@@ -342,6 +342,26 @@ export function App() @{ <input value={draft$.get()} /> }`,
 		expect(server).toContain('ssrSignalValue');
 	});
 
+	it('keeps Strong render calculations in signal-free modules on plain writers', () => {
+		// Strong caches each calculation in a compiler-named local. None of those
+		// names may read as `$` handle syntax.
+		const source = `"use strong";
+		function format(value) {
+			return value.toFixed(1);
+		}
+		export function Range(props) @{
+			<p title={format(props.low) + ' to ' + format(props.high)}>
+				<span>{format(props.low) as string}</span>
+				<span>{format(props.high) as string}</span>
+			</p>
+		}`;
+		const client = compile(source, '/src/strong-calculations.tsrx', {
+			dev: false,
+			hmr: false,
+		}).code;
+		expect(client).not.toMatch(/bindSignal|enableSignalBindings/);
+	});
+
 	it('passes each prop-driven attribute binding its statically selected writer', () => {
 		const source = `import 'octane/signals';
 		export function Link(props) @{

@@ -281,6 +281,24 @@ export function App(props) @{
 		expect(compileToVolarMappings(strong(source), '/src/Reflective.tsrx').diagnostics).toEqual([]);
 	});
 
+	it('keeps host attribute literals in their templates', () => {
+		// Only component props and ref arrays rely on a literal's identity.
+		const source = `export function List(props) @{
+			<ul style={{ margin: 0 }}>
+				@for (const row of props.rows; key row.id) {
+					<li style={{ color: 'red', padding: '4px' }}>{row.label as string}</li>
+				}
+			</ul>
+		}`;
+		const templates = (code: string) =>
+			compile(code, '/src/List.tsrx', {
+				dev: false,
+				hmr: false,
+				inspect: true,
+			}).inspect.templates.map((template: { html: string }) => template.html);
+		expect(templates(strong(source))).toEqual(templates(source));
+	});
+
 	it('retains hashbang syntax when a plain module needs a cache', () => {
 		const source = `#!/usr/bin/env node
 "use strong"; import { useEffect } from 'octane'; export function useOptions(value: string) { const options = { value }; useEffect(() => console.log(options)); }`;
