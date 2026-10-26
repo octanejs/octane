@@ -12,15 +12,17 @@
 //                         the sandbox import map resolves them (Octane's
 //                         public and compiler-only APIs share local blobs)
 //   octane/signals, octane/signals/client → shared local signal runtime blobs
-//   other octane/*      → error (not available in the playground)
+//   other octane/*      → error (not available in the playground, or not
+//                         shipped by the selected published release)
 //   https://esm.sh/*    → allowed verbatim; any other URL → error
 //   any other bare id   → https://esm.sh/<id>?external=octane — `external`
 //                         makes esm.sh leave `import 'octane'` bare so the
 //                         import map pins bindings to the runtime singleton
 //
 // Client-only: load via dynamic import from an effect (never during SSR).
-import { compilePlayground, type CompileDiagnostic } from './playground.ts';
+import { compilePlayground, playgroundCompiler, type CompileDiagnostic } from './playground.ts';
 import { moduleToken } from './playground-sandbox.ts';
+import { RUNTIME_ENTRIES } from './playground-version.ts';
 
 export interface PlaygroundFile {
 	name: string;
@@ -41,13 +43,8 @@ export interface ModuleGraphFailure {
 	error: string;
 }
 
-/** Import specifiers the sandbox import map resolves — leave them bare. */
-const IMPORT_MAP_SPECIFIERS = new Set([
-	'octane',
-	'octane/internal/client',
-	'octane/react',
-	'octane/signals',
-	'octane/signals/client',
+/** Non-Octane import specifiers the sandbox import map resolves — leave them bare. */
+const REACT_SPECIFIERS = new Set([
 	'react',
 	'react/jsx-runtime',
 	'react/jsx-dev-runtime',
@@ -63,14 +60,21 @@ export function isReactHostFile(name: string): boolean {
 const SIBLING_EXTENSIONS = ['', '.tsrx', '.tsx', '.react.tsx'];
 
 // Compilation is re-run on every debounced keystroke; memoize per (name,
-// source) so only the edited file recompiles.
-const compileCache = new Map<string, { source: string; result: CachedCompile }>();
+// source, compiler) so only the edited file recompiles, and switching the
+// Octane version recompiles everything.
+const compileCache = new Map<
+	string,
+	{ source: string; compiler: unknown; result: CachedCompile }
+>();
 type CachedCompile =
 	{ ok: true; code: string; warnings: CompileDiagnostic[] } | { ok: false; error: string };
 
 async function compileFile(file: PlaygroundFile): Promise<CachedCompile> {
+	const compiler = playgroundCompiler();
 	const cached = compileCache.get(file.name);
-	if (cached && cached.source === file.source) return cached.result;
+	if (cached && cached.source === file.source && cached.compiler === compiler) {
+		return cached.result;
+	}
 	let result: CachedCompile;
 	if (isReactHostFile(file.name)) {
 		// React-host files bypass the octane compiler: sucrase strips types and
@@ -94,7 +98,7 @@ async function compileFile(file: PlaygroundFile): Promise<CachedCompile> {
 	} else {
 		result = compilePlayground(file.source, file.name);
 	}
-	compileCache.set(file.name, { source: file.source, result });
+	compileCache.set(file.name, { source: file.source, compiler, result });
 	return result;
 }
 
@@ -108,7 +112,9 @@ async function compileFile(file: PlaygroundFile): Promise<CachedCompile> {
  */
 export function peekCompiledFile(file: PlaygroundFile): CachedCompile | null {
 	const cached = compileCache.get(file.name);
-	return cached && cached.source === file.source ? cached.result : null;
+	return cached && cached.source === file.source && cached.compiler === playgroundCompiler()
+		? cached.result
+		: null;
 }
 
 /** Resolve `./Name[.ext]` against the file set, with extension inference. */
@@ -122,11 +128,13 @@ function resolveSibling(specifier: string, names: Set<string>): string | null {
 
 /**
  * Compile every file and produce the rewritten, dependency-ordered module
- * graph for the sandbox. Never throws.
+ * graph for the sandbox. `runtimeEntries` are the Octane entries the active
+ * runtime provides (a published release may lack newer ones). Never throws.
  */
 export async function buildModuleGraph(
 	files: PlaygroundFile[],
 	entry: string,
+	runtimeEntries: readonly string[] = RUNTIME_ENTRIES,
 ): Promise<ModuleGraph | ModuleGraphFailure> {
 	if (!files.some((f) => f.name === entry)) {
 		return { ok: false, error: `Entry file "${entry}" does not exist.` };
@@ -193,12 +201,14 @@ export async function buildModuleGraph(
 					ok: false,
 					error: `${file.name}: "${specifier}" — only sibling "./File" imports are supported.`,
 				};
-			} else if (IMPORT_MAP_SPECIFIERS.has(specifier)) {
+			} else if (REACT_SPECIFIERS.has(specifier) || runtimeEntries.includes(specifier)) {
 				// Left bare — the sandbox import map owns these.
-			} else if (specifier.startsWith('octane/')) {
+			} else if (specifier === 'octane' || specifier.startsWith('octane/')) {
 				return {
 					ok: false,
-					error: `${file.name}: "${specifier}" is not available in the playground (only bundled client runtime entry points are supported).`,
+					error: (RUNTIME_ENTRIES as readonly string[]).includes(specifier)
+						? `${file.name}: "${specifier}" is not shipped by the selected Octane version.`
+						: `${file.name}: "${specifier}" is not available in the playground (only bundled client runtime entry points are supported).`,
 				};
 			} else if (specifier.startsWith('https://esm.sh/')) {
 				// Already an esm.sh URL — allowed verbatim.
