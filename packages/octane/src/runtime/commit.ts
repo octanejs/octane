@@ -545,9 +545,7 @@ export function placeAtCommit(parent: Node, node: Node, before: Node | null): vo
 	if (!queued) ROOT_RENDER_TRANSACTION.ops.push(placeMarker, node);
 }
 
-// A named function expression: its recursion alone cannot keep it in a bundle
-// that never hydrates.
-const placeMarker = function placeMarker(node: Node): void {
+function placeMarker(node: Node): void {
 	const placement = PENDING_MARKERS?.get(node);
 	if (placement === undefined) return;
 	const [parent, before] = placement;
@@ -555,7 +553,7 @@ const placeMarker = function placeMarker(node: Node): void {
 	// A marker it goes before that is still to be placed lands first.
 	if (before !== null && PENDING_MARKERS!.has(before)) placeMarker(before);
 	parent.insertBefore(node, before);
-};
+}
 
 /** Whether `node` is a marker still to be placed (placeAtCommit). */
 export function markerPending(node: Node): boolean {
