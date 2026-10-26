@@ -718,6 +718,10 @@ jobs:
           # older WebKit revision (which can strand the last streaming fetch chunk).
           pnpm --filter @octanejs/vite-plugin exec node node_modules/playwright-webkit/cli.js install --with-deps webkit
 
+      - name: Run Octane iframe focus regression in WebKit
+        if: ${{ !cancelled() && steps.install_heavy_node_chromium.outcome == 'success' }}
+        run: node --test packages/octane/tests/browser/iframe-focus-preservation.webkit.mjs
+
       # Keep each former lane as a named step, and let independent suites run
       # after a sibling failure when their own prerequisites are still valid.
       - name: Run package-build integration tests

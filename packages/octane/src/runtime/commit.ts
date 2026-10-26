@@ -1298,7 +1298,9 @@ function activeElementForDocument(doc: Document): Element | null {
 			if (focused.localName === 'iframe') {
 				let nested: Document | null;
 				try {
-					nested = (focused as HTMLIFrameElement).contentDocument;
+					const frameWindow = (focused as HTMLIFrameElement).contentWindow;
+					if (frameWindow === null || typeof frameWindow.location.href !== 'string') break;
+					nested = frameWindow.document;
 				} catch {
 					break;
 				}
