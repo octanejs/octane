@@ -1,5 +1,12 @@
 # octane
 
+## 0.16.2
+
+### Patch Changes
+
+- 2ee6063: Omit development-only structural mismatch descriptions from production hydration bundles.
+- c1c5ca5: Allow independent hydration islands to omit generic root return-value handling from their client bundles.
+
 ## 0.16.1
 
 ### Patch Changes
