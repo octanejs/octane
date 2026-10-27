@@ -29,7 +29,10 @@ import {
 	PLAYGROUND_SOURCE_LIMIT_ERROR,
 } from '../src/lib/playground-hash.ts';
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.unstubAllGlobals();
+});
 
 async function renderRoute(url: string) {
 	const router = getRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
@@ -373,6 +376,25 @@ describe('playground sandbox boundary', () => {
 		}
 	});
 
+	it('exposes runtime readiness so a version swap can wait for it', async () => {
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		const preview = createPreview(host, () => {}, { kind: 'esm', imports: {} });
+		try {
+			const iframe = host.querySelector('iframe')!;
+			window.dispatchEvent(
+				new MessageEvent('message', {
+					source: iframe.contentWindow,
+					data: { [PROTOCOL_KEY]: true, type: 'ready', error: 'esm.sh unreachable' },
+				}),
+			);
+			await expect(preview.ready).resolves.toBe('esm.sh unreachable');
+		} finally {
+			preview.destroy();
+			host.remove();
+		}
+	});
+
 	it('reports when a ready iframe never returns a render result', async () => {
 		vi.useFakeTimers();
 		const host = document.createElement('div');
@@ -444,6 +466,25 @@ describe('/playground route', () => {
 
 		// The playground fills the viewport — the layout renders no footer here.
 		expect(container.querySelector('footer')).toBeNull();
+	});
+
+	it('labels the Octane version combobox and defaults it to main', async () => {
+		// The release list and release toolchains come from npm/esm.sh; keep
+		// route tests offline.
+		vi.stubGlobal('fetch', () => new Promise(() => {}));
+		const { container } = await renderRoute('/playground');
+		const input = container.querySelector<HTMLInputElement>('#pg-octane-version');
+		expect(input?.getAttribute('role')).toBe('combobox');
+		expect(container.querySelector('label[for="pg-octane-version"]')?.textContent?.trim()).toBe(
+			'Octane version',
+		);
+		expect(input?.value).toBe('main');
+	});
+
+	it('shows the version a pasted URL requests before its toolchain loads', async () => {
+		vi.stubGlobal('fetch', () => new Promise(() => {}));
+		const { container } = await renderRoute('/playground?version=0.2.7');
+		expect(container.querySelector<HTMLInputElement>('#pg-octane-version')?.value).toBe('0.2.7');
 	});
 
 	it('other routes keep the footer', async () => {

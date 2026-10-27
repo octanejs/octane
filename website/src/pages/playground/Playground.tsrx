@@ -30,6 +30,14 @@
 // pure string work), but it does NOT execute — even in the sandbox — until the
 // visitor explicitly presses "Run" on the consent overlay. Your own edits from
 // the default sources auto-run as before.
+//
+// The `version` query parameter picks the Octane the examples compile and run
+// against (src/lib/playground-version.ts): absent or `main` is the build
+// bundled with this site, anything else an exact npm release loaded from
+// esm.sh. The URL is the source of truth: choosing a version loads its
+// toolchain first and only then writes the URL, and a URL change (history,
+// a pasted link) loads whatever it names. A failed load keeps the running
+// toolchain and preview; it never falls back to another version.
 'use strong';
 
 import {
@@ -41,7 +49,7 @@ import {
 	useLinkedState,
 } from 'octane';
 import type { CompileDiagnostic } from 'octane/compiler';
-import { useNavigate } from '@octanejs/tanstack-router/compiled';
+import { useNavigate, useSearch } from '@octanejs/tanstack-router/compiled';
 import type {
 	PlaygroundLang,
 	PlaygroundOutputTarget,
@@ -54,7 +62,9 @@ import {
 	PLAYGROUND_SOURCE_LIMIT_ERROR,
 } from '../../lib/playground-hash.ts';
 import * as pgExamples from '../../lib/playground-examples.ts';
+import { MAIN_VERSION } from '../../lib/playground-version.ts';
 import { useTitle } from '../../hooks/use-title.ts';
+import { PlaygroundVersionCombobox } from './PlaygroundVersionCombobox.tsrx';
 
 const { EXAMPLES, CUSTOM_EXAMPLE_ID, DEFAULT_EXAMPLE_ID } = pgExamples;
 
@@ -119,6 +129,29 @@ export function Playground() @{
 			hashScrollIntoView: false,
 		}),
 	);
+	const search = useSearch({ strict: false }) as Record<string, unknown>;
+	const versionParam = search.version == null ? '' : String(search.version);
+	const writeVersion = useEffectEvent((version: string) =>
+		navigate({
+			to: '.',
+			search: (prev: Record<string, unknown>) => ({
+				...prev,
+				version: version === MAIN_VERSION ? undefined : version,
+			}),
+			hash: true,
+			resetScroll: false,
+			hashScrollIntoView: false,
+		}),
+	);
+	// The version the editor stack is running (null until the first load
+	// succeeds), the one loading, and why the last load failed.
+	// `versionParamRef` hands the URL's request to the boot closure, which
+	// applies it before its first compile.
+	const [activeVersion, setActiveVersion] = useState<string | null>(null);
+	const [versionLoading, setVersionLoading] = useState<string | null>(null);
+	const [versionError, setVersionError] = useState('');
+	const [releases, setReleases] = useState<string[] | null>(null);
+	const versionParamRef = useRef(versionParam);
 	const [lang, setLang] = useState<PlaygroundLang>('tsrx');
 	const [view, setView] = useState<'preview' | 'compiled'>('preview');
 	// Which compiler artifact the right pane shows.
@@ -179,6 +212,9 @@ export function Playground() @{
 		approveRun?: () => void;
 		syncOutput?: () => void;
 		revealAst?: () => void;
+		loadVersion?: (param: string, fromUrl: boolean) => void;
+		loadReleases?: () => void;
+		retryVersion?: () => void;
 	}>({});
 
 	const selectView = (next: 'preview' | 'compiled') => {
@@ -225,6 +261,11 @@ export function Playground() @{
 	});
 
 	useEffect(() => {
+		versionParamRef.current = versionParam;
+		controllerRef.current.loadVersion?.(versionParam, true);
+	});
+
+	useEffect(() => {
 		const sourceHost = sourceHostRef.current;
 		const outputHost = outputHostRef.current;
 		const astHost = astHostRef.current;
@@ -236,6 +277,8 @@ export function Playground() @{
 		let outputView: any;
 		let astPreview: any;
 		let preview: any = null;
+		// A version's sandbox while it boots hidden, before it replaces `preview`.
+		let stagedPreview: any = null;
 		let compileDebounceId = 0;
 		let hashDebounceId = 0;
 		// Validate the URL payload before loading CodeMirror, Shiki, or the
@@ -245,9 +288,9 @@ export function Playground() @{
 
 		(async () => {
 			let stateMod: any, commandsMod: any, viewMod: any, shikiMod: any, pg: any, pgModules: any;
-			let pgMapping: any, pgAst: any;
+			let pgMapping: any, pgAst: any, pgVersion: any;
 			try {
-				[stateMod, commandsMod, viewMod, shikiMod, pg, pgModules, pgMapping, pgAst] =
+				[stateMod, commandsMod, viewMod, shikiMod, pg, pgModules, pgMapping, pgAst, pgVersion] =
 					await Promise.all([
 						import('@codemirror/state'),
 						import('@codemirror/commands'),
@@ -257,6 +300,7 @@ export function Playground() @{
 						import('../../lib/playground-modules.ts'),
 						import('../../lib/playground-mapping.ts'),
 						import('../../lib/playground-ast.ts'),
+						import('../../lib/playground-version.ts'),
 					]);
 			} catch (bootError) {
 				// A load failure after unmount (e.g. a test env torn down mid-import)
@@ -379,9 +423,12 @@ export function Playground() @{
 				'.cm-cursor': { borderLeftColor: 'var(--text)' },
 			});
 
-			preview = pg.createPreview(previewHost, (message: string) => {
+			// The running toolchain. Null until the URL's version has loaded, so a
+			// requested release never compiles or runs on main in the meantime.
+			let toolchain: { version: string; runtimeEntries: readonly string[] } | null = null;
+			const onRuntimeError = (message: string) => {
 				if (!disposed) setError(message);
-			});
+			};
 
 			const replaceDoc = (view: any, doc: string) => {
 				view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: doc } });
@@ -604,6 +651,9 @@ export function Playground() @{
 				// re-tokenize of the output document. syncOutput re-runs this when
 				// the pane is revealed, so it refreshes exactly once, on demand.
 				if (resultModeRef.current.view !== 'compiled') return null;
+				// Until the requested version's compiler has loaded there is no
+				// output to show — compiling with main would mislabel it.
+				if (!toolchain) return null;
 				if (resultModeRef.current.compiledMode === 'ast') {
 					const { entry, error } = astEntry(currentFile);
 					if (entry && entry.ast !== lastShownAst?.ast) {
@@ -904,7 +954,8 @@ export function Playground() @{
 					setError(PLAYGROUND_SOURCE_LIMIT_ERROR);
 					return;
 				}
-				const graph = await pgModules.buildModuleGraph(wsFiles, entry);
+				if (!toolchain) return;
+				const graph = await pgModules.buildModuleGraph(wsFiles, entry, toolchain.runtimeEntries);
 				if (disposed || seq !== compileSeq) return;
 				// Compiler artifacts describe the active source file, independently of
 				// whether another workspace file prevents the runnable module graph
@@ -924,7 +975,7 @@ export function Playground() @{
 				// While a shared payload is gated, everything except EXECUTION
 				// happens — the visitor can inspect source and compiled output.
 				if (executionGated) return;
-				void preview.run(graph).then((r: { error: string | null }) => {
+				await preview.run(graph).then((r: { error: string | null }) => {
 					if (!disposed && r.error) setError(r.error);
 				});
 			};
@@ -1185,11 +1236,152 @@ export function Playground() @{
 				astPreview.reveal(sourceView.state.selection.main.head, true);
 			};
 
+			// Loads `param`'s compiler and runtime, then swaps both in and
+			// recompiles the workspace into a fresh preview (an import map cannot
+			// change once the sandbox has loaded a module). The new sandbox boots
+			// in a hidden slot and replaces the running one only once its runtime
+			// has loaded, so any failure — compiler or runtime — keeps the running
+			// toolchain and preview. The first load has nothing to keep, so it
+			// installs at once and compiles while the sandbox boots. The newest
+			// request wins. A selection writes
+			// the URL only after its load succeeds; a URL change never writes it
+			// back.
+			let versionSeq = 0;
+			let loadingVersion: string | null = null;
+			let failedVersion: { param: string; fromUrl: boolean } | null = null;
+			let previewSlot: HTMLElement | null = null;
+			const loadVersion = async (param: string, fromUrl: boolean) => {
+				const parsed = pgVersion.parseVersionParam(param);
+				const wanted = parsed.ok ? parsed.version : null;
+				// Already loading this version (e.g. the URL write that follows a
+				// selection): let that load finish.
+				if (wanted !== null && wanted === loadingVersion) return;
+				if (wanted !== null && wanted === toolchain?.version) {
+					// Back on the running version — drop a load of another one.
+					versionSeq++;
+					loadingVersion = null;
+					failedVersion = null;
+					setVersionLoading(null);
+					setVersionError('');
+					return;
+				}
+				const seq = ++versionSeq;
+				loadingVersion = wanted;
+				const fail = (message: string) => {
+					loadingVersion = null;
+					failedVersion = { param, fromUrl };
+					setVersionLoading(null);
+					setVersionError(message);
+				};
+				if (!parsed.ok) return fail(parsed.error);
+				setVersionLoading(wanted);
+				setVersionError('');
+				let next: any;
+				try {
+					next =
+						wanted === pgVersion.MAIN_VERSION
+							? {
+									version: wanted,
+									compiler: pg.MAIN_COMPILER,
+									runtime: { kind: 'manifest' },
+								}
+							: await pgVersion.loadReleaseToolchain(wanted);
+				} catch (loadError) {
+					if (disposed || seq !== versionSeq) return;
+					return fail(loadError instanceof Error ? loadError.message : String(loadError));
+				}
+				if (disposed || seq !== versionSeq) return;
+				const slot = previewHost.ownerDocument.createElement('div');
+				slot.style.cssText = 'height:100%;';
+				previewHost.appendChild(slot);
+				const nextPreview = pg.createPreview(slot, onRuntimeError, next.runtime);
+				const staging = toolchain !== null;
+				if (staging) {
+					slot.style.display = 'none';
+					stagedPreview = nextPreview;
+				}
+				const readyError = staging ? await nextPreview.ready : null;
+				if (stagedPreview === nextPreview) stagedPreview = null;
+				if (disposed || seq !== versionSeq || readyError) {
+					nextPreview.destroy();
+					slot.remove();
+					if (readyError && !disposed && seq === versionSeq) fail(readyError);
+					return;
+				}
+				failedVersion = null;
+				pg.setPlaygroundCompiler(next.compiler);
+				toolchain = {
+					version: next.version,
+					runtimeEntries:
+						next.runtime.kind === 'esm'
+							? Object.keys(next.runtime.imports)
+							: pgVersion.RUNTIME_ENTRIES,
+				};
+				preview?.destroy();
+				previewSlot?.remove();
+				preview = nextPreview;
+				previewSlot = slot;
+				slot.style.display = '';
+				typesCache.clear();
+				runtimeCache.clear();
+				reactCache.clear();
+				lastShownCode = null;
+				lastShownAst = null;
+				setActiveVersion(next.version);
+				if (!fromUrl) void writeVersion(next.version);
+				window.clearTimeout(compileDebounceId);
+				// The status stays up until the new sandbox has run the workspace:
+				// a release's runtime is still downloading from esm.sh until then.
+				await compileAndRun();
+				if (!disposed && seq === versionSeq) {
+					loadingVersion = null;
+					setVersionLoading(null);
+				}
+			};
+			controllerRef.current.loadVersion = (param, fromUrl) => {
+				if (!disposed) void loadVersion(param, fromUrl);
+			};
+
+			// The release list is fetched from npm when the picker first opens, so
+			// a visit that never opens it makes no registry request.
+			let releasesState: 'idle' | 'loading' | 'loaded' | 'failed' = 'idle';
+			const loadReleases = () => {
+				if (releasesState === 'loading' || releasesState === 'loaded') return;
+				releasesState = 'loading';
+				pgVersion.fetchReleases().then(
+					(list: string[]) => {
+						releasesState = 'loaded';
+						if (!disposed) setReleases(list);
+					},
+					(fetchError: unknown) => {
+						releasesState = 'failed';
+						if (disposed) return;
+						setReleases([]);
+						setVersionError(
+							'Could not load the Octane release list: ' +
+								(fetchError instanceof Error ? fetchError.message : String(fetchError)),
+						);
+					},
+				);
+			};
+			controllerRef.current.loadReleases = () => {
+				if (!disposed) loadReleases();
+			};
+			controllerRef.current.retryVersion = () => {
+				if (disposed) return;
+				if (releasesState === 'failed') {
+					setReleases(null);
+					setVersionError('');
+					loadReleases();
+				}
+				if (failedVersion) void loadVersion(failedVersion.param, failedVersion.fromUrl);
+			};
+
 			publishWorkspaceState();
-			void compileAndRun().then(() => {
+			setReady(true);
+			void loadVersion(versionParamRef.current, true).then(() => {
 				if (!disposed && paneRef.current === 'result') controllerRef.current.revealAst?.();
 			});
-			setReady(true);
 		})();
 
 		return () => {
@@ -1201,12 +1393,16 @@ export function Playground() @{
 			controllerRef.current.approveRun = undefined;
 			controllerRef.current.syncOutput = undefined;
 			controllerRef.current.revealAst = undefined;
+			controllerRef.current.loadVersion = undefined;
+			controllerRef.current.loadReleases = undefined;
+			controllerRef.current.retryVersion = undefined;
 			window.clearTimeout(compileDebounceId);
 			window.clearTimeout(hashDebounceId);
 			sourceView?.destroy();
 			outputView?.destroy();
 			astPreview?.destroy();
 			preview?.destroy();
+			stagedPreview?.destroy();
 		};
 	});
 
@@ -1635,6 +1831,9 @@ export function Playground() @{
 					width: 100%;
 					min-width: 0;
 				}
+				.pg-version {
+					grid-column: 1 / -1;
+				}
 				.pg-toolbar-side .pg-seg {
 					padding: 2px;
 				}
@@ -1745,6 +1944,18 @@ export function Playground() @{
 					>
 						{(formatting ? 'Formatting…' : 'Format') as string}
 					</button>
+					<div class="pg-version">
+						<PlaygroundVersionCombobox
+							value={activeVersion ?? (versionParam || MAIN_VERSION)}
+							releases={releases}
+							loading={versionLoading}
+							error={versionError}
+							disabled={!ready}
+							onOpen={() => controllerRef.current.loadReleases?.()}
+							onSelect={(version: string) => controllerRef.current.loadVersion?.(version, false)}
+							onRetry={() => controllerRef.current.retryVersion?.()}
+						/>
+					</div>
 				</div>
 				<div class="pg-seg pg-view-switch" role="group" aria-label="Result view">
 					<button
