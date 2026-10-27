@@ -4,6 +4,7 @@ import {
 	createPortal,
 	startTransition,
 	use,
+	useEffect,
 	useLayoutEffect,
 	useRef,
 	useState,
@@ -198,6 +199,38 @@ export function ActivityApp(props: ActivityProps) @{
 	<main>
 		<Activity mode={props.mode}>
 			<ActivityLeaf label={props.label} log={props.log} />
+		</Activity>
+		@if (props.gate) {
+			<Gate gate={props.gate} />
+		}
+	</main>
+}
+
+export interface ActivityCounterProps {
+	mode: 'visible' | 'hidden';
+	gate?: PromiseLike<unknown>;
+	log: (entry: string) => void;
+}
+
+function ActivityCounter(props: { log: (entry: string) => void }) @{
+	const [count, setCount] = useState(0);
+	useLayoutEffect(() => {
+		props.log('layout:' + count);
+	}, [count]);
+	useEffect(() => {
+		props.log('passive:' + count);
+	}, [count]);
+	<button id="activity-counter" onClick={() => setCount(count + 1)}>
+		{'' + count}
+	</button>
+}
+
+// Activity content that takes its own update while a sibling holds a render
+// that changes the Activity's visibility.
+export function ActivityCounterApp(props: ActivityCounterProps) @{
+	<main>
+		<Activity mode={props.mode}>
+			<ActivityCounter log={props.log} />
 		</Activity>
 		@if (props.gate) {
 			<Gate gate={props.gate} />
