@@ -50,7 +50,7 @@ export function App() @{
 	<Theme value="dark"><Label /></Theme>
 }`,
 	'entry.ts': `export { App, store } from './App.tsrx';
-export { flushSync, hydrateRoot } from 'octane';`,
+export { act, flushSync, hydrateRoot } from 'octane';`,
 	'entry.server.ts': `export { App } from './App.tsrx';
 export { renderToString } from 'octane/server';`,
 };
@@ -128,12 +128,14 @@ describe('plain .ts custom hooks through Vite SSR', () => {
 			try {
 				window.document.body.innerHTML = `<div id="host">${html}</div>`;
 				window.eval(client);
+				// The store subscribes in a passive effect, which runs after an animation
+				// frame and a message. act() drains it; a fixed delay can lose that race.
 				const result = await window.eval(`(async () => {
- const { App, store, flushSync, hydrateRoot } = fixture;
+ const { App, act, store, flushSync, hydrateRoot } = fixture;
  const host = document.querySelector('#host'), server = host.querySelector('p'), errors = [];
  const rendered = { text: server.textContent, id: server.id !== '' };
  const root = hydrateRoot(host, App, {}, { onRecoverableError: (error) => errors.push(String(error)) });
- await new Promise((done) => setTimeout(done, 20));
+ await act(() => {});
  const hydrated = { html: host.innerHTML, adopted: host.querySelector('p') === server, errors };
  flushSync(() => store.set('client'));
  const updated = host.textContent;
