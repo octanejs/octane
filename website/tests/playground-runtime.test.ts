@@ -156,4 +156,42 @@ globalThis.__playgroundMemo = { render, computed, dispose: () => root.unmount() 
 			rmSync(directory, { recursive: true, force: true });
 		}
 	});
+
+	it('maps a published release to its esm.sh entries and drops non-esm.sh URLs', async () => {
+		const dom = new JSDOM(sandboxSrcdoc(), { runScripts: 'dangerously' });
+		try {
+			const ready = new Promise<void>((resolve) => {
+				dom.window.addEventListener('message', (event: MessageEvent) => {
+					if (event.data?.[PROTOCOL_KEY] === true && event.data.type === 'ready') resolve();
+				});
+			});
+			const octane = 'https://esm.sh/octane@0.16.0?external=react,react-dom';
+			const internal = 'https://esm.sh/octane@0.16.0/internal/client?external=react,react-dom';
+			dom.window.dispatchEvent(
+				new dom.window.MessageEvent('message', {
+					source: dom.window.parent,
+					data: {
+						[PROTOCOL_KEY]: true,
+						type: 'init',
+						imports: {
+							octane,
+							'octane/internal/client': internal,
+							'octane/signals': 'https://evil.example/octane.js',
+						},
+					},
+				}),
+			);
+			const map = JSON.parse(
+				dom.window.document.querySelector('script[type="importmap"]')!.textContent!,
+			);
+			expect(map.imports.octane).toBe(octane);
+			expect(map.imports['octane/internal/client']).toBe(internal);
+			expect(map.imports['octane/signals']).toBeUndefined();
+			expect(map.imports.react).toMatch(/^https:\/\/esm\.sh\/react@/);
+			// jsdom cannot import from esm.sh; the bootstrap still reports ready.
+			await ready;
+		} finally {
+			dom.window.close();
+		}
+	});
 });

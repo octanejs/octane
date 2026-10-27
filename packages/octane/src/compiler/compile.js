@@ -4065,7 +4065,9 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates, literalsO
 				return attribute;
 			if (!component && /^on[A-Z]/.test(name)) return attribute;
 			if (attribute.value?.type !== 'JSXExpressionContainer') return attribute;
-			const value = visitContainer(attribute.value, true, deferred);
+			// Only component props and ref arrays rely on a literal's identity. Host
+			// attributes keep the default lowering, so a static one stays in the template.
+			const value = visitContainer(attribute.value, true, deferred, component || name === 'ref');
 			return value === attribute.value ? attribute : { ...attribute, value };
 		});
 		// Component children own evaluation. Discover named reads without moving
@@ -4079,7 +4081,7 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates, literalsO
 		};
 	}
 
-	function visitContainer(container, prop = false, deferred = false) {
+	function visitContainer(container, prop = false, deferred = false, literal = false) {
 		const expression = container.expression;
 		const inner = unwrapTsExpr(expression);
 		if (!inner || inner.type === 'JSXEmptyExpression' || containsJsxNode(inner)) return container;
@@ -4099,7 +4101,7 @@ function hoistStrongRenderCalculations(jsxNodes, ctx, immutableStates, literalsO
 		if (
 			calculation === null ||
 			((literalsOnly || !ctx.strongMemo) && !calculation.literal) ||
-			(calculation.literal && !prop)
+			(calculation.literal && !literal)
 		) {
 			return container;
 		}
@@ -4679,7 +4681,8 @@ function allocCompilerName(ctx, preferred) {
 		const suffixes = (ctx.compilerNameSuffixes ??= new Map());
 		let suffix = suffixes.get(preferred) ?? 1;
 		do {
-			name = suffix === 1 ? `${preferred}$` : `${preferred}$${suffix}`;
+			// A suffix never ends the name in `$`, which is signal-handle syntax.
+			name = `${preferred}$${suffix}`;
 			suffix++;
 		} while (ctx.usedCompilerNames.has(name));
 		suffixes.set(preferred, suffix);

@@ -12,6 +12,10 @@
 // boundary. Multi-file graphs and third-party esm.sh imports are prepared by
 // playground-modules.ts.
 //
+// The compiler is swappable: `main` uses the bundled one imported below, and
+// playground-version.ts installs a published release's compiler through
+// `setPlaygroundCompiler` alongside that release's sandbox runtime.
+//
 // Client-only: load via dynamic import from an effect (never during SSR).
 import { compile, type CompileDiagnostic } from 'octane/compiler';
 import { compileTypesInspection } from 'octane/compiler/volar';
@@ -20,10 +24,24 @@ import {
 	RUNTIME_MANIFEST_PATH,
 	PROTOCOL_KEY,
 	type RuntimeManifest,
+	type RuntimeSource,
 } from './playground-sandbox.ts';
 import type { InspectAlias, InspectSegment, InspectTemplate } from './playground-mapping.ts';
+import type { PlaygroundCompiler } from './playground-version.ts';
 
 export type { CompileDiagnostic };
+
+export const MAIN_COMPILER: PlaygroundCompiler = { compile, compileTypesInspection };
+let activeCompiler = MAIN_COMPILER;
+
+/** The compiler every compile below uses; identity changes when the version does. */
+export function playgroundCompiler(): PlaygroundCompiler {
+	return activeCompiler;
+}
+
+export function setPlaygroundCompiler(compiler: PlaygroundCompiler): void {
+	activeCompiler = compiler;
+}
 
 export type PlaygroundLang = 'tsrx' | 'tsx';
 export type PlaygroundRuntimeTarget = 'client' | 'server';
@@ -51,7 +69,7 @@ export function compilePlayground(
 	mode: PlaygroundRuntimeTarget = 'client',
 ): CompileSuccess | CompileFailure {
 	try {
-		const out = compile(source, filename, { mode });
+		const out = activeCompiler.compile(source, filename, { mode });
 		return { ok: true, code: out.code, warnings: out.diagnostics };
 	} catch (error) {
 		return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -95,7 +113,7 @@ export function compileRuntime(
 	mode: PlaygroundRuntimeTarget,
 ): RuntimeSuccess | CompileFailure {
 	try {
-		const result = compile(source, filename, { mode, inspect: true });
+		const result = activeCompiler.compile(source, filename, { mode, inspect: true });
 		if (!result.inspect) throw new Error('Compiler inspection result is unavailable.');
 		const { ast, templates, segments, aliases } = result.inspect;
 		return {
@@ -135,7 +153,9 @@ export function compileRuntime(
  */
 export function compileTypes(source: string, filename: string): TypesSuccess | CompileFailure {
 	try {
-		const out = compileTypesInspection(source, filename);
+		const inspectTypes = activeCompiler.compileTypesInspection;
+		if (!inspectTypes) throw new Error('This Octane version has no types inspection.');
+		const out = inspectTypes(source, filename);
 		return {
 			ok: true,
 			code: out.code,
@@ -158,6 +178,8 @@ export interface RunPayload {
 }
 
 export interface Preview {
+	/** Resolves once the sandbox has loaded its runtime: null, or why it could not. */
+	ready: Promise<string | null>;
 	/** Execute a compiled playground module graph and render its entry component. Never throws. */
 	run(payload: RunPayload): Promise<{ error: string | null }>;
 	destroy(): void;
@@ -176,6 +198,7 @@ export const PREVIEW_RUN_TIMEOUT_MS = 10_000;
 export function createPreview(
 	container: Element,
 	onRuntimeError: (message: string) => void,
+	runtime: RuntimeSource = { kind: 'manifest' },
 ): Preview {
 	const doc = container.ownerDocument;
 	const win = doc.defaultView!;
@@ -246,7 +269,12 @@ export function createPreview(
 							// case the toggle flipped before the sandbox started listening.
 							send({ type: 'theme', theme: currentTheme() });
 							// Sandbox is listening — hand it the runtime chunk manifest (it
-							// cannot fetch same-origin resources itself; see sandbox notes).
+							// cannot fetch same-origin resources itself; see sandbox notes),
+							// or a published release's esm.sh entry URLs.
+							if (runtime.kind === 'esm') {
+								send({ type: 'init', imports: runtime.imports });
+								break;
+							}
 							fetch(RUNTIME_MANIFEST_PATH)
 								.then((res) => {
 									if (!res.ok) throw new Error(`${RUNTIME_MANIFEST_PATH} → HTTP ${res.status}`);
@@ -298,6 +326,7 @@ export function createPreview(
 	}
 
 	return {
+		ready,
 		async run(payload) {
 			const gen = ++generation;
 			const readyError = await ready;

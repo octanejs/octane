@@ -659,7 +659,7 @@ catalogs:
       version: 19.2.18
     '@types/react-dom':
       specifier: ^19.2.3
-      version: 19.2.4
+      version: 19.2.7
     '@types/stylis':
       specifier: ^4.2.7
       version: 4.2.7
@@ -10962,6 +10962,9 @@ importers:
       '@codemirror/view':
         specifier: catalog:default
         version: 6.43.6
+      '@octanejs/base-ui':
+        specifier: workspace:*
+        version: link:../packages/base-ui
       '@octanejs/devtools':
         specifier: workspace:*
         version: link:../packages/devtools
@@ -15940,6 +15943,7 @@ packages:
   '@opentelemetry/sdk-trace-web@2.10.0':
     resolution: {integrity: sha512-6WqXdWSlBH0GNjDhv1gg6SLVtMtIBVhLaWqd1hiKSXS8meXXP13sVPQoYFHz1uVo0feUTUCdP9vMS54KflisAw==}
     engines: {node: ^18.19.0 || >=20.6.0}
+    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': '>=1.0.0 <1.10.0'
 

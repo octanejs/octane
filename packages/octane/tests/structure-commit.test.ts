@@ -4,6 +4,7 @@ import { act, mount, type MountResult } from './_helpers';
 import {
 	RetireList,
 	ActivityApp,
+	ActivityCounterApp,
 	ArmSwapApp,
 	type ArmSwapControls,
 	BoundaryArmsApp,
@@ -15,6 +16,7 @@ import {
 	ResumeApp,
 	SelectProbeApp,
 	StructureApp,
+	type ActivityCounterProps,
 	type ActivityProps,
 	type BoundaryArmsProps,
 	type ListProps,
@@ -725,6 +727,46 @@ describe('Activity visibility changes at commit', () => {
 					expect(log).toEqual([from === 'visible' ? 'mount' : 'unmount']);
 				} finally {
 					observer.disconnect();
+					app.unmount();
+				}
+			});
+		}
+	}
+
+	// Content inside the Activity keeps the committed visibility while the
+	// render that changes it is held: a visible Activity runs the effects of an
+	// update it accepts, and a hidden one keeps them disconnected (#1351).
+	for (const priority of ['urgent', 'transition'] as const) {
+		for (const [from, to] of [
+			['visible', 'hidden'],
+			['hidden', 'visible'],
+		] as const) {
+			it(`an update inside a ${from} Activity ${from === 'visible' ? 'runs' : 'skips'} its effects while the ${priority} render to ${to} is held`, async () => {
+				const log: string[] = [];
+				const initial: ActivityCounterProps = { mode: from, log: (entry) => log.push(entry) };
+				const app = mount(ActivityCounterApp, initial);
+				try {
+					await act(() => {});
+					const counter = app.find('#activity-counter') as HTMLElement;
+					log.length = 0;
+
+					await act(() => {
+						const next = () =>
+							app.root.render(ActivityCounterApp, {
+								...initial,
+								mode: to,
+								gate: new Promise(() => {}),
+							});
+						if (priority === 'transition') startTransition(next);
+						else next();
+					});
+					expect(log).toEqual([]);
+
+					await act(() => counter.click());
+					expect(counter.textContent).toBe('1');
+					expect(counter.style.display).toBe(from === 'visible' ? '' : 'none');
+					expect(log).toEqual(from === 'visible' ? ['layout:1', 'passive:1'] : []);
+				} finally {
 					app.unmount();
 				}
 			});

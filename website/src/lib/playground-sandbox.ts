@@ -21,6 +21,8 @@
 //                                                (the entries/order/files JSON
 //                                                the vite plugin serves at
 //                                                RUNTIME_MANIFEST_PATH), once
+//   parent → iframe  { type: 'init', imports }   or, for a published release,
+//                                                esm.sh URLs per runtime entry
 //   parent → iframe  { type: 'run', gen, entry, entryKind, modules }
 //                                                compiled user module graph in
 //                                                dependency order
@@ -78,6 +80,15 @@ export interface RuntimeManifest {
 	files: Record<string, string>;
 }
 
+/**
+ * Where the sandbox gets Octane's runtime: the bundled chunk manifest (main),
+ * or exact esm.sh URLs per runtime entry (a published release). A release
+ * may lack newer entries; compiled imports of those fail in
+ * playground-modules.ts before anything runs.
+ */
+export type RuntimeSource =
+	{ kind: 'manifest' } | { kind: 'esm'; imports: Partial<Record<string, string>> };
+
 /** Wraps a sibling-file module name into its rewritten-specifier token. */
 export function moduleToken(name: string): string {
 	return `__pg_module:${name}__`;
@@ -130,17 +141,29 @@ window.addEventListener('message', async (event) => {
 		return;
 	}
 
-	if (msg.type === 'init' && !octane && msg.manifest) {
+	if (msg.type === 'init' && !octane && (msg.manifest || msg.imports)) {
 		try {
-			const { entries, order, files } = msg.manifest;
-			// Blob-ify the runtime chunks dependencies-first, splicing each file's
-			// "./name.mjs" specifiers to the already-created blob URLs.
-			const blobs = Object.create(null);
-			for (const name of order) {
-				const code = files[name].replace(/(["'])\\.\\/([\\w.-]+\\.mjs)\\1/g, (m, _q, dep) =>
-					blobs[dep] ? JSON.stringify(blobs[dep]) : m,
-				);
-				blobs[name] = toBlobUrl(code);
+			// A published release arrives as exact esm.sh URLs (the CSP already
+			// admits esm.sh); main arrives as the bundled chunk manifest.
+			const octaneImports = Object.create(null);
+			if (msg.imports) {
+				for (const [name, url] of Object.entries(msg.imports)) {
+					if (typeof url === 'string' && url.startsWith('https://esm.sh/')) {
+						octaneImports[name] = url;
+					}
+				}
+			} else {
+				const { entries, order, files } = msg.manifest;
+				// Blob-ify the runtime chunks dependencies-first, splicing each file's
+				// "./name.mjs" specifiers to the already-created blob URLs.
+				const blobs = Object.create(null);
+				for (const name of order) {
+					const code = files[name].replace(/(["'])\\.\\/([\\w.-]+\\.mjs)\\1/g, (m, _q, dep) =>
+						blobs[dep] ? JSON.stringify(blobs[dep]) : m,
+					);
+					blobs[name] = toBlobUrl(code);
+				}
+				for (const name of Object.keys(entries)) octaneImports[name] = blobs[entries[name]];
 			}
 			// Install the import map BEFORE the first module load (see header).
 			const esm = (path) => 'https://esm.sh/' + path;
@@ -148,11 +171,7 @@ window.addEventListener('message', async (event) => {
 			map.type = 'importmap';
 			map.textContent = JSON.stringify({
 				imports: {
-					octane: blobs[entries['octane']],
-					'octane/internal/client': blobs[entries['octane/internal/client']],
-					'octane/react': blobs[entries['octane/react']],
-					'octane/signals': blobs[entries['octane/signals']],
-					'octane/signals/client': blobs[entries['octane/signals/client']],
+					...octaneImports,
 					react: esm('react@' + REACT_VERSION),
 					'react/jsx-runtime': esm('react@' + REACT_VERSION + '/jsx-runtime'),
 					'react/jsx-dev-runtime': esm('react@' + REACT_VERSION + '/jsx-dev-runtime'),

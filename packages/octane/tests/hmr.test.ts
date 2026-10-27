@@ -1729,10 +1729,10 @@ describe('hmr — runtime wrapper', () => {
 			const _$hookSlots = 'user helper';
 			export function helper() { const _h$0 = 'user site'; return useState(1); }`;
 		const full = compile(source, 'slot-names.tsrx', { hmr: false }).code;
-		expect(full).toContain('hookSlots as _$hookSlots$');
-		expect(full).toContain('const _hs$$ = /* @__PURE__ */ _$hookSlots$(1);');
-		expect(full).toMatch(/const _h\$0\$ = \/\* @__PURE__ \*\/ Symbol\(_hs\$\$\);/);
-		expect(full).toContain('useStateWithGetter(1, _h$0$)');
+		expect(full).toContain('hookSlots as _$hookSlots$1');
+		expect(full).toContain('const _hs$$1 = /* @__PURE__ */ _$hookSlots$1(1);');
+		expect(full).toMatch(/const _h\$0\$1 = \/\* @__PURE__ \*\/ Symbol\(_hs\$\$1\);/);
+		expect(full).toContain('useStateWithGetter(1, _h$0$1)');
 
 		const { slotHooks } = await import('../src/compiler/slot-hooks.js');
 		const surgical = slotHooks(source, 'slot-names.ts')!.code;
@@ -1752,8 +1752,8 @@ describe('hmr — runtime wrapper', () => {
 			}`;
 		for (const mode of ['client', 'server'] as const) {
 			const code = compile(source, `slot-helper-${mode}.tsrx`, { mode, hmr: false }).code;
-			expect(code).toContain('hookSlots as _$hookSlots$');
-			expect(code).toContain('/* @__PURE__ */ _$hookSlots$(1)');
+			expect(code).toContain('hookSlots as _$hookSlots$1');
+			expect(code).toContain('/* @__PURE__ */ _$hookSlots$1(1)');
 		}
 	});
 });
