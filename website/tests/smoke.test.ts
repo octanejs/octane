@@ -539,6 +539,7 @@ describe('website routes', () => {
 		expect(container.querySelector('.prose h1')?.textContent?.trim()).toBe(doc.title);
 		expect(container.querySelectorAll('.prose .doc-hero')).toHaveLength(1);
 		expect(container.querySelector('.prose .doc-lede')?.textContent?.trim()).toBeTruthy();
+		expect(container.querySelector('.prose p.doc-lede p')).toBeNull();
 		expect(doc.sections?.length).toBeGreaterThan(0);
 		const toc = container.querySelector('nav[aria-label="On this page"]')!;
 		const sidebar = container.querySelector('.sidebar-nav')!;
