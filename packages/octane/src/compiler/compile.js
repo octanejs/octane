@@ -1781,6 +1781,7 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'createHostElement',
 	'enableDescriptorFormActions',
 	'enableDescriptorFragmentRefs',
+	'enableHostDescriptors',
 	'isRenderCall',
 	'deferRecord',
 	'bindSignalText',
@@ -26176,9 +26177,13 @@ function descriptorTagKind(ctx, nameNode, componentTag) {
 // Descriptor hosts reach a function form action, and Fragment descriptors a ref,
 // only through the element factory that built them. Compiled JSX names its props
 // statically, so it installs a capability only when a prop or spread can select
-// it; public factories install every capability themselves.
+// it; public factories install every capability themselves. A host tag's
+// factory installs the host renderer itself; a tag that may resolve to a host
+// string at runtime installs it here, so component-only modules never name it.
 function classifyDescriptorCapabilities(ctx, nameNode, componentTag, attrs) {
 	if (ctx.mode === 'server') return; // the server renders descriptors without installers
+	const kind = descriptorTagKind(ctx, nameNode, componentTag);
+	if (kind === 'dynamic') addDescriptorCapability(ctx, 'enableHostDescriptors');
 	let spread = false;
 	let action = false;
 	let ref = false;
@@ -26191,7 +26196,6 @@ function classifyDescriptorCapabilities(ctx, nameNode, componentTag, attrs) {
 		}
 	}
 	if (!spread && !action && !ref) return;
-	const kind = descriptorTagKind(ctx, nameNode, componentTag);
 	if (kind === 'component') return; // props reach a component, never a host or Fragment
 	if (kind !== 'fragment' && (action || spread))
 		addDescriptorCapability(ctx, 'enableDescriptorFormActions');
@@ -36372,14 +36376,16 @@ function isImmutableComponentTag(tag, ctx) {
 }
 
 // A module `const` initialized by Octane's `lazy()` always holds the lazy
-// wrapper, a function, so its call sites never resolve a host string at runtime
-// and can skip the generic entry's dynamic-tag capability.
-function isLazyComponentTag(tag, ctx) {
+// wrapper, and a module function declaration the module never reassigns always
+// holds that function, so their call sites never resolve a host string at
+// runtime and can skip the generic entry's dynamic-tag capability.
+function isFunctionComponentTag(tag, ctx) {
 	if (tag?.type !== 'JSXIdentifier' && tag?.type !== 'Identifier') return false;
 	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
 	const scope = lexical.nodeScopes.get(tag);
 	if (scope === undefined || lexical.resolveBinding(scope, tag.name)?.scope !== lexical.rootScope)
 		return false;
+	if (ctx.moduleFunctionDeclarations?.has(tag.name)) return true;
 	ctx.lazyComponentBindings ??= collectLazyComponentBindings(ctx, lexical);
 	return ctx.lazyComponentBindings.has(tag.name);
 }
@@ -36973,7 +36979,7 @@ function makeCompCall(
 		autoMemoPublicationWitnesses,
 		voidComponent,
 		functionComponent:
-			!voidComponent && isLazyComponentTag(node.openingElement?.name ?? node.id, ctx),
+			!voidComponent && isFunctionComponentTag(node.openingElement?.name ?? node.id, ctx),
 		singleRoot: node._octaneBindingSite ? false : singleRoot,
 		maybeSingleRoot: node._octaneBindingSite ? false : maybeSingleRoot,
 		loc: devLoc(ctx, node),

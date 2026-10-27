@@ -115,13 +115,7 @@ import {
 } from './elements.js';
 import { childSlot } from './child-slots.js';
 import { sharesBlockBoundary, freshSlotEnd, settleFreshSlot, removeAfter } from './branches.js';
-import {
-	DESCRIPTOR_HOST_PROPS,
-	enableHostDescriptors,
-	hostElementBody,
-	hostStringTagBody,
-	journalRootChildShape,
-} from './deopt.js';
+import { hostElementBody, hostStringTagBody, journalRootChildShape } from './deopt.js';
 import { forEachSubtreeChild, detachDeoptTreeRefs } from './activity.js';
 import { type ForSlot, removeRange } from './lists.js';
 import {
@@ -705,11 +699,11 @@ export function componentSlot(
 		throw invalidElementTypeError(comp);
 	}
 	// Dynamic JSX tags can resolve to a host STRING at runtime. Keep this
-	// descriptor/de-opt capability in the generic entry point: compiler-proven
-	// function tags (componentSlotFunction) and void calls (componentSlotVoid,
-	// which also skips return reconciliation) then retain neither
-	// hostStringTagBody nor generic attributes.
-	if (typeof comp === 'string' && !DESCRIPTOR_HOST_PROPS) enableHostDescriptors();
+	// renderer in the generic entry point: compiler-proven function tags
+	// (componentSlotFunction) and void calls (componentSlotVoid, which also
+	// skips return reconciliation) then retain neither hostStringTagBody nor
+	// generic attributes. It renders its element itself, so it needs none of
+	// the host descriptor renderer that element factories install.
 	const body = activity
 		? dispatch!.body
 		: typeof comp === 'string'

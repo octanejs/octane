@@ -155,6 +155,11 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		survivor: true,
 		cleaned: true,
 	},
+	'renderable-holes': {
+		before: 'apendingchildren',
+		after: 'abreadychildren',
+		cleaned: true,
+	},
 	'binding-vanilla': {
 		before: 0,
 		after: 1,

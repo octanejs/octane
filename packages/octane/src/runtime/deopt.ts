@@ -20,7 +20,7 @@ import type {
 	ElementDescriptor,
 	ChildSlot,
 } from './types.js';
-import { queueRefAttach } from './drivers.js';
+import { queueRefAttach, HOST_DESCRIPTORS } from './drivers.js';
 import { renderBlock } from './signal-owners.js';
 import { queueRefDetach, type FragmentInstance, mountFragmentRef } from './refs.js';
 import {
@@ -160,19 +160,6 @@ declare const __OCTANE_PROFILE_ENABLED__: boolean;
 // this path are rendered via real Blocks (hostElementBody / the childSlot component
 // path) so their hooks/state reconcile too.
 // ---------------------------------------------------------------------------
-
-// Host element descriptors are built only by an element factory
-// (createElementFromConfig, a scoped element record) or by a dynamic tag that
-// resolves to a host string in componentSlot. Each of those installs generic
-// host props first, so a bundle whose renderable values are compiled bodies,
-// text and empties does not retain generic attributes or controlled forms. The
-// de-opt host paths below call it only for a host descriptor.
-export let DESCRIPTOR_HOST_PROPS: typeof setHostProps | null = null;
-
-/** @internal Installed by every site that can create a host element descriptor. */
-export function enableHostDescriptors(): void {
-	DESCRIPTOR_HOST_PROPS = setHostProps;
-}
 
 // React dedupes missing-key diagnostics by render owner/source. Octane does not
 // carry owner stacks, so use the closest durable equivalent: once per rendering
@@ -962,13 +949,9 @@ function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefi
 // reuse/adopt it, or null to build fresh (first client mount). Pure host/text only:
 // component descendants are handled by the Block path (hostElementBody/componentSlot),
 // never here. Returns the node to occupy this position (reused or freshly built), or
-// null for an empty value.
-export function reconcileDeoptNode(
-	prev: Node | null,
-	value: any,
-	ownerBlock: Block,
-	ns?: string,
-): Node | null {
+// null for an empty value. A host descriptor goes to reconcileDeoptHost instead,
+// which only bundles that can build one retain (HostDescriptorDriver).
+export function reconcileDeoptNode(prev: Node | null, value: any, ownerBlock: Block): Node | null {
 	if (value == null || value === false || value === true || value === '') return null;
 	const t = typeof value;
 	if (t === 'string' || t === 'number' || t === 'bigint') {
@@ -984,77 +967,6 @@ export function reconcileDeoptNode(
 		}
 		return document.createTextNode(s);
 	}
-	if (isHostDescriptor(value)) {
-		// `<svg>` opens the SVG namespace; descendants inherit it (a `foreignObject`
-		// switches ITS children back to HTML — see childNs below). SVG-ONLY tags
-		// (`g`, `rect`, `path`, … — see SVG_ONLY_TAGS) imply it with no `<svg>`
-		// ancestor. Without this the de-opt path's document.createElement would
-		// mis-namespace SVG content (e.g. `<path>` returned from a component via
-		// createElement, or portaled into an SVG target).
-		const elNs = inferTagNs(value.type, ns);
-		let el: Element;
-		let defer = false;
-		let pending: DeoptOrder | null = null;
-		let desc: ElementDescriptor | null = null;
-		let owner: Block | null = ownerBlock;
-		if (
-			prev !== null &&
-			prev.nodeType === 1 &&
-			isHostElementOfType(prev as Element, value.type) &&
-			(prev as Element).namespaceURI === (elNs ?? HTML_NS)
-		) {
-			// REUSE the existing element — patch props in place instead of rebuilding.
-			// Committed DOM takes the patch at commit, with its children's order.
-			el = prev as Element;
-			if (usesFrontier(ownerBlock, el)) {
-				defer = true;
-				pending = pendingDeoptOrder(el);
-				desc = changedDeoptRecord(el, value, pending);
-			} else {
-				DESCRIPTOR_HOST_PROPS!(
-					el,
-					value.props,
-					getDeoptDesc(el)?.props ?? null,
-					ownerBlock,
-					DESCRIPTOR_HOST,
-				);
-				// Hydration orders an adopted host's children at commit, after what
-				// its reconcile removes, and stamps its record there: an attempt that
-				// never commits leaves the server node without one, so the next
-				// attempt applies its props, ref included, as the first did.
-				if (hydrating && CURSOR !== null && ROOT_RENDER_TRANSACTION !== null) {
-					defer = true;
-					desc = deoptRecord(el, value);
-					owner = null;
-				}
-			}
-		} else {
-			// What hydration builds here, as in a `<noscript>` whose server content
-			// is text, is client DOM: it builds with adoption suspended.
-			const hydration = hydrating ? CURSOR : null;
-			if (hydration !== null)
-				return hydration.suspend(() => reconcileDeoptNode(null, value, ownerBlock, ns));
-			el =
-				elNs !== undefined
-					? document.createElementNS(elNs, value.type)
-					: document.createElement(value.type);
-			DESCRIPTOR_HOST_PROPS!(el, value.props, undefined, ownerBlock, DESCRIPTOR_HOST);
-		}
-		if (desc === null) setDeoptDesc(el, value);
-		const nodes = hasHostPropContent(value)
-			? null
-			: reconcileDeoptChildren(
-					el,
-					isHtmlTextareaType(value.type, elNs)
-						? textareaChildText(value.children, rejectTextareaChild)
-						: value.children,
-					ownerBlock,
-					defer,
-					pending,
-				);
-		if (desc !== null || nodes !== null) queueDeoptOrder(el, owner, desc, nodes, null);
-		return el;
-	}
 	// A component descriptor must not reach here — the de-opt callers gate on
 	// descNeedsBlocks() and route component-bearing subtrees through Blocks.
 	if (isElementDescriptor(value)) {
@@ -1062,6 +974,78 @@ export function reconcileDeoptNode(
 	}
 	if (t === 'object') throw invalidChildError(value);
 	return null;
+}
+
+export function reconcileDeoptHost(
+	prev: Node | null,
+	value: ElementDescriptor & { type: string },
+	ownerBlock: Block,
+	ns: string | undefined,
+): Element {
+	// `<svg>` opens the SVG namespace; descendants inherit it (a `foreignObject`
+	// switches ITS children back to HTML — see childNs below). SVG-ONLY tags
+	// (`g`, `rect`, `path`, … — see SVG_ONLY_TAGS) imply it with no `<svg>`
+	// ancestor. Without this the de-opt path's document.createElement would
+	// mis-namespace SVG content (e.g. `<path>` returned from a component via
+	// createElement, or portaled into an SVG target).
+	const elNs = inferTagNs(value.type, ns);
+	let el: Element;
+	let defer = false;
+	let pending: DeoptOrder | null = null;
+	let desc: ElementDescriptor | null = null;
+	let owner: Block | null = ownerBlock;
+	if (
+		prev !== null &&
+		prev.nodeType === 1 &&
+		isHostElementOfType(prev as Element, value.type) &&
+		(prev as Element).namespaceURI === (elNs ?? HTML_NS)
+	) {
+		// REUSE the existing element — patch props in place instead of rebuilding.
+		// Committed DOM takes the patch at commit, with its children's order.
+		el = prev as Element;
+		if (usesFrontier(ownerBlock, el)) {
+			defer = true;
+			pending = pendingDeoptOrder(el);
+			desc = changedDeoptRecord(el, value, pending);
+		} else {
+			setHostProps(el, value.props, getDeoptDesc(el)?.props ?? null, ownerBlock, DESCRIPTOR_HOST);
+			// Hydration orders an adopted host's children at commit, after what
+			// its reconcile removes, and stamps its record there: an attempt that
+			// never commits leaves the server node without one, so the next
+			// attempt applies its props, ref included, as the first did.
+			if (hydrating && CURSOR !== null && ROOT_RENDER_TRANSACTION !== null) {
+				defer = true;
+				desc = deoptRecord(el, value);
+				owner = null;
+			}
+		}
+	} else {
+		// What hydration builds here, as in a `<noscript>` whose server content
+		// is text, is client DOM: it builds with adoption suspended.
+		const hydration = hydrating ? CURSOR : null;
+		if (hydration !== null)
+			return hydration.suspend(() => reconcileDeoptHost(null, value, ownerBlock, ns));
+		el =
+			elNs !== undefined
+				? document.createElementNS(elNs, value.type)
+				: document.createElement(value.type);
+		setHostProps(el, value.props, undefined, ownerBlock, DESCRIPTOR_HOST);
+	}
+	if (desc === null) setDeoptDesc(el, value);
+	const nodes = hasHostPropContent(value)
+		? null
+		: reconcileDeoptChildren(
+				el,
+				isHtmlTextareaType(value.type, elNs)
+					? textareaChildText(value.children, rejectTextareaChild)
+					: value.children,
+				ownerBlock,
+				defer,
+				pending,
+			);
+	if (desc !== null || nodes !== null)
+		queueDeoptOrder(applyDeoptOrder, el, owner, desc, nodes, null);
+	return el;
 }
 
 // Reconcile a host element's children in place, reusing existing child nodes: keyed
@@ -1136,7 +1120,11 @@ function reconcileDeoptChildren(
 		if (next.length !== 0 && hydrating) HYDRATION_PASS!.deoptMismatch(el, next[0]);
 		const built: Node[] = [];
 		for (let i = 0; i < next.length; i++) {
-			const node = reconcileDeoptNode(null, next[i], ownerBlock, childNs);
+			const child = next[i];
+			const node =
+				typeof child === 'object' && isHostDescriptor(child)
+					? reconcileDeoptHost(null, child, ownerBlock, childNs)
+					: reconcileDeoptNode(null, child, ownerBlock);
 			if (node !== null) {
 				(node as any).$$deoptKey = nextKeys[i];
 				if (defer) built.push(node);
@@ -1252,7 +1240,10 @@ function reconcileDeoptChildren(
 			else if (hydrating && hydrationOwnsUnstamped === true && !singleton)
 				HYDRATION_PASS!.deoptMismatch(el, child);
 		}
-		const node = reconcileDeoptNode(prev, child, ownerBlock, childNs);
+		const node =
+			typeof child === 'object' && isHostDescriptor(child)
+				? reconcileDeoptHost(prev, child, ownerBlock, childNs)
+				: reconcileDeoptNode(prev, child, ownerBlock);
 		if (node !== null) {
 			(node as any).$$deoptKey = key;
 			result.push(node);
@@ -1304,10 +1295,11 @@ function reconcileDeoptChildren(
 
 /**
  * A committed de-opt node's change in an open root render, written by its
- * commit entry (applyDeoptOrder) after the deletions its reconcile queued: a
- * host's descriptor (`desc`: its props and DEOPT_DESC record, applied in the
- * Scope `owner`, or only the record without one, for a host hydration adopted)
- * and its children's order (`nodes`), or a Text's `text`. Null
+ * commit entry (applyDeoptOrder, or applyDeoptText for a Text) after the
+ * deletions its reconcile queued: a host's descriptor (`desc`: its props and
+ * DEOPT_DESC record, applied in the Scope `owner`, or only the record without
+ * one, for a host hydration adopted) and its children's order (`nodes`), or a
+ * Text's `text`. Null
  * fields are unchanged. A later pass of the same render queues a new record,
  * which supersedes it; a window that drops forgets its records with its entries.
  */
@@ -1358,6 +1350,7 @@ function changedDeoptRecord(
 }
 
 function queueDeoptOrder(
+	apply: (order: DeoptOrder) => void,
 	node: Node,
 	owner: Block | null,
 	desc: ElementDescriptor | null,
@@ -1368,25 +1361,28 @@ function queueDeoptOrder(
 	const order: DeoptOrder = { tx, el: node, nodes, desc, text, owner };
 	journalRootProperty(node, '$$deoptOrder', (node as any).$$deoptOrder);
 	(node as any).$$deoptOrder = order;
-	tx.ops.push(applyDeoptOrder, order);
+	tx.ops.push(apply, order);
 }
 
 /** A committed Text's data, written at commit unless it already shows `data`. */
 function queueDeoptText(node: Text, data: string): void {
 	const pending = pendingDeoptOrder(node);
 	if (data !== (pending !== null ? pending.text : node.nodeValue))
-		queueDeoptOrder(node, null, null, null, data);
+		queueDeoptOrder(applyDeoptText, node, null, null, null, data);
 }
 
-function applyDeoptOrder(order: DeoptOrder): void {
+function applyDeoptText(order: DeoptOrder): void {
 	const node = order.el as any;
 	// A later pass of this render superseded it.
 	if (node.$$deoptOrder !== order) return;
 	node.$$deoptOrder = undefined;
-	if (order.text !== null) {
-		updateTextValue(node, order.text);
-		return;
-	}
+	updateTextValue(node, order.text!);
+}
+
+function applyDeoptOrder(order: DeoptOrder): void {
+	const node = order.el as any;
+	if (node.$$deoptOrder !== order) return;
+	node.$$deoptOrder = undefined;
 	// A hydrated host applied its props in render and commits only its record.
 	// A lite arm's stand-in is no Scope: commit in the Block that owns it.
 	if (order.desc !== null) {
@@ -1399,7 +1395,7 @@ function applyDeoptOrder(order: DeoptOrder): void {
 
 function commitDeoptHost(el: Element, record: ElementDescriptor, owner: Scope): void {
 	const committed = (el as DeoptStamped)[DEOPT_DESC];
-	DESCRIPTOR_HOST_PROPS!(el, record.props, committed?.props ?? null, owner, DESCRIPTOR_HOST);
+	setHostProps(el, record.props, committed?.props ?? null, owner, DESCRIPTOR_HOST);
 	stampDeoptDesc(el, record);
 }
 
@@ -1529,14 +1525,15 @@ export function deoptItemBody(item: any, scope: Scope): void {
 	// Each field read of a scoped JSX value resolves its record again. A component
 	// descriptor always needs Blocks, so it skips descNeedsBlocks' second read.
 	const itemType = isElementDescriptor(item) ? item.type : undefined;
-	const hostItem = typeof itemType === 'string';
+	// Only a bundle that can build a host item has its renderer (see childSlot).
+	const hostDriver = typeof itemType === 'string' && HOST_DESCRIPTORS ? HOST_DESCRIPTORS : null;
 	const needsBlocks =
-		(hostItem &&
+		(hostDriver !== null &&
 			existingChild?.__kind === 'childSlot' &&
-			existingChild.currentComp === (hostElementBody as unknown as ComponentBody)) ||
+			existingChild.currentComp === (hostDriver.body as unknown as ComponentBody)) ||
 		typeof itemType === 'function' ||
 		descNeedsBlocks(item);
-	if (needsBlocks || !hostItem) promoteSelfMarkedItem(block);
+	if (needsBlocks || hostDriver === null) promoteSelfMarkedItem(block);
 	const [itemStart, itemEnd] = itemRange(block);
 	// An item whose subtree contains a COMPONENT descriptor (a bare `<Comp/>`, or a
 	// host element with component children like `<li><Comp/></li>`) needs real Blocks
@@ -1564,7 +1561,7 @@ export function deoptItemBody(item: any, scope: Scope): void {
 			if (
 				scope.slots[0] === undefined &&
 				stale.nodeType === 1 /* Element */ &&
-				hostItem &&
+				hostDriver !== null &&
 				isHostElementOfType(stale as Element, itemType as string) &&
 				stale.parentNode === block.parentNode
 			) {
@@ -1656,7 +1653,10 @@ export function deoptItemBody(item: any, scope: Scope): void {
 		prev = startM != null ? getNextSibling(startM) : null;
 		if (prev === endM) prev = null; // empty item range → nothing to adopt
 	}
-	const node = reconcileDeoptNode(prev, item, block, deoptChildNamespace(block.parentNode));
+	const node =
+		hostDriver !== null
+			? hostDriver.reconcile(prev, item, block, deoptChildNamespace(block.parentNode))
+			: reconcileDeoptNode(prev, item, block);
 	if (node !== prev) {
 		journalRootProperty(block, 'deoptNode', block.deoptNode);
 		const parent = block.parentNode;
@@ -1957,7 +1957,7 @@ export function hostElementBody(d: ElementDescriptor, block: Block): void {
 	) {
 		el = hydration.node as Element;
 		block.deoptNode = el;
-		DESCRIPTOR_HOST_PROPS!(el, d.props, undefined, block, DESCRIPTOR_HOST);
+		setHostProps(el, d.props, undefined, block, DESCRIPTOR_HOST);
 		setDeoptDesc(el, d);
 		const savedCursor = getNextSibling(hydration.node);
 		if (!hasHostPropContent(d)) {
@@ -2026,14 +2026,14 @@ export function hostElementBody(d: ElementDescriptor, block: Block): void {
 			const frag = queueFrontier(block, parent, block.endMarker);
 			frag.appendChild(el);
 		} else parent.insertBefore(el, block.endMarker);
-		DESCRIPTOR_HOST_PROPS!(el, d.props, undefined, block, DESCRIPTOR_HOST);
+		setHostProps(el, d.props, undefined, block, DESCRIPTOR_HOST);
 	} else if (usesFrontier(block, el)) {
 		// REUSE the committed element — its props change at commit, after its
 		// children's entries. Its childSlot owns the children's structure.
 		desc = changedDeoptRecord(el, d, pendingDeoptOrder(el));
 	} else {
 		// REUSE the existing element — diff props in place (no rebuild).
-		DESCRIPTOR_HOST_PROPS!(el, d.props, getDeoptDesc(el)?.props ?? null, block, DESCRIPTOR_HOST);
+		setHostProps(el, d.props, getDeoptDesc(el)?.props ?? null, block, DESCRIPTOR_HOST);
 	}
 	if (desc === null) setDeoptDesc(el, d);
 	// One childSlot renders all children INTO the element (append; no anchor): it
@@ -2041,7 +2041,7 @@ export function hostElementBody(d: ElementDescriptor, block: Block): void {
 	// recurses into nested host-with-components subtrees uniformly. Skipped when
 	// dangerouslySetInnerHTML owns the content (see hasDangerHTML).
 	if (!hasHostPropContent(d)) deoptHostChildren(block, el, d, elNs);
-	if (desc !== null) queueDeoptOrder(el, block, desc, null, null);
+	if (desc !== null) queueDeoptOrder(applyDeoptOrder, el, block, desc, null, null);
 }
 
 // Stable render body for a componentSlot whose comp resolved to a HOST tag
@@ -2083,7 +2083,7 @@ export function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 			// server emitted no inner markers).
 			el = hydration.node as Element;
 			block.deoptNode = el;
-			DESCRIPTOR_HOST_PROPS!(el, d.props, undefined, block, DESCRIPTOR_HOST);
+			setHostProps(el, d.props, undefined, block, DESCRIPTOR_HOST);
 			setDeoptDesc(el, d);
 			const savedCursor = getNextSibling(hydration.node);
 			if (!hasHostPropContent(d)) {
@@ -2111,18 +2111,18 @@ export function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 		block.deoptNode = el;
 		const parent = block.parentNode;
 		parent.insertBefore(el, block.endMarker);
-		DESCRIPTOR_HOST_PROPS!(el, d.props, undefined, block, DESCRIPTOR_HOST);
+		setHostProps(el, d.props, undefined, block, DESCRIPTOR_HOST);
 	} else if (usesFrontier(block, el)) {
 		// A committed element's props change at commit, after its children's
 		// entries, as hostElementBody's do.
 		desc = changedDeoptRecord(el, d, pendingDeoptOrder(el));
 	} else {
 		// Re-render, same tag — diff props in place against the stamped descriptor.
-		DESCRIPTOR_HOST_PROPS!(el, d.props, getDeoptDesc(el)?.props ?? null, block, DESCRIPTOR_HOST);
+		setHostProps(el, d.props, getDeoptDesc(el)?.props ?? null, block, DESCRIPTOR_HOST);
 	}
 	if (desc === null) setDeoptDesc(el, d);
 	if (!hasHostPropContent(d)) renderHostTagChildren(d, block, el);
-	if (desc !== null) queueDeoptOrder(el, block, desc, null, null);
+	if (desc !== null) queueDeoptOrder(applyDeoptOrder, el, block, desc, null, null);
 }
 
 // Render a string-tag componentSlot's children into `el`. A FUNCTION child (the
@@ -2327,7 +2327,7 @@ function adoptedDeoptChildren(value: any, cursor: { node: Node | null }): any {
 // will use. Empty old values (null/false/'' — the raw path rendered nothing
 // for them) occupy a key slot but get no node. Stops pairing at the first
 // node/value mismatch (defensive; unpaired nodes are swept after the render).
-function buildDeoptAdoptQueue(
+export function buildDeoptAdoptQueue(
 	oldChildren: any,
 	first: Node | null,
 ): Array<{ key: any; node: Node }> {
@@ -2364,7 +2364,7 @@ function buildDeoptAdoptQueue(
  * have landed at the host's end (queueFrontier) and move into place here. The
  * upgraded host's children slot (its slot 0) must still show this list.
  */
-function placeUpgradedList(args: any[]): void {
+export function placeUpgradedList(args: any[]): void {
 	const [state, owner, host, wraps] = args as [ForSlot, Block, Node, any[] | null];
 	if (owner.disposed || (owner.slots[0] as ChildSlot | undefined)?.forSlot !== state) return;
 	if (wraps !== null)
@@ -2517,8 +2517,9 @@ export function renderPreparedChildList(
 			signalSite: undefined,
 			next: null,
 		};
-		if (upgradeArmed)
-			state.forSlot.adopt = buildDeoptAdoptQueue(upgradeChildren, getFirstChild(domParent));
+		// Only a host descriptor's Block upgrades its raw children (childSlot).
+		if (upgradeArmed && HOST_DESCRIPTORS)
+			state.forSlot.adopt = HOST_DESCRIPTORS.adoptQueue(upgradeChildren, getFirstChild(domParent));
 	}
 	const { items, keys } = preparedList;
 	const keySource = compiledMapKey || keys!;
@@ -2624,8 +2625,8 @@ export function renderPreparedChildList(
 				adopt !== null ? domParent : null,
 				adoptByKey,
 			);
-			if (adoptByKey !== null)
-				ROOT_RENDER_TRANSACTION!.ops.push(placeUpgradedList, [
+			if (adoptByKey !== null && HOST_DESCRIPTORS)
+				ROOT_RENDER_TRANSACTION!.ops.push(HOST_DESCRIPTORS.placeUpgraded, [
 					forSlot,
 					parentBlock,
 					domParent,

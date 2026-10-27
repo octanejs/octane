@@ -99,6 +99,7 @@ export type {
 } from './runtime/types.js';
 export {
 	enableSignalBindings,
+	enableHostDescriptors,
 	queueRefAttach,
 	invokeManualHook,
 	withSlot,

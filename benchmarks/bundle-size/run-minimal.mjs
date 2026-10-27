@@ -63,6 +63,7 @@ const existingScenarios = [
 	['server-render', 'ts'],
 	['component-owned-effects', 'ts'],
 	['descriptor-children', 'ts'],
+	['renderable-holes', 'tsrx'],
 	['binding-vanilla', 'ts'],
 	['binding-hooks', 'tsrx'],
 ];
@@ -305,6 +306,14 @@ const signalOwnerDeclarations = [
 	'pruneSignalRetryVisit',
 	'trackSignalRetryListKeys',
 ];
+// Only host element factories install the host descriptor renderer. Holes over
+// text, arrays and component descriptors keep the shared list path.
+const hostDescriptorRenderer = [
+	'reconcileDeoptHost',
+	'reconcileDeoptChildren',
+	'hostElementBody',
+	'setHostProps',
+];
 // A recorded context read installs the dependency checks and memo() its bail;
 // a bundle that never binds a renderer region drops the bridge lookups.
 const contextDependencyDeclarations = [
@@ -324,7 +333,11 @@ const featureControls = {
 			'rendererRegionOwnerForBlock',
 			'collectRetiredSignalRetryOwners',
 		],
-		kept: ['childSlot', 'tryImplicitBail'],
+		kept: ['childSlot', 'tryImplicitBail', ...hostDescriptorRenderer],
+	},
+	'renderable-holes': {
+		dropped: hostDescriptorRenderer,
+		kept: ['childSlot', 'renderPreparedChildList'],
 	},
 	context: {
 		dropped: [...signalOwnerDeclarations, ...memoBailDeclarations, 'rendererRegionOwnerForBlock'],
