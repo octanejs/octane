@@ -1996,13 +1996,23 @@ function adopt(
 			const fragment = template;
 			h.fail(
 				process.env.NODE_ENV !== 'production' ? componentSourceLoc(h.rootBlock.body) : undefined,
-				() => `a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`,
+				() =>
+					process.env.NODE_ENV !== 'production'
+						? `a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`
+						: '',
 				cursor,
 			);
 		}
 	}
 	if (cursor === null) {
-		h.fail(loc, () => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)), null);
+		h.fail(
+			loc,
+			() =>
+				process.env.NODE_ENV !== 'production'
+					? describeHydrationNode(template ?? resolveLazyTemplate(lazy!))
+					: '',
+			null,
+		);
 	}
 	if (
 		!isFragment &&
@@ -2010,7 +2020,14 @@ function adopt(
 	) {
 		const match = skipForeign(h, cursor, template, lazy);
 		if (match === null)
-			h.fail(loc, () => describeHydrationNode(template ?? resolveLazyTemplate(lazy!)), cursor);
+			h.fail(
+				loc,
+				() =>
+					process.env.NODE_ENV !== 'production'
+						? describeHydrationNode(template ?? resolveLazyTemplate(lazy!))
+						: '',
+				cursor,
+			);
 		h.node = cursor = match;
 	}
 	// The compiled walk descends into the root's children: where it would find
@@ -2018,7 +2035,10 @@ function adopt(
 	if (!isFragment && rootWalkMisses(cursor, template, lazy))
 		h.fail(
 			loc,
-			() => describeHydrationNode(firstElementChild(template ?? resolveLazyTemplate(lazy!))),
+			() =>
+				process.env.NODE_ENV !== 'production'
+					? describeHydrationNode(firstElementChild(template ?? resolveLazyTemplate(lazy!)))
+					: '',
 			getFirstChild(cursor),
 		);
 	if (isFragment) {
@@ -2041,7 +2061,10 @@ function adopt(
 		const fragment = template ?? resolveLazyTemplate(lazy!);
 		h.fail(
 			loc,
-			() => `a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`,
+			() =>
+				process.env.NODE_ENV !== 'production'
+					? `a fragment starting with ${describeHydrationNode(getFirstChild(fragment))}`
+					: '',
 			cursor,
 		);
 	}
