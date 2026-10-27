@@ -333,7 +333,9 @@ const signalRetryListPath = function signalRetryListPath(
 	return null;
 };
 
-function collectRetiredSignalRetryOwners(
+// A named function expression, as signalRetrySlot is: its recursion alone
+// cannot keep it in a bundle that never retires a retry owner.
+const collectRetiredSignalRetryOwners = function collectRetiredSignalRetryOwners(
 	node: SignalRetryNode,
 	cache: SignalRetryOwners,
 	retired: SignalRendererOwnerIdentity[],
@@ -347,7 +349,7 @@ function collectRetiredSignalRetryOwners(
 	if (node.children !== undefined)
 		for (const child of node.children.values())
 			collectRetiredSignalRetryOwners(child, cache, retired, keep);
-}
+};
 
 // Component, child and branch slots hold one occupant at a time, so a newer
 // attempt that renders one there proves every retained occupant with another

@@ -38,7 +38,7 @@ import {
 	runWithBlockSignalOwner,
 	type NativeStyleBinding,
 } from './signal-owners.js';
-import { queueOwnRefDetach } from './refs.js';
+import { queueOwnRefDetach, FRAGMENT_REFS } from './refs.js';
 import {
 	ROOT_RENDER_ROLLBACK,
 	journalUndo,
@@ -1734,7 +1734,7 @@ export function renderPortalChild(
 	// Conditional portals and portals inside directive helpers use childSlot
 	// rather than the compiler's direct portal helper. Their retained end anchor
 	// still locates the authored position inside any enclosing Fragment refs.
-	if (activeFragments.size !== 0 && state.end !== null) {
+	if (FRAGMENT_REFS && activeFragments.size !== 0 && state.end !== null) {
 		registerValuePortalFragmentOwners(state.portal, parentBlock, state.end);
 	}
 	return true;

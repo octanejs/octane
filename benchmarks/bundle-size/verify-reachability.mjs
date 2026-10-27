@@ -80,6 +80,16 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		after: 'dark',
 		cleaned: true,
 	},
+	'memo-context': {
+		before: 'light',
+		after: 'dark',
+		cleaned: true,
+	},
+	'controlled-input': {
+		before: 'a',
+		after: 'B',
+		cleaned: true,
+	},
 	'hydrate-root': {
 		adopted: true,
 		before: 'server',

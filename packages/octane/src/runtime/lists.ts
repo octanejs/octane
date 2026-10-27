@@ -30,7 +30,7 @@ import {
 	captureFocusedMovement,
 } from './engine.js';
 import { isSuspenseException, retainDiscardedWarmMemos } from './use.js';
-import { SKIPPED_ROW_REFRESH, isHostContextRequest } from './context.js';
+import { CONTEXT_DEPENDENCIES, isHostContextRequest } from './context.js';
 import { CURSOR, isRendererHydrationStyle, auditHydrationProbe } from './hydration.js';
 import {
 	createBlock,
@@ -477,7 +477,7 @@ export function forBlock<T>(
 			(f & 8) !== 0,
 			markerless,
 		);
-		if (pure && SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state, parentBlock);
+		if (pure && CONTEXT_DEPENDENCIES) CONTEXT_DEPENDENCIES.skippedRows(state, parentBlock);
 	}
 	// Advance the hydration cursor past the @for's `<!--]-->` so a later sibling's
 	// clone() starts after this block — covers the zero-item, no-@empty case where
@@ -553,7 +553,7 @@ export function keyedForBlock<T>(
 			selectionBody,
 		)
 	) {
-		if (SKIPPED_ROW_REFRESH) SKIPPED_ROW_REFRESH(state, parentScope.block);
+		if (CONTEXT_DEPENDENCIES) CONTEXT_DEPENDENCIES.skippedRows(state, parentScope.block);
 		return;
 	}
 

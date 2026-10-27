@@ -3334,7 +3334,7 @@ export function findTryHandler(block: Block | null): TryHandler | null {
 		if (h && b.rare!.trySlot?.catchBody !== null) return h;
 		b = b.parentBlock;
 	}
-	return RENDERER_REGION_OWNER_COUNT === 0 ? null : rendererRegionTryHandler(origin);
+	return RENDERER_REGION_OWNER_COUNT ? rendererRegionTryHandler(origin) : null;
 }
 
 /**
@@ -3351,7 +3351,7 @@ export function handleRenderError(block: Block, err: any): void {
 	// arms and reach the owner, which settles the carried thenable once the
 	// authoritative host value has committed and then retries the root.
 	if (isHostContextRequest(err)) {
-		const bridge = rendererRegionOwnerForBlock(block);
+		const bridge = RENDERER_REGION_OWNER_COUNT ? rendererRegionOwnerForBlock(block) : null;
 		if (bridge !== null && bridge.routeSuspense(err.thenable)) return;
 		err = new Error(formatClientError(27));
 	}
@@ -3365,7 +3365,7 @@ export function handleRenderError(block: Block, err: any): void {
 			}
 			b = b.parentBlock;
 		}
-		const external = rendererRegionSuspenseHandler(block);
+		const external = RENDERER_REGION_OWNER_COUNT ? rendererRegionSuspenseHandler(block) : null;
 		if (external !== null) {
 			external(err.thenable);
 			return;

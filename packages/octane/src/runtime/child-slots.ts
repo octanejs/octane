@@ -9,7 +9,6 @@ import {
 	coerceChildText,
 	renderFrontierBlock,
 	clearChildContent,
-	tryMemoBail,
 	tryImplicitBail,
 } from './component-slots.js';
 import { hydrationStarted, hydrating } from '../hydration-flag.js';
@@ -33,6 +32,7 @@ import {
 	type HydrationDriver,
 	HYDRATION_DRIVER,
 	SIGNAL_BINDINGS_ENABLED,
+	MEMO_BAIL,
 } from './drivers.js';
 import {
 	type SignalInstanceKey,
@@ -1246,7 +1246,7 @@ export function childSlot(
 			// honoring React.memo's bail — previously only componentSlot did, so a
 			// memo()'d component rendered as VALUE-POSITION children (e.g. provider
 			// children in a `.ts` binding tree) re-rendered unconditionally.
-			if (tryMemoBail(state.block, comp, props)) return;
+			if (MEMO_BAIL && MEMO_BAIL(state.block, comp, props)) return;
 			// React's implicit same-element bailout: the IDENTICAL committed props
 			// object (same cached descriptor, or a host descriptor re-passed as-is)
 			// skips the body outright; changed-context consumers below refresh

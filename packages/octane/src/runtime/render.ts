@@ -109,6 +109,7 @@ import {
 	NATIVE_READ_DRIVER,
 	activityInsertionEffectCreated,
 	noop,
+	MEMO_BAIL,
 } from './drivers.js';
 import {
 	NATIVE_BLOCK_RETRIES,
@@ -180,7 +181,12 @@ import {
 	STAGED_REVEALS,
 	fallTransitionHook,
 } from './transitions.js';
-import { openScopeFrontier, SHARED_BODY_SCOPE, isHostContextRequest } from './context.js';
+import {
+	openScopeFrontier,
+	SHARED_BODY_SCOPE,
+	isHostContextRequest,
+	CONTEXT_DEPENDENCIES,
+} from './context.js';
 import {
 	clearHydrationThrow,
 	HYDRATION_PASS,
@@ -236,8 +242,6 @@ import {
 	openCaptureWindow,
 	dropCaptureWindow,
 	discardOffscreenCapture,
-	ctxDirectChanged,
-	tryMemoBail,
 	tryImplicitBail,
 } from './component-slots.js';
 import { freshSlotEnd, settleFreshSlot } from './branches.js';
@@ -809,12 +813,14 @@ export function renderBlockInner(block: Block): true | undefined {
 		// replacing its reads so memo-wrapped boundaries cannot preserve stale HTML.
 		const state = block.slots[0] as HydrateSlot | undefined;
 		if (
+			CONTEXT_DEPENDENCIES &&
 			state?.__kind === 'hydrateBlockSlot' &&
 			state.parentBlock === block &&
 			!state.independent &&
 			!state.hydrated
 		) {
-			state.contextChanged = block.$$ctxDepsEpoch !== EPOCH_CELL.value && ctxDirectChanged(block);
+			state.contextChanged =
+				block.$$ctxDepsEpoch !== EPOCH_CELL.value && CONTEXT_DEPENDENCIES.directChanged(block);
 		}
 		block.$$ctxDirect = null;
 	}
@@ -1735,7 +1741,10 @@ export function updateDeoptComponent(block: Block, item: any, index: number): bo
 		block.currentRenderMode = previousBlock?.currentRenderMode ?? 'urgent';
 		block.currentRenderDeferred = previousBlock?.currentRenderDeferred ?? false;
 		const props = item.props;
-		if (tryMemoBail(child, comp, props) || (props === child.props && tryImplicitBail(child)))
+		if (
+			(MEMO_BAIL && MEMO_BAIL(child, comp, props)) ||
+			(props === child.props && tryImplicitBail(child))
+		)
 			return true;
 		if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK && block.props !== item)
 			TRANSITION_JOURNAL!.push(JOURNAL_INPUTS, block, block.props, block.extra);

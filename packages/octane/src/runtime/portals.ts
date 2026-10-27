@@ -10,7 +10,7 @@ import { profilePortalComponent } from './profile-probes.js';
 import type { ComponentBody, Scope, Block, ElementDescriptor } from './types.js';
 import { noop, activityPortalCreated } from './drivers.js';
 import { renderBlock } from './signal-owners.js';
-import { type FragmentInstance, fragmentDirectNodes } from './refs.js';
+import { type FragmentInstance, FRAGMENT_REFS, fragmentDirectNodes } from './refs.js';
 import {
 	ROOT_RENDER_ROLLBACK,
 	journalUndo,
@@ -137,6 +137,7 @@ export function portal(
 	const prev = parentScope.slots[slotKey] as PortalSlot | undefined;
 	const key = portalKey(props);
 	if (
+		FRAGMENT_REFS &&
 		fragmentAnchor !== undefined &&
 		fragmentOwners === undefined &&
 		prev !== undefined &&
@@ -167,7 +168,7 @@ export function portal(
 		if (prev === undefined) registerSlot(parentScope, state);
 		else replacePortalSlot(parentScope, prev, state);
 	}
-	if (fragmentOwners !== undefined && fragmentAnchor !== undefined) {
+	if (FRAGMENT_REFS && fragmentOwners !== undefined && fragmentAnchor !== undefined) {
 		registerFragmentPortalOwners(state, fragmentOwners, fragmentAnchor);
 	} else if (fragmentAnchor !== undefined) {
 		// A Fragment ref rendered inside this portal belongs to its source-tree

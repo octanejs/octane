@@ -53,6 +53,8 @@ const existingScenarios = [
 	['signal-instance-derived', 'tsrx'],
 	['prop-attributes', 'tsrx'],
 	['context', 'tsrx'],
+	['memo-context', 'tsrx'],
+	['controlled-input', 'tsrx'],
 	['hydrate-root', 'tsrx'],
 	['deferred-hydration', 'tsrx'],
 	['hydrate-frame', 'ts'],
@@ -303,21 +305,60 @@ const signalOwnerDeclarations = [
 	'pruneSignalRetryVisit',
 	'trackSignalRetryListKeys',
 ];
+// A recorded context read installs the dependency checks and memo() its bail;
+// a bundle that never binds a renderer region drops the bridge lookups.
+const contextDependencyDeclarations = [
+	'ctxBailDepsClean',
+	'restampCtxDeps',
+	'refreshBlockForContext',
+];
+const memoBailDeclarations = ['tryMemoBail', 'shallowEqualProps'];
 const featureControls = {
 	'descriptor-children': {
-		dropped: ['renderPortalChild', 'bindImplicitSignalChild', 'useContextInternal'],
-		kept: ['childSlot'],
+		dropped: [
+			'renderPortalChild',
+			'bindImplicitSignalChild',
+			'useContextInternal',
+			...contextDependencyDeclarations,
+			...memoBailDeclarations,
+			'rendererRegionOwnerForBlock',
+			'collectRetiredSignalRetryOwners',
+		],
+		kept: ['childSlot', 'tryImplicitBail'],
 	},
-	context: { dropped: signalOwnerDeclarations, kept: ['useContextInternal'] },
+	context: {
+		dropped: [...signalOwnerDeclarations, ...memoBailDeclarations, 'rendererRegionOwnerForBlock'],
+		kept: ['useContextInternal', ...contextDependencyDeclarations],
+	},
+	'memo-context': {
+		dropped: [],
+		kept: [...contextDependencyDeclarations, ...memoBailDeclarations],
+	},
+	// Only a controlled select value installs the select projection.
+	'controlled-input': {
+		dropped: ['projectSelectValue', 'restoreCheckedState'],
+		kept: ['restoreControlledElement'],
+	},
 	'signal-counter': { dropped: ['childSlot', 'bindSignalChild'], kept: ['enableSignalBindings'] },
 	'signal-instance-derived': {
 		dropped: [],
 		kept: ['presentDerivedView', 'promoteDeclarationView'],
 	},
-	// Module declarations are never declared again, so no view stages them.
+	// Module declarations are never declared again, so no view stages them, and
+	// its portal has no Fragment ref to own it.
 	'hydrate-frame': {
-		dropped: ['presentDerivedView', 'promoteDeclarationView'],
-		kept: ['renderPortalChild', 'bindImplicitSignalChild', ...signalOwnerDeclarations],
+		dropped: [
+			'presentDerivedView',
+			'promoteDeclarationView',
+			'registerFragmentPortalOwners',
+			'registerValuePortalFragmentOwners',
+		],
+		kept: [
+			'renderPortalChild',
+			'bindImplicitSignalChild',
+			...signalOwnerDeclarations,
+			'placeMarker',
+		],
 	},
 };
 const effectDeclarations = Object.values(effectControls).flat();
