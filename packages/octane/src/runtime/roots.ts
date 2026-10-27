@@ -1260,7 +1260,7 @@ export function createIndependentHydrateActivator(
 				scope.block.endMarker,
 			);
 		};
-		const root = hydrateRoot(element, adapter, captures, {
+		const root = __hydrateVoidRoot(element, adapter, captures, {
 			identifierPrefix: manifest.boundaryId + '-',
 			identifierSeed: manifest.idSeed,
 			signalInstancePrefix: manifest.boundaryId,
