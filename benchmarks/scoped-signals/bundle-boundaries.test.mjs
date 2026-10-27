@@ -1433,9 +1433,9 @@ export function increment() { count$.set((n) => n + 1); }`;
 	const options = { dev: false, hmr: false };
 	const renderer =
 		/packages\/octane\/src\/(?:runtime(?:\.server)?\.ts|runtime\/[^/]+\.ts|internal\/client\.ts)$/;
-	const bundle = async (entry, bindings, mode = 'client') => {
+	const bundle = async (entry, bindings, mode = 'client', appSource = app) => {
 		const sources = {
-			'island-app.tsrx': app,
+			'island-app.tsrx': appSource,
 			'island-panel.tsrx': panel(bindings),
 			'island-state.tsrx': state,
 		};
@@ -1480,6 +1480,9 @@ export function increment() { count$.set((n) => n + 1); }`;
 			api: await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64')),
 			gzip: gzipSync(code, { level: 9 }).length,
 			resolved: Object.keys(result.metafile.inputs),
+			emitted: Object.entries(Object.values(result.metafile.outputs)[0].inputs)
+				.filter(([, input]) => input.bytesInOutput > 0)
+				.map(([name]) => name),
 		};
 	};
 	const window = new Window();
@@ -1563,6 +1566,31 @@ export { activations, count$ } from './island-state.tsrx';`,
 		host.remove();
 	}
 	t.diagnostic(JSON.stringify(sizes));
+	await t.test('ordinary islands retain arbitrary child rendering only when used', async () => {
+		for (const [value, needsChildSlots] of [
+			['String(n) as string', false],
+			['n', true],
+		]) {
+			const source = `import { Hydrate, useState } from 'octane';
+import { interaction } from 'octane/hydration';
+function Counter() @{
+ const [n, set] = useState(0);
+ <button onClick={() => set(n + 1)}>{${value}}</button>
+}
+export function App() @{ <Hydrate independent when={interaction()}><Counter /></Hydrate> }`;
+			const island = await bundle(
+				"export { default } from './island-app.tsrx?octane-hydrate=0';",
+				false,
+				'client',
+				source,
+			);
+			assert.equal(
+				island.emitted.some((id) => id.endsWith('/runtime/child-slots.ts')),
+				needsChildSlots,
+				value,
+			);
+		}
+	});
 });
 
 test('list-free programs omit list costs while imported legacy lists remain live', async (t) => {
