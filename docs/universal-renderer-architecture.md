@@ -955,8 +955,9 @@ That copy-on-write state includes a render-phase write to a `useRef` object's
 or a timer, reads the committed value, and a discarded attempt discards the
 write. An event delivered between `prepare()` and commit runs the committed
 handler, so its props, state, and refs all come from the same committed render.
-Host work that must observe the new values belongs in commit-phase code, such
-as a layout effect or a host prop the driver applies, not in the render body.
+Work that must observe the new values, such as mutating a host-owned data
+source, belongs in a layout effect, which runs after commit publishes hook
+state, not in the render body.
 
 Visibility is inherited through owner records. Hidden Activity and retained
 Suspense hosts keep logical/public identity, resources, state, and insertion
