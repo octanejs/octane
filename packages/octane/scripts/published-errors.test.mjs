@@ -108,11 +108,8 @@ stdout.write(JSON.stringify(observations));
 	}
 });
 
-// Bundles the published signals entry the way an application consumer does and
-// evaluates it where no process global exists, as in a browser.
-async function consumerBundles(mode) {
-	const source =
-		"export { installSignalOwnerEnvironment, ScopeDisposedError } from 'octane/signals';\n";
+// Bundle published browser entries the way an application consumer does.
+async function consumerBundles(mode, source) {
 	const octane = /^octane(?:\/|$)/;
 	const esbuildResult = await build({
 		stdin: { contents: source, resolveDir: packageDir, loader: 'js' },
@@ -170,8 +167,10 @@ async function consumerBundles(mode) {
 }
 
 test('consumer substitution selects messages and drops development branches', async () => {
+	const source =
+		"export { installSignalOwnerEnvironment, ScopeDisposedError } from 'octane/signals';";
 	for (const mode of ['development', 'production']) {
-		for (const [bundler, code] of await consumerBundles(mode)) {
+		for (const [bundler, code] of await consumerBundles(mode, source)) {
 			const label = `${bundler} ${mode}`;
 			assert.doesNotMatch(code, /process\.env/, label);
 			const module = { exports: {} };
@@ -197,6 +196,23 @@ test('consumer substitution selects messages and drops development branches', as
 				const shipped =
 					code.includes(message) || code.includes(JSON.stringify(message).slice(1, -1));
 				assert.equal(shipped, mode === 'development', `${label}: ${message}`);
+			}
+		}
+	}
+});
+
+test('published hydration consumers ship structural mismatch descriptions only in development', async () => {
+	for (const mode of ['development', 'production']) {
+		for (const [bundler, code] of await consumerBundles(
+			mode,
+			"export { hydrateRoot } from 'octane';",
+		)) {
+			for (const description of ['a fragment starting with ', 'fewer nodes than expected']) {
+				assert.equal(
+					code.includes(description),
+					mode === 'development',
+					`${bundler} ${mode}: ${description}`,
+				);
 			}
 		}
 	}
