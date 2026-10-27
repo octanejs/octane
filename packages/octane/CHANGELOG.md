@@ -1,5 +1,24 @@
 # octane
 
+## 0.16.1
+
+### Patch Changes
+
+- 7246709: Avoid WebKit security errors while preserving focus across cross-origin iframes.
+- 5dd4e20: Shrink compiled client output: template strings leave out what the HTML parser restores on its own (quotes a value does not need, empty values, an HTML void element's `/`, and the close tags that end a template), a text hole seeds its committed value inside its mount call, a handler bundle compares inline without a temporary, and a template commits at its end by testing the bag's state word alone. The parsed DOM, the runtime calls a render makes, and SSR output are unchanged.
+- 331811c: Ship less client runtime in applications that never use a capability. Context dependency checks install with the first recorded context read, the memo bail with `memo()`, a portal's Fragment-ref owner registration with the first Fragment ref, and controlled `<select>` restoration with the first controlled select value. Renderer-region bridge lookups drop from applications that never bind a region owner. A signal-free `createRoot` application such as the relay example ships about 1.2 KB less gzip, with the same render work.
+- 10b10ad: Ship the host element descriptor renderer only in applications that can build a
+  host element descriptor. Renderable holes over text, arrays, component
+  descriptors and compiled children no longer pull in the runtime host renderer or
+  its generic attribute and controlled-form writers, so `.tsrx` applications that
+  never create host descriptors shrink by up to 18% of their client JavaScript
+  (gzip). Calls to module function components also skip the dynamic-tag entry.
+- d7a964c: Pass a `@catch` arm the same `reset` function on every render, as an
+  `ErrorBoundary` fallback already receives. Production builds of `octane/behavior`
+  now throw coded errors that link to the error decoder, like the rest of the
+  runtime, and the client runtime ships one copy of several shared predicates.
+- 38ea6b5: Stop Strong mode from pulling the signal-binding runtime into apps that never use signals. A second cached render calculation was named like a `$` signal handle, so its text or attribute went through signal bindings and enabled them for the whole module. Strong mode also no longer caches object and array literals on host attributes: a static `style={{ … }}` stays in the template, as it does without Strong mode. Component props and `ref` arrays keep their stable identities.
+
 ## 0.16.0
 
 ### Minor Changes
