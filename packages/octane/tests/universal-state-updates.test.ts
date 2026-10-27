@@ -326,6 +326,43 @@ describe('universal queued state values', () => {
 		);
 	});
 
+	it('keeps a prepared ref write from events and outside reads until commit', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const eventPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'ref-event',
+			bindings: [
+				['value', 0],
+				['onSelect', 1],
+			],
+		});
+		const reads: string[] = [];
+		let latestRef!: { current: string };
+		const Scene = defineUniversalComponent('object', ({ value }: { value: string }) => {
+			const latest = useRef(value, 'latest-ref');
+			latest.current = value;
+			latestRef = latest;
+			return universalValue(eventPlan, [value, () => reads.push(`${value}:${latest.current}`)]);
+		});
+
+		root.render(Scene, { value: 'committed' });
+		const host = container.children[0];
+		const prepared = root.prepare(Scene, { value: 'prepared' });
+		if (prepared.status !== 'prepared') throw new Error('Expected a prepared update.');
+		// An event before commit runs the committed handler, and its ref read
+		// matches that handler's own props (#1254).
+		container.dispatchEvent(host, 'select', undefined);
+		expect(reads).toEqual(['committed:committed']);
+		expect(latestRef.current).toBe('committed');
+
+		prepared.commit();
+		container.dispatchEvent(host, 'select', undefined);
+		expect(reads).toEqual(['committed:committed', 'prepared:prepared']);
+		expect(latestRef.current).toBe('prepared');
+		root.unmount();
+	});
+
 	it('retries a keyed render without publishing abandoned children or effects', () => {
 		const container = createObjectContainer();
 		const root = createUniversalRoot(container, createObjectDriver());
