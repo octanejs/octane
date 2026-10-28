@@ -1095,6 +1095,82 @@ export function Unchecked(props: { label: (value: number) => string }) @{
 		}
 	});
 
+	it('types template component children as the children block they compile to (#1929)', () => {
+		const source = `import type { OctaneNode } from 'octane';
+
+function Title(props: { children: string }) @{
+	<h1>{props.children.toUpperCase()}</h1>
+}
+
+const _Title = Title;
+
+function Frame(props: { children: OctaneNode }) @{
+	<section>{props.children}</section>
+}
+
+function List(props: { children: (item: number) => OctaneNode }) @{
+	<ul>{props.children(1)}</ul>
+}
+
+export function App(props: { name: string; link?: { title: string } }) @{
+	const label = <Title>value position</Title>;
+	<Frame>
+		<Title>hello</Title>
+		<_Title>underscore</_Title>
+		<{Title}>dynamic</{Title}>
+		<Frame>{props.name}</Frame>
+		@if (props.link !== undefined) {
+			<Frame>{props.link.title}</Frame>
+		}
+		<Frame>@if (props.name) { <b /> }</Frame>
+		<List>{(item: number) => <li>{item}</li>}</List>
+		{label}
+	</Frame>
+}
+`;
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-children-block-'));
+		try {
+			mkdirSync(join(root, 'node_modules'));
+			symlinkSync(
+				fileURLToPath(new URL('../..', import.meta.url)),
+				join(root, 'node_modules/octane'),
+				'dir',
+			);
+			const result = compileToVolarMappings(source, 'Children.tsrx');
+			expect(result.errors).toEqual([]);
+			const file = join(root, 'Children.tsx');
+			writeFileSync(file, result.code);
+			const program = ts.createProgram({
+				rootNames: [file],
+				options: {
+					jsx: ts.JsxEmit.Preserve,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					noEmit: true,
+					strict: true,
+					target: ts.ScriptTarget.ESNext,
+					types: [],
+				},
+			});
+			const diagnostics = program.getSemanticDiagnostics(program.getSourceFile(file)!);
+			// Each template `Title` tag (plain, `_`-prefixed, dynamic) hands
+			// `children: string` a block, reported on its mapped tag name. The
+			// value-position `<Title>` keeps its authored string child.
+			expect(diagnostics.map(({ code }) => code)).toEqual([2745, 2745, 2745]);
+			const authored = source.indexOf('Title>hello');
+			expect(
+				result.mappings.some((mapping) =>
+					mapping.sourceOffsets.some(
+						(offset, index) =>
+							offset === authored && mapping.generatedOffsets[index] === diagnostics[0].start,
+					),
+				),
+			).toBe(true);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it.each([false, true])('maps dynamic style content as host props (Strong: %s)', (strong) => {
 		const source = readFileSync(
 			new URL('../_fixtures/dynamic-style-content.tsrx', import.meta.url),
@@ -1599,8 +1675,9 @@ const invalid: number = knownAttributeSpreads[0].fields[0];
 				[
 					'scalar text handles and unions',
 					`import type { SignalHandle, WritableSignal } from 'octane/signals';
+import type { OctaneNode } from 'octane';
 import 'octane/signals';
-function Label({children}: {children: string}) @{ <span>{children}</span> }
+function Label({children}: {children: OctaneNode}) @{ <span>{children}</span> }
 export function Text(props: {
 	readable: SignalHandle<string>;
 	writable: WritableSignal<string>;
@@ -2256,12 +2333,20 @@ export const ordinaryResult: string = ordinary('draft', { count: 1 });
 				join(root, 'node_modules/octane/package.json'),
 				JSON.stringify({
 					name: 'octane',
-					exports: { '.': './index.d.ts', './jsx-runtime': './jsx-runtime.d.ts' },
+					exports: {
+						'.': './index.d.ts',
+						'./jsx-runtime': './jsx-runtime.d.ts',
+						'./tsrx-boundary': './tsrx-boundary.d.ts',
+					},
 				}),
 			);
 			writeFileSync(
 				join(root, 'node_modules/octane/index.d.ts'),
 				'export declare function Suspense(props: { fallback: unknown; children?: unknown }): unknown;\n',
+			);
+			writeFileSync(
+				join(root, 'node_modules/octane/tsrx-boundary.d.ts'),
+				'export declare function childrenBlock(children: unknown): () => never;\n',
 			);
 			const files = Object.entries(sources).flatMap(([name, source]) => {
 				const result = compileToVolarMappings(source, `/src/${name}.tsrx`);

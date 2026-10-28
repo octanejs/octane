@@ -36,6 +36,16 @@ export const TsrxErrorBoundary = typeOnlyBoundary as unknown as (
 	},
 ) => never;
 
+/**
+ * A DOM component's template children: the render function they compile to
+ * (see `isChildrenBlock`), not the children as written. The type-only output
+ * passes them through `childrenBlock` so the `children` prop is checked
+ * against a function. A call, unlike a closure, keeps the template's narrowing.
+ */
+export type ChildrenBlock = () => never;
+
+export const childrenBlock = typeOnlyBoundary as unknown as (children: unknown) => ChildrenBlock;
+
 type DynamicTag = string | ((props: any) => unknown);
 
 type DynamicTagProps<
