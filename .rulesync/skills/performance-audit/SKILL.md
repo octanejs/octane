@@ -176,6 +176,24 @@ the full benchmark sweep, and end-to-end or browser suites. Parallel agent
 sessions share one machine, and a wide local run makes every timing on it
 noise.
 
+## Streamed interactions
+
+Measure from trusted input through request dispatch, the first read containing
+content, the first DOM update containing that text, and the first frame that
+shows it. Record which control records arrived with the content. Earlier delivery
+of controls can move work outside the interval being compared.
+
+For a slow dispatch, trace the work awaited before the request. For slow text
+publication, count the view revisions triggered by each record. Hold the
+renderer fixed and remove one unnecessary wait or publication at a time. A
+renderer sample shows where the CPU ran. Inspect its caller to see what
+requested that work.
+
+When skipping an equal-value update, replace the owner while an acknowledgment
+is pending. Check that the replacement adopts the live value even if its initial
+markup contains the same text. When preloading an adapter, verify the original
+consumer still owns initialization, cancellation, and error delivery.
+
 ## Report template
 
 ```md
