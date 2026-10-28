@@ -77,7 +77,11 @@ import {
 } from './use.js';
 import type { Context } from './context.js';
 import { CURSOR, isRendererHydrationStyle, type HydrationCapability } from './hydration.js';
-import { suspenseRetryBatchForSubtree, tryBlockImpl } from './suspense.js';
+import {
+	findScheduledVisibilityOwner,
+	suspenseRetryBatchForSubtree,
+	tryBlockImpl,
+} from './suspense.js';
 import {
 	CURRENT_SCOPE,
 	CURRENT_BLOCK,
@@ -441,6 +445,10 @@ function createHydrateBoundaryBody(
 	renderChild: typeof renderHydrateChild,
 	pendingBody: ComponentBody,
 ): ComponentBody {
+	let waitingForFirstModule =
+		pendingBody === EMPTY_HYDRATE_PENDING &&
+		!state.serverPreserved &&
+		state.props.__load !== undefined;
 	const contentBody: ComponentBody = (_props, scope, extra) => {
 		try {
 			if (state.loadedBody === null) {
@@ -453,6 +461,10 @@ function createHydrateBoundaryBody(
 					trackThenable(thenable);
 					if (thenable.status === 'rejected') throw thenable.reason;
 					if (thenable.status !== 'fulfilled') throw new SuspenseException(thenable);
+				} else {
+					// An inline child can mount work and then suspend. Even if that render
+					// rolls back, a later module must go through the normal reveal path.
+					waitingForFirstModule = false;
 				}
 			}
 			renderChild(state, scope, extra);
@@ -480,6 +492,32 @@ function createHydrateBoundaryBody(
 				: scopeSignalOwner(state.parentBlock.signalInstanceParent),
 	});
 	return (_props, scope) => {
+		if (
+			waitingForFirstModule &&
+			state.loadedBody === null &&
+			state.props.__load !== undefined &&
+			!state.hasError &&
+			!ROOT_RENDER_ROLLBACK &&
+			(!hydrating || CURSOR === null)
+		) {
+			const pending = state.preloadPromise as TrackedThenable<void> | null;
+			const slot = scope.slots[0] as TrySlot | undefined;
+			// The empty fallback is already visible. The registered retry will read
+			// the latest props on settlement. Parent renders cannot reveal it sooner.
+			if (
+				pending?.status === 'pending' &&
+				slot?.pendingThenable === pending &&
+				slot.branch === 2 &&
+				slot.hiddenDom !== null &&
+				!slot.hasResolved &&
+				!slot.transitionHeld &&
+				slot.tryBlock?.inactive &&
+				!slot.tryBlock.disposed &&
+				findScheduledVisibilityOwner(scope.block, true, 'urgent') === null &&
+				suspenseRetryBatchForSubtree(scope.block) === null
+			)
+				return;
+		}
 		tryBlockImpl(
 			scope,
 			0,

@@ -1,4 +1,14 @@
-import { Hydrate, useEffect, useLayoutEffect, useState } from 'octane';
+import {
+	createContext,
+	Hydrate,
+	Suspense,
+	use,
+	useContext,
+	useEffect,
+	useLayoutEffect,
+	useState,
+	type HydrateProps,
+} from 'octane';
 
 const splitReviewPrefix = 'captured:';
 
@@ -63,7 +73,7 @@ export function ClientOnlySplitHydration(props) @{
 		@if (props.show) {
 			<Hydrate
 				when={props.when}
-				fallback={<p id="split-client-only-fallback">{'Loading split content'}</p>}
+				fallback={<p id="split-client-only-fallback">{props.message as string}</p>}
 				onHydrated={props.onHydrated}
 			>
 				<SplitClientOnlyContent onClick={props.onClick} />
@@ -86,4 +96,36 @@ export function RepeatedSplitHydration(props) @{
 			</Hydrate>
 		}
 	</section>
+}
+
+const Locale = createContext('default');
+
+function LocalizedLabel(props: { label: string }) @{
+	const locale = useContext(Locale);
+	<output>{props.label + '/' + locale}</output>
+}
+
+function SplitSibling(props: { label: string; wait: Promise<void> | undefined }) @{
+	if (props.wait) use(props.wait);
+	<span>{props.label as string}</span>
+}
+
+export function PendingSplitList(props: {
+	when: HydrateProps['when'];
+	ids: string[];
+	label: string;
+	locale: string;
+	wait?: Promise<void>;
+	onHydrated: (id: string) => void;
+}) @{
+	<Locale value={props.locale}>
+		<Suspense fallback={<p>Outer fallback</p>}>
+			@for (const id of props.ids; key id) {
+				<Hydrate when={props.when} onHydrated={() => props.onHydrated(id)}>
+					<LocalizedLabel label={props.label} />
+				</Hydrate>
+			}
+			<SplitSibling label={props.label} wait={props.wait} />
+		</Suspense>
+	</Locale>
 }
