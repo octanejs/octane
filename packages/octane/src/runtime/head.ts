@@ -13,15 +13,16 @@ import { unpatchedAttribute } from '../hydration/dev-values.js';
 import { sanitizeURLAttribute, sanitizeURL } from '../sanitize-url.js';
 import type { Scope, Block, RootRenderTransaction, ElementDescriptor } from './types.js';
 import { blockSubtreeDisposed } from './refs.js';
-import { ROOT_RENDER_ROLLBACK, journalRootProperty } from './engine.js';
+import { journalRootProperty } from './engine.js';
 import { CURSOR } from './hydration.js';
-import { CURRENT_BLOCK, TRANSITION_JOURNAL, ROOT_RENDER_TRANSACTION } from './render.js';
+import { CURRENT_BLOCK, ROOT_RENDER_TRANSACTION } from './render.js';
 import { DISCARDED_HEADS, removeNodes } from './roots.js';
 import { deoptChildNamespace, setAttribute, coerceAttrValue } from './host-props.js';
 import { createElement } from './elements.js';
 import { queueRootDeletion, journalBag, journalObjectOnce } from './commit.js';
 import { getFirstChild, getNextSibling } from './templates.js';
 import { eventSlot, devEventListener } from './events.js';
+import { ROOT_RENDER_ROLLBACK, TRANSITION_JOURNAL } from './drivers.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -273,7 +274,7 @@ function applyHeadProps(
 	text: unknown,
 ): void {
 	const el = state.el;
-	if (TRANSITION_JOURNAL !== null) {
+	if (TRANSITION_JOURNAL) {
 		journalObjectOnce(state);
 		journalBag();
 	}

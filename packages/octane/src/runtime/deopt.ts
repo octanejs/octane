@@ -20,11 +20,16 @@ import type {
 	ElementDescriptor,
 	ChildSlot,
 } from './types.js';
-import { queueRefAttach, HOST_DESCRIPTORS } from './drivers.js';
+import {
+	queueRefAttach,
+	HOST_DESCRIPTORS,
+	ROOT_RENDER_ROLLBACK,
+	TRANSITION_JOURNAL,
+	TRANSITION_JOURNAL_DEPTH,
+} from './drivers.js';
 import { renderBlock } from './signal-owners.js';
 import { queueRefDetach, type FragmentInstance, mountFragmentRef } from './refs.js';
 import {
-	ROOT_RENDER_ROLLBACK,
 	journalRootProperty,
 	retireRootBlock,
 	renderingFocus,
@@ -49,8 +54,6 @@ import {
 } from './block.js';
 import {
 	CURRENT_BLOCK,
-	TRANSITION_JOURNAL,
-	TRANSITION_JOURNAL_DEPTH,
 	ROOT_RENDER_TRANSACTION,
 	ROOT_DISCARD_STAMP,
 	commitInScope,
@@ -327,6 +330,7 @@ export function hostComponent(
 		// A root render that drops forgets the host it created with it, unless
 		// it discards the whole Block.
 		if (
+			TRANSITION_JOURNAL &&
 			ROOT_RENDER_TRANSACTION !== null &&
 			(TRANSITION_JOURNAL_DEPTH !== 1 || block.createdStamp !== ROOT_DISCARD_STAMP)
 		) {
@@ -610,8 +614,7 @@ function stampDeoptDesc(el: Element, record: ElementDescriptor): void {
 	const host = el as Element & DeoptStamped;
 	// A held descriptor retry restores host props too. Restore their comparison
 	// record with them or the final retry will mistake aborted props for live ones.
-	if (TRANSITION_JOURNAL !== null)
-		TRANSITION_JOURNAL.push(JOURNAL_PROP, el, DEOPT_DESC, host[DEOPT_DESC]);
+	if (TRANSITION_JOURNAL) TRANSITION_JOURNAL.push(JOURNAL_PROP, el, DEOPT_DESC, host[DEOPT_DESC]);
 	host[DEOPT_DESC] = record;
 }
 

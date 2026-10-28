@@ -24,6 +24,7 @@ import {
 	queueControlledCommit,
 	queueDevFormCheck,
 	armControlledBase,
+	TRANSITION_JOURNAL,
 } from './drivers.js';
 import {
 	VIEW_TRANSITION_DRIVER,
@@ -36,12 +37,7 @@ import {
 } from './engine.js';
 import { hasPendingWork } from './effects.js';
 import { CURSOR } from './hydration.js';
-import {
-	CURRENT_SCOPE,
-	CURRENT_BLOCK,
-	TRANSITION_JOURNAL,
-	ROOT_RENDER_TRANSACTION,
-} from './render.js';
+import { CURRENT_SCOPE, CURRENT_BLOCK, ROOT_RENDER_TRANSACTION } from './render.js';
 import { DIRECT_SIGNAL_BINDING, type DirectSignalBinding } from './signal-bindings.js';
 import { HTML_NS, isHtmlCustomElement } from './host-props.js';
 import { componentSourceLoc } from './diagnostics.js';
@@ -569,7 +565,7 @@ export function setValue(el: Element, value: unknown): void {
 	// discrete event. A fresh structural replacement is client-built and needs
 	// normal projection.
 	const adopted = hydrating && first ? CURSOR !== null : false;
-	if (TRANSITION_JOURNAL !== null) {
+	if (TRANSITION_JOURNAL) {
 		journalObjectOnce(ctrl);
 		journalBag();
 	}
@@ -766,7 +762,7 @@ function inActivationWindow(input: HTMLInputElement): boolean {
 
 export function setChecked(el: Element, value: unknown): void {
 	const ctrl = armControlled(el);
-	if (TRANSITION_JOURNAL !== null) {
+	if (TRANSITION_JOURNAL) {
 		journalObjectOnce(ctrl);
 		journalBag();
 	}
@@ -780,7 +776,7 @@ export function setChecked(el: Element, value: unknown): void {
  */
 export function setCheckedCheckable(el: Element, value: unknown): void {
 	const ctrl = armControlledBase(el);
-	if (TRANSITION_JOURNAL !== null) {
+	if (TRANSITION_JOURNAL) {
 		journalObjectOnce(ctrl);
 		journalBag();
 	}
@@ -798,7 +794,7 @@ export function setCheckedCheckable(el: Element, value: unknown): void {
 export function setSelectValue(el: Element, value: unknown): void {
 	const sel = el as HTMLSelectElement;
 	const ctrl = armControlled(el);
-	if (TRANSITION_JOURNAL !== null) {
+	if (TRANSITION_JOURNAL) {
 		journalObjectOnce(ctrl);
 		journalBag();
 	}
@@ -902,7 +898,7 @@ export function setDefaultValue(el: Element, value: unknown, initial?: boolean):
 		const multiple = (el as HTMLSelectElement).multiple;
 		const changedMultiple = ctrl.formMultiple !== multiple;
 		if (first || changedMultiple) {
-			if (TRANSITION_JOURNAL !== null) {
+			if (TRANSITION_JOURNAL) {
 				journalObjectOnce(ctrl);
 				journalBag();
 			}
@@ -918,7 +914,7 @@ export function setDefaultValue(el: Element, value: unknown, initial?: boolean):
 	}
 	const first = initial ?? !ctrl.sawV;
 	const previousDefault = ctrl.dvv;
-	if (TRANSITION_JOURNAL !== null) {
+	if (TRANSITION_JOURNAL) {
 		journalObjectOnce(ctrl);
 		journalBag();
 	}
@@ -958,7 +954,7 @@ export function setDefaultValueUncontrolled(el: Element, value: unknown): void {
 	const input = el as HTMLInputElement | HTMLTextAreaElement;
 	const previous = (input as any)[DEFAULT_VALUE_BASELINE] as string | null | undefined;
 	const s = value == null ? null : toControlledString(value);
-	if (TRANSITION_JOURNAL !== null) {
+	if (TRANSITION_JOURNAL) {
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, input, DEFAULT_VALUE_BASELINE, previous);
 		journalBag();
 	}
@@ -982,7 +978,7 @@ export function setDefaultChecked(el: Element, value: unknown): void {
 	const input = el as HTMLInputElement;
 	const adopted = hydrating ? CURSOR !== null : false;
 	const first = !ctrl.sawDC;
-	if (TRANSITION_JOURNAL !== null) {
+	if (TRANSITION_JOURNAL) {
 		journalObjectOnce(ctrl);
 		journalBag();
 	}
@@ -1081,7 +1077,7 @@ export function applyFormControlValues(
 	const ctrl = armControlled(el);
 	const first = !ctrl.formSeen;
 	const previousMultiple = ctrl.formMultiple;
-	if (TRANSITION_JOURNAL !== null) {
+	if (TRANSITION_JOURNAL) {
 		journalObjectOnce(ctrl);
 		journalBag();
 	}

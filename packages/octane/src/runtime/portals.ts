@@ -8,11 +8,10 @@ import { __profileTrackComponent } from '../profiling.js';
 import { ELEMENT_TAG, PORTAL_TAG } from '../runtime-tags.js';
 import { profilePortalComponent } from './profile-probes.js';
 import type { ComponentBody, Scope, Block, ElementDescriptor } from './types.js';
-import { noop, activityPortalCreated } from './drivers.js';
+import { noop, activityPortalCreated, ROOT_RENDER_ROLLBACK } from './drivers.js';
 import { renderBlock } from './signal-owners.js';
 import { type FragmentInstance, FRAGMENT_REFS, fragmentDirectNodes } from './refs.js';
 import {
-	ROOT_RENDER_ROLLBACK,
 	journalUndo,
 	journalRootProperty,
 	isCreatedInRootRender,

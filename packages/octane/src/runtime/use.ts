@@ -48,6 +48,7 @@ import { HYDRATION_PASS } from './hydration.js';
 import { blockRare } from './block.js';
 import { CURRENT_SCOPE, CURRENT_BLOCK, CURRENT_WARM_EPISODE, RESUME_REPLAY } from './render.js';
 import { forEachSubtreeChild } from './activity.js';
+import { rollbackEntry } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -315,7 +316,7 @@ function warnUseWaterfall(block: Block, idx: number): void {
  * it joins every registered ancestor plan and prefetches provably-independent
  * descendants via warmChild/warmMemo. A resolved batch costs no warm work.
  */
-export function useBatch(items: any[], warm?: () => void): void {
+function useBatchImpl(items: any[], warm?: () => void): void {
 	// Compiler registration form: publish the component's child-only plan on
 	// the active render stack. It is intentionally lazy — a fully synchronous
 	// tree neither walks its children nor allocates a warm cache.
@@ -361,6 +362,7 @@ export function useBatch(items: any[], warm?: () => void): void {
 	});
 	throw new SuspenseException(combined);
 }
+export const useBatch: typeof useBatchImpl = /* @__PURE__ */ rollbackEntry(useBatchImpl);
 
 /**
  * A batch suspends before its unwraps reach useThenable, so it applies the

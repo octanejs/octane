@@ -69,6 +69,7 @@ import {
 	resolveDeclarationRanges,
 	retainedDeclarations,
 } from './hydration-free-gates.mjs';
+import { RENDER_ROLLBACK_DECLARATIONS } from './render-rollback-gates.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JS_FRAMEWORK = path.resolve(__dirname, '../js-framework');
@@ -274,10 +275,21 @@ const shellHostRanges = resolveDeclarationRanges(
 	[{ name: 'componentSlotFunction', source: 'runtime.ts' }, ...HOST_DESCRIPTOR_PROPS],
 );
 
+// Neither application has an entry that can drop a render, so neither may ship
+// render rollback; run-minimal's suspense-transition control proves the oracle
+// sees each declaration.
+const rollbackRanges = resolveDeclarationRanges(
+	(source) => fs.readFileSync(path.resolve(__dirname, '../../packages/octane/src', source), 'utf8'),
+	(text, source) => parseAst(text, { lang: 'ts' }, source),
+	RENDER_ROLLBACK_DECLARATIONS,
+);
+
 for (const set of SETS)
 	for (const name of set.targets.filter(selected)) {
 		const appRoot = path.join(set.root, name);
 		const shellHostGate = set.root === APP_SHELL && name === 'octane-tsrx';
+		const rollbackGate =
+			(set.root === JS_FRAMEWORK || set.root === CHAT_STREAM) && name === 'octane-tsrx';
 		const outDir = path.join(OUT_ROOT, set.prefix + name);
 		const setLabel = set.prefix ? set.prefix + '/' : '';
 		console.log(`building ${setLabel}${name} (production, ${VITE_MINIFY} minify)…`);
@@ -295,7 +307,7 @@ for (const set of SETS)
 				emptyOutDir: true,
 				minify: VITE_MINIFY,
 				target: 'esnext',
-				...(shellHostGate ? { sourcemap: 'hidden' } : {}),
+				...(shellHostGate || rollbackGate ? { sourcemap: 'hidden' } : {}),
 				rollupOptions: {
 					...(set.entry ? { input: path.join(appRoot, set.entry) } : {}),
 					output: buildOutput,
@@ -320,6 +332,20 @@ for (const set of SETS)
 				HOST_DESCRIPTOR_PROPS.filter(({ name }) => retained.has(name)).map(({ name }) => name),
 				[],
 				`${setLabel}${name}: a body-only app retained generic host props`,
+			);
+		}
+		if (rollbackGate) {
+			const retained = new Set();
+			for (const file of walk(outDir)) {
+				if (!/\.m?js$/.test(file)) continue;
+				const map = JSON.parse(fs.readFileSync(file + '.map', 'utf8'));
+				for (const declaration of retainedDeclarations(map, rollbackRanges))
+					retained.add(declaration);
+			}
+			assert.deepEqual(
+				[...retained],
+				[],
+				`${setLabel}${name}: an app that cannot drop a render retained render rollback`,
 			);
 		}
 		const total = {

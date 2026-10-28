@@ -49,6 +49,8 @@ import {
 	NATIVE_READ_DRIVER,
 	reportCaughtError,
 	reportUncaughtError,
+	ROOT_RENDER_ROLLBACK,
+	TRANSITION_JOURNAL,
 } from './drivers.js';
 import { RENDERER_INVOCATION_SITE } from './signal-owners.js';
 import {
@@ -60,7 +62,6 @@ import {
 	QUEUE_REINDEX_EPOCH,
 	inFlush,
 	TRANSITION_QUEUE,
-	ROOT_RENDER_ROLLBACK,
 	journalUndo,
 	journalRootProperty,
 	retireRootBlock,
@@ -86,7 +87,6 @@ import { CURSOR } from './hydration.js';
 import { findTryHandler } from './suspense.js';
 import {
 	RETAINED_SIGNAL_OWNERS,
-	TRANSITION_JOURNAL,
 	ROOT_RENDER_TRANSACTION,
 	EFFECT_EVENT_RENDER_TARGET,
 	EFFECT_EVENT_ACTION_TARGET,
@@ -616,7 +616,7 @@ export let RETURNED_OUTPUT_SCOPE: Scope | null = null;
 
 export function setReturnedOutputOwner(state: any, returned: boolean): void {
 	if (state.returnedOutput === returned) return;
-	if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+	if (TRANSITION_JOURNAL && !ROOT_RENDER_ROLLBACK) {
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, state, 'returnedOutput', state.returnedOutput);
 	}
 	state.returnedOutput = returned;
@@ -715,7 +715,7 @@ export function renderReturnedValue(block: Block, out: unknown, reset?: true): v
 				// and takes the outgoing slot's place at commit. If it throws, the flip
 				// unwinds like a rollback window and the outgoing slot stays.
 				const transaction = ROOT_RENDER_TRANSACTION!;
-				journalAt = TRANSITION_JOURNAL!.length;
+				journalAt = TRANSITION_JOURNAL ? TRANSITION_JOURNAL.length : 0;
 				opsAt = transaction.ops.length;
 				retiredAt = transaction.retired?.size ?? 0;
 				const frag = queueFrontier(block, block.parentNode, block.endMarker);
@@ -778,7 +778,9 @@ export function renderReturnedValue(block: Block, out: unknown, reset?: true): v
 				childSlot(block, 0, domParent, out, anchor);
 			}
 		} catch (error) {
-			if (frontier !== null) {
+			// Without a journal nothing keeps this Block past the error: the
+			// boundary that catches it, or its root, tears it down.
+			if (TRANSITION_JOURNAL && frontier !== null) {
 				rollbackTransitionJournal(journalAt, block);
 				dropRootOps(ROOT_RENDER_TRANSACTION!, opsAt, retiredAt);
 			}
@@ -808,7 +810,7 @@ export function renderReturnedValue(block: Block, out: unknown, reset?: true): v
 		if (!block.disposed && state !== undefined && state.returnedOutput !== true) {
 			// New returned children claim ownership on mount. Keep that common path
 			// inline; shared-body handoffs use the cold journal helper.
-			if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+			if (TRANSITION_JOURNAL && !ROOT_RENDER_ROLLBACK) {
 				TRANSITION_JOURNAL.push(JOURNAL_PROP, state, 'returnedOutput', state.returnedOutput);
 			}
 			state.returnedOutput = true;

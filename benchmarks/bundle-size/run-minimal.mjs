@@ -29,6 +29,7 @@ import { build as buildVite, parseAst } from 'vite';
 import { appComponent, clientEntry } from '../../packages/cli/src/commands/init/templates.js';
 import { verifyScenario } from './verify-reachability.mjs';
 import { selectMinimalScenarios } from './minimal-gates.mjs';
+import { RENDER_ROLLBACK_DECLARATIONS, RENDER_ROLLBACK_NAMES } from './render-rollback-gates.mjs';
 import {
 	exportedNames,
 	isRuntimeModule,
@@ -59,6 +60,7 @@ const existingScenarios = [
 	['deferred-hydration', 'tsrx'],
 	['hydrate-frame', 'ts'],
 	['suspense-transition', 'tsrx'],
+	['render-errors', 'tsrx'],
 	['server-hooks', 'ts'],
 	['server-render', 'ts'],
 	['component-owned-effects', 'ts'],
@@ -353,6 +355,13 @@ const featureControls = {
 		kept: ['restoreControlledElement'],
 	},
 	'signal-counter': { dropped: ['childSlot', 'bindSignalChild'], kept: ['enableSignalBindings'] },
+	// Only an entry that can drop a render installs its rollback; an error
+	// boundary, an uncaught error and a failed root replacement need none.
+	'suspense-transition': { dropped: [], kept: RENDER_ROLLBACK_NAMES },
+	'render-errors': {
+		dropped: RENDER_ROLLBACK_NAMES,
+		kept: ['rollbackRootRender', 'errorBlock', 'reconcileKeyed'],
+	},
 	'signal-instance-derived': {
 		dropped: [],
 		kept: ['presentDerivedView', 'promoteDeclarationView'],
@@ -400,6 +409,7 @@ const splitControls = {
 const declarationSources = {
 	presentDerivedView: 'signals/computations.ts',
 	promoteDeclarationView: 'signals/graph.ts',
+	...Object.fromEntries(RENDER_ROLLBACK_DECLARATIONS.map(({ name, source }) => [name, source])),
 };
 const runtimeRanges = (names) =>
 	resolveDeclarationRanges(

@@ -25,7 +25,12 @@ import type {
 	CompilerMemoRegion,
 	Block,
 } from './types.js';
-import { reportCaughtError, reportUncaughtError } from './drivers.js';
+import {
+	reportCaughtError,
+	reportUncaughtError,
+	ROOT_RENDER_ROLLBACK,
+	TRANSITION_JOURNAL,
+} from './drivers.js';
 import {
 	beginNativeReadScope,
 	endNativeReadScope,
@@ -34,23 +39,13 @@ import {
 	replayNativeReadWitness,
 } from './signal-owners.js';
 import { blockSubtreeDisposed } from './refs.js';
-import {
-	DOM_ROOT_DISPOSERS,
-	ROOT_RENDER_ROLLBACK,
-	journalUndo,
-	journalRootProperty,
-} from './engine.js';
+import { DOM_ROOT_DISPOSERS, journalUndo, journalRootProperty } from './engine.js';
 import { ensureHooks, devMemoComputeDepth } from './hooks.js';
 import { type TrackedThenable, SuspenseException, useThenable } from './use.js';
 import { HYDRATION_PASS } from './hydration.js';
 import { setReturnedOutputOwner, resetScopeChildren } from './block.js';
 import { findSuspenseHiddenTry, findHiddenActivity, findTryHandler } from './suspense.js';
-import {
-	CURRENT_SCOPE,
-	CURRENT_BLOCK,
-	TRANSITION_JOURNAL,
-	ROOT_RENDER_TRANSACTION,
-} from './render.js';
+import { CURRENT_SCOPE, CURRENT_BLOCK, ROOT_RENDER_TRANSACTION } from './render.js';
 import {
 	provideContext,
 	CHILDREN_BODY,
@@ -74,6 +69,7 @@ import {
 	queueRootDeletion,
 } from './commit.js';
 import { getFirstChild, getNextSibling } from './templates.js';
+import { rollbackEntry } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -169,7 +165,7 @@ export function __createCompiledContext<T>(defaultValue: T): Context<T> {
 		if (previous !== dialect) {
 			if (previous !== undefined) {
 				invalidateSharedBodyOutput(scope);
-				if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+				if (TRANSITION_JOURNAL && !ROOT_RENDER_ROLLBACK) {
 					const hooks = scope.hooks!;
 					journalUndo(() => hooks.set(CHILDREN_DIALECT_SLOT, previous));
 				}
@@ -222,7 +218,7 @@ function clearEmptiedProvider(scope: Scope): void {
 
 /** Record a Provider's children dialect; a dropped window restores the previous one. */
 function setChildrenDialect(scope: Scope, previous: unknown, dialect: unknown): void {
-	if (previous !== undefined && TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+	if (previous !== undefined && TRANSITION_JOURNAL && !ROOT_RENDER_ROLLBACK) {
 		// A reset above may have dropped the hooks map, so the undo reopens it.
 		journalUndo(() => ensureHooks(scope).set(CHILDREN_DIALECT_SLOT, previous));
 	}
@@ -358,7 +354,7 @@ export function renderClientContextProvider<T>(
 				// output dependencies no longer prove what those slots contain. Hook
 				// values remain per-body and keep their mounted lifetime.
 				invalidateSharedBodyOutput(scope);
-				if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+				if (TRANSITION_JOURNAL && !ROOT_RENDER_ROLLBACK) {
 					const hooks = scope.hooks!;
 					journalUndo(() => hooks.set(CHILDREN_DIALECT_SLOT, previous));
 				}
@@ -435,7 +431,7 @@ function invalidateSharedBodyMemoRegion(region: CompilerMemoRegion): void {
 	if (region.auto === undefined) return;
 	// A candidate may complete before a later sibling suspends. Rollback must
 	// restore the accepted body's dependencies along with its visible output.
-	if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+	if (TRANSITION_JOURNAL && !ROOT_RENDER_ROLLBACK) {
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, region, 'auto', region.auto);
 	}
 	region.auto = undefined;
@@ -478,7 +474,7 @@ export interface ForeignHostContext<T> {
  */
 type NotAnElementDescriptor = { $$kind?: never };
 
-export function use<T>(
+export function useImpl<T>(
 	usable:
 		| Context<T>
 		| (PromiseLike<T> & NotAnElementDescriptor)
@@ -502,6 +498,8 @@ export function use<T>(
 	}
 	return useThenable(usable as TrackedThenable<T>);
 }
+
+export const use: typeof useImpl = /* @__PURE__ */ rollbackEntry(useImpl);
 
 // React 19 context objects carry $$typeof: Symbol.for('react.context') — used
 // ONLY to sharpen the out-of-hosted-root diagnostic, never as a read strategy.
@@ -530,9 +528,11 @@ function useForeignContext<T>(usable: unknown, api: string): T {
  * the stored thenable even during resume replay so a sequential A -> B
  * suspension keeps the outer host fallback visible until B settles.
  */
-export function useRendererThenable<T>(thenable: PromiseLike<T>): T {
+function useRendererThenableImpl<T>(thenable: PromiseLike<T>): T {
 	return useThenable(thenable as TrackedThenable<T>, true);
 }
+export const useRendererThenable: typeof useRendererThenableImpl =
+	/* @__PURE__ */ rollbackEntry(useRendererThenableImpl);
 
 /**
  * React's `useContext(Context)` — reads the nearest Provider's value (or the
@@ -591,7 +591,7 @@ export function rendererRegionSuspenseHandler(
  * The bridge is deliberately attached only to the owning DOM root; normal DOM
  * blocks retain no renderer fields or dispatch branches.
  */
-export function bindRendererRegionOwner(props: unknown): void {
+function bindRendererRegionOwnerImpl(props: unknown): void {
 	const bridge = (props as any)?.[RENDERER_REGION_OWNER] as RendererRegionOwnerBridge | undefined;
 	if (bridge === undefined) {
 		throw new Error(formatClientError(19));
@@ -641,6 +641,8 @@ export function bindRendererRegionOwner(props: unknown): void {
 		});
 	}
 }
+export const bindRendererRegionOwner: typeof bindRendererRegionOwnerImpl =
+	/* @__PURE__ */ rollbackEntry(bindRendererRegionOwnerImpl);
 
 // ---------------------------------------------------------------------------
 // Hosted-root control signal (§6.3 HostContextRequest): thrown by an owner

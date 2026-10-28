@@ -124,6 +124,10 @@ import {
 	ensureScheduledVisibilityDriver,
 	MANUAL_HOOK_DRIVER,
 	noop,
+	TRANSITION_JOURNAL,
+	TRANSITION_JOURNAL_DEPTH,
+	ROOT_RENDER_ROLLBACK,
+	markRootRenderRollback,
 } from './drivers.js';
 import {
 	clearSignalRetryOwners,
@@ -278,8 +282,6 @@ import {
 	CURRENT_SCOPE,
 	CURRENT_BLOCK,
 	CURRENT_WARM_EPISODE,
-	TRANSITION_JOURNAL,
-	TRANSITION_JOURNAL_DEPTH,
 	ROOT_RENDER_TRANSACTION,
 	ROOT_DISCARD_STAMP,
 	beginRootRender,
@@ -356,6 +358,7 @@ import {
 	ACTIVE_SUBMIT_DISPATCH,
 } from './events.js';
 import { hasControlledSyncs } from './forms.js';
+import { ROOT_ROLLBACK, installRootRollback } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -986,17 +989,10 @@ export let COMMIT_OP = 0;
 export interface RootRenderFrame {
 	transaction: RootRenderTransaction;
 	previous: RootRenderTransaction | null;
-	log: any[] | null;
-	bags: Map<object, number> | null;
-	checkpoint: number;
-	bagWindow: number;
-	depth: number;
 	capture: OffscreenCapture | null;
 	discardStamp: number;
-	opsCheckpoint: number;
 }
 export let ROOT_RENDER_TRANSACTIONS: RootRenderTransaction[] = [];
-export let ROOT_RENDER_ROLLBACK = false;
 
 /** @internal Opaque retry episode, without retaining an abandoned Scope. */
 export function getRootRenderRetryKey(scope: Scope, retryOnly = false): object | null {
@@ -1007,12 +1003,12 @@ export function getRootRenderRetryKey(scope: Scope, retryOnly = false): object |
 }
 
 export function journalUndo(undo: () => void): void {
-	TRANSITION_JOURNAL!.push(JOURNAL_UNDO, undo, null, null);
+	if (TRANSITION_JOURNAL) TRANSITION_JOURNAL.push(JOURNAL_UNDO, undo, null, null);
 }
 
 export function journalRootProperty(target: object, key: PropertyKey, oldValue: unknown): void {
-	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_ROLLBACK) return;
-	TRANSITION_JOURNAL!.push(JOURNAL_PROP, target, key, oldValue);
+	if (!TRANSITION_JOURNAL || ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_ROLLBACK) return;
+	TRANSITION_JOURNAL.push(JOURNAL_PROP, target, key, oldValue);
 }
 
 /**
@@ -1020,7 +1016,12 @@ export function journalRootProperty(target: object, key: PropertyKey, oldValue: 
  * DOM the render created (#2043), so a dropped render left the range as it was.
  */
 export function journalRootSlot(state: object): void {
-	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_TRANSACTION.aborted || ROOT_RENDER_ROLLBACK)
+	if (
+		!TRANSITION_JOURNAL ||
+		ROOT_RENDER_TRANSACTION === null ||
+		ROOT_RENDER_TRANSACTION.aborted ||
+		ROOT_RENDER_ROLLBACK
+	)
 		return;
 	journalObjectOnce(state);
 }
@@ -1149,12 +1150,21 @@ export function createdInRootRender(block: Block): void {
 	// as do hydration and adopted DOM, where ROOT_DISCARD_STAMP is -1. A hookless
 	// child's stand-in is not a Block; its owner's teardown reaches what is
 	// created below it.
-	let parent = TRANSITION_JOURNAL_DEPTH === 1 ? block.parentBlock : null;
-	if (parent instanceof LiteBlockImpl) parent = parent.ownerBlock;
-	if (parent === null || parent.createdStamp !== ROOT_DISCARD_STAMP)
-		TRANSITION_JOURNAL!.push(JOURNAL_CREATED, block, null, null);
+	if (TRANSITION_JOURNAL) {
+		let parent = TRANSITION_JOURNAL_DEPTH === 1 ? block.parentBlock : null;
+		if (parent instanceof LiteBlockImpl) parent = parent.ownerBlock;
+		if (parent === null || parent.createdStamp !== ROOT_DISCARD_STAMP)
+			TRANSITION_JOURNAL.push(JOURNAL_CREATED, block, null, null);
+	}
 }
 
+/**
+ * Drop a root render. A feature that can drop one installs the journal
+ * (installRootRollback), which the rollback replays. Without it, a render is
+ * dropped only with its root's teardown, an uncaught error or an unmount, so
+ * what it changed needs no restoring: it commits nothing, and what it created
+ * goes now.
+ */
 export function rollbackRootRender(transaction: RootRenderTransaction): void {
 	if (transaction.aborted) return;
 	transaction.aborted = true;
@@ -1168,31 +1178,32 @@ export function rollbackRootRender(transaction: RootRenderTransaction): void {
 	const frame = beginRootRender(transaction.owner);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileRootRolledBack();
-	const previousRollback = ROOT_RENDER_ROLLBACK;
-	ROOT_RENDER_ROLLBACK = true;
+	const previousRollback = ROOT_ROLLBACK ? markRootRenderRollback(true) : false;
 	try {
-		const owner = transaction.owner.current;
-		if (owner !== null) rollbackTransitionJournal(0, owner);
-		else {
-			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-				__profileJournalRolledBack(transaction.log.length / 4);
-			for (let i = transaction.log.length - 4; i >= 0; i -= 4) {
-				if (transaction.log[i] === JOURNAL_UNDO) transaction.log[i + 1]();
-				else if (transaction.log[i] === JOURNAL_CREATED)
-					undoCreatedInRootRender(transaction.log[i + 1]);
-				else if (transaction.log[i] === JOURNAL_EVENT_OWNER)
-					transaction.log[i + 1].$$signalOwner = transaction.log[i + 2];
+		// A transaction that began before the rollback was installed has no log.
+		const log = transaction.log;
+		if (ROOT_ROLLBACK && log !== null) {
+			const owner = transaction.owner.current;
+			if (owner !== null) rollbackTransitionJournal(0, owner);
+			else {
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileJournalRolledBack(log.length / 4);
+				for (let i = log.length - 4; i >= 0; i -= 4) {
+					if (log[i] === JOURNAL_UNDO) log[i + 1]();
+					else if (log[i] === JOURNAL_CREATED) undoCreatedInRootRender(log[i + 1]);
+					else if (log[i] === JOURNAL_EVENT_OWNER) log[i + 1].$$signalOwner = log[i + 2];
+				}
+				log.length = 0;
 			}
-			transaction.log.length = 0;
-		}
-		// Slot snapshots restore render state, but cannot restore a transition
-		// hold the parked reveal has already released outside the journal.
-		if (transaction.hostEventReveals !== undefined)
-			for (const reveal of transaction.hostEventReveals)
-				if (reveal.releasedHold && reveal.state.stagedCapture === reveal.capture)
-					reveal.state.transitionHeld = false;
-		// After the replay, which can restore a bag's queued state.
-		dropRootOps(transaction, 0, 0);
+			// Slot snapshots restore render state, but cannot restore a transition
+			// hold the parked reveal has already released outside the journal.
+			if (transaction.hostEventReveals !== undefined)
+				for (const reveal of transaction.hostEventReveals)
+					if (reveal.releasedHold && reveal.state.stagedCapture === reveal.capture)
+						reveal.state.transitionHeld = false;
+			// After the replay, which can restore a bag's queued state.
+			dropRootOps(transaction, 0, 0);
+		} else transaction.ops.length = 0;
 		// A Block discarded with its parent has no creation entry
 		// (createdInRootRender). Unmount any its parent's undo did not reach.
 		const created = transaction.created;
@@ -1201,7 +1212,7 @@ export function rollbackRootRender(transaction: RootRenderTransaction): void {
 				if (!created[i].disposed) undoCreatedInRootRender(created[i]);
 		discardOffscreenCapture(transaction.capture);
 	} finally {
-		ROOT_RENDER_ROLLBACK = previousRollback;
+		if (ROOT_ROLLBACK) markRootRenderRollback(previousRollback);
 		endRootRender(frame);
 	}
 }
@@ -1289,7 +1300,7 @@ export function acceptHydrationHostEvents(transaction: RootRenderTransaction): b
 				const undo = install();
 				// A later installer may revoke this acceptance. Undo belongs to this
 				// transaction even though no render frame is active here.
-				if (undo !== undefined) transaction.log.push(JOURNAL_UNDO, undo, null, null);
+				if (undo !== undefined) transaction.log!.push(JOURNAL_UNDO, undo, null, null);
 			} catch (error) {
 				if (install.recover === undefined) throw error;
 				failed = { recover: install.recover, error };
@@ -1436,9 +1447,9 @@ export function commitRootRenders(): void {
 							COMMIT_OP = i;
 							try {
 								// A commit function's `careful` flag, as bagDone passes it.
-								const careful =
-									TRANSITION_JOURNAL !== null ||
-									(_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0);
+								const careful = TRANSITION_JOURNAL
+									? true
+									: _dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0;
 								if (bag) {
 									// commitQueuedBag, inline.
 									const next = target.next;
@@ -1520,6 +1531,8 @@ export let VT_ACTION_CUE = false;
 /** Install the concrete driver only when a ViewTransition-facing API survives. */
 export function ensureViewTransitionDriver(): ViewTransitionDriver {
 	if (VIEW_TRANSITION_DRIVER) return VIEW_TRANSITION_DRIVER;
+	// A held commit drops when its root is replaced or unmounted meanwhile.
+	installRootRollback();
 	const driver: ViewTransitionDriver = {
 		addType(type) {
 			if (VT_PENDING_TYPES.indexOf(type) === -1) VT_PENDING_TYPES.push(type);
@@ -1643,7 +1656,7 @@ export function ensureViewTransitionDriver(): ViewTransitionDriver {
 		queueAllTransition,
 		renderBoundary(block, props) {
 			const rare = blockRare(block);
-			if (TRANSITION_JOURNAL !== null) journalRootProperty(rare, 'vt', rare.vt);
+			if (TRANSITION_JOURNAL) journalRootProperty(rare, 'vt', rare.vt);
 			if (rare.vt === null) {
 				// Visibility snapshots decide activation: retained Activity boundaries
 				// can enter/exit without changing this mounted-boundary registration.
@@ -4660,12 +4673,11 @@ export function discardHydratePresentation(state: HydrateSlot, capture: Offscree
 			PRESENTATION_PREPARATIONS.delete(frame.lease);
 	// These scopes never acquired the visible DOM. In a new root transaction,
 	// ordinary unmount(false) means deferred parent-owned deletion, not rollback.
-	const previousRollback = ROOT_RENDER_ROLLBACK;
-	ROOT_RENDER_ROLLBACK = true;
+	const previousRollback = markRootRenderRollback(true);
 	try {
 		withRefDetachSuppression(refs, () => resetScopeChildren(state.block, false));
 	} finally {
-		ROOT_RENDER_ROLLBACK = previousRollback;
+		markRootRenderRollback(previousRollback);
 	}
 	state.block.mounted = false;
 	state.block.deoptNode = null;
@@ -5289,13 +5301,14 @@ export function makeRoot(
 			!isCreatedInRootRender(renderOwner.transaction!, previousRoot);
 		const oldFirst = staged ? getFirstChild(container) : null;
 		const oldLast = staged ? container.lastChild : null;
-		journalUndo(() => {
-			rootBlock = previousRoot;
-			currentBody = previousBody;
-			currentKey = previousKey;
-			renderOwner.current = previousRoot;
-			if (previousRoot !== null) registerRootDisposer(previousRoot);
-		});
+		if (TRANSITION_JOURNAL)
+			journalUndo(() => {
+				rootBlock = previousRoot;
+				currentBody = previousBody;
+				currentKey = previousKey;
+				renderOwner.current = previousRoot;
+				if (previousRoot !== null) registerRootDisposer(previousRoot);
+			});
 		try {
 			if (rootBlock) {
 				DOM_ROOT_DISPOSERS.delete(rootBlock);
@@ -5407,6 +5420,9 @@ export function makeRoot(
 					error = unhandled;
 					const transaction = renderOwner.transaction;
 					if (transaction !== null) rollbackRootRender(transaction);
+					// Without a journal nothing restores the screen this mount replaces,
+					// so it goes with the failed one, as a restored one would below.
+					if (!ROOT_ROLLBACK && staged && !previousRoot!.disposed) unmountBlock(previousRoot!);
 					// Match the scheduled-render failure path: discard the failed tree
 					// before surfacing the error, but keep the public root reusable for a
 					// later recovery render. In particular, effects registered before the

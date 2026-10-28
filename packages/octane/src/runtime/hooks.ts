@@ -32,12 +32,13 @@ import {
 	resolveSlot,
 	MANUAL_HOOK_DRIVER,
 	invokeManualHook,
+	ROOT_RENDER_ROLLBACK,
+	TRANSITION_JOURNAL,
 } from './drivers.js';
 import { compilerMemoPass, captureRenderPhaseUpdate } from './signal-owners.js';
 import { storeSyncQueue } from './refs.js';
 import {
 	TRANSITION_HOLDERS,
-	ROOT_RENDER_ROLLBACK,
 	type EffectEventCommitAction,
 	UPDATE_DEPTH_CAUSES,
 	scheduleRender,
@@ -61,7 +62,6 @@ import {
 	CURRENT_SCOPE,
 	CURRENT_BLOCK,
 	CURRENT_WARM_EPISODE,
-	TRANSITION_JOURNAL,
 	ROOT_RENDER_TRANSACTION,
 	WIP_CAPTURE,
 	enqueueEffect,
@@ -1188,7 +1188,7 @@ export function compilerMemoRegion(scope: Scope, bodyId: number): CompilerMemoRe
 	// The body may publish a new output cache. A held or rolled-back render
 	// restores the cache with the screen it describes, so a retry re-enters what
 	// the rollback undid.
-	if (TRANSITION_JOURNAL !== null && region.auto !== undefined && !ROOT_RENDER_ROLLBACK) {
+	if (TRANSITION_JOURNAL && region.auto !== undefined && !ROOT_RENDER_ROLLBACK) {
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, region, 'auto', region.auto);
 	}
 	return region;

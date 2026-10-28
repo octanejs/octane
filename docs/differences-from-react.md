@@ -1730,6 +1730,15 @@ Other consequences:
   a catch-only error boundary (`ErrorBoundary`, or a `@try` with only
   `@catch`) does not own suspension, on the client or the server; promises
   thrown by effects remain application errors.
+- On the client, suspension ships only with an entry that can suspend or hold
+  a render: `use`, `lazy`, `Suspense`, `@try`, `Hydrate` and hydration, native
+  signal reads, `ViewTransition`, or a renderer region. Each installs the
+  render rollback that holds the committed screen while a render waits. A
+  bundle that keeps none of them, including one whose only boundary is
+  `ErrorBoundary`, ships no rollback, and there a thenable thrown during
+  render or rendered as a child is an ordinary render error: the nearest error
+  boundary catches it, or it unmounts the root like any uncaught error. React
+  suspends on it.
 - A Suspense retry runs on the settling thenable's microtask; React waits for a
   Scheduler task. If the retry suspends again on a thenable Octane has already
   seen settle, the next retry yields one macrotask after that thenable notifies,

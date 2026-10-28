@@ -25,6 +25,7 @@ import type {
 	Scope,
 	Block,
 	RootRenderOwner,
+	RootRenderTransaction,
 	RefAttach,
 	SuspenseRefEntry,
 	OffscreenCapture,
@@ -125,7 +126,7 @@ import {
 	registerActivityPortal,
 	detachRegisteredSubtreeRefs,
 } from './activity.js';
-import { withRegisteredRefDetachSuppression } from './commit.js';
+import { withRegisteredRefDetachSuppression, JOURNAL_OPS } from './commit.js';
 import { publishRegisteredManualFormPending } from './actions.js';
 import { delegateEvents } from './events.js';
 import type { tryMemoBail } from './component-slots.js';
@@ -152,6 +153,7 @@ import {
 	restoreControlledStates,
 	maybeEnqueueRestore,
 } from './forms.js';
+import { installRootRollback } from '../rollback-flag.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -174,6 +176,113 @@ export let withRefDetachSuppression: typeof withRegisteredRefDetachSuppression =
 export let TRANSITION_TASK_DRIVER: TransitionTaskDriver | null = null;
 export let TRANSITION_ROOT_DRIVER: TransitionRootDriver | null = null;
 export let SCHEDULED_VISIBILITY_DRIVER: ScheduledVisibilityDriver | null = null;
+
+// The root render journal. A root render updates its scopes' records in place
+// while its DOM writes wait for the commit (#2043), so only a feature that can
+// drop a render needs those updates undone: Suspense and use(), lazy,
+// hydration, native-read validation and ViewTransition holds. Each installs
+// the journal before its first render (rollback-flag.ts). Without one,
+// nothing assigns the state below, so every journal write folds away, and a
+// render ends in its commit or in its root's teardown: an uncaught error or an
+// unmount, which needs nothing undone (rollbackRootRender).
+/** Flat undo log, four slots per entry: kind, target, a, b. */
+export let TRANSITION_JOURNAL: any[] | null = null;
+/** Bags already captured in the open window, so each is snapshotted once. */
+export let TRANSITION_JOURNAL_BAGS: Map<object, number> | null = null;
+export let TRANSITION_JOURNAL_CHECKPOINT = 0;
+/** Bag snapshots use one stamp per rollback window, including nested boundaries. */
+export let TRANSITION_JOURNAL_BAG_WINDOW = 0;
+let NEXT_TRANSITION_JOURNAL_BAG_WINDOW = 0;
+/** Open windows: 1 in a root render. Boundaries nest, and only the outermost may drop the log. */
+export let TRANSITION_JOURNAL_DEPTH = 0;
+/** Ops length when the innermost open window began; 0 for the root window. */
+export let OPS_CHECKPOINT = 0;
+const OPS_CHECKPOINTS: number[] = [];
+const TRANSITION_JOURNAL_WINDOWS: number[] = [];
+const TRANSITION_JOURNAL_BAG_WINDOWS: number[] = [];
+/** A rollback is replaying the journal: what it undoes journals and queues nothing. */
+export let ROOT_RENDER_ROLLBACK = false;
+/** The windows root render frames interrupted, six slots each; frames nest. */
+const ROOT_JOURNAL_FRAMES: any[] = [];
+
+/** Open a root render frame's journal window, saving the one it interrupts (beginRootRender). */
+export function enterRootJournal(transaction: RootRenderTransaction): void {
+	ROOT_JOURNAL_FRAMES.push(
+		TRANSITION_JOURNAL,
+		TRANSITION_JOURNAL_BAGS,
+		TRANSITION_JOURNAL_CHECKPOINT,
+		TRANSITION_JOURNAL_BAG_WINDOW,
+		TRANSITION_JOURNAL_DEPTH,
+		OPS_CHECKPOINT,
+	);
+	if (transaction.log === null) {
+		transaction.log = [];
+		transaction.bags = new Map();
+		transaction.bagWindow = ++NEXT_TRANSITION_JOURNAL_BAG_WINDOW;
+	}
+	TRANSITION_JOURNAL = transaction.log;
+	TRANSITION_JOURNAL_BAGS = transaction.bags;
+	TRANSITION_JOURNAL_CHECKPOINT = 0;
+	TRANSITION_JOURNAL_BAG_WINDOW = transaction.bagWindow;
+	TRANSITION_JOURNAL_DEPTH = 1;
+	OPS_CHECKPOINT = 0;
+}
+
+/** Restore the window the closing root render frame interrupted (endRootRender). */
+export function exitRootJournal(): void {
+	const frames = ROOT_JOURNAL_FRAMES;
+	// A frame that began before the journal was installed entered no window.
+	// Frames nest, so every frame entered since has already left.
+	if (frames.length === 0) return;
+	OPS_CHECKPOINT = frames.pop();
+	TRANSITION_JOURNAL_DEPTH = frames.pop();
+	TRANSITION_JOURNAL_BAG_WINDOW = frames.pop();
+	TRANSITION_JOURNAL_CHECKPOINT = frames.pop();
+	TRANSITION_JOURNAL_BAGS = frames.pop();
+	TRANSITION_JOURNAL = frames.pop();
+}
+
+/** Open a nested window and return the checkpoint to roll back to (armTransitionJournal). */
+export function openJournalWindow(): number {
+	TRANSITION_JOURNAL ??= [];
+	TRANSITION_JOURNAL_BAGS ??= new Map();
+	TRANSITION_JOURNAL_WINDOWS.push(TRANSITION_JOURNAL_CHECKPOINT);
+	TRANSITION_JOURNAL_BAG_WINDOWS.push(TRANSITION_JOURNAL_BAG_WINDOW);
+	TRANSITION_JOURNAL_CHECKPOINT = TRANSITION_JOURNAL.length;
+	TRANSITION_JOURNAL_BAG_WINDOW = ++NEXT_TRANSITION_JOURNAL_BAG_WINDOW;
+	TRANSITION_JOURNAL_DEPTH++;
+	const checkpoint = TRANSITION_JOURNAL.length;
+	OPS_CHECKPOINTS.push(OPS_CHECKPOINT);
+	const transaction = ROOT_RENDER_TRANSACTION;
+	if (transaction !== null) {
+		OPS_CHECKPOINT = transaction.ops.length;
+		TRANSITION_JOURNAL.push(
+			JOURNAL_OPS,
+			transaction,
+			OPS_CHECKPOINT,
+			transaction.retired?.size ?? 0,
+		);
+	}
+	return checkpoint;
+}
+
+/** Close the window openJournalWindow opened (disarmTransitionJournal). */
+export function closeJournalWindow(): void {
+	TRANSITION_JOURNAL_CHECKPOINT = TRANSITION_JOURNAL_WINDOWS.pop()!;
+	TRANSITION_JOURNAL_BAG_WINDOW = TRANSITION_JOURNAL_BAG_WINDOWS.pop()!;
+	OPS_CHECKPOINT = OPS_CHECKPOINTS.pop()!;
+	if (--TRANSITION_JOURNAL_DEPTH === 0) {
+		TRANSITION_JOURNAL = null;
+		TRANSITION_JOURNAL_BAGS = null;
+	}
+}
+
+/** Mark a rollback's replay (rollbackRootRender), returning the previous mark. */
+export function markRootRenderRollback(rolling: boolean): boolean {
+	const previous = ROOT_RENDER_ROLLBACK;
+	ROOT_RENDER_ROLLBACK = rolling;
+	return previous;
+}
 // Record actual committed ref identities only when an Activity is in use. A
 // hidden render may already have replaced its manifest's ref before cleanup;
 // the committed identity is the one that must be disconnected exactly once.
@@ -333,6 +442,8 @@ export function enableSignalBindings(abi = 1, potentialOnly = false): void {
 
 export function ensureNativeReadDriver(): NativeReadDriver {
 	if (NATIVE_READ_DRIVER) return NATIVE_READ_DRIVER;
+	// A render whose native reads changed before its commit is dropped.
+	installRootRollback();
 	// Native producers share the landed host-task queue without installing
 	// the transition root or offscreen-rendering capabilities.
 	TRANSITION_TASK_DRIVER ??= {
@@ -558,6 +669,8 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
  */
 export function installHydrationDriver(): void {
 	startHydration();
+	// A hydration attempt that misses or suspends is dropped and retried.
+	installRootRollback();
 	supplyNativeAdoptionMiss();
 	HYDRATION_DRIVER ??= {
 		acceptHostEvents: acceptHydrationHostEvents,

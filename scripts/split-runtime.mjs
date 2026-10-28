@@ -549,7 +549,7 @@ const OFF_CHAIN = ['profile-probes'];
 // split check; an entry that is in order again must be removed.
 const ORDER_BASELINE = new Set([
 	'act > DEFERRED_SWAPS',
-	'bindRendererRegionOwner > HYDRATION_PASS',
+	'bindRendererRegionOwnerImpl > HYDRATION_PASS',
 	'createdInRootRender > CURSOR',
 	'createdInRootRender > PRESENTATION_HYDRATION',
 	'ensureViewTransitionDriver > CURSOR',
@@ -564,7 +564,7 @@ const ORDER_BASELINE = new Set([
 	'seedOrCreate > HYDRATION_PASS',
 	'setHostProps > DESCRIPTOR_FORM_ACTION',
 	'unmountSlot > UNMOUNT_LITE_ARM',
-	'useBatch > HYDRATION_PASS',
+	'useBatchImpl > HYDRATION_PASS',
 	'useSyncExternalStore > CURSOR',
 	'useThenable > HYDRATION_PASS',
 	'vtHostVisible > hiddenDisplayNodes',

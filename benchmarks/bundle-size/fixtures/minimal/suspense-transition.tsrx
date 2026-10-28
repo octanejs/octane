@@ -5,9 +5,18 @@ function SuspendedValue(props: { resource: Promise<string> }) @{
 	<span id="minimal-suspense-value">{value as string}</span>
 }
 
-function SuspenseRoot(props: { initial: Promise<string>; next: Promise<string> }) @{
+function SuspenseRoot(props: {
+	initial: Promise<string>;
+	next: Promise<string>;
+	steps: string[];
+}) @{
 	const [resource, setResource] = useState(props.initial);
 	<div>
+		<ol>
+			@for (const step of props.steps; key step) {
+				<li>{step}</li>
+			}
+		</ol>
 		<button
 			id="minimal-transition-action"
 			onClick={() => startTransition(() => setResource(props.next))}
@@ -50,7 +59,7 @@ export async function run(container: HTMLElement) {
 		resolveNext = resolve;
 	});
 	const root = createRoot(container);
-	root.render(SuspenseRoot, { initial, next });
+	root.render(SuspenseRoot, { initial, next, steps: ['load', 'advance'] });
 	const pending = container.querySelector('#minimal-suspense-fallback')!.textContent;
 	resolveInitial!('ready');
 	// Retry-only reveals can stage a hidden primary before its fallback is

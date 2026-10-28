@@ -581,8 +581,9 @@ export interface HydrationEventReveal {
 
 export interface RootRenderTransaction {
 	owner: RootRenderOwner;
-	log: any[];
-	bags: Map<object, number>;
+	/** The undo journal, allocated by its first frame once installed (enterRootJournal). */
+	log: any[] | null;
+	bags: Map<object, number> | null;
 	capture: OffscreenCapture;
 	created: Block[] | null;
 	createdStamp: number;

@@ -110,6 +110,13 @@ import {
 	activityInsertionEffectCreated,
 	noop,
 	MEMO_BAIL,
+	TRANSITION_JOURNAL,
+	TRANSITION_JOURNAL_DEPTH,
+	ROOT_RENDER_ROLLBACK,
+	enterRootJournal,
+	exitRootJournal,
+	openJournalWindow,
+	closeJournalWindow,
 } from './drivers.js';
 import {
 	NATIVE_BLOCK_RETRIES,
@@ -138,7 +145,6 @@ import {
 	ARMED_TRANSITION_FALLS,
 	type RootRenderFrame,
 	ROOT_RENDER_TRANSACTIONS,
-	ROOT_RENDER_ROLLBACK,
 	journalUndo,
 	journalRootProperty,
 	isCreatedInRootRender,
@@ -256,10 +262,6 @@ import type { ForSlot } from './lists.js';
 import {
 	JOURNAL_RENDER,
 	JOURNAL_INPUTS,
-	JOURNAL_OPS,
-	TRANSITION_JOURNAL_WINDOWS,
-	TRANSITION_JOURNAL_BAG_WINDOWS,
-	OPS_CHECKPOINTS,
 	noteFrontierMember,
 	usesFrontier,
 	dropRootOps,
@@ -274,6 +276,7 @@ import {
 import { getNextSibling, DeferredHydrationSuspension } from './templates.js';
 import type { SubmitDispatchRec } from './actions.js';
 import { type EventSlot, invokeEventSlot, reportListenerError } from './events.js';
+import { ROOT_ROLLBACK } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -289,7 +292,7 @@ export let RETAINED_SIGNAL_OWNERS: SignalRetryOwners | undefined;
 
 export function discardSignalRetryItem(block: Block, error: unknown): void {
 	const previous = RETAINED_SIGNAL_OWNERS;
-	if (isSuspenseException(error)) {
+	if (ROOT_ROLLBACK && isSuspenseException(error)) {
 		const owner = block.idState.renderOwner;
 		const boundary = signalRetryBoundary(block);
 		const root = boundary?.tryBlock ?? owner?.current;
@@ -333,37 +336,6 @@ export let CURRENT_WARM_EPISODE = 0;
 // The effect sequence of a drain's falling-edge renders, and the drain and queue
 // index from which its renders are those (renderTransitionFall).
 let TRANSITION_FALL_SEQ = 0;
-/** Flat undo log, four slots per entry: kind, target, a, b. */
-export let TRANSITION_JOURNAL: any[] | null = null;
-/** Bags already captured in the open window, so each is snapshotted once. */
-export let TRANSITION_JOURNAL_BAGS: Map<object, number> | null = null;
-export let TRANSITION_JOURNAL_CHECKPOINT = 0;
-/** Bag snapshots use one stamp per rollback window, including nested boundaries. */
-export let TRANSITION_JOURNAL_BAG_WINDOW = 0;
-let NEXT_TRANSITION_JOURNAL_BAG_WINDOW = 0;
-/** Open windows. Boundaries nest, and only the outermost may drop the log. */
-export let TRANSITION_JOURNAL_DEPTH = 0;
-/** Ops length when the innermost open window began; 0 for the root window. */
-export let OPS_CHECKPOINT = 0;
-
-/** Open a nested window's ops checkpoint (paired with closeOpsWindow). */
-function openOpsWindow(): void {
-	OPS_CHECKPOINTS.push(OPS_CHECKPOINT);
-	const transaction = ROOT_RENDER_TRANSACTION;
-	if (transaction === null) return;
-	OPS_CHECKPOINT = transaction.ops.length;
-	TRANSITION_JOURNAL!.push(
-		JOURNAL_OPS,
-		transaction,
-		OPS_CHECKPOINT,
-		transaction.retired?.size ?? 0,
-	);
-}
-
-function closeOpsWindow(): void {
-	OPS_CHECKPOINT = OPS_CHECKPOINTS.pop()!;
-}
-
 // A root can discover its first suspension after any earlier sibling write.
 // Open an undo window before running user render code, but record only touched
 // bindings and changed structure. There is no subtree snapshot or preflight
@@ -402,12 +374,12 @@ export function beginRootRender(owner: RootRenderOwner | undefined): RootRenderF
 		capture.rootTransaction = true;
 		transaction = {
 			owner,
-			log: [],
-			bags: new Map(),
+			log: null,
+			bags: null,
 			capture,
 			created: null,
 			createdStamp: ++NEXT_ROOT_RENDER_CREATED_STAMP,
-			bagWindow: ++NEXT_TRANSITION_JOURNAL_BAG_WINDOW,
+			bagWindow: 0,
 			retainedCreated: null,
 			retired: null,
 			ops: owner.spareOps ?? [],
@@ -430,14 +402,8 @@ export function beginRootRender(owner: RootRenderOwner | undefined): RootRenderF
 	const frame: RootRenderFrame = {
 		transaction,
 		previous: ROOT_RENDER_TRANSACTION,
-		log: TRANSITION_JOURNAL,
-		bags: TRANSITION_JOURNAL_BAGS,
-		checkpoint: TRANSITION_JOURNAL_CHECKPOINT,
-		bagWindow: TRANSITION_JOURNAL_BAG_WINDOW,
-		depth: TRANSITION_JOURNAL_DEPTH,
 		capture: WIP_CAPTURE,
 		discardStamp: ROOT_DISCARD_STAMP,
-		opsCheckpoint: OPS_CHECKPOINT,
 	};
 	if (DEFERRED_LAYOUT_DRIVER) DEFERRED_LAYOUT_DRIVER.recordRootTransaction(transaction);
 	ROOT_RENDER_TRANSACTION = transaction;
@@ -445,12 +411,7 @@ export function beginRootRender(owner: RootRenderOwner | undefined): RootRenderF
 		transaction.hydrating === true || transaction.retainedCreated !== null
 			? -1
 			: transaction.createdStamp;
-	TRANSITION_JOURNAL = transaction.log;
-	TRANSITION_JOURNAL_BAGS = transaction.bags;
-	TRANSITION_JOURNAL_CHECKPOINT = 0;
-	TRANSITION_JOURNAL_BAG_WINDOW = transaction.bagWindow;
-	TRANSITION_JOURNAL_DEPTH = 1;
-	OPS_CHECKPOINT = 0;
+	if (ROOT_ROLLBACK) enterRootJournal(transaction);
 	WIP_CAPTURE = transaction.capture;
 	// An early binding program defers its writes until the outermost slice closes.
 	if (renderSlice && frame.previous === null) renderSlice.open = true;
@@ -473,12 +434,7 @@ export function endRootRender(frame: RootRenderFrame | null): void {
 		__profileRootExit();
 	ROOT_RENDER_TRANSACTION = frame.previous;
 	ROOT_DISCARD_STAMP = frame.discardStamp;
-	TRANSITION_JOURNAL = frame.log;
-	TRANSITION_JOURNAL_BAGS = frame.bags;
-	TRANSITION_JOURNAL_CHECKPOINT = frame.checkpoint;
-	TRANSITION_JOURNAL_BAG_WINDOW = frame.bagWindow;
-	TRANSITION_JOURNAL_DEPTH = frame.depth;
-	OPS_CHECKPOINT = frame.opsCheckpoint;
+	if (ROOT_ROLLBACK) exitRootJournal();
 	WIP_CAPTURE = frame.capture;
 	if (renderSlice && frame.previous === null) {
 		renderSlice.open = false;
@@ -583,6 +539,7 @@ export function suspendRootRender(block: Block, wakeable: PromiseLike<unknown>):
  */
 function armTransitionJournal(state: TrySlot): number {
 	if (
+		!ROOT_ROLLBACK ||
 		!state.hasResolved ||
 		state.hiddenDom !== null ||
 		!(
@@ -591,16 +548,7 @@ function armTransitionJournal(state: TrySlot): number {
 		)
 	)
 		return -1;
-	TRANSITION_JOURNAL ??= [];
-	TRANSITION_JOURNAL_BAGS ??= new Map();
-	TRANSITION_JOURNAL_WINDOWS.push(TRANSITION_JOURNAL_CHECKPOINT);
-	TRANSITION_JOURNAL_BAG_WINDOWS.push(TRANSITION_JOURNAL_BAG_WINDOW);
-	TRANSITION_JOURNAL_CHECKPOINT = TRANSITION_JOURNAL.length;
-	TRANSITION_JOURNAL_BAG_WINDOW = ++NEXT_TRANSITION_JOURNAL_BAG_WINDOW;
-	TRANSITION_JOURNAL_DEPTH++;
-	const checkpoint = TRANSITION_JOURNAL.length;
-	openOpsWindow();
-	return checkpoint;
+	return openJournalWindow();
 }
 
 /**
@@ -613,14 +561,7 @@ function armTransitionJournal(state: TrySlot): number {
  * to replay it.
  */
 function disarmTransitionJournal(checkpoint: number): void {
-	if (checkpoint < 0) return;
-	TRANSITION_JOURNAL_CHECKPOINT = TRANSITION_JOURNAL_WINDOWS.pop()!;
-	TRANSITION_JOURNAL_BAG_WINDOW = TRANSITION_JOURNAL_BAG_WINDOWS.pop()!;
-	closeOpsWindow();
-	if (--TRANSITION_JOURNAL_DEPTH === 0) {
-		TRANSITION_JOURNAL = null;
-		TRANSITION_JOURNAL_BAGS = null;
-	}
+	if (checkpoint >= 0) closeJournalWindow();
 }
 // useEffectEvent callback bodies are render output: updates become observable at
 // commit, before insertion/layout effects, and are discarded with an aborted
@@ -708,7 +649,7 @@ export function renderBlockInner(block: Block): true | undefined {
 	// journal can roll back even while its enclosing capture survives.
 	// Not for a Block the root window discards with its parent (createdInRootRender).
 	if (
-		TRANSITION_JOURNAL !== null &&
+		TRANSITION_JOURNAL &&
 		(TRANSITION_JOURNAL_DEPTH !== 1 ||
 			block.createdStamp !== ROOT_DISCARD_STAMP ||
 			block.parentBlock?.createdStamp !== ROOT_DISCARD_STAMP)
@@ -908,7 +849,9 @@ export function renderBlockInner(block: Block): true | undefined {
 		// Resource readers may throw a wakeable directly instead of calling use().
 		// Normalize only render throws: a promise thrown by an effect or cleanup
 		// is still an application error, not a request to suspend that commit.
-		if (error !== null && typeof error === 'object') {
+		// A bundle without an entry that can suspend cannot hold its screen while
+		// it waits, so there a thrown wakeable is an ordinary render error.
+		if (ROOT_ROLLBACK && error !== null && typeof error === 'object') {
 			try {
 				if (typeof (error as any).then === 'function') {
 					error = new SuspenseException(error as TrackedThenable);
@@ -934,7 +877,7 @@ export function renderBlockInner(block: Block): true | undefined {
 			// to the actual Suspense owner, passing through catch-only boundaries.
 			if (block.renderStatus !== RENDER_INVALID) {
 				let owner: Block | null = null;
-				const suspension = isSuspenseException(profileThrown);
+				const suspension = ROOT_ROLLBACK ? isSuspenseException(profileThrown) : false;
 				if (suspension || !isHostContextRequest(profileThrown)) {
 					for (let current: Block | null = block; current !== null; current = current.parentBlock) {
 						const claims = suspension
@@ -1644,7 +1587,7 @@ export function discardFrontierBlock(
 	retryLocation: SignalRetryLocation | undefined,
 ): void {
 	const previousRetained = RETAINED_SIGNAL_OWNERS;
-	if (retryLocation !== undefined && isSuspenseException(error)) {
+	if (ROOT_ROLLBACK && retryLocation !== undefined && isSuspenseException(error)) {
 		const owner = parentBlock.idState.renderOwner;
 		const boundary = signalRetryBoundary(parentBlock);
 		const retryRoot = boundary?.tryBlock ?? owner?.current;
@@ -1746,8 +1689,13 @@ export function updateDeoptComponent(block: Block, item: any, index: number): bo
 			(props === child.props && tryImplicitBail(child))
 		)
 			return true;
-		if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK && block.props !== item)
-			TRANSITION_JOURNAL!.push(JOURNAL_INPUTS, block, block.props, block.extra);
+		if (
+			TRANSITION_JOURNAL &&
+			ROOT_RENDER_TRANSACTION !== null &&
+			!ROOT_RENDER_ROLLBACK &&
+			block.props !== item
+		)
+			TRANSITION_JOURNAL.push(JOURNAL_INPUTS, block, block.props, block.extra);
 		block.props = item;
 		if (child.props !== props) journalRootProperty(child, 'props', child.props);
 		child.props = props;
@@ -2726,7 +2674,7 @@ export function mountFastHostItems<T>(
 	const previousBlock = CURRENT_BLOCK;
 	let previous: Block | null = null;
 	let current: Block | null = null;
-	if (TRANSITION_JOURNAL !== null) journalForSlot(state);
+	if (TRANSITION_JOURNAL) journalForSlot(state);
 	if (ROOT_RENDER_TRANSACTION !== null && state.env !== deps)
 		journalRootProperty(state, 'env', state.env);
 	state.env = deps;
@@ -2833,7 +2781,7 @@ export function renderLiteListItem(
 	body: ComponentBody,
 	env: any[] | undefined,
 ): void {
-	if (TRANSITION_JOURNAL === null && !NATIVE_READ_DRIVER) {
+	if (!TRANSITION_JOURNAL && !NATIVE_READ_DRIVER) {
 		body(block.props, block, env);
 		return;
 	}
