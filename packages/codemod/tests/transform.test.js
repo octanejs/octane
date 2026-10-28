@@ -180,14 +180,17 @@ describe('strengthen', () => {
 		expect(compileErrors(result.code, 'raw.tsrx')).toEqual([]);
 	});
 
-	it('removes the directive it added after a `"use client"` prologue', async () => {
+	it.each([
+		["'use client';\n\n", /^'use client';\n\n"use strong";\nexport/],
+		['/* a comment */ ', /^"use strong";\n\n\/\* a comment \*\/ export/],
+	])('removes the directive it added after %j on fallback', async (prologue, added) => {
 		const compiler = await loadCompiler(import.meta.dirname);
-		const source =
-			"'use client';\n\nexport function Raw({ html }: { html: string }) {\n\treturn <div dangerouslySetInnerHTML={{ __html: html }} />;\n}\n";
-		const { code } = transformModule(source, 'raw.tsx', { strong: true });
-		expect(code).toMatch(/^'use client';\n"use strong";\n\nexport/);
+		const body =
+			'export function Raw({ html }: { html: string }) {\n\treturn <div dangerouslySetInnerHTML={{ __html: html }} />;\n}\n';
+		const { code } = transformModule(prologue + body, 'raw.tsx', { strong: true });
+		expect(code).toMatch(added);
 		const result = strengthen(compiler, code, path.join(FIXTURES, 'raw.tsrx'));
 		expect(result.strong).toBe(false);
-		expect(result.code).toMatch(/^'use client';\n\nexport function Raw/);
+		expect(result.code.startsWith(prologue + 'export function Raw')).toBe(true);
 	});
 });

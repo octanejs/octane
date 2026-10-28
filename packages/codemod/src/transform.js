@@ -864,8 +864,13 @@ class ModuleTransform {
 	 * @param {string} code
 	 */
 	insertionPoint(code) {
+		// Whole lines only: a shebang, blank lines, comments that end their
+		// line, and directive lines. Anything inserted here starts a line, so
+		// the Strong fallback can find its own directive line again.
 		const prologue =
-			/^(?:\s*(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/)\s*)*(?:\s*(['"])use [a-z ]+\1;?[^\n]*\n)*/.exec(code);
+			/^(?:#![^\n]*\n)?(?:[ \t]*(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/[ \t]*|(['"])use [a-z ]+\1;?[^\n]*)?\r?\n)*/.exec(
+				code,
+			);
 		return prologue ? prologue[0].length : 0;
 	}
 

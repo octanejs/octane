@@ -37,6 +37,9 @@ describe('runCodemod', () => {
 			'src/components/index.tsx':
 				"import { Slot } from '@radix-ui/react-slot';\nexport function Button(props: { children: unknown }) {\n\treturn <Slot>{props.children as any}</Slot>;\n}\n",
 			'src/routes.ts': "export const routes = [() => import('./App.tsx')];\n",
+			// Build output is not source.
+			'out/App.js':
+				"import { jsx } from 'react/jsx-runtime';\nexport const App = () => jsx('p', {});\n",
 		});
 		const result = await runCodemod([root]);
 
@@ -55,6 +58,7 @@ describe('runCodemod', () => {
 		expect(fs.existsSync(path.join(root, 'src/App.tsx'))).toBe(false);
 		// Configs belong to `octane init`.
 		expect(read('vite.config.ts')).toContain('@vitejs/plugin-react');
+		expect(read('out/App.js')).toContain("from 'react/jsx-runtime'");
 
 		expect(result.packages).toEqual([
 			{ from: '@tanstack/react-query', to: '@octanejs/tanstack-query' },
