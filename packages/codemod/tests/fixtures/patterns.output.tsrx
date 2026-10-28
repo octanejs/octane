@@ -13,7 +13,7 @@ export const Tree = memo(function Tree({ items, status }: { items: Item[]; statu
             if (item.hidden) return null;
             const label = item.label.toUpperCase();
             <li>
-              {label}
+              {label as string}
               @if (item.children) { <Tree items={item.children} status="idle" /> }
             </li>
           }
@@ -22,8 +22,8 @@ export const Tree = memo(function Tree({ items, status }: { items: Item[]; statu
     }
     @for (const item of items; key item.id) {
       <>
-        <dt>{item.label}</dt>
-        <dd>{item.id}</dd>
+        <dt>{item.label as string}</dt>
+        <dd>{item.id as string}</dd>
       </>
     }
   </div>

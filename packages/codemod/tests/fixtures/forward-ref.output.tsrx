@@ -12,7 +12,7 @@ Button.displayName = 'Button';
 export const Input = memo(
   function Input({ ref: forwarded, ...props }: { label: string } & { ref?: Ref<HTMLInputElement> }) @{
     <label>
-      {props.label}
+      {props.label as string}
       <input ref={forwarded} />
     </label>
   },

@@ -17,6 +17,12 @@ import {
  *   bodies as templates; `tsx` keeps JSX and only ports the React APIs.
  * @property {boolean} [strong] emit Strong-mode source: add `"use strong"` and
  *   leave omitted dependency lists to the compiler.
+ * @property {boolean} [strictNullChecks] the project checks with
+ *   `strictNullChecks`, so a TypeScript module's own types may prove a child
+ *   hole is text
+ * @property {{ sourceFile: ts.SourceFile, checker: ts.TypeChecker }} [types]
+ *   this module in a program over the whole project, whose resolved imports
+ *   type what the module's own program cannot
  * @property {(specifier: string) => string | null} [resolveSpecifier] the new
  *   spelling of an import specifier (a renamed module, a binding package), or
  *   null to keep it.
@@ -73,6 +79,7 @@ const RULE = {
 	component: 'template-component',
 	if: 'template-if',
 	for: 'template-for',
+	text: 'template-text',
 	try: 'template-try',
 	unsupported: 'unsupported-api',
 	strong: 'strong',
@@ -91,14 +98,17 @@ export function transformModule(source, filename, options = {}) {
 }
 
 /**
- * Parse and bind one module on its own, with no libraries and no module
- * resolution. Binding is enough to map every name to the declaration it refers
- * to, so a shadowed `useState` or event parameter is never mistaken for another.
+ * Parse and bind one module on its own, with only the ES5 library and no
+ * module resolution. Binding is enough to map every name to the declaration it
+ * refers to, so a shadowed `useState` or event parameter is never mistaken for
+ * another; the library gives the module's own types their array and string
+ * members.
  *
  * @param {string} filename
  * @param {string} source
  */
 function bind(filename, source) {
+	const lib = esLib();
 	const sf = ts.createSourceFile(
 		filename,
 		source,
@@ -108,22 +118,50 @@ function bind(filename, source) {
 	);
 	/** @type {ts.CompilerHost} */
 	const host = {
-		getSourceFile: (name) => (name === filename ? sf : undefined),
-		getDefaultLibFileName: () => 'lib.d.ts',
+		getSourceFile: (name) => (name === filename ? sf : name === lib.fileName ? lib : undefined),
+		getDefaultLibFileName: () => lib.fileName,
 		writeFile: () => {},
 		getCurrentDirectory: () => '',
 		getCanonicalFileName: (name) => name,
 		useCaseSensitiveFileNames: () => true,
 		getNewLine: () => '\n',
-		fileExists: (name) => name === filename,
+		fileExists: (name) => name === filename || name === lib.fileName,
 		readFile: () => undefined,
 	};
 	const program = ts.createProgram({
-		rootNames: [filename],
-		options: { noLib: true, noResolve: true, allowJs: true, jsx: ts.JsxEmit.Preserve, types: [] },
+		rootNames: [filename, lib.fileName],
+		options: {
+			noLib: true,
+			noResolve: true,
+			allowJs: true,
+			jsx: ts.JsxEmit.Preserve,
+			types: [],
+			// As the compiler's typed-text proof requires: a `string` excludes
+			// null, and an indexed read may be missing.
+			strictNullChecks: true,
+			noUncheckedIndexedAccess: true,
+		},
 		host,
 	});
 	return { sf, checker: program.getTypeChecker() };
+}
+
+/** @type {ts.SourceFile | undefined} */
+let es5;
+
+/**
+ * The ES5 library, parsed once and shared by every module's program, so
+ * array and string members have types.
+ */
+function esLib() {
+	const file = ts.getDefaultLibFilePath({}).replace(/[^/\\]+$/, 'lib.es5.d.ts');
+	es5 ??= ts.createSourceFile(
+		'lib.es5.d.ts',
+		/** @type {string} */ (ts.sys.readFile(file)),
+		ts.ScriptTarget.Latest,
+		true,
+	);
+	return es5;
 }
 
 /** @param {string} filename */
@@ -147,6 +185,87 @@ function skipParens(node) {
 /** @param {ts.Node} node */
 function isJsx(node) {
 	return ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
+}
+
+/**
+ * Whether a hole is already spelled as text, or as a literal the cast would
+ * only clutter.
+ *
+ * @param {ts.Expression} node
+ */
+function isTextSpelling(node) {
+	node = skipParens(node);
+	return (
+		ts.isNumericLiteral(node) ||
+		ts.isBigIntLiteral(node) ||
+		ts.isAsExpression(node) ||
+		isStringSpelling(node)
+	);
+}
+
+/**
+ * Whether the compiler proves `node` a string by its spelling: a string
+ * literal, a `String()` call, or a concatenation with one.
+ *
+ * @param {ts.Expression} node
+ * @returns {boolean}
+ */
+function isStringSpelling(node) {
+	node = skipParens(node);
+	if (ts.isStringLiteral(node) || ts.isTemplateLiteral(node)) return true;
+	if (ts.isCallExpression(node)) {
+		return ts.isIdentifier(node.expression) && node.expression.text === 'String';
+	}
+	return (
+		ts.isBinaryExpression(node) &&
+		node.operatorToken.kind === ts.SyntaxKind.PlusToken &&
+		(isStringSpelling(node.left) || isStringSpelling(node.right))
+	);
+}
+
+/**
+ * What a type renders as: 1 when every member is a string, 2 when every
+ * member is a string, number, or bigint and one is not a string, else 0. The
+ * compiler's typed-text proof applies the same test.
+ *
+ * @param {ts.Type} type
+ * @returns {0 | 1 | 2}
+ */
+function textKind(type) {
+	const { TypeFlags } = ts;
+	const opaque =
+		TypeFlags.Any | TypeFlags.Unknown | TypeFlags.Never | TypeFlags.VoidLike | TypeFlags.Null;
+	if (type.flags & opaque) return 0;
+	if (type.flags & TypeFlags.StringLike) return 1;
+	if (type.flags & (TypeFlags.NumberLike | TypeFlags.BigIntLike)) return 2;
+	if (!type.isUnion()) return 0;
+	/** @type {0 | 1 | 2} */
+	let kind = 1;
+	for (const member of type.types) {
+		const each = textKind(member);
+		if (each === 0) return 0;
+		if (each === 2) kind = 2;
+	}
+	return kind;
+}
+
+/**
+ * The outermost node of `sf` spanning exactly `[start, end)`.
+ *
+ * @param {ts.SourceFile} sf
+ * @param {number} start
+ * @param {number} end
+ * @returns {ts.Node | null}
+ */
+function nodeSpanning(sf, start, end) {
+	/** @type {ts.Node} */
+	let node = sf;
+	for (;;) {
+		const child = ts.forEachChild(node, (c) => (c.pos <= start && c.end >= end ? c : undefined));
+		if (!child) return null;
+		if (child.getStart(sf) === start && child.end === end) return child;
+		node = child;
+	}
 }
 
 /** @param {ts.Node} node */
@@ -344,6 +463,7 @@ class ModuleTransform {
 		this.options = options;
 		this.target = options.target ?? 'tsrx';
 		this.strong = options.strong === true;
+		this.textTypes = options.strictNullChecks === true && /\.[cm]?tsx?$/.test(filename);
 		const { sf, checker } = bind(filename, source);
 		this.sf = sf;
 		this.checker = checker;
@@ -593,6 +713,16 @@ class ModuleTransform {
 	}
 
 	/**
+	 * Whether this module declares `symbol`, rather than the library or
+	 * nothing at all.
+	 *
+	 * @param {ts.Symbol | undefined} symbol
+	 */
+	declaresHere(symbol) {
+		return symbol?.declarations?.some((d) => d.getSourceFile() === this.sf) ?? false;
+	}
+
+	/**
 	 * Whether the module reads `name` as a global, such as the DOM's
 	 * `MouseEvent`, which an import of the same name would shadow.
 	 *
@@ -606,7 +736,7 @@ class ModuleTransform {
 				node.text === name &&
 				!isPropertyName(node) &&
 				!declaresName(node) &&
-				!this.checker.getSymbolAtLocation(node)
+				!this.declaresHere(this.checker.getSymbolAtLocation(node))
 			) {
 				return true;
 			}
@@ -1612,13 +1742,67 @@ class ModuleTransform {
 	rewriteHole(node) {
 		if (!node.expression || node.dotDotDotToken) return null;
 		const directive = this.directive(node.expression);
-		if (directive === null) return null;
+		if (directive === null) return this.textHole(node);
 		// Comments the directive did not carry over sit before it, as JSX
 		// comments, since this is a children position.
 		const lost = this.lostComments(node.getStart(this.sf) + 1, node.end - 1, directive)
 			.map((comment) => `{/* ${commentText(comment)} */}\n`)
 			.join('');
 		return this.absolute(lost + directive, node);
+	}
+
+	/**
+	 * A child hole the module's types prove is a string, number, or bigint,
+	 * spelled as text so it compiles to a text binding rather than a
+	 * renderable hole. React renders those values as text too.
+	 *
+	 * @param {ts.JsxExpression} node
+	 */
+	textHole(node) {
+		const expression = /** @type {ts.Expression} */ (node.expression);
+		if (!this.textTypes || isTextSpelling(expression)) return null;
+		const kind = textKind(this.typeOf(expression));
+		if (kind === 0) return null;
+		this.count(RULE.text);
+		const value = this.emit(expression, PLAIN);
+		let text;
+		if (kind === 1) {
+			const bare =
+				ts.isIdentifier(expression) ||
+				ts.isPropertyAccessExpression(expression) ||
+				ts.isElementAccessExpression(expression) ||
+				ts.isCallExpression(expression) ||
+				ts.isParenthesizedExpression(expression) ||
+				ts.isNonNullExpression(expression);
+			text = `${bare ? value : `(${value})`} as string`;
+		} else if (
+			this.declaresHere(this.checker.resolveName('String', node, ts.SymbolFlags.Value, false))
+		) {
+			text = `\`\${${value}}\``;
+		} else {
+			text = `String(${value})`;
+		}
+		return (
+			this.span(node, node.getStart(this.sf), expression.getStart(this.sf), PLAIN) +
+			text +
+			this.span(node, expression.end, node.end, PLAIN)
+		);
+	}
+
+	/**
+	 * The type of `expression`, from the project's program when it has this
+	 * module, else from the module's own.
+	 *
+	 * @param {ts.Expression} expression
+	 */
+	typeOf(expression) {
+		const types = this.options.types;
+		if (types?.sourceFile.text === this.source) {
+			const start = expression.getStart(this.sf);
+			const same = nodeSpanning(types.sourceFile, start, expression.end);
+			if (same?.kind === expression.kind) return types.checker.getTypeAtLocation(same);
+		}
+		return this.checker.getTypeAtLocation(expression);
 	}
 
 	/**

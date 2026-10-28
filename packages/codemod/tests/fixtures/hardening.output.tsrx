@@ -25,10 +25,12 @@ export function Notes({ notes, items, html }: { notes: string[]; items: string[]
   <Tooltip.Provider>
     <button onClick={handle}>Log</button>
     {/* Only shown with notes. */}
-    @if (notes.length > 0) { <p>{notes.length}</p> }
+    @if (notes.length > 0) { <p>{String(notes.length)}</p> }
     {/* Rendered as preformatted text. */}
-    @if (notes.length > 0) { <pre title={`first line
-  second line`}>{html}</pre> }
+    @if (notes.length > 0) {
+      <pre title={`first line
+  second line`}>{html as string}</pre>
+    }
     {items.map((items) => <span key={items.join()}>{items}</span>)}
     {notes.map(function (note) {
       return <i key={note}>{this === undefined ? note : ''}</i>;

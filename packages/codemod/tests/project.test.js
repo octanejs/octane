@@ -137,6 +137,28 @@ describe('runCodemod', () => {
 		expect(fs.existsSync(path.join(root, 'src/A.tsrx'))).toBe(false);
 	});
 
+	it('spells holes as text through imported types, only under strictNullChecks', async () => {
+		const files = {
+			'package.json': '{ "name": "app" }',
+			'src/types.ts': 'export interface Story { title: string; score: number; by?: string }\n',
+			'src/Story.tsx':
+				"import type { Story } from './types.js';\nexport function Row({ story }: { story: Story }) {\n\treturn <p>{story.title} {story.score} {story.by}</p>;\n}\n",
+		};
+		const strict = project({
+			...files,
+			'tsconfig.json': '{ "compilerOptions": { "strict": true } }',
+		});
+		const loose = project({ ...files, 'tsconfig.json': '{ "compilerOptions": {} }' });
+		const code = async (/** @type {string} */ root) =>
+			(await runCodemod([root], { write: false })).files.find((f) => f.file === 'src/Story.tsx')
+				?.code;
+		// An optional `by` may be undefined, which React renders as nothing.
+		expect(await code(strict)).toContain(
+			'<p>{story.title as string} {String(story.score)} {story.by}</p>',
+		);
+		expect(await code(loose)).toContain('<p>{story.title} {story.score} {story.by}</p>');
+	});
+
 	it('migrates the Hacker News reader to modules matching its hand-written TSRX twin', async () => {
 		const example = path.join(REPO, 'examples/hacker-news');
 		const twin = fs

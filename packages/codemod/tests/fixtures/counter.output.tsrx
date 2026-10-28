@@ -10,7 +10,7 @@ export default function Counter({ initial = 0, label }: Props) @{
   }, null);
 
   <div class="counter">
-    <span>{label}</span>
+    <span>{label as string}</span>
     <button onClick={() => setCount((c) => c + 1)}>+</button>
     @if (count > 10) { <strong>Big!</strong> }
     @if (count === 0) { <em>zero</em> } @else { <span>{count}</span> }

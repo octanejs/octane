@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { findRoot, scanSourceFiles } from '@octanejs/cli';
 import { DATA } from '@octanejs/cli/data';
+import ts from 'typescript';
 import { finding, loadCompiler, thrown } from './compiler.js';
 import { strengthen } from './strong.js';
 import { transformModule } from './transform.js';
@@ -66,6 +67,8 @@ export async function runCodemod(paths, options = {}) {
 	const files = paths.flatMap((entry) => collect(path.resolve(entry)));
 
 	const known = new Set(files);
+	const program = projectProgram(root, files);
+	const checker = program?.getTypeChecker();
 	/** @type {Map<string, string>} */
 	const renames = new Map();
 	/** @type {Map<string, import('./transform.js').ModuleExports>} */
@@ -99,9 +102,12 @@ export async function runCodemod(paths, options = {}) {
 			const target = resolveModule(file, specifier, known);
 			return target ? contextsOf(target.file).has(name) : null;
 		};
+		const sourceFile = program?.getSourceFile(file);
 		const result = transformModule(source, file, {
 			target,
 			strong,
+			strictNullChecks: program !== null,
+			types: sourceFile && checker && { sourceFile, checker },
 			resolveSpecifier,
 			isContext,
 		});
@@ -216,6 +222,28 @@ function dedupe(diagnostics) {
 function collect(entry) {
 	if (fs.statSync(entry).isFile()) return isSource(entry) ? [entry] : [];
 	return scanSourceFiles(entry, { limit: Infinity }).filter(isSource).sort();
+}
+
+/**
+ * A program over the TypeScript modules being migrated, under the project's
+ * tsconfig, so their types resolve through imports. Null unless that config
+ * enables `strictNullChecks`: without it a `string` may still hold null, so
+ * types cannot prove a hole is text.
+ *
+ * @param {string} root
+ * @param {string[]} files
+ */
+function projectProgram(root, files) {
+	const file = ts.findConfigFile(root, ts.sys.fileExists);
+	if (!file) return null;
+	const { config } = ts.readConfigFile(file, ts.sys.readFile);
+	const { options } = ts.parseJsonConfigFileContent(config ?? {}, ts.sys, path.dirname(file));
+	if (!(options.strictNullChecks ?? options.strict)) return null;
+	return ts.createProgram(
+		files.filter((name) => /\.[cm]?tsx?$/.test(name)),
+		// As the compiler's typed-text proof requires.
+		{ ...options, noEmit: true, noUncheckedIndexedAccess: true },
+	);
 }
 
 /**

@@ -28,7 +28,9 @@ function compileErrors(code, filename, strong = false) {
 
 /** @param {string} name */
 function migrate(name) {
-	const result = transformModule(fs.readFileSync(path.join(FIXTURES, name), 'utf8'), name);
+	const result = transformModule(fs.readFileSync(path.join(FIXTURES, name), 'utf8'), name, {
+		strictNullChecks: true,
+	});
 	const output = name
 		.replace('.input.', '.output.')
 		.replace(/\.[jt]sx$/, (ext) => (result.template ? '.tsrx' : ext));
@@ -79,6 +81,27 @@ describe('transformModule', () => {
 		expect(code).toContain('@if (n > 0) { <u /> }');
 		// `ok` is a boolean, but proving that needs types.
 		expect(code).toContain('{ok && <i />}');
+	});
+
+	it('spells a hole as text only when the project proves it cannot be null', () => {
+		const source =
+			'export function A({ t, n }: { t: string; n: number }) {\n\treturn <p>{t} {n}</p>;\n}\n';
+		expect(transformModule(source, 'a.tsx', { strictNullChecks: true }).code).toContain(
+			'<p>{t as string} {String(n)}</p>',
+		);
+		// Without `strictNullChecks` a `string` may hold null, which React renders as nothing.
+		expect(transformModule(source, 'a.tsx').code).toContain('<p>{t} {n}</p>');
+		// A JavaScript module's inferred types are not a contract.
+		const js =
+			'export function A() {\n\tconst t = "a";\n\tlet n = 1;\n\treturn <p>{t} {n}</p>;\n}\n';
+		expect(transformModule(js, 'a.jsx', { strictNullChecks: true }).code).toContain(
+			'<p>{t} {n}</p>',
+		);
+		// A local `String` is not the global.
+		const shadowed = `const String = (n: number) => 'n';\n${source}`;
+		expect(transformModule(shadowed, 'a.tsx', { strictNullChecks: true }).code).toContain(
+			'{`${n}`}',
+		);
 	});
 
 	it('leaves a module already migrated untouched', () => {

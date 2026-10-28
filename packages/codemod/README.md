@@ -28,6 +28,7 @@ dependencies over to Octane.
 | `template-if` | `{a ? <A /> : <B />}`, `{a > 0 && <A />}` | `@if (a) { <A /> } @else { <B /> }` |
 | `template-for` | `{xs.map((x, i) => <li key={x.id} />)}` | `@for (const x of xs; index i; key x.id) { <li /> }` |
 | `template-try` | `<Suspense fallback={f}>…</Suspense>` | `@try { … } @pending { f }` |
+| `template-text` | `{title}` with `title: string`, `{count}` with `count: number` | `{title as string}`, `{String(count)}`: text bindings, not renderable holes |
 | `hook-dependencies` | `useEffect(fn)` (runs every render) | `useEffect(fn, null)`: an omitted list is inferred in Octane |
 | `forward-ref` | `forwardRef((props, ref) => …)` | `({ ref, ...props }) => …` |
 | `context-provider` | `<Ctx.Provider value>` | `<Ctx value>` |
@@ -40,7 +41,10 @@ dependencies over to Octane.
 
 Every rewrite keeps React's behavior. Where it cannot be proven equal, the code
 is left alone: `{count && <X />}` stays a hole, because React renders `0` there
-and `@if` would not. Modules that become templates are renamed to `.tsrx`, and
+and `@if` would not. `template-text` reads types through the project's
+`tsconfig.json` and runs only on TypeScript modules when that config enables
+`strictNullChecks`; otherwise a `string` may hold null, which React renders as
+nothing. Modules that become templates are renamed to `.tsrx`, and
 every import of them, dynamic imports and `index.html` entry scripts included,
 is updated.
 

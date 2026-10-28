@@ -4,7 +4,8 @@ Status: prototype landed in `packages/codemod` (2026-10-28); M1's workstream 1
 and Hacker News lane are done, and the lane passes all 10 Playwright journeys
 (2026-10-28, local run). The TS2300 fix landed in #2265, so the corpus now
 compiles with no errors; the first publish is outstanding. The js-framework
-benchmark run (2026-10-28) measures the output's speed. This plan takes it
+benchmark run (2026-10-28) measures the output's speed, and the text-hole rule
+it called for has landed. This plan takes it
 from a working prototype to a migration tool we can point at any React app.
 
 ## Goal
@@ -55,7 +56,10 @@ In-repo: `examples/hacker-news/jsx` migrates to 9 `.tsrx` modules (the same set
 as the hand-written twin), compiles clean, and **typechecks clean under
 `octane-tsc`**. With `--strong`, 6 of 9 become Strong; the other 3 are blocked
 only by `OCTANE_STRONG_UNTRUSTED_HTML`, a `trustHTML()` decision that belongs
-to a person.
+to a person. The text-hole rule casts the holes whose types prove them text
+(`{String(rank)}`, `{relativeTime(created) as string}`). It leaves optional
+fields such as `story.title?: string` as holes, where the hand-written twin
+casts them: React renders a missing title as nothing.
 
 Third-party corpus, shallow clones at pinned commits, dry run, every output
 compiled:
@@ -144,21 +148,46 @@ in a second run (ratios to that run's `octane-tsrx`):
 | A: text holes cast | 1.8× | 1.4× | 1.9× | 1.2× | 16× | 4.2× | 156× |
 | B: A, plus `memo(Row)` inlined into the `@for` | 1.04× | 1.00× | 1.02× | 0.95× | 28× | 6.8× | 297× |
 
-That gives three rule candidates:
+Two causes, both since confirmed:
 
-1. **Text holes** (workstream 2): `{item.label as string}` and
-   `{String(item.id)}` in place of bare holes take about 20% off run and
-   runlots. It needs the item types, so it waits for the type-aware program.
+- **`String()` in a row was a compiler gap, not React state.** B's slower
+  selection came from the `{String(item.id)}` cast inside the inlined row. In
+  compatibility mode the compiler treated a call to a global as possibly
+  reading live state, so that one call switched off every keyed-list fast path:
+  the row skip on a parent render, the whole-list cache that keyed selection
+  depends on, and the fast mount. The `useReducer` state and wrapped `dispatch`
+  were not involved: the same reducer app with a bare `{item.id}` selected at
+  0.79×. #2268 fixes the compiler (built-in conversions like `String` and
+  `Number` no longer count as render calls unless shadowed); with it, B's
+  source selects at 0.83×, select_lots 0.87×, swap 1.00×. #2268 is being
+  extended to component bodies, where `String()` still has the same cost.
+- **The un-inlined row's 18× select is `memo`'s comparator.**
+  `memo(Row, (a, b) => …)` hides the row from every fast path, so all 1,000
+  rows re-enter and run the comparator. `memo(Row)` without a comparator gets
+  the row skip and the list cache back; a plain `function Row` also gets the
+  fast mount. Inlining the row is unnecessary.
+
+The rule candidates, as they now stand:
+
+1. **Text holes: landed** (`template-text`). A child hole whose type is a
+   string becomes `{x as string}`; a number or bigint (or a mix with strings)
+   becomes `{String(x)}`, or `` {`${x}`} `` where a local shadows `String`. It
+   takes about 20% off run and runlots here. Types come from one program over
+   the project under its tsconfig, falling back to the module's own program.
+   It runs only on `.ts`/`.tsx` modules in a project with `strictNullChecks`,
+   the same boundary as the compiler's typed-text proof: otherwise a `string`
+   may hold null, which React renders as nothing. This fixture is `.jsx`, so it
+   stays bare. Across the corpus the rule casts 219 holes with no new compile
+   errors. `String()` stays fast in component bodies only once #2268's
+   extension lands.
 2. **`render(<App />)` → `render(App)`** (workstream 3): 3.0 kB gzip off the
    bundle (65.0 → 62.0 kB). Timing was not measured separately.
-3. **Row inlining, on hold.** Inlining the `memo` row component into the `@for`
-   reaches parity on run, replace, runlots, and clear, but almost doubles
-   selection cost: without `memo` every row re-renders on select, and the
-   inlined loop still misses the twin's keyed-selection path. The likely cause,
-   unconfirmed, is that the migrated app keeps React's single `useReducer`
-   state `{ data, selected }` behind a wrapped `dispatch`, where the twin uses
-   separate `useState`s. That is a compiler question; the rule waits for its
-   answer.
+3. **`memo` comparators**, in place of row inlining (workstream 3). Dropping a
+   comparator changes when the component renders, so it is not
+   behavior-preserving in general. Drop it when it compares a subset of props
+   by identity and every prop it omits is provably stable (a `useReducer`
+   `dispatch`, a `useCallback` with fixed dependencies), which is this
+   fixture's case. Otherwise report it with the measured cost.
 
 The rest of the byte gap is React habit (`memo`, `useReducer`, `flushSync`,
 separate `Button` and `Jumbotron` components), which a behavior-preserving
@@ -174,11 +203,11 @@ the description. Ordered by what unblocks the most real code.
 Every name is resolved through its declaration, not its spelling, so a shadowed
 `React`, `useState`, or event parameter is never rewritten.
 
-- Each module is bound by a single-file TypeScript program (no libs, no module
-  resolution); React imports, namespaces, event parameters, contexts, and the
-  global `JSX` resolve through the checker. Added imports are aliased when they
-  would shadow a module declaration or a global the module reads (the DOM's
-  `MouseEvent` beside an Octane `MouseEvent` type).
+- Each module is bound by a single-file TypeScript program (the ES5 library
+  only, no module resolution); React imports, namespaces, event parameters,
+  contexts, and the global `JSX` resolve through the checker. Added imports are
+  aliased when they would shadow a module declaration or a global the module
+  reads (the DOM's `MouseEvent` beside an Octane `MouseEvent` type).
 - Contexts by provenance: a `createContext` result here, or an export the
   project index proves is one, re-exports followed. Only a package's export is
   judged by its `*Context` name; a namespace member such as radix's
@@ -205,11 +234,11 @@ Default on when a `tsconfig.json` is found; `--no-types` for speed. Build one
 - Lower `a && <X />` to `@if` when `a`'s type excludes `number`, `bigint`, and
   `NaN`-producing types. This is the largest remaining gap against the
   hand-written HN output.
-- Text holes: `{x}` where `x: string` → `{x as string}`; `number` → `{String(x)}`.
-  Merge adjacent static text and proven-string holes into one text binding,
-  as the hand-written HN twin does (`{'(' + host + ')' as string}`). On
-  js-framework-benchmark the casts take about 20% off run and runlots; measure
-  the corpus apps too before making it the default.
+- Text holes: the cast itself landed in M1 (`template-text`, above), with
+  the project program it needs for imported types. Still to do: merge adjacent
+  static text and proven-string holes into one text binding, as the
+  hand-written HN twin does (`{'(' + host + ')' as string}`), and measure the
+  corpus apps.
 - Prove `.map` receivers are arrays (vs. Immutable, Observables) and that a key
   is an item identity.
 - Resolve `onChange` on inputs with a dynamic `type` from the union of literal
@@ -225,6 +254,9 @@ Default on when a `tsconfig.json` is found; `--no-types` for speed. Build one
 - `root.render(<App />)` with no key, ref, or children → `root.render(App)`,
   or `root.render(App, { … })` for plain attributes: 3 kB gzip off the
   js-framework entry.
+- `memo(C, compare)`: drop the comparator when it compares a subset of props
+  by identity and the props it omits are provably stable, so the component
+  regains the row skip and list cache; otherwise report its cost.
 - Error boundaries → `@try { … } @catch (error) { … }` when the boundary is used
   in one place, else Octane's `ErrorBoundary`; `react-error-boundary` usage maps
   to `@try` directly.
@@ -297,8 +329,8 @@ fixtures, the HN behavior lane, and zero compile errors on supported patterns.
 | Milestone | Contents | Exit criteria |
 | --- | --- | --- |
 | M0 (done) | Prototype, rules above, Strong fixpoint, corpus run | 574 modules, 2 compile errors (an Octane defect, since fixed), 76% Strong |
-| M1 (in progress) | Workstream 1 (done), HN lane (done), TS2300 fix (done, #2265), first publish as `0.1.0` | 0 compile errors on corpus (done); HN spec green on migrated output (done: 10/10 journeys); idempotent (done) |
-| M2 | Workstream 2 (types) | HN output matches the hand-written twin's holes and `@if`s; measured text-binding gain (js-framework: about 20% on run and runlots) |
+| M1 (in progress) | Workstream 1 (done), HN lane (done), TS2300 fix (done, #2265), text-hole casts (done), first publish as `0.1.0` | 0 compile errors on corpus (done); HN spec green on migrated output (done: 10/10 journeys); idempotent (done) |
+| M2 | Workstream 2 (types) | HN output matches the hand-written twin's holes and `@if`s wherever React's behavior allows (not its casts of optional fields); merged text bindings measured |
 | M3 | Workstreams 3 + 4 | Error boundaries and simple classes convert; `react-classes` passes the js-framework harness; radix adapter; `octane migrate`; bulletproof-react tests pass after migration |
 | M4 | Workstream 5 | Strong share on the corpus up from 76%, each fixer owned by the compiler |
 | M5 | Workstream 6, docs page on octanejs.dev | Migration guide built from real corpus before/after |
