@@ -3,7 +3,7 @@
 // Adopting server DOM: the HydrationCapability cursor, server value differences
 // and their diagnostics, the navigation helpers, and mismatch recovery.
 
-import { use, isHostContextRequest } from './context.js';
+import { useImpl, isHostContextRequest } from './context.js';
 import { setHydrating } from '../hydration-flag.js';
 import { domBindingClaims } from '../dom-binding-claims.js';
 import {
@@ -45,11 +45,15 @@ import type {
 	TrySlot,
 	RootContainer,
 } from './types.js';
-import { installHydrationDriver } from './drivers.js';
+import {
+	HOST_BODY,
+	ELEMENT_DESCRIPTORS,
+	installHydrationDriver,
+	ROOT_RENDER_ROLLBACK,
+} from './drivers.js';
 import { renderBlock } from './signal-owners.js';
 import {
 	QUEUE,
-	ROOT_RENDER_ROLLBACK,
 	journalUndo,
 	journalRootProperty,
 	inRootHydrationAttempt,
@@ -1186,7 +1190,8 @@ export class HydrationCapability {
 		value: unknown,
 		list: { items: readonly unknown[] } | null,
 	): boolean {
-		const type = list === null && isHostDescriptor(value) ? value.type : null;
+		// Only a bundle with a host descriptor factory can hold one.
+		const type = HOST_BODY && list === null && isHostDescriptor(value) ? value.type : null;
 		// Other values, such as a component or text, check what they adopt as
 		// they render.
 		if (type === null && list === null && (value as any)?.$$kind !== PORTAL_TAG) return false;
@@ -1253,7 +1258,7 @@ export class HydrationCapability {
 		if (
 			text === null ||
 			text.nodeType !== 3 ||
-			!(list || (value as any)?.$$kind === PORTAL_TAG || isHostDescriptor(value)) ||
+			!(list || (value as any)?.$$kind === PORTAL_TAG || (HOST_BODY && isHostDescriptor(value))) ||
 			text.parentNode !== parent ||
 			getNextSibling(text) !== end
 		)
@@ -1401,7 +1406,7 @@ export class HydrationCapability {
 			) {
 				return useThenable(usable as TrackedThenable<T>, true);
 			}
-			return use(usable as PromiseLike<T>) as T;
+			return useImpl(usable as PromiseLike<T>) as T;
 		}
 
 		const seed = this.seeds![this.seedCursor++];
@@ -1621,7 +1626,7 @@ export class HydrationCapability {
 				? siteLoc(scope, slotKey) || (el as any).__oct_loc
 				: undefined;
 		if (stale !== null && !textarea) {
-			if (isElementDescriptor(value) && !isHostDescriptor(value))
+			if (ELEMENT_DESCRIPTORS && isElementDescriptor(value) && !isHostDescriptor(value))
 				renderBeforeMismatch(this, el, render);
 			this.fail(loc, () => 'a renderable range', stale);
 		}

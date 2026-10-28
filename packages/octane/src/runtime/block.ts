@@ -49,7 +49,16 @@ import {
 	NATIVE_READ_DRIVER,
 	reportCaughtError,
 	reportUncaughtError,
+	registerRootOptions,
+	SIGNAL_BINDINGS_ENABLED,
+	EFFECT_HOOKS,
+	COMMIT_WORK,
+	installCommitWork,
+	ROOT_RENDER_ROLLBACK,
+	TRANSITION_JOURNAL,
 } from './drivers.js';
+import { signalDocumentEnabled } from '../signals/document-owner.js';
+import { explicitSignalOwners } from '../signals/owner-context.js';
 import { RENDERER_INVOCATION_SITE } from './signal-owners.js';
 import {
 	VIEW_TRANSITION_DRIVER,
@@ -60,7 +69,6 @@ import {
 	QUEUE_REINDEX_EPOCH,
 	inFlush,
 	TRANSITION_QUEUE,
-	ROOT_RENDER_ROLLBACK,
 	journalUndo,
 	journalRootProperty,
 	retireRootBlock,
@@ -86,7 +94,6 @@ import { CURSOR } from './hydration.js';
 import { findTryHandler } from './suspense.js';
 import {
 	RETAINED_SIGNAL_OWNERS,
-	TRANSITION_JOURNAL,
 	ROOT_RENDER_TRANSACTION,
 	EFFECT_EVENT_RENDER_TARGET,
 	EFFECT_EVENT_ACTION_TARGET,
@@ -543,6 +550,7 @@ export function enqueueEffectEventUpdate(entry: PendingEffectEvent): void {
 export function enqueueEffectEventCommitAction(action: EffectEventCommitAction): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileQueueWork(action);
+	installCommitWork();
 	EFFECT_EVENT_ACTION_TARGET.push(action);
 }
 
@@ -616,7 +624,7 @@ export let RETURNED_OUTPUT_SCOPE: Scope | null = null;
 
 export function setReturnedOutputOwner(state: any, returned: boolean): void {
 	if (state.returnedOutput === returned) return;
-	if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+	if (TRANSITION_JOURNAL && !ROOT_RENDER_ROLLBACK) {
 		TRANSITION_JOURNAL.push(JOURNAL_PROP, state, 'returnedOutput', state.returnedOutput);
 	}
 	state.returnedOutput = returned;
@@ -715,7 +723,7 @@ export function renderReturnedValue(block: Block, out: unknown, reset?: true): v
 				// and takes the outgoing slot's place at commit. If it throws, the flip
 				// unwinds like a rollback window and the outgoing slot stays.
 				const transaction = ROOT_RENDER_TRANSACTION!;
-				journalAt = TRANSITION_JOURNAL!.length;
+				journalAt = TRANSITION_JOURNAL ? TRANSITION_JOURNAL.length : 0;
 				opsAt = transaction.ops.length;
 				retiredAt = transaction.retired?.size ?? 0;
 				const frag = queueFrontier(block, block.parentNode, block.endMarker);
@@ -778,7 +786,9 @@ export function renderReturnedValue(block: Block, out: unknown, reset?: true): v
 				childSlot(block, 0, domParent, out, anchor);
 			}
 		} catch (error) {
-			if (frontier !== null) {
+			// Without a journal nothing keeps this Block past the error: the
+			// boundary that catches it, or its root, tears it down.
+			if (TRANSITION_JOURNAL && frontier !== null) {
 				rollbackTransitionJournal(journalAt, block);
 				dropRootOps(ROOT_RENDER_TRANSACTION!, opsAt, retiredAt);
 			}
@@ -808,7 +818,7 @@ export function renderReturnedValue(block: Block, out: unknown, reset?: true): v
 		if (!block.disposed && state !== undefined && state.returnedOutput !== true) {
 			// New returned children claim ownership on mount. Keep that common path
 			// inline; shared-body handoffs use the cold journal helper.
-			if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+			if (TRANSITION_JOURNAL && !ROOT_RENDER_ROLLBACK) {
 				TRANSITION_JOURNAL.push(JOURNAL_PROP, state, 'returnedOutput', state.returnedOutput);
 			}
 			state.returnedOutput = true;
@@ -1203,7 +1213,7 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 	// registration is phase-EXECUTION order, which loses the declared order and
 	// can't tell a passive destroy from a ref teardown.
 	const effects = scope.effectSlots;
-	if (effects !== null) {
+	if (EFFECT_HOOKS && effects !== null) {
 		for (let i = 0; i < effects.length; i++) {
 			const slot = effects[i];
 			// Retire this call site's queued entries. The drains skip a disposed
@@ -1240,7 +1250,8 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 	// De-opt refs are unaffected: their detaches queue from detachDeoptTreeRefs
 	// walks outside this cleanups loop.
 	let abortedRefs: SuspenseRefEntry[] | null = null;
-	if ((scope as any).mounted !== true) {
+	// Only a producer of commit-phase refs gives an aborted mount refs to suppress.
+	if (COMMIT_WORK && (scope as any).mounted !== true) {
 		abortedRefs = [];
 		collectVisibleSubtreeRefs(scope, abortedRefs);
 	}
@@ -1267,17 +1278,27 @@ function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 				reportTeardownError(err);
 			}
 		}
-	const signalOwner = scope.signalOwner;
-	if (signalOwner) {
-		if (RETAINED_SIGNAL_OWNERS?.owners.has(signalOwner)) return;
-		if (retireUnowned) scope.signalOwner = null;
-		else scope.signalOwner = undefined;
-		retireRendererSignalOwner(signalOwner);
-	} else if (
-		retireUnowned &&
-		(signalOwner === false || (signalOwner === undefined && scope.signalTokenEscaped))
+	// A scope holds an owner only from a resolved root owner (the signal document
+	// or a root's options), and an escaped token only from event authority (see
+	// setEventHandler). Bundles with neither keep no retirement.
+	if (
+		registerRootOptions ||
+		signalDocumentEnabled ||
+		SIGNAL_BINDINGS_ENABLED ||
+		explicitSignalOwners
 	) {
-		retireUnownedSignalScope(scope);
+		const signalOwner = scope.signalOwner;
+		if (signalOwner) {
+			if (RETAINED_SIGNAL_OWNERS?.owners.has(signalOwner)) return;
+			if (retireUnowned) scope.signalOwner = null;
+			else scope.signalOwner = undefined;
+			retireRendererSignalOwner(signalOwner);
+		} else if (
+			retireUnowned &&
+			(signalOwner === false || (signalOwner === undefined && scope.signalTokenEscaped))
+		) {
+			retireUnownedSignalScope(scope);
+		}
 	}
 }
 

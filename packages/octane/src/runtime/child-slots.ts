@@ -38,6 +38,8 @@ import {
 	HOST_ADOPTS,
 	HOST_LAND_PAIR,
 	HOST_UNCHANGED,
+	ELEMENT_DESCRIPTORS,
+	ROOT_RENDER_ROLLBACK,
 } from './drivers.js';
 import {
 	type SignalInstanceKey,
@@ -46,7 +48,7 @@ import {
 	stampSignalInstanceKey,
 	renderBlock,
 } from './signal-owners.js';
-import { ROOT_RENDER_ROLLBACK, journalRootProperty, isCreatedInRootRender } from './engine.js';
+import { journalRootProperty, isCreatedInRootRender } from './engine.js';
 import { type TrackedThenable, useThenable } from './use.js';
 import { CONTEXT_CHILD, type Context, promoteMemoAncestry } from './context.js';
 import { KEPT_TEXT_CONTENT, clearKeptTextContent, CURSOR } from './hydration.js';
@@ -116,6 +118,7 @@ import {
 	journalBag,
 } from './commit.js';
 import { getFirstChild, getNextSibling, rejectTextareaChild } from './templates.js';
+import { ROOT_ROLLBACK } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -673,7 +676,10 @@ export function childSlot(
 			continue;
 		}
 		if (typeof (value as any).then === 'function') {
-			value = useThenable(value as TrackedThenable<unknown>);
+			// Without an entry that can suspend, a wakeable is a render error, as a
+			// thrown one is (renderBlockInner): nothing could hold the screen.
+			if (ROOT_ROLLBACK) value = useThenable(value as TrackedThenable<unknown>);
+			else throw value;
 			continue;
 		}
 		break;
@@ -681,7 +687,8 @@ export function childSlot(
 	// Each field read of a scoped JSX value resolves its record again, and this
 	// classifies every renderable hole on every render. Read the type once here;
 	// later branches read only the fields they consume.
-	const elementType = isElementDescriptor(value) ? value.type : undefined;
+	// Only a bundle with a descriptor factory can hold one (ELEMENT_DESCRIPTORS).
+	const elementType = ELEMENT_DESCRIPTORS && isElementDescriptor(value) ? value.type : undefined;
 	// Only a factory that installed the host renderer can build a host
 	// descriptor. Reading its type first resolves a deferred JSX value, whose
 	// factory installs it; a bundle without one keeps no host branch below.
@@ -724,8 +731,8 @@ export function childSlot(
 	// After Usable unwrapping a host descriptor is no thenable, so it needs Blocks
 	// exactly when its children do.
 	const pureHost =
-		preparedList === null &&
 		hostBody !== null &&
+		preparedList === null &&
 		state?.currentComp !== (hostBody as unknown as ComponentBody) &&
 		!descNeedsBlocks((value as ElementDescriptor).children);
 	let rootShapeChanged = false;
@@ -917,7 +924,7 @@ export function childSlot(
 			ownsHost !== undefined &&
 			hydration === null &&
 			ROOT_RENDER_TRANSACTION !== null &&
-			DEOPT_UPGRADE?.block !== parentScope.block;
+			(HOST_BODY ? DEOPT_UPGRADE?.block !== parentScope.block : true);
 	} else if (hydration !== null) {
 		if (hydration.lentSlot === state) {
 			hydration.lentSlot = null;
@@ -941,6 +948,7 @@ export function childSlot(
 	let upgradeChildren: any = undefined;
 	let upgradeArmed = false;
 	if (
+		HOST_BODY &&
 		DEOPT_UPGRADE !== null &&
 		DEOPT_UPGRADE.block === parentScope.block &&
 		ownsHost !== undefined
@@ -956,7 +964,8 @@ export function childSlot(
 	// pair on demand around the current host node, so every path below sees the
 	// normal marked regime — the childSlot analogue of the singleRoot shape-flip
 	// handling in disposeReturnSlot. One-way: once marked, the slot stays marked.
-	if (state.end === null && !pureHost && state.ownerHost === null && !state.borrowed) {
+	// Only a host descriptor's slot mints no markers (pureHost).
+	if (HOST_BODY && state.end === null && !pureHost && state.ownerHost === null && !state.borrowed) {
 		const start = document.createComment('');
 		const end = document.createComment('');
 		const host = state.hostNode;
@@ -1203,7 +1212,7 @@ export function childSlot(
 	} else if (typeof value === 'function') {
 		comp = value as ComponentBody;
 		isBodyFn = true;
-	} else if (isElementDescriptor(value)) {
+	} else if (ELEMENT_DESCRIPTORS && isElementDescriptor(value)) {
 		const dispatch = activityDescriptorDispatch;
 		const activity = dispatch !== null && (elementType as unknown) === dispatch.type;
 		if (!activity && typeof elementType !== 'function') {
@@ -1370,7 +1379,8 @@ export function childSlot(
 				!parentBlock.exclusiveMarkers &&
 				state.borrowed &&
 				(sharesBlockBoundary(parentBlock, state.start, state.end) ||
-					itemRange(parentBlock)[1] === state.end);
+					// Only a host descriptor's item can be awaiting its pair (itemRange).
+					(HOST_BODY ? itemRange(parentBlock)[1] : parentBlock.endMarker) === state.end);
 			const implicitBail = !isBodyFn || isChildrenBlock(comp);
 			const frag = slotFrontier(
 				state,

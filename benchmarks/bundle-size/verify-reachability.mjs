@@ -131,6 +131,18 @@ const EXPECTED_SNAPSHOTS = Object.freeze({
 		transition: 'next',
 		cleaned: true,
 	},
+	'render-errors': {
+		mountedRows: 3,
+		clearedRows: 0,
+		crashedEmpty: true,
+		caught: 'row caught failed',
+		sibling: 'after',
+		replacedEmpty: true,
+		recovered: 'good',
+		wakeable: 'wakeable',
+		uncaught: ['row c failed', 'row mount failed'],
+		cleaned: true,
+	},
 	'server-hooks': {
 		first: 0,
 		second: 2,

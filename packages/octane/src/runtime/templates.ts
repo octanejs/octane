@@ -231,6 +231,15 @@ function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Node {
 	return getFirstChild(wrapEl) as Element;
 }
 
+// Only a compiled module with an opaque template installs the destination
+// lookup below (enableOpaqueTemplates), so a bundle whose templates all name
+// their namespace keeps none of it.
+let OPAQUE_TEMPLATES = false;
+/** @internal */
+export function enableOpaqueTemplates(): void {
+	OPAQUE_TEMPLATES = true;
+}
+
 /* @__NO_SIDE_EFFECTS__ */
 export function template(html: string, ns: number = 0, frag: number = 0): Element {
 	return {
@@ -478,7 +487,9 @@ export function resolveLazyTemplate(lazy: LazyTemplateRecord): Node {
 	let ns: 0 | 1 | 2;
 	if (lazy.ns === 3) {
 		const inherited =
-			CURRENT_SCOPE === null ? undefined : deoptChildNamespace(CURRENT_SCOPE.block.parentNode);
+			OPAQUE_TEMPLATES && CURRENT_SCOPE !== null
+				? deoptChildNamespace(CURRENT_SCOPE.block.parentNode)
+				: undefined;
 		ns = inherited === SVG_NS ? 1 : inherited === MATHML_NS ? 2 : 0;
 	} else {
 		ns = lazy.ns;

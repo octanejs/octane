@@ -27,6 +27,7 @@ import {
 } from '../event-names.js';
 import { formatClientError } from '../error-codes.client.generated.js';
 import { beginNativeEventBatch } from '../signals/native-read-events.js';
+import { nativeBatchHooks } from '../signals/read-protocol.js';
 import {
 	signalOwnerUse,
 	activeSynchronousSignalOwner,
@@ -40,6 +41,8 @@ import {
 	publishManualFormPending,
 	SIGNAL_BINDINGS_ENABLED,
 	noop,
+	TRANSITION_JOURNAL,
+	TRANSITION_JOURNAL_DEPTH,
 } from './drivers.js';
 import {
 	inFlush,
@@ -54,8 +57,6 @@ import { preparePortalEventOwners, type PortalSlot } from './portals.js';
 import type { BlockImpl, ScopeImpl } from './block.js';
 import {
 	CURRENT_SCOPE,
-	TRANSITION_JOURNAL,
-	TRANSITION_JOURNAL_DEPTH,
 	ROOT_RENDER_TRANSACTION,
 	ROOT_DISCARD_STAMP,
 	fireEventSlot,
@@ -249,7 +250,7 @@ export const EMPTY_ARGS: any[] = [];
 /** Commit a native handler slot; its authority was published at render. */
 export function setEventSlot(el: Element, key: string, handler: unknown): void {
 	const host = el as any;
-	if (TRANSITION_JOURNAL !== null) TRANSITION_JOURNAL.push(JOURNAL_PROP, el, key, host[key]);
+	if (TRANSITION_JOURNAL) TRANSITION_JOURNAL.push(JOURNAL_PROP, el, key, host[key]);
 	host[key] = handler;
 }
 
@@ -267,7 +268,7 @@ export function commitEventBundle(bag: any, d: HandlerBundle, next: any[], cell:
 	const a1 = count === 2 ? next[cell + 2] : bag;
 	if (fn === bag && a0 === bag && a1 === bag) return;
 	if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
-	if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
+	if (TRANSITION_JOURNAL) journalObjectOnce(d);
 	if (fn !== bag) d.fn = fn;
 	if (a0 !== bag) {
 		if (typeof args === 'number') d.a0 = a0;
@@ -319,7 +320,7 @@ export function evt0(el: Element, key: string, fn: any): HandlerBundle {
 	const d: HandlerBundle = { fn, args: EMPTY_ARGS, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	if (
 		signalOwnerUse.active ||
-		(TRANSITION_JOURNAL !== null &&
+		(TRANSITION_JOURNAL &&
 			(TRANSITION_JOURNAL_DEPTH !== 1 ||
 				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP ||
 				(hydrating && CURSOR?.recoverHostEvent !== undefined)))
@@ -331,7 +332,7 @@ export function evt0(el: Element, key: string, fn: any): HandlerBundle {
 export function evt0u(d: HandlerBundle, fn: any): void {
 	if (d.fn !== fn) {
 		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
-		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
+		if (TRANSITION_JOURNAL) journalObjectOnce(d);
 		d.fn = fn;
 	}
 	if (
@@ -352,7 +353,7 @@ export function evt1(el: Element, key: string, fn: any, a0: any): HandlerBundle 
 	const d: HandlerBundle = { fn, args: 1, a0, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	if (
 		signalOwnerUse.active ||
-		(TRANSITION_JOURNAL !== null &&
+		(TRANSITION_JOURNAL &&
 			(TRANSITION_JOURNAL_DEPTH !== 1 ||
 				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP ||
 				(hydrating && CURSOR?.recoverHostEvent !== undefined)))
@@ -364,7 +365,7 @@ export function evt1(el: Element, key: string, fn: any, a0: any): HandlerBundle 
 export function evt1u(d: HandlerBundle, fn: any, a0: any): void {
 	if (d.fn !== fn || !Object.is(d.a0, a0)) {
 		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
-		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
+		if (TRANSITION_JOURNAL) journalObjectOnce(d);
 		d.fn = fn;
 		d.a0 = a0;
 	}
@@ -386,7 +387,7 @@ export function evt2(el: Element, key: string, fn: any, a0: any, a1: any): Handl
 	const d: HandlerBundle = { fn, args: 2, a0, a1, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	if (
 		signalOwnerUse.active ||
-		(TRANSITION_JOURNAL !== null &&
+		(TRANSITION_JOURNAL &&
 			(TRANSITION_JOURNAL_DEPTH !== 1 ||
 				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP ||
 				(hydrating && CURSOR?.recoverHostEvent !== undefined)))
@@ -398,7 +399,7 @@ export function evt2(el: Element, key: string, fn: any, a0: any, a1: any): Handl
 export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
 	if (d.fn !== fn || !Object.is(d.a0, a0) || !Object.is(d.a1, a1)) {
 		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
-		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
+		if (TRANSITION_JOURNAL) journalObjectOnce(d);
 		d.fn = fn;
 		d.a0 = a0;
 		d.a1 = a1;
@@ -424,7 +425,7 @@ export function evt1e(el: Element, key: string, fn: any, a0: any): HandlerBundle
 	const d: HandlerBundle = { fn, args: -1, a0, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	if (
 		signalOwnerUse.active ||
-		(TRANSITION_JOURNAL !== null &&
+		(TRANSITION_JOURNAL &&
 			(TRANSITION_JOURNAL_DEPTH !== 1 ||
 				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP ||
 				(hydrating && CURSOR?.recoverHostEvent !== undefined)))
@@ -437,7 +438,7 @@ export function evt2e(el: Element, key: string, fn: any, a0: any, a1: any): Hand
 	const d: HandlerBundle = { fn, args: -2, a0, a1, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	if (
 		signalOwnerUse.active ||
-		(TRANSITION_JOURNAL !== null &&
+		(TRANSITION_JOURNAL &&
 			(TRANSITION_JOURNAL_DEPTH !== 1 ||
 				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP ||
 				(hydrating && CURSOR?.recoverHostEvent !== undefined)))
@@ -450,7 +451,7 @@ export function evtN(el: Element, key: string, fn: any, args: any[]): HandlerBun
 	const d: HandlerBundle = { fn, args, el, [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND };
 	if (
 		signalOwnerUse.active ||
-		(TRANSITION_JOURNAL !== null &&
+		(TRANSITION_JOURNAL &&
 			(TRANSITION_JOURNAL_DEPTH !== 1 ||
 				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP ||
 				(hydrating && CURSOR?.recoverHostEvent !== undefined)))
@@ -462,7 +463,7 @@ export function evtN(el: Element, key: string, fn: any, args: any[]): HandlerBun
 export function evtNu(d: HandlerBundle, fn: any, args: any[]): void {
 	if (d.fn !== fn || d.args !== args) {
 		if (_dispatchDepth !== 0) preserveDispatchedBundle(d);
-		if (TRANSITION_JOURNAL !== null) journalObjectOnce(d);
+		if (TRANSITION_JOURNAL) journalObjectOnce(d);
 		d.fn = fn;
 		d.args = args;
 	}
@@ -1328,7 +1329,9 @@ function dispatchDelegated(this: Node, event: Event): void {
 		// An ordinary child of a portal target belongs to its enclosing root.
 		// Only the listener that owns a route may finish this delivery and restore the edit.
 		if (!nativeCapture && buildDelegatedPath(event, this) === 0) return;
-		nativeBatch = beginNativeEventBatch(event);
+		// The engine registers its batch hooks once, so a batch that did not begin
+		// never closes; bundles without the engine fold both calls away.
+		nativeBatch = nativeBatchHooks ? beginNativeEventBatch(event) : null;
 		_dispatchDepth++;
 		(event as any)[DELEGATED_BUBBLE_VERSION] = ((event as any)[DELEGATED_BUBBLE_VERSION] || 0) + 1;
 		if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.enqueue(event, type);
@@ -1400,7 +1403,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 		// Only this bubble queue sets currentTarget here; the capture queue clears its own.
 		if (propagationStarted) clearCurrentTarget(event);
 		if (nativeBatch !== undefined) {
-			closeNativeEventBatch(event, nativeBatch, false);
+			if (nativeBatchHooks) closeNativeEventBatch(event, nativeBatch, false);
 			_dispatchDepth--;
 			if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.finish(type);
 		}
@@ -1437,7 +1440,7 @@ function dispatchDelegatedCapture(
 	const wasCancelled = event.cancelBubble;
 	let stopped = false;
 	_dispatchDepth++;
-	const nativeBatch = beginNativeEventBatch(event);
+	const nativeBatch = nativeBatchHooks ? beginNativeEventBatch(event) : null;
 	let frame: DelegatedEventFrame | undefined;
 	try {
 		if (hasSlot) {
@@ -1462,11 +1465,12 @@ function dispatchDelegatedCapture(
 			endDelegatedPropagation(event, stop, immediate);
 			clearCurrentTarget(event);
 		}
-		closeNativeEventBatch(
-			event,
-			nativeBatch,
-			event.bubbles && !event.cancelBubble && (type.flags & EVENT_BUBBLE) !== 0,
-		);
+		if (nativeBatchHooks)
+			closeNativeEventBatch(
+				event,
+				nativeBatch,
+				event.bubbles && !event.cancelBubble && (type.flags & EVENT_BUBBLE) !== 0,
+			);
 		_dispatchDepth--;
 		CAPTURE_FINISH(event, type);
 	}

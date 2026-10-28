@@ -1782,6 +1782,7 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'enableDescriptorFormActions',
 	'enableDescriptorFragmentRefs',
 	'enableHostDescriptors',
+	'enableOpaqueTemplates',
 	'isRenderCall',
 	'deferRecord',
 	'bindSignalText',
@@ -39518,6 +39519,9 @@ function allocTemplate(ctx, authored, ns = 0, frag = 0, scriptPaths = null) {
 		}
 		return existing.name;
 	}
+	// clone() resolves an opaque template's namespace from its destination,
+	// which only modules with such a template install.
+	if (ns === 3) addDescriptorCapability(ctx, 'enableOpaqueTemplates');
 	const id = ctx.nextTemplateId++;
 	const name = `_t$${id}`;
 	const template = { name, ast, html, ns, frag, origins, scriptPaths, scripts };

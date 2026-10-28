@@ -58,6 +58,7 @@ import {
 	registerNativeReadRebase,
 	beginNativeBatch,
 	endNativeBatch,
+	nativeBatchHooks,
 	runNativeBatch,
 } from '../signals/read-protocol.js';
 import type { NativeSignalManifest } from '../signals/native-read-seeds.js';
@@ -124,6 +125,12 @@ import {
 	ensureScheduledVisibilityDriver,
 	MANUAL_HOOK_DRIVER,
 	noop,
+	COMMIT_WORK,
+	EFFECT_HOOKS,
+	TRANSITION_JOURNAL,
+	TRANSITION_JOURNAL_DEPTH,
+	ROOT_RENDER_ROLLBACK,
+	markRootRenderRollback,
 } from './drivers.js';
 import {
 	clearSignalRetryOwners,
@@ -278,8 +285,6 @@ import {
 	CURRENT_SCOPE,
 	CURRENT_BLOCK,
 	CURRENT_WARM_EPISODE,
-	TRANSITION_JOURNAL,
-	TRANSITION_JOURNAL_DEPTH,
 	ROOT_RENDER_TRANSACTION,
 	ROOT_DISCARD_STAMP,
 	beginRootRender,
@@ -356,6 +361,7 @@ import {
 	ACTIVE_SUBMIT_DISPATCH,
 } from './events.js';
 import { hasControlledSyncs } from './forms.js';
+import { ROOT_ROLLBACK, installRootRollback } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -520,7 +526,10 @@ export function runEffectLifecycleCallback(callback: Cleanup, scope: Scope | nul
 	EFFECT_EVENT_LIFECYCLE_DEPTH++;
 	const nativeFrame = NATIVE_READ_DRIVER ? NATIVE_READ_DRIVER.pauseLifecycle() : -1;
 	try {
-		if (signalDocumentEnabled || scope?.block.idState.renderOwner?.signalOwner !== undefined)
+		if (
+			signalDocumentEnabled ||
+			(registerRootOptions && scope?.block.idState.renderOwner?.signalOwner !== undefined)
+		)
 			runWithBlockSignalOwner(scope, callback);
 		else callback();
 	} finally {
@@ -986,17 +995,10 @@ export let COMMIT_OP = 0;
 export interface RootRenderFrame {
 	transaction: RootRenderTransaction;
 	previous: RootRenderTransaction | null;
-	log: any[] | null;
-	bags: Map<object, number> | null;
-	checkpoint: number;
-	bagWindow: number;
-	depth: number;
 	capture: OffscreenCapture | null;
 	discardStamp: number;
-	opsCheckpoint: number;
 }
 export let ROOT_RENDER_TRANSACTIONS: RootRenderTransaction[] = [];
-export let ROOT_RENDER_ROLLBACK = false;
 
 /** @internal Opaque retry episode, without retaining an abandoned Scope. */
 export function getRootRenderRetryKey(scope: Scope, retryOnly = false): object | null {
@@ -1007,12 +1009,12 @@ export function getRootRenderRetryKey(scope: Scope, retryOnly = false): object |
 }
 
 export function journalUndo(undo: () => void): void {
-	TRANSITION_JOURNAL!.push(JOURNAL_UNDO, undo, null, null);
+	if (TRANSITION_JOURNAL) TRANSITION_JOURNAL.push(JOURNAL_UNDO, undo, null, null);
 }
 
 export function journalRootProperty(target: object, key: PropertyKey, oldValue: unknown): void {
-	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_ROLLBACK) return;
-	TRANSITION_JOURNAL!.push(JOURNAL_PROP, target, key, oldValue);
+	if (!TRANSITION_JOURNAL || ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_ROLLBACK) return;
+	TRANSITION_JOURNAL.push(JOURNAL_PROP, target, key, oldValue);
 }
 
 /**
@@ -1020,7 +1022,12 @@ export function journalRootProperty(target: object, key: PropertyKey, oldValue: 
  * DOM the render created (#2043), so a dropped render left the range as it was.
  */
 export function journalRootSlot(state: object): void {
-	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_TRANSACTION.aborted || ROOT_RENDER_ROLLBACK)
+	if (
+		!TRANSITION_JOURNAL ||
+		ROOT_RENDER_TRANSACTION === null ||
+		ROOT_RENDER_TRANSACTION.aborted ||
+		ROOT_RENDER_ROLLBACK
+	)
 		return;
 	journalObjectOnce(state);
 }
@@ -1149,18 +1156,28 @@ export function createdInRootRender(block: Block): void {
 	// as do hydration and adopted DOM, where ROOT_DISCARD_STAMP is -1. A hookless
 	// child's stand-in is not a Block; its owner's teardown reaches what is
 	// created below it.
-	let parent = TRANSITION_JOURNAL_DEPTH === 1 ? block.parentBlock : null;
-	if (parent instanceof LiteBlockImpl) parent = parent.ownerBlock;
-	if (parent === null || parent.createdStamp !== ROOT_DISCARD_STAMP)
-		TRANSITION_JOURNAL!.push(JOURNAL_CREATED, block, null, null);
+	if (TRANSITION_JOURNAL) {
+		let parent = TRANSITION_JOURNAL_DEPTH === 1 ? block.parentBlock : null;
+		if (parent instanceof LiteBlockImpl) parent = parent.ownerBlock;
+		if (parent === null || parent.createdStamp !== ROOT_DISCARD_STAMP)
+			TRANSITION_JOURNAL.push(JOURNAL_CREATED, block, null, null);
+	}
 }
 
+/**
+ * Drop a root render. A feature that can drop one installs the journal
+ * (installRootRollback), which the rollback replays. Without it, a render is
+ * dropped only with its root's teardown, an uncaught error or an unmount, so
+ * what it changed needs no restoring: it commits nothing, and what it created
+ * goes now.
+ */
 export function rollbackRootRender(transaction: RootRenderTransaction): void {
 	if (transaction.aborted) return;
 	transaction.aborted = true;
 	// Its hook-cell folds never publish: their updates stay queued.
 	transaction.cells = null;
 	if (
+		(signalDocumentEnabled || registerRootOptions) &&
 		transaction.owner.retrySignalOwners !== undefined &&
 		transaction.owner.retrySignalOwners !== RETAINED_SIGNAL_OWNERS
 	)
@@ -1168,31 +1185,32 @@ export function rollbackRootRender(transaction: RootRenderTransaction): void {
 	const frame = beginRootRender(transaction.owner);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileRootRolledBack();
-	const previousRollback = ROOT_RENDER_ROLLBACK;
-	ROOT_RENDER_ROLLBACK = true;
+	const previousRollback = ROOT_ROLLBACK ? markRootRenderRollback(true) : false;
 	try {
-		const owner = transaction.owner.current;
-		if (owner !== null) rollbackTransitionJournal(0, owner);
-		else {
-			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-				__profileJournalRolledBack(transaction.log.length / 4);
-			for (let i = transaction.log.length - 4; i >= 0; i -= 4) {
-				if (transaction.log[i] === JOURNAL_UNDO) transaction.log[i + 1]();
-				else if (transaction.log[i] === JOURNAL_CREATED)
-					undoCreatedInRootRender(transaction.log[i + 1]);
-				else if (transaction.log[i] === JOURNAL_EVENT_OWNER)
-					transaction.log[i + 1].$$signalOwner = transaction.log[i + 2];
+		// A transaction that began before the rollback was installed has no log.
+		const log = transaction.log;
+		if (ROOT_ROLLBACK && log !== null) {
+			const owner = transaction.owner.current;
+			if (owner !== null) rollbackTransitionJournal(0, owner);
+			else {
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileJournalRolledBack(log.length / 4);
+				for (let i = log.length - 4; i >= 0; i -= 4) {
+					if (log[i] === JOURNAL_UNDO) log[i + 1]();
+					else if (log[i] === JOURNAL_CREATED) undoCreatedInRootRender(log[i + 1]);
+					else if (log[i] === JOURNAL_EVENT_OWNER) log[i + 1].$$signalOwner = log[i + 2];
+				}
+				log.length = 0;
 			}
-			transaction.log.length = 0;
-		}
-		// Slot snapshots restore render state, but cannot restore a transition
-		// hold the parked reveal has already released outside the journal.
-		if (transaction.hostEventReveals !== undefined)
-			for (const reveal of transaction.hostEventReveals)
-				if (reveal.releasedHold && reveal.state.stagedCapture === reveal.capture)
-					reveal.state.transitionHeld = false;
-		// After the replay, which can restore a bag's queued state.
-		dropRootOps(transaction, 0, 0);
+			// Slot snapshots restore render state, but cannot restore a transition
+			// hold the parked reveal has already released outside the journal.
+			if (transaction.hostEventReveals !== undefined)
+				for (const reveal of transaction.hostEventReveals)
+					if (reveal.releasedHold && reveal.state.stagedCapture === reveal.capture)
+						reveal.state.transitionHeld = false;
+			// After the replay, which can restore a bag's queued state.
+			dropRootOps(transaction, 0, 0);
+		} else transaction.ops.length = 0;
 		// A Block discarded with its parent has no creation entry
 		// (createdInRootRender). Unmount any its parent's undo did not reach.
 		const created = transaction.created;
@@ -1201,7 +1219,7 @@ export function rollbackRootRender(transaction: RootRenderTransaction): void {
 				if (!created[i].disposed) undoCreatedInRootRender(created[i]);
 		discardOffscreenCapture(transaction.capture);
 	} finally {
-		ROOT_RENDER_ROLLBACK = previousRollback;
+		if (ROOT_ROLLBACK) markRootRenderRollback(previousRollback);
 		endRootRender(frame);
 	}
 }
@@ -1289,7 +1307,7 @@ export function acceptHydrationHostEvents(transaction: RootRenderTransaction): b
 				const undo = install();
 				// A later installer may revoke this acceptance. Undo belongs to this
 				// transaction even though no render frame is active here.
-				if (undo !== undefined) transaction.log.push(JOURNAL_UNDO, undo, null, null);
+				if (undo !== undefined) transaction.log!.push(JOURNAL_UNDO, undo, null, null);
 			} catch (error) {
 				if (install.recover === undefined) throw error;
 				failed = { recover: install.recover, error };
@@ -1345,7 +1363,10 @@ export function commitRootRenders(): void {
 	}
 	// Finished transitions' signals promote before this commit accepts the
 	// renders that read them; committed readers hear of it once it ends.
-	const promoting = PENDING_SIGNAL_PROMOTIONS !== null;
+	// Pending signals queue promotions only once the transition drivers install
+	// their host. That driver is sticky, unlike the queue every promotion resets,
+	// so bundles without transitions fold this.
+	const promoting = TRANSITION_ROOT_DRIVER ? PENDING_SIGNAL_PROMOTIONS !== null : false;
 	const signals = promoting ? beginNativeBatch() : null;
 	try {
 		if (promoting) promotePendingSignals();
@@ -1407,7 +1428,11 @@ export function commitRootRenders(): void {
 					owner.nativeRetry?.clear();
 					// Claimed owners belong to accepted scopes. Unvisited branches from
 					// an earlier pending attempt have no continuing consumer.
-					if (owner.retrySignalOwners !== undefined) clearSignalRetryOwners(owner);
+					if (
+						(signalDocumentEnabled || registerRootOptions) &&
+						owner.retrySignalOwners !== undefined
+					)
+						clearSignalRetryOwners(owner);
 				}
 				const deferredNativeAcceptance = acceptNativeCapture(transaction.capture, owner, true);
 				if (transaction.cells !== null) commitHookCells(transaction.cells);
@@ -1436,9 +1461,9 @@ export function commitRootRenders(): void {
 							COMMIT_OP = i;
 							try {
 								// A commit function's `careful` flag, as bagDone passes it.
-								const careful =
-									TRANSITION_JOURNAL !== null ||
-									(_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0);
+								const careful = TRANSITION_JOURNAL
+									? true
+									: _dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0;
 								if (bag) {
 									// commitQueuedBag, inline.
 									const next = target.next;
@@ -1477,7 +1502,7 @@ export function commitRootRenders(): void {
 				}
 				const split = refAttachQueue.length;
 				spliceOffscreenCapture(transaction.capture, deferredNativeAcceptance);
-				if (split > refsAt) placeCommitRefs(refsAt, split);
+				if (COMMIT_WORK && split > refsAt) placeCommitRefs(refsAt, split);
 				if (hydrationStarted && owner.bindingLeases !== undefined && owner.bindingLeases.size > 0) {
 					// A successful replacement may remove a still-dormant leased view.
 					HYDRATION_DRIVER!.retireDetachedBindingLeases(owner);
@@ -1520,6 +1545,8 @@ export let VT_ACTION_CUE = false;
 /** Install the concrete driver only when a ViewTransition-facing API survives. */
 export function ensureViewTransitionDriver(): ViewTransitionDriver {
 	if (VIEW_TRANSITION_DRIVER) return VIEW_TRANSITION_DRIVER;
+	// A held commit drops when its root is replaced or unmounted meanwhile.
+	installRootRollback();
 	const driver: ViewTransitionDriver = {
 		addType(type) {
 			if (VT_PENDING_TYPES.indexOf(type) === -1) VT_PENDING_TYPES.push(type);
@@ -1643,7 +1670,7 @@ export function ensureViewTransitionDriver(): ViewTransitionDriver {
 		queueAllTransition,
 		renderBoundary(block, props) {
 			const rare = blockRare(block);
-			if (TRANSITION_JOURNAL !== null) journalRootProperty(rare, 'vt', rare.vt);
+			if (TRANSITION_JOURNAL) journalRootProperty(rare, 'vt', rare.vt);
 			if (rare.vt === null) {
 				// Visibility snapshots decide activation: retained Activity boundaries
 				// can enter/exit without changing this mounted-boundary registration.
@@ -1843,6 +1870,7 @@ function countNestedUpdate(block: Block, flushed: boolean | undefined): void {
 			rare.updateCount === NESTED_UPDATE_LIMIT + 1 &&
 			EFFECT_COMMIT_DEPTH <= 1 &&
 			CURRENT_EFFECT_PHASE !== PASSIVE &&
+			EFFECT_HOOKS &&
 			(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0)
 		) {
 			HELD_PASSIVE_CHAIN = NESTED_UPDATE_CHAIN_ID;
@@ -2566,7 +2594,7 @@ function drainQueue(): { err: any } | null {
 			for (const activity of activitiesToRehide) SCHEDULED_VISIBILITY_DRIVER!.rehide!(activity);
 		}
 		// Batches that finished during that commit.
-		if (PENDING_SIGNAL_PROMOTIONS !== null) promotePendingSignals();
+		if (TRANSITION_ROOT_DRIVER && PENDING_SIGNAL_PROMOTIONS !== null) promotePendingSignals();
 	}
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileDrainEnd();
@@ -2836,7 +2864,7 @@ function commitHeldRootRenders(held: RootRenderTransaction[], layout: DeferredLa
 	HELD_REHIDES = null;
 	if (rehides !== null)
 		for (const activity of rehides) SCHEDULED_VISIBILITY_DRIVER!.rehide!(activity);
-	if (PENDING_SIGNAL_PROMOTIONS !== null) promotePendingSignals();
+	if (TRANSITION_ROOT_DRIVER && PENDING_SIGNAL_PROMOTIONS !== null) promotePendingSignals();
 	// A custom-element callback may synchronously replace a root during the
 	// mutation phase. Accept that root's work before resource readiness.
 	acceptDeferredRootTransactions(layout);
@@ -3397,7 +3425,7 @@ function vtFlush(
 
 /** Drain pending passive effects ahead of a render pass (see flush()). */
 function drainPassivesBeforeRender(): void {
-	if (effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) {
+	if (EFFECT_HOOKS && (effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0)) {
 		if (DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.holdPassivesBeforeRender()) return;
 		drainPassiveEffects();
 	}
@@ -3426,7 +3454,8 @@ export function flushSync<T>(fn: () => T): T {
 	// rendering: run the callback and let the AMBIENT flush drain whatever it
 	// schedules — drainQueue picks up mid-pass appends, and the microtask
 	// scheduler backstops work queued after the render pass (see `inFlush`).
-	if (inFlush) return runNativeBatch(fn);
+	// The engine registers its batch hooks once; bundles without it call fn directly.
+	if (inFlush) return nativeBatchHooks ? runNativeBatch(fn) : fn();
 	// A preparing view transition is skipped so the sync drain can commit now.
 	// A running animation survives; the urgent update changes the live DOM under it.
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
@@ -3435,7 +3464,7 @@ export function flushSync<T>(fn: () => T): T {
 	let result: T;
 	try {
 		try {
-			result = runNativeBatch(fn);
+			result = nativeBatchHooks ? runNativeBatch(fn) : fn();
 			// flushSync drains both priorities, including transitions waiting for their task.
 			if (TRANSITION_TASK_DRIVER) TRANSITION_TASK_DRIVER.adopt(true);
 			// `inFlush` guards only the DRAIN below, not fn(): a nested flushSync
@@ -3904,18 +3933,21 @@ export function commitEffects(): void {
 	// each drain tests individually) keeps the whole drain pipeline off this
 	// path; only the passive hand-off below can still apply. INVARIANT: a drain
 	// added to this function must also add its has-work condition here, or its
-	// work is silently skipped whenever the other queues are empty.
+	// work is silently skipped whenever the other queues are empty. Its producer
+	// must also install COMMIT_WORK: without it every queue is empty, so a bundle
+	// whose producers are all absent drops the drains below.
 	if (
-		effectEventQueue.length === 0 &&
-		effectEventCommitActions.length === 0 &&
-		effectQueues[INSERTION].length === 0 &&
-		effectQueues[LAYOUT].length === 0 &&
-		refDetachQueue.length === 0 &&
-		refAttachQueue.length === 0 &&
-		storeSyncQueue.length === 0 &&
-		(!hydrationStarted || NATIVE_ADOPTION_RELEASES === null) &&
-		activeFragments.size === 0 &&
-		!hasControlledSyncs()
+		(!COMMIT_WORK ||
+			(effectEventQueue.length === 0 &&
+				effectEventCommitActions.length === 0 &&
+				effectQueues[INSERTION].length === 0 &&
+				effectQueues[LAYOUT].length === 0 &&
+				refDetachQueue.length === 0 &&
+				refAttachQueue.length === 0 &&
+				storeSyncQueue.length === 0 &&
+				activeFragments.size === 0 &&
+				!hasControlledSyncs())) &&
+		(!hydrationStarted || NATIVE_ADOPTION_RELEASES === null)
 	) {
 		if (DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.defer(null, null)) return;
 		if (
@@ -3924,6 +3956,7 @@ export function commitEffects(): void {
 		)
 			DEFERRED_LAYOUT_DRIVER.beforeCommit();
 		if (
+			EFFECT_HOOKS &&
 			(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) &&
 			!passiveScheduled
 		) {
@@ -3984,6 +4017,7 @@ export function commitEffects(): void {
 		// store-consistency checks right after commitLayoutEffects.
 		drainStoreSyncs();
 		if (
+			EFFECT_HOOKS &&
 			(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) &&
 			!passiveScheduled
 		) {
@@ -4212,7 +4246,8 @@ export function runEffectBody(e: PendingEffect): void {
 			// effect has args === undefined, which apply accepts as zero arguments.
 			// eslint-disable-next-line prefer-spread
 			cleanup =
-				signalDocumentEnabled || e.scope.block.idState.renderOwner?.signalOwner !== undefined
+				signalDocumentEnabled ||
+				(registerRootOptions && e.scope.block.idState.renderOwner?.signalOwner !== undefined)
 					? runWithBlockSignalOwner(e.scope, () => e.fn!.apply(null, e.args as []))
 					: e.fn.apply(null, e.args as []);
 		} finally {
@@ -4660,12 +4695,11 @@ export function discardHydratePresentation(state: HydrateSlot, capture: Offscree
 			PRESENTATION_PREPARATIONS.delete(frame.lease);
 	// These scopes never acquired the visible DOM. In a new root transaction,
 	// ordinary unmount(false) means deferred parent-owned deletion, not rollback.
-	const previousRollback = ROOT_RENDER_ROLLBACK;
-	ROOT_RENDER_ROLLBACK = true;
+	const previousRollback = markRootRenderRollback(true);
 	try {
 		withRefDetachSuppression(refs, () => resetScopeChildren(state.block, false));
 	} finally {
-		ROOT_RENDER_ROLLBACK = previousRollback;
+		markRootRenderRollback(previousRollback);
 	}
 	state.block.mounted = false;
 	state.block.deoptNode = null;
@@ -5289,13 +5323,14 @@ export function makeRoot(
 			!isCreatedInRootRender(renderOwner.transaction!, previousRoot);
 		const oldFirst = staged ? getFirstChild(container) : null;
 		const oldLast = staged ? container.lastChild : null;
-		journalUndo(() => {
-			rootBlock = previousRoot;
-			currentBody = previousBody;
-			currentKey = previousKey;
-			renderOwner.current = previousRoot;
-			if (previousRoot !== null) registerRootDisposer(previousRoot);
-		});
+		if (TRANSITION_JOURNAL)
+			journalUndo(() => {
+				rootBlock = previousRoot;
+				currentBody = previousBody;
+				currentKey = previousKey;
+				renderOwner.current = previousRoot;
+				if (previousRoot !== null) registerRootDisposer(previousRoot);
+			});
 		try {
 			if (rootBlock) {
 				DOM_ROOT_DISPOSERS.delete(rootBlock);
@@ -5407,6 +5442,9 @@ export function makeRoot(
 					error = unhandled;
 					const transaction = renderOwner.transaction;
 					if (transaction !== null) rollbackRootRender(transaction);
+					// Without a journal nothing restores the screen this mount replaces,
+					// so it goes with the failed one, as a restored one would below.
+					if (!ROOT_ROLLBACK && staged && !previousRoot!.disposed) unmountBlock(previousRoot!);
 					// Match the scheduled-render failure path: discard the failed tree
 					// before surfacing the error, but keep the public root reusable for a
 					// later recovery render. In particular, effects registered before the
@@ -5546,7 +5584,11 @@ export function makeRoot(
 				if (COMMITTING_OWNER === renderOwner) COMMITTING_GENERATION = renderOwner.generation;
 			}
 			renderOwner.nativeRetry?.clear();
-			if (renderOwner.retrySignalOwners !== undefined) clearSignalRetryOwners(renderOwner);
+			if (
+				(signalDocumentEnabled || registerRootOptions) &&
+				renderOwner.retrySignalOwners !== undefined
+			)
+				clearSignalRetryOwners(renderOwner);
 			renderOwner.retryKey = null;
 			renderOwner.request = null;
 			if (renderOwner.transaction?.aborted === true) renderOwner.transaction = null;
@@ -5603,7 +5645,11 @@ export function makeRoot(
 			renderOwner.disposed = true;
 			if (hydrationStarted) HYDRATION_DRIVER!.releaseRootLeases(renderOwner, rootBlock);
 			renderOwner.nativeRetry?.clear();
-			if (renderOwner.retrySignalOwners !== undefined) clearSignalRetryOwners(renderOwner);
+			if (
+				(signalDocumentEnabled || registerRootOptions) &&
+				renderOwner.retrySignalOwners !== undefined
+			)
+				clearSignalRetryOwners(renderOwner);
 			renderOwner.retry = noop;
 			if (TRANSITION_ROOT_DRIVER) TRANSITION_ROOT_DRIVER.discard(renderOwner);
 			renderOwner.generation++;
