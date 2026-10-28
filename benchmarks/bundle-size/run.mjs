@@ -298,6 +298,7 @@ const creatorInstalledRanges = resolveDeclarationRanges(
 		'placeCommitRefs',
 		'collectVisibleSubtreeRefs',
 		// Renderer signal owners, event authority and native-read batches.
+		'signalRetryBoundary',
 		'takeSignalRetryVisit',
 		'runWithBlockSignalOwner',
 		'discardSignalRetryItem',
