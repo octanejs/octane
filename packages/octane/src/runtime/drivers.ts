@@ -385,6 +385,18 @@ export function enableHostDescriptors(): void {
 		placeUpgraded: placeUpgradedList,
 	};
 }
+
+/**
+ * Element descriptors as renderable values. Every factory that builds one sets
+ * this first (enableElementDescriptors), so the child slots and lists of a
+ * bundle without one keep no descriptor dispatch: no component, Fragment or
+ * keyed-element handling, and no descriptor list-item updates.
+ */
+export let ELEMENT_DESCRIPTORS = false;
+/** @internal */
+export function enableElementDescriptors(): void {
+	ELEMENT_DESCRIPTORS = true;
+}
 // Only memo() marks a memo boundary, so it installs the bail that compares the
 // boundary's props, and applications without memo() skip that call per update.
 export let MEMO_BAIL: typeof tryMemoBail | null = null;

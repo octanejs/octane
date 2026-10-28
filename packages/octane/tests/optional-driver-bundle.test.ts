@@ -13,8 +13,10 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { build, parseAst, type Rolldown } from 'vite';
 import { octane } from 'octane/compiler/vite';
 import {
+	type DeclarationRange,
 	resolveDeclarationRanges,
 	retainedDeclarations,
+	topLevelDeclarations,
 } from '../../../benchmarks/bundle-size/hydration-free-gates.mjs';
 import { evaluateCompiledFixtureCode } from './_server-fixture.js';
 
@@ -643,6 +645,179 @@ export async function run(container, scenario) {
 }
 `;
 
+// A renderable hole dispatches element descriptors only in a bundle with a
+// factory that builds one. The descriptor renderer and the branches of the hole
+// and list code that only a descriptor factory enables (ELEMENT_DESCRIPTORS,
+// HOST_DESCRIPTORS) are ranges of the source: a bundle retains one exactly when
+// some generated code maps into it.
+const parseSource = (text: string, source: string) => parseAst(text, { lang: 'ts' }, source);
+// The host renderer, Fragment handling and descriptor list-item updates.
+const DESCRIPTOR_DECLARATIONS = [
+	'reconcileDeoptHost',
+	'reconcileDeoptChildren',
+	'hostElementBody',
+	'isFragmentDescriptor',
+	'fragmentDescriptorChildren',
+	'adoptsPureHost',
+	'buildDeoptAdoptQueue',
+	'unchangedScopedHostDescriptor',
+	'updateDeoptComponent',
+];
+const DESCRIPTOR_GUARDS = new Set([
+	'ELEMENT_DESCRIPTORS',
+	'HOST_DESCRIPTORS',
+	'hostDriver',
+	'isElementDescriptor',
+	'isHostDescriptor',
+]);
+
+// The statement or value a test selects only when a descriptor can be present:
+// a guard, a call to it, a `guard !== null` check, or either side of an `&&`
+// chain.
+function descriptorBranchRanges(source: string) {
+	const text = readFileSync(join(SOURCE, source), 'utf8');
+	const lineStarts = [0];
+	for (let index = text.indexOf('\n'); index !== -1; index = text.indexOf('\n', index + 1))
+		lineStarts.push(index + 1);
+	const position = (offset: number) => {
+		let line = lineStarts.length - 1;
+		while (lineStarts[line] > offset) line--;
+		return [line, offset - lineStarts[line]];
+	};
+	const enables = (test: any): boolean =>
+		(test?.type === 'Identifier' && DESCRIPTOR_GUARDS.has(test.name)) ||
+		(test?.type === 'CallExpression' && enables(test.callee)) ||
+		(test?.type === 'BinaryExpression' &&
+			test.operator === '!==' &&
+			test.right?.type === 'Literal' &&
+			test.right.value === null &&
+			enables(test.left)) ||
+		(test?.type === 'LogicalExpression' &&
+			test.operator === '&&' &&
+			(enables(test.left) || enables(test.right)));
+	const ranges: DeclarationRange[] = [];
+	const visit = (node: any) => {
+		if (node === null || typeof node !== 'object') return;
+		if (Array.isArray(node)) return node.forEach(visit);
+		// A descriptor-only declaration is checked whole.
+		if (node.type === 'FunctionDeclaration' && DESCRIPTOR_DECLARATIONS.includes(node.id?.name))
+			return;
+		const branch =
+			(node.type === 'IfStatement' || node.type === 'ConditionalExpression') && enables(node.test)
+				? node.consequent
+				: null;
+		// A bare identifier or literal arm carries no code of its own to retain.
+		if (branch !== null && branch.type !== 'Identifier' && branch.type !== 'Literal') {
+			const [startLine, startColumn] = position(branch.start);
+			const [endLine, endColumn] = position(branch.end);
+			ranges.push({
+				name: `${source}:${startLine + 1}`,
+				source,
+				startLine,
+				startColumn,
+				endLine,
+				endColumn,
+			});
+		}
+		for (const key in node) if (key !== 'loc' && key !== 'range') visit(node[key]);
+	};
+	visit(parseSource(text, source));
+	return ranges;
+}
+const holeRanges = [
+	...resolveDeclarationRanges(
+		(source: string) => readFileSync(join(SOURCE, source), 'utf8'),
+		parseSource,
+		DESCRIPTOR_DECLARATIONS.map((name) => ({ name, source: 'runtime.ts' })),
+	),
+	...descriptorBranchRanges('runtime/child-slots.ts'),
+	...descriptorBranchRanges('runtime/deopt.ts'),
+];
+
+// Strong-mode components whose holes hold text, numbers, arrays of text and
+// compiled children, and one that returns a portal. Typed props cannot reach
+// the compiler, so each is a renderable hole.
+const STRONG_HOLES_APP = `"use strong";
+import { createPortal, useState } from 'octane';
+
+function Card(props: { title: string; children: unknown }) @{
+	<article>
+		<h2>{props.title}</h2>
+		{props.children}
+	</article>
+}
+
+function Row(props: { message: { author: string; body: string; tags: string[] } }) @{
+	<li>
+		<b>{props.message.author}</b>
+		{props.message.body}
+		<span>{props.message.tags}</span>
+	</li>
+}
+
+function Panel(props: { target: Element; text: string }) {
+	return createPortal(Card, props.target, { title: props.text, children: null });
+}
+
+export function Feed(props: { messages: any[]; status: string | null; set: Set<string>; target: Element }) @{
+	const [count, setCount] = useState(0);
+	<section>
+		<button onClick={() => setCount(count + 1)}>{count}</button>
+		<Card title="feed">
+			<p>{props.status}</p>
+			<p>{props.set}</p>
+		</Card>
+		<ul>
+			@for (const message of props.messages; key message.id) {
+				<Row message={message} />
+			}
+		</ul>
+		<Panel target={props.target} text={props.status ?? 'idle'} />
+	</section>
+}
+`;
+
+const HOLES_ENTRY = `import { createRoot, flushSync } from 'octane';
+import { Feed } from './App.tsrx';
+export function run(container) {
+	const target = document.createElement('div');
+	document.body.append(target);
+	const root = createRoot(container);
+	const props = (tags, status) => ({
+		messages: [{ id: 1, author: 'ada', body: 'hi', tags }],
+		status,
+		set: new Set(['x', 'y']),
+		target,
+	});
+	flushSync(() => root.render(Feed, props(['a', 'b'], null)));
+	const before = container.textContent;
+	flushSync(() => container.querySelector('button').click());
+	flushSync(() => root.render(Feed, props(['a', 'b', 'c'], 'live')));
+	const after = container.textContent;
+	const portal = target.textContent;
+	root.unmount();
+	target.remove();
+	return { before, after, portal, empty: container.childNodes.length === 0 };
+}
+`;
+
+const DESCRIPTOR_APP = `import { Fragment, createElement, createPortal, createRoot, flushSync } from 'octane';
+function Item(props) { return createElement('em', null, props.label); }
+export function run(container) {
+	const target = document.createElement('div');
+	document.body.append(target);
+	const root = createRoot(container);
+	const view = (labels) => createElement('ul', null, labels.map((label) =>
+		createElement(Fragment, { key: label }, createElement(Item, { label }), ' ', createPortal(label, target, label))));
+	flushSync(() => root.render(() => view(['a', 'b'])));
+	flushSync(() => root.render(() => view(['b', 'a', 'c'])));
+	const text = container.textContent + '|' + target.textContent;
+	root.unmount();
+	target.remove();
+	return text;
+}
+`;
+
 const roots: string[] = [];
 afterAll(() => {
 	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
@@ -899,4 +1074,27 @@ export function run(container) {
 			expect(await run(chunk, scenario)).toEqual({ ...expected, empty: true });
 		},
 	);
+});
+
+describe('renderable holes in production bundles', { timeout: 60_000 }, () => {
+	it('ships no descriptor code when no factory can build a descriptor', async () => {
+		const { chunk } = await buildApp(HOLES_ENTRY, { 'App.tsrx': STRONG_HOLES_APP }, 'entry.ts');
+		expect([...retainedDeclarations(chunk.map!, holeRanges)]).toEqual([]);
+		expect(await run(chunk)).toEqual({
+			before: '0feedxyadahiab',
+			after: '1feedlivexyadahiabc',
+			portal: 'live',
+			empty: true,
+		});
+	});
+
+	it('keeps all of it in an application that builds element descriptors', async () => {
+		const { chunk } = await buildApp(DESCRIPTOR_APP, {}, 'entry.ts');
+		const retained = retainedDeclarations(chunk.map!, holeRanges);
+		// The oracle sees every range the other case denies.
+		expect(holeRanges.filter(({ name }) => !retained.has(name)).map(({ name }) => name)).toEqual(
+			[],
+		);
+		expect(await run(chunk)).toBe('b a c |bac');
+	});
 });

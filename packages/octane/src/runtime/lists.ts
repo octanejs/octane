@@ -62,6 +62,7 @@ import {
 	removeAfter,
 } from './branches.js';
 import { descNeedsBlocks } from './deopt.js';
+import { HOST_DESCRIPTORS } from './drivers.js';
 import {
 	JOURNAL_INPUTS,
 	queueFrontier,
@@ -1931,11 +1932,14 @@ function mountItem<T>(
 		if (!inserted) {
 			const node = hydration.node;
 			// A descriptor item delimits itself by its value (selfDelimits), as the
-			// server decided for the same value.
+			// server decided for the same value. Only a host descriptor can, which
+			// a bundle without a host descriptor factory never holds.
 			const descriptor = singleRoot === 2;
 			if (
 				descriptor
-					? isElementDescriptor(item) && selfDelimits(item.type, descNeedsBlocks(item))
+					? HOST_DESCRIPTORS
+						? isElementDescriptor(item) && selfDelimits(item.type, descNeedsBlocks(item))
+						: false
 					: ssrMarkerless === true
 			) {
 				// The outer @for pair is the only list framing on the wire. Each proven
@@ -1999,7 +2003,7 @@ function mountItem<T>(
 					? (forSlot.end.parentNode as any)?.__oct_loc
 					: undefined,
 				() =>
-					descriptor && isHostDescriptor(item) && !descNeedsBlocks(item)
+					descriptor && HOST_DESCRIPTORS && isHostDescriptor(item) && !descNeedsBlocks(item)
 						? `<${item.type as string}>`
 						: 'another list item',
 				hydration.node,
@@ -2028,7 +2032,7 @@ function mountItem<T>(
 	}
 	if (
 		singleRoot === true ||
-		(singleRoot === 2 && isHostDescriptor(item) && !descNeedsBlocks(item))
+		(singleRoot === 2 && HOST_DESCRIPTORS && isHostDescriptor(item) && !descNeedsBlocks(item))
 	) {
 		// Compiler verified the body emits exactly one Element root (true) — or,
 		// on the de-opt sentinel (2), the ITEM VALUE is a pure single-element

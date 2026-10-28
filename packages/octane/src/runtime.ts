@@ -414,6 +414,7 @@ export { bagRecord, bagDone } from './runtime/commit.js';
 export {
 	template,
 	scriptTemplate,
+	enableOpaqueTemplates,
 	clone,
 	drainFrag,
 	bag0,

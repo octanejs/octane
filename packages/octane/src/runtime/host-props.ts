@@ -559,7 +559,9 @@ export function inferTagNs(tag: string, inherited: string | undefined): string |
 // runtime parent is the only authoritative source. `foreignObject` is itself an
 // SVG element but switches its children back to HTML; HTML is represented by an
 // undefined namespace because document.createElement is the fast/default path.
-export function deoptChildNamespace(parent: Node): string | undefined {
+// A named function expression: its recursion alone cannot keep it in a bundle
+// without opaque templates or descriptors.
+export const deoptChildNamespace = function deoptChildNamespace(parent: Node): string | undefined {
 	if (parent.nodeType !== 1) {
 		// A frontier fragment builds content for its live parent.
 		const next: SlotNext | undefined = (parent as any).$$next;
@@ -569,7 +571,7 @@ export function deoptChildNamespace(parent: Node): string | undefined {
 	if (el.namespaceURI === SVG_NS) return el.localName === 'foreignObject' ? undefined : SVG_NS;
 	if (el.namespaceURI === MATHML_NS) return MATHML_NS;
 	return undefined;
-}
+};
 
 function attrNamespace(name: string): string | null {
 	// Bare `xmlns` is the xmlns namespace itself (rare in practice).
