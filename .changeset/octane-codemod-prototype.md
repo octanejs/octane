@@ -10,7 +10,7 @@ It rewrites React imports to `octane` and React libraries to their
 `@for`, and `@try` where that keeps React's behavior, unwraps `forwardRef`,
 ports context providers and consumers, legacy roots, and text-input `onChange`,
 spells holes whose types prove them strings or numbers as text bindings, and
-renames template modules to `.tsrx`, updating every import of them. Every
+renames every module with JSX to `.tsrx`, updating every import of them. Every
 migrated module is compiled before it is written. With `--strong` it applies the
 compiler's own fixes and keeps each module Strong where the compiler accepts it,
 falling back to compatibility mode with the remaining Strong errors reported.

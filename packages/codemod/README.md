@@ -44,9 +44,12 @@ is left alone: `{count && <X />}` stays a hole, because React renders `0` there
 and `@if` would not. `template-text` reads types through the project's
 `tsconfig.json` and runs only on TypeScript modules when that config enables
 `strictNullChecks`; otherwise a `string` may hold null, which React renders as
-nothing. Modules that become templates are renamed to `.tsrx`, and
-every import of them, dynamic imports and `index.html` entry scripts included,
-is updated.
+nothing.
+
+Every module with JSX becomes `.tsrx`, entries and helpers without a component
+included, so Strong mode can reach all of them; one that was JavaScript gains
+`// @ts-nocheck`, so it stays as unchecked as it was. Every import of a renamed
+module, dynamic imports and `index.html` entry scripts included, is updated.
 
 ## Strong mode
 

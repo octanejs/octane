@@ -23,6 +23,10 @@ if (app !== 'jsx' && app !== 'tsrx' && app !== 'codemod') {
 	process.exit(1);
 }
 const APP_DIR = path.join(__dirname, app);
+// The codemod's entry keeps JSX, which makes it TSRX.
+const SERVER_ENTRY = fs.existsSync(path.join(APP_DIR, 'entry-server.tsrx'))
+	? '/entry-server.tsrx'
+	: '/entry-server.tsx';
 const PORT = Number(process.env.PORT || 5170);
 
 // Inline the dehydrated query cache as a JSON <script>. Escape `<` so the JSON
@@ -64,7 +68,7 @@ const server = createHttp((req, res) => {
 
 			// 2. Load the app's SSR entry through Vite (so 'octane' resolves to the
 			//    server runtime per the app's vite config) and render this URL.
-			const { render } = await vite.ssrLoadModule('/entry-server.tsx');
+			const { render } = await vite.ssrLoadModule(SERVER_ENTRY);
 			const { head, body, css, state } = await render(url);
 
 			// 2b. Inline the StyleX atomic sheet so the first paint is styled (no FOUC).

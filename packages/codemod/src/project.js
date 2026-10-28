@@ -26,7 +26,8 @@ import { transformModule } from './transform.js';
  * @property {string} output where it is written, relative to the root
  * @property {boolean} changed
  * @property {Record<string, number>} rules
- * @property {Note[]} notes
+ * @property {Note[]} notes the codemod's own findings, at the original file's
+ *   lines
  * @property {boolean | null} strong whether it is Strong, or null when Strong
  *   was not requested or does not apply
  * @property {string[]} strongFixes
@@ -398,9 +399,8 @@ function rewriteEntryPages(root, targets, renames, write) {
 		const next = html.replace(
 			/(<script\b[^>]*\bsrc=)(["'])([^"']+)\2/g,
 			(match, open, quote, src) => {
-				const file = src.startsWith('/')
-					? path.join(root, src)
-					: path.resolve(path.dirname(page), src);
+				// Vite serves `/` from the page's own directory, as it does `./`.
+				const file = path.join(path.dirname(page), src);
 				const renamed = renames.get(file);
 				if (!renamed) return match;
 				return open + quote + src.replace(/\.[jt]sx?$/, '.tsrx') + quote;

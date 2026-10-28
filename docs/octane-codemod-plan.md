@@ -5,7 +5,10 @@ and Hacker News lane are done, and the lane passes all 10 Playwright journeys
 (2026-10-28, local run). The TS2300 fix landed in #2265, so the corpus now
 compiles with no errors; the first publish is outstanding. The js-framework
 benchmark run (2026-10-28) measures the output's speed, and the text-hole rule
-it called for has landed. This plan takes it
+it called for has landed. The weather and chat benchmark apps migrate and pass
+their harnesses, and the three codemod defects they found are fixed. Every
+module that had JSX now becomes TSRX, so none is left as `.tsx` outside Strong
+mode. This plan takes it
 from a working prototype to a migration tool we can point at any React app.
 
 ## Goal
@@ -52,11 +55,12 @@ hand-written `tsrx/` twin.
 
 ### Validation so far
 
-In-repo: `examples/hacker-news/jsx` migrates to 9 `.tsrx` modules (the same set
-as the hand-written twin), compiles clean, and **typechecks clean under
-`octane-tsc`**. With `--strong`, 6 of 9 become Strong; the other 3 are blocked
-only by `OCTANE_STRONG_UNTRUSTED_HTML`, a `trustHTML()` decision that belongs
-to a person. The text-hole rule casts the holes whose types prove them text
+In-repo: `examples/hacker-news/jsx` migrates to 11 `.tsrx` modules: the
+hand-written twin's 9, plus the two entries, which the twin keeps as `.tsx`. It
+compiles clean and **typechecks clean under `octane-tsc`**. With `--strong`, 8
+of 11 become Strong; the other 3 are blocked only by
+`OCTANE_STRONG_UNTRUSTED_HTML`, a `trustHTML()` decision that belongs to a
+person. The text-hole rule casts the holes whose types prove them text
 (`{String(rank)}`, `{relativeTime(created) as string}`). It leaves optional
 fields such as `story.title?: string` as holes, where the hand-written twin
 casts them: React renders a missing title as nothing.
@@ -66,13 +70,19 @@ compiled:
 
 | App | Commit | Modules | Migrated | `.tsrx` | Compile errors | Strong |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| TodoMVC React (`tastejs/todomvc`) | `ff43b02e59df` | 12 | 7 | 6 | 0 | 6/6 |
-| bulletproof-react (`apps/react-vite`) | `9506629ed003` | 133 | 109 | 60 | 0 | 56/60 |
-| react.dev `src/` | `0821e7d9428a` | 123 | 107 | 91 | 0 | 66/91 |
-| TanStack Query React examples | `e423d30ae010` | 186 | 126 | 81 | 0 | 70/81 |
-| Excalidraw components | `e7b534668a60` | 236 | 200 | 160 | 0 | 108/160 |
-| Excalidraw app | `e7b534668a60` | 43 | 25 | 16 | 0 | 10/16 |
-| **Total** | | **733** | **574** | **414** | **0** | **316/414 (76%)** |
+| TodoMVC React (`tastejs/todomvc`) | `ff43b02e59df` | 12 | 7 | 7 | 0 | 7/7 |
+| bulletproof-react (`apps/react-vite`) | `9506629ed003` | 133 | 109 | 78 | 0 | 74/78 |
+| react.dev `src/` | `0821e7d9428a` | 123 | 110 | 107 | 0 | 77/107 |
+| TanStack Query React examples | `e423d30ae010` | 186 | 127 | 92 | 0 | 81/92 |
+| Excalidraw components | `e7b534668a60` | 236 | 212 | 181 | 0 | 122/181 |
+| Excalidraw app | `e7b534668a60` | 43 | 28 | 23 | 0 | 17/23 |
+| **Total** | | **733** | **593** | **488** | **0** | **378/488 (77%)** |
+
+Every module that had JSX (`.jsx`, `.tsx`, or a `.js` file with JSX) becomes
+`.tsrx`, including entries and helpers with no component template, so Strong
+mode reaches all of them. That took the corpus from 414 `.tsrx` modules and
+316 Strong to 488 and 378. A module that was JavaScript gains
+`// @ts-nocheck`, so it stays as unchecked as it was.
 
 The first corpus run had 2 compile errors, both one Octane defect rather than a
 codemod one: a `.tsrx` module rejected `import type { Toc }` beside
@@ -87,13 +97,13 @@ Strong blockers left across the corpus, by frequency, which orders workstream 5:
 
 | Diagnostic | Count | Planned response |
 | --- | ---: | --- |
-| `OCTANE_STRONG_EXPLICIT_DEPENDENCIES` (non-equivalent list) | 66 | `[]` mount effects that read props → `useEffectEvent`; otherwise report |
-| `OCTANE_STRONG_EFFECT_STATE_UPDATE` | 38 | layout measurement → `useLayoutSnapshot`; derived state → render calculation |
-| `OCTANE_STRONG_MAP_JSX` | 30 | widen `@for` lowering (helpers, attribute positions, row-local keys) |
-| `OCTANE_STRONG_RENDER_REF_READ` / `_WRITE` | 20 | compiler `useLazyRef` edit where it applies; move reads to effects/handlers |
+| `OCTANE_STRONG_EXPLICIT_DEPENDENCIES` (non-equivalent list) | 69 | `[]` mount effects that read props → `useEffectEvent`; otherwise report |
+| `OCTANE_STRONG_EFFECT_STATE_UPDATE` | 40 | layout measurement → `useLayoutSnapshot`; derived state → render calculation |
+| `OCTANE_STRONG_MAP_JSX` | 36 | widen `@for` lowering (helpers, attribute positions, row-local keys) |
+| `OCTANE_STRONG_RENDER_REF_READ` / `_WRITE` | 22 | compiler `useLazyRef` edit where it applies; move reads to effects/handlers |
 | `OCTANE_STRONG_RENDER_AMBIENT_READ` | 14 | `useSyncExternalStore` with a server snapshot |
-| `OCTANE_STRONG_ELEMENT_API` | 15 | stays compatibility (Children/cloneElement); report the render-prop recipe |
-| `OCTANE_STRONG_INDEX_KEY` | 10 | type-aware: suggest an item id field |
+| `OCTANE_STRONG_ELEMENT_API` | 17 | stays compatibility (Children/cloneElement); report the render-prop recipe |
+| `OCTANE_STRONG_INDEX_KEY` | 11 | type-aware: suggest an item id field |
 | `OCTANE_STRONG_RENDER_MODULE_STATE_READ` | 9 | report |
 | others (data fetch, chains, locale, impure calls) | <8 each | report with the documented replacement |
 
@@ -192,6 +202,66 @@ The rule candidates, as they now stand:
 The rest of the byte gap is React habit (`memo`, `useReducer`, `flushSync`,
 separate `Button` and `Jumbotron` components), which a behavior-preserving
 codemod keeps.
+
+### Weather and chat benchmark apps
+
+The React ports in `benchmarks/weather-app` and `benchmarks/chat-stream`,
+migrated from `de97a8ad54` (before the text-hole rule) and run through each
+harness against `octane-tsrx` and React (2026-10-28, two runs at once, so the
+timings are noisy; mins agreed). Both passed every harness check. Ratios are to
+`octane-tsrx`:
+
+| App, op | Codemod | Codemod with fixes | React |
+| --- | ---: | ---: | ---: |
+| weather, `forecast_cycle` | 1.53× | 1.03× | 1.34× |
+| weather, `initial_ready` | 1.08× | 1.00× | 1.18× |
+| weather, JS gzip (`octane-tsrx` 54.0 kB) | 88.5 kB | 53.7 kB | 67.7 kB |
+| chat, `streamFine` | 2.6× | 1.0× | 3.8× |
+| chat, `appendHistory` | 2.7× | 1.1× | 8.2× |
+| chat, `switchConv` | 2.2× | 1.0× | 1.4× |
+| chat, JS gzip (`octane-tsrx` 41.2 kB) | 66.2 kB | 41.0 kB | 62.3 kB |
+
+The fixes column is a hand-edited copy; the ones now in the codemod are marked
+fixed below.
+
+Codemod defects, all fixed:
+
+- **JSX left in a `.jsx` module** (weather). The entry kept `render(<App />)` as
+  `main.jsx`, which Octane's Vite plugin does not compile, so the build failed;
+  the codemod's own compile check calls the compiler directly and passed. Every
+  module that keeps JSX now becomes `.tsrx` (above). Root-absolute `index.html`
+  script paths now resolve from the page's directory, as Vite serves them.
+- **A key on each arm of a conditional row stayed on the arms** (chat).
+  `xs.map((x) => (x.a ? <li key={x.id} /> : <b key={x.id} />))` became an
+  unkeyed `@for` whose arms compiled to runtime element descriptors: +12.8 kB
+  gzip, 150 comment nodes instead of 24, and about 2× on streaming. A key every
+  arm shares now moves to the header; arms keyed differently stay a `.map()`.
+- **Finding lines** (chat) pointed at neither file: the codemod's notes carried
+  the original file's lines under the new name, and Strong blockers carried the
+  Strong candidate's lines, with its directive. Notes now name the original
+  file, and blockers are shifted to the written one.
+
+What the hand-edited copies needed beyond those:
+
+- **Text-hole casts** (both), now the `template-text` rule. These apps are
+  `.jsx`, so it does not reach them: they have no types to prove a hole text.
+  In chat, the bare holes cost 12.4 kB gzip.
+- **`{isActive && <div />}` as `@if`** (weather): `forecast_cycle` 1.53× → 1.08×.
+  Correct only when `isActive` cannot be a number; untyped here, so it stays a
+  hole (workstream 2).
+- **Class error boundary** (weather), workstream 3. Two traps for that rule: a
+  bare `{children}` inside a `@try` arm compiles to a dead statement with no
+  diagnostic, so it must be `<>{children}</>`; and a catch-only `@try` keeps the
+  Suspense runtime, 10.1 kB gzip more than `<ErrorBoundary fallback>`.
+- **`export default memo(X)` / `export default X`** (weather) is an Octane
+  compiler gap, not a codemod one: `findVoidComponentExports` in
+  `packages/octane/src/compiler/bundler.js` accepts neither, so every call site
+  takes the generic component slot, about 20 kB gzip here. Its compiled-code
+  check already accepts both shapes.
+- **Strong** (chat) fell back on `flushSync` and `window[name] =` writes during
+  render; fixed by hand, it compiled Strong. It did not flag three impure calls
+  into `data.js` (an updater, a module cursor, a cache), which cross a module
+  boundary.
 
 ## Workstreams
 
@@ -332,17 +402,17 @@ fixtures, the HN behavior lane, and zero compile errors on supported patterns.
 | M1 (in progress) | Workstream 1 (done), HN lane (done), TS2300 fix (done, #2265), text-hole casts (done), first publish as `0.1.0` | 0 compile errors on corpus (done); HN spec green on migrated output (done: 10/10 journeys); idempotent (done) |
 | M2 | Workstream 2 (types) | HN output matches the hand-written twin's holes and `@if`s wherever React's behavior allows (not its casts of optional fields); merged text bindings measured |
 | M3 | Workstreams 3 + 4 | Error boundaries and simple classes convert; `react-classes` passes the js-framework harness; radix adapter; `octane migrate`; bulletproof-react tests pass after migration |
-| M4 | Workstream 5 | Strong share on the corpus up from 76%, each fixer owned by the compiler |
+| M4 | Workstream 5 | Strong share on the corpus up from 77%, each fixer owned by the compiler |
 | M5 | Workstream 6, docs page on octanejs.dev | Migration guide built from real corpus before/after |
 
 ## Open questions
 
 - **Name.** The prototype is `@octanejs/codemod` with an `octane-codemod` bin,
   matching `@octanejs/cli`. Publish an unscoped `octane-codemod` alias too?
-- **JavaScript projects.** A `.jsx` module becomes `.tsrx` today, which is
-  TypeScript syntax. Fine for the compiler, but a JS-only project gains files
-  its tooling treats as TS. Is there appetite for a JS flavor of TSRX, or do we
-  keep JS projects on `--target tsx`?
+- **JavaScript projects.** A `.jsx` module becomes `.tsrx` with
+  `// @ts-nocheck`, so it stays unchecked, as JavaScript was. A JS-only project
+  still gains files its tooling treats as TS; a JS flavor of TSRX would remove
+  that.
 - **Default aggressiveness.** Ship behavior-preserving by default with a
   `--idiomatic` flag for rewrites like `{n && <X />}` → `@if (n)`, or make
   type-aware proofs good enough that the flag is rarely needed?

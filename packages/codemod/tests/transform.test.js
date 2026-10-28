@@ -104,6 +104,17 @@ describe('transformModule', () => {
 		);
 	});
 
+	it('moves a key every arm of a conditional row shares to the `@for` header', () => {
+		const row = (/** @type {string} */ other) =>
+			`export function L({ xs }: { xs: { id: string; a: boolean }[] }) {\n\treturn <ul>{xs.map((x) => (x.a ? <li key={x.id}>a</li> : <b key={${other}}>b</b>))}</ul>;\n}\n`;
+		const { code } = transformModule(row('x.id'), 'l.tsx');
+		expect(code).toContain('@for (const x of xs; key x.id) {');
+		expect(code).toContain('<li>a</li>');
+		expect(code).not.toContain('key={');
+		// Arms keyed differently stay a `.map()`, so each keeps its own key.
+		expect(transformModule(row("'b' + x.id"), 'l.tsx').code).toContain('{xs.map((x) =>');
+	});
+
 	it('leaves a module already migrated untouched', () => {
 		for (const input of INPUTS) {
 			const { result, output } = migrate(input);
@@ -232,5 +243,8 @@ describe('strengthen', () => {
 		const result = strengthen(compiler, code, path.join(FIXTURES, 'raw.tsrx'));
 		expect(result.strong).toBe(false);
 		expect(result.code.startsWith(prologue + 'export function Raw')).toBe(true);
+		// Blockers point at the written file, which no longer has the directive.
+		const line = result.code.split('\n').findIndex((l) => l.includes('dangerouslySetInnerHTML'));
+		expect(result.blockers.map((b) => b.line)).toEqual([line + 1]);
 	});
 });

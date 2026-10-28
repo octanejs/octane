@@ -80,7 +80,7 @@ describe('runCodemod', () => {
 		const first = await runCodemod([root]);
 		expect(first.files.filter((file) => file.changed).map((file) => file.output)).toEqual([
 			'src/App.tsrx',
-			'src/main.tsx',
+			'src/main.tsrx',
 			'src/use-title.ts',
 		]);
 		const second = await runCodemod([root]);
@@ -124,6 +124,25 @@ describe('runCodemod', () => {
 		const [file] = (await runCodemod([root], { write: false, strong: true })).files;
 		expect(file.strong).toBe(false);
 		expect(file.diagnostics.map((d) => `${d.severity} ${d.code}`)).toEqual(['error COMPILE_ERROR']);
+	});
+
+	it('makes a module that keeps JSX TSRX, unchecked when it was JavaScript', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'index.html': '<script type="module" src="/src/main.jsx"></script>',
+			'src/main.jsx':
+				"import { createRoot } from 'react-dom/client';\nimport { App } from './App';\ncreateRoot(document.body).render(<App />);\n",
+			'src/App.jsx': 'export function App() {\n\treturn <p />;\n}\n',
+		});
+		const result = await runCodemod([root]);
+		expect(result.files.map((file) => [file.file, file.output])).toEqual([
+			['src/App.jsx', 'src/App.tsrx'],
+			['src/main.jsx', 'src/main.tsrx'],
+		]);
+		const read = (/** @type {string} */ name) => fs.readFileSync(path.join(root, name), 'utf8');
+		expect(read('index.html')).toContain('src="/src/main.tsrx"');
+		expect(read('src/main.tsrx')).toMatch(/^\/\/ @ts-nocheck\n/);
+		expect(read('src/main.tsrx')).toContain("import { App } from './App.tsrx';");
 	});
 
 	it('writes nothing in a dry run', async () => {
@@ -171,7 +190,8 @@ describe('runCodemod', () => {
 			.filter((file) => file.output.endsWith('.tsrx'))
 			.map((file) => path.basename(file.output))
 			.sort();
-		expect(renamed).toEqual(twin);
+		// The entries are TSRX too; the twin's are hand-written as `.tsx`.
+		expect(renamed).toEqual([...twin, 'entry-client.tsrx', 'entry-server.tsrx'].sort());
 		expect(
 			result.files.flatMap((file) => file.diagnostics.filter((d) => d.severity === 'error')),
 		).toEqual([]);
@@ -201,6 +221,8 @@ describe('runCodemod', () => {
 			'RootLayout.tsrx',
 			'StoriesPage.tsrx',
 			'StoryRow.tsrx',
+			'entry-client.tsrx',
+			'entry-server.tsrx',
 		]);
 	});
 });

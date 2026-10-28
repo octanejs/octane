@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { lazy, createRoot } from 'octane';
 
 const Page = lazy(() => import('./Page'));

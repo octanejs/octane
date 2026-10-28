@@ -56,11 +56,12 @@ const result = await runCodemod(positionals.length > 0 ? positionals : ['.'], {
 	write: !dryRun,
 });
 
-// The codemod's own notes and the compiler's diagnostics, as one list.
+// The codemod's own notes, at the original file's lines, and the compiler's
+// diagnostics, at the written file's, as one list.
 const findings = result.files.flatMap((file) => [
 	...file.notes
 		.filter((note) => note.severity !== 'info')
-		.map((note) => ({ file: file.output, ...note, code: note.rule })),
+		.map((note) => ({ file: file.file, ...note, code: note.rule })),
 	...file.diagnostics.map((diagnostic) => ({ file: file.output, ...diagnostic })),
 ]);
 const errors = findings.filter((finding) => finding.severity === 'error');

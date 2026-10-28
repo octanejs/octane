@@ -32,8 +32,9 @@ import {
  * @typedef {Object} TransformResult
  * @property {string} code
  * @property {boolean} changed
- * @property {boolean} template whether the module now holds `.tsrx` template
- *   syntax, so it must be renamed
+ * @property {boolean} template whether the module becomes `.tsrx`: it holds a
+ *   template, keeps JSX, or was a JSX module, so no `.tsx` module is left
+ *   outside Strong mode's reach
  * @property {Note[]} notes
  * @property {Record<string, number>} rules how often each rule fired
  * @property {ModuleExports} exports what the module exports that other modules'
@@ -266,6 +267,24 @@ function nodeSpanning(sf, start, end) {
 		if (child.getStart(sf) === start && child.end === end) return child;
 		node = child;
 	}
+}
+
+/**
+ * The elements a list row can render: the row itself, or each arm of a
+ * conditional row. Null when an arm renders anything else.
+ *
+ * @param {ts.Expression} node
+ * @returns {(ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment)[] | null}
+ */
+function rowElements(node) {
+	node = skipParens(node);
+	if (isJsx(node))
+		return [/** @type {ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment} */ (node)];
+	if (isNullish(node)) return [];
+	if (!ts.isConditionalExpression(node)) return null;
+	const whenTrue = rowElements(node.whenTrue);
+	const whenFalse = rowElements(node.whenFalse);
+	return whenTrue && whenFalse && [...whenTrue, ...whenFalse];
 }
 
 /** @param {ts.Node} node */
@@ -504,16 +523,21 @@ class ModuleTransform {
 		code = this.finishImports(code);
 		code = code.replace(/^[ \t]*\u0000DROP\u0000[ \t]*\r?\n/gm, '').replaceAll(DROP, '');
 		code = code.replaceAll(LITERAL_NEWLINE, '\n');
-		if (this.template)
-			code = code.replace(/^\/\*\*\s*@jsxImportSource\s+\S+\s*\*\/[ \t]*\r?\n/m, '');
-		if (this.strong && this.template) code = this.addStrongDirective(code);
-		if (!this.template && this.fromReact && this.hasJsx && /\.(?:[jt]sx|js)$/.test(this.filename)) {
+		const tsrx =
+			this.template || (this.target === 'tsrx' && (this.hasJsx || /\.[jt]sx$/.test(this.filename)));
+		if (tsrx) code = code.replace(/^\/\*\*\s*@jsxImportSource\s+\S+\s*\*\/[ \t]*\r?\n/m, '');
+		if (this.strong && tsrx) code = this.addStrongDirective(code);
+		if (!tsrx && this.fromReact && this.hasJsx && /\.(?:[jt]sx|js)$/.test(this.filename)) {
 			code = this.addJsxPragma(code);
+		}
+		// A JavaScript module was never type-checked; as TSRX it stays unchecked.
+		if (tsrx && /\.[cm]?jsx?$/.test(this.filename)) {
+			code = code.replace(/^(#![^\n]*\n)?/, '$1// @ts-nocheck\n');
 		}
 		return {
 			code,
 			changed: code !== this.source,
-			template: this.template,
+			template: tsrx,
 			notes: this.notes.sort((a, b) => a.line - b.line),
 			rules: this.rules,
 			exports: this.exportsOf(),
@@ -1943,45 +1967,56 @@ class ModuleTransform {
 		const root = skipParens(output);
 		if (!isJsx(root) && !ts.isConditionalExpression(root)) return null;
 
-		let key = null;
-		/** @type {ts.JsxAttribute | null} */
-		let keyAttribute = null;
-		if (ts.isJsxElement(root) || ts.isJsxSelfClosingElement(root)) {
-			const opening = ts.isJsxElement(root) ? root.openingElement : root;
+		// Every element the row can render carries the item's key, so it moves
+		// to the header once: the same key on each arm of a conditional row.
+		const elements = (rowElements(root) ?? []).filter((element) => !ts.isJsxFragment(element));
+		const keys = elements.map((element) => {
+			const opening = ts.isJsxElement(element) ? element.openingElement : element;
 			const attribute = opening.attributes.properties.find(
 				(a) => ts.isJsxAttribute(a) && a.name.getText(this.sf) === 'key',
 			);
-			if (attribute && ts.isJsxAttribute(attribute)) {
-				const value = attribute.initializer;
-				const expression = value && ts.isJsxExpression(value) ? value.expression : value;
-				if (!expression) return null;
-				if (this.readsLocals(expression, setup)) {
-					this.note(
-						RULE.for,
-						'warning',
-						attribute,
-						'This row key reads a value computed in the row, so the list stays a `.map()`.',
-					);
-					return null;
-				}
-				key = expression;
-				keyAttribute = attribute;
-				this.removed.add(attribute);
-				if (
-					ts.isJsxElement(root) &&
-					opening.attributes.properties.length === 1 &&
-					this.calleeName(opening.tagName) === 'Fragment'
-				) {
-					this.bare.add(root);
-				}
+			return /** @type {ts.JsxAttribute | undefined} */ (attribute);
+		});
+		let key = null;
+		if (keys.some(Boolean)) {
+			const values = keys.map((attribute) => {
+				const value = attribute?.initializer;
+				return value && ts.isJsxExpression(value) ? value.expression : value;
+			});
+			const text = values[0]?.getText(this.sf);
+			if (!values[0] || values.some((value) => value?.getText(this.sf) !== text)) return null;
+			key = values[0];
+			if (this.readsLocals(key, setup)) {
+				this.note(
+					RULE.for,
+					'warning',
+					/** @type {ts.JsxAttribute} */ (keys[0]),
+					'This row key reads a value computed in the row, so the list stays a `.map()`.',
+				);
+				return null;
+			}
+		}
+		const hoisted = key ? /** @type {ts.JsxAttribute[]} */ (keys) : [];
+		/** @type {ts.JsxElement[]} A keyed `<Fragment>` is a bare row. */
+		const fragments = [];
+		for (const attribute of hoisted) {
+			this.removed.add(attribute);
+			const opening = attribute.parent.parent;
+			if (
+				ts.isJsxOpeningElement(opening) &&
+				opening.attributes.properties.length === 1 &&
+				this.calleeName(opening.tagName) === 'Fragment'
+			) {
+				fragments.push(opening.parent);
+				this.bare.add(opening.parent);
 			}
 		}
 		const arm = ts.isConditionalExpression(root)
 			? this.ifDirective(root)
 			: this.relative(this.emit(root, TEMPLATE), root);
 		if (arm === null) {
-			if (keyAttribute) this.removed.delete(keyAttribute);
-			this.bare.delete(root);
+			for (const attribute of hoisted) this.removed.delete(attribute);
+			for (const fragment of fragments) this.bare.delete(fragment);
 			return null;
 		}
 		this.count(RULE.for);

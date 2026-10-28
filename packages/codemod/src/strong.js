@@ -15,13 +15,20 @@ import { finding, thrown } from './compiler.js';
 /**
  * The source without the directive the codemod added: its own line after any
  * leading comments and `"use client"`, or, at the very top, that line and the
- * blank line after it.
+ * blank line after it. `line` is where it stood and `lines` how many went.
  *
  * @param {string} code
  */
 function withoutDirective(code) {
 	const top = '"use strong";\n\n';
-	return code.startsWith(top) ? code.slice(top.length) : code.replace(/^"use strong";\n/m, '');
+	if (code.startsWith(top)) return { code: code.slice(top.length), line: 1, lines: 2 };
+	const match = /^"use strong";\n/m.exec(code);
+	if (!match) return { code, line: 0, lines: 0 };
+	return {
+		code: code.slice(0, match.index) + code.slice(match.index + match[0].length),
+		line: code.slice(0, match.index).split('\n').length,
+		lines: 1,
+	};
 }
 const MAX_ROUNDS = 6;
 
@@ -56,7 +63,7 @@ export function strengthen(compiler, code, filename, { force = false } = {}) {
 		if (result.error != null) {
 			// A module that compatibility mode cannot compile either has no
 			// Strong blocker to report; the compile failure is its own error.
-			const compat = compiler.collectDiagnostics(withoutDirective(code), filename, {});
+			const compat = compiler.collectDiagnostics(withoutDirective(code).code, filename, {});
 			return fallback(code, compat.error == null ? [thrown(result.error)] : [], fixed, force);
 		}
 		diagnostics = result.diagnostics;
@@ -82,9 +89,15 @@ export function strengthen(compiler, code, filename, { force = false } = {}) {
 function fallback(code, blockers, fixed, force) {
 	if (force) return { code, strong: true, fixed, blockers };
 	// The module builds in compatibility mode; what kept it there is work
-	// left, not a failure.
-	const kept = blockers.map((blocker) => ({ ...blocker, severity: 'warning' }));
-	return { code: withoutDirective(code), strong: false, fixed, blockers: kept };
+	// left, not a failure. Its lines are the written file's, without the
+	// directive.
+	const compat = withoutDirective(code);
+	const kept = blockers.map((blocker) => ({
+		...blocker,
+		severity: 'warning',
+		line: blocker.line > compat.line ? blocker.line - compat.lines : blocker.line,
+	}));
+	return { code: compat.code, strong: false, fixed, blockers: kept };
 }
 
 /**
