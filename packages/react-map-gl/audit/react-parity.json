@@ -421,7 +421,7 @@
         {
           "path": "packages/react-map-gl/tests/_fixtures/upstream-apps.tsrx",
           "role": "support",
-          "sha256": "689d69b61f502d294070fa3c06c0975c82d88f74ec8cbbb89cb380c07c326c57"
+          "sha256": "c744c619a815c56ca66b7c0a91bcd19a16140f4eb6701e8b549dac24a36f874b"
         }
       ]
     },

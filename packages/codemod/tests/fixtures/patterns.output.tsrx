@@ -6,6 +6,7 @@ export const Tree = memo(function Tree({ items, status }: { items: Item[]; statu
   if (status === 'error') return <p role="alert">Failed</p>;
 
   <div>
+    <h2>@if (status === 'idle') { <em>Ready</em> } @else { <>{status}</> }</h2>
     @if (status === 'loading') { <span>Loading…</span> } @else {
       @if (items.length === 0) { <span>Empty</span> } @else {
         <ul>
