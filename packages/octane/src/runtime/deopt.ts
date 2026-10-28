@@ -97,7 +97,7 @@ import {
 	componentSlotFunction,
 	clearChildContent,
 } from './component-slots.js';
-import { childSlot, childTextHole, iterableChildArray } from './child-slots.js';
+import { childSlot, childTextHole } from './child-slots.js';
 import { detachDeoptTreeRefs } from './activity.js';
 import {
 	type ForSlot,
@@ -121,10 +121,8 @@ import {
 	queueRootDeletion,
 	journalBag,
 	journalObjectOnce,
-	journalRootChildShape,
 } from './commit.js';
-import { DEOPT_DESC, getFirstChild, getNextSibling, rejectTextareaChild } from './templates.js';
-import { nodeAfterPortalRange } from './portals.js';
+import { getFirstChild, getNextSibling, rejectTextareaChild } from './templates.js';
 import {
 	eventSlot,
 	devEventListener,
@@ -522,7 +520,7 @@ function applyHostProps(state: HostComponentSlot, props: any, scope: Scope): voi
 // DOM-resident state (input value, focus, selection, scroll, media). A direct
 // property (not a WeakMap) keeps the per-child lookup in reconcileDeoptChildren cheap;
 // `DeoptStamped` types it so there's no `any`. Absent on text/adopted server nodes.
-// (DEOPT_DESC lives with the DOM expandos templates.ts seeds.)
+export const DEOPT_DESC: unique symbol = Symbol('octane.deoptDesc');
 
 // Whether any of `el`'s current children were created by the de-opt reconciler. Every node it
 // builds carries a `$$deoptKey` stamp (or a descriptor), so ownership is derivable and needs no
@@ -619,7 +617,7 @@ function stampDeoptDesc(el: Element, record: ElementDescriptor): void {
 
 type DeoptWrapperKind = 'array' | 'fragment';
 
-export interface PreparedDeoptList {
+interface PreparedDeoptList {
 	items: any[];
 	keys: any[];
 }
@@ -849,7 +847,7 @@ export function prepareDeoptList(
 	forceSingle: boolean = false,
 	includeKeyedSingle: boolean = true,
 	// childSlot passes the element type it already read; undefined otherwise.
-	elementType: unknown = isElementDescriptor(value) ? value.type : undefined,
+	elementType: unknown = ELEMENT_DESCRIPTORS && isElementDescriptor(value) ? value.type : undefined,
 ): PreparedDeoptList | null {
 	// childSlot calls this for EVERY renderable hole on every render, and the
 	// non-list answer (a lone component descriptor, text, null) is the common one
@@ -882,6 +880,23 @@ export function prepareDeoptList(
 		return { items: [value], keys: [singleDeoptKey(value, ownListKey(value, false) ?? 0)] };
 	}
 	return null;
+}
+
+export function iterableChildArray(value: any): any[] | null {
+	if (
+		value == null ||
+		typeof value === 'string' ||
+		Array.isArray(value) ||
+		(ELEMENT_DESCRIPTORS && isElementDescriptor(value))
+	)
+		return null;
+	const iterator = childrenIterator(value);
+	if (iterator === null) return null;
+	const out: any[] = [];
+	const cursor = iterator.call(value);
+	let step: IteratorResult<any>;
+	while (!(step = cursor.next()).done) out.push(step.value);
+	return out;
 }
 
 // Flatten a descriptor's `children` (a single value, or a possibly-nested array —
@@ -1409,6 +1424,16 @@ function placeDeoptChildren(el: Element, result: Node[], skip: boolean, adopt: b
 	}
 }
 
+// Resume point of an owned-children walk after a foreign portal range: the first
+// node AFTER the range close (`end`). Tolerates a torn range (the close was removed
+// out from under us) by resuming right after `start`, so the walk can never loop.
+// Shared by reconcileDeoptChildren's ownership and ordering walks.
+export function nodeAfterPortalRange(start: Node, end: Node): Node | null {
+	let m: Node | null = start;
+	while (m !== null && m !== end) m = getNextSibling(m);
+	return getNextSibling(m ?? start);
+}
+
 // Continue an ordering walk past foreign portal ranges and imperative nodes.
 // Hydration may also adopt unmarked server children in this owned host, except
 // the server's text separators, which stay where they are.
@@ -1585,7 +1610,6 @@ export function deoptItemBody(item: any, scope: Scope): void {
 				currentComp: null,
 				currentIsBodyFn: false,
 				forSlot: null,
-				texts: null,
 				// Pure → Blocks transfer: the raw element becomes the slot's reuse
 				// candidate — childSlot's upgrade branch adopts it in place.
 				hostNode: transfer,
@@ -2363,23 +2387,18 @@ export function placeUpgradedList(args: any[]): void {
 	host.insertBefore(state.start, anchor);
 }
 
-/** childSlot's keyed list for `value` (ChildListDriver.prepare): an iterable reads once. */
-export function prepareChildList(
-	value: any,
-	includeKeyedSingle: boolean,
-	elementType: unknown,
-): PreparedDeoptList | null {
-	return prepareDeoptList(
-		iterableChildArray(value) ?? value,
-		false,
-		includeKeyedSingle,
-		elementType,
-	);
-}
-
 // List-only reconciliation is separate from childSlot's text/function path so
 // its first-use compilation can remain deferred until a list value reaches it.
 // Slot registration and upgrade ownership have already been established.
+export function journalRootChildShape(state: ChildSlot): void {
+	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_TRANSACTION.aborted || ROOT_RENDER_ROLLBACK)
+		return;
+	// Compiled holes cache their input after this helper returns. A structural
+	// clear can be the parent's only binding write, so restore that cache too.
+	journalBag();
+	journalObjectOnce(state);
+}
+
 export function renderPreparedChildList(
 	state: ChildSlot,
 	parentBlock: Block,

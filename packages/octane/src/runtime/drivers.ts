@@ -137,9 +137,6 @@ import {
 	unchangedScopedHostDescriptor,
 	buildDeoptAdoptQueue,
 	placeUpgradedList,
-	prepareChildList,
-	renderPreparedChildList,
-	teardownChildForSlot,
 } from './deopt.js';
 import {
 	maybeFlushDiscrete,
@@ -265,37 +262,15 @@ export function enableHostDescriptors(): void {
 }
 
 /**
- * The keyed list regime for an array or iterable child whose items may be more
- * than text: compiled bodies, portals, element descriptors. Each factory of such
- * a value installs it (enableChildLists). Without one, an array's items can only
- * be text, which childSlot's text list renders, and this keeps none of the list.
- */
-export interface ChildListDriver {
-	/** The value's keyed items, or null when it renders as a single child. */
-	prepare: typeof prepareChildList;
-	render: typeof renderPreparedChildList;
-	teardown: typeof teardownChildForSlot;
-}
-export let CHILD_LISTS: ChildListDriver | null = null;
-/** @internal */
-export function enableChildLists(): void {
-	CHILD_LISTS ??= {
-		prepare: prepareChildList,
-		render: renderPreparedChildList,
-		teardown: teardownChildForSlot,
-	};
-}
-
-/**
- * Element descriptors as renderable values. Every factory that builds one
- * installs this first (enableElementDescriptors), so a renderable hole of a
- * bundle without one dispatches only text, bodies, portals and the Usables.
+ * Element descriptors as renderable values. Every factory that builds one sets
+ * this first (enableElementDescriptors), so the child slots and lists of a
+ * bundle without one keep no descriptor dispatch: no component, Fragment or
+ * keyed-element handling, and no descriptor list-item updates.
  */
 export let ELEMENT_DESCRIPTORS = false;
 /** @internal */
 export function enableElementDescriptors(): void {
 	ELEMENT_DESCRIPTORS = true;
-	if (!CHILD_LISTS) enableChildLists();
 }
 // Only memo() marks a memo boundary, so it installs the bail that compares the
 // boundary's props, and applications without memo() skip that call per update.

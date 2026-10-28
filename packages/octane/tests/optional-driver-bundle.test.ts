@@ -645,23 +645,24 @@ export async function run(container, scenario) {
 }
 `;
 
-// A renderable hole holds a primitive unless something in the bundle can build
-// another kind of value. The descriptor de-opt module serves element
-// descriptors, and the hole and list code has branches that only a descriptor
-// factory (ELEMENT_DESCRIPTORS, HOST_DESCRIPTORS) or a factory of a list item
-// other than text (CHILD_LISTS) enables. Each such branch is a range of the
-// source: a bundle retains it exactly when some generated code maps into it.
+// A renderable hole dispatches element descriptors only in a bundle with a
+// factory that builds one. The descriptor renderer and the branches of the hole
+// and list code that only a descriptor factory enables (ELEMENT_DESCRIPTORS,
+// HOST_DESCRIPTORS) are ranges of the source: a bundle retains one exactly when
+// some generated code maps into it.
 const parseSource = (text: string, source: string) => parseAst(text, { lang: 'ts' }, source);
-const DEOPT_SOURCE = 'runtime/deopt.ts';
-const deoptRanges = resolveDeclarationRanges(
-	(source: string) => readFileSync(join(SOURCE, source), 'utf8'),
-	parseSource,
-	[
-		...topLevelDeclarations(
-			parseSource(readFileSync(join(SOURCE, DEOPT_SOURCE), 'utf8'), DEOPT_SOURCE),
-		).keys(),
-	].map((name) => ({ name, source: DEOPT_SOURCE })),
-);
+// The host renderer, Fragment handling and descriptor list-item updates.
+const DESCRIPTOR_DECLARATIONS = [
+	'reconcileDeoptHost',
+	'reconcileDeoptChildren',
+	'hostElementBody',
+	'isFragmentDescriptor',
+	'fragmentDescriptorChildren',
+	'adoptsPureHost',
+	'buildDeoptAdoptQueue',
+	'unchangedScopedHostDescriptor',
+	'updateDeoptComponent',
+];
 const DESCRIPTOR_GUARDS = new Set([
 	'ELEMENT_DESCRIPTORS',
 	'HOST_DESCRIPTORS',
@@ -669,12 +670,11 @@ const DESCRIPTOR_GUARDS = new Set([
 	'isElementDescriptor',
 	'isHostDescriptor',
 ]);
-const LIST_GUARDS = new Set(['CHILD_LISTS']);
 
-// The statement or value a test selects only when one of `guards` holds: the
-// guard itself, a call to it, a `guard !== null` check, or either side of an
-// `&&` chain.
-function capabilityBranchRanges(source: string, guards: ReadonlySet<string>) {
+// The statement or value a test selects only when a descriptor can be present:
+// a guard, a call to it, a `guard !== null` check, or either side of an `&&`
+// chain.
+function descriptorBranchRanges(source: string) {
 	const text = readFileSync(join(SOURCE, source), 'utf8');
 	const lineStarts = [0];
 	for (let index = text.indexOf('\n'); index !== -1; index = text.indexOf('\n', index + 1))
@@ -685,7 +685,7 @@ function capabilityBranchRanges(source: string, guards: ReadonlySet<string>) {
 		return [line, offset - lineStarts[line]];
 	};
 	const enables = (test: any): boolean =>
-		(test?.type === 'Identifier' && guards.has(test.name)) ||
+		(test?.type === 'Identifier' && DESCRIPTOR_GUARDS.has(test.name)) ||
 		(test?.type === 'CallExpression' && enables(test.callee)) ||
 		(test?.type === 'BinaryExpression' &&
 			test.operator === '!==' &&
@@ -699,6 +699,9 @@ function capabilityBranchRanges(source: string, guards: ReadonlySet<string>) {
 	const visit = (node: any) => {
 		if (node === null || typeof node !== 'object') return;
 		if (Array.isArray(node)) return node.forEach(visit);
+		// A descriptor-only declaration is checked whole.
+		if (node.type === 'FunctionDeclaration' && DESCRIPTOR_DECLARATIONS.includes(node.id?.name))
+			return;
 		const branch =
 			(node.type === 'IfStatement' || node.type === 'ConditionalExpression') && enables(node.test)
 				? node.consequent
@@ -721,62 +724,20 @@ function capabilityBranchRanges(source: string, guards: ReadonlySet<string>) {
 	visit(parseSource(text, source));
 	return ranges;
 }
-// A descriptor branch of the list code names a deopt.ts declaration, which the
-// deopt ranges already cover.
-const descriptorBranchRanges = capabilityBranchRanges('runtime/child-slots.ts', DESCRIPTOR_GUARDS);
-const listBranchRanges = capabilityBranchRanges('runtime/child-slots.ts', LIST_GUARDS);
-// The host renderer and Fragment handling, which only element descriptors reach.
-const DESCRIPTOR_DECLARATIONS = [
-	'reconcileDeoptHost',
-	'reconcileDeoptChildren',
-	'hostElementBody',
-	'isFragmentDescriptor',
-	'fragmentDescriptorChildren',
-	'adoptsPureHost',
-	'buildDeoptAdoptQueue',
-	'unchangedScopedHostDescriptor',
+const holeRanges = [
+	...resolveDeclarationRanges(
+		(source: string) => readFileSync(join(SOURCE, source), 'utf8'),
+		parseSource,
+		DESCRIPTOR_DECLARATIONS.map((name) => ({ name, source: 'runtime.ts' })),
+	),
+	...descriptorBranchRanges('runtime/child-slots.ts'),
+	...descriptorBranchRanges('runtime/deopt.ts'),
 ];
 
-// Strong-mode components whose holes hold text, arrays of text, and numbers,
-// and one that returns a portal. Typed props cannot reach the compiler, so
-// each is a renderable hole.
+// Strong-mode components whose holes hold text, numbers, arrays of text and
+// compiled children, and one that returns a portal. Typed props cannot reach
+// the compiler, so each is a renderable hole.
 const STRONG_HOLES_APP = `"use strong";
-import { createPortal, useState } from 'octane';
-
-function Row(props: { message: { author: string; body: string; tags: string[] } }) @{
-	<li>
-		<b>{props.message.author}</b>
-		{props.message.body}
-		<span>{props.message.tags}</span>
-	</li>
-}
-
-function Status(props: { text: string }) @{
-	<output>{props.text}</output>
-}
-
-function Panel(props: { target: Element; text: string }) {
-	return createPortal(Status, props.target, { text: props.text });
-}
-
-export function Feed(props: { messages: any[]; status: string | null; set: Set<string>; target: Element }) @{
-	const [count, setCount] = useState(0);
-	<section>
-		<button onClick={() => setCount(count + 1)}>{count}</button>
-		<p>{props.status}</p>
-		<p>{props.set}</p>
-		<ul>
-			@for (const message of props.messages; key message.id) {
-				<Row message={message} />
-			}
-		</ul>
-		<Panel target={props.target} text={props.status ?? 'idle'} />
-	</section>
-}
-`;
-
-// The same holes, plus component children and a portal a component returns.
-const STRONG_CHILDREN_APP = `"use strong";
 import { createPortal, useState } from 'octane';
 
 function Card(props: { title: string; children: unknown }) @{
@@ -784,6 +745,14 @@ function Card(props: { title: string; children: unknown }) @{
 		<h2>{props.title}</h2>
 		{props.children}
 	</article>
+}
+
+function Row(props: { message: { author: string; body: string; tags: string[] } }) @{
+	<li>
+		<b>{props.message.author}</b>
+		{props.message.body}
+		<span>{props.message.tags}</span>
+	</li>
 }
 
 function Panel(props: { target: Element; text: string }) {
@@ -797,12 +766,12 @@ export function Feed(props: { messages: any[]; status: string | null; set: Set<s
 		<Card title="feed">
 			<p>{props.status}</p>
 			<p>{props.set}</p>
-			<ul>
-				@for (const message of props.messages; key message.id) {
-					<li>{message.tags}</li>
-				}
-			</ul>
 		</Card>
+		<ul>
+			@for (const message of props.messages; key message.id) {
+				<Row message={message} />
+			}
+		</ul>
 		<Panel target={props.target} text={props.status ?? 'idle'} />
 	</section>
 }
@@ -829,29 +798,6 @@ export function run(container) {
 	root.unmount();
 	target.remove();
 	return { before, after, portal, empty: container.childNodes.length === 0 };
-}
-`;
-
-// A function called directly can hand its portal to an array, so the call keeps
-// the public createPortal, which installs the keyed list.
-const PORTAL_ARRAY_APP = `import { createPortal, createRoot, flushSync } from 'octane';
-function Badge(props) {
-	return createPortal(props.label, props.target, props.label);
-}
-function Badges(props) @{
-	const badges = props.labels.map((label) => Badge({ label, target: props.target }));
-	<p>{badges}</p>
-}
-export function run(container) {
-	const target = document.createElement('div');
-	document.body.append(target);
-	const root = createRoot(container);
-	flushSync(() => root.render(Badges, { labels: ['a', 'b'], target }));
-	flushSync(() => root.render(Badges, { labels: ['c', 'b', 'a'], target }));
-	const text = target.textContent;
-	root.unmount();
-	target.remove();
-	return { text, empty: target.childNodes.length === 0 };
 }
 `;
 
@@ -1131,57 +1077,24 @@ export function run(container) {
 });
 
 describe('renderable holes in production bundles', { timeout: 60_000 }, () => {
-	const holeRanges = [...deoptRanges, ...descriptorBranchRanges, ...listBranchRanges];
-
-	it('ships no descriptor or list code when holes hold only text and lone portals', async () => {
+	it('ships no descriptor code when no factory can build a descriptor', async () => {
 		const { chunk } = await buildApp(HOLES_ENTRY, { 'App.tsrx': STRONG_HOLES_APP }, 'entry.ts');
 		expect([...retainedDeclarations(chunk.map!, holeRanges)]).toEqual([]);
 		expect(await run(chunk)).toEqual({
-			before: '0xyadahiab',
-			after: '1livexyadahiabc',
+			before: '0feedxyadahiab',
+			after: '1feedlivexyadahiabc',
 			portal: 'live',
 			empty: true,
 		});
-	});
-
-	it('ships the keyed list but no descriptor code for compiled children and portals', async () => {
-		const { chunk } = await buildApp(HOLES_ENTRY, { 'App.tsrx': STRONG_CHILDREN_APP }, 'entry.ts');
-		const retained = retainedDeclarations(chunk.map!, holeRanges);
-		expect(listBranchRanges.filter(({ name }) => !retained.has(name))).toEqual([]);
-		expect(
-			[...descriptorBranchRanges.map(({ name }) => name), ...DESCRIPTOR_DECLARATIONS].filter(
-				(name) => retained.has(name),
-			),
-		).toEqual([]);
-		expect(await run(chunk)).toEqual({
-			before: '0feedxyab',
-			after: '1feedlivexyabc',
-			portal: 'live',
-			empty: true,
-		});
-	});
-
-	it('keeps the keyed list for portals that a function returns to its caller', async () => {
-		const { chunk } = await buildApp(PORTAL_ARRAY_APP);
-		const retained = retainedDeclarations(chunk.map!, holeRanges);
-		expect(listBranchRanges.filter(({ name }) => !retained.has(name))).toEqual([]);
-		// As in React, a reordered portal keeps its content where it is in the target.
-		expect(await run(chunk)).toEqual({ text: 'abc', empty: true });
 	});
 
 	it('keeps all of it in an application that builds element descriptors', async () => {
 		const { chunk } = await buildApp(DESCRIPTOR_APP, {}, 'entry.ts');
 		const retained = retainedDeclarations(chunk.map!, holeRanges);
-		// The oracle sees every range the other cases deny.
-		expect(
-			[
-				...descriptorBranchRanges.map(({ name }) => name),
-				...listBranchRanges.map(({ name }) => name),
-				...DESCRIPTOR_DECLARATIONS,
-				'renderPreparedChildList',
-				'deoptItemBody',
-			].filter((name) => !retained.has(name)),
-		).toEqual([]);
+		// The oracle sees every range the other case denies.
+		expect(holeRanges.filter(({ name }) => !retained.has(name)).map(({ name }) => name)).toEqual(
+			[],
+		);
 		expect(await run(chunk)).toBe('b a c |bac');
 	});
 });

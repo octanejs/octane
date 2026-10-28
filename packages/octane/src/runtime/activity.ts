@@ -2,8 +2,7 @@
 //
 // `<Activity mode>`: hiding and showing subtrees, with their refs and effects.
 
-import { DEOPT_REFS_STAMPED, getDeoptDesc, isHostBlock } from './deopt.js';
-import { nodeAfterPortalRange } from './portals.js';
+import { DEOPT_REFS_STAMPED, getDeoptDesc, nodeAfterPortalRange, isHostBlock } from './deopt.js';
 import { hydrating } from '../hydration-flag.js';
 import { __profileCount, ProfileCounter } from '../profiling.js';
 import type {

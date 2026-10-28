@@ -2,16 +2,17 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { join } from 'node:path';
 import * as ServerRuntime from 'octane/server';
 import { act, createElement, flushSync, hydrateRoot, startTransition } from '../src/index.js';
-import { CHILD_LISTS } from '../src/runtime/drivers.js';
+import { ELEMENT_DESCRIPTORS } from '../src/runtime/drivers.js';
 import { mount } from './_helpers.js';
 import { loadServerFixture } from './_server-fixture.js';
 import { SoleChild, Siblings, Suspending } from './_fixtures/array-text-children.tsrx';
 
 // An array or iterable child of text renders as React's does: one Text node
 // per leaf, nothing for an empty leaf, and a leaf keeps its Text node while its
-// position survives. A bundle whose values can only be text renders these
-// without the keyed list; one with an element factory renders them through it.
-// The same contract holds for both, so every case runs in each.
+// position survives. A bundle without an element factory renders these through
+// the keyed list without its descriptor handling; one with a factory renders
+// them through the whole list. The same contract holds for both, so every case
+// runs in each.
 
 const server = loadServerFixture(join(import.meta.dirname, '_fixtures/array-text-children.tsrx'), {
 	id: 'array-text-children.tsrx',
@@ -130,6 +131,34 @@ function contract() {
 		r.unmount();
 	});
 
+	// OCTANE DIVERGENCE: a function item renders as a body, as a lone `{fn}`
+	// does, on the server and client alike. React renders nothing for it.
+	it('renders a function item as a body on the server and client', async () => {
+		const value = ['a', () => 'body', 'b'];
+		const r = mount(Siblings, { value });
+		expect(r.find('#host').textContent).toBe('beforeabodybafter');
+		r.update(Siblings, { value: ['a', 'b'] });
+		expect(r.find('#host').textContent).toBe('beforeabafter');
+		r.unmount();
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		containers.push(container);
+		container.innerHTML = ServerRuntime.renderToString(server.Siblings, { value }).html;
+		const host = container.querySelector('#host')!;
+		expect(host.textContent).toBe('beforeabodybafter');
+		const serverHtml = host.innerHTML;
+		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const recoverable: unknown[] = [];
+		const root = hydrateRoot(container, Siblings, { value } as any, {
+			onRecoverableError: (error) => recoverable.push(error),
+		});
+		await act(() => {});
+		expect(recoverable).toEqual([]);
+		expect(errors.mock.calls).toEqual([]);
+		expect(host.innerHTML).toBe(serverHtml);
+		root.unmount();
+	});
+
 	it('rejects an object leaf as React does', () => {
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		expect(() => mount(SoleChild, { value: ['a', { b: 1 }] })).toThrow(/object with keys \{b\}/);
@@ -198,20 +227,11 @@ function contract() {
 
 describe('array text children in a bundle that builds no element values', () => {
 	beforeAll(() => {
-		// Nothing has installed the keyed list yet, so these render without it.
-		expect(CHILD_LISTS).toBe(null);
+		// No element factory has run yet, so the list keeps no descriptor handling.
+		expect(ELEMENT_DESCRIPTORS).toBe(false);
 	});
 
 	contract();
-
-	it('renders nothing for a function leaf, as React does', () => {
-		const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
-		const r = mount(Siblings, { value: ['a', () => 'body', 'b'] });
-		expect(data(r.find('#host'))).toEqual(['before', 'a', 'b']);
-		if (process.env.NODE_ENV !== 'production')
-			expect(errors.mock.calls.flat().join(' ')).toMatch(/not a valid array child/);
-		r.unmount();
-	});
 });
 
 describe('array text children when an element factory first runs', () => {
@@ -221,7 +241,7 @@ describe('array text children when an element factory first runs', () => {
 		expect(data(host)).toEqual(['before', 'a', 'b']);
 		// As when a lazily loaded module builds the first element value.
 		createElement('i');
-		expect(CHILD_LISTS).not.toBe(null);
+		expect(ELEMENT_DESCRIPTORS).toBe(true);
 		r.update(Siblings, { value: ['a', 'b', 'c'] });
 		expect(data(host)).toEqual(['before', 'a', 'b', 'c']);
 		expect(host.textContent).toBe('beforeabcafter');
@@ -235,7 +255,7 @@ describe('array text children when an element factory first runs', () => {
 describe('array text children once an element factory has run', () => {
 	beforeAll(() => {
 		createElement('i');
-		expect(CHILD_LISTS).not.toBe(null);
+		expect(ELEMENT_DESCRIPTORS).toBe(true);
 	});
 
 	contract();

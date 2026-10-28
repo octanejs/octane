@@ -1783,7 +1783,6 @@ const INTERNAL_CLIENT_RUNTIME_HELPERS = new Set([
 	'enableDescriptorFragmentRefs',
 	'enableHostDescriptors',
 	'enableOpaqueTemplates',
-	'createPortalChild',
 	'isRenderCall',
 	'deferRecord',
 	'bindSignalText',
@@ -2116,92 +2115,6 @@ function annotatePureFactoryCalls(ast, names) {
 		return null;
 	});
 	return body === ast.body ? ast : { ...ast, body };
-}
-
-/**
- * A portal that a component returns renders as that component's lone child,
- * never as an array item. The public createPortal installs the keyed list a
- * portal inside an array needs (ChildListDriver), so route such a call to
- * createPortalChild, which supports only lone portal children. The proof holds
- * for a module-local function whose every reference is a JSX tag, and only for a
- * portal it returns directly or as an arm of a conditional.
- */
-function lowerReturnedPortals(ast) {
-	const portalLocals = collectPureFactoryLocals(ast.body, new Set(['createPortal']));
-	if (portalLocals.size === 0) return { ast, lowered: false };
-	// Bindings below module scope, which may shadow a module-level name.
-	const nested = collectNestedBindingNames(
-		ast.body.map((statement) =>
-			statement.type === 'FunctionDeclaration' ? [statement.params, statement.body] : statement,
-		),
-	);
-	for (const name of nested) portalLocals.delete(name);
-	const components = new Set();
-	for (const statement of ast.body) {
-		if (statement.type === 'FunctionDeclaration' && statement.id && !nested.has(statement.id.name))
-			components.add(statement.id.name);
-	}
-	if (portalLocals.size === 0 || components.size === 0) return { ast, lowered: false };
-	const seen = new WeakSet();
-	const scan = (value, parent, key) => {
-		if (value === null || typeof value !== 'object' || seen.has(value)) return;
-		seen.add(value);
-		if (Array.isArray(value)) {
-			for (const child of value) scan(child, parent, key);
-			return;
-		}
-		if (
-			(value.type === 'Identifier' || value.type === 'JSXIdentifier') &&
-			components.has(value.name) &&
-			!(parent?.type === 'FunctionDeclaration' && key === 'id') &&
-			!(
-				(parent?.type === 'JSXOpeningElement' || parent?.type === 'JSXClosingElement') &&
-				key === 'name'
-			) &&
-			!(parent?.type === 'Element' && key === 'id')
-		)
-			components.delete(value.name);
-		for (const k in value) {
-			if (k !== 'loc' && k !== 'metadata') scan(value[k], value, k);
-		}
-	};
-	scan(ast.body, ast, 'body');
-	if (components.size === 0) return { ast, lowered: false };
-	let lowered = false;
-	const portalChild = (node) => {
-		if (node?.type === 'ConditionalExpression') {
-			const consequent = portalChild(node.consequent);
-			const alternate = portalChild(node.alternate);
-			return consequent === node.consequent && alternate === node.alternate
-				? node
-				: { ...node, consequent, alternate };
-		}
-		if (
-			node?.type !== 'CallExpression' ||
-			node.callee?.type !== 'Identifier' ||
-			!portalLocals.has(node.callee.name)
-		)
-			return node;
-		lowered = true;
-		return { ...node, callee: { ...node.callee, name: rtAlias('createPortalChild') } };
-	};
-	const body = ast.body.map((statement) => {
-		if (statement.type !== 'FunctionDeclaration' || !components.has(statement.id?.name))
-			return statement;
-		const fnBody = mapAst(statement.body, (node) => {
-			if (
-				node.type === 'FunctionDeclaration' ||
-				node.type === 'FunctionExpression' ||
-				node.type === 'ArrowFunctionExpression'
-			)
-				return node;
-			if (node.type !== 'ReturnStatement') return null;
-			const argument = portalChild(node.argument);
-			return argument === node.argument ? node : { ...node, argument };
-		});
-		return fnBody === statement.body ? statement : { ...statement, body: fnBody };
-	});
-	return lowered ? { ast: { ...ast, body }, lowered } : { ast, lowered: false };
 }
 
 /**
@@ -12554,13 +12467,15 @@ function compileInternal(
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
 	ast = bindDefaultComponent(normalizeArrowComponents(ast, options?.output === 'ts'));
-	const clientDom =
-		(options?.renderer?.target ?? 'dom') === 'dom' &&
-		universalRuntime === undefined &&
-		options?.__universal == null;
-	ast = annotatePureFactoryCalls(ast, octanePureFactoryNames({ clientDom }));
-	const returnedPortals = clientDom && options?.output !== 'ts' ? lowerReturnedPortals(ast) : null;
-	if (returnedPortals !== null) ast = returnedPortals.ast;
+	ast = annotatePureFactoryCalls(
+		ast,
+		octanePureFactoryNames({
+			clientDom:
+				(options?.renderer?.target ?? 'dom') === 'dom' &&
+				universalRuntime === undefined &&
+				options?.__universal == null,
+		}),
+	);
 	const errorBoundaryLowering = lowerImportedErrorBoundaries(ast);
 	ast = errorBoundaryLowering.ast;
 	const consumedRuntimeLocals = errorBoundaryLowering.consumed;
@@ -12745,8 +12660,7 @@ function compileInternal(
 			ast,
 			options?.isDescriptorChildrenImport,
 		),
-		// helpers referenced by GENERATED code — imported as `name as _$name`
-		runtimeNeeded: new Set(returnedPortals?.lowered ? ['createPortalChild'] : []),
+		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		profileRuntimeNeeded: new Set(), // compiler ABI helpers imported from `octane/profiling`
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		userRuntimeNamespaces: new Set(), // `import * as ns from 'octane'`

@@ -39,6 +39,7 @@ import {
 	deoptChildNamespace,
 } from './host-props.js';
 import { isElementDescriptor } from './elements.js';
+import { DEOPT_DESC } from './deopt.js';
 import { DEFAULT_VALUE_BASELINE } from './forms.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
@@ -172,9 +173,6 @@ export interface LazyTemplateRecord {
 }
 
 const LAZY_TEMPLATE = Symbol('octane.lazy-template');
-
-/** The descriptor a de-opt host element or text was last reconciled from (deopt.ts). */
-export const DEOPT_DESC: unique symbol = Symbol('octane.deoptDesc');
 
 // The parser needs a wrapper to establish foreign-content namespaces and to
 // retain HTML fragment roots. Transfer ordinary children once while caching

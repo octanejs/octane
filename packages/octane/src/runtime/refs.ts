@@ -32,7 +32,7 @@ import type { PortalSlot } from './portals.js';
 import { TEARDOWN_HANDLER, TEARDOWN_BLOCK } from './block.js';
 import { fragmentHostVisible, findHiddenActivity } from './suspense.js';
 import { TRANSITION_JOURNAL, ROOT_RENDER_TRANSACTION, WIP_CAPTURE } from './render.js';
-import { nodeAfterPortalRange } from './portals.js';
+import { nodeAfterPortalRange } from './deopt.js';
 import { journalBag, REF_DETACH_SUPPRESSION } from './commit.js';
 import { getNextSibling } from './templates.js';
 

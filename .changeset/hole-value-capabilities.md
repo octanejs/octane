@@ -2,4 +2,4 @@
 'octane': patch
 ---
 
-Render arrays of text in renderable holes without the keyed child list, which an application now ships only when it can build another kind of list item: element values, compiled children, compiled maps, or portals that may reach an array. A portal a component returns no longer counts. Applications whose holes hold only text, such as Strong-mode apps without component children, drop the element-descriptor and list code from their client bundles.
+Drop element-descriptor handling from renderable holes and child lists in applications that never build an element value. Without an element factory, `childSlot` and the keyed child list keep no component-descriptor, Fragment, keyed-element or host-descriptor code. Strong-mode and pure `.tsrx` apps whose holes hold text therefore ship less runtime. Applications without holes also drop the descriptor classification helpers, and the destination-namespace lookup that only opaque templates need.

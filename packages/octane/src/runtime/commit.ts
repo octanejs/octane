@@ -9,14 +9,7 @@ export {} from './head.js';
 import { hydrating, hydrationStarted } from '../hydration-flag.js';
 import { __profileCount, ProfileCounter, __profileJournalRolledBack } from '../profiling.js';
 import { formatClientError } from '../error-codes.client.generated.js';
-import type {
-	Scope,
-	Block,
-	ChildSlot,
-	RootRenderTransaction,
-	SlotNext,
-	SuspenseRefEntry,
-} from './types.js';
+import type { Scope, Block, RootRenderTransaction, SlotNext, SuspenseRefEntry } from './types.js';
 import type { RefDetachSuppression, FragmentInstance } from './refs.js';
 import {
 	QUEUE,
@@ -932,16 +925,6 @@ export function journalBag(): void {
 	// The spill bagOf path and runtime slots retain the generic, exact snapshot.
 	if ((bag as any).__kind !== undefined) return;
 	journalObjectOnce(bag);
-}
-
-/** Record a child slot's shape before its content changes kind in a root render. */
-export function journalRootChildShape(state: ChildSlot): void {
-	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_TRANSACTION.aborted || ROOT_RENDER_ROLLBACK)
-		return;
-	// Compiled holes cache their input after this helper returns. A structural
-	// clear can be the parent's only binding write, so restore that cache too.
-	journalBag();
-	journalObjectOnce(state);
 }
 
 /** Record every own value of `obj`, once per window, so it can be put back. */

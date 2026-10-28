@@ -49,8 +49,6 @@ import {
 	SIGNAL_BINDINGS_ENABLED,
 	MEMO_BAIL,
 	installMemoBail,
-	CHILD_LISTS,
-	enableChildLists,
 } from './drivers.js';
 import {
 	type SignalInstanceKey,
@@ -117,7 +115,7 @@ import {
 } from './elements.js';
 import { childSlot } from './child-slots.js';
 import { sharesBlockBoundary, freshSlotEnd, settleFreshSlot, removeAfter } from './branches.js';
-import { hostElementBody, hostStringTagBody } from './deopt.js';
+import { hostElementBody, hostStringTagBody, journalRootChildShape } from './deopt.js';
 import { forEachSubtreeChild, detachDeoptTreeRefs } from './activity.js';
 import { type ForSlot, removeRange } from './lists.js';
 import {
@@ -127,7 +125,6 @@ import {
 	queueSlotDeletion,
 	placeAtCommit,
 	queueRootDeletion,
-	journalRootChildShape,
 } from './commit.js';
 import { getFirstChild, getNextSibling } from './templates.js';
 
@@ -218,8 +215,6 @@ export function markChildrenBlock<T>(
 	body?: object,
 	captures?: (() => readonly unknown[]) | null,
 ): T {
-	// A compiled body can be an array child, which only the keyed list renders.
-	if (!CHILD_LISTS) enableChildLists();
 	if (typeof fn === 'function') {
 		(fn as any)[CHILDREN_BLOCK] = true;
 		// Keep the boolean ABI for consumers using another runtime copy. Compiled
@@ -1627,7 +1622,7 @@ export function discardOffscreenCapture(capture: OffscreenCapture | null): void 
 	}
 }
 
-// Remove the slot's current content (Block, Text, text list, or pure-host node) while
+// Remove the slot's current content (Block, Text, or pure-host node) while
 // preserving its marker pair, so a mode switch (or component-identity swap)
 // rebuilds in place.
 export function clearChildContent(state: ChildSlot): void {
@@ -1639,7 +1634,6 @@ export function clearChildContent(state: ChildSlot): void {
 		if (
 			state.block === null &&
 			state.forSlot === null &&
-			state.texts === null &&
 			state.text === null &&
 			state.hostNode === null
 		)
@@ -1688,7 +1682,6 @@ export function clearChildContent(state: ChildSlot): void {
 			// until the root outcome is known. Incoming content mounts beside them.
 			state.block = null;
 			state.forSlot = null;
-			state.texts = null;
 			state.text = null;
 			state.hostNode = null;
 			state.currentComp = null;
@@ -1758,7 +1751,6 @@ export function clearChildContent(state: ChildSlot): void {
 		state.hostNode.parentNode!.removeChild(state.hostNode);
 	}
 	state.text = null;
-	state.texts = null;
 	state.currentComp = null;
 	// The marker sweep above (or the direct removes) detached any pure-host node, so
 	// drop the stale reference — a later pure-host render must rebuild, not "reuse" a

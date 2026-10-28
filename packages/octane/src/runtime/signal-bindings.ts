@@ -32,7 +32,7 @@ import {
 } from '../signals/types.js';
 import { styleName } from '../css.js';
 import type { Scope, Block, RootRenderTransaction, HostPropSource, ChildSlot } from './types.js';
-import { HYDRATION_DRIVER, CHILD_LISTS, enableSignalBindings } from './drivers.js';
+import { HYDRATION_DRIVER, enableSignalBindings } from './drivers.js';
 import {
 	scopeSignalOwner,
 	runWithBlockSignalOwner,
@@ -80,6 +80,7 @@ import {
 } from './host-props.js';
 import { coerceChildText, clearChildContent } from './component-slots.js';
 import { renderSignalChildSlot, type SignalChildSlotRenderer } from './child-slots.js';
+import { teardownChildForSlot } from './deopt.js';
 import { BAG_SIZE, bagRecord, journalBag, journalObjectOnce } from './commit.js';
 import { getFirstChild, getNextSibling, htext, htextSwap, bindingText } from './templates.js';
 import { isEventKey } from './events.js';
@@ -1712,16 +1713,11 @@ export function renderPortalChild(
 		return false;
 	}
 	const portalDesc = value as PortalDescriptor;
-	if (CHILD_LISTS && state.forSlot !== null) {
+	if (state.forSlot !== null) {
 		if (ROOT_RENDER_TRANSACTION !== null && hydration === null) clearChildContent(state);
-		else CHILD_LISTS.teardown(state);
+		else teardownChildForSlot(state);
 	}
-	if (
-		state.block !== null ||
-		state.text !== null ||
-		state.texts !== null ||
-		state.hostNode !== null
-	) {
+	if (state.block !== null || state.text !== null || state.hostNode !== null) {
 		clearChildContent(state);
 	}
 	state.portal = renderPortalState(
