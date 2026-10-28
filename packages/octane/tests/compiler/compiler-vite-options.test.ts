@@ -1157,30 +1157,43 @@ export function Styled(props) @{ 'use dom bindings'; <div {...nativeAttrs(props.
 	});
 
 	// A module the plugin compiles can be hundreds of kilobytes of generated
-	// code with almost no comments. Parsing it must stay roughly linear: when
-	// every node scanned all the code up to the next comment, this 540 kB
-	// module took about 20 s to transform instead of about 2 s.
+	// code with almost no comments. When every node scanned all the code up to
+	// the next comment (the @tsrx/core 0.5.5 patch), parsing it was quadratic.
+	// The same rows with a comment every ten lines keep that scan short, so the
+	// test compares the two on one machine: a slow or loaded runner slows both,
+	// and a fixed time limit failed CI on linear parses. At 5,000 rows the two
+	// take about the same time when parsing is linear, and the module with few
+	// comments took 9 to 17 times as long when it was quadratic.
 	it('compiles a large module with few comments without quadratic comment scans', async () => {
 		const plugin = octane({ hmr: false });
 		configure(plugin, 'build');
-		const moduleWithRows = (count: number) =>
+		const moduleWithRows = (count: number, commentEvery: number) =>
 			[
 				"import { useState } from 'octane';",
 				'export function useRow() { return useState(0); }',
 				...Array.from(
 					{ length: count },
-					(_, index) => `export const value${index} = compute(${index}, 'label ${index}');`,
+					(_, index) =>
+						(commentEvery > 0 && index % commentEvery === 0 ? `// rows from ${index}\n` : '') +
+						`export const value${index} = compute(${index}, 'label ${index}');`,
 				),
 				'// end of generated rows',
 			].join('\n');
+		const time = async (name: string, source: string) => {
+			const start = performance.now();
+			expect(await transform(plugin, source, `${ROOT}/src/${name}.js`)).not.toBeNull();
+			return performance.now() - start;
+		};
 		// Time the parse, not the plugin's first-use setup.
-		expect(await transform(plugin, moduleWithRows(1), `${ROOT}/src/warm.js`)).not.toBeNull();
+		await time('warm', moduleWithRows(1, 0));
 
-		const start = performance.now();
-		const output = await transform(plugin, moduleWithRows(10_000), `${ROOT}/src/rows.js`);
-		const seconds = (performance.now() - start) / 1000;
-
-		expect(output).not.toBeNull();
-		expect(seconds).toBeLessThan(6);
+		// The faster of two interleaved rounds, so one stall cannot decide it.
+		let fewComments = Infinity;
+		let commented = Infinity;
+		for (const round of [1, 2]) {
+			commented = Math.min(commented, await time(`commented-${round}`, moduleWithRows(5_000, 10)));
+			fewComments = Math.min(fewComments, await time(`rows-${round}`, moduleWithRows(5_000, 0)));
+		}
+		expect(fewComments / commented).toBeLessThan(4);
 	}, 60_000);
 });
