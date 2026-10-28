@@ -8,7 +8,7 @@ import { __profileTrackComponent } from '../profiling.js';
 import { ELEMENT_TAG, PORTAL_TAG } from '../runtime-tags.js';
 import { profilePortalComponent } from './profile-probes.js';
 import type { ComponentBody, Scope, Block, ElementDescriptor } from './types.js';
-import { noop, activityPortalCreated } from './drivers.js';
+import { noop, activityPortalCreated, CHILD_LISTS, enableChildLists } from './drivers.js';
 import { renderBlock } from './signal-owners.js';
 import { type FragmentInstance, FRAGMENT_REFS, fragmentDirectNodes } from './refs.js';
 import {
@@ -25,7 +25,6 @@ import { createBlock, renderReturnedValue, unmountBlock, registerSlot } from './
 import { CURRENT_BLOCK, ROOT_RENDER_TRANSACTION } from './render.js';
 import { renderPortalChild } from './signal-bindings.js';
 import { childSlot } from './child-slots.js';
-import { nodeAfterPortalRange } from './deopt.js';
 import { queueFrontier, noteFrontierMember, atCommit, queueRootDeletion } from './commit.js';
 import { getNextSibling } from './templates.js';
 import {
@@ -37,6 +36,16 @@ import {
 import { type ControlledState, restoreControlledElement } from './forms.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
+
+// Resume point of an owned-children walk after a foreign portal range: the first
+// node AFTER the range close (`end`). Tolerates a torn range (the close was removed
+// out from under us) by resuming right after `start`, so the walk can never loop.
+// Shared by the portal, ref and de-opt child walks.
+export function nodeAfterPortalRange(start: Node, end: Node): Node | null {
+	let m: Node | null = start;
+	while (m !== null && m !== end) m = getNextSibling(m);
+	return getNextSibling(m ?? start);
+}
 
 // A PortalSlot installs its consumers before deferred range publication. Keep
 // them installed after the last removal: an event can still be between capture
@@ -636,6 +645,18 @@ export interface PortalDescriptor {
 }
 /* @__NO_SIDE_EFFECTS__ */
 export function createPortal(
+	body: ComponentBody | ElementDescriptor | unknown,
+	target: Element | DocumentFragment,
+	props: any = undefined,
+): PortalDescriptor {
+	// A portal can be an array child, which only the keyed list renders.
+	if (!CHILD_LISTS) enableChildLists();
+	return createPortalChild(body, target, props);
+}
+
+/** @internal createPortal for a portal the compiler proved renders as a lone child. */
+/* @__NO_SIDE_EFFECTS__ */
+export function createPortalChild(
 	body: ComponentBody | ElementDescriptor | unknown,
 	target: Element | DocumentFragment,
 	props: any = undefined,

@@ -20,7 +20,7 @@ import type {
 	ElementDescriptor,
 	ChildSlot,
 } from './types.js';
-import { queueRefAttach, HOST_DESCRIPTORS } from './drivers.js';
+import { queueRefAttach, HOST_DESCRIPTORS, ELEMENT_DESCRIPTORS } from './drivers.js';
 import { renderBlock } from './signal-owners.js';
 import { queueRefDetach, type FragmentInstance, mountFragmentRef } from './refs.js';
 import {
@@ -97,7 +97,7 @@ import {
 	componentSlotFunction,
 	clearChildContent,
 } from './component-slots.js';
-import { childSlot, childTextHole } from './child-slots.js';
+import { childSlot, childTextHole, iterableChildArray } from './child-slots.js';
 import { detachDeoptTreeRefs } from './activity.js';
 import {
 	type ForSlot,
@@ -121,8 +121,10 @@ import {
 	queueRootDeletion,
 	journalBag,
 	journalObjectOnce,
+	journalRootChildShape,
 } from './commit.js';
-import { getFirstChild, getNextSibling, rejectTextareaChild } from './templates.js';
+import { DEOPT_DESC, getFirstChild, getNextSibling, rejectTextareaChild } from './templates.js';
+import { nodeAfterPortalRange } from './portals.js';
 import {
 	eventSlot,
 	devEventListener,
@@ -520,7 +522,7 @@ function applyHostProps(state: HostComponentSlot, props: any, scope: Scope): voi
 // DOM-resident state (input value, focus, selection, scroll, media). A direct
 // property (not a WeakMap) keeps the per-child lookup in reconcileDeoptChildren cheap;
 // `DeoptStamped` types it so there's no `any`. Absent on text/adopted server nodes.
-export const DEOPT_DESC: unique symbol = Symbol('octane.deoptDesc');
+// (DEOPT_DESC lives with the DOM expandos templates.ts seeds.)
 
 // Whether any of `el`'s current children were created by the de-opt reconciler. Every node it
 // builds carries a `$$deoptKey` stamp (or a descriptor), so ownership is derivable and needs no
@@ -617,7 +619,7 @@ function stampDeoptDesc(el: Element, record: ElementDescriptor): void {
 
 type DeoptWrapperKind = 'array' | 'fragment';
 
-interface PreparedDeoptList {
+export interface PreparedDeoptList {
 	items: any[];
 	keys: any[];
 }
@@ -705,8 +707,9 @@ export function renderFragmentRefDescriptor(
 	if (hydration !== null) hydration.node = getNextSibling(instance._endMarker);
 }
 
+// Only an element factory builds a positional children array or a Fragment.
 function deoptWrapperKind(value: any[]): DeoptWrapperKind {
-	return POSITIONAL_CHILDREN.has(value as object) ? 'fragment' : 'array';
+	return ELEMENT_DESCRIPTORS && POSITIONAL_CHILDREN.has(value as object) ? 'fragment' : 'array';
 }
 
 const DEOPT_KEY_STRINGIFY = JSON.stringify;
@@ -788,7 +791,7 @@ function flattenReactChildContainer(
 	let keyPrefix: string | null | undefined = count > 1 ? undefined : null;
 	for (let i = 0; i < count; i++) {
 		const item = children[i];
-		if (isFragmentDescriptor(item)) {
+		if (ELEMENT_DESCRIPTORS && isFragmentDescriptor(item)) {
 			if (item.ref != null || hasOwnProp.call(item.props, 'ref')) {
 				outItems.push(DESCRIPTOR_FRAGMENT_REF!(item));
 				keyPrefix = appendScopedDeoptKey(
@@ -851,7 +854,7 @@ export function prepareDeoptList(
 	// childSlot calls this for EVERY renderable hole on every render, and the
 	// non-list answer (a lone component descriptor, text, null) is the common one
 	// — build the two output arrays only once a list regime is established.
-	if (elementType === Fragment) {
+	if (ELEMENT_DESCRIPTORS && elementType === Fragment) {
 		if (value.ref != null || hasOwnProp.call(value.props, 'ref')) {
 			return {
 				items: [DESCRIPTOR_FRAGMENT_REF!(value)],
@@ -871,7 +874,7 @@ export function prepareDeoptList(
 		flattenReactChildContainer(items, keys, value, deoptWrapperKind(value), []);
 		return { items, keys };
 	}
-	if (includeKeyedSingle && isElementDescriptor(value)) {
+	if (ELEMENT_DESCRIPTORS && includeKeyedSingle && isElementDescriptor(value)) {
 		const key = value.key;
 		if (key != null) return { items: [value], keys: ['k' + String(key)] };
 	}
@@ -879,23 +882,6 @@ export function prepareDeoptList(
 		return { items: [value], keys: [singleDeoptKey(value, ownListKey(value, false) ?? 0)] };
 	}
 	return null;
-}
-
-export function iterableChildArray(value: any): any[] | null {
-	if (
-		value == null ||
-		typeof value === 'string' ||
-		Array.isArray(value) ||
-		isElementDescriptor(value)
-	)
-		return null;
-	const iterator = childrenIterator(value);
-	if (iterator === null) return null;
-	const out: any[] = [];
-	const cursor = iterator.call(value);
-	let step: IteratorResult<any>;
-	while (!(step = cursor.next()).done) out.push(step.value);
-	return out;
 }
 
 // Flatten a descriptor's `children` (a single value, or a possibly-nested array —
@@ -969,7 +955,7 @@ export function reconcileDeoptNode(prev: Node | null, value: any, ownerBlock: Bl
 	}
 	// A component descriptor must not reach here — the de-opt callers gate on
 	// descNeedsBlocks() and route component-bearing subtrees through Blocks.
-	if (isElementDescriptor(value)) {
+	if (ELEMENT_DESCRIPTORS && isElementDescriptor(value)) {
 		throw new Error(formatClientError(25));
 	}
 	if (t === 'object') throw invalidChildError(value);
@@ -1423,16 +1409,6 @@ function placeDeoptChildren(el: Element, result: Node[], skip: boolean, adopt: b
 	}
 }
 
-// Resume point of an owned-children walk after a foreign portal range: the first
-// node AFTER the range close (`end`). Tolerates a torn range (the close was removed
-// out from under us) by resuming right after `start`, so the walk can never loop.
-// Shared by reconcileDeoptChildren's ownership and ordering walks.
-export function nodeAfterPortalRange(start: Node, end: Node): Node | null {
-	let m: Node | null = start;
-	while (m !== null && m !== end) m = getNextSibling(m);
-	return getNextSibling(m ?? start);
-}
-
 // Continue an ordering walk past foreign portal ranges and imperative nodes.
 // Hydration may also adopt unmarked server children in this owned host, except
 // the server's text separators, which stay where they are.
@@ -1524,7 +1500,7 @@ export function deoptItemBody(item: any, scope: Scope): void {
 	const existingChild = scope.slots[0] as ChildSlot | undefined;
 	// Each field read of a scoped JSX value resolves its record again. A component
 	// descriptor always needs Blocks, so it skips descNeedsBlocks' second read.
-	const itemType = isElementDescriptor(item) ? item.type : undefined;
+	const itemType = ELEMENT_DESCRIPTORS && isElementDescriptor(item) ? item.type : undefined;
 	// Only a bundle that can build a host item has its renderer (see childSlot).
 	const hostDriver = typeof itemType === 'string' && HOST_DESCRIPTORS ? HOST_DESCRIPTORS : null;
 	const needsBlocks =
@@ -1609,6 +1585,7 @@ export function deoptItemBody(item: any, scope: Scope): void {
 				currentComp: null,
 				currentIsBodyFn: false,
 				forSlot: null,
+				texts: null,
 				// Pure → Blocks transfer: the raw element becomes the slot's reuse
 				// candidate — childSlot's upgrade branch adopts it in place.
 				hostNode: transfer,
@@ -1721,7 +1698,7 @@ export function deoptItemBody(item: any, scope: Scope): void {
 function mappedDeoptItemBody(item: any, scope: Scope): void {
 	const state = scope.slots[0] as CompSlot | ChildSlot | undefined;
 	const block = scope.block;
-	if (isElementDescriptor(item) && typeof item.type === 'function') {
+	if (ELEMENT_DESCRIPTORS && isElementDescriptor(item) && typeof item.type === 'function') {
 		if (state === undefined || state.__kind === 'componentSlotSlot') {
 			const stale = block.deoptNode;
 			let parent: Node = block.parentNode;
@@ -1809,7 +1786,9 @@ function itemComponentFrontier(block: Block, stale: Node): DocumentFragment {
 // its components need reconcilable, unmountable Blocks — so the de-opt
 // paths (childSlot, deoptItemBody) route it through `hostElementBody`/componentSlot
 // instead. Pure host/text subtrees return false and keep the cheap rebuild path.
-export function descNeedsBlocks(value: any): boolean {
+// A named function expression: its recursion alone cannot keep it in a bundle
+// whose lists never render a descriptor (mountItem names it behind the driver).
+export const descNeedsBlocks = function descNeedsBlocks(value: any): boolean {
 	// A render-FUNCTION child (the `.tsrx` lowering of `<Host>{children}</Host>` passes
 	// `props.children` as a component body, not a descriptor) needs a Block: childSlot
 	// renders a function value as a component. Without this a `.tsrx` consumer's children
@@ -1832,8 +1811,9 @@ export function descNeedsBlocks(value: any): boolean {
 	// as a keyed list. The raw host reconciler treats unknown objects as empty;
 	// consuming here merely to inspect for component descendants would also
 	// exhaust generators before the real render.
-	if (!isElementDescriptor(value) && childrenIterator(value) !== null) return true;
-	if (value.$$kind === ELEMENT_TAG) {
+	if (!(ELEMENT_DESCRIPTORS && isElementDescriptor(value)) && childrenIterator(value) !== null)
+		return true;
+	if (ELEMENT_DESCRIPTORS && value.$$kind === ELEMENT_TAG) {
 		// A Fragment descriptor is reconciled by childSlot's fragment-aware list
 		// path. If it appears below a host descriptor, keep that host on the Block
 		// path so the Fragment boundary is not mistaken for a raw host node.
@@ -1851,7 +1831,7 @@ export function descNeedsBlocks(value: any): boolean {
 	// must route through childSlot, not the raw host reconciler.
 	if (value.$$kind === PORTAL_TAG) return true;
 	return false;
-}
+};
 
 // An HTML tag name is ASCII case-insensitive (`createElement('TEXTAREA')` makes
 // a textarea), and the server folds on the lowercased tag (ssrHostElement).
@@ -2383,18 +2363,23 @@ export function placeUpgradedList(args: any[]): void {
 	host.insertBefore(state.start, anchor);
 }
 
+/** childSlot's keyed list for `value` (ChildListDriver.prepare): an iterable reads once. */
+export function prepareChildList(
+	value: any,
+	includeKeyedSingle: boolean,
+	elementType: unknown,
+): PreparedDeoptList | null {
+	return prepareDeoptList(
+		iterableChildArray(value) ?? value,
+		false,
+		includeKeyedSingle,
+		elementType,
+	);
+}
+
 // List-only reconciliation is separate from childSlot's text/function path so
 // its first-use compilation can remain deferred until a list value reaches it.
 // Slot registration and upgrade ownership have already been established.
-export function journalRootChildShape(state: ChildSlot): void {
-	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_TRANSACTION.aborted || ROOT_RENDER_ROLLBACK)
-		return;
-	// Compiled holes cache their input after this helper returns. A structural
-	// clear can be the parent's only binding write, so restore that cache too.
-	journalBag();
-	journalObjectOnce(state);
-}
-
 export function renderPreparedChildList(
 	state: ChildSlot,
 	parentBlock: Block,
@@ -2527,7 +2512,13 @@ export function renderPreparedChildList(
 	const wasMappedNative = state.forSlot.mappedNative === true;
 	const body =
 		compiledMapBody || (mappedFallback === true ? mappedDeoptItemBody : (deoptItemBody as any));
-	if (compiledMapBody === undefined && wasMappedNative && state.forSlot.size > 0) {
+	// Only a host descriptor row can take over a compiled row's element.
+	if (
+		HOST_DESCRIPTORS &&
+		compiledMapBody === undefined &&
+		wasMappedNative &&
+		state.forSlot.size > 0
+	) {
 		for (let index = 0; index < items.length; index++) {
 			const item = items[index];
 			if (!isHostDescriptor(item)) continue;
@@ -2575,7 +2566,7 @@ export function renderPreparedChildList(
 	// and this is not the mapped fallback. Record it on the slot rather than
 	// re-deriving it by identity in mountItem (see ForSlot.plainDeopt).
 	const plainDeopt = compiledMapBody === undefined && mappedFallback !== true;
-	state.forSlot.plainDeopt = plainDeopt ? updateDeoptComponent : null;
+	state.forSlot.plainDeopt = ELEMENT_DESCRIPTORS && plainDeopt ? updateDeoptComponent : null;
 	const fastFlags = compiledMapFlags || 0;
 	const ssrMarkerless = compiledMapBody !== undefined && (fastFlags & 16) !== 0;
 	let pure = (fastFlags & 1) !== 0;

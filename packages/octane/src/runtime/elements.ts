@@ -31,7 +31,12 @@ import {
 import { componentSlot } from './component-slots.js';
 import { type FragmentProps, renderActivityDescriptor } from './activity.js';
 import { EMPTY_ARGS } from './events.js';
-import { HOST_DESCRIPTORS, enableHostDescriptors } from './drivers.js';
+import {
+	HOST_DESCRIPTORS,
+	ELEMENT_DESCRIPTORS,
+	enableHostDescriptors,
+	enableElementDescriptors,
+} from './drivers.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -251,6 +256,7 @@ function scopedElementRecord<P>(
 	resolve: () => unknown,
 	invocationSite?: string,
 ): ElementDescriptor<P> {
+	if (!ELEMENT_DESCRIPTORS) enableElementDescriptors();
 	if (typeof type === 'string' && !HOST_DESCRIPTORS) enableHostDescriptors();
 	const descriptor = { $$kind: ELEMENT_TAG, type, props, key, ref } as ElementDescriptor<P>;
 	if (invocationSite !== undefined) descriptor.__octaneInvocationSite = invocationSite;
@@ -363,6 +369,7 @@ export function nativeCreateScopedValue<P>(
 }
 
 function scopedValueDescriptor<P>(resolve: () => ElementDescriptor<P>): ElementDescriptor<P> {
+	if (!ELEMENT_DESCRIPTORS) enableElementDescriptors();
 	const descriptor = { $$kind: ELEMENT_TAG } as ElementDescriptor<P>;
 	Object.defineProperty(descriptor, SCOPED_VALUE_RECORD, { value: resolve });
 	// Different renderer copies can share the initial { $$kind } V8 map. Seed
@@ -554,6 +561,7 @@ export function createElementFromConfig<P>(
 	props: P | null | undefined,
 	children: any[] = EMPTY_ARGS,
 ): ElementDescriptor<P> {
+	if (!ELEMENT_DESCRIPTORS) enableElementDescriptors();
 	if (typeof type === 'function' && isRendererContext(type)) {
 		registerClientRendererBridge(renderClientContextProvider, flushSync);
 	}

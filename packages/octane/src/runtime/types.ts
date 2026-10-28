@@ -919,6 +919,12 @@ export interface ElementDescriptor<P = any> {
 // is null; mirrors componentSlot's singleRoot regime). A later mode flip
 // promotes the slot to the marked regime by minting the pair in place.
 
+/** A child slot's text list: parallel leaf keys and the Text each leaf shows. */
+interface TextList {
+	keys: (number | string)[];
+	nodes: (Text | null)[];
+}
+
 export interface ChildSlot {
 	__kind: 'childSlot';
 	/**
@@ -969,6 +975,10 @@ export interface ChildSlot {
 	// array. Lets `{items.map(...)}` / `{props.rows}` / any array-of-elements
 	// child render soundly without compile-time pattern matching.
 	forSlot: ForSlot | null;
+	// Non-null while the slot renders an array of text in a bundle without the
+	// keyed list regime (childSlot's renderTextList): each leaf's index path and
+	// the Text it shows, null where it renders nothing.
+	texts: TextList | null;
 	// The single pure-host (no component descendants) DOM node currently rendered at
 	// this slot, REUSED across re-renders by the de-opt reconciler so DOM-resident
 	// state survives. Null when the slot holds a component/text/array instead.

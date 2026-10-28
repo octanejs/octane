@@ -19,7 +19,7 @@ import {
 	HYDRATION_END,
 } from '../constants.js';
 import { hasOwnProp } from '../has-own.js';
-import { textareaChildText } from '../shared-value-helpers.js';
+import { childrenIterator, textareaChildText } from '../shared-value-helpers.js';
 import { __profileHasComponentMetadata, __profileTrackComponent } from '../profiling.js';
 import { formatClientError } from '../error-codes.client.generated.js';
 import { ELEMENT_TAG, CONTEXT_TAG } from '../runtime-tags.js';
@@ -34,6 +34,9 @@ import {
 	SIGNAL_BINDINGS_ENABLED,
 	MEMO_BAIL,
 	HOST_DESCRIPTORS,
+	CHILD_LISTS,
+	ELEMENT_DESCRIPTORS,
+	enableChildLists,
 } from './drivers.js';
 import {
 	type SignalInstanceKey,
@@ -86,17 +89,7 @@ import {
 	freshSlotEnd,
 	settleFreshSlot,
 } from './branches.js';
-import {
-	warnMissingListKey,
-	getDeoptDesc,
-	prepareDeoptList,
-	iterableChildArray,
-	itemRange,
-	descNeedsBlocks,
-	teardownChildForSlot,
-	journalRootChildShape,
-	renderPreparedChildList,
-} from './deopt.js';
+import { warnMissingListKey, getDeoptDesc, itemRange, descNeedsBlocks } from './deopt.js';
 import { detachDeoptTreeRefs } from './activity.js';
 import {
 	BAG_SIZE,
@@ -110,6 +103,7 @@ import {
 	placeHydratedText,
 	queueRootDeletion,
 	journalBag,
+	journalRootChildShape,
 } from './commit.js';
 import { getFirstChild, getNextSibling, rejectTextareaChild } from './templates.js';
 
@@ -369,6 +363,8 @@ export function mapSlot(
 		callback = native;
 		native = mapSlot(items, method) as boolean;
 	}
+	// A compiled map renders its rows as a keyed list.
+	if (!CHILD_LISTS) enableChildLists();
 	if (process.env.NODE_ENV !== 'production' && ((flags ?? 0) & 64) !== 0 && items?.length > 0)
 		warnMissingListKey((scopeOrItems as Scope).block);
 	if (ownEnd === 1) ownEnd = true;
@@ -677,7 +673,8 @@ export function childSlot(
 	// Each field read of a scoped JSX value resolves its record again, and this
 	// classifies every renderable hole on every render. Read the type once here;
 	// later branches read only the fields they consume.
-	const elementType = isElementDescriptor(value) ? value.type : undefined;
+	// Only a bundle with a descriptor factory can hold one (ELEMENT_DESCRIPTORS).
+	const elementType = ELEMENT_DESCRIPTORS && isElementDescriptor(value) ? value.type : undefined;
 	// Only a factory that installed the host renderer can build a host
 	// descriptor. Reading its type first resolves a deferred JSX value, whose
 	// factory installs it; a bundle without one keeps no host branch below.
@@ -703,12 +700,17 @@ export function childSlot(
 	// whatever range the server rendered first, so its output need not fill it.
 	const passthroughOwner = hydration?.passthroughRanges === true && !hydrationTransparent;
 	if (passthroughOwner) hydration!.passthroughRanges = false;
-	const iterable = iterableChildArray(value);
-	if (iterable !== null) value = iterable;
+	// Arrays, iterables, Fragment descriptors, and a lone explicitly-keyed
+	// element share one keyed-list regime, which only a factory of a list item
+	// other than text installs (CHILD_LISTS). Without one, an array or iterable
+	// child holds only text, which renders as a text list.
 	const preparedList =
 		compiledMapBody !== undefined
 			? { items: value as any[], keys: null }
-			: prepareDeoptList(value, false, includeKeyedSingle, elementType);
+			: CHILD_LISTS
+				? CHILD_LISTS.prepare(value, includeKeyedSingle, elementType)
+				: null;
+	const textList = CHILD_LISTS ? null : textListItems(value);
 	// A LONE PURE-HOST descriptor (host/text-only subtree — no components, no
 	// portals, no render functions). Computed once per call: the slot init below
 	// uses it to pick the ANCHORLESS regime, the promotion after it to detect a
@@ -720,19 +722,21 @@ export function childSlot(
 	// After Usable unwrapping a host descriptor is no thenable, so it needs Blocks
 	// exactly when its children do.
 	const pureHost =
-		preparedList === null &&
 		hostDriver !== null &&
+		preparedList === null &&
 		state?.currentComp !== (hostDriver.body as unknown as ComponentBody) &&
 		!descNeedsBlocks((value as ElementDescriptor).children);
 	let rootShapeChanged = false;
 	if (state !== undefined && ROOT_RENDER_TRANSACTION !== null) {
 		const component =
-			pureHost || preparedList !== null
+			pureHost || preparedList !== null || textList !== null
 				? null
 				: hostDriver !== null
 					? (hostDriver.body as unknown as ComponentBody)
 					: valueComponent;
-		const unchangedList = preparedList !== null && state.forSlot !== null;
+		const unchangedList =
+			(preparedList !== null && state.forSlot !== null) ||
+			(textList !== null && state.texts !== null);
 		const unchangedComponent =
 			state.block !== null &&
 			component !== null &&
@@ -752,6 +756,7 @@ export function childSlot(
 			primitive &&
 			state.block === null &&
 			state.forSlot === null &&
+			state.texts === null &&
 			state.hostNode === null &&
 			state.portal === null &&
 			(state.text === null) === (text === '');
@@ -766,7 +771,7 @@ export function childSlot(
 		!hydrationTransparent &&
 		parentBlock === hydration.rootBlock
 	)
-		hydration.rootSlot(anchor ?? null, value, preparedList !== null);
+		hydration.rootSlot(anchor ?? null, value, preparedList !== null || textList !== null);
 	// This call adopted the server's `<!--[-->…<!--]-->` pair as the slot's range,
 	// or is the first render of a slot lent its list item's or returning
 	// component's range.
@@ -878,7 +883,8 @@ export function childSlot(
 						domParent,
 						anchor ?? null,
 						value,
-						preparedList !== null && compiledMapBody === undefined && mappedFallback !== true,
+						(preparedList !== null && compiledMapBody === undefined && mappedFallback !== true) ||
+							textList !== null,
 					);
 			}
 			end = document.createComment('');
@@ -899,6 +905,7 @@ export function childSlot(
 			currentComp: null,
 			currentIsBodyFn: false,
 			forSlot: null,
+			texts: null,
 			hostNode: null,
 			portal: null,
 			next: null,
@@ -913,7 +920,7 @@ export function childSlot(
 			ownsHost !== undefined &&
 			hydration === null &&
 			ROOT_RENDER_TRANSACTION !== null &&
-			DEOPT_UPGRADE?.block !== parentScope.block;
+			(HOST_DESCRIPTORS ? DEOPT_UPGRADE?.block !== parentScope.block : true);
 	} else if (hydration !== null) {
 		if (hydration.lentSlot === state) {
 			hydration.lentSlot = null;
@@ -927,7 +934,7 @@ export function childSlot(
 			state.start!,
 			state.end!,
 			value,
-			compiledMapBody === undefined && mappedFallback !== true ? preparedList : null,
+			compiledMapBody === undefined && mappedFallback !== true ? (preparedList ?? textList) : null,
 		);
 	if (compactable === true) state.compactable = true;
 
@@ -937,6 +944,7 @@ export function childSlot(
 	let upgradeChildren: any = undefined;
 	let upgradeArmed = false;
 	if (
+		HOST_DESCRIPTORS &&
 		DEOPT_UPGRADE !== null &&
 		DEOPT_UPGRADE.block === parentScope.block &&
 		ownsHost !== undefined
@@ -952,7 +960,14 @@ export function childSlot(
 	// pair on demand around the current host node, so every path below sees the
 	// normal marked regime — the childSlot analogue of the singleRoot shape-flip
 	// handling in disposeReturnSlot. One-way: once marked, the slot stays marked.
-	if (state.end === null && !pureHost && state.ownerHost === null && !state.borrowed) {
+	// Only a host descriptor's slot mints no markers (pureHost).
+	if (
+		HOST_DESCRIPTORS &&
+		state.end === null &&
+		!pureHost &&
+		state.ownerHost === null &&
+		!state.borrowed
+	) {
 		const start = document.createComment('');
 		const end = document.createComment('');
 		const host = state.hostNode;
@@ -1005,17 +1020,17 @@ export function childSlot(
 
 	if (PORTAL_CHILD && PORTAL_CHILD(state, value, parentBlock, domParent, hydration)) return;
 
-	// Arrays, iterables, Fragment descriptors, and a lone explicitly-keyed
-	// element share one keyed-list regime. Keeping a keyed single child in this
-	// regime is what lets it retain state when a sibling is added around it.
-	if (preparedList !== null) {
+	// Keeping a keyed single child in the list regime is what lets it retain
+	// state when a sibling is added around it.
+	if (CHILD_LISTS && preparedList !== null) {
+		const lists = CHILD_LISTS;
 		// A hydrating update builds a list that replaces other content, or one an
 		// earlier hydrating update built, on the client.
 		if (rebuild || (hydratingUpdate && (state.forSlot === null || hydration!.buildsList(state)))) {
 			// Mount each item rather than look for server items that are not there.
 			const slot = state;
 			hydration!.suspend(() =>
-				renderPreparedChildList(
+				lists.render(
 					slot,
 					parentBlock,
 					domParent,
@@ -1027,7 +1042,7 @@ export function childSlot(
 			);
 			return;
 		}
-		renderPreparedChildList(
+		lists.render(
 			state,
 			parentBlock,
 			domParent,
@@ -1046,10 +1061,20 @@ export function childSlot(
 			hydration.parkPast(state.end, parentScope);
 		return;
 	}
+	if (textList !== null) {
+		if (rebuild || hydratingUpdate) {
+			// No server items to adopt: build the text as a client mount would.
+			const slot = state;
+			hydration!.suspend(() => renderTextList(slot, parentScope, slotKey, domParent, textList));
+		} else renderTextList(state, parentScope, slotKey, domParent, textList);
+		if (hydration !== null && !state.borrowed && state.end !== null)
+			hydration.parkPast(state.end, parentScope);
+		return;
+	}
 	// Value is NOT an array — if we were in array mode, tear the list down first.
-	if (state.forSlot !== null) {
+	if (CHILD_LISTS && state.forSlot !== null) {
 		if (ROOT_RENDER_TRANSACTION !== null && hydration === null) clearChildContent(state);
-		else teardownChildForSlot(state);
+		else CHILD_LISTS.teardown(state);
 	}
 	// Upgrade adoption, single-child form: the new children value is a lone
 	// renderable. Adopt the element's sole existing raw node as the slot's
@@ -1199,7 +1224,7 @@ export function childSlot(
 	} else if (typeof value === 'function') {
 		comp = value as ComponentBody;
 		isBodyFn = true;
-	} else if (isElementDescriptor(value)) {
+	} else if (ELEMENT_DESCRIPTORS && isElementDescriptor(value)) {
 		const dispatch = activityDescriptorDispatch;
 		const activity = dispatch !== null && (elementType as unknown) === dispatch.type;
 		if (!activity && typeof elementType !== 'function') {
@@ -1366,7 +1391,8 @@ export function childSlot(
 				!parentBlock.exclusiveMarkers &&
 				state.borrowed &&
 				(sharesBlockBoundary(parentBlock, state.start, state.end) ||
-					itemRange(parentBlock)[1] === state.end);
+					// Only a host descriptor's item can be awaiting its pair (itemRange).
+					(HOST_DESCRIPTORS ? itemRange(parentBlock)[1] : parentBlock.endMarker) === state.end);
 			const implicitBail = !isBodyFn || isChildrenBlock(comp);
 			const frag = slotFrontier(
 				state,
@@ -1497,8 +1523,9 @@ export function childSlot(
 
 	// Text / empty.
 	if (value !== null && typeof value === 'object') throw invalidChildError(value);
-	// Swapped away from a component OR a pure-host de-opt node → tear it down first.
-	if (state.block !== null || state.hostNode !== null) clearChildContent(state);
+	// Swapped away from a component, a text list OR a pure-host de-opt node → tear it down first.
+	if (state.block !== null || state.texts !== null || state.hostNode !== null)
+		clearChildContent(state);
 	const str = coerceChildText(value);
 	if (adoptedRange) hydration!.settleTextRange(parentScope, slotKey, state, str);
 	if (str === '') {
@@ -1559,6 +1586,197 @@ function insertSlotText(state: ChildSlot, parentBlock: Block, domParent: Node, s
 	frag.appendChild(tn);
 }
 
+/** An array child's text leaves and their index paths (textListItems). */
+interface TextItems {
+	items: string[];
+	keys: (number | string)[];
+}
+
+/**
+ * The leaves of an array or iterable child in a bundle whose list items can
+ * only be text (no ChildListDriver), or null for any other value. React keys
+ * array children by position, so each leaf is keyed by its index path. As in
+ * the keyed list, a thenable leaf renders what it resolves to, an empty value
+ * or a symbol renders nothing, and another object is no child. A function is
+ * no child either: React renders nothing for it.
+ */
+function textListItems(value: unknown): TextItems | null {
+	const list = textListArray(value);
+	if (list === null) return null;
+	const out: TextItems = { items: [], keys: [] };
+	collectTextItems(out, list, '');
+	return out;
+}
+
+function textListArray(value: unknown): unknown[] | null {
+	return Array.isArray(value) ? value : iterableChildArray(value);
+}
+
+/** An iterable child other than an array, read once into one. */
+export function iterableChildArray(value: any): any[] | null {
+	if (
+		value == null ||
+		typeof value === 'string' ||
+		Array.isArray(value) ||
+		(ELEMENT_DESCRIPTORS && isElementDescriptor(value))
+	)
+		return null;
+	const iterator = childrenIterator(value);
+	if (iterator === null) return null;
+	const out: any[] = [];
+	const cursor = iterator.call(value);
+	let step: IteratorResult<any>;
+	while (!(step = cursor.next()).done) out.push(step.value);
+	return out;
+}
+
+function collectTextItems(out: TextItems, list: unknown[], path: string): void {
+	for (let i = 0; i < list.length; i++) {
+		let item = list[i];
+		while (item !== null && typeof item === 'object' && typeof (item as any).then === 'function')
+			item = useThenable(item as TrackedThenable<unknown>);
+		const key = path === '' ? i : path + i;
+		const nested = textListArray(item);
+		if (nested !== null) {
+			collectTextItems(out, nested, key + '.');
+			continue;
+		}
+		if (item !== null && typeof item === 'object') throw invalidChildError(item);
+		if (process.env.NODE_ENV !== 'production' && typeof item === 'function')
+			console.error(
+				'Octane: a function is not a valid array child, so it renders nothing. ' +
+					'Render a component as <Component /> instead.',
+			);
+		out.keys.push(key);
+		out.items.push(
+			typeof item === 'function' || typeof item === 'symbol' ? '' : coerceChildText(item),
+		);
+	}
+}
+
+/**
+ * Render a text list (ChildSlot.texts) between the slot's markers. A leaf whose
+ * index path survives keeps its Text, so the texts never move. Over committed
+ * DOM in a root render, removals and inserts wait for its commit, where each
+ * run of new texts lands before the next text that was already there.
+ */
+function renderTextList(
+	state: ChildSlot,
+	parentScope: Scope,
+	slotKey: number,
+	domParent: Node,
+	list: TextItems,
+): void {
+	const parentBlock = parentScope.block;
+	const { items, keys } = list;
+	const prev = state.texts;
+	const hydration = hydrating ? CURSOR : null;
+	const owned = state.ownerHost !== null || (state.borrowed && state.start === null);
+	const end = owned ? null : state.end;
+	const nodes: (Text | null)[] = [];
+	if (prev === null && hydration !== null) {
+		// Adopt the range the server frames each leaf in, its text if any.
+		if (state.start === null && !owned) {
+			state.start = document.createComment('');
+			placeAtCommit(domParent, state.start, hydration.node);
+		}
+		const loc = process.env.NODE_ENV !== 'production' ? siteLoc(parentScope, slotKey) : undefined;
+		for (let i = 0; i < items.length; i++) {
+			const open = hydration.node;
+			const close = isBlockOpen(open) ? hydration.close(open!) : null;
+			const text = close === null ? null : getNextSibling(open!);
+			const str = items[i];
+			if (
+				close === null ||
+				(str === '' ? text !== close : text!.nodeType !== 3 || getNextSibling(text!) !== close)
+			)
+				hydration.fail(loc, () => 'another list item', open);
+			if (str !== '' && !hydration.keepsText(domParent, text, text!.nodeValue, str, loc))
+				updateTextValue(text as Text, str);
+			nodes.push(str === '' ? null : (text as Text));
+			hydration.node = getNextSibling(close!);
+		}
+		state.texts = { keys, nodes };
+		return;
+	}
+	const frontier = ROOT_RENDER_TRANSACTION !== null && usesFrontier(parentBlock, domParent);
+	// The run of new nodes that lands before `runBefore`: a frontier over
+	// committed DOM, else the parent itself.
+	let run: DocumentFragment | null = null;
+	let runBefore: Node | null = null;
+	const place = (node: Node, before: Node | null): void => {
+		if (!frontier) {
+			domParent.insertBefore(node, before);
+			return;
+		}
+		if (run === null || runBefore !== before) {
+			run = queueFrontier(parentBlock, domParent, before);
+			runBefore = before;
+		}
+		run.appendChild(node);
+	};
+	// Entering from other content: it leaves first, and a start marker bounds
+	// the range a later clear sweeps, as a component's range does.
+	if (prev === null) {
+		if (state.block !== null || state.text !== null || state.hostNode !== null)
+			clearChildContent(state);
+		if (state.start === null && !owned) place((state.start = document.createComment('')), end);
+	}
+	const prevKeys = prev === null ? [] : prev.keys;
+	const prevNodes = prev === null ? [] : prev.nodes;
+	// Leaves that survive keep their order, so one pass pairs them: an old leaf
+	// before the next surviving one is gone.
+	let index: Map<number | string, number> | null = null;
+	let changed = prev === null || keys.length !== prevKeys.length;
+	let j = 0;
+	for (let i = 0; i < keys.length; i++) {
+		const key = keys[i];
+		let at = j < prevKeys.length && prevKeys[j] === key ? j : -1;
+		if (at === -1 && prevKeys.length !== 0) {
+			if (index === null) {
+				index = new Map();
+				for (let k = 0; k < prevKeys.length; k++) index.set(prevKeys[k], k);
+			}
+			at = index.get(key) ?? -1;
+		}
+		let node: Text | null = null;
+		if (at !== -1) {
+			for (; j < at; j++) changed = removeListText(prevNodes[j], frontier) || changed;
+			node = prevNodes[at];
+			j = at + 1;
+		} else changed = true;
+		const str = items[i];
+		if (str === '') {
+			if (node !== null) changed = removeListText(node, frontier);
+			node = null;
+		} else if (node !== null) renderText(parentBlock, node, str);
+		else {
+			let before: Node | null = end;
+			for (let k = j; k < prevNodes.length; k++) {
+				if (prevNodes[k] !== null) {
+					before = prevNodes[k];
+					break;
+				}
+			}
+			place((node = document.createTextNode(str)), before);
+			changed = true;
+		}
+		nodes.push(node);
+	}
+	for (; j < prevNodes.length; j++) changed = removeListText(prevNodes[j], frontier) || changed;
+	if (!changed) return;
+	if (ROOT_RENDER_TRANSACTION !== null) journalRootChildShape(state);
+	state.texts = { keys, nodes };
+}
+
+/** Remove a text list's Text, at the commit of a root render over committed DOM. */
+function removeListText(node: Text | null, frontier: boolean): boolean {
+	if (node === null) return false;
+	if (frontier) queueRootDeletion(null, node, node);
+	else node.remove();
+	return true;
+}
+
 // A `{expr}` value-hole slot whose value is USUALLY a primitive (text) — what the
 // compiler emits for `.tsx` element children. `childSlot` is a large function that
 // V8 won't inline, so calling it per cell on every render dominated update-heavy
@@ -1610,6 +1828,10 @@ export function textSlot(
 		vt === 'string' ? (value as string) : vt === 'boolean' || value == null ? '' : String(value);
 	if (state.text !== null) {
 		renderText(parentScope.block, state.text, str);
+		return;
+	}
+	if (state.texts !== null) {
+		childSlot(parentScope, slotKey, domParent, value, anchor, ownEnd, undefined, compactable);
 		return;
 	}
 	if (str === '') return;

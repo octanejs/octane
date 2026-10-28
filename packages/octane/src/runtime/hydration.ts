@@ -45,7 +45,7 @@ import type {
 	TrySlot,
 	RootContainer,
 } from './types.js';
-import { installHydrationDriver } from './drivers.js';
+import { HOST_DESCRIPTORS, ELEMENT_DESCRIPTORS, installHydrationDriver } from './drivers.js';
 import { renderBlock } from './signal-owners.js';
 import {
 	QUEUE,
@@ -1186,7 +1186,8 @@ export class HydrationCapability {
 		value: unknown,
 		list: { items: readonly unknown[] } | null,
 	): boolean {
-		const type = list === null && isHostDescriptor(value) ? value.type : null;
+		// Only a bundle with a host descriptor factory can hold one.
+		const type = HOST_DESCRIPTORS && list === null && isHostDescriptor(value) ? value.type : null;
 		// Other values, such as a component or text, check what they adopt as
 		// they render.
 		if (type === null && list === null && (value as any)?.$$kind !== PORTAL_TAG) return false;
@@ -1253,7 +1254,11 @@ export class HydrationCapability {
 		if (
 			text === null ||
 			text.nodeType !== 3 ||
-			!(list || (value as any)?.$$kind === PORTAL_TAG || isHostDescriptor(value)) ||
+			!(
+				list ||
+				(value as any)?.$$kind === PORTAL_TAG ||
+				(HOST_DESCRIPTORS && isHostDescriptor(value))
+			) ||
 			text.parentNode !== parent ||
 			getNextSibling(text) !== end
 		)
@@ -1621,7 +1626,7 @@ export class HydrationCapability {
 				? siteLoc(scope, slotKey) || (el as any).__oct_loc
 				: undefined;
 		if (stale !== null && !textarea) {
-			if (isElementDescriptor(value) && !isHostDescriptor(value))
+			if (ELEMENT_DESCRIPTORS && isElementDescriptor(value) && !isHostDescriptor(value))
 				renderBeforeMismatch(this, el, render);
 			this.fail(loc, () => 'a renderable range', stale);
 		}

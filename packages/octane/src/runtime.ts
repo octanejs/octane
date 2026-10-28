@@ -227,7 +227,7 @@ export {
 	reportRendererOwnerError,
 } from './runtime/context.js';
 export type { Context, ForeignHostContext } from './runtime/context.js';
-export { portal, createPortal } from './runtime/portals.js';
+export { portal, createPortal, createPortalChild } from './runtime/portals.js';
 export type { PortalDescriptor } from './runtime/portals.js';
 export {
 	Hydrate,
@@ -414,6 +414,7 @@ export { bagRecord, bagDone } from './runtime/commit.js';
 export {
 	template,
 	scriptTemplate,
+	enableOpaqueTemplates,
 	clone,
 	drainFrag,
 	bag0,

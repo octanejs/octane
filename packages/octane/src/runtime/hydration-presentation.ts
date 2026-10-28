@@ -32,7 +32,7 @@ import { SIGNAL_BINDING_SUBSCRIBE } from '../signals/types.js';
 import { isSignalHandle, isWritableSignal } from '../signals/handle-protocol.js';
 import { normalizeClass } from '../css.js';
 import type { Scope, Block, RootRenderOwner, OffscreenCapture, HostPropSource } from './types.js';
-import { SIGNAL_BINDINGS_ENABLED } from './drivers.js';
+import { SIGNAL_BINDINGS_ENABLED, CHILD_LISTS, enableChildLists } from './drivers.js';
 import {
 	runWithBlockSignalOwner,
 	type NativeStyleBinding,
@@ -1199,6 +1199,8 @@ export const BINDING_CHILDREN_SITE = /* @__PURE__ */ Symbol.for('octane.binding.
 
 /** @internal A lexical children body carries its authored invocation site across modules. */
 export function markBindingChildren<T extends Function>(body: T, site: string): T {
+	// A compiled body can be an array child, which only the keyed list renders.
+	if (!CHILD_LISTS) enableChildLists();
 	(body as T & { [BINDING_CHILDREN_SITE]: string })[BINDING_CHILDREN_SITE] = site;
 	return body;
 }
