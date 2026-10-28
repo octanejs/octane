@@ -609,7 +609,11 @@ describe('compile errors — textarea children', () => {
 		['an element', '<textarea><b>x</b></textarea>', /contains `<b>`/],
 		['a component', '<textarea>{"a"}<Field /></textarea>', /contains an element/],
 		['document metadata', '<div><textarea><title>x</title></textarea></div>', /contains `<title>`/],
-		['an @if block', '<textarea>@if (props.on) {\n{"a"}\n}</textarea>', /contains an `@if` block/],
+		[
+			'an @if block',
+			'<textarea>@if (props.on) {\n<>{"a"}</>\n}</textarea>',
+			/contains an `@if` block/,
+		],
 		['a JSX expression', '<textarea>{props.on ? <b /> : "x"}</textarea>', /a JSX expression/],
 		[
 			'a mapped JSX list',
@@ -926,6 +930,33 @@ describe('compile errors — universal async/generator functions', () => {
 	});
 });
 
+// Every emit path, for the contracts checked once on the authored module.
+const object = {
+	id: 'object',
+	module: 'octane/universal',
+	target: 'universal',
+	text: 'host',
+} as const;
+const valdi = {
+	id: 'native',
+	module: '@test/valdi-writer',
+	target: 'valdi',
+	server: 'unsupported',
+	text: 'reject',
+} as const;
+type Path = [path: string, run: (src: string) => ReturnType<typeof compile>];
+const paths: Path[] = [
+	...[true, false].flatMap((dev): Path[] => [
+		[`client dev=${dev}`, (src) => compile(src, 'For.tsrx', { mode: 'client', dev })],
+		[`server dev=${dev}`, (src) => compile(src, 'For.tsrx', { mode: 'server', dev })],
+		[
+			`universal dev=${dev}`,
+			(src) => compile(src, 'For.object.tsrx', { hmr: false, renderer: object, dev }),
+		],
+	]),
+	['valdi', (src) => compile(src, 'For.tsrx', { hmr: false, renderer: valdi })],
+];
+
 // `@for` lowers to a keyed row list over an iterable. The parser also accepts a
 // `for…in` header and a C-style header. No target can lower either, and
 // lowering `for…in` as `for…of` would render an object's values (or nothing)
@@ -933,31 +964,6 @@ describe('compile errors — universal async/generator functions', () => {
 describe('compile errors — @for headers', () => {
 	const component = (markup: string) =>
 		`export function List({ o, n, items }: { o: Record<string, string>; n: number; items: string[] }) @{\n\t<view>${markup}</view>\n}\n`;
-	const object = {
-		id: 'object',
-		module: 'octane/universal',
-		target: 'universal',
-		text: 'host',
-	} as const;
-	const valdi = {
-		id: 'native',
-		module: '@test/valdi-writer',
-		target: 'valdi',
-		server: 'unsupported',
-		text: 'reject',
-	} as const;
-	type Path = [path: string, run: (src: string) => ReturnType<typeof compile>];
-	const paths: Path[] = [
-		...[true, false].flatMap((dev): Path[] => [
-			[`client dev=${dev}`, (src) => compile(src, 'For.tsrx', { mode: 'client', dev })],
-			[`server dev=${dev}`, (src) => compile(src, 'For.tsrx', { mode: 'server', dev })],
-			[
-				`universal dev=${dev}`,
-				(src) => compile(src, 'For.object.tsrx', { hmr: false, renderer: object, dev }),
-			],
-		]),
-		['valdi', (src) => compile(src, 'For.tsrx', { hmr: false, renderer: valdi })],
-	];
 	const FOR_IN = /a `for…in` header is not supported/;
 	const FOR_STATEMENT = /a C-style `\(init; test; update\)` header is not supported/;
 
@@ -1018,6 +1024,82 @@ describe('compile errors — @for headers', () => {
 }
 `;
 		for (const [path, run] of paths) {
+			expect(run(src).diagnostics, path).toEqual([]);
+		}
+	});
+});
+
+// A `@{ … }` body or directive arm ends with one output node, and `{expr}` in
+// statement position is a JavaScript block around a dead expression, so the
+// body rendered nothing in the hole's place. Every target rejects it instead.
+describe('compile errors — bare holes in template bodies', () => {
+	const component = (markup: string) =>
+		`export function Arms({ x, y, items, children }: { x: boolean; y: boolean; items: string[]; children?: any }) @{\n\t<view>${markup}</view>\n}\n`;
+	const BARE_HOLE =
+		/is a JavaScript block, not a hole, so it renders nothing\. Wrap it in a fragment/;
+
+	it.each([
+		['an `@if` arm', '@if (x) { {children} }', '{children}'],
+		['an `@else` arm', '@if (x) { <view /> } @else { {children} }', '{children}'],
+		['an `@else if` arm', '@if (x) { <view /> } @else if (y) { {children} }', '{children}'],
+		['an `@for` row', '@for (const item of items; key item) { {item} }', '{item}'],
+		[
+			'an `@empty` arm',
+			'@for (const item of items; key item) { <view /> } @empty { {children} }',
+			'{children}',
+		],
+		['a `@try` body', '@try { {children} } @catch (e) { <view /> }', '{children}'],
+		['a `@pending` arm', '@try { <view /> } @pending { {children} }', '{children}'],
+		['a `@catch` arm', '@try { <view /> } @catch (e) { {String(e)} }', '{String(e)}'],
+		['a nested `@{ … }` block', '@{ {children} }', '{children}'],
+		['an arm after setup statements', '@if (x) { const label = items.join(); {label} }', '{label}'],
+		['an arm before its output node', '@if (x) { {children} <view /> }', '{children}'],
+	])('rejects a bare hole as %s on every emit path, at the hole', (_label, markup, hole) => {
+		// The markup sits on line 2 after `\t<view>`; columns are zero-based.
+		const at = `:2:${'\t<view>'.length + markup.indexOf(hole)})`;
+		for (const [path, run] of paths) {
+			const compileArms = () => run(component(markup));
+			expect(compileArms, path).toThrow(BARE_HOLE);
+			expect(compileArms, path).toThrow(at);
+		}
+	});
+
+	it("rejects a bare hole as a component's `@{ … }` body on every emit path", () => {
+		const src = `export function Body({ children }: { children?: any }) @{\n\t{children}\n}\n`;
+		for (const [path, run] of paths) {
+			expect(() => run(src), path).toThrow(BARE_HOLE);
+			expect(() => run(src), path).toThrow(':2:1)');
+		}
+	});
+
+	it('compiles wrapped holes, `@case` holes, and blocks that are setup code', () => {
+		const src = `export function Arms({ x, items, children }: { x: number; items: string[]; children?: any }) @{
+	{
+		items.sort();
+		items.reverse();
+	}
+	const sort = () => {
+		{
+			items.sort();
+		}
+	};
+	if (x) {
+		sort();
+	}
+	<view>
+		@if (x) {
+			<>{children}</>
+		}
+		@switch (x) {
+			@case 1: {
+				{children}
+			}
+		}
+	</view>
+}
+`;
+		// Valdi renders text only through `<label value>`, so it has no holes.
+		for (const [path, run] of paths.filter(([path]) => path !== 'valdi')) {
 			expect(run(src).diagnostics, path).toEqual([]);
 		}
 	});

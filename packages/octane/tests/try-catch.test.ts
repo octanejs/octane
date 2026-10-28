@@ -10,6 +10,7 @@ import {
 	EffectBoundary,
 	Nested,
 	StatefulInside,
+	ChildrenBoundaryHost,
 } from './_fixtures/try-catch.tsrx';
 
 describe('tryBlock — render errors', () => {
@@ -37,6 +38,16 @@ describe('tryBlock — render errors', () => {
 		expect(r.find('.ok').textContent).toBe('rendered');
 		expect(r.findAll('.caught')).toHaveLength(0);
 		r.unmount();
+	});
+
+	it('renders children through a fragment hole and catches their render error', () => {
+		const r = mount(ChildrenBoundaryHost, { bang: false });
+		expect(r.find('.host .ok').textContent).toBe('rendered');
+		r.unmount();
+		const failed = mount(ChildrenBoundaryHost, { bang: true });
+		expect(failed.findAll('.ok')).toHaveLength(0);
+		expect(failed.find('.host .caught').textContent).toBe('render boom');
+		failed.unmount();
 	});
 
 	it('gives the catch arm one reset function across renders', () => {

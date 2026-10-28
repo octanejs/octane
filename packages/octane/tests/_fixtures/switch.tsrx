@@ -89,3 +89,18 @@ export function HookInCase() @{
 		}
 	</div>
 }
+
+// A `{…}` that opens a case arm is a hole. In every other arm it would be a
+// JavaScript block, which the compiler rejects.
+export function CaseHole(props) @{
+	<div class="case">
+		@switch (props.kind) {
+			@case 'hole': {
+				{props.children}
+			}
+			@default: {
+				<span>{'none'}</span>
+			}
+		}
+	</div>
+}

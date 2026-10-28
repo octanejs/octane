@@ -14,7 +14,9 @@ or an array. A function may early-return a non-JSX value.
 `@{ … }` is shorthand for returning JSX: `function f() @{ … }` desugars to
 `function f() { … return <jsx> }`, so setup (hooks, locals) sits next to the
 output. The `@{ … }` scope ends with **exactly one** output node: a JSX element
-or a fragment `<>…</>`.
+or a fragment `<>…</>`. A lone `{children}` there, or in a directive arm other
+than `@case`, is a JavaScript block rather than a hole, and a compile error:
+render it as `<>{children}</>`.
 
 Both forms compile identically and any function may use either:
 

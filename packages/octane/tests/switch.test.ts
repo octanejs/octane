@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile } from 'octane/compiler';
 import { mount } from './_helpers';
-import { PickKind, Cycle, NoDefault, HookInCase } from './_fixtures/switch.tsrx';
+import { PickKind, Cycle, NoDefault, HookInCase, CaseHole } from './_fixtures/switch.tsrx';
 
 describe('switchBlock', () => {
 	it('compiles the case and default grammar documented by authoring guidance', () => {
@@ -104,6 +104,14 @@ describe('switchBlock', () => {
 		expect(r.find('#inc-b').textContent).toBe('b:10');
 		r.click('#swap'); // back to x — fresh again
 		expect(r.find('#inc-a').textContent).toBe('a:0');
+		r.unmount();
+	});
+
+	it('renders a hole that opens a case arm', () => {
+		const r = mount(CaseHole, { kind: 'hole', children: 'held' });
+		expect(r.find('.case').textContent).toBe('held');
+		r.update(CaseHole, { kind: 'other', children: 'held' });
+		expect(r.find('.case').textContent).toBe('none');
 		r.unmount();
 	});
 });
