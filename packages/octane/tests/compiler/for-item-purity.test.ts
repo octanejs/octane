@@ -118,7 +118,7 @@ describe('@for item-body purity with host-only conditional content', () => {
 		// gate walks its arguments and defers the arrow — the component inside
 		// reaches PURE only through the host-conditional shape gate.
 		const flags = compileList(
-			'<li>@if (item.flag) {{renderTags(item.tags, (t) => <Tag x={t} />)}}</li>',
+			'<li>@if (item.flag) {<>{renderTags(item.tags, (t) => <Tag x={t} />)}</>}</li>',
 			"import { renderTags } from './lib';\n" +
 				'function Tag(props) @{ <span>{props.x as string}</span> }',
 		);
