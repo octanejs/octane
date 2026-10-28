@@ -17,7 +17,13 @@ import type {
 	OffscreenCapture,
 	UncommittedRefAttaches,
 } from './types.js';
-import { activityRefState, NATIVE_READ_DRIVER, queueRefAttach, noop } from './drivers.js';
+import {
+	activityRefState,
+	NATIVE_READ_DRIVER,
+	queueRefAttach,
+	noop,
+	installCommitWork,
+} from './drivers.js';
 import {
 	ROOT_RENDER_ROLLBACK,
 	journalRootProperty,
@@ -118,7 +124,10 @@ export const refDetachQueue: any[] = [];
  * callback ref shared across elements releases ITS element's React-19 cleanup.
  */
 export function queueRefDetach(ref: any, el: Element | FragmentInstance | null): void {
-	if (drainRefDetaches === noop) drainRefDetaches = drainQueuedRefDetaches;
+	if (drainRefDetaches === noop) {
+		installCommitWork();
+		drainRefDetaches = drainQueuedRefDetaches;
+	}
 
 	if (ref == null || isRefDetachSuppressed(el)) return;
 	if (el !== null && NATIVE_READ_DRIVER && NATIVE_READ_DRIVER.unpublishedRef(el, ref)) {
@@ -276,7 +285,13 @@ export function attachRef(
 	applyRefValue(ref, el, prevTarget);
 }
 
-export function applyRefValue(ref: any, el: object | null, prevTarget?: object | null): void {
+// A named function expression, as signalRetrySlot is: its array recursion alone
+// cannot keep it in a bundle that never attaches a ref.
+export const applyRefValue = function applyRefValue(
+	ref: any,
+	el: object | null,
+	prevTarget?: object | null,
+): void {
 	if (ref == null) return;
 	if (
 		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
@@ -332,7 +347,7 @@ export function applyRefValue(ref: any, el: object | null, prevTarget?: object |
 		return;
 	}
 	ref.current = el;
-}
+};
 // ─────────────────────────────────────────────────────────────────────────────
 // Fragment refs (React canary `enableFragmentRefs` parity).
 //

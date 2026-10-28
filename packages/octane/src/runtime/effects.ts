@@ -35,7 +35,12 @@ import type {
 	UncommittedRefAttaches,
 	TryHandler,
 } from './types.js';
-import { drainPassivePhase, schedulePassiveFlush, NATIVE_READ_DRIVER } from './drivers.js';
+import {
+	drainPassivePhase,
+	schedulePassiveFlush,
+	NATIVE_READ_DRIVER,
+	TRANSITION_ROOT_DRIVER,
+} from './drivers.js';
 import {
 	storeSyncQueue,
 	type RefStateUpdate,
@@ -219,7 +224,7 @@ export function hasScheduledWork(): boolean {
 	return (
 		QUEUE.length > 0 ||
 		ROOT_RENDER_TRANSACTIONS.length > 0 ||
-		PENDING_SIGNAL_PROMOTIONS !== null ||
+		(TRANSITION_ROOT_DRIVER ? PENDING_SIGNAL_PROMOTIONS !== null : false) ||
 		effectEventQueue.length > 0 ||
 		effectEventCommitActions.length > 0 ||
 		effectQueues[INSERTION].length > 0 ||

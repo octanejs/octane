@@ -58,6 +58,7 @@ import {
 	registerNativeReadRebase,
 	beginNativeBatch,
 	endNativeBatch,
+	nativeBatchHooks,
 	runNativeBatch,
 } from '../signals/read-protocol.js';
 import type { NativeSignalManifest } from '../signals/native-read-seeds.js';
@@ -124,6 +125,8 @@ import {
 	ensureScheduledVisibilityDriver,
 	MANUAL_HOOK_DRIVER,
 	noop,
+	COMMIT_WORK,
+	EFFECT_HOOKS,
 } from './drivers.js';
 import {
 	clearSignalRetryOwners,
@@ -520,7 +523,10 @@ export function runEffectLifecycleCallback(callback: Cleanup, scope: Scope | nul
 	EFFECT_EVENT_LIFECYCLE_DEPTH++;
 	const nativeFrame = NATIVE_READ_DRIVER ? NATIVE_READ_DRIVER.pauseLifecycle() : -1;
 	try {
-		if (signalDocumentEnabled || scope?.block.idState.renderOwner?.signalOwner !== undefined)
+		if (
+			signalDocumentEnabled ||
+			(registerRootOptions && scope?.block.idState.renderOwner?.signalOwner !== undefined)
+		)
 			runWithBlockSignalOwner(scope, callback);
 		else callback();
 	} finally {
@@ -1161,6 +1167,7 @@ export function rollbackRootRender(transaction: RootRenderTransaction): void {
 	// Its hook-cell folds never publish: their updates stay queued.
 	transaction.cells = null;
 	if (
+		(signalDocumentEnabled || registerRootOptions) &&
 		transaction.owner.retrySignalOwners !== undefined &&
 		transaction.owner.retrySignalOwners !== RETAINED_SIGNAL_OWNERS
 	)
@@ -1345,7 +1352,10 @@ export function commitRootRenders(): void {
 	}
 	// Finished transitions' signals promote before this commit accepts the
 	// renders that read them; committed readers hear of it once it ends.
-	const promoting = PENDING_SIGNAL_PROMOTIONS !== null;
+	// Pending signals queue promotions only once the transition drivers install
+	// their host. That driver is sticky, unlike the queue every promotion resets,
+	// so bundles without transitions fold this.
+	const promoting = TRANSITION_ROOT_DRIVER ? PENDING_SIGNAL_PROMOTIONS !== null : false;
 	const signals = promoting ? beginNativeBatch() : null;
 	try {
 		if (promoting) promotePendingSignals();
@@ -1407,7 +1417,11 @@ export function commitRootRenders(): void {
 					owner.nativeRetry?.clear();
 					// Claimed owners belong to accepted scopes. Unvisited branches from
 					// an earlier pending attempt have no continuing consumer.
-					if (owner.retrySignalOwners !== undefined) clearSignalRetryOwners(owner);
+					if (
+						(signalDocumentEnabled || registerRootOptions) &&
+						owner.retrySignalOwners !== undefined
+					)
+						clearSignalRetryOwners(owner);
 				}
 				const deferredNativeAcceptance = acceptNativeCapture(transaction.capture, owner, true);
 				if (transaction.cells !== null) commitHookCells(transaction.cells);
@@ -1477,7 +1491,7 @@ export function commitRootRenders(): void {
 				}
 				const split = refAttachQueue.length;
 				spliceOffscreenCapture(transaction.capture, deferredNativeAcceptance);
-				if (split > refsAt) placeCommitRefs(refsAt, split);
+				if (COMMIT_WORK && split > refsAt) placeCommitRefs(refsAt, split);
 				if (hydrationStarted && owner.bindingLeases !== undefined && owner.bindingLeases.size > 0) {
 					// A successful replacement may remove a still-dormant leased view.
 					HYDRATION_DRIVER!.retireDetachedBindingLeases(owner);
@@ -1843,6 +1857,7 @@ function countNestedUpdate(block: Block, flushed: boolean | undefined): void {
 			rare.updateCount === NESTED_UPDATE_LIMIT + 1 &&
 			EFFECT_COMMIT_DEPTH <= 1 &&
 			CURRENT_EFFECT_PHASE !== PASSIVE &&
+			EFFECT_HOOKS &&
 			(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0)
 		) {
 			HELD_PASSIVE_CHAIN = NESTED_UPDATE_CHAIN_ID;
@@ -2566,7 +2581,7 @@ function drainQueue(): { err: any } | null {
 			for (const activity of activitiesToRehide) SCHEDULED_VISIBILITY_DRIVER!.rehide!(activity);
 		}
 		// Batches that finished during that commit.
-		if (PENDING_SIGNAL_PROMOTIONS !== null) promotePendingSignals();
+		if (TRANSITION_ROOT_DRIVER && PENDING_SIGNAL_PROMOTIONS !== null) promotePendingSignals();
 	}
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileDrainEnd();
@@ -2836,7 +2851,7 @@ function commitHeldRootRenders(held: RootRenderTransaction[], layout: DeferredLa
 	HELD_REHIDES = null;
 	if (rehides !== null)
 		for (const activity of rehides) SCHEDULED_VISIBILITY_DRIVER!.rehide!(activity);
-	if (PENDING_SIGNAL_PROMOTIONS !== null) promotePendingSignals();
+	if (TRANSITION_ROOT_DRIVER && PENDING_SIGNAL_PROMOTIONS !== null) promotePendingSignals();
 	// A custom-element callback may synchronously replace a root during the
 	// mutation phase. Accept that root's work before resource readiness.
 	acceptDeferredRootTransactions(layout);
@@ -3397,7 +3412,7 @@ function vtFlush(
 
 /** Drain pending passive effects ahead of a render pass (see flush()). */
 function drainPassivesBeforeRender(): void {
-	if (effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) {
+	if (EFFECT_HOOKS && (effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0)) {
 		if (DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.holdPassivesBeforeRender()) return;
 		drainPassiveEffects();
 	}
@@ -3426,7 +3441,8 @@ export function flushSync<T>(fn: () => T): T {
 	// rendering: run the callback and let the AMBIENT flush drain whatever it
 	// schedules — drainQueue picks up mid-pass appends, and the microtask
 	// scheduler backstops work queued after the render pass (see `inFlush`).
-	if (inFlush) return runNativeBatch(fn);
+	// The engine registers its batch hooks once; bundles without it call fn directly.
+	if (inFlush) return nativeBatchHooks ? runNativeBatch(fn) : fn();
 	// A preparing view transition is skipped so the sync drain can commit now.
 	// A running animation survives; the urgent update changes the live DOM under it.
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
@@ -3435,7 +3451,7 @@ export function flushSync<T>(fn: () => T): T {
 	let result: T;
 	try {
 		try {
-			result = runNativeBatch(fn);
+			result = nativeBatchHooks ? runNativeBatch(fn) : fn();
 			// flushSync drains both priorities, including transitions waiting for their task.
 			if (TRANSITION_TASK_DRIVER) TRANSITION_TASK_DRIVER.adopt(true);
 			// `inFlush` guards only the DRAIN below, not fn(): a nested flushSync
@@ -3904,18 +3920,21 @@ export function commitEffects(): void {
 	// each drain tests individually) keeps the whole drain pipeline off this
 	// path; only the passive hand-off below can still apply. INVARIANT: a drain
 	// added to this function must also add its has-work condition here, or its
-	// work is silently skipped whenever the other queues are empty.
+	// work is silently skipped whenever the other queues are empty. Its producer
+	// must also install COMMIT_WORK: without it every queue is empty, so a bundle
+	// whose producers are all absent drops the drains below.
 	if (
-		effectEventQueue.length === 0 &&
-		effectEventCommitActions.length === 0 &&
-		effectQueues[INSERTION].length === 0 &&
-		effectQueues[LAYOUT].length === 0 &&
-		refDetachQueue.length === 0 &&
-		refAttachQueue.length === 0 &&
-		storeSyncQueue.length === 0 &&
-		(!hydrationStarted || NATIVE_ADOPTION_RELEASES === null) &&
-		activeFragments.size === 0 &&
-		!hasControlledSyncs()
+		(!COMMIT_WORK ||
+			(effectEventQueue.length === 0 &&
+				effectEventCommitActions.length === 0 &&
+				effectQueues[INSERTION].length === 0 &&
+				effectQueues[LAYOUT].length === 0 &&
+				refDetachQueue.length === 0 &&
+				refAttachQueue.length === 0 &&
+				storeSyncQueue.length === 0 &&
+				activeFragments.size === 0 &&
+				!hasControlledSyncs())) &&
+		(!hydrationStarted || NATIVE_ADOPTION_RELEASES === null)
 	) {
 		if (DEFERRED_LAYOUT_DRIVER && DEFERRED_LAYOUT_DRIVER.defer(null, null)) return;
 		if (
@@ -3924,6 +3943,7 @@ export function commitEffects(): void {
 		)
 			DEFERRED_LAYOUT_DRIVER.beforeCommit();
 		if (
+			EFFECT_HOOKS &&
 			(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) &&
 			!passiveScheduled
 		) {
@@ -3984,6 +4004,7 @@ export function commitEffects(): void {
 		// store-consistency checks right after commitLayoutEffects.
 		drainStoreSyncs();
 		if (
+			EFFECT_HOOKS &&
 			(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) &&
 			!passiveScheduled
 		) {
@@ -4212,7 +4233,8 @@ export function runEffectBody(e: PendingEffect): void {
 			// effect has args === undefined, which apply accepts as zero arguments.
 			// eslint-disable-next-line prefer-spread
 			cleanup =
-				signalDocumentEnabled || e.scope.block.idState.renderOwner?.signalOwner !== undefined
+				signalDocumentEnabled ||
+				(registerRootOptions && e.scope.block.idState.renderOwner?.signalOwner !== undefined)
 					? runWithBlockSignalOwner(e.scope, () => e.fn!.apply(null, e.args as []))
 					: e.fn.apply(null, e.args as []);
 		} finally {
@@ -5546,7 +5568,11 @@ export function makeRoot(
 				if (COMMITTING_OWNER === renderOwner) COMMITTING_GENERATION = renderOwner.generation;
 			}
 			renderOwner.nativeRetry?.clear();
-			if (renderOwner.retrySignalOwners !== undefined) clearSignalRetryOwners(renderOwner);
+			if (
+				(signalDocumentEnabled || registerRootOptions) &&
+				renderOwner.retrySignalOwners !== undefined
+			)
+				clearSignalRetryOwners(renderOwner);
 			renderOwner.retryKey = null;
 			renderOwner.request = null;
 			if (renderOwner.transaction?.aborted === true) renderOwner.transaction = null;
@@ -5603,7 +5629,11 @@ export function makeRoot(
 			renderOwner.disposed = true;
 			if (hydrationStarted) HYDRATION_DRIVER!.releaseRootLeases(renderOwner, rootBlock);
 			renderOwner.nativeRetry?.clear();
-			if (renderOwner.retrySignalOwners !== undefined) clearSignalRetryOwners(renderOwner);
+			if (
+				(signalDocumentEnabled || registerRootOptions) &&
+				renderOwner.retrySignalOwners !== undefined
+			)
+				clearSignalRetryOwners(renderOwner);
 			renderOwner.retry = noop;
 			if (TRANSITION_ROOT_DRIVER) TRANSITION_ROOT_DRIVER.discard(renderOwner);
 			renderOwner.generation++;

@@ -155,6 +155,17 @@ import {
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
+// Every producer of commit-phase callbacks installs this before its first
+// entry: effect slots (with the external-store checks and Fragment refs, which
+// always register an effect or a ref attach), Effect Events, commit actions
+// (Activity and Suspense hides, linked state, signal control adoption), ref
+// attaches and detaches, and controlled forms. A bundle with none never writes
+// it, so a commit, and the capture that carries its work, skips those phases.
+export let COMMIT_WORK = false;
+export function installCommitWork(): void {
+	COMMIT_WORK = true;
+}
+
 // Ref queues own commit and subtree visibility work. Install before either
 // queue publishes its first entry, including deferred or unpublished refs.
 export let drainRefAttaches: typeof drainQueuedRefAttaches = noop;
@@ -188,7 +199,12 @@ export let runLayoutEffects: typeof runRegisteredLayoutEffects = noop;
 export let drainPassivePhase: typeof drainRegisteredPassivePhase = noop;
 export let drainDeferredPassiveUnmounts: typeof drainRegisteredPassiveUnmounts = noop;
 export let schedulePassiveFlush: typeof scheduleRegisteredPassiveFlush = noop;
+// Only an effect slot queues effects, passive unmounts or a render's effect
+// retirement, and every scope.effectSlots comes from enqueueEffect.
+export let EFFECT_HOOKS = false;
 export function installEffectDrivers(): void {
+	EFFECT_HOOKS = true;
+	COMMIT_WORK = true;
 	drainMutationEffects = drainRegisteredMutationEffects;
 	runLayoutEffects = runRegisteredLayoutEffects;
 	drainPassivePhase = drainRegisteredPassivePhase;
@@ -407,6 +423,7 @@ export function ensureScheduledVisibilityDriver(): void {
  */
 export function queueRefAttach(scope: Scope, ref: any, el: Element | FragmentInstance): void {
 	if (drainRefAttaches === noop) {
+		COMMIT_WORK = true;
 		drainRefAttaches = drainQueuedRefAttaches;
 		detachSubtreeRefs = detachRegisteredSubtreeRefs;
 		withRefDetachSuppression = withRegisteredRefDetachSuppression;
@@ -520,6 +537,7 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 	if (rare.eventRender === 0) rare.eventRender = 1;
 	let s = scope.hooks?.get(slot) as EffectEventCell | undefined;
 	if (s === undefined) {
+		COMMIT_WORK = true;
 		drainEffectEventUpdates = drainQueuedEffectEventUpdates;
 		s = { impl: fn, active: true };
 		ensureHooks(scope).set(slot, s);
@@ -582,7 +600,10 @@ let liveActivityCount = 0;
 export function noop(): void {}
 
 export function queueControlledCommit<T>(queue: T[], item: T): void {
-	if (drainControlledSyncs === noop) drainControlledSyncs = drainQueuedControlledSyncs;
+	if (drainControlledSyncs === noop) {
+		COMMIT_WORK = true;
+		drainControlledSyncs = drainQueuedControlledSyncs;
+	}
 	queue.push(item);
 	if (ROOT_RENDER_TRANSACTION !== null)
 		journalUndo(() => {
@@ -621,7 +642,10 @@ function devFormLifetime(owner: Scope): { active: boolean } {
 }
 
 export function queueDevFormCheck(queue: DevFormCheck[], el: Element, owner: Scope | null): void {
-	if (drainControlledSyncs === noop) drainControlledSyncs = drainQueuedControlledSyncs;
+	if (drainControlledSyncs === noop) {
+		COMMIT_WORK = true;
+		drainControlledSyncs = drainQueuedControlledSyncs;
+	}
 	const check = { element: el, lifetime: owner === null ? null : devFormLifetime(owner) };
 	queue.push(check);
 	if (ROOT_RENDER_TRANSACTION !== null) {

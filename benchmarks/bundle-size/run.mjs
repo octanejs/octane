@@ -274,10 +274,61 @@ const shellHostRanges = resolveDeclarationRanges(
 	[{ name: 'componentSlotFunction', source: 'runtime.ts' }, ...HOST_DESCRIPTOR_PROPS],
 );
 
+// js-framework and chat-stream use no effects, refs, Effect Events, Activity,
+// Suspense, external stores, controlled selects, transitions, signals or
+// hydration. Each of those installs the commit, capture, owner and native-read
+// work below from its creator, so neither fixture may retain any of it. The
+// other Octane builds in this run use those features; together they must retain
+// every entry, which proves the source-map oracle still sees each declaration.
+const CREATOR_INSTALLED_FIXTURES = new Set([`${JS_FRAMEWORK}:`, `${CHAT_STREAM}:chat_`]);
+const creatorInstalledRanges = resolveDeclarationRanges(
+	(source) => fs.readFileSync(path.resolve(__dirname, '../../packages/octane/src', source), 'utf8'),
+	(text, source) => parseAst(text, { lang: 'ts' }, source),
+	[
+		// Effect slots and the commit phases that run their callbacks.
+		'finishEffectRender',
+		'runEffectCleanupCallback',
+		'drainPassiveEffects',
+		'cancelPostPaint',
+		'drainEffectEventCommitActions',
+		'drainCommitRefs',
+		'finishEffectCommit',
+		// Ref attaches, and the refs an aborted mount suppresses.
+		'applyRefValue',
+		'placeCommitRefs',
+		'collectVisibleSubtreeRefs',
+		// Renderer signal owners, event authority and native-read batches.
+		'takeSignalRetryVisit',
+		'runWithBlockSignalOwner',
+		'discardSignalRetryItem',
+		'clearSignalRetryOwners',
+		'retireRendererSignalOwner',
+		'retireUnownedSignalScope',
+		'queueEventOwner',
+		'closeNativeEventBatch',
+		'promotePendingSignals',
+	]
+		.map((name) => ({ name, source: 'runtime.ts' }))
+		.concat(
+			['runWithSignalOwner', 'runInSignalOwner', 'currentExplicitSignalOwner'].map((name) => ({
+				name,
+				source: 'signals/owner-context.ts',
+			})),
+			['beginNativeBatch', 'endNativeBatch'].map((name) => ({
+				name,
+				source: 'signals/read-protocol.ts',
+			})),
+			{ name: 'beginNativeEventBatch', source: 'signals/native-read-events.ts' },
+		),
+);
+const creatorInstalledControls = new Map();
+
 for (const set of SETS)
 	for (const name of set.targets.filter(selected)) {
 		const appRoot = path.join(set.root, name);
 		const shellHostGate = set.root === APP_SHELL && name === 'octane-tsrx';
+		const creatorInstalledGate = CREATOR_INSTALLED_FIXTURES.has(`${set.root}:${set.prefix}`);
+		const octaneBuild = name.startsWith('octane-');
 		const outDir = path.join(OUT_ROOT, set.prefix + name);
 		const setLabel = set.prefix ? set.prefix + '/' : '';
 		console.log(`building ${setLabel}${name} (production, ${VITE_MINIFY} minify)…`);
@@ -295,7 +346,7 @@ for (const set of SETS)
 				emptyOutDir: true,
 				minify: VITE_MINIFY,
 				target: 'esnext',
-				...(shellHostGate ? { sourcemap: 'hidden' } : {}),
+				...(octaneBuild ? { sourcemap: 'hidden' } : {}),
 				rollupOptions: {
 					...(set.entry ? { input: path.join(appRoot, set.entry) } : {}),
 					output: buildOutput,
@@ -304,6 +355,23 @@ for (const set of SETS)
 		});
 
 		const { sums, files } = measure(name, outDir);
+		if (octaneBuild) {
+			const retained = new Set();
+			for (const file of walk(outDir)) {
+				// Rolldown's virtual runtime chunk has no source map and no Octane source.
+				if (!/\.m?js$/.test(file) || !fs.existsSync(file + '.map')) continue;
+				const map = JSON.parse(fs.readFileSync(file + '.map', 'utf8'));
+				for (const declaration of retainedDeclarations(map, creatorInstalledRanges))
+					retained.add(declaration);
+			}
+			if (creatorInstalledGate && name === 'octane-tsrx')
+				assert.deepEqual(
+					[...retained],
+					[],
+					`${setLabel}${name}: retained commit, owner or native-read work that only its creators install`,
+				);
+			else if (!creatorInstalledGate) creatorInstalledControls.set(`${setLabel}${name}`, retained);
+		}
 		if (shellHostGate) {
 			const retained = new Set();
 			for (const file of walk(outDir)) {
@@ -394,6 +462,17 @@ for (const set of SETS)
 		});
 		entry.meta.files.push(...files.map((f) => ({ ...f, set: px || 'js' })));
 	}
+
+if (selected('octane-tsrx')) {
+	const unseen = creatorInstalledRanges
+		.map(({ name }) => name)
+		.filter((name) => ![...creatorInstalledControls.values()].some((kept) => kept.has(name)));
+	assert.deepEqual(
+		unseen,
+		[],
+		'no Octane control build retains these creator-installed declarations; update their reachability check',
+	);
+}
 
 // The metaframework entry is absent from the SPA sets above. Keep this real
 // application's normal chunking, and count every emitted client JS asset,

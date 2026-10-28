@@ -27,6 +27,7 @@ import {
 } from '../event-names.js';
 import { formatClientError } from '../error-codes.client.generated.js';
 import { beginNativeEventBatch } from '../signals/native-read-events.js';
+import { nativeBatchHooks } from '../signals/read-protocol.js';
 import {
 	signalOwnerUse,
 	activeSynchronousSignalOwner,
@@ -1328,7 +1329,9 @@ function dispatchDelegated(this: Node, event: Event): void {
 		// An ordinary child of a portal target belongs to its enclosing root.
 		// Only the listener that owns a route may finish this delivery and restore the edit.
 		if (!nativeCapture && buildDelegatedPath(event, this) === 0) return;
-		nativeBatch = beginNativeEventBatch(event);
+		// The engine registers its batch hooks once, so a batch that did not begin
+		// never closes; bundles without the engine fold both calls away.
+		nativeBatch = nativeBatchHooks ? beginNativeEventBatch(event) : null;
 		_dispatchDepth++;
 		(event as any)[DELEGATED_BUBBLE_VERSION] = ((event as any)[DELEGATED_BUBBLE_VERSION] || 0) + 1;
 		if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.enqueue(event, type);
@@ -1400,7 +1403,7 @@ function dispatchDelegated(this: Node, event: Event): void {
 		// Only this bubble queue sets currentTarget here; the capture queue clears its own.
 		if (propagationStarted) clearCurrentTarget(event);
 		if (nativeBatch !== undefined) {
-			closeNativeEventBatch(event, nativeBatch, false);
+			if (nativeBatchHooks) closeNativeEventBatch(event, nativeBatch, false);
 			_dispatchDepth--;
 			if (CONTROLLED_RESTORE_DRIVER) CONTROLLED_RESTORE_DRIVER.finish(type);
 		}
@@ -1437,7 +1440,7 @@ function dispatchDelegatedCapture(
 	const wasCancelled = event.cancelBubble;
 	let stopped = false;
 	_dispatchDepth++;
-	const nativeBatch = beginNativeEventBatch(event);
+	const nativeBatch = nativeBatchHooks ? beginNativeEventBatch(event) : null;
 	let frame: DelegatedEventFrame | undefined;
 	try {
 		if (hasSlot) {
@@ -1462,11 +1465,12 @@ function dispatchDelegatedCapture(
 			endDelegatedPropagation(event, stop, immediate);
 			clearCurrentTarget(event);
 		}
-		closeNativeEventBatch(
-			event,
-			nativeBatch,
-			event.bubbles && !event.cancelBubble && (type.flags & EVENT_BUBBLE) !== 0,
-		);
+		if (nativeBatchHooks)
+			closeNativeEventBatch(
+				event,
+				nativeBatch,
+				event.bubbles && !event.cancelBubble && (type.flags & EVENT_BUBBLE) !== 0,
+			);
 		_dispatchDepth--;
 		CAPTURE_FINISH(event, type);
 	}

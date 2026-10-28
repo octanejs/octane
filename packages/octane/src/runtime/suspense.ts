@@ -63,6 +63,7 @@ import {
 	ensureScheduledVisibilityDriver,
 	queueRefAttach,
 	noop,
+	installCommitWork,
 } from './drivers.js';
 import {
 	handOverSignalRetryScope,
@@ -2436,6 +2437,7 @@ function hideTryContentAndMountPendingInner(
 		const action = () => deactivateSuspensePrimary(state, persistent, uncommittedRefs);
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileQueueWork(action);
+		installCommitWork();
 		if (WIP_CAPTURE === null) effectEventCommitActions.push(action);
 		else {
 			// A later sibling can suspend after this nested fallback was selected.
