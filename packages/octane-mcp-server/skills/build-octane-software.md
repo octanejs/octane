@@ -59,6 +59,10 @@ details but do not replace these gates.
   can expose stale state, duplicate work, or unbounded retention.
 - Use a production build for final validation. Measure the important user journey
   before and after performance-sensitive changes under comparable conditions.
+- For streamed interactions, measure input, request dispatch, first content read,
+  first text in the DOM, and its first presented frame separately. Before
+  suppressing a repeated publication, test the same value on a replacement or
+  still-unadopted owner and a changed value while an acknowledgment is pending.
 - Do not claim that code is faster because it is shorter, uses memoization, or
   causes fewer apparent renders. Report measured results and the command or
   procedure that produced them; call inconclusive measurements inconclusive.
