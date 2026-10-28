@@ -463,7 +463,13 @@ export function App(props) @{
 	it('uses fallback while loading a default-split boundary first mounted on the client', async () => {
 		const onClick = vi.fn();
 		const onHydrated = vi.fn();
-		const props = { show: false, when: never(), onClick, onHydrated };
+		const props = {
+			show: false,
+			when: never(),
+			message: 'Loading split content',
+			onClick,
+			onHydrated,
+		};
 		root = createRoot(container);
 		flushSync(() => root!.render(splitClient.ClientOnlySplitHydration, props));
 		const host = container.querySelector('#split-client-only-host');
@@ -479,6 +485,16 @@ export function App(props) @{
 			'Loading split content',
 		);
 		expect(container.querySelector('#split-client-only-content')).toBeNull();
+		flushSync(() =>
+			root!.render(splitClient.ClientOnlySplitHydration, {
+				...props,
+				show: true,
+				message: 'Still loading',
+			}),
+		);
+		expect(container.querySelector('#split-client-only-fallback')?.textContent).toBe(
+			'Still loading',
+		);
 
 		await act(async () => {
 			await vi.waitFor(() => {
@@ -491,6 +507,68 @@ export function App(props) @{
 
 		await act(() => content.click());
 		expect(onClick).toHaveBeenCalledOnce();
+	});
+
+	it('keeps the sibling visible and reveals only the current split children with their latest captures and context', async () => {
+		const onHydrated = vi.fn();
+		const props = {
+			when: load(),
+			ids: ['keep', 'remove'],
+			label: 'first',
+			locale: 'en',
+			onHydrated,
+		};
+		root = createRoot(container);
+		flushSync(() => root!.render(splitClient.PendingSplitList, props));
+		const sibling = container.querySelector('span');
+		expect(container.textContent).toBe('first');
+
+		// Stay in one turn so both updates commit before the split import settles.
+		flushSync(() => root!.render(splitClient.PendingSplitList, { ...props, label: 'second' }));
+		flushSync(() =>
+			root!.render(splitClient.PendingSplitList, {
+				...props,
+				ids: ['keep'],
+				label: 'last',
+				locale: 'fr',
+			}),
+		);
+		expect(container.querySelector('span')).toBe(sibling);
+		expect(container.textContent).toBe('last');
+		expect(onHydrated).not.toHaveBeenCalled();
+
+		await vi.waitFor(async () => {
+			await act(() => {});
+			expect(container.querySelector('output')?.textContent).toBe('last/fr');
+			expect(onHydrated.mock.calls).toEqual([['keep']]);
+		}, SPLIT_CHILD_LOAD);
+		expect(container.querySelector('span')).toBe(sibling);
+		expect(container.querySelectorAll('output')).toHaveLength(1);
+	});
+
+	it('reveals a previously suspended sibling before the split child loads', async () => {
+		const wait = deferred<void>();
+		const props = {
+			when: load(),
+			ids: ['keep'],
+			label: 'first',
+			locale: 'en',
+			onHydrated: vi.fn(),
+		};
+		root = createRoot(container);
+		flushSync(() => root!.render(splitClient.PendingSplitList, props));
+		expect(container.textContent).toBe('first');
+		flushSync(() => root!.render(splitClient.PendingSplitList, { ...props, wait: wait.promise }));
+		expect(container.querySelector('p')?.textContent).toBe('Outer fallback');
+		flushSync(() => root!.render(splitClient.PendingSplitList, { ...props, label: 'latest' }));
+		expect(container.querySelector('p')).toBeNull();
+		expect(container.textContent).toBe('latest');
+		await vi.waitFor(async () => {
+			await act(() => {});
+			expect(container.querySelector('output')?.textContent).toBe('latest/en');
+			expect(props.onHydrated).toHaveBeenCalledOnce();
+		}, SPLIT_CHILD_LOAD);
+		await act(() => wait.resolve());
 	});
 
 	it('hydrates repeated instances of one split boundary with instance-local captures', async () => {
