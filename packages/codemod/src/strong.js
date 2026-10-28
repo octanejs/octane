@@ -12,7 +12,17 @@ import { finding, thrown } from './compiler.js';
  * @property {Finding[]} blockers the Strong errors left, when it did not
  */
 
-const DIRECTIVE = /^(\s*(?:\/\/[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*)"use strong";\n\n?/;
+/**
+ * The source without the directive the codemod added: its own line after any
+ * leading comments and `"use client"`, or, at the very top, that line and the
+ * blank line after it.
+ *
+ * @param {string} code
+ */
+function withoutDirective(code) {
+	const top = '"use strong";\n\n';
+	return code.startsWith(top) ? code.slice(top.length) : code.replace(/^"use strong";\n/m, '');
+}
 const MAX_ROUNDS = 6;
 
 /**
@@ -46,7 +56,7 @@ export function strengthen(compiler, code, filename, { force = false } = {}) {
 		if (result.error != null) {
 			// A module that compatibility mode cannot compile either has no
 			// Strong blocker to report; the compile failure is its own error.
-			const compat = compiler.collectDiagnostics(code.replace(DIRECTIVE, '$1'), filename, {});
+			const compat = compiler.collectDiagnostics(withoutDirective(code), filename, {});
 			return fallback(code, compat.error == null ? [thrown(result.error)] : [], fixed, force);
 		}
 		diagnostics = result.diagnostics;
@@ -74,7 +84,7 @@ function fallback(code, blockers, fixed, force) {
 	// The module builds in compatibility mode; what kept it there is work
 	// left, not a failure.
 	const kept = blockers.map((blocker) => ({ ...blocker, severity: 'warning' }));
-	return { code: code.replace(DIRECTIVE, '$1'), strong: false, fixed, blockers: kept };
+	return { code: withoutDirective(code), strong: false, fixed, blockers: kept };
 }
 
 /**

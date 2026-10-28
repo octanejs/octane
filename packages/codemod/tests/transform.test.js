@@ -119,6 +119,18 @@ describe('transformModule', () => {
 		expect(result.code).toContain('`first line\n  second line`');
 	});
 
+	it('maps dynamic imports of React modules', () => {
+		const source =
+			"export async function mount(el: Element) {\n\tconst { createRoot } = await import('react-dom/client');\n\treturn createRoot(el);\n}\n";
+		expect(transformModule(source, 'mount.ts').code).toContain("await import('octane');");
+	});
+
+	it('rewrites self-closing context providers', () => {
+		const source =
+			"import { createContext } from 'react';\nconst Theme = createContext('light');\nexport function A() {\n\treturn <Theme.Provider value=\"dark\" />;\n}\n";
+		expect(transformModule(source, 'a.tsx').code).toContain('<Theme value="dark" />');
+	});
+
 	it('reports what it cannot migrate', () => {
 		const { result } = migrate('legacy.input.tsx');
 		expect(result.notes.map((note) => `${note.severity} ${note.rule}`)).toEqual([
@@ -166,5 +178,16 @@ describe('strengthen', () => {
 			'warning OCTANE_STRONG_UNTRUSTED_HTML',
 		]);
 		expect(compileErrors(result.code, 'raw.tsrx')).toEqual([]);
+	});
+
+	it('removes the directive it added after a `"use client"` prologue', async () => {
+		const compiler = await loadCompiler(import.meta.dirname);
+		const source =
+			"'use client';\n\nexport function Raw({ html }: { html: string }) {\n\treturn <div dangerouslySetInnerHTML={{ __html: html }} />;\n}\n";
+		const { code } = transformModule(source, 'raw.tsx', { strong: true });
+		expect(code).toMatch(/^'use client';\n"use strong";\n\nexport/);
+		const result = strengthen(compiler, code, path.join(FIXTURES, 'raw.tsrx'));
+		expect(result.strong).toBe(false);
+		expect(result.code).toMatch(/^'use client';\n\nexport function Raw/);
 	});
 });

@@ -887,6 +887,19 @@ class ModuleTransform {
 
 	/** @param {ts.PropertyAccessExpression} node */
 	rewriteMember(node) {
+		// `<Ctx.Provider value>` is `<Ctx value>` in Octane, as in React 19.
+		const tag = node.parent;
+		if (
+			node.name.text === 'Provider' &&
+			(ts.isJsxOpeningElement(tag) ||
+				ts.isJsxClosingElement(tag) ||
+				ts.isJsxSelfClosingElement(tag)) &&
+			tag.tagName === node &&
+			this.isContext(node.expression)
+		) {
+			if (!ts.isJsxClosingElement(tag)) this.count(RULE.provider);
+			return this.emit(node.expression, PLAIN);
+		}
 		const namespace = this.importOf(node.expression);
 		if (namespace?.namespace && namespace.module in REACT_MODULES) {
 			const name = node.name.text;
@@ -953,7 +966,11 @@ class ModuleTransform {
 	/** @param {ts.CallExpression} node */
 	rewriteCall(node) {
 		if (node.expression.kind === ts.SyntaxKind.ImportKeyword && node.arguments[0]) {
-			return this.rewriteSpecifier(node, node.arguments[0]);
+			const [specifier] = node.arguments;
+			const mapped = ts.isStringLiteral(specifier) ? REACT_MODULES[specifier.text] : undefined;
+			if (mapped === undefined) return this.rewriteSpecifier(node, specifier);
+			this.count(RULE.import);
+			return this.replaceSpecifier(node, specifier, mapped);
 		}
 		const callee = this.callee(node.expression);
 		// An Octane hook without a list already means "inferred".
@@ -1358,7 +1375,6 @@ class ModuleTransform {
 		}
 		if (name === 'Suspense' && ctx.template) return this.rewriteSuspense(node);
 		if (ts.isPropertyAccessExpression(tag) && this.isContext(tag.expression)) {
-			if (tag.name.text === 'Provider') return this.rewriteProvider(node, ctx);
 			if (tag.name.text === 'Consumer') return this.rewriteConsumer(node, ctx);
 		}
 		return null;
@@ -1403,26 +1419,6 @@ class ModuleTransform {
 		const last = node.children[node.children.length - 1];
 		if (!first) return '<></>';
 		return '<>' + this.span(node, first.pos, last.end, ctx) + '</>';
-	}
-
-	/**
-	 * `<Ctx.Provider value>` is `<Ctx value>` in Octane, as in React 19.
-	 *
-	 * @param {ts.JsxElement} node
-	 * @param {Context} ctx
-	 */
-	rewriteProvider(node, ctx) {
-		this.count(RULE.provider);
-		const opening = node.openingElement;
-		const tag = /** @type {ts.PropertyAccessExpression} */ (opening.tagName);
-		const name = this.emit(tag.expression, PLAIN);
-		return (
-			'<' +
-			name +
-			this.span(opening, tag.end, opening.end, PLAIN) +
-			this.span(node, opening.end, node.closingElement.getStart(this.sf), ctx) +
-			`</${name}>`
-		);
 	}
 
 	/**

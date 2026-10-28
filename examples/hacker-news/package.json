@@ -16,7 +16,7 @@
     "build:codemod": "node codemod.mjs && octane-tsc -p tsconfig.codemod.json && vite build --config codemod/vite.config.ts",
     "typecheck": "octane-tsc -p tsconfig.json",
     "test:e2e": "pnpm build:e2e && playwright test --config e2e/playwright.config.ts",
-    "test:e2e:dev": "HN_E2E_CLIENT_MODE=dev playwright test --config e2e/playwright.config.ts",
+    "test:e2e:dev": "node codemod.mjs && HN_E2E_CLIENT_MODE=dev playwright test --config e2e/playwright.config.ts",
     "e2e": "pnpm test:e2e"
   },
   "dependencies": {
