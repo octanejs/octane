@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { compile } from 'octane/compiler';
+import { assertNoBareHoles } from '../../src/compiler/bare-holes.js';
 import { parseModule } from '../../src/compiler/parser.node.js';
 
 // Compile-error coverage: pin the maintained rejection messages so future
@@ -1070,6 +1071,25 @@ describe('compile errors — bare holes in template bodies', () => {
 			expect(() => run(src), path).toThrow(BARE_HOLE);
 			expect(() => run(src), path).toThrow(':2:1)');
 		}
+	});
+
+	it('checks the arm shapes the compilers accept beyond what the parser builds', () => {
+		// The parser always braces an arm and chains `@else if` as an IfStatement;
+		// lowering also produces JSXIfExpression chains and single-node arms.
+		const src = `export function Arms({ x, y, children }: any) @{\n\t<div>@if (x) { <a /> } @else if (y) { {children} }</div>\n}\n`;
+		const directive = (parseModule(src, 'Arms.tsrx') as any).body[0].declaration.body.render
+			.children[0];
+		const chained = {
+			...directive,
+			alternate: { ...directive.alternate, type: 'JSXIfExpression' },
+		};
+		expect(() => assertNoBareHoles({ type: 'Program', body: [chained] }, src, 'Arms.tsrx')).toThrow(
+			BARE_HOLE,
+		);
+		const unbraced = { ...directive, consequent: directive.consequent.body[0], alternate: null };
+		expect(() =>
+			assertNoBareHoles({ type: 'Program', body: [unbraced] }, src, 'Arms.tsrx'),
+		).not.toThrow();
 	});
 
 	it('compiles wrapped holes, `@case` holes, and blocks that are setup code', () => {

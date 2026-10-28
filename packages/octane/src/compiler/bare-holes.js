@@ -33,6 +33,9 @@ export function assertNoBareHoles(ast, source, filename) {
 			check(body.alternate);
 			return;
 		}
+		// The compilers also accept an arm that is a single node, or an `@else`
+		// that is a JSXIfExpression, which the walk below checks on its own.
+		if (!Array.isArray(body.body)) return;
 		for (const statement of body.body) {
 			if (
 				statement.type === 'BlockStatement' &&
