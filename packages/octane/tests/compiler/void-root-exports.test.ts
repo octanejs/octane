@@ -33,14 +33,56 @@ describe('compiled component export contracts', () => {
 			['try {} catch (App) { App = () => "unrelated"; }', true],
 			['for (let App of replacements) { App = () => "unrelated"; }', true],
 		] as const) {
-			for (const exported of ['export function App()', 'export default function App()']) {
-				const ast = freeze(
-					parseModule(`${exported} @{ <main>first</main> }\n${tail}`, '/project/View.tsrx'),
-				);
-				expect(findVoidComponentExports(ast, '/project/View.tsrx')).toEqual(
-					eligible ? [exported.includes('default') ? 'default' : 'App'] : [],
+			for (const [module, exported] of [
+				['export function App() @{ <main>first</main> }', 'App'],
+				['export default function App() @{ <main>first</main> }', 'default'],
+				// React's usual default exports of a local component.
+				['function App() @{ <main>first</main> }\nexport default App;', 'default'],
+				[
+					"import { memo } from 'octane';\nfunction App() @{ <main>first</main> }\nexport default memo(App);",
+					'default',
+				],
+			] as const) {
+				const ast = freeze(parseModule(`${module}\n${tail}`, '/project/View.tsrx'));
+				expect(findVoidComponentExports(ast, '/project/View.tsrx'), module).toEqual(
+					eligible ? [exported] : [],
 				);
 			}
+		}
+	});
+
+	it('certifies a default export only through a local void binding and the imported memo', () => {
+		const view = 'function App() @{ <main>first</main> }\n';
+		for (const [source, expected] of [
+			[`${view}export default App;`, ['default']],
+			[`import { memo } from 'octane';\n${view}export default memo(App);`, ['default']],
+			[`import { memo as m } from 'octane';\n${view}export default m(App);`, ['default']],
+			[
+				`import { memo } from 'octane';\nconst Arrow = () => @{ <main>first</main> };\nexport default memo(Arrow);`,
+				['default'],
+			],
+			[
+				`import { memo } from 'octane';\n${view}const Inner = memo(App);\nexport default memo(Inner);`,
+				['default'],
+			],
+			// Value returns, foreign wrappers, comparators, and non-local or
+			// mutable bindings stay generic.
+			[`function App() { return 'value'; }\nexport default App;`, []],
+			[
+				`import { memo } from 'octane';\nfunction App() { return 'value'; }\nexport default memo(App);`,
+				[],
+			],
+			[`import { memo } from './memo';\n${view}export default memo(App);`, []],
+			[`import { memo } from 'octane';\n${view}export default memo(App, () => true);`, []],
+			[`import { lazy } from 'octane';\n${view}export default lazy(App);`, []],
+			[`import App from './App.tsrx';\nexport default App;`, []],
+			[
+				`import { memo } from 'octane';\nimport App from './App.tsrx';\nexport default memo(App);`,
+				[],
+			],
+			[`let App = () => @{ <main>first</main> };\nexport default App;`, []],
+		] as const) {
+			expect(findVoidComponentExports(source, '/project/View.tsrx'), source).toEqual(expected);
 		}
 	});
 });
@@ -80,6 +122,12 @@ export function Branches({ x }: { x?: boolean }) {
 export const Arrow = (props: { a: string }) => @{ <p>{props.a as string}</p>; };
 export function Guarded({ x }: { x?: boolean }) @{ if (!x) return null; <p>guarded</p>; }
 export function Value() { return <p>value</p>; }`,
+			// React's usual default exports of a local component.
+			'DefaultBinding.tsrx': `function Local(props: { x: string }) @{ <p>{props.x as string}</p>; }
+export default Local;`,
+			'DefaultMemo.tsrx': `import { memo } from 'octane';
+function Local(props: { x: string }) @{ <p>{props.x as string}</p>; }
+export default memo(Local);`,
 		};
 		for (const [name, source] of Object.entries(sources)) {
 			const id = `/project/src/${name}`;
@@ -95,6 +143,8 @@ export function Value() { return <p>value</p>; }`,
 		for (const name of [
 			'anonymous-default-component.tsrx',
 			'anonymous-default-arrow-component.tsrx',
+			'DefaultBinding.tsrx',
+			'DefaultMemo.tsrx',
 		]) {
 			expect(
 				compileClient(sources[name], `/project/src/${name}`).voidComponentExports,

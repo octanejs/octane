@@ -316,10 +316,10 @@ function normalizeHmrDialect(value) {
 /**
  * Classify direct function exports whose production TSRX body has no renderable
  * JavaScript return. A direct `memo(LocalComponent)` export preserves that
- * contract, as do null-only early-return guards that compile to template
- * control flow. Bundler adapters attach this fact after compiling the exact
- * source they loaded. Re-exports and indirect bindings remain deliberately
- * unknown.
+ * contract, as does a default export of such a binding, and so do null-only
+ * early-return guards that compile to template control flow. Bundler adapters
+ * attach this fact after compiling the exact source they loaded. Re-exports and
+ * indirect bindings remain deliberately unknown.
  */
 export function findVoidComponentExports(source, id) {
 	let ast;
@@ -357,6 +357,17 @@ export function findVoidComponentExports(source, id) {
 		if (declaration) declarations.push(declaration);
 	}
 
+	// The local a direct `memo(Local)` call wraps, or null. The imported memo
+	// identity is lexical proof; method calls, comparators, and arbitrary
+	// wrappers stay unknown.
+	const memoTarget = (node) =>
+		node?.type === 'CallExpression' &&
+		node.callee?.type === 'Identifier' &&
+		memoLocals.has(node.callee.name) &&
+		node.arguments?.length === 1 &&
+		node.arguments[0]?.type === 'Identifier'
+			? node.arguments[0].name
+			: null;
 	const voidBindings = new Set();
 	const memoDependents = new Map();
 	const hasLowerableJsxReturnBranches = createJsxReturnBranchClassifier(ast.body || []);
@@ -375,10 +386,9 @@ export function findVoidComponentExports(source, id) {
 			continue;
 		}
 		if (declaration.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
-		// Resolve only the exact, immutable `const Export = memo(Local)` form. The
-		// imported memo identity is lexical proof; method calls, comparators, and
-		// arbitrary wrappers stay unknown. Index the reverse edges once so a chain
-		// declared outermost-first does not rescan every declaration per link.
+		// Resolve only the exact, immutable `const Export = memo(Local)` form.
+		// Index the reverse edges once so a chain declared outermost-first does
+		// not rescan every declaration per link.
 		for (const item of declaration.declarations || []) {
 			const init = item.init;
 			if (
@@ -389,17 +399,9 @@ export function findVoidComponentExports(source, id) {
 			) {
 				voidBindings.add(item.id.name);
 			}
-			if (
-				item.id?.type !== 'Identifier' ||
-				reassigned.has(item.id) ||
-				init?.type !== 'CallExpression' ||
-				init.callee?.type !== 'Identifier' ||
-				!memoLocals.has(init.callee.name) ||
-				init.arguments?.length !== 1 ||
-				init.arguments[0]?.type !== 'Identifier'
-			)
-				continue;
-			const target = init.arguments[0].name;
+			const target =
+				item.id?.type === 'Identifier' && !reassigned.has(item.id) ? memoTarget(init) : null;
+			if (target === null) continue;
 			let dependents = memoDependents.get(target);
 			if (dependents === undefined) memoDependents.set(target, (dependents = []));
 			dependents.push(item.id.name);
@@ -418,12 +420,17 @@ export function findVoidComponentExports(source, id) {
 	for (const node of ast.body || []) {
 		if (node.type === 'ExportDefaultDeclaration') {
 			const declaration = node.declaration;
+			// React's `export default Local` and `export default memo(Local)` export
+			// a local binding's value, so they carry that binding's proof.
 			if (
-				(declaration?.type === 'FunctionDeclaration' ||
+				((declaration?.type === 'FunctionDeclaration' ||
 					declaration?.type === 'FunctionExpression' ||
 					declaration?.type === 'ArrowFunctionExpression') &&
-				(declaration.id == null || !reassigned.has(declaration.id)) &&
-				isVoidFunction(declaration)
+					(declaration.id == null || !reassigned.has(declaration.id)) &&
+					isVoidFunction(declaration)) ||
+				voidBindings.has(
+					declaration?.type === 'Identifier' ? declaration.name : memoTarget(declaration),
+				)
 			) {
 				exports.push('default');
 			}
