@@ -15,7 +15,8 @@ title: Signals
 Use `signal$` for a value you change, `derived$` for a value you calculate
 from other signals, and `query$` for data you load by a key such as a user ID.
 All three return a handle you can read with `.get()`. For data with a lifetime
-your application manages, use [an explicit scope and resource](#explicit-resources).
+your application manages, use [an explicit scope and resource](#explicit-resources). The
+[application API reference](#reference) lists the exports used in app code.
 
 **Every module that reads a signal during rendering needs a runtime import**
 from `octane/signals`, `octane/signals/client`, or `octane/signals/server`.
@@ -603,113 +604,23 @@ Call `releaseControl()` before handing the node to a component and `dispose()`
 when the document ends. For a host that also places streamed HTML, see
 [custom SSR host setup](https://github.com/octanejs/octane/blob/main/docs/ssr.md#connect-signals-in-a-custom-ssr-host).
 
-<h2 id="reference">Signals API reference</h2>
+<h2 id="reference">Application API reference</h2>
 
-Import the shared APIs from `octane/signals`. The `octane/signals/client` and
-`octane/signals/server` entry points also export them. Import the component
-hook `useSignal$` from the client entry. Octane selects its server
-implementation when compiling for SSR.
+Import these APIs from `octane/signals`, except for the component hook
+`useSignal$`, which comes from `octane/signals/client`. Octane selects the
+hook's server implementation when it compiles a component for SSR.
 
-<h3 id="handle-reference">Creating and reading handles</h3>
+| Export                                        | When to use it                                                                                                                                                                                                                                     |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `signal$`, `useSignal$`                       | Create writable state and update it with `.set(valueOrUpdater)`. A `signal$` can belong to a module or component and stores a function initial value as data. The component hook `useSignal$` calls a function initializer once for its hook slot. |
+| `derived$`                                    | Calculate a read-only value from other signals. Use it directly inside a component or at module level. For async work, `await read(handle$)` tracks a dependency across an earlier `await`.                                                        |
+| `query$`, `skip`                              | Load data for a selected key. Return `skip` from the selector to leave the query idle. Use `.refetch()` to refresh while showing a ready value, or `.reset()` to show pending UI.                                                                  |
+| `createScope`                                 | Own state for a lifetime you manage, such as a cart or an account session. Create keyed signals with `scope.signal$` and synchronous calculations with `scope.derived$`. Call `scope.dispose()` when the owner closes.                             |
+| `query`, `createResource`                     | In an explicit scope, `query` defines a reusable request. Calling that function with an argument describes a load. `createResource` selects the request, starts the load in the scope, and returns the handle you read.                            |
+| `optimistic$`, `action$`, `isActionUncertain` | Show an edit while saving it. `optimistic$` overlays the edit on a ready source. `action$` gives each save its own operation. Use `isActionUncertain` to recognize a receipt or error that needs reconciliation with the server.                   |
+| `isSignalHandle`, `isWritableSignal`          | Check an unknown value before treating it as a readable handle or writing to it with `.set()`.                                                                                                                                                     |
 
-| API                                  | When to use it                                                                                                                                                                                                                                                            |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `signal$`, `useSignal$`              | Create writable state. `signal$` stores its initial value, including a function. `useSignal$` calls a function initializer once for the component's hook slot.                                                                                                            |
-| `derived$`                           | Compute a read-only value from other handles. A computation can return a value, a promise, or an async iterable, including a promise of an iterable. Its context provides `read(handle$)` and an abort `signal`. Set `{ sync: true }` only for a synchronous computation. |
-| `query$`, `skip`                     | Select a request and run its loader. The loader receives the selected argument, an abort `signal`, and an optional `previous` ready value. The selector can return `skip` to stay idle. `undefined` is a valid selection.                                                 |
-| `query`, `createResource`            | For a scope you own, define a reusable request, then select it in a resource. Set `kind` to `'stream'` on the query for an async iterable loader. The default is `'promise'`.                                                                                             |
-| `isSignalHandle`, `isWritableSignal` | Narrow an unknown value to a readable handle or a writable signal before using its methods.                                                                                                                                                                               |
-
-In compiled code Octane supplies a key for `signal$`, `derived$`, and `query$`.
-Pass a trailing `{ key }` to specify it yourself. Uncompiled declarations need
-an explicit, nonempty key.
-
-Every handle has a `key` and a `kind` (`'signal'`, `'derived'`, or `'async'`).
-Use these methods on the handle:
-
-| Method                                  | Result                                                                                                                                                                                                                                                      |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.get()`                                | Returns the ready value, suspends on pending work, or throws the error. A strict idle read throws `SignalIdleError`.                                                                                                                                        |
-| `.latest(fallback)`                     | Returns the last successful value through pending work or an ordinary error. If none exists, it returns the fallback, or `undefined` when omitted.                                                                                                          |
-| `.snapshot()`                           | Returns the status (`idle`, `pending`, `ready`, or `error`), with `value` when ready and `error` on failure. Inspect `refreshing`, `complete`, optional `requestKey`, and `connection` (`none`, `connecting`, `open`, or `closed`) for background activity. |
-| `.subscribe(notify)`                    | Subscribes to changes and returns an unsubscribe function. Read the initial value separately.                                                                                                                                                               |
-| `.set(valueOrUpdater)`                  | Writes a writable signal. Equality uses `Object.is`, so replace a changed object or array to publish the update.                                                                                                                                            |
-| `.retry()`, `.retry({ pending: true })` | Retries a resource. The first form retains a usable value during refresh. The second makes strict reads wait. Handles from `query$` also expose these as `.refetch()` and `.reset()`.                                                                       |
-
-<h3 id="scope-reference">Scopes and historical reads</h3>
-
-`createScope` takes a `scopeKey` and an optional initial `seed`. The scope
-exposes its `scopeKey`, current `epoch`, and whether it is `retired`.
-
-| Scope API                                                     | What it does                                                                                                                                                                                                                                    |
-| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `scope.signal$(key, initial)`, `scope.derived$(key, compute)` | Create a writable value or synchronous calculation under a unique key in this scope.                                                                                                                                                            |
-| `scope.get(handle$)`, `scope.set(handle$, valueOrUpdater)`    | Read or write a handle and check that it belongs to this scope.                                                                                                                                                                                 |
-| `scope.isPending(read)`                                       | Returns whether the expression suspends. Ordinary errors propagate.                                                                                                                                                                             |
-| `scope.batch(fn)`, `scope.action(fn)`                         | Batch notifications during a synchronous call. `batch` runs the function now. `action` returns a wrapped function you can call later. Reads see writes immediately.                                                                             |
-| `scope.serialize()`, `scope.beginAdoption(seed)`              | Capture a seed, or open a historical frame from a matching seed. Use `frame.run(read)` for synchronous historical reads, `frame.retain()` for another lease, and `frame.release()` when finished. Each frame exposes `scopeKey` and `released`. |
-| `scope.inspect()`, `scope.dispose()`                          | Inspect node, dependency, and request metadata, or retire the scope and cancel its work. Enable bounded tracing with `debug: { traceLimit: 256 }` in the scope options.                                                                         |
-
-<h3 id="action-reference">Optimistic actions</h3>
-
-`optimistic$` overlays edits on a ready source. Its optional `compareAuthority`
-function compares incoming and current authoritative values. A positive result
-accepts a newer receipt. `action$` takes a handler, optionally preceded by an
-action key. Each call supplies an operation with its own `id`, `key`, and
-`status` (`pending`, `confirmed`, `rejected`, or `uncertain`).
-
-| Operation API                                  | What it does                                                                                                                                                       |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `operation.set(overlay$, update)`              | Write an optimistic update for this operation, including after an `await`.                                                                                         |
-| `operation.until(read, { timeout })`           | After an optimistic write, wait for a predicate on the selected data, excluding this operation's overlay. The timeout is optional.                                 |
-| `operation.adopt(value)`, `operation.reject()` | Apply an authoritative result to a single target or remove this operation's tentative edits.                                                                       |
-| `operation.uncertain()`, `isActionUncertain`   | Keep the operation available for reconciliation. The guard recognizes both the returned receipt and an `ActionUncertainError` from an uncertain transport outcome. |
-
-<h3 id="host-reference">Custom hosts and renderer integrations</h3>
-
-The standard fullstack host handles ownership and streamed delivery. Use these
-APIs when implementing that work in a custom host or renderer.
-
-| API                                                                                                            | Purpose                                                                                                                                                                                              |
-| -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `currentSignalOwner`, `runWithSignalOwner`, `captureSignalOwner`                                               | Read the active owner (or `null`), run a callback with a specified owner, or capture a runner for later callbacks.                                                                                   |
-| `installSignalOwnerEnvironment`, `retireSignalOwnerIdentity`                                                   | Install a host's owner carrier and get a restore function, or retire state for a renderer-created identity.                                                                                          |
-| `bindSignalControl`, `readSignalBinding`                                                                       | Bind an existing control's `value` or `checked` property and get its cleanup function, or read through a handle's direct-binding protocol. Writable controls feed native edits back into the signal. |
-| `bindStreamedSignalSelection`, `attachStreamedSignalResult`                                                    | Bind a validated stream selection to its owner, or attach a receiver to that selection and get a detach function.                                                                                    |
-| `acceptStreamedSignalResult`, `failStreamedSignalResult`                                                       | Deliver a validated result frame or report failure to its matching channel.                                                                                                                          |
-| `SIGNAL_HANDLE`, `QUERY_REQUEST`, `SIGNAL_BINDING_READ`, `SIGNAL_BINDING_SUBSCRIBE`, `SIGNAL_BINDING_IDENTITY` | Protocol symbols for recognizing handles and request descriptors, reading and subscribing to bindings, and identifying the bound signal.                                                             |
-
-The related `octane/hydration/streamed-signals` entry point exports
-`bootstrapStreamedSignalResults` for data and `bootstrapStreamedSignalHydration`
-for data and HTML placement. Both return a `receiver`, a `signalOwner`, and
-`suspend()` and `dispose()` methods. Use `installSignalDocumentLifecycle` to
-connect the owner's lifetime to browser navigation and back/forward cache
-events. A host emitting its own HTML can install `earlySignalBootstrapScript`
-from `octane/server` before controls appear.
-[Custom SSR host setup](https://github.com/octanejs/octane/blob/main/docs/ssr.md#connect-signals-in-a-custom-ssr-host)
-
-<h3 id="signal-errors">Errors and types</h3>
-
-| Error                                    | When it occurs                                                                                         |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `ScopeDisposedError`, `SignalFrameError` | Code uses a retired owner or an invalid historical frame.                                              |
-| `SignalCycleError`, `SignalWriteError`   | A computation has a dependency cycle, or code attempts a write where it is prohibited.                 |
-| `SignalIdleError`, `SignalStreamError`   | A strict read has no selected request, or a streamed result channel fails.                             |
-| `SignalSerializationError`               | A value or seed cannot be serialized or adopted.                                                       |
-| `ActionUncertainError`                   | A transport failure leaves a mutation's outcome unknown. The error carries the operation ID and cause. |
-
-<details>
-<summary>Exported TypeScript types</summary>
-
-- **Handles and calculations.** `SignalHandle`, `WritableSignal`, `DerivedSignal`, `SignalSnapshot`, `ConnectionState`, `SignalOptions`, `DerivedCompute`, `DerivedContext`, `DerivedOptions`.
-- **Queries and resources.** `Query`, `QueryRequest`, `QueryContext`, `QueryOptions`, `QueryLoadResult`, `QuerySignal`, `Resource`.
-- **Scopes, inspection, and seeds.** `Scope`, `ScopeOptions`, `ScopeInspection`, `SignalTraceEvent`, `ScopeSeed`, `SignalSeedEntry`, `EncodedSignalValue`, `AdoptionFrame`.
-- **Actions.** `OptimisticSignal`, `OptimisticOptions`, `SignalAction`, `ActionOperation`, `ActionUncertain`.
-- **Host integrations.** `SignalOwner`, `SignalOwnerIdentity`, `SignalRendererOwnerIdentity`, `SignalOwnerEnvironment`, `SignalBindingIdentity`, `SignalControlBinding`.
-- **From `octane/hydration/streamed-signals`.** `NativeSignalManifest`, `NativeSignalReference`, `StreamedSignalHydrationOptions`, `StreamedSignalResults`, `StreamedSignalHydration`, `SignalDocumentLifecycleOptions`.
-
-</details>
-
-For the full ownership and transport contracts, see the
-[signals reference](https://github.com/octanejs/octane/blob/main/docs/signals.md)
-and the [public type definitions](https://github.com/octanejs/octane/blob/main/packages/octane/src/signals/types.ts).
+Read a handle with `.get()` for its current value. Use `.latest(fallback)`
+to show the last successful value and `.snapshot()` to inspect pending or error
+states. For ownership, retries, and hydration details, see the
+[signals reference](https://github.com/octanejs/octane/blob/main/docs/signals.md).

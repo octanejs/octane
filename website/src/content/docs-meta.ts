@@ -268,12 +268,11 @@ export const docsMeta: DocMeta[] = [
 				title: 'Adopt streamed results before hydration',
 				searchTerms: ['bindSignalControl', 'bootstrapStreamedSignalResults'],
 			},
-			{ id: 'reference', title: 'Signals API reference' },
-			{ id: 'handle-reference', title: 'Creating and reading handles', level: 3 },
-			{ id: 'scope-reference', title: 'Scopes and historical reads', level: 3 },
-			{ id: 'action-reference', title: 'Optimistic actions', level: 3 },
-			{ id: 'host-reference', title: 'Custom hosts and renderer integrations', level: 3 },
-			{ id: 'signal-errors', title: 'Errors and types', level: 3 },
+			{
+				id: 'reference',
+				title: 'Application API reference',
+				searchTerms: ['isSignalHandle', 'isWritableSignal', 'isActionUncertain'],
+			},
 		],
 	},
 	{

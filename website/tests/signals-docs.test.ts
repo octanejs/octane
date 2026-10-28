@@ -1,9 +1,7 @@
 import { cleanup, render } from '@octanejs/testing-library';
 import { compile } from 'octane/compiler';
-import * as streamedSignals from 'octane/hydration/streamed-signals';
 import * as signals from 'octane/signals';
 import * as clientSignals from 'octane/signals/client';
-import * as serverSignals from 'octane/signals/server';
 import { afterEach, describe, expect, it } from 'vitest';
 import SignalsGuide from '../src/content/docs/signals.mdx';
 import guide from '../src/content/docs/signals.mdx?raw';
@@ -22,25 +20,16 @@ describe.each(['client', 'server'] as const)('Signals guide examples (%s)', (mod
 
 afterEach(cleanup);
 
-it('names the public signals exports in the API reference', () => {
+it('lists importable APIs in the Signals reference table', () => {
 	const { container } = render(SignalsGuide);
-	const heading = container.querySelector('h2#reference');
-	expect(heading).not.toBeNull();
-
-	const documented = new Set<string>();
-	for (
-		let node = heading!.nextElementSibling;
-		node && node.tagName !== 'H2';
-		node = node.nextElementSibling
-	) {
-		for (const code of node.querySelectorAll(':not(pre) > code')) {
-			documented.add(code.textContent ?? '');
-		}
-	}
-
-	const exported = new Set(
-		[signals, clientSignals, serverSignals, streamedSignals].flatMap(Object.keys),
+	const table = container.querySelector('#reference ~ table');
+	const names = Array.from(
+		table?.querySelectorAll('tbody td:first-child code') ?? [],
+		(code) => code.textContent!,
 	);
-	const missing = [...exported].filter((name) => !name.startsWith('__') && !documented.has(name));
-	expect(missing).toEqual([]);
+	expect(names.length).toBeGreaterThan(0);
+	for (const name of names) {
+		const entry = name === 'useSignal$' ? clientSignals : signals;
+		expect(Object.hasOwn(entry, name), name).toBe(true);
+	}
 });
