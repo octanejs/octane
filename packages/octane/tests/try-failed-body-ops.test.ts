@@ -7,7 +7,7 @@ import { loadCompiledFixtureSource } from './_server-fixture';
 // render queued for commit belongs to content that never commits (#2043): its
 // bag writes, its structure and its resources must not reach the page.
 const SOURCE = `
-import { useState } from 'octane';
+import { ErrorBoundary, useState } from 'octane';
 function Boom(props) @{
 	if (props.bang) throw new Error('boom');
 	<i>{'ok'}</i>
@@ -25,6 +25,19 @@ export function FailingBody(props) @{
 		} @catch (err) {
 			<p id="caught">{'caught'}</p>
 		}
+	</main>
+}
+export function FailingBoundary(props) @{
+	<main>
+		<ErrorBoundary fallback={<p id="caught">{'caught'}</p>}>
+			<section id="body" title={props.title}>
+				<link rel="stylesheet" href={props.sheet} precedence="failed-body" />
+				@if (props.extra) {
+					<b id="extra">{'extra'}</b>
+				}
+				<Boom bang={props.bang} />
+			</section>
+		</ErrorBoundary>
 	</main>
 }
 function Leaf(props) @{
@@ -241,53 +254,59 @@ describe.each([false, true])('a @try body that throws in an urgent render (dev=%
 		}
 	});
 
-	it('commits none of the failed body’s queued work', () => {
-		const c = loadCompiledFixtureSource(SOURCE, {
-			id: `try-failed-body-ops-${dev}.tsrx`,
-			mode: 'client',
-			compileOptions: { dev, hmr: false },
-		});
-		const container = document.createElement('div');
-		document.body.appendChild(container);
-		const root = createRoot(container);
-		const records: MutationRecord[] = [];
-		const observer = new MutationObserver((batch) => records.push(...batch));
-		try {
-			flushSync(() =>
-				root.render(c.FailingBody, {
-					title: 'before',
-					sheet: '/kept.css',
-					extra: false,
-					bang: false,
-				}),
-			);
-			const body = container.querySelector('#body')!;
-			expect(body.getAttribute('title')).toBe('before');
-			observer.observe(document, { subtree: true, childList: true, attributes: true });
-			flushSync(() =>
-				root.render(c.FailingBody, {
-					title: 'after',
-					sheet: '/failed.css',
-					extra: true,
-					bang: true,
-				}),
-			);
-			records.push(...observer.takeRecords());
-			expect(container.querySelector('#caught')).not.toBeNull();
-			expect(container.querySelector('#body')).toBeNull();
-			// The failed body's bag write never ran on the committed host.
-			expect(body.getAttribute('title')).toBe('before');
-			expect(records.some((r) => r.type === 'attributes' && r.target === body)).toBe(false);
-			// Its new arm never landed.
-			const added = records.flatMap((r) => [...r.addedNodes]);
-			expect(added.some((n) => (n as Element).id === 'extra')).toBe(false);
-			// Its stylesheet resource never joined the head. (A render-time preload
-			// hint for it may, as React's does: hints insert when requested.)
-			expect(document.head.querySelector('link[rel="stylesheet"][href="/failed.css"]')).toBeNull();
-		} finally {
-			observer.disconnect();
-			root.unmount();
-			container.remove();
-		}
-	});
+	// ErrorBoundary is the same catch-only boundary as a @try without @pending.
+	it.each(['FailingBody', 'FailingBoundary'] as const)(
+		'commits none of the failed body’s queued work (%s)',
+		(component) => {
+			const c = loadCompiledFixtureSource(SOURCE, {
+				id: `try-failed-body-ops-${dev}.tsrx`,
+				mode: 'client',
+				compileOptions: { dev, hmr: false },
+			});
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			const root = createRoot(container);
+			const records: MutationRecord[] = [];
+			const observer = new MutationObserver((batch) => records.push(...batch));
+			try {
+				flushSync(() =>
+					root.render(c[component], {
+						title: 'before',
+						sheet: '/kept.css',
+						extra: false,
+						bang: false,
+					}),
+				);
+				const body = container.querySelector('#body')!;
+				expect(body.getAttribute('title')).toBe('before');
+				observer.observe(document, { subtree: true, childList: true, attributes: true });
+				flushSync(() =>
+					root.render(c[component], {
+						title: 'after',
+						sheet: '/failed.css',
+						extra: true,
+						bang: true,
+					}),
+				);
+				records.push(...observer.takeRecords());
+				expect(container.querySelector('#caught')).not.toBeNull();
+				expect(container.querySelector('#body')).toBeNull();
+				// The failed body's bag write never ran on the committed host.
+				expect(body.getAttribute('title')).toBe('before');
+				expect(records.some((r) => r.type === 'attributes' && r.target === body)).toBe(false);
+				// Its new arm never landed.
+				const added = records.flatMap((r) => [...r.addedNodes]);
+				expect(added.some((n) => (n as Element).id === 'extra')).toBe(false);
+				// Its stylesheet resource never joined the head. (A render-time preload
+				// hint for it may, as React's does: hints insert when requested.)
+				expect(
+					document.head.querySelector('link[rel="stylesheet"][href="/failed.css"]'),
+				).toBeNull();
+			} finally {
+				observer.disconnect();
+				root.unmount();
+				container.remove();
+			}
+		},
+	);
 });
