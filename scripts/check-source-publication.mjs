@@ -86,6 +86,8 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/base-ui/tsconfig.json',
 		'packages/cli/tsconfig.typecheck.json',
 		'packages/cmdk/tsconfig.json',
+		// A Node CLI like @octanejs/cli; Node tooling's way out is #2266.
+		'packages/codemod/tsconfig.typecheck.json',
 		'packages/colorful/tsconfig.json',
 		'packages/create-octane/tsconfig.typecheck.json',
 		'packages/day-picker/tsconfig.json',
@@ -167,6 +169,8 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'@octanejs/app-core',
 		'@octanejs/astro',
 		'@octanejs/cli',
+		// Node tooling like @octanejs/cli; tracked by #2266.
+		'@octanejs/codemod',
 		'@octanejs/docusaurus',
 		'@octanejs/i18next',
 		'@octanejs/mcp-server',

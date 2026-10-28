@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["shared/**/*", "codemod/**/*", "env.d.ts"]
+}

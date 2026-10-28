@@ -5339,6 +5339,14 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'codemod',
+					include: ['packages/codemod/tests/**/*.test.js'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
 					name: 'create-octane',
 					include: ['packages/create-octane/tests/**/*.test.js'],
 					environment: 'node',

@@ -55,8 +55,9 @@ active pathname to each link's target; the router `<Link>` also sets
 pnpm dev            # the .tsrx app, SSR + hydrate -> http://localhost:5170
 pnpm dev:jsx        # the React-style .tsx app, SSR + hydrate
 pnpm dev:tsrx       # the .tsrx app, SSR + hydrate
+pnpm dev:codemod    # the .tsx app migrated by @octanejs/codemod, SSR + hydrate
 pnpm typecheck      # strict TypeScript check for shared, JSX, glue, and E2E code
-pnpm build          # production client builds for both authoring dialects
+pnpm build          # production client builds for both dialects and the codemod lane
 pnpm test:e2e       # build + Playwright parity/SSR journeys for both apps
 pnpm test:e2e:dev   # optional fast pass from source-serving Vite clients
 ```
@@ -66,8 +67,9 @@ macOS/Linux (CI runs Ubuntu). The ordinary `dev`, `typecheck`, and `build`
 commands do not require that launcher syntax.
 
 `pnpm test:e2e` boots a local HN-compatible fixture API on `:5190`, each app's
-production client build through Vite preview (`:5191` JSX, `:5192` TSRX), and
-both source-driven SSR servers (`:5193` JSX, `:5194` TSRX). The fixture base is
+production client build through Vite preview (`:5191` JSX, `:5192` TSRX,
+`:5195` codemod), and each source-driven SSR server (`:5193` JSX, `:5194` TSRX,
+`:5197` codemod). The fixture base is
 baked into the production clients before Playwright starts. The same data drives
 browser and Node SSR fetches, so no external API or manually started server is
 required. The SSR servers use Vite middleware for source loading but set
@@ -239,10 +241,25 @@ The same assertions passing under **both** projects is the `.tsx` ≡ `.tsrx`
 parity result.
 
 ```
-20 passed
-  [jsx]  10 passed
-  [tsrx] 10 passed
+30 passed
+  [jsx]     10 passed
+  [tsrx]    10 passed
+  [codemod] 10 passed
 ```
+
+### Codemod lane
+
+A third project, `codemod`, checks
+[`@octanejs/codemod`](../../packages/codemod) against the same journeys.
+`codemod.mjs` copies `jsx/` to the gitignored `codemod/`, respells its imports the
+way a React app writes them (`react`, `react-dom/client`, `@tanstack/react-query`,
+`@tanstack/react-router`), and migrates the result. The script fails if the
+codemod reports an error or leaves a React import behind; `pnpm build:codemod`
+then typechecks the output with `octane-tsc` (`tsconfig.codemod.json`) and builds
+it. Only APIs React spells identically are respelled: `ErrorBoundary`,
+`octane/static`, and StyleX have no same-API React counterpart and stay on
+Octane, as in a partly migrated app. The `codemod` project's 10 passing
+journeys are the evidence that the migration kept the app's behavior.
 
 ### Notes on selectors
 

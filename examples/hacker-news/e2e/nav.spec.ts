@@ -6,7 +6,8 @@ import fixture from './fixtures/hacker-news.json' with { type: 'json' };
 // query + suspense + stylex) and the shared view-model — only their view
 // components differ. So identical assertions passing under both projects is the
 // proof that the React-style `.tsx` views and the `.tsrx` directive views are
-// observably equivalent.
+// observably equivalent. The `codemod` project (:5195) runs the `.tsx` views
+// after @octanejs/codemod migrated them, proving the migration equivalent too.
 //
 // Every test is deterministic and offline: browser and SSR requests use the
 // local HN-compatible fixture API started by playwright.config.ts. Its small
