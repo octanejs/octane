@@ -3,7 +3,8 @@
 Status: prototype landed in `packages/codemod` (2026-10-28); M1's workstream 1
 and Hacker News lane are done, and the lane passes all 10 Playwright journeys
 (2026-10-28, local run). The TS2300 fix landed in #2265, so the corpus now
-compiles with no errors; the first publish is outstanding. This plan takes it
+compiles with no errors; the first publish is outstanding. The js-framework
+benchmark run (2026-10-28) measures the output's speed. This plan takes it
 from a working prototype to a migration tool we can point at any React app.
 
 ## Goal
@@ -92,6 +93,77 @@ Strong blockers left across the corpus, by frequency, which orders workstream 5:
 | `OCTANE_STRONG_RENDER_MODULE_STATE_READ` | 9 | report |
 | others (data fetch, chains, locale, impure calls) | <8 each | report with the documented replacement |
 
+### Performance: js-framework-benchmark
+
+The React variants of js-framework-benchmark, migrated and run against the
+hand-written `octane-tsrx` target and React (2026-10-28: local Chromium,
+production builds, `benchmarks/js-framework/run.mjs`, 8 iterations, medians).
+`react-hooks` is the repo's `benchmarks/js-framework/react` fixture, which is
+upstream's plus the harness's `flushSync` wrapper; `react-classes` is upstream
+`frameworks/keyed/react-classes` at `247fafa2`. Every target passed the
+harness's DOM check after every timed op. The migrated apps were scratch Vite
+projects; nothing in the repo runs this yet.
+
+| Op | `octane-tsrx` (ms) | Codemod | Codemod, Strong | React |
+| --- | ---: | ---: | ---: | ---: |
+| run | 2.3 | 2.2× | 2.3× | 2.4× |
+| replace | 5.0 | 1.5× | 1.5× | 2.1× |
+| add | 1.8 | 1.8× | 1.8× | 2.5× |
+| update | 0.4 | 1.0× | 1.3× | 2.3× |
+| select | 0.005 | 14× | 16× | 19× |
+| swap | 0.018 | 4.5× | 4.9× | 100× |
+| remove | 0.3 | 1.3× | 1.3× | 2.3× |
+| runlots | 13.1 | 2.3× | 2.3× | 9.1× |
+| select_lots | 0.003 | 169× | 166× | 271× |
+| clear | 22.0 | 1.2× | 1.2× | 2.1× |
+| JS, gzip -9 | 36.8 kB | 65.0 kB | 71.8 kB | 63.1 kB |
+
+Ratios are to `octane-tsrx`. `update` and `remove` sit near the timer's 0.1 ms
+resolution.
+
+- The migrated `react-hooks` is correct and faster than React on every op
+  (1.1× on run to 22× on swap), but slower than the hand-written twin on every
+  op except update (1.2× on clear to 169× on select_lots), and it ships about
+  as many bytes as React.
+- `--strong` fell back to compatibility on three real blockers: the reducer
+  increments a module-level `nextId` and calls `Math.random`
+  (`OCTANE_STRONG_IMPURE_UPDATER`, a bug under React's own purity rule too), and
+  the module imports `flushSync` (`OCTANE_STRONG_COMPAT_IMPORT`). With those
+  fixed by hand the module became Strong with nothing else to fix, ran no
+  faster, and grew 6.8 kB (not yet attributed). The "Codemod, Strong" column is
+  that hand-fixed copy.
+- `react-classes` reports its four class components and stays unrunnable until
+  workstream 3 converts classes.
+
+Where the gap comes from, measured on hand-edited copies of the migrated output
+in a second run (ratios to that run's `octane-tsrx`):
+
+| Variant | run | replace | runlots | clear | select | swap | select_lots |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Codemod output | 2.3× | 1.5× | 2.3× | 1.2× | 18× | 4.3× | 158× |
+| A: text holes cast | 1.8× | 1.4× | 1.9× | 1.2× | 16× | 4.2× | 156× |
+| B: A, plus `memo(Row)` inlined into the `@for` | 1.04× | 1.00× | 1.02× | 0.95× | 28× | 6.8× | 297× |
+
+That gives three rule candidates:
+
+1. **Text holes** (workstream 2): `{item.label as string}` and
+   `{String(item.id)}` in place of bare holes take about 20% off run and
+   runlots. It needs the item types, so it waits for the type-aware program.
+2. **`render(<App />)` → `render(App)`** (workstream 3): 3.0 kB gzip off the
+   bundle (65.0 → 62.0 kB). Timing was not measured separately.
+3. **Row inlining, on hold.** Inlining the `memo` row component into the `@for`
+   reaches parity on run, replace, runlots, and clear, but almost doubles
+   selection cost: without `memo` every row re-renders on select, and the
+   inlined loop still misses the twin's keyed-selection path. The likely cause,
+   unconfirmed, is that the migrated app keeps React's single `useReducer`
+   state `{ data, selected }` behind a wrapped `dispatch`, where the twin uses
+   separate `useState`s. That is a compiler question; the rule waits for its
+   answer.
+
+The rest of the byte gap is React habit (`memo`, `useReducer`, `flushSync`,
+separate `Button` and `Jumbotron` components), which a behavior-preserving
+codemod keeps.
+
 ## Workstreams
 
 Each workstream ships as its own PR with golden fixtures and corpus numbers in
@@ -135,8 +207,9 @@ Default on when a `tsconfig.json` is found; `--no-types` for speed. Build one
   hand-written HN output.
 - Text holes: `{x}` where `x: string` → `{x as string}`; `number` → `{String(x)}`.
   Merge adjacent static text and proven-string holes into one text binding,
-  as the hand-written HN twin does (`{'(' + host + ')' as string}`). Measure the
-  render gain on the corpus before making it the default.
+  as the hand-written HN twin does (`{'(' + host + ')' as string}`). On
+  js-framework-benchmark the casts take about 20% off run and runlots; measure
+  the corpus apps too before making it the default.
 - Prove `.map` receivers are arrays (vs. Immutable, Observables) and that a key
   is an item identity.
 - Resolve `onChange` on inputs with a dynamic `type` from the union of literal
@@ -147,7 +220,11 @@ Default on when a `tsconfig.json` is found; `--no-types` for speed. Build one
 - Class components → function components for the common subset: `state` +
   `setState` → `useState` per field, `componentDidMount`/`Update`/`WillUnmount`
   → effects, instance fields → refs. Anything else (`getSnapshotBeforeUpdate`,
-  `forceUpdate`, legacy context) stays reported.
+  `forceUpdate`, legacy context) stays reported. js-framework-benchmark's
+  `react-classes` is the acceptance case.
+- `root.render(<App />)` with no key, ref, or children → `root.render(App)`,
+  or `root.render(App, { … })` for plain attributes: 3 kB gzip off the
+  js-framework entry.
 - Error boundaries → `@try { … } @catch (error) { … }` when the boundary is used
   in one place, else Octane's `ErrorBoundary`; `react-error-boundary` usage maps
   to `@try` directly.
@@ -208,6 +285,7 @@ equivalent dependencies, prop-initialized state) move into the compiler too.
 | Types | Migrated fixtures and HN typechecked with `octane-tsc` | add to the codemod test project |
 | Behavior, in repo | `examples/hacker-news/codemod.mjs` respells `jsx/` with React imports, migrates it, and fails on any codemod error or leftover React import; `build:codemod` typechecks and builds it; the shared Playwright spec runs it as the `codemod` project (`:5195`, SSR `:5197`) | `pnpm --dir examples/hacker-news test:e2e`, part of the examples e2e job |
 | Behavior, third party | For corpus apps with their own tests (bulletproof-react's Vitest + Testing Library suite), migrate and run their tests on `@octanejs/testing-library` | corpus job |
+| Performance | A `codemod` target in `benchmarks/js-framework` that migrates the `react` fixture at build time, run against `octane-tsrx` and `react`; manual today (above) | `benchmarks/js-framework`, report only |
 | Parity | Feed migrated components through the React-vs-Octane parity probe harness: same fixture, both renderers, compare DOM and event logs | reuse the parity harness |
 | Corpus | Pinned commits above, report modules migrated / compile errors / `octane-tsc` errors / Strong share per app on each run | scheduled job, report only |
 
@@ -220,8 +298,8 @@ fixtures, the HN behavior lane, and zero compile errors on supported patterns.
 | --- | --- | --- |
 | M0 (done) | Prototype, rules above, Strong fixpoint, corpus run | 574 modules, 2 compile errors (an Octane defect, since fixed), 76% Strong |
 | M1 (in progress) | Workstream 1 (done), HN lane (done), TS2300 fix (done, #2265), first publish as `0.1.0` | 0 compile errors on corpus (done); HN spec green on migrated output (done: 10/10 journeys); idempotent (done) |
-| M2 | Workstream 2 (types) | HN output matches the hand-written twin's holes and `@if`s; measured text-binding gain |
-| M3 | Workstreams 3 + 4 | Error boundaries and simple classes convert; radix adapter; `octane migrate`; bulletproof-react tests pass after migration |
+| M2 | Workstream 2 (types) | HN output matches the hand-written twin's holes and `@if`s; measured text-binding gain (js-framework: about 20% on run and runlots) |
+| M3 | Workstreams 3 + 4 | Error boundaries and simple classes convert; `react-classes` passes the js-framework harness; radix adapter; `octane migrate`; bulletproof-react tests pass after migration |
 | M4 | Workstream 5 | Strong share on the corpus up from 76%, each fixer owned by the compiler |
 | M5 | Workstream 6, docs page on octanejs.dev | Migration guide built from real corpus before/after |
 
