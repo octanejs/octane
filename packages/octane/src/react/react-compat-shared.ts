@@ -9,7 +9,7 @@ import {
 	REACT_CONTEXT_TAG,
 } from '../runtime-tags.js';
 import type { Context, OctaneNode } from '../runtime.js';
-import type { Context as ServerContext } from '../runtime.server.js';
+import type { ServerContext } from '../context-identity.js';
 
 /** One native Octane context delivered through a real React context provider. */
 export interface ReactContextBridge<T> {
