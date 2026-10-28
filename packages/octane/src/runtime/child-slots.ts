@@ -35,6 +35,7 @@ import {
 	MEMO_BAIL,
 	HOST_DESCRIPTORS,
 	ELEMENT_DESCRIPTORS,
+	ROOT_RENDER_ROLLBACK,
 } from './drivers.js';
 import {
 	type SignalInstanceKey,
@@ -43,7 +44,7 @@ import {
 	stampSignalInstanceKey,
 	renderBlock,
 } from './signal-owners.js';
-import { ROOT_RENDER_ROLLBACK, journalRootProperty, isCreatedInRootRender } from './engine.js';
+import { journalRootProperty, isCreatedInRootRender } from './engine.js';
 import { type TrackedThenable, useThenable } from './use.js';
 import { CONTEXT_CHILD, type Context, promoteMemoAncestry } from './context.js';
 import { KEPT_TEXT_CONTENT, clearKeptTextContent, CURSOR } from './hydration.js';
@@ -113,6 +114,7 @@ import {
 	journalBag,
 } from './commit.js';
 import { getFirstChild, getNextSibling, rejectTextareaChild } from './templates.js';
+import { ROOT_ROLLBACK } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -670,7 +672,10 @@ export function childSlot(
 			continue;
 		}
 		if (typeof (value as any).then === 'function') {
-			value = useThenable(value as TrackedThenable<unknown>);
+			// Without an entry that can suspend, a wakeable is a render error, as a
+			// thrown one is (renderBlockInner): nothing could hold the screen.
+			if (ROOT_ROLLBACK) value = useThenable(value as TrackedThenable<unknown>);
+			else throw value;
 			continue;
 		}
 		break;

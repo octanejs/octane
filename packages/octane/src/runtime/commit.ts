@@ -13,7 +13,6 @@ import type { Scope, Block, RootRenderTransaction, SlotNext, SuspenseRefEntry } 
 import type { RefDetachSuppression, FragmentInstance } from './refs.js';
 import {
 	QUEUE,
-	ROOT_RENDER_ROLLBACK,
 	journalUndo,
 	retireRootBlock,
 	placeRun,
@@ -31,22 +30,21 @@ import {
 	unmountSlot,
 	releaseLiteArm,
 } from './block.js';
+import { CURRENT_SCOPE, ROOT_RENDER_TRANSACTION, ROOT_DISCARD_STAMP } from './render.js';
+import { owningBlock, replaceSharedBlockBoundary } from './branches.js';
+import { forEachSubtreeChild } from './activity.js';
+import { type ForSlot, moveBlockBefore } from './lists.js';
+import { getFirstChild, getNextSibling } from './templates.js';
+import { type HandlerBundle, EMPTY_ARGS, _dispatchDepth, CAPTURE_SLOTS } from './events.js';
 import {
-	CURRENT_SCOPE,
+	ROOT_RENDER_ROLLBACK,
 	TRANSITION_JOURNAL,
 	TRANSITION_JOURNAL_BAGS,
 	TRANSITION_JOURNAL_CHECKPOINT,
 	TRANSITION_JOURNAL_BAG_WINDOW,
 	TRANSITION_JOURNAL_DEPTH,
 	OPS_CHECKPOINT,
-	ROOT_RENDER_TRANSACTION,
-	ROOT_DISCARD_STAMP,
-} from './render.js';
-import { owningBlock, replaceSharedBlockBoundary } from './branches.js';
-import { forEachSubtreeChild } from './activity.js';
-import { type ForSlot, moveBlockBefore } from './lists.js';
-import { getFirstChild, getNextSibling } from './templates.js';
-import { type HandlerBundle, EMPTY_ARGS, _dispatchDepth, CAPTURE_SLOTS } from './events.js';
+} from './drivers.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -101,8 +99,6 @@ export const JOURNAL_INPUTS = 8;
 export const JOURNAL_EVENT_OWNER = 9;
 /** A nested window's start in its root's commit ops; replay drops what follows (dropRootOps). */
 export const JOURNAL_OPS = 10;
-export const TRANSITION_JOURNAL_WINDOWS: number[] = [];
-export const TRANSITION_JOURNAL_BAG_WINDOWS: number[] = [];
 /** Undo updates the prepared host projection without publishing rollback writes. */
 let TRANSITION_JOURNAL_REPLAYING = false;
 
@@ -151,7 +147,6 @@ const BAG_STAGED = 256;
 const BAG_QUEUED = 512;
 /** Eight spare cell arrays, seeded at load: see the section comment. */
 export const BAG_POOL: any[][] = [[], [], [], [], [], [], [], []];
-export const OPS_CHECKPOINTS: number[] = [];
 
 /**
  * Record one binding the compiled template found changed, or any binding of a
@@ -207,7 +202,8 @@ export function bagRecord(
 			(state & BAG_QUEUED) === 0 &&
 			transaction !== null &&
 			!hydrating &&
-			(TRANSITION_JOURNAL_DEPTH !== 1 || s.block.createdStamp !== ROOT_DISCARD_STAMP)
+			((TRANSITION_JOURNAL && TRANSITION_JOURNAL_DEPTH !== 1) ||
+				s.block.createdStamp !== ROOT_DISCARD_STAMP)
 		) {
 			next![size] = s;
 			next![size + 1] = transaction.ops.length;
@@ -231,7 +227,11 @@ export function bagRecord(
  */
 function bagResume(bag: any): any[] {
 	const next = bag.next;
-	if ((bag.$ & BAG_QUEUED) !== 0 && next[(bag.$ & BAG_SIZE) + 1] < OPS_CHECKPOINT)
+	if (
+		TRANSITION_JOURNAL &&
+		(bag.$ & BAG_QUEUED) !== 0 &&
+		next[(bag.$ & BAG_SIZE) + 1] < OPS_CHECKPOINT
+	)
 		journalObjectOnce(next);
 	return next;
 }
@@ -250,7 +250,7 @@ export function bagDone(s: Scope, bag: any): void {
 	next[size + 2](
 		bag,
 		next,
-		TRANSITION_JOURNAL !== null || (_dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0),
+		TRANSITION_JOURNAL ? true : _dispatchDepth !== 0 && CAPTURE_SLOTS.length !== 0,
 	);
 }
 
@@ -285,9 +285,10 @@ export function slotNext(slot: { next: SlotNext | null }): SlotNext {
 		tx.ops.push(applySlotNext, slot);
 		// A window that drops truncates what it created; only a structure an
 		// outer window built needs copying back (below).
-		if (TRANSITION_JOURNAL_DEPTH > 1)
-			TRANSITION_JOURNAL_BAGS!.set(next, TRANSITION_JOURNAL!.length);
+		if (TRANSITION_JOURNAL && TRANSITION_JOURNAL_DEPTH > 1)
+			TRANSITION_JOURNAL_BAGS!.set(next, TRANSITION_JOURNAL.length);
 	} else if (
+		TRANSITION_JOURNAL &&
 		TRANSITION_JOURNAL_DEPTH > 1 &&
 		(TRANSITION_JOURNAL_BAGS!.get(next) ?? -1) < TRANSITION_JOURNAL_CHECKPOINT
 	) {
@@ -798,7 +799,8 @@ export function listNext(state: ForSlot, parentBlock: Block, at: number): SlotNe
 	const ops = tx.ops;
 	if (at >= ops.length) ops.push(applySlotNext, state);
 	else ops.splice(at, 0, applySlotNext, state);
-	if (TRANSITION_JOURNAL_DEPTH > 1) TRANSITION_JOURNAL_BAGS!.set(next, TRANSITION_JOURNAL!.length);
+	if (TRANSITION_JOURNAL && TRANSITION_JOURNAL_DEPTH > 1)
+		TRANSITION_JOURNAL_BAGS!.set(next, TRANSITION_JOURNAL.length);
 	return next;
 }
 
@@ -905,7 +907,7 @@ function cloneBindingBag(bag: any, arity: number): object {
 
 export function journalBag(): void {
 	const scope = CURRENT_SCOPE;
-	if (scope === null) return;
+	if (!TRANSITION_JOURNAL || scope === null) return;
 	// The root log discards a Block created in this transaction wholesale, even
 	// if it completed an earlier render in the same wave. Keep nested boundary
 	// windows and adopted DOM on the ordinary snapshot path: they can restore
@@ -929,6 +931,7 @@ export function journalBag(): void {
 
 /** Record every own value of `obj`, once per window, so it can be put back. */
 export function journalObjectOnce(obj: object): void {
+	if (!TRANSITION_JOURNAL) return;
 	const seen = TRANSITION_JOURNAL_BAGS!;
 	if ((seen.get(obj) ?? -1) >= TRANSITION_JOURNAL_CHECKPOINT) return;
 	seen.set(obj, TRANSITION_JOURNAL!.length);
@@ -992,6 +995,7 @@ export interface ForSlotRecord {
  * way, like the single snapshot function this replaces.
  */
 export function journalForSlot(state: ForSlot, link?: boolean): ForSlotRecord | null {
+	if (!TRANSITION_JOURNAL) return null;
 	const seen = TRANSITION_JOURNAL_BAGS!;
 	const at = seen.get(state) ?? -1;
 	// The record rides in the spare slot of the list's undo entry; an entry without

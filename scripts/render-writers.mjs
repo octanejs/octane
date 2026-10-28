@@ -129,7 +129,7 @@ export const WRITERS = new Map(
 		removeOnlyChildText: 'fresh',
 		childTextHole: 'fresh',
 		errorBlock: 'fresh',
-		tryBlock: 'fresh',
+		tryBlockImpl: 'fresh',
 		ownSlotAnchor: 'fresh',
 		delimitMarkerlessBranch: 'fresh',
 		swapBranchFrontier: 'fresh',

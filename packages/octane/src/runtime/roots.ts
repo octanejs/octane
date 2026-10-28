@@ -137,7 +137,7 @@ import {
 	EFFECT_RECONNECT_CONTEXT,
 	suspenseRetryBatchForSubtree,
 	type ErrorSlot,
-	tryBlock,
+	tryBlockImpl,
 	type ScheduledVisibilityOwner,
 	findScheduledVisibilityOwner,
 	findSuspenseHiddenTry,
@@ -1246,7 +1246,7 @@ export function createIndependentHydrateActivator(
 			// render directly under the island's `[prefix, 'root']` signal identity.
 			// Resolve it to that root key so it contributes no invocation segment.
 			stampSignalInstanceKey(scope, rootSignalInstanceKey(scope.block.idState));
-			tryBlock(scope, 0, scope.block.parentNode, content, null, null, scope.block.endMarker);
+			tryBlockImpl(scope, 0, scope.block.parentNode, content, null, null, scope.block.endMarker);
 		};
 		const adapter: ComponentBody = (_props, scope) => {
 			rootOwner = scope.block.idState.renderOwner;

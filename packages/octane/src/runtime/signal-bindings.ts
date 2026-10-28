@@ -32,20 +32,20 @@ import {
 } from '../signals/types.js';
 import { styleName } from '../css.js';
 import type { Scope, Block, RootRenderTransaction, HostPropSource, ChildSlot } from './types.js';
-import { HYDRATION_DRIVER, enableSignalBindings } from './drivers.js';
+import {
+	HYDRATION_DRIVER,
+	enableSignalBindings,
+	ROOT_RENDER_ROLLBACK,
+	TRANSITION_JOURNAL,
+	TRANSITION_JOURNAL_DEPTH,
+} from './drivers.js';
 import {
 	scopeSignalOwner,
 	runWithBlockSignalOwner,
 	type NativeStyleBinding,
 } from './signal-owners.js';
 import { queueOwnRefDetach, FRAGMENT_REFS } from './refs.js';
-import {
-	ROOT_RENDER_ROLLBACK,
-	journalUndo,
-	journalRootProperty,
-	activeFragments,
-	scheduleRender,
-} from './engine.js';
+import { journalUndo, journalRootProperty, activeFragments, scheduleRender } from './engine.js';
 import { registerHookCleanup } from './hooks.js';
 import { CURSOR, type HydrationCapability } from './hydration.js';
 import {
@@ -57,8 +57,6 @@ import {
 import { enqueueEffectEventCommitAction } from './block.js';
 import {
 	CURRENT_BLOCK,
-	TRANSITION_JOURNAL,
-	TRANSITION_JOURNAL_DEPTH,
 	ROOT_RENDER_TRANSACTION,
 	ROOT_DISCARD_STAMP,
 	WIP_CAPTURE,
@@ -103,7 +101,9 @@ export function pendingWrites(block: Block | null): RootRenderTransaction | null
 	return transaction.aborted ||
 		ROOT_RENDER_ROLLBACK ||
 		hydrating ||
-		(block !== null && TRANSITION_JOURNAL_DEPTH === 1 && block.createdStamp === ROOT_DISCARD_STAMP)
+		(block !== null &&
+			(!TRANSITION_JOURNAL || TRANSITION_JOURNAL_DEPTH === 1) &&
+			block.createdStamp === ROOT_DISCARD_STAMP)
 		? null
 		: transaction;
 }
@@ -159,11 +159,11 @@ export function hydrateClaimedBindingCaches(
 		} else {
 			const cached = bag[field];
 			if (cached?.[DIRECT_SIGNAL_BINDING] === true) {
-				if (TRANSITION_JOURNAL !== null) journalObjectOnce(cached);
+				if (TRANSITION_JOURNAL) journalObjectOnce(cached);
 				cached.value = value;
 			} else if (!tokenOnly) {
 				// Scalar text keeps its adopted Text in the token field.
-				if (TRANSITION_JOURNAL !== null) journalBag();
+				if (TRANSITION_JOURNAL) journalBag();
 				bag[field] = value;
 			}
 		}
@@ -270,7 +270,7 @@ function writeCommittedDirectSignalBinding(binding: DirectSignalBinding, value: 
 }
 
 export function writeDirectSignalBinding(binding: DirectSignalBinding, value: unknown): void {
-	if (TRANSITION_JOURNAL !== null) journalObjectOnce(binding);
+	if (TRANSITION_JOURNAL) journalObjectOnce(binding);
 	// A render that can be dropped writes committed DOM at its commit; text
 	// writes wait for it themselves (setRenderText).
 	const policy = binding.policy;
@@ -641,7 +641,7 @@ function bindDirectSignal(
 			const hydration = value === undefined && hydrating ? CURSOR : null;
 			if (hydration === null) return previous;
 		}
-		if (TRANSITION_JOURNAL !== null) journalBag();
+		if (TRANSITION_JOURNAL) journalBag();
 		const scalarTarget =
 			(kind === 'text' || kind === 'textOnlyChild') && previous instanceof Text ? previous : target;
 		return writeDirectSignal(scope, policy, scalarTarget, value, previous, name, attributeKind);
@@ -665,7 +665,7 @@ function bindDirectSignal(
 		if (!Object.is(prior.value, next)) writeDirectSignalBinding(prior, next);
 		return prior;
 	}
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	if (handle === null) {
 		const scalarTarget =
 			kind === 'text' || kind === 'textOnlyChild'
@@ -1043,7 +1043,7 @@ function rebindSignalHostSubscriptions(
 		if (handles.has(handle)) continue;
 		unsubscribe();
 		binding.subscriptions.delete(handle);
-		if (TRANSITION_JOURNAL !== null) {
+		if (TRANSITION_JOURNAL) {
 			// The record snapshot restores source identity, but a canceled observer
 			// must actually be reattached to keep the committed DOM live.
 			journalUndo(() => {
@@ -1055,7 +1055,7 @@ function rebindSignalHostSubscriptions(
 	for (const handle of handles) {
 		if (binding.subscriptions.has(handle)) continue;
 		const unsubscribe = addSignalHostSubscription(binding, handle);
-		if (TRANSITION_JOURNAL !== null) {
+		if (TRANSITION_JOURNAL) {
 			journalUndo(() => {
 				unsubscribe();
 				binding.subscriptions.delete(handle);
@@ -1095,7 +1095,7 @@ function syncSignalHostControl(binding: SignalHostPropSourcesBinding): void {
 		}
 		cleanup();
 		binding.controlWriters.delete(channel);
-		if (TRANSITION_JOURNAL !== null) {
+		if (TRANSITION_JOURNAL) {
 			journalUndo(() => {
 				if (!binding.disposed && !binding.scope.block.disposed)
 					addSignalHostControlWriter(binding, channel);
@@ -1104,7 +1104,7 @@ function syncSignalHostControl(binding: SignalHostPropSourcesBinding): void {
 	}
 	if (isWritableSignal(value) && !binding.controlWriters.has('value')) {
 		const cleanup = addSignalHostControlWriter(binding, 'value');
-		if (TRANSITION_JOURNAL !== null) {
+		if (TRANSITION_JOURNAL) {
 			journalUndo(() => {
 				cleanup();
 				binding.controlWriters.delete('value');
@@ -1113,7 +1113,7 @@ function syncSignalHostControl(binding: SignalHostPropSourcesBinding): void {
 	}
 	if (isWritableSignal(checked) && !binding.controlWriters.has('checked')) {
 		const cleanup = addSignalHostControlWriter(binding, 'checked');
-		if (TRANSITION_JOURNAL !== null) {
+		if (TRANSITION_JOURNAL) {
 			journalUndo(() => {
 				cleanup();
 				binding.controlWriters.delete('checked');
@@ -1124,7 +1124,7 @@ function syncSignalHostControl(binding: SignalHostPropSourcesBinding): void {
 		if (binding.input !== undefined) {
 			const input = binding.input;
 			element.removeEventListener('input', input);
-			if (TRANSITION_JOURNAL !== null) {
+			if (TRANSITION_JOURNAL) {
 				journalUndo(() => {
 					if (!binding.disposed && !binding.scope.block.disposed)
 						element.addEventListener('input', input);
@@ -1154,7 +1154,7 @@ function syncSignalHostControl(binding: SignalHostPropSourcesBinding): void {
 	};
 	binding.input = input;
 	element.addEventListener('input', input);
-	if (TRANSITION_JOURNAL !== null) journalUndo(() => element.removeEventListener('input', input));
+	if (TRANSITION_JOURNAL) journalUndo(() => element.removeEventListener('input', input));
 }
 
 function disposeSignalHostPropSources(binding: SignalHostPropSourcesBinding): void {
@@ -1352,7 +1352,7 @@ export function bindSignalHostPropSources(
 	} else {
 		// The resolved props must roll back with the DOM; otherwise a retry
 		// mistakes discarded event/control writes for already committed values.
-		if (TRANSITION_JOURNAL !== null) journalObjectOnce(binding);
+		if (TRANSITION_JOURNAL) journalObjectOnce(binding);
 		binding.sources = sources;
 	}
 	const valueControl = winningSignalHostControl(sources, 'value');
@@ -1562,7 +1562,7 @@ function bindSignalChildWith(
 			cachedText,
 		);
 		if (prior !== null) {
-			if (TRANSITION_JOURNAL !== null) journalBag();
+			if (TRANSITION_JOURNAL) journalBag();
 			const finish = (discarded: boolean): void => {
 				if (!discarded) disposeDirectSignalChild(prior);
 			};
@@ -1586,7 +1586,7 @@ function bindSignalChildWith(
 	}
 	if (prior !== null && !prior.disposed && prior.handle === value) {
 		const next = readSignalBinding(value);
-		if (TRANSITION_JOURNAL !== null) journalObjectOnce(prior);
+		if (TRANSITION_JOURNAL) journalObjectOnce(prior);
 		const text = render(
 			parentScope,
 			slotKey,
@@ -1619,7 +1619,7 @@ function bindSignalChildWith(
 		bindingMarker,
 		cachedText,
 	);
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	const binding: DirectSignalChildBinding = {
 		[DIRECT_SIGNAL_CHILD]: true,
 		scope: parentScope,

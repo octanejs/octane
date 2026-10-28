@@ -43,7 +43,7 @@ import {
 	mergeClass,
 } from '../css.js';
 import type { Scope, Block, SlotNext, HostPropSource } from './types.js';
-import { queueRefAttach } from './drivers.js';
+import { queueRefAttach, TRANSITION_JOURNAL, TRANSITION_JOURNAL_DEPTH } from './drivers.js';
 import { queueRefDetach, attachRef } from './refs.js';
 import { VIEW_TRANSITION_DRIVER, journalRootProperty, reportEffectError } from './engine.js';
 import { HYDRATION_PASS, CURSOR } from './hydration.js';
@@ -51,8 +51,6 @@ import { hiddenTextWriter, hiddenStyleWriter } from './suspense.js';
 import {
 	CURRENT_SCOPE,
 	CURRENT_BLOCK,
-	TRANSITION_JOURNAL,
-	TRANSITION_JOURNAL_DEPTH,
 	ROOT_RENDER_TRANSACTION,
 	ROOT_DISCARD_STAMP,
 } from './render.js';
@@ -101,7 +99,7 @@ export function updateTextValue(node: Text, value: string): void {
 	if (previous !== value) {
 		// A held window restores the bag that chose this write, not the DOM: a
 		// render writes committed text only through its commit (#2043).
-		if (TRANSITION_JOURNAL !== null) journalBag();
+		if (TRANSITION_JOURNAL) journalBag();
 		node.nodeValue = value;
 	}
 }
@@ -124,7 +122,7 @@ export function setText(node: Text | null, value: any, host?: Node): void {
 	// boundary. The optional driver marks the innermost boundary only during a
 	// wrapped drain.
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.markDirty();
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	//
 	// Write via `nodeValue` (a `Node`-level accessor) rather than `data` (which
 	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
@@ -172,7 +170,7 @@ export function setRenderText(node: Text, value: any): void {
 	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(CURRENT_BLOCK);
 	if (transaction === null) return setText(node, value);
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.markDirty();
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	transaction.ops.push(commitSetText, [node, value]);
 }
 
@@ -791,7 +789,7 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		return;
 	}
 	const ns = attrNamespace(name);
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	if (next === null) {
 		if (ns) {
 			const colon = name.indexOf(':');
@@ -911,7 +909,7 @@ export function setPlainAttribute(el: Element, name: string, value: unknown): vo
 		if (process.env.NODE_ENV !== 'production') unpatchedAttribute(CURSOR, el, name, next);
 		return;
 	}
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, type === 'object' ? trustedOr(value as object, next) : next);
 }
@@ -939,7 +937,7 @@ export function setURLAttribute(el: Element, name: string, value: unknown): void
 		if (process.env.NODE_ENV !== 'production') unpatchedAttribute(CURSOR, el, name, next);
 		return;
 	}
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, type === 'object' ? trustedOr(value as object, next) : next);
 }
@@ -983,7 +981,7 @@ export function setStringData(el: Element, name: string, value: unknown): void {
 		if (process.env.NODE_ENV !== 'production') unpatchedAttribute(CURSOR, el, name, next);
 		return;
 	}
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
 }
@@ -1007,7 +1005,7 @@ export function setBooleanAttribute(el: Element, name: string, value: unknown): 
 		if (process.env.NODE_ENV !== 'production') unpatchedAttribute(CURSOR, el, name, next);
 		return;
 	}
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
 }
@@ -1034,7 +1032,7 @@ export function setAriaAttribute(el: Element, name: string, value: unknown): voi
 		if (process.env.NODE_ENV !== 'production') unpatchedAttribute(CURSOR, el, name, next);
 		return;
 	}
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	if (next === null) el.removeAttribute(name);
 	else el.setAttribute(name, next);
 }
@@ -1233,7 +1231,7 @@ export function setClassName(el: Element, value: unknown, foreign?: boolean): vo
 	// erases the null-vs-'' difference, so the check must be on `value`.
 	// A host of a Block the root attempt discards needs no undo (setEventHandler).
 	if (
-		TRANSITION_JOURNAL !== null &&
+		TRANSITION_JOURNAL &&
 		(foreign === true ||
 			TRANSITION_JOURNAL_DEPTH !== 1 ||
 			CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP)
@@ -1255,7 +1253,7 @@ export function setClassAttr(el: Element, value: unknown): void {
 		if (process.env.NODE_ENV !== 'production') unpatchedClass(CURSOR, el, cls, false);
 		return;
 	}
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	if (cls === null) el.removeAttribute('class');
 	else el.setAttribute('class', cls);
 }
@@ -1299,7 +1297,7 @@ export function setStyle(el: HTMLElement | SVGElement, value: any, prev: any): v
 	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, prev)) return;
 	// A render writes only fresh DOM here (setRenderStyle stages the rest), so a
 	// held window restores the bag that chose the write.
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	applyStyleValue(el, style, value, prev);
 }
 
@@ -1329,7 +1327,7 @@ export function setStyleProperty(
 	// A commit function passes the rendering scope it recorded.
 	if (remove && previous === scope) return;
 	if (hiddenStyleWriter !== null && hiddenStyleWriter(el, value, previous, name)) return;
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	const style = (el as HTMLElement).style;
 	if (remove) style.removeProperty(styleName(name));
 	else applyStyleProperty(el, style, name, value);
@@ -1346,7 +1344,7 @@ export function setRenderStyle(el: HTMLElement | SVGElement, value: any, prev: a
 	const transaction =
 		prev === undefined || ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(CURRENT_BLOCK);
 	if (transaction === null) return setStyle(el, value, prev);
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	transaction.ops.push(commitStyle, [el, value, prev, CURRENT_SCOPE!]);
 }
 
@@ -1360,7 +1358,7 @@ export function setRenderStyleProperty(
 ): void {
 	const transaction = ROOT_RENDER_TRANSACTION === null ? null : pendingWrites(CURRENT_BLOCK);
 	if (transaction === null) return setStyleProperty(el, name, value, staticCss, previous);
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	transaction.ops.push(commitStyle, [el, value, previous, CURRENT_SCOPE!, name, staticCss]);
 }
 
@@ -1398,7 +1396,7 @@ export function setStyleProperties(
 		return;
 	}
 	const style = (el as HTMLElement).style;
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	for (let i = 0; i < entries.length; i += 2) {
 		const value = entries[i + 1];
 		// No dynamic declaration exists yet. Removing a null or boolean value
@@ -1541,7 +1539,7 @@ function expectedStyle(
 // `state.ref`) — see the call sites.
 export function removeHostProp(el: Element, name: string, prevValue?: unknown): void {
 	if (name === 'class' || name === 'className') {
-		if (TRANSITION_JOURNAL !== null) journalBag();
+		if (TRANSITION_JOURNAL) journalBag();
 		el.removeAttribute('class');
 	} else if (name === 'style') {
 		setStyle(el as HTMLElement, null, prevValue);
@@ -1920,7 +1918,7 @@ function setHostPropClassAttr(el: Element, value: unknown, prevValue: unknown): 
 		if (process.env.NODE_ENV !== 'production') unpatchedClass(CURSOR, el, cls, false);
 		return;
 	}
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	// Compare the DOM only when the authored class could already match. Changed
 	// values need a write, while a staged write must reassert its value at publish.
 	// Reuse the previous snapshot's normalized result; its class object may contain

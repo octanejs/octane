@@ -37,6 +37,7 @@ import {
 	enableHostDescriptors,
 	enableElementDescriptors,
 } from './drivers.js';
+import { ROOT_ROLLBACK } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -831,8 +832,9 @@ function cloneAndReplaceElementKey(element: ElementDescriptor, key: string): Ele
 function resolveChildrenThenable(thenable: TrackedThenable): any {
 	// During a component render, use the same tracked call-order storage and
 	// Suspense sentinel as use(). This lets a cached promise in Children.map
-	// suspend and replay through the nearest Octane boundary.
-	if (CURRENT_BLOCK !== null) return useThenable(thenable);
+	// suspend and replay through the nearest Octane boundary. Without an entry
+	// that can suspend, a pending one is thrown as a render error.
+	if (ROOT_ROLLBACK && CURRENT_BLOCK !== null) return useThenable(thenable);
 	trackThenable(thenable);
 	if (thenable.status === 'fulfilled') return thenable.value;
 	if (thenable.status === 'rejected') throw thenable.reason;
