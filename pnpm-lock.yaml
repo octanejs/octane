@@ -1416,7 +1416,9 @@ overrides:
 packageExtensionsChecksum: sha256-XN5zp/IiFh7oL3uoVIj9kQwS10aRIZS77YifBp5DLNo=
 
 patchedDependencies:
+  '@sveltejs/acorn-typescript@1.0.13': fe96849d048ea45c6910b18b5d7344ab5b6fe50b3ece6f27144eb95578bcbff5
   '@tsrx/core@0.5.5': b9b1f2568e7fe143ba6e6fef41c3891e3d032e88af72d8f6ae1c745eb5dd8f50
+  '@tsrx/oxc@0.23.0': d7d900fb526a332617bf9816090271082f8175fc0ee483c999f6f5f7d41d88e9
   '@vitest/browser-playwright@4.1.10': 1957634122dfa6f4790b66e73a42343637af36d3fb182eb25e07fa261dbc27dd
   '@vitest/browser@4.1.10': d32609637593fc211ed808df6fbea6cb1da80adb049c0b0752bda8e1586d0ae0
   '@vitest/mocker@4.1.10': 538740e541a5a8ef50611b521995775cac3031548f696745eb4b90a7bd659ca4
@@ -7389,7 +7391,7 @@ importers:
     devDependencies:
       '@tsrx/oxc':
         specifier: catalog:default
-        version: 0.23.0(svelte@5.57.2)
+        version: 0.23.0(patch_hash=d7d900fb526a332617bf9816090271082f8175fc0ee483c999f6f5f7d41d88e9)(svelte@5.57.2)
       '@tsrx/react':
         specifier: catalog:default
         version: 0.4.5(react@19.2.7)
@@ -47013,7 +47015,7 @@ snapshots:
       invariant: 2.2.4
       styleq: 0.2.1
 
-  '@sveltejs/acorn-typescript@1.0.13(acorn@8.18.0)':
+  '@sveltejs/acorn-typescript@1.0.13(patch_hash=fe96849d048ea45c6910b18b5d7344ab5b6fe50b3ece6f27144eb95578bcbff5)(acorn@8.18.0)':
     dependencies:
       acorn: 8.18.0
 
@@ -48765,7 +48767,7 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
       '@noble/hashes': 2.2.0
-      '@sveltejs/acorn-typescript': 1.0.13(acorn@8.18.0)
+      '@sveltejs/acorn-typescript': 1.0.13(patch_hash=fe96849d048ea45c6910b18b5d7344ab5b6fe50b3ece6f27144eb95578bcbff5)(acorn@8.18.0)
       '@tsrx/runtime': 0.2.0
       '@types/estree': 1.0.9
       '@types/estree-jsx': 1.0.5
@@ -48781,7 +48783,7 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
       '@noble/hashes': 2.2.0
-      '@sveltejs/acorn-typescript': 1.0.13(acorn@8.18.0)
+      '@sveltejs/acorn-typescript': 1.0.13(patch_hash=fe96849d048ea45c6910b18b5d7344ab5b6fe50b3ece6f27144eb95578bcbff5)(acorn@8.18.0)
       '@tsrx/runtime': 0.2.4
       '@types/estree': 1.0.9
       '@types/estree-jsx': 1.0.5
@@ -48817,7 +48819,7 @@ snapshots:
   '@tsrx/oxc-win32-x64-msvc@0.23.0':
     optional: true
 
-  '@tsrx/oxc@0.23.0(svelte@5.57.2)':
+  '@tsrx/oxc@0.23.0(patch_hash=d7d900fb526a332617bf9816090271082f8175fc0ee483c999f6f5f7d41d88e9)(svelte@5.57.2)':
     dependencies:
       '@oxc-project/types': 0.150.0
       oxfmt-current: oxfmt@0.68.0(svelte@5.57.2)
@@ -64970,7 +64972,7 @@ snapshots:
     dependencies:
       '@jridgewell/remapping': 2.3.5
       '@jridgewell/sourcemap-codec': 1.6.0
-      '@sveltejs/acorn-typescript': 1.0.13(acorn@8.18.0)
+      '@sveltejs/acorn-typescript': 1.0.13(patch_hash=fe96849d048ea45c6910b18b5d7344ab5b6fe50b3ece6f27144eb95578bcbff5)(acorn@8.18.0)
       '@types/estree': 1.0.9
       acorn: 8.18.0
       aria-query: 5.3.1

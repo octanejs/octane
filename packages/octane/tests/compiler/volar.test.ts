@@ -1171,6 +1171,62 @@ export function App(props: { name: string; link?: { title: string } }) @{
 		}
 	});
 
+	it('leaves conflicts with a type-only import to the type checker', () => {
+		// Parsing accepts a value declaration named like a type-only import; the
+		// type checker still rejects value use and duplicate imports.
+		const sources = {
+			'Toc.tsrx': `import type { Toc } from './types';
+export function Toc({ headings }: { headings: Toc }) @{ <nav>{headings[0].text}</nav> }
+`,
+			'Value.tsrx': `import type { Store } from './types';
+export const store = new Store();
+`,
+			'Duplicate.tsrx': `import { Store } from './types';
+import type { Store } from './types';
+export function App() @{ <p /> }
+`,
+		};
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-type-import-'));
+		try {
+			mkdirSync(join(root, 'node_modules'));
+			symlinkSync(
+				fileURLToPath(new URL('../..', import.meta.url)),
+				join(root, 'node_modules/octane'),
+				'dir',
+			);
+			writeFileSync(
+				join(root, 'types.ts'),
+				'export type Toc = { text: string }[];\nexport class Store {}\n',
+			);
+			const files = Object.entries(sources).map(([name, source]) => {
+				const result = compileToVolarMappings(source, name);
+				expect(result.errors).toEqual([]);
+				const file = join(root, name.replace(/\.tsrx$/, '.tsx'));
+				writeFileSync(file, result.code);
+				return file;
+			});
+			const program = ts.createProgram({
+				rootNames: files,
+				options: {
+					jsx: ts.JsxEmit.Preserve,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					noEmit: true,
+					strict: true,
+					target: ts.ScriptTarget.ESNext,
+					types: [],
+				},
+			});
+			const codes = files.map((file) =>
+				program.getSemanticDiagnostics(program.getSourceFile(file)!).map(({ code }) => code),
+			);
+			// 1361: imported using 'import type'. 2300: duplicate identifier.
+			expect(codes).toEqual([[], [1361], [2300, 2300]]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	}, 15_000);
+
 	it.each([false, true])('maps dynamic style content as host props (Strong: %s)', (strong) => {
 		const source = readFileSync(
 			new URL('../_fixtures/dynamic-style-content.tsrx', import.meta.url),

@@ -1,0 +1,37 @@
+diff --git a/index.js b/index.js
+index fe6763f19ad149d169986bbd4f0c8ff218106962..95c55dcc4b174d850f97654832ac6c558ce250a6 100644
+--- a/index.js
++++ b/index.js
+@@ -5484,7 +5484,10 @@ function tsPlugin(options) {
+           node[rightOfAsKey] = this.copyNode(node[leftOfAsKey]);
+         }
+         if (isImport) {
+-          this.checkLValSimple(node[rightOfAsKey], acornScope.BIND_LEXICAL);
++          this.checkLValSimple(
++            node[rightOfAsKey],
++            hasTypeSpecifier ? acornScope.BIND_FLAGS_TS_IMPORT : acornScope.BIND_LEXICAL
++          );
+         }
+       }
+       raiseCommonCheck(pos, message, recoverable) {
+@@ -5583,11 +5586,19 @@ function tsPlugin(options) {
+         }
+       }
+       declareName(name, bindingType, pos) {
++        // Every name `import type …` binds arrives here as lexical, including
++        // acorn's own specifiers and the alias of `import type A = require()`.
++        if (bindingType === acornScope.BIND_LEXICAL && this.importOrExportOuterKind === "type") {
++          bindingType = acornScope.BIND_FLAGS_TS_IMPORT;
++        }
++        // A type-only import binds no value, so only another type-only import of
++        // the name clashes here. The type checker reports its other conflicts.
+         if (bindingType & acornScope.BIND_FLAGS_TS_IMPORT) {
+           if (this.hasImport(name, true)) {
+-            this.raise(pos, `Identifier '${name}' has already been declared.`);
++            this.raiseRecoverable(pos, `Identifier '${name}' has already been declared`);
+           }
+           this.parseEffects.append(this.importsStack[this.importsStack.length - 1], name);
++          this.maybeExportDefined(this.currentScope(), name);
+           return;
+         }
+         const scope = this.currentScope();
