@@ -1,5 +1,31 @@
 # octane
 
+## 0.16.3
+
+### Patch Changes
+
+- 53f17bf: Ship less client runtime in applications that never use effects, refs, Effect Events, Activity, Suspense hides, controlled selects, transitions, signals or hydration. Their commit phases, offscreen capture transfer, renderer signal-owner bookkeeping, event authority and native-read batches now install from the APIs that create that work. The js-framework benchmark ships about 2.2 KB less gzip and chat-stream about 2.1 KB less, with the same render work.
+- 68b56c6: Drop element-descriptor handling from renderable holes and child lists in applications that never build an element value. Without an element factory, `childSlot` and the keyed child list keep no component-descriptor, Fragment, keyed-element or host-descriptor code. Strong-mode and pure `.tsrx` apps whose holes hold text therefore ship less runtime. Applications without holes also drop the descriptor classification helpers, and the destination-namespace lookup that only opaque templates need.
+- ba9c3a8: Applications that build host element descriptors ship a slightly smaller host
+  renderer. Its entry points are now separate bindings rather than fields of one
+  driver object, so a minifier can shorten their names.
+- 669b318: Avoid retrying a hidden, compiler-split `Hydrate` child on parent updates while its first module is still loading. The child reveals with the latest props when the module settles.
+- 8f5d432: Ship render rollback and suspension only with the entries that can drop a
+  render.
+
+  Every root render used to record an undo journal so the render could be rolled
+  back, and every bundle shipped suspension handling. Now `use`, `lazy`,
+  `Suspense`, `@try`, `Hydrate`, hydration, native signal reads, `ViewTransition`
+  and renderer regions install them as they load. An application that uses none
+  of them neither ships nor runs either: an uncaught error, an unmount or a
+  failed root replacement still tears its root down, and `ErrorBoundary` still
+  catches errors, all without a journal. The js-framework benchmark app shrinks
+  from 28.6 to 26.0 kB gzip, and chat-stream from 32.7 to 30.0 kB.
+
+  In such a bundle a thenable thrown during render, or rendered as a child, is an
+  ordinary render error, since nothing could hold the screen while it waits.
+  React suspends on it.
+
 ## 0.16.2
 
 ### Patch Changes
