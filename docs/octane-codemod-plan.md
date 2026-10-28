@@ -62,12 +62,12 @@ compiled:
 | App | Commit | Modules | Migrated | `.tsrx` | Compile errors | Strong |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | TodoMVC React (`tastejs/todomvc`) | `ff43b02e59df` | 12 | 7 | 6 | 0 | 6/6 |
-| bulletproof-react (`apps/react-vite`) | `9506629ed003` | 139 | 110 | 60 | 0 | 56/60 |
+| bulletproof-react (`apps/react-vite`) | `9506629ed003` | 133 | 109 | 60 | 0 | 56/60 |
 | react.dev `src/` | `0821e7d9428a` | 123 | 107 | 91 | 1 | 66/91 |
 | TanStack Query React examples | `e423d30ae010` | 186 | 126 | 81 | 1 | 69/81 |
 | Excalidraw components | `e7b534668a60` | 236 | 200 | 160 | 0 | 108/160 |
 | Excalidraw app | `e7b534668a60` | 43 | 25 | 16 | 0 | 10/16 |
-| **Total** | | **739** | **575** | **414** | **2** | **315/414 (76%)** |
+| **Total** | | **733** | **574** | **414** | **2** | **315/414 (76%)** |
 
 Both compile errors are one Octane defect, not a codemod one: a `.tsrx` module
 rejects `import type { Toc }` beside `function Toc` with TS2300, which `.tsx`
@@ -218,7 +218,7 @@ fixtures, the HN behavior lane, and zero compile errors on supported patterns.
 
 | Milestone | Contents | Exit criteria |
 | --- | --- | --- |
-| M0 (done) | Prototype, rules above, Strong fixpoint, corpus run | 575 modules, 2 compile errors (Octane defect), 76% Strong |
+| M0 (done) | Prototype, rules above, Strong fixpoint, corpus run | 574 modules, 2 compile errors (Octane defect), 76% Strong |
 | M1 (in progress) | Workstream 1 (done), HN lane (done), `@tsrx/core` TS2300 fix (separate session), first publish as `0.1.0` | 0 compile errors on corpus (2 left, both TS2300); HN spec green on migrated output (done: 10/10 journeys); idempotent (done) |
 | M2 | Workstream 2 (types) | HN output matches the hand-written twin's holes and `@if`s; measured text-binding gain |
 | M3 | Workstreams 3 + 4 | Error boundaries and simple classes convert; radix adapter; `octane migrate`; bulletproof-react tests pass after migration |

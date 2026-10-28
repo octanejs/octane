@@ -307,6 +307,17 @@ function usesOwnThis(node) {
 }
 
 /**
+ * The children of an element that are more than layout whitespace.
+ *
+ * @param {ts.JsxElement | ts.JsxFragment} node
+ */
+function contentOf(node) {
+	return node.children.filter(
+		(child) => !(ts.isJsxText(child) && child.containsOnlyTriviaWhiteSpaces),
+	);
+}
+
+/**
  * A comment's text without its delimiters, to wrap as a JSX comment.
  *
  * @param {string} comment
@@ -376,7 +387,7 @@ class ModuleTransform {
 		if (this.template)
 			code = code.replace(/^\/\*\*\s*@jsxImportSource\s+\S+\s*\*\/[ \t]*\r?\n/m, '');
 		if (this.strong && this.template) code = this.addStrongDirective(code);
-		if (!this.template && this.fromReact && this.hasJsx && this.isJsxSourceFile()) {
+		if (!this.template && this.fromReact && this.hasJsx && /\.(?:[jt]sx|js)$/.test(this.filename)) {
 			code = this.addJsxPragma(code);
 		}
 		return {
@@ -435,10 +446,6 @@ class ModuleTransform {
 			}
 		}
 		return { contexts: [...exported], reexports };
-	}
-
-	isJsxSourceFile() {
-		return /\.(tsx|jsx|js)$/.test(this.filename);
 	}
 
 	// ---------------------------------------------------------------- analysis
@@ -883,9 +890,7 @@ class ModuleTransform {
 		const namespace = this.importOf(node.expression);
 		if (namespace?.namespace && namespace.module in REACT_MODULES) {
 			const name = node.name.text;
-			const mapped =
-				mapReactImport(namespace.module, name, false) ??
-				mapReactImport(namespace.module, name, true);
+			const mapped = mapReactImport(namespace.module, name, false);
 			if (!mapped) {
 				this.used.add(namespace.local);
 				this.note(
@@ -1195,14 +1200,8 @@ class ModuleTransform {
 			return true;
 		const attribute = this.handlerAttribute(found.fn);
 		if (!attribute || !/^on(Change|Input)/.test(attribute.name.getText(this.sf))) return false;
-		const tag = this.tagOf(attribute);
+		const tag = attribute.parent.parent.tagName.getText(this.sf);
 		return tag === 'input' || tag === 'textarea' || tag === 'select';
-	}
-
-	/** @param {ts.JsxAttribute} attribute */
-	tagOf(attribute) {
-		const element = attribute.parent.parent;
-		return element.tagName.getText(this.sf);
 	}
 
 	/** @param {ts.ClassDeclaration | ts.ClassExpression} node */
@@ -1398,9 +1397,7 @@ class ModuleTransform {
 	 * @param {Context} ctx
 	 */
 	emitChildren(node, ctx) {
-		const children = node.children.filter(
-			(child) => !(ts.isJsxText(child) && child.containsOnlyTriviaWhiteSpaces),
-		);
+		const children = contentOf(node);
 		if (children.length === 1 && isJsx(children[0])) return this.emit(children[0], ctx);
 		const first = node.children[0];
 		const last = node.children[node.children.length - 1];
@@ -1437,9 +1434,7 @@ class ModuleTransform {
 	 */
 	rewriteConsumer(node, ctx) {
 		const tag = /** @type {ts.PropertyAccessExpression} */ (node.openingElement.tagName);
-		const children = node.children.filter(
-			(child) => !(ts.isJsxText(child) && child.containsOnlyTriviaWhiteSpaces),
-		);
+		const children = contentOf(node);
 		const render =
 			children.length === 1 && ts.isJsxExpression(children[0]) ? children[0].expression : null;
 		const fn = render && skipParens(render);
@@ -1551,12 +1546,20 @@ class ModuleTransform {
 		return `${head} {\n${lines.join('\n')}\n}`;
 	}
 
+	/**
+	 * The text before `node` on its line.
+	 *
+	 * @param {ts.Node} node
+	 */
+	linePrefix(node) {
+		const start = node.getStart(this.sf);
+		return this.source.slice(this.source.lastIndexOf('\n', start - 1) + 1, start);
+	}
+
 	/** @param {ts.Node} node */
 	indentOf(node) {
-		const start = node.getStart(this.sf);
-		const lineStart = this.source.lastIndexOf('\n', start - 1) + 1;
-		const line = this.source.slice(lineStart, start);
-		return line.slice(0, line.length - line.trimStart().length);
+		const prefix = this.linePrefix(node);
+		return prefix.slice(0, prefix.length - prefix.trimStart().length);
 	}
 
 	/**
@@ -1800,24 +1803,13 @@ class ModuleTransform {
 	 * @param {ts.Statement[]} statements
 	 */
 	readsLocals(expression, statements) {
-		const declared = new Set();
-		const collect = (/** @type {ts.BindingName} */ name) => {
-			if (ts.isIdentifier(name)) declared.add(name.text);
-			else
-				for (const element of name.elements)
-					if (!ts.isOmittedExpression(element)) collect(element.name);
-		};
-		for (const statement of statements) {
-			if (!ts.isVariableStatement(statement)) continue;
-			for (const declaration of statement.declarationList.declarations) collect(declaration.name);
-		}
-		let reads = false;
-		const visit = (/** @type {ts.Node} */ node) => {
-			if (ts.isIdentifier(node) && declared.has(node.text)) reads = true;
-			node.forEachChild(visit);
-		};
-		visit(expression);
-		return reads;
+		const declared = new Set(
+			statements
+				.filter(ts.isVariableStatement)
+				.flatMap((statement) => statement.declarationList.declarations)
+				.flatMap((declaration) => bindingNames(declaration.name)),
+		);
+		return reads(expression, (name) => declared.has(name));
 	}
 
 	// ---------------------------------------------------------------- components
@@ -1907,9 +1899,7 @@ class ModuleTransform {
 
 	/** @param {ts.Node} node */
 	startsLine(node) {
-		const start = node.getStart(this.sf);
-		const lineStart = this.source.lastIndexOf('\n', start - 1) + 1;
-		return this.source.slice(lineStart, start).trim() === '';
+		return this.linePrefix(node).trim() === '';
 	}
 
 	/**

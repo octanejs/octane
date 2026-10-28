@@ -105,6 +105,19 @@ describe('runCodemod', () => {
 		expect(app).toContain('<Tooltip.Provider />');
 	});
 
+	it('reports a module the compiler rejects as an error, not a Strong blocker', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			// React warns about a textarea with both `value` and children; Octane
+			// rejects it in every mode.
+			'src/Note.tsx':
+				'export function Note({ v }: { v: string }) {\n\treturn <textarea value={v}>text</textarea>;\n}\n',
+		});
+		const [file] = (await runCodemod([root], { write: false, strong: true })).files;
+		expect(file.strong).toBe(false);
+		expect(file.diagnostics.map((d) => `${d.severity} ${d.code}`)).toEqual(['error COMPILE_ERROR']);
+	});
+
 	it('writes nothing in a dry run', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',

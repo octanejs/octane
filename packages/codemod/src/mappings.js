@@ -183,12 +183,10 @@ export function mapReactImport(module, name, typeOnly) {
 	if (module === 'react-dom/server' || module.startsWith('react-dom/server.')) {
 		return OCTANE_SERVER_VALUES.has(name) ? { module: 'octane/server', name } : null;
 	}
-	if (typeOnly || !OCTANE_VALUES.has(name)) {
-		if (OCTANE_TYPES.has(name)) return { module: 'octane', name };
-		if (name in RENAMED_TYPES) return { module: 'octane', name: RENAMED_TYPES[name] };
-		if (typeOnly) return null;
-	}
-	return OCTANE_VALUES.has(name) ? { module: 'octane', name } : null;
+	if (!typeOnly && OCTANE_VALUES.has(name)) return { module: 'octane', name };
+	if (OCTANE_TYPES.has(name)) return { module: 'octane', name };
+	if (name in RENAMED_TYPES) return { module: 'octane', name: RENAMED_TYPES[name] };
+	return null;
 }
 
 /**

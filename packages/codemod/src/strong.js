@@ -1,8 +1,9 @@
 import { applyFixes, pruneImports } from '@octanejs/cli/fix';
+import { finding, thrown } from './compiler.js';
 
 /**
  * @typedef {import('./compiler.js').Compiler} Compiler
- * @typedef {{ code: string, severity: string, message: string, line: number }} Finding
+ * @typedef {import('./compiler.js').Finding} Finding
  *
  * @typedef {Object} StrongResult
  * @property {string} code the module after every fix the compiler allowed
@@ -43,7 +44,10 @@ export function strengthen(compiler, code, filename, { force = false } = {}) {
 	for (let round = 0; round < MAX_ROUNDS; round++) {
 		const result = compiler.collectDiagnostics(code, filename, { strong: true });
 		if (result.error != null) {
-			return fallback(code, [thrown(result.error)], fixed, force);
+			// A module that compatibility mode cannot compile either has no
+			// Strong blocker to report; the compile failure is its own error.
+			const compat = compiler.collectDiagnostics(code.replace(DIRECTIVE, '$1'), filename, {});
+			return fallback(code, compat.error == null ? [thrown(result.error)] : [], fixed, force);
 		}
 		diagnostics = result.diagnostics;
 		const fixes = diagnostics.flatMap((diagnostic) => fixesFor(code, diagnostic));
@@ -53,9 +57,7 @@ export function strengthen(compiler, code, filename, { force = false } = {}) {
 		code = pruneImports(text);
 		for (const fix of applied) fixed.push(fix.code);
 	}
-	const blockers = diagnostics
-		.filter((diagnostic) => diagnostic.severity === 'error')
-		.map((diagnostic) => finding(diagnostic));
+	const blockers = diagnostics.filter((diagnostic) => diagnostic.severity === 'error').map(finding);
 	if (blockers.length === 0) return { code, strong: true, fixed, blockers };
 	return fallback(code, blockers, fixed, force);
 }
@@ -73,29 +75,6 @@ function fallback(code, blockers, fixed, force) {
 	// left, not a failure.
 	const kept = blockers.map((blocker) => ({ ...blocker, severity: 'warning' }));
 	return { code: code.replace(DIRECTIVE, '$1'), strong: false, fixed, blockers: kept };
-}
-
-/**
- * @param {any} diagnostic
- * @returns {Finding}
- */
-function finding(diagnostic) {
-	return {
-		code: diagnostic.code,
-		severity: diagnostic.severity,
-		message: String(diagnostic.message).replace(`[${diagnostic.code}] `, ''),
-		line: diagnostic.start?.line ?? 1,
-	};
-}
-
-/** @param {any} error */
-function thrown(error) {
-	return {
-		code: error?.code ?? 'COMPILE_ERROR',
-		severity: 'error',
-		message: String(error?.message ?? error),
-		line: error?.loc?.line ?? 1,
-	};
 }
 
 /**

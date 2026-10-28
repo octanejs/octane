@@ -1,8 +1,9 @@
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { findRoot, scanSourceFiles } from '@octanejs/cli';
 import { DATA } from '@octanejs/cli/data';
-import { loadCompiler } from './compiler.js';
+import { finding, loadCompiler, thrown } from './compiler.js';
 import { strengthen } from './strong.js';
 import { transformModule } from './transform.js';
 
@@ -46,19 +47,6 @@ import { transformModule } from './transform.js';
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
 /** A package that, by its name, renders through React. */
 const REACT_PACKAGE = /^(?:react-|@[^/]+\/react(?:-|\/|$)|[^/]+\/react$)|-react(?:\/|$)/;
-const IGNORED_DIRECTORIES = new Set([
-	'node_modules',
-	'.git',
-	'dist',
-	'build',
-	'out',
-	'coverage',
-	'.next',
-	'.turbo',
-	'.cache',
-	'.vercel',
-	'.output',
-]);
 
 /**
  * Migrate every React module under `paths`.
@@ -74,7 +62,7 @@ const IGNORED_DIRECTORIES = new Set([
 export async function runCodemod(paths, options = {}) {
 	const target = options.target ?? 'tsrx';
 	const strong = options.strong === true && target === 'tsrx';
-	const root = path.resolve(options.root ?? findRoot(path.resolve(paths[0] ?? '.')));
+	const root = path.resolve(options.root ?? findRoot(paths[0] ?? '.'));
 	const files = paths.flatMap((entry) => collect(path.resolve(entry)));
 
 	const known = new Set(files);
@@ -202,29 +190,11 @@ function isCompiled(file, code) {
 function compile(compiler, code, file, strong) {
 	try {
 		const result = compiler.collectDiagnostics(code, file, strong ? { strong: true } : {});
-		const found = result.diagnostics
-			.filter((/** @type {any} */ d) => d.severity !== 'hint')
-			.map((/** @type {any} */ d) => ({
-				code: d.code,
-				severity: d.severity,
-				message: String(d.message).replace(`[${d.code}] `, ''),
-				line: d.start?.line ?? 1,
-			}));
-		if (result.error != null) found.push(thrown(result.error));
-		return found;
+		const found = result.diagnostics.filter((d) => d.severity !== 'hint').map(finding);
+		return result.error == null ? found : [...found, thrown(result.error)];
 	} catch (error) {
 		return [thrown(error)];
 	}
-}
-
-/** @param {any} error */
-function thrown(error) {
-	return {
-		code: 'COMPILE_ERROR',
-		severity: 'error',
-		message: String(error?.message ?? error),
-		line: error?.loc?.line ?? 1,
-	};
 }
 
 /** @param {FileResult['diagnostics']} diagnostics */
@@ -238,33 +208,14 @@ function dedupe(diagnostics) {
 	});
 }
 
-/** @param {string} start */
-function findRoot(start) {
-	let dir = fs.existsSync(start) && fs.statSync(start).isFile() ? path.dirname(start) : start;
-	for (let current = dir; ; current = path.dirname(current)) {
-		if (fs.existsSync(path.join(current, 'package.json'))) return current;
-		if (path.dirname(current) === current) return dir;
-	}
-}
-
 /**
+ * The modules under `entry` the codemod migrates.
+ *
  * @param {string} entry
- * @returns {string[]}
  */
 function collect(entry) {
-	const stat = fs.statSync(entry);
-	if (stat.isFile()) return isSource(path.basename(entry)) ? [entry] : [];
-	/** @type {string[]} */
-	const found = [];
-	for (const dirent of fs.readdirSync(entry, { withFileTypes: true })) {
-		if (dirent.isDirectory()) {
-			if (!IGNORED_DIRECTORIES.has(dirent.name))
-				found.push(...collect(path.join(entry, dirent.name)));
-		} else if (isSource(dirent.name)) {
-			found.push(path.join(entry, dirent.name));
-		}
-	}
-	return found.sort();
+	if (fs.statSync(entry).isFile()) return isSource(entry) ? [entry] : [];
+	return scanSourceFiles(entry, { limit: Infinity }).filter(isSource).sort();
 }
 
 /**
