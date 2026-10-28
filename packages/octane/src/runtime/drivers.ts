@@ -153,6 +153,7 @@ import {
 	restoreControlledStates,
 	maybeEnqueueRestore,
 } from './forms.js';
+import { installRootRollback } from '../rollback-flag.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -180,7 +181,7 @@ export let SCHEDULED_VISIBILITY_DRIVER: ScheduledVisibilityDriver | null = null;
 // while its DOM writes wait for the commit (#2043), so only a feature that can
 // drop a render needs those updates undone: Suspense and use(), lazy,
 // hydration, native-read validation and ViewTransition holds. Each installs
-// the journal before its first render (installRootRollback). Without one,
+// the journal before its first render (rollback-flag.ts). Without one,
 // nothing assigns the state below, so every journal write folds away, and a
 // render ends in its commit or in its root's teardown: an uncaught error or an
 // unmount, which needs nothing undone (rollbackRootRender).
@@ -201,11 +202,6 @@ const TRANSITION_JOURNAL_WINDOWS: number[] = [];
 const TRANSITION_JOURNAL_BAG_WINDOWS: number[] = [];
 /** A rollback is replaying the journal: what it undoes journals and queues nothing. */
 export let ROOT_RENDER_ROLLBACK = false;
-export let ROOT_ROLLBACK = false;
-export function installRootRollback(): void {
-	ROOT_ROLLBACK = true;
-}
-
 /** The windows root render frames interrupted, six slots each; frames nest. */
 const ROOT_JOURNAL_FRAMES: any[] = [];
 

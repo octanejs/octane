@@ -35,7 +35,6 @@ import {
 	MEMO_BAIL,
 	HOST_DESCRIPTORS,
 	ROOT_RENDER_ROLLBACK,
-	ROOT_ROLLBACK,
 } from './drivers.js';
 import {
 	type SignalInstanceKey,
@@ -114,6 +113,7 @@ import {
 	journalBag,
 } from './commit.js';
 import { getFirstChild, getNextSibling, rejectTextareaChild } from './templates.js';
+import { ROOT_ROLLBACK } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never

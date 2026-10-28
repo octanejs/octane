@@ -3,7 +3,7 @@
 // Adopting server DOM: the HydrationCapability cursor, server value differences
 // and their diagnostics, the navigation helpers, and mismatch recovery.
 
-import { use, isHostContextRequest } from './context.js';
+import { useImpl, isHostContextRequest } from './context.js';
 import { setHydrating } from '../hydration-flag.js';
 import { domBindingClaims } from '../dom-binding-claims.js';
 import {
@@ -1400,7 +1400,7 @@ export class HydrationCapability {
 			) {
 				return useThenable(usable as TrackedThenable<T>, true);
 			}
-			return use(usable as PromiseLike<T>) as T;
+			return useImpl(usable as PromiseLike<T>) as T;
 		}
 
 		const seed = this.seeds![this.seedCursor++];

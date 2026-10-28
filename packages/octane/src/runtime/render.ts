@@ -113,7 +113,6 @@ import {
 	TRANSITION_JOURNAL,
 	TRANSITION_JOURNAL_DEPTH,
 	ROOT_RENDER_ROLLBACK,
-	ROOT_ROLLBACK,
 	enterRootJournal,
 	exitRootJournal,
 	openJournalWindow,
@@ -277,6 +276,7 @@ import {
 import { getNextSibling, DeferredHydrationSuspension } from './templates.js';
 import type { SubmitDispatchRec } from './actions.js';
 import { type EventSlot, invokeEventSlot, reportListenerError } from './events.js';
+import { ROOT_ROLLBACK } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never

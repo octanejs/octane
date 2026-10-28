@@ -31,7 +31,8 @@ import {
 import { componentSlot } from './component-slots.js';
 import { type FragmentProps, renderActivityDescriptor } from './activity.js';
 import { EMPTY_ARGS } from './events.js';
-import { HOST_DESCRIPTORS, enableHostDescriptors, ROOT_ROLLBACK } from './drivers.js';
+import { HOST_DESCRIPTORS, enableHostDescriptors } from './drivers.js';
+import { ROOT_ROLLBACK } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never

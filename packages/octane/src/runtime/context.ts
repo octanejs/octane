@@ -69,6 +69,7 @@ import {
 	queueRootDeletion,
 } from './commit.js';
 import { getFirstChild, getNextSibling } from './templates.js';
+import { rollbackEntry } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -473,7 +474,7 @@ export interface ForeignHostContext<T> {
  */
 type NotAnElementDescriptor = { $$kind?: never };
 
-export function use<T>(
+export function useImpl<T>(
 	usable:
 		| Context<T>
 		| (PromiseLike<T> & NotAnElementDescriptor)
@@ -497,6 +498,8 @@ export function use<T>(
 	}
 	return useThenable(usable as TrackedThenable<T>);
 }
+
+export const use: typeof useImpl = /* @__PURE__ */ rollbackEntry(useImpl);
 
 // React 19 context objects carry $$typeof: Symbol.for('react.context') — used
 // ONLY to sharpen the out-of-hosted-root diagnostic, never as a read strategy.
@@ -525,9 +528,11 @@ function useForeignContext<T>(usable: unknown, api: string): T {
  * the stored thenable even during resume replay so a sequential A -> B
  * suspension keeps the outer host fallback visible until B settles.
  */
-export function useRendererThenable<T>(thenable: PromiseLike<T>): T {
+function useRendererThenableImpl<T>(thenable: PromiseLike<T>): T {
 	return useThenable(thenable as TrackedThenable<T>, true);
 }
+export const useRendererThenable: typeof useRendererThenableImpl =
+	/* @__PURE__ */ rollbackEntry(useRendererThenableImpl);
 
 /**
  * React's `useContext(Context)` — reads the nearest Provider's value (or the
@@ -586,7 +591,7 @@ export function rendererRegionSuspenseHandler(
  * The bridge is deliberately attached only to the owning DOM root; normal DOM
  * blocks retain no renderer fields or dispatch branches.
  */
-export function bindRendererRegionOwner(props: unknown): void {
+function bindRendererRegionOwnerImpl(props: unknown): void {
 	const bridge = (props as any)?.[RENDERER_REGION_OWNER] as RendererRegionOwnerBridge | undefined;
 	if (bridge === undefined) {
 		throw new Error(formatClientError(19));
@@ -636,6 +641,8 @@ export function bindRendererRegionOwner(props: unknown): void {
 		});
 	}
 }
+export const bindRendererRegionOwner: typeof bindRendererRegionOwnerImpl =
+	/* @__PURE__ */ rollbackEntry(bindRendererRegionOwnerImpl);
 
 // ---------------------------------------------------------------------------
 // Hosted-root control signal (§6.3 HostContextRequest): thrown by an owner

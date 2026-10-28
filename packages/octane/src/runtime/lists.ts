@@ -88,8 +88,8 @@ import {
 	TRANSITION_JOURNAL,
 	TRANSITION_JOURNAL_BAGS,
 	TRANSITION_JOURNAL_CHECKPOINT,
-	ROOT_ROLLBACK,
 } from './drivers.js';
+import { ROOT_ROLLBACK } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never

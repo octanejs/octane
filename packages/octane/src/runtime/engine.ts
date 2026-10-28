@@ -127,9 +127,7 @@ import {
 	TRANSITION_JOURNAL,
 	TRANSITION_JOURNAL_DEPTH,
 	ROOT_RENDER_ROLLBACK,
-	ROOT_ROLLBACK,
 	markRootRenderRollback,
-	installRootRollback,
 } from './drivers.js';
 import {
 	clearSignalRetryOwners,
@@ -360,6 +358,7 @@ import {
 	ACTIVE_SUBMIT_DISPATCH,
 } from './events.js';
 import { hasControlledSyncs } from './forms.js';
+import { ROOT_ROLLBACK, installRootRollback } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -1181,9 +1180,10 @@ export function rollbackRootRender(transaction: RootRenderTransaction): void {
 		__profileRootRolledBack();
 	const previousRollback = ROOT_ROLLBACK ? markRootRenderRollback(true) : false;
 	try {
-		if (ROOT_ROLLBACK) {
+		// A transaction that began before the rollback was installed has no log.
+		const log = transaction.log;
+		if (ROOT_ROLLBACK && log !== null) {
 			const owner = transaction.owner.current;
-			const log = transaction.log!;
 			if (owner !== null) rollbackTransitionJournal(0, owner);
 			else {
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)

@@ -29,7 +29,7 @@ import { build as buildVite, parseAst } from 'vite';
 import { appComponent, clientEntry } from '../../packages/cli/src/commands/init/templates.js';
 import { verifyScenario } from './verify-reachability.mjs';
 import { selectMinimalScenarios } from './minimal-gates.mjs';
-import { RENDER_ROLLBACK_NAMES } from './render-rollback-gates.mjs';
+import { RENDER_ROLLBACK_DECLARATIONS, RENDER_ROLLBACK_NAMES } from './render-rollback-gates.mjs';
 import {
 	exportedNames,
 	isRuntimeModule,
@@ -409,6 +409,7 @@ const splitControls = {
 const declarationSources = {
 	presentDerivedView: 'signals/computations.ts',
 	promoteDeclarationView: 'signals/graph.ts',
+	...Object.fromEntries(RENDER_ROLLBACK_DECLARATIONS.map(({ name, source }) => [name, source])),
 };
 const runtimeRanges = (names) =>
 	resolveDeclarationRanges(

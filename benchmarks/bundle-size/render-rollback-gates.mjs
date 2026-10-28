@@ -1,5 +1,5 @@
 // Render rollback is installed by the runtime entries that can drop a render
-// (installRootRollback in packages/octane/src/runtime/drivers.ts): the root
+// (packages/octane/src/rollback-flag.ts): the root
 // render journal, its replay, and suspension. A client that keeps none of them
 // renders only renders that commit or go with their root's teardown, so it must
 // retain none of these top-level declarations. The oracle is the bundle's
@@ -10,9 +10,7 @@
 // declares the name.
 export const RENDER_ROLLBACK_DECLARATIONS = Object.freeze(
 	[
-		// The capability and the journal state only it writes.
-		'ROOT_ROLLBACK',
-		'installRootRollback',
+		// The journal state only the capability writes.
 		'TRANSITION_JOURNAL',
 		'ROOT_RENDER_ROLLBACK',
 		'enterRootJournal',
@@ -37,7 +35,15 @@ export const RENDER_ROLLBACK_DECLARATIONS = Object.freeze(
 		'SuspenseException',
 		'suspendRootRender',
 		'resumeOnSettle',
-	].map((name) => ({ name, source: 'runtime.ts' })),
+	]
+		.map((name) => ({ name, source: 'runtime.ts' }))
+		// The flag itself, which only those entries set.
+		.concat(
+			['ROOT_ROLLBACK', 'rollbackEntry'].map((name) => ({
+				name,
+				source: 'rollback-flag.ts',
+			})),
+		),
 );
 
 export const RENDER_ROLLBACK_NAMES = Object.freeze(

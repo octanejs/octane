@@ -95,7 +95,7 @@ import {
 	registerSlot,
 	resetHmrBlock,
 } from './block.js';
-import { EFFECT_RECONNECT_CONTEXT, PUBLISH_SUSPENSE_COMMIT, tryBlock } from './suspense.js';
+import { EFFECT_RECONNECT_CONTEXT, PUBLISH_SUSPENSE_COMMIT, tryBlockImpl } from './suspense.js';
 import {
 	CURRENT_SCOPE,
 	CURRENT_BLOCK,
@@ -127,6 +127,7 @@ import {
 	queueRootDeletion,
 } from './commit.js';
 import { getFirstChild, getNextSibling } from './templates.js';
+import { installRootRollback } from '../rollback-flag.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -296,7 +297,7 @@ export function childrenTryBlock(
 		body = descriptorChildrenTryBody;
 		env = [props.children];
 	}
-	return tryBlock(
+	return tryBlockImpl(
 		scope,
 		0,
 		block.parentNode,
@@ -445,6 +446,9 @@ function resolveLazyModule(mod: any): ComponentBody<any> {
 export function lazy<C extends ComponentBody<any>>(
 	load: () => PromiseLike<{ default: C } | C>,
 ): C & { displayName?: string } {
+	// Its component suspends while the module loads. Created at module scope,
+	// it installs the rollback before any render; an unused one is dropped.
+	installRootRollback();
 	let status:
 		'uninitialized' | 'pending' | 'fulfilled' | 'rejected' | 'fulfilled-error' | 'rejected-error' =
 		'uninitialized';

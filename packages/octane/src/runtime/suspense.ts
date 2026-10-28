@@ -66,7 +66,6 @@ import {
 	ROOT_RENDER_ROLLBACK,
 	TRANSITION_JOURNAL,
 	TRANSITION_JOURNAL_BAGS,
-	ROOT_ROLLBACK,
 } from './drivers.js';
 import {
 	handOverSignalRetryScope,
@@ -178,6 +177,7 @@ import {
 	rollbackTransitionJournal,
 } from './commit.js';
 import { getNextSibling } from './templates.js';
+import { ROOT_ROLLBACK, rollbackEntry } from '../rollback-flag.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -201,20 +201,23 @@ export let PUBLISH_SUSPENSE_COMMIT: ((state: TrySlot) => void) | null = null;
 // children as element values (`Octane.JSX.Element`), and the de-opt path
 // renders element descriptors directly.
 export const Suspense: ComponentBody<{ fallback?: unknown; children: unknown }> =
-	/* @__PURE__ */ markComponentFlags<ComponentBody<{ fallback?: unknown; children: unknown }>>(
-		function Suspense(props, scope) {
-			const pendingBody: ComponentBody = (_p, s) => {
-				childSlot(s, 1, s.block.parentNode, props.fallback, s.block.endMarker);
-			};
-			childrenTryBlock(scope, props, null, pendingBody);
-		},
-		COMPONENT_FLAG_BOUNDARY,
-		'Suspense',
-		SUSPENSE_TAG,
+	/* @__PURE__ */ rollbackEntry(
+		/* @__PURE__ */ markComponentFlags<ComponentBody<{ fallback?: unknown; children: unknown }>>(
+			function Suspense(props, scope) {
+				const pendingBody: ComponentBody = (_p, s) => {
+					childSlot(s, 1, s.block.parentNode, props.fallback, s.block.endMarker);
+				};
+				childrenTryBlock(scope, props, null, pendingBody);
+			},
+			COMPONENT_FLAG_BOUNDARY,
+			'Suspense',
+			SUSPENSE_TAG,
+		),
 	);
 
-export const ViewTransition: ComponentBody<ViewTransitionProps> =
-	/* @__PURE__ */ initializeViewTransitionComponent();
+export const ViewTransition: ComponentBody<ViewTransitionProps> = /* @__PURE__ */ rollbackEntry(
+	/* @__PURE__ */ initializeViewTransitionComponent(),
+);
 
 const CATCH_ENTRY = /* @__PURE__ */ Symbol('octane.catch-entry');
 
@@ -1208,7 +1211,7 @@ function switchErrorToCatchInner(state: ErrorSlot, error: any, reportInline: boo
 	mountCatchArm(state, error, reportInline);
 }
 
-export function tryBlock(
+export function tryBlockImpl(
 	parentScope: Scope,
 	slotKey: number,
 	domParent: Node,
@@ -1461,6 +1464,8 @@ export function tryBlock(
 	hydration?.parkPast(s.end, parentScope);
 	return s.reset;
 }
+/** The compiler's @try entry; internal boundaries call tryBlockImpl. */
+export const tryBlock: typeof tryBlockImpl = /* @__PURE__ */ rollbackEntry(tryBlockImpl);
 
 function createTryBody(
 	state: TrySlot,
@@ -3356,7 +3361,7 @@ export function handleRenderError(block: Block, err: any): void {
 		err = new Error(formatClientError(27));
 	}
 	// Only an entry that can suspend creates a SuspenseException, and each
-	// installs the rollback a suspended render needs (installRootRollback).
+	// installs the rollback a suspended render needs (rollbackEntry).
 	if (ROOT_ROLLBACK && isSuspenseException(err)) {
 		let b: Block | null = block;
 		while (b) {
