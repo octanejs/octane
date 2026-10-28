@@ -23,10 +23,15 @@ const app = (name, layer) => `export function ${name}({ active$, load }) @{
 		} @else { <p>idle</p> }
 	</main>
 }`;
+// Leaf reads a module `let`, which no compiler memo proof can witness. That keeps
+// every Leaf, and so every Layer above it, live: the retry must re-render the
+// whole signal-owner tree whose ancestry copying this test bounds, rather than
+// reuse cached subtrees and leave nothing to measure.
 const source = `import { query$ } from 'octane/signals';
 import { useSignal$ } from 'octane/signals/client';
+let leafSuffix = '';
 function Noise({ id, index }) @{ <i data-id={id} data-index={index}></i> }
-function Leaf({ id }) @{ const value$ = useSignal$(id); <button>{String(value$.get())}</button> }
+function Leaf({ id }) @{ const value$ = useSignal$(id); <button>{String(value$.get()) + leafSuffix}</button> }
 ${layers}
 function Data({ load }) @{ const result$ = query$(() => true, load); <output>{String(result$.get())}</output> }
 ${app('Shallow', 48)}

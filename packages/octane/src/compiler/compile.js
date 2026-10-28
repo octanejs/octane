@@ -3814,7 +3814,8 @@ function autoCalculationOf(expression, selfName, componentLocals, ctx, immutable
 		if (
 			!componentLocals.has(name) &&
 			!ctx.moduleFunctionDeclarations?.has(name) &&
-			!ctx.importedNames?.has(name)
+			!ctx.importedNames?.has(name) &&
+			!isConversionGlobal(name, ctx)
 		) {
 			return null;
 		}
@@ -6174,7 +6175,12 @@ function autoMemoCallExecutesSetupHook(call, ctx) {
  * Passing `memoCtx` admits projections under the selected render contract — see
  * `plainCalleeIsMemoizable` for the contract and why callee shapes are
  * classified differently. Callers that need "no call executes here" for a reason
- * other than memo staleness (SSR item identity) omit it and keep every call.
+ * other than memo staleness (SSR item identity) omit it and keep every other call.
+ *
+ * Every caller admits a lexically unbound standard global from
+ * SETUP_PURE_GLOBAL_CALLEES, such as `String(row.id)`. It closes over nothing and
+ * runs no user code beyond the argument coercion that template literals and `+`
+ * already perform. Memo proofs accept the name through isConversionGlobal.
  */
 function containsRenderCall(stmts, memoCtx = null) {
 	let found = false;
@@ -6213,7 +6219,11 @@ function containsRenderCall(stmts, memoCtx = null) {
 			}
 			const assumedPureOperation =
 				memoCtx?.strongMemo === true && (t === 'NewExpression' || t === 'TaggedTemplateExpression');
-			if (assumedPureOperation || (memoCtx !== null && plainCalleeIsMemoizable(n, memoCtx))) {
+			if (
+				assumedPureOperation ||
+				isConversionGlobalCall(n) ||
+				(memoCtx !== null && plainCalleeIsMemoizable(n, memoCtx))
+			) {
 				// Admitting a call never admits the expressions that resolve its
 				// callee or arguments. In compatibility mode `fmt(row.get())` still
 				// fails closed; Strong applies its purity assertion recursively to
@@ -6348,7 +6358,8 @@ const SETUP_SYNC_FACTORY_HOOKS = new Set([
 ]);
 // Standard globals that only project their arguments. A user-defined
 // `toString`/`valueOf`/`toJSON` that schedules a render violates the hook rules
-// in React and Octane alike, so these count as call-free setup.
+// in React and Octane alike, so these count as call-free setup and render work
+// (containsRenderCall).
 const SETUP_PURE_GLOBAL_CALLEES = new Set([
 	'String',
 	'Number',
@@ -6585,7 +6596,8 @@ function isHookCalleeName(name) {
  * member-callee hazard in an identifier, and the inline hook-memo tier can hand
  * it a stable identity, so admitting it would let a skipped body freeze a live
  * accessor result. Unbound globals fail closed for the same reason: nothing
- * witnesses what they close over.
+ * witnesses what they close over. containsRenderCall separately admits the
+ * standard pure globals.
  *
  * `new Foo()` and tagged templates are classified by containsRenderCall rather
  * than this call-only helper. Strong admits them under the same assertion;
@@ -6847,6 +6859,26 @@ function isUnwitnessedAmbientRead(name, ctx) {
 	return !module.all.has(name) && !IMMUTABLE_AMBIENT_GLOBALS.has(name);
 }
 
+/** A standard language global that no top-level module binding shadows. */
+function isImmutableAmbientGlobal(name, ctx) {
+	return IMMUTABLE_AMBIENT_GLOBALS.has(name) && ctx.moduleTopLevelBindings?.all.has(name) === false;
+}
+
+/**
+ * An unshadowed conversion global such as `String`, which containsRenderCall
+ * already admits as a call. Every component, call-site, and calculation memo
+ * proof accepts the name, so `String(value)` is memoizable wherever an imported
+ * helper is.
+ */
+function isConversionGlobal(name, ctx) {
+	return SETUP_PURE_GLOBAL_CALLEES.has(name) && isImmutableAmbientGlobal(name, ctx);
+}
+
+/** A call whose callee lexically resolves to a conversion global, as `String(value)`. */
+function isConversionGlobalCall(node) {
+	return node._octaneUnboundCallee === true && SETUP_PURE_GLOBAL_CALLEES.has(node.callee?.name);
+}
+
 // A component whose synchronous proof reads its props is safe only at JSX
 // edges that construct every read property as an own data field. Missing keys
 // can reach an inherited getter, and `__proto__` changes an object literal's
@@ -6989,6 +7021,11 @@ function classifySameModuleWarmPotential(ctx) {
 				) {
 					// Context reads create nothing a warm plan can pre-start. Keep the
 					// authored read: a hosted renderer may still request an owner retry.
+					return;
+				}
+				if (isConversionGlobalCall(node)) {
+					// A conversion such as `String(value)` starts no work either.
+					walk(node.arguments);
 					return;
 				}
 				const hook = stableHookCallName(node);
@@ -7299,7 +7336,11 @@ function classifyStableHookfulChildCalls(moduleBody, ctx) {
 				break;
 			}
 			if (ctx.importedNames.has(free)) captures.add(free);
-			else if (!ctx.componentInfo.has(free) && !ctx.moduleFunctionDeclarations.has(free)) {
+			else if (
+				!ctx.componentInfo.has(free) &&
+				!ctx.moduleFunctionDeclarations.has(free) &&
+				!isConversionGlobal(free, ctx)
+			) {
 				safe = false;
 				break;
 			}
@@ -8329,7 +8370,11 @@ function collectPrivateMappedProviderComponents(body, ctx) {
 			}
 			if (ctx.importedNames.has(name)) {
 				captures.add(name);
-			} else if (!ctx.defaultMemoBindings.has(name) && !ctx.moduleFunctionDeclarations.has(name)) {
+			} else if (
+				!ctx.defaultMemoBindings.has(name) &&
+				!ctx.moduleFunctionDeclarations.has(name) &&
+				!isConversionGlobal(name, ctx)
+			) {
 				safe = false;
 				break;
 			}
@@ -13177,7 +13222,8 @@ function compileInternal(
 				(!ctx.importedNames.has(name) &&
 					!ctx.defaultMemoBindings.has(name) &&
 					!ctx.componentInfo.has(name) &&
-					!ctx.moduleFunctionDeclarations.has(name))
+					!ctx.moduleFunctionDeclarations.has(name) &&
+					!isConversionGlobal(name, ctx))
 			) {
 				autoMemoCallsitesSafe = false;
 				break;
@@ -13221,8 +13267,8 @@ function compileInternal(
 					// Immutable const wrapper; its default memo contract is the wall.
 					continue;
 				} else if (ctx.componentInfo.has(name)) autoMemoComponentDeps.push(name);
-				else if (ctx.moduleFunctionDeclarations?.has(name)) {
-					// Immutable same-module function identity; no dependency slot needed.
+				else if (ctx.moduleFunctionDeclarations?.has(name) || isConversionGlobal(name, ctx)) {
+					// An immutable module function or conversion global needs no dependency slot.
 					continue;
 				} else {
 					autoMemoSafe = false;
@@ -13318,7 +13364,8 @@ function compileInternal(
 						!locals.has(cname) &&
 						!ctx.componentInfo.has(cname) &&
 						!HOOK_NAMES.has(cname) &&
-						!(liteHooks && (cname === 'useContext' || cname === methodDepLocal))
+						!(liteHooks && (cname === 'useContext' || cname === methodDepLocal)) &&
+						!isConversionGlobalCall(n)
 					) {
 						return true;
 					}
@@ -20525,7 +20572,8 @@ function isPropCreationExpr(expr, ctx, includesLiteral = false) {
 					blocked = true;
 					return;
 				}
-				found = true;
+				// A conversion such as `String(value)` creates nothing; its arguments may.
+				if (!isConversionGlobalCall(n)) found = true;
 			}
 		}
 		for (const k in n) {
@@ -36216,7 +36264,8 @@ function collectAutoMemoDependencyExpressions(nodes, templateControlFlow = false
 			return;
 		}
 		if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') {
-			walkCallable(node.callee);
+			// A conversion global such as `String` never changes; only its arguments can.
+			if (!isConversionGlobalCall(node)) walkCallable(node.callee);
 			walk(node.arguments);
 			return;
 		}
@@ -36809,9 +36858,10 @@ function makeCompCall(
 					} else if (
 						ctx.componentInfo.has(name) ||
 						ctx.defaultMemoBindings.has(name) ||
-						ctx.moduleFunctionDeclarations?.has(name)
+						ctx.moduleFunctionDeclarations?.has(name) ||
+						isConversionGlobal(name, ctx)
 					) {
-						// Same-module FunctionDeclaration identity is immutable.
+						// Same-module FunctionDeclaration and conversion-global identities are immutable.
 						continue;
 					} else {
 						// A module/global read at the call site is not a reactive witness.
@@ -37936,8 +37986,9 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					// Immutable same-module function identity; no dependency slot needed.
 					continue;
 				}
-				// Ambient globals and module `let`s are not reactive witnesses. Imported
-				// live bindings are handled above; everything else fails closed.
+				if (isImmutableAmbientGlobal(name, ctx)) continue;
+				// Other ambient globals and module `let`s are not reactive witnesses.
+				// Imported live bindings are handled above; everything else fails closed.
 				itemMemo = false;
 				break;
 			}
@@ -38002,6 +38053,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					// Immutable same-module function identity; no dependency slot needed.
 					continue;
 				}
+				if (isImmutableAmbientGlobal(name, ctx)) continue;
 				listSafe = false;
 				break;
 			}

@@ -395,6 +395,28 @@ export function KeyedSelectionList(props: {
 	</ul>
 }
 
+// The same row with its text converted by the `String` global, the spelling a
+// numeric text hole takes.
+export function KeyedSelectionConvertedList(props: {
+	items: SelectionRow[];
+	selected: number | null;
+	prefix?: string;
+}) @{
+	const selected = props.selected;
+	const prefix = props.prefix ?? 'row';
+	<ul id="keyed-selection-converted-list">
+		@for (const row of props.items; key row.id) {
+			<li
+				class={selected === row.id ? 'selected' : ''}
+				data-id={String(row.id)}
+				data-prefix={prefix}
+			>
+				{String(row.label)}
+			</li>
+		}
+	</ul>
+}
+
 export function KeyedSelectionProjectionList(props: {
 	items: SelectionRow[];
 	selected: number | null;
@@ -533,6 +555,28 @@ export function FastHostKeyedList(props: {
 				onClick={() => onPick(row.id)}
 			>
 				{row.label as string}
+			</li>
+		}
+		<li class="fast-host-after">{'after'}</li>
+	</ul>
+}
+
+export function FastHostConvertedList(props: {
+	items: SelectionRow[];
+	selected: number | null;
+	onPick: (id: number) => void;
+}) @{
+	const selected = props.selected;
+	const onPick = props.onPick;
+	<ul id="fast-host-converted-list">
+		<li class="fast-host-before">{'before'}</li>
+		@for (const row of props.items; key row.id) {
+			<li
+				class={selected === row.id ? 'fast-host-row selected' : 'fast-host-row'}
+				data-fast-host-id={String(row.id)}
+				onClick={() => onPick(row.id)}
+			>
+				{String(row.label)}
 			</li>
 		}
 		<li class="fast-host-after">{'after'}</li>

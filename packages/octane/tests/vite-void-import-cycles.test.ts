@@ -277,7 +277,10 @@ export function run(host) {
 // Vite's own TypeScript transform reprints every `.ts`/`.tsx` module after the
 // Octane pre-transform, so a `.tsx` component's final code never equals the
 // compiled code byte for byte. The proof compares the parsed program instead,
-// and still fails closed when a later transform changes that program.
+// and still fails closed when a later transform changes that program. Lite
+// exports are void exports vouched for by the same fingerprint, so either proven
+// edge at the call site shows the proof survived.
+const PROVEN_SLOT = /componentSlot(?:Void|Lite)\(/;
 describe(
 	'production Vite void-component proofs for TypeScript modules',
 	{ timeout: 30_000 },
@@ -311,7 +314,7 @@ export function run(host) {
 		it('proves void .tsx components after the TypeScript reprint', async () => {
 			const { compiled, chunks } = await buildFixture(fixture(files), ['entry.ts']);
 			expect(compiled['entry.ts']).toContain('__createVoidRoot');
-			expect(compiled['A.tsx']).toContain('componentSlotVoid(');
+			expect(compiled['A.tsx']).toMatch(PROVEN_SLOT);
 			expect(run(chunks[0])).toEqual({ text: 'A3', empty: true });
 		});
 
@@ -326,7 +329,7 @@ export function run(host) {
 			const { compiled, chunks } = await buildFixture(fixture(files), ['entry.ts'], [rewrite]);
 			expect(compiled['entry.ts']).not.toContain('__createVoidRoot');
 			expect(compiled['entry.ts']).toContain('__createRootDefaultOptions');
-			expect(compiled['A.tsx']).not.toContain('componentSlotVoid(');
+			expect(compiled['A.tsx']).not.toMatch(PROVEN_SLOT);
 			expect(run(chunks[0])).toEqual({ text: 'A3', empty: true });
 		});
 	},
