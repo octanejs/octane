@@ -45,11 +45,10 @@ import type {
 	TrySlot,
 	RootContainer,
 } from './types.js';
-import { installHydrationDriver } from './drivers.js';
+import { installHydrationDriver, ROOT_RENDER_ROLLBACK } from './drivers.js';
 import { renderBlock } from './signal-owners.js';
 import {
 	QUEUE,
-	ROOT_RENDER_ROLLBACK,
 	journalUndo,
 	journalRootProperty,
 	inRootHydrationAttempt,

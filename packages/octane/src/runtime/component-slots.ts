@@ -49,6 +49,8 @@ import {
 	SIGNAL_BINDINGS_ENABLED,
 	MEMO_BAIL,
 	installMemoBail,
+	ROOT_RENDER_ROLLBACK,
+	TRANSITION_JOURNAL,
 } from './drivers.js';
 import {
 	type SignalInstanceKey,
@@ -59,7 +61,6 @@ import {
 } from './signal-owners.js';
 import { storeSyncQueue, refDetachQueue } from './refs.js';
 import {
-	ROOT_RENDER_ROLLBACK,
 	journalUndo,
 	journalRootProperty,
 	journalRootSlot,
@@ -98,7 +99,6 @@ import { EFFECT_RECONNECT_CONTEXT, PUBLISH_SUSPENSE_COMMIT, tryBlock } from './s
 import {
 	CURRENT_SCOPE,
 	CURRENT_BLOCK,
-	TRANSITION_JOURNAL,
 	ROOT_RENDER_TRANSACTION,
 	effectEventQueue,
 	effectEventCommitActions,
@@ -508,7 +508,7 @@ export function lazy<C extends ComponentBody<any>>(
 		if (previousBody !== comp) {
 			if (previousBody !== undefined) invalidateSharedBodyOutput(scope);
 			const hooks = ensureHooks(scope);
-			if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+			if (TRANSITION_JOURNAL && !ROOT_RENDER_ROLLBACK) {
 				journalUndo(() => {
 					if (previousBody === undefined) hooks.delete(bodySlot);
 					else hooks.set(bodySlot, previousBody);

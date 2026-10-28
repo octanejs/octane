@@ -182,7 +182,6 @@ export {
 export type { LinkedStatePrevious, LinkedStateOptions } from './runtime/hooks.js';
 export {
 	seedOrCreate,
-	useBatch,
 	registerWarmPlan,
 	warmMemo,
 	nativeWarmMemo,
@@ -217,10 +216,7 @@ export {
 	CompiledContext,
 	compilerOwnsContextProvider,
 	renderClientContextProvider,
-	use,
-	useRendererThenable,
 	useContext,
-	bindRendererRegionOwner,
 	createHostContextRequest,
 	readContextFromScope,
 	getRendererOwnerVisibility,
@@ -229,21 +225,14 @@ export {
 export type { Context, ForeignHostContext } from './runtime/context.js';
 export { portal, createPortal } from './runtime/portals.js';
 export type { PortalDescriptor } from './runtime/portals.js';
+export { __PermanentStaticHydrate } from './runtime/hydrate-boundary.js';
 export {
-	Hydrate,
-	__HydrateCompiled,
-	__PermanentStaticHydrate,
-} from './runtime/hydrate-boundary.js';
-export {
-	Suspense,
-	ViewTransition,
 	ErrorBoundary,
 	__runOnCatch,
 	TsrxErrorBoundary,
 	setTransitionFallbackTimeout,
 	getTransitionFallbackTimeout,
 	errorBlock,
-	tryBlock,
 } from './runtime/suspense.js';
 export { componentSlotLite, commitHostSources } from './runtime/render.js';
 export {
@@ -351,7 +340,6 @@ export {
 	isChildrenBlock,
 	memoPublish,
 	memoPublishAlways,
-	lazy,
 	componentSlot,
 	componentSlotVoid,
 	componentSlotFunction,
@@ -490,3 +478,17 @@ export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY } from './constant
 export { validateNativeReadWitness } from './signals/native-read-collector.js';
 export { readNativeDomStyle, readNativeDomProps } from './signals/read-protocol.js';
 export { normalizeClass } from './css.js';
+// Entries that can drop a render install the root render journal as they load.
+// Last, so the runtime chain above evaluates first and keeps its order.
+export {
+	useBatch,
+	use,
+	useRendererThenable,
+	bindRendererRegionOwner,
+	Hydrate,
+	__HydrateCompiled,
+	Suspense,
+	ViewTransition,
+	tryBlock,
+	lazy,
+} from './rollback-entries.js';

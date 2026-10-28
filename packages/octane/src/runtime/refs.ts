@@ -17,9 +17,15 @@ import type {
 	OffscreenCapture,
 	UncommittedRefAttaches,
 } from './types.js';
-import { activityRefState, NATIVE_READ_DRIVER, queueRefAttach, noop } from './drivers.js';
 import {
+	activityRefState,
+	NATIVE_READ_DRIVER,
+	queueRefAttach,
+	noop,
 	ROOT_RENDER_ROLLBACK,
+	TRANSITION_JOURNAL,
+} from './drivers.js';
+import {
 	journalRootProperty,
 	refAttachQueue,
 	attachLiveFragmentRef,
@@ -31,7 +37,7 @@ import { blockIsAncestorOf } from './effects.js';
 import type { PortalSlot } from './portals.js';
 import { TEARDOWN_HANDLER, TEARDOWN_BLOCK } from './block.js';
 import { fragmentHostVisible, findHiddenActivity } from './suspense.js';
-import { TRANSITION_JOURNAL, ROOT_RENDER_TRANSACTION, WIP_CAPTURE } from './render.js';
+import { ROOT_RENDER_TRANSACTION, WIP_CAPTURE } from './render.js';
 import { nodeAfterPortalRange } from './deopt.js';
 import { journalBag, REF_DETACH_SUPPRESSION } from './commit.js';
 import { getNextSibling } from './templates.js';
@@ -142,7 +148,7 @@ export function replaceRef(
 	next: any,
 	target: Element | FragmentInstance,
 ): any {
-	if (TRANSITION_JOURNAL !== null) {
+	if (TRANSITION_JOURNAL) {
 		// The compiler stores the replacement immediately after this call. A
 		// later suspension must restore both the binding and the fragment handle
 		// before retrying, even when no other binding in this scope changed.

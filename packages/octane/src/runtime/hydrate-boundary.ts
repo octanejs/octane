@@ -67,7 +67,7 @@ import type {
 	TrySlot,
 } from './types.js';
 import { scopeSignalOwner, renderBlock } from './signal-owners.js';
-import { ROOT_RENDER_ROLLBACK, journalRootProperty, scheduleRender } from './engine.js';
+import { journalRootProperty, scheduleRender } from './engine.js';
 import { useEffect, useId } from './hooks.js';
 import {
 	type TrackedThenable,
@@ -107,6 +107,7 @@ import {
 } from './commit.js';
 import { getFirstChild, getNextSibling, DeferredHydrationSuspension } from './templates.js';
 import { eventPathNode } from './events.js';
+import { ROOT_RENDER_ROLLBACK } from './drivers.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
