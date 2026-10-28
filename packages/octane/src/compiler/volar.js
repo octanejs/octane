@@ -37,6 +37,7 @@ import {
 import { collectDescriptorChildrenBindings, soleRenderPropChild } from './descriptor-lowering.js';
 import { buildFatSegments, decodeSourceMappings } from './fat-segments.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
+import { isComponentTag } from './render-classification.js';
 import { analyzeStrongMode, withStrongDocs } from './strong-mode.js';
 import { analyzeNativeReadDiagnostics, nativeReadOptions } from './native-read-diagnostics.js';
 import { jsxImportSourcePragmaModule } from './pragma.js';
@@ -258,17 +259,11 @@ function projectComponentChildren(ast, comments) {
 	const jsx = pragma ? jsxImportSourcePragmaModule(pragma.value) : DOM_RENDERER_MODULE;
 	if (jsx !== DOM_RENDERER_MODULE && jsx !== 'octane/strong') return ast;
 	const descriptorTags = collectDescriptorChildrenBindings(ast);
-	const isBlockChildren = (node) => {
-		const name = node.openingElement?.name;
-		if (name?.type === 'JSXIdentifier') {
-			if (name.name[0] === name.name[0].toLowerCase() || descriptorTags.has(name.name))
-				return false;
-		} else if (name?.type !== 'JSXMemberExpression') return false;
-		return (
-			node.children.some((child) => child.type !== 'JSXText' || /\S/.test(child.value)) &&
-			soleRenderPropChild(node.children) === null
-		);
-	};
+	const isBlockChildren = (node) =>
+		isComponentTag(node) &&
+		!descriptorTags.has(node.openingElement.name.name) &&
+		node.children.some((child) => child.type !== 'JSXText' || /\S/.test(child.value)) &&
+		soleRenderPropChild(node.children) === null;
 	// Template JSX is a direct statement of a template body or directive arm, or
 	// a child of other template JSX. Anything inside an expression is a value.
 	const isTemplateKey = (node, key, template) =>

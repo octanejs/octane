@@ -1102,6 +1102,8 @@ function Title(props: { children: string }) @{
 	<h1>{props.children.toUpperCase()}</h1>
 }
 
+const _Title = Title;
+
 function Frame(props: { children: OctaneNode }) @{
 	<section>{props.children}</section>
 }
@@ -1114,6 +1116,8 @@ export function App(props: { name: string; link?: { title: string } }) @{
 	const label = <Title>value position</Title>;
 	<Frame>
 		<Title>hello</Title>
+		<_Title>underscore</_Title>
+		<{Title}>dynamic</{Title}>
 		<Frame>{props.name}</Frame>
 		@if (props.link !== undefined) {
 			<Frame>{props.link.title}</Frame>
@@ -1149,10 +1153,10 @@ export function App(props: { name: string; link?: { title: string } }) @{
 				},
 			});
 			const diagnostics = program.getSemanticDiagnostics(program.getSourceFile(file)!);
-			// Only the template `<Title>hello</Title>` hands `children: string` a block,
-			// reported on its mapped tag name. The value-position `<Title>` keeps its
-			// authored string child.
-			expect(diagnostics.map(({ code }) => code)).toEqual([2745]);
+			// Each template `Title` tag (plain, `_`-prefixed, dynamic) hands
+			// `children: string` a block, reported on its mapped tag name. The
+			// value-position `<Title>` keeps its authored string child.
+			expect(diagnostics.map(({ code }) => code)).toEqual([2745, 2745, 2745]);
 			const authored = source.indexOf('Title>hello');
 			expect(
 				result.mappings.some((mapping) =>
