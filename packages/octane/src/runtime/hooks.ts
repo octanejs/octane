@@ -32,6 +32,7 @@ import {
 	resolveSlot,
 	MANUAL_HOOK_DRIVER,
 	invokeManualHook,
+	installCommitWork,
 } from './drivers.js';
 import { compilerMemoPass, captureRenderPhaseUpdate } from './signal-owners.js';
 import { storeSyncQueue } from './refs.js';
@@ -1509,6 +1510,8 @@ export function enqueueStoreSync(
 	inst.subscribe = subscribe;
 	if (inst.queued) return;
 	inst.queued = true;
+	// Its subscription effect is not an installer: a hidden Activity registers none.
+	installCommitWork();
 	(WIP_CAPTURE !== null ? WIP_CAPTURE.stores : storeSyncQueue).push(inst);
 }
 

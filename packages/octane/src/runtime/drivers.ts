@@ -156,11 +156,11 @@ import {
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
 // Every producer of commit-phase callbacks installs this before its first
-// entry: effect slots (with the external-store checks and Fragment refs, which
-// always register an effect or a ref attach), Effect Events, commit actions
+// entry: effect slots, external-store checks, Effect Events, commit actions
 // (Activity and Suspense hides, linked state, signal control adoption), ref
-// attaches and detaches, and controlled forms. A bundle with none never writes
-// it, so a commit, and the capture that carries its work, skips those phases.
+// attaches and detaches (Fragment refs queue one), and controlled forms. A
+// bundle with none never writes it, so a commit, and the capture that carries
+// its work, skips those phases.
 export let COMMIT_WORK = false;
 export function installCommitWork(): void {
 	COMMIT_WORK = true;

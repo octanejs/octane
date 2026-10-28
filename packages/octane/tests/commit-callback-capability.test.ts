@@ -161,6 +161,52 @@ describe('commit callbacks in a fresh runtime', () => {
 		expect(listeners.size).toBe(0);
 	});
 
+	it('keeps checking an external store for tearing after a hidden Activity reveals it', async () => {
+		const { runtime, compile, container, root } = await freshRuntime();
+		const { App } = compile(
+			'commit-hidden-store.tsx',
+			`import { Activity, useLayoutEffect, useSyncExternalStore } from 'octane';
+			type Store = { get(): string; subscribe(cb: () => void): () => void };
+			function Reader(props: { store: Store }) {
+				return <p>{useSyncExternalStore(props.store.subscribe, props.store.get) as string}</p>;
+			}
+			function Mutator(props: { mutate(): void }) {
+				useLayoutEffect(() => props.mutate());
+				return null;
+			}
+			export function App(props: { mode: 'visible' | 'hidden'; store: Store; mutate(): void }) {
+				return (
+					<Activity mode={props.mode}>
+						<Reader store={props.store} />
+						<Mutator mutate={props.mutate} />
+					</Activity>
+				);
+			}`,
+		);
+		let value = 'a';
+		const store = { get: () => value, subscribe: () => () => {} };
+		const mutate = () => {};
+		// Hidden content registers no effects, so its store check is the first
+		// commit-phase work this runtime sees.
+		await runtime.act(() => root.render(App, { mode: 'hidden', store, mutate }));
+		await runtime.act(() => root.render(App, { mode: 'visible', store, mutate }));
+		expect(container.textContent).toBe('a');
+		// The store moves before this render and again, silently, during its
+		// commit: the post-layout consistency check must render the latest value.
+		value = 'b';
+		await runtime.act(() =>
+			root.render(App, {
+				mode: 'visible',
+				store,
+				mutate: () => {
+					value = 'c';
+				},
+			}),
+		);
+		expect(container.textContent).toBe('c');
+		await runtime.act(() => root.unmount());
+	});
+
 	it('selects a controlled select value from the options its render built', async () => {
 		const { runtime, compile, container, root } = await freshRuntime();
 		const { App } = compile(
