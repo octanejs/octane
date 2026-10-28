@@ -6174,7 +6174,13 @@ function autoMemoCallExecutesSetupHook(call, ctx) {
  * Passing `memoCtx` admits projections under the selected render contract — see
  * `plainCalleeIsMemoizable` for the contract and why callee shapes are
  * classified differently. Callers that need "no call executes here" for a reason
- * other than memo staleness (SSR item identity) omit it and keep every call.
+ * other than memo staleness (SSR item identity) omit it and keep every other call.
+ *
+ * Every caller admits a lexically unbound standard global from
+ * SETUP_PURE_GLOBAL_CALLEES, such as `String(row.id)`. It closes over nothing and
+ * runs no user code beyond the argument coercion that template literals and `+`
+ * already perform. A region whose free-name proof rejects the global's name
+ * still fails closed.
  */
 function containsRenderCall(stmts, memoCtx = null) {
 	let found = false;
@@ -6213,7 +6219,13 @@ function containsRenderCall(stmts, memoCtx = null) {
 			}
 			const assumedPureOperation =
 				memoCtx?.strongMemo === true && (t === 'NewExpression' || t === 'TaggedTemplateExpression');
-			if (assumedPureOperation || (memoCtx !== null && plainCalleeIsMemoizable(n, memoCtx))) {
+			const pureGlobal =
+				n._octaneUnboundCallee === true && SETUP_PURE_GLOBAL_CALLEES.has(n.callee?.name);
+			if (
+				assumedPureOperation ||
+				pureGlobal ||
+				(memoCtx !== null && plainCalleeIsMemoizable(n, memoCtx))
+			) {
 				// Admitting a call never admits the expressions that resolve its
 				// callee or arguments. In compatibility mode `fmt(row.get())` still
 				// fails closed; Strong applies its purity assertion recursively to
@@ -6348,7 +6360,8 @@ const SETUP_SYNC_FACTORY_HOOKS = new Set([
 ]);
 // Standard globals that only project their arguments. A user-defined
 // `toString`/`valueOf`/`toJSON` that schedules a render violates the hook rules
-// in React and Octane alike, so these count as call-free setup.
+// in React and Octane alike, so these count as call-free setup and render work
+// (containsRenderCall).
 const SETUP_PURE_GLOBAL_CALLEES = new Set([
 	'String',
 	'Number',
@@ -6585,7 +6598,8 @@ function isHookCalleeName(name) {
  * member-callee hazard in an identifier, and the inline hook-memo tier can hand
  * it a stable identity, so admitting it would let a skipped body freeze a live
  * accessor result. Unbound globals fail closed for the same reason: nothing
- * witnesses what they close over.
+ * witnesses what they close over. containsRenderCall separately admits the
+ * standard pure globals.
  *
  * `new Foo()` and tagged templates are classified by containsRenderCall rather
  * than this call-only helper. Strong admits them under the same assertion;
@@ -6845,6 +6859,11 @@ function isUnwitnessedAmbientRead(name, ctx) {
 	if (module === undefined) return false;
 	if (module.mutable.has(name)) return true;
 	return !module.all.has(name) && !IMMUTABLE_AMBIENT_GLOBALS.has(name);
+}
+
+/** A standard language global that no top-level module binding shadows. */
+function isImmutableAmbientGlobal(name, ctx) {
+	return IMMUTABLE_AMBIENT_GLOBALS.has(name) && ctx.moduleTopLevelBindings?.all.has(name) === false;
 }
 
 // A component whose synchronous proof reads its props is safe only at JSX
@@ -37936,8 +37955,9 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					// Immutable same-module function identity; no dependency slot needed.
 					continue;
 				}
-				// Ambient globals and module `let`s are not reactive witnesses. Imported
-				// live bindings are handled above; everything else fails closed.
+				if (isImmutableAmbientGlobal(name, ctx)) continue;
+				// Other ambient globals and module `let`s are not reactive witnesses.
+				// Imported live bindings are handled above; everything else fails closed.
 				itemMemo = false;
 				break;
 			}
@@ -38002,6 +38022,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					// Immutable same-module function identity; no dependency slot needed.
 					continue;
 				}
+				if (isImmutableAmbientGlobal(name, ctx)) continue;
 				listSafe = false;
 				break;
 			}

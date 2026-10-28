@@ -9,9 +9,11 @@ import {
 	LiveViaLocalFunction,
 	LiveViaReassignedHelper,
 	LiveViaProjectedArgument,
+	LiveViaShadowedGlobal,
 	ProjectionModuleHelper,
 	ProjectionTransitive,
 	ProjectionImported,
+	ProjectionGlobal,
 	HookInRegion,
 	CtxUnderRegion,
 	CallSiteParent,
@@ -67,6 +69,13 @@ const liveCases: Array<[string, any, string, string, [string, string]]> = [
 		['r1:', 'r2:'],
 	],
 	['a reassigned module function', LiveViaReassignedHelper, '#lrh-go', '.lrh-row', ['r1:', 'r2:']],
+	[
+		'a component local that shadows String',
+		LiveViaShadowedGlobal,
+		'#lsg-go',
+		'.lsg-row',
+		['r1:', 'r2:'],
+	],
 ];
 
 describe('autoMemo — live accessor results are never frozen by a region cache', () => {
@@ -114,6 +123,7 @@ const projectionCases: Array<[string, any, string, string, string]> = [
 		'.pt-row',
 	],
 	['an imported helper', ProjectionImported, '#pi-go', '#pi-bump', '.pi-row'],
+	['the String global', ProjectionGlobal, '#pg-go', '#pg-bump', '.pg-row'],
 ];
 
 describe('autoMemo — memoized projections stay reactive to their real inputs', () => {

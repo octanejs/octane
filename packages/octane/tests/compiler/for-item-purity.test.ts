@@ -398,6 +398,70 @@ describe('@for item-body purity with module and global reads', () => {
 	});
 });
 
+// An unshadowed standard conversion global, such as `String(item.id)` for a
+// numeric text hole, runs no user code beyond the coercion a template literal
+// performs. It keeps every row fast path: PURE survivors, the whole-list cache,
+// and the keyed-selection update. A binding that shadows the name is an ordinary
+// callee again.
+describe('@for rows calling a standard conversion global', () => {
+	// The js-framework row a React reducer app migrates to: `selected` is the
+	// second sorted capture, so the flags carry selection dependency index 1.
+	const selectionList = (prelude: string, local: string) =>
+		compile(
+			`
+			${prelude}
+			export function App(props) @{
+				const selected = props.selected;
+				const dispatch = props.dispatch;
+				${local}
+				<table><tbody>@for (const row of props.items; key row.id) {
+					<tr class={selected === row.id ? 'danger' : ''}>
+						<td>{String(row.id)}</td>
+						<td><a onClick={() => dispatch({ type: 'SELECT', id: row.id })}>{row.label as string}</a></td>
+					</tr>
+				}</tbody></table>
+			}
+		`,
+			'App.tsrx',
+			{ hmr: false, dev: false },
+		).code;
+
+	it.each([
+		['String in a text hole', '<li>{String(item.id)}</li>'],
+		['Number in an attribute', '<li data-n={Number(item.n)} />'],
+	])('keeps PURE and the whole-list cache for %s', (_name, body) => {
+		const flags = compileList(body);
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & PURE).toBe(PURE);
+		const code = compile(
+			`export function App(props) @{ <ul>@for (const item of props.items; key item.id) {${body}}</ul> }`,
+			'App.tsrx',
+			{ hmr: false, dev: false },
+		).code;
+		expect(code).toContain('_$compilerMemoRegion');
+	});
+
+	it('keeps the keyed-selection update', () => {
+		const code = selectionList('', '');
+		expect(code).toContain('_$compilerMemoRegion');
+		const [flags] = appListFlags(code);
+		expect(flags! & DEP_ELIGIBLE).toBe(DEP_ELIGIBLE);
+		expect(flags! >> 8).toBe(1);
+	});
+
+	it.each([
+		['a component local', '', 'const String = props.format;'],
+		['a module const', 'const String = (value) => value.read();', ''],
+		['a module function', 'function String(value) { return value.read(); }', ''],
+	])('declines every row fast path when %s shadows String', (_name, prelude, local) => {
+		const code = selectionList(prelude, local);
+		expect(code).not.toContain('_$compilerMemoRegion');
+		const [flags] = appListFlags(code);
+		expect(flags! & (PURE | DEP_ELIGIBLE)).toBe(0);
+		expect(flags! >> 8).toBe(0);
+	});
+});
+
 // A memo wall reached through `import * as React from 'octane'` is the same
 // immutable default-memo binding as a named `memo` import. Treating it as an
 // opaque call dropped depEligible, so every row re-rendered on parent updates.

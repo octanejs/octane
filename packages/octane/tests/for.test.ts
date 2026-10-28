@@ -33,6 +33,7 @@ import {
 	PureConditionalList,
 	PlainCalleeList,
 	KeyedSelectionList,
+	KeyedSelectionConvertedList,
 	KeyedSelectionProjectionList,
 	KeyedSelectionControlledList,
 	KeyedSelectionRenderableList,
@@ -41,6 +42,7 @@ import {
 	MismatchedKeyedSelectionList,
 	SharedKeyedSelectionList,
 	FastHostKeyedList,
+	FastHostConvertedList,
 	FastHostMappedList,
 	FastHostCustomList,
 	FastHostRefList,
@@ -1704,29 +1706,36 @@ describe('keyed list selection', () => {
 		r.unmount();
 	});
 
-	it('adopts server-rendered rows and keeps them live when selection changes', () => {
-		const items = makeRows();
-		const props = { items, selected: 1, prefix: 'hydrated' };
-		const server = loadServerFixture('packages/octane/tests/_fixtures/for.tsrx', {
-			compileOptions: { hmr: false, dev: false },
-		});
-		const container = document.createElement('div');
-		document.body.appendChild(container);
-		container.innerHTML = ServerRuntime.renderToString(server.KeyedSelectionList, props).html;
-		const originalRows = Array.from(container.querySelectorAll('li'));
-		const root = hydrateRoot(container, KeyedSelectionList, props);
-		flushSync(() => {});
+	it.each([
+		['authored text casts', 'KeyedSelectionList'],
+		['String() conversions', 'KeyedSelectionConvertedList'],
+	] as const)(
+		'adopts server-rendered rows with %s and keeps them live when selection changes',
+		(_, name) => {
+			const List = { KeyedSelectionList, KeyedSelectionConvertedList }[name];
+			const items = makeRows();
+			const props = { items, selected: 1, prefix: 'hydrated' };
+			const server = loadServerFixture('packages/octane/tests/_fixtures/for.tsrx', {
+				compileOptions: { hmr: false, dev: false },
+			});
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			container.innerHTML = ServerRuntime.renderToString(server[name], props).html;
+			const originalRows = Array.from(container.querySelectorAll('li'));
+			const root = hydrateRoot(container, List, props);
+			flushSync(() => {});
 
-		expect(Array.from(container.querySelectorAll('li'))).toEqual(originalRows);
-		expect(container.querySelector('.selected')?.textContent).toBe('first');
+			expect(Array.from(container.querySelectorAll('li'))).toEqual(originalRows);
+			expect(container.querySelector('.selected')?.textContent).toBe('first');
 
-		flushSync(() => root.render(KeyedSelectionList, { ...props, selected: 3 }));
-		expect(Array.from(container.querySelectorAll('li'))).toEqual(originalRows);
-		expect(container.querySelector('.selected')?.textContent).toBe('third');
+			flushSync(() => root.render(List, { ...props, selected: 3 }));
+			expect(Array.from(container.querySelectorAll('li'))).toEqual(originalRows);
+			expect(container.querySelector('.selected')?.textContent).toBe('third');
 
-		root.unmount();
-		container.remove();
-	});
+			root.unmount();
+			container.remove();
+		},
+	);
 
 	it('keeps the committed selection while a later transition sibling suspends', async () => {
 		const items = makeRows();
@@ -1883,64 +1892,72 @@ describe('large keyed list fills', () => {
 	const makeRows = (length = 24) =>
 		Array.from({ length }, (_, index) => ({ id: index + 1, label: `row ${index + 1}` }));
 
-	it('preserves row order, static siblings, delegated events, selection, and keyed identity', () => {
-		const items = makeRows();
-		const picked: number[] = [];
-		const onPick = (id: number) => picked.push(id);
-		const r = mount(FastHostKeyedList, { items: [], selected: null, onPick });
+	it.each([
+		['authored text', FastHostKeyedList, '#fast-host-keyed-list'],
+		['String() conversions', FastHostConvertedList, '#fast-host-converted-list'],
+	] as const)(
+		'preserves row order, static siblings, delegated events, selection, and keyed identity with %s',
+		(_, List, listId) => {
+			const items = makeRows();
+			const picked: number[] = [];
+			const onPick = (id: number) => picked.push(id);
+			const r = mount(List, { items: [], selected: null, onPick });
 
-		r.update(FastHostKeyedList, { items, selected: 5, onPick });
-		const rows = r.findAll('.fast-host-row');
-		expect(rows.map((row) => row.textContent)).toEqual(items.map((row) => row.label));
-		expect(rows.every((row) => row.isConnected)).toBe(true);
-		expect(r.find('#fast-host-keyed-list').firstElementChild?.className).toBe('fast-host-before');
-		expect(r.find('#fast-host-keyed-list').lastElementChild?.className).toBe('fast-host-after');
-		expect(r.find('.fast-host-row.selected').textContent).toBe('row 5');
+			r.update(List, { items, selected: 5, onPick });
+			const rows = r.findAll('.fast-host-row');
+			expect(rows.map((row) => row.textContent)).toEqual(items.map((row) => row.label));
+			expect(rows.every((row) => row.isConnected)).toBe(true);
+			expect(r.find(listId).firstElementChild?.className).toBe('fast-host-before');
+			expect(r.find(listId).lastElementChild?.className).toBe('fast-host-after');
+			expect(r.find('.fast-host-row.selected').textContent).toBe('row 5');
 
-		r.click('[data-fast-host-id="5"]');
-		expect(picked).toEqual([5]);
-		r.update(FastHostKeyedList, { items, selected: 20, onPick });
-		expect(r.findAll('.fast-host-row')).toEqual(rows);
-		expect(r.find('.fast-host-row.selected').textContent).toBe('row 20');
+			r.click('[data-fast-host-id="5"]');
+			expect(picked).toEqual([5]);
+			r.update(List, { items, selected: 20, onPick });
+			expect(r.findAll('.fast-host-row')).toEqual(rows);
+			expect(r.find('.fast-host-row.selected').textContent).toBe('row 20');
 
-		const changed = items.map((row) => (row.id === 12 ? { ...row, label: 'updated row 12' } : row));
-		r.update(FastHostKeyedList, { items: changed, selected: 12, onPick });
-		expect(r.find('[data-fast-host-id="12"]').textContent).toBe('updated row 12');
-		expect(r.findAll('.fast-host-row')).toEqual(rows);
+			const changed = items.map((row) =>
+				row.id === 12 ? { ...row, label: 'updated row 12' } : row,
+			);
+			r.update(List, { items: changed, selected: 12, onPick });
+			expect(r.find('[data-fast-host-id="12"]').textContent).toBe('updated row 12');
+			expect(r.findAll('.fast-host-row')).toEqual(rows);
 
-		// Removing a row shifts the surviving suffix, including rows whose inputs
-		// change in the same update. Reinsertions must keep those survivors alive.
-		const removed = changed
-			.filter((row) => row.id !== 5)
-			.map((row) => (row.id === 20 ? { ...row, label: 'updated row 20' } : row));
-		r.update(FastHostKeyedList, { items: removed, selected: 12, onPick });
-		const survivors = rows.filter((_, index) => index !== 4);
-		const remaining = r.findAll('.fast-host-row');
-		expect(remaining).toHaveLength(survivors.length);
-		remaining.forEach((row, index) => expect(row).toBe(survivors[index]));
-		expect(r.find('[data-fast-host-id="20"]').textContent).toBe('updated row 20');
-		r.update(FastHostKeyedList, { items: removed.slice(1), selected: 20, onPick });
-		expect(r.find('.fast-host-row.selected')).toBe(rows[19]);
-		r.click('[data-fast-host-id="20"]');
-		expect(picked).toEqual([5, 20]);
-		r.update(FastHostKeyedList, { items: changed, selected: 12, onPick });
-		const restored = r.findAll('.fast-host-row');
-		for (let index = 0; index < rows.length; index++) {
-			if (index !== 0 && index !== 4) expect(restored[index]).toBe(rows[index]);
-		}
-		expect(r.find('[data-fast-host-id="20"]').textContent).toBe('row 20');
+			// Removing a row shifts the surviving suffix, including rows whose inputs
+			// change in the same update. Reinsertions must keep those survivors alive.
+			const removed = changed
+				.filter((row) => row.id !== 5)
+				.map((row) => (row.id === 20 ? { ...row, label: 'updated row 20' } : row));
+			r.update(List, { items: removed, selected: 12, onPick });
+			const survivors = rows.filter((_, index) => index !== 4);
+			const remaining = r.findAll('.fast-host-row');
+			expect(remaining).toHaveLength(survivors.length);
+			remaining.forEach((row, index) => expect(row).toBe(survivors[index]));
+			expect(r.find('[data-fast-host-id="20"]').textContent).toBe('updated row 20');
+			r.update(List, { items: removed.slice(1), selected: 20, onPick });
+			expect(r.find('.fast-host-row.selected')).toBe(rows[19]);
+			r.click('[data-fast-host-id="20"]');
+			expect(picked).toEqual([5, 20]);
+			r.update(List, { items: changed, selected: 12, onPick });
+			const restored = r.findAll('.fast-host-row');
+			for (let index = 0; index < rows.length; index++) {
+				if (index !== 0 && index !== 4) expect(restored[index]).toBe(rows[index]);
+			}
+			expect(r.find('[data-fast-host-id="20"]').textContent).toBe('row 20');
 
-		const reversed = changed.toReversed();
-		r.update(FastHostKeyedList, { items: reversed, selected: 12, onPick });
-		expect(r.findAll('.fast-host-row')).toEqual(restored.toReversed());
-		r.update(FastHostKeyedList, { items: [], selected: null, onPick });
-		expect(r.findAll('.fast-host-row')).toHaveLength(0);
-		r.update(FastHostKeyedList, { items, selected: 1, onPick });
-		expect(r.findAll('.fast-host-row').map((row) => row.textContent)).toEqual(
-			items.map((row) => row.label),
-		);
-		r.unmount();
-	});
+			const reversed = changed.toReversed();
+			r.update(List, { items: reversed, selected: 12, onPick });
+			expect(r.findAll('.fast-host-row')).toEqual(restored.toReversed());
+			r.update(List, { items: [], selected: null, onPick });
+			expect(r.findAll('.fast-host-row')).toHaveLength(0);
+			r.update(List, { items, selected: 1, onPick });
+			expect(r.findAll('.fast-host-row').map((row) => row.textContent)).toEqual(
+				items.map((row) => row.label),
+			);
+			r.unmount();
+		},
+	);
 
 	it('keeps mapped JSX rows interactive and reusable after an empty-to-populated update', () => {
 		const items = makeRows();
