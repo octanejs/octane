@@ -13,7 +13,7 @@ import fixture from './fixtures/hacker-news.json' with { type: 'json' };
 // BOTH apps SSR — the React-style `.tsx` app (SSR on :5193) and the TSRX app (SSR on
 // :5194) over the same octane core — so this spec runs once per project. The SAME
 // assertions passing under both IS the .tsx ≡ .tsrx SSR-parity proof. The SSR base is
-// the project's client port + 2 (5191 → 5193, 5192 → 5194).
+// the project's client port + 2 (5191 → 5193, 5192 → 5194, 5195 → 5197).
 
 function ssrBase(baseURL: string | undefined): string {
 	const port = Number(new URL(baseURL ?? 'http://localhost:5191').port);

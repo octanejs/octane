@@ -33,6 +33,10 @@ const SPECIAL_ROLES = new Map([
 	// exists to fix. Coupling it to the runtime singleton would make it
 	// uninstallable in the case it is meant to solve.
 	['@octanejs/cli', 'developer tooling'],
+	// The codemod runs against React projects that have no Octane yet, so it
+	// carries its own compiler to verify what it writes. It never runs inside
+	// an app, so that copy is not a second runtime.
+	['@octanejs/codemod', 'developer tooling'],
 	['@octanejs/evals', 'evaluation tooling'],
 	// The one package people type by name rather than install. It is a thin entry
 	// point onto `octane create`, so it carries no scope and would otherwise fall

@@ -6,6 +6,7 @@ const IGNORED_DIRS = new Set([
 	'node_modules',
 	'dist',
 	'build',
+	'out',
 	'.git',
 	'coverage',
 	'.next',
