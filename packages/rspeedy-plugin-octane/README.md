@@ -155,7 +155,7 @@ metadata was checked on 2026-07-23:
 | `@lynx-js/types` | `4.1.0` | `4.1.0` |
 | `@lynx-js/web-core` | `0.22.2` | `0.22.2` |
 | TypeScript | `5.9.3` | `5.9.3` |
-| `@tsrx/oxc` (Octane compiler parser peer) | `0.20.0` | `0.20.0` |
+| `@tsrx/oxc` (Octane compiler parser peer) | `0.23.0` | `0.23.0` |
 | Webpack (tooling peer only) | `5.112.0` | `5.112.0` |
 
 Rspeedy `0.16.0` requires Rsbuild `2.1.4` exactly. That Rsbuild release accepts

@@ -315,3 +315,32 @@ function unwrapTsExpr(n) {
 	}
 	return n;
 }
+
+// React-style render-prop detection: if a component's children are exactly one
+// `{fn}` expression hole whose expression is a function (arrow or function
+// expression) — `<Comp>{(data) => <jsx/>}</Comp>` — return that function node so
+// the caller can pass it RAW as the `children` prop (callable with arbitrary
+// args). Whitespace-only JSXText around the hole is tolerated. Returns null for
+// anything else (multiple children, static JSX, a non-function hole), which then
+// rides the normal `__children$N` render-function wrapping. An arrow whose body
+// is a `JSXCodeBlock` (`(data) => @{…}`) is EXCLUDED — that octane render-prop
+// form has its own hoisting path (rewriteTsrxBlocks) and a different calling
+// convention; this detection is only for the React bare-JSX-body arrow.
+export function soleRenderPropChild(children) {
+	if (!children || children.length === 0) return null;
+	let sole = null;
+	for (const c of children) {
+		if (!c) continue;
+		if (c.type === 'JSXText' && /^\s*$/.test(c.value)) continue; // indentation
+		if (sole) return null; // more than one meaningful child
+		sole = c;
+	}
+	if (!sole || sole.type !== 'JSXExpressionContainer') return null;
+	let e = sole.expression;
+	// The editor parser preserves grouping parentheses; the runtime parser drops them.
+	while (e?.type === 'ParenthesizedExpression') e = e.expression;
+	if (!e) return null;
+	if (e.type !== 'ArrowFunctionExpression' && e.type !== 'FunctionExpression') return null;
+	if (e.body && e.body.type === 'JSXCodeBlock') return null; // `@{…}` form — leave alone
+	return e;
+}

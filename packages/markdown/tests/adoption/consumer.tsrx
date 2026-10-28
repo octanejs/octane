@@ -33,8 +33,12 @@ export function AsyncConsumer() {
 	return MarkdownAsync({ ...options, children: '# Awaited' });
 }
 
-export function HooksConsumer() @{
-	<MarkdownHooks {...options} fallback={<span>{'Loading'}</span>}>
-		{'# Client'}
-	</MarkdownHooks>
+// Template children compile to a render function, and markdown source must be
+// a string, so the source rides value-position JSX as in SyncConsumer.
+export function HooksConsumer() {
+	return (
+		<MarkdownHooks {...options} fallback={<span>{'Loading'}</span>}>
+			{'# Client'}
+		</MarkdownHooks>
+	);
 }

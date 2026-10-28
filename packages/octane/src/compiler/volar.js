@@ -34,8 +34,10 @@ import {
 	dedupeMappings,
 	error as collectCompileError,
 } from '@tsrx/core';
+import { collectDescriptorChildrenBindings, soleRenderPropChild } from './descriptor-lowering.js';
 import { buildFatSegments, decodeSourceMappings } from './fat-segments.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
+import { isComponentTag } from './render-classification.js';
 import { analyzeStrongMode, withStrongDocs } from './strong-mode.js';
 import { analyzeNativeReadDiagnostics, nativeReadOptions } from './native-read-diagnostics.js';
 import { jsxImportSourcePragmaModule } from './pragma.js';
@@ -239,6 +241,91 @@ function projectNativeDomReads(ast, contracts) {
 				],
 			}
 		: ast;
+}
+
+/**
+ * A DOM component rendered from a template receives its JSX children as a
+ * children block, a render function, not as the children written (see
+ * markChildrenBlock). Print them as `<C>{childrenBlock(<>…</>)}</C>` so
+ * TypeScript checks a function against the `children` prop and rejects e.g.
+ * `children: string`. A call keeps the template's narrowing, which a closure
+ * would drop. Value-position JSX, a sole render-prop function child and
+ * descriptor-children tags keep the authored children, as compile.js does.
+ */
+function projectComponentChildren(ast, comments) {
+	// Universal renderers pass children as values. The content mapper supplies
+	// no renderer config, so their files are known by their own JSX pragma.
+	const pragma = authoredLeadingPragma(ast, comments);
+	const jsx = pragma ? jsxImportSourcePragmaModule(pragma.value) : DOM_RENDERER_MODULE;
+	if (jsx !== DOM_RENDERER_MODULE && jsx !== 'octane/strong') return ast;
+	const descriptorTags = collectDescriptorChildrenBindings(ast);
+	const isBlockChildren = (node) =>
+		isComponentTag(node) &&
+		!descriptorTags.has(node.openingElement.name.name) &&
+		node.children.some((child) => child.type !== 'JSXText' || /\S/.test(child.value)) &&
+		soleRenderPropChild(node.children) === null;
+	// Template JSX is a direct statement of a template body or directive arm, or
+	// a child of other template JSX. Anything inside an expression is a value.
+	const isTemplateKey = (node, key, template) =>
+		node.type === 'JSXElement' || node.type === 'JSXFragment'
+			? template && key === 'children'
+			: (node.type === 'JSXCodeBlock' && (key === 'body' || key === 'render')) ||
+				(node.type === 'BlockStatement' && key === 'body') ||
+				(node.type === 'SwitchCase' && key === 'consequent');
+	let helper = null;
+	const blockHelper = () => {
+		if (helper !== null) return helper;
+		const names = new Set();
+		const collect = (node) => {
+			if (!node || typeof node !== 'object') return;
+			if (node.type === 'Identifier' || node.type === 'JSXIdentifier') names.add(node.name);
+			for (const key in node) if (key !== 'metadata' && key !== 'loc') collect(node[key]);
+		};
+		collect(ast);
+		helper = '__octane_childrenBlock';
+		while (names.has(helper)) helper += '_';
+		return helper;
+	};
+	const walk = (node, template) => {
+		if (!node || typeof node !== 'object') return node;
+		if (Array.isArray(node)) {
+			let result = node;
+			node.forEach((child, index) => {
+				const next = walk(child, template);
+				if (next !== child) {
+					if (result === node) result = [...node];
+					result[index] = next;
+				}
+			});
+			return result;
+		}
+		let result = node;
+		for (const key of Object.keys(node)) {
+			if (['metadata', 'loc', 'start', 'end', 'parent'].includes(key)) continue;
+			const value = node[key];
+			if (!value || typeof value !== 'object') continue;
+			const next = walk(value, isTemplateKey(node, key, template));
+			if (next !== value) {
+				if (result === node) result = { ...node };
+				result[key] = next;
+			}
+		}
+		if (!template || node.type !== 'JSXElement' || !isBlockChildren(result)) return result;
+		const fragment = b.jsx_fragment(result.children);
+		// Template children still lower their directives, as the parser marks them.
+		fragment.metadata.native_tsrx = true;
+		return {
+			...result,
+			children: [b.jsx_expression_container(b.call(blockHelper(), fragment))],
+		};
+	};
+	const projected = walk(ast, false);
+	return helper === null
+		? ast
+		: {
+				...projected,
+				body: [b.imports([['childrenBlock', helper]], 'octane/tsrx-boundary'), ...projected.body],
+			};
 }
 
 /**
@@ -665,7 +752,10 @@ export function compileToVolarMappings(source, filename, options) {
 	const transformed = transform(
 		projectServerContextCalls(
 			renderer.target === 'dom'
-				? projectNativeDomReads(transformAst, options?.knownAttributeSpreads)
+				? projectComponentChildren(
+						projectNativeDomReads(transformAst, options?.knownAttributeSpreads),
+						comments,
+					)
 				: transformAst,
 			filename,
 		),
@@ -918,7 +1008,9 @@ export function compileTypesInspection(source, filename, options) {
 	const transform = selectOctaneTransform(ast, dynamicJsxTypes?.componentAlias);
 	const transformed = transform(
 		projectServerContextCalls(
-			renderer.target === 'dom' ? projectNativeDomReads(transformAst) : transformAst,
+			renderer.target === 'dom'
+				? projectComponentChildren(projectNativeDomReads(transformAst), comments)
+				: transformAst,
 			filename,
 		),
 		source,
