@@ -235,6 +235,9 @@ export function enterRootJournal(transaction: RootRenderTransaction): void {
 /** Restore the window the closing root render frame interrupted (endRootRender). */
 export function exitRootJournal(): void {
 	const frames = ROOT_JOURNAL_FRAMES;
+	// A frame that began before the journal was installed entered no window.
+	// Frames nest, so every frame entered since has already left.
+	if (frames.length === 0) return;
 	OPS_CHECKPOINT = frames.pop();
 	TRANSITION_JOURNAL_DEPTH = frames.pop();
 	TRANSITION_JOURNAL_BAG_WINDOW = frames.pop();
