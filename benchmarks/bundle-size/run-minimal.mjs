@@ -292,7 +292,13 @@ const selectedScenarios = selectMinimalScenarios(process.argv.slice(2), scenario
 // Hidden maps measure retained implementation bodies even after inlining.
 const effectControls = {
 	'root-static-specialized': [],
-	'hooks-state': ['drainRegisteredMutationEffects', 'runRegisteredLayoutEffects'],
+	'hooks-state': [
+		'drainRegisteredMutationEffects',
+		'runRegisteredLayoutEffects',
+		'finishEffectRender',
+		'runEffectCleanupCallback',
+		'drainCommitRefs',
+	],
 	'binding-hooks': [
 		'drainRegisteredPassivePhase',
 		'drainRegisteredPassiveUnmounts',

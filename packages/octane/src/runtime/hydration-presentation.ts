@@ -25,6 +25,7 @@ import {
 	activeSignalOwnerEnvironment,
 	currentExplicitSignalOwner,
 	currentSignalOwner,
+	explicitSignalOwners,
 } from '../signals/owner-context.js';
 import { signalDocumentEnabled } from '../signals/document-owner.js';
 import { hasHydrationControlSignalWriter } from '../signals/early-values.js';
@@ -169,9 +170,10 @@ export function retryPresentationMiss(error: PresentationAdoptionMiss, retry: ()
  * Whether `error` is hydration control flow (NativeAdoptionMiss, including a
  * HydrationMismatch, or PresentationAdoptionMiss), which every application
  * boundary passes through. It tests their brand, so client-only bundles keep
- * neither class.
+ * neither class. Only a runtime that hydrates throws one, so their tests fold.
  */
 export function isAdoptionControl(error: unknown): boolean {
+	if (!hydrationStarted) return false;
 	return (
 		typeof error === 'object' &&
 		error !== null &&
@@ -1303,59 +1305,66 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 		}
 		(el as any)[key] = handler;
 	}
-	// Explicit authority also applies to handlers in modules with no signal bindings.
-	const explicitOwner =
-		activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined
-			? currentExplicitSignalOwner()
-			: null;
-	if (
-		SIGNAL_BINDINGS_ENABLED ||
-		signalDocumentEnabled ||
-		explicitOwner !== null ||
-		SIGNAL_EVENT_OWNERS_RECORDED
-	) {
-		// Retain the precise invocation for an event-only reader whose signal
-		// module may arrive later. No owner or wrapper is allocated speculatively.
-		const owner =
-			explicitOwner ??
-			(signalDocumentEnabled || CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined
-				? CURRENT_SCOPE === null
-					? currentSignalOwner()
-					: CURRENT_SCOPE.signalOwner || CURRENT_SCOPE
-				: CURRENT_SCOPE);
-		if (owner !== null) {
-			// Mark that a scope token escaped before queuing its commit. A queued
-			// event may be followed by deletion in the same render; recording only
-			// at commit would miss that retirement. Discard leaves only this
-			// conservative flag, never an owner or signal state.
-			if ((owner instanceof ScopeImpl || owner instanceof BlockImpl) && !owner.signalTokenEscaped)
-				owner.signalTokenEscaped = true;
-			// Later writers must replace explicit authority with the usual scope
-			// token, including when both writers are still waiting for publication.
-			SIGNAL_EVENT_OWNERS_RECORDED = true;
-			// Compare queued writes at publication: an earlier preparation may
-			// replace even the authority that is currently committed.
-			const transaction = ROOT_RENDER_TRANSACTION;
-			if (
-				hydrating &&
-				PRESENTATION_HYDRATION === null &&
-				(staged || key === undefined) &&
-				CURSOR?.stageEvent(el, '$$signalOwner', owner) === true
-			)
-				return;
-			if (
-				key === undefined &&
-				transaction !== null &&
-				!transaction.aborted &&
-				!ROOT_RENDER_ROLLBACK &&
-				!hydrating
-			)
-				queueEventOwner(el, owner, transaction);
-			else {
-				const previous = (el as any).$$signalOwner as SignalEventOwner | undefined;
-				if (previous !== owner) {
-					if (TRANSITION_JOURNAL) TRANSITION_JOURNAL.push(JOURNAL_EVENT_OWNER, el, previous, null);
-					(el as any).$$signalOwner = owner;
+	// Authority needs a signal module, the signal document, or an explicit owner
+	// API. Each sets its sticky flag before any owner reaches a handler, so a
+	// bundle without them drops this along with the owners' dispatch.
+	if (SIGNAL_BINDINGS_ENABLED || signalDocumentEnabled || explicitSignalOwners) {
+		// Explicit authority also applies to handlers in modules with no signal bindings.
+		const explicitOwner =
+			activeSynchronousSignalOwner !== null || activeSignalOwnerEnvironment !== undefined
+				? currentExplicitSignalOwner()
+				: null;
+		if (
+			SIGNAL_BINDINGS_ENABLED ||
+			signalDocumentEnabled ||
+			explicitOwner !== null ||
+			SIGNAL_EVENT_OWNERS_RECORDED
+		) {
+			// Retain the precise invocation for an event-only reader whose signal
+			// module may arrive later. No owner or wrapper is allocated speculatively.
+			const owner =
+				explicitOwner ??
+				(signalDocumentEnabled ||
+				CURRENT_SCOPE?.block.idState.renderOwner?.signalOwner !== undefined
+					? CURRENT_SCOPE === null
+						? currentSignalOwner()
+						: CURRENT_SCOPE.signalOwner || CURRENT_SCOPE
+					: CURRENT_SCOPE);
+			if (owner !== null) {
+				// Mark that a scope token escaped before queuing its commit. A queued
+				// event may be followed by deletion in the same render; recording only
+				// at commit would miss that retirement. Discard leaves only this
+				// conservative flag, never an owner or signal state.
+				if ((owner instanceof ScopeImpl || owner instanceof BlockImpl) && !owner.signalTokenEscaped)
+					owner.signalTokenEscaped = true;
+				// Later writers must replace explicit authority with the usual scope
+				// token, including when both writers are still waiting for publication.
+				SIGNAL_EVENT_OWNERS_RECORDED = true;
+				// Compare queued writes at publication: an earlier preparation may
+				// replace even the authority that is currently committed.
+				const transaction = ROOT_RENDER_TRANSACTION;
+				if (
+					hydrating &&
+					PRESENTATION_HYDRATION === null &&
+					(staged || key === undefined) &&
+					CURSOR?.stageEvent(el, '$$signalOwner', owner) === true
+				)
+					return;
+				if (
+					key === undefined &&
+					transaction !== null &&
+					!transaction.aborted &&
+					!ROOT_RENDER_ROLLBACK &&
+					!hydrating
+				)
+					queueEventOwner(el, owner, transaction);
+				else {
+					const previous = (el as any).$$signalOwner as SignalEventOwner | undefined;
+					if (previous !== owner) {
+						if (TRANSITION_JOURNAL)
+							TRANSITION_JOURNAL.push(JOURNAL_EVENT_OWNER, el, previous, null);
+						(el as any).$$signalOwner = owner;
+					}
 				}
 			}
 		}

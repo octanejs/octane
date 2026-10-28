@@ -69,7 +69,12 @@ import { ELEMENT_TAG } from '../runtime-tags.js';
 import { STREAM_RETRY_PROP } from '../stream-protocol.js';
 import { setNativeAdoptionResolver, NativeAdoptionMiss } from '../signals/read-protocol.js';
 import { type beginNativeEventBatch, endNativeEventBatch } from '../signals/native-read-events.js';
-import { currentSignalOwner, runWithSignalOwner } from '../signals/owner-context.js';
+import {
+	currentSignalOwner,
+	explicitSignalOwners,
+	runInSignalOwner,
+	runWithSignalOwner,
+} from '../signals/owner-context.js';
 import {
 	signalDocumentEnabled,
 	streamedSignalOwnerActivator as STREAMED_SIGNAL_OWNER_ACTIVATOR,
@@ -110,6 +115,9 @@ import {
 	activityInsertionEffectCreated,
 	noop,
 	MEMO_BAIL,
+	SIGNAL_BINDINGS_ENABLED,
+	EFFECT_HOOKS,
+	registerRootOptions,
 	TRANSITION_JOURNAL,
 	TRANSITION_JOURNAL_DEPTH,
 	ROOT_RENDER_ROLLBACK,
@@ -670,7 +678,8 @@ export function renderBlockInner(block: Block): true | undefined {
 	const effectEventActionCheckpoint = effectEventActionTarget.length;
 	CURRENT_SCOPE = block;
 	CURRENT_BLOCK = block;
-	CURRENT_EFFECT_RENDER_VERSION = block.effectSlots === null ? 0 : NEXT_EFFECT_RENDER_VERSION++;
+	CURRENT_EFFECT_RENDER_VERSION =
+		EFFECT_HOOKS && block.effectSlots !== null ? NEXT_EFFECT_RENDER_VERSION++ : 0;
 	CURRENT_EFFECT_REACHED = 0;
 	const continuesParentTree =
 		prevBlock !== null && (block.parentBlock === prevBlock || blockIsAncestor(prevBlock, block));
@@ -834,7 +843,7 @@ export function renderBlockInner(block: Block): true | undefined {
 		// render version it also checks is 0 exactly then — see above). effectSlots
 		// is populated mid-body by enqueueEffect, so a block's first useEffect
 		// still lands the full path on the render that registered it.
-		if (block.effectSlots !== null) finishEffectRender(block);
+		if (EFFECT_HOOKS && block.effectSlots !== null) finishEffectRender(block);
 		if (!block.mounted) block.mounted = true;
 		if (block.renderStatus === RENDER_RETRYING) block.renderStatus = RENDER_VALID;
 		// Re-read: the body's first useEffectEvent call allocates the record. A
@@ -1027,7 +1036,7 @@ export function componentSlotLite<P>(
 	// Block, so finishEffectRender retires exactly the ones this render skipped.
 	const effectReached = CURRENT_EFFECT_REACHED;
 	CURRENT_EFFECT_REACHED = 0;
-	if (scope.effectSlots !== null) ensureEffectRenderVersion();
+	if (EFFECT_HOOKS && scope.effectSlots !== null) ensureEffectRenderVersion();
 	CURRENT_SCOPE = scope;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileTrackComponent(scope, comp);
@@ -1044,7 +1053,10 @@ export function componentSlotLite<P>(
 		adoptedOpen === null ? undefined : hydration!.beginClaim(getNextSibling(adoptedOpen), scope);
 	let retryVisit: SignalRetryVisit | null = null;
 	try {
-		if (signalDocumentEnabled || scope.block.idState.renderOwner?.signalOwner !== undefined) {
+		if (
+			signalDocumentEnabled ||
+			(registerRootOptions && scope.block.idState.renderOwner?.signalOwner !== undefined)
+		) {
 			// Same owner-resolution order as runWithBlockSignalOwner, but the
 			// per-mount closure only exists when the owner actually changes.
 			const owner = scopeSignalOwner(scope);
@@ -1056,7 +1068,7 @@ export function componentSlotLite<P>(
 			} else runWithSignalOwner(owner, () => comp(props, scope, undefined));
 		} else comp(props, scope, undefined);
 		if (retryVisit !== null) pruneSignalRetryVisit(retryVisit, false);
-		if (scope.effectSlots !== null) finishEffectRender(scope);
+		if (EFFECT_HOOKS && scope.effectSlots !== null) finishEffectRender(scope);
 		if (!scope.mounted) scope.mounted = true;
 	} catch (error) {
 		if (retryVisit !== null && isSuspenseException(error)) pruneSignalRetryVisit(retryVisit, true);
@@ -1534,12 +1546,16 @@ export function fireEventSlot(
 	// Effect Event permission and signal ownership are unchanged.
 	const nativeFrame = NATIVE_READ_DRIVER ? NATIVE_READ_DRIVER.pauseLifecycle() : -1;
 	try {
+		// A handler's owner is recorded only once one of these flags is set (see
+		// setEventHandler), and each stays set.
 		const owner =
-			recorded instanceof ScopeImpl || recorded instanceof BlockImpl
-				? scopeSignalOwner(recorded)
-				: recorded;
+			!SIGNAL_BINDINGS_ENABLED && !signalDocumentEnabled && !explicitSignalOwners
+				? undefined
+				: recorded instanceof ScopeImpl || recorded instanceof BlockImpl
+					? scopeSignalOwner(recorded)
+					: recorded;
 		if (owner === undefined || currentSignalOwner() === owner) invokeEventSlot(slot, event);
-		else runWithSignalOwner(owner, () => invokeEventSlot(slot, event));
+		else runInSignalOwner(owner, () => invokeEventSlot(slot, event));
 	} catch (err) {
 		reportListenerError(err);
 	} finally {

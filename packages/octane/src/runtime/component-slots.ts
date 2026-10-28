@@ -5,7 +5,7 @@
 
 // Evaluates after the module it names; runtime.ts explains the chain.
 export {} from './diagnostics.js';
-import { hydrating } from '../hydration-flag.js';
+import { hydrating, hydrationStarted } from '../hydration-flag.js';
 import { bumpContextEpoch, EPOCH_CELL } from '../context-epoch.js';
 import { HYDRATION_RANGE_BOUNDARY } from '../constants.js';
 import { hasOwnProp } from '../has-own.js';
@@ -49,6 +49,7 @@ import {
 	SIGNAL_BINDINGS_ENABLED,
 	MEMO_BAIL,
 	installMemoBail,
+	COMMIT_WORK,
 	ROOT_RENDER_ROLLBACK,
 	TRANSITION_JOURNAL,
 } from './drivers.js';
@@ -1459,9 +1460,10 @@ export function spliceOffscreenCapture(
 	capture: OffscreenCapture,
 	deferredNativeAcceptance = false,
 ): void {
-	if (capture.presentations !== undefined && WIP_CAPTURE !== null)
+	// Only hydration records presentations and host events.
+	if (hydrationStarted && capture.presentations !== undefined && WIP_CAPTURE !== null)
 		(WIP_CAPTURE.presentations ??= []).push(...capture.presentations);
-	if (capture.hostEvents !== undefined && WIP_CAPTURE !== null) {
+	if (hydrationStarted && capture.hostEvents !== undefined && WIP_CAPTURE !== null) {
 		(WIP_CAPTURE.hostEvents ??= []).push(...capture.hostEvents);
 		capture.hostEvents = undefined;
 	}
@@ -1477,38 +1479,42 @@ export function spliceOffscreenCapture(
 		// An inner success is still speculative until its enclosing capture commits.
 		for (const block of rendered) recordCapturedRender(WIP_CAPTURE, block);
 	}
-	for (let p = 0 as Phase; p < 3; p++) {
-		const src = capture.effects[p];
-		const target = WIP_CAPTURE !== null ? WIP_CAPTURE.effects[p] : effectQueues[p];
-		for (let i = 0; i < src.length; i++) {
-			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-				__profileQueueWork(src[i]);
-			target.push(src[i]);
+	// Only the producers that install COMMIT_WORK fill these lists.
+	if (COMMIT_WORK) {
+		for (let p = 0 as Phase; p < 3; p++) {
+			const src = capture.effects[p];
+			const target = WIP_CAPTURE !== null ? WIP_CAPTURE.effects[p] : effectQueues[p];
+			for (let i = 0; i < src.length; i++) {
+				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+					__profileQueueWork(src[i]);
+				target.push(src[i]);
+			}
 		}
+		const eventTarget = WIP_CAPTURE !== null ? WIP_CAPTURE.events : effectEventQueue;
+		for (let i = 0; i < capture.events.length; i++) {
+			eventTarget.push(capture.events[i]);
+		}
+		const eventActionTarget =
+			WIP_CAPTURE !== null ? WIP_CAPTURE.eventActions : effectEventCommitActions;
+		for (let i = 0; i < capture.eventActions.length; i++) {
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__profileQueueWork(capture.eventActions[i]);
+			eventActionTarget.push(capture.eventActions[i]);
+		}
+		const refTarget = WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue;
+		for (let i = 0; i < capture.refs.length; i++) refTarget.push(capture.refs[i]);
+		if (capture.detaches !== undefined) {
+			const target = WIP_CAPTURE === null ? refDetachQueue : (WIP_CAPTURE.detaches ??= []);
+			for (const entry of capture.detaches) target.push(entry);
+		}
+		// Store-syncs enqueued off-screen now belong to committed DOM — hand them to the
+		// live queue so the surrounding commit's drainStoreSyncs reconciles them.
+		const storeTarget = WIP_CAPTURE !== null ? WIP_CAPTURE.stores : storeSyncQueue;
+		for (let i = 0; i < capture.stores.length; i++) storeTarget.push(capture.stores[i]);
 	}
-	const eventTarget = WIP_CAPTURE !== null ? WIP_CAPTURE.events : effectEventQueue;
-	for (let i = 0; i < capture.events.length; i++) {
-		eventTarget.push(capture.events[i]);
-	}
-	const eventActionTarget =
-		WIP_CAPTURE !== null ? WIP_CAPTURE.eventActions : effectEventCommitActions;
-	for (let i = 0; i < capture.eventActions.length; i++) {
-		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
-			__profileQueueWork(capture.eventActions[i]);
-		eventActionTarget.push(capture.eventActions[i]);
-	}
-	const refTarget = WIP_CAPTURE !== null ? WIP_CAPTURE.refs : refAttachQueue;
-	for (let i = 0; i < capture.refs.length; i++) refTarget.push(capture.refs[i]);
-	if (capture.detaches !== undefined) {
-		const target = WIP_CAPTURE === null ? refDetachQueue : (WIP_CAPTURE.detaches ??= []);
-		for (const entry of capture.detaches) target.push(entry);
-	}
-	// Store-syncs enqueued off-screen now belong to committed DOM — hand them to the
-	// live queue so the surrounding commit's drainStoreSyncs reconciles them.
-	const storeTarget = WIP_CAPTURE !== null ? WIP_CAPTURE.stores : storeSyncQueue;
-	for (let i = 0; i < capture.stores.length; i++) storeTarget.push(capture.stores[i]);
-	if (capture.suspenseCommits !== undefined) {
-		for (const state of capture.suspenseCommits) PUBLISH_SUSPENSE_COMMIT!(state);
+	// recordSuspenseCommit installs its publisher before the capture records one.
+	if (PUBLISH_SUSPENSE_COMMIT && capture.suspenseCommits !== undefined) {
+		for (const state of capture.suspenseCommits) PUBLISH_SUSPENSE_COMMIT(state);
 	}
 	const cleanups = capture.renderCleanups;
 	if (cleanups !== undefined) {
@@ -1618,7 +1624,7 @@ export function discardOffscreenCapture(capture: OffscreenCapture | null): void 
 		// Dispose paths have already unmounted their blocks and are ignored.
 		for (const block of rendered) invalidateRender(block, owner);
 	}
-	for (let i = 0; i < capture.stores.length; i++) capture.stores[i].queued = false;
+	if (COMMIT_WORK) for (let i = 0; i < capture.stores.length; i++) capture.stores[i].queued = false;
 	const cleanups = capture.renderCleanups;
 	if (cleanups !== undefined) {
 		capture.renderCleanups = undefined;

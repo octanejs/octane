@@ -11,6 +11,7 @@ import { __profileCount, ProfileCounter } from '../profiling.js';
 import { selfDelimits } from '../hydration-protocol.js';
 import { isBlockOpen } from '../stream-protocol.js';
 import { isChildOf, moveNativeNodeBefore } from '../dom-focused-move.js';
+import { signalDocumentEnabled } from '../signals/document-owner.js';
 import type {
 	ComponentBody,
 	Scope,
@@ -29,6 +30,7 @@ import {
 	captureFocusedMovement,
 } from './engine.js';
 import { isSuspenseException, retainDiscardedWarmMemos } from './use.js';
+import { registerRootOptions } from './drivers.js';
 import { CONTEXT_DEPENDENCIES, isHostContextRequest } from './context.js';
 import { CURSOR, isRendererHydrationStyle, auditHydrationProbe } from './hydration.js';
 import {
@@ -1127,7 +1129,10 @@ export function mountItemsLinear<T>(
 				!isAdoptionControl(error);
 			if (ROOT_ROLLBACK && isSuspenseException(error)) retainDiscardedWarmMemos(block);
 			// A hydrating item adopted server DOM, which a failed attempt leaves.
-			if (block.idState.renderOwner?.signalOwner !== undefined)
+			if (
+				(signalDocumentEnabled || registerRootOptions) &&
+				block.idState.renderOwner?.signalOwner !== undefined
+			)
 				discardSignalRetryItem(block, error);
 			else unmountBlock(block, !hydrating && !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
 			if (start !== null && end !== null)

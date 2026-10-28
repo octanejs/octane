@@ -49,9 +49,16 @@ import {
 	NATIVE_READ_DRIVER,
 	reportCaughtError,
 	reportUncaughtError,
+	registerRootOptions,
+	SIGNAL_BINDINGS_ENABLED,
+	EFFECT_HOOKS,
+	COMMIT_WORK,
+	installCommitWork,
 	ROOT_RENDER_ROLLBACK,
 	TRANSITION_JOURNAL,
 } from './drivers.js';
+import { signalDocumentEnabled } from '../signals/document-owner.js';
+import { explicitSignalOwners } from '../signals/owner-context.js';
 import { RENDERER_INVOCATION_SITE } from './signal-owners.js';
 import {
 	VIEW_TRANSITION_DRIVER,
@@ -543,6 +550,7 @@ export function enqueueEffectEventUpdate(entry: PendingEffectEvent): void {
 export function enqueueEffectEventCommitAction(action: EffectEventCommitAction): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileQueueWork(action);
+	installCommitWork();
 	EFFECT_EVENT_ACTION_TARGET.push(action);
 }
 
@@ -1205,7 +1213,7 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 	// registration is phase-EXECUTION order, which loses the declared order and
 	// can't tell a passive destroy from a ref teardown.
 	const effects = scope.effectSlots;
-	if (effects !== null) {
+	if (EFFECT_HOOKS && effects !== null) {
 		for (let i = 0; i < effects.length; i++) {
 			const slot = effects[i];
 			// Retire this call site's queued entries. The drains skip a disposed
@@ -1242,7 +1250,8 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 	// De-opt refs are unaffected: their detaches queue from detachDeoptTreeRefs
 	// walks outside this cleanups loop.
 	let abortedRefs: SuspenseRefEntry[] | null = null;
-	if ((scope as any).mounted !== true) {
+	// Only a producer of commit-phase refs gives an aborted mount refs to suppress.
+	if (COMMIT_WORK && (scope as any).mounted !== true) {
 		abortedRefs = [];
 		collectVisibleSubtreeRefs(scope, abortedRefs);
 	}
@@ -1269,17 +1278,27 @@ function runScopeCleanups(scope: Scope, retireUnowned: boolean): void {
 				reportTeardownError(err);
 			}
 		}
-	const signalOwner = scope.signalOwner;
-	if (signalOwner) {
-		if (RETAINED_SIGNAL_OWNERS?.owners.has(signalOwner)) return;
-		if (retireUnowned) scope.signalOwner = null;
-		else scope.signalOwner = undefined;
-		retireRendererSignalOwner(signalOwner);
-	} else if (
-		retireUnowned &&
-		(signalOwner === false || (signalOwner === undefined && scope.signalTokenEscaped))
+	// A scope holds an owner only from a resolved root owner (the signal document
+	// or a root's options), and an escaped token only from event authority (see
+	// setEventHandler). Bundles with neither keep no retirement.
+	if (
+		registerRootOptions ||
+		signalDocumentEnabled ||
+		SIGNAL_BINDINGS_ENABLED ||
+		explicitSignalOwners
 	) {
-		retireUnownedSignalScope(scope);
+		const signalOwner = scope.signalOwner;
+		if (signalOwner) {
+			if (RETAINED_SIGNAL_OWNERS?.owners.has(signalOwner)) return;
+			if (retireUnowned) scope.signalOwner = null;
+			else scope.signalOwner = undefined;
+			retireRendererSignalOwner(signalOwner);
+		} else if (
+			retireUnowned &&
+			(signalOwner === false || (signalOwner === undefined && scope.signalTokenEscaped))
+		) {
+			retireUnownedSignalScope(scope);
+		}
 	}
 }
 

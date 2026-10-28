@@ -63,6 +63,7 @@ import {
 	ensureScheduledVisibilityDriver,
 	queueRefAttach,
 	noop,
+	installCommitWork,
 	ROOT_RENDER_ROLLBACK,
 	TRANSITION_JOURNAL,
 	TRANSITION_JOURNAL_BAGS,
@@ -2441,6 +2442,7 @@ function hideTryContentAndMountPendingInner(
 		const action = () => deactivateSuspensePrimary(state, persistent, uncommittedRefs);
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileQueueWork(action);
+		installCommitWork();
 		if (WIP_CAPTURE === null) effectEventCommitActions.push(action);
 		else {
 			// A later sibling can suspend after this nested fallback was selected.

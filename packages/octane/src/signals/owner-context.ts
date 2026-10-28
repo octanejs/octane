@@ -22,6 +22,14 @@ export {
  */
 export const signalOwnerUse = { active: false };
 
+/**
+ * @internal Set by the public owner APIs: a frame, a carrier, or SSR's
+ * synchronous entry. Signal bindings and the signal document have their own
+ * flags. Renderer code tests it to reach owner authority, and a bundle that
+ * never calls those APIs never writes it, so that code folds away.
+ */
+export let explicitSignalOwners = false;
+
 /** Install a concurrency-safe owner carrier without importing the signal engine. */
 export function installSignalOwnerEnvironment(environment: SignalOwnerEnvironment): () => void {
 	if (
@@ -34,6 +42,7 @@ export function installSignalOwnerEnvironment(environment: SignalOwnerEnvironmen
 	}
 	const previous = installedEnvironment;
 	installedEnvironment = environment;
+	explicitSignalOwners = true;
 	signalOwnerUse.active = true;
 	return () => {
 		if (installedEnvironment === environment) installedEnvironment = previous;
@@ -64,6 +73,16 @@ export function installDefaultSignalOwner(current: () => SignalOwner | null): ()
 /** Enter an owner for a synchronous declaration, read, write, or callback. */
 export function runWithSignalOwner<T>(owner: SignalOwner, callback: () => T): T {
 	if (typeof callback !== 'function') throw new TypeError(formatClientError(191));
+	explicitSignalOwners = true;
+	return runInSignalOwner(owner, callback);
+}
+
+/**
+ * @internal runWithSignalOwner for an owner the renderer recorded, which only
+ * code that already tested the owner flags can hold. It leaves
+ * explicitSignalOwners unwritten, so those tests can still fold.
+ */
+export function runInSignalOwner<T>(owner: SignalOwner, callback: () => T): T {
 	if (installedEnvironment) return installedEnvironment.run(owner, callback);
 	const previous = synchronousOwner;
 	synchronousOwner = owner;
@@ -82,6 +101,7 @@ export function enterSynchronousSignalOwner(owner: SignalOwner): SignalOwner | n
 	if (installedEnvironment !== undefined) return undefined;
 	const previous = synchronousOwner;
 	synchronousOwner = owner;
+	explicitSignalOwners = true;
 	signalOwnerUse.active = true;
 	return previous;
 }

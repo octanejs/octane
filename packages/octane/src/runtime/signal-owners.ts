@@ -1357,7 +1357,11 @@ export function renderBlock(block: Block): void {
 	// The synchronous owner this call replaced, or undefined when the block
 	// renders in its caller's owner frame.
 	let previousSignalOwner: SignalOwner | null | undefined;
-	if (signalDocumentEnabled || block.idState.renderOwner?.signalOwner !== undefined) {
+	// Only the signal document or an options root can give a root its owner.
+	if (
+		signalDocumentEnabled ||
+		(registerRootOptions && block.idState.renderOwner?.signalOwner !== undefined)
+	) {
 		const owner = scopeSignalOwner(block);
 		if (owner !== undefined) {
 			STREAMED_SIGNAL_OWNER_ACTIVATOR?.(owner);
@@ -1434,6 +1438,7 @@ export function renderBlock(block: Block): void {
 		// the creation journal alone cannot clean up this otherwise-orphaned item.
 		// Preserve only its signal authority for retry, never its failed DOM/scope.
 		if (
+			(signalDocumentEnabled || registerRootOptions) &&
 			block.idState.renderOwner?.signalOwner !== undefined &&
 			!block.mounted &&
 			block.forSlot !== null &&
