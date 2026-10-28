@@ -68,7 +68,7 @@ describe('auto-calculation — identity is stable while inputs are', () => {
 });
 
 describe('auto-calculation — conversion globals are projections', () => {
-	it('keeps an object built with String() stable while its input is', () => {
+	it('keeps a calculation that converts with String() stable while its input is', () => {
 		const r = mount(ConvertedIdentity);
 		const first = r.find('#ci-identity').textContent;
 		expect(r.find('#ci-count').textContent).toBe('1');

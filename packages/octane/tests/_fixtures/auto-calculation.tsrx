@@ -1,5 +1,5 @@
 import { useState } from 'octane';
-import { projectRows, tagged } from './auto-calculation-helpers.ts';
+import { projectRows, summarize, tagged } from './auto-calculation-helpers.ts';
 
 // Fixtures for auto-calculation memoization: a derived `const` whose init
 // reaches a render-time call is cached on its component-local inputs, so its
@@ -44,12 +44,13 @@ export function DerivedIdentity() @{
 	</div>
 }
 
-// A conversion global is a value projection like an imported helper, so the
-// object it builds keeps its identity while `items` does.
+// A conversion global inside a cached calculation is a value projection like
+// the imported helper around it, so the result keeps its identity while
+// `items` does.
 export function ConvertedIdentity() @{
 	const [items, setItems] = useState([{ id: 1, n: 1 }]);
 	const [tick, setTick] = useState(0);
-	const summary = { count: String(items.length) };
+	const summary = summarize(String(items.length));
 	<div>
 		<button id="ci-tick" onClick={() => setTick(tick + 1)}>
 			{'tick'}

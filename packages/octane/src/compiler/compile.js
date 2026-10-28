@@ -20572,7 +20572,8 @@ function isPropCreationExpr(expr, ctx, includesLiteral = false) {
 					blocked = true;
 					return;
 				}
-				found = true;
+				// A conversion such as `String(value)` creates nothing; its arguments may.
+				if (!isConversionGlobalCall(n)) found = true;
 			}
 		}
 		for (const k in n) {
