@@ -275,7 +275,16 @@ export function run() { const host = document.querySelector('#host'), c = attach
 			'export default function (props) @{ <main>{props.label as string}<input /></main> }',
 		],
 		['arrow', 'export default (props) => @{ <main>{props.label as string}<input /></main> }'],
-	])('specializes roots over an anonymous default %s component export', async (_form, view) => {
+		// React's usual default exports of a local component.
+		[
+			'binding',
+			'function Local(props) @{ <main>{props.label as string}<input /></main> }\nexport default Local;',
+		],
+		[
+			'memo',
+			"import { memo } from 'octane';\nfunction Local(props) @{ <main>{props.label as string}<input /></main> }\nexport default memo(Local);",
+		],
+	])('specializes roots over a default %s component export', async (_form, view) => {
 		const entry = `${IMPORTS}
 export async function run() { const host=document.querySelector('#host'); const root=createRoot(host);
  root.render(View, {label:'first'}); const input=host.querySelector('input'); input.value='typed';
