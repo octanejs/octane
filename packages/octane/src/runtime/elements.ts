@@ -31,7 +31,7 @@ import {
 import { componentSlot } from './component-slots.js';
 import { type FragmentProps, renderActivityDescriptor } from './activity.js';
 import { EMPTY_ARGS } from './events.js';
-import { HOST_DESCRIPTORS, enableHostDescriptors } from './drivers.js';
+import { HOST_BODY, enableHostDescriptors } from './drivers.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -251,7 +251,7 @@ function scopedElementRecord<P>(
 	resolve: () => unknown,
 	invocationSite?: string,
 ): ElementDescriptor<P> {
-	if (typeof type === 'string' && !HOST_DESCRIPTORS) enableHostDescriptors();
+	if (typeof type === 'string' && !HOST_BODY) enableHostDescriptors();
 	const descriptor = { $$kind: ELEMENT_TAG, type, props, key, ref } as ElementDescriptor<P>;
 	if (invocationSite !== undefined) descriptor.__octaneInvocationSite = invocationSite;
 	Object.defineProperty(descriptor, SCOPED_CHILDREN_RESOLVER, { value: resolve });
@@ -484,7 +484,7 @@ export function createHostElement<P>(
 	props?: P | null,
 	...children: any[]
 ): ElementDescriptor<P> {
-	if (!HOST_DESCRIPTORS) enableHostDescriptors();
+	if (!HOST_BODY) enableHostDescriptors();
 	return createElementFromConfig(undefined, type, props, children);
 }
 
