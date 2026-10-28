@@ -648,7 +648,7 @@ export async function run(container, scenario) {
 // A renderable hole dispatches element descriptors only in a bundle with a
 // factory that builds one. The descriptor renderer and the branches of the hole
 // and list code that only a descriptor factory enables (ELEMENT_DESCRIPTORS,
-// HOST_DESCRIPTORS) are ranges of the source: a bundle retains one exactly when
+// HOST_BODY) are ranges of the source: a bundle retains one exactly when
 // some generated code maps into it.
 const parseSource = (text: string, source: string) => parseAst(text, { lang: 'ts' }, source);
 // The host renderer, Fragment handling and descriptor list-item updates.
@@ -665,8 +665,8 @@ const DESCRIPTOR_DECLARATIONS = [
 ];
 const DESCRIPTOR_GUARDS = new Set([
 	'ELEMENT_DESCRIPTORS',
-	'HOST_DESCRIPTORS',
-	'hostDriver',
+	'HOST_BODY',
+	'hostBody',
 	'isElementDescriptor',
 	'isHostDescriptor',
 ]);

@@ -46,7 +46,7 @@ import type {
 	RootContainer,
 } from './types.js';
 import {
-	HOST_DESCRIPTORS,
+	HOST_BODY,
 	ELEMENT_DESCRIPTORS,
 	installHydrationDriver,
 	ROOT_RENDER_ROLLBACK,
@@ -1191,7 +1191,7 @@ export class HydrationCapability {
 		list: { items: readonly unknown[] } | null,
 	): boolean {
 		// Only a bundle with a host descriptor factory can hold one.
-		const type = HOST_DESCRIPTORS && list === null && isHostDescriptor(value) ? value.type : null;
+		const type = HOST_BODY && list === null && isHostDescriptor(value) ? value.type : null;
 		// Other values, such as a component or text, check what they adopt as
 		// they render.
 		if (type === null && list === null && (value as any)?.$$kind !== PORTAL_TAG) return false;
@@ -1258,11 +1258,7 @@ export class HydrationCapability {
 		if (
 			text === null ||
 			text.nodeType !== 3 ||
-			!(
-				list ||
-				(value as any)?.$$kind === PORTAL_TAG ||
-				(HOST_DESCRIPTORS && isHostDescriptor(value))
-			) ||
+			!(list || (value as any)?.$$kind === PORTAL_TAG || (HOST_BODY && isHostDescriptor(value))) ||
 			text.parentNode !== parent ||
 			getNextSibling(text) !== end
 		)

@@ -33,7 +33,11 @@ import {
 	HYDRATION_DRIVER,
 	SIGNAL_BINDINGS_ENABLED,
 	MEMO_BAIL,
-	HOST_DESCRIPTORS,
+	HOST_BODY,
+	HOST_RECONCILE,
+	HOST_ADOPTS,
+	HOST_LAND_PAIR,
+	HOST_UNCHANGED,
 	ELEMENT_DESCRIPTORS,
 	ROOT_RENDER_ROLLBACK,
 } from './drivers.js';
@@ -688,7 +692,7 @@ export function childSlot(
 	// Only a factory that installed the host renderer can build a host
 	// descriptor. Reading its type first resolves a deferred JSX value, whose
 	// factory installs it; a bundle without one keeps no host branch below.
-	const hostDriver = typeof elementType === 'string' && HOST_DESCRIPTORS ? HOST_DESCRIPTORS : null;
+	const hostBody = typeof elementType === 'string' && HOST_BODY ? HOST_BODY : null;
 	const valueComponent =
 		typeof value === 'function'
 			? (value as ComponentBody)
@@ -727,17 +731,17 @@ export function childSlot(
 	// After Usable unwrapping a host descriptor is no thenable, so it needs Blocks
 	// exactly when its children do.
 	const pureHost =
-		hostDriver !== null &&
+		hostBody !== null &&
 		preparedList === null &&
-		state?.currentComp !== (hostDriver.body as unknown as ComponentBody) &&
+		state?.currentComp !== (hostBody as unknown as ComponentBody) &&
 		!descNeedsBlocks((value as ElementDescriptor).children);
 	let rootShapeChanged = false;
 	if (state !== undefined && ROOT_RENDER_TRANSACTION !== null) {
 		const component =
 			pureHost || preparedList !== null
 				? null
-				: hostDriver !== null
-					? (hostDriver.body as unknown as ComponentBody)
+				: hostBody !== null
+					? (hostBody as unknown as ComponentBody)
 					: valueComponent;
 		const unchangedList = preparedList !== null && state.forSlot !== null;
 		const unchangedComponent =
@@ -920,7 +924,7 @@ export function childSlot(
 			ownsHost !== undefined &&
 			hydration === null &&
 			ROOT_RENDER_TRANSACTION !== null &&
-			(HOST_DESCRIPTORS ? DEOPT_UPGRADE?.block !== parentScope.block : true);
+			(HOST_BODY ? DEOPT_UPGRADE?.block !== parentScope.block : true);
 	} else if (hydration !== null) {
 		if (hydration.lentSlot === state) {
 			hydration.lentSlot = null;
@@ -944,7 +948,7 @@ export function childSlot(
 	let upgradeChildren: any = undefined;
 	let upgradeArmed = false;
 	if (
-		HOST_DESCRIPTORS &&
+		HOST_BODY &&
 		DEOPT_UPGRADE !== null &&
 		DEOPT_UPGRADE.block === parentScope.block &&
 		ownsHost !== undefined
@@ -961,13 +965,7 @@ export function childSlot(
 	// normal marked regime — the childSlot analogue of the singleRoot shape-flip
 	// handling in disposeReturnSlot. One-way: once marked, the slot stays marked.
 	// Only a host descriptor's slot mints no markers (pureHost).
-	if (
-		HOST_DESCRIPTORS &&
-		state.end === null &&
-		!pureHost &&
-		state.ownerHost === null &&
-		!state.borrowed
-	) {
+	if (HOST_BODY && state.end === null && !pureHost && state.ownerHost === null && !state.borrowed) {
 		const start = document.createComment('');
 		const end = document.createComment('');
 		const host = state.hostNode;
@@ -979,8 +977,8 @@ export function childSlot(
 			hydration === null &&
 			preparedList === null &&
 			host !== null &&
-			hostDriver !== null &&
-			hostDriver.adopts(host, value as ElementDescriptor, domParent);
+			hostBody !== null &&
+			HOST_ADOPTS!(host, value as ElementDescriptor, domParent);
 		if (p !== null && !adopts && ROOT_RENDER_TRANSACTION !== null && usesFrontier(parentBlock, p)) {
 			// Over committed DOM the pair, and whatever this render puts in it, take
 			// the host's place at commit: the rest of this call renders into the
@@ -1003,7 +1001,7 @@ export function childSlot(
 			// The pure-host upgrade below adopts the host in place. Its commit puts
 			// the pair around it, after any move of the host by its list, and only
 			// then hands the shared bound over (landHostPair).
-			ROOT_RENDER_TRANSACTION.ops.push(hostDriver!.landPair, [host, start, end, parentBlock]);
+			ROOT_RENDER_TRANSACTION.ops.push(HOST_LAND_PAIR!, [host, start, end, parentBlock]);
 		} else if (p !== null) {
 			p.insertBefore(start, host);
 			p.insertBefore(end, getNextSibling(host!));
@@ -1112,7 +1110,7 @@ export function childSlot(
 	// only, so the mount path below reads them; a same-component update never
 	// resolves them.
 	let componentDescriptor: ElementDescriptor | null = null;
-	if (hostDriver !== null) {
+	if (hostBody !== null) {
 		if (pureHost) {
 			// Pure host/text → reconcile in place, REUSING the existing node so DOM
 			// state survives a re-render. Switching in from a component/text first
@@ -1126,7 +1124,7 @@ export function childSlot(
 				// always yields a node for a host descriptor; the null checks are
 				// shape-parity with the marked path below.
 				const prev = state.hostNode;
-				const node = hostDriver.reconcile(
+				const node = HOST_RECONCILE!(
 					prev,
 					value as ElementDescriptor & { type: string },
 					parentBlock,
@@ -1172,7 +1170,7 @@ export function childSlot(
 				prev = getNextSibling(state.start!);
 				if (prev === state.end) prev = null;
 			}
-			const node = hostDriver.reconcile(
+			const node = HOST_RECONCILE!(
 				prev,
 				value as ElementDescriptor & { type: string },
 				parentBlock,
@@ -1208,7 +1206,7 @@ export function childSlot(
 			state.hostNode = node;
 			return;
 		}
-		comp = hostDriver.body as unknown as ComponentBody;
+		comp = hostBody as unknown as ComponentBody;
 		props = value;
 		invocationSite = RENDERER_INVOCATION_SITE;
 	} else if (typeof value === 'function') {
@@ -1281,7 +1279,7 @@ export function childSlot(
 				props === state.block.props &&
 				// Deferred host shells can change their complete record or children.
 				// Compare the accepted resolution before accepting the shell's identity.
-				(hostDriver === null || hostDriver.unchanged(state.block, props)) &&
+				(hostBody === null || HOST_UNCHANGED!(state.block, props)) &&
 				tryImplicitBail(state.block)
 			)
 				return;
@@ -1331,10 +1329,10 @@ export function childSlot(
 		if (
 			hydration === null &&
 			ROOT_RENDER_TRANSACTION !== null &&
-			hostDriver !== null &&
+			hostBody !== null &&
 			state.block === null &&
 			state.hostNode !== null &&
-			hostDriver.adopts(state.hostNode, props as ElementDescriptor, domParent)
+			HOST_ADOPTS!(state.hostNode, props as ElementDescriptor, domParent)
 		) {
 			const el = state.hostNode as Element;
 			state.hostNode = null;
@@ -1382,7 +1380,7 @@ export function childSlot(
 				state.borrowed &&
 				(sharesBlockBoundary(parentBlock, state.start, state.end) ||
 					// Only a host descriptor's item can be awaiting its pair (itemRange).
-					(HOST_DESCRIPTORS ? itemRange(parentBlock)[1] : parentBlock.endMarker) === state.end);
+					(HOST_BODY ? itemRange(parentBlock)[1] : parentBlock.endMarker) === state.end);
 			const implicitBail = !isBodyFn || isChildrenBlock(comp);
 			const frag = slotFrontier(
 				state,
@@ -1476,7 +1474,7 @@ export function childSlot(
 		if (
 			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 			__OCTANE_PROFILE_ENABLED__ &&
-			hostDriver === null
+			hostBody === null
 		)
 			__profileTrackComponent(b, !isBodyFn || __profileHasComponentMetadata(comp) ? comp : null);
 		if (state.borrowed) b.exclusiveMarkers = true;
@@ -1495,7 +1493,7 @@ export function childSlot(
 		state.block = b;
 		if (hydratingUpdate) {
 			hydration!.renderUpdate(b);
-		} else if (adoptedRange && !passthroughOwner && hostDriver === null) {
+		} else if (adoptedRange && !passthroughOwner && hostBody === null) {
 			// The server may have rendered more in the range, for another value.
 			// (claimRange already settled a host's.)
 			hydration!.renderClaimed(b, parentScope, slotKey);

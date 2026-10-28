@@ -355,35 +355,37 @@ export function installManualFormPending(): void {
  * the renderer only through it, so a bundle whose values are compiled bodies,
  * component descriptors, text, arrays and empties retains neither the renderer
  * nor the generic attribute and controlled-form writers it calls.
+ *
+ * Each entry point is its own binding rather than a field of one driver
+ * object: bundles that install the renderer reach every one of them, and a
+ * minifier can shorten a binding's name but not a property's. HOST_BODY is
+ * set exactly when the renderer is installed, so it doubles as that check.
  */
-export interface HostDescriptorDriver {
-	/** Reconcile a host descriptor against the node at its position. */
-	reconcile: typeof reconcileDeoptHost;
-	/** The stable body of a host descriptor whose subtree needs Blocks. */
-	body: typeof hostElementBody;
-	/** Whether a raw host element can become a descriptor's Block's element. */
-	adopts: typeof adoptsPureHost;
-	/** Place an adopted host's new marker pair around it at commit. */
-	landPair: typeof landHostPair;
-	/** Whether a deferred host shell still resolves to its committed record. */
-	unchanged: typeof unchangedScopedHostDescriptor;
-	/** An upgraded host's raw children, keyed for its first list to adopt. */
-	adoptQueue: typeof buildDeoptAdoptQueue;
-	/** Commit an upgraded host's first list over the children it adopted. */
-	placeUpgraded: typeof placeUpgradedList;
-}
-export let HOST_DESCRIPTORS: HostDescriptorDriver | null = null;
+/** The stable body of a host descriptor whose subtree needs Blocks. */
+export let HOST_BODY: typeof hostElementBody | null = null;
+/** Reconcile a host descriptor against the node at its position. */
+export let HOST_RECONCILE: typeof reconcileDeoptHost | null = null;
+/** Whether a raw host element can become a descriptor's Block's element. */
+export let HOST_ADOPTS: typeof adoptsPureHost | null = null;
+/** Place an adopted host's new marker pair around it at commit. */
+export let HOST_LAND_PAIR: typeof landHostPair | null = null;
+/** Whether a deferred host shell still resolves to its committed record. */
+export let HOST_UNCHANGED: typeof unchangedScopedHostDescriptor | null = null;
+/** An upgraded host's raw children, keyed for its first list to adopt. */
+export let HOST_ADOPT_QUEUE: typeof buildDeoptAdoptQueue | null = null;
+/** Commit an upgraded host's first list over the children it adopted. */
+export let HOST_PLACE_UPGRADED: typeof placeUpgradedList | null = null;
 /** @internal Installed by every site that can create a host element descriptor. */
 export function enableHostDescriptors(): void {
-	HOST_DESCRIPTORS ??= {
-		reconcile: reconcileDeoptHost,
-		body: hostElementBody,
-		adopts: adoptsPureHost,
-		landPair: landHostPair,
-		unchanged: unchangedScopedHostDescriptor,
-		adoptQueue: buildDeoptAdoptQueue,
-		placeUpgraded: placeUpgradedList,
-	};
+	// The public factories install on every call; later calls stay one check.
+	if (HOST_BODY) return;
+	HOST_BODY = hostElementBody;
+	HOST_RECONCILE = reconcileDeoptHost;
+	HOST_ADOPTS = adoptsPureHost;
+	HOST_LAND_PAIR = landHostPair;
+	HOST_UNCHANGED = unchangedScopedHostDescriptor;
+	HOST_ADOPT_QUEUE = buildDeoptAdoptQueue;
+	HOST_PLACE_UPGRADED = placeUpgradedList;
 }
 
 /**

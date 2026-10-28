@@ -22,7 +22,10 @@ import type {
 } from './types.js';
 import {
 	queueRefAttach,
-	HOST_DESCRIPTORS,
+	HOST_BODY,
+	HOST_RECONCILE,
+	HOST_ADOPT_QUEUE,
+	HOST_PLACE_UPGRADED,
 	ELEMENT_DESCRIPTORS,
 	ROOT_RENDER_ROLLBACK,
 	TRANSITION_JOURNAL,
@@ -955,7 +958,7 @@ function flattenDeoptChildrenKeyed(outVals: any[], outKeys: any[], v: any, prefi
 // component descendants are handled by the Block path (hostElementBody/componentSlot),
 // never here. Returns the node to occupy this position (reused or freshly built), or
 // null for an empty value. A host descriptor goes to reconcileDeoptHost instead,
-// which only bundles that can build one retain (HostDescriptorDriver).
+// which only bundles that can build one retain (enableHostDescriptors).
 export function reconcileDeoptNode(prev: Node | null, value: any, ownerBlock: Block): Node | null {
 	if (value == null || value === false || value === true || value === '') return null;
 	const t = typeof value;
@@ -1531,14 +1534,14 @@ export function deoptItemBody(item: any, scope: Scope): void {
 	// descriptor always needs Blocks, so it skips descNeedsBlocks' second read.
 	const itemType = ELEMENT_DESCRIPTORS && isElementDescriptor(item) ? item.type : undefined;
 	// Only a bundle that can build a host item has its renderer (see childSlot).
-	const hostDriver = typeof itemType === 'string' && HOST_DESCRIPTORS ? HOST_DESCRIPTORS : null;
+	const hostBody = typeof itemType === 'string' && HOST_BODY ? HOST_BODY : null;
 	const needsBlocks =
-		(hostDriver !== null &&
+		(hostBody !== null &&
 			existingChild?.__kind === 'childSlot' &&
-			existingChild.currentComp === (hostDriver.body as unknown as ComponentBody)) ||
+			existingChild.currentComp === (hostBody as unknown as ComponentBody)) ||
 		typeof itemType === 'function' ||
 		descNeedsBlocks(item);
-	if (needsBlocks || hostDriver === null) promoteSelfMarkedItem(block);
+	if (needsBlocks || hostBody === null) promoteSelfMarkedItem(block);
 	const [itemStart, itemEnd] = itemRange(block);
 	// An item whose subtree contains a COMPONENT descriptor (a bare `<Comp/>`, or a
 	// host element with component children like `<li><Comp/></li>`) needs real Blocks
@@ -1566,7 +1569,7 @@ export function deoptItemBody(item: any, scope: Scope): void {
 			if (
 				scope.slots[0] === undefined &&
 				stale.nodeType === 1 /* Element */ &&
-				hostDriver !== null &&
+				hostBody !== null &&
 				isHostElementOfType(stale as Element, itemType as string) &&
 				stale.parentNode === block.parentNode
 			) {
@@ -1659,8 +1662,8 @@ export function deoptItemBody(item: any, scope: Scope): void {
 		if (prev === endM) prev = null; // empty item range → nothing to adopt
 	}
 	const node =
-		hostDriver !== null
-			? hostDriver.reconcile(prev, item, block, deoptChildNamespace(block.parentNode))
+		hostBody !== null
+			? HOST_RECONCILE!(prev, item, block, deoptChildNamespace(block.parentNode))
 			: reconcileDeoptNode(prev, item, block);
 	if (node !== prev) {
 		journalRootProperty(block, 'deoptNode', block.deoptNode);
@@ -2526,8 +2529,8 @@ export function renderPreparedChildList(
 			next: null,
 		};
 		// Only a host descriptor's Block upgrades its raw children (childSlot).
-		if (upgradeArmed && HOST_DESCRIPTORS)
-			state.forSlot.adopt = HOST_DESCRIPTORS.adoptQueue(upgradeChildren, getFirstChild(domParent));
+		if (upgradeArmed && HOST_ADOPT_QUEUE)
+			state.forSlot.adopt = HOST_ADOPT_QUEUE(upgradeChildren, getFirstChild(domParent));
 	}
 	const { items, keys } = preparedList;
 	const keySource = compiledMapKey || keys!;
@@ -2536,12 +2539,7 @@ export function renderPreparedChildList(
 	const body =
 		compiledMapBody || (mappedFallback === true ? mappedDeoptItemBody : (deoptItemBody as any));
 	// Only a host descriptor row can take over a compiled row's element.
-	if (
-		HOST_DESCRIPTORS &&
-		compiledMapBody === undefined &&
-		wasMappedNative &&
-		state.forSlot.size > 0
-	) {
+	if (HOST_BODY && compiledMapBody === undefined && wasMappedNative && state.forSlot.size > 0) {
 		for (let index = 0; index < items.length; index++) {
 			const item = items[index];
 			if (!isHostDescriptor(item)) continue;
@@ -2639,8 +2637,8 @@ export function renderPreparedChildList(
 				adopt !== null ? domParent : null,
 				adoptByKey,
 			);
-			if (adoptByKey !== null && HOST_DESCRIPTORS)
-				ROOT_RENDER_TRANSACTION!.ops.push(HOST_DESCRIPTORS.placeUpgraded, [
+			if (adoptByKey !== null && HOST_PLACE_UPGRADED)
+				ROOT_RENDER_TRANSACTION!.ops.push(HOST_PLACE_UPGRADED, [
 					forSlot,
 					parentBlock,
 					domParent,

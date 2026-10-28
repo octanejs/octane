@@ -32,7 +32,7 @@ import { componentSlot } from './component-slots.js';
 import { type FragmentProps, renderActivityDescriptor } from './activity.js';
 import { EMPTY_ARGS } from './events.js';
 import {
-	HOST_DESCRIPTORS,
+	HOST_BODY,
 	ELEMENT_DESCRIPTORS,
 	enableHostDescriptors,
 	enableElementDescriptors,
@@ -258,7 +258,7 @@ function scopedElementRecord<P>(
 	invocationSite?: string,
 ): ElementDescriptor<P> {
 	if (!ELEMENT_DESCRIPTORS) enableElementDescriptors();
-	if (typeof type === 'string' && !HOST_DESCRIPTORS) enableHostDescriptors();
+	if (typeof type === 'string' && !HOST_BODY) enableHostDescriptors();
 	const descriptor = { $$kind: ELEMENT_TAG, type, props, key, ref } as ElementDescriptor<P>;
 	if (invocationSite !== undefined) descriptor.__octaneInvocationSite = invocationSite;
 	Object.defineProperty(descriptor, SCOPED_CHILDREN_RESOLVER, { value: resolve });
@@ -492,7 +492,7 @@ export function createHostElement<P>(
 	props?: P | null,
 	...children: any[]
 ): ElementDescriptor<P> {
-	if (!HOST_DESCRIPTORS) enableHostDescriptors();
+	if (!HOST_BODY) enableHostDescriptors();
 	return createElementFromConfig(undefined, type, props, children);
 }
 

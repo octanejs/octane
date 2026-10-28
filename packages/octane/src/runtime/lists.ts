@@ -62,7 +62,7 @@ import {
 	removeAfter,
 } from './branches.js';
 import { descNeedsBlocks } from './deopt.js';
-import { HOST_DESCRIPTORS } from './drivers.js';
+import { HOST_BODY } from './drivers.js';
 import {
 	JOURNAL_INPUTS,
 	queueFrontier,
@@ -1937,7 +1937,7 @@ function mountItem<T>(
 			const descriptor = singleRoot === 2;
 			if (
 				descriptor
-					? HOST_DESCRIPTORS
+					? HOST_BODY
 						? isElementDescriptor(item) && selfDelimits(item.type, descNeedsBlocks(item))
 						: false
 					: ssrMarkerless === true
@@ -2003,7 +2003,7 @@ function mountItem<T>(
 					? (forSlot.end.parentNode as any)?.__oct_loc
 					: undefined,
 				() =>
-					descriptor && HOST_DESCRIPTORS && isHostDescriptor(item) && !descNeedsBlocks(item)
+					descriptor && HOST_BODY && isHostDescriptor(item) && !descNeedsBlocks(item)
 						? `<${item.type as string}>`
 						: 'another list item',
 				hydration.node,
@@ -2032,7 +2032,7 @@ function mountItem<T>(
 	}
 	if (
 		singleRoot === true ||
-		(singleRoot === 2 && HOST_DESCRIPTORS && isHostDescriptor(item) && !descNeedsBlocks(item))
+		(singleRoot === 2 && HOST_BODY && isHostDescriptor(item) && !descNeedsBlocks(item))
 	) {
 		// Compiler verified the body emits exactly one Element root (true) — or,
 		// on the de-opt sentinel (2), the ITEM VALUE is a pure single-element
