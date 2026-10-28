@@ -1009,9 +1009,12 @@ export function PublishedSourceConsumer() @{
 			Message
 		<TextareaAutosize minRows={2} maxRows={6} defaultValue="Packed source" />
 		</label>
-		<Light language="javascript" style={docco} showLineNumbers>
-			{'const packed = true;'}
-		</Light>
+		<Light
+			language="javascript"
+			style={docco}
+			showLineNumbers
+			children={'const packed = true;'}
+		/>
 		<EditorProvider
 			extensions={[]}
 			immediatelyRender={false}
