@@ -12,6 +12,10 @@ export function tagged(value: string): string {
 	return `[${value}]`;
 }
 
+export function summarize(count: string): { count: string } {
+	return { count };
+}
+
 export function UNSTABLE_useProjectedCounter(): {
 	value: number;
 	increment: () => void;

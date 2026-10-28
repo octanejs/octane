@@ -158,6 +158,23 @@ export function LiveViaProjectedArgument() @{
 	</div>
 }
 
+// A component-local binding that shadows the `String` global is an ordinary
+// local callee: only the unshadowed standard global is a value projection.
+export function LiveViaShadowedGlobal() @{
+	const [n, setN] = useState(0);
+	const String = (row: { read: () => string }) => row.read();
+	<div>
+		<button id="lsg-go" onClick={() => setN(n + 1)}>
+			{'go'}
+		</button>
+		<ul>
+			@for (const row of liveRows; key row.id) {
+				<li class="lsg-row">{String(row)}</li>
+			}
+		</ul>
+	</div>
+}
+
 // A direct member call — the original contract, unchanged by this work.
 export function LiveViaMemberCall() @{
 	const [n, setN] = useState(0);
@@ -250,6 +267,35 @@ export function ProjectionImported() @{
 		<ul>
 			@for (const row of rows; key row.id) {
 				<li class="pi-row">{projectValue(row)}</li>
+			}
+		</ul>
+	</div>
+}
+
+// The unshadowed `String` global, the honest spelling of a numeric text hole.
+export function ProjectionGlobal() @{
+	const [rows, setRows] = useState([
+		{ id: 1, value: 0 },
+		{ id: 2, value: 0 },
+	]);
+	const [n, setN] = useState(0);
+	<div>
+		<button id="pg-go" onClick={() => setN(n + 1)}>
+			{'go'}
+		</button>
+		<button
+			id="pg-bump"
+			onClick={() => setRows(rows.map((r) => (r.id === 1 ? { ...r, value: r.value + 1 } : r)))}
+		>
+			{'bump'}
+		</button>
+		<ul>
+			@for (const row of rows; key row.id) {
+				<li class="pg-row">
+					{String(row.id)}
+					{':'}
+					{String(row.value)}
+				</li>
 			}
 		</ul>
 	</div>
