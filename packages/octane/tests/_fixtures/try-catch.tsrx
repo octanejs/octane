@@ -129,3 +129,21 @@ export function StatefulInside() @{
 		}
 	</>
 }
+
+// A boundary component renders its children through a fragment hole, because
+// a bare `{children}` as the try body is a JavaScript block, not a hole.
+function ChildrenBoundary(props) @{
+	@try {
+		<>{props.children}</>
+	} @catch (err) {
+		<span class="caught">{err.message as string}</span>
+	}
+}
+
+export function ChildrenBoundaryHost(props) @{
+	<div class="host">
+		<ChildrenBoundary>
+			<ThrowsOnRender bang={props.bang} />
+		</ChildrenBoundary>
+	</div>
+}

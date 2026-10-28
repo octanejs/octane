@@ -2010,7 +2010,7 @@ export function usePreviousLog(value, log) { const [count, setCount, getCount] =
 	it('treats a ref attached by a nearer JavaScript callback binding inside a shadowing template row as a host element', () => {
 		const source = app(
 			`const element = useRef(null); const attach = (node) => { element.current = node; }; ${listen}`,
-			'<section>@for (const attach of props.callbacks; key attach) { const render = () => { const attach = (node) => { element.current = node; }; const alias = attach; return <div ref={alias} />; }; {render()} }</section>',
+			'<section>@for (const attach of props.callbacks; key attach) { const render = () => { const attach = (node) => { element.current = node; }; const alias = attach; return <div ref={alias} />; }; <>{render()}</> }</section>',
 		);
 		for (const mode of ['client', 'server'] as const) {
 			expect(() => compile(source, '/src/App.tsrx', { mode, strong: true })).toThrow(LEAK);
@@ -2021,7 +2021,7 @@ export function usePreviousLog(value, log) { const [count, setCount, getCount] =
 	it('treats a ref attached through a nearer JavaScript alias inside a shadowing template row as a host element', () => {
 		const source = app(
 			`const element = useRef(null); ${listen}`,
-			'<section>@for (const local of props.items; key local) { const render = () => { const local = element; return <div ref={(node) => { local.current = node; }} />; }; {render()} }</section>',
+			'<section>@for (const local of props.items; key local) { const render = () => { const local = element; return <div ref={(node) => { local.current = node; }} />; }; <>{render()}</> }</section>',
 		);
 		for (const mode of ['client', 'server'] as const) {
 			expect(() => compile(source, '/src/App.tsrx', { mode, strong: true })).toThrow(LEAK);
@@ -2226,12 +2226,12 @@ export function App(props) {
 		[
 			'a nearer JavaScript-scoped callback reused as an event in a shadowing row',
 			'const attach = (node) => { element.current = node; };',
-			'<section>@for (const attach of props.callbacks; key attach) { const render = () => { const attach = (node) => { element.current = node; }; const alias = attach; return <div ref={alias} onClick={attach} />; }; {render()} }</section>',
+			'<section>@for (const attach of props.callbacks; key attach) { const render = () => { const attach = (node) => { element.current = node; }; const alias = attach; return <div ref={alias} onClick={attach} />; }; <>{render()}</> }</section>',
 		],
 		[
 			'a nearer JavaScript-scoped alias reused as an event in a shadowing row',
 			'const attach = (node) => { element.current = node; };',
-			'<section><div ref={attach} /> @for (const alias of props.callbacks; key alias) { const render = () => { const alias = attach; return <button onClick={alias} />; }; {render()} }</section>',
+			'<section><div ref={attach} /> @for (const alias of props.callbacks; key alias) { const render = () => { const alias = attach; return <button onClick={alias} />; }; <>{render()}</> }</section>',
 		],
 		[
 			'an alias of a shadowed catch callback',

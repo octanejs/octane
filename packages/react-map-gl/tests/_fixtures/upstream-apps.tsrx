@@ -84,9 +84,7 @@ export function PopupMap(props: MapFixtureProps) @{
 			@if (props.richContent) {
 				<div id="popup-content">You are here</div>
 			} @else {
-				{
-					('You are here');
-				}
+				<>You are here</>
 			}
 		</Popup>
 	</Map>

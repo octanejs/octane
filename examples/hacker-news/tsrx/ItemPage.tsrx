@@ -22,9 +22,7 @@ export function ItemPage() @{
 					{item.title as string}
 				</a>
 			} @else {
-				{
-					item.title as string;
-				}
+				<>{item.title as string}</>
 			}
 			@if (host) {
 				<span {...stylex.props(styles.host)}>{(' (' + host + ')') as string}</span>

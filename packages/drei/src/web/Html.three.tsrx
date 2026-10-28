@@ -376,8 +376,8 @@ export function Html({
 		<DOMRegion target={regionTarget} region={children as RendererRegion} containerRef={content} />
 		@if (occlude && !isRaycastOcclusion) {
 			<mesh ref={mesh} castShadow={castShadow} receiveShadow={receiveShadow}>
-				@if (geometry) { {geometry} } @else { <planeGeometry /> }
-				@if (material) { {material} } @else {
+				@if (geometry) { <>{geometry}</> } @else { <planeGeometry /> }
+				@if (material) { <>{material}</> } @else {
 					<shaderMaterial
 						side={DoubleSide}
 						vertexShader={transform ? undefined : NON_TRANSFORM_VERTEX_SHADER}

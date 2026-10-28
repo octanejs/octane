@@ -1910,11 +1910,12 @@ class ModuleTransform {
 		let whenTrue = this.arm(node.whenTrue);
 		let whenFalse = this.arm(node.whenFalse);
 		// A ternary between two values is a value; one with an element on
-		// either side is control flow, and a value arm is a hole.
+		// either side is control flow, and a value arm is a hole in a fragment:
+		// a bare `{value}` arm is a JavaScript block, not a hole.
 		if (whenTrue === null && whenFalse === null) return null;
 		if ((whenTrue ?? '') === '' && (whenFalse ?? '') === '') return null;
-		whenTrue ??= `{${this.emit(skipParens(node.whenTrue), PLAIN)}}`;
-		whenFalse ??= `{${this.emit(skipParens(node.whenFalse), PLAIN)}}`;
+		whenTrue ??= `<>{${this.emit(skipParens(node.whenTrue), PLAIN)}}</>`;
+		whenFalse ??= `<>{${this.emit(skipParens(node.whenFalse), PLAIN)}}</>`;
 		this.count(RULE.if);
 		const condition = this.emit(node.condition, PLAIN);
 		if (whenTrue === '') {

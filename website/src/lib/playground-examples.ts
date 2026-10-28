@@ -616,7 +616,7 @@ export default function App() @{
 			<button onClick={() => setToastOpen(true)}>Save draft</button>
 
 			@if (toastOpen) {
-				{createPortal(Toast, document.body, { onDismiss: () => setToastOpen(false) })}
+				<>{createPortal(Toast, document.body, { onDismiss: () => setToastOpen(false) })}</>
 			}
 
 			<p class="hint">

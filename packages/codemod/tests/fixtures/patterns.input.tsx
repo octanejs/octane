@@ -7,6 +7,7 @@ export const Tree = memo(function Tree({ items, status }: { items: Item[]; statu
 
   return (
     <div>
+      <h2>{status === 'idle' ? <em>Ready</em> : status}</h2>
       {status === 'loading' ? (
         <span>Loading…</span>
       ) : items.length === 0 ? (
