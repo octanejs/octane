@@ -1,0 +1,46 @@
+diff --git a/dist/tsrx-core-compat/facade.js b/dist/tsrx-core-compat/facade.js
+index a5469dfe856464892e7e8ffb9d7b1374b4cc9643..2ba93259e2108fc405b3af957fd9f15263fe4fbd 100644
+--- a/dist/tsrx-core-compat/facade.js
++++ b/dist/tsrx-core-compat/facade.js
+@@ -1957,6 +1957,7 @@ const DECLARED_VAR = 2;
+ const DECLARED_TYPE = 4;
+ const DECLARED_ENUM = 8;
+ const DECLARED_EXPORT_ONLY = 16;
++const DECLARED_TYPE_IMPORT = 32;
+ function scopeHas(scope, name, kind) {
+ 	return scope.names !== null && ((scope.names.get(name) ?? 0) & kind) !== 0;
+ }
+@@ -2116,7 +2117,14 @@ function scopeDiagnostics(program, source) {
+ 		scopeAdd(scope, name, kind);
+ 		if (scope.flags & SCOPE_TOP) undefinedExports.delete(name);
+ 	};
+-	const scopeDeclares = (scope, name) => scopeHas(scope, name, 23);
++	// A type-only import binds no value, so only another type-only import of the
++	// name clashes, as in acorn-typescript's import stack.
++	const declareTypeImport = (name, start) => {
++		const scope = current();
++		if (scopeHas(scope, name, DECLARED_TYPE_IMPORT)) redeclared(name, start);
++		declareTopLevelName(scope, name, DECLARED_TYPE_IMPORT);
++	};
++	const scopeDeclares = (scope, name) => scopeHas(scope, name, 55);
+ 	const tasks = [];
+ 	const enterBlock = () => enter(0);
+ 	const enterVarScope = () => enter(SCOPE_VAR);
+@@ -2291,11 +2299,15 @@ function scopeDiagnostics(program, source) {
+ 			case "ImportDeclaration":
+ 				for (const specifier of node.specifiers ?? []) {
+ 					const local = specifier?.local;
+-					if (local?.type === "Identifier") declareName(local.name, BIND_LEXICAL, local.start);
++					if (local?.type !== "Identifier") continue;
++					if (node.importKind === "type" || specifier.importKind === "type") declareTypeImport(local.name, local.start);
++					else declareName(local.name, BIND_LEXICAL, local.start);
+ 				}
+ 				return;
+ 			case "TSImportEqualsDeclaration":
+-				if (node.id?.type === "Identifier") declareName(node.id.name, BIND_LEXICAL, node.id.start);
++				if (node.id?.type !== "Identifier") return;
++				if (node.importKind === "type") declareTypeImport(node.id.name, node.id.start);
++				else declareName(node.id.name, BIND_LEXICAL, node.id.start);
+ 				return;
+ 			case "ExportNamedDeclaration":
+ 				if (node.source == null && current().flags & SCOPE_TOP) schedule([node.declaration, () => checkLocalExports(node)]);

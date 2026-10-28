@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { acorn } from '@tsrx/core';
 import type { CompileError, ParseOptions } from '@tsrx/core/types';
 import { parseModule as parseNativeModule } from '@tsrx/oxc/tsrx-core-compat';
 import { parseModule as parseJavaScriptModule } from '../../src/compiler/parser.browser.js';
@@ -196,6 +197,49 @@ describe('TSRX destructuring syntax', () => {
 		expect(parseModule(source, 'ordinary.tsrx').body).not.toHaveLength(0);
 		expect(parseJavaScriptModule(source, 'ordinary.tsrx').body).not.toHaveLength(0);
 		expect(compileToVolarMappings(source, 'ordinary.tsrx').errors).toEqual([]);
+	});
+});
+
+describe('type-only import bindings', () => {
+	// A type-only import binds no value, so TypeScript lets a value declaration
+	// reuse its name, as react.dev's Toc.tsx and TanStack Query's contact.tsx do.
+	const accepted = [
+		"import type { Toc } from './types';\nexport function Toc({ headings }: { headings: Toc }) @{ <nav>{headings.length as string}</nav> }",
+		"import type { Contact } from '../data';\nexport default function Contact({ contact }: { contact: Contact }) { return <h1>{contact.name}</h1>; }",
+		"import { type Item, items } from './items';\nexport function Item({ item }: { item: Item }) @{ <li>{item.name as string}</li> }\nexport const count = items.length;",
+		"import type * as Shapes from './shapes';\nexport const Shapes: Shapes.Registry = {};",
+		"export type { Theme };\nimport type { Theme } from './theme';",
+	];
+
+	it.each(accepted)('parses in native and editor parsing: %s', (source) => {
+		expect(parseModule(source, 'types.tsrx').body).not.toHaveLength(0);
+		expect(parseJavaScriptModule(source, 'types.tsrx').body).not.toHaveLength(0);
+		expect(compileToVolarMappings(source, 'types.tsrx').errors).toEqual([]);
+	});
+
+	it.each([
+		{ mode: 'client' as const, dev: true, hmr: true },
+		{ mode: 'client' as const, dev: false, hmr: false },
+		{ mode: 'server' as const, dev: false, hmr: false },
+	])('compiles to a valid module that imports no type-only binding with %j', (options) => {
+		for (const source of accepted) {
+			const { code } = compile(source, 'types.tsrx', options);
+			// A type-only import kept as a value import would redeclare the name.
+			expect(() =>
+				acorn.parse(code, { ecmaVersion: 'latest', sourceType: 'module' }),
+			).not.toThrow();
+		}
+	});
+
+	it.each([
+		"import type { Toc } from './a';\nimport type { Toc } from './b';",
+		"import { type Toc } from './a';\nimport type { Toc } from './b';",
+		"import { Toc } from './a';\nexport function Toc() @{ <nav /> }",
+	])('still rejects a redeclared binding: %s', (source) => {
+		const message = "Identifier 'Toc' has already been declared";
+		expect(() => parseModule(source, 'redeclared.tsrx')).toThrow(message);
+		expect(() => parseJavaScriptModule(source, 'redeclared.tsrx')).toThrow(message);
+		expect(compileToVolarMappings(source, 'redeclared.tsrx').errors).toMatchObject([{ message }]);
 	});
 });
 
