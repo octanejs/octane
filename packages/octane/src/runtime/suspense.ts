@@ -1175,9 +1175,19 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 		return state.block;
 	};
 	state.block = body;
+	// A boundary the server left to the client renders there, catch arm included,
+	// so a body that throws takes its client-built DOM with it.
+	if (freshBoundary) hydration!.suspend(() => renderErrorBody(state, body, hydration));
+	else renderErrorBody(state, body, hydration);
+}
+
+function renderErrorBody(
+	state: ErrorSlot,
+	body: Block,
+	hydration: HydrationCapability | null,
+): void {
 	try {
-		if (freshBoundary) hydration!.suspend(() => hydration!.renderTryBody(body, true));
-		else if (hydration !== null) hydration.renderTryBody(body, true);
+		if (hydration !== null) hydration.renderTryBody(body, true);
 		else renderBlock(body);
 		state.hasResolved = true;
 	} catch (error) {
