@@ -239,7 +239,7 @@ declaration. When you already own a scope, use two functions together:
 
 - `query('user', load)` defines a reusable request. Calling the returned
   function with an ID describes what to fetch.
-- `createResource(account, 'user', describe)` runs the selection callback,
+- `createResource(account, 'selected-user', describe)` runs the selection callback,
   starts the load in the account scope, and returns the readable handle.
 
 ```ts
@@ -534,17 +534,22 @@ export async function hydratePage(
 		documentId,
 		initialSignals: { version: 1, scopes: [initialDocumentSignals] },
 	});
-	const { App } = await import('./view.tsrx');
-	const root = hydrateRoot(
-		container,
-		App,
-		{},
-		{
-			signalOwner: page.signalOwner,
-			initialDocumentSignals,
-		},
-	);
-	return { root, page };
+	try {
+		const { App } = await import('./view.tsrx');
+		const root = hydrateRoot(
+			container,
+			App,
+			{},
+			{
+				signalOwner: page.signalOwner,
+				initialDocumentSignals,
+			},
+		);
+		return { root, page };
+	} catch (error) {
+		page.dispose();
+		throw error;
+	}
 }
 ```
 
