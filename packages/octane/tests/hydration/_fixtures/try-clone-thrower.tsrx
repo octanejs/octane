@@ -226,6 +226,27 @@ export function Uncaught(props: PageProps) @{
 	</div>
 }
 
+// The same, with the compiled ErrorBoundary as the outer boundary.
+export function UncaughtBoundary(props: PageProps) @{
+	<div>
+		<h1>{'before'}</h1>
+		<ErrorBoundary fallback={(error: unknown) => <p class="caught">{String(error) as string}</p>}>
+			<section>
+				@try {
+					@if (props.server) {
+						<b class="server">{'server'}</b>
+					} @else {
+						<Leaf value={props.value} />
+					}
+				} @pending {
+					<span class="pending">{'pending'}</span>
+				}
+			</section>
+		</ErrorBoundary>
+		<button onClick={props.onAfter}>{'after'}</button>
+	</div>
+}
+
 function Update(props: { set?: (show: boolean) => void }) @{
 	// Updates the parent during render; the update applies after the hydration
 	// it interrupts.

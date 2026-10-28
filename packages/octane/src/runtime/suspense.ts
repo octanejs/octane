@@ -284,7 +284,7 @@ export const ErrorBoundary: ComponentBody<{
  * The virtual-TSX (IDE / tsrx-tsc) name for `@try { … } @catch (e) { … }`: the
  * shared tsrx transform's type-only output emits the catch clause as
  * `fallback={(error, _reset) => …}`. Runtime compilation never references this
- * name (`@try` lowers to `tryBlock`), so this exists for TYPES: the
+ * name (`@try` lowers to `tryBlock` or `errorBlock`), so this exists for TYPES: the
  * function-typed `fallback` (unlike `ErrorBoundary`'s renderable-or-render-prop
  * union, which collapses to `unknown`) gives the emitted arrow contextual
  * parameter types, so authored `@catch` bindings type-check under
@@ -1013,10 +1013,11 @@ function renderPassthroughTry(state: TrySlot): void {
 }
 
 /**
- * Exact imported JSX ErrorBoundary lowering. Unlike @try, these boundaries
- * only catch application errors: suspension belongs to an enclosing Suspense.
- * Keeping their state independent lets catch-only applications discard the
- * hidden-primary, transition-hold, and off-screen rendering implementations.
+ * The catch-only boundary: a `@try` without `@pending`, or an exact imported
+ * JSX ErrorBoundary. It only catches application errors: suspension belongs to
+ * an enclosing Suspense. Keeping its state independent lets catch-only
+ * applications discard the hidden-primary, transition-hold, and off-screen
+ * rendering implementations.
  */
 export function errorBlock(
 	parentScope: Scope,
@@ -1174,9 +1175,19 @@ function mountErrorBoundary(state: ErrorSlot, hydration: HydrationCapability | n
 		return state.block;
 	};
 	state.block = body;
+	// A boundary the server left to the client renders there, catch arm included,
+	// so a body that throws takes its client-built DOM with it.
+	if (freshBoundary) hydration!.suspend(() => renderErrorBody(state, body, hydration));
+	else renderErrorBody(state, body, hydration);
+}
+
+function renderErrorBody(
+	state: ErrorSlot,
+	body: Block,
+	hydration: HydrationCapability | null,
+): void {
 	try {
-		if (freshBoundary) hydration!.suspend(() => hydration!.renderTryBody(body, true));
-		else if (hydration !== null) hydration.renderTryBody(body, true);
+		if (hydration !== null) hydration.renderTryBody(body, true);
 		else renderBlock(body);
 		state.hasResolved = true;
 	} catch (error) {
@@ -1204,6 +1215,8 @@ function switchErrorToCatchInner(state: ErrorSlot, error: any, reportInline: boo
 	const previous = state.block;
 	if (previous !== null) {
 		state.block = null;
+		const transaction = ROOT_RENDER_TRANSACTION;
+		if (transaction !== null && !transaction.aborted) dropBodyOps(transaction, previous);
 		// Hydrating, the body adopted server DOM, which its commit discards.
 		unmountBlock(previous, hydration === null);
 		if (state.parentBlock.disposed || state.block !== null) return;

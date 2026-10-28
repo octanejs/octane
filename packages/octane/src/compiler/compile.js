@@ -19,9 +19,9 @@
  *          of dynamic bindings (text/attr/class/style holes, events, refs,
  *          spreads) and runtime construct calls for the directive blocks —
  *          forBlock (@for), ifBlock (@if), switchBlock (@switch), tryBlock
- *          (@try), componentSlot (<Foo/>), portal (createPortal), headBlock
- *          (hoisted <title>/<meta>/<link>) — plus scoped-CSS injection and
- *          optional HMR wrapping.
+ *          or errorBlock (@try), componentSlot (<Foo/>), portal
+ *          (createPortal), headBlock (hoisted <title>/<meta>/<link>) — plus
+ *          scoped-CSS injection and optional HMR wrapping.
  *
  * `mode: 'server'` selects a parallel, self-contained SSR codegen (see the
  * "Server (SSR) codegen" section) that emits HTML-string-building bodies with
@@ -31196,8 +31196,13 @@ function planJsx(
 	for (const tc of tryCalls) {
 		const slotIndex = tc.slotIndex;
 		const org = tc.origin ?? planOrigin;
+		// Without @pending a boundary passes suspension on, so only errors reach it
+		// and errorBlock serves it, unless a presentation-binding view's server
+		// render owns that suspension (ssrTry).
 		const catchOnly =
-			tc.propagateSuspense && tc.pendingHelper === 'null' && tc.catchHelper !== 'null';
+			tc.pendingHelper === 'null' &&
+			tc.catchHelper !== 'null' &&
+			(tc.propagateSuspense || tc.bindingSite === undefined);
 		const boundaryHelper = catchOnly ? 'errorBlock' : 'tryBlock';
 		ctx.runtimeNeeded.add(boundaryHelper);
 		registerDirectiveOrigin(ctx, org, [rtAlias(boundaryHelper), tc.tryHelper]);
@@ -37419,6 +37424,7 @@ function makeTryCall(
 		handlerKeyword: node.handlerKeyword ?? null,
 		pendingKeyword: node.pendingKeyword ?? null,
 		propagateSuspense: node.propagateSuspense === true,
+		bindingSite: node._octaneBindingSite,
 		hostPath: null,
 	};
 }
