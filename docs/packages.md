@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**121 publishable package(s), including 107 framework binding(s) and 3 framework integration(s).**
+**122 publishable package(s), including 107 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -26,8 +26,9 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/better-auth` | [`packages/better-auth`](../packages/better-auth) | framework binding | `0.0.20` | 1 |
 | `@octanejs/blocknote` | [`packages/blocknote`](../packages/blocknote) | framework binding | `0.1.12` | 2 |
 | `@octanejs/calendar` | [`packages/calendar`](../packages/calendar) | framework binding | `0.0.24` | 4 |
-| `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.2.4` | 2 |
+| `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.2.4` | 4 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.53` | 1 |
+| `@octanejs/codemod` | [`packages/codemod`](../packages/codemod) | developer tooling | `0.0.0` | 2 |
 | `@octanejs/colorful` | [`packages/colorful`](../packages/colorful) | framework binding | `0.0.33` | 1 |
 | `@octanejs/content-loader` | [`packages/content-loader`](../packages/content-loader) | framework binding | `0.0.23` | 2 |
 | `@octanejs/day-picker` | [`packages/day-picker`](../packages/day-picker) | framework binding | `0.0.34` | 12 |

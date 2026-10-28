@@ -1,7 +1,8 @@
 // Dev SSR server (shared by the jsx and tsrx apps).
 //
-//   node server.mjs jsx    -> serves the .tsx app  on PORT (default 5170)
-//   node server.mjs tsrx   -> serves the .tsrx app on PORT (default 5170)
+//   node server.mjs jsx      -> serves the .tsx app  on PORT (default 5170)
+//   node server.mjs tsrx     -> serves the .tsrx app on PORT (default 5170)
+//   node server.mjs codemod  -> serves the codemod-migrated app (run `node codemod.mjs` first)
 //
 // Vite runs in middleware mode (appType:'custom'), so it transforms .tsx/.tsrx
 // on the fly but does NOT serve index.html itself — we own the HTML response.
@@ -17,11 +18,15 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = process.argv[2] || 'jsx';
-if (app !== 'jsx' && app !== 'tsrx') {
-	console.error(`unknown app "${app}" — use jsx or tsrx`);
+if (app !== 'jsx' && app !== 'tsrx' && app !== 'codemod') {
+	console.error(`unknown app "${app}" — use jsx, tsrx, or codemod`);
 	process.exit(1);
 }
 const APP_DIR = path.join(__dirname, app);
+// The codemod's entry keeps JSX, which makes it TSRX.
+const SERVER_ENTRY = fs.existsSync(path.join(APP_DIR, 'entry-server.tsrx'))
+	? '/entry-server.tsrx'
+	: '/entry-server.tsx';
 const PORT = Number(process.env.PORT || 5170);
 
 // Inline the dehydrated query cache as a JSON <script>. Escape `<` so the JSON
@@ -63,7 +68,7 @@ const server = createHttp((req, res) => {
 
 			// 2. Load the app's SSR entry through Vite (so 'octane' resolves to the
 			//    server runtime per the app's vite config) and render this URL.
-			const { render } = await vite.ssrLoadModule('/entry-server.tsx');
+			const { render } = await vite.ssrLoadModule(SERVER_ENTRY);
 			const { head, body, css, state } = await render(url);
 
 			// 2b. Inline the StyleX atomic sheet so the first paint is styled (no FOUC).

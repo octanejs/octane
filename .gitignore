@@ -23,6 +23,8 @@ coverage
 **/test-results/
 **/playwright-report/
 examples/**/*.d.tsrx.ts
+# Written by examples/hacker-news/codemod.mjs from jsx/.
+examples/hacker-news/codemod/
 
 # Vercel Build Output (@octanejs/adapter-vercel writes {root}/.vercel/output on build)
 .vercel/

@@ -10,7 +10,7 @@ const fixturePort = Number(process.env.HN_FIXTURE_PORT || 5190);
 const fixtureBase = `http://127.0.0.1:${fixturePort}/v0`;
 const clientMode = process.env.HN_E2E_CLIENT_MODE === 'dev' ? 'dev' : 'preview';
 
-function clientCommand(app: 'jsx' | 'tsrx', port: number): string {
+function clientCommand(app: 'jsx' | 'tsrx' | 'codemod', port: number): string {
 	if (clientMode === 'dev') {
 		return `NODE_ENV=production VITE_HN_API_BASE=${fixtureBase} ./node_modules/.bin/vite --config ${app}/vite.config.ts --port ${port} --strictPort`;
 	}
@@ -20,7 +20,10 @@ function clientCommand(app: 'jsx' | 'tsrx', port: number): string {
 // One Hacker News reader, built twice — the React-style `.tsx` app (port 5191)
 // and the TSRX app (port 5192) — over a shared octane core. The SAME spec
 // (nav.spec.ts) runs once per project; identical assertions passing under both
-// IS the .tsx ≡ .tsrx parity proof.
+// IS the .tsx ≡ .tsrx parity proof. A third project (port 5195) runs the
+// `.tsx` app after `codemod.mjs` respells it with React imports and migrates it
+// with @octanejs/codemod: the same assertions passing there prove the migration
+// kept the app's behavior.
 //
 // Standard `pnpm test:e2e` builds both clients with the fixture base baked in,
 // then each project boots a Vite preview server for that production artifact.
@@ -54,6 +57,13 @@ export default defineConfig({
 				baseURL: 'http://localhost:5192',
 			},
 		},
+		{
+			name: 'codemod',
+			use: {
+				...devices['Desktop Chrome'],
+				baseURL: 'http://localhost:5195',
+			},
+		},
 	],
 
 	// Boot the fixture API plus four app servers:
@@ -64,11 +74,12 @@ export default defineConfig({
 	//    default (plain Vite dev servers only in explicit dev mode). The index.html
 	//    entry falls back to createRoot() because these are client-only responses.
 	//    The nav/feed/pagination specs run here.
-	//  - :5193 (jsx) / :5194 (tsrx) — source-driven SSR servers (`node server.mjs
-	//    <app>`) running production runtime semantics:
+	//  - :5195 — the codemod-migrated app's production client artifact.
+	//  - :5193 (jsx) / :5194 (tsrx) / :5197 (codemod) — source-driven SSR servers
+	//    (`node server.mjs <app>`) running production runtime semantics:
 	//    each request is server-rendered with the route's data resolved (prefetched
 	//    into the QueryClient) + dehydrated, then hydrated. ssr.spec.ts proves exact
-	//    fixture rows arrive in the server HTML and hydrate cleanly. BOTH apps SSR,
+	//    fixture rows arrive in the server HTML and hydrate cleanly. Every app SSRs,
 	//    so the same assertions run once per project (SSR port = client port + 2).
 	//
 	// Never reuse hand-started servers: the suite owns their fixture environment.
@@ -105,6 +116,20 @@ export default defineConfig({
 		{
 			command: `NODE_ENV=production VITE_HN_API_BASE=${fixtureBase} PORT=5194 node server.mjs tsrx`,
 			url: 'http://localhost:5194',
+			cwd: exampleRoot,
+			reuseExistingServer: false,
+			timeout: 90_000,
+		},
+		{
+			command: clientCommand('codemod', 5195),
+			url: 'http://localhost:5195',
+			cwd: exampleRoot,
+			reuseExistingServer: false,
+			timeout: 60_000,
+		},
+		{
+			command: `NODE_ENV=production VITE_HN_API_BASE=${fixtureBase} PORT=5197 node server.mjs codemod`,
+			url: 'http://localhost:5197',
 			cwd: exampleRoot,
 			reuseExistingServer: false,
 			timeout: 90_000,
