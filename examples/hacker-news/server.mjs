@@ -1,7 +1,8 @@
 // Dev SSR server (shared by the jsx and tsrx apps).
 //
-//   node server.mjs jsx    -> serves the .tsx app  on PORT (default 5170)
-//   node server.mjs tsrx   -> serves the .tsrx app on PORT (default 5170)
+//   node server.mjs jsx      -> serves the .tsx app  on PORT (default 5170)
+//   node server.mjs tsrx     -> serves the .tsrx app on PORT (default 5170)
+//   node server.mjs codemod  -> serves the codemod-migrated app (run `node codemod.mjs` first)
 //
 // Vite runs in middleware mode (appType:'custom'), so it transforms .tsx/.tsrx
 // on the fly but does NOT serve index.html itself — we own the HTML response.
@@ -17,8 +18,8 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = process.argv[2] || 'jsx';
-if (app !== 'jsx' && app !== 'tsrx') {
-	console.error(`unknown app "${app}" — use jsx or tsrx`);
+if (app !== 'jsx' && app !== 'tsrx' && app !== 'codemod') {
+	console.error(`unknown app "${app}" — use jsx, tsrx, or codemod`);
 	process.exit(1);
 }
 const APP_DIR = path.join(__dirname, app);

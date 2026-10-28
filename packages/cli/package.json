@@ -35,6 +35,8 @@
   },
   "exports": {
     ".": "./src/index.js",
+    "./data": "./src/data/index.js",
+    "./fix": "./src/commands/analyze/fix.js",
     "./package.json": "./package.json"
   },
   "scripts": {
