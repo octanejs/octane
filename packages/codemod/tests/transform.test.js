@@ -134,6 +134,14 @@ describe('transformModule', () => {
 		expect(code).toContain("Component = import('octane').FC<{ id: string }>;");
 	});
 
+	it('rewrites inside a remapped `import()` type', () => {
+		const source = "export type Boxed = import('./box').Box<import('react').ReactNode>;\n";
+		const { code } = transformModule(source, 'types.ts', {
+			resolveSpecifier: (specifier) => (specifier === './box' ? './box.tsrx' : null),
+		});
+		expect(code).toContain("Boxed = import('./box.tsrx').Box<import('octane').OctaneNode>;");
+	});
+
 	it('rewrites self-closing context providers', () => {
 		const source =
 			"import { createContext } from 'react';\nconst Theme = createContext('light');\nexport function A() {\n\treturn <Theme.Provider value=\"dark\" />;\n}\n";

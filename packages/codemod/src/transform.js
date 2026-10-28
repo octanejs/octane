@@ -766,7 +766,9 @@ class ModuleTransform {
 			quote +
 			next +
 			quote +
-			this.source.slice(specifier.end, node.end)
+			// The rest is emitted, not copied: `import('./x').T<import('react').U>`
+			// has a nested specifier of its own.
+			this.span(node, specifier.end, node.end, PLAIN)
 		);
 	}
 
