@@ -125,6 +125,15 @@ describe('transformModule', () => {
 		expect(transformModule(source, 'mount.ts').code).toContain("await import('octane');");
 	});
 
+	it('maps `import()` types of React modules', () => {
+		const source =
+			"export type Node = import('react').ReactNode;\nexport type Click = import('react').SyntheticEvent<HTMLElement>;\nexport type Component = import('react').FC<{ id: string }>;\n";
+		const { code } = transformModule(source, 'types.ts');
+		expect(code).toContain("Node = import('octane').OctaneNode;");
+		expect(code).toContain("Click = import('octane').NativeEvent<HTMLElement>;");
+		expect(code).toContain("Component = import('octane').FC<{ id: string }>;");
+	});
+
 	it('rewrites self-closing context providers', () => {
 		const source =
 			"import { createContext } from 'react';\nconst Theme = createContext('light');\nexport function A() {\n\treturn <Theme.Provider value=\"dark\" />;\n}\n";

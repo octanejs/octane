@@ -466,8 +466,11 @@ class ModuleTransform {
 				this.imports.set(declaration, entry);
 				if (isApiModule(module)) this.apiLocals.set(name.text, entry);
 			};
-			// A default import of React is the namespace in practice.
-			if (clause.name) record(clause, clause.name, '*', clause.isTypeOnly);
+			// A default import of React is the namespace in practice; any other
+			// module's default import is its `default` export.
+			if (clause.name) {
+				record(clause, clause.name, isApiModule(module) ? '*' : 'default', clause.isTypeOnly);
+			}
 			const bindings = clause.namedBindings;
 			if (bindings && ts.isNamespaceImport(bindings)) {
 				record(bindings, bindings.name, '*', clause.isTypeOnly);
@@ -691,6 +694,7 @@ class ModuleTransform {
 		if (ts.isCallExpression(node)) return this.rewriteCall(node);
 		if (ts.isPropertyAccessExpression(node)) return this.rewriteMember(node);
 		if (ts.isQualifiedName(node)) return this.rewriteQualifiedType(node);
+		if (ts.isImportTypeNode(node)) return this.rewriteImportType(node);
 		if (ts.isTypeReferenceNode(node)) return this.rewriteTypeReference(node);
 		if (ts.isExpressionStatement(node)) return this.rewriteStatement(node);
 		if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) this.checkClass(node);
@@ -763,6 +767,42 @@ class ModuleTransform {
 			next +
 			quote +
 			this.source.slice(specifier.end, node.end)
+		);
+	}
+
+	/**
+	 * `import('react').ReactNode` in a type: the module, and a React type name
+	 * Octane spells differently, follow the same map as static imports.
+	 *
+	 * @param {ts.ImportTypeNode} node
+	 */
+	rewriteImportType(node) {
+		const argument = node.argument;
+		if (!ts.isLiteralTypeNode(argument) || !ts.isStringLiteral(argument.literal)) return null;
+		const specifier = argument.literal;
+		const module = REACT_MODULES[specifier.text];
+		if (module === undefined) return this.rewriteSpecifier(node, specifier);
+		this.count(RULE.import);
+		const qualifier = node.qualifier;
+		const name = qualifier && ts.isIdentifier(qualifier) ? qualifier.text : null;
+		const renamed = name === null ? null : mapQualifiedType(name);
+		if (name !== null && renamed === null) {
+			this.note(RULE.unsupported, 'warning', node, `Octane has no type \`${name}\`.`);
+		}
+		const quote = this.source[specifier.getStart(this.sf)];
+		const head =
+			this.span(node, node.getStart(this.sf), specifier.getStart(this.sf), PLAIN) +
+			quote +
+			module +
+			quote;
+		if (!qualifier || renamed === null || renamed === name) {
+			return head + this.span(node, specifier.end, node.end, PLAIN);
+		}
+		return (
+			head +
+			this.source.slice(specifier.end, qualifier.getStart(this.sf)) +
+			renamed +
+			this.span(node, qualifier.end, node.end, PLAIN)
 		);
 	}
 
@@ -1405,9 +1445,8 @@ class ModuleTransform {
 		}
 		const entry = declaration ? this.imports.get(declaration) : null;
 		if (!entry || entry.namespace) return false;
-		return (
-			this.options.isContext?.(entry.module, entry.imported) ?? /Context$/.test(entry.imported)
-		);
+		const name = entry.imported === 'default' ? entry.local : entry.imported;
+		return this.options.isContext?.(entry.module, entry.imported) ?? /Context$/.test(name);
 	}
 
 	/**

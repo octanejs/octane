@@ -93,8 +93,10 @@ describe('runCodemod', () => {
 			'src/theme.ts':
 				"import { createContext } from 'react';\nexport const Theme = createContext('light');\n",
 			'src/index.ts': "export { Theme as AppTheme } from './theme';\n",
+			'src/mode.ts':
+				"import { createContext } from 'react';\nconst Mode = createContext('auto');\nexport default Mode;\n",
 			'src/App.tsx':
-				"import * as Tooltip from '@radix-ui/react-tooltip';\nimport { AppTheme } from './index';\nimport { Store } from './store';\n\nexport function App() {\n\treturn (\n\t\t<AppTheme.Provider value=\"dark\">\n\t\t\t<Store.Provider>\n\t\t\t\t<Tooltip.Provider />\n\t\t\t</Store.Provider>\n\t\t</AppTheme.Provider>\n\t);\n}\n",
+				"import * as Tooltip from '@radix-ui/react-tooltip';\nimport { AppTheme } from './index';\nimport Mode from './mode';\nimport { Store } from './store';\n\nexport function App() {\n\treturn (\n\t\t<AppTheme.Provider value=\"dark\">\n\t\t\t<Mode.Provider value=\"light\" />\n\t\t\t<Store.Provider>\n\t\t\t\t<Tooltip.Provider />\n\t\t\t</Store.Provider>\n\t\t</AppTheme.Provider>\n\t);\n}\n",
 			'src/store.tsx':
 				'export const Store = { Provider: (props: { children?: unknown }) => props.children };\n',
 		});
@@ -103,6 +105,8 @@ describe('runCodemod', () => {
 		// A context re-exported under another name is still one.
 		expect(app).toContain('<AppTheme value="dark">');
 		expect(app).toContain('</AppTheme>');
+		// So is a default-exported one.
+		expect(app).toContain('<Mode value="light" />');
 		// A project export that is not a context, and a package namespace, keep
 		// their `.Provider`.
 		expect(app).toContain('<Store.Provider>');
