@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { mount } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture';
 import {
+	ConvertedIdentity,
 	DerivedIdentity,
 	DerivedValue,
 	HookCallDeclarations,
@@ -62,6 +63,23 @@ describe('auto-calculation — identity is stable while inputs are', () => {
 		r.click('#di-tick');
 		expect(r.find('#di-identity').textContent).toBe(second);
 		expect(r.find('#di-count').textContent).toBe('2');
+		r.unmount();
+	});
+});
+
+describe('auto-calculation — conversion globals are projections', () => {
+	it('keeps an object built with String() stable while its input is', () => {
+		const r = mount(ConvertedIdentity);
+		const first = r.find('#ci-identity').textContent;
+		expect(r.find('#ci-count').textContent).toBe('1');
+
+		r.click('#ci-tick');
+		expect(r.find('#ci-tickval').textContent).toBe('1');
+		expect(r.find('#ci-identity').textContent).toBe(first);
+
+		r.click('#ci-add');
+		expect(r.find('#ci-identity').textContent).not.toBe(first);
+		expect(r.find('#ci-count').textContent).toBe('2');
 		r.unmount();
 	});
 });

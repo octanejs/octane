@@ -254,12 +254,12 @@ component without a proof, such as one that calls a hook, publishes none, and
 a cached call lapses while any live import the subtree reads changes.
 
 A call keeps its surrounding region memoizable only when the callee is an
-imported binding or an unreassigned same-module function whose body is itself a
-value projection. Arguments must satisfy the same rule. Inside an `@for` row, an
-unshadowed standard conversion global such as `String`, `Number`, or `parseInt`
-also qualifies: it runs no user code beyond the coercion a template literal
-performs, so `{String(row.id)}` keeps the row on the same fast paths as
-`{row.id}`.
+imported binding, an unreassigned same-module function whose body is itself a
+value projection, or an unshadowed standard conversion global such as `String`,
+`Number`, or `parseInt`. Arguments must satisfy the same rule. A conversion
+global runs no user code beyond the coercion a template literal performs, so
+`{String(value)}` keeps every component, call-site, and `@for` row fast path
+that `{value}` gets.
 
 In compatibility mode, member calls fail closed because the receiver may be a live object:
 `header.getIsSorted()` can return a new answer while `header` retains the same

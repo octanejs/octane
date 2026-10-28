@@ -44,6 +44,28 @@ export function DerivedIdentity() @{
 	</div>
 }
 
+// A conversion global is a value projection like an imported helper, so the
+// object it builds keeps its identity while `items` does.
+export function ConvertedIdentity() @{
+	const [items, setItems] = useState([{ id: 1, n: 1 }]);
+	const [tick, setTick] = useState(0);
+	const summary = { count: String(items.length) };
+	<div>
+		<button id="ci-tick" onClick={() => setTick(tick + 1)}>
+			{'tick'}
+		</button>
+		<button
+			id="ci-add"
+			onClick={() => setItems([...items, { id: items.length + 1, n: items.length + 1 }])}
+		>
+			{'add'}
+		</button>
+		<span id="ci-identity">{identityOf(summary)}</span>
+		<span id="ci-count">{summary.count as string}</span>
+		<span id="ci-tickval">{'' + tick}</span>
+	</div>
+}
+
 // --- correctness of the cached value ---------------------------------------
 
 export function DerivedValue() @{

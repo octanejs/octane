@@ -8244,3 +8244,113 @@ describe('compiler-owned component-region memoization', () => {
 		expectNoCompilerRegion(dynamicImport);
 	});
 });
+
+// `String(value)` is the documented spelling of an intended text conversion. An
+// unshadowed conversion global must leave every component memo proof where the
+// bare value leaves it, so each source compiles to the same plan with or without
+// the call. A binding that shadows `String` is an ordinary callee again.
+describe('autoMemo — conversion globals in component regions', () => {
+	const compileClient = (source: string, id: string) =>
+		compile(source, id, { hmr: false, autoMemo: true }).code;
+	// Component ids hash the authored source, so they differ between the twins.
+	const normalized = (code: string) =>
+		code.replace(/\bString\(([^()]*)\)/g, '$1').replace(/'c:[0-9a-z]+'/g, "'c:id'");
+
+	it.each([
+		[
+			'a component body',
+			'component-body.tsrx',
+			`function Child(props) @{ <span>{'n=' + String(props.n)}</span> }
+			 export function App(props) @{ <p><Child n={props.n} /></p> }`,
+		],
+		[
+			'a call-site prop',
+			'call-site.tsrx',
+			`function Child(props) @{ <span>{props.label as string}</span> }
+			 export function App(props) @{ <p><Child label={String(props.n)} /></p> }`,
+		],
+		[
+			'a hookful child that publishes its setter',
+			'hookful-child.tsrx',
+			`import { useState } from 'octane';
+			 let childSetter = null;
+			 function Child(props) @{
+				const [own, setOwn] = useState(0);
+				childSetter = setOwn;
+				<button onClick={() => setOwn(own + 1)}>{props.label + ':' + String(own)}</button>
+			 }
+			 export function App(props) @{
+				const [tick, setTick] = useState(0);
+				<section data-tick={tick as number}><Child label={props.label} /></section>
+			 }`,
+		],
+		[
+			'a mapped row under a provider',
+			'mapped-provider.tsx',
+			`import { createContext, memo, useState } from 'octane';
+			 const Theme = createContext(null);
+			 function RowImpl(props) { return <span>{props.label}</span>; }
+			 const Row = memo(RowImpl);
+			 function Rows(props) {
+				return (
+					<div id="rows">
+						{props.items.map((item) => <Row key={item.id} label={String(item.label)} />)}
+					</div>
+				);
+			 }
+			 export function App(props) {
+				const [tick, setTick] = useState(0);
+				const items = props.items;
+				return (
+					<section>
+						<button onClick={() => setTick(tick + 1)}>{tick}</button>
+						<Theme value={null}><Rows items={items} /></Theme>
+					</section>
+				);
+			 }`,
+		],
+	])('compiles %s exactly like the bare value', (_name, id, source) => {
+		const bare = compileClient(source.replace(/\bString\(/g, '('), id);
+		expect(bare).toContain('compilerMemoRegion as');
+		expect(normalized(compileClient(source, id))).toBe(normalized(bare));
+	});
+
+	it.each([
+		['a component local', '', 'const String = (value) => value.read();'],
+		['a module const', 'const String = (value) => value.read();', ''],
+		['a module function', 'function String(value) { return value.read(); }', ''],
+	])('re-reads a live value when %s shadows String', (_name, prelude, local) => {
+		const source = `
+			${prelude}
+			let live = 'v0';
+			export function setLive(value) { live = value; }
+			export const source = { read: () => live };
+			function Child(props) @{ <span id="shadowed-string-child">{props.label as string}</span> }
+			export function App(props) @{
+				${local}
+				<p data-tick={props.tick as number}><Child label={String(props.source)} /></p>
+			}
+		`;
+		expectNoCompilerRegion(compileClient(source, 'shadowed-string.tsrx'));
+		const {
+			App,
+			setLive,
+			source: live,
+		} = loadCompiledFixtureSource(source, {
+			id: 'shadowed-string.tsrx',
+			mode: 'client',
+			compileOptions: { hmr: false, dev: false },
+		});
+		// The source keeps its identity, so only a cache that never reads it would
+		// keep showing the first value.
+		const root = mount(App, { tick: 0, source: live });
+		try {
+			expect(root.find('#shadowed-string-child').textContent).toBe('v0');
+			setLive('v1');
+			root.update(App, { tick: 1, source: live });
+			expect(root.find('#shadowed-string-child').textContent).toBe('v1');
+		} finally {
+			root.unmount();
+		}
+	});
+});
