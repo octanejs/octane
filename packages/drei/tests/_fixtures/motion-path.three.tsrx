@@ -27,5 +27,5 @@ export function MotionPathScene(props) @{
 
 export function InvalidMotionReader() @{
 	const motion = useMotion();
-	{motion.offset}
+	motion.offset;
 }

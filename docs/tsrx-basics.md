@@ -21,7 +21,10 @@ primitive (coerced to text), `null`, or an array.
 `@{ … }` is shorthand for returning JSX. `function f() @{ … }` desugars to
 `function f() { … return <jsx> }`, so hooks and locals can sit next to the
 output. The `@{ … }` scope ends with exactly one output node, a JSX element or a
-fragment. Both forms compile identically, and any function can use either.
+fragment. Both forms compile identically, and any function can use either. A lone
+`{children}` there, or in a directive arm other than `@case`, would be a
+JavaScript block rather than a hole, so the compiler rejects it: render it as
+`<>{children}</>`.
 
 ```jsx
 import { useState } from 'octane';

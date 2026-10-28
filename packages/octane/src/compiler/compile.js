@@ -86,6 +86,7 @@ import {
 	armJump,
 	assertTemplateJumps,
 } from './arm-exits.js';
+import { assertNoBareHoles } from './bare-holes.js';
 import { assertForOfHeaders } from './for-headers.js';
 import {
 	isComponentTag,
@@ -11935,6 +11936,7 @@ function prepareAuthoredAst(source, cleanFilename, options) {
 	analyzeTsrx(ast, cleanFilename);
 	assertForOfHeaders(ast, source, cleanFilename);
 	assertTemplateJumps(ast, source, cleanFilename);
+	assertNoBareHoles(ast, source, cleanFilename);
 	adoptParserAst(ast);
 	assertNoLegacyContextProviders(ast, source, cleanFilename);
 	options = nativeReadOptions(ast, options);

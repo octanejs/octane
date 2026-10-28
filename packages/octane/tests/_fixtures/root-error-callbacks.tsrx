@@ -289,9 +289,7 @@ export function UncaughtHost() @{
 // error path (the first root.render() mounts synchronously in Octane) and the
 // hydration render path, both of which must honor onUncaughtError.
 export function MountThrower() @{
-	{
-		throwOnMount() as string;
-	}
+	throwOnMount();
 }
 
 function RenderRecord(props: { record: () => void }) @{

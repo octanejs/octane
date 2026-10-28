@@ -302,6 +302,7 @@ describe('Html', () => {
 		expect(meshIn(custom.octaneRoot.store.getState().scene).scale.toArray()).toEqual([
 			0.5, 0.25, 0.2,
 		]);
+		expect(meshIn(custom.octaneRoot.store.getState().scene).geometry.type).toBe('BoxGeometry');
 		custom.octaneRoot.unmount();
 		await act(async () => custom.reactRoot.unmount());
 	});
