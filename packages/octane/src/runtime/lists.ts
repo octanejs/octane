@@ -22,7 +22,6 @@ import type {
 } from './types.js';
 import { trackSignalRetryListKeys, renderBlock } from './signal-owners.js';
 import {
-	ROOT_RENDER_ROLLBACK,
 	journalRootProperty,
 	retireBlocks,
 	placeRun,
@@ -45,9 +44,6 @@ import {
 import {
 	discardSignalRetryItem,
 	CURRENT_BLOCK,
-	TRANSITION_JOURNAL,
-	TRANSITION_JOURNAL_BAGS,
-	TRANSITION_JOURNAL_CHECKPOINT,
 	ROOT_RENDER_TRANSACTION,
 	preserveRootCreatedDom,
 	mountFastHostItems,
@@ -89,6 +85,13 @@ import {
 	type FocusSelectionBatch,
 } from './commit.js';
 import { getNextSibling } from './templates.js';
+import {
+	ROOT_RENDER_ROLLBACK,
+	TRANSITION_JOURNAL,
+	TRANSITION_JOURNAL_BAGS,
+	TRANSITION_JOURNAL_CHECKPOINT,
+} from './drivers.js';
+import { ROOT_ROLLBACK } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -334,7 +337,7 @@ export function forBlock<T>(
 			state.emptyBlock.extra = state.env;
 			renderBlock(state.emptyBlock);
 		} else {
-			if (TRANSITION_JOURNAL !== null) journalForSlot(state);
+			if (TRANSITION_JOURNAL) journalForSlot(state);
 			if (hydration !== null) {
 				// The server rendered a populated list where the client renders @empty:
 				// the content inside the @for range is item blocks (`<!--[-->`), not the
@@ -403,7 +406,7 @@ export function forBlock<T>(
 		// A committed list deletes the branch at commit, like a row; one this
 		// render built leaves its run now.
 		const empty = state.emptyBlock;
-		if (TRANSITION_JOURNAL !== null) journalForSlot(state);
+		if (TRANSITION_JOURNAL) journalForSlot(state);
 		const next = listNext(state, parentBlock, at);
 		if (next === null) unmountBlock(empty);
 		else if (!isCreatedInRootRender(next.tx, empty)) queueRootUnmount(empty, true, next.out);
@@ -436,7 +439,7 @@ export function forBlock<T>(
 	let lite = false;
 	if ((f & 4) !== 0 && deps !== undefined) {
 		const requiresScope = (f & 32) !== 0;
-		if (requiresScope && TRANSITION_JOURNAL !== null && ROOT_RENDER_TRANSACTION === null) {
+		if (requiresScope && TRANSITION_JOURNAL && ROOT_RENDER_TRANSACTION === null) {
 			// The list journal restores membership and DOM, not this dependency
 			// snapshot. A suspended attempt must never leave a rolled-back list
 			// believing that its uncommitted dependencies are still current.
@@ -531,7 +534,7 @@ export function keyedForBlock<T>(
 	// Skip selection bookkeeping with the same owner check.
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
 	const state = parentScope.slots[slotKey] as ForSlot | undefined;
-	if (TRANSITION_JOURNAL !== null && ROOT_RENDER_TRANSACTION === null) {
+	if (TRANSITION_JOURNAL && ROOT_RENDER_TRANSACTION === null) {
 		if (state !== undefined) {
 			// A transition can commit or roll back without journaling this cache.
 			// Invalidate both snapshots so its next ordinary render re-primes them.
@@ -573,7 +576,7 @@ export function keyedForBlock<T>(
 		ownEnd,
 		signalSite,
 	);
-	if (TRANSITION_JOURNAL === null || ROOT_RENDER_TRANSACTION !== null) {
+	if (!TRANSITION_JOURNAL || ROOT_RENDER_TRANSACTION !== null) {
 		const rendered = parentScope.slots[slotKey] as ForSlot;
 		if (rendered.selectionItems !== items)
 			journalRootProperty(rendered, 'selectionItems', rendered.selectionItems);
@@ -926,7 +929,9 @@ function updateSurvivor<T>(
 	// (shuffle / reverse / rotate) move survivors' DOM without re-rendering them.
 	// The list's shape record restores itemIndex from chain order; reconcileKeyed
 	// takes it before the first survivor index write.
-	const journal = ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK;
+	const journal = TRANSITION_JOURNAL
+		? ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK
+		: false;
 	if (journal && block.body !== itemBody) journalRootProperty(block, 'body', block.body);
 	if (pure && block.props === newItem && (indexIndependent || block.itemIndex === newIdx)) {
 		block.itemIndex = newIdx;
@@ -1033,7 +1038,7 @@ export function mountItemsLinear<T>(
 	// shape to go back to: a fill during a render that may yet hold must come
 	// back out — rows, scopes and queued effects together — or the held boundary
 	// shows fresh rows with their bindings half rolled back underneath them.
-	if (TRANSITION_JOURNAL !== null) journalForSlot(state);
+	if (TRANSITION_JOURNAL) journalForSlot(state);
 	const oldItems = state.items;
 	// A hydrating list's end may still be to place (placeAtCommit).
 	const parentNode = upgradeHost ?? markerParent(state.end)!;
@@ -1119,10 +1124,10 @@ export function mountItemsLinear<T>(
 			const end = passthroughList ? block.endMarker : null;
 			const discardOwnedDom =
 				passthroughList &&
-				!isSuspenseException(error) &&
+				!(ROOT_ROLLBACK && isSuspenseException(error)) &&
 				!isHostContextRequest(error) &&
 				!isAdoptionControl(error);
-			if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
+			if (ROOT_ROLLBACK && isSuspenseException(error)) retainDiscardedWarmMemos(block);
 			// A hydrating item adopted server DOM, which a failed attempt leaves.
 			if (
 				(signalDocumentEnabled || registerRootOptions) &&
@@ -1189,11 +1194,11 @@ function mountPassthroughListItem<T>(
 		if (fresh) hydration.suspend(() => renderBlock(block));
 		else renderBlock(block);
 	} catch (error) {
-		if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
+		if (ROOT_ROLLBACK && isSuspenseException(error)) retainDiscardedWarmMemos(block);
 		const discardOwnedDom =
 			previousPassthrough &&
 			!hydration.passthroughRanges &&
-			!isSuspenseException(error) &&
+			!(ROOT_ROLLBACK && isSuspenseException(error)) &&
 			!isHostContextRequest(error) &&
 			!isAdoptionControl(error);
 		unmountBlock(block, false);
@@ -1270,7 +1275,7 @@ export function reconcileKeyed<T>(
 	// Index writes and the bounded relinks (inserts, removals, a small
 	// displacement) take the link form and record the rows they relink; a
 	// wholesale relink takes the full form (journalForSlot).
-	let journalShape = TRANSITION_JOURNAL !== null;
+	let journalShape = TRANSITION_JOURNAL ? true : false;
 	let record: ForSlotRecord | null = null;
 
 	// Fast path: empty → fill — the linear first-fill pass (callers on the
@@ -1301,11 +1306,12 @@ export function reconcileKeyed<T>(
 		next = listNext(state, parentBlock, at);
 		// A committed list's rows change nothing before its commit clears them.
 		if (
+			TRANSITION_JOURNAL &&
 			next !== null &&
 			(TRANSITION_JOURNAL_BAGS!.get(state) ?? -1) < TRANSITION_JOURNAL_CHECKPOINT
 		)
 			journalForListClear(state);
-		else if (journalShape) journalForSlot(state);
+		else if (TRANSITION_JOURNAL && journalShape) journalForSlot(state);
 		// The undo holds the old key map; clear only the one the list now has.
 		batchClearItems(state, state.items, next);
 		state.head = null;
@@ -1338,7 +1344,7 @@ export function reconcileKeyed<T>(
 			block.body !== itemBody ||
 			block.itemIndex !== prefixLen
 		) {
-			if (journalShape && block.itemIndex !== prefixLen) {
+			if (TRANSITION_JOURNAL && journalShape && block.itemIndex !== prefixLen) {
 				record = journalForSlot(state, true);
 				journalShape = false;
 			}
@@ -1363,7 +1369,7 @@ export function reconcileKeyed<T>(
 		const block = oldLast;
 		// Same stable-survivor skip as the prefix walk (see above).
 		if (!pure || block.props !== newItem || block.body !== itemBody || block.itemIndex !== newEnd) {
-			if (journalShape && block.itemIndex !== newEnd) {
+			if (TRANSITION_JOURNAL && journalShape && block.itemIndex !== newEnd) {
 				record = journalForSlot(state, true);
 				journalShape = false;
 			}
@@ -1399,7 +1405,7 @@ export function reconcileKeyed<T>(
 
 	// Case: old middle empty, new middle non-empty → only inserts.
 	if (oldRemain === 0) {
-		if (journalShape) record = journalForSlot(state, true);
+		if (TRANSITION_JOURNAL && journalShape) record = journalForSlot(state, true);
 		// Only `beforeMiddle` gets a new nextSibling; new keys append to the Map,
 		// which a middle insert leaves out of chain order.
 		const links = forSlotLinks(record);
@@ -1444,7 +1450,7 @@ export function reconcileKeyed<T>(
 
 	// Case: new middle empty, old middle non-empty → only removes.
 	if (prefixLen > newEnd) {
-		if (journalShape) record = journalForSlot(state, true);
+		if (TRANSITION_JOURNAL && journalShape) record = journalForSlot(state, true);
 		// The removed run keeps its own links; only `beforeMiddle` gets a new
 		// nextSibling. Deleted keys go back to their Map positions by chain order,
 		// or by the Map's order kept here when that differs.
@@ -1521,7 +1527,7 @@ export function reconcileKeyed<T>(
 			cur = cur.nextSibling!;
 		}
 		if (!anySurvivors) {
-			if (journalShape || record !== null) journalForSlot(state);
+			if (TRANSITION_JOURNAL && (journalShape || record !== null)) journalForSlot(state);
 			next = listNext(state, parentBlock, at);
 			batchClearItems(state, oldItems, next);
 			state.inOrder = true;
@@ -1584,7 +1590,7 @@ export function reconcileKeyed<T>(
 			const newRelIdx =
 				hasStableKeys && newKeys[oldIdx] === cur!.key ? oldIdx : newKeysToIdx.get(cur!.key);
 			if (newRelIdx === undefined) {
-				if (journalShape || record !== null) {
+				if (TRANSITION_JOURNAL && (journalShape || record !== null)) {
 					journalForSlot(state);
 					journalShape = false;
 					record = null;
@@ -1617,7 +1623,7 @@ export function reconcileKeyed<T>(
 					cur!.body !== itemBody ||
 					cur!.itemIndex !== newIdx
 				) {
-					if (journalShape && cur!.itemIndex !== newIdx) {
+					if (TRANSITION_JOURNAL && journalShape && cur!.itemIndex !== newIdx) {
 						record = journalForSlot(state, true);
 						journalShape = false;
 					}
@@ -1664,7 +1670,7 @@ export function reconcileKeyed<T>(
 				}
 			}
 			if (dCount <= K_DISP) {
-				if (journalShape) record = journalForSlot(state, true);
+				if (TRANSITION_JOURNAL && journalShape) record = journalForSlot(state, true);
 				// Before the first write, record each row whose nextSibling this
 				// shortcut rewrites: every displaced row and the row it lands after,
 				// the new middle's last row, and `beforeMiddle`.
@@ -1721,7 +1727,7 @@ export function reconcileKeyed<T>(
 			}
 		}
 
-		if (journalShape || record !== null) journalForSlot(state);
+		if (TRANSITION_JOURNAL && (journalShape || record !== null)) journalForSlot(state);
 		if (next === undefined) next = listNext(state, parentBlock, at);
 		// Place survivors first, then mount new rows in authored order. Reversing
 		// mounts reverses their ref/layout/effect order even when the DOM is right.
@@ -2151,7 +2157,7 @@ function discardThrownItem(
 		block.startMarker = root;
 		block.endMarker = root;
 	}
-	if (isSuspenseException(error)) retainDiscardedWarmMemos(block);
+	if (ROOT_ROLLBACK && isSuspenseException(error)) retainDiscardedWarmMemos(block);
 	unmountBlock(block, !ROOT_RENDER_TRANSACTION?.retainedCreated?.has(block));
 }
 

@@ -50,6 +50,8 @@ import {
 	MEMO_BAIL,
 	installMemoBail,
 	COMMIT_WORK,
+	ROOT_RENDER_ROLLBACK,
+	TRANSITION_JOURNAL,
 } from './drivers.js';
 import {
 	type SignalInstanceKey,
@@ -60,7 +62,6 @@ import {
 } from './signal-owners.js';
 import { storeSyncQueue, refDetachQueue } from './refs.js';
 import {
-	ROOT_RENDER_ROLLBACK,
 	journalUndo,
 	journalRootProperty,
 	journalRootSlot,
@@ -95,11 +96,10 @@ import {
 	registerSlot,
 	resetHmrBlock,
 } from './block.js';
-import { EFFECT_RECONNECT_CONTEXT, PUBLISH_SUSPENSE_COMMIT, tryBlock } from './suspense.js';
+import { EFFECT_RECONNECT_CONTEXT, PUBLISH_SUSPENSE_COMMIT, tryBlockImpl } from './suspense.js';
 import {
 	CURRENT_SCOPE,
 	CURRENT_BLOCK,
-	TRANSITION_JOURNAL,
 	ROOT_RENDER_TRANSACTION,
 	effectEventQueue,
 	effectEventCommitActions,
@@ -128,6 +128,7 @@ import {
 	queueRootDeletion,
 } from './commit.js';
 import { getFirstChild, getNextSibling } from './templates.js';
+import { installRootRollback } from '../rollback-flag.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -297,7 +298,7 @@ export function childrenTryBlock(
 		body = descriptorChildrenTryBody;
 		env = [props.children];
 	}
-	return tryBlock(
+	return tryBlockImpl(
 		scope,
 		0,
 		block.parentNode,
@@ -446,6 +447,9 @@ function resolveLazyModule(mod: any): ComponentBody<any> {
 export function lazy<C extends ComponentBody<any>>(
 	load: () => PromiseLike<{ default: C } | C>,
 ): C & { displayName?: string } {
+	// Its component suspends while the module loads. Created at module scope,
+	// it installs the rollback before any render; an unused one is dropped.
+	installRootRollback();
 	let status:
 		'uninitialized' | 'pending' | 'fulfilled' | 'rejected' | 'fulfilled-error' | 'rejected-error' =
 		'uninitialized';
@@ -509,7 +513,7 @@ export function lazy<C extends ComponentBody<any>>(
 		if (previousBody !== comp) {
 			if (previousBody !== undefined) invalidateSharedBodyOutput(scope);
 			const hooks = ensureHooks(scope);
-			if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK) {
+			if (TRANSITION_JOURNAL && !ROOT_RENDER_ROLLBACK) {
 				journalUndo(() => {
 					if (previousBody === undefined) hooks.delete(bodySlot);
 					else hooks.set(bodySlot, previousBody);

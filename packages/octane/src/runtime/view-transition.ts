@@ -18,7 +18,7 @@ import type {
 	SlotNext,
 	ViewTransitionProps,
 } from './types.js';
-import { TRANSITION_ROOT_DRIVER } from './drivers.js';
+import { TRANSITION_ROOT_DRIVER, TRANSITION_JOURNAL } from './drivers.js';
 import { LAYOUT_CASCADE_LIMIT, applyRefValue } from './refs.js';
 import {
 	DEFERRED_LAYOUT_DRIVER,
@@ -35,7 +35,7 @@ import { inInactiveSubtree, useLayoutEffect } from './hooks.js';
 import { transitionBatchReady, FLUSHED_TRANSITION_BATCHES } from './transitions.js';
 import { CURSOR } from './hydration.js';
 import { HIDDEN_DISPLAYS, hiddenDisplayNodes } from './suspense.js';
-import { CURRENT_BLOCK, TRANSITION_JOURNAL, ROOT_RENDER_TRANSACTION } from './render.js';
+import { CURRENT_BLOCK, ROOT_RENDER_TRANSACTION } from './render.js';
 import { type RootErrorHandlers, rootErrorHandlersFor, invokeRootErrorHandler } from './roots.js';
 import { childSlot } from './child-slots.js';
 import { moveBlockBefore } from './lists.js';
@@ -446,15 +446,15 @@ export function vtReleaseScopeBoundary(block: Block): void {
 	if (state?.scopeHost == null) return;
 	const host = state.scopeHost;
 	const saved = VT_SCOPE_OWNERS.get(host);
-	if (TRANSITION_JOURNAL !== null) journalObjectOnce(state);
+	if (TRANSITION_JOURNAL) journalObjectOnce(state);
 	state.scopeHost = null;
 	if (saved === undefined) return;
-	if (TRANSITION_JOURNAL !== null) journalObjectOnce(saved);
+	if (TRANSITION_JOURNAL) journalObjectOnce(saved);
 	saved.owners = saved.owners.filter((owner) => owner !== block);
 	if (saved.owners.length !== 0) return;
 	if (!VT_DRAIN) vtInterruptOwner(host as VTOwner);
 	atCommit(vtSyncScopeMarker, host);
-	if (TRANSITION_JOURNAL !== null) journalUndo(() => VT_SCOPE_OWNERS.set(host, saved));
+	if (TRANSITION_JOURNAL) journalUndo(() => VT_SCOPE_OWNERS.set(host, saved));
 	VT_SCOPE_OWNERS.delete(host);
 }
 
@@ -485,15 +485,15 @@ function vtPrepareScopeBoundary(block: Block): void {
 		}
 		return;
 	}
-	if (TRANSITION_JOURNAL !== null) journalObjectOnce(state);
+	if (TRANSITION_JOURNAL) journalObjectOnce(state);
 	let saved = VT_SCOPE_OWNERS.get(host);
 	if (saved === undefined) {
 		saved = { owners: [] };
-		if (TRANSITION_JOURNAL !== null) journalUndo(() => VT_SCOPE_OWNERS.delete(host));
+		if (TRANSITION_JOURNAL) journalUndo(() => VT_SCOPE_OWNERS.delete(host));
 		VT_SCOPE_OWNERS.set(host, saved);
 	}
 	if (state.scopeHost !== host) {
-		if (TRANSITION_JOURNAL !== null) journalObjectOnce(saved);
+		if (TRANSITION_JOURNAL) journalObjectOnce(saved);
 		saved.owners = [...saved.owners, block];
 		state.scopeHost = host;
 	}
@@ -548,7 +548,7 @@ function vtScopeRefInstance(block: Block, scope: Element): ViewTransitionInstanc
 			return resolve().new;
 		},
 	};
-	if (TRANSITION_JOURNAL !== null)
+	if (TRANSITION_JOURNAL)
 		journalUndo(() => {
 			if (previous === undefined) VT_SCOPE_REFS.delete(block);
 			else VT_SCOPE_REFS.set(block, previous);
@@ -585,7 +585,7 @@ function vtGetInstance(
 	}
 	if (state.instance !== null && state.instance.name === name && state.instanceScope === scope)
 		return state.instance;
-	if (TRANSITION_JOURNAL !== null) journalObjectOnce(state);
+	if (TRANSITION_JOURNAL) journalObjectOnce(state);
 	state.instanceScope = scope;
 	return (state.instance = vtCreateInstance(name, scope));
 }

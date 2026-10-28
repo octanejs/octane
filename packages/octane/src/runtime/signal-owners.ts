@@ -10,6 +10,8 @@ import {
 	SIGNAL_BINDINGS_ENABLED,
 	ensureNativeReadDriver,
 	registerRootOptions,
+	ROOT_RENDER_ROLLBACK,
+	TRANSITION_JOURNAL,
 } from './drivers.js';
 import { hydrating } from '../hydration-flag.js';
 import { __normalizeBindingStyle } from '../dom-binding-styles.js';
@@ -55,7 +57,6 @@ import { blockSubtreeDisposed } from './refs.js';
 import {
 	retireRendererSignalOwner,
 	scheduleNativeRead,
-	ROOT_RENDER_ROLLBACK,
 	journalUndo,
 	journalRootProperty,
 	attachLiveFragmentRef,
@@ -88,7 +89,6 @@ import {
 	discardSignalRetryItem,
 	CURRENT_SCOPE,
 	CURRENT_BLOCK,
-	TRANSITION_JOURNAL,
 	ROOT_RENDER_TRANSACTION,
 	WIP_CAPTURE,
 	renderBlockInner,
@@ -903,7 +903,7 @@ export function writeScalarNativeStyle(
 	} else if (binding.el !== el) {
 		// An incomplete template mount retries with a fresh clone, which must be
 		// written in full even when its values match the abandoned host.
-		if (TRANSITION_JOURNAL !== null) {
+		if (TRANSITION_JOURNAL) {
 			TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'el', binding.el);
 			TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'style', binding.style);
 		}
@@ -917,8 +917,7 @@ export function writeScalarNativeStyle(
 		return;
 	}
 	write(el, value, binding.style);
-	if (TRANSITION_JOURNAL !== null)
-		TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'style', binding.style);
+	if (TRANSITION_JOURNAL) TRANSITION_JOURNAL.push(JOURNAL_PROP, binding, 'style', binding.style);
 	binding.style = value;
 }
 
@@ -1157,7 +1156,7 @@ export function currentSignalDeclarationStage(
 		for (const callback of callbacks) callback(discarded);
 	};
 	// A boundary hold or a dropped transition unwinds its render while the capture survives.
-	if (TRANSITION_JOURNAL !== null) journalUndo(() => finish(true));
+	if (TRANSITION_JOURNAL) journalUndo(() => finish(true));
 	(capture.renderCleanups ??= []).push(finish);
 	if (invocation !== undefined) invocation.invocationData = stage;
 	return stage;

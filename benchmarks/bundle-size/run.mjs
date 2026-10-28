@@ -69,6 +69,7 @@ import {
 	resolveDeclarationRanges,
 	retainedDeclarations,
 } from './hydration-free-gates.mjs';
+import { RENDER_ROLLBACK_DECLARATIONS } from './render-rollback-gates.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JS_FRAMEWORK = path.resolve(__dirname, '../js-framework');
@@ -280,7 +281,6 @@ const shellHostRanges = resolveDeclarationRanges(
 // work below from its creator, so neither fixture may retain any of it. The
 // other Octane builds in this run use those features; together they must retain
 // every entry, which proves the source-map oracle still sees each declaration.
-const CREATOR_INSTALLED_FIXTURES = new Set([`${JS_FRAMEWORK}:`, `${CHAT_STREAM}:chat_`]);
 const creatorInstalledRanges = resolveDeclarationRanges(
 	(source) => fs.readFileSync(path.resolve(__dirname, '../../packages/octane/src', source), 'utf8'),
 	(text, source) => parseAst(text, { lang: 'ts' }, source),
@@ -323,12 +323,34 @@ const creatorInstalledRanges = resolveDeclarationRanges(
 );
 const creatorInstalledControls = new Map();
 
+// Neither application has an entry that can drop a render, so neither may ship
+// render rollback; run-minimal's suspense-transition control proves the oracle
+// sees each declaration.
+const rollbackRanges = resolveDeclarationRanges(
+	(source) => fs.readFileSync(path.resolve(__dirname, '../../packages/octane/src', source), 'utf8'),
+	(text, source) => parseAst(text, { lang: 'ts' }, source),
+	RENDER_ROLLBACK_DECLARATIONS,
+);
+
+// Declarations from `ranges` that any source-mapped chunk in `outDir` retains.
+// Rolldown's virtual runtime chunk has no source map and no Octane source.
+function retainedIn(outDir, ranges) {
+	const retained = new Set();
+	for (const file of walk(outDir)) {
+		if (!/\.m?js$/.test(file) || !fs.existsSync(file + '.map')) continue;
+		const map = JSON.parse(fs.readFileSync(file + '.map', 'utf8'));
+		for (const declaration of retainedDeclarations(map, ranges)) retained.add(declaration);
+	}
+	return retained;
+}
+
 for (const set of SETS)
 	for (const name of set.targets.filter(selected)) {
 		const appRoot = path.join(set.root, name);
 		const shellHostGate = set.root === APP_SHELL && name === 'octane-tsrx';
-		const creatorInstalledGate = CREATOR_INSTALLED_FIXTURES.has(`${set.root}:${set.prefix}`);
 		const octaneBuild = name.startsWith('octane-');
+		// The applications whose creator-installed and rollback checks are above.
+		const leanApp = set.root === JS_FRAMEWORK || set.root === CHAT_STREAM;
 		const outDir = path.join(OUT_ROOT, set.prefix + name);
 		const setLabel = set.prefix ? set.prefix + '/' : '';
 		console.log(`building ${setLabel}${name} (production, ${VITE_MINIFY} minify)…`);
@@ -356,30 +378,17 @@ for (const set of SETS)
 
 		const { sums, files } = measure(name, outDir);
 		if (octaneBuild) {
-			const retained = new Set();
-			for (const file of walk(outDir)) {
-				// Rolldown's virtual runtime chunk has no source map and no Octane source.
-				if (!/\.m?js$/.test(file) || !fs.existsSync(file + '.map')) continue;
-				const map = JSON.parse(fs.readFileSync(file + '.map', 'utf8'));
-				for (const declaration of retainedDeclarations(map, creatorInstalledRanges))
-					retained.add(declaration);
-			}
-			if (creatorInstalledGate && name === 'octane-tsrx')
+			const retained = retainedIn(outDir, creatorInstalledRanges);
+			if (!leanApp) creatorInstalledControls.set(`${setLabel}${name}`, retained);
+			else if (name === 'octane-tsrx')
 				assert.deepEqual(
 					[...retained],
 					[],
 					`${setLabel}${name}: retained commit, owner or native-read work that only its creators install`,
 				);
-			else if (!creatorInstalledGate) creatorInstalledControls.set(`${setLabel}${name}`, retained);
 		}
 		if (shellHostGate) {
-			const retained = new Set();
-			for (const file of walk(outDir)) {
-				if (!/\.m?js$/.test(file)) continue;
-				const map = JSON.parse(fs.readFileSync(file + '.map', 'utf8'));
-				for (const declaration of retainedDeclarations(map, shellHostRanges))
-					retained.add(declaration);
-			}
+			const retained = retainedIn(outDir, shellHostRanges);
 			assert(
 				retained.has('componentSlotFunction'),
 				`${setLabel}${name}: lazy-route control is absent; update its reachability check`,
@@ -390,6 +399,12 @@ for (const set of SETS)
 				`${setLabel}${name}: a body-only app retained generic host props`,
 			);
 		}
+		if (leanApp && name === 'octane-tsrx')
+			assert.deepEqual(
+				[...retainedIn(outDir, rollbackRanges)],
+				[],
+				`${setLabel}${name}: an app that cannot drop a render retained render rollback`,
+			);
 		const total = {
 			raw: sums.app.raw + sums.fw.raw,
 			gzip: sums.app.gzip + sums.fw.gzip,

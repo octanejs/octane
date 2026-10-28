@@ -67,7 +67,7 @@ import type {
 	TrySlot,
 } from './types.js';
 import { scopeSignalOwner, renderBlock } from './signal-owners.js';
-import { ROOT_RENDER_ROLLBACK, journalRootProperty, scheduleRender } from './engine.js';
+import { journalRootProperty, scheduleRender } from './engine.js';
 import { useEffect, useId } from './hooks.js';
 import {
 	type TrackedThenable,
@@ -77,7 +77,7 @@ import {
 } from './use.js';
 import type { Context } from './context.js';
 import { CURSOR, isRendererHydrationStyle, type HydrationCapability } from './hydration.js';
-import { suspenseRetryBatchForSubtree, tryBlock } from './suspense.js';
+import { suspenseRetryBatchForSubtree, tryBlockImpl } from './suspense.js';
 import {
 	CURRENT_SCOPE,
 	CURRENT_BLOCK,
@@ -107,6 +107,8 @@ import {
 } from './commit.js';
 import { getFirstChild, getNextSibling, DeferredHydrationSuspension } from './templates.js';
 import { eventPathNode } from './events.js';
+import { ROOT_RENDER_ROLLBACK } from './drivers.js';
+import { rollbackEntry } from '../rollback-flag.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -478,7 +480,7 @@ function createHydrateBoundaryBody(
 				: scopeSignalOwner(state.parentBlock.signalInstanceParent),
 	});
 	return (_props, scope) => {
-		tryBlock(
+		tryBlockImpl(
 			scope,
 			0,
 			scope.block.parentNode,
@@ -1422,9 +1424,11 @@ function initializeHydrateComponent(
 	return hydrate as InternalHydrateComponent;
 }
 
-export const Hydrate: ComponentBody<HydrateProps> =
-	/* @__PURE__ */ initializeHydrateComponent(hydrateBoundaryBody);
+export const Hydrate: ComponentBody<HydrateProps> = /* @__PURE__ */ rollbackEntry(
+	/* @__PURE__ */ initializeHydrateComponent(hydrateBoundaryBody),
+);
 
 /** Compiler-owned template children with no authored fallback; never a descriptor entry point. */
-export const __HydrateCompiled: ComponentBody<HydrateProps> =
-	/* @__PURE__ */ initializeHydrateComponent(compiledHydrateBoundaryBody);
+export const __HydrateCompiled: ComponentBody<HydrateProps> = /* @__PURE__ */ rollbackEntry(
+	/* @__PURE__ */ initializeHydrateComponent(compiledHydrateBoundaryBody),
+);

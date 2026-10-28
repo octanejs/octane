@@ -9,14 +9,9 @@ import { __profileCount, ProfileCounter, __profileArm } from '../profiling.js';
 import { BINDING_OPEN_PREFIX } from '../dom-binding-protocol.js';
 import { signalDocumentEnabled } from '../signals/document-owner.js';
 import type { ComponentBody, Scope, SignalRetryLocation, Block, SlotNext } from './types.js';
-import { NATIVE_READ_DRIVER } from './drivers.js';
+import { NATIVE_READ_DRIVER, ROOT_RENDER_ROLLBACK } from './drivers.js';
 import { SIGNAL_RETRY_LOCATIONS, renderBlock } from './signal-owners.js';
-import {
-	ROOT_RENDER_ROLLBACK,
-	journalRootProperty,
-	journalRootSlot,
-	isCreatedInRootRender,
-} from './engine.js';
+import { journalRootProperty, journalRootSlot, isCreatedInRootRender } from './engine.js';
 import { isSuspenseException } from './use.js';
 import { SHARED_BODY_SCOPE } from './context.js';
 import { CURSOR, END_OF_CONTENT } from './hydration.js';

@@ -64,6 +64,9 @@ import {
 	queueRefAttach,
 	noop,
 	installCommitWork,
+	ROOT_RENDER_ROLLBACK,
+	TRANSITION_JOURNAL,
+	TRANSITION_JOURNAL_BAGS,
 } from './drivers.js';
 import {
 	handOverSignalRetryScope,
@@ -77,7 +80,6 @@ import {
 	VIEW_TRANSITION_DRIVER,
 	inFlush,
 	type RootRenderFrame,
-	ROOT_RENDER_ROLLBACK,
 	journalUndo,
 	journalRootProperty,
 	rollbackRootRender,
@@ -140,8 +142,6 @@ import {
 import {
 	CURRENT_SCOPE,
 	CURRENT_BLOCK,
-	TRANSITION_JOURNAL,
-	TRANSITION_JOURNAL_BAGS,
 	ROOT_RENDER_TRANSACTION,
 	beginRootRender,
 	suspendRootRender,
@@ -178,6 +178,7 @@ import {
 	rollbackTransitionJournal,
 } from './commit.js';
 import { getNextSibling } from './templates.js';
+import { ROOT_ROLLBACK, rollbackEntry } from '../rollback-flag.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -201,20 +202,23 @@ export let PUBLISH_SUSPENSE_COMMIT: ((state: TrySlot) => void) | null = null;
 // children as element values (`Octane.JSX.Element`), and the de-opt path
 // renders element descriptors directly.
 export const Suspense: ComponentBody<{ fallback?: unknown; children: unknown }> =
-	/* @__PURE__ */ markComponentFlags<ComponentBody<{ fallback?: unknown; children: unknown }>>(
-		function Suspense(props, scope) {
-			const pendingBody: ComponentBody = (_p, s) => {
-				childSlot(s, 1, s.block.parentNode, props.fallback, s.block.endMarker);
-			};
-			childrenTryBlock(scope, props, null, pendingBody);
-		},
-		COMPONENT_FLAG_BOUNDARY,
-		'Suspense',
-		SUSPENSE_TAG,
+	/* @__PURE__ */ rollbackEntry(
+		/* @__PURE__ */ markComponentFlags<ComponentBody<{ fallback?: unknown; children: unknown }>>(
+			function Suspense(props, scope) {
+				const pendingBody: ComponentBody = (_p, s) => {
+					childSlot(s, 1, s.block.parentNode, props.fallback, s.block.endMarker);
+				};
+				childrenTryBlock(scope, props, null, pendingBody);
+			},
+			COMPONENT_FLAG_BOUNDARY,
+			'Suspense',
+			SUSPENSE_TAG,
+		),
 	);
 
-export const ViewTransition: ComponentBody<ViewTransitionProps> =
-	/* @__PURE__ */ initializeViewTransitionComponent();
+export const ViewTransition: ComponentBody<ViewTransitionProps> = /* @__PURE__ */ rollbackEntry(
+	/* @__PURE__ */ initializeViewTransitionComponent(),
+);
 
 const CATCH_ENTRY = /* @__PURE__ */ Symbol('octane.catch-entry');
 
@@ -603,10 +607,10 @@ function writeHiddenStyle(
 	if (!HIDDEN_DISPLAYS.has(el as HTMLElement)) return false;
 	const transaction = ROOT_RENDER_TRANSACTION;
 	if (transaction !== null && !transaction.aborted && !ROOT_RENDER_ROLLBACK) {
-		if (TRANSITION_JOURNAL !== null) journalBag();
+		if (TRANSITION_JOURNAL) journalBag();
 		transaction.ops.push(commitHiddenStyle, [el, value, previous, property, CURRENT_SCOPE]);
 	} else {
-		if (TRANSITION_JOURNAL !== null) journalBag();
+		if (TRANSITION_JOURNAL) journalBag();
 		commitHiddenStyle([el, value, previous, property, null]);
 	}
 	return true;
@@ -626,7 +630,7 @@ function commitHiddenStyle([el, value, previous, property, scope]: [
 	Scope | null,
 ]): void {
 	const hidden = HIDDEN_DISPLAYS.get(el as HTMLElement);
-	if (hidden !== undefined && TRANSITION_JOURNAL !== null) {
+	if (hidden !== undefined && TRANSITION_JOURNAL) {
 		TRANSITION_JOURNAL.push(
 			JOURNAL_PROP,
 			hidden,
@@ -664,8 +668,7 @@ function commitHiddenStyle([el, value, previous, property, scope]: [
 function writeHiddenText(node: Text, value: string): boolean {
 	const hidden = HIDDEN_TEXTS.get(node);
 	if (hidden === undefined) return false;
-	if (TRANSITION_JOURNAL !== null)
-		TRANSITION_JOURNAL.push(JOURNAL_PROP, hidden, 'data', hidden.data);
+	if (TRANSITION_JOURNAL) TRANSITION_JOURNAL.push(JOURNAL_PROP, hidden, 'data', hidden.data);
 	hidden.data = value;
 	return true;
 }
@@ -798,7 +801,7 @@ function teardownErrorSlot(state: ErrorSlot, detachDom: boolean): void {
 function beginDetachedBoundaryRender(state: TrySlot | ErrorSlot): RootRenderFrame | null {
 	const frame =
 		WIP_CAPTURE === null ? beginRootRender(state.parentBlock.idState.renderOwner) : null;
-	if (ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_ROLLBACK) return frame;
+	if (!TRANSITION_JOURNAL || ROOT_RENDER_TRANSACTION === null || ROOT_RENDER_ROLLBACK) return frame;
 	if (frame === null) journalObjectOnce(state);
 	else {
 		// A frame of its own opens a window nothing has snapshotted in yet: one
@@ -1209,7 +1212,7 @@ function switchErrorToCatchInner(state: ErrorSlot, error: any, reportInline: boo
 	mountCatchArm(state, error, reportInline);
 }
 
-export function tryBlock(
+export function tryBlockImpl(
 	parentScope: Scope,
 	slotKey: number,
 	domParent: Node,
@@ -1462,6 +1465,8 @@ export function tryBlock(
 	hydration?.parkPast(s.end, parentScope);
 	return s.reset;
 }
+/** The compiler's @try entry; internal boundaries call tryBlockImpl. */
+export const tryBlock: typeof tryBlockImpl = /* @__PURE__ */ rollbackEntry(tryBlockImpl);
 
 function createTryBody(
 	state: TrySlot,
@@ -2083,7 +2088,7 @@ export function hideTryBlock(state: TrySlot): void {
 	}
 	if (owns) ownTryBodyRange(state);
 	state.hiddenDom = hidden;
-	if (TRANSITION_JOURNAL !== null) {
+	if (TRANSITION_JOURNAL) {
 		journalUndo(() => {
 			if (state.hiddenDom === hidden) state.hiddenDom = null;
 			releaseTryHide(hidden);
@@ -2140,7 +2145,7 @@ export function showTryBlock(state: TrySlot): void {
 		return;
 	}
 	state.hiddenDom = null;
-	if (TRANSITION_JOURNAL !== null) {
+	if (TRANSITION_JOURNAL) {
 		journalUndo(() => {
 			state.hiddenDom = hidden;
 			if (hidden.active) return;
@@ -2423,7 +2428,7 @@ function hideTryContentAndMountPendingInner(
 		// an abandoned enclosing retry drops that action but keeps this primary
 		// hidden, and its reveal must still attach refs from current manifests.
 		if (state.detachedRefs === null && enclosingPrimaryDetachedRefs(state.parentBlock)) {
-			if (TRANSITION_JOURNAL !== null && !ROOT_RENDER_ROLLBACK)
+			if (TRANSITION_JOURNAL && !ROOT_RENDER_ROLLBACK)
 				TRANSITION_JOURNAL.push(JOURNAL_PROP, state, 'detachedRefs', null);
 			state.detachedRefs = [];
 		}
@@ -3357,7 +3362,9 @@ export function handleRenderError(block: Block, err: any): void {
 		if (bridge !== null && bridge.routeSuspense(err.thenable)) return;
 		err = new Error(formatClientError(27));
 	}
-	if (isSuspenseException(err)) {
+	// Only an entry that can suspend creates a SuspenseException, and each
+	// installs the rollback a suspended render needs (rollbackEntry).
+	if (ROOT_ROLLBACK && isSuspenseException(err)) {
 		let b: Block | null = block;
 		while (b) {
 			const h = b.rare?.suspenseHandler;

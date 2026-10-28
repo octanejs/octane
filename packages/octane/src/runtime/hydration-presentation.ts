@@ -33,7 +33,12 @@ import { SIGNAL_BINDING_SUBSCRIBE } from '../signals/types.js';
 import { isSignalHandle, isWritableSignal } from '../signals/handle-protocol.js';
 import { normalizeClass } from '../css.js';
 import type { Scope, Block, RootRenderOwner, OffscreenCapture, HostPropSource } from './types.js';
-import { SIGNAL_BINDINGS_ENABLED } from './drivers.js';
+import {
+	SIGNAL_BINDINGS_ENABLED,
+	ROOT_RENDER_ROLLBACK,
+	TRANSITION_JOURNAL,
+	TRANSITION_JOURNAL_DEPTH,
+} from './drivers.js';
 import {
 	runWithBlockSignalOwner,
 	type NativeStyleBinding,
@@ -48,12 +53,7 @@ import {
 	beginNativeReadWitness,
 	finishNativeReadWitness,
 } from './signal-owners.js';
-import {
-	ROOT_RENDER_ROLLBACK,
-	retireBindingLease,
-	scheduleRender,
-	reportEffectError,
-} from './engine.js';
+import { retireBindingLease, scheduleRender, reportEffectError } from './engine.js';
 import { registerHookCleanup } from './hooks.js';
 import { isSuspenseException } from './use.js';
 import { reportRendererOwnerError } from './context.js';
@@ -62,8 +62,6 @@ import { BlockImpl, ScopeImpl, invalidateRender } from './block.js';
 import {
 	CURRENT_SCOPE,
 	CURRENT_BLOCK,
-	TRANSITION_JOURNAL,
-	TRANSITION_JOURNAL_DEPTH,
 	ROOT_RENDER_TRANSACTION,
 	ROOT_DISCARD_STAMP,
 	preserveRootCreatedDom,
@@ -955,7 +953,7 @@ function writeAtCommit<T>(writer: (...args: any[]) => T, kind: string, args: any
 		if (cached === args[1]) return cached as T;
 	}
 	// The view caches what it wrote in its bag; a dropped render must restore it.
-	if (TRANSITION_JOURNAL !== null) journalBag();
+	if (TRANSITION_JOURNAL) journalBag();
 	transaction.ops.push(commitRenderWrite, [writer, args, CURRENT_BLOCK]);
 	return cached as T;
 }
@@ -1297,7 +1295,7 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 		// marks runtime callers that may write a host the current scope does not
 		// own, such as a signal-driven spread.
 		if (
-			TRANSITION_JOURNAL !== null &&
+			TRANSITION_JOURNAL &&
 			(foreign === true ||
 				TRANSITION_JOURNAL_DEPTH !== 1 ||
 				CURRENT_SCOPE?.block.createdStamp !== ROOT_DISCARD_STAMP)
@@ -1363,7 +1361,7 @@ export function setEventHandler(el: Element, key?: string, handler?: any, foreig
 				else {
 					const previous = (el as any).$$signalOwner as SignalEventOwner | undefined;
 					if (previous !== owner) {
-						if (TRANSITION_JOURNAL !== null)
+						if (TRANSITION_JOURNAL)
 							TRANSITION_JOURNAL.push(JOURNAL_EVENT_OWNER, el, previous, null);
 						(el as any).$$signalOwner = owner;
 					}

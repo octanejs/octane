@@ -20,6 +20,7 @@ import {
 	activityRefOwners,
 	retainActivityTracking,
 	releaseActivityTracking,
+	ROOT_RENDER_ROLLBACK,
 } from './drivers.js';
 import { renderBlock } from './signal-owners.js';
 import {
@@ -33,7 +34,6 @@ import {
 } from './refs.js';
 import {
 	runEffectCleanupCallback,
-	ROOT_RENDER_ROLLBACK,
 	journalRootProperty,
 	attachLiveFragmentRef,
 	activeFragments,
