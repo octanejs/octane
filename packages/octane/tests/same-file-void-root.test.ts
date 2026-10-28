@@ -264,11 +264,12 @@ export function run(){const host=document.querySelector('#host'),early=createRoo
 	});
 
 	it('reads mutable error callbacks at body creation, retry and replacement, including reentrant roots', async () => {
-		const source = `import {createRoot,flushSync,useState} from 'octane';
+		// A catch-only @try cannot suspend, so the root suspends through use().
+		const source = `import {createRoot,flushSync,use,useState} from 'octane';
 let ready=false,release;const gate=new Promise(resolve=>release=resolve);
 function Thrower() @{ if(true)throw new Error('boom'); <span>unreachable</span> }
 function Waiting() @{
- if(!ready)throw gate;
+ if(!ready)use(gate);
  @try { <Thrower /> } @catch(error) { <strong>{'waiting:'+error.message as string}</strong> }
 }
 function Replacement() @{

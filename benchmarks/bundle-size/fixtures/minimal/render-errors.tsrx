@@ -46,14 +46,13 @@ function Waits() @{
 	throw new Promise(() => {});
 }
 
+// A @try without @pending is the same catch-only boundary as ErrorBoundary.
 function WaitsGuarded() @{
-	<ErrorBoundary
-		fallback={(error) => (
-			<p id="minimal-waits-caught">{error instanceof Promise ? 'wakeable' : 'error'}</p>
-		)}
-	>
+	@try {
 		<Waits />
-	</ErrorBoundary>
+	} @catch (error) {
+		<p id="minimal-waits-caught">{error instanceof Promise ? 'wakeable' : 'error'}</p>
+	}
 }
 
 function Good() @{

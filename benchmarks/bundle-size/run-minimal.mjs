@@ -362,10 +362,11 @@ const featureControls = {
 	},
 	'signal-counter': { dropped: ['childSlot', 'bindSignalChild'], kept: ['enableSignalBindings'] },
 	// Only an entry that can drop a render installs its rollback; an error
-	// boundary, an uncaught error and a failed root replacement need none.
+	// boundary, an uncaught error and a failed root replacement need none. A
+	// catch-only @try is an error boundary, so it ships no tryBlock either.
 	'suspense-transition': { dropped: [], kept: RENDER_ROLLBACK_NAMES },
 	'render-errors': {
-		dropped: RENDER_ROLLBACK_NAMES,
+		dropped: [...RENDER_ROLLBACK_NAMES, 'tryBlockImpl'],
 		kept: ['rollbackRootRender', 'errorBlock', 'reconcileKeyed'],
 	},
 	'signal-instance-derived': {

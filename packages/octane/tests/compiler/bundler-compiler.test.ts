@@ -2037,14 +2037,37 @@ export function App() @{ <Boundary fallback={async (error) => String(error)}><sp
 		expect(asyncFallback?.code).toContain('_$componentSlot(');
 		expect(asyncFallback?.code).not.toContain('_$errorBlock(');
 		expect(asyncFallback?.code).not.toContain('_$tryBlock(');
+	});
 
-		const ordinaryTry = compiler.transform(
+	// A @try without @pending passes suspension on, so it is the same catch-only
+	// boundary as ErrorBoundary and must not retain the Suspense implementation.
+	it('lowers a @try without @pending to the catch-only boundary', () => {
+		const compiler = createOctaneCompiler({ root: '/project', hmr: false, dev: false });
+		const client = (source: string) =>
+			compiler.transform(source, '/project/src/App.tsrx', { hmr: false, dev: false })?.code;
+
+		const catchOnly = client(
 			`export function App(p) @{ @try { <span>ok</span> } @catch (error) { <span>{String(error)}</span> } }`,
-			'/project/src/OrdinaryTry.tsrx',
-			{ hmr: false, dev: false },
 		);
-		expect(ordinaryTry?.code).toContain('_$tryBlock(');
-		expect(ordinaryTry?.code).not.toContain('_$errorBlock(');
+		expect(catchOnly).toContain('_$errorBlock(');
+		expect(catchOnly).not.toContain('_$tryBlock(');
+
+		const pending = client(
+			`export function App(p) @{ @try { <span>ok</span> } @pending { <span>wait</span> } @catch (error) { <span>{String(error)}</span> } }`,
+		);
+		expect(pending).toContain('_$tryBlock(');
+		expect(pending).not.toContain('_$errorBlock(');
+
+		// A presentation-binding view's server render owns its catch-only
+		// suspension, so its client keeps the boundary that can claim that arm.
+		const binding = client(`export function App(p) @{
+  'use dom bindings';
+  <section>
+    @try { <span>{p.label as string}</span> } @catch (error) { <span>{String(error) as string}</span> }
+  </section>
+}`);
+		expect(binding).toContain('_$tryBlock(');
+		expect(binding).not.toContain('_$errorBlock(');
 	});
 
 	it('applies profiling metadata only to client transforms', () => {

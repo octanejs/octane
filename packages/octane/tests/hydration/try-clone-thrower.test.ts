@@ -162,19 +162,22 @@ describe('hydrateRoot — a try body that threw on the server', () => {
 		expect(visible()).toBe(expected);
 	});
 
-	it('an outer clone renders the outer catch arm when its inner pending-only boundary throws', async () => {
-		const { root, hosts, onAfter, recovered, caught } = await hydrateServerHtml(
-			'Uncaught',
-			{ value: 'x' },
-			{ value: 'x' },
-		);
-		expect(visible()).toBe(CATCH_ARM);
-		expectAdoptedHosts(hosts, onAfter);
-		expect(caught).toEqual(['x']);
-		expect(recovered).toEqual([]);
-		expect(consoleError).not.toHaveBeenCalled();
-		root.unmount();
-	});
+	it.each<PageName>(['Uncaught', 'UncaughtBoundary'])(
+		'an outer clone renders the outer catch arm when its inner pending-only boundary throws (%s)',
+		async (name) => {
+			const { root, hosts, onAfter, recovered, caught } = await hydrateServerHtml(
+				name,
+				{ value: 'x' },
+				{ value: 'x' },
+			);
+			expect(visible()).toBe(CATCH_ARM);
+			expectAdoptedHosts(hosts, onAfter);
+			expect(caught).toEqual(['x']);
+			expect(recovered).toEqual([]);
+			expect(consoleError).not.toHaveBeenCalled();
+			root.unmount();
+		},
+	);
 });
 
 describe('hydrateRoot — a try body throws to its catch arm where the server rendered another arm', () => {
