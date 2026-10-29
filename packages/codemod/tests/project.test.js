@@ -388,6 +388,7 @@ describe('runCodemod', () => {
 				"import { useHotkey, type ReactHotkeyRecorder } from '@tanstack/react-hotkeys';",
 				"import { useDebouncer, type ReactDebouncer } from '@tanstack/react-pacer/debouncer';",
 				"import { PacerProvider, usePacerContext } from '@tanstack/react-pacer';",
+				"export { createColumnHelper, getCoreRowModel, type ReactTable as Table } from '@tanstack/react-table';",
 				'',
 				'export type Kit = [ReactTable<any, any>, ReactHotkeyRecorder, ReactDebouncer<() => void, any>];',
 				'export const kit = [flexRender, useReactTable, useTable, useHotkey, useDebouncer, PacerProvider, usePacerContext];',
@@ -409,12 +410,18 @@ describe('runCodemod', () => {
 		// What the adapters lack stays on React's, with what to do instead.
 		expect(file.code).toContain("import { useReactTable } from '@tanstack/react-table';");
 		expect(file.code).toContain("import { usePacerContext } from '@tanstack/react-pacer';");
+		// So does a re-export.
+		expect(file.code).toContain("export { getCoreRowModel } from '@tanstack/react-table';");
+		expect(file.code).toContain(
+			"export { createColumnHelper, type OctaneTable as Table } from '@tanstack/octane-table';",
+		);
 		expect(file.notes.filter((note) => note.severity === 'error')).toEqual([
 			expect.objectContaining({ line: 1, message: expect.stringContaining('`useTable`') }),
 			expect.objectContaining({
 				line: 4,
 				message: expect.stringContaining('useDefaultPacerOptions'),
 			}),
+			expect.objectContaining({ line: 5, message: expect.stringContaining('`getCoreRowModel`') }),
 		]);
 		expect(result.packages).toEqual([
 			{ from: '@tanstack/react-table', to: '@tanstack/octane-table' },

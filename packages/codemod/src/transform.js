@@ -1323,35 +1323,40 @@ class ModuleTransform {
 			return `\u0000IMPORT${this.importSlots.length - 1}\u0000`;
 		}
 		return (
-			this.rewritePackageImport(node, module) ?? this.rewriteSpecifier(node, node.moduleSpecifier)
+			this.rewritePackageNames(node, module) ?? this.rewriteSpecifier(node, node.moduleSpecifier)
 		);
 	}
 
 	/**
-	 * An import of a ported package whose port spells some of its names
-	 * differently. A Radix package is a namespace of `@octanejs/radix`, so its
-	 * namespace import becomes that namespace and its named imports read from
-	 * it. Names the port lacks stay on the React package, for a person.
+	 * An import or re-export of a ported package whose port spells some of its
+	 * names differently. A Radix package is a namespace of `@octanejs/radix`, so
+	 * its namespace import becomes that namespace and its named imports read
+	 * from it. Names the port lacks stay on the React package, for a person.
 	 *
-	 * @param {ts.ImportDeclaration} node
+	 * @param {ts.ImportDeclaration | ts.ExportDeclaration} node
 	 * @param {string} module
 	 */
-	rewritePackageImport(node, module) {
-		const clause = node.importClause;
-		const next = this.resolve(module);
-		if (!clause || clause.name || next === null) return null;
+	rewritePackageNames(node, module) {
+		const clause = ts.isImportDeclaration(node) ? node.importClause : node;
 		const namespace = radixNamespace(module);
-		const quote = this.source[node.moduleSpecifier.getStart(this.sf)];
+		const next = this.resolve(module);
+		// A default import; and a Radix package's re-export, which rewriteSpecifier reports.
+		if (!clause || next === null || (ts.isImportClause(clause) ? clause.name : namespace)) {
+			return null;
+		}
+		const keyword = ts.isImportClause(clause) ? 'import' : 'export';
+		const quote =
+			this.source[/** @type {ts.Expression} */ (node.moduleSpecifier).getStart(this.sf)];
 		const from = (/** @type {string} */ specifier) => `from ${quote}${specifier}${quote};`;
 		const type = clause.isTypeOnly ? 'type ' : '';
-		const bindings = clause.namedBindings;
+		const bindings = ts.isImportClause(clause) ? clause.namedBindings : clause.exportClause;
 		if (bindings && ts.isNamespaceImport(bindings)) {
 			if (namespace === null) return null;
 			const local = bindings.name.text;
 			this.count(RULE.import);
 			return `import ${type}{ ${local === namespace ? local : `${namespace} as ${local}`} } ${from(next)}`;
 		}
-		if (!bindings) return null;
+		if (!bindings || ts.isNamespaceExport(bindings)) return null;
 		/** @type {string[]} */
 		const kept = [];
 		/** @type {string[]} */
@@ -1381,11 +1386,12 @@ class ModuleTransform {
 		}
 		if (namespace === null && kept.length === 0 && !renamed) return null;
 		this.count(RULE.import);
-		const lines = kept.length > 0 ? [`import ${type}{ ${kept.join(', ')} } ${from(module)}`] : [];
+		const lines =
+			kept.length > 0 ? [`${keyword} ${type}{ ${kept.join(', ')} } ${from(module)}`] : [];
 		if (values.length > 0) {
 			lines.push(
 				namespace === null
-					? `import ${type}{ ${values.join(', ')} } ${from(next)}`
+					? `${keyword} ${type}{ ${values.join(', ')} } ${from(next)}`
 					: `const { ${values.join(', ')} } = ${this.require(next, namespace, false)};`,
 			);
 		}
@@ -1427,7 +1433,10 @@ class ModuleTransform {
 				mapped,
 			);
 		}
-		return this.rewriteSpecifier(node, /** @type {ts.Expression} */ (node.moduleSpecifier));
+		return (
+			this.rewritePackageNames(node, module) ??
+			this.rewriteSpecifier(node, /** @type {ts.Expression} */ (node.moduleSpecifier))
+		);
 	}
 
 	/**
