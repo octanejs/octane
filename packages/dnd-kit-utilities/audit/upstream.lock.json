@@ -1,0 +1,240 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@dnd-kit/utilities",
+    "version": "3.2.2",
+    "repository": {
+      "owner": "clauderic",
+      "repo": "dnd-kit",
+      "subdirectory": "packages/utilities"
+    },
+    "commit": "e9215e820798459ae036896fce7fd9a6fe855772",
+    "integrity": "sha512-+MKAJEOfaBe5SmV6t34p80MMKhjvUz0vRrvVJbPT0WElzaOJ/1xs+D+KDv+tD/NE5ujfrChEcshd4fLn0wpiqg=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "537607e3f1533ad2c5b12978967f5ab27f34ffb7e626e321017a7ccca6cc24ff"
+      },
+      {
+        "path": "packages/utilities/LICENSE",
+        "sha256": "537607e3f1533ad2c5b12978967f5ab27f34ffb7e626e321017a7ccca6cc24ff"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "src/test",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "from '../src'",
+      "replace": "from '@octanejs/dnd-kit-utilities'"
+    }
+  ],
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "ee70ab16d907a83dd434ea6cd9152a195320fd02",
+      "size": 8777
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "f26f4536c972561fbbffe4858a0254a8732d9a22",
+      "size": 1075
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "f777478b6f1e3fc7503ab95d1fb3384ecfd2261f",
+      "size": 896
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "80ec7916300359583ef11352feb2518073e9e7cb",
+      "size": 192
+    },
+    {
+      "path": "src/adjustment.ts",
+      "gitBlob": "95cb7d4c17272802c9ed08d40d4fbd06eb6aa6d7",
+      "size": 714
+    },
+    {
+      "path": "src/coordinates/getEventCoordinates.ts",
+      "gitBlob": "4db17856459d42dc74d0aa28e06247cf65f57cfa",
+      "size": 779
+    },
+    {
+      "path": "src/coordinates/index.ts",
+      "gitBlob": "db22d988f84ad16277e7ae5cdf73961abb5666e0",
+      "size": 101
+    },
+    {
+      "path": "src/coordinates/types.ts",
+      "gitBlob": "a479a1aacf5b899e0e1efb502afcd4448b60d36a",
+      "size": 57
+    },
+    {
+      "path": "src/css.ts",
+      "gitBlob": "8b13f71e4e065ce9b5c2bca83af59555c0bf9705",
+      "size": 1062
+    },
+    {
+      "path": "src/event/hasViewportRelativeCoordinates.ts",
+      "gitBlob": "300d6bb88a1981b47f64a4511a23c4fd7d99af26",
+      "size": 180
+    },
+    {
+      "path": "src/event/index.ts",
+      "gitBlob": "49cc8419e1f70a66e52e41f463b4e87adf0444dd",
+      "size": 177
+    },
+    {
+      "path": "src/event/isKeyboardEvent.ts",
+      "gitBlob": "49f38e96f8e36103be9cc1752256b562d474d88a",
+      "size": 295
+    },
+    {
+      "path": "src/event/isTouchEvent.ts",
+      "gitBlob": "7675b7336abbc66eb3d537c5664e36c279aa4f0f",
+      "size": 280
+    },
+    {
+      "path": "src/execution-context/canUseDOM.ts",
+      "gitBlob": "fb4a8dd5e592af310612bac3adb10e697bf94608",
+      "size": 249
+    },
+    {
+      "path": "src/execution-context/getOwnerDocument.ts",
+      "gitBlob": "1e5591912e226c2a4ee49ffd2bbd37041b273e06",
+      "size": 493
+    },
+    {
+      "path": "src/execution-context/getWindow.ts",
+      "gitBlob": "c060a65fc8819c0bf61678a2e0d14b2b4fd3296f",
+      "size": 361
+    },
+    {
+      "path": "src/execution-context/index.ts",
+      "gitBlob": "c4e5f19f68d4b1b6a25f285dc25888608e9217ea",
+      "size": 131
+    },
+    {
+      "path": "src/focus/findFirstFocusableNode.ts",
+      "gitBlob": "d7d9e3c22ac46d5677ec476e9e4a8230987bf822",
+      "size": 349
+    },
+    {
+      "path": "src/focus/index.ts",
+      "gitBlob": "1363b99544208e7279fc9b8251be39cfa85f1030",
+      "size": 65
+    },
+    {
+      "path": "src/hooks/index.ts",
+      "gitBlob": "b7b180554e8f3b89b911c4cb4e05a570f534569f",
+      "size": 421
+    },
+    {
+      "path": "src/hooks/useCombinedRefs.ts",
+      "gitBlob": "5de510b894de8f6dc2ecfafef84c1d3fd597c00f",
+      "size": 290
+    },
+    {
+      "path": "src/hooks/useEvent.ts",
+      "gitBlob": "6f754e21b878465e89ba64dbf70b48d2167b8041",
+      "size": 419
+    },
+    {
+      "path": "src/hooks/useInterval.ts",
+      "gitBlob": "619781d62d6c7ec6ab879e4f654b5793c2233352",
+      "size": 471
+    },
+    {
+      "path": "src/hooks/useIsomorphicLayoutEffect.ts",
+      "gitBlob": "7ddc6306afb078a2f32963396b774a27e7bc6f3e",
+      "size": 384
+    },
+    {
+      "path": "src/hooks/useLatestValue.ts",
+      "gitBlob": "411817f692ca17e01315f3066fd347c9ad092dfa",
+      "size": 442
+    },
+    {
+      "path": "src/hooks/useLazyMemo.ts",
+      "gitBlob": "3c0c73bfefda13ffbda49692ddc0e802171e9f67",
+      "size": 412
+    },
+    {
+      "path": "src/hooks/useNodeRef.ts",
+      "gitBlob": "5ed8d4d8f9aca05b81a963e47b00d9c87bf1db64",
+      "size": 603
+    },
+    {
+      "path": "src/hooks/usePrevious.ts",
+      "gitBlob": "b4c02accbc1112bb0eb529be041d888f3df2bc87",
+      "size": 198
+    },
+    {
+      "path": "src/hooks/useUniqueId.ts",
+      "gitBlob": "448bf1b63b5333d8b19d5bd78ddea525ad9c8676",
+      "size": 338
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "c1b3a597f74ec6fb5fd01cf36211d142957a176c",
+      "size": 800
+    },
+    {
+      "path": "src/test/utilities.test.ts",
+      "gitBlob": "7702ab40e952b760ae0a8b6f118aa523fc9b9533",
+      "size": 112
+    },
+    {
+      "path": "src/type-guards/index.ts",
+      "gitBlob": "242193d5507f249208066f88ab0661367e3a6c23",
+      "size": 203
+    },
+    {
+      "path": "src/type-guards/isDocument.ts",
+      "gitBlob": "055492475e7ebc65ab67362fc41a8185a59fcc11",
+      "size": 194
+    },
+    {
+      "path": "src/type-guards/isHTMLElement.ts",
+      "gitBlob": "fc805af6a67dbc33395eab91c85d250d544edc4e",
+      "size": 274
+    },
+    {
+      "path": "src/type-guards/isNode.ts",
+      "gitBlob": "647af35f394d7dbc781cdb7ac9441f073356a4b8",
+      "size": 84
+    },
+    {
+      "path": "src/type-guards/isSVGElement.ts",
+      "gitBlob": "d8432bc6300b9eec6f81102fdc77e94959370f47",
+      "size": 177
+    },
+    {
+      "path": "src/type-guards/isWindow.ts",
+      "gitBlob": "9c2a6a7d498a475e2cedb0ab1ec1c57d5e076300",
+      "size": 311
+    },
+    {
+      "path": "src/types.ts",
+      "gitBlob": "19ed033618c4c78a25fdc25874ac2e17b5129f15",
+      "size": 336
+    },
+    {
+      "path": "tsconfig.build.json",
+      "gitBlob": "e34f92a29f7e61ed97eb9f90e0515d294fddc075",
+      "size": 91
+    }
+  ],
+  "fingerprint": "ad5d1c660ebf955d449199b587528b90653a6abdf1e82b16135e10ccec352397"
+}

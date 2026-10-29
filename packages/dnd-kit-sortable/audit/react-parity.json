@@ -1,0 +1,155 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "materializedTests": "packages/dnd-kit-sortable",
+  "provenance": {
+    "repo": "https://github.com/clauderic/dnd-kit.git",
+    "version": "10.0.0",
+    "commit": "e9215e820798459ae036896fce7fd9a6fe855772",
+    "sourceRoot": "packages/sortable/src",
+    "testRoot": "packages/sortable/test",
+    "license": "MIT",
+    "integrity": "sha256:07d017cb1e84bfad0687c5415594cb3e4a8045cc7edfa9066cadda5e5323f604",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": { "runtime": "insufficient", "types": "absent" },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/dnd-kit-sortable/src"],
+      "include": ["\\.(?:ts|tsx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/dnd-kit-sortable/tests/upstream"],
+      "include": ["\\.test\\.(?:ts|tsx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 1,
+    "uniqueIdentities": 1,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@12.9.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "601b477dd7f148702d5069ec1632f6cdf223bd1b68ae4f249ff8a42127b58d8d"
+    }
+  },
+  "lanes": [
+    {
+      "id": "dnd-kit-sortable-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-sortable-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the pinned @dnd-kit/sortable@10.0.0 Jest suite unchanged, with Vitest globals, against the pinned source and the published React packages.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/dnd-kit-sortable/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/dnd-kit-sortable/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "6057159f46a837bec353ad68e3ee595e38cfdea4327415290d12aec843264f78"
+        },
+        {
+          "path": "packages/dnd-kit-sortable/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "e41a01594879b787001b205286735a9a29652deb80ebc8b2a34868821c3a0292"
+        }
+      ]
+    },
+    {
+      "id": "dnd-kit-sortable-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-sortable-upstream",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Regenerates the same suite from the lock with its imports repointed at @octanejs/dnd-kit-sortable and runs it against the port.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/dnd-kit-sortable/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/dnd-kit-sortable/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "70744eaaf607e4412708866fd83ba1f5eed09e51d49a1b055d951cf90558a9da"
+        },
+        {
+          "path": "packages/dnd-kit-sortable/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "e41a01594879b787001b205286735a9a29652deb80ebc8b2a34868821c3a0292"
+        }
+      ]
+    },
+    {
+      "id": "dnd-kit-sortable-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-sortable-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs the same authored fixtures and interactions through @octanejs/dnd-kit-sortable and the published @dnd-kit/sortable@10.0.0 on React and compares the DOM after every step.",
+      "files": [
+        {
+          "path": "packages/dnd-kit-sortable/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "390b81ebb787bd2bc2b151b1fcb38ec577f3cae836e37fb21a24c7e107d22646",
+          "cases": [
+            {
+              "id": "differential:dnd-kit-sortable-keyboard-reorder",
+              "testName": "matches a keyboard reorder of a vertical sortable list",
+              "fullName": "differential: @octanejs/dnd-kit-sortable vs @dnd-kit/sortable@10.0.0 matches a keyboard reorder of a vertical sortable list"
+            },
+            {
+              "id": "differential:dnd-kit-sortable-keyboard-cancel",
+              "testName": "matches a keyboard drag cancelled with Escape",
+              "fullName": "differential: @octanejs/dnd-kit-sortable vs @dnd-kit/sortable@10.0.0 matches a keyboard drag cancelled with Escape"
+            },
+            {
+              "id": "differential:dnd-kit-sortable-pointer-reorder",
+              "testName": "matches a pointer reorder of horizontal tabs past a distance constraint",
+              "fullName": "differential: @octanejs/dnd-kit-sortable vs @dnd-kit/sortable@10.0.0 matches a pointer reorder of horizontal tabs past a distance constraint"
+            }
+          ]
+        },
+        {
+          "path": "packages/dnd-kit-sortable/tests/_fixtures/differential.tsrx",
+          "role": "support",
+          "sha256": "cd4d8f6a96a6daf2006096cd3d2038fe13c22680cdbf0cdfcc0629425c4b900e"
+        },
+        {
+          "path": "packages/dnd-kit-sortable/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "21b406945627aca3c8e4ccfac874620b091269eb4a20a21c10e467aab70a3d40"
+        },
+        {
+          "path": "packages/dnd-kit-core/tests/differential/_react-fixture.ts",
+          "role": "support",
+          "sha256": "272d707f100c5812ae8dbbdb9a123648aba845373daf0fc8d73ba43deca76d3d"
+        },
+        {
+          "path": "packages/dnd-kit-sortable/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "9c76dcbcb402eb624bea5660942d18cb77d2090533f21fed7582c47b79d8e694"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "3b7e60f5d1d410e0d3b5ffe79b45c9ad8936a02353a9a3eff29df6b8da8c2d16"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

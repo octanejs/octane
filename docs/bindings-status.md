@@ -3,7 +3,7 @@
 <!-- GENERATED FILE — do not edit. Edit packages/<name>/status.json and
      regenerate with `pnpm bindings:status`. -->
 
-The central status table for the 107 `@octanejs/*` framework bindings.
+The central status table for the 112 `@octanejs/*` framework bindings.
 Each row is sourced from that package's `packages/<name>/status.json` — the
 machine-readable status block maintained next to the code it describes — merged
 with the version in its `package.json`. CI runs `pnpm bindings:status:check`,
@@ -35,6 +35,11 @@ supported surface and known test coverage described for that package.
 | [`@octanejs/devtools`](#octanejsdevtools) | `octane@workspace` | Octane-native DevTools plugin (not an upstream port): renders live runtime diagnostics into a TanStack Devtools host via @tanstack/devtools-event-client. P1 ships the Components tree + state inspector. | none known | The plugin renders no anchor of its own; it is a client-only panel plugged into @octanejs/tanstack-devtools. Include it only in dev. | 2026-07-24 |
 | [`@octanejs/dexie`](#octanejsdexie) | `dexie-react-hooks@4.4.0` | Port of the public dexie-react-hooks surface: useObservable, useLiveQuery, useSuspendingObservable, useSuspendingLiveQuery, usePermissions, and useDocument, with Dexie's framework-neutral API re-exported from the package root. | Suspending hooks integrate with Octane's use() rather than React's use() or thrown-promise implementation details; Hook call-site slots are forwarded through Octane's compiler binding ABI; useDocument requires consumers to install and import y-dexie and yjs before using the hook; those integrations remain optional | Supported for non-suspending live queries: SSR returns the configured default without opening IndexedDB, and hydration adopts the server host before replacing the default with live data. Suspending live queries remain client-oriented and do not claim server data loading. | 2026-08-02 |
 | [`@octanejs/dnd-kit`](#octanejsdnd-kit) | `@dnd-kit/react@0.5.0` | Complete modern dnd-kit React-adapter surface: DragDropProvider, DragOverlay, useDraggable/useDroppable, manager/monitor/operation hooks, PointerSensor/KeyboardSensor re-exports, the public signal-hook utilities, useSortable, and all four upstream entry points. | DragOverlay distinguishes octane compiled children blocks from function render props; ordinary typed usage is behaviorally equivalent; useSortable retains the upstream keyboard plugin by default but omits OptimisticSortingPlugin because moving one host element before application state commits can split an Octane keyed DOM range; explicit plugin arrays remain authoritative | Static SSR and hydration are covered; DOM plugins initialize only after client refs register. | 2026-08-03 |
+| [`@octanejs/dnd-kit-accessibility`](#octanejsdnd-kit-accessibility) | `@dnd-kit/accessibility@3.1.1` | Complete @dnd-kit/accessibility 3.1.1 surface: HiddenText, LiveRegion, and useAnnouncement. | none known | Plain markup with no browser globals; no dedicated SSR lane. | 2026-10-29 |
+| [`@octanejs/dnd-kit-core`](#octanejsdnd-kit-core) | `@dnd-kit/core@6.3.1` | Complete @dnd-kit/core 6.3.1 surface: DndContext, DragOverlay with drop animations, useDraggable/useDroppable/useDndContext/useDndMonitor, pointer/mouse/touch/keyboard sensors, collision detection, modifiers, measuring and auto-scroll configuration, and screen-reader announcements. | Sensor activator handlers receive the native DOM event; React passes a SyntheticEvent, and the built-in sensors read the event directly instead of `event.nativeEvent`. A custom sensor that destructures `{ nativeEvent }` must read the event itself | Accessibility markup mounts after the first client effect, as upstream; no dedicated SSR lane. | 2026-10-29 |
+| [`@octanejs/dnd-kit-modifiers`](#octanejsdnd-kit-modifiers) | `@dnd-kit/modifiers@9.0.0` | Complete @dnd-kit/modifiers 9.0.0 surface: the restrictTo* modifiers, snapCenterToCursor, and createSnapModifier. | none known | Pure functions; no dedicated SSR lane. | 2026-10-29 |
+| [`@octanejs/dnd-kit-sortable`](#octanejsdnd-kit-sortable) | `@dnd-kit/sortable@10.0.0` | Complete @dnd-kit/sortable 10.0.0 surface: SortableContext, useSortable, the rect/vertical/horizontal list and rect swapping strategies, arrayMove/arraySwap, sortableKeyboardCoordinates, hasSortableData, and defaultAnimateLayoutChanges/defaultNewIndexGetter. | none known | No dedicated SSR lane. | 2026-10-29 |
+| [`@octanejs/dnd-kit-utilities`](#octanejsdnd-kit-utilities) | `@dnd-kit/utilities@3.2.2` | Complete @dnd-kit/utilities 3.2.2 surface: every hook (useCombinedRefs, useEvent, useInterval, useIsomorphicLayoutEffect, useLatestValue, useLazyMemo, useNodeRef, usePrevious, useUniqueId), CSS transform/transition serializers, coordinate math, event and node type guards, and getWindow/getOwnerDocument. | none known | useIsomorphicLayoutEffect falls back to useEffect without a DOM; no dedicated SSR lane. | 2026-10-29 |
 | [`@octanejs/draggable`](#octanejsdraggable) | `react-draggable@4.7.1` | Complete against the published react-draggable 4.7.1 root runtime and type surface: default Draggable, named DraggableCore, controlled and uncontrolled positioning, bounds, grid, axis, offsets, mouse and touch gestures, and all eight public types. | React component instance, lifecycle, React.Component assignability, findDOMNode fallback, and instance refs are unavailable; use the structural nodeRef prop with an Octane host ref; React-specific node and synthetic-event types are represented by OctaneNode and native mouse/touch events while retaining the observable callback and data contract | Draggable and DraggableCore render deterministically without browser globals, adopt their existing HTML or SVG child during hydration, and become interactive after hydration. | 2026-08-03 |
 | [`@octanejs/drei`](#octanejsdrei) | `@react-three/drei@10.7.7` | Complete port of the pinned @react-three/drei 10.7.7 public web API (commit b8b99fd4ca1dfb8d821335671320512daa6efea4): 379 source exports and 217 runtime exports are accounted for by the executable crosswalk, with 299 parity assertions across 105 test files. | View: inline Canvas views are ported. Calling View from an Octane DOM root fails with the universal renderer-boundary diagnostic, and View.Port is a callable no-op. Octane components are statically renderer-owned, so one component cannot switch between DOM and Three renderers or transport authored Three children between independent roots as React Drei does with tunnel-rat | Browser-dependent helpers remain client-only; server-safe behavior is verified per export. | 2026-08-02 |
 | [`@octanejs/dropzone`](#octanejsdropzone) | `react-dropzone@20.0.0` | Exact mapped port of the react-dropzone 20.0.0 root runtime and type namespace at canonical commit 01fc05c5996bf615caf812627f7491375e647c7d. The binding preserves the default Dropzone component, useDropzone, ErrorCode, all public types, root package conditions, and ./package.json export. Runtime coverage executes 218 pristine canonical React cases plus 109 adapted, differential, SSR, hydration, browser, and evidence cases. | Consumers import from @octanejs/dropzone and author TSRX instead of importing react-dropzone and authoring React JSX; option names and observable file-acquisition behavior remain mapped to the pinned upstream contract; The package points its types/import/require conditions at authored Octane source under repository policy; packed-consumer checks prove equivalent ESM, CommonJS, TypeScript, package-json, and public-namespace resolution without React runtime leakage | Supported and tested — server rendering and hydration preserve the hidden input and getter-provided root contract without browser-global access during render. | 2026-08-02 |
@@ -436,8 +441,77 @@ SSR / hydration: Static SSR and hydration are covered; DOM plugins initialize on
 
 Scope/evidence last checked: 2026-08-03.
 
-- Targets the modern @dnd-kit/react API. The legacy @dnd-kit/core 6.x API is intentionally out of scope.
+- Targets the modern @dnd-kit/react API. The legacy @dnd-kit/core 6.x API is in scope and ported separately, one package per upstream package: @octanejs/dnd-kit-core, -sortable, -modifiers, -utilities, and -accessibility.
 - The canonical React adapter source is vendored and checksum-verified. Upstream ships no adapter test suite at this pin; one bounded jsdom differential is available, while real pointer geometry and browser lifecycle coverage remain open, so parity is recorded-unverified.
+
+## @octanejs/dnd-kit-accessibility
+
+[`packages/dnd-kit-accessibility`](../packages/dnd-kit-accessibility) `0.0.0` — ports `@dnd-kit/accessibility@3.1.1`. Status data: [`packages/dnd-kit-accessibility/status.json`](../packages/dnd-kit-accessibility/status.json).
+
+Complete @dnd-kit/accessibility 3.1.1 surface: HiddenText, LiveRegion, and useAnnouncement.
+
+SSR / hydration: Plain markup with no browser globals; no dedicated SSR lane.
+
+Scope/evidence last checked: 2026-10-29.
+
+- Ports the legacy dnd kit API (the @dnd-kit/core 6.x family) that `@octanejs/dnd-kit` does not cover; that package ports the modern `@dnd-kit/react` API.
+- Upstream ships placeholder unit tests (plus two modifier cases), so a repo-authored React differential carries the behavioral contract; the pinned suite also runs pristine and adapted. The npm releases record no `gitHead`, so the source is pinned to the `@dnd-kit/core@6.3.1` release-tag commit, which holds every package byte-identical to its own release tag; parity stays recorded-unverified.
+
+## @octanejs/dnd-kit-core
+
+[`packages/dnd-kit-core`](../packages/dnd-kit-core) `0.0.0` — ports `@dnd-kit/core@6.3.1`. Status data: [`packages/dnd-kit-core/status.json`](../packages/dnd-kit-core/status.json).
+
+Complete @dnd-kit/core 6.3.1 surface: DndContext, DragOverlay with drop animations, useDraggable/useDroppable/useDndContext/useDndMonitor, pointer/mouse/touch/keyboard sensors, collision detection, modifiers, measuring and auto-scroll configuration, and screen-reader announcements.
+
+Known divergences:
+
+- Sensor activator handlers receive the native DOM event; React passes a SyntheticEvent, and the built-in sensors read the event directly instead of `event.nativeEvent`. A custom sensor that destructures `{ nativeEvent }` must read the event itself.
+
+SSR / hydration: Accessibility markup mounts after the first client effect, as upstream; no dedicated SSR lane.
+
+Scope/evidence last checked: 2026-10-29.
+
+- Ports the legacy dnd kit API (the @dnd-kit/core 6.x family) that `@octanejs/dnd-kit` does not cover; that package ports the modern `@dnd-kit/react` API.
+- Upstream ships placeholder unit tests (plus two modifier cases), so a repo-authored React differential carries the behavioral contract; the pinned suite also runs pristine and adapted. The npm releases record no `gitHead`, so the source is pinned to the `@dnd-kit/core@6.3.1` release-tag commit, which holds every package byte-identical to its own release tag; parity stays recorded-unverified.
+
+## @octanejs/dnd-kit-modifiers
+
+[`packages/dnd-kit-modifiers`](../packages/dnd-kit-modifiers) `0.0.0` — ports `@dnd-kit/modifiers@9.0.0`. Status data: [`packages/dnd-kit-modifiers/status.json`](../packages/dnd-kit-modifiers/status.json).
+
+Complete @dnd-kit/modifiers 9.0.0 surface: the restrictTo* modifiers, snapCenterToCursor, and createSnapModifier.
+
+SSR / hydration: Pure functions; no dedicated SSR lane.
+
+Scope/evidence last checked: 2026-10-29.
+
+- Ports the legacy dnd kit API (the @dnd-kit/core 6.x family) that `@octanejs/dnd-kit` does not cover; that package ports the modern `@dnd-kit/react` API.
+- Upstream ships placeholder unit tests (plus two modifier cases), so a repo-authored React differential carries the behavioral contract; the pinned suite also runs pristine and adapted. The npm releases record no `gitHead`, so the source is pinned to the `@dnd-kit/core@6.3.1` release-tag commit, which holds every package byte-identical to its own release tag; parity stays recorded-unverified.
+
+## @octanejs/dnd-kit-sortable
+
+[`packages/dnd-kit-sortable`](../packages/dnd-kit-sortable) `0.0.0` — ports `@dnd-kit/sortable@10.0.0`. Status data: [`packages/dnd-kit-sortable/status.json`](../packages/dnd-kit-sortable/status.json).
+
+Complete @dnd-kit/sortable 10.0.0 surface: SortableContext, useSortable, the rect/vertical/horizontal list and rect swapping strategies, arrayMove/arraySwap, sortableKeyboardCoordinates, hasSortableData, and defaultAnimateLayoutChanges/defaultNewIndexGetter.
+
+SSR / hydration: No dedicated SSR lane.
+
+Scope/evidence last checked: 2026-10-29.
+
+- Ports the legacy dnd kit API (the @dnd-kit/core 6.x family) that `@octanejs/dnd-kit` does not cover; that package ports the modern `@dnd-kit/react` API.
+- Upstream ships placeholder unit tests (plus two modifier cases), so a repo-authored React differential carries the behavioral contract; the pinned suite also runs pristine and adapted. The npm releases record no `gitHead`, so the source is pinned to the `@dnd-kit/core@6.3.1` release-tag commit, which holds every package byte-identical to its own release tag; parity stays recorded-unverified.
+
+## @octanejs/dnd-kit-utilities
+
+[`packages/dnd-kit-utilities`](../packages/dnd-kit-utilities) `0.0.0` — ports `@dnd-kit/utilities@3.2.2`. Status data: [`packages/dnd-kit-utilities/status.json`](../packages/dnd-kit-utilities/status.json).
+
+Complete @dnd-kit/utilities 3.2.2 surface: every hook (useCombinedRefs, useEvent, useInterval, useIsomorphicLayoutEffect, useLatestValue, useLazyMemo, useNodeRef, usePrevious, useUniqueId), CSS transform/transition serializers, coordinate math, event and node type guards, and getWindow/getOwnerDocument.
+
+SSR / hydration: useIsomorphicLayoutEffect falls back to useEffect without a DOM; no dedicated SSR lane.
+
+Scope/evidence last checked: 2026-10-29.
+
+- Ports the legacy dnd kit API (the @dnd-kit/core 6.x family) that `@octanejs/dnd-kit` does not cover; that package ports the modern `@dnd-kit/react` API.
+- Upstream ships placeholder unit tests (plus two modifier cases), so a repo-authored React differential carries the behavioral contract; the pinned suite also runs pristine and adapted. The npm releases record no `gitHead`, so the source is pinned to the `@dnd-kit/core@6.3.1` release-tag commit, which holds every package byte-identical to its own release tag; parity stays recorded-unverified.
 
 ## @octanejs/draggable
 

@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@dnd-kit/modifiers",
+    "version": "9.0.0",
+    "repository": {
+      "owner": "clauderic",
+      "repo": "dnd-kit",
+      "subdirectory": "packages/modifiers"
+    },
+    "commit": "e9215e820798459ae036896fce7fd9a6fe855772",
+    "integrity": "sha512-ybiLc66qRGuZoC20wdSSG6pDXFikui/dCNGthxv4Ndy8ylErY0N3KVxY2bgo7AWwIbxDmXDg3ylAFmnrjcbVvw=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "537607e3f1533ad2c5b12978967f5ab27f34ffb7e626e321017a7ccca6cc24ff"
+      },
+      {
+        "path": "packages/modifiers/LICENSE",
+        "sha256": "537607e3f1533ad2c5b12978967f5ab27f34ffb7e626e321017a7ccca6cc24ff"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "test",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "from '../src'",
+      "replace": "from '@octanejs/dnd-kit-modifiers'"
+    },
+    {
+      "find": "from '@dnd-kit/core'",
+      "replace": "from '@octanejs/dnd-kit-core'"
+    },
+    {
+      "find": "from '@dnd-kit/utilities'",
+      "replace": "from '@octanejs/dnd-kit-utilities'"
+    }
+  ],
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "376bdef4d54f3dceb5817a4f10d2d120fdfbf21b",
+      "size": 15629
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "f26f4536c972561fbbffe4858a0254a8732d9a22",
+      "size": 1075
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "09e0ea02b6269a395ed0a5cf962cb13228751075",
+      "size": 1021
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "62738b41f5afabc56d1cf96acb1194694de4d759",
+      "size": 2856
+    },
+    {
+      "path": "src/createSnapModifier.ts",
+      "gitBlob": "2f42639212907948ae0bd1a70a9ec9661d4a364d",
+      "size": 272
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "2a0fd4da200b641ce9d93f3cb95b8c9184e3e163",
+      "size": 465
+    },
+    {
+      "path": "src/restrictToFirstScrollableAncestor.ts",
+      "gitBlob": "8cf1d3ee2bf01351c3a0c61a8b9d3c98ecf6c780",
+      "size": 491
+    },
+    {
+      "path": "src/restrictToHorizontalAxis.ts",
+      "gitBlob": "f6d39d158ebb864eb0c3ce8890b8d628ea494d8f",
+      "size": 162
+    },
+    {
+      "path": "src/restrictToParentElement.ts",
+      "gitBlob": "8391bc31f907c9e49e612c0817a0cae8ce6dd8b4",
+      "size": 372
+    },
+    {
+      "path": "src/restrictToVerticalAxis.ts",
+      "gitBlob": "beae7d7c4d8aa9b37dc30367a673650cffdad07d",
+      "size": 160
+    },
+    {
+      "path": "src/restrictToWindowEdges.ts",
+      "gitBlob": "71b7c9b773d03eceff92a11616d81f1a04a2df68",
+      "size": 350
+    },
+    {
+      "path": "src/snapCenterToCursor.ts",
+      "gitBlob": "915e38c9d8ed32f2973c3d35c0440ecfa06e2b21",
+      "size": 714
+    },
+    {
+      "path": "src/utilities/index.ts",
+      "gitBlob": "fd3b4b1dccbde49c22ebf102b88bb55635419f0d",
+      "size": 65
+    },
+    {
+      "path": "src/utilities/restrictToBoundingRect.ts",
+      "gitBlob": "4505c37a0d7f8aa32f4241a8539ad17cd36009d2",
+      "size": 815
+    },
+    {
+      "path": "test/modifiers.test.tsx",
+      "gitBlob": "a0525a642325cfd5d4acf6d3a6ccc89d1ac1add4",
+      "size": 1355
+    },
+    {
+      "path": "tsconfig.build.json",
+      "gitBlob": "e34f92a29f7e61ed97eb9f90e0515d294fddc075",
+      "size": 91
+    }
+  ],
+  "fingerprint": "c9760fcacee202382f1e1b7a54306b66d6c7f5ab39b09c86a9016d010522fef0"
+}

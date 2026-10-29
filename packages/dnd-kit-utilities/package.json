@@ -1,0 +1,52 @@
+{
+  "name": "@octanejs/dnd-kit-utilities",
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "dnd kit utilities for the octane renderer — a port of the legacy @dnd-kit/utilities 3.2.2 hooks and DOM helpers (CSS, getWindow, getOwnerDocument, useCombinedRefs, useUniqueId, …).",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/dnd-kit-utilities"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE",
+    "LICENSE.upstream"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project dnd-kit-utilities",
+    "typecheck": "octane-tsc -p tsconfig.json"
+  },
+  "peerDependencies": {
+    "octane": "workspace:^0.16.0"
+  },
+  "devDependencies": {
+    "@dnd-kit/utilities": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}
