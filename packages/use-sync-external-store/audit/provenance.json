@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/package/LICENSE",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    },
+    {
+      "path": "upstream-artifact/package/README.md",
+      "sha256": "cd2eabc87b510aa7099f43df105c9f0b1a015607660532b07c419b39020b0d1f"
+    },
+    {
+      "path": "upstream-artifact/package/cjs/use-sync-external-store-shim.development.js",
+      "sha256": "6dfd5d60543b0a24a524d1366758ff6303fc67604a69eb1536d0b70c47af0e8d"
+    },
+    {
+      "path": "upstream-artifact/package/cjs/use-sync-external-store-shim.native.development.js",
+      "sha256": "77fdf6e7158ca42db77846603e5404d6c1eae8e39c027ae6688ec31960130d10"
+    },
+    {
+      "path": "upstream-artifact/package/cjs/use-sync-external-store-shim.native.production.js",
+      "sha256": "854acd16966761052074efc076dda867c4fd2c3db41cb3b85ee8d15aaf072a21"
+    },
+    {
+      "path": "upstream-artifact/package/cjs/use-sync-external-store-shim.production.js",
+      "sha256": "e8c2f1808804d75c9e0ffab8c37329b34f356140275dea0efe1e75684ded14fa"
+    },
+    {
+      "path": "upstream-artifact/package/cjs/use-sync-external-store-shim/with-selector.development.js",
+      "sha256": "47600087cfa6f998386b2d2b46072b28564d2992099676b0d3eed8c0031f78b9"
+    },
+    {
+      "path": "upstream-artifact/package/cjs/use-sync-external-store-shim/with-selector.production.js",
+      "sha256": "fc76f309604db72c728d7c46cc593c6bba65e3f3d00dd38a1c32032927bb94d8"
+    },
+    {
+      "path": "upstream-artifact/package/cjs/use-sync-external-store-with-selector.development.js",
+      "sha256": "48111cde39f0b32a3dbb4cdedecf31939450b233e7deedb0da9b74d58e4f97ac"
+    },
+    {
+      "path": "upstream-artifact/package/cjs/use-sync-external-store-with-selector.production.js",
+      "sha256": "d634a0554277dcca162f5c1ae28978c5bf0f3c0f56f16e35e8926bd31021781e"
+    },
+    {
+      "path": "upstream-artifact/package/cjs/use-sync-external-store.development.js",
+      "sha256": "bd999528bc05772118316ace694df775169d2b6dece86a486d7a8a8567a50e39"
+    },
+    {
+      "path": "upstream-artifact/package/cjs/use-sync-external-store.production.js",
+      "sha256": "4ed641853adbce751186824e8e661b7218a559cf7c148b810bd8d9bf29dc3a31"
+    },
+    {
+      "path": "upstream-artifact/package/index.js",
+      "sha256": "d21888099b46792f16d5a540623cda49d270a7346ffe3878435cc312abb17682"
+    },
+    {
+      "path": "upstream-artifact/package/package.json",
+      "sha256": "ba3694aec166f2f53612c4978bc85fb31dd4eee75a2eccc1ad1a1cc49c9428d2"
+    },
+    {
+      "path": "upstream-artifact/package/shim/index.js",
+      "sha256": "de571b60495a636e12a24000b78531994a819aba03917e679803c2b482c66a89"
+    },
+    {
+      "path": "upstream-artifact/package/shim/index.native.js",
+      "sha256": "d1211307208ab6270b30894af7c61d16c5f6588cb382ca6107d11f84ef8b11f6"
+    },
+    {
+      "path": "upstream-artifact/package/shim/with-selector.js",
+      "sha256": "08f4e878658941dd77b3d9032d2f0818649dd0a093288e768526090e9f00556f"
+    },
+    {
+      "path": "upstream-artifact/package/with-selector.js",
+      "sha256": "2e90f9e6323b863b6d6132e1f45fc262ceceb8c861f686a9593a2369cf5c609e"
+    },
+    {
+      "path": "upstream-artifact/use-sync-external-store-1.7.0.tgz",
+      "sha256": "4f62a44660396a55417322fb0c71c14413b784192e4cd18acfec6bdf3157e359"
+    },
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+    }
+  ],
+  "packageIdentity": {
+    "path": "upstream-artifact/package/package.json",
+    "name": "use-sync-external-store",
+    "version": "1.7.0",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "scripts", "tests", "upstream", "upstream-artifact"],
+  "filesEqual": [{ "path": "LICENSE.upstream", "equalsPath": "upstream-artifact/package/LICENSE" }]
+}

@@ -40,6 +40,12 @@
         "tags": ["store"]
       },
       {
+        "packageName": "@octanejs/use-sync-external-store",
+        "title": "use-sync-external-store",
+        "searchTerms": ["useSyncExternalStoreWithSelector", "with-selector"],
+        "tags": ["store", "hooks"]
+      },
+      {
         "packageName": "@octanejs/valtio",
         "title": "Valtio",
         "tags": ["proxy", "store"]

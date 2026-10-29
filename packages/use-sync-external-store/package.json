@@ -1,0 +1,65 @@
+{
+  "name": "@octanejs/use-sync-external-store",
+  "version": "0.0.0",
+  "description": "use-sync-external-store 1.7.0 for Octane: Octane's built-in useSyncExternalStore and a port of useSyncExternalStoreWithSelector.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/use-sync-external-store"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./with-selector": "./src/useSyncExternalStoreWithSelector.ts",
+    "./with-selector.js": "./src/useSyncExternalStoreWithSelector.ts",
+    "./shim": "./src/shim/index.ts",
+    "./shim/index.js": "./src/shim/index.ts",
+    "./shim/index.native": "./src/shim/index.ts",
+    "./shim/index.native.js": "./src/shim/index.ts",
+    "./shim/with-selector": "./src/useSyncExternalStoreWithSelector.ts",
+    "./shim/with-selector.js": "./src/useSyncExternalStoreWithSelector.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE",
+    "LICENSE.upstream"
+  ],
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project use-sync-external-store",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs"
+  },
+  "peerDependencies": {
+    "octane": "workspace:^"
+  },
+  "devDependencies": {
+    "octane": "workspace:*",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "vitest": "catalog:default"
+  }
+}

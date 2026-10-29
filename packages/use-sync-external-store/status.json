@@ -1,0 +1,22 @@
+{
+  "upstream": {
+    "package": "use-sync-external-store",
+    "version": "1.7.0"
+  },
+  "surface": "Every use-sync-external-store 1.7.0 entry point, including the .js spellings: the main entry and /shim (with index.native) re-export Octane's built-in useSyncExternalStore, and /with-selector and /shim/with-selector export a port of useSyncExternalStoreWithSelector.",
+  "divergences": [
+    "The /shim entry points always forward to Octane's built-in hook; the userspace fallback for React 16 and 17 is not ported.",
+    "The main entry point's development warning names the Octane package and recommends /shim or octane."
+  ],
+  "ssr": "Supported and tested: the server renders getServerSnapshot, and hydration reads it first, then syncs to getSnapshot. Without a server snapshot, Octane's server hook falls back to getSnapshot where React throws.",
+  "notes": [
+    "Requires the Octane release whose useSyncExternalStore reads getServerSnapshot when it is called through a re-export; earlier releases dropped it on the server and during hydration."
+  ],
+  "verified": "2026-10-29",
+  "provenance": {
+    "source": "https://github.com/react/react",
+    "license": "MIT",
+    "commit": "1d34f91dfde6bba84d08b683aaba164c7194dacb",
+    "verification": "verified"
+  }
+}

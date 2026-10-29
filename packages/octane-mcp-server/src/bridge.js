@@ -89,6 +89,7 @@ export const KNOWN_BINDINGS = {
 	'react-draggable': '@octanejs/draggable',
 	'react-colorful': '@octanejs/colorful',
 	'use-stick-to-bottom': '@octanejs/stick-to-bottom',
+	'use-sync-external-store': '@octanejs/use-sync-external-store',
 	'react-image-crop': '@octanejs/image-crop',
 	'react-content-loader': '@octanejs/content-loader',
 	'react-to-print': '@octanejs/to-print',

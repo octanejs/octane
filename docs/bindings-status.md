@@ -3,7 +3,7 @@
 <!-- GENERATED FILE — do not edit. Edit packages/<name>/status.json and
      regenerate with `pnpm bindings:status`. -->
 
-The central status table for the 108 `@octanejs/*` framework bindings.
+The central status table for the 109 `@octanejs/*` framework bindings.
 Each row is sourced from that package's `packages/<name>/status.json` — the
 machine-readable status block maintained next to the code it describes — merged
 with the version in its `package.json`. CI runs `pnpm bindings:status:check`,
@@ -113,6 +113,7 @@ supported surface and known test coverage described for that package.
 | [`@octanejs/tiptap`](#octanejstiptap) | `@tiptap/react@3.28.0` | Complete @tiptap/react 3.28.0 adapter surface across the root and ./menus entries: @tiptap/core re-exports, editor hooks and contexts, the EditorContent portal bridge, compound Tiptap API, ReactRenderer, custom NodeView/MarkView renderers and helpers, BubbleMenu, and FloatingMenu. | Subscriptions use Octane's native useSyncExternalStore implementation, so the published binding does not depend on React or use-sync-external-store; EditorConsumer is a render-prop compatibility component because Octane contexts do not expose React's .Consumer property; Renderer components are Octane component bodies and refs are ordinary props; the React-prefixed public names are retained for TipTap source compatibility without a React dependency; NodeViewWrapper consumes its as prop after selecting the host tag; @tiptap/react 3.28.0 also forwards that prop as an invalid DOM attribute; BubbleMenu and FloatingMenu handlers receive native browser events rather than React synthetic events; ReactMarkView tears down its portal when ProseMirror destroys the mark view, closing a renderer leak present in @tiptap/react 3.28.0 | Covered across the complete surface: hooks use null server snapshots and suppress editor construction without a DOM, static NodeView/MarkView helpers render without a DOM renderer, detached menu targets are client-only, and hydration adopts deferred server shells before mounting live custom views and menus. | 2026-08-02 |
 | [`@octanejs/to-print`](#octanejsto-print) | `react-to-print@3.3.0` | Public runtime surface at react-to-print 3.3.0: useReactToPrint and its option/content/fn types. Print pipeline utilities are ported unchanged aside from Octane ref and event types. | Consumers import from @octanejs/to-print instead of react-to-print; contentRef is a structural { current } ref object rather than React.RefObject; The print callback accepts a native Event or a content getter; React.UIEvent is not used; The plain TypeScript useReactToPrint hook forwards compiler-injected slots; a symbol in the options position is treated as empty options | The hook is client-only: it constructs an iframe and calls window.print (or a custom print function). Calling it during SSR has no DOM target. | 2026-08-20 |
 | [`@octanejs/transition-group`](#octanejstransition-group) | `react-transition-group@4.4.5` | Transition, CSSTransition, TransitionGroup, SwitchTransition, ReplaceTransition, config, and their documented subpath exports. | Octane does not implement ReactDOM.findDOMNode; DOM-aware callbacks and CSSTransition require nodeRef; TransitionGroup collections must be supplied as inspectable descriptor values, normally with children={items.map(...)}; compiler-generated opaque children blocks cannot be enumerated; The complete pinned upstream suite runs unchanged as the pristine Jest oracle; adapted Octane lanes cover the public export surface, DOM transition behavior, switch and replacement sequencing, keyed groups, nodeRef semantics, mount-on-enter sequencing, and server rendering, and are not yet a one-for-one port of every upstream case | Transition state and wrapper markup render on the server; DOM class mutation begins only after client mount and requires nodeRef. | 2026-08-09 |
+| [`@octanejs/use-sync-external-store`](#octanejsuse-sync-external-store) | `use-sync-external-store@1.7.0` | Every use-sync-external-store 1.7.0 entry point, including the .js spellings: the main entry and /shim (with index.native) re-export Octane's built-in useSyncExternalStore, and /with-selector and /shim/with-selector export a port of useSyncExternalStoreWithSelector. | The /shim entry points always forward to Octane's built-in hook; the userspace fallback for React 16 and 17 is not ported; The main entry point's development warning names the Octane package and recommends /shim or octane | Supported and tested: the server renders getServerSnapshot, and hydration reads it first, then syncs to getSnapshot. Without a server snapshot, Octane's server hook falls back to getSnapshot where React throws. | 2026-10-29 |
 | [`@octanejs/usehooks-ts`](#octanejsusehooks-ts) | `usehooks-ts@3.1.1` | First host-safe cohort: useBoolean, useCounter, useToggle, useMap, useStep, useDebounceCallback, useDebounceValue, useInterval, useTimeout, useIsMounted, and useUnmount. | Only the listed pure, timing, and lifecycle hooks are exported; browser storage/media hooks and DOM observer/direct-element hooks are deliberately absent; Public setter types are structurally equivalent to React Dispatch/SetStateAction without importing React types | Supported for the listed cohort. Effects and timers do not run during server rendering; hydration activates lifecycle and timing work without requiring browser reads during render. | 2026-08-02 |
 | [`@octanejs/valtio`](#octanejsvaltio) | `valtio@2.3.2` | The framework-agnostic `valtio/vanilla` core and `valtio/vanilla/utils` are re-exported verbatim; `useSnapshot` and the `useProxy` utility are ported to Octane. | React DevTools affected-path debug labels are omitted because Octane's `useDebugValue` is currently a no-op | The server snapshot path uses `snapshot(proxyObject)`; no dedicated SSR rendering test is included yet. | 2026-08-02 |
 | [`@octanejs/vaul`](#octanejsvaul) | `vaul@1.1.2` | Drawer, Root, NestedRoot, Portal, Overlay, Content, Handle, public props, and style.css. | React DOM prop types are preserved publicly and normalized at Octane render boundaries | Closed drawer roots and triggers render without browser globals; portaled content remains absent while closed. | 2026-08-02 |
@@ -1897,6 +1898,23 @@ Known divergences:
 SSR / hydration: Transition state and wrapper markup render on the server; DOM class mutation begins only after client mount and requires nodeRef.
 
 Scope/evidence last checked: 2026-08-09.
+
+## @octanejs/use-sync-external-store
+
+[`packages/use-sync-external-store`](../packages/use-sync-external-store) `0.0.0` — ports `use-sync-external-store@1.7.0`. Status data: [`packages/use-sync-external-store/status.json`](../packages/use-sync-external-store/status.json).
+
+Every use-sync-external-store 1.7.0 entry point, including the .js spellings: the main entry and /shim (with index.native) re-export Octane's built-in useSyncExternalStore, and /with-selector and /shim/with-selector export a port of useSyncExternalStoreWithSelector.
+
+Known divergences:
+
+- The /shim entry points always forward to Octane's built-in hook; the userspace fallback for React 16 and 17 is not ported.
+- The main entry point's development warning names the Octane package and recommends /shim or octane.
+
+SSR / hydration: Supported and tested: the server renders getServerSnapshot, and hydration reads it first, then syncs to getSnapshot. Without a server snapshot, Octane's server hook falls back to getSnapshot where React throws.
+
+Scope/evidence last checked: 2026-10-29.
+
+- Requires the Octane release whose useSyncExternalStore reads getServerSnapshot when it is called through a re-export; earlier releases dropped it on the server and during hydration.
 
 ## @octanejs/usehooks-ts
 

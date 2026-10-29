@@ -1,0 +1,156 @@
+diff --git a/tests/upstream/useSyncExternalStoreShared-test.js b/tests/upstream/useSyncExternalStoreShared-test.js
+--- a/tests/upstream/useSyncExternalStoreShared-test.js
++++ b/tests/upstream/useSyncExternalStoreShared-test.js
+@@ -527,23 +527,12 @@ describe('Shared useSyncExternalStore behavior (shim and built-in)', () => {
+     expect(container.textContent).toEqual('2');
+   });
+   it('handles errors thrown by getSnapshot', async () => {
+-    class ErrorBoundary extends React.Component {
+-      state = {
+-        error: null,
+-      };
+-      static getDerivedStateFromError(error) {
+-        return {
+-          error,
+-        };
+-      }
+-      render() {
+-        if (this.state.error) {
+-          return React.createElement(Text, {
+-            text: this.state.error.message,
+-          });
+-        }
+-        return this.props.children;
+-      }
++    // OCTANE DIVERGENCE[getsnapshot-error-render]: Octane has no class components; its ErrorBoundary takes the fallback.
++    function ErrorBoundary({children}) {
++      return React.createElement(React.ErrorBoundary, {
++        fallback: error => React.createElement(Text, {text: error.message}),
++        children,
++      });
+     }
+     const store = createExternalStore({
+       value: 0,
+@@ -562,7 +551,8 @@ describe('Shared useSyncExternalStore behavior (shim and built-in)', () => {
+         text: value,
+       });
+     }
+-    const errorBoundary = React.createRef(null);
++    // OCTANE DIVERGENCE[getsnapshot-error-render]: Octane has no createRef; a ref is any {current} object.
++    const errorBoundary = {current: null};
+     const container = document.createElement('div');
+     const root = createRoot(container);
+     await act(() =>
+@@ -604,9 +594,8 @@ describe('Shared useSyncExternalStore behavior (shim and built-in)', () => {
+       gate(flags => flags.enableUseSyncExternalStoreShim)
+         ? ['Error in getSnapshot']
+         : [
+-            'Error in getSnapshot',
+-            // In a concurrent root, React renders a second time to attempt to
+-            // recover from the error.
++            // OCTANE DIVERGENCE[getsnapshot-error-render]: Octane renders synchronously and does
++            // not render a tree that threw a second time to attempt to recover from the error.
+             'Error in getSnapshot',
+           ],
+     );
+@@ -629,9 +618,8 @@ describe('Shared useSyncExternalStore behavior (shim and built-in)', () => {
+         );
+       });
+     }).rejects.toThrow(
+-      'Maximum update depth exceeded. This can happen when a component repeatedly ' +
+-        'calls setState inside componentWillUpdate or componentDidUpdate. React limits ' +
+-        'the number of nested updates to prevent infinite loops.',
++      // OCTANE DIVERGENCE[octane-diagnostics]: Octane words its own diagnostics.
++      'Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.',
+     );
+ 
+     assertConsoleErrorDev(
+@@ -648,8 +636,8 @@ describe('Shared useSyncExternalStore behavior (shim and built-in)', () => {
+               'Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.',
+           ]
+         : [
+-            'The result of getSnapshot should be cached to avoid an infinite loop' +
+-              '\n    in App (at **)',
++            // OCTANE DIVERGENCE[octane-diagnostics]: Octane words its own diagnostics.
++            'The getSnapshot result must be cached to avoid an infinite update loop.',
+           ],
+     );
+   });
+@@ -800,7 +788,8 @@ describe('Shared useSyncExternalStore behavior (shim and built-in)', () => {
+     });
+     it('basic server hydration', async () => {
+       const store = createExternalStore('client');
+-      const ref = React.createRef();
++      // OCTANE DIVERGENCE[foreign-server-markup]: Octane has no createRef; a ref is any {current} object.
++      const ref = {current: null};
+       function App() {
+         const text = useSyncExternalStore(
+           store.subscribe,
+@@ -824,17 +813,17 @@ describe('Shared useSyncExternalStore behavior (shim and built-in)', () => {
+       container.innerHTML = '<div>server</div>';
+       const serverRenderedDiv = container.getElementsByTagName('div')[0];
+       if (gate(flags => !flags.enableUseSyncExternalStoreShim)) {
++        // OCTANE DIVERGENCE[foreign-server-markup]: Octane adopts only markup its own server
++        // renderer wrote, so it renders this root on the client and reports why. tests/ssr
++        // hydrates Octane's server output: server snapshot first, then the client state.
++        const recoverableErrors = [];
+         await act(() => {
+-          ReactDOMClient.hydrateRoot(container, React.createElement(App, null));
++          ReactDOMClient.hydrateRoot(container, React.createElement(App, null), {
++            onRecoverableError: error => recoverableErrors.push(error),
++          });
+         });
+-        assertLog([
+-          // First it hydrates the server rendered HTML
+-          'server',
+-          'Passive effect: server',
+-          // Then in a second paint, it re-renders with the client state
+-          'client',
+-          'Passive effect: client',
+-        ]);
++        expect(recoverableErrors).toHaveLength(1);
++        assertLog(['client', 'Passive effect: client']);
+       } else {
+         // In the userspace shim, there's no mechanism to detect whether we're
+         // currently hydrating, so `getServerSnapshot` is not called on the
+@@ -852,7 +841,8 @@ describe('Shared useSyncExternalStore behavior (shim and built-in)', () => {
+         assertLog(['client', 'Passive effect: client']);
+       }
+       expect(container.textContent).toEqual('client');
+-      expect(ref.current).toEqual(serverRenderedDiv);
++      // OCTANE DIVERGENCE[foreign-server-markup]: the root rendered on the client.
++      expect(ref.current).not.toBe(serverRenderedDiv);
+     });
+   });
+   it('regression test for #23150', async () => {
+@@ -967,24 +957,12 @@ describe('Shared useSyncExternalStore behavior (shim and built-in)', () => {
+   describe('selector and isEqual error handling in extra', () => {
+     let ErrorBoundary;
+     beforeEach(() => {
+-      ErrorBoundary = class extends React.Component {
+-        state = {
+-          error: null,
+-        };
+-        static getDerivedStateFromError(error) {
+-          return {
+-            error,
+-          };
+-        }
+-        render() {
+-          if (this.state.error) {
+-            return React.createElement(Text, {
+-              text: this.state.error.message,
+-            });
+-          }
+-          return this.props.children;
+-        }
+-      };
++      // OCTANE DIVERGENCE[error-boundary-component]: Octane has no class components; its ErrorBoundary takes the fallback.
++      ErrorBoundary = ({children}) =>
++        React.createElement(React.ErrorBoundary, {
++          fallback: error => React.createElement(Text, {text: error.message}),
++          children,
++        });
+     });
+     it('selector can throw on update', async () => {
+       const store = createExternalStore({

@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "use-sync-external-store",
+    "version": "1.7.0",
+    "repository": {
+      "owner": "react",
+      "repo": "react",
+      "subdirectory": "packages/use-sync-external-store"
+    },
+    "commit": "1d34f91dfde6bba84d08b683aaba164c7194dacb",
+    "integrity": "sha512-6L+EeigHMQhdaIPNIFUKwfWJSwWFQ8gJbJ2DLOs5sDIegTwR9fRxvnM3uciHKjIZhFz+KAv2emhWMRvDmMcY8A=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "src/__tests__",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "require('react')",
+      "replace": "require('octane')"
+    },
+    {
+      "find": "require('react-dom')",
+      "replace": "require('octane')"
+    },
+    {
+      "find": "require('react-dom/client')",
+      "replace": "require('octane')"
+    },
+    {
+      "find": "require('react-dom/server')",
+      "replace": "require('octane/server')"
+    },
+    {
+      "find": "jest.mock('react',",
+      "replace": "jest.mock('octane',"
+    },
+    {
+      "find": "jest.requireActual('react')",
+      "replace": "jest.requireActual('octane')"
+    },
+    {
+      "find": "'use-sync-external-store/",
+      "replace": "'@octanejs/use-sync-external-store/"
+    }
+  ],
+  "files": [
+    {
+      "path": "index.js",
+      "gitBlob": "2c9ef5a9fae5fb3ee1a3c22faa01cab18594d952",
+      "size": 284
+    },
+    {
+      "path": "npm/index.js",
+      "gitBlob": "303d4b916e8f72b7c8cf8ea81995971e086c2cd5",
+      "size": 222
+    },
+    {
+      "path": "npm/shim/index.js",
+      "gitBlob": "974854c2cd8ad8adc102db0c12a3880c41ee2529",
+      "size": 234
+    },
+    {
+      "path": "npm/shim/index.native.js",
+      "gitBlob": "69bc7586babc85345ea904cc0361bb4a95803b7f",
+      "size": 248
+    },
+    {
+      "path": "npm/shim/with-selector.js",
+      "gitBlob": "91859dbd47282b19308a9b52e4afb897167ad0ec",
+      "size": 262
+    },
+    {
+      "path": "npm/with-selector.js",
+      "gitBlob": "c0d0da3b43d46a04d00aa0acdffa66bbdf681ee9",
+      "size": 250
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "487af2a4d927927aa0edc65c706de3083f64d9e7",
+      "size": 1275
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "e9987a399b65f1e0a931bb4b0dbdb974147f3f79",
+      "size": 261
+    },
+    {
+      "path": "shim/index.js",
+      "gitBlob": "4fff77d89350601b7071a305041dc72ebc6dc70f",
+      "size": 310
+    },
+    {
+      "path": "shim/index.native.js",
+      "gitBlob": "4fff77d89350601b7071a305041dc72ebc6dc70f",
+      "size": 310
+    },
+    {
+      "path": "shim/with-selector.js",
+      "gitBlob": "23b78acfd942d31df47eed3fc68ed9a61fc7f882",
+      "size": 330
+    },
+    {
+      "path": "src/__tests__/useSyncExternalStoreNative-test.js",
+      "gitBlob": "98f0f017b3525583b903f36752734e54fbf16989",
+      "size": 4975
+    },
+    {
+      "path": "src/__tests__/useSyncExternalStoreShared-test.js",
+      "gitBlob": "f2e290215557653e16109621af9b52673cf496bc",
+      "size": 33775
+    },
+    {
+      "path": "src/__tests__/useSyncExternalStoreShimServer-test.js",
+      "gitBlob": "f11e7a6c53ae67c0adc2b2aeb7a929dbce03b643",
+      "size": 2580
+    },
+    {
+      "path": "src/forks/isServerEnvironment.native.js",
+      "gitBlob": "8fa8d5b5768cb7ef7c70765e26cb29f51049c04e",
+      "size": 246
+    },
+    {
+      "path": "src/forks/useSyncExternalStore.forward-to-built-in.js",
+      "gitBlob": "a9638224513e5910aa72c30962ae4d2e05ccd326",
+      "size": 433
+    },
+    {
+      "path": "src/forks/useSyncExternalStore.forward-to-shim.js",
+      "gitBlob": "aca88a8bb9c1799eb8ce2bb7839a526cd5fcb5df",
+      "size": 454
+    },
+    {
+      "path": "src/isServerEnvironment.js",
+      "gitBlob": "6af961a3697acccf8fb1c78988d8346e1940faa6",
+      "size": 307
+    },
+    {
+      "path": "src/useSyncExternalStore.js",
+      "gitBlob": "8d6c49105d1ac8582827161f973d879f30de2f99",
+      "size": 1181
+    },
+    {
+      "path": "src/useSyncExternalStoreShim.js",
+      "gitBlob": "dce61ed1dc483a2f3c5895bf311c4df1dac86099",
+      "size": 728
+    },
+    {
+      "path": "src/useSyncExternalStoreShimClient.js",
+      "gitBlob": "579933f3dded791de61c0608e5f0f17b7ad7e070",
+      "size": 5750
+    },
+    {
+      "path": "src/useSyncExternalStoreShimServer.js",
+      "gitBlob": "469af9d7f0b33c9773a79d8e4486bfb9d0ea073d",
+      "size": 628
+    },
+    {
+      "path": "src/useSyncExternalStoreWithSelector.js",
+      "gitBlob": "23fd22ec9a38a80042bd8c5a9e1e77b6d8477e15",
+      "size": 4673
+    },
+    {
+      "path": "with-selector.js",
+      "gitBlob": "23b78acfd942d31df47eed3fc68ed9a61fc7f882",
+      "size": 330
+    }
+  ],
+  "fingerprint": "0fdf0ff9888ab940dde8d173107340ff439f1f6001d63ca95d3dccb1249e0c26"
+}
