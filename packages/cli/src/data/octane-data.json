@@ -286,7 +286,7 @@
     },
     {
       "name": "@octanejs/dnd-kit-accessibility",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "category": "Drag & Drop",
       "upstream": { "package": "@dnd-kit/accessibility", "version": "3.1.1" },
       "surface": "Complete @dnd-kit/accessibility 3.1.1 surface: HiddenText, LiveRegion, and useAnnouncement.",
@@ -296,7 +296,7 @@
     },
     {
       "name": "@octanejs/dnd-kit-core",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "category": "Drag & Drop",
       "upstream": { "package": "@dnd-kit/core", "version": "6.3.1" },
       "surface": "Complete @dnd-kit/core 6.3.1 surface: DndContext, DragOverlay with drop animations, useDraggable/useDroppable/useDndContext/useDndMonitor, pointer/mouse/touch/keyboard sensors, collision detection, modifiers, measuring and auto-scroll configuration, and screen-reader announcements.",
@@ -308,7 +308,7 @@
     },
     {
       "name": "@octanejs/dnd-kit-modifiers",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "category": "Drag & Drop",
       "upstream": { "package": "@dnd-kit/modifiers", "version": "9.0.0" },
       "surface": "Complete @dnd-kit/modifiers 9.0.0 surface: the restrictTo* modifiers, snapCenterToCursor, and createSnapModifier.",
@@ -318,7 +318,7 @@
     },
     {
       "name": "@octanejs/dnd-kit-sortable",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "category": "Drag & Drop",
       "upstream": { "package": "@dnd-kit/sortable", "version": "10.0.0" },
       "surface": "Complete @dnd-kit/sortable 10.0.0 surface: SortableContext, useSortable, the rect/vertical/horizontal list and rect swapping strategies, arrayMove/arraySwap, sortableKeyboardCoordinates, hasSortableData, and defaultAnimateLayoutChanges/defaultNewIndexGetter.",
@@ -328,7 +328,7 @@
     },
     {
       "name": "@octanejs/dnd-kit-utilities",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "category": "Drag & Drop",
       "upstream": { "package": "@dnd-kit/utilities", "version": "3.2.2" },
       "surface": "Complete @dnd-kit/utilities 3.2.2 surface: every hook (useCombinedRefs, useEvent, useInterval, useIsomorphicLayoutEffect, useLatestValue, useLazyMemo, useNodeRef, usePrevious, useUniqueId), CSS transform/transition serializers, coordinate math, event and node type guards, and getWindow/getOwnerDocument.",
@@ -351,7 +351,7 @@
     },
     {
       "name": "@octanejs/drei",
-      "version": "0.0.38",
+      "version": "0.0.39",
       "category": "3D",
       "upstream": { "package": "@react-three/drei", "version": "10.7.7" },
       "surface": "Complete port of the pinned @react-three/drei 10.7.7 public web API (commit b8b99fd4ca1dfb8d821335671320512daa6efea4): 379 source exports and 217 runtime exports are accounted for by the executable crosswalk, with 299 parity assertions across 105 test files.",
@@ -502,7 +502,7 @@
     },
     {
       "name": "@octanejs/hot-toast",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "category": "UI Utilities",
       "upstream": { "package": "react-hot-toast", "version": "2.6.1" },
       "surface": "Complete published react-hot-toast 2.6.1 surface: the callable `toast` API with every variant, promise lifecycle, dismissal and removal, `Toaster`, `ToastBar`, `ToastIcon`, the icon components, multiple toasters, hover pause, `useToaster`, `useToasterStore`, `resolveValue`, and the `/headless` entry. All 14 upstream Jest cases run unchanged against React and against the port.",
@@ -774,7 +774,7 @@
     },
     {
       "name": "@octanejs/next-themes",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "category": "Styling",
       "upstream": { "package": "next-themes", "version": "0.4.6" },
       "surface": "Complete published surface: ThemeProvider with every prop (attribute, defaultTheme, enableSystem, enableColorScheme, storageKey, forcedTheme, disableTransitionOnChange, themes, value, nonce, scriptProps), useTheme, and the Attribute, ThemeProviderProps and UseThemeProps types. All 28 upstream runtime registrations run unchanged against React and, with import rewrites only, against Octane.",
@@ -989,7 +989,7 @@
     },
     {
       "name": "@octanejs/remix-router",
-      "version": "0.1.64",
+      "version": "0.1.65",
       "category": "Routing",
       "upstream": { "package": "react-router", "version": "8.2.0" },
       "surface": "All planned port phases are shipped and the pinned runtime export namespace is complete: the framework-agnostic router core, data/declarative/DOM/mutation/guard layers, static SSR, and cookie/session runtime are implemented on Octane. Framework-mode and RSC names remain throwing scope stubs. Selected vendored-core suites, local conformance, and nine exact shared-fixture scenarios provide bounded evidence rather than exhaustive React parity.",
@@ -1539,7 +1539,7 @@
     },
     {
       "name": "@octanejs/use-sync-external-store",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "category": "State Management",
       "upstream": { "package": "use-sync-external-store", "version": "1.7.0" },
       "surface": "Every use-sync-external-store 1.7.0 entry point, including the .js spellings: the main entry and /shim (with index.native) re-export Octane's built-in useSyncExternalStore, and /with-selector and /shim/with-selector export a port of useSyncExternalStoreWithSelector.",
