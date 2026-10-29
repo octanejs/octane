@@ -423,10 +423,7 @@ function resolveBinding(from, specifier, packages, notes, unmapped) {
 	// An aggregate binding (`@octanejs/visx`, for `@visx/visx`) serves each
 	// package of its scope from a subpath: `@visx/hierarchy` is
 	// `@octanejs/visx/hierarchy`.
-	const upstream = DATA.bindings.find(
-		(/** @type {{ name: string, upstream?: { package?: string } }} */ entry) =>
-			entry.name === binding,
-	)?.upstream?.package;
+	const upstream = DATA.bindings.find((entry) => entry.name === binding)?.upstream?.package;
 	const aggregate = upstream?.match(/^@([^/]+)\/\1$/);
 	if (aggregate && name !== upstream && name.startsWith(`@${aggregate[1]}/`)) {
 		return `${binding}/${name.slice(aggregate[1].length + 2)}${specifier.slice(name.length)}`;
