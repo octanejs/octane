@@ -1,3 +1,5 @@
+'use strong';
+
 // Router — transcribed from react-router@8.2.0 lib/components.tsx. The
 // low-level context provider every router variant renders through.
 import { useMemo } from 'octane';

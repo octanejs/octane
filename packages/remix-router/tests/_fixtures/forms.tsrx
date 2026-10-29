@@ -132,7 +132,7 @@ async function fetchAction({ request }: any) {
 	return { value: 'acted:' + fd.get('name') };
 }
 
-function FetcherPage() @{
+export function FetcherPage() @{
 	const fetcher = useFetcher();
 	const shared = useFetcher({ key: 'shared' });
 	const fetchers = useFetchers();

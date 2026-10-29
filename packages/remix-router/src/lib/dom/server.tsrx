@@ -1,9 +1,11 @@
+'use strong';
+
 // Static SSR — transcribed from react-router@8.2.0 lib/dom/server.tsx onto
 // octane: StaticRouter (a Router that may not navigate), StaticRouterProvider
 // (renders a static data router + the __staticRouterHydrationData script),
 // and createStaticRouter (a stateless DataRouter over a StaticHandlerContext).
 // Render through `octane/server` (renderToString / renderToPipeableStream).
-import type { OctaneNode } from 'octane';
+import { trustHTML, type OctaneNode } from 'octane';
 import type { Location, Path, To } from '../router/history.ts';
 import { Action as NavigationType, createPath, invariant, parsePath } from '../router/history.ts';
 import { IDLE_BLOCKER, IDLE_FETCHER, IDLE_NAVIGATION } from '../router/router.ts';
@@ -130,11 +132,7 @@ export function StaticRouterProvider(props: StaticRouterProviderProps) @{
 			</DataRouterStateContext>
 		</DataRouterContext>
 		@if (hydrateScript !== '') {
-			<script
-				suppressHydrationWarning
-				nonce={nonce}
-				dangerouslySetInnerHTML={{ __html: hydrateScript }}
-			/>
+			<script nonce={nonce} dangerouslySetInnerHTML={trustHTML(hydrateScript)} />
 		}
 	</>
 }
