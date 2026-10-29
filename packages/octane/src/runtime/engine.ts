@@ -158,6 +158,7 @@ import {
 	blockIsAncestorOf,
 	compareEffectPostOrder,
 	compareRefPostOrder,
+	postOrderHostRefs,
 	fireEffectCleanup,
 	nativeEffectPublicationCurrent,
 	drainEffectEventCommitActions,
@@ -3598,7 +3599,8 @@ export function drainQueuedRefAttaches(): void {
 	// ES stable sort preserves the queue's DFS/source order for disjoint subtrees;
 	// comparePostOrder moves only descendants ahead of their queued ancestors.
 	// Entries with one immediate parent are siblings (or on the same block), so
-	// every comparison is zero and their existing queue order is already final.
+	// every comparison is zero and their existing block order is already final.
+	// postOrderHostRefs then orders the hosts within each block.
 	if (q.length > 1) {
 		const parent = q[0].block?.parentBlock ?? null;
 		for (let i = 1; i < q.length; i++) {
@@ -3607,6 +3609,7 @@ export function drainQueuedRefAttaches(): void {
 				break;
 			}
 		}
+		postOrderHostRefs(q);
 	}
 	for (const r of q) {
 		// Skip attaches whose owning subtree was unmounted earlier in THIS flush

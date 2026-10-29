@@ -24,6 +24,7 @@ import {
 import { hydrationStarted } from '../hydration-flag.js';
 import { __profileQueueCleanup, __profileWorkEnter, __profileRootExit } from '../profiling.js';
 import type { NativeAdoptionState } from '../signals/native-adoption.js';
+import type { FragmentInstance } from './refs.js';
 import type {
 	Cleanup,
 	Block,
@@ -333,6 +334,36 @@ export function compareEffectPostOrder(a: PendingEffect, b: PendingEffect): numb
 }
 export function compareRefPostOrder(a: RefAttach, b: RefAttach): number {
 	return comparePostOrder(a.block, 0, b.block, 0);
+}
+
+// The block order above keeps one block's entries in queue order, which puts
+// a host before the hosts inside it, and commit-written props before the rest.
+// React attaches a host's ref after every ref inside it, and a Fragment's
+// before its children's: insertion-sort each block's run by document position,
+// with a Fragment standing at its start marker. A run already in order costs
+// one comparison per pair; moves are bounded by nesting depth.
+export function postOrderHostRefs(q: RefAttach[]): void {
+	for (let i = 1; i < q.length; i++) {
+		const entry = q[i];
+		let j = i;
+		while (j > 0 && q[j - 1].block === entry.block && compareHostRefs(q[j - 1], entry) > 0) {
+			q[j] = q[j - 1];
+			j--;
+		}
+		q[j] = entry;
+	}
+}
+
+// `b` attaches first when it is inside `a` (CONTAINED_BY, 16), or precedes `a`
+// (PRECEDING, 2) without containing it (CONTAINS, 8).
+function compareHostRefs(a: RefAttach, b: RefAttach): number {
+	const position = refPosition(a).compareDocumentPosition(refPosition(b));
+	return position & 16 || (position & 10) === 2 ? 1 : position === 0 ? 0 : -1;
+}
+
+function refPosition(entry: RefAttach): Node {
+	const el = entry.el;
+	return (el as Node).nodeType === 1 ? (el as Element) : (el as FragmentInstance)._startMarker;
 }
 
 export function fireEffectCleanup(e: PendingEffect): void {

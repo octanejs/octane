@@ -21,9 +21,11 @@ and the conformance effect-order tests for observable effect/ref ordering.
 
 The separate untimed ref-drain guard exercises the production `drainRefAttaches`
 and comparator with 1,000 sibling refs, deep disjoint branches, a mixed-depth
-parent/child commit, a single ref, and ownerless refs before, after, and without
-owned refs. It checks callback order and counts native sort calls, with no DOM
-or callback timing claim:
+parent/child commit, a single ref, ownerless refs before, after, and without
+owned refs, and two runs within one block: 1,000 hosts in tree order, and a host
+around two hosts before its sibling. It checks callback order and counts native
+sort calls and the position comparisons that order one block's hosts, with
+stand-in nodes and no DOM or callback timing claim:
 
 ```bash
 node benchmarks/effect-postorder/refs.mjs <baseline-git-ref> --measure
@@ -41,3 +43,10 @@ entry can join a same-parent queue without changing callback order. The
 deep-disjoint comparator shape reads 11,340 parent links for 129 queued
 effects on both versions: sorting those branches still needs the ancestry
 check, and this change adds no persistent block depth field.
+
+After the block sort, an insertion pass orders one block's hosts by document
+position (octanejs/octane#2296), without a native sort. A run already in order
+compares each adjacent pair once: 1,000 hosts in one block cost 999
+comparisons. The nested run moves the outer host behind the two inside it in
+four comparisons. Every other case keeps its sort count, and only the three
+ownerless entries, which share a null owner, add comparisons (two).
