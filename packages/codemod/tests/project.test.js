@@ -215,6 +215,12 @@ describe('runCodemod', () => {
 				peerDependencies: { react: '>=18' },
 				peerDependenciesMeta: { react: { optional: true } },
 			}),
+			// An optional peer with no `/react` entry may be for the root.
+			'node_modules/hooks-kit/package.json': manifest({
+				exports: { '.': './index.js', './package.json': './package.json' },
+				peerDependencies: { react: '>=18' },
+				peerDependenciesMeta: { react: { optional: true } },
+			}),
 			// A required peer, but only the `/react` entry renders through it.
 			'node_modules/tree-kit/package.json': manifest({
 				exports: { '.': './index.js', './react': './react.js', './package.json': './package.json' },
@@ -228,10 +234,10 @@ describe('runCodemod', () => {
 			'src/build.ts':
 				"import react from '@vitejs/plugin-react';\nexport const plugins = [react()];\n",
 			'src/Note.tsx':
-				"import { parse } from 'editor-kit';\nimport { Editor } from 'editor-kit/react';\nimport { Widget } from 'react-widget';\nimport { tree } from 'tree-kit';\nconsole.log(tree);\nexport function Note() {\n\treturn <Editor doc={parse('')}><Widget /></Editor>;\n}\n",
+				"import { parse } from 'editor-kit';\nimport { Editor } from 'editor-kit/react';\nimport { Widget } from 'react-widget';\nimport { tree } from 'tree-kit';\nimport { useKit } from 'hooks-kit';\nconsole.log(tree, useKit);\nexport function Note() {\n\treturn <Editor doc={parse('')}><Widget /></Editor>;\n}\n",
 		});
 		const result = await runCodemod([root], { write: false });
-		expect(result.missing.sort()).toEqual(['editor-kit/react', 'react-widget']);
+		expect(result.missing.sort()).toEqual(['editor-kit/react', 'hooks-kit', 'react-widget']);
 	});
 
 	it('reports TSRX written for React, which it cannot read', async () => {

@@ -22,8 +22,7 @@ Fixes from migrating Memos and T3 Code:
   of React's types are reported.
 - A package is reported as needing a binding only when the entry imported needs
   React: a package whose export map hides `package.json` is read from disk, and
-  one with a `./react` entry or an optional React peer needs a binding only
-  there.
+  one with a `./react` entry needs a binding only there.
 - A component that reads its `children` as an element (`render={children}`,
   `cloneElement`, `Children.only`, `isValidElement`) is marked
   `descriptorChildren`, so its callers pass elements as React does, and its

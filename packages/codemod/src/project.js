@@ -443,9 +443,9 @@ function resolveBinding(from, specifier, packages, notes, unmapped) {
 /**
  * Whether a package renders through React: it declares `react` as a peer or
  * dependency when installed, or its name says so when it is not. A package
- * with a `./react` entry (`@pierre/trees/react`), or an optional React peer
- * for one, renders through React there, which the caller matches by subpath;
- * its other entries need no binding.
+ * with a `./react` entry (`@pierre/trees/react`) renders through React there,
+ * which the caller matches by subpath; its other entries need no binding. An
+ * optional peer alone does not say which entries use React.
  *
  * @param {string} name
  * @param {string} from
@@ -454,7 +454,7 @@ function rendersWithReact(name, from) {
 	if (name === 'octane' || name.startsWith('@octanejs/') || name.startsWith('node:')) return false;
 	const manifest = readInstalled(path.dirname(from), name)?.manifest;
 	if (!manifest) return REACT_PACKAGE.test(name);
-	if (manifest.exports?.['./react'] || manifest.peerDependenciesMeta?.react?.optional) return false;
+	if (manifest.exports?.['./react']) return false;
 	return ['peerDependencies', 'dependencies'].some((field) => manifest[field]?.react !== undefined);
 }
 
