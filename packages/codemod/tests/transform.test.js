@@ -218,6 +218,39 @@ describe('transformModule', () => {
 		expect(transformModule(shadowed, 'b.ts').code).toBe(shadowed);
 	});
 
+	it('marks a component that reads its `children` as an element `descriptorChildren`', () => {
+		const migrate = (/** @type {string} */ source) => transformModule(source, 'tip.tsx');
+		// Base UI clones `render`; React hands the component an element.
+		const tip = migrate(
+			'const Tip = ({ children }: { children: React.ReactElement }) => <Trigger render={children} />;\nexport function Row({ c }: { c: boolean }) {\n\treturn <div><Tip>{c ? <span /> : <a href="#" />}</Tip>{c ? <b /> : <i />}</div>;\n}\nfunction Trigger(_: { render: unknown }) {\n\treturn null;\n}\n',
+		);
+		expect(tip.code).toContain(
+			'const Tip = descriptorChildren(({ children }: { children: OctaneElement }) => @{ <Trigger render={children} /> });',
+		);
+		// Its children stay elements: an `@if` would hand it a fragment.
+		expect(tip.code).toContain(
+			'<div><Tip>{c ? <span /> : <a href="#" />}</Tip>@if (c) { <b /> } @else { <i /> }</div>',
+		);
+		expect(compileErrors(tip.code, 'tip.tsrx')).toEqual([]);
+		// A declaration becomes a marked `const`, unless the module reads it before.
+		const slot =
+			"import { Children, cloneElement } from 'react';\nexport function Slot(props: { children: React.ReactElement }) {\n\treturn cloneElement(Children.only(props.children), { id: 's' });\n}\n";
+		expect(migrate(slot).code).toContain(
+			"export const Slot = descriptorChildren(function Slot(props: { children: OctaneElement }) {\n\treturn cloneElement(Children.only(props.children), { id: 's' });\n});",
+		);
+		const early = migrate(`export const routes = [<Slot />];\n${slot.replace('export ', '')}`);
+		expect([early.code.includes('descriptorChildren'), early.notes.map((n) => n.rule)]).toEqual([
+			false,
+			['descriptor-children'],
+		]);
+		// Through `forwardRef` or `memo`, the declaration holds the call.
+		expect(
+			migrate(
+				"import { forwardRef, isValidElement } from 'react';\nexport const P = forwardRef<HTMLElement, { children: React.ReactNode }>(({ children }, ref) => (isValidElement(children) ? <b ref={ref} /> : null));\n",
+			).code,
+		).toContain('export const P = descriptorChildren(({ children, ref }');
+	});
+
 	it('passes a text field wrapper its rest props `onChange` as `onInput`', () => {
 		const migrate = (/** @type {string} */ body) =>
 			transformModule(

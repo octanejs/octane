@@ -328,13 +328,24 @@ Two popular open-source React apps, migrated as they stood on 2026-10-29:
 React Router, TanStack Query, Base UI) and
 [T3 Code](https://github.com/pingdotgg/t3code) (`6d82a22e9d`, React 19, Vite,
 TanStack Router, Base UI, Tiptap, Effect). Each was migrated with `--strong`
-and type-checked with `octane-tsc` against this branch's packages. Neither ran:
-building or serving a third-party app runs its code, which needs the user's
-approval in this environment.
+and type-checked with `octane-tsc` against this branch's packages. T3 Code
+cannot run until its unported libraries have bindings.
+
+Memos ran: its Go server on SQLite on localhost, the migrated web app served by
+Vite with `@octanejs/vite-plugin`, and the original React app beside it on the
+same server for comparison. Four stand-ins replaced what has no binding: a small
+toast store for `react-hot-toast`, `@usememos/editor/react` migrated by the
+codemod itself (a `forwardRef` + `flushSync` wrapper), a react-leaflet
+placeholder, and the class error boundary ported to `@try`/`@catch`. Sign-up,
+the timeline, creating, editing and pinning memos, tags, search, the memo page
+with comments, all 17 settings sections, the SSO form dialog, and 11 more routes
+worked with no console errors. Controlled fields kept every keystroke, which
+the old `onChange` pass-through would have reverted. Two defects surfaced only at
+runtime: the type-only imports below, and the `children` rendered by Base UI.
 
 | | Memos (`web/`) | T3 Code (`apps/web`) |
 | --- | --- | --- |
-| Modules migrated, `.tsrx`, Strong | 458, 345, 260 | 968, 727, 509 |
+| Modules migrated, `.tsrx`, Strong | 458, 345, 259 | 968, 727, 509 |
 | Codemod errors before → after | 85 → 61 | 251 → 248 |
 | `octane-tsc` errors before → after | 262 → 68, after hand-patching the two TypeScript-view defects below | not run: six unported libraries |
 | Codemod run | 8.5 s | 30 s, 3.5 GB peak |
@@ -369,9 +380,20 @@ Codemod defects found, all fixed with tests:
   its `./react` entry uses React (`@usememos/editor`, `@pierre/trees`,
   `@clerk/electron`).
 - Added imports used single quotes in double-quoted modules.
+- A component that hands its `children` to Base UI's `render` prop crashed the
+  memo list when the first memo was saved: React passes JSX children as
+  elements, Octane as a compiled render body. Components that read `children`
+  as an element (`render={children}`, `cloneElement`, `Children.*`,
+  `isValidElement`) are now marked `descriptorChildren`, and their call sites in
+  the module keep conditional children as expressions; an `@if` there handed
+  Base UI a fragment, so the tooltip never opened.
 
 Still open, owned elsewhere:
 
+- **Compiler:** `.tsrx` keeps an import of a name used only as a type, which
+  TypeScript drops; 30 Memos modules then fail to link in the browser
+  (`does not provide an export named 'InstanceProfile'`). The run marked them
+  `type` by hand.
 - **Compiler (`.tsrx` TypeScript view):** `compileToVolarMappings` prints
   `<T,>(…) =>` as `<T>`, which TypeScript reads as JSX, and reports `return
   null` in an `@for` row (TSRX2005) that the compiler and the authoring rules
@@ -380,9 +402,12 @@ Still open, owned elsewhere:
   Memos errors; React 19 has both); `ComponentProps<"div">` spread onto a host
   in a Strong module fails `StrongIntrinsicProps` (12 Memos wrappers); a
   `children: ReactElement` prop cannot take template children.
-- **Bindings:** `@octanejs/remix-router` lacks `LinkProps` and types `Link`'s
+- **Bindings:** Base UI's `render` prop calls a compiled children body as a
+  render function, an opaque `parentNode` crash; it should say to pass an
+  element. `@octanejs/remix-router` lacks `LinkProps` and types `Link`'s
   `ref` narrower than React Router; the libraries above have no binding.
-- **Codemod, later:** binding subpath warnings (`@octanejs/base-ui/dialog`) could
+- **Codemod, later:** a `descriptorChildren` component used from another module
+  still gets `@if` children there; binding subpath warnings (`@octanejs/base-ui/dialog`) could
   be checked against the binding's exports, but recording them would add about
   110 kB to the CLI's catalog.
 

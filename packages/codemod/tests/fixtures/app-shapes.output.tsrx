@@ -1,8 +1,10 @@
-import { useState, type ComponentProps, type ElementRef, type ComponentPropsWithoutRef, type Ref, type FC, type OctaneNode, type ChangeEvent } from "octane";
+import { Tooltip } from "@base-ui/react/tooltip";
+import { useState, type ComponentProps, type ElementRef, type ComponentPropsWithoutRef, type Ref, descriptorChildren, type OctaneElement, type FC, type OctaneNode, type ChangeEvent } from "octane";
 
 // Shapes from migrating Memos and T3 Code: shadcn-style fields whose rest
-// props carry React's per-edit `onChange`, `forwardRef` type arguments and
-// annotations that name the global `React` namespace without importing it.
+// props carry React's per-edit `onChange`, `forwardRef` type arguments,
+// annotations that name the global `React` namespace without importing it,
+// and a component that hands its `children` to a `render` prop.
 
 export function Input({ className, type, onChange, ...props }: ComponentProps<"input">) @{
   <input type={type} data-slot="input" className={className} onInput={onChange} {...props} />
@@ -18,6 +20,20 @@ export function Textarea({ className, onChange, ...props }: ComponentProps<"text
 }
 
 export const DialogHeader = ({ className, ref, ...props }: ComponentPropsWithoutRef<"div"> & { ref?: Ref<ElementRef<"div">> }) => @{ <div ref={ref} className={className} {...props} /> };
+
+// Base UI clones the element `render` gets, which React passes as `children`.
+const TimeTooltip = descriptorChildren(({ children, label }: { children: OctaneElement; label: string }) => @{
+  <Tooltip.Root>
+    <Tooltip.Trigger render={children} />
+    <Tooltip.Popup>{label as string}</Tooltip.Popup>
+  </Tooltip.Root>
+});
+
+export function MemoTime({ when, linked }: { when: string; linked: boolean }) @{
+  <TimeTooltip label={when}>
+    {linked ? <a href="#memo">{when}</a> : <span>{when}</span>}
+  </TimeTooltip>
+}
 
 export const RenameDialog: FC<{ title: OctaneNode; onRename(name: string): void }> = ({
   title,

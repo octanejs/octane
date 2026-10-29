@@ -33,6 +33,7 @@ dependencies over to Octane.
 | `template-text` | `{title}` with `title: string`, `{count}` with `count: number` | `{title as string}`, `{String(count)}`: text bindings, not renderable holes |
 | `hook-dependencies` | `useEffect(fn)` (runs every render) | `useEffect(fn, null)`: an omitted list is inferred in Octane |
 | `forward-ref` | `forwardRef((props, ref) => …)` | `({ ref, ...props }) => …` |
+| `descriptor-children` | a component that clones or inspects `children` (`render={children}`, `cloneElement`, `Children.only`) | `descriptorChildren(…)`, so callers pass elements as React does |
 | `context-provider` | `<Ctx.Provider value>` | `<Ctx value>` |
 | `context-consumer` | `<Ctx.Consumer>{(v) => …}</Ctx.Consumer>` | `@{ const v = useContext(Ctx); … }` |
 | `native-text-change` | `onChange` on a text `<input>` / `<textarea>` | `onInput` (native `change` fires on blur) |

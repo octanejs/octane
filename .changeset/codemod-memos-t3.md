@@ -24,6 +24,10 @@ Fixes from migrating Memos and T3 Code:
   React: a package whose export map hides `package.json` is read from disk, and
   one with a `./react` entry or an optional React peer needs a binding only
   there.
+- A component that reads its `children` as an element (`render={children}`,
+  `cloneElement`, `Children.only`, `isValidElement`) is marked
+  `descriptorChildren`, so its callers pass elements as React does, and its
+  call sites in the module keep conditional children as expressions.
 - Added imports use the module's own quote style.
 - `@octanejs/cli` exports `readInstalled`, which reads an installed package's
   manifest without going through its export map.

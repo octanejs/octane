@@ -68,6 +68,7 @@ const RULE = {
 	classComponent: 'class-component',
 	consumer: 'context-consumer',
 	defaultProps: 'default-props',
+	descriptorChildren: 'descriptor-children',
 	deps: 'hook-dependencies',
 	eventObject: 'event-object',
 	forwardRef: 'forward-ref',
@@ -597,6 +598,8 @@ class ModuleTransform {
 		this.restChange = new Set();
 		/** @type {Set<ts.JsxSpreadAttribute>} Spreads of those rest props, which pass it as `onInput`. */
 		this.changeSpreads = new Set();
+		/** @type {Set<ts.VariableDeclaration | ts.FunctionDeclaration>} Components to mark `descriptorChildren`. */
+		this.descriptorComponents = new Set();
 		/** @type {ts.ImportDeclaration[]} Placeholder index -> import declaration. */
 		this.importSlots = [];
 		this.hasJsx = false;
@@ -720,14 +723,139 @@ class ModuleTransform {
 		}
 		/** @type {ts.JsxOpeningLikeElement[]} */
 		const fields = [];
+		/** @type {ts.Expression[]} Values read as an element: cloned, inspected, or a `render` prop. */
+		const elements = [];
 		const visit = (/** @type {ts.Node} */ node) => {
 			if (ts.isIdentifier(node) && declaresName(node)) this.declared.add(node.text);
 			if (isJsx(node)) this.hasJsx = true;
 			if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) fields.push(node);
+			if (
+				ts.isJsxAttribute(node) &&
+				node.name.getText(this.sf) === 'render' &&
+				node.initializer &&
+				ts.isJsxExpression(node.initializer) &&
+				node.initializer.expression
+			) {
+				elements.push(node.initializer.expression);
+			}
+			if (ts.isCallExpression(node) && node.arguments[0] && this.readsElement(node.expression)) {
+				elements.push(node.arguments[0]);
+			}
 			ts.forEachChild(node, visit);
 		};
 		visit(this.sf);
 		for (const field of fields) if (this.takesChange(field)) this.planRestChange(field);
+		for (const element of elements) this.planDescriptorChildren(element);
+	}
+
+	/**
+	 * Whether a callee reads its argument as an element: `cloneElement`,
+	 * `isValidElement`, or a `Children` method.
+	 *
+	 * @param {ts.Expression} callee
+	 */
+	readsElement(callee) {
+		const name = this.calleeName(callee);
+		if (name === 'cloneElement' || name === 'isValidElement') return true;
+		return (
+			ts.isPropertyAccessExpression(callee) && this.calleeName(callee.expression) === 'Children'
+		);
+	}
+
+	/**
+	 * React passes a component its JSX children as elements, which
+	 * `render={children}` and `cloneElement(children)` rely on. Octane passes a
+	 * compiled render body unless the component is marked `descriptorChildren`,
+	 * so mark the component whose own `children` this reads.
+	 *
+	 * @param {ts.Expression} expression
+	 */
+	planDescriptorChildren(expression) {
+		const component = this.childrenOwner(skipParens(expression));
+		if (!component) return;
+		// `memo(…)` and `forwardRef(…)` wrap it; the declaration holds the call.
+		let holder = component.parent;
+		while (
+			ts.isCallExpression(holder) &&
+			/^(?:memo|forwardRef)$/.test(this.calleeName(holder.expression) ?? '')
+		) {
+			holder = holder.parent;
+		}
+		if (ts.isCallExpression(holder) && this.calleeName(holder.expression) === 'descriptorChildren')
+			return;
+		if (
+			ts.isVariableDeclaration(holder) &&
+			ts.isIdentifier(holder.name) &&
+			ts.getCombinedNodeFlags(holder) & ts.NodeFlags.Const
+		) {
+			this.descriptorComponents.add(holder);
+		} else if (
+			ts.isFunctionDeclaration(component) &&
+			component.name &&
+			!component.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) &&
+			this.declaredBeforeUse(component)
+		) {
+			this.descriptorComponents.add(component);
+		} else {
+			this.note(
+				RULE.descriptorChildren,
+				'warning',
+				expression,
+				'This reads `children` as an element, which Octane passes as a compiled render body; mark the component with `descriptorChildren` so callers pass element descriptors.',
+			);
+		}
+	}
+
+	/**
+	 * The component whose own `children` prop `node` is: `children` from its
+	 * props pattern, or `props.children`.
+	 *
+	 * @param {ts.Expression} node
+	 * @returns {ts.SignatureDeclaration | null}
+	 */
+	childrenOwner(node) {
+		/** @type {ts.Node | null} */
+		let props = null;
+		if (ts.isPropertyAccessExpression(node) && node.name.text === 'children') {
+			props = ts.isIdentifier(node.expression) ? this.declarationOf(node.expression) : null;
+		} else if (ts.isIdentifier(node)) {
+			const declaration = this.declarationOf(node);
+			if (
+				declaration &&
+				ts.isBindingElement(declaration) &&
+				(declaration.propertyName ?? declaration.name).getText(this.sf) === 'children'
+			) {
+				props = declaration.parent.parent;
+			}
+		}
+		if (!props || !ts.isParameter(props)) return null;
+		const component = /** @type {ts.SignatureDeclaration} */ (props.parent);
+		return component.parameters[0] === props && isFunctionLike(component) ? component : null;
+	}
+
+	/**
+	 * Whether no code that runs while the module loads reads `fn` before its
+	 * declaration, so it can become a `const`, which is not hoisted.
+	 *
+	 * @param {ts.FunctionDeclaration} fn
+	 */
+	declaredBeforeUse(fn) {
+		let safe = true;
+		const visit = (/** @type {ts.Node} */ node) => {
+			if (!safe) return;
+			if (
+				ts.isIdentifier(node) &&
+				node !== fn.name &&
+				node.end <= fn.getStart(this.sf) &&
+				this.declarationOf(node) === fn &&
+				!ts.findAncestor(node, isFunctionLike)
+			) {
+				safe = false;
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(this.sf);
+		return safe;
 	}
 
 	/**
@@ -1070,6 +1198,13 @@ class ModuleTransform {
 		if (ts.isBindingElement(node) && this.restChange.has(node)) {
 			return 'onChange, ' + node.getText(this.sf);
 		}
+		if (ts.isVariableDeclaration(node) && this.descriptorComponents.has(node) && node.initializer) {
+			this.count(RULE.descriptorChildren);
+			return (
+				this.span(node, node.getStart(this.sf), node.initializer.getStart(this.sf), PLAIN) +
+				`${this.require('octane', 'descriptorChildren', false)}(${this.emit(node.initializer, PLAIN)})`
+			);
+		}
 		if (ts.isJsxText(node) && this.target === 'tsrx' && /\/[/*]/.test(node.text)) {
 			// TSRX reads `//` and `/*` in element text as comments, as JavaScript does.
 			return node.getText(this.sf).replace(/\/(?=[/*])/g, "{'/'}");
@@ -1096,8 +1231,20 @@ class ModuleTransform {
 			ts.isArrowFunction(node)
 		) {
 			const component = this.target === 'tsrx' ? this.rewriteComponent(node) : null;
-			if (component !== null || !this.parameters.has(node) || !node.body) return component;
-			return this.head(node, node.body.getStart(this.sf)) + this.emit(node.body, PLAIN);
+			const text =
+				component ??
+				(this.parameters.has(node) && node.body
+					? this.head(node, node.body.getStart(this.sf)) + this.emit(node.body, PLAIN)
+					: null);
+			if (!ts.isFunctionDeclaration(node) || !this.descriptorComponents.has(node)) return text;
+			// A marked binding is a `const`; the function keeps its name.
+			this.count(RULE.descriptorChildren);
+			const fn = (text ?? this.span(node, node.getStart(this.sf), node.end, ctx)).replace(
+				/^export\s+/,
+				'',
+			);
+			const exported = node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+			return `${exported ? 'export ' : ''}const ${node.name?.text} = ${this.require('octane', 'descriptorChildren', false)}(${fn});`;
 		}
 		return null;
 	}
@@ -1990,6 +2137,15 @@ class ModuleTransform {
 			);
 		}
 		const tag = node.openingElement.tagName;
+		// A `descriptorChildren` component receives its children as elements, as
+		// in React; `@if` or `@for` there would hand it a fragment instead.
+		const declaration = ts.isIdentifier(tag) ? this.declarationOf(tag) : null;
+		if (
+			declaration &&
+			this.descriptorComponents.has(/** @type {ts.VariableDeclaration} */ (declaration))
+		) {
+			return this.span(node, node.getStart(this.sf), node.end, PLAIN);
+		}
 		const name = this.calleeName(tag);
 		if (name === 'StrictMode') {
 			// Octane's StrictMode is a pass-through wrapper.
