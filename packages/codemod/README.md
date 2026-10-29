@@ -25,6 +25,8 @@ dependencies over to Octane.
 | `imports` | `React.useState`, `React.FC`, and `React.ReactNode` with no import (the global namespace React's types declare) | named imports |
 | `imports` | `declare module 'react' { namespace JSX { … } }` (custom elements) | `declare module 'octane/jsx-runtime'` |
 | `imports` | React libraries with a binding (`@tanstack/react-query`, ...) | `@octanejs/*` |
+| `imports` | `@radix-ui/react-<primitive>` (`import * as DialogPrimitive from '@radix-ui/react-dialog'`) | that primitive's namespace of `@octanejs/radix` (`import { Dialog as DialogPrimitive } from '@octanejs/radix'`) |
+| `imports` | `@tanstack/react-table`, `@tanstack/react-hotkeys`, `@tanstack/react-pacer` | TanStack's own `@tanstack/octane-*` adapters, with `Octane` for `React` in type names |
 | `template-component` | `function C() { …; return <div /> }` | `function C() @{ …; <div /> }` |
 | `template-if` | `{a ? <A /> : <B />}`, `{a > 0 && <A />}` (also through a `const`) | `@if (a) { <A /> } @else { <B /> }` |
 | `template-if` | `if (a) return <A />; …; return <B />` in a component | `@if (a) { <A /> } @else { …; <B /> }` |
