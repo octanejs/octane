@@ -142,6 +142,13 @@ describe.sequential('real-browser keyed moves', () => {
 		expect(result).toEqual({ order: [3, 2, 1], sameNodes: true });
 	});
 
+	it('attaches refs inside a form whose controls are named nodeType and compareDocumentPosition', async () => {
+		const current = await openCase(false);
+		const log = await current.evaluate(() => window.__moveState.attachNamedControlRefs());
+
+		expect(log).toEqual(['nodeType:set', 'compareDocumentPosition:set', 'form:set']);
+	});
+
 	it('inserts a fresh form whose control is named isConnected', async () => {
 		const current = await openCase(false);
 		const result = await current.evaluate(() => window.__moveState.insertFormIntoMountedSection());

@@ -6,7 +6,14 @@ import {
 	type Root,
 } from '../../../src/index.js';
 import { mountBoundRows } from './bound-rows.tsrx';
-import { CompiledRows, FormParentRows, FormRows, TipRows, type StatefulRow } from './rows.tsrx';
+import {
+	CompiledRows,
+	FormParentRows,
+	FormRows,
+	NamedControlRefs,
+	TipRows,
+	type StatefulRow,
+} from './rows.tsrx';
 
 type RowKind = 'compiled' | 'descriptor' | 'binding';
 
@@ -279,6 +286,14 @@ function moveFocusedEditorFormRow() {
 	};
 }
 
+function attachNamedControlRefs() {
+	const container = reset();
+	root = createRoot(container);
+	const log: string[] = [];
+	flushSync(() => root!.render(NamedControlRefs, { log: (entry: string) => log.push(entry) }));
+	return log;
+}
+
 window.__moveState = {
 	mount,
 	reverse,
@@ -288,6 +303,7 @@ window.__moveState = {
 	reverseTipRows,
 	reverseFormParentRows,
 	moveFocusedEditorFormRow,
+	attachNamedControlRefs,
 };
 
 declare global {
@@ -301,6 +317,7 @@ declare global {
 			reverseTipRows: typeof reverseTipRows;
 			reverseFormParentRows: typeof reverseFormParentRows;
 			moveFocusedEditorFormRow: typeof moveFocusedEditorFormRow;
+			attachNamedControlRefs: typeof attachNamedControlRefs;
 		};
 	}
 }

@@ -1,3 +1,5 @@
+import { Fragment } from 'octane';
+
 type Props = { log: (entry: string) => void; label: string };
 
 function Leaf({ log, label }: Props) @{
@@ -63,4 +65,43 @@ export function CompiledSiblings(props: SiblingProps) @{
 		<MaybeInput show={props.show} first={props.first} />
 		<RegisteredInput bind={props.bind} />
 	</form>
+}
+
+// Nested hosts in one template, each logging its own ref.
+type Log = { log: (entry: string) => void };
+const logRef = (log: (entry: string) => void, name: string) => (node: unknown) =>
+	log(`${name}:${node ? 'set' : 'null'}`);
+
+export function NestedRefs({ log }: Log) @{
+	<section>
+		<p ref={logRef(log, 'p')}>
+			<i ref={logRef(log, 'i')}>
+				<u ref={logRef(log, 'u')} />
+			</i>
+			<em ref={logRef(log, 'em')} />
+		</p>
+		<span ref={logRef(log, 'span')} />
+	</section>
+}
+
+export function NestedSpreadRefs({ log }: Log) @{
+	<section>
+		<p {...{ ref: logRef(log, 'p'), title: 'p' }}>
+			<i ref={logRef(log, 'i')}>
+				<u {...{ ref: logRef(log, 'u') }} />
+			</i>
+			<em {...{ ref: logRef(log, 'em') }} />
+		</p>
+		<span ref={logRef(log, 'span')} />
+	</section>
+}
+
+export function NestedFragmentRefs({ log }: Log) @{
+	<section>
+		<p ref={logRef(log, 'p')}>
+			<Fragment ref={logRef(log, 'fragment')}>
+				<i ref={logRef(log, 'i')} />
+			</Fragment>
+		</p>
+	</section>
 }
