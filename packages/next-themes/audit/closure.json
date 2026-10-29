@@ -1,0 +1,27 @@
+{
+  "runtimeDependencies": ["octane"],
+  "adaptedSources": [
+    { "packageName": "next-themes", "paths": ["src/index.tsrx", "src/script.ts", "src/types.ts"] }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/index.tsrx",
+      "origin": "adapted",
+      "packageName": "next-themes",
+      "sha256": "76a5014febf6e936c2176fe353f37b208ccc6f2a3d8a630419cb20ceba323c1c"
+    },
+    {
+      "path": "src/script.ts",
+      "origin": "adapted",
+      "packageName": "next-themes",
+      "sha256": "36ffb9ebc82e82f32de0221fb9cc9c814233d696a615eaaecbab24f7dfe45bbe"
+    },
+    {
+      "path": "src/types.ts",
+      "origin": "adapted",
+      "packageName": "next-themes",
+      "sha256": "b274f2a91146fc19ea32f9ab24b409d821b4859ab45b7e051569008675944fa2"
+    }
+  ],
+  "reimplementedDependencies": []
+}

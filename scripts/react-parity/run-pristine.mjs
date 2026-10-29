@@ -16,6 +16,7 @@ export const runners = new Map([
 	['floating-ui', { module: './floating-ui-pristine-runtime.mjs', label: '@floating-ui/react' }],
 	['livestore', { module: './livestore-pristine-runtime.mjs', label: 'LiveStore' }],
 	['jotai', { module: './jotai-pristine-runtime.mjs', label: 'Jotai' }],
+	['next-themes', { module: './next-themes-pristine-runtime.mjs', label: 'next-themes' }],
 	[
 		'monaco-editor',
 		{ module: './monaco-editor-pristine-runtime.mjs', label: '@monaco-editor/react' },

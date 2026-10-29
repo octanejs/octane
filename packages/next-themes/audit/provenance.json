@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/next-themes-0.4.6.tgz",
+      "sha256": "07e1be7d92087c76ac3cfc7b1ecc46cc42963678a48b5d7908f7b64b5db80bb3"
+    },
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "b5acfd21b3b61508365224c40ec1b03ec71091248baaf989d4be916551e7d532"
+    }
+  ],
+  "requiredFiles": ["audit/upstream.lock.json"],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "next-themes",
+    "version": "0.4.6",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "scripts", "tests", "upstream", "upstream-artifact"]
+}

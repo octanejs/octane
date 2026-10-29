@@ -204,6 +204,27 @@ describe('runCodemod', () => {
 		expect(result.missing).toEqual(['@tanstack/markdown/react']);
 	});
 
+	it('maps next-themes, which has no React-shaped name, to its binding', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'src/Theme.tsx':
+				"import { ThemeProvider, useTheme } from 'next-themes';\nimport type { ThemeProviderProps } from 'next-themes';\nfunction Toggle() {\n\tconst { resolvedTheme, setTheme } = useTheme();\n\treturn <button onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}>Toggle</button>;\n}\nexport function Providers(props: ThemeProviderProps) {\n\treturn <ThemeProvider attribute=\"class\" {...props}><Toggle /></ThemeProvider>;\n}\n",
+		});
+		const result = await runCodemod([root], { write: false });
+		const theme = result.files.find((file) => file.file === 'src/Theme.tsx');
+		expect(theme?.output).toBe('src/Theme.tsrx');
+		expect(theme?.code).toContain(
+			"import { ThemeProvider, useTheme } from '@octanejs/next-themes';",
+		);
+		expect(theme?.code).toContain(
+			"import type { ThemeProviderProps } from '@octanejs/next-themes';",
+		);
+		expect(theme?.code).not.toContain("'next-themes'");
+		expect(result.packages).toEqual([{ from: 'next-themes', to: '@octanejs/next-themes' }]);
+		expect(result.missing).toEqual([]);
+		expect(theme?.diagnostics).toEqual([]);
+	});
+
 	it('reports React packages from their installed manifest, not their name', async () => {
 		const manifest = (/** @type {object} */ fields) =>
 			JSON.stringify({ version: '1.0.0', ...fields });

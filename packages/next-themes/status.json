@@ -1,0 +1,19 @@
+{
+  "upstream": { "package": "next-themes", "version": "0.4.6" },
+  "provenance": {
+    "source": "https://github.com/pacocoursey/next-themes/tree/v0.4.6/next-themes",
+    "license": "MIT",
+    "commit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752",
+    "verification": "verified"
+  },
+  "surface": "Complete published surface: ThemeProvider with every prop (attribute, defaultTheme, enableSystem, enableColorScheme, storageKey, forcedTheme, disableTransitionOnChange, themes, value, nonce, scriptProps), useTheme, and the Attribute, ThemeProviderProps and UseThemeProps types. All 28 upstream runtime registrations run unchanged against React and, with import rewrites only, against Octane.",
+  "divergences": [
+    "The context renders as `<ThemeContext value>`, because Octane has no `Context.Provider`; consumers see the same `useTheme` values.",
+    "Public prop types use Octane's `DetailedHTMLProps`, `ScriptHTMLAttributes` and `PropsWithChildren`."
+  ],
+  "ssr": "Supported and tested: octane/server renders the inline no-flash script with its nonce and scriptProps, the script applies the stored or system theme before hydration, and hydrateRoot adopts the server script without a mismatch.",
+  "notes": [
+    "npm publishes no gitHead or provenance for next-themes 0.4.6; the pin is the v0.4.6 release tag, whose package manifest, README and license match the published tarball."
+  ],
+  "verified": "2026-10-29"
+}

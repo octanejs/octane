@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "project": "next-themes-adapted",
+  "roots": ["packages/next-themes/tests/upstream"],
+  "files": ["packages/next-themes/tests/upstream/index.test.tsx"],
+  "tests": [
+    {
+      "id": "runtime:93aab8591dfb6a5a",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "color-scheme does not set color-scheme when disabled"
+    },
+    {
+      "id": "runtime:c9833bcc72fbd90f",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "color-scheme should set color-scheme dark when dark theme is active"
+    },
+    {
+      "id": "runtime:0c9ea073e8165543",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "color-scheme should set color-scheme light when light theme is active"
+    },
+    {
+      "id": "runtime:46109b5f9afd80bb",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "custom attribute should use \"data-example\"-attribute when attribute=\"data-example\""
+    },
+    {
+      "id": "runtime:038241e3141a54bd",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "custom attribute should use class attribute (CSS-class) when attribute=\"class\""
+    },
+    {
+      "id": "runtime:509524263044cc02",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "custom attribute should use data-theme attribute when using default"
+    },
+    {
+      "id": "runtime:16e08e6d8ca8e4a1",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "custom attribute supports multiple attributes"
+    },
+    {
+      "id": "runtime:4f456e7604dae7ab",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "custom storageKey should save to localStorage with 'custom' when setting prop 'storageKey' to 'customKey'"
+    },
+    {
+      "id": "runtime:3a4eb3da726ac7b5",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "custom storageKey should save to localStorage with 'theme' key when using default settings"
+    },
+    {
+      "id": "runtime:f7190161735bb351",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "custom value-mapping should allow missing values (attribute)"
+    },
+    {
+      "id": "runtime:f15181add6f28a43",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "custom value-mapping should allow missing values (class)"
+    },
+    {
+      "id": "runtime:69301479fa265dcd",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "custom value-mapping should use custom value mapping when using value={{pink:\"my-pink-theme\"}}"
+    },
+    {
+      "id": "runtime:367aa7d59603ab52",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "custom value-mapping supports multiple attributes"
+    },
+    {
+      "id": "runtime:bbc14a3f9e470f21",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "defaultTheme should return dark when dark is set as default-theme"
+    },
+    {
+      "id": "runtime:4b62f6b760ec861f",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "defaultTheme should return light when light is set as default-theme"
+    },
+    {
+      "id": "runtime:06d1ae1bf683ae75",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "defaultTheme should return light when no default-theme is set and enableSystem=false"
+    },
+    {
+      "id": "runtime:dbe743f59b754597",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "defaultTheme should return system-theme when no default-theme is set"
+    },
+    {
+      "id": "runtime:9c328f8a51425696",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "forcedTheme should render light theme when forcedTheme is set to light"
+    },
+    {
+      "id": "runtime:61c329100158bce1",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "forcedTheme should render saved theme when no forcedTheme is set"
+    },
+    {
+      "id": "runtime:e138e811241cb39c",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "inline script should pass props to script"
+    },
+    {
+      "id": "runtime:54dfc99dfb1f028f",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "provider ignores nested ThemeProviders"
+    },
+    {
+      "id": "runtime:b33ff3154a2087b2",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "setTheme setTheme(<function>)"
+    },
+    {
+      "id": "runtime:07ed0aa185ce7a7f",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "setTheme setTheme(<literal>)"
+    },
+    {
+      "id": "runtime:d40dcbfc90262685",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "storage should not set localStorage with default value"
+    },
+    {
+      "id": "runtime:dd815400b845a736",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "storage should set localStorage when switching themes"
+    },
+    {
+      "id": "runtime:6517c4cbbba097c4",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "system theme resolved theme should be set"
+    },
+    {
+      "id": "runtime:801a93f1bad6e7eb",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "system theme system theme should be set, even if theme is not system"
+    },
+    {
+      "id": "runtime:a524cfc938b25848",
+      "file": "packages/next-themes/tests/upstream/index.test.tsx",
+      "fullName": "system theme system theme should not be set if enableSystem is false"
+    }
+  ],
+  "snapshots": 0
+}
