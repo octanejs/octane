@@ -43,6 +43,7 @@ import {
 	type HostedServerSession,
 } from '../runtime.server.js';
 import {
+	OCTANE_COMPAT_HOST_STYLE,
 	resolveHostedIsland,
 	type OctaneCompatComponentProps,
 	type OctaneCompatProps,
@@ -159,6 +160,7 @@ export function OctaneCompat(
 		React.createElement('div', {
 			key: 'host',
 			'data-octane-compat': '',
+			style: OCTANE_COMPAT_HOST_STYLE,
 			suppressHydrationWarning: true,
 			dangerouslySetInnerHTML: { __html: attempt.html },
 		}),
