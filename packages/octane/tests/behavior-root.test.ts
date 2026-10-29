@@ -5034,8 +5034,10 @@ export function TreeHydration(props) @{
 				structuralBinding.dispose();
 			}
 		}
-		// This dev/prod matrix compiles and exercises hundreds of fresh fixtures.
-	}, 15_000);
+		// This dev/prod matrix compiles and exercises hundreds of fresh fixtures:
+		// 582 compiles take about 9 s of a 12 s run on a busy machine, so a slow
+		// CI runner passed the old 15 s limit.
+	}, 60_000);
 
 	// A publication inside an Octane render defers the early program's drain.
 	// The drain runs once that render has committed, on the same synchronous
