@@ -1,4 +1,4 @@
-import { use, useSyncExternalStore, useLayoutEffect } from 'octane';
+import { memo, use, useState, useSyncExternalStore, useLayoutEffect } from 'octane';
 
 export interface ExternalStore<T> {
 	getState: () => T;
@@ -138,5 +138,43 @@ export function CrossComponentStoreApp(props: {
 	<div>
 		<RenderNotificationMutator store={props.store} next={props.next} />
 		<PendingStoreReader store={props.store} />
+	</div>
+}
+
+interface HeldSelectionProps {
+	store: ExternalStore<{ a: number; b: number; c: number }>;
+	k: 'a' | 'b' | 'c';
+	pending: Promise<void>;
+	tail: Promise<void>;
+	expose: (setCount: (count: number) => void) => void;
+}
+
+// Memoized, so a root render with new props does not render it.
+const HeldSelectionCount = memo(function HeldSelectionCount(props: {
+	expose: HeldSelectionProps['expose'];
+}) @{
+	const [count, setCount] = useState(0);
+	props.expose(setCount);
+	<span id="held-selection-count">{String(count)}</span>
+});
+
+function HeldSelectionConsumer(props: HeldSelectionProps) @{
+	const value = useSyncExternalStore(props.store.subscribe, () => props.store.getState()[props.k]);
+	if (props.k === 'b') {
+		use(props.pending);
+		use(props.tail);
+	}
+	<output id="held-selection-value">{props.k + ':' + value}</output>
+}
+
+export function HeldSelectionBoundary(props: HeldSelectionProps) @{
+	<div>
+		<h2 id="held-selection-label">{props.k}</h2>
+		<HeldSelectionCount expose={props.expose} />
+		@try {
+			<HeldSelectionConsumer {...props} />
+		} @pending {
+			<span id="held-selection-fallback">{'loading'}</span>
+		}
 	</div>
 }

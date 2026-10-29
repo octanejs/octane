@@ -72,11 +72,11 @@ declare const __OCTANE_PROFILE_ENABLED__: boolean;
 // rollback, only a boundary that never split.
 //
 // An explicit boundary replays its own checkpoint; writes outside that window
-// remain unless the render folded queued hook work, which drops the whole root
-// transaction (Transition holds). If no boundary owns the suspension, the root
-// instead replays its whole queued render wave. These change-local journals
-// preserve committed output and lifecycle; they are not a separate
-// render/commit phase for every eager native host mutation.
+// remain unless the render folded queued hook work or applied a root request,
+// which drops the whole root transaction (Transition holds). If no boundary
+// owns the suspension, the root instead replays its whole queued render wave.
+// These change-local journals preserve committed output and lifecycle; they are
+// not a separate render/commit phase for every eager native host mutation.
 //
 // Compiled bindings guard on a cached copy of the last value (`if (_b.d !== _v)`)
 // and never read the DOM, so restoring a node without restoring that cache would

@@ -111,14 +111,17 @@ more than the node: the `default*` mirror and the per-element record of what was
 projected go back with it, or the record would believe the new value had already landed and
 skip re-projecting it on resume.
 
-**Remaining limitation — transitions not driven by hook state.** A transition render that
-folded queued hook updates (`useState`, `useReducer`, `useLinkedState`) and suspends into a
-hold drops its whole root transaction, so nothing it patched commits early, whatever its
-origins (#2029 step 4). A transition driven only by something else, such as an external
-store, still holds per boundary: content patched outside a suspended boundary, or a
-structural change above it, can commit early there. These were originally filed as
-separate gaps. The following investigation motivated the staged-state implementation
-that the update queues later replaced:
+**Remaining limitation — transitions not driven by hook state or `root.render`.** A
+transition render that folded queued hook updates (`useState`, `useReducer`,
+`useLinkedState`) and suspends into a hold drops its whole root transaction, so nothing it
+patched commits early, whatever its origins (#2029 step 4). A `root.render` request
+rendered at transition priority does the same, and each holding boundary keeps the request
+until it retries it (#1341). Until then the screen keeps the root's committed props, so an
+external store notification updates the selection the held screen shows. A transition
+driven only by something else still holds per boundary: content patched outside a
+suspended boundary, or a structural change above it, can commit early there. These were
+originally filed as separate gaps. The following investigation motivated the staged-state
+implementation that the update queues later replaced:
 
 1. _Reveal scope._ Reverting content outside the boundary strands it. The reveal path
    re-renders the try block only, so a restored bag outside it is never re-patched and the
@@ -177,8 +180,9 @@ old-input pending-cue render; see
 #2029 step 4 replaced it with React's update queues: a held transition is updates no
 render has processed, so there is nothing to revert, re-render or promote, and holds
 cover multi-origin transitions. An urgent update now rebases over a held transition,
-as in React, where the staging model discarded it. External-store transitions remain
-per boundary. Fallback-visible retries are capture-safe and never had this limitation.
+as in React, where the staging model discarded it. `root.render` transitions joined them
+in #1341; other transitions with no queued work remain per boundary. Fallback-visible
+retries are capture-safe and never had this limitation.
 Time-based cross-boundary fallback throttling is the separate Divergence #5.
 
 ---

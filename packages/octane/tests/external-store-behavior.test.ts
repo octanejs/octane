@@ -3,6 +3,7 @@ import { act, mount, flushEffects } from './_helpers';
 import { flushSync, setIsOctaneActEnvironment, startTransition } from '../src/index.js';
 import {
 	CrossComponentStoreApp,
+	HeldSelectionBoundary,
 	makeStore,
 	PairedStoreConsumer,
 	RenderPhaseStoreConsumer,
@@ -163,6 +164,107 @@ describe('useSyncExternalStore — live selectors and commit updates', () => {
 			r.unmount();
 			flushEffects();
 		}
+	});
+
+	describe('a root.render transition that suspends into a held boundary', () => {
+		function heldSelection(k: 'a' | 'b' | 'c', pending: Promise<void>, tail = pending) {
+			const store = makeStore({ a: 0, b: 0, c: 0 });
+			let setCount!: (count: number) => void;
+			const expose = (set: (count: number) => void) => (setCount = set);
+			const props = { store, pending, tail, expose };
+			const r = mount(HeldSelectionBoundary, { ...props, k });
+			flushEffects();
+			const render = (next: 'a' | 'b' | 'c') =>
+				r.root.render(HeldSelectionBoundary, { ...props, k: next });
+			const shown = () => [
+				r.find('#held-selection-label').textContent,
+				r.find('#held-selection-value').textContent,
+			];
+			const count = () => r.find('#held-selection-count').textContent;
+			return { r, store, render, shown, setCount: (next: number) => setCount(next), count };
+		}
+
+		it('keeps the store selection of the screen it holds live', async () => {
+			const pending = deferred();
+			const { r, store, render, shown } = heldSelection('a', pending.promise);
+			try {
+				await act(() => startTransition(() => render('b')));
+				// The whole root holds, including the content outside the boundary.
+				expect(shown()).toEqual(['a', 'a:0']);
+
+				// The held screen still selects `a`, so this notification must update it
+				// in place rather than show the fallback for the transition's `b`.
+				await act(() => store.setState({ a: 1, b: 0, c: 0 }));
+				expect(shown()).toEqual(['a', 'a:1']);
+				expect(r.container.querySelector('#held-selection-fallback')).toBeNull();
+
+				await act(() => pending.resolve());
+				expect(shown()).toEqual(['b', 'b:0']);
+			} finally {
+				r.unmount();
+				flushEffects();
+			}
+		});
+
+		it('keeps holding when the retried request suspends again', async () => {
+			const pending = deferred();
+			const tail = deferred();
+			const { r, store, render, shown } = heldSelection('a', pending.promise, tail.promise);
+			try {
+				await act(() => startTransition(() => render('b')));
+				await act(() => pending.resolve());
+				expect(shown()).toEqual(['a', 'a:0']);
+
+				await act(() => store.setState({ a: 1, b: 0, c: 0 }));
+				expect(shown()).toEqual(['a', 'a:1']);
+				expect(r.container.querySelector('#held-selection-fallback')).toBeNull();
+
+				await act(() => tail.resolve());
+				expect(shown()).toEqual(['b', 'b:0']);
+			} finally {
+				r.unmount();
+				flushEffects();
+			}
+		});
+
+		it('keeps a memoized transition update that rendered with the dropped request', async () => {
+			const pending = deferred();
+			const { r, render, shown, setCount, count } = heldSelection('a', pending.promise);
+			try {
+				// The root's render skips the memoized counter, which renders its own
+				// update in the drain that drops the root request.
+				await act(() => {
+					startTransition(() => setCount(1));
+					startTransition(() => render('b'));
+				});
+				expect(shown()).toEqual(['a', 'a:0']);
+
+				await act(() => pending.resolve());
+				expect(shown()).toEqual(['b', 'b:0']);
+				expect(count()).toBe('1');
+			} finally {
+				r.unmount();
+				flushEffects();
+			}
+		});
+
+		it('lets a later urgent root.render replace the held request', async () => {
+			const pending = deferred();
+			const { r, render, shown } = heldSelection('a', pending.promise);
+			try {
+				await act(() => startTransition(() => render('b')));
+				await act(() => render('c'));
+				expect(shown()).toEqual(['c', 'c:0']);
+
+				// The superseded request does not come back when its data arrives.
+				await act(() => pending.resolve());
+				expect(shown()).toEqual(['c', 'c:0']);
+				expect(r.container.querySelector('#held-selection-fallback')).toBeNull();
+			} finally {
+				r.unmount();
+				flushEffects();
+			}
+		});
 	});
 
 	it('warns when another rendering component notifies an already-pending store reader', () => {
