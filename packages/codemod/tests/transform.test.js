@@ -238,11 +238,38 @@ describe('transformModule', () => {
 		expect(migrate(slot).code).toContain(
 			"export const Slot = descriptorChildren(function Slot(props: { children: OctaneElement }) {\n\treturn cloneElement(Children.only(props.children), { id: 's' });\n});",
 		);
-		const early = migrate(`export const routes = [<Slot />];\n${slot.replace('export ', '')}`);
-		expect([early.code.includes('descriptorChildren'), early.notes.map((n) => n.rule)]).toEqual([
-			false,
-			['descriptor-children'],
-		]);
+		// It is reported instead when code that runs while the module loads can
+		// reach it first (directly, in a callback, or through a local call), when
+		// it has overloads, or when it is not at module level, where the compiler
+		// reads the marker.
+		const local = slot.replace('export ', '');
+		for (const [source, marked] of /** @type {[string, boolean][]} */ ([
+			[`export const routes = [<Slot />];\n${local}`, false],
+			[
+				`function make() {\n\treturn Slot({ children: <b /> });\n}\nexport const made = make();\n${local}`,
+				false,
+			],
+			[`export const list = [1].map(() => Slot({ children: <b /> }));\n${local}`, false],
+			[
+				slot.replace(
+					'export function Slot',
+					'export function Slot(props: { children: React.ReactElement; id: string }): React.ReactElement;\nexport function Slot',
+				),
+				false,
+			],
+			[
+				"import { cloneElement } from 'react';\nexport function Outer() {\n\tconst Inner = ({ children }: { children: React.ReactElement }) => cloneElement(children, {});\n\treturn <Inner><b /></Inner>;\n}\n",
+				false,
+			],
+			// A function that is only defined, or an imported call, runs nothing of the module's.
+			[`export const Row = () => <Slot><b /></Slot>;\nconst v = String(1);\n${local}`, true],
+		])) {
+			const result = migrate(source);
+			expect([
+				result.code.includes('descriptorChildren('),
+				result.notes.map((n) => n.rule),
+			]).toEqual(marked ? [true, []] : [false, ['descriptor-children']]);
+		}
 		// Through `forwardRef` or `memo`, the declaration holds the call.
 		expect(
 			migrate(

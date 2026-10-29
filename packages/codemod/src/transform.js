@@ -783,16 +783,21 @@ class ModuleTransform {
 		}
 		if (ts.isCallExpression(holder) && this.calleeName(holder.expression) === 'descriptorChildren')
 			return;
+		// The compiler reads the marker from module-level `const` bindings only.
 		if (
 			ts.isVariableDeclaration(holder) &&
 			ts.isIdentifier(holder.name) &&
-			ts.getCombinedNodeFlags(holder) & ts.NodeFlags.Const
+			ts.getCombinedNodeFlags(holder) & ts.NodeFlags.Const &&
+			holder.parent.parent.parent === this.sf
 		) {
 			this.descriptorComponents.add(holder);
 		} else if (
 			ts.isFunctionDeclaration(component) &&
+			component.parent === this.sf &&
 			component.name &&
 			!component.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) &&
+			// Overload signatures would stay `function` declarations.
+			this.checker.getSymbolAtLocation(component.name)?.declarations?.length === 1 &&
 			this.declaredBeforeUse(component)
 		) {
 			this.descriptorComponents.add(component);
@@ -834,8 +839,10 @@ class ModuleTransform {
 	}
 
 	/**
-	 * Whether no code that runs while the module loads reads `fn` before its
-	 * declaration, so it can become a `const`, which is not hoisted.
+	 * Whether no code that runs while the module loads can reach `fn` before
+	 * its declaration, so it can become a `const`, which is not hoisted. That
+	 * code reads `fn` directly, in a callback or IIFE it runs, or through a call
+	 * of anything the module declares; a function it only defines does not run.
 	 *
 	 * @param {ts.FunctionDeclaration} fn
 	 */
@@ -843,18 +850,30 @@ class ModuleTransform {
 		let safe = true;
 		const visit = (/** @type {ts.Node} */ node) => {
 			if (!safe) return;
-			if (
-				ts.isIdentifier(node) &&
-				node !== fn.name &&
-				node.end <= fn.getStart(this.sf) &&
-				this.declarationOf(node) === fn &&
-				!ts.findAncestor(node, isFunctionLike)
-			) {
-				safe = false;
+			if (isFunctionLike(node)) {
+				const call = node.parent;
+				const runs =
+					(ts.isCallExpression(call) || ts.isNewExpression(call)) &&
+					(call.expression === node || call.arguments?.includes(/** @type {any} */ (node)));
+				if (!runs) return;
+			} else if (ts.isIdentifier(node) && node !== fn.name) {
+				const declaration = this.declarationOf(node);
+				const called =
+					(ts.isCallExpression(node.parent) || ts.isNewExpression(node.parent)) &&
+					node.parent.expression === node;
+				if (
+					declaration === fn ||
+					(called && declaration && declaration.getSourceFile() === this.sf && !this.importOf(node))
+				) {
+					safe = false;
+				}
 			}
 			ts.forEachChild(node, visit);
 		};
-		visit(this.sf);
+		for (const statement of this.sf.statements) {
+			if (statement === fn) break;
+			visit(statement);
+		}
 		return safe;
 	}
 
