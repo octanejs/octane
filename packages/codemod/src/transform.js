@@ -337,7 +337,8 @@ const DOCUMENT_TAGS = /** @type {Record<string, string>} */ ({
 
 /**
  * Whether an identifier is read in a type, where an import needs no value.
- * `extends Base` reads a value, so heritage counts as one.
+ * A `typeof X` query is a type, which `import type` serves; `extends Base`
+ * reads a value, so heritage counts as one.
  *
  * @param {ts.Identifier} node
  */
@@ -2484,8 +2485,9 @@ class ModuleTransform {
 		const chain = (from) => {
 			let at = from;
 			while (at < statements.length - 1 && !guardReturn(statements[at])) at++;
+			// Comments before the first guard stay in the body's own text.
 			const lead =
-				from > 0
+				from > first
 					? this.lostComments(statements[from - 1].end, statements[from].getStart(this.sf), '')
 					: [];
 			const prefix =

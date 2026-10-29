@@ -125,6 +125,9 @@ describe('transformModule', () => {
 		);
 		expect(code).not.toContain('return');
 		expect(compileErrors(code, 'node.tsrx')).toEqual([]);
+		// A comment before a guard is kept once.
+		const commented = source.replace('\tif (depth > 0)', '\t// Recurse.\n\tif (depth > 0)');
+		expect(transformModule(commented, 'node.tsx').code.match(/\/\/ Recurse\./g)).toHaveLength(1);
 	});
 
 	it('mounts a root by component, not by element', () => {
