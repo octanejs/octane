@@ -131,6 +131,7 @@
     "./compiler/valdi": {
       "types": "./src/compiler/valdi.d.ts"
     },
+    "./strong": "./src/strong.d.ts",
     "./strong/jsx-runtime": "./src/jsx-runtime-strong.d.ts",
     "./strong/jsx-dev-runtime": "./src/jsx-runtime-strong.d.ts"
   },
@@ -420,6 +421,9 @@
       "./compiler/volar": "./dist/compiler/volar.js",
       "./compiler/valdi": {
         "types": "./dist/compiler/valdi.d.ts"
+      },
+      "./strong": {
+        "types": "./dist/strong.d.ts"
       },
       "./strong/jsx-runtime": {
         "types": "./dist/jsx-runtime-strong.d.ts"
