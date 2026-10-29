@@ -163,6 +163,24 @@ describe('runCodemod', () => {
 		expect(app).toContain("from '~/components/index.tsrx'");
 	});
 
+	it('maps `use-sync-external-store/with-selector` to its binding', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'src/useSettings.ts':
+				"import { useSyncExternalStoreWithSelector } from 'use-sync-external-store/with-selector';\nexport const useSettings = (store: { subscribe(l: () => void): () => void; get(): { theme: string } }) =>\n\tuseSyncExternalStoreWithSelector(store.subscribe, store.get, store.get, (settings) => settings.theme);\n",
+		});
+		const result = await runCodemod([root], { write: false });
+		const settings = result.files.find((file) => file.file === 'src/useSettings.ts');
+		expect(settings?.code).toContain(
+			"import { useSyncExternalStoreWithSelector } from '@octanejs/use-sync-external-store/with-selector';",
+		);
+		expect(result.packages).toContainEqual({
+			from: 'use-sync-external-store',
+			to: '@octanejs/use-sync-external-store',
+		});
+		expect(settings?.diagnostics).toEqual([]);
+	});
+
 	it('maps module augmentation, aggregate subpaths, and reports `/react` entries', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',

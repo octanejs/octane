@@ -1,0 +1,35 @@
+{
+  "runtimeDependencies": ["octane"],
+  "adaptedSources": [
+    {
+      "packageName": "use-sync-external-store",
+      "paths": ["src/index.ts", "src/shim/index.ts", "src/useSyncExternalStoreWithSelector.ts"]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "package.json",
+      "origin": "authored",
+      "sha256": "6967888da04f68b537c29dcb5f50fb88a3ea3de9336cf86c636bab2b480dc271"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "packageName": "use-sync-external-store",
+      "sha256": "56c72738764a648608efa99d2dd10c8525e1b70c6b0978e3d8207ae08d802ac1"
+    },
+    {
+      "path": "src/shim/index.ts",
+      "origin": "adapted",
+      "packageName": "use-sync-external-store",
+      "sha256": "9e902322312157800a412a4ba1df2c3799f505a284d69d13158981c36f86a84c"
+    },
+    {
+      "path": "src/useSyncExternalStoreWithSelector.ts",
+      "origin": "adapted",
+      "packageName": "use-sync-external-store",
+      "sha256": "f8ac46d6acad52e49a4171797417f3b4ee92b591f51d44f62e388a6c96f92781"
+    }
+  ],
+  "reimplementedDependencies": []
+}

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "project": "use-sync-external-store-adapted-ssr",
+  "roots": ["packages/use-sync-external-store/tests/upstream"],
+  "files": [
+    "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShimServer-test.js"
+  ],
+  "tests": [
+    {
+      "id": "runtime:e3d3a4583dea3b87",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShimServer-test.js",
+      "fullName": "useSyncExternalStore (userspace shim, server rendering) basic server render"
+    }
+  ],
+  "skippedTests": []
+}

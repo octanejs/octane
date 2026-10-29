@@ -1,0 +1,14 @@
+diff --git a/tests/upstream/useSyncExternalStoreNative-test.js b/tests/upstream/useSyncExternalStoreNative-test.js
+--- a/tests/upstream/useSyncExternalStoreNative-test.js
++++ b/tests/upstream/useSyncExternalStoreNative-test.js
+@@ -6,7 +6,9 @@
+  *
+  * @emails react-core
+  *
+- * @jest-environment node
++ * OCTANE DIVERGENCE[noop-renderer-host]: the noop renderer's stand-in is Octane's
++ * client root, which Octane resolves only in a DOM environment.
++ * @jest-environment jsdom
+  */
+ 
+ 'use strict';

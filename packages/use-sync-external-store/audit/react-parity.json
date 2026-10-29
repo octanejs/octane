@@ -1,0 +1,349 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/react/react.git",
+    "version": "1.7.0",
+    "commit": "1d34f91dfde6bba84d08b683aaba164c7194dacb",
+    "sourceRoot": "packages/use-sync-external-store/upstream/src",
+    "testRoot": "packages/use-sync-external-store/upstream/src/__tests__",
+    "license": "MIT",
+    "integrity": "sha256:4f62a44660396a55417322fb0c71c14413b784192e4cd18acfec6bdf3157e359",
+    "verification": "verified"
+  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "materializedTests": "packages/use-sync-external-store",
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/use-sync-external-store/src"],
+      "include": ["\\.ts$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/use-sync-external-store/tests/upstream"],
+      "include": ["-test\\.js$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 21,
+    "uniqueIdentities": 21,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@12.9.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "093ff629b5f70d0802a379470ac8923ca1167bf2af3086dee5afe33d18e76a9f"
+    }
+  },
+  "lanes": [
+    {
+      "id": "use-sync-external-store-pristine-full",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "use-sync-external-store-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/use-sync-external-store/audit/pristine-runtime.json"
+      },
+      "notes": "Runs all 22 pinned registrations byte-exact against React 19.2.7 and the hash-pinned npm artifact; the build-test configuration skips the one case gated to the React 17 shim.",
+      "files": [
+        {
+          "path": "packages/use-sync-external-store/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "1661d4ef497c709df714615727ff7d643e97cff1429c947946315e6951585cbd"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "8533fcf477fe3036f8e57a349cc8c0389d2800b72a07222157136b0c3ab97785"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/provenance.json",
+          "role": "support",
+          "sha256": "d666dffef430254f26c444133fae4b590a2adc80190ac145dd23f79e64b568e3"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/registrations.json",
+          "role": "support",
+          "sha256": "2f739f58925eeda89712f4990544b441ee5a55f74d50790f747b1c9b25104dbe"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "75db6c2f8a28df4da747886e1beea97775b334d0f5728dad06a972540db95734"
+        },
+        {
+          "path": "packages/use-sync-external-store/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "a85539207f4e392245aed8deec3ae7ed564e4abf7d1954873d6268b8904e4ed3"
+        },
+        {
+          "path": "packages/use-sync-external-store/tests/harness.ts",
+          "role": "support",
+          "sha256": "b6997890c8c42d37e3d4401322afee45cd14e242e0998e8edd0a5589ca7d3201"
+        },
+        {
+          "path": "packages/use-sync-external-store/tests/upstream-modules.ts",
+          "role": "support",
+          "sha256": "2bcb02afe23d2cb9964dde24e56fe402ebaf47e0810ef1dbad8c070d6e023b1b"
+        },
+        {
+          "path": "packages/use-sync-external-store/tests/pristine-registry.ts",
+          "role": "support",
+          "sha256": "4cae7dea5f676cc02eaf289e83f202eff658bfb0b6f7690eced38baaa03cb6f0"
+        },
+        {
+          "path": "packages/use-sync-external-store/tests/vitest.pristine.config.ts",
+          "role": "support",
+          "sha256": "b20af3be887fe95cb9ecb74de3a5993f06357d61916b10c4de1e8ceadc0359db"
+        }
+      ]
+    },
+    {
+      "id": "use-sync-external-store-adapted-full",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "use-sync-external-store-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/use-sync-external-store/audit/adapted-runtime.json"
+      },
+      "notes": "Runs the pinned Shared and Native suites, regenerated with import rewrites and divergence patches, against Octane and this binding.",
+      "files": [
+        {
+          "path": "packages/use-sync-external-store/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "151dcbb2f8ce94323d54fff57c590dd4ef64b2f6c1215b3a8357705e8e0c818d"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "8533fcf477fe3036f8e57a349cc8c0389d2800b72a07222157136b0c3ab97785"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/provenance.json",
+          "role": "support",
+          "sha256": "d666dffef430254f26c444133fae4b590a2adc80190ac145dd23f79e64b568e3"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/registrations.json",
+          "role": "support",
+          "sha256": "2f739f58925eeda89712f4990544b441ee5a55f74d50790f747b1c9b25104dbe"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "75db6c2f8a28df4da747886e1beea97775b334d0f5728dad06a972540db95734"
+        },
+        {
+          "path": "packages/use-sync-external-store/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "a85539207f4e392245aed8deec3ae7ed564e4abf7d1954873d6268b8904e4ed3"
+        },
+        {
+          "path": "packages/use-sync-external-store/tests/harness.ts",
+          "role": "support",
+          "sha256": "b6997890c8c42d37e3d4401322afee45cd14e242e0998e8edd0a5589ca7d3201"
+        },
+        {
+          "path": "packages/use-sync-external-store/tests/upstream-modules.ts",
+          "role": "support",
+          "sha256": "2bcb02afe23d2cb9964dde24e56fe402ebaf47e0810ef1dbad8c070d6e023b1b"
+        },
+        {
+          "path": "packages/use-sync-external-store/tests/adapted-registry.ts",
+          "role": "support",
+          "sha256": "a5bb6672ea845b35530376e778b696506d33be1470c5af626c6d8f650cf3c6b7"
+        },
+        {
+          "path": "packages/use-sync-external-store/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "bf51555f3b29b487242114c15a83684f7f9d5d97a083f09b1f26ba29b4980c59"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/upstream-patches/tests/upstream/useSyncExternalStoreNative-test.js.patch",
+          "role": "support",
+          "sha256": "a046d52456beb723941651a8e2bc5735ffc19f6eb5a9228b49d6e59a3b73b2e7"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/upstream-patches/tests/upstream/useSyncExternalStoreShared-test.js.patch",
+          "role": "support",
+          "sha256": "d0139f0b689c4ed969d62e20517795eb190eb0b7e55cd77ad0092792c57df231"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/upstream-patches/tests/upstream/useSyncExternalStoreShimServer-test.js.patch",
+          "role": "support",
+          "sha256": "5e16b9405cdc449e902a2d12bd162449db1b7ffcb743400a75d2488712e92d1a"
+        }
+      ]
+    },
+    {
+      "id": "use-sync-external-store-adapted-ssr-full",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "use-sync-external-store-adapted-ssr",
+      "evidenceOrigin": "upstream-suite",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/use-sync-external-store/audit/adapted-ssr-runtime.json"
+      },
+      "notes": "Runs the pinned shim server-rendering case against Octane's server runtime and this binding.",
+      "files": [
+        {
+          "path": "packages/use-sync-external-store/audit/adapted-ssr-runtime.json",
+          "role": "support",
+          "sha256": "232273c46ce1c337161b2bfb3ee87b8b9a34948b44e457c8a54f54916d6b1e6d"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "8533fcf477fe3036f8e57a349cc8c0389d2800b72a07222157136b0c3ab97785"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/provenance.json",
+          "role": "support",
+          "sha256": "d666dffef430254f26c444133fae4b590a2adc80190ac145dd23f79e64b568e3"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/registrations.json",
+          "role": "support",
+          "sha256": "2f739f58925eeda89712f4990544b441ee5a55f74d50790f747b1c9b25104dbe"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "75db6c2f8a28df4da747886e1beea97775b334d0f5728dad06a972540db95734"
+        },
+        {
+          "path": "packages/use-sync-external-store/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "a85539207f4e392245aed8deec3ae7ed564e4abf7d1954873d6268b8904e4ed3"
+        },
+        {
+          "path": "packages/use-sync-external-store/tests/harness.ts",
+          "role": "support",
+          "sha256": "b6997890c8c42d37e3d4401322afee45cd14e242e0998e8edd0a5589ca7d3201"
+        },
+        {
+          "path": "packages/use-sync-external-store/tests/upstream-modules.ts",
+          "role": "support",
+          "sha256": "2bcb02afe23d2cb9964dde24e56fe402ebaf47e0810ef1dbad8c070d6e023b1b"
+        },
+        {
+          "path": "packages/use-sync-external-store/tests/adapted-registry.ts",
+          "role": "support",
+          "sha256": "a5bb6672ea845b35530376e778b696506d33be1470c5af626c6d8f650cf3c6b7"
+        },
+        {
+          "path": "packages/use-sync-external-store/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "bf51555f3b29b487242114c15a83684f7f9d5d97a083f09b1f26ba29b4980c59"
+        },
+        {
+          "path": "packages/use-sync-external-store/tests/vitest.adapted-ssr.config.ts",
+          "role": "support",
+          "sha256": "8f8c51da221a2b0603fad9e5a40c071f67409856cd29547d3d87d4505e1df55c"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/upstream-patches/tests/upstream/useSyncExternalStoreNative-test.js.patch",
+          "role": "support",
+          "sha256": "a046d52456beb723941651a8e2bc5735ffc19f6eb5a9228b49d6e59a3b73b2e7"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/upstream-patches/tests/upstream/useSyncExternalStoreShared-test.js.patch",
+          "role": "support",
+          "sha256": "d0139f0b689c4ed969d62e20517795eb190eb0b7e55cd77ad0092792c57df231"
+        },
+        {
+          "path": "packages/use-sync-external-store/audit/upstream-patches/tests/upstream/useSyncExternalStoreShimServer-test.js.patch",
+          "role": "support",
+          "sha256": "5e16b9405cdc449e902a2d12bd162449db1b7ffcb743400a75d2488712e92d1a"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "error-boundary-component",
+      "caseIds": ["runtime:222a37e241fbd87c", "runtime:b2fdd42669fec3a9"],
+      "upstreamResult": "The cases catch render errors with a class component using getDerivedStateFromError.",
+      "octaneResult": "The adaptation catches them with Octane's ErrorBoundary and the same fallback text.",
+      "rationale": "Octane has no class components; ErrorBoundary is its catch-only boundary.",
+      "classification": "framework-component-model",
+      "consumerImpact": "None for this binding; boundaries are authored as ErrorBoundary or @try/@catch.",
+      "migrationGuidance": "Replace class error boundaries with ErrorBoundary or @try/@catch.",
+      "reviewCondition": "Revisit if Octane adds class components.",
+      "owner": "octanejs"
+    },
+    {
+      "id": "getsnapshot-error-render",
+      "caseIds": ["runtime:0db587ce88b27185"],
+      "upstreamResult": "A class boundary held by a createRef ref catches the error, and React's concurrent root renders the tree that threw a second time, so the fallback logs twice.",
+      "octaneResult": "Octane's ErrorBoundary catches it with a {current} ref, and its fallback renders once, as React 17 legacy roots and the upstream shim variant do.",
+      "rationale": "Octane has no class components or createRef, and renders synchronously without retrying a render that threw to attempt recovery.",
+      "classification": "scheduler-model",
+      "consumerImpact": "An erroring store selector is called one fewer time.",
+      "migrationGuidance": "Do not depend on the number of renders of an erroring tree.",
+      "reviewCondition": "Revisit if Octane adopts React's concurrent error recovery.",
+      "owner": "octanejs"
+    },
+    {
+      "id": "octane-diagnostics",
+      "caseIds": ["runtime:25672a9582eaac62"],
+      "upstreamResult": "React's uncached-snapshot warning and update-depth error use React's wording.",
+      "octaneResult": "Octane reports the same two conditions in its own wording.",
+      "rationale": "Octane words its own diagnostics.",
+      "classification": "diagnostics",
+      "consumerImpact": "Code matching React message text must match Octane text instead.",
+      "migrationGuidance": "Match on the condition, not on the message text.",
+      "reviewCondition": "Revisit if Octane adopts React message text.",
+      "owner": "octanejs"
+    },
+    {
+      "id": "foreign-server-markup",
+      "caseIds": ["runtime:af99467e762c6999"],
+      "upstreamResult": "React hydrates hand-written <div>server</div>, reading getServerSnapshot first and adopting the div held by a createRef ref.",
+      "octaneResult": "Octane renders that root on the client and reports error #348 through onRecoverableError. tests/conformance.test.ts hydrates Octane server output: server snapshot first, then the client state, adopting the server DOM.",
+      "rationale": "Octane adopts only markup written by its own server renderer, identified by its hydration protocol comment. It has no createRef; any {current} object is a ref.",
+      "classification": "ssr-hydration",
+      "consumerImpact": "Server HTML from another renderer is replaced rather than adopted.",
+      "migrationGuidance": "Render the server HTML with octane/server.",
+      "reviewCondition": "Revisit if Octane adopts markup without its hydration protocol.",
+      "owner": "octanejs"
+    },
+    {
+      "id": "noop-renderer-host",
+      "caseIds": ["runtime:194b8479ad647fdd", "runtime:60a41de7c299204e"],
+      "upstreamResult": "The native cases render through react-noop-renderer in a Node environment.",
+      "octaneResult": "The adaptation renders through Octane's client root in a DOM environment.",
+      "rationale": "Octane resolves its client runtime only in a DOM environment; the noop renderer has no Octane counterpart.",
+      "classification": "test-harness",
+      "consumerImpact": "None; React Native is not an Octane target.",
+      "migrationGuidance": "None.",
+      "reviewCondition": "Revisit if Octane gains a host-agnostic test renderer.",
+      "owner": "octanejs"
+    },
+    {
+      "id": "built-in-shim",
+      "caseIds": ["runtime:e3d3a4583dea3b87"],
+      "upstreamResult": "With React's built-in hook removed, the shim's server fallback ignores getServerSnapshot, and renderToString returns 'client'.",
+      "octaneResult": "The shim is Octane's built-in hook, which renders getServerSnapshot; renderToStaticMarkup returns {html: 'server'}.",
+      "rationale": "The userspace fallback serves only React 16 and 17; Octane always has the built-in hook, which the published shim also selects on React 18+. Octane's server renderers return a result object, and only static markup omits hydration ranges.",
+      "classification": "framework-component-model",
+      "consumerImpact": "Server rendering through /shim uses getServerSnapshot, as on React 18+.",
+      "migrationGuidance": "Pass getServerSnapshot for content that must match the client.",
+      "reviewCondition": "None while Octane exports a built-in useSyncExternalStore.",
+      "owner": "octanejs"
+    }
+  ]
+}
