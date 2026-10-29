@@ -1059,6 +1059,51 @@ export function Wrapper(props: Widget.Props<string>) { return <Widget {...props}
 			Response.json(fullVersionMetadata),
 		);
 
+		// npm reads a bare `owner/repo` repository as GitHub; a source manifest using
+		// that shorthand still identifies the requested repository.
+		const shorthandManifestBytes = Buffer.from(
+			JSON.stringify({ ...manifest, repository: 'example/widgets' }),
+		);
+		responses.set(
+			`https://api.github.com/repos/example/widgets/git/trees/${tree}?recursive=1`,
+			githubTreeResponse(
+				sourceTree.map((entry) =>
+					entry.path === 'packages/react-widget/package.json'
+						? {
+								...entry,
+								size: shorthandManifestBytes.length,
+								sha: gitBlobSha(shorthandManifestBytes),
+							}
+						: entry,
+				),
+			),
+		);
+		responses.set(
+			'https://api.github.com/repos/example/widgets/git/blobs/manifest',
+			Response.json({
+				encoding: 'base64',
+				content: shorthandManifestBytes.toString('base64'),
+				size: shorthandManifestBytes.length,
+			}),
+		);
+		const fromShorthand = await resolveRemoteInput(parseInput(githubInput), githubInput, {
+			fetchImpl,
+		});
+		assert.equal(fromShorthand.status, 'licensed');
+		assert.equal(fromShorthand.identity.commit, commit);
+		responses.set(
+			`https://api.github.com/repos/example/widgets/git/trees/${tree}?recursive=1`,
+			githubTreeResponse(),
+		);
+		responses.set(
+			'https://api.github.com/repos/example/widgets/git/blobs/manifest',
+			Response.json({
+				encoding: 'base64',
+				content: sourceManifest,
+				size: Buffer.byteLength(JSON.stringify(manifest)),
+			}),
+		);
+
 		const tamperedManifest = Buffer.from(sourceManifestBytes);
 		tamperedManifest[0] ^= 1;
 		responses.set(
