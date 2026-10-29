@@ -1,0 +1,161 @@
+[
+  {
+    "id": "react-case-v1:4dfe9d8122d32d2bdb30",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreNative-test.js"],
+    "rationale": "Runs the pinned shim case against Octane, whose built-in hook replaces the React 16-17 userspace fallback.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:ea9ec574c18651aadb7b",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreNative-test.js"],
+    "rationale": "Runs the pinned shim case against Octane, whose built-in hook replaces the React 16-17 userspace fallback.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:1af9005f386e214b9c95",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:ed9c50190e3b2085dd2a",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:ef1a5a03e90eba813dc6",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:db96157f51b336e314bc",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:40cb0cdb675fae5718b6",
+    "classification": "inapplicable",
+    "rationale": "React gates this case with `@gate enableUseSyncExternalStoreShim`: it observes a legacy root between a synchronous render and its passive effects, which only the React 17 shim variant can do. The build-test configuration on React 18+ does not run it.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:d76e94c3098c790dc750",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:f4c3e9775075af6327fb",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:9e00734362096fac8b7f",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:150bad2ce41d37c321fa",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:8fbd3294cbf6f8ce284b",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:e300153ea2f9cd040ecd",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:8e43f4883750df5ff7b4",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:a73369e6a71614e6a4c3",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:e9f56c8bfa7737a4c533",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:395d8195007062e53883",
+    "classification": "implemented",
+    "localEvidence": [
+      "tests/upstream/useSyncExternalStoreShared-test.js",
+      "tests/conformance.test.ts"
+    ],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:c75fc76336e1a6b66f8d",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:a10d104c6e31a1965abd",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:2d1116918edc6c7795fb",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:b9258e4c605f4a2be1e1",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/useSyncExternalStoreShared-test.js"],
+    "rationale": "Runs the pinned case against Octane and this binding; the patch records any divergence.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  },
+  {
+    "id": "react-case-v1:94d8460706a840b15be3",
+    "classification": "implemented",
+    "localEvidence": [
+      "tests/upstream/useSyncExternalStoreShimServer-test.js",
+      "tests/conformance.test.ts"
+    ],
+    "rationale": "Runs the pinned shim case against Octane, whose built-in hook replaces the React 16-17 userspace fallback.",
+    "upstreamCommit": "1d34f91dfde6bba84d08b683aaba164c7194dacb"
+  }
+]

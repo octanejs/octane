@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**25 active pin(s) across 108 binding package(s).**
+**25 active pin(s) across 109 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -110,6 +110,7 @@ surface and evidence.
 | `@octanejs/tiptap` | 0 |
 | `@octanejs/to-print` | 0 |
 | `@octanejs/transition-group` | 0 |
+| `@octanejs/use-sync-external-store` | 0 |
 | `@octanejs/usehooks-ts` | 0 |
 | `@octanejs/valtio` | 0 |
 | `@octanejs/vaul` | 0 |

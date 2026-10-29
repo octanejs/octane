@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 2,
+  "project": "use-sync-external-store-adapted",
+  "roots": ["packages/use-sync-external-store/tests/upstream"],
+  "files": [
+    "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreNative-test.js",
+    "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js"
+  ],
+  "tests": [
+    {
+      "id": "runtime:0db587ce88b27185",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) handles errors thrown by getSnapshot"
+    },
+    {
+      "id": "runtime:1321d8568846c0c8",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) compares selection to rendered selection even if selector changes"
+    },
+    {
+      "id": "runtime:194b8479ad647fdd",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreNative-test.js",
+      "fullName": "useSyncExternalStore (userspace shim, server rendering) Using isEqual to bailout"
+    },
+    {
+      "id": "runtime:222a37e241fbd87c",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) selector and isEqual error handling in extra isEqual can throw on update"
+    },
+    {
+      "id": "runtime:25672a9582eaac62",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) Infinite loop if getSnapshot keeps returning new reference"
+    },
+    {
+      "id": "runtime:517a8f83410aba6c",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) mutating the store in between render and commit when getSnapshot has _not_ changed"
+    },
+    {
+      "id": "runtime:60a41de7c299204e",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreNative-test.js",
+      "fullName": "useSyncExternalStore (userspace shim, server rendering) native version"
+    },
+    {
+      "id": "runtime:62835039ae5236b3",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) switch to a different store"
+    },
+    {
+      "id": "runtime:813bea7ddaa04d60",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) does not bail out if the previous update hasn't finished yet"
+    },
+    {
+      "id": "runtime:86b396a8ef56ffed",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) mutating the store in between render and commit when getSnapshot has changed"
+    },
+    {
+      "id": "runtime:9cc3db9c4037b7a1",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) skips re-rendering if nothing changes"
+    },
+    {
+      "id": "runtime:af99467e762c6999",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) extra features implemented in user-space basic server hydration"
+    },
+    {
+      "id": "runtime:b2fdd42669fec3a9",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) selector and isEqual error handling in extra selector can throw on update"
+    },
+    {
+      "id": "runtime:cc617e81ba806047",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) getSnapshot can return NaN without infinite loop warning"
+    },
+    {
+      "id": "runtime:d16932cadbf9315c",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) basic usage"
+    },
+    {
+      "id": "runtime:dc2a7e6d66e07e22",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) regression test for #23150"
+    },
+    {
+      "id": "runtime:df9e910a276a3191",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) extra features implemented in user-space Using isEqual to bailout"
+    },
+    {
+      "id": "runtime:e389c9edbc4f6170",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) extra features implemented in user-space memoized selectors are only called once per update"
+    },
+    {
+      "id": "runtime:e3e67b9e598e158b",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) selecting a specific value inside getSnapshot"
+    },
+    {
+      "id": "runtime:f488c690661af431",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) uses the latest getSnapshot, even if it changed in the same batch as a store update"
+    }
+  ],
+  "skippedTests": [
+    {
+      "id": "runtime:dc0193cdda351118",
+      "file": "packages/use-sync-external-store/tests/upstream/useSyncExternalStoreShared-test.js",
+      "fullName": "Shared useSyncExternalStore behavior (shim and built-in) compares to current state before bailing out, even when there's a mutation in between the sync and passive effects",
+      "mode": "skip",
+      "rationale": "React gates this case with `@gate enableUseSyncExternalStoreShim`: it observes a legacy root between a synchronous render and its passive effects, which only the React 17 shim variant can do. The build-test configuration on React 18+ does not run it."
+    }
+  ]
+}

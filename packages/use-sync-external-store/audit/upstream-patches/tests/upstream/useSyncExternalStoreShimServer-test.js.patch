@@ -1,0 +1,22 @@
+diff --git a/tests/upstream/useSyncExternalStoreShimServer-test.js b/tests/upstream/useSyncExternalStoreShimServer-test.js
+--- a/tests/upstream/useSyncExternalStoreShimServer-test.js
++++ b/tests/upstream/useSyncExternalStoreShimServer-test.js
+@@ -91,10 +91,14 @@ describe('useSyncExternalStore (userspace shim, server rendering)', () => {
+       return <Text text={text} />;
+     }
+ 
+-    const html = ReactDOMServer.renderToString(<App />);
++    // OCTANE DIVERGENCE[built-in-shim]: Octane's server renderers return {html}, and
++    // only its static markup omits hydration ranges, as React's string does for plain text.
++    const {html} = ReactDOMServer.renderToStaticMarkup(<App />);
+ 
+-    // We don't call getServerSnapshot in the shim
+-    assertLog(['client']);
+-    expect(html).toEqual('client');
++    // OCTANE DIVERGENCE[built-in-shim]: the shim's userspace fallback serves React before 18.
++    // Octane always has the built-in hook, which renders getServerSnapshot on the server, as
++    // the published shim does on React 18 and later.
++    assertLog(['server']);
++    expect(html).toEqual('server');
+   });
+ });
