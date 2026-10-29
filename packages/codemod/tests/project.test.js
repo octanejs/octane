@@ -175,6 +175,9 @@ describe('runCodemod', () => {
 				"import 'react';\ndeclare module 'react' {\n\tinterface CSSProperties { [name: `--${string}`]: string }\n}\n",
 			'src/clock.d.ts':
 				"import 'react';\ndeclare module 'react' {\n\tnamespace JSX {\n\t\tinterface IntrinsicElements { 'x-clock': { time?: string } }\n\t}\n}\n",
+			// A script: no import or export at all.
+			'src/meter.d.ts':
+				"declare module 'react' {\n\tnamespace JSX {\n\t\tinterface IntrinsicElements { 'x-meter': { value?: number } }\n\t}\n}\n",
 			'src/Chart.tsx':
 				"import { Pack } from '@visx/hierarchy';\nimport { Markdown } from '@tanstack/markdown/react';\nimport { createServerFn } from '@tanstack/react-start';\nexport function Chart() {\n\treturn <Pack><Markdown /></Pack>;\n}\n",
 		});
@@ -192,6 +195,9 @@ describe('runCodemod', () => {
 		expect(css?.code.startsWith("export {};\ndeclare module 'react' {")).toBe(true);
 		expect(
 			code('src/clock.d.ts')?.startsWith("export {};\ndeclare module 'octane/jsx-runtime' {"),
+		).toBe(true);
+		expect(
+			code('src/meter.d.ts')?.startsWith("export {};\ndeclare module 'octane/jsx-runtime' {"),
 		).toBe(true);
 		expect(code('src/Chart.tsx')).toContain("from '@octanejs/visx/hierarchy'");
 		expect(code('src/Chart.tsx')).toContain("from '@octanejs/tanstack-start'");

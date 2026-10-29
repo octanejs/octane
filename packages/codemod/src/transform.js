@@ -600,6 +600,8 @@ class ModuleTransform {
 		this.changeSpreads = new Set();
 		/** @type {Set<ts.VariableDeclaration | ts.FunctionDeclaration>} Components to mark `descriptorChildren`. */
 		this.descriptorComponents = new Set();
+		/** Whether a `declare module` now augments `octane/jsx-runtime`. */
+		this.augments = false;
 		/** @type {ts.ImportDeclaration[]} Placeholder index -> import declaration. */
 		this.importSlots = [];
 		this.hasJsx = false;
@@ -771,7 +773,17 @@ class ModuleTransform {
 	 * @param {ts.Expression} expression
 	 */
 	planDescriptorChildren(expression) {
-		const component = this.childrenOwner(skipParens(expression));
+		let value = expression;
+		while (
+			ts.isParenthesizedExpression(value) ||
+			ts.isAsExpression(value) ||
+			ts.isSatisfiesExpression(value) ||
+			ts.isNonNullExpression(value) ||
+			ts.isTypeAssertionExpression(value)
+		) {
+			value = value.expression;
+		}
+		const component = this.childrenOwner(value);
 		if (!component) return;
 		// `memo(…)` and `forwardRef(…)` wrap it; the declaration holds the call.
 		let holder = component.parent;
@@ -1331,6 +1343,7 @@ class ModuleTransform {
 			statements.every((s) => ts.isModuleDeclaration(s) && s.name.getText(this.sf) === 'JSX')
 		) {
 			this.count(RULE.import);
+			this.augments = true;
 			return this.replaceSpecifier(node, specifier, 'octane/jsx-runtime');
 		}
 		this.note(
@@ -1478,15 +1491,22 @@ class ModuleTransform {
 		for (const [module, specs] of kept)
 			lines.push(`import { ${specs.join(', ')} } from ${quote(module)};`);
 
+		// In a script, `declare module` declares the module instead of adding to
+		// it: a module whose only import was `import 'react'` stays a module, and
+		// a script with a retargeted augmentation becomes one.
+		if (
+			lines.length === 0 &&
+			(this.importSlots.length > 0 || this.augments) &&
+			!this.otherModuleSyntax()
+		) {
+			lines.push('export {};');
+		}
 		if (this.importSlots.length === 0) {
 			if (lines.length === 0) return code;
 			const at = this.insertionPoint(code);
 			return code.slice(0, at) + lines.join('\n') + '\n' + code.slice(at);
 		}
 		this.count(RULE.import);
-		// A module whose only import was `import 'react'` stays a module, or its
-		// `declare module` would declare the module instead of augmenting it.
-		if (lines.length === 0 && !this.otherModuleSyntax()) lines.push('export {};');
 		return code.replace(/\u0000IMPORT(\d+)\u0000(\r?\n)?/g, (_, index, newline) =>
 			index === '0' && lines.length > 0 ? lines.join('\n') + (newline ?? '') : '',
 		);

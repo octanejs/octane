@@ -232,6 +232,18 @@ describe('transformModule', () => {
 			'<div><Tip>{c ? <span /> : <a href="#" />}</Tip>@if (c) { <b /> } @else { <i /> }</div>',
 		);
 		expect(compileErrors(tip.code, 'tip.tsrx')).toEqual([]);
+		// Through a type assertion too.
+		for (const read of [
+			'children as React.ReactElement',
+			'children!',
+			'(children satisfies object)',
+		]) {
+			expect(
+				migrate(
+					`const Tip = ({ children }: { children?: React.ReactNode }) => <Trigger render={${read}} />;\nfunction Trigger(_: { render: unknown }) {\n\treturn null;\n}\n`,
+				).code,
+			).toContain('const Tip = descriptorChildren(');
+		}
 		// A declaration becomes a marked `const`, unless the module reads it before.
 		const slot =
 			"import { Children, cloneElement } from 'react';\nexport function Slot(props: { children: React.ReactElement }) {\n\treturn cloneElement(Children.only(props.children), { id: 's' });\n}\n";
