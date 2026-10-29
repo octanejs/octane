@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
+	createElement,
+	createRoot,
+	flushSync,
 	useState,
 	useReducer,
 	useEffect,
@@ -73,5 +76,47 @@ describe('slot ergonomics — public signature hides the compiler-injected slot'
 			}),
 		).toThrow(failure);
 		expect(() => useCallback(() => 0, [])).toThrow(/useCallback was called without a hook slot/);
+	});
+});
+
+// Compiled code always supplies the slot, so a slotted hook that finds no
+// rendering component was called outside a render, or by a second copy of the
+// runtime that is not the one rendering (octanejs/octane#2287).
+describe('missing hook owner — a slotted hook with no rendering component', () => {
+	it('explains a hook called outside a component render', () => {
+		expect(() => useState(0, Symbol('outside-render'))).toThrow(
+			/A hook was called outside a component render/,
+		);
+	});
+
+	it('explains a custom hook whose path supplies the slot outside a component render', () => {
+		expect(() => withSlot(Symbol('custom-hook'), () => useState(0))).toThrow(
+			/A hook was called outside a component render/,
+		);
+	});
+
+	it('points at a second copy of Octane when that copy runs the hook during a render', async () => {
+		vi.resetModules();
+		const other = (await import('../src/index.js')) as typeof import('../src/index.js');
+		expect(other.useState).not.toBe(useState);
+		const slot = Symbol('second-runtime');
+		function Widget() {
+			const [value] = other.useState('ready', slot);
+			return createElement('span', null, value);
+		}
+		const errors: unknown[] = [];
+		const container = document.createElement('div');
+		const root = createRoot(container, { onUncaughtError: (error) => errors.push(error) });
+		try {
+			flushSync(() => root.render(Widget, {}));
+			expect(container.textContent).toBe('');
+			expect(errors).toHaveLength(1);
+			const message = (errors[0] as Error).message;
+			expect(message).toMatch(/A hook was called outside a component render/);
+			expect(message).toMatch(/more than one copy of Octane/);
+			expect(message).toMatch(/octane\/internal\/client/);
+		} finally {
+			root.unmount();
+		}
 	});
 });

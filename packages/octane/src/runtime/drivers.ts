@@ -74,6 +74,7 @@ import {
 	drainRegisteredPassiveUnmounts,
 } from './effects.js';
 import {
+	checkHookOwner,
 	ensureHooks,
 	registerHookCleanup,
 	missingSlot,
@@ -154,6 +155,12 @@ import {
 	maybeEnqueueRestore,
 } from './forms.js';
 import { installRootRollback } from '../rollback-flag.js';
+
+// The consumer's bundler substitutes the whole Node environment expression below,
+// so the source guard must stay written out literally. Declared module-locally — never
+// `declare global`, which would ship in the tarball — so this file type-checks in
+// a browser app that has no `@types/node`.
+declare const process: { env: { NODE_ENV?: string } };
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -328,7 +335,10 @@ export function installEffectDrivers(): void {
 export let NATIVE_READ_DRIVER: NativeReadDriver | null = null;
 // Until withSlot first runs, the private path stack is empty. Direct component
 // hooks use their own slot; only custom-hook callers retain path composition.
-export let resolveSlot = (slot: HookSlot | undefined): HookSlot | undefined => slot;
+export let resolveSlot = (slot: HookSlot | undefined): HookSlot | undefined => {
+	if (process.env.NODE_ENV !== 'production' && slot !== undefined) checkHookOwner();
+	return slot;
+};
 // Only controlled bindings install event restoration. Keeping its concrete
 // entry points at that owner lets event-only applications drop the restore
 // graph without adding a wrapper call to dispatch. Read the live capability:
