@@ -36,8 +36,10 @@ import {
 	builders as b,
 	createStyleClassMapFromStylesheet,
 	clone_ast_node as cloneAstNode,
+	DIAGNOSTIC_CODES,
 	getCommentHandlers,
 	strongHash,
+	TSRX_ERRORS,
 	withDeferredImports,
 } from '@tsrx/core';
 import { parseModule } from '#octane/compiler-parser';
@@ -981,11 +983,12 @@ function rejectVoidElementContent(tag, node, ctx) {
 	)
 		offending = true;
 	if (!offending) return;
-	const l = node.loc && node.loc.start;
-	const at = l ? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})` : '';
-	throw new Error(
+	throw sourceError(
+		'OCTANE_VOID_ELEMENT_CONTENT',
+		ctx,
+		node,
 		`\`<${tag}>\` is a void element tag and must neither have children nor use ` +
-			`\`dangerouslySetInnerHTML\`.${at}`,
+			`\`dangerouslySetInnerHTML\`.`,
 	);
 }
 
@@ -1187,11 +1190,12 @@ function rejectTextareaValueChildren(tag, node, ctx) {
 		break;
 	}
 	if (!offending) return;
-	const l = node.loc && node.loc.start;
-	const at = l ? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})` : '';
-	throw new Error(
+	throw sourceError(
+		'OCTANE_TEXTAREA_CHILDREN',
+		ctx,
+		node,
 		'`<textarea>` must not have children when it uses `value` or `defaultValue` — ' +
-			`the prop owns the content. Move the text into the prop.${at}`,
+			'the prop owns the content. Move the text into the prop.',
 	);
 }
 
@@ -1225,14 +1229,13 @@ function textareaTextParts(tag, ns, children, ctx) {
 				element.type === 'JSXElement' || (element.type === 'Element' && !isComponentTag(element))
 					? `\`<${jsxTagName(element) || elementTagName(element)}>\``
 					: (TEXTAREA_CHILD_KINDS[child.type] ?? 'a non-text child');
-			const l = (element.loc ?? child.expression?.loc)?.start;
-			const at = l
-				? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})`
-				: '';
-			throw new Error(
+			throw sourceError(
+				'OCTANE_TEXTAREA_CHILDREN',
+				ctx,
+				element.loc ? element : child.expression,
 				`\`<textarea>\` children must be text, but it contains ${kind}. A textarea's content ` +
 					'is its default value and the HTML parser keeps markup inside it as literal ' +
-					`text: move the markup outside the textarea, or pass a string expression.${at}`,
+					'text: move the markup outside the textarea, or pass a string expression.',
 			);
 		}
 		// Authored binding views address each hole by its own marker range.
@@ -1524,11 +1527,12 @@ function rejectDangerouslySetInnerHTMLChildren(tag, node, ctx) {
 	)
 		return;
 
-	const loc = node.loc?.start;
-	const at = loc
-		? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${loc.line}:${loc.column})`
-		: '';
-	throw new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.' + at);
+	throw sourceError(
+		'OCTANE_INNER_HTML_WITH_CHILDREN',
+		ctx,
+		node,
+		'Can only set one of `children` or `props.dangerouslySetInnerHTML`.',
+	);
 }
 
 // This is a compiler option, not a DOM prop or a runtime execution switch.
@@ -1551,7 +1555,10 @@ function scriptExecutionOption(
 						(property.key.name ?? property.key.value) === '__executeOnMount',
 				))
 		) {
-			throw new Error('__executeOnMount must be a direct attribute, not a spread property.');
+			throw codedError(
+				'OCTANE_EXECUTE_ON_MOUNT',
+				'__executeOnMount must be a direct attribute, not a spread property.',
+			);
 		}
 		if (
 			(attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') ||
@@ -1562,10 +1569,6 @@ function scriptExecutionOption(
 			attr.value?.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value,
 		);
 		const tag = elementTagName(node) || jsxTagName(node);
-		const loc = attr.loc?.start;
-		const at = loc
-			? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${loc.line}:${loc.column})`
-			: '';
 		if (
 			tag !== 'script' ||
 			(value != null &&
@@ -1574,8 +1577,11 @@ function scriptExecutionOption(
 					typeof value.value === 'boolean'
 				))
 		) {
-			throw new Error(
-				'__executeOnMount requires a static boolean on a native <script> template.' + at,
+			throw sourceError(
+				'OCTANE_EXECUTE_ON_MOUNT',
+				ctx,
+				attr,
+				'__executeOnMount requires a static boolean on a native <script> template.',
 			);
 		}
 		execute = value == null || value.value;
@@ -10086,13 +10092,11 @@ function arrowComponentToFunctionDecl(varDecl, preserveTypes = false) {
 	if (init.id && init.id.name !== d.id.name) {
 		const binding = d.id.name;
 		const self = init.id.name;
-		const body = aliasComponentOwnName(
-			init,
-			binding,
-			(where) =>
-				new Error(
-					`Component \`${binding}\` refers to itself as \`${self}\` ${where}, but only its function expression binds \`${self}\`. Rename the function expression to \`${binding}\` and refer to the component by that name.`,
-				),
+		const body = aliasComponentOwnName(init, binding, (where) =>
+			codedError(
+				'OCTANE_COMPONENT_SELF_REFERENCE',
+				`Component \`${binding}\` refers to itself as \`${self}\` ${where}, but only its function expression binds \`${self}\`. Rename the function expression to \`${binding}\` and refer to the component by that name.`,
+			),
 		);
 		if (body !== init.body) fn = { ...init, body };
 	}
@@ -10330,13 +10334,11 @@ function bindDefaultComponent(ast) {
 			{ usedCompilerNames: collectIdentifierNames(ast), compilerNameSuffixes: null },
 			self,
 		);
-		const block = aliasComponentOwnName(
-			component,
-			name,
-			(where) =>
-				new Error(
-					`Component \`${self}\` refers to itself by name ${where}, but its module also declares \`${self}\`. Rename the component's function expression.`,
-				),
+		const block = aliasComponentOwnName(component, name, (where) =>
+			codedError(
+				'OCTANE_COMPONENT_SELF_REFERENCE',
+				`Component \`${self}\` refers to itself by name ${where}, but its module also declares \`${self}\`. Rename the component's function expression.`,
+			),
 		);
 		declaration = { ...component, id: b.id(name), body: block };
 	}
@@ -10609,7 +10611,8 @@ function validateServerModuleIsolation(ast, declaration, filename) {
 	const free = collectFreeIdentifiers(declaration.body, serverBindings);
 	const captures = [...free].filter((name) => outerBindings.has(name)).sort();
 	if (captures.length > 0) {
-		throw new Error(
+		throw codedError(
+			'OCTANE_SERVER_MODULE_CAPTURE',
 			`\`module server\` cannot reference client-module bindings (${captures.join(', ')}) in ${filename}; declare or import them inside the server block.`,
 		);
 	}
@@ -10622,7 +10625,10 @@ function assertServerModulesAreTopLevel(ast, filename) {
 		if (node === null || typeof node !== 'object' || seen.has(node)) return;
 		seen.add(node);
 		if (isServerModuleDeclaration(node) && !topLevel.has(node)) {
-			throw new Error(`\`module server\` can only be declared at module level (${filename}).`);
+			throw codedError(
+				'OCTANE_SERVER_MODULE_DECLARATION',
+				`\`module server\` can only be declared at module level (${filename}).`,
+			);
 		}
 		for (const [key, value] of Object.entries(node)) {
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
@@ -10651,12 +10657,14 @@ function analyzeServerModule(ast, filename) {
 		if (isServerModuleDeclaration(node)) {
 			const name = identifierName(node.id);
 			if (name !== 'server') {
-				throw new Error(
+				throw codedError(
+					'OCTANE_SERVER_MODULE_DECLARATION',
 					`Octane only supports \`module server\` submodules, found \`module ${name ?? '<unknown>'}\` in ${filename}.`,
 				);
 			}
 			if (declaration !== null) {
-				throw new Error(
+				throw codedError(
+					'OCTANE_SERVER_MODULE_DECLARATION',
 					`Only one \`module server\` declaration is allowed per file (${filename}).`,
 				);
 			}
@@ -10669,7 +10677,10 @@ function analyzeServerModule(ast, filename) {
 			);
 			for (const specifier of valueSpecifiers) {
 				if (specifier.type !== 'ImportSpecifier') {
-					throw new Error('Only named imports are supported from `module server`.');
+					throw codedError(
+						'OCTANE_SERVER_MODULE_IMPORT',
+						'Only named imports are supported from `module server`.',
+					);
 				}
 			}
 			if (valueSpecifiers.length > 0) imports.push(node);
@@ -10678,7 +10689,8 @@ function analyzeServerModule(ast, filename) {
 
 	if (declaration === null) {
 		if (imports.length > 0) {
-			throw new Error(
+			throw codedError(
+				'OCTANE_SERVER_MODULE_IMPORT',
 				`Cannot import from \`server\` because ${filename} has no \`module server\` declaration.`,
 			);
 		}
@@ -10692,14 +10704,23 @@ function analyzeServerModule(ast, filename) {
 	const contextImports = serverContextTypeImports(statements);
 	for (const statement of statements) {
 		if (statement.type === 'ExportDefaultDeclaration') {
-			throw new Error('`module server` does not support default exports; use named functions.');
+			throw codedError(
+				'OCTANE_SERVER_MODULE_EXPORT',
+				'`module server` does not support default exports; use named functions.',
+			);
 		}
 		if (statement.type === 'ExportAllDeclaration') {
-			throw new Error('`module server` does not support export-all declarations.');
+			throw codedError(
+				'OCTANE_SERVER_MODULE_EXPORT',
+				'`module server` does not support export-all declarations.',
+			);
 		}
 		if (statement.type !== 'ExportNamedDeclaration' || statement.exportKind === 'type') continue;
 		if (statement.source) {
-			throw new Error('`module server` does not support re-exports from another module.');
+			throw codedError(
+				'OCTANE_SERVER_MODULE_EXPORT',
+				'`module server` does not support re-exports from another module.',
+			);
 		}
 
 		const decl = statement.declaration;
@@ -10709,17 +10730,24 @@ function analyzeServerModule(ast, filename) {
 			} else if (decl.type === 'VariableDeclaration') {
 				for (const item of decl.declarations || []) {
 					if (item.id?.type !== 'Identifier') {
-						throw new Error('`module server` exported variables must use identifier bindings.');
+						throw codedError(
+							'OCTANE_SERVER_MODULE_EXPORT',
+							'`module server` exported variables must use identifier bindings.',
+						);
 					}
 					if (!functionBindings.has(item.id.name)) {
-						throw new Error(
+						throw codedError(
+							'OCTANE_SERVER_MODULE_EXPORT',
 							'`module server` exported variables must be initialized with a function.',
 						);
 					}
 					exports.set(item.id.name, item.id.name);
 				}
 			} else if (!isTypeOnlyStatement(decl)) {
-				throw new Error('`module server` exports must be functions or function-valued variables.');
+				throw codedError(
+					'OCTANE_SERVER_MODULE_EXPORT',
+					'`module server` exports must be functions or function-valued variables.',
+				);
 			}
 		}
 
@@ -10729,7 +10757,10 @@ function analyzeServerModule(ast, filename) {
 			const exported = identifierName(specifier.exported);
 			if (local && exported) {
 				if (!functionBindings.has(local)) {
-					throw new Error('`module server` export specifiers must reference local functions.');
+					throw codedError(
+						'OCTANE_SERVER_MODULE_EXPORT',
+						'`module server` export specifiers must reference local functions.',
+					);
 				}
 				exports.set(exported, local);
 			}
@@ -10741,7 +10772,10 @@ function analyzeServerModule(ast, filename) {
 			if (specifier.importKind === 'type') continue;
 			const imported = identifierName(specifier.imported);
 			if (imported !== null && !exports.has(imported)) {
-				throw new Error(`Module \`server\` does not export \`${imported}\` in ${filename}.`);
+				throw codedError(
+					'OCTANE_SERVER_MODULE_IMPORT',
+					`Module \`server\` does not export \`${imported}\` in ${filename}.`,
+				);
 			}
 		}
 	}
@@ -11775,7 +11809,8 @@ function markKnownAttributeSpreads(ast, contracts) {
 								other.type === 'SpreadAttribute' ||
 								fields.has(identity(jsxAttrRawName(other)))))
 					)
-						throw new Error(
+						throw codedError(
+							'OCTANE_NATIVE_PROJECTION_CONFLICT',
 							'Native JSX signal projections cannot overlap other writers for their fields or an unknown spread.',
 						);
 				}
@@ -11809,7 +11844,8 @@ function expandKnownAttributeSpreads(attributes) {
 				(other) => other !== attr && ['class', 'className'].includes(jsxAttrRawName(other)),
 			)
 		) {
-			throw new Error(
+			throw codedError(
+				'OCTANE_NATIVE_PROJECTION_CONFLICT',
 				'A reactive native attribute projection cannot share its class with scoped or authored classes. Compose classes in the projection.',
 			);
 		}
@@ -11948,7 +11984,10 @@ function prepareAuthoredAst(source, cleanFilename, options) {
 					scriptExecutionOption(node, { mapSourceName: cleanFilename }) &&
 					(options?.renderer?.target ?? 'dom') !== 'dom'
 				) {
-					throw new Error('__executeOnMount requires the DOM template renderer.');
+					throw codedError(
+						'OCTANE_EXECUTE_ON_MOUNT',
+						'__executeOnMount requires the DOM template renderer.',
+					);
 				}
 			}
 			return null;
@@ -12201,7 +12240,8 @@ function compileInternal(
 	if (options?.renderer?.target === 'valdi') {
 		const renderer = options.renderer;
 		if (mode !== 'client') {
-			throw new Error(
+			throw codedError(
+				'OCTANE_RENDERER_SERVER_UNSUPPORTED',
 				`Renderer ${JSON.stringify(renderer.id)} does not provide the serialization/hydration capability required by server compilation.`,
 			);
 		}
@@ -12294,7 +12334,8 @@ function compileInternal(
 	}
 	if (mode === 'server') {
 		if (options?.renderer?.target === 'universal') {
-			throw new Error(
+			throw codedError(
+				'OCTANE_RENDERER_SERVER_UNSUPPORTED',
 				`Renderer ${JSON.stringify(options.renderer.id)} does not provide the serialization/hydration capability required by server compilation.`,
 			);
 		}
@@ -14606,14 +14647,16 @@ function compileServer(
 // synchronous code with no diagnostic — the worst failure mode. Fail loudly.
 function rejectAsyncOrGenerator(node, name) {
 	if (node.async) {
-		throw new Error(
+		throw codedError(
+			'OCTANE_COMPONENT_FUNCTION_KIND',
 			`Component \`${name}\` is declared \`async\`, which the octane target does not support. ` +
 				`Load async data with \`use(promise)\` inside a \`@try\` / \`@pending\` boundary instead of ` +
 				`awaiting in the component body.`,
 		);
 	}
 	if (node.generator) {
-		throw new Error(
+		throw codedError(
+			'OCTANE_COMPONENT_FUNCTION_KIND',
 			`Component \`${name}\` is declared as a generator (\`function*\`), which the octane ` +
 				`target does not support.`,
 		);
@@ -15740,7 +15783,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// the inherited ns — svg subtrees would never enter the svg namespace).
 	const selfNs = nsForSelf(tag, parentNs);
 	if (scriptExecutionOption(node, ctx) && selfNs !== 'html' && selfNs !== 'opaque') {
-		throw new Error('__executeOnMount requires an HTML <script> template.');
+		throw codedError(
+			'OCTANE_EXECUTE_ON_MOUNT',
+			'__executeOnMount requires an HTML <script> template.',
+		);
 	}
 	const childNs = nsForChildren(tag, selfNs);
 	// The static namespace walk starts each independently compiled component in
@@ -15829,7 +15875,8 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		const site = firstSpreadIdx === -1 ? directSignalSite(ctx, node, 'input') : hostSignalSite;
 		if (directSignalControlSite === null) {
 			if (directAttributeIdentities.has('data-octane-input')) {
-				throw new Error(
+				throw codedError(
+					'OCTANE_RESERVED_ATTRIBUTE',
 					'`data-octane-input` is reserved for compiler-owned writable signal controls.',
 				);
 			}
@@ -15846,7 +15893,8 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		directSignalControlValues = true;
 		directSignalControlSite = hostSignalSite;
 		if (directAttributeIdentities.has('data-octane-input')) {
-			throw new Error(
+			throw codedError(
+				'OCTANE_RESERVED_ATTRIBUTE',
 				'`data-octane-input` is reserved for compiler-owned writable signal controls.',
 			);
 		}
@@ -16384,7 +16432,8 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 
 		if (attrName === 'style') {
 			if (!ctx.nativeReads && isDirectSignalHandleExpression(inner)) {
-				throw new Error(
+				throw codedError(
+					'OCTANE_SIGNAL_STYLE_OBJECT',
 					'Direct signal style objects cannot install property-targeted bindings. ' +
 						'Use fixed style properties such as `style={{ color: color$ }}`, or use `.get()` ' +
 						'for a one-way whole-style value.',
@@ -19649,7 +19698,10 @@ function universalRuntimeUnitForTopLevelNode(node, ctx) {
 		const candidate = ctx._universalRuntimeUnitsByBinding?.get(name);
 		if (candidate === undefined) continue;
 		if (unit !== undefined && unit !== candidate) {
-			throw new Error(`Top-level declaration mixes universal renderer specializations: ${names}.`);
+			throw codedError(
+				'OCTANE_UNIVERSAL_SPECIALIZATION_MIX',
+				`Top-level declaration mixes universal renderer specializations: ${names}.`,
+			);
 		}
 		unit = candidate;
 	}
@@ -22149,7 +22201,8 @@ function rejectHookInJsLoop(loop, ctx, componentName) {
 			const at = l
 				? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})`
 				: '';
-			throw new Error(
+			throw codedError(
+				'OCTANE_HOOK_IN_LOOP',
 				`\`${hook}\` is called inside a \`${JS_LOOP_WORD[loop.type]}\` loop in ${componentName}. ` +
 					`Hooks are keyed by call site, so every iteration would share this call site's ONE ` +
 					`hook slot — state, memo, and effect entries would silently collide across ` +
@@ -25364,7 +25417,8 @@ function lowerSetupValueDirectives(node, lowerDirective) {
 /** @param {{ type: keyof typeof DIRECTIVE_KEYWORDS }} node */
 function rejectUnownedValueDirective(node) {
 	const keyword = DIRECTIVE_KEYWORDS[node.type] ?? 'directive';
-	throw new Error(
+	throw codedError(
+		'OCTANE_MODULE_CALLBACK_DIRECTIVE',
 		`\`${keyword}\` is not supported inside a module-level callback. Its arms are hoisted, so anything they read ` +
 			`from the callback has to be threaded in from the call site, and that channel is built per component — a ` +
 			`module-level callback has no component to build it against. Move the callback inside the component that ` +
@@ -26281,7 +26335,8 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 		rejectDangerouslySetInnerHTMLChildren(compNode.value, node, ctx);
 	}
 	if (!componentTag && scriptExecutionOption(node, ctx)) {
-		throw new Error(
+		throw codedError(
+			'OCTANE_EXECUTE_ON_MOUNT',
 			'__executeOnMount requires a native <script> in an owned template, not a JSX value.',
 		);
 	}
@@ -26296,7 +26351,8 @@ function jsxElementToCreateElement(node, ctx, eagerRoot = false) {
 			attr.type !== 'JSXSpreadAttribute' &&
 			attr.type !== 'SpreadAttribute'
 		)
-			throw new Error(
+			throw codedError(
+				'OCTANE_NATIVE_ATTRIBUTE_SHORTHAND',
 				'Native JSX attribute shorthands are not supported in descriptor-backed JSX values; use an owned template element.',
 			);
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
@@ -27203,7 +27259,8 @@ function headAttrsExpression(el) {
 			a.type !== 'JSXSpreadAttribute' &&
 			a.type !== 'SpreadAttribute'
 		)
-			throw new Error(
+			throw codedError(
+				'OCTANE_NATIVE_ATTRIBUTE_SHORTHAND',
 				'Native JSX attribute shorthands are not supported on hoisted head elements.',
 			);
 		if (a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute') {
@@ -27441,7 +27498,8 @@ function declareBareForBindings(ast, source, filename) {
 		if (target !== null) {
 			const l = target.loc?.start;
 			const at = l ? ` (${filename.split(/[\\/]/).pop()}:${l.line}:${l.column})` : '';
-			throw new Error(
+			throw codedError(
+				'OCTANE_FOR_ITEM_BINDING',
 				`A \`@for\` header declares each row's own item binding, so it cannot assign the ` +
 					`item to \`${source.slice(target.start, target.end)}\`. Bind a name or a ` +
 					`destructuring pattern instead: \`@for (item of items)\` or ` +
@@ -33900,7 +33958,10 @@ function emitElementHtml(
 	const childNs = nsForChildren(tag, parentNs);
 	if (scriptExecutionOption(node, ctx)) {
 		if (hostNs !== 'html' && hostNs !== 'opaque') {
-			throw new Error('__executeOnMount requires an HTML <script> template.');
+			throw codedError(
+				'OCTANE_EXECUTE_ON_MOUNT',
+				'__executeOnMount requires an HTML <script> template.',
+			);
 		}
 		scriptPaths.push(path);
 	}
@@ -34013,7 +34074,8 @@ function emitElementHtml(
 	const ensureDirectControlSite = (site) => {
 		if (directSignalControlSite !== null) return;
 		if (directPropNames.has('data-octane-input')) {
-			throw new Error(
+			throw codedError(
+				'OCTANE_RESERVED_ATTRIBUTE',
 				'`data-octane-input` is reserved for compiler-owned writable signal controls.',
 			);
 		}
@@ -34100,11 +34162,7 @@ function emitElementHtml(
 		if (resolveHostPropsAcrossSources) {
 			if (rawAttrName === 'ref') {
 				if (sawRef) {
-					throw new Error(
-						'Element has multiple `ref={…}` attributes; an element may have ' +
-							'at most one. Use a single array-valued ref to attach multiple, ' +
-							'e.g. `ref={[a, b]}` (attachRef in the runtime iterates the array).',
-					);
+					throw codedError(TSRX_ERRORS.MULTIPLE_REFS.code, TSRX_ERRORS.MULTIPLE_REFS.message);
 				}
 				sawRef = true;
 			}
@@ -34262,11 +34320,7 @@ function emitElementHtml(
 		// form expresses the same intent unambiguously.
 		if (attrName === 'ref' && val) {
 			if (sawRef) {
-				throw new Error(
-					'Element has multiple `ref={…}` attributes; an element may have ' +
-						'at most one. Use a single array-valued ref to attach multiple, ' +
-						'e.g. `ref={[a, b]}` (attachRef in the runtime iterates the array).',
-				);
+				throw codedError(TSRX_ERRORS.MULTIPLE_REFS.code, TSRX_ERRORS.MULTIPLE_REFS.message);
 			}
 			sawRef = true;
 			const refInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
@@ -34404,7 +34458,8 @@ function emitElementHtml(
 		// literal prefix plus dynamic suffix can avoid a whole-object diff.
 		if (attrName === 'style') {
 			if (!ctx.nativeReads && isDirectSignalHandleExpression(inner)) {
-				throw new Error(
+				throw codedError(
+					'OCTANE_SIGNAL_STYLE_OBJECT',
 					'Direct signal style objects cannot install property-targeted bindings. ' +
 						'Use fixed style properties such as `style={{ color: color$ }}`, or use `.get()` ' +
 						'for a one-way whole-style value.',
@@ -37669,15 +37724,14 @@ function forRowKeyAttribute(node, ctx) {
 		if (child.type === 'Identifier' && isIdentifierReference(child, parent, key, lexical)) {
 			const binding = lexical.resolveBinding(lexical.nodeScopes.get(child) ?? rowScope, child.name);
 			if (binding?.scope === rowScope || binding?.scope === lexical.rootScope) {
-				const l = attribute.loc && attribute.loc.start;
-				const at = l
-					? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})`
-					: '';
-				throw new Error(
+				throw sourceError(
+					'OCTANE_FOR_KEY_BODY_BINDING',
+					ctx,
+					attribute,
 					`The \`key\` attribute on this \`@for\` row reads \`${child.name}\`, which is declared ` +
 						'inside the loop body. Row keys are computed before the body runs, so they can only ' +
 						'read the item, its `index` binding, and names from outside the loop. Derive the key ' +
-						`from the item in the loop header instead: \`@for (const item of items; key …)\`.${at}`,
+						'from the item in the loop header instead: `@for (const item of items; key …)`.',
 				);
 			}
 		}
@@ -37731,7 +37785,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// can't make it silently lower to a plain synchronous loop, dropping the
 	// `await` with no diagnostic.
 	if (node.await) {
-		throw new Error(
+		throw codedError(
+			DIAGNOSTIC_CODES.TARGET_FOR_AWAIT_UNSUPPORTED,
 			'`@for await (...)` (async iteration) is not supported by the octane target. ' +
 				'Use a synchronous `@for` over a materialized array, or resolve async data with ' +
 				'`use(promise)` first.',
@@ -38697,10 +38752,10 @@ function replaceArmExits(node, loop, breakable, ctx, exit) {
 	const jump = armJump(node, loop, breakable);
 	if (jump === 'exit') return exit(node);
 	if (jump === 'value') {
-		throw armExitError(ctx, node, ARM_VALUE_RETURN_MESSAGE);
+		throw sourceError('OCTANE_ARM_VALUE_RETURN', ctx, node, ARM_VALUE_RETURN_MESSAGE);
 	}
 	if (jump === 'break') {
-		throw armExitError(ctx, node, ARM_BREAK_MESSAGE);
+		throw sourceError('OCTANE_ARM_BREAK', ctx, node, ARM_BREAK_MESSAGE);
 	}
 	const innerLoop = loop || LOOP_TYPES.has(type);
 	const innerBreakable = breakable || innerLoop || type === 'SwitchStatement';
@@ -38759,10 +38814,21 @@ function isArmJumpBoundary(type) {
 	);
 }
 
-function armExitError(ctx, node, message) {
-	const l = node.loc && node.loc.start;
+/**
+ * A compile error with the `code` of its mistake: Octane's own `OCTANE_*` code
+ * for a mistake only Octane reports, or core's (`TSRX_ERRORS`,
+ * `DIAGNOSTIC_CODES`) for one `@tsrx/core` also reports, so both report it the
+ * same way.
+ */
+function codedError(code, message) {
+	return Object.assign(new Error(message), { code });
+}
+
+/** A {@link codedError} that ends with the location of `node` in the source. */
+function sourceError(code, ctx, node, message) {
+	const l = node?.loc?.start;
 	const at = l ? ` (${ctx.mapSourceName ? ctx.mapSourceName + ':' : ''}${l.line}:${l.column})` : '';
-	return new Error(message + at);
+	return codedError(code, message + at);
 }
 
 /**

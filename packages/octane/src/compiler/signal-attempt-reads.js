@@ -200,9 +200,12 @@ function transformAttempt(callback, reader, helpers, imports) {
 			(call.arguments ?? []).some(directSignal) &&
 			!(call.arguments ?? []).some(passesReader)
 		) {
-			throw new Error(
-				`Post-await signal read through opaque helper \`${callee}\` cannot be proven attempt-bound. ` +
-					'Pass the derived context `read` function explicitly, or move the direct `.get()` into the compiled callback.',
+			throw Object.assign(
+				new Error(
+					`Post-await signal read through opaque helper \`${callee}\` cannot be proven attempt-bound. ` +
+						'Pass the derived context `read` function explicitly, or move the direct `.get()` into the compiled callback.',
+				),
+				{ code: 'OCTANE_SIGNAL_ATTEMPT_READ' },
 			);
 		}
 	};
@@ -242,9 +245,12 @@ function transformAttempt(callback, reader, helpers, imports) {
 								(helper.parameter === 0 && helper.params.length === 1))
 						)
 							return { node: awaitedRead(handle, node), deferred: true };
-						throw new Error(
-							`Post-await signal helper \`${node.callee.name}\` cannot be proven safe to inline. ` +
-								'Pass the derived context `read` function explicitly.',
+						throw Object.assign(
+							new Error(
+								`Post-await signal helper \`${node.callee.name}\` cannot be proven safe to inline. ` +
+									'Pass the derived context `read` function explicitly.',
+							),
+							{ code: 'OCTANE_SIGNAL_ATTEMPT_READ' },
 						);
 					}
 				}

@@ -108,8 +108,11 @@ export function serverFunctionContextIndex(fn, imports, filename) {
 		if (parameter.type === 'AssignmentPattern') parameter = parameter.left;
 		if (!serverContextTypeName(parameter.typeAnnotation, imports)) continue;
 		if (index !== params.length - 1) {
-			throw new Error(
-				`ServerCallContext must be the final parameter of a \`module server\` function (${filename}).`,
+			throw Object.assign(
+				new Error(
+					`ServerCallContext must be the final parameter of a \`module server\` function (${filename}).`,
+				),
+				{ code: 'OCTANE_SERVER_CALL_CONTEXT' },
 			);
 		}
 		contextIndex = index;

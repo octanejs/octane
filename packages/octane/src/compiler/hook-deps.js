@@ -2023,8 +2023,11 @@ function analyzeInternal(ast, options) {
 			if (dependencies === null) {
 				const loc = candidate.call.loc?.start;
 				const at = loc ? ` at ${options.filename || 'source'}:${loc.line}:${loc.column}` : '';
-				throw new Error(
-					`Cannot infer dependencies for ${candidate.name}${at}: the callback must be an inline function or a stable reference. Pass an explicit dependency array, or \`null\` to run on every render.`,
+				throw Object.assign(
+					new Error(
+						`Cannot infer dependencies for ${candidate.name}${at}: the callback must be an inline function or a stable reference. Pass an explicit dependency array, or \`null\` to run on every render.`,
+					),
+					{ code: 'OCTANE_HOOK_DEPENDENCIES_UNINFERABLE' },
 				);
 			}
 		}

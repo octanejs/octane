@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { compile } from 'octane/compiler';
+import { DIAGNOSTIC_CODES } from '@tsrx/core/diagnostics';
+import { compile, type CompileOptions } from 'octane/compiler';
 import { assertNoBareHoles } from '../../src/compiler/bare-holes.js';
 import { parseModule } from '../../src/compiler/parser.node.js';
 
@@ -1209,6 +1210,252 @@ describe('script __executeOnMount authoring contract', () => {
 					{ mode },
 				).diagnostics,
 			).toEqual([]);
+		},
+	);
+});
+
+// Every compile error for an authoring mistake carries a stable `code`, so tools
+// and agents can recognize it without matching its message. A mistake
+// `@tsrx/core` also reports on its own targets carries core's code; one only
+// Octane reports carries an `OCTANE_*` code.
+describe('compile errors — codes', () => {
+	const object = { id: 'object', module: 'octane/universal', target: 'universal', text: 'host' };
+	const valdi = { id: 'native', module: '@test/valdi', target: 'valdi', text: 'reject' };
+	const universal = { hmr: false, renderer: object } as CompileOptions;
+	const writer = { hmr: false, renderer: valdi } as CompileOptions;
+	const server: CompileOptions = { mode: 'server' };
+	const sx = { source: 'sx-lib', imported: 'sx', fields: ['class'], jsxAttribute: 'sx' };
+	const arm = (markup: string) =>
+		`export function Arm({ x, items }: { x: number; items: string[] }) @{ <div>${markup}</div> }`;
+
+	it.each([
+		['OCTANE_VOID_ELEMENT_CONTENT', `export function V() @{ <input>{'kid'}</input> }`],
+		[
+			'OCTANE_TEXTAREA_CHILDREN',
+			`export function T(props) @{ <textarea value={props.v}>{'kid'}</textarea> }`,
+		],
+		['OCTANE_TEXTAREA_CHILDREN', `export function T() @{ <textarea><b /></textarea> }`],
+		[
+			'OCTANE_INNER_HTML_WITH_CHILDREN',
+			`export function H() @{ <div dangerouslySetInnerHTML={{ __html: '' }}>{'kid'}</div> }`,
+		],
+		['OCTANE_EXECUTE_ON_MOUNT', 'export function App() @{ <script __executeOnMount="true" /> }'],
+		[
+			'OCTANE_EXECUTE_ON_MOUNT',
+			'export function App() @{ <script {...{ __executeOnMount: true }} /> }',
+		],
+		[
+			'OCTANE_EXECUTE_ON_MOUNT',
+			'export function App() @{ <script __executeOnMount /> }',
+			'script.object.tsrx',
+			universal,
+		],
+		[
+			'OCTANE_COMPONENT_SELF_REFERENCE',
+			'const Name = 1;\nexport default (function Name({ x = Name.name }: { x?: string }) @{ <p>{x as string}</p>; })',
+		],
+		['OCTANE_COMPONENT_FUNCTION_KIND', 'export async function Foo() @{ <div /> }'],
+		['OCTANE_COMPONENT_FUNCTION_KIND', 'export function* Foo() @{ <div /> }', 'codes.tsrx', server],
+		[
+			'OCTANE_COMPONENT_FUNCTION_KIND',
+			'export async function Foo() @{ <view /> }',
+			'codes.object.tsrx',
+			universal,
+		],
+		[
+			'OCTANE_COMPONENT_FUNCTION_KIND',
+			'export async function Foo() @{ <view /> }',
+			'codes.tsrx',
+			writer,
+		],
+		[
+			'OCTANE_HOOK_IN_LOOP',
+			`import { useMemo } from 'octane';
+export function C(props) @{
+	const memos = [];
+	for (let i = 0; i < props.n; i++) memos.push(useMemo(() => i * 10, [i]));
+	<div>{memos.length + ''}</div>
+}`,
+		],
+		[
+			'OCTANE_HOOK_DEPENDENCIES_UNINFERABLE',
+			`import { useEffect } from 'octane';
+export function App(props) @{ useEffect(props.makeEffect()); <div /> }`,
+		],
+		[
+			'OCTANE_FOR_ITEM_BINDING',
+			'export function Rows(props) @{ <ul>@for (props.current of props.rows) { <li /> }</ul> }',
+		],
+		[
+			'OCTANE_FOR_KEY_BODY_BINDING',
+			`export function Rows(props) @{
+	<ul>@for (const row of props.rows) { const id = row.id; <li key={id} /> }</ul>
+}`,
+		],
+		[
+			DIAGNOSTIC_CODES.FOR_OF_ONLY,
+			'export function List({ o }) @{ <ul>@for (const name in o) { <li /> }</ul> }',
+		],
+		[
+			DIAGNOSTIC_CODES.MULTIPLE_REFS,
+			`export function R({ a, b }) @{ <div ref={a} ref={b}>{'two refs'}</div> }`,
+		],
+		['OCTANE_ARM_VALUE_RETURN', arm('@if (x > 0) { if (x > 1) return <i />; <b /> }')],
+		[
+			'OCTANE_ARM_VALUE_RETURN',
+			arm('@if (x > 0) { if (x > 1) return <i />; <b /> }'),
+			'arm.object.tsrx',
+			universal,
+		],
+		[
+			'OCTANE_ARM_BREAK',
+			arm('@for (const item of items; key item) { if (item === "") break; <b /> }'),
+		],
+		[
+			'OCTANE_ARM_LABELED_JUMP',
+			arm('@if (x > 0) { outer: { <p>@if (x > 1) { if (x > 2) break outer; <b /> }</p> } <i /> }'),
+		],
+		[
+			'OCTANE_BLOCK_JUMP',
+			arm('@for (const item of items; key item) { <i>@{ if (item) continue; <b /> }</i> }'),
+		],
+		['OCTANE_BARE_HOLE', 'export function B({ children }) @{ @if (true) { {children} <b /> } }'],
+		[
+			'OCTANE_SIGNAL_STYLE_OBJECT',
+			'export function S({ style$ }) @{ <div style={style$} /> }',
+			'codes.tsrx',
+			server,
+		],
+		[
+			'OCTANE_RENDERER_SERVER_UNSUPPORTED',
+			'export function App() @{ <view /> }',
+			'codes.object.tsrx',
+			{ ...universal, mode: 'server' },
+		],
+		[
+			'OCTANE_NATIVE_READ_TARGET',
+			`import 'octane/signals';\nexport function App() @{ <view /> }`,
+			'codes.object.tsrx',
+			universal,
+		],
+		[
+			'OCTANE_UNIVERSAL_STYLE',
+			'export function App() @{ <view><style>.a { color: red; }</style></view> }',
+			'codes.object.tsrx',
+			universal,
+		],
+		[
+			'OCTANE_UNIVERSAL_UNSUPPORTED',
+			'export function App() @{ <view a:b="x" /> }',
+			'codes.object.tsrx',
+			universal,
+		],
+		[
+			DIAGNOSTIC_CODES.TARGET_FOR_AWAIT_UNSUPPORTED,
+			'export function App(props) @{ <view>@for await (const x of props.xs) { <view /> }</view> }',
+			'codes.object.tsrx',
+			universal,
+		],
+		[
+			'OCTANE_RENDERER_VALIDATION',
+			'export function App() @{ <unknown-host /> }',
+			'codes.object.tsrx',
+			{ hmr: false, renderer: { ...object, validation: { allowedTags: ['view'] } } },
+		],
+		[
+			'OCTANE_THREAD_FUNCTION',
+			`function run() { 'main thread'; }\nexport function App() @{ <view onTap={run} /> }`,
+			'codes.object.tsrx',
+			{ hmr: false, renderer: { ...object, capabilities: ['thread-functions'] } },
+		],
+		[
+			'OCTANE_ACTIVITY_MODE',
+			`import { Activity } from 'octane';\nexport function App() @{ <Activity mode="later"><view /></Activity> }`,
+			'codes.object.tsrx',
+			{ hmr: false, renderer: { ...object, capabilities: ['visibility'] } },
+		],
+		[
+			'OCTANE_NATIVE_ATTRIBUTE_SHORTHAND',
+			'export const value = <div sx={1} />;',
+			'codes.tsx',
+			{ knownAttributeSpreads: [sx] },
+		],
+		[
+			'OCTANE_NATIVE_PROJECTION_CONFLICT',
+			'export function A({ c$ }) @{ <div sx={c$} class="x" /> }',
+			'codes.tsrx',
+			{ knownAttributeSpreads: [sx] },
+		],
+		[
+			'OCTANE_NATIVE_PROJECTION_READ',
+			'export function A({ c$ }) @{ <div sx={c$.value} /> }',
+			'codes.tsrx',
+			{ knownAttributeSpreads: [sx] },
+		],
+		[
+			'OCTANE_RESERVED_ATTRIBUTE',
+			`import { signal$ } from 'octane/signals';
+const v$ = signal$('');
+export function A() @{ <input value={v$} data-octane-input="x" /> }`,
+		],
+		[
+			'OCTANE_VALDI_UNSUPPORTED',
+			'module server {}\nexport function App() @{ <view /> }',
+			'codes.tsrx',
+			writer,
+		],
+		[
+			DIAGNOSTIC_CODES.TARGET_FOR_AWAIT_UNSUPPORTED,
+			'export function App(props) @{ <view>@for await (const x of props.xs; key x) { <view /> }</view> }',
+			'codes.tsrx',
+			writer,
+		],
+		[
+			'OCTANE_FOR_ITEM_BINDING',
+			'export function App(props) @{ <view>@for (props.x of props.xs; key 1) { <view /> }</view> }',
+			'codes.tsrx',
+			writer,
+		],
+		[
+			'OCTANE_SERVER_MODULE_CAPTURE',
+			`import { database } from './database.js'; module server { export function save() { return database.save(); } }`,
+		],
+		['OCTANE_SERVER_MODULE_DECLARATION', 'module server {} module server {}'],
+		[
+			'OCTANE_SERVER_MODULE_DECLARATION',
+			'function nested() { module server { export function nope() {} } }',
+		],
+		[
+			'OCTANE_SERVER_MODULE_IMPORT',
+			`import { nope } from 'server'; export function App() @{ <p /> }`,
+		],
+		[
+			'OCTANE_SERVER_MODULE_IMPORT',
+			`module server { export function ok() {} } import { nope } from 'server';`,
+		],
+		['OCTANE_SERVER_MODULE_EXPORT', 'module server { export default function save() {} }'],
+		[
+			'OCTANE_SERVER_CALL_CONTEXT',
+			`module server {
+	import type { ServerCallContext } from 'octane/server';
+	export function invalid(context: ServerCallContext, value: string) { return value; }
+}`,
+			'codes.tsrx',
+			server,
+		],
+		[
+			'OCTANE_SIGNAL_ATTEMPT_READ',
+			`import { signal$, derived$ } from 'octane/signals';
+import { inspectSignal } from './opaque';
+const count$ = signal$(1);
+export const result$ = derived$(async () => { await pause(); return inspectSignal(count$); });`,
+			'/src/signal-attempts.tsrx',
+			{ hmr: false },
+		],
+	] as [string, string, string?, CompileOptions?][])(
+		'reports %s',
+		(code, source, filename = 'codes.tsrx', options = {}) => {
+			expect(() => compile(source, filename, options)).toThrow(expect.objectContaining({ code }));
 		},
 	);
 });
