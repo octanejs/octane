@@ -1,4 +1,4 @@
-import { use, useSyncExternalStore, useLayoutEffect } from 'octane';
+import { memo, use, useState, useSyncExternalStore, useLayoutEffect } from 'octane';
 
 export interface ExternalStore<T> {
 	getState: () => T;
@@ -146,7 +146,17 @@ interface HeldSelectionProps {
 	k: 'a' | 'b' | 'c';
 	pending: Promise<void>;
 	tail: Promise<void>;
+	expose: (setCount: (count: number) => void) => void;
 }
+
+// Memoized, so a root render with new props does not render it.
+const HeldSelectionCount = memo(function HeldSelectionCount(props: {
+	expose: HeldSelectionProps['expose'];
+}) @{
+	const [count, setCount] = useState(0);
+	props.expose(setCount);
+	<span id="held-selection-count">{String(count)}</span>
+});
 
 function HeldSelectionConsumer(props: HeldSelectionProps) @{
 	const value = useSyncExternalStore(props.store.subscribe, () => props.store.getState()[props.k]);
@@ -160,6 +170,7 @@ function HeldSelectionConsumer(props: HeldSelectionProps) @{
 export function HeldSelectionBoundary(props: HeldSelectionProps) @{
 	<div>
 		<h2 id="held-selection-label">{props.k}</h2>
+		<HeldSelectionCount expose={props.expose} />
 		@try {
 			<HeldSelectionConsumer {...props} />
 		} @pending {

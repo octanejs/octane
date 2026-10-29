@@ -169,7 +169,9 @@ describe('useSyncExternalStore — live selectors and commit updates', () => {
 	describe('a root.render transition that suspends into a held boundary', () => {
 		function heldSelection(k: 'a' | 'b' | 'c', pending: Promise<void>, tail = pending) {
 			const store = makeStore({ a: 0, b: 0, c: 0 });
-			const props = { store, pending, tail };
+			let setCount!: (count: number) => void;
+			const expose = (set: (count: number) => void) => (setCount = set);
+			const props = { store, pending, tail, expose };
 			const r = mount(HeldSelectionBoundary, { ...props, k });
 			flushEffects();
 			const render = (next: 'a' | 'b' | 'c') =>
@@ -178,7 +180,8 @@ describe('useSyncExternalStore — live selectors and commit updates', () => {
 				r.find('#held-selection-label').textContent,
 				r.find('#held-selection-value').textContent,
 			];
-			return { r, store, render, shown };
+			const count = () => r.find('#held-selection-count').textContent;
+			return { r, store, render, shown, setCount: (next: number) => setCount(next), count };
 		}
 
 		it('keeps the store selection of the screen it holds live', async () => {
@@ -218,6 +221,27 @@ describe('useSyncExternalStore — live selectors and commit updates', () => {
 
 				await act(() => tail.resolve());
 				expect(shown()).toEqual(['b', 'b:0']);
+			} finally {
+				r.unmount();
+				flushEffects();
+			}
+		});
+
+		it('keeps a memoized transition update that rendered with the dropped request', async () => {
+			const pending = deferred();
+			const { r, render, shown, setCount, count } = heldSelection('a', pending.promise);
+			try {
+				// The root's render skips the memoized counter, which renders its own
+				// update in the drain that drops the root request.
+				await act(() => {
+					startTransition(() => setCount(1));
+					startTransition(() => render('b'));
+				});
+				expect(shown()).toEqual(['a', 'a:0']);
+
+				await act(() => pending.resolve());
+				expect(shown()).toEqual(['b', 'b:0']);
+				expect(count()).toBe('1');
 			} finally {
 				r.unmount();
 				flushEffects();
