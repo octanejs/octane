@@ -6,7 +6,11 @@ const testingLibraryRoot = dirname(
 	requireFromPackage.resolve('@testing-library/react/package.json'),
 );
 const testingLibrary = require(join(testingLibraryRoot, 'dist/index.js'));
-const { createSupersedingTimeoutGate, holdFirstTimeout } = require('./upstream-timer-gate.cjs');
+const {
+	createSupersedingTimeoutGate,
+	holdFirstTimeout,
+	holdRepeatingTimeouts,
+} = require('./upstream-timer-gate.cjs');
 
 const REMOTE_MUTATION_RACE_TEST =
 	'useSWR - remote mutation should prevent race conditions with `useSWR`';
@@ -15,10 +19,18 @@ const REMOTE_MUTATION_MULTIPLE_TEST =
 const LOCAL_MUTATION_VALIDATING_TEST =
 	'useSWR - local mutation should reset isValidating after mutate';
 const LOCAL_MUTATION_VALIDATING_TEXT = 'isValidating:true';
+const BROADCAST_TESTS = new Set(['useSWR should broadcast data', 'useSWR should broadcast error']);
+const BROADCAST_RELEASE_TEXTS = new Set(['0 0 0', '1 1 1']);
 
 let releaseInitialRequest = null;
 let releaseLocalMutationInitialRequest = null;
 let supersedingMutationTimers = null;
+let broadcastPollingTimers = null;
+
+afterEach(() => {
+	broadcastPollingTimers?.restore();
+	broadcastPollingTimers = null;
+});
 
 function isRemoteMutationRaceTest() {
 	return expect.getState().currentTestName === REMOTE_MUTATION_RACE_TEST;
@@ -30,6 +42,10 @@ function isLocalMutationValidatingTest() {
 
 function isRemoteMutationMultipleTest() {
 	return expect.getState().currentTestName === REMOTE_MUTATION_MULTIPLE_TEST;
+}
+
+function isBroadcastTest() {
+	return BROADCAST_TESTS.has(expect.getState().currentTestName);
 }
 
 function render(element, options) {
@@ -65,6 +81,19 @@ function render(element, options) {
 		// waits. Keep each superseded completion pending until the next click has
 		// started its replacement; the third request retains its real timer.
 		supersedingMutationTimers = createSupersedingTimeoutGate(10, 2);
+	}
+
+	if (isBroadcastTest()) {
+		// Three subscribers poll every 100 ms, and the test asserts each count after
+		// sleeping to 50, 150, and 250 ms. A loaded runner delays the act() turns
+		// between those sleeps but not the polling chain, so a refresh can land before
+		// the count it should follow. Hold each polling round until the previous count
+		// is observed. The round after the last count stays held until unmount clears
+		// it, as it does when the test ends at 250 ms.
+		broadcastPollingTimers = holdRepeatingTimeouts(100, () =>
+			testingLibrary.render(element, options),
+		);
+		return broadcastPollingTimers.result;
 	}
 
 	return testingLibrary.render(element, options);
@@ -103,6 +132,10 @@ function getByText(...args) {
 		const release = releaseLocalMutationInitialRequest;
 		releaseLocalMutationInitialRequest = null;
 		release();
+	}
+	if (isBroadcastTest() && BROADCAST_RELEASE_TEXTS.has(args[0])) {
+		// Fire the round inside the act() the test enters next, as its timer would.
+		queueMicrotask(broadcastPollingTimers.release);
 	}
 	return result;
 }

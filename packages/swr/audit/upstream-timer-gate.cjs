@@ -72,4 +72,55 @@ function createSupersedingTimeoutGate(delay, heldRuns) {
 	};
 }
 
-module.exports = { createSupersedingTimeoutGate, holdFirstTimeout };
+// Holds every `delay` ms timeout scheduled inside `run`, and each later one that
+// re-arms one of those callbacks, as a polling loop does. Held timeouts fire
+// only on `release()`; `restore()` reinstates the global timers.
+function holdRepeatingTimeouts(delay, run) {
+	const originalSetTimeout = globalThis.setTimeout;
+	const originalClearTimeout = globalThis.clearTimeout;
+	const callbacks = new Set();
+	const held = new Map();
+	let capturing = true;
+
+	globalThis.setTimeout = (callback, currentDelay, ...args) => {
+		if (currentDelay !== delay || !(capturing || callbacks.has(callback))) {
+			return originalSetTimeout(callback, currentDelay, ...args);
+		}
+
+		const token = {};
+		callbacks.add(callback);
+		held.set(token, () => callback(...args));
+		return token;
+	};
+	globalThis.clearTimeout = (token) => {
+		if (!held.delete(token)) originalClearTimeout(token);
+	};
+	const restore = () => {
+		globalThis.setTimeout = originalSetTimeout;
+		globalThis.clearTimeout = originalClearTimeout;
+	};
+
+	let result;
+	try {
+		result = run();
+		if (held.size === 0) throw new Error(`Expected a ${delay} ms timeout to be scheduled`);
+	} catch (error) {
+		restore();
+		throw error;
+	} finally {
+		capturing = false;
+	}
+
+	return {
+		result,
+		release() {
+			if (held.size === 0) throw new Error('No held timeout to release');
+			const round = [...held.values()];
+			held.clear();
+			for (const callback of round) callback();
+		},
+		restore,
+	};
+}
+
+module.exports = { createSupersedingTimeoutGate, holdFirstTimeout, holdRepeatingTimeouts };

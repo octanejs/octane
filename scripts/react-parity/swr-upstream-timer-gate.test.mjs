@@ -6,6 +6,7 @@ const require = createRequire(import.meta.url);
 const {
 	createSupersedingTimeoutGate,
 	holdFirstTimeout,
+	holdRepeatingTimeouts,
 } = require('../../packages/swr/audit/upstream-timer-gate.cjs');
 
 test('holds a request completion until the competing mutation has started', () => {
@@ -94,4 +95,41 @@ test('holds superseded mutation completions until the following mutation starts'
 		globalThis.setTimeout = originalSetTimeout;
 		globalThis.clearTimeout = originalClearTimeout;
 	}
+});
+
+test('holds each polling round until it is released', () => {
+	const events = [];
+	const originalSetTimeout = globalThis.setTimeout;
+	const originalClearTimeout = globalThis.clearTimeout;
+	let timer;
+	let round = 0;
+	const poll = () => {
+		events.push(`round ${++round}`);
+		timer = setTimeout(poll, 100);
+	};
+
+	const held = holdRepeatingTimeouts(100, () => {
+		timer = setTimeout(poll, 100);
+		return 'rendered';
+	});
+
+	try {
+		assert.equal(held.result, 'rendered');
+		const unrelated = setTimeout(() => {}, 100);
+		assert.equal(typeof unrelated.ref, 'function');
+		clearTimeout(unrelated);
+
+		assert.deepEqual(events, []);
+		held.release();
+		assert.deepEqual(events, ['round 1']);
+		held.release();
+		assert.deepEqual(events, ['round 1', 'round 2']);
+
+		clearTimeout(timer);
+		assert.throws(() => held.release(), /No held timeout/);
+	} finally {
+		held.restore();
+	}
+	assert.equal(globalThis.setTimeout, originalSetTimeout);
+	assert.equal(globalThis.clearTimeout, originalClearTimeout);
 });
