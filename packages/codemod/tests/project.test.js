@@ -178,6 +178,7 @@ describe('runCodemod', () => {
 		expect(await code(loose)).toContain('<p>{story.title} {story.score} {story.by}</p>');
 	});
 
+	// Compiles every module of the app twice; under CI load that can pass the default 5 s.
 	it('migrates the Hacker News reader to modules matching its hand-written TSRX twin', async () => {
 		const example = path.join(REPO, 'examples/hacker-news');
 		const twin = fs
@@ -224,5 +225,5 @@ describe('runCodemod', () => {
 			'entry-client.tsrx',
 			'entry-server.tsrx',
 		]);
-	});
+	}, 30_000);
 });
