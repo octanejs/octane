@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**124 publishable package(s), including 109 framework binding(s) and 3 framework integration(s).**
+**125 publishable package(s), including 110 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -120,6 +120,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/tiptap` | [`packages/tiptap`](../packages/tiptap) | framework binding | `0.0.61` | 2 |
 | `@octanejs/to-print` | [`packages/to-print`](../packages/to-print) | framework binding | `0.0.24` | 2 |
 | `@octanejs/transition-group` | [`packages/transition-group`](../packages/transition-group) | framework binding | `0.0.33` | 7 |
+| `@octanejs/use-sync-external-store` | [`packages/use-sync-external-store`](../packages/use-sync-external-store) | framework binding | `0.0.0` | 10 |
 | `@octanejs/usehooks-ts` | [`packages/usehooks-ts`](../packages/usehooks-ts) | framework binding | `0.0.49` | 1 |
 | `@octanejs/valtio` | [`packages/valtio`](../packages/valtio) | framework binding | `0.1.50` | 5 |
 | `@octanejs/vaul` | [`packages/vaul`](../packages/vaul) | framework binding | `0.0.36` | 3 |

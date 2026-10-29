@@ -318,8 +318,7 @@ Still open, owned elsewhere:
   under a raw `<html>` root; Radix `asChild` cannot clone template children.
 - **CLI:** `octane init` should add `**/*.tsrx` to a tsconfig `include`.
 - **Codemod, later:** an early `return items.map(…)` is not lowered; `.jsx`
-  holes stay bare without types; class components; `@radix-ui/react-*` and
-  upstream adapters (`@tanstack/react-hotkeys`) are not in the catalog.
+  holes stay bare without types; class components.
 
 ### Memos and T3 Code
 
@@ -513,11 +512,12 @@ Default on when a `tsconfig.json` is found; `--no-types` for speed. Build one
 
 ### 4. Ecosystem and project wiring
 
-- **Binding import adapters**, generated from each binding's `status.json`
-  rather than hand-written: `@radix-ui/react-<x>` → the `@octanejs/radix`
-  namespace (`import * as Dialog from '@radix-ui/react-dialog'` →
-  `import { Dialog } from '@octanejs/radix'`), router subpaths, icon packages.
-  Radix alone accounts for 6 of bulletproof-react's 9 unmapped packages.
+- **Binding import adapters**: router subpaths, icon packages. Done for
+  `@radix-ui/react-<x>` → the `@octanejs/radix` namespace
+  (`import * as Dialog from '@radix-ui/react-dialog'` →
+  `import { Dialog } from '@octanejs/radix'`), whose per-namespace export table
+  a codemod test checks against the binding and the upstream packages, and for
+  TanStack's own `@tanstack/octane-*` adapters.
 - **Unmapped React packages**: today they are reported as errors. Offer the
   `octane/react` ReactCompat boundary as an opt-in escape hatch so an app can
   migrate before every dependency has a binding.

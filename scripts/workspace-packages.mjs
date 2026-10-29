@@ -83,6 +83,7 @@ const OCTANE_CURRENT_CORE_CONSUMERS = new Set([
 	'@octanejs/rsbuild-plugin',
 	'@octanejs/tanstack-router',
 	'@octanejs/three',
+	'@octanejs/use-sync-external-store',
 	'@octanejs/vite-plugin',
 ]);
 

@@ -1486,6 +1486,19 @@
       "verified": "2026-08-09"
     },
     {
+      "name": "@octanejs/use-sync-external-store",
+      "version": "0.0.0",
+      "category": "State Management",
+      "upstream": { "package": "use-sync-external-store", "version": "1.7.0" },
+      "surface": "Every use-sync-external-store 1.7.0 entry point, including the .js spellings: the main entry and /shim (with index.native) re-export Octane's built-in useSyncExternalStore, and /with-selector and /shim/with-selector export a port of useSyncExternalStoreWithSelector.",
+      "divergences": [
+        "The /shim entry points always forward to Octane's built-in hook; the userspace fallback for React 16 and 17 is not ported.",
+        "The main entry point's development warning names the Octane package and recommends /shim or octane."
+      ],
+      "ssr": "Supported and tested: the server renders getServerSnapshot, and hydration reads it first, then syncs to getSnapshot. Without a server snapshot, Octane's server hook falls back to getSnapshot where React throws.",
+      "verified": "2026-10-29"
+    },
+    {
       "name": "@octanejs/usehooks-ts",
       "version": "0.0.49",
       "category": "UI Utilities",
@@ -1845,6 +1858,7 @@
     "swr": "@octanejs/swr",
     "thinking-orbs": "@octanejs/thinking-orbs",
     "use-stick-to-bottom": "@octanejs/stick-to-bottom",
+    "use-sync-external-store": "@octanejs/use-sync-external-store",
     "usehooks-ts": "@octanejs/usehooks-ts",
     "valtio": "@octanejs/valtio",
     "vaul": "@octanejs/vaul",
