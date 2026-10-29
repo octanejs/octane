@@ -13,6 +13,16 @@ interface TransformOptions {
 	types?: { sourceFile: ts.SourceFile; checker: ts.TypeChecker };
 	resolveSpecifier?(specifier: string): string | null;
 	isContext?(specifier: string, name: string): boolean | null;
+	unported?(specifier: string): string | null;
+	reactCompat?: boolean;
+}
+/** A React package with no Octane port, and how migrated code uses it. */
+interface Unported {
+	name: string;
+	/** Elements now rendered in a `ReactCompat` island. */
+	islands: number;
+	/** Uses that only a port can support. */
+	blocked: number;
 }
 interface TransformResult {
 	code: string;
@@ -24,6 +34,7 @@ interface TransformResult {
 		contexts: string[];
 		reexports: { specifier: string; names: [string, string][] | null }[];
 	};
+	unported: Unported[];
 }
 interface CodemodOptions {
 	target?: 'tsrx' | 'tsx';
@@ -58,7 +69,7 @@ interface CodemodResult {
 	root: string;
 	files: FileResult[];
 	packages: { from: string; to: string }[];
-	missing: string[];
+	missing: (Unported & { modules: number })[];
 	html: string[];
 	compiler: string | null;
 }

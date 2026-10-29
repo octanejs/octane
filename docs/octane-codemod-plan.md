@@ -410,6 +410,30 @@ Still open, owned elsewhere:
   be checked against the binding's exports, but recording them would add about
   110 kB to the CLI's catalog.
 
+#### Packages with no port
+
+A package with no binding now stays on React rather than failing every module
+that imports it. A component whose element gives React only text and data
+renders in a `ReactCompat` island; hooks, contexts, and components that take
+Octane children or render callbacks are reported at each use, so error counts
+are per use (T3 Code: 363, where 248 counted modules); and the CLI lists every
+such package under **No Octane port**.
+
+- **Memos:** the `react-hot-toast` stand-in is gone. `<Toaster>` renders in an
+  island, the 46 modules calling `toast()` run unchanged, and Memos' own flows
+  (copying a memo link) show their toasts. With Octane linked from this
+  repository, Vite needed `resolve.dedupe: ["react", "react-dom"]`, or
+  `octane/react` loaded the repository's React beside the app's; an installed
+  Octane resolves its React peers to the app's copy.
+- **T3 Code:** 6 `@pierre/*` elements became islands. The rest of its 14
+  unported packages are hooks (303 uses, 294 of them `@effect/atom-react`),
+  contexts (10), and components that take Octane content (40: providers,
+  `LegendList` rows, Clerk's nested React children), so bindings remain the
+  work. One is `use-sync-external-store/with-selector`: the codemod now maps
+  the package's root and `/shim` entries to Octane's `useSyncExternalStore`,
+  but `useSyncExternalStoreWithSelector` needs a port, which four bindings
+  (redux, tanstack-store, tiptap, xstate) each carry a copy of.
+
 ## Workstreams
 
 Each workstream ships as its own PR with golden fixtures and corpus numbers in

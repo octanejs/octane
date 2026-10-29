@@ -3,12 +3,13 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { type DialogProps } from "@radix-ui/react-dialog";
 import { Slot } from "@radix-ui/react-slot";
 import { forwardRef, useState } from "react";
+import { Toaster, toast } from "react-hot-toast";
 
 // Shapes from migrating Memos and T3 Code: shadcn-style fields whose rest
 // props carry React's per-edit `onChange`, `forwardRef` type arguments,
 // annotations that name the global `React` namespace without importing it,
-// a component that hands its `children` to a `render` prop, and shadcn's
-// Radix components.
+// a component that hands its `children` to a `render` prop, a library with
+// no Octane port, and shadcn's Radix components.
 
 export function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   return <input type={type} data-slot="input" className={className} {...props} />;
@@ -57,6 +58,17 @@ export const RenameDialog: React.FC<{ title: React.ReactNode; onRename(name: str
     </form>
   );
 };
+
+// No Octane port of react-hot-toast: `Toaster` renders in a React island, and
+// `toast()` calls run as they are.
+export function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <main onCopy={() => toast.success("Copied")}>
+      {children}
+      <Toaster position="top-right" toastOptions={{ style: { background: "var(--popover)" } }} />
+    </main>
+  );
+}
 
 export function Button({ asChild, ...props }: React.ComponentProps<"button"> & { asChild?: boolean }) {
   const Comp = asChild ? Slot : "button";

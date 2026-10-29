@@ -133,6 +133,14 @@ export function missingSlot(name: string): never {
 	throw new Error(formatClientError(15, name));
 }
 
+// Development only, from both slot resolvers. Compiled code always supplies a
+// slot, so a hook that resolves one while no Scope renders ran outside a render,
+// or in a second copy of this runtime that is not the copy rendering. Without
+// this check the hook fails reading hook cells from the null Scope.
+export function checkHookOwner(): void {
+	if (CURRENT_SCOPE === null) throw new Error(formatClientError(362));
+}
+
 // withSlot — establishes hook call-site identity via a per-render PATH STACK, so a
 // hook reached THROUGH a custom-hook wrapper combines the wrapper's call-site symbol
 // with its own. The compiler wraps CUSTOM hook calls only, as
@@ -190,6 +198,8 @@ function appendSlotKey(key: string, slot: HookSlot): string {
 // its own (a hand-written or library-binding base hook) falls back to the path.
 export function resolveCustomSlot(slot: HookSlot | undefined): HookSlot | undefined {
 	const n = slotStack.length;
+	// A hook with neither a slot nor a path keeps the missingSlot diagnostic.
+	if (process.env.NODE_ENV !== 'production' && (slot !== undefined || n !== 0)) checkHookOwner();
 	if (n === 0) return slot;
 	if (slot === undefined && n === 1) return slotStack[0];
 	const resolved = resolveHookPath(slotStack, slot, false);
@@ -900,7 +910,7 @@ export function inInactiveSubtree(block: Block | null): boolean {
 // recompute on every commit/render". Shared by the effect and memo hooks.
 export function resolveHookArgs(
 	name: string,
-	deps: any[] | null | symbol | undefined,
+	deps: readonly unknown[] | null | symbol | undefined,
 	slot: HookSlot | undefined,
 ): [any[] | undefined, HookSlot] {
 	if (slot === undefined && typeof deps === 'symbol') {
@@ -913,13 +923,21 @@ export function resolveHookArgs(
 	return [deps as any[] | undefined, slot];
 }
 
-export function useEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void;
-export function useEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void {
+export function useEffect(fn: EffectFn, deps?: readonly unknown[] | null, slot?: HookSlot): void;
+export function useEffect(fn: EffectFn, deps?: readonly unknown[] | null, slot?: HookSlot): void {
 	const [d, s] = resolveHookArgs('useEffect', deps, slot);
 	enqueueEffect(s, fn, d, PASSIVE);
 }
-export function useLayoutEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void;
-export function useLayoutEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void {
+export function useLayoutEffect(
+	fn: EffectFn,
+	deps?: readonly unknown[] | null,
+	slot?: HookSlot,
+): void;
+export function useLayoutEffect(
+	fn: EffectFn,
+	deps?: readonly unknown[] | null,
+	slot?: HookSlot,
+): void {
 	const [d, s] = resolveHookArgs('useLayoutEffect', deps, slot);
 	enqueueEffect(s, fn, d, LAYOUT);
 }
@@ -990,8 +1008,16 @@ export function useLayoutSnapshot<T>(
 	return box.value;
 }
 
-export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void;
-export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void {
+export function useInsertionEffect(
+	fn: EffectFn,
+	deps?: readonly unknown[] | null,
+	slot?: HookSlot,
+): void;
+export function useInsertionEffect(
+	fn: EffectFn,
+	deps?: readonly unknown[] | null,
+	slot?: HookSlot,
+): void {
 	const [d, s] = resolveHookArgs('useInsertionEffect', deps, slot);
 	enqueueEffect(s, fn, d, INSERTION);
 }
@@ -1087,10 +1113,14 @@ function computeMemoWithDiagnostics<T>(compute: (...deps: any[]) => T, deps: any
 	}
 }
 
-export function useMemo<T>(compute: (...deps: any[]) => T, deps?: any[] | null, slot?: HookSlot): T;
 export function useMemo<T>(
 	compute: (...deps: any[]) => T,
-	deps?: any[] | null,
+	deps?: readonly unknown[] | null,
+	slot?: HookSlot,
+): T;
+export function useMemo<T>(
+	compute: (...deps: any[]) => T,
+	deps?: readonly unknown[] | null,
 	slot?: HookSlot,
 ): T {
 	const [d, s] = resolveHookArgs('useMemo', deps, slot);
@@ -1110,12 +1140,12 @@ export function useMemo<T>(
 
 export function useCallback<F extends (...args: any[]) => any>(
 	fn: F,
-	deps?: any[] | null,
+	deps?: readonly unknown[] | null,
 	slot?: HookSlot,
 ): F;
 export function useCallback<F extends (...args: any[]) => any>(
 	fn: F,
-	deps?: any[] | null,
+	deps?: readonly unknown[] | null,
 	slot?: HookSlot,
 ): F {
 	// Resolve the raw slot exactly once, including the omitted-deps Symbol ABI
@@ -1436,13 +1466,13 @@ function attachImperativeRefArray<T>(refs: readonly ImperativeRef<T>[], factory:
 export function useImperativeHandle<T>(
 	ref: ImperativeRef<T>,
 	factory: () => T,
-	deps?: any[] | null,
+	deps?: readonly unknown[] | null,
 	slot?: HookSlot,
 ): void;
 export function useImperativeHandle<T>(
 	ref: ImperativeRef<T>,
 	factory: () => T,
-	deps?: any[] | null,
+	deps?: readonly unknown[] | null,
 	slot?: HookSlot,
 ): void {
 	const [resolvedDeps, resolvedSlot] = resolveHookArgs('useImperativeHandle', deps, slot);

@@ -30,6 +30,8 @@ function compileErrors(code, filename, strong = false) {
 function migrate(name) {
 	const result = transformModule(fs.readFileSync(path.join(FIXTURES, name), 'utf8'), name, {
 		strictNullChecks: true,
+		unported: (specifier) => (specifier === 'react-hot-toast' ? specifier : null),
+		reactCompat: true,
 		// As the project resolves bindings: Radix's primitives are `@octanejs/radix`.
 		resolveSpecifier: (specifier) =>
 			specifier.startsWith('@radix-ui/react-') ? '@octanejs/radix' : null,
@@ -210,6 +212,15 @@ describe('transformModule', () => {
 		);
 	});
 
+	it("imports `useSyncExternalStore` from Octane, not React's shim for it", () => {
+		const { code } = transformModule(
+			"import { useEffect } from 'react';\nimport { useSyncExternalStore } from 'use-sync-external-store/shim';\nexport const useOnline = (s: { on(f: () => void): () => void; get(): boolean }) => {\n\tuseEffect(() => {}, []);\n\treturn useSyncExternalStore(s.on, s.get);\n};\n",
+			'online.ts',
+		);
+		expect(code).toContain("import { useEffect, useSyncExternalStore } from 'octane';\n");
+		expect(code).not.toContain('use-sync-external-store');
+	});
+
 	it("maps the global `React` namespace React's types declare, unless a name shadows it", () => {
 		const source =
 			'export const A: React.FC<{ c: React.ReactNode }> = ({ c }) => {\n\tconst onInput = (e: React.ChangeEvent<HTMLInputElement>) => e;\n\treturn <input onInput={onInput} title={String(c)} />;\n};\n';
@@ -302,6 +313,95 @@ describe('transformModule', () => {
 				"import { forwardRef, isValidElement } from 'react';\nexport const P = forwardRef<HTMLElement, { children: React.ReactNode }>(({ children }, ref) => (isValidElement(children) ? <b ref={ref} /> : null));\n",
 			).code,
 		).toContain('export const P = descriptorChildren(({ children, ref }');
+	});
+
+	it('hosts a leaf component of a package with no Octane port in a `ReactCompat` island', () => {
+		const migrate = (
+			/** @type {string} */ source,
+			/** @type {import('../src/transform.js').TransformOptions} */ options = {},
+		) =>
+			transformModule(source, 'toast.tsx', {
+				strictNullChecks: true,
+				unported: (specifier) => (specifier.startsWith('toast-kit') ? 'toast-kit' : null),
+				reactCompat: true,
+				...options,
+			});
+		const imports = "import { Toaster, toast, useToaster, ToastContext } from 'toast-kit';\n";
+		const source = `${imports}const options = { duration: 2 };\nexport function App({ label }: { label: string }) {\n\treturn <main onClick={() => toast(label)}><Toaster position="top-right" options={options} /><Toaster>{label} and text</Toaster></main>;\n}\n`;
+		const app = migrate(source);
+		expect(app.code).toContain(
+			"import { ReactCompat } from 'octane/react';\n// No Octane port of `toast-kit` exists, so its components render in React through ReactCompat.\nimport { Toaster, toast, useToaster, ToastContext } from 'toast-kit';\n",
+		);
+		expect(app.code).toContain(
+			'<ReactCompat><Toaster position="top-right" options={options} /></ReactCompat><ReactCompat><Toaster>{label} and text</Toaster></ReactCompat>',
+		);
+		expect([app.notes, app.unported]).toEqual([
+			[],
+			[{ name: 'toast-kit', islands: 2, blocked: 0 }],
+		]);
+		expect(compileErrors(app.code, 'toast.tsrx')).toEqual([]);
+		// A second run leaves the islands and the comment as they are.
+		const tsx = migrate(source, { target: 'tsx' }).code;
+		expect(tsx.match(/<ReactCompat>/g)?.length).toBe(2);
+		expect(migrate(tsx, { target: 'tsx' }).code).toBe(tsx);
+
+		// React cannot render what Octane renders, call Octane's hooks, or read
+		// its contexts; without React 19.2 there is no island at all.
+		const crossing = '`<Toaster>` takes children or props that Octane renders';
+		for (const [body, message] of [
+			['<Toaster>{children}</Toaster>', crossing],
+			['<Toaster>{children as ReactNode}</Toaster>', crossing],
+			['<Toaster>{(<b />) as any}</Toaster>', crossing],
+			['<Toaster icon={<b />} />', crossing],
+			['<Toaster icon={children} />', crossing],
+			['<Toaster render={row} />', crossing],
+			['<Toaster render={(t) => <b>{t}</b>} />', crossing],
+			['<Toaster render={renderToast} />', crossing],
+			['useToaster(), null', '`useToaster` is a React hook'],
+			['useContext(ToastContext), null', '`ToastContext` is a React context'],
+		]) {
+			const result = migrate(
+				`${imports}import { useContext, type ReactNode } from 'react';\nconst row = <b />;\nfunction renderToast(t: string) {\n\treturn <b>{t}</b>;\n}\nexport function App({ children }: { children: ReactNode }) {\n\treturn (${body});\n}\n`,
+			);
+			expect([
+				result.code.includes('<ReactCompat>'),
+				result.notes.map((note) => note.message.split(', which')[0]),
+			]).toEqual([false, [message]]);
+			expect(result.code).toContain(
+				'// No Octane port of `toast-kit` exists, and this module needs one: Octane cannot call its hooks, read its contexts, or pass Octane content to its components.\n',
+			);
+		}
+		const old = migrate(`${imports}export const App = () => <Toaster />;\n`, {
+			reactCompat: false,
+		});
+		expect([old.code.includes('<ReactCompat>'), old.notes[0].message]).toEqual([
+			false,
+			'`<Toaster>` can render in a `ReactCompat` island only with React and React DOM 19.2 or newer in the React 19 series. `toast-kit` has no Octane port.',
+		]);
+
+		// Through a namespace import too; a function call stays as it is, and a
+		// type-only import says nothing.
+		const named = migrate(
+			"import * as Kit from 'toast-kit/react';\nimport type { Toast } from 'toast-kit';\nexport const notify = (t: Toast) => Kit.toast(t);\nexport const App = () => <Kit.Toaster />;\nexport const useCount = () => Kit.useToaster().length;\n",
+		);
+		expect(named.code).toContain(
+			'export const App = () => @{ <ReactCompat><Kit.Toaster /></ReactCompat> };',
+		);
+		expect(named.code).toContain("import type { Toast } from 'toast-kit';");
+		expect(named.code.match(/No Octane port/g)?.length).toBe(1);
+		expect(named.notes.map((note) => note.message.split(', which')[0])).toEqual([
+			'`Kit.useToaster` is a React hook',
+		]);
+		expect(
+			migrate("import { toast } from 'toast-kit';\nexport const notify = () => toast('hi');\n")
+				.code,
+		).toBe(
+			"// No Octane port of `toast-kit` exists; React stays a dependency for it.\nimport { toast } from 'toast-kit';\nexport const notify = () => toast('hi');\n",
+		);
+		// A re-export hides the package from the modules that render it.
+		expect(migrate("export { Toaster } from 'toast-kit';\n").notes).toMatchObject([
+			{ rule: 'bindings', severity: 'warning' },
+		]);
 	});
 
 	it('passes a text field wrapper its rest props `onChange` as `onInput`', () => {

@@ -275,9 +275,9 @@ function validateRuntimeImports(ast, state) {
 	});
 }
 
-function hasOwnTemplate(fn) {
+function hasOwnTemplate(body) {
 	let found = false;
-	walk(fn.body, (node) => {
+	walk(body, (node) => {
 		if (FUNCTION_TYPES.has(node.type)) return false;
 		if (isTemplate(node)) {
 			found = true;
@@ -327,7 +327,7 @@ function collectComponents(ast, state) {
 		const shape = componentShape(node);
 		if (shape === null) continue;
 		if (
-			!hasOwnTemplate(shape.fn) &&
+			!hasOwnTemplate(shape.fn.body) &&
 			!referenced.has(shape.name) &&
 			shape.exportKind !== 'default' &&
 			!(shape.exportKind === 'named' && /^[A-Z]/.test(shape.name ?? ''))
@@ -412,7 +412,82 @@ function hasRenderTimeCalls(fn) {
 	return found;
 }
 
-function attributeValue(attribute, state) {
+function writerBody(fn, state) {
+	if (fn.body.type === 'JSXCodeBlock') {
+		return [
+			...emitNodes(fn.body.body, state, [], true),
+			...emitRenderable(fn.body.render, state, []),
+		];
+	}
+	if (fn.body.type === 'BlockStatement') return emitNodes(fn.body.body, state, [], true);
+	return emitRenderable(fn.body, state, []);
+}
+
+function lowerRenderCallback(fn, state) {
+	if (fn.async || fn.generator)
+		throw valdiError(state, fn, 'render callbacks must be synchronous.');
+	walk(fn.body, (node) => {
+		if (FUNCTION_TYPES.has(node.type)) return false;
+		if (node.type === 'CallExpression' && slotHookName(node, state) !== null) {
+			throw valdiError(state, node, 'hooks inside render callbacks require a child component.');
+		}
+	});
+	for (const parameter of fn.params)
+		assertNoTemplate(parameter, state, 'render callback parameters');
+	return { ...fn, body: withOrigin(b.block(writerBody(fn, state)), fn.body), expression: false };
+}
+
+function componentProp(value, state, element, prop) {
+	const fn = unwrap(value);
+	if (!FUNCTION_TYPES.has(fn?.type)) return assertNoTemplate(value, state, 'JSX-valued attributes');
+	// Preserve any authored assertions or contextual annotations around the function.
+	const wrap = (node) =>
+		node === fn ? lowerRenderCallback(fn, state) : { ...node, expression: wrap(node.expression) };
+	const lowered = hasOwnTemplate(fn.body)
+		? wrap(value)
+		: assertNoTemplate(value, state, 'JSX-valued attributes');
+	if (
+		state.output !== 'ts' ||
+		value !== fn ||
+		!fn.params.some((parameter) => !parameter.typeAnnotation)
+	)
+		return lowered;
+	// Writer setters accept unknown. Restore the context JSX gave the callback
+	// using the receiver's prop type, Parameters<typeof Child>[0]["row"].
+	const parameters = b.ts_type_reference(
+		b.id('Parameters', fn),
+		b.ts_type_parameter_instantiation(
+			[
+				b.ts_type_query(
+					b.id(elementName(element).name, fn),
+					element.openingElement?.typeArguments,
+					fn,
+				),
+			],
+			fn,
+		),
+		fn,
+	);
+	const index = (objectType, key) =>
+		b.set_location(
+			{
+				type: 'TSIndexedAccessType',
+				objectType,
+				indexType: b.ts_literal_type(b.literal(key, undefined, fn), fn),
+			},
+			fn,
+		);
+	return withOrigin(
+		{
+			type: 'TSSatisfiesExpression',
+			expression: lowered,
+			typeAnnotation: index(index(parameters, 0), prop),
+		},
+		fn,
+	);
+}
+
+function attributeValue(attribute, state, tag) {
 	if (attribute.value == null) return withOrigin(b.literal(true), attribute);
 	const value =
 		attribute.value.type === 'JSXExpressionContainer'
@@ -421,7 +496,9 @@ function attributeValue(attribute, state) {
 	if (!value || value.type === 'JSXEmptyExpression') {
 		throw valdiError(state, attribute, 'empty attribute expressions are unsupported.');
 	}
-	return assertNoTemplate(value, state, 'JSX-valued attributes');
+	return tag
+		? componentProp(value, state, tag, attribute.name.name)
+		: assertNoTemplate(value, state, 'JSX-valued attributes');
 }
 
 function attributeEntries(node, state) {
@@ -436,13 +513,17 @@ function attributeEntries(node, state) {
 		const name = attribute.name?.type === 'JSXIdentifier' ? attribute.name.name : null;
 		if (name === null) throw valdiError(state, attribute, 'namespaced attributes are unsupported.');
 		if (
-			name === 'children' ||
+			(name === 'children' && intrinsicTag(node) !== null) ||
 			(name === 'ref' &&
 				(intrinsicTag(node) === null || !state.renderer.capabilities?.includes('host-ref')))
 		) {
 			throw valdiError(state, attribute, `authored ${name} props are not supported yet.`);
 		}
-		return { name, value: attributeValue(attribute, state), origin: attribute };
+		return {
+			name,
+			value: attributeValue(attribute, state, intrinsicTag(node) === null ? node : null),
+			origin: attribute,
+		};
 	});
 }
 
@@ -604,8 +685,8 @@ function keyExpression(state, prototype, keys, explicit, origin) {
 }
 
 function mergedAttributes(entries, state, origin) {
-	const allowRef =
-		intrinsicTag(origin) !== null && state.renderer.capabilities?.includes('host-ref');
+	const component = intrinsicTag(origin) === null;
+	const allowRef = !component && state.renderer.capabilities?.includes('host-ref');
 	const keyName = allocName(state, '__octaneValdiKey');
 	const refName = allocName(state, '__octaneValdiRef');
 	const childrenName = allocName(state, '__octaneValdiChildren');
@@ -639,21 +720,25 @@ function mergedAttributes(entries, state, origin) {
 	const pattern = b.object_pattern([
 		b.prop('init', b.id('key'), b.id(keyName)),
 		...(allowRef ? [] : [b.prop('init', b.id('ref'), b.id(refName))]),
-		b.prop('init', b.id('children'), b.id(childrenName)),
+		...(component ? [] : [b.prop('init', b.id('children'), b.id(childrenName))]),
 		b.rest(b.id(propsName)),
 	]);
+	const reserved = [];
+	if (!allowRef) reserved.push(refName);
+	if (!component) reserved.push(childrenName);
+	const defined = reserved.map((name) =>
+		b.binary('!==', b.id(name), b.unary('void', b.literal(0))),
+	);
 	const prelude = [
 		b.const(pattern, expression),
 		b.if(
-			allowRef
-				? b.binary('!==', b.id(childrenName), b.unary('void', b.literal(0)))
-				: b.logical(
-						'||',
-						b.binary('!==', b.id(refName), b.unary('void', b.literal(0))),
-						b.binary('!==', b.id(childrenName), b.unary('void', b.literal(0))),
-					),
+			defined.reduce((left, right) => b.logical('||', left, right)),
 			b.block([
-				b.throw_error('Octane Valdi compiler: spread ref/children props are not supported yet.'),
+				b.throw_error(
+					component
+						? 'Octane Valdi compiler: spread ref props are not supported yet.'
+						: 'Octane Valdi compiler: spread ref/children props are not supported yet.',
+				),
 			]),
 			null,
 		),
@@ -813,6 +898,28 @@ function emitElement(node, state, keys) {
 	const tag = intrinsicTag(node);
 	const intrinsic = tag !== null;
 	const entries = attributeEntries(node, state);
+	if (!intrinsic) {
+		const children = (node.children ?? []).filter((child) => !isEmptyChild(child, state));
+		if (children.length) {
+			const child = children[0];
+			const fn = child.type === 'JSXExpressionContainer' && unwrap(child.expression);
+			if (
+				children.length !== 1 ||
+				!(
+					FUNCTION_TYPES.has(fn?.type) ||
+					fn?.type === 'Identifier' ||
+					fn?.type === 'MemberExpression'
+				)
+			) {
+				throw valdiError(state, node, 'component children must be a single render callback.');
+			}
+			entries.push({
+				name: 'children',
+				value: componentProp(child.expression, state, node, 'children'),
+				origin: child,
+			});
+		}
+	}
 	const attrs = prepareAttributes(entries, state, node);
 	const prototypeArgs = intrinsic ? [b.literal(tag)] : [];
 	if (attrs.statics.length > 0) prototypeArgs.push(b.array(attrs.statics));
@@ -834,10 +941,6 @@ function emitElement(node, state, keys) {
 		return statements;
 	}
 	const component = componentExpression(name, state, node);
-	const children = (node.children ?? []).filter((child) => !isEmptyChild(child, state));
-	if (children.length !== 0) {
-		throw valdiError(state, node, 'component children/render props are not supported yet.');
-	}
 	statements.push(
 		writerStatement(
 			state,
@@ -1052,6 +1155,23 @@ function emitRenderable(node, state, keys) {
 	if (state.renderer.text === 'host') {
 		return emitHostText(assertNoTemplate(node, state, 'JSX within host text'), state, keys, node);
 	}
+	if (
+		value?.type === 'CallExpression' ||
+		(value?.type === 'ChainExpression' && value.expression.type === 'CallExpression')
+	) {
+		// A writer callback emits into the active scope and returns no renderable.
+		// Keep rejecting scalar output on targets without host text.
+		return [
+			withOrigin(
+				b.if(
+					b.binary('!=', assertNoTemplate(value, state, 'JSX in call arguments'), b.literal(null)),
+					b.block([b.throw_error('Octane Valdi compiler: render callbacks must return no value.')]),
+					null,
+				),
+				node,
+			),
+		];
+	}
 	throw valdiError(
 		state,
 		node,
@@ -1142,17 +1262,7 @@ function emitComponent(shape, state) {
 	for (const parameter of fn.params ?? [])
 		assertNoTemplate(parameter, state, 'component parameters');
 	state.currentComponent = shape;
-	let statements;
-	if (fn.body?.type === 'JSXCodeBlock') {
-		statements = [
-			...emitNodes(fn.body.body ?? [], state, [], true),
-			...emitRenderable(fn.body.render, state, []),
-		];
-	} else if (fn.body?.type === 'BlockStatement') {
-		statements = emitNodes(fn.body.body ?? [], state, [], true);
-	} else {
-		statements = emitRenderable(fn.body, state, []);
-	}
+	const statements = writerBody(fn, state);
 	state.currentComponent = null;
 	// A named expression called `name` would shadow the outer branded component
 	// inside its own body, breaking recursive <Name /> calls. The raw writer body

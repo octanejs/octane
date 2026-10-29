@@ -3,12 +3,15 @@ import { Dialog as DialogPrimitive } from "@octanejs/radix";
 import { type DialogProps } from "@radix-ui/react-dialog";
 import { Slot } from "@octanejs/radix";
 import { useState, type ComponentProps, type ElementRef, type ComponentPropsWithoutRef, type Ref, descriptorChildren, type OctaneElement, type FC, type OctaneNode, type ChangeEvent } from "octane";
+import { ReactCompat } from "octane/react";
+// No Octane port of `react-hot-toast` exists, so its components render in React through ReactCompat.
+import { Toaster, toast } from "react-hot-toast";
 
 // Shapes from migrating Memos and T3 Code: shadcn-style fields whose rest
 // props carry React's per-edit `onChange`, `forwardRef` type arguments,
 // annotations that name the global `React` namespace without importing it,
-// a component that hands its `children` to a `render` prop, and shadcn's
-// Radix components.
+// a component that hands its `children` to a `render` prop, a library with
+// no Octane port, and shadcn's Radix components.
 
 export function Input({ className, type, onChange, ...props }: ComponentProps<"input">) @{
   <input type={type} data-slot="input" className={className} onInput={onChange} {...props} />
@@ -50,6 +53,15 @@ export const RenameDialog: FC<{ title: OctaneNode; onRename(name: string): void 
     <Textarea value={note} onChange={handleNote} />
   </form>
 };
+
+// No Octane port of react-hot-toast: `Toaster` renders in a React island, and
+// `toast()` calls run as they are.
+export function Shell({ children }: { children: OctaneNode }) @{
+  <main onCopy={() => toast.success("Copied")}>
+    {children}
+    <ReactCompat><Toaster position="top-right" toastOptions={{ style: { background: "var(--popover)" } }} /></ReactCompat>
+  </main>
+}
 
 export function Button({ asChild, ...props }: ComponentProps<"button"> & { asChild?: boolean }) @{
   const Comp = asChild ? Slot : "button";

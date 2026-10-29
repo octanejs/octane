@@ -21,7 +21,7 @@ dependencies over to Octane.
 
 | Rule | React | Octane |
 | --- | --- | --- |
-| `imports` | `react`, `react-dom`, `react-dom/client` | `octane`, merged into one import |
+| `imports` | `react`, `react-dom`, `react-dom/client`, `use-sync-external-store/shim` | `octane`, merged into one import |
 | `imports` | `React.useState`, `React.FC`, and `React.ReactNode` with no import (the global namespace React's types declare) | named imports |
 | `imports` | `declare module 'react' { namespace JSX { … } }` (custom elements) | `declare module 'octane/jsx-runtime'` |
 | `imports` | React libraries with a binding (`@tanstack/react-query`, ...) | `@octanejs/*` |
@@ -46,6 +46,7 @@ dependencies over to Octane.
 | `root-render` | `root.render(<App a={1} />)`, `hydrateRoot(c, createElement(App, p))` | `root.render(App, { a: 1 })`, `hydrateRoot(c, App, p)`: no generic element renderer |
 | `server-render` | `renderToString(<App />)` | `renderToString(App).html`: Octane returns `{ html, css }` |
 | `strict-mode` | `<StrictMode>…</StrictMode>` | its children (Octane's is a pass-through) |
+| `react-compat` | `<Toaster position="top-right" />` from a React package with no Octane port | `<ReactCompat><Toaster position="top-right" /></ReactCompat>`, rendered by React |
 
 Every rewrite keeps React's behavior. Where it cannot be proven equal, the code
 is left alone: `{count && <X />}` stays a hole, because React renders `0` there
@@ -77,9 +78,19 @@ anyway.
 
 ## What it reports
 
-Class components, `createRef`, `defaultProps`, unported React libraries, and
-anything else without an automatic rewrite are listed under **Needs attention**
-with a file and line. The process exits with status 1 when any error remains.
+Class components, `createRef`, `defaultProps`, and anything else without an
+automatic rewrite are listed under **Needs attention** with a file and line.
+The process exits with status 1 when any error remains.
+
+A React package with no Octane binding still runs on React, so React stays a
+dependency, and a comment above each import of it says so. When the project
+has React and React DOM 19.2 or newer in the React 19 series, a component of that package renders in
+its own React root through `ReactCompat` if its element gives React nothing
+Octane renders: text children and props without elements. The package's hooks
+and contexts, and its components that take Octane children or render
+callbacks, are reported where they are used. **No Octane port** lists each such
+package with the modules that import it, the elements hosted in islands, and
+the uses that need a port.
 
 ## Options
 

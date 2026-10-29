@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "next-themes-pristine",
+  "roots": ["packages/next-themes/tests"],
+  "files": ["packages/next-themes/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:a478d596a114b320",
+      "file": "packages/next-themes/tests/upstream-original.test.ts",
+      "fullName": "runs all pinned next-themes runtime registrations unchanged"
+    }
+  ],
+  "snapshots": 0
+}

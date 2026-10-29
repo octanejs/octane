@@ -145,6 +145,40 @@ and devtools runtime. For an intentional profiling build, compile with
 Vite, Rspack, and Rsbuild integrations configure this reserved define
 automatically; do not override it when using those integrations.
 
+A custom pipeline must also resolve `octane` and its subpaths to one installed
+copy. A workspace or linked package can get its own copy, even of the same
+version: pnpm installs a package once per set of peer dependencies, so a library
+that develops against another `typescript` version gets a second `octane`. Hooks
+from the copy that is not rendering then fail, and in development the error says
+a hook was called outside a component render. The Vite, Rspack, and Rsbuild
+integrations already resolve one copy. With esbuild, resolve every `octane`
+import from the application's directory, here the build script's own:
+
+```js
+import { build } from 'esbuild';
+
+const singleOctane = {
+	name: 'single-octane',
+	setup(builder) {
+		builder.onResolve({ filter: /^octane(\/|$)/ }, (args) =>
+			args.pluginData === 'single-octane'
+				? undefined
+				: builder.resolve(args.path, {
+						kind: args.kind,
+						resolveDir: import.meta.dirname,
+						pluginData: 'single-octane',
+					}),
+		);
+	},
+};
+
+await build({
+	entryPoints: ['./src/main.ts'],
+	bundle: true,
+	plugins: [singleOctane],
+});
+```
+
 ## Mount
 
 ```ts
