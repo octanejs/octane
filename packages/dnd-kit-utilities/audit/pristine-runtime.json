@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "dnd-kit-utilities-pristine",
+  "roots": ["packages/dnd-kit-utilities/upstream"],
+  "files": ["packages/dnd-kit-utilities/upstream/src/test/utilities.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:6722bf47910c2865",
+      "file": "packages/dnd-kit-utilities/upstream/src/test/utilities.test.ts",
+      "fullName": "@dnd-kit/utilities works"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "dnd-kit-utilities-upstream",
+  "roots": ["packages/dnd-kit-utilities/tests/upstream"],
+  "files": ["packages/dnd-kit-utilities/tests/upstream/utilities.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:406cca6f8f0e670d",
+      "file": "packages/dnd-kit-utilities/tests/upstream/utilities.test.ts",
+      "fullName": "@dnd-kit/utilities works"
+    }
+  ]
+}

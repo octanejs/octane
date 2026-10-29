@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/dnd-kit-core/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs the same authored fixtures and interactions against the published @dnd-kit/core@6.3.1 on React and compares the DOM after every step."
+    },
+    {
+      "path": "packages/dnd-kit-core/tests/exports.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Compares the runtime export names and value kinds with the published @dnd-kit/core@6.3.1."
+    },
+    {
+      "path": "packages/dnd-kit-core/tests/native-events.test.ts",
+      "disposition": "octane-only-divergence",
+      "reason": "Pins the native activator event contract; React passes a SyntheticEvent there, so there is no React oracle.",
+      "divergenceIds": ["native-activator-events"]
+    },
+    {
+      "path": "packages/dnd-kit-core/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane public declarations, including negative controls; upstream publishes no type-test suite."
+    }
+  ]
+}

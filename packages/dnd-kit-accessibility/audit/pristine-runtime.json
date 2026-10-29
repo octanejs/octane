@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "dnd-kit-accessibility-pristine",
+  "roots": ["packages/dnd-kit-accessibility/upstream"],
+  "files": ["packages/dnd-kit-accessibility/upstream/test/accessibility.test.tsx"],
+  "tests": [
+    {
+      "id": "runtime:d28b03855fba1a77",
+      "file": "packages/dnd-kit-accessibility/upstream/test/accessibility.test.tsx",
+      "fullName": "@dnd-kit/accessibility works"
+    }
+  ]
+}

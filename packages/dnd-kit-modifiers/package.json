@@ -1,0 +1,59 @@
+{
+  "name": "@octanejs/dnd-kit-modifiers",
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "dnd kit modifiers for the octane renderer — a port of the legacy @dnd-kit/modifiers 9.0.0 restrictTo* and snap modifiers.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/dnd-kit-modifiers"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE",
+    "LICENSE.upstream"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project dnd-kit-modifiers",
+    "typecheck": "octane-tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@octanejs/dnd-kit-utilities": "workspace:*"
+  },
+  "peerDependencies": {
+    "@octanejs/dnd-kit-core": "workspace:*",
+    "octane": "workspace:^0.16.0"
+  },
+  "devDependencies": {
+    "@dnd-kit/core": "catalog:default",
+    "@dnd-kit/modifiers": "catalog:default",
+    "@dnd-kit/utilities": "catalog:default",
+    "@octanejs/dnd-kit-core": "workspace:*",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

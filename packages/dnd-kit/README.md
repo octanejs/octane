@@ -61,4 +61,9 @@ above and Octane performs the visible keyed move. An explicit `plugins` array is
 still used exactly as supplied.
 
 This package targets the modern dnd-kit API. The legacy `@dnd-kit/core` 6.x
-API is not included.
+API is ported separately, one package per upstream package:
+[`@octanejs/dnd-kit-core`](../dnd-kit-core),
+[`@octanejs/dnd-kit-sortable`](../dnd-kit-sortable),
+[`@octanejs/dnd-kit-modifiers`](../dnd-kit-modifiers),
+[`@octanejs/dnd-kit-utilities`](../dnd-kit-utilities), and
+[`@octanejs/dnd-kit-accessibility`](../dnd-kit-accessibility).

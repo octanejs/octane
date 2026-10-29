@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.json",
+  "include": ["./*.ts"],
+  "exclude": ["node_modules", "dist"],
+  "reactPortEvidence": {
+    "gate": "public-types"
+  },
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  }
+}

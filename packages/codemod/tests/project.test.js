@@ -470,6 +470,52 @@ describe('runCodemod', () => {
 		expect(result.missing).toEqual([]);
 	});
 
+	it('maps the legacy dnd kit packages to their Octane ports', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'src/Tabs.tsx': [
+				"import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';",
+				"import { restrictToFirstScrollableAncestor, restrictToHorizontalAxis } from '@dnd-kit/modifiers';",
+				"import { SortableContext, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';",
+				"import { CSS } from '@dnd-kit/utilities';",
+				"import { LiveRegion } from '@dnd-kit/accessibility';",
+				'const modifiers = [restrictToHorizontalAxis, restrictToFirstScrollableAncestor];',
+				'function Tab({ id }: { id: string }) {',
+				'\tconst { listeners, setNodeRef, transform, transition } = useSortable({ id });',
+				'\tconst style = { transform: CSS.Translate.toString(transform), transition };',
+				'\treturn <button ref={setNodeRef} style={style} {...listeners}>{id}</button>;',
+				'}',
+				'export function Tabs({ ids }: { ids: string[] }) {',
+				'\tconst sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));',
+				'\treturn (',
+				'\t\t<DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={modifiers}>',
+				'\t\t\t<SortableContext items={ids} strategy={horizontalListSortingStrategy}>',
+				'\t\t\t\t{ids.map((id) => <Tab key={id} id={id} />)}',
+				'\t\t\t</SortableContext>',
+				'\t\t\t<LiveRegion id="tabs-status" announcement="" />',
+				'\t\t</DndContext>',
+				'\t);',
+				'}',
+				'',
+			].join('\n'),
+		});
+		const result = await runCodemod([root], { write: false });
+		const code = result.files.find((f) => f.file === 'src/Tabs.tsx')?.code ?? '';
+		for (const name of ['core', 'modifiers', 'sortable', 'utilities', 'accessibility']) {
+			expect(code).toContain(`from '@octanejs/dnd-kit-${name}'`);
+			expect(code).not.toContain(`from '@dnd-kit/${name}'`);
+		}
+		expect(result.packages).toEqual(
+			expect.arrayContaining(
+				['core', 'modifiers', 'sortable', 'utilities', 'accessibility'].map((name) => ({
+					from: `@dnd-kit/${name}`,
+					to: `@octanejs/dnd-kit-${name}`,
+				})),
+			),
+		);
+		expect(result.missing).toEqual([]);
+	});
+
 	it('reports React packages from their installed manifest, not their name', async () => {
 		const manifest = (/** @type {object} */ fields) =>
 			JSON.stringify({ version: '1.0.0', ...fields });

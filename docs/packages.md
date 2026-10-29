@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**124 publishable package(s), including 109 framework binding(s) and 3 framework integration(s).**
+**129 publishable package(s), including 114 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -35,6 +35,11 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/devtools` | [`packages/devtools`](../packages/devtools) | framework binding | `0.0.56` | 1 |
 | `@octanejs/dexie` | [`packages/dexie`](../packages/dexie) | framework binding | `0.1.61` | 1 |
 | `@octanejs/dnd-kit` | [`packages/dnd-kit`](../packages/dnd-kit) | framework binding | `0.1.62` | 4 |
+| `@octanejs/dnd-kit-accessibility` | [`packages/dnd-kit-accessibility`](../packages/dnd-kit-accessibility) | framework binding | `0.0.0` | 1 |
+| `@octanejs/dnd-kit-core` | [`packages/dnd-kit-core`](../packages/dnd-kit-core) | framework binding | `0.0.0` | 1 |
+| `@octanejs/dnd-kit-modifiers` | [`packages/dnd-kit-modifiers`](../packages/dnd-kit-modifiers) | framework binding | `0.0.0` | 1 |
+| `@octanejs/dnd-kit-sortable` | [`packages/dnd-kit-sortable`](../packages/dnd-kit-sortable) | framework binding | `0.0.0` | 1 |
+| `@octanejs/dnd-kit-utilities` | [`packages/dnd-kit-utilities`](../packages/dnd-kit-utilities) | framework binding | `0.0.0` | 1 |
 | `@octanejs/docusaurus` | [`packages/docusaurus`](../packages/docusaurus) | framework integration | `0.0.58` | 8 |
 | `@octanejs/draggable` | [`packages/draggable`](../packages/draggable) | framework binding | `0.0.33` | 2 |
 | `@octanejs/drei` | [`packages/drei`](../packages/drei) | framework binding | `0.0.38` | 5 |

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "dnd-kit-core-upstream",
+  "roots": ["packages/dnd-kit-core/tests/upstream"],
+  "files": ["packages/dnd-kit-core/tests/upstream/core.test.tsx"],
+  "tests": [
+    {
+      "id": "runtime:a102d27b55e160a5",
+      "file": "packages/dnd-kit-core/tests/upstream/core.test.tsx",
+      "fullName": "@dnd-kit/core works"
+    }
+  ]
+}
