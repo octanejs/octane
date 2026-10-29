@@ -1438,6 +1438,7 @@ patchedDependencies:
   '@vitest/browser@4.1.10': d32609637593fc211ed808df6fbea6cb1da80adb049c0b0752bda8e1586d0ae0
   '@vitest/mocker@4.1.10': 538740e541a5a8ef50611b521995775cac3031548f696745eb4b90a7bd659ca4
   esrap@2.3.2: b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e
+  httpxy@0.5.5: eb6bec83dc65e7713c89c2bc997b0e2adfc3a34b75d1df00c05fc3a654a169cd
 
 importers:
 
@@ -55111,7 +55112,7 @@ snapshots:
     dependencies:
       crossws: 0.4.10(srvx@0.11.22)
       exsolve: 1.1.0
-      httpxy: 0.5.5
+      httpxy: 0.5.5(patch_hash=eb6bec83dc65e7713c89c2bc997b0e2adfc3a34b75d1df00c05fc3a654a169cd)
       srvx: 0.11.22
     optionalDependencies:
       miniflare: 4.20260714.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
@@ -55121,7 +55122,7 @@ snapshots:
     dependencies:
       crossws: 0.4.10(srvx@0.11.22)
       exsolve: 1.1.0
-      httpxy: 0.5.5
+      httpxy: 0.5.5(patch_hash=eb6bec83dc65e7713c89c2bc997b0e2adfc3a34b75d1df00c05fc3a654a169cd)
       srvx: 0.11.22
     optionalDependencies:
       miniflare: 4.20260714.0(bufferutil@4.1.0)(utf-8-validate@5.0.10)
@@ -56800,7 +56801,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  httpxy@0.5.5: {}
+  httpxy@0.5.5(patch_hash=eb6bec83dc65e7713c89c2bc997b0e2adfc3a34b75d1df00c05fc3a654a169cd): {}
 
   human-id@4.2.0: {}
 

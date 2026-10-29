@@ -716,3 +716,16 @@ patchedDependencies:
   # packages/octane/tests/compiler/volar.test.ts. Drop when the adopted esrap is
   # 2.3.8 or later.
   esrap@2.3.2: patches/esrap@2.3.2.patch
+  # Replay a bodiless request once when the upstream closes its pooled keep-alive
+  # socket before answering it, as Node documents for `request.reusedSocket`.
+  # Nitro's dev server proxies every document to its SSR worker through
+  # env-runner's proxyFetch. A long synchronous render can hold the worker's
+  # event loop past a socket's idle deadline, and the worker then resets a
+  # request already queued on that socket. Nitro answered it with Vite's 500
+  # error page and broadcast the error overlay to every open page, which failed
+  # the website dev-SSR e2e under load. Not fixed upstream in unjs/httpxy
+  # (checked through 0.5.6 and the copy env-runner 0.3.10 bundles). SCOPE: dev
+  # tooling in this repository; no published package ships httpxy. Guarded by
+  # website/tests/dev-ssr-proxy.test.ts. Drop when the adopted httpxy replays a
+  # request reset on a reused socket.
+  httpxy@0.5.5: patches/httpxy@0.5.5.patch

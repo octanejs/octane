@@ -1,0 +1,30 @@
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 84c1368b5e7dc3135ae09fdd7c487c6f84011c3f..996d425bbf3936f869a45e68972f0e52605ac18d 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -716,7 +716,9 @@ function _sendRequest(doRequest, method, path, headers, addr, body, opts) {
+ 		}
+ 		if (opts.signal) reqOpts.signal = opts.signal;
+ 		if (opts.ssl) Object.assign(reqOpts, opts.ssl);
++		let responded = false;
+ 		const req = doRequest(reqOpts, (res) => {
++			responded = true;
+ 			const statusCode = res.statusCode;
+ 			if (opts.maxRedirects > 0 && _redirectStatuses.has(statusCode) && opts.redirectCount < opts.maxRedirects && res.headers.location) {
+ 				res.resume();
+@@ -747,7 +749,14 @@ function _sendRequest(doRequest, method, path, headers, addr, body, opts) {
+ 			}
+ 			resolve(res);
+ 		});
+-		req.on("error", reject);
++		req.on("error", (err) => {
++			// The upstream closed a pooled keep-alive socket while this request was
++			// on it: its idle timer ran before it read the request. Replay a
++			// bodiless request on another socket, as Node documents for
++			// `request.reusedSocket`, instead of failing a request it never answered.
++			if (!responded && !body && req.reusedSocket && err.code === "ECONNRESET") _sendRequest(doRequest, method, path, headers, addr, body, opts).then(resolve, reject);
++			else reject(err);
++		});
+ 		if (opts.timeout) req.setTimeout(opts.timeout, () => {
+ 			req.destroy(/* @__PURE__ */ new Error("Proxy request timed out"));
+ 		});
