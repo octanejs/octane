@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "project": "effect-atom-adapted",
+  "roots": ["packages/effect-atom/tests/upstream"],
+  "files": ["packages/effect-atom/tests/upstream/index.test.tsx"],
+  "tests": [
+    {
+      "id": "runtime:0890afaf1fe887d5",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react SSR hydrates a delayed Suspense boundary after the atom changes"
+    },
+    {
+      "id": "runtime:dd87b2147b1a0b47",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react SSR keeps the hydrated value until the last reader unmounts"
+    },
+    {
+      "id": "runtime:ddd79a67d7090feb",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react SSR should run atom's during SSR by default"
+    },
+    {
+      "id": "runtime:a115fa5b4b992fe5",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react ScopedAtom input factory uses provider value once"
+    },
+    {
+      "id": "runtime:a38829a4c8589847",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react ScopedAtom integrates with useAtomValue"
+    },
+    {
+      "id": "runtime:91626a3701e0cc4e",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react ScopedAtom scopes atom instances per Provider"
+    },
+    {
+      "id": "runtime:03d811eb2344e018",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react ScopedAtom throws when used outside Provider"
+    },
+    {
+      "id": "runtime:c2ea5afe538ba17c",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react hydration HydrationBoundary splits new vs existing atoms"
+    },
+    {
+      "id": "runtime:41348a6405405b54",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react hydration HydrationBoundary updates existing readers after commit"
+    },
+    {
+      "id": "runtime:62f34ddb4cc9b153",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react hydration basic hydration with number atom and result atoms"
+    },
+    {
+      "id": "runtime:bc5d360708de846b",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react hydration dehydrate + JSON roundtrip + hydrate works (SSR simulation)"
+    },
+    {
+      "id": "runtime:877682d90d80f061",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react hydration dehydrate with encodeInitialAs ignore (default)"
+    },
+    {
+      "id": "runtime:1ad6bf8abb39d589",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react hydration dehydrate with encodeInitialAs value-only"
+    },
+    {
+      "id": "runtime:e16a766d276cc508",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react hydration empty state is a no-op"
+    },
+    {
+      "id": "runtime:01638ff989ce8e31",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react hydration hydrate with no state is a no-op"
+    },
+    {
+      "id": "runtime:8083e6279569590f",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react hydration hydration streaming with resultPromise"
+    },
+    {
+      "id": "runtime:83bc14f5cc5ea48d",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react hydration serializable encode/decode survives JSON roundtrip (wire transfer)"
+    },
+    {
+      "id": "runtime:8c6fc5e08138e132",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react runtime can inject test layers"
+    },
+    {
+      "id": "runtime:7a18eeadc2c2c97c",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react should not execute Atom effects during SSR when using withServerSnapshot"
+    },
+    {
+      "id": "runtime:d5d7cd390372eda8",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react suspense error"
+    },
+    {
+      "id": "runtime:e9b081f63410c109",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react useAtomRef updates after switching refs"
+    },
+    {
+      "id": "runtime:72319d1b9c66f8f2",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react useAtomValue initializing an atom that sets another atom does not update other components during render"
+    },
+    {
+      "id": "runtime:47ff3613f00f3456",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react useAtomValue should read value from simple Atom"
+    },
+    {
+      "id": "runtime:993e7fe686edac64",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react useAtomValue should read value with transform function"
+    },
+    {
+      "id": "runtime:2115b862d509be7c",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react useAtomValue should update when Atom value changes"
+    },
+    {
+      "id": "runtime:5eef9f7768bda51a",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react useAtomValue should work with computed Atom"
+    },
+    {
+      "id": "runtime:7a4bfeb820dca15e",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react useAtomValue suspense subscriptions are isolated per registry"
+    },
+    {
+      "id": "runtime:97cf828c77519992",
+      "file": "packages/effect-atom/tests/upstream/index.test.tsx",
+      "fullName": "atom-react useAtomValue suspense success"
+    }
+  ],
+  "snapshots": 0
+}

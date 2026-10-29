@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@effect/atom-react",
+    "version": "4.1.0",
+    "repository": {
+      "owner": "Effect-TS",
+      "repo": "effect",
+      "subdirectory": "packages/atom/react"
+    },
+    "commit": "9a91b1926a5fbfaffd302a7a41a94d4d53a1154e",
+    "integrity": "sha512-PeaBDmwqG9BPQfaPHeWCB2NF4NQaFlI6poKxjlBHMrMjKqV+LVBdryhpDNqSZOhqGgT+qnh9gV+19MYjNOQ+bg=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "774c3bc5924ad8ae6c5a75f1c53db13feb238ade15989625c513d07b60dedf30"
+      },
+      {
+        "path": "packages/atom/react/LICENSE",
+        "sha256": "f6d8d56714209bca4f23969f7b219acb442d3b7b0f95f23605da354d4757f00c"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    "LICENSE",
+    "README.md",
+    "package.json",
+    "src",
+    "test",
+    "tsconfig.json",
+    "vitest.setup.ts"
+  ],
+  "adaptedMappings": [
+    {
+      "fromRoot": "test",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "from \"react\"",
+      "replace": "from \"octane\""
+    },
+    {
+      "find": "from \"react-dom/client\"",
+      "replace": "from \"octane\""
+    },
+    {
+      "find": "from \"react-dom/server\"",
+      "replace": "from \"octane/server\""
+    },
+    {
+      "find": "\"@testing-library/react\"",
+      "replace": "\"@octanejs/testing-library\""
+    },
+    {
+      "find": "\"react-error-boundary\"",
+      "replace": "\"@octanejs/react-error-boundary\""
+    },
+    {
+      "find": "\"@effect/vitest\"",
+      "replace": "\"vitest\""
+    },
+    {
+      "find": "\"../src/index.ts\"",
+      "replace": "\"../../src/index.ts\""
+    },
+    {
+      "find": "\"../src/ScopedAtom.ts\"",
+      "replace": "\"../../src/ScopedAtom.tsrx\""
+    },
+    {
+      "find": "RegistryContext.Provider",
+      "replace": "RegistryContext"
+    }
+  ],
+  "files": [
+    {
+      "path": "LICENSE",
+      "gitBlob": "7f6fe480f77d5ee022bca87016c0cbac65713470",
+      "size": 1081
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "884a03e2390a1f16ec27c4c872d9f704e7c18f90",
+      "size": 1936
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "bc437cf9cdc1890b595df6462281a7701d19c8c6",
+      "size": 1559
+    },
+    {
+      "path": "src/Hooks.ts",
+      "gitBlob": "cad72dc1169eee130b0ec0c787ceee782e293065",
+      "size": 18510
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "c4350d25476b820cb6907551efae37ada261d68b",
+      "size": 279
+    },
+    {
+      "path": "src/ReactHydration.ts",
+      "gitBlob": "bbc8d91c504a680775a5cd1de4273e09bb7e6dfe",
+      "size": 4117
+    },
+    {
+      "path": "src/RegistryContext.ts",
+      "gitBlob": "d6aab5ae08937c1b5739f4da2fb018fb34111ed8",
+      "size": 3738
+    },
+    {
+      "path": "src/ScopedAtom.ts",
+      "gitBlob": "ea04bc9c8cf0353698d47e20f33121cf41511680",
+      "size": 4479
+    },
+    {
+      "path": "test/index.test.tsx",
+      "gitBlob": "0da0b92e9ca908ff8a158c04c08bd2535b1b82c4",
+      "size": 28520
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "e2a8ca19a0d5b669c7f2eeef6b201ccec871d86e",
+      "size": 177
+    },
+    {
+      "path": "vitest.setup.ts",
+      "gitBlob": "5f520a536624886736de84bcbfd64a5b9d71edfe",
+      "size": 209
+    }
+  ],
+  "fingerprint": "bb4ef311f33b21b6cd0e96a9709b7b116ea70237e2a990bf24d12c4b6419cea9"
+}

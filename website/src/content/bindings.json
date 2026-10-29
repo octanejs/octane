@@ -9,6 +9,12 @@
         "tags": ["signals", "reactivity"]
       },
       {
+        "packageName": "@octanejs/effect-atom",
+        "title": "Effect Atom",
+        "searchTerms": ["@effect/atom-react", "effect"],
+        "tags": ["atoms", "effect"]
+      },
+      {
         "packageName": "@octanejs/jotai",
         "title": "Jotai",
         "tags": ["atoms"]

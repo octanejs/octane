@@ -6332,6 +6332,51 @@ importers:
         specifier: catalog:default
         version: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
 
+  packages/effect-atom:
+    devDependencies:
+      '@octanejs/react-error-boundary':
+        specifier: workspace:*
+        version: link:../react-error-boundary
+      '@octanejs/testing-library':
+        specifier: workspace:*
+        version: link:../testing-library
+      '@testing-library/jest-dom':
+        specifier: catalog:default
+        version: 6.9.1
+      '@testing-library/react':
+        specifier: catalog:default
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@types/react':
+        specifier: catalog:default
+        version: 19.2.18
+      '@types/scheduler':
+        specifier: 0.26.0
+        version: 0.26.0
+      effect:
+        specifier: 4.1.0
+        version: 4.1.0
+      jsdom:
+        specifier: catalog:default
+        version: 30.0.1(@noble/hashes@2.2.0)
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      react-error-boundary:
+        specifier: catalog:default
+        version: 6.1.2(react@19.2.7)
+      scheduler:
+        specifier: 0.27.0
+        version: 0.27.0
+      vitest:
+        specifier: catalog:default
+        version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+
   packages/electron:
     devDependencies:
       electron:
@@ -22066,6 +22111,9 @@ packages:
   '@types/scheduler@0.16.8':
     resolution: {integrity: sha512-WZLiwShhwLRmeV6zH+GkbOFT6Z6VklCItrDioxUnv+u4Ll+8vKeFySoFyK/0ctcRpOmwAicELfmys1sDc/Rw+A==}
 
+  '@types/scheduler@0.26.0':
+    resolution: {integrity: sha512-WFHp9YUJQ6CKshqoC37iOlHnQSmxNc795UhB26CyBBttrN9svdIrUjl/NjnNmfcwtncN0h/0PPAFWv9ovP8mLA==}
+
   '@types/semver@7.8.0':
     resolution: {integrity: sha512-1mAINjtQCXXeLkJ9ehXkwOcBpqtLxiVtKhpUf83DdRNdQKV0iXZpaHYqRr7nj+wvxuJzoAmAwXI+sCNMv1CzLQ==}
 
@@ -25619,6 +25667,9 @@ packages:
 
   effect@3.21.3:
     resolution: {integrity: sha512-RqwU7WnJ6CqYhyjpOVJA5vh1Sgkn6eVECO6mnD0EjlbWcC2M3LJaPglXXr13Rdo/Y+B+wTEPzGRYFNL2xKxNeQ==}
+
+  effect@4.1.0:
+    resolution: {integrity: sha512-lGx2MJJyrXA8RZb2UpQ/0Nkb5Utaimby7oD92+18noBxLPE85IFOvptdzau8dvcxAOwfwHo9iqapbKeFzqQM/Q==}
 
   ejs@3.1.10:
     resolution: {integrity: sha512-UeJmFfOrAQS8OJWPZ4qtgHyWExa088/MtK5UEyoJGFH67cDEXkZSviOiKRCZ4Xij0zxI3JECgYs3oKx+AizQBA==}
@@ -49931,6 +49982,8 @@ snapshots:
 
   '@types/scheduler@0.16.8': {}
 
+  '@types/scheduler@0.26.0': {}
+
   '@types/semver@7.8.0': {}
 
   '@types/send@0.17.6':
@@ -54989,6 +55042,8 @@ snapshots:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 3.23.2
+
+  effect@4.1.0: {}
 
   ejs@3.1.10:
     dependencies:

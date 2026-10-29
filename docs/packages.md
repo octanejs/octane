@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**130 publishable package(s), including 115 framework binding(s) and 3 framework integration(s).**
+**131 publishable package(s), including 116 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -44,6 +44,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/draggable` | [`packages/draggable`](../packages/draggable) | framework binding | `0.0.33` | 2 |
 | `@octanejs/drei` | [`packages/drei`](../packages/drei) | framework binding | `0.0.39` | 5 |
 | `@octanejs/dropzone` | [`packages/dropzone`](../packages/dropzone) | framework binding | `0.0.34` | 2 |
+| `@octanejs/effect-atom` | [`packages/effect-atom`](../packages/effect-atom) | framework binding | `0.0.0` | 6 |
 | `@octanejs/electron` | [`packages/electron`](../packages/electron) | framework binding | `0.0.45` | 6 |
 | `@octanejs/email` | [`packages/email`](../packages/email) | framework binding | `0.0.19` | 1 |
 | `@octanejs/email-cli` | [`packages/email-cli`](../packages/email-cli) | framework binding | `0.0.19` | 2 |

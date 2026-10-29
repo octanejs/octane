@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/effect-atom-react-4.1.0.tgz",
+      "sha256": "045118ccc6a1d0e11c97879bfc8dfdd6a84c80becb871a2e4d2ea7aa96156210"
+    },
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "f6d8d56714209bca4f23969f7b219acb442d3b7b0f95f23605da354d4757f00c"
+    },
+    {
+      "path": "LICENSE.upstream-root",
+      "sha256": "774c3bc5924ad8ae6c5a75f1c53db13feb238ade15989625c513d07b60dedf30"
+    }
+  ],
+  "requiredFiles": ["audit/upstream.lock.json"],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "@effect/atom-react",
+    "version": "4.1.0",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "scripts", "tests", "typetests", "upstream", "upstream-artifact"]
+}

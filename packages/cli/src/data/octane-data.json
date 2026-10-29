@@ -375,6 +375,19 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/effect-atom",
+      "version": "0.0.0",
+      "category": "State Management",
+      "upstream": { "package": "@effect/atom-react", "version": "4.1.0" },
+      "surface": "Complete published surface, at the root and at the Hooks, RegistryContext, ReactHydration and ScopedAtom subpaths: useAtomValue (with selector), useAtom, useAtomSet (value, promise and promiseExit modes), useAtomMount, useAtomRefresh, useAtomSubscribe, useAtomSuspense, useAtomInitialValues, useAtomRef, useAtomRefProp, useAtomRefPropValue, RegistryContext, RegistryProvider, scheduleTask, HydrationBoundary, and ScopedAtom's make and TypeId. All 28 upstream runtime registrations run unchanged against React and against Octane, four of them with a test-harness patch for their server render.",
+      "divergences": [
+        "scheduleTask posts a host task (its own MessageChannel message, or setTimeout) instead of a React Scheduler LowPriority task, because Octane has no Scheduler package. Tasks still run later than the current task and its microtasks, in order, and can be cancelled.",
+        "Contexts render as `<RegistryContext value>` and `<ScopedAtom.Context value>`, because Octane has no `Context.Provider`."
+      ],
+      "ssr": "Supported and tested: useAtomValue reads Atom.getServerValue under octane/server, atoms marked withServerValueInitial skip their effects on the server, hydrateRoot adopts the server markup, and a Suspense boundary that hydrates after an atom changes still matches the server HTML.",
+      "verified": "2026-10-29"
+    },
+    {
       "name": "@octanejs/electron",
       "version": "0.0.45",
       "category": "Desktop Apps",
@@ -1759,6 +1772,7 @@
     "@dnd-kit/react": "@octanejs/dnd-kit",
     "@dnd-kit/sortable": "@octanejs/dnd-kit-sortable",
     "@dnd-kit/utilities": "@octanejs/dnd-kit-utilities",
+    "@effect/atom-react": "@octanejs/effect-atom",
     "@floating-ui/react": "@octanejs/floating-ui",
     "@formisch/react": "@octanejs/formisch",
     "@formkit/auto-animate": "@octanejs/auto-animate",
