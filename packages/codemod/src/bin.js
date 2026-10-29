@@ -101,6 +101,19 @@ if (result.packages.length > 0) {
 	process.stdout.write(`\n${colors.bold('Dependencies')}\n`);
 	for (const { from, to } of result.packages) process.stdout.write(`  ${from} → ${to}\n`);
 }
+if (result.missing.length > 0) {
+	process.stdout.write(
+		`\n${colors.bold('No Octane port')} ${colors.dim('(still runs on React)')}\n`,
+	);
+	for (const { name, modules, islands, blocked } of result.missing) {
+		const uses = [
+			`${modules} module(s)`,
+			islands > 0 ? `${islands} element(s) in ReactCompat islands` : null,
+			blocked > 0 ? colors.red(`${blocked} use(s) need a port`) : null,
+		].filter(Boolean);
+		process.stdout.write(`  ${name}  ${colors.dim(uses.join(', '))}\n`);
+	}
+}
 for (const page of result.html) process.stdout.write(`\nUpdated the entry script in ${page}\n`);
 
 const strong = changed.filter((file) => file.strong !== null);

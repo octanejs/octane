@@ -146,6 +146,9 @@ export const REACT_MODULES = {
 	'react-dom/test-utils': 'octane',
 	'react/jsx-runtime': 'octane/jsx-runtime',
 	'react/jsx-dev-runtime': 'octane/jsx-dev-runtime',
+	// React's `useSyncExternalStore` for React 17 and earlier.
+	'use-sync-external-store': 'octane',
+	'use-sync-external-store/shim': 'octane',
 };
 
 /**
