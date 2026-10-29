@@ -11,7 +11,7 @@
  * gives the same mistake on its own targets.
  */
 
-import { DIAGNOSTIC_CODES } from '@tsrx/core/diagnostics';
+import { DIAGNOSTIC_CODES } from '@tsrx/core';
 
 export const FOR_IN_MESSAGE =
 	'`@for` iterates an iterable with `for…of`, so a `for…in` header is not supported. ' +
