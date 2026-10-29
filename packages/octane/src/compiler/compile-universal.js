@@ -7,7 +7,7 @@
  * the client hook/dependency pass with its final runtime imports already routed
  * to the selected renderer module.
  */
-import { builders as b, clone_ast_node, parseModule } from '@tsrx/core';
+import { builders as b, clone_ast_node, DIAGNOSTIC_CODES, parseModule } from '@tsrx/core';
 import { createStyleScopePass } from './style-scopes.js';
 import { adoptTemplateShape } from './parser-template-shape.js';
 import { normalizeUniversalRuntime } from './universal-runtime.js';
@@ -134,6 +134,7 @@ function validateRegionStyleCaptures(ast, authoredAst, state) {
 		for (const node of capture.nodes) {
 			if (!externalReferences.has(node.start)) continue;
 			throw universalError(
+				'OCTANE_UNIVERSAL_THEME_BOUNDARY',
 				state.filename,
 				node,
 				`theme ${JSON.stringify(externalReferences.get(node.start))} crosses a renderer boundary without its CSS; declare the theme inside the universal region or in a module compiled for that renderer.`,
@@ -547,10 +548,11 @@ function firstScreenEventHelper(state) {
 	return referenceHelper(state, 'firstScreenEvent');
 }
 
-function universalError(filename, node, message) {
+// `code` is Octane's code for the mistake, or core's for one `@tsrx/core` also reports.
+function universalError(code, filename, node, message) {
 	const start = node?.loc?.start;
 	const at = start ? ` at ${filename}:${start.line}:${start.column}` : '';
-	return new Error(`Octane universal compiler: ${message}${at}`);
+	return Object.assign(new Error(`Octane universal compiler: ${message}${at}`), { code });
 }
 
 const AST_SKIP_KEYS = new Set(['end', 'loc', 'metadata', 'parent', 'range', 'start']);
@@ -621,6 +623,7 @@ function isTemplateNode(node) {
 
 function universalStyleError(node, state) {
 	return universalError(
+		'OCTANE_UNIVERSAL_STYLE',
 		state.filename,
 		node,
 		rendererHasCapability(state, 'scoped-styles')
@@ -643,6 +646,7 @@ function assertNoResidualTemplate(node, state, context) {
 		(node.type.startsWith('JSX') || node.type === 'Element' || node.type === 'Fragment')
 	) {
 		throw universalError(
+			'OCTANE_UNIVERSAL_UNSUPPORTED',
 			state.filename,
 			node,
 			`JSX in ${context} requires universal plan lowering and cannot fall back to DOM codegen.`,
@@ -662,6 +666,7 @@ function validateRuntimeImports(ast, state) {
 			if (specifier.importKind === 'type') continue;
 			if (specifier.type !== 'ImportSpecifier') {
 				throw universalError(
+					'OCTANE_UNIVERSAL_UNSUPPORTED',
 					state.filename,
 					specifier,
 					'universal renderer modules require named imports from octane.',
@@ -671,6 +676,7 @@ function validateRuntimeImports(ast, state) {
 			if (specifier.local?.name) state.runtimeImports.set(specifier.local.name, imported);
 			if (!UNIVERSAL_RUNTIME_IMPORTS.has(imported)) {
 				throw universalError(
+					'OCTANE_UNIVERSAL_UNSUPPORTED',
 					state.filename,
 					specifier,
 					`runtime import ${JSON.stringify(imported)} has no universal renderer implementation.`,
@@ -808,6 +814,7 @@ function validateForbiddenImports(
 		requests.sort((left, right) => (left.sourceNode.start ?? 0) - (right.sourceNode.start ?? 0));
 		const { kind, matched, source, sourceNode } = requests[0];
 		throw universalError(
+			'OCTANE_RENDERER_VALIDATION',
 			state.filename,
 			sourceNode,
 			`renderer ${JSON.stringify(state.renderer.id)} forbids static ${kind} ${JSON.stringify(source)} (matched ${JSON.stringify(matched)}).`,
@@ -1216,6 +1223,7 @@ function threadFunctionCaptures(site, state, lexicalAnalysis) {
 		if (node === directive) return;
 		if (isTemplateNode(node)) {
 			throw universalError(
+				'OCTANE_THREAD_FUNCTION',
 				state.filename,
 				node,
 				'thread functions cannot contain JSX or TSRX template syntax.',
@@ -1223,6 +1231,7 @@ function threadFunctionCaptures(site, state, lexicalAnalysis) {
 		}
 		if (node.type === 'ThisExpression' || node.type === 'Super') {
 			throw universalError(
+				'OCTANE_THREAD_FUNCTION',
 				state.filename,
 				node,
 				'thread functions cannot reference this or super; pass serializable values explicitly.',
@@ -1233,7 +1242,12 @@ function threadFunctionCaptures(site, state, lexicalAnalysis) {
 			node.meta?.name === 'new' &&
 			node.property?.name === 'target'
 		) {
-			throw universalError(state.filename, node, 'thread functions cannot reference new.target.');
+			throw universalError(
+				'OCTANE_THREAD_FUNCTION',
+				state.filename,
+				node,
+				'thread functions cannot reference new.target.',
+			);
 		}
 		if (
 			node.type === 'Identifier' &&
@@ -1241,6 +1255,7 @@ function threadFunctionCaptures(site, state, lexicalAnalysis) {
 			isIdentifierReference(node, parent, key, lexicalAnalysis)
 		) {
 			throw universalError(
+				'OCTANE_THREAD_FUNCTION',
 				state.filename,
 				node,
 				'thread functions cannot capture arguments; use an explicit rest parameter.',
@@ -1250,6 +1265,7 @@ function threadFunctionCaptures(site, state, lexicalAnalysis) {
 			const binding = resolveBinding(nodeScopes.get(node.callee) ?? rootScope, node.callee.name);
 			if (node.callee.name === 'eval' && binding === null) {
 				throw universalError(
+					'OCTANE_THREAD_FUNCTION',
 					state.filename,
 					node.callee,
 					'thread functions cannot call direct eval.',
@@ -1257,7 +1273,12 @@ function threadFunctionCaptures(site, state, lexicalAnalysis) {
 			}
 			const imported = state.runtimeImports.get(node.callee.name);
 			if (imported === 'use' || /^use[A-Z]/.test(imported ?? node.callee.name)) {
-				throw universalError(state.filename, node.callee, 'thread functions cannot call hooks.');
+				throw universalError(
+					'OCTANE_THREAD_FUNCTION',
+					state.filename,
+					node.callee,
+					'thread functions cannot call hooks.',
+				);
 			}
 		}
 		if (node.type === 'Identifier' && isIdentifierReference(node, parent, key, lexicalAnalysis)) {
@@ -1371,6 +1392,7 @@ function prepareThreadFunctionAstReplacements(ast, state) {
 		}
 		if (!fn || fn.body?.type !== 'BlockStatement' || fn.body.body?.[0] !== directive) {
 			throw universalError(
+				'OCTANE_THREAD_FUNCTION',
 				state.filename,
 				directive,
 				`${JSON.stringify(directiveValue)} must be the first statement of a function body.`,
@@ -1382,6 +1404,7 @@ function prepareThreadFunctionAstReplacements(ast, state) {
 			(parent?.type === 'Property' && (parent.method === true || parent.kind !== 'init'))
 		) {
 			throw universalError(
+				'OCTANE_THREAD_FUNCTION',
 				state.filename,
 				directive,
 				'thread directives are not supported in methods, getters, setters, or constructors; use a function-valued field or declaration.',
@@ -1401,6 +1424,7 @@ function prepareThreadFunctionAstReplacements(ast, state) {
 				declarationContainer?.type !== 'JSXCodeBlock'
 			) {
 				throw universalError(
+					'OCTANE_THREAD_FUNCTION',
 					state.filename,
 					directive,
 					'thread function declarations require a module or block statement container.',
@@ -1410,6 +1434,7 @@ function prepareThreadFunctionAstReplacements(ast, state) {
 		const kind = THREAD_DIRECTIVES.get(directiveValue);
 		if (fn.generator || (kind === 'main-thread' && fn.async)) {
 			throw universalError(
+				'OCTANE_THREAD_FUNCTION',
 				state.filename,
 				directive,
 				kind === 'main-thread' && fn.async
@@ -1426,6 +1451,7 @@ function prepareThreadFunctionAstReplacements(ast, state) {
 			if (nested.fn.start >= outer.fn.end) break;
 			if (nested.fn.end <= outer.fn.end) {
 				throw universalError(
+					'OCTANE_THREAD_FUNCTION',
 					state.filename,
 					nested.directive,
 					'thread functions cannot contain another thread function.',
@@ -1435,6 +1461,7 @@ function prepareThreadFunctionAstReplacements(ast, state) {
 	}
 	if (state.universalRuntime === undefined) {
 		throw universalError(
+			'OCTANE_THREAD_FUNCTION',
 			state.filename,
 			sites[0].directive,
 			'thread directives require universalRuntime.thread to select the current execution layer.',
@@ -1821,6 +1848,7 @@ function validateForbiddenGlobals(ast, state, validation, isAuthored, lexicalAna
 		references.sort((left, right) => (left.node.start ?? 0) - (right.node.start ?? 0));
 		const reference = references[0];
 		throw universalError(
+			'OCTANE_RENDERER_VALIDATION',
 			state.filename,
 			reference.node,
 			`renderer ${JSON.stringify(state.renderer.id)} forbids unbound global ${JSON.stringify(reference.name)}.`,
@@ -1923,6 +1951,7 @@ function validateHostTemplates(ast, state, validation, isAuthored) {
 				!textParents.has(nearestHost)
 			) {
 				throw universalError(
+					'OCTANE_RENDERER_VALIDATION',
 					state.filename,
 					node,
 					`renderer ${JSON.stringify(state.renderer.id)} does not allow authored JSX text under <${nearestHost}>.`,
@@ -1939,6 +1968,7 @@ function validateHostTemplates(ast, state, validation, isAuthored) {
 				isStaticallyPrimitiveTextExpression(node.expression)
 			) {
 				throw universalError(
+					'OCTANE_RENDERER_VALIDATION',
 					state.filename,
 					node.expression,
 					`renderer ${JSON.stringify(state.renderer.id)} does not allow authored primitive text under <${nearestHost}>.`,
@@ -1956,6 +1986,7 @@ function validateHostTemplates(ast, state, validation, isAuthored) {
 			const nextHost = isHost ? name : null;
 			if (isHost && allowedTags !== null && !allowedTags.has(name) && isAuthored(node)) {
 				throw universalError(
+					'OCTANE_RENDERER_VALIDATION',
 					state.filename,
 					node,
 					`renderer ${JSON.stringify(state.renderer.id)} does not allow <${name}>.`,
@@ -1970,6 +2001,7 @@ function validateHostTemplates(ast, state, validation, isAuthored) {
 				isAuthored(node)
 			) {
 				throw universalError(
+					'OCTANE_RENDERER_VALIDATION',
 					state.filename,
 					node,
 					`renderer ${JSON.stringify(state.renderer.id)} does not allow <${name}> under <${nearestHost}>.`,
@@ -1997,6 +2029,7 @@ function validateHostTemplates(ast, state, validation, isAuthored) {
 						continue;
 					}
 					throw universalError(
+						'OCTANE_RENDERER_VALIDATION',
 						state.filename,
 						attribute,
 						`renderer ${JSON.stringify(state.renderer.id)} does not allow static attribute ${JSON.stringify(attributeValue)} on <${name}>.`,
@@ -2898,6 +2931,7 @@ function componentRender(fn, state, force = false) {
 	if (!component) return null;
 	if (fn.async || fn.generator) {
 		throw universalError(
+			'OCTANE_COMPONENT_FUNCTION_KIND',
 			state.filename,
 			fn,
 			'async/generator component functions are not supported yet.',
@@ -2933,7 +2967,12 @@ function jsxNameExpressionAst(node, state) {
 		assertNoResidualTemplate(name.expression, state, 'a dynamic component name');
 		return rewriteSourceAst(name.expression, state);
 	}
-	throw universalError(state.filename, node, 'unsupported JSX tag name.');
+	throw universalError(
+		'OCTANE_UNIVERSAL_UNSUPPORTED',
+		state.filename,
+		node,
+		'unsupported JSX tag name.',
+	);
 }
 
 function contextProviderExpressionAst(node, state) {
@@ -3092,7 +3131,12 @@ function compilePropsAst(
 		const rawName = host ? hostAttributeName(attribute, state) : attributeName(attribute);
 		const name = canonicalHostAttributeName(rawName, canonicalizeHostClass);
 		if (name === null) {
-			throw universalError(state.filename, attribute, 'namespaced JSX attributes are unsupported.');
+			throw universalError(
+				'OCTANE_UNIVERSAL_UNSUPPORTED',
+				state.filename,
+				attribute,
+				'namespaced JSX attributes are unsupported.',
+			);
 		}
 		const value = attribute.value;
 		let expression;
@@ -3108,6 +3152,7 @@ function compilePropsAst(
 			continue;
 		} else {
 			throw universalError(
+				'OCTANE_UNIVERSAL_UNSUPPORTED',
 				state.filename,
 				attribute,
 				`unsupported value for JSX attribute ${name}.`,
@@ -3249,6 +3294,7 @@ function loweredHostClassAst(expression, state) {
 function compileAttributeAst(attribute, context, state, canonicalizeHostClass) {
 	if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') {
 		throw universalError(
+			'OCTANE_UNIVERSAL_UNSUPPORTED',
 			state.filename,
 			attribute,
 			'host spreads require the ordered universal prop program.',
@@ -3259,7 +3305,12 @@ function compileAttributeAst(attribute, context, state, canonicalizeHostClass) {
 		canonicalizeHostClass,
 	);
 	if (name === null) {
-		throw universalError(state.filename, attribute, 'namespaced host attributes are unsupported.');
+		throw universalError(
+			'OCTANE_UNIVERSAL_UNSUPPORTED',
+			state.filename,
+			attribute,
+			'namespaced host attributes are unsupported.',
+		);
 	}
 	if (name === 'key') return null;
 	const value = attribute.value;
@@ -3283,7 +3334,12 @@ function compileAttributeAst(attribute, context, state, canonicalizeHostClass) {
 		context.values.push(mainThreadHostValueAst(name, value.expression, state));
 		return { name, slot };
 	}
-	throw universalError(state.filename, attribute, `unsupported value for host attribute ${name}.`);
+	throw universalError(
+		'OCTANE_UNIVERSAL_UNSUPPORTED',
+		state.filename,
+		attribute,
+		`unsupported value for host attribute ${name}.`,
+	);
 }
 
 /**
@@ -3345,6 +3401,7 @@ function compileHostElementAst(node, context, state) {
 	if (isComponentElement(node)) return compileComponentElementAst(node, context, state);
 	if (type === null) {
 		throw universalError(
+			'OCTANE_UNIVERSAL_UNSUPPORTED',
 			state.filename,
 			node,
 			'member-expression and namespaced host tags are unsupported.',
@@ -3360,6 +3417,7 @@ function compileHostElementAst(node, context, state) {
 		);
 		if (spread !== undefined) {
 			throw universalError(
+				'OCTANE_UNIVERSAL_UNSUPPORTED',
 				state.filename,
 				spread,
 				'main-thread render-only host spreads are unsupported because first-screen event and ref props must be statically named for callback erasure; expand the spread into explicit host props.',
@@ -3415,6 +3473,7 @@ function compileHostElementAst(node, context, state) {
 function compileActivityElementAst(node, context, state) {
 	if (!rendererHasCapability(state, 'visibility')) {
 		throw universalError(
+			'OCTANE_UNIVERSAL_UNSUPPORTED',
 			state.filename,
 			node,
 			'Activity requires an explicit renderer visibility capability.',
@@ -3425,6 +3484,7 @@ function compileActivityElementAst(node, context, state) {
 	for (const attribute of attributes) {
 		if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') {
 			throw universalError(
+				'OCTANE_ACTIVITY_MODE',
 				state.filename,
 				attribute,
 				'Activity props must declare mode explicitly; spreads are unsupported.',
@@ -3433,18 +3493,25 @@ function compileActivityElementAst(node, context, state) {
 		const name = attributeName(attribute);
 		if (name !== 'mode') {
 			throw universalError(
+				'OCTANE_UNIVERSAL_UNSUPPORTED',
 				state.filename,
 				attribute,
 				`Activity does not support the ${JSON.stringify(name)} prop in universal content.`,
 			);
 		}
 		if (mode !== null) {
-			throw universalError(state.filename, attribute, 'Activity mode may be declared only once.');
+			throw universalError(
+				'OCTANE_ACTIVITY_MODE',
+				state.filename,
+				attribute,
+				'Activity mode may be declared only once.',
+			);
 		}
 		const value = attribute.value;
 		if (value?.type === 'Literal') {
 			if (value.value !== 'visible' && value.value !== 'hidden') {
 				throw universalError(
+					'OCTANE_ACTIVITY_MODE',
 					state.filename,
 					attribute,
 					'Activity mode must be either "visible" or "hidden".',
@@ -3459,6 +3526,7 @@ function compileActivityElementAst(node, context, state) {
 			mode = dynamicExpressionAst(value.expression, state);
 		} else {
 			throw universalError(
+				'OCTANE_ACTIVITY_MODE',
 				state.filename,
 				attribute,
 				'Activity mode must be "visible", "hidden", or an expression producing one.',
@@ -3466,7 +3534,12 @@ function compileActivityElementAst(node, context, state) {
 		}
 	}
 	if (mode === null) {
-		throw universalError(state.filename, node, 'Activity requires an explicit mode prop.');
+		throw universalError(
+			'OCTANE_ACTIVITY_MODE',
+			state.filename,
+			node,
+			'Activity requires an explicit mode prop.',
+		);
 	}
 	const body = compileBlockValueAst(node.children ?? [], state, [], node);
 	return addDynamicAst(
@@ -3611,8 +3684,15 @@ function lowerArmExitsAst(setup, state) {
 			return;
 		}
 		const jump = armJump(node, loop, breakable);
-		if (jump === 'value') throw universalError(state.filename, node, ARM_VALUE_RETURN_MESSAGE);
-		if (jump === 'break') throw universalError(state.filename, node, ARM_BREAK_MESSAGE);
+		if (jump === 'value')
+			throw universalError(
+				'OCTANE_ARM_VALUE_RETURN',
+				state.filename,
+				node,
+				ARM_VALUE_RETURN_MESSAGE,
+			);
+		if (jump === 'break')
+			throw universalError('OCTANE_ARM_BREAK', state.filename, node, ARM_BREAK_MESSAGE);
 		if (jump === 'exit') {
 			if (type === 'ContinueStatement') {
 				state.astNodeReplacements ??= new WeakMap();
@@ -3824,6 +3904,7 @@ function forRowKeyAttribute(node, state) {
 			);
 			if (binding?.scope === rowScope || binding?.scope === analysis.rootScope) {
 				throw universalError(
+					'OCTANE_FOR_KEY_BODY_BINDING',
 					state.filename,
 					attribute,
 					`the \`key\` attribute on this \`@for\` row reads \`${child.name}\`, which is ` +
@@ -3877,6 +3958,7 @@ function forRowTemplateBody(node) {
 function compileForAst(authored, context, state) {
 	if (authored.await) {
 		throw universalError(
+			DIAGNOSTIC_CODES.TARGET_FOR_AWAIT_UNSUPPORTED,
 			state.filename,
 			authored,
 			'await @for requires the async-collection capability.',
@@ -3884,7 +3966,12 @@ function compileForAst(authored, context, state) {
 	}
 	const declaration = authored.left?.declarations?.[0];
 	if (!declaration?.id) {
-		throw universalError(state.filename, authored, 'universal @for requires one item binding.');
+		throw universalError(
+			'OCTANE_FOR_ITEM_BINDING',
+			state.filename,
+			authored,
+			'universal @for requires one item binding.',
+		);
 	}
 	const attributeKey = forRowKeyAttribute(authored, state);
 	const rowBody = forRowTemplateBody(authored);
@@ -4122,6 +4209,7 @@ function compileChildAst(node, context, state) {
 		if (value === '' || state.renderer.text === 'ignore') return [];
 		if (state.renderer.text !== 'host') {
 			throw universalError(
+				'OCTANE_RENDERER_VALIDATION',
 				state.filename,
 				node,
 				`renderer ${JSON.stringify(state.renderer.id)} rejects authored text children.`,
@@ -4171,9 +4259,19 @@ function compileChildAst(node, context, state) {
 		throw universalStyleError(node, state);
 	}
 	if (node.type === 'JSXActivityExpression') {
-		throw universalError(state.filename, node, 'unsupported Activity expression shape.');
+		throw universalError(
+			'OCTANE_UNIVERSAL_UNSUPPORTED',
+			state.filename,
+			node,
+			'unsupported Activity expression shape.',
+		);
 	}
-	throw universalError(state.filename, node, `unsupported template node ${node.type}.`);
+	throw universalError(
+		'OCTANE_UNIVERSAL_UNSUPPORTED',
+		state.filename,
+		node,
+		`unsupported template node ${node.type}.`,
+	);
 }
 
 function compileChildrenAst(children, context, state) {

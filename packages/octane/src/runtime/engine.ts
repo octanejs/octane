@@ -746,28 +746,59 @@ export let TRANSITION_PENDING_COUNT = 0;
  * Batches each holder keeps waiting: a Suspense boundary or root whose
  * dropped render suspended on them (dropTransitionRender). A held batch keeps
  * its hooks pending and no render folds it until its holder retries it
- * (retryTransitionHolder).
+ * (retryTransitionHolder). A boundary can hold its root's request too.
  */
 export let TRANSITION_HOLDERS: Map<object, TransitionHold> | null = null;
 /** Holders a new update woke, retried in the transition task once that update committed. */
 let WOKEN_TRANSITION_HOLDERS: Set<object> | null = null;
 /** Released batches waiting for that task, as (batch, render, fall) triples (retryTransitionBatch). */
 let RETRIED_TRANSITION_BATCHES: Array<TransitionActionBatch | boolean> | null = null;
+/** Released root requests waiting for that task, as (owner, generation) pairs (retryRootRequest). */
+let RETRIED_ROOT_REQUESTS: Array<RootRenderOwner | number> | null = null;
 
-export function holdTransitionBatch(holder: object, batch: TransitionActionBatch): void {
+/** `holder`'s hold, suspending its work again if it had stopped (unsuspendTransitionHolder). */
+export function suspendingTransitionHold(holder: object): TransitionHold {
 	const holders = (TRANSITION_HOLDERS ??= new Map());
 	let hold = holders.get(holder);
-	if (hold === undefined) holders.set(holder, (hold = { batches: new Set(), suspends: true }));
+	if (hold === undefined)
+		holders.set(holder, (hold = { batches: new Set(), suspends: true, request: -1 }));
 	else if (!hold.suspends) {
 		// The holder suspended its retried work again.
 		hold.suspends = true;
 		for (const held of hold.batches) held.suspended++;
 	}
+	return hold;
+}
+
+export function holdTransitionBatch(holder: object, batch: TransitionActionBatch): void {
+	const hold = suspendingTransitionHold(holder);
 	if (hold.batches.has(batch)) return;
 	hold.batches.add(batch);
 	batch.pendingHolds = (batch.pendingHolds ?? 0) + 1;
 	if (hold.suspends) batch.suspended++;
 	raiseHeldTransitionBatch(batch);
+}
+
+/**
+ * Render a held root request again at transition priority, returning false
+ * when a later request or its commit replaced it (a new generation). Inside a
+ * render or flush the retry waits for the transition task, as
+ * retryTransitionBatch does.
+ */
+export function retryRootRequest(owner: RootRenderOwner, generation: number): boolean {
+	if (owner.disposed || owner.generation !== generation) return false;
+	if (inFlush || CURRENT_BLOCK !== null) {
+		(RETRIED_ROOT_REQUESTS ??= []).push(owner, generation);
+		scheduleTransitionTask();
+		return true;
+	}
+	TRANSITION_DEPTH++;
+	try {
+		owner.retry();
+	} finally {
+		TRANSITION_DEPTH--;
+	}
+	return true;
 }
 
 /**
@@ -811,6 +842,13 @@ export function unsuspendTransitionHolder(holder: object): void {
 			(RETRIED_TRANSITION_BATCHES ??= []).push(batch, true, false);
 			scheduleTransitionTask();
 		}
+	if (hold.request !== -1) {
+		(RETRIED_ROOT_REQUESTS ??= []).push(
+			(holder as TrySlot).parentBlock.idState.renderOwner!,
+			hold.request,
+		);
+		scheduleTransitionTask();
+	}
 }
 // Pending-state hook publications are runtime-owned render work. When a hook
 // publishes while another component is rendering, its scheduled refresh must
@@ -979,6 +1017,11 @@ function retryWokenTransitions(): void {
 				retried[i + 2] as boolean,
 			);
 	}
+	const requests = RETRIED_ROOT_REQUESTS;
+	RETRIED_ROOT_REQUESTS = null;
+	if (requests !== null)
+		for (let i = 0; i < requests.length; i += 2)
+			retryRootRequest(requests[i] as RootRenderOwner, requests[i + 1] as number);
 }
 
 /**
@@ -2136,7 +2179,8 @@ export function scheduleTransitionTask(): void {
 		if (transitionTask !== id) return;
 		TRANSITION_TASK_ACTIVE = true;
 		try {
-			if (WOKEN_TRANSITION_HOLDERS || RETRIED_TRANSITION_BATCHES) retryWokenTransitions();
+			if (WOKEN_TRANSITION_HOLDERS || RETRIED_TRANSITION_BATCHES || RETRIED_ROOT_REQUESTS)
+				retryWokenTransitions();
 			adoptTransitionQueue(true);
 			flush();
 		} finally {
@@ -2163,7 +2207,8 @@ export function adoptTransitionQueue(drain?: boolean): void {
 		else scheduleTransitionTask();
 	}
 	// Woken holds retry in a task of their own, after this drain's commit.
-	if (WOKEN_TRANSITION_HOLDERS || RETRIED_TRANSITION_BATCHES) scheduleTransitionTask();
+	if (WOKEN_TRANSITION_HOLDERS || RETRIED_TRANSITION_BATCHES || RETRIED_ROOT_REQUESTS)
+		scheduleTransitionTask();
 }
 
 /**
@@ -4660,7 +4705,11 @@ export function useSyncExternalStore<T>(
 		// with an unstable inline getSnapshot enqueue nothing. Queue a commit-sync
 		// ONLY when the read snapshot moved off the last-committed value, or the store
 		// was swapped — an unchanged snapshot pushes nothing (the optimization).
-		inst.getSnapshot = getSnapshot;
+		// A dropped render restores the selector the screen still shows (#1341).
+		if (inst.getSnapshot !== getSnapshot) {
+			journalRootProperty(inst, 'getSnapshot', inst.getSnapshot);
+			inst.getSnapshot = getSnapshot;
+		}
 		if (!Object.is(value, inst.value) || subscribe !== inst.subscribe) {
 			enqueueStoreSync(inst, value, subscribe);
 		}

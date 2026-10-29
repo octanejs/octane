@@ -151,7 +151,10 @@ export function assertNativeReadOptions(options) {
 		options.renderer?.target != null &&
 		options.renderer.target !== 'dom'
 	) {
-		throw new Error('Octane native signal reads support only the DOM client and server.');
+		throw Object.assign(
+			new Error('Octane native signal reads support only the DOM client and server.'),
+			{ code: 'OCTANE_NATIVE_READ_TARGET' },
+		);
 	}
 }
 
