@@ -33,7 +33,9 @@ import {
 	createVolarMappingsResult,
 	dedupeMappings,
 	error as collectCompileError,
+	TSRX_ERRORS,
 } from '@tsrx/core';
+import { mapArmExits } from './arm-exits.js';
 import { collectDescriptorChildrenBindings, soleRenderPropChild } from './descriptor-lowering.js';
 import { buildFatSegments, decodeSourceMappings } from './fat-segments.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
@@ -440,6 +442,30 @@ function projectServerContextCalls(ast, filename) {
 		: ast;
 }
 
+// What the shared transform reports for a return in an `@for` or `@if` arm.
+const ARM_EXIT_REPORTS = new Set([
+	TSRX_ERRORS.FOR_RETURN_STATEMENT.code,
+	TSRX_ERRORS.IF_RETURN_STATEMENT.code,
+]);
+
+/**
+ * A directive arm ends early with `return;`, `return null;`, or a `continue;`
+ * that no inner loop owns (see arm-exits.js). The shared transform prints each
+ * arm as a function body, such as the `map_iterable` callback of an `@for`
+ * row, so a return there is the same exit, and TypeScript narrows the rest of
+ * the arm after it. A `continue` cannot leave that function, so it prints as
+ * `return;`. The transform checks arms against TSRX's own rules, which have no
+ * exits, so `exits` collects their starts for the caller to drop those
+ * ARM_EXIT_REPORTS. A value return, or a `break` that leaves the directive, is
+ * still reported: compiling rejects both.
+ */
+function projectArmExits(ast, exits) {
+	return mapArmExits(ast, (node) => {
+		exits?.add(node.start);
+		return node.type === 'ContinueStatement' ? b.return(null, node) : node;
+	});
+}
+
 const OCTANE_PLATFORM_WITH_AUTHORED_SUSPENSE = {
 	...OCTANE_PLATFORM,
 	hooks: {
@@ -761,7 +787,8 @@ export function compileToVolarMappings(source, filename, options) {
 		transformAst = { ...ast, body: [first, ...ast.body.slice(1)] };
 	}
 	const dynamicJsxTypes = prepareDynamicJsxTypes(transformAst, printComments);
-	transformAst = dynamicJsxTypes.ast;
+	const armExits = new Set();
+	transformAst = projectArmExits(dynamicJsxTypes.ast, armExits);
 
 	// The `module server { … }` dialect is lowered to plain checkable TS by
 	// the shared transform itself (via the platform's `serverModule` option)
@@ -826,7 +853,9 @@ export function compileToVolarMappings(source, filename, options) {
 		source,
 		generated_code: transformed.code,
 		source_map: transformed.map,
-		errors,
+		errors: errors.filter(
+			(error) => !(armExits.has(error.pos) && ARM_EXIT_REPORTS.has(error.code)),
+		),
 	});
 	const mappings = dedupeMappings(result.mappings);
 	return {
@@ -1029,7 +1058,7 @@ export function compileTypesInspection(source, filename, options) {
 		: createRendererTypePragma(renderer, ast);
 	const typeOnlyComments = rendererPragma === null ? comments : [rendererPragma, ...comments];
 	const dynamicJsxTypes = prepareDynamicJsxTypes(ast, typeOnlyComments);
-	const transformAst = dynamicJsxTypes.ast;
+	const transformAst = projectArmExits(dynamicJsxTypes.ast);
 	const transform = selectOctaneTransform(ast, dynamicJsxTypes?.componentAlias);
 	const transformed = transform(
 		projectServerContextCalls(

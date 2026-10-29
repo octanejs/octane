@@ -2012,6 +2012,100 @@ export function Invalid(value: SignalHandle<string>) @{ <p>{value as string}</p>
 		expect(result.code).toContain('x.label');
 	});
 
+	it('types directive arm early exits as the exits they compile to', () => {
+		// An arm ends early with `return;`, `return null;`, or a `continue;` that no
+		// inner loop owns. Each is a return from the function the arm becomes in the
+		// virtual TSX, so the rest of the arm is checked with the exit's narrowing:
+		// `row.user` is defined after `if (!row.user) continue;`. A `@switch` case's
+		// `continue;` ends that case, and the inner loop keeps its own `continue`.
+		const rows = `type Row = { id: string; hidden: boolean; tags: string[]; user?: { name: string }; kind: number };
+export function Rows({ rows }: { rows: Row[] }) @{
+	<ul>
+		@for (const row of rows; key row.id) {
+			if (row.hidden) return null;
+			if (!row.user) continue;
+			let tagged = 0;
+			for (const tag of row.tags) {
+				if (!tag) continue;
+				tagged++;
+			}
+			<li>
+				{row.user.name.toUpperCase()}
+				@switch (row.kind) {
+					@case 1: {
+						if (tagged === 0) continue;
+						<b>{tagged}</b>
+					}
+					@default: { <i /> }
+				}
+			</li>
+		}
+	</ul>
+}
+export function Greeting({ user }: { user?: { name?: string } }) @{
+	<p>
+		@if (user) {
+			if (!user.name) return;
+			<span>{user.name.toUpperCase()}</span>
+		}
+	</p>
+}
+`;
+		// The row keeps its element type rather than widening to `any`.
+		const invalidRows = rows.replace('row.user.name.toUpperCase()', 'row.user.label.toUpperCase()');
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-arm-exits-'));
+		try {
+			mkdirSync(join(root, 'node_modules'));
+			symlinkSync(
+				fileURLToPath(new URL('../..', import.meta.url)),
+				join(root, 'node_modules/octane'),
+				'dir',
+			);
+			const valid = compileToVolarMappings(rows, '/src/Rows.tsrx');
+			const invalid = compileToVolarMappings(invalidRows, '/src/Invalid.tsrx');
+			expect(valid.errors).toEqual([]);
+			expect(invalid.errors).toEqual([]);
+			const files = {
+				valid: join(root, 'Rows.tsx'),
+				inspection: join(root, 'Rows.inspection.tsx'),
+				invalid: join(root, 'Invalid.tsx'),
+			};
+			writeFileSync(files.valid, valid.code);
+			writeFileSync(files.inspection, compileTypesInspection(rows, '/src/Rows.tsrx').code);
+			writeFileSync(files.invalid, invalid.code);
+			const program = ts.createProgram({
+				rootNames: Object.values(files),
+				options: {
+					jsx: ts.JsxEmit.Preserve,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					noEmit: true,
+					skipLibCheck: true,
+					strict: true,
+					target: ts.ScriptTarget.ESNext,
+					types: [],
+				},
+			});
+			const codes = (file: string) =>
+				ts.getPreEmitDiagnostics(program, program.getSourceFile(file)).map(({ code }) => code);
+			expect(codes(files.valid)).toEqual([]);
+			expect(codes(files.inspection)).toEqual([]);
+			expect(codes(files.invalid)).toEqual([2339]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+
+		// A value return has nothing to render in the row's place, and compiling
+		// rejects it, so the editor still reports it.
+		const valueReturn = compileToVolarMappings(
+			'export function Rows({ xs }: { xs: number[] }) @{\n' +
+				'\t<ul>@for (const x of xs; key x) { if (x) return 1; <li /> }</ul>\n' +
+				'}\n',
+			'/src/ValueReturn.tsrx',
+		);
+		expect(valueReturn.errors.map(({ code }) => code)).toEqual(['TSRX2005']);
+	});
+
 	it('preserves declare global as a type-checkable global augmentation', () => {
 		const src =
 			'export {};\n' +
@@ -2262,6 +2356,51 @@ export const ordinaryResult: string = ordinary('draft', { count: 1 });
 					.getPreEmitDiagnostics(program)
 					.map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n')),
 			).toEqual([]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('keeps a one-parameter generic arrow function generic in the virtual TSX', () => {
+		// The virtual file is TSX, where `<T>(x: T) => x` opens a JSX element `T`.
+		// Printed without the trailing comma of `<T,>`, the arrow reports TS17008
+		// and every statement after it a syntax error, on source that compiles.
+		const src =
+			'const first = <T,>(items: readonly T[]): T | undefined => items[0];\n' +
+			'const constant = <const T,>(value: T) => value;\n' +
+			'export const count: number | undefined = first([1, 2]);\n' +
+			"export const label: 'ready' = constant('ready');\n" +
+			'export function First(props: { items: string[] }) @{\n' +
+			"\t<p>{first(props.items) ?? ''}</p>\n" +
+			'}\n';
+		// The parameter is inferred, so a mismatched element type is an error.
+		const invalidSource = src.replace('count: number | undefined', 'count: string | undefined');
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-generic-arrow-'));
+		try {
+			writeOctaneJsxRuntimeStub(root, '\t\tp: { children?: unknown };');
+			const files = Object.entries({ First: src, Invalid: invalidSource }).map(([name, source]) => {
+				const result = compileToVolarMappings(source, `/src/${name}.tsrx`);
+				expect(result.errors).toEqual([]);
+				const file = join(root, `${name}.tsx`);
+				writeFileSync(file, result.code);
+				return file;
+			});
+			const program = ts.createProgram({
+				rootNames: files,
+				options: {
+					jsx: ts.JsxEmit.Preserve,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					noEmit: true,
+					skipLibCheck: true,
+					strict: true,
+					target: ts.ScriptTarget.ESNext,
+				},
+			});
+			const codes = (file: string) =>
+				ts.getPreEmitDiagnostics(program, program.getSourceFile(file)).map(({ code }) => code);
+			expect(codes(files[0])).toEqual([]);
+			expect(codes(files[1])).toEqual([2322]);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
