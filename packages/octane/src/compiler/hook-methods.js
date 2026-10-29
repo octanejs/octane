@@ -58,8 +58,11 @@ export function assertSynchronousHookMethod(node) {
 		);
 	}
 	if (suspends(node)) {
-		throw new SyntaxError(
-			'An Octane hook method cannot contain await or yield in its receiver or arguments. Evaluate the suspended expression before calling the hook method.',
+		throw Object.assign(
+			new SyntaxError(
+				'An Octane hook method cannot contain await or yield in its receiver or arguments. Evaluate the suspended expression before calling the hook method.',
+			),
+			{ code: 'OCTANE_HOOK_METHOD_SUSPENSION' },
 		);
 	}
 }

@@ -46,8 +46,11 @@ export function isDirectSignalHandleExpression(node) {
 function rejectNestedHandles(node) {
 	if (!node || typeof node !== 'object') return;
 	if (isDirectSignalHandleExpression(node))
-		throw new Error(
-			'Native JSX signal projections do not support handles inside callbacks, constructors, or tagged templates.',
+		throw Object.assign(
+			new Error(
+				'Native JSX signal projections do not support handles inside callbacks, constructors, or tagged templates.',
+			),
+			{ code: 'OCTANE_NATIVE_PROJECTION_READ' },
 		);
 	for (const key of Object.keys(node)) {
 		if (!['metadata', 'loc', 'start', 'end'].includes(key)) rejectNestedHandles(node[key]);
@@ -66,8 +69,11 @@ export function lowerNativeAttributeReads(expression, read) {
 		}
 		if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
 			if (isDirectSignalHandleExpression(node.object))
-				throw new Error(
-					'Native JSX signal projections require .get() before reading a signal payload property.',
+				throw Object.assign(
+					new Error(
+						'Native JSX signal projections require .get() before reading a signal payload property.',
+					),
+					{ code: 'OCTANE_NATIVE_PROJECTION_READ' },
 				);
 			return {
 				...node,

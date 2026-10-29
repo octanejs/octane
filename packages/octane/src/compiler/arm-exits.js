@@ -169,7 +169,10 @@ export function assertTemplateJumps(ast, source, filename) {
 					: region === BLOCK && !(type === 'ContinueStatement' ? loop : breakable);
 			if (leaves) {
 				const at = node.loc ? ` (${file}:${node.loc.start.line}:${node.loc.start.column})` : '';
-				throw new Error((region === BLOCK ? BLOCK_JUMP_MESSAGE : ARM_LABEL_MESSAGE) + at);
+				throw Object.assign(
+					new Error((region === BLOCK ? BLOCK_JUMP_MESSAGE : ARM_LABEL_MESSAGE) + at),
+					{ code: region === BLOCK ? 'OCTANE_BLOCK_JUMP' : 'OCTANE_ARM_LABELED_JUMP' },
+				);
 			}
 			return;
 		}

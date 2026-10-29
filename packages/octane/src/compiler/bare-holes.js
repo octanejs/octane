@@ -45,7 +45,7 @@ export function assertNoBareHoles(ast, source, filename) {
 				const at = statement.loc
 					? ` (${file}:${statement.loc.start.line}:${statement.loc.start.column})`
 					: '';
-				throw new Error(BARE_HOLE_MESSAGE + at);
+				throw Object.assign(new Error(BARE_HOLE_MESSAGE + at), { code: 'OCTANE_BARE_HOLE' });
 			}
 		}
 	};
