@@ -13,7 +13,7 @@ export const KNOWN_BINDINGS = {
 	zustand: '@octanejs/zustand',
 	valtio: '@octanejs/valtio',
 	jotai: '@octanejs/jotai',
-	'@effect/atom-react': '@octanejs/effect-atom-react',
+	'@effect/atom-react': '@octanejs/effect-atom',
 	'@mantine/hooks': '@octanejs/mantine-hooks',
 	'mobx-react-lite': '@octanejs/mobx',
 	'mobx-react': '@octanejs/mobx',

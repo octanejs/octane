@@ -40,7 +40,7 @@ surface and evidence.
 | `@octanejs/draggable` | 0 |
 | `@octanejs/drei` | 0 |
 | `@octanejs/dropzone` | 0 |
-| `@octanejs/effect-atom-react` | 0 |
+| `@octanejs/effect-atom` | 0 |
 | `@octanejs/electron` | 0 |
 | `@octanejs/email` | 0 |
 | `@octanejs/email-cli` | 0 |

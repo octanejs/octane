@@ -47,9 +47,9 @@
   },
   {
     "kind": "library-binding",
-    "id": "binding-effect-atom-react",
+    "id": "binding-effect-atom",
     "title": "Effect Atom",
-    "packageName": "@octanejs/effect-atom-react",
+    "packageName": "@octanejs/effect-atom",
     "upstreamPackage": "@effect/atom-react",
     "category": "State Management",
     "categoryId": "state-management",

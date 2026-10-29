@@ -259,23 +259,19 @@ describe('runCodemod', () => {
 		const result = await runCodemod([root], { write: false });
 		const provider = result.files.find((file) => file.file === 'src/atomRegistry.ts');
 		const query = result.files.find((file) => file.file === 'src/query.ts');
-		expect(provider?.code).toContain(
-			"import { RegistryContext } from '@octanejs/effect-atom-react';",
-		);
+		expect(provider?.code).toContain("import { RegistryContext } from '@octanejs/effect-atom';");
 		expect(provider?.code).toContain(
 			'return createElement(RegistryContext, { value: appAtomRegistry }, children);',
 		);
 		expect(query?.code).toContain(
-			"import { RegistryContext, useAtomRefresh, useAtomValue } from '@octanejs/effect-atom-react';",
+			"import { RegistryContext, useAtomRefresh, useAtomValue } from '@octanejs/effect-atom';",
 		);
 		for (const file of [provider, query]) {
 			expect(file?.code).not.toContain("'@effect/atom-react'");
 			expect(file?.code).not.toContain('No Octane port');
 			expect(file?.diagnostics).toEqual([]);
 		}
-		expect(result.packages).toEqual([
-			{ from: '@effect/atom-react', to: '@octanejs/effect-atom-react' },
-		]);
+		expect(result.packages).toEqual([{ from: '@effect/atom-react', to: '@octanejs/effect-atom' }]);
 		expect(result.missing).toEqual([]);
 	});
 
