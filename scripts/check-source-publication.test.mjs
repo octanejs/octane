@@ -138,6 +138,25 @@ test('Node tooling may validate with Node types while its public JS still needs 
 	assert.deepEqual(audit(), []);
 });
 
+test('a later types condition supplies missing siblings but does not override an earlier declaration', () => {
+	const { repo, packages } = createRepository({
+		rootScripts: {},
+		manifest: {
+			type: 'module',
+			files: ['src'],
+			exports: { '.': { default: './src/cli.js', types: './src/public.d.ts' } },
+		},
+		tsconfigs: {},
+		sources: { 'cli.js': '', 'public.d.ts': 'export declare const run: string;', 'private.js': '' },
+	});
+	const [pkg] = packages;
+	pkg.role = 'developer tooling';
+	const audit = () => rulesAndIds(findSourcePublicationViolations(repo, packages));
+	assert.deepEqual(audit(), []);
+	writeFileSync(path.join(pkg.directory, 'src/cli.d.ts'), "export * from './private.js';");
+	assert.deepEqual(audit(), [[RULES.untypedJavaScript, pkg.name]]);
+});
+
 test('a JS integration with a typed entry still guards new untyped or browser source exports', () => {
 	const { repo, packages } = createRepository({
 		rootScripts: {},
@@ -150,7 +169,10 @@ test('a JS integration with a typed entry still guards new untyped or browser so
 	});
 	const [pkg] = packages;
 	pkg.role = 'framework integration';
-	const audit = () => rulesAndIds(findSourcePublicationViolations(repo, packages));
+	const audit = () => {
+		writeJson(path.join(pkg.directory, 'package.json'), pkg.manifest);
+		return rulesAndIds(findSourcePublicationViolations(repo, packages));
+	};
 	mkdirSync(path.join(pkg.directory, 'types'));
 	writeFileSync(
 		path.join(pkg.directory, 'types/index.d.ts'),
@@ -217,7 +239,7 @@ test('strict Node consumers get typed CLI, codemod and MCP APIs through package 
 		import { searchBindings } from '@octanejs/cli/data';
 		import { applyFixes } from '@octanejs/cli/fix';
 		import { runCodemod } from '@octanejs/codemod';
-		import { createServer } from '@octanejs/mcp-server';
+		import { createServer, issueContext } from '@octanejs/mcp-server';
 		import { scanSource } from '@octanejs/mcp-server/bridge';
 		import { explainStrong } from '@octanejs/mcp-server/strong';
 
@@ -228,6 +250,11 @@ test('strict Node consumers get typed CLI, codemod and MCP APIs through package 
 		const result = await runCodemod(['src'], { target: 'tsrx', write: false });
 		result.files[0].diagnostics[0].message.toUpperCase();
 		createServer({ repoRoot: '.' }).close();
+		const issue = await issueContext('.', { issue: 123 });
+		// @ts-expect-error successful lookups do not expose subprocess output
+		issue.stdout.toUpperCase();
+		if ('triage' in issue) issue.triage.labels.join(', ');
+		else issue.stderr.toUpperCase();
 		scanSource('useState').apis.get('useState')?.toFixed();
 		explainStrong({ recipe: 'lazy-ref' }).text.toUpperCase();
 		// @ts-expect-error main takes an argv array

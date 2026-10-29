@@ -450,44 +450,63 @@ function untypedToolExports(pkg) {
 		}
 	}
 
-	function visit(target, types) {
+	// Let TypeScript select the declaration for each public subpath. Conditional
+	// exports are ordered and can fall through when a target has no declaration.
+	function checkExport(subpath, conditions) {
+		const specifier = pkg.name + subpath.slice(1);
+		const options = {
+			moduleResolution: ts.ModuleResolutionKind.Bundler,
+			customConditions: conditions,
+		};
+		for (const mode of [ts.ModuleKind.ESNext, ts.ModuleKind.CommonJS]) {
+			const resolved = ts.resolveModuleName(
+				specifier,
+				path.join(directory, 'consumer.ts'),
+				options,
+				ts.sys,
+				undefined,
+				undefined,
+				mode,
+			).resolvedModule;
+			// A subpath can be unavailable for one mode or explicitly blocked.
+			if (!resolved) continue;
+			const file = toPosix(path.relative(directory, resolved.resolvedFileName));
+			if (DECLARATION_FILE.test(file)) checkDeclaration(file);
+			else if (JAVASCRIPT_MODULE.test(file)) missing.add(file);
+		}
+	}
+
+	function visit(subpath, target, conditions) {
 		if (typeof target === 'string') {
-			if (DECLARATION_FILE.test(target) && !target.includes('*')) {
-				checkDeclaration(target.slice(2));
-				return;
-			}
-			if (!JAVASCRIPT_MODULE.test(target) && !target.includes('*')) return;
-			const relative = target.slice(2);
-			if (relative.includes('*')) {
-				// In a package export, every '*' stands for the same substring,
+			if (!subpath.includes('*') || !target.includes('*')) {
+				checkExport(subpath, conditions);
+			} else {
+				// Node substitutes every target '*' with the same substring,
 				// which may span directories (unlike a tsconfig glob).
-				const [prefix, ...parts] = relative
+				const [prefix, ...parts] = target
+					.slice(2)
 					.split('*')
 					.map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
 				const pattern = new RegExp(`^${prefix}(.+)${parts.join('\\1')}$`);
 				packageFiles ??= collectSourceFiles(directory);
 				for (const file of packageFiles) {
 					const match = pattern.exec(file);
-					if (match && JAVASCRIPT_MODULE.test(file) && isPacked(file)) {
-						checkDeclaration(
-							types ? types.slice(2).replaceAll('*', match[1]) : siblingDeclaration(file),
-						);
-					}
+					if (match && isPacked(file)) checkExport(subpath.replace('*', match[1]), conditions);
 				}
-			} else {
-				checkDeclaration(types ? types.slice(2) : siblingDeclaration(relative));
 			}
+		} else if (Array.isArray(target)) {
+			for (const entry of target) visit(subpath, entry, conditions);
 		} else if (target && typeof target === 'object') {
-			for (const [condition, value] of Object.entries(target)) {
-				if (condition === 'types' && typeof value === 'string' && DECLARATION_FILE.test(value)) {
-					types ??= value;
-				} else {
-					visit(value, types);
-				}
+			for (const [key, value] of Object.entries(target)) {
+				if (key.startsWith('.')) visit(key, value, conditions);
+				else if (['import', 'require', 'default', 'types'].includes(key))
+					visit(subpath, value, conditions);
+				else visit(subpath, value, [...conditions, key]);
 			}
 		}
 	}
-	visit(manifest.exports);
+	visit('.', manifest.exports, []);
+
 	return [...missing].sort();
 }
 

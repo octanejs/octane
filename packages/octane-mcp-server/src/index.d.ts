@@ -57,12 +57,12 @@ export declare function issueContext(
 	repoRoot: string,
 	input: { issue: string | number; timeoutMs?: number },
 ): Promise<
-	CommandResult & {
-		command: string[];
-		parseError?: string;
-		issue?: Record<string, unknown>;
-		triage?: { suggestedArea: string; labels: string[]; state: string; url: string };
-	}
+	| (CommandResult & { command: string[]; parseError?: string })
+	| {
+			command: string[];
+			issue: Record<string, unknown>;
+			triage: { suggestedArea: string; labels: string[]; state: string; url: string };
+	  }
 >;
 export declare function createServer(options?: { repoRoot?: string }): McpServer;
 export declare function main(): Promise<void>;
