@@ -1,7 +1,6 @@
 import fs from 'node:fs';
-import { createRequire } from 'node:module';
 import path from 'node:path';
-import { findRoot, scanSourceFiles } from '@octanejs/cli';
+import { findRoot, readInstalled, scanSourceFiles } from '@octanejs/cli';
 import { DATA } from '@octanejs/cli/data';
 import ts from 'typescript';
 import { finding, loadCompiler, thrown } from './compiler.js';
@@ -211,12 +210,13 @@ export async function runCodemod(paths, options = {}) {
 
 /**
  * Whether Octane compiles this module: `.tsrx`, JSX, or a module that imports
- * the runtime.
+ * the runtime. A declaration file is only types.
  *
  * @param {string} file
  * @param {string} code
  */
 function isCompiled(file, code) {
+	if (file.endsWith('.d.ts')) return false;
 	return /\.(?:tsrx|[jt]sx)$/.test(file) || /from\s+['"]octane['"]/.test(code);
 }
 
@@ -301,7 +301,7 @@ function projectProgram(options, files) {
  * @param {string} name
  */
 function isSource(name) {
-	return SOURCE.test(name) && !name.endsWith('.d.ts') && !/\.config\.[cm]?[jt]s$/.test(name);
+	return SOURCE.test(name) && !/\.config\.[cm]?[jt]s$/.test(name);
 }
 
 /**
@@ -442,23 +442,20 @@ function resolveBinding(from, specifier, packages, notes, unmapped) {
 
 /**
  * Whether a package renders through React: it declares `react` as a peer or
- * dependency when installed, or its name says so when it is not.
+ * dependency when installed, or its name says so when it is not. A package
+ * with a `./react` entry (`@pierre/trees/react`) renders through React there,
+ * which the caller matches by subpath; its other entries need no binding. An
+ * optional peer alone does not say which entries use React.
  *
  * @param {string} name
  * @param {string} from
  */
 function rendersWithReact(name, from) {
 	if (name === 'octane' || name.startsWith('@octanejs/') || name.startsWith('node:')) return false;
-	try {
-		const manifest = JSON.parse(
-			fs.readFileSync(createRequire(from).resolve(`${name}/package.json`), 'utf8'),
-		);
-		return ['peerDependencies', 'dependencies'].some(
-			(field) => manifest[field]?.react !== undefined,
-		);
-	} catch {
-		return REACT_PACKAGE.test(name);
-	}
+	const manifest = readInstalled(path.dirname(from), name)?.manifest;
+	if (!manifest) return REACT_PACKAGE.test(name);
+	if (manifest.exports?.['./react']) return false;
+	return ['peerDependencies', 'dependencies'].some((field) => manifest[field]?.react !== undefined);
 }
 
 /**

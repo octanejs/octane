@@ -22,7 +22,8 @@ dependencies over to Octane.
 | Rule | React | Octane |
 | --- | --- | --- |
 | `imports` | `react`, `react-dom`, `react-dom/client` | `octane`, merged into one import |
-| `imports` | `React.useState`, `React.FC` | named imports |
+| `imports` | `React.useState`, `React.FC`, and `React.ReactNode` with no import (the global namespace React's types declare) | named imports |
+| `imports` | `declare module 'react' { namespace JSX { … } }` (custom elements) | `declare module 'octane/jsx-runtime'` |
 | `imports` | React libraries with a binding (`@tanstack/react-query`, ...) | `@octanejs/*` |
 | `template-component` | `function C() { …; return <div /> }` | `function C() @{ …; <div /> }` |
 | `template-if` | `{a ? <A /> : <B />}`, `{a > 0 && <A />}` (also through a `const`) | `@if (a) { <A /> } @else { <B /> }` |
@@ -32,10 +33,12 @@ dependencies over to Octane.
 | `template-text` | `{title}` with `title: string`, `{count}` with `count: number` | `{title as string}`, `{String(count)}`: text bindings, not renderable holes |
 | `hook-dependencies` | `useEffect(fn)` (runs every render) | `useEffect(fn, null)`: an omitted list is inferred in Octane |
 | `forward-ref` | `forwardRef((props, ref) => …)` | `({ ref, ...props }) => …` |
+| `descriptor-children` | a component that clones or inspects `children` (`render={children}`, `cloneElement`, `Children.only`) | `descriptorChildren(…)`, so callers pass elements as React does |
 | `context-provider` | `<Ctx.Provider value>` | `<Ctx value>` |
 | `context-consumer` | `<Ctx.Consumer>{(v) => …}</Ctx.Consumer>` | `@{ const v = useContext(Ctx); … }` |
 | `native-text-change` | `onChange` on a text `<input>` / `<textarea>` | `onInput` (native `change` fires on blur) |
-| `event-object` | `e.nativeEvent`, `e.persist()`, `e.target` on a control | `e`, removed, `e.currentTarget` |
+| `native-text-change` | `function Input({ ...props }) { return <input {...props} /> }` | `function Input({ onChange, ...props }) @{ <input onInput={onChange} {...props} /> }` |
+| `event-object` | `e.nativeEvent`, `e.persist()`, `e.target` on a control, also through a component typed for one | `e`, removed, `e.currentTarget` |
 | `class-attribute` | `className` on an HTML element | `class` |
 | `legacy-root` | `ReactDOM.render(el, c)` | `createRoot(c).render(el)` |
 | `root-render` | `root.render(<App a={1} />)`, `hydrateRoot(c, createElement(App, p))` | `root.render(App, { a: 1 })`, `hydrateRoot(c, App, p)`: no generic element renderer |

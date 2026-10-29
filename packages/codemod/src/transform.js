@@ -68,6 +68,7 @@ const RULE = {
 	classComponent: 'class-component',
 	consumer: 'context-consumer',
 	defaultProps: 'default-props',
+	descriptorChildren: 'descriptor-children',
 	deps: 'hook-dependencies',
 	eventObject: 'event-object',
 	forwardRef: 'forward-ref',
@@ -272,6 +273,20 @@ function nodeSpanning(sf, start, end) {
 		if (child.getStart(sf) === start && child.end === end) return child;
 		node = child;
 	}
+}
+
+/**
+ * The attribute an element sets by `name`.
+ *
+ * @param {ts.JsxOpeningLikeElement} element
+ * @param {string} name
+ */
+function attributeOf(element, name) {
+	return /** @type {ts.JsxAttribute | undefined} */ (
+		element.attributes.properties.find(
+			(a) => ts.isJsxAttribute(a) && ts.isIdentifier(a.name) && a.name.text === name,
+		)
+	);
 }
 
 /**
@@ -579,6 +594,14 @@ class ModuleTransform {
 		this.bare = new Set();
 		/** Functions whose parameter list a rule replaced. */
 		this.parameters = new Map();
+		/** @type {Set<ts.BindingElement>} Rest props that give up `onChange` to a text field. */
+		this.restChange = new Set();
+		/** @type {Set<ts.JsxSpreadAttribute>} Spreads of those rest props, which pass it as `onInput`. */
+		this.changeSpreads = new Set();
+		/** @type {Set<ts.VariableDeclaration | ts.FunctionDeclaration>} Components to mark `descriptorChildren`. */
+		this.descriptorComponents = new Set();
+		/** Whether a `declare module` now augments `octane/jsx-runtime`. */
+		this.augments = false;
 		/** @type {ts.ImportDeclaration[]} Placeholder index -> import declaration. */
 		this.importSlots = [];
 		this.hasJsx = false;
@@ -665,6 +688,9 @@ class ModuleTransform {
 	// ---------------------------------------------------------------- analysis
 
 	analyze() {
+		// Added imports quote their module as the module's own imports do.
+		const first = this.sf.statements.find(ts.isImportDeclaration);
+		this.quote = first ? first.moduleSpecifier.getText(this.sf)[0] : "'";
 		for (const statement of this.sf.statements) {
 			if (!ts.isImportDeclaration(statement) || !statement.importClause) continue;
 			const module = /** @type {ts.StringLiteral} */ (statement.moduleSpecifier).text;
@@ -697,12 +723,274 @@ class ModuleTransform {
 				}
 			}
 		}
+		/** @type {ts.JsxOpeningLikeElement[]} */
+		const fields = [];
+		/** @type {ts.Expression[]} Values read as an element: cloned, inspected, or a `render` prop. */
+		const elements = [];
 		const visit = (/** @type {ts.Node} */ node) => {
 			if (ts.isIdentifier(node) && declaresName(node)) this.declared.add(node.text);
 			if (isJsx(node)) this.hasJsx = true;
+			if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) fields.push(node);
+			if (
+				ts.isJsxAttribute(node) &&
+				node.name.getText(this.sf) === 'render' &&
+				node.initializer &&
+				ts.isJsxExpression(node.initializer) &&
+				node.initializer.expression
+			) {
+				elements.push(node.initializer.expression);
+			}
+			if (ts.isCallExpression(node) && node.arguments[0] && this.readsElement(node.expression)) {
+				elements.push(node.arguments[0]);
+			}
 			ts.forEachChild(node, visit);
 		};
 		visit(this.sf);
+		for (const field of fields) if (this.takesChange(field)) this.planRestChange(field);
+		for (const element of elements) this.planDescriptorChildren(element);
+	}
+
+	/**
+	 * Whether a callee reads its argument as an element: `cloneElement`,
+	 * `isValidElement`, or a `Children` method.
+	 *
+	 * @param {ts.Expression} callee
+	 */
+	readsElement(callee) {
+		const name = this.calleeName(callee);
+		if (name === 'cloneElement' || name === 'isValidElement') return true;
+		return (
+			ts.isPropertyAccessExpression(callee) && this.calleeName(callee.expression) === 'Children'
+		);
+	}
+
+	/**
+	 * React passes a component its JSX children as elements, which
+	 * `render={children}` and `cloneElement(children)` rely on. Octane passes a
+	 * compiled render body unless the component is marked `descriptorChildren`,
+	 * so mark the component whose own `children` this reads.
+	 *
+	 * @param {ts.Expression} expression
+	 */
+	planDescriptorChildren(expression) {
+		let value = expression;
+		while (
+			ts.isParenthesizedExpression(value) ||
+			ts.isAsExpression(value) ||
+			ts.isSatisfiesExpression(value) ||
+			ts.isNonNullExpression(value) ||
+			ts.isTypeAssertionExpression(value)
+		) {
+			value = value.expression;
+		}
+		const component = this.childrenOwner(value);
+		if (!component) return;
+		// `memo(…)` and `forwardRef(…)` wrap it; the declaration holds the call.
+		let holder = component.parent;
+		while (
+			ts.isCallExpression(holder) &&
+			/^(?:memo|forwardRef)$/.test(this.calleeName(holder.expression) ?? '')
+		) {
+			holder = holder.parent;
+		}
+		if (ts.isCallExpression(holder) && this.calleeName(holder.expression) === 'descriptorChildren')
+			return;
+		// The compiler reads the marker from module-level `const` bindings only.
+		if (
+			ts.isVariableDeclaration(holder) &&
+			ts.isIdentifier(holder.name) &&
+			ts.getCombinedNodeFlags(holder) & ts.NodeFlags.Const &&
+			holder.parent.parent.parent === this.sf
+		) {
+			this.descriptorComponents.add(holder);
+		} else if (
+			ts.isFunctionDeclaration(component) &&
+			component.parent === this.sf &&
+			component.name &&
+			!component.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) &&
+			// Overload signatures would stay `function` declarations.
+			this.checker.getSymbolAtLocation(component.name)?.declarations?.length === 1 &&
+			this.declaredBeforeUse(component)
+		) {
+			this.descriptorComponents.add(component);
+		} else {
+			this.note(
+				RULE.descriptorChildren,
+				'warning',
+				expression,
+				'This reads `children` as an element, which Octane passes as a compiled render body; mark the component with `descriptorChildren` so callers pass element descriptors.',
+			);
+		}
+	}
+
+	/**
+	 * The component whose own `children` prop `node` is: `children` from its
+	 * props pattern, or `props.children`.
+	 *
+	 * @param {ts.Expression} node
+	 * @returns {ts.SignatureDeclaration | null}
+	 */
+	childrenOwner(node) {
+		/** @type {ts.Node | null} */
+		let props = null;
+		if (ts.isPropertyAccessExpression(node) && node.name.text === 'children') {
+			props = ts.isIdentifier(node.expression) ? this.declarationOf(node.expression) : null;
+		} else if (ts.isIdentifier(node)) {
+			const declaration = this.declarationOf(node);
+			if (
+				declaration &&
+				ts.isBindingElement(declaration) &&
+				(declaration.propertyName ?? declaration.name).getText(this.sf) === 'children'
+			) {
+				props = declaration.parent.parent;
+			}
+		}
+		if (!props || !ts.isParameter(props)) return null;
+		const component = /** @type {ts.SignatureDeclaration} */ (props.parent);
+		return component.parameters[0] === props && isFunctionLike(component) ? component : null;
+	}
+
+	/**
+	 * Whether no code that runs while the module loads can reach `fn` before
+	 * its declaration, so it can become a `const`, which is not hoisted. Any
+	 * function there may run (an IIFE, a callback, a method an imported call
+	 * invokes) except one it only defines: a declaration or a variable's value.
+	 * Those run only when called or passed on, which counts as reaching `fn`
+	 * for any binding the module declares.
+	 *
+	 * @param {ts.FunctionDeclaration} fn
+	 */
+	declaredBeforeUse(fn) {
+		let safe = true;
+		const visit = (/** @type {ts.Node} */ node) => {
+			if (!safe) return;
+			if (isFunctionLike(node) && this.onlyDefines(node)) return;
+			if (ts.isIdentifier(node) && node !== fn.name) {
+				const declaration = this.declarationOf(node);
+				const call = node.parent;
+				const handed =
+					(ts.isCallExpression(call) || ts.isNewExpression(call)) &&
+					(call.expression === node || call.arguments?.includes(node));
+				if (
+					declaration === fn ||
+					(handed && declaration?.getSourceFile() === this.sf && !this.importOf(node))
+				) {
+					safe = false;
+				}
+			}
+			ts.forEachChild(node, visit);
+		};
+		for (const statement of this.sf.statements) {
+			if (statement === fn) break;
+			visit(statement);
+		}
+		return safe;
+	}
+
+	/**
+	 * Whether a function is only defined where it stands: a declaration, or a
+	 * variable's value, also through `memo` or `forwardRef`, which do not call it.
+	 *
+	 * @param {ts.Node} fn
+	 */
+	onlyDefines(fn) {
+		if (ts.isFunctionDeclaration(fn)) return true;
+		let parent = fn.parent;
+		while (
+			ts.isParenthesizedExpression(parent) ||
+			(ts.isCallExpression(parent) &&
+				/^(?:memo|forwardRef)$/.test(this.calleeName(parent.expression) ?? ''))
+		) {
+			parent = parent.parent;
+		}
+		return ts.isVariableDeclaration(parent);
+	}
+
+	/**
+	 * Whether an `onChange` a spread passes this element fires per edit in
+	 * React: a text field with no `onChange` or `onInput` of its own.
+	 *
+	 * @param {ts.JsxOpeningLikeElement} element
+	 */
+	takesChange(element) {
+		if (!/^(?:input|textarea)$/.test(element.tagName.getText(this.sf))) return false;
+		if (attributeOf(element, 'onChange') || attributeOf(element, 'onInput')) return false;
+		const type = attributeOf(element, 'type')?.initializer;
+		return !type || !ts.isStringLiteral(type) || TEXT_INPUT_TYPES.has(type.text);
+	}
+
+	/**
+	 * A text field that spreads a component's rest props passes on any
+	 * `onChange` in them, which React fires per edit and Octane on commit. Take
+	 * it out of the rest and pass it as `onInput`, before the spread, so a
+	 * caller's own `onInput` still wins. Only when the rest is read nowhere
+	 * else, since those reads would lose it.
+	 *
+	 * @param {ts.JsxOpeningLikeElement} field
+	 */
+	planRestChange(field) {
+		for (const spread of field.attributes.properties) {
+			if (!ts.isJsxSpreadAttribute(spread)) continue;
+			// Props whose type has no `onChange` have none to pass on.
+			const type = this.projectType(spread.expression)?.type;
+			if (type && !(type.flags & ts.TypeFlags.Any) && !type.getProperty('onChange')) continue;
+			const declaration = ts.isIdentifier(spread.expression)
+				? this.declarationOf(spread.expression)
+				: null;
+			const rest =
+				declaration &&
+				ts.isBindingElement(declaration) &&
+				declaration.dotDotDotToken &&
+				ts.isObjectBindingPattern(declaration.parent)
+					? declaration
+					: null;
+			// A pattern that names `onChange` leaves none in the rest.
+			const pattern = /** @type {ts.ObjectBindingPattern | undefined} */ (rest?.parent);
+			if (
+				pattern?.elements.some((e) => (e.propertyName ?? e.name).getText(this.sf) === 'onChange')
+			) {
+				continue;
+			}
+			if (
+				rest &&
+				!this.checker.resolveName('onChange', spread, ts.SymbolFlags.Value, false) &&
+				this.onlySpreadOntoFields(rest)
+			) {
+				this.restChange.add(rest);
+				this.changeSpreads.add(spread);
+			} else {
+				this.note(
+					RULE.nativeChange,
+					'warning',
+					spread,
+					`An \`onChange\` in this spread fires on commit (blur) in Octane, not per edit; pass it to the \`<${field.tagName.getText(this.sf)}>\` as \`onInput\`.`,
+				);
+			}
+		}
+	}
+
+	/**
+	 * Whether no read of a rest binding but its spreads onto text fields can
+	 * see an `onChange` in it: other reads name another member (`props.type`).
+	 *
+	 * @param {ts.BindingElement} rest
+	 */
+	onlySpreadOntoFields(rest) {
+		let only = true;
+		const visit = (/** @type {ts.Node} */ node) => {
+			if (!only) return;
+			if (ts.isIdentifier(node) && node !== rest.name && this.declarationOf(node) === rest) {
+				const parent = node.parent;
+				only = ts.isJsxSpreadAttribute(parent)
+					? this.takesChange(parent.parent.parent)
+					: ts.isPropertyAccessExpression(parent) &&
+						parent.expression === node &&
+						parent.name.text !== 'onChange';
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(ts.findAncestor(rest, ts.isFunctionLike) ?? this.sf);
+		return only;
 	}
 
 	/**
@@ -951,7 +1239,19 @@ class ModuleTransform {
 			this.checkDefaultProps(node);
 		}
 		if (ts.isModuleDeclaration(node) && ts.isStringLiteral(node.name)) {
-			return this.rewriteSpecifier(node, node.name);
+			return node.name.text in REACT_MODULES
+				? this.rewriteAugmentation(node, node.name)
+				: this.rewriteSpecifier(node, node.name);
+		}
+		if (ts.isBindingElement(node) && this.restChange.has(node)) {
+			return 'onChange, ' + node.getText(this.sf);
+		}
+		if (ts.isVariableDeclaration(node) && this.descriptorComponents.has(node) && node.initializer) {
+			this.count(RULE.descriptorChildren);
+			return (
+				this.span(node, node.getStart(this.sf), node.initializer.getStart(this.sf), PLAIN) +
+				`${this.require('octane', 'descriptorChildren', false)}(${this.emit(node.initializer, PLAIN)})`
+			);
 		}
 		if (ts.isJsxText(node) && this.target === 'tsrx' && /\/[/*]/.test(node.text)) {
 			// TSRX reads `//` and `/*` in element text as comments, as JavaScript does.
@@ -979,8 +1279,20 @@ class ModuleTransform {
 			ts.isArrowFunction(node)
 		) {
 			const component = this.target === 'tsrx' ? this.rewriteComponent(node) : null;
-			if (component !== null || !this.parameters.has(node) || !node.body) return component;
-			return this.head(node, node.body.getStart(this.sf)) + this.emit(node.body, PLAIN);
+			const text =
+				component ??
+				(this.parameters.has(node) && node.body
+					? this.head(node, node.body.getStart(this.sf)) + this.emit(node.body, PLAIN)
+					: null);
+			if (!ts.isFunctionDeclaration(node) || !this.descriptorComponents.has(node)) return text;
+			// A marked binding is a `const`; the function keeps its name.
+			this.count(RULE.descriptorChildren);
+			const fn = (text ?? this.span(node, node.getStart(this.sf), node.end, ctx)).replace(
+				/^export\s+/,
+				'',
+			);
+			const exported = node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+			return `${exported ? 'export ' : ''}const ${node.name?.text} = ${this.require('octane', 'descriptorChildren', false)}(${fn});`;
 		}
 		return null;
 	}
@@ -1031,6 +1343,33 @@ class ModuleTransform {
 		if (next === null || next === specifier.text) return null;
 		this.count(RULE.import);
 		return this.replaceSpecifier(node, specifier, next);
+	}
+
+	/**
+	 * `declare module 'react' { namespace JSX { … } }` types custom elements,
+	 * which Octane reads from `octane/jsx-runtime`'s JSX namespace. Anything
+	 * else it adds patches React's own types, which Octane does not use.
+	 *
+	 * @param {ts.ModuleDeclaration} node
+	 * @param {ts.StringLiteral} specifier
+	 */
+	rewriteAugmentation(node, specifier) {
+		const statements = node.body && ts.isModuleBlock(node.body) ? node.body.statements : [];
+		if (
+			statements.length > 0 &&
+			statements.every((s) => ts.isModuleDeclaration(s) && s.name.getText(this.sf) === 'JSX')
+		) {
+			this.count(RULE.import);
+			this.augments = true;
+			return this.replaceSpecifier(node, specifier, 'octane/jsx-runtime');
+		}
+		this.note(
+			RULE.unsupported,
+			'warning',
+			node,
+			`This augments React's own types, which Octane does not read; add what it declares to Octane's.`,
+		);
+		return null;
 	}
 
 	/**
@@ -1151,10 +1490,11 @@ class ModuleTransform {
 
 		/** @type {string[]} */
 		const lines = [];
+		const quote = (/** @type {string} */ module) => this.quote + module + this.quote;
 		for (const [module, names] of imports) {
 			const specs = [...names.values()];
 			for (const { name, local } of specs) {
-				if (name === '*') lines.push(`import * as ${local} from '${module}';`);
+				if (name === '*') lines.push(`import * as ${local} from ${quote(module)};`);
 			}
 			const named = specs.filter(({ name }) => name !== '*');
 			if (named.length === 0) continue;
@@ -1163,11 +1503,21 @@ class ModuleTransform {
 				({ name, local, typeOnly }) =>
 					(typeOnly && !allTypes ? 'type ' : '') + (name === local ? name : `${name} as ${local}`),
 			);
-			lines.push(`import ${allTypes ? 'type ' : ''}{ ${list.join(', ')} } from '${module}';`);
+			lines.push(`import ${allTypes ? 'type ' : ''}{ ${list.join(', ')} } from ${quote(module)};`);
 		}
 		for (const [module, specs] of kept)
-			lines.push(`import { ${specs.join(', ')} } from '${module}';`);
+			lines.push(`import { ${specs.join(', ')} } from ${quote(module)};`);
 
+		// In a script, `declare module` declares the module instead of adding to
+		// it: a module whose only import was `import 'react'` stays a module, and
+		// a script with a retargeted augmentation becomes one.
+		if (
+			lines.length === 0 &&
+			(this.importSlots.length > 0 || this.augments) &&
+			!this.otherModuleSyntax()
+		) {
+			lines.push('export {};');
+		}
 		if (this.importSlots.length === 0) {
 			if (lines.length === 0) return code;
 			const at = this.insertionPoint(code);
@@ -1176,6 +1526,19 @@ class ModuleTransform {
 		this.count(RULE.import);
 		return code.replace(/\u0000IMPORT(\d+)\u0000(\r?\n)?/g, (_, index, newline) =>
 			index === '0' && lines.length > 0 ? lines.join('\n') + (newline ?? '') : '',
+		);
+	}
+
+	/** Whether the module has an import or export besides its React imports. */
+	otherModuleSyntax() {
+		return this.sf.statements.some(
+			(statement) =>
+				(ts.isImportDeclaration(statement) && !this.importSlots.includes(statement)) ||
+				ts.isImportEqualsDeclaration(statement) ||
+				ts.isExportDeclaration(statement) ||
+				ts.isExportAssignment(statement) ||
+				(ts.canHaveModifiers(statement) &&
+					ts.getModifiers(statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)),
 		);
 	}
 
@@ -1260,13 +1623,34 @@ class ModuleTransform {
 		return null;
 	}
 
+	/**
+	 * Whether `node` names a global namespace React's types declare, such as
+	 * `React` in `React.ReactNode` written without an import.
+	 *
+	 * @param {ts.EntityName} node
+	 * @param {string} name
+	 */
+	isGlobalNamespace(node, name) {
+		return (
+			ts.isIdentifier(node) &&
+			node.text === name &&
+			!this.checker.resolveName(name, node, ts.SymbolFlags.Namespace, false)
+		);
+	}
+
 	/** @param {ts.QualifiedName} node */
 	rewriteQualifiedType(node) {
 		const namespace = this.importOf(node.left);
-		if (!namespace?.namespace || !(namespace.module in REACT_MODULES)) return null;
+		if (
+			namespace
+				? !namespace.namespace || !(namespace.module in REACT_MODULES)
+				: !this.isGlobalNamespace(node.left, 'React')
+		) {
+			return null;
+		}
 		const name = mapQualifiedType(node.right.text);
 		if (!name) {
-			this.used.add(namespace.local);
+			if (namespace) this.used.add(namespace.local);
 			this.note(
 				RULE.unsupported,
 				'warning',
@@ -1283,12 +1667,7 @@ class ModuleTransform {
 	rewriteTypeReference(node) {
 		// The global `JSX` namespace React's types declared is Octane's export.
 		const name = node.typeName;
-		if (
-			ts.isQualifiedName(name) &&
-			ts.isIdentifier(name.left) &&
-			name.left.text === 'JSX' &&
-			!this.checker.resolveName('JSX', node, ts.SymbolFlags.Namespace, false)
-		) {
+		if (ts.isQualifiedName(name) && this.isGlobalNamespace(name.left, 'JSX')) {
 			this.require('octane', 'JSX', true);
 		}
 		return null;
@@ -1398,9 +1777,9 @@ class ModuleTransform {
 		this.count(RULE.forwardRef);
 		const [props, ref] = render.parameters;
 		const typeArgs = node.typeArguments;
-		const refType = typeArgs?.[0]?.getText(this.sf) ?? this.refTypeOf(ref);
-		const propsType =
-			typeArgs?.[1]?.getText(this.sf) ?? (props?.type ? this.emit(props.type, PLAIN) : null);
+		const refType = typeArgs?.[0] ? this.emit(typeArgs[0], PLAIN) : this.refTypeOf(ref);
+		const propsNode = typeArgs?.[1] ?? props?.type;
+		const propsType = propsNode ? this.emit(propsNode, PLAIN) : null;
 		const refName = ref && ts.isIdentifier(ref.name) ? ref.name.text : null;
 		const refBinding = refName === null ? null : refName === 'ref' ? 'ref' : `ref: ${refName}`;
 
@@ -1478,7 +1857,7 @@ class ModuleTransform {
 	refTypeOf(ref) {
 		const type = ref?.type;
 		if (type && ts.isTypeReferenceNode(type) && type.typeArguments?.length === 1) {
-			return type.typeArguments[0].getText(this.sf);
+			return this.emit(type.typeArguments[0], PLAIN);
 		}
 		return null;
 	}
@@ -1660,11 +2039,19 @@ class ModuleTransform {
 	targetsControl(node) {
 		const found = this.parameterOf(node);
 		if (!found) return false;
-		const type = found.param.type?.getText(this.sf) ?? '';
-		if (/(ChangeEvent|FormEvent)<\s*HTML(Input|TextArea|Select)Element\s*>$/.test(type))
+		// Unannotated, the project's types still name a handler a component
+		// passes on to a control: `<Input onChange={(e) => …}>`.
+		const inferred = found.param.type ? null : this.projectType(found.param);
+		const type =
+			found.param.type?.getText(this.sf) ??
+			(inferred ? inferred.checker.typeToString(inferred.type) : '');
+		if (
+			/(ChangeEvent|FormEvent)<\s*(?:HTML(?:Input|TextArea|Select)Element\s*[|,]?\s*)+>$/.test(type)
+		)
 			return true;
 		const attribute = this.handlerAttribute(found.fn);
-		if (!attribute || !/^on(Change|Input)/.test(attribute.name.getText(this.sf))) return false;
+		if (!attribute || !/^on(Change|Input|Focus|Blur)/.test(attribute.name.getText(this.sf)))
+			return false;
 		const tag = attribute.parent.parent.tagName.getText(this.sf);
 		return tag === 'input' || tag === 'textarea' || tag === 'select';
 	}
@@ -1716,8 +2103,6 @@ class ModuleTransform {
 		const intrinsic = /^[a-z]/.test(tag);
 		const spread = node.properties.some(ts.isJsxSpreadAttribute);
 		const attributes = node.properties;
-		const named = (/** @type {string} */ name) =>
-			attributes.find((a) => ts.isJsxAttribute(a) && a.name.getText(this.sf) === name);
 
 		let out = '';
 		let cursor = node.getStart(this.sf);
@@ -1739,17 +2124,28 @@ class ModuleTransform {
 			}
 			out += this.source.slice(cursor, start);
 			cursor = attribute.end;
+			if (ts.isJsxSpreadAttribute(attribute) && this.changeSpreads.has(attribute)) {
+				// On the spread's own line when it has one.
+				this.count(RULE.nativeChange);
+				const line = this.source.slice(this.source.lastIndexOf('\n', start - 1), start);
+				out += 'onInput={onChange}' + (/^\n[ \t]*$/.test(line) ? line : ' ');
+			}
 			if (!ts.isJsxAttribute(attribute) || !intrinsic) {
 				out += this.emit(attribute, PLAIN);
 				continue;
 			}
 			const name = attribute.name.getText(this.sf);
-			if (name === 'className' && this.target === 'tsrx' && !named('class') && !spread) {
+			if (
+				name === 'className' &&
+				this.target === 'tsrx' &&
+				!attributeOf(element, 'class') &&
+				!spread
+			) {
 				this.count(RULE.className);
 				out += 'class' + this.emitInitializer(attribute);
 			} else if ((name === 'onChange' || name === 'onChangeCapture') && this.isTextEntry(element)) {
 				const input = name === 'onChange' ? 'onInput' : 'onInputCapture';
-				if (named(input)) {
+				if (attributeOf(element, input)) {
 					this.note(
 						RULE.nativeChange,
 						'warning',
@@ -1787,10 +2183,8 @@ class ModuleTransform {
 		const tag = element.tagName.getText(this.sf);
 		if (tag === 'textarea') return true;
 		if (tag !== 'input') return false;
-		const type = element.attributes.properties.find(
-			(a) => ts.isJsxAttribute(a) && a.name.getText(this.sf) === 'type',
-		);
-		if (!type || !ts.isJsxAttribute(type)) return true;
+		const type = attributeOf(element, 'type');
+		if (!type) return true;
 		const value = type.initializer;
 		if (value && ts.isStringLiteral(value)) return TEXT_INPUT_TYPES.has(value.text);
 		this.note(
@@ -1815,6 +2209,15 @@ class ModuleTransform {
 			);
 		}
 		const tag = node.openingElement.tagName;
+		// A `descriptorChildren` component receives its children as elements, as
+		// in React; `@if` or `@for` there would hand it a fragment instead.
+		const declaration = ts.isIdentifier(tag) ? this.declarationOf(tag) : null;
+		if (
+			declaration &&
+			this.descriptorComponents.has(/** @type {ts.VariableDeclaration} */ (declaration))
+		) {
+			return this.span(node, node.getStart(this.sf), node.end, PLAIN);
+		}
 		const name = this.calleeName(tag);
 		if (name === 'StrictMode') {
 			// Octane's StrictMode is a pass-through wrapper.
@@ -2099,19 +2502,28 @@ class ModuleTransform {
 	}
 
 	/**
+	 * The type of `node` in the project's program, which resolves imports and
+	 * packages, or null when the program does not have this module.
+	 *
+	 * @param {ts.Node} node
+	 * @returns {{ type: ts.Type, checker: ts.TypeChecker } | null}
+	 */
+	projectType(node) {
+		const types = this.options.types;
+		if (types?.sourceFile.text !== this.source) return null;
+		const same = nodeSpanning(types.sourceFile, node.getStart(this.sf), node.end);
+		if (same?.kind !== node.kind) return null;
+		return { type: types.checker.getTypeAtLocation(same), checker: types.checker };
+	}
+
+	/**
 	 * The type of `expression`, from the project's program when it has this
 	 * module, else from the module's own.
 	 *
 	 * @param {ts.Expression} expression
 	 */
 	typeOf(expression) {
-		const types = this.options.types;
-		if (types?.sourceFile.text === this.source) {
-			const start = expression.getStart(this.sf);
-			const same = nodeSpanning(types.sourceFile, start, expression.end);
-			if (same?.kind === expression.kind) return types.checker.getTypeAtLocation(same);
-		}
-		return this.checker.getTypeAtLocation(expression);
+		return this.projectType(expression)?.type ?? this.checker.getTypeAtLocation(expression);
 	}
 
 	/**
@@ -2260,11 +2672,7 @@ class ModuleTransform {
 		// to the header once: the same key on each arm of a conditional row.
 		const elements = (rowElements(root) ?? []).filter((element) => !ts.isJsxFragment(element));
 		const keys = elements.map((element) => {
-			const opening = ts.isJsxElement(element) ? element.openingElement : element;
-			const attribute = opening.attributes.properties.find(
-				(a) => ts.isJsxAttribute(a) && a.name.getText(this.sf) === 'key',
-			);
-			return /** @type {ts.JsxAttribute | undefined} */ (attribute);
+			return attributeOf(ts.isJsxElement(element) ? element.openingElement : element, 'key');
 		});
 		let key = null;
 		if (keys.some(Boolean)) {

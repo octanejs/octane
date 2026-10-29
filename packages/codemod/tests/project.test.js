@@ -166,17 +166,78 @@ describe('runCodemod', () => {
 	it('maps module augmentation, aggregate subpaths, and reports `/react` entries', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',
-			'src/router.d2.ts':
+			'src/router.d.ts':
 				"declare module '@tanstack/react-router' {\n\tinterface Register { router: unknown }\n}\nexport {};\n",
+			// Custom elements: Octane's JSX namespace is `octane/jsx-runtime`'s.
+			'src/elements.d.ts':
+				"import type { HTMLAttributes } from 'react';\ndeclare module 'react' {\n\tnamespace JSX {\n\t\tinterface IntrinsicElements { 'x-clock': HTMLAttributes<HTMLElement> }\n\t}\n}\n",
+			'src/css.d.ts':
+				"import 'react';\ndeclare module 'react' {\n\tinterface CSSProperties { [name: `--${string}`]: string }\n}\n",
+			'src/clock.d.ts':
+				"import 'react';\ndeclare module 'react' {\n\tnamespace JSX {\n\t\tinterface IntrinsicElements { 'x-clock': { time?: string } }\n\t}\n}\n",
+			// A script: no import or export at all.
+			'src/meter.d.ts':
+				"declare module 'react' {\n\tnamespace JSX {\n\t\tinterface IntrinsicElements { 'x-meter': { value?: number } }\n\t}\n}\n",
 			'src/Chart.tsx':
 				"import { Pack } from '@visx/hierarchy';\nimport { Markdown } from '@tanstack/markdown/react';\nimport { createServerFn } from '@tanstack/react-start';\nexport function Chart() {\n\treturn <Pack><Markdown /></Pack>;\n}\n",
 		});
 		const result = await runCodemod([root], { write: false });
 		const code = (/** @type {string} */ name) => result.files.find((f) => f.file === name)?.code;
-		expect(code('src/router.d2.ts')).toContain("declare module '@octanejs/tanstack-router' {");
+		expect(code('src/router.d.ts')).toContain("declare module '@octanejs/tanstack-router' {");
+		expect(code('src/elements.d.ts')).toBe(
+			"import type { HTMLAttributes } from 'octane';\ndeclare module 'octane/jsx-runtime' {\n\tnamespace JSX {\n\t\tinterface IntrinsicElements { 'x-clock': HTMLAttributes<HTMLElement> }\n\t}\n}\n",
+		);
+		const css = result.files.find((f) => f.file === 'src/css.d.ts');
+		expect(css?.notes.map((note) => note.rule)).toEqual(['unsupported-api']);
+		expect(css?.diagnostics).toEqual([]);
+		// Without its `import 'react'` the file would be a script, whose `declare
+		// module` replaces the module's types instead of adding to them.
+		expect(css?.code.startsWith("export {};\ndeclare module 'react' {")).toBe(true);
+		expect(
+			code('src/clock.d.ts')?.startsWith("export {};\ndeclare module 'octane/jsx-runtime' {"),
+		).toBe(true);
+		expect(
+			code('src/meter.d.ts')?.startsWith("export {};\ndeclare module 'octane/jsx-runtime' {"),
+		).toBe(true);
 		expect(code('src/Chart.tsx')).toContain("from '@octanejs/visx/hierarchy'");
 		expect(code('src/Chart.tsx')).toContain("from '@octanejs/tanstack-start'");
 		expect(result.missing).toEqual(['@tanstack/markdown/react']);
+	});
+
+	it('reports React packages from their installed manifest, not their name', async () => {
+		const manifest = (/** @type {object} */ fields) =>
+			JSON.stringify({ version: '1.0.0', ...fields });
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			// React is an optional peer for the `/react` entry only.
+			'node_modules/editor-kit/package.json': manifest({
+				exports: { '.': './index.js', './react': './react.js', './package.json': './package.json' },
+				peerDependencies: { react: '>=18' },
+				peerDependenciesMeta: { react: { optional: true } },
+			}),
+			// An optional peer with no `/react` entry may be for the root.
+			'node_modules/hooks-kit/package.json': manifest({
+				exports: { '.': './index.js', './package.json': './package.json' },
+				peerDependencies: { react: '>=18' },
+				peerDependenciesMeta: { react: { optional: true } },
+			}),
+			// A required peer, but only the `/react` entry renders through it.
+			'node_modules/tree-kit/package.json': manifest({
+				exports: { '.': './index.js', './react': './react.js', './package.json': './package.json' },
+				peerDependencies: { react: '*' },
+			}),
+			// The export map hides package.json, and the name looks like React.
+			'node_modules/@vitejs/plugin-react/package.json': manifest({
+				exports: { '.': './index.js' },
+			}),
+			'node_modules/react-widget/package.json': manifest({ peerDependencies: { react: '*' } }),
+			'src/build.ts':
+				"import react from '@vitejs/plugin-react';\nexport const plugins = [react()];\n",
+			'src/Note.tsx':
+				"import { parse } from 'editor-kit';\nimport { Editor } from 'editor-kit/react';\nimport { Widget } from 'react-widget';\nimport { tree } from 'tree-kit';\nimport { useKit } from 'hooks-kit';\nconsole.log(tree, useKit);\nexport function Note() {\n\treturn <Editor doc={parse('')}><Widget /></Editor>;\n}\n",
+		});
+		const result = await runCodemod([root], { write: false });
+		expect(result.missing.sort()).toEqual(['editor-kit/react', 'hooks-kit', 'react-widget']);
 	});
 
 	it('reports TSRX written for React, which it cannot read', async () => {
@@ -222,6 +283,32 @@ describe('runCodemod', () => {
 			'<p>{story.title as string} {String(story.score)} {story.by}</p>',
 		);
 		expect(await code(loose)).toContain('<p>{story.title} {story.score} {story.by}</p>');
+	});
+
+	it('leaves a text field spread alone when its type has no `onChange`', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'tsconfig.json': '{ "compilerOptions": { "strict": true } }',
+			'src/Field.tsx':
+				'type Props = { value: string; readOnly: true };\nexport function Field({ ...props }: Props) {\n\treturn <input {...props} />;\n}\n',
+		});
+		const [file] = (await runCodemod([root], { write: false })).files;
+		expect(file.code).toContain(
+			'export function Field({ ...props }: Props) @{\n\t<input {...props} />',
+		);
+		expect(file.notes).toEqual([]);
+	});
+
+	it("reads `target` as `currentTarget` where a component's types say it is a control", async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'tsconfig.json': '{ "compilerOptions": { "strict": true } }',
+			'src/Form.tsx':
+				// React 19.2 types name the target too: `ChangeEvent<CurrentTarget, Target>`.
+				'interface ChangeEvent<C, T> { target: T; currentTarget: C }\nfunction Input(_: { onChange(e: ChangeEvent<HTMLInputElement, HTMLInputElement>): void }) {\n\treturn <input />;\n}\nexport function Form({ set }: { set(v: string): void }) {\n\treturn <Input onChange={(e) => set(e.target.value)} />;\n}\n',
+		});
+		const [file] = (await runCodemod([root], { write: false })).files;
+		expect(file.code).toContain('<Input onChange={(e) => set(e.currentTarget.value)} />');
 	});
 
 	// Compiles every module of the app twice; under CI load that can pass the default 5 s.
