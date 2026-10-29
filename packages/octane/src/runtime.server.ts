@@ -7913,7 +7913,7 @@ export function __useReducerWithGetter<S, A, I = S>(
 // client either, so a development render can witness each one it reaches.
 export function useEffect(
 	fn: Parameters<typeof ClientUseEffect>[0],
-	deps?: any[] | null,
+	deps?: readonly unknown[] | null,
 	slot?: ServerHookSlot,
 ): void;
 export function useEffect(): void {
@@ -7922,7 +7922,7 @@ export function useEffect(): void {
 }
 export function useLayoutEffect(
 	fn: Parameters<typeof ClientUseEffect>[0],
-	deps?: any[] | null,
+	deps?: readonly unknown[] | null,
 	slot?: ServerHookSlot,
 ): void;
 export function useLayoutEffect(): void {
@@ -7965,14 +7965,14 @@ export function useLayoutSnapshot<T>(
 // Insertion effects inject styles the server render already emitted.
 export function useInsertionEffect(
 	fn: Parameters<typeof ClientUseEffect>[0],
-	deps?: any[] | null,
+	deps?: readonly unknown[] | null,
 	slot?: ServerHookSlot,
 ): void;
 export function useInsertionEffect(): void {}
 export function useImperativeHandle<T>(
 	ref: Parameters<typeof ClientUseImperativeHandle<T>>[0],
 	factory: () => T,
-	deps?: any[] | null,
+	deps?: readonly unknown[] | null,
 	slot?: ServerHookSlot,
 ): void;
 export function useImperativeHandle(): void {
