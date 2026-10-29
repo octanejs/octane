@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import test from 'node:test';
 
@@ -115,6 +117,171 @@ test('the validation project may not pin Node types a consumer does not install'
 	assert.deepEqual(rulesAndIds(findSourcePublicationViolations(repo, packages)), [
 		[RULES.nodeTypes, 'packages/demo/tsconfig.json'],
 	]);
+});
+
+test('Node tooling may validate with Node types while its public JS still needs declarations', () => {
+	const { repo, packages } = createRepository({
+		rootScripts: {},
+		manifest: { files: ['src'], exports: { '.': './src/cli.js', './features/*': './src/*.mjs' } },
+		tsconfigs: { 'tsconfig.json': { compilerOptions: { types: ['node'], ...unusedFlags } } },
+		sources: { 'cli.js': '', 'nested/feature.mjs': '', 'private.js': '' },
+	});
+	const [pkg] = packages;
+	pkg.role = 'developer tooling';
+	const audit = () => rulesAndIds(findSourcePublicationViolations(repo, packages));
+	assert.deepEqual(audit(), [[RULES.untypedJavaScript, pkg.name]]);
+	writeFileSync(path.join(pkg.directory, 'src/cli.d.ts'), 'export declare const cli: string;');
+	writeFileSync(
+		path.join(pkg.directory, 'src/nested/feature.d.mts'),
+		'export declare const feature: string;',
+	);
+	assert.deepEqual(audit(), []);
+});
+
+test('a later types condition supplies missing siblings but does not override an earlier declaration', () => {
+	const { repo, packages } = createRepository({
+		rootScripts: {},
+		manifest: {
+			type: 'module',
+			files: ['src'],
+			exports: { '.': { default: './src/cli.js', types: './src/public.d.ts' } },
+		},
+		tsconfigs: {},
+		sources: { 'cli.js': '', 'public.d.ts': 'export declare const run: string;', 'private.js': '' },
+	});
+	const [pkg] = packages;
+	pkg.role = 'developer tooling';
+	const audit = () => rulesAndIds(findSourcePublicationViolations(repo, packages));
+	assert.deepEqual(audit(), []);
+	writeFileSync(path.join(pkg.directory, 'src/cli.d.ts'), "export * from './private.js';");
+	assert.deepEqual(audit(), [[RULES.untypedJavaScript, pkg.name]]);
+});
+
+test('a JS integration with a typed entry still guards new untyped or browser source exports', () => {
+	const { repo, packages } = createRepository({
+		rootScripts: {},
+		manifest: {
+			files: ['src', 'types'],
+			exports: { '.': { types: './types/index.d.ts', import: './src/build.js' } },
+		},
+		tsconfigs: { 'tsconfig.json': { compilerOptions: { types: ['node'], ...unusedFlags } } },
+		sources: { 'build.js': '', 'private.js': '', 'widget.js': '' },
+	});
+	const [pkg] = packages;
+	pkg.role = 'framework integration';
+	const audit = () => {
+		writeJson(path.join(pkg.directory, 'package.json'), pkg.manifest);
+		return rulesAndIds(findSourcePublicationViolations(repo, packages));
+	};
+	mkdirSync(path.join(pkg.directory, 'types'));
+	writeFileSync(
+		path.join(pkg.directory, 'types/index.d.ts'),
+		'export declare const build: string;',
+	);
+	assert.deepEqual(audit(), []);
+	writeFileSync(path.join(pkg.directory, 'types/index.d.ts'), "export * from '../src/private.js';");
+	assert.deepEqual(audit(), [[RULES.untypedJavaScript, pkg.name]]);
+	writeFileSync(
+		path.join(pkg.directory, 'src/private.d.ts'),
+		'export declare const helper: string;',
+	);
+	assert.deepEqual(audit(), []);
+	writeFileSync(
+		path.join(pkg.directory, 'types/index.d.ts'),
+		'/// <reference path="helper.d.ts" />',
+	);
+	assert.deepEqual(audit(), [[RULES.untypedJavaScript, pkg.name]]);
+	writeFileSync(
+		path.join(pkg.directory, 'types/helper.d.ts'),
+		'export declare const helper: string;',
+	);
+	assert.deepEqual(audit(), []);
+	pkg.manifest.exports['./widget'] = { browser: './src/widget.js' };
+	assert.deepEqual(audit(), [[RULES.untypedJavaScript, pkg.name]]);
+	delete pkg.manifest.exports['./widget'];
+	writeFileSync(
+		path.join(pkg.directory, 'src/browser.ts'),
+		"export { widget } from './widget.js';",
+	);
+	pkg.manifest.exports['./browser'] = './src/browser.ts';
+	assert.deepEqual(audit(), [
+		[RULES.nodeTypes, 'packages/demo/tsconfig.json'],
+		[RULES.untypedJavaScript, pkg.name],
+	]);
+});
+
+test('strict Node consumers get typed CLI, codemod and MCP APIs through package exports', () => {
+	const require = createRequire(import.meta.url);
+	const consumer = mkdtempSync(path.join(tmpdir(), 'tooling-consumer-'));
+	const modules = path.join(consumer, 'node_modules');
+	mkdirSync(path.join(modules, '@octanejs'), { recursive: true });
+	for (const [name, dir] of [
+		['cli', 'cli'],
+		['codemod', 'codemod'],
+		['mcp-server', 'octane-mcp-server'],
+	]) {
+		symlinkSync(
+			path.resolve(import.meta.dirname, '../packages', dir),
+			path.join(modules, '@octanejs', name),
+			'dir',
+		);
+	}
+	mkdirSync(path.join(modules, '@types'));
+	symlinkSync(
+		path.dirname(require.resolve('@types/node/package.json')),
+		path.join(modules, '@types/node'),
+		'dir',
+	);
+	writeFileSync(
+		path.join(consumer, 'index.mts'),
+		`
+		import { main, defineCommand } from '@octanejs/cli';
+		import { searchBindings } from '@octanejs/cli/data';
+		import { applyFixes } from '@octanejs/cli/fix';
+		import { runCodemod } from '@octanejs/codemod';
+		import { createServer, issueContext } from '@octanejs/mcp-server';
+		import { scanSource } from '@octanejs/mcp-server/bridge';
+		import { explainStrong } from '@octanejs/mcp-server/strong';
+
+		const exitCode: number = await main(['--version']);
+		defineCommand({ async run(ctx, input) { ctx.ui.log(input.positionals.join(' ')); return exitCode; } });
+		searchBindings('router')[0].name.toUpperCase();
+		applyFixes('abc', [{ code: 'a', edits: [{ start: 1, end: 2, text: 'B' }] }]).text.toUpperCase();
+		const result = await runCodemod(['src'], { target: 'tsrx', write: false });
+		result.files[0].diagnostics[0].message.toUpperCase();
+		createServer({ repoRoot: '.' }).close();
+		const issue = await issueContext('.', { issue: 123 });
+		// @ts-expect-error successful lookups do not expose subprocess output
+		issue.stdout.toUpperCase();
+		if ('triage' in issue) issue.triage.labels.join(', ');
+		else issue.stderr.toUpperCase();
+		scanSource('useState').apis.get('useState')?.toFixed();
+		explainStrong({ recipe: 'lazy-ref' }).text.toUpperCase();
+		// @ts-expect-error main takes an argv array
+		main('--version');
+		// @ts-expect-error unknown command flag kind
+		defineCommand({ flags: { size: { type: 'array', description: 'size' } } });
+		// @ts-expect-error programmatic codemod targets are checked
+		runCodemod(['src'], { target: 'jsx' });
+		// @ts-expect-error the compiler diagnostics are structured
+		result.files[0].diagnostics[0].nonexistent;
+	`,
+	);
+	writeJson(path.join(consumer, 'tsconfig.json'), {
+		compilerOptions: {
+			strict: true,
+			noEmit: true,
+			module: 'NodeNext',
+			target: 'ES2022',
+			types: ['node'],
+		},
+		files: ['index.mts'],
+	});
+	execFileSync(
+		process.execPath,
+		[require.resolve('typescript/bin/tsc'), '-p', consumer, '--pretty', 'false'],
+		{ stdio: 'inherit' },
+	);
 });
 
 test('a validation project the typecheck chain never reaches is still checked', () => {
