@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**25 active pin(s) across 114 binding package(s).**
+**25 active pin(s) across 115 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -48,6 +48,7 @@ surface and evidence.
 | `@octanejs/formisch` | 0 |
 | `@octanejs/gsap` | 0 |
 | `@octanejs/hook-form` | 0 |
+| `@octanejs/hot-toast` | 0 |
 | `@octanejs/html-react-parser` | 0 |
 | `@octanejs/i18next` | 0 |
 | `@octanejs/image-crop` | 0 |

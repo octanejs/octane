@@ -687,6 +687,8 @@ function normalizeRepository(repository) {
 	if (typeof repositoryUrl !== 'string')
 		throw new Error('Package metadata has no GitHub repository URL');
 	let value = repositoryUrl.trim();
+	// npm reads a bare `owner/repo` as a GitHub repository.
+	if (/^[\w.-]+\/[\w.-]+$/.test(value)) value = `github:${value}`;
 	if (value.startsWith('github:')) value = `https://github.com/${value.slice('github:'.length)}`;
 	if (value.startsWith('git+')) value = value.slice(4);
 	if (value.startsWith('git://github.com/'))

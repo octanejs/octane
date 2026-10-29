@@ -1,0 +1,119 @@
+{
+  "runtimeDependencies": ["goober", "octane"],
+  "adaptedSources": [
+    {
+      "packageName": "react-hot-toast",
+      "paths": [
+        "src/components/checkmark.ts",
+        "src/components/error.ts",
+        "src/components/loader.ts",
+        "src/components/toast-bar.tsrx",
+        "src/components/toast-icon.tsrx",
+        "src/components/toaster.tsrx",
+        "src/core/store.ts",
+        "src/core/toast.ts",
+        "src/core/types.ts",
+        "src/core/use-toaster.ts",
+        "src/core/utils.ts",
+        "src/headless/index.ts",
+        "src/index.ts"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/components/checkmark.ts",
+      "origin": "adapted",
+      "packageName": "react-hot-toast",
+      "sha256": "496819496c441f53f11aeefdac0b0549056787ff91e115b49fc21a4f36c10538"
+    },
+    {
+      "path": "src/components/error.ts",
+      "origin": "adapted",
+      "packageName": "react-hot-toast",
+      "sha256": "8e1a969f1d1f06f0f44450830e1d08b64d4e9d33e6781f43a76bf18b30883513"
+    },
+    {
+      "path": "src/components/loader.ts",
+      "origin": "adapted",
+      "packageName": "react-hot-toast",
+      "sha256": "388d048c25df2ba7cb1922f952897decdfe72bbcfa2a5e962556f51281f52626"
+    },
+    {
+      "path": "src/components/styled.tsrx",
+      "origin": "authored",
+      "sha256": "2fa98fa2bd5beda82aa100557165817ec1e98879993581775393ab4f38aa4c27"
+    },
+    {
+      "path": "src/components/toast-bar.tsrx",
+      "origin": "adapted",
+      "packageName": "react-hot-toast",
+      "sha256": "07ba143d680a861ab3c37c060986f4c23e564e7c670ed28090aab4db649c2458"
+    },
+    {
+      "path": "src/components/toast-icon.tsrx",
+      "origin": "adapted",
+      "packageName": "react-hot-toast",
+      "sha256": "76cd94bdf4d242e2af1435998caa6d291d4e2bc671846e03f1010003f43c0c39"
+    },
+    {
+      "path": "src/components/toaster.tsrx",
+      "origin": "adapted",
+      "packageName": "react-hot-toast",
+      "sha256": "9486c4d4a48eae6101aaab8ece4f624bd5c44b0872ff3c96fc7d3185a67d092b"
+    },
+    {
+      "path": "src/core/store.ts",
+      "origin": "adapted",
+      "packageName": "react-hot-toast",
+      "sha256": "a9d14d601b23bb440aff8ba8d2fc57763ebba045e430c39afb9776ec9ebd11fa"
+    },
+    {
+      "path": "src/core/toast.ts",
+      "origin": "adapted",
+      "packageName": "react-hot-toast",
+      "sha256": "8063d2d409ded9da21ebe0bc078dd6da7ca9e65c204233c6c378e431db18266c"
+    },
+    {
+      "path": "src/core/types.ts",
+      "origin": "adapted",
+      "packageName": "react-hot-toast",
+      "sha256": "6fb1105f4a21b7352435c8cadcf0a5bf9501d1cf03331f2d4197f5a6ded4e86b"
+    },
+    {
+      "path": "src/core/use-toaster.ts",
+      "origin": "adapted",
+      "packageName": "react-hot-toast",
+      "sha256": "a8b9ea97fcd5462c474bdd43f862f7be34488c55ea593f79f6928f37efcb9a60"
+    },
+    {
+      "path": "src/core/utils.ts",
+      "origin": "adapted",
+      "packageName": "react-hot-toast",
+      "sha256": "809512d1639a61a1c4bc6fabc8947f0ec4ef5fbf8d818878b8faeebb908f068f"
+    },
+    {
+      "path": "src/goober.d.ts",
+      "origin": "authored",
+      "sha256": "411887a91d6a133e94cb5f5bf20af4f0b82f438e3407db19beab5c00e3276d06"
+    },
+    {
+      "path": "src/goober.js",
+      "origin": "authored",
+      "sha256": "e39ed55e0cb64c677e822ef78548cd75f050dff7b321e15ea9d785729b6892a1"
+    },
+    {
+      "path": "src/headless/index.ts",
+      "origin": "adapted",
+      "packageName": "react-hot-toast",
+      "sha256": "07cce92b0fdd41a1d48279135421d21e6d77abd1c4ba86573db5e53dbd52294f"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "packageName": "react-hot-toast",
+      "sha256": "fd120c37e7c8db00f649a132b9e324ed098ef2db56ce91eff324154544f48554"
+    }
+  ],
+  "reimplementedDependencies": []
+}

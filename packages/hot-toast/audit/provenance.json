@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/react-hot-toast-2.6.1.tgz",
+      "sha256": "336bae521480e2f77425cf7c993ffbb58ca0b61407df9f99c63ca954b8099360"
+    },
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "48a5d811a3ea66e5a7f6fb93205294f3bac1d6f8c8ff323729a58bc74f11c3c3"
+    }
+  ],
+  "requiredFiles": ["audit/upstream.lock.json"],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "react-hot-toast",
+    "version": "2.6.1",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "scripts", "tests", "upstream", "upstream-artifact"]
+}

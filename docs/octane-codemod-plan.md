@@ -425,6 +425,8 @@ such package under **No Octane port**.
   repository, Vite needed `resolve.dedupe: ["react", "react-dom"]`, or
   `octane/react` loaded the repository's React beside the app's; an installed
   Octane resolves its React peers to the app's copy.
+  Since then `@octanejs/hot-toast` ports `react-hot-toast`, so the codemod
+  rewrites those imports to the binding and Memos needs no island for it.
 - **T3 Code:** 6 `@pierre/*` elements became islands. The rest of its 14
   unported packages are hooks (303 uses, 294 of them `@effect/atom-react`),
   contexts (10), and components that take Octane content (40: providers,

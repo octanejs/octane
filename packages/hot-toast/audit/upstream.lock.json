@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "react-hot-toast",
+    "version": "2.6.1",
+    "repository": {
+      "owner": "timolins",
+      "repo": "react-hot-toast",
+      "subdirectory": null
+    },
+    "commit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d",
+    "integrity": "sha512-gjFsf05dxcku0FkyMtFH+XmYFdA2odXfBVknEr/IZ+XpUjwsgvtY2616sOpUynK+l9ykQDRNpaJ1hYfuximUiA=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "48a5d811a3ea66e5a7f6fb93205294f3bac1d6f8c8ff323729a58bc74f11c3c3"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": ["LICENSE", "jest.config.js", "package.json", "src", "test", "tsconfig.json"],
+  "adaptedMappings": [
+    {
+      "fromRoot": "test",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "import React, { useEffect, useState } from 'react';",
+      "replace": "import { useEffect, useState } from 'octane';"
+    },
+    {
+      "find": "import React from 'react';",
+      "replace": ""
+    },
+    {
+      "find": "'@testing-library/react'",
+      "replace": "'@octanejs/testing-library'"
+    },
+    {
+      "find": "'../src'",
+      "replace": "'../../src/index.ts'"
+    },
+    {
+      "find": "'../src/core/store'",
+      "replace": "'../../src/core/store.ts'"
+    },
+    {
+      "find": "'../src/core/use-toaster'",
+      "replace": "'../../src/core/use-toaster.ts'"
+    },
+    {
+      "find": "afterEach((done)",
+      "replace": "afterEach(()"
+    },
+    {
+      "find": "    done();",
+      "replace": ""
+    }
+  ],
+  "files": [
+    {
+      "path": "jest.config.js",
+      "gitBlob": "0cd7a4ac1906cb360d0e8c9f77f42ed9691fc657",
+      "size": 187
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "669336ec767cb313c37a948685b0ed515efe311e",
+      "size": 1065
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "0d430e834782cc5ee3f06fa9e778e998991c2db1",
+      "size": 2759
+    },
+    {
+      "path": "src/components/checkmark.tsx",
+      "gitBlob": "bffaa5c54390458dbc4cba38088c4c4141d6ff78",
+      "size": 1161
+    },
+    {
+      "path": "src/components/error.tsx",
+      "gitBlob": "96da602f2aeeb1937b832942ec607df8ded3387b",
+      "size": 1356
+    },
+    {
+      "path": "src/components/loader.tsx",
+      "gitBlob": "49af0e7f18e71e7f3e4ed4e3cc43746f6a6cb8da",
+      "size": 544
+    },
+    {
+      "path": "src/components/toast-bar.tsx",
+      "gitBlob": "de520dc5e26318138c9a1a3eba5cb0fadf2e4b45",
+      "size": 2957
+    },
+    {
+      "path": "src/components/toast-icon.tsx",
+      "gitBlob": "d7e367766afbd0fd5a66e43b59ead34843187c4f",
+      "size": 1644
+    },
+    {
+      "path": "src/components/toaster.tsx",
+      "gitBlob": "1b36ddba5934fec392877919ceca740c6d29c020",
+      "size": 3391
+    },
+    {
+      "path": "src/core/store.ts",
+      "gitBlob": "8a94a237882752c1bb1c4926b4c76c57aa8ef7cc",
+      "size": 5300
+    },
+    {
+      "path": "src/core/toast.ts",
+      "gitBlob": "c8ef1884dfa93298e63e04520309b0504808406f",
+      "size": 3505
+    },
+    {
+      "path": "src/core/types.ts",
+      "gitBlob": "2e668eedd85df46b6a819600282707088c5bc8b2",
+      "size": 2204
+    },
+    {
+      "path": "src/core/use-toaster.ts",
+      "gitBlob": "c97a0f1a9169904bd22ab46786a0599de6982882",
+      "size": 3724
+    },
+    {
+      "path": "src/core/utils.ts",
+      "gitBlob": "f57160ffb0c9f4e846a7c57b379eabab91e8b175",
+      "size": 509
+    },
+    {
+      "path": "src/headless/index.ts",
+      "gitBlob": "2de75ca08f128aa4efc36542193d608db4cdc743",
+      "size": 434
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "1968353c6de2f335c520591ae351b0560145dda0",
+      "size": 415
+    },
+    {
+      "path": "test/setup.ts",
+      "gitBlob": "f96b1bd32ec205e6b8e9dbdf2fda9c71c5f159b5",
+      "size": 667
+    },
+    {
+      "path": "test/store.test.tsx",
+      "gitBlob": "54a7cdd5955cb1b1eebd4fc2cf3944aaf2089c2f",
+      "size": 932
+    },
+    {
+      "path": "test/toast.test.tsx",
+      "gitBlob": "dea5c8e20690b9630324b70716fc39fd44fecea8",
+      "size": 12839
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "6c796b885725dc0b72a22d1d77f952eb97c62c40",
+      "size": 1401
+    }
+  ],
+  "fingerprint": "06ec1d83816d48248ce223abb942c766035b0b49cedc5e66f0757eac157fc30c"
+}

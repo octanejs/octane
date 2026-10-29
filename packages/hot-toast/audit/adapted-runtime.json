@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "project": "hot-toast-adapted",
+  "roots": ["packages/hot-toast/tests/upstream"],
+  "files": [
+    "packages/hot-toast/tests/upstream/store.test.tsx",
+    "packages/hot-toast/tests/upstream/toast.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:ae9d658d43c0f3ff",
+      "file": "packages/hot-toast/tests/upstream/store.test.tsx",
+      "fullName": "keeps a subscriber active when another subscriber with the same toasterId unmounts"
+    },
+    {
+      "id": "runtime:1111662a0107ec39",
+      "file": "packages/hot-toast/tests/upstream/toast.test.tsx",
+      "fullName": "\"toast\" can be called from useEffect hook"
+    },
+    {
+      "id": "runtime:b7a58f7d1eb19db5",
+      "file": "packages/hot-toast/tests/upstream/toast.test.tsx",
+      "fullName": "Multi-Toaster behavior dismisses all toasts across all toasters with dismissAll"
+    },
+    {
+      "id": "runtime:c6799b62609b5b69",
+      "file": "packages/hot-toast/tests/upstream/toast.test.tsx",
+      "fullName": "Multi-Toaster behavior dismisses all toasts from a specific toaster and leaves others intact"
+    },
+    {
+      "id": "runtime:e1434e6a8feaf809",
+      "file": "packages/hot-toast/tests/upstream/toast.test.tsx",
+      "fullName": "Multi-Toaster behavior removes toasts immediately when calling toast.remove()"
+    },
+    {
+      "id": "runtime:d2e53cad4fb5eb20",
+      "file": "packages/hot-toast/tests/upstream/toast.test.tsx",
+      "fullName": "Multi-Toaster behavior renders toasts in correct containers and dismisses them individually"
+    },
+    {
+      "id": "runtime:1c1b3809871854ec",
+      "file": "packages/hot-toast/tests/upstream/toast.test.tsx",
+      "fullName": "Multi-Toaster behavior updates a toast in a specific toaster without affecting others"
+    },
+    {
+      "id": "runtime:ba45d59ce0594537",
+      "file": "packages/hot-toast/tests/upstream/toast.test.tsx",
+      "fullName": "close notification"
+    },
+    {
+      "id": "runtime:305a392dc989e176",
+      "file": "packages/hot-toast/tests/upstream/toast.test.tsx",
+      "fullName": "custom toaster renderer"
+    },
+    {
+      "id": "runtime:9b84ad240f10d891",
+      "file": "packages/hot-toast/tests/upstream/toast.test.tsx",
+      "fullName": "different toasts types with dismiss"
+    },
+    {
+      "id": "runtime:16ce2b7a3ab35c4e",
+      "file": "packages/hot-toast/tests/upstream/toast.test.tsx",
+      "fullName": "error toast with custom duration"
+    },
+    {
+      "id": "runtime:881f043dd890fb2b",
+      "file": "packages/hot-toast/tests/upstream/toast.test.tsx",
+      "fullName": "pause toast"
+    },
+    {
+      "id": "runtime:7eea0c4947a54bf3",
+      "file": "packages/hot-toast/tests/upstream/toast.test.tsx",
+      "fullName": "promise toast"
+    },
+    {
+      "id": "runtime:e43d3c720b5df15d",
+      "file": "packages/hot-toast/tests/upstream/toast.test.tsx",
+      "fullName": "promise toast error"
+    }
+  ],
+  "snapshots": 0
+}
