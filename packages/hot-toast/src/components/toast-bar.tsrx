@@ -48,7 +48,7 @@ const getAnimationStyle = (position: ToastPosition, visible: boolean): CSSProper
 	};
 };
 
-export const ToastBar: FC<ToastBarProps> = memo(function ToastBar(props: ToastBarProps) @{
+function ToastBarBody(props: ToastBarProps) @{
 	const { toast, position, style, children } = props;
 	const animationStyle: CSSProperties = toast.height
 		? getAnimationStyle(toast.position || position || 'top-center', toast.visible)
@@ -74,4 +74,8 @@ export const ToastBar: FC<ToastBarProps> = memo(function ToastBar(props: ToastBa
 			</>
 		}
 	</ToastBarBase>
-});
+}
+
+// TypeScript 5.9 resolves `FC = memo(function … )` to memo's ComponentBody
+// overload, so the body is a declaration.
+export const ToastBar: FC<ToastBarProps> = memo(ToastBarBody);

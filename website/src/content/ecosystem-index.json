@@ -515,19 +515,6 @@
   },
   {
     "kind": "library-binding",
-    "id": "binding-hot-toast",
-    "title": "React Hot Toast",
-    "packageName": "@octanejs/hot-toast",
-    "upstreamPackage": "react-hot-toast",
-    "category": "UI Libraries",
-    "categoryId": "ui-libraries",
-    "description": "Use react-hot-toast with Octane.",
-    "searchTerms": [],
-    "tags": ["toasts", "notifications", "components"],
-    "order": 40
-  },
-  {
-    "kind": "library-binding",
     "id": "binding-select",
     "title": "React Select",
     "packageName": "@octanejs/select",
@@ -537,7 +524,7 @@
     "description": "Use react-select with Octane.",
     "searchTerms": [],
     "tags": ["select", "components", "forms"],
-    "order": 41
+    "order": 40
   },
   {
     "kind": "library-binding",
@@ -550,7 +537,7 @@
     "description": "Use react-textarea-autosize with Octane.",
     "searchTerms": [],
     "tags": ["textarea", "components", "forms"],
-    "order": 42
+    "order": 41
   },
   {
     "kind": "library-binding",
@@ -563,7 +550,7 @@
     "description": "Use shadcn-ui/ui (component registry) with Octane.",
     "searchTerms": ["shadcn UI"],
     "tags": ["components", "primitives"],
-    "order": 43
+    "order": 42
   },
   {
     "kind": "library-binding",
@@ -576,7 +563,7 @@
     "description": "Use sonner with Octane.",
     "searchTerms": [],
     "tags": ["toasts", "notifications", "components"],
-    "order": 44
+    "order": 43
   },
   {
     "kind": "library-binding",
@@ -589,7 +576,7 @@
     "description": "Use vaul with Octane.",
     "searchTerms": [],
     "tags": ["drawer", "components", "primitives"],
-    "order": 45
+    "order": 44
   },
   {
     "kind": "library-binding",
@@ -602,7 +589,7 @@
     "description": "Use @zag-js/react with Octane.",
     "searchTerms": [],
     "tags": ["components", "state machines", "headless"],
-    "order": 46
+    "order": 45
   },
   {
     "kind": "library-binding",
@@ -615,7 +602,7 @@
     "description": "Use animejs with Octane.",
     "searchTerms": [],
     "tags": ["motion", "timeline"],
-    "order": 47
+    "order": 46
   },
   {
     "kind": "library-binding",
@@ -628,7 +615,7 @@
     "description": "Use @formkit/auto-animate with Octane.",
     "searchTerms": [],
     "tags": ["motion", "layout"],
-    "order": 48
+    "order": 47
   },
   {
     "kind": "library-binding",
@@ -641,7 +628,7 @@
     "description": "Use @gsap/react with Octane.",
     "searchTerms": [],
     "tags": ["motion", "timeline"],
-    "order": 49
+    "order": 48
   },
   {
     "kind": "library-binding",
@@ -654,7 +641,7 @@
     "description": "Use motion with Octane.",
     "searchTerms": [],
     "tags": ["animation", "transitions"],
-    "order": 50
+    "order": 49
   },
   {
     "kind": "library-binding",
@@ -667,7 +654,7 @@
     "description": "Use @react-spring/web with Octane.",
     "searchTerms": [],
     "tags": ["animation", "springs"],
-    "order": 51
+    "order": 50
   },
   {
     "kind": "library-binding",
@@ -680,7 +667,7 @@
     "description": "Use thinking-orbs with Octane.",
     "searchTerms": [],
     "tags": ["animation", "loading", "ai"],
-    "order": 52
+    "order": 51
   },
   {
     "kind": "library-binding",
@@ -693,7 +680,7 @@
     "description": "Use react-transition-group with Octane.",
     "searchTerms": [],
     "tags": ["animation", "transitions"],
-    "order": 53
+    "order": 52
   },
   {
     "kind": "library-binding",
@@ -706,7 +693,7 @@
     "description": "Use @base-ui/utils with Octane.",
     "searchTerms": [],
     "tags": ["utilities", "hooks", "browser"],
-    "order": 54
+    "order": 53
   },
   {
     "kind": "library-binding",
@@ -719,7 +706,7 @@
     "description": "Use @dnd-kit/react with Octane.",
     "searchTerms": [],
     "tags": ["drag drop", "interaction"],
-    "order": 55
+    "order": 54
   },
   {
     "kind": "library-binding",
@@ -732,6 +719,19 @@
     "description": "Use @floating-ui/react with Octane.",
     "searchTerms": [],
     "tags": ["positioning", "popovers", "tooltips"],
+    "order": 55
+  },
+  {
+    "kind": "library-binding",
+    "id": "binding-hot-toast",
+    "title": "React Hot Toast",
+    "packageName": "@octanejs/hot-toast",
+    "upstreamPackage": "react-hot-toast",
+    "category": "UI Utilities",
+    "categoryId": "ui-utilities",
+    "description": "Use react-hot-toast with Octane.",
+    "searchTerms": [],
+    "tags": ["toasts", "notifications", "components"],
     "order": 56
   },
   {

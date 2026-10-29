@@ -219,11 +219,6 @@
         "tags": ["calendar", "date picker", "components"]
       },
       {
-        "packageName": "@octanejs/hot-toast",
-        "title": "React Hot Toast",
-        "tags": ["toasts", "notifications", "components"]
-      },
-      {
         "packageName": "@octanejs/select",
         "title": "React Select",
         "tags": ["select", "components", "forms"]
@@ -315,6 +310,11 @@
         "packageName": "@octanejs/floating-ui",
         "title": "Floating UI",
         "tags": ["positioning", "popovers", "tooltips"]
+      },
+      {
+        "packageName": "@octanejs/hot-toast",
+        "title": "React Hot Toast",
+        "tags": ["toasts", "notifications", "components"]
       },
       {
         "packageName": "@octanejs/image-crop",

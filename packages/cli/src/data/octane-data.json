@@ -451,7 +451,7 @@
     {
       "name": "@octanejs/hot-toast",
       "version": "0.0.0",
-      "category": "UI Libraries",
+      "category": "UI Utilities",
       "upstream": { "package": "react-hot-toast", "version": "2.6.1" },
       "surface": "Complete published react-hot-toast 2.6.1 surface: the callable `toast` API with every variant, promise lifecycle, dismissal and removal, `Toaster`, `ToastBar`, `ToastIcon`, the icon components, multiple toasters, hover pause, `useToaster`, `useToasterStore`, `resolveValue`, and the `/headless` entry. All 14 upstream Jest cases run unchanged against React and against the port.",
       "divergences": [

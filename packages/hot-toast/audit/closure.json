@@ -48,7 +48,7 @@
       "path": "src/components/toast-bar.tsrx",
       "origin": "adapted",
       "packageName": "react-hot-toast",
-      "sha256": "38055002f14c8084e7aeb0a43454ec650c0ba573303613c2afc09786df25ff2a"
+      "sha256": "07ba143d680a861ab3c37c060986f4c23e564e7c670ed28090aab4db649c2458"
     },
     {
       "path": "src/components/toast-icon.tsrx",
