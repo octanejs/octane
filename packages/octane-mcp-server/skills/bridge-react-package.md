@@ -33,6 +33,7 @@ of bridging by hand:
 | `@base-ui-components/react` | `@octanejs/base-ui` |
 | `@dnd-kit/react` | `@octanejs/dnd-kit` |
 | `sonner` | `@octanejs/sonner` |
+| `react-hot-toast` | `@octanejs/hot-toast` |
 | `streamdown` | `@octanejs/streamdown` |
 | `@streamdown/code` | `@octanejs/streamdown/code` |
 | `@streamdown/math` | `@octanejs/streamdown/math` |

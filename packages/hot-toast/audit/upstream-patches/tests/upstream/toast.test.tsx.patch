@@ -1,0 +1,21 @@
+diff --git a/tests/upstream/toast.test.tsx b/tests/upstream/toast.test.tsx
+--- a/tests/upstream/toast.test.tsx
++++ b/tests/upstream/toast.test.tsx
+@@ -306,13 +306,15 @@ test('pause toast', async () => {
+ 
+   expect(toastElement).toBeInTheDocument();
+ 
+-  fireEvent.mouseEnter(toastElement);
++  // OCTANE DIVERGENCE[native-mouseenter]: the Toaster listens for the native, non-bubbling mouseenter/mouseleave, which a pointer entering the toast dispatches on the container; React synthesizes them from mouseover/mouseout on the toast.
++  const toasterElement = toastElement.closest('[data-rht-toaster]')!;
++  fireEvent.mouseEnter(toasterElement);
+ 
+   waitTime(10000);
+ 
+   expect(toastElement).toBeInTheDocument();
+ 
+-  fireEvent.mouseLeave(toastElement);
++  fireEvent.mouseLeave(toasterElement);
+ 
+   waitTime(1000);
+   waitTime(1000);

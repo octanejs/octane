@@ -1,0 +1,12 @@
+{
+  "upstream": { "package": "react-hot-toast", "version": "2.6.1" },
+  "surface": "Complete published react-hot-toast 2.6.1 surface: the callable `toast` API with every variant, promise lifecycle, dismissal and removal, `Toaster`, `ToastBar`, `ToastIcon`, the icon components, multiple toasters, hover pause, `useToaster`, `useToasterStore`, `resolveValue`, and the `/headless` entry. All 14 upstream Jest cases run unchanged against React and against the port.",
+  "divergences": [
+    "The Toaster pauses on native `mouseenter`/`mouseleave` events on its container; tests fire them there rather than on a toast.",
+    "goober's `setup()` is never called, so an application's goober pragma stays in place.",
+    "The root and `/headless` entries share one toast store; upstream bundles each with its own.",
+    "Renderables, styles and refs use Octane types; the icon components are typed as Octane components over `div` props."
+  ],
+  "ssr": "Supported and tested: `Toaster` and queued toasts server-render without browser globals, matching React's markup, and `hydrateRoot` adopts the server container before showing client toasts.",
+  "verified": "2026-10-29"
+}

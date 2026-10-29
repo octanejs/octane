@@ -219,6 +219,11 @@
         "tags": ["calendar", "date picker", "components"]
       },
       {
+        "packageName": "@octanejs/hot-toast",
+        "title": "React Hot Toast",
+        "tags": ["toasts", "notifications", "components"]
+      },
+      {
         "packageName": "@octanejs/select",
         "title": "React Select",
         "tags": ["select", "components", "forms"]

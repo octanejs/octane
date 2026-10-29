@@ -19,6 +19,7 @@ import tanstackVirtualAdapted from './packages/tanstack-virtual/tests/vitest.ada
 import tanstackQueryAdaptedSSR from './packages/tanstack-query/tests/vitest.adapted-ssr.config.ts';
 import tanstackQueryAdapted from './packages/tanstack-query/tests/vitest.adapted.config.ts';
 import tanstackQueryDevtoolsAdapted from './packages/tanstack-query-devtools/tests/vitest.adapted.config.ts';
+import hotToastAdapted from './packages/hot-toast/tests/vitest.adapted.config.ts';
 import baseUIAdapted from './packages/base-ui/tests/vitest.config.ts';
 import baseUIUtilsAdapted from './packages/base-ui-utils/tests/vitest.config.ts';
 import baseUIPristine from './packages/base-ui/tests/vitest.pristine.config.ts';
@@ -607,6 +608,7 @@ export default defineConfig({
 			{ ...tanstackQueryAdapted, testExecution: { group: 'react-parity' } },
 			{ ...tanstackQueryAdaptedSSR, testExecution: { group: 'react-parity' } },
 			{ ...tanstackQueryDevtoolsAdapted, testExecution: { group: 'react-parity' } },
+			{ ...hotToastAdapted, testExecution: { group: 'react-parity' } },
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
@@ -4874,6 +4876,77 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/sonner\/dist\/styles\.css$/,
 							replacement: resolve(import.meta.dirname, 'packages/sonner/src/styles.css'),
+						},
+					],
+				},
+			},
+			{
+				// Package-authored react-hot-toast contracts stay ordinary. Parity owns
+				// the adapted upstream suite and the differential project below.
+				test: {
+					name: 'hot-toast',
+					include: ['packages/hot-toast/tests/conformance/**/*.test.ts'],
+					environment: 'jsdom',
+					setupFiles: ['packages/hot-toast/tests/setup.ts'],
+					globals: false,
+				},
+				// `?octane-ssr` fixtures render server HTML for the hydration test.
+				plugins: [octaneServerFixtures(import.meta.dirname), octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/hot-toast$/,
+							replacement: resolve(import.meta.dirname, 'packages/hot-toast/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/hot-toast\/headless$/,
+							replacement: resolve(import.meta.dirname, 'packages/hot-toast/src/headless/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'hot-toast-differential',
+					include: ['packages/hot-toast/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					// Rewrites `@octanejs/hot-toast` to the published react-hot-toast@2.6.1.
+					globalSetup: ['packages/hot-toast/tests/differential/_setup.ts'],
+					setupFiles: ['packages/hot-toast/tests/setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/hot-toast$/,
+							replacement: resolve(import.meta.dirname, 'packages/hot-toast/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'hot-toast-ssr',
+					include: ['packages/hot-toast/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/hot-toast$/,
+							replacement: resolve(import.meta.dirname, 'packages/hot-toast/src/index.ts'),
 						},
 					],
 				},

@@ -1,0 +1,100 @@
+[
+  {
+    "id": "react-case-v1:fda66f9097f862ee30ca",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/store.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port after mechanical import and harness rewrites; the same bytes also run unchanged against React.",
+    "upstreamCommit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d"
+  },
+  {
+    "id": "react-case-v1:c5138d945e1dd1951c91",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/toast.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port after mechanical import and harness rewrites; the same bytes also run unchanged against React.",
+    "upstreamCommit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d"
+  },
+  {
+    "id": "react-case-v1:026b4709cd1382591eef",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/toast.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port after mechanical import and harness rewrites; the same bytes also run unchanged against React.",
+    "upstreamCommit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d"
+  },
+  {
+    "id": "react-case-v1:b70019b18d6d26875991",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/toast.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port after mechanical import and harness rewrites; the same bytes also run unchanged against React.",
+    "upstreamCommit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d"
+  },
+  {
+    "id": "react-case-v1:b2d9e107c255e8d96c39",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/toast.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port after mechanical import and harness rewrites; the same bytes also run unchanged against React.",
+    "upstreamCommit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d"
+  },
+  {
+    "id": "react-case-v1:1e0a2051d5ded2225d68",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/toast.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port after mechanical import and harness rewrites; the same bytes also run unchanged against React.",
+    "upstreamCommit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d"
+  },
+  {
+    "id": "react-case-v1:badd531d2698b7f801dd",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/toast.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port after mechanical import and harness rewrites; the same bytes also run unchanged against React.",
+    "upstreamCommit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d"
+  },
+  {
+    "id": "react-case-v1:e4f13996c696ce981645",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/toast.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port after mechanical import and harness rewrites; the same bytes also run unchanged against React.",
+    "upstreamCommit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d"
+  },
+  {
+    "id": "react-case-v1:5c71a561875a0d984a9d",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/toast.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port after mechanical import and harness rewrites; the same bytes also run unchanged against React.",
+    "upstreamCommit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d"
+  },
+  {
+    "id": "react-case-v1:84c517c16c62f58a3296",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/toast.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port after mechanical import and harness rewrites; the same bytes also run unchanged against React.",
+    "upstreamCommit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d"
+  },
+  {
+    "id": "react-case-v1:bfb625c86d85b7e56a33",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/toast.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port after mechanical import and harness rewrites; the same bytes also run unchanged against React.",
+    "upstreamCommit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d"
+  },
+  {
+    "id": "react-case-v1:0231c9715169c8768cc7",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/toast.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port after mechanical import and harness rewrites; the same bytes also run unchanged against React.",
+    "upstreamCommit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d"
+  },
+  {
+    "id": "react-case-v1:e0304be88f35ddb313ca",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/toast.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port after mechanical import and harness rewrites; the same bytes also run unchanged against React.",
+    "upstreamCommit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d"
+  },
+  {
+    "id": "react-case-v1:4cc47c8659a96447d068",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/toast.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port after mechanical import and harness rewrites; the same bytes also run unchanged against React.",
+    "upstreamCommit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d"
+  }
+]

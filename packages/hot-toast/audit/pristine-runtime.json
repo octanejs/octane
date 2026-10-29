@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "root": "packages/hot-toast",
+  "tests": [
+    {
+      "file": "upstream/test/store.test.tsx",
+      "fullName": "keeps a subscriber active when another subscriber with the same toasterId unmounts",
+      "status": "passed"
+    },
+    {
+      "file": "upstream/test/toast.test.tsx",
+      "fullName": "\"toast\" can be called from useEffect hook",
+      "status": "passed"
+    },
+    {
+      "file": "upstream/test/toast.test.tsx",
+      "fullName": "Multi-Toaster behavior dismisses all toasts across all toasters with dismissAll",
+      "status": "passed"
+    },
+    {
+      "file": "upstream/test/toast.test.tsx",
+      "fullName": "Multi-Toaster behavior dismisses all toasts from a specific toaster and leaves others intact",
+      "status": "passed"
+    },
+    {
+      "file": "upstream/test/toast.test.tsx",
+      "fullName": "Multi-Toaster behavior removes toasts immediately when calling toast.remove()",
+      "status": "passed"
+    },
+    {
+      "file": "upstream/test/toast.test.tsx",
+      "fullName": "Multi-Toaster behavior renders toasts in correct containers and dismisses them individually",
+      "status": "passed"
+    },
+    {
+      "file": "upstream/test/toast.test.tsx",
+      "fullName": "Multi-Toaster behavior updates a toast in a specific toaster without affecting others",
+      "status": "passed"
+    },
+    {
+      "file": "upstream/test/toast.test.tsx",
+      "fullName": "close notification",
+      "status": "passed"
+    },
+    {
+      "file": "upstream/test/toast.test.tsx",
+      "fullName": "custom toaster renderer",
+      "status": "passed"
+    },
+    {
+      "file": "upstream/test/toast.test.tsx",
+      "fullName": "different toasts types with dismiss",
+      "status": "passed"
+    },
+    {
+      "file": "upstream/test/toast.test.tsx",
+      "fullName": "error toast with custom duration",
+      "status": "passed"
+    },
+    { "file": "upstream/test/toast.test.tsx", "fullName": "pause toast", "status": "passed" },
+    { "file": "upstream/test/toast.test.tsx", "fullName": "promise toast", "status": "passed" },
+    {
+      "file": "upstream/test/toast.test.tsx",
+      "fullName": "promise toast error",
+      "status": "passed"
+    }
+  ],
+  "snapshots": 0
+}

@@ -6509,6 +6509,67 @@ importers:
         specifier: catalog:default
         version: 3.25.76
 
+  packages/hot-toast:
+    dependencies:
+      goober:
+        specifier: 2.1.19
+        version: 2.1.19(csstype@3.2.3)
+    devDependencies:
+      '@babel/preset-env':
+        specifier: 7.29.7
+        version: 7.29.7(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2)
+      '@babel/preset-react':
+        specifier: 7.29.7
+        version: 7.29.7(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2)
+      '@babel/preset-typescript':
+        specifier: 7.29.7
+        version: 7.29.7(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2)
+      '@octanejs/testing-library':
+        specifier: workspace:*
+        version: link:../testing-library
+      '@testing-library/jest-dom':
+        specifier: catalog:default
+        version: 6.9.1
+      '@testing-library/react':
+        specifier: 16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.4.5(react@19.2.7)
+      '@types/react':
+        specifier: catalog:default
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: catalog:default
+        version: 19.2.7(@types/react@19.2.18)
+      babel-jest:
+        specifier: 30.4.1
+        version: 30.4.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2)
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
+      jest:
+        specifier: 30.4.2
+        version: 30.4.2(@types/node@24.13.3)(babel-plugin-macros@3.1.0)(node-notifier@8.0.2)(supports-color@10.2.2)
+      jest-environment-jsdom:
+        specifier: 30.4.1
+        version: 30.4.1(bufferutil@4.1.0)(supports-color@10.2.2)(utf-8-validate@5.0.10)
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      react-hot-toast:
+        specifier: 2.6.1
+        version: 2.6.1(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+
   packages/html-react-parser:
     dependencies:
       domhandler:
@@ -31080,6 +31141,20 @@ packages:
     engines: {node: '>=18.0.0'}
     peerDependencies:
       react: ^16.8.0 || ^17 || ^18 || ^19
+
+  react-hot-toast@2.6.1:
+    resolution: {integrity: sha512-gjFsf05dxcku0FkyMtFH+XmYFdA2odXfBVknEr/IZ+XpUjwsgvtY2616sOpUynK+l9ykQDRNpaJ1hYfuximUiA==}
+    engines: {node: '>=10'}
+    peerDependencies:
+      '@types/react': '*'
+      '@types/react-dom': '*'
+      react: '>=16'
+      react-dom: '>=16'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      '@types/react-dom':
+        optional: true
 
   react-hotkeys-hook@4.6.2:
     resolution: {integrity: sha512-FmP+ZriY3EG59Ug/lxNfrObCnW9xQShgk7Nb83+CkpfkcCpfS95ydv+E9JuXA5cp8KtskU7LGlIARpkc92X22Q==}
@@ -62746,6 +62821,16 @@ snapshots:
   react-hook-form@7.81.0(react@19.2.7):
     dependencies:
       react: 19.2.7
+
+  react-hot-toast@2.6.1(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+    dependencies:
+      csstype: 3.2.3
+      goober: 2.1.19(csstype@3.2.3)
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+    optionalDependencies:
+      '@types/react': 19.2.18
+      '@types/react-dom': 19.2.7(@types/react@19.2.18)
 
   react-hotkeys-hook@4.6.2(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
