@@ -7,7 +7,12 @@
 import { describe, it, expect } from 'vitest';
 import { createRoutesFromElements, Route } from '@octanejs/remix-router';
 import { mount, nextPaint } from '../_helpers';
-import { DeclarativeApp, NavigateApp, ConditionalApp } from '../_fixtures/declarative.tsrx';
+import {
+	DeclarativeApp,
+	NavigateApp,
+	ConditionalApp,
+	SwitchingChildrenApp,
+} from '../_fixtures/declarative.tsrx';
 import { createElement } from 'octane';
 
 async function flush() {
@@ -18,10 +23,9 @@ async function flush() {
 }
 
 describe('<Routes> block children (registration collector)', () => {
-	it('matches the index route inside a layout on first paint', async () => {
+	it('matches the index route inside a layout on first paint', () => {
 		// Per useRoutes-test.tsx "returns the matching element from a route config".
 		const r = mount(DeclarativeApp, {});
-		await flush();
 		expect(r.find('header, nav')).toBeTruthy();
 		expect(r.find('main h1').textContent).toBe('Home');
 		r.unmount();
@@ -57,6 +61,21 @@ describe('<Routes> block children (registration collector)', () => {
 		r.unmount();
 	});
 
+	it('updates nested routes when the same Route switches between block and descriptor children', () => {
+		const view = mount(SwitchingChildrenApp, { descriptor: true });
+		try {
+			expect(view.find('h1').textContent).toBe('Descriptor');
+			view.update(SwitchingChildrenApp, { descriptor: false });
+			expect(view.find('h1').textContent).toBe('Block');
+			view.update(SwitchingChildrenApp, { descriptor: true });
+			expect(view.find('h1').textContent).toBe('Descriptor');
+			view.update(SwitchingChildrenApp, { descriptor: false });
+			expect(view.find('h1').textContent).toBe('Block');
+		} finally {
+			view.unmount();
+		}
+	});
+
 	it('a conditionally-mounted <Route> participates in matching once rendered (ordering caveat pinned)', async () => {
 		// Registration order is MOUNT order: the late route registers after the
 		// static siblings. That only affects matchRoutes score TIES — /extra
@@ -67,7 +86,6 @@ describe('<Routes> block children (registration collector)', () => {
 		expect(r.find('.nf').textContent).toBe('not found'); // /extra not declared yet
 
 		r.click('#add-route');
-		await flush();
 		expect(r.find('h1').textContent).toBe('Extra');
 		r.unmount();
 	});

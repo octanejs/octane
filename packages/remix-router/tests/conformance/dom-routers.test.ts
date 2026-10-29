@@ -58,6 +58,32 @@ describe('<HashRouter>', () => {
 });
 
 describe('<unstable_HistoryRouter>', () => {
+	it('resubscribes when two history instances share the same listen function', async () => {
+		const subscriptions: string[] = [];
+		let owner = 'first';
+		const listen = () => {
+			const subscribed = owner;
+			subscriptions.push('subscribe ' + subscribed);
+			return () => subscriptions.push('unsubscribe ' + subscribed);
+		};
+		const first = Object.assign(createMemoryHistory(), { listen });
+		const second = Object.assign(createMemoryHistory(), { listen });
+		const r = mount(HistoryApp, { history: first });
+		r.update(HistoryApp, { history: first });
+		await flush();
+		expect(subscriptions).toEqual(['subscribe first']);
+		owner = 'second';
+		r.update(HistoryApp, { history: second });
+		await flush();
+		r.unmount();
+		expect(subscriptions).toEqual([
+			'subscribe first',
+			'unsubscribe first',
+			'subscribe second',
+			'unsubscribe second',
+		]);
+	});
+
 	it('drives the router from a caller-provided history instance', async () => {
 		const history = createMemoryHistory({ initialEntries: ['/about'], v5Compat: true });
 		const r = mount(HistoryApp, { history });

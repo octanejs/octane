@@ -1,3 +1,5 @@
+'use strong';
+
 // NavLink — transcribed from react-router@8.2.0 lib/dom/lib.tsx onto octane.
 // forwardRef → ref-as-prop. Renders <Link> with active/pending-derived
 // className/style/aria-current; `className`, `style`, and `children` accept

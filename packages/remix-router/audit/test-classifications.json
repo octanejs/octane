@@ -77,6 +77,16 @@
       "reason": "Checks the vendored Octane server runtime and scope stubs; it is not counted as same-fixture React evidence."
     },
     {
+      "path": "packages/remix-router/tests/conformance/strong-templates.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks client and server Strong compilation of the Octane templates."
+    },
+    {
+      "path": "packages/remix-router/tests/conformance/view-transitions.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks browser transition callbacks, router replacement and retained fetcher results in the Octane adapter."
+    },
+    {
       "path": "packages/remix-router/tests/differential/parity.test.ts",
       "disposition": "react-octane-differential",
       "oracle": "Runs nine exact routing scenarios from eight shared fixtures against pinned react-router and @octanejs/remix-router."

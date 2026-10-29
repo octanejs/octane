@@ -1,3 +1,5 @@
+'use strong';
+
 // DefaultErrorComponent — port of react-router@8.2.0 lib/hooks.tsx's default
 // error UI. Markup-identical (differential fixtures still avoid it — the dev
 // stack trace can never byte-match across runtimes).

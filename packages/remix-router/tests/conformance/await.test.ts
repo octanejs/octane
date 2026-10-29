@@ -5,7 +5,7 @@
  * data-memory-router-test.tsx "defer" suite.
  */
 import { describe, it, expect } from 'vitest';
-import { createMemoryRouter } from '@octanejs/remix-router';
+import { Await, RouterProvider, createMemoryRouter } from '@octanejs/remix-router';
 import { act, mount, nextPaint } from '../_helpers';
 import { App, ErrorProbe } from '../_fixtures/basic.tsrx';
 import { AwaitPage, AwaitRenderPropPage, AwaitNoErrorElementPage } from '../_fixtures/await.tsrx';
@@ -88,6 +88,33 @@ describe('<Await>', () => {
 		await flush();
 		expect(r.findAll('.fallback').length).toBe(0);
 		expect(r.find('.err').textContent).toBe('error:bubble');
+		r.unmount();
+	});
+
+	it('reports a thrown child once before rendering its Await fallback', async () => {
+		const caught = new Error('child render');
+		const reports: unknown[] = [];
+		const reportCountsAtFallback: number[] = [];
+		function Fallback() {
+			reportCountsAtFallback.push(reports.length);
+			return createElement('p', { class: 'await-err' }, 'caught');
+		}
+		const boundary = createElement(Await, {
+			resolve: 'ready',
+			children: () => {
+				throw caught;
+			},
+			errorElement: createElement(Fallback),
+		});
+		const router = createMemoryRouter([{ path: '/', element: boundary }]);
+		const r = mount(RouterProvider, { router, onError: (error) => reports.push(error) });
+		await flush();
+		expect(r.find('.await-err').textContent).toBe('caught');
+		r.update(RouterProvider, { router, onError: (error) => reports.push(error) });
+		await flush();
+		expect(reports).toHaveLength(1);
+		expect(reports[0]).toBe(caught);
+		expect(reportCountsAtFallback[0]).toBe(1);
 		r.unmount();
 	});
 

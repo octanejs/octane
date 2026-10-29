@@ -11,7 +11,10 @@
     "integrity": "sha256:4ac4dc0f608dfaced2943da365c95634c9f5a550d33be6c10f1d13d70f59692b",
     "verification": "recorded-unverified"
   },
-  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/remix-router/src"],
@@ -155,7 +158,7 @@
         {
           "path": "packages/remix-router/audit/test-classifications.json",
           "role": "support",
-          "sha256": "d039c59ccfdffabe3d405231c43333562830f6b2965d929f4cb2f8bd7a70f39d"
+          "sha256": "c30d9bb9c5b6ba67e0f89896fcad7ef46e130322e0e3a4764d8410e032d5b634"
         },
         {
           "path": "packages/octane/tests/differential/_rig.ts",
@@ -176,7 +179,7 @@
         {
           "path": "packages/remix-router/tests/ssr/ssr-static.test.ts",
           "role": "test",
-          "sha256": "1d29f5c22a374ebab41f1d3289bbcf52b0624dbf2ed0e7d3417291d4d06cee27",
+          "sha256": "bc87930898f057da8b509eb9c3c309675bff4cc61152c2a53eec71155e1db3e3",
           "cases": [
             {
               "id": "differential:remix-router-ssr-index",
@@ -208,7 +211,7 @@
         {
           "path": "packages/remix-router/tests/_fixtures/static-ssr-diff.tsrx",
           "role": "support",
-          "sha256": "51a98edbaa4c87432a45ae1155c9e7e06040080169413882a9f6140d867bff71"
+          "sha256": "5af39dd224d7e67476c42b72dfdf53128005095e5e4d7120317519224c92c45e"
         },
         {
           "path": "packages/remix-router/tests/differential/_setup-ssr.ts",
@@ -223,7 +226,7 @@
         {
           "path": "packages/remix-router/audit/test-classifications.json",
           "role": "support",
-          "sha256": "d039c59ccfdffabe3d405231c43333562830f6b2965d929f4cb2f8bd7a70f39d"
+          "sha256": "c30d9bb9c5b6ba67e0f89896fcad7ef46e130322e0e3a4764d8410e032d5b634"
         }
       ]
     }

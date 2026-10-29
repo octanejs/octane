@@ -5,11 +5,13 @@
  * data-memory-router-test.tsx errors suite.
  */
 import { describe, it, expect } from 'vitest';
-import { createMemoryRouter } from '@octanejs/remix-router';
+import { RouterProvider, createMemoryRouter } from '@octanejs/remix-router';
 import { mount, nextPaint } from '../_helpers';
 import { App, Layout, Home, LoaderPage, ErrorProbe } from '../_fixtures/basic.tsrx';
 import { StatusProbe } from '../_fixtures/probes.tsrx';
-import { createElement } from 'octane';
+import { createElement, useContext } from 'octane';
+import { RouteErrorContext } from '../../src/lib/context';
+import { RenderErrorBoundary } from '../../src/lib/RenderErrorBoundary.tsrx';
 
 async function flush() {
 	for (let i = 0; i < 4; i++) {
@@ -124,6 +126,38 @@ describe('route error boundaries', () => {
 		r.unmount();
 	});
 
+	it('propagates an error thrown by the inner render error reporter to the parent', async () => {
+		const caught = new Error('child render');
+		const replacement = new Error('reporter threw');
+		const reports: unknown[] = [];
+		function ThrowingChild(): never {
+			throw caught;
+		}
+		const router = createMemoryRouter([
+			{
+				path: '/',
+				element: createElement(Layout),
+				errorElement: createElement(ErrorProbe),
+				children: [
+					{ index: true, element: createElement(ThrowingChild), errorElement: 'inner fallback' },
+				],
+			},
+		]);
+		const r = mount(RouterProvider, {
+			router,
+			onError(error) {
+				reports.push(error);
+				if (error === caught) throw replacement;
+			},
+		});
+		await flush();
+		expect(reports).toHaveLength(2);
+		expect(reports[0]).toBe(caught);
+		expect(reports[1]).toBe(replacement);
+		expect(r.find('.err').textContent).toBe('error:reporter threw');
+		r.unmount();
+	});
+
 	it('renders a 404 ErrorResponse into the root errorElement when nothing matches', async () => {
 		// Per data-memory-router-test.tsx:1884 ("renders 404 errors using
 		// path='/' error boundary").
@@ -140,6 +174,34 @@ describe('route error boundaries', () => {
 		const r = mount(App, { router });
 		await flush();
 		expect(r.find('.status').textContent).toBe('404 Not Found');
+		r.unmount();
+	});
+
+	it('retains the latest data error at a location until revalidation finishes or the location changes', () => {
+		function ErrorValue() {
+			const error = useContext(RouteErrorContext) as Error;
+			return createElement('p', {}, error.message);
+		}
+		const props = {
+			location: { pathname: '/', search: '', hash: '', state: null, key: 'first' },
+			revalidation: 'idle' as const,
+			error: new Error('one'),
+			component: createElement(ErrorValue),
+			routeContext: { outlet: null, matches: [], isDataRoute: true },
+			children: 'healthy',
+		};
+		const r = mount(RenderErrorBoundary, props);
+		r.update(RenderErrorBoundary, { ...props, error: new Error('two') });
+		r.update(RenderErrorBoundary, { ...props, error: undefined });
+		expect(r.find('p').textContent).toBe('two');
+		r.update(RenderErrorBoundary, { ...props, revalidation: 'loading', error: undefined });
+		expect(r.find('p').textContent).toBe('two');
+		r.update(RenderErrorBoundary, { ...props, error: undefined });
+		expect(r.container.textContent).toBe('healthy');
+		r.update(RenderErrorBoundary, props);
+		expect(r.find('p').textContent).toBe('one');
+		r.update(RenderErrorBoundary, { ...props, location: { ...props.location }, error: undefined });
+		expect(r.container.textContent).toBe('healthy');
 		r.unmount();
 	});
 

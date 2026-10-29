@@ -1,3 +1,5 @@
+'use strong';
+
 // Link — transcribed from react-router@8.2.0 lib/dom/lib.tsx onto octane.
 // forwardRef → ref-as-prop (octane refs are props; documented divergence).
 // Framework-mode prefetching (usePrefetchBehavior / PrefetchPageLinks) is

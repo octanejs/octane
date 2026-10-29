@@ -1,3 +1,5 @@
+'use strong';
+
 // Await — port of react-router@8.2.0 lib/components.tsx's Await +
 // AwaitErrorBoundary + ResolveAwait onto octane. The class boundary becomes an
 // octane @try/@catch; the "throw to the suspense boundary" becomes use(promise)
@@ -10,7 +12,7 @@
 // and the pending suspension live in AwaitBody, OUTSIDE Await's render-error
 // catch; the @try/@catch wraps only the CHILDREN render (what upstream's
 // componentDidCatch actually sees).
-import { use, useCallback, useContext, useRef, isChildrenBlock } from 'octane';
+import { use, useCallback, useContext, useMemo, isChildrenBlock } from 'octane';
 import type { OctaneNode } from 'octane';
 import { AwaitContext, DataRouterContext, DataRouterStateContext } from './context.ts';
 import { getRoutePattern } from './router/utils.ts';
@@ -129,9 +131,7 @@ type AwaitCaughtProps = {
 
 function AwaitCaught(props: AwaitCaughtProps) @{
 	// componentDidCatch parity — once per distinct caught error, during render.
-	const reported = useRef<unknown>(null);
-	if (reported.current !== props.caught) {
-		reported.current = props.caught;
+	useMemo(() => {
 		if (props.onError) {
 			props.onError(props.caught, { componentStack: '' });
 		} else {
@@ -139,7 +139,7 @@ function AwaitCaught(props: AwaitCaughtProps) @{
 				componentStack: '',
 			});
 		}
-	}
+	}, [props.caught]);
 
 	if (!props.errorElement) {
 		// Rethrow from the catch branch → propagates to the parent boundary.
