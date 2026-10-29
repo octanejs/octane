@@ -82,6 +82,50 @@ const LOOP_TYPES = new Set([
 	'DoWhileStatement',
 ]);
 
+/**
+ * Replace each exit that a directive arm's setup owns, anywhere in `ast`, with
+ * `exit(node)`, copy-on-write. Nested functions and `@{ … }` blocks own their
+ * jumps, and a nested directive's arms are arms of their own. The type-only
+ * view uses this; each compiler walks its arms itself.
+ */
+export function mapArmExits(ast, exit) {
+	const visit = (node, arm, loop, breakable) => {
+		if (Array.isArray(node)) {
+			let out = null;
+			for (let i = 0; i < node.length; i++) {
+				const child = node[i];
+				const mapped =
+					child !== null && typeof child === 'object' ? visit(child, arm, loop, breakable) : child;
+				if (out === null && mapped !== child) out = node.slice(0, i);
+				if (out !== null) out.push(mapped);
+			}
+			return out ?? node;
+		}
+		const type = node.type;
+		if (arm && armJump(node, loop, breakable) === 'exit') return exit(node);
+		if (DIRECTIVE_TYPES.has(type)) {
+			arm = true;
+			loop = breakable = false;
+		} else if (FUNCTION_TYPES.has(type) || type === 'JSXCodeBlock') {
+			arm = false;
+		} else if (LOOP_TYPES.has(type)) {
+			loop = breakable = true;
+		} else if (type === 'SwitchStatement') {
+			breakable = true;
+		}
+		let out = null;
+		for (const key in node) {
+			if (WALK_SKIP_KEYS.has(key)) continue;
+			const child = node[key];
+			if (child === null || typeof child !== 'object') continue;
+			const mapped = visit(child, arm, loop, breakable);
+			if (mapped !== child) (out ??= { ...node })[key] = mapped;
+		}
+		return out ?? node;
+	};
+	return visit(ast, false, false, false);
+}
+
 // The template region a statement sits in. Outside every template, jumps are
 // ordinary JavaScript and the parser resolves them.
 const OUTSIDE = 0;
