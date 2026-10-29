@@ -530,6 +530,27 @@ function createRendererTypePragma(renderer, ast, strong = false, typeIntrinsics 
 	};
 }
 
+/**
+ * Under the Strong JSX types, read `octane` through `octane/strong`, whose
+ * React-shaped host prop types describe Strong hosts: `ComponentProps<'span'>`
+ * spread onto `<span>` must not accept the untrusted HTML that `<span>`
+ * rejects. Runs after every pass that recognizes imports by their `octane`
+ * source; the specifier keeps its authored location.
+ */
+function importStrongTypes(ast) {
+	let changed = false;
+	const body = ast.body.map((statement) => {
+		if (statement.type !== 'ImportDeclaration' || statement.source.value !== DOM_RENDERER_MODULE)
+			return statement;
+		changed = true;
+		return {
+			...statement,
+			source: { ...statement.source, value: 'octane/strong', raw: undefined },
+		};
+	});
+	return changed ? { ...ast, body } : ast;
+}
+
 function prepareDynamicJsxTypes(ast, comments) {
 	const pragma = authoredLeadingPragma(ast, comments);
 	const jsxImportSource = pragma ? jsxImportSourcePragmaModule(pragma.value) : null;
@@ -749,16 +770,20 @@ export function compileToVolarMappings(source, filename, options) {
 	// original parse, and replacement nodes keep authored locations so
 	// mappings/hover still work.
 	const transform = selectOctaneTransform(ast, dynamicJsxTypes?.componentAlias);
+	const projected = projectServerContextCalls(
+		renderer.target === 'dom'
+			? projectComponentChildren(
+					projectNativeDomReads(transformAst, options?.knownAttributeSpreads),
+					comments,
+				)
+			: transformAst,
+		filename,
+	);
+	const typePragmaModule = jsxImportSourcePragmaModule(
+		(typePragma ?? rendererPragma ?? authoredPragma)?.value ?? '',
+	);
 	const transformed = transform(
-		projectServerContextCalls(
-			renderer.target === 'dom'
-				? projectComponentChildren(
-						projectNativeDomReads(transformAst, options?.knownAttributeSpreads),
-						comments,
-					)
-				: transformAst,
-			filename,
-		),
+		typePragmaModule === 'octane/strong' ? importStrongTypes(projected) : projected,
 		source,
 		filename,
 		{
