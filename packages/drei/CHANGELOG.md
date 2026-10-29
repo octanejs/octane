@@ -1,5 +1,13 @@
 # @octanejs/drei
 
+## 0.0.39
+
+### Patch Changes
+
+- 868ee70: `<Html>` now renders a custom `geometry` or `material` on its occlusion mesh. Both were dropped, so the mesh fell back to three.js's empty default geometry and default material.
+- @octanejs/three@0.1.62
+  - @octanejs/zustand@0.1.68
+
 ## 0.0.38
 
 ### Patch Changes
