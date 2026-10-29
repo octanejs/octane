@@ -262,6 +262,13 @@ describe('transformModule', () => {
 				false,
 			],
 			[`export const list = [1].map(() => Slot({ children: <b /> }));\n${local}`, false],
+			[`export const v = (() => Slot({ children: <b /> }))();\n${local}`, false],
+			// `String` calls the object's `toString` while the module loads.
+			[`export const s = String({ toString: () => Slot({ children: <b /> }) });\n${local}`, false],
+			[
+				`const cb = () => Slot({ children: <b /> });\nexport const list = [1].map(cb);\n${local}`,
+				false,
+			],
 			[
 				slot.replace(
 					'export function Slot',
@@ -275,6 +282,10 @@ describe('transformModule', () => {
 			],
 			// A function that is only defined, or an imported call, runs nothing of the module's.
 			[`export const Row = () => <Slot><b /></Slot>;\nconst v = String(1);\n${local}`, true],
+			[
+				`import { memo } from 'react';\nexport const Row = memo(() => <Slot><b /></Slot>);\n${local}`,
+				true,
+			],
 		])) {
 			const result = migrate(source);
 			expect([

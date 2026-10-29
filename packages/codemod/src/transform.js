@@ -852,9 +852,11 @@ class ModuleTransform {
 
 	/**
 	 * Whether no code that runs while the module loads can reach `fn` before
-	 * its declaration, so it can become a `const`, which is not hoisted. That
-	 * code reads `fn` directly, in a callback or IIFE it runs, or through a call
-	 * of anything the module declares; a function it only defines does not run.
+	 * its declaration, so it can become a `const`, which is not hoisted. Any
+	 * function there may run (an IIFE, a callback, a method an imported call
+	 * invokes) except one it only defines: a declaration or a variable's value.
+	 * Those run only when called or passed on, which counts as reaching `fn`
+	 * for any binding the module declares.
 	 *
 	 * @param {ts.FunctionDeclaration} fn
 	 */
@@ -862,20 +864,16 @@ class ModuleTransform {
 		let safe = true;
 		const visit = (/** @type {ts.Node} */ node) => {
 			if (!safe) return;
-			if (isFunctionLike(node)) {
-				const call = node.parent;
-				const runs =
-					(ts.isCallExpression(call) || ts.isNewExpression(call)) &&
-					(call.expression === node || call.arguments?.includes(/** @type {any} */ (node)));
-				if (!runs) return;
-			} else if (ts.isIdentifier(node) && node !== fn.name) {
+			if (isFunctionLike(node) && this.onlyDefines(node)) return;
+			if (ts.isIdentifier(node) && node !== fn.name) {
 				const declaration = this.declarationOf(node);
-				const called =
-					(ts.isCallExpression(node.parent) || ts.isNewExpression(node.parent)) &&
-					node.parent.expression === node;
+				const call = node.parent;
+				const handed =
+					(ts.isCallExpression(call) || ts.isNewExpression(call)) &&
+					(call.expression === node || call.arguments?.includes(node));
 				if (
 					declaration === fn ||
-					(called && declaration && declaration.getSourceFile() === this.sf && !this.importOf(node))
+					(handed && declaration?.getSourceFile() === this.sf && !this.importOf(node))
 				) {
 					safe = false;
 				}
@@ -887,6 +885,25 @@ class ModuleTransform {
 			visit(statement);
 		}
 		return safe;
+	}
+
+	/**
+	 * Whether a function is only defined where it stands: a declaration, or a
+	 * variable's value, also through `memo` or `forwardRef`, which do not call it.
+	 *
+	 * @param {ts.Node} fn
+	 */
+	onlyDefines(fn) {
+		if (ts.isFunctionDeclaration(fn)) return true;
+		let parent = fn.parent;
+		while (
+			ts.isParenthesizedExpression(parent) ||
+			(ts.isCallExpression(parent) &&
+				/^(?:memo|forwardRef)$/.test(this.calleeName(parent.expression) ?? ''))
+		) {
+			parent = parent.parent;
+		}
+		return ts.isVariableDeclaration(parent);
 	}
 
 	/**
