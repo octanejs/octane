@@ -201,6 +201,64 @@ describe('transformModule', () => {
 		expect(transformModule(source, 'a.tsx').code).toContain(
 			"import { type ReactNode, useState } from 'octane';",
 		);
+		// In the quotes the module's own imports use.
+		expect(transformModule(source.replaceAll("'", '"'), 'a.tsx').code).toContain(
+			'import { type ReactNode, useState } from "octane";',
+		);
+	});
+
+	it("maps the global `React` namespace React's types declare, unless a name shadows it", () => {
+		const source =
+			'export const A: React.FC<{ c: React.ReactNode }> = ({ c }) => {\n\tconst onInput = (e: React.ChangeEvent<HTMLInputElement>) => e;\n\treturn <input onInput={onInput} title={String(c)} />;\n};\n';
+		const { code } = transformModule(source, 'a.tsx');
+		expect(code).toContain("import type { FC, OctaneNode, ChangeEvent } from 'octane';");
+		expect(code).toContain('export const A: FC<{ c: OctaneNode }>');
+		expect(code).toContain('(e: ChangeEvent<HTMLInputElement>)');
+		const shadowed = "import * as React from './my-react';\nexport type T = React.ReactNode;\n";
+		expect(transformModule(shadowed, 'b.ts').code).toBe(shadowed);
+	});
+
+	it('passes a text field wrapper its rest props `onChange` as `onInput`', () => {
+		const migrate = (/** @type {string} */ body) =>
+			transformModule(
+				`export function F({ id, ...props }: React.ComponentProps<"input">) {\n\t${body}\n}\n`,
+				'f.tsx',
+			);
+		const wrapper = migrate('return <input type={props.type} id={id} {...props} />;');
+		expect(wrapper.code).toContain('export function F({ id, onChange, ...props }');
+		// Before the spread, so a caller's own `onInput` still wins.
+		expect(wrapper.code).toContain(
+			'<input type={props.type} id={id} onInput={onChange} {...props} />',
+		);
+		expect(compileErrors(wrapper.code, 'f.tsrx')).toEqual([]);
+		expect(migrate('return (\n\t\t<textarea\n\t\t\t{...props}\n\t\t/>\n\t);').code).toContain(
+			'\t<textarea\n\t\tonInput={onChange}\n\t\t{...props}\n\t/>',
+		);
+		// A checkbox's native `change` already fires when React's `onChange` does.
+		expect(migrate('return <input type="checkbox" {...props} />;').code).not.toContain('onInput');
+		// Another read of the rest would lose `onChange`, so it is reported instead.
+		const shared = migrate('return <label><input {...props} /><output {...props} /></label>;');
+		expect(shared.code).not.toContain('onInput');
+		expect(shared.notes.map((note) => note.rule)).toEqual(['native-text-change']);
+		expect(
+			migrate('return <input title={String(props.onChange)} {...props} />;').code,
+		).not.toContain('onInput');
+		// A rest without `onChange` has nothing to pass on.
+		const named = transformModule(
+			'export function F({ onChange, ...props }: React.ComponentProps<"input">) {\n\treturn <input {...props} />;\n}\n',
+			'f.tsx',
+		);
+		expect([named.code.includes('onInput'), named.notes]).toEqual([false, []]);
+	});
+
+	it('reads `target` as `currentTarget` on a handler typed for any form control', () => {
+		const source =
+			'export function F({ set }: { set(v: string): void }) {\n\tconst on = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => set(e.target.value);\n\treturn <textarea onInput={on} />;\n}\n';
+		expect(transformModule(source, 'f.tsx').code).toContain('set(e.currentTarget.value)');
+		// A focus event's target is the control too.
+		const blur =
+			'export function F({ set }: { set(v: string): void }) {\n\treturn <input onBlur={(e) => set(e.target.value)} />;\n}\n';
+		expect(transformModule(blur, 'f.tsx').code).toContain('set(e.currentTarget.value)');
 	});
 
 	it('keeps a `.map()` whose row writes an outer variable', () => {

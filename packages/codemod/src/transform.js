@@ -275,6 +275,20 @@ function nodeSpanning(sf, start, end) {
 }
 
 /**
+ * The attribute an element sets by `name`.
+ *
+ * @param {ts.JsxOpeningLikeElement} element
+ * @param {string} name
+ */
+function attributeOf(element, name) {
+	return /** @type {ts.JsxAttribute | undefined} */ (
+		element.attributes.properties.find(
+			(a) => ts.isJsxAttribute(a) && ts.isIdentifier(a.name) && a.name.text === name,
+		)
+	);
+}
+
+/**
  * The elements a list row can render: the row itself, or each arm of a
  * conditional row. Null when an arm renders anything else.
  *
@@ -579,6 +593,10 @@ class ModuleTransform {
 		this.bare = new Set();
 		/** Functions whose parameter list a rule replaced. */
 		this.parameters = new Map();
+		/** @type {Set<ts.BindingElement>} Rest props that give up `onChange` to a text field. */
+		this.restChange = new Set();
+		/** @type {Set<ts.JsxSpreadAttribute>} Spreads of those rest props, which pass it as `onInput`. */
+		this.changeSpreads = new Set();
 		/** @type {ts.ImportDeclaration[]} Placeholder index -> import declaration. */
 		this.importSlots = [];
 		this.hasJsx = false;
@@ -665,6 +683,9 @@ class ModuleTransform {
 	// ---------------------------------------------------------------- analysis
 
 	analyze() {
+		// Added imports quote their module as the module's own imports do.
+		const first = this.sf.statements.find(ts.isImportDeclaration);
+		this.quote = first ? first.moduleSpecifier.getText(this.sf)[0] : "'";
 		for (const statement of this.sf.statements) {
 			if (!ts.isImportDeclaration(statement) || !statement.importClause) continue;
 			const module = /** @type {ts.StringLiteral} */ (statement.moduleSpecifier).text;
@@ -697,12 +718,103 @@ class ModuleTransform {
 				}
 			}
 		}
+		/** @type {ts.JsxOpeningLikeElement[]} */
+		const fields = [];
 		const visit = (/** @type {ts.Node} */ node) => {
 			if (ts.isIdentifier(node) && declaresName(node)) this.declared.add(node.text);
 			if (isJsx(node)) this.hasJsx = true;
+			if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) fields.push(node);
 			ts.forEachChild(node, visit);
 		};
 		visit(this.sf);
+		for (const field of fields) if (this.takesChange(field)) this.planRestChange(field);
+	}
+
+	/**
+	 * Whether an `onChange` a spread passes this element fires per edit in
+	 * React: a text field with no `onChange` or `onInput` of its own.
+	 *
+	 * @param {ts.JsxOpeningLikeElement} element
+	 */
+	takesChange(element) {
+		if (!/^(?:input|textarea)$/.test(element.tagName.getText(this.sf))) return false;
+		if (attributeOf(element, 'onChange') || attributeOf(element, 'onInput')) return false;
+		const type = attributeOf(element, 'type')?.initializer;
+		return !type || !ts.isStringLiteral(type) || TEXT_INPUT_TYPES.has(type.text);
+	}
+
+	/**
+	 * A text field that spreads a component's rest props passes on any
+	 * `onChange` in them, which React fires per edit and Octane on commit. Take
+	 * it out of the rest and pass it as `onInput`, before the spread, so a
+	 * caller's own `onInput` still wins. Only when the rest is read nowhere
+	 * else, since those reads would lose it.
+	 *
+	 * @param {ts.JsxOpeningLikeElement} field
+	 */
+	planRestChange(field) {
+		for (const spread of field.attributes.properties) {
+			if (!ts.isJsxSpreadAttribute(spread)) continue;
+			// Props whose type has no `onChange` have none to pass on.
+			const type = this.projectType(spread.expression)?.type;
+			if (type && !(type.flags & ts.TypeFlags.Any) && !type.getProperty('onChange')) continue;
+			const declaration = ts.isIdentifier(spread.expression)
+				? this.declarationOf(spread.expression)
+				: null;
+			const rest =
+				declaration &&
+				ts.isBindingElement(declaration) &&
+				declaration.dotDotDotToken &&
+				ts.isObjectBindingPattern(declaration.parent)
+					? declaration
+					: null;
+			// A pattern that names `onChange` leaves none in the rest.
+			const pattern = /** @type {ts.ObjectBindingPattern | undefined} */ (rest?.parent);
+			if (
+				pattern?.elements.some((e) => (e.propertyName ?? e.name).getText(this.sf) === 'onChange')
+			) {
+				continue;
+			}
+			if (
+				rest &&
+				!this.checker.resolveName('onChange', spread, ts.SymbolFlags.Value, false) &&
+				this.onlySpreadOntoFields(rest)
+			) {
+				this.restChange.add(rest);
+				this.changeSpreads.add(spread);
+			} else {
+				this.note(
+					RULE.nativeChange,
+					'warning',
+					spread,
+					`An \`onChange\` in this spread fires on commit (blur) in Octane, not per edit; pass it to the \`<${field.tagName.getText(this.sf)}>\` as \`onInput\`.`,
+				);
+			}
+		}
+	}
+
+	/**
+	 * Whether no read of a rest binding but its spreads onto text fields can
+	 * see an `onChange` in it: other reads name another member (`props.type`).
+	 *
+	 * @param {ts.BindingElement} rest
+	 */
+	onlySpreadOntoFields(rest) {
+		let only = true;
+		const visit = (/** @type {ts.Node} */ node) => {
+			if (!only) return;
+			if (ts.isIdentifier(node) && node !== rest.name && this.declarationOf(node) === rest) {
+				const parent = node.parent;
+				only = ts.isJsxSpreadAttribute(parent)
+					? this.takesChange(parent.parent.parent)
+					: ts.isPropertyAccessExpression(parent) &&
+						parent.expression === node &&
+						parent.name.text !== 'onChange';
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(ts.findAncestor(rest, ts.isFunctionLike) ?? this.sf);
+		return only;
 	}
 
 	/**
@@ -951,7 +1063,12 @@ class ModuleTransform {
 			this.checkDefaultProps(node);
 		}
 		if (ts.isModuleDeclaration(node) && ts.isStringLiteral(node.name)) {
-			return this.rewriteSpecifier(node, node.name);
+			return node.name.text in REACT_MODULES
+				? this.rewriteAugmentation(node, node.name)
+				: this.rewriteSpecifier(node, node.name);
+		}
+		if (ts.isBindingElement(node) && this.restChange.has(node)) {
+			return 'onChange, ' + node.getText(this.sf);
 		}
 		if (ts.isJsxText(node) && this.target === 'tsrx' && /\/[/*]/.test(node.text)) {
 			// TSRX reads `//` and `/*` in element text as comments, as JavaScript does.
@@ -1031,6 +1148,32 @@ class ModuleTransform {
 		if (next === null || next === specifier.text) return null;
 		this.count(RULE.import);
 		return this.replaceSpecifier(node, specifier, next);
+	}
+
+	/**
+	 * `declare module 'react' { namespace JSX { … } }` types custom elements,
+	 * which Octane reads from `octane/jsx-runtime`'s JSX namespace. Anything
+	 * else it adds patches React's own types, which Octane does not use.
+	 *
+	 * @param {ts.ModuleDeclaration} node
+	 * @param {ts.StringLiteral} specifier
+	 */
+	rewriteAugmentation(node, specifier) {
+		const statements = node.body && ts.isModuleBlock(node.body) ? node.body.statements : [];
+		if (
+			statements.length > 0 &&
+			statements.every((s) => ts.isModuleDeclaration(s) && s.name.getText(this.sf) === 'JSX')
+		) {
+			this.count(RULE.import);
+			return this.replaceSpecifier(node, specifier, 'octane/jsx-runtime');
+		}
+		this.note(
+			RULE.unsupported,
+			'warning',
+			node,
+			`This augments React's own types, which Octane does not read; add what it declares to Octane's.`,
+		);
+		return null;
 	}
 
 	/**
@@ -1151,10 +1294,11 @@ class ModuleTransform {
 
 		/** @type {string[]} */
 		const lines = [];
+		const quote = (/** @type {string} */ module) => this.quote + module + this.quote;
 		for (const [module, names] of imports) {
 			const specs = [...names.values()];
 			for (const { name, local } of specs) {
-				if (name === '*') lines.push(`import * as ${local} from '${module}';`);
+				if (name === '*') lines.push(`import * as ${local} from ${quote(module)};`);
 			}
 			const named = specs.filter(({ name }) => name !== '*');
 			if (named.length === 0) continue;
@@ -1163,10 +1307,10 @@ class ModuleTransform {
 				({ name, local, typeOnly }) =>
 					(typeOnly && !allTypes ? 'type ' : '') + (name === local ? name : `${name} as ${local}`),
 			);
-			lines.push(`import ${allTypes ? 'type ' : ''}{ ${list.join(', ')} } from '${module}';`);
+			lines.push(`import ${allTypes ? 'type ' : ''}{ ${list.join(', ')} } from ${quote(module)};`);
 		}
 		for (const [module, specs] of kept)
-			lines.push(`import { ${specs.join(', ')} } from '${module}';`);
+			lines.push(`import { ${specs.join(', ')} } from ${quote(module)};`);
 
 		if (this.importSlots.length === 0) {
 			if (lines.length === 0) return code;
@@ -1260,13 +1404,34 @@ class ModuleTransform {
 		return null;
 	}
 
+	/**
+	 * Whether `node` names a global namespace React's types declare, such as
+	 * `React` in `React.ReactNode` written without an import.
+	 *
+	 * @param {ts.EntityName} node
+	 * @param {string} name
+	 */
+	isGlobalNamespace(node, name) {
+		return (
+			ts.isIdentifier(node) &&
+			node.text === name &&
+			!this.checker.resolveName(name, node, ts.SymbolFlags.Namespace, false)
+		);
+	}
+
 	/** @param {ts.QualifiedName} node */
 	rewriteQualifiedType(node) {
 		const namespace = this.importOf(node.left);
-		if (!namespace?.namespace || !(namespace.module in REACT_MODULES)) return null;
+		if (
+			namespace
+				? !namespace.namespace || !(namespace.module in REACT_MODULES)
+				: !this.isGlobalNamespace(node.left, 'React')
+		) {
+			return null;
+		}
 		const name = mapQualifiedType(node.right.text);
 		if (!name) {
-			this.used.add(namespace.local);
+			if (namespace) this.used.add(namespace.local);
 			this.note(
 				RULE.unsupported,
 				'warning',
@@ -1283,12 +1448,7 @@ class ModuleTransform {
 	rewriteTypeReference(node) {
 		// The global `JSX` namespace React's types declared is Octane's export.
 		const name = node.typeName;
-		if (
-			ts.isQualifiedName(name) &&
-			ts.isIdentifier(name.left) &&
-			name.left.text === 'JSX' &&
-			!this.checker.resolveName('JSX', node, ts.SymbolFlags.Namespace, false)
-		) {
+		if (ts.isQualifiedName(name) && this.isGlobalNamespace(name.left, 'JSX')) {
 			this.require('octane', 'JSX', true);
 		}
 		return null;
@@ -1398,9 +1558,9 @@ class ModuleTransform {
 		this.count(RULE.forwardRef);
 		const [props, ref] = render.parameters;
 		const typeArgs = node.typeArguments;
-		const refType = typeArgs?.[0]?.getText(this.sf) ?? this.refTypeOf(ref);
-		const propsType =
-			typeArgs?.[1]?.getText(this.sf) ?? (props?.type ? this.emit(props.type, PLAIN) : null);
+		const refType = typeArgs?.[0] ? this.emit(typeArgs[0], PLAIN) : this.refTypeOf(ref);
+		const propsNode = typeArgs?.[1] ?? props?.type;
+		const propsType = propsNode ? this.emit(propsNode, PLAIN) : null;
 		const refName = ref && ts.isIdentifier(ref.name) ? ref.name.text : null;
 		const refBinding = refName === null ? null : refName === 'ref' ? 'ref' : `ref: ${refName}`;
 
@@ -1478,7 +1638,7 @@ class ModuleTransform {
 	refTypeOf(ref) {
 		const type = ref?.type;
 		if (type && ts.isTypeReferenceNode(type) && type.typeArguments?.length === 1) {
-			return type.typeArguments[0].getText(this.sf);
+			return this.emit(type.typeArguments[0], PLAIN);
 		}
 		return null;
 	}
@@ -1660,11 +1820,19 @@ class ModuleTransform {
 	targetsControl(node) {
 		const found = this.parameterOf(node);
 		if (!found) return false;
-		const type = found.param.type?.getText(this.sf) ?? '';
-		if (/(ChangeEvent|FormEvent)<\s*HTML(Input|TextArea|Select)Element\s*>$/.test(type))
+		// Unannotated, the project's types still name a handler a component
+		// passes on to a control: `<Input onChange={(e) => …}>`.
+		const inferred = found.param.type ? null : this.projectType(found.param);
+		const type =
+			found.param.type?.getText(this.sf) ??
+			(inferred ? inferred.checker.typeToString(inferred.type) : '');
+		if (
+			/(ChangeEvent|FormEvent)<\s*(?:HTML(?:Input|TextArea|Select)Element\s*[|,]?\s*)+>$/.test(type)
+		)
 			return true;
 		const attribute = this.handlerAttribute(found.fn);
-		if (!attribute || !/^on(Change|Input)/.test(attribute.name.getText(this.sf))) return false;
+		if (!attribute || !/^on(Change|Input|Focus|Blur)/.test(attribute.name.getText(this.sf)))
+			return false;
 		const tag = attribute.parent.parent.tagName.getText(this.sf);
 		return tag === 'input' || tag === 'textarea' || tag === 'select';
 	}
@@ -1716,8 +1884,6 @@ class ModuleTransform {
 		const intrinsic = /^[a-z]/.test(tag);
 		const spread = node.properties.some(ts.isJsxSpreadAttribute);
 		const attributes = node.properties;
-		const named = (/** @type {string} */ name) =>
-			attributes.find((a) => ts.isJsxAttribute(a) && a.name.getText(this.sf) === name);
 
 		let out = '';
 		let cursor = node.getStart(this.sf);
@@ -1739,17 +1905,28 @@ class ModuleTransform {
 			}
 			out += this.source.slice(cursor, start);
 			cursor = attribute.end;
+			if (ts.isJsxSpreadAttribute(attribute) && this.changeSpreads.has(attribute)) {
+				// On the spread's own line when it has one.
+				this.count(RULE.nativeChange);
+				const line = this.source.slice(this.source.lastIndexOf('\n', start - 1), start);
+				out += 'onInput={onChange}' + (/^\n[ \t]*$/.test(line) ? line : ' ');
+			}
 			if (!ts.isJsxAttribute(attribute) || !intrinsic) {
 				out += this.emit(attribute, PLAIN);
 				continue;
 			}
 			const name = attribute.name.getText(this.sf);
-			if (name === 'className' && this.target === 'tsrx' && !named('class') && !spread) {
+			if (
+				name === 'className' &&
+				this.target === 'tsrx' &&
+				!attributeOf(element, 'class') &&
+				!spread
+			) {
 				this.count(RULE.className);
 				out += 'class' + this.emitInitializer(attribute);
 			} else if ((name === 'onChange' || name === 'onChangeCapture') && this.isTextEntry(element)) {
 				const input = name === 'onChange' ? 'onInput' : 'onInputCapture';
-				if (named(input)) {
+				if (attributeOf(element, input)) {
 					this.note(
 						RULE.nativeChange,
 						'warning',
@@ -1787,10 +1964,8 @@ class ModuleTransform {
 		const tag = element.tagName.getText(this.sf);
 		if (tag === 'textarea') return true;
 		if (tag !== 'input') return false;
-		const type = element.attributes.properties.find(
-			(a) => ts.isJsxAttribute(a) && a.name.getText(this.sf) === 'type',
-		);
-		if (!type || !ts.isJsxAttribute(type)) return true;
+		const type = attributeOf(element, 'type');
+		if (!type) return true;
 		const value = type.initializer;
 		if (value && ts.isStringLiteral(value)) return TEXT_INPUT_TYPES.has(value.text);
 		this.note(
@@ -2099,19 +2274,28 @@ class ModuleTransform {
 	}
 
 	/**
+	 * The type of `node` in the project's program, which resolves imports and
+	 * packages, or null when the program does not have this module.
+	 *
+	 * @param {ts.Node} node
+	 * @returns {{ type: ts.Type, checker: ts.TypeChecker } | null}
+	 */
+	projectType(node) {
+		const types = this.options.types;
+		if (types?.sourceFile.text !== this.source) return null;
+		const same = nodeSpanning(types.sourceFile, node.getStart(this.sf), node.end);
+		if (same?.kind !== node.kind) return null;
+		return { type: types.checker.getTypeAtLocation(same), checker: types.checker };
+	}
+
+	/**
 	 * The type of `expression`, from the project's program when it has this
 	 * module, else from the module's own.
 	 *
 	 * @param {ts.Expression} expression
 	 */
 	typeOf(expression) {
-		const types = this.options.types;
-		if (types?.sourceFile.text === this.source) {
-			const start = expression.getStart(this.sf);
-			const same = nodeSpanning(types.sourceFile, start, expression.end);
-			if (same?.kind === expression.kind) return types.checker.getTypeAtLocation(same);
-		}
-		return this.checker.getTypeAtLocation(expression);
+		return this.projectType(expression)?.type ?? this.checker.getTypeAtLocation(expression);
 	}
 
 	/**
@@ -2260,11 +2444,7 @@ class ModuleTransform {
 		// to the header once: the same key on each arm of a conditional row.
 		const elements = (rowElements(root) ?? []).filter((element) => !ts.isJsxFragment(element));
 		const keys = elements.map((element) => {
-			const opening = ts.isJsxElement(element) ? element.openingElement : element;
-			const attribute = opening.attributes.properties.find(
-				(a) => ts.isJsxAttribute(a) && a.name.getText(this.sf) === 'key',
-			);
-			return /** @type {ts.JsxAttribute | undefined} */ (attribute);
+			return attributeOf(ts.isJsxElement(element) ? element.openingElement : element, 'key');
 		});
 		let key = null;
 		if (keys.some(Boolean)) {

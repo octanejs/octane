@@ -321,6 +321,71 @@ Still open, owned elsewhere:
   holes stay bare without types; class components; `@radix-ui/react-*` and
   upstream adapters (`@tanstack/react-hotkeys`) are not in the catalog.
 
+### Memos and T3 Code
+
+Two popular open-source React apps, migrated as they stood on 2026-10-29:
+[Memos](https://github.com/usememos/memos) (`08acc22f3f`, React 19, Vite,
+React Router, TanStack Query, Base UI) and
+[T3 Code](https://github.com/pingdotgg/t3code) (`6d82a22e9d`, React 19, Vite,
+TanStack Router, Base UI, Tiptap, Effect). Each was migrated with `--strong`
+and type-checked with `octane-tsc` against this branch's packages. Neither ran:
+building or serving a third-party app runs its code, which needs the user's
+approval in this environment.
+
+| | Memos (`web/`) | T3 Code (`apps/web`) |
+| --- | --- | --- |
+| Modules migrated, `.tsrx`, Strong | 458, 345, 260 | 968, 727, 509 |
+| Codemod errors before → after | 85 → 61 | 251 → 248 |
+| `octane-tsc` errors before → after | 262 → 68, after hand-patching the two TypeScript-view defects below | not run: six unported libraries |
+| Codemod run | 8.5 s | 30 s, 3.5 GB peak |
+
+The remaining codemod errors are missing bindings (`react-hot-toast` in 46
+Memos modules; `@effect/atom-react` in 165 T3 Code modules, then
+`@legendapp/list`, `@clerk/react`, `@pierre/diffs/react`, `@dnd-kit/core`,
+`@tanstack/react-pacer`), `createRef` in tests, and one class error boundary
+per app.
+
+Codemod defects found, all fixed with tests:
+
+- A shadcn-style `Input` or `Textarea` that spreads its rest props onto the
+  field passed `onChange` through as Octane's native commit-time `change`, so
+  every controlled field stopped updating per keystroke. The codemod now takes
+  `onChange` out of the rest and passes it as `onInput`, before the spread so a
+  caller's `onInput` still wins. A spread it cannot prove safe is reported.
+- `React.ReactNode`, `React.FC`, and `React.ChangeEvent` written with no import
+  (React's global namespace; 29 Memos and 31 T3 Code modules) stayed React's
+  types.
+- `forwardRef<React.ElementRef<"div">, React.ComponentPropsWithoutRef<"div">>`
+  copied its type arguments as text, so they kept `React.`.
+- `e.target.value` in `<Input onChange={(e) => …}>` was left alone, since only
+  handlers on a host control or annotated ones were recognized; the project's
+  types now say when a component passes the event on from a control, including
+  React 19.2's two-argument `ChangeEvent<C, T>`. `onFocus`/`onBlur` count too.
+- Declaration files were skipped, so `declare module "react" { namespace JSX }`
+  custom-element typing never reached Octane; it now targets
+  `octane/jsx-runtime`, and any other React augmentation is reported.
+- A package was reported as needing a binding by its name when its export map
+  hid `package.json` (`@vitejs/plugin-react`), and by its React peer when only
+  its `./react` entry uses React (`@usememos/editor`, `@pierre/trees`,
+  `@clerk/electron`).
+- Added imports used single quotes in double-quoted modules.
+
+Still open, owned elsewhere:
+
+- **Compiler (`.tsrx` TypeScript view):** `compileToVolarMappings` prints
+  `<T,>(…) =>` as `<T>`, which TypeScript reads as JSX, and reports `return
+  null` in an `@for` row (TSRX2005) that the compiler and the authoring rules
+  allow.
+- **Types:** `useRef<T>(null)` and `useRef<T>(undefined)` have no overload (31
+  Memos errors; React 19 has both); `ComponentProps<"div">` spread onto a host
+  in a Strong module fails `StrongIntrinsicProps` (12 Memos wrappers); a
+  `children: ReactElement` prop cannot take template children.
+- **Bindings:** `@octanejs/remix-router` lacks `LinkProps` and types `Link`'s
+  `ref` narrower than React Router; the libraries above have no binding.
+- **Codemod, later:** binding subpath warnings (`@octanejs/base-ui/dialog`) could
+  be checked against the binding's exports, but recording them would add about
+  110 kB to the CLI's catalog.
+
 ## Workstreams
 
 Each workstream ships as its own PR with golden fixtures and corpus numbers in

@@ -110,4 +110,8 @@ export declare class CliError extends Error {
 export declare const EXIT: { OK: 0; FAILURE: 1; USAGE: 2; DIAGNOSTIC: 3 };
 export declare function detectProject(cwd: string): Project;
 export declare function findRoot(cwd: string): string;
+export declare function readInstalled(
+	root: string,
+	name: string,
+): { version: string; dir: string; manifest: any } | null;
 export declare function scanSourceFiles(root: string, options?: { limit?: number }): string[];
