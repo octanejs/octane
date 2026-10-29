@@ -2257,7 +2257,8 @@ export function handleSuspense(
 		// boundary simply never shows half of the new screen.
 		rollbackTransitionJournal(journalCheckpoint, state.tryBlock ?? sourceBlock);
 		// The hold drops the root transaction when its render folded transition
-		// hook work: this boundary then holds those batches (dropTransitionRender).
+		// hook work or applied a root request: this boundary then holds that work
+		// (dropTransitionRender).
 		if (ROOT_RENDER_TRANSACTION !== null && !ROOT_RENDER_ROLLBACK)
 			(ROOT_RENDER_TRANSACTION.holders ??= []).push(state);
 		if (!state.transitionHeld) {
