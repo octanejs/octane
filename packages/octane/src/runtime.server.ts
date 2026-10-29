@@ -8144,9 +8144,9 @@ export function useSyncExternalStore<T>(
 	// The client subscribes in a passive effect.
 	if (SHELL_WITNESS !== null && process.env.NODE_ENV !== 'production')
 		witnessShellHook('useSyncExternalStore', useSyncExternalStore);
-	// `getServerSnapshot` (if provided) precedes the trailing slot symbol.
-	const getServerSnapshot = arguments.length >= 4 ? (serverSnapshotOrSlot as () => T) : undefined;
-	return getServerSnapshot ? getServerSnapshot() : getSnapshot();
+	// `getServerSnapshot` (if provided) precedes the trailing slot. A slot is never
+	// a function, and a re-exported hook is called through withSlot with no slot.
+	return typeof serverSnapshotOrSlot === 'function' ? serverSnapshotOrSlot() : getSnapshot();
 }
 
 export function useActionState<S>(
