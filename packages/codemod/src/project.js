@@ -4,7 +4,7 @@ import { findRoot, readInstalled, scanSourceFiles } from '@octanejs/cli';
 import { DATA } from '@octanejs/cli/data';
 import ts from 'typescript';
 import { finding, loadCompiler, thrown } from './compiler.js';
-import { FRAMEWORK_PACKAGES } from './mappings.js';
+import { PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
 import { transformModule } from './transform.js';
 
@@ -48,7 +48,7 @@ import { transformModule } from './transform.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
 /** React packages and the Octane package that replaces each. */
-const CATALOG = { ...DATA.reactPackages, ...FRAMEWORK_PACKAGES };
+const CATALOG = { ...DATA.reactPackages, ...PORTED_PACKAGES };
 /** A package that, by its name, renders through React. */
 const REACT_PACKAGE = /^(?:react-|@[^/]+\/react(?:-|\/|$)|[^/]+\/react$)|-react(?:\/|$)/;
 

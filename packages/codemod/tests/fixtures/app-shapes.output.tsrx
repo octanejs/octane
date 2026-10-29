@@ -1,10 +1,14 @@
 import { Tooltip } from "@base-ui/react/tooltip";
+import { Dialog as DialogPrimitive } from "@octanejs/radix";
+import { type DialogProps } from "@radix-ui/react-dialog";
+import { Slot } from "@octanejs/radix";
 import { useState, type ComponentProps, type ElementRef, type ComponentPropsWithoutRef, type Ref, descriptorChildren, type OctaneElement, type FC, type OctaneNode, type ChangeEvent } from "octane";
 
 // Shapes from migrating Memos and T3 Code: shadcn-style fields whose rest
 // props carry React's per-edit `onChange`, `forwardRef` type arguments,
 // annotations that name the global `React` namespace without importing it,
-// and a component that hands its `children` to a `render` prop.
+// a component that hands its `children` to a `render` prop, and shadcn's
+// Radix components.
 
 export function Input({ className, type, onChange, ...props }: ComponentProps<"input">) @{
   <input type={type} data-slot="input" className={className} onInput={onChange} {...props} />
@@ -46,3 +50,23 @@ export const RenameDialog: FC<{ title: OctaneNode; onRename(name: string): void 
     <Textarea value={note} onChange={handleNote} />
   </form>
 };
+
+export function Button({ asChild, ...props }: ComponentProps<"button"> & { asChild?: boolean }) @{
+  const Comp = asChild ? Slot : "button";
+  <Comp data-slot="button" {...props} />
+}
+
+export const DialogOverlay = ({ className, ref, ...props }: ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay> & { ref?: Ref<ElementRef<typeof DialogPrimitive.Overlay>> }) => @{ <DialogPrimitive.Overlay ref={ref} className={className} {...props} /> };
+DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
+
+export function CommandDialog({ children, ...props }: DialogProps) @{
+  <DialogPrimitive.Root {...props}>
+    <DialogPrimitive.Portal>
+      <DialogOverlay />
+      <DialogPrimitive.Content data-slot="dialog-content">
+        <DialogPrimitive.Title className="sr-only">Command Palette</DialogPrimitive.Title>
+        {children}
+      </DialogPrimitive.Content>
+    </DialogPrimitive.Portal>
+  </DialogPrimitive.Root>
+}

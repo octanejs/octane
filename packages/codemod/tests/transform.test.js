@@ -30,6 +30,9 @@ function compileErrors(code, filename, strong = false) {
 function migrate(name) {
 	const result = transformModule(fs.readFileSync(path.join(FIXTURES, name), 'utf8'), name, {
 		strictNullChecks: true,
+		// As the project resolves bindings: Radix's primitives are `@octanejs/radix`.
+		resolveSpecifier: (specifier) =>
+			specifier.startsWith('@radix-ui/react-') ? '@octanejs/radix' : null,
 	});
 	const output = name
 		.replace('.input.', '.output.')

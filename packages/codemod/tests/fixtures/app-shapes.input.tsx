@@ -1,10 +1,14 @@
 import { Tooltip } from "@base-ui/react/tooltip";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { type DialogProps } from "@radix-ui/react-dialog";
+import { Slot } from "@radix-ui/react-slot";
 import { forwardRef, useState } from "react";
 
 // Shapes from migrating Memos and T3 Code: shadcn-style fields whose rest
 // props carry React's per-edit `onChange`, `forwardRef` type arguments,
 // annotations that name the global `React` namespace without importing it,
-// and a component that hands its `children` to a `render` prop.
+// a component that hands its `children` to a `render` prop, and shadcn's
+// Radix components.
 
 export function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   return <input type={type} data-slot="input" className={className} {...props} />;
@@ -53,3 +57,28 @@ export const RenameDialog: React.FC<{ title: React.ReactNode; onRename(name: str
     </form>
   );
 };
+
+export function Button({ asChild, ...props }: React.ComponentProps<"button"> & { asChild?: boolean }) {
+  const Comp = asChild ? Slot : "button";
+  return <Comp data-slot="button" {...props} />;
+}
+
+export const DialogOverlay = forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Overlay>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
+>(({ className, ...props }, ref) => <DialogPrimitive.Overlay ref={ref} className={className} {...props} />);
+DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
+
+export function CommandDialog({ children, ...props }: DialogProps) {
+  return (
+    <DialogPrimitive.Root {...props}>
+      <DialogPrimitive.Portal>
+        <DialogOverlay />
+        <DialogPrimitive.Content data-slot="dialog-content">
+          <DialogPrimitive.DialogTitle className="sr-only">Command Palette</DialogPrimitive.DialogTitle>
+          {children}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  );
+}

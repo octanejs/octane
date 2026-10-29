@@ -1,11 +1,15 @@
 import ts from 'typescript';
 import {
 	DEPENDENCY_HOOKS,
+	RADIX_TYPES,
 	REACT_MODULES,
 	TEXT_INPUT_TYPES,
 	UNSUPPORTED_VALUES,
+	mapPackageExport,
 	mapQualifiedType,
 	mapReactImport,
+	missingExport,
+	radixNamespace,
 } from './mappings.js';
 
 /**
@@ -65,6 +69,7 @@ const PLAIN = { template: false };
 
 /** Rule names, as reported. */
 const RULE = {
+	binding: 'bindings',
 	classComponent: 'class-component',
 	consumer: 'context-consumer',
 	defaultProps: 'default-props',
@@ -607,6 +612,8 @@ class ModuleTransform {
 		this.hasJsx = false;
 		/** Whether the module imports React, rather than already being Octane. */
 		this.fromReact = false;
+		/** @type {Map<string, string | null>} Each specifier's new spelling, or null to keep it. */
+		this.resolved = new Map();
 	}
 
 	/** @returns {TransformResult} */
@@ -1315,7 +1322,97 @@ class ModuleTransform {
 			this.importSlots.push(node);
 			return `\u0000IMPORT${this.importSlots.length - 1}\u0000`;
 		}
-		return this.rewriteSpecifier(node, node.moduleSpecifier);
+		return (
+			this.rewritePackageImport(node, module) ?? this.rewriteSpecifier(node, node.moduleSpecifier)
+		);
+	}
+
+	/**
+	 * An import of a ported package whose port spells some of its names
+	 * differently. A Radix package is a namespace of `@octanejs/radix`, so its
+	 * namespace import becomes that namespace and its named imports read from
+	 * it. Names the port lacks stay on the React package, for a person.
+	 *
+	 * @param {ts.ImportDeclaration} node
+	 * @param {string} module
+	 */
+	rewritePackageImport(node, module) {
+		const clause = node.importClause;
+		const next = this.resolve(module);
+		if (!clause || clause.name || next === null) return null;
+		const namespace = radixNamespace(module);
+		const quote = this.source[node.moduleSpecifier.getStart(this.sf)];
+		const from = (/** @type {string} */ specifier) => `from ${quote}${specifier}${quote};`;
+		const type = clause.isTypeOnly ? 'type ' : '';
+		const bindings = clause.namedBindings;
+		if (bindings && ts.isNamespaceImport(bindings)) {
+			if (namespace === null) return null;
+			const local = bindings.name.text;
+			this.count(RULE.import);
+			return `import ${type}{ ${local === namespace ? local : `${namespace} as ${local}`} } ${from(next)}`;
+		}
+		if (!bindings) return null;
+		/** @type {string[]} */
+		const kept = [];
+		/** @type {string[]} */
+		const values = [];
+		/** @type {string[]} */
+		const types = [];
+		let renamed = false;
+		for (const element of bindings.elements) {
+			const imported = (element.propertyName ?? element.name).text;
+			const local = element.name.text;
+			const name = mapPackageExport(module, imported);
+			if (name === null) {
+				this.note(RULE.binding, 'error', element, missingExport(module, imported));
+				kept.push(element.getText(this.sf));
+				continue;
+			}
+			renamed ||= name !== imported;
+			if (namespace === null) {
+				values.push(
+					`${element.isTypeOnly ? 'type ' : ''}${name === local ? name : `${name} as ${local}`}`,
+				);
+			} else if (RADIX_TYPES.has(name)) {
+				types.push(`type ${local} = ${this.require(next, namespace, true)}.${name};`);
+			} else {
+				values.push(name === local ? name : `${name}: ${local}`);
+			}
+		}
+		if (namespace === null && kept.length === 0 && !renamed) return null;
+		this.count(RULE.import);
+		const lines = kept.length > 0 ? [`import ${type}{ ${kept.join(', ')} } ${from(module)}`] : [];
+		if (values.length > 0) {
+			lines.push(
+				namespace === null
+					? `import ${type}{ ${values.join(', ')} } ${from(next)}`
+					: `const { ${values.join(', ')} } = ${this.require(next, namespace, false)};`,
+			);
+		}
+		return [...lines, ...types].join('\n');
+	}
+
+	/**
+	 * `DialogPrimitive.DialogTitle`, a member of a ported package's namespace
+	 * import, as its port spells it.
+	 *
+	 * @param {ts.Node} namespace
+	 * @param {ts.MemberName} member
+	 * @param {Severity} severity of a member the port lacks
+	 */
+	rewritePackageMember(namespace, member, severity) {
+		const entry = this.importOf(namespace);
+		if (!entry?.namespace) return null;
+		const name = mapPackageExport(entry.module, member.text);
+		if (name === member.text || this.resolve(entry.module) === null) return null;
+		if (name === null) {
+			if (!ts.isJsxClosingElement(member.parent.parent)) {
+				this.note(RULE.binding, severity, member, missingExport(entry.module, member.text));
+			}
+			return null;
+		}
+		this.count(RULE.import);
+		return `${entry.local}.${name}`;
 	}
 
 	/** @param {ts.ExportDeclaration} node */
@@ -1339,10 +1436,35 @@ class ModuleTransform {
 	 */
 	rewriteSpecifier(node, specifier) {
 		if (!ts.isStringLiteral(specifier)) return null;
-		const next = this.options.resolveSpecifier?.(specifier.text) ?? null;
+		const next = this.resolve(specifier.text);
 		if (next === null || next === specifier.text) return null;
+		const namespace = radixNamespace(specifier.text);
+		if (namespace !== null) {
+			// A re-export, `import()`, or type of the package would be the whole binding.
+			this.note(
+				RULE.binding,
+				'error',
+				node,
+				`\`@octanejs/radix\` serves \`${specifier.text}\` as its \`${namespace}\` namespace; read it from \`import { ${namespace} } from '@octanejs/radix'\`.`,
+			);
+			return null;
+		}
 		this.count(RULE.import);
 		return this.replaceSpecifier(node, specifier, next);
+	}
+
+	/**
+	 * The new spelling of an import specifier, or null to keep it.
+	 *
+	 * @param {string} specifier
+	 */
+	resolve(specifier) {
+		let next = this.resolved.get(specifier);
+		if (next === undefined) {
+			next = this.options.resolveSpecifier?.(specifier) ?? null;
+			this.resolved.set(specifier, next);
+		}
+		return next;
 	}
 
 	/**
@@ -1611,6 +1733,8 @@ class ModuleTransform {
 			this.count(RULE.import);
 			return this.require(mapped.module, mapped.name, false);
 		}
+		const member = this.rewritePackageMember(node.expression, node.name, 'error');
+		if (member !== null) return member;
 		// event.nativeEvent: Octane events are already native.
 		if (node.name.text === 'nativeEvent' && this.isEventParameter(node.expression)) {
 			this.count(RULE.eventObject);
@@ -1640,6 +1764,8 @@ class ModuleTransform {
 
 	/** @param {ts.QualifiedName} node */
 	rewriteQualifiedType(node) {
+		const member = this.rewritePackageMember(node.left, node.right, 'warning');
+		if (member !== null) return member;
 		const namespace = this.importOf(node.left);
 		if (
 			namespace

@@ -1,6 +1,8 @@
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import ts from 'typescript';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runCodemod } from '../src/index.js';
 
@@ -62,8 +64,9 @@ describe('runCodemod', () => {
 
 		expect(result.packages).toEqual([
 			{ from: '@tanstack/react-query', to: '@octanejs/tanstack-query' },
+			{ from: '@radix-ui/react-slot', to: '@octanejs/radix' },
 		]);
-		expect(result.missing).toEqual(['@radix-ui/react-slot']);
+		expect(result.missing).toEqual([]);
 		expect(result.files.flatMap((file) => file.diagnostics)).toEqual([]);
 	});
 
@@ -202,6 +205,223 @@ describe('runCodemod', () => {
 		expect(code('src/Chart.tsx')).toContain("from '@octanejs/visx/hierarchy'");
 		expect(code('src/Chart.tsx')).toContain("from '@octanejs/tanstack-start'");
 		expect(result.missing).toEqual(['@tanstack/markdown/react']);
+	});
+
+	it('imports each Radix primitive package as its namespace of `@octanejs/radix`', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'src/ui.tsx': [
+				"import * as DialogPrimitive from '@radix-ui/react-dialog';",
+				"import { Root as PopoverRoot, PopoverTrigger, PopoverContent, type PopoverProps } from '@radix-ui/react-popover';",
+				"import type { CheckedState } from '@radix-ui/react-checkbox';",
+				"import { Slot } from '@radix-ui/react-slot';",
+				"import { CheckIcon } from '@radix-ui/react-icons';",
+				'',
+				'export const DialogTitle = DialogPrimitive.DialogTitle;',
+				'export function Menu(props: PopoverProps & { checked: CheckedState }) {',
+				'\treturn (',
+				'\t\t<PopoverRoot {...props}>',
+				'\t\t\t<PopoverTrigger><Slot><CheckIcon /></Slot></PopoverTrigger>',
+				'\t\t\t<PopoverContent><DialogPrimitive.Content /></PopoverContent>',
+				'\t\t</PopoverRoot>',
+				'\t);',
+				'}',
+				'',
+			].join('\n'),
+		});
+		const result = await runCodemod([root], { write: false });
+		const [file] = result.files;
+		expect(file.diagnostics).toEqual([]);
+		expect(file.code).toContain("import { Popover, type Checkbox } from '@octanejs/radix';");
+		// shadcn's spelling: the package's namespace import is the binding's namespace.
+		expect(file.code).toContain("import { Dialog as DialogPrimitive } from '@octanejs/radix';");
+		// Radix exports each part twice, as `Title` and `DialogTitle`.
+		expect(file.code).toContain('export const DialogTitle = DialogPrimitive.Title;');
+		expect(file.code).toContain('<DialogPrimitive.Content />');
+		expect(file.code).toContain(
+			'const { Root: PopoverRoot, PopoverTrigger, Content: PopoverContent } = Popover;',
+		);
+		expect(file.code).toContain('type CheckedState = Checkbox.CheckedState;');
+		expect(file.code).toContain("import { Slot } from '@octanejs/radix';");
+		// The binding has no props types, so that import stays for a person.
+		expect(file.code).toContain("import { type PopoverProps } from '@radix-ui/react-popover';");
+		expect(file.notes.filter((note) => note.rule === 'bindings')).toEqual([
+			expect.objectContaining({
+				line: 2,
+				message: expect.stringContaining('`Popover.PopoverProps`'),
+			}),
+			// No primitive of the binding serves icons.
+			expect.objectContaining({ message: expect.stringContaining('`@radix-ui/react-icons`') }),
+		]);
+		expect(result.packages.map((entry) => entry.from)).toEqual([
+			'@radix-ui/react-dialog',
+			'@radix-ui/react-popover',
+			'@radix-ui/react-checkbox',
+			'@radix-ui/react-slot',
+		]);
+		expect(new Set(result.packages.map((entry) => entry.to))).toEqual(new Set(['@octanejs/radix']));
+		expect(result.missing).toEqual(['@radix-ui/react-icons']);
+	});
+
+	it('reports exactly the Radix exports `@octanejs/radix` lacks', async () => {
+		const radix = path.join(REPO, 'packages/radix');
+		// The binding's own dev dependency on `radix-ui` installs every primitive package.
+		const upstream = createRequire(
+			createRequire(path.join(radix, 'package.json')).resolve('radix-ui'),
+		);
+		const options = {
+			noEmit: true,
+			skipLibCheck: true,
+			strict: true,
+			module: ts.ModuleKind.ESNext,
+			moduleResolution: ts.ModuleResolutionKind.Bundler,
+			target: ts.ScriptTarget.ESNext,
+			allowImportingTsExtensions: true,
+		};
+		const exportsOf = (/** @type {ts.Program} */ program, /** @type {string} */ file) => {
+			const checker = program.getTypeChecker();
+			const module = checker.getSymbolAtLocation(
+				/** @type {ts.SourceFile} */ (program.getSourceFile(file)),
+			);
+			return checker.getExportsOfModule(/** @type {ts.Symbol} */ (module)).map((symbol) => ({
+				symbol,
+				target: symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol,
+			}));
+		};
+		const index = path.join(radix, 'src/index.ts');
+		const binding = ts.createProgram([index], options);
+		const ported = new Map(
+			exportsOf(binding, index)
+				.filter(({ target }) => target.flags & ts.SymbolFlags.ValueModule)
+				.map(({ symbol, target }) => [
+					symbol.name,
+					binding
+						.getTypeChecker()
+						.getExportsOfModule(target)
+						.map((member) => member.name),
+				]),
+		);
+		// `@radix-ui/react-slot`'s exports are the binding's own.
+		ported.set('Slot', ['Slot', 'Slottable']);
+		const packages = [...ported].map(([name, names]) => {
+			const kebab = name.replace(/[A-Z]/g, (c, i) => (i ? '-' : '') + c.toLowerCase());
+			const types = path.join(
+				path.dirname(upstream.resolve(`@radix-ui/react-${kebab}`)),
+				'index.d.ts',
+			);
+			return { name, names, module: `@radix-ui/react-${kebab}`, types };
+		});
+		const declarations = ts.createProgram(
+			packages.map((entry) => entry.types),
+			options,
+		);
+		const read = (
+			/** @type {{ symbol: ts.Symbol, target: ts.Symbol }} */ { target },
+			/** @type {string} */ name,
+			/** @type {number} */ i,
+		) =>
+			target.flags & ts.SymbolFlags.Value
+				? `export const v${i} = ${name};`
+				: `export type T${i} = ${name};`;
+		// Per package, a module that reads every export through a namespace import,
+		// and one that imports by name every export the binding shares with it.
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			...Object.fromEntries(
+				packages.flatMap(({ name, names, module, types }) => {
+					const upstream = exportsOf(declarations, types);
+					const shared = upstream.filter(({ symbol }) => names.includes(symbol.name));
+					return [
+						[
+							`src/${name}.ts`,
+							[
+								`import * as N from '${module}';`,
+								...upstream.map((e, i) => read(e, `N.${e.symbol.name}`, i)),
+							].join('\n'),
+						],
+						[
+							`src/${name}.named.ts`,
+							[
+								`import { ${shared.map((e) => e.symbol.name).join(', ')} } from '${module}';`,
+								...shared.map((e, i) => read(e, e.symbol.name, i)),
+							].join('\n'),
+						],
+					];
+				}),
+			),
+		});
+		fs.mkdirSync(path.join(root, 'node_modules/@octanejs'), { recursive: true });
+		fs.symlinkSync(radix, path.join(root, 'node_modules/@octanejs/radix'), 'dir');
+		const result = await runCodemod([root], { verify: false });
+		expect(result.missing).toEqual([]);
+
+		const migrated = ts.createProgram(
+			result.files.map((file) => path.join(root, file.output)),
+			options,
+		);
+		const at = (
+			/** @type {import('../src/project.js').FileResult} */ file,
+			/** @type {number} */ line,
+		) => `${file.file}: ${file.code.split('\n')[line - 1]}`;
+		const reported = result.files.flatMap((file) => file.notes.map((note) => at(file, note.line)));
+		const failing = result.files.flatMap((file) => {
+			const source = /** @type {ts.SourceFile} */ (
+				migrated.getSourceFile(path.join(root, file.output))
+			);
+			return migrated
+				.getSemanticDiagnostics(source)
+				.map((d) =>
+					at(file, source.getLineAndCharacterOfPosition(/** @type {number} */ (d.start)).line + 1),
+				);
+		});
+		// Every name the migrated code reads exists in the binding, except the ones
+		// the codemod reported, and it reported nothing that exists.
+		expect(reported.sort()).toEqual(failing.sort());
+		expect(reported.length).toBeGreaterThan(0);
+	}, 60_000);
+
+	it("imports TanStack's Octane adapters, with their names for React-named types", async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'src/kit.ts': [
+				"import { flexRender, useReactTable, useTable, type ReactTable } from '@tanstack/react-table';",
+				"import { useHotkey, type ReactHotkeyRecorder } from '@tanstack/react-hotkeys';",
+				"import { useDebouncer, type ReactDebouncer } from '@tanstack/react-pacer/debouncer';",
+				"import { PacerProvider, usePacerContext } from '@tanstack/react-pacer';",
+				'',
+				'export type Kit = [ReactTable<any, any>, ReactHotkeyRecorder, ReactDebouncer<() => void, any>];',
+				'export const kit = [flexRender, useReactTable, useTable, useHotkey, useDebouncer, PacerProvider, usePacerContext];',
+				'',
+			].join('\n'),
+		});
+		const result = await runCodemod([root], { write: false, verify: false });
+		const [file] = result.files;
+		expect(file.code).toContain(
+			"import { flexRender, useTable, type OctaneTable as ReactTable } from '@tanstack/octane-table';",
+		);
+		expect(file.code).toContain(
+			"import { useHotkey, type OctaneHotkeyRecorder as ReactHotkeyRecorder } from '@tanstack/octane-hotkeys';",
+		);
+		expect(file.code).toContain(
+			"import { useDebouncer, type OctaneDebouncer as ReactDebouncer } from '@tanstack/octane-pacer/debouncer';",
+		);
+		expect(file.code).toContain("import { PacerProvider } from '@tanstack/octane-pacer';");
+		// What the adapters lack stays on React's, with what to do instead.
+		expect(file.code).toContain("import { useReactTable } from '@tanstack/react-table';");
+		expect(file.code).toContain("import { usePacerContext } from '@tanstack/react-pacer';");
+		expect(file.notes.filter((note) => note.severity === 'error')).toEqual([
+			expect.objectContaining({ line: 1, message: expect.stringContaining('`useTable`') }),
+			expect.objectContaining({
+				line: 4,
+				message: expect.stringContaining('useDefaultPacerOptions'),
+			}),
+		]);
+		expect(result.packages).toEqual([
+			{ from: '@tanstack/react-table', to: '@tanstack/octane-table' },
+			{ from: '@tanstack/react-hotkeys', to: '@tanstack/octane-hotkeys' },
+			{ from: '@tanstack/react-pacer', to: '@tanstack/octane-pacer' },
+		]);
+		expect(result.missing).toEqual([]);
 	});
 
 	it('reports React packages from their installed manifest, not their name', async () => {
