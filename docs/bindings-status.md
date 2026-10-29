@@ -450,7 +450,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/dnd-kit-accessibility
 
-[`packages/dnd-kit-accessibility`](../packages/dnd-kit-accessibility) `0.0.0` — ports `@dnd-kit/accessibility@3.1.1`. Status data: [`packages/dnd-kit-accessibility/status.json`](../packages/dnd-kit-accessibility/status.json).
+[`packages/dnd-kit-accessibility`](../packages/dnd-kit-accessibility) `0.0.1` — ports `@dnd-kit/accessibility@3.1.1`. Status data: [`packages/dnd-kit-accessibility/status.json`](../packages/dnd-kit-accessibility/status.json).
 
 Complete @dnd-kit/accessibility 3.1.1 surface: HiddenText, LiveRegion, and useAnnouncement.
 
@@ -463,7 +463,7 @@ Scope/evidence last checked: 2026-10-29.
 
 ## @octanejs/dnd-kit-core
 
-[`packages/dnd-kit-core`](../packages/dnd-kit-core) `0.0.0` — ports `@dnd-kit/core@6.3.1`. Status data: [`packages/dnd-kit-core/status.json`](../packages/dnd-kit-core/status.json).
+[`packages/dnd-kit-core`](../packages/dnd-kit-core) `0.0.1` — ports `@dnd-kit/core@6.3.1`. Status data: [`packages/dnd-kit-core/status.json`](../packages/dnd-kit-core/status.json).
 
 Complete @dnd-kit/core 6.3.1 surface: DndContext, DragOverlay with drop animations, useDraggable/useDroppable/useDndContext/useDndMonitor, pointer/mouse/touch/keyboard sensors, collision detection, modifiers, measuring and auto-scroll configuration, and screen-reader announcements.
 
@@ -480,7 +480,7 @@ Scope/evidence last checked: 2026-10-29.
 
 ## @octanejs/dnd-kit-modifiers
 
-[`packages/dnd-kit-modifiers`](../packages/dnd-kit-modifiers) `0.0.0` — ports `@dnd-kit/modifiers@9.0.0`. Status data: [`packages/dnd-kit-modifiers/status.json`](../packages/dnd-kit-modifiers/status.json).
+[`packages/dnd-kit-modifiers`](../packages/dnd-kit-modifiers) `0.0.1` — ports `@dnd-kit/modifiers@9.0.0`. Status data: [`packages/dnd-kit-modifiers/status.json`](../packages/dnd-kit-modifiers/status.json).
 
 Complete @dnd-kit/modifiers 9.0.0 surface: the restrictTo* modifiers, snapCenterToCursor, and createSnapModifier.
 
@@ -493,7 +493,7 @@ Scope/evidence last checked: 2026-10-29.
 
 ## @octanejs/dnd-kit-sortable
 
-[`packages/dnd-kit-sortable`](../packages/dnd-kit-sortable) `0.0.0` — ports `@dnd-kit/sortable@10.0.0`. Status data: [`packages/dnd-kit-sortable/status.json`](../packages/dnd-kit-sortable/status.json).
+[`packages/dnd-kit-sortable`](../packages/dnd-kit-sortable) `0.0.1` — ports `@dnd-kit/sortable@10.0.0`. Status data: [`packages/dnd-kit-sortable/status.json`](../packages/dnd-kit-sortable/status.json).
 
 Complete @dnd-kit/sortable 10.0.0 surface: SortableContext, useSortable, the rect/vertical/horizontal list and rect swapping strategies, arrayMove/arraySwap, sortableKeyboardCoordinates, hasSortableData, and defaultAnimateLayoutChanges/defaultNewIndexGetter.
 
@@ -506,7 +506,7 @@ Scope/evidence last checked: 2026-10-29.
 
 ## @octanejs/dnd-kit-utilities
 
-[`packages/dnd-kit-utilities`](../packages/dnd-kit-utilities) `0.0.0` — ports `@dnd-kit/utilities@3.2.2`. Status data: [`packages/dnd-kit-utilities/status.json`](../packages/dnd-kit-utilities/status.json).
+[`packages/dnd-kit-utilities`](../packages/dnd-kit-utilities) `0.0.1` — ports `@dnd-kit/utilities@3.2.2`. Status data: [`packages/dnd-kit-utilities/status.json`](../packages/dnd-kit-utilities/status.json).
 
 Complete @dnd-kit/utilities 3.2.2 surface: every hook (useCombinedRefs, useEvent, useInterval, useIsomorphicLayoutEffect, useLatestValue, useLazyMemo, useNodeRef, usePrevious, useUniqueId), CSS transform/transition serializers, coordinate math, event and node type guards, and getWindow/getOwnerDocument.
 
@@ -534,7 +534,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/drei
 
-[`packages/drei`](../packages/drei) `0.0.38` — ports `@react-three/drei@10.7.7`. Status data: [`packages/drei/status.json`](../packages/drei/status.json).
+[`packages/drei`](../packages/drei) `0.0.39` — ports `@react-three/drei@10.7.7`. Status data: [`packages/drei/status.json`](../packages/drei/status.json).
 
 Complete port of the pinned @react-three/drei 10.7.7 public web API (commit b8b99fd4ca1dfb8d821335671320512daa6efea4): 379 source exports and 217 runtime exports are accounted for by the executable crosswalk, with 299 parity assertions across 105 test files.
 
@@ -726,7 +726,7 @@ See also: [`docs/octanejs-hook-form-plan.md`](octanejs-hook-form-plan.md)
 
 ## @octanejs/hot-toast
 
-[`packages/hot-toast`](../packages/hot-toast) `0.0.0` — ports `react-hot-toast@2.6.1`. Status data: [`packages/hot-toast/status.json`](../packages/hot-toast/status.json).
+[`packages/hot-toast`](../packages/hot-toast) `0.0.1` — ports `react-hot-toast@2.6.1`. Status data: [`packages/hot-toast/status.json`](../packages/hot-toast/status.json).
 
 Complete published react-hot-toast 2.6.1 surface: the callable `toast` API with every variant, promise lifecycle, dismissal and removal, `Toaster`, `ToastBar`, `ToastIcon`, the icon components, multiple toasters, hover pause, `useToaster`, `useToasterStore`, `resolveValue`, and the `/headless` entry. All 14 upstream Jest cases run unchanged against React and against the port.
 
@@ -1040,7 +1040,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/next-themes
 
-[`packages/next-themes`](../packages/next-themes) `0.0.0` — ports `next-themes@0.4.6`. Status data: [`packages/next-themes/status.json`](../packages/next-themes/status.json).
+[`packages/next-themes`](../packages/next-themes) `0.0.1` — ports `next-themes@0.4.6`. Status data: [`packages/next-themes/status.json`](../packages/next-themes/status.json).
 
 Complete published surface: ThemeProvider with every prop (attribute, defaultTheme, enableSystem, enableColorScheme, storageKey, forcedTheme, disableTransitionOnChange, themes, value, nonce, scriptProps), useTheme, and the Attribute, ThemeProviderProps and UseThemeProps types. All 28 upstream runtime registrations run unchanged against React and, with import rewrites only, against Octane.
 
@@ -1313,7 +1313,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/remix-router
 
-[`packages/remix-router`](../packages/remix-router) `0.1.64` — ports `react-router@8.2.0`. Status data: [`packages/remix-router/status.json`](../packages/remix-router/status.json).
+[`packages/remix-router`](../packages/remix-router) `0.1.65` — ports `react-router@8.2.0`. Status data: [`packages/remix-router/status.json`](../packages/remix-router/status.json).
 
 All planned port phases are shipped and the pinned runtime export namespace is complete: the framework-agnostic router core, data/declarative/DOM/mutation/guard layers, static SSR, and cookie/session runtime are implemented on Octane. Framework-mode and RSC names remain throwing scope stubs. Selected vendored-core suites, local conformance, and nine exact shared-fixture scenarios provide bounded evidence rather than exhaustive React parity.
 
@@ -2011,7 +2011,7 @@ Scope/evidence last checked: 2026-08-09.
 
 ## @octanejs/use-sync-external-store
 
-[`packages/use-sync-external-store`](../packages/use-sync-external-store) `0.0.0` — ports `use-sync-external-store@1.7.0`. Status data: [`packages/use-sync-external-store/status.json`](../packages/use-sync-external-store/status.json).
+[`packages/use-sync-external-store`](../packages/use-sync-external-store) `0.0.1` — ports `use-sync-external-store@1.7.0`. Status data: [`packages/use-sync-external-store/status.json`](../packages/use-sync-external-store/status.json).
 
 Every use-sync-external-store 1.7.0 entry point, including the .js spellings: the main entry and /shim (with index.native) re-export Octane's built-in useSyncExternalStore, and /with-selector and /shim/with-selector export a port of useSyncExternalStoreWithSelector.
 

@@ -225,10 +225,10 @@ async function loadRoute(
 		if (m.type() === 'error') errors.push(m.text());
 	});
 	page.on('pageerror', (e) => errors.push('pageerror: ' + String(e)));
-	let navigationStatus: number | undefined;
+	let navigation: import('playwright').Response | null = null;
 	try {
 		await options.beforeNavigation?.(page, errors);
-		navigationStatus = (await page.goto(base + path, { waitUntil: 'load' }))?.status();
+		navigation = await page.goto(base + path, { waitUntil: 'load' });
 		// The dev server can replace the document AFTER `load`: Vite reloads the
 		// page when a request resolves against a stale optimized-dependency hash,
 		// which is its normal recovery, not something the caller asked about. That
@@ -279,7 +279,23 @@ async function loadRoute(
 		])
 			.catch(() => null)
 			.finally(() => clearTimeout(diagnosticTimer));
-		const diagnostics = JSON.stringify({ url: page.url(), navigationStatus, errors, snapshot });
+		const navigationStatus = navigation?.status();
+		// The dev server's 500 page renders its error inside the overlay's shadow
+		// root, where the snapshot cannot read it. Its body carries the message.
+		const serverError =
+			navigationStatus !== undefined && navigationStatus >= 500
+				? await navigation!
+						.text()
+						.then((body) => body.slice(0, 4000))
+						.catch(() => undefined)
+				: undefined;
+		const diagnostics = JSON.stringify({
+			url: page.url(),
+			navigationStatus,
+			serverError,
+			errors,
+			snapshot,
+		});
 		await page.close().catch(() => {});
 		throw new Error(`Failed to load ${base + path}: ${diagnostics}`, { cause: error });
 	}

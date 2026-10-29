@@ -1,5 +1,23 @@
 # @octanejs/mcp-server
 
+## 0.3.7
+
+### Patch Changes
+
+- d6f5536: Add Octane ports of the legacy dnd kit API, one package per upstream package: `@octanejs/dnd-kit-core` (`@dnd-kit/core` 6.3.1), `@octanejs/dnd-kit-sortable` (`@dnd-kit/sortable` 10.0.0), `@octanejs/dnd-kit-modifiers` (`@dnd-kit/modifiers` 9.0.0), `@octanejs/dnd-kit-utilities` (`@dnd-kit/utilities` 3.2.2), and `@octanejs/dnd-kit-accessibility` (`@dnd-kit/accessibility` 3.1.1). They cover `DndContext`, `DragOverlay`, `useDraggable`/`useDroppable`, the sensors and collision algorithms, `SortableContext`/`useSortable` with the sorting strategies and `arrayMove`, the `restrictTo*` and snap modifiers, and the `CSS`/DOM helpers. One difference from React: sensor activator handlers receive the native DOM event, because Octane has no synthetic events.
+
+  The binding catalog maps each `@dnd-kit/*` package to its port, so `@octanejs/codemod` and `octane bindings` resolve them.
+- 4fc96cf: Add `@octanejs/hot-toast`, an Octane port of `react-hot-toast` 2.6.1: the `toast` API and
+  every variant, `Toaster`, `ToastBar`, `ToastIcon`, the icon components, `useToaster`,
+  `useToasterStore`, `resolveValue` and the `/headless` entry. The binding catalog now maps
+  `react-hot-toast` to it, so `@octanejs/codemod` rewrites `react-hot-toast` imports to the
+  binding instead of reporting a package with no binding.
+- 58ddff8: Map `next-themes` to `@octanejs/next-themes` in the binding catalog, so `@octanejs/codemod` rewrites `next-themes` imports to the binding.
+- 1e143d7: Guide authors through measuring streamed interactions and checking repeated updates across owner replacement.
+- b4e303d: Ship TypeScript declarations for the CLI, React codemod and MCP server, including their public subpath exports.
+- 86cf9cb: The React bridge names `@octanejs/use-sync-external-store` as the binding for
+  `use-sync-external-store`.
+
 ## 0.3.6
 
 ### Patch Changes
