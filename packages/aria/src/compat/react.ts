@@ -6,11 +6,6 @@ import * as Octane from 'octane';
 
 export * from 'octane';
 
-// React permits `useRef<Element>(null)`. Octane has the same runtime shape but
-// infers the initializer literally, so expose the React-compatible overload at
-// this import boundary while keeping the call visible to the Octane compiler.
-export const useRef = Octane.useRef as <T>(initial: T | null) => { current: T };
-
 export type ForwardedRef<T> =
 	((instance: T | null) => void | (() => void)) | { current: T | null } | null;
 export type ReactNode = any;
@@ -82,7 +77,7 @@ export function forwardRef<T, P = Record<string, never>>(
 	return component;
 }
 
-const React = Object.assign({}, Octane, { forwardRef, useRef });
+const React = Object.assign({}, Octane, { forwardRef });
 
 namespace React {
 	export type ForwardedRef<T> = import('./react').ForwardedRef<T>;

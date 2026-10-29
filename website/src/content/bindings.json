@@ -621,8 +621,13 @@
   },
   {
     "title": "Styling",
-    "description": "Compiled and runtime CSS-in-JS options for Octane components.",
+    "description": "Theme switching and compiled or runtime CSS-in-JS options for Octane components.",
     "packages": [
+      {
+        "packageName": "@octanejs/next-themes",
+        "title": "next-themes",
+        "tags": ["themes", "dark mode", "styling"]
+      },
       {
         "packageName": "@octanejs/styled-components",
         "title": "styled-components",

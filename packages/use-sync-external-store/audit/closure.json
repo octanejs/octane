@@ -10,7 +10,7 @@
     {
       "path": "package.json",
       "origin": "authored",
-      "sha256": "6967888da04f68b537c29dcb5f50fb88a3ea3de9336cf86c636bab2b480dc271"
+      "sha256": "68c5b9c4ef42ced1e9af843c04917fb35ed622f99cfab56cec561041d235af3e"
     },
     {
       "path": "src/index.ts",

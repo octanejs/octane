@@ -73,6 +73,7 @@ export const KNOWN_BINDINGS = {
 	'embla-carousel-react': '@octanejs/embla-carousel',
 	'react-dropzone': '@octanejs/dropzone',
 	sonner: '@octanejs/sonner',
+	'next-themes': '@octanejs/next-themes',
 	'react-error-boundary': '@octanejs/react-error-boundary',
 	'react-email': '@octanejs/email',
 	'@react-email/components': '@octanejs/email',

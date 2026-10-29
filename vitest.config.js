@@ -22,6 +22,7 @@ import tanstackQueryDevtoolsAdapted from './packages/tanstack-query-devtools/tes
 import useSyncExternalStoreAdapted from './packages/use-sync-external-store/tests/vitest.adapted.config.ts';
 import useSyncExternalStoreAdaptedSSR from './packages/use-sync-external-store/tests/vitest.adapted-ssr.config.ts';
 import useSyncExternalStorePristine from './packages/use-sync-external-store/tests/vitest.pristine.config.ts';
+import nextThemesAdapted from './packages/next-themes/tests/vitest.adapted.config.ts';
 import baseUIAdapted from './packages/base-ui/tests/vitest.config.ts';
 import baseUIUtilsAdapted from './packages/base-ui-utils/tests/vitest.config.ts';
 import baseUIPristine from './packages/base-ui/tests/vitest.pristine.config.ts';
@@ -620,6 +621,26 @@ export default defineConfig({
 					environment: 'jsdom',
 				},
 				plugins: [octaneServerFixtures(import.meta.dirname), octane()],
+			},
+			{ ...nextThemesAdapted, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'next-themes-pristine',
+					include: ['packages/next-themes/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'next-themes-differential',
+					include: ['packages/next-themes/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane({ requireDirective: true })],
+				resolve: { dedupe: ['octane', 'react', 'react-dom'] },
 			},
 			{
 				testExecution: { group: 'react-parity' },
@@ -2220,6 +2241,35 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/tanstack-ai$/,
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-ai/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'next-themes',
+					include: ['packages/next-themes/tests/*.test.ts'],
+					exclude: ['packages/next-themes/tests/upstream-original.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: { dedupe: ['octane'] },
+			},
+			{
+				test: {
+					name: 'next-themes-ssr',
+					include: ['packages/next-themes/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					dedupe: ['octane'],
+					alias: [
+						{
+							find: /^octane(?:\/server)?$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
 						},
 					],
 				},
