@@ -31,6 +31,13 @@ only those superseded or initial request completions until the competing mutatio
 or observation has happened, then releases them so the unchanged assertions
 deterministically exercise the intended overlap.
 
+The same harness covers the `useSWR` data and error broadcast cases. Three
+subscribers poll every 100 ms, and each case asserts the shared count after
+sleeping to 50, 150, and 250 ms. A loaded runner delays the `act()` turns between
+those sleeps but not the polling chain, so a refresh could land before the count
+it should follow. The harness holds each polling round until the previous count
+is observed and leaves the round after the last count to unmount.
+
 ## Provenance status
 
 `packages/swr/audit/react-parity.json` is `recorded-unverified`. Required lanes
