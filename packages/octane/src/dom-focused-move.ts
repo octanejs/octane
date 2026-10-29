@@ -81,7 +81,7 @@ let nextSiblingGetter: ((this: Node) => Node | null) | undefined;
  * the `Node` global (a Node process driving a jsdom document), and a form's
  * named controls shadow the members read through the node itself.
  */
-function nodeProto(node: Node): Node {
+export function nodeProto(node: Node): Node {
 	if (NODE_PROTO === undefined) {
 		let proto = Object.getPrototypeOf(node);
 		while (!Object.prototype.hasOwnProperty.call(proto, 'nextSibling'))

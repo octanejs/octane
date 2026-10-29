@@ -3,6 +3,9 @@ import { createElement, flushSync, hostComponent, type ComponentBody } from '../
 import { act, mount } from './_helpers';
 import {
 	CompiledSiblings,
+	NestedFragmentRefs,
+	NestedRefs,
+	NestedSpreadRefs,
 	RefPostorderBatch,
 	type SiblingProps,
 } from './_fixtures/ref-postorder-batches.tsrx';
@@ -41,6 +44,56 @@ it('attaches child refs before parent refs while preserving sibling branch order
 	} finally {
 		r.unmount();
 	}
+});
+
+// React attaches a host's ref after the refs of every host inside it, though
+// one template, spread, or de-opt tree queues the outer host's ref first.
+type LogProps = { log: (entry: string) => void };
+
+function DeoptNestedRefs({ log }: LogProps) {
+	const ref = (name: string) => (node: unknown) => log(`${name}:${node ? 'set' : 'null'}`);
+	return createElement(
+		'section',
+		null,
+		createElement(
+			'p',
+			{ ref: ref('p') },
+			createElement('i', { ref: ref('i') }, createElement('u', { ref: ref('u') })),
+			createElement('em', { ref: ref('em') }),
+		),
+		createElement('span', { ref: ref('span') }),
+	);
+}
+
+const nested: [string, (props: LogProps) => any][] = [
+	['ref attributes', NestedRefs],
+	['spread refs', NestedSpreadRefs],
+	['a de-opt tree', DeoptNestedRefs],
+];
+
+describe.each(nested)('nested hosts attach their refs child first (%s)', (_, App) => {
+	it('on mount and when every ref changes', () => {
+		const log: string[] = [];
+		const props = { log: (entry: string) => log.push(entry) };
+		const m = mount(App as any, props);
+		expect(log).toEqual(['u:set', 'i:set', 'em:set', 'p:set', 'span:set']);
+
+		log.length = 0;
+		m.root.render(App as any, { ...props });
+		flushSync(() => {});
+		// Every old ref detaches before any new one attaches.
+		expect(log.slice(5)).toEqual(['u:set', 'i:set', 'em:set', 'p:set', 'span:set']);
+		m.unmount();
+	});
+});
+
+// React attaches a Fragment's ref before its children's, and its host's after
+// both (ReactFiberCommitWork.js, commitLayoutEffectOnFiber).
+it("attaches a fragment's ref before its children and its host's after them", () => {
+	const log: string[] = [];
+	const m = mount(NestedFragmentRefs as any, { log: (entry: string) => log.push(entry) });
+	expect(log).toEqual(['fragment:set', 'i:set', 'p:set']);
+	m.unmount();
 });
 
 // React attaches refs in its layout phase in tree order, whether the host is

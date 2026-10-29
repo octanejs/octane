@@ -75,3 +75,17 @@ export function FormParentRows(props: { items: readonly StatefulRow[] }) @{
 		}
 	</section>
 }
+
+// A form's named controls shadow the members the commit orders its refs with.
+export function NamedControlRefs(props: { log: (entry: string) => void }) @{
+	<form ref={(node: Element | null) => props.log(`form:${node ? 'set' : 'null'}`)}>
+		<input
+			name="nodeType"
+			ref={(node: Element | null) => props.log(`nodeType:${node ? 'set' : 'null'}`)}
+		/>
+		<input
+			name="compareDocumentPosition"
+			ref={(node: Element | null) => props.log(`compareDocumentPosition:${node ? 'set' : 'null'}`)}
+		/>
+	</form>
+}
