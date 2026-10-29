@@ -1,0 +1,277 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/timolins/react-hot-toast.git",
+    "version": "2.6.1",
+    "commit": "e725d38e0faec05f7b8fb10644b616ef978d2f4d",
+    "sourceRoot": "src",
+    "testRoot": "test",
+    "license": "MIT",
+    "integrity": "sha256:336bae521480e2f77425cf7c993ffbb58ca0b61407df9f99c63ca954b8099360",
+    "verification": "verified"
+  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "materializedTests": "packages/hot-toast",
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/hot-toast/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/hot-toast/tests/upstream"],
+      "include": ["\\.test\\.(?:ts|tsx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 14,
+    "uniqueIdentities": 14,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@12.9.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "e62a4b568598a76242e187a55f3c065848f010e1981b6d1bc0a429e6c31bbafd"
+    }
+  },
+  "lanes": [
+    {
+      "id": "hot-toast-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "hot-toast-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 14 pinned Jest registrations byte for byte against the pinned React source.",
+      "execution": {
+        "kind": "jest-full",
+        "config": "packages/hot-toast/jest.pristine.config.cjs",
+        "root": "packages/hot-toast",
+        "inventory": "packages/hot-toast/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/hot-toast/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "a29bf205912513c3127b9e67883457040ae8b29e767e5522072fcc7f221077ee"
+        },
+        {
+          "path": "packages/hot-toast/jest.pristine.config.cjs",
+          "role": "support",
+          "sha256": "01a455e4d6c061af06bcdd134b3d738fec40aa6d3d536762b4cdb2da459e1ca5"
+        },
+        {
+          "path": "packages/hot-toast/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "e9fdd4961b237840040e75764bc2a0d210d5abd0385a16a5b4ac803501642d8c"
+        },
+        {
+          "path": "packages/hot-toast/audit/provenance.json",
+          "role": "support",
+          "sha256": "27ef0fc5e316d1d439791019e6b150a58ca52544dd6ad29cf1e2085ddd1fd630"
+        },
+        {
+          "path": "packages/hot-toast/audit/registrations.json",
+          "role": "support",
+          "sha256": "8ee37a342afd240d4456d7d91fba0b6b2f4199764a7eacfc2fd46eec960fb265"
+        },
+        {
+          "path": "packages/hot-toast/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "de0033eb123c883944cc0265f8f0ba84314c5b97446f0e61e09430869400ca38"
+        },
+        {
+          "path": "packages/hot-toast/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "51576651d90fedabf9c1a5eee6ce44453668972f5105622d3422b2d82e487ea9"
+        }
+      ]
+    },
+    {
+      "id": "hot-toast-adapted-full",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "hot-toast-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 14 pinned registrations against Octane after mechanical rewrites and one event-model divergence patch.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/hot-toast/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/hot-toast/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "62896055c081dcfdf5f9162121457fd08966dde7fc4c34afad44041553f4abc4"
+        },
+        {
+          "path": "packages/hot-toast/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "e9fdd4961b237840040e75764bc2a0d210d5abd0385a16a5b4ac803501642d8c"
+        },
+        {
+          "path": "packages/hot-toast/audit/provenance.json",
+          "role": "support",
+          "sha256": "27ef0fc5e316d1d439791019e6b150a58ca52544dd6ad29cf1e2085ddd1fd630"
+        },
+        {
+          "path": "packages/hot-toast/audit/registrations.json",
+          "role": "support",
+          "sha256": "8ee37a342afd240d4456d7d91fba0b6b2f4199764a7eacfc2fd46eec960fb265"
+        },
+        {
+          "path": "packages/hot-toast/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "de0033eb123c883944cc0265f8f0ba84314c5b97446f0e61e09430869400ca38"
+        },
+        {
+          "path": "packages/hot-toast/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "51576651d90fedabf9c1a5eee6ce44453668972f5105622d3422b2d82e487ea9"
+        },
+        {
+          "path": "packages/hot-toast/audit/upstream-patches/tests/upstream/toast.test.tsx.patch",
+          "role": "support",
+          "sha256": "7b2fbd99aa3395544cd458ffe6635713622617eeb1a6ca8dd1404092c3e43369"
+        },
+        {
+          "path": "packages/hot-toast/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "d20219045c5135b79eae1fed7b1b2675213d9d91e7770f79d7ac32b0fa8c8b9c"
+        },
+        {
+          "path": "packages/hot-toast/tests/adapted-setup.ts",
+          "role": "support",
+          "sha256": "01bc12de9a6562d392a3be58fdbd48d24627e018f828e15eaaf750fd3642f09c"
+        }
+      ]
+    },
+    {
+      "id": "hot-toast-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "hot-toast-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs one same-fixture lifecycle against the published react-hot-toast@2.6.1 React runtime, comparing HTML after every step.",
+      "files": [
+        {
+          "path": "packages/hot-toast/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "5b6f2150a7fbf03547649d29ab62223906e166f244b3984aeac48365c1bb0fdb",
+          "cases": [
+            {
+              "id": "differential:hot-toast-lifecycle",
+              "testName": "matches every toast type, updates, dismissal, removal and render props",
+              "fullName": "differential: @octanejs/hot-toast vs react-hot-toast@2.6.1 matches every toast type, updates, dismissal, removal and render props"
+            }
+          ]
+        },
+        {
+          "path": "packages/hot-toast/tests/_fixtures/hot-toast-diff.tsrx",
+          "role": "support",
+          "sha256": "28ce0103f074363982b92986a8605ae26319c546b0531f7642d22d865d9cf65c"
+        },
+        {
+          "path": "packages/hot-toast/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "82f83b2286daed4c9e3242db789628b3e5f2b6cf2993a8ccb04f6564251ca945"
+        },
+        {
+          "path": "packages/hot-toast/tests/setup.ts",
+          "role": "support",
+          "sha256": "b4a239e4ee2dea1a3130e1815f7e81e16175b1ebcb3a4bdcb0996ced36d9a440"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "3b7e60f5d1d410e0d3b5ffe79b45c9ad8936a02353a9a3eff29df6b8da8c2d16"
+        }
+      ]
+    }
+  ],
+  "ordinaryEvidence": [
+    {
+      "path": "packages/hot-toast/tests/conformance/toaster.test.ts",
+      "sha256": "3c960c9b8552d6dec7e90afc8874d5019f5f64887fe925ba69f1e50d86fc37fc",
+      "cases": [
+        {
+          "id": "conformance:hot-toast-native-pause",
+          "testName": "pauses the auto-dismiss timer while the pointer is over the Toaster",
+          "fullName": "@octanejs/hot-toast pauses the auto-dismiss timer while the pointer is over the Toaster"
+        },
+        {
+          "id": "conformance:hot-toast-shared-headless-store",
+          "testName": "shares one toast store between the root and /headless entries",
+          "fullName": "@octanejs/hot-toast shares one toast store between the root and /headless entries"
+        },
+        {
+          "id": "conformance:hot-toast-goober-pragma",
+          "testName": "leaves the application's goober pragma in place",
+          "fullName": "@octanejs/hot-toast leaves the application's goober pragma in place"
+        },
+        {
+          "id": "conformance:hot-toast-hydration",
+          "testName": "hydrates the server Toaster and shows the first client toast in it",
+          "fullName": "@octanejs/hot-toast hydrates the server Toaster and shows the first client toast in it"
+        }
+      ]
+    },
+    {
+      "path": "packages/hot-toast/tests/ssr/server.test.ts",
+      "sha256": "dfb42a08f8ca2cfd2e97c5ae72a74fad3c28b4022eedb6d40064282b35a46999",
+      "cases": [
+        {
+          "id": "conformance:hot-toast-server-render",
+          "testName": "renders queued toasts as react-hot-toast does, without browser globals",
+          "fullName": "@octanejs/hot-toast — server rendering renders queued toasts as react-hot-toast does, without browser globals"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "native-mouseenter",
+      "caseIds": ["runtime:881f043dd890fb2b", "conformance:hot-toast-native-pause"],
+      "upstreamResult": "React synthesizes the Toaster container's onMouseEnter/onMouseLeave from mouseover/mouseout, so a mouseenter fired on a toast reaches the container's pause handler.",
+      "octaneResult": "The pause handlers are the native, non-bubbling mouseenter/mouseleave listeners on the container, which a pointer entering any toast dispatches there.",
+      "rationale": "Octane delivers native DOM events and has no synthetic enter/leave layer.",
+      "classification": "event-model",
+      "consumerImpact": "None for real pointers. Tests that fire mouseenter on a toast element must fire it on the Toaster container instead.",
+      "migrationGuidance": "Dispatch mouseenter/mouseleave on the [data-rht-toaster] container in tests.",
+      "owner": "@octanejs/hot-toast",
+      "reviewCondition": "Review if Octane adds synthetic enter/leave delegation."
+    },
+    {
+      "id": "goober-pragma",
+      "caseIds": ["conformance:hot-toast-goober-pragma"],
+      "upstreamResult": "react-hot-toast calls goober's setup(React.createElement) when it loads, replacing any pragma the application configured.",
+      "octaneResult": "The port renders its own elements and never calls setup(), so the application's goober pragma stays in place.",
+      "rationale": "goober's styled() builds React elements through its global pragma; the port authors those elements in .tsrx and uses goober only to compile CSS.",
+      "classification": "framework-integration",
+      "consumerImpact": "Applications that also use goober keep their own pragma regardless of import order.",
+      "migrationGuidance": "No change needed.",
+      "owner": "@octanejs/hot-toast",
+      "reviewCondition": "Review if upstream stops calling setup() at module load."
+    },
+    {
+      "id": "shared-headless-store",
+      "caseIds": ["conformance:hot-toast-shared-headless-store"],
+      "upstreamResult": "The root and /headless entries are separate bundles, each with its own toast store.",
+      "octaneResult": "Both entries publish the same source modules and therefore share one toast store.",
+      "rationale": "Octane bindings ship their authored source unbundled, so both entries resolve the same modules.",
+      "classification": "implementation",
+      "consumerImpact": "A toast created through one entry also reaches toasters and useToaster hooks imported from the other.",
+      "migrationGuidance": "No change needed; mixing the entries now behaves as one store.",
+      "owner": "@octanejs/hot-toast",
+      "reviewCondition": "Review if the binding starts bundling its entries."
+    }
+  ]
+}

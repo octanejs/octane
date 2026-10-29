@@ -30,7 +30,7 @@ function compileErrors(code, filename, strong = false) {
 function migrate(name) {
 	const result = transformModule(fs.readFileSync(path.join(FIXTURES, name), 'utf8'), name, {
 		strictNullChecks: true,
-		unported: (specifier) => (specifier === 'react-hot-toast' ? specifier : null),
+		unported: (specifier) => (specifier === '@example/react-toast' ? specifier : null),
 		reactCompat: true,
 		// As the project resolves bindings: Radix's primitives are `@octanejs/radix`.
 		resolveSpecifier: (specifier) =>

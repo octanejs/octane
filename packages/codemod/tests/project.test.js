@@ -592,6 +592,29 @@ describe('runCodemod', () => {
 		}
 	});
 
+	it('maps react-hot-toast to its binding instead of hosting it in React', async () => {
+		// Memos' shape: one <Toaster> at the root, toast() calls everywhere else.
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'node_modules/react-hot-toast/package.json': JSON.stringify({
+				version: '2.6.1',
+				peerDependencies: { react: '>=16', 'react-dom': '>=16' },
+			}),
+			'src/main.tsx':
+				"import { Toaster } from 'react-hot-toast';\nexport function App() {\n\treturn <Toaster position=\"top-right\" toastOptions={{ style: { fontSize: '14px' } }} />;\n}\n",
+			'src/notify.ts':
+				"import toast from 'react-hot-toast';\nimport { useToaster } from 'react-hot-toast/headless';\nexport const notify = () => toast.success('Saved');\nexport { useToaster };\n",
+		});
+		const result = await runCodemod([root], { write: false });
+		const code = (/** @type {string} */ name) => result.files.find((f) => f.file === name)?.code;
+		expect(result.missing).toEqual([]);
+		expect(result.packages).toEqual([{ from: 'react-hot-toast', to: '@octanejs/hot-toast' }]);
+		expect(code('src/main.tsx')).toContain("import { Toaster } from '@octanejs/hot-toast';");
+		expect(code('src/main.tsx')).not.toMatch(/ReactCompat|octane\/react/);
+		expect(code('src/notify.ts')).toContain("import toast from '@octanejs/hot-toast';");
+		expect(code('src/notify.ts')).toContain("from '@octanejs/hot-toast/headless'");
+	});
+
 	it('reports TSRX written for React, which it cannot read', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',

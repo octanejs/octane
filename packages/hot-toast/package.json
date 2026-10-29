@@ -1,0 +1,70 @@
+{
+  "name": "@octanejs/hot-toast",
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "react-hot-toast for Octane: the toast store, Toaster, ToastBar, icons, and headless useToaster hook, ported from react-hot-toast 2.6.1.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/hot-toast"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE",
+    "LICENSE.upstream"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./headless": "./src/headless/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project hot-toast --project hot-toast-adapted --project hot-toast-ssr",
+    "test:pristine": "CI=true jest --config jest.pristine.config.cjs --runInBand",
+    "typecheck": "octane-tsc -p tsconfig.json",
+    "verify:upstream": "node ../../scripts/react-parity/verify-provenance.mjs"
+  },
+  "dependencies": {
+    "goober": "2.1.19"
+  },
+  "peerDependencies": {
+    "octane": "workspace:^0.16.0"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "7.29.7",
+    "@babel/preset-react": "7.29.7",
+    "@babel/preset-typescript": "7.29.7",
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/jest-dom": "catalog:default",
+    "@testing-library/react": "16.3.2",
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "babel-jest": "30.4.1",
+    "esbuild": "catalog:default",
+    "jest": "30.4.2",
+    "jest-environment-jsdom": "30.4.1",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "react-hot-toast": "2.6.1",
+    "vitest": "catalog:default"
+  }
+}

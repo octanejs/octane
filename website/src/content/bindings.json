@@ -313,6 +313,11 @@
         "tags": ["positioning", "popovers", "tooltips"]
       },
       {
+        "packageName": "@octanejs/hot-toast",
+        "title": "React Hot Toast",
+        "tags": ["toasts", "notifications", "components"]
+      },
+      {
         "packageName": "@octanejs/image-crop",
         "title": "React Image Crop",
         "tags": ["images", "media"]
