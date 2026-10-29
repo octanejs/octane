@@ -702,6 +702,7 @@ void packedIsWrong;
 export function renderPackedStrictBrowserConsumerTypeProbe() {
 	return `${renderPackedOctaneIsTypeProbe()}
 import { sumTypedPair } from './App.tsrx';
+export { ReactCompat } from 'octane/react';
 import { compileToVolarMappings, compileTypesInspection } from 'octane/compiler/volar';
 import { atom, useAtom } from '@octanejs/jotai';
 import { useSelector } from '@octanejs/redux';

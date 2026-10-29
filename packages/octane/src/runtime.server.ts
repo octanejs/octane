@@ -187,7 +187,13 @@ import {
 import { formatServerError } from './error-codes.server.generated.js';
 import { formAuthoringDiagnostics } from './form-diagnostics.js';
 import { isRendererContext, registerServerRendererContextProvider } from './renderer-bridge.js';
-import { defineRemovedContextMembers, registerContext } from './context-identity.js';
+import {
+	defineRemovedContextMembers,
+	registerContext,
+	type ServerContext as Context,
+	type SSRScope,
+} from './context-identity.js';
+export type { ServerContext as Context, SSRScope } from './context-identity.js';
 import {
 	validateNativeReadWitness,
 	type NativeReadWitness,
@@ -374,12 +380,6 @@ export function mapSlot(receiver: any, method: any, callback?: (...args: any[]) 
 		if (descriptor === undefined || descriptor.get !== undefined) return false;
 	}
 	return true;
-}
-
-export interface SSRScope {
-	parent: SSRScope | null;
-	/** Context Provider values stamped on this scope (lazily allocated). */
-	$$ctxValues: Map<unknown, unknown> | null;
 }
 
 type ParserNamespace = 'html' | 'svg' | 'mathml';
@@ -6772,15 +6772,6 @@ export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 // ---------------------------------------------------------------------------
 // Context
 // ---------------------------------------------------------------------------
-
-// NOTE: unlike the client runtime's Context, there is no `$$version` here — that
-// field drives the client's provider-change invalidation machinery, which has no
-// server analogue (an SSR pass reads each provider value exactly once, top-down).
-export interface Context<T> {
-	(props: { value: T; children?: any }, scope: SSRScope): string;
-	$$kind: typeof CONTEXT_TAG;
-	defaultValue: T;
-}
 
 export function createContext<T>(defaultValue: T): Context<T> {
 	const ctx = function ProviderBody(props, scope) {

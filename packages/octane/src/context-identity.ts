@@ -1,3 +1,18 @@
+import type { CONTEXT_TAG } from './runtime-tags.js';
+
+export interface SSRScope {
+	parent: SSRScope | null;
+	/** Context Provider values stamped on this scope (lazily allocated). */
+	$$ctxValues: Map<unknown, unknown> | null;
+}
+
+/** Server providers read values top-down and need no client version counter. */
+export interface ServerContext<T> {
+	(props: { value: T; children?: any }, scope: SSRScope): string;
+	$$kind: typeof CONTEXT_TAG;
+	defaultValue: T;
+}
+
 // Contexts can cross bundled copies and ESM/CJS loads in the same realm.
 // Share exact identities without accepting copied component metadata.
 const CONTEXT_IDENTITIES = Symbol.for('octane.contextIdentities');
