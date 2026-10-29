@@ -54,7 +54,7 @@
     "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.16.0"
+    "octane": "workspace:^"
   },
   "devDependencies": {
     "octane": "workspace:*",

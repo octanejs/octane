@@ -11,6 +11,10 @@ npm install @octanejs/use-sync-external-store octane
 pnpm add @octanejs/use-sync-external-store octane
 ```
 
+Install it with the Octane release it is published alongside. Earlier releases
+drop `getServerSnapshot` when `useSyncExternalStore` is imported through a
+re-export such as this package's.
+
 ## Usage
 
 ```ts

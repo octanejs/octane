@@ -792,6 +792,7 @@ describe('manifest-declared manual hook slots', () => {
 			'three',
 			'tiptap',
 			'to-print',
+			'use-sync-external-store',
 			'usehooks-ts',
 			'valtio',
 			'vaul',
