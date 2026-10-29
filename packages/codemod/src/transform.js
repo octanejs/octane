@@ -1465,8 +1465,24 @@ class ModuleTransform {
 			return code.slice(0, at) + lines.join('\n') + '\n' + code.slice(at);
 		}
 		this.count(RULE.import);
+		// A module whose only import was `import 'react'` stays a module, or its
+		// `declare module` would declare the module instead of augmenting it.
+		if (lines.length === 0 && !this.otherModuleSyntax()) lines.push('export {};');
 		return code.replace(/\u0000IMPORT(\d+)\u0000(\r?\n)?/g, (_, index, newline) =>
 			index === '0' && lines.length > 0 ? lines.join('\n') + (newline ?? '') : '',
+		);
+	}
+
+	/** Whether the module has an import or export besides its React imports. */
+	otherModuleSyntax() {
+		return this.sf.statements.some(
+			(statement) =>
+				(ts.isImportDeclaration(statement) && !this.importSlots.includes(statement)) ||
+				ts.isImportEqualsDeclaration(statement) ||
+				ts.isExportDeclaration(statement) ||
+				ts.isExportAssignment(statement) ||
+				(ts.canHaveModifiers(statement) &&
+					ts.getModifiers(statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)),
 		);
 	}
 

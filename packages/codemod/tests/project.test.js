@@ -173,6 +173,8 @@ describe('runCodemod', () => {
 				"import type { HTMLAttributes } from 'react';\ndeclare module 'react' {\n\tnamespace JSX {\n\t\tinterface IntrinsicElements { 'x-clock': HTMLAttributes<HTMLElement> }\n\t}\n}\n",
 			'src/css.d.ts':
 				"import 'react';\ndeclare module 'react' {\n\tinterface CSSProperties { [name: `--${string}`]: string }\n}\n",
+			'src/clock.d.ts':
+				"import 'react';\ndeclare module 'react' {\n\tnamespace JSX {\n\t\tinterface IntrinsicElements { 'x-clock': { time?: string } }\n\t}\n}\n",
 			'src/Chart.tsx':
 				"import { Pack } from '@visx/hierarchy';\nimport { Markdown } from '@tanstack/markdown/react';\nimport { createServerFn } from '@tanstack/react-start';\nexport function Chart() {\n\treturn <Pack><Markdown /></Pack>;\n}\n",
 		});
@@ -185,6 +187,12 @@ describe('runCodemod', () => {
 		const css = result.files.find((f) => f.file === 'src/css.d.ts');
 		expect(css?.notes.map((note) => note.rule)).toEqual(['unsupported-api']);
 		expect(css?.diagnostics).toEqual([]);
+		// Without its `import 'react'` the file would be a script, whose `declare
+		// module` replaces the module's types instead of adding to them.
+		expect(css?.code.startsWith("export {};\ndeclare module 'react' {")).toBe(true);
+		expect(
+			code('src/clock.d.ts')?.startsWith("export {};\ndeclare module 'octane/jsx-runtime' {"),
+		).toBe(true);
 		expect(code('src/Chart.tsx')).toContain("from '@octanejs/visx/hierarchy'");
 		expect(code('src/Chart.tsx')).toContain("from '@octanejs/tanstack-start'");
 		expect(result.missing).toEqual(['@tanstack/markdown/react']);
