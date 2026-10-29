@@ -16,12 +16,17 @@ import {
 	Counter,
 	StoreView,
 } from './_fixtures/leaf.tsrx';
+import { ReexportedStoreView } from './_fixtures/reexported-store-view.tsrx';
 
 // SSR Phase 2 — client hydration. Server-render a fixture to HTML, put it in a
 // container, hydrateRoot with the CLIENT component, and assert (1) the DOM is NOT
 // rebuilt (innerHTML unchanged → no mismatch) and (2) interactivity works.
 
 const FIXTURE = join(process.cwd(), 'packages/octane/tests/hydration/_fixtures/leaf.tsrx');
+const REEXPORTED_STORE_FIXTURE = join(
+	process.cwd(),
+	'packages/octane/tests/hydration/_fixtures/reexported-store-view.tsrx',
+);
 
 // Eval the SERVER-compiled fixture module with the server runtime injected
 // (same trick as ssr.test.ts) to get the server component functions.
@@ -314,6 +319,34 @@ describe('hydrateRoot — useSyncExternalStore', () => {
 		drainPassiveEffects();
 		flushSync(() => {});
 		expect((container.querySelector('#sv') as HTMLElement).textContent).toBe('client');
+		root.unmount();
+	});
+
+	it('uses getServerSnapshot when the hook is imported through a re-export', async () => {
+		const store = {
+			subscribe: () => () => {},
+			getSnapshot: () => 'client',
+			getServerSnapshot: () => 'server',
+		};
+		const reexported = loadCompiledFixtureSource(readFileSync(REEXPORTED_STORE_FIXTURE, 'utf8'), {
+			id: 'reexported-store-view.tsrx',
+			mode: 'server',
+			runtimeModules: { './reexported-store.ts': ServerRT },
+		});
+		const { html } = ServerRT.renderToString(reexported.ReexportedStoreView, { store });
+		expect(html).toBe(ServerRT.renderToString(server.StoreView, { store }).html);
+
+		container.innerHTML = html;
+		const span = container.querySelector('#sv');
+		const before = container.innerHTML;
+		const root = hydrateRoot(container, ReexportedStoreView, { store });
+		expect(container.innerHTML).toBe(before);
+		expect(container.querySelector('#sv')).toBe(span);
+
+		flushSync(() => {});
+		drainPassiveEffects();
+		flushSync(() => {});
+		expect(span!.textContent).toBe('client');
 		root.unmount();
 	});
 });

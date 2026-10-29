@@ -149,6 +149,7 @@ for (const name of [
 	'octane-is',
 	'tanstack-router',
 	'three',
+	'use-sync-external-store',
 	'vite-plugin-octane',
 	'rspack-plugin-octane',
 	'rsbuild-plugin-octane',

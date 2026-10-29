@@ -4612,13 +4612,22 @@ export function useSyncExternalStore<T>(
 	// getServerSnapshot?)`. The compiler appends the hook slot as the
 	// LAST argument. Count arguments, including an explicitly passed undefined,
 	// to distinguish an authored server snapshot from the trailing slot without
-	// materializing a rest array on every render.
+	// materializing a rest array on every render. A slot is never a function: a
+	// re-exported hook is called through withSlot, with no trailing slot.
 	const count = arguments.length;
-	let slot = (count > 4 ? arguments[count - 1] : count === 4 ? lastSlot : serverSnapshotOrSlot) as
-		HookSlot | undefined;
+	const getServerSnapshot =
+		typeof serverSnapshotOrSlot === 'function' ? (serverSnapshotOrSlot as () => T) : undefined;
+	let slot = (
+		count > 4
+			? arguments[count - 1]
+			: count === 4
+				? lastSlot
+				: getServerSnapshot
+					? undefined
+					: serverSnapshotOrSlot
+	) as HookSlot | undefined;
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useSyncExternalStore');
-	const getServerSnapshot = count >= 4 ? (serverSnapshotOrSlot as () => T) : undefined;
 	const subs = usesSubslots(slot);
 
 	// Fresh read on every render — the anti-tearing snapshot. DURING HYDRATION the

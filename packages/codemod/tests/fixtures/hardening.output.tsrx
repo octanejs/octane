@@ -1,5 +1,5 @@
 import { useEffect, type MouseEvent as OctaneMouseEvent } from 'octane';
-import * as Tooltip from '@radix-ui/react-tooltip';
+import { Tooltip } from '@octanejs/radix';
 
 // A local helper that shadows nothing at module scope but is named like a hook.
 function useLocalState(useEffect: (fn: () => void) => void) {

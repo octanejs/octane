@@ -19,6 +19,9 @@ import tanstackVirtualAdapted from './packages/tanstack-virtual/tests/vitest.ada
 import tanstackQueryAdaptedSSR from './packages/tanstack-query/tests/vitest.adapted-ssr.config.ts';
 import tanstackQueryAdapted from './packages/tanstack-query/tests/vitest.adapted.config.ts';
 import tanstackQueryDevtoolsAdapted from './packages/tanstack-query-devtools/tests/vitest.adapted.config.ts';
+import useSyncExternalStoreAdapted from './packages/use-sync-external-store/tests/vitest.adapted.config.ts';
+import useSyncExternalStoreAdaptedSSR from './packages/use-sync-external-store/tests/vitest.adapted-ssr.config.ts';
+import useSyncExternalStorePristine from './packages/use-sync-external-store/tests/vitest.pristine.config.ts';
 import nextThemesAdapted from './packages/next-themes/tests/vitest.adapted.config.ts';
 import baseUIAdapted from './packages/base-ui/tests/vitest.config.ts';
 import baseUIUtilsAdapted from './packages/base-ui-utils/tests/vitest.config.ts';
@@ -670,6 +673,17 @@ export default defineConfig({
 			{ ...tanstackQueryAdapted, testExecution: { group: 'react-parity' } },
 			{ ...tanstackQueryAdaptedSSR, testExecution: { group: 'react-parity' } },
 			{ ...tanstackQueryDevtoolsAdapted, testExecution: { group: 'react-parity' } },
+			{ ...useSyncExternalStorePristine, testExecution: { group: 'react-parity' } },
+			{ ...useSyncExternalStoreAdapted, testExecution: { group: 'react-parity' } },
+			{ ...useSyncExternalStoreAdaptedSSR, testExecution: { group: 'react-parity' } },
+			{
+				test: {
+					name: 'use-sync-external-store',
+					include: ['packages/use-sync-external-store/tests/*.test.ts'],
+					environment: 'jsdom',
+				},
+				plugins: [octaneServerFixtures(import.meta.dirname), octane()],
+			},
 			{ ...nextThemesAdapted, testExecution: { group: 'react-parity' } },
 			{
 				testExecution: { group: 'react-parity' },

@@ -32,6 +32,9 @@ function migrate(name) {
 		strictNullChecks: true,
 		unported: (specifier) => (specifier === 'react-hot-toast' ? specifier : null),
 		reactCompat: true,
+		// As the project resolves bindings: Radix's primitives are `@octanejs/radix`.
+		resolveSpecifier: (specifier) =>
+			specifier.startsWith('@radix-ui/react-') ? '@octanejs/radix' : null,
 	});
 	const output = name
 		.replace('.input.', '.output.')
