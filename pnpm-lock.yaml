@@ -1422,6 +1422,7 @@ patchedDependencies:
   '@vitest/browser-playwright@4.1.10': 1957634122dfa6f4790b66e73a42343637af36d3fb182eb25e07fa261dbc27dd
   '@vitest/browser@4.1.10': d32609637593fc211ed808df6fbea6cb1da80adb049c0b0752bda8e1586d0ae0
   '@vitest/mocker@4.1.10': 538740e541a5a8ef50611b521995775cac3031548f696745eb4b90a7bd659ca4
+  esrap@2.3.2: b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e
 
 importers:
 
@@ -7409,7 +7410,7 @@ importers:
         version: 1.7.0
       esrap:
         specifier: ^2.3.2
-        version: 2.3.2
+        version: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
     devDependencies:
       '@tsrx/oxc':
         specifier: catalog:default
@@ -11052,7 +11053,7 @@ importers:
         version: 1.7.0
       esrap:
         specifier: ^2.3.2
-        version: 2.3.2
+        version: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
       nitro:
         specifier: ^3.0.260311-beta
         version: 3.0.260311-beta(chokidar@5.0.0)(dotenv@17.4.2)(idb-keyval@6.3.0)(jiti@2.7.0)(lru-cache@11.5.2)(miniflare@4.20260714.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))(rollup@4.62.3)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))(wrangler@4.112.0(bufferutil@4.1.0)(utf-8-validate@5.0.10))
@@ -48794,7 +48795,7 @@ snapshots:
       '@types/estree': 1.0.9
       '@types/estree-jsx': 1.0.5
       acorn: 8.18.0
-      esrap: 2.3.2
+      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
       get-tsconfig: 5.0.0-beta.6
       magic-string: 0.30.21
       zimmerframe: 1.1.4
@@ -48810,7 +48811,7 @@ snapshots:
       '@types/estree': 1.0.9
       '@types/estree-jsx': 1.0.5
       acorn: 8.18.0
-      esrap: 2.3.2
+      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
       get-tsconfig: 5.0.0-beta.6
       magic-string: 0.30.21
       zimmerframe: 1.1.4
@@ -48904,7 +48905,7 @@ snapshots:
     dependencies:
       '@tsrx/core': 0.5.5(patch_hash=b9b1f2568e7fe143ba6e6fef41c3891e3d032e88af72d8f6ae1c745eb5dd8f50)
       '@tsrx/react-runtime': 0.1.12(react@18.2.0)
-      esrap: 2.3.2
+      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
       react: 18.2.0
       zimmerframe: 1.1.4
     transitivePeerDependencies:
@@ -48914,7 +48915,7 @@ snapshots:
     dependencies:
       '@tsrx/core': 0.5.5(patch_hash=b9b1f2568e7fe143ba6e6fef41c3891e3d032e88af72d8f6ae1c745eb5dd8f50)
       '@tsrx/react-runtime': 0.1.12(react@19.0.0)
-      esrap: 2.3.2
+      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
       react: 19.0.0
       zimmerframe: 1.1.4
     transitivePeerDependencies:
@@ -48924,7 +48925,7 @@ snapshots:
     dependencies:
       '@tsrx/core': 0.5.5(patch_hash=b9b1f2568e7fe143ba6e6fef41c3891e3d032e88af72d8f6ae1c745eb5dd8f50)
       '@tsrx/react-runtime': 0.1.12(react@19.2.3)
-      esrap: 2.3.2
+      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
       react: 19.2.3
       zimmerframe: 1.1.4
     transitivePeerDependencies:
@@ -48934,7 +48935,7 @@ snapshots:
     dependencies:
       '@tsrx/core': 0.5.5(patch_hash=b9b1f2568e7fe143ba6e6fef41c3891e3d032e88af72d8f6ae1c745eb5dd8f50)
       '@tsrx/react-runtime': 0.1.12(react@19.2.7)
-      esrap: 2.3.2
+      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
       react: 19.2.7
       zimmerframe: 1.1.4
     transitivePeerDependencies:
@@ -48944,7 +48945,7 @@ snapshots:
     dependencies:
       '@tsrx/core': 0.5.5(patch_hash=b9b1f2568e7fe143ba6e6fef41c3891e3d032e88af72d8f6ae1c745eb5dd8f50)
       '@tsrx/react-runtime': 0.1.12(react@19.2.8)
-      esrap: 2.3.2
+      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
       react: 19.2.8
       zimmerframe: 1.1.4
     transitivePeerDependencies:
@@ -48954,7 +48955,7 @@ snapshots:
     dependencies:
       '@tsrx/core': 0.5.5(patch_hash=b9b1f2568e7fe143ba6e6fef41c3891e3d032e88af72d8f6ae1c745eb5dd8f50)
       '@tsrx/react-runtime': 0.1.12(react@19.3.0)
-      esrap: 2.3.2
+      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
       react: 19.3.0
       zimmerframe: 1.1.4
     transitivePeerDependencies:
@@ -48964,7 +48965,7 @@ snapshots:
   '@tsrx/ripple@0.2.0(typescript@5.9.3)':
     dependencies:
       '@tsrx/core': 0.2.0
-      esrap: 2.3.2
+      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
       is-reference: 3.0.3
       source-map: 0.7.6
       zimmerframe: 1.1.4
@@ -48995,7 +48996,7 @@ snapshots:
       '@solidjs/web': 2.0.0-rc.14(solid-js@2.0.0-rc.14)
       '@tsrx/core': 0.5.5(patch_hash=b9b1f2568e7fe143ba6e6fef41c3891e3d032e88af72d8f6ae1c745eb5dd8f50)
       '@tsrx/solid-runtime': 0.1.12(@solidjs/web@2.0.0-rc.14(solid-js@2.0.0-rc.14))(solid-js@2.0.0-rc.14)
-      esrap: 2.3.2
+      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
       solid-js: 2.0.0-rc.14
       zimmerframe: 1.1.4
     transitivePeerDependencies:
@@ -49006,7 +49007,7 @@ snapshots:
       '@solidjs/web': 2.0.0-rc.3(solid-js@2.0.0-rc.3)
       '@tsrx/core': 0.5.5(patch_hash=b9b1f2568e7fe143ba6e6fef41c3891e3d032e88af72d8f6ae1c745eb5dd8f50)
       '@tsrx/solid-runtime': 0.1.12(@solidjs/web@2.0.0-rc.3(solid-js@2.0.0-rc.3))(solid-js@2.0.0-rc.3)
-      esrap: 2.3.2
+      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
       solid-js: 2.0.0-rc.3
       zimmerframe: 1.1.4
     transitivePeerDependencies:
@@ -55071,7 +55072,7 @@ snapshots:
     dependencies:
       estraverse: 5.3.0
 
-  esrap@2.3.2:
+  esrap@2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e):
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
 
@@ -65002,7 +65003,7 @@ snapshots:
       clsx: 2.1.1
       devalue: 5.9.2
       esm-env: 1.2.2
-      esrap: 2.3.2
+      esrap: 2.3.2(patch_hash=b245f05179dd63b533cda7380fa1b56adc9dc3c10cbf3a1fcf3699ee7dba1a6e)
       is-reference: 3.0.3
       locate-character: 3.0.0
       magic-string: 0.30.21
