@@ -82,7 +82,7 @@ The process exits with status 1 when any error remains.
 
 A React package with no Octane binding still runs on React, so React stays a
 dependency, and a comment above each import of it says so. When the project
-has React and React DOM 19.2 or newer, a component of that package renders in
+has React and React DOM 19.2 or newer in the React 19 series, a component of that package renders in
 its own React root through `ReactCompat` if its element gives React nothing
 Octane renders: text children and props without elements. The package's hooks
 and contexts, and its components that take Octane children or render

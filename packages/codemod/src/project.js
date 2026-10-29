@@ -94,7 +94,7 @@ export async function runCodemod(paths, options = {}) {
 	/** @type {Map<string, Missing>} */
 	const missing = new Map();
 	// `ReactCompat` hosts a component from a package with no port in a React
-	// 19.2 root.
+	// root, from 19.2 within the React 19 series it supports.
 	const reactCompat = ['react', 'react-dom'].every((name) =>
 		/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(root, name)?.version ?? ''),
 	);

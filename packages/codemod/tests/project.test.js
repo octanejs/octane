@@ -275,9 +275,11 @@ describe('runCodemod', () => {
 			'<ReactCompat><Toaster position="top-right" label="Saved" /></ReactCompat>',
 		);
 		expect([main?.strong, main?.diagnostics]).toEqual([true, []]);
-		// React 18 has no `ReactCompat`.
-		const old = await runCodemod([app('18.3.1')], { write: false });
-		expect(old.missing).toEqual([{ name: 'toast-kit', modules: 2, islands: 0, blocked: 2 }]);
+		// `ReactCompat` needs the React 19 series from 19.2.
+		for (const react of ['18.3.1', '20.0.0']) {
+			const other = await runCodemod([app(react)], { write: false });
+			expect(other.missing).toEqual([{ name: 'toast-kit', modules: 2, islands: 0, blocked: 2 }]);
+		}
 	});
 
 	it('reports TSRX written for React, which it cannot read', async () => {

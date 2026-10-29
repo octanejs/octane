@@ -347,6 +347,8 @@ describe('transformModule', () => {
 		const crossing = '`<Toaster>` takes children or props that Octane renders';
 		for (const [body, message] of [
 			['<Toaster>{children}</Toaster>', crossing],
+			['<Toaster>{children as ReactNode}</Toaster>', crossing],
+			['<Toaster>{(<b />) as any}</Toaster>', crossing],
 			['<Toaster icon={<b />} />', crossing],
 			['<Toaster icon={children} />', crossing],
 			['<Toaster render={row} />', crossing],
@@ -371,7 +373,7 @@ describe('transformModule', () => {
 		});
 		expect([old.code.includes('<ReactCompat>'), old.notes[0].message]).toEqual([
 			false,
-			'`<Toaster>` can render in a `ReactCompat` island only with React and React DOM 19.2 or newer. `toast-kit` has no Octane port.',
+			'`<Toaster>` can render in a `ReactCompat` island only with React and React DOM 19.2 or newer in the React 19 series. `toast-kit` has no Octane port.',
 		]);
 
 		// Through a namespace import too; a function call stays as it is, and a

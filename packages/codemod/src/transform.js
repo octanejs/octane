@@ -31,7 +31,8 @@ import {
  * @property {(specifier: string) => string | null} [unported] the React package
  *   an import specifier names when that package has no Octane port, or null
  * @property {boolean} [reactCompat] the project has React and React DOM 19.2 or
- *   newer, so `ReactCompat` can host an unported package's components
+ *   newer in the React 19 series, so `ReactCompat` can host an unported
+ *   package's components
  *
  * @typedef {Object} Unported A React package with no Octane port, as this
  *   module uses it
@@ -865,7 +866,7 @@ class ModuleTransform {
 				);
 			} else if (!this.options.reactCompat) {
 				block(
-					`\`<${text}>\` can render in a \`ReactCompat\` island only with React and React DOM 19.2 or newer.`,
+					`\`<${text}>\` can render in a \`ReactCompat\` island only with React and React DOM 19.2 or newer in the React 19 series.`,
 				);
 			} else {
 				port.islands++;
@@ -891,12 +892,11 @@ class ModuleTransform {
 	 * @param {ts.JsxElement | ts.JsxSelfClosingElement} element
 	 */
 	hostsInReact(element) {
+		// By type: a cast to `any` or `ReactNode` proves nothing.
 		const text = (/** @type {ts.JsxChild} */ child) =>
 			ts.isJsxText(child) ||
 			(ts.isJsxExpression(child) &&
-				(!child.expression ||
-					isTextSpelling(child.expression) ||
-					textKind(this.typeOf(child.expression)) !== 0));
+				(!child.expression || textKind(this.typeOf(child.expression)) !== 0));
 		if (ts.isJsxElement(element) && !element.children.every(text)) return false;
 		const seen = new Set();
 		/** @type {(node: ts.Node) => boolean} */
