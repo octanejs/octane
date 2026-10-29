@@ -130,6 +130,7 @@ describe('runCodemod', () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',
 			'index.html': '<script type="module" src="/src/main.jsx"></script>',
+			'stress.html': '<script type="module" src="./src/main.jsx"></script>',
 			'src/main.jsx':
 				"import { createRoot } from 'react-dom/client';\nimport { App } from './App';\ncreateRoot(document.body).render(<App />);\n",
 			'src/App.jsx': 'export function App() {\n\treturn <p />;\n}\n',
@@ -141,8 +142,53 @@ describe('runCodemod', () => {
 		]);
 		const read = (/** @type {string} */ name) => fs.readFileSync(path.join(root, name), 'utf8');
 		expect(read('index.html')).toContain('src="/src/main.tsrx"');
+		// Every page of a multi-page app, not only `index.html`.
+		expect(read('stress.html')).toContain('src="./src/main.tsrx"');
 		expect(read('src/main.tsrx')).toMatch(/^\/\/ @ts-nocheck\n/);
 		expect(read('src/main.tsrx')).toContain("import { App } from './App.tsrx';");
+	});
+
+	it('resolves tsconfig path aliases to renamed modules', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'tsconfig.json': '{ "compilerOptions": { "paths": { "~/*": ["./src/*"] } } }',
+			'src/components/Card.tsx': 'export function Card() {\n\treturn <p />;\n}\n',
+			'src/components/index.tsx': "export { Card } from './Card';\n",
+			'src/App.tsx':
+				"import { Card } from '~/components/Card';\nimport * as all from '~/components';\nexport function App() {\n\treturn <Card />;\n}\n",
+		});
+		const result = await runCodemod([root], { write: false });
+		const app = result.files.find((file) => file.file === 'src/App.tsx')?.code;
+		expect(app).toContain("from '~/components/Card.tsrx'");
+		expect(app).toContain("from '~/components/index.tsrx'");
+	});
+
+	it('maps module augmentation, aggregate subpaths, and reports `/react` entries', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'src/router.d2.ts':
+				"declare module '@tanstack/react-router' {\n\tinterface Register { router: unknown }\n}\nexport {};\n",
+			'src/Chart.tsx':
+				"import { Pack } from '@visx/hierarchy';\nimport { Markdown } from '@tanstack/markdown/react';\nimport { createServerFn } from '@tanstack/react-start';\nexport function Chart() {\n\treturn <Pack><Markdown /></Pack>;\n}\n",
+		});
+		const result = await runCodemod([root], { write: false });
+		const code = (/** @type {string} */ name) => result.files.find((f) => f.file === name)?.code;
+		expect(code('src/router.d2.ts')).toContain("declare module '@octanejs/tanstack-router' {");
+		expect(code('src/Chart.tsx')).toContain("from '@octanejs/visx/hierarchy'");
+		expect(code('src/Chart.tsx')).toContain("from '@octanejs/tanstack-start'");
+		expect(result.missing).toEqual(['@tanstack/markdown/react']);
+	});
+
+	it('reports TSRX written for React, which it cannot read', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'src/App.tsrx': "import { useState } from 'react';\nexport function App() @{\n\t<p />\n}\n",
+			'src/Octane.tsrx': "import { useState } from 'octane';\nexport function O() @{\n\t<p />\n}\n",
+		});
+		const result = await runCodemod([root], { write: false });
+		expect(result.files.map((file) => [file.file, file.notes.map((n) => n.rule)])).toEqual([
+			['src/App.tsrx', ['tsrx-react']],
+		]);
 	});
 
 	it('writes nothing in a dry run', async () => {

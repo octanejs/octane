@@ -115,6 +115,127 @@ describe('transformModule', () => {
 		expect(transformModule(row("'b' + x.id"), 'l.tsx').code).toContain('{xs.map((x) =>');
 	});
 
+	it('turns `if (c) return <A />` guards into `@if`/`@else`', () => {
+		const source =
+			'export function Node({ depth, ok }: { depth: number; ok: boolean }) {\n\tconst n = depth * 2;\n\tif (depth > 0) return <div class="n"><Node depth={depth - 1} ok={ok} /></div>;\n\tconst label = \'leaf \' + n;\n\tif (!ok) {\n\t\treturn <b>{label}</b>;\n\t}\n\treturn <span>{label}</span>;\n}\n';
+		const { code } = transformModule(source, 'node.tsx');
+		expect(code).toContain('\tconst n = depth * 2;\n\t@if (depth > 0) {');
+		expect(code).toContain(
+			"} @else {\n\t\tconst label = 'leaf ' + n;\n\t\t@if (!ok) { <b>{label}</b> } @else { <span>{label}</span> }",
+		);
+		expect(code).not.toContain('return');
+		expect(compileErrors(code, 'node.tsrx')).toEqual([]);
+		// A comment before a guard is kept once.
+		const commented = source.replace('\tif (depth > 0)', '\t// Recurse.\n\tif (depth > 0)');
+		expect(transformModule(commented, 'node.tsx').code.match(/\/\/ Recurse\./g)).toHaveLength(1);
+	});
+
+	it('mounts a root by component, not by element', () => {
+		const source = (/** @type {string} */ call) =>
+			`import { createElement, StrictMode } from 'react';\nimport { createRoot, hydrateRoot } from 'react-dom/client';\nimport { renderToString } from 'react-dom/server';\nimport { App } from './App';\nconst root = createRoot(document.body);\n${call};\n`;
+		const render = (/** @type {string} */ call) =>
+			transformModule(source(call), 'main.tsx').code.split('\n').at(-2);
+		expect(render('root.render(<App />)')).toBe('root.render(App);');
+		expect(render('root.render(<StrictMode><App size={2} {...rest} on /></StrictMode>)')).toBe(
+			'root.render(App, { size: 2, ...rest, on: true });',
+		);
+		expect(render('root.render(createElement(App, { depth: 10 }))')).toBe(
+			'root.render(App, { depth: 10 });',
+		);
+		expect(render('createRoot(document.body).render(createElement(App))')).toBe(
+			'createRoot(document.body).render(App);',
+		);
+		expect(render('hydrateRoot(document.body, <App size={2} />)')).toBe(
+			'hydrateRoot(document.body, App, { size: 2 });',
+		);
+		// React's server renderers return the HTML; Octane's return `{ html, css }`.
+		expect(render('renderToString(createElement(App))')).toBe('renderToString(App).html;');
+		expect(render('renderToString(<div />)')).toBe('renderToString(<div />).html;');
+		// A key, a ref, or children keep the element.
+		expect(render('root.render(<App key="a" />)')).toBe('root.render(<App key="a" />);');
+		expect(transformModule(source('root.render(<App />)'), 'main.tsx').code).not.toContain(
+			'StrictMode',
+		);
+	});
+
+	it('lowers `&&` to `@if` through a `const` that holds a comparison', () => {
+		const source =
+			'export function A({ n }: { n: number }) {\n\tconst any = n > 0;\n\tlet some = n > 0;\n\treturn <p>{any && <b />}{some && <i />}</p>;\n}\n';
+		const { code } = transformModule(source, 'a.tsx');
+		expect(code).toContain('@if (any) { <b /> }');
+		// A `let` can be reassigned to a number.
+		expect(code).toContain('{some && <i />}');
+	});
+
+	it('flags React Three Fiber, whose scene belongs in a `.three.tsrx` module', () => {
+		const source =
+			"import { Canvas } from '@react-three/fiber';\nexport function S() {\n\treturn <Canvas><mesh /></Canvas>;\n}\n";
+		expect(transformModule(source, 's.tsx').notes).toMatchObject([
+			{ rule: 'unsupported-api', severity: 'error', line: 1 },
+		]);
+	});
+
+	it("renders a TanStack root shell's document through the router's components", () => {
+		const source =
+			'import { HeadContent } from \'@tanstack/react-router\';\nexport function Shell({ children }: { children: unknown }) {\n\treturn <html lang="en"><head><HeadContent /></head><body>{children as any}</body></html>;\n}\n';
+		const { code } = transformModule(source, 'root.tsx');
+		expect(code).toContain('<Html lang="en"><Head><HeadContent /></Head><Body>');
+		expect(code).toContain("import { Html, Head, Body } from '@octanejs/tanstack-router';");
+		// Outside a router module, `<html>` is the element.
+		expect(
+			transformModule(source.replace('@tanstack/react-router', './x'), 'root.tsx').code,
+		).toContain('<html lang="en">');
+	});
+
+	it('ports providers of a context made on either branch, and providers read as values', () => {
+		const source =
+			"import { createContext } from 'react';\nconst C = DEV ? createContext(1) : createContext(2);\nexport const P = C.Provider;\nexport function A() {\n\treturn <C.Provider value={1}><i /></C.Provider>;\n}\n";
+		const { code } = transformModule(source, 'c.tsx');
+		expect(code).toContain('export const P = C;');
+		expect(code).toContain('<C value={1}><i /></C>');
+	});
+
+	it('imports a React name read only in types as a type', () => {
+		const source =
+			"import { ReactNode, useState } from 'react';\nexport function A({ c }: { c: ReactNode }) {\n\tconst [n] = useState(0);\n\treturn <p>{c}{n}</p>;\n}\n";
+		expect(transformModule(source, 'a.tsx').code).toContain(
+			"import { type ReactNode, useState } from 'octane';",
+		);
+	});
+
+	it('keeps a `.map()` whose row writes an outer variable', () => {
+		const source =
+			'export function A({ xs }: { xs: string[] }) {\n\tlet n = 0;\n\treturn <ul>{xs.map((x) => { const i = n++; return <li key={x}>{i}</li>; })}</ul>;\n}\n';
+		expect(transformModule(source, 'a.tsx').code).toContain('{xs.map((x) => {');
+	});
+
+	it('keeps `//` and `/*` in element text as text', () => {
+		const source = 'export function A() {\n\treturn <p>see .changeset/*.md, a // b</p>;\n}\n';
+		const { code } = transformModule(source, 'a.tsx');
+		expect(code).toContain("<p>see .changeset{'/'}*.md, a {'/'}/ b</p>");
+		expect(compileErrors(code, 'a.tsrx')).toEqual([]);
+	});
+
+	it('guards a render-prop `children` call against a compiled children block', () => {
+		const source =
+			"export function R({ children, v }: { children: any; v: number }) {\n\treturn <p>{typeof children === 'function' ? children(v) : children}</p>;\n}\n";
+		const { code } = transformModule(source, 'r.tsx');
+		expect(code).toContain(
+			"(typeof children === 'function' && !isChildrenBlock(children)) ? children(v) : children",
+		);
+		expect(code).toContain("import { isChildrenBlock } from 'octane';");
+		const again = transformModule(code, 'r.tsrx').code;
+		expect(again.match(/isChildrenBlock\(/g)).toHaveLength(1);
+	});
+
+	it('flags `flushSync`, whose passive effects stay queued in Octane', () => {
+		const source =
+			"import { flushSync } from 'react-dom';\nexport function go(f: () => void) {\n\tflushSync(f);\n}\n";
+		expect(transformModule(source, 'go.ts').notes).toMatchObject([
+			{ rule: 'flush-sync', severity: 'warning', line: 3 },
+		]);
+	});
+
 	it('leaves a module already migrated untouched', () => {
 		for (const input of INPUTS) {
 			const { result, output } = migrate(input);
@@ -246,5 +367,15 @@ describe('strengthen', () => {
 		// Blockers point at the written file, which no longer has the directive.
 		const line = result.code.split('\n').findIndex((l) => l.includes('dangerouslySetInnerHTML'));
 		expect(result.blockers.map((b) => b.line)).toEqual([line + 1]);
+	});
+
+	it('leaves no blank line where the directive was in a module from JavaScript', async () => {
+		const compiler = await loadCompiler(import.meta.dirname);
+		const body =
+			'export function Raw({ html }) {\n\treturn <div dangerouslySetInnerHTML={{ __html: html }} />;\n}\n';
+		const { code } = transformModule(body, 'raw.jsx', { strong: true });
+		expect(code.startsWith('// @ts-nocheck\n"use strong";\nexport')).toBe(true);
+		const result = strengthen(compiler, code, path.join(FIXTURES, 'raw.tsrx'));
+		expect(result.code.startsWith('// @ts-nocheck\nexport function Raw')).toBe(true);
 	});
 });
