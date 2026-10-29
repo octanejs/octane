@@ -140,11 +140,21 @@ export const REACT_MODULES = {
 	'react-dom/client': 'octane',
 	'react-dom/server': 'octane/server',
 	'react-dom/server.browser': 'octane/server',
+	'react-dom/server.bun': 'octane/server',
+	'react-dom/server.edge': 'octane/server',
 	'react-dom/server.node': 'octane/server',
 	'react-dom/test-utils': 'octane',
 	'react/jsx-runtime': 'octane/jsx-runtime',
 	'react/jsx-dev-runtime': 'octane/jsx-dev-runtime',
 };
+
+/**
+ * React framework packages an Octane framework integration serves. They are
+ * not bindings, so the shared binding catalog leaves them out.
+ */
+export const FRAMEWORK_PACKAGES = /** @type {Record<string, string>} */ ({
+	'@tanstack/react-start': '@octanejs/tanstack-start',
+});
 
 /**
  * React values with no Octane export, each with what to do instead. A value

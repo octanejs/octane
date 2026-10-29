@@ -8,7 +8,8 @@ benchmark run (2026-10-28) measures the output's speed, and the text-hole rule
 it called for has landed. The weather and chat benchmark apps migrate and pass
 their harnesses, and the three codemod defects they found are fixed. Every
 module that had JSX now becomes TSRX, so none is left as `.tsx` outside Strong
-mode. This plan takes it
+mode. Every other React app in the repo has been migrated and checked against
+its own harness (2026-10-29, below). This plan takes it
 from a working prototype to a migration tool we can point at any React app.
 
 ## Goal
@@ -262,6 +263,63 @@ What the hand-edited copies needed beyond those:
   render; fixed by hand, it compiled Strong. It did not flag three impure calls
   into `data.js` (an updater, a module cursor, a cache), which cross a module
   boundary.
+
+### Every React app in the repo
+
+The React variants of 17 more benchmark apps, migrated from `868ee70aaa` and
+run through each app's own harness (2026-10-29, six runs in parallel, so
+timings are indicative). The React-hosted apps (`examples/harbor`,
+`examples/storybook`, `react-hosted-islands`, `streamdown-hosted`) host Octane
+inside React by design and were left alone.
+
+| Apps | Result |
+| --- | --- |
+| todomvc, uibench, dbmon, recursive-context | pass as emitted; with the fixes below, each matches its TSRX variant in size and speed |
+| memo-wall, effectful-list, signal-favoring, portal-swarm | pass as emitted |
+| async-composition, async-waterfall, spa-navigation, svg-dashboard | pass as emitted |
+| news, bundle-size app shell, tauri-shell | pass after the HTML and `renderToString` fixes |
+| three (React Three Fiber) | fails as emitted: the scene needs a `.three.tsrx` module by hand, now reported |
+| ssr-workerd, tanstack-start | server-render and pass after binding and config fixes |
+| tanstack-com (613 modules) | builds and hydrates 7 routes with 0 errors after 13 hand fixes, most now in the codemod: 0 compile errors and 228/337 Strong |
+
+Codemod defects found, all fixed with tests:
+
+- An early `return <A />` rendered through runtime descriptors: guards now
+  become `@if`/`@else` (recursive-context mount 1.9× → 1.03×; 6,142 comment
+  nodes → 0 in spa-navigation).
+- `root.render(<App />)`, `root.render(createElement(App, props))` and
+  `hydrateRoot(c, <App />)` kept the generic element renderer (7–21 kB gzip per
+  app); they now mount `App` directly.
+- `renderToString` returned `{ html, css }` where React code expects a string;
+  `.html` is added.
+- `const any = n > 0; {any && <b />}` stayed a hole (12.8 kB in todomvc).
+- Only `index.html` was updated; every page is now, and `~/` alias imports get
+  `.tsrx` like relative ones.
+- `react-dom/server.edge` and `@tanstack/react-start` had no mapping.
+- The TanStack document shell kept `<html>`, so nothing hydrated; it now uses
+  the router's `Html`/`Head`/`Body`.
+- Two provider shapes (a context made on either branch, `C.Provider` as a
+  value), type-only React imports emitted as values, a `.map()` with an outer
+  `n++` turned into `@for`, `/*` in element text read as a comment, and
+  `typeof children === 'function'` without `isChildrenBlock`.
+- `flushSync` and React Three Fiber are now reported; `@tsrx/react` files are
+  reported instead of skipped.
+
+Still open, owned elsewhere:
+
+- **Compiler:** `root.render(<App />)` through a variable or `flushSync`, and
+  `memo` around a local component, lose component-slot proofs (13–23 kB); a
+  template `@if` can make hydration fall back to a client render with no
+  diagnostic; `.tsrx` keeps imports of type-only names; an `@for` row writing an
+  enclosing `let` compiles without a diagnostic; Strong renders a `useState`
+  component through a lite slot that re-runs its ancestors (1.4–1.5×).
+- **Bindings:** TanStack `Await` always installs a boundary, `StartClient` takes
+  `{ router }` where React's takes nothing, and deferred content never reveals
+  under a raw `<html>` root; Radix `asChild` cannot clone template children.
+- **CLI:** `octane init` should add `**/*.tsrx` to a tsconfig `include`.
+- **Codemod, later:** an early `return items.map(…)` is not lowered; `.jsx`
+  holes stay bare without types; class components; `@radix-ui/react-*` and
+  upstream adapters (`@tanstack/react-hotkeys`) are not in the catalog.
 
 ## Workstreams
 
