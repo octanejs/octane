@@ -246,6 +246,35 @@ describe('runCodemod', () => {
 		expect(theme?.diagnostics).toEqual([]);
 	});
 
+	it('maps @effect/atom-react to its binding', async () => {
+		// T3 Code's shapes: a registry provider built with createElement, and a
+		// query hook that reads the registry and refreshes atoms.
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'src/atomRegistry.ts':
+				"import { RegistryContext } from '@effect/atom-react';\nimport { AtomRegistry } from 'effect/reactivity';\nimport { createElement } from 'react';\n\nexport const appAtomRegistry = AtomRegistry.make();\n\nexport function AppAtomRegistryProvider({ children }: React.PropsWithChildren) {\n\treturn createElement(RegistryContext.Provider, { value: appAtomRegistry }, children);\n}\n",
+			'src/query.ts':
+				"import { RegistryContext, useAtomRefresh, useAtomValue } from '@effect/atom-react';\nimport { Atom } from 'effect/reactivity';\nimport { useContext } from 'react';\n\nexport function useQuery<A>(atom: Atom.Atom<A>) {\n\tconst registry = useContext(RegistryContext);\n\tconst value = useAtomValue(atom);\n\tconst refresh = useAtomRefresh(atom);\n\treturn { registry, value, refresh };\n}\n",
+		});
+		const result = await runCodemod([root], { write: false });
+		const provider = result.files.find((file) => file.file === 'src/atomRegistry.ts');
+		const query = result.files.find((file) => file.file === 'src/query.ts');
+		expect(provider?.code).toContain("import { RegistryContext } from '@octanejs/effect-atom';");
+		expect(provider?.code).toContain(
+			'return createElement(RegistryContext, { value: appAtomRegistry }, children);',
+		);
+		expect(query?.code).toContain(
+			"import { RegistryContext, useAtomRefresh, useAtomValue } from '@octanejs/effect-atom';",
+		);
+		for (const file of [provider, query]) {
+			expect(file?.code).not.toContain("'@effect/atom-react'");
+			expect(file?.code).not.toContain('No Octane port');
+			expect(file?.diagnostics).toEqual([]);
+		}
+		expect(result.packages).toEqual([{ from: '@effect/atom-react', to: '@octanejs/effect-atom' }]);
+		expect(result.missing).toEqual([]);
+	});
+
 	it('imports each Radix primitive package as its namespace of `@octanejs/radix`', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',

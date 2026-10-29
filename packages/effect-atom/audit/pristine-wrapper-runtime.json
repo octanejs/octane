@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "effect-atom-pristine",
+  "roots": ["packages/effect-atom/tests"],
+  "files": ["packages/effect-atom/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:c2f53bcf6e4a7b9b",
+      "file": "packages/effect-atom/tests/upstream-original.test.ts",
+      "fullName": "runs all pinned effect-atom runtime registrations unchanged"
+    }
+  ],
+  "snapshots": 0
+}

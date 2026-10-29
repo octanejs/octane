@@ -1,0 +1,313 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/Effect-TS/effect.git",
+    "version": "4.1.0",
+    "commit": "9a91b1926a5fbfaffd302a7a41a94d4d53a1154e",
+    "sourceRoot": "packages/atom/react/src",
+    "testRoot": "packages/atom/react/test",
+    "license": "MIT",
+    "integrity": "sha256:045118ccc6a1d0e11c97879bfc8dfdd6a84c80becb871a2e4d2ea7aa96156210",
+    "verification": "verified"
+  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "materializedTests": "packages/effect-atom",
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/effect-atom/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/effect-atom/tests/upstream"],
+      "include": ["\\.test\\.tsx$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 28,
+    "uniqueIdentities": 28,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@12.9.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "1e8df133771afaf7bb9ff08ee2e8171d63df16150bdb5ef1f70c649a1855a031"
+    }
+  },
+  "lanes": [
+    {
+      "id": "effect-atom-pristine-full",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "effect-atom-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 28 pinned runtime registrations unchanged against React.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/effect-atom/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/effect-atom/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "94a50ade64e4fac2c4c5aa149a7a925ebd052d12b4303a206c21dc4e4507f301"
+        },
+        {
+          "path": "packages/effect-atom/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "12a95696c7ad47b7b5b0cbb392fbe645a817ec85b2f3a2814628cf8122664552"
+        },
+        {
+          "path": "packages/effect-atom/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "1b8a6f91be32602c2848178df5d7e8e2e2e749baee1cf05512e2015dd3905a06"
+        },
+        {
+          "path": "packages/effect-atom/audit/upstream-patches/tests/upstream/index.test.tsx.patch",
+          "role": "support",
+          "sha256": "27e907cad2b99587b656b149cf479a0fd77f148e3da09b81ada5104a57eb26e6"
+        },
+        {
+          "path": "packages/effect-atom/audit/provenance.json",
+          "role": "support",
+          "sha256": "99f315bfc767c44f9e09015ab2f910b6875ab2e26f687049b9d7017520983a94"
+        },
+        {
+          "path": "packages/effect-atom/audit/registrations.json",
+          "role": "support",
+          "sha256": "b676fdc6eddd53451bb62ff43e4ec179e7c32c0d4ade5223b9b20015c93ea563"
+        },
+        {
+          "path": "packages/effect-atom/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "8ff55766888e749a1173155388a0e21c61826329c29df411b2a06507a5565c3d"
+        },
+        {
+          "path": "packages/effect-atom/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "f2f162fbabdf82b259adf392475cbd38f2f0c0e2b81c180c939ca9a3ac5c3974"
+        },
+        {
+          "path": "packages/effect-atom/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "1174d75855a4257b5b7e4063f7b29f8fd9cb85e5b74c2fda2505c7c0af3e2034"
+        },
+        {
+          "path": "packages/effect-atom/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "a2ac0fc21f4b3127aead9ab2f91d2c57a16fbe2c9571c0da47e5bf792adce00d"
+        },
+        {
+          "path": "packages/effect-atom/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "198413caf9114a6ac654587c3a770a280626bd91b9ab62804263588d0fc7833a"
+        },
+        {
+          "path": "scripts/react-parity/effect-atom-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "88ed96d147f1e2d72b75d2f074cb4d7c0f5facf4dac94958b6e0d11e31c741bf"
+        },
+        {
+          "path": "scripts/react-parity/pristine-suite-lib.mjs",
+          "role": "support",
+          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
+        }
+      ]
+    },
+    {
+      "id": "effect-atom-adapted-full",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "effect-atom-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 28 pinned runtime registrations against Octane; only the four SSR cases carry a patch.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/effect-atom/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/effect-atom/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "c02cd2a2c8c05e0028a4052d56253ae77c17762ce80dc3ac24bb20f8f757773e"
+        },
+        {
+          "path": "packages/effect-atom/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "1b8a6f91be32602c2848178df5d7e8e2e2e749baee1cf05512e2015dd3905a06"
+        },
+        {
+          "path": "packages/effect-atom/audit/upstream-patches/tests/upstream/index.test.tsx.patch",
+          "role": "support",
+          "sha256": "27e907cad2b99587b656b149cf479a0fd77f148e3da09b81ada5104a57eb26e6"
+        },
+        {
+          "path": "packages/effect-atom/audit/provenance.json",
+          "role": "support",
+          "sha256": "99f315bfc767c44f9e09015ab2f910b6875ab2e26f687049b9d7017520983a94"
+        },
+        {
+          "path": "packages/effect-atom/audit/registrations.json",
+          "role": "support",
+          "sha256": "b676fdc6eddd53451bb62ff43e4ec179e7c32c0d4ade5223b9b20015c93ea563"
+        },
+        {
+          "path": "packages/effect-atom/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "8ff55766888e749a1173155388a0e21c61826329c29df411b2a06507a5565c3d"
+        },
+        {
+          "path": "packages/effect-atom/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "f2f162fbabdf82b259adf392475cbd38f2f0c0e2b81c180c939ca9a3ac5c3974"
+        },
+        {
+          "path": "packages/effect-atom/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "f9f2df528f98c0f14fb787b83e7eef3a7bf639e02d887421bace9fcb19d3458b"
+        },
+        {
+          "path": "packages/effect-atom/tests/adapted-setup.ts",
+          "role": "support",
+          "sha256": "8d56636f15645a1af1cfe6b13b746be3774e2fb30c71a092caa387761965a92f"
+        },
+        {
+          "path": "packages/effect-atom/tests/_server.ts",
+          "role": "support",
+          "sha256": "4bbf81bae50bddb873a34a584d1e1ba4c9ee798e6954da4efb0edbef52cd316f"
+        },
+        {
+          "path": "packages/effect-atom/tests/_fixtures/server.tsx",
+          "role": "support",
+          "sha256": "b7ee73221514508449722b2bdafaec15a6f9da2c4855b13b0b82092ef4e84802"
+        }
+      ]
+    },
+    {
+      "id": "effect-atom-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "effect-atom-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Drives the pinned React @effect/atom-react and the Octane port through the same steps for the hooks and provider the upstream suite does not exercise, and compares rendered text, returned setters and promises, and registry lifecycle after each.",
+      "files": [
+        {
+          "path": "packages/effect-atom/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "6a2a4326f14e8bdc10782ef818bc3fed7387415fd3c92807c430d56150cb2587",
+          "cases": [
+            {
+              "id": "differential:effect-atom-use-atom",
+              "testName": "useAtom renders the value and writes values and updaters",
+              "fullName": "@octanejs/effect-atom against @effect/atom-react 4.1.0 useAtom renders the value and writes values and updaters"
+            },
+            {
+              "id": "differential:effect-atom-use-atom-set-promise",
+              "testName": "useAtomSet resolves promise and promiseExit writes with the next settled result",
+              "fullName": "@octanejs/effect-atom against @effect/atom-react 4.1.0 useAtomSet resolves promise and promiseExit writes with the next settled result"
+            },
+            {
+              "id": "differential:effect-atom-use-atom-mount",
+              "testName": "useAtomMount keeps an atom built while mounted and releases it after unmount",
+              "fullName": "@octanejs/effect-atom against @effect/atom-react 4.1.0 useAtomMount keeps an atom built while mounted and releases it after unmount"
+            },
+            {
+              "id": "differential:effect-atom-use-atom-refresh",
+              "testName": "useAtomRefresh reruns the atom and rerenders its readers",
+              "fullName": "@octanejs/effect-atom against @effect/atom-react 4.1.0 useAtomRefresh reruns the atom and rerenders its readers"
+            },
+            {
+              "id": "differential:effect-atom-use-atom-subscribe",
+              "testName": "useAtomSubscribe calls back for changes, immediately when asked, until unmount",
+              "fullName": "@octanejs/effect-atom against @effect/atom-react 4.1.0 useAtomSubscribe calls back for changes, immediately when asked, until unmount"
+            },
+            {
+              "id": "differential:effect-atom-use-atom-initial-values",
+              "testName": "useAtomInitialValues seeds each atom once per registry",
+              "fullName": "@octanejs/effect-atom against @effect/atom-react 4.1.0 useAtomInitialValues seeds each atom once per registry"
+            },
+            {
+              "id": "differential:effect-atom-atom-ref-prop",
+              "testName": "useAtomRefProp memoizes the property ref and useAtomRefPropValue follows it",
+              "fullName": "@octanejs/effect-atom against @effect/atom-react 4.1.0 useAtomRefProp memoizes the property ref and useAtomRefPropValue follows it"
+            },
+            {
+              "id": "differential:effect-atom-registry-provider",
+              "testName": "RegistryProvider seeds a registry it owns and disposes it 500 ms after unmount",
+              "fullName": "@octanejs/effect-atom against @effect/atom-react 4.1.0 RegistryProvider seeds a registry it owns and disposes it 500 ms after unmount"
+            },
+            {
+              "id": "differential:effect-atom-use-atom-suspense",
+              "testName": "useAtomSuspense suspends while initial, and while waiting when asked, then returns the result",
+              "fullName": "@octanejs/effect-atom against @effect/atom-react 4.1.0 useAtomSuspense suspends while initial, and while waiting when asked, then returns the result"
+            }
+          ]
+        },
+        {
+          "path": "packages/effect-atom/tests/_fixtures/probes.tsrx",
+          "role": "support",
+          "sha256": "0acab30ca00f80a9970854ea74b71394375984fda15c03d374122ec15db2a3aa"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "scheduler",
+      "caseIds": [
+        "ordinary:effect-atom-schedule-task-order",
+        "ordinary:effect-atom-schedule-task-cancel"
+      ],
+      "ordinaryEvidence": [
+        {
+          "id": "ordinary:effect-atom-schedule-task-order",
+          "path": "packages/effect-atom/tests/scheduleTask.test.ts",
+          "sha256": "4cb8488e6142312090566784f4b572a3523a92d795dba3cf67756a7565246c44",
+          "testName": "runs each task in a later host task, in the order they were scheduled",
+          "fullName": "scheduleTask runs each task in a later host task, in the order they were scheduled"
+        },
+        {
+          "id": "ordinary:effect-atom-schedule-task-cancel",
+          "path": "packages/effect-atom/tests/scheduleTask.test.ts",
+          "sha256": "4cb8488e6142312090566784f4b572a3523a92d795dba3cf67756a7565246c44",
+          "testName": "skips a task cancelled before it runs",
+          "fullName": "scheduleTask skips a task cancelled before it runs"
+        }
+      ],
+      "upstreamResult": "scheduleTask queues registry work as a React Scheduler task at LowPriority, which Scheduler delivers in a MessageChannel message (setImmediate on Node).",
+      "octaneResult": "scheduleTask posts the task in its own MessageChannel message (setTimeout where MessageChannel is absent): later than the current task and its microtasks, in order, and cancellable.",
+      "rationale": "Octane has no Scheduler package; its own scheduler is not a public task queue. Registry work needs only an unclamped, cancellable later task.",
+      "classification": "scheduler",
+      "consumerImpact": "Registry work no longer yields to React Scheduler's higher-priority tasks, which Octane apps do not have. Custom scheduleTask options passed to RegistryProvider are used as before.",
+      "migrationGuidance": "None.",
+      "owner": "@octanejs/effect-atom",
+      "reviewCondition": "Review if Octane exposes a public low-priority task API."
+    },
+    {
+      "id": "renderer-test-harness",
+      "caseIds": [
+        "runtime:0890afaf1fe887d5",
+        "runtime:7a18eeadc2c2c97c",
+        "runtime:dd87b2147b1a0b47",
+        "runtime:ddd79a67d7090feb"
+      ],
+      "upstreamResult": "The SSR cases server-render the test file's own components with react-dom/server and compare innerHTML with React's Suspense markers.",
+      "octaneResult": "The server half renders server-compiled twins of the same components (tests/_fixtures/server.tsx), and the innerHTML comparisons drop comments. Every value, recoverable-error and hydration assertion is upstream.",
+      "rationale": "One Octane test module compiles for either the client or the server, not both, and Octane's hydration comments are not React's.",
+      "classification": "renderer-test-harness",
+      "consumerImpact": "None: the server snapshot, hydration lock and SSR effect behavior are preserved.",
+      "migrationGuidance": "None.",
+      "owner": "@octanejs/effect-atom",
+      "reviewCondition": "Review when the upstream SSR cases change."
+    }
+  ]
+}

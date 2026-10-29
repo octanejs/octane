@@ -24,6 +24,7 @@ import useSyncExternalStoreAdapted from './packages/use-sync-external-store/test
 import useSyncExternalStoreAdaptedSSR from './packages/use-sync-external-store/tests/vitest.adapted-ssr.config.ts';
 import useSyncExternalStorePristine from './packages/use-sync-external-store/tests/vitest.pristine.config.ts';
 import nextThemesAdapted from './packages/next-themes/tests/vitest.adapted.config.ts';
+import effectAtomAdapted from './packages/effect-atom/tests/vitest.adapted.config.ts';
 import baseUIAdapted from './packages/base-ui/tests/vitest.config.ts';
 import baseUIUtilsAdapted from './packages/base-ui-utils/tests/vitest.config.ts';
 import baseUIPristine from './packages/base-ui/tests/vitest.pristine.config.ts';
@@ -705,6 +706,28 @@ export default defineConfig({
 				},
 				plugins: [octane({ requireDirective: true })],
 				resolve: { dedupe: ['octane', 'react', 'react-dom'] },
+			},
+			{ ...effectAtomAdapted, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'effect-atom-pristine',
+					include: ['packages/effect-atom/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'effect-atom-differential',
+					include: ['packages/effect-atom/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane({ requireDirective: true })],
+				resolve: { dedupe: ['octane', 'react', 'react-dom', 'effect'] },
+				// The pinned upstream/tsconfig.json extends a file outside the pin.
+				oxc: { tsconfig: false },
 			},
 			{
 				testExecution: { group: 'react-parity' },
@@ -2319,6 +2342,17 @@ export default defineConfig({
 				},
 				plugins: [octane()],
 				resolve: { dedupe: ['octane'] },
+			},
+			{
+				test: {
+					name: 'effect-atom',
+					include: ['packages/effect-atom/tests/*.test.ts'],
+					exclude: ['packages/effect-atom/tests/upstream-original.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: { dedupe: ['octane', 'effect'] },
 			},
 			{
 				test: {
