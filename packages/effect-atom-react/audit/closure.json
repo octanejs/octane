@@ -1,0 +1,63 @@
+{
+  "runtimeDependencies": ["effect", "octane"],
+  "adaptedSources": [
+    {
+      "packageName": "@effect/atom-react",
+      "paths": [
+        "src/Hooks.tsrx",
+        "src/ReactHydration.tsrx",
+        "src/RegistryContext.tsrx",
+        "src/ScopedAtom.tsrx",
+        "src/index.ts"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "package.json",
+      "origin": "authored",
+      "sha256": "2029abc941a512cbe2eba17f31d70127cc09ca077715815b4a5d2a1b974d4ec1"
+    },
+    {
+      "path": "src/Hooks.tsrx",
+      "origin": "adapted",
+      "packageName": "@effect/atom-react",
+      "sha256": "05a5c56fb2e730e25a5412e37d5aa0decf549c04598adcf19189eecf8260227a"
+    },
+    {
+      "path": "src/ReactHydration.tsrx",
+      "origin": "adapted",
+      "packageName": "@effect/atom-react",
+      "sha256": "a3988265144ac96ffb2d511a5ecd737ef89c408487382ce76f6cc7ac4091643b"
+    },
+    {
+      "path": "src/RegistryContext.tsrx",
+      "origin": "adapted",
+      "packageName": "@effect/atom-react",
+      "sha256": "651f9c2a6f8071543c07f16ea75c58b7e5c22d45884771ab151bffc699c2dcc8"
+    },
+    {
+      "path": "src/ScopedAtom.tsrx",
+      "origin": "adapted",
+      "packageName": "@effect/atom-react",
+      "sha256": "2b623e53f912029fd6d4d554aebb60d9b1650b8f38e303ea12e9ac301587214c"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "packageName": "@effect/atom-react",
+      "sha256": "d99bddb4053964794d138e1fb150b7c0e223ca2c057b2b948ee62b0c411bb78b"
+    }
+  ],
+  "reimplementedDependencies": [
+    {
+      "packageName": "scheduler",
+      "publicBehaviors": [
+        "A low-priority task scheduled with unstable_scheduleCallback runs in a later host task, after the current task and its microtasks.",
+        "Tasks run in the order they were scheduled.",
+        "unstable_cancelCallback prevents a task that has not run yet."
+      ],
+      "localEvidence": ["tests/scheduleTask.test.ts"]
+    }
+  ]
+}

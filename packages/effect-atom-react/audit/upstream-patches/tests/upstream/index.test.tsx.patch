@@ -1,0 +1,99 @@
+diff --git a/tests/upstream/index.test.tsx b/tests/upstream/index.test.tsx
+--- a/tests/upstream/index.test.tsx
++++ b/tests/upstream/index.test.tsx
+@@ -11,7 +11,7 @@ import * as Schema from "effect/Schema"
+ import * as React from "octane"
+ import { Suspense } from "octane"
+ import * as ReactDOMClient from "octane"
+-import { renderToString } from "octane/server"
++import { renderToString, Server, withoutComments } from "../_server"
+ import { ErrorBoundary } from "@octanejs/react-error-boundary"
+ import { beforeEach, describe, expect, it, test, vi } from "vitest"
+ import {
+@@ -760,7 +760,10 @@ describe("atom-react", { concurrent: false }, () => {
+         return <TestComponent />
+       }
+ 
+-      const ssrHtml = renderToString(<App />)
++      // OCTANE DIVERGENCE[renderer-test-harness]: client-compiled test components
++      // cannot render on the server, so their server-compiled twins in
++      // _fixtures/server.tsx do.
++      const ssrHtml = renderToString(Server.ssrByDefault(counterAtom).App)
+ 
+       expect(getCount).toHaveBeenCalled()
+       expect(ssrHtml).toContain("0")
+@@ -797,11 +800,11 @@ describe("atom-react", { concurrent: false }, () => {
+       }
+ 
+       const container = document.createElement("div")
+-      container.innerHTML = renderToString(
+-        <RegistryContext value={AtomRegistry.make()}>
+-          <App Panel={Passthrough} />
+-        </RegistryContext>
+-      )
++      // OCTANE DIVERGENCE[renderer-test-harness]: client-compiled test components
++      // cannot render on the server, so their server-compiled twins in
++      // _fixtures/server.tsx do.
++      const server = Server.delayedBoundary(userAtom)
++      container.innerHTML = renderToString(server.App, { Panel: server.Passthrough }, AtomRegistry.make())
+       document.body.append(container)
+ 
+       // The panel stays dehydrated until its lazy chunk loads.
+@@ -831,8 +834,10 @@ describe("atom-react", { concurrent: false }, () => {
+       })
+ 
+       expect(recoverableErrors).toEqual([])
+-      expect(container.innerHTML).toBe(
+-        `<div><span id="header">ALICE</span><!--$--><span id="panel">ALICE</span><!--/$--></div>`
++      // OCTANE DIVERGENCE[renderer-test-harness]: Octane's hydration comments
++      // differ from React's, so the comparisons drop comments.
++      expect(withoutComments(container.innerHTML)).toBe(
++        `<div><span id="header">ALICE</span><span id="panel">ALICE</span></div>`
+       )
+ 
+       act(() => root.unmount())
+@@ -851,7 +856,11 @@ describe("atom-react", { concurrent: false }, () => {
+           <Name />
+         </RegistryContext>
+       )
+-      const html = renderToString(app)
++      // OCTANE DIVERGENCE[renderer-test-harness]: client-compiled test components
++      // cannot render on the server, so their server-compiled twins in
++      // _fixtures/server.tsx do.
++      const server = Server.lastReader(userAtom)
++      const html = renderToString(server.Name, {}, registry)
+       const containers = [0, 1, 2].map(() => {
+         const container = document.createElement("div")
+         container.innerHTML = html
+@@ -882,7 +891,9 @@ describe("atom-react", { concurrent: false }, () => {
+       })
+ 
+       expect(recoverableErrors).toEqual([])
+-      expect(containers[2].innerHTML).toBe("<span>Alice</span>")
++      // OCTANE DIVERGENCE[renderer-test-harness]: Octane's hydration comments
++      // differ from React's, so the comparisons drop comments.
++      expect(withoutComments(containers[2].innerHTML)).toBe("<span>Alice</span>")
+ 
+       // Once no reader is subscribed, server renders read the registry again.
+       act(() => {
+@@ -891,7 +902,7 @@ describe("atom-react", { concurrent: false }, () => {
+       })
+       containers.forEach((container) => container.remove())
+ 
+-      expect(renderToString(app)).toBe("<span>Alice</span>")
++      expect(withoutComments(renderToString(server.Name, {}, registry))).toBe("<span>Alice</span>")
+     })
+   })
+ 
+@@ -912,7 +923,10 @@ describe("atom-react", { concurrent: false }, () => {
+       return <TestComponent />
+     }
+ 
+-    const ssrHtml = renderToString(<App />)
++    // OCTANE DIVERGENCE[renderer-test-harness]: client-compiled test components
++    // cannot render on the server, so their server-compiled twins in
++    // _fixtures/server.tsx do.
++    const ssrHtml = renderToString(Server.serverValueInitial(userDataAtom).App)
+ 
+     expect(mockFetchData).not.toHaveBeenCalled()
+     expect(ssrHtml).toContain("Initial")

@@ -18,6 +18,10 @@ export const runners = new Map([
 	['jotai', { module: './jotai-pristine-runtime.mjs', label: 'Jotai' }],
 	['next-themes', { module: './next-themes-pristine-runtime.mjs', label: 'next-themes' }],
 	[
+		'effect-atom-react',
+		{ module: './effect-atom-react-pristine-runtime.mjs', label: '@effect/atom-react' },
+	],
+	[
 		'monaco-editor',
 		{ module: './monaco-editor-pristine-runtime.mjs', label: '@monaco-editor/react' },
 	],

@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "project": "effect-atom-react-pristine",
+  "vitestConfig": "tests/upstream-vitest.config.ts",
+  "rootEnvVar": "EFFECT_ATOM_REACT_PRISTINE_ROOT",
+  "copy": ["src", "test", "vitest.setup.ts"]
+}
