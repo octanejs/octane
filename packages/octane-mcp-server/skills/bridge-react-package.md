@@ -38,6 +38,7 @@ of bridging by hand:
 | `@dnd-kit/utilities` | `@octanejs/dnd-kit-utilities` |
 | `@dnd-kit/accessibility` | `@octanejs/dnd-kit-accessibility` |
 | `sonner` | `@octanejs/sonner` |
+| `next-themes` | `@octanejs/next-themes` |
 | `streamdown` | `@octanejs/streamdown` |
 | `@streamdown/code` | `@octanejs/streamdown/code` |
 | `@streamdown/math` | `@octanejs/streamdown/math` |

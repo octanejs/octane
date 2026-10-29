@@ -1399,6 +1399,19 @@
   },
   {
     "kind": "library-binding",
+    "id": "binding-next-themes",
+    "title": "next-themes",
+    "packageName": "@octanejs/next-themes",
+    "upstreamPackage": "next-themes",
+    "category": "Styling",
+    "categoryId": "styling",
+    "description": "Use next-themes with Octane.",
+    "searchTerms": [],
+    "tags": ["themes", "dark mode", "styling"],
+    "order": 108
+  },
+  {
+    "kind": "library-binding",
     "id": "binding-styled-components",
     "title": "styled-components",
     "packageName": "@octanejs/styled-components",
@@ -1408,7 +1421,7 @@
     "description": "Use styled-components with Octane.",
     "searchTerms": [],
     "tags": ["css", "css in js"],
-    "order": 108
+    "order": 109
   },
   {
     "kind": "library-binding",
@@ -1421,7 +1434,7 @@
     "description": "Use @stylexjs/stylex with Octane.",
     "searchTerms": ["Style X"],
     "tags": ["css", "css in js"],
-    "order": 109
+    "order": 110
   },
   {
     "kind": "library-binding",
@@ -1434,7 +1447,7 @@
     "description": "Use @testing-library/react with Octane.",
     "searchTerms": ["React Testing Library"],
     "tags": ["testing", "components", "dom"],
-    "order": 110
+    "order": 111
   },
   {
     "kind": "library-binding",
@@ -1447,7 +1460,7 @@
     "description": "Use octane with Octane.",
     "searchTerms": [],
     "tags": ["devtools", "debugging"],
-    "order": 111
+    "order": 112
   },
   {
     "kind": "library-binding",
@@ -1460,7 +1473,7 @@
     "description": "Use react-is with Octane.",
     "searchTerms": ["react-is", "React Is"],
     "tags": ["elements", "introspection", "compatibility"],
-    "order": 112
+    "order": 113
   },
   {
     "kind": "library-binding",
@@ -1473,7 +1486,7 @@
     "description": "Use @tanstack/react-devtools with Octane.",
     "searchTerms": [],
     "tags": ["devtools", "debugging"],
-    "order": 113
+    "order": 114
   },
   {
     "kind": "library-binding",
@@ -1486,6 +1499,6 @@
     "description": "Use @tanstack/react-query-devtools with Octane.",
     "searchTerms": ["react-query-devtools", "React Query Devtools"],
     "tags": ["devtools", "debugging", "data"],
-    "order": 114
+    "order": 115
   }
 ]

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 362,
+  "nextCode": 363,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2169,6 +2169,12 @@
       "message": "This container already has a behavior root; pass replace: true to replace it.",
       "argumentCount": 0,
       "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "362": {
+      "message": "A hook was called outside a component render. If the call is inside a component, the app probably loads more than one copy of Octane, possibly with the same version. Check that the renderer (`createRoot`), the hooks, and `octane/internal/client` all resolve to one installed `octane` package; a custom bundler may need to deduplicate `octane` and its subpaths.",
+      "argumentCount": 0,
+      "runtime": ["client"],
       "status": "active"
     }
   }

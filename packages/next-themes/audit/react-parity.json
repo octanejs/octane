@@ -1,0 +1,228 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/pacocoursey/next-themes.git",
+    "version": "0.4.6",
+    "commit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752",
+    "sourceRoot": "next-themes/src",
+    "testRoot": "next-themes/__tests__",
+    "license": "MIT",
+    "integrity": "sha256:07e1be7d92087c76ac3cfc7b1ecc46cc42963678a48b5d7908f7b64b5db80bb3",
+    "verification": "verified"
+  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/next-themes/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/next-themes/tests/upstream"],
+      "include": ["\\.test\\.tsx$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 28,
+    "uniqueIdentities": 28,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@12.9.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "10a32b7db8454f634b35ebe48b69b21381de0f3460450a055cf4ea341ff94613"
+    }
+  },
+  "lanes": [
+    {
+      "id": "next-themes-pristine-full",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "next-themes-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 28 pinned runtime registrations unchanged against React.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/next-themes/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/next-themes/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "b1edb7764cb57c5d8b4f547b3c6aa90e38fd6deac1bb7cadb0244137607fb8da"
+        },
+        {
+          "path": "packages/next-themes/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "a0976297860b336078ab86208eb39649a92b1bc26997e39af8b7462862e90926"
+        },
+        {
+          "path": "packages/next-themes/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "6ae1d3b87432f23d37ca4181bb5dce0c79ca938d52d3ebe1da482827545aa979"
+        },
+        {
+          "path": "packages/next-themes/audit/provenance.json",
+          "role": "support",
+          "sha256": "ea4f24e566c9c3fbee7e031a04ca31a409b013e9124954282436bb878e3c7f6b"
+        },
+        {
+          "path": "packages/next-themes/audit/registrations.json",
+          "role": "support",
+          "sha256": "a951bba5e4ddd2b54a030f657001c5215df6fe8fbed5b5e1cc9ce47be492e5b0"
+        },
+        {
+          "path": "packages/next-themes/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "96b0d03c6a77e26a791c1384a53fb46566d05b7997f17828c611f4d4976266ab"
+        },
+        {
+          "path": "packages/next-themes/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "a8f495ee1acad330d57fce47bc0436590f54b931a59e1bc766399a231fccaee4"
+        },
+        {
+          "path": "packages/next-themes/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "b4fa5d24a23f94abec6346ab9c031c0d93fe6d81115233ea96f79159a296e1e4"
+        },
+        {
+          "path": "packages/next-themes/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "c5545cc480e6876d03024128bbfcefe6062cea5934e321989f4428ed6995c6d7"
+        },
+        {
+          "path": "packages/next-themes/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "ef2016fe4ad2a1012f63b10c85d2b7cd759071b926b8e99ad92aba23b47d97a9"
+        },
+        {
+          "path": "scripts/react-parity/next-themes-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "07973073e4db5c6fdf60fb3e5bff985052c755ae3b0fabe6dcd099110be39c23"
+        },
+        {
+          "path": "scripts/react-parity/pristine-suite-lib.mjs",
+          "role": "support",
+          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
+        }
+      ]
+    },
+    {
+      "id": "next-themes-adapted-full",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "next-themes-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 28 pinned runtime registrations against Octane with import rewrites only.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/next-themes/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/next-themes/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "89549617156a73dc342bce6eb63ba72b35338ca74588f28b533ba4c6dbec8dfb"
+        },
+        {
+          "path": "packages/next-themes/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "6ae1d3b87432f23d37ca4181bb5dce0c79ca938d52d3ebe1da482827545aa979"
+        },
+        {
+          "path": "packages/next-themes/audit/provenance.json",
+          "role": "support",
+          "sha256": "ea4f24e566c9c3fbee7e031a04ca31a409b013e9124954282436bb878e3c7f6b"
+        },
+        {
+          "path": "packages/next-themes/audit/registrations.json",
+          "role": "support",
+          "sha256": "a951bba5e4ddd2b54a030f657001c5215df6fe8fbed5b5e1cc9ce47be492e5b0"
+        },
+        {
+          "path": "packages/next-themes/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "96b0d03c6a77e26a791c1384a53fb46566d05b7997f17828c611f4d4976266ab"
+        },
+        {
+          "path": "packages/next-themes/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "a8f495ee1acad330d57fce47bc0436590f54b931a59e1bc766399a231fccaee4"
+        },
+        {
+          "path": "packages/next-themes/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "48b604e49e9bbbf705ea9bb8e292686a27d495d9b6dae3f1be2344fc7a74e0e5"
+        }
+      ]
+    },
+    {
+      "id": "next-themes-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "next-themes-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Drives the pinned React next-themes and the Octane port through the same steps, including the server-rendered inline script, and compares the page state after each.",
+      "files": [
+        {
+          "path": "packages/next-themes/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "b3f787b3a271b0f8fc51a1e846900a5141da2a76c6e818f7909fa5aa3e75d7b8",
+          "cases": [
+            {
+              "id": "differential:next-themes-set-theme",
+              "testName": "persists setTheme, mapping values onto class and data attributes",
+              "fullName": "@octanejs/next-themes against next-themes 0.4.6 persists setTheme, mapping values onto class and data attributes"
+            },
+            {
+              "id": "differential:next-themes-system-preference",
+              "testName": "follows the system preference only while the theme is system",
+              "fullName": "@octanejs/next-themes against next-themes 0.4.6 follows the system preference only while the theme is system"
+            },
+            {
+              "id": "differential:next-themes-storage-event",
+              "testName": "syncs with storage events from other tabs and falls back to defaultTheme",
+              "fullName": "@octanejs/next-themes against next-themes 0.4.6 syncs with storage events from other tabs and falls back to defaultTheme"
+            },
+            {
+              "id": "differential:next-themes-forced-theme",
+              "testName": "applies forcedTheme to the page while keeping the chosen theme",
+              "fullName": "@octanejs/next-themes against next-themes 0.4.6 applies forcedTheme to the page while keeping the chosen theme"
+            },
+            {
+              "id": "differential:next-themes-disable-transition",
+              "testName": "blocks transitions with a nonce-bearing style for one tick when the theme changes",
+              "fullName": "@octanejs/next-themes against next-themes 0.4.6 blocks transitions with a nonce-bearing style for one tick when the theme changes"
+            },
+            {
+              "id": "differential:next-themes-inline-script",
+              "testName": "serves an inline script that sets the same page state before hydration",
+              "fullName": "@octanejs/next-themes against next-themes 0.4.6 serves an inline script that sets the same page state before hydration"
+            }
+          ]
+        },
+        {
+          "path": "packages/next-themes/tests/_fixtures/app.tsrx",
+          "role": "support",
+          "sha256": "942ec1c8f6d4263b8ed9934df64cc854fdb84ae3f2d524e272243c823fe8c083"
+        },
+        {
+          "path": "packages/next-themes/tests/_server.ts",
+          "role": "support",
+          "sha256": "585ec735efe57207776204f743e21aaf04f384b066e3ef5367bde9af9f5019aa"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}
