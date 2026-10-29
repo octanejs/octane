@@ -41,6 +41,8 @@ function instantiate(source) {
 		let NATIVE_READ_DRIVER = null;
 		let activityRefState = null;
 		const log = [];
+		// Stand-in hosts carry compareDocumentPosition themselves.
+		function nodeProto(node) { return node; }
 		function blockSubtreeDisposed(block) { return block?.disposed === true; }
 		function findHiddenActivity() { return null; }
 		function attachRef(ref, el) { log.push(ref); }

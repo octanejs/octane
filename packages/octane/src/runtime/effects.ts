@@ -21,6 +21,7 @@ import {
 	reportEffectError,
 	runEffectBody,
 } from './engine.js';
+import { nodeProto } from '../dom-focused-move.js';
 import { hydrationStarted } from '../hydration-flag.js';
 import { __profileQueueCleanup, __profileWorkEnter, __profileRootExit } from '../profiling.js';
 import type { NativeAdoptionState } from '../signals/native-adoption.js';
@@ -355,15 +356,16 @@ export function postOrderHostRefs(q: RefAttach[]): void {
 }
 
 // `b` attaches first when it is inside `a` (CONTAINED_BY, 16), or precedes `a`
-// (PRECEDING, 2) without containing it (CONTAINS, 8).
+// (PRECEDING, 2) without containing it (CONTAINS, 8). A form's named controls
+// shadow its DOM members, so the comparison goes through Node.prototype.
 function compareHostRefs(a: RefAttach, b: RefAttach): number {
-	const position = refPosition(a).compareDocumentPosition(refPosition(b));
+	const from = refPosition(a);
+	const position = nodeProto(from).compareDocumentPosition.call(from, refPosition(b));
 	return position & 16 || (position & 10) === 2 ? 1 : position === 0 ? 0 : -1;
 }
 
 function refPosition(entry: RefAttach): Node {
-	const el = entry.el;
-	return (el as Node).nodeType === 1 ? (el as Element) : (el as FragmentInstance)._startMarker;
+	return (entry.el as FragmentInstance)._startMarker ?? (entry.el as Element);
 }
 
 export function fireEffectCleanup(e: PendingEffect): void {
