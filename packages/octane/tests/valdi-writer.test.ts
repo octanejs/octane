@@ -293,7 +293,42 @@ describe.each([false, true])('compiled Valdi writer behavior in dev=%s', (dev) =
 		).toEqual([{ tag: 'label', props: { value: 'child' }, children: [] }]);
 	});
 
-	it.each(['text', '<label value="nested" />', '{() => null}'])(
+	it('invokes render props and function children in the receiving writer scope', () => {
+		const { render, module } = writerFixture(
+			`function Leaf(props) @{ <view>{props.row('named')}{props.children?.('child')}{props.missing?.('absent')}</view> }
+			 export function Scene(props) @{
+				<Leaf {...props.defaults} row={value => <label value={props.prefix + value} />}>
+					{function (value) { return <badge value={props.prefix + value} />; }}
+				</Leaf>
+			 }`,
+			dev,
+		);
+		const unused = vi.fn();
+		const root = render(module.Scene, { prefix: 'row:', defaults: { children: unused } })[0];
+		expect(root.children.map((node) => [node.tag, node.props.value])).toEqual([
+			['label', 'row:named'],
+			['badge', 'row:child'],
+		]);
+		expect(unused).not.toHaveBeenCalled();
+	});
+
+	it('forwards a render callback and preserves scalar results on host text targets', () => {
+		const { render, module } = writerFixture(
+			`function Leaf(props) @{ <view>{props.children?.(1)}{props.read()}</view> }
+			 function Forward(props) @{ <Leaf {...props} children={props.row} /> }
+			 export function Scene() @{ <Forward read={() => 42} row={n => <badge value={n} />} /> }`,
+			dev,
+			{ renderer: { ...renderer, text: 'host', capabilities: ['host-text-site'] } },
+		);
+		expect(
+			render(module.Scene, {})[0].children.map((node) => [node.tag, node.props.value]),
+		).toEqual([
+			['badge', 1],
+			['#text', 42],
+		]);
+	});
+
+	it.each(['text', '<label value="nested" />', '{42}'])(
 		'continues to reject nonempty component children: %s',
 		(children) => {
 			expect(() =>
@@ -302,7 +337,7 @@ describe.each([false, true])('compiled Valdi writer behavior in dev=%s', (dev) =
 					 export function Scene() @{ <Leaf>{/* explanation */}${children}</Leaf> }`,
 					dev,
 				),
-			).toThrow(/component children\/render props are not supported/);
+			).toThrow(/component children must be a single render callback/);
 		},
 	);
 

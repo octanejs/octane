@@ -133,6 +133,21 @@ describe.each(['native', 'javascript'])(
 			},
 		);
 
+		it('preserves contextual parameter types for named and child render callbacks', () => {
+			parser.javascript = parserName === 'javascript';
+			const result = compile(
+				`type Item = { name: string };
+				type Props<T> = { row: (item: T) => void; children: (count: number) => void };
+				function Leaf<T>(props: Props<T> & {item: T}) @{ <view>{props.row(props.item)}{props.children(1)}</view> }
+				export function Scene() @{
+					<Leaf<Item> item={{name: 'A'}} row={item => <label value={item.name} />}>{count => <label value={count.toFixed()} />}</Leaf>
+				}`,
+				'/src/Scene.tsrx',
+				{ renderer, hmr: false, output: 'ts' },
+			);
+			expect(typecheck(result.code, '')).toEqual([]);
+		});
+
 		it('keeps typed conditionals, keyed loops and ordinary spreads valid TypeScript', () => {
 			parser.javascript = parserName === 'javascript';
 			vi.stubEnv('OCTANE_COMPILE_ASSERT_LOC', '1');

@@ -156,6 +156,9 @@ describe('compiler AST emit architecture', () => {
 			'ThrowStatement',
 			// @tsrx/core has a type-argument builder but no expression-instantiation builder.
 			'TSInstantiationExpression',
+			// @tsrx/core also lacks builders for indexed access and satisfies in Valdi callback types.
+			'TSIndexedAccessType',
+			'TSSatisfiesExpression',
 		]);
 		const compilerRecordShapes = new Set([
 			'ActivityStatement',

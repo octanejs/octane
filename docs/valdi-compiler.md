@@ -367,12 +367,21 @@ Mutable `let`/`var` components and writes to component bindings are rejected.
 Both development and production compilation use the same external writer
 contract.
 
+A component can receive an inline synchronous render callback as a named prop or as
+its single child, for example `<List row={item => <label value={item.name} />} />`
+or `<List>{item => <label value={item.name} />}</List>`. The receiving
+component invokes the callback inside its active writer scope. Each invocation
+emits its JSX at that position. Use an expression body or return the JSX from
+a block. Put hooks in a child component when a callback needs component state.
+For generic receivers, provide explicit JSX type arguments when a callback
+parameter’s type depends on the generic.
+
 Unsupported constructs fail with diagnostics rather than falling back to DOM
 code. These include server rendering/hydration, HMR, Octane profiling,
-cross-renderer boundaries, dynamic or namespace component tags, component
-children/render props and refs, authored host `children` props, `@try`, `@switch`, and
+cross-renderer boundaries, dynamic or namespace component tags, ordinary JSX
+component children and component refs, authored host `children` props, `@try`, `@switch`, and
 `style`/`slot`/`slotted` elements. Host refs require the `host-ref` capability;
-component refs remain unsupported. Spread `ref`/`children` values are checked at
+component refs remain unsupported. Unsupported spread `ref` and host `children` values are checked at
 execution time. Unkeyed or asynchronous template loops and slot-keyed hooks
 directly inside loops are rejected; put hooks in a keyed child component.
 
