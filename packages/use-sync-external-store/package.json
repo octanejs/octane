@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/use-sync-external-store",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "use-sync-external-store 1.7.0 for Octane: Octane's built-in useSyncExternalStore and a port of useSyncExternalStoreWithSelector.",
   "license": "MIT",
   "type": "module",

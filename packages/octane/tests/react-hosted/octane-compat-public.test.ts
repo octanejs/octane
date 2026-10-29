@@ -64,6 +64,24 @@ describe('octane/react — mount, update, unmount', () => {
 		expect(document.querySelector('[data-octane-compat]')).toBeNull();
 	});
 
+	// #2305: like ReactCompat's host, the island host adds no layout box, so the
+	// island's root element is the parent's flex or grid item.
+	it('styles the host display: contents across renders', async () => {
+		function App(props: { name: string }) {
+			return h(OctaneCompat, null, h(GreetingIsland as any, { name: props.name }));
+		}
+		const mounted = await mountReactHost(h(App, { name: 'a' }));
+		try {
+			const host = mounted.host();
+			expect(host.style.display).toBe('contents');
+			await mounted.render(h(App, { name: 'b' }));
+			expect(mounted.host()).toBe(host);
+			expect(host.style.display).toBe('contents');
+		} finally {
+			await mounted.unmount();
+		}
+	});
+
 	it('publishes committed prop changes and preserves island state', async () => {
 		function App(props: { name: string }) {
 			return h(OctaneCompat, null, h(GreetingIsland as any, { name: props.name }));
