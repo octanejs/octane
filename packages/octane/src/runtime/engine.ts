@@ -4622,9 +4622,9 @@ export function useSyncExternalStore<T>(
 			? arguments[count - 1]
 			: count === 4
 				? lastSlot
-				: getServerSnapshot === undefined
-					? serverSnapshotOrSlot
-					: undefined
+				: getServerSnapshot
+					? undefined
+					: serverSnapshotOrSlot
 	) as HookSlot | undefined;
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useSyncExternalStore');
