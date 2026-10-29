@@ -50,7 +50,9 @@ import {
 	flushTransitionActionBatch,
 	TRANSITION_HOLDERS,
 	holdTransitionBatch,
+	suspendingTransitionHold,
 	retryTransitionBatch,
+	retryRootRequest,
 	type unsuspendTransitionHolder,
 	TRANSITION_ORIGIN,
 	TRANSITION_HARVEST,
@@ -431,6 +433,8 @@ export function finishTransitionHookBatch(batch: TransitionActionBatch): void {
 export interface TransitionHold {
 	batches: Set<TransitionActionBatch>;
 	suspends: boolean;
+	/** The owner generation of the root request a boundary holds, or -1 (dropTransitionRender). */
+	request: number;
 }
 
 /** A held batch and the batches entangled into it stay pending until it finishes. */
@@ -465,6 +469,12 @@ export function releaseTransitionHookHolder(holder: object, retry = true): boole
 			if (unblocked || settled) retryTransitionBatch(batch, unblocked, settled);
 		} else if (settled) finishTransitionHookBatch(batch);
 	}
+	// A request a later one replaced holds nothing: the boundary resumes on its own.
+	if (hold.request !== -1 && hold.suspends && retry)
+		return (
+			retryRootRequest((holder as TrySlot).parentBlock.idState.renderOwner!, hold.request) ||
+			hold.batches.size !== 0
+		);
 	return true;
 }
 
@@ -493,11 +503,12 @@ export const STAGED_REVEALS = new Set<TrySlot>();
 /**
  * A group of held boundaries that is fully staged, or null, skipping the groups
  * already `flushed` and adding the result's members to it. Boundaries that hold
- * a common batch form a group, transitively. Boundaries with no batch hold (their
- * transition folded no hook work, such as `root.render`, or their hold is being
- * retried) form one group of their own, the barrier before parallel transitions,
- * and never join a batch's group. Runs when a boundary stages, on a handful of
- * boundaries.
+ * a common batch form a group, transitively. Boundaries with no hold (their
+ * transition folded no hook work and applied no root request, or their hold is
+ * being retried) form one group of their own, the barrier before parallel
+ * transitions, and never join a batch's group. A boundary holding only a root
+ * request reveals by retrying it, alone. Runs when a boundary stages, on a
+ * handful of boundaries.
  */
 export function stagedRevealGroup(flushed: Set<TrySlot>): TrySlot[] | null {
 	// A group still waiting is scanned again on the next call: flushing another
@@ -548,6 +559,12 @@ export function stagedRevealGroup(flushed: Set<TrySlot>): TrySlot[] | null {
 // new update reached its root (React's markRootUpdated). The retry renders the
 // batches' blocks at transition priority and commits the whole screen in one
 // flush, or suspends again and goes around.
+//
+// A `root.render` request rendered at transition priority is held work too, as
+// React keeps it in the root's update queue: the drop restores the root's
+// committed props, and each holding boundary keeps the request until it
+// retries it (retryRootRequest). The retry renders the owner's latest request,
+// unless a later request or its commit already replaced the held one.
 //
 // Memo state gets a second copy for a dropped render only. The hook-map entries
 // and inline memo cells a transition render replaces are recorded on its
@@ -680,23 +697,36 @@ function noteTransitionBatch(
 /**
  * Drop a transaction whose transition render suspended into a hold (see
  * Transition holds). Returns false when there is nothing to hold: no hook work
- * was folded, or every holder already stopped holding, and the transaction
- * then commits as before, with any boundary holding on its own.
+ * was folded and no root request applied, or every holder already stopped
+ * holding, and the transaction then commits as before, with any boundary
+ * holding on its own.
  */
 export function dropTransitionRender(transaction: RootRenderTransaction): boolean {
 	const holders = transaction.holders!;
 	transaction.holders = null;
+	const owner = transaction.owner;
 	// A drained origin holds the batches its own render folded; other
 	// transitions in the drain render again and can still commit.
 	const origin = TRANSITION_ORIGIN;
 	const batches =
-		origin === null
+		(origin === null
 			? transaction.batches
-			: (transaction.batches?.filter((batch) => batch.origin === origin) ?? null);
-	if (batches === null || batches.length === 0 || transaction.owner.disposed) return false;
+			: transaction.batches?.filter((batch) => batch.origin === origin)) ?? [];
+	// So does the root request it applied at transition priority.
+	const request =
+		transaction.rootRequest &&
+		origin !== null &&
+		origin === owner.current &&
+		origin.currentRenderMode === 'transition';
+	if ((batches.length === 0 && !request) || owner.disposed) return false;
+	// A root that suspended retries its request itself (suspendRootRender).
 	let live = false;
 	for (const holder of holders)
-		if ((holder as TrySlot).__kind !== 'trySlotSlot' || (holder as TrySlot).transitionHeld)
+		if (
+			(holder as TrySlot).__kind === 'trySlotSlot'
+				? (holder as TrySlot).transitionHeld
+				: batches.length !== 0
+		)
 			live = true;
 	if (!live) return false;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
@@ -711,7 +741,11 @@ export function dropTransitionRender(transaction: RootRenderTransaction): boolea
 	for (const holder of holders) {
 		if ((holder as TrySlot).__kind === 'trySlotSlot') {
 			if (!(holder as TrySlot).transitionHeld) continue;
-		} else if (TRANSITION_HOLDERS?.has(holder) !== true) tickTransitionCount(+1);
+			if (request) suspendingTransitionHold(holder).request = owner.generation;
+		} else {
+			if (batches.length === 0) continue;
+			if (TRANSITION_HOLDERS?.has(holder) !== true) tickTransitionCount(+1);
+		}
 		for (const batch of batches) holdTransitionBatch(holder, batch);
 	}
 	// Signals are shared by every root. Another root that rendered a batch with
@@ -755,6 +789,13 @@ export function holdsUnrenderedTransition(state: TrySlot): boolean {
 	const hold = TRANSITION_HOLDERS.get(state);
 	if (hold === undefined) return false;
 	const transaction = ROOT_RENDER_TRANSACTION;
+	// Any render of the root's request renders its latest one.
+	if (
+		hold.request !== -1 &&
+		(transaction === null || !transaction.rootRequest) &&
+		state.parentBlock.idState.renderOwner!.generation === hold.request
+	)
+		return true;
 	for (const batch of hold.batches)
 		if (transaction === null || batch.stamp !== transaction.createdStamp) return true;
 	return false;

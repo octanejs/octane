@@ -140,3 +140,30 @@ export function CrossComponentStoreApp(props: {
 		<PendingStoreReader store={props.store} />
 	</div>
 }
+
+interface HeldSelectionProps {
+	store: ExternalStore<{ a: number; b: number; c: number }>;
+	k: 'a' | 'b' | 'c';
+	pending: Promise<void>;
+	tail: Promise<void>;
+}
+
+function HeldSelectionConsumer(props: HeldSelectionProps) @{
+	const value = useSyncExternalStore(props.store.subscribe, () => props.store.getState()[props.k]);
+	if (props.k === 'b') {
+		use(props.pending);
+		use(props.tail);
+	}
+	<output id="held-selection-value">{props.k + ':' + value}</output>
+}
+
+export function HeldSelectionBoundary(props: HeldSelectionProps) @{
+	<div>
+		<h2 id="held-selection-label">{props.k}</h2>
+		@try {
+			<HeldSelectionConsumer {...props} />
+		} @pending {
+			<span id="held-selection-fallback">{'loading'}</span>
+		}
+	</div>
+}
