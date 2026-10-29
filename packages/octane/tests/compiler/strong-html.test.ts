@@ -98,6 +98,10 @@ describe('Strong trusted HTML', () => {
 				join(root, 'values.ts'),
 				`import { trustHTML } from 'octane'; export const trusted = trustHTML('<b>safe</b>'); export const raw = { __html: '<b>raw</b>' }; export const suppressed = { suppressHydrationWarning: true };`,
 			);
+			writeFileSync(
+				join(root, 'strong-props.ts'),
+				`import type { ComponentProps } from 'octane/strong'; export type LabelProps = ComponentProps<'label'>;`,
+			);
 			const cases = {
 				valid: `'use strong'; import { trusted } from './values'; export function App() @{ <div dangerouslySetInnerHTML={trusted} /> }`,
 				invalid: `'use strong'; import { raw } from './values'; export function App() @{ <div dangerouslySetInnerHTML={raw} /> }`,
@@ -110,6 +114,16 @@ describe('Strong trusted HTML', () => {
 				compatSuppressed: `import { suppressed } from './values'; export function App() @{ <div {...suppressed} /> }`,
 				componentSuppressed: `'use strong'; import { suppressed } from './values'; function Child(props: { suppressHydrationWarning: boolean }) { return String(props.suppressHydrationWarning); } export function App() @{ <Child {...suppressed} /> }`,
 				component: `'use strong'; import { raw } from './values'; function Child(props: { dangerouslySetInnerHTML: { __html: string } }) { return props.dangerouslySetInnerHTML.__html; } export function App() @{ <Child dangerouslySetInnerHTML={raw} /> }`,
+				// React-shaped host prop types describe the module's own hosts, so
+				// a Strong wrapper's callers supply the brand its host requires.
+				wrappers: `'use strong'; import { useId, type ComponentProps, type ComponentPropsWithoutRef } from 'octane'; import type * as React from 'octane'; export function Badge({ className, ...props }: ComponentProps<"span">) @{ <span class={className} {...props} /> } export function Header(props: ComponentPropsWithoutRef<'div'>) @{ <div {...props} /> } export function Field(props: React.InputHTMLAttributes<HTMLInputElement>) @{ const id = useId(); <input id={id} {...props} /> } export function Icon(props: React.SVGProps<SVGSVGElement>) @{ <svg {...props} /> }`,
+				wrapperTrusted: `import { trusted } from './values'; import { Badge } from './wrappers'; export function App() @{ <Badge dangerouslySetInnerHTML={trusted} /> }`,
+				wrapperRaw: `import { raw } from './values'; import { Badge } from './wrappers'; export function App() @{ <Badge dangerouslySetInnerHTML={raw} /> }`,
+				wrapperSuppressed: `import { suppressed } from './values'; import { Header } from './wrappers'; export function App() @{ <Header {...suppressed} /> }`,
+				helperProps: `'use strong'; import type { LabelProps } from './strong-props'; export function Label(props: LabelProps) @{ <label {...props} /> }`,
+				compatWrapper: `import type { ComponentProps } from 'octane'; export function Primitive(props: ComponentProps<'button'>) @{ <button {...props} /> }`,
+				compatWrapperRaw: `import { raw } from './values'; import { Primitive } from './compatWrapper'; export function App() @{ <Primitive dangerouslySetInnerHTML={raw} /> }`,
+				strongOverCompat: `'use strong'; import type { ComponentProps } from 'octane'; import { Primitive } from './compatWrapper'; export function Button(props: ComponentProps<'button'>) @{ <Primitive {...props} /> }`,
 			};
 			const compilations = new Map<string, ReturnType<typeof compileToVolarMappings>>();
 			const files = Object.entries(cases).map(([name, source]) => {
@@ -151,9 +165,19 @@ describe('Strong trusted HTML', () => {
 			expect(errors.nativeSuppressed.join('\n')).toContain('suppressNativeChangeWarning');
 			expect(errors.compatSuppressed).toEqual([]);
 			expect(errors.componentSuppressed).toEqual([]);
-			expect(
-				program.getSemanticDiagnostics(program.getSourceFile(join(root, 'values.ts'))!),
-			).toEqual([]);
+			expect(errors.wrappers).toEqual([]);
+			expect(errors.wrapperTrusted).toEqual([]);
+			expect(errors.wrapperRaw.join('\n')).toContain('TrustedHTML');
+			expect(errors.wrapperSuppressed.join('\n')).toContain('suppressHydrationWarning');
+			expect(errors.helperProps).toEqual([]);
+			expect(errors.compatWrapper).toEqual([]);
+			expect(errors.compatWrapperRaw).toEqual([]);
+			expect(errors.strongOverCompat).toEqual([]);
+			for (const helper of ['values.ts', 'strong-props.ts']) {
+				expect(program.getSemanticDiagnostics(program.getSourceFile(join(root, helper))!)).toEqual(
+					[],
+				);
+			}
 			const typedError = program.getSemanticDiagnostics(
 				program.getSourceFile(join(root, 'pragma.tsx'))!,
 			)[0];
