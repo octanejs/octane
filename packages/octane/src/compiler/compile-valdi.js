@@ -7,7 +7,7 @@
  * erasure, and the single source-map print. It never enters the DOM planner or
  * constructs a universal renderer tree.
  */
-import { builders as b } from '@tsrx/core';
+import { builders as b, DIAGNOSTIC_CODES } from '@tsrx/core';
 import { parseModule } from '#octane/compiler-parser';
 import { createLexicalAnalysis, validateRendererAst } from './compile-universal.js';
 import { HOOK_NAMES } from './hook-names.js';
@@ -64,10 +64,12 @@ const TRANSPARENT_EXPRESSIONS = new Set([
 	'TSSatisfiesExpression',
 ]);
 
-function valdiError(state, node, message) {
+// Nearly every Valdi rejection is a feature the writer does not support yet. A
+// mistake other targets also reject keeps that rule's code, Octane's or core's.
+function valdiError(state, node, message, code = 'OCTANE_VALDI_UNSUPPORTED') {
 	const start = node?.loc?.start;
 	const at = start ? ` at ${state.filename}:${start.line}:${start.column}` : '';
-	return new Error(`Octane Valdi compiler: ${message}${at}`);
+	return Object.assign(new Error(`Octane Valdi compiler: ${message}${at}`), { code });
 }
 
 function forEachChild(node, visit) {
@@ -864,11 +866,16 @@ function emitElement(node, state, keys) {
 
 function emitFor(node, state, keys) {
 	if (node.await || node.statementType === 'ForInStatement') {
-		throw valdiError(state, node, 'only synchronous @for-of is supported.');
+		throw valdiError(
+			state,
+			node,
+			'only synchronous @for-of is supported.',
+			DIAGNOSTIC_CODES.TARGET_FOR_AWAIT_UNSUPPORTED,
+		);
 	}
 	if (!node.key) throw valdiError(state, node, '@for requires an explicit key.');
 	if (node.left?.type !== 'VariableDeclaration' || node.left.declarations?.length !== 1) {
-		throw valdiError(state, node, '@for requires one item binding.');
+		throw valdiError(state, node, '@for requires one item binding.', 'OCTANE_FOR_ITEM_BINDING');
 	}
 	walk(node.body, (child) => {
 		if (FUNCTION_TYPES.has(child.type)) return false;
@@ -1125,7 +1132,12 @@ function emitNodes(nodes, state, keys, allowReturn) {
 function emitComponent(shape, state) {
 	const { fn, name, exportKind } = shape;
 	if (fn.async || fn.generator) {
-		throw valdiError(state, fn, 'async/generator components are not supported yet.');
+		throw valdiError(
+			state,
+			fn,
+			'async/generator components are not supported yet.',
+			'OCTANE_COMPONENT_FUNCTION_KIND',
+		);
 	}
 	for (const parameter of fn.params ?? [])
 		assertNoTemplate(parameter, state, 'component parameters');

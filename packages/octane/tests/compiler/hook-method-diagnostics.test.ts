@@ -21,7 +21,12 @@ describe.each([false, true])('method hook evaluation boundaries (inline=%s)', (i
 			(code) => {
 				expect(() =>
 					slotHooks(code, 'method.ts', { inlineHookMemo, environment, dev: false }),
-				).toThrow(/hook method.*await or yield/i);
+				).toThrow(
+					expect.objectContaining({
+						code: 'OCTANE_HOOK_METHOD_SUSPENSION',
+						message: expect.stringMatching(/hook method.*await or yield/i),
+					}),
+				);
 			},
 		);
 		it(`allows async callbacks passed as arguments in ${environment}`, () => {

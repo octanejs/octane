@@ -7,8 +7,11 @@
  * C-style header, recording the statement form on `statementType`. No target
  * can lower either, and a target that read only the for-of fields compiled
  * `for…in` as `for…of` over the object. assertForOfHeaders rejects them once
- * on the authored module, ahead of every compiler.
+ * on the authored module, ahead of every compiler, with the code `@tsrx/core`
+ * gives the same mistake on its own targets.
  */
+
+import { DIAGNOSTIC_CODES } from '@tsrx/core/diagnostics';
 
 export const FOR_IN_MESSAGE =
 	'`@for` iterates an iterable with `for…of`, so a `for…in` header is not supported. ' +
@@ -37,8 +40,11 @@ export function assertForOfHeaders(ast, source, filename) {
 		}
 		if (node.type === 'JSXForExpression' && node.statementType !== 'ForOfStatement') {
 			const at = node.loc ? ` (${file}:${node.loc.start.line}:${node.loc.start.column})` : '';
-			throw new Error(
-				(node.statementType === 'ForInStatement' ? FOR_IN_MESSAGE : FOR_STATEMENT_MESSAGE) + at,
+			throw Object.assign(
+				new Error(
+					(node.statementType === 'ForInStatement' ? FOR_IN_MESSAGE : FOR_STATEMENT_MESSAGE) + at,
+				),
+				{ code: DIAGNOSTIC_CODES.FOR_OF_ONLY },
 			);
 		}
 		for (const key in node) {
