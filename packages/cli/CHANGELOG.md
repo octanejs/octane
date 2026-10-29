@@ -1,5 +1,59 @@
 # @octanejs/cli
 
+## 0.3.0
+
+### Minor Changes
+
+- 722b602: Export the binding catalog as `@octanejs/cli/data`, `octane analyze --fix`'s
+  edit application as `@octanejs/cli/fix`, and the project helpers `findRoot` and
+  `scanSourceFiles` from the package root, so `@octanejs/codemod` finds sources,
+  maps React packages, and applies compiler fixes exactly as the CLI does.
+
+  Project scans skip `out/` as build output, as they already skipped `dist/` and
+  `build/`.
+
+### Patch Changes
+
+- 3430ec0: Fixes from migrating Memos and T3 Code:
+
+  - A text field that spreads a component's rest props (a shadcn-style `Input` or
+    `Textarea`) takes `onChange` out of the rest and passes it as `onInput`, so
+    controlled fields keep updating per keystroke. Before, the spread passed it
+    through as Octane's native `change`, which fires on blur. A spread the codemod
+    cannot prove safe is reported.
+  - `React.ReactNode`, `React.FC` and the other names of React's global namespace,
+    written without an import, map to Octane's types.
+  - `forwardRef` type arguments are rewritten like any other type, so
+    `React.ComponentPropsWithoutRef<"div">` no longer survives the migration.
+  - `e.target` becomes `e.currentTarget` in a handler a component passes on to a
+    form control, as the project's types say (`<Input onChange={(e) => …}>`), in
+    handlers annotated with a union of controls, and in `onFocus`/`onBlur`.
+  - Declaration files are migrated: `declare module 'react' { namespace JSX }`
+    custom-element typing moves to `octane/jsx-runtime`, and other augmentations
+    of React's types are reported.
+  - A package is reported as needing a binding only when the entry imported needs
+    React: a package whose export map hides `package.json` is read from disk, and
+    one with a `./react` entry needs a binding only there.
+  - A component that reads its `children` as an element (`render={children}`,
+    `cloneElement`, `Children.only`, `isValidElement`) is marked
+    `descriptorChildren`, so its callers pass elements as React does, and its
+    call sites in the module keep conditional children as expressions.
+  - Added imports use the module's own quote style.
+  - `@octanejs/cli` exports `readInstalled`, which reads an installed package's
+    manifest without going through its export map.
+- d6f5536: Add Octane ports of the legacy dnd kit API, one package per upstream package: `@octanejs/dnd-kit-core` (`@dnd-kit/core` 6.3.1), `@octanejs/dnd-kit-sortable` (`@dnd-kit/sortable` 10.0.0), `@octanejs/dnd-kit-modifiers` (`@dnd-kit/modifiers` 9.0.0), `@octanejs/dnd-kit-utilities` (`@dnd-kit/utilities` 3.2.2), and `@octanejs/dnd-kit-accessibility` (`@dnd-kit/accessibility` 3.1.1). They cover `DndContext`, `DragOverlay`, `useDraggable`/`useDroppable`, the sensors and collision algorithms, `SortableContext`/`useSortable` with the sorting strategies and `arrayMove`, the `restrictTo*` and snap modifiers, and the `CSS`/DOM helpers. One difference from React: sensor activator handlers receive the native DOM event, because Octane has no synthetic events.
+
+  The binding catalog maps each `@dnd-kit/*` package to its port, so `@octanejs/codemod` and `octane bindings` resolve them.
+- 4fc96cf: Add `@octanejs/hot-toast`, an Octane port of `react-hot-toast` 2.6.1: the `toast` API and
+  every variant, `Toaster`, `ToastBar`, `ToastIcon`, the icon components, `useToaster`,
+  `useToasterStore`, `resolveValue` and the `/headless` entry. The binding catalog now maps
+  `react-hot-toast` to it, so `@octanejs/codemod` rewrites `react-hot-toast` imports to the
+  binding instead of reporting a package with no binding.
+- 58ddff8: Map `next-themes` to `@octanejs/next-themes` in the binding catalog, so `@octanejs/codemod` rewrites `next-themes` imports to the binding.
+- b4e303d: Ship TypeScript declarations for the CLI, React codemod and MCP server, including their public subpath exports.
+- 86cf9cb: The binding catalog lists `@octanejs/use-sync-external-store`, so `@octanejs/codemod` maps
+  `use-sync-external-store` imports, such as `use-sync-external-store/with-selector`, to it.
+
 ## 0.2.4
 
 ### Patch Changes

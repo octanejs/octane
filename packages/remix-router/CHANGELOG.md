@@ -1,5 +1,11 @@
 # @octanejs/remix-router
 
+## 0.1.65
+
+### Patch Changes
+
+- cf70088: The Remix router's shipped templates now use Octane Strong mode on the client and server.
+
 ## 0.1.64
 
 ### Patch Changes
