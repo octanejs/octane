@@ -1,8 +1,8 @@
 import { Tooltip } from "@base-ui/react/tooltip";
 import { useState, type ComponentProps, type ElementRef, type ComponentPropsWithoutRef, type Ref, descriptorChildren, type OctaneElement, type FC, type OctaneNode, type ChangeEvent } from "octane";
 import { ReactCompat } from "octane/react";
-// No Octane port of `react-hot-toast` exists, so its components render in React through ReactCompat.
-import { Toaster, toast } from "react-hot-toast";
+// No Octane port of `@example/react-toast` exists, so its components render in React through ReactCompat.
+import { Toaster, toast } from "@example/react-toast";
 
 // Shapes from migrating Memos and T3 Code: shadcn-style fields whose rest
 // props carry React's per-edit `onChange`, `forwardRef` type arguments,
@@ -51,7 +51,7 @@ export const RenameDialog: FC<{ title: OctaneNode; onRename(name: string): void 
   </form>
 };
 
-// No Octane port of react-hot-toast: `Toaster` renders in a React island, and
+// No Octane port of @example/react-toast: `Toaster` renders in a React island, and
 // `toast()` calls run as they are.
 export function Shell({ children }: { children: OctaneNode }) @{
   <main onCopy={() => toast.success("Copied")}>
