@@ -699,3 +699,15 @@ patchedDependencies:
   # Browser ships its own prebundled copy of the mocker implementation.
   '@vitest/browser@4.1.10': patches/@vitest__browser@4.1.10.patch
   '@vitest/mocker@4.1.10': patches/@vitest__mocker@4.1.10.patch
+  # Print a one-parameter type parameter list as `<T,>` in TSX. 2.3.2 prints
+  # `<T>`, so a generic arrow in a .tsrx file became a JSX element in the virtual
+  # TSX the editor and octane-tsc check (TS17008 and a cascade of syntax errors).
+  # Backports sveltejs/esrap#188 (4a0bb7f, released in 2.3.8). Upgrading instead
+  # would also take 2.3.11, which removed the `boundaryTokens` option @tsrx/core
+  # 0.5.5 maps structural tokens with. SCOPE: packages/octane/scripts/
+  # bundle-volar.mjs freezes this install's esrap into the published
+  # `octane/compiler/volar`, so this patch ships in the octane tarball. Guarded
+  # by the generic arrow case in
+  # packages/octane/tests/compiler/volar.test.ts. Drop when the adopted esrap is
+  # 2.3.8 or later.
+  esrap@2.3.2: patches/esrap@2.3.2.patch
