@@ -74,6 +74,7 @@ export const KNOWN_BINDINGS = {
 	'react-dropzone': '@octanejs/dropzone',
 	sonner: '@octanejs/sonner',
 	'react-hot-toast': '@octanejs/hot-toast',
+	'next-themes': '@octanejs/next-themes',
 	'react-error-boundary': '@octanejs/react-error-boundary',
 	'react-email': '@octanejs/email',
 	'@react-email/components': '@octanejs/email',

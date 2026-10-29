@@ -34,6 +34,7 @@ of bridging by hand:
 | `@dnd-kit/react` | `@octanejs/dnd-kit` |
 | `sonner` | `@octanejs/sonner` |
 | `react-hot-toast` | `@octanejs/hot-toast` |
+| `next-themes` | `@octanejs/next-themes` |
 | `streamdown` | `@octanejs/streamdown` |
 | `@streamdown/code` | `@octanejs/streamdown/code` |
 | `@streamdown/math` | `@octanejs/streamdown/math` |

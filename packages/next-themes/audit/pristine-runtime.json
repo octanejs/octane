@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "project": "next-themes-pristine",
+  "roots": ["packages/next-themes/upstream"],
+  "files": ["packages/next-themes/upstream/__tests__/index.test.tsx"],
+  "tests": [
+    {
+      "id": "runtime:5947f4bef96b1a05",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "color-scheme does not set color-scheme when disabled"
+    },
+    {
+      "id": "runtime:79a3a72f0ce28a20",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "color-scheme should set color-scheme dark when dark theme is active"
+    },
+    {
+      "id": "runtime:8b5ad3181b7b29a8",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "color-scheme should set color-scheme light when light theme is active"
+    },
+    {
+      "id": "runtime:57935043cef143fd",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "custom attribute should use \"data-example\"-attribute when attribute=\"data-example\""
+    },
+    {
+      "id": "runtime:a571325fa0285ff1",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "custom attribute should use class attribute (CSS-class) when attribute=\"class\""
+    },
+    {
+      "id": "runtime:719248a45a5de809",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "custom attribute should use data-theme attribute when using default"
+    },
+    {
+      "id": "runtime:b871b2b2e5209bfe",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "custom attribute supports multiple attributes"
+    },
+    {
+      "id": "runtime:b51154e2a82ef761",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "custom storageKey should save to localStorage with 'custom' when setting prop 'storageKey' to 'customKey'"
+    },
+    {
+      "id": "runtime:776eba14cf2f3cdc",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "custom storageKey should save to localStorage with 'theme' key when using default settings"
+    },
+    {
+      "id": "runtime:94612f3b50dac0ec",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "custom value-mapping should allow missing values (attribute)"
+    },
+    {
+      "id": "runtime:c4681afc08a54000",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "custom value-mapping should allow missing values (class)"
+    },
+    {
+      "id": "runtime:5a8a6ced63626a42",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "custom value-mapping should use custom value mapping when using value={{pink:\"my-pink-theme\"}}"
+    },
+    {
+      "id": "runtime:b78a907e6ab69540",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "custom value-mapping supports multiple attributes"
+    },
+    {
+      "id": "runtime:f275d0a425582f12",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "defaultTheme should return dark when dark is set as default-theme"
+    },
+    {
+      "id": "runtime:f4aefb165df72682",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "defaultTheme should return light when light is set as default-theme"
+    },
+    {
+      "id": "runtime:9345de1b7a9dde48",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "defaultTheme should return light when no default-theme is set and enableSystem=false"
+    },
+    {
+      "id": "runtime:30fbdb46ed3823fd",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "defaultTheme should return system-theme when no default-theme is set"
+    },
+    {
+      "id": "runtime:20a7b588e203f989",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "forcedTheme should render light theme when forcedTheme is set to light"
+    },
+    {
+      "id": "runtime:90f4fe2bc6a70db6",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "forcedTheme should render saved theme when no forcedTheme is set"
+    },
+    {
+      "id": "runtime:0de594f0625ab95e",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "inline script should pass props to script"
+    },
+    {
+      "id": "runtime:0f68993f50abbe4f",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "provider ignores nested ThemeProviders"
+    },
+    {
+      "id": "runtime:7114037b1cf0a185",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "setTheme setTheme(<function>)"
+    },
+    {
+      "id": "runtime:96aed78d1d1e5c2f",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "setTheme setTheme(<literal>)"
+    },
+    {
+      "id": "runtime:5d11e5299549c6ae",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "storage should not set localStorage with default value"
+    },
+    {
+      "id": "runtime:68ab36d547fc8977",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "storage should set localStorage when switching themes"
+    },
+    {
+      "id": "runtime:36914db7db44109c",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "system theme resolved theme should be set"
+    },
+    {
+      "id": "runtime:bc68e23f220ae175",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "system theme system theme should be set, even if theme is not system"
+    },
+    {
+      "id": "runtime:a272afe96ec989fc",
+      "file": "packages/next-themes/upstream/__tests__/index.test.tsx",
+      "fullName": "system theme system theme should not be set if enableSystem is false"
+    }
+  ],
+  "snapshots": 0
+}

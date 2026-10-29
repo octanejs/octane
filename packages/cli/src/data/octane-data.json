@@ -721,6 +721,19 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/next-themes",
+      "version": "0.0.0",
+      "category": "Styling",
+      "upstream": { "package": "next-themes", "version": "0.4.6" },
+      "surface": "Complete published surface: ThemeProvider with every prop (attribute, defaultTheme, enableSystem, enableColorScheme, storageKey, forcedTheme, disableTransitionOnChange, themes, value, nonce, scriptProps), useTheme, and the Attribute, ThemeProviderProps and UseThemeProps types. All 28 upstream runtime registrations run unchanged against React and, with import rewrites only, against Octane.",
+      "divergences": [
+        "The context renders as `<ThemeContext value>`, because Octane has no `Context.Provider`; consumers see the same `useTheme` values.",
+        "Public prop types use Octane's `DetailedHTMLProps`, `ScriptHTMLAttributes` and `PropsWithChildren`."
+      ],
+      "ssr": "Supported and tested: octane/server renders the inline no-flash script with its nonce and scriptProps, the script applies the stored or system theme before hydration, and hydrateRoot adopts the server script without a mismatch.",
+      "verified": "2026-10-29"
+    },
+    {
       "name": "@octanejs/nuqs",
       "version": "0.1.56",
       "category": "Routing",
@@ -1787,6 +1800,7 @@
     "mobx-react": "@octanejs/mobx",
     "mobx-react-lite": "@octanejs/mobx",
     "motion": "@octanejs/motion",
+    "next-themes": "@octanejs/next-themes",
     "nuqs": "@octanejs/nuqs",
     "radix-ui": "@octanejs/radix",
     "react-alien-signals": "@octanejs/alien-signals",
@@ -3630,6 +3644,11 @@
     "361": {
       "message": "This container already has a behavior root; pass replace: true to replace it.",
       "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "362": {
+      "message": "A hook was called outside a component render. If the call is inside a component, the app probably loads more than one copy of Octane, possibly with the same version. Check that the renderer (`createRoot`), the hooks, and `octane/internal/client` all resolve to one installed `octane` package; a custom bundler may need to deduplicate `octane` and its subpaths.",
+      "runtime": ["client"],
       "status": "active"
     }
   },
