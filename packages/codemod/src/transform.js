@@ -28,6 +28,16 @@ import {
  *   null to keep it.
  * @property {(specifier: string, name: string) => boolean | null} [isContext]
  *   whether an imported name is a context, or null when it cannot be known
+ * @property {(specifier: string) => string | null} [unported] the React package
+ *   an import specifier names when that package has no Octane port, or null
+ * @property {boolean} [reactCompat] the project has React and React DOM 19.2 or
+ *   newer, so `ReactCompat` can host an unported package's components
+ *
+ * @typedef {Object} Unported A React package with no Octane port, as this
+ *   module uses it
+ * @property {string} name
+ * @property {number} islands elements now rendered in a `ReactCompat` island
+ * @property {number} blocked uses that only a port can support
  *
  * @typedef {Object} TransformResult
  * @property {string} code
@@ -39,6 +49,7 @@ import {
  * @property {Record<string, number>} rules how often each rule fired
  * @property {ModuleExports} exports what the module exports that other modules'
  *   rewrites depend on
+ * @property {Unported[]} unported
  *
  * @typedef {Object} ModuleExports
  * @property {string[]} contexts exported names whose value is a context this
@@ -49,7 +60,7 @@ import {
 
 /**
  * @typedef {{ template: boolean }} Context
- * @typedef {{ module: string, local: string, imported: string, namespace: boolean, typeOnly: boolean }} Import
+ * @typedef {{ module: string, local: string, imported: string, namespace: boolean, typeOnly: boolean, port: Unported | null }} Import
  */
 
 /** Marks emitted text whose whole line should go. */
@@ -90,6 +101,8 @@ const RULE = {
 	try: 'template-try',
 	unsupported: 'unsupported-api',
 	strong: 'strong',
+	bindings: 'bindings',
+	reactCompat: 'react-compat',
 };
 
 /**
@@ -192,6 +205,21 @@ function skipParens(node) {
 /** @param {ts.Node} node */
 function isJsx(node) {
 	return ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
+}
+
+/**
+ * What a module's import of a package with no Octane port leaves to do.
+ *
+ * @param {Unported} port
+ */
+function portComment({ name, islands, blocked }) {
+	const missing = `No Octane port of \`${name}\` exists`;
+	if (blocked > 0) {
+		return `${missing}, and this module needs one: Octane cannot call its hooks, read its contexts, or pass Octane content to its components.`;
+	}
+	return islands > 0
+		? `${missing}, so its components render in React through ReactCompat.`
+		: `${missing}; React stays a dependency for it.`;
 }
 
 /**
@@ -602,6 +630,12 @@ class ModuleTransform {
 		this.descriptorComponents = new Set();
 		/** Whether a `declare module` now augments `octane/jsx-runtime`. */
 		this.augments = false;
+		/** @type {Map<string, Unported | null>} Each import specifier's unported package. */
+		this.ports = new Map();
+		/** @type {Map<string, Unported>} Unported packages, by name. */
+		this.unported = new Map();
+		/** @type {Set<ts.JsxElement | ts.JsxSelfClosingElement>} Elements to host in a `ReactCompat` island. */
+		this.islands = new Set();
 		/** @type {ts.ImportDeclaration[]} Placeholder index -> import declaration. */
 		this.importSlots = [];
 		this.hasJsx = false;
@@ -634,6 +668,7 @@ class ModuleTransform {
 			notes: this.notes.sort((a, b) => a.line - b.line),
 			rules: this.rules,
 			exports: this.exportsOf(),
+			unported: [...this.unported.values()],
 		};
 	}
 
@@ -691,7 +726,25 @@ class ModuleTransform {
 		// Added imports quote their module as the module's own imports do.
 		const first = this.sf.statements.find(ts.isImportDeclaration);
 		this.quote = first ? first.moduleSpecifier.getText(this.sf)[0] : "'";
+		/** Locals imported from a package with no Octane port. */
+		const portLocals = new Set();
 		for (const statement of this.sf.statements) {
+			if (
+				ts.isExportDeclaration(statement) &&
+				!statement.isTypeOnly &&
+				statement.moduleSpecifier &&
+				ts.isStringLiteral(statement.moduleSpecifier)
+			) {
+				const port = this.portOf(statement.moduleSpecifier.text);
+				if (port) {
+					this.note(
+						RULE.bindings,
+						'warning',
+						statement,
+						`\`${port.name}\` has no Octane port: import its components from it where they render, so they can render in a \`ReactCompat\` island.`,
+					);
+				}
+			}
 			if (!ts.isImportDeclaration(statement) || !statement.importClause) continue;
 			const module = /** @type {ts.StringLiteral} */ (statement.moduleSpecifier).text;
 			if (module in REACT_MODULES) this.fromReact = true;
@@ -703,8 +756,17 @@ class ModuleTransform {
 				/** @type {string} */ imported,
 				/** @type {boolean} */ typeOnly,
 			) => {
-				const entry = { module, local: name.text, imported, namespace: imported === '*', typeOnly };
+				const port = typeOnly ? null : this.portOf(module);
+				const entry = {
+					module,
+					local: name.text,
+					imported,
+					namespace: imported === '*',
+					typeOnly,
+					port,
+				};
 				this.imports.set(declaration, entry);
+				if (port) portLocals.add(name.text);
 				if (isApiModule(module)) this.apiLocals.set(name.text, entry);
 			};
 			// A default import of React is the namespace in practice; any other
@@ -729,6 +791,7 @@ class ModuleTransform {
 		const elements = [];
 		const visit = (/** @type {ts.Node} */ node) => {
 			if (ts.isIdentifier(node) && declaresName(node)) this.declared.add(node.text);
+			if (ts.isIdentifier(node) && portLocals.has(node.text)) this.planUnported(node);
 			if (isJsx(node)) this.hasJsx = true;
 			if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) fields.push(node);
 			if (
@@ -748,6 +811,128 @@ class ModuleTransform {
 		visit(this.sf);
 		for (const field of fields) if (this.takesChange(field)) this.planRestChange(field);
 		for (const element of elements) this.planDescriptorChildren(element);
+	}
+
+	/**
+	 * The package with no Octane port that a specifier names, or null. It
+	 * still runs on React, which only the codemod's report and a comment say.
+	 *
+	 * @param {string} module
+	 */
+	portOf(module) {
+		let port = this.ports.get(module);
+		if (port === undefined) {
+			const name = isApiModule(module) ? null : (this.options.unported?.(module) ?? null);
+			port = name === null ? null : (this.unported.get(name) ?? { name, islands: 0, blocked: 0 });
+			if (port) this.unported.set(port.name, port);
+			this.ports.set(module, port);
+		}
+		return port;
+	}
+
+	/**
+	 * A component from a package with no Octane port renders in React, inside
+	 * a `ReactCompat` island, when its element hands React nothing Octane
+	 * renders. Its hooks and contexts cannot run in an Octane component, so
+	 * they are reported.
+	 *
+	 * @param {ts.Identifier} node
+	 */
+	planUnported(node) {
+		const port = this.inImport(node) ? null : this.importOf(node)?.port;
+		if (!port) return;
+		// `Toast.Bar`, through a namespace or default import, is the member.
+		const member =
+			ts.isPropertyAccessExpression(node.parent) && node.parent.expression === node
+				? node.parent
+				: node;
+		const name = ts.isPropertyAccessExpression(member) ? member.name.text : node.text;
+		const text = member.getText(this.sf);
+		const parent = member.parent;
+		const block = (/** @type {string} */ message) => {
+			port.blocked++;
+			this.note(RULE.bindings, 'error', member, `${message} \`${port.name}\` has no Octane port.`);
+		};
+		if (
+			(ts.isJsxOpeningElement(parent) || ts.isJsxSelfClosingElement(parent)) &&
+			parent.tagName === member
+		) {
+			const element = ts.isJsxOpeningElement(parent) ? parent.parent : parent;
+			if (this.inIsland(element)) return;
+			if (!this.hostsInReact(element)) {
+				block(
+					`\`<${text}>\` takes children or props that Octane renders, which cannot cross into a React island.`,
+				);
+			} else if (!this.options.reactCompat) {
+				block(
+					`\`<${text}>\` can render in a \`ReactCompat\` island only with React and React DOM 19.2 or newer.`,
+				);
+			} else {
+				port.islands++;
+				this.islands.add(element);
+			}
+		} else if (ts.isCallExpression(parent) && parent.expression === member) {
+			if (/^use[A-Z0-9]/.test(name))
+				block(`\`${text}\` is a React hook, which Octane cannot call.`);
+		} else if (
+			ts.isCallExpression(parent) &&
+			/^(?:use|useContext)$/.test(this.calleeName(parent.expression) ?? '')
+		) {
+			block(`\`${text}\` is a React context, which Octane cannot read.`);
+		}
+	}
+
+	/**
+	 * Whether a React component's element can be the root of a `ReactCompat`
+	 * island: React renders all of it, so its children are text and no prop
+	 * holds an element, as JSX here, through a value this module declares, or
+	 * by its type.
+	 *
+	 * @param {ts.JsxElement | ts.JsxSelfClosingElement} element
+	 */
+	hostsInReact(element) {
+		const text = (/** @type {ts.JsxChild} */ child) =>
+			ts.isJsxText(child) ||
+			(ts.isJsxExpression(child) &&
+				(!child.expression ||
+					isTextSpelling(child.expression) ||
+					textKind(this.typeOf(child.expression)) !== 0));
+		if (ts.isJsxElement(element) && !element.children.every(text)) return false;
+		const seen = new Set();
+		/** @type {(node: ts.Node) => boolean} */
+		const rendersOctane = (node) => {
+			if (isJsx(node)) return true;
+			if (ts.isIdentifier(node)) {
+				const project = this.projectType(node);
+				const type = (project?.checker ?? this.checker).typeToString(
+					project?.type ?? this.checker.getTypeAtLocation(node),
+					undefined,
+					ts.TypeFormatFlags.NoTruncation,
+				);
+				if (/\b(?:React(?:Node|Element)|JSX\.Element)\b/.test(type)) return true;
+				const declaration = this.declarationOf(node);
+				if (declaration?.getSourceFile() === this.sf && !seen.has(declaration)) {
+					seen.add(declaration);
+					if (rendersOctane(declaration)) return true;
+				}
+			}
+			return ts.forEachChild(node, rendersOctane) ?? false;
+		};
+		return !rendersOctane(
+			ts.isJsxElement(element) ? element.openingElement.attributes : element.attributes,
+		);
+	}
+
+	/**
+	 * Whether an element is already the child of a `ReactCompat` island.
+	 *
+	 * @param {ts.JsxElement | ts.JsxSelfClosingElement} element
+	 */
+	inIsland(element) {
+		const parent = element.parent;
+		if (!ts.isJsxElement(parent)) return false;
+		const entry = this.importOf(parent.openingElement.tagName);
+		return entry?.module === 'octane/react' && entry.imported === 'ReactCompat';
 	}
 
 	/**
@@ -1271,6 +1456,11 @@ class ModuleTransform {
 			return this.require('@octanejs/tanstack-router', DOCUMENT_TAGS[node.text], false);
 		}
 		if (ts.isJsxAttributes(node)) return this.rewriteAttributes(node);
+		if ((ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) && this.islands.has(node)) {
+			this.count(RULE.reactCompat);
+			const island = this.require('octane/react', 'ReactCompat', false);
+			return `<${island}>${this.span(node, node.getStart(this.sf), node.end, PLAIN)}</${island}>`;
+		}
 		if (ts.isJsxElement(node)) return this.rewriteElement(node, ctx);
 		if (ts.isJsxExpression(node) && ctx.template) return this.rewriteHole(node);
 		if (
@@ -1315,7 +1505,17 @@ class ModuleTransform {
 			this.importSlots.push(node);
 			return `\u0000IMPORT${this.importSlots.length - 1}\u0000`;
 		}
-		return this.rewriteSpecifier(node, node.moduleSpecifier);
+		const text = this.rewriteSpecifier(node, node.moduleSpecifier);
+		// Analysis recorded the packages this module imports values from.
+		const port = node.importClause?.isTypeOnly === false ? (this.ports.get(module) ?? null) : null;
+		if (
+			!port ||
+			ts
+				.getLeadingCommentRanges(this.source, node.pos)
+				?.some((range) => this.source.slice(range.pos, range.end).includes('No Octane port of'))
+		)
+			return text;
+		return `// ${portComment(port)}\n${text ?? node.getText(this.sf)}`;
 	}
 
 	/** @param {ts.ExportDeclaration} node */
@@ -1551,9 +1751,10 @@ class ModuleTransform {
 	insertionPoint(code) {
 		// Whole lines only: a shebang, blank lines, comments that end their
 		// line, and directive lines. Anything inserted here starts a line, so
-		// the Strong fallback can find its own directive line again.
+		// the Strong fallback can find its own directive line again. The
+		// comment on an unported package's import stays with it.
 		const prologue =
-			/^(?:#![^\n]*\n)?(?:[ \t]*(?:\/\/[^\n]*|\/\*[\s\S]*?\*\/[ \t]*|(['"])use [a-z ]+\1;?[^\n]*)?\r?\n)*/.exec(
+			/^(?:#![^\n]*\n)?(?:[ \t]*(?:\/\/(?! No Octane port of)[^\n]*|\/\*[\s\S]*?\*\/[ \t]*|(['"])use [a-z ]+\1;?[^\n]*)?\r?\n)*/.exec(
 				code,
 			);
 		return prologue ? prologue[0].length : 0;

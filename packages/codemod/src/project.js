@@ -40,10 +40,13 @@ import { transformModule } from './transform.js';
  * @property {FileResult[]} files
  * @property {{ from: string, to: string }[]} packages React packages the
  *   migrated code now imports as Octane bindings
- * @property {string[]} missing React packages the code imports that have no
- *   Octane binding
+ * @property {Missing[]} missing React packages the code imports that have no
+ *   Octane port, and how it uses them
  * @property {string[]} html entry pages whose script reference was updated
  * @property {string | null} compiler where the verifying compiler came from
+ *
+ * @typedef {import('./transform.js').Unported & { modules: number }} Missing
+ *   with how many modules import it
  */
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
@@ -88,20 +91,23 @@ export async function runCodemod(paths, options = {}) {
 	const compiler = verify || strong ? await loadCompiler(root) : null;
 	/** @type {Map<string, string>} */
 	const packages = new Map();
-	/** @type {Set<string>} */
-	const missing = new Set();
+	/** @type {Map<string, Missing>} */
+	const missing = new Map();
+	// `ReactCompat` hosts a component from a package with no port in a React
+	// 19.2 root.
+	const reactCompat = ['react', 'react-dom'].every((name) =>
+		/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(root, name)?.version ?? ''),
+	);
 	/** @type {FileResult[]} */
 	const results = [];
 	for (const file of files) {
 		const source = fs.readFileSync(file, 'utf8');
 		/** @type {Note[]} */
 		const extra = [];
-		/** @type {Set<string>} */
-		const unmapped = new Set();
 		const resolveSpecifier = (/** @type {string} */ specifier) =>
 			resolveRelative(file, specifier, known, renames) ??
 			resolveAlias(file, specifier, renames, config) ??
-			resolveBinding(file, specifier, packages, extra, unmapped);
+			resolveBinding(specifier, packages, extra);
 		const isContext = (/** @type {string} */ specifier, /** @type {string} */ name) => {
 			if (!specifier.startsWith('.')) return null;
 			const target = resolveModule(file, specifier, known);
@@ -115,15 +121,20 @@ export async function runCodemod(paths, options = {}) {
 			types: sourceFile && checker && { sourceFile, checker },
 			resolveSpecifier,
 			isContext,
+			unported: (specifier) => unportedName(specifier, file),
+			reactCompat,
 		});
-		for (const name of unmapped) {
-			missing.add(name);
-			extra.push({
-				rule: 'bindings',
-				severity: 'error',
-				line: 1,
-				message: `No Octane binding for \`${name}\`, a React package; port it or replace it.`,
-			});
+		for (const port of result.unported) {
+			const entry = missing.get(port.name) ?? {
+				name: port.name,
+				modules: 0,
+				islands: 0,
+				blocked: 0,
+			};
+			entry.modules++;
+			entry.islands += port.islands;
+			entry.blocked += port.blocked;
+			missing.set(port.name, entry);
 		}
 		const output = renames.get(file) ?? file;
 		let code = result.code;
@@ -202,7 +213,7 @@ export async function runCodemod(paths, options = {}) {
 		root,
 		files: results,
 		packages: [...packages].map(([from, to]) => ({ from, to })),
-		missing: [...missing].sort(),
+		missing: [...missing.values()].sort((a, b) => a.name.localeCompare(b.name)),
 		html,
 		compiler: compiler?.from ?? null,
 	};
@@ -395,29 +406,13 @@ function contextIndex(exports, files) {
  * The binding that replaces a React package import, recorded so the report
  * can list the dependency changes.
  *
- * @param {string} from the importing module
  * @param {string} specifier
  * @param {Map<string, string>} packages
  * @param {Note[]} notes
- * @param {Set<string>} unmapped React packages with no binding
  */
-function resolveBinding(from, specifier, packages, notes, unmapped) {
-	if (specifier.startsWith('.') || specifier.startsWith('/')) return null;
-	// The catalog keys some bindings by subpath (`better-auth/react`), so the
-	// longest matching prefix wins.
-	const parts = specifier.split('/');
-	let name = '';
-	for (let length = parts.length; length > 0 && name === ''; length--) {
-		const candidate = parts.slice(0, length).join('/');
-		if (candidate in CATALOG) name = candidate;
-	}
-	if (name === '') {
-		const root = specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
-		// Any package's `/react` entry renders with React (`@tanstack/markdown/react`).
-		if (/\/react(?:\/|$)/.test(specifier.slice(root.length))) unmapped.add(specifier);
-		else if (rendersWithReact(root, from)) unmapped.add(root);
-		return null;
-	}
+function resolveBinding(specifier, packages, notes) {
+	const name = catalogName(specifier);
+	if (name === null) return null;
 	const binding = CATALOG[name];
 	packages.set(name, binding);
 	// An aggregate binding (`@octanejs/visx`, for `@visx/visx`) serves each
@@ -438,6 +433,40 @@ function resolveBinding(from, specifier, packages, notes, unmapped) {
 		});
 	}
 	return binding + subpath;
+}
+
+/**
+ * The catalog entry for a package specifier, or null. The catalog keys some
+ * bindings by subpath (`better-auth/react`), so the longest matching prefix
+ * wins.
+ *
+ * @param {string} specifier
+ */
+function catalogName(specifier) {
+	if (specifier.startsWith('.') || specifier.startsWith('/')) return null;
+	const parts = specifier.split('/');
+	for (let length = parts.length; length > 0; length--) {
+		const candidate = parts.slice(0, length).join('/');
+		if (candidate in CATALOG) return candidate;
+	}
+	return null;
+}
+
+/**
+ * The React package a specifier names when Octane has no binding for it, or
+ * null.
+ *
+ * @param {string} specifier
+ * @param {string} from the importing module
+ */
+function unportedName(specifier, from) {
+	if (specifier.startsWith('.') || specifier.startsWith('/') || catalogName(specifier) !== null)
+		return null;
+	const parts = specifier.split('/');
+	const root = specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+	// Any package's `/react` entry renders with React (`@tanstack/markdown/react`).
+	if (/\/react(?:\/|$)/.test(specifier.slice(root.length))) return specifier;
+	return rendersWithReact(root, from) ? root : null;
 }
 
 /**
