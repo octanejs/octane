@@ -21,7 +21,7 @@ import {
 	useContext,
 	useId,
 	useLayoutEffect,
-	useRef,
+	useLazyRef,
 	Children,
 	isValidElement,
 	Fragment,
@@ -183,7 +183,24 @@ function buildRoute(entry: CollectorEntry, treePath: number[]): RouteObject {
 	return route;
 }
 
-export const RoutesCollectorContext = createContext<RoutesCollector | null>(null);
+// Collect once per dirty registration batch, after the children have committed.
+export function createRootCollector(invalidate: () => void) {
+	let snapshot: RouteObject[] | null | undefined = null;
+	const root = createCollector(() => {
+		if (snapshot !== undefined) {
+			snapshot = undefined;
+			invalidate();
+		}
+	});
+	return Object.assign(root, {
+		snapshot() {
+			if (snapshot === undefined) snapshot = root.collect();
+			return snapshot;
+		},
+	});
+}
+
+export const RoutesCollectorContext = createContext<{ current: RoutesCollector } | null>(null);
 
 /**
  * Configures an element to render when a pattern matches the current location.
@@ -202,12 +219,12 @@ export function Route(props: Record<string, any>): unknown {
 	// symbols are exactly what the compiler would inject).
 	const id = useId(Symbol.for('rr:route:id') as any);
 	const hasBlockChildren = props.children != null && isChildrenBlock(props.children);
-	const childCollectorRef = useRef<RoutesCollector | null>(null, Symbol.for('rr:route:cc') as any);
-	if (hasBlockChildren && childCollectorRef.current === null) {
-		// Nested block children register here; changes bubble to the root
-		// collector's onChange.
-		childCollectorRef.current = createCollector(collector.onChange);
-	}
+	const childCollector = hasBlockChildren
+		? useLazyRef(
+				() => createCollector(() => collector.current.onChange()),
+				Symbol.for('rr:route:cc') as any,
+			)
+		: null;
 
 	// Register AFTER the children's layout effects (octane runs effects
 	// child-first on mount), so a nested collector is fully populated before
@@ -215,14 +232,15 @@ export function Route(props: Record<string, any>): unknown {
 	// collector's material-change check keeps this loop-free.
 	useLayoutEffect(
 		() => {
-			collector.register(id, props, hasBlockChildren ? childCollectorRef.current : null);
+			collector.current.register(id, props, childCollector?.current ?? null);
 		},
 		undefined as any,
 		Symbol.for('rr:route:reg') as any,
 	);
 	useLayoutEffect(
 		() => {
-			return () => collector.unregister(id);
+			const parent = collector.current;
+			return () => parent.unregister(id);
 		},
 		[collector, id],
 		Symbol.for('rr:route:unreg') as any,
@@ -231,9 +249,9 @@ export function Route(props: Record<string, any>): unknown {
 	// Block children render invisibly under the nested collector so the
 	// <Route>s inside register; descriptor children need no rendering (walked
 	// at collect time). Route itself renders nothing, as upstream.
-	if (hasBlockChildren) {
+	if (childCollector) {
 		return createElement(RoutesCollectorContext as any, {
-			value: childCollectorRef.current,
+			value: childCollector,
 			children: props.children,
 		});
 	}

@@ -5,9 +5,17 @@
  * onSubmit is a NATIVE delegated submit listener — jsdom fires SubmitEvent
  * (with `submitter`) when a submit button is clicked, same as the browser.
  */
-import { describe, it, expect } from 'vitest';
+import { createElement, startTransition } from 'octane';
+import { createMemoryRouter, RouterProvider } from '@octanejs/remix-router';
+import { describe, it, expect, vi } from 'vitest';
 import { mount, nextPaint } from '../_helpers';
-import { FormApp, FormActionApp, FetcherApp, fetcherGate } from '../_fixtures/forms.tsrx';
+import {
+	FormApp,
+	FormActionApp,
+	FetcherApp,
+	FetcherPage,
+	fetcherGate,
+} from '../_fixtures/forms.tsrx';
 
 async function flush() {
 	for (let i = 0; i < 4; i++) {
@@ -84,6 +92,34 @@ describe('useFormAction', () => {
 });
 
 describe('useFetcher / useFetchers', () => {
+	it('retains completed fetcher data when an async transition delays its publication', async () => {
+		const loader = Promise.withResolvers<{ value: string }>();
+		const hold = Promise.withResolvers<void>();
+		const router = createMemoryRouter([
+			{ path: '/', element: createElement(FetcherPage) },
+			{ path: '/api', loader: () => loader.promise },
+		]);
+		const view = mount(RouterProvider, { router });
+		try {
+			await flush();
+			view.click('#f-load');
+			await vi.waitFor(() => expect(router.state.fetchers.size).toBe(1));
+			startTransition(() => {
+				loader.resolve({ value: 'retained' });
+				return hold.promise;
+			});
+			// The router trims mounted idle fetchers before Octane can publish this Action.
+			await vi.waitFor(() => expect(router.state.fetchers.size).toBe(0));
+			hold.resolve();
+			await vi.waitFor(() => expect(view.find('#f-data').textContent).toBe('retained'));
+			expect(view.find('#f-state').textContent).toBe('idle');
+		} finally {
+			hold.resolve();
+			view.unmount();
+			router.dispose();
+		}
+	});
+
 	it('fetcher.load runs a loader without navigating: idle → loading → idle + data', async () => {
 		// Per data-browser-router-test.tsx "fetcher.load()".
 		fetcherGate.resolve = null;

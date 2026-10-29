@@ -1,3 +1,5 @@
+'use strong';
+
 // RenderErrorBoundary — port of the class boundary in react-router@8.2.0
 // lib/hooks.tsx onto octane's @try/@catch (octane has no class components).
 // RSC digest branches are dropped (RSCRouterContext is hardwired false here).
@@ -19,7 +21,7 @@
 // the catch state via reset() one commit after the location/revalidation
 // derivation says the error cleared (documented divergence: upstream clears
 // in a render-phase derivation; same observable outcome).
-import { useRef, useLayoutEffect } from 'octane';
+import { useRef, useLayoutEffect, useLinkedState, useMemo } from 'octane';
 import type { OctaneNode } from 'octane';
 import { RouteContext, RouteErrorContext } from './context.ts';
 import type { RouteContextObject } from './context.ts';
@@ -38,35 +40,24 @@ type RenderErrorBoundaryProps = {
 
 export function RenderErrorBoundary(props: RenderErrorBoundaryProps) @{
 	// getDerivedStateFromProps, run during render (pure derivation).
-	const state = useRef({
-		location: props.location,
-		revalidation: props.revalidation,
-		error: props.error,
-	});
-	{
-		const s = state.current;
-		if (
-			s.location !== props.location ||
-			(s.revalidation !== 'idle' && props.revalidation === 'idle')
-		) {
-			state.current = {
-				error: props.error,
-				location: props.location,
-				revalidation: props.revalidation,
-			};
-		} else {
-			state.current = {
-				error: props.error !== undefined ? props.error : s.error,
-				location: s.location,
-				revalidation: props.revalidation || s.revalidation,
-			};
-		}
-	}
+	const [error] = useLinkedState(
+		{ location: props.location, revalidation: props.revalidation, error: props.error },
+		(next, previous) => {
+			if (
+				previous === undefined ||
+				next.location !== previous.source.location ||
+				(previous.source.revalidation !== 'idle' && next.revalidation === 'idle')
+			) {
+				return next.error;
+			}
+			return next.error !== undefined ? next.error : previous.value;
+		},
+	);
 
 	@try {
-		@if (state.current.error !== undefined) {
+		@if (error !== undefined) {
 			<RouteContext value={props.routeContext}>
-				<RouteErrorContext value={state.current.error}>{props.component}</RouteErrorContext>
+				<RouteErrorContext value={error}>{props.component}</RouteErrorContext>
 			</RouteContext>
 		} @else {
 			<>{props.children}</>
@@ -93,15 +84,13 @@ type CaughtErrorViewProps = Omit<RenderErrorBoundaryProps, 'children'> & {
 function CaughtErrorView(props: CaughtErrorViewProps) @{
 	// componentDidCatch parity — once per distinct caught error, during render
 	// so a rethrowing onError escapes to the parent boundary.
-	const reported = useRef<unknown>(null);
-	if (reported.current !== props.caught) {
-		reported.current = props.caught;
+	useMemo(() => {
 		if (props.onError) {
 			props.onError(props.caught, { componentStack: '' });
 		} else {
 			console.error('React Router caught the following error during render', props.caught);
 		}
-	}
+	}, [props.caught]);
 
 	// Error precedence per upstream derivation: a defined props.error (data
 	// error for this location) wins over the caught render error.
@@ -124,7 +113,7 @@ function CaughtErrorView(props: CaughtErrorViewProps) @{
 		if (shouldReset) {
 			props.reset();
 		}
-	}, [props.location, props.revalidation]);
+	});
 
 	<RouteContext value={props.routeContext}>
 		<RouteErrorContext value={error}>{props.component}</RouteErrorContext>
