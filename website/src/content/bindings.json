@@ -294,13 +294,74 @@
   },
   {
     "title": "UI Utilities",
-    "description": "Browser hooks, positioning, drag interactions, keyboard input, layout helpers, and event pacing.",
+    "description": "Browser hooks, positioning, keyboard input, layout helpers, and event pacing.",
     "packages": [
       {
         "packageName": "@octanejs/base-ui-utils",
         "title": "Base UI Utils",
         "tags": ["utilities", "hooks", "browser"]
       },
+      {
+        "packageName": "@octanejs/floating-ui",
+        "title": "Floating UI",
+        "tags": ["positioning", "popovers", "tooltips"]
+      },
+      {
+        "packageName": "@octanejs/image-crop",
+        "title": "React Image Crop",
+        "tags": ["images", "media"]
+      },
+      {
+        "packageName": "@octanejs/mantine-hooks",
+        "title": "Mantine Hooks",
+        "tags": ["hooks", "browser"]
+      },
+      {
+        "packageName": "@octanejs/popper",
+        "title": "Popper",
+        "tags": ["positioning", "popovers", "tooltips"]
+      },
+      {
+        "packageName": "@octanejs/react-error-boundary",
+        "title": "React Error Boundary",
+        "tags": ["errors", "recovery"]
+      },
+      {
+        "packageName": "@octanejs/intersection-observer",
+        "title": "React Intersection Observer",
+        "tags": ["visibility", "scroll", "browser"]
+      },
+      {
+        "packageName": "@octanejs/resizable-panels",
+        "title": "React Resizable Panels",
+        "tags": ["layout", "panels"]
+      },
+      {
+        "packageName": "@octanejs/to-print",
+        "title": "React to Print",
+        "tags": ["printing", "browser"]
+      },
+      {
+        "packageName": "@octanejs/waypoint",
+        "title": "React Waypoint",
+        "tags": ["visibility", "scroll", "browser"]
+      },
+      {
+        "packageName": "@octanejs/stick-to-bottom",
+        "title": "Stick to Bottom",
+        "tags": ["scroll", "chat"]
+      },
+      {
+        "packageName": "@octanejs/usehooks-ts",
+        "title": "usehooks-ts",
+        "tags": ["hooks", "browser"]
+      }
+    ]
+  },
+  {
+    "title": "Drag & Drop",
+    "description": "Drag interactions, sortable lists, movement modifiers, and drop announcements, including dnd kit's modern and legacy APIs.",
+    "packages": [
       {
         "packageName": "@octanejs/dnd-kit",
         "title": "DnD Kit",
@@ -337,64 +398,9 @@
         "tags": ["drag drop", "utilities", "legacy api"]
       },
       {
-        "packageName": "@octanejs/floating-ui",
-        "title": "Floating UI",
-        "tags": ["positioning", "popovers", "tooltips"]
-      },
-      {
-        "packageName": "@octanejs/image-crop",
-        "title": "React Image Crop",
-        "tags": ["images", "media"]
-      },
-      {
-        "packageName": "@octanejs/mantine-hooks",
-        "title": "Mantine Hooks",
-        "tags": ["hooks", "browser"]
-      },
-      {
-        "packageName": "@octanejs/popper",
-        "title": "Popper",
-        "tags": ["positioning", "popovers", "tooltips"]
-      },
-      {
         "packageName": "@octanejs/draggable",
         "title": "React Draggable",
         "tags": ["drag drop", "interaction"]
-      },
-      {
-        "packageName": "@octanejs/react-error-boundary",
-        "title": "React Error Boundary",
-        "tags": ["errors", "recovery"]
-      },
-      {
-        "packageName": "@octanejs/intersection-observer",
-        "title": "React Intersection Observer",
-        "tags": ["visibility", "scroll", "browser"]
-      },
-      {
-        "packageName": "@octanejs/resizable-panels",
-        "title": "React Resizable Panels",
-        "tags": ["layout", "panels"]
-      },
-      {
-        "packageName": "@octanejs/to-print",
-        "title": "React to Print",
-        "tags": ["printing", "browser"]
-      },
-      {
-        "packageName": "@octanejs/waypoint",
-        "title": "React Waypoint",
-        "tags": ["visibility", "scroll", "browser"]
-      },
-      {
-        "packageName": "@octanejs/stick-to-bottom",
-        "title": "Stick to Bottom",
-        "tags": ["scroll", "chat"]
-      },
-      {
-        "packageName": "@octanejs/usehooks-ts",
-        "title": "usehooks-ts",
-        "tags": ["hooks", "browser"]
       }
     ]
   },
