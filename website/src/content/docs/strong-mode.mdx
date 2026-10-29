@@ -121,7 +121,9 @@ see [Build tools](/docs/build-tools#strong-mode). `octane analyze` reads
 config file where you can.
 
 Type checking selects Strong JSX types for Strong `.tsrx` modules automatically, so
-`dangerouslySetInnerHTML` needs a value from `trustHTML`.
+`dangerouslySetInnerHTML` needs a value from `trustHTML`. Host prop types imported from
+`octane`, such as `ComponentProps<'span'>`, follow them too, so a wrapper that spreads its
+props onto a host passes that requirement on to its callers.
 
 <h2 id="adopt-strong-mode">Adopt it in an existing app</h2>
 

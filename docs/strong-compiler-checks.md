@@ -393,6 +393,28 @@ JSX types, so imported values and props also need the brand. `null` and
 `undefined` remain valid empty values; custom component props and foreign
 renderer JSX keep their own types.
 
+The host prop types a Strong module imports from `octane` follow the same JSX
+types. `ComponentProps<'span'>`, `ComponentPropsWithoutRef<'div'>`,
+`HTMLAttributes<T>`, `SVGProps<T>`, and the other React-shaped host attribute
+types require `TrustedHTML` and exclude the suppression props. A shadcn-style
+wrapper that spreads them onto its host type-checks, and its callers supply the
+brand:
+
+```tsrx
+"use strong";
+import type { ComponentProps } from 'octane';
+
+export function Badge({ className, ...props }: ComponentProps<'span'>) @{
+  <span class={className} {...props} />
+}
+```
+
+`<Badge dangerouslySetInnerHTML={{ __html: html }} />` is then a type error in
+any module, Strong or not. These types narrow the compatibility ones, so a
+Strong wrapper can still spread its props onto a compatibility component. A
+`.ts` module that declares host props for Strong components imports them from
+the type-only `octane/strong` entry.
+
 The syntax compiler cannot establish the type of an arbitrary imported value or
 dynamic factory prop. Run the project's `tsrx-tsc --noEmit` check as well as its
 build. Type assertions and `any` can bypass nominal checking, as with other

@@ -139,6 +139,7 @@ export type NativeEvent<T = Element, E extends Event = Event> = E & {
 	currentTarget: T & EventTarget;
 };
 export type EventHandler<E extends Event> = { bivarianceHack(event: E): void }['bivarianceHack'];
+// Each host prop type, ComponentProps included, has a Strong counterpart in strong.d.ts.
 export type AnchorHTMLAttributes<T> = Octane.AnchorHTMLAttributes<T>;
 export type AreaHTMLAttributes<T> = Octane.AreaHTMLAttributes<T>;
 export type AudioHTMLAttributes<T> = Octane.AudioHTMLAttributes<T>;
