@@ -153,6 +153,76 @@ describe('ReactCompat buffered server rendering', () => {
 		}
 	});
 
+	it.each(['Octane', 'React'] as const)(
+		'reports repaired islands once to the %s reporter while retaining their neighbors',
+		async (reporter) => {
+			function Label() {
+				return React.createElement('b', null, 'label');
+			}
+			const container = document.createElement('div');
+			container.innerHTML = (
+				await prerender(() =>
+					Server.createElement(
+						'main',
+						null,
+						reactIsland(Label),
+						reactIsland(Label),
+						reactIsland(Label),
+					),
+				)
+			).html;
+			const [first, second, matching] = container.querySelectorAll('b');
+			first.textContent = second.textContent = 'stale';
+			const reporterFailure = new Error('reporter failed');
+			const onRecoverableError = vi.fn((_error: unknown) => {
+				throw reporterFailure;
+			});
+			const defaults: unknown[] = [];
+			const onError = (event: ErrorEvent) => {
+				event.preventDefault();
+				defaults.push(event.error);
+			};
+			window.addEventListener('error', onError);
+			const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+			const child = () =>
+				Client.createElement<ReactCompatComponentProps<Record<string, never>>>(ClientReactCompat, {
+					component: Label,
+				});
+			let root: Client.Root | undefined;
+			try {
+				root = Client.hydrateRoot(
+					container,
+					() => Client.createElement('main', null, child(), child(), child()),
+					undefined,
+					reporter === 'Octane' ? { onRecoverableError } : undefined,
+				);
+				await vi.waitFor(() => expect(container.textContent).toBe('labellabellabel'));
+				const [currentFirst, currentSecond, currentMatching] = container.querySelectorAll('b');
+				expect(currentFirst).not.toBe(first);
+				expect(currentSecond).not.toBe(second);
+				expect(currentMatching).toBe(matching);
+				if (reporter === 'Octane') {
+					expect(onRecoverableError).toHaveBeenCalledTimes(2);
+					const errors = onRecoverableError.mock.calls.map(([error]) => error as Error);
+					for (const error of errors) {
+						expect(error.message).toContain('ReactCompat');
+						expect(error.cause).toBeInstanceOf(Error);
+					}
+					expect(errors[0].message).not.toBe(errors[1].message);
+					expect(logged).toHaveBeenCalledWith(reporterFailure);
+					expect(defaults).toEqual([]);
+				} else {
+					expect(defaults).toHaveLength(2);
+					expect(defaults[0]).toBeInstanceOf(Error);
+				}
+			} finally {
+				root?.unmount();
+				window.removeEventListener('error', onError);
+				logged.mockRestore();
+			}
+		},
+	);
+
 	it('renders a real React component with scoped context and escaped content', async () => {
 		const source = Server.createContext('default');
 		const target = React.createContext('React default');

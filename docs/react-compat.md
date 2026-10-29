@@ -178,7 +178,11 @@ React `useId` values receive a per-island prefix derived from Octane `useId`.
 Hydration adopts the existing island DOM through React `hydrateRoot`, preserving
 its nodes, refs, and user-edited form state. The server and client must render the
 same component, context values, and tree. Normal React hydration recovery applies
-to a mismatch inside an island.
+to a mismatch inside an island. If the owning Octane root has an
+`onRecoverableError` handler, it receives one error for each recovery reported
+by React. The error message identifies the island by its React identifier prefix,
+and its `cause` is the original React error. With no handler, React reports the
+error through its usual channel.
 
 The server request owns pending React work. Abort, cancellation, timeout, and
 request completion release it. Buffered island HTML is limited to 8 MiB. A

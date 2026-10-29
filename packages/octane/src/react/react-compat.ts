@@ -1,6 +1,6 @@
 /** @jsxImportSource octane */
 /** A real React root owned by one committed Octane boundary. */
-import { createRoot, hydrateRoot, type Root } from 'react-dom/client';
+import { createRoot, hydrateRoot, type HydrationOptions, type Root } from 'react-dom/client';
 import {
 	createElement,
 	descriptorChildren,
@@ -19,6 +19,7 @@ import {
 	type Context,
 	type Scope,
 } from '../runtime.js';
+import { invokeRootErrorHandler, rootErrorHandlersFor } from '../runtime/roots.js';
 import {
 	createReactCompatTree,
 	isReactCompatErrorBoundary,
@@ -164,7 +165,7 @@ class ReactIslandController {
 		this.contexts = contexts;
 		const tree = this.tree();
 		if (this.root === null) {
-			const options = {
+			const options: HydrationOptions = {
 				identifierPrefix,
 				onUncaughtError: (error: unknown) => this.signal('error', error),
 				onCaughtError: (error: unknown, info: { errorBoundary?: unknown }) => {
@@ -179,8 +180,22 @@ class ReactIslandController {
 					(first as Comment).data === SENTINEL_COMMENT &&
 					first.nextSibling === null
 				);
-			if (serverMarkup) this.root = hydrateRoot(this.host, tree, options);
-			else {
+			if (serverMarkup) {
+				const report = rootErrorHandlersFor(this.scope.block)?.onRecoverableError;
+				if (report !== undefined) {
+					options.onRecoverableError = (cause) => {
+						const error = new Error(
+							`Hydration recovered in ReactCompat island ${identifierPrefix}.`,
+							{
+								cause,
+							},
+						);
+						// Let the React commit finish before the reporter can re-enter either root.
+						queueMicrotask(() => invokeRootErrorHandler(report, error));
+					};
+				}
+				this.root = hydrateRoot(this.host, tree, options);
+			} else {
 				this.root = createRoot(this.host, options);
 				this.root.render(tree);
 			}
