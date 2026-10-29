@@ -274,7 +274,7 @@
     {
       "name": "@octanejs/dnd-kit",
       "version": "0.1.62",
-      "category": "UI Utilities",
+      "category": "Drag & Drop",
       "upstream": { "package": "@dnd-kit/react", "version": "0.5.0" },
       "surface": "Complete modern dnd-kit React-adapter surface: DragDropProvider, DragOverlay, useDraggable/useDroppable, manager/monitor/operation hooks, PointerSensor/KeyboardSensor re-exports, the public signal-hook utilities, useSortable, and all four upstream entry points.",
       "divergences": [
@@ -285,9 +285,61 @@
       "verified": "2026-08-03"
     },
     {
+      "name": "@octanejs/dnd-kit-accessibility",
+      "version": "0.0.0",
+      "category": "Drag & Drop",
+      "upstream": { "package": "@dnd-kit/accessibility", "version": "3.1.1" },
+      "surface": "Complete @dnd-kit/accessibility 3.1.1 surface: HiddenText, LiveRegion, and useAnnouncement.",
+      "divergences": [],
+      "ssr": "Plain markup with no browser globals; no dedicated SSR lane.",
+      "verified": "2026-10-29"
+    },
+    {
+      "name": "@octanejs/dnd-kit-core",
+      "version": "0.0.0",
+      "category": "Drag & Drop",
+      "upstream": { "package": "@dnd-kit/core", "version": "6.3.1" },
+      "surface": "Complete @dnd-kit/core 6.3.1 surface: DndContext, DragOverlay with drop animations, useDraggable/useDroppable/useDndContext/useDndMonitor, pointer/mouse/touch/keyboard sensors, collision detection, modifiers, measuring and auto-scroll configuration, and screen-reader announcements.",
+      "divergences": [
+        "Sensor activator handlers receive the native DOM event; React passes a SyntheticEvent, and the built-in sensors read the event directly instead of `event.nativeEvent`. A custom sensor that destructures `{ nativeEvent }` must read the event itself."
+      ],
+      "ssr": "Accessibility markup mounts after the first client effect, as upstream; no dedicated SSR lane.",
+      "verified": "2026-10-29"
+    },
+    {
+      "name": "@octanejs/dnd-kit-modifiers",
+      "version": "0.0.0",
+      "category": "Drag & Drop",
+      "upstream": { "package": "@dnd-kit/modifiers", "version": "9.0.0" },
+      "surface": "Complete @dnd-kit/modifiers 9.0.0 surface: the restrictTo* modifiers, snapCenterToCursor, and createSnapModifier.",
+      "divergences": [],
+      "ssr": "Pure functions; no dedicated SSR lane.",
+      "verified": "2026-10-29"
+    },
+    {
+      "name": "@octanejs/dnd-kit-sortable",
+      "version": "0.0.0",
+      "category": "Drag & Drop",
+      "upstream": { "package": "@dnd-kit/sortable", "version": "10.0.0" },
+      "surface": "Complete @dnd-kit/sortable 10.0.0 surface: SortableContext, useSortable, the rect/vertical/horizontal list and rect swapping strategies, arrayMove/arraySwap, sortableKeyboardCoordinates, hasSortableData, and defaultAnimateLayoutChanges/defaultNewIndexGetter.",
+      "divergences": [],
+      "ssr": "No dedicated SSR lane.",
+      "verified": "2026-10-29"
+    },
+    {
+      "name": "@octanejs/dnd-kit-utilities",
+      "version": "0.0.0",
+      "category": "Drag & Drop",
+      "upstream": { "package": "@dnd-kit/utilities", "version": "3.2.2" },
+      "surface": "Complete @dnd-kit/utilities 3.2.2 surface: every hook (useCombinedRefs, useEvent, useInterval, useIsomorphicLayoutEffect, useLatestValue, useLazyMemo, useNodeRef, usePrevious, useUniqueId), CSS transform/transition serializers, coordinate math, event and node type guards, and getWindow/getOwnerDocument.",
+      "divergences": [],
+      "ssr": "useIsomorphicLayoutEffect falls back to useEffect without a DOM; no dedicated SSR lane.",
+      "verified": "2026-10-29"
+    },
+    {
       "name": "@octanejs/draggable",
       "version": "0.0.33",
-      "category": "UI Utilities",
+      "category": "Drag & Drop",
       "upstream": { "package": "react-draggable", "version": "4.7.1" },
       "surface": "Complete against the published react-draggable 4.7.1 root runtime and type surface: default Draggable, named DraggableCore, controlled and uncontrolled positioning, bounds, grid, axis, offsets, mouse and touch gestures, and all eight public types.",
       "divergences": [
@@ -1701,7 +1753,12 @@
     "@base-ui/react": "@octanejs/base-ui",
     "@base-ui/utils": "@octanejs/base-ui-utils",
     "@blocknote/react": "@octanejs/blocknote",
+    "@dnd-kit/accessibility": "@octanejs/dnd-kit-accessibility",
+    "@dnd-kit/core": "@octanejs/dnd-kit-core",
+    "@dnd-kit/modifiers": "@octanejs/dnd-kit-modifiers",
     "@dnd-kit/react": "@octanejs/dnd-kit",
+    "@dnd-kit/sortable": "@octanejs/dnd-kit-sortable",
+    "@dnd-kit/utilities": "@octanejs/dnd-kit-utilities",
     "@floating-ui/react": "@octanejs/floating-ui",
     "@formisch/react": "@octanejs/formisch",
     "@formkit/auto-animate": "@octanejs/auto-animate",

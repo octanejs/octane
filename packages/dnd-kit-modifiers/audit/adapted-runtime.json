@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "project": "dnd-kit-modifiers-upstream",
+  "roots": ["packages/dnd-kit-modifiers/tests/upstream"],
+  "files": ["packages/dnd-kit-modifiers/tests/upstream/modifiers.test.tsx"],
+  "tests": [
+    {
+      "id": "runtime:8bc3fb41059885fd",
+      "file": "packages/dnd-kit-modifiers/tests/upstream/modifiers.test.tsx",
+      "fullName": "@dnd-kit/modifiers restrictToHorizontalAxis"
+    },
+    {
+      "id": "runtime:42e4b789aff98be3",
+      "file": "packages/dnd-kit-modifiers/tests/upstream/modifiers.test.tsx",
+      "fullName": "@dnd-kit/modifiers restrictToVerticalAxis"
+    }
+  ]
+}

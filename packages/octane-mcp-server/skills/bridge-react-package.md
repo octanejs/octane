@@ -32,6 +32,11 @@ of bridging by hand:
 | `react-hook-form` | `@octanejs/hook-form` |
 | `@base-ui-components/react` | `@octanejs/base-ui` |
 | `@dnd-kit/react` | `@octanejs/dnd-kit` |
+| `@dnd-kit/core` | `@octanejs/dnd-kit-core` |
+| `@dnd-kit/sortable` | `@octanejs/dnd-kit-sortable` |
+| `@dnd-kit/modifiers` | `@octanejs/dnd-kit-modifiers` |
+| `@dnd-kit/utilities` | `@octanejs/dnd-kit-utilities` |
+| `@dnd-kit/accessibility` | `@octanejs/dnd-kit-accessibility` |
 | `sonner` | `@octanejs/sonner` |
 | `react-hot-toast` | `@octanejs/hot-toast` |
 | `next-themes` | `@octanejs/next-themes` |

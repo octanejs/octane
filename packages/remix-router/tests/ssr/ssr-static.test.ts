@@ -14,6 +14,7 @@ import { renderToString as octaneRenderToString } from 'octane/server';
 import { createElement as reactCreateElement } from 'react';
 import { renderToString as reactRenderToString } from 'react-dom/server';
 import {
+	StaticRouterProvider,
 	createStaticHandler as octaneCreateStaticHandler,
 	createStaticRouter as octaneCreateStaticRouter,
 } from '@octanejs/remix-router';
@@ -105,6 +106,36 @@ describe('static SSR: octane/server vs react-dom/server over real react-router',
 		);
 		expect(normalize(html)).toBe(normalize(r));
 		expect(normalize(html)).toContain('About');
+	});
+
+	it('renders the selected memory history entry and basename on the server', async () => {
+		const { html } = octaneRenderToString(octaneFixture.MemoryEntryApp, {});
+		const reactFixture = await loadReactFixture();
+		const react = reactRenderToString(reactCreateElement(reactFixture.MemoryEntryApp));
+		expect(normalize(html)).toBe(normalize(react));
+		expect(html).toContain('href="/base/next"');
+		expect(html).toContain('POP /selected selected-key');
+	});
+
+	it('keeps escaped loader data inside the one nonced hydration script', async () => {
+		const payload = '</script><script>injected()</script>&\u2028\u2029';
+		const handler = octaneCreateStaticHandler([
+			{ ...octaneFixture.routes[0], id: 'shell', loader: () => payload },
+		]);
+		const context = await handler.query(new Request('http://localhost/'));
+		if (context instanceof Response) throw new Error('unexpected redirect Response');
+		const router = octaneCreateStaticRouter(handler.dataRoutes, context);
+		const { html } = octaneRenderToString(StaticRouterProvider, {
+			router,
+			context,
+			nonce: 'test-nonce',
+		});
+		const scripts = html.match(/<script\b[^>]*>[\s\S]*?<\/script>/g) ?? [];
+		expect(scripts).toHaveLength(1);
+		expect(scripts[0]).toContain('nonce="test-nonce"');
+		const encoded = scripts[0].match(/JSON\.parse\(([\s\S]+)\);/)?.[1];
+		expect(encoded).toBeDefined();
+		expect(JSON.parse(JSON.parse(encoded!)).loaderData.shell).toBe(payload);
 	});
 
 	// @parity-case differential:remix-router-ssr-hydration-data

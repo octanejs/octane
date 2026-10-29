@@ -555,6 +555,68 @@ const PUCK_SOURCE_ALIASES = [
 		replacement: resolve(import.meta.dirname, 'packages/lucide/src') + '/$1.ts',
 	},
 ];
+// The legacy dnd kit API (@dnd-kit/core 6.x and its siblings) ports one
+// upstream package per binding; tests resolve every sibling to its source.
+const DND_KIT_LEGACY_PACKAGES = ['utilities', 'accessibility', 'core', 'sortable', 'modifiers'];
+const DND_KIT_LEGACY_ALIASES = DND_KIT_LEGACY_PACKAGES.map((name) => ({
+	find: new RegExp(`^@octanejs/dnd-kit-${name}$`),
+	replacement: resolve(import.meta.dirname, `packages/dnd-kit-${name}/src/index.ts`),
+}));
+function dndKitLegacyProjects(name) {
+	const root = `packages/dnd-kit-${name}/tests`;
+	return [
+		{
+			test: {
+				name: `dnd-kit-${name}`,
+				include: [`${root}/**/*.test.ts`],
+				exclude: [`${root}/differential/**`, `${root}/upstream/**`],
+				environment: 'jsdom',
+				globals: false,
+			},
+			plugins: [octane()],
+			resolve: { alias: DND_KIT_LEGACY_ALIASES },
+		},
+		{
+			// The pinned upstream Jest tests, unchanged, against the published
+			// React packages.
+			testExecution: { group: 'react-parity' },
+			test: {
+				name: `dnd-kit-${name}-pristine`,
+				include: [`packages/dnd-kit-${name}/upstream/**/test/*.test.{ts,tsx}`],
+				environment: 'jsdom',
+				globals: true,
+			},
+		},
+		{
+			// The adapted upstream suite is regenerated from audit/upstream.lock.json;
+			// upstream's Jest tests rely on globals.
+			testExecution: { group: 'react-parity' },
+			test: {
+				name: `dnd-kit-${name}-upstream`,
+				include: [`${root}/upstream/**/*.test.{ts,tsx}`],
+				environment: 'jsdom',
+				globals: true,
+			},
+			plugins: [octane()],
+			resolve: { alias: DND_KIT_LEGACY_ALIASES },
+		},
+		{
+			testExecution: { group: 'react-parity' },
+			test: {
+				name: `dnd-kit-${name}-differential`,
+				include: [`${root}/differential/**/*.test.ts`],
+				environment: 'jsdom',
+				// Each case mounts both runtimes and drives a full drag lifecycle.
+				testTimeout: 30_000,
+				hookTimeout: 30_000,
+				globalSetup: [`${root}/differential/_setup.ts`],
+				globals: false,
+			},
+			plugins: [octane()],
+			resolve: { alias: DND_KIT_LEGACY_ALIASES },
+		},
+	];
+}
 const BLOCKNOTE_SOURCE_ALIASES = [
 	{
 		find: /^@octanejs\/blocknote$/,
@@ -4182,6 +4244,7 @@ export default defineConfig({
 					],
 				},
 			},
+			...DND_KIT_LEGACY_PACKAGES.flatMap(dndKitLegacyProjects),
 			{
 				test: {
 					name: 'lexical',

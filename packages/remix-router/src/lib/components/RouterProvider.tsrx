@@ -1,28 +1,17 @@
-// RouterProvider + DataRoutes + Outlet — transcribed from react-router@8.2.0
-// lib/components.tsx onto octane. Structure preserved verbatim: useState for
-// router state + layout-effect subscription (early enough for render-driven
-// redirects; subscribe() replays a pre-attach notification), useOptimistic for
-// the optimistic in-flight state, and the three commit paths — plain
-// startTransition, flushSync + startViewTransition, and startTransition INSIDE
-// the deferred startViewTransition callback (which is exactly what octane's
-// transition-at-commit constraint requires — see tanstack-router's
-// src/router.ts:19-53 for the background). jsdom has no startViewTransition,
-// so the VT paths are dormant under tests until Phase E exercises them.
-//
-// Octane substitutions: hooks from 'octane' (useOptimistic exists — upstream's
-// useOptimisticSafe feature-detection collapses to a direct call), memo() for
-// MemoizedDataRoutes, and the RSC branch dropped (RSCRouterContext is
-// hardwired false in this port).
+'use strong';
+
+// RouterProvider uses the browser's view transition and waits for the published
+// context and destination DOM to commit before completing an asynchronous update.
 import {
 	memo,
 	startTransition,
 	useCallback,
 	useEffect,
 	useLayoutEffect,
+	useLinkedState,
 	useMemo,
 	useOptimistic,
 	useRef,
-	useState,
 } from 'octane';
 import {
 	DataRouterContext,
@@ -36,7 +25,6 @@ import type {
 	Navigator,
 	ViewTransitionContextObject,
 } from '../context.ts';
-import type { Location } from '../router/history.ts';
 import type { Router as DataRouter, RouterState, RouterSubscriber } from '../router/router.ts';
 import { getRoutePattern } from '../router/utils.ts';
 import type { RouteManifest, RouteObject } from '../router/utils.ts';
@@ -77,16 +65,21 @@ type RouterProviderProps = {
 	useTransitions?: boolean;
 };
 
-type VtInterruption = {
-	state: RouterState;
-	currentLocation: Location;
-	nextLocation: Location;
+type ActiveViewTransition = {
+	router: DataRouter;
+	locationKey: string;
+	context: ViewTransitionContextObject;
+	contextCommitted: Deferred<void>;
+	destinationCommitted: Deferred<void>;
+	updateStarted: boolean;
+	browser?: ViewTransition;
+	next?: { locationKey: string; begin: () => void };
 };
 
 export function RouterProvider(props: RouterProviderProps) @{
 	const { router, flushSync: reactDomFlushSyncImpl, onError, useTransitions } = props;
 
-	const [_state, setStateImpl] = useState(router.state);
+	const [_state, setStateImpl] = useLinkedState(router, (source) => source.state);
 	// OCTANE NOTE: React's useOptimistic falls back to basicStateReducer, which
 	// applies function updaters — octane's default replaces the state with the
 	// raw queued value, so the upstream `setOptimisticState((s) => …)` call sites
@@ -95,14 +88,15 @@ export function RouterProvider(props: RouterProviderProps) @{
 		RouterState,
 		(current: RouterState) => RouterState
 	>(_state, (current, update) => update(current));
-	const [pendingState, setPendingState] = useState<RouterState | undefined>(undefined);
-	const [vtContext, setVtContext] = useState<ViewTransitionContextObject>({
-		isTransitioning: false,
-	});
-	const [renderDfd, setRenderDfd] = useState<Deferred<void> | undefined>(undefined);
-	const [transition, setTransition] = useState<ViewTransition | undefined>(undefined);
-	const [interruption, setInterruption] = useState<VtInterruption | undefined>(undefined);
-	const fetcherData = useRef<FetchersContextObject>(new Map());
+	const [vtContext, setVtContext] = useLinkedState<DataRouter, ViewTransitionContextObject>(
+		router,
+		() => ({ isTransitioning: false }),
+	);
+	const [fetcherData, setFetcherData] = useLinkedState<DataRouter, FetchersContextObject>(
+		router,
+		() => new Map(),
+	);
+	const activeTransition = useRef<ActiveViewTransition | null>(null);
 
 	const setState = useCallback<RouterSubscriber>(
 		(newState, { deletedFetchers, newErrors, flushSync, viewTransitionOpts }) => {
@@ -117,12 +111,26 @@ export function RouterProvider(props: RouterProviderProps) @{
 				);
 			}
 
-			newState.fetchers.forEach((fetcher, key) => {
-				if (fetcher.data !== undefined) {
-					fetcherData.current.set(key, fetcher.data);
+			if (newState.fetchers.size || deletedFetchers.length) {
+				// The router trims idle fetchers immediately after notifying subscribers.
+				const changes = new Map<string, unknown>();
+				for (const [key, { data }] of newState.fetchers) {
+					if (data !== undefined) changes.set(key, data);
 				}
-			});
-			deletedFetchers.forEach((key) => fetcherData.current.delete(key));
+				for (const key of deletedFetchers) changes.set(key, undefined);
+				if (changes.size) {
+					setFetcherData((previous) => {
+						let next: FetchersContextObject | undefined;
+						for (const [key, data] of changes) {
+							if (Object.is(previous.get(key), data)) continue;
+							next ??= new Map(previous);
+							if (data === undefined) next.delete(key);
+							else next.set(key, data);
+						}
+						return next ?? previous;
+					});
+				}
+			}
 
 			warnOnce(
 				flushSync === false || reactDomFlushSyncImpl != null,
@@ -145,91 +153,103 @@ export function RouterProvider(props: RouterProviderProps) @{
 					'`window.startViewTransition` is not available.',
 			);
 
-			// If this isn't a view transition or it's not available in this browser,
-			// just update and be done with it
-			if (!viewTransitionOpts || !isViewTransitionAvailable) {
-				if (reactDomFlushSyncImpl && flushSync) {
-					reactDomFlushSyncImpl(() => setStateImpl(newState));
+			const flush = flushSync ? reactDomFlushSyncImpl : undefined;
+			const update = (nextState: RouterState) => {
+				if (flush) {
+					flush(() => setStateImpl(nextState));
 				} else if (useTransitions === false) {
-					setStateImpl(newState);
+					setStateImpl(nextState);
 				} else {
 					startTransition(() => {
 						if (useTransitions === true) {
-							setOptimisticState((s) => getOptimisticRouterState(s, newState));
+							setOptimisticState((s) => getOptimisticRouterState(s, nextState));
 						}
-						setStateImpl(newState);
+						setStateImpl(nextState);
 					});
 				}
+			};
+			if (!viewTransitionOpts || !isViewTransitionAvailable) {
+				const previous = activeTransition.current;
+				// Keep the outgoing DOM intact until the browser takes its snapshot.
+				// The update callback will read the latest data for this destination.
+				if (
+					previous &&
+					(newState.location.key === previous.next?.locationKey ||
+						(newState.location.key === previous.locationKey && !previous.updateStarted))
+				)
+					return;
+				if (previous && newState.location.key !== previous.locationKey) {
+					activeTransition.current = null;
+					previous.contextCommitted.resolve();
+					previous.destinationCommitted.resolve();
+					previous.browser?.skipTransition();
+					setVtContext({ isTransitioning: false });
+				}
+				update(newState);
 				return;
 			}
 
-			// flushSync + startViewTransition
-			if (reactDomFlushSyncImpl && flushSync) {
-				// Flush through the context to mark DOM elements as transition=ing
-				reactDomFlushSyncImpl(() => {
-					// Cancel any pending transitions
-					if (transition) {
-						renderDfd?.resolve();
-						transition.skipTransition();
-					}
-					setVtContext({
-						isTransitioning: true,
-						flushSync: true,
-						currentLocation: viewTransitionOpts.currentLocation,
-						nextLocation: viewTransitionOpts.nextLocation,
+			const begin = () => {
+				if (router.state.location.key !== newState.location.key) return;
+				const active: ActiveViewTransition = {
+					router,
+					locationKey: newState.location.key,
+					context: { isTransitioning: true, flushSync: !!flush, ...viewTransitionOpts },
+					contextCommitted: new Deferred<void>(),
+					destinationCommitted: new Deferred<void>(),
+					updateStarted: false,
+				};
+				activeTransition.current = active;
+
+				const start = () => {
+					if (activeTransition.current !== active) return;
+					const transition = router.window!.document.startViewTransition(() => {
+						// A delayed browser callback must not replay an older location or its old loader data.
+						const latest = router.state;
+						if (activeTransition.current !== active || latest.location.key !== active.locationKey)
+							return;
+						active.updateStarted = true;
+						update(latest);
+						if (!flush) return active.destinationCommitted.promise;
 					});
-				});
+					active.browser = transition;
+					const finish = () => {
+						if (activeTransition.current !== active) return;
+						active.context = { isTransitioning: false };
+						active.contextCommitted = new Deferred<void>();
+						if (flush) flush(() => setVtContext(active.context));
+						else setVtContext(active.context);
 
-				// Update the DOM (window presence was checked via isViewTransitionAvailable)
-				const t = router.window!.document.startViewTransition(() => {
-					reactDomFlushSyncImpl(() => setStateImpl(newState));
-				});
-
-				// Clean up after the animation completes
-				t.finished.finally(() => {
-					reactDomFlushSyncImpl(() => {
-						setRenderDfd(undefined);
-						setTransition(undefined);
-						setPendingState(undefined);
-						setVtContext({ isTransitioning: false });
-					});
-				});
-
-				reactDomFlushSyncImpl(() => setTransition(t));
-				return;
+						// An interruption starts after the prior transition's context leaves the DOM.
+						void active.contextCommitted.promise.then(() => {
+							if (activeTransition.current !== active) return;
+							activeTransition.current = null;
+							active.next?.begin();
+						});
+					};
+					void transition.finished.then(finish, finish);
+				};
+				if (flush) {
+					flush(() => setVtContext(active.context));
+					start();
+				} else {
+					setVtContext(active.context);
+					void active.contextCommitted.promise.then(start);
+				}
+			};
+			const previous = activeTransition.current;
+			if (previous) {
+				previous.destinationCommitted.resolve();
+				previous.browser?.skipTransition();
+				if (previous.browser && !flush) {
+					previous.next = { locationKey: newState.location.key, begin };
+					return;
+				}
+				// A superseded transition might still be waiting to publish its context.
+				previous.contextCommitted.resolve();
 			}
-
-			// startTransition + startViewTransition
-			if (transition) {
-				// Interrupting an in-progress transition, cancel and let everything flush
-				// out, and then kick off a new transition from the interruption state
-				renderDfd?.resolve();
-				transition.skipTransition();
-				setInterruption({
-					state: newState,
-					currentLocation: viewTransitionOpts.currentLocation,
-					nextLocation: viewTransitionOpts.nextLocation,
-				});
-			} else {
-				// Completed navigation update with opted-in view transitions, let 'er rip
-				setPendingState(newState);
-				setVtContext({
-					isTransitioning: true,
-					flushSync: false,
-					currentLocation: viewTransitionOpts.currentLocation,
-					nextLocation: viewTransitionOpts.nextLocation,
-				});
-			}
+			begin();
 		},
-		[
-			router.window,
-			reactDomFlushSyncImpl,
-			transition,
-			renderDfd,
-			useTransitions,
-			setOptimisticState,
-			onError,
-		],
 	);
 
 	// Need to use a layout effect here so we are subscribed early enough to
@@ -237,68 +257,22 @@ export function RouterProvider(props: RouterProviderProps) @{
 	// If the router finished initializing (and emitted errors) before this
 	// subscriber was attached, `subscribe()` replays that notification so
 	// `onError` still fires for initial data load errors.
-	useLayoutEffect(() => router.subscribe(setState), [router, setState]);
+	useLayoutEffect(() => router.subscribe(setState));
 
-	// When we start a view transition, create a Deferred we can use for the
-	// eventual "completed" render
 	useEffect(() => {
-		if (vtContext.isTransitioning && !vtContext.flushSync) {
-			setRenderDfd(new Deferred<void>());
-		}
-	}, [vtContext]);
-
-	// Once the deferred is created, kick off startViewTransition() to update the
-	// DOM and then wait on the Deferred to resolve (indicating the DOM update has
-	// happened)
-	useEffect(() => {
-		if (renderDfd && pendingState && router.window) {
-			const newState = pendingState;
-			const renderPromise = renderDfd.promise;
-			const t = router.window.document.startViewTransition(async () => {
-				if (useTransitions === false) {
-					setStateImpl(newState);
-				} else {
-					startTransition(() => {
-						if (useTransitions === true) {
-							setOptimisticState((s) => getOptimisticRouterState(s, newState));
-						}
-						setStateImpl(newState);
-					});
-				}
-				await renderPromise;
-			});
-			t.finished.finally(() => {
-				setRenderDfd(undefined);
-				setTransition(undefined);
-				setPendingState(undefined);
-				setVtContext({ isTransitioning: false });
-			});
-			setTransition(t);
-		}
-	}, [pendingState, renderDfd, router.window, useTransitions, setOptimisticState]);
-
-	// When the new location finally renders and is committed to the DOM, this
-	// effect will run to resolve the transition
-	useEffect(() => {
-		if (renderDfd && pendingState && state.location.key === pendingState.location.key) {
-			renderDfd.resolve();
-		}
-	}, [renderDfd, transition, state.location, pendingState]);
-
-	// If we get interrupted with a new navigation during a transition, we skip
-	// the active transition, let it cleanup, then kick it off again here
-	useEffect(() => {
-		if (!vtContext.isTransitioning && interruption) {
-			setPendingState(interruption.state);
-			setVtContext({
-				isTransitioning: true,
-				flushSync: false,
-				currentLocation: interruption.currentLocation,
-				nextLocation: interruption.nextLocation,
-			});
-			setInterruption(undefined);
-		}
-	}, [vtContext.isTransitioning, interruption]);
+		const active = activeTransition.current;
+		if (!active) return;
+		if (active.context === vtContext) active.contextCommitted.resolve();
+		if (active.locationKey === state.location.key) active.destinationCommitted.resolve();
+	});
+	useLayoutEffect(() => () => {
+		const active = activeTransition.current;
+		if (!active || active.router !== router) return;
+		activeTransition.current = null;
+		active.contextCommitted.resolve();
+		active.destinationCommitted.resolve();
+		active.browser?.skipTransition();
+	});
 
 	const navigator = useMemo<Navigator>(() => {
 		return {
@@ -317,27 +291,24 @@ export function RouterProvider(props: RouterProviderProps) @{
 					preventScrollReset: opts?.preventScrollReset,
 				}),
 		};
-	}, [router]);
+	});
 
 	const basename = router.basename || '/';
 
-	const dataRouterContext = useMemo(
-		() => ({
-			router,
-			navigator,
-			static: false,
-			basename,
-			onError,
-		}),
-		[router, navigator, basename, onError],
-	);
+	const dataRouterContext = useMemo(() => ({
+		router,
+		navigator,
+		static: false,
+		basename,
+		onError,
+	}));
 
 	// The fragment shape mirrors upstream (kept for useId stability parity with
 	// the server-rendered StaticRouterProvider in a later phase).
 	<>
 		<DataRouterContext value={dataRouterContext}>
 			<DataRouterStateContext value={state}>
-				<FetchersContext value={fetcherData.current}>
+				<FetchersContext value={fetcherData}>
 					<ViewTransitionContext value={vtContext}>
 						<Router
 							basename={basename}

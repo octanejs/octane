@@ -1,0 +1,182 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "materializedTests": "packages/dnd-kit-core",
+  "provenance": {
+    "repo": "https://github.com/clauderic/dnd-kit.git",
+    "version": "6.3.1",
+    "commit": "e9215e820798459ae036896fce7fd9a6fe855772",
+    "sourceRoot": "packages/core/src",
+    "testRoot": "packages/core/test",
+    "license": "MIT",
+    "integrity": "sha256:f68d69af50234872c2e3345bc8bf98d8bcb0a9481eab6d370605c99e76a98c33",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": { "runtime": "insufficient", "types": "absent" },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/dnd-kit-core/src"],
+      "include": ["\\.(?:ts|tsx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/dnd-kit-core/tests/upstream"],
+      "include": ["\\.test\\.(?:ts|tsx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 1,
+    "uniqueIdentities": 1,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@12.9.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "e62a4b568598a76242e187a55f3c065848f010e1981b6d1bc0a429e6c31bbafd"
+    }
+  },
+  "lanes": [
+    {
+      "id": "dnd-kit-core-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-core-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the pinned @dnd-kit/core@6.3.1 Jest suite unchanged, with Vitest globals, against the pinned source and the published React packages.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/dnd-kit-core/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/dnd-kit-core/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "eb978aa7d11b64ab1affa35d16faaa72835c81f51e00bbea1bc122bc358e9e1b"
+        },
+        {
+          "path": "packages/dnd-kit-core/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "7b436ead53e2872b5be63d19336a4eeaa8752a1f718ad96669459872b3d97c45"
+        }
+      ]
+    },
+    {
+      "id": "dnd-kit-core-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-core-upstream",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Regenerates the same suite from the lock with its imports repointed at @octanejs/dnd-kit-core and runs it against the port.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/dnd-kit-core/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/dnd-kit-core/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "145fd4847df48922fd0797012896a4d083e7d30d88e9e31d683385c3cf62e275"
+        },
+        {
+          "path": "packages/dnd-kit-core/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "7b436ead53e2872b5be63d19336a4eeaa8752a1f718ad96669459872b3d97c45"
+        }
+      ]
+    },
+    {
+      "id": "dnd-kit-core-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-core-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs the same authored fixtures and interactions through @octanejs/dnd-kit-core and the published @dnd-kit/core@6.3.1 on React and compares the DOM after every step.",
+      "files": [
+        {
+          "path": "packages/dnd-kit-core/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "6b12e53e23712db932720e5e7d2548c1981e56370e4058f71643659451868b0f",
+          "cases": [
+            {
+              "id": "differential:dnd-kit-core-pointer-overlay-drop-animation",
+              "testName": "matches a pointer drag through a DragOverlay and its drop animation",
+              "fullName": "differential: @octanejs/dnd-kit-core vs @dnd-kit/core@6.3.1 matches a pointer drag through a DragOverlay and its drop animation"
+            },
+            {
+              "id": "differential:dnd-kit-core-keyboard-announcements",
+              "testName": "matches a keyboard drag and its screen-reader announcements",
+              "fullName": "differential: @octanejs/dnd-kit-core vs @dnd-kit/core@6.3.1 matches a keyboard drag and its screen-reader announcements"
+            },
+            {
+              "id": "differential:dnd-kit-core-keyboard-cancel",
+              "testName": "matches a keyboard drag cancelled with Escape",
+              "fullName": "differential: @octanejs/dnd-kit-core vs @dnd-kit/core@6.3.1 matches a keyboard drag cancelled with Escape"
+            },
+            {
+              "id": "differential:dnd-kit-core-mouse-custom-accessibility",
+              "testName": "matches a mouse drag with custom announcements in an explicit container",
+              "fullName": "differential: @octanejs/dnd-kit-core vs @dnd-kit/core@6.3.1 matches a mouse drag with custom announcements in an explicit container"
+            }
+          ]
+        },
+        {
+          "path": "packages/dnd-kit-core/tests/_fixtures/differential.tsrx",
+          "role": "support",
+          "sha256": "41764c0e24b8db74c708d61ea6cd06140372aa7a8ede41aba349367452ee4d9e"
+        },
+        {
+          "path": "packages/dnd-kit-core/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "7413a8d0f4e291425c26b40267c8edd34bc82a981758a1851648c1a95064f429"
+        },
+        {
+          "path": "packages/dnd-kit-core/tests/differential/_react-fixture.ts",
+          "role": "support",
+          "sha256": "272d707f100c5812ae8dbbdb9a123648aba845373daf0fc8d73ba43deca76d3d"
+        },
+        {
+          "path": "packages/dnd-kit-core/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "60493418169563899461d2b73a53e925e933c6195c1c489ba206ec1a744f5e5f"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "3b7e60f5d1d410e0d3b5ffe79b45c9ad8936a02353a9a3eff29df6b8da8c2d16"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "native-activator-events",
+      "caseIds": ["ordinary:dnd-kit-core-native-activator-events"],
+      "ordinaryEvidence": [
+        {
+          "id": "ordinary:dnd-kit-core-native-activator-events",
+          "testName": "passes native events to activators and lets the innermost draggable claim them",
+          "fullName": "passes native events to activators and lets the innermost draggable claim them",
+          "path": "packages/dnd-kit-core/tests/native-events.test.ts",
+          "sha256": "7e9897c89191827a92d7972ce0ed451c6b42e83042346ce711913a2ab8b37bb6"
+        }
+      ],
+      "upstreamResult": "Sensor activator handlers receive a React SyntheticEvent; built-in sensors read event.nativeEvent.",
+      "octaneResult": "Sensor activator handlers receive the native DOM event, and the built-in sensors read it directly.",
+      "rationale": "Octane delivers native delegated events with no synthetic layer, so there is no nativeEvent wrapper to unwrap.",
+      "classification": "event-model",
+      "consumerImpact": "A custom sensor whose activator destructures { nativeEvent } from its event reads undefined.",
+      "migrationGuidance": "Read the activator event directly: (event: PointerEvent) => event.isPrimary instead of ({ nativeEvent }) => nativeEvent.isPrimary.",
+      "owner": "octane",
+      "reviewCondition": "Review if Octane adds a synthetic event layer."
+    }
+  ]
+}

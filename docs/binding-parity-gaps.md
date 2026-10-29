@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**25 active pin(s) across 110 binding package(s).**
+**25 active pin(s) across 115 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -32,6 +32,11 @@ surface and evidence.
 | `@octanejs/devtools` | 0 |
 | `@octanejs/dexie` | 0 |
 | `@octanejs/dnd-kit` | 0 |
+| `@octanejs/dnd-kit-accessibility` | 0 |
+| `@octanejs/dnd-kit-core` | 0 |
+| `@octanejs/dnd-kit-modifiers` | 0 |
+| `@octanejs/dnd-kit-sortable` | 0 |
+| `@octanejs/dnd-kit-utilities` | 0 |
 | `@octanejs/draggable` | 0 |
 | `@octanejs/drei` | 0 |
 | `@octanejs/dropzone` | 0 |

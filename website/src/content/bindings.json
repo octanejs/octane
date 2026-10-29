@@ -300,17 +300,12 @@
   },
   {
     "title": "UI Utilities",
-    "description": "Browser hooks, positioning, drag interactions, keyboard input, layout helpers, and event pacing.",
+    "description": "Browser hooks, positioning, keyboard input, layout helpers, and event pacing.",
     "packages": [
       {
         "packageName": "@octanejs/base-ui-utils",
         "title": "Base UI Utils",
         "tags": ["utilities", "hooks", "browser"]
-      },
-      {
-        "packageName": "@octanejs/dnd-kit",
-        "title": "DnD Kit",
-        "tags": ["drag drop", "interaction"]
       },
       {
         "packageName": "@octanejs/floating-ui",
@@ -336,11 +331,6 @@
         "packageName": "@octanejs/popper",
         "title": "Popper",
         "tags": ["positioning", "popovers", "tooltips"]
-      },
-      {
-        "packageName": "@octanejs/draggable",
-        "title": "React Draggable",
-        "tags": ["drag drop", "interaction"]
       },
       {
         "packageName": "@octanejs/react-error-boundary",
@@ -376,6 +366,52 @@
         "packageName": "@octanejs/usehooks-ts",
         "title": "usehooks-ts",
         "tags": ["hooks", "browser"]
+      }
+    ]
+  },
+  {
+    "title": "Drag & Drop",
+    "description": "Drag interactions, sortable lists, movement modifiers, and drop announcements, including dnd kit's modern and legacy APIs.",
+    "packages": [
+      {
+        "packageName": "@octanejs/dnd-kit",
+        "title": "DnD Kit",
+        "tags": ["drag drop", "interaction"]
+      },
+      {
+        "packageName": "@octanejs/dnd-kit-accessibility",
+        "title": "DnD Kit Accessibility",
+        "searchTerms": ["@dnd-kit/accessibility"],
+        "tags": ["drag drop", "accessibility", "legacy api"]
+      },
+      {
+        "packageName": "@octanejs/dnd-kit-core",
+        "title": "DnD Kit Core",
+        "searchTerms": ["@dnd-kit/core"],
+        "tags": ["drag drop", "interaction", "legacy api"]
+      },
+      {
+        "packageName": "@octanejs/dnd-kit-modifiers",
+        "title": "DnD Kit Modifiers",
+        "searchTerms": ["@dnd-kit/modifiers"],
+        "tags": ["drag drop", "modifiers", "legacy api"]
+      },
+      {
+        "packageName": "@octanejs/dnd-kit-sortable",
+        "title": "DnD Kit Sortable",
+        "searchTerms": ["@dnd-kit/sortable"],
+        "tags": ["drag drop", "sortable", "legacy api"]
+      },
+      {
+        "packageName": "@octanejs/dnd-kit-utilities",
+        "title": "DnD Kit Utilities",
+        "searchTerms": ["@dnd-kit/utilities"],
+        "tags": ["drag drop", "utilities", "legacy api"]
+      },
+      {
+        "packageName": "@octanejs/draggable",
+        "title": "React Draggable",
+        "tags": ["drag drop", "interaction"]
       }
     ]
   },

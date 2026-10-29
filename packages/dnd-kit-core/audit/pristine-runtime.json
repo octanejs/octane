@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "dnd-kit-core-pristine",
+  "roots": ["packages/dnd-kit-core/upstream"],
+  "files": ["packages/dnd-kit-core/upstream/test/core.test.tsx"],
+  "tests": [
+    {
+      "id": "runtime:2f367c8d70b2f808",
+      "file": "packages/dnd-kit-core/upstream/test/core.test.tsx",
+      "fullName": "@dnd-kit/core works"
+    }
+  ]
+}
