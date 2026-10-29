@@ -1,0 +1,145 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "materializedTests": "packages/dnd-kit-accessibility",
+  "provenance": {
+    "repo": "https://github.com/clauderic/dnd-kit.git",
+    "version": "3.1.1",
+    "commit": "e9215e820798459ae036896fce7fd9a6fe855772",
+    "sourceRoot": "packages/accessibility/src",
+    "testRoot": "packages/accessibility/test",
+    "license": "MIT",
+    "integrity": "sha256:5c4e4168454bc38e0ae6d95b00931bad8a4eda487760e36460217387a0b31450",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": { "runtime": "insufficient", "types": "absent" },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/dnd-kit-accessibility/src"],
+      "include": ["\\.(?:ts|tsx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/dnd-kit-accessibility/tests/upstream"],
+      "include": ["\\.test\\.(?:ts|tsx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 1,
+    "uniqueIdentities": 1,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@12.9.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "8bfa46b30923396705f3107794cdc4519303231d3c36e88e0658e4b5fce72ee6"
+    }
+  },
+  "lanes": [
+    {
+      "id": "dnd-kit-accessibility-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-accessibility-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the pinned @dnd-kit/accessibility@3.1.1 Jest suite unchanged, with Vitest globals, against the pinned source and the published React packages.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/dnd-kit-accessibility/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/dnd-kit-accessibility/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "942b5b616bef2a8b0608fbe6949fbc8e1a6d84f34bb278f2a59006d7f75a96f2"
+        },
+        {
+          "path": "packages/dnd-kit-accessibility/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "f77baffcc2c148a053ec34ee6a7d5c28abe44246fb1eda2489204a151c918aaa"
+        }
+      ]
+    },
+    {
+      "id": "dnd-kit-accessibility-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-accessibility-upstream",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Regenerates the same suite from the lock with its imports repointed at @octanejs/dnd-kit-accessibility and runs it against the port.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/dnd-kit-accessibility/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/dnd-kit-accessibility/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "12e962da5adcbf666e3b03dab3d80c31dfd3e1a92369666e07cedbb282c6d15c"
+        },
+        {
+          "path": "packages/dnd-kit-accessibility/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "f77baffcc2c148a053ec34ee6a7d5c28abe44246fb1eda2489204a151c918aaa"
+        }
+      ]
+    },
+    {
+      "id": "dnd-kit-accessibility-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-accessibility-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs the same authored fixtures and interactions through @octanejs/dnd-kit-accessibility and the published @dnd-kit/accessibility@3.1.1 on React and compares the DOM after every step.",
+      "files": [
+        {
+          "path": "packages/dnd-kit-accessibility/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "d6f7cfa7660e3027b135e2ea4a8e86bf9cbf502bacb80f43f97ac5bfe7f3561e",
+          "cases": [
+            {
+              "id": "differential:dnd-kit-accessibility-announcements",
+              "testName": "matches live regions, hidden instructions, and announcements",
+              "fullName": "differential: @octanejs/dnd-kit-accessibility vs @dnd-kit/accessibility@3.1.1 matches live regions, hidden instructions, and announcements"
+            }
+          ]
+        },
+        {
+          "path": "packages/dnd-kit-accessibility/tests/_fixtures/differential.tsrx",
+          "role": "support",
+          "sha256": "94598d20c715ce5661419a416d6e34a6229ce63dbf1938a0fb968b0690e7aa19"
+        },
+        {
+          "path": "packages/dnd-kit-accessibility/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "21b406945627aca3c8e4ccfac874620b091269eb4a20a21c10e467aab70a3d40"
+        },
+        {
+          "path": "packages/dnd-kit-core/tests/differential/_react-fixture.ts",
+          "role": "support",
+          "sha256": "272d707f100c5812ae8dbbdb9a123648aba845373daf0fc8d73ba43deca76d3d"
+        },
+        {
+          "path": "packages/dnd-kit-accessibility/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "742e53c9af56a8db0b313ce7185b8e54a3c54fa61f548450cfcbb84ac2547902"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "3b7e60f5d1d410e0d3b5ffe79b45c9ad8936a02353a9a3eff29df6b8da8c2d16"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

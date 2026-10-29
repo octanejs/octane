@@ -1,0 +1,165 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "materializedTests": "packages/dnd-kit-modifiers",
+  "provenance": {
+    "repo": "https://github.com/clauderic/dnd-kit.git",
+    "version": "9.0.0",
+    "commit": "e9215e820798459ae036896fce7fd9a6fe855772",
+    "sourceRoot": "packages/modifiers/src",
+    "testRoot": "packages/modifiers/test",
+    "license": "MIT",
+    "integrity": "sha256:1ad2f9ecf7b65bd58de367c7b9226b62951916ca2694ad66440a3c8978ebdc29",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": { "runtime": "insufficient", "types": "absent" },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/dnd-kit-modifiers/src"],
+      "include": ["\\.(?:ts|tsx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/dnd-kit-modifiers/tests/upstream"],
+      "include": ["\\.test\\.(?:ts|tsx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 2,
+    "uniqueIdentities": 2,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@12.9.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "8bfa46b30923396705f3107794cdc4519303231d3c36e88e0658e4b5fce72ee6"
+    }
+  },
+  "lanes": [
+    {
+      "id": "dnd-kit-modifiers-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-modifiers-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the pinned @dnd-kit/modifiers@9.0.0 Jest suite unchanged, with Vitest globals, against the pinned source and the published React packages.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/dnd-kit-modifiers/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/dnd-kit-modifiers/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "62d76f3c1142d6f60744e6a9301ff3cf14d7ce657fcc1f222cc92f5e4325e606"
+        },
+        {
+          "path": "packages/dnd-kit-modifiers/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "4369c740bde50b722de6144cba29ade4bf8d692e9c8911c3c3cbb8ae63409a6a"
+        }
+      ]
+    },
+    {
+      "id": "dnd-kit-modifiers-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-modifiers-upstream",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Regenerates the same suite from the lock with its imports repointed at @octanejs/dnd-kit-modifiers and runs it against the port.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/dnd-kit-modifiers/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/dnd-kit-modifiers/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "b351444bce54622db8b920a65da03fb672981dc211e0b32ecd9858bf266f95a5"
+        },
+        {
+          "path": "packages/dnd-kit-modifiers/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "4369c740bde50b722de6144cba29ade4bf8d692e9c8911c3c3cbb8ae63409a6a"
+        }
+      ]
+    },
+    {
+      "id": "dnd-kit-modifiers-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-modifiers-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs the same authored fixtures and interactions through @octanejs/dnd-kit-modifiers and the published @dnd-kit/modifiers@9.0.0 on React and compares the DOM after every step.",
+      "files": [
+        {
+          "path": "packages/dnd-kit-modifiers/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "0acca0abc1dfed3798141b35c36788acbb1078164aac20efd656ea9a97b42326",
+          "cases": [
+            {
+              "id": "differential:dnd-kit-modifiers-horizontal-scrollable",
+              "testName": "restricts to the horizontal axis and the first scrollable ancestor",
+              "fullName": "differential: @octanejs/dnd-kit-modifiers vs @dnd-kit/modifiers@9.0.0 restricts to the horizontal axis and the first scrollable ancestor"
+            },
+            {
+              "id": "differential:dnd-kit-modifiers-vertical-parent",
+              "testName": "restricts to the vertical axis and the parent element",
+              "fullName": "differential: @octanejs/dnd-kit-modifiers vs @dnd-kit/modifiers@9.0.0 restricts to the vertical axis and the parent element"
+            },
+            {
+              "id": "differential:dnd-kit-modifiers-window-edges",
+              "testName": "restricts to the window edges",
+              "fullName": "differential: @octanejs/dnd-kit-modifiers vs @dnd-kit/modifiers@9.0.0 restricts to the window edges"
+            },
+            {
+              "id": "differential:dnd-kit-modifiers-snap-grid",
+              "testName": "snaps the transform to a grid",
+              "fullName": "differential: @octanejs/dnd-kit-modifiers vs @dnd-kit/modifiers@9.0.0 snaps the transform to a grid"
+            },
+            {
+              "id": "differential:dnd-kit-modifiers-overlay-snap-center",
+              "testName": "snaps a DragOverlay to the cursor inside the window",
+              "fullName": "differential: @octanejs/dnd-kit-modifiers vs @dnd-kit/modifiers@9.0.0 snaps a DragOverlay to the cursor inside the window"
+            }
+          ]
+        },
+        {
+          "path": "packages/dnd-kit-modifiers/tests/_fixtures/differential.tsrx",
+          "role": "support",
+          "sha256": "7da7135bf315a2489922b8f82678e23f7829f68cceea0561e31d1580073329b1"
+        },
+        {
+          "path": "packages/dnd-kit-modifiers/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "21b406945627aca3c8e4ccfac874620b091269eb4a20a21c10e467aab70a3d40"
+        },
+        {
+          "path": "packages/dnd-kit-core/tests/differential/_react-fixture.ts",
+          "role": "support",
+          "sha256": "272d707f100c5812ae8dbbdb9a123648aba845373daf0fc8d73ba43deca76d3d"
+        },
+        {
+          "path": "packages/dnd-kit-modifiers/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "8a93ba4cc00a111e57c5c0684331802f47e0715f27684efc1cfb4405a9fce955"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "3b7e60f5d1d410e0d3b5ffe79b45c9ad8936a02353a9a3eff29df6b8da8c2d16"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

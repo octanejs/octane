@@ -1,0 +1,57 @@
+{
+  "name": "@octanejs/dnd-kit-core",
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "dnd kit core for the octane renderer — a port of the legacy @dnd-kit/core 6.3.1 API: DndContext, DragOverlay, useDraggable/useDroppable, sensors, collision detection, and modifiers on native events.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/dnd-kit-core"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE",
+    "LICENSE.upstream"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project dnd-kit-core",
+    "typecheck": "octane-tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@octanejs/dnd-kit-accessibility": "workspace:*",
+    "@octanejs/dnd-kit-utilities": "workspace:*"
+  },
+  "peerDependencies": {
+    "octane": "workspace:^0.16.0"
+  },
+  "devDependencies": {
+    "@dnd-kit/core": "catalog:default",
+    "@dnd-kit/utilities": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

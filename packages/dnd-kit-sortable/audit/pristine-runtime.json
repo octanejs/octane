@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "dnd-kit-sortable-pristine",
+  "roots": ["packages/dnd-kit-sortable/upstream"],
+  "files": ["packages/dnd-kit-sortable/upstream/test/sortable.test.tsx"],
+  "tests": [
+    {
+      "id": "runtime:0d1a1308d8f93cc3",
+      "file": "packages/dnd-kit-sortable/upstream/test/sortable.test.tsx",
+      "fullName": "@dnd-kit/sortable works"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "upstream": {
+    "package": "@dnd-kit/sortable",
+    "version": "10.0.0"
+  },
+  "provenance": {
+    "source": "https://github.com/clauderic/dnd-kit/tree/e9215e820798459ae036896fce7fd9a6fe855772/packages/sortable",
+    "license": "MIT",
+    "commit": "e9215e820798459ae036896fce7fd9a6fe855772",
+    "verification": "recorded-unverified"
+  },
+  "surface": "Complete @dnd-kit/sortable 10.0.0 surface: SortableContext, useSortable, the rect/vertical/horizontal list and rect swapping strategies, arrayMove/arraySwap, sortableKeyboardCoordinates, hasSortableData, and defaultAnimateLayoutChanges/defaultNewIndexGetter.",
+  "divergences": [],
+  "ssr": "No dedicated SSR lane.",
+  "verified": "2026-10-29",
+  "notes": [
+    "Ports the legacy dnd kit API (the @dnd-kit/core 6.x family) that `@octanejs/dnd-kit` does not cover; that package ports the modern `@dnd-kit/react` API.",
+    "Upstream ships placeholder unit tests (plus two modifier cases), so a repo-authored React differential carries the behavioral contract; the pinned suite also runs pristine and adapted. The npm releases record no `gitHead`, so the source is pinned to the `@dnd-kit/core@6.3.1` release-tag commit, which holds every package byte-identical to its own release tag; parity stays recorded-unverified."
+  ]
+}

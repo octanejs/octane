@@ -1,0 +1,172 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "materializedTests": "packages/dnd-kit-utilities",
+  "provenance": {
+    "repo": "https://github.com/clauderic/dnd-kit.git",
+    "version": "3.2.2",
+    "commit": "e9215e820798459ae036896fce7fd9a6fe855772",
+    "sourceRoot": "packages/utilities/src",
+    "testRoot": "packages/utilities/src/test",
+    "license": "MIT",
+    "integrity": "sha256:048c7f56d17ceae19a29979700582566c0036600ee4d2c38ba13e9e8f906a18e",
+    "verification": "recorded-unverified"
+  },
+  "upstreamSuites": { "runtime": "insufficient", "types": "absent" },
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/dnd-kit-utilities/src"],
+      "include": ["\\.(?:ts|tsx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/dnd-kit-utilities/tests/upstream"],
+      "include": ["\\.test\\.(?:ts|tsx)$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 1,
+    "uniqueIdentities": 1,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@12.9.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "8bfa46b30923396705f3107794cdc4519303231d3c36e88e0658e4b5fce72ee6"
+    }
+  },
+  "lanes": [
+    {
+      "id": "dnd-kit-utilities-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-utilities-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs the pinned @dnd-kit/utilities@3.2.2 Jest suite unchanged, with Vitest globals, against the pinned source and the published React packages.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/dnd-kit-utilities/audit/pristine-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/dnd-kit-utilities/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "67204dd466b2a60f0c122d35888ed64e4cf7163e9aa7118a4ecb9571698085b5"
+        },
+        {
+          "path": "packages/dnd-kit-utilities/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "b14c4cf290aa1948a01f0b525149bedc55cb4c7a41a9f956fe850a00e0371558"
+        }
+      ]
+    },
+    {
+      "id": "dnd-kit-utilities-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-utilities-upstream",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Regenerates the same suite from the lock with its imports repointed at @octanejs/dnd-kit-utilities and runs it against the port.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/dnd-kit-utilities/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/dnd-kit-utilities/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "9389dacfce3c356c513433b0a8bb07870dfd5fc9e27d13b012225c201a824c6a"
+        },
+        {
+          "path": "packages/dnd-kit-utilities/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "b14c4cf290aa1948a01f0b525149bedc55cb4c7a41a9f956fe850a00e0371558"
+        }
+      ]
+    },
+    {
+      "id": "dnd-kit-utilities-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "dnd-kit-utilities-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Runs the same authored fixtures and interactions through @octanejs/dnd-kit-utilities and the published @dnd-kit/utilities@3.2.2 on React and compares the DOM after every step.",
+      "files": [
+        {
+          "path": "packages/dnd-kit-utilities/tests/differential/helpers.test.ts",
+          "role": "test",
+          "sha256": "32f6eb047a646587d34ee4c1583c7f042efba90b81626616b2aa998ba6aa1229",
+          "cases": [
+            {
+              "id": "differential:dnd-kit-utilities-css",
+              "testName": "serializes transforms and transitions identically",
+              "fullName": "differential: @octanejs/dnd-kit-utilities helpers vs @dnd-kit/utilities@3.2.2 serializes transforms and transitions identically"
+            },
+            {
+              "id": "differential:dnd-kit-utilities-adjustment",
+              "testName": "adds and subtracts coordinate adjustments identically",
+              "fullName": "differential: @octanejs/dnd-kit-utilities helpers vs @dnd-kit/utilities@3.2.2 adds and subtracts coordinate adjustments identically"
+            },
+            {
+              "id": "differential:dnd-kit-utilities-events",
+              "testName": "classifies events and reads their coordinates identically",
+              "fullName": "differential: @octanejs/dnd-kit-utilities helpers vs @dnd-kit/utilities@3.2.2 classifies events and reads their coordinates identically"
+            },
+            {
+              "id": "differential:dnd-kit-utilities-dom",
+              "testName": "resolves windows, documents, focus targets, and node types identically",
+              "fullName": "differential: @octanejs/dnd-kit-utilities helpers vs @dnd-kit/utilities@3.2.2 resolves windows, documents, focus targets, and node types identically"
+            }
+          ]
+        },
+        {
+          "path": "packages/dnd-kit-utilities/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "e72debdddb7bf932114063e5ce5f9c59c3b105391528369113f7b4d02787aafa",
+          "cases": [
+            {
+              "id": "differential:dnd-kit-utilities-hooks",
+              "testName": "matches hook values, ref callbacks, and effects across updates",
+              "fullName": "differential: @octanejs/dnd-kit-utilities hooks vs @dnd-kit/utilities@3.2.2 matches hook values, ref callbacks, and effects across updates"
+            }
+          ]
+        },
+        {
+          "path": "packages/dnd-kit-utilities/tests/_fixtures/differential.tsrx",
+          "role": "support",
+          "sha256": "abf7726d7e0cc66a59baff29460b0f86e6ded357427c96448639c6ac0b2006ec"
+        },
+        {
+          "path": "packages/dnd-kit-utilities/tests/differential/_setup.ts",
+          "role": "support",
+          "sha256": "21b406945627aca3c8e4ccfac874620b091269eb4a20a21c10e467aab70a3d40"
+        },
+        {
+          "path": "packages/dnd-kit-core/tests/differential/_react-fixture.ts",
+          "role": "support",
+          "sha256": "272d707f100c5812ae8dbbdb9a123648aba845373daf0fc8d73ba43deca76d3d"
+        },
+        {
+          "path": "packages/dnd-kit-utilities/audit/test-classifications.json",
+          "role": "support",
+          "sha256": "69989dd6683095f300d523fe61cc8d873de38a22f73113784aa8e08c354470c9"
+        },
+        {
+          "path": "packages/octane/tests/differential/_rig.ts",
+          "role": "support",
+          "sha256": "3b7e60f5d1d410e0d3b5ffe79b45c9ad8936a02353a9a3eff29df6b8da8c2d16"
+        }
+      ]
+    }
+  ],
+  "divergences": []
+}

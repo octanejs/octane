@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@dnd-kit/accessibility",
+    "version": "3.1.1",
+    "repository": {
+      "owner": "clauderic",
+      "repo": "dnd-kit",
+      "subdirectory": "packages/accessibility"
+    },
+    "commit": "e9215e820798459ae036896fce7fd9a6fe855772",
+    "integrity": "sha512-2P+YgaXF+gRsIihwwY1gCsQSYnu9Zyj2py8kY5fFvUM1qm2WA2u639R6YNVfU4GWr+ZM5mqEsfHZZLoRONbemw=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "537607e3f1533ad2c5b12978967f5ab27f34ffb7e626e321017a7ccca6cc24ff"
+      },
+      {
+        "path": "packages/accessibility/LICENSE",
+        "sha256": "537607e3f1533ad2c5b12978967f5ab27f34ffb7e626e321017a7ccca6cc24ff"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "test",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "from '../src'",
+      "replace": "from '@octanejs/dnd-kit-accessibility'"
+    },
+    {
+      "find": "from '@dnd-kit/core'",
+      "replace": "from '@octanejs/dnd-kit-core'"
+    },
+    {
+      "find": "from '@dnd-kit/utilities'",
+      "replace": "from '@octanejs/dnd-kit-utilities'"
+    }
+  ],
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "bce4236a0594d1e7c3d5535781f0189bec8d810b",
+      "size": 5886
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "f26f4536c972561fbbffe4858a0254a8732d9a22",
+      "size": 1075
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "a3a6606111f97841cc57bfe3b1f95a12a4624835",
+      "size": 877
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "0e2b83877fa8871aeec3563f83a90846d05470d7",
+      "size": 304
+    },
+    {
+      "path": "src/components/HiddenText/HiddenText.tsx",
+      "gitBlob": "7b94419c6768e8ae103f60697150ef8ea442a054",
+      "size": 278
+    },
+    {
+      "path": "src/components/HiddenText/index.ts",
+      "gitBlob": "6be37900493b7863ca8fe73a31d13543a6a092f6",
+      "size": 41
+    },
+    {
+      "path": "src/components/index.ts",
+      "gitBlob": "46e2bfb1275ed52e4fc03a1d8fe51e5bc6d4ed13",
+      "size": 82
+    },
+    {
+      "path": "src/components/LiveRegion/index.ts",
+      "gitBlob": "cae43ff21652918ce433bd424ff0dbb8ec1b4804",
+      "size": 41
+    },
+    {
+      "path": "src/components/LiveRegion/LiveRegion.tsx",
+      "gitBlob": "15c88aa03755cf316d06fedd4bf967bf4555f369",
+      "size": 756
+    },
+    {
+      "path": "src/hooks/index.ts",
+      "gitBlob": "d62a723444627a22c87bf987d541791b2287c0e7",
+      "size": 51
+    },
+    {
+      "path": "src/hooks/useAnnouncement.ts",
+      "gitBlob": "e1db96ea520efb07274603a112bef3dd5c7e180b",
+      "size": 320
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "b6fd70b9c9a2b669f2b842fa34a2e976c6f203f8",
+      "size": 94
+    },
+    {
+      "path": "test/accessibility.test.tsx",
+      "gitBlob": "afec497f5de4457d8b25649edd1cb9ab042d0326",
+      "size": 116
+    },
+    {
+      "path": "tsconfig.build.json",
+      "gitBlob": "16bbd61d3a8eb91fae7adc3f51ac65a2d9150ded",
+      "size": 93
+    }
+  ],
+  "fingerprint": "b47e917c5d8d5da702e37cfd64b3c76ee47003992564729a6053a864b94de9b2"
+}

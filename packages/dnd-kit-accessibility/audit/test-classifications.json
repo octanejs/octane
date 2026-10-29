@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "path": "packages/dnd-kit-accessibility/tests/differential/parity.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Runs the same authored fixtures and interactions against the published @dnd-kit/accessibility@3.1.1 on React and compares the DOM after every step."
+    },
+    {
+      "path": "packages/dnd-kit-accessibility/tests/exports.test.ts",
+      "disposition": "react-octane-differential",
+      "oracle": "Compares the runtime export names and value kinds with the published @dnd-kit/accessibility@3.1.1."
+    },
+    {
+      "path": "packages/dnd-kit-accessibility/typetests/public-api.test-d.ts",
+      "disposition": "octane-only-type-conformance",
+      "reason": "Checks the Octane public declarations, including negative controls; upstream publishes no type-test suite."
+    }
+  ]
+}

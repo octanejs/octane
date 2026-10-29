@@ -1,0 +1,228 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@dnd-kit/sortable",
+    "version": "10.0.0",
+    "repository": {
+      "owner": "clauderic",
+      "repo": "dnd-kit",
+      "subdirectory": "packages/sortable"
+    },
+    "commit": "e9215e820798459ae036896fce7fd9a6fe855772",
+    "integrity": "sha512-+xqhmIIzvAYMGfBYYnbKuNicfSsk4RksY2XdmJhT+HAC01nix6fHCztU68jooFiMUB01Ky3F0FyOvhG/BZrWkg=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "537607e3f1533ad2c5b12978967f5ab27f34ffb7e626e321017a7ccca6cc24ff"
+      },
+      {
+        "path": "packages/sortable/LICENSE",
+        "sha256": "537607e3f1533ad2c5b12978967f5ab27f34ffb7e626e321017a7ccca6cc24ff"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "test",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "from '../src'",
+      "replace": "from '@octanejs/dnd-kit-sortable'"
+    },
+    {
+      "find": "from '@dnd-kit/core'",
+      "replace": "from '@octanejs/dnd-kit-core'"
+    },
+    {
+      "find": "from '@dnd-kit/utilities'",
+      "replace": "from '@octanejs/dnd-kit-utilities'"
+    }
+  ],
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "gitBlob": "a0d2426c00bf61be836dfc834762e1160143d05a",
+      "size": 40983
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "f26f4536c972561fbbffe4858a0254a8732d9a22",
+      "size": 1075
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "940a903f5ce25584eb8c6134529f15c011ed06a9",
+      "size": 1007
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "6d5fc9b4928da8cc4ef5aa672cb53e69839fb058",
+      "size": 1017
+    },
+    {
+      "path": "src/components/index.ts",
+      "gitBlob": "4efc657633ef76636ab33b0ddfff78cf8f6de850",
+      "size": 130
+    },
+    {
+      "path": "src/components/SortableContext.tsx",
+      "gitBlob": "ed370e24efd5f2b53ec127d17336d9197155db63",
+      "size": 3113
+    },
+    {
+      "path": "src/hooks/defaults.ts",
+      "gitBlob": "c0cf1e0a2412f7579cdf63c2e2900a1cdbd59f56",
+      "size": 1136
+    },
+    {
+      "path": "src/hooks/index.ts",
+      "gitBlob": "a00168c9b6cb856cbb46b891e092ee6a6451afe7",
+      "size": 260
+    },
+    {
+      "path": "src/hooks/types.ts",
+      "gitBlob": "26c67d24d143183f0a215b09cee23954383a8265",
+      "size": 800
+    },
+    {
+      "path": "src/hooks/useSortable.ts",
+      "gitBlob": "7df81f3110b05d74f0a47b6511ea50cf381f0510",
+      "size": 6415
+    },
+    {
+      "path": "src/hooks/utilities/index.ts",
+      "gitBlob": "29576b672e309afc6e7465df9de0c675f563c53a",
+      "size": 59
+    },
+    {
+      "path": "src/hooks/utilities/useDerivedTransform.ts",
+      "gitBlob": "51f6585f24ee728e501370dd5a8cd4d43914dece",
+      "size": 1516
+    },
+    {
+      "path": "src/index.ts",
+      "gitBlob": "58ebbd15ab822b408707a7c95d5b82be71194a38",
+      "size": 647
+    },
+    {
+      "path": "src/sensors/index.ts",
+      "gitBlob": "a3dbd3d9ca19b998773cd836fb4344f2e10b46e7",
+      "size": 28
+    },
+    {
+      "path": "src/sensors/keyboard/index.ts",
+      "gitBlob": "f3dbad16f853a0c77eda2971e9b86daf6d820fbf",
+      "size": 75
+    },
+    {
+      "path": "src/sensors/keyboard/sortableKeyboardCoordinates.ts",
+      "gitBlob": "b1407cdec3d59b2c88eec09dede5ef11482215b1",
+      "size": 3928
+    },
+    {
+      "path": "src/strategies/horizontalListSorting.ts",
+      "gitBlob": "befc89621bf2cd93b83ad75b4e0fb8de3721f301",
+      "size": 1979
+    },
+    {
+      "path": "src/strategies/index.ts",
+      "gitBlob": "bf054cc2d201677e0006cf6b782dbc67599f2378",
+      "size": 242
+    },
+    {
+      "path": "src/strategies/rectSorting.ts",
+      "gitBlob": "cc4c194ee69b024ac77df174f1c5c246eb5e191f",
+      "size": 556
+    },
+    {
+      "path": "src/strategies/rectSwapping.ts",
+      "gitBlob": "274027126d6252eb67e84cb3990b72d40ed83fb7",
+      "size": 610
+    },
+    {
+      "path": "src/strategies/verticalListSorting.ts",
+      "gitBlob": "e4538647caaccfd003655b76455ce326fe882439",
+      "size": 2032
+    },
+    {
+      "path": "src/types/data.ts",
+      "gitBlob": "6bfda94733014684bc6147c75c2111aefcb823f0",
+      "size": 190
+    },
+    {
+      "path": "src/types/disabled.ts",
+      "gitBlob": "16a19f0e5c702862a822099b85b5bb985cf8bf19",
+      "size": 76
+    },
+    {
+      "path": "src/types/index.ts",
+      "gitBlob": "17412e64698820218d96ce39c5d8fa1af6010867",
+      "size": 181
+    },
+    {
+      "path": "src/types/strategies.ts",
+      "gitBlob": "5ea719df8ade9a3538af5c0a9e35ea4d1e73f3a0",
+      "size": 283
+    },
+    {
+      "path": "src/types/type-guard.ts",
+      "gitBlob": "9352a18a769af60ef3494ad7be61d39edb6cc304",
+      "size": 638
+    },
+    {
+      "path": "src/utilities/arrayMove.ts",
+      "gitBlob": "d0f89b6a9f0b4f1bd1b1462b5d7b72a8cbf6dcdf",
+      "size": 349
+    },
+    {
+      "path": "src/utilities/arraySwap.ts",
+      "gitBlob": "e2984ced457f8150b35db7ab8f3b070063ba1b4e",
+      "size": 309
+    },
+    {
+      "path": "src/utilities/getSortedRects.ts",
+      "gitBlob": "4989c017025808df3a01b64cb08d3fee9bc69661",
+      "size": 426
+    },
+    {
+      "path": "src/utilities/index.ts",
+      "gitBlob": "fe7a4f263b66c46d54f153c315bad5d7326a00c9",
+      "size": 268
+    },
+    {
+      "path": "src/utilities/isValidIndex.ts",
+      "gitBlob": "14dc0f9bb60c40a4f17e92114515389d83fc9051",
+      "size": 111
+    },
+    {
+      "path": "src/utilities/itemsEqual.ts",
+      "gitBlob": "ba596c965554d786cbaec68049d71d195c8bf04a",
+      "size": 334
+    },
+    {
+      "path": "src/utilities/normalizeDisabled.ts",
+      "gitBlob": "6dd0e8a781af2e397d4930fd96496994b639efb9",
+      "size": 256
+    },
+    {
+      "path": "test/sortable.test.tsx",
+      "gitBlob": "49a50a1a7ddaacf59a79b83488b344bb125fd022",
+      "size": 111
+    },
+    {
+      "path": "tsconfig.build.json",
+      "gitBlob": "e34f92a29f7e61ed97eb9f90e0515d294fddc075",
+      "size": 91
+    }
+  ],
+  "fingerprint": "708e57236c4891912a86507c52dc839958e226e5d4a4728404e187a535a47cbf"
+}
