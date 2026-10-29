@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 362,
+  "nextCode": 363,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -2170,6 +2170,13 @@
       "argumentCount": 0,
       "runtime": ["client", "server"],
       "status": "active"
+    },
+    "362": {
+      "message": "A hook was called while no Octane component was rendering. Hooks run only during a component's render, so a call from an event handler, effect, or module scope fails. If the call is inside a component, the app has loaded more than one copy of Octane, even at the same version: createRoot or hydrateRoot, the hook, and octane/internal/client must all resolve to the same octane package. Deduplicate octane in your package manager or bundler; the octane/compiler/vite plugin does this for you.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active",
+      "note": "A version check alone can pass: pnpm, for example, installs one Octane version once per set of peer dependencies. Make every import of octane and its subpaths resolve to one directory, for example with Vite's resolve.dedupe: ['octane'] or a bundler alias."
     }
   }
 }

@@ -323,6 +323,7 @@ type ClientErrorArguments = {
 	359: [];
 	360: [];
 	361: [];
+	362: [];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -1431,6 +1432,11 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 361:
 				return formatDevErrorMessage(
 					'This container already has a behavior root; pass replace: true to replace it.',
+					args,
+				);
+			case 362:
+				return formatDevErrorMessage(
+					"A hook was called while no Octane component was rendering. Hooks run only during a component's render, so a call from an event handler, effect, or module scope fails. If the call is inside a component, the app has loaded more than one copy of Octane, even at the same version: createRoot or hydrateRoot, the hook, and octane/internal/client must all resolve to the same octane package. Deduplicate octane in your package manager or bundler; the octane/compiler/vite plugin does this for you.",
 					args,
 				);
 			default:

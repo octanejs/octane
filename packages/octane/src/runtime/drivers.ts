@@ -77,6 +77,7 @@ import {
 	ensureHooks,
 	registerHookCleanup,
 	missingSlot,
+	checkHookOwner,
 	slotStack,
 	resolveCustomSlot,
 } from './hooks.js';
@@ -155,6 +156,9 @@ import {
 } from './forms.js';
 import { installRootRollback } from '../rollback-flag.js';
 
+// The consumer's bundler substitutes this literal expression; declared locally
+// so the module type-checks in a browser app without @types/node.
+declare const process: { env: { NODE_ENV?: string } };
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
 // Every producer of commit-phase callbacks installs this before its first
@@ -328,7 +332,10 @@ export function installEffectDrivers(): void {
 export let NATIVE_READ_DRIVER: NativeReadDriver | null = null;
 // Until withSlot first runs, the private path stack is empty. Direct component
 // hooks use their own slot; only custom-hook callers retain path composition.
-export let resolveSlot = (slot: HookSlot | undefined): HookSlot | undefined => slot;
+export let resolveSlot = (slot: HookSlot | undefined): HookSlot | undefined => {
+	if (process.env.NODE_ENV !== 'production' && slot !== undefined) checkHookOwner();
+	return slot;
+};
 // Only controlled bindings install event restoration. Keeping its concrete
 // entry points at that owner lets event-only applications drop the restore
 // graph without adding a wrapper call to dispatch. Read the live capability:

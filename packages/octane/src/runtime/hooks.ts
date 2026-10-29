@@ -133,6 +133,14 @@ export function missingSlot(name: string): never {
 	throw new Error(formatClientError(15, name));
 }
 
+// Development only: a hook with a slot reads its Scope next. With no rendering
+// component, usually because a second Octane copy owns the root, name that cause
+// instead of letting the read fail with a TypeError. The resolvers call it only
+// when a slot resolves, so a missing slot keeps its own diagnostic.
+export function checkHookOwner(): void {
+	if (CURRENT_SCOPE === null) throw new Error(formatClientError(362));
+}
+
 // withSlot — establishes hook call-site identity via a per-render PATH STACK, so a
 // hook reached THROUGH a custom-hook wrapper combines the wrapper's call-site symbol
 // with its own. The compiler wraps CUSTOM hook calls only, as
@@ -190,6 +198,7 @@ function appendSlotKey(key: string, slot: HookSlot): string {
 // its own (a hand-written or library-binding base hook) falls back to the path.
 export function resolveCustomSlot(slot: HookSlot | undefined): HookSlot | undefined {
 	const n = slotStack.length;
+	if (process.env.NODE_ENV !== 'production' && (slot !== undefined || n !== 0)) checkHookOwner();
 	if (n === 0) return slot;
 	if (slot === undefined && n === 1) return slotStack[0];
 	const resolved = resolveHookPath(slotStack, slot, false);
