@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "project": "next-themes-pristine",
+  "vitestConfig": "tests/upstream-vitest.config.ts",
+  "rootEnvVar": "NEXT_THEMES_PRISTINE_ROOT",
+  "copy": ["src", "__tests__"]
+}

@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "next-themes",
+    "version": "0.4.6",
+    "repository": {
+      "owner": "pacocoursey",
+      "repo": "next-themes",
+      "subdirectory": "next-themes"
+    },
+    "commit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752",
+    "integrity": "sha512-pZvgD5L0IEvX5/9GWyHMf3m8BKiVQwsCMHfoFosXtXBMnaS0ZnIJ9ST4b4NqLVKDEm8QBxoNNGNaBv2JNF6XNA=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "license.md",
+        "sha256": "b5acfd21b3b61508365224c40ec1b03ec71091248baaf989d4be916551e7d532"
+      },
+      {
+        "path": "next-themes/license.md",
+        "sha256": "b5acfd21b3b61508365224c40ec1b03ec71091248baaf989d4be916551e7d532"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [],
+  "adaptedMappings": [
+    {
+      "fromRoot": "__tests__",
+      "toRoot": "tests/upstream"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "from 'react'",
+      "replace": "from 'octane'"
+    },
+    {
+      "find": "'@testing-library/react'",
+      "replace": "'@octanejs/testing-library'"
+    },
+    {
+      "find": "'../src/index'",
+      "replace": "'../../src/index.tsrx'"
+    },
+    {
+      "find": "'../src/types'",
+      "replace": "'../../src/types'"
+    }
+  ],
+  "files": [
+    {
+      "path": "__tests__/index.test.tsx",
+      "gitBlob": "7ebb8319a8bb699f199d69aa33de04ae3cc22b1a",
+      "size": 14216
+    },
+    {
+      "path": "license.md",
+      "gitBlob": "76228ccc3abb7a0f1b423f9d3f6815fb7019d3f5",
+      "size": 1069
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "8aae527664464df09c91339680a9faf94fb5ff4d",
+      "size": 798
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "2d6bc5eb6835f66707c473d1c8b1cef809912256",
+      "size": 18986
+    },
+    {
+      "path": "src/index.tsx",
+      "gitBlob": "df1645a34b274a7b2f66b0c73cd0d3803f598341",
+      "size": 6914
+    },
+    {
+      "path": "src/script.ts",
+      "gitBlob": "05bfbc0284a181b7dd34f2d8a87d537d65459b88",
+      "size": 1320
+    },
+    {
+      "path": "src/types.ts",
+      "gitBlob": "c73c7a6ac0b046f027091e66a17daa9a32635336",
+      "size": 2510
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "d94f7c2a27c1823c5eb0fec322aadc92488c6b74",
+      "size": 565
+    },
+    {
+      "path": "tsup.config.ts",
+      "gitBlob": "fd39d1bffa0729dc9835133342a5c26705c688ed",
+      "size": 246
+    }
+  ],
+  "fingerprint": "99be63932858e90575726ca8e7c42505dbed557078c809ca504edbd4f763ac3e"
+}

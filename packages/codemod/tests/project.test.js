@@ -63,7 +63,9 @@ describe('runCodemod', () => {
 		expect(result.packages).toEqual([
 			{ from: '@tanstack/react-query', to: '@octanejs/tanstack-query' },
 		]);
-		expect(result.missing).toEqual(['@radix-ui/react-slot']);
+		expect(result.missing).toEqual([
+			{ name: '@radix-ui/react-slot', modules: 1, islands: 0, blocked: 1 },
+		]);
 		expect(result.files.flatMap((file) => file.diagnostics)).toEqual([]);
 	});
 
@@ -201,7 +203,28 @@ describe('runCodemod', () => {
 		).toBe(true);
 		expect(code('src/Chart.tsx')).toContain("from '@octanejs/visx/hierarchy'");
 		expect(code('src/Chart.tsx')).toContain("from '@octanejs/tanstack-start'");
-		expect(result.missing).toEqual(['@tanstack/markdown/react']);
+		expect(result.missing.map((port) => port.name)).toEqual(['@tanstack/markdown/react']);
+	});
+
+	it('maps next-themes, which has no React-shaped name, to its binding', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'src/Theme.tsx':
+				"import { ThemeProvider, useTheme } from 'next-themes';\nimport type { ThemeProviderProps } from 'next-themes';\nfunction Toggle() {\n\tconst { resolvedTheme, setTheme } = useTheme();\n\treturn <button onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}>Toggle</button>;\n}\nexport function Providers(props: ThemeProviderProps) {\n\treturn <ThemeProvider attribute=\"class\" {...props}><Toggle /></ThemeProvider>;\n}\n",
+		});
+		const result = await runCodemod([root], { write: false });
+		const theme = result.files.find((file) => file.file === 'src/Theme.tsx');
+		expect(theme?.output).toBe('src/Theme.tsrx');
+		expect(theme?.code).toContain(
+			"import { ThemeProvider, useTheme } from '@octanejs/next-themes';",
+		);
+		expect(theme?.code).toContain(
+			"import type { ThemeProviderProps } from '@octanejs/next-themes';",
+		);
+		expect(theme?.code).not.toContain("'next-themes'");
+		expect(result.packages).toEqual([{ from: 'next-themes', to: '@octanejs/next-themes' }]);
+		expect(result.missing).toEqual([]);
+		expect(theme?.diagnostics).toEqual([]);
 	});
 
 	it('reports React packages from their installed manifest, not their name', async () => {
@@ -237,7 +260,47 @@ describe('runCodemod', () => {
 				"import { parse } from 'editor-kit';\nimport { Editor } from 'editor-kit/react';\nimport { Widget } from 'react-widget';\nimport { tree } from 'tree-kit';\nimport { useKit } from 'hooks-kit';\nconsole.log(tree, useKit);\nexport function Note() {\n\treturn <Editor doc={parse('')}><Widget /></Editor>;\n}\n",
 		});
 		const result = await runCodemod([root], { write: false });
-		expect(result.missing.sort()).toEqual(['editor-kit/react', 'hooks-kit', 'react-widget']);
+		expect(result.missing.map((port) => port.name)).toEqual([
+			'editor-kit/react',
+			'hooks-kit',
+			'react-widget',
+		]);
+	});
+
+	it('hosts components of a React package with no port in `ReactCompat` islands', async () => {
+		const manifest = (/** @type {string} */ version, /** @type {object} */ fields = {}) =>
+			JSON.stringify({ version, ...fields });
+		/** @param {string} react */
+		const app = (react) =>
+			project({
+				'package.json': '{ "name": "app" }',
+				'node_modules/react/package.json': manifest(react),
+				'node_modules/react-dom/package.json': manifest(react),
+				'node_modules/toast-kit/package.json': manifest('2.6.0', {
+					types: 'index.d.ts',
+					peerDependencies: { react: '>=18' },
+				}),
+				// A prop typed for an element may still be given text.
+				'node_modules/toast-kit/index.d.ts':
+					'type ReactNode = string | { element: true };\nexport declare function Toaster(props: { position?: string; label?: ReactNode }): null;\nexport declare function toast(text: string): void;\nexport declare function useToaster(): { toasts: string[] };\n',
+				'tsconfig.json': '{ "compilerOptions": { "strict": true, "jsx": "preserve" } }',
+				'src/main.tsx':
+					'import { Toaster } from \'toast-kit\';\nexport function Main() {\n\treturn <main><Toaster position="top-right" label="Saved" /></main>;\n}\n',
+				'src/notify.ts':
+					"import { toast, useToaster } from 'toast-kit';\nexport const notify = (text: string) => toast(text);\nexport const useCount = () => useToaster().toasts.length;\n",
+			});
+		const result = await runCodemod([app('19.2.6')], { write: false, strong: true });
+		expect(result.missing).toEqual([{ name: 'toast-kit', modules: 2, islands: 1, blocked: 1 }]);
+		const main = result.files.find((file) => file.file === 'src/main.tsx');
+		expect(main?.code).toContain(
+			'<ReactCompat><Toaster position="top-right" label="Saved" /></ReactCompat>',
+		);
+		expect([main?.strong, main?.diagnostics]).toEqual([true, []]);
+		// `ReactCompat` needs the React 19 series from 19.2.
+		for (const react of ['18.3.1', '20.0.0']) {
+			const other = await runCodemod([app(react)], { write: false });
+			expect(other.missing).toEqual([{ name: 'toast-kit', modules: 2, islands: 0, blocked: 2 }]);
+		}
 	});
 
 	it('reports TSRX written for React, which it cannot read', async () => {
