@@ -3,31 +3,31 @@ import { memo, useImperativeHandle, useRef, type Ref } from 'octane';
 type Item = { id: string; label: string; hidden?: boolean; children?: Item[] };
 
 export const Tree = memo(function Tree({ items, status }: { items: Item[]; status: 'idle' | 'loading' | 'error' }) @{
-  if (status === 'error') return <p role="alert">Failed</p>;
-
-  <div>
-    <h2>@if (status === 'idle') { <em>Ready</em> } @else { <>{status}</> }</h2>
-    @if (status === 'loading') { <span>Loading…</span> } @else {
-      @if (items.length === 0) { <span>Empty</span> } @else {
-        <ul>
-          @for (const item of items; key item.id) {
-            if (item.hidden) return null;
-            const label = item.label.toUpperCase();
-            <li>
-              {label as string}
-              @if (item.children) { <Tree items={item.children} status="idle" /> }
-            </li>
-          }
-        </ul>
+  @if (status === 'error') { <p role="alert">Failed</p> } @else {
+    <div>
+      <h2>@if (status === 'idle') { <em>Ready</em> } @else { <>{status}</> }</h2>
+      @if (status === 'loading') { <span>Loading…</span> } @else {
+        @if (items.length === 0) { <span>Empty</span> } @else {
+          <ul>
+            @for (const item of items; key item.id) {
+              if (item.hidden) return null;
+              const label = item.label.toUpperCase();
+              <li>
+                {label as string}
+                @if (item.children) { <Tree items={item.children} status="idle" /> }
+              </li>
+            }
+          </ul>
+        }
       }
-    }
-    @for (const item of items; key item.id) {
-      <>
-        <dt>{item.label as string}</dt>
-        <dd>{item.id as string}</dd>
-      </>
-    }
-  </div>
+      @for (const item of items; key item.id) {
+        <>
+          <dt>{item.label as string}</dt>
+          <dd>{item.id as string}</dd>
+        </>
+      }
+    </div>
+  }
 });
 
 export function Field({ ref, onCommit }: { ref?: Ref<{ focus(): void }>; onCommit: (value: string) => void }) @{

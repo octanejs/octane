@@ -25,7 +25,8 @@ dependencies over to Octane.
 | `imports` | `React.useState`, `React.FC` | named imports |
 | `imports` | React libraries with a binding (`@tanstack/react-query`, ...) | `@octanejs/*` |
 | `template-component` | `function C() { …; return <div /> }` | `function C() @{ …; <div /> }` |
-| `template-if` | `{a ? <A /> : <B />}`, `{a > 0 && <A />}` | `@if (a) { <A /> } @else { <B /> }` |
+| `template-if` | `{a ? <A /> : <B />}`, `{a > 0 && <A />}` (also through a `const`) | `@if (a) { <A /> } @else { <B /> }` |
+| `template-if` | `if (a) return <A />; …; return <B />` in a component | `@if (a) { <A /> } @else { …; <B /> }` |
 | `template-for` | `{xs.map((x, i) => <li key={x.id} />)}` | `@for (const x of xs; index i; key x.id) { <li /> }` |
 | `template-try` | `<Suspense fallback={f}>…</Suspense>` | `@try { … } @pending { f }` |
 | `template-text` | `{title}` with `title: string`, `{count}` with `count: number` | `{title as string}`, `{String(count)}`: text bindings, not renderable holes |
@@ -37,6 +38,8 @@ dependencies over to Octane.
 | `event-object` | `e.nativeEvent`, `e.persist()`, `e.target` on a control | `e`, removed, `e.currentTarget` |
 | `class-attribute` | `className` on an HTML element | `class` |
 | `legacy-root` | `ReactDOM.render(el, c)` | `createRoot(c).render(el)` |
+| `root-render` | `root.render(<App a={1} />)`, `hydrateRoot(c, createElement(App, p))` | `root.render(App, { a: 1 })`, `hydrateRoot(c, App, p)`: no generic element renderer |
+| `server-render` | `renderToString(<App />)` | `renderToString(App).html`: Octane returns `{ html, css }` |
 | `strict-mode` | `<StrictMode>…</StrictMode>` | its children (Octane's is a pass-through) |
 
 Every rewrite keeps React's behavior. Where it cannot be proven equal, the code
@@ -45,6 +48,11 @@ and `@if` would not. `template-text` reads types through the project's
 `tsconfig.json` and runs only on TypeScript modules when that config enables
 `strictNullChecks`; otherwise a `string` may hold null, which React renders as
 nothing.
+
+Some differences are reported rather than rewritten. Each `flushSync` call
+keeps its React shape, but Octane's leaves the commit's `useEffect`s queued
+where React runs them before returning. React Three Fiber scenes need moving
+into `.three.tsrx` modules by hand.
 
 Every module with JSX becomes `.tsrx`, entries and helpers without a component
 included, so Strong mode can reach all of them; one that was JavaScript gains

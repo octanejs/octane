@@ -7,4 +7,4 @@ function App() @{
   @try { <Page /> } @pending { <div class="spinner">Loading…</div> }
 }
 
-createRoot(document.getElementById('root')).render(<App />);
+createRoot(document.getElementById('root')).render(App);

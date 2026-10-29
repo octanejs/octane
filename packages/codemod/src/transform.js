@@ -73,6 +73,11 @@ const RULE = {
 	forwardRef: 'forward-ref',
 	import: 'imports',
 	legacyRoot: 'legacy-root',
+	rootRender: 'root-render',
+	serverRender: 'server-render',
+	flushSync: 'flush-sync',
+	renderProp: 'render-prop-children',
+	documentShell: 'document-shell',
 	nativeChange: 'native-text-change',
 	className: 'class-attribute',
 	provider: 'context-provider',
@@ -287,6 +292,62 @@ function rowElements(node) {
 	return whenTrue && whenFalse && [...whenTrue, ...whenFalse];
 }
 
+/**
+ * The element an `if (c) return <A />;` guard returns, or null for any other
+ * statement.
+ *
+ * @param {ts.Statement} statement
+ * @returns {ts.Expression | null}
+ */
+function guardReturn(statement) {
+	if (!ts.isIfStatement(statement) || statement.elseStatement) return null;
+	let then = statement.thenStatement;
+	if (ts.isBlock(then)) {
+		if (then.statements.length !== 1) return null;
+		then = then.statements[0];
+	}
+	if (!ts.isReturnStatement(then) || !then.expression) return null;
+	return isJsx(skipParens(then.expression)) ? then.expression : null;
+}
+
+/**
+ * Whether any `return` in `statements`, outside nested functions, returns
+ * JSX.
+ *
+ * @param {readonly ts.Statement[]} statements
+ */
+function returnsJsx(statements) {
+	/** @type {(node: ts.Node) => boolean} */
+	const hasJsx = (node) => isJsx(node) || (ts.forEachChild(node, hasJsx) ?? false);
+	/** @type {(node: ts.Node) => boolean} */
+	const visit = (node) => {
+		if (isFunctionLike(node)) return false;
+		if (ts.isReturnStatement(node) && node.expression && hasJsx(node.expression)) return true;
+		return ts.forEachChild(node, visit) ?? false;
+	};
+	return statements.some(visit);
+}
+
+/** Document tags a router shell renders through `@octanejs/tanstack-router`. */
+const DOCUMENT_TAGS = /** @type {Record<string, string>} */ ({
+	html: 'Html',
+	head: 'Head',
+	body: 'Body',
+});
+
+/**
+ * Whether an identifier is read in a type, where an import needs no value.
+ * A `typeof X` query is a type, which `import type` serves; `extends Base`
+ * reads a value, so heritage counts as one.
+ *
+ * @param {ts.Identifier} node
+ */
+function inTypeNode(node) {
+	let parent = node.parent;
+	while (ts.isQualifiedName(parent)) parent = parent.parent;
+	return ts.isTypeNode(parent) && !ts.isExpressionWithTypeArguments(parent);
+}
+
 /** @param {ts.Node} node */
 function isNullish(node) {
 	return (
@@ -313,12 +374,18 @@ function isFunctionLike(node) {
  * Whether evaluating `node` can only produce a boolean, so `node && <X />`
  * renders nothing when it is falsy, exactly as `@if` does. React renders `0`
  * and `NaN` from a numeric left side, so anything unproven stays a hole.
+ * `valueOf` gives the initializer a `const` name is bound to, if any.
  *
  * @param {ts.Expression} node
+ * @param {(name: ts.Identifier) => ts.Expression | null} valueOf
  * @returns {boolean}
  */
-function isBoolean(node) {
+function isBoolean(node, valueOf) {
 	node = skipParens(node);
+	if (ts.isIdentifier(node)) {
+		const value = valueOf(node);
+		return value !== null && isBoolean(value, valueOf);
+	}
 	if (node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword) {
 		return true;
 	}
@@ -340,7 +407,7 @@ function isBoolean(node) {
 				return true;
 			case ts.SyntaxKind.AmpersandAmpersandToken:
 			case ts.SyntaxKind.BarBarToken:
-				return isBoolean(node.left) && isBoolean(node.right);
+				return isBoolean(node.left, valueOf) && isBoolean(node.right, valueOf);
 		}
 		return false;
 	}
@@ -482,6 +549,9 @@ class ModuleTransform {
 		this.options = options;
 		this.target = options.target ?? 'tsrx';
 		this.strong = options.strong === true;
+		/** @type {Set<string>} React imports read as values, not only as types. */
+		this.valueUses = new Set();
+		this.routerShell = false;
 		this.textTypes = options.strictNullChecks === true && /\.[cm]?tsx?$/.test(filename);
 		const { sf, checker } = bind(filename, source);
 		this.sf = sf;
@@ -526,13 +596,13 @@ class ModuleTransform {
 		const tsrx =
 			this.template || (this.target === 'tsrx' && (this.hasJsx || /\.[jt]sx$/.test(this.filename)));
 		if (tsrx) code = code.replace(/^\/\*\*\s*@jsxImportSource\s+\S+\s*\*\/[ \t]*\r?\n/m, '');
-		if (this.strong && tsrx) code = this.addStrongDirective(code);
-		if (!tsrx && this.fromReact && this.hasJsx && /\.(?:[jt]sx|js)$/.test(this.filename)) {
-			code = this.addJsxPragma(code);
-		}
 		// A JavaScript module was never type-checked; as TSRX it stays unchecked.
 		if (tsrx && /\.[cm]?jsx?$/.test(this.filename)) {
 			code = code.replace(/^(#![^\n]*\n)?/, '$1// @ts-nocheck\n');
+		}
+		if (this.strong && tsrx) code = this.addStrongDirective(code);
+		if (!tsrx && this.fromReact && this.hasJsx && /\.(?:[jt]sx|js)$/.test(this.filename)) {
+			code = this.addJsxPragma(code);
 		}
 		return {
 			code,
@@ -599,6 +669,7 @@ class ModuleTransform {
 			if (!ts.isImportDeclaration(statement) || !statement.importClause) continue;
 			const module = /** @type {ts.StringLiteral} */ (statement.moduleSpecifier).text;
 			if (module in REACT_MODULES) this.fromReact = true;
+			if (/^@tanstack\/react-(?:router|start)(?:\/|$)/.test(module)) this.routerShell = true;
 			const clause = statement.importClause;
 			const record = (
 				/** @type {ts.Node} */ declaration,
@@ -647,6 +718,25 @@ class ModuleTransform {
 				? this.checker.getShorthandAssignmentValueSymbol(parent)
 				: this.checker.getSymbolAtLocation(node);
 		return symbol?.declarations?.[0] ?? null;
+	}
+
+	/**
+	 * The initializer of the `const` a name refers to, or null.
+	 *
+	 * @param {ts.Identifier} node
+	 * @returns {ts.Expression | null}
+	 */
+	constValue(node) {
+		const declaration = this.declarationOf(node);
+		if (
+			!declaration ||
+			!ts.isVariableDeclaration(declaration) ||
+			!declaration.initializer ||
+			!(ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const)
+		) {
+			return null;
+		}
+		return declaration.initializer;
 	}
 
 	/**
@@ -783,7 +873,10 @@ class ModuleTransform {
 	emit(node, ctx, start) {
 		if (ts.isIdentifier(node) && this.apiLocals.has(node.text) && !this.inImport(node)) {
 			const entry = this.importOf(node);
-			if (entry) this.used.add(entry.local);
+			if (entry) {
+				this.used.add(entry.local);
+				if (!inTypeNode(node)) this.valueUses.add(entry.local);
+			}
 		}
 		const replaced = this.rewrite(node, ctx);
 		if (replaced !== null) return replaced;
@@ -852,7 +945,31 @@ class ModuleTransform {
 		if (ts.isTypeReferenceNode(node)) return this.rewriteTypeReference(node);
 		if (ts.isExpressionStatement(node)) return this.rewriteStatement(node);
 		if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) this.checkClass(node);
-		if (ts.isBinaryExpression(node)) this.checkDefaultProps(node);
+		if (ts.isBinaryExpression(node)) {
+			const guarded = this.rewriteRenderProp(node);
+			if (guarded !== null) return guarded;
+			this.checkDefaultProps(node);
+		}
+		if (ts.isModuleDeclaration(node) && ts.isStringLiteral(node.name)) {
+			return this.rewriteSpecifier(node, node.name);
+		}
+		if (ts.isJsxText(node) && this.target === 'tsrx' && /\/[/*]/.test(node.text)) {
+			// TSRX reads `//` and `/*` in element text as comments, as JavaScript does.
+			return node.getText(this.sf).replace(/\/(?=[/*])/g, "{'/'}");
+		}
+		if (
+			ts.isIdentifier(node) &&
+			this.routerShell &&
+			Object.hasOwn(DOCUMENT_TAGS, node.text) &&
+			(ts.isJsxOpeningElement(node.parent) ||
+				ts.isJsxClosingElement(node.parent) ||
+				ts.isJsxSelfClosingElement(node.parent)) &&
+			node.parent.tagName === node
+		) {
+			// The router's document components own the hydration root.
+			if (!ts.isJsxClosingElement(node.parent)) this.count(RULE.documentShell);
+			return this.require('@octanejs/tanstack-router', DOCUMENT_TAGS[node.text], false);
+		}
 		if (ts.isJsxAttributes(node)) return this.rewriteAttributes(node);
 		if (ts.isJsxElement(node)) return this.rewriteElement(node, ctx);
 		if (ts.isJsxExpression(node) && ctx.template) return this.rewriteHole(node);
@@ -874,6 +991,14 @@ class ModuleTransform {
 	rewriteImport(node) {
 		const module = /** @type {ts.StringLiteral} */ (node.moduleSpecifier).text;
 		if (module === 'octane') return null;
+		if (module === '@react-three/fiber' && this.hasJsx) {
+			this.note(
+				RULE.unsupported,
+				'error',
+				node,
+				"Three.js elements compile only in a `.three.tsrx` module, Octane's three renderer: move the scene components there and mount them with `root.render(Scene, props)`.",
+			);
+		}
 		if (module in REACT_MODULES) {
 			this.importSlots.push(node);
 			return `\u0000IMPORT${this.importSlots.length - 1}\u0000`;
@@ -1004,7 +1129,8 @@ class ModuleTransform {
 				const typeOnly = clause.isTypeOnly || element.isTypeOnly;
 				const mapped = mapReactImport(module, imported, typeOnly);
 				if (mapped) {
-					add(mapped.module, mapped.name, local, typeOnly);
+					// A name read only in types imports as a type, which bundlers elide.
+					add(mapped.module, mapped.name, local, typeOnly || !this.valueUses.has(local));
 					continue;
 				}
 				this.note(
@@ -1090,14 +1216,18 @@ class ModuleTransform {
 	rewriteMember(node) {
 		// `<Ctx.Provider value>` is `<Ctx value>` in Octane, as in React 19.
 		const tag = node.parent;
-		if (
-			node.name.text === 'Provider' &&
+		const isTag =
 			(ts.isJsxOpeningElement(tag) ||
 				ts.isJsxClosingElement(tag) ||
 				ts.isJsxSelfClosingElement(tag)) &&
-			tag.tagName === node &&
-			this.isContext(node.expression)
-		) {
+			tag.tagName === node;
+		// So is `const P = C.Provider`; a member of the provider (`C.Provider.x`)
+		// or a write to it stays.
+		const isValue =
+			!isTag &&
+			!(ts.isPropertyAccessExpression(tag) && tag.expression === node) &&
+			!(ts.isBinaryExpression(tag) && tag.left === node);
+		if (node.name.text === 'Provider' && (isTag || isValue) && this.isContext(node.expression)) {
 			if (!ts.isJsxClosingElement(tag)) this.count(RULE.provider);
 			return this.emit(node.expression, PLAIN);
 		}
@@ -1173,12 +1303,44 @@ class ModuleTransform {
 			this.count(RULE.import);
 			return this.replaceSpecifier(node, specifier, mapped);
 		}
+		if (
+			ts.isPropertyAccessExpression(node.expression) &&
+			node.expression.name.text === 'render' &&
+			node.arguments.length === 1 &&
+			this.isRoot(node.expression.expression)
+		) {
+			return this.rewriteRootRender(node, node.arguments[0]);
+		}
 		const callee = this.callee(node.expression);
 		// An Octane hook without a list already means "inferred".
 		if (!callee || callee.module === 'octane') return null;
 		const name = callee.name;
 		if (name === 'forwardRef') return this.rewriteForwardRef(node);
 		if (name === 'render' || name === 'hydrate') return this.rewriteLegacyRoot(node, name);
+		if (name === 'hydrateRoot' && node.arguments.length === 2) {
+			return this.rewriteRootRender(node, node.arguments[1]);
+		}
+		if (
+			(name === 'renderToString' || name === 'renderToStaticMarkup') &&
+			callee.module.startsWith('react-dom/server') &&
+			node.arguments.length === 1
+		) {
+			// React returns the HTML; Octane returns `{ html, css }`.
+			this.count(RULE.serverRender);
+			return (
+				(this.rewriteRootRender(node, node.arguments[0]) ??
+					this.span(node, node.getStart(this.sf), node.end, PLAIN)) + '.html'
+			);
+		}
+		if (name === 'flushSync') {
+			this.note(
+				RULE.flushSync,
+				'warning',
+				node,
+				"Octane's `flushSync` commits synchronously but leaves the commit's `useEffect`s queued, where React runs them before returning. If code after it reads what an effect did, use `useLayoutEffect` for that effect.",
+			);
+			return null;
+		}
 		if (name in DEPENDENCY_HOOKS) return this.rewriteDependencies(node, name);
 		return null;
 	}
@@ -1341,11 +1503,96 @@ class ModuleTransform {
 			);
 		}
 		this.count(RULE.legacyRoot);
-		const elementText = this.emit(element, PLAIN);
+		const elementText = this.rootComponent(element) ?? this.emit(element, PLAIN);
 		const containerText = this.emit(container, PLAIN);
 		return name === 'render'
 			? `${this.require('octane', 'createRoot', false)}(${containerText}).render(${elementText})`
 			: `${this.require('octane', 'hydrateRoot', false)}(${containerText}, ${elementText})`;
+	}
+
+	/**
+	 * Whether `node` is a root `createRoot` made: the call itself, or a
+	 * `const` bound to it.
+	 *
+	 * @param {ts.Expression} node
+	 */
+	isRoot(node) {
+		node = skipParens(node);
+		const value = ts.isIdentifier(node) ? this.constValue(node) : node;
+		return (
+			!!value && ts.isCallExpression(value) && this.calleeName(value.expression) === 'createRoot'
+		);
+	}
+
+	/**
+	 * `root.render(<App a={1} />)` and `root.render(createElement(App, props))`
+	 * are `root.render(App, props)`, which mounts the component without an
+	 * element: the generic element renderer stays out of the bundle. So are
+	 * `hydrateRoot(c, <App />)` and the server renderers' element argument.
+	 *
+	 * @param {ts.CallExpression} node
+	 * @param {ts.Expression} argument the element, the call's last argument
+	 */
+	rewriteRootRender(node, argument) {
+		const component = this.rootComponent(argument);
+		if (component === null) return null;
+		this.count(RULE.rootRender);
+		return (
+			this.span(node, node.getStart(this.sf), argument.getStart(this.sf), PLAIN) +
+			component +
+			this.span(node, argument.end, node.end, PLAIN)
+		);
+	}
+
+	/**
+	 * `App` or `App, props` for an element of a component with no key, ref,
+	 * or children, through a `<StrictMode>` wrapper, else null.
+	 *
+	 * @param {ts.Expression} expression
+	 * @returns {string | null}
+	 */
+	rootComponent(expression) {
+		let node = skipParens(expression);
+		if (ts.isJsxElement(node) && this.calleeName(node.openingElement.tagName) === 'StrictMode') {
+			const children = node.children.filter(
+				(child) => !(ts.isJsxText(child) && child.containsOnlyTriviaWhiteSpaces),
+			);
+			if (children.length !== 1 || !isJsx(children[0])) return null;
+			node = /** @type {ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment} */ (children[0]);
+		}
+		if (ts.isJsxSelfClosingElement(node)) {
+			const tag = node.tagName;
+			if (!ts.isIdentifier(tag) && !ts.isPropertyAccessExpression(tag)) return null;
+			if (!isComponentName(tag.getText(this.sf).split('.').pop() ?? '')) return null;
+			/** @type {string[]} */
+			const props = [];
+			for (const property of node.attributes.properties) {
+				if (ts.isJsxSpreadAttribute(property)) {
+					props.push(`...${this.emit(property.expression, PLAIN)}`);
+					continue;
+				}
+				const name = property.name.getText(this.sf);
+				if (name === 'key' || name === 'ref') return null;
+				const key = /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name);
+				const value = property.initializer;
+				if (!value) props.push(`${key}: true`);
+				else if (ts.isStringLiteral(value)) props.push(`${key}: ${value.getText(this.sf)}`);
+				else if (ts.isJsxExpression(value) && value.expression)
+					props.push(`${key}: ${this.emit(value.expression, PLAIN)}`);
+				else return null;
+			}
+			const type = this.emit(tag, PLAIN);
+			return props.length === 0 ? type : `${type}, { ${props.join(', ')} }`;
+		}
+		if (ts.isCallExpression(node) && this.calleeName(node.expression) === 'createElement') {
+			const [type, props, ...children] = node.arguments;
+			if (!type || children.length > 0) return null;
+			if (!(ts.isIdentifier(type) || ts.isPropertyAccessExpression(type))) return null;
+			if (!isComponentName(type.getText(this.sf).split('.').pop() ?? '')) return null;
+			const text = this.emit(type, PLAIN);
+			return !props || isNullish(props) ? text : `${text}, ${this.emit(props, PLAIN)}`;
+		}
+		return null;
 	}
 
 	/** @param {ts.ExpressionStatement} node */
@@ -1592,17 +1839,55 @@ class ModuleTransform {
 		if (!ts.isIdentifier(node)) return false;
 		const declaration = this.declarationOf(node);
 		if (declaration && ts.isVariableDeclaration(declaration)) {
-			const value = declaration.initializer && skipParens(declaration.initializer);
-			return (
-				!!value &&
-				ts.isCallExpression(value) &&
-				this.calleeName(value.expression) === 'createContext'
-			);
+			return !!declaration.initializer && this.createsContext(declaration.initializer);
 		}
 		const entry = declaration ? this.imports.get(declaration) : null;
 		if (!entry || entry.namespace) return false;
 		const name = entry.imported === 'default' ? entry.local : entry.imported;
 		return this.options.isContext?.(entry.module, entry.imported) ?? /Context$/.test(name);
+	}
+
+	/**
+	 * Whether `node` evaluates to a `createContext` result on every branch.
+	 *
+	 * @param {ts.Expression} node
+	 * @returns {boolean}
+	 */
+	createsContext(node) {
+		node = skipParens(node);
+		if (ts.isConditionalExpression(node)) {
+			return this.createsContext(node.whenTrue) && this.createsContext(node.whenFalse);
+		}
+		return ts.isCallExpression(node) && this.calleeName(node.expression) === 'createContext';
+	}
+
+	/**
+	 * `typeof children === 'function'` also holds for a compiled children
+	 * block, which renders through Octane rather than being called, so the
+	 * check also asks `isChildrenBlock`.
+	 *
+	 * @param {ts.BinaryExpression} node
+	 */
+	rewriteRenderProp(node) {
+		const op = node.operatorToken.kind;
+		if (op !== ts.SyntaxKind.EqualsEqualsEqualsToken && op !== ts.SyntaxKind.EqualsEqualsToken) {
+			return null;
+		}
+		if (!ts.isTypeOfExpression(node.left) || !ts.isStringLiteral(node.right)) return null;
+		const operand = skipParens(node.left.expression);
+		const name = ts.isIdentifier(operand)
+			? operand.text
+			: ts.isPropertyAccessExpression(operand)
+				? operand.name.text
+				: null;
+		if (node.right.text !== 'function' || name !== 'children') return null;
+		const parent = node.parent;
+		if (ts.isBinaryExpression(parent) && /\bisChildrenBlock\(/.test(parent.getText(this.sf))) {
+			return null;
+		}
+		this.count(RULE.renderProp);
+		const check = this.require('octane', 'isChildrenBlock', false);
+		return `(${this.span(node, node.getStart(this.sf), node.end, PLAIN)} && !${check}(${this.emit(operand, PLAIN)}))`;
 	}
 
 	/**
@@ -1879,7 +2164,7 @@ class ModuleTransform {
 		if (
 			ts.isBinaryExpression(node) &&
 			node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
-			isBoolean(node.left)
+			isBoolean(node.left, (name) => this.constValue(name))
 		) {
 			const arm = this.arm(node.right);
 			if (arm === null || arm === '') return null;
@@ -1952,6 +2237,9 @@ class ModuleTransform {
 		if (reads(callee.expression, (name) => bound.has(name))) return null;
 		// A `function` row sees its own `this` and `arguments`; an arm does not.
 		if (ts.isFunctionExpression(fn) && usesOwnThis(fn.body)) return null;
+		// A row that writes an outer variable (`n++`) needs every row to run in
+		// order; an `@for` row can be skipped.
+		if (this.writesOuter(fn)) return null;
 
 		/** @type {ts.Statement[]} */
 		let setup = [];
@@ -2044,6 +2332,37 @@ class ModuleTransform {
 	}
 
 	/**
+	 * Whether `fn` assigns a variable declared outside it.
+	 *
+	 * @param {ts.ArrowFunction | ts.FunctionExpression} fn
+	 */
+	writesOuter(fn) {
+		/** @type {(node: ts.Node) => boolean} */
+		const visit = (node) => {
+			let target = null;
+			if (
+				ts.isBinaryExpression(node) &&
+				node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+				node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+			) {
+				target = node.left;
+			} else if (
+				(ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+				(node.operator === ts.SyntaxKind.PlusPlusToken ||
+					node.operator === ts.SyntaxKind.MinusMinusToken)
+			) {
+				target = node.operand;
+			}
+			if (target && ts.isIdentifier(skipParens(target))) {
+				const declaration = this.declarationOf(/** @type {ts.Identifier} */ (skipParens(target)));
+				if (declaration && (declaration.pos < fn.pos || declaration.end > fn.end)) return true;
+			}
+			return ts.forEachChild(node, visit) ?? false;
+		};
+		return visit(fn.body);
+	}
+
+	/**
 	 * Whether every `return` in a list row's setup leaves the row empty, the
 	 * only early exit a directive arm allows.
 	 *
@@ -2111,6 +2430,11 @@ class ModuleTransform {
 		const statements = body.statements;
 		const last = statements[statements.length - 1];
 		if (!last || !ts.isReturnStatement(last) || !last.expression) return null;
+		const guard = statements.findIndex((s, i) => i < statements.length - 1 && guardReturn(s));
+		if (guard !== -1) return this.rewriteGuards(node, body, guard);
+		// A template body has one output; any other early `return <A />` would
+		// render through runtime descriptors, so the plain function stays.
+		if (returnsJsx(statements.slice(0, -1))) return null;
 		const inner = skipParens(last.expression);
 		let output = this.output(inner);
 		if (output === null) return null;
@@ -2137,6 +2461,63 @@ class ModuleTransform {
 			last.getStart(this.sf),
 		);
 		return head + '@{' + setup + gap + output + this.source.slice(last.end, body.end - 1) + '}';
+	}
+
+	/**
+	 * A component with `if (c) return <A />;` guards: each becomes
+	 * `@if (c) { <A /> } @else { …the rest }`, since a template body has one
+	 * output. The setup before the first guard stays as it was.
+	 *
+	 * @param {ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction} node
+	 * @param {ts.Block} body
+	 * @param {number} first the index of the first guard
+	 */
+	rewriteGuards(node, body, first) {
+		const statements = body.statements;
+		const last = /** @type {ts.ReturnStatement} */ (statements[statements.length - 1]);
+		// Setup before the first guard stays in the body, which may return a
+		// value early; the rest moves into arms, which may only return nothing.
+		const rest = statements.slice(first + 1, -1).filter((statement) => !guardReturn(statement));
+		if (returnsJsx(statements.slice(0, first)) || !this.armReturnsOnlyEmpty(rest)) return null;
+		const output = this.arm(/** @type {ts.Expression} */ (last.expression));
+		if (output === null) return null;
+		/** @type {(from: number) => string} */
+		const chain = (from) => {
+			let at = from;
+			while (at < statements.length - 1 && !guardReturn(statements[at])) at++;
+			// Comments before the first guard stay in the body's own text.
+			const lead =
+				from > first
+					? this.lostComments(statements[from - 1].end, statements[from].getStart(this.sf), '')
+					: [];
+			const prefix =
+				lead.map((comment) => comment + '\n').join('') +
+				(at > from
+					? this.relative(
+							this.span(body, statements[from].getStart(this.sf), statements[at - 1].end, PLAIN),
+							statements[from],
+						) + '\n'
+					: '');
+			if (at === statements.length - 1) return prefix + output;
+			const guard = /** @type {ts.IfStatement} */ (statements[at]);
+			this.count(RULE.if);
+			const then = this.block(
+				`@if (${this.emit(guard.expression, PLAIN)})`,
+				/** @type {string} */ (this.arm(/** @type {ts.Expression} */ (guardReturn(guard)))),
+			);
+			const rest = chain(at + 1);
+			return prefix + (rest === '' ? then : then + ' ' + this.block('@else', rest));
+		};
+		const directive = this.absolute(chain(first), statements[first]);
+		const head = this.head(node, body.getStart(this.sf));
+		this.markTemplate();
+		const previous = statements[first - 1];
+		const before = previous ? this.span(body, body.getStart(this.sf) + 1, previous.end, PLAIN) : '';
+		const gap = this.source.slice(
+			previous ? previous.end : body.getStart(this.sf) + 1,
+			statements[first].getStart(this.sf),
+		);
+		return head + '@{' + before + gap + directive + this.source.slice(last.end, body.end - 1) + '}';
 	}
 
 	markTemplate() {

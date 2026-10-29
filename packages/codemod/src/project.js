@@ -5,6 +5,7 @@ import { findRoot, scanSourceFiles } from '@octanejs/cli';
 import { DATA } from '@octanejs/cli/data';
 import ts from 'typescript';
 import { finding, loadCompiler, thrown } from './compiler.js';
+import { FRAMEWORK_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
 import { transformModule } from './transform.js';
 
@@ -47,6 +48,8 @@ import { transformModule } from './transform.js';
  */
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
+/** React packages and the Octane package that replaces each. */
+const CATALOG = { ...DATA.reactPackages, ...FRAMEWORK_PACKAGES };
 /** A package that, by its name, renders through React. */
 const REACT_PACKAGE = /^(?:react-|@[^/]+\/react(?:-|\/|$)|[^/]+\/react$)|-react(?:\/|$)/;
 
@@ -68,7 +71,8 @@ export async function runCodemod(paths, options = {}) {
 	const files = paths.flatMap((entry) => collect(path.resolve(entry)));
 
 	const known = new Set(files);
-	const program = projectProgram(root, files);
+	const config = tsconfigOptions(root);
+	const program = projectProgram(config, files);
 	const checker = program?.getTypeChecker();
 	/** @type {Map<string, string>} */
 	const renames = new Map();
@@ -97,6 +101,7 @@ export async function runCodemod(paths, options = {}) {
 		const unmapped = new Set();
 		const resolveSpecifier = (/** @type {string} */ specifier) =>
 			resolveRelative(file, specifier, known, renames) ??
+			resolveAlias(file, specifier, renames, config) ??
 			resolveBinding(file, specifier, packages, extra, unmapped);
 		const isContext = (/** @type {string} */ specifier, /** @type {string} */ name) => {
 			if (!specifier.startsWith('.')) return null;
@@ -150,6 +155,33 @@ export async function runCodemod(paths, options = {}) {
 			strongFixes,
 			diagnostics: dedupe(diagnostics),
 			code,
+		});
+	}
+
+	// TSRX written for React (`@tsrx/react`) is a dialect the TypeScript
+	// parser cannot read, so it is reported rather than skipped silently.
+	for (const file of paths.flatMap((entry) => collect(path.resolve(entry), isTsrx))) {
+		const source = fs.readFileSync(file, 'utf8');
+		const react = /^import\b[^;]*?\bfrom\s+['"]react(?:-dom)?(?:\/[^'"]*)?['"]/m.exec(source);
+		if (!react || /\bfrom\s+['"]octane(?:\/[^'"]*)?['"]/.test(source)) continue;
+		results.push({
+			file: path.relative(root, file),
+			output: path.relative(root, file),
+			changed: false,
+			rules: {},
+			notes: [
+				{
+					rule: 'tsrx-react',
+					severity: 'error',
+					line: source.slice(0, react.index).split('\n').length,
+					message:
+						'This is TSRX written for React (`@tsrx/react`), which the codemod cannot read. Port it by hand: its templates are already TSRX, but its React imports and APIs need the changes the codemod makes to TSX.',
+				},
+			],
+			strong: null,
+			strongFixes: [],
+			diagnostics: [],
+			code: source,
 		});
 	}
 
@@ -216,13 +248,33 @@ function dedupe(diagnostics) {
 }
 
 /**
- * The modules under `entry` the codemod migrates.
+ * The modules under `entry` that pass `test`: by default, those the codemod
+ * migrates.
  *
  * @param {string} entry
+ * @param {(name: string) => boolean} [test]
  */
-function collect(entry) {
-	if (fs.statSync(entry).isFile()) return isSource(entry) ? [entry] : [];
-	return scanSourceFiles(entry, { limit: Infinity }).filter(isSource).sort();
+function collect(entry, test = isSource) {
+	if (fs.statSync(entry).isFile()) return test(entry) ? [entry] : [];
+	return scanSourceFiles(entry, { limit: Infinity }).filter(test).sort();
+}
+
+/** @param {string} name */
+function isTsrx(name) {
+	return name.endsWith('.tsrx');
+}
+
+/**
+ * The compiler options of the tsconfig that governs `root`, or null.
+ *
+ * @param {string} root
+ * @returns {ts.CompilerOptions | null}
+ */
+function tsconfigOptions(root) {
+	const file = ts.findConfigFile(root, ts.sys.fileExists);
+	if (!file) return null;
+	const { config } = ts.readConfigFile(file, ts.sys.readFile);
+	return ts.parseJsonConfigFileContent(config ?? {}, ts.sys, path.dirname(file)).options;
 }
 
 /**
@@ -231,15 +283,11 @@ function collect(entry) {
  * enables `strictNullChecks`: without it a `string` may still hold null, so
  * types cannot prove a hole is text.
  *
- * @param {string} root
+ * @param {ts.CompilerOptions | null} options
  * @param {string[]} files
  */
-function projectProgram(root, files) {
-	const file = ts.findConfigFile(root, ts.sys.fileExists);
-	if (!file) return null;
-	const { config } = ts.readConfigFile(file, ts.sys.readFile);
-	const { options } = ts.parseJsonConfigFileContent(config ?? {}, ts.sys, path.dirname(file));
-	if (!(options.strictNullChecks ?? options.strict)) return null;
+function projectProgram(options, files) {
+	if (!options || !(options.strictNullChecks ?? options.strict)) return null;
 	return ts.createProgram(
 		files.filter((name) => /\.[cm]?tsx?$/.test(name)),
 		// As the compiler's typed-text proof requires.
@@ -296,6 +344,26 @@ function resolveRelative(from, specifier, files, renames) {
 }
 
 /**
+ * The new specifier for an import of a renamed module through a tsconfig
+ * `paths` alias (`~/components/Card`), resolved as TypeScript resolves it.
+ *
+ * @param {string} from
+ * @param {string} specifier
+ * @param {Map<string, string>} renames
+ * @param {ts.CompilerOptions | null} options
+ */
+function resolveAlias(from, specifier, renames, options) {
+	if (!options?.paths || specifier.startsWith('.')) return null;
+	const file = ts.resolveModuleName(specifier, from, { ...options, preserveSymlinks: true }, ts.sys)
+		.resolvedModule?.resolvedFileName;
+	if (!file || !renames.has(file)) return null;
+	if (SOURCE.test(specifier)) return specifier.replace(SOURCE, '.tsrx');
+	return path.basename(file).startsWith('index.') && !/(?:^|\/)index$/.test(specifier)
+		? `${specifier}/index.tsrx`
+		: `${specifier}.tsrx`;
+}
+
+/**
  * Which names each module exports as a context, following `export … from`.
  *
  * @param {Map<string, import('./transform.js').ModuleExports>} exports
@@ -341,15 +409,28 @@ function resolveBinding(from, specifier, packages, notes, unmapped) {
 	let name = '';
 	for (let length = parts.length; length > 0 && name === ''; length--) {
 		const candidate = parts.slice(0, length).join('/');
-		if (candidate in DATA.reactPackages) name = candidate;
+		if (candidate in CATALOG) name = candidate;
 	}
 	if (name === '') {
 		const root = specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
-		if (rendersWithReact(root, from)) unmapped.add(root);
+		// Any package's `/react` entry renders with React (`@tanstack/markdown/react`).
+		if (/\/react(?:\/|$)/.test(specifier.slice(root.length))) unmapped.add(specifier);
+		else if (rendersWithReact(root, from)) unmapped.add(root);
 		return null;
 	}
-	const binding = DATA.reactPackages[name];
+	const binding = CATALOG[name];
 	packages.set(name, binding);
+	// An aggregate binding (`@octanejs/visx`, for `@visx/visx`) serves each
+	// package of its scope from a subpath: `@visx/hierarchy` is
+	// `@octanejs/visx/hierarchy`.
+	const upstream = DATA.bindings.find(
+		(/** @type {{ name: string, upstream?: { package?: string } }} */ entry) =>
+			entry.name === binding,
+	)?.upstream?.package;
+	const aggregate = upstream?.match(/^@([^/]+)\/\1$/);
+	if (aggregate && name !== upstream && name.startsWith(`@${aggregate[1]}/`)) {
+		return `${binding}/${name.slice(aggregate[1].length + 2)}${specifier.slice(name.length)}`;
+	}
 	const subpath = specifier.slice(name.length);
 	if (subpath !== '') {
 		notes.push({
@@ -415,15 +496,20 @@ function rewriteEntryPages(root, targets, renames, write) {
 }
 
 /**
- * The entry pages a Vite or CRA app keeps beside its sources.
+ * The HTML pages a Vite or CRA app keeps beside its sources: those in the
+ * root, `public/`, `src/`, and each migrated directory.
  *
  * @param {string} root
  * @param {string[]} targets
  */
 function findHtml(root, targets) {
-	const pages = new Set(
-		['index.html', 'public/index.html', 'src/index.html'].map((name) => path.join(root, name)),
-	);
-	for (const target of targets) pages.add(path.join(target, 'index.html'));
-	return [...pages].filter((file) => fs.existsSync(file));
+	const dirs = new Set([root, path.join(root, 'public'), path.join(root, 'src'), ...targets]);
+	return [...dirs]
+		.filter((dir) => fs.existsSync(dir) && fs.statSync(dir).isDirectory())
+		.flatMap((dir) =>
+			fs
+				.readdirSync(dir)
+				.filter((name) => name.endsWith('.html'))
+				.map((name) => path.join(dir, name)),
+		);
 }
