@@ -8043,6 +8043,12 @@ export function useCallback<F>(
 
 export function useRef<T = undefined>(): { current: T | undefined };
 export function useRef<T>(initial: T, slot?: ServerHookSlot): { current: T };
+// React 19's nullable overloads: `useRef<HTMLElement>(null)` admits its initializer.
+export function useRef<T>(initial: T | null, slot?: ServerHookSlot): { current: T | null };
+export function useRef<T>(
+	initial: T | undefined,
+	slot?: ServerHookSlot,
+): { current: T | undefined };
 export function useRef<T>(initial?: T, slot?: ServerHookSlot): { current: T | undefined } {
 	// Legacy lone-slot calls remain valid outside custom paths. Compiled spread
 	// calls use the path for identity and preserve the original argument count.

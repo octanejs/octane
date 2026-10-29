@@ -6712,6 +6712,10 @@ export function useCallback<T extends (...args: any[]) => any>(
 	return memoHookValue<T>(callback, false, deps, slot);
 }
 
+export function useRef<T>(initial: T, slot?: unknown): { current: T };
+// React 19's nullable overloads: `useRef<HTMLElement>(null)` admits its initializer.
+export function useRef<T>(initial: T | null, slot?: unknown): { current: T | null };
+export function useRef<T>(initial: T | undefined, slot?: unknown): { current: T | undefined };
 export function useRef<T>(initial: T, slot?: unknown): { current: T } {
 	if (
 		slot === undefined &&

@@ -1314,6 +1314,9 @@ export function hookMemoPublishInvariant<T>(cells: any[], base: number, value: T
 
 export function useRef<T = undefined>(): { current: T | undefined };
 export function useRef<T>(initial: T, slot?: HookSlot): { current: T };
+// React 19's nullable overloads: `useRef<HTMLElement>(null)` admits its initializer.
+export function useRef<T>(initial: T | null, slot?: HookSlot): { current: T | null };
+export function useRef<T>(initial: T | undefined, slot?: HookSlot): { current: T | undefined };
 export function useRef<T>(initial?: T, slot?: HookSlot): { current: T | undefined } {
 	// Same legacy lone-slot compatibility and authored alias arguments as useState.
 	if (
