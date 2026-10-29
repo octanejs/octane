@@ -1,0 +1,198 @@
+[
+  {
+    "id": "react-case-v1:4a62f0e7d591d6a22f7b",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:cd54136662e7c0aff6de",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:a06f2726452ba6a1d237",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:fe437295224726843a82",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:11b9c9db44b2fd49c3b6",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:e291a5a83718cdad27f9",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:60102435f4c83617071a",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:ad3d96343bb2b0aada88",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:8e8cb3eb33d16d5677a5",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:1e980f02662376170d3f",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:00816809d4a60fd97059",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:9b4effbeb009753aedf4",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:fabd62e862255c7f9b30",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:2ae0d26032d97448e183",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:6efa06f17eff73a25c2b",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:39b92d5b1716616947f9",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:9a5c75b3355c1b9b9b4e",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:dadff427c894d716fa21",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:d8c9c33a0267eb631a6d",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:b79ece4a3d0cd892e624",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:36090dd7a8746b794d4d",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:4b5a287bd159be4db48a",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:c1702ff4ae907be9b925",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:3387c1a5d19f9ac5ef08",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:6c491eaaccc927bb1424",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:0dc029ddf45d6c1f47a9",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:519efaafde5bc8370b06",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  },
+  {
+    "id": "react-case-v1:054e530d083c3becce02",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/index.test.tsx"],
+    "rationale": "Runs the pinned upstream case against the Octane port with import rewrites only; the same bytes also run unchanged against React.",
+    "upstreamCommit": "3a43743798db3008a0fc59e8bcc9d6e1bb5d4752"
+  }
+]
