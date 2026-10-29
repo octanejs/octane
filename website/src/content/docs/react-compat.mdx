@@ -319,6 +319,10 @@ hydration recovery.
   `div[data-react-compat]`. Place them where a div is valid, not directly inside a
   table row, select, SVG tree, or another restricted content model. Do not let
   another renderer reconcile or directly write the island's interior.
+- Each host div is styled `display: contents`, so it adds no layout box: the
+  island's own root element is the parent's flex or grid item. Selectors still
+  see the div, so a child combinator such as `.row > .title` does not reach the
+  island's root. Wrap the island in your own element when you want a box.
 - React Server Components, Flight, and React's server `cache()` do not cross
   these boundaries.
 - Nested React→`OctaneCompat`→`ReactCompat` **server rendering** is unsupported.

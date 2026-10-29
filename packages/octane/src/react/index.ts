@@ -69,6 +69,7 @@ import {
 	type Root as OctaneRoot,
 } from '../index.js';
 import {
+	OCTANE_COMPAT_HOST_STYLE,
 	OPAQUE_HOST_SENTINEL,
 	OPAQUE_HOST_SENTINEL_COMMENT,
 	REACT_CONTEXT_TAG,
@@ -625,6 +626,7 @@ export function OctaneCompat(
 
 	return React.createElement('div', {
 		'data-octane-compat': '',
+		style: OCTANE_COMPAT_HOST_STYLE,
 		ref: hostRef,
 		// §9.3 opaque-host contract: the server writes real island HTML; the
 		// client ALWAYS supplies this stable frozen sentinel so React neither

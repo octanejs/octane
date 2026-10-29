@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+	<head>
+		<style>
+			.row {
+				display: flex;
+				width: 320px;
+				font: 16px monospace;
+			}
+			.row > button {
+				flex: none;
+			}
+			.title {
+				display: block;
+				flex: 1 1 auto;
+				min-width: 0;
+				overflow: hidden;
+				white-space: nowrap;
+				text-overflow: ellipsis;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="root"></div>
+		<script type="module" src="/main.tsx"></script>
+	</body>
+</html>

@@ -34,7 +34,9 @@ into Octane, an imperative React ref, local Suspense, and unmount/remount contro
 Octane components inside React 19. See the
 [two-direction interoperability guide](https://octanejs.dev/docs/react-compat)
 for choosing a boundary and setting up a mixed application. Both boundaries
-have server implementations in `octane/react/server`.
+have server implementations in `octane/react/server`. Like the `ReactCompat`
+host below, the `div[data-octane-compat]` host is styled `display: contents`,
+so the island's own root element is the parent's flex or grid item.
 
 ## Storybook with Octane components
 

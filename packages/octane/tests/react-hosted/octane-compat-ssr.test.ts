@@ -157,9 +157,12 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 
 		const errors = vi.spyOn(console, 'error');
 		const mounted = await hydratePage(serverPage, clientPage);
-		// The server host carries real island HTML.
+		// The server host carries real island HTML and the client host's style:
+		// hydration never patches host attributes (#2305).
 		expect(mounted.serverHtml).toContain('island iso');
+		expect(mounted.serverHtml).toContain('<div data-octane-compat="" style="display:contents">');
 		const host = mounted.host();
+		expect(host.style.display).toBe('contents');
 		const serverButton = host.querySelector('.ssr-count');
 		expect(serverButton?.textContent).toBe('clicks:0');
 

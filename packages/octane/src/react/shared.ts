@@ -80,6 +80,13 @@ export const OPAQUE_HOST_SENTINEL = Object.freeze({
 	__html: `<!--${OPAQUE_HOST_SENTINEL_COMMENT}-->`,
 });
 
+/**
+ * Like the ReactCompat host, the island host adds no layout box: the island's
+ * own root element is the parent's flex or grid item (octanejs/octane#2305).
+ * The client and server hosts share it so hydration sees the same style.
+ */
+export const OCTANE_COMPAT_HOST_STYLE = Object.freeze({ display: 'contents' as const });
+
 export interface TransportedChild {
 	type: ComponentBody;
 	props: Record<string, unknown>;

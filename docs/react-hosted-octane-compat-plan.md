@@ -202,10 +202,11 @@ Development validation should reject a host-element child, Fragment, multiple
 children, or an unbranded ordinary React component before Octane attempts to invoke
 it.
 
-The host element is a real ownership boundary. The prototype may use a
-`<div data-octane-compat>`; its final tag and layout behavior remain an explicit
-decision because a `div`, custom element, and `display: contents` each have layout
-or accessibility tradeoffs. This decision must not change the component call site.
+The host element is a real ownership boundary. It is a
+`<div data-octane-compat>` styled `display: contents`, like the ReactCompat host,
+so it adds no layout box and the island's root element takes part in the
+parent's flex or grid layout (#2305). A different tag or layout would still have
+layout or accessibility tradeoffs, and must not change the component call site.
 
 ## 4. Architecture and invariants
 
