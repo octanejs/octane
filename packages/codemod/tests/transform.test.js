@@ -201,6 +201,147 @@ describe('transformModule', () => {
 		expect(transformModule(source, 'a.tsx').code).toContain(
 			"import { type ReactNode, useState } from 'octane';",
 		);
+		// In the quotes the module's own imports use.
+		expect(transformModule(source.replaceAll("'", '"'), 'a.tsx').code).toContain(
+			'import { type ReactNode, useState } from "octane";',
+		);
+	});
+
+	it("maps the global `React` namespace React's types declare, unless a name shadows it", () => {
+		const source =
+			'export const A: React.FC<{ c: React.ReactNode }> = ({ c }) => {\n\tconst onInput = (e: React.ChangeEvent<HTMLInputElement>) => e;\n\treturn <input onInput={onInput} title={String(c)} />;\n};\n';
+		const { code } = transformModule(source, 'a.tsx');
+		expect(code).toContain("import type { FC, OctaneNode, ChangeEvent } from 'octane';");
+		expect(code).toContain('export const A: FC<{ c: OctaneNode }>');
+		expect(code).toContain('(e: ChangeEvent<HTMLInputElement>)');
+		const shadowed = "import * as React from './my-react';\nexport type T = React.ReactNode;\n";
+		expect(transformModule(shadowed, 'b.ts').code).toBe(shadowed);
+	});
+
+	it('marks a component that reads its `children` as an element `descriptorChildren`', () => {
+		const migrate = (/** @type {string} */ source) => transformModule(source, 'tip.tsx');
+		// Base UI clones `render`; React hands the component an element.
+		const tip = migrate(
+			'const Tip = ({ children }: { children: React.ReactElement }) => <Trigger render={children} />;\nexport function Row({ c }: { c: boolean }) {\n\treturn <div><Tip>{c ? <span /> : <a href="#" />}</Tip>{c ? <b /> : <i />}</div>;\n}\nfunction Trigger(_: { render: unknown }) {\n\treturn null;\n}\n',
+		);
+		expect(tip.code).toContain(
+			'const Tip = descriptorChildren(({ children }: { children: OctaneElement }) => @{ <Trigger render={children} /> });',
+		);
+		// Its children stay elements: an `@if` would hand it a fragment.
+		expect(tip.code).toContain(
+			'<div><Tip>{c ? <span /> : <a href="#" />}</Tip>@if (c) { <b /> } @else { <i /> }</div>',
+		);
+		expect(compileErrors(tip.code, 'tip.tsrx')).toEqual([]);
+		// Through a type assertion too.
+		for (const read of [
+			'children as React.ReactElement',
+			'children!',
+			'(children satisfies object)',
+		]) {
+			expect(
+				migrate(
+					`const Tip = ({ children }: { children?: React.ReactNode }) => <Trigger render={${read}} />;\nfunction Trigger(_: { render: unknown }) {\n\treturn null;\n}\n`,
+				).code,
+			).toContain('const Tip = descriptorChildren(');
+		}
+		// A declaration becomes a marked `const`, unless the module reads it before.
+		const slot =
+			"import { Children, cloneElement } from 'react';\nexport function Slot(props: { children: React.ReactElement }) {\n\treturn cloneElement(Children.only(props.children), { id: 's' });\n}\n";
+		expect(migrate(slot).code).toContain(
+			"export const Slot = descriptorChildren(function Slot(props: { children: OctaneElement }) {\n\treturn cloneElement(Children.only(props.children), { id: 's' });\n});",
+		);
+		// It is reported instead when code that runs while the module loads can
+		// reach it first (directly, in a callback, or through a local call), when
+		// it has overloads, or when it is not at module level, where the compiler
+		// reads the marker.
+		const local = slot.replace('export ', '');
+		for (const [source, marked] of /** @type {[string, boolean][]} */ ([
+			[`export const routes = [<Slot />];\n${local}`, false],
+			[
+				`function make() {\n\treturn Slot({ children: <b /> });\n}\nexport const made = make();\n${local}`,
+				false,
+			],
+			[`export const list = [1].map(() => Slot({ children: <b /> }));\n${local}`, false],
+			[`export const v = (() => Slot({ children: <b /> }))();\n${local}`, false],
+			// `String` calls the object's `toString` while the module loads.
+			[`export const s = String({ toString: () => Slot({ children: <b /> }) });\n${local}`, false],
+			[
+				`const cb = () => Slot({ children: <b /> });\nexport const list = [1].map(cb);\n${local}`,
+				false,
+			],
+			[
+				slot.replace(
+					'export function Slot',
+					'export function Slot(props: { children: React.ReactElement; id: string }): React.ReactElement;\nexport function Slot',
+				),
+				false,
+			],
+			[
+				"import { cloneElement } from 'react';\nexport function Outer() {\n\tconst Inner = ({ children }: { children: React.ReactElement }) => cloneElement(children, {});\n\treturn <Inner><b /></Inner>;\n}\n",
+				false,
+			],
+			// A function that is only defined, or an imported call, runs nothing of the module's.
+			[`export const Row = () => <Slot><b /></Slot>;\nconst v = String(1);\n${local}`, true],
+			[
+				`import { memo } from 'react';\nexport const Row = memo(() => <Slot><b /></Slot>);\n${local}`,
+				true,
+			],
+		])) {
+			const result = migrate(source);
+			expect([
+				result.code.includes('descriptorChildren('),
+				result.notes.map((n) => n.rule),
+			]).toEqual(marked ? [true, []] : [false, ['descriptor-children']]);
+		}
+		// Through `forwardRef` or `memo`, the declaration holds the call.
+		expect(
+			migrate(
+				"import { forwardRef, isValidElement } from 'react';\nexport const P = forwardRef<HTMLElement, { children: React.ReactNode }>(({ children }, ref) => (isValidElement(children) ? <b ref={ref} /> : null));\n",
+			).code,
+		).toContain('export const P = descriptorChildren(({ children, ref }');
+	});
+
+	it('passes a text field wrapper its rest props `onChange` as `onInput`', () => {
+		const migrate = (/** @type {string} */ body) =>
+			transformModule(
+				`export function F({ id, ...props }: React.ComponentProps<"input">) {\n\t${body}\n}\n`,
+				'f.tsx',
+			);
+		const wrapper = migrate('return <input type={props.type} id={id} {...props} />;');
+		expect(wrapper.code).toContain('export function F({ id, onChange, ...props }');
+		// Before the spread, so a caller's own `onInput` still wins.
+		expect(wrapper.code).toContain(
+			'<input type={props.type} id={id} onInput={onChange} {...props} />',
+		);
+		expect(compileErrors(wrapper.code, 'f.tsrx')).toEqual([]);
+		expect(migrate('return (\n\t\t<textarea\n\t\t\t{...props}\n\t\t/>\n\t);').code).toContain(
+			'\t<textarea\n\t\tonInput={onChange}\n\t\t{...props}\n\t/>',
+		);
+		// A checkbox's native `change` already fires when React's `onChange` does.
+		expect(migrate('return <input type="checkbox" {...props} />;').code).not.toContain('onInput');
+		// Another read of the rest would lose `onChange`, so it is reported instead.
+		const shared = migrate('return <label><input {...props} /><output {...props} /></label>;');
+		expect(shared.code).not.toContain('onInput');
+		expect(shared.notes.map((note) => note.rule)).toEqual(['native-text-change']);
+		expect(
+			migrate('return <input title={String(props.onChange)} {...props} />;').code,
+		).not.toContain('onInput');
+		// A rest without `onChange` has nothing to pass on.
+		const named = transformModule(
+			'export function F({ onChange, ...props }: React.ComponentProps<"input">) {\n\treturn <input {...props} />;\n}\n',
+			'f.tsx',
+		);
+		expect([named.code.includes('onInput'), named.notes]).toEqual([false, []]);
+	});
+
+	it('reads `target` as `currentTarget` on a handler typed for any form control', () => {
+		const source =
+			'export function F({ set }: { set(v: string): void }) {\n\tconst on = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => set(e.target.value);\n\treturn <textarea onInput={on} />;\n}\n';
+		expect(transformModule(source, 'f.tsx').code).toContain('set(e.currentTarget.value)');
+		// A focus event's target is the control too.
+		const blur =
+			'export function F({ set }: { set(v: string): void }) {\n\treturn <input onBlur={(e) => set(e.target.value)} />;\n}\n';
+		expect(transformModule(blur, 'f.tsx').code).toContain('set(e.currentTarget.value)');
 	});
 
 	it('keeps a `.map()` whose row writes an outer variable', () => {
