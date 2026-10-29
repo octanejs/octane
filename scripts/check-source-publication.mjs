@@ -33,6 +33,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { getPublishablePackages, REPO_ROOT } from './workspace-packages.mjs';
 
 export const RULES = {
@@ -75,21 +76,13 @@ export const SOURCE_PUBLICATION_DEBT = {
 	// Node types they compile against surfaced them here; same issue, not a new
 	// class.
 	[RULES.nodeTypes]: [
-		'packages/adapter-cloudflare/tsconfig.typecheck.json',
-		'packages/adapter-vercel/tsconfig.typecheck.json',
 		'packages/alien-signals/tsconfig.json',
 		'packages/animejs/tsconfig.json',
 		'packages/apollo-client/tsconfig.json',
-		'packages/app-core/tsconfig.typecheck.json',
 		'packages/aria/tsconfig.json',
-		'packages/astro/tsconfig.typecheck.json',
 		'packages/base-ui/tsconfig.json',
-		'packages/cli/tsconfig.typecheck.json',
 		'packages/cmdk/tsconfig.json',
-		// A Node CLI like @octanejs/cli; Node tooling's way out is #2266.
-		'packages/codemod/tsconfig.typecheck.json',
 		'packages/colorful/tsconfig.json',
-		'packages/create-octane/tsconfig.typecheck.json',
 		'packages/day-picker/tsconfig.json',
 		'packages/devtools/tsconfig.json',
 		'packages/dexie/tsconfig.json',
@@ -125,8 +118,6 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/react-error-boundary/tsconfig.json',
 		'packages/react-map-gl/tsconfig.json',
 		'packages/redux-toolkit/tsconfig.json',
-		'packages/rsbuild-plugin-octane/tsconfig.typecheck.json',
-		'packages/rspack-plugin-octane/tsconfig.typecheck.json',
 		'packages/rxjs/tsconfig.json',
 		'packages/seo/tsconfig.json',
 		'packages/shadcn/tsconfig.json',
@@ -152,7 +143,6 @@ export const SOURCE_PUBLICATION_DEBT = {
 		'packages/transition-group/tsconfig.json',
 		'packages/valtio/tsconfig.json',
 		'packages/vaul/tsconfig.json',
-		'packages/vite-plugin-octane/tsconfig.typecheck.json',
 		'packages/wagmi/tsconfig.json',
 		'packages/window/tsconfig.json',
 		'packages/wouter/tsconfig.json',
@@ -163,25 +153,13 @@ export const SOURCE_PUBLICATION_DEBT = {
 	// These packages publish `.js` modules with no sibling declaration file, so
 	// the consumer's program types their public API as `any`.
 	[RULES.untypedJavaScript]: [
-		'@octanejs/adapter-cloudflare',
-		'@octanejs/adapter-vercel',
 		'@octanejs/apollo-client',
-		'@octanejs/app-core',
-		'@octanejs/astro',
-		'@octanejs/cli',
-		// Node tooling like @octanejs/cli; tracked by #2266.
-		'@octanejs/codemod',
 		'@octanejs/docusaurus',
 		'@octanejs/i18next',
-		'@octanejs/mcp-server',
 		'@octanejs/mdx',
-		'@octanejs/rsbuild-plugin',
-		'@octanejs/rspack-plugin',
 		'@octanejs/stylex',
 		'@octanejs/syntax-highlighter',
 		'@octanejs/tanstack-start',
-		'@octanejs/vite-plugin',
-		'create-octane',
 	],
 	[RULES.unusedFlags]: [],
 };
@@ -412,6 +390,107 @@ function projectChecks(config, file) {
 	return included && !(config.exclude ?? []).some((entry) => createSpecMatcher(entry)(file));
 }
 
+// These roles ship Node tools, or integrations with both Node and browser entry
+// points. Only use the export boundary when there is no consumer-compiled TS
+// in src. A TS entry could import a private JS module and expose its types.
+const NODE_TOOL_ROLES = new Set(['developer tooling', 'project scaffolder', 'agent tooling']);
+const INTEGRATION_ROLES = new Set([
+	'deployment adapter',
+	'metaframework core',
+	'metaframework',
+	'compiler integration',
+	'framework integration',
+]);
+
+function siblingDeclaration(file) {
+	return file.replace(/\.([cm]?)js$/, '.d.$1ts');
+}
+
+// The exports map hides private JS until an exported declaration imports it.
+// Follow those imports with TypeScript's resolver, including re-exports and
+// import() types, so a consumer cannot fall back to untyped JS through a .d.ts.
+function untypedToolExports(pkg) {
+	const { directory, manifest } = pkg;
+	const packed = manifest.files.map(createSpecMatcher);
+	const checked = new Set();
+	const missing = new Set();
+	let packageFiles;
+	const isPacked = (file) => packed.some((matches) => matches(file));
+	function checkDeclaration(file) {
+		if (checked.has(file)) return;
+		checked.add(file);
+		const absolute = path.join(directory, file);
+		if (!isPacked(file) || !existsSync(absolute)) {
+			missing.add(file);
+			return;
+		}
+		const { importedFiles, referencedFiles } = ts.preProcessFile(readFileSync(absolute, 'utf8'));
+		for (const { fileName } of referencedFiles) {
+			checkDeclaration(
+				toPosix(path.relative(directory, path.resolve(path.dirname(absolute), fileName))),
+			);
+		}
+		for (const { fileName } of importedFiles) {
+			if (!fileName.startsWith('.')) continue;
+			const resolved = ts.resolveModuleName(
+				fileName,
+				absolute,
+				{ moduleResolution: ts.ModuleResolutionKind.Bundler },
+				ts.sys,
+			).resolvedModule;
+			const target = toPosix(
+				path.relative(
+					directory,
+					resolved?.resolvedFileName ?? path.resolve(path.dirname(absolute), fileName),
+				),
+			);
+			if (DECLARATION_FILE.test(target)) checkDeclaration(target);
+			else if (!resolved || JAVASCRIPT_MODULE.test(target) || !isPacked(target))
+				missing.add(target);
+		}
+	}
+
+	function visit(target, types) {
+		if (typeof target === 'string') {
+			if (DECLARATION_FILE.test(target) && !target.includes('*')) {
+				checkDeclaration(target.slice(2));
+				return;
+			}
+			if (!JAVASCRIPT_MODULE.test(target) && !target.includes('*')) return;
+			const relative = target.slice(2);
+			if (relative.includes('*')) {
+				// In a package export, every '*' stands for the same substring,
+				// which may span directories (unlike a tsconfig glob).
+				const [prefix, ...parts] = relative
+					.split('*')
+					.map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+				const pattern = new RegExp(`^${prefix}(.+)${parts.join('\\1')}$`);
+				packageFiles ??= collectSourceFiles(directory);
+				for (const file of packageFiles) {
+					const match = pattern.exec(file);
+					if (match && JAVASCRIPT_MODULE.test(file) && isPacked(file)) {
+						checkDeclaration(
+							types ? types.slice(2).replaceAll('*', match[1]) : siblingDeclaration(file),
+						);
+					}
+				}
+			} else {
+				checkDeclaration(types ? types.slice(2) : siblingDeclaration(relative));
+			}
+		} else if (target && typeof target === 'object') {
+			for (const [condition, value] of Object.entries(target)) {
+				if (condition === 'types' && typeof value === 'string' && DECLARATION_FILE.test(value)) {
+					types ??= value;
+				} else {
+					visit(value, types);
+				}
+			}
+		}
+	}
+	visit(manifest.exports);
+	return [...missing].sort();
+}
+
 export function findSourcePublicationViolations(
 	repo = REPO_ROOT,
 	packages = getPublishablePackages(),
@@ -424,6 +503,11 @@ export function findSourcePublicationViolations(
 		const sourceFiles = collectSourceFiles(path.join(pkg.directory, 'src'));
 		const sourceFileSet = new Set(sourceFiles);
 		const validationProjects = [];
+		const nodeTool = NODE_TOOL_ROLES.has(pkg.role);
+		const jsTool =
+			(nodeTool || INTEGRATION_ROLES.has(pkg.role)) &&
+			pkg.manifest.exports &&
+			!sourceFiles.some((file) => COMPILED_SOURCE.test(file) && !DECLARATION_FILE.test(file));
 
 		for (const project of collectPackageRootProjects(pkg, projects.keys())) {
 			const config = readJson(project);
@@ -432,7 +516,7 @@ export function findSourcePublicationViolations(
 			const id = toPosix(path.relative(repo, project));
 
 			const types = config.compilerOptions?.types;
-			if (Array.isArray(types) && types.includes('node')) {
+			if (!jsTool && !nodeTool && Array.isArray(types) && types.includes('node')) {
 				violations.push({
 					rule: RULES.nodeTypes,
 					id,
@@ -478,15 +562,21 @@ export function findSourcePublicationViolations(
 			});
 		}
 
-		const untyped = sourceFiles
-			.filter((file) => JAVASCRIPT_MODULE.test(file) && !TEST_MODULE.test(file))
-			.filter((file) => !sourceFileSet.has(file.replace(JAVASCRIPT_MODULE, '.d.ts')))
-			.sort();
+		const untyped = jsTool
+			? untypedToolExports(pkg)
+			: sourceFiles
+					.filter((file) => JAVASCRIPT_MODULE.test(file) && !TEST_MODULE.test(file))
+					.filter(
+						(file) =>
+							!sourceFileSet.has(file.replace(JAVASCRIPT_MODULE, '.d.ts')) &&
+							!sourceFileSet.has(siblingDeclaration(file)),
+					)
+					.sort();
 		if (untyped.length) {
 			violations.push({
 				rule: RULES.untypedJavaScript,
 				id: pkg.name,
-				detail: `publishes ${untyped.length} .js module(s) with no sibling .d.ts, starting with ${untyped
+				detail: `publishes ${untyped.length} .js module(s) without shipped declarations, starting with ${untyped
 					.slice(0, 3)
 					.join(', ')}`,
 			});
