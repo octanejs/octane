@@ -9,14 +9,14 @@
 //   registration collector (see routes-collector.ts): the block renders
 //   invisibly under the collector context, each <Route> registers, and the
 //   collected config renders through useRoutes on the next pre-paint pass.
-import { isChildrenBlock, useMemo, useState } from 'octane';
+import { isChildrenBlock, useLayoutSnapshot, useLazyRef, useState } from 'octane';
 import type { OctaneNode } from 'octane';
 import { useRoutes } from '../hooks.ts';
 import type { Location } from '../router/history.ts';
 import type { RouteObject } from '../router/utils.ts';
 import {
 	RoutesCollectorContext,
-	createCollector,
+	createRootCollector,
 	createRoutesFromChildren,
 } from './routes-collector.ts';
 
@@ -43,11 +43,10 @@ function CollectedRoutes(props: { routes: RouteObject[]; location?: Partial<Loca
 
 function BlockRoutes(props: RoutesProps) @{
 	const [version, setVersion] = useState(0);
-	const [collector] = useState(() => createCollector(() => setVersion((v) => v + 1)));
-	// Registrations land in the children's layout effects (pre-paint); the
-	// version bump re-renders with the finalized config, so the first paint
-	// already shows the matched route.
-	const routes = useMemo(() => (version === 0 ? null : collector.collect()));
+	const collector = useLazyRef(() => createRootCollector(() => setVersion((v) => v + 1)));
+	const routes = useLayoutSnapshot(() => (version === 0 ? null : collector.current.snapshot()), {
+		initial: null,
+	});
 
 	<>
 		<RoutesCollectorContext value={collector}>{props.children}</RoutesCollectorContext>

@@ -2,12 +2,19 @@
 
 // Router — transcribed from react-router@8.2.0 lib/components.tsx. The
 // low-level context provider every router variant renders through.
-import { useMemo } from 'octane';
+import {
+	startTransition,
+	useCallback,
+	useLayoutEffect,
+	useMemo,
+	useState,
+	useSyncExternalStore,
+} from 'octane';
 import type { OctaneNode } from 'octane';
 import { LocationContext, NavigationContext } from '../context.ts';
 import type { Navigator } from '../context.ts';
 import { Action as NavigationType, invariant, parsePath, warning } from '../router/history.ts';
-import type { Location } from '../router/history.ts';
+import type { History, Location, Update } from '../router/history.ts';
 import { stripBasename } from '../router/utils.ts';
 import { useInRouterContext } from '../hooks.ts';
 
@@ -20,6 +27,43 @@ type RouterProps = {
 	static?: boolean;
 	useTransitions?: boolean;
 };
+
+// A router owns the same History for its lifetime. Location changes are
+// subscribed in layout below so they can still run in a transition.
+const unsubscribe = () => {};
+const subscribeToIdentity = () => unsubscribe;
+
+export function useOwnedHistoryNavigation(
+	ref: { readonly current: History },
+	useTransitions?: boolean,
+) {
+	const getHistory = () => ref.current;
+	const history = useSyncExternalStore(subscribeToIdentity, getHistory, getHistory);
+	return useHistoryNavigation(history, useTransitions);
+}
+
+// Replacing a caller-supplied history must resubscribe even when it shares
+// its listen function with the previous instance.
+function listenToHistory(history: History, onChange: (update: Update) => void) {
+	return history.listen(onChange);
+}
+
+export function useHistoryNavigation(history: History, useTransitions?: boolean) {
+	const [state, setState] = useState(() => ({
+		action: history.action,
+		location: history.location,
+	}));
+	const onChange = useCallback((update: Update) => {
+		if (useTransitions === false) {
+			setState(update);
+		} else {
+			startTransition(() => setState(update));
+		}
+	});
+	useLayoutEffect(() => listenToHistory(history, onChange));
+
+	return { navigator: history, location: state.location, navigationType: state.action };
+}
 
 export function Router(props: RouterProps) @{
 	const {

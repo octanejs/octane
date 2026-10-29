@@ -1,4 +1,4 @@
-import { useState } from 'octane';
+import { createElement, useState, type OctaneNode } from 'octane';
 import {
 	Link,
 	MemoryRouter,
@@ -97,4 +97,21 @@ export function ConditionalApp() @{
 			</Routes>
 		</MemoryRouter>
 	</div>
+}
+
+function SwitchingRoutes(props: { descriptor: boolean; children?: OctaneNode }) @{
+	const children = props.descriptor
+		? createElement(Route, { path: 'nested', element: createElement('h1', null, 'Descriptor') })
+		: props.children;
+	<Routes>
+		<Route path="/" children={children} />
+	</Routes>
+}
+
+export function SwitchingChildrenApp(props: { descriptor: boolean }) @{
+	<MemoryRouter initialEntries={['/nested']}>
+		<SwitchingRoutes descriptor={props.descriptor}>
+			<Route path="nested" element={<h1>Block</h1>} />
+		</SwitchingRoutes>
+	</MemoryRouter>
 }

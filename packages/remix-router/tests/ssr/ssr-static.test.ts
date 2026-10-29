@@ -108,6 +108,15 @@ describe('static SSR: octane/server vs react-dom/server over real react-router',
 		expect(normalize(html)).toContain('About');
 	});
 
+	it('renders the selected memory history entry and basename on the server', async () => {
+		const { html } = octaneRenderToString(octaneFixture.MemoryEntryApp, {});
+		const reactFixture = await loadReactFixture();
+		const react = reactRenderToString(reactCreateElement(reactFixture.MemoryEntryApp));
+		expect(normalize(html)).toBe(normalize(react));
+		expect(html).toContain('href="/base/next"');
+		expect(html).toContain('POP /selected selected-key');
+	});
+
 	it('keeps escaped loader data inside the one nonced hydration script', async () => {
 		const payload = '</script><script>injected()</script>&\u2028\u2029';
 		const handler = octaneCreateStaticHandler([

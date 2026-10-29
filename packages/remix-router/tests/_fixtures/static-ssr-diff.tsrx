@@ -1,5 +1,6 @@
 import {
 	Link,
+	MemoryRouter,
 	Outlet,
 	Route,
 	Routes,
@@ -7,6 +8,8 @@ import {
 	StaticRouterProvider,
 	isRouteErrorResponse,
 	useLoaderData,
+	useLocation,
+	useNavigationType,
 	useRouteError,
 } from '@octanejs/remix-router';
 
@@ -89,4 +92,24 @@ export function DeclarativeStaticApp(props: { url: string }) @{
 	<StaticRouter location={props.url}>
 		<Routes children={staticRoutes} />
 	</StaticRouter>
+}
+
+function EntryLink() @{
+	const location = useLocation();
+	const action = useNavigationType();
+	<Link to="/next">{action + ' ' + location.pathname + ' ' + location.key}</Link>
+}
+
+export function MemoryEntryApp() @{
+	<MemoryRouter
+		basename="/base"
+		initialEntries={[
+			'/base/first',
+			{ pathname: '/base/selected', key: 'selected-key' },
+			'/base/last',
+		]}
+		initialIndex={1}
+	>
+		<EntryLink />
+	</MemoryRouter>
 }
