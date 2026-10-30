@@ -12,6 +12,7 @@ import {
 	collectArchiveEvidence,
 	conventionalTestPath,
 	evaluateApprovedLicense,
+	immutableTestInventory,
 	parseTarArchive,
 	parseInput,
 	resolveRemoteInput,
@@ -29,6 +30,47 @@ test('conventional test discovery excludes fixture modules beside runnable suite
 	assert.equal(conventionalTestPath('test/dnd/example.test.js', { runner: 'jest' }), true);
 	assert.equal(conventionalTestPath('__tests__/example.js', { runner: 'jest' }), true);
 	assert.equal(conventionalTestPath('test/types.ts', { runner: 'vitest' }), false);
+	assert.equal(conventionalTestPath('test/helpers/dom.ts', { runner: 'bun' }), false);
+	assert.equal(conventionalTestPath('test/tree.test.tsx', { runner: 'bun' }), true);
+	assert.equal(conventionalTestPath('test/tree_spec.ts', { runner: 'bun' }), true);
+});
+
+test('a moon task that runs bun test selects bun named test files', async () => {
+	const blobs = new Map();
+	const entry = (path, text) => {
+		const bytes = Buffer.from(text);
+		const sha = gitBlobSha(bytes);
+		const url = `https://api.github.com/repos/example/widgets/git/blobs/${sha}`;
+		blobs.set(url, bytes);
+		return { path, type: 'blob', mode: '100644', sha, size: bytes.length, url };
+	};
+	const fetchImpl = async (url) => {
+		const bytes = blobs.get(String(url));
+		return bytes
+			? Response.json({ encoding: 'base64', content: bytes.toString('base64'), size: bytes.length })
+			: new Response('missing', { status: 404 });
+	};
+	const packageTree = [
+		entry('packages/widget/test/helpers/dom.ts', 'export const dom = true;\n'),
+		entry('packages/widget/test/widget.test.ts', "test('renders', () => {});\n"),
+	];
+	const manifest = { name: 'widget', version: '1.0.0', scripts: {} };
+	const options = { fetchImpl, sourceCommit: 'a'.repeat(40) };
+
+	// Without a declared runner, every module under test/ counts as a test.
+	await assert.rejects(
+		immutableTestInventory(packageTree, 'packages/widget', manifest, options),
+		/helpers\/dom\.ts has no countable registrations/,
+	);
+	const tree = [
+		entry('.moon/tasks/js.yml', "tasks:\n  test:\n    command: 'bun test'\n"),
+		...packageTree,
+	];
+	const inventory = await immutableTestInventory(tree, 'packages/widget', manifest, options);
+	assert.deepEqual(
+		inventory.map(({ path, registrations }) => [path, registrations.length]),
+		[['packages/widget/test/widget.test.ts', 1]],
+	);
 });
 
 const MIT_TEXT = `MIT License
@@ -134,6 +176,23 @@ describe('evaluateApprovedLicense', () => {
 		assert.equal(result.evidence[0].sha256.length, 64);
 		assert.equal(result.notices[0].path, 'NOTICE');
 		assert.match(result.obligations[0], /copyright and permission notice/i);
+	});
+
+	test('matches SPDX identifiers case-insensitively', () => {
+		const result = evaluateApprovedLicense({
+			manifestLicense: 'mit',
+			licenseFiles: [{ path: 'LICENSE', scope: 'package', content: MIT_TEXT }],
+		});
+
+		assert.equal(result.status, 'passed');
+		assert.equal(result.spdx, 'MIT');
+		assert.equal(
+			evaluateApprovedLicense({
+				manifestLicense: 'mit or apache-2.0',
+				licenseFiles: [{ path: 'LICENSE', scope: 'package', content: MIT_TEXT }],
+			}).status,
+			'blocked',
+		);
 	});
 
 	test('passes exact Unlicense metadata with matching public-domain evidence', () => {

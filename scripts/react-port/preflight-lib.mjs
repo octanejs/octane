@@ -161,14 +161,18 @@ export function evaluateApprovedLicense({ manifestLicense, licenseFiles = [], no
 		}))
 		.sort((left, right) => left.path.localeCompare(right.path));
 	const reasons = [];
-	let approvedSpdx = null;
+	// SPDX matches license identifiers case-insensitively, so `apache-2.0` is
+	// `Apache-2.0`. Compound expressions and aliases still fail closed.
+	let approvedSpdx =
+		typeof manifestLicense === 'string'
+			? (APPROVED_LICENSE_IDENTIFIERS.find(
+					(identifier) => identifier.toLowerCase() === manifestLicense.toLowerCase(),
+				) ?? null)
+			: null;
 
 	if (typeof manifestLicense !== 'string' || !manifestLicense.trim()) {
 		reasons.push('The package manifest does not declare a license.');
-	} else if (APPROVED_LICENSE_IDENTIFIERS.includes(manifestLicense)) {
-		approvedSpdx = manifestLicense;
-		// Exact SPDX metadata is required; compound expressions and aliases fail closed.
-	} else {
+	} else if (approvedSpdx === null) {
 		const referencedFile = /^SEE LICENSE IN (.+)$/i.exec(manifestLicense)?.[1];
 		if (!referencedFile) {
 			reasons.push(
@@ -762,9 +766,10 @@ export function conventionalTestPath(relativePath, { runner } = {}) {
 	) {
 		return false;
 	}
-	if (runner === 'vitest' || runner === 'jest') {
+	if (runner === 'vitest' || runner === 'jest' || runner === 'bun') {
 		return (
 			/(?:^|[.-])(?:test|spec|test-d|d-test)\.[cm]?[jt]sx?$/.test(baseName) ||
+			(runner === 'bun' && /_(?:test|spec)\.[cm]?[jt]sx?$/.test(baseName)) ||
 			segments.some((segment) => ['typetests', 'type-tests', 'test-d'].includes(segment)) ||
 			(runner === 'jest' && segments.includes('__tests__'))
 		);
@@ -835,6 +840,24 @@ function commandPathPatterns(testScripts) {
 	return Object.values(testScripts).flatMap((command) =>
 		String(command).split(/\s+/).map(normalizeConfigurationPattern).filter(Boolean),
 	);
+}
+
+// `bun test` has no config file of its own to discover. Moon workspaces declare
+// it as a task, in the package's moon.yml or a shared .moon/tasks file.
+async function declaresBunTestRunner(tree, scopePrefix, testScripts, options) {
+	const bunTest = /\bbun\s+test\b/;
+	if (Object.values(testScripts).some((command) => bunTest.test(command))) return true;
+	for (const entry of tree) {
+		if (
+			isGitHubRegularBlob(entry) &&
+			(entry.path === `${scopePrefix}moon.yml` ||
+				/^\.moon\/tasks\/[^/]+\.ya?ml$/.test(entry.path)) &&
+			bunTest.test((await fetchGitHubBlob(entry, options)).toString('utf8'))
+		) {
+			return true;
+		}
+	}
+	return false;
 }
 
 function propertyName(name) {
@@ -1058,11 +1081,15 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 	const configuredTestPatterns = [...configurationPatterns];
 	const configuredInlineSourcePatterns = [...inlineSourcePatterns];
 	const configurationEntryPaths = new Set(configurationEntries.map((entry) => entry.path));
-	const runner = ['vitest', 'jest'].find(
-		(name) =>
-			Object.values(testScripts).some((command) => new RegExp(`\\b${name}\\b`).test(command)) ||
-			configurationEntries.some((entry) => path.posix.basename(entry.path).startsWith(`${name}.`)),
-	);
+	const runner =
+		['vitest', 'jest'].find(
+			(name) =>
+				Object.values(testScripts).some((command) => new RegExp(`\\b${name}\\b`).test(command)) ||
+				configurationEntries.some((entry) =>
+					path.posix.basename(entry.path).startsWith(`${name}.`),
+				),
+		) ??
+		((await declaresBunTestRunner(tree, scopePrefix, testScripts, options)) ? 'bun' : undefined);
 	const candidateEntries = tree.flatMap((entry) => {
 		if (!isGitHubRegularBlob(entry) || !entry.path.startsWith(scopePrefix)) return [];
 		if (configurationEntryPaths.has(entry.path)) return [];
