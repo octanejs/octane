@@ -1,0 +1,84 @@
+import type { OctaneNode } from 'octane';
+
+import type { DiffFileInput, FileContents } from '@pierre/diffs';
+import type { DiffBasePropsReact } from './types';
+import { renderDiffChildren } from './utils/renderDiffChildren.tsrx';
+import { templateRender } from './utils/templateRender.tsrx';
+import { useFileDiffInstance } from './utils/useFileDiffInstance';
+
+export type { FileContents };
+
+interface MultiFileDiffBaseProps<LAnnotation, Caret> extends DiffBasePropsReact<
+	LAnnotation,
+	Caret
+> {
+	disableWorkerPool?: boolean;
+}
+
+export type MultiFileDiffProps<LAnnotation, Caret> = MultiFileDiffBaseProps<LAnnotation, Caret> &
+	DiffFileInput;
+
+export function MultiFileDiff<LAnnotation = undefined, Caret = undefined>({
+	oldFile,
+	newFile,
+	options,
+	editorOptions,
+	editStateKey,
+	metrics,
+	lineAnnotations,
+	selectedLines,
+	className,
+	style,
+	prerenderedHTML,
+	renderAnnotation,
+	renderCustomHeader,
+	renderHeaderPrefix,
+	renderHeaderFilenameSuffix,
+	renderHeaderMetadata,
+	renderGutterUtility,
+	disableWorkerPool = false,
+	edit = false,
+	onEditChange,
+	onEditComplete,
+}: MultiFileDiffProps<LAnnotation, Caret>): OctaneNode {
+	const {
+		fileDiff,
+		ref,
+		getHoveredLine,
+		getAnnotationSlotName,
+		lineAnnotations: renderedAnnotations,
+	} = useFileDiffInstance({
+		oldFile,
+		newFile,
+		options,
+		editorOptions,
+		editStateKey,
+		metrics,
+		lineAnnotations,
+		selectedLines,
+		prerenderedHTML,
+		hasGutterRenderUtility: renderGutterUtility != null,
+		hasCustomHeader: renderCustomHeader != null,
+		disableWorkerPool,
+		edit,
+		onEditChange,
+		onEditComplete,
+	});
+	const children = renderDiffChildren({
+		fileDiff,
+		renderCustomHeader,
+		renderHeaderPrefix,
+		renderHeaderFilenameSuffix,
+		renderHeaderMetadata,
+		renderAnnotation,
+		lineAnnotations: renderedAnnotations,
+		renderGutterUtility,
+		getHoveredLine,
+		getAnnotationSlotName,
+	});
+	return (
+		<diffs-container ref={ref} className={className} style={style}>
+			{templateRender(children, prerenderedHTML)}
+		</diffs-container>
+	);
+}

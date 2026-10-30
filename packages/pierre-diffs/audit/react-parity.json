@@ -1,0 +1,287 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/pierrecomputer/pierre.git",
+    "version": "1.6.1",
+    "commit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7",
+    "sourceRoot": "packages/diffs/src/react",
+    "testRoot": "packages/diffs/test",
+    "license": "Apache-2.0",
+    "integrity": "sha256:d098930547777226a3e25a5cb2f1b471ba91303d6f9e7626663290eb3bec352e",
+    "verification": "verified"
+  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "materializedTests": "packages/pierre-diffs",
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/pierre-diffs/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/pierre-diffs/tests/upstream"],
+      "include": ["\\.test\\.ts$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 84,
+    "uniqueIdentities": 84,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@12.9.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "198efde80cab07daf0f681a29ee3705938ac7f8751bc1529ed560686c1bac98f"
+    }
+  },
+  "lanes": [
+    {
+      "id": "pierre-diffs-pristine-full",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "pierre-diffs-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 84 pinned React runtime registrations unchanged against the pinned @pierre/diffs source on React 19.2.7.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/pierre-diffs/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/pierre-diffs/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "86f5dc5131f3442b8a05509402a261771ca4063f22973367ef4cb21dd547f3d0"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "c6793d433a73a3b37c895f15db70e3be3efe31d0d4351d32348658ba9d778839"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "268c921ad8e6df7b9e2541e9d7867d1e7317c6e63cd9c3972f429313ebb3f474"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/upstream-patches/tests/upstream/reactAnnotations.workerRendering.test.ts.patch",
+          "role": "support",
+          "sha256": "ac9d4b2893c288881d02174a64a411a109118b8f37d2e5cbf8b1dd8284019cb6"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/upstream-patches/tests/upstream/reactCodeViewEditorOptions.test.ts.patch",
+          "role": "support",
+          "sha256": "acc402bf6dc4d364b252a78edfade1007e522ccaba8f79d6bdf8f1d41a3687f0"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/upstream-patches/tests/upstream/reactEditorOptions.test.ts.patch",
+          "role": "support",
+          "sha256": "f98d6c7097be200e489dd6a1a8d8f004a024432fc6ae085fb8d5a7c08b217164"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/provenance.json",
+          "role": "support",
+          "sha256": "3a8de8c9d7056305713b37fdacf8fe35c40ca0f313b18fb788e5697b9b8d1fb4"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/registrations.json",
+          "role": "support",
+          "sha256": "65a6f27eaeab4b1be0b81adf018c01435454d1507f95c6735a3ccf754bb5123f"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "edd14dea07aa0695dfa05ad638552cc38d35142c2d2013d9a5f9bddb4b48da54"
+        },
+        {
+          "path": "packages/pierre-diffs/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "2659fd7922a188ba9201f0c93009206cfff41218011a2a6ef2ccd2bff4ee174f"
+        },
+        {
+          "path": "packages/pierre-diffs/tests/bun-test.ts",
+          "role": "support",
+          "sha256": "f6aeb14b62604726401a68be38c254b15fbc0d45e4ee04db51f3b6f40b03562d"
+        },
+        {
+          "path": "packages/pierre-diffs/tests/bun-environment.ts",
+          "role": "support",
+          "sha256": "3dcc3463fd9ea0d899cdfab72ddfff00560abcae6d874b1a80d580fef700cc7e"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "a5865bf89434ae68328befd438a475358afa9a9c5ddbb5567000e51a080a497a"
+        },
+        {
+          "path": "packages/pierre-diffs/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "7c038bddd64294c3511ae9d593920f60acc55bb68d8990919ea32b88f36a485e"
+        },
+        {
+          "path": "packages/pierre-diffs/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "77fe125d346d6c59643efebe20164c9a427750d9f57089d17eef4c62f296b103"
+        },
+        {
+          "path": "scripts/react-parity/pierre-diffs-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "8b80e5ecab10fa5cebff02ce97b7cc1dcb365752273a2dd3e720cbc79f986589"
+        },
+        {
+          "path": "scripts/react-parity/pristine-suite-lib.mjs",
+          "role": "support",
+          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
+        }
+      ]
+    },
+    {
+      "id": "pierre-diffs-adapted-full",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "pierre-diffs-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 84 pinned React runtime registrations against the Octane port; 29 carry a divergence patch.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/pierre-diffs/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/pierre-diffs/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "453ee76387a8392fe664531ed3d2c70f22254329507359abf624d94e12129520"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "268c921ad8e6df7b9e2541e9d7867d1e7317c6e63cd9c3972f429313ebb3f474"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/upstream-patches/tests/upstream/reactAnnotations.workerRendering.test.ts.patch",
+          "role": "support",
+          "sha256": "ac9d4b2893c288881d02174a64a411a109118b8f37d2e5cbf8b1dd8284019cb6"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/upstream-patches/tests/upstream/reactCodeViewEditorOptions.test.ts.patch",
+          "role": "support",
+          "sha256": "acc402bf6dc4d364b252a78edfade1007e522ccaba8f79d6bdf8f1d41a3687f0"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/upstream-patches/tests/upstream/reactEditorOptions.test.ts.patch",
+          "role": "support",
+          "sha256": "f98d6c7097be200e489dd6a1a8d8f004a024432fc6ae085fb8d5a7c08b217164"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/provenance.json",
+          "role": "support",
+          "sha256": "3a8de8c9d7056305713b37fdacf8fe35c40ca0f313b18fb788e5697b9b8d1fb4"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/registrations.json",
+          "role": "support",
+          "sha256": "65a6f27eaeab4b1be0b81adf018c01435454d1507f95c6735a3ccf754bb5123f"
+        },
+        {
+          "path": "packages/pierre-diffs/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "edd14dea07aa0695dfa05ad638552cc38d35142c2d2013d9a5f9bddb4b48da54"
+        },
+        {
+          "path": "packages/pierre-diffs/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "2659fd7922a188ba9201f0c93009206cfff41218011a2a6ef2ccd2bff4ee174f"
+        },
+        {
+          "path": "packages/pierre-diffs/tests/bun-test.ts",
+          "role": "support",
+          "sha256": "f6aeb14b62604726401a68be38c254b15fbc0d45e4ee04db51f3b6f40b03562d"
+        },
+        {
+          "path": "packages/pierre-diffs/tests/bun-environment.ts",
+          "role": "support",
+          "sha256": "3dcc3463fd9ea0d899cdfab72ddfff00560abcae6d874b1a80d580fef700cc7e"
+        },
+        {
+          "path": "packages/pierre-diffs/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "177ac982f762acf4e325ec8408a51b2b577c777adb66c24f87e62662c922e135"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "owner": "@octanejs/pierre-diffs",
+      "migrationGuidance": "None.",
+      "id": "uncaught-effect-error",
+      "caseIds": [
+        "runtime:001f650e1421cc9e",
+        "runtime:05e30faffe5db980",
+        "runtime:7d6098c67870cab7",
+        "runtime:91fb7f4b4f2ae344",
+        "runtime:c0c10ad7e78f1669",
+        "runtime:cd31d7a203120fe7",
+        "runtime:d65cf4560be3f122"
+      ],
+      "upstreamResult": "An error a layout effect or ref callback throws outside any error boundary is rethrown by React's act(), where the case catches it.",
+      "octaneResult": "Octane reports the error to the root's onUncaughtError, and the cases' roots record it there. The error, its message, and the editor cleanup assertions are upstream's.",
+      "rationale": "Octane's documented root contract: with no boundary, effect-channel errors go to onUncaughtError (console.error by default) and the root unmounts; act() does not rethrow them.",
+      "classification": "renderer-test-harness",
+      "consumerImpact": "None for the components: the same errors are thrown from the same effects, and an application observes them through onUncaughtError or an error boundary.",
+      "reviewCondition": "Review if Octane act() starts rethrowing effect-channel errors."
+    },
+    {
+      "owner": "@octanejs/pierre-diffs",
+      "migrationGuidance": "None.",
+      "id": "strict-mode-replay",
+      "caseIds": ["runtime:132cf045438d20aa", "runtime:e300530db219c227"],
+      "upstreamResult": "Under StrictMode, React's simulated unmount and remount creates a second editor per surface, and the first is cleaned up.",
+      "octaneResult": "Octane creates the committed editor only; the cleanup and no-leak assertions hold unchanged.",
+      "rationale": "Octane's StrictMode does not double-invoke mounts.",
+      "classification": "strict-mode",
+      "consumerImpact": "None: StrictMode replays are development-only.",
+      "reviewCondition": "Review if Octane StrictMode gains mount replay."
+    },
+    {
+      "owner": "@octanejs/pierre-diffs",
+      "migrationGuidance": "None.",
+      "id": "create-ref",
+      "caseIds": [
+        "runtime:1d95d718974219a1",
+        "runtime:2047edf682fd619c",
+        "runtime:2944fec046336b6c",
+        "runtime:2aa23424b88ff05d",
+        "runtime:3c020f8737b4de90",
+        "runtime:41ad052c5df2556b",
+        "runtime:43cf69d3f991791a",
+        "runtime:466110e72f5de169",
+        "runtime:686fa00a6da4f3ab",
+        "runtime:72128d41f04cca08",
+        "runtime:77eaf1c5d9d7a926",
+        "runtime:7e15cfde1aa228bc",
+        "runtime:80241d5017d4e0fb",
+        "runtime:8745769966d6ab3d",
+        "runtime:93d0e1d5f6bcc198",
+        "runtime:9d4ced24901d5c6c",
+        "runtime:a777a8adac54342e",
+        "runtime:caa3555999154f00",
+        "runtime:daf76bf9ad1d4f26",
+        "runtime:eb6fa264b37e9cf6"
+      ],
+      "upstreamResult": "The cases create their ref objects with React's createRef().",
+      "octaneResult": "The patched files define createRef as React's { current: null }; every assertion is upstream's.",
+      "rationale": "Octane has no createRef; a ref object is a plain { current } object.",
+      "classification": "renderer-test-harness",
+      "consumerImpact": "None: CodeView accepts any ref object or callback.",
+      "reviewCondition": "Review if Octane exports createRef."
+    }
+  ]
+}

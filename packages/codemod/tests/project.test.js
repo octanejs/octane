@@ -707,6 +707,61 @@ describe('runCodemod', () => {
 		expect(code('src/notify.ts')).toContain("from '@octanejs/hot-toast/headless'");
 	});
 
+	it('maps @pierre/diffs/react to its binding and leaves the framework-neutral core', async () => {
+		// T3 Code's shapes: a worker-pool provider, a styled CodeView adapter, a
+		// FileDiff excerpt, and type-only imports, beside imports of the core.
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'node_modules/@pierre/diffs/package.json': JSON.stringify({
+				version: '1.6.1',
+				exports: {
+					'.': './dist/index.js',
+					'./react': './dist/react/index.js',
+					'./worker': './dist/worker/index.js',
+				},
+				peerDependencies: { react: '^18.3.1 || ^19.0.0', 'react-dom': '^18.3.1 || ^19.0.0' },
+				peerDependenciesMeta: { react: { optional: true }, 'react-dom': { optional: true } },
+			}),
+			'src/DiffWorkerPoolProvider.tsx':
+				"import { WorkerPoolContext, useWorkerPool } from '@pierre/diffs/react';\nimport { WorkerPoolManager } from '@pierre/diffs/worker';\nimport type { ReactNode } from 'react';\n\nexport function DiffWorkerPoolProvider({ children }: { children: ReactNode }) {\n\tconst workerPool = useWorkerPool();\n\treturn <WorkerPoolContext value={workerPool}>{children}</WorkerPoolContext>;\n}\nexport type { WorkerPoolManager };\n",
+			'src/StyledDiffCodeView.tsx':
+				"import { CodeView, type CodeViewHandle, type CodeViewProps } from '@pierre/diffs/react';\nimport type { Ref } from 'react';\n\nexport function StyledDiffCodeView(props: CodeViewProps<undefined, undefined> & { viewerRef?: Ref<CodeViewHandle<undefined, undefined>> }) {\n\tconst { viewerRef, ...rest } = props;\n\treturn <CodeView {...rest} ref={viewerRef} />;\n}\n",
+			'src/GuideExcerpt.tsx':
+				"import { type FileDiffMetadata, parseDiffFromFile } from '@pierre/diffs';\nimport { FileDiff } from '@pierre/diffs/react';\n\nexport function GuideExcerpt({ fileDiff }: { fileDiff: FileDiffMetadata }) {\n\treturn <FileDiff fileDiff={fileDiff} options={{ diffStyle: 'unified' }} />;\n}\nexport { parseDiffFromFile };\n",
+			'src/types.ts':
+				"import type { CodeViewAnnotationArgs, CodeViewDiffItem } from '@pierre/diffs/react';\nexport type Args = CodeViewAnnotationArgs<string>;\nexport type Item = CodeViewDiffItem<string>;\n",
+		});
+		const result = await runCodemod([root], { write: false });
+		const code = (/** @type {string} */ name) => result.files.find((f) => f.file === name)?.code;
+		expect(result.missing).toEqual([]);
+		expect(result.packages).toEqual([
+			{ from: '@pierre/diffs/react', to: '@octanejs/pierre-diffs' },
+		]);
+		expect(code('src/DiffWorkerPoolProvider.tsx')).toContain(
+			"import { WorkerPoolContext, useWorkerPool } from '@octanejs/pierre-diffs';",
+		);
+		expect(code('src/DiffWorkerPoolProvider.tsx')).toContain(
+			"import { WorkerPoolManager } from '@pierre/diffs/worker';",
+		);
+		expect(code('src/StyledDiffCodeView.tsx')).toContain(
+			"import { CodeView, type CodeViewHandle, type CodeViewProps } from '@octanejs/pierre-diffs';",
+		);
+		expect(code('src/GuideExcerpt.tsx')).toContain(
+			"import { FileDiff } from '@octanejs/pierre-diffs';",
+		);
+		expect(code('src/GuideExcerpt.tsx')).toContain(
+			"import { type FileDiffMetadata, parseDiffFromFile } from '@pierre/diffs';",
+		);
+		expect(code('src/types.ts')).toContain(
+			"import type { CodeViewAnnotationArgs, CodeViewDiffItem } from '@octanejs/pierre-diffs';",
+		);
+		for (const file of result.files) {
+			expect(file.code).not.toContain("'@pierre/diffs/react'");
+			expect(file.code).not.toMatch(/ReactCompat|octane\/react/);
+			expect(file.diagnostics.filter((diagnostic) => diagnostic.rule === 'bindings')).toEqual([]);
+		}
+	});
+
 	it('reports TSRX written for React, which it cannot read', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',

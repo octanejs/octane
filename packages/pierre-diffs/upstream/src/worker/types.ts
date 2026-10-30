@@ -1,0 +1,273 @@
+import type { LanguageRegistration } from 'shiki';
+
+import type {
+  DiffsTheme,
+  DiffsThemeNames,
+  ExtensionFormatMap,
+  FileContents,
+  FileDiffMetadata,
+  HighlighterTypes,
+  LineDiffTypes,
+  RenderDiffOptions,
+  RenderFileOptions,
+  SupportedLanguages,
+  ThemedDiffResult,
+  ThemedFileResult,
+  ThemesType,
+} from '../types';
+
+export type WorkerRequestId = string;
+
+export interface WorkerRenderingOptions {
+  theme: DiffsThemeNames | ThemesType;
+  useTokenTransformer: boolean;
+  tokenizeMaxLineLength: number;
+  lineDiffType: LineDiffTypes;
+  maxLineDiffLength: number;
+}
+
+export interface FileRendererInstance {
+  readonly __id: string;
+  onHighlightSuccess(
+    file: FileContents,
+    result: ThemedFileResult,
+    options: RenderFileOptions
+  ): unknown;
+  onHighlightError(error: unknown): unknown;
+}
+
+export interface DiffRendererInstance {
+  readonly __id: string;
+  onHighlightSuccess(
+    diff: FileDiffMetadata,
+    result: ThemedDiffResult,
+    options: RenderDiffOptions
+  ): unknown;
+  onHighlightError(error: unknown): unknown;
+}
+
+export interface RenderFileRequest {
+  type: 'file';
+  id: WorkerRequestId;
+  file: FileContents;
+  resolvedLanguages?: ResolvedLanguage[];
+  customExtensionsVersion?: number;
+  customExtensionMap?: ExtensionFormatMap;
+}
+
+export interface RenderDiffRequest {
+  type: 'diff';
+  id: WorkerRequestId;
+  diff: FileDiffMetadata;
+  resolvedLanguages?: ResolvedLanguage[];
+  customExtensionsVersion?: number;
+  customExtensionMap?: ExtensionFormatMap;
+}
+
+export interface InitializeWorkerRequest {
+  type: 'initialize';
+  id: WorkerRequestId;
+  renderOptions: WorkerRenderingOptions;
+  preferredHighlighter: HighlighterTypes;
+  resolvedThemes: DiffsTheme[];
+  resolvedLanguages?: ResolvedLanguage[];
+  customExtensionsVersion?: number;
+  customExtensionMap?: ExtensionFormatMap;
+}
+
+export interface ResolvedLanguage {
+  name: Exclude<SupportedLanguages, 'text'>;
+  data: LanguageRegistration[];
+}
+
+export interface SetRenderOptionsWorkerRequest {
+  type: 'set-render-options';
+  id: WorkerRequestId;
+  renderOptions: WorkerRenderingOptions;
+  resolvedThemes: DiffsTheme[];
+}
+
+export type SubmitRequest =
+  | Omit<RenderFileRequest, 'id'>
+  | Omit<RenderDiffRequest, 'id'>;
+
+export type WorkerRequest =
+  | RenderFileRequest
+  | RenderDiffRequest
+  | InitializeWorkerRequest
+  | SetRenderOptionsWorkerRequest;
+
+export interface RenderFileSuccessResponse {
+  type: 'success';
+  requestType: 'file';
+  id: WorkerRequestId;
+  result: ThemedFileResult;
+  options: RenderFileOptions;
+  sentAt: number;
+}
+
+export interface RenderDiffSuccessResponse {
+  type: 'success';
+  requestType: 'diff';
+  id: WorkerRequestId;
+  result: ThemedDiffResult;
+  options: RenderDiffOptions;
+  sentAt: number;
+}
+
+export interface InitializeSuccessResponse {
+  type: 'success';
+  requestType: 'initialize';
+  id: WorkerRequestId;
+  sentAt: number;
+}
+
+export interface RegisterThemeSuccessResponse {
+  type: 'success';
+  requestType: 'set-render-options';
+  id: WorkerRequestId;
+  sentAt: number;
+}
+
+export interface RenderErrorResponse {
+  type: 'error';
+  id: WorkerRequestId;
+  error: string;
+  stack?: string;
+}
+
+export type RenderSuccessResponse =
+  | RenderFileSuccessResponse
+  | RenderDiffSuccessResponse;
+
+export type WorkerResponse =
+  | RenderSuccessResponse
+  | RenderErrorResponse
+  | InitializeSuccessResponse
+  | RegisterThemeSuccessResponse;
+
+export interface WorkerPoolOptions {
+  /**
+   * Factory function that creates a new Web Worker instance for the pool.
+   * This is called once per worker in the pool during initialization.
+   */
+  workerFactory: () => Worker;
+
+  /**
+   * Number of workers to create in the pool.
+   * @default 8
+   */
+  poolSize?: number;
+
+  /**
+   * Maximum time to wait for the worker pool to initialize, in milliseconds.
+   * @default 10000
+   */
+  workerInitializationTimeout?: number;
+
+  /**
+   * Called for each worker error instead of logging it with console.error.
+   * Call event.preventDefault() to prevent the browser from also reporting it
+   * as an uncaught error.
+   *
+   * Script load failures may provide a plain Event without message or error;
+   * uncaught exceptions provide an ErrorEvent. If initialization fails, the
+   * pool stops its workers and components highlight on the main thread.
+   *
+   * Several workers can report the same script load failure. Track errors in
+   * this callback if your application should report that failure only once.
+   */
+  onWorkerError?: (event: ErrorEvent | Event, worker: Worker) => void;
+
+  totalASTLRUCacheSize?: number;
+
+  /**
+   * Files and diffs with at most this many characters highlight on the main
+   * thread instead of a worker. Small highlights finish faster than a worker
+   * round trip, so they render highlighted without a plain-text pass. Files
+   * count `contents`; diffs count both sides of the diff. Main-thread results
+   * share the pool's highlight cache, and priming the cache follows the same
+   * rule.
+   *
+   * When unset, every highlight uses a worker.
+   */
+  mainThreadMaxCharacters?: number;
+}
+
+export interface WorkerInitializationRenderOptions extends Partial<WorkerRenderingOptions> {
+  langs?: SupportedLanguages[];
+  preferredHighlighter?: HighlighterTypes;
+}
+
+export interface InitializeWorkerTask {
+  type: 'initialize';
+  id: WorkerRequestId;
+  request: InitializeWorkerRequest;
+  resolve(value?: undefined): void;
+  reject(error: Error): void;
+  requestStart: number;
+}
+
+export interface SetRenderOptionsWorkerTask {
+  type: 'set-render-options';
+  id: WorkerRequestId;
+  request: SetRenderOptionsWorkerRequest;
+  resolve(value?: undefined): void;
+  reject(error: Error): void;
+  requestStart: number;
+}
+
+export interface RenderTaskCallbacks {
+  resolve(): void;
+  reject(error: Error): void;
+}
+
+export interface RenderFileTask {
+  type: 'file';
+  id: WorkerRequestId;
+  request: RenderFileRequest;
+  /** Cache key included in the payload when it was dispatched to the worker. */
+  cacheKeyAtDispatch?: string;
+  instances: Set<FileRendererInstance>;
+  // If primeCache is true, then the request will still be sent to workers
+  // regardless of whether there's any instances subscribed to the task
+  primeCache: boolean;
+  highlightKey?: string;
+  callbacks: Set<RenderTaskCallbacks>;
+  renderOptionsVersion: number;
+  requestStart: number;
+}
+
+export interface RenderDiffTask {
+  type: 'diff';
+  id: WorkerRequestId;
+  request: RenderDiffRequest;
+  /** Cache key included in the payload when it was dispatched to the worker. */
+  cacheKeyAtDispatch?: string;
+  instances: Set<DiffRendererInstance>;
+  // If primeCache is true, then the request will still be sent to workers
+  // regardless of whether there's any instances subscribed to the task
+  primeCache: boolean;
+  highlightKey?: string;
+  callbacks: Set<RenderTaskCallbacks>;
+  renderOptionsVersion: number;
+  requestStart: number;
+}
+
+export type AllWorkerTasks =
+  | InitializeWorkerTask
+  | SetRenderOptionsWorkerTask
+  | RenderFileTask
+  | RenderDiffTask;
+
+export interface WorkerStats {
+  managerState: 'waiting' | 'initializing' | 'initialized';
+  workersFailed: boolean;
+  totalWorkers: number;
+  busyWorkers: number;
+  queuedTasks: number;
+  activeTasks: number;
+  themeSubscribers: number;
+  fileCacheSize: number;
+  diffCacheSize: number;
+}

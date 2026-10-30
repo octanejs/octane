@@ -19,6 +19,7 @@ export const runners = new Map([
 	['next-themes', { module: './next-themes-pristine-runtime.mjs', label: 'next-themes' }],
 	['effect-atom', { module: './effect-atom-pristine-runtime.mjs', label: '@effect/atom-react' }],
 	['pierre-trees', { module: './pierre-trees-pristine-runtime.mjs', label: '@pierre/trees/react' }],
+	['pierre-diffs', { module: './pierre-diffs-pristine-runtime.mjs', label: '@pierre/diffs/react' }],
 	[
 		'monaco-editor',
 		{ module: './monaco-editor-pristine-runtime.mjs', label: '@monaco-editor/react' },

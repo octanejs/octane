@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**25 active pin(s) across 117 binding package(s).**
+**25 active pin(s) across 118 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -73,6 +73,7 @@ surface and evidence.
 | `@octanejs/opentui` | 0 |
 | `@octanejs/pdf` | 0 |
 | `@octanejs/phosphor-icons` | 0 |
+| `@octanejs/pierre-diffs` | 0 |
 | `@octanejs/pierre-trees` | 0 |
 | `@octanejs/popper` | 0 |
 | `@octanejs/portabletext` | 0 |
