@@ -275,6 +275,51 @@ describe('runCodemod', () => {
 		expect(result.missing).toEqual([]);
 	});
 
+	it('maps @legendapp/list/react to its binding instead of reporting it unported', async () => {
+		// T3 Code's timeline shape: a typed LegendList with renderItem, scroll anchoring
+		// options and an imperative ref.
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'node_modules/@legendapp/list/package.json': JSON.stringify({
+				version: '3.3.5',
+				exports: { './react': './react.mjs' },
+				peerDependencies: { react: '*' },
+			}),
+			'src/Timeline.tsx': [
+				"import { LegendList, type LegendListRef } from '@legendapp/list/react';",
+				"import { useRef } from 'react';",
+				'',
+				'export function Timeline({ rows }: { rows: { id: string; text: string }[] }) {',
+				'\tconst listRef = useRef<LegendListRef | null>(null);',
+				'\treturn (',
+				'\t\t<LegendList',
+				'\t\t\tref={listRef}',
+				'\t\t\tdata={rows}',
+				'\t\t\tkeyExtractor={(row) => row.id}',
+				'\t\t\trenderItem={({ item }) => <p>{item.text}</p>}',
+				'\t\t\tinitialScrollAtEnd',
+				'\t\t\tmaintainScrollAtEnd={{ animated: false, on: { dataChange: true } }}',
+				'\t\t\tmaintainVisibleContentPosition',
+				'\t\t\tonScroll={() => listRef.current?.scrollToEnd({ animated: false })}',
+				'\t\t/>',
+				'\t);',
+				'}',
+				'',
+			].join('\n'),
+		});
+		const result = await runCodemod([root], { write: false });
+		const timeline = result.files.find((file) => file.file === 'src/Timeline.tsx');
+		expect(timeline?.code).toContain(
+			"import { LegendList, type LegendListRef } from '@octanejs/legendapp-list';",
+		);
+		expect(timeline?.code).not.toContain('@legendapp/list');
+		expect(timeline?.notes.filter((note) => note.rule === 'bindings')).toEqual([]);
+		expect(result.packages).toEqual([
+			{ from: '@legendapp/list/react', to: '@octanejs/legendapp-list' },
+		]);
+		expect(result.missing).toEqual([]);
+	});
+
 	it('imports each Radix primitive package as its namespace of `@octanejs/radix`', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',
