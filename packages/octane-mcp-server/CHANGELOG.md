@@ -1,5 +1,11 @@
 # @octanejs/mcp-server
 
+## 0.3.9
+
+### Patch Changes
+
+- 0bdbad9: Map `@daypicker/react`, react-day-picker v10's new package name, to `@octanejs/day-picker` in the binding catalog, so `@octanejs/codemod` rewrites its imports to the binding.
+
 ## 0.3.8
 
 ### Patch Changes
