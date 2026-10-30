@@ -873,6 +873,18 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/pierre-trees",
+      "version": "0.0.0",
+      "category": "UI Libraries",
+      "upstream": { "package": "@pierre/trees", "version": "1.0.0-beta.6" },
+      "surface": "Complete @pierre/trees/react surface: FileTree (host props, header slot, renderContextMenu, and preloadedData server rendering and hydration), useFileTree, useFileTreeSelector, useFileTreeSelection, useFileTreeSearch, and the FileTreeProps, FileTreePreloadedData, UseFileTreeResult, FileTreeSelector, FileTreeSelectorEquality and FileTreeSearchState types. The model, options and payload types stay in the framework-neutral @pierre/trees root entry. All 14 upstream React registrations run unchanged against React and against Octane, the two SSR cases with a test-harness patch for their server render.",
+      "divergences": [
+        "FileTree's host event props receive native DOM events, as every Octane host does; there is no `event.nativeEvent`."
+      ],
+      "ssr": "Supported and tested: FileTree server-renders the preloaded shadow root as a declarative <template shadowrootmode=\"open\">, the @pierre/trees element attaches it, and hydrateRoot adopts the host, header and tree with no hydration warnings.",
+      "verified": "2026-10-30"
+    },
+    {
       "name": "@octanejs/popper",
       "version": "0.0.33",
       "category": "UI Utilities",
@@ -1785,6 +1797,7 @@
     "@monaco-editor/react": "@octanejs/monaco-editor",
     "@opentui/react": "@octanejs/opentui",
     "@phosphor-icons/react": "@octanejs/phosphor-icons",
+    "@pierre/trees/react": "@octanejs/pierre-trees",
     "@portabletext/react": "@octanejs/portabletext",
     "@rainbow-me/rainbowkit": "@octanejs/rainbowkit",
     "@react-email/components": "@octanejs/email",

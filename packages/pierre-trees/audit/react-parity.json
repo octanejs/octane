@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/pierrecomputer/pierre.git",
+    "version": "1.0.0-beta.6",
+    "commit": "a90629e0481bb8fed48f36ccb358d5d48a3ae8b6",
+    "sourceRoot": "packages/trees/src/react",
+    "testRoot": "packages/trees/test",
+    "license": "Apache-2.0",
+    "integrity": "sha256:2d086842ee5d51e594b816bd83f775218ccf14714b2dc1751fa494cd323c3e35",
+    "verification": "verified"
+  },
+  "upstreamSuites": { "runtime": "present", "types": "absent" },
+  "materializedTests": "packages/pierre-trees",
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/pierre-trees/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/pierre-trees/tests/upstream"],
+      "include": ["\\.test\\.tsx$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 14,
+    "uniqueIdentities": 14,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@12.9.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "405bd96648fe1aeab54776e5a7b11922267a464e46251dc4dca6d29e8fff9eef"
+    }
+  },
+  "lanes": [
+    {
+      "id": "pierre-trees-pristine-full",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "pierre-trees-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 14 pinned runtime registrations unchanged against React.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/pierre-trees/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/pierre-trees/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "6b2126d5ea955b2b74704464d073294753225c976f1938b7c333b62617211088"
+        },
+        {
+          "path": "packages/pierre-trees/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "be51ad2ce2b6dd72ca5efe94cef8d44d2fe12d62193577c291bdcd39fea6b087"
+        },
+        {
+          "path": "packages/pierre-trees/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "2e7fd8f49d48313c884e4a4eef86d6d25d53f25413da56379cc0e49e9a8efef7"
+        },
+        {
+          "path": "packages/pierre-trees/audit/upstream-patches/tests/upstream/file-tree-react.test.tsx.patch",
+          "role": "support",
+          "sha256": "a51cb103e07d1503981ad1be31787686fde048df3cc8e36b1c05c362e408a1fa"
+        },
+        {
+          "path": "packages/pierre-trees/audit/provenance.json",
+          "role": "support",
+          "sha256": "248d60abcaa6871b26ce69158e475528b090f22827ec76d430c4eee5f32a539b"
+        },
+        {
+          "path": "packages/pierre-trees/audit/registrations.json",
+          "role": "support",
+          "sha256": "d4329f5013add9257f8f939d09731712e4ff2febc2dd237a5c670148dca211f9"
+        },
+        {
+          "path": "packages/pierre-trees/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "2ea2c552630de2ef813f3c369b231944b88e4fb3a3746301b8548f290023b8c5"
+        },
+        {
+          "path": "packages/pierre-trees/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "d1f0550f0ee56d7ac9c1cbfd0dc60f4369ef4eb6a20dc7b4f14b3a31ffe91e95"
+        },
+        {
+          "path": "packages/pierre-trees/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "3bbe850b32039804ba1ee0737ddb1c53637e50dd7a43bef7f6040e12f75983fc"
+        },
+        {
+          "path": "packages/pierre-trees/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "15277e55adda659a13a93002e4587f8b1331af9d17060731bde22f0608ca2765"
+        },
+        {
+          "path": "packages/pierre-trees/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "77597092c19e31abb0fb0a1e8c9198a1e8a39ae0ad37fc1c8c250a3e876675e0"
+        },
+        {
+          "path": "packages/pierre-trees/tests/bun-test.ts",
+          "role": "support",
+          "sha256": "65745931fff1d0af735dc32e9d3b5eda28b5c9c7d76bbcb5c2242ecad2c09913"
+        },
+        {
+          "path": "scripts/react-parity/pierre-trees-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "abab13a741311422af0c6a8eeeb13b250abfdda7d2806a2736ce975a4915e4a9"
+        },
+        {
+          "path": "scripts/react-parity/pristine-suite-lib.mjs",
+          "role": "support",
+          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
+        }
+      ]
+    },
+    {
+      "id": "pierre-trees-adapted-full",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "pierre-trees-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs all 14 pinned runtime registrations against Octane; only the two SSR cases carry a patch.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/pierre-trees/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/pierre-trees/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "9cdbe2522771d2d60999759dd74080c6f911510edfa0acccd757980d137aae9c"
+        },
+        {
+          "path": "packages/pierre-trees/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "2e7fd8f49d48313c884e4a4eef86d6d25d53f25413da56379cc0e49e9a8efef7"
+        },
+        {
+          "path": "packages/pierre-trees/audit/upstream-patches/tests/upstream/file-tree-react.test.tsx.patch",
+          "role": "support",
+          "sha256": "a51cb103e07d1503981ad1be31787686fde048df3cc8e36b1c05c362e408a1fa"
+        },
+        {
+          "path": "packages/pierre-trees/audit/provenance.json",
+          "role": "support",
+          "sha256": "248d60abcaa6871b26ce69158e475528b090f22827ec76d430c4eee5f32a539b"
+        },
+        {
+          "path": "packages/pierre-trees/audit/registrations.json",
+          "role": "support",
+          "sha256": "d4329f5013add9257f8f939d09731712e4ff2febc2dd237a5c670148dca211f9"
+        },
+        {
+          "path": "packages/pierre-trees/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "2ea2c552630de2ef813f3c369b231944b88e4fb3a3746301b8548f290023b8c5"
+        },
+        {
+          "path": "packages/pierre-trees/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "d1f0550f0ee56d7ac9c1cbfd0dc60f4369ef4eb6a20dc7b4f14b3a31ffe91e95"
+        },
+        {
+          "path": "packages/pierre-trees/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "868d7e188a071b7adf0d6c748deea369098bb25f1399333455c788022ed40869"
+        },
+        {
+          "path": "packages/pierre-trees/tests/bun-test.ts",
+          "role": "support",
+          "sha256": "65745931fff1d0af735dc32e9d3b5eda28b5c9c7d76bbcb5c2242ecad2c09913"
+        },
+        {
+          "path": "packages/pierre-trees/tests/_server.ts",
+          "role": "support",
+          "sha256": "e81aaae8cddae5acbaba4ab81b8ef470c36d02bfd774dadc1e87e09456b7a220"
+        },
+        {
+          "path": "packages/pierre-trees/tests/_fixtures/server.tsx",
+          "role": "support",
+          "sha256": "fb04ec6166dcc9529384be84d346f07c1382b14fd078b93084b6b06daef3f480"
+        }
+      ]
+    },
+    {
+      "id": "pierre-trees-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "pierre-trees-differential",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Drives the published @pierre/trees/react and the Octane port through the same steps for the paths the upstream suite does not exercise (useFileTreeSelector equality, search actions, host props, model swaps, host events), and compares rendered text, returned values, host attributes and model ownership after each.",
+      "files": [
+        {
+          "path": "packages/pierre-trees/tests/differential/parity.test.ts",
+          "role": "test",
+          "sha256": "6dad7a87336834313eec271d9b2cacc192cf3a86ca57d097de8b2fbada177eb4",
+          "cases": [
+            {
+              "id": "differential:pierre-trees-selector-equality",
+              "testName": "useFileTreeSelector keeps its previous value while isEqual holds",
+              "fullName": "@pierre/trees/react differential parity useFileTreeSelector keeps its previous value while isEqual holds"
+            },
+            {
+              "id": "differential:pierre-trees-selector-derived",
+              "testName": "useFileTreeSelector rerenders a derived value as the model changes",
+              "fullName": "@pierre/trees/react differential parity useFileTreeSelector rerenders a derived value as the model changes"
+            },
+            {
+              "id": "differential:pierre-trees-search-actions",
+              "testName": "useFileTreeSearch actions drive the model and its snapshot",
+              "fullName": "@pierre/trees/react differential parity useFileTreeSearch actions drive the model and its snapshot"
+            },
+            {
+              "id": "differential:pierre-trees-host-props",
+              "testName": "FileTree passes host props through, merges style, and falls back to the preloaded id",
+              "fullName": "@pierre/trees/react differential parity FileTree passes host props through, merges style, and falls back to the preloaded id"
+            },
+            {
+              "id": "differential:pierre-trees-model-swap",
+              "testName": "FileTree moves the tree to a new model and unmounts the old one",
+              "fullName": "@pierre/trees/react differential parity FileTree moves the tree to a new model and unmounts the old one"
+            },
+            {
+              "id": "differential:pierre-trees-host-events",
+              "testName": "host click handlers see clicks on rows inside the shadow root",
+              "fullName": "@pierre/trees/react differential parity host click handlers see clicks on rows inside the shadow root"
+            }
+          ]
+        },
+        {
+          "path": "packages/pierre-trees/tests/_fixtures/probes.tsrx",
+          "role": "support",
+          "sha256": "950ea33240af9d2ca16146b70204077178232bc15c5dc814e9100aa218bdef6d"
+        },
+        {
+          "path": "packages/pierre-trees/tests/_dom.ts",
+          "role": "support",
+          "sha256": "507bd3dc969fbedb57e2af602ce0bb04beb69a7f6366a1dde5ec682f4df01c99"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "renderer-test-harness",
+      "caseIds": ["runtime:1fee62cba7c1857c", "runtime:d4a0b809364851e0"],
+      "upstreamResult": "The SSR cases server-render the test file's own components with react-dom/server.",
+      "octaneResult": "The server half renders server-compiled twins of the same components (tests/_fixtures/server.tsx). Every hydration and interaction assertion is upstream.",
+      "rationale": "One Octane test module compiles for either the client or the server, not both.",
+      "classification": "renderer-test-harness",
+      "consumerImpact": "None: the server markup, hydration and live header behavior are preserved.",
+      "migrationGuidance": "None.",
+      "owner": "@octanejs/pierre-trees",
+      "reviewCondition": "Review when the upstream SSR cases change."
+    }
+  ]
+}

@@ -25,6 +25,7 @@ import useSyncExternalStoreAdaptedSSR from './packages/use-sync-external-store/t
 import useSyncExternalStorePristine from './packages/use-sync-external-store/tests/vitest.pristine.config.ts';
 import nextThemesAdapted from './packages/next-themes/tests/vitest.adapted.config.ts';
 import effectAtomAdapted from './packages/effect-atom/tests/vitest.adapted.config.ts';
+import pierreTreesAdapted from './packages/pierre-trees/tests/vitest.adapted.config.ts';
 import baseUIAdapted from './packages/base-ui/tests/vitest.config.ts';
 import baseUIUtilsAdapted from './packages/base-ui-utils/tests/vitest.config.ts';
 import baseUIPristine from './packages/base-ui/tests/vitest.pristine.config.ts';
@@ -728,6 +729,26 @@ export default defineConfig({
 				resolve: { dedupe: ['octane', 'react', 'react-dom', 'effect'] },
 				// The pinned upstream/tsconfig.json extends a file outside the pin.
 				oxc: { tsconfig: false },
+			},
+			{ ...pierreTreesAdapted, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'pierre-trees-pristine',
+					include: ['packages/pierre-trees/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'pierre-trees-differential',
+					include: ['packages/pierre-trees/tests/differential/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane({ requireDirective: true })],
+				resolve: { dedupe: ['octane', 'react', 'react-dom', '@pierre/trees'] },
 			},
 			{
 				testExecution: { group: 'react-parity' },
@@ -2353,6 +2374,17 @@ export default defineConfig({
 				},
 				plugins: [octane()],
 				resolve: { dedupe: ['octane', 'effect'] },
+			},
+			{
+				test: {
+					name: 'pierre-trees',
+					include: ['packages/pierre-trees/tests/*.test.ts'],
+					exclude: ['packages/pierre-trees/tests/upstream-original.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: { dedupe: ['octane', '@pierre/trees'] },
 			},
 			{
 				test: {

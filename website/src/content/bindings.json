@@ -231,6 +231,12 @@
         "tags": ["calendar", "date picker", "components"]
       },
       {
+        "packageName": "@octanejs/pierre-trees",
+        "title": "Pierre Trees",
+        "searchTerms": ["@pierre/trees", "@pierre/trees/react", "file tree"],
+        "tags": ["file tree", "tree view"]
+      },
+      {
         "packageName": "@octanejs/select",
         "title": "React Select",
         "tags": ["select", "components", "forms"]
