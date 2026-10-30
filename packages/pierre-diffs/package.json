@@ -1,0 +1,67 @@
+{
+  "name": "@octanejs/pierre-diffs",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "@pierre/diffs/react for Octane: the File, FileDiff, MultiFileDiff, PatchDiff, UnresolvedFile and CodeView components, Virtualizer, WorkerPoolContextProvider and EditProvider, ported from @pierre/diffs 1.6.1.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/pierre-diffs"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE",
+    "LICENSE.upstream"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project pierre-diffs --project pierre-diffs-ssr --project pierre-diffs-pristine --project pierre-diffs-adapted",
+    "typecheck": "octane-tsc -p tsconfig.json",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs",
+    "upstream:test": "node ../../scripts/react-parity/run-pristine.mjs pierre-diffs"
+  },
+  "dependencies": {
+    "@pierre/diffs": "1.6.1"
+  },
+  "peerDependencies": {
+    "octane": "workspace:^0.16.0"
+  },
+  "devDependencies": {
+    "@pierre/highlights": "0.2.0",
+    "@pierre/theme": "2.0.0",
+    "@pierre/theming": "1.0.2",
+    "@types/hast": "3.0.4",
+    "@types/jsdom": "28.0.1",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "diff": "9.0.0",
+    "hast-util-to-html": "9.0.5",
+    "jsdom": "26.1.0",
+    "lru_map": "0.4.1",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "shiki": "4.4.1",
+    "vitest": "catalog:default"
+  }
+}

@@ -1,0 +1,107 @@
+import type {
+  CodeViewLayout,
+  HighlighterTypes,
+  HunkExpansionRegion,
+  RenderRange,
+  SmoothScrollSettings,
+  ThemesType,
+  VirtualFileMetrics,
+} from './types';
+
+export const DIFFS_TAG_NAME = 'diffs-container' as const;
+
+// Keep this as a NODE_ENV read so app builds can hard-disable development-only
+// checks unless they are explicitly built for development.
+export const DIFFS_DEVELOPMENT_BUILD: boolean = (() => {
+  try {
+    return process.env.NODE_ENV === 'development';
+  } catch {
+    return false;
+  }
+})();
+
+// Misc patch/content parsing regexes
+export const COMMIT_METADATA_SPLIT: RegExp = /(?=^From [a-f0-9]+ .+$)/m;
+export const GIT_DIFF_FILE_BREAK_REGEX: RegExp = /(?=^diff --git)/gm;
+export const UNIFIED_DIFF_FILE_BREAK_REGEX: RegExp = /(?=^---\s+\S)/gm;
+export const FILE_CONTEXT_BLOB: RegExp = /(?=^@@ )/gm;
+export const HUNK_HEADER: RegExp =
+  /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: (.*))?/m;
+export const SPLIT_WITH_NEWLINES: RegExp = /(?<=\n)/;
+export const FILENAME_HEADER_REGEX: RegExp = /^(---|\+\+\+)\s+([^\t\r\n]+)/;
+export const INDEX_LINE_METADATA: RegExp =
+  /^index ([0-9a-f]+)\.\.([0-9a-f]+)(?: (\d+))?$/i;
+
+export const MERGE_CONFLICT_START_MARKER_REGEX: RegExp = /^<{7,}(?:\s.*)?$/;
+export const MERGE_CONFLICT_BASE_MARKER_REGEX: RegExp = /^\|{7,}(?:\s.*)?$/;
+export const MERGE_CONFLICT_SEPARATOR_MARKER_REGEX: RegExp = /^={7,}$/;
+export const MERGE_CONFLICT_END_MARKER_REGEX: RegExp = /^>{7,}(?:\s.*)?$/;
+
+export const HEADER_PREFIX_SLOT_ID = 'header-prefix';
+export const HEADER_FILENAME_SUFFIX_SLOT_ID = 'header-filename-suffix';
+export const HEADER_METADATA_SLOT_ID = 'header-metadata';
+export const CUSTOM_HEADER_SLOT_ID = 'header-custom';
+
+export const DEFAULT_THEMES: ThemesType = {
+  dark: 'pierre-dark',
+  light: 'pierre-light',
+};
+
+// The highlighter type used when no request names one and none is active yet.
+export const DEFAULT_HIGHLIGHTER: HighlighterTypes = 'shiki-js';
+
+export const THEME_CSS_ATTRIBUTE = 'data-theme-css';
+export const UNSAFE_CSS_ATTRIBUTE = 'data-unsafe-css';
+export const CORE_CSS_ATTRIBUTE = 'data-core-css';
+export const DIFFS_SCROLLBAR_MEASURE_ATTRIBUTE = 'data-diffs-scrollbar-measure';
+export const CODE_VIEW_HEADER_ATTRIBUTE = 'data-diffs-code-view-header';
+export const CODE_VIEW_FOOTER_ATTRIBUTE = 'data-diffs-code-view-footer';
+export const DIFFS_SCROLLBAR_GUTTER_MEASURED_PROPERTY =
+  '--diffs-scrollbar-gutter-measured';
+
+export const DEFAULT_COLLAPSED_CONTEXT_THRESHOLD = 1;
+export const DEFAULT_TOKENIZE_MAX_LENGTH = 100_000;
+export const DEFAULT_VIRTUAL_FILE_METRICS: VirtualFileMetrics = {
+  hunkLineCount: 50,
+  lineHeight: 20,
+  diffHeaderHeight: 44,
+  spacing: 8,
+};
+
+export const DEFAULT_CODE_VIEW_FILE_METRICS: VirtualFileMetrics = {
+  ...DEFAULT_VIRTUAL_FILE_METRICS,
+  hunkLineCount: 1,
+};
+
+export const DEFAULT_CODE_VIEW_LAYOUT: CodeViewLayout = {
+  paddingTop: 8,
+  paddingBottom: 8,
+  gap: 8,
+};
+
+export const DEFAULT_SMOOTH_SCROLL_SETTINGS: SmoothScrollSettings = {
+  omega: 0.015,
+  positionEpsilon: 0.5,
+  velocityEpsilon: 0.05,
+};
+
+export const DEFAULT_EXPANDED_REGION: HunkExpansionRegion = Object.freeze({
+  fromStart: 0,
+  fromEnd: 0,
+});
+
+export const DEFAULT_RENDER_RANGE: RenderRange = {
+  startingLine: 0,
+  totalLines: Infinity,
+  bufferBefore: 0,
+  bufferAfter: 0,
+};
+
+export const EMPTY_LINE_ANNOTATIONS: never[] = Object.freeze([]) as never[];
+
+export const EMPTY_RENDER_RANGE: RenderRange = {
+  startingLine: 0,
+  totalLines: 0,
+  bufferBefore: 0,
+  bufferAfter: 0,
+};

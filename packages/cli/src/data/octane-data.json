@@ -873,6 +873,20 @@
       "verified": "2026-08-02"
     },
     {
+      "name": "@octanejs/pierre-diffs",
+      "version": "0.0.1",
+      "category": "Content",
+      "upstream": { "package": "@pierre/diffs", "version": "1.6.1" },
+      "surface": "The complete @pierre/diffs/react entry: CodeView (controlled and uncontrolled, with its imperative handle and slot portals), File, FileDiff, MultiFileDiff, PatchDiff, UnresolvedFile, Virtualizer, WorkerPoolContextProvider and WorkerPoolContext, EditProvider and EditContext, their hooks (useVirtualizer, useWorkerPool, useCreateEditor, useFileInstance, useFileDiffInstance, useStableCallback), the slot renderers, templateRender, the slot style constants, and the core types the entry re-exports. All 84 upstream React runtime registrations run unchanged against React and, regenerated from the lock, against Octane.",
+      "divergences": [
+        "CodeView reads `ref` as a prop instead of going through forwardRef, because Octane refs are props.",
+        "Contexts render as `<WorkerPoolContext value>`, `<EditContext value>` and `<VirtualizerContext value>`, because Octane has no `Context.Provider`.",
+        "The four core helpers the React layer imports from @pierre/diffs internals (parseMergeConflictDiffFromFile, getMergeConflictActionSlotName, getCodeViewItemRenderData, areFileTargetsEqual) are copied into src/core with getHunkSideBoundaries, because @pierre/diffs does not export them."
+      ],
+      "ssr": "Supported and tested: on octane/server the components render their slotted children, and with prerenderedHTML a `<template shadowrootmode=\"open\">` beside them, as upstream does on react-dom/server. hydrateRoot adopts the server's diffs-container, slots and declarative shadow root.",
+      "verified": "2026-10-30"
+    },
+    {
       "name": "@octanejs/popper",
       "version": "0.0.33",
       "category": "UI Utilities",
@@ -1785,6 +1799,7 @@
     "@monaco-editor/react": "@octanejs/monaco-editor",
     "@opentui/react": "@octanejs/opentui",
     "@phosphor-icons/react": "@octanejs/phosphor-icons",
+    "@pierre/diffs/react": "@octanejs/pierre-diffs",
     "@portabletext/react": "@octanejs/portabletext",
     "@rainbow-me/rainbowkit": "@octanejs/rainbowkit",
     "@react-email/components": "@octanejs/email",
