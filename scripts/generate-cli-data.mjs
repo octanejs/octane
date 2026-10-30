@@ -58,6 +58,10 @@ function buildBindings() {
 			divergences: status.divergences ?? [],
 			ssr: status.ssr ?? '',
 			verified: status.verified ?? null,
+			// The codemod checks each migrated subpath import against these.
+			exports: Object.keys(manifest.exports ?? {}).filter(
+				(key) => key.startsWith('./') && key !== './package.json',
+			),
 		});
 	}
 	return bindings;

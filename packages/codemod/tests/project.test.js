@@ -320,6 +320,37 @@ describe('runCodemod', () => {
 		expect(result.missing).toEqual([]);
 	});
 
+	it('checks binding subpaths against what the binding exports', async () => {
+		// T3 Code's shapes. `@daypicker/react` re-exports `react-day-picker`.
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'src/store.ts':
+				"import { persist } from 'zustand/middleware';\nimport { immer } from 'zustand/middleware/immer';\nimport { useShallow } from 'zustand/react/shallow';\nimport { shallow } from 'zustand/vanilla/shallow';\nexport { persist, immer, useShallow, shallow };\n",
+			'src/Calendar.tsx':
+				"import { DayPicker } from '@daypicker/react';\nimport { fr } from '@daypicker/react/locale/fr';\nimport { Dialog } from '@base-ui/react/dialog';\nexport function Calendar() {\n\treturn <Dialog.Root><DayPicker locale={fr} /></Dialog.Root>;\n}\n",
+		});
+		const result = await runCodemod([root], { write: false });
+		const store = result.files.find((file) => file.file === 'src/store.ts');
+		const calendar = result.files.find((file) => file.file === 'src/Calendar.tsx');
+		for (const subpath of ['middleware', 'middleware/immer', 'react/shallow', 'vanilla/shallow']) {
+			expect(store?.code).toContain(`from '@octanejs/zustand/${subpath}'`);
+		}
+		expect(store?.notes).toEqual([
+			{
+				rule: 'bindings',
+				severity: 'error',
+				line: 1,
+				message:
+					'`@octanejs/zustand` has no `./middleware/immer` export. Import these names from its root if it exports them there.',
+			},
+		]);
+		expect(calendar?.code).toContain("import { DayPicker } from '@octanejs/day-picker';");
+		expect(calendar?.code).toContain("import { fr } from '@octanejs/day-picker/locale/fr';");
+		expect(calendar?.code).toContain("import { Dialog } from '@octanejs/base-ui/dialog';");
+		expect(calendar?.notes.filter((note) => note.rule === 'bindings')).toEqual([]);
+		expect(result.missing).toEqual([]);
+	});
+
 	it('imports each Radix primitive package as its namespace of `@octanejs/radix`', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',
