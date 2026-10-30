@@ -12,6 +12,7 @@ of bridging by hand:
 | `zustand` | `@octanejs/zustand` |
 | `jotai` | `@octanejs/jotai` |
 | `@effect/atom-react` | `@octanejs/effect-atom` |
+| `@pierre/trees/react` | `@octanejs/pierre-trees` |
 | `@apollo/client` | `@octanejs/apollo-client` |
 | `@tanstack/ai-react` | `@octanejs/tanstack-ai` |
 | `@tanstack/react-form` | `@octanejs/tanstack-form` |

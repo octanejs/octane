@@ -1,0 +1,40 @@
+diff --git a/tests/upstream/file-tree-react.test.tsx b/tests/upstream/file-tree-react.test.tsx
+--- a/tests/upstream/file-tree-react.test.tsx
++++ b/tests/upstream/file-tree-react.test.tsx
+@@ -13,7 +13,7 @@ import {
+ import { JSDOM } from 'jsdom';
+ import { act, StrictMode, useState } from 'octane';
+ import { createRoot, hydrateRoot, type Root } from 'octane';
+-import { renderToString } from 'octane/server';
++import { renderToString, Server } from '../_server';
+ 
+ let FileTreeReact: typeof import('../../src/index.ts').FileTree;
+ let FileTreeClass: typeof import('@pierre/trees').FileTree;
+@@ -905,7 +905,12 @@ describe('file-tree React lane', () => {
+     }
+ 
+     Reflect.deleteProperty(globalThis, 'document');
+-    const serverHtml = renderToString(<Harness />);
++    // OCTANE DIVERGENCE[renderer-test-harness]: client-compiled test components
++    // cannot render on the server, so their server-compiled twins in
++    // _fixtures/server.tsx do.
++    const serverHtml = renderToString(
++      Server.preloadedHarness(model, preloadedData).Harness
++    );
+     Object.assign(globalThis, { document: originalDocument });
+     hydrateContainer.innerHTML = serverHtml;
+     console.error = (...args: unknown[]) => {
+@@ -982,7 +987,12 @@ describe('file-tree React lane', () => {
+     }
+ 
+     Reflect.deleteProperty(globalThis, 'document');
+-    const serverHtml = renderToString(<Harness />);
++    // OCTANE DIVERGENCE[renderer-test-harness]: client-compiled test components
++    // cannot render on the server, so their server-compiled twins in
++    // _fixtures/server.tsx do.
++    const serverHtml = renderToString(
++      Server.colocatedHarness(BASE_OPTIONS, preloadedData).Harness
++    );
+     Object.assign(globalThis, { document: originalDocument });
+     ssrMount.innerHTML = serverHtml;
+ 

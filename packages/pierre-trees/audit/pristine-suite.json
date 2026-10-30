@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "project": "pierre-trees-pristine",
+  "vitestConfig": "tests/upstream-vitest.config.ts",
+  "rootEnvVar": "PIERRE_TREES_PRISTINE_ROOT",
+  "copy": ["src", "test"],
+  "inlineFiles": {
+    "src/constants.ts": "export { CONTEXT_MENU_SLOT_NAME, FILE_TREE_TAG_NAME, HEADER_SLOT_NAME } from '@pierre/trees';\n",
+    "src/render/FileTree.ts": "export { FileTree, preloadFileTree } from '@pierre/trees';\n"
+  }
+}

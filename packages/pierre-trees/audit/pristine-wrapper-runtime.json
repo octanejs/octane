@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "pierre-trees-pristine",
+  "roots": ["packages/pierre-trees/tests"],
+  "files": ["packages/pierre-trees/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:dcb30fb5984b9f8a",
+      "file": "packages/pierre-trees/tests/upstream-original.test.ts",
+      "fullName": "runs all pinned pierre-trees runtime registrations unchanged"
+    }
+  ],
+  "snapshots": 0
+}
