@@ -788,7 +788,10 @@ export function compileToVolarMappings(source, filename, options) {
 	}
 	const dynamicJsxTypes = prepareDynamicJsxTypes(transformAst, printComments);
 	const armExits = new Set();
-	transformAst = projectArmExits(dynamicJsxTypes.ast, armExits);
+	transformAst =
+		renderer.target === 'valdi'
+			? dynamicJsxTypes.ast
+			: projectArmExits(dynamicJsxTypes.ast, armExits);
 
 	// The `module server { … }` dialect is lowered to plain checkable TS by
 	// the shared transform itself (via the platform's `serverModule` option)
@@ -1058,7 +1061,8 @@ export function compileTypesInspection(source, filename, options) {
 		: createRendererTypePragma(renderer, ast);
 	const typeOnlyComments = rendererPragma === null ? comments : [rendererPragma, ...comments];
 	const dynamicJsxTypes = prepareDynamicJsxTypes(ast, typeOnlyComments);
-	const transformAst = projectArmExits(dynamicJsxTypes.ast);
+	const transformAst =
+		renderer.target === 'valdi' ? dynamicJsxTypes.ast : projectArmExits(dynamicJsxTypes.ast);
 	const transform = selectOctaneTransform(ast, dynamicJsxTypes?.componentAlias);
 	const transformed = transform(
 		projectServerContextCalls(

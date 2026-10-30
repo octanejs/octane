@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import ts from 'typescript';
 import { describe, it, expect } from 'vitest';
+import { compile } from 'octane/compiler';
 import { compileToVolarMappings, compileTypesInspection } from 'octane/compiler/volar';
 import { bundleVolarCompiler } from '../../scripts/bundle-volar.mjs';
 import { compileToVolarMappings as compileStylexToVolarMappings } from '../../../stylex/src/compiler.js';
@@ -2104,6 +2105,95 @@ export function Greeting({ user }: { user?: { name?: string } }) @{
 			'/src/ValueReturn.tsrx',
 		);
 		expect(valueReturn.errors.map(({ code }) => code)).toEqual(['TSRX2005']);
+	});
+
+	describe('Valdi directive arm exits', () => {
+		const renderer = {
+			module: '@fixture/valdi-writer',
+			target: 'valdi',
+			server: 'unsupported',
+			text: 'reject',
+		} as const;
+		const renderers = {
+			registry: { native: renderer },
+			rules: [{ include: '**/*.native.tsrx', renderer: 'native' }],
+		};
+		const filename = '/src/Arm.native.tsrx';
+
+		it.each([
+			['@if (hidden)', 'return;'],
+			['@if (hidden)', 'return null;'],
+			['@for (const item of items; key item)', 'return;'],
+			['@for (const item of items; key item)', 'return null;'],
+		])('reports %s %s at its authored span only when the writer rejects it', (arm, exit) => {
+			const source = `export function Arm({ hidden, items }: { hidden: boolean; items: number[] }) @{
+	<div>
+		${arm} {
+			if (hidden) ${exit}
+			<span />
+		}
+	</div>
+}`;
+			expect(() =>
+				compile(source, filename, { renderer: { id: 'native', ...renderer }, hmr: false }),
+			).toThrow('early returns inside template regions are not supported yet.');
+			expect(compileToVolarMappings(source, filename).errors).toEqual([]);
+			for (const mode of ['client', 'server'] as const) {
+				expect(compile(source, filename, { mode, hmr: false }).diagnostics).toEqual([]);
+			}
+			const start = source.indexOf(exit);
+			expect(compileToVolarMappings(source, filename, { renderers }).errors).toEqual([
+				expect.objectContaining({
+					message: expect.stringContaining(
+						'Return statements are not allowed inside TSRX template',
+					),
+					pos: start,
+					end: start + exit.length,
+				}),
+			]);
+		});
+
+		it.each([
+			['native', { renderers }, ts.SyntaxKind.ContinueStatement, 'continue'],
+			['DOM', undefined, ts.SyntaxKind.ReturnStatement, 'return'],
+		] as const)(
+			'keeps inspected directive exits consistent with the %s writer',
+			(_target, options, kind, keyword) => {
+				const source = `export function Arm({ hidden, items }: { hidden: boolean; items: number[] }) @{
+	<div>@for (const item of items; key item) {
+		if (hidden) continue;
+		<span />
+	}</div>
+}`;
+				const result = compileTypesInspection(source, filename, options);
+				const parsed = ts.createSourceFile(
+					'Arm.tsx',
+					result.code,
+					ts.ScriptTarget.Latest,
+					true,
+					ts.ScriptKind.TSX,
+				);
+				const jumps: ts.Node[] = [];
+				function visit(node: ts.Node): void {
+					if (ts.isContinueStatement(node) || (ts.isReturnStatement(node) && !node.expression)) {
+						jumps.push(node);
+					}
+					ts.forEachChild(node, visit);
+				}
+				visit(parsed);
+				expect(jumps.map((node) => node.kind)).toEqual([kind]);
+				const start = source.indexOf('continue');
+				const lines = result.code.split('\n');
+				expect(
+					result.segments.some(
+						(segment) =>
+							segment.srcStart === start &&
+							source.slice(segment.srcStart, segment.srcEnd!) === 'continue;' &&
+							lines[segment.genLine].slice(segment.genCol).startsWith(keyword),
+					),
+				).toBe(true);
+			},
+		);
 	});
 
 	it('preserves declare global as a type-checkable global augmentation', () => {
