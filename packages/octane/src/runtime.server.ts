@@ -37,6 +37,7 @@ import type {
 	LayoutSnapshotOptions,
 	LayoutSnapshotOptionsWithInitial,
 } from './layout-snapshot-types.js';
+import type { ReducerDispatch } from './reducer-dispatch.js';
 import { bindingRootMarker, encodeBindingKey, type BindingKey } from './dom-binding-protocol.js';
 import {
 	BOUNDARY_CLIENT,
@@ -7870,20 +7871,20 @@ export function useReducer<S, A, I = S>(
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol,
 	maybeSlot?: ServerHookSlot,
-): [S, (action: A) => void, () => S];
+): [S, ReducerDispatch<A>, () => S];
 export function useReducer<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol | string,
 	maybeSlot?: ServerHookSlot,
-): [S, (action: A) => void, () => S] {
+): [S, ReducerDispatch<A>, () => S] {
 	const init = typeof initOrSlot === 'function' ? initOrSlot : undefined;
 	const slot = maybeSlot !== undefined ? maybeSlot : initOrSlot;
 	return stateHook<S, A>(
 		reducer,
 		() => (init ? init(initialArg) : (initialArg as unknown as S)),
 		slot,
-	) as [S, (action: A) => void, () => S];
+	) as [S, ReducerDispatch<A>, () => S];
 }
 
 /** Compiler-emitted useReducer variant for a tuple whose third member is observable. */
@@ -7892,13 +7893,13 @@ export function __useReducerWithGetter<S, A, I = S>(
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol,
 	maybeSlot?: ServerHookSlot,
-): [S, (action: A) => void, () => S];
+): [S, ReducerDispatch<A>, () => S];
 export function __useReducerWithGetter<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol | string,
 	maybeSlot?: ServerHookSlot,
-): [S, (action: A) => void, () => S] {
+): [S, ReducerDispatch<A>, () => S] {
 	const init = typeof initOrSlot === 'function' ? initOrSlot : undefined;
 	const slot = maybeSlot !== undefined ? maybeSlot : initOrSlot;
 	return stateHook<S, A>(
@@ -7906,7 +7907,7 @@ export function __useReducerWithGetter<S, A, I = S>(
 		() => (init ? init(initialArg) : (initialArg as unknown as S)),
 		slot,
 		true,
-	) as [S, (action: A) => void, () => S];
+	) as [S, ReducerDispatch<A>, () => S];
 }
 
 // Effects never run on the server. An islands shell never runs them on the

@@ -20,6 +20,7 @@ of bridging by hand:
 | `@tanstack/react-store` | `@octanejs/tanstack-store` |
 | `@tanstack/react-table` | `@tanstack/octane-table` |
 | `@tanstack/react-virtual` | `@octanejs/tanstack-virtual` |
+| `@legendapp/list/react` | `@octanejs/legendapp-list` |
 | `framer-motion` / `motion` | `@octanejs/motion` |
 | `@stylexjs/stylex` | `@octanejs/stylex` |
 | `styled-components` | `@octanejs/styled-components` |

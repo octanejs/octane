@@ -1,0 +1,819 @@
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import "../setup"; // Import global test setup
+
+import { Platform } from "@/platform/Platform";
+import * as calculateItemsInViewModule from "../../src/core/calculateItemsInView";
+import * as doMaintainScrollAtEndModule from "../../src/core/doMaintainScrollAtEnd";
+import { updateItemSizes, updateOneItemSize } from "../../src/core/updateItemSizes";
+import type { StateContext } from "../../src/state/state";
+import type { InternalState } from "../../src/types.internal";
+import { getItemSize } from "../../src/utils/getItemSize";
+import { normalizeMaintainVisibleContentPosition } from "../../src/utils/normalizeMaintainVisibleContentPosition";
+import { createMockContext } from "../__mocks__/createMockContext";
+
+function updateItemAndFlush(ctx: StateContext, itemKey: string, size: { height: number; width: number }) {
+    updateItemSizes(ctx, { itemKey, size });
+}
+
+describe("item size update functions", () => {
+    let mockCtx: StateContext;
+    let mockState: InternalState;
+    let onItemSizeChangedCalls: any[];
+
+    beforeEach(() => {
+        onItemSizeChangedCalls = [];
+
+        mockCtx = createMockContext(
+            {
+                numContainers: 10,
+                otherAxisSize: 400,
+                readyToRender: true,
+            },
+            {
+                didContainersLayout: true,
+                didFinishInitialScroll: true,
+                endBuffered: 4,
+                firstFullyOnScreenIndex: undefined,
+                hasScrolled: false,
+                indexByKey: new Map([
+                    ["item_0", 0],
+                    ["item_1", 1],
+                    ["item_2", 2],
+                    ["item_3", 3],
+                    ["item_4", 4],
+                ]),
+                isAtStart: true,
+                lastLayout: { height: 600, width: 400, x: 0, y: 0 },
+                otherAxisSize: 400,
+                props: {
+                    data: [
+                        { id: "item1", name: "First" },
+                        { id: "item2", name: "Second" },
+                        { id: "item3", name: "Third" },
+                        { id: "item4", name: "Fourth" },
+                        { id: "item5", name: "Fifth" },
+                    ],
+                    estimatedItemSize: 100,
+                    maintainVisibleContentPosition: normalizeMaintainVisibleContentPosition(false),
+                    onItemSizeChanged: (event: any) => onItemSizeChangedCalls.push(event),
+                },
+                queuedInitialLayout: true,
+                scrollLength: 600,
+                totalSize: 0,
+            },
+        );
+        mockState = mockCtx.state;
+    });
+
+    describe("updateOneItemSize", () => {
+        it("should update size for new item", () => {
+            const sizeObj = { height: 150, width: 400 };
+
+            const diff = updateOneItemSize(mockCtx, "item_0", sizeObj);
+
+            expect(diff).toBe(50); // 150 - 100 (estimated size from getItemSize)
+            expect(mockState.sizesKnown.get("item_0")).toBe(150);
+            expect(mockState.sizes.get("item_0")).toBe(150);
+        });
+
+        it("should call getFixedItemSize with the correct item", () => {
+            const sizeObj = { height: 150, width: 400 };
+            let calledItem: any;
+            mockState.props.getFixedItemSize = (item) => {
+                calledItem = item;
+                return 100;
+            };
+
+            const diff = updateOneItemSize(mockCtx, "item_0", sizeObj);
+
+            expect(diff).toBe(50); // 150 - 100 (estimated size from getItemSize)
+            expect(mockState.sizesKnown.get("item_0")).toBe(150);
+            expect(mockState.sizes.get("item_0")).toBe(150);
+            expect(calledItem).toBe(mockState.props.data[0]);
+        });
+
+        it("should calculate size difference when updating existing item", () => {
+            mockState.sizesKnown.set("item_0", 100);
+            const sizeObj = { height: 120, width: 400 };
+
+            const diff = updateOneItemSize(mockCtx, "item_0", sizeObj);
+
+            expect(diff).toBe(20); // 120 - 100
+            expect(mockState.sizesKnown.get("item_0")).toBe(120);
+        });
+
+        it("should return 0 when size change is minimal", () => {
+            mockState.sizesKnown.set("item_0", 100);
+            const sizeObj = { height: 100.05, width: 400 }; // Very small change
+
+            const diff = updateOneItemSize(mockCtx, "item_0", sizeObj);
+
+            expect(diff).toBe(0); // Change < 0.1 threshold
+            expect(mockState.sizesKnown.get("item_0")).toBe(100); // Still updated in sizesKnown
+        });
+
+        it("ignores one-physical-pixel raw measurement noise for known item sizes", () => {
+            mockState.sizesKnown.set("item_0", 66.625);
+            mockState.sizes.set("item_0", 66.625);
+
+            const diff = updateOneItemSize(mockCtx, "item_0", { height: 66.333984375, width: 400 });
+
+            expect(diff).toBe(0);
+            expect(mockState.sizesKnown.get("item_0")).toBe(66.625);
+            expect(mockState.sizes.get("item_0")).toBe(66.625);
+        });
+
+        it("keeps web whole-pixel size changes responsive", () => {
+            const prevPlatform = Platform.OS;
+            Platform.OS = "web";
+            mockState.sizesKnown.set("item_0", 66);
+            mockState.sizes.set("item_0", 66);
+
+            try {
+                const diff = updateOneItemSize(mockCtx, "item_0", { height: 66.7, width: 400 });
+
+                expect(diff).toBe(1);
+                expect(mockState.sizesKnown.get("item_0")).toBe(67);
+                expect(mockState.sizes.get("item_0")).toBe(67);
+            } finally {
+                Platform.OS = prevPlatform;
+            }
+        });
+
+        it("should handle horizontal layout", () => {
+            mockState.props.horizontal = true;
+            const sizeObj = { height: 100, width: 250 };
+
+            const diff = updateOneItemSize(mockCtx, "item_0", sizeObj);
+
+            expect(diff).toBe(150); // 250 - 100 (estimated size)
+            expect(mockState.sizesKnown.get("item_0")).toBe(250);
+        });
+
+        it("should update average sizes", () => {
+            const sizeObj = { height: 120, width: 400 };
+
+            updateOneItemSize(mockCtx, "item_0", sizeObj);
+
+            expect(mockState.averageSizes[""]).toEqual({
+                avg: 120,
+                num: 1,
+            });
+
+            // Add another item
+            updateOneItemSize(mockCtx, "item_1", { height: 180, width: 400 });
+
+            expect(mockState.averageSizes[""]).toEqual({
+                avg: 150, // (120 + 180) / 2
+                num: 2,
+            });
+        });
+
+        it("updates averages when getFixedItemSize returns undefined for an item", () => {
+            mockState.props.data = [
+                { id: "item1", type: "dynamic" },
+                { id: "item2", type: "fixed" },
+            ];
+            mockState.props.getItemType = (item) => item.type;
+            mockState.props.getFixedItemSize = (_item, _index, type) => (type === "fixed" ? 40 : undefined);
+
+            updateOneItemSize(mockCtx, "item_0", { height: 120, width: 400 });
+            updateOneItemSize(mockCtx, "item_1", { height: 80, width: 400 });
+
+            expect(mockState.averageSizes.dynamic).toEqual({
+                avg: 120,
+                num: 1,
+            });
+            expect(mockState.averageSizes.fixed).toBeUndefined();
+        });
+
+        it("keeps averages finite after data changes with known sizes", () => {
+            const ctx = createMockContext(
+                {},
+                {
+                    averageSizes: {},
+                    indexByKey: new Map([["0", 0]]),
+                    props: {
+                        data: [0],
+                        keyExtractor: (_item, index) => String(index),
+                    },
+                    sizesKnown: new Map([["0", 50]]),
+                },
+            );
+
+            updateOneItemSize(ctx, "0", { height: 80, width: 100 });
+
+            const average = ctx.state.averageSizes[""];
+            expect(average).toBeDefined();
+            expect(average.num).toBe(1);
+            expect(Number.isFinite(average.avg)).toBe(true);
+            expect(average.avg).toBe(80);
+        });
+
+        it("should round sizes to quarter pixels", () => {
+            const sizeObj = { height: 150.123456, width: 400 };
+
+            updateOneItemSize(mockCtx, "item_0", sizeObj);
+
+            const expectedSize = Math.floor(150.123456 * 8) / 8; // Quarter pixel rounding
+            expect(mockState.sizesKnown.get("item_0")).toBe(expectedSize);
+        });
+
+        it("should handle zero and negative sizes", () => {
+            const sizeObj = { height: 0, width: 400 };
+
+            const diff = updateOneItemSize(mockCtx, "item_0", sizeObj);
+
+            expect(diff).toBe(-100); // 0 - 100 (estimated size)
+            expect(mockState.sizesKnown.get("item_0")).toBe(0);
+        });
+
+        it("should handle missing data gracefully", () => {
+            mockState.props.data = null as any;
+
+            const diff = updateOneItemSize(mockCtx, "item_0", { height: 150, width: 400 });
+
+            expect(diff).toBe(0);
+        });
+    });
+
+    describe("updateItemSizes", () => {
+        it("treats modifier-only object options as all triggers", () => {
+            const doMaintainScrollAtEndSpy = spyOn(
+                doMaintainScrollAtEndModule,
+                "doMaintainScrollAtEnd",
+            ).mockReturnValue(true);
+            mockState.props.maintainScrollAtEnd = { animated: true };
+            mockState.sizesKnown.set("item_0", 100);
+            mockState.sizes.set("item_0", 100);
+
+            updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+
+            expect(doMaintainScrollAtEndSpy).toHaveBeenCalledWith(mockCtx);
+            doMaintainScrollAtEndSpy.mockRestore();
+        });
+
+        it("respects explicit itemLayout on config", () => {
+            const doMaintainScrollAtEndSpy = spyOn(
+                doMaintainScrollAtEndModule,
+                "doMaintainScrollAtEnd",
+            ).mockReturnValue(true);
+            mockState.props.maintainScrollAtEnd = {
+                animated: true,
+                on: { itemLayout: true },
+            };
+            mockState.sizesKnown.set("item_0", 100);
+            mockState.sizes.set("item_0", 100);
+
+            updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+
+            expect(doMaintainScrollAtEndSpy).toHaveBeenCalledWith(mockCtx);
+            doMaintainScrollAtEndSpy.mockRestore();
+        });
+
+        it("anchors on a first measurement, which has no previously known size", () => {
+            // Rows added by a prepend are measured for the first time, so requiring a previously
+            // known size made maintainScrollAtEnd blind to the content they add and left the list
+            // parked short of its end.
+            const doMaintainScrollAtEndSpy = spyOn(
+                doMaintainScrollAtEndModule,
+                "doMaintainScrollAtEnd",
+            ).mockReturnValue(true);
+            mockState.props.maintainScrollAtEnd = {
+                animated: true,
+                on: { itemLayout: true },
+            };
+            expect(mockState.sizesKnown.has("item_0")).toBe(false);
+
+            updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+
+            expect(doMaintainScrollAtEndSpy).toHaveBeenCalledWith(mockCtx);
+            doMaintainScrollAtEndSpy.mockRestore();
+        });
+
+        describe("first-measurement end-maintenance safety", () => {
+            const originalRAF = globalThis.requestAnimationFrame;
+            const originalSetTimeout = globalThis.setTimeout;
+            let rafCallback: FrameRequestCallback | undefined;
+            let scrollToEnd: ReturnType<typeof mock>;
+
+            beforeEach(() => {
+                rafCallback = undefined;
+                globalThis.requestAnimationFrame = mock((callback: FrameRequestCallback) => {
+                    rafCallback = callback;
+                    return 1;
+                });
+                globalThis.setTimeout = mock(() => 1) as typeof globalThis.setTimeout;
+                scrollToEnd = mock();
+
+                mockState.props.maintainScrollAtEnd = {
+                    animated: false,
+                    on: { itemLayout: true },
+                };
+                mockState.refScroller.current = { scrollToEnd } as any;
+                mockState.totalSize = 1000;
+                mockCtx.values.set("totalSize", 1000);
+                mockState.scroll = 400;
+            });
+
+            afterEach(() => {
+                globalThis.requestAnimationFrame = originalRAF;
+                globalThis.setTimeout = originalSetTimeout;
+            });
+
+            it("does not pull back to the end when a first measurement arrives after scrolling away", () => {
+                mockState.isWithinMaintainScrollAtEndThreshold = false;
+
+                updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+
+                expect(mockState.sizesKnown.get("item_0")).toBe(150);
+                expect(globalThis.requestAnimationFrame).not.toHaveBeenCalled();
+                expect(scrollToEnd).not.toHaveBeenCalled();
+                expect(mockState.maintainingScrollAtEnd).toBeUndefined();
+            });
+
+            it("cancels a first-measurement maintain request when the user scrolls away before its frame", () => {
+                mockState.isWithinMaintainScrollAtEndThreshold = true;
+
+                updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+
+                expect(globalThis.requestAnimationFrame).toHaveBeenCalledTimes(1);
+                expect(mockState.maintainingScrollAtEnd).toBe("pending-instant");
+
+                mockState.scroll = 250;
+                mockState.isWithinMaintainScrollAtEndThreshold = false;
+                rafCallback?.(0);
+
+                expect(scrollToEnd).not.toHaveBeenCalled();
+                expect(mockState.maintainingScrollAtEnd).toBeUndefined();
+                expect(mockState.pendingMaintainScrollAtEnd).toBe(false);
+            });
+
+            it("preserves a first-measurement maintain request when only geometry moves beyond the threshold", () => {
+                mockState.isWithinMaintainScrollAtEndThreshold = true;
+
+                updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+
+                expect(globalThis.requestAnimationFrame).toHaveBeenCalledTimes(1);
+
+                mockState.isWithinMaintainScrollAtEndThreshold = false;
+                rafCallback?.(0);
+
+                expect(scrollToEnd).toHaveBeenCalledTimes(1);
+                expect(scrollToEnd).toHaveBeenCalledWith({ animated: false });
+                expect(mockState.maintainingScrollAtEnd).toBe("instant");
+            });
+        });
+
+        it("skips item-layout anchoring when on excludes it", () => {
+            const doMaintainScrollAtEndSpy = spyOn(
+                doMaintainScrollAtEndModule,
+                "doMaintainScrollAtEnd",
+            ).mockReturnValue(true);
+            mockState.props.maintainScrollAtEnd = {
+                animated: true,
+                on: { dataChange: true },
+            };
+            mockState.sizesKnown.set("item_0", 100);
+            mockState.sizes.set("item_0", 100);
+
+            updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+
+            expect(doMaintainScrollAtEndSpy).not.toHaveBeenCalled();
+            doMaintainScrollAtEndSpy.mockRestore();
+        });
+
+        it("keeps totalSize correct when an averaged size is cached before measurement", () => {
+            const ctx = createMockContext(
+                {
+                    numContainers: 0,
+                    readyToRender: true,
+                },
+                {
+                    averageSizes: { "": { avg: 20, num: 1 } },
+                    didContainersLayout: true,
+                    didFinishInitialScroll: true,
+                    endBuffered: -1,
+                    indexByKey: new Map([["item_0", 0]]),
+                    props: {
+                        data: [{ id: "item1", name: "First" }],
+                        estimatedItemSize: undefined,
+                        onItemSizeChanged: undefined,
+                    },
+                    startBuffered: 1,
+                    totalSize: 0,
+                },
+            );
+            const state = ctx.state;
+
+            // Prime the cache with an averaged size without touching totalSize.
+            getItemSize(ctx, "item_0", 0, state.props.data[0], true);
+
+            expect(state.totalSize).toBe(20);
+
+            updateItemSizes(ctx, { itemKey: "item_0", size: { height: 100, width: 400 } });
+
+            expect(state.totalSize).toBe(100);
+        });
+
+        it("should update known sizes and total size tracking", () => {
+            const prevTotal = mockState.totalSize;
+            updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+
+            expect(mockState.sizesKnown.get("item_0")).toBe(150);
+            expect(onItemSizeChangedCalls.length).toBe(1);
+            expect(mockState.totalSize).not.toBe(prevTotal);
+            expect(mockCtx.values.get("totalSize")).toBe(mockState.totalSize);
+        });
+
+        it("should respect early return when data is missing", () => {
+            mockState.props.data = null as any;
+
+            expect(() => updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 })).not.toThrow();
+            expect(mockState.sizesKnown.size).toBe(0);
+            expect(onItemSizeChangedCalls.length).toBe(0);
+        });
+
+        it("should update other axis size when requested", () => {
+            mockState.needsOtherAxisSize = true;
+            mockCtx.values.set("otherAxisSize", 400);
+
+            updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 420 });
+
+            expect(mockCtx.values.get("otherAxisSize")).toBe(420);
+        });
+
+        it("should update horizontal other axis height when requested", () => {
+            mockState.props.horizontal = true;
+            mockState.needsOtherAxisSize = true;
+            mockCtx.values.set("otherAxisSize", 32);
+
+            updateItemAndFlush(mockCtx, "item_0", { height: 200, width: 150 });
+
+            expect(mockCtx.values.get("otherAxisSize")).toBe(200);
+        });
+
+        it("should update horizontal other axis height when fixed main-axis size is unchanged", () => {
+            mockState.props.horizontal = true;
+            mockState.props.getFixedItemSize = () => 200;
+            mockState.sizesKnown.set("item_0", 200);
+            mockState.needsOtherAxisSize = true;
+            mockCtx.values.set("otherAxisSize", 32);
+
+            updateItemAndFlush(mockCtx, "item_0", { height: 200, width: 200 });
+
+            expect(mockCtx.values.get("otherAxisSize")).toBe(200);
+            expect(onItemSizeChangedCalls.length).toBe(0);
+        });
+
+        it("reuses resolved item type and fixed size while measuring", () => {
+            let getItemTypeCalls = 0;
+            let getFixedItemSizeCalls = 0;
+            mockState.startBuffered = 2;
+            mockState.endBuffered = 4;
+            mockState.props.getItemType = (item) => {
+                getItemTypeCalls++;
+                return item.name;
+            };
+            mockState.props.getFixedItemSize = () => {
+                getFixedItemSizeCalls++;
+                return undefined;
+            };
+
+            updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+
+            expect(getItemTypeCalls).toBe(1);
+            expect(getFixedItemSizeCalls).toBe(1);
+            expect(mockState.averageSizes.First).toEqual({
+                avg: 150,
+                num: 1,
+            });
+        });
+
+        it("schedules a single mvcp recalculate per frame while anchor lock is active", () => {
+            const prevPlatform = Platform.OS;
+            Platform.OS = "web";
+            try {
+                const calculateSpy = spyOn(calculateItemsInViewModule, "calculateItemsInView").mockImplementation(
+                    () => undefined as any,
+                );
+                const rafCallbacks: Array<(time: number) => void> = [];
+                const rafSpy = spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb: any) => {
+                    rafCallbacks.push(cb);
+                    return rafCallbacks.length;
+                });
+                try {
+                    mockState.mvcpAnchorLock = {
+                        expiresAt: Date.now() + 1000,
+                        id: "item_0",
+                        position: 0,
+                        quietPasses: 0,
+                    };
+
+                    updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+                    updateItemAndFlush(mockCtx, "item_0", { height: 170, width: 400 });
+
+                    expect(calculateSpy).not.toHaveBeenCalled();
+                    expect(rafCallbacks.length).toBe(1);
+                    expect(mockState.scheduledWork.has("mvcpRecalculate")).toBe(true);
+
+                    rafCallbacks[0](0);
+
+                    expect(calculateSpy).toHaveBeenCalledTimes(1);
+                    expect(calculateSpy).toHaveBeenCalledWith(mockCtx, { doMVCP: true });
+                    expect(mockState.scheduledWork.has("mvcpRecalculate")).toBe(false);
+                } finally {
+                    rafSpy.mockRestore();
+                    calculateSpy.mockRestore();
+                }
+            } finally {
+                Platform.OS = prevPlatform;
+            }
+        });
+
+        it("cancels queued mvcp recalculate and runs immediately when anchor lock clears", () => {
+            const prevPlatform = Platform.OS;
+            Platform.OS = "web";
+            try {
+                const calculateSpy = spyOn(calculateItemsInViewModule, "calculateItemsInView").mockImplementation(
+                    () => undefined as any,
+                );
+                const rafSpy = spyOn(globalThis, "requestAnimationFrame").mockImplementation((_cb: any) => 42);
+                const cancelCalls: number[] = [];
+                const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+                globalThis.cancelAnimationFrame = (id: number) => {
+                    cancelCalls.push(id);
+                };
+                try {
+                    mockState.mvcpAnchorLock = {
+                        expiresAt: Date.now() + 1000,
+                        id: "item_0",
+                        position: 0,
+                        quietPasses: 0,
+                    };
+
+                    updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+                    expect(mockState.scheduledWork.has("mvcpRecalculate")).toBe(true);
+
+                    mockState.mvcpAnchorLock = undefined;
+                    updateItemAndFlush(mockCtx, "item_0", { height: 180, width: 400 });
+
+                    expect(cancelCalls).toEqual([42]);
+                    expect(calculateSpy).toHaveBeenCalledTimes(1);
+                    expect(calculateSpy).toHaveBeenCalledWith(mockCtx, { doMVCP: true });
+                    expect(mockState.scheduledWork.has("mvcpRecalculate")).toBe(false);
+                } finally {
+                    globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+                    rafSpy.mockRestore();
+                    calculateSpy.mockRestore();
+                }
+            } finally {
+                Platform.OS = prevPlatform;
+            }
+        });
+
+        for (const platform of ["web", "ios"] as const) {
+            it(`runs small replacement measurement batches immediately on ${platform}`, () => {
+                const prevPlatform = Platform.OS;
+                Platform.OS = platform;
+                try {
+                    const calculateSpy = spyOn(calculateItemsInViewModule, "calculateItemsInView").mockImplementation(
+                        () => undefined as any,
+                    );
+                    const rafSpy = spyOn(globalThis, "requestAnimationFrame").mockImplementation((_cb: any) => 1);
+                    try {
+                        mockState.userScrollAnchorReset = { keys: new Set(["item_0", "item_1"]) };
+                        mockState.sizesKnown.set("item_0", 100);
+                        mockState.sizes.set("item_0", 100);
+                        mockState.sizesKnown.set("item_1", 100);
+                        mockState.sizes.set("item_1", 100);
+
+                        updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+                        updateItemAndFlush(mockCtx, "item_1", { height: 170, width: 400 });
+
+                        expect(rafSpy).not.toHaveBeenCalled();
+                        expect(calculateSpy).toHaveBeenCalledTimes(2);
+                        expect(calculateSpy).toHaveBeenNthCalledWith(1, mockCtx);
+                        expect(calculateSpy).toHaveBeenNthCalledWith(2, mockCtx);
+                        expect(mockState.userScrollAnchorReset).toBeUndefined();
+                        expect(mockState.scheduledWork.has("mvcpRecalculate")).toBe(false);
+                    } finally {
+                        rafSpy.mockRestore();
+                        calculateSpy.mockRestore();
+                    }
+                } finally {
+                    Platform.OS = prevPlatform;
+                }
+            });
+        }
+
+        it("runs web replacement measurements immediately while replacement keys remain pending", () => {
+            const prevPlatform = Platform.OS;
+            Platform.OS = "web";
+            try {
+                const calculateSpy = spyOn(calculateItemsInViewModule, "calculateItemsInView").mockImplementation(
+                    () => undefined as any,
+                );
+                const rafCallbacks: Array<(time: number) => void> = [];
+                const rafSpy = spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb: any) => {
+                    rafCallbacks.push(cb);
+                    return rafCallbacks.length;
+                });
+                try {
+                    mockState.userScrollAnchorReset = { keys: new Set(["item_0", "item_1", "item_2", "item_3"]) };
+                    mockState.sizesKnown.set("item_0", 100);
+                    mockState.sizes.set("item_0", 100);
+                    mockState.sizesKnown.set("item_1", 100);
+                    mockState.sizes.set("item_1", 100);
+
+                    updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+                    updateItemAndFlush(mockCtx, "item_1", { height: 170, width: 400 });
+
+                    expect(calculateSpy).toHaveBeenCalledTimes(2);
+                    expect(calculateSpy).toHaveBeenNthCalledWith(1, mockCtx);
+                    expect(calculateSpy).toHaveBeenNthCalledWith(2, mockCtx);
+                    expect(rafCallbacks.length).toBe(0);
+                    expect(mockState.userScrollAnchorReset?.keys).toEqual(new Set(["item_2", "item_3"]));
+                    expect(mockState.scheduledWork.has("mvcpRecalculate")).toBe(false);
+                } finally {
+                    rafSpy.mockRestore();
+                    calculateSpy.mockRestore();
+                }
+            } finally {
+                Platform.OS = prevPlatform;
+            }
+        });
+
+        it("keeps web replacement reset active until all tracked keys finish measuring", () => {
+            const prevPlatform = Platform.OS;
+            Platform.OS = "web";
+            try {
+                const calculateSpy = spyOn(calculateItemsInViewModule, "calculateItemsInView").mockImplementation(
+                    () => undefined as any,
+                );
+                const rafCallbacks: Array<(time: number) => void> = [];
+                const rafSpy = spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb: any) => {
+                    rafCallbacks.push(cb);
+                    return rafCallbacks.length;
+                });
+                try {
+                    mockState.userScrollAnchorReset = { keys: new Set(["item_0", "item_1", "item_2", "item_3"]) };
+                    for (let i = 0; i < 4; i++) {
+                        mockState.sizesKnown.set(`item_${i}`, 100);
+                        mockState.sizes.set(`item_${i}`, 100);
+                    }
+
+                    updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+                    updateItemAndFlush(mockCtx, "item_1", { height: 170, width: 400 });
+
+                    expect(calculateSpy).toHaveBeenCalledTimes(2);
+                    expect(rafCallbacks.length).toBe(0);
+                    expect(mockState.userScrollAnchorReset?.keys).toEqual(new Set(["item_2", "item_3"]));
+                    expect(mockState.scheduledWork.has("mvcpRecalculate")).toBe(false);
+
+                    for (let i = 2; i < 4; i++) {
+                        updateItemAndFlush(mockCtx, `item_${i}`, { height: 150 + i * 10, width: 400 });
+                    }
+
+                    expect(calculateSpy).toHaveBeenCalledTimes(4);
+                    expect(rafCallbacks.length).toBe(0);
+                    expect(mockState.userScrollAnchorReset).toBeUndefined();
+                } finally {
+                    rafSpy.mockRestore();
+                    calculateSpy.mockRestore();
+                }
+            } finally {
+                Platform.OS = prevPlatform;
+            }
+        });
+
+        it("runs native replacement measurements immediately while replacement keys remain pending", () => {
+            const prevPlatform = Platform.OS;
+            Platform.OS = "ios";
+            try {
+                const calculateSpy = spyOn(calculateItemsInViewModule, "calculateItemsInView").mockImplementation(
+                    () => undefined as any,
+                );
+                const rafCallbacks: Array<(time: number) => void> = [];
+                const rafSpy = spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb: any) => {
+                    rafCallbacks.push(cb);
+                    return rafCallbacks.length;
+                });
+                try {
+                    mockState.userScrollAnchorReset = { keys: new Set(["item_0", "item_1", "item_2", "item_3"]) };
+                    mockState.sizesKnown.set("item_0", 100);
+                    mockState.sizes.set("item_0", 100);
+                    mockState.sizesKnown.set("item_1", 100);
+                    mockState.sizes.set("item_1", 100);
+
+                    updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+                    updateItemAndFlush(mockCtx, "item_1", { height: 170, width: 400 });
+
+                    expect(calculateSpy).toHaveBeenCalledTimes(2);
+                    expect(calculateSpy).toHaveBeenNthCalledWith(1, mockCtx);
+                    expect(calculateSpy).toHaveBeenNthCalledWith(2, mockCtx);
+                    expect(rafCallbacks.length).toBe(0);
+                    expect(mockState.userScrollAnchorReset?.keys).toEqual(new Set(["item_2", "item_3"]));
+                    expect(mockState.scheduledWork.has("mvcpRecalculate")).toBe(false);
+                } finally {
+                    rafSpy.mockRestore();
+                    calculateSpy.mockRestore();
+                }
+            } finally {
+                Platform.OS = prevPlatform;
+            }
+        });
+
+        it("runs a single native replacement measurement immediately and clears the reset", () => {
+            const prevPlatform = Platform.OS;
+            Platform.OS = "ios";
+            try {
+                const calculateSpy = spyOn(calculateItemsInViewModule, "calculateItemsInView").mockImplementation(
+                    () => undefined as any,
+                );
+                const rafCallbacks: Array<(time: number) => void> = [];
+                const rafSpy = spyOn(globalThis, "requestAnimationFrame").mockImplementation((cb: any) => {
+                    rafCallbacks.push(cb);
+                    return rafCallbacks.length;
+                });
+                try {
+                    mockState.userScrollAnchorReset = { keys: new Set(["item_0"]) };
+                    mockState.sizesKnown.set("item_0", 100);
+                    mockState.sizes.set("item_0", 100);
+
+                    updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+
+                    expect(calculateSpy).toHaveBeenCalledTimes(1);
+                    expect(calculateSpy).toHaveBeenCalledWith(mockCtx);
+                    expect(rafCallbacks.length).toBe(0);
+                    expect(mockState.userScrollAnchorReset).toBeUndefined();
+                } finally {
+                    rafSpy.mockRestore();
+                    calculateSpy.mockRestore();
+                }
+            } finally {
+                Platform.OS = prevPlatform;
+            }
+        });
+
+        for (const platform of ["web", "ios"] as const) {
+            it(`keeps the ${platform} user scroll anchor reset active until all replacement keys measure`, () => {
+                const prevPlatform = Platform.OS;
+                Platform.OS = platform;
+                try {
+                    const calculateSpy = spyOn(calculateItemsInViewModule, "calculateItemsInView").mockImplementation(
+                        () => undefined as any,
+                    );
+                    const rafSpy = spyOn(globalThis, "requestAnimationFrame").mockImplementation((_cb: any) => 1);
+                    try {
+                        mockState.userScrollAnchorReset = { keys: new Set(["item_0", "item_1"]) };
+                        mockState.sizesKnown.set("item_0", 100);
+                        mockState.sizes.set("item_0", 100);
+                        mockState.sizesKnown.set("item_1", 100);
+                        mockState.sizes.set("item_1", 100);
+
+                        updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+
+                        expect(rafSpy).not.toHaveBeenCalled();
+                        expect(calculateSpy).toHaveBeenCalledTimes(1);
+                        expect(calculateSpy).toHaveBeenCalledWith(mockCtx);
+                        expect(mockState.userScrollAnchorReset?.keys).toEqual(new Set(["item_1"]));
+                    } finally {
+                        rafSpy.mockRestore();
+                        calculateSpy.mockRestore();
+                    }
+                } finally {
+                    Platform.OS = prevPlatform;
+                }
+            });
+
+            it(`does not clear the ${platform} user scroll anchor reset for unrelated item measurements`, () => {
+                const prevPlatform = Platform.OS;
+                Platform.OS = platform;
+                try {
+                    const calculateSpy = spyOn(calculateItemsInViewModule, "calculateItemsInView").mockImplementation(
+                        () => undefined as any,
+                    );
+                    const rafSpy = spyOn(globalThis, "requestAnimationFrame").mockImplementation((_cb: any) => 1);
+                    try {
+                        mockState.userScrollAnchorReset = { keys: new Set(["item_1"]) };
+                        mockState.sizesKnown.set("item_0", 100);
+                        mockState.sizes.set("item_0", 100);
+
+                        updateItemAndFlush(mockCtx, "item_0", { height: 150, width: 400 });
+
+                        expect(rafSpy).not.toHaveBeenCalled();
+                        expect(calculateSpy).toHaveBeenCalledTimes(1);
+                        expect(calculateSpy).toHaveBeenCalledWith(mockCtx);
+                        expect(mockState.userScrollAnchorReset?.keys).toEqual(new Set(["item_1"]));
+                    } finally {
+                        rafSpy.mockRestore();
+                        calculateSpy.mockRestore();
+                    }
+                } finally {
+                    Platform.OS = prevPlatform;
+                }
+            });
+        }
+    });
+});

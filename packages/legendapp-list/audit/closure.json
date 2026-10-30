@@ -1,0 +1,984 @@
+{
+  "runtimeDependencies": ["octane"],
+  "adaptedSources": [
+    {
+      "packageName": "@legendapp/list",
+      "paths": [
+        "src/components/Container.tsrx",
+        "src/components/ContainerLayoutCoordinator.tsrx",
+        "src/components/ContainerSlot.tsrx",
+        "src/components/Containers.tsrx",
+        "src/components/DebugView.tsrx",
+        "src/components/DevNumbers.tsrx",
+        "src/components/LegendList.tsrx",
+        "src/components/ListComponent.tsrx",
+        "src/components/ListComponentScrollView.tsrx",
+        "src/components/PositionView.tsrx",
+        "src/components/ScrollAdjust.tsrx",
+        "src/components/Separator.tsrx",
+        "src/components/SnapWrapper.tsrx",
+        "src/components/listComponentStyles.ts",
+        "src/components/stickyPositionUtils.ts",
+        "src/components/useDevChecks.ts",
+        "src/components/webConstants.ts",
+        "src/components/webScrollUtils.ts",
+        "src/constants-platform.ts",
+        "src/constants.ts",
+        "src/core/ScheduledWork.ts",
+        "src/core/ScrollAdjustHandler.ts",
+        "src/core/adaptiveRender.ts",
+        "src/core/addTotalSize.ts",
+        "src/core/bootstrapInitialScroll.ts",
+        "src/core/calculateItemsInView.ts",
+        "src/core/calculateOffsetForIndex.ts",
+        "src/core/calculateOffsetWithOffsetPosition.ts",
+        "src/core/cancelImperativeScroll.ts",
+        "src/core/checkFinishedScroll.ts",
+        "src/core/checkResetContainers.ts",
+        "src/core/checkStructuralDataChange.ts",
+        "src/core/clampScrollOffset.ts",
+        "src/core/containerItemMetadata.ts",
+        "src/core/containerLayoutBaseline.ts",
+        "src/core/deferredPublicOnScroll.ts",
+        "src/core/doInitialAllocateContainers.ts",
+        "src/core/doMaintainScrollAtEnd.ts",
+        "src/core/doScrollParams.ts",
+        "src/core/doScrollTo.ts",
+        "src/core/finishInitialScroll.ts",
+        "src/core/finishScrollTo.ts",
+        "src/core/getStartOffsetAdjustment.ts",
+        "src/core/handleLayout.ts",
+        "src/core/initialScroll.ts",
+        "src/core/initialScrollLifecycle.ts",
+        "src/core/initialScrollSession.ts",
+        "src/core/measureContainersInLayoutEffect.ts",
+        "src/core/mvcp.ts",
+        "src/core/onScroll.ts",
+        "src/core/prepareColumnStartState.ts",
+        "src/core/recalculateSettledScroll.ts",
+        "src/core/resetLayoutCachesForDataChange.ts",
+        "src/core/scheduleContainerLayout.ts",
+        "src/core/scrollTo.ts",
+        "src/core/scrollToEnd.ts",
+        "src/core/scrollToIndex.ts",
+        "src/core/setSize.ts",
+        "src/core/syncMountedContainer.ts",
+        "src/core/updateAnchoredEndSpace.ts",
+        "src/core/updateContentInsetEndAdjustment.ts",
+        "src/core/updateContentMetrics.ts",
+        "src/core/updateContentMetricsState.ts",
+        "src/core/updateItemPositions.ts",
+        "src/core/updateItemSizes.ts",
+        "src/core/updateScroll.ts",
+        "src/core/updateTotalSize.ts",
+        "src/core/useWrapIfItem.ts",
+        "src/core/viewability.ts",
+        "src/entrypoints/shared.ts",
+        "src/hooks/createResizeObserver.ts",
+        "src/hooks/useCombinedRef.ts",
+        "src/hooks/useContainerMeasurement.ts",
+        "src/hooks/useDOMOrder.ts",
+        "src/hooks/useFreshDataTransitionVisibility.ts",
+        "src/hooks/useInit.ts",
+        "src/hooks/useLatestRef.ts",
+        "src/hooks/useOnLayoutSync.ts",
+        "src/hooks/useStableRenderComponent.ts",
+        "src/hooks/useThrottleDebounce.ts",
+        "src/hooks/useValueListener$.ts",
+        "src/platform/Animated.ts",
+        "src/platform/I18nManager.ts",
+        "src/platform/LayoutView.tsrx",
+        "src/platform/PixelRatio.ts",
+        "src/platform/Platform.ts",
+        "src/platform/RefreshControl.ts",
+        "src/platform/StyleSheet.ts",
+        "src/platform/ViewComponents.tsrx",
+        "src/platform/batchedUpdates.ts",
+        "src/platform/flushSync.ts",
+        "src/platform/getWindowSize.ts",
+        "src/platform/platform-types.ts",
+        "src/platform/scrollview-types.ts",
+        "src/platform/useStickyScrollHandler.ts",
+        "src/react.ts",
+        "src/state/ContextContainer.ts",
+        "src/state/getContentInsetEnd.ts",
+        "src/state/getContentSize.ts",
+        "src/state/state.ts",
+        "src/types.base.ts",
+        "src/types.internal.ts",
+        "src/types.web.ts",
+        "src/typesInternal.ts",
+        "src/utils/checkAllSizesKnown.ts",
+        "src/utils/checkAtBottom.ts",
+        "src/utils/checkAtTop.ts",
+        "src/utils/checkThreshold.ts",
+        "src/utils/checkThresholds.ts",
+        "src/utils/containerPool.ts",
+        "src/utils/createColumnWrapperStyle.ts",
+        "src/utils/createImperativeHandle.ts",
+        "src/utils/devEnvironment.ts",
+        "src/utils/edgeReachedGate.ts",
+        "src/utils/findAvailableContainers.ts",
+        "src/utils/getAlwaysRenderIndices.ts",
+        "src/utils/getComponent.ts",
+        "src/utils/getEffectiveDrawDistance.ts",
+        "src/utils/getId.ts",
+        "src/utils/getItemSize.ts",
+        "src/utils/getRenderedItem.ts",
+        "src/utils/getScrollVelocity.ts",
+        "src/utils/hasActiveInitialScroll.ts",
+        "src/utils/hasActiveMVCPAnchorLock.ts",
+        "src/utils/helpers.ts",
+        "src/utils/isInMVCPActiveMode.ts",
+        "src/utils/layoutMeasurement.ts",
+        "src/utils/normalizeMaintainScrollAtEnd.ts",
+        "src/utils/normalizeMaintainVisibleContentPosition.ts",
+        "src/utils/reordering.ts",
+        "src/utils/requestAdjust.ts",
+        "src/utils/rtl.ts",
+        "src/utils/setDidLayout.ts",
+        "src/utils/setInitialRenderState.ts",
+        "src/utils/setPaddingTop.ts",
+        "src/utils/throttledOnScroll.ts",
+        "src/utils/updateSnapToOffsets.ts",
+        "src/utils/useRafCoalescer.ts"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "package.json",
+      "origin": "authored",
+      "sha256": "4a028decb8f588e88014e7426334d4af9fd36eb3191fdc125a94fc3dafd63d6e"
+    },
+    {
+      "path": "src/components/Container.tsrx",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "0fc843a9e5907e8dc2c4e61ca8cef71fd6a6f84bde66649a5ab1bb7c7837478b"
+    },
+    {
+      "path": "src/components/ContainerLayoutCoordinator.tsrx",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "6e6171ac486e0992591ed6180eb86f377c769dde72611031587a501d6f68f71e"
+    },
+    {
+      "path": "src/components/ContainerSlot.tsrx",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "e20fcd8c289f1de80f382fc5119f1dfed445907ec6b6c9ffc79912e969069b55"
+    },
+    {
+      "path": "src/components/Containers.tsrx",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "64aa7ad328967c6a333eb41de1377b9e659ed27620939fb08abbfc1ef9449a98"
+    },
+    {
+      "path": "src/components/DebugView.tsrx",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "35b6be926686333d55bcd322c48814ea36ccfb5e8e72676bfe041daa70db265e"
+    },
+    {
+      "path": "src/components/DevNumbers.tsrx",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "2c5b16e48e90bce988b467d9e21e57b882c870b87a506548c084874b36f9fee2"
+    },
+    {
+      "path": "src/components/LegendList.tsrx",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "cb645b55801e847481d0710190e710bdca94579a13ab7f591d3182f155cdc5b7"
+    },
+    {
+      "path": "src/components/ListComponent.tsrx",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "11daca22eed059b8525fe9caab730437b92574bbfec9bf46bad380380e5dd8cd"
+    },
+    {
+      "path": "src/components/ListComponentScrollView.tsrx",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "41f52f55949176fa1ebee2fcde6d9ea7e3b6936a2d1bafacf1eca83f5afdfc42"
+    },
+    {
+      "path": "src/components/PositionView.tsrx",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "d19ba0a0564bbba166bdc00eb17e831dbfed9560e9fc7b5a6cccda640d1b04fa"
+    },
+    {
+      "path": "src/components/ScrollAdjust.tsrx",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "eeceb8dc2f1a5fd0a6377748da98a5d5ad83fe744dbddfcfea19bf0e2f16c1fc"
+    },
+    {
+      "path": "src/components/Separator.tsrx",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "bac58511a1c1a32e06bd23501f3d602f9ca752e13b70ee1e2fb374ad6bb86e90"
+    },
+    {
+      "path": "src/components/SnapWrapper.tsrx",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "49e5424628796e28d8ef25d314a0ad5c36d4e57d0fb1b76dc53e7aa60b626922"
+    },
+    {
+      "path": "src/components/listComponentStyles.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "8ba0927314e18da61bce2fcecc30640aa13639b63a47fb18b0e27d33904e982b"
+    },
+    {
+      "path": "src/components/stickyPositionUtils.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "aea11070afb53c96c49d29914330a0895766965d906e98aea5f54a9e8a1cfce9"
+    },
+    {
+      "path": "src/components/useDevChecks.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "24bfb29a59e9eebf46233fc1cd32a5c44dee5827aa79234d80080b1659111755"
+    },
+    {
+      "path": "src/components/webConstants.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "f3c49e54e1f3e698cd41a17028fc577efc336477be77897f0122067c89c05182"
+    },
+    {
+      "path": "src/components/webScrollUtils.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "4d1221a060cd4fa9b870dd37583d9295083102299435d8431c13d78a54987fff"
+    },
+    {
+      "path": "src/constants-platform.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "b4927458c7f8b012baac72ce34397d3671face64cd242a2599d257ffed7ee51d"
+    },
+    {
+      "path": "src/constants.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "d78913f4922891b4ea4119332bfd0f6eb590b175652ddd7020a9fd9594430970"
+    },
+    {
+      "path": "src/core/ScheduledWork.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "2b168eab94862f937e4d8a1887cc45292187d3c37e843f520caa9207c3d91d33"
+    },
+    {
+      "path": "src/core/ScrollAdjustHandler.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "a990f6e1744aabde4125ee9051549487ba5dcb35b51b8e1c70d65d4764a67a61"
+    },
+    {
+      "path": "src/core/adaptiveRender.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "9fb1674fa509f6649cb85afc96106d2a805698d3250ccd1aefe31be6cd4290c1"
+    },
+    {
+      "path": "src/core/addTotalSize.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "99626b460681a1d3039322a73e83be7a9f47d3c574d2e0299354e8725b3f23ed"
+    },
+    {
+      "path": "src/core/bootstrapInitialScroll.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "72eb79a4824b22b50707d1c82b67b9af23f5fb169117a945fbe765aa29d341a4"
+    },
+    {
+      "path": "src/core/calculateItemsInView.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "1a6734660c7de738ad4bb77b86efaec3b64bc42b91d74dabc81fb12e83b4c2d7"
+    },
+    {
+      "path": "src/core/calculateOffsetForIndex.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "e7bab844227dfeef452e7787e29ba229359d7957521648b54f967298cf35101b"
+    },
+    {
+      "path": "src/core/calculateOffsetWithOffsetPosition.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "bb92de9471147a0f38acaaad1d64fa80a8c5a3e98ee76d998fafa7b7542af5b8"
+    },
+    {
+      "path": "src/core/cancelImperativeScroll.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "806943946d4e4e94fe191d5fb78aad1f941677cf0fa1137920a00e87754724c8"
+    },
+    {
+      "path": "src/core/checkFinishedScroll.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "b341f23ecfc729ac7277e2dac18d4c7971a9b4d2f5be9dc12c094a444c5cf18c"
+    },
+    {
+      "path": "src/core/checkResetContainers.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "c010a6619434577973ea37a0df40efc0395b351e49aba4eba362f3a199798600"
+    },
+    {
+      "path": "src/core/checkStructuralDataChange.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "29696594dd33abd66bb1461a2ef79a10698e9c532a7e8457ba7ebf1b3d7201fc"
+    },
+    {
+      "path": "src/core/clampScrollOffset.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "4f032f7ff6376fefd6fac2d6d7412013c96c347da642e86875839a5c9b2e3c50"
+    },
+    {
+      "path": "src/core/containerItemMetadata.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "2e9985869698c88d4c17fe1243c656c76779ad03d8bcdf8ca2c0fa89ec00e168"
+    },
+    {
+      "path": "src/core/containerLayoutBaseline.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "eb9eb602eaf0b211446ca892b028107d336d4383f0f03025da19d6b6a2359455"
+    },
+    {
+      "path": "src/core/deferredPublicOnScroll.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "796536f1d199b69270ef372c965cf54cf3c23c60f1643883b668119a60ced07c"
+    },
+    {
+      "path": "src/core/doInitialAllocateContainers.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "16d19d11f4577f2fd96f568bd3929a900a62acabacf6dad843fe0b1dcb30dd0f"
+    },
+    {
+      "path": "src/core/doMaintainScrollAtEnd.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "e6aa63cd405ff9d11ca7403351518ecbc3101dcd99a2868fb77ff00d77295fe3"
+    },
+    {
+      "path": "src/core/doScrollParams.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "202c18f06268f065f90ad12f552b6e60fabdd5a96fce0fa95974bdaf1e61836f"
+    },
+    {
+      "path": "src/core/doScrollTo.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "7007e843d16b68a07367cc5ef6da2674886c091a24c70ed61dee9625586de2ff"
+    },
+    {
+      "path": "src/core/finishInitialScroll.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "d067d0e6cda0e427e11bfdb72f53732d0bdce500f36c8cc1791385afa5111bfe"
+    },
+    {
+      "path": "src/core/finishScrollTo.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "c7c113d7726f121c1142fe2d90804678cb4534a86dfab831cd2030bc3603cfac"
+    },
+    {
+      "path": "src/core/getStartOffsetAdjustment.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "2e9ffef0b5c4bc42ce59be137fb17c62bf7bdadf874af16cd5af813606aa6f0d"
+    },
+    {
+      "path": "src/core/handleLayout.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "5d50a9802b8f84cffca3040a292d9c09991d77871eec17ec10a85adb3370e53b"
+    },
+    {
+      "path": "src/core/initialScroll.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "7f364952cdcc181b238fdbabfd8ebc2f8dabf7a18f142edd3d331a613cff7b51"
+    },
+    {
+      "path": "src/core/initialScrollLifecycle.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "4c8401b79e81744c21b42ef5ef89f42f6debaa3dbdf9e339c39964d335904c22"
+    },
+    {
+      "path": "src/core/initialScrollSession.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "c24f7fcd69078c7687ce2673add92e68f56cd1d67c1a0b667817aaeb8eaab5f5"
+    },
+    {
+      "path": "src/core/measureContainersInLayoutEffect.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "b07d351aefb94043153e9bc9a23867589df32e8828ff68fa7c3e20a19dd9a88f"
+    },
+    {
+      "path": "src/core/mvcp.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "0570f9ee303ef84cec9e837ebdd5eb701c39ef408d38902203f07f6d9ad606d3"
+    },
+    {
+      "path": "src/core/onScroll.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "0e72dbac1c9d713e6a38828dc7b09f973f5cd030d88082011c3a3481eafdea9f"
+    },
+    {
+      "path": "src/core/prepareColumnStartState.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "63bee35f63959216e347a356666a83d085ee8b8fd41471589bcc7912b5f1a8ed"
+    },
+    {
+      "path": "src/core/recalculateSettledScroll.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "3aa33f010ecf7436569f2c923275ed17a8fcf3937e408309cc6d51a7e294075b"
+    },
+    {
+      "path": "src/core/resetLayoutCachesForDataChange.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "4ceabc3dabcb021bf5c8ecd21ec03998d183c58b99b905da8eae2781d29ea1d7"
+    },
+    {
+      "path": "src/core/scheduleContainerLayout.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "61ae0692a4da81f8a7da3b7ec6348560990cfd09c469fae3c6aee432664de98a"
+    },
+    {
+      "path": "src/core/scrollTo.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "23be6fc623f55f5fa74391231d1a49f2660c783cc8b982fe0c61554c21712e9f"
+    },
+    {
+      "path": "src/core/scrollToEnd.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "3c8c194965e3ab0334bb200d12e9e315d069849c9ced88d40254f3da5d6d7b2b"
+    },
+    {
+      "path": "src/core/scrollToIndex.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "dbd25b76c9aed6ad1b9f3b015d0fffd1b5c0ef631a6424c4144c322ba2518942"
+    },
+    {
+      "path": "src/core/setSize.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "d09cd91229ad3c874450127a011d468258226fadf15bc5c023f43f8e1328ccc6"
+    },
+    {
+      "path": "src/core/syncMountedContainer.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "b12a190668790706dc3f0c441358be41d50f739de63bbad43c4a911558965022"
+    },
+    {
+      "path": "src/core/updateAnchoredEndSpace.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "5a2c9ca5fdc7ec6c086204731c01f0e7d6ca52a92fd52d2fa7805942a9460d03"
+    },
+    {
+      "path": "src/core/updateContentInsetEndAdjustment.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "b2574aca5f9d44ced5d3eb9251a6e4f7835fd8f3a411c166bdf08d6a990dcb20"
+    },
+    {
+      "path": "src/core/updateContentMetrics.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "038c808a440751e4516c538f66f1b5edd929dba399132cbcd21c103d938560e1"
+    },
+    {
+      "path": "src/core/updateContentMetricsState.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "babad82d1d848042b1ef773fa98da04ee784cfe495342ff0dc103d796612bc53"
+    },
+    {
+      "path": "src/core/updateItemPositions.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "d05c96890db879f5d007f1b22c65bc642111c03e903d9176d675e866b25c69e5"
+    },
+    {
+      "path": "src/core/updateItemSizes.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "6c4390ca788df00d70f76071f85446e31da733df3d98416a504e7f4a43fae8cb"
+    },
+    {
+      "path": "src/core/updateScroll.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "86b80685c9f5cab601c78b1ca852c13390c735bdd2860454e4a3e2b7e0c3592a"
+    },
+    {
+      "path": "src/core/updateTotalSize.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "919a01fa105cd63658fe75e329114d9257ede86206d33571bf1f93c88c7b8723"
+    },
+    {
+      "path": "src/core/useWrapIfItem.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "94b4b8ae57ee6915eef1dc930cc3607e8c282fb1e7dfb56c42a3107b31699cf3"
+    },
+    {
+      "path": "src/core/viewability.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "ddbfbaf2cbc6051cd61540d1b863a38dd315af32299663db1078116aadcb85e5"
+    },
+    {
+      "path": "src/entrypoints/shared.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "8aa9c42be353824e28e05f983989342ae3dd31b9331d4000a85069f6f10d3f7b"
+    },
+    {
+      "path": "src/hooks/createResizeObserver.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "ed45f9680534476694afac8e89badca0033cfd5ac2d40be249d6a6e58da46baa"
+    },
+    {
+      "path": "src/hooks/useCombinedRef.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "e6ef989db9d361cf467604aa46a5828b45523b5161a4ee6f876b10b57a526ecb"
+    },
+    {
+      "path": "src/hooks/useContainerMeasurement.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "9271387c5a5e9aa3dbffc67586c16849863f6ed23dabe13ef22a2dcfd992d453"
+    },
+    {
+      "path": "src/hooks/useDOMOrder.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "d6720d5cbe728a8f91bd6ecb23bdac0bbfe2ba6d7256c440f11af4347d2ebe08"
+    },
+    {
+      "path": "src/hooks/useFreshDataTransitionVisibility.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "2eb76e86b9cec0d0e345afaa8926196d359d81abb20156261d944a5d00c7542a"
+    },
+    {
+      "path": "src/hooks/useInit.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "9613a33d6c0f0887869559e70ca29c1125608f5d5be36b57f560db4d887b08c0"
+    },
+    {
+      "path": "src/hooks/useLatestRef.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "a5328c55cbf6ea14c83d2a6c1ac8eed27fa2fa4982848448d8b5ed0436fa8d75"
+    },
+    {
+      "path": "src/hooks/useOnLayoutSync.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "c4da526a2aaabf755cdddf569e5815bf6194d037ffe1a0c519fa0237a07ca33c"
+    },
+    {
+      "path": "src/hooks/useStableRenderComponent.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "f64c87c96c2ff53ace762dfa839fcd41d61b4d0c7089e90935aec3295a73393c"
+    },
+    {
+      "path": "src/hooks/useThrottleDebounce.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "76695e11332934dbd5e965c063d30a4e3a6b98c2b7c3221e6c20cef1d010609b"
+    },
+    {
+      "path": "src/hooks/useValueListener$.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "c9a17ae4733548f3bb0774d53f86669ba9aef2b7cc559609a2d6066eed34e6dd"
+    },
+    {
+      "path": "src/platform/Animated.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "89bdc11c624a6be04864ae192860acc7acf018a80afba2c988d4a02481e96935"
+    },
+    {
+      "path": "src/platform/I18nManager.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "cd4367d3e3e8301fc4044aa2929baa24a6a913aebbdd341463ba7cd6d6fc9d0c"
+    },
+    {
+      "path": "src/platform/LayoutView.tsrx",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "392b883fa7f34880062c2cb2156ed0752f006d94245f9231541ee90cd7b16d28"
+    },
+    {
+      "path": "src/platform/PixelRatio.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "523f87c4e7302172cd52a29261a8cbea697df18aa46ccb3640514a28a187890c"
+    },
+    {
+      "path": "src/platform/Platform.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "62015fc0fa4f9bfc1a8028cc4ce5deafb467c7682e73096aba369acaa32e7a74"
+    },
+    {
+      "path": "src/platform/RefreshControl.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "1b9731c81f2fbdc0b5aeec509bdb0c3bc93e560ab9f4727022e0a85afb2782cc"
+    },
+    {
+      "path": "src/platform/StyleSheet.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "41653bda7633f802db1cce7df10ccdeb4cd4100993a4716088c82a0e3033f95b"
+    },
+    {
+      "path": "src/platform/ViewComponents.tsrx",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "de84dfb9e763d133c7f9bcd8968795e2a3ec432db077390adef8aa6e8dbb5fa9"
+    },
+    {
+      "path": "src/platform/batchedUpdates.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "f1fe62024916c69aa2cb44d9dd102afaa37744fcfb31f985341a33889aca9c80"
+    },
+    {
+      "path": "src/platform/flushSync.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "ad5377e31880dcab170ef8bad6e67e94e2860bea4274397992677ab55cc14662"
+    },
+    {
+      "path": "src/platform/getWindowSize.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "2c7b4ebe715ebf87adbcb428bb79157f5c035a9750bc5304bb4be7afbde75329"
+    },
+    {
+      "path": "src/platform/platform-types.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "fee4ba6818c69aab68977d7f97672f341c16876723e449ba6b31947cc422e255"
+    },
+    {
+      "path": "src/platform/scrollview-types.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "71a512f73c1f7bb08c9f8b74bb4c23f161849845dd6d7d631f3f412fe4a3290a"
+    },
+    {
+      "path": "src/platform/useStickyScrollHandler.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "8bceea0b42864a1e0d8bbc77e7c83ec82d894608790a9c79696636832330b6fe"
+    },
+    {
+      "path": "src/react.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "02c7bfaf75a36ca9877451f141caa337376397beb9e3bbceffdfd6569a99f176"
+    },
+    {
+      "path": "src/state/ContextContainer.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "97ef0c1f73d2c9c21ae810756d67f887e6cf2462c8fbebcb1546c0761050f740"
+    },
+    {
+      "path": "src/state/getContentInsetEnd.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "e18648bdb6f88a6aa20ffd1f4791859ac4239254939090d26b2203f06a05b72d"
+    },
+    {
+      "path": "src/state/getContentSize.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "414825a51b33610ce021486a3b521210e5cc1243d0c5b799e3b2c5e288501ce5"
+    },
+    {
+      "path": "src/state/state.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "a6399b62a1e0a20bea16c92eb295c4a09b71d229de710a835fa2bee468b1c095"
+    },
+    {
+      "path": "src/types.base.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "872f654ff2d35843cf674b9fa428a06df76206a5d85e29c392b924d17a165218"
+    },
+    {
+      "path": "src/types.internal.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "81030b1d0ee10687d778a462fecb8af0992eb305d24c35f1db4eaf21ad76bf13"
+    },
+    {
+      "path": "src/types.web.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "e52bcc8c837ba6c155c0cfb2c23d94575c78fec1a8a4de4acbc0e7bc935e78c2"
+    },
+    {
+      "path": "src/typesInternal.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "5834f587a8711a3db642abf7e2d1977007e19fe237615d919c189cc31e0fa74a"
+    },
+    {
+      "path": "src/utils/checkAllSizesKnown.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "90fb52ec3492bbd52ff64687980c72fd8109ece7d7f7e810c3bce90c936e476f"
+    },
+    {
+      "path": "src/utils/checkAtBottom.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "61a0023168d41e65a42fe14818dcaef8f39ea27add2da95ce70239e27e06963c"
+    },
+    {
+      "path": "src/utils/checkAtTop.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "d204a2d9da559b637fc0dbdd5b216df1dc797755f158fab0180f23c5642d2725"
+    },
+    {
+      "path": "src/utils/checkThreshold.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "b656e8556d658be415bcefbbc0bb57f6bfa3f303e5e40664715a950023c7b349"
+    },
+    {
+      "path": "src/utils/checkThresholds.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "7ec346cf46941acaaacedd8a67f01ac77a8a47ed0c4f01aaa806081a54dae6b8"
+    },
+    {
+      "path": "src/utils/containerPool.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "e8e2bb6e07db17d876dafe922de6aa0235951a8b51da65517878acb1c9015bc2"
+    },
+    {
+      "path": "src/utils/createColumnWrapperStyle.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "33159923573dc9187cd91a526ed50498499cd7e553511982771e080a2597b5a7"
+    },
+    {
+      "path": "src/utils/createImperativeHandle.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "eb8a561eee80efbd6bec7dfe2403a5befd8158d7e085bebd2c068933015effae"
+    },
+    {
+      "path": "src/utils/devEnvironment.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "36ac23d2f28c8651f57c0d6fd7ae06c7a67e727b91811202437d5ec944e74685"
+    },
+    {
+      "path": "src/utils/edgeReachedGate.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "fb003ac0497738324a8fd10c388b6b69d31b2e44ac93950e9bbd6ea81f52dd36"
+    },
+    {
+      "path": "src/utils/findAvailableContainers.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "64d070a6fd73c29f226f5a4acbee3bf8a1ada70b26b9653e218a195707228baa"
+    },
+    {
+      "path": "src/utils/getAlwaysRenderIndices.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "499e0f5d3b29527c81bef69cd79bd4a1425480c6cbbc3d112f87526be56a6a22"
+    },
+    {
+      "path": "src/utils/getComponent.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "dc5d902cc007d741acea42e7d9314d5695c775ab28b054af7047ffaa80c7e14b"
+    },
+    {
+      "path": "src/utils/getEffectiveDrawDistance.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "eae8215368437e5847da6c40f976f30887ef55f2b913ebd5136b4b4c2cf63c56"
+    },
+    {
+      "path": "src/utils/getId.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "5cb4f7a29d61caefc5a439499805debfa7b619e2612b51187dfdc11a7644bcc1"
+    },
+    {
+      "path": "src/utils/getItemSize.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "38532aa49a92e56d552803e50a1cd00eeba8f156a513e496297d9142fcf479a2"
+    },
+    {
+      "path": "src/utils/getRenderedItem.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "1436400d1d14114678dd54266bdcbb8e5d0cb3ee5ec81f2424856ce7eeb7d81e"
+    },
+    {
+      "path": "src/utils/getScrollVelocity.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "3b53e736c77bb83764917452c4151d87b9ffb6b2293e656566b4aa27bda2a691"
+    },
+    {
+      "path": "src/utils/hasActiveInitialScroll.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "d35fd6a45bbb0612e0feeb98ed0effcefd5693f10dc43b64c1482fef592b52f1"
+    },
+    {
+      "path": "src/utils/hasActiveMVCPAnchorLock.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "d9e406089a7364a33bee3a584f4f074c53918bc769d94098fc5182ae0f14620b"
+    },
+    {
+      "path": "src/utils/helpers.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "f7ccce01be9c1f8dbd7cdcbb3cc1faa34729c321b14d01fce3687c7637b223a9"
+    },
+    {
+      "path": "src/utils/isInMVCPActiveMode.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "f0a09f00ee12db2e3400639799911dc82c668ca4eb8d66e28d9629bb69f517ed"
+    },
+    {
+      "path": "src/utils/layoutMeasurement.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "2aeee591ec710fd2ecced02ad9ee0e4f7333be4f08122f159f64deef9bff4d5c"
+    },
+    {
+      "path": "src/utils/normalizeMaintainScrollAtEnd.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "92a18d4b4ae344f99a461101d0839acb87e672c2899e07eeb9a1e284568051b7"
+    },
+    {
+      "path": "src/utils/normalizeMaintainVisibleContentPosition.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "a22bf3add363e5806db696443dab30a6a525ae4c5b7b6499a42ead64f99dad96"
+    },
+    {
+      "path": "src/utils/reordering.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "f2928fc57ca9f2c28fe984cb3e32bdb095a255c9cda5c9f5542f8fad88097b07"
+    },
+    {
+      "path": "src/utils/requestAdjust.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "bce1f11bf6e934e4c61dd3d0cd40dae17c17fb49a5af38da5c9ba5ec12f180d6"
+    },
+    {
+      "path": "src/utils/rtl.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "df561731e219f7695995c530448f56f81320a01b7c5d01a2685a09fb37126e54"
+    },
+    {
+      "path": "src/utils/setDidLayout.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "8172e4842634976622f3756da009e81029a6d7d273cded3cd561e16efe6b6879"
+    },
+    {
+      "path": "src/utils/setInitialRenderState.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "0be5d04a2787ba169a42aa97b9e18c4d8245b7ef78d5b73daa94593d8350bb2d"
+    },
+    {
+      "path": "src/utils/setPaddingTop.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "2761432f178cdaaf66ce3c4e1ae14478a0a7d900089326e4098ff00380a348a8"
+    },
+    {
+      "path": "src/utils/throttledOnScroll.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "86cdd50739f1bc72e0d2c0c289bea0e2cda338d6c4aeb151d8557137c42269e3"
+    },
+    {
+      "path": "src/utils/updateSnapToOffsets.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "cb8769f682d730b7219c0ac618bd93bbb6e71940edbdf74f12b66a02d01d6054"
+    },
+    {
+      "path": "src/utils/useRafCoalescer.ts",
+      "origin": "adapted",
+      "packageName": "@legendapp/list",
+      "sha256": "bad9b210943dc4a8738d5f49fdc8055ad2ac9524362b8e5b595c60ff96f27ea1"
+    }
+  ],
+  "reimplementedDependencies": []
+}

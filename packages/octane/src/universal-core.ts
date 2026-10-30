@@ -21,6 +21,7 @@ import {
 	RENDERER_REGION_OWNER_TAG as RENDERER_REGION_OWNER,
 } from './runtime-tags.js';
 import { resolveHookPath } from './hook-slot-cache.js';
+import type { ReducerDispatch } from './reducer-dispatch.js';
 import {
 	__profileBeginRender,
 	__profileComponentSource,
@@ -6533,7 +6534,7 @@ export function useReducer<S, A, I = S>(
 	initialArg: I,
 	initOrSlot?: ((value: I) => S) | unknown,
 	maybeSlot?: unknown,
-): [S, (action: A) => void, () => S] {
+): [S, ReducerDispatch<A>, () => S] {
 	const init = typeof initOrSlot === 'function' ? (initOrSlot as (value: I) => S) : null;
 	const slot = maybeSlot ?? (init === null ? initOrSlot : undefined);
 	const owner = currentDraftOwner();
@@ -6612,7 +6613,7 @@ export function useReducer<S, A, I = S>(
 		}
 		hook.reducer = reducer;
 	}
-	return [hook.value, hook.dispatch, hook.get];
+	return [hook.value, hook.dispatch as ReducerDispatch<A>, hook.get];
 }
 
 export const __useReducerWithGetter = useReducer;

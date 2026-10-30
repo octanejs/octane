@@ -1,0 +1,450 @@
+import * as React from "react";
+import { useSyncExternalStore } from "use-sync-external-store/shim";
+
+import { type AnimatedValue, createAnimatedValue } from "@/platform/Animated";
+import type { LooseView } from "@/platform/scrollview-types";
+import type {
+    ColumnWrapperStyle,
+    ViewAmountToken,
+    ViewabilityAmountCallback,
+    ViewabilityCallback,
+    ViewToken,
+} from "@/types.base";
+import type { InternalState, MaintainVisibleContentPositionNormalized } from "@/types.internal";
+
+// This is an implementation of a simple state management system, inspired by Legend State.
+// It stores values and listeners in Maps, with peek$ and set$ functions to get and set values.
+// The set$ function also triggers the listeners.
+//
+// This is definitely not general purpose and has one big optimization/caveat: use$ is only ever called
+// once for each unique name. So we don't need to manage a Set of listeners or dispose them,
+// which saves needing useEffect hooks or managing listeners in a Set.
+
+export type ListenerType =
+    | "activeStickyIndex"
+    | "alignItemsAtEndPadding"
+    | "anchoredEndSpaceSize"
+    | "containerLayoutEpoch"
+    | "debugComputedScroll"
+    | "debugRawScroll"
+    | "extraData"
+    | "footerSize"
+    | "headerSize"
+    | "lastItemKeys"
+    | "lastPositionUpdate"
+    | "maintainVisibleContentPosition"
+    | "numColumns"
+    | "numContainers"
+    | "numContainersPooled"
+    | "otherAxisSize"
+    | "readyToRender"
+    | "scrollAdjust"
+    | "scrollAdjustPending"
+    | "scrollAdjustUserOffset"
+    | "scrollSize"
+    | "snapToOffsets"
+    | "stylePaddingTop"
+    | "totalSize"
+    | "isAtEnd"
+    | "isAtStart"
+    | "isNearEnd"
+    | "isNearStart"
+    | "isWithinMaintainScrollAtEndThreshold"
+    | "adaptiveRender"
+    | `containerColumn${number}`
+    | `containerSpan${number}`
+    | `containerItemData${number}`
+    | `containerItemIndex${number}`
+    | `containerItemKey${number}`
+    | `containerPosition${number}`
+    | `containerSticky${number}`;
+
+export type LegendListListenerType = Extract<
+    ListenerType,
+    | "activeStickyIndex"
+    | "anchoredEndSpaceSize"
+    | "footerSize"
+    | "headerSize"
+    | "isAtEnd"
+    | "isAtStart"
+    | "isNearEnd"
+    | "isNearStart"
+    | "isWithinMaintainScrollAtEndThreshold"
+    | "adaptiveRender"
+    | "lastItemKeys"
+    | "lastPositionUpdate"
+    | "numContainers"
+    | "numContainersPooled"
+    | "otherAxisSize"
+    | "readyToRender"
+    | "snapToOffsets"
+    | "totalSize"
+>;
+
+export type ListenerTypeValueMap = {
+    activeStickyIndex: number;
+    alignItemsAtEndPadding: number;
+    anchoredEndSpaceSize: number;
+    containerLayoutEpoch: number;
+    animatedScrollY: any;
+    debugComputedScroll: number;
+    debugRawScroll: number;
+    extraData: any;
+    footerSize: number;
+    headerSize: number;
+    isAtEnd: boolean;
+    isAtStart: boolean;
+    isNearEnd: boolean;
+    isNearStart: boolean;
+    isWithinMaintainScrollAtEndThreshold: boolean;
+    lastItemKeys: string[];
+    lastPositionUpdate: number;
+    maintainVisibleContentPosition: MaintainVisibleContentPositionNormalized;
+    numColumns: number;
+    numContainers: number;
+    numContainersPooled: number;
+    otherAxisSize: number;
+    readyToRender: boolean;
+    scrollAdjust: number;
+    scrollAdjustPending: number;
+    scrollAdjustUserOffset: number;
+    scrollSize: { width: number; height: number };
+    snapToOffsets: number[];
+    stylePaddingTop: number;
+    totalSize: number;
+    adaptiveRender: "normal" | "light";
+} & {
+    [K in ListenerType as K extends `containerItemKey${number}` ? K : never]: string;
+} & {
+    [K in ListenerType as K extends `containerItemData${number}` ? K : never]: any;
+} & {
+    [K in ListenerType as K extends `containerItemIndex${number}` ? K : never]: number;
+} & {
+    [K in ListenerType as K extends `containerPosition${number}` ? K : never]: number;
+} & {
+    [K in ListenerType as K extends `containerColumn${number}` ? K : never]: number;
+} & {
+    [K in ListenerType as K extends `containerSpan${number}` ? K : never]: number;
+} & {
+    [K in ListenerType as K extends `containerSticky${number}` ? K : never]: boolean;
+};
+
+export interface StateContext {
+    animatedScrollY: AnimatedValue;
+    columnWrapperStyle: ColumnWrapperStyle | undefined;
+    containerLayoutTriggers: Map<number, () => void>;
+    contextNum: number; // For debug checking that it's the right context
+    listeners: Map<ListenerType, Set<(value: any) => void>>;
+    mapViewabilityCallbacks: Map<string, ViewabilityCallback>;
+    mapViewabilityValues: Map<string, ViewToken>;
+    mapViewabilityAmountCallbacks: Map<number, ViewabilityAmountCallback>;
+    mapViewabilityAmountValues: Map<number, ViewAmountToken>;
+    mapViewabilityConfigStates: Map<
+        string,
+        {
+            end: number;
+            endBuffered: number;
+            previousStart: number;
+            previousEnd: number;
+            start: number;
+            startBuffered: number;
+            viewableItems: ViewToken[];
+        }
+    >;
+    pendingContainerIds: Set<number> | null | undefined;
+    positionListeners: Map<string, Set<(value: any) => void>>;
+    state: InternalState;
+    scrollAxisGap: number;
+    values: Map<ListenerType, any>;
+    viewRefs: Map<number, React.RefObject<LooseView | null>>;
+}
+
+const ContextState = React.createContext<StateContext | null>(null);
+const SIGNAL_NAMES_SEPARATOR = "\0";
+type NonEmptySignalNames = readonly [ListenerType, ...ListenerType[]];
+
+let contextNum = 0;
+
+export function StateProvider({ children }: { children: React.ReactNode }) {
+    const [value] = React.useState<StateContext>(() => ({
+        animatedScrollY: createAnimatedValue(0),
+        columnWrapperStyle: undefined,
+        containerLayoutTriggers: new Map<number, () => void>(),
+        contextNum: contextNum++,
+        listeners: new Map(),
+        mapViewabilityAmountCallbacks: new Map<number, ViewabilityAmountCallback>(),
+        mapViewabilityAmountValues: new Map<number, ViewAmountToken>(),
+        mapViewabilityCallbacks: new Map<string, ViewabilityCallback>(),
+        mapViewabilityConfigStates: new Map(),
+        mapViewabilityValues: new Map<string, ViewToken>(),
+        pendingContainerIds: undefined,
+        positionListeners: new Map(),
+        scrollAxisGap: 0,
+        state: undefined as any,
+        values: new Map<ListenerType, any>([
+            ["alignItemsAtEndPadding", 0],
+            ["containerLayoutEpoch", 0],
+            ["stylePaddingTop", 0],
+            ["headerSize", 0],
+            ["numContainers", 0],
+            ["activeStickyIndex", -1],
+            ["isAtEnd", false],
+            ["isAtStart", false],
+            ["isNearEnd", false],
+            ["isNearStart", false],
+            ["isWithinMaintainScrollAtEndThreshold", false],
+            ["adaptiveRender", "normal"],
+            ["totalSize", 0],
+            ["scrollAdjustPending", 0],
+        ]),
+        viewRefs: new Map<number, React.RefObject<LooseView | null>>(),
+    }));
+    return <ContextState.Provider value={value}>{children}</ContextState.Provider>;
+}
+
+export function useStateContext() {
+    return React.useContext(ContextState)!;
+}
+
+function createSelectorFunctionsArr(ctx: StateContext | null, signalNames: readonly ListenerType[]) {
+    if (!ctx) {
+        const emptyValues: any[] = [];
+        return {
+            get: () => emptyValues,
+            subscribe: () => () => {},
+        };
+    }
+
+    let lastValues: any[] = [];
+    let lastSignalValues: any[] = [];
+
+    return {
+        get: () => {
+            const currentValues: any[] = [];
+            let hasChanged = false;
+
+            for (let i = 0; i < signalNames.length; i++) {
+                const value = peek$(ctx, signalNames[i]);
+                currentValues.push(value);
+
+                // Check if this value has changed from last time
+                if (value !== lastSignalValues[i]) {
+                    hasChanged = true;
+                }
+            }
+
+            // Update our cached signal values regardless
+            lastSignalValues = currentValues;
+
+            // Only create a new array reference if something changed
+            if (hasChanged) {
+                lastValues = currentValues;
+            }
+
+            return lastValues;
+        },
+        subscribe: (cb: (value: any) => void) => {
+            const listeners: (() => void)[] = [];
+            for (const signalName of signalNames) {
+                listeners.push(listen$(ctx, signalName, cb));
+            }
+            return () => {
+                for (const listener of listeners) {
+                    listener();
+                }
+            };
+        },
+    };
+}
+
+function getSignalNamesKey(signalNames: NonEmptySignalNames): string {
+    return signalNames.length === 1 ? signalNames[0] : signalNames.join(SIGNAL_NAMES_SEPARATOR);
+}
+
+function getSignalNamesFromKey(signalNamesKey: string): NonEmptySignalNames {
+    return signalNamesKey.split(SIGNAL_NAMES_SEPARATOR) as unknown as NonEmptySignalNames;
+}
+
+export function listen$<T extends ListenerType>(
+    ctx: StateContext,
+    signalName: T,
+    cb: (value: ListenerTypeValueMap[T]) => void,
+): () => void {
+    const { listeners } = ctx;
+    let setListeners = listeners.get(signalName);
+    if (!setListeners) {
+        setListeners = new Set();
+        listeners.set(signalName, setListeners);
+    }
+    setListeners!.add(cb);
+
+    return () => setListeners!.delete(cb);
+}
+
+// Function to get value based on ListenerType without requiring generic type
+export function peek$<T extends ListenerType>(
+    ctx: Pick<StateContext, "values">,
+    signalName: T,
+): ListenerTypeValueMap[T] {
+    const { values } = ctx;
+    return values.get(signalName);
+}
+
+export function set$<T extends ListenerType>(
+    ctx: StateContext,
+    signalName: T,
+    value: ListenerTypeValueMap[T] | undefined,
+) {
+    const { listeners, values } = ctx;
+    if (values.get(signalName) !== value) {
+        values.set(signalName, value);
+        const setListeners = listeners.get(signalName);
+        if (setListeners) {
+            for (const listener of setListeners) {
+                listener(value);
+            }
+        }
+    }
+}
+
+export function listenPosition$<T extends ListenerType>(
+    ctx: StateContext,
+    key: string,
+    cb: (value: ListenerTypeValueMap[T]) => void,
+) {
+    const { positionListeners } = ctx;
+    let setListeners = positionListeners.get(key);
+    if (!setListeners) {
+        setListeners = new Set();
+        positionListeners.set(key, setListeners);
+    }
+    setListeners!.add(cb);
+
+    return () => setListeners!.delete(cb);
+}
+
+export function notifyPosition$<T extends ListenerType>(
+    ctx: StateContext,
+    key: string,
+    value: ListenerTypeValueMap[T] | undefined,
+) {
+    const { positionListeners } = ctx;
+    const setListeners = positionListeners.get(key);
+    if (setListeners) {
+        for (const listener of setListeners) {
+            listener(value);
+        }
+    }
+}
+
+export function useArr$<T extends ListenerType>(signalNames: [T]): [ListenerTypeValueMap[T]];
+export function useArr$<T1 extends ListenerType, T2 extends ListenerType>(
+    signalNames: [T1, T2],
+): [ListenerTypeValueMap[T1], ListenerTypeValueMap[T2]];
+export function useArr$<T1 extends ListenerType, T2 extends ListenerType, T3 extends ListenerType>(
+    signalNames: [T1, T2, T3],
+): [ListenerTypeValueMap[T1], ListenerTypeValueMap[T2], ListenerTypeValueMap[T3]];
+export function useArr$<
+    T1 extends ListenerType,
+    T2 extends ListenerType,
+    T3 extends ListenerType,
+    T4 extends ListenerType,
+>(
+    signalNames: [T1, T2, T3, T4],
+): [ListenerTypeValueMap[T1], ListenerTypeValueMap[T2], ListenerTypeValueMap[T3], ListenerTypeValueMap[T4]];
+export function useArr$<
+    T1 extends ListenerType,
+    T2 extends ListenerType,
+    T3 extends ListenerType,
+    T4 extends ListenerType,
+    T5 extends ListenerType,
+>(
+    signalNames: [T1, T2, T3, T4, T5],
+): [
+    ListenerTypeValueMap[T1],
+    ListenerTypeValueMap[T2],
+    ListenerTypeValueMap[T3],
+    ListenerTypeValueMap[T4],
+    ListenerTypeValueMap[T5],
+];
+export function useArr$<
+    T1 extends ListenerType,
+    T2 extends ListenerType,
+    T3 extends ListenerType,
+    T4 extends ListenerType,
+    T5 extends ListenerType,
+    T6 extends ListenerType,
+>(
+    signalNames: [T1, T2, T3, T4, T5, T6],
+): [
+    ListenerTypeValueMap[T1],
+    ListenerTypeValueMap[T2],
+    ListenerTypeValueMap[T3],
+    ListenerTypeValueMap[T4],
+    ListenerTypeValueMap[T5],
+    ListenerTypeValueMap[T6],
+];
+export function useArr$<
+    T1 extends ListenerType,
+    T2 extends ListenerType,
+    T3 extends ListenerType,
+    T4 extends ListenerType,
+    T5 extends ListenerType,
+    T6 extends ListenerType,
+    T7 extends ListenerType,
+>(
+    signalNames: [T1, T2, T3, T4, T5, T6, T7],
+): [
+    ListenerTypeValueMap[T1],
+    ListenerTypeValueMap[T2],
+    ListenerTypeValueMap[T3],
+    ListenerTypeValueMap[T4],
+    ListenerTypeValueMap[T5],
+    ListenerTypeValueMap[T6],
+    ListenerTypeValueMap[T7],
+];
+export function useArr$<
+    T1 extends ListenerType,
+    T2 extends ListenerType,
+    T3 extends ListenerType,
+    T4 extends ListenerType,
+    T5 extends ListenerType,
+    T6 extends ListenerType,
+    T7 extends ListenerType,
+    T8 extends ListenerType,
+>(
+    signalNames: [T1, T2, T3, T4, T5, T6, T7, T8],
+): [
+    ListenerTypeValueMap[T1],
+    ListenerTypeValueMap[T2],
+    ListenerTypeValueMap[T3],
+    ListenerTypeValueMap[T4],
+    ListenerTypeValueMap[T5],
+    ListenerTypeValueMap[T6],
+    ListenerTypeValueMap[T7],
+    ListenerTypeValueMap[T8],
+];
+export function useArr$<T extends ListenerType>(signalNames: readonly [T, ...T[]]): ListenerTypeValueMap[T][] {
+    const ctx = React.useContext(ContextState);
+    const signalNamesKey = getSignalNamesKey(signalNames);
+    const { subscribe, get } = React.useMemo(
+        () => createSelectorFunctionsArr(ctx, getSignalNamesFromKey(signalNamesKey)),
+        [ctx, signalNamesKey],
+    );
+    const value = useSyncExternalStore(subscribe, get, get);
+
+    return value;
+}
+export function useSelector$<T extends ListenerType, T2>(
+    signalName: T,
+    selector: (value: ListenerTypeValueMap[T]) => T2,
+): T2 {
+    const ctx = React.useContext(ContextState);
+    const { subscribe, get } = React.useMemo(() => createSelectorFunctionsArr(ctx, [signalName]), [ctx, signalName]);
+    const getSelectedValue = React.useCallback(() => selector(get()[0]), [get, selector]);
+
+    // Return a selected value based on the signal name, so it only re-renders when the selected value changes
+    const value = useSyncExternalStore(subscribe, getSelectedValue, getSelectedValue);
+
+    return value;
+}

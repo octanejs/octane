@@ -1,0 +1,341 @@
+import { IsNewArchitecture } from '../constants-platform.ts';
+import { settlePendingImperativeScroll } from '../core/cancelImperativeScroll.ts';
+import { invalidateContainerFixedItemSizes } from '../core/containerItemMetadata.ts';
+import { supersedeInitialScroll } from '../core/finishInitialScroll.ts';
+import { retargetActiveInitialScrollAtEnd } from '../core/initialScrollLifecycle.ts';
+import { scheduleContainerLayout } from '../core/scheduleContainerLayout.ts';
+import { scrollTo } from '../core/scrollTo.ts';
+import { scrollToEnd } from '../core/scrollToEnd.ts';
+import { scrollToIndex } from '../core/scrollToIndex.ts';
+import { setContentInsetOverride } from '../core/updateContentMetrics.ts';
+import { updateItemSizes } from '../core/updateItemSizes.ts';
+import { updateScroll } from '../core/updateScroll.ts';
+import { getContentSize } from '../state/getContentSize.ts';
+import {
+	type LegendListListenerType,
+	type ListenerTypeValueMap,
+	listen$,
+	listenPosition$,
+	peek$,
+	type StateContext,
+	set$,
+} from '../state/state.ts';
+import type { LegendListAverageItemSize, LegendListRef } from '../types.base.ts';
+import { getId } from './getId.ts';
+import { areKnownOrFixedItemSizesAvailable } from './getItemSize.ts';
+import { getScrollVelocity } from './getScrollVelocity.ts';
+import { findContainerId, isFunction } from './helpers.ts';
+
+const DEFAULT_AVERAGE_ITEM_SIZE_TYPE = 'default';
+
+function getAverageItemSizes(
+	state: StateContext['state'],
+): Record<string, LegendListAverageItemSize> {
+	const averageItemSizes: Record<string, LegendListAverageItemSize> = {};
+
+	for (const itemType in state.averageSizes) {
+		const averageSize = state.averageSizes[itemType];
+		if (averageSize) {
+			averageItemSizes[itemType || DEFAULT_AVERAGE_ITEM_SIZE_TYPE] = {
+				average: averageSize.avg,
+				count: averageSize.num,
+			};
+		}
+	}
+
+	return averageItemSizes;
+}
+
+function triggerMountedContainerLayouts(ctx: StateContext) {
+	if (IsNewArchitecture) {
+		scheduleContainerLayout(ctx);
+	} else {
+		for (const triggerLayout of ctx.containerLayoutTriggers.values()) {
+			triggerLayout();
+		}
+	}
+}
+
+export function createImperativeHandle(
+	ctx: StateContext,
+	scheduleImperativeScrollCommit?: () => void,
+): LegendListRef {
+	const state = ctx.state;
+	const IMPERATIVE_SCROLL_SETTLE_MAX_WAIT_MS = 800;
+	const IMPERATIVE_SCROLL_SETTLE_STABLE_FRAMES = 2;
+	let imperativeScrollToken = 0;
+
+	const isSettlingAfterDataChange = () =>
+		!!state.didDataChange ||
+		!!state.didColumnsChange ||
+		state.scheduledWork.has('mvcpRecalculate') ||
+		state.ignoreScrollFromMVCP !== undefined;
+
+	const isScrollToIndexReady = (targetIndex: number, allowEmpty = false) => {
+		const props = state.props;
+		const dataLength = props.data.length;
+		const anchorIndex = props.anchoredEndSpace?.anchorIndex;
+
+		if (targetIndex < 0) {
+			return allowEmpty;
+		}
+		if (targetIndex >= dataLength) {
+			return false;
+		}
+		if (
+			anchorIndex === undefined ||
+			anchorIndex < 0 ||
+			anchorIndex >= dataLength ||
+			targetIndex < anchorIndex
+		) {
+			return true;
+		}
+
+		return areKnownOrFixedItemSizesAvailable(ctx, anchorIndex, dataLength - 1);
+	};
+
+	const runWhenReady = (token: number, run: () => void, isReady: () => boolean) => {
+		const startedAt = Date.now();
+		let stableFrames = 0;
+
+		const check = () => {
+			if (token !== imperativeScrollToken) {
+				return;
+			}
+
+			if (isSettlingAfterDataChange() || !isReady()) {
+				stableFrames = 0;
+			} else {
+				stableFrames += 1;
+			}
+
+			const timedOut = Date.now() - startedAt >= IMPERATIVE_SCROLL_SETTLE_MAX_WAIT_MS;
+			if (stableFrames >= IMPERATIVE_SCROLL_SETTLE_STABLE_FRAMES || timedOut) {
+				run();
+				return;
+			}
+
+			state.scheduledWork.frame(check, 'imperativeScrollReady');
+		};
+
+		state.scheduledWork.frame(check, 'imperativeScrollReady');
+	};
+
+	const runScrollRequest = (
+		token: number,
+		resolve: () => void,
+		run: () => boolean,
+		isReady = () => true,
+	) => {
+		const runNow = () => {
+			if (token !== imperativeScrollToken) {
+				return;
+			}
+
+			const didStartScroll = run();
+			if (!didStartScroll || !state.scrollingTo) {
+				if (state.pendingScrollResolve === resolve) {
+					state.pendingScrollResolve = undefined;
+				}
+				resolve();
+			}
+		};
+
+		if (isSettlingAfterDataChange() || !isReady()) {
+			runWhenReady(token, runNow, isReady);
+		} else {
+			runNow();
+		}
+	};
+	const startImperativeScroll = (resolve: () => void) => {
+		// A new imperative scroll supersedes any previous unresolved one.
+		state.scheduledWork.cancel('imperativeScrollReady');
+		const token = ++imperativeScrollToken;
+
+		settlePendingImperativeScroll(state);
+		state.pendingScrollResolve = resolve;
+
+		return token;
+	};
+	const runScrollWithPromise = (run: () => boolean, isReady = () => true) =>
+		new Promise<void>((resolve) => {
+			const token = startImperativeScroll(resolve);
+
+			supersedeInitialScroll(ctx);
+			runScrollRequest(token, resolve, run, isReady);
+		});
+
+	state.runPendingScrollToEnd = () => {
+		const pendingScroll = state.pendingScrollToEnd;
+
+		if (pendingScroll) {
+			state.pendingScrollToEnd = undefined;
+
+			if (pendingScroll.token === imperativeScrollToken) {
+				runScrollRequest(
+					pendingScroll.token,
+					pendingScroll.resolve,
+					() => scrollToEnd(ctx, pendingScroll.options),
+					() => isScrollToIndexReady(state.props.data.length - 1, true),
+				);
+			}
+		}
+	};
+
+	const scrollIndexIntoView = (options: Parameters<LegendListRef['scrollIndexIntoView']>[0]) => {
+		if (state) {
+			const { index, ...rest } = options;
+			const { startNoBuffer, endNoBuffer } = state;
+			if (index < startNoBuffer || index > endNoBuffer) {
+				const viewPosition = index < startNoBuffer ? 0 : 1;
+				scrollToIndex(ctx, {
+					...rest,
+					index,
+					viewPosition,
+				});
+				return true;
+			}
+		}
+		return false;
+	};
+
+	const refScroller = state.refScroller;
+	const clearCaches = (options?: Parameters<LegendListRef['clearCaches']>[0]) => {
+		const mode = options?.mode ?? 'sizes';
+
+		state.sizes.clear();
+		state.sizesKnown.clear();
+		invalidateContainerFixedItemSizes(state);
+		for (const key in state.averageSizes) {
+			delete state.averageSizes[key];
+		}
+		state.minIndexSizeChanged = 0;
+		state.scrollForNextCalculateItemsInView = undefined;
+
+		state.pendingTotalSize = undefined;
+		state.totalSize = 0;
+		set$(ctx, 'totalSize', 0);
+
+		if (mode === 'full') {
+			state.indexByKey.clear();
+			state.idCache.length = 0;
+			state.positions.length = 0;
+			state.columns.length = 0;
+			state.columnSpans.length = 0;
+		}
+
+		triggerMountedContainerLayouts(ctx);
+		state.triggerCalculateItemsInView?.({ forceFullItemPositions: true });
+	};
+
+	return {
+		clearCaches,
+		flashScrollIndicators: () => refScroller.current!.flashScrollIndicators(),
+		getAnimatableRef: () => refScroller.current!.getNativeScrollRef?.() ?? refScroller.current!,
+		getNativeScrollRef: () => refScroller.current!,
+		getScrollableNode: () => refScroller.current!.getScrollableNode(),
+		getScrollResponder: () => refScroller.current!.getScrollResponder(),
+		getState: () => ({
+			activeStickyIndex: peek$(ctx, 'activeStickyIndex'),
+			contentLength: getContentSize(ctx),
+			data: state.props.data,
+			elementAtIndex: (index: number) =>
+				ctx.viewRefs.get(findContainerId(ctx, getId(state, index)))?.current,
+			end: state.endNoBuffer,
+			endBuffered: state.endBuffered,
+			getAverageItemSizes: () => getAverageItemSizes(state),
+			indexByKey: (key: string) => state.indexByKey.get(key),
+			isAtEnd: peek$(ctx, 'isAtEnd'),
+			isAtStart: peek$(ctx, 'isAtStart'),
+			isEndReached: state.isEndReached!,
+			isNearEnd: peek$(ctx, 'isNearEnd'),
+			isNearStart: peek$(ctx, 'isNearStart'),
+			isStartReached: state.isStartReached!,
+			isWithinMaintainScrollAtEndThreshold: peek$(ctx, 'isWithinMaintainScrollAtEndThreshold'),
+			listen: <T extends LegendListListenerType>(
+				signalName: T,
+				cb: (value: ListenerTypeValueMap[T]) => void,
+			) => listen$(ctx, signalName, cb),
+			listenToPosition: (key: string, cb: (value: number) => void) => listenPosition$(ctx, key, cb),
+			positionAtIndex: (index: number) => state.positions[index]!,
+			positionByKey: (key: string) => {
+				const index = state.indexByKey.get(key);
+				return index === undefined ? undefined : state.positions[index];
+			},
+			scroll: state.scroll,
+			scrollLength: state.scrollLength,
+			scrollVelocity: getScrollVelocity(state),
+			sizeAtIndex: (index: number) => state.sizesKnown.get(getId(state, index))!,
+			sizes: state.sizesKnown,
+			start: state.startNoBuffer,
+			startBuffered: state.startBuffered,
+		}),
+		reportContentInset: (inset) => {
+			const didChange = setContentInsetOverride(ctx, inset);
+			updateScroll(ctx, state.scroll, true, { markHasScrolled: false });
+			if (didChange) {
+				retargetActiveInitialScrollAtEnd(ctx);
+			}
+		},
+		scrollIndexIntoView: (options) => runScrollWithPromise(() => scrollIndexIntoView(options)),
+		scrollItemIntoView: ({ item, ...props }) =>
+			runScrollWithPromise(() => {
+				const data = state.props.data;
+				const index = data.indexOf(item);
+				if (index !== -1) {
+					scrollIndexIntoView({ index, ...props });
+					return true;
+				}
+				return false;
+			}),
+		scrollToEnd: (options) =>
+			new Promise<void>((resolve) => {
+				const token = startImperativeScroll(resolve);
+				state.pendingScrollToEnd = {
+					options,
+					resolve,
+					token,
+				};
+
+				scheduleImperativeScrollCommit?.();
+				supersedeInitialScroll(ctx);
+				if (!scheduleImperativeScrollCommit) {
+					state.runPendingScrollToEnd?.();
+				}
+			}),
+		scrollToIndex: (params) => {
+			return runScrollWithPromise(
+				() => {
+					scrollToIndex(ctx, params);
+					return true;
+				},
+				params.index >= 0 ? () => isScrollToIndexReady(params.index) : undefined,
+			);
+		},
+		scrollToItem: ({ item, ...props }) =>
+			runScrollWithPromise(() => {
+				const data = state.props.data;
+				const index = data.indexOf(item);
+				if (index !== -1) {
+					scrollToIndex(ctx, { index, ...props });
+					return true;
+				}
+				return false;
+			}),
+		scrollToOffset: (params) =>
+			runScrollWithPromise(() => {
+				scrollTo(ctx, params);
+				return true;
+			}),
+		setItemSize: (itemKey, size) => {
+			updateItemSizes(ctx, { itemKey, size });
+		},
+		setScrollProcessingEnabled: (enabled: boolean) => {
+			state.scrollProcessingEnabled = enabled;
+		},
+		setVisibleContentAnchorOffset: (value: number | ((val: number) => number)) => {
+			const val = isFunction(value) ? value(peek$(ctx, 'scrollAdjustUserOffset') || 0) : value;
+			set$(ctx, 'scrollAdjustUserOffset', val);
+		},
+	};
+}

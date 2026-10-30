@@ -1295,6 +1295,19 @@
   },
   {
     "kind": "library-binding",
+    "id": "binding-legendapp-list",
+    "title": "Legend List",
+    "packageName": "@octanejs/legendapp-list",
+    "upstreamPackage": "@legendapp/list",
+    "category": "Tables",
+    "categoryId": "tables",
+    "description": "Use @legendapp/list with Octane.",
+    "searchTerms": ["@legendapp/list", "LegendList"],
+    "tags": ["virtualization", "lists", "chat", "performance"],
+    "order": 100
+  },
+  {
+    "kind": "library-binding",
     "id": "binding-window",
     "title": "React Window",
     "packageName": "@octanejs/window",
@@ -1304,7 +1317,7 @@
     "description": "Use react-window with Octane.",
     "searchTerms": [],
     "tags": ["virtualization", "lists", "performance"],
-    "order": 100
+    "order": 101
   },
   {
     "kind": "library-binding",
@@ -1317,7 +1330,7 @@
     "description": "Use @tanstack/react-virtual with Octane.",
     "searchTerms": [],
     "tags": ["virtualization", "lists", "performance"],
-    "order": 101
+    "order": 102
   },
   {
     "kind": "library-binding",
@@ -1330,7 +1343,7 @@
     "description": "Use @xyflow/react with Octane.",
     "searchTerms": ["React Flow", "xy flow"],
     "tags": ["diagrams", "nodes", "graphs"],
-    "order": 102
+    "order": 103
   },
   {
     "kind": "library-binding",
@@ -1343,7 +1356,7 @@
     "description": "Use @vis.gl/react-mapbox with Octane.",
     "searchTerms": ["Mapbox", "MapLibre"],
     "tags": ["maps", "geospatial"],
-    "order": 103
+    "order": 104
   },
   {
     "kind": "library-binding",
@@ -1356,7 +1369,7 @@
     "description": "Use recharts with Octane.",
     "searchTerms": [],
     "tags": ["charts", "data visualization"],
-    "order": 104
+    "order": 105
   },
   {
     "kind": "library-binding",
@@ -1369,7 +1382,7 @@
     "description": "Use @visx/visx with Octane.",
     "searchTerms": [],
     "tags": ["charts", "data visualization"],
-    "order": 105
+    "order": 106
   },
   {
     "kind": "library-binding",
@@ -1382,7 +1395,7 @@
     "description": "Use @react-three/drei with Octane.",
     "searchTerms": [],
     "tags": ["three.js", "3d", "helpers"],
-    "order": 106
+    "order": 107
   },
   {
     "kind": "library-binding",
@@ -1395,7 +1408,7 @@
     "description": "Use @react-three/fiber with Octane.",
     "searchTerms": ["R3F", "React Three Fiber"],
     "tags": ["three.js", "3d", "webgl"],
-    "order": 107
+    "order": 108
   },
   {
     "kind": "library-binding",
@@ -1408,7 +1421,7 @@
     "description": "Use ink with Octane.",
     "searchTerms": [],
     "tags": ["terminal", "cli", "universal renderer"],
-    "order": 108
+    "order": 109
   },
   {
     "kind": "library-binding",
@@ -1421,7 +1434,7 @@
     "description": "Use @opentui/react with Octane.",
     "searchTerms": ["Open TUI"],
     "tags": ["terminal", "cli", "universal renderer"],
-    "order": 109
+    "order": 110
   },
   {
     "kind": "library-binding",
@@ -1434,7 +1447,7 @@
     "description": "Use electron with Octane.",
     "searchTerms": [],
     "tags": ["desktop", "native apps"],
-    "order": 110
+    "order": 111
   },
   {
     "kind": "library-binding",
@@ -1447,7 +1460,7 @@
     "description": "Use @tauri-apps/api with Octane.",
     "searchTerms": [],
     "tags": ["desktop", "native apps"],
-    "order": 111
+    "order": 112
   },
   {
     "kind": "library-binding",
@@ -1460,7 +1473,7 @@
     "description": "Use next-themes with Octane.",
     "searchTerms": [],
     "tags": ["themes", "dark mode", "styling"],
-    "order": 112
+    "order": 113
   },
   {
     "kind": "library-binding",
@@ -1473,7 +1486,7 @@
     "description": "Use styled-components with Octane.",
     "searchTerms": [],
     "tags": ["css", "css in js"],
-    "order": 113
+    "order": 114
   },
   {
     "kind": "library-binding",
@@ -1486,7 +1499,7 @@
     "description": "Use @stylexjs/stylex with Octane.",
     "searchTerms": ["Style X"],
     "tags": ["css", "css in js"],
-    "order": 114
+    "order": 115
   },
   {
     "kind": "library-binding",
@@ -1499,7 +1512,7 @@
     "description": "Use @testing-library/react with Octane.",
     "searchTerms": ["React Testing Library"],
     "tags": ["testing", "components", "dom"],
-    "order": 115
+    "order": 116
   },
   {
     "kind": "library-binding",
@@ -1512,7 +1525,7 @@
     "description": "Use octane with Octane.",
     "searchTerms": [],
     "tags": ["devtools", "debugging"],
-    "order": 116
+    "order": 117
   },
   {
     "kind": "library-binding",
@@ -1525,7 +1538,7 @@
     "description": "Use react-is with Octane.",
     "searchTerms": ["react-is", "React Is"],
     "tags": ["elements", "introspection", "compatibility"],
-    "order": 117
+    "order": 118
   },
   {
     "kind": "library-binding",
@@ -1538,7 +1551,7 @@
     "description": "Use @tanstack/react-devtools with Octane.",
     "searchTerms": [],
     "tags": ["devtools", "debugging"],
-    "order": 118
+    "order": 119
   },
   {
     "kind": "library-binding",
@@ -1551,6 +1564,6 @@
     "description": "Use @tanstack/react-query-devtools with Octane.",
     "searchTerms": ["react-query-devtools", "React Query Devtools"],
     "tags": ["devtools", "debugging", "data"],
-    "order": 119
+    "order": 120
   }
 ]

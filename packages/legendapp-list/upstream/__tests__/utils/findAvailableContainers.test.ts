@@ -1,0 +1,570 @@
+import { beforeEach, describe, expect, it } from "bun:test";
+import "../setup"; // Import global test setup
+
+import type { StateContext } from "../../src/state/state";
+import type { InternalState } from "../../src/types.internal";
+import { findAvailableContainers } from "../../src/utils/findAvailableContainers";
+import { createMockContext } from "../__mocks__/createMockContext";
+
+describe("findAvailableContainers", () => {
+    let mockState: InternalState;
+    let ctx: StateContext;
+
+    const neededItems = (count: number) => Array.from({ length: count }, (_, index) => index);
+    const containerIndices = (allocations: ReturnType<typeof findAvailableContainers>) =>
+        allocations.map((allocation) => allocation.containerIndex);
+    const setContainerItemType = (containerIndex: number, itemType: string) => {
+        mockState.containerItemMetadata.set(containerIndex, {
+            dataChangeEpoch: 0,
+            getFixedItemSize: undefined,
+            getItemType: undefined,
+            itemData: undefined,
+            itemIndex: -1,
+            itemType,
+        });
+    };
+
+    beforeEach(() => {
+        ctx = createMockContext();
+        mockState = {
+            containerItemMetadata: new Map(),
+            indexByKey: new Map(),
+            props: {
+                stickyHeaderIndicesSet: new Set(),
+            },
+            stickyContainerPool: new Set(),
+        } as unknown as InternalState;
+        ctx.state = mockState;
+    });
+
+    describe("when there are unallocated containers", () => {
+        it("should return unallocated containers first", () => {
+            // Setup container data via context
+            ctx.values.set("numContainers", 5);
+            ctx.values.set("containerItemKey0", undefined);
+            ctx.values.set("containerItemKey1", undefined);
+            ctx.values.set("containerItemKey2", undefined);
+            ctx.values.set("containerItemKey3", "item3");
+            ctx.values.set("containerItemKey4", "item4");
+
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(2), 0, 10, []));
+
+            expect(result).toEqual([0, 1]);
+        });
+
+        it("should use pending removal containers as unallocated", () => {
+            ctx.values.set("numContainers", 3);
+            ctx.values.set("containerItemKey0", "item0");
+            ctx.values.set("containerItemKey1", "item1");
+            ctx.values.set("containerItemKey2", "item2");
+
+            const pendingRemoval = [1];
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(1), 0, 10, pendingRemoval));
+
+            expect(result).toEqual([1]);
+            expect(pendingRemoval).toEqual([]); // Should be modified in place
+        });
+
+        it("should leave unused pending removals untouched", () => {
+            ctx.values.set("numContainers", 3);
+            ctx.values.set("containerItemKey0", "item0");
+            ctx.values.set("containerItemKey1", "item1");
+            ctx.values.set("containerItemKey2", "item2");
+
+            const pendingRemoval = [1, 2];
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(1), 0, 10, pendingRemoval));
+
+            expect(result).toEqual([1]);
+            expect(pendingRemoval).toEqual([2]);
+        });
+
+        it("does not reuse a selected pending-removal container again as out of view", () => {
+            ctx.values.set("numContainers", 2);
+            ctx.values.set("numContainersPooled", 5);
+            ctx.values.set("containerItemKey0", "item0");
+            ctx.values.set("containerItemKey1", "item1");
+
+            mockState.indexByKey.set("item0", 0);
+            mockState.indexByKey.set("item1", 15);
+
+            const pendingRemoval = [0];
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(2), 10, 20, pendingRemoval));
+
+            expect(result).toEqual([0, 2]);
+            expect(pendingRemoval).toEqual([]);
+        });
+    });
+
+    describe("when containers are out of view", () => {
+        it("should return containers that are before the buffered range", () => {
+            ctx.values.set("numContainers", 3);
+            ctx.values.set("containerItemKey0", "item0");
+            ctx.values.set("containerItemKey1", "item1");
+            ctx.values.set("containerItemKey2", "item15");
+
+            mockState.indexByKey.set("item0", 0);
+            mockState.indexByKey.set("item1", 1);
+            mockState.indexByKey.set("item15", 15);
+
+            // Buffered range is 5-10, so items 0 and 1 are out of view (before), item15 is out of view (after)
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(2), 5, 10, []));
+
+            // Should return containers 0 and 2 (items furthest from buffered range)
+            expect(result.sort()).toEqual([0, 2]);
+        });
+
+        it("should prioritize containers furthest from the buffered range", () => {
+            ctx.values.set("numContainers", 4);
+            ctx.values.set("containerItemKey0", "item0"); // distance: 5
+            ctx.values.set("containerItemKey1", "item1"); // distance: 4
+            ctx.values.set("containerItemKey2", "item15"); // distance: 5
+            ctx.values.set("containerItemKey3", "item20"); // distance: 10
+
+            mockState.indexByKey.set("item0", 0);
+            mockState.indexByKey.set("item1", 1);
+            mockState.indexByKey.set("item15", 15);
+            mockState.indexByKey.set("item20", 20);
+
+            // Buffered range is 5-10, need only 2 containers
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(2), 5, 10, []));
+
+            // Should return containers with furthest distances (item20: distance 10, then item0 or item15: distance 5)
+            expect(result.length).toBe(2);
+            expect(result).toContain(3); // item20 (distance 10)
+        });
+
+        it("should not reuse protected out-of-view containers", () => {
+            ctx.values.set("numContainers", 3);
+            ctx.values.set("numContainersPooled", 5);
+            ctx.values.set("containerItemKey0", "item0");
+            ctx.values.set("containerItemKey1", "item1");
+            ctx.values.set("containerItemKey2", "item20");
+
+            mockState.indexByKey.set("item0", 0);
+            mockState.indexByKey.set("item1", 1);
+            mockState.indexByKey.set("item20", 20);
+
+            const result = findAvailableContainers(
+                ctx,
+                neededItems(2),
+                5,
+                10,
+                [],
+                undefined,
+                new Set(["item0", "item1"]),
+            );
+            const resultIndices = containerIndices(result);
+
+            expect(resultIndices).not.toContain(0);
+            expect(resultIndices).not.toContain(1);
+            expect(resultIndices).toEqual([2, 3]);
+        });
+    });
+
+    describe("when creating new containers", () => {
+        it("should create new containers when needed", () => {
+            ctx.values.set("numContainers", 2);
+            ctx.values.set("numContainersPooled", 10); // Prevent warning in __DEV__
+            ctx.values.set("containerItemKey0", "item5");
+            ctx.values.set("containerItemKey1", "item6");
+
+            mockState.indexByKey.set("item5", 5);
+            mockState.indexByKey.set("item6", 6);
+
+            // Buffered range is 4-8, both items are in view, need 3 containers total
+            // Since no containers are available from existing pool, should create 3 new ones
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(3), 4, 8, []));
+
+            expect(result).toEqual([2, 3, 4]); // Creates new container indices 2, 3, 4
+        });
+
+        it("should not duplicate new container indices after allocating a new sticky container", () => {
+            ctx.values.set("numContainers", 2);
+            ctx.values.set("numContainersPooled", 10);
+            ctx.values.set("containerItemKey0", "item0");
+            ctx.values.set("containerItemKey1", "item1");
+
+            mockState.indexByKey.set("item0", 0);
+            mockState.indexByKey.set("item1", 1);
+            mockState.props.stickyHeaderIndicesSet = new Set([5]);
+
+            const result = containerIndices(findAvailableContainers(ctx, [5, 6, 7], 0, 10, []));
+
+            expect(result).toEqual([2, 3, 4]);
+            expect(new Set(result).size).toBe(result.length);
+            expect(mockState.stickyContainerPool.has(2)).toBe(true);
+        });
+
+        it("keeps sticky allocation paired with the sticky item type", () => {
+            ctx.values.set("numContainers", 2);
+            ctx.values.set("containerItemKey0", undefined);
+            ctx.values.set("containerItemKey1", undefined);
+
+            mockState.props.stickyHeaderIndicesSet = new Set([5]);
+            mockState.stickyContainerPool = new Set([0]);
+            setContainerItemType(0, "header");
+            setContainerItemType(1, "row");
+
+            const itemTypes = new Map([
+                [2, "row"],
+                [5, "header"],
+            ]);
+            const result = findAvailableContainers(ctx, [2, 5], 0, 10, [], (index) => itemTypes.get(index));
+
+            expect(result).toEqual([
+                { containerIndex: 1, itemIndex: 2, itemType: "row" },
+                { containerIndex: 0, itemIndex: 5, itemType: "header" },
+            ]);
+        });
+
+        it("creates a new sticky container when sticky pool types do not match", () => {
+            ctx.values.set("numContainers", 2);
+            ctx.values.set("numContainersPooled", 5);
+            ctx.values.set("containerItemKey0", undefined);
+            ctx.values.set("containerItemKey1", undefined);
+
+            mockState.props.stickyHeaderIndicesSet = new Set([5]);
+            mockState.stickyContainerPool = new Set([0]);
+            setContainerItemType(0, "section");
+            setContainerItemType(1, "row");
+
+            const result = findAvailableContainers(ctx, [5], 0, 10, [], () => "header");
+
+            expect(result).toEqual([{ containerIndex: 2, itemIndex: 5, itemType: "header" }]);
+            expect(mockState.stickyContainerPool.has(0)).toBe(true);
+            expect(mockState.stickyContainerPool.has(2)).toBe(true);
+        });
+
+        it("keeps allocation results in needed item order with mixed sticky items", () => {
+            ctx.values.set("numContainers", 3);
+            ctx.values.set("containerItemKey0", undefined);
+            ctx.values.set("containerItemKey1", undefined);
+            ctx.values.set("containerItemKey2", undefined);
+
+            mockState.props.stickyHeaderIndicesSet = new Set([5]);
+            mockState.stickyContainerPool = new Set([1]);
+
+            const result = findAvailableContainers(ctx, [2, 5, 6], 0, 10, []);
+
+            expect(result.map((allocation) => allocation.itemIndex)).toEqual([2, 5, 6]);
+            expect(result.map((allocation) => allocation.containerIndex)).toEqual([0, 1, 2]);
+        });
+
+        it("retypes an inactive container before using spare capacity", () => {
+            ctx.values.set("numContainers", 2);
+            ctx.values.set("numContainersPooled", 3);
+            ctx.values.set("containerItemKey0", "item0");
+            ctx.values.set("containerItemKey1", "item20");
+
+            mockState.indexByKey.set("item0", 0);
+            mockState.indexByKey.set("item20", 20);
+            setContainerItemType(0, "header");
+            setContainerItemType(1, "footer");
+
+            const result = findAvailableContainers(ctx, [10], 8, 12, [], () => "row");
+
+            expect(result).toEqual([{ containerIndex: 0, itemIndex: 10, itemType: "row" }]);
+        });
+
+        it("retypes the farthest inactive container", () => {
+            ctx.values.set("numContainers", 3);
+            ctx.values.set("containerItemKey0", "item0");
+            ctx.values.set("containerItemKey1", "item10");
+            ctx.values.set("containerItemKey2", "item20");
+
+            mockState.indexByKey.set("item0", 0);
+            mockState.indexByKey.set("item10", 10);
+            mockState.indexByKey.set("item20", 20);
+            setContainerItemType(0, "header");
+            setContainerItemType(1, "footer");
+            setContainerItemType(2, "footer");
+
+            const result = findAvailableContainers(ctx, [11], 8, 12, [], () => "row");
+
+            expect(result).toEqual([{ containerIndex: 0, itemIndex: 11, itemType: "row" }]);
+        });
+
+        it("retypes a pending-removal container before an assigned inactive container", () => {
+            ctx.values.set("numContainers", 2);
+            ctx.values.set("containerItemKey0", "item0");
+            ctx.values.set("containerItemKey1", "removed-item");
+
+            mockState.indexByKey.set("item0", 0);
+            mockState.indexByKey.set("removed-item", 10);
+            setContainerItemType(0, "header");
+            setContainerItemType(1, "footer");
+
+            const pendingRemoval = [1];
+            const result = findAvailableContainers(ctx, [11], 8, 12, pendingRemoval, () => "row");
+
+            expect(result).toEqual([{ containerIndex: 1, itemIndex: 11, itemType: "row" }]);
+            expect(pendingRemoval).toEqual([]);
+        });
+
+        it("does not retype active or protected containers", () => {
+            ctx.values.set("numContainers", 3);
+            ctx.values.set("containerItemKey0", "protected-item");
+            ctx.values.set("containerItemKey1", "active-item");
+            ctx.values.set("containerItemKey2", "item20");
+
+            mockState.indexByKey.set("protected-item", 0);
+            mockState.indexByKey.set("active-item", 10);
+            mockState.indexByKey.set("item20", 20);
+            setContainerItemType(0, "header");
+            setContainerItemType(1, "footer");
+            setContainerItemType(2, "footer");
+
+            const result = findAvailableContainers(ctx, [11], 8, 12, [], () => "row", new Set(["protected-item"]));
+
+            expect(result).toEqual([{ containerIndex: 2, itemIndex: 11, itemType: "row" }]);
+        });
+
+        it("grows when every existing container is active", () => {
+            ctx.values.set("numContainers", 2);
+            ctx.values.set("containerItemKey0", "item10");
+            ctx.values.set("containerItemKey1", "item11");
+
+            mockState.indexByKey.set("item10", 10);
+            mockState.indexByKey.set("item11", 11);
+            setContainerItemType(0, "header");
+            setContainerItemType(1, "footer");
+
+            const result = findAvailableContainers(ctx, [12], 8, 12, [], () => "row");
+
+            expect(result).toEqual([{ containerIndex: 2, itemIndex: 12, itemType: "row" }]);
+        });
+
+        it("reuses existing containers across sequential long-tail item types", () => {
+            ctx.values.set("numContainers", 3);
+
+            for (let containerIndex = 0; containerIndex < 3; containerIndex++) {
+                const key = `seed-${containerIndex}`;
+                ctx.values.set(`containerItemKey${containerIndex}`, key);
+                mockState.indexByKey.set(key, -10 + containerIndex);
+                setContainerItemType(containerIndex, `seed-type-${containerIndex}`);
+            }
+
+            for (let itemIndex = 0; itemIndex < 20; itemIndex++) {
+                const itemType = `type-${itemIndex}`;
+                const result = findAvailableContainers(ctx, [itemIndex], itemIndex, itemIndex, [], () => itemType);
+                const allocation = result[0];
+                const oldKey = ctx.values.get(`containerItemKey${allocation.containerIndex}`);
+                const nextKey = `item-${itemIndex}`;
+
+                expect(allocation.containerIndex).toBeLessThan(3);
+                mockState.indexByKey.delete(oldKey);
+                mockState.indexByKey.set(nextKey, itemIndex);
+                setContainerItemType(allocation.containerIndex, itemType);
+                ctx.values.set(`containerItemKey${allocation.containerIndex}`, nextKey);
+            }
+        });
+
+        it("does not retype a container needed by a later item in the same batch", () => {
+            ctx.values.set("numContainers", 2);
+            ctx.values.set("containerItemKey0", "footer-item");
+            ctx.values.set("containerItemKey1", "header-item");
+
+            mockState.indexByKey.set("footer-item", 0);
+            mockState.indexByKey.set("header-item", 20);
+            setContainerItemType(0, "footer");
+            setContainerItemType(1, "header");
+
+            const itemTypes = new Map([
+                [10, "row"],
+                [11, "footer"],
+            ]);
+            const result = findAvailableContainers(ctx, [10, 11], 8, 12, [], (index) => itemTypes.get(index));
+
+            expect(result).toEqual([
+                { containerIndex: 1, itemIndex: 10, itemType: "row" },
+                { containerIndex: 0, itemIndex: 11, itemType: "footer" },
+            ]);
+        });
+    });
+
+    describe("mixed scenarios", () => {
+        it("should combine unallocated, out-of-view, and new containers", () => {
+            ctx.values.set("numContainers", 3);
+            ctx.values.set("numContainersPooled", 10);
+            ctx.values.set("containerItemKey0", undefined); // unallocated
+            ctx.values.set("containerItemKey1", "item0"); // out of view (before)
+            ctx.values.set("containerItemKey2", "item15"); // out of view (after)
+
+            mockState.indexByKey.set("item0", 0);
+            mockState.indexByKey.set("item15", 15);
+
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(5), 5, 10, []));
+
+            // Should get: unallocated (0), out of view (1, 2), new containers (3, 4)
+            expect(result).toEqual([0, 1, 2, 3, 4]);
+        });
+
+        it("should create new containers instead of reusing assigned ones during recycled layout animation", () => {
+            ctx.values.set("numContainers", 3);
+            ctx.values.set("numContainersPooled", 10);
+            ctx.values.set("containerItemKey0", undefined); // unallocated
+            ctx.values.set("containerItemKey1", "item0"); // out of view (before)
+            ctx.values.set("containerItemKey2", "item15"); // out of view (after)
+
+            mockState.indexByKey.set("item0", 0);
+            mockState.indexByKey.set("item15", 15);
+            mockState.props.recycleItems = true;
+            mockState.props.positionComponentInternal = () => null;
+
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(3), 5, 10, []));
+
+            expect(result).toEqual([0, 3, 4]);
+        });
+    });
+
+    describe("edge cases", () => {
+        it("should handle empty container pool", () => {
+            ctx.values.set("numContainers", 0);
+            ctx.values.set("numContainersPooled", 10);
+
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(2), 0, 10, []));
+
+            expect(result).toEqual([0, 1]);
+        });
+
+        it("should handle zero containers needed", () => {
+            ctx.values.set("numContainers", 5);
+            ctx.values.set("containerItemKey0", undefined);
+
+            const result = containerIndices(findAvailableContainers(ctx, [], 0, 10, []));
+
+            // The real function doesn't allocate when numNeeded=0
+            expect(result).toEqual([]);
+        });
+
+        it("should handle invalid buffered range (start > end)", () => {
+            ctx.values.set("numContainers", 1);
+            ctx.values.set("containerItemKey0", "item5");
+
+            mockState.indexByKey.set("item5", 5);
+
+            // Invalid range: start > end
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(1), 10, 5, []));
+
+            // Should still work, treating all containers as out of view
+            expect(result).toEqual([0]);
+        });
+
+        it("should handle large numNeeded efficiently", () => {
+            ctx.values.set("numContainers", 2);
+            ctx.values.set("numContainersPooled", 2000);
+
+            const start = Date.now();
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(1000), 0, 10, []));
+            const duration = Date.now() - start;
+
+            // Should create many new containers efficiently
+            expect(result.length).toBe(1000);
+            expect(result[0]).toBe(0);
+            expect(result[1]).toBe(1);
+            expect(result[999]).toBe(999);
+            expect(duration).toBeLessThan(100); // Should complete quickly
+        });
+    });
+
+    describe("catastrophic failure scenarios", () => {
+        it("should handle inconsistent indexByKey data", () => {
+            ctx.values.set("numContainers", 2);
+            ctx.values.set("numContainersPooled", 10);
+            ctx.values.set("containerItemKey0", "item0");
+            ctx.values.set("containerItemKey1", "item1");
+
+            // indexByKey has keys that don't exist in containerData
+            mockState.indexByKey.set("item0", 15); // Put item0 out of view (beyond range 0-8)
+            mockState.indexByKey.set("nonexistent", 10);
+            // Missing item1 in indexByKey
+
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(2), 0, 8, []));
+
+            // Container 0 is now out of view, container 1 has no indexByKey entry so is skipped
+            // Function should return out of view container 0 + new container 2
+            expect(result.length).toBe(2);
+            expect(result).toEqual([0, 2]);
+        });
+
+        it("should handle corrupted pendingRemoval with duplicates", () => {
+            ctx.values.set("numContainers", 2);
+            ctx.values.set("containerItemKey0", "item0");
+            ctx.values.set("containerItemKey1", "item1");
+
+            const pendingRemoval = [0, 0, 1, 1, 0]; // duplicates
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(2), 0, 10, pendingRemoval));
+
+            expect(result).toEqual([0, 1]);
+            expect(pendingRemoval).toEqual([]);
+        });
+
+        it("should handle missing container keys gracefully", () => {
+            ctx.values.set("numContainers", 3);
+            // Don't set containerItemKey values - they'll be undefined
+
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(2), 0, 10, []));
+
+            // Should treat all as unallocated and return first 2
+            expect(result).toEqual([0, 1]);
+        });
+
+        it("should handle extreme distance values", () => {
+            ctx.values.set("numContainers", 1);
+            ctx.values.set("containerItemKey0", "item0");
+
+            mockState.indexByKey.set("item0", Number.MAX_SAFE_INTEGER);
+
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(1), 0, 10, []));
+
+            // Should handle extremely large distance without overflow
+            expect(result).toEqual([0]);
+        });
+    });
+
+    describe("performance benchmarks", () => {
+        it("should handle large container pools efficiently", () => {
+            const numContainers = 1000;
+            ctx.values.set("numContainers", numContainers);
+
+            // Make some containers allocated and out of view
+            for (let i = 0; i < 100; i++) {
+                ctx.values.set(`containerItemKey${i}`, `item${i}`);
+                mockState.indexByKey.set(`item${i}`, i + 1000); // Far out of view
+            }
+
+            const start = Date.now();
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(50), 0, 10, []));
+            const duration = Date.now() - start;
+
+            // Should return 50 indices, starting with unallocated containers
+            expect(result.length).toBe(50);
+            expect(result[0]).toBe(100); // First unallocated container
+            expect(result[49]).toBe(149);
+            expect(duration).toBeLessThan(50); // Should complete quickly
+        });
+
+        it("should prioritize by distance correctly with many containers", () => {
+            ctx.values.set("numContainers", 100);
+
+            // Create containers with varying distances
+            for (let i = 0; i < 100; i++) {
+                ctx.values.set(`containerItemKey${i}`, `item${i}`);
+                mockState.indexByKey.set(`item${i}`, i * 10); // Distances: 0, 10, 20, ...
+            }
+
+            const result = containerIndices(findAvailableContainers(ctx, neededItems(5), 500, 510, []));
+
+            // Should pick containers furthest from range 500-510
+            expect(result.length).toBe(5);
+            // The furthest containers should be at indices with largest distances
+            expect(
+                result.some((idx) => {
+                    const itemKey = ctx.values.get(`containerItemKey${idx}`);
+                    const itemIndex = mockState.indexByKey.get(itemKey!);
+                    return itemIndex! >= 900; // Very far from 500-510 range
+                }),
+            ).toBe(true);
+        });
+    });
+});

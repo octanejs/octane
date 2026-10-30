@@ -70,6 +70,7 @@ import {
 import { HMR } from './component-slots.js';
 import { NATIVE_REFLECT_APPLY } from './child-slots.js';
 import { JOURNAL_PROP } from './commit.js';
+import type { ReducerDispatch } from '../reducer-dispatch.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -771,7 +772,7 @@ interface ReducerSlot<S, A> extends QueuedCell {
 	getter: (() => S) | undefined;
 }
 
-type ReducerTuple<S, A> = [S, (action: A) => void, () => S];
+type ReducerTuple<S, A> = [S, ReducerDispatch<A>, () => S];
 
 export function useReducer<S, A, I = S>(
 	reducer: (s: S, a: A) => S,
@@ -865,7 +866,11 @@ export function __useReducerWithGetter<S, A, I = S>(
 ): ReducerTuple<S, A> {
 	const s = readReducerHook(reducer, initialArg, initOrSlot, slot);
 	const getter = (s.getter ??= () => latestHookValue(s, s.reducer));
-	return [s.queue === null ? s.value : foldHookQueue(s, reducer), s.dispatch, getter];
+	return [
+		s.queue === null ? s.value : foldHookQueue(s, reducer),
+		s.dispatch as ReducerDispatch<A>,
+		getter,
+	];
 }
 
 export function depsChanged(

@@ -29,6 +29,10 @@ test('conventional test discovery excludes fixture modules beside runnable suite
 	assert.equal(conventionalTestPath('test/dnd/example.test.js', { runner: 'jest' }), true);
 	assert.equal(conventionalTestPath('__tests__/example.js', { runner: 'jest' }), true);
 	assert.equal(conventionalTestPath('test/types.ts', { runner: 'vitest' }), false);
+	assert.equal(conventionalTestPath('__tests__/__mocks__/state.ts', { runner: 'bun' }), false);
+	assert.equal(conventionalTestPath('__tests__/hooks/a.web.cases.ts', { runner: 'bun' }), false);
+	assert.equal(conventionalTestPath('__tests__/core/scroll.test.ts', { runner: 'bun' }), true);
+	assert.equal(conventionalTestPath('src/scroll_spec.tsx', { runner: 'bun' }), true);
 });
 
 const MIT_TEXT = `MIT License

@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "project": "legendapp-list-pristine",
+  "vitestConfig": "tests/upstream-vitest.config.ts",
+  "rootEnvVar": "LEGENDAPP_LIST_PRISTINE_ROOT",
+  "copy": ["src", "__tests__"]
+}
