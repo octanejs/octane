@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/legendapp-list-3.3.5.tgz",
+      "sha256": "786c21d10d1a62deeb23ed19139daa8a2c8727158f01741a5f845609f68d6b20"
+    },
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "35ca3e7ed51c8e7533b15b774e40458262a2ead0b7cc5682af41323dcdb8d0ef"
+    }
+  ],
+  "requiredFiles": ["audit/upstream.lock.json"],
+  "filesEqual": [
+    {
+      "path": "LICENSE.upstream",
+      "equalsPath": "upstream/LICENSE"
+    }
+  ],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "@legendapp/list",
+    "version": "3.3.5",
+    "license": "MIT"
+  },
+  "unpublishedDirs": ["audit", "scripts", "tests", "upstream", "upstream-artifact"]
+}

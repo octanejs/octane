@@ -762,6 +762,8 @@ export function conventionalTestPath(relativePath, { runner } = {}) {
 	) {
 		return false;
 	}
+	// bun test selects only named files: *.test, *_test, *.spec and *_spec.
+	if (runner === 'bun') return /[._](?:test|spec)\.[cm]?[jt]sx?$/.test(baseName);
 	if (runner === 'vitest' || runner === 'jest') {
 		return (
 			/(?:^|[.-])(?:test|spec|test-d|d-test)\.[cm]?[jt]sx?$/.test(baseName) ||
@@ -832,8 +834,15 @@ function normalizeConfigurationPattern(value) {
 }
 
 function commandPathPatterns(testScripts) {
+	// `bun run <file>` executes a script and `open <file>` views a report; neither
+	// selects test files.
 	return Object.values(testScripts).flatMap((command) =>
-		String(command).split(/\s+/).map(normalizeConfigurationPattern).filter(Boolean),
+		String(command)
+			.split(/&&|\|\||[;|]/)
+			.filter((segment) => !/^\s*(?:bun\s+run|open)\s/.test(segment))
+			.flatMap((segment) => segment.split(/\s+/))
+			.map(normalizeConfigurationPattern)
+			.filter(Boolean),
 	);
 }
 
@@ -1058,11 +1067,17 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 	const configuredTestPatterns = [...configurationPatterns];
 	const configuredInlineSourcePatterns = [...inlineSourcePatterns];
 	const configurationEntryPaths = new Set(configurationEntries.map((entry) => entry.path));
-	const runner = ['vitest', 'jest'].find(
-		(name) =>
-			Object.values(testScripts).some((command) => new RegExp(`\\b${name}\\b`).test(command)) ||
-			configurationEntries.some((entry) => path.posix.basename(entry.path).startsWith(`${name}.`)),
-	);
+	// A test script that runs `bun test` names the runner, even beside an unused
+	// jest.config: its discovery decides which files hold registrations.
+	const runner = Object.values(testScripts).some((command) => /\bbun\s+test\b/.test(command))
+		? 'bun'
+		: ['vitest', 'jest'].find(
+				(name) =>
+					Object.values(testScripts).some((command) => new RegExp(`\\b${name}\\b`).test(command)) ||
+					configurationEntries.some((entry) =>
+						path.posix.basename(entry.path).startsWith(`${name}.`),
+					),
+			);
 	const candidateEntries = tree.flatMap((entry) => {
 		if (!isGitHubRegularBlob(entry) || !entry.path.startsWith(scopePrefix)) return [];
 		if (configurationEntryPaths.has(entry.path)) return [];

@@ -1,0 +1,71 @@
+import { IsNewArchitecture } from '../constants-platform.ts';
+import { doScrollTo } from '../core/doScrollTo.ts';
+import { Platform } from '../platform/Platform.ts';
+import { peek$, type StateContext } from '../state/state.ts';
+
+export function requestAdjust(ctx: StateContext, positionDiff: number, dataChanged?: boolean) {
+	const state = ctx.state;
+	if (Math.abs(positionDiff) > 0.1) {
+		const needsScrollWorkaround =
+			Platform.OS === 'android' &&
+			!IsNewArchitecture &&
+			dataChanged &&
+			state.scroll <= positionDiff;
+
+		const doit = () => {
+			if (needsScrollWorkaround) {
+				doScrollTo(ctx, { horizontal: state.props.horizontal, offset: state.scroll });
+			} else {
+				state.scrollAdjustHandler.requestAdjust(positionDiff);
+
+				if (state.adjustingFromInitialMount) {
+					state.adjustingFromInitialMount--;
+				}
+			}
+		};
+		state.scroll += positionDiff;
+		state.scrollForNextCalculateItemsInView = undefined;
+
+		const readyToRender = peek$(ctx, 'readyToRender');
+
+		if (readyToRender) {
+			doit();
+
+			if (Platform.OS !== 'web') {
+				// Calculate a threshold to ignore scroll jumps for a short period of time
+				// This is to avoid the case where a scroll event comes in that was relevant from before
+				// the requestAdjust. So we ignore scroll events that are closer to the previous
+				// scroll position than the target position.
+				const threshold = state.scroll - positionDiff / 2;
+				if (!state.ignoreScrollFromMVCP) {
+					state.ignoreScrollFromMVCP = {};
+				}
+				if (positionDiff > 0) {
+					state.ignoreScrollFromMVCP.lt = threshold;
+				} else {
+					state.ignoreScrollFromMVCP.gt = threshold;
+				}
+
+				const delay = needsScrollWorkaround ? 250 : 100;
+				state.scheduledWork.timeout(
+					() => {
+						state.ignoreScrollFromMVCP = undefined;
+						const shouldForceUpdate =
+							state.ignoreScrollFromMVCPIgnored && state.scrollProcessingEnabled !== false;
+
+						if (shouldForceUpdate) {
+							state.ignoreScrollFromMVCPIgnored = false;
+							state.scrollPending = state.scroll;
+							state.reprocessCurrentScroll?.();
+						}
+					},
+					delay,
+					'ignoreScrollFromMVCP',
+				);
+			}
+		} else {
+			state.adjustingFromInitialMount = (state.adjustingFromInitialMount || 0) + 1;
+			requestAnimationFrame(doit);
+		}
+	}
+}
