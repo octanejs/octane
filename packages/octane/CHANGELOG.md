@@ -1,5 +1,13 @@
 # octane
 
+## 0.16.5
+
+### Patch Changes
+
+- 999a5dd: Report unsupported directive-arm returns at their authored locations in Valdi
+  editor diagnostics, and preserve unsupported arm exits in native type inspection.
+  DOM arm-exit type checking and emitted runtime behavior remain unchanged.
+
 ## 0.16.4
 
 ### Patch Changes
