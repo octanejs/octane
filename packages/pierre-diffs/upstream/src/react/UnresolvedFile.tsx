@@ -1,0 +1,123 @@
+'use client';
+
+import type { ReactNode } from 'react';
+
+import type { UnresolvedFile as UnresolvedFileClass } from '../components/UnresolvedFile';
+import { DIFFS_TAG_NAME } from '../constants';
+import type { UnresolvedFileHunksRendererOptions } from '../renderers/UnresolvedFileHunksRenderer';
+import type {
+  FileContents,
+  HunkSeparators,
+  MergeConflictResolution,
+  PostRenderPhase,
+} from '../types';
+import { type MergeConflictDiffAction } from '../utils/parseMergeConflictDiffFromFile';
+import type { FileDiffProps } from './FileDiff';
+import type { FileDiffOptions } from './types';
+import { renderDiffChildren } from './utils/renderDiffChildren';
+import { templateRender } from './utils/templateRender';
+import { useUnresolvedFileInstance } from './utils/useUnresolvedFileInstance';
+
+export interface RenderMergeConflictActionContext {
+  resolveConflict(resolution: MergeConflictResolution): void;
+}
+
+export type RenderMergeConflictActions = (
+  action: MergeConflictDiffAction,
+  context: RenderMergeConflictActionContext
+) => ReactNode;
+
+export type MergeConflictActionsTypeOption =
+  | 'none'
+  | 'default'
+  | RenderMergeConflictActions;
+
+export interface UnresolvedFileReactOptions<LAnnotation>
+  extends
+    Omit<
+      FileDiffOptions<LAnnotation, undefined>,
+      'hunkSeparators' | 'diffStyle' | 'onMergeConflictAction' | 'onPostRender'
+    >,
+    UnresolvedFileHunksRendererOptions {
+  hunkSeparators?: HunkSeparators;
+  onPostRender?(
+    node: HTMLElement,
+    instance: UnresolvedFileClass<LAnnotation>,
+    phase: PostRenderPhase
+  ): unknown;
+  maxContextLines?: number;
+}
+
+export interface UnresolvedFileProps<LAnnotation> extends Omit<
+  FileDiffProps<LAnnotation, undefined>,
+  | 'fileDiff'
+  | 'options'
+  | 'edit'
+  | 'editorOptions'
+  | 'onEditChange'
+  | 'onEditComplete'
+> {
+  file: FileContents;
+  options?: UnresolvedFileReactOptions<LAnnotation>;
+  renderMergeConflictUtility?(
+    action: MergeConflictDiffAction,
+    getInstance: () => UnresolvedFileClass<LAnnotation> | undefined
+  ): ReactNode;
+  disableWorkerPool?: boolean;
+}
+
+export function UnresolvedFile<LAnnotation = undefined>({
+  file,
+  options,
+  lineAnnotations,
+  selectedLines,
+  className,
+  style,
+  prerenderedHTML,
+  renderAnnotation,
+  renderCustomHeader,
+  renderHeaderPrefix,
+  renderHeaderFilenameSuffix,
+  renderHeaderMetadata,
+  renderGutterUtility,
+  renderMergeConflictUtility,
+  disableWorkerPool = false,
+}: UnresolvedFileProps<LAnnotation>): React.JSX.Element {
+  const {
+    ref,
+    getHoveredLine,
+    fileDiff,
+    actions,
+    getInstance,
+    lineAnnotations: renderedAnnotations,
+  } = useUnresolvedFileInstance({
+    file,
+    options,
+    lineAnnotations,
+    selectedLines,
+    prerenderedHTML,
+    hasConflictUtility: renderMergeConflictUtility != null,
+    hasGutterRenderUtility: renderGutterUtility != null,
+    hasCustomHeader: renderCustomHeader != null,
+    disableWorkerPool,
+  });
+  const children = renderDiffChildren({
+    fileDiff,
+    renderCustomHeader,
+    renderHeaderPrefix,
+    renderHeaderFilenameSuffix,
+    renderHeaderMetadata,
+    renderAnnotation,
+    renderGutterUtility,
+    lineAnnotations: renderedAnnotations,
+    getHoveredLine,
+    actions,
+    renderMergeConflictUtility,
+    getInstance,
+  });
+  return (
+    <DIFFS_TAG_NAME ref={ref} className={className} style={style}>
+      {templateRender(children, prerenderedHTML)}
+    </DIFFS_TAG_NAME>
+  );
+}

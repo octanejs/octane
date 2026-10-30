@@ -1,4 +1,4 @@
-import { useState, createPortal, createContext, use, memo } from 'octane';
+import { useState, useMemo, createPortal, createContext, use, memo } from 'octane';
 
 export function PortalCounter(props: { target: Element | DocumentFragment }) {
 	const [count, setCount] = useState(0);
@@ -137,5 +137,32 @@ export function ToggleApp(props) @{
 	<div class="root">
 		<button onClick={() => setOpen(!open)}>{'toggle'}</button>
 		{open ? createPortal(ModalBody, props.target, { label: 'toggle' }) : null}
+	</div>
+}
+
+// 9. A parent rebuilds its portal values whenever `count` changes; the portal's
+//    memo()'d child gets an equal props object each time, so it skips its body as
+//    React.memo does.
+export const memoPortalChildRenders: string[] = [];
+const MemoPortalChild = memo(function MemoPortalChild(props: { label: string }) @{
+	memoPortalChildRenders.push(props.label);
+	<span class="memo-child">{props.label}</span>
+});
+
+export function MemoPortalChildApp(props: { target: Element; portalKey?: string }) @{
+	const [count, setCount] = useState(0);
+	const [label, setLabel] = useState('a');
+	const portals = useMemo(
+		() => [createPortal(<MemoPortalChild label={label} />, props.target, props.portalKey)],
+		[count, label, props.target, props.portalKey],
+	);
+	<div class="root">
+		<button class="b-bump" onClick={() => setCount(count + 1)}>
+			{String(count)}
+		</button>
+		<button class="b-relabel" onClick={() => setLabel(label + '!')}>
+			{'relabel'}
+		</button>
+		{portals}
 	</div>
 }

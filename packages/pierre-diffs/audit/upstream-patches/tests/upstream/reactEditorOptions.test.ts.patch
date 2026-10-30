@@ -1,0 +1,73 @@
+diff --git a/tests/upstream/reactEditorOptions.test.ts b/tests/upstream/reactEditorOptions.test.ts
+--- a/tests/upstream/reactEditorOptions.test.ts
++++ b/tests/upstream/reactEditorOptions.test.ts
+@@ -179,10 +179,22 @@ async function unmountRoot(root: Root | undefined): Promise<void> {
+   });
+ }
+ 
++// OCTANE DIVERGENCE[uncaught-effect-error]: React's act() rethrows an
++// error that a layout effect or ref callback throws outside any error boundary.
++// Octane reports it to the root's onUncaughtError (console.error by default),
++// so a root that expects one records it there for captureRenderError.
++let lastUncaughtError: unknown;
++const recordUncaughtError = {
++  onUncaughtError(error: unknown): void {
++    lastUncaughtError = error;
++  },
++};
++
+ async function captureRenderError(
+   root: Root,
+   element: ReactElement
+ ): Promise<unknown> {
++  lastUncaughtError = undefined;
+   try {
+     await act(async () => {
+       root.render(element);
+@@ -191,7 +203,7 @@ async function captureRenderError(
+   } catch (error) {
+     return unwrapRenderError(error);
+   }
+-  return undefined;
++  return lastUncaughtError;
+ }
+ 
+ function unwrapRenderError(error: unknown): unknown {
+@@ -642,7 +654,7 @@ describe('React editor factory lifecycle', () => {
+       let root: Root | undefined;
+ 
+       try {
+-        root = createReactRoot(container);
++        root = createReactRoot(container, recordUncaughtError);
+         const renderError = await captureRenderError(
+           root,
+           createElement(
+@@ -1131,7 +1143,7 @@ describe('React editor factory lifecycle', () => {
+       let root: Root | undefined;
+ 
+       try {
+-        root = createReactRoot(container);
++        root = createReactRoot(container, recordUncaughtError);
+         const missingProviderError = await captureRenderError(
+           root,
+           createEditableSurfaceElement(surface)
+@@ -1166,7 +1178,7 @@ describe('React editor factory lifecycle', () => {
+     let root: Root | undefined;
+ 
+     try {
+-      root = createReactRoot(container);
++      root = createReactRoot(container, recordUncaughtError);
+       const error = await captureRenderError(
+         root,
+         createElement(ReactFileDiffComponent, {
+@@ -1354,7 +1366,9 @@ describe('React editor factory lifecycle', () => {
+       // StrictMode's simulated destroy/re-create pass gets fresh editors from
+       // the owner factory. The first pair is cleaned before the committed pair
+       // attaches, and the provider retains none of them.
+-      expect(editors).toHaveLength(4);
++      // OCTANE DIVERGENCE[strict-mode-replay]: Octane's StrictMode
++      // does not replay mounts, so only the committed pair is created.
++      expect(editors).toHaveLength(2);
+       expect(onAttach).toHaveBeenCalledTimes(2);
+       const attachedEditors = onAttach.mock.calls.map(
+         ([editor]) => editor as AnyTrackedEditor

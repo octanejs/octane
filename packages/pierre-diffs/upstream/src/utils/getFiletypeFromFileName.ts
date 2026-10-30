@@ -1,0 +1,459 @@
+import type { ExtensionFormatMap, SupportedLanguages } from '../types';
+
+const CUSTOM_EXTENSION_TO_FILE_FORMAT: Map<string, SupportedLanguages> =
+  new Map();
+
+let customExtensionsVersion = 0;
+
+export const EXTENSION_TO_FILE_FORMAT: ExtensionFormatMap = {
+  '1c': '1c',
+  abap: 'abap',
+  as: 'actionscript-3',
+  ada: 'ada',
+  adb: 'ada',
+  ads: 'ada',
+  adoc: 'asciidoc',
+  asciidoc: 'asciidoc',
+  'component.html': 'angular-html',
+  'component.ts': 'angular-ts',
+  conf: 'nginx',
+  htaccess: 'apache',
+  cls: 'tex',
+  trigger: 'apex',
+  apl: 'apl',
+  applescript: 'applescript',
+  scpt: 'applescript',
+  ara: 'ara',
+  asm: 'asm',
+  s: 'riscv',
+  astro: 'astro',
+  awk: 'awk',
+  bal: 'ballerina',
+  sh: 'zsh',
+  bash: 'zsh',
+  bat: 'cmd',
+  cmd: 'cmd',
+  be: 'berry',
+  beancount: 'beancount',
+  bib: 'bibtex',
+  bicep: 'bicep',
+  'blade.php': 'blade',
+  bsl: 'bsl',
+  c: 'c',
+  h: 'objective-cpp',
+  cs: 'csharp',
+  cpp: 'cpp',
+  hpp: 'cpp',
+  cc: 'cpp',
+  cxx: 'cpp',
+  hh: 'cpp',
+  cdc: 'cdc',
+  cairo: 'cairo',
+  clar: 'clarity',
+  clj: 'clojure',
+  cljs: 'clojure',
+  cljc: 'clojure',
+  soy: 'soy',
+  cmake: 'cmake',
+  'CMakeLists.txt': 'cmake',
+  cob: 'cobol',
+  cbl: 'cobol',
+  cobol: 'cobol',
+  CODEOWNERS: 'codeowners',
+  ql: 'ql',
+  coffee: 'coffeescript',
+  lisp: 'lisp',
+  cl: 'lisp',
+  lsp: 'lisp',
+  log: 'log',
+  v: 'verilog',
+  cql: 'cql',
+  cr: 'crystal',
+  css: 'css',
+  csv: 'csv',
+  cue: 'cue',
+  cypher: 'cypher',
+  cyp: 'cypher',
+  d: 'd',
+  dart: 'dart',
+  dax: 'dax',
+  desktop: 'desktop',
+  diff: 'diff',
+  patch: 'diff',
+  Dockerfile: 'dockerfile',
+  dockerfile: 'dockerfile',
+  env: 'dotenv',
+  dm: 'dream-maker',
+  edge: 'edge',
+  el: 'emacs-lisp',
+  ex: 'elixir',
+  exs: 'elixir',
+  elm: 'elm',
+  erb: 'erb',
+  erl: 'erlang',
+  hrl: 'erlang',
+  f: 'fortran-fixed-form',
+  for: 'fortran-fixed-form',
+  fs: 'fsharp',
+  fsi: 'fsharp',
+  fsx: 'fsharp',
+  f03: 'f03',
+  f08: 'f08',
+  f18: 'f18',
+  f77: 'f77',
+  f90: 'fortran-free-form',
+  f95: 'fortran-free-form',
+  fnl: 'fennel',
+  fish: 'fish',
+  ftl: 'ftl',
+  tres: 'gdresource',
+  res: 'gdresource',
+  gd: 'gdscript',
+  gdshader: 'gdshader',
+  gs: 'genie',
+  feature: 'gherkin',
+  COMMIT_EDITMSG: 'git-commit',
+  'git-rebase-todo': 'git-rebase',
+  gjs: 'glimmer-js',
+  gleam: 'gleam',
+  gts: 'glimmer-ts',
+  glsl: 'glsl',
+  vert: 'glsl',
+  frag: 'glsl',
+  shader: 'shaderlab',
+  gp: 'gnuplot',
+  plt: 'gnuplot',
+  gnuplot: 'gnuplot',
+  go: 'go',
+  graphql: 'graphql',
+  gql: 'graphql',
+  groovy: 'groovy',
+  gvy: 'groovy',
+  hack: 'hack',
+  haml: 'haml',
+  hbs: 'handlebars',
+  handlebars: 'handlebars',
+  hs: 'haskell',
+  lhs: 'haskell',
+  hx: 'haxe',
+  hcl: 'hcl',
+  hjson: 'hjson',
+  hlsl: 'hlsl',
+  fx: 'hlsl',
+  html: 'html',
+  htm: 'html',
+  http: 'http',
+  rest: 'http',
+  hxml: 'hxml',
+  hy: 'hy',
+  imba: 'imba',
+  ini: 'ini',
+  cfg: 'ini',
+  jade: 'pug',
+  pug: 'pug',
+  java: 'java',
+  js: 'javascript',
+  mjs: 'javascript',
+  cjs: 'javascript',
+  jinja: 'jinja',
+  jinja2: 'jinja',
+  j2: 'jinja',
+  jison: 'jison',
+  jl: 'julia',
+  json: 'json',
+  json5: 'json5',
+  jsonc: 'jsonc',
+  jsonl: 'jsonl',
+  jsonnet: 'jsonnet',
+  libsonnet: 'jsonnet',
+  jssm: 'jssm',
+  jsx: 'jsx',
+  kt: 'kotlin',
+  kts: 'kts',
+  kql: 'kusto',
+  tex: 'tex',
+  ltx: 'tex',
+  lean: 'lean4',
+  less: 'less',
+  liquid: 'liquid',
+  lit: 'lit',
+  ll: 'llvm',
+  logo: 'logo',
+  lua: 'lua',
+  luau: 'luau',
+  Makefile: 'makefile',
+  mk: 'makefile',
+  makefile: 'makefile',
+  md: 'markdown',
+  markdown: 'markdown',
+  marko: 'marko',
+  m: 'wolfram',
+  mat: 'matlab',
+  mdc: 'mdc',
+  mdx: 'mdx',
+  wiki: 'wikitext',
+  mediawiki: 'wikitext',
+  mmd: 'mermaid',
+  mermaid: 'mermaid',
+  mips: 'mipsasm',
+  mojo: 'mojo',
+  '🔥': 'mojo',
+  move: 'move',
+  nar: 'narrat',
+  nf: 'nextflow',
+  nim: 'nim',
+  nims: 'nim',
+  nimble: 'nim',
+  nix: 'nix',
+  nu: 'nushell',
+  mm: 'objective-cpp',
+  ml: 'ocaml',
+  mli: 'ocaml',
+  mll: 'ocaml',
+  mly: 'ocaml',
+  odin: 'odin',
+  pas: 'pascal',
+  p: 'pascal',
+  pl: 'prolog',
+  pm: 'perl',
+  t: 'perl',
+  raku: 'raku',
+  p6: 'raku',
+  pl6: 'raku',
+  php: 'php',
+  phtml: 'php',
+  pls: 'plsql',
+  sql: 'sql',
+  po: 'po',
+  polar: 'polar',
+  pcss: 'postcss',
+  pot: 'pot',
+  potx: 'potx',
+  pq: 'powerquery',
+  pqm: 'powerquery',
+  ps1: 'powershell',
+  psm1: 'powershell',
+  psd1: 'powershell',
+  prisma: 'prisma',
+  pro: 'prolog',
+  P: 'prolog',
+  properties: 'properties',
+  proto: 'protobuf',
+  pp: 'puppet',
+  purs: 'purescript',
+  py: 'python',
+  pyw: 'python',
+  pyi: 'python',
+  // FIXME: these should be changed to a Starlark file type if/when one
+  // appears in shiki. For now, Starlark is highlighted like the Python subset
+  // it is.
+  BUCK: 'python',
+  BUILD: 'python',
+  PACKAGE: 'python',
+  WORKSPACE: 'python',
+  Tiltfile: 'python',
+  bazel: 'python',
+  bxl: 'python',
+  bzl: 'python',
+  bzlmod: 'python',
+  star: 'python',
+  sky: 'python',
+  qml: 'qml',
+  qmldir: 'qmldir',
+  qss: 'qss',
+  r: 'r',
+  R: 'r',
+  rkt: 'racket',
+  rktl: 'racket',
+  razor: 'razor',
+  cshtml: 'razor',
+  rb: 'ruby',
+  rbw: 'ruby',
+  reg: 'reg',
+  regex: 'regexp',
+  rel: 'rel',
+  rs: 'rust',
+  rst: 'rst',
+  rake: 'ruby',
+  gemspec: 'ruby',
+  jbuilder: 'ruby',
+  builder: 'ruby',
+  rabl: 'ruby',
+  arb: 'ruby',
+  ru: 'ruby',
+  podspec: 'ruby',
+  Gemfile: 'ruby',
+  Rakefile: 'ruby',
+  Guardfile: 'ruby',
+  Capfile: 'ruby',
+  Berksfile: 'ruby',
+  Brewfile: 'ruby',
+  Vagrantfile: 'ruby',
+  Thorfile: 'ruby',
+  Appraisals: 'ruby',
+  Dangerfile: 'ruby',
+  sas: 'sas',
+  sass: 'sass',
+  scala: 'scala',
+  sc: 'scala',
+  scm: 'scheme',
+  ss: 'scheme',
+  sld: 'scheme',
+  scss: 'scss',
+  sdbl: 'sdbl',
+  shadergraph: 'shader',
+  st: 'smalltalk',
+  sol: 'solidity',
+  sparql: 'sparql',
+  rq: 'sparql',
+  spl: 'splunk',
+  config: 'ssh-config',
+  do: 'stata',
+  ado: 'stata',
+  dta: 'stata',
+  styl: 'stylus',
+  stylus: 'stylus',
+  svelte: 'svelte',
+  swift: 'swift',
+  sv: 'system-verilog',
+  svh: 'system-verilog',
+  service: 'systemd',
+  socket: 'systemd',
+  device: 'systemd',
+  timer: 'systemd',
+  talon: 'talonscript',
+  tasl: 'tasl',
+  tcl: 'tcl',
+  templ: 'templ',
+  tf: 'tf',
+  tfvars: 'tfvars',
+  toml: 'toml',
+  ts: 'typescript',
+  mts: 'typescript',
+  cts: 'typescript',
+  tsp: 'typespec',
+  tsv: 'tsv',
+  tsx: 'tsx',
+  ttl: 'turtle',
+  twig: 'twig',
+  typ: 'typst',
+  vv: 'v',
+  vala: 'vala',
+  vapi: 'vala',
+  vb: 'vb',
+  vbs: 'vb',
+  bas: 'vb',
+  vh: 'verilog',
+  vhd: 'vhdl',
+  vhdl: 'vhdl',
+  vim: 'vimscript',
+  vue: 'vue',
+  'vine.ts': 'vue-vine',
+  vy: 'vyper',
+  wasm: 'wasm',
+  wat: 'wasm',
+  wy: '文言',
+  wgsl: 'wgsl',
+  wit: 'wit',
+  wl: 'wolfram',
+  nb: 'wolfram',
+  xml: 'xml',
+  xsl: 'xsl',
+  xslt: 'xsl',
+  yaml: 'yaml',
+  yml: 'yml',
+  zs: 'zenscript',
+  zig: 'zig',
+  zsh: 'zsh',
+  sty: 'tex',
+};
+
+export function getFiletypeFromFileName(fileName: string): SupportedLanguages {
+  const format = matchFiletypeFromName(fileName);
+  if (format != null) {
+    return format;
+  }
+
+  // Special files are keyed by their exact name (Dockerfile, CMakeLists.txt), but callers
+  // routinely pass a repository-relative path. Retry on the basename so `docker/Dockerfile`
+  // resolves the same way a top-level `Dockerfile` does. The retry only runs once the full
+  // path has matched nothing, so real extensions still win (e.g. `docker/Dockerfile.ts`).
+  const baseName = fileName.split(/[/\\]/).pop() ?? fileName;
+  return baseName === fileName
+    ? 'text'
+    : (matchFiletypeFromName(baseName) ?? 'text');
+}
+
+function matchFiletypeFromName(fileName: string): SupportedLanguages | null {
+  if (CUSTOM_EXTENSION_TO_FILE_FORMAT.has(fileName)) {
+    return CUSTOM_EXTENSION_TO_FILE_FORMAT.get(fileName) ?? 'text';
+  }
+  // Handle special files without extensions first
+  if (Object.hasOwn(EXTENSION_TO_FILE_FORMAT, fileName)) {
+    return EXTENSION_TO_FILE_FORMAT[fileName] ?? null;
+  }
+
+  // Try compound extensions first (e.g., .blade.php, .component.ts)
+  const compoundMatch = fileName.match(/\.([^/\\]+\.[^/\\]+)$/);
+  if (compoundMatch != null) {
+    if (CUSTOM_EXTENSION_TO_FILE_FORMAT.has(compoundMatch[1])) {
+      return CUSTOM_EXTENSION_TO_FILE_FORMAT.get(compoundMatch[1]) ?? 'text';
+    }
+    if (Object.hasOwn(EXTENSION_TO_FILE_FORMAT, compoundMatch[1])) {
+      return EXTENSION_TO_FILE_FORMAT[compoundMatch[1]] ?? 'text';
+    }
+  }
+
+  // Fall back to simple extension
+  const simpleMatch = fileName.match(/\.([^.]+)$/)?.[1] ?? '';
+  if (CUSTOM_EXTENSION_TO_FILE_FORMAT.has(simpleMatch)) {
+    return CUSTOM_EXTENSION_TO_FILE_FORMAT.get(simpleMatch) ?? 'text';
+  }
+  return Object.hasOwn(EXTENSION_TO_FILE_FORMAT, simpleMatch)
+    ? (EXTENSION_TO_FILE_FORMAT[simpleMatch] ?? 'text')
+    : null;
+}
+
+export function replaceCustomExtensions(
+  version: number,
+  map: ExtensionFormatMap
+): boolean {
+  if (version <= customExtensionsVersion) {
+    return false;
+  }
+  CUSTOM_EXTENSION_TO_FILE_FORMAT.clear();
+  for (const key in map) {
+    const lang = map[key];
+    if (lang != null) {
+      CUSTOM_EXTENSION_TO_FILE_FORMAT.set(key, lang);
+    }
+  }
+  customExtensionsVersion = version;
+  return true;
+}
+
+export function getCustomExtensionsVersion(): number {
+  return customExtensionsVersion;
+}
+
+export function setCustomExtension(
+  key: string,
+  lang: SupportedLanguages
+): boolean {
+  const existing = CUSTOM_EXTENSION_TO_FILE_FORMAT.get(key);
+  if (existing === lang) {
+    return false;
+  }
+  if (existing != null) {
+    console.warn(
+      `setCustomExtension: overriding custom mapping for "${key}" from "${existing}" to "${lang}"`
+    );
+  }
+  CUSTOM_EXTENSION_TO_FILE_FORMAT.set(key, lang);
+  customExtensionsVersion++;
+  return true;
+}
+
+export function getCustomExtensionsMap(): ExtensionFormatMap {
+  return Object.fromEntries(CUSTOM_EXTENSION_TO_FILE_FORMAT);
+}

@@ -521,6 +521,12 @@
         "tags": ["pdf", "documents"]
       },
       {
+        "packageName": "@octanejs/pierre-diffs",
+        "title": "Pierre Diffs",
+        "searchTerms": ["@pierre/diffs/react", "@pierre/diffs"],
+        "tags": ["diffs", "code", "components"]
+      },
+      {
         "packageName": "@octanejs/syntax-highlighter",
         "title": "React Syntax Highlighter",
         "tags": ["code", "highlighting"]
