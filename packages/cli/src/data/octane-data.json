@@ -1139,7 +1139,7 @@
     {
       "name": "@octanejs/pierre-trees",
       "version": "0.0.0",
-      "category": "UI Libraries",
+      "category": "Content",
       "upstream": { "package": "@pierre/trees", "version": "1.0.0-beta.6" },
       "surface": "Complete @pierre/trees/react surface: FileTree (host props, header slot, renderContextMenu, and preloadedData server rendering and hydration), useFileTree, useFileTreeSelector, useFileTreeSelection, useFileTreeSearch, and the FileTreeProps, FileTreePreloadedData, UseFileTreeResult, FileTreeSelector, FileTreeSelectorEquality and FileTreeSearchState types. The model, options and payload types stay in the framework-neutral @pierre/trees root entry. All 14 upstream React registrations run unchanged against React and against Octane, the two SSR cases with a test-harness patch for their server render.",
       "divergences": [

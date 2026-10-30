@@ -231,12 +231,6 @@
         "tags": ["calendar", "date picker", "components"]
       },
       {
-        "packageName": "@octanejs/pierre-trees",
-        "title": "Pierre Trees",
-        "searchTerms": ["@pierre/trees", "@pierre/trees/react", "file tree"],
-        "tags": ["file tree", "tree view"]
-      },
-      {
         "packageName": "@octanejs/select",
         "title": "React Select",
         "tags": ["select", "components", "forms"]
@@ -515,6 +509,12 @@
         "packageName": "@octanejs/monaco-editor",
         "title": "Monaco Editor",
         "tags": ["editor", "code"]
+      },
+      {
+        "packageName": "@octanejs/pierre-trees",
+        "title": "Pierre Trees",
+        "searchTerms": ["@pierre/trees", "@pierre/trees/react", "file tree"],
+        "tags": ["file tree", "code", "components"]
       },
       {
         "packageName": "@octanejs/markdown",
