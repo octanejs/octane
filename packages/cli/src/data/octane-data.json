@@ -1148,7 +1148,8 @@
         "The four core helpers the React layer imports from @pierre/diffs internals (parseMergeConflictDiffFromFile, getMergeConflictActionSlotName, getCodeViewItemRenderData, areFileTargetsEqual) are copied into src/core with getHunkSideBoundaries, because @pierre/diffs does not export them."
       ],
       "ssr": "Supported and tested: on octane/server the components render their slotted children, and with prerenderedHTML a `<template shadowrootmode=\"open\">` beside them, as upstream does on react-dom/server. hydrateRoot adopts the server's diffs-container, slots and declarative shadow root.",
-      "verified": "2026-10-30"
+      "verified": "2026-10-30",
+      "exports": []
     },
     {
       "name": "@octanejs/popper",
