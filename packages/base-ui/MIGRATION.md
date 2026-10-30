@@ -2,16 +2,9 @@
 
 This binding targets `@base-ui/react` 1.8.0 and `@base-ui/utils` 0.4.0 through the companion `@octanejs/base-ui-utils` package. Upstream 1.8 parity does not by itself preserve the previously published Octane binding surface.
 
-## Required Octane versions
+## Required Octane version
 
-`@octanejs/base-ui`, `@octanejs/base-ui-utils`, `@octanejs/shadcn`, and `@octanejs/testing-library` now peer on **Octane `^0.2.5`**.
-
-Published Octane **0.2.4 and earlier** is not enough:
-
-- `@octanejs/testing-library` statically imports `isInActScope`, which 0.2.4 does not export.
-- The Base UI 1.8 source needs the compiler and runtime from this release (method and transitive hook compilation, typed namespaces, act batching, layout cascades, fragment portals, and resolved Suspense hydration).
-
-Upgrade Octane in the same release as these bindings. Other `@octanejs/*` packages still accept `^0.1.51 || ^0.2.0` unless they pull in the packages above.
+`@octanejs/base-ui`, `@octanejs/base-ui-utils`, `@octanejs/shadcn`, and `@octanejs/testing-library` peer on the current Octane minor line, like the other `@octanejs/*` packages; each package's `peerDependencies` names the range. Upgrade Octane in the same release as these bindings.
 
 ## Newly added APIs
 
