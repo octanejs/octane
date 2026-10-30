@@ -1,0 +1,91 @@
+'use client';
+
+import type {
+  FileDiffEditChangeHandler,
+  FileDiffEditCompleteEvent,
+  FileDiffEditCompleteHandler,
+} from '../components/FileDiff';
+import { DIFFS_TAG_NAME } from '../constants';
+import type { FileDiffMetadata } from '../types';
+import type { DiffBasePropsReact } from './types';
+import { renderDiffChildren } from './utils/renderDiffChildren';
+import { templateRender } from './utils/templateRender';
+import { useFileDiffInstance } from './utils/useFileDiffInstance';
+
+export type {
+  FileDiffEditChangeHandler,
+  FileDiffEditCompleteEvent,
+  FileDiffEditCompleteHandler,
+  FileDiffMetadata,
+};
+
+export interface FileDiffProps<LAnnotation, Caret> extends DiffBasePropsReact<
+  LAnnotation,
+  Caret
+> {
+  fileDiff: FileDiffMetadata;
+  disableWorkerPool?: boolean;
+}
+
+export function FileDiff<LAnnotation = undefined, Caret = undefined>({
+  fileDiff,
+  options,
+  editorOptions,
+  editStateKey,
+  metrics,
+  lineAnnotations,
+  selectedLines,
+  className,
+  style,
+  prerenderedHTML,
+  renderAnnotation,
+  renderCustomHeader,
+  renderHeaderPrefix,
+  renderHeaderFilenameSuffix,
+  renderHeaderMetadata,
+  renderGutterUtility,
+  disableWorkerPool = false,
+  edit = false,
+  onEditChange,
+  onEditComplete,
+}: FileDiffProps<LAnnotation, Caret>): React.JSX.Element {
+  const {
+    ref,
+    getHoveredLine,
+    getAnnotationSlotName,
+    fileDiff: renderedDiff,
+    lineAnnotations: renderedAnnotations,
+  } = useFileDiffInstance({
+    fileDiff,
+    options,
+    editorOptions,
+    editStateKey,
+    metrics,
+    lineAnnotations,
+    selectedLines,
+    prerenderedHTML,
+    hasGutterRenderUtility: renderGutterUtility != null,
+    hasCustomHeader: renderCustomHeader != null,
+    disableWorkerPool,
+    edit,
+    onEditChange,
+    onEditComplete,
+  });
+  const children = renderDiffChildren({
+    fileDiff: renderedDiff,
+    renderCustomHeader,
+    renderHeaderPrefix,
+    renderHeaderFilenameSuffix,
+    renderHeaderMetadata,
+    renderAnnotation,
+    renderGutterUtility,
+    lineAnnotations: renderedAnnotations,
+    getHoveredLine,
+    getAnnotationSlotName,
+  });
+  return (
+    <DIFFS_TAG_NAME ref={ref} className={className} style={style}>
+      {templateRender(children, prerenderedHTML)}
+    </DIFFS_TAG_NAME>
+  );
+}

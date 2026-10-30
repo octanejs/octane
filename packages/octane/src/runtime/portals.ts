@@ -8,7 +8,7 @@ import { __profileTrackComponent } from '../profiling.js';
 import { ELEMENT_TAG, PORTAL_TAG } from '../runtime-tags.js';
 import { profilePortalComponent } from './profile-probes.js';
 import type { ComponentBody, Scope, Block, ElementDescriptor } from './types.js';
-import { noop, activityPortalCreated, ROOT_RENDER_ROLLBACK } from './drivers.js';
+import { noop, activityPortalCreated, MEMO_BAIL, ROOT_RENDER_ROLLBACK } from './drivers.js';
 import { renderBlock } from './signal-owners.js';
 import { type FragmentInstance, FRAGMENT_REFS, fragmentDirectNodes } from './refs.js';
 import {
@@ -484,18 +484,21 @@ export function renderPortalState(
 			(state.start as any).$$portalParent = host;
 		}
 		state.host = host;
-		if (state.block!.body !== norm.body)
-			journalRootProperty(state.block!, 'body', state.block!.body);
-		if (state.block!.props !== norm.props)
-			journalRootProperty(state.block!, 'props', state.block!.props);
-		if (state.block!.extra !== env) journalRootProperty(state.block!, 'extra', state.block!.extra);
-		state.block!.body = norm.body;
-		state.block!.props = norm.props;
-		state.block!.extra = env;
-		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
-			__profileTrackComponent(state.block!, profilePortalComponent(rawBody, norm.body));
+		const block = state.block!;
+		// `memo(Component)` as the portal's child: a re-created element with equal
+		// props skips the body, as componentSlot and childSlot honor React.memo.
+		if (!(MEMO_BAIL && block.body === norm.body && MEMO_BAIL(block, norm.body, norm.props))) {
+			if (block.body !== norm.body) journalRootProperty(block, 'body', block.body);
+			if (block.props !== norm.props) journalRootProperty(block, 'props', block.props);
+			if (block.extra !== env) journalRootProperty(block, 'extra', block.extra);
+			block.body = norm.body;
+			block.props = norm.props;
+			block.extra = env;
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+				__profileTrackComponent(block, profilePortalComponent(rawBody, norm.body));
+			}
+			renderBlock(block);
 		}
-		renderBlock(state.block!);
 	}
 	// Stamp `$$portalParent` on every direct child the portal placed between its
 	// start/end markers. The dispatcher reads this when bubbling up: on reaching a

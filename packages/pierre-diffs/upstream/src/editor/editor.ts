@@ -1,0 +1,7642 @@
+import type { File } from '../components/File';
+import type { FileDiff } from '../components/FileDiff';
+import type { VirtualizedFile } from '../components/VirtualizedFile';
+import type { VirtualizedFileDiff } from '../components/VirtualizedFileDiff';
+import {
+  dequeueRender,
+  queueRender,
+} from '../managers/UniversalRenderingManager';
+import type {
+  DiffLineAnnotation,
+  DiffsHighlighter,
+  FileContents,
+  FileDiffMetadata,
+  HighlightedToken,
+  LineAnnotation,
+  RenderRange,
+  SelectionSide,
+} from '../types';
+import { computeLineOffsets } from '../utils/computeFileOffsets';
+import { getFiletypeFromFileName } from '../utils/getFiletypeFromFileName';
+import { isGutterUtilityPath } from '../utils/isGutterUtilityPath';
+import { cloneRetainedDiffSessionSnapshot } from './cloneRetainedDiffSessionSnapshot';
+import {
+  type EditorCommand,
+  type EditorKeymap,
+  resolveEditorCommandFromKeyboardEvent,
+  resolveFindAgainShortcut,
+} from './command';
+import editorCSS from './editor.css?inline';
+import {
+  buildEditPredictionRequest,
+  type EditPredictionHistoryRecord,
+  type EditPredictProvider,
+  type EditPredictResponse,
+  matchesEditPredictionPattern,
+  recordEditPrediction,
+} from './editPrediction';
+import { EditStack } from './editStack';
+import {
+  cloneEditorViewState,
+  EditStateManager,
+  type ManagedEditSession,
+  toManagedEditState,
+} from './EditStateManager';
+import { getChangedDocumentLines } from './getChangedDocumentLines';
+import {
+  type LanguageConfigMap,
+  resolveBlockCommentEdits,
+  resolveCommentConfig,
+  resolveLineCommentEdits,
+} from './languages';
+import {
+  applyDocumentChangeToLineAnnotations,
+  renderLineAnnotations,
+} from './lineAnnotations';
+import {
+  type Marker,
+  MarkerRenderer,
+  markerSeverityDatasetKey,
+} from './marker';
+import { findBracketMatchRanges } from './matchBrackets';
+import { isMoveCursorShortcut, isPrimaryModifier, isSafari } from './platform';
+import {
+  POPOVER_BOUNDARY_LINES,
+  PopoverManager,
+  type PopoverPlacementBounds,
+} from './popover';
+import {
+  type MatchRange,
+  type SearchPanelMode,
+  SearchPanelWidget,
+} from './searchPanel';
+import type {
+  AutoSurround,
+  CursorMoveOptions,
+  ResolveRenderableLine,
+} from './selection';
+import {
+  applyDeleteCharacterToSelections,
+  applyDeleteHardLineForwardToSelections,
+  applyDeleteSoftLineBackwardToSelections,
+  applyDeleteWordBackwardToSelections,
+  applyTextChangeToSelections,
+  applyTextReplaceToSelections,
+  applyTransposeToSelections,
+  comparePosition,
+  convertSelection,
+  createSelectionFrom,
+  createSelectionFromAnchorAndFocusOffsets,
+  DirectionBackward,
+  DirectionForward,
+  DirectionNone,
+  expandCollapsedSelectionToWord,
+  extendSelection,
+  extendSelections,
+  findNextMatch,
+  getAutoSurroundReplacementTexts,
+  getCaretPosition,
+  getDocumentBoundarySelection,
+  getDocumentFullSelection,
+  getSelectedLineBlocks,
+  getSelectionAnchor,
+  getSelectionClipboardTexts,
+  getSelectionText,
+  isCollapsedSelection,
+  isLineEditable,
+  mapCursorMove,
+  mapSelectionShift,
+  mergeOverlappingSelections,
+  remapOffsetThroughEdits,
+  remapSelectionsAfterEdits,
+  resolveIndentEdits,
+  resolveSelectionCut,
+  selectionIntersects,
+  shiftSelectionLines,
+  snapCharacterToGraphemeBoundary,
+} from './selection';
+import {
+  type SelectionActionContext,
+  SelectionActionWidget,
+} from './selectionAction';
+import { createSpriteElement } from './sprite';
+import { TextDocument, type TextDocumentChange } from './textDocument';
+import { getTextDocumentChangeTransaction } from './textDocumentChangeTransaction';
+import {
+  getExpandedAsciiTextColumns,
+  getUnicodeMeasurementOffsets,
+  Metrics,
+  snapTextOffsetToUnicodeBoundary,
+} from './textMeasure';
+import { EditorTokenizer, renderLineTokens } from './tokenizer';
+import type {
+  EditorCaret,
+  EditorChange,
+  EditorChangeEvent,
+  EditorEditCompleteEvent,
+  EditorInitialState,
+  EditorLineAnnotation,
+  EditorSelection,
+  EditorType,
+  EditorViewState,
+  EditState,
+  Position,
+  Range,
+  ResolvedTextEdit,
+  RetainedDiffSessionSnapshot,
+  TextEdit,
+} from './types';
+import {
+  addEventListener,
+  clampDomOffset,
+  extend,
+  getLineNumberAttr,
+  h,
+  lookupScrollContainer,
+  round,
+} from './utils';
+
+export type {
+  EditPredictContext,
+  EditPredictProvider,
+  EditPredictRequest,
+  EditPredictResponse,
+} from './editPrediction';
+
+// ShadowRoot.getSelection is a non-standard Blink/WebKit method (predates the
+// spec'd Selection.getComposedRanges) and is missing from the DOM lib types.
+type ShadowRootWithSelection = ShadowRoot & {
+  getSelection?: () => Selection | null;
+};
+
+// Fallback for browsers without Selection.getComposedRanges: read the first
+// range from the shadow root's own selection so the editor can still map a
+// caret placed by a click inside its shadow tree. Normalized to a StaticRange
+// so it matches the getComposedRanges return shape the callers expect. Returns
+// undefined when the API or a live range is unavailable.
+function getShadowRootRange(shadowRoot: ShadowRoot): StaticRange | undefined {
+  const selection = (shadowRoot as ShadowRootWithSelection).getSelection?.();
+  if (selection == null || selection.rangeCount === 0) {
+    return undefined;
+  }
+  const range = selection.getRangeAt(0);
+  return {
+    collapsed: range.collapsed,
+    startContainer: range.startContainer,
+    startOffset: range.startOffset,
+    endContainer: range.endContainer,
+    endOffset: range.endOffset,
+  };
+}
+
+/** Describe replacing the complete document from its previous text. */
+function createFullDocumentChange(
+  previousContents: string,
+  contents: string
+): EditorChange {
+  const lineOffsets = computeLineOffsets(previousContents);
+  const lastLineOffset = lineOffsets[lineOffsets.length - 1] ?? 0;
+  return {
+    start: 0,
+    end: previousContents.length,
+    text: contents,
+    range: {
+      start: { line: 0, character: 0 },
+      end: {
+        line: lineOffsets.length - 1,
+        character: previousContents.length - lastLineOffset,
+      },
+    },
+  };
+}
+
+interface EditorAttachState {
+  generation: number;
+  callback: (() => void) | undefined;
+  delivered: boolean;
+}
+
+interface AltColumnDrag {
+  pointerId: number;
+  startClientX: number;
+  clientX: number;
+  startScrollLeft: number;
+  focusLine?: number;
+  renderedGoal?: Position;
+}
+
+interface TrackedCaret<T> {
+  caret: EditorCaret<T>;
+  anchorOffset: number;
+  focusOffset: number;
+}
+
+interface SyncRenderViewBaseProps {
+  highlighter: DiffsHighlighter;
+  fileContainer: HTMLElement;
+  renderRange: RenderRange | undefined;
+  /** Start fresh history instead of retaining or extending the current history. */
+  resetHistory?: boolean;
+}
+
+interface SyncFileRenderViewProps<LAnnotation> extends SyncRenderViewBaseProps {
+  file: FileContents;
+  lineAnnotations: LineAnnotation<LAnnotation>[] | undefined;
+  /** Treat the supplied contents as an externally provided document update. */
+  externalDocument?: boolean;
+}
+
+interface SyncDiffRenderViewProps<LAnnotation> extends SyncRenderViewBaseProps {
+  fileDiff: FileDiffMetadata;
+  lineAnnotations: DiffLineAnnotation<LAnnotation>[] | undefined;
+  /** Treat the supplied contents as an externally provided document update. */
+  externalDocument?: boolean;
+}
+
+type SyncRenderViewProps<
+  EType extends EditorType,
+  LAnnotation,
+> = EType extends 'file'
+  ? SyncFileRenderViewProps<LAnnotation>
+  : SyncDiffRenderViewProps<LAnnotation>;
+
+type EditorComponent<
+  EType extends EditorType,
+  LAnnotation,
+  Caret,
+> = EType extends 'file'
+  ? File<LAnnotation, Caret>
+  : FileDiff<LAnnotation, Caret>;
+
+type EditorVirtualizedComponent<LAnnotation, Caret> =
+  | VirtualizedFile<LAnnotation, Caret>
+  | VirtualizedFileDiff<LAnnotation, Caret>;
+
+// Narrow an editor host through the virtualized components' runtime marker
+// without importing either component class as a runtime dependency.
+function isVirtualizedEditorComponent<LAnnotation, Caret>(
+  instance: EditorComponent<EditorType, LAnnotation, Caret> | undefined
+): instance is EditorVirtualizedComponent<LAnnotation, Caret> {
+  return (
+    instance != null &&
+    'renderType' in instance &&
+    instance.renderType === 'virtualized'
+  );
+}
+
+export interface EditorOptions<EType extends EditorType, LAnnotation, Caret> {
+  /** The maximum number of entries to keep in the undo stack. */
+  historyMaxEntries?: number;
+  /**
+   * Retain and restore the attached component's vertical viewport position.
+   * Defaults to false because scroll views generally contain multiple items.
+   * This option is captured when the editor is constructed.
+   */
+  ownsVerticalViewport?: boolean;
+  /**
+   * Document and editor state transferred to the first attachment. Missing
+   * fields are initialized from the attached component. The editor takes
+   * ownership and does not clone supplied objects.
+   */
+  initialState?: EditorInitialState<EType, LAnnotation>;
+  /** Custom keymap groups checked before defaults; later groups take precedence. */
+  keymap?: EditorKeymap;
+  /** Render rounded corners for selection ranges, default is true. */
+  roundedSelection?: boolean;
+  /** Highlight matching brackets near the caret, default is true. */
+  matchBrackets?: boolean;
+  /**
+   * Controls auto-surround when typing quotes or brackets over a selection.
+   * Default is `"default"` (both quotes and brackets).
+   */
+  autoSurround?: AutoSurround;
+  /** Per-language comment tokens used by the comment commands. */
+  languageCommentConfig?: LanguageConfigMap;
+  /**
+   * Show a floating selection action popover after a user-created selection.
+   * Defaults to disabled. Programmatic selection updates do not open it.
+   */
+  enabledSelectionAction?: boolean;
+  /**
+   * Configuration for inline edit prediction.
+   */
+  editPrediction?: {
+    /**
+     * The edit prediction mode.
+     * - 'eager': predictions appear inline when the user types.
+     * - 'subtle': pressing the `Alt` key toggles predictions inline.
+     * @default 'eager'
+     */
+    mode?: 'eager' | 'subtle';
+    /**
+     * The edit prediction provider.
+     */
+    provider: EditPredictProvider;
+    /**
+     * Glob or regular-expression patterns for files to include in prediction.
+     * String patterns support `?`, segment-local `*`, and cross-segment `**`.
+     * An empty array matches no files.
+     */
+    include?: readonly (string | RegExp)[];
+    /**
+     * Glob or regular-expression patterns for files to exclude from prediction.
+     * String patterns support `?`, segment-local `*`, and cross-segment `**`.
+     * Exclusions take precedence over inclusions.
+     */
+    exclude?: readonly (string | RegExp)[];
+  };
+  /**
+   * Custom clipboard provider.
+   * Highly recommended to use native clipboard API if you are building an electron app.
+   * see https://www.electronjs.org/docs/latest/api/clipboard
+   */
+  clipboard?: {
+    readText: (type?: string) => Promise<string> | string;
+  };
+  /** Render the selection action widget element. */
+  renderSelectionAction?: (
+    context: SelectionActionContext<EType, LAnnotation>
+  ) => HTMLElement;
+  /**
+   * Render an externally owned caret at its normalized document position.
+   */
+  renderCaret?: (caret: EditorCaret<Caret>) => HTMLElement;
+  /** Callback when the editor is attached to a file. */
+  onAttach?: (
+    editor: Editor<EType, LAnnotation, Caret>,
+    fileInstance: EditorComponent<EType, LAnnotation, Caret>
+  ) => void;
+  /**
+   * Called with an `EditorChangeEvent` whenever the editor document changes.
+   * Treat this as a document notification; do not feed the changes back into
+   * the editor or you will create loops.
+   */
+  onChange?: (event: EditorChangeEvent<EType, LAnnotation, Caret>) => void;
+  /**
+   * Observes completion with the same frozen event sent to the component. Runs
+   * before the component callback, including when the component callback is
+   * missing. There is no way to accept or reject from this API.
+   */
+  onComplete?: (
+    event: EditorEditCompleteEvent<EType, LAnnotation, Caret>
+  ) => void;
+  /** Callback when the editor gains focus. */
+  onFocus?: () => void;
+  /** Callback when the editor loses focus. */
+  onBlur?: () => void;
+  // debug flag
+  __debug?: boolean;
+}
+
+export interface EditorFocusOptions extends FocusOptions {
+  /** One-based document line number or first editable line with a visible top. */
+  lineNumber?: number | 'first-visible';
+  /** Zero-based character offset for a numeric line. Defaults to 0. */
+  character?: number;
+  /** Non-negative CSS pixels below the viewport or sticky header. */
+  offset?: number;
+}
+
+// Cap on how far an edit may widen the virtualized render window, as a multiple
+// of the bounded window the virtualizer last synced (~viewport + 2*hunkLineCount).
+// Edits within this many lines of the window bottom widen so their caret renders;
+// larger inserts fall back to the bounded buffer-only path instead of building a
+// row per inserted line. A safety bound, not a correctness-critical value.
+const MAX_EDIT_WIDEN_WINDOW_MULTIPLE = 2;
+
+// Wrap offsets persist across render-range syncs (see #resetCache), so
+// scrolling through a very large file could otherwise accumulate an entry per
+// line. Past this many lines the cache resets and refills lazily for whatever
+// is measured next. A memory bound, not a correctness-critical value.
+const MAX_WRAP_OFFSETS_CACHE_LINES = 10_000;
+const EDIT_PREDICTION_DEBOUNCE_MS = 300;
+const MAX_EDIT_PREDICTION_RESPONSE_EDITS = 256;
+const MAX_EDIT_PREDICTION_RESPONSE_BYTES = 128 * 1024;
+const editPredictionTextEncoder = new TextEncoder();
+const SELECTION_ACTION_POPOVER_PLACEMENT_KEY = 'selection-action';
+const MULTI_SELECTION_CLIPBOARD_TYPE =
+  'application/vnd.pierre.diffs-selections+json';
+type OverlayRangeType =
+  | 'selection'
+  | 'match'
+  | 'marker'
+  | 'bracketMatch'
+  | 'caretHighlight'
+  | 'editPredictionDeletion'
+  | 'editPredictionInsertion'
+  | 'editPredictionReplacement';
+
+// Response edits that touch the same source lines are previewed by one ghost
+// overlay. `edit` is their combined text range; `startIndex` and `endIndex`
+// are the response edits it covers.
+interface EditPredictionGroup {
+  edit: TextEdit;
+  startIndex: number;
+  endIndex: number;
+}
+
+// A rendered column's content element and its gutter counterpart, or one
+// content child and the gutter child at the same index. Every rendered column
+// has a gutter, and gutter and content children are kept parallel.
+interface ColumnElements {
+  content: HTMLElement;
+  gutter: HTMLElement;
+}
+
+export class Editor<
+  EType extends EditorType = EditorType,
+  LAnnotation = undefined,
+  Caret = undefined,
+> {
+  #options: EditorOptions<EType, LAnnotation, Caret>;
+  #initialState: EditorInitialState<EType, LAnnotation> | undefined;
+  #editSession?: ManagedEditSession<EType, LAnnotation>;
+  #metrics = new Metrics();
+  #tokenizer?: EditorTokenizer;
+  #popoverManager?: PopoverManager;
+  // event disposes
+  #editorEventDisposes?: (() => void)[];
+  #globalEventDisposes?: (() => void)[];
+  #selectEventDisposes?: (() => void)[];
+  #detach?: () => void;
+  // onAttach is deferred until the synchronized document and DOM are usable.
+  // Track the state so cleanup cannot notify an editor from an ended session.
+  #attachState: EditorAttachState = {
+    generation: 0,
+    callback: undefined,
+    delivered: false,
+  };
+
+  // cache
+  #contentOffset?: { left: number; top: number };
+  #gutterWidthCache?: number;
+  #contentWidthCache?: number;
+  #lineYCache = new Map<number, number>();
+  #wrapLineOffsetsCache = new Map<number, Uint32Array>();
+  #lineElementsCache = new Map<number, HTMLElement | null>();
+  #lastAccessedCharX?: [
+    line: number,
+    character: number,
+    x: number,
+    wrapLine: number,
+  ];
+
+  // dom
+  #globalStyleElement?: HTMLStyleElement;
+  #editorStyleElement?: HTMLStyleElement;
+  #themeStyleElement?: HTMLStyleElement;
+  #spriteElement?: SVGSVGElement;
+  #fileContainer?: HTMLElement;
+  #gutterElement?: HTMLElement;
+  #contentElement?: HTMLElement;
+  #deletionsColumn?: ColumnElements;
+  #overlayElement?: HTMLElement;
+  #overlayElements?: Map<string, HTMLElement>;
+  #caretElements?: Map<TrackedCaret<Caret>, HTMLElement>;
+  #caretHighlightElements?: HTMLElement[];
+  #primaryCaretElement?: HTMLElement;
+  #resizeObserver?: ResizeObserver;
+
+  // state
+  #fileInstance?: EditorComponent<EType, LAnnotation, Caret>;
+  // Preserves the current file/diff instance's applyDocumentChange
+  // type/semantics to avoid annoying `as X` narrowing
+  #applyDocumentChange?: (
+    textDocument: TextDocument<EType, LAnnotation>,
+    newLineAnnotations: EditorLineAnnotation<EType, LAnnotation>[] | undefined,
+    shouldUpdateBuffer?: boolean
+  ) => void;
+  #applySuspendedDocumentChange?: (
+    textDocument: TextDocument<EType, LAnnotation>,
+    newLineAnnotations: EditorLineAnnotation<EType, LAnnotation>[] | undefined
+  ) => void;
+  #publishChange?: (
+    changes: EditorChange[],
+    file: FileContents,
+    lineAnnotations: EditorLineAnnotation<EType, LAnnotation>[] | undefined
+  ) => void;
+  #isRendering = false;
+  #restoreEditorStateOnSync = false;
+  #lineAnnotations?: EditorLineAnnotation<EType, LAnnotation>[];
+  readonly #editStateKey?: string;
+  readonly #ownsVerticalViewport: boolean;
+  #renderRange?: RenderRange;
+  // Bounded render-window size (~viewport + 2*hunkLineCount) from the last view
+  // sync. Used to cap how far #applyChange widens the window for an edit, so a
+  // large insert can't materialize an unbounded number of rows. Captured at sync
+  // time so consecutive edits that grow #renderRange can't ratchet the cap up.
+  // undefined until the first sync; Infinity for non-virtualized (whole-file)
+  // windows, where no cap is needed.
+  #viewportWindowLines?: number;
+  #markerRenderer?: MarkerRenderer;
+  #carets?: TrackedCaret<Caret>[];
+  #searchPanel?: SearchPanelWidget;
+  #selectionAction?: SelectionActionWidget;
+  // Programmatic ranges stay passive until the user interacts with the editor.
+  #canMountSelectionAction = true;
+  #shouldIgnoreSelectionChange = false;
+  // Set when the browser's native Selection is temporarily not the source of
+  // truth for editor text selections. Select-all can only mirror rendered
+  // lines, while diff line-selection and gutter-utility gestures can move the
+  // native range without selecting editor text. Gutter gestures only enable
+  // this when an editor selection exists to preserve; otherwise refocus must
+  // remain free to seed a caret. The next direct content pointerdown or keydown
+  // clears this, and keeping it through gutter pointerup also protects against
+  // a queued selectionchange.
+  #suppressNativeSelectionSync = false;
+  // Whether the contenteditable holds (or is claiming) focus. Synced by
+  // focus/blur listeners and set eagerly by #focus(), whose real focus() call is
+  // deferred to a rAF. Lets applyEdits skip focus/scroll only on unfocused
+  // editors, without regressing a same-tick setSelections-then-applyEdits flow.
+  #contentHasFocus = false;
+  // A render-owned request object prevents an older deferred frame from
+  // consuming a newer replacement's focus intent. Once synchronized, target
+  // identifies the new content so a subsequent user blur can cancel it.
+  #replacementFocusRequest?: { target?: HTMLElement };
+  #isComposing = false;
+  #isGutterMouseDown = false;
+  #isContentMouseDown = false;
+  #altColumnDrag?: AltColumnDrag;
+  #shiftKeyPressed = false;
+  #selectionStart: EditorSelection | undefined;
+  // The full text of a read-only deleted-line selection built from the gutter,
+  // captured when the selection is made. Deleted lines are separate read-only
+  // hosts, so window.getSelection() only spans the first line; the copy/cut
+  // handlers prefer this. Empty for a direct content drag (no gutter range).
+  #deletedSelectionText = '';
+  #reservedSelections?: EditorSelection[];
+  #initSelections?: EditorSelection[];
+  #selections?: EditorSelection[];
+  #matches?: MatchRange[];
+  #scrollingToLine?: number;
+  #scrollingToLineChar?: number;
+  #scrollingToLineFixed = false;
+  #scrollingToLineNoFocus = false;
+  #retainSearchPanelFocus = false;
+  #fontRemeasureScheduled = false;
+  #themeSelectionRefreshFrame?: number;
+  #editPredictionTimer?: ReturnType<typeof setTimeout>;
+  #editPredictionAbortController?: AbortController;
+  #editPredictionGeneration = 0;
+  #editPredictionRevealed = false;
+  // True when we skipped asking for a prediction because the caret sits on a
+  // line that has no rendered row right now (for example a large paste pushed
+  // it below the virtualized window). The next time the attached component
+  // renders and that row exists, we ask again.
+  #retryEditPredictionOnRender = false;
+  #editPrediction?: {
+    document: TextDocument<EType, LAnnotation>;
+    version: number;
+    cursorOffset: number;
+    rendered: boolean;
+    response: EditPredictResponse;
+  };
+  #editPredictionHistory: EditPredictionHistoryRecord[] = [];
+  #editPredictionSpacers = new Map<HTMLElement, number>();
+  // Ghost text rows shown below lines (zero-based line -> row count). Replaced
+  // only when the contents change and never mutated, so the attached component
+  // can treat the same instance as "nothing changed".
+  #ghostTextRows: ReadonlyMap<number, number> = new Map();
+  #onDeferTokenize = (
+    lines: Map<number, Array<HighlightedToken>>,
+    themeType: 'light' | 'dark'
+  ) => {
+    if (!this.#isRendering) {
+      return;
+    }
+    this.#fileInstance?.updateRenderCache(lines, themeType);
+    // update the view if the render range is updated by scrolling
+    // and the deferred tokenized lines inside the render range
+    if (
+      this.#renderRange !== undefined &&
+      this.#renderRange.totalLines !== Infinity
+    ) {
+      const predictionLines =
+        this.#editPrediction === undefined
+          ? undefined
+          : new Set(
+              this.#editPrediction.response.edits.map(
+                (edit) => edit.range.start.line
+              )
+            );
+      let refreshPrediction = false;
+      const { startingLine, totalLines } = this.#renderRange;
+      const endLine = Math.min(
+        startingLine + totalLines,
+        (this.#editSession ?? this.#initialState)?.document?.lineCount ?? 0
+      );
+      for (const [line, tokens] of lines) {
+        if (line >= startingLine && line < endLine) {
+          const lineElement = this.#getLineElement(line);
+          if (lineElement !== undefined) {
+            lineElement.replaceChildren(...renderLineTokens(tokens));
+            refreshPrediction ||= predictionLines?.has(line) === true;
+          }
+        }
+      }
+      if (refreshPrediction && this.#selections !== undefined) {
+        this.#updateSelections(this.#selections);
+      }
+    }
+  };
+
+  /**
+   * @param type The component surface this editor can attach to.
+   * @param options Configure editor behavior and lifecycle callbacks.
+   * @param editStateKey Retain this editable draft and its undo/redo history
+   * in memory so a later editor using the same type and key can resume them.
+   */
+  constructor(
+    public readonly type: EType,
+    options: EditorOptions<EType, LAnnotation, Caret> = {},
+    editStateKey?: string
+  ) {
+    this.#options = options;
+    this.#ownsVerticalViewport = options.ownsVerticalViewport === true;
+    this.#initialState = options.initialState;
+    this.#editStateKey = editStateKey;
+  }
+
+  // Preserve the component/editor type match while keeping caret metadata
+  // opaque to components, which never read it.
+  get #getTypedEditor():
+    | Editor<'file', LAnnotation, Caret>
+    | Editor<'file-diff', LAnnotation, Caret> {
+    return this.type === 'file'
+      ? (this as Editor<'file', LAnnotation, Caret>)
+      : (this as Editor<'file-diff', LAnnotation, Caret>);
+  }
+
+  setOptions(options: EditorOptions<EType, LAnnotation, Caret>): void {
+    const previousRenderCaret = this.#options.renderCaret;
+    const previousEditPrediction = this.#options.editPrediction;
+    this.#options = {
+      ...this.#options,
+      ...options,
+    };
+    if (previousRenderCaret !== this.#options.renderCaret) {
+      this.#caretElements?.forEach((element) => element.remove());
+      this.#caretElements = undefined;
+      this.#renderCarets();
+    }
+    if (previousEditPrediction !== this.#options.editPrediction) {
+      this.#cancelEditPrediction(true);
+      this.#editPredictionHistory = [];
+      this.#scheduleEditPrediction();
+    }
+  }
+
+  __emitEditComplete(
+    event: EditorEditCompleteEvent<EType, LAnnotation, Caret>
+  ): void {
+    this.#options.onComplete?.(event);
+  }
+
+  /** @internal */
+  __getGhostTextRows(): ReadonlyMap<number, number> {
+    return this.#ghostTextRows;
+  }
+
+  setCarets(carets: EditorCaret<Caret>[]): void {
+    const textDocument = this.#editSession?.document;
+    if (textDocument === undefined) return;
+    this.#caretElements?.forEach((element) => element.remove());
+    this.#caretElements = undefined;
+    this.#caretHighlightElements?.forEach((element) => element.remove());
+    this.#caretHighlightElements = undefined;
+    this.#carets =
+      carets.length === 0
+        ? undefined
+        : carets.map((caret) => {
+            const anchor = textDocument.normalizePosition(caret.anchor);
+            const focus = textDocument.normalizePosition(caret.focus);
+            return {
+              caret: {
+                ...caret,
+                anchor,
+                focus,
+              },
+              anchorOffset: textDocument.offsetAt(anchor),
+              focusOffset: textDocument.offsetAt(focus),
+            };
+          });
+    this.#renderCarets();
+  }
+
+  // UnresolvedFile extends FileDiff for rendering, but its conflict-specific
+  // document model is not supported by Editor. For a partial diff, await
+  // FileDiff.prepareForEditing() before starting a new session.
+  edit<T extends EditorComponent<EType, LAnnotation, Caret>>(
+    fileInstance: T extends { readonly type: 'unresolved-file' } ? never : T
+  ): () => void;
+  edit(fileInstance: EditorComponent<EType, LAnnotation, Caret>): () => void {
+    const editor = this.#getTypedEditor;
+    const previousSession = this.#editSession;
+    if (this.#isRendering) {
+      throw new Error(
+        'Editor.edit: the editor is already rendering its component'
+      );
+    }
+    if (this.#fileInstance != null && this.#fileInstance !== fileInstance) {
+      throw new Error(
+        'Editor.edit: a recycled edit session cannot attach to a different component'
+      );
+    }
+    if (
+      fileInstance.type === 'file-diff' &&
+      this.#editSession == null &&
+      !fileInstance.__canAttachEditor()
+    ) {
+      throw new Error(
+        'Editor.edit: a complete diff is required before editing'
+      );
+    }
+    const initialState = this.#initialState;
+    const initialEditorState = initialState?.editor;
+    const editStateKey = this.#editStateKey;
+    const editSession = getEditSession({
+      type: this.type,
+      editStateKey,
+      owner: this,
+      initialState,
+      previousSession,
+    });
+    const previousDiffSession = editSession.diffSession;
+    this.#initialState = undefined;
+    this.#editSession = editSession;
+    this.#fileInstance = fileInstance;
+    this.#isRendering = true;
+    this.#restoreEditorStateOnSync = editSession.editor != null;
+    try {
+      this.#initialize();
+      if (fileInstance.type === 'file' && editor.type === 'file') {
+        editor.#applyDocumentChange =
+          fileInstance.applyDocumentChange.bind(fileInstance);
+        editor.#applySuspendedDocumentChange =
+          fileInstance.applySuspendedDocumentChange.bind(fileInstance);
+        editor.#publishChange = (changes, file, lineAnnotations) => {
+          const event: EditorChangeEvent<'file', LAnnotation, Caret> = {
+            changes,
+            file,
+            editor,
+            lineAnnotations,
+          };
+          fileInstance.__acceptEditorChange(event);
+          editor.#options.onChange?.(event);
+          fileInstance.emitEditChange(event);
+        };
+        // First edit: attach the editor to the component.
+        if (this.#detach == null) {
+          this.#detach = fileInstance.__attachEditor(editor);
+        }
+        // Otherwise we resume our edit session
+        else {
+          fileInstance.__resumeEditor(editor);
+        }
+      } else if (
+        fileInstance.type === 'file-diff' &&
+        editor.type === 'file-diff'
+      ) {
+        editor.#applyDocumentChange =
+          fileInstance.applyDocumentChange.bind(fileInstance);
+        editor.#applySuspendedDocumentChange =
+          fileInstance.applySuspendedDocumentChange.bind(fileInstance);
+        editor.#publishChange = (changes, file, lineAnnotations) => {
+          const event: EditorChangeEvent<'file-diff', LAnnotation, Caret> = {
+            changes,
+            file,
+            editor,
+            lineAnnotations,
+          };
+          fileInstance.__acceptEditorChange(event);
+          editor.#options.onChange?.(event);
+          fileInstance.emitEditChange(event);
+        };
+        // First edit: attach the editor to the component.
+        if (this.#detach == null) {
+          this.#detach = fileInstance.__attachEditor(editor);
+        }
+        // Otherwise we resume our edit session
+        else {
+          fileInstance.__resumeEditor(editor);
+        }
+      } else {
+        throw new Error('Editor.edit: Impossible edit state');
+      }
+    } catch (error: unknown) {
+      this.cleanUp('recycle');
+      // A failed attachment never replaced the claimed session. Restore diff
+      // state that cleanup could not recapture before returning its key.
+      if (editSession.type === 'file-diff' && editSession.diffSession == null) {
+        editSession.diffSession = previousDiffSession;
+      }
+      // If we haven't ever attached, and failed to edit, release any edit
+      // state lock
+      if (this.#detach == null && editStateKey != null) {
+        if (editor.type === 'file') {
+          EditStateManager.releaseFile(editStateKey, editor);
+        } else {
+          EditStateManager.releaseFileDiff(editStateKey, editor);
+        }
+      }
+      this.#editSession = previousSession;
+      if (this.#detach == null) {
+        this.#fileInstance = undefined;
+        this.#applyDocumentChange = undefined;
+        this.#applySuspendedDocumentChange = undefined;
+        this.#publishChange = undefined;
+      }
+      if (initialState != null && initialEditorState != null) {
+        initialState.editor = initialEditorState;
+      }
+      this.#initialState = initialState;
+      throw error;
+    }
+    return () => {
+      this.cleanUp('complete');
+    };
+  }
+
+  /**
+   * Apply edits to current attached file. Every edit joins the undo timeline:
+   * a programmatic edit must leave the document and its history exactly as
+   * the same edit typed by the user would (history equivalence — see
+   * TextDocument.applyResolvedEdits), so it is undoable like any other edit.
+   *
+   * @param updateHistory Whether to record caller selection snapshots for
+   * exact undo/redo restoration. Defaults to true. When false, live selections
+   * are remapped during replay and the text edit still joins the undo timeline.
+   */
+  applyEdits(edits: TextEdit[], updateHistory = true): void {
+    const textDocument = this.#editSession?.document;
+    if (textDocument == null) {
+      throw new Error('Editor.applyEdits: Editor is not attached');
+    }
+    // Only reposition focus and scroll when the editor already holds focus. A
+    // programmatic edit must not pull focus from another input the user is
+    // typing in; the selection state below is re-anchored either way.
+    const wasFocused = this.#contentHasFocus;
+    // Capture the current selection edges and the edit ranges as pre-edit
+    // offsets so the caret can be re-anchored once the buffer changes. Reading
+    // them after applyEdits would resolve against the new buffer and desync.
+    const selectionsBefore = this.#selections;
+    const selectionOffsetsBefore = selectionsBefore?.map(
+      (selection) =>
+        [
+          textDocument.offsetAt(selection.start),
+          textDocument.offsetAt(selection.end),
+        ] as [number, number]
+    );
+    // Resolve edits to pre-edit offsets, mirroring TextDocument's own
+    // resolution (swap reversed ranges, sort ascending), so the remap matches
+    // the edits TextDocument actually applies below.
+    const resolvedEditOffsets =
+      selectionsBefore === undefined
+        ? undefined
+        : textDocument.resolveEdits(edits).sort((a, b) => a.start - b.start);
+
+    const change = textDocument.applyEdits(
+      edits,
+      updateHistory,
+      selectionsBefore
+    );
+    if (change === undefined) {
+      return;
+    }
+
+    // Re-anchor selections against the applied edits so the editor #selections,
+    // the native window selection, and the on-screen caret stay in sync with
+    // the new buffer. Skipping this leaves a programmatic edit (e.g. an AI or
+    // codemod insertion) with a stale caret and corrupts the next keystroke.
+    let nextSelections: EditorSelection[] | undefined;
+    if (
+      selectionsBefore !== undefined &&
+      selectionOffsetsBefore !== undefined &&
+      resolvedEditOffsets !== undefined
+    ) {
+      nextSelections = remapSelectionsAfterEdits(
+        textDocument,
+        selectionsBefore,
+        selectionOffsetsBefore,
+        resolvedEditOffsets
+      );
+      if (updateHistory) {
+        textDocument.setLastUndoSelectionsAfter(nextSelections);
+      }
+    }
+
+    this.#applyChange(
+      change,
+      nextSelections,
+      this.#applyChangeToLineAnnotations(change),
+      { skipFocus: !wasFocused }
+    );
+  }
+
+  /** Whether there is an edit to undo. */
+  get canUndo(): boolean {
+    return (
+      (this.#editSession ?? this.#initialState)?.document?.canUndo ?? false
+    );
+  }
+
+  /** Whether there is an undone edit to redo. */
+  get canRedo(): boolean {
+    return (
+      (this.#editSession ?? this.#initialState)?.document?.canRedo ?? false
+    );
+  }
+
+  /** Undo the last edit. Does nothing when there is nothing to undo. */
+  undo(): void {
+    this.#runCommand('undo');
+  }
+
+  /** Redo the last undone edit. Does nothing when there is nothing to redo. */
+  redo(): void {
+    this.#runCommand('redo');
+  }
+
+  getFile(): FileContents | undefined {
+    const editSession = this.#editSession ?? this.#initialState;
+    const fileInfo = editSession?.fileInfo;
+    const textDocument = editSession?.document;
+    if (fileInfo === undefined || textDocument === undefined) {
+      return undefined;
+    }
+    const file = { ...fileInfo }; // copy
+    Object.defineProperty(file, 'contents', {
+      enumerable: true,
+      get: () => textDocument.getText(),
+    });
+    return file as FileContents;
+  }
+
+  getText(): string {
+    return (this.#editSession ?? this.#initialState)?.document?.getText() ?? '';
+  }
+
+  /** Return an isolated copy of selections and restorable view state. */
+  getViewState(): EditorViewState {
+    const fileInstance = this.#isRendering ? this.#fileInstance : undefined;
+    if (!this.#isRendering && this.#editSession?.editor != null) {
+      return cloneEditorViewState(this.#editSession.editor);
+    }
+    const selections = this.#selections?.map((selection) => ({
+      ...selection,
+      start: { ...selection.start },
+      end: { ...selection.end },
+    }));
+    if (fileInstance == null) {
+      return { selections };
+    }
+
+    const viewport = this.#getOwnedVerticalViewport();
+    const scrollLeft = fileInstance.getCodeScrollLeft();
+    if (viewport == null) {
+      return { selections, view: { scrollLeft } };
+    }
+    return {
+      selections,
+      view: { scrollLeft, scrollTop: viewport.scrollTop },
+    };
+  }
+
+  /**
+   * Return the objects that make up the active edit session, or undefined when
+   * no complete session exists.
+   */
+  getEditState(): EditState<EType, LAnnotation> | undefined {
+    const editSession = this.#editSession;
+    if (editSession == null) {
+      return undefined;
+    }
+    const fileInstance = this.#fileInstance;
+    if (fileInstance == null) {
+      throw new Error(
+        `Editor.getEditState: active ${this.type} session has no component`
+      );
+    }
+    return toManagedEditState<EType, LAnnotation>(editSession);
+  }
+
+  setViewState({ selections, view }: EditorViewState): void {
+    if (
+      !this.#isRendering ||
+      this.#fileInstance === undefined ||
+      this.#editSession?.document === undefined
+    ) {
+      throw new Error('Editor.setViewState: Editor is not attached');
+    }
+    this.#canMountSelectionAction = false;
+    this.#updateSelections(selections ?? []);
+    // When a saved view is present, honor its scroll offsets exactly. Scrolling
+    // the caret into view afterward would overwrite them whenever the caret
+    // sits outside that viewport (e.g. TreeApp remount restore).
+    if (view != null) {
+      this.#fileInstance.setCodeScrollLeft(view.scrollLeft);
+      // States without scrollTop leave the viewport where it is rather than
+      // guessing.
+      const viewport = this.#getOwnedVerticalViewport();
+      if (view.scrollTop !== undefined && viewport != null) {
+        viewport.scrollTop = view.scrollTop;
+      }
+    } else if (this.#ownsVerticalViewport) {
+      this.#scrollToPrimaryCaret();
+    }
+    this.#checkpointEditSessionState();
+  }
+
+  setSelections(
+    selections: (Range & { direction: 'none' | 'backward' | 'forward' })[]
+  ): void {
+    const textDocument = this.#editSession?.document;
+    if (textDocument === undefined) {
+      throw new Error('Editor.setSelections: Text document is not initialized');
+    }
+    const resolvedSelections = selections.map<EditorSelection>((selection) => {
+      let start = textDocument.normalizePosition(selection.start);
+      let end = textDocument.normalizePosition(selection.end);
+      let direction: EditorSelection['direction'] =
+        selection.direction === 'none'
+          ? DirectionNone
+          : selection.direction === 'backward'
+            ? DirectionBackward
+            : DirectionForward;
+
+      if (comparePosition(start, end) > 0) {
+        [start, end] = [end, start];
+        if (direction !== DirectionNone) {
+          direction =
+            direction === DirectionForward
+              ? DirectionBackward
+              : DirectionForward;
+        }
+      }
+      return { direction, start, end };
+    });
+    this.#canMountSelectionAction = false;
+    this.#updateSelections(resolvedSelections);
+    const primarySelection = resolvedSelections.at(-1);
+    if (primarySelection !== undefined) {
+      this.#revealLineIfCollapsed(getCaretPosition(primarySelection).line);
+    }
+    this.#scrollToPrimaryCaret();
+  }
+
+  setMarkers(markers: Marker[]): void {
+    const textDocument = this.#editSession?.document;
+    if (textDocument === undefined) {
+      throw new Error('Editor.setMarkers: Text document is not initialized');
+    }
+
+    if (markers.length === 0) {
+      this.#markerRenderer?.cleanup();
+      this.#markerRenderer = undefined;
+      this.#updateSelections(this.#selections ?? []);
+      return;
+    }
+
+    this.#markerRenderer ??= new MarkerRenderer({
+      popoverManager: this.#getPopoverManager(),
+      getLineHeight: () => this.#metrics.lineHeight,
+      getOverlayElement: () => this.#overlayElement,
+      getGutterWidth: () => this.#getGutterWidth(),
+      getCharX: (line, character) => this.#getCharX(line, character),
+      getLineY: (line) => this.#getLineY(line),
+      isMouseDown: () => this.#isContentMouseDown || this.#isGutterMouseDown,
+    });
+    this.#markerRenderer.setMarkers(markers, textDocument);
+    if (this.#contentElement !== undefined) {
+      this.#markerRenderer.listenHover(this.#contentElement);
+    }
+    this.#updateSelections(this.#selections ?? []);
+    this.#renderCarets();
+  }
+
+  focus(options?: EditorFocusOptions): void {
+    const preventScroll = options?.preventScroll ?? false;
+    const lineNumber = options?.lineNumber;
+    if (lineNumber === 'first-visible' || typeof lineNumber === 'number') {
+      const textDocument = this.#editSession?.document;
+      if (
+        textDocument == null ||
+        !this.#isRendering ||
+        this.#fileInstance == null
+      ) {
+        return;
+      }
+      const targetLineNumber =
+        lineNumber === 'first-visible'
+          ? this.#getFirstVisibleLineNumber(options?.offset)
+          : lineNumber;
+      if (targetLineNumber == null) {
+        return;
+      }
+      const position = textDocument.normalizePosition({
+        line: targetLineNumber - 1,
+        character:
+          lineNumber === 'first-visible' ? 0 : (options?.character ?? 0),
+      });
+      this.#focusAtPosition(position, preventScroll);
+      return;
+    }
+    const primarySelection = this.#selections?.at(-1);
+    if (primarySelection !== undefined) {
+      const pos =
+        primarySelection.direction === DirectionBackward
+          ? primarySelection.end
+          : primarySelection.start;
+      this.#focus(pos, preventScroll);
+    } else {
+      this.#focus(undefined, preventScroll);
+    }
+  }
+
+  blur(): void {
+    this.#replacementFocusRequest = undefined;
+    this.#contentHasFocus = false;
+    this.#shouldIgnoreSelectionChange = false;
+    this.#contentElement?.blur();
+  }
+
+  // 'discard' ends the session and lets the component publish its completion
+  // event without installing the result.
+  //
+  // 'recycle' suspends rendering for collapse or virtualization. The component
+  // association, document, history, and editor state remain fixed so the same
+  // surface resumes on the next edit().
+  //
+  // 'complete' ends the session and lets the component install an accepted
+  // completion result. Keyed documents outlive all three teardown modes until
+  // explicitly disposed or evicted from the manager.
+  cleanUp(reason: 'discard' | 'recycle' | 'complete' = 'discard'): void {
+    const fileInstance = this.#fileInstance;
+    const recycle = reason === 'recycle';
+    this.#cancelEditPrediction(true, false);
+    if (!recycle) {
+      this.#editPredictionHistory = [];
+    }
+    const editSession = this.#editSession;
+    if (fileInstance != null && editSession != null) {
+      const discardDiffState = !this.#checkpointEditSessionState();
+      if (!recycle) {
+        this.#releaseEditSession(discardDiffState);
+      }
+    }
+    this.#invalidateOnAttach();
+    if (!recycle) {
+      this.#attachState.delivered = false;
+    }
+    this.#isRendering = false;
+    dequeueRender(this.#handleCustomPasteEvent);
+    // The tokenizer is destroyed in both modes: it holds highlighter/worker
+    // resources and writes into the (removed below) theme style element.
+    // __syncRenderView recreates one for a retained document on render resume.
+    this.#tokenizer?.cleanUp();
+    this.#tokenizer = undefined;
+
+    // dispse event listeners
+    this.#globalEventDisposes?.forEach((dispose) => dispose());
+    this.#globalEventDisposes = undefined;
+    this.#editorEventDisposes?.forEach((dispose) => dispose());
+    this.#editorEventDisposes = undefined;
+    if (!recycle) {
+      this.#detach?.();
+      this.#detach = undefined;
+    }
+
+    // cache
+    this.#gutterWidthCache = undefined;
+    this.#contentWidthCache = undefined;
+    this.#lineYCache.clear();
+    this.#wrapLineOffsetsCache.clear();
+    this.#lineElementsCache.clear();
+    this.#lastAccessedCharX = undefined;
+
+    // clean up dom elements
+    this.#globalStyleElement?.remove();
+    this.#globalStyleElement = undefined;
+    this.#editorStyleElement?.remove();
+    this.#editorStyleElement = undefined;
+    this.#themeStyleElement?.remove();
+    this.#themeStyleElement = undefined;
+    this.#spriteElement?.remove();
+    this.#spriteElement = undefined;
+    this.#fileContainer = undefined;
+    this.#popoverManager?.cleanUp();
+    this.#popoverManager = undefined;
+    this.#gutterElement = undefined;
+    this.#deletionsColumn = undefined;
+    this.#contentElement?.removeAttribute('contentEditable');
+    this.#contentElement = undefined;
+    this.#replacementFocusRequest = undefined;
+    this.#contentHasFocus = false;
+    this.#overlayElement?.remove();
+    this.#overlayElement = undefined;
+    this.#resizeObserver?.disconnect();
+    this.#resizeObserver = undefined;
+    // Let a reused instance schedule the font re-measure again on its next
+    // mount, where a different font-family string may not be loaded yet.
+    this.#fontRemeasureScheduled = false;
+    if (this.#themeSelectionRefreshFrame !== undefined) {
+      cancelAnimationFrame(this.#themeSelectionRefreshFrame);
+      this.#themeSelectionRefreshFrame = undefined;
+    }
+
+    this.#resetState(recycle);
+    if (!recycle) {
+      try {
+        if (fileInstance != null && editSession != null) {
+          const editor = this.#getTypedEditor;
+          const mode = reason === 'complete' ? 'install' : 'discard';
+          if (fileInstance.type === 'file' && editor.type === 'file') {
+            fileInstance.__completeEditSession(editor, mode);
+          } else if (
+            fileInstance.type === 'file-diff' &&
+            editor.type === 'file-diff'
+          ) {
+            fileInstance.__completeEditSession(editor, mode);
+          } else {
+            throw new Error('Editor.cleanUp: Impossible edit state');
+          }
+        }
+      } finally {
+        this.#editSession = undefined;
+        this.#fileInstance = undefined;
+        this.#applyDocumentChange = undefined;
+        this.#applySuspendedDocumentChange = undefined;
+        this.#publishChange = undefined;
+      }
+    }
+  }
+
+  // Checkpoint editor and diff-component state after synchronization, edits,
+  // and teardown. Returns whether a keyed diff is worth retaining after the
+  // session ends.
+  #checkpointEditSessionState(): boolean {
+    const fileInstance = this.#fileInstance;
+    const editSession = this.#editSession;
+    if (fileInstance == null || editSession == null) {
+      return false;
+    }
+
+    const editorState = this.#isRendering
+      ? this.getViewState()
+      : (editSession.editor ?? {});
+    const { view } = editorState;
+    const hasNonDefaultView =
+      view != null && (view.scrollLeft !== 0 || (view.scrollTop ?? 0) !== 0);
+    const hasEditorState = editorState.selections != null || hasNonDefaultView;
+    editSession.editor = cloneEditorViewState(editorState);
+
+    if (editSession.type === 'file') {
+      return false;
+    }
+
+    const capturedDiffSession = fileInstance.__captureDocumentSessionState();
+    if (capturedDiffSession == null) {
+      editSession.diffSession = undefined;
+      return false;
+    }
+
+    editSession.diffSession = capturedDiffSession.diffSession;
+
+    const document = editSession.document;
+    return (
+      capturedDiffSession.hasChanges ||
+      hasEditorState ||
+      document?.canUndo === true ||
+      document?.canRedo === true
+    );
+  }
+
+  #releaseEditSession(discardDiffState = false): void {
+    const editStateKey = this.#editStateKey;
+    if (editStateKey == null) {
+      return;
+    }
+    const editor = this.#getTypedEditor;
+    if (editor.type === 'file') {
+      EditStateManager.releaseFile(editStateKey, editor);
+    } else {
+      EditStateManager.releaseFileDiff(editStateKey, editor, discardDiffState);
+    }
+  }
+
+  /** @internal */
+  __postponeBgTokenizeToNextFrame(): void {
+    const tokenizer = this.#tokenizer;
+    if (tokenizer !== undefined) {
+      tokenizer.pauseBackgroundTokenize();
+      requestAnimationFrame(() => {
+        if (this.#tokenizer === tokenizer) {
+          tokenizer.resumeBackgroundTokenize();
+        }
+      });
+    }
+  }
+
+  /** @internal */
+  __captureFocusForDOMReplacement(): void {
+    const contentElement = this.#contentElement;
+    const shadowActiveElement = this.#fileContainer?.shadowRoot?.activeElement;
+    if (
+      contentElement != null &&
+      (this.#contentHasFocus ||
+        shadowActiveElement === contentElement ||
+        (shadowActiveElement != null &&
+          contentElement.contains(shadowActiveElement)))
+    ) {
+      this.#replacementFocusRequest = {};
+    }
+  }
+
+  /** @internal */
+  __getDocumentContents(fallbackFile?: FileContents): FileContents | undefined {
+    const fileInfo = this.#editSession?.fileInfo;
+    const textDocument = this.#editSession?.document;
+    if (textDocument == null) {
+      return fileInfo == null || fallbackFile == null
+        ? undefined
+        : { ...fileInfo, contents: fallbackFile.contents };
+    }
+    const resolvedFileInfo = fileInfo ?? fallbackFile;
+    if (resolvedFileInfo == null) {
+      return undefined;
+    }
+    return {
+      name: resolvedFileInfo.name,
+      lang: resolvedFileInfo.lang,
+      contents: textDocument.getText(),
+    };
+  }
+
+  /** @internal */
+  __getDocumentSessionState(): RetainedDiffSessionSnapshot | undefined {
+    const snapshot = this.#editSession?.diffSession;
+    return snapshot != null
+      ? cloneRetainedDiffSessionSnapshot(snapshot)
+      : undefined;
+  }
+
+  /** @internal */
+  __syncRenderView(props: SyncRenderViewProps<EType, LAnnotation>): void {
+    const {
+      highlighter,
+      fileContainer,
+      renderRange,
+      externalDocument = false,
+    } = props;
+    const renderView:
+      | SyncFileRenderViewProps<LAnnotation>
+      | SyncDiffRenderViewProps<LAnnotation> = props;
+    let fileOrDiff: FileContents | FileDiffMetadata;
+    if ('file' in renderView && this.type === 'file') {
+      fileOrDiff = renderView.file;
+    } else if ('fileDiff' in renderView && this.type === 'file-diff') {
+      fileOrDiff = renderView.fileDiff;
+    } else {
+      throw new Error('Editor.__syncRenderView: Impossible render state');
+    }
+    const lineAnnotations = renderView.lineAnnotations as
+      | EditorLineAnnotation<EType, LAnnotation>[]
+      | undefined;
+    const editStateKey = this.#editStateKey;
+    const fileInstance = this.#fileInstance;
+    const editSession = this.#editSession;
+    if (!this.#isRendering || fileInstance == null || editSession == null) {
+      return;
+    }
+    const shadowRoot = fileContainer.shadowRoot;
+    if (shadowRoot == null) {
+      console.error('[editor] Could not find the shadow root.');
+      return;
+    }
+
+    let codeElement: HTMLElement | undefined;
+    let gutterEl: HTMLElement | undefined;
+    let contentEl: HTMLElement | undefined;
+    let deletionsGutterEl: HTMLElement | undefined;
+    let deletionsContentEl: HTMLElement | undefined;
+    for (const el of shadowRoot.querySelectorAll<HTMLElement>('[data-code]')) {
+      const isDeletions = el.dataset.deletions != null;
+      if (!isDeletions) {
+        codeElement = el;
+      }
+      for (const child of el.children) {
+        if (!(child instanceof HTMLElement)) {
+          continue;
+        }
+        const { gutter, content } = child.dataset;
+        if (gutter != null) {
+          if (isDeletions) {
+            deletionsGutterEl = child;
+          } else {
+            gutterEl = child;
+          }
+        } else if (content != null) {
+          if (isDeletions) {
+            deletionsContentEl = child;
+          } else {
+            contentEl = child;
+          }
+        }
+      }
+    }
+    if (deletionsContentEl == null) {
+      this.#deletionsColumn = undefined;
+    } else if (deletionsGutterEl == null) {
+      throw new Error(
+        'Editor.__syncRenderView: the deletions column has no gutter'
+      );
+    } else {
+      this.#deletionsColumn = {
+        content: deletionsContentEl,
+        gutter: deletionsGutterEl,
+      };
+    }
+    if (codeElement === undefined || contentEl === undefined) {
+      this.#replacementFocusRequest = undefined;
+      return;
+    }
+
+    this.#getPopoverManager().setViewportElements(fileContainer, codeElement);
+
+    // inject editor&theme style to the file container
+    if (this.#fileContainer !== fileContainer) {
+      this.#fileContainer = fileContainer;
+      if (this.#globalStyleElement !== undefined) {
+        fileContainer.appendChild(this.#globalStyleElement);
+      }
+      if (this.#editorStyleElement !== undefined) {
+        shadowRoot.appendChild(this.#editorStyleElement);
+      }
+      if (this.#themeStyleElement !== undefined) {
+        shadowRoot.appendChild(this.#themeStyleElement);
+      }
+      if (this.#spriteElement !== undefined) {
+        shadowRoot.prepend(this.#spriteElement);
+      }
+    }
+
+    const languageId =
+      fileOrDiff.lang ?? getFiletypeFromFileName(fileOrDiff.name);
+    const contents =
+      'contents' in fileOrDiff
+        ? fileOrDiff.contents
+        : fileOrDiff.additionLines.join('');
+    const previousTextDocument = editSession.document;
+    // The caller flags whether the host replaced the file (`externalDocument`)
+    // document that should win. Undo-reset, however, is derived here from the
+    // editor's own fileInfo: it resets only when name/language change or when
+    // the caller passes in resetHistory
+    const resetHistory =
+      props.resetHistory ??
+      (previousTextDocument != null &&
+        editSession.fileInfo != null &&
+        (editSession.fileInfo.name !== fileOrDiff.name ||
+          previousTextDocument.languageId !== languageId));
+    const documentChanges =
+      externalDocument &&
+      previousTextDocument !== undefined &&
+      previousTextDocument.getText() !== contents
+        ? [createFullDocumentChange(previousTextDocument.getText(), contents)]
+        : undefined;
+
+    const resetForExternalDocument = externalDocument && resetHistory;
+    const shouldRebuildDocument =
+      editSession.document == null ||
+      editSession.fileInfo == null ||
+      (editStateKey == null &&
+        (editSession.fileInfo.name !== fileOrDiff.name ||
+          editSession.document.languageId !== languageId)) ||
+      resetForExternalDocument;
+    if (shouldRebuildDocument) {
+      this.#cancelEditPrediction(true);
+      this.#editPredictionHistory = [];
+      this.#invalidateOnAttach();
+      const { name, lang } = fileOrDiff;
+      let textDocument =
+        resetForExternalDocument ||
+        (editStateKey == null && editSession.fileInfo != null)
+          ? undefined
+          : editSession.document;
+      if (previousTextDocument != null && textDocument == null) {
+        editSession.editor = undefined;
+      }
+      if (textDocument == null) {
+        const editStack = new EditStack<EType, LAnnotation>({
+          maxEntries: this.#options.historyMaxEntries,
+        });
+        textDocument = new TextDocument<EType, LAnnotation>(
+          fileOrDiff.name,
+          contents,
+          languageId,
+          0,
+          editStack
+        );
+      }
+      editSession.fileInfo = { name, lang };
+      editSession.document = textDocument;
+      if (resetForExternalDocument) {
+        editSession.diffSession = undefined;
+      }
+      this.#tokenizer?.cleanUp();
+      this.#tokenizer = undefined;
+      this.#resetState();
+      // Wrap offsets survive #resetCache, so a document swap on a reused
+      // content element must drop the previous document's measurements here.
+      this.#wrapLineOffsetsCache.clear();
+      this.#selections = this.#initSelections;
+      if (this.#options.__debug === true) {
+        console.log(
+          '[diffs/editor] text document initialized from',
+          fileOrDiff.name
+        );
+      }
+    }
+    if (externalDocument && !resetForExternalDocument) {
+      this.#applyExternalDocumentReplacement(
+        editSession,
+        contents,
+        lineAnnotations
+      );
+      const { name, lang } = fileOrDiff;
+      editSession.fileInfo = { name, lang };
+    }
+
+    // The tokenizer is (re)created whenever the current document lacks one:
+    // right after a fresh document build above, or on the first sync after a
+    // recycled surface resumes its retained document. Tying it to the document
+    // (rather than the rebuild) keeps an unchanged resumed document, which
+    // skips the rebuild, able to paint edits.
+    const textDocument = editSession.document;
+    if (
+      this.#tokenizer != null &&
+      this.#tokenizer.highlighter !== highlighter
+    ) {
+      this.#tokenizer.cleanUp();
+      this.#tokenizer = undefined;
+    }
+    if (this.#tokenizer == null && textDocument != null) {
+      this.#tokenizer = new EditorTokenizer({
+        highlighter,
+        textDocument,
+        codeOptions: this.#fileInstance?.__getEffectiveCodeOptions() ?? {},
+        matchBrackets: this.#options.matchBrackets,
+        onDeferTokenize: this.#onDeferTokenize,
+        onThemeChange: () => this.#scheduleThemeSelectionRefresh(),
+        setStyle: (css) => {
+          this.#themeStyleElement!.textContent = css;
+        },
+        __debug: this.#options.__debug,
+      });
+    }
+
+    if (this.#contentElement !== contentEl) {
+      this.#gutterElement = gutterEl;
+      this.#contentElement = extend(contentEl, {
+        contentEditable: 'true',
+        role: 'textbox',
+        ariaMultiLine: 'true',
+        autocapitalize: 'off',
+        writingSuggestions: 'off',
+        autocorrect: false,
+        spellcheck: false,
+        translate: false,
+      });
+      if (this.#overlayElement !== undefined) {
+        contentEl.after(this.#overlayElement);
+      }
+      this.#metrics.init(contentEl);
+      this.#remeasureMetricsOnFontLoad();
+      this.#listenContentElement(contentEl, gutterEl);
+      if (
+        this.#contentElement !== undefined &&
+        this.#options.__debug === true
+      ) {
+        console.log('[diffs/editor] full re-render triggered !!!');
+      }
+    }
+    if (this.#replacementFocusRequest != null) {
+      this.#replacementFocusRequest.target = contentEl;
+    }
+
+    // The contenteditable host advertises role="textbox", so without an
+    // accessible name screen readers announce an unlabeled text field. Label it
+    // with the file name. The same content element is reused across file
+    // switches (see File#applyFullRender), so refresh the label on every sync
+    // rather than only when the element is first initialized above.
+    if (contentEl.ariaLabel !== fileOrDiff.name) {
+      contentEl.ariaLabel = fileOrDiff.name;
+    }
+
+    // Annotation rows, unified deleted rows, and hunk separators are
+    // non-document rows living inside the contenteditable column; mark them
+    // read-only so the caret can never enter them. Separators render in both
+    // diff styles whenever a collapsed region exists.
+    if (
+      (lineAnnotations !== undefined && lineAnnotations.length > 0) ||
+      this.#isDiff
+    ) {
+      for (const child of this.#contentElement.children) {
+        const el = child as HTMLElement;
+        const { lineAnnotation, lineType, separator } = el.dataset;
+        if (
+          lineAnnotation !== undefined ||
+          separator !== undefined ||
+          lineType === 'change-deletion'
+        ) {
+          el.setAttribute('contenteditable', 'false');
+        }
+      }
+    }
+
+    this.#resetCache();
+
+    // The tokenizer is created once per attached document and reused across
+    // re-renders, so a host-driven theme swap (theme picker, light/dark toggle)
+    // wouldn't otherwise reach it. Re-apply the surface's current theme on every
+    // sync so the editor's line-highlight/token colors track the active theme.
+    this.#tokenizer?.syncTheme(
+      this.#fileInstance?.__getEffectiveCodeOptions() ?? {}
+    );
+
+    this.#lineAnnotations = lineAnnotations;
+    this.#renderRange = renderRange;
+    // Remember the bounded window the virtualizer just synced so #applyChange
+    // can clamp any edit-time widening against it. Refreshed on every scroll;
+    // undefined/Infinity windows leave the clamp disabled.
+    this.#viewportWindowLines = renderRange?.totalLines;
+    this.#tokenizer?.prebuildStateStack(renderRange);
+
+    const retainedEditorState = editSession.editor;
+    const restoreEditorStateOnSync = this.#restoreEditorStateOnSync;
+
+    try {
+      this.#markerRenderer?.removePopover();
+
+      // re-render the existing selections, matches, and markers
+      if (
+        this.#selections !== undefined ||
+        this.#matches !== undefined ||
+        this.#markerRenderer !== undefined
+      ) {
+        this.#updateSelections(this.#selections ?? []);
+      }
+      this.#renderCarets();
+      if (this.#retryEditPredictionOnRender) {
+        this.#scheduleEditPrediction();
+      }
+
+      if (
+        this.#initSelections !== undefined &&
+        this.#primaryCaretElement !== undefined
+      ) {
+        this.#initSelections = undefined;
+        this.#scrollToPrimaryCaret(false, 'center');
+      } else if (this.#scrollingToLine !== undefined) {
+        this.#scrollToLine(
+          this.#scrollingToLine,
+          this.#scrollingToLineChar,
+          this.#scrollingToLineNoFocus
+        );
+      } else if (this.#replacementFocusRequest !== undefined) {
+        this.#restoreReplacementFocus();
+      } else if (
+        this.#selections !== undefined &&
+        this.#selections.length > 0 &&
+        this.#contentHasFocus &&
+        !this.#retainSearchPanelFocus
+      ) {
+        this.focus({ preventScroll: true });
+      }
+
+      if (this.#retainSearchPanelFocus) {
+        this.#searchPanel?.focus();
+      }
+
+      if (restoreEditorStateOnSync) {
+        this.#restoreEditorStateOnSync = false;
+        if (retainedEditorState !== undefined) {
+          this.setViewState(retainedEditorState);
+        }
+      }
+
+      if (this.#options.__debug === true && renderRange !== undefined) {
+        const { startingLine, totalLines } = renderRange;
+        console.log(
+          '[diffs/editor] render file:',
+          fileOrDiff.name,
+          'RenderRange:',
+          startingLine + '-' + (startingLine + totalLines),
+          'of',
+          editSession.document?.lineCount,
+          'lines'
+        );
+      }
+
+      // A reconciled replacement is current even when its text did not change.
+      // Retire it before checkpointing the new diff state or notifying observers.
+      if (externalDocument) {
+        fileInstance.__acknowledgeDocumentUpdate();
+      }
+      this.#checkpointEditSessionState();
+    } catch (error) {
+      this.#restoreEditorStateOnSync = restoreEditorStateOnSync;
+      editSession.editor = retainedEditorState;
+      throw error;
+    }
+
+    if (documentChanges != null) {
+      this.#emitChange(documentChanges, lineAnnotations);
+    }
+
+    this.#scheduleOnAttach(fileInstance);
+  }
+
+  // The host component has already rendered these external contents. Update
+  // only the editor document and history so the same replacement is not
+  // applied twice. __syncRenderView emits the resulting onChange notification
+  // afterward.
+  #applyExternalDocumentReplacement(
+    editSession: ManagedEditSession<EType, LAnnotation>,
+    contents: string,
+    lineAnnotations: EditorLineAnnotation<EType, LAnnotation>[] | undefined
+  ): void {
+    const textDocument = editSession.document;
+    if (textDocument == null || textDocument.getText() === contents) {
+      return;
+    }
+
+    const selections = this.#selections;
+    const selectionOffsets = selections?.map(
+      (selection) =>
+        [
+          textDocument.offsetAt(selection.start),
+          textDocument.offsetAt(selection.end),
+        ] as const
+    );
+    const replacement = {
+      start: 0,
+      end: textDocument.getText().length,
+      text: contents,
+    };
+    const change = textDocument.applyResolvedEdits(
+      [replacement],
+      true,
+      selections,
+      undefined,
+      true
+    );
+    if (change == null) {
+      return;
+    }
+
+    if (selections != null && selectionOffsets != null) {
+      const nextSelections = remapSelectionsAfterEdits(
+        textDocument,
+        selections,
+        selectionOffsets,
+        [replacement]
+      );
+      textDocument.setLastUndoSelectionsAfter(nextSelections);
+      this.#selections = nextSelections;
+    }
+    if (this.#lineAnnotations != null || lineAnnotations != null) {
+      textDocument.setLastUndoLineAnnotations(
+        this.#lineAnnotations ?? [],
+        lineAnnotations ?? []
+      );
+    }
+
+    this.#tokenizer?.cleanUp();
+    this.#tokenizer = undefined;
+    this.#resetCache();
+    this.#wrapLineOffsetsCache.clear();
+    this.#markerRenderer?.removePopover();
+    if (this.#searchPanel !== undefined && this.#matches !== undefined) {
+      this.#searchPanel.updateMatches({ syncSelection: false });
+    }
+  }
+
+  get #fileDiffInstance(): FileDiff<LAnnotation, Caret> | undefined {
+    return this.#fileInstance?.type === 'file-diff'
+      ? this.#fileInstance
+      : undefined;
+  }
+
+  get #virtualizedInstance():
+    | EditorVirtualizedComponent<LAnnotation, Caret>
+    | undefined {
+    return isVirtualizedEditorComponent(this.#fileInstance)
+      ? this.#fileInstance
+      : undefined;
+  }
+
+  // Whether a zero-based document line has (or will have on scroll) a
+  // rendered row. False only for lines hidden inside a collapsed unchanged
+  // region of a diff host; hosts without collapsible regions treat every
+  // line as renderable.
+  #isLineRenderable(line: number): boolean {
+    return this.#fileDiffInstance?.isLineRenderable?.(line + 1) ?? true;
+  }
+
+  // Fold-skip resolver for vertical caret motion (zero-based lines), or
+  // undefined for hosts without collapsible regions so motion stays plain
+  // line arithmetic.
+  get #resolveRenderableLine(): ResolveRenderableLine | undefined {
+    const fileInstance = this.#fileDiffInstance;
+    if (fileInstance == null) {
+      return undefined;
+    }
+    return (line, direction) => {
+      const nearest = fileInstance.getNearestRenderableLine(
+        line + 1,
+        direction
+      );
+      return nearest == null ? undefined : nearest - 1;
+    };
+  }
+
+  // Jump targets (search matches, undo restores, setSelections, doc-end
+  // moves) may land inside a collapsed region; expand it minimally so the
+  // caret's row can render before the scroll below retries toward it.
+  #revealLineIfCollapsed(line: number): void {
+    if (!this.#isLineRenderable(line)) {
+      this.#fileDiffInstance?.revealLine?.(line + 1);
+    }
+  }
+
+  get #diffSyle(): 'unified' | 'split' {
+    return this.#fileDiffInstance?.options.diffStyle ?? 'split';
+  }
+
+  get #isDiff(): boolean {
+    return this.type === 'file-diff';
+  }
+
+  get #isWrap(): boolean {
+    return this.#fileInstance?.options.overflow === 'wrap';
+  }
+
+  #getPopoverManager(): PopoverManager {
+    return (this.#popoverManager ??= new PopoverManager({
+      hasActivePopover: () =>
+        this.#selectionAction !== undefined ||
+        this.#markerRenderer?.isPopoverVisible() === true,
+      updateActivePopover: () => {
+        this.#updateSelectionActionPopover();
+        this.#markerRenderer?.updatePopoverPosition();
+      },
+    }));
+  }
+
+  // Drop the DOM-geometry caches (memoized row elements, measured line Ys,
+  // last caret x).
+  #resetCache(): void {
+    this.#lineYCache.clear();
+    this.#lineElementsCache.clear();
+    this.#lastAccessedCharX = undefined;
+  }
+
+  #resetState(preserveCarets = false): void {
+    this.#setEditorActiveLineSafe(null);
+    this.#gutterWidthCache = undefined;
+    this.#contentWidthCache = undefined;
+    this.#resetSelectionGesture();
+    this.#suppressNativeSelectionSync = false;
+    this.#overlayElements?.forEach((el) => el.remove());
+    this.#overlayElements = undefined;
+    this.#caretElements?.forEach((element) => element.remove());
+    this.#caretElements = undefined;
+    this.#caretHighlightElements?.forEach((element) => element.remove());
+    this.#caretHighlightElements = undefined;
+    if (!preserveCarets) {
+      this.#carets = undefined;
+    }
+    this.#selections = undefined;
+    this.#scrollingToLine = undefined;
+    this.#markerRenderer?.cleanup();
+    this.#markerRenderer = undefined;
+    this.#searchPanel?.cleanup();
+    this.#searchPanel = undefined;
+    this.#selectionAction?.cleanup();
+    this.#selectionAction = undefined;
+    this.#canMountSelectionAction = true;
+  }
+
+  #invalidateOnAttach(): void {
+    const attachState = this.#attachState;
+    attachState.generation++;
+    if (attachState.callback != null) {
+      dequeueRender(attachState.callback);
+      attachState.callback = undefined;
+    }
+  }
+
+  // A recycled attachment remains the same edit session. If its first
+  // notification was canceled, the next live synchronization reschedules it;
+  // once delivered, later recycled mounts stay silent.
+  #scheduleOnAttach(
+    fileInstance: EditorComponent<EType, LAnnotation, Caret>
+  ): void {
+    const attachState = this.#attachState;
+    const textDocument = this.#editSession?.document;
+    if (
+      attachState.delivered ||
+      attachState.callback != null ||
+      textDocument == null
+    ) {
+      return;
+    }
+    const { generation } = attachState;
+    const callback = () => {
+      if (attachState.callback !== callback) {
+        return;
+      }
+      attachState.callback = undefined;
+      if (
+        generation !== attachState.generation ||
+        this.#fileInstance !== fileInstance ||
+        this.#editSession?.document !== textDocument
+      ) {
+        return;
+      }
+      const contentElement = this.#contentElement;
+      const shadowRoot = this.#fileContainer?.shadowRoot;
+      // A host rerender queued ahead of this callback may have replaced the
+      // editable DOM while its asynchronous editor sync is still pending.
+      if (
+        contentElement == null ||
+        shadowRoot == null ||
+        !shadowRoot.contains(contentElement)
+      ) {
+        return;
+      }
+      attachState.delivered = true;
+      this.#options.onAttach?.(this, fileInstance);
+    };
+    attachState.callback = callback;
+    queueRender(callback);
+  }
+
+  // Get the editor's scrolling viewport, return undefined if the Virtualizer
+  // is not present.`
+  #getScrollViewport(): HTMLElement | Document | undefined {
+    const viewport = this.#virtualizedInstance?.getEditorViewport?.();
+    if (viewport != null) {
+      return viewport;
+    }
+    const fileContainer = this.#fileContainer;
+    if (this.#fileInstance == null || fileContainer == null) {
+      return undefined;
+    }
+    return lookupScrollContainer(fileContainer);
+  }
+
+  #getOwnedVerticalViewport(): HTMLElement | undefined {
+    if (!this.#ownsVerticalViewport) {
+      return undefined;
+    }
+    const viewport = this.#virtualizedInstance?.getEditorViewport?.();
+    if (viewport instanceof HTMLElement) {
+      return viewport;
+    }
+    return undefined;
+  }
+
+  #initialize(): void {
+    // Safari doesn't support `::selection` for slot elements in ShadowDOM,
+    // Add a global style to disable selection for slot elements
+    this.#globalStyleElement = h('style', {
+      dataset: 'editorGlobalCss',
+      textContent: `
+        [data-annotation-slot] {
+          user-select: none;
+          -webkit-user-select: none;
+        }
+      `,
+    });
+
+    this.#editorStyleElement = h('style', {
+      dataset: 'editorCss',
+      textContent: editorCSS,
+    });
+
+    this.#themeStyleElement = h('style', {
+      dataset: 'editorThemeCss',
+    });
+
+    this.#spriteElement = createSpriteElement();
+
+    this.#overlayElement = h('div', {
+      dataset: 'editorOverlay',
+    });
+
+    const replacementFocusTargetIsContent = (event: Event) => {
+      const target = event.composedPath()[0];
+      return (
+        target instanceof Node &&
+        this.#contentElement?.contains(target) === true
+      );
+    };
+    const cancelReplacementFocus = () => {
+      if (this.#replacementFocusRequest == null) {
+        return;
+      }
+
+      // A focus or pointer target outside the editor owns the newer intent.
+      this.#replacementFocusRequest = undefined;
+      this.#contentHasFocus = false;
+      this.#shouldIgnoreSelectionChange = false;
+    };
+    const finishMouseSelection = (event: PointerEvent) => {
+      if (event.pointerType !== 'mouse') {
+        return;
+      }
+
+      const refocusEditor = this.#isGutterMouseDown;
+      this.#resetSelectionGesture();
+      if (refocusEditor) {
+        this.#focus();
+      }
+
+      // The popover is suppressed while the mouse is down so it doesn't
+      // flicker under the cursor mid-drag. Once settled, re-run the overlay
+      // pass so a ranged selection reveals it.
+      if (
+        this.#options.enabledSelectionAction === true &&
+        this.#selections !== undefined &&
+        this.#selections.length > 0 &&
+        !isCollapsedSelection(this.#selections.at(-1)!)
+      ) {
+        this.#updateSelections(this.#selections);
+      }
+    };
+    this.#globalEventDisposes = [
+      addEventListener(
+        document,
+        'focusin',
+        (event) => {
+          if (!replacementFocusTargetIsContent(event)) {
+            cancelReplacementFocus();
+          }
+        },
+        { passive: true }
+      ),
+      addEventListener(
+        document,
+        'pointerdown',
+        (event) => {
+          if (!replacementFocusTargetIsContent(event)) {
+            // Target handlers can synchronously render and arm the request.
+            queueMicrotask(cancelReplacementFocus);
+          }
+        },
+        { capture: true, passive: true }
+      ),
+
+      addEventListener(
+        document,
+        'selectionchange',
+        () => {
+          const shadowRoot = this.#fileContainer?.shadowRoot;
+          // Ignore selection changes while the contenteditable is unfocused. A
+          // programmatic applyEdits (skipFocus) re-anchors #selections without
+          // syncing the native Selection, so a DOM-driven or refocus
+          // selectionchange whose range still belongs to the editor must not
+          // overwrite the remapped #selections before the user returns to type.
+          if (
+            this.#shouldIgnoreSelectionChange ||
+            this.#suppressNativeSelectionSync ||
+            shadowRoot == null ||
+            !this.#contentHasFocus
+          ) {
+            return;
+          }
+
+          // Native selection only tracks one range. focus() and DOM updates while
+          // typing mirror the primary caret there, so selectionchange must not
+          // overwrite multi-cursor editor state outside an active pointer gesture.
+          if (
+            this.#selections !== undefined &&
+            this.#selections.length > 1 &&
+            !this.#isContentMouseDown
+          ) {
+            return;
+          }
+
+          const selectionRaw = document.getSelection();
+          if (selectionRaw == null) {
+            return;
+          }
+          // Read the caret/selection through the editor's shadow root.
+          // getComposedRanges is the standard, spec'd way to do this but is only
+          // available in newer browsers. When it is missing (older browsers,
+          // embedded WebViews, and the pinned CI Chromium), fall back to the
+          // older Blink/WebKit-specific ShadowRoot.getSelection(), which still
+          // reports the range inside the shadow tree. Normalize that live Range
+          // to a StaticRange so it matches the getComposedRanges return shape.
+          // Only bail when neither API yields a range, so a click can still seed
+          // the caret rather than leaving the surface unusable.
+          let composedRange: StaticRange | undefined;
+          if (typeof selectionRaw.getComposedRanges === 'function') {
+            composedRange = selectionRaw.getComposedRanges({
+              shadowRoots: [shadowRoot],
+            })?.[0];
+          } else {
+            composedRange = getShadowRootRange(shadowRoot);
+          }
+          if (
+            composedRange === undefined ||
+            !this.#rangeBelongsToEditor(composedRange)
+          ) {
+            return;
+          }
+
+          const selection = convertSelection(composedRange, DirectionNone);
+          if (selection === undefined) {
+            return;
+          }
+
+          // extend selection by shift + click
+          if (
+            this.#isContentMouseDown &&
+            this.#shiftKeyPressed &&
+            this.#selections !== undefined &&
+            this.#selections.length > 0
+          ) {
+            const primarySelection = this.#selections.at(-1)!;
+            this.#updateSelections([
+              extendSelection(primarySelection, selection),
+            ]);
+            return;
+          }
+
+          if (this.#selectionStart !== undefined) {
+            // Keep the browser's range for word and whole-line drags. Rebuilding
+            // it from the initial start drops that word or line when dragging up.
+            selection.direction = createSelectionFrom(
+              this.#selectionStart,
+              selection
+            ).direction;
+          } else if (this.#isContentMouseDown) {
+            this.#selectionStart = selection;
+          } else if (
+            this.#selections !== undefined &&
+            this.#selections.length === 1
+          ) {
+            // getComposedRanges only reports an ordered start/end range, so a
+            // selectionchange fired by a refocus (or by our own focus-handler
+            // setBaseAndExtent) carries no direction and would otherwise flip a
+            // backward selection to DirectionNone, jumping the caret/popover to
+            // the bottom. When the bounds are unchanged, keep the prior
+            // direction; a genuine change (different bounds) still resets it.
+            const previous = this.#selections[0];
+            if (
+              comparePosition(previous.start, selection.start) === 0 &&
+              comparePosition(previous.end, selection.end) === 0
+            ) {
+              selection.direction = previous.direction;
+            }
+          }
+
+          if (this.#altColumnDrag !== undefined) {
+            this.#altColumnDrag.focusLine = getCaretPosition(selection).line;
+            if (this.#updateAltColumnSelections()) {
+              return;
+            }
+          }
+
+          if (this.#reservedSelections !== undefined) {
+            this.#updateSelections([
+              ...this.#reservedSelections.filter(
+                (reservedSelection) =>
+                  !selectionIntersects(reservedSelection, selection)
+              ),
+              selection,
+            ]);
+          } else {
+            this.#updateSelections([selection]);
+          }
+        },
+        { passive: true }
+      ),
+
+      addEventListener(document, 'pointerup', finishMouseSelection, {
+        passive: true,
+      }),
+      addEventListener(document, 'pointercancel', finishMouseSelection, {
+        passive: true,
+      }),
+
+      addEventListener(
+        document,
+        'keydown',
+        (e) => {
+          if (e.key === 'Shift') {
+            this.#selectionStart = this.#selections?.at(-1);
+          } else if (
+            e.key === 'Alt' &&
+            !e.repeat &&
+            this.#contentHasFocus &&
+            this.#options.editPrediction?.mode === 'subtle'
+          ) {
+            this.#editPredictionRevealed = !this.#editPredictionRevealed;
+            this.#updateSelections(this.#selections ?? []);
+          }
+        },
+        { passive: true }
+      ),
+
+      addEventListener(
+        document,
+        'keyup',
+        (e) => {
+          if (e.key === 'Shift') {
+            this.#selectionStart = undefined;
+          }
+        },
+        { passive: true }
+      ),
+    ];
+  }
+
+  // End any in-flight text or gutter selection and release its document-level
+  // listeners. Pointer completion, cancellation, and editor resets share this
+  // path so none can strand gesture state.
+  #resetSelectionGesture(): void {
+    this.#selectEventDisposes?.forEach((dispose) => dispose());
+    this.#selectEventDisposes = undefined;
+    this.#shouldIgnoreSelectionChange = false;
+    this.#isGutterMouseDown = false;
+    this.#isContentMouseDown = false;
+    this.#altColumnDrag = undefined;
+    this.#shiftKeyPressed = false;
+    this.#selectionStart = undefined;
+    this.#reservedSelections = undefined;
+  }
+
+  // Swaps in a new batch of transient "select" listeners — gutter drag
+  // tracking or the Safari annotation-hover workaround — disposing the
+  // previous batch first. Routing every reassignment through here keeps the
+  // dispose-before-replace invariant in one place: a stale set (e.g. from a
+  // pointerup that never fired after a canceled gesture, or a fresh
+  // pointerdown before the previous interaction tore down) can never be
+  // overwritten while its listeners are still attached to the document.
+  #replaceSelectEventListeners(disposes: (() => void)[]): void {
+    this.#selectEventDisposes?.forEach((dispose) => dispose());
+    this.#selectEventDisposes = disposes;
+  }
+
+  // Normal line selection owns gutter gestures when enabled, so the editor
+  // must not also turn the same drag into a text selection.
+  #isLineSelectionEnabled(): boolean {
+    return this.#fileInstance?.options.enableLineSelection === true;
+  }
+
+  // Gutter gestures owned by diff interactions must not replace the editor's
+  // text selections through a browser-generated selectionchange.
+  #preserveEditorSelectionsForGutterGesture(): void {
+    this.#suppressNativeSelectionSync = this.#selections !== undefined;
+  }
+
+  #listenContentElement(contentEl: HTMLElement, gutterEl?: HTMLElement): void {
+    const { onFocus, onBlur } = this.#options;
+    const targetIsContentElement = (e: Event) => {
+      const target = e.composedPath()[0] as HTMLElement | undefined;
+      return (
+        target !== undefined &&
+        (target === contentEl || contentEl.contains(target))
+      );
+    };
+
+    this.#editorEventDisposes?.forEach((dispose) => dispose());
+    this.#editorEventDisposes = [
+      addEventListener(
+        contentEl,
+        'focus',
+        () => {
+          this.#contentHasFocus = true;
+          onFocus?.();
+          // A keyboard or direct programmatic refocus restores a stale native
+          // Selection that the selectionchange handler would apply over the
+          // remapped #selections (after an applyEdits inserted a line above the
+          // unfocused caret). Re-assert the editor's selection so the caret
+          // stays anchored. A pointer focus is left to the click, and #focus()
+          // already syncs the selection during an editor-driven focus.
+          if (
+            !this.#isContentMouseDown &&
+            !this.#shouldIgnoreSelectionChange &&
+            this.#selections !== undefined &&
+            this.#selections.length > 0
+          ) {
+            this.#setWindowSelection(this.#selections.at(-1)!);
+          }
+        },
+        { passive: true }
+      ),
+      addEventListener(
+        contentEl,
+        'blur',
+        () => {
+          if (this.#replacementFocusRequest?.target === contentEl) {
+            this.#replacementFocusRequest = undefined;
+            this.#shouldIgnoreSelectionChange = false;
+          }
+          this.#contentHasFocus = false;
+          onBlur?.();
+        },
+        { passive: true }
+      ),
+      addEventListener(
+        contentEl,
+        'pointerdown',
+        (e) => {
+          this.#canMountSelectionAction = true;
+          // Any pointer press — mouse, touch, or pen — moves off the select-all
+          // selection, so let selectionchange sync #selections from the new
+          // native selection again. This must run before the mouse-only guard
+          // below: a touch or pen tap also moves the caret, and if the flag
+          // stayed set its selectionchange would be ignored and the next typed
+          // character would replace the whole still-selected document.
+          this.#suppressNativeSelectionSync = false;
+
+          if (e.pointerType !== 'mouse') {
+            return;
+          }
+          this.#altColumnDrag = undefined;
+
+          // A click on a read-only deleted line (unified view) selects it
+          // natively. Hand the selection to the deleted text and drop the
+          // editor's own selection, so only one region is highlighted at a
+          // time and the deleted line is not swept into an editable selection.
+          if (this.#isDeletedLineTarget(e)) {
+            this.#setDeletedTextSelectionActive(true);
+            if (this.#selections !== undefined) {
+              this.#updateSelections([]);
+            }
+            return;
+          }
+          this.#setDeletedTextSelectionActive(false);
+
+          this.#markerRenderer?.removePopover();
+
+          // this is a workaround for the selection rendering glitch
+          // happens when selecting content in shadow DOM on Safari
+          const selectEventDisposes: (() => void)[] = [];
+          if (
+            isSafari() &&
+            this.#lineAnnotations !== undefined &&
+            this.#lineAnnotations.length > 0
+          ) {
+            const annotationDisposes = [
+              ...contentEl.querySelectorAll<HTMLElement>(
+                '[data-line-annotation]'
+              ),
+            ]
+              .map((el) => [
+                addEventListener(el, 'mouseenter', () => {
+                  this.#shouldIgnoreSelectionChange = true;
+                }),
+                addEventListener(el, 'mouseleave', () => {
+                  this.#shouldIgnoreSelectionChange = false;
+                }),
+              ])
+              .flat();
+            selectEventDisposes.push(...annotationDisposes);
+          }
+
+          this.#isContentMouseDown = true;
+          const isAltColumnDrag =
+            e.button === 0 &&
+            e.altKey &&
+            !e.ctrlKey &&
+            !e.metaKey &&
+            !e.shiftKey;
+          this.#selectionStart = undefined;
+          if (isAltColumnDrag) {
+            this.#altColumnDrag = {
+              pointerId: e.pointerId,
+              startClientX: e.clientX,
+              clientX: e.clientX,
+              startScrollLeft: contentEl.parentElement?.scrollLeft ?? 0,
+            };
+            this.#reservedSelections = undefined;
+            this.#selections = undefined;
+            this.#updateSelections([]);
+            selectEventDisposes.push(
+              addEventListener(
+                document,
+                'pointermove',
+                (moveEvent) => {
+                  const drag = this.#altColumnDrag;
+                  if (
+                    drag === undefined ||
+                    moveEvent.pointerType !== 'mouse' ||
+                    moveEvent.pointerId !== drag.pointerId
+                  ) {
+                    return;
+                  }
+                  drag.clientX = moveEvent.clientX;
+                  this.#updateAltColumnSelections();
+                },
+                { capture: true, passive: true }
+              )
+            );
+          } else if (e.button === 0 && isPrimaryModifier(e)) {
+            this.#reservedSelections = this.#selections?.map((selection) => ({
+              ...selection,
+            }));
+          }
+          this.#replaceSelectEventListeners(selectEventDisposes);
+          if (e.shiftKey) {
+            const primarySelection = this.#selections?.at(-1);
+            if (primarySelection !== undefined) {
+              const pos =
+                primarySelection.direction === DirectionBackward
+                  ? primarySelection.end
+                  : primarySelection.start;
+              // fix the window selection for shift mode
+              this.#setWindowSelection({
+                start: pos,
+                end: pos,
+                direction: DirectionNone,
+              });
+            }
+            this.#shiftKeyPressed = true;
+          }
+        },
+        { passive: true }
+      ),
+
+      addEventListener(contentEl, 'keydown', (e) => {
+        if (!targetIsContentElement(e)) {
+          return;
+        }
+        this.#canMountSelectionAction = true;
+        // A keystroke is the user acting on the select-all selection (deleting,
+        // typing, moving); let selectionchange sync #selections again.
+        this.#suppressNativeSelectionSync = false;
+
+        // keyCode 229 opens the composition, before compositionstart fires.
+        if (e.isComposing || e.keyCode === 229) {
+          return;
+        }
+
+        if (
+          e.key === 'Tab' &&
+          !e.shiftKey &&
+          !e.ctrlKey &&
+          !e.metaKey &&
+          !e.isComposing &&
+          !this.#isComposing &&
+          (!e.altKey || this.#options.editPrediction?.mode === 'subtle') &&
+          this.#editPrediction?.rendered === true
+        ) {
+          // Ghost text is on screen, so Tab belongs to the prediction even when
+          // acceptance fails; it must never fall through to indentation.
+          this.#acceptEditPrediction();
+          e.preventDefault();
+          return;
+        }
+
+        if (e.key === 'Escape' && this.#editPrediction !== undefined) {
+          this.#cancelEditPrediction(true);
+          e.preventDefault();
+          return;
+        }
+
+        const command = resolveEditorCommandFromKeyboardEvent(
+          e,
+          this.#options.keymap
+        );
+        if (command !== undefined) {
+          e.preventDefault();
+          if (command === 'simplifySelection') {
+            this.#searchPanel?.close();
+            this.#searchPanel = undefined;
+            this.#retainSearchPanelFocus = false;
+            this.#selectionAction?.cleanup();
+            this.#selectionAction = undefined;
+          }
+          this.#runCommand(command);
+          return;
+        }
+
+        // handle the cursor move events manually for multiple selections and virtual viewport
+        const mvShortcut = isMoveCursorShortcut(e);
+        const textDocument = this.#editSession?.document;
+        if (
+          this.#selections !== undefined &&
+          this.#selections.length > 0 &&
+          mvShortcut !== undefined &&
+          textDocument !== undefined
+        ) {
+          const cursorMoveOptions: CursorMoveOptions = {
+            getSoftLineOffsets: this.#isWrap
+              ? (line) => this.#wrapLineTextOrWholeLine(line)
+              : undefined,
+            resolveRenderableLine: this.#resolveRenderableLine,
+          };
+          if (e.shiftKey) {
+            this.#updateSelections(
+              mapSelectionShift(
+                textDocument,
+                this.#selections,
+                mvShortcut,
+                cursorMoveOptions
+              )
+            );
+          } else {
+            this.#updateSelections(
+              mapCursorMove(
+                textDocument,
+                this.#selections,
+                mvShortcut,
+                cursorMoveOptions
+              )
+            );
+          }
+          this.#scrollToPrimaryCaret();
+          e.preventDefault();
+          return;
+        }
+
+        const normalizedKey = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+        if (normalizedKey === 'v' && isPrimaryModifier(e)) {
+          // Holding paste can enqueue a costly full diff recompute for every
+          // keyboard repeat. Accept the first paste and suppress repeats.
+          if (e.repeat && this.#isDiff) {
+            e.preventDefault();
+            return;
+          }
+
+          // Handle the 'paste' event manually with the custom clipboard API.
+          if (this.#options.clipboard !== undefined) {
+            e.preventDefault();
+            queueRender(this.#handleCustomPasteEvent);
+            return;
+          }
+        }
+
+        // Only hijack the native find-again shortcut while the panel is open
+        // so cmd+g/cmd+shift+g step through matches; otherwise leave it alone.
+        if (this.#searchPanel !== undefined) {
+          const findAgain = resolveFindAgainShortcut(e);
+          if (findAgain !== undefined) {
+            e.preventDefault();
+            this.#searchPanel.navigate(findAgain === 'previous');
+            return;
+          }
+        }
+      }),
+
+      addEventListener(contentEl, 'copy', (e) => {
+        if (!targetIsContentElement(e)) {
+          return;
+        }
+        e.preventDefault();
+        // A read-only deleted-text selection lives outside the editor's
+        // document, so #getSelectionText() would be empty. Copy the selected
+        // deleted text instead.
+        if (this.#isDeletedTextSelectionActive()) {
+          e.clipboardData?.setData('text', this.#deletedTextForClipboard());
+        } else {
+          this.#writeSelectionClipboardData(
+            e.clipboardData,
+            this.#getSelectionText(),
+            this.#getSelectionClipboardTexts()
+          );
+        }
+      }),
+
+      addEventListener(contentEl, 'cut', (e) => {
+        if (!targetIsContentElement(e)) {
+          return;
+        }
+        e.preventDefault();
+        // Deleted text is read-only and can't be removed, so a cut there copies
+        // the selected deleted text (like the copy handler) without editing.
+        if (this.#isDeletedTextSelectionActive()) {
+          e.clipboardData?.setData('text', this.#deletedTextForClipboard());
+        } else {
+          const selectionTexts = this.#getSelectionClipboardTexts();
+          this.#writeSelectionClipboardData(
+            e.clipboardData,
+            this.#cutSelectionText(),
+            selectionTexts
+          );
+        }
+      }),
+
+      addEventListener(contentEl, 'paste', (e) => {
+        if (!targetIsContentElement(e)) {
+          return;
+        }
+        e.preventDefault();
+        const clipboardData = e.clipboardData;
+        const textDocument = this.#editSession?.document;
+        if (clipboardData === null || textDocument === undefined) {
+          return;
+        }
+
+        let text: string | string[] = clipboardData.getData('text');
+
+        const selectionCount = this.#selections?.length ?? 0;
+        if (selectionCount > 1) {
+          const multiSelectionText = clipboardData.getData(
+            MULTI_SELECTION_CLIPBOARD_TYPE
+          );
+          if (multiSelectionText !== undefined) {
+            try {
+              const selectionTexts = JSON.parse(multiSelectionText);
+              if (
+                Array.isArray(selectionTexts) &&
+                selectionTexts.length === selectionCount
+              ) {
+                text = selectionTexts;
+              }
+            } catch {
+              // ignore the invalid custom clipboard data
+            }
+          }
+        }
+
+        // Rewrite clipboard line breaks to the document's EOL so a Windows
+        // clipboard (\r\n or \r) doesn't leave mixed line endings behind.
+        this.#replaceSelectionText(
+          Array.isArray(text)
+            ? text.map((t) => textDocument.normalizeEol(t))
+            : textDocument.normalizeEol(text),
+          undefined,
+          true,
+          'document'
+        );
+      }),
+
+      addEventListener(contentEl, 'beforeinput', (e) => {
+        if (!targetIsContentElement(e)) {
+          return;
+        }
+        if (e.inputType === 'insertCompositionText') {
+          this.#cancelEditPrediction(true);
+          return;
+        }
+        e.preventDefault();
+        this.#handleInput(e.inputType, e.data);
+      }),
+
+      addEventListener(contentEl, 'drop', (e) => {
+        if (!targetIsContentElement(e)) {
+          return;
+        }
+        e.preventDefault();
+        // TODO(@ije): Add support of drag move selection
+      }),
+
+      addEventListener(
+        contentEl,
+        'compositionstart',
+        (e) => {
+          if (!targetIsContentElement(e)) {
+            return;
+          }
+          this.#cancelEditPrediction(true);
+          this.#isComposing = true;
+          this.#shouldIgnoreSelectionChange = true;
+        },
+        { passive: true }
+      ),
+
+      addEventListener(
+        contentEl,
+        'compositionend',
+        (e) => {
+          if (!targetIsContentElement(e)) {
+            return;
+          }
+          this.#shouldIgnoreSelectionChange = false;
+          const wasComposing = this.#isComposing;
+          this.#isComposing = false;
+          // An empty compositionend during a tracked composition means the
+          // candidate was canceled (e.g. Esc), so there is nothing to commit.
+          if (e.data !== '' || !wasComposing) {
+            this.#handleInput('insertText', e.data);
+          }
+        },
+        { passive: true }
+      ),
+    ];
+
+    // A selection in the read-only deletions column is painted natively (see
+    // the gated ::selection rule). Starting one there reveals that selection
+    // and clears the editor's own selection on the additions side, so only one
+    // column shows a selection at a time. Non-diff files have no deletions
+    // column.
+    const deletionsCode =
+      this.#fileContainer?.shadowRoot?.querySelector<HTMLElement>(
+        '[data-deletions]'
+      );
+    if (deletionsCode != null) {
+      this.#editorEventDisposes.push(
+        addEventListener(
+          deletionsCode,
+          'pointerdown',
+          (e) => {
+            const path = e.composedPath();
+            if (isGutterUtilityPath(path)) {
+              this.#preserveEditorSelectionsForGutterGesture();
+              return;
+            }
+            // Clicking a deletion line's number selects the whole line's text
+            // and dragging extends the selection across deletion lines (like a
+            // click/drag on an addition line number); clicking its text lets
+            // the browser place/extend the selection directly. Either way the
+            // deleted-text marker reveals it and the editor drops its own
+            // selection.
+            const target = path[0];
+            const gutterRow =
+              target instanceof HTMLElement
+                ? target.closest('[data-column-number]')
+                : null;
+            if (gutterRow instanceof HTMLElement) {
+              if (this.#isLineSelectionEnabled()) {
+                this.#preserveEditorSelectionsForGutterGesture();
+                return;
+              }
+              if (
+                this.#beginDeletionGutterSelection(
+                  gutterRow,
+                  deletionsCode,
+                  e.pointerType === 'mouse'
+                )
+              ) {
+                return;
+              }
+            }
+            this.#setDeletedTextSelectionActive(true);
+            if (this.#selections !== undefined) {
+              this.#updateSelections([]);
+            }
+          },
+          { passive: true }
+        )
+      );
+    }
+
+    if (gutterEl !== undefined) {
+      const resolveGutterTarget = (
+        eventTarget: HTMLElement | undefined,
+        includeContentLine = false
+      ) => {
+        let target = eventTarget;
+        if (target?.dataset.lineNumberContent !== undefined) {
+          target = target.parentElement ?? undefined;
+        } else if (includeContentLine && target?.tagName === 'SPAN') {
+          target = target.closest('[data-line]') as HTMLElement | undefined;
+        }
+        return target;
+      };
+
+      const resolveEditableLine = (target: HTMLElement | undefined) => {
+        if (target === undefined) {
+          return;
+        }
+        const lineType = target.dataset.lineType;
+        const lineNumber =
+          getLineNumberAttr(target) ??
+          getLineNumberAttr(target, 'columnNumber');
+        if (
+          lineNumber === undefined ||
+          lineType === undefined ||
+          !isLineEditable(lineType)
+        ) {
+          return;
+        }
+        return lineNumber - 1;
+      };
+
+      this.#editorEventDisposes.push(
+        addEventListener(
+          gutterEl,
+          'pointerdown',
+          (e) => {
+            const path = e.composedPath();
+            if (isGutterUtilityPath(path)) {
+              this.#preserveEditorSelectionsForGutterGesture();
+              return;
+            }
+            const gutterRow = resolveGutterTarget(
+              path[0] as HTMLElement | undefined
+            );
+            if (gutterRow !== undefined && this.#isLineSelectionEnabled()) {
+              this.#preserveEditorSelectionsForGutterGesture();
+              return;
+            }
+            // Clicking a read-only deleted line's number (unified view) selects
+            // that line's text natively, since the line is not in the editor's
+            // document. This runs before the mouse-only gate below: a deletion
+            // tap registers no drag state to strand, so it works on touch too,
+            // matching the split deletions column.
+            if (gutterRow?.dataset.lineType === 'change-deletion') {
+              const code = gutterRow.closest('[data-code]');
+              if (code != null) {
+                this.#beginDeletionGutterSelection(
+                  gutterRow,
+                  code,
+                  e.pointerType === 'mouse'
+                );
+              }
+              return;
+            }
+
+            // Editable gutter drag-selection is mouse-only: the global pointerup
+            // that clears #isGutterMouseDown and disposes the mousemove listener
+            // bails for non-mouse pointers, so reacting to a touch/pen tap here
+            // would strand that state and leak the listener. Mirror the content
+            // pointerdown guard.
+            if (e.pointerType !== 'mouse') {
+              return;
+            }
+
+            const textDocument = this.#editSession?.document;
+            const lineIndex = resolveEditableLine(gutterRow);
+            if (lineIndex === undefined || textDocument === undefined) {
+              return;
+            }
+
+            this.#canMountSelectionAction = true;
+            this.#markerRenderer?.removePopover();
+            const selection = this.#spanLineSelection(
+              lineIndex,
+              lineIndex,
+              textDocument
+            );
+            this.#isGutterMouseDown = true;
+            this.#selectionStart = selection;
+            this.#updateSelections([selection]);
+            // Span the native selection across the clicked line and focus
+            // without collapsing it. #focus(position) would drop a collapsed
+            // caret at the line end, which a later selectionchange then turns
+            // into a bare caret — so a single click on a line number would
+            // place a cursor instead of selecting the whole line's text.
+            this.#setWindowSelection(selection);
+            this.#focus();
+            this.#replaceSelectEventListeners([
+              addEventListener(
+                document,
+                'mousemove',
+                (e) => {
+                  if (!this.#isGutterMouseDown) {
+                    return;
+                  }
+                  const textDocument = this.#editSession?.document;
+                  const lineIndex = resolveEditableLine(
+                    resolveGutterTarget(
+                      e.composedPath()[0] as HTMLElement | undefined,
+                      true
+                    )
+                  );
+                  if (lineIndex === undefined || textDocument === undefined) {
+                    return;
+                  }
+
+                  // A gutter drag keeps both the clicked line (the anchor) and
+                  // the line under the pointer fully selected. Until a drag
+                  // outruns its pointerdown the anchor is set; if it somehow is
+                  // not, the line under the pointer becomes the anchor.
+                  const anchorLine =
+                    this.#selectionStart?.start.line ?? lineIndex;
+                  const selection = this.#spanLineSelection(
+                    anchorLine,
+                    lineIndex,
+                    textDocument
+                  );
+                  this.#selectionStart ??= selection;
+                  this.#updateSelections([selection]);
+                  this.#focus(
+                    selection.direction === DirectionBackward
+                      ? selection.start
+                      : selection.end
+                  );
+                },
+                { passive: true }
+              ),
+            ]);
+          },
+          { passive: true }
+        )
+      );
+    }
+
+    this.#markerRenderer?.listenHover(contentEl);
+
+    this.#resizeObserver?.disconnect();
+    this.#resizeObserver = new ResizeObserver(this.#handleLayoutResize);
+    this.#resizeObserver.observe(contentEl);
+    this.#resizeObserver.observe(contentEl.parentElement!);
+    this.#computeContentOffset(contentEl);
+  }
+
+  #handleCustomPasteEvent = async () => {
+    const clipboard = this.#options.clipboard;
+    if (clipboard !== undefined) {
+      let text: string | string[] = await clipboard.readText();
+      const selectionCount = this.#selections?.length ?? 0;
+      if (selectionCount > 1) {
+        const multiSelectionText = await clipboard.readText(
+          MULTI_SELECTION_CLIPBOARD_TYPE
+        );
+        try {
+          const selectionTexts = JSON.parse(multiSelectionText);
+          if (
+            Array.isArray(selectionTexts) &&
+            selectionTexts.length === selectionCount
+          ) {
+            text = selectionTexts;
+          }
+        } catch {
+          // Invalid selection metadata falls back to the plain-text value.
+        }
+      }
+      const textDocument = this.#editSession?.document;
+      if (textDocument != null) {
+        this.#replaceSelectionText(
+          Array.isArray(text)
+            ? text.map((t) => textDocument.normalizeEol(t))
+            : textDocument.normalizeEol(text),
+          undefined,
+          true,
+          'document'
+        );
+      }
+    }
+  };
+
+  // diff(split) treat the content element as grid item,
+  // that breaks the overlay element positioning.
+  // this function computes the content offset to fix
+  // the overlay element position.
+  #computeContentOffset(contentEl: HTMLElement) {
+    if (this.#isDiff && this.#diffSyle === 'split' && this.#isWrap) {
+      this.#contentOffset = {
+        // #getLineY already includes the code column's block padding. Store
+        // only the grid displacement beyond it so split + wrap does not add
+        // the same top gap twice.
+        top: contentEl.offsetTop - this.#metrics.paddingTop,
+        left: contentEl.offsetLeft - this.#getGutterWidth(),
+      };
+      if (this.#options.__debug === true) {
+        console.log('[diffs/editor] content offset:', this.#contentOffset);
+      }
+    }
+  }
+
+  // #computeContentOffset only assigns #contentOffset in a split + wrap diff and
+  // never clears it, so after toggling wrap off (or switching to unified) the
+  // same editor keeps a stale offset. Read it through this getter, which returns
+  // the offset only while the live layout is the one that produced it, so a
+  // stale value is never applied to caret, selection, or line-Y positions.
+  get #activeContentOffset(): { left: number; top: number } | undefined {
+    if (this.#isDiff && this.#diffSyle === 'split' && this.#isWrap) {
+      return this.#contentOffset;
+    }
+    return undefined;
+  }
+
+  #runCommand(command: EditorCommand) {
+    const textDocument = this.#editSession?.document;
+    if (textDocument == null) {
+      return;
+    }
+
+    switch (command) {
+      case 'openSearchPanel':
+        this.#openSearchPanel('find');
+        break;
+
+      case 'openSearchReplacePanel':
+        this.#openSearchPanel('replace');
+        break;
+
+      case 'findNextMatch': {
+        const selections = this.#selections;
+        if (selections === undefined) {
+          break;
+        }
+        const hasCollapsed = selections.some(isCollapsedSelection);
+        if (hasCollapsed) {
+          const expanded: EditorSelection[] = selections.map((sel) => {
+            if (isCollapsedSelection(sel)) {
+              return expandCollapsedSelectionToWord(textDocument, sel);
+            }
+            return sel;
+          });
+          this.#updateSelections(expanded);
+          this.focus();
+        } else {
+          const nextMatch = findNextMatch(textDocument, selections);
+          if (nextMatch !== undefined) {
+            this.#updateSelections(nextMatch);
+            const primaryMatch = nextMatch.at(-1);
+            if (primaryMatch !== undefined) {
+              this.#revealLineIfCollapsed(getCaretPosition(primaryMatch).line);
+            }
+            this.#scrollToPrimaryCaret();
+          }
+        }
+        break;
+      }
+
+      case 'moveLineUp':
+      case 'moveLineDown':
+        this.#moveSelectedLines(command === 'moveLineUp' ? -1 : 1);
+        break;
+
+      case 'copyLineUp':
+      case 'copyLineDown':
+        this.#copySelectedLines(command === 'copyLineUp' ? -1 : 1);
+        break;
+
+      case 'simplifySelection': {
+        const selections = this.#selections;
+        const primarySelection = selections?.at(-1);
+        if (selections === undefined || primarySelection === undefined) {
+          break;
+        }
+        if (selections.length > 1) {
+          this.#updateSelections([primarySelection]);
+          this.#focus(getCaretPosition(primarySelection));
+        } else if (!isCollapsedSelection(primarySelection)) {
+          const caret = getCaretPosition(primarySelection);
+          this.#updateSelections([
+            { start: caret, end: caret, direction: DirectionNone },
+          ]);
+          this.#focus(caret);
+        }
+        break;
+      }
+
+      case 'insertBlankLine':
+        this.#insertBlankLine();
+        break;
+
+      case 'deleteHardLineForward':
+        this.#deleteHardLineForward();
+        break;
+
+      case 'toggleComment':
+      case 'toggleBlockComment': {
+        const selections = this.#selections;
+        if (selections === undefined) {
+          break;
+        }
+        const { lineComment, blockComment } = resolveCommentConfig(
+          textDocument.languageId,
+          this.#options.languageCommentConfig
+        );
+        if (command === 'toggleComment' && lineComment !== null) {
+          this.#applyCommandEdits(
+            resolveLineCommentEdits(textDocument, selections, lineComment)
+          );
+          break;
+        }
+        const linewise = command === 'toggleComment';
+        const result = resolveBlockCommentEdits(
+          textDocument,
+          selections,
+          blockComment,
+          linewise
+        );
+        if (result !== undefined) {
+          this.#applyCommandEdits(
+            result.edits,
+            linewise
+              ? undefined
+              : (document) =>
+                  result.nextSelectionOffsets.map(
+                    ([start, end, direction]) => ({
+                      start: document.positionAt(start),
+                      end: document.positionAt(end),
+                      direction,
+                    })
+                  )
+          );
+        }
+        break;
+      }
+
+      case 'indent':
+      case 'outdent':
+      case 'indentLess':
+      case 'indentMore':
+        if (this.#selections !== undefined) {
+          const edits: TextEdit[] = [];
+          const nextSelections: EditorSelection[] = [];
+          // Line-based indentation is resolved per selection, so overlapping
+          // line coverage must share the same leading-whitespace edit.
+          const editedLines = new Set<number>();
+          // Single-line indent inserts text at each caret. When several carets
+          // share a line, indentation inserted by carets to their left shifts
+          // them right, so record each one here and offset its resulting
+          // position once every edit on the line is known. Without this, later
+          // same-line carets land before their own inserted indent.
+          const sameLineIndents: Array<{
+            line: number;
+            startCharacter: number;
+            addedLength: number;
+            selectionIndex: number;
+          }> = [];
+          for (const selection of this.#selections) {
+            const startLine = selection.start.line;
+            const outdent = command === 'outdent' || command === 'indentLess';
+            const lineBased =
+              command === 'indentLess' || command === 'indentMore';
+            if (startLine !== selection.end.line || outdent || lineBased) {
+              const ret = resolveIndentEdits(
+                textDocument,
+                selection,
+                this.#metrics.tabSize,
+                outdent
+              );
+              for (const edit of ret[0]) {
+                const line = edit.range.start.line;
+                if (!editedLines.has(line)) {
+                  editedLines.add(line);
+                  edits.push(edit);
+                }
+              }
+              nextSelections.push(ret[1]);
+            } else {
+              const lineChar0 = textDocument.charAt({
+                line: startLine,
+                character: 0,
+              });
+              const text =
+                lineChar0 === '\t' ? '\t' : ' '.repeat(this.#metrics.tabSize);
+              edits.push({
+                range: selection,
+                newText: text,
+              });
+              sameLineIndents.push({
+                line: startLine,
+                startCharacter: selection.start.character,
+                addedLength:
+                  text.length -
+                  (selection.end.character - selection.start.character),
+                selectionIndex: nextSelections.length,
+              });
+              const nextPosition = {
+                line: selection.start.line,
+                character: selection.start.character + text.length,
+              };
+              nextSelections.push({
+                start: nextPosition,
+                end: nextPosition,
+                direction: DirectionNone,
+              });
+            }
+          }
+          for (const indent of sameLineIndents) {
+            let shift = 0;
+            for (const other of sameLineIndents) {
+              if (
+                other.line === indent.line &&
+                other.startCharacter < indent.startCharacter
+              ) {
+                shift += other.addedLength;
+              }
+            }
+            if (shift !== 0) {
+              const current = nextSelections[indent.selectionIndex];
+              const position = {
+                line: indent.line,
+                character: current.start.character + shift,
+              };
+              nextSelections[indent.selectionIndex] = {
+                start: position,
+                end: position,
+                direction: DirectionNone,
+              };
+            }
+          }
+          const change = textDocument.applyEdits(
+            edits,
+            true,
+            this.#selections,
+            nextSelections
+          );
+          if (change !== undefined) {
+            this.#applyChange(change, nextSelections);
+          }
+        }
+        break;
+
+      case 'selectAll': {
+        const fullSelection = getDocumentFullSelection(textDocument);
+        this.#updateSelections([fullSelection]);
+        this.focus();
+        // The editor paints selections with an overlay and otherwise leaves the
+        // native selection a collapsed caret. focus() above collapses it to the
+        // document start, and Safari/WebKit then fires no delete beforeinput for
+        // a following Backspace — nothing sits before a caret at offset 0 — so
+        // select-all then delete is silently dropped. Give WebKit a non-collapsed
+        // native selection so it emits the delete; Chrome already deletes via
+        // #selections regardless. #setWindowSelection can only resolve lines that
+        // are currently rendered, and in a virtualized diff most of the document
+        // is offscreen, so anchor the native range to the editable lines on
+        // screen rather than the document bounds. The native range only needs to
+        // be non-collapsed — the edit uses #selections, which still spans the
+        // whole document. #suppressNativeSelectionSync then stops the resulting
+        // selectionchange from reading that shorter range back over #selections
+        // before the delete runs.
+        const renderedLineRanges = this.#getRenderedEditableLineRanges();
+        const firstRenderedLine = renderedLineRanges[0]?.[0];
+        const lastRenderedLine = renderedLineRanges.at(-1)?.[1];
+        if (firstRenderedLine !== undefined && lastRenderedLine !== undefined) {
+          this.#suppressNativeSelectionSync = true;
+          this.#setWindowSelection({
+            start: { line: firstRenderedLine, character: 0 },
+            end: {
+              line: lastRenderedLine,
+              character: textDocument.getLineLength(lastRenderedLine),
+            },
+            direction: DirectionForward,
+          });
+        }
+        break;
+      }
+
+      case 'moveCursorToDocStart':
+      case 'moveCursorToDocEnd':
+        {
+          const atEnd = command === 'moveCursorToDocEnd';
+          const boundarySelection = getDocumentBoundarySelection(
+            textDocument,
+            atEnd,
+            this.#isDiff
+          );
+          this.#updateSelections([boundarySelection]);
+          this.#revealLineIfCollapsed(getCaretPosition(boundarySelection).line);
+          this.#scrollToPrimaryCaret();
+        }
+        break;
+
+      case 'expandSelectionDocStart':
+      case 'expandSelectionDocEnd':
+        {
+          const atEnd = command === 'expandSelectionDocEnd';
+          const selections = this.#selections;
+          if (selections !== undefined) {
+            const boundarySelection = getDocumentBoundarySelection(
+              textDocument,
+              atEnd,
+              this.#isDiff
+            );
+            this.#updateSelections(
+              extendSelections(selections, boundarySelection)
+            );
+            this.#revealLineIfCollapsed(
+              getCaretPosition(boundarySelection).line
+            );
+            this.#scrollToPrimaryCaret();
+          }
+        }
+        break;
+
+      case 'undo':
+      case 'redo':
+        this.#applyHistoryChange(command);
+        break;
+    }
+  }
+
+  // Replays history and remaps live selections when the entry intentionally
+  // has no stored selection metadata.
+  #applyHistoryChange(command: 'undo' | 'redo'): void {
+    const textDocument = this.#editSession?.document;
+    if (textDocument == null) {
+      return;
+    }
+    if (
+      (command === 'undo' && !textDocument.canUndo) ||
+      (command === 'redo' && !textDocument.canRedo)
+    ) {
+      return;
+    }
+    const selections = this.#selections;
+    const selectionOffsets = selections?.map(
+      (selection) =>
+        [
+          textDocument.offsetAt(selection.start),
+          textDocument.offsetAt(selection.end),
+        ] as const
+    );
+    const result =
+      command === 'undo' ? textDocument.undo() : textDocument.redo();
+    if (result === undefined) {
+      return;
+    }
+    const [change, recordedSelections, lineAnnotations, selectionEdits] =
+      result;
+    const nextSelections =
+      recordedSelections ??
+      (selections !== undefined &&
+      selectionOffsets !== undefined &&
+      selectionEdits !== undefined
+        ? remapSelectionsAfterEdits(
+            textDocument,
+            selections,
+            selectionOffsets,
+            selectionEdits
+          )
+        : undefined);
+    const replayedLineAnnotations =
+      lineAnnotations ??
+      (this.#lineAnnotations != null
+        ? applyDocumentChangeToLineAnnotations(change, this.#lineAnnotations)
+        : undefined);
+    this.#applyChange(change, nextSelections, replayedLineAnnotations);
+  }
+
+  /** Applies one undoable command batch and records its resulting selections. */
+  #applyCommandEdits(
+    edits: TextEdit[],
+    resolveNextSelections?: (
+      textDocument: TextDocument<EType, LAnnotation>
+    ) => EditorSelection[]
+  ): void {
+    const textDocument = this.#editSession?.document;
+    const selections = this.#selections;
+    if (textDocument === undefined || selections === undefined) {
+      return;
+    }
+    const remapSelections = resolveNextSelections === undefined;
+    const selectionOffsets = remapSelections
+      ? selections.map(
+          (selection) =>
+            [
+              textDocument.offsetAt(selection.start),
+              textDocument.offsetAt(selection.end),
+            ] as const
+        )
+      : undefined;
+    const resolvedEdits = remapSelections
+      ? edits
+          .map((edit) => {
+            const start = textDocument.offsetAt(edit.range.start);
+            const end = textDocument.offsetAt(edit.range.end);
+            return {
+              start: Math.min(start, end),
+              end: Math.max(start, end),
+              text: edit.newText,
+            };
+          })
+          .sort((a, b) => {
+            const startOrder = a.start - b.start;
+            return startOrder !== 0 ? startOrder : a.end - b.end;
+          })
+      : undefined;
+    const change = textDocument.applyEdits(
+      edits,
+      true,
+      selections,
+      undefined,
+      true
+    );
+    if (change === undefined) {
+      return;
+    }
+    const nextSelections = remapSelections
+      ? remapSelectionsAfterEdits(
+          textDocument,
+          selections,
+          selectionOffsets!,
+          resolvedEdits!
+        )
+      : resolveNextSelections(textDocument);
+    textDocument.setLastUndoSelectionsAfter(nextSelections);
+    this.#applyChange(
+      change,
+      nextSelections,
+      this.#applyChangeToLineAnnotations(change)
+    );
+  }
+
+  /** Copies selected line blocks and keeps the selection in the requested copy. */
+  #copySelectedLines(direction: -1 | 1): void {
+    const textDocument = this.#editSession?.document;
+    const selections = this.#selections;
+    if (textDocument === undefined || selections === undefined) {
+      return;
+    }
+
+    const blocks = getSelectedLineBlocks(selections);
+    if (blocks.length === 0) {
+      return;
+    }
+    const copiedLinesBefore: number[] = [];
+    let copiedLineCount = 0;
+    const edits: TextEdit[] = [];
+    for (const block of blocks) {
+      copiedLinesBefore.push(copiedLineCount);
+      const blockLineCount = block.endLine - block.startLine + 1;
+      copiedLineCount += blockLineCount;
+      const text = textDocument.getText({
+        start: { line: block.startLine, character: 0 },
+        end: {
+          line: block.endLine,
+          character: textDocument.getLineLength(block.endLine),
+        },
+      });
+
+      if (direction > 0) {
+        const position = { line: block.startLine, character: 0 };
+        edits.push({
+          range: { start: position, end: position },
+          newText: text + textDocument.eol,
+        });
+      } else if (block.endLine < textDocument.lineCount - 1) {
+        const position = { line: block.endLine + 1, character: 0 };
+        edits.push({
+          range: { start: position, end: position },
+          newText: text + textDocument.eol,
+        });
+      } else {
+        const position = {
+          line: block.endLine,
+          character: textDocument.getLineLength(block.endLine),
+        };
+        edits.push({
+          range: { start: position, end: position },
+          newText: textDocument.eol + text,
+        });
+      }
+    }
+
+    const nextSelections = selections.map((selection) => {
+      const line = selection.start.line;
+      let low = 0;
+      let high = blocks.length - 1;
+      while (low <= high) {
+        const middle = (low + high) >>> 1;
+        const block = blocks[middle];
+        if (line < block.startLine) {
+          high = middle - 1;
+        } else if (line > block.endLine) {
+          low = middle + 1;
+        } else {
+          low = middle;
+          break;
+        }
+      }
+      const blockIndex = Math.max(0, low <= high ? low : high);
+      const block = blocks[blockIndex];
+      const shift =
+        copiedLinesBefore[blockIndex] +
+        (direction > 0 ? block.endLine - block.startLine + 1 : 0);
+      return {
+        start: { ...selection.start, line: selection.start.line + shift },
+        end: { ...selection.end, line: selection.end.line + shift },
+        direction: selection.direction,
+      };
+    });
+    this.#applyCommandEdits(edits, () => nextSelections);
+  }
+
+  /** Inserts an indented blank line after each selection's final line. */
+  #insertBlankLine(): void {
+    const textDocument = this.#editSession?.document;
+    const selections = this.#selections;
+    if (textDocument === undefined || selections === undefined) {
+      return;
+    }
+
+    const selectionLines = selections.map(
+      (selection) => getCaretPosition(selection).line
+    );
+    const targetLines = Array.from(new Set(selectionLines)).sort(
+      (a, b) => a - b
+    );
+    const targetIndex = new Map<number, number>();
+    const indents = new Map<number, string>();
+    const edits: TextEdit[] = [];
+    for (let index = 0; index < targetLines.length; index++) {
+      const line = targetLines[index];
+      const lineText = textDocument.getLineText(line);
+      const indent = /^\s*/.exec(lineText)?.[0] ?? '';
+      targetIndex.set(line, index);
+      indents.set(line, indent);
+      const position = {
+        line,
+        character: textDocument.getLineLength(line),
+      };
+      edits.push({
+        range: { start: position, end: position },
+        newText: textDocument.eol + indent,
+      });
+    }
+
+    const nextSelections = selections.map<EditorSelection>((_, index) => {
+      const line = selectionLines[index];
+      const position = {
+        line: line + 1 + targetIndex.get(line)!,
+        character: indents.get(line)!.length,
+      };
+      return { start: position, end: position, direction: DirectionNone };
+    });
+    this.#applyCommandEdits(edits, () => nextSelections);
+  }
+
+  #moveSelectedLines(direction: -1 | 1): void {
+    const textDocument = this.#editSession?.document;
+    const selections = this.#selections;
+    if (textDocument === undefined || selections === undefined) {
+      return;
+    }
+
+    const blocks = getSelectedLineBlocks(selections);
+    if (
+      blocks.length === 0 ||
+      (direction < 0 && blocks[0].startLine === 0) ||
+      (direction > 0 && blocks.at(-1)!.endLine >= textDocument.lineCount - 1)
+    ) {
+      return;
+    }
+
+    const lineCount = textDocument.lineCount;
+    const lineRangeEnd = (line: number): Position =>
+      line < lineCount - 1
+        ? { line: line + 1, character: 0 }
+        : { line, character: textDocument.getLineLength(line) };
+    const getLinesText = (
+      lines: number[],
+      appendFinalLineBreak: boolean
+    ): string => {
+      const text = lines
+        .map((line) => textDocument.getLineText(line))
+        .join(textDocument.eol);
+      return appendFinalLineBreak ? text + textDocument.eol : text;
+    };
+
+    const edits: TextEdit[] = [];
+    if (direction < 0) {
+      for (const block of blocks) {
+        const previousLine = block.startLine - 1;
+        const blockLines: number[] = [];
+        for (let line = block.startLine; line <= block.endLine; line++) {
+          blockLines.push(line);
+        }
+        edits.push({
+          range: {
+            start: { line: previousLine, character: 0 },
+            end: lineRangeEnd(block.endLine),
+          },
+          newText: getLinesText(
+            [...blockLines, previousLine],
+            block.endLine < lineCount - 1
+          ),
+        });
+      }
+    } else {
+      for (let index = blocks.length - 1; index >= 0; index--) {
+        const block = blocks[index];
+        const nextLine = block.endLine + 1;
+        const blockLines: number[] = [];
+        for (let line = block.startLine; line <= block.endLine; line++) {
+          blockLines.push(line);
+        }
+        edits.push({
+          range: {
+            start: { line: block.startLine, character: 0 },
+            end: lineRangeEnd(nextLine),
+          },
+          newText: getLinesText(
+            [nextLine, ...blockLines],
+            nextLine < lineCount - 1
+          ),
+        });
+      }
+    }
+
+    const lastBlock = blocks.at(-1)!;
+    const lastLineLengthAfterMove =
+      direction > 0 && lastBlock.endLine === lineCount - 2
+        ? textDocument.getLineLength(lastBlock.endLine)
+        : textDocument.getLineLength(lineCount - 1);
+    const nextSelections = selections.map((selection) =>
+      shiftSelectionLines(selection, direction, lineCount, (line) =>
+        line === lineCount - 1
+          ? lastLineLengthAfterMove
+          : textDocument.getLineLength(line)
+      )
+    );
+    const change = textDocument.applyEdits(
+      edits,
+      true,
+      selections,
+      nextSelections,
+      true
+    );
+    if (change !== undefined) {
+      this.#applyChange(change, nextSelections);
+    }
+  }
+
+  #handleLayoutResize = () => {
+    const lineAnnotations = this.#lineAnnotations?.length ?? 0;
+    const prevGutterWidth = this.#gutterWidthCache;
+    const prevContentWidth = this.#contentWidthCache;
+    this.#gutterWidthCache = undefined;
+    this.#contentWidthCache = undefined;
+    const gutterWidthChanged = this.#getGutterWidth() !== prevGutterWidth;
+    const contentWidthChanged = this.#getContentWidth() !== prevContentWidth;
+    if (!gutterWidthChanged && !contentWidthChanged) {
+      return;
+    }
+
+    this.#lineElementsCache.clear();
+    this.#lastAccessedCharX = undefined;
+    // A width change means the inherited font/metrics may have changed (e.g. a
+    // web font finished loading) while this same content element survived, so
+    // discard memoized non-ASCII text widths and let them re-measure.
+    this.#metrics.clearTextWidthCache();
+    if (contentWidthChanged) {
+      // Wrap points depend on the content width, so cached offsets go stale
+      // even while wrap is off — the mode can be toggled back on before the
+      // next width change.
+      this.#wrapLineOffsetsCache.clear();
+      if (this.#isWrap || lineAnnotations > 0) {
+        this.#lineYCache.clear();
+      }
+    }
+    if (
+      this.#selections !== undefined ||
+      this.#matches !== undefined ||
+      this.#markerRenderer !== undefined
+    ) {
+      this.#updateSelections(this.#selections ?? []);
+      // Virtualized row swaps can resize a blurred editor. Repaint its overlays
+      // without letting that layout work reclaim DOM focus.
+      if (this.#selections !== undefined && this.#contentHasFocus) {
+        this.focus();
+      }
+    }
+    this.#markerRenderer?.removePopover();
+    this.#computeContentOffset(this.#contentElement!);
+    // Reposition remote carets after a gutter or content-width change. Their
+    // transforms and wrapped rows use the same geometry caches as selections.
+    this.#renderCarets();
+  };
+
+  // A custom monospace web font can finish loading after the editor first
+  // renders. Until then Metrics measured the '0' width against the fallback
+  // font, so the gutter width and every caret/selection x-position (each
+  // offset by a whole number of `ch` units) are wrong. Re-measure once fonts
+  // settle and, when the width actually changed, drop the cached widths and
+  // offsets and repaint the overlays so they line up with the loaded glyphs.
+  // FontFaceSet is unavailable in non-browser hosts (e.g. jsdom in tests).
+  #remeasureMetricsOnFontLoad(): void {
+    if (this.#fontRemeasureScheduled) {
+      return;
+    }
+    const fonts = document.fonts as FontFaceSet | undefined;
+    if (fonts === undefined) {
+      return;
+    }
+    this.#fontRemeasureScheduled = true;
+    void fonts.ready.then(() => {
+      if (
+        this.#contentElement === undefined ||
+        !this.#metrics.remeasureCharacterWidth()
+      ) {
+        return;
+      }
+      this.#gutterWidthCache = undefined;
+      this.#contentWidthCache = undefined;
+      this.#resetCache();
+      // The loaded font changes glyph widths, which moves every wrap point.
+      this.#wrapLineOffsetsCache.clear();
+      if (
+        this.#selections !== undefined ||
+        this.#matches !== undefined ||
+        this.#markerRenderer !== undefined
+      ) {
+        this.#updateSelections(this.#selections ?? []);
+      }
+      this.#renderCarets();
+      this.#markerRenderer?.removePopover();
+    });
+  }
+
+  #rerender(
+    change: TextDocumentChange,
+    newLineAnnotations?: EditorLineAnnotation<EType, LAnnotation>[],
+    renderRange = this.#renderRange,
+    shouldUpdateBuffer?: boolean
+  ) {
+    const tokenizer = this.#tokenizer;
+    const fileInstance = this.#fileInstance;
+    const applyDocumentChange = this.#applyDocumentChange;
+    const textDocument = this.#editSession?.document;
+    const gutterEl = this.#gutterElement;
+    const contentEl = this.#contentElement;
+    if (
+      tokenizer == null ||
+      fileInstance == null ||
+      applyDocumentChange == null ||
+      textDocument == null ||
+      contentEl == null
+    ) {
+      return;
+    }
+
+    // cancel existing background tokenizing task
+    tokenizer.stopBackgroundTokenize();
+
+    const t = performance.now();
+    const dirtyLines = tokenizer.tokenize(
+      change,
+      renderRange,
+      !this.#isDiff && this.#virtualizedInstance != null
+    );
+    const t2 = performance.now();
+
+    if (dirtyLines.size > 0) {
+      const children = contentEl.children;
+      // Lines hidden inside a collapsed region have no row to patch, and
+      // letting them reach the create branch below would append rows for
+      // them; the tokenizer still received them (dirtyLines is forwarded to
+      // the host untouched).
+      const dirtyLineIndexes = new Set<number>();
+      for (const lineIndex of dirtyLines.keys()) {
+        if (this.#isLineRenderable(lineIndex)) {
+          dirtyLineIndexes.add(lineIndex);
+        }
+      }
+
+      // Update line elements that have been changed in the document. The
+      // scan starts at 0 because rendered rows can be sparse (collapsed
+      // regions): a dirty line's row may sit at a smaller child index than
+      // its dense line-arithmetic position, and overshooting it would fall
+      // through to the create branch below as a duplicate row.
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i] as HTMLElement | undefined;
+        if (child !== undefined) {
+          const lineNumber = getLineNumberAttr(child);
+          const lineType = child.dataset.lineType;
+          if (lineNumber === undefined || lineType === 'change-deletion') {
+            continue;
+          }
+          const lineIndex = lineNumber - 1;
+          if (dirtyLineIndexes.has(lineIndex)) {
+            const tokens = dirtyLines.get(lineIndex)!;
+            child.replaceChildren(...renderLineTokens(tokens));
+            dirtyLineIndexes.delete(lineIndex);
+            if (dirtyLineIndexes.size === 0) {
+              break;
+            }
+          }
+        }
+      }
+
+      // Create new line elements for the new lines — only beyond the last
+      // existing rendered row: rows are appended to the column end, so any
+      // earlier missing row belongs at a collapsed-region boundary and is
+      // owned by the full re-render that follows a hunk-structure change.
+      if (dirtyLineIndexes.size > 0) {
+        let lastRenderedLineNumber = 0;
+        for (let i = children.length - 1; i >= 0; i--) {
+          const child = children[i] as HTMLElement;
+          const lineNumber = getLineNumberAttr(child);
+          if (
+            lineNumber !== undefined &&
+            child.dataset.lineType !== 'change-deletion'
+          ) {
+            lastRenderedLineNumber = lineNumber;
+            break;
+          }
+        }
+        for (const lineIndex of dirtyLineIndexes) {
+          if (lineIndex < lastRenderedLineNumber) {
+            continue;
+          }
+          const tokens = dirtyLines.get(lineIndex)!;
+          const lineNumber = String(lineIndex + 1);
+          h(
+            'div',
+            {
+              dataset: {
+                line: lineNumber,
+                lineType: 'context',
+                lineIndex: lineIndex.toString(),
+              },
+              // oxlint-disable-next-line react/no-children-prop
+              children: renderLineTokens(tokens),
+            },
+            contentEl
+          );
+          if (gutterEl !== undefined) {
+            h(
+              'div',
+              {
+                dataset: {
+                  lineType: 'context',
+                  columnNumber: lineNumber,
+                  lineIndex: lineIndex.toString(),
+                },
+                // oxlint-disable-next-line react/no-children-prop
+                children: [
+                  h('span', {
+                    dataset: {
+                      lineNumberContent: '',
+                    },
+                    textContent: lineNumber,
+                  }),
+                ],
+              },
+              gutterEl
+            );
+          }
+        }
+      }
+    }
+
+    // remove line elements that have been deleted in the document
+    if (change.lineDelta < 0) {
+      for (const children of [contentEl.children, gutterEl?.children ?? []]) {
+        for (let i = children.length - 1; i >= 0; i--) {
+          const child = children[i] as HTMLElement;
+          const lineNumber =
+            getLineNumberAttr(child) ??
+            getLineNumberAttr(child, 'columnNumber');
+          const lineType = child.dataset.lineType;
+          if (lineNumber === undefined || lineType === 'change-deletion') {
+            continue;
+          }
+          if (lineNumber - 1 < change.lineCount) {
+            break;
+          }
+          child.remove();
+        }
+      }
+    }
+
+    const didLineCountChange = change.lineDelta !== 0;
+
+    // fix grid layout
+    if (didLineCountChange) {
+      let gridRow = contentEl.children.length;
+      for (const child of contentEl.children) {
+        const { bufferSize } = (child as HTMLElement).dataset;
+        if (bufferSize !== undefined) {
+          gridRow += parseInt(bufferSize) - 1;
+        }
+      }
+      contentEl.style.gridRow = 'span ' + gridRow;
+      if (gutterEl !== undefined) {
+        gutterEl.style.gridRow = 'span ' + gridRow;
+      }
+    }
+
+    fileInstance.updateRenderCache(dirtyLines, tokenizer.themeType, {
+      shouldRefreshDiffsView: this.#isDiff && !didLineCountChange,
+      lineCountChangeInFlight: didLineCountChange,
+      changedDocumentLines:
+        this.#isDiff && !didLineCountChange
+          ? getChangedDocumentLines(textDocument, change)
+          : undefined,
+      documentLineCount: textDocument.lineCount,
+    });
+    if (didLineCountChange) {
+      // Line-count change: recompute hunks from the full document and re-render.
+      applyDocumentChange(textDocument, newLineAnnotations, shouldUpdateBuffer);
+    }
+
+    // A line-count change can remove cached rows, while a unified diff rebuilds
+    // its content column on every edit. Either can detach the line elements
+    // memoized for caret/selection geometry, making offsetTop read as 0 and
+    // scrolling the caret to the top. Re-measure against the current rows.
+    if (didLineCountChange || (this.#isDiff && this.#diffSyle === 'unified')) {
+      this.#resetCache();
+    }
+
+    if (newLineAnnotations != null) {
+      this.#lineAnnotations = newLineAnnotations;
+      // A structural FileDiff edit rebuilds both columns and their paired
+      // annotation rows together. Re-inserting those rows independently by
+      // line number would break their visual alignment in split view.
+      if (!this.#isDiff || !didLineCountChange) {
+        renderLineAnnotations(
+          newLineAnnotations,
+          contentEl,
+          gutterEl,
+          fileInstance.getAnnotationSlotName
+        );
+      }
+    }
+    this.#renderCarets();
+
+    if (this.#options.__debug === true) {
+      console.log(
+        `[diffs/editor] re-render in: ${round(performance.now() - t2)}ms,`,
+        `tokenize in: ${round(t2 - t)}ms (${dirtyLines.size} dirty lines)`
+      );
+    }
+  }
+
+  // input type doc: https://developer.mozilla.org/en-US/docs/Web/API/InputEvent/inputType
+  #handleInput(inputType: string, data: string | null) {
+    switch (inputType) {
+      case 'insertText': {
+        const text = data ?? '';
+        const textDocument = this.#editSession?.document;
+        const selections = this.#selections;
+        const autoSurroundTexts =
+          textDocument !== undefined && selections !== undefined
+            ? getAutoSurroundReplacementTexts(
+                textDocument,
+                selections,
+                text,
+                this.#options.autoSurround
+              )
+            : undefined;
+        this.#replaceSelectionText(autoSurroundTexts ?? text);
+        break;
+      }
+      case 'insertCompositionText':
+        break;
+      case 'insertLineBreak':
+      case 'insertParagraph': {
+        this.#replaceSelectionText(this.#editSession?.document?.eol ?? '\n');
+        break;
+      }
+      case 'deleteContentBackward':
+        this.#deleteSelectionText();
+        break;
+      case 'deleteContentForward':
+        this.#deleteSelectionText(true);
+        break;
+      case 'deleteSoftLineBackward':
+      // Safari emits deleteHardLineBackward for cmd+backspace where Chrome emits
+      // deleteSoftLineBackward; treat them the same so cmd+backspace deletes to
+      // the line start in both. They differ only on a wrapped line (hard goes to
+      // the logical line start, soft to the visual one), and Chrome's soft
+      // behavior is what we match.
+      case 'deleteHardLineBackward':
+        this.#deleteSoftLineBackward();
+        break;
+      case 'deleteWordBackward':
+        this.#deleteWordBackward();
+        break;
+      case 'insertTranspose':
+        this.#insertTranspose();
+        break;
+      default:
+        console.warn(`[diffs] Unknown input type: ${inputType}`, data);
+        break;
+    }
+  }
+
+  #focus(
+    position?: Position,
+    preventScroll = true,
+    shouldFocus?: () => boolean
+  ) {
+    // Mark focus eagerly: the positional branch defers the real focus() to a
+    // rAF, so a same-tick applyEdits would otherwise see the editor as
+    // unfocused and skip repositioning while this focus still lands afterward.
+    this.#contentHasFocus = true;
+    if (position !== undefined) {
+      this.#shouldIgnoreSelectionChange = true;
+      this.#setWindowSelection({
+        start: position,
+        end: position,
+        direction: DirectionNone,
+      });
+      // call focus in a request animation frame to prevent conflict with
+      // the `setBaseAndExtent` method
+      queueRender(() => {
+        // #contentHasFocus was marked eagerly above; a blur (or cleanup) in
+        // the deferred gap cedes focus, and this stale frame must not pull
+        // it back into the current — possibly replaced — content.
+        if (shouldFocus?.() === false || !this.#contentHasFocus) {
+          this.#shouldIgnoreSelectionChange = false;
+          return;
+        }
+        this.#contentElement?.focus({ preventScroll });
+        // another request animation frame since the `focus` call
+        // may trigger a selectionchange event, which should be ignored
+        queueRender(() => {
+          this.#shouldIgnoreSelectionChange = false;
+        });
+      });
+    } else if (shouldFocus?.() !== false) {
+      this.#contentElement?.focus({ preventScroll });
+    } else {
+      this.#contentHasFocus = false;
+    }
+  }
+
+  // A full host render can remove the focused contenteditable before the
+  // replacement view synchronizes. Restore only after the new content is live
+  // and only while focus has not moved to another real control in the gap.
+  #restoreReplacementFocus(position?: Position): void {
+    const request = this.#replacementFocusRequest;
+    if (request == null) {
+      return;
+    }
+    if (this.#retainSearchPanelFocus) {
+      this.#replacementFocusRequest = undefined;
+      this.#contentHasFocus = false;
+      this.#shouldIgnoreSelectionChange = false;
+      return;
+    }
+    const contentElement = this.#contentElement;
+    if (
+      contentElement == null ||
+      !this.#replacementFocusIsAvailable(contentElement)
+    ) {
+      this.#replacementFocusRequest = undefined;
+      this.#contentHasFocus = false;
+      return;
+    }
+
+    const shouldFocus = () => {
+      if (this.#replacementFocusRequest !== request) {
+        return false;
+      }
+      const shouldRestore = this.#replacementFocusIsAvailable(contentElement);
+      this.#replacementFocusRequest = undefined;
+      return shouldRestore;
+    };
+    if (position != null) {
+      this.#focus(position, true, shouldFocus);
+      return;
+    }
+    const primarySelection = this.#selections?.at(-1);
+    if (primarySelection == null) {
+      this.#focus(undefined, true, shouldFocus);
+      return;
+    }
+    const primaryPosition =
+      primarySelection.direction === DirectionBackward
+        ? primarySelection.end
+        : primarySelection.start;
+    this.#focus(primaryPosition, true, shouldFocus);
+  }
+
+  #replacementFocusIsAvailable(contentElement: HTMLElement): boolean {
+    const fileContainer = this.#fileContainer;
+    const shadowRoot = fileContainer?.shadowRoot;
+    if (
+      fileContainer == null ||
+      shadowRoot == null ||
+      this.#contentElement !== contentElement ||
+      !shadowRoot.contains(contentElement)
+    ) {
+      return false;
+    }
+    const { activeElement: shadowActiveElement } = shadowRoot;
+    if (
+      shadowActiveElement === contentElement ||
+      (shadowActiveElement != null &&
+        contentElement.contains(shadowActiveElement))
+    ) {
+      return true;
+    }
+    if (shadowActiveElement != null) {
+      return false;
+    }
+    const { ownerDocument } = fileContainer;
+    const { activeElement } = ownerDocument;
+    return (
+      activeElement == null ||
+      activeElement === ownerDocument.body ||
+      activeElement === ownerDocument.documentElement ||
+      activeElement === fileContainer
+    );
+  }
+
+  #getFirstVisibleLineNumber(offset = 0): number | undefined {
+    const contentElement = this.#contentElement;
+    const fileContainer = this.#fileContainer;
+    if (
+      this.#editSession?.document == null ||
+      contentElement == null ||
+      fileContainer == null
+    ) {
+      return undefined;
+    }
+
+    const viewport = this.#getScrollViewport();
+    if (viewport === undefined) {
+      return undefined;
+    }
+
+    let viewportTop: number;
+    let viewportBottom: number;
+    if (viewport instanceof HTMLElement) {
+      const viewportRect = viewport.getBoundingClientRect();
+      viewportTop = viewportRect.top;
+      viewportBottom = viewportRect.bottom;
+    } else {
+      viewportTop = 0;
+      viewportBottom = viewport.defaultView?.innerHeight ?? 0;
+    }
+
+    const stickyHeader = fileContainer.shadowRoot?.querySelector<HTMLElement>(
+      '[data-diffs-header][data-sticky]'
+    );
+    if (stickyHeader != null) {
+      viewportTop = Math.max(
+        viewportTop,
+        stickyHeader.getBoundingClientRect().bottom
+      );
+    }
+    if (Number.isFinite(offset)) {
+      viewportTop += Math.max(0, offset);
+    }
+    if (viewportBottom <= viewportTop) {
+      return undefined;
+    }
+
+    for (const child of contentElement.children) {
+      const row = child as HTMLElement;
+      const lineNumber = getLineNumberAttr(row);
+      const lineType = row.dataset.lineType;
+      if (lineNumber == null || lineType == null || !isLineEditable(lineType)) {
+        continue;
+      }
+      const rowRect = row.getBoundingClientRect();
+      if (rowRect.bottom <= rowRect.top) {
+        continue;
+      }
+      if (rowRect.top >= viewportTop && rowRect.top < viewportBottom) {
+        return lineNumber;
+      }
+    }
+    return undefined;
+  }
+
+  #focusAtPosition(position: Position, preventScroll: boolean): void {
+    const selection: EditorSelection = {
+      start: position,
+      end: position,
+      direction: DirectionNone,
+    };
+    this.#canMountSelectionAction = false;
+    this.#updateSelections([selection]);
+    this.#revealLineIfCollapsed(position.line);
+    if (preventScroll) {
+      this.#focus(position, true);
+    } else {
+      this.#scrollToPrimaryCaret();
+    }
+  }
+
+  // set window native selection to match the selection
+  #setWindowSelection(selection: EditorSelection) {
+    const winSelection = window.getSelection();
+    if (winSelection === null) {
+      return;
+    }
+    let { start, end, direction } = selection;
+    if (comparePosition(start, end) > 0) {
+      [start, end] = [end, start];
+    }
+    const startLineElement = this.#getLineElement(start.line);
+    const endLineElement = this.#getLineElement(end.line);
+    if (startLineElement === undefined || endLineElement === undefined) {
+      return;
+    }
+    let [anchorNode, anchorOffset] = getSelectionAnchor(
+      startLineElement,
+      start.character
+    );
+    let [focusNode, focusOffset] = getSelectionAnchor(
+      endLineElement,
+      end.character
+    );
+    if (direction === DirectionBackward) {
+      [anchorNode, anchorOffset, focusNode, focusOffset] = [
+        focusNode,
+        focusOffset,
+        anchorNode,
+        anchorOffset,
+      ];
+    }
+    try {
+      winSelection.setBaseAndExtent(
+        anchorNode,
+        clampDomOffset(anchorNode, anchorOffset),
+        focusNode,
+        clampDomOffset(focusNode, focusOffset)
+      );
+    } catch (err) {
+      console.error('[diffs/editor] failed to update window selection:', err);
+    }
+  }
+
+  #scrollToPrimaryCaret(
+    noFocus = false,
+    scrollPosition: ScrollLogicalPosition = 'nearest'
+  ) {
+    const primarySelection = this.#selections?.at(-1);
+    if (primarySelection === undefined) {
+      return;
+    }
+    const primaryCaretElement = this.#primaryCaretElement;
+    if (primaryCaretElement !== undefined) {
+      primaryCaretElement.scrollIntoView({
+        block: scrollPosition,
+        inline: 'nearest',
+      });
+      if (!noFocus) {
+        const position =
+          primarySelection.direction === DirectionBackward
+            ? primarySelection.end
+            : primarySelection.start;
+        if (this.#replacementFocusRequest !== undefined) {
+          this.#restoreReplacementFocus(position);
+        } else {
+          this.#focus(position);
+        }
+      }
+    } else {
+      const pos = getCaretPosition(primarySelection);
+      this.#scrollToLine(pos.line, pos.character, noFocus);
+    }
+  }
+
+  // add scroll margin to the primary caret element to prevent
+  // the caret from being hidden by the gutter (and the search panel when
+  // open). The margin must only reserve viewport space above the caret —
+  // never include the host's virtualized `top` offset: that is a scroll-space
+  // coordinate, and folding it in makes every caret scrollIntoView treat the
+  // caret as thousands of pixels tall once the host is scrolled down, which
+  // mis-scrolls the caret line (e.g. pinning it to the viewport bottom).
+  #getScrollMargin() {
+    const top = this.#searchPanel !== undefined ? 48 : 0;
+    const start = this.#getGutterWidth() + this.#metrics.ch;
+    const end = this.#metrics.ch;
+    return `${top}px ${end}px 0 ${start}px`;
+  }
+
+  #scrollToLine(line: number, char = 0, noFocus = false) {
+    this.__postponeBgTokenizeToNextFrame();
+
+    const virtualCaret = h('div', {
+      style: {
+        position: 'absolute',
+        left: '0',
+        width: '2px',
+        height: this.#metrics.lineHeight + 'px',
+        scrollMargin: this.#getScrollMargin(),
+      },
+    });
+    if (this.#getLineElement(line) !== undefined) {
+      const [left, wrapLine] = this.#getCharX(line, char);
+      const lineY = this.#getLineY(line) + wrapLine * this.#metrics.lineHeight;
+      virtualCaret.style.top = lineY + 'px';
+      virtualCaret.style.left = left + 'px';
+      this.#overlayElement?.appendChild(virtualCaret);
+      virtualCaret.scrollIntoView({ block: 'center', inline: 'nearest' });
+      if (!noFocus) {
+        const position = { line, character: char };
+        if (this.#replacementFocusRequest !== undefined) {
+          this.#restoreReplacementFocus(position);
+        } else {
+          this.#focus(position);
+        }
+      }
+      this.#scrollingToLine = undefined;
+      this.#scrollingToLineChar = undefined;
+      this.#scrollingToLineFixed = false;
+      this.#scrollingToLineNoFocus = false;
+    }
+    // if the line is not rendered yet(virtualized), scroll to the modeled or approximate
+    // line position to trigger the line to be rendered, then recall this function
+    // to ensure the line is scrolled into view
+    else {
+      const modelLinePosition = this.#virtualizedInstance?.getLinePosition?.(
+        line + 1
+      );
+      if (modelLinePosition !== undefined) {
+        virtualCaret.style.top = modelLinePosition.top + 'px';
+        this.#fileContainer?.shadowRoot?.appendChild(virtualCaret);
+        virtualCaret.scrollIntoView({ block: 'center', inline: 'nearest' });
+        // A collapsed line reports its separator's (nonzero) geometry, so
+        // parking the retry for it would re-scroll on every sync forever;
+        // only renderable lines may keep the retry alive.
+        if (modelLinePosition.height > 0 && this.#isLineRenderable(line)) {
+          this.#scrollingToLine = line;
+          this.#scrollingToLineChar = char;
+          this.#scrollingToLineNoFocus = noFocus;
+        } else {
+          this.#scrollingToLine = undefined;
+          this.#scrollingToLineChar = undefined;
+          this.#scrollingToLineNoFocus = false;
+        }
+      } else {
+        let yFix = 0;
+        if (
+          this.#scrollingToLine === line &&
+          this.#contentElement !== undefined
+        ) {
+          for (
+            let i = this.#contentElement.childElementCount - 1;
+            i >= 0;
+            i--
+          ) {
+            const child = this.#contentElement.children[i] as HTMLElement;
+            const lineType = child.dataset.lineType;
+            const lineNumber = getLineNumberAttr(child);
+            if (
+              lineType !== undefined &&
+              isLineEditable(lineType) &&
+              lineNumber !== undefined
+            ) {
+              yFix = (line - (lineNumber - 1)) * this.#metrics.lineHeight;
+              break;
+            }
+          }
+        }
+        const lineAnnotations = (this.#lineAnnotations ?? []).filter(
+          (annotation) => annotation.lineNumber < line
+        ).length;
+        const approximateLineY =
+          (lineAnnotations + line) * this.#metrics.lineHeight + yFix;
+        virtualCaret.style.top = approximateLineY + 'px';
+        this.#fileContainer?.shadowRoot?.appendChild(virtualCaret);
+        virtualCaret.scrollIntoView({ block: 'center', inline: 'nearest' });
+
+        if (
+          (this.#scrollingToLine === line &&
+            (yFix === 0 || this.#scrollingToLineFixed)) ||
+          !this.#isLineRenderable(line)
+        ) {
+          this.#scrollingToLine = undefined;
+          this.#scrollingToLineChar = undefined;
+          this.#scrollingToLineFixed = false;
+          this.#scrollingToLineNoFocus = false;
+        } else {
+          this.#scrollingToLine = line;
+          this.#scrollingToLineChar = char;
+          this.#scrollingToLineFixed = yFix !== 0;
+          this.#scrollingToLineNoFocus = noFocus;
+        }
+      }
+    }
+    virtualCaret.remove();
+  }
+
+  // Build a selection that fully covers every line from the anchor line to the
+  // focus line — from the topmost line's start to the bottommost line's end.
+  // Dragging above the anchor yields a backward selection so the anchor line
+  // stays selected and #focus lands on the line the gesture ended on. A single
+  // line (anchor === focus) is a forward whole-line selection.
+  #spanLineSelection(
+    anchorLine: number,
+    focusLine: number,
+    textDocument: TextDocument<EType, LAnnotation>
+  ): EditorSelection {
+    const lineStart = (line: number): Position => ({ line, character: 0 });
+    const lineEnd = (line: number): Position => ({
+      line,
+      character: textDocument.getLineText(line).length,
+    });
+    if (focusLine < anchorLine) {
+      return {
+        start: lineStart(focusLine),
+        end: lineEnd(anchorLine),
+        direction: DirectionBackward,
+      };
+    }
+    return {
+      start: lineStart(anchorLine),
+      end: lineEnd(focusLine),
+      direction: DirectionForward,
+    };
+  }
+
+  // A pointer gesture targets read-only deleted text when its closest row is a
+  // change-deletion. Used to route a click in unified view's deleted text to a
+  // native selection instead of the editor's own.
+  #isDeletedLineTarget(event: Event): boolean {
+    const target = event.composedPath()[0];
+    return (
+      target instanceof HTMLElement &&
+      target.closest('[data-line]')?.getAttribute('data-line-type') ===
+        'change-deletion'
+    );
+  }
+
+  // Select read-only deleted text with the native selection, spanning from the
+  // anchor row to the focus row (the same row for a click). Deleted lines are
+  // not part of the editor's document, so they cannot be selected as editor
+  // text; instead select their DOM text, reveal it via the deleted-text marker,
+  // drop the editor's own selection, and highlight the deleted gutter numbers so
+  // the result matches a click/drag on an addition line.
+  #selectDeletedLines(
+    anchorContent: HTMLElement,
+    focusContent: HTMLElement,
+    deletionsCode: Element
+  ): void {
+    const rows = [
+      ...deletionsCode.querySelectorAll('[data-content] > [data-line]'),
+    ];
+    const anchorIndex = rows.indexOf(anchorContent);
+    const focusIndex = rows.indexOf(focusContent);
+    const [topContent, bottomContent] =
+      focusIndex < anchorIndex
+        ? [focusContent, anchorContent]
+        : [anchorContent, focusContent];
+
+    const winSelection = window.getSelection();
+    if (winSelection !== null) {
+      const range = document.createRange();
+      range.setStart(topContent, 0);
+      range.setEnd(bottomContent, bottomContent.childNodes.length);
+      winSelection.removeAllRanges();
+      winSelection.addRange(range);
+    }
+
+    this.#setDeletedTextSelectionActive(true);
+    this.#updateSelections([]);
+
+    // Highlight only the focus line's gutter number — the line where the click
+    // landed or the drag ended. Route it through the editor active-line state
+    // so selected lines and deleted-line focus remain independent.
+    this.#setEditorActiveLineSafe(
+      getLineNumberAttr(focusContent) ?? null,
+      true,
+      'deletions'
+    );
+
+    // Record the selected deleted lines' text for the clipboard. Each deleted
+    // line is its own read-only host, so window.getSelection().toString() only
+    // captures the first line; the copy/cut handlers prefer this value.
+    const lo = Math.min(anchorIndex, focusIndex);
+    const hi = Math.max(anchorIndex, focusIndex);
+    this.#deletedSelectionText =
+      lo < 0
+        ? ''
+        : rows
+            .slice(lo, hi + 1)
+            .filter(
+              (row) => row.getAttribute('data-line-type') === 'change-deletion'
+            )
+            .map((row) => row.textContent ?? '')
+            .join('\n');
+  }
+
+  // The content row that lines up with a gutter row: the two columns are
+  // parallel, so the gutter row's index is the content row's index.
+  #contentRowForGutterRow(
+    gutterRow: HTMLElement,
+    contentColumn: Element | null | undefined
+  ): HTMLElement | undefined {
+    const gutterColumn = gutterRow.parentElement;
+    if (gutterColumn == null || contentColumn == null) {
+      return undefined;
+    }
+    const index = [...gutterColumn.children].indexOf(gutterRow);
+    const row = contentColumn.children[index];
+    return row instanceof HTMLElement ? row : undefined;
+  }
+
+  // Begin a native selection of read-only deleted lines from a pointerdown on a
+  // deletion line number. Selects the clicked line and, for a mouse pointer,
+  // tracks a drag across the deletion gutter that extends the selection — the
+  // same gesture as a click/drag on an addition line number. `code` is the
+  // [data-code] holding the deletion column: the separate deletions column in
+  // split view, or the shared column in unified view. Returns false when the
+  // gutter row has no matching content row, letting the caller fall back to a
+  // plain deleted-text selection.
+  #beginDeletionGutterSelection(
+    gutterRow: HTMLElement,
+    code: Element,
+    isMouse: boolean
+  ): boolean {
+    const contentColumn = code.querySelector('[data-content]');
+    const anchorContent = this.#contentRowForGutterRow(
+      gutterRow,
+      contentColumn
+    );
+    if (anchorContent === undefined) {
+      return false;
+    }
+    this.#selectDeletedLines(anchorContent, anchorContent, code);
+    // The document pointerup disposes this listener; it must not set
+    // #isGutterMouseDown, whose pointerup focuses the editor and would collapse
+    // the native deletion selection.
+    if (isMouse) {
+      this.#replaceSelectEventListeners([
+        addEventListener(
+          document,
+          'mousemove',
+          (moveEvent) => {
+            const moveTarget = moveEvent.composedPath()[0];
+            const moveGutter =
+              moveTarget instanceof HTMLElement
+                ? moveTarget.closest('[data-column-number]')
+                : null;
+            if (
+              moveGutter instanceof HTMLElement &&
+              code.contains(moveGutter)
+            ) {
+              const focusContent = this.#contentRowForGutterRow(
+                moveGutter,
+                contentColumn
+              );
+              if (focusContent !== undefined) {
+                this.#selectDeletedLines(anchorContent, focusContent, code);
+              }
+            }
+          },
+          { passive: true }
+        ),
+      ]);
+    }
+    return true;
+  }
+
+  // Whether a read-only deleted-text selection is currently active (the marker
+  // #setDeletedTextSelectionActive sets). The copy/cut handlers read this to
+  // copy the native selection instead of the editor's empty document selection.
+  #isDeletedTextSelectionActive(): boolean {
+    return (
+      this.#fileContainer?.shadowRoot
+        ?.querySelector('pre')
+        ?.hasAttribute('data-deleted-text-selection') ?? false
+    );
+  }
+
+  // The clipboard text for a read-only deleted-text selection. A gutter
+  // selection records the full multi-line text in #deletedSelectionText; a
+  // direct content drag leaves it empty, so fall back to the browser's native
+  // selection (which spans only the first deleted line — its separate host).
+  #deletedTextForClipboard(): string {
+    return this.#deletedSelectionText !== ''
+      ? this.#deletedSelectionText
+      : (window.getSelection()?.toString() ?? '');
+  }
+
+  // Toggle the marker that reveals the native selection inside read-only
+  // deleted text (see the gated ::selection rule). It stays on only while the
+  // user is actively selecting within deleted lines, so a normal selection of
+  // editable code that sweeps across an interleaved deleted line does not
+  // highlight it.
+  #setDeletedTextSelectionActive(active: boolean): void {
+    const pre = this.#fileContainer?.shadowRoot?.querySelector('pre');
+    if (pre == null) {
+      return;
+    }
+    if (active) {
+      pre.setAttribute('data-deleted-text-selection', '');
+      this.#setEditorActiveLineSafe(null);
+      // Reset the captured selection text. #selectDeletedLines refills it for a
+      // gutter selection; a content drag leaves it empty so the copy/cut
+      // handlers fall back to the native selection.
+      this.#deletedSelectionText = '';
+    } else {
+      pre.removeAttribute('data-deleted-text-selection');
+      this.#deletedSelectionText = '';
+    }
+  }
+
+  #setEditorActiveLineSafe(
+    lineNumber: number | null,
+    lineNumberOnly = false,
+    side: SelectionSide = 'additions'
+  ): void {
+    try {
+      // Keep the caret decoration separate from selected lines. The component
+      // confines it to the relevant diff pane, and a text selection keeps only
+      // the focus line's gutter number highlighted.
+      this.#fileInstance?.setEditorActiveLine(lineNumber, {
+        lineNumberOnly,
+        side,
+      });
+    } catch {
+      // InteractionManager.renderSelection can throw while editor DOM is updating.
+    }
+  }
+
+  // Re-render the selection overlay after a theme swap so rounded corner masks
+  // recompute their `--diffs-selection-corner-bg`. Those masks capture the
+  // resolved line-background color when the selection is drawn; a light/dark or
+  // theme-name change updates the line CSS but leaves the captured color stale,
+  // showing wrong-colored corners on diff-colored lines until the selection
+  // moves. Deferred to the next frame because a host-driven theme change fires
+  // this mid-`#sync` (before the render range is refreshed), and `#sync`
+  // re-renders the overlay itself; the frame delay avoids re-entrancy and is
+  // imperceptible.
+  #scheduleThemeSelectionRefresh(): void {
+    if (this.#themeSelectionRefreshFrame !== undefined) {
+      return;
+    }
+    this.#themeSelectionRefreshFrame = requestAnimationFrame(() => {
+      this.#themeSelectionRefreshFrame = undefined;
+      if (
+        this.#selections !== undefined ||
+        this.#matches !== undefined ||
+        this.#markerRenderer !== undefined
+      ) {
+        this.#updateSelections(this.#selections ?? []);
+      }
+    });
+  }
+
+  // Keep the drag's horizontal goal in pointer space so a native caret that
+  // briefly clamps to a short line cannot move every generated selection.
+  #updateAltColumnSelections(): boolean {
+    const drag = this.#altColumnDrag;
+    const selectionStart = this.#selectionStart;
+    const textDocument = this.#editSession?.document;
+    if (
+      drag === undefined ||
+      drag.focusLine === undefined ||
+      selectionStart === undefined ||
+      textDocument === undefined
+    ) {
+      return false;
+    }
+
+    const anchor =
+      selectionStart.direction === DirectionBackward
+        ? selectionStart.end
+        : selectionStart.start;
+    const scrollLeft = this.#contentElement?.parentElement?.scrollLeft ?? 0;
+    const characterDeltaRaw =
+      (drag.clientX - drag.startClientX + scrollLeft - drag.startScrollLeft) /
+      this.#metrics.ch;
+    const characterDelta =
+      characterDeltaRaw < 0
+        ? -Math.round(-characterDeltaRaw)
+        : Math.round(characterDeltaRaw);
+    const focusCharacter = Math.max(0, anchor.character + characterDelta);
+    const goal = { line: drag.focusLine, character: focusCharacter };
+    if (
+      drag.renderedGoal !== undefined &&
+      comparePosition(drag.renderedGoal, goal) === 0
+    ) {
+      return true;
+    }
+    drag.renderedGoal = goal;
+
+    const selections: EditorSelection[] = [];
+    const step = goal.line < anchor.line ? -1 : 1;
+    for (let line = anchor.line; ; line += step) {
+      if (this.#isLineRenderable(line)) {
+        // Projected UTF-16 offsets must not split a grapheme on this line.
+        const lineText = textDocument.getLineText(line);
+        const anchorOffset = Math.min(anchor.character, lineText.length);
+        const focusOffset = Math.min(focusCharacter, lineText.length);
+        const anchorCharacter = snapCharacterToGraphemeBoundary(
+          lineText,
+          anchorOffset
+        );
+        const lineFocusCharacter =
+          focusOffset === anchorOffset
+            ? anchorCharacter
+            : snapCharacterToGraphemeBoundary(lineText, focusOffset);
+        selections.push({
+          start: {
+            line,
+            character: Math.min(anchorCharacter, lineFocusCharacter),
+          },
+          end: {
+            line,
+            character: Math.max(anchorCharacter, lineFocusCharacter),
+          },
+          direction:
+            anchorCharacter === lineFocusCharacter
+              ? DirectionNone
+              : anchorCharacter < lineFocusCharacter
+                ? DirectionForward
+                : DirectionBackward,
+        });
+      }
+      if (line === goal.line) {
+        break;
+      }
+    }
+    this.#updateSelections(selections);
+    return true;
+  }
+
+  #removeRenderedEditPrediction(): void {
+    for (const [key, element] of this.#overlayElements ?? []) {
+      if (key.startsWith('editPrediction')) {
+        element.remove();
+        this.#overlayElements?.delete(key);
+      }
+    }
+  }
+
+  // Combines edits that share source lines into the exact text range rendered
+  // by one ghost preview. A non-deletion replacement also includes the
+  // preserved line suffix so it reflows after the ghost text. Spacing and
+  // rendering both use this geometry so they cannot disagree about how many
+  // continuation lines the preview contains.
+  #composeEditPredictionGroup(
+    textDocument: TextDocument<EType, LAnnotation>,
+    edits: readonly TextEdit[],
+    startIndex: number
+  ): { edit: TextEdit; endIndex: number } {
+    const firstEdit = edits[startIndex];
+    let endIndex = startIndex;
+    let endLine = firstEdit.range.end.line;
+    while (
+      endIndex + 1 < edits.length &&
+      edits[endIndex + 1].range.start.line <= endLine
+    ) {
+      endIndex++;
+      endLine = Math.max(endLine, edits[endIndex].range.end.line);
+    }
+    if (
+      endIndex === startIndex &&
+      (firstEdit.newText.length === 0 ||
+        comparePosition(firstEdit.range.start, firstEdit.range.end) === 0)
+    ) {
+      return { edit: firstEdit, endIndex };
+    }
+
+    const start = firstEdit.range.start;
+    const end = {
+      line: endLine,
+      character: textDocument.getLineLength(endLine),
+    };
+    const parts: string[] = [];
+    let consumed = textDocument.offsetAt(start);
+    for (let index = startIndex; index <= endIndex; index++) {
+      const edit = edits[index];
+      const editStart = textDocument.offsetAt(edit.range.start);
+      const editEnd = textDocument.offsetAt(edit.range.end);
+      parts.push(textDocument.getTextSlice(consumed, editStart), edit.newText);
+      consumed = editEnd;
+    }
+    parts.push(textDocument.getTextSlice(consumed, textDocument.offsetAt(end)));
+    return {
+      edit: { range: { start, end }, newText: parts.join('') },
+      endIndex,
+    };
+  }
+
+  // Composes the active prediction into ghost groups and decides, once, whether
+  // every group has rendered rows. Spacers and ghost rendering read this result
+  // directly; Tab acceptance reads the `rendered` flag that rendering sets only
+  // after drawing every group. A prediction is therefore shown all-or-nothing
+  // and Tab acts on exactly the ghost text the user sees. A virtualized or
+  // collapsed row cannot show its edit, and accepting would change unseen
+  // document content. Undefined when no prediction applies to the current
+  // document version or subtle mode has not revealed it.
+  #getEditPredictionGroups():
+    | { groups: EditPredictionGroup[]; allVisible: boolean }
+    | undefined {
+    const prediction = this.#editPrediction;
+    const textDocument = this.#editSession?.document;
+    if (
+      prediction == null ||
+      textDocument == null ||
+      prediction.document !== textDocument ||
+      prediction.version !== textDocument.version ||
+      (this.#options.editPrediction?.mode === 'subtle' &&
+        !this.#editPredictionRevealed)
+    ) {
+      return undefined;
+    }
+    const { edits } = prediction.response;
+    const groups: EditPredictionGroup[] = [];
+    let allVisible = edits.length > 0;
+    for (let startIndex = 0; startIndex < edits.length; ) {
+      const { edit, endIndex } = this.#composeEditPredictionGroup(
+        textDocument,
+        edits,
+        startIndex
+      );
+      for (
+        let line = edit.range.start.line;
+        allVisible && line <= edit.range.end.line;
+        line++
+      ) {
+        allVisible = this.#isLineVisible(line);
+      }
+      groups.push({ edit, startIndex, endIndex });
+      startIndex = endIndex + 1;
+    }
+    return { groups, allVisible };
+  }
+
+  // Give a ghost text element one block per predicted line. The first line
+  // continues from the caret, so it is indented to the caret's x. When lines
+  // wrap, the element spans the rest of the column so its lines break where
+  // document text would; otherwise it grows to fit its content.
+  #fillGhostTextElement(
+    element: HTMLElement,
+    newText: string,
+    anchorLeft: number,
+    lineLeft: number,
+    insertionSuffix: Node | undefined
+  ): void {
+    if (this.#isWrap) {
+      element.dataset.wrap = '';
+      element.style.width = `calc(100cqw - ${lineLeft}px)`;
+    } else {
+      delete element.dataset.wrap;
+      element.style.width = 'max-content';
+    }
+    const lines = newText.split(/\r\n|\r|\n/);
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+      const lineText = lines[lineIndex];
+      const suffix =
+        lineIndex === lines.length - 1 ? insertionSuffix : undefined;
+      const isEmpty = lineText.length === 0 && suffix === undefined;
+      const line = h(
+        'span',
+        {
+          dataset: isEmpty
+            ? ['editPredictionLine', 'empty']
+            : 'editPredictionLine',
+          textContent: isEmpty ? '\u200b' : lineText,
+        },
+        element
+      );
+      if (suffix !== undefined) {
+        const suffixElement = h(
+          'span',
+          {
+            dataset: 'editPredictionSuffix',
+          },
+          line
+        );
+        suffixElement.append(suffix);
+      }
+      // Indent only the first visual line to the caret; when the line wraps,
+      // its continuation rows start at the column's left edge like document
+      // text does. Padding would indent every row of the block.
+      if (lineIndex === 0 && anchorLeft !== lineLeft) {
+        line.style.textIndent = `${anchorLeft - lineLeft}px`;
+      }
+    }
+  }
+
+  // A mid-line insertion masks the rest of its line and redraws that text after
+  // the ghost text. Returns the copy to redraw (cloned from the rendered row so
+  // it keeps its colors), or undefined when there is nothing to redraw or a
+  // neighbouring edit on the same line would move it.
+  #cloneInsertionSuffix(group: EditPredictionGroup): Node | undefined {
+    const prediction = this.#editPrediction;
+    const textDocument = this.#editSession?.document;
+    if (prediction == null || textDocument == null) {
+      return undefined;
+    }
+    const { edit, startIndex, endIndex } = group;
+    const { start, end } = edit.range;
+    const isMidLineInsertion =
+      comparePosition(start, end) === 0 &&
+      start.character < textDocument.getLineLength(start.line);
+    if (
+      !isMidLineInsertion ||
+      prediction.response.edits[startIndex - 1]?.range.end.line ===
+        start.line ||
+      prediction.response.edits[endIndex + 1]?.range.start.line === start.line
+    ) {
+      return undefined;
+    }
+    const sourceLine = this.#getLineElement(start.line);
+    if (sourceLine === undefined) {
+      return document.createTextNode(
+        textDocument.getLineText(start.line).slice(start.character)
+      );
+    }
+    const [suffixNode, suffixOffset] = getSelectionAnchor(
+      sourceLine,
+      start.character
+    );
+    const suffixRange = document.createRange();
+    suffixRange.selectNodeContents(sourceLine);
+    suffixRange.setStart(suffixNode, clampDomOffset(suffixNode, suffixOffset));
+    const suffix = suffixRange.cloneContents();
+    if (suffix.firstChild?.textContent === '') {
+      suffix.firstChild.remove();
+    }
+    return suffix;
+  }
+
+  // How many rows of ghost text extend below the anchor row. The ghost's first
+  // visual line sits on the caret's visual line and the rest run down over the
+  // anchor row's remaining visual lines before spilling below it. Without
+  // wrapping every predicted line is one row. With wrapping only the browser
+  // knows where the lines break, so the ghost element is laid out hidden in the
+  // overlay and measured; an element that cannot be measured counts as
+  // unwrapped, the same fallback #wrapLineText uses.
+  #measureGhostTextRows(group: EditPredictionGroup): number {
+    const { edit } = group;
+    const { start } = edit.range;
+    const [anchorLeft, anchorWrapLine] = this.#getCharX(
+      start.line,
+      start.character
+    );
+    let anchorVisualLines = 1;
+    let ghostVisualLines = edit.newText.split(/\r\n|\r|\n/).length;
+    const overlayElement = this.#overlayElement;
+    if (this.#isWrap && overlayElement != null) {
+      anchorVisualLines = Math.max(
+        1,
+        this.#wrapLineTextOrWholeLine(start.line).length - 1
+      );
+      const probe = h(
+        'span',
+        { dataset: 'editPrediction', style: { visibility: 'hidden' } },
+        overlayElement
+      );
+      this.#fillGhostTextElement(
+        probe,
+        edit.newText,
+        anchorLeft,
+        this.#getCharX(start.line, 0)[0],
+        this.#cloneInsertionSuffix(group)
+      );
+      const { width, height } = probe.getBoundingClientRect();
+      probe.remove();
+      const { lineHeight } = this.#metrics;
+      // A zero-width column (mid re-render) would wrap every character; treat
+      // that, like a zero height, as unmeasurable.
+      if (width > 0 && height > 0 && lineHeight > 0) {
+        ghostVisualLines = Math.round(height / lineHeight);
+      }
+    }
+    return Math.max(0, ghostVisualLines - (anchorVisualLines - anchorWrapLine));
+  }
+
+  // Reserve numberless grid space for ghost continuation lines without adding
+  // rows that could be mistaken for document content by the editor.
+  #syncEditPredictionSpacers(notifyComponent = true): void {
+    const nextSpacers = new Map<HTMLElement, number>();
+    // Ghost text rows per line for this sync. It replaces #ghostTextRows only
+    // when the contents differ, so an unchanged map keeps its identity.
+    const ghostTextRows = new Map<number, number>();
+    const previousRows = this.#ghostTextRows;
+    let rowsChanged = false;
+    const contentElement = this.#contentElement;
+    const composed = this.#getEditPredictionGroups();
+    if (contentElement != null && composed != null && composed.allVisible) {
+      for (const group of composed.groups) {
+        const { edit } = group;
+        if (edit.newText.length === 0) {
+          continue;
+        }
+        const count = this.#measureGhostTextRows(group);
+        if (count > (ghostTextRows.get(edit.range.start.line) ?? 0)) {
+          ghostTextRows.set(edit.range.start.line, count);
+        }
+      }
+
+      if (ghostTextRows.size > 0) {
+        let rowIndexes: Map<Element, number> | undefined;
+        const startingLine = this.#renderRange?.startingLine ?? 0;
+        for (const [line, count] of ghostTextRows) {
+          rowsChanged ||= previousRows.get(line) !== count;
+          const lineElement = this.#getLineElement(line);
+          if (lineElement === undefined) {
+            continue;
+          }
+          let rowIndex = line - startingLine;
+          if (contentElement.children[rowIndex] !== lineElement) {
+            if (rowIndexes === undefined) {
+              rowIndexes = new Map();
+              for (
+                let index = 0;
+                index < contentElement.children.length;
+                index++
+              ) {
+                rowIndexes.set(contentElement.children[index], index);
+              }
+            }
+            rowIndex = rowIndexes.get(lineElement) ?? -1;
+          }
+          if (rowIndex < 0) {
+            continue;
+          }
+          nextSpacers.set(lineElement, count);
+          const gutterRow = this.#gutterElement?.children[rowIndex];
+          if (gutterRow instanceof HTMLElement) {
+            nextSpacers.set(gutterRow, count);
+          }
+          const partner = this.#deletionsColumnPartner(rowIndex);
+          if (partner != null) {
+            // Several anchors can share one buffer, so their rows add up.
+            nextSpacers.set(
+              partner.content,
+              (nextSpacers.get(partner.content) ?? 0) + count
+            );
+            nextSpacers.set(
+              partner.gutter,
+              (nextSpacers.get(partner.gutter) ?? 0) + count
+            );
+          }
+        }
+      }
+    }
+
+    let changed = false;
+    for (const [element, count] of this.#editPredictionSpacers) {
+      if (nextSpacers.get(element) === count) {
+        continue;
+      }
+      delete element.dataset.editPredictionSpacer;
+      element.style.removeProperty('--diffs-edit-prediction-spacer-height');
+      changed = true;
+    }
+    for (const [element, count] of nextSpacers) {
+      if (this.#editPredictionSpacers.get(element) === count) {
+        continue;
+      }
+      element.dataset.editPredictionSpacer = '';
+      element.style.setProperty(
+        '--diffs-edit-prediction-spacer-height',
+        `${count}lh`
+      );
+      changed = true;
+    }
+    this.#editPredictionSpacers = nextSpacers;
+    if (rowsChanged || ghostTextRows.size !== previousRows.size) {
+      this.#ghostTextRows = ghostTextRows;
+      if (notifyComponent) {
+        this.#virtualizedInstance?.syncGhostTextRows();
+      }
+    }
+    if (changed) {
+      this.#resetCache();
+    }
+  }
+
+  // In a split diff whose columns scroll separately, each column is its own
+  // grid, so a ghost text margin on an additions row grows that column alone
+  // and the deletions rows below drift out of line. Find the deletions element
+  // in the same grid track as the additions row at `rowIndex`: its paired line
+  // row, or the empty buffer that spans the tracks of a one-sided run. A row is
+  // one track; a buffer spans `data-buffer-size` tracks. Undefined when the
+  // columns share a grid (wrap mode) or this is not a split diff.
+  #deletionsColumnPartner(rowIndex: number): ColumnElements | undefined {
+    const deletionsColumn = this.#deletionsColumn;
+    const contentElement = this.#contentElement;
+    if (
+      deletionsColumn == null ||
+      contentElement == null ||
+      !this.#isDiff ||
+      this.#diffSyle !== 'split' ||
+      this.#isWrap
+    ) {
+      return undefined;
+    }
+    let track = 0;
+    for (let index = 0; index < rowIndex; index++) {
+      track += gridTrackSpan(contentElement.children[index]);
+    }
+    const { content, gutter } = deletionsColumn;
+    let covered = 0;
+    for (let index = 0; index < content.children.length; index++) {
+      const child = content.children[index];
+      covered += gridTrackSpan(child);
+      if (covered > track) {
+        const gutterChild = gutter.children[index];
+        if (
+          !(child instanceof HTMLElement) ||
+          !(gutterChild instanceof HTMLElement)
+        ) {
+          throw new Error(
+            'Editor: deletions column rows and gutter cells are out of step'
+          );
+        }
+        return { content: child, gutter: gutterChild };
+      }
+    }
+    return undefined;
+  }
+
+  #cancelEditPrediction(removeRendered: boolean, notifyComponent = true): void {
+    if (this.#editPredictionTimer !== undefined) {
+      clearTimeout(this.#editPredictionTimer);
+      this.#editPredictionTimer = undefined;
+    }
+    this.#editPredictionAbortController?.abort();
+    this.#editPredictionAbortController = undefined;
+    this.#editPredictionGeneration++;
+    this.#editPredictionRevealed = false;
+    this.#retryEditPredictionOnRender = false;
+    this.#editPrediction = undefined;
+    this.#syncEditPredictionSpacers(notifyComponent);
+    if (removeRendered) {
+      this.#removeRenderedEditPrediction();
+    }
+  }
+
+  #includesEditPredictionPath(path: string): boolean {
+    const options = this.#options.editPrediction;
+    if (options === undefined) {
+      return false;
+    }
+    const normalizedPath = path.replaceAll('\\', '/');
+    return (
+      (options.include === undefined ||
+        options.include.some((pattern) =>
+          matchesEditPredictionPattern(normalizedPath, pattern)
+        )) &&
+      options.exclude?.some((pattern) =>
+        matchesEditPredictionPattern(normalizedPath, pattern)
+      ) !== true
+    );
+  }
+
+  #scheduleEditPrediction(): void {
+    this.#cancelEditPrediction(true);
+    const selection = this.#selections?.[0];
+    if (
+      this.#options.editPrediction === undefined ||
+      this.#editSession?.document === undefined ||
+      this.#editSession?.fileInfo === undefined ||
+      this.#selections?.length !== 1 ||
+      selection === undefined ||
+      !isCollapsedSelection(selection)
+    ) {
+      return;
+    }
+
+    const document = this.#editSession?.document;
+    const cursorOffset = document.offsetAt(getCaretPosition(selection));
+    this.#editPredictionTimer = setTimeout(() => {
+      this.#editPredictionTimer = undefined;
+      const options = this.#options.editPrediction;
+      const currentSelection = this.#selections?.[0];
+      const path = this.#editSession?.fileInfo?.name;
+      if (
+        options === undefined ||
+        path === undefined ||
+        this.#editSession?.document !== document ||
+        this.#selections?.length !== 1 ||
+        currentSelection === undefined ||
+        !isCollapsedSelection(currentSelection) ||
+        document.offsetAt(getCaretPosition(currentSelection)) !== cursorOffset
+      ) {
+        return;
+      }
+
+      if (!this.#includesEditPredictionPath(path)) {
+        return;
+      }
+
+      const isLineEditable = (line: number): boolean =>
+        this.#isLineInRenderRange(line) && this.#isLineRenderable(line);
+      if (!isLineEditable(getCaretPosition(currentSelection).line)) {
+        this.#retryEditPredictionOnRender = true;
+        return;
+      }
+      const request = buildEditPredictionRequest(
+        path,
+        document,
+        cursorOffset,
+        this.#editPredictionHistory,
+        isLineEditable
+      );
+      if (request === undefined) {
+        return;
+      }
+      const excerptStartOffset = document.offsetAt({
+        line: request.excerptStartLine,
+        character: 0,
+      });
+      const editableStart = excerptStartOffset + request.editableRange.start;
+      const editableEnd = excerptStartOffset + request.editableRange.end;
+      const controller = new AbortController();
+      const generation = ++this.#editPredictionGeneration;
+      this.#editPredictionAbortController = controller;
+
+      let prediction: Promise<EditPredictResponse>;
+      try {
+        prediction = options.provider.predict(request, {
+          signal: controller.signal,
+        });
+      } catch {
+        this.#editPredictionAbortController = undefined;
+        return;
+      }
+
+      void Promise.resolve(prediction)
+        .then((response) => {
+          const selection = this.#selections?.[0];
+          if (
+            controller.signal.aborted ||
+            generation !== this.#editPredictionGeneration ||
+            this.#editPredictionAbortController !== controller ||
+            this.#editSession?.document !== document ||
+            document.version !== request.version ||
+            this.#selections?.length !== 1 ||
+            selection === undefined ||
+            !isCollapsedSelection(selection) ||
+            document.offsetAt(getCaretPosition(selection)) !== cursorOffset
+          ) {
+            return;
+          }
+
+          if (
+            response == null ||
+            !Array.isArray(response.edits) ||
+            response.edits.length === 0 ||
+            response.edits.length > MAX_EDIT_PREDICTION_RESPONSE_EDITS ||
+            response.newCursor == null
+          ) {
+            return;
+          }
+          const resolvedEdits: ResolvedTextEdit[] = [];
+          let responseBytes = 0;
+          for (const edit of response.edits) {
+            if (
+              edit == null ||
+              typeof edit.newText !== 'string' ||
+              !isValidEditPredictionPosition(document, edit.range?.start) ||
+              !isValidEditPredictionPosition(document, edit.range?.end) ||
+              comparePosition(edit.range.start, edit.range.end) > 0
+            ) {
+              return;
+            }
+            responseBytes += editPredictionTextEncoder.encode(
+              edit.newText
+            ).byteLength;
+            if (responseBytes > MAX_EDIT_PREDICTION_RESPONSE_BYTES) {
+              return;
+            }
+            const start = document.offsetAt(edit.range.start);
+            const end = document.offsetAt(edit.range.end);
+            const resolvedEdit = document.resolveEdits([edit])[0];
+            if (resolvedEdit.start !== start || resolvedEdit.end !== end) {
+              return;
+            }
+            resolvedEdits.push(resolvedEdit);
+          }
+          resolvedEdits.sort((left, right) => {
+            const startDelta = left.start - right.start;
+            return startDelta === 0 ? left.end - right.end : startDelta;
+          });
+          for (let index = 0; index < resolvedEdits.length; index++) {
+            const edit = resolvedEdits[index];
+            if (
+              edit.start < editableStart ||
+              edit.end > editableEnd ||
+              (index > 0 && resolvedEdits[index - 1].end > edit.start)
+            ) {
+              return;
+            }
+          }
+          const edits = resolvedEdits.filter(
+            (edit) => edit.text !== document.getTextSlice(edit.start, edit.end)
+          );
+          if (edits.length === 0) {
+            return;
+          }
+
+          const firstEditPosition = document.positionAt(edits[0].start);
+          const lastEditPosition = document.positionAt(edits.at(-1)!.end);
+          const affectedStart = document.offsetAt({
+            line: firstEditPosition.line,
+            character: 0,
+          });
+          const affectedEnd = document.offsetAt({
+            line: lastEditPosition.line,
+            character: document.getLineLength(lastEditPosition.line),
+          });
+          const predictedParts: string[] = [];
+          let consumed = affectedStart;
+          for (const edit of edits) {
+            predictedParts.push(
+              document.getTextSlice(consumed, edit.start),
+              edit.text
+            );
+            consumed = edit.end;
+          }
+          predictedParts.push(document.getTextSlice(consumed, affectedEnd));
+          const predictedLines = predictedParts.join('').split(/\r\n|\r|\n/);
+          const affectedEndLine =
+            firstEditPosition.line + predictedLines.length - 1;
+          const lineDelta =
+            predictedLines.length -
+            (lastEditPosition.line - firstEditPosition.line + 1);
+          const newCursor = response.newCursor;
+          if (
+            !Number.isInteger(newCursor.line) ||
+            !Number.isInteger(newCursor.character) ||
+            newCursor.line < 0 ||
+            newCursor.character < 0
+          ) {
+            return;
+          }
+          if (
+            newCursor.line >= firstEditPosition.line &&
+            newCursor.line <= affectedEndLine
+          ) {
+            const line =
+              predictedLines[newCursor.line - firstEditPosition.line];
+            if (
+              newCursor.character > line.length ||
+              splitsSurrogatePair(line, newCursor.character)
+            ) {
+              return;
+            }
+          } else {
+            const originalLine =
+              newCursor.line < firstEditPosition.line
+                ? newCursor.line
+                : newCursor.line - lineDelta;
+            if (
+              originalLine < 0 ||
+              originalLine >= document.lineCount ||
+              newCursor.character > document.getLineLength(originalLine)
+            ) {
+              return;
+            }
+            const originalOffset = document.offsetAt({
+              line: originalLine,
+              character: newCursor.character,
+            });
+            if (
+              splitsSurrogatePair(
+                document.charAt(originalOffset - 1) +
+                  document.charAt(originalOffset),
+                1
+              )
+            ) {
+              return;
+            }
+          }
+
+          this.#editPrediction = {
+            document,
+            version: request.version,
+            cursorOffset,
+            rendered: false,
+            response: {
+              edits: edits.map((edit) => ({
+                range: {
+                  start: document.positionAt(edit.start),
+                  end: document.positionAt(edit.end),
+                },
+                newText: edit.text,
+              })),
+              newCursor: { ...newCursor },
+            },
+          };
+          this.#updateSelections(this.#selections);
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (this.#editPredictionAbortController === controller) {
+            this.#editPredictionAbortController = undefined;
+          }
+        });
+    }, EDIT_PREDICTION_DEBOUNCE_MS);
+  }
+
+  #recordEditPredictionHistory(
+    change: TextDocumentChange,
+    source: 'user' | 'prediction'
+  ): void {
+    const textDocument = this.#editSession?.document;
+    const path = this.#editSession?.fileInfo?.name;
+    const transaction = getTextDocumentChangeTransaction(change);
+    if (
+      textDocument === undefined ||
+      path === undefined ||
+      transaction === undefined ||
+      !this.#includesEditPredictionPath(path)
+    ) {
+      return;
+    }
+    this.#editPredictionHistory = recordEditPrediction(
+      this.#editPredictionHistory,
+      path,
+      textDocument,
+      transaction,
+      source
+    );
+  }
+
+  #acceptEditPrediction(): void {
+    const prediction = this.#editPrediction;
+    const textDocument = this.#editSession?.document;
+    const selection = this.#selections?.[0];
+    if (
+      prediction === undefined ||
+      !prediction.rendered ||
+      textDocument === undefined ||
+      prediction.document !== textDocument ||
+      prediction.version !== textDocument.version ||
+      this.#selections?.length !== 1 ||
+      selection === undefined ||
+      !isCollapsedSelection(selection) ||
+      textDocument.offsetAt(getCaretPosition(selection)) !==
+        prediction.cursorOffset
+    ) {
+      return;
+    }
+
+    const { edits, newCursor } = prediction.response;
+    this.#cancelEditPrediction(true);
+    const change = textDocument.applyEdits(
+      edits.map((edit) => ({
+        range: {
+          start: { ...edit.range.start },
+          end: { ...edit.range.end },
+        },
+        newText: edit.newText,
+      })),
+      true,
+      this.#selections,
+      undefined,
+      true
+    );
+    if (change === undefined) {
+      this.#scheduleEditPrediction();
+      return;
+    }
+
+    const cursor = textDocument.normalizePosition(newCursor);
+    const nextSelections: EditorSelection[] = [
+      { start: cursor, end: cursor, direction: DirectionNone },
+    ];
+    textDocument.setLastUndoSelectionsAfter(nextSelections);
+    this.#applyChange(
+      change,
+      nextSelections,
+      this.#applyChangeToLineAnnotations(change),
+      { editSource: 'prediction' }
+    );
+  }
+
+  #renderEditPrediction(renderCtx: {
+    fragment: DocumentFragment;
+    elements: Map<string, HTMLElement>;
+  }): void {
+    const prediction = this.#editPrediction;
+    const textDocument = this.#editSession?.document;
+    if (prediction !== undefined) {
+      prediction.rendered = false;
+    }
+    const composed = this.#getEditPredictionGroups();
+    if (
+      prediction == null ||
+      textDocument == null ||
+      composed == null ||
+      !composed.allVisible
+    ) {
+      return;
+    }
+
+    for (const group of composed.groups) {
+      const { edit, endIndex } = group;
+      const { start, end } = edit.range;
+      const isDeletion = edit.newText.length === 0;
+      const isReplacement = comparePosition(start, end) !== 0;
+      const lineLength = textDocument.getLineLength(start.line);
+      const isMidLineInsertion = !isReplacement && start.character < lineLength;
+      if (isReplacement) {
+        this.#renderSelection(
+          renderCtx,
+          isDeletion ? 'editPredictionDeletion' : 'editPredictionReplacement',
+          { start, end }
+        );
+      } else if (isMidLineInsertion) {
+        // Hide the in-flow suffix so ghost text never collides with it.
+        this.#renderSelection(renderCtx, 'editPredictionInsertion', {
+          start,
+          end: { line: start.line, character: lineLength },
+        });
+      }
+
+      if (isDeletion) {
+        continue;
+      }
+
+      const [anchorLeft, anchorWrapLine] = this.#getCharX(
+        start.line,
+        start.character
+      );
+      const lineLeft = this.#getCharX(start.line, 0)[0];
+      const anchorTop =
+        this.#getLineY(start.line) + anchorWrapLine * this.#metrics.lineHeight;
+      const key = `editPrediction-${endIndex}`;
+      let element = this.#overlayElements?.get(key);
+      if (element !== undefined) {
+        this.#overlayElements?.delete(key);
+        element.replaceChildren();
+      } else {
+        element = h(
+          'span',
+          {
+            ariaHidden: 'true',
+            contentEditable: 'false',
+            dataset: 'editPrediction',
+          },
+          renderCtx.fragment
+        );
+      }
+      if (isReplacement) {
+        element.dataset.replacement = '';
+        const lineElement = this.#getLineElement(start.line);
+        if (lineElement !== undefined) {
+          element.style.setProperty(
+            '--diffs-edit-prediction-bg',
+            getComputedStyle(lineElement).getPropertyValue('--diffs-line-bg')
+          );
+        }
+      } else {
+        delete element.dataset.replacement;
+        element.style.removeProperty('--diffs-edit-prediction-bg');
+      }
+      this.#fillGhostTextElement(
+        element,
+        edit.newText,
+        anchorLeft,
+        lineLeft,
+        this.#cloneInsertionSuffix(group)
+      );
+      element.style.transform = `translateX(${lineLeft}px) translateY(${anchorTop}px)`;
+      renderCtx.elements.set(key, element);
+    }
+    prediction.rendered = true;
+  }
+
+  #updateSelections(selections: EditorSelection[]) {
+    this.__postponeBgTokenizeToNextFrame();
+
+    const previousSelections = this.#selections;
+    let selectionsChanged = previousSelections?.length !== selections.length;
+    if (!selectionsChanged && previousSelections !== undefined) {
+      for (let i = 0; i < selections.length; i++) {
+        const previous = previousSelections[i];
+        const next = selections[i];
+        if (
+          previous.direction !== next.direction ||
+          comparePosition(previous.start, next.start) !== 0 ||
+          comparePosition(previous.end, next.end) !== 0
+        ) {
+          selectionsChanged = true;
+          break;
+        }
+      }
+    }
+    if (selectionsChanged) {
+      this.#cancelEditPrediction(true);
+    }
+    this.#syncEditPredictionSpacers();
+
+    this.#primaryCaretElement = undefined;
+    this.#setEditorActiveLineSafe(null);
+
+    if (
+      selections.length === 0 &&
+      this.#matches === undefined &&
+      this.#markerRenderer === undefined
+    ) {
+      this.#selections = undefined;
+      this.#overlayElements?.forEach((el) => el.remove());
+      this.#overlayElements?.clear();
+      this.#selectionAction?.cleanup();
+      this.#selectionAction = undefined;
+      if (selectionsChanged) {
+        this.#scheduleEditPrediction();
+      }
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    const renderCtx = {
+      fragment,
+      elements: new Map<string, HTMLElement>(),
+    };
+
+    if (selections.length > 0) {
+      const normalizedSelections = mergeOverlappingSelections(selections);
+      const primarySelection = normalizedSelections.at(-1)!;
+      this.#selections = normalizedSelections;
+      // The caret line always keeps its highlighted gutter number. With a bare
+      // caret it also gets the full-line background; once any selection spans
+      // text, the background is dropped (lineNumberOnly) so the text selection
+      // is the only line-level highlight.
+      const hasNonEmptySelection = normalizedSelections.some(
+        (selection) => !isCollapsedSelection(selection)
+      );
+      const caretLine = getCaretPosition(primarySelection).line + 1;
+
+      this.#setEditorActiveLineSafe(caretLine, hasNonEmptySelection);
+
+      for (const selection of normalizedSelections) {
+        if (!isCollapsedSelection(selection)) {
+          this.#renderSelection(renderCtx, 'selection', selection);
+        }
+        this.#renderCaret(renderCtx, selection, selection === primarySelection);
+      }
+
+      const bracketMatchRanges =
+        this.#options.matchBrackets !== false &&
+        this.#editSession?.document != null &&
+        this.#tokenizer !== undefined &&
+        isCollapsedSelection(primarySelection)
+          ? findBracketMatchRanges(
+              this.#editSession?.document,
+              this.#tokenizer,
+              primarySelection.start
+            )
+          : undefined;
+      if (bracketMatchRanges !== undefined) {
+        for (const range of bracketMatchRanges) {
+          this.#renderSelection(renderCtx, 'bracketMatch', range);
+        }
+      }
+    }
+
+    const textDocument = this.#editSession?.document;
+    if (this.#matches !== undefined && textDocument !== undefined) {
+      const matches = this.#matches;
+      const renderRange = this.#renderRange;
+      const shouldCullMatches =
+        (renderRange != null && Number.isFinite(renderRange.totalLines)) ||
+        (this.#isDiff &&
+          this.#fileDiffInstance?.options.expandUnchanged !== true);
+      const renderedLineRanges = shouldCullMatches
+        ? this.#getRenderedEditableLineRanges()
+        : undefined;
+      const primarySelection = this.#selections?.at(-1);
+      const primaryStartOffset =
+        primarySelection !== undefined
+          ? textDocument.offsetAt(primarySelection.start)
+          : -1;
+      const primaryEndOffset =
+        primarySelection !== undefined
+          ? textDocument.offsetAt(primarySelection.end)
+          : -1;
+      let firstMatchIndex = 0;
+      const rangeCount = renderedLineRanges?.length ?? 1;
+      for (let rangeIndex = 0; rangeIndex < rangeCount; rangeIndex++) {
+        let visibleEndOffset = Infinity;
+        const lineRange = renderedLineRanges?.[rangeIndex];
+        if (lineRange !== undefined) {
+          const [firstLine, lastLine] = lineRange;
+          const visibleStartOffset = textDocument.offsetAt({
+            line: firstLine,
+            character: 0,
+          });
+          const endLine = lastLine + 1;
+          visibleEndOffset =
+            endLine < textDocument.lineCount
+              ? textDocument.offsetAt({ line: endLine, character: 0 })
+              : textDocument.offsetAt({
+                  line: endLine - 1,
+                  character: textDocument.getLineLength(endLine - 1),
+                });
+
+          // Matches are sorted and non-overlapping, so narrow the rendered
+          // offset window before resolving any match positions through the treap.
+          let low = firstMatchIndex;
+          let high = matches.length;
+          while (low < high) {
+            const middle = low + Math.floor((high - low) / 2);
+            if (matches[middle][1] <= visibleStartOffset) {
+              low = middle + 1;
+            } else {
+              high = middle;
+            }
+          }
+          firstMatchIndex = low;
+        }
+        for (; firstMatchIndex < matches.length; firstMatchIndex++) {
+          const [startOffset, endOffset] = matches[firstMatchIndex];
+          if (startOffset >= visibleEndOffset) {
+            break;
+          }
+          const range: Range = {
+            start: textDocument.positionAt(startOffset),
+            end: textDocument.positionAt(endOffset),
+          };
+          const isFocused =
+            primaryStartOffset === startOffset &&
+            primaryEndOffset === endOffset;
+          this.#renderSelection(
+            renderCtx,
+            'match',
+            range,
+            isFocused ? 'focus' : undefined
+          );
+        }
+      }
+    }
+
+    if (this.#markerRenderer !== undefined && textDocument !== undefined) {
+      for (const marker of this.#markerRenderer.markers) {
+        this.#renderSelection(
+          renderCtx,
+          'marker',
+          marker,
+          markerSeverityDatasetKey(marker.severity)
+        );
+      }
+    }
+
+    this.#renderEditPrediction(renderCtx);
+
+    this.#overlayElement?.appendChild(fragment);
+    this.#overlayElements?.forEach((el) => el.remove());
+    this.#overlayElements?.clear();
+    this.#overlayElements = renderCtx.elements;
+    this.#updateSelectionActionPopover();
+    if (selectionsChanged) {
+      this.#scheduleEditPrediction();
+    }
+  }
+
+  // Render externally owned cursors independently from local selections so
+  // collaboration state never changes focus, editing, or native selection.
+  #renderCarets(): void {
+    const carets = this.#carets;
+    const renderCaret = this.#options.renderCaret;
+    const overlayElement = this.#overlayElement;
+    this.#caretHighlightElements?.forEach((element) => element.remove());
+    this.#caretHighlightElements = undefined;
+    if (
+      carets === undefined ||
+      renderCaret === undefined ||
+      overlayElement === undefined
+    ) {
+      this.#caretElements?.forEach((element) => element.remove());
+      this.#caretElements = undefined;
+      return;
+    }
+
+    const elements = (this.#caretElements ??= new Map());
+    for (const [trackedCaret, element] of elements) {
+      if (!this.#isLineVisible(trackedCaret.caret.focus.line)) {
+        element.remove();
+        elements.delete(trackedCaret);
+      }
+    }
+
+    const fragment = document.createDocumentFragment();
+    const highlightElements: HTMLElement[] = [];
+    for (const trackedCaret of carets) {
+      const { caret } = trackedCaret;
+      const { line, character } = caret.focus;
+      if (trackedCaret.anchorOffset !== trackedCaret.focusOffset) {
+        // Keep each collaborator's rounded-corner state and highlight elements
+        // separate so overlapping ranges retain their own geometry and color.
+        const highlightContext = {
+          fragment,
+          elements: new Map<string, HTMLElement>(),
+        };
+        this.#renderSelection(
+          highlightContext,
+          'caretHighlight',
+          trackedCaret.anchorOffset < trackedCaret.focusOffset
+            ? { start: caret.anchor, end: caret.focus }
+            : { start: caret.focus, end: caret.anchor },
+          undefined,
+          caret.focus
+        );
+        for (const highlightElement of highlightContext.elements.values()) {
+          highlightElement.style.setProperty(
+            '--diffs-caret-highlight-bg',
+            `color-mix(in srgb, ${caret.metadata.color} 32%, transparent)`
+          );
+          highlightElements.push(highlightElement);
+        }
+      }
+      // Virtualized views omit off-screen rows. Do not leave an unpositioned
+      // anchor at the overlay origin for a caret whose row is not rendered.
+      if (!this.#isLineVisible(line)) continue;
+      let element = elements.get(trackedCaret);
+      if (element === undefined) {
+        element = h(
+          'div',
+          { dataset: 'remoteCaret', children: [renderCaret(caret)] },
+          fragment
+        );
+        elements.set(trackedCaret, element);
+      }
+      const [left, wrapLine] = this.#getCharX(line, character);
+      const top = this.#getLineY(line) + wrapLine * this.#metrics.lineHeight;
+      element.style.transform = `translateX(${left}px) translateY(${top}px)`;
+    }
+    this.#caretHighlightElements = highlightElements;
+    overlayElement.appendChild(fragment);
+  }
+
+  #renderSelection(
+    renderCtx: {
+      fragment: DocumentFragment;
+      elements: Map<string, HTMLElement>;
+    },
+    type: OverlayRangeType,
+    range: Range,
+    extraDataset?: string,
+    connectedCaret?: Position
+  ) {
+    if (this.#editSession?.document == null) {
+      return;
+    }
+
+    const { start, end } = range;
+    let firstLine = start.line;
+    let endLine = end.line + 1;
+    if (this.#renderRange !== undefined) {
+      const { startingLine, totalLines } = this.#renderRange;
+      firstLine = Math.max(firstLine, startingLine);
+      endLine = Math.min(endLine, startingLine + totalLines);
+    }
+    for (let line = firstLine; line < endLine; line++) {
+      if (!this.#isLineVisible(line)) {
+        continue;
+      }
+
+      const isLastLine = line === end.line;
+      const startChar = line === start.line ? start.character : 0;
+      const endChar = isLastLine
+        ? end.character
+        : this.#editSession?.document.getLineLength(line);
+
+      // A predicted deletion of an empty line or of a lone line break has no
+      // text to strike through; draw a one-character mark at the boundary so
+      // the removal is visible, on flat and soft-wrapped lines alike. A range
+      // that ends at column 0 of a later line also produces an empty segment
+      // on that line, but that line survives the edit, so it gets no mark.
+      if (
+        startChar === endChar &&
+        (type === 'editPredictionDeletion' ||
+          type === 'editPredictionReplacement')
+      ) {
+        if (isLastLine && line !== start.line) {
+          continue;
+        }
+        const [left, wrapLine] = this.#getCharX(line, startChar);
+        this.#renderSelectionBlock(
+          renderCtx,
+          type,
+          line,
+          wrapLine,
+          left,
+          this.#metrics.ch,
+          extraDataset
+        );
+        continue;
+      }
+
+      if (this.#isWrap) {
+        const contentWidth = this.#getContentWidth();
+        const lineText = this.#editSession?.document.getLineText(line);
+        const textWidth =
+          2 * this.#metrics.ch + this.#metrics.measureTextWidth(lineText);
+        if (textWidth > contentWidth) {
+          this.#renderWrappedSelection(
+            renderCtx,
+            line,
+            lineText,
+            startChar,
+            endChar,
+            isLastLine,
+            type,
+            extraDataset,
+            connectedCaret
+          );
+          continue;
+        }
+      }
+
+      let left = 0;
+      let width = 0;
+      let paddingEnd = 0;
+      if (startChar === 0) {
+        // gutter width + inline padding (1ch), plus the split-diff content
+        // offset so a column-0 selection lines up with the content panel the
+        // same way #getCharX (used for startChar > 0 and the caret) does.
+        left =
+          this.#getGutterWidth() +
+          this.#metrics.ch +
+          (this.#activeContentOffset?.left ?? 0);
+      } else {
+        left = this.#getCharX(line, startChar)[0];
+      }
+      if (!isLastLine && type === 'selection') {
+        paddingEnd = this.#metrics.ch;
+      }
+      if (startChar === endChar) {
+        width = paddingEnd;
+      } else {
+        width = this.#getCharX(line, endChar)[0] - left + paddingEnd;
+      }
+      this.#renderSelectionBlock(
+        renderCtx,
+        type,
+        line,
+        0,
+        left,
+        width,
+        extraDataset,
+        {
+          start:
+            connectedCaret?.line === start.line &&
+            connectedCaret.character === start.character &&
+            line === start.line,
+          end:
+            connectedCaret?.line === end.line &&
+            connectedCaret.character === end.character &&
+            line === end.line,
+        }
+      );
+    }
+  }
+
+  // Render the selection on a wrapped logical line by splitting it into one
+  // selection-range div per visual sub-line. For each wrap segment, we compute
+  // the intersection with the line's selection range and render the slice in
+  // segment-local coordinates so left/width line up with the visually wrapped
+  // text. Zero-width slices that fall on intermediate segment boundaries are
+  // skipped to avoid duplicate markers across consecutive visual lines.
+  #renderWrappedSelection(
+    renderCtx: {
+      fragment: DocumentFragment;
+      elements: Map<string, HTMLElement>;
+    },
+    line: number,
+    lineText: string,
+    startChar: number,
+    endChar: number,
+    isLastLine: boolean,
+    type: OverlayRangeType,
+    extraDataset?: string,
+    connectedCaret?: Position
+  ) {
+    const wrapOffsets = this.#wrapLineTextOrWholeLine(line);
+    const segmentCount = wrapOffsets.length - 1;
+    // offsetLeft is the x of the content's left edge in overlay coordinates.
+    // In a split diff with wrapping the content element is a grid item shifted
+    // right of the deletion panel, so the same content offset that #getCharX
+    // adds for the caret must be included here too; otherwise every wrapped
+    // selection block is pulled left by the panel offset.
+    const offsetLeft =
+      this.#getGutterWidth() +
+      this.#metrics.ch +
+      (this.#activeContentOffset?.left ?? 0);
+
+    for (let wrapLine = 0; wrapLine < segmentCount; wrapLine++) {
+      const segmentStart = wrapOffsets[wrapLine];
+      const segmentEnd = wrapOffsets[wrapLine + 1];
+      const wrapStartChar = Math.max(startChar, segmentStart);
+      const wrapEndChar = Math.min(endChar, segmentEnd);
+
+      // Selection range doesn't reach this visual segment.
+      if (wrapStartChar > wrapEndChar) {
+        continue;
+      }
+
+      const segmentStartWidth = this.#segmentTextWidth(
+        lineText,
+        segmentStart,
+        wrapStartChar
+      );
+      const segmentLeft = offsetLeft + segmentStartWidth;
+      let paddingEnd = 0;
+      if (
+        !isLastLine &&
+        wrapLine === segmentCount - 1 &&
+        type === 'selection'
+      ) {
+        paddingEnd = this.#metrics.ch;
+      }
+      // Measure the selection width as the gap between two segment-relative
+      // offsets so a tab inside the selection advances from its real column,
+      // not from the start of the sliced selection text.
+      const segmentWidth =
+        wrapStartChar === wrapEndChar
+          ? paddingEnd
+          : this.#segmentTextWidth(lineText, segmentStart, wrapEndChar) -
+            segmentStartWidth +
+            paddingEnd;
+
+      this.#renderSelectionBlock(
+        renderCtx,
+        type,
+        line,
+        wrapLine,
+        segmentLeft,
+        segmentWidth,
+        extraDataset,
+        {
+          start:
+            connectedCaret?.line === line &&
+            connectedCaret.character === startChar &&
+            wrapStartChar === startChar,
+          end:
+            connectedCaret?.line === line &&
+            connectedCaret.character === endChar &&
+            wrapEndChar === endChar,
+        }
+      );
+    }
+  }
+
+  // Pixel width of the text from a wrapped segment's start up to a character,
+  // relative to the segment's left edge. Tabs advance from the segment start,
+  // which sits on a tab stop, so tab stops line up with the rendered text.
+  #segmentTextWidth(
+    lineText: string,
+    segmentStart: number,
+    character: number
+  ): number {
+    if (character <= segmentStart) {
+      return 0;
+    }
+    const segmentText = lineText.slice(segmentStart, character);
+    const asciiColumns = getExpandedAsciiTextColumns(
+      segmentText,
+      this.#metrics.tabSize
+    );
+    return asciiColumns !== -1
+      ? asciiColumns * this.#metrics.ch
+      : this.#metrics.measureTextWidth(segmentText);
+  }
+
+  // Render one selection block for a single visual line.
+  #renderSelectionBlock(
+    renderCtx: {
+      fragment: DocumentFragment;
+      elements: Map<string, HTMLElement>;
+      previousSelectionRange?: {
+        element: HTMLElement;
+        line: number;
+        wrapLine: number;
+        left: number;
+        width: number;
+      };
+    },
+    type: OverlayRangeType,
+    line: number,
+    wrapLine: number,
+    left: number,
+    width: number,
+    extraDataset?: string,
+    connectedCaretEdge?: { start: boolean; end: boolean }
+  ) {
+    if (width === 0) {
+      return;
+    }
+
+    const { ch, lineHeight } = this.#metrics;
+    const y = this.#getLineY(line) + wrapLine * lineHeight;
+    const cacheKey = `${type}-${line}/${wrapLine}-${left}-${width} ${extraDataset ?? ''}`;
+    const overlayEls = this.#overlayElements;
+    const rounded =
+      (this.#options.roundedSelection ?? true) &&
+      (type === 'selection' || type === 'caretHighlight');
+
+    const addRoundedCorner = (
+      line: number,
+      wrapLine: number,
+      left: number,
+      radius: 'rtl' | 'rbl' | 'rbr'
+    ) => {
+      const top = this.#getLineY(line) + wrapLine * lineHeight;
+      // Match the corner mask to the line color behind the selection; when
+      // absent (context lines) the CSS falls back to the editor base bg.
+      const lineElement = this.#getLineElement(line);
+      let cornerBg = 'initial';
+      if (
+        lineElement !== undefined &&
+        (lineElement.dataset.lineType === 'change-addition' ||
+          lineElement.dataset.selectedLine !== undefined)
+      ) {
+        cornerBg =
+          getComputedStyle(lineElement).getPropertyValue('--diffs-line-bg');
+      }
+      const css = `width:${ch}px;transform:translateX(${left}px) translateY(${top}px);--diffs-selection-corner-bg:${cornerBg}`;
+      const dataset = {
+        selectionCorner: '',
+        [radius]: '',
+      };
+      const cacheKeyPrefix = `${type}-block-${line}/${wrapLine}-${left}-1ch`;
+      let cacheKey = cacheKeyPrefix + '-' + radius;
+      if (radius === 'rbl') {
+        const prevCornerKey = cacheKeyPrefix + '-rtl';
+        const prevCorner = renderCtx.elements.get(prevCornerKey);
+        if (prevCorner !== undefined) {
+          prevCorner.remove();
+          renderCtx.elements.delete(prevCornerKey);
+          cacheKey += '-rtl';
+          dataset.rtl = '';
+        }
+      }
+      let cornerEl = renderCtx.elements.get(cacheKey);
+      if (cornerEl !== undefined) {
+        return;
+      }
+      if (overlayEls?.has(cacheKey) === true) {
+        cornerEl = overlayEls.get(cacheKey)!;
+        cornerEl.style.cssText = css;
+        overlayEls.delete(cacheKey);
+      } else {
+        cornerEl = h(
+          'div',
+          {
+            dataset:
+              type === 'caretHighlight'
+                ? 'caretHighlightRange'
+                : 'selectionRange',
+            style: { cssText: css },
+            children: [
+              h('div', {
+                dataset: dataset,
+              }),
+            ],
+          },
+          renderCtx.fragment
+        );
+      }
+      renderCtx.elements.set(cacheKey, cornerEl);
+    };
+    const addRadiusStyle = (element: HTMLElement) => {
+      const end = left + width;
+      const dataset = element.dataset;
+      const previousSelectionRange = renderCtx.previousSelectionRange;
+      if (
+        previousSelectionRange === undefined ||
+        previousSelectionRange.line !== line ||
+        previousSelectionRange.wrapLine !== wrapLine
+      ) {
+        renderCtx.previousSelectionRange = {
+          element,
+          line,
+          wrapLine,
+          left,
+          width,
+        };
+      }
+      if (
+        previousSelectionRange === undefined ||
+        end <= previousSelectionRange.left
+      ) {
+        ['rtl', 'rtr', 'rbl', 'rbr'].forEach((key) => {
+          dataset[key] = '';
+        });
+      } else {
+        const prevLine = previousSelectionRange.line;
+        const prevWrapLine = previousSelectionRange.wrapLine;
+        const prevLeft = previousSelectionRange.left;
+        const prevDataset = previousSelectionRange.element.dataset;
+        const prevEnd = prevLeft + previousSelectionRange.width;
+        if (prevLeft > left) {
+          addRoundedCorner(prevLine, prevWrapLine, prevLeft - ch, 'rbr');
+        }
+        delete prevDataset.rbl;
+        delete dataset.rtl;
+        delete dataset.rtr;
+        if (end >= prevEnd) {
+          delete prevDataset.rbr;
+        }
+        if (end > prevEnd) {
+          addRoundedCorner(prevLine, prevWrapLine, prevEnd, 'rbl');
+          dataset.rtr = '';
+        }
+        if (end < prevEnd) {
+          addRoundedCorner(line, wrapLine, end, 'rtl');
+        }
+        if (left < prevLeft) {
+          dataset.rtl = '';
+        }
+        dataset.rbl = '';
+        dataset.rbr = '';
+      }
+      // A collaborator's selection meets its caret at this endpoint. Keep
+      // that seam square, while preserving rounded corners at the free edge.
+      if (connectedCaretEdge?.start === true) {
+        delete dataset.rtl;
+        delete dataset.rbl;
+      }
+      if (connectedCaretEdge?.end === true) {
+        delete dataset.rtr;
+        delete dataset.rbr;
+      }
+    };
+
+    let rangeEl = renderCtx.elements.get(cacheKey);
+    if (rangeEl !== undefined) {
+      if (rounded) {
+        addRadiusStyle(rangeEl);
+      }
+      return;
+    }
+
+    if (overlayEls?.has(cacheKey) === true) {
+      rangeEl = overlayEls.get(cacheKey)!;
+      overlayEls.delete(cacheKey);
+    } else {
+      rangeEl = h(
+        'div',
+        {
+          dataset: extraDataset
+            ? [type + 'Range', extraDataset]
+            : type + 'Range',
+        },
+        renderCtx.fragment
+      );
+    }
+
+    rangeEl.style.width = `${width}px`;
+    rangeEl.style.transform = `translateX(${left}px) translateY(${y}px)`;
+    if (
+      type === 'editPredictionInsertion' ||
+      type === 'editPredictionReplacement'
+    ) {
+      const lineElement = this.#getLineElement(line);
+      if (lineElement !== undefined) {
+        rangeEl.style.setProperty(
+          '--diffs-edit-prediction-bg',
+          getComputedStyle(lineElement).getPropertyValue('--diffs-line-bg')
+        );
+      }
+    } else {
+      rangeEl.style.removeProperty('--diffs-edit-prediction-bg');
+    }
+    if (rounded) {
+      addRadiusStyle(rangeEl);
+    }
+    renderCtx.elements.set(cacheKey, rangeEl);
+  }
+
+  #renderCaret(
+    renderCtx: {
+      fragment: DocumentFragment;
+      elements: Map<string, HTMLElement>;
+    },
+    selection: EditorSelection,
+    isPrimary: boolean
+  ) {
+    const { line, character } = getCaretPosition(selection);
+    if (!this.#isLineVisible(line)) {
+      return;
+    }
+    const [left, wrapLine] = this.#getCharX(line, character);
+    const cacheKey = 'caret-' + line + '/' + wrapLine + ':' + character;
+    if (renderCtx.elements.has(cacheKey)) {
+      return;
+    }
+
+    const x = left - 1;
+    const y = this.#getLineY(line) + wrapLine * this.#metrics.lineHeight;
+
+    const caretEl = h(
+      'div',
+      {
+        dataset: 'caret',
+        style: { transform: `translateX(${x}px) translateY(${y}px)` },
+      },
+      renderCtx.fragment
+    );
+    renderCtx.elements.set(cacheKey, caretEl);
+    if (isPrimary) {
+      caretEl.style.scrollMargin = this.#getScrollMargin();
+      this.#primaryCaretElement = caretEl;
+    }
+  }
+
+  #updateSelectionActionPopover(): void {
+    const primarySelection = this.#selections?.at(-1);
+    const overlayElement = this.#overlayElement;
+    const textDocument = this.#editSession?.document;
+    const renderSelectionAction = this.#options.renderSelectionAction;
+    const cleanup = () => {
+      this.#selectionAction?.cleanup();
+      this.#selectionAction = undefined;
+    };
+
+    if (
+      this.#options.enabledSelectionAction !== true ||
+      renderSelectionAction === undefined ||
+      primarySelection === undefined ||
+      isCollapsedSelection(primarySelection) ||
+      this.#isContentMouseDown ||
+      overlayElement === undefined ||
+      textDocument === undefined
+    ) {
+      cleanup();
+      return;
+    }
+
+    const head = getCaretPosition(primarySelection);
+    if (!this.#isLineVisible(head.line)) {
+      cleanup();
+      return;
+    }
+
+    if (this.#selectionAction === undefined) {
+      if (!this.#canMountSelectionAction) {
+        return;
+      }
+      const getActiveSelection = (): EditorSelection =>
+        this.#selections?.at(-1) ?? primarySelection;
+      const selectionActionElement = renderSelectionAction({
+        textDocument,
+        get selection(): EditorSelection {
+          return getActiveSelection();
+        },
+        applyEdits: (edits: TextEdit[]) => this.applyEdits(edits),
+        getSelectionText: () =>
+          this.#editSession?.document?.getText(getActiveSelection()) ?? '',
+        replaceSelectionText: (text: string) => {
+          this.#replaceSelectionText(text, [getActiveSelection()]);
+        },
+        close: () => {
+          cleanup();
+          this.#scrollToPrimaryCaret();
+        },
+      });
+      this.#selectionAction = new SelectionActionWidget(
+        selectionActionElement,
+        overlayElement,
+        () => this.#updateSelectionActionPopover()
+      );
+      // Avoid biasing the first decision with a stale side from a prior popover.
+      this.#getPopoverManager().resetPlacement(
+        SELECTION_ACTION_POPOVER_PLACEMENT_KEY
+      );
+    }
+
+    const lineHeight = this.#metrics.lineHeight;
+    const isBackward = primarySelection.direction === DirectionBackward;
+    const preferred = {
+      placeAbove: isBackward,
+      anchor: head,
+    };
+    const fallback: typeof preferred = isBackward
+      ? { placeAbove: false, anchor: primarySelection.end }
+      : { placeAbove: true, anchor: primarySelection.start };
+
+    // Resolve each candidate's [left, top, bottom] in overlay coordinate space
+    // up front so both the viewport fit-check and the final reposition() call
+    // below can reuse them without re-deriving the same line/char geometry
+    // twice. For an above placement the CSS `--popover-y-shift: -100%` lifts
+    // the popover by its own height, so its top is the anchor row's top minus
+    // that height.
+    const popoverHeight = this.#selectionAction.height;
+    const candidateGeometry = (
+      candidate: typeof preferred
+    ): PopoverPlacementBounds & {
+      left: number;
+      anchorTop: number;
+      rowTop: number;
+    } => {
+      const [left, candidateWrapLine] = this.#getCharX(
+        candidate.anchor.line,
+        candidate.anchor.character
+      );
+      const rowTop =
+        this.#getLineY(candidate.anchor.line) + candidateWrapLine * lineHeight;
+      const anchorTop = candidate.placeAbove ? rowTop : rowTop + lineHeight;
+      const top = candidate.placeAbove ? anchorTop - popoverHeight : anchorTop;
+      return { top, bottom: top + popoverHeight, left, anchorTop, rowTop };
+    };
+    const preferredGeometry = candidateGeometry(preferred);
+
+    const lineCount = textDocument.lineCount;
+    const atDocumentEdge = isBackward
+      ? head.line < POPOVER_BOUNDARY_LINES
+      : head.line >= lineCount - POPOVER_BOUNDARY_LINES;
+    const fallbackGeometry = this.#isLineVisible(fallback.anchor.line)
+      ? candidateGeometry(fallback)
+      : undefined;
+    const popoverManager = this.#getPopoverManager();
+    const viewport = popoverManager.getPlacementBounds();
+    const useFallback =
+      fallbackGeometry !== undefined &&
+      popoverManager.choosePlacement({
+        preferred: preferredGeometry,
+        fallback: fallbackGeometry,
+        viewport,
+        popoverHeight,
+        atDocumentEdge,
+        placementKey: SELECTION_ACTION_POPOVER_PLACEMENT_KEY,
+      }) === 'fallback';
+    if (fallbackGeometry === undefined) {
+      popoverManager.setPlacement(
+        'preferred',
+        SELECTION_ACTION_POPOVER_PLACEMENT_KEY
+      );
+    }
+    const { placeAbove } = useFallback ? fallback : preferred;
+    const { left, anchorTop } =
+      useFallback && fallbackGeometry !== undefined
+        ? fallbackGeometry
+        : preferredGeometry;
+    // An endpoint outside the virtualized window extends past the viewport
+    // rather than making a selection that crosses it look offscreen.
+    const selectionTop = isBackward
+      ? preferredGeometry.rowTop
+      : (fallbackGeometry?.rowTop ?? -Infinity);
+    const selectionBottom =
+      (isBackward
+        ? (fallbackGeometry?.rowTop ?? Infinity)
+        : preferredGeometry.rowTop) +
+      (primarySelection.end.line > primarySelection.start.line &&
+      primarySelection.end.character === 0
+        ? 0
+        : lineHeight);
+    const isSelectionVisible =
+      viewport === undefined ||
+      (selectionBottom > viewport.top && selectionTop < viewport.bottom);
+
+    this.#selectionAction.reposition(
+      left,
+      anchorTop,
+      this.#getGutterWidth(),
+      placeAbove,
+      isSelectionVisible,
+      viewport
+    );
+  }
+
+  // Opens the search panel in the requested mode. If a panel is already open,
+  // it switches that panel's mode in place (preserving the current query)
+  // rather than recreating it.
+  #openSearchPanel(mode: SearchPanelMode) {
+    if (this.#searchPanel !== undefined) {
+      this.#searchPanel.setMode(mode);
+      return;
+    }
+    this.#renderSearchPanel(mode);
+  }
+
+  #renderSearchPanel(mode: SearchPanelMode) {
+    // cleanup the existing search panel
+    this.#searchPanel?.cleanup();
+
+    const textDocument = this.#editSession?.document;
+    const preElement =
+      this.#fileContainer?.shadowRoot?.querySelector<HTMLElement>('pre');
+    const selections = this.#selections;
+    if (textDocument === undefined || preElement == null) {
+      return;
+    }
+
+    let defaultQuery = '';
+    let initialMatch: [number, number] | undefined = undefined;
+
+    if (selections !== undefined && selections.length > 0) {
+      let primarySelection = selections.at(-1)!;
+      if (isCollapsedSelection(primarySelection)) {
+        primarySelection = expandCollapsedSelectionToWord(
+          textDocument,
+          primarySelection
+        );
+        this.#updateSelections([...selections.slice(0, -1), primarySelection]);
+        const selectionText = textDocument.getText(primarySelection);
+        if (selectionText !== '' && !selectionText.includes('\n')) {
+          defaultQuery = selectionText;
+          initialMatch = [
+            textDocument.offsetAt(primarySelection.start),
+            textDocument.offsetAt(primarySelection.end),
+          ];
+        }
+      }
+    }
+
+    const scrollToMatch = (
+      [startOffset, endOffset]: MatchRange,
+      retainFocus: boolean
+    ) => {
+      const nextSelection = createSelectionFromAnchorAndFocusOffsets(
+        textDocument,
+        startOffset,
+        endOffset
+      );
+      this.#updateSelections([nextSelection]);
+      // Search counts include matches hidden in collapsed regions; navigating
+      // to one reveals it.
+      this.#revealLineIfCollapsed(getCaretPosition(nextSelection).line);
+      this.#scrollToPrimaryCaret(true); // scroll to the primary caret and don't focus
+      this.#retainSearchPanelFocus = retainFocus;
+    };
+
+    const searchPanel = new SearchPanelWidget({
+      textDocument,
+      containerElement: preElement,
+      defaultQuery,
+      mode,
+      initialMatch,
+      scrollToMatch,
+      applyReplace: (edits: ResolvedTextEdit[]) => {
+        if (edits.length === 0) {
+          return;
+        }
+        const change = textDocument.applyEdits(
+          edits.map((edit) => ({
+            range: {
+              start: textDocument.positionAt(edit.start),
+              end: textDocument.positionAt(edit.end),
+            },
+            newText: edit.text,
+          })),
+          true,
+          this.#selections
+        );
+        if (change !== undefined) {
+          this.#applyChange(
+            change,
+            undefined,
+            this.#applyChangeToLineAnnotations(change),
+            { skipSearchRefresh: true }
+          );
+        }
+      },
+      onUpdate: (
+        allMatches: MatchRange[],
+        options?: { syncSelection?: boolean }
+      ): MatchRange | undefined => {
+        if (allMatches.length === 0) {
+          this.#matches = undefined;
+          this.#updateSelections(this.#selections ?? []);
+          return;
+        }
+
+        this.#matches = allMatches;
+        if (options?.syncSelection === false) {
+          this.#updateSelections(this.#selections ?? []);
+          const primarySelection = this.#selections?.at(-1);
+          if (primarySelection !== undefined) {
+            const startOffset = textDocument.offsetAt(primarySelection.start);
+            const endOffset = textDocument.offsetAt(primarySelection.end);
+            for (const match of allMatches) {
+              if (match[0] === startOffset && match[1] === endOffset) {
+                return match;
+              }
+            }
+          }
+          return undefined;
+        }
+
+        const primarySelection = this.#selections?.at(-1);
+        let searchOffset = 0;
+        let nextMatch: MatchRange | undefined;
+        if (primarySelection !== undefined) {
+          searchOffset = textDocument.offsetAt(primarySelection.start);
+        }
+        for (const m of allMatches) {
+          if (m[0] >= searchOffset) {
+            nextMatch = m;
+            break;
+          }
+        }
+        if (nextMatch !== undefined) {
+          scrollToMatch(nextMatch, true);
+        } else {
+          this.#updateSelections(this.#selections ?? []);
+        }
+        return nextMatch;
+      },
+      onClose: () => {
+        this.#searchPanel = undefined;
+        this.#retainSearchPanelFocus = false;
+        this.#matches = undefined;
+        this.#updateSelections(this.#selections ?? []);
+      },
+    });
+
+    this.#searchPanel = searchPanel;
+    this.#retainSearchPanelFocus = false;
+  }
+
+  #getSelectionText() {
+    const textDocument = this.#editSession?.document;
+    const selections = this.#selections;
+    if (textDocument === undefined || selections === undefined) {
+      return '';
+    }
+    return getSelectionText(textDocument, selections);
+  }
+
+  #getSelectionClipboardTexts(): string[] {
+    const textDocument = this.#editSession?.document;
+    const selections = this.#selections;
+    if (textDocument === undefined || selections === undefined) {
+      return [];
+    }
+    return getSelectionClipboardTexts(textDocument, selections);
+  }
+
+  /** Writes both the portable text and the selection pairing metadata. */
+  #writeSelectionClipboardData(
+    clipboardData: DataTransfer | null,
+    text: string,
+    selectionTexts: string[]
+  ): void {
+    if (clipboardData === null) {
+      return;
+    }
+    clipboardData.setData('text', text);
+    if (selectionTexts.length > 1) {
+      clipboardData.setData(
+        MULTI_SELECTION_CLIPBOARD_TYPE,
+        JSON.stringify(selectionTexts)
+      );
+    }
+  }
+
+  #cutSelectionText(): string {
+    const textDocument = this.#editSession?.document;
+    const selections = this.#selections;
+    if (
+      textDocument === undefined ||
+      selections === undefined ||
+      selections.length === 0
+    ) {
+      return '';
+    }
+
+    if (selections.some((selection) => isCollapsedSelection(selection))) {
+      const cut = resolveSelectionCut(textDocument, selections);
+      this.#applySelectionCutEdits(cut.edits, cut.nextSelectionOffsets);
+      return cut.text;
+    }
+
+    const text = getSelectionText(textDocument, selections);
+    this.#replaceSelectionText('', undefined, true);
+    return text;
+  }
+
+  #applySelectionCutEdits(
+    edits: ResolvedTextEdit[],
+    nextSelectionOffsets: number[]
+  ): void {
+    const textDocument = this.#editSession?.document;
+    const selections = this.#selections;
+    if (
+      textDocument === undefined ||
+      selections === undefined ||
+      edits.length === 0
+    ) {
+      return;
+    }
+
+    const change = textDocument.applyResolvedEdits(
+      edits,
+      true,
+      selections,
+      undefined,
+      true
+    );
+    if (change === undefined) {
+      return;
+    }
+
+    const nextSelections = nextSelectionOffsets.map<EditorSelection>(
+      (offset) => {
+        const caret = textDocument.positionAt(offset);
+        return {
+          start: caret,
+          end: caret,
+          direction: DirectionNone,
+        };
+      }
+    );
+    textDocument.setLastUndoSelectionsAfter(nextSelections);
+    this.#applyChange(
+      change,
+      nextSelections,
+      this.#applyChangeToLineAnnotations(change)
+    );
+  }
+
+  // replace the selection text
+  #replaceSelectionText(
+    text: string | string[],
+    selections = this.#selections,
+    undoBoundary = false,
+    textOrder: 'selection' | 'document' = 'selection'
+  ) {
+    if (selections === undefined) {
+      return;
+    }
+    const textDocument = this.#editSession?.document;
+    const primarySelection = selections.at(-1);
+    if (textDocument === undefined || primarySelection === undefined) {
+      return;
+    }
+    const { nextSelections, change } =
+      Array.isArray(text) && text.length === selections.length
+        ? applyTextReplaceToSelections<EType, LAnnotation>(
+            textDocument,
+            selections,
+            text,
+            this.#lineAnnotations,
+            undoBoundary,
+            textOrder
+          )
+        : applyTextChangeToSelections<EType, LAnnotation>(
+            textDocument,
+            selections,
+            {
+              start: textDocument.offsetAt(primarySelection.start),
+              end: textDocument.offsetAt(primarySelection.end),
+              text: Array.isArray(text) ? text.join(textDocument.eol) : text,
+            },
+            this.#lineAnnotations,
+            undefined,
+            undoBoundary
+          );
+
+    if (change !== undefined) {
+      this.#applyChange(
+        change,
+        nextSelections,
+        this.#applyChangeToLineAnnotations(change)
+      );
+    }
+  }
+
+  #deleteSelectionText(forward: boolean = false) {
+    const selections = this.#selections;
+    const textDocument = this.#editSession?.document;
+    if (selections === undefined || textDocument === undefined) {
+      return;
+    }
+
+    const { nextSelections, change } = applyDeleteCharacterToSelections<
+      EType,
+      LAnnotation
+    >(
+      textDocument,
+      selections,
+      forward,
+      this.#lineAnnotations,
+      this.#metrics.tabSize
+    );
+    if (change !== undefined) {
+      this.#applyChange(
+        change,
+        nextSelections,
+        this.#applyChangeToLineAnnotations(change)
+      );
+    }
+  }
+
+  #deleteSoftLineBackward() {
+    const selections = this.#selections;
+    const textDocument = this.#editSession?.document;
+    if (selections === undefined || textDocument === undefined) {
+      return;
+    }
+    const getSoftLineStart = this.#isWrap
+      ? (line: number, character: number) => {
+          const wrapOffsets = this.#wrapLineTextOrWholeLine(line);
+          for (let w = 0; w + 1 < wrapOffsets.length; w++) {
+            const segmentStart = wrapOffsets[w];
+            const segmentEnd = wrapOffsets[w + 1];
+            if (character >= segmentStart && character <= segmentEnd) {
+              return segmentStart;
+            }
+          }
+          return 0;
+        }
+      : undefined;
+    const { nextSelections, change } = applyDeleteSoftLineBackwardToSelections<
+      EType,
+      LAnnotation
+    >(textDocument, selections, getSoftLineStart, this.#lineAnnotations);
+    if (change !== undefined) {
+      this.#applyChange(
+        change,
+        nextSelections,
+        this.#applyChangeToLineAnnotations(change)
+      );
+    }
+  }
+
+  #deleteWordBackward() {
+    const selections = this.#selections;
+    const textDocument = this.#editSession?.document;
+    if (selections === undefined || textDocument === undefined) {
+      return;
+    }
+    const { nextSelections, change } = applyDeleteWordBackwardToSelections<
+      EType,
+      LAnnotation
+    >(textDocument, selections, this.#lineAnnotations);
+    if (change !== undefined) {
+      this.#applyChange(
+        change,
+        nextSelections,
+        this.#applyChangeToLineAnnotations(change)
+      );
+    }
+  }
+
+  #deleteHardLineForward() {
+    const selections = this.#selections;
+    const textDocument = this.#editSession?.document;
+    if (selections === undefined || textDocument === undefined) {
+      return;
+    }
+    const { nextSelections, change } = applyDeleteHardLineForwardToSelections<
+      EType,
+      LAnnotation
+    >(textDocument, selections, this.#lineAnnotations);
+    if (change !== undefined) {
+      this.#applyChange(
+        change,
+        nextSelections,
+        this.#applyChangeToLineAnnotations(change)
+      );
+    }
+  }
+
+  #insertTranspose() {
+    const selections = this.#selections;
+    const textDocument = this.#editSession?.document;
+    if (selections === undefined || textDocument === undefined) {
+      return;
+    }
+    const { nextSelections, change } = applyTransposeToSelections<
+      EType,
+      LAnnotation
+    >(textDocument, selections, this.#lineAnnotations);
+    if (change !== undefined) {
+      this.#applyChange(
+        change,
+        nextSelections,
+        this.#applyChangeToLineAnnotations(change)
+      );
+    }
+  }
+
+  #applyChange(
+    change: TextDocumentChange,
+    newSelections?: EditorSelection[],
+    newLineAnnotations?: EditorLineAnnotation<EType, LAnnotation>[],
+    options?: {
+      skipSearchRefresh?: boolean;
+      skipFocus?: boolean;
+      editSource?: 'user' | 'prediction';
+    }
+  ) {
+    // Cancel first so a line-count change, which rebuilds the component's
+    // layout, folds the now-empty ghost rows rather than rows keyed by pre-edit
+    // lines. Every change ends the prediction anyway.
+    if (this.#editPrediction != null) {
+      this.#cancelEditPrediction(true);
+    }
+    const textDocument = this.#editSession?.document;
+    if (textDocument !== undefined && this.#carets !== undefined) {
+      for (const trackedCaret of this.#carets) {
+        trackedCaret.anchorOffset = remapOffsetThroughEdits(
+          trackedCaret.anchorOffset,
+          change.changes
+        );
+        trackedCaret.focusOffset = remapOffsetThroughEdits(
+          trackedCaret.focusOffset,
+          change.changes
+        );
+        trackedCaret.caret.anchor = textDocument.positionAt(
+          trackedCaret.anchorOffset
+        );
+        trackedCaret.caret.focus = textDocument.positionAt(
+          trackedCaret.focusOffset
+        );
+      }
+    }
+    // Invalidate layout caches touched by the edit. Clear cached line Y
+    // positions from startLine onward when either:
+    // - the line count changed (inserts/deletes renumber every later line), or
+    // - wrap is on, where editing a line can add or remove a wrapped row and
+    //   shift the Y of every line after it even though the line count is the
+    //   same.
+    if (change.lineDelta !== 0 || this.#isWrap) {
+      for (const line of this.#lineYCache.keys()) {
+        if (line >= change.startLine) {
+          this.#lineYCache.delete(line);
+        }
+      }
+    }
+    // Wrap offsets persist while overflow is 'scroll' (the mode can toggle
+    // back before any width/font/document invalidation runs), so edits must
+    // invalidate them in every mode, not just while wrap is on. The size
+    // guard keeps edits free when nothing was ever measured.
+    if (this.#wrapLineOffsetsCache.size > 0) {
+      // Lines outside the edited ranges keep both their text and their
+      // numbering when no renumbering happened anywhere, so only the rewritten
+      // lines need new wrap measurements. A net-zero lineDelta alone is not
+      // enough: a multi-edit batch can cancel out (one edit removes a line,
+      // another adds one) while still renumbering the lines between the edits.
+      // It is sufficient when the batch coalesced into a single range (any
+      // renumbered lines sit inside that range), or when every individual edit
+      // kept the line count.
+      const keepsLineNumbers =
+        change.lineDelta === 0 &&
+        (change.changedLineRanges.length === 1 ||
+          change.changedLineChanges?.every(
+            ([, , editLineDelta]) => editLineDelta === 0
+          ) === true);
+      if (keepsLineNumbers) {
+        for (const [rangeStart, rangeEnd] of change.changedLineRanges) {
+          for (let line = rangeStart; line <= rangeEnd; line++) {
+            this.#wrapLineOffsetsCache.delete(line);
+          }
+        }
+      } else {
+        // Renumbering invalidates every cached entry from startLine onward:
+        // its keyed line no longer holds the text that was measured.
+        for (const line of this.#wrapLineOffsetsCache.keys()) {
+          if (line >= change.startLine) {
+            this.#wrapLineOffsetsCache.delete(line);
+          }
+        }
+      }
+    }
+    this.#lastAccessedCharX = undefined;
+
+    let renderRange = this.#renderRange;
+    let shouldUpdateBuffer: boolean | undefined;
+    if (
+      renderRange !== undefined &&
+      newSelections !== undefined &&
+      newSelections.length > 0
+    ) {
+      const primarySelection = newSelections.at(-1)!;
+      const renderRangeEndLine =
+        renderRange.startingLine + renderRange.totalLines;
+      // When an edit moves the caret to or past the last rendered line — typing
+      // Enter at the window's bottom edge, or pasting a few lines there — widen
+      // the render range so every new line up to the caret gets a row when
+      // #rerender runs below. The widened range is also written back to
+      // #renderRange: the next edit reads renderRangeEndLine from it, and
+      // #renderCaret/#isLineVisible read it to decide whether to draw the caret.
+      // Without persisting, the end line stays stale, a following edit is
+      // misclassified as "past the window", and its just-typed line is left
+      // unrendered until the next scroll re-syncs the range. Only edits that
+      // carry a caret reach here (the block is guarded on `selections` above), so
+      // a bare programmatic applyEdits with no active selection does not widen.
+      //
+      // Cap the widening at a multiple of the bounded window the virtualizer
+      // last synced. A large insert at the caret — most often a big multi-line
+      // paste, or a scripted set-selection-then-edit at scale — can drop the
+      // caret far below the window; widening to reach it would make #rerender
+      // build a row per inserted line synchronously, defeating virtualization.
+      // Past the cap, keep the bounded window and only recompute the buffer
+      // spacer — the scroll that follows a focused edit (or the next user scroll
+      // when unfocused) renders the far region with a bounded window.
+      if (primarySelection.end.line >= renderRangeEndLine) {
+        const widenedTotalLines =
+          primarySelection.end.line - renderRange.startingLine + 1;
+        const maxWidenLines =
+          this.#viewportWindowLines === undefined ||
+          this.#viewportWindowLines === Infinity
+            ? Infinity
+            : this.#viewportWindowLines * MAX_EDIT_WIDEN_WINDOW_MULTIPLE;
+        // Only widen when the edit actually reaches the rendered window — its
+        // dirty lines start at or before the window end. #rerender materializes
+        // rows from change.startLine onward, so widening for an edit that starts
+        // entirely below the window (e.g. setSelections to an offscreen line
+        // then applyEdits before the virtualizer re-syncs) would leave the
+        // rows between the window and the edit unbuilt while #isLineVisible
+        // reports them visible, mispositioning the new rows and caret until the
+        // next scroll.
+        if (
+          change.startLine <= renderRangeEndLine &&
+          widenedTotalLines <= maxWidenLines &&
+          // Widening exists to give the caret's line a row; a caret target
+          // hidden in a collapsed region can never gain one, so take the
+          // buffer-only path instead of building rows toward it.
+          this.#isLineRenderable(primarySelection.end.line)
+        ) {
+          if (primarySelection.end.line > renderRangeEndLine) {
+            // The line count grew below the window, so the buffer spacer must be
+            // recomputed (preserves the prior behavior for this case).
+            shouldUpdateBuffer = true;
+          }
+          renderRange = { ...renderRange, totalLines: widenedTotalLines };
+          this.#renderRange = renderRange;
+        } else {
+          // The edit is past the cap, or starts below the rendered window: keep
+          // the bounded window and only recompute the buffer; the scroll that
+          // follows a focused edit (or the next user scroll) renders the far
+          // region.
+          shouldUpdateBuffer = true;
+        }
+      }
+    }
+    if (
+      this.#isRendering &&
+      this.#tokenizer != null &&
+      this.#contentElement != null
+    ) {
+      this.#rerender(
+        change,
+        newLineAnnotations,
+        renderRange,
+        shouldUpdateBuffer
+      );
+    } else if (textDocument != null) {
+      // Recycling or pending hydration can leave the document editable
+      // without editor markup. Keep the host session current before the
+      // change callback observes it or a later mount renders from it.
+      this.#applySuspendedDocumentChange?.(textDocument, newLineAnnotations);
+      if (newLineAnnotations != null) {
+        this.#lineAnnotations = newLineAnnotations;
+      }
+    }
+
+    if (newSelections != null) {
+      // Install the resulting selections before publishing so event state and
+      // synchronous getViewState() calls describe the edited document.
+      this.#updateSelections(newSelections);
+    }
+
+    // A completed local edit also supersedes any pending external replacement.
+    this.#fileInstance?.__acknowledgeDocumentUpdate();
+    this.#checkpointEditSessionState();
+
+    this.#recordEditPredictionHistory(change, options?.editSource ?? 'user');
+    this.#scheduleEditPrediction();
+
+    // Publish the change only after the host renderer agrees with the new
+    // document. Consumers may synchronously render the returned annotations,
+    // which must not observe the previous line structure.
+    this.#emitChange(
+      change.changes,
+      newLineAnnotations ?? this.#lineAnnotations
+    );
+
+    if (
+      options?.skipSearchRefresh !== true &&
+      this.#searchPanel !== undefined &&
+      this.#matches !== undefined
+    ) {
+      this.#searchPanel.updateMatches({ syncSelection: false });
+    }
+
+    if (newSelections != null) {
+      // When skipFocus is set (a programmatic edit on an editor that is not
+      // focused) we stop here: focusing or scrolling would pull the caret and
+      // viewport toward an editor the user is not interacting with.
+      // focus to update the native window selection, and scroll to the caret
+      // to mock the 'contenteditable' behavior
+      if (options?.skipFocus !== true) {
+        // An undo/redo caret restore can land inside a collapsed region.
+        const revealTarget = newSelections.at(-1);
+        if (revealTarget !== undefined) {
+          this.#revealLineIfCollapsed(getCaretPosition(revealTarget).line);
+        }
+        if (this.#primaryCaretElement !== undefined) {
+          requestAnimationFrame(() => {
+            this.#primaryCaretElement?.scrollIntoView({
+              block: 'nearest',
+              inline: 'nearest',
+            });
+          });
+        } else if (newSelections.length > 0) {
+          const pos = getCaretPosition(newSelections.at(-1)!);
+          this.#scrollToLine(pos.line, pos.character);
+        }
+        this.focus({ preventScroll: true });
+      }
+    }
+  }
+
+  #emitChange(
+    changes: EditorChange[],
+    lineAnnotations: EditorLineAnnotation<EType, LAnnotation>[] | undefined
+  ): void {
+    const file = this.getFile();
+    const publishChange = this.#publishChange;
+    if (file == null || publishChange == null) {
+      return;
+    }
+    publishChange(changes, file, lineAnnotations);
+  }
+
+  #applyChangeToLineAnnotations(
+    change: TextDocumentChange
+  ): EditorLineAnnotation<EType, LAnnotation>[] | undefined {
+    if (this.#lineAnnotations != null) {
+      const nextLineAnnotations = applyDocumentChangeToLineAnnotations(
+        change,
+        this.#lineAnnotations
+      );
+      if (nextLineAnnotations != null) {
+        this.#editSession?.document?.setLastUndoLineAnnotations(
+          this.#lineAnnotations,
+          nextLineAnnotations
+        );
+        return nextLineAnnotations;
+      }
+    }
+    return undefined;
+  }
+
+  // Returns contiguous document-line ranges that have editable rows in the
+  // current render window. Collapsed diff sections create gaps between ranges.
+  #getRenderedEditableLineRanges(): [first: number, last: number][] {
+    const contentElement = this.#contentElement;
+    if (contentElement === undefined) {
+      return [];
+    }
+    const ranges: [first: number, last: number][] = [];
+    for (const child of contentElement.children) {
+      const el = child as HTMLElement;
+      const lineType = el.dataset.lineType;
+      const lineNumber = getLineNumberAttr(el);
+      if (
+        lineNumber === undefined ||
+        lineType === undefined ||
+        !isLineEditable(lineType)
+      ) {
+        continue;
+      }
+      const line = lineNumber - 1;
+      const current = ranges.at(-1);
+      if (current !== undefined && line <= current[1] + 1) {
+        current[1] = Math.max(current[1], line);
+      } else {
+        ranges.push([line, line]);
+      }
+    }
+    return ranges;
+  }
+
+  // Whether the File or FileDiff component this editor is attached to
+  // currently renders a row for this document line. Virtualized components
+  // only render a window of lines, so a line outside that window has no DOM
+  // row. Without a render range, every line has a row.
+  #isLineInRenderRange(line: number): boolean {
+    const renderRange = this.#renderRange;
+    return (
+      renderRange == null ||
+      (line >= renderRange.startingLine &&
+        line < renderRange.startingLine + renderRange.totalLines)
+    );
+  }
+
+  #getLineElement(line: number): HTMLElement | undefined {
+    let lineElement = this.#lineElementsCache.get(line);
+    if (lineElement !== undefined) {
+      return lineElement ?? undefined;
+    }
+
+    const renderRange = this.#renderRange;
+    if (!this.#isLineInRenderRange(line)) {
+      return undefined;
+    }
+
+    const contentElement = this.#contentElement;
+    if (contentElement === undefined) {
+      return undefined;
+    }
+
+    // check if the line is within the render range (fast)
+    if (renderRange !== undefined) {
+      const { startingLine } = renderRange;
+      const { children } = contentElement;
+      for (let i = line - startingLine; i <= children.length; i++) {
+        const child = children[i] as HTMLElement | undefined;
+        if (child === undefined) {
+          break;
+        }
+        const lineNumber = getLineNumberAttr(child);
+        const lineType = child.dataset.lineType;
+        if (
+          lineNumber !== undefined &&
+          lineNumber === line + 1 &&
+          lineType !== undefined &&
+          isLineEditable(lineType)
+        ) {
+          lineElement = child;
+          break;
+        }
+      }
+    }
+
+    // fallback to query selector
+    lineElement ??= contentElement.querySelector<HTMLElement>(
+      `[data-line="${line + 1}"]` +
+        (this.#diffSyle === 'unified'
+          ? ':not([data-line-type="change-deletion"])'
+          : '')
+    );
+
+    if (lineElement !== undefined) {
+      this.#lineElementsCache.set(line, lineElement);
+    }
+    return lineElement ?? undefined;
+  }
+
+  #getGutterWidth(): number {
+    if (this.#gutterElement === undefined) {
+      return 0;
+    }
+
+    if (this.#gutterWidthCache === undefined) {
+      const diffsColumnNumberWidth =
+        this.#contentElement?.parentElement?.style.getPropertyValue(
+          '--diffs-column-number-width'
+        );
+      if (
+        diffsColumnNumberWidth !== undefined &&
+        diffsColumnNumberWidth.length > 2 &&
+        diffsColumnNumberWidth.endsWith('px')
+      ) {
+        this.#gutterWidthCache = parseInt(
+          diffsColumnNumberWidth.slice(0, -2),
+          10
+        );
+      } else {
+        this.#gutterWidthCache = this.#gutterElement.offsetWidth;
+      }
+    }
+
+    return this.#gutterWidthCache;
+  }
+
+  #getContentWidth(): number {
+    if (this.#contentElement === undefined) {
+      return 0;
+    }
+
+    if (this.#contentWidthCache === undefined) {
+      const diffsColumnContentWidth =
+        this.#contentElement.parentElement?.style.getPropertyValue(
+          '--diffs-column-content-width'
+        );
+      if (
+        diffsColumnContentWidth !== undefined &&
+        diffsColumnContentWidth.length > 2 &&
+        diffsColumnContentWidth.endsWith('px')
+      ) {
+        this.#contentWidthCache = parseFloat(
+          diffsColumnContentWidth.slice(0, -2)
+        );
+      } else {
+        this.#contentWidthCache = this.#contentElement.offsetWidth;
+      }
+    }
+    return this.#contentWidthCache;
+  }
+
+  // get line top(y-coordinate) position
+  #getLineY(line: number) {
+    const cachedY = this.#lineYCache.get(line);
+    if (cachedY !== undefined) {
+      return cachedY;
+    }
+
+    const lineElement = this.#getLineElement(line);
+    if (lineElement === undefined) {
+      return -1;
+    }
+
+    // cold(slow) path: measure line top position from DOM (will cause reflow)
+    let y = lineElement.offsetTop + this.#metrics.paddingTop;
+    y += this.#activeContentOffset?.top ?? 0;
+    this.#lineYCache.set(line, y);
+    return y;
+  }
+
+  // Return the visual position for a character. Wrapped lines include the
+  // visual line index so carets can be placed on the correct row.
+  #getCharX(line: number, char: number): [x: number, wrapLine: number] {
+    if (
+      this.#lastAccessedCharX !== undefined &&
+      this.#lastAccessedCharX[0] === line &&
+      this.#lastAccessedCharX[1] === char
+    ) {
+      return [this.#lastAccessedCharX[2], this.#lastAccessedCharX[3]];
+    }
+
+    const lineText = this.#editSession?.document?.getLineText(line);
+    const offsetLeft = this.#getGutterWidth() + this.#metrics.ch; // gutter width + inline padding (1ch)
+    if (lineText === undefined || lineText.length === 0 || char <= 0) {
+      return [offsetLeft + (this.#activeContentOffset?.left ?? 0), 0];
+    }
+
+    const boundedCharacter = snapTextOffsetToUnicodeBoundary(
+      lineText,
+      Math.min(char, lineText.length)
+    );
+    const textBeforeCharacter = lineText.slice(0, boundedCharacter);
+    const asciiColumns = getExpandedAsciiTextColumns(
+      textBeforeCharacter,
+      this.#metrics.tabSize
+    );
+
+    let left = 0;
+    let wrapLine = 0;
+    if (asciiColumns !== -1) {
+      left = offsetLeft + asciiColumns * this.#metrics.ch;
+    } else {
+      left = offsetLeft + this.#metrics.measureTextWidth(textBeforeCharacter);
+    }
+
+    if (this.#isWrap) {
+      const contentWidth = this.#getContentWidth();
+      const textWidth =
+        2 * this.#metrics.ch + this.#metrics.measureTextWidth(lineText);
+      if (textWidth > contentWidth) {
+        const wrapOffsets = this.#wrapLineText(line);
+        // undefined means the wrap offsets could not be measured — the
+        // content element is detached or has no layout (see #wrapLineText).
+        // Fall back to an unwrapped position, and return before the
+        // #lastAccessedCharX write below so nothing derived from the
+        // unmeasurable DOM gets memoized; the next call re-measures against
+        // live layout.
+        if (wrapOffsets == null) {
+          return [left + (this.#activeContentOffset?.left ?? 0), 0];
+        }
+        for (let w = 0; w + 1 < wrapOffsets.length; w++) {
+          const segmentStart = wrapOffsets[w];
+          const segmentEnd = wrapOffsets[w + 1];
+          if (boundedCharacter <= segmentEnd) {
+            wrapLine = w;
+            const prefixInSegment = lineText.slice(
+              segmentStart,
+              boundedCharacter
+            );
+            const segmentAsciiColumns = getExpandedAsciiTextColumns(
+              prefixInSegment,
+              this.#metrics.tabSize
+            );
+            if (segmentAsciiColumns !== -1) {
+              left = offsetLeft + segmentAsciiColumns * this.#metrics.ch;
+            } else {
+              left =
+                offsetLeft + this.#metrics.measureTextWidth(prefixInSegment);
+            }
+            break;
+          }
+        }
+      }
+      left += this.#activeContentOffset?.left ?? 0;
+    }
+
+    if (this.#lastAccessedCharX !== undefined) {
+      this.#lastAccessedCharX[0] = line;
+      this.#lastAccessedCharX[1] = char;
+      this.#lastAccessedCharX[2] = left;
+      this.#lastAccessedCharX[3] = wrapLine;
+    } else {
+      this.#lastAccessedCharX = [line, char, left, wrapLine];
+    }
+
+    return [left, wrapLine];
+  }
+
+  // Compute how a logical line of text is broken into visual lines when line
+  // wrapping is enabled.
+  //
+  // Returns undefined when the offsets cannot be measured: measurement works
+  // by appending a hidden probe to #contentElement, so a detached or
+  // zero-width content element (both occur while a session re-render replaces
+  // the code columns) would report "never wraps" for any line. That result is
+  // never returned or cached — a cached wrong answer would keep placing
+  // carets at unwrapped positions until an unrelated edit evicted it. Callers
+  // that need best-effort segmentation use #wrapLineTextOrWholeLine;
+  // #getCharX propagates the undefined so its own memoization is skipped
+  // too.
+  #wrapLineText(line: number): Uint32Array | undefined {
+    const cachedOffsets = this.#wrapLineOffsetsCache.get(line);
+    if (cachedOffsets !== undefined) {
+      return cachedOffsets;
+    }
+    if (this.#wrapLineOffsetsCache.size >= MAX_WRAP_OFFSETS_CACHE_LINES) {
+      this.#wrapLineOffsetsCache.clear();
+    }
+
+    const lineText = this.#editSession?.document?.getLineText(line);
+    if (lineText === undefined || lineText.length === 0) {
+      const offsets = new Uint32Array([0]);
+      this.#wrapLineOffsetsCache.set(line, offsets);
+      return offsets;
+    }
+
+    const contentElement = this.#contentElement;
+    if (contentElement == null || !contentElement.isConnected) {
+      return undefined;
+    }
+
+    const div = h(
+      'div',
+      {
+        style: {
+          position: 'absolute',
+          top: '0',
+          left: '0',
+          width: '100%',
+          boxSizing: 'border-box',
+          visibility: 'hidden',
+          pointerEvents: 'none',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          font: 'inherit',
+          paddingInline: '1ch',
+          tabSize: this.#metrics.tabSize.toString(),
+        },
+        textContent: lineText,
+      },
+      contentElement
+    );
+    const textNode = div.firstChild as Text;
+    const range = document.createRange();
+    const starts: number[] = [];
+
+    try {
+      const divRect = div.getBoundingClientRect();
+      if (divRect.width === 0) {
+        return undefined;
+      }
+      const unicodeOffsets = getUnicodeMeasurementOffsets(lineText);
+      const wrapLineStartLeft = divRect.left + this.#metrics.ch;
+
+      // Measurement steps through grapheme clusters when the text needs
+      // Unicode-aware boundaries, single UTF-16 units otherwise. Grapheme
+      // `index` spans [graphemeStart(index), graphemeStart(index + 1)).
+      const graphemeCount =
+        unicodeOffsets === undefined
+          ? lineText.length
+          : unicodeOffsets.length - 1;
+      const graphemeStart = (index: number): number =>
+        unicodeOffsets === undefined ? index : unicodeOffsets[index];
+      const measureGrapheme = (index: number): DOMRect => {
+        range.setStart(textNode, graphemeStart(index));
+        range.setEnd(textNode, graphemeStart(index + 1));
+        // WebKit adds a zero-width fragment on the previous row at soft wraps;
+        // the final fragment belongs to the grapheme's rendered row.
+        const clientRects = range.getClientRects();
+        return (
+          clientRects.item(clientRects.length - 1) ??
+          range.getBoundingClientRect()
+        );
+      };
+
+      // A new visual line starts whenever a grapheme's top edge moves below
+      // the previous grapheme's top edge. Line breaking assigns graphemes to
+      // visual lines in logical order, so tops are non-decreasing with the
+      // text offset and each wrap point can be located by binary-searching for
+      // the first grapheme below the current visual line — O(wraps * log n)
+      // rect measurements instead of one per character.
+      starts.push(0);
+      let lastTop = measureGrapheme(0).top;
+      let searchStart = 1;
+      while (searchStart < graphemeCount) {
+        let low = searchStart;
+        let high = graphemeCount;
+        while (low < high) {
+          const mid = (low + high) >> 1;
+          if (measureGrapheme(mid).top > lastTop) {
+            high = mid;
+          } else {
+            low = mid + 1;
+          }
+        }
+        if (low >= graphemeCount) {
+          break;
+        }
+        const { left, top } = measureGrapheme(low);
+        // Safari can report the first range on a wrapped visual line as
+        // starting one character past the visual line start. Use the previous
+        // grapheme so segment-local caret math begins at the actual wrap point.
+        const startsPastLineStart =
+          isSafari() && left - wrapLineStartLeft > this.#metrics.ch / 2;
+        starts.push(graphemeStart(startsPastLineStart ? low - 1 : low));
+        lastTop = top;
+        searchStart = low + 1;
+      }
+
+      const offsets = new Uint32Array(starts.length + 1);
+      for (let i = 0; i < starts.length; i++) {
+        offsets[i] = starts[i]!;
+      }
+      offsets[starts.length] = lineText.length;
+      this.#wrapLineOffsetsCache.set(line, offsets);
+      return offsets;
+    } finally {
+      div.remove();
+    }
+  }
+
+  // #wrapLineText for callers that need usable offsets even when measurement
+  // is impossible (undefined): treats the line as one unwrapped segment.
+  // Safe because the fallback is never cached — once the content element is
+  // measurable again, the same call returns real offsets.
+  #wrapLineTextOrWholeLine(line: number): Uint32Array {
+    const offsets = this.#wrapLineText(line);
+    if (offsets !== undefined) {
+      return offsets;
+    }
+    const length = this.#editSession?.document?.getLineText(line)?.length ?? 0;
+    return Uint32Array.of(0, length);
+  }
+
+  // check if the web selection belongs to editor
+  #rangeBelongsToEditor({ startContainer, endContainer }: StaticRange) {
+    const contentEl = this.#contentElement;
+    if (contentEl === undefined) {
+      return false;
+    }
+    return (
+      contentEl.contains(startContainer) && contentEl.contains(endContainer)
+    );
+  }
+
+  // Check whether a line is visible in the currently rendered line window.
+  #isLineVisible(line: number): boolean {
+    const lineCount = this.#editSession?.document?.lineCount ?? 0;
+    if (line < 0 || line >= lineCount) {
+      return false;
+    }
+    return this.#getLineElement(line) !== undefined;
+  }
+}
+
+interface GetEditSessionProps<EType extends EditorType, LAnnotation, Caret> {
+  type: EType;
+  editStateKey: string | undefined;
+  owner: Editor<EType, LAnnotation, Caret>;
+  initialState: EditorInitialState<EType, LAnnotation> | undefined;
+  previousSession: ManagedEditSession<EType, LAnnotation> | undefined;
+}
+
+function getEditSession<EType extends EditorType, LAnnotation, Caret>({
+  type,
+  editStateKey,
+  owner,
+  initialState,
+  previousSession,
+}: GetEditSessionProps<EType, LAnnotation, Caret>): ManagedEditSession<
+  EType,
+  LAnnotation
+> {
+  if (initialState != null && initialState.type !== type) {
+    throw new TypeError(
+      `Editor: initialState: a ${initialState.type} state cannot initialize a ${type} editor`
+    );
+  }
+  const initialSession = initialState as
+    | ManagedEditSession<EType, LAnnotation>
+    | undefined;
+  if (editStateKey != null) {
+    return EditStateManager.activate(type, editStateKey, owner, initialSession);
+  }
+  if (initialSession != null) {
+    return initialSession;
+  }
+  if (previousSession != null) {
+    return previousSession;
+  }
+  return (
+    type === 'file' ? { type: 'file' } : { type: 'file-diff' }
+  ) as ManagedEditSession<EType, LAnnotation>;
+}
+
+// Grid tracks a rendered column child occupies: rows take one, empty buffers
+// take the `data-buffer-size` they were emitted with.
+function gridTrackSpan(child: Element | undefined): number {
+  if (!(child instanceof HTMLElement)) {
+    return 1;
+  }
+  return Number(child.dataset.bufferSize ?? 1);
+}
+
+function isValidEditPredictionPosition<EType extends EditorType, LAnnotation>(
+  document: TextDocument<EType, LAnnotation>,
+  position: Position | undefined
+): position is Position {
+  return (
+    position !== undefined &&
+    Number.isInteger(position.line) &&
+    Number.isInteger(position.character) &&
+    position.line >= 0 &&
+    position.line < document.lineCount &&
+    position.character >= 0 &&
+    position.character <= document.getLineLength(position.line)
+  );
+}
+
+function splitsSurrogatePair(text: string, offset: number): boolean {
+  const previous = text.charCodeAt(offset - 1);
+  const next = text.charCodeAt(offset);
+  return (
+    offset > 0 &&
+    offset < text.length &&
+    previous >= 0xd800 &&
+    previous <= 0xdbff &&
+    next >= 0xdc00 &&
+    next <= 0xdfff
+  );
+}

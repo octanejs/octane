@@ -16,6 +16,7 @@ export const KNOWN_BINDINGS = {
 	'@effect/atom-react': '@octanejs/effect-atom',
 	// Only the web entry is ported; the React Native entries keep their own.
 	'@legendapp/list/react': '@octanejs/legendapp-list',
+	'@pierre/diffs/react': '@octanejs/pierre-diffs',
 	'@mantine/hooks': '@octanejs/mantine-hooks',
 	'mobx-react-lite': '@octanejs/mobx',
 	'mobx-react': '@octanejs/mobx',
@@ -244,6 +245,7 @@ export const KNOWN_VANILLA_CORES = {
 	valtio: 'valtio/vanilla',
 	jotai: 'jotai/vanilla',
 	'@effect/atom-react': 'effect/reactivity',
+	'@pierre/diffs/react': '@pierre/diffs',
 	'@lexical/react': 'lexical',
 	'@tiptap/react': '@tiptap/core',
 	'@monaco-editor/react': 'monaco-editor',

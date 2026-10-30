@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "13d92be18d5ceac526f33cc96b6902a14d168f3e1d4b16be738f0fa70da7fe98"
+    }
+  ],
+  "requiredFiles": ["audit/upstream.lock.json"],
+  "filesEqual": [{ "path": "LICENSE.upstream", "equalsPath": "upstream/LICENSE.md" }],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "@pierre/diffs",
+    "version": "1.6.1",
+    "license": "apache-2.0"
+  },
+  "unpublishedDirs": ["audit", "scripts", "tests", "typetests", "upstream"]
+}

@@ -1,0 +1,434 @@
+{
+  "schemaVersion": 1,
+  "project": "pierre-diffs-adapted",
+  "roots": ["packages/pierre-diffs/tests/upstream"],
+  "files": [
+    "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+    "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+    "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+    "packages/pierre-diffs/tests/upstream/reactPartialHydration.test.ts"
+  ],
+  "tests": [
+    {
+      "id": "runtime:686fa00a6da4f3ab",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React CodeView diff keeps an edited item's annotation content when another item rerenders"
+    },
+    {
+      "id": "runtime:965baf30c33916f9",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React CodeView diff keeps annotation content unchanged when editing moves its row"
+    },
+    {
+      "id": "runtime:93d0e1d5f6bcc198",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React CodeView diff keeps displayed annotations while the input version advances (header and gutter slots: false, controlled: false)"
+    },
+    {
+      "id": "runtime:3c020f8737b4de90",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React CodeView diff keeps displayed annotations while the input version advances (header and gutter slots: false, controlled: true)"
+    },
+    {
+      "id": "runtime:a777a8adac54342e",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React CodeView diff keeps displayed annotations while the input version advances (header and gutter slots: true, controlled: false)"
+    },
+    {
+      "id": "runtime:7e15cfde1aa228bc",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React CodeView diff keeps displayed annotations while the input version advances (header and gutter slots: true, controlled: true)"
+    },
+    {
+      "id": "runtime:2047edf682fd619c",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React CodeView file keeps an edited item's annotation content when another item rerenders"
+    },
+    {
+      "id": "runtime:6f729be40b80cd8d",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React CodeView file keeps annotation content unchanged when editing moves its row"
+    },
+    {
+      "id": "runtime:72128d41f04cca08",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React CodeView file keeps displayed annotations while the input version advances (header and gutter slots: false, controlled: false)"
+    },
+    {
+      "id": "runtime:80241d5017d4e0fb",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React CodeView file keeps displayed annotations while the input version advances (header and gutter slots: false, controlled: true)"
+    },
+    {
+      "id": "runtime:466110e72f5de169",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React CodeView file keeps displayed annotations while the input version advances (header and gutter slots: true, controlled: false)"
+    },
+    {
+      "id": "runtime:2944fec046336b6c",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React CodeView file keeps displayed annotations while the input version advances (header and gutter slots: true, controlled: true)"
+    },
+    {
+      "id": "runtime:5c5f40303221c481",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React FileDiff keeps hydrated annotations while a replacement is highlighted"
+    },
+    {
+      "id": "runtime:840f1214242b335b",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React UnresolvedFile keeps custom actions and annotations during sequential resolutions"
+    },
+    {
+      "id": "runtime:2fbad4bf62261309",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React UnresolvedFile keeps default actions and annotations during sequential resolutions"
+    },
+    {
+      "id": "runtime:5494d42ba01683bb",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React diff resets frozen annotation slots while rejected completion is highlighted"
+    },
+    {
+      "id": "runtime:b43d998cc6e47116",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React diff retains matching annotation children during delayed movement and removal (virtualized: false)"
+    },
+    {
+      "id": "runtime:2742479cf739316d",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React diff retains matching annotation children during delayed movement and removal (virtualized: true)"
+    },
+    {
+      "id": "runtime:5b2dd8a8e67d32fb",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React diff shows the edited content's annotations when editing starts during a replacement"
+    },
+    {
+      "id": "runtime:947992af1aa9ea54",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React file resets frozen annotation slots while rejected completion is highlighted"
+    },
+    {
+      "id": "runtime:3086e9b8091cb221",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React file retains matching annotation children during delayed movement and removal (virtualized: false)"
+    },
+    {
+      "id": "runtime:d5351edd4fad18b9",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React file retains matching annotation children during delayed movement and removal (virtualized: true)"
+    },
+    {
+      "id": "runtime:07c3fe220b0058bf",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React file shows the edited content's annotations when editing starts during a replacement"
+    },
+    {
+      "id": "runtime:11aa803c02630faf",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React multi retains matching annotation children during delayed movement and removal (virtualized: false)"
+    },
+    {
+      "id": "runtime:5bb4a17506235eef",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React multi retains matching annotation children during delayed movement and removal (virtualized: true)"
+    },
+    {
+      "id": "runtime:fd8efd01efe694b4",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React patch retains matching annotation children during delayed movement and removal (virtualized: false)"
+    },
+    {
+      "id": "runtime:e23128cd0dee0f2c",
+      "file": "packages/pierre-diffs/tests/upstream/reactAnnotations.workerRendering.test.ts",
+      "fullName": "React patch retains matching annotation children during delayed movement and removal (virtualized: true)"
+    },
+    {
+      "id": "runtime:1d95d718974219a1",
+      "file": "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+      "fullName": "React CodeView edit completion teardown completes a changed session once on React unmount"
+    },
+    {
+      "id": "runtime:2aa23424b88ff05d",
+      "file": "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+      "fullName": "React CodeView edit completion teardown completes a changed session once on direct cleanup"
+    },
+    {
+      "id": "runtime:e300530db219c227",
+      "file": "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+      "fullName": "React CodeView editor factory cleans StrictMode replay editors without leaking the active session"
+    },
+    {
+      "id": "runtime:cd31d7a203120fe7",
+      "file": "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+      "fullName": "React CodeView editor factory cleans a newly created editor when attachment fails"
+    },
+    {
+      "id": "runtime:9d4ced24901d5c6c",
+      "file": "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+      "fullName": "React CodeView editor factory completes controlled sessions with their owning items"
+    },
+    {
+      "id": "runtime:77eaf1c5d9d7a926",
+      "file": "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+      "fullName": "React CodeView editor factory completes every session when a controlled empty list removes all items"
+    },
+    {
+      "id": "runtime:243f183655acefed",
+      "file": "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+      "fullName": "React CodeView editor factory merges editor options and isolates simultaneous item callbacks"
+    },
+    {
+      "id": "runtime:43cf69d3f991791a",
+      "file": "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+      "fullName": "React CodeView editor factory rejects imperative item removal in controlled mode"
+    },
+    {
+      "id": "runtime:eb6fa264b37e9cf6",
+      "file": "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+      "fullName": "React CodeView editor factory removes initial items through the imperative handle"
+    },
+    {
+      "id": "runtime:d65cf4560be3f122",
+      "file": "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+      "fullName": "React CodeView editor factory renders read-only without a provider and rejects a factory escape hatch"
+    },
+    {
+      "id": "runtime:caa3555999154f00",
+      "file": "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+      "fullName": "React CodeView editor factory retains an item editor across virtualization"
+    },
+    {
+      "id": "runtime:c75a670651dccd29",
+      "file": "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+      "fullName": "React CodeView editor factory uses replacement factories, options, and keys only for later sessions"
+    },
+    {
+      "id": "runtime:8745769966d6ab3d",
+      "file": "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+      "fullName": "React CodeView editor factory uses the context factory for imperative item additions"
+    },
+    {
+      "id": "runtime:41ad052c5df2556b",
+      "file": "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+      "fullName": "React CodeView selection keeps selection controlled by props with a provider mounted"
+    },
+    {
+      "id": "runtime:daf76bf9ad1d4f26",
+      "file": "packages/pierre-diffs/tests/upstream/reactCodeViewEditorOptions.test.ts",
+      "fullName": "React CodeView selection overwrites untyped selection options in uncontrolled mode"
+    },
+    {
+      "id": "runtime:158285f201dd7231",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React completion lifecycle a re-serialized keyed file prop keeps the accepted file installed"
+    },
+    {
+      "id": "runtime:17d688bce6b2409e",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React completion lifecycle accepted annotations keep their moved rows through stale commits"
+    },
+    {
+      "id": "runtime:ce4ec2feee32dbcd",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React completion lifecycle accepting installs the completed file with no stale-prop repaint"
+    },
+    {
+      "id": "runtime:0c7a8ad960b96cea",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React completion lifecycle accepting unchanged text does not restore stale annotation props"
+    },
+    {
+      "id": "runtime:1a62a7c3d28b7816",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React completion lifecycle returning null reverts to the exact file prop"
+    },
+    {
+      "id": "runtime:fa32c88bd82daf9d",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React completion lifecycle unmount completes a changed session once without installing"
+    },
+    {
+      "id": "runtime:cebf5c92c10b3cbc",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React diff input bridges after acceptance MultiFileDiff does not restore stale annotations after unchanged text"
+    },
+    {
+      "id": "runtime:5d2fd24afc8ec42f",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React diff input bridges after acceptance MultiFileDiff retains the accepted diff through stale and caught-up pairs"
+    },
+    {
+      "id": "runtime:eacf035bf7f341a4",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React diff input bridges after acceptance PatchDiff keeps the accepted diff until the patch prop advances"
+    },
+    {
+      "id": "runtime:997ecd973cf73a6f",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React diff input bridges after acceptance a newer MultiFileDiff pair supersedes a pending bridge"
+    },
+    {
+      "id": "runtime:f05c645244090bbb",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React diff input bridges after acceptance a re-serialized keyed pair keeps the accepted diff installed"
+    },
+    {
+      "id": "runtime:0b0b35305479dc0d",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React edit surfaces File renders editor token markup without mutating options"
+    },
+    {
+      "id": "runtime:2b137abfad1dfcaa",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React edit surfaces FileDiff renders editor token markup without mutating options"
+    },
+    {
+      "id": "runtime:a045ff0ef33e9cfd",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React edit surfaces an unchanged commit does not force-render an optionless edit surface"
+    },
+    {
+      "id": "runtime:3f9dae0fd2a5c3cb",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle File annotation slots stay projected through a remap without prop feedback"
+    },
+    {
+      "id": "runtime:d378123eb9671f71",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle File cancels onAttach on edit-off before the frame"
+    },
+    {
+      "id": "runtime:28c011bae14df0b6",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle File cancels onAttach on unmount before the frame"
+    },
+    {
+      "id": "runtime:bc22bd49db7ed5ef",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle File forwards editStateKey when creating its editor"
+    },
+    {
+      "id": "runtime:51edff056006d70c",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle File onEditChange prop receives editor change events and swaps mid-session"
+    },
+    {
+      "id": "runtime:7d6098c67870cab7",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle File rejects concurrent surfaces using the same editStateKey"
+    },
+    {
+      "id": "runtime:001f650e1421cc9e",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle File reports a missing provider"
+    },
+    {
+      "id": "runtime:f90c2e4fa4acebe7",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle File uses factory inputs only for new edit sessions"
+    },
+    {
+      "id": "runtime:12b3f02bfa3a5510",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle FileDiff annotation slots stay projected through a remap without prop feedback"
+    },
+    {
+      "id": "runtime:5c845b59556878ba",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle FileDiff cancels onAttach on edit-off before the frame"
+    },
+    {
+      "id": "runtime:943e6a6faa8e647b",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle FileDiff cancels onAttach on unmount before the frame"
+    },
+    {
+      "id": "runtime:b807ab064f29ce54",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle FileDiff forwards editStateKey when creating its editor"
+    },
+    {
+      "id": "runtime:3150975dd49142bf",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle FileDiff onEditChange prop receives editor change events and swaps mid-session"
+    },
+    {
+      "id": "runtime:91fb7f4b4f2ae344",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle FileDiff rejects concurrent surfaces using the same editStateKey"
+    },
+    {
+      "id": "runtime:05e30faffe5db980",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle FileDiff reports a missing provider"
+    },
+    {
+      "id": "runtime:b7a66214514cf70b",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle FileDiff uses factory inputs only for new edit sessions"
+    },
+    {
+      "id": "runtime:61d0a1762f71bfbb",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle MultiFileDiff forwards editor options to its FileDiff instance"
+    },
+    {
+      "id": "runtime:b4b80b1c575e49c9",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle PatchDiff forwards editor options to its FileDiff instance"
+    },
+    {
+      "id": "runtime:2f69bae962cdaf69",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle a factory returning an owner-constructed editor shares it as configured, ignoring surface editorOptions"
+    },
+    {
+      "id": "runtime:132cf045438d20aa",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle cleans StrictMode and virtualized edit passes without leaks"
+    },
+    {
+      "id": "runtime:067e8906a33884eb",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle keeps simultaneous sibling callbacks isolated"
+    },
+    {
+      "id": "runtime:c0c10ad7e78f1669",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle partial FileDiff reports a missing provider before loading completes"
+    },
+    {
+      "id": "runtime:1ca823e6634c8ad2",
+      "file": "packages/pierre-diffs/tests/upstream/reactEditorOptions.test.ts",
+      "fullName": "React editor factory lifecycle partial FileDiff reports an editor factory failure after loading"
+    },
+    {
+      "id": "runtime:df957e6e6f8741f4",
+      "file": "packages/pierre-diffs/tests/upstream/reactPartialHydration.test.ts",
+      "fullName": "React partial diff hydration FileDiff accepts a different partial source after hydration"
+    },
+    {
+      "id": "runtime:44fe861a62c371ca",
+      "file": "packages/pierre-diffs/tests/upstream/reactPartialHydration.test.ts",
+      "fullName": "React partial diff hydration FileDiff updates React-owned slots when a partial diff finishes loading"
+    },
+    {
+      "id": "runtime:c341622021dba232",
+      "file": "packages/pierre-diffs/tests/upstream/reactPartialHydration.test.ts",
+      "fullName": "React partial diff hydration PatchDiff updates React-owned slots after loading and keeps the result on parent rerender"
+    },
+    {
+      "id": "runtime:8b9420d63a91c7cb",
+      "file": "packages/pierre-diffs/tests/upstream/reactPartialHydration.test.ts",
+      "fullName": "React partial diff hydration editable FileDiff creates its editor only after the partial diff hydrates"
+    },
+    {
+      "id": "runtime:9b028343bbc24f41",
+      "file": "packages/pierre-diffs/tests/upstream/reactPartialHydration.test.ts",
+      "fullName": "React partial diff hydration turning edit off during a partial load prevents late attachment"
+    }
+  ],
+  "snapshots": 0
+}
