@@ -95,7 +95,9 @@ interface merges with `@types/node`'s.
   shiki 4.4.1 (upstream's own versions), 84/84 registrations. Upstream runs them
   under `bun test`; this lane runs them under Vitest, with `bun:test` resolved to
   Vitest's registrars (`tests/bun-test.ts`) and `tests/bun-environment.ts`
-  supplying the two Bun behaviors the suite relies on.
+  supplying the two Bun behaviors the suite relies on: a one-argument
+  `postMessage`, and the core's shared highlighter loaded before the first render
+  waits 10 ms for it.
 - **Adapted lane** (`pierre-diffs-adapted`): the same files, regenerated from the
   lock, run against the port, 84/84. The core resolves to the same pinned source
   in both lanes. Rewrites point `../src/react/*` at the port, the rest of

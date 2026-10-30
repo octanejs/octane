@@ -112,7 +112,7 @@
         {
           "path": "packages/pierre-diffs/tests/bun-environment.ts",
           "role": "support",
-          "sha256": "3abe0b0be215845d967e74e99d49c4be61edca8e28d95f6532030283bb4b0b00"
+          "sha256": "3dcc3463fd9ea0d899cdfab72ddfff00560abcae6d874b1a80d580fef700cc7e"
         },
         {
           "path": "packages/pierre-diffs/audit/pristine-suite.json",
@@ -207,7 +207,7 @@
         {
           "path": "packages/pierre-diffs/tests/bun-environment.ts",
           "role": "support",
-          "sha256": "3abe0b0be215845d967e74e99d49c4be61edca8e28d95f6532030283bb4b0b00"
+          "sha256": "3dcc3463fd9ea0d899cdfab72ddfff00560abcae6d874b1a80d580fef700cc7e"
         },
         {
           "path": "packages/pierre-diffs/tests/vitest.adapted.config.ts",
