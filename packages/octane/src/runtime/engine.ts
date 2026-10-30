@@ -3567,9 +3567,59 @@ export function flushSync<T>(fn: () => T): T {
 	return result;
 }
 
+// Queued detach positions by target: one index, or every index once a target has
+// several. Reused, so a commit that both detaches and attaches allocates nothing.
+const DETACHES_BY_TARGET = /* @__PURE__ */ new Map<unknown, number | number[]>();
+
+/**
+ * A host can render again before its commit drains its refs, since a
+ * cross-component render-time update joins the drain. A ref from its earlier
+ * pass then has both an attach and a detach queued, and React never calls a ref
+ * whose attach did not commit. A committed ref that a later pass restores queues
+ * the same pair in the other order. Per (ref, target), queued detaches and
+ * attaches alternate, so each pair nets to nothing: drop both. A Fragment's mount
+ * attach reads its ref when it runs, so it pairs with its instance's first
+ * queued detach.
+ */
+function dropUncommittedRefPairs(detaches: any[]): void {
+	const byTarget = DETACHES_BY_TARGET;
+	for (let i = 0; i < detaches.length; i += 4) {
+		const queued = byTarget.get(detaches[i + 1]);
+		if (queued === undefined) byTarget.set(detaches[i + 1], i);
+		else if (typeof queued === 'number') byTarget.set(detaches[i + 1], [queued, i]);
+		else queued.push(i);
+	}
+	let write = 0;
+	for (let read = 0; read < refAttachQueue.length; read++) {
+		const entry = refAttachQueue[read];
+		const queued = byTarget.get(entry.el);
+		if (queued !== undefined) {
+			const live = entry.ref === attachLiveFragmentRef;
+			if (typeof queued === 'number') {
+				if (live || detaches[queued] === entry.ref) {
+					detaches[queued] = null;
+					byTarget.delete(entry.el);
+					continue;
+				}
+			} else {
+				const k = live ? 0 : queued.findIndex((i) => detaches[i] === entry.ref);
+				if (k !== -1 && k < queued.length) {
+					detaches[queued[k]] = null;
+					queued.splice(k, 1);
+					continue;
+				}
+			}
+		}
+		refAttachQueue[write++] = entry;
+	}
+	refAttachQueue.length = write;
+	byTarget.clear();
+}
+
 export function drainQueuedRefDetaches(): void {
 	if (refDetachQueue.length === 0) return;
 	const q = refDetachQueue.splice(0);
+	if (refAttachQueue.length !== 0) dropUncommittedRefPairs(q);
 	for (let i = 0; i < q.length; i += 4) {
 		try {
 			REF_CALLBACK_DEPTH++;
