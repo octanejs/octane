@@ -565,7 +565,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/effect-atom
 
-[`packages/effect-atom`](../packages/effect-atom) `0.0.0` — ports `@effect/atom-react@4.1.0`. Status data: [`packages/effect-atom/status.json`](../packages/effect-atom/status.json).
+[`packages/effect-atom`](../packages/effect-atom) `0.0.1` — ports `@effect/atom-react@4.1.0`. Status data: [`packages/effect-atom/status.json`](../packages/effect-atom/status.json).
 
 Complete published surface, at the root and at the Hooks, RegistryContext, ReactHydration and ScopedAtom subpaths: useAtomValue (with selector), useAtom, useAtomSet (value, promise and promiseExit modes), useAtomMount, useAtomRefresh, useAtomSubscribe, useAtomSuspense, useAtomInitialValues, useAtomRef, useAtomRefProp, useAtomRefPropValue, RegistryContext, RegistryProvider, scheduleTask, HydrationBoundary, and ScopedAtom's make and TypeId. All 28 upstream runtime registrations run unchanged against React and against Octane, four of them with a test-harness patch for their server render.
 

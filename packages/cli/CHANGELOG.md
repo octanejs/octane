@@ -1,5 +1,11 @@
 # @octanejs/cli
 
+## 0.3.1
+
+### Patch Changes
+
+- 2b78b6b: Map `@effect/atom-react` to `@octanejs/effect-atom` in the binding catalog, so `@octanejs/codemod` rewrites `@effect/atom-react` imports to the binding.
+
 ## 0.3.0
 
 ### Minor Changes
