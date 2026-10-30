@@ -119,4 +119,22 @@ describe('octane/compiler/vite integration', () => {
 		const loaded = await server.ssrLoadModule('/entry.ts');
 		expect(loaded.render()).toBe('<p>zero shim</p>');
 	});
+
+	it("drops the bundler's 'use client' directive warning and passes other logs on", () => {
+		// Rolldown 1.2.16+ (Vite 8.3) warns once for every module that opens with a
+		// directive; ported React libraries such as Base UI start hundreds of parts
+		// with `'use client'`. Octane has no Server Components, so that one has
+		// nothing to preserve. The log below is the shape Rolldown emits.
+		const directive = (name: string) => ({
+			code: 'MODULE_LEVEL_DIRECTIVE',
+			message: `[MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "${name}" in "src/Part.tsrx" may not be preserved when bundling.`,
+		});
+		const onLog = octane({ hmr: false }).onLog as (
+			level: 'warn',
+			log: ReturnType<typeof directive>,
+		) => boolean | void;
+
+		expect(onLog('warn', directive('use client'))).toBe(false);
+		expect(onLog('warn', directive('use custom'))).not.toBe(false);
+	});
 });
