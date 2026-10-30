@@ -10,8 +10,8 @@ npm install @octanejs/testing-library
 pnpm add @octanejs/testing-library
 ```
 
-This package peers on **Octane `^0.2.5`**. Published 0.2.4 and earlier do not export
-`isInActScope`, which both public entries import.
+This package peers on the current Octane minor line (its `peerDependencies` names
+the range).
 
 The split mirrors RTL's own architecture (and
 `docs/react-library-compat-plan.md` §2): **`@testing-library/dom` is
@@ -166,7 +166,7 @@ this package's [`status.json`](./status.json).
 
 ## Runtime requirement
 
-This release requires Octane 0.2.5 or later in the 0.2 line. Upgrade Octane together
-with testing-library so the `isInActScope` API used for nested `act` batching is
-available. The packed-consumer checks exercise that API and rendering inside
-an outer `act` scope.
+Use the Octane minor line this package's `peerDependencies` names, and upgrade
+Octane together with testing-library. The packed-consumer checks exercise the
+`isInActScope` API used for nested `act` batching and rendering inside an outer
+`act` scope.

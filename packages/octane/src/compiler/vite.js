@@ -1195,6 +1195,15 @@ export function octane(options = {}) {
 				});
 			}
 		},
+		// Rolldown warns for every module that opens with a directive, and ported
+		// React libraries open hundreds of modules with `'use client'`. Octane has
+		// no Server Components, so that directive has nothing to preserve; drop its
+		// warning as @vitejs/plugin-react does and pass every other log on.
+		onLog(_level, log) {
+			if (log.code === 'MODULE_LEVEL_DIRECTIVE' && log.message.includes('"use client"')) {
+				return false;
+			}
+		},
 		buildStart() {
 			if (this.environment === undefined) {
 				cssModuleProofStates.clear();

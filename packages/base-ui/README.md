@@ -13,7 +13,8 @@ pnpm add @octanejs/base-ui
 
 This binding targets Base UI **1.8.0**. The complete export surface is implemented,
 including Select, Combobox, Autocomplete, Drawer, Navigation Menu, OTP Field,
-Scroll Area, and Toolbar. It peers on **Octane `^0.2.5`**; see
+Scroll Area, and Toolbar. It peers on the current Octane minor line (its
+`peerDependencies` names the range); see
 [MIGRATION.md](./MIGRATION.md) for added, replaced, and removed surfaces.
 Pristine and native unit, browser, type, and hydration checks pass;
 see [UPSTREAM.md](./UPSTREAM.md) for the pinned source and evidence.
@@ -62,10 +63,9 @@ pnpm --dir packages/base-ui upstream:verify
 
 ## Migrating from the Base UI 1.6 binding
 
-Upgrade `octane` to **0.2.5 or later in the 0.2 line** together with this binding,
+Upgrade `octane` to the minor line this binding peers on, together with
 `@octanejs/base-ui-utils`, `@octanejs/testing-library`, and `@octanejs/shadcn` when
-used. These packages require the compiler, hydration, and `act` support released
-in that coordinated patch. Earlier Octane 0.1 and 0.2 releases are not supported.
+used. Earlier Octane lines are not supported.
 
 - Select, Combobox, Autocomplete, Drawer, Navigation Menu, OTP Field, Scroll Area,
   Toolbar, temporal adapters, and the remaining upstream parts are now available.

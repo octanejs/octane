@@ -36,5 +36,4 @@ pnpm --dir packages/base-ui-utils upstream:verify
 
 ## Runtime requirement
 
-Use Octane 0.2.5 or later in the 0.2 line. This binding relies on the coordinated
-release’s transitive hook compilation and runtime support.
+Use the Octane minor line this package's `peerDependencies` names.
