@@ -141,7 +141,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/xstate-store` | [`packages/xstate-store`](../packages/xstate-store) | framework binding | `0.0.25` | 2 |
 | `@octanejs/xyflow` | [`packages/xyflow`](../packages/xyflow) | framework binding | `0.1.24` | 3 |
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.34` | 1 |
-| `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.68` | 6 |
+| `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.68` | 8 |
 | `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.20` | 1 |
 | `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.16.5` | 49 |
 
