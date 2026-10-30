@@ -1,5 +1,11 @@
 # @octanejs/zustand
 
+## 0.1.69
+
+### Patch Changes
+
+- 0bdbad9: Serve `@octanejs/zustand/react/shallow` and `@octanejs/zustand/vanilla/shallow`, matching zustand's own `zustand/react/shallow` and `zustand/vanilla/shallow` entries. Both resolve to the same module as `@octanejs/zustand/shallow`.
+
 ## 0.1.68
 
 ### Patch Changes
