@@ -15,8 +15,8 @@ type StrongIntrinsicProps<P> = Omit<
 	'dangerouslySetInnerHTML' | 'suppressHydrationWarning' | 'suppressNativeChangeWarning'
 > & {
 	dangerouslySetInnerHTML?: TrustedHTML | null | undefined;
-	suppressHydrationWarning?: never;
-	suppressNativeChangeWarning?: never;
+	suppressHydrationWarning?: undefined;
+	suppressNativeChangeWarning?: undefined;
 };
 
 export namespace JSX {

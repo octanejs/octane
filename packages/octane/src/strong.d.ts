@@ -16,8 +16,8 @@ export type { JSX } from './jsx-runtime-strong.js';
 
 type Strong<P> = P & {
 	dangerouslySetInnerHTML?: TrustedHTML | undefined;
-	suppressHydrationWarning?: never;
-	suppressNativeChangeWarning?: never;
+	suppressHydrationWarning?: undefined;
+	suppressNativeChangeWarning?: undefined;
 };
 
 export type ComponentProps<
