@@ -225,7 +225,7 @@ Scope/evidence last checked: 2026-08-20.
 
 ## @octanejs/base-ui
 
-[`packages/base-ui`](../packages/base-ui) `0.1.69` — ports `@base-ui/react@1.8.0`. Status data: [`packages/base-ui/status.json`](../packages/base-ui/status.json).
+[`packages/base-ui`](../packages/base-ui) `0.1.70` — ports `@base-ui/react@1.8.0`. Status data: [`packages/base-ui/status.json`](../packages/base-ui/status.json).
 
 All 79 upstream export entries are implemented, including Select, Combobox, Autocomplete, Drawer, Navigation Menu, OTP Field, Scroll Area, Toolbar, and the remaining parts of existing components.
 
@@ -245,7 +245,7 @@ See also: [`docs/base-ui-migration-plan.md`](base-ui-migration-plan.md), [`packa
 
 ## @octanejs/base-ui-utils
 
-[`packages/base-ui-utils`](../packages/base-ui-utils) `0.1.17` — ports `@base-ui/utils@0.4.0`. Status data: [`packages/base-ui-utils/status.json`](../packages/base-ui-utils/status.json).
+[`packages/base-ui-utils`](../packages/base-ui-utils) `0.1.18` — ports `@base-ui/utils@0.4.0`. Status data: [`packages/base-ui-utils/status.json`](../packages/base-ui-utils/status.json).
 
 All 45 published Base UI utility entries and 85 entry/export pairs match the pinned 0.4.0 release.
 
@@ -534,7 +534,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/drei
 
-[`packages/drei`](../packages/drei) `0.0.39` — ports `@react-three/drei@10.7.7`. Status data: [`packages/drei/status.json`](../packages/drei/status.json).
+[`packages/drei`](../packages/drei) `0.0.40` — ports `@react-three/drei@10.7.7`. Status data: [`packages/drei/status.json`](../packages/drei/status.json).
 
 Complete port of the pinned @react-three/drei 10.7.7 public web API (commit b8b99fd4ca1dfb8d821335671320512daa6efea4): 379 source exports and 217 runtime exports are accounted for by the executable crosswalk, with 299 parity assertions across 105 test files.
 
@@ -1442,7 +1442,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/shadcn
 
-[`packages/shadcn`](../packages/shadcn) `0.0.58` — ports `shadcn-ui/ui (component registry)@7c9eaba1c0a6404c990c144a654792e3313c650d + shadcn@4.21.0`. Status data: [`packages/shadcn/status.json`](../packages/shadcn/status.json).
+[`packages/shadcn`](../packages/shadcn) `0.0.59` — ports `shadcn-ui/ui (component registry)@7c9eaba1c0a6404c990c144a654792e3313c650d + shadcn@4.21.0`. Status data: [`packages/shadcn/status.json`](../packages/shadcn/status.json).
 
 Registry-first source binding with Radix (44 families, bare subpaths), React Aria (33, react-aria/<Family>), and Base UI (43, base-ui/<Family>) implementations. The registry emits base-nova (default), radix-nova, and aria-nova styles. The 4.21.0 update migrates class merging to cn@0.2.6 across all existing families while preserving tested Octane adaptations and local style choices. Base UI Select, Navigation Menu, and Scroll Area are transcribed from the release registry, resolved with its Nova style and Lucide icons, and target Base UI 1.8.0. The 44-family inventory is the current Octane scope, not the complete upstream registry: Base UI Sonner and additional upstream families such as Combobox remain outside it. Existing derived styles retain their unverified upstream-fidelity status.
 
@@ -1872,7 +1872,7 @@ Scope/evidence last checked: 2026-07-27.
 
 ## @octanejs/testing-library
 
-[`packages/testing-library`](../packages/testing-library) `0.1.66` — ports `@testing-library/react@16.3.2`. Status data: [`packages/testing-library/status.json`](../packages/testing-library/status.json).
+[`packages/testing-library`](../packages/testing-library) `0.1.67` — ports `@testing-library/react@16.3.2`. Status data: [`packages/testing-library/status.json`](../packages/testing-library/status.json).
 
 `render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config. Focus and blur helpers additionally emit their bubbling native counterparts.
 
@@ -2202,7 +2202,7 @@ Scope/evidence last checked: 2026-08-15.
 
 ## @octanejs/xyflow
 
-[`packages/xyflow`](../packages/xyflow) `0.1.24` — ports `@xyflow/react@12.11.2`. Status data: [`packages/xyflow/status.json`](../packages/xyflow/status.json).
+[`packages/xyflow`](../packages/xyflow) `0.1.25` — ports `@xyflow/react@12.11.2`. Status data: [`packages/xyflow/status.json`](../packages/xyflow/status.json).
 
 ReactFlow, ReactFlowProvider, Handle, hooks (useReactFlow, useNodes, useEdges, …), change helpers, and node/edge utilities from @xyflow/react@12.11.2.
 
@@ -2242,7 +2242,7 @@ See also: [`packages/zag/UPSTREAM.md`](../packages/zag/UPSTREAM.md)
 
 ## @octanejs/zustand
 
-[`packages/zustand`](../packages/zustand) `0.1.68` — ports `zustand@5.0.15`. Status data: [`packages/zustand/status.json`](../packages/zustand/status.json).
+[`packages/zustand`](../packages/zustand) `0.1.69` — ports `zustand@5.0.15`. Status data: [`packages/zustand/status.json`](../packages/zustand/status.json).
 
 Complete 1:1 port: the framework-agnostic vanilla store is reused verbatim; `create`/`useStore`, `shallow`/`useShallow`, the traditional equality-fn variants, and all middleware (persist, devtools, subscribeWithSelector, combine, redux).
 
