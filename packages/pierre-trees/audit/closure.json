@@ -1,0 +1,60 @@
+{
+  "runtimeDependencies": ["@pierre/trees", "octane"],
+  "adaptedSources": [
+    {
+      "packageName": "@pierre/trees",
+      "paths": [
+        "src/FileTree.tsrx",
+        "src/index.ts",
+        "src/useFileTree.tsrx",
+        "src/useFileTreeSearch.tsrx",
+        "src/useFileTreeSelection.tsrx",
+        "src/useFileTreeSelector.tsrx"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "package.json",
+      "origin": "authored",
+      "sha256": "1b117e044af483d6a0decb88c408ad0fb812724b5df20952f8495d5e1ef662f9"
+    },
+    {
+      "path": "src/FileTree.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/trees",
+      "sha256": "d770f618703da7d2c493933d09ece107aa416d98b67b1fb5eebca775cd2731db"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/trees",
+      "sha256": "728ecc48170bba7b530bdfa6899459e1958c25640d23e50498ec91f8f827d961"
+    },
+    {
+      "path": "src/useFileTree.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/trees",
+      "sha256": "fa3f6be04edeb5ad089bd673837a543463a01da91f5d461277a607afbd461890"
+    },
+    {
+      "path": "src/useFileTreeSearch.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/trees",
+      "sha256": "93a2fdf9ac486a7195fcdc1b10f1fb4e9621bd1ddebc4a7af3b54b7388b1dcf2"
+    },
+    {
+      "path": "src/useFileTreeSelection.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/trees",
+      "sha256": "1f9c5509ac823891cc0bccc0cdcd3714b2d4298bc9999947decd8319e1db4f1b"
+    },
+    {
+      "path": "src/useFileTreeSelector.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/trees",
+      "sha256": "b116bcabaf4a8d65e4e02fd3726db9461c1728bb41e46dc88810e5e9bf6c87d0"
+    }
+  ],
+  "reimplementedDependencies": []
+}

@@ -1,0 +1,84 @@
+{
+  "name": "@pierre/trees",
+  "version": "1.0.0-beta.6",
+  "license": "apache-2.0",
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "NOTICE.md",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./dist/components/web-components.js"
+  ],
+  "typesVersions": {
+    "*": {
+      "*": [
+        "dist/*"
+      ],
+      "react": [
+        "dist/react/index.d.ts"
+      ],
+      "ssr": [
+        "dist/ssr/index.d.ts"
+      ],
+      "web-components": [
+        "dist/web-components.d.ts"
+      ]
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./web-components": {
+      "types": "./dist/web-components.d.ts",
+      "import": "./dist/web-components.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    },
+    "./ssr": {
+      "types": "./dist/ssr/index.d.ts",
+      "import": "./dist/ssr/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepublishOnly": "moon run trees:prepublish"
+  },
+  "dependencies": {
+    "@pierre/path-store": "workspace:*",
+    "@pierre/theming": "workspace:*",
+    "preact": "catalog:",
+    "preact-render-to-string": "catalog:"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/core": "catalog:",
+    "@pierre/tree-test-data": "workspace:*",
+    "@pierre/vscode-icons": "catalog:",
+    "@playwright/test": "catalog:",
+    "@radix-ui/react-dropdown-menu": "catalog:",
+    "@tsdown/css": "catalog:",
+    "@types/jsdom": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "autoprefixer": "catalog:",
+    "jsdom": "catalog:",
+    "postcss": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1 || ^19.0.0",
+    "react-dom": "^18.3.1 || ^19.0.0"
+  }
+}

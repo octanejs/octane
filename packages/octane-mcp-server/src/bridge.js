@@ -14,6 +14,7 @@ export const KNOWN_BINDINGS = {
 	valtio: '@octanejs/valtio',
 	jotai: '@octanejs/jotai',
 	'@effect/atom-react': '@octanejs/effect-atom',
+	'@pierre/trees/react': '@octanejs/pierre-trees',
 	// Only the web entry is ported; the React Native entries keep their own.
 	'@legendapp/list/react': '@octanejs/legendapp-list',
 	'@pierre/diffs/react': '@octanejs/pierre-diffs',
@@ -245,6 +246,7 @@ export const KNOWN_VANILLA_CORES = {
 	valtio: 'valtio/vanilla',
 	jotai: 'jotai/vanilla',
 	'@effect/atom-react': 'effect/reactivity',
+	'@pierre/trees/react': '@pierre/trees',
 	'@pierre/diffs/react': '@pierre/diffs',
 	'@lexical/react': 'lexical',
 	'@tiptap/react': '@tiptap/core',

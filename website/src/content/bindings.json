@@ -511,6 +511,12 @@
         "tags": ["editor", "code"]
       },
       {
+        "packageName": "@octanejs/pierre-trees",
+        "title": "Pierre Trees",
+        "searchTerms": ["@pierre/trees", "@pierre/trees/react", "file tree"],
+        "tags": ["file tree", "code", "components"]
+      },
+      {
         "packageName": "@octanejs/markdown",
         "title": "React Markdown",
         "tags": ["markdown", "rendering"]

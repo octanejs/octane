@@ -1,0 +1,18 @@
+{
+  "upstream": { "package": "@pierre/trees", "version": "1.0.0-beta.6" },
+  "provenance": {
+    "source": "https://github.com/pierrecomputer/pierre/tree/a90629e0481bb8fed48f36ccb358d5d48a3ae8b6/packages/trees",
+    "license": "Apache-2.0",
+    "commit": "a90629e0481bb8fed48f36ccb358d5d48a3ae8b6",
+    "verification": "verified"
+  },
+  "surface": "Complete @pierre/trees/react surface: FileTree (host props, header slot, renderContextMenu, and preloadedData server rendering and hydration), useFileTree, useFileTreeSelector, useFileTreeSelection, useFileTreeSearch, and the FileTreeProps, FileTreePreloadedData, UseFileTreeResult, FileTreeSelector, FileTreeSelectorEquality and FileTreeSearchState types. The model, options and payload types stay in the framework-neutral @pierre/trees root entry. All 14 upstream React registrations run unchanged against React and against Octane, the two SSR cases with a test-harness patch for their server render.",
+  "divergences": [
+    "FileTree's host event props receive native DOM events, as every Octane host does; there is no `event.nativeEvent`."
+  ],
+  "ssr": "Supported and tested: FileTree server-renders the preloaded shadow root as a declarative <template shadowrootmode=\"open\">, the @pierre/trees element attaches it, and hydrateRoot adopts the host, header and tree with no hydration warnings.",
+  "notes": [
+    "npm publishes no gitHead or repository for @pierre/trees 1.0.0-beta.6. The pin is the release commit (\"@pierre/trees 1.0.0-beta.6\", 1.5 minutes before the publish); the tarball's source maps embed src/react byte for byte as that commit has it."
+  ],
+  "verified": "2026-10-30"
+}

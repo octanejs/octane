@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@pierre/trees",
+    "version": "1.0.0-beta.6",
+    "repository": {
+      "owner": "pierrecomputer",
+      "repo": "pierre",
+      "subdirectory": "packages/trees"
+    },
+    "commit": "a90629e0481bb8fed48f36ccb358d5d48a3ae8b6",
+    "integrity": "sha512-zxeuSFM9TveM7b5XofweJALCtm/tGYV9HZzdbf7Uf+kBxIlUyz24/EHaGRjB0dsmmfDQl2ETz7AWwJ15lhSnpw=="
+  },
+  "license": {
+    "spdx": "Apache-2.0",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE.md",
+        "sha256": "13d92be18d5ceac526f33cc96b6902a14d168f3e1d4b16be738f0fa70da7fe98"
+      },
+      {
+        "path": "packages/trees/LICENSE.md",
+        "sha256": "13d92be18d5ceac526f33cc96b6902a14d168f3e1d4b16be738f0fa70da7fe98"
+      }
+    ],
+    "notices": [
+      {
+        "path": "packages/trees/NOTICE.md",
+        "sha256": "a3504441e109da15ac873123ac4436250936b8261055c998360748ce35485963"
+      }
+    ]
+  },
+  "scopes": [
+    "LICENSE.md",
+    "NOTICE.md",
+    "README.md",
+    "package.json",
+    "src/react",
+    "test/file-tree-react.test.tsx"
+  ],
+  "adaptedMappings": [
+    {
+      "fromRoot": "test",
+      "toRoot": "tests/upstream",
+      "include": "file-tree-react\\.test\\.tsx$"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "/** @jsxImportSource react */",
+      "replace": "/** @jsxImportSource octane */"
+    },
+    {
+      "find": "from 'react';",
+      "replace": "from 'octane';"
+    },
+    {
+      "find": "from 'react-dom/client';",
+      "replace": "from 'octane';"
+    },
+    {
+      "find": "from 'react-dom/server';",
+      "replace": "from 'octane/server';"
+    },
+    {
+      "find": "'../src/react'",
+      "replace": "'../../src/index.ts'"
+    },
+    {
+      "find": "'../src/render/FileTree'",
+      "replace": "'@pierre/trees'"
+    },
+    {
+      "find": "import('../src')",
+      "replace": "import('@pierre/trees')"
+    }
+  ],
+  "files": [
+    {
+      "path": "LICENSE.md",
+      "gitBlob": "e2c2b06060d8fea2f1f5d744a99d58e5954975ee",
+      "size": 10899
+    },
+    {
+      "path": "NOTICE.md",
+      "gitBlob": "d20fdd9f74e096a94878634d2572fed53bc1f11c",
+      "size": 1754
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "c2ac160d9880bcca277db73ffad734f35d72caa5",
+      "size": 1931
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "f062b818500b84aa2f1d1da6dd832c3f8d65754f",
+      "size": 5726
+    },
+    {
+      "path": "src/react/FileTree.tsx",
+      "gitBlob": "3a88d30299317f9c5a167a05ceaae1ffc0b1637c",
+      "size": 7064
+    },
+    {
+      "path": "src/react/index.ts",
+      "gitBlob": "c530aeab7ef878117d21edb7ca217ee9708d0775",
+      "size": 436
+    },
+    {
+      "path": "src/react/jsx.d.ts",
+      "gitBlob": "f26c6e87471856c2f5ab268a499507ba85babf41",
+      "size": 287
+    },
+    {
+      "path": "src/react/useFileTree.ts",
+      "gitBlob": "9c4c7efdbaf9fdfcd6927dfafc1f72098dca8dfb",
+      "size": 1167
+    },
+    {
+      "path": "src/react/useFileTreeSearch.ts",
+      "gitBlob": "6fc19772ca5f8cdcbdb8f64869a2cc8dd05c8391",
+      "size": 1650
+    },
+    {
+      "path": "src/react/useFileTreeSelection.ts",
+      "gitBlob": "32f08b8d594fa845b6c93481a4d337eff18ee923",
+      "size": 342
+    },
+    {
+      "path": "src/react/useFileTreeSelector.ts",
+      "gitBlob": "3cc82ea56de037b154a2d3634ee791c51a4b32d2",
+      "size": 2468
+    },
+    {
+      "path": "test/file-tree-react.test.tsx",
+      "gitBlob": "6989b738aaba590623dc56422bfdb5e83388cffe",
+      "size": 29538
+    }
+  ],
+  "fingerprint": "d64b9597cb94aba8968bcfa2809eb0e0a802873b21b92db81daebb39263327f2"
+}

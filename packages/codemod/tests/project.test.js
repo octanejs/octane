@@ -275,6 +275,38 @@ describe('runCodemod', () => {
 		expect(result.missing).toEqual([]);
 	});
 
+	it('maps @pierre/trees/react to its binding and keeps the @pierre/trees core', async () => {
+		// T3 Code's shapes: the diff file tree reads a derived value through
+		// useFileTreeSelector; the file browser adds useFileTreeSearch. Both take
+		// types from the framework-neutral core.
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'src/DiffFileTree.tsx':
+				"import type { GitStatusEntry } from '@pierre/trees';\nimport { FileTree, useFileTree, useFileTreeSelector } from '@pierre/trees/react';\n\nexport function DiffFileTree({ paths, gitStatus }: { paths: string[]; gitStatus: GitStatusEntry[] }) {\n\tconst { model } = useFileTree({ paths, gitStatus, initialExpansion: 'open' });\n\tconst selected = useFileTreeSelector(model, (current) => current.getSelectedPaths().length);\n\treturn <FileTree model={model} aria-label={`${selected} selected`} />;\n}\n",
+			'src/FileBrowserPanel.tsx':
+				"import type { ContextMenuItem } from '@pierre/trees';\nimport { FileTree, useFileTree, useFileTreeSearch, useFileTreeSelector } from '@pierre/trees/react';\n\nexport function FileBrowserPanel({ paths }: { paths: string[]; onOpen?: (item: ContextMenuItem) => void }) {\n\tconst { model } = useFileTree({ paths, search: true });\n\tconst search = useFileTreeSearch(model);\n\tconst focused = useFileTreeSelector(model, (current) => current.getFocusedPath());\n\treturn (\n\t\t<div>\n\t\t\t<input value={search.value} onInput={(event) => search.setValue(event.currentTarget.value)} />\n\t\t\t<FileTree model={model} aria-label={focused ?? 'files'} className=\"min-h-0 flex-1\" />\n\t\t</div>\n\t);\n}\n",
+		});
+		const result = await runCodemod([root], { write: false });
+		const diffTree = result.files.find((file) => file.file === 'src/DiffFileTree.tsx');
+		const browser = result.files.find((file) => file.file === 'src/FileBrowserPanel.tsx');
+		expect(diffTree?.code).toContain(
+			"import { FileTree, useFileTree, useFileTreeSelector } from '@octanejs/pierre-trees';",
+		);
+		expect(browser?.code).toContain(
+			"import { FileTree, useFileTree, useFileTreeSearch, useFileTreeSelector } from '@octanejs/pierre-trees';",
+		);
+		for (const file of [diffTree, browser]) {
+			expect(file?.code).toContain("from '@pierre/trees';");
+			expect(file?.code).not.toContain("'@pierre/trees/react'");
+			expect(file?.code).not.toContain('No Octane port');
+			expect(file?.notes.filter((note) => note.rule === 'bindings')).toEqual([]);
+		}
+		expect(result.packages).toEqual([
+			{ from: '@pierre/trees/react', to: '@octanejs/pierre-trees' },
+		]);
+		expect(result.missing).toEqual([]);
+	});
+
 	it('maps @legendapp/list/react to its binding instead of reporting it unported', async () => {
 		// T3 Code's timeline shape: a typed LegendList with renderItem, scroll anchoring
 		// options and an imperative ref.

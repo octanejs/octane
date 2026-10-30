@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "project": "pierre-trees-adapted",
+  "roots": ["packages/pierre-trees/tests/upstream"],
+  "files": ["packages/pierre-trees/tests/upstream/file-tree-react.test.tsx"],
+  "tests": [
+    {
+      "id": "runtime:232e07f0185025f3",
+      "file": "packages/pierre-trees/tests/upstream/file-tree-react.test.tsx",
+      "fullName": "file-tree React lane baseline onOpen can close synchronously without leaving a stale React menu"
+    },
+    {
+      "id": "runtime:6b1ab6b37c45cebf",
+      "file": "packages/pierre-trees/tests/upstream/file-tree-react.test.tsx",
+      "fullName": "file-tree React lane bridges header and context-menu composition through the model surface"
+    },
+    {
+      "id": "runtime:c6e531e2faf4f139",
+      "file": "packages/pierre-trees/tests/upstream/file-tree-react.test.tsx",
+      "fullName": "file-tree React lane can remount the same model instance after unmount"
+    },
+    {
+      "id": "runtime:fa270040facefbfc",
+      "file": "packages/pierre-trees/tests/upstream/file-tree-react.test.tsx",
+      "fullName": "file-tree React lane header button clicks can mutate the model and focus the new item"
+    },
+    {
+      "id": "runtime:1fee62cba7c1857c",
+      "file": "packages/pierre-trees/tests/upstream/file-tree-react.test.tsx",
+      "fullName": "file-tree React lane hydrates colocated preloadedData and preserves live header interactions"
+    },
+    {
+      "id": "runtime:d4a0b809364851e0",
+      "file": "packages/pierre-trees/tests/upstream/file-tree-react.test.tsx",
+      "fullName": "file-tree React lane hydrates preloadedData without a client/server mismatch"
+    },
+    {
+      "id": "runtime:b1e2c9aac1e6605e",
+      "file": "packages/pierre-trees/tests/upstream/file-tree-react.test.tsx",
+      "fullName": "file-tree React lane keeps the model subscribed through StrictMode effect replay"
+    },
+    {
+      "id": "runtime:ee06faab0475d2a0",
+      "file": "packages/pierre-trees/tests/upstream/file-tree-react.test.tsx",
+      "fullName": "file-tree React lane preserves a model header composition when the wrapper does not override it"
+    },
+    {
+      "id": "runtime:698f60437cc61080",
+      "file": "packages/pierre-trees/tests/upstream/file-tree-react.test.tsx",
+      "fullName": "file-tree React lane renderContextMenu preserves baseline context-menu trigger settings and handlers"
+    },
+    {
+      "id": "runtime:576f23b3b6128c28",
+      "file": "packages/pierre-trees/tests/upstream/file-tree-react.test.tsx",
+      "fullName": "file-tree React lane renders a model-first tree and applies model mutations from React event handlers"
+    },
+    {
+      "id": "runtime:550a7d64fc7b6fd0",
+      "file": "packages/pierre-trees/tests/upstream/file-tree-react.test.tsx",
+      "fullName": "file-tree React lane restores a model header composition after a wrapper override unmounts"
+    },
+    {
+      "id": "runtime:880fdcddc3a8adf4",
+      "file": "packages/pierre-trees/tests/upstream/file-tree-react.test.tsx",
+      "fullName": "file-tree React lane search hook reacts to manual input in the tree search box"
+    },
+    {
+      "id": "runtime:8ef38bc5e68743ad",
+      "file": "packages/pierre-trees/tests/upstream/file-tree-react.test.tsx",
+      "fullName": "file-tree React lane selection and search hooks rerender from model updates"
+    },
+    {
+      "id": "runtime:fe7de6f35a46c696",
+      "file": "packages/pierre-trees/tests/upstream/file-tree-react.test.tsx",
+      "fullName": "file-tree React lane useFileTree cleans up the model when its owner unmounts"
+    }
+  ],
+  "snapshots": 0
+}

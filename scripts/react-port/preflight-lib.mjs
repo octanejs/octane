@@ -161,14 +161,18 @@ export function evaluateApprovedLicense({ manifestLicense, licenseFiles = [], no
 		}))
 		.sort((left, right) => left.path.localeCompare(right.path));
 	const reasons = [];
-	let approvedSpdx = null;
+	// SPDX matches license identifiers case-insensitively, so `apache-2.0` is
+	// `Apache-2.0`. Compound expressions and aliases still fail closed.
+	let approvedSpdx =
+		typeof manifestLicense === 'string'
+			? (APPROVED_LICENSE_IDENTIFIERS.find(
+					(identifier) => identifier.toLowerCase() === manifestLicense.toLowerCase(),
+				) ?? null)
+			: null;
 
 	if (typeof manifestLicense !== 'string' || !manifestLicense.trim()) {
 		reasons.push('The package manifest does not declare a license.');
-	} else if (APPROVED_LICENSE_IDENTIFIERS.includes(manifestLicense)) {
-		approvedSpdx = manifestLicense;
-		// Exact SPDX metadata is required; compound expressions and aliases fail closed.
-	} else {
+	} else if (approvedSpdx === null) {
 		const referencedFile = /^SEE LICENSE IN (.+)$/i.exec(manifestLicense)?.[1];
 		if (!referencedFile) {
 			reasons.push(
@@ -846,6 +850,22 @@ function commandPathPatterns(testScripts) {
 	);
 }
 
+// `bun test` has no config file of its own to discover. Moon workspaces declare
+// it as a task, in the package's moon.yml or a shared .moon/tasks file.
+async function declaresMoonBunTestTask(tree, scopePrefix, options) {
+	for (const entry of tree) {
+		if (
+			isGitHubRegularBlob(entry) &&
+			(entry.path === `${scopePrefix}moon.yml` ||
+				/^\.moon\/tasks\/[^/]+\.ya?ml$/.test(entry.path)) &&
+			/\bbun\s+test\b/.test((await fetchGitHubBlob(entry, options)).toString('utf8'))
+		) {
+			return true;
+		}
+	}
+	return false;
+}
+
 function propertyName(name) {
 	return is.isIdentifier(name) || is.isStringLiteralLikeNode(name) ? name.text : null;
 }
@@ -1071,13 +1091,13 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 	// jest.config: its discovery decides which files hold registrations.
 	const runner = Object.values(testScripts).some((command) => /\bbun\s+test\b/.test(command))
 		? 'bun'
-		: ['vitest', 'jest'].find(
+		: (['vitest', 'jest'].find(
 				(name) =>
 					Object.values(testScripts).some((command) => new RegExp(`\\b${name}\\b`).test(command)) ||
 					configurationEntries.some((entry) =>
 						path.posix.basename(entry.path).startsWith(`${name}.`),
 					),
-			);
+			) ?? ((await declaresMoonBunTestTask(tree, scopePrefix, options)) ? 'bun' : undefined));
 	const candidateEntries = tree.flatMap((entry) => {
 		if (!isGitHubRegularBlob(entry) || !entry.path.startsWith(scopePrefix)) return [];
 		if (configurationEntryPaths.has(entry.path)) return [];

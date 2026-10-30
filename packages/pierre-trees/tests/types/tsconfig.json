@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "esnext",
+    "target": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "skipLibCheck": false,
+    "types": [],
+    "noEmit": true,
+    "noErrorTruncation": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "allowImportingTsExtensions": true
+  },
+  "include": ["./**/*.test-d.ts"],
+  "reactPortEvidence": {
+    "gate": "public-types"
+  }
+}

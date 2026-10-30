@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "upstream-artifact/pierre-trees-1.0.0-beta.6.tgz",
+      "sha256": "2d086842ee5d51e594b816bd83f775218ccf14714b2dc1751fa494cd323c3e35"
+    }
+  ],
+  "requiredFiles": ["audit/upstream.lock.json"],
+  "filesEqual": [
+    { "path": "LICENSE.upstream", "equalsPath": "upstream/LICENSE.md" },
+    { "path": "NOTICE.upstream", "equalsPath": "upstream/NOTICE.md" }
+  ],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "@pierre/trees",
+    "version": "1.0.0-beta.6",
+    "license": "apache-2.0"
+  },
+  "unpublishedDirs": ["audit", "scripts", "tests", "typetests", "upstream", "upstream-artifact"]
+}
