@@ -26,9 +26,9 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/better-auth` | [`packages/better-auth`](../packages/better-auth) | framework binding | `0.0.20` | 1 |
 | `@octanejs/blocknote` | [`packages/blocknote`](../packages/blocknote) | framework binding | `0.1.12` | 2 |
 | `@octanejs/calendar` | [`packages/calendar`](../packages/calendar) | framework binding | `0.0.24` | 4 |
-| `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.3.0` | 4 |
+| `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.3.1` | 4 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.53` | 1 |
-| `@octanejs/codemod` | [`packages/codemod`](../packages/codemod) | developer tooling | `0.1.0` | 2 |
+| `@octanejs/codemod` | [`packages/codemod`](../packages/codemod) | developer tooling | `0.1.1` | 2 |
 | `@octanejs/colorful` | [`packages/colorful`](../packages/colorful) | framework binding | `0.0.33` | 1 |
 | `@octanejs/content-loader` | [`packages/content-loader`](../packages/content-loader) | framework binding | `0.0.23` | 2 |
 | `@octanejs/day-picker` | [`packages/day-picker`](../packages/day-picker) | framework binding | `0.0.34` | 12 |
@@ -44,7 +44,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/draggable` | [`packages/draggable`](../packages/draggable) | framework binding | `0.0.33` | 2 |
 | `@octanejs/drei` | [`packages/drei`](../packages/drei) | framework binding | `0.0.39` | 5 |
 | `@octanejs/dropzone` | [`packages/dropzone`](../packages/dropzone) | framework binding | `0.0.34` | 2 |
-| `@octanejs/effect-atom` | [`packages/effect-atom`](../packages/effect-atom) | framework binding | `0.0.0` | 6 |
+| `@octanejs/effect-atom` | [`packages/effect-atom`](../packages/effect-atom) | framework binding | `0.0.1` | 6 |
 | `@octanejs/electron` | [`packages/electron`](../packages/electron) | framework binding | `0.0.45` | 6 |
 | `@octanejs/email` | [`packages/email`](../packages/email) | framework binding | `0.0.19` | 1 |
 | `@octanejs/email-cli` | [`packages/email-cli`](../packages/email-cli) | framework binding | `0.0.19` | 2 |
@@ -67,7 +67,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/lucide` | [`packages/lucide`](../packages/lucide) | framework binding | `0.1.62` | 4 |
 | `@octanejs/mantine-hooks` | [`packages/mantine-hooks`](../packages/mantine-hooks) | framework binding | `0.1.48` | 1 |
 | `@octanejs/markdown` | [`packages/markdown`](../packages/markdown) | framework binding | `0.0.33` | 1 |
-| `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.3.7` | 3 |
+| `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.3.8` | 3 |
 | `@octanejs/mdx` | [`packages/mdx`](../packages/mdx) | framework binding | `0.1.68` | 4 |
 | `@octanejs/mobx` | [`packages/mobx`](../packages/mobx) | framework binding | `0.1.48` | 1 |
 | `@octanejs/monaco-editor` | [`packages/monaco-editor`](../packages/monaco-editor) | framework binding | `0.0.36` | 1 |
@@ -141,8 +141,8 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/xyflow` | [`packages/xyflow`](../packages/xyflow) | framework binding | `0.1.24` | 3 |
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.34` | 1 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.68` | 6 |
-| `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.19` | 1 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.16.4` | 49 |
+| `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.20` | 1 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.16.5` | 49 |
 
 ## Private packages
 
