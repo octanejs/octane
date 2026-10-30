@@ -1,5 +1,12 @@
 # @octanejs/cli
 
+## 0.3.2
+
+### Patch Changes
+
+- 0bdbad9: Check each migrated binding subpath against what the binding exports. An import such as `@base-ui/react/dialog` that the binding serves no longer reports a "check that it exists" warning, and one it does not serve, such as `zustand/middleware/immer`, is now an error naming the missing export. The CLI's binding catalog records each binding's export subpaths for this check.
+- 0bdbad9: Map `@daypicker/react`, react-day-picker v10's new package name, to `@octanejs/day-picker` in the binding catalog, so `@octanejs/codemod` rewrites its imports to the binding.
+
 ## 0.3.1
 
 ### Patch Changes
