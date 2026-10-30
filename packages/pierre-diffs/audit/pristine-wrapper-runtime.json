@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "pierre-diffs-pristine",
+  "roots": ["packages/pierre-diffs/tests"],
+  "files": ["packages/pierre-diffs/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:aab8696b18b0b628",
+      "file": "packages/pierre-diffs/tests/upstream-original.test.ts",
+      "fullName": "runs all pinned @pierre/diffs React runtime registrations unchanged"
+    }
+  ],
+  "snapshots": 0
+}

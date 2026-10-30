@@ -10,6 +10,8 @@ import {
 	ToggleApp,
 	FlipApp,
 	MemoPortalApp,
+	MemoPortalChildApp,
+	memoPortalChildRenders,
 	TextPortalFlip,
 	PortalCounter,
 } from './_fixtures/portal-value.tsrx';
@@ -136,6 +138,27 @@ describe('portal as a value (no host-element wrapper)', () => {
 			r.unmount();
 		});
 	});
+
+	for (const portalKey of [undefined, 'child']) {
+		it(`skips a memo()'d portal child whose re-created element has equal props (portal key: ${portalKey})`, () => {
+			withTarget((target) => {
+				memoPortalChildRenders.length = 0;
+				const r = mount(MemoPortalChildApp, { target, portalKey });
+				expect(memoPortalChildRenders).toEqual(['a']);
+
+				r.click('.b-bump');
+				expect(r.find('.b-bump').textContent).toBe('1');
+				expect(memoPortalChildRenders).toEqual(['a']);
+
+				// Changed props still render the child.
+				r.click('.b-relabel');
+				expect(memoPortalChildRenders).toEqual(['a', 'a!']);
+				expect(target.querySelector('.memo-child')!.textContent).toBe('a!');
+				r.unmount();
+				expect(target.querySelector('.memo-child')).toBe(null);
+			});
+		});
+	}
 
 	it('tears the portal down when an inline text hole flips from a portal to a primitive', () => {
 		withTarget((target) => {

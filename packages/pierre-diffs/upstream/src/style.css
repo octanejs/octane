@@ -1,0 +1,1866 @@
+@layer base, theme, rendered, unsafe;
+
+@layer base {
+  :host {
+    --diffs-font-fallback:
+      'SF Mono', Monaco, Consolas, 'Ubuntu Mono', 'Liberation Mono',
+      'Courier New', monospace;
+    --diffs-header-font-fallback:
+      system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+      'Noto Sans', 'Liberation Sans', Arial, sans-serif;
+
+    --diffs-mixer: light-dark(black, white);
+    --diffs-gap-fallback: 8px;
+    --diffs-scrollbar-gutter-fallback: 6px;
+    --diffs-scrollbar-gutter: var(
+      --diffs-scrollbar-gutter-override,
+      var(
+        --diffs-scrollbar-gutter-measured,
+        var(--diffs-scrollbar-gutter-fallback)
+      )
+    );
+
+    --diffs-added-light: #0dbe4e;
+    --diffs-added-dark: #5ecc71;
+    --diffs-modified-light: #009fff;
+    --diffs-modified-dark: #69b1ff;
+    --diffs-deleted-light: #ff2e3f;
+    --diffs-deleted-dark: #ff6762;
+    --diffs-warning-light: #d5a910;
+    --diffs-warning-dark: #ffd452;
+
+    /*
+    // Available CSS Color Overrides
+    --diffs-bg-buffer-override
+    --diffs-bg-hover-override
+    --diffs-bg-context-override
+    --diffs-bg-context-gutter-override
+    --diffs-bg-separator-override
+    --diffs-bg-caret-override
+
+    --diffs-fg-number-override
+    --diffs-fg-number-addition-override
+    --diffs-fg-number-deletion-override
+    --diffs-fg-conflict-marker-override
+
+    --diffs-deletion-color-override
+    --diffs-addition-color-override
+    --diffs-modified-color-override
+
+    --diffs-bg-deletion-override
+    --diffs-bg-deletion-number-override
+    --diffs-bg-deletion-emphasis-override
+
+    --diffs-bg-addition-override
+    --diffs-bg-addition-number-override
+    --diffs-bg-addition-emphasis-override
+
+    --conflict-bg-current-override
+    --conflict-bg-current-number-override
+    --conflict-bg-current-header-override
+    --conflict-bg-incoming-override
+    --conflict-bg-incoming-number-override
+    --conflict-bg-incoming-header-override
+
+    // Line Selection Color Overrides (for enableLineSelection)
+    --diffs-selection-color-override
+    --diffs-bg-selection-override
+    --diffs-bg-selection-number-override
+
+    // Available CSS Layout Overrides
+    --diffs-gap-inline
+    --diffs-gap-block
+    --diffs-gap-style
+    --diffs-scrollbar-gutter-override
+    --diffs-tab-size
+    --diffs-popover-gap (edit mode: inset for edge-clamped popovers)
+    */
+
+    color-scheme: light dark;
+    display: block;
+    font-family: var(
+      --diffs-header-font-family,
+      var(--diffs-header-font-fallback)
+    );
+    font-size: var(--diffs-font-size, 13px);
+    line-height: var(--diffs-line-height, 20px);
+    font-feature-settings: var(--diffs-font-features);
+
+    /* NOTE(amadeus): we cannot use 'in oklch' because current versions of cursor
+     * and vscode use an older build of chrome that appears to have a bug with
+     * color-mix and 'in oklch', so use 'in lab' instead */
+    --diffs-bg: light-dark(
+      var(--diffs-light-bg, #fff),
+      var(--diffs-dark-bg, #000)
+    );
+    --diffs-bg-buffer: var(
+      --diffs-bg-buffer-override,
+      light-dark(
+        color-mix(in lab, var(--diffs-bg) 92%, var(--diffs-mixer)),
+        color-mix(in lab, var(--diffs-bg) 92%, var(--diffs-mixer))
+      )
+    );
+    --diffs-bg-context: var(
+      --diffs-bg-context-override,
+      light-dark(
+        color-mix(in lab, var(--diffs-bg) 98.5%, var(--diffs-mixer)),
+        color-mix(in lab, var(--diffs-bg) 92.5%, var(--diffs-mixer))
+      )
+    );
+    --diffs-bg-context-gutter: var(
+      --diffs-bg-context-gutter-override,
+      light-dark(
+        color-mix(in lab, var(--diffs-bg-context) 90%, var(--diffs-bg)),
+        color-mix(in lab, var(--diffs-bg-context) 45%, var(--diffs-bg))
+      )
+    );
+    --diffs-bg-separator: var(
+      --diffs-bg-separator-override,
+      light-dark(
+        color-mix(in lab, var(--diffs-bg) 96%, var(--diffs-mixer)),
+        color-mix(in lab, var(--diffs-bg) 85%, var(--diffs-mixer))
+      )
+    );
+
+    --diffs-fg: light-dark(var(--diffs-light, #000), var(--diffs-dark, #fff));
+    --diffs-fg-number: var(
+      --diffs-fg-number-override,
+      light-dark(
+        color-mix(in lab, var(--diffs-fg) 65%, var(--diffs-bg)),
+        color-mix(in lab, var(--diffs-fg) 65%, var(--diffs-bg))
+      )
+    );
+    --diffs-fg-conflict-marker: var(
+      --diffs-fg-conflict-marker-override,
+      var(--diffs-fg-number)
+    );
+
+    --diffs-deletion-base: var(
+      --diffs-deletion-color-override,
+      light-dark(
+        var(
+          --diffs-light-deletion-color,
+          var(--diffs-deletion-color, var(--diffs-deleted-light))
+        ),
+        var(
+          --diffs-dark-deletion-color,
+          var(--diffs-deletion-color, var(--diffs-deleted-dark))
+        )
+      )
+    );
+    --diffs-addition-base: var(
+      --diffs-addition-color-override,
+      light-dark(
+        var(
+          --diffs-light-addition-color,
+          var(--diffs-addition-color, var(--diffs-added-light))
+        ),
+        var(
+          --diffs-dark-addition-color,
+          var(--diffs-addition-color, var(--diffs-added-dark))
+        )
+      )
+    );
+    --diffs-modified-base: var(
+      --diffs-modified-color-override,
+      light-dark(
+        var(
+          --diffs-light-modified-color,
+          var(--diffs-modified-color, var(--diffs-modified-light))
+        ),
+        var(
+          --diffs-dark-modified-color,
+          var(--diffs-modified-color, var(--diffs-modified-dark))
+        )
+      )
+    );
+
+    /* NOTE(amadeus): we cannot use 'in oklch' because current versions of cursor
+   * and vscode use an older build of chrome that appears to have a bug with
+   * color-mix and 'in oklch', so use 'in lab' instead */
+    --diffs-bg-deletion: var(
+      --diffs-bg-deletion-override,
+      light-dark(
+        color-mix(in lab, var(--diffs-bg) 88%, var(--diffs-deletion-base)),
+        color-mix(in lab, var(--diffs-bg) 80%, var(--diffs-deletion-base))
+      )
+    );
+    --diffs-bg-deletion-emphasis: var(
+      --diffs-bg-deletion-emphasis-override,
+      light-dark(
+        rgb(from var(--diffs-deletion-base) r g b / 0.15),
+        rgb(from var(--diffs-deletion-base) r g b / 0.2)
+      )
+    );
+
+    --diffs-bg-addition: var(
+      --diffs-bg-addition-override,
+      light-dark(
+        color-mix(in lab, var(--diffs-bg) 88%, var(--diffs-addition-base)),
+        color-mix(in lab, var(--diffs-bg) 80%, var(--diffs-addition-base))
+      )
+    );
+    --diffs-bg-addition-emphasis: var(
+      --diffs-bg-addition-emphasis-override,
+      light-dark(
+        rgb(from var(--diffs-addition-base) r g b / 0.15),
+        rgb(from var(--diffs-addition-base) r g b / 0.2)
+      )
+    );
+
+    --diffs-selection-base: var(--diffs-modified-base);
+    --diffs-selection-number-fg: light-dark(
+      color-mix(in lab, var(--diffs-selection-base) 65%, var(--diffs-mixer)),
+      color-mix(in lab, var(--diffs-selection-base) 75%, var(--diffs-mixer))
+    );
+    background-color: var(--diffs-bg);
+    color: var(--diffs-fg);
+  }
+
+  /* NOTE(mdo): Some semantic HTML elements (e.g. `pre`, `code`) have default
+ * user-agent styles. These must be overridden to use our custom styles. */
+  pre,
+  code,
+  [data-error-wrapper] {
+    isolation: isolate;
+    margin: 0;
+    padding: 0;
+    display: block;
+    outline: none;
+    font-family: var(--diffs-font-family, var(--diffs-font-fallback));
+  }
+
+  pre,
+  code {
+    background-color: var(--diffs-bg);
+  }
+
+  code {
+    contain: content;
+  }
+
+  input,
+  button {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  [data-icon-sprite] {
+    display: none;
+  }
+
+  /* NOTE(mdo): Headers and separators are within pre/code, so we need to reset
+   * their font-family explicitly. */
+  [data-diffs-header],
+  [data-separator] {
+    font-family: var(
+      --diffs-header-font-family,
+      var(--diffs-header-font-fallback)
+    );
+  }
+
+  [data-diffs-header][data-sticky] {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: var(--diffs-bg);
+  }
+
+  [data-file-info] {
+    padding: 10px;
+    font-weight: 700;
+    color: var(--fg);
+    /* NOTE(amadeus): we cannot use 'in oklch' because current versions of cursor
+   * and vscode use an older build of chrome that appears to have a bug with
+   * color-mix and 'in oklch', so use 'in lab' instead */
+    background-color: color-mix(in lab, var(--bg) 98%, var(--fg));
+    border-block: 1px solid color-mix(in lab, var(--bg) 95%, var(--fg));
+  }
+
+  [data-diff],
+  [data-file] {
+    /* This feels a bit crazy to me... so I need to think about it a bit more... */
+    --diffs-grid-number-column-width: minmax(min-content, max-content);
+    --diffs-code-grid: var(--diffs-grid-number-column-width) 1fr;
+
+    &[data-dehydrated] {
+      --diffs-code-grid: var(--diffs-grid-number-column-width) minmax(0, 1fr);
+    }
+
+    &:hover [data-code]::-webkit-scrollbar-thumb {
+      background-color: var(--diffs-bg-context);
+    }
+  }
+
+  /* iOS WebKit uses overlay scrollbars, so unmeasured layout compensation
+   * should start at zero rather than the desktop custom-scrollbar fallback. */
+  @supports (-webkit-touch-callout: none) {
+    :host {
+      --diffs-scrollbar-gutter-fallback: 0px;
+    }
+  }
+
+  [data-line] span,
+  [data-edit-prediction-suffix] span {
+    color: light-dark(
+      var(--diffs-token-light, var(--diffs-light)),
+      var(--diffs-token-dark, var(--diffs-dark))
+    );
+    background-color: light-dark(
+      var(--diffs-token-light-bg, inherit),
+      var(--diffs-token-dark-bg, inherit)
+    );
+  }
+
+  /* Line Color and BG Calculations */
+  [data-line],
+  [data-gutter-buffer],
+  [data-column-number],
+  [data-line-annotation],
+  [data-no-newline],
+  [data-merge-conflict],
+  [data-merge-conflict-actions],
+  [data-editor-overlay] {
+    /* Pre-fill css variables for appropriate up-mixing */
+    --diffs-computed-decoration-bg: var(--diffs-bg);
+    --diffs-computed-diff-line-bg: var(--diffs-computed-decoration-bg);
+    --diffs-computed-selected-line-bg: var(--diffs-computed-diff-line-bg);
+    --diffs-computed-editor-active-line-bg: var(
+      --diffs-computed-selected-line-bg
+    );
+    --diffs-computed-hovered-line-bg: var(
+      --diffs-computed-editor-active-line-bg
+    );
+
+    --diffs-hover-mix-target: var(
+      --diffs-bg-hover-override,
+      var(--diffs-mixer)
+    );
+    --diffs-line-bg: var(--diffs-computed-hovered-line-bg);
+
+    color: var(--diffs-fg);
+    background-color: var(--diffs-line-bg, var(--diffs-bg));
+  }
+
+  [data-line],
+  [data-no-newline] {
+    &[data-decoration-bg] {
+      --mix-deco-light: 92%;
+      --mix-deco-dark: 85%;
+
+      &[data-decoration-bg-depth='2'] {
+        --mix-deco-light: 88%;
+        --mix-deco-dark: 80%;
+      }
+
+      &[data-decoration-bg-depth='3'] {
+        --mix-deco-light: 85%;
+        --mix-deco-dark: 78%;
+      }
+
+      --diffs-hover-mix-target: var(--diffs-decoration-bg);
+
+      --diffs-computed-decoration-bg: light-dark(
+        color-mix(
+          in lab,
+          var(--diffs-bg) var(--mix-deco-light),
+          var(--diffs-decoration-bg)
+        ),
+        color-mix(
+          in lab,
+          var(--diffs-bg) var(--mix-deco-dark),
+          var(--diffs-decoration-bg)
+        )
+      );
+    }
+  }
+
+  [data-line-annotation],
+  [data-gutter-buffer='annotation'] {
+    --diffs-annotation-bg: var(--diffs-bg-context);
+    --diffs-computed-decoration-bg: var(--diffs-annotation-bg);
+    --diffs-hover-mix-target: var(--diffs-computed-editor-active-line-bg);
+  }
+
+  [data-merge-conflict-actions],
+  [data-gutter-buffer='merge-conflict-action'],
+  [data-gutter-buffer='merge-conflict-marker-base'],
+  [data-gutter-buffer='merge-conflict-marker-separator'],
+  [data-merge-conflict='marker-base'],
+  [data-merge-conflict='marker-separator'] {
+    --diffs-computed-decoration-bg: var(--diffs-bg-context);
+    --diffs-hover-mix-target: var(--diffs-computed-editor-active-line-bg);
+  }
+
+  [data-gutter-buffer='merge-conflict-marker-start'],
+  [data-merge-conflict='marker-start'] {
+    --diffs-computed-decoration-bg: light-dark(
+      color-mix(
+        in lab,
+        var(--diffs-bg) 78%,
+        var(--conflict-bg-current-header-override, var(--diffs-addition-base))
+      ),
+      color-mix(
+        in lab,
+        var(--diffs-bg) 68%,
+        var(--conflict-bg-current-header-override, var(--diffs-addition-base))
+      )
+    );
+    --diffs-hover-mix-target: var(--diffs-computed-editor-active-line-bg);
+  }
+
+  [data-gutter-buffer='merge-conflict-marker-end'],
+  [data-merge-conflict='marker-end'] {
+    --diffs-computed-decoration-bg: light-dark(
+      color-mix(
+        in lab,
+        var(--diffs-bg) 78%,
+        var(--conflict-bg-incoming-header-override, var(--diffs-modified-base))
+      ),
+      color-mix(
+        in lab,
+        var(--diffs-bg) 68%,
+        var(--conflict-bg-incoming-header-override, var(--diffs-modified-base))
+      )
+    );
+    --diffs-hover-mix-target: var(--diffs-computed-editor-active-line-bg);
+  }
+
+  [data-has-merge-conflict] [data-line-annotation],
+  [data-has-merge-conflict] [data-gutter-buffer='annotation'] {
+    --diffs-computed-decoration-bg: var(--diffs-bg);
+    --diffs-hover-mix-target: var(--diffs-computed-editor-active-line-bg);
+  }
+
+  /* We are using where here to not affect the nesting impacts later on for
+   * hover and selection */
+  :where([data-background]) {
+    [data-gutter-buffer],
+    [data-column-number] {
+      --mix-light: 91%;
+      --mix-dark: 85%;
+    }
+
+    [data-line],
+    [data-no-newline] {
+      --mix-light: 88%;
+      --mix-dark: 80%;
+    }
+
+    [data-gutter-buffer],
+    [data-column-number],
+    [data-line],
+    [data-no-newline] {
+      --diffs-diff-line-mix-target: var(--diffs-bg);
+
+      &[data-line-type='change-deletion'] {
+        --diffs-diff-line-mix-target: var(
+          --diffs-bg-deletion-override,
+          var(--diffs-deletion-base)
+        );
+        --diffs-hover-mix-target: var(--diffs-diff-line-mix-target);
+
+        &:where([data-gutter-buffer], [data-column-number]) {
+          color: var(
+            --diffs-fg-number-deletion-override,
+            var(--diffs-deletion-base)
+          );
+
+          --diffs-diff-line-mix-target: var(
+            --diffs-bg-deletion-number-override,
+            var(--diffs-deletion-base)
+          );
+        }
+
+        --diffs-computed-diff-line-bg: light-dark(
+          color-mix(
+            in lab,
+            var(--diffs-computed-decoration-bg) var(--mix-light),
+            var(--diffs-diff-line-mix-target)
+          ),
+          color-mix(
+            in lab,
+            var(--diffs-computed-decoration-bg) var(--mix-dark),
+            var(--diffs-diff-line-mix-target)
+          )
+        );
+      }
+
+      &[data-line-type='change-addition'] {
+        --diffs-diff-line-mix-target: var(
+          --diffs-bg-addition-override,
+          var(--diffs-addition-base)
+        );
+        --diffs-hover-mix-target: var(--diffs-diff-line-mix-target);
+
+        &:where([data-gutter-buffer], [data-column-number]) {
+          color: var(
+            --diffs-fg-number-addition-override,
+            var(--diffs-addition-base)
+          );
+
+          --diffs-diff-line-mix-target: var(
+            --diffs-bg-addition-number-override,
+            var(--diffs-addition-base)
+          );
+        }
+
+        --diffs-computed-diff-line-bg: light-dark(
+          color-mix(
+            in lab,
+            var(--diffs-computed-decoration-bg) var(--mix-light),
+            var(--diffs-diff-line-mix-target)
+          ),
+          color-mix(
+            in lab,
+            var(--diffs-computed-decoration-bg) var(--mix-dark),
+            var(--diffs-diff-line-mix-target)
+          )
+        );
+      }
+
+      &[data-merge-conflict='current'] {
+        --diffs-diff-line-mix-target: var(
+          --conflict-bg-current-override,
+          var(--diffs-addition-base)
+        );
+        --diffs-hover-mix-target: var(--diffs-diff-line-mix-target);
+
+        &:where([data-gutter-buffer], [data-column-number]) {
+          color: var(
+            --diffs-fg-number-addition-override,
+            var(--diffs-addition-base)
+          );
+
+          --diffs-diff-line-mix-target: var(
+            --conflict-bg-current-number-override,
+            var(--diffs-addition-base)
+          );
+        }
+
+        --diffs-computed-diff-line-bg: light-dark(
+          color-mix(
+            in lab,
+            var(--diffs-computed-decoration-bg) var(--mix-light),
+            var(--diffs-diff-line-mix-target)
+          ),
+          color-mix(
+            in lab,
+            var(--diffs-computed-decoration-bg) var(--mix-dark),
+            var(--diffs-diff-line-mix-target)
+          )
+        );
+      }
+
+      &[data-merge-conflict='incoming'] {
+        --diffs-diff-line-mix-target: var(
+          --conflict-bg-incoming-override,
+          var(--diffs-modified-base)
+        );
+        --diffs-hover-mix-target: var(--diffs-diff-line-mix-target);
+
+        &:where([data-gutter-buffer], [data-column-number]) {
+          color: var(--diffs-modified-base);
+
+          --diffs-diff-line-mix-target: var(
+            --conflict-bg-incoming-number-override,
+            var(--diffs-modified-base)
+          );
+        }
+
+        --diffs-computed-diff-line-bg: light-dark(
+          color-mix(
+            in lab,
+            var(--diffs-computed-decoration-bg) var(--mix-light),
+            var(--diffs-diff-line-mix-target)
+          ),
+          color-mix(
+            in lab,
+            var(--diffs-computed-decoration-bg) var(--mix-dark),
+            var(--diffs-diff-line-mix-target)
+          )
+        );
+      }
+    }
+  }
+
+  /* Order is important for rationalizing these selectors and for order of
+   * application, therefore we need to disable this style-lint rule */
+  /* stylelint-disable-next-line no-duplicate-selectors */
+  [data-gutter-buffer],
+  [data-column-number],
+  [data-line],
+  [data-line-annotation],
+  [data-merge-conflict],
+  [data-merge-conflict-actions],
+  [data-no-newline],
+  [data-editor-overlay] {
+    --diffs-selection-mix-target: var(
+      --diffs-bg-selection-override,
+      var(--diffs-selection-base)
+    );
+    --diffs-selection-emphasis-mix-target: var(--diffs-selection-mix-target);
+
+    &:where([data-editor-overlay]),
+    &:where(
+        [data-line],
+        [data-line-annotation],
+        [data-merge-conflict],
+        [data-merge-conflict-actions],
+        [data-no-newline]
+      )[data-selected-line] {
+      --mix-selection-light: 82%;
+      --mix-selection-dark: 75%;
+      --diffs-hover-mix-target: var(--diffs-selection-mix-target);
+    }
+
+    &:where(
+      [data-gutter-buffer][data-selected-line],
+      [data-column-number]:is([data-selected-line], [data-editor-active-line])
+    ) {
+      --mix-selection-light: 75%;
+      --mix-selection-dark: 60%;
+      --diffs-selection-mix-target: var(
+        --diffs-bg-selection-number-override,
+        var(--diffs-selection-base)
+      );
+      --diffs-hover-mix-target: var(--diffs-selection-mix-target);
+    }
+
+    /* Keep the light-theme emphasis on a selected changed line tied to its
+     * resolved diff and selection colors. */
+    &:where([data-line][data-selected-line]):is(
+        [data-line-type='change-addition'],
+        [data-line-type='change-deletion']
+      ) {
+      --diffs-selection-emphasis-mix-target: light-dark(
+        color-mix(
+          in lab,
+          var(--diffs-diff-line-mix-target, var(--diffs-selection-mix-target))
+            var(--mix-selection-light),
+          var(--diffs-selection-mix-target)
+        ),
+        var(--diffs-selection-mix-target)
+      );
+    }
+
+    &:where([data-editor-overlay]),
+    &[data-selected-line] {
+      --diffs-computed-selected-line-bg: light-dark(
+        color-mix(
+          in lab,
+          var(--diffs-computed-diff-line-bg) var(--mix-selection-light),
+          var(--diffs-selection-mix-target)
+        ),
+        color-mix(
+          in lab,
+          var(--diffs-computed-diff-line-bg) var(--mix-selection-dark),
+          var(--diffs-selection-mix-target)
+        )
+      );
+    }
+  }
+
+  /* The editor's active line sits above selection, but hover remains the final
+   * line-background treatment. */
+  [data-line][data-editor-active-line],
+  [data-column-number][data-editor-active-line] {
+    --diffs-computed-editor-active-line-bg: color-mix(
+      in lab,
+      var(--diffs-computed-selected-line-bg)
+        var(--diffs-editor-active-line-source-mix, 100%),
+      var(--diffs-selection-emphasis-mix-target)
+    );
+  }
+
+  @media (pointer: fine) {
+    [data-line][data-hovered],
+    [data-gutter-buffer][data-hovered],
+    [data-column-number][data-hovered],
+    [data-line-annotation][data-hovered],
+    [data-no-newline][data-hovered],
+    [data-merge-conflict][data-hovered],
+    [data-merge-conflict-actions][data-hovered],
+    [data-editor-overlay][data-hovered] {
+      --diffs-computed-hovered-line-bg: light-dark(
+        color-mix(
+          in lab,
+          var(--diffs-computed-editor-active-line-bg) 97%,
+          var(--diffs-hover-mix-target)
+        ),
+        color-mix(
+          in lab,
+          var(--diffs-computed-editor-active-line-bg) 91%,
+          var(--diffs-hover-mix-target)
+        )
+      );
+    }
+  }
+
+  [data-gutter-buffer][data-selected-line],
+  [data-column-number]:is([data-selected-line], [data-editor-active-line]) {
+    color: var(--diffs-selection-number-fg);
+  }
+
+  [data-no-newline] {
+    user-select: none;
+
+    span {
+      opacity: 0.6;
+    }
+  }
+
+  [data-diff-type='split'][data-overflow='scroll'] {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+
+    [data-additions] {
+      border-left: 1px solid var(--diffs-bg);
+    }
+
+    [data-deletions] {
+      border-right: 1px solid var(--diffs-bg);
+    }
+  }
+
+  [data-code] {
+    display: grid;
+    grid-auto-flow: dense;
+    grid-template-columns: var(--diffs-code-grid);
+    overflow: var(--diffs-overflow-override, scroll) clip;
+    overscroll-behavior-x: none;
+    tab-size: var(--diffs-tab-size, 2);
+    align-self: flex-start;
+    padding-top: var(--diffs-gap-block, var(--diffs-gap-fallback));
+    padding-bottom: max(
+      0px,
+      calc(
+        var(--diffs-gap-block, var(--diffs-gap-fallback)) -
+          var(--diffs-scrollbar-gutter)
+      )
+    );
+    scrollbar-gutter: stable;
+  }
+
+  [data-diffs-scrollbar-measure] {
+    position: absolute;
+    top: -200px;
+    left: -200px;
+    opacity: 0;
+    pointer-events: none;
+    width: 100px;
+    height: 100px;
+    padding: 0;
+    grid-template-columns: none;
+    scrollbar-gutter: auto;
+  }
+
+  [data-container-size] {
+    container-type: inline-size;
+  }
+
+  [data-code]::-webkit-scrollbar {
+    width: 0;
+    height: var(--diffs-scrollbar-gutter);
+  }
+
+  [data-code]::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  [data-code]::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border: 1px solid transparent;
+    background-clip: content-box;
+    border-radius: 3px;
+  }
+
+  [data-code]::-webkit-scrollbar-corner {
+    background-color: transparent;
+  }
+
+  /*
+   * If we apply these rules globally it will mean that webkit will opt into the
+   * standards compliant version of custom css scrollbars, which we do not want
+   * because the custom stuff will look better
+  */
+  @supports (-moz-appearance: none) {
+    [data-code] {
+      scrollbar-width: thin;
+      scrollbar-color: var(--diffs-bg-context) transparent;
+      padding-bottom: var(--diffs-gap-block, var(--diffs-gap-fallback));
+    }
+  }
+
+  [data-diffs-header] ~ [data-diff],
+  [data-diffs-header] ~ [data-file] {
+    [data-code],
+    &[data-overflow='wrap'],
+    &[data-dehydrated][data-diff-type='split'][data-overflow='scroll'] {
+      padding-top: 0;
+    }
+  }
+
+  [data-gutter] {
+    display: grid;
+    grid-template-rows: subgrid;
+    grid-template-columns: subgrid;
+    grid-column: 1;
+    z-index: 3;
+    position: relative;
+    background-color: var(--diffs-bg);
+
+    [data-gutter-buffer],
+    [data-column-number] {
+      border-right: var(--diffs-gap-style, 2px solid var(--diffs-bg));
+    }
+  }
+
+  [data-content] {
+    display: grid;
+    grid-template-rows: subgrid;
+    grid-template-columns: subgrid;
+    grid-column: 2;
+    min-width: 0;
+    background-color: var(--diffs-bg);
+  }
+
+  /* Keep per-row selectors outside this guard: :has would rescan the columns
+   * for every row. */
+  [data-overflow='scroll']:not(
+      [data-dehydrated],
+      [data-custom-styles],
+      :has(
+        > [data-code] > [contenteditable],
+        > [data-code]
+          > *
+          > :is(
+            [data-line-annotation],
+            [data-separator],
+            [data-merge-conflict],
+            [data-merge-conflict-actions]
+          )
+      )
+    )
+    > [data-code] {
+    display: flex;
+
+    > [data-gutter] {
+      display: block;
+      flex-shrink: 0;
+    }
+
+    > [data-content] {
+      display: block;
+      flex: 1 0 max-content;
+    }
+  }
+
+  /* Both split layouts that share one grid across the two columns: wrap
+   * always, and scroll while dehydrated. Scroll mode normally renders each
+   * column as its own scroll container, where paired annotation rows only get
+   * equal heights once the resize manager measures them — before hydration
+   * that measurement hasn't run, so the side hosting the annotation content
+   * would be taller and the rows below it would shift on hydration. The
+   * shared grid gives paired rows equal heights in pure CSS; the dehydrated
+   * scroll variant keeps nowrap text and clips horizontal overflow until
+   * hydration swaps in the real scroll containers. */
+  [data-diff-type='split'][data-overflow='wrap'],
+  [data-dehydrated][data-diff-type='split'][data-overflow='scroll'] {
+    display: grid;
+    grid-auto-flow: dense;
+    grid-template-columns: repeat(2, var(--diffs-code-grid));
+    padding-block: var(--diffs-gap-block, var(--diffs-gap-fallback));
+
+    [data-code] {
+      display: contents;
+    }
+
+    [data-deletions] {
+      [data-gutter] {
+        grid-column: 1;
+      }
+
+      [data-content] {
+        grid-column: 2;
+        border-right: 1px solid var(--diffs-bg);
+      }
+    }
+
+    [data-additions] {
+      [data-gutter] {
+        grid-column: 3;
+        border-left: 1px solid var(--diffs-bg);
+      }
+
+      [data-content] {
+        grid-column: 4;
+      }
+    }
+  }
+
+  [data-dehydrated][data-diff-type='split'][data-overflow='scroll']
+    [data-content] {
+    overflow: clip;
+  }
+
+  [data-overflow='scroll'] [data-gutter] {
+    position: sticky;
+    left: 0;
+  }
+
+  [data-interactive-lines] [data-line] {
+    cursor: pointer;
+  }
+
+  [data-interactive-line-numbers] [data-column-number] {
+    cursor: pointer;
+    touch-action: none;
+  }
+
+  [data-content-buffer],
+  [data-gutter-buffer] {
+    position: relative;
+    user-select: none;
+    min-height: 1lh;
+  }
+
+  [data-gutter-buffer] {
+    padding-left: 2ch;
+    padding-right: 1ch;
+
+    &::before {
+      content: '';
+      display: block;
+      min-width: var(
+        --diffs-min-number-column-width,
+        var(--diffs-min-number-column-width-default, 3ch)
+      );
+    }
+  }
+
+  [data-gutter-buffer='annotation'] {
+    --diffs-annotation-bg: var(--diffs-bg-context-gutter);
+    min-height: 0;
+  }
+
+  [data-gutter-buffer='buffer'] {
+    --diffs-line-bg: var(--diffs-bg-context-gutter);
+  }
+
+  [data-content-buffer] {
+    grid-column: 1;
+    /* We multiply by 1.414 (√2) to better approximate the diagonal repeat distance */
+    background-size: 8px 8px;
+    background-position: 5px 0;
+    background-origin: border-box;
+    /* This is incredibley expensive... */
+    background-image: repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent calc(3px * 1.414),
+      var(--diffs-bg-buffer) calc(3px * 1.414),
+      var(--diffs-bg-buffer) calc(4px * 1.414)
+    );
+  }
+
+  /* Hunk Separators */
+  /* --------------- */
+  [data-separator] {
+    box-sizing: content-box;
+    background-color: var(--diffs-bg);
+  }
+
+  [data-separator='simple'] {
+    min-height: 4px;
+  }
+
+  [data-separator='line-info'],
+  [data-separator='line-info-basic'],
+  [data-separator='metadata'],
+  [data-separator='simple'] {
+    background-color: var(--diffs-bg-separator);
+  }
+
+  [data-separator='line-info'],
+  [data-separator='line-info-basic'],
+  [data-separator='metadata'] {
+    height: 32px;
+    position: relative;
+  }
+
+  [data-separator-wrapper] {
+    user-select: none;
+    fill: currentColor;
+    position: absolute;
+    inset-inline: 0;
+    display: flex;
+    align-items: center;
+    background-color: var(--diffs-bg);
+    height: 100%;
+  }
+
+  [data-content] [data-separator-wrapper] {
+    display: none;
+  }
+
+  [data-separator='metadata'] [data-separator-wrapper] {
+    inset-inline: 100% auto;
+    padding-inline: 1ch;
+    height: 100%;
+    background-color: var(--diffs-bg-separator);
+    color: var(--diffs-fg-number);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: min-content;
+  }
+
+  [data-separator='line-info'] {
+    margin-block: var(--diffs-gap-block, var(--diffs-gap-fallback));
+
+    [data-separator-wrapper] {
+      min-width: 16px;
+    }
+  }
+
+  [data-separator='line-info-basic'],
+  [data-separator='metadata'] {
+    margin-block: 0;
+  }
+
+  [data-separator='line-info'][data-separator-first] {
+    margin-top: 0;
+  }
+
+  [data-separator='line-info'][data-separator-last] {
+    margin-bottom: 0;
+  }
+
+  [data-expand-index] [data-separator-wrapper] {
+    display: grid;
+    grid-template-columns: 32px auto;
+  }
+
+  [data-expand-index] [data-separator-wrapper][data-separator-multi-button] {
+    grid-template-columns: 32px 32px auto;
+  }
+
+  [data-expand-button],
+  [data-separator-content] {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    background-color: var(--diffs-bg-separator);
+  }
+
+  [data-expand-index] [data-separator-content]:hover {
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  [data-expand-button] {
+    justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+    min-width: 32px;
+    align-self: stretch;
+    color: var(--diffs-fg-number);
+    border-right: 2px solid var(--diffs-bg);
+
+    &:hover {
+      color: var(--diffs-fg);
+    }
+
+    &[data-expand-all-button] {
+      display: none;
+    }
+  }
+
+  [data-expand-down] [data-icon] {
+    transform: scaleY(-1);
+  }
+
+  [data-separator-content] {
+    flex: 1 1 auto;
+    padding: 0 1ch;
+    height: 100%;
+    color: var(--diffs-fg-number);
+
+    overflow: hidden;
+    justify-content: flex-start;
+  }
+
+  [data-separator='line-info'],
+  [data-separator='line-info-basic'] {
+    [data-separator-content] {
+      height: 100%;
+      user-select: none;
+      overflow: clip;
+    }
+  }
+
+  [data-unmodified-lines] {
+    display: block;
+    overflow: hidden;
+    min-width: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 0 1 auto;
+  }
+
+  @supports (width: 1cqi) {
+    [data-unified] {
+      [data-separator='line-info'] [data-separator-wrapper] {
+        padding-inline: var(--diffs-gap-inline, var(--diffs-gap-fallback));
+        width: 100cqi;
+
+        [data-separator-content] {
+          border-radius: 6px;
+        }
+      }
+
+      [data-separator='line-info'][data-expand-index]
+        [data-separator-wrapper]
+        [data-separator-content] {
+        border-top-left-radius: unset;
+        border-bottom-left-radius: unset;
+      }
+    }
+
+    [data-gutter] {
+      [data-separator='line-info'] [data-separator-wrapper] {
+        padding-left: var(--diffs-gap-inline, var(--diffs-gap-fallback));
+      }
+
+      [data-separator='line-info'] [data-separator-content] {
+        border-top-left-radius: 6px;
+        border-bottom-left-radius: 6px;
+      }
+
+      [data-separator='line-info'][data-expand-index] [data-separator-content] {
+        border-top-left-radius: unset;
+        border-bottom-left-radius: unset;
+      }
+    }
+
+    [data-additions] {
+      [data-content] [data-separator='line-info'] {
+        background-color: var(--diffs-bg);
+
+        [data-separator-wrapper] {
+          display: none;
+        }
+      }
+
+      [data-gutter] [data-separator='line-info'] [data-separator-wrapper] {
+        display: block;
+        height: 100%;
+        background-color: var(--diffs-bg-separator);
+        border-top-right-radius: 6px;
+        border-bottom-right-radius: 6px;
+
+        [data-separator-content],
+        [data-expand-button] {
+          display: none;
+        }
+      }
+    }
+
+    [data-overflow='scroll']
+      [data-additions]
+      [data-gutter]
+      [data-separator='line-info']
+      [data-separator-wrapper] {
+      width: calc(100cqi - var(--diffs-gap-inline, var(--diffs-gap-fallback)));
+    }
+
+    [data-overflow='wrap']
+      [data-additions]
+      [data-content]
+      [data-separator='line-info']
+      [data-separator-wrapper] {
+      background-color: var(--diffs-bg-separator);
+      display: block;
+      height: 100%;
+      margin-right: var(--diffs-gap-inline, var(--diffs-gap-fallback));
+      border-top-right-radius: 6px;
+      border-bottom-right-radius: 6px;
+
+      [data-separator-content],
+      [data-expand-button] {
+        display: none;
+      }
+    }
+
+    [data-separator='line-info'] [data-separator-wrapper] {
+      [data-expand-both],
+      [data-expand-down],
+      [data-expand-up] {
+        border-top-left-radius: 6px;
+        border-bottom-left-radius: 6px;
+      }
+    }
+
+    @media (pointer: fine) {
+      [data-separator='line-info'] [data-separator-wrapper] {
+        &[data-separator-multi-button] {
+          [data-expand-up] {
+            border-top-left-radius: 6px;
+            border-bottom-left-radius: unset;
+          }
+
+          [data-expand-down] {
+            border-bottom-left-radius: 6px;
+            border-top-left-radius: unset;
+          }
+        }
+      }
+    }
+  }
+
+  @media (pointer: coarse) {
+    [data-separator='line-info-basic']
+      [data-separator-wrapper][data-separator-multi-button] {
+      grid-template-columns: 34px 34px auto;
+
+      [data-separator-content] {
+        grid-column: unset;
+        grid-row: unset;
+      }
+    }
+
+    @supports (width: 1cqi) {
+      [data-separator='line-info'] [data-separator-wrapper] {
+        [data-expand-both],
+        [data-expand-down],
+        [data-expand-up] {
+          border-top-left-radius: 6px;
+          border-bottom-left-radius: 6px;
+        }
+
+        &[data-separator-multi-button] {
+          [data-expand-up] {
+            border-top-left-radius: 6px;
+            border-bottom-left-radius: 6px;
+          }
+
+          [data-expand-down] {
+            border-bottom-left-radius: unset;
+            border-top-left-radius: unset;
+          }
+        }
+      }
+    }
+  }
+
+  @media (pointer: fine) {
+    [data-separator-wrapper][data-separator-multi-button] {
+      display: grid;
+      grid-template-rows: 50% 50%;
+
+      [data-separator-content] {
+        grid-column: 2;
+        grid-row: 1 / -1;
+        min-width: min-content;
+      }
+
+      [data-expand-button] {
+        grid-column: 1;
+      }
+    }
+
+    [data-separator='line-info'] [data-separator-wrapper],
+    [data-separator='line-info']
+      [data-separator-wrapper][data-separator-multi-button] {
+      grid-template-columns: 34px auto;
+    }
+
+    [data-separator='line-info-basic'][data-expand-index]
+      [data-separator-wrapper] {
+      grid-template-columns: 100% auto;
+    }
+
+    [data-separator='line-info'],
+    [data-separator='line-info-basic'] {
+      [data-separator-multi-button] {
+        [data-expand-up] {
+          border-bottom: 1px solid var(--diffs-bg);
+          border-right: 2px solid var(--diffs-bg);
+        }
+        [data-expand-down] {
+          border-top: 1px solid var(--diffs-bg);
+          border-right: 2px solid var(--diffs-bg);
+        }
+      }
+    }
+  }
+
+  /* Hunk separator content is duplicated across gutters and content columns,
+   * so custom CSS can do some stuff. Lets hide things for defaults */
+  [data-additions] [data-gutter] [data-separator-wrapper],
+  [data-additions] [data-separator='line-info-basic'] [data-separator-wrapper],
+  [data-content] [data-separator-wrapper] {
+    display: none;
+  }
+
+  [data-line-annotation] {
+    min-height: var(--diffs-annotation-min-height, 0);
+    z-index: 2;
+  }
+
+  [data-merge-conflict-actions] {
+    z-index: 2;
+  }
+
+  [data-separator='custom'] {
+    display: grid;
+    grid-template-columns: subgrid;
+  }
+
+  [data-line],
+  [data-column-number],
+  [data-no-newline] {
+    position: relative;
+    padding-inline: 1ch;
+  }
+
+  [data-indicators='classic'] [data-line] {
+    padding-inline-start: 2ch;
+  }
+
+  [data-indicators='classic'] {
+    [data-line-type='change-addition'],
+    [data-line-type='change-deletion'] {
+      &[data-no-newline],
+      &[data-line] {
+        &::before {
+          display: inline-block;
+          width: 1ch;
+          height: 1lh;
+          position: absolute;
+          top: 0;
+          left: 0;
+          user-select: none;
+        }
+      }
+    }
+
+    [data-line-type='change-addition'] {
+      &[data-line],
+      &[data-no-newline] {
+        &::before {
+          content: '+';
+          color: var(--diffs-addition-base);
+        }
+      }
+    }
+
+    [data-line-type='change-deletion'] {
+      &[data-line],
+      &[data-no-newline] {
+        &::before {
+          content: '-';
+          color: var(--diffs-deletion-base);
+        }
+      }
+    }
+  }
+
+  [data-indicators='bars'] {
+    [data-line-type='change-deletion'],
+    [data-line-type='change-addition'] {
+      &[data-column-number] {
+        &::before {
+          content: '';
+          display: block;
+          width: 4px;
+          height: 100%;
+          position: absolute;
+          top: 0;
+          left: 0;
+          user-select: none;
+          contain: strict;
+        }
+      }
+    }
+
+    [data-line-type='change-deletion'] {
+      &[data-column-number] {
+        &::before {
+          background-image: linear-gradient(
+            0deg,
+            var(--diffs-bg-deletion) 50%,
+            var(--diffs-deletion-base) 50%
+          );
+          background-repeat: repeat;
+          background-size: 2px 2px;
+          background-size: calc(1lh / round(1lh / 2px))
+            calc(1lh / round(1lh / 2px));
+        }
+      }
+    }
+
+    [data-line-type='change-addition'] {
+      &[data-column-number] {
+        &::before {
+          background-color: var(--diffs-addition-base);
+        }
+      }
+    }
+  }
+
+  [data-overflow='wrap'] {
+    [data-line] {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Annotations wrap in every overflow mode (see the base
+     * [data-annotation-content] rule). In wrap mode, also break long words so
+     * they do not overflow the wrapped column. */
+    [data-annotation-content] {
+      word-break: break-word;
+    }
+  }
+
+  [data-overflow='scroll'] [data-line] {
+    white-space: pre;
+    min-height: 1lh;
+  }
+
+  [data-overflow='scroll'] [data-column-number] {
+    min-height: 1lh;
+  }
+
+  [data-column-number] {
+    box-sizing: content-box;
+    text-align: right;
+    user-select: none;
+    color: var(--diffs-fg-number);
+    padding-left: 2ch;
+  }
+
+  [data-line-number-content] {
+    display: inline-block;
+    min-width: var(
+      --diffs-min-number-column-width,
+      var(--diffs-min-number-column-width-default, 3ch)
+    );
+    position: relative;
+    z-index: 1;
+  }
+
+  [data-disable-line-numbers] {
+    [data-gutter-buffer],
+    [data-column-number] {
+      min-width: 4px;
+      padding: 0;
+
+      &::before {
+        min-width: 0;
+      }
+    }
+
+    [data-line-number-content] {
+      display: none;
+    }
+
+    [data-gutter-utility-slot] {
+      right: unset;
+      left: 0;
+      justify-content: flex-start;
+    }
+
+    &[data-indicators='bars'] [data-gutter-utility-slot] {
+      /* Using 5px here because theres a 2px separator after the bar */
+      left: 6px;
+    }
+  }
+
+  [data-file][data-disable-line-numbers] {
+    [data-gutter-buffer],
+    [data-column-number] {
+      min-width: 0;
+      border-right: 0;
+    }
+  }
+
+  [data-diff-span] {
+    border-radius: 3px;
+    box-decoration-break: clone;
+  }
+
+  [data-line-type='change-addition'] [data-diff-span] {
+    background-color: var(--diffs-bg-addition-emphasis);
+  }
+
+  [data-line-type='change-deletion'] [data-diff-span] {
+    background-color: var(--diffs-bg-deletion-emphasis);
+  }
+
+  [data-merge-conflict='marker-start'],
+  [data-merge-conflict='marker-base'],
+  [data-merge-conflict='marker-separator'],
+  [data-merge-conflict='marker-end'] {
+    padding-left: 1ch;
+    color: var(--diffs-fg);
+  }
+
+  [data-merge-conflict='marker-start'],
+  [data-merge-conflict='marker-end'] {
+    display: flex;
+    align-items: center;
+
+    &::after {
+      color: var(--diffs-fg-conflict-marker);
+      font-style: normal;
+      font-size: 0.75rem;
+      line-height: 1.25rem;
+      padding-left: 1ch;
+      font-family: var(
+        --diffs-header-font-family,
+        var(--diffs-header-font-fallback)
+      );
+    }
+  }
+
+  [data-merge-conflict='marker-start']::after {
+    content: '(Current Change)';
+  }
+
+  [data-merge-conflict='marker-end']::after {
+    content: '(Incoming Change)';
+  }
+
+  [data-merge-conflict-actions-content] {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding-inline: 0.5rem;
+    min-height: 1.75rem;
+    font-family: var(
+      --diffs-header-font-family,
+      var(--diffs-header-font-fallback)
+    );
+    font-size: 0.75rem;
+    line-height: 1.2;
+    color: var(--diffs-fg);
+  }
+
+  [data-merge-conflict-action] {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--diffs-fg-number);
+    font: inherit;
+    font-style: normal;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  [data-merge-conflict-action]:hover {
+    color: var(--diffs-fg);
+  }
+
+  [data-merge-conflict-action='current']:hover {
+    color: var(--diffs-addition-base);
+  }
+
+  [data-merge-conflict-action='incoming']:hover {
+    color: var(--diffs-modified-base);
+  }
+
+  [data-merge-conflict-action-separator] {
+    color: var(--diffs-fg-number);
+    opacity: 0.6;
+    user-select: none;
+  }
+
+  /* Default Header Styles */
+  /* --------------------- */
+  [data-diffs-header='default'] {
+    position: relative;
+    background-color: var(--diffs-bg);
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--diffs-gap-inline, var(--diffs-gap-fallback));
+    min-height: calc(
+      1lh + (var(--diffs-gap-block, var(--diffs-gap-fallback)) * 3)
+    );
+    padding-inline: 16px;
+    top: 0;
+    z-index: 2;
+  }
+
+  [data-header-content] {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--diffs-gap-inline, var(--diffs-gap-fallback));
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  [data-header-content] [data-prev-name],
+  [data-header-content] [data-title] {
+    direction: rtl;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  [data-prev-name] {
+    opacity: 0.7;
+  }
+
+  [data-rename-icon] {
+    fill: currentColor;
+    flex-shrink: 0;
+    flex-grow: 0;
+  }
+
+  [data-diffs-header='default'] [data-metadata] {
+    display: flex;
+    align-items: center;
+    gap: 1ch;
+    white-space: nowrap;
+  }
+
+  [data-diffs-header='default'] [data-additions-count] {
+    font-family: var(--diffs-font-family, var(--diffs-font-fallback));
+    color: var(--diffs-addition-base);
+  }
+
+  [data-diffs-header='default'] [data-deletions-count] {
+    font-family: var(--diffs-font-family, var(--diffs-font-fallback));
+    color: var(--diffs-deletion-base);
+  }
+
+  [data-change-icon] {
+    fill: currentColor;
+    flex-shrink: 0;
+  }
+
+  [data-change-icon='change'],
+  [data-change-icon='rename-pure'],
+  [data-change-icon='rename-changed'] {
+    color: var(--diffs-modified-base);
+  }
+
+  [data-change-icon='new'] {
+    color: var(--diffs-addition-base);
+  }
+
+  [data-change-icon='deleted'] {
+    color: var(--diffs-deletion-base);
+  }
+
+  [data-change-icon='file'] {
+    opacity: 0.6;
+  }
+
+  [data-annotation-content] {
+    position: relative;
+    display: flow-root;
+    align-self: flex-start;
+    z-index: 2;
+    min-width: 0;
+    isolation: isolate;
+    /* Annotations contain prose, not code. The text must wrap in every
+     * overflow mode. Slotted annotation content inherits this white-space
+     * value. In scroll mode without this rule, the text inherits
+     * `white-space: pre` from the `pre` element. Then long text does not
+     * wrap. */
+    white-space: normal;
+  }
+
+  /* Sticky positioning has a composite costs, so we should _only_ pay it if we
+   * need to */
+  [data-overflow='scroll'] [data-annotation-content] {
+    position: sticky;
+    width: var(--diffs-column-content-width, auto);
+    left: var(--diffs-column-number-width, 0);
+  }
+
+  [data-overflow='scroll'] [data-merge-conflict-actions-content] {
+    position: sticky;
+    width: var(--diffs-column-content-width, auto);
+    left: var(--diffs-column-number-width, 0);
+  }
+
+  /* Undo some of the stuff that the 'pre' tag does */
+  [data-annotation-slot] {
+    text-wrap-mode: wrap;
+    word-break: normal;
+    white-space-collapse: collapse;
+  }
+
+  [data-gutter-utility-slot] {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    display: flex;
+    justify-content: flex-end;
+    touch-action: none;
+  }
+
+  [data-utility-button] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    appearance: none;
+    width: 1lh;
+    height: 1lh;
+    margin-right: calc((1lh - 1ch) * -1);
+    padding: 0;
+    cursor: pointer;
+    font-size: var(--diffs-font-size, 13px);
+    line-height: var(--diffs-line-height, 20px);
+    border-radius: 4px;
+    background-color: var(--diffs-modified-base);
+    color: var(--diffs-bg);
+    fill: currentColor;
+    position: relative;
+    z-index: 4;
+    touch-action: none;
+
+    &::before {
+      content: '';
+      display: block;
+      position: absolute;
+      inset: 0 0 0 -4px;
+    }
+  }
+
+  /* Decoration Bars */
+  /* --------------- */
+  [data-decoration-bar-stack] {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -2px;
+    width: 6px;
+    pointer-events: none;
+    isolation: isolate;
+    z-index: 1;
+    background-color: var(--diffs-decoration-bar-color, transparent);
+    /* overflow: clip visible; */
+    box-sizing: content-box;
+    border-left: 2px solid var(--diffs-bg);
+    border-right: 2px solid var(--diffs-bg);
+
+    [data-decoration-bar-depth='1'] & {
+      background-color: color-mix(
+        in lab,
+        var(--diffs-bg) 20%,
+        var(--diffs-decoration-bar-color, transparent)
+      );
+    }
+
+    [data-decoration-bar-depth='2'] & {
+      background-color: color-mix(
+        in lab,
+        var(--diffs-bg) 45%,
+        var(--diffs-decoration-bar-color, transparent)
+      );
+    }
+
+    [data-decoration-bar-depth='3'] & {
+      background-color: color-mix(
+        in lab,
+        var(--diffs-bg) 65%,
+        var(--diffs-decoration-bar-color, transparent)
+      );
+    }
+
+    [data-decoration-bar-start] & {
+      border-top-left-radius: 5px;
+      border-top-right-radius: 5px;
+
+      /* &::before { */
+      /*   content: ''; */
+      /*   position: absolute; */
+      /*   box-sizing: content-box; */
+      /*   display: block; */
+      /*   width: 6px; */
+      /*   height: 6px; */
+      /*   z-index: 1; */
+      /*   border-top-left-radius: 3px; */
+      /*   border-top-right-radius: 3px; */
+      /*   border-top: 2px solid var(--diffs-bg); */
+      /*   border-left: 2px solid var(--diffs-bg); */
+      /*   border-right: 2px solid var(--diffs-bg); */
+      /*   left: -2px; */
+      /*   top: -2px; */
+      /* } */
+    }
+
+    [data-decoration-bar-end] & {
+      z-index: 3;
+      border-bottom-left-radius: 5px;
+      border-bottom-right-radius: 5px;
+
+      /* &::after { */
+      /*   content: ''; */
+      /*   position: absolute; */
+      /*   box-sizing: content-box; */
+      /*   display: block; */
+      /*   width: 6px; */
+      /*   height: 6px; */
+      /*   border-bottom-left-radius: 3px; */
+      /*   border-bottom-right-radius: 3px; */
+      /*   border-bottom: 2px solid var(--diffs-bg); */
+      /*   border-left: 2px solid var(--diffs-bg); */
+      /*   border-right: 2px solid var(--diffs-bg); */
+      /*   left: -2px; */
+      /*   bottom: -2px; */
+      /* } */
+    }
+
+    /* [data-decoration-bar-end] & { */
+    /*   border-bottom-left-radius: 5px; */
+    /*   border-bottom-right-radius: 5px; */
+    /*   border-bottom: 2px solid var(--diffs-bg); */
+    /*   border-left: 2px solid var(--diffs-bg); */
+    /*   border-right: 2px solid var(--diffs-bg); */
+    /*   right: -2px; */
+    /*   bottom: -2px; */
+    /*   z-index: 3; */
+    /* } */
+  }
+
+  [data-placeholder] {
+    contain: strict;
+  }
+
+  [data-error-wrapper] {
+    overflow: auto;
+    padding: var(--diffs-gap-block, var(--diffs-gap-fallback))
+      var(--diffs-gap-inline, var(--diffs-gap-fallback));
+    max-height: 400px;
+    scrollbar-width: none;
+
+    [data-error-message] {
+      font-weight: bold;
+      font-size: 18px;
+      color: var(--diffs-deletion-base);
+    }
+
+    [data-error-stack] {
+      color: var(--diffs-fg-number);
+    }
+  }
+}

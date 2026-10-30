@@ -1,0 +1,83 @@
+diff --git a/tests/upstream/reactCodeViewEditorOptions.test.ts b/tests/upstream/reactCodeViewEditorOptions.test.ts
+--- a/tests/upstream/reactCodeViewEditorOptions.test.ts
++++ b/tests/upstream/reactCodeViewEditorOptions.test.ts
+@@ -3,7 +3,6 @@ import {
+   act,
+   type ComponentType,
+   createElement,
+-  createRef,
+   type PropsWithChildren,
+   type ReactElement,
+   type Ref,
+@@ -44,6 +43,12 @@ import {
+   waitFor,
+ } from './domHarness';
+ 
++// OCTANE DIVERGENCE[create-ref]: Octane has no createRef; React's returns
++// this same `{ current: null }` object.
++function createRef<T>(): { current: T | null } {
++  return { current: null };
++}
++
+ afterAll(async () => {
+   await disposeHighlighter();
+ });
+@@ -259,16 +264,28 @@ async function unmountRoot(root: Root | undefined): Promise<void> {
+   });
+ }
+ 
++// OCTANE DIVERGENCE[uncaught-effect-error]: React's act() rethrows an
++// error that a layout effect or ref callback throws outside any error boundary.
++// Octane reports it to the root's onUncaughtError (console.error by default),
++// so a root that expects one records it there for captureRenderError.
++let lastUncaughtError: unknown;
++const recordUncaughtError = {
++  onUncaughtError(error: unknown): void {
++    lastUncaughtError = error;
++  },
++};
++
+ async function captureRenderError(
+   root: Root,
+   element: ReactElement
+ ): Promise<unknown> {
++  lastUncaughtError = undefined;
+   try {
+     await renderRoot(root, element);
+   } catch (error) {
+     return error;
+   }
+-  return undefined;
++  return lastUncaughtError;
+ }
+ 
+ function installReactActEnvironment(): () => void {
+@@ -336,7 +353,7 @@ describe('React CodeView editor factory', () => {
+     let root: Root | undefined;
+ 
+     try {
+-      root = createReactRoot(container);
++      root = createReactRoot(container, recordUncaughtError);
+       await renderRoot(
+         root,
+         createCodeViewElement({
+@@ -852,7 +869,7 @@ describe('React CodeView editor factory', () => {
+     let root: Root | undefined;
+ 
+     try {
+-      root = createReactRoot(container);
++      root = createReactRoot(container, recordUncaughtError);
+       const renderError = await captureRenderError(
+         root,
+         withProvider(
+@@ -896,7 +913,9 @@ describe('React CodeView editor factory', () => {
+         )
+       );
+ 
+-      expect(editors.length).toBeGreaterThanOrEqual(2);
++      // OCTANE DIVERGENCE[strict-mode-replay]: Octane's StrictMode
++      // does not replay mounts, so only the committed editor is created.
++      expect(editors.length).toBe(1);
+       expect(
+         editors.slice(0, -1).every((editor) => editor.fullCleanUps > 0)
+       ).toBe(true);

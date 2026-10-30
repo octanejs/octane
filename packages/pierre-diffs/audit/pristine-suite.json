@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "project": "pierre-diffs-pristine",
+  "vitestConfig": "tests/upstream-vitest.config.ts",
+  "rootEnvVar": "PIERRE_DIFFS_PRISTINE_ROOT",
+  "copy": ["src", "test"]
+}

@@ -25,6 +25,7 @@ import useSyncExternalStoreAdaptedSSR from './packages/use-sync-external-store/t
 import useSyncExternalStorePristine from './packages/use-sync-external-store/tests/vitest.pristine.config.ts';
 import nextThemesAdapted from './packages/next-themes/tests/vitest.adapted.config.ts';
 import effectAtomAdapted from './packages/effect-atom/tests/vitest.adapted.config.ts';
+import pierreDiffsAdapted from './packages/pierre-diffs/tests/vitest.adapted.config.ts';
 import baseUIAdapted from './packages/base-ui/tests/vitest.config.ts';
 import baseUIUtilsAdapted from './packages/base-ui-utils/tests/vitest.config.ts';
 import baseUIPristine from './packages/base-ui/tests/vitest.pristine.config.ts';
@@ -708,6 +709,15 @@ export default defineConfig({
 				resolve: { dedupe: ['octane', 'react', 'react-dom'] },
 			},
 			{ ...effectAtomAdapted, testExecution: { group: 'react-parity' } },
+			{ ...pierreDiffsAdapted, testExecution: { group: 'react-parity' } },
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'pierre-diffs-pristine',
+					include: ['packages/pierre-diffs/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
@@ -2342,6 +2352,35 @@ export default defineConfig({
 				},
 				plugins: [octane()],
 				resolve: { dedupe: ['octane'] },
+			},
+			{
+				test: {
+					name: 'pierre-diffs',
+					include: ['packages/pierre-diffs/tests/*.test.ts'],
+					exclude: ['packages/pierre-diffs/tests/upstream-original.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: { dedupe: ['octane', '@pierre/diffs'] },
+			},
+			{
+				test: {
+					name: 'pierre-diffs-ssr',
+					include: ['packages/pierre-diffs/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					dedupe: ['octane', '@pierre/diffs'],
+					alias: [
+						{
+							find: /^octane(?:\/server)?$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+					],
+				},
 			},
 			{
 				test: {

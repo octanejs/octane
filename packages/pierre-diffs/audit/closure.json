@@ -1,0 +1,219 @@
+{
+  "runtimeDependencies": ["@pierre/diffs", "octane"],
+  "adaptedSources": [
+    {
+      "packageName": "@pierre/diffs",
+      "paths": [
+        "src/CodeView.tsrx",
+        "src/EditContext.tsrx",
+        "src/File.tsrx",
+        "src/FileDiff.tsrx",
+        "src/MultiFileDiff.tsrx",
+        "src/PatchDiff.tsrx",
+        "src/UnresolvedFile.tsrx",
+        "src/Virtualizer.tsrx",
+        "src/WorkerPoolContext.tsrx",
+        "src/constants.ts",
+        "src/core/areFileTargetsEqual.ts",
+        "src/core/getCodeViewItemRenderData.ts",
+        "src/core/getHunkSideBoundaries.ts",
+        "src/core/getMergeConflictActionSlotName.ts",
+        "src/core/parseMergeConflictDiffFromFile.ts",
+        "src/index.ts",
+        "src/jsx.d.ts",
+        "src/types.ts",
+        "src/utils/assignRef.ts",
+        "src/utils/renderDiffChildren.tsrx",
+        "src/utils/renderFileChildren.tsrx",
+        "src/utils/templateRender.tsrx",
+        "src/utils/useFileDiffInstance.ts",
+        "src/utils/useFileInstance.ts",
+        "src/utils/useForceUpdate.ts",
+        "src/utils/useNextRenderData.ts",
+        "src/utils/useStableCallback.ts",
+        "src/utils/useUnresolvedFileInstance.ts"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "package.json",
+      "origin": "authored",
+      "sha256": "beef47aedf291da39fbcb18e2c65a4180a384996895aa9ed14e8f725267ab888"
+    },
+    {
+      "path": "src/CodeView.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "fad916740d5a0e25aa4d1bd7a2660fdeeea1917ad1397af277fbf0de3888f60f"
+    },
+    {
+      "path": "src/constants.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "3f9802e593a70cf398322910ad80af9c1b4a78fcf88ee69b62d1ea535be031ee"
+    },
+    {
+      "path": "src/core/areFileTargetsEqual.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "b81557f3acf3063612b1d19843c40fa9c153a98a047f7c6b07b1f86c0d718518"
+    },
+    {
+      "path": "src/core/getCodeViewItemRenderData.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "3a1b47ec374b41847c54bdd99e15ea5c76f3faf11e34df94dec14fd86685f6e3"
+    },
+    {
+      "path": "src/core/getHunkSideBoundaries.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "654b41c31f661b84efe694e994292fe105942e2ac38473d4beb7ef57575907e9"
+    },
+    {
+      "path": "src/core/getMergeConflictActionSlotName.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "f3963437327ecabff00b512b20bec2bbf716086fd12af90c83872e3559d39888"
+    },
+    {
+      "path": "src/core/parseMergeConflictDiffFromFile.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "b4eed88b57b6d152d79f3dfb6f6882ac153d98000c73bbccd3ca99ec637dc035"
+    },
+    {
+      "path": "src/EditContext.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "13680479330743ad8fc4cc4e273612255bf5d80a3b1a172a7a137e82a5468358"
+    },
+    {
+      "path": "src/File.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "9115b8b8b0c917f569a638c8d68c4eabf0b8af32023b7968809d7734f16a22d2"
+    },
+    {
+      "path": "src/FileDiff.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "3b076113d5de7b652068d3bc177bf817c046c275834712e85b5955f9fc5e06b6"
+    },
+    {
+      "path": "src/index.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "d7d3207e5e92b5d7bb1919365057be2e1fbd74e4da3a834d1f48b7b24ad4046e"
+    },
+    {
+      "path": "src/jsx.d.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "e7a9032bf3092bc336bd4aa2e23616d75bc97fa2792c5915adad948ae91c7c37"
+    },
+    {
+      "path": "src/MultiFileDiff.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "812a77a02e5b1597be2bcb4a04e6af210933db855680c0f434a4220c10a4b782"
+    },
+    {
+      "path": "src/node-timeout.d.ts",
+      "origin": "authored",
+      "sha256": "7d2c9d50df62358b7cfc39a8f0d6b2db9183dd8627d597f9a543ab2ad44d7264"
+    },
+    {
+      "path": "src/PatchDiff.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "0961467c900bc7b478a8bc9afbb30bb8fc4c0577dd47087978a16cf0b8ef9c49"
+    },
+    {
+      "path": "src/types.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "3c15246251ec3e75988c2367f57281baa2fe649a826727bf6243f9567ade97ed"
+    },
+    {
+      "path": "src/UnresolvedFile.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "1ba5f724a6f78d89f0b1867351b553a5f2dbf34e433f90c5266ec097ce582687"
+    },
+    {
+      "path": "src/utils/assignRef.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "8e89675fd41e4a74b2a12fcec34d53b001506c3044055b6103cb6b75232ddb44"
+    },
+    {
+      "path": "src/utils/renderDiffChildren.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "64b9aa8b536cb49e715a76afaa4324ebe38b401142c1252b5257e5403b1ac134"
+    },
+    {
+      "path": "src/utils/renderFileChildren.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "a96956d6fc3e2d600d3178a506a6d9ab5ca59ce3c366df824ef316e3fdbb1824"
+    },
+    {
+      "path": "src/utils/templateRender.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "2b3f8cfb09a68f08495af60a742afcef4c0de6e1e2a29deb0d0a8983690cf527"
+    },
+    {
+      "path": "src/utils/useFileDiffInstance.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "dd4290cab05c1260355e8f7b98f91c42672c624a885c34a3a34c056ef5506cda"
+    },
+    {
+      "path": "src/utils/useFileInstance.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "e0c3d5bcbfdc73fcdaad50eaaa8e89fdfe2be31a53152647fc0b56b457cb3ca3"
+    },
+    {
+      "path": "src/utils/useForceUpdate.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "97df2fe0ad157fc170f9dab9da7fb4dc489249d5b5d1e63fd9f5baf65bc47db3"
+    },
+    {
+      "path": "src/utils/useNextRenderData.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "15855a0ca739f5ab339273086521f6aaeb843d17f4276fbb77c1a69a178c691d"
+    },
+    {
+      "path": "src/utils/useStableCallback.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "0eb6160d87ec863e96bd978b2000bc9a72b3c7ebe5f1df1ad297f8d516836c9c"
+    },
+    {
+      "path": "src/utils/useUnresolvedFileInstance.ts",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "54330357f0b76c9ad4c77c34a01d741762a02121fc27a995fa14c1f0cbec44fa"
+    },
+    {
+      "path": "src/Virtualizer.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "d07b4548e6c3d8d4417959a3cf36ac292b5d94363f38cb094f238ef9b5a82244"
+    },
+    {
+      "path": "src/WorkerPoolContext.tsrx",
+      "origin": "adapted",
+      "packageName": "@pierre/diffs",
+      "sha256": "ea3e3aedefea02fa3ad198e35fbfc51737b1c459be1443263c5c1749c4d6b9fc"
+    }
+  ],
+  "reimplementedDependencies": []
+}

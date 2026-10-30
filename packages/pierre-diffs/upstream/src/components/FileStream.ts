@@ -1,0 +1,397 @@
+import { DEFAULT_THEMES, DIFFS_TAG_NAME } from '../constants';
+import { getSharedHighlighter } from '../highlighter/shared_highlighter';
+import {
+  dequeueRender,
+  queueRender,
+} from '../managers/UniversalRenderingManager';
+import { CodeToTokenTransformStream, type RecallToken } from '../shiki-stream';
+import type {
+  AppliedThemeStyleCache,
+  BaseCodeOptions,
+  DiffsHighlighter,
+  SupportedLanguages,
+  ThemedToken,
+  ThemeTypes,
+} from '../types';
+import { createSpanFromToken } from '../utils/createSpanNodeFromToken';
+import { wrapThemeCSS } from '../utils/cssWrappers';
+import { getHighlighterOptions } from '../utils/getHighlighterOptions';
+import { getHighlighterThemeStyles } from '../utils/getHighlighterThemeStyles';
+import { getOrCreateCodeNode } from '../utils/getOrCreateCodeNode';
+import { getTokenOptions } from '../utils/getTokenOptions';
+import { upsertHostThemeStyle } from '../utils/hostTheme';
+import { getMeasuredScrollbarGutter } from '../utils/scrollbarGutter';
+import { setPreNodeProperties } from '../utils/setWrapperNodeProps';
+
+export interface FileStreamOptions extends BaseCodeOptions {
+  lang?: SupportedLanguages;
+  startingLineIndex?: number;
+
+  onPreRender?(instance: FileStream): unknown;
+  onPostRender?(instance: FileStream): unknown;
+
+  onStreamStart?(controller: WritableStreamDefaultController): unknown;
+  onStreamWrite?(token: ThemedToken | RecallToken): unknown;
+  onStreamClose?(): unknown;
+  onStreamAbort?(reason: unknown): unknown;
+}
+
+let instanceId = -1;
+
+export class FileStream {
+  readonly __id: string = `file-stream:${++instanceId}`;
+
+  private stream: ReadableStream<string> | undefined;
+  private tokenStream: CodeToTokenTransformStream | undefined;
+  private abortController: AbortController | undefined;
+  private fileContainer: HTMLElement | undefined;
+  private pre: HTMLPreElement | undefined;
+  private code: HTMLElement | undefined;
+  private gutterElement: HTMLElement | undefined;
+  private contentElement: HTMLElement | undefined;
+  private themeCSSStyle: HTMLStyleElement | undefined;
+  private appliedThemeCSS: AppliedThemeStyleCache | undefined;
+  private currentRowCount = 0;
+
+  constructor(public options: FileStreamOptions = { theme: DEFAULT_THEMES }) {
+    this.currentLineIndex = this.options.startingLineIndex ?? 1;
+  }
+
+  cleanUp(): void {
+    dequeueRender(this.render);
+    this.abortController?.abort();
+    this.abortController = undefined;
+    this.tokenStream?.tokenizer.dispose();
+    this.tokenStream = undefined;
+  }
+
+  setThemeType(themeType: ThemeTypes): void {
+    if ((this.options.themeType ?? 'system') === themeType) {
+      return;
+    }
+    this.options = { ...this.options, themeType };
+    if (
+      typeof this.options.theme === 'string' ||
+      this.fileContainer == null ||
+      this.appliedThemeCSS == null
+    ) {
+      return;
+    }
+    this.applyThemeState(
+      this.fileContainer,
+      this.appliedThemeCSS.themeStyles,
+      themeType,
+      this.appliedThemeCSS.baseThemeType
+    );
+  }
+
+  private queuedSetupArgs: [ReadableStream<string>, HTMLElement] | undefined;
+  async setup(
+    _source: ReadableStream<string>,
+    _wrapper: HTMLElement
+  ): Promise<void> {
+    const isSettingUp = this.queuedSetupArgs != null;
+    this.queuedSetupArgs = [_source, _wrapper];
+    if (isSettingUp) {
+      // TODO(amadeus): Make it so that this function can be properly
+      // awaitable, maybe?
+      return;
+    }
+    let highlighter: DiffsHighlighter;
+    try {
+      highlighter = await getSharedHighlighter(
+        getHighlighterOptions(this.options.lang, this.options)
+      );
+    } catch (error) {
+      this.queuedSetupArgs = undefined;
+      throw error;
+    }
+
+    const [source, wrapper] = this.queuedSetupArgs;
+    this.queuedSetupArgs = undefined;
+
+    this.setupStream(source, wrapper, highlighter);
+  }
+
+  private setupStream(
+    stream: ReadableStream<string>,
+    wrapper: HTMLElement,
+    highlighter: DiffsHighlighter
+  ): void {
+    const {
+      disableLineNumbers = false,
+      overflow = 'scroll',
+      theme = DEFAULT_THEMES,
+      themeType = 'system',
+    } = this.options;
+    const fileContainer = this.getOrCreateFileContainer();
+    if (fileContainer.parentElement == null) {
+      wrapper.appendChild(fileContainer);
+    }
+    this.pre ??= document.createElement('pre');
+    if (this.pre.parentElement == null) {
+      fileContainer.shadowRoot?.appendChild(this.pre);
+    }
+    const baseThemeType =
+      typeof theme === 'string' ? highlighter.getTheme(theme).type : undefined;
+    const themeStyles = getHighlighterThemeStyles({ theme, highlighter });
+    this.applyThemeState(fileContainer, themeStyles, themeType, baseThemeType);
+    const pre = setPreNodeProperties(this.pre, {
+      type: 'file',
+      diffIndicators: 'none',
+      disableBackground: true,
+      disableLineNumbers,
+      overflow,
+      split: false,
+      totalLines: 0,
+    });
+    pre.textContent = '';
+
+    this.pre = pre;
+    this.code = getOrCreateCodeNode({ code: this.code, pre });
+    this.gutterElement = undefined;
+    this.contentElement = undefined;
+    this.currentRowCount = 0;
+    this.currentLineElement = undefined;
+    this.currentLineIndex = this.options.startingLineIndex ?? 1;
+    this.pendingCarriageReturn = false;
+    this.streamClosed = false;
+    this.abortController?.abort();
+    this.tokenStream?.tokenizer.dispose();
+    this.queuedTokens = [];
+    this.abortController = new AbortController();
+    const { onStreamStart, onStreamClose, onStreamAbort } = this.options;
+    // Cancel the prior source so upstream producers stop generating tokens.
+    // Swallow AbortError / locked-stream rejections since we're tearing down.
+    this.stream?.cancel().catch(() => {});
+    this.stream = stream;
+    const tokenStream = new CodeToTokenTransformStream({
+      ...getTokenOptions(
+        this.options.lang ?? 'text',
+        theme,
+        this.options.tokenizeMaxLineLength
+      ),
+      highlighter,
+      allowRecalls: true,
+    });
+    this.tokenStream = tokenStream;
+    this.stream
+      .pipeThrough(tokenStream)
+      .pipeTo(
+        new WritableStream({
+          start(controller) {
+            onStreamStart?.(controller);
+          },
+          close: () => {
+            if (this.tokenStream === tokenStream) {
+              this.streamClosed = true;
+              queueRender(this.render);
+            }
+            onStreamClose?.();
+          },
+          abort(reason) {
+            onStreamAbort?.(reason);
+          },
+          write: this.handleWrite,
+        }),
+        { signal: this.abortController.signal }
+      )
+      .catch((error) => {
+        // Ignore AbortError - it's expected when cleaning up
+        if (error.name !== 'AbortError') {
+          console.error('FileStream pipe error:', error);
+        }
+      })
+      .finally(() => tokenStream.tokenizer.dispose());
+  }
+
+  private queuedTokens: (ThemedToken | RecallToken)[] = [];
+  private handleWrite = (token: ThemedToken | RecallToken) => {
+    // If we've recalled tokens we haven't rendered yet, we can just yeet them
+    // and never apply them
+    if ('recall' in token && this.queuedTokens.length >= token.recall) {
+      this.queuedTokens.length = this.queuedTokens.length - token.recall;
+    } else {
+      this.queuedTokens.push(token);
+    }
+    queueRender(this.render);
+    this.options.onStreamWrite?.(token);
+  };
+
+  private currentLineIndex: number;
+  private currentLineElement: HTMLElement | undefined;
+  private pendingCarriageReturn = false;
+  private streamClosed = false;
+  private render = () => {
+    this.options.onPreRender?.(this);
+    const { gutter, content } = this.getOrCreateStreamColumns();
+    const gutterFragment = document.createDocumentFragment();
+    const contentFragment = document.createDocumentFragment();
+    const cacheHtmlStyle =
+      this.tokenStream?.options.highlighter.name === 'highlights';
+    const appendLine = () => {
+      const { gutterLine, contentLine } = this.createLine();
+      gutterFragment.appendChild(gutterLine);
+      contentFragment.appendChild(contentLine);
+    };
+    for (const token of this.queuedTokens) {
+      if ('recall' in token) {
+        if (this.currentLineElement == null) {
+          throw new Error(
+            'FileStream.render: no current line element, shouldnt be possible to get here'
+          );
+        }
+        if (token.recall > this.currentLineElement.childNodes.length) {
+          throw new Error(
+            `FileStream.render: Token recall exceed the current line, there's probably a bug...`
+          );
+        }
+        for (let i = 0; i < token.recall; i++) {
+          this.currentLineElement.lastChild?.remove();
+        }
+        if (token.recall > 0) this.pendingCarriageReturn = false;
+      } else {
+        const span = createSpanFromToken(token, cacheHtmlStyle);
+        // Delay the CR's row break so recalls can remove it and CRLF counts once.
+        if (this.pendingCarriageReturn && token.content !== '\n') {
+          this.currentLineIndex++;
+          appendLine();
+        } else if (this.currentLineElement == null) {
+          appendLine();
+        }
+        this.currentLineElement?.appendChild(span);
+        this.pendingCarriageReturn = token.content === '\r';
+        if (token.content === '\n') {
+          this.currentLineIndex++;
+          appendLine();
+        }
+      }
+    }
+    if (this.streamClosed && this.pendingCarriageReturn) {
+      this.pendingCarriageReturn = false;
+      this.currentLineIndex++;
+      appendLine();
+    }
+    if (gutterFragment.childNodes.length > 0) {
+      gutter.appendChild(gutterFragment);
+    }
+    if (contentFragment.childNodes.length > 0) {
+      content.appendChild(contentFragment);
+    }
+    this.queuedTokens.length = 0;
+    this.options.onPostRender?.(this);
+  };
+
+  private getOrCreateStreamColumns(): {
+    gutter: HTMLElement;
+    content: HTMLElement;
+  } {
+    if (this.code == null) {
+      throw new Error('FileStream: expected code element to exist');
+    }
+    if (this.gutterElement != null && this.contentElement != null) {
+      return { gutter: this.gutterElement, content: this.contentElement };
+    }
+    const gutter = document.createElement('div');
+    gutter.dataset.gutter = '';
+    const content = document.createElement('div');
+    content.dataset.content = '';
+    this.code.appendChild(gutter);
+    this.code.appendChild(content);
+    this.gutterElement = gutter;
+    this.contentElement = content;
+    return { gutter, content };
+  }
+
+  private updateRowSpan(): void {
+    if (this.gutterElement != null) {
+      this.gutterElement.style.gridRow = `span ${this.currentRowCount}`;
+    }
+    if (this.contentElement != null) {
+      this.contentElement.style.gridRow = `span ${this.currentRowCount}`;
+    }
+  }
+
+  private createLine(): { gutterLine: HTMLElement; contentLine: HTMLElement } {
+    const lineNumber = this.currentLineIndex;
+    const lineIndex = `${lineNumber - 1}`;
+    const gutterLine = document.createElement('div');
+    gutterLine.dataset.columnNumber = `${lineNumber}`;
+    gutterLine.dataset.lineType = 'context';
+    gutterLine.dataset.lineIndex = lineIndex;
+
+    const numberContent = document.createElement('span');
+    numberContent.dataset.lineNumberContent = '';
+    numberContent.textContent = `${lineNumber}`;
+    gutterLine.appendChild(numberContent);
+
+    const contentLine = document.createElement('div');
+    contentLine.dataset.line = `${lineNumber}`;
+    contentLine.dataset.lineType = 'context';
+    contentLine.dataset.lineIndex = lineIndex;
+
+    this.currentRowCount += 1;
+    this.updateRowSpan();
+    this.currentLineElement = contentLine;
+    return { gutterLine, contentLine };
+  }
+
+  private getOrCreateFileContainer(fileContainer?: HTMLElement): HTMLElement {
+    if (
+      (fileContainer != null && fileContainer === this.fileContainer) ||
+      (fileContainer == null && this.fileContainer != null)
+    ) {
+      return this.fileContainer;
+    }
+    if (
+      this.fileContainer != null &&
+      fileContainer != null &&
+      fileContainer !== this.fileContainer
+    ) {
+      this.themeCSSStyle = undefined;
+      this.appliedThemeCSS = undefined;
+    }
+    this.fileContainer =
+      fileContainer ?? document.createElement(DIFFS_TAG_NAME);
+    return this.fileContainer;
+  }
+
+  private applyThemeState(
+    container: HTMLElement,
+    themeStyles: string,
+    themeType: ThemeTypes,
+    baseThemeType?: 'light' | 'dark'
+  ): void {
+    const shadowRoot =
+      container.shadowRoot ?? container.attachShadow({ mode: 'open' });
+    const effectiveThemeType = baseThemeType ?? themeType;
+    const currentTheme = this.options.theme ?? DEFAULT_THEMES;
+    const theme =
+      typeof currentTheme === 'string' ? currentTheme : { ...currentTheme };
+    const scrollbarGutter = getMeasuredScrollbarGutter(shadowRoot);
+    if (
+      this.themeCSSStyle?.parentNode === shadowRoot &&
+      this.appliedThemeCSS?.themeStyles === themeStyles &&
+      this.appliedThemeCSS.themeType === effectiveThemeType &&
+      this.appliedThemeCSS.scrollbarGutter === scrollbarGutter
+    ) {
+      this.appliedThemeCSS.theme = theme;
+      return;
+    }
+    this.themeCSSStyle = upsertHostThemeStyle({
+      shadowRoot,
+      currentNode: this.themeCSSStyle,
+      themeCSS: wrapThemeCSS(themeStyles, effectiveThemeType, scrollbarGutter),
+    });
+    this.appliedThemeCSS =
+      this.themeCSSStyle != null
+        ? {
+            theme,
+            themeStyles,
+            themeType: effectiveThemeType,
+            baseThemeType,
+            scrollbarGutter,
+          }
+        : undefined;
+  }
+}

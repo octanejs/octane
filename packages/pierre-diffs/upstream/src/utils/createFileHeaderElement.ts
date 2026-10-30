@@ -1,0 +1,171 @@
+import type { ElementContent, Element as HASTElement, Properties } from 'hast';
+
+import {
+  CUSTOM_HEADER_SLOT_ID,
+  HEADER_FILENAME_SUFFIX_SLOT_ID,
+  HEADER_METADATA_SLOT_ID,
+  HEADER_PREFIX_SLOT_ID,
+} from '../constants';
+import type {
+  ChangeTypes,
+  FileContents,
+  FileDiffMetadata,
+  FileHeaderRenderMode,
+} from '../types';
+import { getIconForType } from './getIconForType';
+import {
+  createHastElement,
+  createIconElement,
+  createTextNodeElement,
+} from './hast_utils';
+
+export interface CreateFileHeaderElementProps {
+  fileOrDiff: FileDiffMetadata | FileContents;
+  mode: FileHeaderRenderMode;
+  stickyHeader: boolean;
+}
+
+export function createFileHeaderElement({
+  fileOrDiff,
+  mode,
+  stickyHeader,
+}: CreateFileHeaderElementProps): HASTElement {
+  const fileDiff = 'type' in fileOrDiff ? fileOrDiff : undefined;
+  const properties: Properties = {
+    'data-diffs-header': mode,
+    'data-change-type': fileDiff?.type,
+    'data-sticky': stickyHeader ? '' : undefined,
+  };
+
+  return createHastElement({
+    tagName: 'div',
+    children: [
+      mode === 'custom'
+        ? createHastElement({
+            tagName: 'slot',
+            properties: { name: CUSTOM_HEADER_SLOT_ID },
+          })
+        : createHeaderElement({
+            name: fileOrDiff.name,
+            prevName:
+              'prevName' in fileOrDiff ? fileOrDiff.prevName : undefined,
+            iconType: fileDiff?.type ?? 'file',
+          }),
+      ...(mode === 'custom' ? [] : [createMetadataElement(fileDiff)]),
+    ],
+    properties,
+  });
+}
+
+interface CreateHeaderElementOptions {
+  name: string;
+  prevName?: string;
+  iconType: ChangeTypes | 'file';
+}
+
+function createHeaderElement({
+  name,
+  prevName,
+  iconType,
+}: CreateHeaderElementOptions): HASTElement {
+  const children: ElementContent[] = [
+    createHastElement({
+      tagName: 'slot',
+      properties: { name: HEADER_PREFIX_SLOT_ID },
+    }),
+    createIconElement({
+      name: getIconForType(iconType),
+      properties: { 'data-change-icon': iconType },
+    }),
+  ];
+  if (prevName != null) {
+    children.push(
+      createHastElement({
+        tagName: 'div',
+        children: [
+          createHastElement({
+            tagName: 'bdi',
+            children: [createTextNodeElement(prevName)],
+          }),
+        ],
+        properties: {
+          'data-prev-name': '',
+        },
+      })
+    );
+    children.push(
+      createIconElement({
+        name: 'diffs-icon-arrow-right-short',
+        properties: {
+          'data-rename-icon': '',
+        },
+      })
+    );
+  }
+  children.push(
+    createHastElement({
+      tagName: 'div',
+      children: [
+        createHastElement({
+          tagName: 'bdi',
+          children: [createTextNodeElement(name)],
+        }),
+      ],
+      properties: { 'data-title': '' },
+    })
+  );
+  children.push(
+    createHastElement({
+      tagName: 'slot',
+      properties: { name: HEADER_FILENAME_SUFFIX_SLOT_ID },
+    })
+  );
+  return createHastElement({
+    tagName: 'div',
+    children,
+    properties: { 'data-header-content': '' },
+  });
+}
+
+function createMetadataElement(
+  fileDiff: FileDiffMetadata | undefined
+): HASTElement {
+  const children: ElementContent[] = [];
+  if (fileDiff != null) {
+    let additions = 0;
+    let deletions = 0;
+    for (const hunk of fileDiff.hunks) {
+      additions += hunk.additionLines;
+      deletions += hunk.deletionLines;
+    }
+    if (deletions > 0 || additions === 0) {
+      children.push(
+        createHastElement({
+          tagName: 'span',
+          children: [createTextNodeElement(`-${deletions}`)],
+          properties: { 'data-deletions-count': '' },
+        })
+      );
+    }
+    if (additions > 0 || deletions === 0) {
+      children.push(
+        createHastElement({
+          tagName: 'span',
+          children: [createTextNodeElement(`+${additions}`)],
+          properties: { 'data-additions-count': '' },
+        })
+      );
+    }
+  }
+  children.push(
+    createHastElement({
+      tagName: 'slot',
+      properties: { name: HEADER_METADATA_SLOT_ID },
+    })
+  );
+  return createHastElement({
+    tagName: 'div',
+    children,
+    properties: { 'data-metadata': '' },
+  });
+}

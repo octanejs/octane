@@ -1,0 +1,590 @@
+[
+  {
+    "id": "react-registration-v1:acc8be0f6e62b1149aca",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:caceeec2b5f1c9735831",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:b330dd80bd6b67a8defe",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:8a9d5553e384389a46cb",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:60b668745e3120e22841",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:c11a27abf0d932e3bea6",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:2169e1d502a8af659a19",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:dcec29b2983295c8ebc4",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:40acbbf315b2f900a74a",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:ae7d9be04fcda5201e97",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:8c6a511dd83128198a54",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:bfce08d9d1ac0bec98b6",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:bb6ad18d13aad2c19d9a",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:7bb71168ac2d5ad9393c",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:059199ccffee7607857e",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:3b699e969c9a78fe04fe",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:e814ca45ef86fe38a81a",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:1a0f3687653c5063bf04",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:1f3ca1beef5faf662462",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:b509ee4bdcc8b97011d1",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:07ee00a9c866586cde6c",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:f4547ed26002b3e054ae",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:a1f5d553c017796c2d80",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:778a5ea536cf3f370ffe",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:95ff4cf154e6e8f214ee",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:446dba4eb9bb55a6850f",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:ab76f5e3141a99788770",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactAnnotations.workerRendering.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:8433faed0c8c71f14423",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactCodeViewEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:2f6b3cfd01c26a045876",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactCodeViewEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:73c8210a2bb75d90224b",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactCodeViewEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:3005871b5217c3b0d2d5",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactCodeViewEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:6208ba1aaef4a7f30c58",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactCodeViewEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:67440a4c433dbc50a00e",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactCodeViewEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:6050175b6841d92fb773",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactCodeViewEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:00070ab2c4699e34cd87",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactCodeViewEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:12c1e183432fc423b2e5",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactCodeViewEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:b3e9d54d90b494a09e24",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactCodeViewEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:da9c6822ef0b0541468d",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactCodeViewEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:cb4d9a6b15cc4b5d8b43",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactCodeViewEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:33ad2d75bd8116c75185",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactCodeViewEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:4933771cfa1116bfab0d",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactCodeViewEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:0a1d7371b8072b14d29b",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactCodeViewEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:0667b6c2bb389f074a29",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:eb5b872551ca33e7ced7",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:e91d834adfcd32e9ed46",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:13416e180a6e9c49a9c1",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:84523817ac9bbc0c17aa",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:d2f1dad5358af77b392d",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:9ccd8f4920d28b14245c",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:65b95a55eff3294765c7",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:e3179d19b6124cb5e63b",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:15f1945bf09a01e0c5bb",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:25689b4701dce55bd875",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:ac0e288778b14d6a4234",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:d56c31cd849e902c0a6f",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:4c4d505381c351b2f1f1",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:f7f5b9a1a1980ed4715a",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:5da9ce1ed13e5d0ce9e3",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:d6018066fb33df25b783",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:d95d021e22fe3affb60c",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:d3a296ebe758c1ceca6a",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:d74d51300eb7c05fa59e",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:cc886018f6701b64e781",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:205add0c205a860c48de",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:d81349a9ff4501b8d3c7",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-registration-v1:70dc47ab5ffb26e29bff",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:46c1781d90a928607d4d",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:dcf011668d898fbce009",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:4500ac0f19946da7d3bc",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:26d55b8121e7fd11df20",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:c2a221bbbb81369f4b93",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:5a10eb36788d0ec0c996",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:e6b312b8238d469d7808",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:800db1d6307591eb94f1",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:c31b38fa2b76252b21ff",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:e6fb636a972474f575a6",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:53b7378bd68a5717d675",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:d6bec131421bea47d2f0",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:1121a1c57ecf6681d086",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactEditorOptions.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:b990a660839c645a1434",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactPartialHydration.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:9c8ce86dfcd8ec1e2c76",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactPartialHydration.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:56e3c74ab1359fa6199a",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactPartialHydration.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:4402042025a12149879c",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactPartialHydration.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  },
+  {
+    "id": "react-case-v1:dbd869ebf0be79aefa5c",
+    "classification": "implemented",
+    "localEvidence": ["tests/upstream/reactPartialHydration.test.ts"],
+    "rationale": "Runs the pinned upstream case against the Octane port, regenerated from the lock with import rewrites and the divergence patches recorded in audit/react-parity.json; the same bytes also run unchanged against React.",
+    "upstreamCommit": "cbc028ca863d6e662706dba87b50df3eeaebbfa7"
+  }
+]

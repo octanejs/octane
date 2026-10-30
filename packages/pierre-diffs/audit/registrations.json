@@ -1,0 +1,1154 @@
+[
+  {
+    "id": "react-registration-v1:acc8be0f6e62b1149aca",
+    "declarationId": "react-case-v1:c953430887f772754ab0",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:189:3:registration:0",
+    "kind": "test",
+    "title": "`React ${type} retains matching annotation children during delayed movement and removal (virtualized: %s)`",
+    "estimatedRegistrations": 4,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff', 'multi', 'patch'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:caceeec2b5f1c9735831",
+    "declarationId": "react-case-v1:c953430887f772754ab0",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:189:3:registration:1",
+    "kind": "test",
+    "title": "`React ${type} retains matching annotation children during delayed movement and removal (virtualized: %s)`",
+    "estimatedRegistrations": 4,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff', 'multi', 'patch'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:b330dd80bd6b67a8defe",
+    "declarationId": "react-case-v1:c953430887f772754ab0",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:189:3:registration:2",
+    "kind": "test",
+    "title": "`React ${type} retains matching annotation children during delayed movement and removal (virtualized: %s)`",
+    "estimatedRegistrations": 4,
+    "registrationIndex": 2,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff', 'multi', 'patch'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:8a9d5553e384389a46cb",
+    "declarationId": "react-case-v1:c953430887f772754ab0",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:189:3:registration:3",
+    "kind": "test",
+    "title": "`React ${type} retains matching annotation children during delayed movement and removal (virtualized: %s)`",
+    "estimatedRegistrations": 4,
+    "registrationIndex": 3,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff', 'multi', 'patch'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:60b668745e3120e22841",
+    "declarationId": "react-case-v1:c953430887f772754ab0",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:189:3:registration:0",
+    "kind": "test",
+    "title": "`React ${type} retains matching annotation children during delayed movement and removal (virtualized: %s)`",
+    "estimatedRegistrations": 4,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff', 'multi', 'patch'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:c11a27abf0d932e3bea6",
+    "declarationId": "react-case-v1:c953430887f772754ab0",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:189:3:registration:1",
+    "kind": "test",
+    "title": "`React ${type} retains matching annotation children during delayed movement and removal (virtualized: %s)`",
+    "estimatedRegistrations": 4,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff', 'multi', 'patch'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:2169e1d502a8af659a19",
+    "declarationId": "react-case-v1:c953430887f772754ab0",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:189:3:registration:2",
+    "kind": "test",
+    "title": "`React ${type} retains matching annotation children during delayed movement and removal (virtualized: %s)`",
+    "estimatedRegistrations": 4,
+    "registrationIndex": 2,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff', 'multi', 'patch'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:dcec29b2983295c8ebc4",
+    "declarationId": "react-case-v1:c953430887f772754ab0",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:189:3:registration:3",
+    "kind": "test",
+    "title": "`React ${type} retains matching annotation children during delayed movement and removal (virtualized: %s)`",
+    "estimatedRegistrations": 4,
+    "registrationIndex": 3,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff', 'multi', 'patch'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:40acbbf315b2f900a74a",
+    "declarationId": "react-case-v1:7d7c9e6c035e521d8968",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:321:3:registration:0",
+    "kind": "test",
+    "title": "`React CodeView ${type} keeps displayed annotations while the input version advances (header and gutter slots: %s, controlled: %s)`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:ae7d9be04fcda5201e97",
+    "declarationId": "react-case-v1:7d7c9e6c035e521d8968",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:321:3:registration:1",
+    "kind": "test",
+    "title": "`React CodeView ${type} keeps displayed annotations while the input version advances (header and gutter slots: %s, controlled: %s)`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:8c6a511dd83128198a54",
+    "declarationId": "react-case-v1:7d7c9e6c035e521d8968",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:321:3:registration:0",
+    "kind": "test",
+    "title": "`React CodeView ${type} keeps displayed annotations while the input version advances (header and gutter slots: %s, controlled: %s)`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:bfce08d9d1ac0bec98b6",
+    "declarationId": "react-case-v1:7d7c9e6c035e521d8968",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:321:3:registration:1",
+    "kind": "test",
+    "title": "`React CodeView ${type} keeps displayed annotations while the input version advances (header and gutter slots: %s, controlled: %s)`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:bb6ad18d13aad2c19d9a",
+    "declarationId": "react-case-v1:7d7c9e6c035e521d8968",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:321:3:registration:0",
+    "kind": "test",
+    "title": "`React CodeView ${type} keeps displayed annotations while the input version advances (header and gutter slots: %s, controlled: %s)`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:7bb71168ac2d5ad9393c",
+    "declarationId": "react-case-v1:7d7c9e6c035e521d8968",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:321:3:registration:1",
+    "kind": "test",
+    "title": "`React CodeView ${type} keeps displayed annotations while the input version advances (header and gutter slots: %s, controlled: %s)`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:059199ccffee7607857e",
+    "declarationId": "react-case-v1:7d7c9e6c035e521d8968",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:321:3:registration:0",
+    "kind": "test",
+    "title": "`React CodeView ${type} keeps displayed annotations while the input version advances (header and gutter slots: %s, controlled: %s)`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:3b699e969c9a78fe04fe",
+    "declarationId": "react-case-v1:7d7c9e6c035e521d8968",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:321:3:registration:1",
+    "kind": "test",
+    "title": "`React CodeView ${type} keeps displayed annotations while the input version advances (header and gutter slots: %s, controlled: %s)`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:e814ca45ef86fe38a81a",
+    "declarationId": "react-case-v1:ce77617f9112c0427d31",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:427:3:registration:0",
+    "kind": "test",
+    "title": "`React CodeView ${type} keeps annotation content unchanged when editing moves its row`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:1a0f3687653c5063bf04",
+    "declarationId": "react-case-v1:ce77617f9112c0427d31",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:427:3:registration:1",
+    "kind": "test",
+    "title": "`React CodeView ${type} keeps annotation content unchanged when editing moves its row`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:1f3ca1beef5faf662462",
+    "declarationId": "react-case-v1:94e11f629dfea9c4c833",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:519:3:registration:0",
+    "kind": "test",
+    "title": "`React CodeView ${type} keeps an edited item's annotation content when another item rerenders`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:b509ee4bdcc8b97011d1",
+    "declarationId": "react-case-v1:94e11f629dfea9c4c833",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:519:3:registration:1",
+    "kind": "test",
+    "title": "`React CodeView ${type} keeps an edited item's annotation content when another item rerenders`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:07ee00a9c866586cde6c",
+    "declarationId": "react-case-v1:39756564975607978abc",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:601:3:registration:0",
+    "kind": "test",
+    "title": "`React ${type} resets frozen annotation slots while rejected completion is highlighted`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:f4547ed26002b3e054ae",
+    "declarationId": "react-case-v1:39756564975607978abc",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:601:3:registration:1",
+    "kind": "test",
+    "title": "`React ${type} resets frozen annotation slots while rejected completion is highlighted`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:a1f5d553c017796c2d80",
+    "declarationId": "react-case-v1:2cff5c7c45f0d05b6e0e",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:726:3:registration:0",
+    "kind": "test",
+    "title": "`React ${type} shows the edited content's annotations when editing starts during a replacement`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:778a5ea536cf3f370ffe",
+    "declarationId": "react-case-v1:2cff5c7c45f0d05b6e0e",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:726:3:registration:1",
+    "kind": "test",
+    "title": "`React ${type} shows the edited content's annotations when editing starts during a replacement`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const type of ['file', 'diff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:95ff4cf154e6e8f214ee",
+    "declarationId": "react-case-v1:b56439f335eff1fdaee3",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:776:3:registration:0",
+    "kind": "test",
+    "title": "`React UnresolvedFile keeps ${custom ? 'custom' : 'default'} actions and annotations during sequential resolutions`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": { "kind": "loop", "contexts": ["for (const custom of [false, true]) {"] },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:446dba4eb9bb55a6850f",
+    "declarationId": "react-case-v1:b56439f335eff1fdaee3",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:776:3:registration:1",
+    "kind": "test",
+    "title": "`React UnresolvedFile keeps ${custom ? 'custom' : 'default'} actions and annotations during sequential resolutions`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": { "kind": "loop", "contexts": ["for (const custom of [false, true]) {"] },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-case-v1:ab76f5e3141a99788770",
+    "declarationId": "react-case-v1:ab76f5e3141a99788770",
+    "source": "packages/diffs/test/reactAnnotations.workerRendering.test.ts:913:1",
+    "kind": "test",
+    "title": "React FileDiff keeps hydrated annotations while a replacement is highlighted",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:8433faed0c8c71f14423",
+    "declarationId": "react-case-v1:8433faed0c8c71f14423",
+    "source": "packages/diffs/test/reactCodeViewEditorOptions.test.ts:322:3",
+    "kind": "test",
+    "title": "renders read-only without a provider and rejects a factory escape hatch",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:2f6b3cfd01c26a045876",
+    "declarationId": "react-case-v1:2f6b3cfd01c26a045876",
+    "source": "packages/diffs/test/reactCodeViewEditorOptions.test.ts:373:3",
+    "kind": "test",
+    "title": "merges editor options and isolates simultaneous item callbacks",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:73c8210a2bb75d90224b",
+    "declarationId": "react-case-v1:73c8210a2bb75d90224b",
+    "source": "packages/diffs/test/reactCodeViewEditorOptions.test.ts:453:3",
+    "kind": "test",
+    "title": "uses replacement factories, options, and keys only for later sessions",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:3005871b5217c3b0d2d5",
+    "declarationId": "react-case-v1:3005871b5217c3b0d2d5",
+    "source": "packages/diffs/test/reactCodeViewEditorOptions.test.ts:532:3",
+    "kind": "test",
+    "title": "completes controlled sessions with their owning items",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:6208ba1aaef4a7f30c58",
+    "declarationId": "react-case-v1:6208ba1aaef4a7f30c58",
+    "source": "packages/diffs/test/reactCodeViewEditorOptions.test.ts:636:3",
+    "kind": "test",
+    "title": "completes every session when a controlled empty list removes all items",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:67440a4c433dbc50a00e",
+    "declarationId": "react-case-v1:67440a4c433dbc50a00e",
+    "source": "packages/diffs/test/reactCodeViewEditorOptions.test.ts:700:3",
+    "kind": "test",
+    "title": "uses the context factory for imperative item additions",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:6050175b6841d92fb773",
+    "declarationId": "react-case-v1:6050175b6841d92fb773",
+    "source": "packages/diffs/test/reactCodeViewEditorOptions.test.ts:737:3",
+    "kind": "test",
+    "title": "removes initial items through the imperative handle",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:00070ab2c4699e34cd87",
+    "declarationId": "react-case-v1:00070ab2c4699e34cd87",
+    "source": "packages/diffs/test/reactCodeViewEditorOptions.test.ts:765:3",
+    "kind": "test",
+    "title": "rejects imperative item removal in controlled mode",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:12c1e183432fc423b2e5",
+    "declarationId": "react-case-v1:12c1e183432fc423b2e5",
+    "source": "packages/diffs/test/reactCodeViewEditorOptions.test.ts:791:3",
+    "kind": "test",
+    "title": "retains an item editor across virtualization",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:b3e9d54d90b494a09e24",
+    "declarationId": "react-case-v1:b3e9d54d90b494a09e24",
+    "source": "packages/diffs/test/reactCodeViewEditorOptions.test.ts:845:3",
+    "kind": "test",
+    "title": "cleans a newly created editor when attachment fails",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:da9c6822ef0b0541468d",
+    "declarationId": "react-case-v1:da9c6822ef0b0541468d",
+    "source": "packages/diffs/test/reactCodeViewEditorOptions.test.ts:875:3",
+    "kind": "test",
+    "title": "cleans StrictMode replay editors without leaking the active session",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:cb4d9a6b15cc4b5d8b43",
+    "declarationId": "react-case-v1:b16e5cc813051e3ce053",
+    "source": "packages/diffs/test/reactCodeViewEditorOptions.test.ts:918:5:registration:0",
+    "kind": "test",
+    "title": "`completes a changed session once on ${teardown}`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const teardown of ['direct cleanup', 'React unmount'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:33ad2d75bd8116c75185",
+    "declarationId": "react-case-v1:b16e5cc813051e3ce053",
+    "source": "packages/diffs/test/reactCodeViewEditorOptions.test.ts:918:5:registration:1",
+    "kind": "test",
+    "title": "`completes a changed session once on ${teardown}`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const teardown of ['direct cleanup', 'React unmount'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-case-v1:4933771cfa1116bfab0d",
+    "declarationId": "react-case-v1:4933771cfa1116bfab0d",
+    "source": "packages/diffs/test/reactCodeViewEditorOptions.test.ts:977:3",
+    "kind": "test",
+    "title": "keeps selection controlled by props with a provider mounted",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:0a1d7371b8072b14d29b",
+    "declarationId": "react-case-v1:0a1d7371b8072b14d29b",
+    "source": "packages/diffs/test/reactCodeViewEditorOptions.test.ts:1038:3",
+    "kind": "test",
+    "title": "overwrites untyped selection options in uncontrolled mode",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:0667b6c2bb389f074a29",
+    "declarationId": "react-case-v1:0667b6c2bb389f074a29",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:309:3",
+    "kind": "test",
+    "title": "File renders editor token markup without mutating options",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:eb5b872551ca33e7ced7",
+    "declarationId": "react-case-v1:eb5b872551ca33e7ced7",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:360:3",
+    "kind": "test",
+    "title": "FileDiff renders editor token markup without mutating options",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:e91d834adfcd32e9ed46",
+    "declarationId": "react-case-v1:e91d834adfcd32e9ed46",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:415:3",
+    "kind": "test",
+    "title": "an unchanged commit does not force-render an optionless edit surface",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:13416e180a6e9c49a9c1",
+    "declarationId": "react-case-v1:c40cbe678af520b705c7",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:466:5:registration:0",
+    "kind": "test",
+    "title": "`${surface} uses factory inputs only for new edit sessions`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const surface of ['File', 'FileDiff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:84523817ac9bbc0c17aa",
+    "declarationId": "react-case-v1:c40cbe678af520b705c7",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:466:5:registration:1",
+    "kind": "test",
+    "title": "`${surface} uses factory inputs only for new edit sessions`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const surface of ['File', 'FileDiff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:d2f1dad5358af77b392d",
+    "declarationId": "react-case-v1:accad6ec7e18b76a029c",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:587:5:registration:0",
+    "kind": "test",
+    "title": "`${surface} forwards editStateKey when creating its editor`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const surface of ['File', 'FileDiff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:9ccd8f4920d28b14245c",
+    "declarationId": "react-case-v1:accad6ec7e18b76a029c",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:587:5:registration:1",
+    "kind": "test",
+    "title": "`${surface} forwards editStateKey when creating its editor`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const surface of ['File', 'FileDiff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:65b95a55eff3294765c7",
+    "declarationId": "react-case-v1:171279cf831be583648a",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:633:5:registration:0",
+    "kind": "test",
+    "title": "`${surface} rejects concurrent surfaces using the same editStateKey`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const surface of ['File', 'FileDiff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:e3179d19b6124cb5e63b",
+    "declarationId": "react-case-v1:171279cf831be583648a",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:633:5:registration:1",
+    "kind": "test",
+    "title": "`${surface} rejects concurrent surfaces using the same editStateKey`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const surface of ['File', 'FileDiff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:15f1945bf09a01e0c5bb",
+    "declarationId": "react-case-v1:59de39d5b694a4cf09c3",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:691:5:registration:0",
+    "kind": "test",
+    "title": "`${surface} onEditChange prop receives editor change events and swaps mid-session`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const surface of ['File', 'FileDiff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:25689b4701dce55bd875",
+    "declarationId": "react-case-v1:59de39d5b694a4cf09c3",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:691:5:registration:1",
+    "kind": "test",
+    "title": "`${surface} onEditChange prop receives editor change events and swaps mid-session`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const surface of ['File', 'FileDiff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:ac0e288778b14d6a4234",
+    "declarationId": "react-case-v1:750c2ee7877ba1371acc",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:799:5:registration:0",
+    "kind": "test",
+    "title": "`${surface} annotation slots stay projected through a remap without prop feedback`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const surface of ['File', 'FileDiff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:d56c31cd849e902c0a6f",
+    "declarationId": "react-case-v1:750c2ee7877ba1371acc",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:799:5:registration:1",
+    "kind": "test",
+    "title": "`${surface} annotation slots stay projected through a remap without prop feedback`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const surface of ['File', 'FileDiff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:4c4d505381c351b2f1f1",
+    "declarationId": "react-case-v1:4392025e12b57cc0d528",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:928:5:registration:0",
+    "kind": "test",
+    "title": "`${wrapper} forwards editor options to its FileDiff instance`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const wrapper of ['MultiFileDiff', 'PatchDiff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:f7f5b9a1a1980ed4715a",
+    "declarationId": "react-case-v1:4392025e12b57cc0d528",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:928:5:registration:1",
+    "kind": "test",
+    "title": "`${wrapper} forwards editor options to its FileDiff instance`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const wrapper of ['MultiFileDiff', 'PatchDiff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-case-v1:5da9ce1ed13e5d0ce9e3",
+    "declarationId": "react-case-v1:5da9ce1ed13e5d0ce9e3",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1009:3",
+    "kind": "test",
+    "title": "keeps simultaneous sibling callbacks isolated",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:d6018066fb33df25b783",
+    "declarationId": "react-case-v1:223ab8ea03a0fac28165",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1126:5:registration:0",
+    "kind": "test",
+    "title": "`${surface} reports a missing provider`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const surface of ['File', 'FileDiff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:d95d021e22fe3affb60c",
+    "declarationId": "react-case-v1:223ab8ea03a0fac28165",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1126:5:registration:1",
+    "kind": "test",
+    "title": "`${surface} reports a missing provider`",
+    "estimatedRegistrations": 2,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": ["for (const surface of ['File', 'FileDiff'] as const) {"]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-case-v1:d3a296ebe758c1ceca6a",
+    "declarationId": "react-case-v1:d3a296ebe758c1ceca6a",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1153:3",
+    "kind": "test",
+    "title": "partial FileDiff reports a missing provider before loading completes",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:d74d51300eb7c05fa59e",
+    "declarationId": "react-case-v1:d74d51300eb7c05fa59e",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1194:3",
+    "kind": "test",
+    "title": "partial FileDiff reports an editor factory failure after loading",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-registration-v1:cc886018f6701b64e781",
+    "declarationId": "react-case-v1:d9c6fc2fbf745da55fe5",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1243:7:registration:0",
+    "kind": "test",
+    "title": "`${surface} cancels onAttach on ${termination} before the frame`",
+    "estimatedRegistrations": 4,
+    "registrationIndex": 0,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": [
+        "for (const surface of ['File', 'FileDiff'] as const) {",
+        "for (const termination of ['edit-off', 'unmount'] as const) {"
+      ]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:205add0c205a860c48de",
+    "declarationId": "react-case-v1:d9c6fc2fbf745da55fe5",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1243:7:registration:1",
+    "kind": "test",
+    "title": "`${surface} cancels onAttach on ${termination} before the frame`",
+    "estimatedRegistrations": 4,
+    "registrationIndex": 1,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": [
+        "for (const surface of ['File', 'FileDiff'] as const) {",
+        "for (const termination of ['edit-off', 'unmount'] as const) {"
+      ]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:d81349a9ff4501b8d3c7",
+    "declarationId": "react-case-v1:d9c6fc2fbf745da55fe5",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1243:7:registration:2",
+    "kind": "test",
+    "title": "`${surface} cancels onAttach on ${termination} before the frame`",
+    "estimatedRegistrations": 4,
+    "registrationIndex": 2,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": [
+        "for (const surface of ['File', 'FileDiff'] as const) {",
+        "for (const termination of ['edit-off', 'unmount'] as const) {"
+      ]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-registration-v1:70dc47ab5ffb26e29bff",
+    "declarationId": "react-case-v1:d9c6fc2fbf745da55fe5",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1243:7:registration:3",
+    "kind": "test",
+    "title": "`${surface} cancels onAttach on ${termination} before the frame`",
+    "estimatedRegistrations": 4,
+    "registrationIndex": 3,
+    "dynamicExpansion": {
+      "kind": "loop",
+      "contexts": [
+        "for (const surface of ['File', 'FileDiff'] as const) {",
+        "for (const termination of ['edit-off', 'unmount'] as const) {"
+      ]
+    },
+    "helperExpansion": null,
+    "manualReviewReason": "The upstream title is a dynamic expression."
+  },
+  {
+    "id": "react-case-v1:46c1781d90a928607d4d",
+    "declarationId": "react-case-v1:46c1781d90a928607d4d",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1296:3",
+    "kind": "test",
+    "title": "cleans StrictMode and virtualized edit passes without leaks",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:dcf011668d898fbce009",
+    "declarationId": "react-case-v1:dcf011668d898fbce009",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1398:3",
+    "kind": "test",
+    "title": "a factory returning an owner-constructed editor shares it as configured, ignoring surface editorOptions",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:4500ac0f19946da7d3bc",
+    "declarationId": "react-case-v1:4500ac0f19946da7d3bc",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1530:3",
+    "kind": "test",
+    "title": "accepting installs the completed file with no stale-prop repaint",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:26d55b8121e7fd11df20",
+    "declarationId": "react-case-v1:26d55b8121e7fd11df20",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1587:3",
+    "kind": "test",
+    "title": "a re-serialized keyed file prop keeps the accepted file installed",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:c2a221bbbb81369f4b93",
+    "declarationId": "react-case-v1:c2a221bbbb81369f4b93",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1617:3",
+    "kind": "test",
+    "title": "returning null reverts to the exact file prop",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:5a10eb36788d0ec0c996",
+    "declarationId": "react-case-v1:5a10eb36788d0ec0c996",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1641:3",
+    "kind": "test",
+    "title": "unmount completes a changed session once without installing",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:e6b312b8238d469d7808",
+    "declarationId": "react-case-v1:e6b312b8238d469d7808",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1666:3",
+    "kind": "test",
+    "title": "accepted annotations keep their moved rows through stale commits",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:800db1d6307591eb94f1",
+    "declarationId": "react-case-v1:800db1d6307591eb94f1",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1707:3",
+    "kind": "test",
+    "title": "accepting unchanged text does not restore stale annotation props",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:c31b38fa2b76252b21ff",
+    "declarationId": "react-case-v1:c31b38fa2b76252b21ff",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1812:3",
+    "kind": "test",
+    "title": "MultiFileDiff retains the accepted diff through stale and caught-up pairs",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:e6fb636a972474f575a6",
+    "declarationId": "react-case-v1:e6fb636a972474f575a6",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1876:3",
+    "kind": "test",
+    "title": "MultiFileDiff does not restore stale annotations after unchanged text",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:53b7378bd68a5717d675",
+    "declarationId": "react-case-v1:53b7378bd68a5717d675",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1927:3",
+    "kind": "test",
+    "title": "a newer MultiFileDiff pair supersedes a pending bridge",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:d6bec131421bea47d2f0",
+    "declarationId": "react-case-v1:d6bec131421bea47d2f0",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:1977:3",
+    "kind": "test",
+    "title": "a re-serialized keyed pair keeps the accepted diff installed",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:1121a1c57ecf6681d086",
+    "declarationId": "react-case-v1:1121a1c57ecf6681d086",
+    "source": "packages/diffs/test/reactEditorOptions.test.ts:2026:3",
+    "kind": "test",
+    "title": "PatchDiff keeps the accepted diff until the patch prop advances",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:b990a660839c645a1434",
+    "declarationId": "react-case-v1:b990a660839c645a1434",
+    "source": "packages/diffs/test/reactPartialHydration.test.ts:142:3",
+    "kind": "test",
+    "title": "editable FileDiff creates its editor only after the partial diff hydrates",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:9c8ce86dfcd8ec1e2c76",
+    "declarationId": "react-case-v1:9c8ce86dfcd8ec1e2c76",
+    "source": "packages/diffs/test/reactPartialHydration.test.ts:231:3",
+    "kind": "test",
+    "title": "turning edit off during a partial load prevents late attachment",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:56e3c74ab1359fa6199a",
+    "declarationId": "react-case-v1:56e3c74ab1359fa6199a",
+    "source": "packages/diffs/test/reactPartialHydration.test.ts:293:3",
+    "kind": "test",
+    "title": "FileDiff updates React-owned slots when a partial diff finishes loading",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:4402042025a12149879c",
+    "declarationId": "react-case-v1:4402042025a12149879c",
+    "source": "packages/diffs/test/reactPartialHydration.test.ts:343:3",
+    "kind": "test",
+    "title": "PatchDiff updates React-owned slots after loading and keeps the result on parent rerender",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  },
+  {
+    "id": "react-case-v1:dbd869ebf0be79aefa5c",
+    "declarationId": "react-case-v1:dbd869ebf0be79aefa5c",
+    "source": "packages/diffs/test/reactPartialHydration.test.ts:391:3",
+    "kind": "test",
+    "title": "FileDiff accepts a different partial source after hydration",
+    "estimatedRegistrations": 1,
+    "registrationIndex": 0,
+    "dynamicExpansion": null,
+    "helperExpansion": null,
+    "manualReviewReason": null
+  }
+]

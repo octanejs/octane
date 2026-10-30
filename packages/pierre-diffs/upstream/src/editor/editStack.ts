@@ -1,0 +1,499 @@
+import type { TextDocument } from './textDocument';
+import type {
+  EditHistoryCoalescingMode,
+  EditHistoryEntry,
+  EditHistoryState,
+  EditorLineAnnotation,
+  EditorSelection,
+  EditorType,
+  ResolvedTextEdit,
+} from './types';
+
+/** Largest number of undo or redo entries kept; oldest entries drop first once exceeded. */
+const DEFAULT_EDIT_STACK_MAX_ENTRIES = 100;
+
+const COALESCING_MODE_INSERT = 'insert';
+const COALESCING_MODE_BACKSPACE = 'backspace';
+const COALESCING_MODE_DELETE = 'delete';
+
+export type EditStackEntry<
+  EType extends EditorType,
+  LAnnotation = unknown,
+> = EditHistoryEntry<EType, LAnnotation>;
+type EditStackCoalescingMode = EditHistoryCoalescingMode;
+
+/** Options for the edit stack. */
+export interface EditStackOptions {
+  /** The maximum number of entries to keep in the undo stack. */
+  maxEntries?: number;
+}
+
+/** A stack of edit entries. */
+export class EditStack<EType extends EditorType, LAnnotation = unknown> {
+  #undoStack: EditStackEntry<EType, LAnnotation>[] = [];
+  #redoStack: EditStackEntry<EType, LAnnotation>[] = [];
+  #maxEntries: number;
+  #canCoalesce = false;
+
+  constructor(options?: EditStackOptions) {
+    this.#maxEntries = Math.max(
+      1,
+      options?.maxEntries ?? DEFAULT_EDIT_STACK_MAX_ENTRIES
+    );
+  }
+
+  get canUndo(): boolean {
+    return this.#undoStack.length > 0;
+  }
+
+  get canRedo(): boolean {
+    return this.#redoStack.length > 0;
+  }
+
+  /** Return an independent, developer-editable history snapshot. */
+  getState(): EditHistoryState<EType, LAnnotation> {
+    return {
+      undoStack: this.#undoStack.map(cloneEditStackEntryForState),
+      redoStack: this.#redoStack.map(cloneEditStackEntryForState),
+      maxEntries: this.#maxEntries,
+      canCoalesce: this.#canCoalesce,
+    };
+  }
+
+  /** Return a live view over this stack without copying its entries. */
+  getLiveState(): EditHistoryState<EType, LAnnotation> {
+    return Object.defineProperties(
+      {},
+      {
+        undoStack: {
+          enumerable: true,
+          get: () => this.#undoStack,
+        },
+        redoStack: {
+          enumerable: true,
+          get: () => this.#redoStack,
+        },
+        maxEntries: {
+          enumerable: true,
+          get: () => this.#maxEntries,
+        },
+        canCoalesce: {
+          enumerable: true,
+          get: () => this.#canCoalesce,
+        },
+      }
+    ) as EditHistoryState<EType, LAnnotation>;
+  }
+
+  /** Transfer developer-owned history into an edit stack. */
+  static fromState<EType extends EditorType, LAnnotation>(
+    state: EditHistoryState<EType, LAnnotation>
+  ): EditStack<EType, LAnnotation> {
+    const stack = new EditStack<EType, LAnnotation>({
+      maxEntries: state.maxEntries,
+    });
+    stack.#undoStack = state.undoStack;
+    stack.#redoStack = state.redoStack;
+    stack.#canCoalesce = state.canCoalesce;
+    return stack;
+  }
+
+  /** Clears both the undo and redo stacks. */
+  clear(): void {
+    this.#undoStack.length = 0;
+    this.#redoStack.length = 0;
+    this.#canCoalesce = false;
+  }
+
+  /** Clears the redo stack. */
+  clearRedo(): void {
+    this.#redoStack.length = 0;
+  }
+
+  /** Pushes a new entry onto the undo stack. */
+  push(entry: EditStackEntry<EType, LAnnotation>): void {
+    this.#undoStack.push(entry);
+    this.clearRedo();
+    this.#canCoalesce = true;
+    if (this.#undoStack.length > this.#maxEntries) {
+      this.#undoStack.shift();
+    }
+  }
+
+  /** Sets the selections after the last undo entry. */
+  setLastUndoSelectionsAfter(selections: EditorSelection[]): void {
+    const lastEntry = this.#undoStack[this.#undoStack.length - 1];
+    if (lastEntry !== undefined) {
+      lastEntry.selectionsAfter = selections.map((selection) => ({
+        ...selection,
+      }));
+    }
+  }
+
+  /** Sets the line annotations after the last undo entry. */
+  setLastUndoLineAnnotations(
+    lineAnnotationsBefore: EditorLineAnnotation<EType, LAnnotation>[],
+    lineAnnotationsAfter: EditorLineAnnotation<EType, LAnnotation>[]
+  ): void {
+    const lastEntry = this.#undoStack[this.#undoStack.length - 1];
+    if (lastEntry !== undefined) {
+      lastEntry.lineAnnotationsBefore = lineAnnotationsBefore.slice();
+      lastEntry.lineAnnotationsAfter = lineAnnotationsAfter.slice();
+    }
+  }
+
+  /** Returns the last undo entry, or `undefined` if empty. */
+  peekUndo(): EditStackEntry<EType, LAnnotation> | undefined {
+    return this.#undoStack[this.#undoStack.length - 1];
+  }
+
+  /** Returns the last undo entry only while its coalescing group is open. */
+  peekUndoForCoalescing(): EditStackEntry<EType, LAnnotation> | undefined {
+    return this.#canCoalesce ? this.peekUndo() : undefined;
+  }
+
+  /** Replaces the last undo entry with the given entry. */
+  replaceLastUndo(entry: EditStackEntry<EType, LAnnotation>): void {
+    if (this.#undoStack.length === 0) {
+      this.push(entry);
+      return;
+    }
+    this.#undoStack[this.#undoStack.length - 1] = entry;
+    this.clearRedo();
+    this.#canCoalesce = true;
+  }
+
+  /** Moves the latest undo entry to the redo stack and returns it, or `undefined` if empty. */
+  popUndoToRedo(): EditStackEntry<EType, LAnnotation> | void {
+    const entry = this.#undoStack.pop();
+    if (entry !== undefined) {
+      this.#redoStack.push(entry);
+      this.#canCoalesce = false;
+      return entry;
+    }
+  }
+
+  /** Moves the latest redo entry back to the undo stack and returns it, or `undefined` if empty. */
+  popRedoToUndo(): EditStackEntry<EType, LAnnotation> | void {
+    const entry = this.#redoStack.pop();
+    if (entry !== undefined) {
+      this.#undoStack.push(entry);
+      this.#canCoalesce = false;
+      return entry;
+    }
+  }
+}
+
+function cloneEditStackEntry<EType extends EditorType, LAnnotation>(
+  entry: EditStackEntry<EType, LAnnotation>
+): EditStackEntry<EType, LAnnotation> {
+  return {
+    ...entry,
+    forwardEdits: entry.forwardEdits.map((edit) => ({ ...edit })),
+    inverseEdits: entry.inverseEdits.map((edit) => ({ ...edit })),
+    selectionsBefore: entry.selectionsBefore?.map(cloneSelection),
+    selectionsAfter: entry.selectionsAfter?.map(cloneSelection),
+    lineAnnotationsBefore: entry.lineAnnotationsBefore?.slice(),
+    lineAnnotationsAfter: entry.lineAnnotationsAfter?.slice(),
+  };
+}
+
+function cloneEditStackEntryForState<EType extends EditorType, LAnnotation>(
+  entry: EditStackEntry<EType, LAnnotation>
+): EditStackEntry<EType, LAnnotation> {
+  return {
+    ...cloneEditStackEntry(entry),
+    lineAnnotationsBefore: entry.lineAnnotationsBefore?.map((annotation) => ({
+      ...annotation,
+    })),
+    lineAnnotationsAfter: entry.lineAnnotationsAfter?.map((annotation) => ({
+      ...annotation,
+    })),
+  };
+}
+
+function cloneSelection(selection: EditorSelection): EditorSelection {
+  return {
+    ...selection,
+    start: { ...selection.start },
+    end: { ...selection.end },
+  };
+}
+
+export function createEditStackEntry<EType extends EditorType, LAnnotation>(
+  textDocument: TextDocument<EType, LAnnotation>,
+  resolvedEdits: ResolvedTextEdit[],
+  versionBefore: number,
+  versionAfter: number,
+  selectionsBefore?: EditorSelection[],
+  selectionsAfter?: EditorSelection[],
+  lineAnnotationsBefore?: EditorLineAnnotation<EType, LAnnotation>[],
+  lineAnnotationsAfter?: EditorLineAnnotation<EType, LAnnotation>[]
+): EditStackEntry<EType, LAnnotation> {
+  const forwardEdits = [...resolvedEdits].sort((a, b) => a.start - b.start);
+  const inverseEdits: ResolvedTextEdit[] = [];
+  let coalescingMode: EditStackCoalescingMode | undefined;
+  if (selectionsBefore?.length === forwardEdits.length) {
+    const caretOffsets: number[] = [];
+    for (const selection of selectionsBefore) {
+      if (
+        selection.start.line !== selection.end.line ||
+        selection.start.character !== selection.end.character
+      ) {
+        break;
+      }
+      caretOffsets.push(textDocument.offsetAt(selection.start));
+    }
+    if (caretOffsets.length === forwardEdits.length) {
+      caretOffsets.sort((a, b) => a - b);
+      let isBackspace = true;
+      let isDelete = true;
+      for (let i = 0; i < forwardEdits.length; i++) {
+        const edit = forwardEdits[i];
+        if (edit.text.length > 0 || edit.start === edit.end) {
+          isBackspace = false;
+          isDelete = false;
+          break;
+        }
+        isBackspace &&= caretOffsets[i] === edit.end;
+        isDelete &&= caretOffsets[i] === edit.start;
+      }
+      coalescingMode = isBackspace
+        ? COALESCING_MODE_BACKSPACE
+        : isDelete
+          ? COALESCING_MODE_DELETE
+          : undefined;
+    }
+  }
+  for (let i = 0, offsetDelta = 0; i < forwardEdits.length; i++) {
+    const edit = forwardEdits[i];
+    const replacedText = textDocument.getTextSlice(edit.start, edit.end);
+    const startAfterEdit = edit.start + offsetDelta;
+    inverseEdits.push({
+      start: startAfterEdit,
+      end: startAfterEdit + edit.text.length,
+      text: replacedText,
+    });
+    offsetDelta += edit.text.length - (edit.end - edit.start);
+  }
+  return {
+    forwardEdits: forwardEdits.map((edit) => ({ ...edit })),
+    inverseEdits: inverseEdits,
+    versionBefore,
+    versionAfter,
+    selectionsBefore: selectionsBefore?.map((selection) => ({
+      ...selection,
+    })),
+    selectionsAfter: selectionsAfter?.map((selection) => ({ ...selection })),
+    lineAnnotationsBefore: lineAnnotationsBefore?.slice(),
+    lineAnnotationsAfter: lineAnnotationsAfter?.slice(),
+    coalescingMode,
+  };
+}
+
+/** Determines if the change matches following modes:
+ * - 'insert': simple typing
+ * - 'backspace': backward delete
+ * - 'delete': forward delete
+ */
+export function shouldCoalesceEditStackEntry<
+  EType extends EditorType,
+  LAnnotation,
+>(
+  previousEntry: EditStackEntry<EType, LAnnotation> | undefined,
+  nextEntry: EditStackEntry<EType, LAnnotation>
+): boolean {
+  if (
+    previousEntry === undefined ||
+    previousEntry.undoBoundary === true ||
+    nextEntry.undoBoundary === true ||
+    previousEntry.forwardEdits.length === 0 ||
+    previousEntry.forwardEdits.length !== previousEntry.inverseEdits.length ||
+    previousEntry.forwardEdits.length !== nextEntry.forwardEdits.length ||
+    nextEntry.forwardEdits.length !== nextEntry.inverseEdits.length
+  ) {
+    return false;
+  }
+  let mode: EditStackCoalescingMode | undefined;
+  for (let i = 0; i < previousEntry.forwardEdits.length; i++) {
+    const previousForward = previousEntry.forwardEdits[i];
+    const previousInverse = previousEntry.inverseEdits[i];
+    const nextForward = nextEntry.forwardEdits[i];
+    const nextInverse = nextEntry.inverseEdits[i];
+    const mappedNextStart = mapOffsetAfterForwardBatchToBefore(
+      nextForward.start,
+      previousEntry.forwardEdits
+    );
+    const previousWasInsert =
+      previousForward.start <= previousForward.end &&
+      previousForward.text.length > 0 &&
+      !previousForward.text.includes('\n') &&
+      !previousInverse.text.includes('\n');
+    const nextIsInsert =
+      nextForward.start === nextForward.end &&
+      nextForward.text.length > 0 &&
+      !nextForward.text.includes('\n') &&
+      nextInverse.text.length === 0;
+    if (previousWasInsert && nextIsInsert) {
+      // Merge only when the next insert starts exactly where the previous
+      // inserted text ends, in after-edit offsets. `previousInverse.end` marks
+      // that point, since undo replaces exactly the inserted range. A
+      // base-offset check can't tell this apart from a caret that jumped to the
+      // left edge: both edges of a pure insert map back to the same base offset,
+      // so typing "a" then "b" at the left edge would merge as "ab" while the
+      // buffer holds "ba", corrupting redo.
+      if (nextForward.start !== previousInverse.end) {
+        return false;
+      }
+      mode ??= COALESCING_MODE_INSERT;
+      if (
+        mode !== COALESCING_MODE_INSERT ||
+        (previousEntry.coalescingMode !== undefined &&
+          previousEntry.coalescingMode !== COALESCING_MODE_INSERT) ||
+        (nextEntry.coalescingMode !== undefined &&
+          nextEntry.coalescingMode !== COALESCING_MODE_INSERT)
+      ) {
+        return false;
+      }
+      continue;
+    }
+    const previousWasDelete =
+      previousForward.text.length === 0 &&
+      previousForward.end > previousForward.start &&
+      previousInverse.text.length > 0;
+    const nextIsDelete =
+      nextForward.text.length === 0 &&
+      nextForward.end > nextForward.start &&
+      nextInverse.text.length > 0;
+    if (previousWasDelete && nextIsDelete) {
+      let nextMode: EditStackCoalescingMode;
+      if (mappedNextStart === previousForward.end) {
+        nextMode = COALESCING_MODE_DELETE;
+      } else if (
+        mappedNextStart + (nextForward.end - nextForward.start) !==
+        previousForward.start
+      ) {
+        return false;
+      } else {
+        nextMode = COALESCING_MODE_BACKSPACE;
+      }
+      mode ??= nextMode;
+      if (
+        mode !== nextMode ||
+        (previousEntry.coalescingMode !== undefined &&
+          previousEntry.coalescingMode !== nextMode) ||
+        (nextEntry.coalescingMode !== undefined &&
+          nextEntry.coalescingMode !== nextMode)
+      ) {
+        return false;
+      }
+      continue;
+    }
+    return false;
+  }
+  return mode !== undefined;
+}
+
+/** Coalesce edit stack entries for simple typing and single-character deletes. */
+export function coalesceEditStackEntries<EType extends EditorType, LAnnotation>(
+  previousEntry: EditStackEntry<EType, LAnnotation>,
+  nextEntry: EditStackEntry<EType, LAnnotation>
+): EditStackEntry<EType, LAnnotation> {
+  const forwardEdits: ResolvedTextEdit[] = [];
+  const replacedTexts: string[] = [];
+  let coalescingMode: EditStackCoalescingMode | undefined;
+  for (let i = 0; i < previousEntry.forwardEdits.length; i++) {
+    const previousForward = previousEntry.forwardEdits[i];
+    const previousInverse = previousEntry.inverseEdits[i];
+    const nextForward = nextEntry.forwardEdits[i];
+    const nextInverse = nextEntry.inverseEdits[i];
+    const mappedNextStart = mapOffsetAfterForwardBatchToBefore(
+      nextForward.start,
+      previousEntry.forwardEdits
+    );
+
+    if (previousForward.text.length > 0) {
+      coalescingMode ??= COALESCING_MODE_INSERT;
+      forwardEdits.push({
+        start: previousForward.start,
+        end: previousForward.end,
+        text: previousForward.text + nextForward.text,
+      });
+      replacedTexts.push(previousInverse.text);
+      continue;
+    }
+
+    if (mappedNextStart === previousForward.end) {
+      coalescingMode ??= COALESCING_MODE_DELETE;
+      forwardEdits.push({
+        start: previousForward.start,
+        end: mappedNextStart + (nextForward.end - nextForward.start),
+        text: '',
+      });
+      replacedTexts.push(previousInverse.text + nextInverse.text);
+      continue;
+    }
+
+    coalescingMode ??= COALESCING_MODE_BACKSPACE;
+    forwardEdits.push({
+      start: Math.min(previousForward.start, mappedNextStart),
+      end: previousForward.end,
+      text: '',
+    });
+    replacedTexts.push(nextInverse.text + previousInverse.text);
+  }
+
+  return {
+    forwardEdits,
+    inverseEdits: buildInverseEditsFromReplacedTexts(
+      forwardEdits,
+      replacedTexts
+    ),
+    versionBefore: previousEntry.versionBefore,
+    versionAfter: nextEntry.versionAfter,
+    selectionsBefore: previousEntry.selectionsBefore?.slice(),
+    selectionsAfter: nextEntry.selectionsAfter?.slice(),
+    lineAnnotationsBefore: previousEntry.lineAnnotationsBefore?.slice(),
+    lineAnnotationsAfter: nextEntry.lineAnnotationsAfter?.slice(),
+    coalescingMode,
+  };
+}
+
+function buildInverseEditsFromReplacedTexts(
+  forwardEdits: readonly ResolvedTextEdit[],
+  replacedTexts: readonly string[]
+): ResolvedTextEdit[] {
+  const inverseEdits: ResolvedTextEdit[] = [];
+  for (let i = 0, offsetDelta = 0; i < forwardEdits.length; i++) {
+    const edit = forwardEdits[i];
+    const startAfterEdit = edit.start + offsetDelta;
+    inverseEdits.push({
+      start: startAfterEdit,
+      end: startAfterEdit + edit.text.length,
+      text: replacedTexts[i],
+    });
+    offsetDelta += edit.text.length - (edit.end - edit.start);
+  }
+  return inverseEdits;
+}
+
+function mapOffsetAfterForwardBatchToBefore(
+  offsetAfter: number,
+  forwardEdits: readonly ResolvedTextEdit[]
+): number {
+  let offset = offsetAfter;
+  for (const edit of forwardEdits) {
+    const oldLength = edit.end - edit.start;
+    const newLength = edit.text.length;
+    const delta = newLength - oldLength;
+    if (offset < edit.start) {
+      continue;
+    }
+    if (offset >= edit.start + newLength) {
+      offset -= delta;
+      continue;
+    }
+    offset = edit.start + Math.min(offset - edit.start, oldLength);
+  }
+  return offset;
+}

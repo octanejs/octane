@@ -1,0 +1,24 @@
+diff --git a/tests/upstream/reactAnnotations.workerRendering.test.ts b/tests/upstream/reactAnnotations.workerRendering.test.ts
+--- a/tests/upstream/reactAnnotations.workerRendering.test.ts
++++ b/tests/upstream/reactAnnotations.workerRendering.test.ts
+@@ -1,6 +1,6 @@
+ import { afterAll, beforeAll, expect, test } from 'bun:test';
+ import { createTwoFilesPatch } from 'diff';
+-import { act, createElement, createRef, type ReactElement } from 'octane';
++import { act, createElement, type ReactElement } from 'octane';
+ import { createRoot } from 'octane';
+ 
+ import { Editor } from '../../upstream/src/editor/editor';
+@@ -34,6 +34,12 @@ import type { RenderDiffRequest } from '../../upstream/src/worker/types';
+ import { installDom, wait, waitFor } from './domHarness';
+ import { createInitializedManager, withTimeout } from './workerPoolHarness';
+ 
++// OCTANE DIVERGENCE[create-ref]: Octane has no createRef; React's returns
++// this same `{ current: null }` object.
++function createRef<T>(): { current: T | null } {
++  return { current: null };
++}
++
+ let highlighter: DiffsHighlighter;
+ beforeAll(async () => {
+   highlighter = await getSharedHighlighter({

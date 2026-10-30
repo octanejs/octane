@@ -1,0 +1,111 @@
+{
+  "name": "@pierre/diffs",
+  "version": "1.6.1",
+  "license": "apache-2.0",
+  "files": [
+    "dist",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "dist/components/web-components.js",
+    "dist/worker/worker.js",
+    "dist/worker/worker-portable.js"
+  ],
+  "typesVersions": {
+    "*": {
+      "*": [
+        "dist/*"
+      ],
+      "edit": [
+        "dist/edit/index.d.ts"
+      ],
+      "react": [
+        "dist/react/index.d.ts"
+      ],
+      "ssr": [
+        "dist/ssr/index.d.ts"
+      ],
+      "worker": [
+        "dist/worker/index.d.ts"
+      ]
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./edit": {
+      "types": "./dist/edit/index.d.ts",
+      "import": "./dist/edit/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    },
+    "./ssr": {
+      "types": "./dist/ssr/index.d.ts",
+      "import": "./dist/ssr/index.js"
+    },
+    "./worker": {
+      "types": "./dist/worker/index.d.ts",
+      "import": "./dist/worker/index.js"
+    },
+    "./worker/worker.js": {
+      "types": "./dist/worker/worker.d.ts",
+      "import": "./dist/worker/worker.js"
+    },
+    "./worker/worker-portable.js": {
+      "types": "./dist/worker/worker-portable.d.ts",
+      "import": "./dist/worker/worker-portable.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepublishOnly": "moon run diffs:prepublish"
+  },
+  "dependencies": {
+    "@pierre/highlights": "workspace:*",
+    "@pierre/theme": "workspace:*",
+    "@pierre/theming": "workspace:*",
+    "diff": "catalog:",
+    "hast-util-to-html": "catalog:",
+    "lru_map": "catalog:",
+    "shiki": "^3.0.0 || ^4.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@tsdown/css": "catalog:",
+    "@types/hast": "catalog:",
+    "@types/jsdom": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "autoprefixer": "catalog:",
+    "jsdom": "catalog:",
+    "lightningcss": "catalog:",
+    "postcss": "catalog:",
+    "postcss-calc": "catalog:",
+    "postcss-nesting": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^18.3.1 || ^19.0.0",
+    "react-dom": "^18.3.1 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  }
+}
