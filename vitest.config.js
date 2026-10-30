@@ -26,6 +26,7 @@ import useSyncExternalStorePristine from './packages/use-sync-external-store/tes
 import nextThemesAdapted from './packages/next-themes/tests/vitest.adapted.config.ts';
 import effectAtomAdapted from './packages/effect-atom/tests/vitest.adapted.config.ts';
 import pierreTreesAdapted from './packages/pierre-trees/tests/vitest.adapted.config.ts';
+import legendappListAdapted from './packages/legendapp-list/tests/vitest.adapted.config.ts';
 import pierreDiffsAdapted from './packages/pierre-diffs/tests/vitest.adapted.config.ts';
 import baseUIAdapted from './packages/base-ui/tests/vitest.config.ts';
 import baseUIUtilsAdapted from './packages/base-ui-utils/tests/vitest.config.ts';
@@ -759,6 +760,48 @@ export default defineConfig({
 				},
 				plugins: [octane({ requireDirective: true })],
 				resolve: { dedupe: ['octane', 'react', 'react-dom', '@pierre/trees'] },
+			},
+			{ ...legendappListAdapted, testExecution: { group: 'react-parity' } },
+			{
+				// Server rendering differential: octane/server against react-dom/server.
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'legendapp-list-ssr',
+					include: ['packages/legendapp-list/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					dedupe: ['octane', 'react', 'react-dom'],
+					alias: [
+						{
+							find: /^octane(?:\/server)?$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'legendapp-list-pristine',
+					include: ['packages/legendapp-list/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
+			{
+				// Real-Chromium differential: the driver serves one .tsrx fixture through the
+				// binding on Octane and through @legendapp/list/react on React.
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'legendapp-list-browser',
+					include: ['packages/legendapp-list/tests/browser/**/*.browser.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 120_000,
+					hookTimeout: 120_000,
+				},
 			},
 			{
 				testExecution: { group: 'react-parity' },

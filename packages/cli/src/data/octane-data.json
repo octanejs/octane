@@ -843,6 +843,20 @@
       ]
     },
     {
+      "name": "@octanejs/legendapp-list",
+      "version": "0.0.0",
+      "category": "Tables",
+      "upstream": { "package": "@legendapp/list", "version": "3.3.5" },
+      "surface": "The complete @legendapp/list/react entry: LegendList with every prop (data or children, renderItem, keyExtractor, getItemType, recycleItems, estimated and fixed item sizes, drawDistance, columns, sticky headers, snapping, initial scroll, maintainScrollAtEnd, maintainVisibleContentPosition, anchoredEndSpace, alwaysRender, viewability, header, footer and empty components, useWindowScroll, renderScrollComponent), the imperative ref handle, the nine per-row hooks, internal, and all 36 exported types. 1,348 upstream registrations run unchanged against React and the 1,255 core ones also against this package's source; 12 Chromium scenarios and 6 server renders match @legendapp/list/react step for step.",
+      "divergences": [
+        "Row elements are sorted into item order by rendering the slots in that order, not by moving the DOM nodes, because Octane tracks each component's nodes. The DOM order is the same; after such a reorder, effects in different rows run in DOM order rather than upstream's container order.",
+        "LegendList takes `ref` as a prop; upstream's forwardRef handle is unchanged."
+      ],
+      "ssr": "Supported and tested: octane/server renders the same scroll container, header, footer, empty state and snap anchors as @legendapp/list/react on react-dom/server. Rows render after the client measures the list, as upstream. Hydration is not covered.",
+      "verified": "2026-10-30",
+      "exports": []
+    },
+    {
       "name": "@octanejs/lexical",
       "version": "0.2.12",
       "category": "Content",
@@ -5211,6 +5225,7 @@
     "@formkit/auto-animate": "@octanejs/auto-animate",
     "@gsap/react": "@octanejs/gsap",
     "@inertiajs/react": "@octanejs/inertia",
+    "@legendapp/list/react": "@octanejs/legendapp-list",
     "@lexical/react": "@octanejs/lexical",
     "@livestore/react": "@octanejs/livestore",
     "@mantine/hooks": "@octanejs/mantine-hooks",

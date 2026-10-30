@@ -766,10 +766,11 @@ export function conventionalTestPath(relativePath, { runner } = {}) {
 	) {
 		return false;
 	}
-	if (runner === 'vitest' || runner === 'jest' || runner === 'bun') {
+	// bun test selects only named files: *.test, *_test, *.spec and *_spec.
+	if (runner === 'bun') return /[._](?:test|spec)\.[cm]?[jt]sx?$/.test(baseName);
+	if (runner === 'vitest' || runner === 'jest') {
 		return (
 			/(?:^|[.-])(?:test|spec|test-d|d-test)\.[cm]?[jt]sx?$/.test(baseName) ||
-			(runner === 'bun' && /_(?:test|spec)\.[cm]?[jt]sx?$/.test(baseName)) ||
 			segments.some((segment) => ['typetests', 'type-tests', 'test-d'].includes(segment)) ||
 			(runner === 'jest' && segments.includes('__tests__'))
 		);
@@ -837,22 +838,27 @@ function normalizeConfigurationPattern(value) {
 }
 
 function commandPathPatterns(testScripts) {
+	// `bun run <file>` executes a script and `open <file>` views a report; neither
+	// selects test files.
 	return Object.values(testScripts).flatMap((command) =>
-		String(command).split(/\s+/).map(normalizeConfigurationPattern).filter(Boolean),
+		String(command)
+			.split(/&&|\|\||[;|]/)
+			.filter((segment) => !/^\s*(?:bun\s+run|open)\s/.test(segment))
+			.flatMap((segment) => segment.split(/\s+/))
+			.map(normalizeConfigurationPattern)
+			.filter(Boolean),
 	);
 }
 
 // `bun test` has no config file of its own to discover. Moon workspaces declare
 // it as a task, in the package's moon.yml or a shared .moon/tasks file.
-async function declaresBunTestRunner(tree, scopePrefix, testScripts, options) {
-	const bunTest = /\bbun\s+test\b/;
-	if (Object.values(testScripts).some((command) => bunTest.test(command))) return true;
+async function declaresMoonBunTestTask(tree, scopePrefix, options) {
 	for (const entry of tree) {
 		if (
 			isGitHubRegularBlob(entry) &&
 			(entry.path === `${scopePrefix}moon.yml` ||
 				/^\.moon\/tasks\/[^/]+\.ya?ml$/.test(entry.path)) &&
-			bunTest.test((await fetchGitHubBlob(entry, options)).toString('utf8'))
+			/\bbun\s+test\b/.test((await fetchGitHubBlob(entry, options)).toString('utf8'))
 		) {
 			return true;
 		}
@@ -1081,15 +1087,17 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 	const configuredTestPatterns = [...configurationPatterns];
 	const configuredInlineSourcePatterns = [...inlineSourcePatterns];
 	const configurationEntryPaths = new Set(configurationEntries.map((entry) => entry.path));
-	const runner =
-		['vitest', 'jest'].find(
-			(name) =>
-				Object.values(testScripts).some((command) => new RegExp(`\\b${name}\\b`).test(command)) ||
-				configurationEntries.some((entry) =>
-					path.posix.basename(entry.path).startsWith(`${name}.`),
-				),
-		) ??
-		((await declaresBunTestRunner(tree, scopePrefix, testScripts, options)) ? 'bun' : undefined);
+	// A test script that runs `bun test` names the runner, even beside an unused
+	// jest.config: its discovery decides which files hold registrations.
+	const runner = Object.values(testScripts).some((command) => /\bbun\s+test\b/.test(command))
+		? 'bun'
+		: (['vitest', 'jest'].find(
+				(name) =>
+					Object.values(testScripts).some((command) => new RegExp(`\\b${name}\\b`).test(command)) ||
+					configurationEntries.some((entry) =>
+						path.posix.basename(entry.path).startsWith(`${name}.`),
+					),
+			) ?? ((await declaresMoonBunTestTask(tree, scopePrefix, options)) ? 'bun' : undefined));
 	const candidateEntries = tree.flatMap((entry) => {
 		if (!isGitHubRegularBlob(entry) || !entry.path.startsWith(scopePrefix)) return [];
 		if (configurationEntryPaths.has(entry.path)) return [];

@@ -1,0 +1,63 @@
+{
+  "name": "@octanejs/legendapp-list",
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "description": "@legendapp/list/react for Octane: the LegendList virtualized list for the web, with recycling, dynamic item sizes, scroll anchoring and imperative scrolling, ported from @legendapp/list 3.3.5.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/legendapp-list"
+  },
+  "main": "src/react.ts",
+  "module": "src/react.ts",
+  "types": "src/react.ts",
+  "files": [
+    "src",
+    "README.md",
+    "UPSTREAM.md",
+    "LICENSE",
+    "LICENSE.upstream"
+  ],
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/react.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "pnpm upstream:verify && vitest run --root ../.. --project legendapp-list-pristine --project legendapp-list-adapted --project legendapp-list-ssr --project legendapp-list-browser",
+    "typecheck": "octane-tsc -p tsconfig.json",
+    "adapted:generate": "node ../../scripts/react-port/materialize.mjs run --package-dir .",
+    "audit:update": "node scripts/update-audit.mjs",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs"
+  },
+  "peerDependencies": {
+    "octane": "workspace:^0.16.0"
+  },
+  "devDependencies": {
+    "@legendapp/list": "3.3.5",
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/react": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "esbuild": "catalog:default",
+    "jsdom": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "react-test-renderer": "19.2.7",
+    "use-sync-external-store": "1.6.0",
+    "vitest": "catalog:default"
+  }
+}

@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**133 publishable package(s), including 118 framework binding(s) and 3 framework integration(s).**
+**134 publishable package(s), including 119 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -62,6 +62,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/input-otp` | [`packages/input-otp`](../packages/input-otp) | framework binding | `0.0.35` | 1 |
 | `@octanejs/intersection-observer` | [`packages/intersection-observer`](../packages/intersection-observer) | framework binding | `0.0.33` | 2 |
 | `@octanejs/jotai` | [`packages/jotai`](../packages/jotai) | framework binding | `0.1.66` | 7 |
+| `@octanejs/legendapp-list` | [`packages/legendapp-list`](../packages/legendapp-list) | framework binding | `0.0.0` | 2 |
 | `@octanejs/lexical` | [`packages/lexical`](../packages/lexical) | framework binding | `0.2.12` | 50 |
 | `@octanejs/livestore` | [`packages/livestore`](../packages/livestore) | framework binding | `0.0.37` | 2 |
 | `@octanejs/lucide` | [`packages/lucide`](../packages/lucide) | framework binding | `0.1.62` | 4 |

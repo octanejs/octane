@@ -15,6 +15,8 @@ export const KNOWN_BINDINGS = {
 	jotai: '@octanejs/jotai',
 	'@effect/atom-react': '@octanejs/effect-atom',
 	'@pierre/trees/react': '@octanejs/pierre-trees',
+	// Only the web entry is ported; the React Native entries keep their own.
+	'@legendapp/list/react': '@octanejs/legendapp-list',
 	'@pierre/diffs/react': '@octanejs/pierre-diffs',
 	'@mantine/hooks': '@octanejs/mantine-hooks',
 	'mobx-react-lite': '@octanejs/mobx',

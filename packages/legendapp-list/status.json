@@ -1,0 +1,21 @@
+{
+  "upstream": { "package": "@legendapp/list", "version": "3.3.5" },
+  "provenance": {
+    "source": "https://github.com/LegendApp/legend-list/tree/80193ceda8f54b31e26b53f8a0ebb8cc07aa9bf0",
+    "license": "MIT",
+    "commit": "80193ceda8f54b31e26b53f8a0ebb8cc07aa9bf0",
+    "verification": "verified"
+  },
+  "surface": "The complete @legendapp/list/react entry: LegendList with every prop (data or children, renderItem, keyExtractor, getItemType, recycleItems, estimated and fixed item sizes, drawDistance, columns, sticky headers, snapping, initial scroll, maintainScrollAtEnd, maintainVisibleContentPosition, anchoredEndSpace, alwaysRender, viewability, header, footer and empty components, useWindowScroll, renderScrollComponent), the imperative ref handle, the nine per-row hooks, internal, and all 36 exported types. 1,348 upstream registrations run unchanged against React and the 1,255 core ones also against this package's source; 12 Chromium scenarios and 6 server renders match @legendapp/list/react step for step.",
+  "divergences": [
+    "Row elements are sorted into item order by rendering the slots in that order, not by moving the DOM nodes, because Octane tracks each component's nodes. The DOM order is the same; after such a reorder, effects in different rows run in DOM order rather than upstream's container order.",
+    "LegendList takes `ref` as a prop; upstream's forwardRef handle is unchanged."
+  ],
+  "ssr": "Supported and tested: octane/server renders the same scroll container, header, footer, empty state and snap anchors as @legendapp/list/react on react-dom/server. Rows render after the client measures the list, as upstream. Hydration is not covered.",
+  "notes": [
+    "npm's gitHead (d5a9dab3b93003c0848dda5ad78e6df1ebb59a35) is the build commit and still names 3.3.4; the pin is its child, the v3.3.5 tag, which changes only CHANGELOG.md and the version.",
+    "The React Native, animated, reanimated, keyboard and section-list entries are not ported."
+  ],
+  "verified": "2026-10-30",
+  "parityEvidence": "packages/legendapp-list/audit/react-parity.json"
+}

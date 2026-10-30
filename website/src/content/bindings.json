@@ -589,6 +589,12 @@
     "description": "Tables plus high-performance rendering for large rows and lists.",
     "packages": [
       {
+        "packageName": "@octanejs/legendapp-list",
+        "title": "Legend List",
+        "searchTerms": ["@legendapp/list", "LegendList"],
+        "tags": ["virtualization", "lists", "chat", "performance"]
+      },
+      {
         "packageName": "@octanejs/window",
         "title": "React Window",
         "tags": ["virtualization", "lists", "performance"]

@@ -30,9 +30,10 @@ test('conventional test discovery excludes fixture modules beside runnable suite
 	assert.equal(conventionalTestPath('test/dnd/example.test.js', { runner: 'jest' }), true);
 	assert.equal(conventionalTestPath('__tests__/example.js', { runner: 'jest' }), true);
 	assert.equal(conventionalTestPath('test/types.ts', { runner: 'vitest' }), false);
-	assert.equal(conventionalTestPath('test/helpers/dom.ts', { runner: 'bun' }), false);
-	assert.equal(conventionalTestPath('test/tree.test.tsx', { runner: 'bun' }), true);
-	assert.equal(conventionalTestPath('test/tree_spec.ts', { runner: 'bun' }), true);
+	assert.equal(conventionalTestPath('__tests__/__mocks__/state.ts', { runner: 'bun' }), false);
+	assert.equal(conventionalTestPath('__tests__/hooks/a.web.cases.ts', { runner: 'bun' }), false);
+	assert.equal(conventionalTestPath('__tests__/core/scroll.test.ts', { runner: 'bun' }), true);
+	assert.equal(conventionalTestPath('src/scroll_spec.tsx', { runner: 'bun' }), true);
 });
 
 test('a moon task that runs bun test selects bun named test files', async () => {

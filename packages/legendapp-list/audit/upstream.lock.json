@@ -1,0 +1,1540 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "packageName": "@legendapp/list",
+    "version": "3.3.5",
+    "repository": {
+      "owner": "LegendApp",
+      "repo": "legend-list",
+      "subdirectory": null
+    },
+    "commit": "80193ceda8f54b31e26b53f8a0ebb8cc07aa9bf0",
+    "integrity": "sha512-XTsLYtpg41SVb5uLBYA+YcDSA3w0tgoPq/W8ZggQ2tx+3lrC/rf+ehTP9KYHea9oFaZIuePAgzACs5/auVMJlQ=="
+  },
+  "license": {
+    "spdx": "MIT",
+    "declaration": "manifest",
+    "evidence": [
+      {
+        "path": "LICENSE",
+        "sha256": "35ca3e7ed51c8e7533b15b774e40458262a2ead0b7cc5682af41323dcdb8d0ef"
+      }
+    ],
+    "notices": []
+  },
+  "scopes": [
+    "LICENSE",
+    "README.md",
+    "__tests__",
+    "bunfig.toml",
+    "package.json",
+    "src",
+    "tsconfig.json"
+  ],
+  "adaptedMappings": [
+    {
+      "fromRoot": "__tests__",
+      "toRoot": "tests/upstream",
+      "include": "^(?:__mocks__/createMockContext\\.ts|__mocks__/createMockState\\.ts|components/Container\\.web\\.test\\.ts|components/LegendList\\.initialScrollThresholds\\.test\\.tsx|components/ListComponent\\.test\\.ts|components/stickyPositionUtils\\.test\\.ts|components/webScrollUtils\\.test\\.ts|core/ScheduledWork\\.test\\.ts|core/ScrollAdjustHandler\\.test\\.ts|core/bootstrapInitialScroll\\.test\\.ts|core/calculateItemsInView\\.test\\.ts|core/calculateOffsetForIndex\\.test\\.ts|core/calculateOffsetWithOffsetPosition\\.test\\.ts|core/checkFinishedScroll\\.test\\.ts|core/checkResetContainers\\.test\\.ts|core/checkStructuralDataChange\\.test\\.ts|core/clampScrollOffset\\.test\\.ts|core/contentMetrics\\.test\\.ts|core/doInitialAllocateContainers\\.test\\.ts|core/doMaintainScrollAtEnd\\.test\\.ts|core/doScrollTo\\.web\\.test\\.ts|core/finishScrollTo\\.test\\.ts|core/handleLayout\\.test\\.ts|core/initialScroll\\.test\\.ts|core/initialScrollLifecycle\\.test\\.ts|core/initialScrollSession\\.test\\.ts|core/measureContainersInLayoutEffect\\.web\\.test\\.ts|core/mvcp\\.test\\.ts|core/onScroll\\.test\\.ts|core/prepareMVCP\\.test\\.ts|core/scheduleContainerLayout\\.test\\.ts|core/scrollTo\\.precompute\\.test\\.ts|core/scrollTo\\.test\\.ts|core/scrollToIndex\\.test\\.ts|core/syncMountedContainer\\.test\\.ts|core/updateAdaptiveRender\\.test\\.ts|core/updateAnchoredEndSpace\\.test\\.ts|core/updateContentInsetEndAdjustment\\.test\\.ts|core/updateItemPositions\\.test\\.ts|core/updateItemSize\\.test\\.ts|core/updateItemSizes\\.test\\.ts|core/updateScroll\\.test\\.ts|core/updateTotalSize\\.test\\.ts|core/viewability\\.test\\.ts|helpers/layoutArrays\\.ts|hooks/createResizeObserver\\.web\\.cases\\.ts|hooks/useContainerMeasurement\\.web\\.cases\\.ts|setup\\.ts|utils/checkAllSizesKnown\\.test\\.ts|utils/checkAtBottom\\.test\\.ts|utils/checkAtTop\\.test\\.ts|utils/checkThreshold\\.test\\.ts|utils/checkThresholds\\.test\\.ts|utils/containerPool\\.test\\.ts|utils/createColumnWrapperStyle\\.test\\.ts|utils/createImperativeHandle\\.test\\.ts|utils/edgeReachedGate\\.test\\.ts|utils/findAvailableContainers\\.test\\.ts|utils/getAlwaysRenderIndices\\.test\\.ts|utils/getEffectiveDrawDistance\\.test\\.ts|utils/getId\\.test\\.ts|utils/getItemSize\\.test\\.ts|utils/getScrollVelocity\\.test\\.ts|utils/helpers\\.test\\.ts|utils/normalizeMaintainScrollAtEnd\\.test\\.ts|utils/reordering\\.test\\.ts|utils/requestAdjust\\.test\\.ts|utils/rtl\\.test\\.ts|utils/setDidLayout\\.test\\.ts|utils/setInitialRenderState\\.test\\.ts|utils/setPaddingTop\\.test\\.ts|utils/updateSnapToOffsets\\.test\\.ts)$"
+    }
+  ],
+  "adaptedRewrites": [
+    {
+      "find": "\"../../src/",
+      "replace": "\"../../../src/"
+    }
+  ],
+  "files": [
+    {
+      "path": "__tests__/__mocks__/createMockContext.ts",
+      "gitBlob": "5c480dcfeee12f2e8a75ebc7b824e4a9883c1e28",
+      "size": 4835
+    },
+    {
+      "path": "__tests__/__mocks__/createMockState.ts",
+      "gitBlob": "f0dae442281d28bb60c997e9f4254d3e74e589e8",
+      "size": 7566
+    },
+    {
+      "path": "__tests__/__mocks__/react-native.ts",
+      "gitBlob": "eecf13f79cd27576e25428fc9baa5fb1066922df",
+      "size": 3423
+    },
+    {
+      "path": "__tests__/components/AnchoredEndSpace.web-usage.test.tsx",
+      "gitBlob": "77fa2884e8f852acf4b0977b0304fd7962f6a975",
+      "size": 1989
+    },
+    {
+      "path": "__tests__/components/Container.clearCaches.test.tsx",
+      "gitBlob": "adcc8ca832e87920405ee8e64a7eb4d72bd01c49",
+      "size": 12542
+    },
+    {
+      "path": "__tests__/components/Container.web.test.ts",
+      "gitBlob": "de8e8e56f8be4db93167bd85f41c11016fbd5aaf",
+      "size": 2155
+    },
+    {
+      "path": "__tests__/components/Containers.layoutScheduler.native.test.tsx",
+      "gitBlob": "66ad1307a063c3021c0e2f4ceb4736ee7e8dc3e1",
+      "size": 8753
+    },
+    {
+      "path": "__tests__/components/Containers.native.test.tsx",
+      "gitBlob": "e9caae6c9926d48cbe5b6c46e40b7fa4e7bc084c",
+      "size": 8954
+    },
+    {
+      "path": "__tests__/components/Containers.web.test.ts",
+      "gitBlob": "1bafd4819e09ff735bf0fa064ecc15dbb319c502",
+      "size": 3410
+    },
+    {
+      "path": "__tests__/components/ContainerSlot.test.tsx",
+      "gitBlob": "e0737d0edc3b79c636ea2f123446e95f5ed01a5c",
+      "size": 4023
+    },
+    {
+      "path": "__tests__/components/LegendList.bootstrapInitialScroll.oldarch.cases.tsx",
+      "gitBlob": "7e766a07818e8b22153aaff4669abccd47148f3b",
+      "size": 12525
+    },
+    {
+      "path": "__tests__/components/LegendList.bootstrapInitialScroll.oldarch.test.ts",
+      "gitBlob": "4e74987d388a10655e14dda56938c660dff60a4d",
+      "size": 524
+    },
+    {
+      "path": "__tests__/components/LegendList.bootstrapInitialScroll.test.tsx",
+      "gitBlob": "e7f80ec5cd264d29ea54ea7b7f0732714a845425",
+      "size": 52721
+    },
+    {
+      "path": "__tests__/components/LegendList.dataRefresh.integration.test.tsx",
+      "gitBlob": "1f0c5aa0234e2eb3a37efdfe4b2ab468a2f7ecb0",
+      "size": 10210
+    },
+    {
+      "path": "__tests__/components/LegendList.dataVersion.test.tsx",
+      "gitBlob": "393bc1f3150ed09f60664caf56c59668b2cf3d71",
+      "size": 15627
+    },
+    {
+      "path": "__tests__/components/LegendList.imperativeScroll.test.tsx",
+      "gitBlob": "882a25e00e8d62965e3f3adecc0afa6ec003394d",
+      "size": 6277
+    },
+    {
+      "path": "__tests__/components/LegendList.initialScroll.integration.test.tsx",
+      "gitBlob": "340d5dfae60212a3ba59dc5c921354976f49b83b",
+      "size": 25052
+    },
+    {
+      "path": "__tests__/components/LegendList.initialScrollThresholds.test.tsx",
+      "gitBlob": "2758f456dd8b555641772a84200924cfd4fcab5c",
+      "size": 2145
+    },
+    {
+      "path": "__tests__/components/LegendList.liveUpdates.integration.test.tsx",
+      "gitBlob": "99954fb642d34432854f840be9d4156692c9592f",
+      "size": 9598
+    },
+    {
+      "path": "__tests__/components/LegendList.numColumnsReset.test.tsx",
+      "gitBlob": "a9274cdd2e37a8038bc9c6b8ff05debd97a63aa0",
+      "size": 4418
+    },
+    {
+      "path": "__tests__/components/LegendList.props.test.tsx",
+      "gitBlob": "b04cdc02957c006a2a0c8346e42e891ab859c494",
+      "size": 62983
+    },
+    {
+      "path": "__tests__/components/LegendList.totalSizeNotifications.test.tsx",
+      "gitBlob": "4f7806a742620dbaa660f0bc5a86d80ea62e7a95",
+      "size": 4613
+    },
+    {
+      "path": "__tests__/components/ListComponent.renderScrollComponent.test.tsx",
+      "gitBlob": "de74521eeaceb31a56abdaf12858a8110a06cc68",
+      "size": 15361
+    },
+    {
+      "path": "__tests__/components/ListComponent.test.ts",
+      "gitBlob": "53880acc6daee83a1e234034b6a17846404f62b5",
+      "size": 1638
+    },
+    {
+      "path": "__tests__/components/ListComponentScrollView.web.test.tsx",
+      "gitBlob": "77247f80ffa7f84412d6e120b377670f5fffaebd",
+      "size": 31798
+    },
+    {
+      "path": "__tests__/components/PositionView.native.test.tsx",
+      "gitBlob": "479e5253130679c4c750163a9b10a4e47502dbd0",
+      "size": 7842
+    },
+    {
+      "path": "__tests__/components/PositionView.web.test.tsx",
+      "gitBlob": "4101441f6156aebe166b0475dbb43af8e253d7ac",
+      "size": 12675
+    },
+    {
+      "path": "__tests__/components/ScrollAdjust.native.test.tsx",
+      "gitBlob": "348e90e7e8e5f9905b7693e80ba1de17390a2b44",
+      "size": 1368
+    },
+    {
+      "path": "__tests__/components/ScrollAdjust.web.test.ts",
+      "gitBlob": "de2fbee0f56ac8ce71191fe0b09b99c321e8ef37",
+      "size": 15361
+    },
+    {
+      "path": "__tests__/components/SnapWrapper.test.tsx",
+      "gitBlob": "53e1e3e6bf884f7b1f654fd83edaa7a8c8060ecc",
+      "size": 1447
+    },
+    {
+      "path": "__tests__/components/stickyPositionUtils.test.ts",
+      "gitBlob": "f409359877fff667f3c0a4c11abbcddcc6234728",
+      "size": 999
+    },
+    {
+      "path": "__tests__/components/webScrollUtils.test.ts",
+      "gitBlob": "bfecc25b94f3c0418c5146d2b0f56ff7fe1d8dbf",
+      "size": 3391
+    },
+    {
+      "path": "__tests__/core/bootstrapInitialScroll.test.ts",
+      "gitBlob": "8eab6351dbc03bd8f28766e037d99b4aea2a6250",
+      "size": 40312
+    },
+    {
+      "path": "__tests__/core/calculateItemsInView.test.ts",
+      "gitBlob": "dccf63a59b88faeed5b98be4a55a05d8a67636b9",
+      "size": 92580
+    },
+    {
+      "path": "__tests__/core/calculateOffsetForIndex.test.ts",
+      "gitBlob": "0d00645770f309567e36fb95e12dfc0b43225d20",
+      "size": 9909
+    },
+    {
+      "path": "__tests__/core/calculateOffsetWithOffsetPosition.test.ts",
+      "gitBlob": "98f02a47d9a066bb4735516843bc99ea9d1f9fb3",
+      "size": 17999
+    },
+    {
+      "path": "__tests__/core/checkFinishedScroll.test.ts",
+      "gitBlob": "7d8f2cad0b017705cb7a4845593a5a1de403aa9a",
+      "size": 26132
+    },
+    {
+      "path": "__tests__/core/checkResetContainers.test.ts",
+      "gitBlob": "81249ce94ebf0cce5b28fcae699ff3dce56b7880",
+      "size": 5960
+    },
+    {
+      "path": "__tests__/core/checkStructuralDataChange.test.ts",
+      "gitBlob": "ca457c0c6762cb59ed9cb5a2fa5485efc9c79720",
+      "size": 3393
+    },
+    {
+      "path": "__tests__/core/clampScrollOffset.test.ts",
+      "gitBlob": "e3cfc02279be0780e9fec2a975124c2cd4858a24",
+      "size": 1502
+    },
+    {
+      "path": "__tests__/core/contentMetrics.test.ts",
+      "gitBlob": "001937ec6cf34c41e1115eedc565a4b70a7da804",
+      "size": 11796
+    },
+    {
+      "path": "__tests__/core/doInitialAllocateContainers.test.ts",
+      "gitBlob": "9c93c73af5911ef201757db87734e34654be729b",
+      "size": 17696
+    },
+    {
+      "path": "__tests__/core/doMaintainScrollAtEnd.test.ts",
+      "gitBlob": "f91de11fca781e7616d82eca462d14ee7e5006c6",
+      "size": 22952
+    },
+    {
+      "path": "__tests__/core/doScrollTo.native.test.ts",
+      "gitBlob": "b42bfafecfe3b3d8f2f7ca37a2d6bbbe2ad9c9ef",
+      "size": 4064
+    },
+    {
+      "path": "__tests__/core/doScrollTo.web.test.ts",
+      "gitBlob": "5bf2c3e9b2e5df1a9e153af488dba991ce04011f",
+      "size": 8255
+    },
+    {
+      "path": "__tests__/core/finishScrollTo.test.ts",
+      "gitBlob": "25aa9518a6313b0bf83b2b48aef2cfe011aa990b",
+      "size": 28307
+    },
+    {
+      "path": "__tests__/core/handleLayout.test.ts",
+      "gitBlob": "80e2bd883e85306277a096a4307af436ad5f7740",
+      "size": 23133
+    },
+    {
+      "path": "__tests__/core/initialScroll.test.ts",
+      "gitBlob": "b5d503a81b29cc2b22362852766bf5d8acf9a32a",
+      "size": 9686
+    },
+    {
+      "path": "__tests__/core/initialScrollLifecycle.test.ts",
+      "gitBlob": "7abcc68afa08185d0afc82e750fffc4f7b201d4e",
+      "size": 11571
+    },
+    {
+      "path": "__tests__/core/initialScrollSession.test.ts",
+      "gitBlob": "3392a6e53c44b1b3d20a54d9563579b3b43f5539",
+      "size": 4426
+    },
+    {
+      "path": "__tests__/core/measureContainersInLayoutEffect.native.test.ts",
+      "gitBlob": "a059c6321654d3ddad0e39a6fc742757a1def2d1",
+      "size": 13752
+    },
+    {
+      "path": "__tests__/core/measureContainersInLayoutEffect.web.test.ts",
+      "gitBlob": "8e5b8c34071ec1b3c1e891f7ba24ad5f535b1103",
+      "size": 2003
+    },
+    {
+      "path": "__tests__/core/mvcp.test.ts",
+      "gitBlob": "9d02b9047cd1a22a4bf16dde28b5c0807f2fa908",
+      "size": 9807
+    },
+    {
+      "path": "__tests__/core/onScroll.test.ts",
+      "gitBlob": "921b8b6b966aa9d075ccc94468293dc960ac0f14",
+      "size": 25694
+    },
+    {
+      "path": "__tests__/core/prepareMVCP.test.ts",
+      "gitBlob": "351f58706e3b144a35b2b6a8bd8fb38cd70f58b4",
+      "size": 42415
+    },
+    {
+      "path": "__tests__/core/scheduleContainerLayout.test.ts",
+      "gitBlob": "324811ecedf054b3d87bc4bf64fe0057a364f9a3",
+      "size": 1724
+    },
+    {
+      "path": "__tests__/core/ScheduledWork.test.ts",
+      "gitBlob": "17abfb90eb1107d0711e89bcea40789ace10465a",
+      "size": 6517
+    },
+    {
+      "path": "__tests__/core/ScrollAdjustHandler.test.ts",
+      "gitBlob": "1689ae15493801b76d5c087bad45d1f69e3cb436",
+      "size": 10354
+    },
+    {
+      "path": "__tests__/core/scrollTo.precompute.test.ts",
+      "gitBlob": "6ba00ced2e0fa07d9f3303f4e1e7fe3a06d31646",
+      "size": 6085
+    },
+    {
+      "path": "__tests__/core/scrollTo.test.ts",
+      "gitBlob": "95bbf773cd47391dde5d55d289f0aba32c754dd5",
+      "size": 13837
+    },
+    {
+      "path": "__tests__/core/scrollToIndex.test.ts",
+      "gitBlob": "f065966c5d0beb30bb305b29893cb3571695f2f8",
+      "size": 17658
+    },
+    {
+      "path": "__tests__/core/syncMountedContainer.test.ts",
+      "gitBlob": "e9f565fab62e29a8ac89417e99ff747e7ff4c93b",
+      "size": 4295
+    },
+    {
+      "path": "__tests__/core/updateAdaptiveRender.test.ts",
+      "gitBlob": "16ef0883e38a31f1e5d3595884a2e92f15a7b752",
+      "size": 8579
+    },
+    {
+      "path": "__tests__/core/updateAnchoredEndSpace.test.ts",
+      "gitBlob": "77799eae18d7dde4ca12ad2494f3d3d7245aecd8",
+      "size": 14940
+    },
+    {
+      "path": "__tests__/core/updateContentInsetEndAdjustment.test.ts",
+      "gitBlob": "fce875c2e2612ed3f4fed80c63bde66789d70837",
+      "size": 4157
+    },
+    {
+      "path": "__tests__/core/updateItemPositions.test.ts",
+      "gitBlob": "434a7ba166d22a979911656471b4828e5b3fa1c9",
+      "size": 34472
+    },
+    {
+      "path": "__tests__/core/updateItemSize.test.ts",
+      "gitBlob": "0e0b5555af20d25ccfef81593121f9ddcbeae6a3",
+      "size": 36073
+    },
+    {
+      "path": "__tests__/core/updateItemSizes.test.ts",
+      "gitBlob": "152aa6728407005c8f69362a42a93d5861435a70",
+      "size": 10797
+    },
+    {
+      "path": "__tests__/core/updateScroll.test.ts",
+      "gitBlob": "4e0dcaf8972af8e06a2b8e806d32cb624d9c0038",
+      "size": 25221
+    },
+    {
+      "path": "__tests__/core/updateTotalSize.test.ts",
+      "gitBlob": "802f2fd831629055d50e3dba242c3ab013065fe7",
+      "size": 13495
+    },
+    {
+      "path": "__tests__/core/viewability.test.ts",
+      "gitBlob": "1bc98de01fb9d65b25399d5644d41cfa573d6f82",
+      "size": 31385
+    },
+    {
+      "path": "__tests__/example-web/comparisonConfig.test.ts",
+      "gitBlob": "cc5d6aa82e1dbab518ddf67ed88292d213795b77",
+      "size": 2722
+    },
+    {
+      "path": "__tests__/example-web/infiniteCalendarWindow.test.ts",
+      "gitBlob": "2b02e7eb0f39c11b6ae5f059d3a3235e1c5e8807",
+      "size": 1634
+    },
+    {
+      "path": "__tests__/example-web/publicExampleRoutes.test.ts",
+      "gitBlob": "f545c71f545f0d30f60f520653636826474cb4d6",
+      "size": 698
+    },
+    {
+      "path": "__tests__/helpers/layoutArrays.ts",
+      "gitBlob": "56967f3dbf6b18c8b85854d33e3dce276c888c5b",
+      "size": 2368
+    },
+    {
+      "path": "__tests__/helpers/testingLibrary.ts",
+      "gitBlob": "7db53a35d65ae68fa07e11cf35fcad15d932299a",
+      "size": 1184
+    },
+    {
+      "path": "__tests__/helpers/testRenderer.ts",
+      "gitBlob": "ef2232714c3ba037a26070fde6cdfda31c1ed1e2",
+      "size": 194
+    },
+    {
+      "path": "__tests__/hooks/createResizeObserver.web.cases.ts",
+      "gitBlob": "aaf61bc047131cd2fbe49cba0c9b32185272e87a",
+      "size": 6106
+    },
+    {
+      "path": "__tests__/hooks/createResizeObserver.web.test.ts",
+      "gitBlob": "7c3fe4aab43307cef767e9f09b9fa1e2d70aa249",
+      "size": 416
+    },
+    {
+      "path": "__tests__/hooks/useContainerMeasurement.web.cases.ts",
+      "gitBlob": "da74f5260b121ad119802de150802798dca55c2a",
+      "size": 9693
+    },
+    {
+      "path": "__tests__/hooks/useContainerMeasurement.web.test.ts",
+      "gitBlob": "c6213b2151a4c44af788759ab341670db5407765",
+      "size": 422
+    },
+    {
+      "path": "__tests__/hooks/useFreshDataTransitionVisibility.test.tsx",
+      "gitBlob": "ce8f312d453dcf30c4c321f5097f3787aece153f",
+      "size": 3047
+    },
+    {
+      "path": "__tests__/hooks/useLatestRef.test.tsx",
+      "gitBlob": "e0e48af12b150f374a7611756c37188696411b40",
+      "size": 1462
+    },
+    {
+      "path": "__tests__/hooks/useOnLayoutSync.native.test.tsx",
+      "gitBlob": "a316a782167b1d5e027491f4b9b6b15e6625d383",
+      "size": 5882
+    },
+    {
+      "path": "__tests__/hooks/useOnLayoutSync.web.test.tsx",
+      "gitBlob": "244a9665e083f3b5b155ef2e8e874db419f81582",
+      "size": 5076
+    },
+    {
+      "path": "__tests__/hooks/useRecyclingEffect.test.tsx",
+      "gitBlob": "262037d05d0f6d5650bb3ea3e9c960b7feaa88c6",
+      "size": 1107
+    },
+    {
+      "path": "__tests__/hooks/useValue$.test.tsx",
+      "gitBlob": "c97e2f2418af924c73d83540482f8efbc628b9d6",
+      "size": 1691
+    },
+    {
+      "path": "__tests__/integrations/keyboard.behavior.test.tsx",
+      "gitBlob": "f58b1f08efd818e7572261aa9d839902f7e48b12",
+      "size": 10369
+    },
+    {
+      "path": "__tests__/integrations/keyboard.interactive-state.test.tsx",
+      "gitBlob": "e69c684dd6b485a4e017fb10e404e2f736cf9b4b",
+      "size": 8740
+    },
+    {
+      "path": "__tests__/integrations/keyboard.onScroll.test.tsx",
+      "gitBlob": "1b7e2b7754c478fbe99a64b0db429f2c9403a4fd",
+      "size": 2372
+    },
+    {
+      "path": "__tests__/integrations/reanimated.itemLayoutAnimation.test.tsx",
+      "gitBlob": "6a626d96235b46a8be1a36d1ff5c267a6a7fb37a",
+      "size": 18969
+    },
+    {
+      "path": "__tests__/integrations/reanimated.sharedValues.test.tsx",
+      "gitBlob": "9f0da2e9d5c0898c7634bbe6c3ed47507a8cb773",
+      "size": 12614
+    },
+    {
+      "path": "__tests__/platform/useStickyScrollHandler.native.test.tsx",
+      "gitBlob": "2bd924f7a17baf082c7085b453199b834d7d6a86",
+      "size": 2409
+    },
+    {
+      "path": "__tests__/section-list/SectionList.test.tsx",
+      "gitBlob": "5e2695ae6edbba0cbcbc03f38603a412f14addc0",
+      "size": 10127
+    },
+    {
+      "path": "__tests__/setup.ts",
+      "gitBlob": "2f85cb27c635e7c609b754ff99275d1a359e5f50",
+      "size": 4439
+    },
+    {
+      "path": "__tests__/state/ContextContainer.test.tsx",
+      "gitBlob": "6f926cd8c61aa3983e21f403ffcad23c31787d2a",
+      "size": 39192
+    },
+    {
+      "path": "__tests__/utils/checkAllSizesKnown.test.ts",
+      "gitBlob": "778da082e1440adea6ce7c814dbf82a7c2caf52a",
+      "size": 3222
+    },
+    {
+      "path": "__tests__/utils/checkAtBottom.test.ts",
+      "gitBlob": "cf95a91246ca96b241f78fb3d4dfb5e833a5c77c",
+      "size": 10595
+    },
+    {
+      "path": "__tests__/utils/checkAtTop.test.ts",
+      "gitBlob": "386bcc2706cb87a1f17cc9f5cf1b2eed4abe97fe",
+      "size": 11327
+    },
+    {
+      "path": "__tests__/utils/checkThreshold.test.ts",
+      "gitBlob": "4ddd762cc09d1dd8a990cb5234fc970b4945c217",
+      "size": 5858
+    },
+    {
+      "path": "__tests__/utils/checkThresholds.test.ts",
+      "gitBlob": "6d242fae9a0127cfbbb0bd4b23a73678cdae3aba",
+      "size": 1786
+    },
+    {
+      "path": "__tests__/utils/containerPool.test.ts",
+      "gitBlob": "2d93f823022febb30adf1ad7c1feb1edc4f6bbe7",
+      "size": 2038
+    },
+    {
+      "path": "__tests__/utils/createColumnWrapperStyle.test.ts",
+      "gitBlob": "cca7a62db37e35b2919e945a55ebcbda6ca35740",
+      "size": 18415
+    },
+    {
+      "path": "__tests__/utils/createImperativeHandle.test.ts",
+      "gitBlob": "f6b07c0a592ab01dc7f1dfd24bba6b6a91e2a119",
+      "size": 39084
+    },
+    {
+      "path": "__tests__/utils/edgeReachedGate.test.ts",
+      "gitBlob": "ce48d527295c1f8ef42ab7853824c2b1d289ef9e",
+      "size": 5388
+    },
+    {
+      "path": "__tests__/utils/findAvailableContainers.test.ts",
+      "gitBlob": "60502d7a0e34ff64df522a3ad79590ef49640a55",
+      "size": 25018
+    },
+    {
+      "path": "__tests__/utils/getAlwaysRenderIndices.test.ts",
+      "gitBlob": "15564bc48a45bb0471a8b5d9902e39de9d279d8e",
+      "size": 1081
+    },
+    {
+      "path": "__tests__/utils/getEffectiveDrawDistance.test.ts",
+      "gitBlob": "0bd19978df7e2fd6db1d34340c59f6fd100c9655",
+      "size": 4368
+    },
+    {
+      "path": "__tests__/utils/getId.test.ts",
+      "gitBlob": "ea12bba765fcb7218dfde9f4547f5b62b2d6b9e0",
+      "size": 11736
+    },
+    {
+      "path": "__tests__/utils/getItemSize.test.ts",
+      "gitBlob": "9405fab9f5b466b77d487d3a31f6fe064806c544",
+      "size": 5618
+    },
+    {
+      "path": "__tests__/utils/getRenderedItem.test.ts",
+      "gitBlob": "3568ce587842dc98462d0456c8d86936714fea2f",
+      "size": 17661
+    },
+    {
+      "path": "__tests__/utils/getScrollVelocity.test.ts",
+      "gitBlob": "6fefe4a601f57a9e26625b26d01d42cd5351297c",
+      "size": 17971
+    },
+    {
+      "path": "__tests__/utils/helpers.test.ts",
+      "gitBlob": "9098a5c84cabf2a86215cac0cef1493a1c55710e",
+      "size": 17698
+    },
+    {
+      "path": "__tests__/utils/normalizeMaintainScrollAtEnd.test.ts",
+      "gitBlob": "1ea8aa9616cd249db860cf781d5fc1ae3007687f",
+      "size": 2508
+    },
+    {
+      "path": "__tests__/utils/reordering.test.ts",
+      "gitBlob": "d10833008ea8ba942aa8c6fb4f1087a11823f4c8",
+      "size": 2008
+    },
+    {
+      "path": "__tests__/utils/requestAdjust.test.ts",
+      "gitBlob": "8f8c8500374fe045b33d889ee7e32ccf4aae13d4",
+      "size": 20506
+    },
+    {
+      "path": "__tests__/utils/rtl.test.ts",
+      "gitBlob": "c891fad30bbc84fde4712162a1ec64d154f7a651",
+      "size": 3772
+    },
+    {
+      "path": "__tests__/utils/setDidLayout.test.ts",
+      "gitBlob": "fab84ad6d9affdf08a1b7ff1a4bae1718e1e0c1e",
+      "size": 13079
+    },
+    {
+      "path": "__tests__/utils/setInitialRenderState.test.ts",
+      "gitBlob": "73d40580dd24d82ceb5ed8a03e8080cb292ddcee",
+      "size": 5467
+    },
+    {
+      "path": "__tests__/utils/setPaddingTop.test.ts",
+      "gitBlob": "2c68a707fa2ee1d108dc814a80678d31e639c669",
+      "size": 15778
+    },
+    {
+      "path": "__tests__/utils/updateSnapToOffsets.test.ts",
+      "gitBlob": "cdfb5540ebdf7c53969c353ba1e2ba65b2e5b186",
+      "size": 16996
+    },
+    {
+      "path": "__tests__/utils/useRafCoalescer.test.tsx",
+      "gitBlob": "104126c83a09db4e5f9be871de133221d58240e0",
+      "size": 6263
+    },
+    {
+      "path": "bunfig.toml",
+      "gitBlob": "c38ecc16e68fa307d8cf4a245b4b2c17fa76396a",
+      "size": 76
+    },
+    {
+      "path": "LICENSE",
+      "gitBlob": "d89d6ad3afce52463aa2df83f6e920bdff2c6151",
+      "size": 1067
+    },
+    {
+      "path": "package.json",
+      "gitBlob": "af87f84ca7fb7e9daf89b14838b595c4f4cbdaf3",
+      "size": 5439
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "75363db74c5bf9dcc1733a8f20da9907e4a275d8",
+      "size": 5302
+    },
+    {
+      "path": "src/components/Container.tsx",
+      "gitBlob": "b1169ecb16b6636afb87e9a58a901caacb1d9c99",
+      "size": 7372
+    },
+    {
+      "path": "src/components/ContainerLayoutCoordinator.tsx",
+      "gitBlob": "7fa5743c575adea71604997c475c2b2c69949044",
+      "size": 1226
+    },
+    {
+      "path": "src/components/Containers.native.tsx",
+      "gitBlob": "e0cb771d9eea21d014f0f6c14d9b8dbdf9c44939",
+      "size": 4094
+    },
+    {
+      "path": "src/components/Containers.tsx",
+      "gitBlob": "65869706c96203771ca4d536a98e7a449d17ca59",
+      "size": 4414
+    },
+    {
+      "path": "src/components/ContainerSlot.tsx",
+      "gitBlob": "eae1a2ff50920382297e849a92afe48ae2a85ed4",
+      "size": 1757
+    },
+    {
+      "path": "src/components/DebugView.tsx",
+      "gitBlob": "dc9ae83cf2d1791acc83145d5986b9ea43c75aa9",
+      "size": 2665
+    },
+    {
+      "path": "src/components/DevNumbers.native.tsx",
+      "gitBlob": "39a9aefee71d5116d43470d7240c7d9677e3f56b",
+      "size": 857
+    },
+    {
+      "path": "src/components/DevNumbers.tsx",
+      "gitBlob": "caf18f7384d15f32aa2b5d7f1c3aa8f1f0df288f",
+      "size": 849
+    },
+    {
+      "path": "src/components/LegendList.tsx",
+      "gitBlob": "48382d92d6e09dd34b8f91771457a0e18db709f7",
+      "size": 38042
+    },
+    {
+      "path": "src/components/ListComponent.tsx",
+      "gitBlob": "cca8216ae1debfa81c3a5911e1396353679e64f4",
+      "size": 10151
+    },
+    {
+      "path": "src/components/ListComponentScrollView.native.tsx",
+      "gitBlob": "435c3378c1816b1ac2525a1fb8bf6211230bfadc",
+      "size": 237
+    },
+    {
+      "path": "src/components/ListComponentScrollView.tsx",
+      "gitBlob": "81ad28d370aacf1deed36ed09160d2fac673f9d0",
+      "size": 20097
+    },
+    {
+      "path": "src/components/listComponentStyles.ts",
+      "gitBlob": "db71babcf412c3934a793247479b5f15992abb61",
+      "size": 488
+    },
+    {
+      "path": "src/components/PositionView.native.tsx",
+      "gitBlob": "9f3cdde7c8777617987ac2c4a96cf3ef174fde6f",
+      "size": 5888
+    },
+    {
+      "path": "src/components/PositionView.tsx",
+      "gitBlob": "ba696f935602ff61b09661570abe224f0d5b2d7b",
+      "size": 4914
+    },
+    {
+      "path": "src/components/ScrollAdjust.native.tsx",
+      "gitBlob": "96fa5de99484b74cfbcbe8a888dbffe413fd13c1",
+      "size": 917
+    },
+    {
+      "path": "src/components/ScrollAdjust.tsx",
+      "gitBlob": "6773c123b416cff5a0652917477ade8261d807a8",
+      "size": 7068
+    },
+    {
+      "path": "src/components/Separator.tsx",
+      "gitBlob": "7a90feef4f36a251945a298d89aeb25f9a7d0b5b",
+      "size": 555
+    },
+    {
+      "path": "src/components/SnapWrapper.tsx",
+      "gitBlob": "89783a0c839c6867eb6de1666c50c7cabf073b80",
+      "size": 560
+    },
+    {
+      "path": "src/components/stickyPositionUtils.ts",
+      "gitBlob": "8906596b3fbdf2f918852f15824ca56da088dbaa",
+      "size": 843
+    },
+    {
+      "path": "src/components/useDevChecks.ts",
+      "gitBlob": "e6a78e002b2b8a2a15c9fb22b004d69812b151c9",
+      "size": 4160
+    },
+    {
+      "path": "src/components/webConstants.ts",
+      "gitBlob": "31b32294dde8bed6e028d575f558cbba21841530",
+      "size": 256
+    },
+    {
+      "path": "src/components/webScrollUtils.ts",
+      "gitBlob": "a3d0d733c4baa75702da94876139a3370a8e00f5",
+      "size": 4249
+    },
+    {
+      "path": "src/constants-platform.native.ts",
+      "gitBlob": "213ddc3363fc3e55619441a36702e24bb2e38087",
+      "size": 112
+    },
+    {
+      "path": "src/constants-platform.ts",
+      "gitBlob": "6cba4c5c9e3dfc45fde29c4a3582b4800a892d52",
+      "size": 123
+    },
+    {
+      "path": "src/constants.ts",
+      "gitBlob": "a0252d256f1efdd50036497fc9d34aee407d6e8c",
+      "size": 581
+    },
+    {
+      "path": "src/core/adaptiveRender.ts",
+      "gitBlob": "b580245f1bf55b35d9fca5897d69cbe22304fbcd",
+      "size": 3292
+    },
+    {
+      "path": "src/core/addTotalSize.ts",
+      "gitBlob": "7cb51a33286ce26d14e419d475492dfe408f64bd",
+      "size": 1549
+    },
+    {
+      "path": "src/core/bootstrapInitialScroll.ts",
+      "gitBlob": "b72c645cd0daa433172ed725d27e85617eadf3d2",
+      "size": 37014
+    },
+    {
+      "path": "src/core/calculateItemsInView.ts",
+      "gitBlob": "6e6d17e77eff58d6875caa088f0545e81b4fd2da",
+      "size": 39406
+    },
+    {
+      "path": "src/core/calculateOffsetForIndex.ts",
+      "gitBlob": "0f91c8d7e3631367cf9d39807a177acea2b5e47f",
+      "size": 237
+    },
+    {
+      "path": "src/core/calculateOffsetWithOffsetPosition.ts",
+      "gitBlob": "720c5b0da0bade25f3ed2368f9dfea284c53dbe2",
+      "size": 1987
+    },
+    {
+      "path": "src/core/cancelImperativeScroll.ts",
+      "gitBlob": "d63de3be07d5205ef2ea41726355cbf94da0c0ef",
+      "size": 1167
+    },
+    {
+      "path": "src/core/checkFinishedScroll.ts",
+      "gitBlob": "242bbc978944307391f5e3b1e0de4778152b9fb4",
+      "size": 11466
+    },
+    {
+      "path": "src/core/checkResetContainers.ts",
+      "gitBlob": "bddfcad754e91d99936e163ce22d2cecc10bb0f6",
+      "size": 1648
+    },
+    {
+      "path": "src/core/checkStructuralDataChange.ts",
+      "gitBlob": "7e8f549d6e053d0d8cc672da03874672ed306cfe",
+      "size": 1722
+    },
+    {
+      "path": "src/core/clampScrollOffset.ts",
+      "gitBlob": "78a79f9289488a6a81a51be060f12f2a4b902dbd",
+      "size": 1008
+    },
+    {
+      "path": "src/core/containerItemMetadata.ts",
+      "gitBlob": "4ca49c7c8d967b111ac5f076170c894fd75c6ffa",
+      "size": 2111
+    },
+    {
+      "path": "src/core/containerLayoutBaseline.ts",
+      "gitBlob": "04328199923acb45e39cd100718b974465645694",
+      "size": 611
+    },
+    {
+      "path": "src/core/deferredPublicOnScroll.ts",
+      "gitBlob": "34abc3834f46d289efd2bd491518e94252f21471",
+      "size": 1058
+    },
+    {
+      "path": "src/core/doInitialAllocateContainers.ts",
+      "gitBlob": "6cacb92a61c58c2c5880b656a00389b764b1250d",
+      "size": 2495
+    },
+    {
+      "path": "src/core/doMaintainScrollAtEnd.ts",
+      "gitBlob": "5bca7f438e7f610ea3d7cdb9a2c77df1040e0a27",
+      "size": 4318
+    },
+    {
+      "path": "src/core/doScrollParams.ts",
+      "gitBlob": "aee6643e104bd5d710cb53f0999fa1dad5dc4d61",
+      "size": 139
+    },
+    {
+      "path": "src/core/doScrollTo.native.ts",
+      "gitBlob": "e1ff2e65f230579c8213171bdf6489c3eb851219",
+      "size": 1504
+    },
+    {
+      "path": "src/core/doScrollTo.ts",
+      "gitBlob": "9e10cad7ffb9d885549e322ca54b9ce6eac15a39",
+      "size": 4457
+    },
+    {
+      "path": "src/core/finishInitialScroll.ts",
+      "gitBlob": "1f234d81f115c5a48270a172d75a0351c8234326",
+      "size": 4812
+    },
+    {
+      "path": "src/core/finishScrollTo.ts",
+      "gitBlob": "51774b56ead05b020bc50c9e6c692228f4dbdee4",
+      "size": 2231
+    },
+    {
+      "path": "src/core/getStartOffsetAdjustment.ts",
+      "gitBlob": "55be25d2d6965965d4b6bffa8830e3db8c3511ac",
+      "size": 510
+    },
+    {
+      "path": "src/core/handleLayout.ts",
+      "gitBlob": "ba106dcf9440140e4112e6f431d3680339f6364c",
+      "size": 3864
+    },
+    {
+      "path": "src/core/initialScroll.ts",
+      "gitBlob": "ef42df5edd4fc766594901d1ee692f0d523ecd66",
+      "size": 6984
+    },
+    {
+      "path": "src/core/initialScrollLifecycle.ts",
+      "gitBlob": "143c41553dd8f456848c1e171526c867429536db",
+      "size": 6286
+    },
+    {
+      "path": "src/core/initialScrollSession.ts",
+      "gitBlob": "5c45a75bf9178fdcddd2f8d0ea780fa8f21d4cb8",
+      "size": 5831
+    },
+    {
+      "path": "src/core/measureContainersInLayoutEffect.native.ts",
+      "gitBlob": "a863e4651dac9e334437c248ef4f9a8b2aac0ccc",
+      "size": 3633
+    },
+    {
+      "path": "src/core/measureContainersInLayoutEffect.ts",
+      "gitBlob": "8ad0b3664bb3d1c55e3ab5d2e2424055f18c9fc6",
+      "size": 1322
+    },
+    {
+      "path": "src/core/mvcp.ts",
+      "gitBlob": "1d36d4663156f8ee87a502f9c5e9352709e8534e",
+      "size": 18380
+    },
+    {
+      "path": "src/core/onScroll.ts",
+      "gitBlob": "ae4920bebf80336af58759e4b5938c86763ea7a4",
+      "size": 4528
+    },
+    {
+      "path": "src/core/prepareColumnStartState.ts",
+      "gitBlob": "61e16519d610c5b89d2e59ea0d742901b13f7b36",
+      "size": 2604
+    },
+    {
+      "path": "src/core/recalculateSettledScroll.ts",
+      "gitBlob": "930b7f9bbb464f85e748ca0df759f0c315a6bbc0",
+      "size": 345
+    },
+    {
+      "path": "src/core/resetLayoutCachesForDataChange.ts",
+      "gitBlob": "8813fa830f74e382005ab16c75af39aa211dedf6",
+      "size": 285
+    },
+    {
+      "path": "src/core/scheduleContainerLayout.ts",
+      "gitBlob": "08a07f6b571b27e9217a870792cb8d9d422beef8",
+      "size": 2391
+    },
+    {
+      "path": "src/core/ScheduledWork.ts",
+      "gitBlob": "4c60713ca801d301553da8ec84e3030da6bf40c3",
+      "size": 2011
+    },
+    {
+      "path": "src/core/ScrollAdjustHandler.ts",
+      "gitBlob": "4dc8ca013a1b36742eaad77e5557161242a69f71",
+      "size": 3324
+    },
+    {
+      "path": "src/core/scrollTo.ts",
+      "gitBlob": "c349d583207a4e56df04c17636d2c47cdc25acf4",
+      "size": 8109
+    },
+    {
+      "path": "src/core/scrollToEnd.ts",
+      "gitBlob": "7d0d324f49877124415d47dd22eb7188e0d704ac",
+      "size": 707
+    },
+    {
+      "path": "src/core/scrollToIndex.ts",
+      "gitBlob": "4689874808ea6fff2a6a8e50629528957e1984ba",
+      "size": 1540
+    },
+    {
+      "path": "src/core/setSize.ts",
+      "gitBlob": "59df6964f44eeeaa6a071f47bc2aff8c3fac761c",
+      "size": 531
+    },
+    {
+      "path": "src/core/syncMountedContainer.ts",
+      "gitBlob": "b13b922ee91996f8b17513be669b7412713675d2",
+      "size": 4506
+    },
+    {
+      "path": "src/core/updateAnchoredEndSpace.ts",
+      "gitBlob": "4e7066afceb398178c027df517ea68f0f1df958c",
+      "size": 3513
+    },
+    {
+      "path": "src/core/updateContentInsetEndAdjustment.ts",
+      "gitBlob": "b589a338b446892934bca04ee5a338bd4bac02a2",
+      "size": 1173
+    },
+    {
+      "path": "src/core/updateContentMetrics.ts",
+      "gitBlob": "717b2aeb6a498d39e63ed692dd1262b7b37a96d1",
+      "size": 3333
+    },
+    {
+      "path": "src/core/updateContentMetricsState.ts",
+      "gitBlob": "7a7e76d804ea68000938994e04fba6248fac630b",
+      "size": 1181
+    },
+    {
+      "path": "src/core/updateItemPositions.ts",
+      "gitBlob": "76103bd55462f81b7f6b8d833cbdbd858169a94e",
+      "size": 8025
+    },
+    {
+      "path": "src/core/updateItemSizes.ts",
+      "gitBlob": "ae35455f23f6370ea4dcdede1ade6cacb8a51a5a",
+      "size": 12915
+    },
+    {
+      "path": "src/core/updateScroll.ts",
+      "gitBlob": "3041eb300cd0ac4cd0a65ceb30ef0d73d7ad58e0",
+      "size": 6039
+    },
+    {
+      "path": "src/core/updateTotalSize.ts",
+      "gitBlob": "6e28400c7ae995fe99452d85e290954e59e4af76",
+      "size": 1788
+    },
+    {
+      "path": "src/core/useWrapIfItem.ts",
+      "gitBlob": "abb239f4e6695d9496a7de7d4eceed0b5fa7fc61",
+      "size": 417
+    },
+    {
+      "path": "src/core/viewability.ts",
+      "gitBlob": "27df56bcad6f9840a04740534788af5165edc716",
+      "size": 11358
+    },
+    {
+      "path": "src/entrypoints/shared.ts",
+      "gitBlob": "4330049a529acc2c3841efee351629e4abdca7ab",
+      "size": 1313
+    },
+    {
+      "path": "src/hooks/createResizeObserver.ts",
+      "gitBlob": "db899bb8437441e4d9ca67fa9bf7f81b337a1f0c",
+      "size": 1936
+    },
+    {
+      "path": "src/hooks/useAnimatedValue.ts",
+      "gitBlob": "3abd296904babc60b0191b3dce04f5f69666ad68",
+      "size": 267
+    },
+    {
+      "path": "src/hooks/useCombinedRef.ts",
+      "gitBlob": "ec9a1e6955932cd2ec9911d8a9c3a11c1fac4fd5",
+      "size": 613
+    },
+    {
+      "path": "src/hooks/useContainerMeasurement.tsx",
+      "gitBlob": "266a83b25d80a772bccbddb540af77baa7423500",
+      "size": 7371
+    },
+    {
+      "path": "src/hooks/useDOMOrder.ts",
+      "gitBlob": "33cd7b3d307911e5f426164658cdbed1980f0521",
+      "size": 1786
+    },
+    {
+      "path": "src/hooks/useFreshDataTransitionVisibility.ts",
+      "gitBlob": "f16dbaa8109bf1b37392a19dfbdd25481734f0fe",
+      "size": 861
+    },
+    {
+      "path": "src/hooks/useInit.ts",
+      "gitBlob": "73fb407c44a3049068bac0376f0445703503f41b",
+      "size": 506
+    },
+    {
+      "path": "src/hooks/useLatestRef.ts",
+      "gitBlob": "1cb97cad23e2f3b45db1a7847128bc814b6e0d43",
+      "size": 157
+    },
+    {
+      "path": "src/hooks/useOnLayoutSync.native.tsx",
+      "gitBlob": "8d4b4ddbaeb4eb305e019f58e99a19222936fa28",
+      "size": 1483
+    },
+    {
+      "path": "src/hooks/useOnLayoutSync.tsx",
+      "gitBlob": "6b22549092141c63e176e90cb418007e7f8901da",
+      "size": 3865
+    },
+    {
+      "path": "src/hooks/useStableRenderComponent.tsx",
+      "gitBlob": "40dd94bbbd749d309c4ca482c4fe7367e816c802",
+      "size": 787
+    },
+    {
+      "path": "src/hooks/useThrottleDebounce.ts",
+      "gitBlob": "b8fe3afdae57949b935d8ae50666fc10f9f06ebf",
+      "size": 1734
+    },
+    {
+      "path": "src/hooks/useValue$.ts",
+      "gitBlob": "a7d16c11e81fbff13bcbe70a8121af301d9b33b7",
+      "size": 868
+    },
+    {
+      "path": "src/hooks/useValueListener$.ts",
+      "gitBlob": "cd9d3a5369e93abe303ad198541db5a811681fd4",
+      "size": 517
+    },
+    {
+      "path": "src/integrations/animated.tsx",
+      "gitBlob": "4e333c2cef70e4a60a64cfc5769321cb7e68a8be",
+      "size": 342
+    },
+    {
+      "path": "src/integrations/keyboard-legacy.tsx",
+      "gitBlob": "6740319678d4e732c1952f08ca0992d6135a7f8a",
+      "size": 23730
+    },
+    {
+      "path": "src/integrations/keyboard.tsx",
+      "gitBlob": "bb6c141dd7d259d393e0dcf87940d39e5da537e1",
+      "size": 7365
+    },
+    {
+      "path": "src/integrations/reanimated.tsx",
+      "gitBlob": "0325bde593c6538651ae2ae76da464f63245492e",
+      "size": 17995
+    },
+    {
+      "path": "src/platform/Animated.native.tsx",
+      "gitBlob": "3aff49e6df6687090d5736cad9fae5bc029c70a3",
+      "size": 318
+    },
+    {
+      "path": "src/platform/Animated.tsx",
+      "gitBlob": "b706a6fb33e501bd409fbe743224271b58dc76e9",
+      "size": 241
+    },
+    {
+      "path": "src/platform/batchedUpdates.native.ts",
+      "gitBlob": "45bf168e3c0ce1a5636a9bf4b64684751c9ef919",
+      "size": 323
+    },
+    {
+      "path": "src/platform/batchedUpdates.ts",
+      "gitBlob": "b96734e51901cf1291d30e67707687fc41e3a131",
+      "size": 314
+    },
+    {
+      "path": "src/platform/flushSync.native.ts",
+      "gitBlob": "2399d7b1b35cd1a43c4b477353713712cd12f081",
+      "size": 66
+    },
+    {
+      "path": "src/platform/flushSync.ts",
+      "gitBlob": "a35d14332147cf3d28d8314ecd5fb80d46c20b0c",
+      "size": 104
+    },
+    {
+      "path": "src/platform/getWindowSize.native.ts",
+      "gitBlob": "33fb0deff57ee09b650a5f6701a1d474e8e2dbd9",
+      "size": 218
+    },
+    {
+      "path": "src/platform/getWindowSize.ts",
+      "gitBlob": "01f6fe6674607807d5393c1b2dc18bef56c2e9ab",
+      "size": 214
+    },
+    {
+      "path": "src/platform/I18nManager.native.ts",
+      "gitBlob": "8c34d7bd68d3b0b9d60edc437eb298efab4a47da",
+      "size": 44
+    },
+    {
+      "path": "src/platform/I18nManager.ts",
+      "gitBlob": "5f61d0ed464e50737048e0b7d977e4238f2be4b6",
+      "size": 50
+    },
+    {
+      "path": "src/platform/LayoutView.native.tsx",
+      "gitBlob": "964421f13dd8353655729eaac256d364d1b2843b",
+      "size": 838
+    },
+    {
+      "path": "src/platform/LayoutView.tsx",
+      "gitBlob": "5d0e52e6b3799a004a7a986ee4365061ab1048e1",
+      "size": 1312
+    },
+    {
+      "path": "src/platform/PixelRatio.native.ts",
+      "gitBlob": "6fa1042580ba58a1151f3ac1dd538110f4ffc560",
+      "size": 100
+    },
+    {
+      "path": "src/platform/PixelRatio.ts",
+      "gitBlob": "16f81e7bcf9ba3ea72c556f8fbf0090c9e871972",
+      "size": 68
+    },
+    {
+      "path": "src/platform/platform-types.ts",
+      "gitBlob": "02199ee3d7c4b5f83150e003c26054d9acda09ed",
+      "size": 569
+    },
+    {
+      "path": "src/platform/Platform.native.ts",
+      "gitBlob": "a1246ad8efb6c17f1556732033080008ae34ff72",
+      "size": 162
+    },
+    {
+      "path": "src/platform/Platform.ts",
+      "gitBlob": "54d93f3c4d318cf78b0334d08605f283eb1a8990",
+      "size": 234
+    },
+    {
+      "path": "src/platform/RefreshControl.native.tsx",
+      "gitBlob": "e0c865727029d43517ab88c72e488b99daf39c9d",
+      "size": 183
+    },
+    {
+      "path": "src/platform/RefreshControl.tsx",
+      "gitBlob": "0994da65556075d646c6c4429cea171afd8ce0c8",
+      "size": 201
+    },
+    {
+      "path": "src/platform/scrollview-types.ts",
+      "gitBlob": "bcb5e0903c1b47cddc2e39a00a9cb4940c82776d",
+      "size": 2431
+    },
+    {
+      "path": "src/platform/StyleSheet.native.tsx",
+      "gitBlob": "0e0be5a66d5809a57e58164dec68df26099da1b9",
+      "size": 235
+    },
+    {
+      "path": "src/platform/StyleSheet.tsx",
+      "gitBlob": "d3a300176662a03f5325d4d8312e9fb6842313cd",
+      "size": 499
+    },
+    {
+      "path": "src/platform/useStickyScrollHandler.native.ts",
+      "gitBlob": "88c19365b19772eaf14fdd0cdc0baaeb1c33c090",
+      "size": 1275
+    },
+    {
+      "path": "src/platform/useStickyScrollHandler.ts",
+      "gitBlob": "f6a860e37c89140186fa546d91e9b6b61a46f8f0",
+      "size": 398
+    },
+    {
+      "path": "src/platform/ViewComponents.native.tsx",
+      "gitBlob": "77dfe3cd5d854f97d955810002e1fe1b535d3565",
+      "size": 308
+    },
+    {
+      "path": "src/platform/ViewComponents.tsx",
+      "gitBlob": "d02659e55f9b86537a1df894b0c077cbda207b7b",
+      "size": 1392
+    },
+    {
+      "path": "src/react-native.ts",
+      "gitBlob": "c864eaff00d7f1d165c8102f24d83ab81851532b",
+      "size": 562
+    },
+    {
+      "path": "src/react.ts",
+      "gitBlob": "84088fa641d5ca8344f8448cfe8d2ef6cbc30004",
+      "size": 545
+    },
+    {
+      "path": "src/section-list/flattenSections.ts",
+      "gitBlob": "c4dfe6a60f11d91daea27e59bb1b62724141b8fe",
+      "size": 6153
+    },
+    {
+      "path": "src/section-list/index.ts",
+      "gitBlob": "04bf24ce9d588c08eff3e6691cfaf67f12c59080",
+      "size": 407
+    },
+    {
+      "path": "src/section-list/SectionList.tsx",
+      "gitBlob": "95acf20329da9418b742c6916515fd348ef981b8",
+      "size": 12037
+    },
+    {
+      "path": "src/state/ContextContainer.ts",
+      "gitBlob": "e28597f65248afe67be91806214307a2675725f5",
+      "size": 7601
+    },
+    {
+      "path": "src/state/getContentInsetEnd.ts",
+      "gitBlob": "b33df79ba770116063ffdba8736f88d3f4472008",
+      "size": 1506
+    },
+    {
+      "path": "src/state/getContentSize.ts",
+      "gitBlob": "a03fd417fb4386405793f30890bbd6787bc9abde",
+      "size": 1175
+    },
+    {
+      "path": "src/state/state.tsx",
+      "gitBlob": "633377e76d795132d105c98f67af859df9ec612b",
+      "size": 14657
+    },
+    {
+      "path": "src/types.base.ts",
+      "gitBlob": "7ef9fa18b04f4f1eb1d9334bb21414a71617e95c",
+      "size": 24742
+    },
+    {
+      "path": "src/types.internal.ts",
+      "gitBlob": "36aaf594c13741fd9097f902ca8488fcac8851b1",
+      "size": 12875
+    },
+    {
+      "path": "src/types.react-native.ts",
+      "gitBlob": "acf3f710417b98e03ba1f32044d68c73c243b7e3",
+      "size": 2978
+    },
+    {
+      "path": "src/types.web.ts",
+      "gitBlob": "8d422e18639acd7baa888c0107bf17b67a2e6a80",
+      "size": 3443
+    },
+    {
+      "path": "src/typesInternal.ts",
+      "gitBlob": "ba757c39404b46e0f6341b421429923428998efc",
+      "size": 180
+    },
+    {
+      "path": "src/utils/checkAllSizesKnown.ts",
+      "gitBlob": "4867a9add071baeda80bbcb3ef129556e6b7c189",
+      "size": 775
+    },
+    {
+      "path": "src/utils/checkAtBottom.ts",
+      "gitBlob": "3b6bf9d750380cc4a01633b984a2b1dedf6c75e3",
+      "size": 2635
+    },
+    {
+      "path": "src/utils/checkAtTop.ts",
+      "gitBlob": "dbd1e8608a9ef60793a248c009d2a13f39df5688",
+      "size": 2376
+    },
+    {
+      "path": "src/utils/checkThreshold.ts",
+      "gitBlob": "a41766e87451f7045c62737104f55a67e603ada8",
+      "size": 2927
+    },
+    {
+      "path": "src/utils/checkThresholds.ts",
+      "gitBlob": "73c1f51bd3969a821242640d8dbee68a8c033d9c",
+      "size": 504
+    },
+    {
+      "path": "src/utils/containerPool.ts",
+      "gitBlob": "bc450404032534812e598184539ca53309b4eb2e",
+      "size": 1052
+    },
+    {
+      "path": "src/utils/createColumnWrapperStyle.ts",
+      "gitBlob": "8a7a0b7417961647a52ff205fc99936a9f3b2be8",
+      "size": 628
+    },
+    {
+      "path": "src/utils/createImperativeHandle.ts",
+      "gitBlob": "1c590e1a8821882d3187f0737b43ea000766f403",
+      "size": 12512
+    },
+    {
+      "path": "src/utils/devEnvironment.ts",
+      "gitBlob": "ce764f5a81f0a2ddf03991d337a36ea671df20d0",
+      "size": 438
+    },
+    {
+      "path": "src/utils/edgeReachedGate.ts",
+      "gitBlob": "64ffcc2359db7dcc4093ac611f0da8d739dec60b",
+      "size": 2335
+    },
+    {
+      "path": "src/utils/findAvailableContainers.ts",
+      "gitBlob": "e2954745dbd92f3a94f1afd09a2f3b98082d4e20",
+      "size": 8055
+    },
+    {
+      "path": "src/utils/getAlwaysRenderIndices.ts",
+      "gitBlob": "ebea9559e73e9e6f9961fd375e8315f86c5f7fc5",
+      "size": 2145
+    },
+    {
+      "path": "src/utils/getComponent.tsx",
+      "gitBlob": "9e491e5104ec5a09a10992d072da3d3418196521",
+      "size": 466
+    },
+    {
+      "path": "src/utils/getEffectiveDrawDistance.ts",
+      "gitBlob": "e29cdd89d9cc2ac1f196994f29db894ac5f44919",
+      "size": 1065
+    },
+    {
+      "path": "src/utils/getId.ts",
+      "gitBlob": "b1e0faba43ac36b633eb24d66e64ffe127b56c79",
+      "size": 734
+    },
+    {
+      "path": "src/utils/getItemSize.ts",
+      "gitBlob": "accdc454118e58fee3cbbfc5db9d76128be139ab",
+      "size": 3994
+    },
+    {
+      "path": "src/utils/getRenderedItem.ts",
+      "gitBlob": "136eb899f9d8b200f17df175922f4665a69d31c3",
+      "size": 976
+    },
+    {
+      "path": "src/utils/getScrollVelocity.ts",
+      "gitBlob": "2dfd078393668285ec71620b36450d572e221916",
+      "size": 1707
+    },
+    {
+      "path": "src/utils/hasActiveInitialScroll.ts",
+      "gitBlob": "bb5b3fde2fff73fb3c45f3656aca2ce097e9efea",
+      "size": 208
+    },
+    {
+      "path": "src/utils/hasActiveMVCPAnchorLock.ts",
+      "gitBlob": "647d5b4e0d77b7da3e00131977893efd0e24de30",
+      "size": 338
+    },
+    {
+      "path": "src/utils/helpers.ts",
+      "gitBlob": "e51b1212f44ea5d4fc5c7b02c73f27995b80a6f5",
+      "size": 1918
+    },
+    {
+      "path": "src/utils/isInMVCPActiveMode.native.ts",
+      "gitBlob": "bf6fb3946cda55b2d3e310ea959bd49726e3f380",
+      "size": 264
+    },
+    {
+      "path": "src/utils/isInMVCPActiveMode.ts",
+      "gitBlob": "27bc203149bb496d7f2531a530e4faedaf81893d",
+      "size": 424
+    },
+    {
+      "path": "src/utils/layoutMeasurement.ts",
+      "gitBlob": "f937379af2acf54b04a9680a905b25b95c53eb73",
+      "size": 542
+    },
+    {
+      "path": "src/utils/normalizeMaintainScrollAtEnd.ts",
+      "gitBlob": "fbffbeb629395cdb7d7c8b8848c79d60ad532241",
+      "size": 1197
+    },
+    {
+      "path": "src/utils/normalizeMaintainVisibleContentPosition.ts",
+      "gitBlob": "e9c2a9e86613cb7fe70000e905605d64f52f1ebd",
+      "size": 750
+    },
+    {
+      "path": "src/utils/reordering.ts",
+      "gitBlob": "b06b1409fbcb8bb4d01c17327c6afb26b2a36f07",
+      "size": 3165
+    },
+    {
+      "path": "src/utils/requestAdjust.ts",
+      "gitBlob": "8fc10d731ba60ae0121e91518961a7ce8fd664f1",
+      "size": 2864
+    },
+    {
+      "path": "src/utils/rtl.ts",
+      "gitBlob": "1732ec13f02c6c69f437ec6211bbb417018c4251",
+      "size": 5873
+    },
+    {
+      "path": "src/utils/setDidLayout.ts",
+      "gitBlob": "b0bc7bb634fa44e4985a7f9dd14f36b83349c462",
+      "size": 375
+    },
+    {
+      "path": "src/utils/setInitialRenderState.ts",
+      "gitBlob": "d73dbc2db72c03c752bf0af7076d8d34221afd44",
+      "size": 1777
+    },
+    {
+      "path": "src/utils/setPaddingTop.ts",
+      "gitBlob": "853474f955ce764f07b9c5a46342b4b83e81f556",
+      "size": 1094
+    },
+    {
+      "path": "src/utils/throttledOnScroll.ts",
+      "gitBlob": "33a831b15cf10d8e826f39914abdd8dd868e206f",
+      "size": 1068
+    },
+    {
+      "path": "src/utils/updateSnapToOffsets.ts",
+      "gitBlob": "b5669dcb399cf0129fb72e78f6050d9f8cd68606",
+      "size": 831
+    },
+    {
+      "path": "src/utils/useRafCoalescer.ts",
+      "gitBlob": "b2cde295be84dd20a7b01466ccd486efe2333e4c",
+      "size": 1495
+    },
+    {
+      "path": "tsconfig.json",
+      "gitBlob": "35d63adb0b80cc1d5937b85956b76217c18a9df8",
+      "size": 2075
+    }
+  ],
+  "fingerprint": "6d6743c181d364066bf921494696cce3188438c6de35cce27827229c1f9c3783"
+}
