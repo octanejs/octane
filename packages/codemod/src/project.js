@@ -415,24 +415,48 @@ function resolveBinding(specifier, packages, notes) {
 	if (name === null) return null;
 	const binding = CATALOG[name];
 	packages.set(name, binding);
+	const entry = DATA.bindings.find((candidate) => candidate.name === binding);
 	// An aggregate binding (`@octanejs/visx`, for `@visx/visx`) serves each
 	// package of its scope from a subpath: `@visx/hierarchy` is
 	// `@octanejs/visx/hierarchy`.
-	const upstream = DATA.bindings.find((entry) => entry.name === binding)?.upstream?.package;
+	const upstream = entry?.upstream?.package;
 	const aggregate = upstream?.match(/^@([^/]+)\/\1$/);
 	if (aggregate && name !== upstream && name.startsWith(`@${aggregate[1]}/`)) {
 		return `${binding}/${name.slice(aggregate[1].length + 2)}${specifier.slice(name.length)}`;
 	}
 	const subpath = specifier.slice(name.length);
-	if (subpath !== '') {
-		notes.push({
-			rule: 'bindings',
-			severity: 'warning',
-			line: 1,
-			message: `Check that \`${binding}${subpath}\` exists; the binding may export it from its root.`,
-		});
+	if (subpath === '' || entry?.exports.some((key) => serves(key, `.${subpath}`))) {
+		return binding + subpath;
 	}
+	// A binding outside the catalog has exports the codemod cannot see.
+	notes.push(
+		entry
+			? {
+					rule: 'bindings',
+					severity: 'error',
+					line: 1,
+					message: `\`${binding}\` has no \`.${subpath}\` export. Import these names from its root if it exports them there.`,
+				}
+			: {
+					rule: 'bindings',
+					severity: 'warning',
+					line: 1,
+					message: `Check that \`${binding}${subpath}\` exists; the binding may export it from its root.`,
+				},
+	);
 	return binding + subpath;
+}
+
+/**
+ * Whether a package `exports` key serves a subpath, directly or through a
+ * `*` pattern such as `./locale/*`.
+ *
+ * @param {string} key
+ * @param {string} subpath
+ */
+function serves(key, subpath) {
+	const [head, tail] = key.split('*');
+	return tail === undefined ? key === subpath : subpath.startsWith(head) && subpath.endsWith(tail);
 }
 
 /**
