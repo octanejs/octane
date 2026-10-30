@@ -1,0 +1,80 @@
+{
+    "compilerOptions": {
+        "allowSyntheticDefaultImports": true,
+        "declaration": true,
+        "declarationMap": false,
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+        "incremental": true,
+        "isolatedModules": true,
+        "jsx": "preserve",
+        "lib": [
+            "dom",
+            "dom.iterable",
+            "esnext"
+        ],
+        "module": "ES2015",
+        "moduleResolution": "node",
+        "noEmit": true,
+        "outDir": "dist",
+        "paths": {
+            "@/*": [
+                "./src/*"
+            ],
+            "@/components/*": [
+                "./src/components/*"
+            ],
+            "@/core/*": [
+                "./src/core/*"
+            ],
+            "@/hooks/*": [
+                "./src/hooks/*"
+            ],
+            "@/integrations/*": [
+                "./src/integrations/*"
+            ],
+            "@/state/*": [
+                "./src/state/*"
+            ],
+            "@/utils/*": [
+                "./src/utils/*"
+            ],
+            "@legendapp/list/react-native": [
+                "./src/react-native"
+            ],
+            "@legendapp/list/react": [
+                "./src/react"
+            ],
+            "@legendapp/list/animated": [
+                "./src/integrations/animated"
+            ],
+            "@legendapp/list/keyboard": [
+                "./src/integrations/keyboard"
+            ],
+            "@legendapp/list/reanimated": [
+                "./src/integrations/reanimated"
+            ]
+        },
+        "resolveJsonModule": true,
+        "rootDirs": [
+            "./src"
+        ],
+        "skipLibCheck": true,
+        "sourceMap": true,
+        "strict": true,
+        "stripInternal": true,
+        "target": "es2018",
+        "tsBuildInfoFile": "./tsconfig.tsbuildinfo" // Specify the build info file
+    },
+    "exclude": [
+        "node_modules",
+        "dist",
+        "types.d.ts",
+        "src/types",
+        "example"
+    ],
+    "include": [
+        "**/*.ts",
+        "**/*.tsx"
+    ]
+}

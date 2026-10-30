@@ -1,0 +1,360 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/LegendApp/legend-list.git",
+    "version": "3.3.5",
+    "commit": "80193ceda8f54b31e26b53f8a0ebb8cc07aa9bf0",
+    "sourceRoot": "src",
+    "testRoot": "__tests__",
+    "license": "MIT",
+    "integrity": "sha256:786c21d10d1a62deeb23ed19139daa8a2c8727158f01741a5f845609f68d6b20",
+    "verification": "verified"
+  },
+  "upstreamSuites": { "runtime": "insufficient", "types": "absent" },
+  "materializedTests": "packages/legendapp-list",
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/legendapp-list/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": ["\\.d\\.ts$"]
+    },
+    "tests": {
+      "roots": ["packages/legendapp-list/tests/upstream"],
+      "include": ["\\.(?:test|cases)\\.tsx?$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 1255,
+    "uniqueIdentities": 1255,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@12.9.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "f28f400b7a075ea55e6e0db911e57988e7f5b0d718dbea01168e141578f7ae71"
+    }
+  },
+  "lanes": [
+    {
+      "id": "legendapp-list-pristine-full",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "legendapp-list-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs 1348 registrations from 84 pinned suites unchanged against the pinned source on React 19, under bun:test mapped onto Vitest and the suite's own setup.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/legendapp-list/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/legendapp-list/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "e1662e5aa28d39902bc2f0be2880a3edd507ebec8913e715ddd3f5046fdd1a91"
+        },
+        {
+          "path": "packages/legendapp-list/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "61fb63309fec8b4c5ac401b94ee063c2302cadf4b81a5eb459f34fa0132f4307"
+        },
+        {
+          "path": "packages/legendapp-list/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "41fd26d004bdba509152a256c13a4e6ef1ed2bc6ce0e0e929b121d7f8a0ae7ea"
+        },
+        {
+          "path": "packages/legendapp-list/audit/provenance.json",
+          "role": "support",
+          "sha256": "59ce210317407a1dc30aa67b5f4824ee9cc0915c01e5a0a5d006209b55c91261"
+        },
+        {
+          "path": "packages/legendapp-list/audit/registrations.json",
+          "role": "support",
+          "sha256": "9bb582bdfb31d5fd93ff105a95c85fbf4c9996a7b6fb7e098e645bb1cb2be3c5"
+        },
+        {
+          "path": "packages/legendapp-list/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "dab05dbccd5a203aa601a0410ff6b808013175e56bc7c874556d5021a5bb1b0f"
+        },
+        {
+          "path": "packages/legendapp-list/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "976e98e475ccc01092e61fdd5e8bc83e3a34a613b4de97f88997836a949d4eed"
+        },
+        {
+          "path": "packages/legendapp-list/tests/upstream-lane-files.ts",
+          "role": "support",
+          "sha256": "4381a206e769913e98c5cb26175b2b637bbfccdb5104f62b6d4bee4190f140f6"
+        },
+        {
+          "path": "packages/legendapp-list/tests/bun/bun-test.ts",
+          "role": "support",
+          "sha256": "1f1f02ff8fa263ae5329ee0fa77a669ad3abccd2c4ba78d9fa8d2d3dfb5cf6ed"
+        },
+        {
+          "path": "packages/legendapp-list/tests/bun/native-overrides.ts",
+          "role": "support",
+          "sha256": "94749da2385a111f3e35ed8ee50491208a9bc19fc9453ce2e848d1b5fd3fe11c"
+        },
+        {
+          "path": "packages/legendapp-list/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "3b94fbfa6e1d98536f5d507d9159053ef8509e2bac3f73d12beb47f0142db3e7"
+        },
+        {
+          "path": "packages/legendapp-list/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "fbe4e14edce740defba0c21c312817ab59c23f250daee5a565356834b348ff3f"
+        },
+        {
+          "path": "packages/legendapp-list/tests/bun/testing-library-react-native.ts",
+          "role": "support",
+          "sha256": "314b094fd8ce7526bb56e28481051b9f3281d8f8f8c5334dee2b2c00d0cfdc65"
+        },
+        {
+          "path": "packages/legendapp-list/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "7f0ccd0b634226cbc71fcf997f73da7991248f6236dca34037ce9cbc26cfc8e2"
+        },
+        {
+          "path": "scripts/react-parity/pristine-suite-lib.mjs",
+          "role": "support",
+          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
+        }
+      ]
+    },
+    {
+      "id": "legendapp-list-adapted-full",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "legendapp-list-adapted",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Runs 1255 registrations from the 68 core suites against this package's source with import rewrites only.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/legendapp-list/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/legendapp-list/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "e3d73408a5d86ea903c4bb015ac7f2da6dab085e32c2716e65b261730e4143be"
+        },
+        {
+          "path": "packages/legendapp-list/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "41fd26d004bdba509152a256c13a4e6ef1ed2bc6ce0e0e929b121d7f8a0ae7ea"
+        },
+        {
+          "path": "packages/legendapp-list/audit/provenance.json",
+          "role": "support",
+          "sha256": "59ce210317407a1dc30aa67b5f4824ee9cc0915c01e5a0a5d006209b55c91261"
+        },
+        {
+          "path": "packages/legendapp-list/audit/registrations.json",
+          "role": "support",
+          "sha256": "9bb582bdfb31d5fd93ff105a95c85fbf4c9996a7b6fb7e098e645bb1cb2be3c5"
+        },
+        {
+          "path": "packages/legendapp-list/audit/crosswalk.json",
+          "role": "support",
+          "sha256": "dab05dbccd5a203aa601a0410ff6b808013175e56bc7c874556d5021a5bb1b0f"
+        },
+        {
+          "path": "packages/legendapp-list/scripts/update-audit.mjs",
+          "role": "support",
+          "sha256": "976e98e475ccc01092e61fdd5e8bc83e3a34a613b4de97f88997836a949d4eed"
+        },
+        {
+          "path": "packages/legendapp-list/tests/upstream-lane-files.ts",
+          "role": "support",
+          "sha256": "4381a206e769913e98c5cb26175b2b637bbfccdb5104f62b6d4bee4190f140f6"
+        },
+        {
+          "path": "packages/legendapp-list/tests/bun/bun-test.ts",
+          "role": "support",
+          "sha256": "1f1f02ff8fa263ae5329ee0fa77a669ad3abccd2c4ba78d9fa8d2d3dfb5cf6ed"
+        },
+        {
+          "path": "packages/legendapp-list/tests/bun/native-overrides.ts",
+          "role": "support",
+          "sha256": "94749da2385a111f3e35ed8ee50491208a9bc19fc9453ce2e848d1b5fd3fe11c"
+        },
+        {
+          "path": "packages/legendapp-list/tests/vitest.adapted.config.ts",
+          "role": "support",
+          "sha256": "010be79c4ceb328d69dd81382e0f19b62ee94d27af779d233d36670f95f59970"
+        },
+        {
+          "path": "packages/legendapp-list/tests/bun/testing-library-cleanup.ts",
+          "role": "support",
+          "sha256": "b7de8650cc1915015d6c16844aa1e6b7186aa0282f20fa657501c4ec3f2c37ff"
+        }
+      ]
+    },
+    {
+      "id": "legendapp-list-browser-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "legendapp-list-browser",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Serves one .tsrx scenario fixture through the port on Octane and through @legendapp/list/react 3.3.5 on React 19 in headless Chromium, applies the same steps to both pages, and compares scroll geometry, mounted rows and offsets, DOM order, getState() and the callback log after each.",
+      "files": [
+        {
+          "path": "packages/legendapp-list/tests/browser/differential.browser.test.ts",
+          "role": "test",
+          "sha256": "1a327f481465b2640f212ddfdf6fe69c9d69d720a886309c3afe4dfe57827aed",
+          "cases": [
+            {
+              "id": "differential:legendapp-list-scrolling",
+              "testName": "virtualizes rows and runs every imperative scroll method",
+              "fullName": "LegendList parity with @legendapp/list/react in Chromium virtualizes rows and runs every imperative scroll method"
+            },
+            {
+              "id": "differential:legendapp-list-chat-follow",
+              "testName": "opens a chat at the end, follows appends and keeps history steady",
+              "fullName": "LegendList parity with @legendapp/list/react in Chromium opens a chat at the end, follows appends and keeps history steady"
+            },
+            {
+              "id": "differential:legendapp-list-picker",
+              "testName": "recycles picker rows with separators, highlight and filtering",
+              "fullName": "LegendList parity with @legendapp/list/react in Chromium recycles picker rows with separators, highlight and filtering"
+            },
+            {
+              "id": "differential:legendapp-list-restore-index",
+              "testName": "restores an initial index with a view offset and always renders it",
+              "fullName": "LegendList parity with @legendapp/list/react in Chromium restores an initial index with a view offset and always renders it"
+            },
+            {
+              "id": "differential:legendapp-list-anchored-end-space",
+              "testName": "reserves anchored end space with a content inset adjustment",
+              "fullName": "LegendList parity with @legendapp/list/react in Chromium reserves anchored end space with a content inset adjustment"
+            },
+            {
+              "id": "differential:legendapp-list-empty",
+              "testName": "shows ListEmptyComponent until data arrives",
+              "fullName": "LegendList parity with @legendapp/list/react in Chromium shows ListEmptyComponent until data arrives"
+            },
+            {
+              "id": "differential:legendapp-list-horizontal",
+              "testName": "virtualizes a horizontal list",
+              "fullName": "LegendList parity with @legendapp/list/react in Chromium virtualizes a horizontal list"
+            },
+            {
+              "id": "differential:legendapp-list-columns",
+              "testName": "lays out columns with a column gap",
+              "fullName": "LegendList parity with @legendapp/list/react in Chromium lays out columns with a column gap"
+            },
+            {
+              "id": "differential:legendapp-list-sticky",
+              "testName": "pins sticky headers and reports the active one",
+              "fullName": "LegendList parity with @legendapp/list/react in Chromium pins sticky headers and reports the active one"
+            },
+            {
+              "id": "differential:legendapp-list-snap",
+              "testName": "places snap anchors at snapToIndices",
+              "fullName": "LegendList parity with @legendapp/list/react in Chromium places snap anchors at snapToIndices"
+            },
+            {
+              "id": "differential:legendapp-list-children",
+              "testName": "renders children as list items",
+              "fullName": "LegendList parity with @legendapp/list/react in Chromium renders children as list items"
+            },
+            {
+              "id": "differential:legendapp-list-row-hooks",
+              "testName": "drives the recycling, viewability and last-item hooks",
+              "fullName": "LegendList parity with @legendapp/list/react in Chromium drives the recycling, viewability and last-item hooks"
+            }
+          ]
+        },
+        {
+          "path": "packages/legendapp-list/tests/browser/_driver.ts",
+          "role": "support",
+          "sha256": "90679ee087f56bbccca87e681da475640555a36b320c510c25bdfc2467b36f51"
+        },
+        {
+          "path": "packages/legendapp-list/tests/browser/harness/scenarios.tsrx",
+          "role": "support",
+          "sha256": "3f920311d64e8e453247f7616e9719c6881c002c5cc66fa4db1441466cba524b"
+        },
+        {
+          "path": "packages/legendapp-list/tests/browser/harness/observe.ts",
+          "role": "support",
+          "sha256": "e550d6449f7a2e3b5f489157885384b3669448c12bac49ca9a62e514fd5bee8a"
+        },
+        {
+          "path": "packages/legendapp-list/tests/browser/harness/bridge.ts",
+          "role": "support",
+          "sha256": "9abd4d974fc367798594ebc66f912d53ee987813bebd3e339dca986f54bb4152"
+        },
+        {
+          "path": "packages/legendapp-list/tests/browser/harness/main.ts",
+          "role": "support",
+          "sha256": "3f305068a828c5b21e5dcc5e347928fdd8f6cb50a6a7da310cd7a033842a1609"
+        },
+        {
+          "path": "packages/legendapp-list/tests/browser/harness/mount-octane.ts",
+          "role": "support",
+          "sha256": "f99eed3aa0544408fec6661c5e176dc2c0ba46e11809a7dbc0ea11f5ed55c52b"
+        },
+        {
+          "path": "packages/legendapp-list/tests/browser/harness/mount-react.ts",
+          "role": "support",
+          "sha256": "d1178e4ba2524cea80d66c1f7b49fac4d62dde2faebd8db696edf0daab927a93"
+        },
+        {
+          "path": "packages/legendapp-list/tests/browser/harness/index.html",
+          "role": "support",
+          "sha256": "053875ac134591924e74755d1b276dfb1ef24ffade82d7dea21128fd1422d8a0"
+        }
+      ]
+    },
+    {
+      "id": "legendapp-list-ssr-differential",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "legendapp-list-ssr",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Renders six prop sets through octane/server and through @legendapp/list/react on react-dom/server and compares the markup without hydration comments.",
+      "files": [
+        {
+          "path": "packages/legendapp-list/tests/ssr/ssr.test.ts",
+          "role": "test",
+          "sha256": "f6f63e0cdf0510610404356f2ce3f52728655861a9fe49989bd54db70c848655",
+          "cases": [
+            {
+              "id": "differential:legendapp-list-ssr",
+              "testName": "matches @legendapp/list/react for every props scenario",
+              "fullName": "LegendList server rendering matches @legendapp/list/react for every props scenario"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "dom-order",
+      "caseIds": ["differential:legendapp-list-row-hooks", "differential:legendapp-list-picker"],
+      "upstreamResult": "Upstream moves the row container elements with insertBefore 500ms after the last position change, so DOM order follows item order. React's tree keeps container-slot order, so sibling rows' effects keep running in slot order.",
+      "octaneResult": "The port renders the containers in that same debounced item order through a keyed @for, so Octane moves the elements. DOM order matches; sibling rows run their effects in DOM order.",
+      "rationale": "Octane tracks each component's DOM as a range between comment markers. An element moved behind its back leaves those ranges, and a later removal orphans it (the differential's stray-row check fails with upstream's mechanism).",
+      "classification": "renderer-adaptation",
+      "consumerImpact": "Row effects across different rows may run in a different order after a reorder. Each row’s own effects keep their order.",
+      "migrationGuidance": "None.",
+      "owner": "@octanejs/legendapp-list",
+      "reviewCondition": "Review if Octane supports externally reordered keyed children."
+    }
+  ]
+}

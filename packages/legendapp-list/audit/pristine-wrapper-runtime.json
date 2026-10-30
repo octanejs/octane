@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "project": "legendapp-list-pristine",
+  "roots": ["packages/legendapp-list/tests"],
+  "files": ["packages/legendapp-list/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:a9f8f773f7a10cc2",
+      "file": "packages/legendapp-list/tests/upstream-original.test.ts",
+      "fullName": "runs the pinned @legendapp/list suites unchanged against React"
+    }
+  ],
+  "snapshots": 0
+}
