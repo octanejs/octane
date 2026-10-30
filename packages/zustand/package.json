@@ -38,6 +38,8 @@
     "./universal": "./src/universal.ts",
     "./vanilla": "./src/vanilla.ts",
     "./shallow": "./src/shallow.ts",
+    "./react/shallow": "./src/shallow.ts",
+    "./vanilla/shallow": "./src/shallow.ts",
     "./middleware": "./src/middleware.ts",
     "./traditional": "./src/traditional.ts"
   },

@@ -7,6 +7,8 @@ interface Binding {
 	divergences: string[];
 	ssr: string;
 	verified: string | null;
+	/** The package's `exports` subpaths, such as `./shallow`, without the root. */
+	exports: string[];
 }
 export declare const DATA: {
 	bindings: Binding[];

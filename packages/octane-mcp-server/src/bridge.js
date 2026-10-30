@@ -88,6 +88,8 @@ export const KNOWN_BINDINGS = {
 	'react-select': '@octanejs/select',
 	'react-transition-group': '@octanejs/transition-group',
 	'react-day-picker': '@octanejs/day-picker',
+	// v10's new name, which re-exports `react-day-picker`.
+	'@daypicker/react': '@octanejs/day-picker',
 	'input-otp': '@octanejs/input-otp',
 	vaul: '@octanejs/vaul',
 	'react-markdown': '@octanejs/markdown',

@@ -3,6 +3,7 @@
  * middleware (`/middleware`), and store-swap re-subscription. The selector snapshot stability
  * contract lives in `unstable-selectors.test.ts` (ordinary shards).
  */
+import { createRequire } from 'node:module';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createStore } from '@octanejs/zustand';
 import { persist, subscribeWithSelector } from '@octanejs/zustand/middleware';
@@ -40,6 +41,14 @@ describe('useShallow (object-slice selection)', () => {
 	it('shallow comparator is the verbatim zustand one', () => {
 		expect(shallow({ a: 1, b: 2 }, { a: 1, b: 2 })).toBe(true);
 		expect(shallow({ a: 1 }, { a: 2 })).toBe(false);
+	});
+
+	it('is also served from zustand’s `/react/shallow` and `/vanilla/shallow` entries', () => {
+		// Node's resolver, because the test alias maps subpaths to files directly.
+		const { resolve } = createRequire(import.meta.url);
+		const file = resolve('@octanejs/zustand/shallow');
+		expect(resolve('@octanejs/zustand/react/shallow')).toBe(file);
+		expect(resolve('@octanejs/zustand/vanilla/shallow')).toBe(file);
 	});
 });
 
