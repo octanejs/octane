@@ -90,7 +90,7 @@ declare const __OCTANE_PROFILE_ENABLED__: boolean;
 export interface FragmentProps {
 	children?: unknown;
 	key?: string | number | bigint | null | undefined;
-	ref?: FragmentRefValue;
+	ref?: FragmentRefValue | undefined;
 }
 
 // ---------------------------------------------------------------------------

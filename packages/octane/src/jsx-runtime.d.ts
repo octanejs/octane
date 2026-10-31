@@ -59,7 +59,7 @@ export interface OctaneElement<P = any> extends ElementDescriptor<P> {}
 export interface CSSProperties extends React.CSSProperties, CSS.PropertiesHyphen<string | number> {
 	cssFloat?: React.CSSProperties['float'];
 	/** Element-scoped View Transition isolation, including authored `!important` values. */
-	viewTransitionScope?: 'none' | 'all' | (string & {});
+	viewTransitionScope?: 'none' | 'all' | (string & {}) | undefined;
 }
 
 /** Native DOM style values; plain CSSProperties remains usable by CSS-consuming libraries. */
@@ -101,9 +101,9 @@ type NativeHandler<H, T> =
 		: never;
 
 type NativeEventHandlers<P, T> = {
-	[K in Extract<keyof P, ReactSyntheticProps>]?: NativeHandler<P[K], T>;
+	[K in Extract<keyof P, ReactSyntheticProps>]?: NativeHandler<P[K], T> | undefined;
 } & {
-	[K in DialogLifecycleProps]?: (event: Event & { currentTarget: T }) => void;
+	[K in DialogLifecycleProps]?: ((event: Event & { currentTarget: T }) => void) | undefined;
 };
 
 /** Props whose lowercase spelling is not a native attribute with equivalent behavior. */
@@ -163,9 +163,9 @@ type Transformed<P, T> = Omit<P, ReactSyntheticProps | 'className' | 'style' | '
 	NativeEventHandlers<P, T & EventTarget> & {
 		class?: ClassValue;
 		className?: ClassValue;
-		for?: string;
-		xmlns?: string;
-		style?: string | CSSProperties;
+		for?: string | undefined;
+		xmlns?: string | undefined;
+		style?: string | CSSProperties | undefined;
 		children?: unknown;
 	};
 
@@ -687,5 +687,5 @@ export declare function jsxDEV(
 export declare function Fragment(props: {
 	children?: unknown;
 	key?: Octane.Key | null | undefined;
-	ref?: Octane.Ref<FragmentInstance>;
+	ref?: Octane.Ref<FragmentInstance> | undefined;
 }): OctaneElement;

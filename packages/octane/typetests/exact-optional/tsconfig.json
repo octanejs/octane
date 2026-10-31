@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "jsxImportSource": "octane",
+    "exactOptionalPropertyTypes": true,
+    "plugins": [{ "name": "@tsrx/typescript-plugin" }]
+  },
+  "include": ["./*.test-d.tsx", "./*.test-d.tsrx"],
+  "exclude": []
+}

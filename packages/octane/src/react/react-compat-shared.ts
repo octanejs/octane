@@ -19,7 +19,7 @@ export interface ReactContextBridge<T> {
 
 interface ReactCompatContextProps {
 	/** Keep the ordered context identities stable for this boundary's lifetime. */
-	contexts?: readonly ReactContextBridge<any>[];
+	contexts?: readonly ReactContextBridge<any>[] | undefined;
 }
 
 export interface ReactCompatProps extends ReactCompatContextProps {

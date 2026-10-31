@@ -1203,9 +1203,9 @@ export const Fragment: typeof FRAGMENT_TAG = FRAGMENT_TAG;
  * Its public type is component-shaped so aliases and JSX values type-check.
  */
 export const Activity = ACTIVITY_TAG as unknown as (props: {
-	mode?: 'visible' | 'hidden';
+	mode?: 'visible' | 'hidden' | undefined;
 	children?: unknown;
-	name?: string;
+	name?: string | undefined;
 	key?: string | number | bigint | null | undefined;
 }) => unknown;
 
@@ -6246,15 +6246,15 @@ export const Suspense = /* @__PURE__ */ markComponentFlags(
 
 type VtSsrClassValue = string | Record<string, string>;
 interface VtSsrProps {
-	name?: string;
-	scope?: 'element';
-	enter?: VtSsrClassValue;
-	exit?: VtSsrClassValue;
-	update?: VtSsrClassValue;
-	share?: VtSsrClassValue;
-	default?: VtSsrClassValue;
-	parentEnter?: VtSsrClassValue;
-	parentExit?: VtSsrClassValue;
+	name?: string | undefined;
+	scope?: 'element' | undefined;
+	enter?: VtSsrClassValue | undefined;
+	exit?: VtSsrClassValue | undefined;
+	update?: VtSsrClassValue | undefined;
+	share?: VtSsrClassValue | undefined;
+	default?: VtSsrClassValue | undefined;
+	parentEnter?: VtSsrClassValue | undefined;
+	parentExit?: VtSsrClassValue | undefined;
 	onParentEnter?: unknown;
 	onParentExit?: unknown;
 	children?: unknown;

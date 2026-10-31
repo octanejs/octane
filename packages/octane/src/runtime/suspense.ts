@@ -247,13 +247,13 @@ export function __runOnCatch(callback: () => void): void {
  */
 export const ErrorBoundary: ComponentBody<{
 	fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
-	resetRef?: { current: (() => void) | null };
+	resetRef?: { current: (() => void) | null } | undefined;
 	// Renderable, not ComponentBody — same reasoning as Suspense above.
 	children: unknown;
 }> = /* @__PURE__ */ markComponentFlags<
 	ComponentBody<{
 		fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
-		resetRef?: { current: (() => void) | null };
+		resetRef?: { current: (() => void) | null } | undefined;
 		children: unknown;
 	}>
 >(
