@@ -844,7 +844,7 @@
     },
     {
       "name": "@octanejs/legendapp-list",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "category": "Tables",
       "upstream": { "package": "@legendapp/list", "version": "3.3.5" },
       "surface": "The complete @legendapp/list/react entry: LegendList with every prop (data or children, renderItem, keyExtractor, getItemType, recycleItems, estimated and fixed item sizes, drawDistance, columns, sticky headers, snapping, initial scroll, maintainScrollAtEnd, maintainVisibleContentPosition, anchoredEndSpace, alwaysRender, viewability, header, footer and empty components, useWindowScroll, renderScrollComponent), the imperative ref handle, the nine per-row hooks, internal, and all 36 exported types. 1,348 upstream registrations run unchanged against React and the 1,255 core ones also against this package's source; 12 Chromium scenarios and 6 server renders match @legendapp/list/react step for step.",
@@ -1152,7 +1152,7 @@
     },
     {
       "name": "@octanejs/pierre-diffs",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "category": "Content",
       "upstream": { "package": "@pierre/diffs", "version": "1.6.1" },
       "surface": "The complete @pierre/diffs/react entry: CodeView (controlled and uncontrolled, with its imperative handle and slot portals), File, FileDiff, MultiFileDiff, PatchDiff, UnresolvedFile, Virtualizer, WorkerPoolContextProvider and WorkerPoolContext, EditProvider and EditContext, their hooks (useVirtualizer, useWorkerPool, useCreateEditor, useFileInstance, useFileDiffInstance, useStableCallback), the slot renderers, templateRender, the slot style constants, and the core types the entry re-exports. All 84 upstream React runtime registrations run unchanged against React and, regenerated from the lock, against Octane.",
@@ -1167,7 +1167,7 @@
     },
     {
       "name": "@octanejs/pierre-trees",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "category": "Content",
       "upstream": { "package": "@pierre/trees", "version": "1.0.0-beta.6" },
       "surface": "Complete @pierre/trees/react surface: FileTree (host props, header slot, renderContextMenu, and preloadedData server rendering and hydration), useFileTree, useFileTreeSelector, useFileTreeSelection, useFileTreeSearch, and the FileTreeProps, FileTreePreloadedData, UseFileTreeResult, FileTreeSelector, FileTreeSelectorEquality and FileTreeSearchState types. The model, options and payload types stay in the framework-neutral @pierre/trees root entry. All 14 upstream React registrations run unchanged against React and against Octane, the two SSR cases with a test-harness patch for their server render.",

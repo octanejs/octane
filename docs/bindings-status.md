@@ -876,7 +876,7 @@ Scope/evidence last checked: 2026-09-12.
 
 ## @octanejs/legendapp-list
 
-[`packages/legendapp-list`](../packages/legendapp-list) `0.0.0` — ports `@legendapp/list@3.3.5`. Status data: [`packages/legendapp-list/status.json`](../packages/legendapp-list/status.json).
+[`packages/legendapp-list`](../packages/legendapp-list) `0.0.1` — ports `@legendapp/list@3.3.5`. Status data: [`packages/legendapp-list/status.json`](../packages/legendapp-list/status.json).
 
 The complete @legendapp/list/react entry: LegendList with every prop (data or children, renderItem, keyExtractor, getItemType, recycleItems, estimated and fixed item sizes, drawDistance, columns, sticky headers, snapping, initial scroll, maintainScrollAtEnd, maintainVisibleContentPosition, anchoredEndSpace, alwaysRender, viewability, header, footer and empty components, useWindowScroll, renderScrollComponent), the imperative ref handle, the nine per-row hooks, internal, and all 36 exported types. 1,348 upstream registrations run unchanged against React and the 1,255 core ones also against this package's source; 12 Chromium scenarios and 6 server renders match @legendapp/list/react step for step.
 
@@ -1170,7 +1170,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/pierre-diffs
 
-[`packages/pierre-diffs`](../packages/pierre-diffs) `0.0.1` — ports `@pierre/diffs@1.6.1`. Status data: [`packages/pierre-diffs/status.json`](../packages/pierre-diffs/status.json).
+[`packages/pierre-diffs`](../packages/pierre-diffs) `0.0.2` — ports `@pierre/diffs@1.6.1`. Status data: [`packages/pierre-diffs/status.json`](../packages/pierre-diffs/status.json).
 
 The complete @pierre/diffs/react entry: CodeView (controlled and uncontrolled, with its imperative handle and slot portals), File, FileDiff, MultiFileDiff, PatchDiff, UnresolvedFile, Virtualizer, WorkerPoolContextProvider and WorkerPoolContext, EditProvider and EditContext, their hooks (useVirtualizer, useWorkerPool, useCreateEditor, useFileInstance, useFileDiffInstance, useStableCallback), the slot renderers, templateRender, the slot style constants, and the core types the entry re-exports. All 84 upstream React runtime registrations run unchanged against React and, regenerated from the lock, against Octane.
 
@@ -1188,7 +1188,7 @@ Scope/evidence last checked: 2026-10-30.
 
 ## @octanejs/pierre-trees
 
-[`packages/pierre-trees`](../packages/pierre-trees) `0.0.0` — ports `@pierre/trees@1.0.0-beta.6`. Status data: [`packages/pierre-trees/status.json`](../packages/pierre-trees/status.json).
+[`packages/pierre-trees`](../packages/pierre-trees) `0.0.1` — ports `@pierre/trees@1.0.0-beta.6`. Status data: [`packages/pierre-trees/status.json`](../packages/pierre-trees/status.json).
 
 Complete @pierre/trees/react surface: FileTree (host props, header slot, renderContextMenu, and preloadedData server rendering and hydration), useFileTree, useFileTreeSelector, useFileTreeSelection, useFileTreeSearch, and the FileTreeProps, FileTreePreloadedData, UseFileTreeResult, FileTreeSelector, FileTreeSelectorEquality and FileTreeSearchState types. The model, options and payload types stay in the framework-neutral @pierre/trees root entry. All 14 upstream React registrations run unchanged against React and against Octane, the two SSR cases with a test-harness patch for their server render.
 
