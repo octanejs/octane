@@ -2025,7 +2025,7 @@ SSR / hydration: Covered across the complete surface: hooks use null server snap
 
 Scope/evidence last checked: 2026-08-02.
 
-- Pinned to the @tiptap/react, @tiptap/core, and @tiptap/pm 3.28.0 release family.
+- Verified against the @tiptap/react, @tiptap/core, and @tiptap/pm 3.28.0 release family. As in @tiptap/react, @tiptap/core and @tiptap/pm are peer dependencies, so the application supplies the single ProseMirror instance.
 - EditorContent owns one external-store portal registry so custom views preserve context, event ownership, and lifecycle beneath the editor host.
 - Package-boundary tests lock the root and ./menus runtime exports plus their client directives to @tiptap/react 3.28.0.
 - Behavioral tests use real TipTap editors for lifecycle, custom views, and menu plugins; shared-fixture differential tests compare editor and custom-view behavior with @tiptap/react.

@@ -5,12 +5,14 @@
 
 This package reuses the framework-independent `@tiptap/core` and `@tiptap/pm`
 packages and ports the editor binding layer from `@tiptap/react` to Octane. It is
-pinned to **TipTap 3.28.0** and re-exports the public `@tiptap/core` API from its
-root entry.
+verified against **TipTap 3.28.0** and re-exports the public `@tiptap/core` API from
+its root entry. Like `@tiptap/react`, it takes `@tiptap/core` and `@tiptap/pm` as
+peer dependencies (`^3.28.0`), so the editor shares the application's single
+ProseMirror instance.
 
 ```bash
-npm install @octanejs/tiptap @tiptap/starter-kit
-pnpm add @octanejs/tiptap @tiptap/starter-kit
+npm install @octanejs/tiptap @tiptap/core @tiptap/pm @tiptap/starter-kit
+pnpm add @octanejs/tiptap @tiptap/core @tiptap/pm @tiptap/starter-kit
 ```
 
 ```tsx
