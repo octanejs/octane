@@ -7,6 +7,31 @@ index 16f3d39..084af4f 100644
 +								// Read only alongside `onlyWhitespace`. Testing it first keeps each
 +								// node from scanning all the code before the next comment
 +								const hasBlankLine = onlyWhitespace && includesBlankLine(slice);
+diff --git a/src/plugin.js b/src/plugin.js
+index cc93ab8..50cf7ee 100644
+--- a/src/plugin.js
++++ b/src/plugin.js
+@@ -1299,0 +1300,4 @@ export function TSRXPlugin(config) {
++			// Set while an opening tag reads its type arguments (`<Select<string | null>`).
++			// acorn-typescript reads them with the tag's token context removed, which
++			// would otherwise read each token after the first as template text.
++			#readingJSXTypeArguments = false;
+@@ -2282,0 +2287 @@ export function TSRXPlugin(config) {
++					this.#readingJSXTypeArguments ||
+@@ -10128,4 +10133,9 @@ export function TSRXPlugin(config) {
+-					const typeArguments = this.tsTryParseAndCatch(() =>
+-						this.tsParseTypeArgumentsInExpression(),
+-					);
+-					if (typeArguments) node.typeArguments = typeArguments;
++					this.#readingJSXTypeArguments = true;
++					try {
++						const typeArguments = this.tsTryParseAndCatch(() =>
++							this.tsParseTypeArgumentsInExpression(),
++						);
++						if (typeArguments) node.typeArguments = typeArguments;
++					} finally {
++						this.#readingJSXTypeArguments = false;
++					}
 diff --git a/src/transform/jsx/index.js b/src/transform/jsx/index.js
 index 54d0f11..5065736 100644
 --- a/src/transform/jsx/index.js

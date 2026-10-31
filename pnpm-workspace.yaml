@@ -683,6 +683,17 @@ patchedDependencies:
   # unpatched @tsrx/core until an upstream release is adopted. Guarded by
   # packages/octane/tests/compiler/compiler-vite-options.test.ts. Drop when the
   # adopted @tsrx/core no longer scans past non-whitespace text for blank lines.
+  # Also keep template text lexing off while an opening tag reads its type
+  # arguments. acorn-typescript reads them with the tag's token context removed,
+  # so every token after the first read as text: `<Select<string | null>>`,
+  # `<Select<string, boolean>>` and `<Select<{ a: string }>>` threw "Unexpected
+  # token" in the editor parser on source the native parser compiles. Not yet
+  # fixed upstream (checked through @tsrx/core 0.5.5). Unlike the Vite plugin's
+  # parse above, the editor and octane-tsc get this fix: bundle-volar.mjs
+  # freezes this install's @tsrx/core into the published `octane/compiler/volar`.
+  # Guarded by "checks props against explicit JSX element type arguments" in
+  # packages/octane/tests/compiler/volar.test.ts. Drop this hunk when the
+  # adopted @tsrx/core reads a tag's type arguments as code.
   '@tsrx/core@0.5.5': patches/@tsrx__core@0.5.5.patch
   # The same type-only import rule for the native parser: the compat facade's
   # scope check mirrors acorn-typescript's lexical import bindings, and the
