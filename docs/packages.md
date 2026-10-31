@@ -26,9 +26,9 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/better-auth` | [`packages/better-auth`](../packages/better-auth) | framework binding | `0.0.20` | 1 |
 | `@octanejs/blocknote` | [`packages/blocknote`](../packages/blocknote) | framework binding | `0.1.12` | 2 |
 | `@octanejs/calendar` | [`packages/calendar`](../packages/calendar) | framework binding | `0.0.24` | 4 |
-| `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.3.2` | 4 |
+| `@octanejs/cli` | [`packages/cli`](../packages/cli) | developer tooling | `0.3.3` | 4 |
 | `@octanejs/cmdk` | [`packages/cmdk`](../packages/cmdk) | framework binding | `0.1.53` | 1 |
-| `@octanejs/codemod` | [`packages/codemod`](../packages/codemod) | developer tooling | `0.1.2` | 2 |
+| `@octanejs/codemod` | [`packages/codemod`](../packages/codemod) | developer tooling | `0.1.3` | 2 |
 | `@octanejs/colorful` | [`packages/colorful`](../packages/colorful) | framework binding | `0.0.33` | 1 |
 | `@octanejs/content-loader` | [`packages/content-loader`](../packages/content-loader) | framework binding | `0.0.23` | 2 |
 | `@octanejs/day-picker` | [`packages/day-picker`](../packages/day-picker) | framework binding | `0.0.34` | 12 |
@@ -62,13 +62,13 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/input-otp` | [`packages/input-otp`](../packages/input-otp) | framework binding | `0.0.35` | 1 |
 | `@octanejs/intersection-observer` | [`packages/intersection-observer`](../packages/intersection-observer) | framework binding | `0.0.33` | 2 |
 | `@octanejs/jotai` | [`packages/jotai`](../packages/jotai) | framework binding | `0.1.66` | 7 |
-| `@octanejs/legendapp-list` | [`packages/legendapp-list`](../packages/legendapp-list) | framework binding | `0.0.0` | 2 |
+| `@octanejs/legendapp-list` | [`packages/legendapp-list`](../packages/legendapp-list) | framework binding | `0.0.1` | 2 |
 | `@octanejs/lexical` | [`packages/lexical`](../packages/lexical) | framework binding | `0.2.12` | 50 |
 | `@octanejs/livestore` | [`packages/livestore`](../packages/livestore) | framework binding | `0.0.37` | 2 |
 | `@octanejs/lucide` | [`packages/lucide`](../packages/lucide) | framework binding | `0.1.62` | 4 |
 | `@octanejs/mantine-hooks` | [`packages/mantine-hooks`](../packages/mantine-hooks) | framework binding | `0.1.48` | 1 |
 | `@octanejs/markdown` | [`packages/markdown`](../packages/markdown) | framework binding | `0.0.33` | 1 |
-| `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.3.9` | 3 |
+| `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.3.10` | 3 |
 | `@octanejs/mdx` | [`packages/mdx`](../packages/mdx) | framework binding | `0.1.68` | 4 |
 | `@octanejs/mobx` | [`packages/mobx`](../packages/mobx) | framework binding | `0.1.48` | 1 |
 | `@octanejs/monaco-editor` | [`packages/monaco-editor`](../packages/monaco-editor) | framework binding | `0.0.36` | 1 |
@@ -79,8 +79,8 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/opentui` | [`packages/opentui`](../packages/opentui) | framework binding | `0.0.23` | 6 |
 | `@octanejs/pdf` | [`packages/pdf`](../packages/pdf) | framework binding | `0.0.34` | 3 |
 | `@octanejs/phosphor-icons` | [`packages/phosphor-icons`](../packages/phosphor-icons) | framework binding | `0.0.47` | 2 |
-| `@octanejs/pierre-diffs` | [`packages/pierre-diffs`](../packages/pierre-diffs) | framework binding | `0.0.1` | 2 |
-| `@octanejs/pierre-trees` | [`packages/pierre-trees`](../packages/pierre-trees) | framework binding | `0.0.0` | 2 |
+| `@octanejs/pierre-diffs` | [`packages/pierre-diffs`](../packages/pierre-diffs) | framework binding | `0.0.2` | 2 |
+| `@octanejs/pierre-trees` | [`packages/pierre-trees`](../packages/pierre-trees) | framework binding | `0.0.1` | 2 |
 | `@octanejs/popper` | [`packages/popper`](../packages/popper) | framework binding | `0.0.33` | 2 |
 | `@octanejs/portabletext` | [`packages/portabletext`](../packages/portabletext) | framework binding | `0.1.17` | 2 |
 | `@octanejs/radix` | [`packages/radix`](../packages/radix) | framework binding | `0.1.69` | 1 |
@@ -144,8 +144,8 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/xyflow` | [`packages/xyflow`](../packages/xyflow) | framework binding | `0.1.25` | 3 |
 | `@octanejs/zag` | [`packages/zag`](../packages/zag) | framework binding | `0.0.34` | 1 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.69` | 8 |
-| `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.21` | 1 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.16.6` | 49 |
+| `create-octane` | [`packages/create-octane`](../packages/create-octane) | project scaffolder | `0.0.22` | 1 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.16.7` | 49 |
 
 ## Private packages
 

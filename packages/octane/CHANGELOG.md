@@ -1,5 +1,24 @@
 # octane
 
+## 0.16.7
+
+### Patch Changes
+
+- c613495: Optional host and built-in props now accept an explicit `undefined` under `exactOptionalPropertyTypes`, as React's types do. `<div style={open ? { height: 10 } : undefined}>` no longer fails with TS2375. This covers `style`, `for`, `xmlns`, every native event handler, and the Strong JSX and `octane/strong` prop types, plus the props of `Activity`, `ViewTransition`, `Fragment`, `ErrorBoundary` and `ReactCompat`. Without that flag nothing changes.
+- 0c8ec2f: A `memo()` component rendered as a portal's child now skips its render when the portal is created again with equal props, as React does and as `memo()` children elsewhere already did.
+- 82f3946: Lower JSX nested inside a component's spread attribute, such as
+  `<View {...{ render: (n) => <Label n={n} /> }} />` or a conditional spread
+  object, the same way as JSX in a named attribute. The client and server
+  compilers previously left that JSX in the compiled module, so bundlers failed
+  to parse it.
+- b379919: Never call a ref from a render pass that did not commit. When a component renders more than once before its commit, for example because a child updated it while rendering, the refs from its earlier passes are now dropped. Previously each one was called with `null` without ever being attached and then attached anyway, so a callback ref returning a React 19 cleanup could receive `null` (`ResizeObserver.observe(null)` throws) and its cleanup never ran. A ref that a later pass restores to the one already committed is left alone, and a host that mounts and unmounts before its commit never calls its ref.
+- a222919: A reducer that reads only its state now gives `useReducer` a dispatch you can call with no argument, as React's types do: `const [, forceUpdate] = useReducer((n: number) => n + 1, 0); forceUpdate();`. This also lets that dispatch go where a `() => void` callback is expected.
+- 73e718c: Fix two `octane/compiler/vite` gaps that broke installed Octane packages and `.tsrx` path aliases.
+
+  - `resolve.tsconfigPaths` now resolves from `.tsrx` files. Vite applies a tsconfig only to files its `include` matches, using TypeScript's own extensions, so `"include": ["src"]` never matched `src/App.tsrx` and every `~/…` import from it failed in dev and build. A `.tsrx` file now gets the `paths` of the tsconfig that owns it under Octane's TypeScript, where `.tsrx` is a source extension. A `.tsrx` file outside every `include` still gets none, like a `.ts` file there.
+  - In dev, the CommonJS beneath an installed Octane source package is now prebundled. Those packages are excluded from Vite's dependency optimizer, so Vite served their imports raw from `node_modules`, and a CommonJS module below them failed in the browser with "does not provide an export named 'default'" (`@octanejs/markdown` through `style-to-js`, `@octanejs/pierre-diffs` through `lru_map`). When a dependency of such a package reaches CommonJS, the plugin now discovers every import the browser requests from the package, as Vite does for a linked package. Apps no longer need hand-written `source-package > dependency` entries in `optimizeDeps.include`. A package whose dependencies are ESM throughout stays raw, and `optimizeDeps.exclude` still applies.
+- 55daac6: The `.tsrx` type view that the editor and `octane-tsc` check no longer throws on two shapes that already compiled. When it threw, `octane-tsc` checked the raw source instead, reporting syntax errors and skipping every type error in the program. Explicit JSX element type arguments beyond a single name, such as `<Select<string | null>>`, `<Select<string, boolean>>` or `<Select<{ a: string }>>`, now parse, and the element's props are checked against them. A directive arm that ends with `return null;` in a template in expression position, such as a component's children or a nested fragment, is now typed as the exit it compiles to, as `return;` already was.
+
 ## 0.16.6
 
 ### Patch Changes
