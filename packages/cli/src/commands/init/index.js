@@ -175,6 +175,22 @@ function toolchainTypescriptRange(root) {
 }
 
 /**
+ * The `run.tasks` object of a Vite+ config, as source, or '' when there is
+ * none. Vite+ refuses a package.json script named like one of these tasks.
+ *
+ * @param {string} config
+ */
+function vitePlusTasks(config) {
+	const start = /['"]vite-plus['"]/.test(config) ? /\btasks\s*:\s*\{/.exec(config) : null;
+	if (!start) return '';
+	for (let depth = 0, at = start.index + start[0].length - 1; at < config.length; at++) {
+		if (config[at] === '{') depth++;
+		else if (config[at] === '}' && --depth === 0) return config.slice(start.index, at + 1);
+	}
+	return '';
+}
+
+/**
  * @param {import('../../kernel/project.js').Project} project
  * @param {keyof typeof MODES} mode
  * @param {ReturnType<typeof integrationFor>} integration
@@ -209,6 +225,10 @@ function plan(project, mode, integration, nativeTypeScript) {
 		/** @type {[string, unknown][]} */
 		const needed = [];
 		if (options.jsxImportSource !== 'octane') needed.push(['jsxImportSource', 'octane']);
+		// TypeScript reports TS2876 for every relative `.tsrx` import it is asked
+		// to rewrite. The bundler emits this app, so turning it off loses nothing.
+		if (options.rewriteRelativeImportExtensions === true)
+			needed.push(['rewriteRelativeImportExtensions', false]);
 		if (!Array.isArray(options.plugins))
 			needed.push(['plugins', [{ name: '@tsrx/typescript-plugin' }]]);
 		else if (
@@ -290,19 +310,39 @@ function plan(project, mode, integration, nativeTypeScript) {
 	}
 
 	const bundlerConfigPath = project.bundlerConfigPath ?? at('vite.config.ts');
+	const bundlerConfig = project.bundlerConfigPath ? readFileSync(bundlerConfigPath, 'utf8') : '';
+	const configFile = path.relative(root, bundlerConfigPath);
 	if (!project.bundlerConfigPath) {
 		changes.push({
 			file: 'vite.config.ts',
 			summary: `create, registering ${integration.specifier}`,
 			apply: writeFile(bundlerConfigPath, viteConfig(mode)),
 		});
-	} else if (!readFileSync(bundlerConfigPath, 'utf8').includes(integration.specifier)) {
+	} else if (!bundlerConfig.includes(integration.specifier)) {
 		// Rewriting an arbitrary bundler config is guesswork; state the exact
 		// edit instead of attempting it. The specifier is the one for THIS
 		// project's bundler, not the Vite plugin init would otherwise scaffold.
+		// React's plugin compiles the same JSX for React, so it has to go.
+		const react = /import\s+(\w+)\s+from\s+['"](@vitejs\/plugin-react(?:-swc|-oxc)?)['"]/.exec(
+			bundlerConfig,
+		);
 		manual.push(
-			`In ${path.relative(root, bundlerConfigPath)}, add: import { octane } from '${integration.specifier}';`,
-			'then include octane() in the plugins array.',
+			`In ${configFile}, add: import { octane } from '${integration.specifier}';`,
+			react
+				? `then replace ${react[1]}() from ${react[2]} with octane() in the plugins array.`
+				: 'then include octane() in the plugins array.',
+		);
+	}
+	// TanStack's generator lists only .ts/.tsx/.js/.jsx route files, so the
+	// route tree it writes would drop every .tsrx route. Start's own generator
+	// reads .tsrx; a plain app keeps the tree it has.
+	if (
+		project.tsrxFiles.length > 0 &&
+		/@tanstack\/router-(?:vite-)?plugin/.test(bundlerConfig) &&
+		!bundlerConfig.includes('enableRouteGeneration')
+	) {
+		manual.push(
+			`In ${configFile}, pass enableRouteGeneration: false to the TanStack Router plugin: it finds no .tsrx route, so it would regenerate the route tree without them. Update routeTree.gen.ts by hand, or move to @octanejs/tanstack-start, whose generator reads .tsrx.`,
 		);
 	}
 
@@ -461,7 +501,17 @@ function plan(project, mode, integration, nativeTypeScript) {
 
 	const scripts = project.manifest.scripts ?? {};
 	const applicable = scaffoldsVite ? { ...VITE_SCRIPTS, ...SCRIPTS } : SCRIPTS;
-	const missing = Object.entries(applicable).filter(([name]) => !scripts[name]);
+	const tasks = vitePlusTasks(bundlerConfig);
+	/** @type {[string, string][]} */
+	const missing = [];
+	for (const [name, command] of Object.entries(applicable)) {
+		if (scripts[name]) continue;
+		if (new RegExp(`(?:^|[{,\\s])["']?${name}["']?\\s*:`).test(tasks)) {
+			manual.push(
+				`In ${configFile}, Vite+ runs the ${name} task in place of a package.json script, so init adds none: make that task run \`${command}\`.`,
+			);
+		} else missing.push([name, command]);
+	}
 	if (missing.length > 0) {
 		changes.push({
 			file: 'package.json',
