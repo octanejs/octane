@@ -453,8 +453,10 @@ const ARM_EXIT_REPORTS = new Set([
  * that no inner loop owns (see arm-exits.js). The shared transform prints each
  * arm as a function body, such as the `map_iterable` callback of an `@for`
  * row, so a return there is the same exit, and TypeScript narrows the rest of
- * the arm after it. A `continue` cannot leave that function, so it prints as
- * `return;`. The transform checks arms against TSRX's own rules, which have no
+ * the arm after it. Every exit prints as `return;`: a `continue` cannot leave
+ * that function, and in a template in expression position, such as a
+ * component's children, the transform reads `return null;` as that template's
+ * own value. The transform checks arms against TSRX's own rules, which have no
  * exits, so `exits` collects their starts for the caller to drop those
  * ARM_EXIT_REPORTS. A value return, or a `break` that leaves the directive, is
  * still reported: compiling rejects both.
@@ -462,7 +464,7 @@ const ARM_EXIT_REPORTS = new Set([
 function projectArmExits(ast, exits) {
 	return mapArmExits(ast, (node) => {
 		exits?.add(node.start);
-		return node.type === 'ContinueStatement' ? b.return(null, node) : node;
+		return node.type === 'ReturnStatement' && node.argument === null ? node : b.return(null, node);
 	});
 }
 
