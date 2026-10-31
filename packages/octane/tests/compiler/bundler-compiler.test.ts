@@ -1049,6 +1049,55 @@ export function Pair(props) @{ 'use dom bindings'; <section>
 		}
 	});
 
+	it("slots custom-hook calls in the application's plain modules without an Octane import", () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-application-hooks-'));
+		try {
+			const manifest = (directory: string, body: object) => {
+				mkdirSync(directory, { recursive: true });
+				writeFileSync(join(directory, 'package.json'), JSON.stringify(body));
+			};
+			manifest(root, { name: 'application', dependencies: { octane: '*' } });
+			const kit = join(root, 'node_modules', 'kit');
+			manifest(kit, { name: 'kit', peerDependencies: { octane: '*' } });
+			const workspace = join(root, 'packages', 'ui');
+			manifest(workspace, { name: 'ui', dependencies: { octane: '*' } });
+			// Unslotted, both calls would share the store hook's one instance.
+			const composed =
+				"import { useStore } from './store';\n" +
+				'export function usePair() { return [useStore((s) => s.a), useStore((s) => s.b)]; }\n';
+			const kind = (
+				compiler: ReturnType<typeof createOctaneCompiler>,
+				code: string,
+				id: string,
+				options = {},
+			) => compiler.transform(code, id, options)?.kind ?? 'none';
+			const compiler = createOctaneCompiler({ root });
+			for (const options of [
+				{ environment: 'client' },
+				{ environment: 'client', hmr: 'vite', dev: true },
+				{ environment: 'server' },
+			] as const) {
+				expect(kind(compiler, composed, join(root, 'src/usePair.ts'), options)).toBe('slots');
+				expect(kind(compiler, composed, join(root, 'src/usePair.js'), options)).toBe('slots');
+				// A package's plain modules may implement hooks with authored slots,
+				// so an import or pragma stays their signal, nested in the root or not.
+				expect(kind(compiler, composed, join(kit, 'src/usePair.ts'), options)).toBe('none');
+				expect(kind(compiler, composed, join(workspace, 'src/usePair.ts'), options)).toBe('none');
+			}
+			expect(kind(compiler, '// octane-no-slot\n' + composed, join(root, 'src/useOptOut.ts'))).toBe(
+				'none',
+			);
+			// Under requireDirective an unmarked application module stays the host's.
+			const gated = createOctaneCompiler({ root, requireDirective: true });
+			expect(kind(gated, composed, join(root, 'src/usePair.ts'))).toBe('none');
+			expect(
+				kind(gated, '/** @jsxImportSource octane */\n' + composed, join(root, 'src/usePair.ts')),
+			).toBe('slots');
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it('keeps Strong directives subordinate to mixed-toolchain ownership', () => {
 		const compiler = createOctaneCompiler({
 			root: '/project',
