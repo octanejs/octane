@@ -10,8 +10,9 @@ npx @octanejs/codemod src --dry-run  # report only
 npx @octanejs/codemod src --strong   # also make modules Strong where possible
 ```
 
-Then run `npx @octanejs/cli init` to swap the bundler plugin, `tsconfig`, and
-dependencies over to Octane.
+The codemod adds each binding the migrated code imports to `package.json`, at
+the version in its catalog. Then run `npx @octanejs/cli init` to swap the
+bundler plugin and `tsconfig` over to Octane and install the dependencies.
 
 > **Prototype.** The rewrites below are tested, and every migrated module is
 > compiled by the Octane compiler before it is written, but the rule set is
@@ -27,6 +28,7 @@ dependencies over to Octane.
 | `imports` | React libraries with a binding (`@tanstack/react-query`, ...) | `@octanejs/*` |
 | `imports` | `@radix-ui/react-<primitive>` (`import * as DialogPrimitive from '@radix-ui/react-dialog'`) | that primitive's namespace of `@octanejs/radix` (`import { Dialog as DialogPrimitive } from '@octanejs/radix'`) |
 | `imports` | `@tanstack/react-table`, `@tanstack/react-hotkeys`, `@tanstack/react-pacer` | TanStack's own `@tanstack/octane-*` adapters, with `Octane` for `React` in type names |
+| `imports` | `jsx`, `jsxs` from `react/jsx-runtime`, passed to a JSX runtime consumer such as `hast-util-to-jsx-runtime` | a local `jsx` that calls `createElement` with the key in its props |
 | `template-component` | `function C() { …; return <div /> }` | `function C() @{ …; <div /> }` |
 | `template-if` | `{a ? <A /> : <B />}`, `{a > 0 && <A />}` (also through a `const`) | `@if (a) { <A /> } @else { <B /> }` |
 | `template-if` | `if (a) return <A />; …; return <B />` in a component | `@if (a) { <A /> } @else { …; <B /> }` |
@@ -38,8 +40,8 @@ dependencies over to Octane.
 | `descriptor-children` | a component that clones or inspects `children` (`render={children}`, `cloneElement`, `Children.only`) | `descriptorChildren(…)`, so callers pass elements as React does |
 | `context-provider` | `<Ctx.Provider value>` | `<Ctx value>` |
 | `context-consumer` | `<Ctx.Consumer>{(v) => …}</Ctx.Consumer>` | `@{ const v = useContext(Ctx); … }` |
-| `native-text-change` | `onChange` on a text `<input>` / `<textarea>` | `onInput` (native `change` fires on blur) |
-| `native-text-change` | `function Input({ ...props }) { return <input {...props} /> }` | `function Input({ onChange, ...props }) @{ <input onInput={onChange} {...props} /> }` |
+| `native-text-change` | `onChange` on a text `<input>` / `<textarea>`, or on Base UI's `Input` / `Field.Control`, which render one | `onInput` (native `change` fires on blur) |
+| `native-text-change` | `function Input({ ...props }) { return <input {...props} /> }`, also when a nested `const { a, ...rest } = props` reaches the field | `function Input({ onChange, ...props }) @{ <input onInput={onChange} {...props} /> }` |
 | `event-object` | `e.nativeEvent`, `e.persist()`, `e.target` on a control, also through a component typed for one | `e`, removed, `e.currentTarget` |
 | `class-attribute` | `className` on an HTML element | `class` |
 | `legacy-root` | `ReactDOM.render(el, c)` | `createRoot(c).render(el)` |
@@ -91,6 +93,11 @@ and contexts, and its components that take Octane children or render
 callbacks, are reported where they are used. **No Octane port** lists each such
 package with the modules that import it, the elements hosted in islands, and
 the uses that need a port.
+
+A patch the project applies to a React package the codemod replaces, through
+`patchedDependencies` (pnpm, Bun) or `patches/` (patch-package), patches the
+React package, not its binding. **Dependencies** names each one, to port by
+hand.
 
 ## Options
 
