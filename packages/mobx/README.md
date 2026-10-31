@@ -7,9 +7,12 @@ Octane hooks.
 ## Installation
 
 ```sh
-npm install @octanejs/mobx
-pnpm add @octanejs/mobx
+npm install @octanejs/mobx mobx
+pnpm add @octanejs/mobx mobx
 ```
+
+As in `mobx-react-lite`, `mobx` is a peer dependency, so the binding re-exports
+and observes your application's MobX instance.
 
 ```tsrx
 import { makeAutoObservable, observer } from '@octanejs/mobx';

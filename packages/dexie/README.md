@@ -6,9 +6,12 @@ UI framework.
 ## Installation
 
 ```sh
-npm install @octanejs/dexie
-pnpm add @octanejs/dexie
+npm install @octanejs/dexie dexie
+pnpm add @octanejs/dexie dexie
 ```
+
+As in `dexie-react-hooks`, `dexie` is a peer dependency: Dexie refuses to load
+two different versions in one app.
 
 This package re-exports Dexie's framework-neutral IndexedDB API and ports the
 reactive hooks from `dexie-react-hooks` to Octane. Existing Dexie database,

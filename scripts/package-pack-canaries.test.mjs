@@ -60,6 +60,7 @@ describe('packed runtime consumer dependencies', () => {
 		[
 			'@octanejs/alien-signals',
 			'@octanejs/apollo-client',
+			'@octanejs/dexie',
 			'@octanejs/dropzone',
 			'@octanejs/hook-form',
 			'@octanejs/recharts',
@@ -79,7 +80,7 @@ describe('packed runtime consumer dependencies', () => {
 		const dependencies = createPackedRuntimeConsumerDependencies(manifests, archiveSpecs);
 		assert.equal(dependencies['@octanejs/redux'], 'file:/tmp/redux.tgz');
 		assert.equal(dependencies.octane, 'file:/tmp/octane.tgz');
-		assert.equal(Object.keys(dependencies).length, 10);
+		assert.equal(Object.keys(dependencies).length, 11);
 		assert.equal(Object.hasOwn(dependencies, '@octanejs/unrelated'), false);
 		assert.equal(Object.hasOwn(dependencies, 'redux'), false);
 		assert.match(

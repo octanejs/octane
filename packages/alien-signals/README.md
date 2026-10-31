@@ -8,9 +8,12 @@ without React or React types.
 ## Installation
 
 ```sh
-npm install @octanejs/alien-signals
-pnpm add @octanejs/alien-signals
+npm install @octanejs/alien-signals alien-signals
+pnpm add @octanejs/alien-signals alien-signals
 ```
+
+As in `react-alien-signals`, `alien-signals` is a peer dependency, so signals
+your application creates and the binding's hooks share one reactive graph.
 
 ```tsx
 import {

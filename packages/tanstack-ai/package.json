@@ -33,14 +33,15 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@tanstack/ai": "catalog:default",
     "@tanstack/ai-client": "catalog:default"
   },
   "peerDependencies": {
+    "@tanstack/ai": "^0.41.0",
     "octane": "workspace:^0.16.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
+    "@tanstack/ai": "catalog:default",
     "@tanstack/ai-react": "catalog:default",
     "@testing-library/jest-dom": "catalog:default",
     "@tsrx/react": "catalog:default",

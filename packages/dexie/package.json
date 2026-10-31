@@ -39,10 +39,8 @@
   "scripts": {
     "test": "vitest run"
   },
-  "dependencies": {
-    "dexie": "catalog:default"
-  },
   "peerDependencies": {
+    "dexie": "^4.4.4",
     "octane": "workspace:^0.16.0"
   },
   "devDependencies": {

@@ -51,15 +51,16 @@
     "@livestore/common": "catalog:default",
     "@livestore/framework-toolkit": "catalog:default",
     "@livestore/livestore": "catalog:default",
-    "@livestore/utils": "catalog:default",
-    "@opentelemetry/api": "catalog:default"
+    "@livestore/utils": "catalog:default"
   },
   "peerDependencies": {
+    "@opentelemetry/api": "^1.9.0",
     "octane": "workspace:^0.16.0"
   },
   "devDependencies": {
     "@livestore/adapter-web": "catalog:default",
     "@livestore/utils-dev": "catalog:livestore-react-oracle",
+    "@opentelemetry/api": "catalog:default",
     "@opentelemetry/sdk-trace-base": "catalog:livestore-react-oracle",
     "@testing-library/dom": "catalog:livestore-react-oracle",
     "@testing-library/react": "catalog:livestore-react-oracle",

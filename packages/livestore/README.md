@@ -12,9 +12,12 @@ vendored byte-for-byte under `upstream/`; [UPSTREAM.md](./UPSTREAM.md) records
 the export and test crosswalk.
 
 ```sh
-npm install @octanejs/livestore @livestore/adapter-web
-pnpm add @octanejs/livestore @livestore/adapter-web
+npm install @octanejs/livestore @livestore/adapter-web @opentelemetry/api
+pnpm add @octanejs/livestore @livestore/adapter-web @opentelemetry/api
 ```
+
+As in `@livestore/react`, `@opentelemetry/api` is a peer dependency, so the
+binding traces through your application's OpenTelemetry API.
 
 ```ts
 import { StoreRegistry, storeOptions, useStore } from '@octanejs/livestore';

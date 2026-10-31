@@ -148,7 +148,7 @@ SSR / hydration: Supported and hydration-tested. Reads use the same server snaps
 
 Scope/evidence last checked: 2026-10-07.
 
-- Pinned to alien-signals@3.2.1, which has no prerequisite framework binding.
+- Verified against alien-signals@3.2.1, which has no prerequisite framework binding. As in react-alien-signals, alien-signals is a peer dependency, so the application and the binding share one reactive graph.
 - Verified with public types, real core behavior, batching, manual triggers, selectors, deferred reads, phased signal effects, effect/scope cleanup, SSR, hydration adoption, and the central playground.
 
 ## @octanejs/animejs

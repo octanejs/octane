@@ -97,6 +97,7 @@ export function createPackedJavascriptConsumerManifest(archiveSpecs) {
 const packedRuntimeConsumerPackages = [
 	'@octanejs/alien-signals',
 	'@octanejs/apollo-client',
+	'@octanejs/dexie',
 	'@octanejs/dropzone',
 	'@octanejs/hook-form',
 	'@octanejs/recharts',
