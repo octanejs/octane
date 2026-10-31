@@ -864,6 +864,19 @@ export const compilerPlugin: Plugin = octane(options);
 export const sourceDependencies: string[] = discoverOctaneSourceDependencies(process.cwd());
 `,
 	);
+	// Custom build pipelines import the bundler-neutral compiler without Vite.
+	writeFileSync(
+		path.join(sourceDirectory, 'compiler-bundler.ts'),
+		`import { createOctaneCompiler, type OctaneCompilerOptions } from 'octane/compiler/bundler';
+import { resolveRendererForFile } from 'octane/compiler/renderers';
+
+const options = { hmr: 'webpack', requireDirective: true } satisfies OctaneCompilerOptions;
+
+export const compiler = createOctaneCompiler(options);
+export const transformed: string | undefined = compiler.transform('', '/src/App.tsrx')?.code;
+export const renderer: string = resolveRendererForFile({}, '/src/App.tsrx').id;
+`,
+	);
 	writeFileSync(
 		path.join(sourceDirectory, 'main.tsrx'),
 		`import { createRoot } from 'octane';
@@ -904,7 +917,7 @@ export function renderProbe() {
 					types: ['node'],
 					plugins: [{ name: '@tsrx/typescript-plugin' }],
 				},
-				include: ['src/compiler-plugin.ts', 'src/package-surface.ts'],
+				include: ['src/compiler-bundler.ts', 'src/compiler-plugin.ts', 'src/package-surface.ts'],
 				tsrx: { compiler: 'octane/compiler/volar' },
 			},
 			null,
@@ -932,7 +945,7 @@ export function renderProbe() {
 					types: ['node'],
 					plugins: [{ name: '@tsrx/typescript-plugin' }],
 				},
-				include: ['src/package-surface.ts'],
+				include: ['src/compiler-bundler.ts', 'src/package-surface.ts'],
 				tsrx: { compiler: 'octane/compiler/volar' },
 			},
 			null,
