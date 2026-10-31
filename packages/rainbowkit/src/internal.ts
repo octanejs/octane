@@ -1,5 +1,5 @@
 import { createContext } from 'octane';
-import type { Connector } from '@wagmi/core';
+import type { Connector } from '@octanejs/wagmi';
 
 export type ModalKind = 'account' | 'chain' | 'connect';
 export type ModalToken = string;

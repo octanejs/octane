@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'octane';
 import { useConnect, useConnection, useDisconnect, useSwitchChain } from '@octanejs/wagmi';
 import type { OctaneNode } from 'octane';
-import type { Connector } from '@wagmi/core';
+import type { Connector } from '@octanejs/wagmi';
 import {
 	RainbowKitContext,
 	connectorIdentity,

@@ -37,20 +37,19 @@
   "scripts": {
     "test": "vitest run --root ../.. --project rainbowkit --project rainbowkit-ssr"
   },
-  "dependencies": {
-    "@octanejs/wagmi": "workspace:*",
-    "@wagmi/core": "catalog:default"
-  },
   "peerDependencies": {
     "@octanejs/tanstack-query": "workspace:*",
+    "@octanejs/wagmi": "workspace:*",
     "octane": "workspace:^0.16.0"
   },
   "devDependencies": {
     "@rainbow-me/rainbowkit": "2.2.11",
     "@octanejs/tanstack-query": "workspace:*",
+    "@octanejs/wagmi": "workspace:*",
     "@testing-library/jest-dom": "catalog:default",
     "@tsrx/react": "catalog:default",
     "@wagmi/connectors": "catalog:default",
+    "@wagmi/core": "catalog:default",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
