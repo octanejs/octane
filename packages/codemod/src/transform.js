@@ -3,6 +3,7 @@ import {
 	DEPENDENCY_HOOKS,
 	RADIX_TYPES,
 	REACT_MODULES,
+	TEXT_FIELD_COMPONENTS,
 	TEXT_INPUT_TYPES,
 	UNSUPPORTED_VALUES,
 	mapPackageExport,
@@ -206,6 +207,45 @@ function scriptKind(filename) {
 function skipParens(node) {
 	while (ts.isParenthesizedExpression(node)) node = node.expression;
 	return node;
+}
+
+/**
+ * Whether `node` wraps an expression only for grouping or the type checker.
+ *
+ * @param {ts.Node} node
+ * @returns {node is ts.ParenthesizedExpression | ts.AsExpression | ts.SatisfiesExpression | ts.NonNullExpression | ts.TypeAssertion}
+ */
+function isWrapper(node) {
+	return (
+		ts.isParenthesizedExpression(node) ||
+		ts.isAsExpression(node) ||
+		ts.isSatisfiesExpression(node) ||
+		ts.isNonNullExpression(node) ||
+		ts.isTypeAssertionExpression(node)
+	);
+}
+
+/**
+ * @param {ts.Expression} node
+ * @returns {ts.Expression}
+ */
+function skipWrappers(node) {
+	while (isWrapper(node)) node = node.expression;
+	return node;
+}
+
+/**
+ * The declaration as a rest binding, `rest` in `{ a, ...rest }`, or null.
+ *
+ * @param {ts.Declaration | null} declaration
+ */
+function asRest(declaration) {
+	return declaration &&
+		ts.isBindingElement(declaration) &&
+		declaration.dotDotDotToken &&
+		ts.isObjectBindingPattern(declaration.parent)
+		? declaration
+		: null;
 }
 
 /** @param {ts.Node} node */
@@ -965,16 +1005,7 @@ class ModuleTransform {
 	 * @param {ts.Expression} expression
 	 */
 	planDescriptorChildren(expression) {
-		let value = expression;
-		while (
-			ts.isParenthesizedExpression(value) ||
-			ts.isAsExpression(value) ||
-			ts.isSatisfiesExpression(value) ||
-			ts.isNonNullExpression(value) ||
-			ts.isTypeAssertionExpression(value)
-		) {
-			value = value.expression;
-		}
+		const value = skipWrappers(expression);
 		const component = this.childrenOwner(value);
 		if (!component) return;
 		// `memo(…)` and `forwardRef(…)` wrap it; the declaration holds the call.
@@ -1105,7 +1136,11 @@ class ModuleTransform {
 	 * @param {ts.JsxOpeningLikeElement} element
 	 */
 	takesChange(element) {
-		if (!/^(?:input|textarea)$/.test(element.tagName.getText(this.sf))) return false;
+		if (
+			!/^(?:input|textarea)$/.test(element.tagName.getText(this.sf)) &&
+			!this.isTextFieldComponent(element)
+		)
+			return false;
 		if (attributeOf(element, 'onChange') || attributeOf(element, 'onInput')) return false;
 		const type = attributeOf(element, 'type')?.initializer;
 		return !type || !ts.isStringLiteral(type) || TEXT_INPUT_TYPES.has(type.text);
@@ -1126,23 +1161,18 @@ class ModuleTransform {
 			// Props whose type has no `onChange` have none to pass on.
 			const type = this.projectType(spread.expression)?.type;
 			if (type && !(type.flags & ts.TypeFlags.Any) && !type.getProperty('onChange')) continue;
-			const declaration = ts.isIdentifier(spread.expression)
-				? this.declarationOf(spread.expression)
-				: null;
-			const rest =
-				declaration &&
-				ts.isBindingElement(declaration) &&
-				declaration.dotDotDotToken &&
-				ts.isObjectBindingPattern(declaration.parent)
-					? declaration
-					: null;
-			// A pattern that names `onChange` leaves none in the rest.
-			const pattern = /** @type {ts.ObjectBindingPattern | undefined} */ (rest?.parent);
-			if (
-				pattern?.elements.some((e) => (e.propertyName ?? e.name).getText(this.sf) === 'onChange')
-			) {
-				continue;
+			const expression = skipWrappers(spread.expression);
+			let rest = ts.isIdentifier(expression) ? asRest(this.declarationOf(expression)) : null;
+			// `const { style, ...native } = props` hands on what `props` holds:
+			// follow it to where the component receives `onChange`, so every field
+			// spread from it gets it.
+			while (rest && !this.namesChange(rest.parent)) {
+				const source = this.restSource(rest);
+				if (!source) break;
+				rest = source;
 			}
+			// A pattern that names `onChange` leaves none in the rest.
+			if (rest && this.namesChange(rest.parent)) continue;
 			if (
 				rest &&
 				!this.checker.resolveName('onChange', spread, ts.SymbolFlags.Value, false) &&
@@ -1172,17 +1202,72 @@ class ModuleTransform {
 		const visit = (/** @type {ts.Node} */ node) => {
 			if (!only) return;
 			if (ts.isIdentifier(node) && node !== rest.name && this.declarationOf(node) === rest) {
-				const parent = node.parent;
-				only = ts.isJsxSpreadAttribute(parent)
-					? this.takesChange(parent.parent.parent)
-					: ts.isPropertyAccessExpression(parent) &&
-						parent.expression === node &&
+				/** @type {ts.Node} */
+				let read = node;
+				while (isWrapper(read.parent)) read = read.parent;
+				const parent = read.parent;
+				if (ts.isJsxSpreadAttribute(parent)) {
+					only = this.takesChange(parent.parent.parent);
+				} else if (
+					ts.isVariableDeclaration(parent) &&
+					parent.initializer === read &&
+					ts.isObjectBindingPattern(parent.name)
+				) {
+					// A destructuring hands `onChange` on to its own rest, if it has one.
+					const inner = asRest(parent.name.elements.find((e) => e.dotDotDotToken) ?? null);
+					only = !this.namesChange(parent.name) && (!inner || this.onlySpreadOntoFields(inner));
+				} else {
+					only =
+						ts.isPropertyAccessExpression(parent) &&
+						parent.expression === read &&
 						parent.name.text !== 'onChange';
+				}
 			}
 			ts.forEachChild(node, visit);
 		};
 		visit(ts.findAncestor(rest, ts.isFunctionLike) ?? this.sf);
 		return only;
+	}
+
+	/**
+	 * The rest binding a destructuring into `rest`'s pattern reads, or null:
+	 * `props` for `native` in `const { style, ...native } = props`.
+	 *
+	 * @param {ts.BindingElement} rest
+	 */
+	restSource(rest) {
+		const declaration = rest.parent.parent;
+		if (!ts.isVariableDeclaration(declaration) || !declaration.initializer) return null;
+		const source = skipWrappers(declaration.initializer);
+		return ts.isIdentifier(source) ? asRest(this.declarationOf(source)) : null;
+	}
+
+	/**
+	 * Whether a destructuring takes `onChange` out by name.
+	 *
+	 * @param {ts.ObjectBindingPattern | ts.ArrayBindingPattern} pattern
+	 */
+	namesChange(pattern) {
+		return pattern.elements.some(
+			(e) => ts.isBindingElement(e) && (e.propertyName ?? e.name).getText(this.sf) === 'onChange',
+		);
+	}
+
+	/**
+	 * Whether `element` is a library component that renders a text `<input>`,
+	 * such as Base UI's `Input`, imported by name or through a namespace.
+	 *
+	 * @param {ts.JsxOpeningLikeElement} element
+	 */
+	isTextFieldComponent(element) {
+		/** @type {ts.Node} */
+		let root = element.tagName;
+		while (ts.isPropertyAccessExpression(root)) root = root.expression;
+		const entry = this.importOf(root);
+		if (!entry) return false;
+		const [, ...members] = element.tagName.getText(this.sf).split('.');
+		const name = (entry.namespace ? members : [entry.imported, ...members]).join('.');
+		return TEXT_FIELD_COMPONENTS[entry.module]?.includes(name) ?? false;
 	}
 
 	/**
@@ -1780,6 +1865,8 @@ class ModuleTransform {
 		};
 		/** React specifiers with no Octane export stay on React, for a person. */
 		const kept = new Map();
+		/** @type {string[]} Locals of React's `jsx` factories, which a JSX runtime consumer calls. */
+		const factories = [];
 		for (const node of this.importSlots) {
 			const module = /** @type {ts.StringLiteral} */ (node.moduleSpecifier).text;
 			const clause = node.importClause;
@@ -1800,6 +1887,11 @@ class ModuleTransform {
 				if (mapped) {
 					// A name read only in types imports as a type, which bundlers elide.
 					add(mapped.module, mapped.name, local, typeOnly || !this.valueUses.has(local));
+					continue;
+				}
+				if (/^react\/jsx-(?:dev-)?runtime$/.test(module) && /^jsx(?:s|DEV)?$/.test(imported)) {
+					add('octane', 'createElement', 'createElement', false);
+					factories.push(local);
 					continue;
 				}
 				this.note(
@@ -1837,6 +1929,20 @@ class ModuleTransform {
 		}
 		for (const [module, specs] of kept)
 			lines.push(`import { ${specs.join(', ')} } from ${quote(module)};`);
+		if (factories.length > 0) {
+			// React's runtime takes the key apart from the props; Octane's
+			// `createElement` reads it from them.
+			const params = this.isTypeScript()
+				? 'type: Parameters<typeof createElement>[0], props: Record<string, unknown>, key?: string | number'
+				: 'type, props, key';
+			const [first, ...rest] = factories;
+			lines.push(
+				`function ${first}(${params}) {`,
+				`${this.indentUnit}return createElement(type, key === undefined ? props : { ...props, key });`,
+				'}',
+				...rest.map((local) => `const ${local} = ${first};`),
+			);
+		}
 
 		// In a script, `declare module` declares the module instead of adding to
 		// it: a module whose only import was `import 'react'` stays a module, and
@@ -2375,13 +2481,17 @@ class ModuleTransform {
 		const found = this.parameterOf(node);
 		if (!found) return false;
 		// Unannotated, the project's types still name a handler a component
-		// passes on to a control: `<Input onChange={(e) => …}>`.
+		// passes on to a control: `<Input onChange={(e) => …}>`. A library may
+		// wrap the event (Base UI's `BaseUIEvent<ChangeEvent<…>>`); its first
+		// type argument is still the element the handler is attached to.
 		const inferred = found.param.type ? null : this.projectType(found.param);
 		const type =
 			found.param.type?.getText(this.sf) ??
 			(inferred ? inferred.checker.typeToString(inferred.type) : '');
 		if (
-			/(ChangeEvent|FormEvent)<\s*(?:HTML(?:Input|TextArea|Select)Element\s*[|,]?\s*)+>$/.test(type)
+			/\b(?:Change|Form|Focus)Event<\s*(?:HTML(?:Input|TextArea|Select)Element\s*\|?\s*)+[,>]/.test(
+				type,
+			)
 		)
 			return true;
 		const attribute = this.handlerAttribute(found.fn);
@@ -2436,6 +2546,9 @@ class ModuleTransform {
 		const element = node.parent;
 		const tag = element.tagName.getText(this.sf);
 		const intrinsic = /^[a-z]/.test(tag);
+		// A library text field takes `onInput` for `onChange` as `<input>` does;
+		// its other props are its own.
+		const textField = !intrinsic && this.isTextFieldComponent(element);
 		const spread = node.properties.some(ts.isJsxSpreadAttribute);
 		const attributes = node.properties;
 
@@ -2465,13 +2578,14 @@ class ModuleTransform {
 				const line = this.source.slice(this.source.lastIndexOf('\n', start - 1), start);
 				out += 'onInput={onChange}' + (/^\n[ \t]*$/.test(line) ? line : ' ');
 			}
-			if (!ts.isJsxAttribute(attribute) || !intrinsic) {
+			if (!ts.isJsxAttribute(attribute) || !(intrinsic || textField)) {
 				out += this.emit(attribute, PLAIN);
 				continue;
 			}
 			const name = attribute.name.getText(this.sf);
 			if (
 				name === 'className' &&
+				intrinsic &&
 				this.target === 'tsrx' &&
 				!attributeOf(element, 'class') &&
 				!spread
@@ -2517,7 +2631,7 @@ class ModuleTransform {
 	isTextEntry(element) {
 		const tag = element.tagName.getText(this.sf);
 		if (tag === 'textarea') return true;
-		if (tag !== 'input') return false;
+		if (tag !== 'input' && !this.isTextFieldComponent(element)) return false;
 		const type = attributeOf(element, 'type');
 		if (!type) return true;
 		const value = type.initializer;
