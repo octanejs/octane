@@ -23,12 +23,12 @@ describe('public exports', () => {
 		const manifest = JSON.parse(
 			readFileSync(resolve(import.meta.dirname, '../package.json'), 'utf8'),
 		) as {
-			dependencies: Record<string, string>;
+			dependencies?: Record<string, string>;
 			devDependencies: Record<string, string>;
 			peerDependencies: Record<string, string>;
 		};
 		// The application supplies Kit, as for @solana/react; tests run on 7.0.0.
-		expect(manifest.dependencies).not.toHaveProperty('@solana/kit');
+		expect(manifest).not.toHaveProperty(['dependencies', '@solana/kit']);
 		expect(manifest.peerDependencies['@solana/kit']).toBe('^7.0.0');
 		expect(manifest.devDependencies['@solana/kit']).toBe('7.0.0');
 		expect(manifest.devDependencies['@solana/react']).toBe('7.0.0');

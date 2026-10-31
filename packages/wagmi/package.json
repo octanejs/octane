@@ -39,16 +39,17 @@
     "test": "vitest run --root ../.. --project wagmi --project wagmi-differential"
   },
   "dependencies": {
-    "@octanejs/tanstack-query": "workspace:*",
     "@wagmi/connectors": "catalog:default",
     "@wagmi/core": "catalog:default"
   },
   "peerDependencies": {
+    "@octanejs/tanstack-query": "workspace:*",
     "@tanstack/query-core": "^5.102.8",
     "octane": "workspace:^0.16.0",
     "viem": "^2.55.10"
   },
   "devDependencies": {
+    "@octanejs/tanstack-query": "workspace:*",
     "@tanstack/query-core": "catalog:default",
     "@tanstack/react-query": "catalog:default",
     "@tsrx/react": "catalog:default",
