@@ -12,7 +12,7 @@ and sizes the work to get the bindings there.
 ## Where things stand
 
 - `compiler.strong` reaches application-owned modules only.
-  `_hasApplicationStrongPolicy` in `packages/octane/src/compiler/bundler.js`
+  `_isApplicationSource` in `packages/octane/src/compiler/bundler.js`
   keeps installed, linked, and workspace packages in their own mode, even when
   they sit inside the project root. A dependency module is Strong only through
   its own `"use strong"`.

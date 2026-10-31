@@ -17,6 +17,7 @@ const helperSource = readFileSync(
 	resolve(import.meta.dirname, './_fixtures/compiler-transitive-hook.ts'),
 	'utf8',
 );
+const unmarkedHelperSource = helperSource.replace('/** @jsxImportSource octane */', '');
 const componentSource = readFileSync(
 	resolve(import.meta.dirname, './_fixtures/compiler-transitive-hook.tsrx'),
 	'utf8',
@@ -368,23 +369,24 @@ export function read(store) { return [store?.useValue()!.value, store?.useValue?
 		}
 	});
 	for (const dev of [false, true]) {
-		for (const requireDirective of [false, true]) {
-			it(`keeps imported alias state independent (dev=${dev}, requireDirective=${requireDirective})`, () => {
+		for (const [requireDirective, pragma] of [
+			[false, true],
+			[true, true],
+			// An application module needs no pragma unless requireDirective is on.
+			[false, false],
+		] as const) {
+			it(`keeps imported alias state independent (dev=${dev}, requireDirective=${requireDirective}, pragma=${pragma})`, () => {
 				const compiler = createOctaneCompiler({ root: '/project', requireDirective });
 				const id = '/project/src/helper.ts';
-				const transformed = compiler.transform(helperSource, id, {
+				const source = pragma ? helperSource : unmarkedHelperSource;
+				const transformed = compiler.transform(source, id, {
 					dev,
 					hmr: false,
 					profile: false,
 				});
-				const helper = evaluateCompiledFixtureCode(
-					transformed?.code ?? helperSource,
-					id,
-					'client',
-					{
-						'./hook-alias': { useAliasedState: useState },
-					},
-				);
+				const helper = evaluateCompiledFixtureCode(transformed?.code ?? source, id, 'client', {
+					'./hook-alias': { useAliasedState: useState },
+				});
 				const { Pair } = loadCompiledFixtureSource(componentSource, {
 					id: '/project/src/Pair.tsrx',
 					mode: 'client',
@@ -402,11 +404,12 @@ export function read(store) { return [store?.useValue()!.value, store?.useValue?
 			});
 		}
 	}
-	it('leaves unmarked and foreign helper modules untouched', () => {
+	it('leaves host-owned and foreign helper modules untouched', () => {
+		const gated = createOctaneCompiler({ root: '/project', requireDirective: true });
+		const host = unmarkedHelperSource;
+		expect(gated.transform(host, '/project/src/host.ts')?.code ?? host).toBe(host);
 		const compiler = createOctaneCompiler({ root: '/project' });
-		const source = helperSource.replace('/** @jsxImportSource octane */', '');
-		expect(compiler.transform(source, '/project/src/host.ts')?.code ?? source).toBe(source);
-		const foreign = '/** @jsxImportSource react */\n' + source;
+		const foreign = '/** @jsxImportSource react */\n' + unmarkedHelperSource;
 		expect(compiler.transform(foreign, '/project/src/host.ts')?.code ?? foreign).toBe(foreign);
 	});
 });

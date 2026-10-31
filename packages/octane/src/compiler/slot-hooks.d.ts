@@ -10,6 +10,8 @@ export interface SlotHooksOptions {
 	profileFilename?: string;
 	inlineHookMemo?: boolean;
 	manualSlots?: boolean;
+	/** Octane owns the module, so its custom-hook calls get slots without an Octane import or pragma. */
+	owned?: boolean;
 	/** Opaque activation signal; the transform only checks its presence. */
 	universalRuntime?: unknown;
 	renderer?: { target?: string };
