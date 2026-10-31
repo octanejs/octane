@@ -1,7 +1,9 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import { DATA } from '@octanejs/cli/data';
 import ts from 'typescript';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runCodemod } from '../src/index.js';
@@ -25,10 +27,16 @@ function project(files) {
 	return root;
 }
 
+/** @param {string} name */
+function catalogVersion(name) {
+	return DATA.bindings.find((binding) => binding.name === name)?.version;
+}
+
 describe('runCodemod', () => {
 	it('renames template modules and rewrites every import of them', async () => {
 		const root = project({
-			'package.json': '{ "name": "app" }',
+			'package.json':
+				'{\n  "name": "app",\n  "devDependencies": { "@radix-ui/react-slot": "^1.2.0" }\n}\n',
 			'index.html': '<script type="module" src="/src/main.tsx"></script>',
 			'vite.config.ts':
 				"import react from '@vitejs/plugin-react';\nexport default { plugins: [react()] };\n",
@@ -66,8 +74,73 @@ describe('runCodemod', () => {
 			{ from: '@tanstack/react-query', to: '@octanejs/tanstack-query' },
 			{ from: '@radix-ui/react-slot', to: '@octanejs/radix' },
 		]);
+		// The bindings join package.json at their catalog versions, beside the
+		// React package each replaces.
+		const query = `^${catalogVersion('@octanejs/tanstack-query')}`;
+		const radix = `^${catalogVersion('@octanejs/radix')}`;
+		expect(result.dependencies).toEqual([
+			{ name: '@octanejs/tanstack-query', range: query },
+			{ name: '@octanejs/radix', range: radix },
+		]);
+		expect(read('package.json')).toBe(
+			`{\n  "name": "app",\n  "devDependencies": {\n    "@octanejs/radix": "${radix}",\n    "@radix-ui/react-slot": "^1.2.0"\n  },\n  "dependencies": {\n    "@octanejs/tanstack-query": "${query}"\n  }\n}\n`,
+		);
 		expect(result.missing).toEqual([]);
 		expect(result.files.flatMap((file) => file.diagnostics)).toEqual([]);
+	});
+
+	it('adds only bindings the project lacks, and names patches the bindings drop', async () => {
+		const root = project({
+			'package.json': '{ "name": "mono", "private": true }',
+			'pnpm-lock.yaml': '',
+			'pnpm-workspace.yaml':
+				'packages:\n  - apps/*\npatchedDependencies:\n  "@legendapp/list@3.3.5": patches/@legendapp__list@3.3.5.patch\n  micromark@4.0.2: patches/micromark@4.0.2.patch\n',
+			'patches/@tanstack+react-pacer+0.19.4.patch': '',
+			'apps/web/package.json':
+				'{ "name": "web", "dependencies": { "@octanejs/zustand": "^0.1.0", "@legendapp/list": "3.3.5" } }',
+			'apps/web/src/App.tsx': [
+				"import { LegendList } from '@legendapp/list/react';",
+				"import { useDebouncer } from '@tanstack/react-pacer';",
+				"import { create } from 'zustand';",
+				'export const useStore = create(() => ({ n: 0 }));',
+				'export function App({ items }: { items: string[] }) {',
+				'\tuseDebouncer(() => {}, { wait: 10 });',
+				'\treturn <LegendList data={items} renderItem={({ item }) => <p>{item}</p>} />;',
+				'}',
+				'',
+			].join('\n'),
+		});
+		const web = path.join(root, 'apps/web');
+		const manifest = fs.readFileSync(path.join(web, 'package.json'), 'utf8');
+		const result = await runCodemod([web], { write: false, verify: false });
+		expect(result.dependencies).toEqual([
+			{
+				name: '@octanejs/legendapp-list',
+				range: `^${catalogVersion('@octanejs/legendapp-list')}`,
+			},
+			// TanStack publishes its adapters, so the catalog has no version for them.
+			{ name: '@tanstack/octane-pacer', range: 'latest' },
+		]);
+		expect(result.patched).toEqual([
+			{ name: '@legendapp/list', patch: '../../patches/@legendapp__list@3.3.5.patch' },
+			{ name: '@tanstack/react-pacer', patch: '../../patches/@tanstack+react-pacer+0.19.4.patch' },
+		]);
+		// A dry run reports what it would add without adding it.
+		expect(fs.readFileSync(path.join(web, 'package.json'), 'utf8')).toBe(manifest);
+	});
+
+	it('names the project to run `octane init` in by a path that resolves from here', () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'src/A.tsx': 'export function A() {\n\treturn <p />;\n}\n',
+		});
+		const cwd = project({});
+		const output = execFileSync(
+			process.execPath,
+			[path.join(import.meta.dirname, '../src/bin.js'), root, '--no-verify'],
+			{ cwd, encoding: 'utf8' },
+		);
+		expect(output).toContain(`init\` in ${root} to wire`);
 	});
 
 	it('is idempotent: a second run changes nothing', async () => {
@@ -870,12 +943,43 @@ describe('runCodemod', () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',
 			'tsconfig.json': '{ "compilerOptions": { "strict": true } }',
-			'src/Form.tsx':
+			'src/Form.tsx': [
 				// React 19.2 types name the target too: `ChangeEvent<CurrentTarget, Target>`.
-				'interface ChangeEvent<C, T> { target: T; currentTarget: C }\nfunction Input(_: { onChange(e: ChangeEvent<HTMLInputElement, HTMLInputElement>): void }) {\n\treturn <input />;\n}\nexport function Form({ set }: { set(v: string): void }) {\n\treturn <Input onChange={(e) => set(e.target.value)} />;\n}\n',
+				'interface ChangeEvent<C, T> { target: T; currentTarget: C }',
+				'interface FocusEvent<C, R> { target: C; currentTarget: C; relatedTarget: R }',
+				// Base UI wraps the event its controls pass on.
+				'type BaseUIEvent<E> = E & { preventBaseUIHandler(): void };',
+				'function Input(_: { onChange(e: ChangeEvent<HTMLInputElement, HTMLInputElement>): void }) {',
+				'\treturn <input />;',
+				'}',
+				'function Field(_: {',
+				'\tonChange(e: BaseUIEvent<ChangeEvent<HTMLInputElement, HTMLInputElement>>): void;',
+				'\tonBlur(e: FocusEvent<HTMLTextAreaElement, Element>): void;',
+				'}) {',
+				'\treturn <textarea />;',
+				'}',
+				// A form hears changes from every control in it.
+				'function Group(_: { onChange(e: ChangeEvent<HTMLFormElement, HTMLInputElement>): void }) {',
+				'\treturn <form />;',
+				'}',
+				'export function Form({ set }: { set(v: string): void }) {',
+				'\treturn (',
+				'\t\t<>',
+				'\t\t\t<Input onChange={(e) => set(e.target.value)} />',
+				'\t\t\t<Field onChange={(e) => set(e.target.value)} onBlur={(e) => set(e.target.value)} />',
+				'\t\t\t<Group onChange={(e) => set(e.target.value)} />',
+				'\t\t</>',
+				'\t);',
+				'}',
+				'',
+			].join('\n'),
 		});
 		const [file] = (await runCodemod([root], { write: false })).files;
 		expect(file.code).toContain('<Input onChange={(e) => set(e.currentTarget.value)} />');
+		expect(file.code).toContain(
+			'<Field onChange={(e) => set(e.currentTarget.value)} onBlur={(e) => set(e.currentTarget.value)} />',
+		);
+		expect(file.code).toContain('<Group onChange={(e) => set(e.target.value)} />');
 	});
 
 	// Compiles every module of the app twice; under CI load that can pass the default 5 s.

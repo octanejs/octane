@@ -69,6 +69,10 @@ interface CodemodResult {
 	root: string;
 	files: FileResult[];
 	packages: { from: string; to: string }[];
+	/** Bindings added to package.json, which the project did not declare. */
+	dependencies: { name: string; range: string }[];
+	/** Patches of replaced React packages, which do not reach their bindings. */
+	patched: { name: string; patch: string }[];
 	missing: (Unported & { modules: number })[];
 	html: string[];
 	compiler: string | null;

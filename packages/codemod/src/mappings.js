@@ -414,3 +414,16 @@ export const TEXT_INPUT_TYPES = new Set([
 	'email',
 	'number',
 ]);
+
+/**
+ * Library components that render a text `<input>` and hand it the `onChange`
+ * they receive, by the module that exports each: React fires that per edit, as
+ * on the element itself.
+ *
+ * @type {Record<string, string[]>}
+ */
+export const TEXT_FIELD_COMPONENTS = {
+	'@base-ui/react': ['Input', 'Field.Control'],
+	'@base-ui/react/input': ['Input'],
+	'@base-ui/react/field': ['Field.Control'],
+};

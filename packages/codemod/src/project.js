@@ -40,6 +40,10 @@ import { transformModule } from './transform.js';
  * @property {FileResult[]} files
  * @property {{ from: string, to: string }[]} packages React packages the
  *   migrated code now imports as Octane bindings
+ * @property {{ name: string, range: string }[]} dependencies the bindings
+ *   added to package.json, which the project did not declare yet
+ * @property {{ name: string, patch: string }[]} patched patches the project
+ *   applies to replaced React packages, which do not reach their bindings
  * @property {Missing[]} missing React packages the code imports that have no
  *   Octane port, and how it uses them
  * @property {string[]} html entry pages whose script reference was updated
@@ -201,6 +205,7 @@ export async function runCodemod(paths, options = {}) {
 		renames,
 		options.write !== false,
 	);
+	const dependencies = addBindings(root, packages, options.write !== false);
 	if (options.write !== false) {
 		for (const result of results) {
 			if (!result.changed) continue;
@@ -213,6 +218,8 @@ export async function runCodemod(paths, options = {}) {
 		root,
 		files: results,
 		packages: [...packages].map(([from, to]) => ({ from, to })),
+		dependencies,
+		patched: patchedPackages(root, packages),
 		missing: [...missing.values()].sort((a, b) => a.name.localeCompare(b.name)),
 		html,
 		compiler: compiler?.from ?? null,
@@ -486,11 +493,112 @@ function catalogName(specifier) {
 function unportedName(specifier, from) {
 	if (specifier.startsWith('.') || specifier.startsWith('/') || catalogName(specifier) !== null)
 		return null;
-	const parts = specifier.split('/');
-	const root = specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+	const root = packageName(specifier);
 	// Any package's `/react` entry renders with React (`@tanstack/markdown/react`).
 	if (/\/react(?:\/|$)/.test(specifier.slice(root.length))) return specifier;
 	return rendersWithReact(root, from) ? root : null;
+}
+
+/**
+ * The package a bare specifier imports from: `@pierre/diffs` for
+ * `@pierre/diffs/react`.
+ *
+ * @param {string} specifier
+ */
+function packageName(specifier) {
+	return specifier
+		.split('/')
+		.slice(0, specifier.startsWith('@') ? 2 : 1)
+		.join('/');
+}
+
+/**
+ * Add the bindings the migrated code imports to the project's package.json,
+ * each at its catalog version and in the field that lists the React package it
+ * replaces. TanStack publishes its Octane adapters outside the catalog, so
+ * those take `latest`.
+ *
+ * @param {string} root
+ * @param {Map<string, string>} packages
+ * @param {boolean} write
+ * @returns {CodemodResult['dependencies']}
+ */
+function addBindings(root, packages, write) {
+	const file = path.join(root, 'package.json');
+	if (!fs.existsSync(file)) return [];
+	const text = fs.readFileSync(file, 'utf8');
+	const manifest = JSON.parse(text);
+	const fields = ['dependencies', 'devDependencies', 'peerDependencies'];
+	/** @type {CodemodResult['dependencies']} */
+	const added = [];
+	for (const [from, to] of packages) {
+		if (fields.some((field) => manifest[field]?.[to] !== undefined)) continue;
+		const version = DATA.bindings.find((binding) => binding.name === to)?.version;
+		const range = version ? `^${version}` : 'latest';
+		const field = manifest.devDependencies?.[packageName(from)]
+			? 'devDependencies'
+			: 'dependencies';
+		manifest[field] = Object.fromEntries(
+			Object.entries({ ...manifest[field], [to]: range }).sort(([a], [b]) => a.localeCompare(b)),
+		);
+		added.push({ name: to, range });
+	}
+	if (write && added.length > 0) {
+		const indent = /^[ \t]+/m.exec(text)?.[0] ?? '  ';
+		fs.writeFileSync(file, JSON.stringify(manifest, null, indent) + '\n');
+	}
+	return added;
+}
+
+/**
+ * The patches a project applies to the React packages the migration replaces,
+ * which stop applying once the code imports the binding instead: pnpm's and
+ * Bun's `patchedDependencies`, in package.json or pnpm-workspace.yaml, and
+ * patch-package's `patches/name+version.patch`. They live where the project
+ * installs, so each directory up from `root` is read until a lockfile.
+ *
+ * @param {string} root
+ * @param {Map<string, string>} packages
+ * @returns {CodemodResult['patched']}
+ */
+function patchedPackages(root, packages) {
+	const replaced = new Set([...packages.keys()].map(packageName));
+	/** @type {CodemodResult['patched']} */
+	const patched = [];
+	for (let dir = root; ; dir = path.dirname(dir)) {
+		const read = (/** @type {string} */ name) => {
+			const file = path.join(dir, name);
+			return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+		};
+		const manifest = JSON.parse(read('package.json') ?? '{}');
+		/** @type {[string, string][]} `name@version` and its patch */
+		const declared = Object.entries({
+			...manifest.pnpm?.patchedDependencies,
+			...manifest.patchedDependencies,
+		});
+		const workspace =
+			/^patchedDependencies:[ \t]*\r?\n((?:[ \t]+.*\r?\n?)*)/m.exec(
+				read('pnpm-workspace.yaml') ?? '',
+			)?.[1] ?? '';
+		for (const [, , key, , patch] of workspace.matchAll(
+			/^[ \t]+(["']?)(.+?)\1:[ \t]*(["']?)(.+?)\3[ \t]*$/gm,
+		)) {
+			declared.push([key, patch]);
+		}
+		const patches = path.join(dir, 'patches');
+		for (const name of fs.existsSync(patches) ? fs.readdirSync(patches) : []) {
+			const match = /^((?:@[^+]+\+)?[^+]+)\+[^+]+\.patch$/.exec(name);
+			if (match) declared.push([match[1].replace('+', '/'), `patches/${name}`]);
+		}
+		for (const [key, patch] of declared) {
+			const name = key.replace(/(?!^)@[^@]*$/, '');
+			if (replaced.has(name))
+				patched.push({ name, patch: path.relative(root, path.join(dir, patch)) });
+		}
+		const installed = ['pnpm-lock.yaml', 'package-lock.json', 'yarn.lock', 'bun.lock', 'bun.lockb'];
+		if (installed.some((name) => fs.existsSync(path.join(dir, name))) || path.dirname(dir) === dir)
+			return patched;
+	}
 }
 
 /**
