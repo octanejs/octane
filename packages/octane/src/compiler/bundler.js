@@ -1881,7 +1881,13 @@ class OctaneBundlerCompiler {
 			// of other hooks keeps one instance per call. A package, installed or
 			// nested in the root, still needs the import or pragma, since its plain
 			// modules may implement hooks with authored slots, as Octane's runtime does.
-			const owned = this._pragmaClaimsOwnership(code) || this._isApplicationSource(file, collected);
+			// A leading pragma decides for itself: one naming `react` hands the
+			// module to that toolchain.
+			const pragma = findLeadingJsxImportSourcePragma(code);
+			const owned =
+				pragma === null
+					? this._isApplicationSource(file, collected)
+					: this.pragmaOwnedModules.has(pragma);
 			if (!importsHookRuntime(code) && !manualSlots && !owned) return passThrough();
 			if (output === 'ts' && !manualSlots) {
 				// The cheap ownership regex also matches documentation examples. A
