@@ -3579,7 +3579,8 @@ const DETACHES_BY_TARGET = /* @__PURE__ */ new Map<unknown, number | number[]>()
  * the same pair in the other order. Per (ref, target), queued detaches and
  * attaches alternate, so each pair nets to nothing: drop both. A Fragment's mount
  * attach reads its ref when it runs, so it pairs with its instance's first
- * queued detach.
+ * queued detach. An Activity reveal queues that attach too, for an instance
+ * whose committed ref may still be connected; that one pairs with nothing.
  */
 function dropUncommittedRefPairs(detaches: any[]): void {
 	const byTarget = DETACHES_BY_TARGET;
@@ -3594,7 +3595,9 @@ function dropUncommittedRefPairs(detaches: any[]): void {
 		const entry = refAttachQueue[read];
 		const queued = byTarget.get(entry.el);
 		if (queued !== undefined) {
-			const live = entry.ref === attachLiveFragmentRef;
+			const live =
+				entry.ref === attachLiveFragmentRef &&
+				(activityRefState ? activityRefState.get(entry.el)?.connected : null) == null;
 			if (typeof queued === 'number') {
 				if (live || detaches[queued] === entry.ref) {
 					detaches[queued] = null;

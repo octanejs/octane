@@ -12,26 +12,20 @@
  * refs never committed: calling one with the element or with `null` breaks that
  * contract and leaks the cleanup it returns.
  */
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { mount } from '../_helpers';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mount, type MountResult } from '../_helpers';
 import { flushSync } from '../../src/index.js';
-import { RequeuedRefHost, RequeuedRefCycle } from './_fixtures/refs-uncommitted.tsrx';
+import {
+	RequeuedRefHost,
+	RequeuedActivityReveal,
+	RequeuedRefCycle,
+} from './_fixtures/refs-uncommitted.tsrx';
 
-type HostProps = Parameters<typeof RequeuedRefHost>[0];
+const calls: string[] = [];
 
-// The cross-component update warns in development; that warning is all it logs.
-let consoleError: ReturnType<typeof vi.spyOn>;
-afterEach(() => {
-	for (const [message] of consoleError.mock.calls) {
-		expect(String(message)).toMatch(/^Cannot update a component/);
-	}
-	consoleError.mockRestore();
-});
-
-function setup(props: Omit<HostProps, 'track'>) {
-	consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-	const calls: string[] = [];
-	const track = (label: string, target: unknown) => {
+// A callback ref that logs each call and returns a React 19 cleanup.
+function tracked(label: string) {
+	return (target: unknown) => {
 		const kind =
 			target === null ? 'null' : target instanceof Element ? target.localName : 'fragment';
 		calls.push(`attach ${label} ${kind}`);
@@ -39,26 +33,43 @@ function setup(props: Omit<HostProps, 'track'>) {
 			calls.push(`cleanup ${label}`);
 		};
 	};
-	const m = mount(RequeuedRefHost, { ...props, track });
-	const render = (next: Partial<HostProps>) => {
-		calls.length = 0;
-		m.root.render(RequeuedRefHost, { ...props, ...next, track });
-		flushSync(() => {});
-		return calls;
-	};
-	return { calls, m, render };
 }
+const track = (label: string, target: unknown) => tracked(label)(target);
+
+function rerender<P>(m: MountResult, body: (props: P) => unknown, props: P): string[] {
+	calls.length = 0;
+	m.root.render(body as any, props);
+	flushSync(() => {});
+	return calls;
+}
+
+// The cross-component update warns in development; that warning is all it logs.
+let consoleError: ReturnType<typeof vi.spyOn>;
+beforeEach(() => {
+	calls.length = 0;
+	consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+});
+afterEach(() => {
+	for (const [message] of consoleError.mock.calls) {
+		expect(String(message)).toMatch(/^Cannot update a component/);
+	}
+	consoleError.mockRestore();
+});
 
 for (const fragment of [false, true]) {
 	const kind = fragment ? 'fragment' : 'div';
 
 	describe(`${fragment ? 'Fragment' : 'host'} refs from an uncommitted pass`, () => {
 		it('runs only the committed refs when the owner renders several times before its commit', () => {
-			const { calls, m, render } = setup({ show: true, target: 0, hideAt: Infinity, fragment });
+			const props = { show: true, target: 0, hideAt: Infinity, fragment, track };
+			const m = mount(RequeuedRefHost, props);
 			expect(calls).toEqual([`attach 0/0 ${kind}`]);
 
 			// Passes 0/2 and 1/2 render and are replaced before the commit.
-			expect(render({ target: 2 })).toEqual(['cleanup 0/0', `attach 2/2 ${kind}`]);
+			expect(rerender(m, RequeuedRefHost, { ...props, target: 2 })).toEqual([
+				'cleanup 0/0',
+				`attach 2/2 ${kind}`,
+			]);
 
 			calls.length = 0;
 			m.unmount();
@@ -66,10 +77,13 @@ for (const fragment of [false, true]) {
 		});
 
 		it('runs only the last ref of a host that mounts and re-renders before its commit', () => {
-			const { calls, m, render } = setup({ show: false, target: 0, hideAt: Infinity, fragment });
+			const props = { show: false, target: 0, hideAt: Infinity, fragment, track };
+			const m = mount(RequeuedRefHost, props);
 			expect(calls).toEqual([]);
 
-			expect(render({ show: true, target: 1 })).toEqual([`attach 1/1 ${kind}`]);
+			expect(rerender(m, RequeuedRefHost, { ...props, show: true, target: 1 })).toEqual([
+				`attach 1/1 ${kind}`,
+			]);
 
 			calls.length = 0;
 			m.unmount();
@@ -77,33 +91,38 @@ for (const fragment of [false, true]) {
 		});
 
 		it('never calls the ref of a host that mounts and unmounts before its commit', () => {
-			const { calls, m, render } = setup({ show: false, target: 0, hideAt: 1, fragment });
+			const props = { show: false, target: 0, hideAt: 1, fragment, track };
+			const m = mount(RequeuedRefHost, props);
 
-			expect(render({ show: true, target: 1 })).toEqual([]);
+			expect(rerender(m, RequeuedRefHost, { ...props, show: true, target: 1 })).toEqual([]);
 			m.unmount();
 			expect(calls).toEqual([]);
+		});
+
+		it('swaps the committed ref when an Activity hides and reveals the host before its commit', () => {
+			const props = { a: tracked('a'), b: tracked('b'), target: 0, fragment };
+			const m = mount(RequeuedActivityReveal, props);
+			expect(calls).toEqual([`attach a ${kind}`]);
+
+			expect(rerender(m, RequeuedActivityReveal, { ...props, target: 2 })).toEqual([
+				'cleanup a',
+				`attach b ${kind}`,
+			]);
+
+			calls.length = 0;
+			m.unmount();
+			expect(calls).toEqual(['cleanup b']);
 		});
 	});
 }
 
 it('leaves a committed ref alone when passes re-point the host back to it', () => {
-	consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-	const calls: string[] = [];
-	const ref = (label: string) => (el: Element | null) => {
-		calls.push(`attach ${label} ${el === null ? 'null' : el.localName}`);
-		return () => {
-			calls.push(`cleanup ${label}`);
-		};
-	};
-	const refs = [ref('a'), ref('b')];
-	const m = mount(RequeuedRefCycle, { refs, target: 0 });
+	const props = { refs: [tracked('a'), tracked('b')], target: 0 };
+	const m = mount(RequeuedRefCycle, props);
 	expect(calls).toEqual(['attach a div']);
 
 	// Passes a, b, a: the committed ref is the one that ends up current.
-	calls.length = 0;
-	m.root.render(RequeuedRefCycle, { refs, target: 2 });
-	flushSync(() => {});
-	expect(calls).toEqual([]);
+	expect(rerender(m, RequeuedRefCycle, { ...props, target: 2 })).toEqual([]);
 
 	m.unmount();
 	expect(calls).toEqual(['cleanup a']);

@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'octane';
+import { Activity, Fragment, useState } from 'octane';
 
 // Fixtures for conformance/refs-uncommitted.test.ts.
 
@@ -33,6 +33,30 @@ export function RequeuedRefHost(props: {
 				<div ref={(el) => props.track(label, el)} />
 			}
 		}
+		<StepTo step={step} target={props.target} setStep={setStep} />
+	</>
+}
+
+// Hides its host at step 1 and reveals it with ref `b` at step 2, so the reveal
+// reconnects a host whose committed ref `a` is still attached.
+export function RequeuedActivityReveal(props: {
+	a: (target: unknown) => () => void;
+	b: (target: unknown) => () => void;
+	target: number;
+	fragment: boolean;
+}) @{
+	const [step, setStep] = useState(0);
+	const ref = step === 2 ? props.b : props.a;
+	<>
+		<Activity mode={step === 1 ? 'hidden' : 'visible'}>
+			@if (props.fragment) {
+				<Fragment ref={ref}>
+					<i />
+				</Fragment>
+			} @else {
+				<div ref={ref} />
+			}
+		</Activity>
 		<StepTo step={step} target={props.target} setStep={setStep} />
 	</>
 }
