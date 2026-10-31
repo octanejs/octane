@@ -1598,6 +1598,8 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 	);
 	const manifest = createPackedJavascriptConsumerManifest(archiveSpecs);
 	addCompilerPeer(manifest);
+	// The application supplies @octanejs/testing-library's DOM Testing Library peer.
+	manifest.dependencies['@testing-library/dom'] = '10.4.1';
 	writeFileSync(
 		path.join(consumerDirectory, 'package.json'),
 		`${JSON.stringify(manifest, null, 2)}\n`,
