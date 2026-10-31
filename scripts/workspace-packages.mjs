@@ -47,6 +47,15 @@ const SPECIAL_ROLES = new Map([
 	['@octanejs/seo', 'document metadata'],
 ]);
 
+// Ports that still install an upstream peer themselves. Each entry is a pending
+// manifest fix: remove entries, never add them.
+const UPSTREAM_PEER_EXCEPTIONS = new Map([
+	['@octanejs/alien-signals', ['alien-signals']],
+	['@octanejs/livestore', ['@opentelemetry/api']],
+	['@octanejs/solana-kit', ['@solana/kit']],
+	['@octanejs/tanstack-router-ssr-query', ['@tanstack/query-core']],
+]);
+
 const OCTANE_SINGLETON_CONSUMERS = new Set([
 	'@octanejs/app-core',
 	'@octanejs/astro',
@@ -154,6 +163,10 @@ export function getWorkspacePackages(repoRoot = REPO_ROOT) {
 			const manifestPath = path.join(directory, 'package.json');
 			if (!existsSync(manifestPath)) return [];
 			const manifest = readRepositoryJson(repoRoot, `packages/${entry.name}/package.json`);
+			// Ports pin the upstream package's own manifest beside the copied source.
+			const upstreamManifest = existsSync(path.join(directory, 'upstream/package.json'))
+				? readRepositoryJson(repoRoot, `packages/${entry.name}/upstream/package.json`)
+				: undefined;
 			return [
 				{
 					dir: entry.name,
@@ -161,6 +174,7 @@ export function getWorkspacePackages(repoRoot = REPO_ROOT) {
 					manifestPath,
 					statusPath: path.join(directory, 'status.json'),
 					manifest,
+					upstreamManifest,
 					name: manifest.name,
 					version: manifest.version,
 					private: manifest.private === true,
@@ -540,6 +554,19 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 				typeof pkg.manifest.peerDependencies?.['@rsbuild/core'] !== 'string'
 			) {
 				errors.push(`${label} must declare its supported Rsbuild range as a peer dependency`);
+			}
+		}
+
+		// An upstream peer is shared with the application. A second copy installed
+		// by the binding splits module identity, as with ProseMirror's keyed plugins.
+		for (const peer of Object.keys(pkg.upstreamManifest?.peerDependencies ?? {})) {
+			if (UPSTREAM_PEER_EXCEPTIONS.get(pkg.name)?.includes(peer)) continue;
+			for (const section of ['dependencies', 'optionalDependencies']) {
+				if (pkg.manifest[section]?.[peer] !== undefined) {
+					errors.push(
+						`${label} ${section}.${peer} must be a peer dependency, as in ${pkg.upstreamManifest.name}`,
+					);
+				}
 			}
 		}
 

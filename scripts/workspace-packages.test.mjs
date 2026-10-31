@@ -244,6 +244,48 @@ test('live manifests obey the peer policy for their own core version', () => {
 	assert.deepEqual(validateWorkspacePackages(), []);
 });
 
+test('ports keep upstream peers as peers', () => {
+	const port = (manifest) => ({
+		...workspacePackage('@octanejs/example', manifest),
+		upstreamManifest: { name: 'example-react', peerDependencies: { shared: '^1.0.0' } },
+	});
+	assert.deepEqual(
+		validateWorkspacePackages([
+			port({ peerDependencies: { shared: '^1.0.0' }, devDependencies: { shared: '1.0.0' } }),
+		]),
+		[],
+	);
+	assert.deepEqual(
+		validateWorkspacePackages([
+			port({ dependencies: { shared: '1.0.0' }, optionalDependencies: { shared: '1.0.0' } }),
+		]),
+		[
+			'packages/@octanejs-example dependencies.shared must be a peer dependency, as in example-react',
+			'packages/@octanejs-example optionalDependencies.shared must be a peer dependency, as in example-react',
+		],
+	);
+});
+
+test('tiptap shares the application ProseMirror instance', () => {
+	const packages = getWorkspacePackages();
+	const tiptap = packages.find((pkg) => pkg.name === '@octanejs/tiptap');
+	const { '@tiptap/core': core, '@tiptap/pm': pm } = tiptap.manifest.devDependencies;
+	const bundled = {
+		...tiptap,
+		manifest: {
+			...tiptap.manifest,
+			dependencies: { ...tiptap.manifest.dependencies, '@tiptap/core': core, '@tiptap/pm': pm },
+		},
+	};
+	assert.deepEqual(
+		validateWorkspacePackages(packages.map((pkg) => (pkg === tiptap ? bundled : pkg))),
+		[
+			'packages/tiptap dependencies.@tiptap/core must be a peer dependency, as in @tiptap/react',
+			'packages/tiptap dependencies.@tiptap/pm must be a peer dependency, as in @tiptap/react',
+		],
+	);
+});
+
 for (const [version, expected] of [
 	['0.4.0', 'workspace:^0.4.0'],
 	['0.4.12', 'workspace:^0.4.0'],

@@ -51,21 +51,23 @@
     "upstream:verify": "node ../../scripts/react-port/materialize.mjs run --check --package-dir ."
   },
   "dependencies": {
-    "@tiptap/core": "catalog:default",
-    "@tiptap/pm": "catalog:default",
     "fast-equals": "catalog:default"
   },
   "optionalDependencies": {
-    "@tiptap/extension-bubble-menu": "catalog:default",
-    "@tiptap/extension-floating-menu": "catalog:default"
+    "@tiptap/extension-bubble-menu": "^3.28.0",
+    "@tiptap/extension-floating-menu": "^3.28.0"
   },
   "peerDependencies": {
+    "@tiptap/core": "^3.28.0",
+    "@tiptap/pm": "^3.28.0",
     "octane": "workspace:^0.16.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
     "@testing-library/jest-dom": "catalog:default",
     "@testing-library/react": "16.3.2",
+    "@tiptap/core": "catalog:default",
+    "@tiptap/pm": "catalog:default",
     "@tiptap/react": "catalog:default",
     "@tiptap/starter-kit": "catalog:default",
     "@tsrx/react": "catalog:default",
