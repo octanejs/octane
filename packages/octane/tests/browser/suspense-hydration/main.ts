@@ -1,3 +1,5 @@
+// octane-no-slot: this module renders React baselines with React's own hooks,
+// and Octane slots the hook calls of an application's plain modules.
 import {
 	createElement,
 	createRoot,

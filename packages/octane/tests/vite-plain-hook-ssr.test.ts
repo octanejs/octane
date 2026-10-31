@@ -11,6 +11,8 @@ import { octane } from 'octane/compiler/vite';
 // real Vite builds. The aliased build pins bare `octane` to the client entry,
 // as checkout-pinned benchmark harnesses do. Vite applies that alias before the
 // plugin's resolveId, so the server graph must name its runtime in the source.
+// `pair.ts` never imports Octane, yet each of its store-hook calls must keep its
+// own store instance and subscription.
 const files = {
 	'hooks.ts': `import { createContext, useContext, useId, useMemo, useState, useSyncExternalStore } from 'octane';
 export const Theme = createContext('light');
@@ -40,16 +42,26 @@ export function useLabel(store: ReturnType<typeof createStore>) {
 export function useLabelId() {
 	return useId();
 }`,
+	'pair.ts': `import { createStore, useValue } from './hooks.ts';
+export const draft = createStore('draft');
+export function usePair(store: ReturnType<typeof createStore>) {
+	return useValue(store) + '|' + useValue(draft);
+}`,
 	'App.tsrx': `import { createStore, Theme, useLabel, useLabelId } from './hooks.ts';
+import { usePair } from './pair.ts';
 export const store = createStore('server');
 function Label() @{
 	const id = useLabelId();
 	<p id={id}>{useLabel(store) as string}</p>
 }
+function Pair() @{
+	<b>{usePair(store) as string}</b>
+}
 export function App() @{
-	<Theme value="dark"><Label /></Theme>
+	<Theme value="dark"><Label /><Pair /></Theme>
 }`,
 	'entry.ts': `export { App, store } from './App.tsrx';
+export { draft } from './pair.ts';
 export { act, flushSync, hydrateRoot } from 'octane';`,
 	'entry.server.ts': `export { App } from './App.tsrx';
 export { renderToString } from 'octane/server';`,
@@ -131,21 +143,24 @@ describe('plain .ts custom hooks through Vite SSR', () => {
 				// The store subscribes in a passive effect, which runs after an animation
 				// frame and a message. act() drains it; a fixed delay can lose that race.
 				const result = await window.eval(`(async () => {
- const { App, act, store, flushSync, hydrateRoot } = fixture;
+ const { App, act, draft, store, flushSync, hydrateRoot } = fixture;
  const host = document.querySelector('#host'), server = host.querySelector('p'), errors = [];
- const rendered = { text: server.textContent, id: server.id !== '' };
+ const rendered = { text: server.textContent, id: server.id !== '', pair: host.querySelector('b').textContent };
  const root = hydrateRoot(host, App, {}, { onRecoverableError: (error) => errors.push(String(error)) });
  await act(() => {});
  const hydrated = { html: host.innerHTML, adopted: host.querySelector('p') === server, errors };
  flushSync(() => store.set('client'));
  const updated = host.textContent;
+ flushSync(() => draft.set('saved'));
+ const saved = host.querySelector('b').textContent;
  root.unmount();
- return { rendered, hydrated, updated };
+ return { rendered, hydrated, updated, saved };
 })()`);
 				expect(result).toEqual({
-					rendered: { text: 'server:4:dark', id: true },
+					rendered: { text: 'server:4:dark', id: true, pair: 'server|draft' },
 					hydrated: { html, adopted: true, errors: [] },
-					updated: 'client:4:dark',
+					updated: 'client:4:darkclient|draft',
+					saved: 'client|saved',
 				});
 			} finally {
 				window.close();

@@ -39,15 +39,14 @@
   "scripts": {
     "test": "vitest run --root ../.. --project mobx --project mobx-differential --project mobx-ssr"
   },
-  "dependencies": {
-    "mobx": "catalog:default"
-  },
   "peerDependencies": {
+    "mobx": "^6.16.1",
     "octane": "workspace:^0.16.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
+    "mobx": "catalog:default",
     "mobx-react-lite": "4.1.1",
     "octane": "workspace:*",
     "react": "catalog:default",

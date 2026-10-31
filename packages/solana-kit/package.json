@@ -43,11 +43,9 @@
     "typecheck": "octane-tsc -p tsconfig.json -p typetests/tsconfig.json && tsc --noEmit -p audit/upstream-typetests/tsconfig.json",
     "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs"
   },
-  "dependencies": {
-    "@solana/kit": "7.0.0"
-  },
   "peerDependencies": {
     "@octanejs/tanstack-query": "workspace:*",
+    "@solana/kit": "^7.0.0",
     "octane": "workspace:^0.16.0"
   },
   "peerDependenciesMeta": {
@@ -57,6 +55,7 @@
   },
   "devDependencies": {
     "@octanejs/tanstack-query": "workspace:*",
+    "@solana/kit": "7.0.0",
     "@solana/react": "7.0.0",
     "@tanstack/query-core": "catalog:default",
     "@tanstack/react-query": "catalog:default",

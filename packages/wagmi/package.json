@@ -40,22 +40,24 @@
   },
   "dependencies": {
     "@wagmi/connectors": "catalog:default",
-    "@wagmi/core": "catalog:default",
-    "viem": "catalog:default",
-    "@tanstack/query-core": "catalog:default"
+    "@wagmi/core": "catalog:default"
   },
   "peerDependencies": {
     "@octanejs/tanstack-query": "workspace:*",
-    "octane": "workspace:^0.16.0"
+    "@tanstack/query-core": "^5.102.8",
+    "octane": "workspace:^0.16.0",
+    "viem": "^2.55.10"
   },
   "devDependencies": {
     "@octanejs/tanstack-query": "workspace:*",
+    "@tanstack/query-core": "catalog:default",
     "@tanstack/react-query": "catalog:default",
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
+    "viem": "catalog:default",
     "vitest": "catalog:default",
     "wagmi": "catalog:default",
     "typescript": "catalog:default"

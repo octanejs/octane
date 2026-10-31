@@ -6,12 +6,13 @@ for the [octane](https://github.com/octanejs/octane) UI framework.
 ## Installation
 
 ```sh
-npm install @octanejs/testing-library
-pnpm add @octanejs/testing-library
+npm install @octanejs/testing-library @testing-library/dom
+pnpm add @octanejs/testing-library @testing-library/dom
 ```
 
-This package peers on the current Octane minor line (its `peerDependencies` names
-the range).
+This package peers on the current Octane minor line and, as React Testing Library
+does, on `@testing-library/dom` (its `peerDependencies` names the ranges), so
+`configure()` and the queries share your test setup's DOM Testing Library.
 
 The split mirrors RTL's own architecture (and
 `docs/react-library-compat-plan.md` §2): **`@testing-library/dom` is

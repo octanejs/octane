@@ -5,12 +5,14 @@ official connectors, while replacing the React provider and hooks with Octane
 bindings backed by `@octanejs/tanstack-query`.
 
 ```bash
-npm install @octanejs/wagmi @octanejs/tanstack-query viem
-pnpm add @octanejs/wagmi @octanejs/tanstack-query viem
+npm install @octanejs/wagmi @octanejs/tanstack-query @tanstack/query-core viem
+pnpm add @octanejs/wagmi @octanejs/tanstack-query @tanstack/query-core viem
 ```
 
-As `@tanstack/react-query` is for `wagmi`, `@octanejs/tanstack-query` is a peer
-dependency, so the hooks read the application's `QueryClientProvider`.
+As in `wagmi`, `viem` is a peer dependency, and so is `@octanejs/tanstack-query`,
+the counterpart of its `@tanstack/react-query` peer, so the hooks read the
+application's `QueryClientProvider`. `@tanstack/query-core` is a peer too,
+because `@wagmi/core/query` imports it as an optional peer of its own.
 
 ```tsrx
 import { QueryClient, QueryClientProvider } from '@octanejs/tanstack-query';
