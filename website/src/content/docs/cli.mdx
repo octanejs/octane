@@ -193,9 +193,16 @@ and scaffolds the same files [`create`](#create) writes, including the
 
 It never overwrites a script you already defined, and it will not rewrite an
 existing bundler config: an arbitrary `vite.config.ts` cannot be edited
-reliably, so `init` prints the exact import and plugin line to add instead. Run
-it on a clean tree, or pass `--force`, so `git diff` stays a usable review of
-what it wrote.
+reliably, so `init` prints the exact import and plugin line to add instead,
+naming the `@vitejs/plugin-react` call that `octane()` replaces and, when the
+project has `.tsrx` routes, the TanStack Router generator to turn off: it finds
+only `.ts`, `.tsx`, `.js`, and `.jsx` route files. A tsconfig that enables
+`rewriteRelativeImportExtensions` gets it turned off, because TypeScript rejects
+every relative `.tsrx` import it is asked to rewrite. In a Vite+ project whose
+config declares a `run.tasks` entry named like a script `init` would add, such
+as `typecheck`, it adds no script, since `vp run` refuses one beside the task,
+and names the command the task should run instead. Run it on a clean tree, or
+pass `--force`, so `git diff` stays a usable review of what it wrote.
 
 <h2 id="bindings">Bindings and errors</h2>
 
