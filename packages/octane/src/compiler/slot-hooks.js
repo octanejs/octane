@@ -1257,8 +1257,10 @@ export function slotHooks(source, id, options) {
 	const importInfo = octaneHookLocals(
 		ast,
 		options?.nativeReads === true,
-		// The bundler claims both pragmas for Octane (see pragmaOwnedModules).
-		['octane', 'octane/strong'].includes(findLeadingJsxImportSourcePragma(source)),
+		// The bundler claims both pragmas for Octane (see pragmaOwnedModules) and
+		// passes `owned` for the application's modules, which need neither.
+		options?.owned === true ||
+			['octane', 'octane/strong'].includes(findLeadingJsxImportSourcePragma(source)),
 	);
 	if (strongHookAnalysis?.callNames.size)
 		importInfo.importsHook ||= [...strongHookAnalysis.callNames.values()].some((name) =>

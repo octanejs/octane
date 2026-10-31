@@ -998,7 +998,7 @@ class OctaneBundlerCompiler {
 		return isPathInside(this.root, absoluteFile) || isPathInside(this.realRoot, absoluteFile);
 	}
 
-	_hasApplicationStrongPolicy(file, collected) {
+	_isApplicationSource(file, collected) {
 		if (!this._isProjectOwnedSource(file)) return false;
 		const absoluteFile = nodePath.isAbsolute(file)
 			? nodePath.resolve(file)
@@ -1031,7 +1031,7 @@ class OctaneBundlerCompiler {
 		const file = cleanModuleId(id);
 		const config =
 			this.defaults.strong === true &&
-			this._hasApplicationStrongPolicy(file, {
+			this._isApplicationSource(file, {
 				dependencies: new Set(),
 				missingDependencies: new Set(),
 			});
@@ -1567,7 +1567,7 @@ class OctaneBundlerCompiler {
 		// directive, which the authored-source compiler resolves separately.
 		const strong =
 			(options.strong ?? this.defaults.strong) === true &&
-			this._hasApplicationStrongPolicy(file, collected);
+			this._isApplicationSource(file, collected);
 		const universalRuntime = normalizeUniversalRuntime(
 			options.universalRuntime ?? this.defaults.universalRuntime,
 		);
@@ -1816,7 +1816,6 @@ class OctaneBundlerCompiler {
 				}
 				return passThrough();
 			}
-			const hasHookRuntimeImport = importsHookRuntime(code);
 			// Hook slotting is an Octane-ownership rewrite, so the ownership
 			// gate applies to it exactly as to full compilation: an unmarked
 			// project module stays with the host pipeline (with the forgotten-
@@ -1826,13 +1825,13 @@ class OctaneBundlerCompiler {
 				return passThrough();
 			}
 			const manualSlots = this._hasManualHookSlots(file, collected);
-			if (
-				!hasHookRuntimeImport &&
-				!manualSlots &&
-				!pragmaOwned &&
-				!this._pragmaClaimsOwnership(code)
-			)
-				return passThrough();
+			// The application's own modules are Octane's, as its `.tsx` are, so they
+			// slot custom-hook calls without importing Octane: a hook composed only
+			// of other hooks keeps one instance per call. A package, installed or
+			// nested in the root, still needs the import or pragma, since its plain
+			// modules may implement hooks with authored slots, as Octane's runtime does.
+			const owned = this._pragmaClaimsOwnership(code) || this._isApplicationSource(file, collected);
+			if (!importsHookRuntime(code) && !manualSlots && !owned) return passThrough();
 			if (output === 'ts' && !manualSlots) {
 				// The cheap ownership regex also matches documentation examples. A
 				// full compile needs a real import (or an explicit ownership pragma).
@@ -1878,7 +1877,7 @@ class OctaneBundlerCompiler {
 				profile,
 				profileFilename,
 				inlineHookMemo: inlinePlainMemo,
-				...(manualSlots ? { manualSlots: true } : null),
+				...(manualSlots ? { manualSlots: true } : owned ? { owned: true } : null),
 				...(strong ? { strong: true } : null),
 				renderer,
 				...(specializeVoidRoot
