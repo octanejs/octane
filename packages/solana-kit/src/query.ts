@@ -1,7 +1,6 @@
-import { useQuery } from '@octanejs/tanstack-query';
-import type { UseQueryOptions, UseQueryResult } from '@octanejs/tanstack-query';
+import { skipToken, useQuery } from '@octanejs/tanstack-query';
+import type { QueryKey, UseQueryOptions, UseQueryResult } from '@octanejs/tanstack-query';
 import type { ReactiveActionSource } from '@solana/kit';
-import { skipToken, type QueryKey } from '@tanstack/query-core';
 import { useCallback, useRef } from 'octane';
 
 const subCache = new Map<symbol, Map<string, symbol>>();

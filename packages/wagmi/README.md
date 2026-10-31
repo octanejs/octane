@@ -9,7 +9,9 @@ npm install @octanejs/wagmi @octanejs/tanstack-query @tanstack/query-core viem
 pnpm add @octanejs/wagmi @octanejs/tanstack-query @tanstack/query-core viem
 ```
 
-As in `wagmi`, `viem` is a peer dependency. `@tanstack/query-core` is one too,
+As in `wagmi`, `viem` is a peer dependency, and so is `@octanejs/tanstack-query`,
+the counterpart of its `@tanstack/react-query` peer, so the hooks read the
+application's `QueryClientProvider`. `@tanstack/query-core` is a peer too,
 because `@wagmi/core/query` imports it as an optional peer of its own.
 
 ```tsrx

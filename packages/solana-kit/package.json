@@ -43,17 +43,21 @@
     "typecheck": "octane-tsc -p tsconfig.json -p typetests/tsconfig.json && tsc --noEmit -p audit/upstream-typetests/tsconfig.json",
     "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs"
   },
-  "dependencies": {
-    "@octanejs/tanstack-query": "workspace:*",
-    "@tanstack/query-core": "catalog:default"
-  },
   "peerDependencies": {
+    "@octanejs/tanstack-query": "workspace:*",
     "@solana/kit": "^7.0.0",
     "octane": "workspace:^0.16.0"
   },
+  "peerDependenciesMeta": {
+    "@octanejs/tanstack-query": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@octanejs/tanstack-query": "workspace:*",
     "@solana/kit": "7.0.0",
     "@solana/react": "7.0.0",
+    "@tanstack/query-core": "catalog:default",
     "@tanstack/react-query": "catalog:default",
     "@testing-library/react": "catalog:livestore-react-oracle",
     "@types/react": "catalog:livestore-react-oracle",
