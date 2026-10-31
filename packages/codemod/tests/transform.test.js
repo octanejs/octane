@@ -437,6 +437,54 @@ describe('transformModule', () => {
 		expect([named.code.includes('onInput'), named.notes]).toEqual([false, []]);
 	});
 
+	it("treats Base UI's text fields as text fields, through a wrapper's nested rest too", () => {
+		// Base UI's `Input` renders an `<input>` and hands it the `onChange` it gets.
+		const wrapper = transformModule(
+			[
+				"import { Input as InputPrimitive } from '@base-ui/react/input';",
+				"import { Field } from '@base-ui/react/field';",
+				'export function Input({ nativeInput, ...props }: InputPrimitive.Props & { nativeInput?: boolean }) {',
+				'\tif (nativeInput) {',
+				'\t\tconst { style, ...native } = props;',
+				'\t\treturn <input {...(native as React.ComponentProps<"input">)} />;',
+				'\t}',
+				'\treturn <InputPrimitive data-slot="input" {...props} />;',
+				'}',
+				'export function Name({ name, set }: { name: string; set(v: string): void }) {',
+				'\treturn <Field.Control value={name} onChange={(e) => set(e.currentTarget.value)} />;',
+				'}',
+				'',
+			].join('\n'),
+			'input.tsx',
+		);
+		expect(wrapper.notes).toEqual([]);
+		// Taken where the component receives it, so both fields still get it.
+		expect(wrapper.code).toContain('export function Input({ nativeInput, onChange, ...props }');
+		expect(wrapper.code).toContain('const { style, ...native } = props;');
+		expect(wrapper.code).toContain(
+			'<input onInput={onChange} {...(native as ComponentProps<"input">)} />',
+		);
+		expect(wrapper.code).toContain(
+			'<InputPrimitive data-slot="input" onInput={onChange} {...props} />',
+		);
+		expect(wrapper.code).toContain(
+			'<Field.Control value={name} onInput={(e) => set(e.currentTarget.value)} />',
+		);
+		// A nested pattern that takes `onChange` itself keeps the parent's rest whole.
+		const named = transformModule(
+			[
+				"import { Input } from '@base-ui/react';",
+				'export function F({ id, ...props }: Input.Props) {',
+				'\tconst { onChange: _, ...rest } = props;',
+				'\treturn <Input {...rest} />;',
+				'}',
+				'',
+			].join('\n'),
+			'f.tsx',
+		);
+		expect(named.code).not.toContain('onInput');
+	});
+
 	it('reads `target` as `currentTarget` on a handler typed for any form control', () => {
 		const source =
 			'export function F({ set }: { set(v: string): void }) {\n\tconst on = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => set(e.target.value);\n\treturn <textarea onInput={on} />;\n}\n';
@@ -539,6 +587,28 @@ describe('transformModule', () => {
 			resolveSpecifier: (specifier) => (specifier === './box' ? './box.tsrx' : null),
 		});
 		expect(code).toContain("Boxed = import('./box.tsrx').Box<import('octane').OctaneNode>;");
+	});
+
+	it("gives a JSX runtime consumer `createElement` for React's `jsx` and `jsxs`", () => {
+		const source = [
+			"import { toJsxRuntime } from 'hast-util-to-jsx-runtime';",
+			"import { Fragment, jsx, jsxs as many } from 'react/jsx-runtime';",
+			'export const render = (tree: any) => toJsxRuntime(tree, { Fragment, jsx, jsxs: many });',
+			'',
+		].join('\n');
+		const { code, notes } = transformModule(source, 'render.ts');
+		expect(notes).toEqual([]);
+		expect(code).not.toContain('react/jsx-runtime');
+		expect(code).toContain("import { Fragment, createElement } from 'octane';");
+		// React's runtime takes the key apart from the props; Octane's reads it from them.
+		expect(code).toContain(
+			'function jsx(type: Parameters<typeof createElement>[0], props: Record<string, unknown>, key?: string | number) {\n  return createElement(type, key === undefined ? props : { ...props, key });\n}\nconst many = jsx;',
+		);
+		const js = transformModule(
+			"import { jsx } from 'react/jsx-runtime';\nexport const p = jsx('p', {}, 'k');\n",
+			'p.js',
+		);
+		expect(js.code).toContain('function jsx(type, props, key) {');
 	});
 
 	it('rewrites self-closing context providers', () => {

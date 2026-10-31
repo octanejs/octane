@@ -99,7 +99,21 @@ if (findings.length > 0) {
 }
 if (result.packages.length > 0) {
 	process.stdout.write(`\n${colors.bold('Dependencies')}\n`);
-	for (const { from, to } of result.packages) process.stdout.write(`  ${from} → ${to}\n`);
+	const ranges = new Map(result.dependencies.map(({ name, range }) => [name, range]));
+	for (const { from, to } of result.packages) {
+		const range = ranges.get(to);
+		process.stdout.write(`  ${from} → ${to}${range ? colors.dim(` ${range}`) : ''}\n`);
+	}
+	if (ranges.size > 0) {
+		process.stdout.write(
+			colors.dim(`  ${dryRun ? 'Would add' : 'Added'} ${ranges.size} to package.json\n`),
+		);
+	}
+	for (const { name, patch } of result.patched) {
+		process.stdout.write(
+			`  ${colors.yellow('warning')} ${name} is patched by ${patch}, which does not apply to its binding: port the patch there.\n`,
+		);
+	}
 }
 if (result.missing.length > 0) {
 	process.stdout.write(
@@ -127,7 +141,9 @@ const summary = [
 ].filter(Boolean);
 process.stdout.write(`\n${summary.join(', ')}${dryRun ? colors.dim(' (dry run)') : ''}\n`);
 if (changed.length > 0 && !dryRun) {
-	const root = path.relative(process.cwd(), result.root) || '.';
+	// A project outside this directory is named in full, not by `../` steps.
+	const relative = path.relative(process.cwd(), result.root);
+	const root = relative.startsWith('..') ? result.root : relative || '.';
 	process.stdout.write(
 		colors.dim(`Next: run \`npx @octanejs/cli init\` in ${root} to wire Octane into the build.\n`),
 	);
