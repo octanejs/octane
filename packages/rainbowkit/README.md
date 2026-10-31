@@ -8,6 +8,10 @@ npm install @octanejs/rainbowkit @octanejs/wagmi @octanejs/tanstack-query viem
 pnpm add @octanejs/rainbowkit @octanejs/wagmi @octanejs/tanstack-query viem
 ```
 
+As `wagmi` and `@tanstack/react-query` are for RainbowKit, `@octanejs/wagmi` and
+`@octanejs/tanstack-query` are peer dependencies, so the components read the
+application's `WagmiProvider` and `QueryClientProvider`.
+
 ```tsrx
 import { QueryClient, QueryClientProvider } from '@octanejs/tanstack-query';
 import { WagmiProvider, createConfig, http } from '@octanejs/wagmi';
