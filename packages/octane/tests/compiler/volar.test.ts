@@ -51,6 +51,50 @@ function writeOctaneJsxRuntimeStub(root: string, intrinsics: string): void {
 }
 
 /**
+ * Type-check virtual TSX files, keyed by name, against this package's own
+ * `octane` types, and return each file's TypeScript diagnostic codes.
+ */
+function virtualTsxDiagnostics(files: Record<string, string>): Record<string, number[]> {
+	const root = mkdtempSync(join(tmpdir(), 'octane-volar-check-'));
+	try {
+		mkdirSync(join(root, 'node_modules'));
+		symlinkSync(
+			fileURLToPath(new URL('../..', import.meta.url)),
+			join(root, 'node_modules/octane'),
+			'dir',
+		);
+		const paths = Object.keys(files).map((name) => {
+			const path = join(root, `${name}.tsx`);
+			writeFileSync(path, files[name]);
+			return path;
+		});
+		const program = ts.createProgram({
+			rootNames: paths,
+			options: {
+				jsx: ts.JsxEmit.Preserve,
+				module: ts.ModuleKind.ESNext,
+				moduleResolution: ts.ModuleResolutionKind.Bundler,
+				noEmit: true,
+				skipLibCheck: true,
+				strict: true,
+				target: ts.ScriptTarget.ESNext,
+				types: [],
+			},
+		});
+		return Object.fromEntries(
+			Object.keys(files).map((name, index) => [
+				name,
+				ts
+					.getPreEmitDiagnostics(program, program.getSourceFile(paths[index]))
+					.map(({ code }) => code),
+			]),
+		);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+}
+
+/**
  * Volar mappings tests. We exercise the IDE-facing virtual-TSX pipeline:
  *   - Returns a `VolarMappingsResult` plus Octane's non-fatal diagnostics.
  *   - Generates TSX (`code`) containing the user identifiers (so TypeScript's
@@ -2054,47 +2098,17 @@ export function Greeting({ user }: { user?: { name?: string } }) @{
 `;
 		// The row keeps its element type rather than widening to `any`.
 		const invalidRows = rows.replace('row.user.name.toUpperCase()', 'row.user.label.toUpperCase()');
-		const root = mkdtempSync(join(tmpdir(), 'octane-volar-arm-exits-'));
-		try {
-			mkdirSync(join(root, 'node_modules'));
-			symlinkSync(
-				fileURLToPath(new URL('../..', import.meta.url)),
-				join(root, 'node_modules/octane'),
-				'dir',
-			);
-			const valid = compileToVolarMappings(rows, '/src/Rows.tsrx');
-			const invalid = compileToVolarMappings(invalidRows, '/src/Invalid.tsrx');
-			expect(valid.errors).toEqual([]);
-			expect(invalid.errors).toEqual([]);
-			const files = {
-				valid: join(root, 'Rows.tsx'),
-				inspection: join(root, 'Rows.inspection.tsx'),
-				invalid: join(root, 'Invalid.tsx'),
-			};
-			writeFileSync(files.valid, valid.code);
-			writeFileSync(files.inspection, compileTypesInspection(rows, '/src/Rows.tsrx').code);
-			writeFileSync(files.invalid, invalid.code);
-			const program = ts.createProgram({
-				rootNames: Object.values(files),
-				options: {
-					jsx: ts.JsxEmit.Preserve,
-					module: ts.ModuleKind.ESNext,
-					moduleResolution: ts.ModuleResolutionKind.Bundler,
-					noEmit: true,
-					skipLibCheck: true,
-					strict: true,
-					target: ts.ScriptTarget.ESNext,
-					types: [],
-				},
-			});
-			const codes = (file: string) =>
-				ts.getPreEmitDiagnostics(program, program.getSourceFile(file)).map(({ code }) => code);
-			expect(codes(files.valid)).toEqual([]);
-			expect(codes(files.inspection)).toEqual([]);
-			expect(codes(files.invalid)).toEqual([2339]);
-		} finally {
-			rmSync(root, { recursive: true, force: true });
-		}
+		const valid = compileToVolarMappings(rows, '/src/Rows.tsrx');
+		const invalid = compileToVolarMappings(invalidRows, '/src/Invalid.tsrx');
+		expect(valid.errors).toEqual([]);
+		expect(invalid.errors).toEqual([]);
+		expect(
+			virtualTsxDiagnostics({
+				Rows: valid.code,
+				Inspection: compileTypesInspection(rows, '/src/Rows.tsrx').code,
+				Invalid: invalid.code,
+			}),
+		).toEqual({ Rows: [], Inspection: [], Invalid: [2339] });
 
 		// A value return has nothing to render in the row's place, and compiling
 		// rejects it, so the editor still reports it.
@@ -2105,6 +2119,90 @@ export function Greeting({ user }: { user?: { name?: string } }) @{
 			'/src/ValueReturn.tsrx',
 		);
 		expect(valueReturn.errors.map(({ code }) => code)).toEqual(['TSRX2005']);
+	});
+
+	it('types arm exits in component children and nested fragments as exits', () => {
+		// A component's children and a fragment below the root are templates in
+		// expression position, where the shared transform reads `return value;` as
+		// the template's own value. An arm's `return null;` exit made it print the
+		// children unlowered, and the type view threw on source that compiles.
+		const source = `import type { OctaneNode } from 'octane';
+type Row = { id: string; kind: number; user?: { name: string } };
+function Panel(props: { children?: OctaneNode }) @{
+	<div>{props.children}</div>
+}
+export function Rows({ rows }: { rows: Row[] }) @{
+	<Panel>
+		@for (const row of rows; key row.id) {
+			if (!row.user) return null;
+			<li>{row.user.name.toUpperCase()}</li>
+		}
+	</Panel>
+}
+export function First({ row }: { row?: Row }) @{
+	<>
+		<span />
+		<>
+			@if (row) {
+				if (!row.user) return null;
+				<b>{row.user.name.toUpperCase()}</b>
+			}
+			@switch (row?.kind) {
+				@case 1: {
+					if (!row?.user) return null;
+					<i>{row.user.name.toUpperCase()}</i>
+				}
+				@default: { <i /> }
+			}
+		</>
+	</>
+}
+`;
+		// Each arm keeps its types and the exit's narrowing.
+		const invalidSource = source.replaceAll('row.user.name', 'row.user.label');
+		const valid = compileToVolarMappings(source, '/src/Rows.tsrx');
+		const invalid = compileToVolarMappings(invalidSource, '/src/Invalid.tsrx');
+		expect(valid.errors).toEqual([]);
+		expect(invalid.errors).toEqual([]);
+		expect(
+			virtualTsxDiagnostics({
+				Rows: valid.code,
+				Inspection: compileTypesInspection(source, '/src/Rows.tsrx').code,
+				Invalid: invalid.code,
+			}),
+		).toEqual({ Rows: [], Inspection: [], Invalid: [2339, 2339, 2339] });
+	});
+
+	it('checks props against explicit JSX element type arguments', () => {
+		// The editor parser read every token after the first in `<Select<…>` as
+		// template text, so a union, a second argument or an object type threw on
+		// source that compiles. Kept, the arguments check the props instead of
+		// being inferred from them.
+		const source = `function Select<A, B = never>(props: { value: A; other?: B }) @{
+	<span>{String(props.value) as string}</span>
+}
+export function App() @{
+	<div>
+		<Select<string | null> value={null} />
+		<Select<string, boolean> value="a" other={true} />
+		<Select<{ a: string }> value={{ a: 'b' }} />
+		<Select<Array<string | null>> value={[null]} />
+	</div>
+}
+`;
+		const invalidSource = source
+			.replace('value={null}', 'value={1}')
+			.replace('other={true}', 'other={1}')
+			.replace("{ a: 'b' }", '{ a: 1 }')
+			.replace('[null]', '[1]');
+		const valid = compileToVolarMappings(source, '/src/App.tsrx');
+		const invalid = compileToVolarMappings(invalidSource, '/src/Invalid.tsrx');
+		expect(valid.errors).toEqual([]);
+		expect(invalid.errors).toEqual([]);
+		expect(virtualTsxDiagnostics({ App: valid.code, Invalid: invalid.code })).toEqual({
+			App: [],
+			Invalid: [2322, 2322, 2322, 2322],
+		});
 	});
 
 	describe('Valdi directive arm exits', () => {
