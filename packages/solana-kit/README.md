@@ -11,6 +11,13 @@ pnpm add @octanejs/solana-kit
 
 Use `@solana/kit` directly for addresses, codecs, RPC, signers, transaction messages, submission, and confirmation. This package is the reactive UI seam; it does not wrap or re-export Kit.
 
+`@octanejs/solana-kit/query` also needs `@octanejs/tanstack-query`. Like `@tanstack/react-query` for `@solana/react/query`, it is an optional peer dependency, so `useRequestQuery` reads the application's `QueryClientProvider`:
+
+```sh
+npm install @octanejs/solana-kit @octanejs/tanstack-query
+pnpm add @octanejs/solana-kit @octanejs/tanstack-query
+```
+
 ## Supported
 
 - `ClientProvider`, `ClientContext`, `useClient`, `useClientCapability`, and `createClientStore`

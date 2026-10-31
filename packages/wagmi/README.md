@@ -9,6 +9,9 @@ npm install @octanejs/wagmi @octanejs/tanstack-query viem
 pnpm add @octanejs/wagmi @octanejs/tanstack-query viem
 ```
 
+As `@tanstack/react-query` is for `wagmi`, `@octanejs/tanstack-query` is a peer
+dependency, so the hooks read the application's `QueryClientProvider`.
+
 ```tsrx
 import { QueryClient, QueryClientProvider } from '@octanejs/tanstack-query';
 import { WagmiProvider, createConfig, http, useConnect, useConnection } from '@octanejs/wagmi';

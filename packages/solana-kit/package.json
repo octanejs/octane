@@ -44,15 +44,21 @@
     "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs"
   },
   "dependencies": {
-    "@solana/kit": "7.0.0",
-    "@octanejs/tanstack-query": "workspace:*",
-    "@tanstack/query-core": "catalog:default"
+    "@solana/kit": "7.0.0"
   },
   "peerDependencies": {
+    "@octanejs/tanstack-query": "workspace:*",
     "octane": "workspace:^0.16.0"
   },
+  "peerDependenciesMeta": {
+    "@octanejs/tanstack-query": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@octanejs/tanstack-query": "workspace:*",
     "@solana/react": "7.0.0",
+    "@tanstack/query-core": "catalog:default",
     "@tanstack/react-query": "catalog:default",
     "@testing-library/react": "catalog:livestore-react-oracle",
     "@types/react": "catalog:livestore-react-oracle",

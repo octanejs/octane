@@ -8995,22 +8995,22 @@ importers:
 
   packages/solana-kit:
     dependencies:
-      '@octanejs/tanstack-query':
-        specifier: workspace:*
-        version: link:../tanstack-query
       '@solana/kit':
         specifier: 7.0.0
         version: 7.0.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)
-      '@tanstack/query-core':
-        specifier: catalog:default
-        version: 5.102.8
     devDependencies:
+      '@octanejs/tanstack-query':
+        specifier: workspace:*
+        version: link:../tanstack-query
       '@solana/react':
         specifier: 7.0.0
         version: 7.0.0(@solana/kit@7.0.0(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10))(@tanstack/react-query@5.102.8(react@19.2.3))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
       '@solana/wallet-standard-features':
         specifier: 1.4.0
         version: 1.4.0
+      '@tanstack/query-core':
+        specifier: catalog:default
+        version: 5.102.8
       '@tanstack/react-query':
         specifier: catalog:default
         version: 5.102.8(react@19.2.3)
@@ -10741,9 +10741,6 @@ importers:
 
   packages/wagmi:
     dependencies:
-      '@octanejs/tanstack-query':
-        specifier: workspace:*
-        version: link:../tanstack-query
       '@tanstack/query-core':
         specifier: catalog:default
         version: 5.102.8
@@ -10757,6 +10754,9 @@ importers:
         specifier: catalog:default
         version: 2.55.10(bufferutil@4.1.0)(typescript@5.9.3)(utf-8-validate@5.0.10)(zod@4.6.2)
     devDependencies:
+      '@octanejs/tanstack-query':
+        specifier: workspace:*
+        version: link:../tanstack-query
       '@tanstack/react-query':
         specifier: catalog:default
         version: 5.102.8(react@19.2.7)
