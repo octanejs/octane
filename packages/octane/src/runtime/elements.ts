@@ -69,9 +69,9 @@ function initializeActivitySentinel(): symbol {
 
 /** Activity keeps its runtime sentinel identity while accepting ordinary JSX props. */
 export const Activity = /* @__PURE__ */ initializeActivitySentinel() as unknown as (props: {
-	mode?: 'visible' | 'hidden';
+	mode?: 'visible' | 'hidden' | undefined;
 	children?: unknown;
-	name?: string;
+	name?: string | undefined;
 	key?: string | number | bigint | null | undefined;
 }) => unknown;
 

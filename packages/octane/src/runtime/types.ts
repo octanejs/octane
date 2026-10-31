@@ -675,15 +675,20 @@ export interface SlotNext {
 	bound: any[] | null;
 }
 
+type ViewTransitionCallback = (
+	instance: ViewTransitionInstance,
+	types: string[],
+) => void | (() => void);
+
 export interface ViewTransitionProps {
-	name?: string;
+	name?: string | undefined;
 	/** Create an element scope from one persistent host. Omitted boundaries inherit their scope. */
-	scope?: 'element';
-	ref?: ViewTransitionRef;
-	enter?: ViewTransitionClassValue;
-	exit?: ViewTransitionClassValue;
-	update?: ViewTransitionClassValue;
-	share?: ViewTransitionClassValue;
+	scope?: 'element' | undefined;
+	ref?: ViewTransitionRef | undefined;
+	enter?: ViewTransitionClassValue | undefined;
+	exit?: ViewTransitionClassValue | undefined;
+	update?: ViewTransitionClassValue | undefined;
+	share?: ViewTransitionClassValue | undefined;
 	/**
 	 * Parent enter/exit relays (React's enableViewTransitionParentEnterExit —
 	 * experimental-channel behavior): a nested boundary inside a unit that
@@ -692,15 +697,15 @@ export interface ViewTransitionProps {
 	 * or the matching handler, not resolving 'none') and the unit's outermost
 	 * boundary genuinely enters/exits (not 'none', not consumed by a share).
 	 */
-	parentEnter?: ViewTransitionClassValue;
-	parentExit?: ViewTransitionClassValue;
-	default?: ViewTransitionClassValue;
-	onEnter?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
-	onExit?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
-	onUpdate?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
-	onShare?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
-	onParentEnter?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
-	onParentExit?: (instance: ViewTransitionInstance, types: string[]) => void | (() => void);
+	parentEnter?: ViewTransitionClassValue | undefined;
+	parentExit?: ViewTransitionClassValue | undefined;
+	default?: ViewTransitionClassValue | undefined;
+	onEnter?: ViewTransitionCallback | undefined;
+	onExit?: ViewTransitionCallback | undefined;
+	onUpdate?: ViewTransitionCallback | undefined;
+	onShare?: ViewTransitionCallback | undefined;
+	onParentEnter?: ViewTransitionCallback | undefined;
+	onParentExit?: ViewTransitionCallback | undefined;
 	children?: unknown;
 }
 export type Phase = 0 | 1 | 2;
