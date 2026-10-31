@@ -116,9 +116,15 @@
       "types": "./src/compiler/index.d.ts",
       "default": "./src/compiler/index.js"
     },
-    "./compiler/bundler": "./src/compiler/bundler.js",
+    "./compiler/bundler": {
+      "types": "./src/compiler/bundler.d.ts",
+      "default": "./src/compiler/bundler.js"
+    },
     "./compiler/register": "./src/compiler/register.js",
-    "./compiler/renderers": "./src/compiler/renderers.js",
+    "./compiler/renderers": {
+      "types": "./src/compiler/renderers.d.ts",
+      "default": "./src/compiler/renderers.js"
+    },
     "./compiler/typescript": {
       "types": "./src/compiler/typescript.d.ts",
       "default": "./src/compiler/typescript.js"
@@ -407,9 +413,15 @@
         "types": "./dist/compiler/index.d.ts",
         "default": "./dist/compiler/index.js"
       },
-      "./compiler/bundler": "./dist/compiler/bundler.js",
+      "./compiler/bundler": {
+        "types": "./dist/compiler/bundler.d.ts",
+        "default": "./dist/compiler/bundler.js"
+      },
       "./compiler/register": "./dist/compiler/register.js",
-      "./compiler/renderers": "./dist/compiler/renderers.js",
+      "./compiler/renderers": {
+        "types": "./dist/compiler/renderers.d.ts",
+        "default": "./dist/compiler/renderers.js"
+      },
       "./compiler/typescript": {
         "types": "./dist/compiler/typescript.d.ts",
         "default": "./dist/compiler/typescript.js"

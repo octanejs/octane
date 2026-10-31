@@ -2,7 +2,6 @@
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
 import { loadOctaneConfig } from '@octanejs/app-core/config-loader';
-// @ts-expect-error The JavaScript-only bundler API has no declarations.
 import { createOctaneCompiler } from 'octane/compiler/bundler';
 // @ts-expect-error The CLI's internal project detector has no declarations.
 import { detectProject } from '../../packages/cli/src/kernel/project.js';

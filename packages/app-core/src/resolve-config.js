@@ -265,7 +265,10 @@ export function resolveOctaneConfig(raw, options = {}) {
 		adapter: raw.adapter,
 		compiler: {
 			strong: raw.compiler?.strong ?? false,
-			renderers: normalizeRendererConfig(raw.compiler?.renderers),
+			// App config declares no Valdi target, so its normalized form has none.
+			renderers: /** @type {ResolvedOctaneConfig['compiler']['renderers']} */ (
+				normalizeRendererConfig(raw.compiler?.renderers)
+			),
 		},
 		router: {
 			routes: raw.router?.routes ?? [],
