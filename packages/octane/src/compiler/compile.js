@@ -17023,7 +17023,9 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	let keyExpr = null;
 	for (const attr of attrs) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
-			propNodes.push(b.spread(tsrxExprNode(attr.argument, ctx, name, inlinedSubs)));
+			propNodes.push(
+				b.spread(tsrxExprNode(rewriteJsxValues(attr.argument, ctx), ctx, name, inlinedSubs)),
+			);
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
@@ -36604,7 +36606,11 @@ function makeCompCall(
 	for (const attr of attrs) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
 			hasSpreadProp = true;
-			propNodes.push(b.spread(tsrxExprNode(attr.argument, ctx, componentName, inlinedSubs)));
+			propNodes.push(
+				b.spread(
+					tsrxExprNode(rewriteJsxValues(attr.argument, ctx), ctx, componentName, inlinedSubs),
+				),
+			);
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;

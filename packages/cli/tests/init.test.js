@@ -906,6 +906,26 @@ describe('octane init', () => {
 		expect(tsconfig).toContain('"jsxImportSource": "octane"');
 	});
 
+	it('turns off the import rewriting a base tsconfig enables, which rejects .tsrx imports', async () => {
+		// TypeScript reports TS2876 for each relative `.tsrx` import it is asked
+		// to rewrite; the bundler emits the app, so no rewrite is lost.
+		const { root } = fixture({
+			'tsconfig.base.json': {
+				compilerOptions: { noEmit: true, rewriteRelativeImportExtensions: true },
+			},
+			'tsconfig.json': { extends: './tsconfig.base.json', compilerOptions: { strict: true } },
+		});
+
+		await runCli(['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install'], {
+			exec: gitExec(),
+		});
+
+		expect(JSON.parse(read(root, 'tsconfig.json')).compilerOptions).toMatchObject({
+			jsxImportSource: 'octane',
+			rewriteRelativeImportExtensions: false,
+		});
+	});
+
 	it('never overwrites a script the project already defines', async () => {
 		const { root } = fixture({
 			'package.json': { name: 'app', scripts: { build: 'my-custom-build' } },
@@ -918,6 +938,29 @@ describe('octane init', () => {
 		const scripts = JSON.parse(read(root, 'package.json')).scripts;
 		expect(scripts.build).toBe('my-custom-build');
 		expect(scripts.dev).toBe('vite');
+	});
+
+	it('adds no script that shadows a Vite+ task, and names the command the task needs', async () => {
+		// `vp run` refuses a package.json script named like a task in the config.
+		const { root } = fixture({
+			'vite.config.ts': [
+				"import { defineConfig } from 'vite-plus';",
+				'export default defineConfig({',
+				"  run: { tasks: { typecheck: { command: 'tsc --noEmit' } } },",
+				'});',
+				'',
+			].join('\n'),
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(JSON.parse(read(root, 'package.json')).scripts?.typecheck).toBeUndefined();
+		expect(result.json().manual.join('\n')).toContain(
+			'make that task run `tsrx-tsc --noEmit -p tsconfig.json`',
+		);
 	});
 
 	it('reports the edit for an existing bundler config instead of rewriting it', async () => {
@@ -936,6 +979,34 @@ describe('octane init', () => {
 
 		expect(read(root, 'vite.config.ts')).toBe(original);
 		expect(result.json().manual.join(' ')).toContain('octane/compiler/vite');
+	});
+
+	it('names the React plugin and the route generator a Vite+ config must give up', async () => {
+		const original = [
+			"import react from '@vitejs/plugin-react';",
+			"import { tanstackRouter } from '@tanstack/router-plugin/vite';",
+			"import { defineConfig } from 'vite-plus';",
+			'export default defineConfig({',
+			'  plugins: [tanstackRouter({ autoCodeSplitting: true }), react({ compiler: true })],',
+			'});',
+			'',
+		].join('\n');
+		const { root } = fixture({
+			'vite.config.ts': original,
+			'src/routes/index.tsrx': 'export function Home() @{\n  <p />\n}\n',
+		});
+
+		const result = await runCli(
+			['init', '--cwd', root, '--mode', 'spa', '--yes', '--no-install', '--json'],
+			{ exec: gitExec() },
+		);
+
+		expect(read(root, 'vite.config.ts')).toBe(original);
+		const manual = result.json().manual.join('\n');
+		// Both plugins would compile the same JSX, React's for React.
+		expect(manual).toContain('replace react() from @vitejs/plugin-react with octane()');
+		// TanStack's generator finds no .tsrx route, so a regenerated tree drops them all.
+		expect(manual).toContain('enableRouteGeneration: false');
 	});
 
 	it("advises the plugin for the project's own bundler, not always Vite", async () => {
