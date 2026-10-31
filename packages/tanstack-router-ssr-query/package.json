@@ -16,17 +16,18 @@
     "typecheck": "octane-tsc -p tsconfig.octane.json"
   },
   "dependencies": {
-    "@tanstack/router-ssr-query-core": "1.169.3",
-    "@tanstack/query-core": "catalog:default"
+    "@tanstack/router-ssr-query-core": "1.169.3"
   },
   "peerDependencies": {
     "@octanejs/tanstack-query": "workspace:*",
     "@octanejs/tanstack-router": "workspace:*",
+    "@tanstack/query-core": "^5.102.8",
     "octane": "workspace:^0.16.0"
   },
   "devDependencies": {
     "@octanejs/tanstack-query": "workspace:*",
     "@octanejs/tanstack-router": "workspace:*",
+    "@tanstack/query-core": "catalog:default",
     "@tanstack/react-query": "catalog:default",
     "@tanstack/react-router": "catalog:default",
     "@tanstack/react-router-ssr-query": "1.167.3",

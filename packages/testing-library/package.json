@@ -40,13 +40,12 @@
   "scripts": {
     "test": "vitest run"
   },
-  "dependencies": {
-    "@testing-library/dom": "catalog:default"
-  },
   "peerDependencies": {
+    "@testing-library/dom": "^10.4.1",
     "octane": "workspace:^0.16.0"
   },
   "devDependencies": {
+    "@testing-library/dom": "catalog:default",
     "@testing-library/user-event": "^14.6.1",
     "esbuild": "catalog:default",
     "octane": "workspace:*",

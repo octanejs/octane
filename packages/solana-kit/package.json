@@ -44,14 +44,15 @@
     "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs"
   },
   "dependencies": {
-    "@solana/kit": "7.0.0",
     "@octanejs/tanstack-query": "workspace:*",
     "@tanstack/query-core": "catalog:default"
   },
   "peerDependencies": {
+    "@solana/kit": "^7.0.0",
     "octane": "workspace:^0.16.0"
   },
   "devDependencies": {
+    "@solana/kit": "7.0.0",
     "@solana/react": "7.0.0",
     "@tanstack/react-query": "catalog:default",
     "@testing-library/react": "catalog:livestore-react-oracle",

@@ -548,6 +548,8 @@ async function validatePackedConsumer(tempRoot, archives, packedManifests) {
 					'@apollo/client': '4.2.6',
 					...archiveSpecs,
 					'@types/three': '0.172.0',
+					'alien-signals': '3.2.1',
+					dexie: '4.4.7',
 					graphql: '^16.11.0',
 					rxjs: '^7.8.2',
 					three: '0.172.0',
@@ -1087,12 +1089,22 @@ process.stdout.write(JSON.stringify(result));`,
 			`Three binding resolved a second Octane runtime:\n  app: ${directRuntime}\n  binding: ${threePeerRuntime}`,
 		);
 	}
-	const directThree = realpathSync(consumerRequire.resolve('three'));
-	const peerThree = realpathSync(threeRequire.resolve('three'));
-	if (peerThree !== directThree) {
-		throw new Error(
-			`Three binding resolved a second Three runtime:\n  app: ${directThree}\n  binding: ${peerThree}`,
-		);
+	// Each binding peers on the library the application installs. The consumer's
+	// Dexie is newer than the release the binding tests with: a binding that
+	// installed its own copy would load a second Dexie, which throws "Two
+	// different versions of Dexie loaded in the same app" at import.
+	for (const [binding, library] of [
+		['@octanejs/alien-signals', 'alien-signals'],
+		['@octanejs/dexie', 'dexie'],
+		['@octanejs/three', 'three'],
+	]) {
+		const direct = realpathSync(consumerRequire.resolve(library));
+		const nested = realpathSync(createRequire(consumerRequire.resolve(binding)).resolve(library));
+		if (nested !== direct) {
+			throw new Error(
+				`${binding} resolved a second ${library}:\n  app: ${direct}\n  binding: ${nested}`,
+			);
+		}
 	}
 	const virtualStoreEntries = readdirSync(path.join(consumerDirectory, 'node_modules/.pnpm'));
 	const installedRuntimes = virtualStoreEntries.filter((entry) => /^octane@/.test(entry));
