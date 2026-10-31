@@ -39,9 +39,11 @@ describe('published package contract', () => {
 			'@livestore/framework-toolkit',
 			'@livestore/livestore',
 			'@livestore/utils',
-			'@opentelemetry/api',
 		]);
-		expect(Object.keys(manifest.peerDependencies)).toEqual(['octane']);
+		// LiveStore's tracing reads the application's OpenTelemetry API, as in
+		// @livestore/react.
+		expect(manifest.peerDependencies['@opentelemetry/api']).toBe('^1.9.0');
+		expect(Object.keys(manifest.peerDependencies)).toEqual(['@opentelemetry/api', 'octane']);
 		expect(manifest.peerDependencies.octane).toMatch(/^workspace:\^/);
 		const { version } = JSON.parse(await readFile(octanePackagePath, 'utf8')) as {
 			version: string;

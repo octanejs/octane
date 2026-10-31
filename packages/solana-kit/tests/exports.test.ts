@@ -22,8 +22,15 @@ describe('public exports', () => {
 	it('pins one exactly aligned stable v7 Solana package family', () => {
 		const manifest = JSON.parse(
 			readFileSync(resolve(import.meta.dirname, '../package.json'), 'utf8'),
-		) as { dependencies: Record<string, string>; devDependencies: Record<string, string> };
-		expect(manifest.dependencies['@solana/kit']).toBe('7.0.0');
+		) as {
+			dependencies: Record<string, string>;
+			devDependencies: Record<string, string>;
+			peerDependencies: Record<string, string>;
+		};
+		// The application supplies Kit, as for @solana/react; tests run on 7.0.0.
+		expect(manifest.dependencies).not.toHaveProperty('@solana/kit');
+		expect(manifest.peerDependencies['@solana/kit']).toBe('^7.0.0');
+		expect(manifest.devDependencies['@solana/kit']).toBe('7.0.0');
 		expect(manifest.devDependencies['@solana/react']).toBe('7.0.0');
 	});
 });

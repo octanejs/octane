@@ -8,6 +8,10 @@ in a `QueryClientProvider`. Delegates to the framework-agnostic
 ## Installation
 
 ```sh
-npm install @octanejs/tanstack-router-ssr-query @octanejs/tanstack-query @octanejs/tanstack-router
-pnpm add @octanejs/tanstack-router-ssr-query @octanejs/tanstack-query @octanejs/tanstack-router
+npm install @octanejs/tanstack-router-ssr-query @octanejs/tanstack-query @octanejs/tanstack-router @tanstack/query-core
+pnpm add @octanejs/tanstack-router-ssr-query @octanejs/tanstack-query @octanejs/tanstack-router @tanstack/query-core
 ```
+
+As in `@tanstack/react-router-ssr-query`, `@tanstack/query-core` is a peer
+dependency, so `@tanstack/router-ssr-query-core` uses your application's
+TanStack Query core.
