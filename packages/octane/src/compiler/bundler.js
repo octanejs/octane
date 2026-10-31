@@ -265,6 +265,57 @@ function realPathOrSelf(dir) {
 	}
 }
 
+/**
+ * Whether Vite would serve this package as CommonJS: its entry is a `.js` or
+ * `.cjs` file outside a `"type": "module"` scope, and neither a `module` field
+ * nor an `import` condition offers ESM.
+ */
+function servesCommonJs(pkg) {
+	if (pkg.type === 'module' || typeof pkg.module === 'string') return false;
+	const exports = JSON.stringify(pkg.exports ?? null);
+	if (/"(?:import|module)":|\.mjs"/.test(exports)) return false;
+	return (
+		/\.c?js"/.test(exports) ||
+		(typeof pkg.main === 'string' && /(?:^|\/)[^./]+$|\.c?js$/.test(pkg.main))
+	);
+}
+
+/**
+ * Whether the installed package at `root` depends, through packages other than
+ * Octane source packages, on one Vite would serve as CommonJS. Reads manifests
+ * only: the package's dependencies and peers, then their dependencies.
+ */
+export function packageReachesCommonJs(root) {
+	const unwatched = { dependencies: new Set(), missingDependencies: new Set() };
+	const seen = new Set();
+	const pending = [root];
+	while (pending.length > 0) {
+		const dir = pending.pop();
+		if (seen.has(dir)) continue;
+		seen.add(dir);
+		let pkg;
+		try {
+			pkg = JSON.parse(nodeFs.readFileSync(nodePath.join(dir, 'package.json'), 'utf8'));
+		} catch {
+			continue;
+		}
+		if (dir !== root) {
+			if (packageUsesOctane(pkg, dir)) continue;
+			if (servesCommonJs(pkg)) return true;
+		}
+		for (const name of Object.keys({
+			...(dir === root ? pkg.peerDependencies : null),
+			...pkg.dependencies,
+			...pkg.optionalDependencies,
+		})) {
+			if (name.startsWith('@types/')) continue;
+			const manifest = resolveInstalledPackageManifest(name, dir, unwatched);
+			if (manifest !== null) pending.push(realPathOrSelf(nodePath.dirname(manifest)));
+		}
+	}
+	return false;
+}
+
 function metadata(dependencies = [], missingDependencies = []) {
 	return { dependencies, missingDependencies };
 }

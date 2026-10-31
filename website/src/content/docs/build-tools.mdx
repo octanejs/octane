@@ -87,6 +87,17 @@ expands a terminal `family/*` rule to matching packages declared by the binding 
 application. This metadata is for raw binding authors; applications consuming the
 binding do not need to repeat it in `vite.config.ts`.
 
+Because the dependency optimizer skips raw-source packages, Vite would serve their
+own imports raw from `node_modules`, and a browser cannot import CommonJS that way.
+When a dependency of an installed raw-source package reaches CommonJS, the dev
+server prebundles every dependency the browser imports from that package, as it
+does for a linked package. Packages that are ESM throughout stay raw. You do not
+need `optimizeDeps.include` entries such as `@octanejs/markdown > unified`.
+
+`resolve.tsconfigPaths` resolves aliases from `.tsrx` files as well. A tsconfig whose
+`include` covers a directory owns the `.tsrx` files in it, as Octane's TypeScript
+sees them, so `"include": ["src"]` is enough.
+
 Scoped `<style>` blocks do not become CSS assets. The compiler emits one
 `injectStyle(hash, css)` call per style scope inside the JavaScript module, so Vite's
 CSS pipeline — PostCSS, `css.modules`, `build.cssMinify`, and `?inline` — never sees

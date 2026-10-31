@@ -28,6 +28,7 @@ import {
 	findDescriptorChildrenExports,
 	findDescriptorChildrenImports,
 	findVoidComponentImports,
+	packageReachesCommonJs,
 	resolveRendererForFile,
 } from './bundler.js';
 import {
@@ -44,6 +45,7 @@ const DESCRIPTOR_CHILDREN_EXPORTS_META = 'octane:descriptor-children-exports';
 const CLIENT_REFERENCE_META = 'octane:client-reference';
 const INDEPENDENT_WIDGETS_META = 'octane:independent-widgets';
 const DESCRIPTOR_PREFLIGHT_AUTHORITY = Symbol('octane.descriptor-preflight');
+const NODE_MODULES_PATH = /(?:^|[\\/])node_modules(?:[\\/]|$)/;
 
 function realRoot(path) {
 	try {
@@ -829,6 +831,19 @@ export function octane(options = {}) {
 	}
 	let hmrEnabled = options.hmr;
 	let resolvedConfig;
+	let tsconfigPaths = false;
+	// Whether each installed source package, by root, depends on CommonJS.
+	const commonJsSourceRoots = new Map();
+	const commonJsSourcePackage = (file) => {
+		const rule = compiler._nearestOctanePackageRule(nodePath.dirname(file)).rule;
+		if (!rule?.usesOctane) return null;
+		let reaches = commonJsSourceRoots.get(rule.root);
+		if (reaches === undefined) {
+			reaches = packageReachesCommonJs(rule.root);
+			commonJsSourceRoots.set(rule.root, reaches);
+		}
+		return reaches ? rule : null;
+	};
 	let foldDevProfileGuards = false;
 	let specializeProductionRoots = false;
 	let specializeCssModuleConstants = false;
@@ -1163,6 +1178,7 @@ export function octane(options = {}) {
 		},
 		configResolved(config) {
 			resolvedConfig = config;
+			tsconfigPaths = config.resolve?.tsconfigPaths === true;
 			if (options.output === 'ts' && config.oxc === false) {
 				throw new Error("octane output: 'ts' requires Vite's OXC transform to be enabled.");
 			}
@@ -1286,11 +1302,64 @@ export function octane(options = {}) {
 			}
 		},
 		async resolveId(source, importer, resolveOptions) {
-			if (!resolveOptions?.ssr) return null;
-			const runtimeRequest = compiler.resolveRuntimeRequest(source, 'server');
-			if (runtimeRequest === null || runtimeRequest === source) return null;
-			const resolved = await this.resolve(runtimeRequest, importer, { skipSelf: true });
-			return resolved ?? null;
+			if (resolveOptions?.ssr) {
+				const runtimeRequest = compiler.resolveRuntimeRequest(source, 'server');
+				if (runtimeRequest !== null && runtimeRequest !== source) {
+					const resolved = await this.resolve(runtimeRequest, importer, { skipSelf: true });
+					return resolved ?? null;
+				}
+			}
+			if (
+				importer === undefined ||
+				source[0] === '.' ||
+				source[0] === '\0' ||
+				nodePath.isAbsolute(source)
+			)
+				return null;
+			const file = cleanModuleId(importer);
+			// `resolve.tsconfigPaths` applies a tsconfig only to files its `include`
+			// matches, read with TypeScript's own extensions. Octane's TypeScript adds
+			// `.tsrx`, so there `"include": ["src"]` owns `src/App.tsrx`. When the
+			// importer's own lookup misses, ask again as a `.ts` file at that path.
+			const tsconfigImporter = tsconfigPaths && file.endsWith('.tsrx');
+			// The dev optimizer never discovers an import made from `node_modules`,
+			// which it expects inside a prebundle, but installed source packages are
+			// excluded from prebundling. Once a dependency of one reaches CommonJS,
+			// which the browser cannot import raw, discover every import that package
+			// makes as Vite does a linked package's. One that is ESM throughout stays
+			// raw.
+			const depsOptimizer = this.environment?.depsOptimizer;
+			const owner =
+				depsOptimizer !== undefined &&
+				!depsOptimizer.options.noDiscovery &&
+				!resolveOptions?.scan &&
+				NODE_MODULES_PATH.test(file)
+					? commonJsSourcePackage(file)
+					: null;
+			if (!tsconfigImporter && owner === null) return null;
+			const options = { ...resolveOptions, skipSelf: true };
+			const resolved =
+				(await this.resolve(source, importer, options)) ??
+				(tsconfigImporter
+					? await this.resolve(source, file.slice(0, -'.tsrx'.length) + '.ts', options)
+					: null);
+			if (owner === null || resolved === null || resolved.external) return resolved;
+			const dependency = cleanModuleId(resolved.id);
+			const name = source
+				.split('/')
+				.slice(0, source[0] === '@' ? 2 : 1)
+				.join('/');
+			if (
+				source.includes('?') ||
+				!/\.[cm]?[jt]s$/.test(dependency) ||
+				depsOptimizer.isOptimizedDepFile(dependency) ||
+				depsOptimizer.options.exclude?.some((entry) => entry === name || entry === source) ||
+				compiler._nearestOctanePackageRule(nodePath.dirname(dependency)).rule?.usesOctane
+			)
+				return resolved;
+			return depsOptimizer.getOptimizedDepId(
+				depsOptimizer.registerMissingImport(`${owner.name} > ${source}`, dependency),
+			);
 		},
 		transform(code, id, transformOptions) {
 			const foldedCode = foldDevProfileGuards ? foldServedProfileGuards(this, code, id) : null;
