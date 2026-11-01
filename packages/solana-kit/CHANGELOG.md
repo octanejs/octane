@@ -1,5 +1,13 @@
 # @octanejs/solana-kit
 
+## 0.0.39
+
+### Patch Changes
+
+- 6ab9de8: `@solana/kit` is now a peer dependency (`^7.0.0`), as it is for `@solana/react`, so the binding uses the application's Kit instead of installing its own pinned 7.0.0. Install `@solana/kit` next to `@octanejs/solana-kit` if your app does not already have it.
+- db85f36: `@octanejs/tanstack-query` is now an optional peer dependency, as `@tanstack/react-query` is for `@solana/react`, so `useRequestQuery` from `@octanejs/solana-kit/query` reads the application's `QueryClientProvider`. Before, the binding pinned its own exact release, so an app on another `@octanejs/tanstack-query` release got a second copy with its own QueryClient context, and `useRequestQuery` threw `No QueryClient set, use QueryClientProvider to set one` under the app's provider. `skipToken` now comes from `@octanejs/tanstack-query` too, and the direct `@tanstack/query-core` dependency is gone, so the token always matches the query engine's copy. Install `@octanejs/tanstack-query` next to `@octanejs/solana-kit` if you use the `query` subpath.
+- @octanejs/tanstack-query@0.1.68
+
 ## 0.0.38
 
 ### Patch Changes

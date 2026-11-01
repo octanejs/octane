@@ -140,7 +140,7 @@ supported surface and known test coverage described for that package.
 
 ## @octanejs/alien-signals
 
-[`packages/alien-signals`](../packages/alien-signals) `0.1.5` — ports `react-alien-signals@0.4.0`. Status data: [`packages/alien-signals/status.json`](../packages/alien-signals/status.json).
+[`packages/alien-signals`](../packages/alien-signals) `0.1.6` — ports `react-alien-signals@0.4.0`. Status data: [`packages/alien-signals/status.json`](../packages/alien-signals/status.json).
 
 Complete react-alien-signals hook and helper surface over the unchanged alien-signals@3.2.1 core, with Octane-native subscriptions and lifecycle ownership.
 
@@ -419,7 +419,7 @@ Scope/evidence last checked: 2026-07-24.
 
 ## @octanejs/dexie
 
-[`packages/dexie`](../packages/dexie) `0.1.61` — ports `dexie-react-hooks@4.4.0`. Status data: [`packages/dexie/status.json`](../packages/dexie/status.json).
+[`packages/dexie`](../packages/dexie) `0.1.62` — ports `dexie-react-hooks@4.4.0`. Status data: [`packages/dexie/status.json`](../packages/dexie/status.json).
 
 Port of the public dexie-react-hooks surface: useObservable, useLiveQuery, useSuspendingObservable, useSuspendingLiveQuery, usePermissions, and useDocument, with Dexie's framework-neutral API re-exported from the package root.
 
@@ -876,7 +876,7 @@ Scope/evidence last checked: 2026-09-12.
 
 ## @octanejs/legendapp-list
 
-[`packages/legendapp-list`](../packages/legendapp-list) `0.0.0` — ports `@legendapp/list@3.3.5`. Status data: [`packages/legendapp-list/status.json`](../packages/legendapp-list/status.json).
+[`packages/legendapp-list`](../packages/legendapp-list) `0.0.1` — ports `@legendapp/list@3.3.5`. Status data: [`packages/legendapp-list/status.json`](../packages/legendapp-list/status.json).
 
 The complete @legendapp/list/react entry: LegendList with every prop (data or children, renderItem, keyExtractor, getItemType, recycleItems, estimated and fixed item sizes, drawDistance, columns, sticky headers, snapping, initial scroll, maintainScrollAtEnd, maintainVisibleContentPosition, anchoredEndSpace, alwaysRender, viewability, header, footer and empty components, useWindowScroll, renderScrollComponent), the imperative ref handle, the nine per-row hooks, internal, and all 36 exported types. 1,348 upstream registrations run unchanged against React and the 1,255 core ones also against this package's source; 12 Chromium scenarios and 6 server renders match @legendapp/list/react step for step.
 
@@ -913,7 +913,7 @@ Scope/evidence last checked: 2026-09-28.
 
 ## @octanejs/livestore
 
-[`packages/livestore`](../packages/livestore) `0.0.37` — ports `@livestore/react@0.4.0`. Status data: [`packages/livestore/status.json`](../packages/livestore/status.json).
+[`packages/livestore`](../packages/livestore) `0.0.38` — ports `@livestore/react@0.4.0`. Status data: [`packages/livestore/status.json`](../packages/livestore/status.json).
 
 Ports the complete stable renderer surface (registry provider/access, Suspense store loading and augmentation, reactive queries, client documents, and sync status) plus the exported experimental LiveList over LiveStore's unchanged 0.4.0 framework-neutral packages.
 
@@ -1005,7 +1005,7 @@ See also: [`docs/mdx-migration-plan.md`](mdx-migration-plan.md)
 
 ## @octanejs/mobx
 
-[`packages/mobx`](../packages/mobx) `0.1.48` — ports `mobx-react-lite@4.1.1`. Status data: [`packages/mobx/status.json`](../packages/mobx/status.json).
+[`packages/mobx`](../packages/mobx) `0.1.49` — ports `mobx-react-lite@4.1.1`. Status data: [`packages/mobx/status.json`](../packages/mobx/status.json).
 
 The framework-independent MobX core is re-exported verbatim. The function-component binding includes observer, Observer, useObserver, useLocalObservable, enableStaticRendering, isUsingStaticRendering, and the deprecated useStaticRendering alias.
 
@@ -1170,7 +1170,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/pierre-diffs
 
-[`packages/pierre-diffs`](../packages/pierre-diffs) `0.0.1` — ports `@pierre/diffs@1.6.1`. Status data: [`packages/pierre-diffs/status.json`](../packages/pierre-diffs/status.json).
+[`packages/pierre-diffs`](../packages/pierre-diffs) `0.0.2` — ports `@pierre/diffs@1.6.1`. Status data: [`packages/pierre-diffs/status.json`](../packages/pierre-diffs/status.json).
 
 The complete @pierre/diffs/react entry: CodeView (controlled and uncontrolled, with its imperative handle and slot portals), File, FileDiff, MultiFileDiff, PatchDiff, UnresolvedFile, Virtualizer, WorkerPoolContextProvider and WorkerPoolContext, EditProvider and EditContext, their hooks (useVirtualizer, useWorkerPool, useCreateEditor, useFileInstance, useFileDiffInstance, useStableCallback), the slot renderers, templateRender, the slot style constants, and the core types the entry re-exports. All 84 upstream React runtime registrations run unchanged against React and, regenerated from the lock, against Octane.
 
@@ -1188,7 +1188,7 @@ Scope/evidence last checked: 2026-10-30.
 
 ## @octanejs/pierre-trees
 
-[`packages/pierre-trees`](../packages/pierre-trees) `0.0.0` — ports `@pierre/trees@1.0.0-beta.6`. Status data: [`packages/pierre-trees/status.json`](../packages/pierre-trees/status.json).
+[`packages/pierre-trees`](../packages/pierre-trees) `0.0.1` — ports `@pierre/trees@1.0.0-beta.6`. Status data: [`packages/pierre-trees/status.json`](../packages/pierre-trees/status.json).
 
 Complete @pierre/trees/react surface: FileTree (host props, header slot, renderContextMenu, and preloadedData server rendering and hydration), useFileTree, useFileTreeSelector, useFileTreeSelection, useFileTreeSearch, and the FileTreeProps, FileTreePreloadedData, UseFileTreeResult, FileTreeSelector, FileTreeSelectorEquality and FileTreeSearchState types. The model, options and payload types stay in the framework-neutral @pierre/trees root entry. All 14 upstream React registrations run unchanged against React and against Octane, the two SSR cases with a test-harness patch for their server render.
 
@@ -1257,7 +1257,7 @@ See also: [`docs/radix-migration-plan.md`](radix-migration-plan.md)
 
 ## @octanejs/rainbowkit
 
-[`packages/rainbowkit`](../packages/rainbowkit) `0.0.50` — ports `@rainbow-me/rainbowkit@2.2.11`. Status data: [`packages/rainbowkit/status.json`](../packages/rainbowkit/status.json).
+[`packages/rainbowkit`](../packages/rainbowkit) `0.0.51` — ports `@rainbow-me/rainbowkit@2.2.11`. Status data: [`packages/rainbowkit/status.json`](../packages/rainbowkit/status.json).
 
 Octane-native RainbowKitProvider, ConnectButton and ConnectButton.Custom, WalletButton, connect/account/chain modal hooks, connector selection, account/chain actions, native accessible dialogs, and light/dark/midnight themes.
 
@@ -1537,7 +1537,7 @@ See also: [`docs/shadcn-port-plan.md`](shadcn-port-plan.md)
 
 ## @octanejs/solana-kit
 
-[`packages/solana-kit`](../packages/solana-kit) `0.0.38` — ports `@solana/react@7.0.0`. Status data: [`packages/solana-kit/status.json`](../packages/solana-kit/status.json).
+[`packages/solana-kit`](../packages/solana-kit) `0.0.39` — ports `@solana/react@7.0.0`. Status data: [`packages/solana-kit/status.json`](../packages/solana-kit/status.json).
 
 Octane-native client provider/store hooks, a validated private Wallet Standard adapter, explicit-action transaction orchestration, and a TanStack Query-backed request hook. Applications import framework-neutral operations directly from @solana/kit@7.0.0.
 
@@ -1706,7 +1706,7 @@ See also: [`packages/syntax-highlighter/README.md`](../packages/syntax-highlight
 
 ## @octanejs/tanstack-ai
 
-[`packages/tanstack-ai`](../packages/tanstack-ai) `0.0.61` — ports `@tanstack/ai-react@0.17.0`. Status data: [`packages/tanstack-ai/status.json`](../packages/tanstack-ai/status.json).
+[`packages/tanstack-ai`](../packages/tanstack-ai) `0.0.62` — ports `@tanstack/ai-react@0.17.0`. Status data: [`packages/tanstack-ai/status.json`](../packages/tanstack-ai/status.json).
 
 Ports the @tanstack/ai-react 0.17.0 hook surface (useChat, useRealtimeChat, useGeneration, useGenerateImage/Audio/Speech/Video, useTranscription, useSummarize, useAudioRecorder, useMcpAppBridge) while reusing @tanstack/ai 0.41.0 and @tanstack/ai-client 0.21.0 unchanged and mirroring all 30 @tanstack/ai-client convenience re-exports from the upstream index.
 
@@ -1858,7 +1858,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-router-ssr-query
 
-[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.1.13` — ports `@tanstack/react-router-ssr-query@1.167.3`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
+[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.1.14` — ports `@tanstack/react-router-ssr-query@1.167.3`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
 
 Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.
 
@@ -1927,7 +1927,7 @@ Scope/evidence last checked: 2026-07-27.
 
 ## @octanejs/testing-library
 
-[`packages/testing-library`](../packages/testing-library) `0.1.67` — ports `@testing-library/react@16.3.2`. Status data: [`packages/testing-library/status.json`](../packages/testing-library/status.json).
+[`packages/testing-library`](../packages/testing-library) `0.1.68` — ports `@testing-library/react@16.3.2`. Status data: [`packages/testing-library/status.json`](../packages/testing-library/status.json).
 
 `render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config. Focus and blur helpers additionally emit their bubbling native counterparts.
 
@@ -2008,7 +2008,7 @@ See also: [`docs/three-port-plan.md`](three-port-plan.md), [`packages/three/UPST
 
 ## @octanejs/tiptap
 
-[`packages/tiptap`](../packages/tiptap) `0.0.61` — ports `@tiptap/react@3.28.0`. Status data: [`packages/tiptap/status.json`](../packages/tiptap/status.json).
+[`packages/tiptap`](../packages/tiptap) `0.0.62` — ports `@tiptap/react@3.28.0`. Status data: [`packages/tiptap/status.json`](../packages/tiptap/status.json).
 
 Complete @tiptap/react 3.28.0 adapter surface across the root and ./menus entries: @tiptap/core re-exports, editor hooks and contexts, the EditorContent portal bridge, compound Tiptap API, ReactRenderer, custom NodeView/MarkView renderers and helpers, BubbleMenu, and FloatingMenu.
 
@@ -2153,7 +2153,7 @@ Scope/evidence last checked: 2026-08-02.
 
 ## @octanejs/wagmi
 
-[`packages/wagmi`](../packages/wagmi) `0.0.50` — ports `wagmi@3.7.7`. Status data: [`packages/wagmi/status.json`](../packages/wagmi/status.json).
+[`packages/wagmi`](../packages/wagmi) `0.0.51` — ports `wagmi@3.7.7`. Status data: [`packages/wagmi/status.json`](../packages/wagmi/status.json).
 
 WagmiProvider and createConfig over @wagmi/core 3.6.5, with config, connection, connect, disconnect, switch-connection, switch-chain, connectors, connections, chains, balance, contract read/simulate/write, transaction send/wait, and message-signing hooks.
 

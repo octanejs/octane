@@ -2,7 +2,7 @@
   "bindings": [
     {
       "name": "@octanejs/alien-signals",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "category": "State Management",
       "upstream": {
         "package": "react-alien-signals",
@@ -410,7 +410,7 @@
     },
     {
       "name": "@octanejs/dexie",
-      "version": "0.1.61",
+      "version": "0.1.62",
       "category": "Data",
       "upstream": { "package": "dexie-react-hooks", "version": "4.4.0" },
       "surface": "Port of the public dexie-react-hooks surface: useObservable, useLiveQuery, useSuspendingObservable, useSuspendingLiveQuery, usePermissions, and useDocument, with Dexie's framework-neutral API re-exported from the package root.",
@@ -844,7 +844,7 @@
     },
     {
       "name": "@octanejs/legendapp-list",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "category": "Tables",
       "upstream": { "package": "@legendapp/list", "version": "3.3.5" },
       "surface": "The complete @legendapp/list/react entry: LegendList with every prop (data or children, renderItem, keyExtractor, getItemType, recycleItems, estimated and fixed item sizes, drawDistance, columns, sticky headers, snapping, initial scroll, maintainScrollAtEnd, maintainVisibleContentPosition, anchoredEndSpace, alwaysRender, viewability, header, footer and empty components, useWindowScroll, renderScrollComponent), the imperative ref handle, the nine per-row hooks, internal, and all 36 exported types. 1,348 upstream registrations run unchanged against React and the 1,255 core ones also against this package's source; 12 Chromium scenarios and 6 server renders match @legendapp/list/react step for step.",
@@ -922,7 +922,7 @@
     },
     {
       "name": "@octanejs/livestore",
-      "version": "0.0.37",
+      "version": "0.0.38",
       "category": "Data",
       "upstream": { "package": "@livestore/react", "version": "0.4.0" },
       "surface": "Ports the complete stable renderer surface (registry provider/access, Suspense store loading and augmentation, reactive queries, client documents, and sync status) plus the exported experimental LiveList over LiveStore's unchanged 0.4.0 framework-neutral packages.",
@@ -995,7 +995,7 @@
     },
     {
       "name": "@octanejs/mobx",
-      "version": "0.1.48",
+      "version": "0.1.49",
       "category": "State Management",
       "upstream": { "package": "mobx-react-lite", "version": "4.1.1", "core": "mobx@6.16.1" },
       "surface": "The framework-independent MobX core is re-exported verbatim. The function-component binding includes observer, Observer, useObserver, useLocalObservable, enableStaticRendering, isUsingStaticRendering, and the deprecated useStaticRendering alias.",
@@ -1152,7 +1152,7 @@
     },
     {
       "name": "@octanejs/pierre-diffs",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "category": "Content",
       "upstream": { "package": "@pierre/diffs", "version": "1.6.1" },
       "surface": "The complete @pierre/diffs/react entry: CodeView (controlled and uncontrolled, with its imperative handle and slot portals), File, FileDiff, MultiFileDiff, PatchDiff, UnresolvedFile, Virtualizer, WorkerPoolContextProvider and WorkerPoolContext, EditProvider and EditContext, their hooks (useVirtualizer, useWorkerPool, useCreateEditor, useFileInstance, useFileDiffInstance, useStableCallback), the slot renderers, templateRender, the slot style constants, and the core types the entry re-exports. All 84 upstream React runtime registrations run unchanged against React and, regenerated from the lock, against Octane.",
@@ -1167,7 +1167,7 @@
     },
     {
       "name": "@octanejs/pierre-trees",
-      "version": "0.0.0",
+      "version": "0.0.1",
       "category": "Content",
       "upstream": { "package": "@pierre/trees", "version": "1.0.0-beta.6" },
       "surface": "Complete @pierre/trees/react surface: FileTree (host props, header slot, renderContextMenu, and preloadedData server rendering and hydration), useFileTree, useFileTreeSelector, useFileTreeSelection, useFileTreeSearch, and the FileTreeProps, FileTreePreloadedData, UseFileTreeResult, FileTreeSelector, FileTreeSelectorEquality and FileTreeSearchState types. The model, options and payload types stay in the framework-neutral @pierre/trees root entry. All 14 upstream React registrations run unchanged against React and against Octane, the two SSR cases with a test-harness patch for their server render.",
@@ -1227,7 +1227,7 @@
     },
     {
       "name": "@octanejs/rainbowkit",
-      "version": "0.0.50",
+      "version": "0.0.51",
       "category": "Web3",
       "upstream": { "package": "@rainbow-me/rainbowkit", "version": "2.2.11" },
       "surface": "Octane-native RainbowKitProvider, ConnectButton and ConnectButton.Custom, WalletButton, connect/account/chain modal hooks, connector selection, account/chain actions, native accessible dialogs, and light/dark/midnight themes.",
@@ -1828,7 +1828,7 @@
     },
     {
       "name": "@octanejs/solana-kit",
-      "version": "0.0.38",
+      "version": "0.0.39",
       "category": "Web3",
       "upstream": {
         "package": "@solana/react",
@@ -4611,7 +4611,7 @@
     },
     {
       "name": "@octanejs/tanstack-ai",
-      "version": "0.0.61",
+      "version": "0.0.62",
       "category": "Data",
       "upstream": { "package": "@tanstack/ai-react", "version": "0.17.0" },
       "surface": "Ports the @tanstack/ai-react 0.17.0 hook surface (useChat, useRealtimeChat, useGeneration, useGenerateImage/Audio/Speech/Video, useTranscription, useSummarize, useAudioRecorder, useMcpAppBridge) while reusing @tanstack/ai 0.41.0 and @tanstack/ai-client 0.21.0 unchanged and mirroring all 30 @tanstack/ai-client convenience re-exports from the upstream index.",
@@ -4729,7 +4729,7 @@
     },
     {
       "name": "@octanejs/tanstack-router-ssr-query",
-      "version": "0.1.13",
+      "version": "0.1.14",
       "category": "Routing",
       "upstream": { "package": "@tanstack/react-router-ssr-query", "version": "1.167.3" },
       "surface": "Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.",
@@ -4785,7 +4785,7 @@
     },
     {
       "name": "@octanejs/testing-library",
-      "version": "0.1.67",
+      "version": "0.1.68",
       "category": "Testing",
       "upstream": { "package": "@testing-library/react", "version": "16.3.2" },
       "surface": "`render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config. Focus and blur helpers additionally emit their bubbling native counterparts.",
@@ -4853,7 +4853,7 @@
     },
     {
       "name": "@octanejs/tiptap",
-      "version": "0.0.61",
+      "version": "0.0.62",
       "category": "Content",
       "upstream": { "package": "@tiptap/react", "version": "3.28.0" },
       "surface": "Complete @tiptap/react 3.28.0 adapter surface across the root and ./menus entries: @tiptap/core re-exports, editor hooks and contexts, the EditorContent portal bridge, compound Tiptap API, ReactRenderer, custom NodeView/MarkView renderers and helpers, BubbleMenu, and FloatingMenu.",
@@ -5056,7 +5056,7 @@
     },
     {
       "name": "@octanejs/wagmi",
-      "version": "0.0.50",
+      "version": "0.0.51",
       "category": "Web3",
       "upstream": { "package": "wagmi", "version": "3.7.7" },
       "surface": "WagmiProvider and createConfig over @wagmi/core 3.6.5, with config, connection, connect, disconnect, switch-connection, switch-chain, connectors, connections, chains, balance, contract read/simulate/write, transaction send/wait, and message-signing hooks.",
