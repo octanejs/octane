@@ -340,7 +340,10 @@ the timeline, creating, editing and pinning memos, tags, search, the memo page
 with comments, all 17 settings sections, the SSO form dialog, and 11 more routes
 worked with no console errors. Controlled fields kept every keystroke, which
 the old `onChange` pass-through would have reverted. Two defects surfaced only at
-runtime: the type-only imports below, and the `children` rendered by Base UI.
+runtime: the `children` rendered by Base UI, below, and imports of names used
+only as types, which TypeScript drops but `.tsrx` kept, so 30 modules failed to
+link (`does not provide an export named 'InstanceProfile'`). The compiler now
+drops those imports as TypeScript does.
 
 | | Memos (`web/`) | T3 Code (`apps/web`) |
 | --- | --- | --- |
@@ -389,10 +392,6 @@ Codemod defects found, all fixed with tests:
 
 Still open, owned elsewhere:
 
-- **Compiler:** `.tsrx` keeps an import of a name used only as a type, which
-  TypeScript drops; 30 Memos modules then fail to link in the browser
-  (`does not provide an export named 'InstanceProfile'`). The run marked them
-  `type` by hand.
 - **Compiler (`.tsrx` TypeScript view):** `compileToVolarMappings` prints
   `<T,>(…) =>` as `<T>`, which TypeScript reads as JSX, and reports `return
   null` in an `@for` row (TSRX2005) that the compiler and the authoring rules
