@@ -125,6 +125,152 @@ describe('compile — inline type-only import/export specifiers', () => {
 	}
 });
 
+// Without `verbatimModuleSyntax`, tsc also elides an import written without
+// `type` when the module uses it only as a type. A `.tsrx` module is not
+// type-stripped again after Octane, so a kept specifier that names only a type
+// reached Rolldown, which rejects it (MISSING_EXPORT).
+describe('compile — imports used only as types', () => {
+	// The emitted import clause for `source`, or undefined once nothing imports it.
+	const importClause = (code: string, source: string) =>
+		new RegExp(`import\\s*([^;]*?)\\s*from\\s*['"]${source.replace(/\./g, '\\.')}['"]`).exec(
+			code,
+		)?.[1];
+	const imports = (code: string, source: string) =>
+		code.includes(`'${source}'`) || code.includes(`"${source}"`);
+
+	const typeOnly = `
+    import { Icon, AntigravityIcon } from './icons.tsrx';
+    import { OnlyAnnotation } from './annotation';
+    import { OnlyGeneric, format } from './generic';
+    import OnlyDefaultType from './default-type';
+    import * as OnlyNamespaceTypes from './namespace-types';
+    import { OnlyTypeQuery } from './type-query';
+    import { OnlySatisfies } from './satisfies';
+    import { OnlyImplements } from './implements';
+    import { OnlyInInterface } from './interface';
+    import { ReExportedType } from './re-exported-type';
+    import { InlineReExportedType } from './inline-re-exported-type';
+    import { Unused } from './unused';
+
+    const ICONS: Record<string, Icon> = { antigravity: AntigravityIcon };
+    let annotated: OnlyAnnotation | undefined;
+    const list = new Array<OnlyGeneric>();
+    let defaulted: OnlyDefaultType | undefined;
+    let namespaced: OnlyNamespaceTypes.Shape | undefined;
+    let queried: typeof OnlyTypeQuery | undefined;
+    const config = { size: 1 } satisfies OnlySatisfies;
+    class Widget implements OnlyImplements {}
+    interface BadgeProps { kind: string; detail?: OnlyInInterface }
+    export type { ReExportedType };
+    export { type InlineReExportedType };
+
+    export function Badge({ kind }: BadgeProps) @{
+      const Icon = ICONS[kind];
+      <div>
+        @if (Icon) {
+          <Icon />
+        }
+        <span>{format(list, config, new Widget(), annotated, defaulted, namespaced, queried) as string}</span>
+      </div>
+    }
+  `;
+
+	const values = `
+    import './side-effect.css';
+    import {} from './empty';
+    import Default from './default';
+    import * as UI from './ui';
+    import { Comp, shorthand, exported, runtimeTypeof, fallback, Base, theme, inArm, inLoop, enumInit } from './values';
+
+    export { exported };
+    enum Level { Low = enumInit }
+    class Panel extends Base {}
+    export function read(value = fallback) {
+      return { shorthand, kind: typeof runtimeTypeof, Default, Level, Panel, value };
+    }
+
+    export function View({ show, items }: { show: boolean; items: string[] }) @{
+      <div>
+        <style apply={theme} />
+        <Comp />
+        <UI.Button />
+        @if (show) {
+          <span>{inArm as string}</span>
+        }
+        @for (const item of items; key item) {
+          <i>{(inLoop + item) as string}</i>
+        }
+      </div>
+    }
+  `;
+
+	for (const mode of ['client', 'server'] as const) {
+		const options = mode === 'server' ? ({ mode: 'server' } as const) : undefined;
+
+		// A bundler id can keep a query suffix, such as Vite's HMR timestamp.
+		it.each(['type-only-imports.tsrx', 'type-only-imports.tsrx?t=1730419200000'])(
+			`${mode} emit drops specifiers used only as types (%s)`,
+			(filename) => {
+				const { code } = compile(typeOnly, filename, options);
+				// The local `const Icon` shadows the import inside the component, so
+				// the rendered `<Icon />` does not read it.
+				const icons = importClause(code, './icons.tsrx');
+				expect(icons).toMatch(/\bAntigravityIcon\b/);
+				expect(icons).not.toMatch(/\bIcon\b/);
+				const generic = importClause(code, './generic');
+				expect(generic).toMatch(/\bformat\b/);
+				expect(generic).not.toMatch(/\bOnlyGeneric\b/);
+				for (const source of [
+					'./annotation',
+					'./default-type',
+					'./namespace-types',
+					'./type-query',
+					'./satisfies',
+					'./implements',
+					'./interface',
+					'./re-exported-type',
+					'./inline-re-exported-type',
+				]) {
+					expect(imports(code, source)).toBe(false);
+				}
+				// Nothing refers to `Unused`, so it stays, as it would in JavaScript.
+				expect(importClause(code, './unused')).toMatch(/\bUnused\b/);
+			},
+		);
+
+		it(`${mode} emit keeps specifiers read as values anywhere in the module`, () => {
+			const { code } = compile(values, 'value-imports.tsrx', options);
+			expect(imports(code, './side-effect.css')).toBe(true);
+			expect(imports(code, './empty')).toBe(true);
+			expect(importClause(code, './default')).toBe('Default');
+			expect(importClause(code, './ui')).toMatch(/\* as UI\b/);
+			const kept = importClause(code, './values');
+			for (const name of [
+				'Comp',
+				'shorthand',
+				'exported',
+				'runtimeTypeof',
+				'fallback',
+				'Base',
+				'theme',
+				'inArm',
+				'inLoop',
+				'enumInit',
+			]) {
+				expect(kept).toMatch(new RegExp(`\\b${name}\\b`));
+			}
+		});
+	}
+
+	it('keeps an unused import in a JavaScript module, which has no elision', () => {
+		const { code } = compile(
+			"import { unused } from './register';\nexport const value = 1;\n",
+			'plain-module.jsx',
+		);
+		expect(importClause(code, './register')).toMatch(/\bunused\b/);
+	});
+});
+
 // A TS `this` parameter is type-only (`function f(this: Foo, x: T)`) but the
 // parser represents it as a leading plain Identifier named `this` — before
 // the stripTsOnlyWrappers params-shift, the annotation strip left `this` as a
