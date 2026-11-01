@@ -10436,29 +10436,70 @@ function dropTypeOnlyStatements(body) {
 
 const TYPESCRIPT_SOURCE = /\.(?:tsrx|[cm]?tsx?)$/;
 
-// Without `verbatimModuleSyntax`, tsc also erases an import specifier written
-// without `type` when nothing reads its binding as a value, and a declaration
-// left with none. Such a specifier usually names only a type, so keeping it
-// imports an export that does not exist, which Rolldown rejects. JavaScript has
-// no elision, and a declaration authored without specifiers is a side-effect
-// import.
-function dropUnreadImportSpecifiers(body, filename) {
-	if (!TYPESCRIPT_SOURCE.test(filename)) return body;
+// The runtime emit erases what tsc does. Without `verbatimModuleSyntax` that
+// includes an import specifier written without `type` when the module refers
+// to it only in type positions, and a declaration left with none. Such a
+// specifier usually names only a type, so keeping it imports an export that
+// does not exist, which Rolldown rejects. A specifier nothing refers to stays,
+// as in JavaScript: a pass before this one may have added an import whose reads
+// it emits later (renderer regions).
+function dropTypeOnlyCode(body, filename) {
+	const runtime = dropTypeOnlyStatements(body);
+	if (!TYPESCRIPT_SOURCE.test(filename)) return runtime;
 	const reads = collectFreeIdentifiers(
-		body.filter((statement) => statement.type !== 'ImportDeclaration'),
+		runtime.filter((statement) => statement.type !== 'ImportDeclaration'),
 		[],
 	);
+	const unread = (specifier) => !reads.has(specifier.local.name);
+	if (
+		!runtime.some(
+			(statement) => statement.type === 'ImportDeclaration' && statement.specifiers.some(unread),
+		)
+	) {
+		return runtime;
+	}
+	// Erased declarations refer to types too, as in `interface Props { icon: Icon }`.
+	const types = collectTypeReferenceNames(body, new Set());
 	const result = [];
-	for (const statement of body) {
-		if (statement.type !== 'ImportDeclaration' || statement.specifiers.length === 0) {
+	for (const statement of runtime) {
+		if (statement.type !== 'ImportDeclaration') {
 			result.push(statement);
 			continue;
 		}
-		const specifiers = statement.specifiers.filter((specifier) => reads.has(specifier.local.name));
+		const specifiers = statement.specifiers.filter(
+			(specifier) => !unread(specifier) || !types.has(specifier.local.name),
+		);
 		if (specifiers.length === statement.specifiers.length) result.push(statement);
 		else if (specifiers.length > 0) result.push({ ...statement, specifiers });
 	}
 	return result;
+}
+
+// The root name of every type reference: `T`, `ns.T`, `typeof value`, and the
+// heritage of `implements` and interface `extends`.
+function collectTypeReferenceNames(node, names) {
+	if (node === null || typeof node !== 'object') return names;
+	if (Array.isArray(node)) {
+		for (const child of node) collectTypeReferenceNames(child, names);
+		return names;
+	}
+	let name =
+		node.type === 'TSTypeReference'
+			? node.typeName
+			: node.type === 'TSTypeQuery'
+				? node.exprName
+				: node.type === 'TSClassImplements' ||
+					  node.type === 'TSInterfaceHeritage' ||
+					  node.type === 'TSExpressionWithTypeArguments'
+					? node.expression
+					: null;
+	while (name?.type === 'TSQualifiedName') name = name.left;
+	while (name?.type === 'MemberExpression') name = name.object;
+	if (name?.type === 'Identifier') names.add(name.name);
+	for (const key in node) {
+		if (!AST_WALK_SKIP_KEYS.has(key)) collectTypeReferenceNames(node[key], names);
+	}
+	return names;
 }
 
 // Local names declared only by an erased statement or specifier.
@@ -12577,10 +12618,8 @@ function compileInternal(
 	// Drop type-only statements (interface / type / declare / import-export type)
 	// and inline `type` specifiers before emit — they carry no runtime value and
 	// would leak invalid TS into the .js (or crash the printer), then imports
-	// nothing reads as a value, as tsc elides them. Runtime-only; Volar keeps them.
-	if (options?.output !== 'ts') {
-		ast = { ...ast, body: dropUnreadImportSpecifiers(dropTypeOnlyStatements(ast.body), filename) };
-	}
+	// used only as types, as tsc elides them. Runtime-only; Volar keeps them.
+	if (options?.output !== 'ts') ast = { ...ast, body: dropTypeOnlyCode(ast.body, filename) };
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
@@ -14370,11 +14409,9 @@ function compileServer(
 	// server codegen rewrites are copy-on-write over it.
 	let ast = parsedAst;
 	// Drop type-only statements and inline `type` specifiers before emit (see
-	// isTypeOnlyStatement), then imports nothing reads as a value — same as the
-	// client path; the server HTML-string output is plain JS too.
-	if (options?.output !== 'ts') {
-		ast = { ...ast, body: dropUnreadImportSpecifiers(dropTypeOnlyStatements(ast.body), filename) };
-	}
+	// isTypeOnlyStatement), then imports used only as types — same as the client
+	// path; the server HTML-string output is plain JS too.
+	if (options?.output !== 'ts') ast = { ...ast, body: dropTypeOnlyCode(ast.body, filename) };
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.

@@ -126,7 +126,7 @@ describe('compile — inline type-only import/export specifiers', () => {
 });
 
 // Without `verbatimModuleSyntax`, tsc also elides an import written without
-// `type` when its binding is never read as a value. A `.tsrx` module is not
+// `type` when the module uses it only as a type. A `.tsrx` module is not
 // type-stripped again after Octane, so a kept specifier that names only a type
 // reached Rolldown, which rejects it (MISSING_EXPORT).
 describe('compile — imports used only as types', () => {
@@ -147,6 +147,7 @@ describe('compile — imports used only as types', () => {
     import { OnlyTypeQuery } from './type-query';
     import { OnlySatisfies } from './satisfies';
     import { OnlyImplements } from './implements';
+    import { OnlyInInterface } from './interface';
     import { Unused } from './unused';
 
     const ICONS: Record<string, Icon> = { antigravity: AntigravityIcon };
@@ -157,8 +158,9 @@ describe('compile — imports used only as types', () => {
     let queried: typeof OnlyTypeQuery | undefined;
     const config = { size: 1 } satisfies OnlySatisfies;
     class Widget implements OnlyImplements {}
+    interface BadgeProps { kind: string; detail?: OnlyInInterface }
 
-    export function Badge({ kind }: { kind: string }) @{
+    export function Badge({ kind }: BadgeProps) @{
       const Icon = ICONS[kind];
       <div>
         @if (Icon) {
@@ -201,7 +203,7 @@ describe('compile — imports used only as types', () => {
 	for (const mode of ['client', 'server'] as const) {
 		const options = mode === 'server' ? ({ mode: 'server' } as const) : undefined;
 
-		it(`${mode} emit drops specifiers that are never read as values`, () => {
+		it(`${mode} emit drops specifiers used only as types`, () => {
 			const { code } = compile(typeOnly, 'type-only-imports.tsrx', options);
 			// The local `const Icon` shadows the import inside the component, so
 			// the rendered `<Icon />` does not read it.
@@ -218,10 +220,12 @@ describe('compile — imports used only as types', () => {
 				'./type-query',
 				'./satisfies',
 				'./implements',
-				'./unused',
+				'./interface',
 			]) {
 				expect(imports(code, source)).toBe(false);
 			}
+			// Nothing refers to `Unused`, so it stays, as it would in JavaScript.
+			expect(importClause(code, './unused')).toMatch(/\bUnused\b/);
 		});
 
 		it(`${mode} emit keeps specifiers read as values anywhere in the module`, () => {
