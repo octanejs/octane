@@ -10445,7 +10445,7 @@ const TYPESCRIPT_SOURCE = /\.(?:tsrx|[cm]?tsx?)$/;
 // it emits later (renderer regions).
 function dropTypeOnlyCode(body, filename) {
 	const runtime = dropTypeOnlyStatements(body);
-	if (!TYPESCRIPT_SOURCE.test(filename)) return runtime;
+	if (!TYPESCRIPT_SOURCE.test(cleanCompileFilename(filename))) return runtime;
 	const reads = collectFreeIdentifiers(
 		runtime.filter((statement) => statement.type !== 'ImportDeclaration'),
 		[],

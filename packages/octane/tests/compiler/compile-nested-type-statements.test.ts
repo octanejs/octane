@@ -203,30 +203,34 @@ describe('compile — imports used only as types', () => {
 	for (const mode of ['client', 'server'] as const) {
 		const options = mode === 'server' ? ({ mode: 'server' } as const) : undefined;
 
-		it(`${mode} emit drops specifiers used only as types`, () => {
-			const { code } = compile(typeOnly, 'type-only-imports.tsrx', options);
-			// The local `const Icon` shadows the import inside the component, so
-			// the rendered `<Icon />` does not read it.
-			const icons = importClause(code, './icons.tsrx');
-			expect(icons).toMatch(/\bAntigravityIcon\b/);
-			expect(icons).not.toMatch(/\bIcon\b/);
-			const generic = importClause(code, './generic');
-			expect(generic).toMatch(/\bformat\b/);
-			expect(generic).not.toMatch(/\bOnlyGeneric\b/);
-			for (const source of [
-				'./annotation',
-				'./default-type',
-				'./namespace-types',
-				'./type-query',
-				'./satisfies',
-				'./implements',
-				'./interface',
-			]) {
-				expect(imports(code, source)).toBe(false);
-			}
-			// Nothing refers to `Unused`, so it stays, as it would in JavaScript.
-			expect(importClause(code, './unused')).toMatch(/\bUnused\b/);
-		});
+		// A bundler id can keep a query suffix, such as Vite's HMR timestamp.
+		it.each(['type-only-imports.tsrx', 'type-only-imports.tsrx?t=1730419200000'])(
+			`${mode} emit drops specifiers used only as types (%s)`,
+			(filename) => {
+				const { code } = compile(typeOnly, filename, options);
+				// The local `const Icon` shadows the import inside the component, so
+				// the rendered `<Icon />` does not read it.
+				const icons = importClause(code, './icons.tsrx');
+				expect(icons).toMatch(/\bAntigravityIcon\b/);
+				expect(icons).not.toMatch(/\bIcon\b/);
+				const generic = importClause(code, './generic');
+				expect(generic).toMatch(/\bformat\b/);
+				expect(generic).not.toMatch(/\bOnlyGeneric\b/);
+				for (const source of [
+					'./annotation',
+					'./default-type',
+					'./namespace-types',
+					'./type-query',
+					'./satisfies',
+					'./implements',
+					'./interface',
+				]) {
+					expect(imports(code, source)).toBe(false);
+				}
+				// Nothing refers to `Unused`, so it stays, as it would in JavaScript.
+				expect(importClause(code, './unused')).toMatch(/\bUnused\b/);
+			},
+		);
 
 		it(`${mode} emit keeps specifiers read as values anywhere in the module`, () => {
 			const { code } = compile(values, 'value-imports.tsrx', options);
