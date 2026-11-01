@@ -1,5 +1,13 @@
 # @octanejs/wagmi
 
+## 0.0.51
+
+### Patch Changes
+
+- 6ab9de8: `viem` is now a peer dependency (`^2.55.10`), as it is for `wagmi`, so the binding uses the application's Viem instead of installing its own. `@tanstack/query-core` is now a peer dependency (`^5.102.8`) too: `@wagmi/core/query` imports it as an optional peer, which resolved to a copy the binding installed instead of the application's. Install `@tanstack/query-core` next to `@octanejs/wagmi` if your app does not already have it.
+- db85f36: `@octanejs/tanstack-query` is now a peer dependency, as `@tanstack/react-query` is for `wagmi`, so the hooks read the application's `QueryClientProvider`. Before, the binding pinned its own exact release, so an app on another `@octanejs/tanstack-query` release got a second copy with its own QueryClient context, and every query or mutation hook threw `No QueryClient set, use QueryClientProvider to set one` under the app's provider.
+- @octanejs/tanstack-query@0.1.68
+
 ## 0.0.50
 
 ### Patch Changes
