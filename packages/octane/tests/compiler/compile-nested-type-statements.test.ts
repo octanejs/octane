@@ -148,6 +148,8 @@ describe('compile — imports used only as types', () => {
     import { OnlySatisfies } from './satisfies';
     import { OnlyImplements } from './implements';
     import { OnlyInInterface } from './interface';
+    import { ReExportedType } from './re-exported-type';
+    import { InlineReExportedType } from './inline-re-exported-type';
     import { Unused } from './unused';
 
     const ICONS: Record<string, Icon> = { antigravity: AntigravityIcon };
@@ -159,6 +161,8 @@ describe('compile — imports used only as types', () => {
     const config = { size: 1 } satisfies OnlySatisfies;
     class Widget implements OnlyImplements {}
     interface BadgeProps { kind: string; detail?: OnlyInInterface }
+    export type { ReExportedType };
+    export { type InlineReExportedType };
 
     export function Badge({ kind }: BadgeProps) @{
       const Icon = ICONS[kind];
@@ -224,6 +228,8 @@ describe('compile — imports used only as types', () => {
 					'./satisfies',
 					'./implements',
 					'./interface',
+					'./re-exported-type',
+					'./inline-re-exported-type',
 				]) {
 					expect(imports(code, source)).toBe(false);
 				}

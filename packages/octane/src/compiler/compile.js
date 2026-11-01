@@ -10475,8 +10475,9 @@ function dropTypeOnlyCode(body, filename) {
 	return result;
 }
 
-// The root name of every type reference: `T`, `ns.T`, `typeof value`, and the
-// heritage of `implements` and interface `extends`.
+// The root name of every type reference: `T`, `ns.T`, `typeof value`, the
+// heritage of `implements` and interface `extends`, and a local exported with
+// `export type { T }` or `export { type T }`.
 function collectTypeReferenceNames(node, names) {
 	if (node === null || typeof node !== 'object') return names;
 	if (Array.isArray(node)) {
@@ -10496,6 +10497,13 @@ function collectTypeReferenceNames(node, names) {
 	while (name?.type === 'TSQualifiedName') name = name.left;
 	while (name?.type === 'MemberExpression') name = name.object;
 	if (name?.type === 'Identifier') names.add(name.name);
+	if (node.type === 'ExportNamedDeclaration' && node.source == null) {
+		for (const specifier of node.specifiers) {
+			if (node.exportKind === 'type' || specifier.exportKind === 'type') {
+				names.add(specifier.local.name);
+			}
+		}
+	}
 	for (const key in node) {
 		if (!AST_WALK_SKIP_KEYS.has(key)) collectTypeReferenceNames(node[key], names);
 	}
