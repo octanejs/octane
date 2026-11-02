@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { DATA } from '@octanejs/cli/data';
 import ts from 'typescript';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { runCodemod } from '../src/index.js';
 
 const REPO = path.resolve(import.meta.dirname, '../../..');
@@ -968,6 +968,25 @@ describe('runCodemod', () => {
 		expect(result.files[0]).toMatchObject({ output: 'src/A.tsrx', changed: true });
 		expect(fs.existsSync(path.join(root, 'src/A.tsx'))).toBe(true);
 		expect(fs.existsSync(path.join(root, 'src/A.tsrx'))).toBe(false);
+	});
+
+	it('migrates a static template without reading its dependency types', async () => {
+		const root = project({
+			'package.json': '{}',
+			'tsconfig.json': '{ "compilerOptions": { "moduleResolution": "bundler", "strict": true } }',
+			'node_modules/palette/index.d.ts': 'export declare const accent: string;',
+			'Badge.tsx':
+				"import { accent } from 'palette';\nexport function Badge() { return <span title={accent} />; }",
+		});
+		const reads = vi.spyOn(ts.sys, 'readFile');
+		try {
+			const result = await runCodemod([path.join(root, 'Badge.tsx')], { write: false });
+			expect(result.files[0].output).toBe('Badge.tsrx');
+			expect(result.files[0].diagnostics).toEqual([]);
+			expect(reads.mock.calls.some(([name]) => name.endsWith('/palette/index.d.ts'))).toBe(false);
+		} finally {
+			reads.mockRestore();
+		}
 	});
 
 	it('spells holes as text through imported types, only under strictNullChecks', async () => {
