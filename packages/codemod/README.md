@@ -66,6 +66,10 @@ Every module with JSX becomes `.tsrx`, entries and helpers without a component
 included, so Strong mode can reach all of them; one that was JavaScript gains
 `// @ts-nocheck`, so it stays as unchecked as it was. Every import of a renamed
 module, dynamic imports and `index.html` entry scripts included, is updated.
+So is each string elsewhere in the project that is exactly a renamed module's
+path, from its own file or from the project root, such as Vite's
+`server.warmup.clientFiles: ['./src/main.tsx']`: the `module-paths` rule.
+Globs and paths without an extension stay as they are.
 
 ## Strong mode
 
@@ -90,7 +94,12 @@ has React and React DOM 19.2 or newer in the React 19 series, a component of tha
 its own React root through `ReactCompat` if its element gives React nothing
 Octane renders: text children and props without elements. The package's hooks
 and contexts, and its components that take Octane children or render
-callbacks, are reported where they are used. **No Octane port** lists each such
+callbacks, are reported where they are used. Each such component is wrapped
+in a local `NoOctanePort`, which throws the reported error where the component
+would render, so the page names the package instead of failing deep in
+Octane's renderer. Once you have checked that nothing Octane renders reaches
+it, such as a spread of props whose `children` no caller passes, swap the
+wrapper for `ReactCompat`. **No Octane port** lists each such
 package with the modules that import it, the elements hosted in islands, and
 the uses that need a port.
 

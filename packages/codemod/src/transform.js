@@ -79,6 +79,8 @@ const LITERAL_NEWLINE = '\u0000NL\u0000';
 
 const TEMPLATE = { template: true };
 const PLAIN = { template: false };
+/** The local component that wraps an element no island can host and throws its `error`. */
+const NO_PORT = 'NoOctanePort';
 
 /** Rule names, as reported. */
 const RULE = {
@@ -682,6 +684,8 @@ class ModuleTransform {
 		this.unported = new Map();
 		/** @type {Set<ts.JsxElement | ts.JsxSelfClosingElement>} Elements to host in a `ReactCompat` island. */
 		this.islands = new Set();
+		/** @type {Map<ts.Node, string>} Elements no island can host, with the error each throws where it renders. */
+		this.unrenderable = new Map();
 		/** @type {ts.ImportDeclaration[]} Placeholder index -> import declaration. */
 		this.importSlots = [];
 		this.hasJsx = false;
@@ -698,6 +702,12 @@ class ModuleTransform {
 		code = this.finishImports(code);
 		code = code.replace(/^[ \t]*\u0000DROP\u0000[ \t]*\r?\n/gm, '').replaceAll(DROP, '');
 		code = code.replaceAll(LITERAL_NEWLINE, '\n');
+		if (this.unrenderable.size > 0) {
+			const [props, result] = this.isTypeScript()
+				? [': { error: string; children?: unknown }', ': never']
+				: ['', ''];
+			code = `${code.trimEnd()}\n\nfunction ${NO_PORT}({ error }${props})${result} {\n${this.indentUnit}throw new Error(error);\n}\n`;
+		}
 		const tsrx =
 			this.template || (this.target === 'tsrx' && (this.hasJsx || /\.[jt]sx$/.test(this.filename)));
 		if (tsrx) code = code.replace(/^\/\*\*\s*@jsxImportSource\s+\S+\s*\*\/[ \t]*\r?\n/m, '');
@@ -899,7 +909,9 @@ class ModuleTransform {
 		const parent = member.parent;
 		const block = (/** @type {string} */ message) => {
 			port.blocked++;
-			this.note(RULE.bindings, 'error', member, `${message} \`${port.name}\` has no Octane port.`);
+			const error = `${message} \`${port.name}\` has no Octane port.`;
+			this.note(RULE.bindings, 'error', member, error);
+			return error;
 		};
 		if (
 			(ts.isJsxOpeningElement(parent) || ts.isJsxSelfClosingElement(parent)) &&
@@ -907,17 +919,18 @@ class ModuleTransform {
 		) {
 			const element = ts.isJsxOpeningElement(parent) ? parent.parent : parent;
 			if (this.inIsland(element)) return;
-			if (!this.hostsInReact(element)) {
-				block(
-					`\`<${text}>\` takes children or props that Octane renders, which cannot cross into a React island.`,
-				);
-			} else if (!this.options.reactCompat) {
-				block(
-					`\`<${text}>\` can render in a \`ReactCompat\` island only with React and React DOM 19.2 or newer in the React 19 series.`,
-				);
-			} else {
+			const reason = !this.hostsInReact(element)
+				? `\`<${text}>\` takes children or props that Octane renders, which cannot cross into a React island.`
+				: this.options.reactCompat
+					? null
+					: `\`<${text}>\` can render in a \`ReactCompat\` island only with React and React DOM 19.2 or newer in the React 19 series.`;
+			if (reason === null) {
 				port.islands++;
 				this.islands.add(element);
+			} else {
+				// Octane fails on a React component deep in its renderer, naming
+				// neither it nor its package, so it throws this error there instead.
+				this.unrenderable.set(element, block(reason));
 			}
 		} else if (ts.isCallExpression(parent) && parent.expression === member) {
 			if (/^use[A-Z0-9]/.test(name))
@@ -1553,8 +1566,25 @@ class ModuleTransform {
 			const island = this.require('octane/react', 'ReactCompat', false);
 			return `<${island}>${this.span(node, node.getStart(this.sf), node.end, PLAIN)}</${island}>`;
 		}
+		// An earlier run's wrapper goes: each run decides again whether its
+		// element throws or renders in an island.
+		if (ts.isJsxElement(node) && node.openingElement.tagName.getText(this.sf) === NO_PORT) {
+			const element = node.children.find(
+				(child) => ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child),
+			);
+			if (element) return this.emit(element, ctx);
+		}
+		const error = this.unrenderable.get(node);
+		if (error !== undefined) {
+			const element =
+				(ts.isJsxElement(node) ? this.rewriteElement(node, ctx) : null) ??
+				this.span(node, node.getStart(this.sf), node.end, ctx);
+			return `<${NO_PORT} error="${error}">${element}</${NO_PORT}>`;
+		}
 		if (ts.isJsxElement(node)) return this.rewriteElement(node, ctx);
 		if (ts.isJsxExpression(node) && ctx.template) return this.rewriteHole(node);
+		// So does its `NoOctanePort`, which `run` adds back while one still throws.
+		if (ts.isFunctionDeclaration(node) && node.name?.text === NO_PORT) return DROP;
 		if (
 			ts.isFunctionDeclaration(node) ||
 			ts.isFunctionExpression(node) ||
