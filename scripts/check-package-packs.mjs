@@ -518,6 +518,78 @@ assert.deepEqual(renderToString(() => 'runtime-only'), { html: '<!--3-->runtime-
 }
 
 /**
+ * Run the packed codemod as `npx @octanejs/codemod` does: from an install of
+ * its own, on a React project with no Octane installed, so the compiler that
+ * verifies the migration is the one the codemod's own dependencies provide.
+ */
+function validatePackedCodemod(tempRoot, archives) {
+	const toolDirectory = path.join(tempRoot, 'external-codemod');
+	const projectDirectory = path.join(tempRoot, 'external-react-project');
+	if (isWithinDirectory(REPO_ROOT, tempRoot)) {
+		throw new Error('packed codemod must be installed outside the workspace');
+	}
+	const archiveSpecs = Object.fromEntries(
+		['@octanejs/codemod', '@octanejs/cli', 'octane'].map((packageName) => [
+			packageName,
+			fileArchiveSpec(archives, packageName),
+		]),
+	);
+	mkdirSync(toolDirectory, { recursive: true });
+	const manifest = {
+		name: 'octane-packed-codemod',
+		private: true,
+		dependencies: { '@octanejs/codemod': archiveSpecs['@octanejs/codemod'] },
+	};
+	writeFileSync(path.join(toolDirectory, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+	writeFileSync(
+		path.join(toolDirectory, 'pnpm-workspace.yaml'),
+		renderPackedExampleWorkspace(archiveSpecs),
+	);
+	execFileSync(
+		'pnpm',
+		[
+			'install',
+			'--prefer-offline',
+			'--ignore-scripts',
+			'--no-frozen-lockfile',
+			'--config.auto-install-peers=true',
+		],
+		{ cwd: toolDirectory, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+	);
+
+	mkdirSync(path.join(projectDirectory, 'src'), { recursive: true });
+	writeFileSync(
+		path.join(projectDirectory, 'package.json'),
+		`${JSON.stringify({ name: 'react-project', private: true, dependencies: { react: '^19.0.0' } }, null, 2)}\n`,
+	);
+	cpSync(
+		path.join(REPO_ROOT, 'packages/codemod/tests/fixtures/counter.input.tsx'),
+		path.join(projectDirectory, 'src/Counter.tsx'),
+	);
+	const result = JSON.parse(
+		execFileSync(
+			path.join(toolDirectory, 'node_modules/.bin/octane-codemod'),
+			['--strong', '--json'],
+			{
+				cwd: projectDirectory,
+				encoding: 'utf8',
+				stdio: ['ignore', 'pipe', 'pipe'],
+				timeout: 60_000,
+			},
+		),
+	);
+	if (!isWithinDirectory(realpathSync(toolDirectory), realpathSync(result.compiler))) {
+		throw new Error(
+			`packed codemod verified with a compiler outside its install: ${result.compiler}`,
+		);
+	}
+	if (!existsSync(path.join(projectDirectory, 'src/Counter.tsrx'))) {
+		throw new Error('packed codemod did not write src/Counter.tsrx');
+	}
+	console.log('migrated a React project with the packed codemod from its own install');
+}
+
+/**
  * Install a real consumer outside the workspace, then compile one application
  * against the packed core and a raw-source binding in both client and server
  * modes. This catches peer-layout and source-publication failures that tarball
@@ -2188,6 +2260,10 @@ try {
 			{
 				label: 'external packed runtime-only consumer',
 				run: () => validatePackedRuntimeWithoutCompiler(tempRoot, packedArchives),
+			},
+			{
+				label: 'external packed codemod',
+				run: () => validatePackedCodemod(tempRoot, packedArchives),
 			},
 			// One lane per TypeScript an application can compile the shipped TSRX
 			// with; each reports separately, so one lane's failure hides no other.
