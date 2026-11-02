@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { findRoot, readInstalled, scanSourceFiles } from '@octanejs/cli';
 import { DATA } from '@octanejs/cli/data';
+import { parseSync } from '@tsrx/oxc/parser';
 import ts from 'typescript';
 import { finding, loadCompiler, thrown } from './compiler.js';
 import { PORTED_PACKAGES } from './mappings.js';
@@ -74,23 +75,53 @@ export async function runCodemod(paths, options = {}) {
 	const target = options.target ?? 'tsrx';
 	const strong = options.strong === true && target === 'tsrx';
 	const root = path.resolve(options.root ?? findRoot(paths[0] ?? '.'));
-	const files = paths.flatMap((entry) => collect(path.resolve(entry)));
-
-	const known = new Set(files);
-	const config = tsconfigOptions(root);
-	const strictConfig = (config?.strictNullChecks ?? config?.strict) ? config : null;
-	/** @type {ts.Program | undefined} */
-	let program;
+	const known = new Set(paths.flatMap((entry) => collect(path.resolve(entry))));
+	const files = [...known];
 	/** @type {Map<string, string>} */
 	const renames = new Map();
 	/** @type {Map<string, import('./transform.js').ModuleExports>} */
 	const exports = new Map();
+	/** @type {Map<string, string>} */
+	const owners = new Map();
 	for (const file of files) {
-		const result = transformModule(fs.readFileSync(file, 'utf8'), file, { target });
+		const source = fs.readFileSync(file, 'utf8');
+		const result = transformModule(source, file, { target });
 		exports.set(file, result.exports);
-		if (result.template) renames.set(file, file.replace(/\.(?:jsx?|tsx)$/, '.tsrx'));
+		if (!result.template) continue;
+		const output = file.replace(/\.(?:jsx?|tsx)$/, '.tsrx');
+		if (output === file) continue;
+		const key = ts.sys.useCaseSensitiveFileNames ? output : output.toLowerCase();
+		const previous = owners.get(key);
+		if (previous || fs.lstatSync(output, { throwIfNoEntry: false })) {
+			const reason = previous
+				? `is also the target of ${path.relative(root, previous)}`
+				: 'already exists';
+			const conflict = unchangedFile(path.relative(root, file), source, {
+				rule: 'rename-conflict',
+				severity: 'error',
+				line: 1,
+				message: `Migration stopped because ${path.relative(root, output)} ${reason}.`,
+			});
+			return {
+				root,
+				files: [conflict],
+				packages: [],
+				dependencies: [],
+				patched: [],
+				missing: [],
+				html: [],
+				compiler: null,
+			};
+		}
+		owners.set(key, file);
+		renames.set(file, output);
 	}
+	const config = tsconfigOptions(root);
+	const strictConfig = (config?.strictNullChecks ?? config?.strict) ? config : null;
+	/** @type {ts.Program | undefined} */
+	let program;
 	const contextsOf = contextIndex(exports, known);
+	const resolveRename = renamedImports(root, config, renames);
 
 	const verify = options.verify !== false;
 	const compiler = verify || strong ? await loadCompiler(root) : null;
@@ -110,9 +141,7 @@ export async function runCodemod(paths, options = {}) {
 		/** @type {Note[]} */
 		const extra = [];
 		const resolveSpecifier = (/** @type {string} */ specifier) =>
-			resolveRelative(file, specifier, known, renames) ??
-			resolveAlias(file, specifier, renames, config) ??
-			resolveBinding(specifier, packages, extra);
+			resolveRename(file, specifier) ?? resolveBinding(specifier, packages, extra);
 		const isContext = (/** @type {string} */ specifier, /** @type {string} */ name) => {
 			if (!specifier.startsWith('.')) return null;
 			const target = resolveModule(file, specifier, known);
@@ -190,31 +219,23 @@ export async function runCodemod(paths, options = {}) {
 		const source = fs.readFileSync(file, 'utf8');
 		const react = /^import\b[^;]*?\bfrom\s+['"]react(?:-dom)?(?:\/[^'"]*)?['"]/m.exec(source);
 		if (!react || /\bfrom\s+['"]octane(?:\/[^'"]*)?['"]/.test(source)) continue;
-		results.push({
-			file: path.relative(root, file),
-			output: path.relative(root, file),
-			changed: false,
-			rules: {},
-			notes: [
-				{
-					rule: 'tsrx-react',
-					severity: 'error',
-					line: source.slice(0, react.index).split('\n').length,
-					message:
-						'This is TSRX written for React (`@tsrx/react`), which the codemod cannot read. Port it by hand: its templates are already TSRX, but its React imports and APIs need the changes the codemod makes to TSX.',
-				},
-			],
-			strong: null,
-			strongFixes: [],
-			diagnostics: [],
-			code: source,
-		});
+		results.push(
+			unchangedFile(path.relative(root, file), source, {
+				rule: 'tsrx-react',
+				severity: 'error',
+				line: source.slice(0, react.index).split('\n').length,
+				message:
+					'This is TSRX written for React (`@tsrx/react`), which the codemod cannot read. Port it by hand: its templates are already TSRX, but its React imports and APIs need the changes the codemod makes to TSX.',
+			}),
+		);
 	}
 
 	// Configs and scripts name modules by path too, such as Vite's
 	// `server.warmup.clientFiles`, including those outside the migrated paths.
 	const byFile = new Map(results.map((result) => [path.join(root, result.file), result]));
-	for (const file of collect(root, (name) => SOURCE.test(name))) {
+	for (const file of renames.size
+		? collect(root, (name) => SOURCE.test(name) || isTsrx(name))
+		: []) {
 		if (renames.has(file)) continue;
 		const result = byFile.get(file);
 		const paths = rewriteModulePaths(
@@ -222,6 +243,7 @@ export async function runCodemod(paths, options = {}) {
 			file,
 			root,
 			renames,
+			resolveRename,
 		);
 		if (!paths) continue;
 		const rules = { ...result?.rules, 'module-paths': paths.count };
@@ -253,7 +275,7 @@ export async function runCodemod(paths, options = {}) {
 		for (const result of results) {
 			if (!result.changed) continue;
 			const output = path.join(root, result.output);
-			fs.writeFileSync(output, result.code);
+			fs.writeFileSync(output, result.code, { flag: result.output === result.file ? 'w' : 'wx' });
 			if (result.output !== result.file) fs.rmSync(path.join(root, result.file));
 		}
 	}
@@ -266,6 +288,21 @@ export async function runCodemod(paths, options = {}) {
 		missing: [...missing.values()].sort((a, b) => a.name.localeCompare(b.name)),
 		html,
 		compiler: compiler?.from ?? null,
+	};
+}
+
+/** @param {string} file @param {string} code @param {Note} note @returns {FileResult} */
+function unchangedFile(file, code, note) {
+	return {
+		file,
+		output: file,
+		code,
+		changed: false,
+		rules: {},
+		notes: [note],
+		strong: null,
+		strongFixes: [],
+		diagnostics: [],
 	};
 }
 
@@ -371,39 +408,51 @@ function resolveModule(from, specifier, files) {
 }
 
 /**
- * The new specifier for a relative import of a renamed module. `.tsrx` modules
- * are imported by their full name.
+ * Resolve against the files on disk before any rename, including modules
+ * outside the selected paths that could win an extensionless lookup.
  *
- * @param {string} from
- * @param {string} specifier
- * @param {Set<string>} files
+ * @param {string} root
+ * @param {ts.CompilerOptions | null} config
  * @param {Map<string, string>} renames
  */
-function resolveRelative(from, specifier, files, renames) {
-	const target = resolveModule(from, specifier, files);
-	if (!target || !renames.has(target.file)) return null;
-	if (target.index) return specifier.replace(/\/?$/, '/index.tsrx');
-	return specifier.replace(/\.(?:[cm]?[jt]sx?)$/, '') + '.tsrx';
-}
-
-/**
- * The new specifier for an import of a renamed module through a tsconfig
- * `paths` alias (`~/components/Card`), resolved as TypeScript resolves it.
- *
- * @param {string} from
- * @param {string} specifier
- * @param {Map<string, string>} renames
- * @param {ts.CompilerOptions | null} options
- */
-function resolveAlias(from, specifier, renames, options) {
-	if (!options?.paths || specifier.startsWith('.')) return null;
-	const file = ts.resolveModuleName(specifier, from, { ...options, preserveSymlinks: true }, ts.sys)
-		.resolvedModule?.resolvedFileName;
-	if (!file || !renames.has(file)) return null;
-	if (SOURCE.test(specifier)) return specifier.replace(SOURCE, '.tsrx');
-	return path.basename(file).startsWith('index.') && !/(?:^|\/)index$/.test(specifier)
-		? `${specifier}/index.tsrx`
-		: `${specifier}.tsrx`;
+function renamedImports(root, config, renames) {
+	const options = {
+		moduleResolution: ts.ModuleResolutionKind.Bundler,
+		...config,
+		preserveSymlinks: true,
+	};
+	const cache = ts.createModuleResolutionCache(root, (file) => file, options);
+	const pathsBase =
+		options.baseUrl ?? (typeof config?.pathsBasePath === 'string' ? config.pathsBasePath : root);
+	const aliases = Object.entries(options.paths ?? {}).map(([key, targets]) => {
+		const [start, end] = key.split('*');
+		const directory =
+			key.endsWith('/*') && targets.length === 1 && targets[0].endsWith('/*')
+				? path.resolve(pathsBase, targets[0].slice(0, -1)) + path.sep
+				: null;
+		return { start, end, directory };
+	});
+	return (/** @type {string} */ from, /** @type {string} */ specifier) => {
+		const matches = specifier.startsWith('.')
+			? []
+			: aliases.filter(({ start, end }) =>
+					end === undefined
+						? specifier === start
+						: specifier.startsWith(start) && specifier.endsWith(end),
+				);
+		if (!renames.size || (!specifier.startsWith('.') && !matches.length)) return null;
+		const resolved = ts.resolveModuleName(specifier, from, options, ts.sys, cache).resolvedModule;
+		const target = resolved && renames.get(resolved.resolvedFileName);
+		if (!target) return null;
+		// Only a single directory alias preserves the specifier's suffix.
+		// A fixed alias or fallback list may resolve elsewhere after a rename.
+		const alias = matches.length === 1 ? matches[0] : null;
+		if (alias?.directory && target.startsWith(alias.directory)) {
+			return alias.start + target.slice(alias.directory.length).split(path.sep).join('/');
+		}
+		const relative = path.relative(path.dirname(from), target).split(path.sep).join('/');
+		return relative.startsWith('../') ? relative : './' + relative;
+	};
 }
 
 /**
@@ -676,40 +725,86 @@ function rewriteEntryPages(root, targets, renames, write) {
 }
 
 /**
- * Point the exact path strings in a module that keeps its name at the modules
- * renamed to `.tsrx`. A path resolves from the module or, as Vite resolves its
- * options, from the root; a glob or an extensionless path stays.
+ * Follow imports outside the migrated paths as well as exact path strings
+ * in scripts and configs. Parse TSRX importers with their own grammar so
+ * template text that looks like an import remains text.
  *
  * @param {string} code
  * @param {string} file
  * @param {string} root
  * @param {Map<string, string>} renames
+ * @param {(from: string, specifier: string) => string | null} resolveRename
  * @returns {{ code: string, count: number } | null}
  */
-function rewriteModulePaths(code, file, root, renames) {
-	const sf = ts.createSourceFile(file, code, ts.ScriptTarget.Latest);
-	/** @type {ts.StringLiteralLike[]} */
-	const paths = [];
-	const visit = (/** @type {ts.Node} */ node) => {
-		if (
-			ts.isStringLiteralLike(node) &&
-			SOURCE.test(node.text) &&
-			[path.dirname(file), root].some((dir) => renames.has(path.join(dir, node.text)))
-		) {
-			paths.push(node);
+function rewriteModulePaths(code, file, root, renames, resolveRename) {
+	/** @type {{ start: number, end: number, text: string }[]} */
+	const edits = [];
+	/** @param {string} value @param {number} start @param {number} end @param {boolean} moduleSource */
+	function literal(value, start, end, moduleSource) {
+		if (!moduleSource) {
+			const ext = SOURCE.exec(value)?.[0];
+			if (
+				ext &&
+				code.slice(end - 1 - ext.length, end - 1) === ext &&
+				[path.dirname(file), root].some((dir) => renames.has(path.join(dir, value)))
+			) {
+				edits.push({ start: end - 1 - ext.length, end: end - 1, text: '.tsrx' });
+			}
+			return;
 		}
-		ts.forEachChild(node, visit);
-	};
-	visit(sf);
-	if (paths.length === 0) return null;
-	let next = code;
-	for (const node of paths.reverse()) {
-		// The extension ends the literal, just before its closing quote.
-		const end = node.getEnd() - 1;
-		const start = node.getStart(sf);
-		next = next.slice(0, start) + next.slice(start, end).replace(SOURCE, '.tsrx') + next.slice(end);
+		const next = resolveRename(file, value);
+		if (next) {
+			const quoted = JSON.stringify(next);
+			const text =
+				code[start] === "'" ? "'" + quoted.slice(1, -1).replaceAll("'", "\\'") + "'" : quoted;
+			edits.push({ start, end, text });
+		}
 	}
-	return { code: next, count: paths.length };
+	if (isTsrx(file)) {
+		const { program } = parseSync(file, code);
+		const visit = (/** @type {import('@tsrx/oxc/parser').Node} */ node) => {
+			const source =
+				'source' in node
+					? node.source
+					: node.type === 'TSExternalModuleReference'
+						? node.expression
+						: null;
+			if (source?.type === 'Literal' && typeof source.value === 'string') {
+				literal(source.value, source.start, source.end, true);
+			} else if (source?.type === 'TemplateLiteral' && !source.expressions.length) {
+				const value = source.quasis[0]?.value.cooked;
+				if (value != null) literal(value, source.start, source.end, true);
+			}
+			for (const child of Object.values(node)) {
+				if (Array.isArray(child)) {
+					for (const item of child) if (item?.type) visit(item);
+				} else if (child?.type) visit(child);
+			}
+		};
+		if (program) visit(program);
+	} else {
+		const sf = ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true);
+		const visit = (/** @type {ts.Node} */ node) => {
+			if (ts.isStringLiteralLike(node)) {
+				const p = node.parent;
+				const moduleSource =
+					((ts.isImportDeclaration(p) || ts.isExportDeclaration(p)) &&
+						p.moduleSpecifier === node) ||
+					ts.isExternalModuleReference(p) ||
+					(ts.isLiteralTypeNode(p) && ts.isImportTypeNode(p.parent) && p.parent.argument === p) ||
+					(ts.isCallExpression(p) &&
+						p.expression.kind === ts.SyntaxKind.ImportKeyword &&
+						p.arguments[0] === node);
+				literal(node.text, node.getStart(sf), node.end, moduleSource);
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(sf);
+	}
+	if (!edits.length) return null;
+	for (const { start, end, text } of edits.sort((a, b) => b.start - a.start))
+		code = code.slice(0, start) + text + code.slice(end);
+	return { code, count: edits.length };
 }
 
 /**

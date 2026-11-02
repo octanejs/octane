@@ -152,14 +152,24 @@ describe('@for item-body purity with host-only conditional content', () => {
 		expect(flags[0]! & PURE).toBe(0);
 	});
 
-	it('declines when the @if test reads an imported member (live-binding hazard)', () => {
+	// TypeScript wrappers around the import leave the read live, so they must not
+	// hide it from the gate.
+	it.each([
+		'flags.enabled',
+		'flags!.enabled',
+		'(flags as Flags).enabled',
+		'(flags satisfies Flags).enabled',
+		'(flags as Flags)?.enabled',
+		'(flags!.nested as Flags).enabled',
+	])('declines when the @if test reads an imported member as %s (live-binding hazard)', (read) => {
 		const flags = appListFlags(
 			compile(
 				`
 				import { flags } from './flags';
+				type Flags = { enabled: boolean; nested: Flags };
 				export function App(props) @{
 					<ul>@for (const item of props.items; key item.id) {
-						<li>@if (flags.enabled) {<span class="x" />}</li>
+						<li>@if (${read}) {<span class="x" />}</li>
 					}</ul>
 				}
 			`,

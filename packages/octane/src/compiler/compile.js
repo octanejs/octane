@@ -8527,7 +8527,8 @@ function scanComponentBody(root, importedNames) {
 
 // A JSX member chain bottoms out at a JSXIdentifier, so the base test below
 // never matches one. Do not reintroduce a JSX-awareness flag: it cannot change
-// the answer.
+// the answer. Each receiver is unwrapped first: `mod!.flag`, `(mod as T).flag`,
+// and `(mod satisfies T)?.flag` still read the live import.
 function containsImportedMemberRead(root, importedNames) {
 	let found = false;
 	const seen = new WeakSet();
@@ -8542,7 +8543,7 @@ function containsImportedMemberRead(root, importedNames) {
 		if (n.type === 'MemberExpression' || n.type === 'JSXMemberExpression') {
 			let object = n;
 			while (object?.type === 'MemberExpression' || object?.type === 'JSXMemberExpression') {
-				object = object.object;
+				object = unwrapValueExpression(object.object);
 			}
 			if (object?.type === 'Identifier' && importedNames.has(object.name)) {
 				found = true;
@@ -12288,13 +12289,15 @@ function compileAuthored(source, filename, options, bundlerMetadata, analyzed = 
 }
 
 // Directives must precede generated imports and setup to remain a module prologue.
+// `"use strong"` only selects compile-time checks, so it is not emitted: bundlers
+// warn once per module about a directive they cannot preserve.
 function moduleDirectives(body) {
 	const directives = [];
-	for (const statement of body) {
-		if (typeof statement.directive !== 'string') break;
-		directives.push(statement);
+	let end = 0;
+	for (; typeof body[end]?.directive === 'string'; end++) {
+		if (body[end].directive !== 'use strong') directives.push(body[end]);
 	}
-	return directives;
+	return { directives, end };
 }
 
 function compileInternal(
@@ -13708,7 +13711,7 @@ function compileInternal(
 	// esrap at the end, which also yields the entire module source map.
 	ctx.hydrationPropsModule = ast;
 	const bodyNodes = emitServerModuleClientStubs(serverModuleInfo, ctx);
-	const directiveNodes = moduleDirectives(ast.body);
+	const prologue = moduleDirectives(ast.body);
 	const compileOpts = { hmrWrap: hmrEnabled, hmrMutable: hmrEnabled };
 	// Exported `const X = () => <jsx/>` components stay plain values; HMR rebinds
 	// them like lowered components. Keyed by authored top-level statement.
@@ -13742,7 +13745,7 @@ function compileInternal(
 			if (component.exportKind === 'default') hmrDefaultValues.add(component.name);
 		}
 	}
-	for (let node of ast.body.slice(directiveNodes.length)) {
+	for (let node of ast.body.slice(prologue.end)) {
 		const firstStatement = bodyNodes.length;
 		if (
 			node === serverModuleInfo?.declaration ||
@@ -14307,7 +14310,12 @@ function compileInternal(
 	const program = {
 		type: 'Program',
 		sourceType: 'module',
-		body: [...directiveNodes, ...runtimeImportNodes, ...profileRuntimeImportNodes, ...moduleBody],
+		body: [
+			...prologue.directives,
+			...runtimeImportNodes,
+			...profileRuntimeImportNodes,
+			...moduleBody,
+		],
 		metadata: { path: [] },
 		start: ast.start,
 		end: ast.end,
@@ -14559,8 +14567,8 @@ function compileServer(
 	}
 	ctx.moduleCssInjections = ctx.cssInjections.slice();
 	const bodyNodes = emitServerModuleServerNodes(serverModuleInfo, ctx);
-	const directiveNodes = moduleDirectives(ast.body);
-	for (const node of ast.body.slice(directiveNodes.length)) {
+	const prologue = moduleDirectives(ast.body);
+	for (const node of ast.body.slice(prologue.end)) {
 		const firstStatement = bodyNodes.length;
 		if (
 			node === serverModuleInfo?.declaration ||
@@ -14669,7 +14677,7 @@ function compileServer(
 		type: 'Program',
 		sourceType: 'module',
 		body: [
-			...directiveNodes,
+			...prologue.directives,
 			...runtimeImportNodes,
 			...nativeActivation,
 			...signalActivation,
