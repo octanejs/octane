@@ -973,9 +973,12 @@ export function lowerSignalDeclarations(ast, filename, options) {
 		);
 		return { ...statement, specifiers: [...statement.specifiers, ...generated] };
 	});
+	// Generated statements follow the directive prologue, which must stay first.
+	const setupStatement = (statement) =>
+		statement.type !== 'ImportDeclaration' && typeof statement.directive !== 'string';
 	if (revision !== null) {
 		// Before any statement that could render, so no declaration reads it early.
-		const first = body.findIndex((statement) => statement.type !== 'ImportDeclaration');
+		const first = body.findIndex(setupStatement);
 		const at = first === -1 ? body.length : first;
 		body.splice(
 			at,
@@ -984,7 +987,7 @@ export function lowerSignalDeclarations(ast, filename, options) {
 		);
 	}
 	if (installers.length > 0) {
-		const first = body.findIndex((statement) => statement.type !== 'ImportDeclaration');
+		const first = body.findIndex(setupStatement);
 		const at = first === -1 ? body.length : first;
 		const origin = body[at] ?? body[at - 1];
 		body.splice(
