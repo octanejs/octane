@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -141,6 +141,32 @@ describe('runCodemod', () => {
 			{ cwd, encoding: 'utf8' },
 		);
 		expect(output).toContain(`init\` in ${root} to wire`);
+	});
+
+	it.each(['json', 'text'])('writes the complete %s report to a pipe', (format) => {
+		const json = format === 'json';
+		const root = project({
+			'package.json': '{}',
+			'Card.tsx': [
+				json ? '' : "import { createRef } from 'react'; export const ref = createRef();",
+				'export const Card = () => <p />;',
+				'// ' + 'x'.repeat(1024 * 1024) + ' end of input',
+			].join('\n'),
+		});
+		const cli = path.join(import.meta.dirname, '../src/bin.js');
+		const { status, stdout } = spawnSync(
+			process.execPath,
+			[cli, root, '--print', '--no-verify', ...(json ? ['--json'] : [])],
+			{
+				encoding: 'utf8',
+				maxBuffer: 2 * 1024 * 1024,
+				env: { ...process.env, NO_COLOR: '1' },
+			},
+		);
+		expect(status).toBe(json ? 0 : 1);
+		if (json)
+			expect(JSON.parse(stdout).files[0].code.trimEnd().endsWith('end of input')).toBe(true);
+		else expect(stdout.trimEnd().endsWith('1 error(s) (dry run)')).toBe(true);
 	});
 
 	it('is idempotent: a second run changes nothing', async () => {

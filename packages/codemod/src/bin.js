@@ -23,129 +23,137 @@ Options:
   -h, --help         show this help
 `;
 
-const { values, positionals } = parseArgs({
-	allowPositionals: true,
-	allowNegative: true,
-	options: {
-		strong: { type: 'boolean', default: false },
-		'force-strong': { type: 'boolean', default: false },
-		target: { type: 'string', default: 'tsrx' },
-		'dry-run': { type: 'boolean', default: false },
-		print: { type: 'boolean', default: false },
-		verify: { type: 'boolean', default: true },
-		json: { type: 'boolean', default: false },
-		help: { type: 'boolean', short: 'h', default: false },
-	},
-});
+process.exitCode = await main();
 
-if (values.help) {
-	process.stdout.write(HELP);
-	process.exit(0);
-}
-if (values.target !== 'tsrx' && values.target !== 'tsx') {
-	process.stderr.write(`--target must be tsrx or tsx, got "${values.target}".\n`);
-	process.exit(2);
-}
+async function main() {
+	const { values, positionals } = parseArgs({
+		allowPositionals: true,
+		allowNegative: true,
+		options: {
+			strong: { type: 'boolean', default: false },
+			'force-strong': { type: 'boolean', default: false },
+			target: { type: 'string', default: 'tsrx' },
+			'dry-run': { type: 'boolean', default: false },
+			print: { type: 'boolean', default: false },
+			verify: { type: 'boolean', default: true },
+			json: { type: 'boolean', default: false },
+			help: { type: 'boolean', short: 'h', default: false },
+		},
+	});
 
-const dryRun = values['dry-run'] || values.print;
-const result = await runCodemod(positionals.length > 0 ? positionals : ['.'], {
-	target: /** @type {'tsrx' | 'tsx'} */ (values.target),
-	strong: values.strong || values['force-strong'],
-	forceStrong: values['force-strong'],
-	verify: values.verify,
-	write: !dryRun,
-});
+	if (values.help) {
+		process.stdout.write(HELP);
+		return 0;
+	}
+	if (values.target !== 'tsrx' && values.target !== 'tsx') {
+		process.stderr.write(`--target must be tsrx or tsx, got "${values.target}".\n`);
+		return 2;
+	}
 
-// The codemod's own notes, at the original file's lines, and the compiler's
-// diagnostics, at the written file's, as one list.
-const findings = result.files.flatMap((file) => [
-	...file.notes
-		.filter((note) => note.severity !== 'info')
-		.map((note) => ({ file: file.file, ...note, code: note.rule })),
-	...file.diagnostics.map((diagnostic) => ({ file: file.output, ...diagnostic })),
-]);
-const errors = findings.filter((finding) => finding.severity === 'error');
+	const dryRun = values['dry-run'] || values.print;
+	const result = await runCodemod(positionals.length > 0 ? positionals : ['.'], {
+		target: /** @type {'tsrx' | 'tsx'} */ (values.target),
+		strong: values.strong || values['force-strong'],
+		forceStrong: values['force-strong'],
+		verify: values.verify,
+		write: !dryRun,
+	});
 
-if (values.json) {
-	const files = result.files.map(({ code, ...file }) => (values.print ? { ...file, code } : file));
-	process.stdout.write(JSON.stringify({ ...result, files }, null, 2) + '\n');
-	process.exit(errors.length > 0 ? 1 : 0);
-}
+	// The codemod's own notes, at the original file's lines, and the compiler's
+	// diagnostics, at the written file's, as one list.
+	const findings = result.files.flatMap((file) => [
+		...file.notes
+			.filter((note) => note.severity !== 'info')
+			.map((note) => ({ file: file.file, ...note, code: note.rule })),
+		...file.diagnostics.map((diagnostic) => ({ file: file.output, ...diagnostic })),
+	]);
+	const errors = findings.filter((finding) => finding.severity === 'error');
 
-const changed = result.files.filter((file) => file.changed);
-for (const file of changed) {
-	const arrow = file.output === file.file ? '' : ` → ${file.output}`;
-	const rules = Object.entries(file.rules)
-		.map(([rule, count]) => (count > 1 ? `${rule}×${count}` : rule))
-		.join(', ');
-	const mode =
-		file.strong === null ? '' : file.strong ? colors.green(' strong') : colors.yellow(' compat');
-	const mark = errors.some((error) => error.file === file.output)
-		? colors.red('✗')
-		: colors.green('✓');
-	process.stdout.write(`${mark} ${file.file}${arrow}${mode}  ${colors.dim(rules)}\n`);
-	if (values.print) process.stdout.write(colors.dim('─'.repeat(60)) + '\n' + file.code + '\n');
-}
+	if (values.json) {
+		const files = result.files.map(({ code, ...file }) =>
+			values.print ? { ...file, code } : file,
+		);
+		process.stdout.write(JSON.stringify({ ...result, files }, null, 2) + '\n');
+		return errors.length > 0 ? 1 : 0;
+	}
 
-if (findings.length > 0) {
-	process.stdout.write(`\n${colors.bold('Needs attention')}\n`);
-	for (const finding of findings) {
-		const tag = finding.severity === 'error' ? colors.red : colors.yellow;
-		const message = finding.message.split('\n')[0];
+	const changed = result.files.filter((file) => file.changed);
+	for (const file of changed) {
+		const arrow = file.output === file.file ? '' : ` → ${file.output}`;
+		const rules = Object.entries(file.rules)
+			.map(([rule, count]) => (count > 1 ? `${rule}×${count}` : rule))
+			.join(', ');
+		const mode =
+			file.strong === null ? '' : file.strong ? colors.green(' strong') : colors.yellow(' compat');
+		const mark = errors.some((error) => error.file === file.output)
+			? colors.red('✗')
+			: colors.green('✓');
+		process.stdout.write(`${mark} ${file.file}${arrow}${mode}  ${colors.dim(rules)}\n`);
+		if (values.print) process.stdout.write(colors.dim('─'.repeat(60)) + '\n' + file.code + '\n');
+	}
+
+	if (findings.length > 0) {
+		process.stdout.write(`\n${colors.bold('Needs attention')}\n`);
+		for (const finding of findings) {
+			const tag = finding.severity === 'error' ? colors.red : colors.yellow;
+			const message = finding.message.split('\n')[0];
+			process.stdout.write(
+				`  ${finding.file}:${finding.line} ${tag(finding.severity)} ${colors.dim(finding.code)} ${message}\n`,
+			);
+		}
+	}
+	if (result.packages.length > 0) {
+		process.stdout.write(`\n${colors.bold('Dependencies')}\n`);
+		const ranges = new Map(result.dependencies.map(({ name, range }) => [name, range]));
+		for (const { from, to } of result.packages) {
+			const range = ranges.get(to);
+			process.stdout.write(`  ${from} → ${to}${range ? colors.dim(` ${range}`) : ''}\n`);
+		}
+		if (ranges.size > 0) {
+			process.stdout.write(
+				colors.dim(`  ${dryRun ? 'Would add' : 'Added'} ${ranges.size} to package.json\n`),
+			);
+		}
+		for (const { name, patch } of result.patched) {
+			process.stdout.write(
+				`  ${colors.yellow('warning')} ${name} is patched by ${patch}, which does not apply to its binding: port the patch there.\n`,
+			);
+		}
+	}
+	if (result.missing.length > 0) {
 		process.stdout.write(
-			`  ${finding.file}:${finding.line} ${tag(finding.severity)} ${colors.dim(finding.code)} ${message}\n`,
+			`\n${colors.bold('No Octane port')} ${colors.dim('(still runs on React)')}\n`,
+		);
+		for (const { name, modules, islands, blocked } of result.missing) {
+			const uses = [
+				`${modules} module(s)`,
+				islands > 0 ? `${islands} element(s) in ReactCompat islands` : null,
+				blocked > 0 ? colors.red(`${blocked} use(s) need a port`) : null,
+			].filter(Boolean);
+			process.stdout.write(`  ${name}  ${colors.dim(uses.join(', '))}\n`);
+		}
+	}
+	for (const page of result.html) process.stdout.write(`\nUpdated the entry script in ${page}\n`);
+
+	const strong = changed.filter((file) => file.strong !== null);
+	const summary = [
+		`${changed.length} module(s) migrated`,
+		`${changed.filter((file) => file.output !== file.file).length} renamed to .tsrx`,
+		strong.length > 0
+			? `${strong.filter((file) => file.strong).length}/${strong.length} Strong`
+			: null,
+		`${errors.length} error(s)`,
+	].filter(Boolean);
+	process.stdout.write(`\n${summary.join(', ')}${dryRun ? colors.dim(' (dry run)') : ''}\n`);
+	if (changed.length > 0 && !dryRun) {
+		// A project outside this directory is named in full, not by `../` steps.
+		const relative = path.relative(process.cwd(), result.root);
+		const root = relative.startsWith('..') ? result.root : relative || '.';
+		process.stdout.write(
+			colors.dim(
+				`Next: run \`npx @octanejs/cli init\` in ${root} to wire Octane into the build.\n`,
+			),
 		);
 	}
+	return errors.length > 0 ? 1 : 0;
 }
-if (result.packages.length > 0) {
-	process.stdout.write(`\n${colors.bold('Dependencies')}\n`);
-	const ranges = new Map(result.dependencies.map(({ name, range }) => [name, range]));
-	for (const { from, to } of result.packages) {
-		const range = ranges.get(to);
-		process.stdout.write(`  ${from} → ${to}${range ? colors.dim(` ${range}`) : ''}\n`);
-	}
-	if (ranges.size > 0) {
-		process.stdout.write(
-			colors.dim(`  ${dryRun ? 'Would add' : 'Added'} ${ranges.size} to package.json\n`),
-		);
-	}
-	for (const { name, patch } of result.patched) {
-		process.stdout.write(
-			`  ${colors.yellow('warning')} ${name} is patched by ${patch}, which does not apply to its binding: port the patch there.\n`,
-		);
-	}
-}
-if (result.missing.length > 0) {
-	process.stdout.write(
-		`\n${colors.bold('No Octane port')} ${colors.dim('(still runs on React)')}\n`,
-	);
-	for (const { name, modules, islands, blocked } of result.missing) {
-		const uses = [
-			`${modules} module(s)`,
-			islands > 0 ? `${islands} element(s) in ReactCompat islands` : null,
-			blocked > 0 ? colors.red(`${blocked} use(s) need a port`) : null,
-		].filter(Boolean);
-		process.stdout.write(`  ${name}  ${colors.dim(uses.join(', '))}\n`);
-	}
-}
-for (const page of result.html) process.stdout.write(`\nUpdated the entry script in ${page}\n`);
-
-const strong = changed.filter((file) => file.strong !== null);
-const summary = [
-	`${changed.length} module(s) migrated`,
-	`${changed.filter((file) => file.output !== file.file).length} renamed to .tsrx`,
-	strong.length > 0
-		? `${strong.filter((file) => file.strong).length}/${strong.length} Strong`
-		: null,
-	`${errors.length} error(s)`,
-].filter(Boolean);
-process.stdout.write(`\n${summary.join(', ')}${dryRun ? colors.dim(' (dry run)') : ''}\n`);
-if (changed.length > 0 && !dryRun) {
-	// A project outside this directory is named in full, not by `../` steps.
-	const relative = path.relative(process.cwd(), result.root);
-	const root = relative.startsWith('..') ? result.root : relative || '.';
-	process.stdout.write(
-		colors.dim(`Next: run \`npx @octanejs/cli init\` in ${root} to wire Octane into the build.\n`),
-	);
-}
-process.exit(errors.length > 0 ? 1 : 0);
