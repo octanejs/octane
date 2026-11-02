@@ -891,6 +891,63 @@ describe('runCodemod', () => {
 		]);
 	});
 
+	it('keeps imports working when migrating one component at a time', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: {
+					moduleSuffixes: ['.native', ''],
+					paths: {
+						'~/*': ['./src/*'],
+						'@card': ['./src/cards/index.tsx'],
+						'#/*': ['./overrides/*', './src/*'],
+					},
+				},
+			}),
+			'src/cards/index.tsx': 'export function Card() { return <p />; }',
+			'overrides/cards/index.tsrx': 'export const Card = () => null;',
+			'src/Label.native.tsx': 'export const Label = () => <i />;',
+			'src/Badge.tsx': 'export function Badge() { return <b />; }',
+			'src/types.ts': 'export type Entry<T> = T;',
+			'src/Badge.ts': 'export const Badge = 1;',
+			'src/App.tsx': [
+				"import { Card } from '~/cards';",
+				"import { Badge } from './Badge';",
+				"export { Card as Other } from '@card';",
+				"export { Card as Fallback } from '#/cards';",
+				"export { Label } from '~/Label';",
+				"export const load = () => import('./cards');",
+				"export const caption = './cards';",
+				"type Entry = import('./types').Entry<'./cards'>;",
+				'export const App = () => <Card />;',
+			].join('\n'),
+			'src/Panel.tsrx':
+				"// 🌵\nimport { Card } from './cards';\nexport function Panel() @{ <p>import './cards'</p> }",
+		});
+		await runCodemod([
+			path.join(root, 'src/cards/index.tsx'),
+			path.join(root, 'src/Badge.tsx'),
+			path.join(root, 'src/Label.native.tsx'),
+		]);
+		const read = (/** @type {string} */ name) => fs.readFileSync(path.join(root, name), 'utf8');
+		expect(read('src/App.tsx')).toBe(
+			[
+				"import { Card } from '~/cards/index.tsrx';",
+				"import { Badge } from './Badge';",
+				"export { Card as Other } from './cards/index.tsrx';",
+				"export { Card as Fallback } from './cards/index.tsrx';",
+				"export { Label } from '~/Label.native.tsrx';",
+				"export const load = () => import('./cards/index.tsrx');",
+				"export const caption = './cards';",
+				"type Entry = import('./types').Entry<'./cards'>;",
+				'export const App = () => <Card />;',
+			].join('\n'),
+		);
+		expect(read('src/Panel.tsrx')).toBe(
+			"// 🌵\nimport { Card } from './cards/index.tsrx';\nexport function Panel() @{ <p>import './cards'</p> }",
+		);
+	});
+
 	it('points exact path strings in configs and scripts at renamed modules', async () => {
 		// T3 Code warms its entry and first routes by path, from its Vite
 		// config and from a plugin beside it, outside the migrated `src`.
@@ -900,6 +957,7 @@ describe('runCodemod', () => {
 				'export default { server: { warmup: { clientFiles: ["./src/main.tsx", "./src/*.tsx"] } } };\n',
 			'vite/warm.ts':
 				'export const entries = ["src/main.tsx", "src/routes/chat.tsx", "src/lib/icons.ts", "src/main", "main.tsx"];\n',
+			'paths.ts': 'export const main = file`src/main.tsx`;',
 			'src/main.tsx':
 				"import { createRoot } from 'react-dom/client';\ncreateRoot(document.body).render(<p />);\n",
 			'src/routes/chat.tsx': 'export const Chat = () => <p />;\n',
@@ -908,6 +966,7 @@ describe('runCodemod', () => {
 		const result = await runCodemod([path.join(root, 'src')]);
 		const read = (/** @type {string} */ name) => fs.readFileSync(path.join(root, name), 'utf8');
 		// Globs, extensionless paths, and modules that keep their names stay.
+		expect(read('paths.ts')).toBe('export const main = file`src/main.tsrx`;');
 		expect(read('vite.config.ts')).toBe(
 			'export default { server: { warmup: { clientFiles: ["./src/main.tsrx", "./src/*.tsx"] } } };\n',
 		);
@@ -919,6 +978,7 @@ describe('runCodemod', () => {
 				.filter((file) => file.rules['module-paths'])
 				.map((file) => [file.file, file.rules['module-paths']]),
 		).toEqual([
+			['paths.ts', 1],
 			['vite.config.ts', 1],
 			['vite/warm.ts', 2],
 		]);
