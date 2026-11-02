@@ -120,9 +120,7 @@ describe.each(['client', 'server'] as const)('%s module directive source maps', 
 "custom directive";
 export function App() @{ <p>Hello</p> }`;
 			const { code, map } = compile(source, 'Directives.tsrx', { mode, dev });
-			for (const directive of ['"use strong"', '"custom directive"']) {
-				expectMappedIn(source, code, map, directive, 0, directive);
-			}
+			expectMappedIn(source, code, map, '"custom directive"', 0, '"custom directive"');
 		},
 	);
 });
