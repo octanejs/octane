@@ -702,7 +702,7 @@ class ModuleTransform {
 		code = this.finishImports(code);
 		code = code.replace(/^[ \t]*\u0000DROP\u0000[ \t]*\r?\n/gm, '').replaceAll(DROP, '');
 		code = code.replaceAll(LITERAL_NEWLINE, '\n');
-		if (this.unrenderable.size > 0 && !this.declared.has(NO_PORT)) {
+		if (this.unrenderable.size > 0) {
 			const [props, result] = this.isTypeScript()
 				? [': { error: string; children?: unknown }', ': never']
 				: ['', ''];
@@ -928,11 +928,9 @@ class ModuleTransform {
 				port.islands++;
 				this.islands.add(element);
 			} else {
-				const error = block(reason);
 				// Octane fails on a React component deep in its renderer, naming
 				// neither it nor its package, so it throws this error there instead.
-				const wrapper = ts.isJsxElement(element.parent) ? element.parent.openingElement : null;
-				if (wrapper?.tagName.getText(this.sf) !== NO_PORT) this.unrenderable.set(element, error);
+				this.unrenderable.set(element, block(reason));
 			}
 		} else if (ts.isCallExpression(parent) && parent.expression === member) {
 			if (/^use[A-Z0-9]/.test(name))
@@ -1568,6 +1566,14 @@ class ModuleTransform {
 			const island = this.require('octane/react', 'ReactCompat', false);
 			return `<${island}>${this.span(node, node.getStart(this.sf), node.end, PLAIN)}</${island}>`;
 		}
+		// An earlier run's wrapper goes: each run decides again whether its
+		// element throws or renders in an island.
+		if (ts.isJsxElement(node) && node.openingElement.tagName.getText(this.sf) === NO_PORT) {
+			const element = node.children.find(
+				(child) => ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child),
+			);
+			if (element) return this.emit(element, ctx);
+		}
 		const error = this.unrenderable.get(node);
 		if (error !== undefined) {
 			const element =
@@ -1577,6 +1583,8 @@ class ModuleTransform {
 		}
 		if (ts.isJsxElement(node)) return this.rewriteElement(node, ctx);
 		if (ts.isJsxExpression(node) && ctx.template) return this.rewriteHole(node);
+		// So does its `NoOctanePort`, which `run` adds back while one still throws.
+		if (ts.isFunctionDeclaration(node) && node.name?.text === NO_PORT) return DROP;
 		if (
 			ts.isFunctionDeclaration(node) ||
 			ts.isFunctionExpression(node) ||

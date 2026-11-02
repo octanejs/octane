@@ -388,6 +388,15 @@ describe('transformModule', () => {
 			`export const App = () => <NoOctanePort error="${old.notes[0].message}"><Toaster /></NoOctanePort>;\n\nfunction NoOctanePort({ error }: { error: string; children?: unknown }): never {\n  throw new Error(error);\n}\n`,
 		);
 		expect(migrate(old.code, { reactCompat: false, target: 'tsx' }).code).toBe(old.code);
+		// Once React 19.2 is installed, a later run hosts it in an island instead.
+		const upgraded = migrate(old.code, { target: 'tsx' });
+		expect([upgraded.code.includes('NoOctanePort'), upgraded.unported]).toEqual([
+			false,
+			[{ name: 'toast-kit', islands: 1, blocked: 0 }],
+		]);
+		expect(upgraded.code).toContain(
+			'export const App = () => <ReactCompat><Toaster /></ReactCompat>;\n',
+		);
 
 		// Through a namespace import too; a function call stays as it is, and a
 		// type-only import says nothing.
