@@ -43,6 +43,7 @@
   },
   "dependencies": {
     "@octanejs/cli": "workspace:*",
+    "@tsrx/oxc": "catalog:default",
     "octane": "workspace:*",
     "picocolors": "catalog:default",
     "typescript": "catalog:default"

@@ -5711,6 +5711,9 @@ importers:
       '@octanejs/cli':
         specifier: workspace:*
         version: link:../cli
+      '@tsrx/oxc':
+        specifier: catalog:default
+        version: 0.23.0(patch_hash=d7d900fb526a332617bf9816090271082f8175fc0ee483c999f6f5f7d41d88e9)(svelte@5.57.2)
       octane:
         specifier: workspace:*
         version: link:../octane
