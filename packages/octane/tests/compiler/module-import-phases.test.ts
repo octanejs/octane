@@ -67,26 +67,40 @@ describe('compiled module imports', () => {
 		['server production', { mode: 'server', dev: false }],
 	] as const) {
 		it.each(['js', 'ts'] as const)(
-			`preserves the module directive prologue in ${label} (%s)`,
+			`preserves the module directive prologue without "use strong" in ${label} (%s)`,
 			(output) => {
+				// Lowering `query$` adds module statements, which must follow the prologue.
 				const source = `/* license */
 "use strict";
 "use strong";
 "custom directive";
 import { useState } from 'octane';
-export function Counter() @{
+import { query$ } from 'octane/signals';
+export function Counter(props) @{
 	const [count, setCount] = useState(0);
-	<button onClick={() => setCount(count + 1)}>{count as string}</button>
+	const label$ = query$(() => 'label', props.load);
+	<button onClick={() => setCount(count + 1)}>{label$.latest(String(count))}</button>
 }`;
 				const { code } = compile(source, '/src/Counter.tsrx', { ...options, output });
 				const filename = `/src/Counter.${output}`;
 				const body = parseModule(code, filename).body;
 				expect(
 					body
-						.slice(0, 3)
+						.slice(0, 2)
 						.map((statement) => ('directive' in statement ? statement.directive : undefined)),
-				).toEqual(['use strict', 'use strong', 'custom directive']);
-				expect(body.filter((statement) => 'directive' in statement)).toHaveLength(3);
+				).toEqual(['use strict', 'custom directive']);
+				expect(body.filter((statement) => 'directive' in statement)).toHaveLength(2);
+				// `"use strong"` only selects compile-time checks. Emitting it makes
+				// Rolldown warn MODULE_LEVEL_DIRECTIVE once per Strong module.
+				expect(code).not.toContain('use strong');
+				// The authored directive still enables those checks.
+				expect(() =>
+					compile(
+						source.replace('<button', 'setCount(count + 1);\n\t<button'),
+						'/src/Counter.tsrx',
+						{ ...options, output },
+					),
+				).toThrow('OCTANE_STRONG_RENDER_STATE_UPDATE');
 				const compiler = createOctaneCompiler({ root: '/src' });
 				expect(
 					compiler.transform(code, filename, {
