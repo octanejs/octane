@@ -8527,7 +8527,8 @@ function scanComponentBody(root, importedNames) {
 
 // A JSX member chain bottoms out at a JSXIdentifier, so the base test below
 // never matches one. Do not reintroduce a JSX-awareness flag: it cannot change
-// the answer.
+// the answer. Each receiver is unwrapped first: `mod!.flag`, `(mod as T).flag`,
+// and `(mod satisfies T)?.flag` still read the live import.
 function containsImportedMemberRead(root, importedNames) {
 	let found = false;
 	const seen = new WeakSet();
@@ -8542,7 +8543,7 @@ function containsImportedMemberRead(root, importedNames) {
 		if (n.type === 'MemberExpression' || n.type === 'JSXMemberExpression') {
 			let object = n;
 			while (object?.type === 'MemberExpression' || object?.type === 'JSXMemberExpression') {
-				object = object.object;
+				object = unwrapValueExpression(object.object);
 			}
 			if (object?.type === 'Identifier' && importedNames.has(object.name)) {
 				found = true;
