@@ -1,5 +1,13 @@
 # @octanejs/mcp-server
 
+## 0.3.10
+
+### Patch Changes
+
+- a222919: Map `@legendapp/list/react` to `@octanejs/legendapp-list` in the binding catalog, so `@octanejs/codemod` rewrites its imports to the binding instead of reporting the package as unported.
+- 0c8ec2f: Map `@pierre/diffs/react` to `@octanejs/pierre-diffs` in the binding catalog, so `@octanejs/codemod` rewrites `@pierre/diffs/react` imports to the binding and leaves the other `@pierre/diffs` entries as they are.
+- 134d36c: Map `@pierre/trees/react` to `@octanejs/pierre-trees` in the binding catalog, so `@octanejs/codemod` rewrites `@pierre/trees/react` imports to the binding and leaves `@pierre/trees` imports in place.
+
 ## 0.3.9
 
 ### Patch Changes

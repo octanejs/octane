@@ -1,5 +1,13 @@
 # @octanejs/tanstack-router-ssr-query
 
+## 0.1.14
+
+### Patch Changes
+
+- 6ab9de8: `@tanstack/query-core` is now a peer dependency (`^5.102.8`), as it is for `@tanstack/react-router-ssr-query`. Before, the binding installed its own copy, so `@tanstack/router-ssr-query-core` resolved its query-core peer to that copy instead of the application's. Install `@tanstack/query-core` next to `@octanejs/tanstack-router-ssr-query` if your app does not already have it.
+- @octanejs/tanstack-query@0.1.68
+  - @octanejs/tanstack-router@0.3.2
+
 ## 0.1.13
 
 ### Patch Changes

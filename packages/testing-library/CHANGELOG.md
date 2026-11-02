@@ -1,5 +1,11 @@
 # @octanejs/testing-library
 
+## 0.1.68
+
+### Patch Changes
+
+- 6ab9de8: `@testing-library/dom` is now a peer dependency (`^10.4.1`), as it is for `@testing-library/react`, so `configure()`, `screen`, and the queries share the test setup's DOM Testing Library instead of a second copy installed by the binding. Install `@testing-library/dom` next to `@octanejs/testing-library` if your project does not already have it.
+
 ## 0.1.67
 
 ### Patch Changes

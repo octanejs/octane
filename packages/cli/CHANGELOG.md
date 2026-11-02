@@ -1,5 +1,14 @@
 # @octanejs/cli
 
+## 0.3.3
+
+### Patch Changes
+
+- d62c24e: `octane init` turns off `rewriteRelativeImportExtensions` when the effective tsconfig enables it: TypeScript reports TS2876 for every relative `.tsrx` import it is asked to rewrite, and the bundler emits the app. For an existing bundler config it names the `@vitejs/plugin-react` call that `octane()` replaces, and, when the project has `.tsrx` files, tells a TanStack Router plugin to pass `enableRouteGeneration: false`, because its generator finds only `.ts`, `.tsx`, `.js`, and `.jsx` routes and would regenerate the route tree without them. In a Vite+ project whose config declares a `run.tasks` entry named like a script `init` would add, such as `typecheck`, it adds no script, which `vp run` would refuse beside the task, and names the command the task should run.
+- a222919: Map `@legendapp/list/react` to `@octanejs/legendapp-list` in the binding catalog, so `@octanejs/codemod` rewrites its imports to the binding instead of reporting the package as unported.
+- 0c8ec2f: Map `@pierre/diffs/react` to `@octanejs/pierre-diffs` in the binding catalog, so `@octanejs/codemod` rewrites `@pierre/diffs/react` imports to the binding and leaves the other `@pierre/diffs` entries as they are.
+- 134d36c: Map `@pierre/trees/react` to `@octanejs/pierre-trees` in the binding catalog, so `@octanejs/codemod` rewrites `@pierre/trees/react` imports to the binding and leaves `@pierre/trees` imports in place.
+
 ## 0.3.2
 
 ### Patch Changes
