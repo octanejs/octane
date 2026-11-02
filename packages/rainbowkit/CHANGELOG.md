@@ -1,5 +1,15 @@
 # @octanejs/rainbowkit
 
+## 0.0.51
+
+### Patch Changes
+
+- 4a733c7: `@octanejs/wagmi` is now a peer dependency, as `wagmi` is for `@rainbow-me/rainbowkit`, so `RainbowKitProvider`, `ConnectButton`, and `WalletButton` read the application's `WagmiProvider`. Before, the binding pinned its own exact release, so an app on another `@octanejs/wagmi` release got a second copy with its own Wagmi context, and the components threw `WagmiProviderNotFoundError` under the app's provider. The `Connector` type now comes from `@octanejs/wagmi` too, and the direct `@wagmi/core` dependency is gone.
+- Updated dependencies [6ab9de8]
+- Updated dependencies [db85f36]
+  - @octanejs/wagmi@0.0.51
+  - @octanejs/tanstack-query@0.1.68
+
 ## 0.0.50
 
 ### Patch Changes

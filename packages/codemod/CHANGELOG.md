@@ -1,5 +1,27 @@
 # @octanejs/codemod
 
+## 0.1.3
+
+### Patch Changes
+
+- 42e8c19: Close the gaps a migration of T3 Code exposed. The codemod now adds each binding the migrated code imports to `package.json`, at its catalog version and beside the React package it replaces; TanStack's own adapters, which the catalog does not version, take `latest`. It names each patch the project applies to a replaced React package (pnpm or Bun `patchedDependencies`, or patch-package's `patches/`), which does not reach the binding. `jsx` and `jsxs` from `react/jsx-runtime`, passed to a JSX runtime consumer such as `hast-util-to-jsx-runtime`, become a local `jsx` that calls `createElement` with the key in its props, instead of an error. `event.target` reads as `event.currentTarget` when the handler's type wraps a control's event, such as Base UI's `BaseUIEvent<ChangeEvent<HTMLInputElement>>`, or is a control's `FocusEvent`. Base UI's `Input` and `Field.Control` count as text fields, so their `onChange` becomes `onInput`, and a wrapper that spreads its rest props onto one, directly or through a nested `const { style, ...rest } = props`, passes `onChange` on as `onInput`. The closing "Next" line names a project outside the current directory by its absolute path.
+- Updated dependencies [99dcc06]
+- Updated dependencies [a740e20]
+- Updated dependencies [4eadb3d]
+- Updated dependencies [c613495]
+- Updated dependencies [d62c24e]
+- Updated dependencies [a222919]
+- Updated dependencies [0c8ec2f]
+- Updated dependencies [134d36c]
+- Updated dependencies [0c8ec2f]
+- Updated dependencies [82f3946]
+- Updated dependencies [b379919]
+- Updated dependencies [a222919]
+- Updated dependencies [73e718c]
+- Updated dependencies [55daac6]
+  - octane@0.16.7
+  - @octanejs/cli@0.3.3
+
 ## 0.1.2
 
 ### Patch Changes
