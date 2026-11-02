@@ -199,6 +199,37 @@ export async function runCodemod(paths, options = {}) {
 		});
 	}
 
+	// Configs and scripts name modules by path too, such as Vite's
+	// `server.warmup.clientFiles`, including those outside the migrated paths.
+	const byFile = new Map(results.map((result) => [path.join(root, result.file), result]));
+	for (const file of collect(root, (name) => SOURCE.test(name))) {
+		if (renames.has(file)) continue;
+		const result = byFile.get(file);
+		const paths = rewriteModulePaths(
+			result?.code ?? fs.readFileSync(file, 'utf8'),
+			file,
+			root,
+			renames,
+		);
+		if (!paths) continue;
+		const rules = { ...result?.rules, 'module-paths': paths.count };
+		if (result) Object.assign(result, { code: paths.code, changed: true, rules });
+		else {
+			const name = path.relative(root, file);
+			results.push({
+				file: name,
+				output: name,
+				changed: true,
+				rules,
+				notes: [],
+				strong: null,
+				strongFixes: [],
+				diagnostics: [],
+				code: paths.code,
+			});
+		}
+	}
+
 	const html = rewriteEntryPages(
 		root,
 		paths.map((entry) => path.resolve(entry)),
@@ -648,6 +679,43 @@ function rewriteEntryPages(root, targets, renames, write) {
 		}
 	}
 	return updated;
+}
+
+/**
+ * Point the exact path strings in a module that keeps its name at the modules
+ * renamed to `.tsrx`. A path resolves from the module or, as Vite resolves its
+ * options, from the root; a glob or an extensionless path stays.
+ *
+ * @param {string} code
+ * @param {string} file
+ * @param {string} root
+ * @param {Map<string, string>} renames
+ * @returns {{ code: string, count: number } | null}
+ */
+function rewriteModulePaths(code, file, root, renames) {
+	const sf = ts.createSourceFile(file, code, ts.ScriptTarget.Latest);
+	/** @type {ts.StringLiteralLike[]} */
+	const paths = [];
+	const visit = (/** @type {ts.Node} */ node) => {
+		if (
+			ts.isStringLiteralLike(node) &&
+			SOURCE.test(node.text) &&
+			[path.dirname(file), root].some((dir) => renames.has(path.join(dir, node.text)))
+		) {
+			paths.push(node);
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(sf);
+	if (paths.length === 0) return null;
+	let next = code;
+	for (const node of paths.reverse()) {
+		// The extension ends the literal, just before its closing quote.
+		const end = node.getEnd() - 1;
+		const start = node.getStart(sf);
+		next = next.slice(0, start) + next.slice(start, end).replace(SOURCE, '.tsrx') + next.slice(end);
+	}
+	return { code: next, count: paths.length };
 }
 
 /**

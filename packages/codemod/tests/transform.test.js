@@ -370,14 +370,24 @@ describe('transformModule', () => {
 			expect(result.code).toContain(
 				'// No Octane port of `toast-kit` exists, and this module needs one: Octane cannot call its hooks, read its contexts, or pass Octane content to its components.\n',
 			);
+			expect(result.code.includes(`<NoOctanePort error="${result.notes[0].message}">`)).toBe(
+				message === crossing,
+			);
 		}
+		// Where no island can host it, the element throws its error as it would
+		// render, rather than failing deep in Octane's renderer.
 		const old = migrate(`${imports}export const App = () => <Toaster />;\n`, {
 			reactCompat: false,
+			target: 'tsx',
 		});
 		expect([old.code.includes('<ReactCompat>'), old.notes[0].message]).toEqual([
 			false,
 			'`<Toaster>` can render in a `ReactCompat` island only with React and React DOM 19.2 or newer in the React 19 series. `toast-kit` has no Octane port.',
 		]);
+		expect(old.code).toContain(
+			`export const App = () => <NoOctanePort error="${old.notes[0].message}"><Toaster /></NoOctanePort>;\n\nfunction NoOctanePort({ error }: { error: string; children?: unknown }): never {\n  throw new Error(error);\n}\n`,
+		);
+		expect(migrate(old.code, { reactCompat: false, target: 'tsx' }).code).toBe(old.code);
 
 		// Through a namespace import too; a function call stays as it is, and a
 		// type-only import says nothing.
