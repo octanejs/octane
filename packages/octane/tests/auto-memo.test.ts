@@ -8126,6 +8126,47 @@ describe('compiler-owned component-region memoization', () => {
 		root.unmount();
 	});
 
+	// An imported object's member can change while the import's identity, the
+	// only thing a dependency holds, stays fixed. A TypeScript wrapper around the
+	// import must not hide that read from the list cache or the row skip.
+	it.each([
+		['non-null', 'flags!.enabled'],
+		['as', '(flags as Flags).enabled'],
+		['satisfies', '(flags satisfies Flags).enabled'],
+	])('keeps keyed rows live when they read an imported member through %s', (name, read) => {
+		const flags = { enabled: false };
+		const client = loadCompiledFixtureSource(
+			`import { flags } from './flags';
+			 type Flags = { enabled: boolean };
+			 export function App(props) @{
+				<ul>@for (const item of props.items; key item.id) {
+					<li>@if (${read}) {<b />}</li>
+				}</ul>
+			 }`,
+			{
+				id: `auto-memo-wrapped-import-${name}.tsrx`,
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false },
+				runtimeModules: { './flags': { flags } },
+			},
+		);
+		const items = [{ id: 1 }, { id: 2 }];
+		const root = mount(client.App, { items });
+		try {
+			expect(root.findAll('b')).toHaveLength(0);
+			// The same list: nothing the list cache compares has changed.
+			flags.enabled = true;
+			root.update(client.App, { items });
+			expect(root.findAll('b')).toHaveLength(2);
+			// A new list of the same rows: nothing a row skip compares has changed.
+			flags.enabled = false;
+			root.update(client.App, { items: [...items] });
+			expect(root.findAll('b')).toHaveLength(0);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('rejects a callback that reads a ref through a binding pattern', () => {
 		// A callback handed to a child can be invoked during that child's render,
 		// so a ref read hidden in the callback's own pattern still counts.
