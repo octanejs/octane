@@ -802,6 +802,73 @@ describe('runCodemod', () => {
 		}
 	});
 
+	it('fails loudly where an unported component takes props Octane may render', async () => {
+		// T3 Code's MorphIcon: SVG props include React's `children`, which a
+		// caller may fill with content Octane renders, so no island can host it.
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'node_modules/react/package.json': '{ "version": "19.2.6" }',
+			'node_modules/react-dom/package.json': '{ "version": "19.2.6" }',
+			'node_modules/morphicons/package.json': '{ "version": "1.7.1" }',
+			'node_modules/morphicons/react.d.ts':
+				'type ReactNode = string | { element: true };\ninterface SVGProps { className?: string; children?: ReactNode }\nexport interface MorphIconProps extends SVGProps { icon?: string; reducedMotion?: "user" | "never" }\nexport declare const MorphIcon: (props: MorphIconProps) => null;\n',
+			'tsconfig.json': '{ "compilerOptions": { "strict": true, "jsx": "preserve" } }',
+			'src/MorphIcon.tsx':
+				'import { MorphIcon as BaseMorphIcon, type MorphIconProps } from "morphicons/react";\n\nexport function MorphIcon({ reducedMotion = "user", ...props }: MorphIconProps) {\n  return <BaseMorphIcon reducedMotion={reducedMotion} {...props} />;\n}\n',
+		});
+		const result = await runCodemod([root], { write: false, strong: true });
+		const [file] = result.files;
+		expect(result.missing).toEqual([
+			{ name: 'morphicons/react', modules: 1, islands: 0, blocked: 1 },
+		]);
+		expect(file.notes.map((note) => note.message)).toEqual([
+			'`<BaseMorphIcon>` takes children or props that Octane renders, which cannot cross into a React island. `morphicons/react` has no Octane port.',
+		]);
+		// It throws that error where it would render, not as its module loads:
+		// T3's Clerk shell imports `<ClerkProvider>` but renders it only with a key.
+		expect(file.code).toContain(
+			`@{\n  <NoOctanePort error="${file.notes[0].message}"><BaseMorphIcon reducedMotion={reducedMotion} {...props} /></NoOctanePort>\n}\n\nfunction NoOctanePort({ error }: { error: string; children?: unknown }): never {\n  throw new Error(error);\n}\n`,
+		);
+		expect([file.code.includes('ReactCompat'), file.strong, file.diagnostics]).toEqual([
+			false,
+			true,
+			[],
+		]);
+	});
+
+	it('points exact path strings in configs and scripts at renamed modules', async () => {
+		// T3 Code warms its entry and first routes by path, from its Vite
+		// config and from a plugin beside it, outside the migrated `src`.
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'vite.config.ts':
+				'export default { server: { warmup: { clientFiles: ["./src/main.tsx", "./src/*.tsx"] } } };\n',
+			'vite/warm.ts':
+				'export const entries = ["src/main.tsx", "src/routes/chat.tsx", "src/lib/icons.ts", "src/main", "main.tsx"];\n',
+			'src/main.tsx':
+				"import { createRoot } from 'react-dom/client';\ncreateRoot(document.body).render(<p />);\n",
+			'src/routes/chat.tsx': 'export const Chat = () => <p />;\n',
+			'src/lib/icons.ts': 'export const icons = {};\n',
+		});
+		const result = await runCodemod([path.join(root, 'src')]);
+		const read = (/** @type {string} */ name) => fs.readFileSync(path.join(root, name), 'utf8');
+		// Globs, extensionless paths, and modules that keep their names stay.
+		expect(read('vite.config.ts')).toBe(
+			'export default { server: { warmup: { clientFiles: ["./src/main.tsrx", "./src/*.tsx"] } } };\n',
+		);
+		expect(read('vite/warm.ts')).toBe(
+			'export const entries = ["src/main.tsrx", "src/routes/chat.tsrx", "src/lib/icons.ts", "src/main", "main.tsx"];\n',
+		);
+		expect(
+			result.files
+				.filter((file) => file.rules['module-paths'])
+				.map((file) => [file.file, file.rules['module-paths']]),
+		).toEqual([
+			['vite.config.ts', 1],
+			['vite/warm.ts', 2],
+		]);
+	});
+
 	it('maps react-hot-toast to its binding instead of hosting it in React', async () => {
 		// Memos' shape: one <Toaster> at the root, toast() calls everywhere else.
 		const root = project({
