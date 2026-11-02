@@ -74,21 +74,50 @@ export async function runCodemod(paths, options = {}) {
 	const target = options.target ?? 'tsrx';
 	const strong = options.strong === true && target === 'tsrx';
 	const root = path.resolve(options.root ?? findRoot(paths[0] ?? '.'));
-	const files = paths.flatMap((entry) => collect(path.resolve(entry)));
-
-	const known = new Set(files);
-	const config = tsconfigOptions(root);
-	const program = projectProgram(config, files);
-	const checker = program?.getTypeChecker();
+	const known = new Set(paths.flatMap((entry) => collect(path.resolve(entry))));
+	const files = [...known];
 	/** @type {Map<string, string>} */
 	const renames = new Map();
 	/** @type {Map<string, import('./transform.js').ModuleExports>} */
 	const exports = new Map();
+	/** @type {Map<string, string>} */
+	const owners = new Map();
 	for (const file of files) {
-		const result = transformModule(fs.readFileSync(file, 'utf8'), file, { target });
+		const source = fs.readFileSync(file, 'utf8');
+		const result = transformModule(source, file, { target });
 		exports.set(file, result.exports);
-		if (result.template) renames.set(file, file.replace(/\.(?:jsx?|tsx)$/, '.tsrx'));
+		if (!result.template) continue;
+		const output = file.replace(/\.(?:jsx?|tsx)$/, '.tsrx');
+		if (output === file) continue;
+		const key = ts.sys.useCaseSensitiveFileNames ? output : output.toLowerCase();
+		const previous = owners.get(key);
+		if (previous || fs.lstatSync(output, { throwIfNoEntry: false })) {
+			const reason = previous
+				? `is also the target of ${path.relative(root, previous)}`
+				: 'already exists';
+			const conflict = unchangedFile(path.relative(root, file), source, {
+				rule: 'rename-conflict',
+				severity: 'error',
+				line: 1,
+				message: `Migration stopped because ${path.relative(root, output)} ${reason}.`,
+			});
+			return {
+				root,
+				files: [conflict],
+				packages: [],
+				dependencies: [],
+				patched: [],
+				missing: [],
+				html: [],
+				compiler: null,
+			};
+		}
+		owners.set(key, file);
+		renames.set(file, output);
 	}
+	const config = tsconfigOptions(root);
+	const program = projectProgram(config, files);
+	const checker = program?.getTypeChecker();
 	const contextsOf = contextIndex(exports, known);
 
 	const verify = options.verify !== false;
@@ -178,25 +207,15 @@ export async function runCodemod(paths, options = {}) {
 		const source = fs.readFileSync(file, 'utf8');
 		const react = /^import\b[^;]*?\bfrom\s+['"]react(?:-dom)?(?:\/[^'"]*)?['"]/m.exec(source);
 		if (!react || /\bfrom\s+['"]octane(?:\/[^'"]*)?['"]/.test(source)) continue;
-		results.push({
-			file: path.relative(root, file),
-			output: path.relative(root, file),
-			changed: false,
-			rules: {},
-			notes: [
-				{
-					rule: 'tsrx-react',
-					severity: 'error',
-					line: source.slice(0, react.index).split('\n').length,
-					message:
-						'This is TSRX written for React (`@tsrx/react`), which the codemod cannot read. Port it by hand: its templates are already TSRX, but its React imports and APIs need the changes the codemod makes to TSX.',
-				},
-			],
-			strong: null,
-			strongFixes: [],
-			diagnostics: [],
-			code: source,
-		});
+		results.push(
+			unchangedFile(path.relative(root, file), source, {
+				rule: 'tsrx-react',
+				severity: 'error',
+				line: source.slice(0, react.index).split('\n').length,
+				message:
+					'This is TSRX written for React (`@tsrx/react`), which the codemod cannot read. Port it by hand: its templates are already TSRX, but its React imports and APIs need the changes the codemod makes to TSX.',
+			}),
+		);
 	}
 
 	// Configs and scripts name modules by path too, such as Vite's
@@ -241,7 +260,7 @@ export async function runCodemod(paths, options = {}) {
 		for (const result of results) {
 			if (!result.changed) continue;
 			const output = path.join(root, result.output);
-			fs.writeFileSync(output, result.code);
+			fs.writeFileSync(output, result.code, { flag: result.output === result.file ? 'w' : 'wx' });
 			if (result.output !== result.file) fs.rmSync(path.join(root, result.file));
 		}
 	}
@@ -254,6 +273,21 @@ export async function runCodemod(paths, options = {}) {
 		missing: [...missing.values()].sort((a, b) => a.name.localeCompare(b.name)),
 		html,
 		compiler: compiler?.from ?? null,
+	};
+}
+
+/** @param {string} file @param {string} code @param {Note} note @returns {FileResult} */
+function unchangedFile(file, code, note) {
+	return {
+		file,
+		output: file,
+		code,
+		changed: false,
+		rules: {},
+		notes: [note],
+		strong: null,
+		strongFixes: [],
+		diagnostics: [],
 	};
 }
 

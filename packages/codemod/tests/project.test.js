@@ -33,6 +33,35 @@ function catalogVersion(name) {
 }
 
 describe('runCodemod', () => {
+	it.each(['Item.tsrx', 'Item.jsx', ...(ts.sys.useCaseSensitiveFileNames ? [] : ['item.jsx'])])(
+		'reports a rename collision (%s) before writing',
+		async (other) => {
+			const original = {
+				'package.json': '{ "name": "app" }',
+				'index.html': '<script type="module" src="./First.tsx"></script>',
+				'First.tsx': 'export const First = () => <div />;',
+				'Item.tsx': 'export const Item = () => <b />;',
+				[other]: other.endsWith('.tsrx')
+					? 'export function Item() @{ <p /> }'
+					: 'export const Item = () => <i />;',
+			};
+			const root = project(original);
+			for (const write of [false, true]) {
+				const result = await runCodemod([root], { write });
+				expect(result.files.flatMap((file) => file.notes)).toContainEqual(
+					expect.objectContaining({
+						severity: 'error',
+						message: expect.stringMatching(/item\.tsrx/i),
+					}),
+				);
+				expect(result.files.some((file) => file.changed)).toBe(false);
+				expect(fs.readdirSync(root).sort()).toEqual(Object.keys(original).sort());
+				for (const [name, source] of Object.entries(original))
+					expect(fs.readFileSync(path.join(root, name), 'utf8')).toBe(source);
+			}
+		},
+	);
+
 	it('renames template modules and rewrites every import of them', async () => {
 		const root = project({
 			'package.json':
