@@ -172,6 +172,60 @@ describe('runCodemod', () => {
 		expect(output).toContain(`init\` in ${root} to wire`);
 	});
 
+	it('previews and writes through an explicitly selected local recipe', () => {
+		const api = new URL('../src/index.js', import.meta.url).href;
+		const root = project({
+			'package.json': '{}',
+			'Card.tsx': 'export const Card = () => <p />;',
+			'recipes/card #1.mjs': `
+				import { runCodemod as migrate } from ${JSON.stringify(api)};
+				export async function runCodemod(paths, options) {
+					const result = await migrate(paths, options);
+					result.files[0].notes.push({rule: 'card', severity: 'error', line: 1, message: 'Review the card.'});
+					return result;
+				}`,
+		});
+		const args = [
+			path.join(import.meta.dirname, '../src/bin.js'),
+			'Card.tsx',
+			'--recipe',
+			'recipes/card #1.mjs',
+			'--no-verify',
+		];
+		const options = { cwd: root, encoding: /** @type {const} */ ('utf8') };
+		const preview = spawnSync(process.execPath, [...args, '--json', '--print'], options);
+		expect(preview.status).toBe(1);
+		const [file] = JSON.parse(preview.stdout).files;
+		expect(file).toMatchObject({
+			file: 'Card.tsx',
+			output: 'Card.tsrx',
+			notes: [{ rule: 'card' }],
+		});
+		expect(fs.existsSync(path.join(root, 'Card.tsrx'))).toBe(false);
+
+		const applied = spawnSync(process.execPath, args, options);
+		expect(applied.status).toBe(1);
+		expect(applied.stdout).toContain('Review the card.');
+		expect(fs.readFileSync(path.join(root, 'Card.tsrx'), 'utf8')).toBe(file.code);
+		expect(fs.existsSync(path.join(root, 'Card.tsx'))).toBe(false);
+	});
+
+	it.each([
+		['missing.mjs', 'missing.mjs'],
+		['invalid.mjs', 'named runCodemod function export'],
+	])('reports an unusable recipe (%s)', (recipe, message) => {
+		const root = project({ 'invalid.mjs': 'export default () => {};' });
+		const result = spawnSync(
+			process.execPath,
+			[path.join(import.meta.dirname, '../src/bin.js'), '--recipe', recipe, '--json'],
+			{ cwd: root, encoding: 'utf8' },
+		);
+		expect(result.status).toBe(2);
+		expect(result.stderr).toContain(`Cannot load --recipe ${recipe}`);
+		expect(result.stderr).toContain(message);
+		expect(result.stdout).toBe('');
+	});
+
 	it.each(['json', 'text'])('writes the complete %s report to a pipe', (format) => {
 		const json = format === 'json';
 		const root = project({

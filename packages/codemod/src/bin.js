@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import colors from 'picocolors';
 import { runCodemod } from './project.js';
@@ -11,6 +12,7 @@ Usage: octane-codemod [paths...] [options]
   paths              files or directories to migrate (default: .)
 
 Options:
+  --recipe <file>    run a local module's exported runCodemod function
   --strong           make each migrated module Strong where the compiler
                      accepts it; the rest stay in compatibility mode
   --force-strong     keep "use strong" even where Strong errors remain
@@ -30,6 +32,7 @@ async function main() {
 		allowPositionals: true,
 		allowNegative: true,
 		options: {
+			recipe: { type: 'string' },
 			strong: { type: 'boolean', default: false },
 			'force-strong': { type: 'boolean', default: false },
 			target: { type: 'string', default: 'tsrx' },
@@ -50,8 +53,21 @@ async function main() {
 		return 2;
 	}
 
+	let run = runCodemod;
+	if (values.recipe !== undefined) {
+		try {
+			const recipe = await import(pathToFileURL(path.resolve(values.recipe)).href);
+			if (typeof recipe.runCodemod !== 'function')
+				throw new TypeError('expected a named runCodemod function export');
+			run = recipe.runCodemod;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			process.stderr.write(`Cannot load --recipe ${values.recipe}: ${message}\n`);
+			return 2;
+		}
+	}
 	const dryRun = values['dry-run'] || values.print;
-	const result = await runCodemod(positionals.length > 0 ? positionals : ['.'], {
+	const result = await run(positionals.length > 0 ? positionals : ['.'], {
 		target: /** @type {'tsrx' | 'tsx'} */ (values.target),
 		strong: values.strong || values['force-strong'],
 		forceStrong: values['force-strong'],

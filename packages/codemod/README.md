@@ -112,6 +112,7 @@ hand.
 
 | Flag | |
 | --- | --- |
+| `--recipe <file>` | Run a local ESM recipe, resolved from the current directory |
 | `--strong` | Make modules Strong where the compiler accepts it |
 | `--force-strong` | Keep `"use strong"` even with Strong errors left |
 | `--target tsx` | Keep JSX and `.tsx`; port only the React APIs |
@@ -119,3 +120,28 @@ hand.
 | `--print` | Print each migrated module (implies `--dry-run`) |
 | `--no-verify` | Skip compiling the result |
 | `--json` | Machine-readable result |
+
+## Local recipes
+
+Pass a recipe explicitly to use it for a migration:
+
+```sh
+octane-codemod src --recipe ./migrate.mjs --print --json
+```
+
+Export a named `runCodemod` function with the same arguments and result as the
+package API. For example, this recipe uses its own directory as the project root:
+
+```js
+import { runCodemod as migrate } from '@octanejs/codemod';
+
+/** @type {typeof import('@octanejs/codemod').runCodemod} */
+export const runCodemod = (paths, options) =>
+	migrate(paths, { ...options, root: import.meta.dirname });
+```
+
+Install `@octanejs/codemod` in the recipe's project to use the import above.
+The CLI loads the module only when you pass `--recipe`. It executes the module
+even for a preview, so the recipe must honor `write: false` for all changes
+when invoked with `--dry-run` or `--print`. The CLI formats the returned report
+and exits with status 1 for reported errors, or status 2 if it cannot load the recipe.
