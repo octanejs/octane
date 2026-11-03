@@ -671,6 +671,7 @@ class ModuleTransform {
 		this.quote = first ? first.moduleSpecifier.getText(this.sf)[0] : "'";
 		/** Locals imported from a package with no Octane port. */
 		const portLocals = new Set<string>();
+		const reactSvgImports = new Set<Import>();
 		for (const statement of this.sf.statements) {
 			if (
 				ts.isExportDeclaration(statement) &&
@@ -709,6 +710,13 @@ class ModuleTransform {
 					port,
 				};
 				this.imports.set(declaration, entry);
+				if (
+					this.target === 'tsrx' &&
+					!typeOnly &&
+					((imported === 'default' && module.endsWith('.svg?react')) ||
+						(imported === 'ReactComponent' && module.endsWith('.svg')))
+				)
+					reactSvgImports.add(entry);
 				if (port) portLocals.add(name.text);
 				if (isApiModule(module)) this.apiLocals.set(name.text, entry);
 			};
@@ -751,7 +759,28 @@ class ModuleTransform {
 			ts.forEachChild(node, visit);
 		};
 		visit(this.sf);
-		for (const field of fields) if (this.takesChange(field)) this.planRestChange(field);
+		for (const field of fields) {
+			if (this.takesChange(field)) this.planRestChange(field);
+			if (!reactSvgImports.size) continue;
+			const asset = this.importOf(field.tagName);
+			if (!asset || !reactSvgImports.has(asset)) continue;
+			if (
+				ts.findAncestor(
+					field,
+					(node) =>
+						(ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) &&
+						(this.inIsland(node) || this.islands.has(node)),
+				)
+			)
+				continue;
+			reactSvgImports.delete(asset);
+			this.note(
+				RULE.bindings,
+				'warning',
+				field.tagName,
+				`\`<${asset.local}>\` uses a React SVG import convention from \`${asset.module}\`. If your loader returns a React component, render it in a ReactCompat island or provide an Octane component.`,
+			);
+		}
 		for (const element of elements) this.planDescriptorChildren(element);
 	}
 
@@ -867,7 +896,10 @@ class ModuleTransform {
 		const parent = element.parent;
 		if (!ts.isJsxElement(parent)) return false;
 		const entry = this.importOf(parent.openingElement.tagName);
-		return entry?.module === 'octane/react' && entry.imported === 'ReactCompat';
+		return (
+			entry?.imported === 'ReactCompat' &&
+			(entry.module === 'octane/react' || entry.module === 'octane/react/server')
+		);
 	}
 
 	/**

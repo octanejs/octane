@@ -43,6 +43,32 @@ function migrate(name) {
 }
 
 describe('transformModule', () => {
+	it('flags React SVG import conventions only where their components render in Octane', () => {
+		const source = `import { ReactCompat } from 'octane/react';
+import { ReactCompat as ServerCompat } from 'octane/react/server';
+import Mark from './mark.svg?react';
+import url, { ReactComponent as Glyph } from './glyph.svg';
+import Shadowed from './shadow.svg?react';
+import IslandOnly from './island.svg?react';
+import Native from './native.svg';
+import Component from './native.tsrx';
+export const View = () => <><ReactCompat><span><Mark/><IslandOnly/></span></ReactCompat><ServerCompat><IslandOnly/></ServerCompat><img src={url}/><Native/><Component/><Mark></Mark><Glyph/><Glyph/></>;
+export const Local = ({ Shadowed }: { Shadowed: () => null }) => <Shadowed/>;`;
+		const result = transformModule(source, 'view.tsx', {
+			strong: true,
+			get types() {
+				throw new Error('SVG import diagnostics must not load project types');
+			},
+		});
+		const notes = result.notes.filter((note) => note.message.includes('SVG import convention'));
+		expect(notes.map(({ severity, message }) => [severity, message.split(' uses ')[0]])).toEqual([
+			['warning', '`<Mark>`'],
+			['warning', '`<Glyph>`'],
+		]);
+		expect(result.code).toContain("import Mark from './mark.svg?react'");
+		expect(result.code).toContain('ReactComponent as Glyph');
+	});
+
 	for (const input of INPUTS) {
 		it(`migrates ${input} to source the compiler accepts`, async () => {
 			const { result, output } = migrate(input);
