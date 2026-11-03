@@ -127,7 +127,9 @@ describe('runCodemod', () => {
 				'App.tsx':
 					'import * as Dialog from "@radix-ui/react-dialog"; export function App() { return <Dialog.Root />; }',
 			});
-			await expect(runCodemod([path.join(root, 'App.tsx')], { root, verify: false })).rejects.toThrow();
+			await expect(
+				runCodemod([path.join(root, 'App.tsx')], { root, verify: false }),
+			).rejects.toThrow();
 			expect(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).toBe(manifest);
 		},
 	);

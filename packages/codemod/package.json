@@ -44,7 +44,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepack": "pnpm run build",
+    "typecheck": "octane-tsc -p tsconfig.typecheck.json",
+    "prepare": "pnpm run build",
     "test": "cd ../.. && vitest run --project codemod"
   },
   "dependencies": {
