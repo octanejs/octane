@@ -7,7 +7,7 @@ import path from 'node:path';
 import { DATA } from '@octanejs/cli/data';
 import ts from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createScopedSignalRecipe, runCodemod } from '../src/index.js';
+import { createScopedSignalRecipe, runCodemod } from '../dist/index.js';
 
 const REPO = path.resolve(import.meta.dirname, '../../..');
 /** @type {string[]} */
@@ -119,6 +119,19 @@ describe('runCodemod', () => {
 		expect(result.files.flatMap((file) => file.diagnostics)).toEqual([]);
 	});
 
+	it.each(['null', '[]', '{"dependencies":"invalid"}'])(
+		'preserves an invalid package manifest when adding bindings: %s',
+		async (manifest) => {
+			const root = project({
+				'package.json': manifest,
+				'App.tsx':
+					'import * as Dialog from "@radix-ui/react-dialog"; export function App() { return <Dialog.Root />; }',
+			});
+			await expect(runCodemod([path.join(root, 'App.tsx')], { root, verify: false })).rejects.toThrow();
+			expect(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).toBe(manifest);
+		},
+	);
+
 	it('adds only bindings the project lacks, and names patches the bindings drop', async () => {
 		const root = project({
 			'package.json': '{ "name": "mono", "private": true }',
@@ -167,14 +180,14 @@ describe('runCodemod', () => {
 		const cwd = project({});
 		const output = execFileSync(
 			process.execPath,
-			[path.join(import.meta.dirname, '../src/bin.js'), root, '--no-verify'],
+			[path.join(import.meta.dirname, '../dist/bin.js'), root, '--no-verify'],
 			{ cwd, encoding: 'utf8' },
 		);
 		expect(output).toContain(`init\` in ${root} to wire`);
 	});
 
 	it('previews and writes through an explicitly selected local recipe', () => {
-		const api = new URL('../src/index.js', import.meta.url).href;
+		const api = new URL('../dist/index.js', import.meta.url).href;
 		const root = project({
 			'package.json': '{}',
 			'Card.tsx': 'export const Card = () => <p />;',
@@ -187,7 +200,7 @@ describe('runCodemod', () => {
 				}`,
 		});
 		const args = [
-			path.join(import.meta.dirname, '../src/bin.js'),
+			path.join(import.meta.dirname, '../dist/bin.js'),
 			'Card.tsx',
 			'--recipe',
 			'recipes/card #1.mjs',
@@ -218,7 +231,7 @@ describe('runCodemod', () => {
 		const root = project({ 'invalid.mjs': 'export default () => {};' });
 		const result = spawnSync(
 			process.execPath,
-			[path.join(import.meta.dirname, '../src/bin.js'), '--recipe', recipe, '--json'],
+			[path.join(import.meta.dirname, '../dist/bin.js'), '--recipe', recipe, '--json'],
 			{ cwd: root, encoding: 'utf8' },
 		);
 		expect(result.status).toBe(2);
@@ -237,7 +250,7 @@ describe('runCodemod', () => {
 				'// ' + 'x'.repeat(1024 * 1024) + ' end of input',
 			].join('\n'),
 		});
-		const cli = path.join(import.meta.dirname, '../src/bin.js');
+		const cli = path.join(import.meta.dirname, '../dist/bin.js');
 		const { status, stdout } = spawnSync(
 			process.execPath,
 			[cli, root, '--print', '--no-verify', ...(json ? ['--json'] : [])],
@@ -719,7 +732,7 @@ describe('runCodemod', () => {
 			options,
 		);
 		const at = (
-			/** @type {import('../src/project.js').FileResult} */ file,
+			/** @type {import('../dist/index.js').FileResult} */ file,
 			/** @type {number} */ line,
 		) => `${file.file}: ${file.code.split('\n')[line - 1]}`;
 		const reported = result.files.flatMap((file) => file.notes.map((note) => at(file, note.line)));
@@ -1334,11 +1347,11 @@ describe('scoped signal recipe', () => {
 	};
 	it('previews, migrates and reruns an aliased producer and its scoped readers and writers', async () => {
 		const root = project(sources);
-		const bin = path.join(REPO, 'packages/codemod/src/bin.js');
+		const bin = path.join(REPO, 'packages/codemod/dist/bin.js');
 		fs.writeFileSync(
 			path.join(root, 'recipe.mjs'),
 			'import {createScopedSignalRecipe} from ' +
-				JSON.stringify(path.join(REPO, 'packages/codemod/src/index.js')) +
+				JSON.stringify(path.join(REPO, 'packages/codemod/dist/index.js')) +
 				';\n' +
 				'export const runCodemod = createScopedSignalRecipe(' +
 				JSON.stringify({

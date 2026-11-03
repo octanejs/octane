@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { collectDiagnostics } from 'octane/compiler';
 import { describe, expect, it } from 'vitest';
-import { loadCompiler, strengthen, transformModule } from '../src/index.js';
+import { loadCompiler, strengthen, transformModule } from '../dist/index.js';
 
 const FIXTURES = path.join(import.meta.dirname, 'fixtures');
 const INPUTS = fs.readdirSync(FIXTURES).filter((name) => /\.input\.[jt]sx$/.test(name));
@@ -318,7 +318,7 @@ describe('transformModule', () => {
 	it('hosts a leaf component of a package with no Octane port in a `ReactCompat` island', () => {
 		const migrate = (
 			/** @type {string} */ source,
-			/** @type {import('../src/transform.js').TransformOptions} */ options = {},
+			/** @type {import('../dist/transform.js').TransformOptions} */ options = {},
 		) =>
 			transformModule(source, 'toast.tsx', {
 				strictNullChecks: true,

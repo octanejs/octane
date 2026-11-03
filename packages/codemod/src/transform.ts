@@ -13,61 +13,19 @@ import {
 	radixNamespace,
 } from './mappings.js';
 
-/**
- * @typedef {'info' | 'warning' | 'error'} Severity
- * @typedef {{ rule: string, severity: Severity, line: number, message: string }} Note
- *
- * @typedef {Object} TransformOptions
- * @property {'tsrx' | 'tsx'} [target] `tsrx` (default) rewrites component
- *   bodies as templates; `tsx` keeps JSX and only ports the React APIs.
- * @property {boolean} [strong] emit Strong-mode source: add `"use strong"` and
- *   leave omitted dependency lists to the compiler.
- * @property {boolean} [strictNullChecks] the project checks with
- *   `strictNullChecks`, so a TypeScript module's own types may prove a child
- *   hole is text
- * @property {{ sourceFile: ts.SourceFile, checker: ts.TypeChecker }} [types]
- *   this module in a program over the whole project, whose resolved imports
- *   type what the module's own program cannot
- * @property {(specifier: string) => string | null} [resolveSpecifier] the new
- *   spelling of an import specifier (a renamed module, a binding package), or
- *   null to keep it.
- * @property {(specifier: string, name: string) => boolean | null} [isContext]
- *   whether an imported name is a context, or null when it cannot be known
- * @property {(specifier: string) => string | null} [unported] the React package
- *   an import specifier names when that package has no Octane port, or null
- * @property {boolean} [reactCompat] the project has React and React DOM 19.2 or
- *   newer in the React 19 series, so `ReactCompat` can host an unported
- *   package's components
- *
- * @typedef {Object} Unported A React package with no Octane port, as this
- *   module uses it
- * @property {string} name
- * @property {number} islands elements now rendered in a `ReactCompat` island
- * @property {number} blocked uses that only a port can support
- *
- * @typedef {Object} TransformResult
- * @property {string} code
- * @property {boolean} changed
- * @property {boolean} template whether the module becomes `.tsrx`: it holds a
- *   template, keeps JSX, or was a JSX module, so no `.tsx` module is left
- *   outside Strong mode's reach
- * @property {Note[]} notes
- * @property {Record<string, number>} rules how often each rule fired
- * @property {ModuleExports} exports what the module exports that other modules'
- *   rewrites depend on
- * @property {Unported[]} unported
- *
- * @typedef {Object} ModuleExports
- * @property {string[]} contexts exported names whose value is a context this
- *   module creates
- * @property {{ specifier: string, names: [string, string][] | null }[]} reexports
- *   `export … from` declarations: [imported, exported] pairs, or null for `*`
- */
+import type { Note, TransformOptions, TransformResult, Unported } from './types.js';
 
-/**
- * @typedef {{ template: boolean }} Context
- * @typedef {{ module: string, local: string, imported: string, namespace: boolean, typeOnly: boolean, port: Unported | null }} Import
- */
+type Context = { template: boolean };
+type Import = {
+	module: string;
+	local: string;
+	imported: string;
+	namespace: boolean;
+	typeOnly: boolean;
+	port: Unported | null;
+};
+type Severity = Note['severity'];
+type ModuleExports = TransformResult['exports'];
 
 /** Marks emitted text whose whole line should go. */
 const DROP = '\u0000DROP\u0000';
@@ -116,13 +74,12 @@ const RULE = {
 
 /**
  * Rewrite one React module as Octane.
- *
- * @param {string} source
- * @param {string} filename
- * @param {TransformOptions} [options]
- * @returns {TransformResult}
  */
-export function transformModule(source, filename, options = {}) {
+export function transformModule(
+	source: string,
+	filename: string,
+	options: TransformOptions = {},
+): TransformResult {
 	return new ModuleTransform(source, filename, options).run();
 }
 
@@ -132,11 +89,8 @@ export function transformModule(source, filename, options = {}) {
  * refers to, so a shadowed `useState` or event parameter is never mistaken for
  * another; the library gives the module's own types their array and string
  * members.
- *
- * @param {string} filename
- * @param {string} source
  */
-function bind(filename, source) {
+function bind(filename: string, source: string) {
 	const lib = esLib();
 	const sf = ts.createSourceFile(
 		filename,
@@ -145,8 +99,7 @@ function bind(filename, source) {
 		true,
 		scriptKind(filename),
 	);
-	/** @type {ts.CompilerHost} */
-	const host = {
+	const host: ts.CompilerHost = {
 		getSourceFile: (name) => (name === filename ? sf : name === lib.fileName ? lib : undefined),
 		getDefaultLibFileName: () => lib.fileName,
 		writeFile: () => {},
@@ -175,8 +128,7 @@ function bind(filename, source) {
 	return { sf, checker: program.getTypeChecker() };
 }
 
-/** @type {ts.SourceFile | undefined} */
-let es5;
+let es5: ts.SourceFile | undefined;
 
 /**
  * The ES5 library, parsed once and shared by every module's program, so
@@ -186,15 +138,14 @@ function esLib() {
 	const file = ts.getDefaultLibFilePath({}).replace(/[^/\\]+$/, 'lib.es5.d.ts');
 	es5 ??= ts.createSourceFile(
 		'lib.es5.d.ts',
-		/** @type {string} */ (ts.sys.readFile(file)),
+		ts.sys.readFile(file) as string,
 		ts.ScriptTarget.Latest,
 		true,
 	);
 	return es5;
 }
 
-/** @param {string} filename */
-function scriptKind(filename) {
+function scriptKind(filename: string) {
 	if (filename.endsWith('.tsx')) return ts.ScriptKind.TSX;
 	if (filename.endsWith('.jsx')) return ts.ScriptKind.JSX;
 	if (/\.[cm]?ts$/.test(filename)) return ts.ScriptKind.TS;
@@ -202,22 +153,22 @@ function scriptKind(filename) {
 	return ts.ScriptKind.JSX;
 }
 
-/**
- * @param {ts.Expression} node
- * @returns {ts.Expression}
- */
-function skipParens(node) {
+function skipParens(node: ts.Expression): ts.Expression {
 	while (ts.isParenthesizedExpression(node)) node = node.expression;
 	return node;
 }
 
 /**
  * Whether `node` wraps an expression only for grouping or the type checker.
- *
- * @param {ts.Node} node
- * @returns {node is ts.ParenthesizedExpression | ts.AsExpression | ts.SatisfiesExpression | ts.NonNullExpression | ts.TypeAssertion}
  */
-function isWrapper(node) {
+function isWrapper(
+	node: ts.Node,
+): node is
+	| ts.ParenthesizedExpression
+	| ts.AsExpression
+	| ts.SatisfiesExpression
+	| ts.NonNullExpression
+	| ts.TypeAssertion {
 	return (
 		ts.isParenthesizedExpression(node) ||
 		ts.isAsExpression(node) ||
@@ -227,21 +178,15 @@ function isWrapper(node) {
 	);
 }
 
-/**
- * @param {ts.Expression} node
- * @returns {ts.Expression}
- */
-function skipWrappers(node) {
+function skipWrappers(node: ts.Expression): ts.Expression {
 	while (isWrapper(node)) node = node.expression;
 	return node;
 }
 
 /**
  * The declaration as a rest binding, `rest` in `{ a, ...rest }`, or null.
- *
- * @param {ts.Declaration | null} declaration
  */
-function asRest(declaration) {
+function asRest(declaration: ts.Declaration | null) {
 	return declaration &&
 		ts.isBindingElement(declaration) &&
 		declaration.dotDotDotToken &&
@@ -250,17 +195,14 @@ function asRest(declaration) {
 		: null;
 }
 
-/** @param {ts.Node} node */
-function isJsx(node) {
+function isJsx(node: ts.Node) {
 	return ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
 }
 
 /**
  * What a module's import of a package with no Octane port leaves to do.
- *
- * @param {Unported} port
  */
-function portComment({ name, islands, blocked }) {
+function portComment({ name, islands, blocked }: Unported) {
 	const missing = `No Octane port of \`${name}\` exists`;
 	if (blocked > 0) {
 		return `${missing}, and this module needs one: Octane cannot call its hooks, read its contexts, or pass Octane content to its components.`;
@@ -273,10 +215,8 @@ function portComment({ name, islands, blocked }) {
 /**
  * Whether a hole is already spelled as text, or as a literal the cast would
  * only clutter.
- *
- * @param {ts.Expression} node
  */
-function isTextSpelling(node) {
+function isTextSpelling(node: ts.Expression) {
 	node = skipParens(node);
 	return (
 		ts.isNumericLiteral(node) ||
@@ -289,11 +229,8 @@ function isTextSpelling(node) {
 /**
  * Whether the compiler proves `node` a string by its spelling: a string
  * literal, a `String()` call, or a concatenation with one.
- *
- * @param {ts.Expression} node
- * @returns {boolean}
  */
-function isStringSpelling(node) {
+function isStringSpelling(node: ts.Expression): boolean {
 	node = skipParens(node);
 	if (ts.isStringLiteral(node) || ts.isTemplateLiteral(node)) return true;
 	if (ts.isCallExpression(node)) {
@@ -310,11 +247,8 @@ function isStringSpelling(node) {
  * What a type renders as: 1 when every member is a string, 2 when every
  * member is a string, number, or bigint and one is not a string, else 0. The
  * compiler's typed-text proof applies the same test.
- *
- * @param {ts.Type} type
- * @returns {0 | 1 | 2}
  */
-function textKind(type) {
+function textKind(type: ts.Type): 0 | 1 | 2 {
 	const { TypeFlags } = ts;
 	const opaque =
 		TypeFlags.Any | TypeFlags.Unknown | TypeFlags.Never | TypeFlags.VoidLike | TypeFlags.Null;
@@ -322,8 +256,7 @@ function textKind(type) {
 	if (type.flags & TypeFlags.StringLike) return 1;
 	if (type.flags & (TypeFlags.NumberLike | TypeFlags.BigIntLike)) return 2;
 	if (!type.isUnion()) return 0;
-	/** @type {0 | 1 | 2} */
-	let kind = 1;
+	let kind: 0 | 1 | 2 = 1;
 	for (const member of type.types) {
 		const each = textKind(member);
 		if (each === 0) return 0;
@@ -334,15 +267,9 @@ function textKind(type) {
 
 /**
  * The outermost node of `sf` spanning exactly `[start, end)`.
- *
- * @param {ts.SourceFile} sf
- * @param {number} start
- * @param {number} end
- * @returns {ts.Node | null}
  */
-function nodeSpanning(sf, start, end) {
-	/** @type {ts.Node} */
-	let node = sf;
+function nodeSpanning(sf: ts.SourceFile, start: number, end: number): ts.Node | null {
+	let node: ts.Node = sf;
 	for (;;) {
 		const child = ts.forEachChild(node, (c) => (c.pos <= start && c.end >= end ? c : undefined));
 		if (!child) return null;
@@ -353,29 +280,23 @@ function nodeSpanning(sf, start, end) {
 
 /**
  * The attribute an element sets by `name`.
- *
- * @param {ts.JsxOpeningLikeElement} element
- * @param {string} name
  */
-function attributeOf(element, name) {
-	return /** @type {ts.JsxAttribute | undefined} */ (
-		element.attributes.properties.find(
-			(a) => ts.isJsxAttribute(a) && ts.isIdentifier(a.name) && a.name.text === name,
-		)
+function attributeOf(element: ts.JsxOpeningLikeElement, name: string) {
+	return element.attributes.properties.find(
+		(a): a is ts.JsxAttribute =>
+			ts.isJsxAttribute(a) && ts.isIdentifier(a.name) && a.name.text === name,
 	);
 }
 
 /**
  * The elements a list row can render: the row itself, or each arm of a
  * conditional row. Null when an arm renders anything else.
- *
- * @param {ts.Expression} node
- * @returns {(ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment)[] | null}
  */
-function rowElements(node) {
+function rowElements(
+	node: ts.Expression,
+): (ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment)[] | null {
 	node = skipParens(node);
-	if (isJsx(node))
-		return [/** @type {ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment} */ (node)];
+	if (isJsx(node)) return [node];
 	if (isNullish(node)) return [];
 	if (!ts.isConditionalExpression(node)) return null;
 	const whenTrue = rowElements(node.whenTrue);
@@ -386,11 +307,8 @@ function rowElements(node) {
 /**
  * The element an `if (c) return <A />;` guard returns, or null for any other
  * statement.
- *
- * @param {ts.Statement} statement
- * @returns {ts.Expression | null}
  */
-function guardReturn(statement) {
+function guardReturn(statement: ts.Statement): ts.Expression | null {
 	if (!ts.isIfStatement(statement) || statement.elseStatement) return null;
 	let then = statement.thenStatement;
 	if (ts.isBlock(then)) {
@@ -404,14 +322,11 @@ function guardReturn(statement) {
 /**
  * Whether any `return` in `statements`, outside nested functions, returns
  * JSX.
- *
- * @param {readonly ts.Statement[]} statements
  */
-function returnsJsx(statements) {
-	/** @type {(node: ts.Node) => boolean} */
-	const hasJsx = (node) => isJsx(node) || (ts.forEachChild(node, hasJsx) ?? false);
-	/** @type {(node: ts.Node) => boolean} */
-	const visit = (node) => {
+function returnsJsx(statements: readonly ts.Statement[]) {
+	const hasJsx: (node: ts.Node) => boolean = (node) =>
+		isJsx(node) || (ts.forEachChild(node, hasJsx) ?? false);
+	const visit: (node: ts.Node) => boolean = (node) => {
 		if (isFunctionLike(node)) return false;
 		if (ts.isReturnStatement(node) && node.expression && hasJsx(node.expression)) return true;
 		return ts.forEachChild(node, visit) ?? false;
@@ -420,27 +335,24 @@ function returnsJsx(statements) {
 }
 
 /** Document tags a router shell renders through `@octanejs/tanstack-router`. */
-const DOCUMENT_TAGS = /** @type {Record<string, string>} */ ({
+const DOCUMENT_TAGS: Record<string, string> = {
 	html: 'Html',
 	head: 'Head',
 	body: 'Body',
-});
+};
 
 /**
  * Whether an identifier is read in a type, where an import needs no value.
  * A `typeof X` query is a type, which `import type` serves; `extends Base`
  * reads a value, so heritage counts as one.
- *
- * @param {ts.Identifier} node
  */
-function inTypeNode(node) {
+function inTypeNode(node: ts.Identifier) {
 	let parent = node.parent;
 	while (ts.isQualifiedName(parent)) parent = parent.parent;
 	return ts.isTypeNode(parent) && !ts.isExpressionWithTypeArguments(parent);
 }
 
-/** @param {ts.Node} node */
-function isNullish(node) {
+function isNullish(node: ts.Node) {
 	return (
 		node.kind === ts.SyntaxKind.NullKeyword ||
 		node.kind === ts.SyntaxKind.FalseKeyword ||
@@ -448,8 +360,7 @@ function isNullish(node) {
 	);
 }
 
-/** @param {ts.Node} node */
-function isFunctionLike(node) {
+function isFunctionLike(node: ts.Node) {
 	return (
 		ts.isFunctionDeclaration(node) ||
 		ts.isFunctionExpression(node) ||
@@ -466,12 +377,11 @@ function isFunctionLike(node) {
  * renders nothing when it is falsy, exactly as `@if` does. React renders `0`
  * and `NaN` from a numeric left side, so anything unproven stays a hole.
  * `valueOf` gives the initializer a `const` name is bound to, if any.
- *
- * @param {ts.Expression} node
- * @param {(name: ts.Identifier) => ts.Expression | null} valueOf
- * @returns {boolean}
  */
-function isBoolean(node, valueOf) {
+function isBoolean(
+	node: ts.Expression,
+	valueOf: (name: ts.Identifier) => ts.Expression | null,
+): boolean {
 	node = skipParens(node);
 	if (ts.isIdentifier(node)) {
 		const value = valueOf(node);
@@ -511,23 +421,20 @@ function isBoolean(node, valueOf) {
 /**
  * Modules whose exports the codemod knows by name: React's, and Octane's own
  * for code already partly migrated.
- *
- * @param {string} module
  */
-function isApiModule(module) {
+function isApiModule(module: string) {
 	return module in REACT_MODULES || module === 'octane';
 }
 
 /**
  * Whether an identifier names a property rather than a binding.
- *
- * @param {ts.Identifier} node
  */
-function isPropertyName(node) {
-	const parent = /** @type {ts.Node & { name?: ts.Node }} */ (node.parent);
+function isPropertyName(node: ts.Identifier) {
+	const parent = node.parent;
 	if (ts.isPropertyAccessExpression(parent)) return parent.name === node;
 	if (ts.isQualifiedName(parent)) return parent.right === node;
 	return (
+		'name' in parent &&
 		parent.name === node &&
 		(ts.isPropertyAssignment(parent) ||
 			ts.isPropertySignature(parent) ||
@@ -540,12 +447,10 @@ function isPropertyName(node) {
 
 /**
  * Whether an identifier is the name a declaration introduces.
- *
- * @param {ts.Identifier} node
  */
-function declaresName(node) {
-	const parent = /** @type {ts.Node & { name?: ts.Node }} */ (node.parent);
-	if (parent.name !== node) return false;
+function declaresName(node: ts.Identifier) {
+	const parent = node.parent;
+	if (!('name' in parent) || parent.name !== node) return false;
 	return (
 		ts.isVariableDeclaration(parent) ||
 		ts.isFunctionDeclaration(parent) ||
@@ -566,11 +471,8 @@ function declaresName(node) {
 
 /**
  * The names a binding pattern introduces.
- *
- * @param {ts.BindingName} name
- * @returns {string[]}
  */
-function bindingNames(name) {
+function bindingNames(name: ts.BindingName): string[] {
 	if (ts.isIdentifier(name)) return [name.text];
 	return name.elements.flatMap((element) =>
 		ts.isOmittedExpression(element) ? [] : bindingNames(element.name),
@@ -579,23 +481,16 @@ function bindingNames(name) {
 
 /**
  * Whether `node` reads a name `test` accepts.
- *
- * @param {ts.Node} node
- * @param {(name: string) => boolean} test
- * @returns {boolean}
  */
-function reads(node, test) {
+function reads(node: ts.Node, test: (name: string) => boolean): boolean {
 	if (ts.isIdentifier(node)) return test(node.text);
 	return ts.forEachChild(node, (child) => reads(child, test) || undefined) === true;
 }
 
 /**
  * Whether a `function` body reads its own `this` or `arguments`.
- *
- * @param {ts.Node} node
- * @returns {boolean}
  */
-function usesOwnThis(node) {
+function usesOwnThis(node: ts.Node): boolean {
 	if (node.kind === ts.SyntaxKind.ThisKeyword) return true;
 	if (ts.isIdentifier(node) && node.text === 'arguments') return true;
 	if (isFunctionLike(node) && !ts.isArrowFunction(node)) return false;
@@ -604,10 +499,8 @@ function usesOwnThis(node) {
 
 /**
  * The children of an element that are more than layout whitespace.
- *
- * @param {ts.JsxElement | ts.JsxFragment} node
  */
-function contentOf(node) {
+function contentOf(node: ts.JsxElement | ts.JsxFragment) {
 	return node.children.filter(
 		(child) => !(ts.isJsxText(child) && child.containsOnlyTriviaWhiteSpaces),
 	);
@@ -615,88 +508,87 @@ function contentOf(node) {
 
 /**
  * A comment's text without its delimiters, to wrap as a JSX comment.
- *
- * @param {string} comment
  */
-function commentText(comment) {
+function commentText(comment: string) {
 	const body = comment.startsWith('//') ? comment.slice(2) : comment.slice(2, -2);
 	return body.trim().replaceAll('*/', '* /');
 }
 
-/** @param {string} name */
-function isComponentName(name) {
+function isComponentName(name: string) {
 	return /^[A-Z]/.test(name);
 }
 
 class ModuleTransform {
-	/**
-	 * @param {string} source
-	 * @param {string} filename
-	 * @param {TransformOptions} options
-	 */
-	constructor(source, filename, options) {
+	readonly source: string;
+	readonly filename: string;
+	readonly options: TransformOptions;
+	readonly target: 'tsrx' | 'tsx';
+	readonly strong: boolean;
+	/** React imports read as values, not only as types. */
+	readonly valueUses = new Set<string>();
+	routerShell = false;
+	readonly textTypes: boolean;
+	readonly sf: ts.SourceFile;
+	readonly checker: ts.TypeChecker;
+	readonly notes: Note[] = [];
+	readonly rules: Record<string, number> = {};
+	template = false;
+	readonly indentUnit: string;
+	/** Every import, keyed by its declaration. */
+	readonly imports = new Map<ts.Node, Import>();
+	/** React and Octane imports, by local name. */
+	readonly apiLocals = new Map<string, Import>();
+	/** React-module locals that are still referenced after the rewrite. */
+	readonly used = new Set<string>();
+	/** Imports the rewrite needs from Octane: module -> name -> { local, typeOnly } */
+	readonly added = new Map<string, Map<string, { local: string; typeOnly: boolean }>>();
+	/** Every name the module declares, to keep added imports from colliding. */
+	readonly declared = new Set<string>();
+	/** Attributes a parent rule has already consumed, such as a row key. */
+	readonly removed = new Set<ts.JsxAttributeLike>();
+	/** `<Fragment key>` rows whose key moved to the `@for` header. */
+	readonly bare = new Set<ts.Node>();
+	/** Functions whose parameter list a rule replaced. */
+	readonly parameters = new Map<ts.Node, string>();
+	/** Rest props that give up `onChange` to a text field. */
+	readonly restChange = new Set<ts.BindingElement>();
+	/** Spreads of those rest props, which pass it as `onInput`. */
+	readonly changeSpreads = new Set<ts.JsxSpreadAttribute>();
+	/** Components to mark `descriptorChildren`. */
+	readonly descriptorComponents = new Set<ts.VariableDeclaration | ts.FunctionDeclaration>();
+	/** Whether a `declare module` now augments `octane/jsx-runtime`. */
+	augments = false;
+	/** Each import specifier's unported package. */
+	readonly ports = new Map<string, Unported | null>();
+	/** Unported packages, by name. */
+	readonly unported = new Map<string, Unported>();
+	/** Elements to host in a `ReactCompat` island. */
+	readonly islands = new Set<ts.JsxElement | ts.JsxSelfClosingElement>();
+	/** Elements no island can host, with the error each throws where it renders. */
+	readonly unrenderable = new Map<ts.Node, string>();
+	/** Placeholder index -> import declaration. */
+	readonly importSlots: ts.ImportDeclaration[] = [];
+	hasJsx = false;
+	/** Whether the module imports React, rather than already being Octane. */
+	fromReact = false;
+	/** Each specifier's new spelling, or null to keep it. */
+	readonly resolved = new Map<string, string | null>();
+	quote = "'";
+
+	constructor(source: string, filename: string, options: TransformOptions) {
 		this.source = source;
 		this.filename = filename;
 		this.options = options;
 		this.target = options.target ?? 'tsrx';
 		this.strong = options.strong === true;
-		/** @type {Set<string>} React imports read as values, not only as types. */
-		this.valueUses = new Set();
-		this.routerShell = false;
 		this.textTypes = options.strictNullChecks === true && /\.[cm]?tsx?$/.test(filename);
 		const { sf, checker } = bind(filename, source);
 		this.sf = sf;
 		this.checker = checker;
-		/** @type {Note[]} */
-		this.notes = [];
-		/** @type {Record<string, number>} */
-		this.rules = {};
-		this.template = false;
 		this.indentUnit = /^\t/m.test(source) ? '\t' : '  ';
-
-		/** @type {Map<ts.Node, Import>} Every import, keyed by its declaration. */
-		this.imports = new Map();
-		/** @type {Map<string, Import>} React and Octane imports, by local name. */
-		this.apiLocals = new Map();
-		/** React-module locals that are still referenced after the rewrite. */
-		this.used = new Set();
-		/** Imports the rewrite needs from Octane: module -> name -> { local, typeOnly } */
-		this.added = new Map();
-		/** Every name the module declares, to keep added imports from colliding. */
-		this.declared = new Set();
-		/** Attributes a parent rule has already consumed, such as a row key. */
-		this.removed = new Set();
-		/** `<Fragment key>` rows whose key moved to the `@for` header. */
-		this.bare = new Set();
-		/** Functions whose parameter list a rule replaced. */
-		this.parameters = new Map();
-		/** @type {Set<ts.BindingElement>} Rest props that give up `onChange` to a text field. */
-		this.restChange = new Set();
-		/** @type {Set<ts.JsxSpreadAttribute>} Spreads of those rest props, which pass it as `onInput`. */
-		this.changeSpreads = new Set();
-		/** @type {Set<ts.VariableDeclaration | ts.FunctionDeclaration>} Components to mark `descriptorChildren`. */
-		this.descriptorComponents = new Set();
-		/** Whether a `declare module` now augments `octane/jsx-runtime`. */
-		this.augments = false;
-		/** @type {Map<string, Unported | null>} Each import specifier's unported package. */
-		this.ports = new Map();
-		/** @type {Map<string, Unported>} Unported packages, by name. */
-		this.unported = new Map();
-		/** @type {Set<ts.JsxElement | ts.JsxSelfClosingElement>} Elements to host in a `ReactCompat` island. */
-		this.islands = new Set();
-		/** @type {Map<ts.Node, string>} Elements no island can host, with the error each throws where it renders. */
-		this.unrenderable = new Map();
-		/** @type {ts.ImportDeclaration[]} Placeholder index -> import declaration. */
-		this.importSlots = [];
-		this.hasJsx = false;
-		/** Whether the module imports React, rather than already being Octane. */
-		this.fromReact = false;
-		/** @type {Map<string, string | null>} Each specifier's new spelling, or null to keep it. */
-		this.resolved = new Map();
 	}
 
-	/** @returns {TransformResult} */
-	run() {
+	run(): TransformResult {
 		this.analyze();
 		let code = this.emit(this.sf, PLAIN, 0);
 		code = this.finishImports(code);
@@ -730,15 +622,11 @@ class ModuleTransform {
 		};
 	}
 
-	/** @returns {ModuleExports} */
-	exportsOf() {
-		/** @type {Set<string>} */
-		const contexts = new Set();
-		/** @type {Set<string>} */
-		const exported = new Set();
-		/** @type {ModuleExports['reexports']} */
-		const reexports = [];
-		const isExported = (/** @type {ts.Statement} */ statement) =>
+	exportsOf(): ModuleExports {
+		const contexts: Set<string> = new Set();
+		const exported: Set<string> = new Set();
+		const reexports: ModuleExports['reexports'] = [];
+		const isExported = (statement: ts.Statement) =>
 			ts.canHaveModifiers(statement) &&
 			ts.getModifiers(statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
 		for (const statement of this.sf.statements) {
@@ -753,13 +641,10 @@ class ModuleTransform {
 				statement.exportClause &&
 				ts.isNamedExports(statement.exportClause)
 			) {
-				const pairs = statement.exportClause.elements.map(
-					(element) =>
-						/** @type {[string, string]} */ ([
-							(element.propertyName ?? element.name).text,
-							element.name.text,
-						]),
-				);
+				const pairs = statement.exportClause.elements.map<[string, string]>((element) => [
+					(element.propertyName ?? element.name).text,
+					element.name.text,
+				]);
 				if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
 					reexports.push({ specifier: statement.moduleSpecifier.text, names: pairs });
 				} else {
@@ -785,7 +670,7 @@ class ModuleTransform {
 		const first = this.sf.statements.find(ts.isImportDeclaration);
 		this.quote = first ? first.moduleSpecifier.getText(this.sf)[0] : "'";
 		/** Locals imported from a package with no Octane port. */
-		const portLocals = new Set();
+		const portLocals = new Set<string>();
 		for (const statement of this.sf.statements) {
 			if (
 				ts.isExportDeclaration(statement) &&
@@ -804,15 +689,15 @@ class ModuleTransform {
 				}
 			}
 			if (!ts.isImportDeclaration(statement) || !statement.importClause) continue;
-			const module = /** @type {ts.StringLiteral} */ (statement.moduleSpecifier).text;
+			const module = (statement.moduleSpecifier as ts.StringLiteral).text;
 			if (module in REACT_MODULES) this.fromReact = true;
 			if (/^@tanstack\/react-(?:router|start)(?:\/|$)/.test(module)) this.routerShell = true;
 			const clause = statement.importClause;
 			const record = (
-				/** @type {ts.Node} */ declaration,
-				/** @type {ts.Identifier} */ name,
-				/** @type {string} */ imported,
-				/** @type {boolean} */ typeOnly,
+				declaration: ts.Node,
+				name: ts.Identifier,
+				imported: string,
+				typeOnly: boolean,
 			) => {
 				const port = typeOnly ? null : this.portOf(module);
 				const entry = {
@@ -843,11 +728,10 @@ class ModuleTransform {
 				}
 			}
 		}
-		/** @type {ts.JsxOpeningLikeElement[]} */
-		const fields = [];
-		/** @type {ts.Expression[]} Values read as an element: cloned, inspected, or a `render` prop. */
-		const elements = [];
-		const visit = (/** @type {ts.Node} */ node) => {
+		const fields: ts.JsxOpeningLikeElement[] = [];
+		/** Values read as an element: cloned, inspected, or a `render` prop. */
+		const elements: ts.Expression[] = [];
+		const visit = (node: ts.Node) => {
 			if (ts.isIdentifier(node) && declaresName(node)) this.declared.add(node.text);
 			if (ts.isIdentifier(node) && portLocals.has(node.text)) this.planUnported(node);
 			if (isJsx(node)) this.hasJsx = true;
@@ -874,10 +758,8 @@ class ModuleTransform {
 	/**
 	 * The package with no Octane port that a specifier names, or null. It
 	 * still runs on React, which only the codemod's report and a comment say.
-	 *
-	 * @param {string} module
 	 */
-	portOf(module) {
+	portOf(module: string) {
 		let port = this.ports.get(module);
 		if (port === undefined) {
 			const name = isApiModule(module) ? null : (this.options.unported?.(module) ?? null);
@@ -893,10 +775,8 @@ class ModuleTransform {
 	 * a `ReactCompat` island, when its element hands React nothing Octane
 	 * renders. Its hooks and contexts cannot run in an Octane component, so
 	 * they are reported.
-	 *
-	 * @param {ts.Identifier} node
 	 */
-	planUnported(node) {
+	planUnported(node: ts.Identifier) {
 		const port = this.inImport(node) ? null : this.importOf(node)?.port;
 		if (!port) return;
 		// `Toast.Bar`, through a namespace or default import, is the member.
@@ -907,7 +787,7 @@ class ModuleTransform {
 		const name = ts.isPropertyAccessExpression(member) ? member.name.text : node.text;
 		const text = member.getText(this.sf);
 		const parent = member.parent;
-		const block = (/** @type {string} */ message) => {
+		const block = (message: string) => {
 			port.blocked++;
 			const error = `${message} \`${port.name}\` has no Octane port.`;
 			this.note(RULE.bindings, 'error', member, error);
@@ -948,19 +828,16 @@ class ModuleTransform {
 	 * island: React renders all of it, so its children are text and no prop
 	 * holds an element, as JSX here, through a value this module declares, or
 	 * by its type.
-	 *
-	 * @param {ts.JsxElement | ts.JsxSelfClosingElement} element
 	 */
-	hostsInReact(element) {
+	hostsInReact(element: ts.JsxElement | ts.JsxSelfClosingElement) {
 		// By type: a cast to `any` or `ReactNode` proves nothing.
-		const text = (/** @type {ts.JsxChild} */ child) =>
+		const text = (child: ts.JsxChild) =>
 			ts.isJsxText(child) ||
 			(ts.isJsxExpression(child) &&
 				(!child.expression || textKind(this.typeOf(child.expression)) !== 0));
 		if (ts.isJsxElement(element) && !element.children.every(text)) return false;
-		const seen = new Set();
-		/** @type {(node: ts.Node) => boolean} */
-		const rendersOctane = (node) => {
+		const seen = new Set<ts.Declaration>();
+		const rendersOctane: (node: ts.Node) => boolean = (node) => {
 			if (isJsx(node)) return true;
 			if (ts.isIdentifier(node)) {
 				const project = this.projectType(node);
@@ -985,10 +862,8 @@ class ModuleTransform {
 
 	/**
 	 * Whether an element is already the child of a `ReactCompat` island.
-	 *
-	 * @param {ts.JsxElement | ts.JsxSelfClosingElement} element
 	 */
-	inIsland(element) {
+	inIsland(element: ts.JsxElement | ts.JsxSelfClosingElement) {
 		const parent = element.parent;
 		if (!ts.isJsxElement(parent)) return false;
 		const entry = this.importOf(parent.openingElement.tagName);
@@ -998,10 +873,8 @@ class ModuleTransform {
 	/**
 	 * Whether a callee reads its argument as an element: `cloneElement`,
 	 * `isValidElement`, or a `Children` method.
-	 *
-	 * @param {ts.Expression} callee
 	 */
-	readsElement(callee) {
+	readsElement(callee: ts.Expression) {
 		const name = this.calleeName(callee);
 		if (name === 'cloneElement' || name === 'isValidElement') return true;
 		return (
@@ -1014,10 +887,8 @@ class ModuleTransform {
 	 * `render={children}` and `cloneElement(children)` rely on. Octane passes a
 	 * compiled render body unless the component is marked `descriptorChildren`,
 	 * so mark the component whose own `children` this reads.
-	 *
-	 * @param {ts.Expression} expression
 	 */
-	planDescriptorChildren(expression) {
+	planDescriptorChildren(expression: ts.Expression) {
 		const value = skipWrappers(expression);
 		const component = this.childrenOwner(value);
 		if (!component) return;
@@ -1062,13 +933,9 @@ class ModuleTransform {
 	/**
 	 * The component whose own `children` prop `node` is: `children` from its
 	 * props pattern, or `props.children`.
-	 *
-	 * @param {ts.Expression} node
-	 * @returns {ts.SignatureDeclaration | null}
 	 */
-	childrenOwner(node) {
-		/** @type {ts.Node | null} */
-		let props = null;
+	childrenOwner(node: ts.Expression): ts.SignatureDeclaration | null {
+		let props: ts.Node | null = null;
 		if (ts.isPropertyAccessExpression(node) && node.name.text === 'children') {
 			props = ts.isIdentifier(node.expression) ? this.declarationOf(node.expression) : null;
 		} else if (ts.isIdentifier(node)) {
@@ -1082,7 +949,7 @@ class ModuleTransform {
 			}
 		}
 		if (!props || !ts.isParameter(props)) return null;
-		const component = /** @type {ts.SignatureDeclaration} */ (props.parent);
+		const component = props.parent;
 		return component.parameters[0] === props && isFunctionLike(component) ? component : null;
 	}
 
@@ -1093,12 +960,10 @@ class ModuleTransform {
 	 * invokes) except one it only defines: a declaration or a variable's value.
 	 * Those run only when called or passed on, which counts as reaching `fn`
 	 * for any binding the module declares.
-	 *
-	 * @param {ts.FunctionDeclaration} fn
 	 */
-	declaredBeforeUse(fn) {
+	declaredBeforeUse(fn: ts.FunctionDeclaration) {
 		let safe = true;
-		const visit = (/** @type {ts.Node} */ node) => {
+		const visit = (node: ts.Node) => {
 			if (!safe) return;
 			if (isFunctionLike(node) && this.onlyDefines(node)) return;
 			if (ts.isIdentifier(node) && node !== fn.name) {
@@ -1126,10 +991,8 @@ class ModuleTransform {
 	/**
 	 * Whether a function is only defined where it stands: a declaration, or a
 	 * variable's value, also through `memo` or `forwardRef`, which do not call it.
-	 *
-	 * @param {ts.Node} fn
 	 */
-	onlyDefines(fn) {
+	onlyDefines(fn: ts.Node) {
 		if (ts.isFunctionDeclaration(fn)) return true;
 		let parent = fn.parent;
 		while (
@@ -1145,10 +1008,8 @@ class ModuleTransform {
 	/**
 	 * Whether an `onChange` a spread passes this element fires per edit in
 	 * React: a text field with no `onChange` or `onInput` of its own.
-	 *
-	 * @param {ts.JsxOpeningLikeElement} element
 	 */
-	takesChange(element) {
+	takesChange(element: ts.JsxOpeningLikeElement) {
 		if (
 			!/^(?:input|textarea)$/.test(element.tagName.getText(this.sf)) &&
 			!this.isTextFieldComponent(element)
@@ -1165,10 +1026,8 @@ class ModuleTransform {
 	 * it out of the rest and pass it as `onInput`, before the spread, so a
 	 * caller's own `onInput` still wins. Only when the rest is read nowhere
 	 * else, since those reads would lose it.
-	 *
-	 * @param {ts.JsxOpeningLikeElement} field
 	 */
-	planRestChange(field) {
+	planRestChange(field: ts.JsxOpeningLikeElement) {
 		for (const spread of field.attributes.properties) {
 			if (!ts.isJsxSpreadAttribute(spread)) continue;
 			// Props whose type has no `onChange` have none to pass on.
@@ -1207,16 +1066,13 @@ class ModuleTransform {
 	/**
 	 * Whether no read of a rest binding but its spreads onto text fields can
 	 * see an `onChange` in it: other reads name another member (`props.type`).
-	 *
-	 * @param {ts.BindingElement} rest
 	 */
-	onlySpreadOntoFields(rest) {
+	onlySpreadOntoFields(rest: ts.BindingElement) {
 		let only = true;
-		const visit = (/** @type {ts.Node} */ node) => {
+		const visit = (node: ts.Node) => {
 			if (!only) return;
 			if (ts.isIdentifier(node) && node !== rest.name && this.declarationOf(node) === rest) {
-				/** @type {ts.Node} */
-				let read = node;
+				let read: ts.Node = node;
 				while (isWrapper(read.parent)) read = read.parent;
 				const parent = read.parent;
 				if (ts.isJsxSpreadAttribute(parent)) {
@@ -1245,10 +1101,8 @@ class ModuleTransform {
 	/**
 	 * The rest binding a destructuring into `rest`'s pattern reads, or null:
 	 * `props` for `native` in `const { style, ...native } = props`.
-	 *
-	 * @param {ts.BindingElement} rest
 	 */
-	restSource(rest) {
+	restSource(rest: ts.BindingElement) {
 		const declaration = rest.parent.parent;
 		if (!ts.isVariableDeclaration(declaration) || !declaration.initializer) return null;
 		const source = skipWrappers(declaration.initializer);
@@ -1257,10 +1111,8 @@ class ModuleTransform {
 
 	/**
 	 * Whether a destructuring takes `onChange` out by name.
-	 *
-	 * @param {ts.ObjectBindingPattern | ts.ArrayBindingPattern} pattern
 	 */
-	namesChange(pattern) {
+	namesChange(pattern: ts.ObjectBindingPattern | ts.ArrayBindingPattern) {
 		return pattern.elements.some(
 			(e) => ts.isBindingElement(e) && (e.propertyName ?? e.name).getText(this.sf) === 'onChange',
 		);
@@ -1269,12 +1121,9 @@ class ModuleTransform {
 	/**
 	 * Whether `element` is a library component that renders a text `<input>`,
 	 * such as Base UI's `Input`, imported by name or through a namespace.
-	 *
-	 * @param {ts.JsxOpeningLikeElement} element
 	 */
-	isTextFieldComponent(element) {
-		/** @type {ts.Node} */
-		let root = element.tagName;
+	isTextFieldComponent(element: ts.JsxOpeningLikeElement) {
+		let root: ts.Node = element.tagName;
 		while (ts.isPropertyAccessExpression(root)) root = root.expression;
 		const entry = this.importOf(root);
 		if (!entry) return false;
@@ -1285,11 +1134,8 @@ class ModuleTransform {
 
 	/**
 	 * The declaration a name refers to.
-	 *
-	 * @param {ts.Identifier} node
-	 * @returns {ts.Declaration | null}
 	 */
-	declarationOf(node) {
+	declarationOf(node: ts.Identifier): ts.Declaration | null {
 		const parent = node.parent;
 		const symbol =
 			ts.isShorthandPropertyAssignment(parent) && parent.name === node
@@ -1300,11 +1146,8 @@ class ModuleTransform {
 
 	/**
 	 * The initializer of the `const` a name refers to, or null.
-	 *
-	 * @param {ts.Identifier} node
-	 * @returns {ts.Expression | null}
 	 */
-	constValue(node) {
+	constValue(node: ts.Identifier): ts.Expression | null {
 		const declaration = this.declarationOf(node);
 		if (
 			!declaration ||
@@ -1320,11 +1163,8 @@ class ModuleTransform {
 	/**
 	 * The import a name refers to, or null when it refers to anything else,
 	 * such as a local that shadows the import.
-	 *
-	 * @param {ts.Node} node
-	 * @returns {Import | null}
 	 */
-	importOf(node) {
+	importOf(node: ts.Node): Import | null {
 		if (!ts.isIdentifier(node)) return null;
 		const declaration = this.declarationOf(node);
 		return declaration ? (this.imports.get(declaration) ?? null) : null;
@@ -1333,19 +1173,12 @@ class ModuleTransform {
 	/**
 	 * The React or Octane export a callee names, through a named import or a
 	 * namespace.
-	 *
-	 * @param {ts.Node} node
-	 * @returns {string | null}
 	 */
-	calleeName(node) {
+	calleeName(node: ts.Node): string | null {
 		return this.callee(node)?.name ?? null;
 	}
 
-	/**
-	 * @param {ts.Node} node
-	 * @returns {{ name: string, module: string } | null}
-	 */
-	callee(node) {
+	callee(node: ts.Node): { name: string; module: string } | null {
 		if (ts.isIdentifier(node)) {
 			const entry = this.importOf(node);
 			if (!entry || entry.namespace || entry.typeOnly || !isApiModule(entry.module)) return null;
@@ -1359,34 +1192,22 @@ class ModuleTransform {
 		return null;
 	}
 
-	/** @param {ts.Node} node */
-	line(node) {
+	line(node: ts.Node) {
 		return this.sf.getLineAndCharacterOfPosition(node.getStart(this.sf)).line + 1;
 	}
 
-	/**
-	 * @param {string} rule
-	 * @param {Severity} severity
-	 * @param {ts.Node} node
-	 * @param {string} message
-	 */
-	note(rule, severity, node, message) {
+	note(rule: string, severity: Severity, node: ts.Node, message: string) {
 		this.notes.push({ rule, severity, line: this.line(node), message });
 	}
 
-	/** @param {string} rule */
-	count(rule) {
+	count(rule: string) {
 		this.rules[rule] = (this.rules[rule] ?? 0) + 1;
 	}
 
 	/**
 	 * Request an import from Octane and return the local name to use.
-	 *
-	 * @param {string} module
-	 * @param {string} name
-	 * @param {boolean} typeOnly
 	 */
-	require(module, name, typeOnly) {
+	require(module: string, name: string, typeOnly: boolean) {
 		let names = this.added.get(module);
 		if (!names) this.added.set(module, (names = new Map()));
 		const existing = names.get(name);
@@ -1407,22 +1228,17 @@ class ModuleTransform {
 	/**
 	 * Whether this module declares `symbol`, rather than the library or
 	 * nothing at all.
-	 *
-	 * @param {ts.Symbol | undefined} symbol
 	 */
-	declaresHere(symbol) {
+	declaresHere(symbol: ts.Symbol | undefined) {
 		return symbol?.declarations?.some((d) => d.getSourceFile() === this.sf) ?? false;
 	}
 
 	/**
 	 * Whether the module reads `name` as a global, such as the DOM's
 	 * `MouseEvent`, which an import of the same name would shadow.
-	 *
-	 * @param {string} name
 	 */
-	readsGlobal(name) {
-		/** @type {(node: ts.Node) => boolean} */
-		const visit = (node) => {
+	readsGlobal(name: string) {
+		const visit: (node: ts.Node) => boolean = (node) => {
 			if (
 				ts.isIdentifier(node) &&
 				node.text === name &&
@@ -1442,13 +1258,8 @@ class ModuleTransform {
 	/**
 	 * The new text of `node`: a rule's replacement, or the original text with
 	 * its children emitted in place.
-	 *
-	 * @param {ts.Node} node
-	 * @param {Context} ctx
-	 * @param {number} [start]
-	 * @returns {string}
 	 */
-	emit(node, ctx, start) {
+	emit(node: ts.Node, ctx: Context, start?: number): string {
 		if (ts.isIdentifier(node) && this.apiLocals.has(node.text) && !this.inImport(node)) {
 			const entry = this.importOf(node);
 			if (entry) {
@@ -1465,8 +1276,7 @@ class ModuleTransform {
 		return text;
 	}
 
-	/** @param {ts.Node} node */
-	inImport(node) {
+	inImport(node: ts.Node) {
 		for (let current = node.parent; current; current = current.parent) {
 			if (ts.isImportDeclaration(current)) return true;
 		}
@@ -1476,13 +1286,8 @@ class ModuleTransform {
 	/**
 	 * The text of `node` between `from` and `to`, with every child inside that
 	 * range emitted.
-	 *
-	 * @param {ts.Node} node
-	 * @param {number} from
-	 * @param {number} to
-	 * @param {Context} ctx
 	 */
-	span(node, from, to, ctx) {
+	span(node: ts.Node, from: number, to: number, ctx: Context) {
 		let out = '';
 		let cursor = from;
 		const childCtx = ts.isJsxElement(node) || ts.isJsxFragment(node) ? ctx : PLAIN;
@@ -1508,12 +1313,7 @@ class ModuleTransform {
 		return out + this.source.slice(cursor, to);
 	}
 
-	/**
-	 * @param {ts.Node} node
-	 * @param {Context} ctx
-	 * @returns {string | null}
-	 */
-	rewrite(node, ctx) {
+	rewrite(node: ts.Node, ctx: Context): string | null {
 		if (ts.isImportDeclaration(node)) return this.rewriteImport(node);
 		if (ts.isExportDeclaration(node) && node.moduleSpecifier) return this.rewriteReexport(node);
 		if (ts.isCallExpression(node)) return this.rewriteCall(node);
@@ -1611,9 +1411,8 @@ class ModuleTransform {
 
 	// ---------------------------------------------------------------- imports
 
-	/** @param {ts.ImportDeclaration} node */
-	rewriteImport(node) {
-		const module = /** @type {ts.StringLiteral} */ (node.moduleSpecifier).text;
+	rewriteImport(node: ts.ImportDeclaration) {
+		const module = (node.moduleSpecifier as ts.StringLiteral).text;
 		if (module === 'octane') return null;
 		if (module === '@react-three/fiber' && this.hasJsx) {
 			this.note(
@@ -1646,11 +1445,8 @@ class ModuleTransform {
 	 * names differently. A Radix package is a namespace of `@octanejs/radix`, so
 	 * its namespace import becomes that namespace and its named imports read
 	 * from it. Names the port lacks stay on the React package, for a person.
-	 *
-	 * @param {ts.ImportDeclaration | ts.ExportDeclaration} node
-	 * @param {string} module
 	 */
-	rewritePackageNames(node, module) {
+	rewritePackageNames(node: ts.ImportDeclaration | ts.ExportDeclaration, module: string) {
 		const clause = ts.isImportDeclaration(node) ? node.importClause : node;
 		const namespace = radixNamespace(module);
 		const next = this.resolve(module);
@@ -1659,9 +1455,8 @@ class ModuleTransform {
 			return null;
 		}
 		const keyword = ts.isImportClause(clause) ? 'import' : 'export';
-		const quote =
-			this.source[/** @type {ts.Expression} */ (node.moduleSpecifier).getStart(this.sf)];
-		const from = (/** @type {string} */ specifier) => `from ${quote}${specifier}${quote};`;
+		const quote = this.source[(node.moduleSpecifier as ts.Expression).getStart(this.sf)];
+		const from = (specifier: string) => `from ${quote}${specifier}${quote};`;
 		const type = clause.isTypeOnly ? 'type ' : '';
 		const bindings = ts.isImportClause(clause) ? clause.namedBindings : clause.exportClause;
 		if (bindings && ts.isNamespaceImport(bindings)) {
@@ -1671,12 +1466,9 @@ class ModuleTransform {
 			return `import ${type}{ ${local === namespace ? local : `${namespace} as ${local}`} } ${from(next)}`;
 		}
 		if (!bindings || ts.isNamespaceExport(bindings)) return null;
-		/** @type {string[]} */
-		const kept = [];
-		/** @type {string[]} */
-		const values = [];
-		/** @type {string[]} */
-		const types = [];
+		const kept: string[] = [];
+		const values: string[] = [];
+		const types: string[] = [];
 		let renamed = false;
 		for (const element of bindings.elements) {
 			const imported = (element.propertyName ?? element.name).text;
@@ -1716,11 +1508,9 @@ class ModuleTransform {
 	 * `DialogPrimitive.DialogTitle`, a member of a ported package's namespace
 	 * import, as its port spells it.
 	 *
-	 * @param {ts.Node} namespace
-	 * @param {ts.MemberName} member
-	 * @param {Severity} severity of a member the port lacks
+	 * @param severity of a member the port lacks
 	 */
-	rewritePackageMember(namespace, member, severity) {
+	rewritePackageMember(namespace: ts.Node, member: ts.MemberName, severity: Severity) {
 		const entry = this.importOf(namespace);
 		if (!entry?.namespace) return null;
 		const name = mapPackageExport(entry.module, member.text);
@@ -1735,29 +1525,20 @@ class ModuleTransform {
 		return `${entry.local}.${name}`;
 	}
 
-	/** @param {ts.ExportDeclaration} node */
-	rewriteReexport(node) {
-		const module = /** @type {ts.StringLiteral} */ (node.moduleSpecifier).text;
+	rewriteReexport(node: ts.ExportDeclaration) {
+		const module = (node.moduleSpecifier as ts.StringLiteral).text;
 		const mapped = REACT_MODULES[module];
 		if (mapped) {
 			this.count(RULE.import);
-			return this.replaceSpecifier(
-				node,
-				/** @type {ts.Expression} */ (node.moduleSpecifier),
-				mapped,
-			);
+			return this.replaceSpecifier(node, node.moduleSpecifier as ts.Expression, mapped);
 		}
 		return (
 			this.rewritePackageNames(node, module) ??
-			this.rewriteSpecifier(node, /** @type {ts.Expression} */ (node.moduleSpecifier))
+			this.rewriteSpecifier(node, node.moduleSpecifier as ts.Expression)
 		);
 	}
 
-	/**
-	 * @param {ts.Node} node
-	 * @param {ts.Expression} specifier
-	 */
-	rewriteSpecifier(node, specifier) {
+	rewriteSpecifier(node: ts.Node, specifier: ts.Expression) {
 		if (!ts.isStringLiteral(specifier)) return null;
 		const next = this.resolve(specifier.text);
 		if (next === null || next === specifier.text) return null;
@@ -1778,10 +1559,8 @@ class ModuleTransform {
 
 	/**
 	 * The new spelling of an import specifier, or null to keep it.
-	 *
-	 * @param {string} specifier
 	 */
-	resolve(specifier) {
+	resolve(specifier: string) {
 		let next = this.resolved.get(specifier);
 		if (next === undefined) {
 			next = this.options.resolveSpecifier?.(specifier) ?? null;
@@ -1794,11 +1573,8 @@ class ModuleTransform {
 	 * `declare module 'react' { namespace JSX { … } }` types custom elements,
 	 * which Octane reads from `octane/jsx-runtime`'s JSX namespace. Anything
 	 * else it adds patches React's own types, which Octane does not use.
-	 *
-	 * @param {ts.ModuleDeclaration} node
-	 * @param {ts.StringLiteral} specifier
 	 */
-	rewriteAugmentation(node, specifier) {
+	rewriteAugmentation(node: ts.ModuleDeclaration, specifier: ts.StringLiteral) {
 		const statements = node.body && ts.isModuleBlock(node.body) ? node.body.statements : [];
 		if (
 			statements.length > 0 &&
@@ -1817,12 +1593,7 @@ class ModuleTransform {
 		return null;
 	}
 
-	/**
-	 * @param {ts.Node} node
-	 * @param {ts.Expression} specifier
-	 * @param {string} next
-	 */
-	replaceSpecifier(node, specifier, next) {
+	replaceSpecifier(node: ts.Node, specifier: ts.Expression, next: string) {
 		const quote = this.source[specifier.getStart(this.sf)];
 		return (
 			this.span(node, node.getStart(this.sf), specifier.getStart(this.sf), PLAIN) +
@@ -1838,10 +1609,8 @@ class ModuleTransform {
 	/**
 	 * `import('react').ReactNode` in a type: the module, and a React type name
 	 * Octane spells differently, follow the same map as static imports.
-	 *
-	 * @param {ts.ImportTypeNode} node
 	 */
-	rewriteImportType(node) {
+	rewriteImportType(node: ts.ImportTypeNode) {
 		const argument = node.argument;
 		if (!ts.isLiteralTypeNode(argument) || !ts.isStringLiteral(argument.literal)) return null;
 		const specifier = argument.literal;
@@ -1875,18 +1644,13 @@ class ModuleTransform {
 	 * Fill each React import placeholder. The first one carries every Octane
 	 * import the module needs, the module's own specifiers first; the others
 	 * disappear with their line.
-	 *
-	 * @param {string} code
 	 */
-	finishImports(code) {
-		/** @type {Map<string, Map<string, { name: string, local: string, typeOnly: boolean }>>} */
-		const imports = new Map();
-		const add = (
-			/** @type {string} */ module,
-			/** @type {string} */ name,
-			/** @type {string} */ local,
-			/** @type {boolean} */ typeOnly,
-		) => {
+	finishImports(code: string) {
+		const imports: Map<
+			string,
+			Map<string, { name: string; local: string; typeOnly: boolean }>
+		> = new Map();
+		const add = (module: string, name: string, local: string, typeOnly: boolean) => {
 			let names = imports.get(module);
 			if (!names) imports.set(module, (names = new Map()));
 			const existing = names.get(`${name} ${local}`);
@@ -1894,11 +1658,11 @@ class ModuleTransform {
 			else names.set(`${name} ${local}`, { name, local, typeOnly });
 		};
 		/** React specifiers with no Octane export stay on React, for a person. */
-		const kept = new Map();
-		/** @type {string[]} Locals of React's `jsx` factories, which a JSX runtime consumer calls. */
-		const factories = [];
+		const kept = new Map<string, string[]>();
+		/** Locals of React's `jsx` factories, which a JSX runtime consumer calls. */
+		const factories: string[] = [];
 		for (const node of this.importSlots) {
-			const module = /** @type {ts.StringLiteral} */ (node.moduleSpecifier).text;
+			const module = (node.moduleSpecifier as ts.StringLiteral).text;
 			const clause = node.importClause;
 			if (!clause) continue;
 			const bindings = clause.namedBindings;
@@ -1940,9 +1704,8 @@ class ModuleTransform {
 			for (const [name, { local, typeOnly }] of names) add(module, name, local, typeOnly);
 		}
 
-		/** @type {string[]} */
-		const lines = [];
-		const quote = (/** @type {string} */ module) => this.quote + module + this.quote;
+		const lines: string[] = [];
+		const quote = (module: string) => this.quote + module + this.quote;
 		for (const [module, names] of imports) {
 			const specs = [...names.values()];
 			for (const { name, local } of specs) {
@@ -1990,8 +1753,10 @@ class ModuleTransform {
 			return code.slice(0, at) + lines.join('\n') + '\n' + code.slice(at);
 		}
 		this.count(RULE.import);
-		return code.replace(/\u0000IMPORT(\d+)\u0000(\r?\n)?/g, (_, index, newline) =>
-			index === '0' && lines.length > 0 ? lines.join('\n') + (newline ?? '') : '',
+		return code.replace(
+			/\u0000IMPORT(\d+)\u0000(\r?\n)?/g,
+			(_, index: string, newline: string | undefined) =>
+				index === '0' && lines.length > 0 ? lines.join('\n') + (newline ?? '') : '',
 		);
 	}
 
@@ -2011,10 +1776,8 @@ class ModuleTransform {
 	/**
 	 * Where new imports go when the module imported nothing from React: after
 	 * the directive prologue and any leading comments.
-	 *
-	 * @param {string} code
 	 */
-	insertionPoint(code) {
+	insertionPoint(code: string) {
 		// Whole lines only: a shebang, blank lines, comments that end their
 		// line, and directive lines. Anything inserted here starts a line, so
 		// the Strong fallback can find its own directive line again. The
@@ -2026,15 +1789,13 @@ class ModuleTransform {
 		return prologue ? prologue[0].length : 0;
 	}
 
-	/** @param {string} code */
-	addStrongDirective(code) {
+	addStrongDirective(code: string) {
 		this.count(RULE.strong);
 		const at = this.insertionPoint(code);
 		return code.slice(0, at) + '"use strong";\n' + (at === 0 ? '\n' : '') + code.slice(at);
 	}
 
-	/** @param {string} code */
-	addJsxPragma(code) {
+	addJsxPragma(code: string) {
 		if (/@jsxImportSource\s+octane/.test(code)) return code;
 		const replaced = code.replace(/@jsxImportSource\s+\S+/, '@jsxImportSource octane');
 		return replaced !== code ? replaced : '/** @jsxImportSource octane */\n' + code;
@@ -2042,8 +1803,7 @@ class ModuleTransform {
 
 	// ---------------------------------------------------------------- APIs
 
-	/** @param {ts.PropertyAccessExpression} node */
-	rewriteMember(node) {
+	rewriteMember(node: ts.PropertyAccessExpression) {
 		// `<Ctx.Provider value>` is `<Ctx value>` in Octane, as in React 19.
 		const tag = node.parent;
 		const isTag =
@@ -2095,11 +1855,8 @@ class ModuleTransform {
 	/**
 	 * Whether `node` names a global namespace React's types declare, such as
 	 * `React` in `React.ReactNode` written without an import.
-	 *
-	 * @param {ts.EntityName} node
-	 * @param {string} name
 	 */
-	isGlobalNamespace(node, name) {
+	isGlobalNamespace(node: ts.EntityName, name: string) {
 		return (
 			ts.isIdentifier(node) &&
 			node.text === name &&
@@ -2107,8 +1864,7 @@ class ModuleTransform {
 		);
 	}
 
-	/** @param {ts.QualifiedName} node */
-	rewriteQualifiedType(node) {
+	rewriteQualifiedType(node: ts.QualifiedName) {
 		const member = this.rewritePackageMember(node.left, node.right, 'warning');
 		if (member !== null) return member;
 		const namespace = this.importOf(node.left);
@@ -2134,8 +1890,7 @@ class ModuleTransform {
 		return this.require('octane', name, true);
 	}
 
-	/** @param {ts.TypeReferenceNode} node */
-	rewriteTypeReference(node) {
+	rewriteTypeReference(node: ts.TypeReferenceNode) {
 		// The global `JSX` namespace React's types declared is Octane's export.
 		const name = node.typeName;
 		if (ts.isQualifiedName(name) && this.isGlobalNamespace(name.left, 'JSX')) {
@@ -2144,8 +1899,7 @@ class ModuleTransform {
 		return null;
 	}
 
-	/** @param {ts.CallExpression} node */
-	rewriteCall(node) {
+	rewriteCall(node: ts.CallExpression) {
 		if (node.expression.kind === ts.SyntaxKind.ImportKeyword && node.arguments[0]) {
 			const [specifier] = node.arguments;
 			const mapped = ts.isStringLiteral(specifier) ? REACT_MODULES[specifier.text] : undefined;
@@ -2200,11 +1954,8 @@ class ModuleTransform {
 	 * Octane infers the list instead, so compatibility output passes `null` to
 	 * keep React's behavior. Strong output leaves it to the compiler, which is
 	 * what Strong asks for.
-	 *
-	 * @param {ts.CallExpression} node
-	 * @param {string} name
 	 */
-	rewriteDependencies(node, name) {
+	rewriteDependencies(node: ts.CallExpression, name: string) {
 		if (node.arguments.length !== DEPENDENCY_HOOKS[name]) return null;
 		if (this.strong) {
 			this.note(
@@ -2227,10 +1978,8 @@ class ModuleTransform {
 	/**
 	 * `forwardRef((props, ref) => …)` becomes the inner function with `ref`
 	 * read from props.
-	 *
-	 * @param {ts.CallExpression} node
 	 */
-	rewriteForwardRef(node) {
+	rewriteForwardRef(node: ts.CallExpression) {
 		const [render] = node.arguments;
 		if (
 			node.arguments.length !== 1 ||
@@ -2255,7 +2004,7 @@ class ModuleTransform {
 		const refBinding = refName === null ? null : refName === 'ref' ? 'ref' : `ref: ${refName}`;
 
 		// Splice `ref` into the props pattern in the pattern's own layout.
-		let pattern;
+		let pattern: string | null;
 		if (!props) pattern = refBinding ? `{ ${refBinding} }` : null;
 		else if (refBinding === null) pattern = this.emit(props.name, PLAIN);
 		else if (ts.isObjectBindingPattern(props.name)) {
@@ -2294,7 +2043,7 @@ class ModuleTransform {
 		// Keep the parameter list's layout: the props parameter is replaced in
 		// place and the ref parameter goes with the comma before it.
 		const list = render.parameters;
-		let parameters;
+		let parameters: string;
 		if (pattern === null) parameters = '';
 		else if (!props) parameters = pattern + annotation;
 		else {
@@ -2310,11 +2059,8 @@ class ModuleTransform {
 
 	/**
 	 * A function's text up to its body, with any parameters a rule replaced.
-	 *
-	 * @param {ts.SignatureDeclaration & { body?: ts.Node }} node
-	 * @param {number} end
 	 */
-	head(node, end) {
+	head(node: ts.SignatureDeclaration & { body?: ts.Node }, end: number) {
 		const parameters = this.parameters.get(node);
 		if (parameters === undefined) return this.span(node, node.getStart(this.sf), end, PLAIN);
 		return (
@@ -2324,8 +2070,7 @@ class ModuleTransform {
 		);
 	}
 
-	/** @param {ts.ParameterDeclaration | undefined} ref */
-	refTypeOf(ref) {
+	refTypeOf(ref: ts.ParameterDeclaration | undefined) {
 		const type = ref?.type;
 		if (type && ts.isTypeReferenceNode(type) && type.typeArguments?.length === 1) {
 			return this.emit(type.typeArguments[0], PLAIN);
@@ -2337,11 +2082,7 @@ class ModuleTransform {
 		return /\.[cm]?tsx?$/.test(this.filename);
 	}
 
-	/**
-	 * @param {ts.CallExpression} node
-	 * @param {'render' | 'hydrate'} name
-	 */
-	rewriteLegacyRoot(node, name) {
+	rewriteLegacyRoot(node: ts.CallExpression, name: 'render' | 'hydrate') {
 		const [element, container, callback] = node.arguments;
 		if (!element || !container) return null;
 		if (callback) {
@@ -2363,10 +2104,8 @@ class ModuleTransform {
 	/**
 	 * Whether `node` is a root `createRoot` made: the call itself, or a
 	 * `const` bound to it.
-	 *
-	 * @param {ts.Expression} node
 	 */
-	isRoot(node) {
+	isRoot(node: ts.Expression) {
 		node = skipParens(node);
 		const value = ts.isIdentifier(node) ? this.constValue(node) : node;
 		return (
@@ -2380,10 +2119,9 @@ class ModuleTransform {
 	 * element: the generic element renderer stays out of the bundle. So are
 	 * `hydrateRoot(c, <App />)` and the server renderers' element argument.
 	 *
-	 * @param {ts.CallExpression} node
-	 * @param {ts.Expression} argument the element, the call's last argument
+	 * @param argument the element, the call's last argument
 	 */
-	rewriteRootRender(node, argument) {
+	rewriteRootRender(node: ts.CallExpression, argument: ts.Expression) {
 		const component = this.rootComponent(argument);
 		if (component === null) return null;
 		this.count(RULE.rootRender);
@@ -2397,25 +2135,21 @@ class ModuleTransform {
 	/**
 	 * `App` or `App, props` for an element of a component with no key, ref,
 	 * or children, through a `<StrictMode>` wrapper, else null.
-	 *
-	 * @param {ts.Expression} expression
-	 * @returns {string | null}
 	 */
-	rootComponent(expression) {
+	rootComponent(expression: ts.Expression): string | null {
 		let node = skipParens(expression);
 		if (ts.isJsxElement(node) && this.calleeName(node.openingElement.tagName) === 'StrictMode') {
 			const children = node.children.filter(
 				(child) => !(ts.isJsxText(child) && child.containsOnlyTriviaWhiteSpaces),
 			);
 			if (children.length !== 1 || !isJsx(children[0])) return null;
-			node = /** @type {ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment} */ (children[0]);
+			node = children[0];
 		}
 		if (ts.isJsxSelfClosingElement(node)) {
 			const tag = node.tagName;
 			if (!ts.isIdentifier(tag) && !ts.isPropertyAccessExpression(tag)) return null;
 			if (!isComponentName(tag.getText(this.sf).split('.').pop() ?? '')) return null;
-			/** @type {string[]} */
-			const props = [];
+			const props: string[] = [];
 			for (const property of node.attributes.properties) {
 				if (ts.isJsxSpreadAttribute(property)) {
 					props.push(`...${this.emit(property.expression, PLAIN)}`);
@@ -2445,8 +2179,7 @@ class ModuleTransform {
 		return null;
 	}
 
-	/** @param {ts.ExpressionStatement} node */
-	rewriteStatement(node) {
+	rewriteStatement(node: ts.ExpressionStatement) {
 		const call = node.expression;
 		if (
 			ts.isCallExpression(call) &&
@@ -2464,19 +2197,17 @@ class ModuleTransform {
 
 	/**
 	 * The parameter `node` refers to, with its function.
-	 *
-	 * @param {ts.Node} node
-	 * @returns {{ fn: ts.SignatureDeclaration, param: ts.ParameterDeclaration } | null}
 	 */
-	parameterOf(node) {
+	parameterOf(
+		node: ts.Node,
+	): { fn: ts.SignatureDeclaration; param: ts.ParameterDeclaration } | null {
 		if (!ts.isIdentifier(node)) return null;
 		const param = this.declarationOf(node);
 		if (!param || !ts.isParameter(param)) return null;
-		return { fn: /** @type {ts.SignatureDeclaration} */ (param.parent), param };
+		return { fn: param.parent, param };
 	}
 
-	/** @param {ts.Node} node */
-	isEventParameter(node) {
+	isEventParameter(node: ts.Node) {
 		const found = this.parameterOf(node);
 		if (!found) return false;
 		const type = found.param.type;
@@ -2488,10 +2219,8 @@ class ModuleTransform {
 
 	/**
 	 * The `on*` attribute an inline handler is passed to.
-	 *
-	 * @param {ts.Node} fn
 	 */
-	handlerAttribute(fn) {
+	handlerAttribute(fn: ts.Node) {
 		const container = fn.parent;
 		if (!container || !ts.isJsxExpression(container)) return null;
 		const attribute = container.parent;
@@ -2504,10 +2233,8 @@ class ModuleTransform {
 	 * Whether `event.target` is the form control the handler is attached to, so
 	 * it can read Octane's typed `currentTarget` instead. Octane types events as
 	 * the native `Event`, whose `target` is an untyped `EventTarget`.
-	 *
-	 * @param {ts.Node} node
 	 */
-	targetsControl(node) {
+	targetsControl(node: ts.Node) {
 		const found = this.parameterOf(node);
 		if (!found) return false;
 		// Unannotated, the project's types still name a handler a component
@@ -2531,8 +2258,7 @@ class ModuleTransform {
 		return tag === 'input' || tag === 'textarea' || tag === 'select';
 	}
 
-	/** @param {ts.ClassDeclaration | ts.ClassExpression} node */
-	checkClass(node) {
+	checkClass(node: ts.ClassDeclaration | ts.ClassExpression) {
 		const base = node.heritageClauses?.find(
 			(clause) => clause.token === ts.SyntaxKind.ExtendsKeyword,
 		)?.types[0]?.expression;
@@ -2553,8 +2279,7 @@ class ModuleTransform {
 		);
 	}
 
-	/** @param {ts.BinaryExpression} node */
-	checkDefaultProps(node) {
+	checkDefaultProps(node: ts.BinaryExpression) {
 		if (
 			node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
 			ts.isPropertyAccessExpression(node.left) &&
@@ -2571,8 +2296,7 @@ class ModuleTransform {
 
 	// ---------------------------------------------------------------- JSX
 
-	/** @param {ts.JsxAttributes} node */
-	rewriteAttributes(node) {
+	rewriteAttributes(node: ts.JsxAttributes) {
 		const element = node.parent;
 		const tag = element.tagName.getText(this.sf);
 		const intrinsic = /^[a-z]/.test(tag);
@@ -2643,8 +2367,7 @@ class ModuleTransform {
 		return out + this.source.slice(cursor, node.end);
 	}
 
-	/** @param {ts.JsxAttribute} attribute */
-	emitInitializer(attribute) {
+	emitInitializer(attribute: ts.JsxAttribute) {
 		if (!attribute.initializer) return '';
 		return (
 			this.source.slice(attribute.name.end, attribute.initializer.getStart(this.sf)) +
@@ -2655,10 +2378,8 @@ class ModuleTransform {
 	/**
 	 * Whether `element` is a text-entry control, where React's `onChange` fires
 	 * per edit and the native `change` fires on commit.
-	 *
-	 * @param {ts.JsxOpeningLikeElement} element
 	 */
-	isTextEntry(element) {
+	isTextEntry(element: ts.JsxOpeningLikeElement) {
 		const tag = element.tagName.getText(this.sf);
 		if (tag === 'textarea') return true;
 		if (tag !== 'input' && !this.isTextFieldComponent(element)) return false;
@@ -2675,11 +2396,7 @@ class ModuleTransform {
 		return false;
 	}
 
-	/**
-	 * @param {ts.JsxElement} node
-	 * @param {Context} ctx
-	 */
-	rewriteElement(node, ctx) {
+	rewriteElement(node: ts.JsxElement, ctx: Context) {
 		if (this.bare.has(node)) {
 			return (
 				'<>' +
@@ -2693,7 +2410,8 @@ class ModuleTransform {
 		const declaration = ts.isIdentifier(tag) ? this.declarationOf(tag) : null;
 		if (
 			declaration &&
-			this.descriptorComponents.has(/** @type {ts.VariableDeclaration} */ (declaration))
+			(ts.isVariableDeclaration(declaration) || ts.isFunctionDeclaration(declaration)) &&
+			this.descriptorComponents.has(declaration)
 		) {
 			return this.span(node, node.getStart(this.sf), node.end, PLAIN);
 		}
@@ -2705,7 +2423,7 @@ class ModuleTransform {
 		}
 		if (name === 'Suspense' && ctx.template) return this.rewriteSuspense(node);
 		if (ts.isPropertyAccessExpression(tag) && this.isContext(tag.expression)) {
-			if (tag.name.text === 'Consumer') return this.rewriteConsumer(node, ctx);
+			if (tag.name.text === 'Consumer') return this.rewriteConsumer(node, ctx, tag);
 		}
 		return null;
 	}
@@ -2714,10 +2432,8 @@ class ModuleTransform {
 	 * Whether `node` is a React context, by where it comes from: a
 	 * `createContext` call here, or an export the project knows is one. Only
 	 * a package's export, which the codemod cannot see, is judged by its name.
-	 *
-	 * @param {ts.Expression} node
 	 */
-	isContext(node) {
+	isContext(node: ts.Expression) {
 		if (!ts.isIdentifier(node)) return false;
 		const declaration = this.declarationOf(node);
 		if (declaration && ts.isVariableDeclaration(declaration)) {
@@ -2731,11 +2447,8 @@ class ModuleTransform {
 
 	/**
 	 * Whether `node` evaluates to a `createContext` result on every branch.
-	 *
-	 * @param {ts.Expression} node
-	 * @returns {boolean}
 	 */
-	createsContext(node) {
+	createsContext(node: ts.Expression): boolean {
 		node = skipParens(node);
 		if (ts.isConditionalExpression(node)) {
 			return this.createsContext(node.whenTrue) && this.createsContext(node.whenFalse);
@@ -2747,10 +2460,8 @@ class ModuleTransform {
 	 * `typeof children === 'function'` also holds for a compiled children
 	 * block, which renders through Octane rather than being called, so the
 	 * check also asks `isChildrenBlock`.
-	 *
-	 * @param {ts.BinaryExpression} node
 	 */
-	rewriteRenderProp(node) {
+	rewriteRenderProp(node: ts.BinaryExpression) {
 		const op = node.operatorToken.kind;
 		if (op !== ts.SyntaxKind.EqualsEqualsEqualsToken && op !== ts.SyntaxKind.EqualsEqualsToken) {
 			return null;
@@ -2775,11 +2486,8 @@ class ModuleTransform {
 	/**
 	 * The children of `node` as one renderable: the sole element, or a
 	 * fragment around several.
-	 *
-	 * @param {ts.JsxElement | ts.JsxFragment} node
-	 * @param {Context} ctx
 	 */
-	emitChildren(node, ctx) {
+	emitChildren(node: ts.JsxElement | ts.JsxFragment, ctx: Context) {
 		const children = contentOf(node);
 		if (children.length === 1 && isJsx(children[0])) return this.emit(children[0], ctx);
 		const first = node.children[0];
@@ -2791,12 +2499,8 @@ class ModuleTransform {
 	/**
 	 * `<Ctx.Consumer>{(value) => …}</Ctx.Consumer>` reads the context in a
 	 * nested template scope, where a hook is legal.
-	 *
-	 * @param {ts.JsxElement} node
-	 * @param {Context} ctx
 	 */
-	rewriteConsumer(node, ctx) {
-		const tag = /** @type {ts.PropertyAccessExpression} */ (node.openingElement.tagName);
+	rewriteConsumer(node: ts.JsxElement, ctx: Context, tag: ts.PropertyAccessExpression) {
 		const children = contentOf(node);
 		const render =
 			children.length === 1 && ts.isJsxExpression(children[0]) ? children[0].expression : null;
@@ -2827,10 +2531,8 @@ class ModuleTransform {
 	/**
 	 * `<Suspense fallback={f}>…</Suspense>` is the template boundary
 	 * `@try { … } @pending { f }`.
-	 *
-	 * @param {ts.JsxElement} node
 	 */
-	rewriteSuspense(node) {
+	rewriteSuspense(node: ts.JsxElement) {
 		const attributes = node.openingElement.attributes.properties.filter(
 			(a) => !this.removed.has(a),
 		);
@@ -2843,7 +2545,7 @@ class ModuleTransform {
 		) {
 			return null;
 		}
-		let pending;
+		let pending: string;
 		const value = fallback.initializer;
 		if (ts.isStringLiteral(value)) pending = `<>{${value.getText(this.sf)}}</>`;
 		else if (ts.isJsxExpression(value) && value.expression) {
@@ -2864,12 +2566,10 @@ class ModuleTransform {
 	/**
 	 * Source text emitted for `node`, re-based so `node`'s own line is level 0.
 	 *
-	 * @param {string} text
-	 * @param {ts.Node} node
-	 * @param {string} [deeper] how far inside `node`'s line the text's own
+	 * @param deeper how far inside `node`'s line the text's own
 	 *   first line sat, such as the children of an element
 	 */
-	relative(text, node, deeper = '') {
+	relative(text: string, node: ts.Node, deeper: string = '') {
 		const from = this.indentOf(node) + deeper;
 		return text
 			.split('\n')
@@ -2882,10 +2582,10 @@ class ModuleTransform {
 	}
 
 	/**
-	 * @param {string} text relative text
-	 * @param {ts.Node} node the node it replaces
+	 * @param text relative text
+	 * @param node the node it replaces
 	 */
-	absolute(text, node) {
+	absolute(text: string, node: ts.Node) {
 		const indent = this.indentOf(node);
 		return text
 			.split('\n')
@@ -2897,10 +2597,9 @@ class ModuleTransform {
 	 * `head { body }` on one line when the body fits on one, else with the body
 	 * on its own lines one level in.
 	 *
-	 * @param {string} head
-	 * @param {string} body relative text
+	 * @param body relative text
 	 */
-	block(head, body) {
+	block(head: string, body: string) {
 		if (!body.includes('\n') && !body.startsWith('@') && head.length + body.length < 80) {
 			return `${head} { ${body} }`;
 		}
@@ -2911,29 +2610,24 @@ class ModuleTransform {
 
 	/**
 	 * The text before `node` on its line.
-	 *
-	 * @param {ts.Node} node
 	 */
-	linePrefix(node) {
+	linePrefix(node: ts.Node) {
 		const start = node.getStart(this.sf);
 		return this.source.slice(this.source.lastIndexOf('\n', start - 1) + 1, start);
 	}
 
-	/** @param {ts.Node} node */
-	indentOf(node) {
+	indentOf(node: ts.Node) {
 		const prefix = this.linePrefix(node);
 		return prefix.slice(0, prefix.length - prefix.trimStart().length);
 	}
 
 	/**
 	 * Template control flow for a JSX child hole.
-	 *
-	 * @param {ts.JsxExpression} node
 	 */
-	rewriteHole(node) {
+	rewriteHole(node: ts.JsxExpression) {
 		if (!node.expression || node.dotDotDotToken) return null;
 		const directive = this.directive(node.expression);
-		if (directive === null) return this.textHole(node);
+		if (directive === null) return this.textHole(node, node.expression);
 		// Comments the directive did not carry over sit before it, as JSX
 		// comments, since this is a children position.
 		const lost = this.lostComments(node.getStart(this.sf) + 1, node.end - 1, directive)
@@ -2946,17 +2640,14 @@ class ModuleTransform {
 	 * A child hole the module's types prove is a string, number, or bigint,
 	 * spelled as text so it compiles to a text binding rather than a
 	 * renderable hole. React renders those values as text too.
-	 *
-	 * @param {ts.JsxExpression} node
 	 */
-	textHole(node) {
-		const expression = /** @type {ts.Expression} */ (node.expression);
+	textHole(node: ts.JsxExpression, expression: ts.Expression) {
 		if (!this.textTypes || isTextSpelling(expression)) return null;
 		const kind = textKind(this.typeOf(expression));
 		if (kind === 0) return null;
 		this.count(RULE.text);
 		const value = this.emit(expression, PLAIN);
-		let text;
+		let text: string;
 		if (kind === 1) {
 			const bare =
 				ts.isIdentifier(expression) ||
@@ -2983,11 +2674,8 @@ class ModuleTransform {
 	/**
 	 * The type of `node` in the project's program, which resolves imports and
 	 * packages, or null when the program does not have this module.
-	 *
-	 * @param {ts.Node} node
-	 * @returns {{ type: ts.Type, checker: ts.TypeChecker } | null}
 	 */
-	projectType(node) {
+	projectType(node: ts.Node): { type: ts.Type; checker: ts.TypeChecker } | null {
 		const types = this.options.types;
 		if (types?.sourceFile.text !== this.source) return null;
 		const same = nodeSpanning(types.sourceFile, node.getStart(this.sf), node.end);
@@ -2998,21 +2686,15 @@ class ModuleTransform {
 	/**
 	 * The type of `expression`, from the project's program when it has this
 	 * module, else from the module's own.
-	 *
-	 * @param {ts.Expression} expression
 	 */
-	typeOf(expression) {
+	typeOf(expression: ts.Expression) {
 		return this.projectType(expression)?.type ?? this.checker.getTypeAtLocation(expression);
 	}
 
 	/**
 	 * Comments in `[from, to)` whose text `kept` does not already carry.
-	 *
-	 * @param {number} from
-	 * @param {number} to
-	 * @param {string} kept
 	 */
-	lostComments(from, to, kept) {
+	lostComments(from: number, to: number, kept: string) {
 		const scanner = ts.createScanner(
 			ts.ScriptTarget.Latest,
 			false,
@@ -3022,8 +2704,7 @@ class ModuleTransform {
 			from,
 			to - from,
 		);
-		/** @type {string[]} */
-		const lost = [];
+		const lost: string[] = [];
 		for (
 			let token = scanner.scan();
 			token !== ts.SyntaxKind.EndOfFileToken;
@@ -3045,11 +2726,8 @@ class ModuleTransform {
 	/**
 	 * The template directive equivalent to a renderable expression, as
 	 * relative text, or null.
-	 *
-	 * @param {ts.Expression} expression
-	 * @returns {string | null}
 	 */
-	directive(expression) {
+	directive(expression: ts.Expression): string | null {
 		const node = skipParens(expression);
 		if (ts.isConditionalExpression(node)) return this.ifDirective(node);
 		if (
@@ -3070,19 +2748,15 @@ class ModuleTransform {
 	 * The relative template text for one directive arm: an element, a nested
 	 * directive, or '' for nothing. An arm that is only a value is null; the
 	 * caller decides whether it may become a `{value}` hole.
-	 *
-	 * @param {ts.Expression} expression
-	 * @returns {string | null}
 	 */
-	arm(expression) {
+	arm(expression: ts.Expression): string | null {
 		const node = skipParens(expression);
 		if (isJsx(node)) return this.relative(this.emit(node, TEMPLATE), node);
 		if (isNullish(node)) return '';
 		return this.directive(node);
 	}
 
-	/** @param {ts.ConditionalExpression} node */
-	ifDirective(node) {
+	ifDirective(node: ts.ConditionalExpression) {
 		let whenTrue = this.arm(node.whenTrue);
 		let whenFalse = this.arm(node.whenFalse);
 		// A ternary between two values is a value; one with an element on
@@ -3105,10 +2779,8 @@ class ModuleTransform {
 	/**
 	 * `items.map((item, i) => <Row key={item.id} />)` is
 	 * `@for (const item of items; index i; key item.id) { <Row /> }`.
-	 *
-	 * @param {ts.CallExpression} node
 	 */
-	forDirective(node) {
+	forDirective(node: ts.CallExpression) {
 		const callee = node.expression;
 		if (
 			!ts.isPropertyAccessExpression(callee) ||
@@ -3132,10 +2804,8 @@ class ModuleTransform {
 		// order; an `@for` row can be skipped.
 		if (this.writesOuter(fn)) return null;
 
-		/** @type {ts.Statement[]} */
-		let setup = [];
-		/** @type {ts.Expression} */
-		let output;
+		let setup: ts.Statement[] = [];
+		let output: ts.Expression;
 		if (ts.isBlock(fn.body)) {
 			const statements = fn.body.statements;
 			const last = statements[statements.length - 1];
@@ -3153,7 +2823,7 @@ class ModuleTransform {
 		const keys = elements.map((element) => {
 			return attributeOf(ts.isJsxElement(element) ? element.openingElement : element, 'key');
 		});
-		let key = null;
+		let key: ts.Expression | null = null;
 		if (keys.some(Boolean)) {
 			const values = keys.map((attribute) => {
 				const value = attribute?.initializer;
@@ -3166,15 +2836,15 @@ class ModuleTransform {
 				this.note(
 					RULE.for,
 					'warning',
-					/** @type {ts.JsxAttribute} */ (keys[0]),
+					keys[0] as ts.JsxAttribute,
 					'This row key reads a value computed in the row, so the list stays a `.map()`.',
 				);
 				return null;
 			}
 		}
-		const hoisted = key ? /** @type {ts.JsxAttribute[]} */ (keys) : [];
-		/** @type {ts.JsxElement[]} A keyed `<Fragment>` is a bare row. */
-		const fragments = [];
+		const hoisted = key ? (keys as ts.JsxAttribute[]) : [];
+		/** A keyed `<Fragment>` is a bare row. */
+		const fragments: ts.JsxElement[] = [];
 		for (const attribute of hoisted) {
 			this.removed.add(attribute);
 			const opening = attribute.parent.parent;
@@ -3220,13 +2890,10 @@ class ModuleTransform {
 
 	/**
 	 * Whether `fn` assigns a variable declared outside it.
-	 *
-	 * @param {ts.ArrowFunction | ts.FunctionExpression} fn
 	 */
-	writesOuter(fn) {
-		/** @type {(node: ts.Node) => boolean} */
-		const visit = (node) => {
-			let target = null;
+	writesOuter(fn: ts.ArrowFunction | ts.FunctionExpression) {
+		const visit: (node: ts.Node) => boolean = (node) => {
+			let target: ts.Expression | null = null;
 			if (
 				ts.isBinaryExpression(node) &&
 				node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
@@ -3240,8 +2907,9 @@ class ModuleTransform {
 			) {
 				target = node.operand;
 			}
-			if (target && ts.isIdentifier(skipParens(target))) {
-				const declaration = this.declarationOf(/** @type {ts.Identifier} */ (skipParens(target)));
+			const assigned = target && skipParens(target);
+			if (assigned && ts.isIdentifier(assigned)) {
+				const declaration = this.declarationOf(assigned);
 				if (declaration && (declaration.pos < fn.pos || declaration.end > fn.end)) return true;
 			}
 			return ts.forEachChild(node, visit) ?? false;
@@ -3252,12 +2920,10 @@ class ModuleTransform {
 	/**
 	 * Whether every `return` in a list row's setup leaves the row empty, the
 	 * only early exit a directive arm allows.
-	 *
-	 * @param {ts.Statement[]} statements
 	 */
-	armReturnsOnlyEmpty(statements) {
+	armReturnsOnlyEmpty(statements: ts.Statement[]) {
 		let ok = true;
-		const visit = (/** @type {ts.Node} */ node) => {
+		const visit = (node: ts.Node) => {
 			if (isFunctionLike(node)) return;
 			if (ts.isReturnStatement(node) && node.expression && !isNullish(node.expression)) ok = false;
 			node.forEachChild(visit);
@@ -3266,11 +2932,7 @@ class ModuleTransform {
 		return ok;
 	}
 
-	/**
-	 * @param {ts.Node} expression
-	 * @param {ts.Statement[]} statements
-	 */
-	readsLocals(expression, statements) {
+	readsLocals(expression: ts.Node, statements: ts.Statement[]) {
 		const declared = new Set(
 			statements
 				.filter(ts.isVariableStatement)
@@ -3285,10 +2947,8 @@ class ModuleTransform {
 	/**
 	 * Rewrite a component whose last statement returns JSX as a template body:
 	 * `function C() { setup; return <div /> }` is `function C() @{ setup; <div /> }`.
-	 *
-	 * @param {ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction} node
 	 */
-	rewriteComponent(node) {
+	rewriteComponent(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction) {
 		if (!node.body || !this.isComponent(node)) return null;
 		if (node.asteriskToken || node.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword))
 			return null;
@@ -3355,21 +3015,22 @@ class ModuleTransform {
 	 * `@if (c) { <A /> } @else { …the rest }`, since a template body has one
 	 * output. The setup before the first guard stays as it was.
 	 *
-	 * @param {ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction} node
-	 * @param {ts.Block} body
-	 * @param {number} first the index of the first guard
+	 * @param first the index of the first guard
 	 */
-	rewriteGuards(node, body, first) {
+	rewriteGuards(
+		node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction,
+		body: ts.Block,
+		first: number,
+	) {
 		const statements = body.statements;
-		const last = /** @type {ts.ReturnStatement} */ (statements[statements.length - 1]);
+		const last = statements[statements.length - 1] as ts.ReturnStatement;
 		// Setup before the first guard stays in the body, which may return a
 		// value early; the rest moves into arms, which may only return nothing.
 		const rest = statements.slice(first + 1, -1).filter((statement) => !guardReturn(statement));
 		if (returnsJsx(statements.slice(0, first)) || !this.armReturnsOnlyEmpty(rest)) return null;
-		const output = this.arm(/** @type {ts.Expression} */ (last.expression));
+		const output = this.arm(last.expression as ts.Expression);
 		if (output === null) return null;
-		/** @type {(from: number) => string} */
-		const chain = (from) => {
+		const chain: (from: number) => string = (from) => {
 			let at = from;
 			while (at < statements.length - 1 && !guardReturn(statements[at])) at++;
 			// Comments before the first guard stay in the body's own text.
@@ -3386,11 +3047,11 @@ class ModuleTransform {
 						) + '\n'
 					: '');
 			if (at === statements.length - 1) return prefix + output;
-			const guard = /** @type {ts.IfStatement} */ (statements[at]);
+			const guard = statements[at] as ts.IfStatement;
 			this.count(RULE.if);
 			const then = this.block(
 				`@if (${this.emit(guard.expression, PLAIN)})`,
-				/** @type {string} */ (this.arm(/** @type {ts.Expression} */ (guardReturn(guard)))),
+				this.arm(guardReturn(guard) as ts.Expression) as string,
 			);
 			const rest = chain(at + 1);
 			return prefix + (rest === '' ? then : then + ' ' + this.block('@else', rest));
@@ -3415,10 +3076,8 @@ class ModuleTransform {
 	/**
 	 * A component's returned expression as template output, at the position
 	 * and indentation `node` had, or null when it is not a single renderable.
-	 *
-	 * @param {ts.Expression} node
 	 */
-	output(node) {
+	output(node: ts.Expression) {
 		if (isJsx(node)) return this.emit(node, TEMPLATE);
 		if (ts.isConditionalExpression(node) || ts.isCallExpression(node)) {
 			const directive = this.directive(node);
@@ -3427,18 +3086,15 @@ class ModuleTransform {
 		return null;
 	}
 
-	/** @param {ts.Node} node */
-	startsLine(node) {
+	startsLine(node: ts.Node) {
 		return this.linePrefix(node).trim() === '';
 	}
 
 	/**
 	 * Whether `node` is a component definition: a capitalized function, or the
 	 * function passed to `memo` / `forwardRef`, or a default-exported one.
-	 *
-	 * @param {ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction} node
 	 */
-	isComponent(node) {
+	isComponent(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction) {
 		if (node.name && isComponentName(node.name.text)) return true;
 		const parent = node.parent;
 		if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {

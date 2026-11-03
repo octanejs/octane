@@ -1,22 +1,16 @@
+import type { runCodemod } from './project.js';
+import type { CodemodResult, ScopedSignalBinding, ScopedSignalOptions } from './types.js';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 
-/**
- * @typedef {Parameters<typeof import('./index.js').createScopedSignalRecipe>[0]} ScopedSignalOptions
- * @typedef {ScopedSignalOptions['scope']} Binding
- * @typedef {Awaited<ReturnType<typeof import('./index.js').runCodemod>>} CodemodResult
- */
-
-/** @param {ts.Node} node @param {(node: ts.Node) => void} visit */
-function walk(node, visit) {
+function walk(node: ts.Node, visit: (node: ts.Node) => void) {
 	visit(node);
 	ts.forEachChild(node, (child) => walk(child, visit));
 }
 
-/** @param {ts.TypeChecker} checker @param {ts.Identifier} node */
-function localSymbol(checker, node) {
+function localSymbol(checker: ts.TypeChecker, node: ts.Identifier) {
 	if (ts.isShorthandPropertyAssignment(node.parent))
 		return checker.getShorthandAssignmentValueSymbol(node.parent);
 	if (ts.isExportSpecifier(node.parent))
@@ -24,9 +18,8 @@ function localSymbol(checker, node) {
 	return checker.getSymbolAtLocation(node);
 }
 
-/** The recipe recognizes bindings in their own lexical scope, including local aliases.
- * @param {ts.TypeChecker} checker @param {ts.Node} node @param {Binding} binding */
-function imported(checker, node, binding) {
+/** The recipe recognizes bindings in their own lexical scope, including local aliases. */
+function imported(checker: ts.TypeChecker, node: ts.Node, binding: ScopedSignalBinding) {
 	const decl = checker.getSymbolAtLocation(node)?.declarations?.[0];
 	return (
 		ts.isIdentifier(node) &&
@@ -39,8 +32,7 @@ function imported(checker, node, binding) {
 	);
 }
 
-/** @param {ts.Node} node @param {string} message @returns {never} */
-function unsupported(node, message) {
+function unsupported(node: ts.Node, message: string): never {
 	const file = node.getSourceFile();
 	throw new Error(
 		file.fileName +
@@ -51,8 +43,7 @@ function unsupported(node, message) {
 	);
 }
 
-/** @param {ts.TypeChecker} checker @param {ts.Expression} expression */
-function literal(checker, expression) {
+function literal(checker: ts.TypeChecker, expression: ts.Expression) {
 	if (ts.isIdentifier(expression)) {
 		const symbol = checker.getSymbolAtLocation(expression);
 		return expression.text === 'undefined' && symbol && checker.isUndefinedSymbol(symbol);
@@ -66,17 +57,18 @@ function literal(checker, expression) {
 	);
 }
 
-/** Locate direct importers before binding. Loading every transitive library through a large
+/**
+ * Locate direct importers before binding. Loading every transitive library through a large
  * application's tsconfig would be unnecessary for these local binding checks.
- * @param {string} root @param {string} producer @param {ts.CompilerOptions} options */
-function consumers(root, producer, options) {
+ */
+function consumers(root: string, producer: string, options: ts.CompilerOptions) {
 	const cache = ts.createModuleResolutionCache(
 		root,
 		ts.sys.useCaseSensitiveFileNames ? (s) => s : (s) => s.toLowerCase(),
 		options,
 	);
-	const resolve = (/** @type {string} */ spec, /** @type {string} */ file) => {
-		const resolveMode = (/** @type {ts.ResolutionMode} */ mode) =>
+	const resolve = (spec: string, file: string) => {
+		const resolveMode = (mode: ts.ResolutionMode) =>
 			ts.resolveModuleName(spec, file, options, ts.sys, cache, undefined, mode).resolvedModule
 				?.resolvedFileName;
 		const esm = resolveMode(ts.ModuleKind.ESNext);
@@ -87,8 +79,7 @@ function consumers(root, producer, options) {
 		// Binding identity is only certain when the two modes agree.
 		return undefined;
 	};
-	/** @type {Map<string, { source: string, positions: Set<number> }>} */
-	const references = new Map([
+	const references: Map<string, { source: string; positions: Set<number> }> = new Map([
 		[producer, { source: fs.readFileSync(producer, 'utf8'), positions: new Set() }],
 	]);
 	for (const file of ts.sys.readDirectory(
@@ -111,8 +102,7 @@ function consumers(root, producer, options) {
 	return { references, resolve };
 }
 
-/** @param {ts.SourceFile} file @param {ts.TypeChecker} checker @param {ScopedSignalOptions} config */
-function declaration(file, checker, config) {
+function declaration(file: ts.SourceFile, checker: ts.TypeChecker, config: ScopedSignalOptions) {
 	const found = [];
 	for (const stmt of file.statements) {
 		if (!ts.isVariableStatement(stmt)) continue;
@@ -166,17 +156,18 @@ function declaration(file, checker, config) {
 	return found[0];
 }
 
-/** @param {ts.SourceFile} file @param {ts.TypeChecker} checker @param {ScopedSignalOptions} config
- * @param {ReturnType<typeof declaration>} target @param {Set<number>} references @param {(spec: string, file: string) => string | undefined} resolve */
-function convert(file, checker, config, target, references, resolve) {
-	/** @type {Map<number, {end: number, text: string}>} */
-	const edits = new Map();
-	/** @type {Set<ts.Symbol | undefined>} */
-	const signals = new Set();
-	/** @type {Map<ts.ImportSpecifier, Set<ts.Node>>} */
-	const replaced = new Map();
-	/** @type {Map<string, Binding>} */
-	const additions = new Map();
+function convert(
+	file: ts.SourceFile,
+	checker: ts.TypeChecker,
+	config: ScopedSignalOptions,
+	target: ReturnType<typeof declaration>,
+	references: Set<number>,
+	resolve: (spec: string, file: string) => string | undefined,
+) {
+	const edits: Map<number, { end: number; text: string }> = new Map();
+	const signals: Set<ts.Symbol | undefined> = new Set();
+	const replaced: Map<ts.ImportSpecifier, Set<ts.Node>> = new Map();
+	const additions: Map<string, ScopedSignalBinding> = new Map();
 	const existingImports = file.statements.flatMap((stmt) => {
 		const bindings = ts.isImportDeclaration(stmt) && stmt.importClause?.namedBindings;
 		return bindings && ts.isNamedImports(bindings) ? [...bindings.elements] : [];
@@ -189,15 +180,13 @@ function convert(file, checker, config, target, references, resolve) {
 		if (!module || resolve(spec, file.fileName) !== module)
 			throw new Error('Cannot verify a common module for ' + spec + ' in ' + file.fileName);
 	}
-	/** @param {ts.Node} node @param {string} text */
-	function edit(node, text) {
+	function edit(node: ts.Node, text: string) {
 		edits.set(node.getStart(), { end: node.end, text });
 	}
-	/** @param {ts.Node} node @param {Binding} [replacement] */
-	function replaceImportUse(node, replacement) {
+	function replaceImportUse(node: ts.Node, replacement?: ScopedSignalBinding) {
 		const decl = checker.getSymbolAtLocation(node)?.declarations?.[0];
 		if (!decl || !ts.isImportSpecifier(decl)) throw new Error('Expected a named import.');
-		const uses = replaced.get(decl) ?? new Set();
+		const uses = replaced.get(decl) ?? new Set<ts.Node>();
 		uses.add(node);
 		replaced.set(decl, uses);
 		if (replacement) {
@@ -410,13 +399,11 @@ function convert(file, checker, config, target, references, resolve) {
 	return code;
 }
 
-/** Create a CLI recipe for one scoped producer and its direct consumers.
- * @param {ScopedSignalOptions} config @returns {typeof import('./index.js').runCodemod} */
-export function createScopedSignalRecipe(config) {
+/** Create a CLI recipe for one scoped producer and its direct consumers. */
+export function createScopedSignalRecipe(config: ScopedSignalOptions): typeof runCodemod {
 	return async (paths, options = {}) => {
 		const root = fs.realpathSync(config.sourceRoot);
-		/** @type {CodemodResult} */
-		const result = {
+		const result: CodemodResult = {
 			root,
 			files: [],
 			packages: [],
@@ -467,7 +454,7 @@ export function createScopedSignalRecipe(config) {
 			host.readFile = (name) => references.get(name)?.source ?? readFile(name);
 			const program = ts.createProgram([...references.keys()], compilerOptions, host);
 			const checker = program.getTypeChecker();
-			const getFile = (/** @type {string} */ name) => {
+			const getFile = (name: string) => {
 				const file = program.getSourceFile(name);
 				if (!file || program.getSyntacticDiagnostics(file).length)
 					throw new Error('Cannot parse ' + name);
@@ -521,11 +508,15 @@ export function createScopedSignalRecipe(config) {
 	};
 }
 
-/** Stage complete files and their originals before replacing any of them. The directory
+/**
+ * Stage complete files and their originals before replacing any of them. The directory
  * excludes concurrent recipe writes and retains the originals if rollback is interrupted.
- * @param {string} root @param {CodemodResult['files']} files
- * @param {(name:string) => string} original */
-function applyChanges(root, files, original) {
+ */
+function applyChanges(
+	root: string,
+	files: CodemodResult['files'],
+	original: (name: string) => string,
+) {
 	const changed = files.filter((file) => file.changed);
 	if (!changed.length) return;
 	const stage = path.join(root, '.octane-scoped-signal');

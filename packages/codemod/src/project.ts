@@ -1,3 +1,12 @@
+import type {
+	CodemodOptions,
+	CodemodResult,
+	Compiler,
+	FileResult,
+	Note,
+	TransformOptions,
+	TransformResult,
+} from './types.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { findRoot, readInstalled, scanSourceFiles } from '@octanejs/cli';
@@ -8,51 +17,6 @@ import { finding, loadCompiler, thrown } from './compiler.js';
 import { PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
 import { transformModule } from './transform.js';
-
-/**
- * @typedef {import('./transform.js').Note} Note
- *
- * @typedef {Object} CodemodOptions
- * @property {'tsrx' | 'tsx'} [target]
- * @property {boolean} [strong] migrate to Strong mode where the compiler
- *   accepts it, falling back to compatibility mode per module
- * @property {boolean} [forceStrong] keep `"use strong"` even on modules with
- *   Strong errors left
- * @property {boolean} [verify] compile every migrated module (default true)
- * @property {boolean} [write] write the result to disk (default true)
- * @property {string} [root] the project root, for resolving its compiler
- *
- * @typedef {Object} FileResult
- * @property {string} file the module's path, relative to the root
- * @property {string} output where it is written, relative to the root
- * @property {boolean} changed
- * @property {Record<string, number>} rules
- * @property {Note[]} notes the codemod's own findings, at the original file's
- *   lines
- * @property {boolean | null} strong whether it is Strong, or null when Strong
- *   was not requested or does not apply
- * @property {string[]} strongFixes
- * @property {{ code: string, severity: string, message: string, line: number }[]} diagnostics
- *   what the compiler reported for the migrated module
- * @property {string} code
- *
- * @typedef {Object} CodemodResult
- * @property {string} root
- * @property {FileResult[]} files
- * @property {{ from: string, to: string }[]} packages React packages the
- *   migrated code now imports as Octane bindings
- * @property {{ name: string, range: string }[]} dependencies the bindings
- *   added to package.json, which the project did not declare yet
- * @property {{ name: string, patch: string }[]} patched patches the project
- *   applies to replaced React packages, which do not reach their bindings
- * @property {Missing[]} missing React packages the code imports that have no
- *   Octane port, and how it uses them
- * @property {string[]} html entry pages whose script reference was updated
- * @property {string | null} compiler where the verifying compiler came from
- *
- * @typedef {import('./transform.js').Unported & { modules: number }} Missing
- *   with how many modules import it
- */
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
 /** React packages and the Octane package that replaces each. */
@@ -66,23 +30,19 @@ const REACT_PACKAGE = /^(?:react-|@[^/]+\/react(?:-|\/|$)|[^/]+\/react$)|-react(
  * Two passes: the first decides which modules become `.tsrx`, the second
  * rewrites every module with that rename map in hand, so an import of a
  * renamed module is updated wherever it is.
- *
- * @param {string[]} paths
- * @param {CodemodOptions} [options]
- * @returns {Promise<CodemodResult>}
  */
-export async function runCodemod(paths, options = {}) {
+export async function runCodemod(
+	paths: string[],
+	options: CodemodOptions = {},
+): Promise<CodemodResult> {
 	const target = options.target ?? 'tsrx';
 	const strong = options.strong === true && target === 'tsrx';
 	const root = path.resolve(options.root ?? findRoot(paths[0] ?? '.'));
 	const known = new Set(paths.flatMap((entry) => collect(path.resolve(entry))));
 	const files = [...known];
-	/** @type {Map<string, string>} */
-	const renames = new Map();
-	/** @type {Map<string, import('./transform.js').ModuleExports>} */
-	const exports = new Map();
-	/** @type {Map<string, string>} */
-	const owners = new Map();
+	const renames: Map<string, string> = new Map();
+	const exports: Map<string, TransformResult['exports']> = new Map();
+	const owners: Map<string, string> = new Map();
 	for (const file of files) {
 		const source = fs.readFileSync(file, 'utf8');
 		const result = transformModule(source, file, { target });
@@ -118,37 +78,31 @@ export async function runCodemod(paths, options = {}) {
 	}
 	const config = tsconfigOptions(root);
 	const strictConfig = (config?.strictNullChecks ?? config?.strict) ? config : null;
-	/** @type {ts.Program | undefined} */
-	let program;
+	let program: ts.Program | undefined;
 	const contextsOf = contextIndex(exports, known);
 	const resolveRename = renamedImports(root, config, renames);
 
 	const verify = options.verify !== false;
 	const compiler = verify || strong ? await loadCompiler(root) : null;
-	/** @type {Map<string, string>} */
-	const packages = new Map();
-	/** @type {Map<string, Missing>} */
-	const missing = new Map();
+	const packages: Map<string, string> = new Map();
+	const missing: Map<string, CodemodResult['missing'][number]> = new Map();
 	// `ReactCompat` hosts a component from a package with no port in a React
 	// root, from 19.2 within the React 19 series it supports.
 	const reactCompat = ['react', 'react-dom'].every((name) =>
 		/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(root, name)?.version ?? ''),
 	);
-	/** @type {FileResult[]} */
-	const results = [];
+	const results: FileResult[] = [];
 	for (const file of files) {
 		const source = fs.readFileSync(file, 'utf8');
-		/** @type {Note[]} */
-		const extra = [];
-		const resolveSpecifier = (/** @type {string} */ specifier) =>
+		const extra: Note[] = [];
+		const resolveSpecifier = (specifier: string) =>
 			resolveRename(file, specifier) ?? resolveBinding(specifier, packages, extra);
-		const isContext = (/** @type {string} */ specifier, /** @type {string} */ name) => {
+		const isContext = (specifier: string, name: string) => {
 			if (!specifier.startsWith('.')) return null;
 			const target = resolveModule(file, specifier, known);
 			return target ? contextsOf(target.file).has(name) : null;
 		};
-		/** @type {import('./transform.js').TransformOptions['types']} */
-		let types;
+		let types: TransformOptions['types'];
 		const result = transformModule(source, file, {
 			target,
 			strong,
@@ -183,12 +137,9 @@ export async function runCodemod(paths, options = {}) {
 		}
 		const output = renames.get(file) ?? file;
 		let code = result.code;
-		/** @type {boolean | null} */
-		let isStrong = null;
-		/** @type {string[]} */
-		let strongFixes = [];
-		/** @type {FileResult['diagnostics']} */
-		let diagnostics = [];
+		let isStrong: boolean | null = null;
+		let strongFixes: string[] = [];
+		let diagnostics: FileResult['diagnostics'] = [];
 		if (compiler && result.changed) {
 			if (strong && result.template) {
 				const strengthened = strengthen(compiler, code, output, { force: options.forceStrong });
@@ -291,8 +242,7 @@ export async function runCodemod(paths, options = {}) {
 	};
 }
 
-/** @param {string} file @param {string} code @param {Note} note @returns {FileResult} */
-function unchangedFile(file, code, note) {
+function unchangedFile(file: string, code: string, note: Note): FileResult {
 	return {
 		file,
 		output: file,
@@ -309,22 +259,13 @@ function unchangedFile(file, code, note) {
 /**
  * Whether Octane compiles this module: `.tsrx`, JSX, or a module that imports
  * the runtime. A declaration file is only types.
- *
- * @param {string} file
- * @param {string} code
  */
-function isCompiled(file, code) {
+function isCompiled(file: string, code: string) {
 	if (file.endsWith('.d.ts')) return false;
 	return /\.(?:tsrx|[jt]sx)$/.test(file) || /from\s+['"]octane['"]/.test(code);
 }
 
-/**
- * @param {import('./compiler.js').Compiler} compiler
- * @param {string} code
- * @param {string} file
- * @param {boolean} strong
- */
-function compile(compiler, code, file, strong) {
+function compile(compiler: Compiler, code: string, file: string, strong: boolean) {
 	try {
 		const result = compiler.collectDiagnostics(code, file, strong ? { strong: true } : {});
 		const found = result.diagnostics.filter((d) => d.severity !== 'hint').map(finding);
@@ -334,9 +275,8 @@ function compile(compiler, code, file, strong) {
 	}
 }
 
-/** @param {FileResult['diagnostics']} diagnostics */
-function dedupe(diagnostics) {
-	const seen = new Set();
+function dedupe(diagnostics: FileResult['diagnostics']) {
+	const seen = new Set<string>();
 	return diagnostics.filter((d) => {
 		const key = `${d.code}:${d.line}:${d.message}`;
 		if (seen.has(key)) return false;
@@ -348,52 +288,38 @@ function dedupe(diagnostics) {
 /**
  * The modules under `entry` that pass `test`: by default, those the codemod
  * migrates.
- *
- * @param {string} entry
- * @param {(name: string) => boolean} [test]
  */
-function collect(entry, test = isSource) {
+function collect(entry: string, test: (name: string) => boolean = isSource) {
 	if (fs.statSync(entry).isFile()) return test(entry) ? [entry] : [];
 	return scanSourceFiles(entry, { limit: Infinity }).filter(test).sort();
 }
 
-/** @param {string} name */
-function isTsrx(name) {
+function isTsrx(name: string) {
 	return name.endsWith('.tsrx');
 }
 
-/**
- * The compiler options of the tsconfig that governs `root`, or null.
- *
- * @param {string} root
- * @returns {ts.CompilerOptions | null}
- */
-function tsconfigOptions(root) {
+/** The compiler options of the tsconfig that governs `root`, or null. */
+function tsconfigOptions(root: string): ts.CompilerOptions | null {
 	const file = ts.findConfigFile(root, ts.sys.fileExists);
 	if (!file) return null;
 	const { config } = ts.readConfigFile(file, ts.sys.readFile);
 	return ts.parseJsonConfigFileContent(config ?? {}, ts.sys, path.dirname(file)).options;
 }
 
-/**
- * Bundler and tool configs belong to `octane init`, not the codemod.
- *
- * @param {string} name
- */
-function isSource(name) {
+/** Bundler and tool configs belong to `octane init`, not the codemod. */
+function isSource(name: string) {
 	return SOURCE.test(name) && !/\.config\.[cm]?[jt]s$/.test(name);
 }
 
 /**
  * The project module a relative specifier names, trying the extensions and
  * directory indexes a bundler would.
- *
- * @param {string} from
- * @param {string} specifier
- * @param {Set<string>} files
- * @returns {{ file: string, index: boolean } | null}
  */
-function resolveModule(from, specifier, files) {
+function resolveModule(
+	from: string,
+	specifier: string,
+	files: Set<string>,
+): { file: string; index: boolean } | null {
 	if (!specifier.startsWith('.')) return null;
 	const base = path.resolve(path.dirname(from), specifier);
 	const stem = base.replace(/\.(?:[cm]?[jt]sx?)$/, '');
@@ -410,12 +336,12 @@ function resolveModule(from, specifier, files) {
 /**
  * Resolve against the files on disk before any rename, including modules
  * outside the selected paths that could win an extensionless lookup.
- *
- * @param {string} root
- * @param {ts.CompilerOptions | null} config
- * @param {Map<string, string>} renames
  */
-function renamedImports(root, config, renames) {
+function renamedImports(
+	root: string,
+	config: ts.CompilerOptions | null,
+	renames: Map<string, string>,
+) {
 	const options = {
 		moduleResolution: ts.ModuleResolutionKind.Bundler,
 		...config,
@@ -432,7 +358,7 @@ function renamedImports(root, config, renames) {
 				: null;
 		return { start, end, directory };
 	});
-	return (/** @type {string} */ from, /** @type {string} */ specifier) => {
+	return (from: string, specifier: string) => {
 		const matches = specifier.startsWith('.')
 			? []
 			: aliases.filter(({ start, end }) =>
@@ -455,17 +381,13 @@ function renamedImports(root, config, renames) {
 	};
 }
 
-/**
- * Which names each module exports as a context, following `export … from`.
- *
- * @param {Map<string, import('./transform.js').ModuleExports>} exports
- * @param {Set<string>} files
- * @returns {(file: string) => Set<string>}
- */
-function contextIndex(exports, files) {
-	/** @type {Map<string, Set<string>>} */
-	const resolved = new Map();
-	const contextsOf = (/** @type {string} */ file) => {
+/** Which names each module exports as a context, following `export … from`. */
+function contextIndex(
+	exports: Map<string, TransformResult['exports']>,
+	files: Set<string>,
+): (file: string) => Set<string> {
+	const resolved: Map<string, Set<string>> = new Map();
+	const contextsOf = (file: string) => {
 		let names = resolved.get(file);
 		if (names) return names;
 		names = new Set(exports.get(file)?.contexts);
@@ -486,12 +408,8 @@ function contextIndex(exports, files) {
 /**
  * The binding that replaces a React package import, recorded so the report
  * can list the dependency changes.
- *
- * @param {string} specifier
- * @param {Map<string, string>} packages
- * @param {Note[]} notes
  */
-function resolveBinding(specifier, packages, notes) {
+function resolveBinding(specifier: string, packages: Map<string, string>, notes: Note[]) {
 	const name = catalogName(specifier);
 	if (name === null) return null;
 	const binding = CATALOG[name];
@@ -531,11 +449,8 @@ function resolveBinding(specifier, packages, notes) {
 /**
  * Whether a package `exports` key serves a subpath, directly or through a
  * `*` pattern such as `./locale/*`.
- *
- * @param {string} key
- * @param {string} subpath
  */
-function serves(key, subpath) {
+function serves(key: string, subpath: string) {
 	const [head, tail] = key.split('*');
 	return tail === undefined ? key === subpath : subpath.startsWith(head) && subpath.endsWith(tail);
 }
@@ -544,10 +459,8 @@ function serves(key, subpath) {
  * The catalog entry for a package specifier, or null. The catalog keys some
  * bindings by subpath (`better-auth/react`), so the longest matching prefix
  * wins.
- *
- * @param {string} specifier
  */
-function catalogName(specifier) {
+function catalogName(specifier: string) {
 	if (specifier.startsWith('.') || specifier.startsWith('/')) return null;
 	const parts = specifier.split('/');
 	for (let length = parts.length; length > 0; length--) {
@@ -560,11 +473,9 @@ function catalogName(specifier) {
 /**
  * The React package a specifier names when Octane has no binding for it, or
  * null.
- *
- * @param {string} specifier
- * @param {string} from the importing module
+ * @param from the importing module
  */
-function unportedName(specifier, from) {
+function unportedName(specifier: string, from: string) {
 	if (specifier.startsWith('.') || specifier.startsWith('/') || catalogName(specifier) !== null)
 		return null;
 	const root = packageName(specifier);
@@ -576,14 +487,20 @@ function unportedName(specifier, from) {
 /**
  * The package a bare specifier imports from: `@pierre/diffs` for
  * `@pierre/diffs/react`.
- *
- * @param {string} specifier
  */
-function packageName(specifier) {
+function packageName(specifier: string) {
 	return specifier
 		.split('/')
 		.slice(0, specifier.startsWith('@') ? 2 : 1)
 		.join('/');
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function record(value: unknown): Record<string, unknown> {
+	return isRecord(value) ? value : {};
 }
 
 /**
@@ -591,29 +508,36 @@ function packageName(specifier) {
  * each at its catalog version and in the field that lists the React package it
  * replaces. TanStack publishes its Octane adapters outside the catalog, so
  * those take `latest`.
- *
- * @param {string} root
- * @param {Map<string, string>} packages
- * @param {boolean} write
- * @returns {CodemodResult['dependencies']}
  */
-function addBindings(root, packages, write) {
+function addBindings(
+	root: string,
+	packages: Map<string, string>,
+	write: boolean,
+): CodemodResult['dependencies'] {
 	const file = path.join(root, 'package.json');
 	if (!fs.existsSync(file)) return [];
 	const text = fs.readFileSync(file, 'utf8');
-	const manifest = JSON.parse(text);
+	const manifest: unknown = JSON.parse(text);
+	if (packages.size === 0) return [];
 	const fields = ['dependencies', 'devDependencies', 'peerDependencies'];
-	/** @type {CodemodResult['dependencies']} */
-	const added = [];
+	if (
+		!isRecord(manifest) ||
+		fields.some((field) => manifest[field] !== undefined && !isRecord(manifest[field]))
+	) {
+		throw new Error('Cannot add bindings to malformed package.json dependency fields.');
+	}
+	const added: CodemodResult['dependencies'] = [];
 	for (const [from, to] of packages) {
-		if (fields.some((field) => manifest[field]?.[to] !== undefined)) continue;
+		if (fields.some((field) => record(manifest[field])[to] !== undefined)) continue;
 		const version = DATA.bindings.find((binding) => binding.name === to)?.version;
 		const range = version ? `^${version}` : 'latest';
-		const field = manifest.devDependencies?.[packageName(from)]
+		const field = record(manifest.devDependencies)[packageName(from)]
 			? 'devDependencies'
 			: 'dependencies';
 		manifest[field] = Object.fromEntries(
-			Object.entries({ ...manifest[field], [to]: range }).sort(([a], [b]) => a.localeCompare(b)),
+			Object.entries({ ...record(manifest[field]), [to]: range }).sort(([a], [b]) =>
+				a.localeCompare(b),
+			),
 		);
 		added.push({ name: to, range });
 	}
@@ -630,26 +554,21 @@ function addBindings(root, packages, write) {
  * Bun's `patchedDependencies`, in package.json or pnpm-workspace.yaml, and
  * patch-package's `patches/name+version.patch`. They live where the project
  * installs, so each directory up from `root` is read until a lockfile.
- *
- * @param {string} root
- * @param {Map<string, string>} packages
- * @returns {CodemodResult['patched']}
  */
-function patchedPackages(root, packages) {
+function patchedPackages(root: string, packages: Map<string, string>): CodemodResult['patched'] {
 	const replaced = new Set([...packages.keys()].map(packageName));
-	/** @type {CodemodResult['patched']} */
-	const patched = [];
+	const patched: CodemodResult['patched'] = [];
 	for (let dir = root; ; dir = path.dirname(dir)) {
-		const read = (/** @type {string} */ name) => {
+		const read = (name: string) => {
 			const file = path.join(dir, name);
 			return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
 		};
-		const manifest = JSON.parse(read('package.json') ?? '{}');
-		/** @type {[string, string][]} `name@version` and its patch */
+		const manifest = record(JSON.parse(read('package.json') ?? '{}'));
+		/** `name@version` and its patch */
 		const declared = Object.entries({
-			...manifest.pnpm?.patchedDependencies,
-			...manifest.patchedDependencies,
-		});
+			...record(record(manifest.pnpm).patchedDependencies),
+			...record(manifest.patchedDependencies),
+		}).filter((entry): entry is [string, string] => typeof entry[1] === 'string');
 		const workspace =
 			/^patchedDependencies:[ \t]*\r?\n((?:[ \t]+.*\r?\n?)*)/m.exec(
 				read('pnpm-workspace.yaml') ?? '',
@@ -681,34 +600,33 @@ function patchedPackages(root, packages) {
  * with a `./react` entry (`@pierre/trees/react`) renders through React there,
  * which the caller matches by subpath; its other entries need no binding. An
  * optional peer alone does not say which entries use React.
- *
- * @param {string} name
- * @param {string} from
  */
-function rendersWithReact(name, from) {
+function rendersWithReact(name: string, from: string) {
 	if (name === 'octane' || name.startsWith('@octanejs/') || name.startsWith('node:')) return false;
-	const manifest = readInstalled(path.dirname(from), name)?.manifest;
-	if (!manifest) return REACT_PACKAGE.test(name);
-	if (manifest.exports?.['./react']) return false;
-	return ['peerDependencies', 'dependencies'].some((field) => manifest[field]?.react !== undefined);
+	const manifest: unknown = readInstalled(path.dirname(from), name)?.manifest;
+	if (!isRecord(manifest)) return REACT_PACKAGE.test(name);
+	if (record(manifest.exports)['./react']) return false;
+	return ['peerDependencies', 'dependencies'].some(
+		(field) => record(manifest[field]).react !== undefined,
+	);
 }
 
 /**
  * Point `<script src>` in HTML entry pages at renamed modules.
- *
- * @param {string} root
- * @param {string[]} targets the paths being migrated
- * @param {Map<string, string>} renames
- * @param {boolean} write
+ * @param targets the paths being migrated
  */
-function rewriteEntryPages(root, targets, renames, write) {
-	/** @type {string[]} */
-	const updated = [];
+function rewriteEntryPages(
+	root: string,
+	targets: string[],
+	renames: Map<string, string>,
+	write: boolean,
+) {
+	const updated: string[] = [];
 	for (const page of findHtml(root, targets)) {
 		const html = fs.readFileSync(page, 'utf8');
 		const next = html.replace(
 			/(<script\b[^>]*\bsrc=)(["'])([^"']+)\2/g,
-			(match, open, quote, src) => {
+			(match, open: string, quote: string, src: string) => {
 				// Vite serves `/` from the page's own directory, as it does `./`.
 				const file = path.join(path.dirname(page), src);
 				const renamed = renames.get(file);
@@ -728,19 +646,16 @@ function rewriteEntryPages(root, targets, renames, write) {
  * Follow imports outside the migrated paths as well as exact path strings
  * in scripts and configs. Parse TSRX importers with their own grammar so
  * template text that looks like an import remains text.
- *
- * @param {string} code
- * @param {string} file
- * @param {string} root
- * @param {Map<string, string>} renames
- * @param {(from: string, specifier: string) => string | null} resolveRename
- * @returns {{ code: string, count: number } | null}
  */
-function rewriteModulePaths(code, file, root, renames, resolveRename) {
-	/** @type {{ start: number, end: number, text: string }[]} */
-	const edits = [];
-	/** @param {string} value @param {number} start @param {number} end @param {boolean} moduleSource */
-	function literal(value, start, end, moduleSource) {
+function rewriteModulePaths(
+	code: string,
+	file: string,
+	root: string,
+	renames: Map<string, string>,
+	resolveRename: (from: string, specifier: string) => string | null,
+): { code: string; count: number } | null {
+	const edits: { start: number; end: number; text: string }[] = [];
+	function literal(value: string, start: number, end: number, moduleSource: boolean) {
 		if (!moduleSource) {
 			const ext = SOURCE.exec(value)?.[0];
 			if (
@@ -762,29 +677,37 @@ function rewriteModulePaths(code, file, root, renames, resolveRename) {
 	}
 	if (isTsrx(file)) {
 		const { program } = parseSync(file, code);
-		const visit = (/** @type {import('@tsrx/oxc/parser').Node} */ node) => {
+		// TSRX has dialect nodes beyond TypeScript's visitor. Inspect only the fields
+		// shared by parsed module sources and recurse through the parser's AST.
+		const visit = (node: unknown): void => {
+			if (Array.isArray(node)) {
+				for (const item of node) visit(item);
+				return;
+			}
+			if (!isRecord(node) || typeof node.type !== 'string') return;
 			const source =
-				'source' in node
-					? node.source
-					: node.type === 'TSExternalModuleReference'
-						? node.expression
-						: null;
-			if (source?.type === 'Literal' && typeof source.value === 'string') {
-				literal(source.value, source.start, source.end, true);
-			} else if (source?.type === 'TemplateLiteral' && !source.expressions.length) {
-				const value = source.quasis[0]?.value.cooked;
-				if (value != null) literal(value, source.start, source.end, true);
+				node.source ?? (node.type === 'TSExternalModuleReference' ? node.expression : null);
+			if (isRecord(source) && typeof source.start === 'number' && typeof source.end === 'number') {
+				if (source.type === 'Literal' && typeof source.value === 'string') {
+					literal(source.value, source.start, source.end, true);
+				} else if (
+					source.type === 'TemplateLiteral' &&
+					Array.isArray(source.expressions) &&
+					!source.expressions.length &&
+					Array.isArray(source.quasis)
+				) {
+					const quasi: unknown = source.quasis[0];
+					if (isRecord(quasi) && isRecord(quasi.value) && typeof quasi.value.cooked === 'string') {
+						literal(quasi.value.cooked, source.start, source.end, true);
+					}
+				}
 			}
-			for (const child of Object.values(node)) {
-				if (Array.isArray(child)) {
-					for (const item of child) if (item?.type) visit(item);
-				} else if (child?.type) visit(child);
-			}
+			for (const child of Object.values(node)) visit(child);
 		};
 		if (program) visit(program);
 	} else {
 		const sf = ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true);
-		const visit = (/** @type {ts.Node} */ node) => {
+		const visit = (node: ts.Node) => {
 			if (ts.isStringLiteralLike(node)) {
 				const p = node.parent;
 				const moduleSource =
@@ -810,11 +733,8 @@ function rewriteModulePaths(code, file, root, renames, resolveRename) {
 /**
  * The HTML pages a Vite or CRA app keeps beside its sources: those in the
  * root, `public/`, `src/`, and each migrated directory.
- *
- * @param {string} root
- * @param {string[]} targets
  */
-function findHtml(root, targets) {
+function findHtml(root: string, targets: string[]) {
 	const dirs = new Set([root, path.join(root, 'public'), path.join(root, 'src'), ...targets]);
 	return [...dirs]
 		.filter((dir) => fs.existsSync(dir) && fs.statSync(dir).isDirectory())

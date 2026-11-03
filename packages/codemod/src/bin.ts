@@ -56,7 +56,9 @@ async function main() {
 	let run = runCodemod;
 	if (values.recipe !== undefined) {
 		try {
-			const recipe = await import(pathToFileURL(path.resolve(values.recipe)).href);
+			const recipe: { runCodemod?: typeof runCodemod } = await import(
+				pathToFileURL(path.resolve(values.recipe)).href
+			);
 			if (typeof recipe.runCodemod !== 'function')
 				throw new TypeError('expected a named runCodemod function export');
 			run = recipe.runCodemod;
@@ -68,7 +70,7 @@ async function main() {
 	}
 	const dryRun = values['dry-run'] || values.print;
 	const result = await run(positionals.length > 0 ? positionals : ['.'], {
-		target: /** @type {'tsrx' | 'tsx'} */ (values.target),
+		target: values.target,
 		strong: values.strong || values['force-strong'],
 		forceStrong: values['force-strong'],
 		verify: values.verify,
