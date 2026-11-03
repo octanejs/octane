@@ -1,25 +1,14 @@
+import type { CompileDiagnostic } from 'octane/compiler';
+import type { Compiler, Finding, StrongResult } from './types.js';
 import { applyFixes, pruneImports } from '@octanejs/cli/fix';
 import { finding, thrown } from './compiler.js';
-
-/**
- * @typedef {import('./compiler.js').Compiler} Compiler
- * @typedef {import('./compiler.js').Finding} Finding
- *
- * @typedef {Object} StrongResult
- * @property {string} code the module after every fix the compiler allowed
- * @property {boolean} strong whether it kept `"use strong"`
- * @property {string[]} fixed the diagnostic codes a fix resolved
- * @property {Finding[]} blockers the Strong errors left, when it did not
- */
 
 /**
  * The source without the directive the codemod added: its own line after any
  * leading comments and `"use client"`, or, at the very top, that line and the
  * blank line after it. `line` is where it stood and `lines` how many went.
- *
- * @param {string} code
  */
-function withoutDirective(code) {
+function withoutDirective(code: string) {
 	const top = '"use strong";\n\n';
 	if (code.startsWith(top)) return { code: code.slice(top.length), line: 1, lines: 2 };
 	const match = /^"use strong";\n/m.exec(code);
@@ -47,17 +36,15 @@ const MAX_ROUNDS = 6;
  * Strong errors that remain mean the module needs a person. With `force`
  * unset the module falls back to compatibility mode so the migrated app still
  * builds, and the errors are reported as the work left to make it Strong.
- *
- * @param {Compiler} compiler
- * @param {string} code
- * @param {string} filename
- * @param {{ force?: boolean }} [options]
- * @returns {StrongResult}
  */
-export function strengthen(compiler, code, filename, { force = false } = {}) {
-	/** @type {string[]} */
-	const fixed = [];
-	let diagnostics = [];
+export function strengthen(
+	compiler: Compiler,
+	code: string,
+	filename: string,
+	{ force = false }: { force?: boolean } = {},
+): StrongResult {
+	const fixed: string[] = [];
+	let diagnostics: CompileDiagnostic[] = [];
 	for (let round = 0; round < MAX_ROUNDS; round++) {
 		const result = compiler.collectDiagnostics(code, filename, { strong: true });
 		if (result.error != null) {
@@ -79,14 +66,12 @@ export function strengthen(compiler, code, filename, { force = false } = {}) {
 	return fallback(code, blockers, fixed, force);
 }
 
-/**
- * @param {string} code
- * @param {Finding[]} blockers
- * @param {string[]} fixed
- * @param {boolean} force
- * @returns {StrongResult}
- */
-function fallback(code, blockers, fixed, force) {
+function fallback(
+	code: string,
+	blockers: Finding[],
+	fixed: string[],
+	force: boolean,
+): StrongResult {
 	if (force) return { code, strong: true, fixed, blockers };
 	// The module builds in compatibility mode; what kept it there is work
 	// left, not a failure. Its lines are the written file's, without the
@@ -100,19 +85,15 @@ function fallback(code, blockers, fixed, force) {
 	return { code: compat.code, strong: false, fixed, blockers: kept };
 }
 
-/**
- * The edits that resolve one diagnostic, as `applyFixes` takes them.
- *
- * @param {string} code
- * @param {any} diagnostic
- * @returns {{ code: string, edits: { start: number, end: number, text: string }[] }[]}
- */
-function fixesFor(code, diagnostic) {
-	/** @type {{ code: string, edits: { start: number, end: number, text: string }[] }[]} */
-	const fixes = [];
+/** The edits that resolve one diagnostic, as `applyFixes` takes them. */
+function fixesFor(
+	code: string,
+	diagnostic: CompileDiagnostic,
+): { code: string; edits: { start: number; end: number; text: string }[] }[] {
+	const fixes: { code: string; edits: { start: number; end: number; text: string }[] }[] = [];
 	for (const suggestion of diagnostic.suggestions ?? []) {
-		if (Array.isArray(suggestion?.edits) && suggestion.edits.length > 0) {
-			fixes.push({ code: diagnostic.code, edits: suggestion.edits });
+		if ('edits' in suggestion && suggestion.edits?.length) {
+			fixes.push({ code: diagnostic.code, edits: [...suggestion.edits] });
 			break;
 		}
 	}

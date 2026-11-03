@@ -1,0 +1,131 @@
+import type ts from 'typescript';
+
+export interface Note {
+	rule: string;
+	severity: 'info' | 'warning' | 'error';
+	line: number;
+	message: string;
+}
+export interface TransformOptions {
+	/** `tsrx` (default) rewrites component bodies as templates; `tsx` keeps JSX and only ports the React APIs. */
+	target?: 'tsx' | 'tsrx';
+	/** Emit Strong-mode source: add `"use strong"` and leave omitted dependency lists to the compiler. */
+	strong?: boolean;
+	/** The project checks with `strictNullChecks`, so a TypeScript module's own types may prove a child hole is text. */
+	strictNullChecks?: boolean;
+	/** This module in a program over the whole project, whose resolved imports type what the module's own program cannot. */
+	types?: { sourceFile: ts.SourceFile; checker: ts.TypeChecker };
+	/** The new spelling of an import specifier (a renamed module, a binding package), or null to keep it. */
+	resolveSpecifier?(specifier: string): string | null;
+	/** Whether an imported name is a context, or null when it cannot be known. */
+	isContext?(specifier: string, name: string): boolean | null;
+	/** The React package an import specifier names when that package has no Octane port, or null. */
+	unported?(specifier: string): string | null;
+	/** The project has React and React DOM 19.2 or newer in the React 19 series, so `ReactCompat` can host an unported package's components. */
+	reactCompat?: boolean;
+}
+/** A React package with no Octane port, and how migrated code uses it. */
+export interface Unported {
+	name: string;
+	/** Elements now rendered in a `ReactCompat` island. */
+	islands: number;
+	/** Uses that only a port can support. */
+	blocked: number;
+}
+export interface TransformResult {
+	code: string;
+	changed: boolean;
+	/** Whether the module becomes `.tsrx`: it holds a template, keeps JSX, or was a JSX module, so no `.tsx` module is left outside Strong mode's reach. */
+	template: boolean;
+	notes: Note[];
+	/** How often each rule fired. */
+	rules: Record<string, number>;
+	/** What the module exports that other modules' rewrites depend on. */
+	exports: {
+		contexts: string[];
+		reexports: { specifier: string; names: [string, string][] | null }[];
+	};
+	unported: Unported[];
+}
+export interface CodemodOptions {
+	target?: 'tsrx' | 'tsx';
+	/** Migrate to Strong mode where the compiler accepts it, falling back to compatibility mode per module. */
+	strong?: boolean;
+	/** Keep `"use strong"` even on modules with Strong errors left. */
+	forceStrong?: boolean;
+	/** Compile every migrated module (default true). */
+	verify?: boolean;
+	/** Write the result to disk (default true). */
+	write?: boolean;
+	/** The project root, for resolving its compiler. */
+	root?: string;
+}
+export interface Finding {
+	code: string;
+	severity: string;
+	message: string;
+	line: number;
+}
+export interface Compiler {
+	/** Where the compiler was loaded. */
+	from: string;
+	collectDiagnostics: typeof import('octane/compiler').collectDiagnostics;
+}
+export interface FileResult {
+	/** The module's path, relative to the root. */
+	file: string;
+	/** Where it is written, relative to the root. */
+	output: string;
+	changed: boolean;
+	rules: Record<string, number>;
+	/** The codemod's own findings, at the original file's lines. */
+	notes: Note[];
+	/** Whether it is Strong, or null when Strong was not requested or does not apply. */
+	strong: boolean | null;
+	strongFixes: string[];
+	/** What the compiler reported for the migrated module. */
+	diagnostics: Finding[];
+	code: string;
+}
+export interface CodemodResult {
+	root: string;
+	files: FileResult[];
+	/** React packages the migrated code now imports as Octane bindings. */
+	packages: { from: string; to: string }[];
+	/** Bindings added to package.json, which the project did not declare. */
+	dependencies: { name: string; range: string }[];
+	/** Patches of replaced React packages, which do not reach their bindings. */
+	patched: { name: string; patch: string }[];
+	/** React packages the code imports that have no Octane port, and how it uses them. */
+	missing: (Unported & { modules: number })[];
+	/** Entry pages whose script reference was updated. */
+	html: string[];
+	/** Where the verifying compiler came from. */
+	compiler: string | null;
+}
+export interface StrongResult {
+	/** The module after every fix the compiler allowed. */
+	code: string;
+	/** Whether it kept `"use strong"`. */
+	strong: boolean;
+	/** The diagnostic codes a fix resolved. */
+	fixed: string[];
+	/** The Strong errors left, when it did not. */
+	blockers: Finding[];
+}
+
+/** A named import used by the scoped signal source or its destination adapter. */
+export interface ScopedSignalBinding {
+	module: string;
+	name: string;
+}
+export interface ScopedSignalOptions {
+	sourceRoot: string;
+	tsconfig: string;
+	sourceModule: string;
+	scope: ScopedSignalBinding;
+	factory: ScopedSignalBinding;
+	reader: ScopedSignalBinding;
+	/** Source-root-relative paths and reviewed SHA-256 hashes of imperative consumers. */
+	reviewedAccess?: Record<string, string>;
+}

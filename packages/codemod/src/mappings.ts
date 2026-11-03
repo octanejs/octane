@@ -109,10 +109,8 @@ const OCTANE_TYPES = new Set(
  * React type names with an Octane spelling of their own. `ReactNode` keeps its
  * alias when imported by name, so only namespace-qualified uses change; the
  * rest have no alias in Octane.
- *
- * @type {Record<string, string>}
  */
-const RENAMED_TYPES = {
+const RENAMED_TYPES: Record<string, string> = {
 	BaseSyntheticEvent: 'NativeEvent',
 	ForwardRefExoticComponent: 'FC',
 	ForwardedRef: 'Ref',
@@ -123,18 +121,14 @@ const RENAMED_TYPES = {
 	SyntheticEvent: 'NativeEvent',
 };
 
-/** Namespace-qualified spellings that read better as Octane's own name. *
- * @type {Record<string, string>}
- */
-const QUALIFIED_TYPE_PREFERENCES = {
+/** Namespace-qualified spellings that read better as Octane's own name. * */
+const QUALIFIED_TYPE_PREFERENCES: Record<string, string> = {
 	ReactElement: 'OctaneElement',
 	ReactNode: 'OctaneNode',
 };
 
-/** Modules whose imports this codemod owns, and the Octane module each becomes. *
- * @type {Record<string, string>}
- */
-export const REACT_MODULES = {
+/** Modules whose imports this codemod owns, and the Octane module each becomes. * */
+export const REACT_MODULES: Record<string, string> = {
 	react: 'octane',
 	'react-dom': 'octane',
 	'react-dom/client': 'octane',
@@ -156,10 +150,8 @@ export const REACT_MODULES = {
  * `@radix-ui/react-*` package it names, as `Dialog` ports
  * `@radix-ui/react-dialog`, except `Slot`, whose exports are the binding's own.
  * A codemod test checks it against the binding and the Radix packages.
- *
- * @type {Record<string, Set<string>>}
  */
-const RADIX = Object.fromEntries(
+const RADIX: Record<string, Set<string>> = Object.fromEntries(
 	Object.entries({
 		AccessibleIcon: 'AccessibleIcon Root',
 		Accordion: 'Accordion Content Header Item Root Trigger createAccordionScope',
@@ -231,7 +223,7 @@ export const RADIX_TYPES = new Set(['CheckedState', 'InputValidationType']);
 /** Each Radix package the binding ports, and its namespace. */
 const RADIX_PACKAGES = new Map(
 	Object.keys(RADIX).map((namespace) => [
-		`@radix-ui/react-${namespace.replace(/[A-Z]/g, (c, i) => (i ? '-' : '') + c.toLowerCase())}`,
+		`@radix-ui/react-${namespace.replace(/[A-Z]/g, (c: string, i: number) => (i ? '-' : '') + c.toLowerCase())}`,
 		namespace,
 	]),
 );
@@ -239,10 +231,8 @@ const RADIX_PACKAGES = new Map(
 /**
  * The adapters TanStack publishes for Octane, by the React adapter each
  * replaces, with the exports each lacks and what to do instead.
- *
- * @type {Record<string, Record<string, string>>}
  */
-const TANSTACK_ADAPTERS = {
+const TANSTACK_ADAPTERS: Record<string, Record<string, string>> = {
 	'@tanstack/react-hotkeys': {},
 	'@tanstack/react-pacer': {
 		usePacerContext:
@@ -267,21 +257,19 @@ const TANSTACK_ADAPTERS = {
  * TanStack's own adapters, and Radix's primitive packages, which
  * `@octanejs/radix` serves as namespaces.
  */
-export const PORTED_PACKAGES = /** @type {Record<string, string>} */ ({
+export const PORTED_PACKAGES = {
 	'@tanstack/react-start': '@octanejs/tanstack-start',
 	...Object.fromEntries(
 		Object.keys(TANSTACK_ADAPTERS).map((name) => [name, name.replace('/react-', '/octane-')]),
 	),
 	...Object.fromEntries([...RADIX_PACKAGES.keys()].map((name) => [name, '@octanejs/radix'])),
-});
+} as Record<string, string>;
 
 /**
  * The `@octanejs/radix` namespace a Radix package's imports become, or null.
  * `@radix-ui/react-slot` has none: its exports are the binding's own.
- *
- * @param {string} module
  */
-export function radixNamespace(module) {
+export function radixNamespace(module: string) {
 	const namespace = RADIX_PACKAGES.get(module) ?? null;
 	return namespace === 'Slot' ? null : namespace;
 }
@@ -289,12 +277,8 @@ export function radixNamespace(module) {
 /**
  * The name an export of a ported package has in its port, or null when the
  * port has none. Other packages keep every name.
- *
- * @param {string} module
- * @param {string} name
- * @returns {string | null}
  */
-export function mapPackageExport(module, name) {
+export function mapPackageExport(module: string, name: string): string | null {
 	const namespace = RADIX_PACKAGES.get(module);
 	if (namespace !== undefined) {
 		const names = RADIX[namespace];
@@ -302,7 +286,7 @@ export function mapPackageExport(module, name) {
 		// Radix exports each part twice, as `Content` and `DialogContent`, with
 		// `Root` as `Dialog`, and a part still in preview as `unstable_Content`.
 		const prefix = new RegExp(`^(?:unstable_)?(?:${namespace}(?![a-z]))?`);
-		const part = (/** @type {string} */ name) => name.replace(prefix, '') || 'Root';
+		const part = (name: string) => name.replace(prefix, '') || 'Root';
 		const wanted = part(name);
 		if (names.has(wanted)) return wanted;
 		return [...names].find((candidate) => part(candidate) === wanted) ?? null;
@@ -314,25 +298,16 @@ export function mapPackageExport(module, name) {
 	return name.replace(/React(?=[A-Z])/, 'Octane');
 }
 
-/**
- * Why the port of a ported package has no `name`.
- *
- * @param {string} module
- * @param {string} name
- */
-export function missingExport(module, name) {
+/** Why the port of a ported package has no `name`. */
+export function missingExport(module: string, name: string) {
 	const adapter = adapterOf(module);
 	if (adapter !== undefined) return adapter[name];
 	const namespace = RADIX_PACKAGES.get(module);
 	return `\`@octanejs/radix\` has no \`${namespace === 'Slot' ? name : `${namespace}.${name}`}\`.`;
 }
 
-/**
- * The TanStack adapter a specifier imports, by its package.
- *
- * @param {string} module
- */
-function adapterOf(module) {
+/** The TanStack adapter a specifier imports, by its package. */
+function adapterOf(module: string) {
 	const name = module.split('/', 2).join('/');
 	return Object.hasOwn(TANSTACK_ADAPTERS, name) ? TANSTACK_ADAPTERS[name] : undefined;
 }
@@ -341,10 +316,8 @@ function adapterOf(module) {
  * React values with no Octane export, each with what to do instead. A value
  * listed here is never imported from Octane; the codemod either rewrites its
  * uses or reports them.
- *
- * @type {Record<string, string>}
  */
-export const UNSUPPORTED_VALUES = {
+export const UNSUPPORTED_VALUES: Record<string, string> = {
 	Component: 'Class components are not supported. Convert it to a function component.',
 	PureComponent:
 		'Class components are not supported. Convert it to a function component with `memo`.',
@@ -364,13 +337,16 @@ export const UNSUPPORTED_VALUES = {
 };
 
 /**
- * @param {string} module a key of {@link REACT_MODULES}
- * @param {string} name the imported name
- * @param {boolean} typeOnly
- * @returns {{ module: string, name: string } | null} null when Octane has no
- *   such export
+ * @param module a key of {@link REACT_MODULES}
+ * @param name the imported name
+ * @returns null when Octane has no
+such export
  */
-export function mapReactImport(module, name, typeOnly) {
+export function mapReactImport(
+	module: string,
+	name: string,
+	typeOnly: boolean,
+): { module: string; name: string } | null {
 	if (module === 'react-dom/server' || module.startsWith('react-dom/server.')) {
 		return OCTANE_SERVER_VALUES.has(name) ? { module: 'octane/server', name } : null;
 	}
@@ -380,22 +356,15 @@ export function mapReactImport(module, name, typeOnly) {
 	return null;
 }
 
-/**
- * The Octane name for `React.<name>` in a type position.
- *
- * @param {string} name
- * @returns {string | null}
- */
-export function mapQualifiedType(name) {
+/** The Octane name for `React.<name>` in a type position. */
+export function mapQualifiedType(name: string): string | null {
 	if (name in QUALIFIED_TYPE_PREFERENCES) return QUALIFIED_TYPE_PREFERENCES[name];
 	if (OCTANE_TYPES.has(name)) return name;
 	return RENAMED_TYPES[name] ?? null;
 }
 
-/** Built-in hooks whose omitted dependency list Octane infers. *
- * @type {Record<string, number>}
- */
-export const DEPENDENCY_HOOKS = {
+/** Built-in hooks whose omitted dependency list Octane infers. * */
+export const DEPENDENCY_HOOKS: Record<string, number> = {
 	useCallback: 1,
 	useEffect: 1,
 	useImperativeHandle: 2,
@@ -419,10 +388,8 @@ export const TEXT_INPUT_TYPES = new Set([
  * Library components that render a text `<input>` and hand it the `onChange`
  * they receive, by the module that exports each: React fires that per edit, as
  * on the element itself.
- *
- * @type {Record<string, string[]>}
  */
-export const TEXT_FIELD_COMPONENTS = {
+export const TEXT_FIELD_COMPONENTS: Record<string, string[]> = {
 	'@base-ui/react': ['Input', 'Field.Control'],
 	'@base-ui/react/input': ['Input'],
 	'@base-ui/react/field': ['Field.Control'],
