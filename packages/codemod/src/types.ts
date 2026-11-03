@@ -17,6 +17,8 @@ export interface TransformOptions {
 	types?: { sourceFile: ts.SourceFile; checker: ts.TypeChecker };
 	/** The new spelling of an import specifier (a renamed module, a binding package), or null to keep it. */
 	resolveSpecifier?(specifier: string): string | null;
+	/** Whether the selected component at this local declaration offset, or this imported name, accepts one explicit element. */
+	elementChild?(binding: number | { module: string; imported: string }): boolean;
 	/** Whether an imported name is a context, or null when it cannot be known. */
 	isContext?(specifier: string, name: string): boolean | null;
 	/** The React package an import specifier names when that package has no Octane port, or null. */
@@ -42,6 +44,7 @@ export interface TransformResult {
 	rules: Record<string, number>;
 	/** What the module exports that other modules' rewrites depend on. */
 	exports: {
+		elementChildren?: { start: number; exported?: string }[];
 		contexts: string[];
 		reexports: { specifier: string; names: [string, string][] | null }[];
 	};
