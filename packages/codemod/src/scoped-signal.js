@@ -87,14 +87,16 @@ function consumers(root, producer, options) {
 		// Binding identity is only certain when the two modes agree.
 		return undefined;
 	};
-	/** @type {Map<string, Set<number>>} */
-	const references = new Map([[producer, new Set()]]);
+	/** @type {Map<string, { source: string, positions: Set<number> }>} */
+	const references = new Map([
+		[producer, { source: fs.readFileSync(producer, 'utf8'), positions: new Set() }],
+	]);
 	for (const file of ts.sys.readDirectory(
 		root,
 		['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs', '.tsrx'],
 		['**/node_modules/**'],
 	)) {
-		const source = fs.readFileSync(file, 'utf8');
+		const source = references.get(file)?.source ?? fs.readFileSync(file, 'utf8');
 		const positions = ts
 			.preProcessFile(source, true, true)
 			.importedFiles.filter((ref) => resolve(ref.fileName, file) === producer)
@@ -103,7 +105,7 @@ function consumers(root, producer, options) {
 			if (fs.realpathSync(file) !== file) throw new Error('Review the symlinked consumer ' + file);
 			if (!/\.[cm]?[jt]sx?$/.test(file) || file.endsWith('.d.ts'))
 				throw new Error('Review the reference to the producer in ' + file);
-			references.set(file, new Set(positions));
+			references.set(file, { source, positions: new Set(positions) });
 		}
 	}
 	return { references, resolve };
@@ -175,6 +177,10 @@ function convert(file, checker, config, target, references, resolve) {
 	const replaced = new Map();
 	/** @type {Map<string, Binding>} */
 	const additions = new Map();
+	const existingImports = file.statements.flatMap((stmt) => {
+		const bindings = ts.isImportDeclaration(stmt) && stmt.importClause?.namedBindings;
+		return bindings && ts.isNamedImports(bindings) ? [...bindings.elements] : [];
+	});
 	const producer = target.decl.getSourceFile();
 	let imperative = false;
 	// A relative specifier or nested installation can resolve differently for each consumer.
@@ -198,6 +204,19 @@ function convert(file, checker, config, target, references, resolve) {
 			const module = resolve(replacement.module, file.fileName);
 			if (!module || module !== resolve(replacement.module, producer.fileName))
 				unsupported(node, 'Cannot resolve a shared destination module: ' + replacement.module);
+			const matches = existingImports.filter((item) => imported(checker, item.name, replacement));
+			if (matches.length) {
+				const local = matches[0].name;
+				if (
+					matches.length !== 1 ||
+					existingImports.some((item) => item.name !== local && item.name.text === local.text) ||
+					checker.resolveName(local.text, node, ts.SymbolFlags.Value, false) !==
+						checker.getSymbolAtLocation(local)
+				)
+					unsupported(node, 'Ambiguous or shadowed destination import: ' + local.text);
+				edit(node, local.text);
+				return;
+			}
 			if (
 				additions.has(replacement.name) &&
 				additions.get(replacement.name)?.module !== replacement.module
@@ -435,13 +454,18 @@ export function createScopedSignalRecipe(config) {
 						),
 				);
 			const { references, resolve } = consumers(root, producer, parsed.options);
-			const program = ts.createProgram([...references.keys()], {
+			const compilerOptions = {
 				...parsed.options,
 				allowJs: true,
 				noResolve: true,
 				noLib: true,
 				types: [],
-			});
+			};
+			// Preserve the exact UTF-8 input, including a BOM, for source positions, review hashes, and writes.
+			const host = ts.createCompilerHost(compilerOptions);
+			const readFile = host.readFile;
+			host.readFile = (name) => references.get(name)?.source ?? readFile(name);
+			const program = ts.createProgram([...references.keys()], compilerOptions, host);
 			const checker = program.getTypeChecker();
 			const getFile = (/** @type {string} */ name) => {
 				const file = program.getSourceFile(name);
@@ -451,7 +475,7 @@ export function createScopedSignalRecipe(config) {
 			};
 			const normalized = { ...config, sourceRoot: root };
 			const target = declaration(getFile(producer), checker, normalized);
-			for (const [absolute, positions] of references) {
+			for (const [absolute, { positions }] of references) {
 				const src = getFile(absolute);
 				const code = convert(src, checker, normalized, target, positions, resolve);
 				const file = path.relative(root, absolute);

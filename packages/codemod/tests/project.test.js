@@ -1388,6 +1388,99 @@ describe('scoped signal recipe', () => {
 	});
 
 	it.each([
+		['register', 'currentValue'],
+		['defineNative', 'readNative'],
+	])('reuses the existing adapter imports %s and %s', async (factory, reader) => {
+		const named = (name, local) => (name === local ? name : name + ' as ' + local);
+		const color =
+			`import { ${named('register', factory)} } from '#adapter';\n` + sources['color.ts'];
+		const controls =
+			`import { ${named('currentValue', reader)} } from '#adapter';\n` +
+			sources['controls.ts'] +
+			`\nexport function unrelated(${reader}) { return ${reader}; }`;
+		const root = project({ ...sources, 'color.ts': color, 'controls.ts': controls });
+		const migrate = createScopedSignalRecipe({
+			...config,
+			sourceRoot: root,
+			tsconfig: path.join(root, 'tsconfig.json'),
+			reviewedAccess: { 'controls.ts': digest(controls) },
+		});
+		const paths = [path.join(root, 'color.ts')];
+		const { files } = await migrate(paths);
+		expect(files.flatMap((f) => f.notes)).toEqual([]);
+		for (const [file, call] of [
+			['color.ts', factory + '("color.ts:color"'],
+			['controls.ts', reader + '(selection)'],
+		]) {
+			const code = fs.readFileSync(path.join(root, file), 'utf8');
+			expect(code).toContain(call);
+			expect(code.match(/from ['"]#adapter['"]/g)).toHaveLength(1);
+		}
+		expect((await migrate(paths)).files.every((f) => !f.changed && !f.notes.length)).toBe(true);
+	});
+
+	it.each([
+		[
+			'a shadowed destination alias',
+			"import {currentValue as current} from '#adapter';",
+			'current',
+		],
+		[
+			'a colliding destination alias',
+			"import {currentValue as current} from '#adapter'; import {other as current} from '#state';",
+			'',
+		],
+		[
+			'multiple destination aliases',
+			"import {currentValue as a, currentValue as b} from '#adapter';",
+			'',
+		],
+		['a type-only destination', "import type {currentValue} from '#adapter';", ''],
+		['a conflicting import', "import {other as currentValue} from '#state';", ''],
+	])('rejects %s without a partial migration', async (_, imports, parameter) => {
+		const controls =
+			imports + '\n' + sources['controls.ts'].replace('controls()', 'controls(' + parameter + ')');
+		const root = project({ ...sources, 'controls.ts': controls });
+		const result = await createScopedSignalRecipe({
+			...config,
+			sourceRoot: root,
+			tsconfig: path.join(root, 'tsconfig.json'),
+			reviewedAccess: { 'controls.ts': digest(controls) },
+		})([path.join(root, 'color.ts')]);
+		expect(result.files.flatMap((f) => f.notes)).toContainEqual(
+			expect.objectContaining({ severity: 'error' }),
+		);
+		expect(fs.readFileSync(path.join(root, 'color.ts'), 'utf8')).toBe(sources['color.ts']);
+		expect(fs.readFileSync(path.join(root, 'controls.ts'), 'utf8')).toBe(controls);
+	});
+
+	it('preserves the UTF-8 BOM in previews, writes, review hashes, and reruns', async () => {
+		const originals = {
+			'color.ts': '\uFEFF' + sources['color.ts'],
+			'controls.ts': '\uFEFF' + sources['controls.ts'],
+		};
+		const root = project({ ...sources, ...originals });
+		const paths = [path.join(root, 'color.ts')];
+		const migrate = createScopedSignalRecipe({
+			...config,
+			sourceRoot: root,
+			tsconfig: path.join(root, 'tsconfig.json'),
+			reviewedAccess: { 'controls.ts': digest(originals['controls.ts']) },
+		});
+		const preview = await migrate(paths, { write: false });
+		expect(preview.files.flatMap((f) => f.notes)).toEqual([]);
+		expect(preview.files.map((f) => f.file).sort()).toEqual(Object.keys(originals).sort());
+		for (const { file, code } of preview.files) {
+			expect(code).toMatch(/^\uFEFFimport /);
+			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(originals[file]);
+		}
+		expect((await migrate(paths)).files).toEqual(preview.files);
+		for (const { file, code } of preview.files)
+			expect(fs.readFileSync(path.join(root, file))).toEqual(Buffer.from(code));
+		expect((await migrate(paths)).files.every((f) => !f.changed && !f.notes.length)).toBe(true);
+	});
+
+	it.each([
 		['an escaped signal', 'export const values = {selection};'],
 		['a CommonJS namespace read', "module.require('./color.ts').color;"],
 		[
