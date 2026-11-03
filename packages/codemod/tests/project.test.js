@@ -314,6 +314,34 @@ describe('runCodemod', () => {
 		expect(app).toContain('<Tooltip.Provider />');
 	});
 
+	it('typechecks the generated Strong span wrapper and its callers', async () => {
+		const root = project({
+			'Inline.tsx': `import type { ComponentProps as Props, ReactElement } from 'react';
+export function Inline({ className, ...rest }: Props<'span'>): ReactElement {
+	return <span className={className} {...rest} />;
+}`,
+			'consumer.ts': `import { Inline } from './Inline.tsrx';
+Inline({ title: 'Hint' });
+// @ts-expect-error Strong host props require trusted HTML.
+Inline({ dangerouslySetInnerHTML: { __html: 'untrusted' } });`,
+			'tsconfig.json': JSON.stringify({
+				extends: path.join(REPO, 'packages/octane/typetests/tsconfig.json'),
+				compilerOptions: { allowImportingTsExtensions: true },
+				include: ['Inline.tsrx', 'consumer.ts'],
+			}),
+		});
+		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+		const { files } = await runCodemod([path.join(root, 'Inline.tsx')], { root, strong: true });
+		expect(files).toMatchObject([{ strong: true, diagnostics: [] }]);
+		execFileSync(
+			process.execPath,
+			[path.join(REPO, 'scripts/octane-tsc/bin.mjs'), '-p', 'tsconfig.json'],
+			{
+				cwd: root,
+			},
+		);
+	});
+
 	it('reports a module the compiler rejects as an error, not a Strong blocker', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',
