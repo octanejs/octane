@@ -93,3 +93,18 @@ export declare function strengthen(
 	options?: { force?: boolean },
 ): { code: string; strong: boolean; fixed: string[]; blockers: Finding[] };
 export declare function loadCompiler(root: string): Promise<Compiler>;
+/** A named import used by the scoped signal source or its destination adapter. */
+interface ScopedSignalBinding {
+	module: string;
+	name: string;
+}
+export declare function createScopedSignalRecipe(config: {
+	sourceRoot: string;
+	tsconfig: string;
+	sourceModule: string;
+	scope: ScopedSignalBinding;
+	factory: ScopedSignalBinding;
+	reader: ScopedSignalBinding;
+	/** Source-root-relative paths and reviewed SHA-256 hashes of imperative consumers. */
+	reviewedAccess?: Record<string, string>;
+}): typeof runCodemod;
