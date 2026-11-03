@@ -2544,8 +2544,7 @@ class ModuleTransform {
 			) {
 				// Only line breaks and ASCII layout whitespace vanish in rendered JSX.
 				const content = node.children.filter(
-					(c) =>
-						!(ts.isJsxText(c) && c.containsOnlyTriviaWhiteSpaces && /^[\t\r\n ]+$/.test(c.text)),
+					(c) => !(ts.isJsxText(c) && /^[\t ]*[\r\n][\t\r\n ]*$/.test(c.text)),
 				);
 				const [child] = content;
 				if (content.length === 1 && (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child))) {

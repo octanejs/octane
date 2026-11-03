@@ -123,7 +123,7 @@ export function Cross() { return <Box>
 import type { ReactElement as E } from 'react';
 export function ArraySlot(p: {children: E[]}) {return <aside>{p.children}</aside>}
 export function Controls(p: { Box: typeof Box }) { const { Box } = p; return <Box><b /></Box> }
-export function Cases(p: {}) {return <main><Box {...p}><i /></Box><Box> <b /> </Box><Box>{/* keep */}<b /></Box><Box><b /><i /></Box><ArraySlot><i /></ArraySlot></main>}`,
+export function Cases(p: {}) {return <main><Box {...p}><i /></Box><Box> <b /> </Box><Box>\u00a0<b />\u00a0</Box><Box>{/* keep */}<b /></Box><Box><b /><i /></Box><ArraySlot><i /></ArraySlot></main>}`,
 			'tsconfig.json': JSON.stringify({
 				extends: path.join(REPO, 'packages/octane/typetests/tsconfig.json'),
 				compilerOptions: { allowImportingTsExtensions: true },
@@ -137,6 +137,8 @@ export function Cases(p: {}) {return <main><Box {...p}><i /></Box><Box> <b /> </
 		expect(output['Frame.tsrx'].code).toContain('<Frame icon={<b />} children={<Leaf />} />');
 		expect(output['Caller.tsrx'].code).toContain('<Box children={<i />} />');
 		expect(output['Unknown.tsrx'].rules['element-child-prop']).toBeUndefined();
+		expect(output['Unknown.tsrx'].code).toContain('<Box> <b /> </Box>');
+		expect(output['Unknown.tsrx'].code).toContain('<Box>\u00a0<b />\u00a0</Box>');
 		expect(output['Unknown.tsrx'].code).toContain('{/* keep */}');
 		for (const file of files) fs.writeFileSync(path.join(root, file.output), file.code);
 		execFileSync(
