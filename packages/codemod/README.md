@@ -88,6 +88,11 @@ Class components, `createRef`, `defaultProps`, and anything else without an
 automatic rewrite are listed under **Needs attention** with a file and line.
 The process exits with status 1 when any error remains.
 
+The codemod warns when JSX renders an SVG imported with `?react` or the named
+`ReactComponent` export. If your loader returns React components for bare
+`.svg` imports, check those tags too. A loader that emits Octane components
+can keep its existing imports.
+
 A React package with no Octane binding still runs on React, so React stays a
 dependency, and a comment above each import of it says so. When the project
 has React and React DOM 19.2 or newer in the React 19 series, a component of that package renders in
