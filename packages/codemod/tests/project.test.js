@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { DATA } from '@octanejs/cli/data';
+import { compileTypesInspection } from 'octane/compiler/volar';
 import ts from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createScopedSignalRecipe, runCodemod } from '../dist/index.js';
@@ -34,6 +35,140 @@ function catalogVersion(name) {
 }
 
 describe('runCodemod', () => {
+	it('warns for element-valued template children and preserves the caller contract', async () => {
+		const root = project({
+			'Frame.tsx': `import type { ReactElement as Child } from "react";
+interface Props { children?: Child; icon?: Child }
+export function Frame({ children, icon }: Props) { return <section>{icon}{children}</section>; }
+`,
+		});
+		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+		const [file] = (await runCodemod([root], { write: false, strong: true })).files;
+		expect(file.notes).toEqual([
+			expect.objectContaining({
+				rule: 'element-children',
+				severity: 'warning',
+				line: 3,
+				message: expect.stringContaining('ChildrenBlock'),
+			}),
+		]);
+		expect(file.code).toContain('children?: Child; icon?: Child');
+
+		// Exercise both choices in the warning with the virtual TSX the editor checks.
+		const declarations = [
+			file.code,
+			file.code.replace(
+				'children?: Child;',
+				'children?: Child | import("octane/tsrx-boundary").ChildrenBlock;',
+			),
+		];
+		const calls = `
+export function Explicit() @{ <Frame children={<i />} icon={<b />} /> }
+export function NestedElement() @{ <Frame><i /></Frame> }
+export function NestedText() @{ <Frame>text</Frame> }
+export function NestedElements() @{ <Frame><b /><i /></Frame> }
+export function WrongChild() @{ <Frame children="text" /> }
+export function WrongIcon() @{ <Frame icon="text" /> }
+export function Callback() @{ <Frame>{() => <b />}</Frame> }
+`;
+		const views = declarations.map((declaration, index) => {
+			const name = path.join(root, `case${index}.tsx`);
+			fs.writeFileSync(
+				name,
+				compileTypesInspection(declaration + calls, name.replace(/\.tsx$/, '.tsrx')).code,
+			);
+			return name;
+		});
+		const program = ts.createProgram(views, {
+			jsx: ts.JsxEmit.ReactJSX,
+			jsxImportSource: 'octane/strong',
+			module: ts.ModuleKind.ESNext,
+			moduleResolution: ts.ModuleResolutionKind.Bundler,
+			target: ts.ScriptTarget.ESNext,
+			strict: true,
+			skipLibCheck: true,
+			types: [],
+		});
+		const errors = views.map((fileName) => {
+			const source = /** @type {ts.SourceFile} */ (program.getSourceFile(fileName));
+			return program.getSemanticDiagnostics(source).map(({ code, start }) => {
+				const fn = source.statements.find(
+					(s) => start !== undefined && s.pos <= start && start < s.end,
+				);
+				return [code, fn && ts.isFunctionDeclaration(fn) ? fn.name?.text : undefined];
+			});
+		});
+		const explicitErrors = [
+			[2322, 'WrongChild'],
+			[2322, 'WrongIcon'],
+			[2322, 'Callback'],
+		];
+		expect(errors).toEqual([
+			[[2322, 'NestedElement'], [2322, 'NestedText'], [2322, 'NestedElements'], ...explicitErrors],
+			explicitErrors,
+		]);
+	});
+
+	it('preserves a single element child at selected local and imported template calls', async () => {
+		const root = project({
+			'Frame.tsx': `import type { ReactElement as E } from 'react';
+export function Frame(p: { children?: E | (E | null)[] | null; icon?: E }) { return <section>{p.icon}{p.children}</section> }
+export function Leaf() { return <i /> }
+export function Local() { return <Frame icon={<b />}><Leaf /></Frame> }`,
+			'Caller.tsx': `import { Frame as Box } from './Frame';
+export function Cross() { return <Box>
+	<i />
+</Box> }`,
+			'Unknown.tsx': `import { Frame as Box } from './Frame';
+import type { ReactElement as E } from 'react';
+export function ArraySlot(p: {children: E[]}) {return <aside>{p.children}</aside>}
+export function Controls(p: { Box: typeof Box }) { const { Box } = p; return <Box><b /></Box> }
+export function Cases(p: {}) {return <main><Box {...p}><i /></Box><Box> <b /> </Box><Box>{/* keep */}<b /></Box><Box><b /><i /></Box><ArraySlot><i /></ArraySlot></main>}`,
+			'tsconfig.json': JSON.stringify({
+				extends: path.join(REPO, 'packages/octane/typetests/tsconfig.json'),
+				compilerOptions: { allowImportingTsExtensions: true },
+				include: ['Frame.tsrx', 'Caller.tsrx'],
+			}),
+		});
+		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+		const { files } = await runCodemod([root], { root, write: false, strong: true });
+		const output = Object.fromEntries(files.map((f) => [f.output, f]));
+		expect(output['Frame.tsrx'].rules['element-child-prop']).toBe(1);
+		expect(output['Frame.tsrx'].code).toContain('<Frame icon={<b />} children={<Leaf />} />');
+		expect(output['Caller.tsrx'].code).toContain('<Box children={<i />} />');
+		expect(output['Unknown.tsrx'].rules['element-child-prop']).toBeUndefined();
+		expect(output['Unknown.tsrx'].code).toContain('{/* keep */}');
+		for (const file of files) fs.writeFileSync(path.join(root, file.output), file.code);
+		execFileSync(
+			process.execPath,
+			[path.join(REPO, 'scripts/octane-tsc/bin.mjs'), '-p', 'tsconfig.json'],
+			{ cwd: root },
+		);
+	});
+
+	it('warns only for narrow, unmarked children on a TSRX component', async () => {
+		const root = project({
+			'foreign.ts': 'export interface ReactElement { label: string }',
+			'Controls.tsx': `import { isValidElement, type ReactElement as Child, type ReactNode } from "react";
+import type { ReactElement } from "./foreign";
+export function List(p: { children?: (Child | null)[] | null }) { return <div>{p.children}</div>; }
+export function Broad(p: { children: ReactNode }) { return <div>{p.children}</div>; }
+export function Mixed(p: { children: Child | string }) { return <div>{p.children}</div>; }
+export function Unrelated(p: { children: ReactElement }) { return <b>{p.children.label}</b>; }
+export function Named(p: { icon: Child }) { return <div>{p.icon}</div>; }
+export function Inspector({ children }: { children: Child }) { return isValidElement(children) ? <b /> : null; }
+`,
+		});
+		const [tsrx] = (await runCodemod([path.join(root, 'Controls.tsx')], { root, write: false }))
+			.files;
+		expect(tsrx.code).toContain('descriptorChildren(');
+		expect(tsrx.notes.filter((note) => note.rule === 'element-children')).toEqual([
+			expect.objectContaining({ severity: 'warning', line: 3 }),
+		]);
+		const [tsx] = (await runCodemod([root], { write: false, target: 'tsx' })).files;
+		expect(tsx.notes.some((note) => note.rule === 'element-children')).toBe(false);
+	});
+
 	it.each(['Item.tsrx', 'Item.jsx', ...(ts.sys.useCaseSensitiveFileNames ? [] : ['item.jsx'])])(
 		'reports a rename collision (%s) before writing',
 		async (other) => {

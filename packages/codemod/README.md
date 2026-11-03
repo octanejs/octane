@@ -71,6 +71,37 @@ path, from its own file or from the project root, such as Vite's
 `server.warmup.clientFiles: ['./src/main.tsx']`: the `module-paths` rule.
 Globs and paths without an extension stay as they are.
 
+### Element-only children
+
+A nested component call in a DOM template supplies a render block. When a
+selected React function component declares an element-only `children` prop,
+`runCodemod` can preserve a single descriptor by rewriting
+`<Frame><Badge /></Frame>` as `<Frame children={<Badge />} />`. This works for
+a top-level function in the same file or a direct relative import from another
+selected input. The `element-child-prop` count records the calls converted.
+
+The `element-children` note flags recognized React or JSX element annotations
+for review at other callers. Spreads, comments, meaningful whitespace, multiple
+children, and array-only or parameterized element types need review. A named
+prop such as `icon={<Badge />}` already supplies a descriptor.
+
+For a slot that simply renders its contents and should also accept arbitrary
+nested templates, add `ChildrenBlock` to **only that slot**:
+
+```ts
+import type { JSX } from 'octane/strong/jsx-runtime';
+import type { ChildrenBlock } from 'octane/tsrx-boundary';
+
+type FrameProps = {
+  children?: JSX.Element | ChildrenBlock;
+  icon?: JSX.Element;
+};
+```
+
+This permits nested text and multiple children as well as one element. Render
+the block with `{props.children}`. Keep the element type for APIs that inspect
+a descriptor or require exactly one child.
+
 ## Strong mode
 
 With `--strong`, each template module starts with `"use strong"` and is

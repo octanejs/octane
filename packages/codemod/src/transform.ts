@@ -47,6 +47,8 @@ const RULE = {
 	consumer: 'context-consumer',
 	defaultProps: 'default-props',
 	descriptorChildren: 'descriptor-children',
+	elementChildren: 'element-children',
+	elementChildProp: 'element-child-prop',
 	deps: 'hook-dependencies',
 	eventObject: 'event-object',
 	forwardRef: 'forward-ref',
@@ -554,6 +556,8 @@ class ModuleTransform {
 	readonly restChange = new Set<ts.BindingElement>();
 	/** Spreads of those rest props, which pass it as `onInput`. */
 	readonly changeSpreads = new Set<ts.JsxSpreadAttribute>();
+	/** Proven element slots on converted top-level declarations, for the project caller pass. */
+	readonly elementChildren: NonNullable<ModuleExports['elementChildren']> = [];
 	/** Components to mark `descriptorChildren`. */
 	readonly descriptorComponents = new Set<ts.VariableDeclaration | ts.FunctionDeclaration>();
 	/** Whether a `declare module` now augments `octane/jsx-runtime`. */
@@ -660,7 +664,11 @@ class ModuleTransform {
 				if (contexts.has(statement.expression.text)) exported.add('default');
 			}
 		}
-		return { contexts: [...exported], reexports };
+		return {
+			contexts: [...exported],
+			reexports,
+			...(this.elementChildren.length ? { elementChildren: this.elementChildren } : {}),
+		};
 	}
 
 	// ---------------------------------------------------------------- analysis
@@ -882,6 +890,101 @@ class ModuleTransform {
 		);
 	}
 
+	/** The declaration holding a component, including memo/forwardRef wrappers. */
+	componentHolder(component: ts.SignatureDeclaration) {
+		let holder = component.parent;
+		while (
+			ts.isCallExpression(holder) &&
+			/^(?:memo|forwardRef)$/.test(this.calleeName(holder.expression) ?? '')
+		)
+			holder = holder.parent;
+		return holder;
+	}
+
+	/**
+	 * A narrow React element slot cannot receive the block produced by a nested
+	 * template call. Preserve the declared contract and explain the two choices.
+	 */
+	checkElementChildren(fn: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction) {
+		const props = fn.parameters[0]?.type;
+		if (!props) return;
+		const declaration = this.checker
+			.getTypeFromTypeNode(props)
+			.getProperty('children')?.valueDeclaration;
+		if (!declaration || !ts.isPropertySignature(declaration) || !declaration.type) return;
+		if (!this.elementSlotType(declaration.type)) return;
+		const holder = this.componentHolder(fn);
+		if (
+			(ts.isVariableDeclaration(holder) && this.descriptorComponents.has(holder)) ||
+			(ts.isFunctionDeclaration(fn) && this.descriptorComponents.has(fn)) ||
+			(ts.isCallExpression(holder) && this.calleeName(holder.expression) === 'descriptorChildren')
+		)
+			return;
+		if (
+			ts.isFunctionDeclaration(fn) &&
+			fn.name &&
+			fn.parent === this.sf &&
+			this.checker.getSymbolAtLocation(fn.name)?.declarations?.length === 1 &&
+			this.acceptsSingleElement(declaration.type)
+		) {
+			const flags = ts.getCombinedModifierFlags(fn);
+			this.elementChildren.push({
+				start: fn.getStart(this.sf),
+				exported:
+					flags & ts.ModifierFlags.Export
+						? flags & ts.ModifierFlags.Default
+							? 'default'
+							: fn.name.text
+						: undefined,
+			});
+		}
+		this.note(
+			RULE.elementChildren,
+			'warning',
+			fn,
+			'Nested TSRX children arrive as a render block. Pass element values explicitly with `children={...}` to keep this slot’s element type. If it only renders content and should accept nested templates, include `ChildrenBlock` from `octane/tsrx-boundary` in the children type.',
+		);
+	}
+
+	// The caller already established that this is an element-only slot. Array-only
+	// and parameterized element types still need the author's review.
+	acceptsSingleElement(type: ts.TypeNode): boolean {
+		if (ts.isParenthesizedTypeNode(type)) return this.acceptsSingleElement(type.type);
+		if (ts.isUnionTypeNode(type)) return type.types.some((t) => this.acceptsSingleElement(t));
+		return ts.isTypeReferenceNode(type) && !type.typeArguments?.length;
+	}
+
+	elementSlotType(type: ts.TypeNode): boolean {
+		if (
+			ts.isParenthesizedTypeNode(type) ||
+			(ts.isTypeOperatorNode(type) && type.operator === ts.SyntaxKind.ReadonlyKeyword)
+		)
+			return this.elementSlotType(type.type);
+		if (ts.isArrayTypeNode(type)) return this.elementSlotType(type.elementType);
+		if (ts.isUnionTypeNode(type)) {
+			const values = type.types.filter(
+				(t) =>
+					t.kind !== ts.SyntaxKind.UndefinedKeyword &&
+					!(ts.isLiteralTypeNode(t) && t.literal.kind === ts.SyntaxKind.NullKeyword),
+			);
+			return values.length > 0 && values.every((t) => this.elementSlotType(t));
+		}
+		if (!ts.isTypeReferenceNode(type)) return false;
+		const name = type.typeName;
+		if (ts.isIdentifier(name)) {
+			const imported = this.importOf(name);
+			return imported?.module === 'react' && imported.imported === 'ReactElement';
+		}
+		if (name.right.text === 'ReactElement') return this.isReactNamespace(name.left);
+		if (name.right.text !== 'Element') return false;
+		if (ts.isQualifiedName(name.left))
+			return name.left.right.text === 'JSX' && this.isReactNamespace(name.left.left);
+		const imported = this.importOf(name.left);
+		return imported
+			? imported.module === 'react' && imported.imported === 'JSX'
+			: this.isGlobalNamespace(name.left, 'JSX');
+	}
+
 	/**
 	 * React passes a component its JSX children as elements, which
 	 * `render={children}` and `cloneElement(children)` rely on. Octane passes a
@@ -892,14 +995,7 @@ class ModuleTransform {
 		const value = skipWrappers(expression);
 		const component = this.childrenOwner(value);
 		if (!component) return;
-		// `memo(…)` and `forwardRef(…)` wrap it; the declaration holds the call.
-		let holder = component.parent;
-		while (
-			ts.isCallExpression(holder) &&
-			/^(?:memo|forwardRef)$/.test(this.calleeName(holder.expression) ?? '')
-		) {
-			holder = holder.parent;
-		}
+		const holder = this.componentHolder(component);
 		if (ts.isCallExpression(holder) && this.calleeName(holder.expression) === 'descriptorChildren')
 			return;
 		// The compiler reads the marker from module-level `const` bindings only.
@@ -1391,6 +1487,7 @@ class ModuleTransform {
 			ts.isArrowFunction(node)
 		) {
 			const component = this.target === 'tsrx' ? this.rewriteComponent(node) : null;
+			if (component !== null) this.checkElementChildren(node);
 			const text =
 				component ??
 				(this.parameters.has(node) && node.body
@@ -1862,6 +1959,13 @@ class ModuleTransform {
 			node.text === name &&
 			!this.checker.resolveName(name, node, ts.SymbolFlags.Namespace, false)
 		);
+	}
+
+	isReactNamespace(node: ts.EntityName): boolean {
+		const entry = this.importOf(node);
+		return entry
+			? entry.namespace && entry.module === 'react'
+			: this.isGlobalNamespace(node, 'React');
 	}
 
 	rewriteQualifiedType(node: ts.QualifiedName) {
@@ -2416,6 +2520,45 @@ class ModuleTransform {
 			return this.span(node, node.getStart(this.sf), node.end, PLAIN);
 		}
 		const name = this.calleeName(tag);
+		const opening = node.openingElement;
+		if (
+			ctx.template &&
+			this.options.elementChild &&
+			ts.isIdentifier(tag) &&
+			isComponentName(tag.text)
+		) {
+			const entry = this.importOf(tag);
+			const binding =
+				declaration && ts.isFunctionDeclaration(declaration)
+					? declaration.getStart(this.sf)
+					: entry && !entry.namespace && !entry.typeOnly && entry.module.startsWith('.')
+						? entry
+						: null;
+			if (
+				binding !== null &&
+				this.options.elementChild(binding) &&
+				opening.attributes.properties.every(
+					(a) => ts.isJsxAttribute(a) && a.name.getText(this.sf) !== 'children',
+				) &&
+				node.closingElement.getText(this.sf) === '</' + tag.text + '>'
+			) {
+				// Only line breaks and ASCII layout whitespace vanish in rendered JSX.
+				const content = node.children.filter(
+					(c) =>
+						!(ts.isJsxText(c) && c.containsOnlyTriviaWhiteSpaces && /^[\t\r\n ]+$/.test(c.text)),
+				);
+				const [child] = content;
+				if (content.length === 1 && (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child))) {
+					this.count(RULE.elementChildProp);
+					return (
+						this.span(opening, opening.getStart(this.sf), opening.end - 1, ctx) +
+						' children={' +
+						this.emit(child, PLAIN) +
+						'} />'
+					);
+				}
+			}
+		}
 		if (name === 'StrictMode') {
 			// Octane's StrictMode is a pass-through wrapper.
 			this.count(RULE.strictMode);
