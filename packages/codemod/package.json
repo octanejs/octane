@@ -27,18 +27,25 @@
     "tsrx"
   ],
   "files": [
-    "src",
+    "dist",
     "README.md",
     "LICENSE"
   ],
   "bin": {
-    "octane-codemod": "src/bin.js"
+    "octane-codemod": "dist/bin.js"
   },
   "exports": {
-    ".": "./src/index.js",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "octane-tsc -p tsconfig.typecheck.json",
+    "prepare": "pnpm run build",
     "test": "cd ../.. && vitest run --project codemod"
   },
   "dependencies": {

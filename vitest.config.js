@@ -5688,6 +5688,7 @@ export default defineConfig({
 			{
 				test: {
 					name: 'codemod',
+					globalSetup: ['packages/codemod/tests/build.js'],
 					include: ['packages/codemod/tests/**/*.test.js'],
 					environment: 'node',
 					globals: false,

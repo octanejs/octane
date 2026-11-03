@@ -1,4 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -6,7 +7,7 @@ import path from 'node:path';
 import { DATA } from '@octanejs/cli/data';
 import ts from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { runCodemod } from '../src/index.js';
+import { createScopedSignalRecipe, runCodemod } from '../dist/index.js';
 
 const REPO = path.resolve(import.meta.dirname, '../../..');
 /** @type {string[]} */
@@ -118,6 +119,21 @@ describe('runCodemod', () => {
 		expect(result.files.flatMap((file) => file.diagnostics)).toEqual([]);
 	});
 
+	it.each(['null', '[]', '{"dependencies":"invalid"}'])(
+		'preserves an invalid package manifest when adding bindings: %s',
+		async (manifest) => {
+			const root = project({
+				'package.json': manifest,
+				'App.tsx':
+					'import * as Dialog from "@radix-ui/react-dialog"; export function App() { return <Dialog.Root />; }',
+			});
+			await expect(
+				runCodemod([path.join(root, 'App.tsx')], { root, verify: false }),
+			).rejects.toThrow();
+			expect(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).toBe(manifest);
+		},
+	);
+
 	it('adds only bindings the project lacks, and names patches the bindings drop', async () => {
 		const root = project({
 			'package.json': '{ "name": "mono", "private": true }',
@@ -166,14 +182,14 @@ describe('runCodemod', () => {
 		const cwd = project({});
 		const output = execFileSync(
 			process.execPath,
-			[path.join(import.meta.dirname, '../src/bin.js'), root, '--no-verify'],
+			[path.join(import.meta.dirname, '../dist/bin.js'), root, '--no-verify'],
 			{ cwd, encoding: 'utf8' },
 		);
 		expect(output).toContain(`init\` in ${root} to wire`);
 	});
 
 	it('previews and writes through an explicitly selected local recipe', () => {
-		const api = new URL('../src/index.js', import.meta.url).href;
+		const api = new URL('../dist/index.js', import.meta.url).href;
 		const root = project({
 			'package.json': '{}',
 			'Card.tsx': 'export const Card = () => <p />;',
@@ -186,7 +202,7 @@ describe('runCodemod', () => {
 				}`,
 		});
 		const args = [
-			path.join(import.meta.dirname, '../src/bin.js'),
+			path.join(import.meta.dirname, '../dist/bin.js'),
 			'Card.tsx',
 			'--recipe',
 			'recipes/card #1.mjs',
@@ -217,7 +233,7 @@ describe('runCodemod', () => {
 		const root = project({ 'invalid.mjs': 'export default () => {};' });
 		const result = spawnSync(
 			process.execPath,
-			[path.join(import.meta.dirname, '../src/bin.js'), '--recipe', recipe, '--json'],
+			[path.join(import.meta.dirname, '../dist/bin.js'), '--recipe', recipe, '--json'],
 			{ cwd: root, encoding: 'utf8' },
 		);
 		expect(result.status).toBe(2);
@@ -236,7 +252,7 @@ describe('runCodemod', () => {
 				'// ' + 'x'.repeat(1024 * 1024) + ' end of input',
 			].join('\n'),
 		});
-		const cli = path.join(import.meta.dirname, '../src/bin.js');
+		const cli = path.join(import.meta.dirname, '../dist/bin.js');
 		const { status, stdout } = spawnSync(
 			process.execPath,
 			[cli, root, '--print', '--no-verify', ...(json ? ['--json'] : [])],
@@ -718,7 +734,7 @@ describe('runCodemod', () => {
 			options,
 		);
 		const at = (
-			/** @type {import('../src/project.js').FileResult} */ file,
+			/** @type {import('../dist/index.js').FileResult} */ file,
 			/** @type {number} */ line,
 		) => `${file.file}: ${file.code.split('\n')[line - 1]}`;
 		const reported = result.files.flatMap((file) => file.notes.map((note) => at(file, note.line)));
@@ -1285,4 +1301,378 @@ describe('runCodemod', () => {
 			'entry-server.tsrx',
 		]);
 	}, 30_000);
+});
+
+describe('scoped signal recipe', () => {
+	const sources = {
+		'package.json': JSON.stringify({
+			type: 'module',
+			imports: { '#state': './state.js', '#owner': './owner.js', '#adapter': './adapter.js' },
+		}),
+		'tsconfig.json': JSON.stringify({ compilerOptions: { module: 'nodenext', allowJs: true } }),
+		'owner.js': 'export const Space = {current: null};',
+		'state.js': 'export const useScope = space => space.current;',
+		'adapter.js': [
+			"import { Space } from '#owner';",
+			'export function register(key, initial) {',
+			'  const cells = new WeakMap();',
+			'  function cell(owner) {',
+			'    if (!cells.has(owner)) cells.set(owner, owner.signal$(key, initial()));',
+			'    return cells.get(owner);',
+			'  }',
+			'  return {get: owner => cell(owner).get(), set: (owner, update) => cell(owner).set(update)};',
+			'}',
+			'export const currentValue = slot => slot.get(Space.current);',
+		].join('\n'),
+		'color.ts': [
+			"import { signal as define } from '#state';",
+			"import { Space as Region } from '#owner';",
+			'export const color = define(Region, (): string | undefined => undefined);',
+		].join('\n'),
+		'controls.ts': [
+			"import { color as selection } from './color.ts';",
+			"import { useScope, useSignal as read } from '#state';",
+			"import { Space } from '#owner';",
+			'export function controls() {',
+			'  const owner = useScope(Space);',
+			'  return {choose: value => owner.set(selection, value), peek: () => owner.get(selection), active: () => read(selection)};',
+			'}',
+		].join('\n'),
+	};
+	const digest = (source) => createHash('sha256').update(source).digest('hex');
+	const config = {
+		reviewedAccess: { 'controls.ts': digest(sources['controls.ts']) },
+		sourceModule: '#state',
+		scope: { module: '#owner', name: 'Space' },
+		factory: { module: '#adapter', name: 'register' },
+		reader: { module: '#adapter', name: 'currentValue' },
+	};
+	it('previews, migrates and reruns an aliased producer and its scoped readers and writers', async () => {
+		const root = project(sources);
+		const bin = path.join(REPO, 'packages/codemod/dist/bin.js');
+		fs.writeFileSync(
+			path.join(root, 'recipe.mjs'),
+			'import {createScopedSignalRecipe} from ' +
+				JSON.stringify(path.join(REPO, 'packages/codemod/dist/index.js')) +
+				';\n' +
+				'export const runCodemod = createScopedSignalRecipe(' +
+				JSON.stringify({
+					...config,
+					sourceRoot: root,
+					tsconfig: path.join(root, 'tsconfig.json'),
+				}) +
+				');',
+		);
+		const run = (...flags) =>
+			JSON.parse(
+				execFileSync(
+					process.execPath,
+					[bin, '--recipe', './recipe.mjs', 'color.ts', '--json', ...flags],
+					{ cwd: root, encoding: 'utf8' },
+				),
+			);
+		expect(
+			run('--print')
+				.files.filter((f) => f.changed)
+				.map((f) => f.file)
+				.sort(),
+		).toEqual(['color.ts', 'controls.ts']);
+		expect(fs.readFileSync(path.join(root, 'color.ts'), 'utf8')).toBe(sources['color.ts']);
+		run();
+		expect(run('--dry-run').files.some((f) => f.changed)).toBe(false);
+		const { createScope } = await import('octane/signals');
+		const { Space } = await import(path.join(root, 'owner.js'));
+		const { controls } = await import(path.join(root, 'controls.ts'));
+		const first = createScope({ scopeKey: 'one' });
+		const second = createScope({ scopeKey: 'two' });
+		try {
+			Space.current = first;
+			const a = controls();
+			expect(a.active()).toBeUndefined();
+			a.choose('blue');
+			expect(a.peek()).toBe('blue');
+			expect(a.active()).toBe('blue');
+			Space.current = second;
+			expect(controls().active()).toBeUndefined();
+			a.choose(undefined);
+			expect(a.peek()).toBeUndefined();
+		} finally {
+			first.dispose();
+			second.dispose();
+		}
+	});
+
+	it.each([
+		['register', 'currentValue'],
+		['defineNative', 'readNative'],
+	])('reuses the existing adapter imports %s and %s', async (factory, reader) => {
+		const named = (name, local) => (name === local ? name : name + ' as ' + local);
+		const color =
+			`import { ${named('register', factory)} } from '#adapter';\n` + sources['color.ts'];
+		const controls =
+			`import { ${named('currentValue', reader)} } from '#adapter';\n` +
+			sources['controls.ts'] +
+			`\nexport function unrelated(${reader}) { return ${reader}; }`;
+		const root = project({ ...sources, 'color.ts': color, 'controls.ts': controls });
+		const migrate = createScopedSignalRecipe({
+			...config,
+			sourceRoot: root,
+			tsconfig: path.join(root, 'tsconfig.json'),
+			reviewedAccess: { 'controls.ts': digest(controls) },
+		});
+		const paths = [path.join(root, 'color.ts')];
+		const { files } = await migrate(paths);
+		expect(files.flatMap((f) => f.notes)).toEqual([]);
+		for (const [file, call] of [
+			['color.ts', factory + '("color.ts:color"'],
+			['controls.ts', reader + '(selection)'],
+		]) {
+			const code = fs.readFileSync(path.join(root, file), 'utf8');
+			expect(code).toContain(call);
+			expect(code.match(/from ['"]#adapter['"]/g)).toHaveLength(1);
+		}
+		expect((await migrate(paths)).files.every((f) => !f.changed && !f.notes.length)).toBe(true);
+	});
+
+	it.each([
+		[
+			'a shadowed destination alias',
+			"import {currentValue as current} from '#adapter';",
+			'current',
+		],
+		[
+			'a colliding destination alias',
+			"import {currentValue as current} from '#adapter'; import {other as current} from '#state';",
+			'',
+		],
+		[
+			'multiple destination aliases',
+			"import {currentValue as a, currentValue as b} from '#adapter';",
+			'',
+		],
+		['a type-only destination', "import type {currentValue} from '#adapter';", ''],
+		['a conflicting import', "import {other as currentValue} from '#state';", ''],
+	])('rejects %s without a partial migration', async (_, imports, parameter) => {
+		const controls =
+			imports + '\n' + sources['controls.ts'].replace('controls()', 'controls(' + parameter + ')');
+		const root = project({ ...sources, 'controls.ts': controls });
+		const result = await createScopedSignalRecipe({
+			...config,
+			sourceRoot: root,
+			tsconfig: path.join(root, 'tsconfig.json'),
+			reviewedAccess: { 'controls.ts': digest(controls) },
+		})([path.join(root, 'color.ts')]);
+		expect(result.files.flatMap((f) => f.notes)).toContainEqual(
+			expect.objectContaining({ severity: 'error' }),
+		);
+		expect(fs.readFileSync(path.join(root, 'color.ts'), 'utf8')).toBe(sources['color.ts']);
+		expect(fs.readFileSync(path.join(root, 'controls.ts'), 'utf8')).toBe(controls);
+	});
+
+	it('preserves the UTF-8 BOM in previews, writes, review hashes, and reruns', async () => {
+		const originals = {
+			'color.ts': '\uFEFF' + sources['color.ts'],
+			'controls.ts': '\uFEFF' + sources['controls.ts'],
+		};
+		const root = project({ ...sources, ...originals });
+		const paths = [path.join(root, 'color.ts')];
+		const migrate = createScopedSignalRecipe({
+			...config,
+			sourceRoot: root,
+			tsconfig: path.join(root, 'tsconfig.json'),
+			reviewedAccess: { 'controls.ts': digest(originals['controls.ts']) },
+		});
+		const preview = await migrate(paths, { write: false });
+		expect(preview.files.flatMap((f) => f.notes)).toEqual([]);
+		expect(preview.files.map((f) => f.file).sort()).toEqual(Object.keys(originals).sort());
+		for (const { file, code } of preview.files) {
+			expect(code).toMatch(/^\uFEFFimport /);
+			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(originals[file]);
+		}
+		expect((await migrate(paths)).files).toEqual(preview.files);
+		for (const { file, code } of preview.files)
+			expect(fs.readFileSync(path.join(root, file))).toEqual(Buffer.from(code));
+		expect((await migrate(paths)).files.every((f) => !f.changed && !f.notes.length)).toBe(true);
+	});
+
+	it.each([
+		['an escaped signal', 'export const values = {selection};'],
+		['a CommonJS namespace read', "module.require('./color.ts').color;"],
+		[
+			'a local alias shadowing the destination',
+			'function other(currentValue) { return currentValue; }',
+		],
+		['a dynamic reference', "void import('./color.ts');"],
+		[
+			'a source-library transaction',
+			"import {batch} from '#state'; function perform(){const s=useScope(Space); batch(() => s.set(selection, 1));}",
+		],
+		['a re-export', "export {color} from './color.ts';"],
+		['a namespace import', "import * as all from './color.ts';"],
+		['a different receiver', 'function update(owner) { owner.set(selection, 2); }'],
+		['a selector reader', 'function useColor() { return read(selection, x => x); }'],
+		['an optional call', 'function update(owner) { owner?.set(selection, 2); }'],
+	])('reports %s before writing any file', async (_, addition) => {
+		const root = project({ ...sources, 'controls.ts': sources['controls.ts'] + '\n' + addition });
+		const migrate = createScopedSignalRecipe({
+			...config,
+			reviewedAccess: { 'controls.ts': digest(sources['controls.ts'] + '\n' + addition) },
+			sourceRoot: root,
+			tsconfig: path.join(root, 'tsconfig.json'),
+		});
+		const result = await migrate([path.join(root, 'color.ts')]);
+		expect(result.files.flatMap((f) => f.notes)).toContainEqual(
+			expect.objectContaining({ severity: 'error' }),
+		);
+		expect(fs.readFileSync(path.join(root, 'color.ts'), 'utf8')).toBe(sources['color.ts']);
+	});
+
+	it.each([
+		['shadowed undefined', 'const undefined = 3;\n', 'zero-argument factory'],
+		['a different declaring scope', "import {Other} from '#owner';\n", 'declaring scope'],
+	])('rejects %s before touching consumers', async (label, prefix, message) => {
+		let code = prefix + sources['color.ts'];
+		if (label === 'a different declaring scope')
+			code = code.replace('define(Region', 'define(Other');
+		const root = project({ ...sources, 'color.ts': code });
+		const result = await createScopedSignalRecipe({
+			...config,
+			sourceRoot: root,
+			tsconfig: path.join(root, 'tsconfig.json'),
+		})([path.join(root, 'color.ts')]);
+		expect(
+			result.files
+				.flatMap((f) => f.notes)
+				.map((n) => n.message)
+				.join(),
+		).toContain(message);
+		expect(fs.readFileSync(path.join(root, 'controls.ts'), 'utf8')).toBe(sources['controls.ts']);
+	});
+
+	it('requires a review of the current imperative consumer and its callers', async () => {
+		const root = project({ ...sources, 'controls.ts': sources['controls.ts'] + '\n// edited' });
+		const result = await createScopedSignalRecipe({
+			...config,
+			sourceRoot: root,
+			tsconfig: path.join(root, 'tsconfig.json'),
+		})([path.join(root, 'color.ts')]);
+		expect(
+			result.files
+				.flatMap((f) => f.notes)
+				.map((n) => n.message)
+				.join(),
+		).toContain('Review the imperative accesses in controls.ts');
+		expect(fs.readFileSync(path.join(root, 'color.ts'), 'utf8')).toBe(sources['color.ts']);
+	});
+
+	it('checks a reference discovered only through CommonJS', async () => {
+		const root = project({
+			...sources,
+			'plugin.cjs': "exports.run = () => module.require('./color.ts').color;",
+		});
+		const result = await createScopedSignalRecipe({
+			...config,
+			sourceRoot: root,
+			tsconfig: path.join(root, 'tsconfig.json'),
+		})([path.join(root, 'color.ts')]);
+		expect(
+			result.files
+				.flatMap((f) => f.notes)
+				.map((n) => n.message)
+				.join(),
+		).toContain('plugin.cjs');
+		expect(fs.readFileSync(path.join(root, 'controls.ts'), 'utf8')).toBe(sources['controls.ts']);
+	});
+
+	it('finds a producer reachable through only one conditional export', async () => {
+		const manifest = {
+			...JSON.parse(sources['package.json']),
+			name: 'palette-demo',
+			exports: { './color': { import: './color.ts', require: './other.cts' } },
+		};
+		const root = project({
+			...sources,
+			'package.json': JSON.stringify(manifest),
+			'other.cts': 'export const color = 0;',
+			'caller.mts': "export {color} from 'palette-demo/color';",
+		});
+		const result = await createScopedSignalRecipe({
+			...config,
+			sourceRoot: root,
+			tsconfig: path.join(root, 'tsconfig.json'),
+		})([path.join(root, 'color.ts')]);
+		expect(
+			result.files
+				.flatMap((f) => f.notes)
+				.map((n) => n.message)
+				.join(),
+		).toContain('mode-dependent producer import');
+		expect(fs.readFileSync(path.join(root, 'color.ts'), 'utf8')).toBe(sources['color.ts']);
+	});
+
+	it('distinguishes identically spelled imports from different owner modules', async () => {
+		const { ['controls.ts']: controls, ...other } = sources;
+		const root = project({
+			...other,
+			'color.ts': other['color.ts'].replace('#owner', './owner.js'),
+			'nested/owner.js': other['owner.js'],
+			'nested/controls.ts': controls
+				.replace('./color.ts', '../color.ts')
+				.replace('#owner', './owner.js'),
+		});
+		const result = await createScopedSignalRecipe({
+			...config,
+			scope: { module: './owner.js', name: 'Space' },
+			sourceRoot: root,
+			tsconfig: path.join(root, 'tsconfig.json'),
+		})([path.join(root, 'color.ts')]);
+		expect(
+			result.files
+				.flatMap((f) => f.notes)
+				.map((n) => n.message)
+				.join(),
+		).toContain('common module for ./owner.js');
+	});
+
+	it('refuses a consumer symlink pointing outside the source root', async () => {
+		const root = project(sources);
+		const external = project({ 'external.ts': sources['controls.ts'] });
+		fs.symlinkSync(path.join(external, 'external.ts'), path.join(root, 'external.ts'));
+		const result = await createScopedSignalRecipe({
+			...config,
+			sourceRoot: root,
+			tsconfig: path.join(root, 'tsconfig.json'),
+		})([path.join(root, 'color.ts')]);
+		expect(
+			result.files
+				.flatMap((f) => f.notes)
+				.map((n) => n.message)
+				.join(),
+		).toContain('symlinked consumer');
+		expect(fs.readFileSync(path.join(external, 'external.ts'), 'utf8')).toBe(
+			sources['controls.ts'],
+		);
+	});
+
+	it('restores source files when a later replacement fails', async () => {
+		const root = project(sources);
+		const rename = fs.renameSync;
+		const failure = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+			if (String(to).endsWith('controls.ts')) throw new Error('write failed');
+			rename(from, to);
+		});
+		try {
+			const result = await createScopedSignalRecipe({
+				...config,
+				sourceRoot: root,
+				tsconfig: path.join(root, 'tsconfig.json'),
+			})([path.join(root, 'color.ts')]);
+			expect(result.files.flatMap((f) => f.notes).map((n) => n.message)).toContain('write failed');
+			for (const [file, text] of Object.entries(sources))
+				expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(text);
+			expect(fs.readdirSync(root).sort()).toEqual(Object.keys(sources).sort());
+		} finally {
+			failure.mockRestore();
+		}
+	});
 });

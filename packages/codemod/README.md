@@ -145,3 +145,110 @@ The CLI loads the module only when you pass `--recipe`. It executes the module
 even for a preview, so the recipe must honor `write: false` for all changes
 when invoked with `--dry-run` or `--print`. The CLI formats the returned report
 and exits with status 1 for reported errors, or status 2 if it cannot load the recipe.
+
+### Migrating scoped signals
+
+Use `createScopedSignalRecipe` to convert one exported writable signal and its
+direct consumers together. Supply the source API, the named scope, and the
+destination imports that bind an Octane signal to the lifetime of that scope.
+
+```js
+import { createScopedSignalRecipe } from '@octanejs/codemod';
+import { fileURLToPath } from 'node:url';
+
+export const runCodemod = createScopedSignalRecipe({
+	sourceRoot: fileURLToPath(new URL('./src', import.meta.url)),
+	tsconfig: fileURLToPath(new URL('./tsconfig.json', import.meta.url)),
+	sourceModule: '@example/state',
+	scope: { module: '@example/owners', name: 'Workspace' },
+	factory: { module: '@example/native-state', name: 'defineCell' },
+	reader: { module: '@example/react-state', name: 'useCellValue' },
+	// Fill from the preview after reviewing this file and its callers.
+	reviewedAccess: { 'palette-controls.ts': '<reviewed SHA-256>' },
+});
+```
+
+```sh
+octane-codemod --recipe ./scoped.mjs --print --json src/palette.ts
+```
+
+For an exported `color = signal(Workspace, () => 'blue')` in that file, the
+recipe emits `color = defineCell("palette.ts:color", () => 'blue')`. The
+key is the source-root-relative path and export name. It converts
+`owner.set(color, value)` to `color.set(owner, value)` and
+`owner.get(color)` to `color.get(owner)` when the owner is a constant
+initialized by `useScope(Workspace)`. A one-argument `useSignal(color)`
+becomes `useCellValue(color)`. Aliases on named imports are supported.
+
+The factory must provide one cell per live owner and stable key, accept a
+zero-argument initializer, and preserve the source API's get, set, and updater
+semantics. The reader must obtain the same owner from the active provider
+and preserve subscription and server snapshot behavior. Supply adapters
+appropriate to the application's ownership, disposal and rendering model.
+
+For example, a client can keep each cell in its owner's native Octane scope.
+Here `nativeScopeFor(owner)` is the application's adapter. It returns the
+same live Octane `Scope` for that owner and disposes it with the owner.
+
+```js
+// @example/native-state
+import { nativeScopeFor } from '@example/owners';
+
+export function defineCell(key, initial) {
+	const cells = new WeakMap();
+	function bind(owner) {
+		const scope = nativeScopeFor(owner);
+		if (!cells.has(scope)) {
+			const first = initial();
+			const cell = scope.signal$(key, first);
+			cells.set(scope, {
+				cell,
+				subscribe: (notify) => cell.subscribe(notify),
+				get: () => cell.get(),
+				getServer: () => first,
+			});
+		}
+		return cells.get(scope);
+	}
+	return {
+		bind,
+		get: (owner) => bind(owner).get(),
+		set: (owner, update) => bind(owner).cell.set(update),
+	};
+}
+```
+
+A React consumer can subscribe to that same cell. This example assumes that
+the server snapshot is the initial value. Applications that hydrate persisted
+or server-provided state should supply their corresponding snapshot.
+
+```js
+// @example/react-state
+import { useSyncExternalStore } from 'react';
+import { useScope } from '@example/state';
+import { Workspace } from '@example/owners';
+
+export function useCellValue(definition) {
+	const { subscribe, get, getServer } = definition.bind(useScope(Workspace));
+	return useSyncExternalStore(subscribe, get, getServer);
+}
+```
+
+Choose a source root containing all consumers. The recipe discovers static
+module references under that root using the supplied TypeScript configuration.
+It accepts primitive initial values (including global `undefined`) and simple
+zero-argument factories returning them. It reports unsupported owners, escaped
+signals, re-exports, and selector or namespace reads before writing. Review
+external consumers, computed imports, tracked effects and transaction boundaries
+when deciding whether the source and destination APIs have matching semantics.
+The recipe reports a SHA-256 hash for each file with imperative accesses.
+Record it under `reviewedAccess` after checking that the file and its callers
+can use the destination API. The hash identifies the reviewed file. Revisit the
+review when a caller or its execution context changes. A scoped access nested
+inside a source-library call requires manual migration.
+
+Remove `--print` to apply the preview, then run the application's typecheck and
+behavioral tests. Writes stage originals and replacements under
+`.octane-scoped-signal` in the source root. If the process is interrupted,
+`paths.json` maps each staged number to its source path. Inspect the files
+and originals before removing the staging directory and retrying.

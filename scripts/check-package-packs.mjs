@@ -566,17 +566,40 @@ function validatePackedCodemod(tempRoot, archives) {
 		path.join(REPO_ROOT, 'packages/codemod/tests/fixtures/counter.input.tsx'),
 		path.join(projectDirectory, 'src/Counter.tsx'),
 	);
+	// Both JavaScript recipes and TypeScript consumers resolve the installed public entry.
+	const recipe = path.join(toolDirectory, 'recipe.mjs');
+	writeFileSync(recipe, "export { runCodemod } from '@octanejs/codemod';\n");
+	const bin = path.join(toolDirectory, 'node_modules/.bin/octane-codemod');
+	const preview = JSON.parse(
+		execFileSync(bin, ['--recipe', recipe, '--dry-run', '--json'], {
+			cwd: projectDirectory,
+			encoding: 'utf8',
+		}),
+	);
+	if (!preview.files.some((file) => file.output === 'src/Counter.tsrx' && file.changed)) {
+		throw new Error('packed JavaScript recipe did not preview the migration');
+	}
+	const consumer = path.join(toolDirectory, 'consumer.mts');
+	writeFileSync(
+		consumer,
+		[
+			"import { runCodemod, type CodemodOptions, type CodemodResult } from '@octanejs/codemod';",
+			'export const migrate: (paths: string[], options?: CodemodOptions) => Promise<CodemodResult> = runCodemod;',
+		].join('\n'),
+	);
+	const tsc = createRequire(import.meta.url).resolve('typescript/bin/tsc');
+	execFileSync(
+		process.execPath,
+		[tsc, '--noEmit', '--strict', '--module', 'NodeNext', '--target', 'ES2022', consumer],
+		{ cwd: toolDirectory },
+	);
 	const result = JSON.parse(
-		execFileSync(
-			path.join(toolDirectory, 'node_modules/.bin/octane-codemod'),
-			['--strong', '--json'],
-			{
-				cwd: projectDirectory,
-				encoding: 'utf8',
-				stdio: ['ignore', 'pipe', 'pipe'],
-				timeout: 60_000,
-			},
-		),
+		execFileSync(bin, ['--strong', '--json'], {
+			cwd: projectDirectory,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'pipe'],
+			timeout: 60_000,
+		}),
 	);
 	if (!isWithinDirectory(realpathSync(toolDirectory), realpathSync(result.compiler))) {
 		throw new Error(
