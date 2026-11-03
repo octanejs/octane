@@ -117,8 +117,9 @@ export async function runCodemod(paths, options = {}) {
 		renames.set(file, output);
 	}
 	const config = tsconfigOptions(root);
-	const program = projectProgram(config, files);
-	const checker = program?.getTypeChecker();
+	const strictConfig = (config?.strictNullChecks ?? config?.strict) ? config : null;
+	/** @type {ts.Program | undefined} */
+	let program;
 	const contextsOf = contextIndex(exports, known);
 	const resolveRename = renamedImports(root, config, renames);
 
@@ -146,12 +147,23 @@ export async function runCodemod(paths, options = {}) {
 			const target = resolveModule(file, specifier, known);
 			return target ? contextsOf(target.file).has(name) : null;
 		};
-		const sourceFile = program?.getSourceFile(file);
+		/** @type {import('./transform.js').TransformOptions['types']} */
+		let types;
 		const result = transformModule(source, file, {
 			target,
 			strong,
-			strictNullChecks: program !== null,
-			types: sourceFile && checker && { sourceFile, checker },
+			strictNullChecks: strictConfig !== null,
+			get types() {
+				if (types || !strictConfig) return types;
+				// Even one input can import a large graph. Bind it only for a rewrite that needs its types.
+				program ??= ts.createProgram(
+					files.filter((name) => /\.[cm]?tsx?$/.test(name)),
+					{ ...strictConfig, noEmit: true, noUncheckedIndexedAccess: true },
+				);
+				const sourceFile = program.getSourceFile(file);
+				if (sourceFile) types = { sourceFile, checker: program.getTypeChecker() };
+				return types;
+			},
 			resolveSpecifier,
 			isContext,
 			unported: (specifier) => unportedName(specifier, file),
@@ -361,24 +373,6 @@ function tsconfigOptions(root) {
 	if (!file) return null;
 	const { config } = ts.readConfigFile(file, ts.sys.readFile);
 	return ts.parseJsonConfigFileContent(config ?? {}, ts.sys, path.dirname(file)).options;
-}
-
-/**
- * A program over the TypeScript modules being migrated, under the project's
- * tsconfig, so their types resolve through imports. Null unless that config
- * enables `strictNullChecks`: without it a `string` may still hold null, so
- * types cannot prove a hole is text.
- *
- * @param {ts.CompilerOptions | null} options
- * @param {string[]} files
- */
-function projectProgram(options, files) {
-	if (!options || !(options.strictNullChecks ?? options.strict)) return null;
-	return ts.createProgram(
-		files.filter((name) => /\.[cm]?tsx?$/.test(name)),
-		// As the compiler's typed-text proof requires.
-		{ ...options, noEmit: true, noUncheckedIndexedAccess: true },
-	);
 }
 
 /**
