@@ -82,6 +82,16 @@ export async function runCodemod(
 	const contextsOf = contextIndex(exports, known);
 	const resolveRename = renamedImports(root, config, renames);
 
+	// resolveRename returns only an on-disk source that actually won import resolution.
+	const elementExports = new Map<string, Set<string>>();
+	for (const [from, to] of renames) {
+		const declarations = exports.get(from)?.elementChildren;
+		if (declarations)
+			elementExports.set(
+				to,
+				new Set(declarations.flatMap((d) => (d.exported ? [d.exported] : []))),
+			);
+	}
 	const verify = options.verify !== false;
 	const compiler = verify || strong ? await loadCompiler(root) : null;
 	const packages: Map<string, string> = new Map();
@@ -120,6 +130,17 @@ export async function runCodemod(
 			},
 			resolveSpecifier,
 			isContext,
+			elementChild: !elementExports.size
+				? undefined
+				: (binding) => {
+						if (typeof binding === 'number')
+							return exports.get(file)?.elementChildren?.some((x) => x.start === binding) ?? false;
+						const to = resolveRename(file, binding.module);
+						return Boolean(
+							to?.startsWith('.') &&
+							elementExports.get(path.resolve(path.dirname(file), to))?.has(binding.imported),
+						);
+					},
 			unported: (specifier) => unportedName(specifier, file),
 			reactCompat,
 		});
