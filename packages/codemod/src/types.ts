@@ -19,6 +19,8 @@ export interface TransformOptions {
 	resolveSpecifier?(specifier: string): string | null;
 	/** Whether the selected component at this local declaration offset, or this imported name, accepts one explicit element. */
 	elementChild?(binding: number | { module: string; imported: string }): boolean;
+	/** Whether a selected, directly imported component inspects its child descriptors. */
+	descriptorChild?(binding: { module: string; imported: string }): boolean;
 	/** Whether an imported name is a context, or null when it cannot be known. */
 	isContext?(specifier: string, name: string): boolean | null;
 	/** The React package an import specifier names when that package has no Octane port, or null. */
@@ -45,6 +47,7 @@ export interface TransformResult {
 	/** What the module exports that other modules' rewrites depend on. */
 	exports: {
 		elementChildren?: { start: number; exported?: string }[];
+		descriptorChildren?: string[];
 		contexts: string[];
 		reexports: { specifier: string; names: [string, string][] | null }[];
 	};

@@ -102,6 +102,19 @@ This permits nested text and multiple children as well as one element. Render
 the block with `{props.children}`. Keep the element type for APIs that inspect
 a descriptor or require exactly one child.
 
+The descriptor-children rule also follows arguments passed to directly called
+helper functions in the same module. If a helper inspects a parameter with a
+React element API, the component passing its children gets the same marker as a
+component that inspects them directly. When both files are selected, a direct
+relative import of a marked, named export keeps its nested JSX as descriptor
+values, including an array produced by `.map()`. Intrinsic descriptors retain
+their `className` prop.
+
+Octane's Vite and Rspack integrations resolve descriptor markers across imports.
+If a custom build compiles each file in isolation, supply the compiler's
+`isDescriptorChildrenImport` option or pass explicit `children={elements}`.
+With `--strong`, descriptor inspection still requires compatibility mode.
+
 ## Strong mode
 
 With `--strong`, each template module starts with `"use strong"` and is
