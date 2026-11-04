@@ -165,7 +165,7 @@ export function App({ items }) {
 		expectStrongValid(
 			`${IMPORTS}const Math = { random: () => 0.5 };
 export function App({ items, request }) {
-  const [seeds] = useState(() => items.map(() => globalThis.Math.random()));
+  const [seeds, _setSeeds] = useState(() => items.map(() => globalThis.Math.random()));
   const [picked, setPicked] = useState(null);
   useEffect(() => { items.forEach(() => console.log(Date.now())); });
   const doubled = items.map((item) => item.value * 2);
@@ -213,7 +213,7 @@ describe('Strong random IDs during render', () => {
 	it('keeps event, lazy-initializer, shadowed, and non-random crypto use legal', () => {
 		expectStrongValid(
 			`${IMPORTS}export function App({ crypto: provided }) {
-  const [draftId] = useState(() => crypto.randomUUID());
+  const [draftId, _setDraftId] = useState(() => crypto.randomUUID());
   const [id, setId] = useState('');
   const subtle = crypto.subtle;
   return <button onClick={() => setId(crypto.randomUUID())}>{draftId}{id}{String(Boolean(subtle))}{provided.randomUUID()}</button>;
@@ -332,7 +332,7 @@ export function App({ t }) {
 			`${IMPORTS}const utc = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', dateStyle: 'medium' });
 const count = new Intl.NumberFormat('en-US');
 export function App({ t, n, date, locale, timeZone, options, args, rest }) {
-  const [label] = useState(() => new Date(t).toLocaleString());
+  const [label, _setLabel] = useState(() => new Date(t).toLocaleString());
   const [clicked, setClicked] = useState('');
   useEffect(() => { console.log(new Date(t).toLocaleString()); });
   return (
@@ -438,7 +438,7 @@ export function Button({ notify }) {
 	it('rejects scheduling in lazy initializers, which may still capture a clock', () => {
 		expectStrongValid(
 			`${IMPORTS}export function App() {
-  const [startedAt] = useState(() => Date.now());
+  const [startedAt, _setStartedAt] = useState(() => Date.now());
   return <time>{startedAt}</time>;
 }`,
 			'/src/App.tsrx',
@@ -462,7 +462,7 @@ export function App() {
 		// A lazy initializer may read browser globals, so only the scheduling reports.
 		expect(
 			codes(`${IMPORTS}export function App() {
-  const [value] = useState(() => { window.setTimeout(() => {}, 0); return globalThis['queueMicrotask'](() => {}); });
+  const [value, _setValue] = useState(() => { window.setTimeout(() => {}, 0); return globalThis['queueMicrotask'](() => {}); });
   return <div>{value}</div>;
 }`),
 		).toEqual([RENDER_SIDE_EFFECT, RENDER_SIDE_EFFECT]);

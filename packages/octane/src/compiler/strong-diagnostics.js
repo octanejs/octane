@@ -189,6 +189,16 @@ export const STRONG_DIAGNOSTICS = [
 			'Use the updater form, `setValue((current) => current + 1)`, compute from the state a reducer receives, or read the latest value with the state getter (the third tuple member).',
 	},
 	{
+		code: 'OCTANE_STRONG_READ_ONLY_STATE',
+		section: 'state',
+		severity: 'error',
+		detects:
+			'A declaration takes the value from a `useState` call and discards its setter, for example `const [value] = useState(initial)` or `const value = useState(initial)[0]`. This includes lazy initializers.',
+		replacement:
+			'Derive render values from their inputs. For values kept for events or effects, use `useRef(value)` or `useLazyRef(() => createValue())` for one-time initialization.',
+		primitives: ['useRef', 'useLazyRef'],
+	},
+	{
 		code: 'OCTANE_STRONG_WRITE_ONLY_STATE',
 		section: 'state',
 		severity: 'error',

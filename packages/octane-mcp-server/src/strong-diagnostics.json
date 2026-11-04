@@ -140,6 +140,15 @@
       "url": "https://octanejs.dev/docs/strong-mode#octane-strong-stale-state-update"
     },
     {
+      "code": "OCTANE_STRONG_READ_ONLY_STATE",
+      "section": "state",
+      "severity": "error",
+      "detects": "A declaration takes the value from a `useState` call and discards its setter, for example `const [value] = useState(initial)` or `const value = useState(initial)[0]`. This includes lazy initializers.",
+      "replacement": "Derive render values from their inputs. For values kept for events or effects, use `useRef(value)` or `useLazyRef(() => createValue())` for one-time initialization.",
+      "primitives": ["useRef", "useLazyRef"],
+      "url": "https://octanejs.dev/docs/strong-mode#octane-strong-read-only-state"
+    },
+    {
       "code": "OCTANE_STRONG_WRITE_ONLY_STATE",
       "section": "state",
       "severity": "error",

@@ -465,7 +465,7 @@ describe('Strong effect chains', () => {
 		`const mixed = props.x + first; ${guardedWrite('setFirst(1)')} useEffect(() => { consume(1); }, [mixed]);`,
 	])('rejects dependent effects after an asynchronous state write: %s', (setup) => {
 		const source = component(
-			`const [first, setFirst] = useState(0); const [second] = useState(0); ${setup}`,
+			`const [first, setFirst] = useState(0); const [second, _setSecond] = useState(0); ${setup}`,
 		);
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 		expect(errors(source)).toContain(CHAIN);
@@ -483,7 +483,7 @@ describe('Strong effect chains', () => {
 	])('preserves independent effects: %s', (setup) => {
 		accepts(
 			component(
-				`const [first, setFirst] = useState(0); const [second] = useState(0); ${setup}`,
+				`const [first, setFirst] = useState(0); const [second, _setSecond] = useState(0); ${setup}`,
 				'props',
 				'<div>{first as string}</div>',
 			),
@@ -515,27 +515,27 @@ export function App(props) @{
 
 describe('Strong prop state intent', () => {
 	it.each([
-		['props', `const [value] = useState(props.value);`],
-		['{ value }', `const [state] = useState(value);`],
-		['{ value: initial }', `const [state] = useState(initial);`],
+		['props', `const [value, _setValue] = useState(props.value);`],
+		['{ value }', `const [state, _setState] = useState(value);`],
+		['{ value: initial }', `const [state, _setState] = useState(initial);`],
 		[
 			'props',
-			`const value = props.value; const initial = value; const [state] = useState(initial);`,
+			`const value = props.value; const initial = value; const [state, _setState] = useState(initial);`,
 		],
-		['props', `const { value } = props; const [state] = useState(value);`],
-		['props', `const [state] = useState(props.value + 1);`],
-		['props', `const [state] = useState(props.items.slice());`],
-		['{ value } = {}', `const [state] = useState(value);`],
+		['props', `const { value } = props; const [state, _setState] = useState(value);`],
+		['props', `const [state, _setState] = useState(props.value + 1);`],
+		['props', `const [state, _setState] = useState(props.items.slice());`],
+		['{ value } = {}', `const [state, _setState] = useState(value);`],
 	])('requires explicit initial-only or linked intent: %s %s', (params, setup) => {
 		rejects(component(setup, params), PROPS);
 	});
 
 	it.each([
-		`const [state] = useState(() => props.value);`,
+		`const [state, _setState] = useState(() => props.value);`,
 		`const [state] = useLinkedState(props.value, () => props.value);`,
-		`const [state] = useState(0);`,
-		`const value = 123; const [state] = useState(value);`,
-		`const create = () => props.value; const [state] = useState(create);`,
+		`const [state, _setState] = useState(0);`,
+		`const value = 123; const [state, _setState] = useState(value);`,
+		`const create = () => props.value; const [state, _setState] = useState(create);`,
 	])('preserves deliberate capture and linked state: %s', (setup) => {
 		expect(() => compile(component(setup), '/src/App.tsrx', { strong: true })).not.toThrow();
 	});
@@ -543,7 +543,7 @@ describe('Strong prop state intent', () => {
 	it('keeps prop-mixed derived state eligible for the eager initializer check', () => {
 		rejects(
 			component(
-				`const [first] = useState(0); const mixed = props.x + first; const [state] = useState(mixed);`,
+				`const [first, _setFirst] = useState(0); const mixed = props.x + first; const [state, _setState] = useState(mixed);`,
 			),
 			PROPS,
 		);
@@ -554,7 +554,7 @@ describe('Strong prop state intent', () => {
 			compile(
 				`"use strong";
 import { useState } from 'octane';
-function useDialog(title) { const [label] = useState(title); const dialog = <div>{label as string}</div>; return dialog; }
+function useDialog(title) { const [label, _setLabel] = useState(title); const dialog = <div>{label as string}</div>; return dialog; }
 export function App() @{ const dialog = useDialog('x'); <div>{dialog}</div> }`,
 				'/src/App.tsrx',
 			),
@@ -596,7 +596,7 @@ describe('Strong effect diagnostic integration', () => {
 	it('enforces .tsrx components and namespace imports', () => {
 		expect(() =>
 			compile(
-				`"use strong"; import * as O from 'octane'; export function App(props) { const [value] = O.useState(props.value); return <div />; }`,
+				`"use strong"; import * as O from 'octane'; export function App(props) { const [value, _setValue] = O.useState(props.value); return <div />; }`,
 				'/src/App.tsrx',
 			),
 		).toThrow(PROPS);
@@ -752,7 +752,7 @@ describe('Strong effect review regressions', () => {
 				['{ open }', 'open'],
 				['props', 'props.open'],
 			]) {
-				const source = `import { useState } from 'octane'; function ${name}(initial) { const [on] = useState(initial); return on; } export function App(${params}) @{ const on = ${name}(${argument}); <div>{on}</div> }`;
+				const source = `import { useState } from 'octane'; function ${name}(initial) { const [on, _setOn] = useState(initial); return on; } export function App(${params}) @{ const on = ${name}(${argument}); <div>{on}</div> }`;
 				expect(() => compile(source, '/src/Review.tsrx', { strong: true })).not.toThrow();
 			}
 		},

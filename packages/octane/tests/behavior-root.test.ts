@@ -9932,7 +9932,7 @@ export function Tree({ node }: { node: Branch }) @{
 					recursive(
 						'<Leaf node={node} />',
 						`import { useState } from 'octane';
-function Leaf({ node }) @{ const [open] = useState(false); <i>{String(open) as string}</i> }`,
+function Leaf({ node }) @{ const [open, _setOpen] = useState(false); <i>{String(open) as string}</i> }`,
 					),
 					/pure const aliases and mount-only effects/,
 				],

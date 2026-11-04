@@ -35,7 +35,7 @@ for (const dev of [true, false]) {
 		function Slot({ content }) @{ <section>{content}</section> }
 		function Frame({ children }) @{ <aside>{children}</aside> }
 		function Child() @{
-			const [expanded] = useState(false);
+			const [expanded, _setExpanded] = useState(false);
 			<><button>Action</button>@if (expanded) { <span>Extra</span> }</>
 		}
 		export function View({ show }) @{

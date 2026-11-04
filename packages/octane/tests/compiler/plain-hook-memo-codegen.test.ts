@@ -386,7 +386,7 @@ export function useValue(value) { return useMemo(() => value, [value]); }`;
 				const memoSlot = Symbol('memo');
 				const callbackSlot = Symbol('callback');
 				export function useValue(value) {
-					const [state] = useState(value, stateSlot);
+					const [state, _setState] = useState(value, stateSlot);
 					const memo = useMemo(() => state, [state], memoSlot);
 					return useCallback(() => memo, [memo], callbackSlot);
 				}`;

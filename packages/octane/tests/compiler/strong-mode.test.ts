@@ -130,8 +130,8 @@ export function App(props) @{
 
 	it('allows local copies, shadowed hooks, and snapshot methods without an array proof', () => {
 		const source =
-			component(`const [state] = useState({ count: 0, sort() { return 1; }, set() { return 2; } });
-  const [items] = useState([2, 1]);
+			component(`const [state, _setState] = useState({ count: 0, sort() { return 1; }, set() { return 2; } });
+  const [items, _setItems] = useState([2, 1]);
   const copy = { ...state };
   copy.count++;
   delete copy.count;
@@ -299,7 +299,7 @@ import { useState } from 'octane';
 function InitialTime() { return Date.now(); }
 function Clock() { this.started = Date.now(); }
 export function App() {
-  const [time] = useState(InitialTime);
+  const [time, _setTime] = useState(InitialTime);
   return <button onClick={() => new Clock()}>{time}</button>;
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
@@ -359,15 +359,15 @@ export function App() @{
 import { useState, useReducer, useMemo } from 'octane';
 function initialTime() { return Date.now(); }
 export function App() @{
-  const [date] = useState(() => new Date());
-  const [time] = useState(initialTime);
-  const [seed] = useState(() => Math.random());
+  const [date, _setDate] = useState(() => new Date());
+  const [time, _setTime] = useState(initialTime);
+  const [seed, _setSeed] = useState(() => Math.random());
   const [stamp] = useReducer((value) => value, null, () => performance.now());
   <div />
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 		const memo = source.replace(
-			'const [time] = useState(initialTime);',
+			'const [time, _setTime] = useState(initialTime);',
 			'useMemo(initialTime, []);',
 		);
 		expect(() => compile(memo, '/src/App.tsrx')).toThrow(RENDER_IMPURE_CALL);
@@ -461,7 +461,7 @@ export function App(props) @{
 		const source = `"use strong";
 import { useEffect, useState } from 'octane';
 export function App(props) @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   <div>@if (props.show) {
     useEffect(() => props.observe(count));
     <span>shown</span>
@@ -476,7 +476,7 @@ export function App(props) @{
 import { useEffect, useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
-  const [shared] = useState(0);
+  const [shared, _setShared] = useState(0);
   useEffect(() => props.observe(count, shared));
   <div>
     <output>{shared as string}</output>
@@ -491,7 +491,7 @@ export function App(props) @{
 import { useEffect, useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
-  const [shared] = useState(0);
+  const [shared, _setShared] = useState(0);
   useEffect(() => props.observe(count));
   useEffect(() => props.observe(count, shared));
   <div>
@@ -507,8 +507,8 @@ export function App(props) @{
 import { useEffect, useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
-  const [observed] = useState(0);
-  const [shared] = useState(0);
+  const [observed, _setObserved] = useState(0);
+  const [shared, _setShared] = useState(0);
   useEffect(() => props.observe(count, observed));
   useEffect(() => props.observe(observed, shared));
   <div>
@@ -524,7 +524,7 @@ export function App(props) @{
 import { useEffect, useState } from 'octane';
 export function App(props) @{
   const [count, setCount] = useState(0);
-  const [observed] = useState(0);
+  const [observed, _setObserved] = useState(0);
   useEffect(() => props.observe(count, observed));
   <div>@if (props.show) { <button onClick={() => setCount(count + 1)}>{count as string}</button> }</div>
 }`;
@@ -536,9 +536,9 @@ export function App(props) @{
 		const source = `"use strong";
 import { useEffect, useState } from 'octane';
 export function App(props) @{
-  const [left] = useState(0);
-  const [right] = useState(0);
-  const [shared] = useState(0);
+  const [left, _setLeft] = useState(0);
+  const [right, _setRight] = useState(0);
+  const [shared, _setShared] = useState(0);
   useEffect(() => props.observe(left, shared));
   useEffect(() => props.observe(right, shared));
   <div>
@@ -553,9 +553,9 @@ export function App(props) @{
 		const source = `"use strong";
 import { useEffect, useState } from 'octane';
 export function App(props) @{
-  const [outer] = useState(0);
-  const [inner] = useState(0);
-  const [shared] = useState(0);
+  const [outer, _setOuter] = useState(0);
+  const [inner, _setInner] = useState(0);
+  const [shared, _setShared] = useState(0);
   useEffect(() => props.observe(outer, shared));
   useEffect(() => props.observe(inner, shared));
   <div>@if (props.show) {
@@ -600,7 +600,7 @@ export function App(props) @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App(props) @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   <ul>${template}</ul>
 }`;
 		for (const mode of ['client', 'server'] as const) {
@@ -666,7 +666,7 @@ export function Search(props) @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App(props) @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   <div>@if (props.show) { @{ <span>{count as string}</span> } }</div>
 }`;
 		for (const mode of ['client', 'server'] as const) {
@@ -753,7 +753,7 @@ export function App() @{
 		const source = `"use strong";
 import { useEffect, useState } from 'octane';
 export function App(props) @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   function observe() { props.record(count); }
   useEffect(observe);
   <div>@{ <output>{count as string}</output> }</div>
@@ -789,7 +789,7 @@ export function App(props) @{
 		const helper = `"use strong";
 import { useState } from 'octane';
 export function App() @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   const renderLabel = () => (<span>{count as string}</span>);
   <div>@{ <section>{renderLabel()}</section> }</div>
 }`;
@@ -802,7 +802,7 @@ export function App() @{
 		const component = `"use strong";
 import { useState } from 'octane';
 export function App() @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   const Child = () => (<span>{count as string}</span>);
   <div>@{ <Child /> }</div>
 }`;
@@ -817,7 +817,7 @@ export function App() @{
 import { useEffect, useState } from 'octane';
 function useObserve(value, observe) { useEffect(() => observe(value)); }
 export function App(props) @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   useObserve(count, props.observe);
   <div>@{ <output>{count as string}</output> }</div>
 }`;
@@ -868,7 +868,7 @@ export function App() @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App(props) @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   <div>@{
     if (props.ready) { var count = 1; }
     <span>{count as string}</span>
@@ -894,7 +894,7 @@ export function App(props) @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App(props) @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   <div>
     {count as string}
     @{
@@ -918,7 +918,7 @@ export function App(props) @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App() @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   ${setup}
   <div>@{ <span>{count as string}</span> }</div>
 }`;
@@ -1029,7 +1029,7 @@ export function App(props) @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App() @{
-  const [label] = useState('ready');
+  const [label, _setLabel] = useState('ready');
   <div>@{
     const displayedLabel = label.toUpperCase();
     <span>{displayedLabel}</span>
@@ -1054,7 +1054,7 @@ export function App() @{
 		const source = `"use strong";
 import { useEffect, useState } from 'octane';
 export function App(props) @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   ${helper}
   ${withEffect ? 'useEffect(() => props.observe(count));' : ''}
   <div>@{ <span>{count as string}</span> }</div>
@@ -1074,8 +1074,8 @@ export function App(props) @{
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
 
 		const fixed = source.replace(
-			`  const [count] = useState(0);\n  ${helper}\n  ${withEffect ? 'useEffect(() => props.observe(count));' : ''}\n  <div>@{ <span>{count as string}</span> }</div>`,
-			`  <div>@{\n    const [count] = useState(0);\n    ${withEffect ? 'useEffect(() => props.observe(count));' : ''}\n    <span>{count as string}</span>\n  }</div>`,
+			`  const [count, _setCount] = useState(0);\n  ${helper}\n  ${withEffect ? 'useEffect(() => props.observe(count));' : ''}\n  <div>@{ <span>{count as string}</span> }</div>`,
+			`  <div>@{\n    const [count, _setCount] = useState(0);\n    ${withEffect ? 'useEffect(() => props.observe(count));' : ''}\n    <span>{count as string}</span>\n  }</div>`,
 		);
 		for (const mode of ['client', 'server'] as const) {
 			expect(() => compile(fixed, '/src/App.tsrx', { mode })).not.toThrow();
@@ -1088,7 +1088,7 @@ export function App(props) @{
 			const source = `"use strong";
 import { useState } from 'octane';
 export function App() @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   const read = () => count;
   <div>${consumer}@{ <span>{count as string}</span> }</div>
 }`;
@@ -1103,7 +1103,7 @@ export function App() @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App() @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   const read = () => count;
   <div>@{ <span>{count as string}</span> }@{ <output>{count as string}</output> }</div>
 }`;
@@ -1117,8 +1117,8 @@ export function App() @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App() @{
-  const [left] = useState('left');
-  const [right] = useState('right');
+  const [left, _setLeft] = useState('left');
+  const [right, _setRight] = useState('right');
   const read = () => left + right;
   <div>@{ <span>{left as string}</span> }@{ <output>{right as string}</output> }</div>
 }`;
@@ -1140,8 +1140,8 @@ export function App() @{
 import { useState } from 'octane';
 export function App() @{
   <div>
-    @{ const [left] = useState('left'); <span>{left as string}</span> }
-    @{ const [right] = useState('right'); <output>{right as string}</output> }
+    @{ const [left, _setLeft] = useState('left'); <span>{left as string}</span> }
+    @{ const [right, _setRight] = useState('right'); <output>{right as string}</output> }
   </div>
 }`;
 		for (const mode of ['client', 'server'] as const) {
@@ -1154,8 +1154,8 @@ export function App() @{
 		const source = `"use strong";
 import { useEffect, useState } from 'octane';
 export function App(props) @{
-  const [root] = useState(0);
-  const [count] = useState(0);
+  const [root, _setRoot] = useState(0);
+  const [count, _setCount] = useState(0);
   const read = () => count;
   useEffect(() => props.observe(root, read()));
   <div><output>{root as string}</output>@{ <span>{count as string}</span> }</div>
@@ -1170,7 +1170,7 @@ export function App(props) @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function Label() @{
-  const [label] = useState('ready');
+  const [label, _setLabel] = useState('ready');
   <div><span>{label as string}</span></div>
 }`;
 		for (const mode of ['client', 'server'] as const) {
@@ -1240,7 +1240,7 @@ export function Counter({ title, observe }) @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App() @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   <div>@{ <span>{count as string}</span> }@{ <output>{count as string}</output> }</div>
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
@@ -1298,7 +1298,7 @@ export function App(props) @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App(props) @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   ${helpers.join('\n  ')}
   <div>@if (props.show) { <button onClick={h18}>run</button> }</div>
 }`;
@@ -1460,7 +1460,7 @@ export function App(props) @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App(props) @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   <div>@{ var useState = () => 1; <span>{count as string}</span> }</div>
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(HOOK_LOCALITY);
@@ -1479,7 +1479,7 @@ export function App(props) @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App(props) @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   <div>@{ ${setup} <span /> }</div>
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
@@ -1490,7 +1490,7 @@ export function App(props) @{
 			const source = `"use strong";
 import { useState } from 'octane';
 export function App(props) @{
-  const [${tag.split('.')[0]}] = useState(() => props.Component);
+  const [${tag.split('.')[0]}, _setComponent] = useState(() => props.Component);
   <div>@if (props.show) { <${tag} /> }</div>
 }`;
 			expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
@@ -1501,7 +1501,7 @@ export function App(props) @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App(props) @{
-  const [index] = useState(0);
+  const [index, _setIndex] = useState(0);
   <ul>@for (const item of props.items; index index; key item.id) { <li>{index as string}</li> }</ul>
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
@@ -1517,7 +1517,7 @@ export function App(props) @{
 		const source = `"use strong";
 import { useState } from 'octane';
 export function App(props) @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   ${child}
   <div>@if (props.show) { <Child /> }</div>
 }`;
@@ -1547,7 +1547,7 @@ export function App(props) @{
 		const state = `"use strong";
 import { useState } from 'octane';
 export function App() @{
-  const [count] = useState(0);
+  const [count, _setCount] = useState(0);
   <div>@{ <span>{count as string}</span> }</div>
 }`;
 		expect(() => compile(state, '/src/App.tsrx', options)).toThrow(HOOK_LOCALITY);
@@ -5433,8 +5433,8 @@ export function App(props) @{
 import { useState, useReducer, useMemo } from 'octane';
 function initialWidth() { return window.innerWidth; }
 export function App() @{
-  const [width] = useState(initialWidth);
-  const [theme] = useState(() => localStorage.getItem("theme"));
+  const [width, _setWidth] = useState(initialWidth);
+  const [theme, _setTheme] = useState(() => localStorage.getItem("theme"));
   const [language] = useReducer((value) => value, null, () => navigator.language);
   <p>{width as string}{theme as string}{language as string}</p>
 }`;

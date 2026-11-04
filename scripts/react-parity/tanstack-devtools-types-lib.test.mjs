@@ -195,6 +195,13 @@ for (const [name, before, after] of [
 	['portal row key', '; key key)', '; key pluginContainer)'],
 	['portal target', 'target={pluginContainer}', 'target={titleContainers[key]}'],
 	['portal content', 'content={PluginComponents[key]}', 'content={TitleComponents[key]}'],
+	['lazy instance factory', 'useLazyRef(() => {', 'useRef(() => {'],
+	['configuration instance', 'devtoolsRef.current.setConfig', 'devToolRef.current.setConfig'],
+	[
+		'mount instance',
+		'const devtools = devtoolsRef.current;',
+		'const devtools = devToolRef.current;',
+	],
 	['effect dependency', '}, [devtools]);', '}, [config]);'],
 	['misplaced dependency', '}, [devtools]);', '}, [plugins]);'],
 ]) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compile } from '../../src/compiler/compile.js';
+import { collectDiagnostics, compile } from '../../src/compiler/compile.js';
 import { slotHooks } from '../../src/compiler/slot-hooks.js';
 import { compileToVolarMappings } from '../../src/compiler/volar.js';
 
@@ -7,6 +7,7 @@ const IMPURE_UPDATER = 'OCTANE_STRONG_IMPURE_UPDATER';
 const SNAPSHOT_MUTATION = 'OCTANE_STRONG_SNAPSHOT_MUTATION';
 const RENDER_SNAPSHOT_MUTATION = 'OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION';
 const STALE_STATE_UPDATE = 'OCTANE_STRONG_STALE_STATE_UPDATE';
+const READ_ONLY_STATE = 'OCTANE_STRONG_READ_ONLY_STATE';
 const WRITE_ONLY_STATE = 'OCTANE_STRONG_WRITE_ONLY_STATE';
 const UNCACHED_STORE_SNAPSHOT = 'OCTANE_STRONG_UNCACHED_STORE_SNAPSHOT';
 
@@ -837,6 +838,63 @@ export function useSave(save) {
 }`),
 			'/src/App.tsrx',
 		);
+	});
+});
+
+describe('Strong read-only state', () => {
+	it.each([
+		['array destructuring', 'const [value] = useState(0);'],
+		['a lazy initializer and getter', 'const [value, , getValue] = useState(() => 0);'],
+		['object destructuring', 'const { 0: value } = useState(0);'],
+		['index access', 'const value = useState(0)[0];'],
+	])('rejects %s that discards the setter', (_label, setup) => {
+		expect(rejected(`export function A() { ${setup} return <p>{value}</p>; }`)).toBe(
+			READ_ONLY_STATE,
+		);
+	});
+
+	it.each([
+		['development client', { mode: 'client', dev: true, hmr: true }],
+		['production client', { mode: 'client', dev: false, hmr: false }],
+		['server', { mode: 'server', dev: false, hmr: false }],
+	] as const)('rejects a prop capture when compiling for %s', (_label, options) => {
+		const source = `import * as Octane from 'octane';
+export function A({ initial }) @{
+  const [value] = Octane.useState(initial);
+  <p>{value as string}</p>
+}`;
+		expect(() => compile(source, '/src/A.tsrx', options)).not.toThrow();
+		const strongOptions = { ...options, strong: true };
+		expect(() => compile(source, '/src/A.tsrx', strongOptions)).toThrow(READ_ONLY_STATE);
+		const { diagnostics } = collectDiagnostics(source, '/src/A.tsrx', strongOptions);
+		expect(diagnostics).toEqual([expect.objectContaining({ code: READ_ONLY_STATE })]);
+	});
+
+	it('reports the authored binding for an aliased hook in plain TypeScript and the editor', () => {
+		const source = `"use strong";
+import { useState as useCell } from 'octane';
+export function useValue(initial: string) {
+  const [value] = (useCell(initial));
+  return value;
+}`;
+		expect(() => slotHooks(source, '/src/useValue.ts')).toThrow(READ_ONLY_STATE);
+		const diagnostic = volarDiagnostic(source, '/src/useValue.tsrx', READ_ONLY_STATE);
+		expect(diagnostic.start.offset).toBe(source.indexOf('[value]'));
+		expect(diagnostic.message).toContain('useLazyRef');
+	});
+
+	it('allows a retained setter, linked state, and a shadowed hook', () => {
+		const source = tsx(`export function A({ initial }) {
+  const [value, ...controls] = useState(0);
+  const [linked] = useLinkedState(initial, () => initial);
+  function format() {
+    const useState = (value) => [value];
+    const [local] = useState('local');
+    return local;
+  }
+  return <p onClick={() => controls[0](1)}>{value}{linked}{format()}</p>;
+}`);
+		expect(strongCode(source)).toBeNull();
 	});
 });
 
