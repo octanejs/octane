@@ -4138,6 +4138,13 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 					finishEffectCommit();
 				} finally {
 					inFlush = previousFlush;
+					// Pending snapshot reads need a scheduler turn after capture completion.
+					if (
+						!scheduled &&
+						LAYOUT_SNAPSHOT_DRIVER !== null &&
+						LAYOUT_SNAPSHOT_DRIVER.pending !== null
+					)
+						requestFlush();
 				}
 			}
 		}
