@@ -117,6 +117,12 @@ With `--strong`, descriptor inspection still requires compatibility mode.
 
 ## Strong mode
 
+A React layout effect with no dependency list runs after every commit. When its
+only work is copying a local element's width, height, or form membership into
+adjacent state, the compiler can replace both hooks with `useLayoutSnapshot`.
+The original state initializer supplies the server and first-render value.
+Other every-commit layout effects retain their schedule in compatibility mode.
+
 With `--strong`, each template module starts with `"use strong"` and is
 compiled in Strong mode. The codemod applies the compiler's own suggested fixes
 (`useLazyRef` for lazily initialized refs) and the rewrites that keep React's

@@ -1744,7 +1744,7 @@ function prepareThreadFunctionAstReplacements(ast, state) {
 	}
 }
 
-function isJsxBindingReference(node, parent, key) {
+export function isJsxBindingReference(node, parent, key) {
 	if (node.type !== 'JSXIdentifier') return false;
 	if (
 		(parent?.type === 'JSXOpeningElement' || parent?.type === 'JSXClosingElement') &&
