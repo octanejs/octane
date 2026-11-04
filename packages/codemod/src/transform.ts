@@ -2161,13 +2161,13 @@ class ModuleTransform {
 
 	/**
 	 * React runs an effect or memo without a dependency list on every render.
-	 * Octane infers the list instead, so compatibility output passes `null` to
-	 * keep React's behavior. Strong output leaves it to the compiler, which is
-	 * what Strong asks for.
+	 * Compatibility output uses `null` to preserve that schedule. Keep it for
+	 * layout effects in Strong migration too: a measurement of the committed
+	 * DOM must still run when its ref is stable across renders.
 	 */
 	rewriteDependencies(node: ts.CallExpression, name: string) {
 		if (node.arguments.length !== DEPENDENCY_HOOKS[name]) return null;
-		if (this.strong) {
+		if (this.strong && name !== 'useLayoutEffect') {
 			this.note(
 				RULE.deps,
 				'info',

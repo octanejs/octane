@@ -21,6 +21,8 @@ import { createStrongRenderPolicy } from './strong-render-policy.js';
 import {
 	collectLazyRefIdioms,
 	lazyRefSuggestion,
+	layoutSnapshotEdits,
+	snapshotImportEditor,
 	readsLayout,
 	strongDocsUrl,
 } from './strong-fixes.js';
@@ -1759,7 +1761,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			return;
 		}
 		// Copying a measurement of the committed DOM into state is the job
-		// useLayoutSnapshot does without a second render pass. The read may sit
+		// useLayoutSnapshot does before paint. The read may sit
 		// in the effect's own setup, or in the function the update runs in: a
 		// helper setup calls, or a microtask or transition callback that still
 		// counts as setup. A setter passed directly as the callback runs in no
@@ -1790,6 +1792,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			return;
 		}
 		if (measures) {
+			const edits = layoutSnapshotEdits(
+				effect,
+				source,
+				strongHookAnalysis.callNames,
+				snapshotImport,
+			);
 			report(
 				STRONG_EFFECT_STATE_UPDATE,
 				node,
@@ -1798,6 +1806,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					{
 						hook: 'useLayoutSnapshot',
 						message: 'Replace the state and the effect with useLayoutSnapshot.',
+						...(edits && { edits }),
 					},
 				],
 			);
@@ -1973,6 +1982,15 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 			(staticExpressionValue(expression, scope) & ~NULLISH_VALUE) === 0 ||
 			definitelySkippedOptionalContinuation(unwrap(expression), scope)
 		);
+	}
+
+	let snapshotImports;
+	function snapshotImport(scope, state, effect) {
+		const existing = resolve(scope, 'useLayoutSnapshot');
+		if (existing && (existing.kind !== 'hook' || existing.hook !== 'useLayoutSnapshot'))
+			return false;
+		snapshotImports ??= snapshotImportEditor(ast, source);
+		return snapshotImports(state, effect, existing);
 	}
 
 	const layoutReaders = new WeakMap();
