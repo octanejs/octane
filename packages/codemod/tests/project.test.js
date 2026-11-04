@@ -43,10 +43,11 @@ function hasBadges(nodes: ReactNode) {
 	const badges = Children.toArray(nodes).filter(isValidElement<{className?: string}>);
 	return badges.length > 0 && badges.every(b => b.props.className === 'badge');
 }
-export function Group({ children }: {children: ReactNode}) {
+function Group({ children }: {children: ReactNode}) {
 	return <section data-matches={String(hasBadges(children))}>{children}</section>;
-}`,
-			'App.tsx': `import { Group as Panel } from './Group';
+}
+export { Group as BadgeGroup };`,
+			'App.tsx': `import { BadgeGroup as Panel } from './Group';
 export function App({ rows }: { rows: string[] }) {
 	return <Panel>{rows.map((label, i) => <b key={i} className={label}>{label}</b>)}</Panel>;
 }

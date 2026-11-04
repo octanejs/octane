@@ -634,6 +634,10 @@ class ModuleTransform {
 		const isExported = (statement: ts.Statement) =>
 			ts.canHaveModifiers(statement) &&
 			ts.getModifiers(statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+		const descriptorChildren = [...this.descriptorComponents].flatMap((d) => {
+			const statement = ts.isVariableDeclaration(d) ? d.parent.parent : d;
+			return d.name && isExported(statement) ? [d.name.getText(this.sf)] : [];
+		});
 		for (const statement of this.sf.statements) {
 			if (ts.isVariableStatement(statement)) {
 				for (const declaration of statement.declarationList.declarations) {
@@ -646,14 +650,28 @@ class ModuleTransform {
 				statement.exportClause &&
 				ts.isNamedExports(statement.exportClause)
 			) {
-				const pairs = statement.exportClause.elements.map<[string, string]>((element) => [
-					(element.propertyName ?? element.name).text,
-					element.name.text,
-				]);
 				if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+					const pairs = statement.exportClause.elements.map<[string, string]>((element) => [
+						(element.propertyName ?? element.name).text,
+						element.name.text,
+					]);
 					reexports.push({ specifier: statement.moduleSpecifier.text, names: pairs });
 				} else {
-					for (const [local, name] of pairs) if (contexts.has(local)) exported.add(name);
+					for (const element of statement.exportClause.elements) {
+						if (contexts.has((element.propertyName ?? element.name).text))
+							exported.add(element.name.text);
+						if (!this.descriptorComponents.size || statement.isTypeOnly || element.isTypeOnly)
+							continue;
+						const local =
+							this.checker.getExportSpecifierLocalTargetSymbol(element)?.valueDeclaration;
+						if (
+							local &&
+							(ts.isFunctionDeclaration(local) || ts.isVariableDeclaration(local)) &&
+							this.descriptorComponents.has(local)
+						) {
+							descriptorChildren.push(element.name.text);
+						}
+					}
 				}
 			} else if (
 				ts.isExportDeclaration(statement) &&
@@ -665,10 +683,7 @@ class ModuleTransform {
 				if (contexts.has(statement.expression.text)) exported.add('default');
 			}
 		}
-		const descriptorChildren = [...this.descriptorComponents].flatMap((d) => {
-			const statement = ts.isVariableDeclaration(d) ? d.parent.parent : d;
-			return d.name && isExported(statement) ? [d.name.getText(this.sf)] : [];
-		});
+
 		return {
 			contexts: [...exported],
 			reexports,

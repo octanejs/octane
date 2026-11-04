@@ -62,3 +62,17 @@ function Untouched({ children }) {
 function Label({ children }) { return <p>{count(children, [])}</p>; }`;
 	expect(transformModule(source, 'count.jsx').code).not.toContain('descriptorChildren');
 });
+
+it('reports named value exports of marked local declarations', () => {
+	const source = `import { Children } from 'react';
+export { Badge as Panel };
+export { Badge as Other } from './other';
+export type { Badge as TypeOnly };
+export { type Badge as AlsoTypeOnly };
+export function Direct({ children }) { return <i>{Children.count(children)}</i>; }
+const Badge = ({ children }) => <b>{Children.count(children)}</b>;`;
+	expect(transformModule(source, 'group.tsx').exports.descriptorChildren?.sort()).toEqual([
+		'Direct',
+		'Panel',
+	]);
+});
