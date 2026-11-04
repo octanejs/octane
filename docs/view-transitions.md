@@ -31,7 +31,10 @@ A boundary only activates on **transition-lane** commits — updates inside
 An urgent update skips a transition only while it is still preparing; once its
 `ready` promise resolves, the urgent commit updates the live DOM under the running
 animation. Removing the last element-scoped boundary on a host still skips that
-host's animation.
+host's animation. As in React, a commit starts no native transition unless a
+boundary wraps the changed content, sits inside it, or sits within one host
+element of its siblings; boundaries elsewhere on the page or in another root do
+not count.
 Event handlers can opt updates into animation with `startTransition`. Octane uses the native options overload (`document.startViewTransition({ update, types })`)
 and detects older callback-only implementations once per native function. Those
 implementations animate without native transition types. Without the native API,

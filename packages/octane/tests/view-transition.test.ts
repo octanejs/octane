@@ -582,22 +582,15 @@ describe('ViewTransition features', () => {
 		await act(async () => {});
 	});
 
-	it('skips an asynchronous native transition when a click touches no boundary', async () => {
+	it('starts no native transition when a click touches no boundary', async () => {
 		let calls = 0;
-		let skips = 0;
 		(document as never as Record<string, unknown>)['startViewTransition'] = (
 			input: (() => void) | { update: () => void },
 		) => {
 			calls++;
 			const update = typeof input === 'function' ? input : input.update;
 			const updated = Promise.resolve().then(update);
-			return {
-				ready: updated,
-				finished: updated,
-				skipTransition: () => {
-					skips++;
-				},
-			};
+			return { ready: updated, finished: updated, skipTransition() {} };
 		};
 
 		await act(() => root.render(PlainClickApp));
@@ -606,8 +599,8 @@ describe('ViewTransition features', () => {
 			await Promise.resolve();
 		});
 
-		expect(calls).toBe(1);
-		expect(skips).toBe(1);
+		// A document transition here would hit-test the next click to <html>.
+		expect(calls).toBe(0);
 		expect(container.querySelector('div')?.textContent).toBe('Count: 1');
 	});
 

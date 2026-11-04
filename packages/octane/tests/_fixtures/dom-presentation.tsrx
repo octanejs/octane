@@ -1,5 +1,5 @@
 import { unbound } from 'octane/behavior';
-import { Hydrate, use, type OctaneNode } from 'octane';
+import { Hydrate, ViewTransition, use, type OctaneNode } from 'octane';
 import type { HydrationStrategy } from 'octane/hydration';
 import type { SignalHandle } from 'octane/signals';
 import type { SignalCSSProperties } from 'octane/jsx-runtime';
@@ -119,6 +119,12 @@ export function LoginPresentation(props: LoginPresentationProps) @{
 		</p>
 		<SubmitButton label={props.submitLabel} disabled={props.pending} pending={props.pending} />
 	</form>
+}
+
+export function AnimatedLoginPresentation(props: LoginPresentationProps) @{
+	<ViewTransition>
+		<LoginPresentation {...props} />
+	</ViewTransition>
 }
 
 export interface AttachmentPresentationItem {

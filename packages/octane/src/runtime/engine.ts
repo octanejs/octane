@@ -212,6 +212,7 @@ import {
 	vtPreview,
 	vtLeaving,
 	vtPendingCaptureElements,
+	vtContains,
 } from './view-transition.js';
 import {
 	ensureHooks,
@@ -2946,10 +2947,6 @@ function vtFlush(
 	// argument takes the default.
 	if (queuedOwners === undefined) queuedOwners = vtQueuedOwners();
 	if (queuedBlocks === undefined) queuedBlocks = QUEUE.slice();
-	const parent = QUEUE[0]?.parentNode;
-	const defaultOwner = (
-		parent?.nodeType === 9 ? parent : (parent?.ownerDocument ?? document)
-	) as VTOwner;
 	const types = VT_PENDING_TYPES;
 	VT_PENDING_TYPES = [];
 	const groups = new Map<VTOwner, VtGroup>();
@@ -2992,6 +2989,24 @@ function vtFlush(
 		groups.set(owner, group);
 		return group;
 	};
+	// React's commit walk measures only boundaries on the changed path, inside it,
+	// or within one host of its siblings (commitNestedViewTransitions). Others
+	// start no native transition, even when none is left to animate.
+	const sources = queuedBlocks;
+	const rootOf = (block: Block): Block => {
+		while (block.parentBlock !== null) block = block.parentBlock;
+		return block;
+	};
+	const related = (block: Block): boolean =>
+		sources.length === 0 ||
+		sources.some(
+			(source) =>
+				source === block ||
+				blockIsAncestorOf(source, block) ||
+				(rootOf(source) === rootOf(block) &&
+					vtContains(block.parentNode.parentNode ?? block.parentNode, source.parentNode)),
+		);
+	let unrelated: Set<Block> | null = null;
 	for (const block of VT_REGISTRY) {
 		if (block.disposed) {
 			VT_REGISTRY.delete(block);
@@ -3015,6 +3030,10 @@ function vtFlush(
 			const record = { block, props, els, name };
 			if (before === undefined) unmeasured.set(owner, [record]);
 			else before.push(record);
+			continue;
+		}
+		if (!related(block)) {
+			(unrelated ??= new Set()).add(block);
 			continue;
 		}
 		const group = getGroup(owner);
@@ -3075,6 +3094,7 @@ function vtFlush(
 				const owner = vtScopeForBlock(block);
 				if (
 					owner === null ||
+					unrelated?.has(block) ||
 					(queuedOwners !== null &&
 						!queuedOwners.has(owner) &&
 						!queuedBlocks.some((source) => blockIsAncestorOf(source, block)))
@@ -3138,9 +3158,6 @@ function vtFlush(
 		}
 	}
 	unmeasured = null;
-	// Keep the document API's no-boundary skip behavior. A declaration with
-	// no usable host must not turn into this document fallback.
-	if (groups.size === 0 && !hasScopedBoundary) getGroup(defaultOwner);
 	const participants = [...groups.values()].filter(
 		(group) =>
 			group.valid && (!hasScopedBoundary || group.recs.length > 0 || group.planned.size > 0),

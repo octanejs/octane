@@ -377,7 +377,7 @@ function vtParent(node: Node): Node | null {
 		: node.parentNode;
 }
 
-function vtContains(host: Node, node: Node | null): boolean {
+export function vtContains(host: Node, node: Node | null): boolean {
 	for (; node !== null; node = vtParent(node)) if (node === host) return true;
 	return false;
 }
