@@ -198,6 +198,17 @@ export function App(props) @{
 		);
 	});
 
+	it.each(['event', 'alias'])('rejects removing an explicit dependency on %s', (entry) => {
+		const source = strong(
+			app(`const event = useEffectEvent(() => props.value);
+			const alias = event;
+			useEffect(() => { event(); }, [${entry}]);`),
+		);
+		expect(compileToVolarMappings(source, '/src/App.tsrx').diagnostics).toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: EXPLICIT, severity: 'error' })]),
+		);
+	});
+
 	it('retains Effect Event dependency errors', () => {
 		const source = app(
 			'const event = useEffectEvent(() => console.log(props.value)); useEffect(() => event(), [event]);',
