@@ -20,6 +20,7 @@ import {
 	MaximumUpdateDepthError,
 	reportEffectError,
 	runEffectBody,
+	LAYOUT_SNAPSHOT_DRIVER,
 } from './engine.js';
 import { nodeProto } from '../dom-focused-move.js';
 import { hydrationStarted } from '../hydration-flag.js';
@@ -226,6 +227,7 @@ export function hasScheduledWork(): boolean {
 	return (
 		QUEUE.length > 0 ||
 		ROOT_RENDER_TRANSACTIONS.length > 0 ||
+		(LAYOUT_SNAPSHOT_DRIVER !== null && LAYOUT_SNAPSHOT_DRIVER.pending !== null) ||
 		(TRANSITION_ROOT_DRIVER ? PENDING_SIGNAL_PROMOTIONS !== null : false) ||
 		effectEventQueue.length > 0 ||
 		effectEventCommitActions.length > 0 ||
@@ -496,8 +498,14 @@ export function runRegisteredLayoutEffects(q: PendingEffect[]): void {
 	for (let i = 0; i < q.length; i++) {
 		const e = q[i];
 		if (e.phase !== LAYOUT) continue;
-		if (e.scope.block.disposed || inInactiveSubtree(e.scope.block)) continue;
-		runEffectBody(e);
+		// The marker follows the callback when a retained scope reconnects it.
+		if (
+			LAYOUT_SNAPSHOT_DRIVER !== null &&
+			e.fn !== null &&
+			LAYOUT_SNAPSHOT_DRIVER.effects.has(e.fn)
+		)
+			LAYOUT_SNAPSHOT_DRIVER.stage(e);
+		else if (!e.scope.block.disposed && !inInactiveSubtree(e.scope.block)) runEffectBody(e);
 	}
 }
 

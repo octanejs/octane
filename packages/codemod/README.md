@@ -121,7 +121,10 @@ A React layout effect with no dependency list runs after every commit. When its
 only work is copying a local element's width, height, or form membership into
 adjacent state, the compiler can replace both hooks with `useLayoutSnapshot`.
 The original state initializer supplies the server and first-render value.
-Other every-commit layout effects retain their schedule in compatibility mode.
+The migrated hook measures after synchronous layout updates settle. For a
+measurement that must run at a specific point among layout effects, keep
+`useLayoutEffect(measure, null)` in compatibility mode. The explicit `null`
+keeps the every-commit schedule.
 
 With `--strong`, each template module starts with `"use strong"` and is
 compiled in Strong mode. The codemod applies the compiler's own suggested fixes
