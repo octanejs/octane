@@ -377,6 +377,18 @@ export let VIEW_TRANSITION_DRIVER: ViewTransitionDriver | null = null;
 /** Renderer listeners own update priority, not delegated DOM propagation. */
 export let RENDERER_DISCRETE_EVENT_DEPTH = 0;
 export let DEFERRED_LAYOUT_DRIVER: DeferredLayoutDriver | null = null;
+
+type LayoutSnapshots = Map<HookSlot, PendingEffect>;
+type LayoutSnapshotUpdate = { effect: PendingEffect; publish: Cleanup };
+
+// The hook registers the driver so clients without snapshots can omit the read path.
+export let LAYOUT_SNAPSHOT_DRIVER: {
+	effects: WeakSet<EffectFn>;
+	pending: LayoutSnapshots | null;
+	stage: typeof enqueueLayoutSnapshot;
+	measure: typeof drainLayoutSnapshots;
+} | null = null;
+
 // A ViewTransition's drain renders without committing: its root transactions
 // commit inside the native update callback (vtFlush).
 let HOLDING_ROOT_COMMITS = false;
@@ -2653,7 +2665,12 @@ export function flush(): void {
 	// Re-entrancy backstop (see `inFlush`): a flush landing inside an active
 	// flush re-arms the scheduler instead of draining over the outer walk.
 	if (inFlush) {
-		if (hasLayoutWork() && !scheduled) {
+		if (
+			!scheduled &&
+			(QUEUE.length > 0 ||
+				ROOT_RENDER_TRANSACTIONS.length > 0 ||
+				(LAYOUT_SNAPSHOT_DRIVER !== null && LAYOUT_SNAPSHOT_DRIVER.pending !== null))
+		) {
 			scheduled = true;
 			queueMicrotask(flush);
 		}
@@ -2754,17 +2771,6 @@ export function captureFocusedMovement(
 	(renderingFocusMoves ??= []).push({ snapshot, ancestors });
 }
 
-type LayoutSnapshots = Map<HookSlot, PendingEffect>;
-type LayoutSnapshotUpdate = { effect: PendingEffect; publish: Cleanup };
-
-// The hook registers the driver so clients without snapshots can omit the read path.
-export let LAYOUT_SNAPSHOT_DRIVER: {
-	effects: WeakSet<EffectFn>;
-	pending: LayoutSnapshots | null;
-	stage: typeof enqueueLayoutSnapshot;
-	measure: typeof drainLayoutSnapshots;
-} | null = null;
-
 export function markLayoutSnapshotEffect(fn: EffectFn): EffectFn {
 	(LAYOUT_SNAPSHOT_DRIVER ??= {
 		effects: new WeakSet(),
@@ -2781,14 +2787,6 @@ function enqueueLayoutSnapshot(effect: PendingEffect): void {
 	(LAYOUT_SNAPSHOT_DRIVER!.pending ??= new Map()).set(effect.slot, effect);
 	// Detached boundary commits can run without a surrounding scheduler drain.
 	if (!inFlush && !syncFlush && !scheduled) requestFlush();
-}
-
-function hasLayoutWork(): boolean {
-	return (
-		QUEUE.length > 0 ||
-		ROOT_RENDER_TRANSACTIONS.length > 0 ||
-		(LAYOUT_SNAPSHOT_DRIVER !== null && LAYOUT_SNAPSHOT_DRIVER.pending !== null)
-	);
 }
 
 function layoutSnapshotIsCurrent(effect: PendingEffect): boolean {
@@ -2921,7 +2919,9 @@ function flushWork(): void {
 			if (
 				!HOLDING_ROOT_COMMITS &&
 				(!DEFERRED_LAYOUT_DRIVER || !DEFERRED_LAYOUT_DRIVER.capturing()) &&
-				hasLayoutWork()
+				(QUEUE.length > 0 ||
+					ROOT_RENDER_TRANSACTIONS.length > 0 ||
+					(LAYOUT_SNAPSHOT_DRIVER !== null && LAYOUT_SNAPSHOT_DRIVER.pending !== null))
 			)
 				pendingError = drainLayoutUpdates(pendingError);
 			if (pendingError !== null) throw pendingError.err;
@@ -3658,7 +3658,13 @@ export function flushSync<T>(fn: () => T): T {
 				// Drain those passes before DOM observers can see intermediate state.
 				// The existing nested-update guard and LAYOUT_CASCADE_LIMIT bound loops;
 				// any remaining work retains its per-chain count in the async scheduler.
-				if (hasLayoutWork()) pendingError = drainLayoutUpdates(pendingError);
+				// Keep both queue checks inline to avoid extra calls on ordinary commits.
+				if (
+					QUEUE.length > 0 ||
+					ROOT_RENDER_TRANSACTIONS.length > 0 ||
+					(LAYOUT_SNAPSHOT_DRIVER !== null && LAYOUT_SNAPSHOT_DRIVER.pending !== null)
+				)
+					pendingError = drainLayoutUpdates(pendingError);
 			} finally {
 				inFlush = false;
 				if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.endCue();
@@ -3668,7 +3674,15 @@ export function flushSync<T>(fn: () => T): T {
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__devtoolsNotifyFlush();
 			}
-			if (hasLayoutWork() && !scheduled) requestFlush();
+			if (
+				!scheduled &&
+				(QUEUE.length > 0 ||
+					ROOT_RENDER_TRANSACTIONS.length > 0 ||
+					(LAYOUT_SNAPSHOT_DRIVER !== null && LAYOUT_SNAPSHOT_DRIVER.pending !== null))
+			) {
+				scheduled = true;
+				queueMicrotask(flush);
+			}
 			if (pendingError !== null) throw pendingError.err;
 		} finally {
 			syncFlush = prevSync;
@@ -4093,7 +4107,11 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 				for (const store of laterStores) storeSyncQueue.push(store);
 			}
 			if (interrupted) restoreDeferredPassives(capture);
-			if (hasLayoutWork()) {
+			if (
+				QUEUE.length > 0 ||
+				ROOT_RENDER_TRANSACTIONS.length > 0 ||
+				(LAYOUT_SNAPSHOT_DRIVER !== null && LAYOUT_SNAPSHOT_DRIVER.pending !== null)
+			) {
 				const error = drainLayoutUpdates(null);
 				if (error !== null) throw error.err;
 			}
