@@ -785,7 +785,7 @@ describe('octane analyze Strong migration', () => {
 				'export function Loop({ value }) @{\n' +
 				'\tuseEffect(() => { observe(value); }, [value]);\n' +
 				'\tfor (const item of [1, 2]) {\n' +
-				'\t\tconst [current] = useState(item);\n' +
+				'\t\tconst [current, _setCurrent] = useState(item);\n' +
 				'\t}\n' +
 				'\t<div />\n' +
 				'}\n',
@@ -820,12 +820,13 @@ describe('octane analyze Strong migration', () => {
 		const result = await run(root, ['--strong-preview']);
 		expect(result.exitCode).toBe(0);
 		expect(result.json().strongPreview).toEqual({
-			findings: 3,
+			findings: 4,
 			modules: 1,
 			byCode: {
 				OCTANE_STRONG_TSX_MODULE: 1,
 				OCTANE_STRONG_RENDER_REF_READ: 1,
 				OCTANE_STRONG_RENDER_REF_WRITE: 1,
+				OCTANE_STRONG_READ_ONLY_STATE: 1,
 			},
 		});
 		expect(result.json().findings.every((/** @type {{ preview?: true }} */ f) => f.preview)).toBe(
@@ -856,12 +857,13 @@ describe('octane analyze Strong migration', () => {
 				'  return <button onClick={add}>{String(total) + String(open)}</button>;\n' +
 				'}\n',
 		);
-		// What remains is reported from the rewritten module: only the `.tsx`
-		// module itself, which has to become `.tsrx` before it can be Strong.
-		expect(result.json().findings).toEqual([
-			expect.objectContaining({ code: 'OCTANE_STRONG_TSX_MODULE', preview: true }),
-		]);
-		expect(result.json().strongPreview.findings).toBe(1);
+		expect(result.json().findings).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ code: 'OCTANE_STRONG_TSX_MODULE', preview: true }),
+				expect.objectContaining({ code: 'OCTANE_STRONG_READ_ONLY_STATE', preview: true }),
+			]),
+		);
+		expect(result.json().strongPreview.findings).toBe(2);
 	});
 
 	it('falls back to the first error with an older compiler that cannot collect', async () => {

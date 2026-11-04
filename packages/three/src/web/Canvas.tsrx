@@ -165,11 +165,6 @@ export function Canvas({
 	const [size, setSize] = useState<Size | null>(null);
 	const [boundaryMount, setBoundaryMount] = useState<ThreeBoundaryMount | null>(null);
 	const [error, setError] = useState<Error | null>(null);
-	const [initialEventSource] = useState(() => ({
-		source: eventSource,
-		target: resolveEventSource(eventSource, null),
-		prefix: eventPrefix,
-	}));
 	const eventSnapshot = useLayoutSnapshot(
 		() => {
 			const wrapper = wrapperRef.current;
@@ -181,7 +176,11 @@ export function Canvas({
 			};
 		},
 		{
-			initial: initialEventSource,
+			initial: {
+				source: eventSource,
+				target: eventSource !== undefined && !('current' in eventSource) ? eventSource : null,
+				prefix: eventPrefix,
+			},
 			equal: (previous, next) =>
 				previous.source === next.source &&
 				previous.target === next.target &&

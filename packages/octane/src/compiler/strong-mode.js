@@ -15,7 +15,7 @@ import {
 	SNAPSHOT_MUTATION_MESSAGE,
 	STRONG_SNAPSHOT_MUTATION,
 } from './strong-state.js';
-import { analyzeStrongWriteOnlyState } from './strong-write-only-state.js';
+import { analyzeStrongStateUsage } from './strong-state-usage.js';
 import { analyzeStrongExternalStore } from './strong-external-store.js';
 import { createStrongRenderPolicy } from './strong-render-policy.js';
 import {
@@ -6248,6 +6248,12 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 
 	for (const statement of ast.body ?? []) visit(statement, moduleScope, 'module');
+	analyzeStrongStateUsage(ast, strongHookAnalysis, (code, node, message, initializer) => {
+		// Report the discarded setter instead of suggesting a lazy state initializer
+		// for an eager prop capture that would still have no way to update.
+		if (initializer !== undefined) unlinkedPropInitializers.delete(initializer);
+		report(code, node, message);
+	});
 	for (const initial of unlinkedPropInitializers) {
 		report(
 			STRONG_UNLINKED_PROP_STATE,
@@ -6285,10 +6291,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 	templatePolicy.finish();
 	const stateDiagnostic = (code, node, message) => diagnostic(code, filename, node, message);
-	diagnostics.push(
-		...analyzeStrongWriteOnlyState(ast, strongHookAnalysis, stateDiagnostic),
-		...analyzeStrongExternalStore(ast, strongHookAnalysis, stateDiagnostic),
-	);
+	diagnostics.push(...analyzeStrongExternalStore(ast, strongHookAnalysis, stateDiagnostic));
 	for (const policy of analyzeStrongHookPolicies(ast, options)) {
 		diagnostics.push({
 			...diagnostic(policy.code, filename, policy.node, policy.message),

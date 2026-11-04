@@ -79,6 +79,10 @@
       "rule": "The adapter may opt into Strong, render its body as a template, and replace the plugin/title JSX maps with keyed @for blocks. Keep the same conditions, container-ID keys, targets, and content; infer the existing memo/effect dependencies from unchanged callbacks."
     },
     {
+      "kind": "stable-instance-ref",
+      "rule": "The setter-less lazy state that owns the Devtools core instance becomes useLazyRef with the same factory. The existing configuration and mount effects read that same ref."
+    },
+    {
       "kind": "export-surface",
       "rule": "Every upstream export must remain after rename transforms; adapted-only extras require allowedExtraExports"
     },

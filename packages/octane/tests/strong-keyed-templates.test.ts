@@ -588,7 +588,7 @@ it('preserves setup locals across a keyed Fragment during server rendering and h
 			@{
 				const label = value;
 				<Fragment key={label}>
-					@{ const [text] = useState(() => label); <span>{text}</span> }
+					@{ const [text, _setText] = useState(() => label); <span>{text}</span> }
 				</Fragment>
 			}
 		}

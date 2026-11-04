@@ -1943,7 +1943,7 @@ describe('Strong hookful lite edges', () => {
 				</button>
 			}
 			function Reader(props) @{
-				const [seen] = useState(() => props.resource.label);
+				const [seen, _setSeen] = useState(() => props.resource.label);
 				const log = props.log;
 				useEffect(() => {
 					log('read:' + seen);

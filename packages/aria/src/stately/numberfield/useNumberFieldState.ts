@@ -18,7 +18,7 @@ import type {
 	ValueBase,
 } from '@react-types/shared';
 import { NumberFormatter, NumberParser } from '@internationalized/number';
-import { useCallback, useLinkedState, useMemo, useState } from 'octane';
+import { useCallback, useLinkedState, useMemo } from 'octane';
 
 import type { FocusableProps } from '../../interactions/useFocusable';
 
@@ -174,7 +174,8 @@ export function useNumberFieldState(...args: any[]): NumberFieldState {
 		onChange,
 		subSlot(slot, 'number'),
 	);
-	let [initialValue] = useState(numberValue, subSlot(slot, 'initial'));
+	// Keep the mounted number as the form-reset fallback.
+	const initialValue = useMemo(() => numberValue, [], subSlot(slot, 'initial'));
 	const providedFormatOptions = formatOptions;
 	// Normalize parser rounding options before linked-source comparison or formatting.
 	let [numberParser, normalizedFormatOptions] = useMemo(

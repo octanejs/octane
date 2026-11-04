@@ -555,7 +555,7 @@ const STRONG_CHAINED_CALCULATIONS = `
 
 	// The hoisted calculation reads reader, whose callback reads a later const.
 	export function StrongForwardRead({ project, make }: Probes) @{
-		const [rows] = useState<readonly Row[]>([{ id: 1, n: 1 }]);
+		const [rows, _setRows] = useState<readonly Row[]>([{ id: 1, n: 1 }]);
 		const reader = make(() => labels);
 		const labels = project(rows);
 		<span id="strong-forward-read">{reader.read().join(',') as string}</span>

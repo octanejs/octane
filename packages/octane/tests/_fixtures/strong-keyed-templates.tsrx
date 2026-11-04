@@ -1,6 +1,6 @@
 'use strong';
 
-import { createContext, Fragment, useContext, useEffect, useState } from 'octane';
+import { createContext, Fragment, useContext, useEffect, useLazyRef, useState } from 'octane';
 import { query$ } from 'octane/signals';
 
 const Channel = createContext('outside');
@@ -69,8 +69,8 @@ export function ResourceGroup(props: {
 
 export function SpreadChild(props: { label: string; subscribe: Subscribe; tail?: string }) @{
 	const [count, setCount] = useState(0);
-	const [initialLabel] = useState(() => props.label);
-	useEffect(() => props.subscribe(initialLabel));
+	const initialLabel = useLazyRef(() => props.label);
+	useEffect(() => props.subscribe(initialLabel.current));
 	<button
 		onClick={() => setCount(count + 1)}
 	>{`${props.label}:${count}:${props.tail ?? ''}`}</button>

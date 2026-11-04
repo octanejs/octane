@@ -357,6 +357,7 @@ export function ControlledNumberFieldHarness(props: NumberFieldStateOptions & { 
 			</button>
 			<output data-testid="input">{'in:' + state.inputValue}</output>
 			<output data-testid="number">{'n:' + state.numberValue}</output>
+			<output data-testid="default">{String(state.defaultNumberValue)}</output>
 			<output data-testid="valid">{'valid:' + state.validate(draft)}</output>
 		</div>
 	);

@@ -375,7 +375,7 @@ export function Loop({ value }) @{
 		// Slotting this module's hooks fails after Strong analysis passes it.
 		const slotted = hinted.replace(
 			'\t<div />',
-			'\tfor (const item of [1, 2]) {\n\t\tconst [current] = useState(item);\n\t}\n\t<div />',
+			'\tfor (const item of [1, 2]) {\n\t\tconst [current, _setCurrent] = useState(item);\n\t}\n\t<div />',
 		);
 		for (const options of [
 			{ mode: 'client', dev: true },

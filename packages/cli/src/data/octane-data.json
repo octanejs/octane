@@ -7279,6 +7279,12 @@
         "replacement": "Use the updater form, `setValue((current) => current + 1)`, compute from the state a reducer receives, or read the latest value with the state getter (the third tuple member).",
         "url": "https://octanejs.dev/docs/strong-mode#octane-strong-stale-state-update"
       },
+      "OCTANE_STRONG_READ_ONLY_STATE": {
+        "severity": "error",
+        "detects": "A declaration takes the value from a `useState` call and discards its setter, for example `const [value] = useState(initial)` or `const value = useState(initial)[0]`. This includes lazy initializers.",
+        "replacement": "Derive render values from their inputs. For values kept for events or effects, use `useRef(value)` or `useLazyRef(() => createValue())` for one-time initialization.",
+        "url": "https://octanejs.dev/docs/strong-mode#octane-strong-read-only-state"
+      },
       "OCTANE_STRONG_WRITE_ONLY_STATE": {
         "severity": "error",
         "detects": "A state tuple whose value is elided, unused, or read only to compute its own next value, whose getter is absent or unused, and whose setter is used. This is the force-update pattern, including `useReducer((x) => x + 1, 0)` and `useState(0)[1]`.",
