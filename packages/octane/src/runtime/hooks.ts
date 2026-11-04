@@ -48,14 +48,9 @@ import {
 	countLayoutSnapshotChange,
 	WARM_EVER,
 	recordRealWarmMemo,
-} from './engine.js';
-import {
-	PASSIVE,
-	LAYOUT,
-	INSERTION,
-	checkStoreChanged,
 	markLayoutSnapshotEffect,
-} from './effects.js';
+} from './engine.js';
+import { PASSIVE, LAYOUT, INSERTION, checkStoreChanged } from './effects.js';
 import { type WarmEntry, WARM_MISS, claimWarmMemoRecord, adoptWarmEntry } from './use.js';
 import {
 	type HookUpdate,

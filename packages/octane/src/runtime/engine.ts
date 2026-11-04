@@ -2757,18 +2757,38 @@ export function captureFocusedMovement(
 type LayoutSnapshots = Map<HookSlot, PendingEffect>;
 type LayoutSnapshotUpdate = { effect: PendingEffect; publish: Cleanup };
 
-export let pendingLayoutSnapshots: LayoutSnapshots | null = null;
+// The hook registers the driver so clients without snapshots can omit the read path.
+export let LAYOUT_SNAPSHOT_DRIVER: {
+	effects: WeakSet<EffectFn>;
+	pending: LayoutSnapshots | null;
+	stage: typeof enqueueLayoutSnapshot;
+	measure: typeof drainLayoutSnapshots;
+} | null = null;
 
-export function enqueueLayoutSnapshot(effect: PendingEffect): void {
+export function markLayoutSnapshotEffect(fn: EffectFn): EffectFn {
+	(LAYOUT_SNAPSHOT_DRIVER ??= {
+		effects: new WeakSet(),
+		pending: null,
+		stage: enqueueLayoutSnapshot,
+		measure: drainLayoutSnapshots,
+	}).effects.add(fn);
+	return fn;
+}
+
+function enqueueLayoutSnapshot(effect: PendingEffect): void {
 	// A superseded entry must not replace the callback from a later commit.
 	if (!layoutSnapshotIsCurrent(effect)) return;
-	(pendingLayoutSnapshots ??= new Map()).set(effect.slot, effect);
+	(LAYOUT_SNAPSHOT_DRIVER!.pending ??= new Map()).set(effect.slot, effect);
 	// Detached boundary commits can run without a surrounding scheduler drain.
 	if (!inFlush && !syncFlush && !scheduled) requestFlush();
 }
 
 function hasLayoutWork(): boolean {
-	return QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0 || pendingLayoutSnapshots !== null;
+	return (
+		QUEUE.length > 0 ||
+		ROOT_RENDER_TRANSACTIONS.length > 0 ||
+		(LAYOUT_SNAPSHOT_DRIVER !== null && LAYOUT_SNAPSHOT_DRIVER.pending !== null)
+	);
 }
 
 function layoutSnapshotIsCurrent(effect: PendingEffect): boolean {
@@ -2815,7 +2835,7 @@ function drainLayoutSnapshots(snapshots: LayoutSnapshots): void {
 			}
 		}
 	} catch (error) {
-		pendingLayoutSnapshots = null;
+		LAYOUT_SNAPSHOT_DRIVER!.pending = null;
 		throw error;
 	} finally {
 		TRANSITION_DEPTH = transitionDepth;
@@ -2831,10 +2851,11 @@ function drainLayoutSnapshots(snapshots: LayoutSnapshots): void {
 function drainLayoutUpdates(pendingError: { err: any } | null): { err: any } | null {
 	for (let guard = 0; ; guard++) {
 		if (QUEUE.length === 0 && ROOT_RENDER_TRANSACTIONS.length === 0) {
-			if (pendingLayoutSnapshots === null) break;
-			drainLayoutSnapshots(pendingLayoutSnapshots);
+			const driver = LAYOUT_SNAPSHOT_DRIVER;
+			if (driver === null || driver.pending === null) break;
+			driver.measure(driver.pending);
 			if (QUEUE.length === 0 && ROOT_RENDER_TRANSACTIONS.length === 0) {
-				pendingLayoutSnapshots = null;
+				driver.pending = null;
 				if (EFFECT_COMMIT_DEPTH === 0) settleNestedUpdateChain();
 				break;
 			}
@@ -4011,8 +4032,8 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 		const previousCompleting = COMPLETING_DEFERRED_LAYOUT;
 		const previousHeldWork = DEFERRED_LAYOUT_HELD_WORK;
 		// This capture must settle only its own reads and corrective writes.
-		const previousSnapshots = pendingLayoutSnapshots;
-		pendingLayoutSnapshots = null;
+		const previousSnapshots = LAYOUT_SNAPSHOT_DRIVER?.pending ?? null;
+		if (LAYOUT_SNAPSHOT_DRIVER !== null) LAYOUT_SNAPSHOT_DRIVER.pending = null;
 		const heldWork: Block[] = [];
 		if (!interrupted) {
 			const queued = QUEUE.splice(0);
@@ -4099,12 +4120,12 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 				ROOT_RENDER_TRANSACTIONS = heldTransactions.concat(ROOT_RENDER_TRANSACTIONS);
 				QUEUE_REINDEX_EPOCH++;
 			}
-			if (previousSnapshots !== null) {
-				const remaining = pendingLayoutSnapshots as LayoutSnapshots | null;
+			if (LAYOUT_SNAPSHOT_DRIVER !== null && previousSnapshots !== null) {
+				const remaining = LAYOUT_SNAPSHOT_DRIVER.pending;
 				if (remaining !== null) {
 					for (const [slot, effect] of remaining) previousSnapshots.set(slot, effect);
 				}
-				pendingLayoutSnapshots = previousSnapshots;
+				LAYOUT_SNAPSHOT_DRIVER.pending = previousSnapshots;
 			}
 			COMPLETING_DEFERRED_LAYOUT = previousCompleting;
 			DEFERRED_LAYOUT_HELD_WORK = previousHeldWork;
@@ -4169,7 +4190,7 @@ export function commitEffects(): void {
 		// are hot, and only a settled hold needs the out-of-line path.
 		if (EFFECT_COMMIT_DEPTH === 0) {
 			if (NESTED_UPDATE_SCHEDULED) NESTED_UPDATE_SCHEDULED = false;
-			else if (pendingLayoutSnapshots === null) {
+			else if (LAYOUT_SNAPSHOT_DRIVER === null || LAYOUT_SNAPSHOT_DRIVER.pending === null) {
 				if (HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID) settleNestedUpdateChain();
 				else NESTED_UPDATE_CHAIN_ID++;
 			}
@@ -4232,7 +4253,7 @@ export function commitEffects(): void {
 		// commit or in a passive drain (flushSync from a passive effect) never reset it.
 		if (EFFECT_COMMIT_DEPTH === 1) {
 			if (NESTED_UPDATE_SCHEDULED) NESTED_UPDATE_SCHEDULED = false;
-			else if (pendingLayoutSnapshots === null) {
+			else if (LAYOUT_SNAPSHOT_DRIVER === null || LAYOUT_SNAPSHOT_DRIVER.pending === null) {
 				if (HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID) settleNestedUpdateChain();
 				else NESTED_UPDATE_CHAIN_ID++;
 			}

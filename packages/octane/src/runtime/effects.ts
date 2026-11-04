@@ -20,8 +20,7 @@ import {
 	MaximumUpdateDepthError,
 	reportEffectError,
 	runEffectBody,
-	enqueueLayoutSnapshot,
-	pendingLayoutSnapshots,
+	LAYOUT_SNAPSHOT_DRIVER,
 } from './engine.js';
 import { nodeProto } from '../dom-focused-move.js';
 import { hydrationStarted } from '../hydration-flag.js';
@@ -32,7 +31,6 @@ import type {
 	Cleanup,
 	Block,
 	EffectSlot,
-	EffectFn,
 	PendingEffect,
 	RootRenderTransaction,
 	StoreInst,
@@ -86,13 +84,6 @@ export const INSERTION = 0,
 
 export const effectQueues: [PendingEffect[], PendingEffect[], PendingEffect[]] = [[], [], []];
 export let passiveScheduled = false;
-
-let layoutSnapshotEffects: WeakSet<EffectFn> | null = null;
-
-export function markLayoutSnapshotEffect(fn: EffectFn): EffectFn {
-	(layoutSnapshotEffects ??= new WeakSet()).add(fn);
-	return fn;
-}
 
 export function inNestedUpdateCallback(): boolean {
 	return EFFECT_BODY_DEPTH > 0 || REF_CALLBACK_DEPTH > 0 || STORE_SYNC_DEPTH > 0;
@@ -236,7 +227,7 @@ export function hasScheduledWork(): boolean {
 	return (
 		QUEUE.length > 0 ||
 		ROOT_RENDER_TRANSACTIONS.length > 0 ||
-		pendingLayoutSnapshots !== null ||
+		(LAYOUT_SNAPSHOT_DRIVER !== null && LAYOUT_SNAPSHOT_DRIVER.pending !== null) ||
 		(TRANSITION_ROOT_DRIVER ? PENDING_SIGNAL_PROMOTIONS !== null : false) ||
 		effectEventQueue.length > 0 ||
 		effectEventCommitActions.length > 0 ||
@@ -508,8 +499,12 @@ export function runRegisteredLayoutEffects(q: PendingEffect[]): void {
 		const e = q[i];
 		if (e.phase !== LAYOUT) continue;
 		// The marker follows the callback when a retained scope reconnects it.
-		if (layoutSnapshotEffects !== null && e.fn !== null && layoutSnapshotEffects.has(e.fn))
-			enqueueLayoutSnapshot(e);
+		if (
+			LAYOUT_SNAPSHOT_DRIVER !== null &&
+			e.fn !== null &&
+			LAYOUT_SNAPSHOT_DRIVER.effects.has(e.fn)
+		)
+			LAYOUT_SNAPSHOT_DRIVER.stage(e);
 		else if (!e.scope.block.disposed && !inInactiveSubtree(e.scope.block)) runEffectBody(e);
 	}
 }
