@@ -2653,7 +2653,7 @@ export function flush(): void {
 	// Re-entrancy backstop (see `inFlush`): a flush landing inside an active
 	// flush re-arms the scheduler instead of draining over the outer walk.
 	if (inFlush) {
-		if ((QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) && !scheduled) {
+		if (hasLayoutWork() && !scheduled) {
 			scheduled = true;
 			queueMicrotask(flush);
 		}
@@ -2754,12 +2754,92 @@ export function captureFocusedMovement(
 	(renderingFocusMoves ??= []).push({ snapshot, ancestors });
 }
 
+type LayoutSnapshots = Map<HookSlot, PendingEffect>;
+type LayoutSnapshotUpdate = { effect: PendingEffect; publish: Cleanup };
+
+export let pendingLayoutSnapshots: LayoutSnapshots | null = null;
+
+export function enqueueLayoutSnapshot(effect: PendingEffect): void {
+	// A superseded entry must not replace the callback from a later commit.
+	if (!layoutSnapshotIsCurrent(effect)) return;
+	(pendingLayoutSnapshots ??= new Map()).set(effect.slot, effect);
+	// Detached boundary commits can run without a surrounding scheduler drain.
+	if (!inFlush && !syncFlush && !scheduled) requestFlush();
+}
+
+function hasLayoutWork(): boolean {
+	return QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0 || pendingLayoutSnapshots !== null;
+}
+
+function layoutSnapshotIsCurrent(effect: PendingEffect): boolean {
+	const slot = effect.scope.hooks?.get(effect.slot) as EffectSlot | undefined;
+	return (
+		slot?.revision === effect.revision &&
+		!effect.scope.block.disposed &&
+		!inInactiveSubtree(effect.scope.block)
+	);
+}
+
+function drainLayoutSnapshots(snapshots: LayoutSnapshots): void {
+	const nativeFrame = NATIVE_READ_DRIVER ? NATIVE_READ_DRIVER.pauseLifecycle() : -1;
+	const transitionDepth = TRANSITION_DEPTH;
+	const actionBatch = ACTIVE_TRANSITION_ACTION_BATCH;
+	TRANSITION_DEPTH = 0;
+	ACTIVE_TRANSITION_ACTION_BATCH = null;
+	EFFECT_COMMIT_DEPTH++;
+	try {
+		const updates: LayoutSnapshotUpdate[] = [];
+		for (const effect of snapshots.values()) {
+			if (layoutSnapshotIsCurrent(effect)) runEffectBody(effect, updates);
+			else snapshots.delete(effect.slot);
+		}
+		// Publish only after the whole read batch. These updates belong to the
+		// synchronous layout cascade even though the callbacks have returned.
+		if (updates.length > 0) {
+			const previousPhase = CURRENT_EFFECT_PHASE;
+			CURRENT_EFFECT_PHASE = LAYOUT;
+			EFFECT_BODY_DEPTH++;
+			try {
+				for (const { effect, publish } of updates) {
+					if (!layoutSnapshotIsCurrent(effect)) continue;
+					try {
+						publish();
+					} catch (error) {
+						if (error instanceof MaximumUpdateDepthError) throw error;
+						reportEffectError(effect.scope.block, error);
+					}
+				}
+			} finally {
+				EFFECT_BODY_DEPTH--;
+				CURRENT_EFFECT_PHASE = previousPhase;
+			}
+		}
+	} catch (error) {
+		pendingLayoutSnapshots = null;
+		throw error;
+	} finally {
+		TRANSITION_DEPTH = transitionDepth;
+		ACTIVE_TRANSITION_ACTION_BATCH = actionBatch;
+		try {
+			if (nativeFrame >= 0) NATIVE_READ_DRIVER!.resumeLifecycle(nativeFrame);
+		} finally {
+			finishEffectCommit();
+		}
+	}
+}
+
 function drainLayoutUpdates(pendingError: { err: any } | null): { err: any } | null {
-	for (
-		let guard = 0;
-		(QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) && guard < LAYOUT_CASCADE_LIMIT;
-		guard++
-	) {
+	for (let guard = 0; ; guard++) {
+		if (QUEUE.length === 0 && ROOT_RENDER_TRANSACTIONS.length === 0) {
+			if (pendingLayoutSnapshots === null) break;
+			drainLayoutSnapshots(pendingLayoutSnapshots);
+			if (QUEUE.length === 0 && ROOT_RENDER_TRANSACTIONS.length === 0) {
+				pendingLayoutSnapshots = null;
+				if (EFFECT_COMMIT_DEPTH === 0) settleNestedUpdateChain();
+				break;
+			}
+		}
+		if (guard === LAYOUT_CASCADE_LIMIT) break;
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileCount(ProfileCounter.CASCADE_LAYOUT);
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
@@ -2820,7 +2900,7 @@ function flushWork(): void {
 			if (
 				!HOLDING_ROOT_COMMITS &&
 				(!DEFERRED_LAYOUT_DRIVER || !DEFERRED_LAYOUT_DRIVER.capturing()) &&
-				(QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0)
+				hasLayoutWork()
 			)
 				pendingError = drainLayoutUpdates(pendingError);
 			if (pendingError !== null) throw pendingError.err;
@@ -3557,9 +3637,7 @@ export function flushSync<T>(fn: () => T): T {
 				// Drain those passes before DOM observers can see intermediate state.
 				// The existing nested-update guard and LAYOUT_CASCADE_LIMIT bound loops;
 				// any remaining work retains its per-chain count in the async scheduler.
-				if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) {
-					pendingError = drainLayoutUpdates(pendingError);
-				}
+				if (hasLayoutWork()) pendingError = drainLayoutUpdates(pendingError);
 			} finally {
 				inFlush = false;
 				if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.endCue();
@@ -3569,10 +3647,7 @@ export function flushSync<T>(fn: () => T): T {
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__devtoolsNotifyFlush();
 			}
-			if ((QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) && !scheduled) {
-				scheduled = true;
-				queueMicrotask(flush);
-			}
+			if (hasLayoutWork() && !scheduled) requestFlush();
 			if (pendingError !== null) throw pendingError.err;
 		} finally {
 			syncFlush = prevSync;
@@ -3935,6 +4010,9 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 		inFlush = true;
 		const previousCompleting = COMPLETING_DEFERRED_LAYOUT;
 		const previousHeldWork = DEFERRED_LAYOUT_HELD_WORK;
+		// This capture must settle only its own reads and corrective writes.
+		const previousSnapshots = pendingLayoutSnapshots;
+		pendingLayoutSnapshots = null;
 		const heldWork: Block[] = [];
 		if (!interrupted) {
 			const queued = QUEUE.splice(0);
@@ -3994,7 +4072,7 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 				for (const store of laterStores) storeSyncQueue.push(store);
 			}
 			if (interrupted) restoreDeferredPassives(capture);
-			if (QUEUE.length > 0 || ROOT_RENDER_TRANSACTIONS.length > 0) {
+			if (hasLayoutWork()) {
 				const error = drainLayoutUpdates(null);
 				if (error !== null) throw error.err;
 			}
@@ -4020,6 +4098,13 @@ function completeDeferredLayouts(capture: DeferredLayoutCapture, interrupted = f
 				}
 				ROOT_RENDER_TRANSACTIONS = heldTransactions.concat(ROOT_RENDER_TRANSACTIONS);
 				QUEUE_REINDEX_EPOCH++;
+			}
+			if (previousSnapshots !== null) {
+				const remaining = pendingLayoutSnapshots as LayoutSnapshots | null;
+				if (remaining !== null) {
+					for (const [slot, effect] of remaining) previousSnapshots.set(slot, effect);
+				}
+				pendingLayoutSnapshots = previousSnapshots;
 			}
 			COMPLETING_DEFERRED_LAYOUT = previousCompleting;
 			DEFERRED_LAYOUT_HELD_WORK = previousHeldWork;
@@ -4084,8 +4169,10 @@ export function commitEffects(): void {
 		// are hot, and only a settled hold needs the out-of-line path.
 		if (EFFECT_COMMIT_DEPTH === 0) {
 			if (NESTED_UPDATE_SCHEDULED) NESTED_UPDATE_SCHEDULED = false;
-			else if (HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID) settleNestedUpdateChain();
-			else NESTED_UPDATE_CHAIN_ID++;
+			else if (pendingLayoutSnapshots === null) {
+				if (HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID) settleNestedUpdateChain();
+				else NESTED_UPDATE_CHAIN_ID++;
+			}
 		}
 		return;
 	}
@@ -4145,8 +4232,10 @@ export function commitEffects(): void {
 		// commit or in a passive drain (flushSync from a passive effect) never reset it.
 		if (EFFECT_COMMIT_DEPTH === 1) {
 			if (NESTED_UPDATE_SCHEDULED) NESTED_UPDATE_SCHEDULED = false;
-			else if (HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID) settleNestedUpdateChain();
-			else NESTED_UPDATE_CHAIN_ID++;
+			else if (pendingLayoutSnapshots === null) {
+				if (HELD_PASSIVE_CHAIN === NESTED_UPDATE_CHAIN_ID) settleNestedUpdateChain();
+				else NESTED_UPDATE_CHAIN_ID++;
+			}
 		}
 	} finally {
 		TRANSITION_DEPTH = transitionDepth;
@@ -4344,7 +4433,7 @@ export function reportEffectError(
 }
 
 /** Run a queued effect's body and stash its returned cleanup on the slot. */
-export function runEffectBody(e: PendingEffect): void {
+export function runEffectBody(e: PendingEffect, snapshotUpdates?: LayoutSnapshotUpdate[]): void {
 	if (e.fn === null) return;
 	let cleanup: void | Cleanup;
 	const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
@@ -4399,6 +4488,10 @@ export function runEffectBody(e: PendingEffect): void {
 		);
 	}
 	if (typeof cleanup === 'function') {
+		if (snapshotUpdates !== undefined) {
+			snapshotUpdates.push({ effect: e, publish: cleanup });
+			return;
+		}
 		// The slot owns its LATEST cleanup: unmountScope's effect-slot walk (and
 		// deactivateScope's hide walk) read + clear it, so a dep-changed effect's
 		// stale cleanup can never replay at teardown.

@@ -20,6 +20,8 @@ import {
 	MaximumUpdateDepthError,
 	reportEffectError,
 	runEffectBody,
+	enqueueLayoutSnapshot,
+	pendingLayoutSnapshots,
 } from './engine.js';
 import { nodeProto } from '../dom-focused-move.js';
 import { hydrationStarted } from '../hydration-flag.js';
@@ -30,6 +32,7 @@ import type {
 	Cleanup,
 	Block,
 	EffectSlot,
+	EffectFn,
 	PendingEffect,
 	RootRenderTransaction,
 	StoreInst,
@@ -83,6 +86,13 @@ export const INSERTION = 0,
 
 export const effectQueues: [PendingEffect[], PendingEffect[], PendingEffect[]] = [[], [], []];
 export let passiveScheduled = false;
+
+let layoutSnapshotEffects: WeakSet<EffectFn> | null = null;
+
+export function markLayoutSnapshotEffect(fn: EffectFn): EffectFn {
+	(layoutSnapshotEffects ??= new WeakSet()).add(fn);
+	return fn;
+}
 
 export function inNestedUpdateCallback(): boolean {
 	return EFFECT_BODY_DEPTH > 0 || REF_CALLBACK_DEPTH > 0 || STORE_SYNC_DEPTH > 0;
@@ -226,6 +236,7 @@ export function hasScheduledWork(): boolean {
 	return (
 		QUEUE.length > 0 ||
 		ROOT_RENDER_TRANSACTIONS.length > 0 ||
+		pendingLayoutSnapshots !== null ||
 		(TRANSITION_ROOT_DRIVER ? PENDING_SIGNAL_PROMOTIONS !== null : false) ||
 		effectEventQueue.length > 0 ||
 		effectEventCommitActions.length > 0 ||
@@ -496,8 +507,10 @@ export function runRegisteredLayoutEffects(q: PendingEffect[]): void {
 	for (let i = 0; i < q.length; i++) {
 		const e = q[i];
 		if (e.phase !== LAYOUT) continue;
-		if (e.scope.block.disposed || inInactiveSubtree(e.scope.block)) continue;
-		runEffectBody(e);
+		// The marker follows the callback when a retained scope reconnects it.
+		if (layoutSnapshotEffects !== null && e.fn !== null && layoutSnapshotEffects.has(e.fn))
+			enqueueLayoutSnapshot(e);
+		else if (!e.scope.block.disposed && !inInactiveSubtree(e.scope.block)) runEffectBody(e);
 	}
 }
 

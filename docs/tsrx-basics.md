@@ -284,25 +284,21 @@ export function MeasuredContent() @{
 }
 ```
 
-The measurement runs after each committed render of the component that reaches
-the hook, before the browser paints. It does not run during server rendering;
-the server and the first hydration render both use `initial`, or `undefined`
-when no initial value is supplied. Snapshots are compared with `Object.is` by
-default. For measurements that return a new object, supply `equal` to compare
-their contents and avoid repeated updates.
+A committed render schedules a measurement whenever it reaches the hook.
+Before paint, Octane settles synchronous updates from refs, layout effects, and
+stores, then runs the queued measurements together. If changed snapshots trigger
+another commit, Octane measures the participating snapshots again before paint.
+The server and first hydration render use `initial`, or `undefined` if it is
+omitted. Octane reads `initial` when the hook mounts.
 
-The measurement runs in the component's layout phase, in hook order. A
-`useLayoutEffect` declared after it in the same component runs after the
-measurement, so DOM it changes is not measured until the next commit. Call
-`useLayoutSnapshot` after layout effects that change the DOM it measures.
+Octane compares snapshots with `Object.is` by default. For measurements that
+return a new object, supply `equal` to compare their contents and avoid
+repeated updates.
 
-The callback is for measurement, not acquiring resources or setting up
-subscriptions. The hook does not observe later changes to layout by itself. For
-changes such as resizing or scrolling that happen independently of the
-component's commits, have an observer or event callback update state so the
-component commits again; that commit measures again. This hook is available for
-the DOM renderer; the experimental universal and Valdi renderers do not support
-it.
+Keep the measurement synchronous and free of writes and resource setup. For
+changes such as resizing or scrolling between component commits, have an
+observer or event callback update state to request another commit and
+measurement. Use this hook in the DOM renderer.
 
 ## Conditional hooks
 

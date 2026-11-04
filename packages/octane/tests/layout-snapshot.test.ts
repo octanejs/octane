@@ -3,6 +3,7 @@ import { act, createRoot, flushSync, hydrateRoot, startTransition } from '../src
 import * as Server from 'octane/server';
 import { mount } from './_helpers.js';
 import { loadCompiledFixtureSource, loadPlainHookFixtureSource } from './_server-fixture.js';
+import { installViewTransitionMocks } from './conformance/_helpers/view-transition-mocks.js';
 
 const source = `
 "use strong";
@@ -424,6 +425,73 @@ it('reports a non-converging async commit in production instead of stranding wor
 		container.remove();
 		scheduled.mockRestore();
 		vi.unstubAllEnvs();
+	}
+});
+
+it('settles layout snapshots before a deferred ViewTransition update finishes', async () => {
+	const { App } = loadCompiledFixtureSource(
+		`import { ViewTransition, useLayoutEffect, useLayoutSnapshot, useState } from 'octane';
+function Writer(props) @{
+	const [value, setValue] = useState('before');
+	useLayoutEffect(() => { setValue(props.value); }, [props.value]);
+	<span data-written={value} />
+}
+function Reader(props) @{
+	const value = useLayoutSnapshot(props.measure, { initial: 'before' });
+	<output data-stage={props.stage}>{value as string}</output>
+}
+export function App(props) @{
+	<ViewTransition name="layout-snapshot">
+		<section>
+			<Writer value={props.value} />
+			<Reader stage={props.value} measure={props.measure} />
+			<img src={props.value + '.png'} />
+		</section>
+	</ViewTransition>
+}`,
+		{
+			id: '/packages/octane/tests/_fixtures/layout-snapshot-transition.tsrx',
+			mode: 'client',
+			compileOptions: { dev: false, hmr: false },
+		},
+	);
+	const container = document.createElement('div');
+	document.body.appendChild(container);
+	const root = createRoot(container);
+	const mocks = installViewTransitionMocks();
+	const incompleteImage = vi
+		.spyOn(HTMLImageElement.prototype, 'complete', 'get')
+		.mockReturnValue(false);
+	const measure = () => container.querySelector('[data-written]')!.getAttribute('data-written');
+	const startViewTransition = document.startViewTransition.bind(document);
+	const started = Promise.withResolvers<ViewTransition>();
+	let captured: string | null | undefined;
+	const capture = vi.spyOn(document, 'startViewTransition').mockImplementation((options) => {
+		const transition = startViewTransition(options);
+		// The mock's finished promise resolves when the browser's update callback returns.
+		void transition.finished.then(() => {
+			captured = container.querySelector('output')?.textContent;
+		});
+		started.resolve(transition);
+		return transition;
+	});
+	try {
+		flushSync(() => root.render(App, { value: 'before', measure }));
+		startTransition(() => root.render(App, { value: 'after', measure }));
+		const transition = await started.promise;
+		const image = container.querySelector('img')!;
+		expect(image.getAttribute('src')).toBe('after.png');
+		expect(captured).toBeUndefined();
+		image.dispatchEvent(new Event('load'));
+		await transition.finished;
+		expect(captured).toBe('after');
+	} finally {
+		container.querySelector('img')?.dispatchEvent(new Event('load'));
+		root.unmount();
+		container.remove();
+		capture.mockRestore();
+		incompleteImage.mockRestore();
+		mocks.restore();
 	}
 });
 

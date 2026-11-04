@@ -101,3 +101,26 @@ export function Field({revision}: {revision: number}) {
 		root.unmount();
 	}
 });
+
+it('measures after later layout effects in a migrated component', () => {
+	const source = `import { useState, useRef, useLayoutEffect } from 'react';
+export function Field() {
+  const parent = useRef<HTMLDivElement>(null);
+  const child = useRef<HTMLButtonElement>(null);
+  const [ready, setReady] = useState(false);
+  useLayoutEffect(() => setReady(child.current?.closest('[data-ready]') != null));
+  useLayoutEffect(() => { parent.current?.setAttribute('data-ready', ''); }, []);
+  return <div ref={parent}><button ref={child}>{ready ? 'ready' : 'pending'}</button></div>;
+}`;
+	const id = 'field.tsrx';
+	const { code } = transformModule(source, 'field.tsx', { strong: true });
+	const result = strengthen({ collectDiagnostics, from: 'octane/compiler' }, code, id);
+	expect(result.strong).toBe(true);
+	const { Field } = loadCompiledFixtureSource(result.code, { id, mode: 'client' });
+	const view = mount(Field);
+	try {
+		expect(view.find('button').textContent).toBe('ready');
+	} finally {
+		view.unmount();
+	}
+});
