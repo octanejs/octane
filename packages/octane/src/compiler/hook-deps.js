@@ -18,11 +18,6 @@ const DEPENDENCY_HOOKS = new Map([
 	['useImperativeHandle', { callback: 1, deps: 2 }],
 ]);
 
-// Results omitted from compiler-inferred dependency arrays. Ref hooks are
-// lifetime-stable. useEffectEvent is intentionally NOT identity-stable, but is
-// non-reactive by API contract: including its fresh wrapper would re-run an
-// effect on every render and defeat the hook's purpose.
-const OMITTED_DEPENDENCY_RESULT_HOOKS = new Set([...REF_HOOKS, 'useEffectEvent']);
 const STABLE_TUPLE_RESULTS = new Map([
 	['useState', new Set([1, 2])],
 	['useLinkedState', new Set([1, 2])],
@@ -56,7 +51,9 @@ function declareName(scope, name, details = null) {
 			name,
 			scope,
 			imported: false,
-			dependencyInvariant: false,
+			// Inferred lists omit both kinds. Only an invariant value can also
+			// be removed from an explicitly authored list.
+			dependencyOmission: null,
 			moduleImmutable: false,
 			reassigned: false,
 			octaneImport: null,
@@ -1352,7 +1349,7 @@ function isInvariantInitializer(node) {
 	return isInvariantLiteral(node);
 }
 
-function markDependencyInvariantBindings(analysis, invariantCall = null) {
+function markOmittedDependencyBindings(analysis, invariantCall = null) {
 	// Seed the lattice with the bindings whose identity is fixed for the
 	// program's lifetime, so the `const alias = original` propagation below
 	// carries them into component scope for free.
@@ -1362,7 +1359,7 @@ function markDependencyInvariantBindings(analysis, invariantCall = null) {
 	// inherits the same answer.
 	for (const binding of analysis.moduleScope.bindings.values()) {
 		if (binding.imported || (binding.moduleImmutable && !binding.reassigned)) {
-			binding.dependencyInvariant = true;
+			binding.dependencyOmission = 'invariant';
 		}
 	}
 	let changed = true;
@@ -1376,16 +1373,21 @@ function markDependencyInvariantBindings(analysis, invariantCall = null) {
 				init?.type === 'CallExpression' ? (analysis.trustedHookNames.get(init) ?? null) : null;
 
 			if (decl.id.type === 'Identifier') {
-				let dependencyInvariant =
-					callName !== null && OMITTED_DEPENDENCY_RESULT_HOOKS.has(callName);
-				if (!dependencyInvariant && init?.type === 'Identifier') {
-					dependencyInvariant = resolveBinding(scope, init.name)?.dependencyInvariant === true;
+				let omission = null;
+				if (callName === 'useEffectEvent') {
+					// Effect Events are non-reactive, but return a fresh wrapper each render.
+					omission = 'effect-event';
+				} else if (init?.type === 'Identifier') {
+					omission = resolveBinding(scope, init.name)?.dependencyOmission;
+				} else if (
+					REF_HOOKS.has(callName) ||
+					isInvariantInitializer(init) ||
+					(init?.type === 'CallExpression' && invariantCall?.(init))
+				) {
+					omission = 'invariant';
 				}
-				if (!dependencyInvariant) dependencyInvariant = isInvariantInitializer(init);
-				if (!dependencyInvariant && init?.type === 'CallExpression' && invariantCall !== null)
-					dependencyInvariant = invariantCall(init);
-				if (dependencyInvariant && bindings[0] && !bindings[0].binding.dependencyInvariant) {
-					bindings[0].binding.dependencyInvariant = true;
+				if (omission && bindings[0] && !bindings[0].binding.dependencyOmission) {
+					bindings[0].binding.dependencyOmission = omission;
 					changed = true;
 				}
 				continue;
@@ -1398,8 +1400,8 @@ function markDependencyInvariantBindings(analysis, invariantCall = null) {
 					const element = decl.id.elements?.[index];
 					if (!element || element.type !== 'Identifier') continue;
 					const binding = resolveBinding(scope, element.name);
-					if (binding && !binding.dependencyInvariant) {
-						binding.dependencyInvariant = true;
+					if (binding && !binding.dependencyOmission) {
+						binding.dependencyOmission = 'invariant';
 						changed = true;
 					}
 				}
@@ -1557,7 +1559,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 		if (
 			binding === null ||
 			binding.imported ||
-			binding.dependencyInvariant ||
+			binding.dependencyOmission ||
 			(callbackScope !== null && scopeIsWithin(binding.scope, callbackScope))
 		) {
 			return;
@@ -1575,7 +1577,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 		if (
 			binding === null ||
 			binding.imported ||
-			binding.dependencyInvariant ||
+			binding.dependencyOmission ||
 			(callbackScope !== null && scopeIsWithin(binding.scope, callbackScope))
 		) {
 			return;
@@ -1610,7 +1612,7 @@ function collectDependencies(expression, callbackScope, analysis) {
 		if (
 			binding === null ||
 			binding.imported ||
-			binding.dependencyInvariant ||
+			binding.dependencyOmission ||
 			(callbackScope !== null && scopeIsWithin(binding.scope, callbackScope))
 		) {
 			return;
@@ -1951,7 +1953,7 @@ function collectCallbackReference(expression, analysis) {
 	if (
 		binding === null ||
 		binding.imported ||
-		(value.type === 'Identifier' && binding.dependencyInvariant)
+		(value.type === 'Identifier' && binding.dependencyOmission)
 	) {
 		return [];
 	}
@@ -2005,7 +2007,7 @@ function analyzeInternal(ast, options) {
 	// memo-only pass still needs lexical import provenance, but must not infer
 	// omitted lists or reject source the manual-slot path previously accepted.
 	if (options.inferDependencies === false) return { analysis, inferred };
-	markDependencyInvariantBindings(analysis);
+	markOmittedDependencyBindings(analysis);
 
 	const findLate = lateDependencyFinder(ast, analysis);
 	for (const candidate of analysis.candidates) {
@@ -2094,7 +2096,7 @@ export function analyzeCallbackDependencies(ast, callbacks, options = {}) {
 		options.onlyImported === true,
 		new Set(['octane', ...(options.hookRuntimeModules || [])]),
 	);
-	markDependencyInvariantBindings(analysis, options.invariantCall ?? null);
+	markOmittedDependencyBindings(analysis, options.invariantCall ?? null);
 	const declaredAt = options.evaluatedAt ? initializationEnds(ast, analysis) : null;
 	const inferred = new Map();
 	for (const original of callbacks) {
@@ -2286,7 +2288,9 @@ function dependencyInvariantRoot(expression, analysis) {
 	if (node?.type !== 'Identifier') return false;
 	const scope = analysis.nodeScopes.get(node);
 	const binding = scope ? resolveBinding(scope, node.name) : null;
-	return binding !== null && (binding.imported === true || binding.dependencyInvariant === true);
+	return (
+		binding !== null && (binding.imported === true || binding.dependencyOmission === 'invariant')
+	);
 }
 
 function equivalentStrongDependencies(authored, callback, inferred, analysis) {
@@ -2333,7 +2337,7 @@ export function analyzeStrongHookPolicies(ast, options = {}) {
 	let markedInvariants = false;
 	const markInvariants = () => {
 		if (markedInvariants) return;
-		markDependencyInvariantBindings(analysis);
+		markOmittedDependencyBindings(analysis);
 		markedInvariants = true;
 	};
 	const findLate = lateDependencyFinder(ast, analysis);
@@ -2540,7 +2544,7 @@ export function analyzeStrongMemoCandidates(ast, options = {}) {
 	const shared = analyzeStrongHookBindings(ast, options);
 	const analysis = shared.analysis;
 	const callNames = shared.callNames;
-	markDependencyInvariantBindings(analysis);
+	markOmittedDependencyBindings(analysis);
 	const hookName = (call) => callNames.get(call) ?? null;
 	const hookCalls = new Map();
 	const omittedDependencies = new Set();
