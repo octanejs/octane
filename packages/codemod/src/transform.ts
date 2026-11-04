@@ -61,6 +61,7 @@ const RULE = {
 	renderProp: 'render-prop-children',
 	documentShell: 'document-shell',
 	nativeChange: 'native-text-change',
+	nativeSignal: 'native-signal-read',
 	className: 'class-attribute',
 	provider: 'context-provider',
 	strictMode: 'strict-mode',
@@ -517,6 +518,12 @@ function commentText(comment: string) {
 	return body.trim().replaceAll('*/', '* /');
 }
 
+const SIGNAL_MODULES = new Set([
+	'octane/signals',
+	'octane/signals/client',
+	'octane/signals/server',
+]);
+
 function isComponentName(name: string) {
 	return /^[A-Z]/.test(name);
 }
@@ -529,6 +536,7 @@ class ModuleTransform {
 	readonly strong: boolean;
 	/** React imports read as values, not only as types. */
 	readonly valueUses = new Set<string>();
+	hasSignalRuntime?: boolean;
 	routerShell = false;
 	readonly textTypes: boolean;
 	readonly sf: ts.SourceFile;
@@ -2129,6 +2137,8 @@ class ModuleTransform {
 		// An Octane hook without a list already means "inferred".
 		if (!callee || callee.module === 'octane') return null;
 		const name = callee.name;
+		if (name === 'useSyncExternalStore' && this.strong && this.target === 'tsrx')
+			return this.nativeSignalRead(node);
 		if (name === 'forwardRef') return this.rewriteForwardRef(node);
 		if (name === 'render' || name === 'hydrate') return this.rewriteLegacyRoot(node, name);
 		if (name === 'hydrateRoot' && node.arguments.length === 2) {
@@ -2157,6 +2167,127 @@ class ModuleTransform {
 		}
 		if (name in DEPENDENCY_HOOKS) return this.rewriteDependencies(node, name);
 		return null;
+	}
+
+	/** Replace only a direct render subscription to one native writable cell, with identical SSR and client reads. */
+	nativeSignalRead(node: ts.CallExpression) {
+		if (node.arguments.length !== 3 || node.questionDotToken || node.typeArguments) return null;
+		const [subscribe, get, server] = node.arguments;
+		const receiver = (fn: ts.Expression, method: 'subscribe' | 'get') => {
+			if (
+				!ts.isArrowFunction(fn) ||
+				fn.modifiers ||
+				fn.type ||
+				fn.typeParameters ||
+				!ts.isCallExpression(fn.body)
+			)
+				return null;
+			const call = fn.body;
+			const member = call.expression;
+			if (
+				call.typeArguments ||
+				call.questionDotToken ||
+				!ts.isPropertyAccessExpression(member) ||
+				member.questionDotToken ||
+				member.name.text !== method ||
+				!ts.isIdentifier(member.expression)
+			)
+				return null;
+			const arity = method === 'get' ? 0 : 1;
+			if (fn.parameters.length !== arity || call.arguments.length !== arity) return null;
+			if (arity === 1) {
+				const [parameter] = fn.parameters;
+				const [argument] = call.arguments;
+				if (
+					!ts.isIdentifier(parameter.name) ||
+					parameter.type ||
+					parameter.initializer ||
+					parameter.dotDotDotToken ||
+					!ts.isIdentifier(argument) ||
+					this.declarationOf(argument) !== parameter
+				)
+					return null;
+			}
+			return member.expression;
+		};
+		const signal = receiver(get, 'get');
+		const watch = receiver(subscribe, 'subscribe');
+		const ssr = receiver(server, 'get');
+		if (!signal || !watch || !ssr || !this.constValue(signal)) return null;
+		const decl = this.declarationOf(signal);
+		if (this.declarationOf(watch) !== decl || this.declarationOf(ssr) !== decl) return null;
+		const owner = ts.findAncestor(node, isFunctionLike);
+		if (
+			!owner ||
+			!(
+				ts.isFunctionDeclaration(owner) ||
+				ts.isFunctionExpression(owner) ||
+				ts.isArrowFunction(owner)
+			) ||
+			!this.isComponent(owner) ||
+			!this.isWritableSignal(signal)
+		)
+			return null;
+		if (this.lostComments(node.getStart(this.sf), node.end, '').length) return null;
+		this.count(RULE.nativeSignal);
+		return signal.text + '.get()';
+	}
+
+	usesSignalRuntime(node: ts.Node): boolean {
+		if (ts.isImportDeclaration(node))
+			return (
+				!node.importClause &&
+				ts.isStringLiteral(node.moduleSpecifier) &&
+				SIGNAL_MODULES.has(node.moduleSpecifier.text)
+			);
+		// A value call keeps the import alive even if TypeScript elides type-only uses.
+		if (ts.isCallExpression(node)) {
+			const name = ts.isPropertyAccessExpression(node.expression)
+				? node.expression.expression
+				: node.expression;
+			const binding = this.importOf(name);
+			if (binding && !binding.typeOnly && SIGNAL_MODULES.has(binding.module)) return true;
+		}
+		return ts.forEachChild(node, (child) => this.usesSignalRuntime(child) || undefined) === true;
+	}
+
+	isWritableSignal(signal: ts.Identifier) {
+		const init = this.constValue(signal);
+		if (init && ts.isCallExpression(init)) {
+			const factory = this.importOf(init.expression);
+			if (
+				factory?.module === 'octane/signals' &&
+				factory.imported === 'signal$' &&
+				!factory.typeOnly
+			)
+				return true;
+		}
+		// The public type's identity distinguishes native handles from ordinary stores with get/subscribe.
+		// Opting in would also subscribe unrelated render reads elsewhere in this module.
+		if (!(this.hasSignalRuntime ??= this.usesSignalRuntime(this.sf))) return false;
+		const resolved = this.projectType(signal);
+		if (resolved?.type.getSymbol()?.name !== 'WritableSignal') return false;
+		const file = this.options.types!.sourceFile;
+		for (const stmt of file.statements) {
+			if (
+				!ts.isImportDeclaration(stmt) ||
+				!ts.isStringLiteral(stmt.moduleSpecifier) ||
+				stmt.moduleSpecifier.text !== 'octane/signals'
+			)
+				continue;
+			const module = resolved.checker.getSymbolAtLocation(stmt.moduleSpecifier);
+			const exported =
+				module &&
+				resolved.checker.getExportsOfModule(module).find((s) => s.name === 'WritableSignal');
+			if (
+				exported &&
+				(exported.flags & ts.SymbolFlags.Alias
+					? resolved.checker.getAliasedSymbol(exported)
+					: exported) === resolved.type.getSymbol()
+			)
+				return true;
+		}
+		return false;
 	}
 
 	/**
