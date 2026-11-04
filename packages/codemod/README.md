@@ -102,6 +102,13 @@ This permits nested text and multiple children as well as one element. Render
 the block with `{props.children}`. Keep the element type for APIs that inspect
 a descriptor or require exactly one child.
 
+The descriptor-children rule also follows arguments passed to directly called
+helper functions in the same module. If a helper inspects a parameter with a React element
+API, the component passing its children gets the same marker as a component
+that inspects them directly. Intrinsic elements passed as descriptor values keep
+their `className` prop for the inspector. With `--strong`, descriptor
+inspection still requires compatibility mode.
+
 ## Strong mode
 
 With `--strong`, each template module starts with `"use strong"` and is
