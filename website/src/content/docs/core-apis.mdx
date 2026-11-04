@@ -650,22 +650,19 @@ export function MeasuredContent() @{
 }
 ```
 
-A committed render schedules a measurement whenever it reaches the hook.
-Before paint, Octane settles synchronous updates from refs, layout effects, and
-stores, then runs the queued measurements together. If changed snapshots trigger
-another commit, Octane measures the participating snapshots again before paint.
-The server and first hydration render use `initial`, or `undefined` if it is
-omitted. Octane reads `initial` when the hook mounts.
+Every committed render that reaches this hook queues a measurement. Before
+paint, Octane settles synchronous updates from refs, layout effects, and stores,
+then runs the queued measurements together. If a changed snapshot triggers
+another commit, Octane measures the participating snapshots again. The server
+and first hydration render use the mount-only `initial`, which defaults to
+`undefined`. Octane compares results with `Object.is` by default. Supply
+`equal(previous, next)` to compare the contents of a new object. Without
+`initial`, `previous` may be `undefined`.
 
-Octane compares snapshots with `Object.is` by default. Supply
-`equal(previous, next)` to compare the contents of a new object, for example.
-Without an initial value, `previous` may be `undefined`. Make sure the
-calculation converges. An oscillating measurement reaches the update depth limit.
-
-Keep the measurement synchronous and free of writes and resource setup. For
-changes such as resizing between component commits, have an observer callback
-update state to request another commit and measurement. Use this hook in the
-DOM renderer.
+Keep the measurement synchronous and free of writes and resource setup. An
+oscillating measurement reaches the update depth limit. For changes such as
+resizing between component commits, have an observer callback update state to
+request another commit and measurement. Use this hook in the DOM renderer.
 
 <h3 id="createResizeObserver">
 	Measure resizes with <code>createResizeObserver</code>
