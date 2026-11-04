@@ -3696,12 +3696,17 @@ export function ProjectedAction(${destructured ? '{ title: header = "default tit
 					expect(icons.map((icon) => icon.hidden)).toEqual([false, true]);
 					if (outcome === 'replace' || viewTransitions !== undefined) {
 						const replace = (label = 'Account') =>
-							hydratedRoot!.render(client.LoginPresentation, {
-								label,
-								error: '',
-								pending: false,
-								submitLabel: 'Continue',
-							});
+							hydratedRoot!.render(
+								viewTransitions === undefined
+									? client.LoginPresentation
+									: client.AnimatedLoginPresentation,
+								{
+									label,
+									error: '',
+									pending: false,
+									submitLabel: 'Continue',
+								},
+							);
 						if (viewTransitions !== undefined) {
 							startTransition(() => {
 								addTransitionType('replace');
@@ -4119,7 +4124,7 @@ export function RefusedRestTree(props) @{ 'use dom bindings';
 						onReady: earlyRef,
 					},
 					dev,
-					`import { Hydrate, use } from 'octane';
+					`import { Hydrate, ViewTransition, use } from 'octane';
 export function RestChild({ classes, style, title, ...rest }) @{ 'use dom bindings';
  <button class={classes} style={style} title={title} {...rest}><b>Action</b></button>
 }
@@ -4129,11 +4134,13 @@ export function RestTree(props) @{ 'use dom bindings';
 }
 function Wait(props) @{ if (props.suspend) use(props.promise); <i/> }
 export function RestHydration(props) @{
- <Hydrate when={props.when} split={false} onHydrated={props.onHydrated}>
-  <RestTree classes={props.classes} style={props.style} title={props.title}
-   aria={props.aria} onAction={props.onAction} onReady={props.onReady}/>
-  <Wait suspend={props.suspend} promise={props.promise}/>
- </Hydrate>
+ <ViewTransition>
+  <Hydrate when={props.when} split={false} onHydrated={props.onHydrated}>
+   <RestTree classes={props.classes} style={props.style} title={props.title}
+    aria={props.aria} onAction={props.onAction} onReady={props.onReady}/>
+   <Wait suspend={props.suspend} promise={props.promise}/>
+  </Hydrate>
+ </ViewTransition>
 }`,
 				);
 				const guard = (value: string) => ({
@@ -4808,7 +4815,7 @@ export function ImportedTree(props) @{ 'use dom bindings';
 					'PendingTree',
 					{ model, onAction },
 					dev,
-					`import { Hydrate, use } from 'octane';
+					`import { Hydrate, ViewTransition, use } from 'octane';
 ${
 	outcome === 'unsupported'
 		? `function Label(props) @{
@@ -4825,10 +4832,12 @@ export function PendingTree(props) @{ 'use dom bindings';
 }
 function Wait(props) @{ if (props.suspend) use(props.promise); <i /> }
 export function TreeHydration(props) @{
- <Hydrate when={props.when} split={false} onHydrated={props.onHydrated}>
-  <PendingTree model={props.model} onAction={props.onAction} onReady={props.onReady}/>
-  <Wait suspend={props.suspend} promise={props.promise}/>
- </Hydrate>
+ <ViewTransition>
+  <Hydrate when={props.when} split={false} onHydrated={props.onHydrated}>
+   <PendingTree model={props.model} onAction={props.onAction} onReady={props.onReady}/>
+   <Wait suspend={props.suspend} promise={props.promise}/>
+  </Hydrate>
+ </ViewTransition>
 }`,
 				);
 				const props = {
