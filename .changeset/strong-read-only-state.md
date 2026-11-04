@@ -1,5 +1,6 @@
 ---
 'octane': patch
+'@octanejs/aria': patch
 '@octanejs/cli': patch
 '@octanejs/mcp-server': patch
 '@octanejs/tanstack-devtools': patch

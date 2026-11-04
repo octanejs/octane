@@ -7,7 +7,7 @@ import {
 	useId,
 	HYDRATION_RANGE_BOUNDARY,
 	createPortal,
-	useLayoutSnapshot,
+	useSyncExternalStore,
 } from 'octane';
 import { DEV_STYLES_ATTR } from '@tanstack/router-core';
 import type { AssetCrossOriginConfig } from '@tanstack/router-core';
@@ -24,6 +24,9 @@ import { isServer } from '@tanstack/router-core/isServer';
 import type { HtmlProps } from '../Html';
 import type { HeadProps } from '../Head';
 import type { BodyProps } from '../Body';
+
+const subscribeToHead = () => () => {};
+const getHead = () => (typeof document === 'undefined' ? null : document.head);
 
 // This boundary returns the authored children directly, as the ordinary Body
 // owner does. Adding a template frame here changes the SSR range it claims.
@@ -55,7 +58,9 @@ export function Head(props: HeadProps) @{
 	@if (isServer ?? router.isServer) {
 		<head {...attrs}>{children}</head>
 	} @else {
-		const target = useLayoutSnapshot(() => document.head, { initial: null });
+		// The head portal participates in the first client hydration render, so its
+		// children and the body keep the server's shared useId sequence.
+		const target = useSyncExternalStore(subscribeToHead, getHead, getHead);
 		@if (target) {
 			<>
 				{createPortal(() => @{

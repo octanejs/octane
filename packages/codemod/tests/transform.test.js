@@ -716,6 +716,7 @@ describe('strengthen', () => {
 		expect(result.strong).toBe(false);
 		expect(result.code).not.toContain('use strong');
 		expect(result.blockers.map((b) => `${b.severity} ${b.code}`)).toEqual([
+			'warning OCTANE_STRONG_READ_ONLY_STATE',
 			'warning OCTANE_STRONG_UNTRUSTED_HTML',
 		]);
 		expect(compileErrors(result.code, 'raw.tsrx')).toEqual([]);

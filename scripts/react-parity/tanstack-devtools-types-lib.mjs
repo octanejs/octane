@@ -169,6 +169,12 @@ function canonicalizeAdapterSource(source, fileName) {
 			'{triggerContainer && TriggerComponent ? createPortal(<>{TriggerComponent}</>, triggerContainer) : null}',
 		)
 		.replace(/(\}\) \?\? \[\]),\s*\[plugins\](?=\s*,?\s*\))/g, '$1')
+		.replace(/const devtoolsRef = useLazyRef\(\(\) => \{/g, 'const [devtools] = useState(() => {')
+		.replace(/(useEffect\(\(\) => \{\s*)devtoolsRef\.current(?=\.setConfig\()/g, '$1devtools')
+		.replace(
+			/(useEffect\(\(\) => \{\s*)const devtools = devtoolsRef\.current;\s*(?=if \(devToolRef\.current\))/g,
+			'$1',
+		)
 		.replace(
 			/(useEffect\(\(\) => \{\s*devtools\.setConfig\(\{\s*plugins: pluginsMap,?\s*\}\);?\s*\}),\s*\[devtools,\s*pluginsMap\](?=\s*,?\s*\))/g,
 			'$1',
@@ -182,7 +188,7 @@ function canonicalizeAdapterSource(source, fileName) {
 			"import { createPortal, useEffect, useMemo, useRef, useState } from '#renderable-runtime';\n",
 		)
 		.replace(
-			/import\s*\{\s*createPortal,\s*useEffect,\s*useMemo,\s*useRef,\s*useState\s*\}\s*from ['"]#renderable-runtime['"];?\s*/g,
+			/import\s*\{\s*createPortal,\s*useEffect,\s*(?:useLazyRef,\s*)?useMemo,\s*useRef,\s*useState\s*\}\s*from ['"]#renderable-runtime['"];?\s*/g,
 			"import { createPortal, useEffect, useMemo, useRef, useState } from '#renderable-runtime';\n",
 		)
 		.replace(/import\s*\{\s*createPortal\s*\}\s*from ['"]#adapter-local['"];?\s*/g, '')

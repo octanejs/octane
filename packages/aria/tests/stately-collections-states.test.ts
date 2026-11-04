@@ -348,6 +348,7 @@ describe('@octanejs/aria/stately — useNumberFieldState', () => {
 		r.update(ControlledNumberFieldHarness, { ...props, value: 2500.25 });
 		expect(text(r, 'input')).toBe('in:2,500.25');
 		expect(text(r, 'number')).toBe('n:2500.25');
+		expect(text(r, 'default')).toBe('1234.5');
 		r.unmount();
 	});
 
