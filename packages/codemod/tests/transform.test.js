@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { collectDiagnostics } from 'octane/compiler';
+import { renderToStaticMarkup } from 'octane/server';
 import { describe, expect, it } from 'vitest';
+import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
 import { loadCompiler, strengthen, transformModule } from '../dist/index.js';
 
 const FIXTURES = path.join(import.meta.dirname, 'fixtures');
@@ -76,6 +78,14 @@ export const Local = ({ Shadowed }: { Shadowed: () => null }) => <Shadowed/>;`;
 			expect(compileErrors(result.code, output)).toEqual([]);
 		});
 	}
+
+	it('renders only the punctuation authored between nested elements', () => {
+		const source = `function Tag() { return <b>tag</b>; }
+export function Pair() { return <p><Tag />; <Tag /></p>; }`;
+		const { code } = transformModule(source, 'pair.tsx', { strong: true });
+		const { Pair } = loadCompiledFixtureSource(code, { id: 'pair.tsrx', mode: 'server' });
+		expect(renderToStaticMarkup(Pair, {}).html).toBe('<p><b>tag</b>; <b>tag</b></p>');
+	});
 
 	it('leaves a module without React untouched', () => {
 		const source = "import { helper } from './helper.js';\nexport const value = helper(1);\n";
