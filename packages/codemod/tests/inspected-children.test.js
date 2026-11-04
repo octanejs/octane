@@ -4,7 +4,8 @@ import { expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'octane/server';
 import { mount } from '../../octane/tests/_helpers.js';
 import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
-import { strengthen, transformModule } from '../dist/index.js';
+import { strengthen } from '../dist/strong.js';
+import { transformModule } from '../dist/transform.js';
 
 it('preserves children inspected by a local helper before rendering', () => {
 	const source = `import { Children as Nodes, isValidElement, type ReactNode } from 'react';
