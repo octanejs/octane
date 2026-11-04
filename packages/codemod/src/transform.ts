@@ -665,9 +665,14 @@ class ModuleTransform {
 				if (contexts.has(statement.expression.text)) exported.add('default');
 			}
 		}
+		const descriptorChildren = [...this.descriptorComponents].flatMap((d) => {
+			const statement = ts.isVariableDeclaration(d) ? d.parent.parent : d;
+			return d.name && isExported(statement) ? [d.name.getText(this.sf)] : [];
+		});
 		return {
 			contexts: [...exported],
 			reexports,
+			...(descriptorChildren.length ? { descriptorChildren } : {}),
 			...(this.elementChildren.length ? { elementChildren: this.elementChildren } : {}),
 		};
 	}
@@ -2599,10 +2604,14 @@ class ModuleTransform {
 		// A `descriptorChildren` component receives its children as elements, as
 		// in React; `@if` or `@for` there would hand it a fragment instead.
 		const declaration = ts.isIdentifier(tag) ? this.declarationOf(tag) : null;
+		const entry = this.importOf(tag);
+		const imported =
+			entry && !entry.namespace && !entry.typeOnly && entry.module.startsWith('.') ? entry : null;
 		if (
-			declaration &&
-			(ts.isVariableDeclaration(declaration) || ts.isFunctionDeclaration(declaration)) &&
-			this.descriptorComponents.has(declaration)
+			(declaration &&
+				(ts.isVariableDeclaration(declaration) || ts.isFunctionDeclaration(declaration)) &&
+				this.descriptorComponents.has(declaration)) ||
+			(imported && this.options.descriptorChild?.(imported))
 		) {
 			return this.span(node, node.getStart(this.sf), node.end, DESCRIPTOR);
 		}
@@ -2614,13 +2623,10 @@ class ModuleTransform {
 			ts.isIdentifier(tag) &&
 			isComponentName(tag.text)
 		) {
-			const entry = this.importOf(tag);
 			const binding =
 				declaration && ts.isFunctionDeclaration(declaration)
 					? declaration.getStart(this.sf)
-					: entry && !entry.namespace && !entry.typeOnly && entry.module.startsWith('.')
-						? entry
-						: null;
+					: imported;
 			if (
 				binding !== null &&
 				this.options.elementChild(binding) &&

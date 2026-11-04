@@ -35,6 +35,56 @@ function catalogVersion(name) {
 }
 
 describe('runCodemod', () => {
+	it('preserves mapped children passed to an imported inspection component under Vite', async () => {
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'Group.tsx': `import { Children, isValidElement, type ReactNode } from 'react';
+function hasBadges(nodes: ReactNode) {
+	const badges = Children.toArray(nodes).filter(isValidElement<{className?: string}>);
+	return badges.length > 0 && badges.every(b => b.props.className === 'badge');
+}
+export function Group({ children }: {children: ReactNode}) {
+	return <section data-matches={String(hasBadges(children))}>{children}</section>;
+}`,
+			'App.tsx': `import { Group as Panel } from './Group';
+export function App({ rows }: { rows: string[] }) {
+	return <Panel>{rows.map((label, i) => <b key={i} className={label}>{label}</b>)}</Panel>;
+}
+export function Other({ Panel, rows }) {
+	return <Panel>{rows.map(label => <b key={label}>{label}</b>)}</Panel>;
+}`,
+		});
+		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+		const { files } = await runCodemod([root], { write: false, strong: true });
+		for (const file of files) fs.writeFileSync(path.join(root, file.output), file.code);
+		const caller = files.find((file) => file.output === 'App.tsrx').code;
+		expect(caller.split('export function Other')[1]).toContain('@for');
+		fs.writeFileSync(
+			path.join(root, 'entry.ts'),
+			`import { App } from './App.tsrx';
+import { renderToStaticMarkup } from 'octane/server';
+export const render = (rows: string[]) => renderToStaticMarkup(App, {rows}).html;`,
+		);
+		const { createServer } = await import('vite');
+		const { octane } = await import('octane/compiler/vite');
+		const server = await createServer({
+			root,
+			cacheDir: path.join(root, '.vite'),
+			configFile: false,
+			logLevel: 'silent',
+			server: { middlewareMode: true, hmr: false },
+			plugins: [octane({ hmr: false })],
+		});
+		try {
+			const { render } = await server.ssrLoadModule('/entry.ts');
+			expect(render(['badge', 'badge'])).toContain('data-matches="true"');
+			expect(render(['badge', 'plain'])).toContain('data-matches="false"');
+			expect(render([])).toContain('data-matches="false"');
+		} finally {
+			await server.close();
+		}
+	}, 30_000);
+
 	it('warns for element-valued template children and preserves the caller contract', async () => {
 		const root = project({
 			'Frame.tsx': `import type { ReactElement as Child } from "react";
