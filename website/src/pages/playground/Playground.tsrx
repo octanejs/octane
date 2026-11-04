@@ -43,6 +43,7 @@
 import {
 	useState,
 	useRef,
+	useLazyRef,
 	useEffect,
 	useEffectEvent,
 	useLayoutSnapshot,
@@ -160,14 +161,17 @@ export function Playground() @{
 	// Mobile only: which panel is visible (desktop always shows both).
 	const [pane, setPane] = useState<'editor' | 'result'>('editor');
 	const paneRef = useRef<'editor' | 'result'>('editor');
-	const [initialHash] = useState(() => {
+	const initialHash = useLazyRef(() => {
 		const rawHash = typeof window === 'undefined' ? '' : window.location.hash.slice(1);
 		return { rawHash, result: decodePlaygroundHash(rawHash) };
 	});
 	// Keep SSR's empty alert state for hydration, then show invalid URL input
 	// before the editor imports finish. Later compiles own this editable value.
 	const initialDiagnostic = useLayoutSnapshot(
-		() => (initialHash.result.ok ? '' : initialHash.result.error),
+		() => {
+			const { result } = initialHash.current;
+			return result.ok ? '' : result.error;
+		},
 		{ initial: '' },
 	);
 	const [error, setError] = useLinkedState(initialDiagnostic, (value) => value);
@@ -283,7 +287,7 @@ export function Playground() @{
 		let hashDebounceId = 0;
 		// Validate the URL payload before loading CodeMirror, Shiki, or the
 		// compiler. Oversized input is ignored in favor of the bounded defaults.
-		const { rawHash, result: hashResult } = initialHash;
+		const { rawHash, result: hashResult } = initialHash.current;
 		const initial = hashResult.ok ? hashResult.value : null;
 
 		(async () => {

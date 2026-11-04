@@ -2,7 +2,13 @@
 
 declare const process: { env: { NODE_ENV?: string } };
 
-import { useEffect, useId, HYDRATION_RANGE_BOUNDARY, createPortal, useState } from 'octane';
+import {
+	useEffect,
+	useId,
+	HYDRATION_RANGE_BOUNDARY,
+	createPortal,
+	useLayoutSnapshot,
+} from 'octane';
 import { DEV_STYLES_ATTR } from '@tanstack/router-core';
 import type { AssetCrossOriginConfig } from '@tanstack/router-core';
 import { createAsset } from '../assetComponent.tsrx';
@@ -49,9 +55,7 @@ export function Head(props: HeadProps) @{
 	@if (isServer ?? router.isServer) {
 		<head {...attrs}>{children}</head>
 	} @else {
-		// Capture the portal target once, before client adoption. This is a
-		// browser handle, not state copied from a post-hydration effect.
-		const [target] = useState(() => (typeof document === 'undefined' ? null : document.head));
+		const target = useLayoutSnapshot(() => document.head, { initial: null });
 		@if (target) {
 			<>
 				{createPortal(() => @{

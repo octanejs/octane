@@ -63,7 +63,7 @@ describe('Strong lazy ref factories and ownership', () => {
 	it('checks a literal-spread factory once, as render-time work', () => {
 		const source = `import { useLazyRef, useState } from 'octane';
 			export function App() {
-				const [items] = useState([]);
+				const [items, _setItems] = useState([]);
 				useLazyRef(...[() => { items.push(1); return 1; }]);
 				return <div />;
 			}`;

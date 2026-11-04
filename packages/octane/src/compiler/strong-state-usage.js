@@ -1,10 +1,11 @@
 // A state tuple whose value and getter are never read has one observable
 // effect: its setter schedules a render. That is a hand-rolled external-store
 // subscription without useSyncExternalStore's tearing check, subscription-time
-// re-check, or server snapshot. This read-only source check uses the shared
-// Strong hook graph, so hook aliases, namespace imports, and shadowing agree
-// with every other Strong analysis.
+// re-check, or server snapshot. Conversely, a useState call that discards its
+// setter cannot update its snapshot. Both checks use the shared Strong hook
+// graph, so aliases, namespace imports, and shadowing agree with other policies.
 
+export const STRONG_READ_ONLY_STATE = 'OCTANE_STRONG_READ_ONLY_STATE';
 export const STRONG_WRITE_ONLY_STATE = 'OCTANE_STRONG_WRITE_ONLY_STATE';
 
 const STATE_HOOKS = new Set(['useState', 'useReducer', 'useLinkedState']);
@@ -31,7 +32,9 @@ const SKIP_KEYS = new Set([
 	'returnType',
 	'typeParameters',
 ]);
-const MESSAGE =
+const READ_ONLY_MESSAGE =
+	'Strong mode does not allow capturing a useState value while discarding its setter. Derive render values from their inputs. For a value kept for events or effects, use useRef(value) or useLazyRef(() => createValue()) to initialize it once.';
+const WRITE_ONLY_MESSAGE =
 	'Strong mode does not allow write-only state. Nothing reads this state value or its getter, so the setter only forces a re-render. Subscribe to external data with useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot) and render its snapshot, or remove the unused state.';
 
 function unwrap(node) {
@@ -59,34 +62,37 @@ function staticIndex(node, computed) {
 /**
  * @param {any} ast
  * @param {{ analysis: any, callNames: Map<any, string> }} strongHookAnalysis
- * @param {(code: string, node: any, message: string) => any} diagnostic
+ * @param {(code: string, node: any, message: string, initializer?: any) => void} report
  */
-export function analyzeStrongWriteOnlyState(ast, strongHookAnalysis, diagnostic) {
+export function analyzeStrongStateUsage(ast, strongHookAnalysis, report) {
 	const { analysis, callNames } = strongHookAnalysis;
 	const bindingOf = (pattern, bindings) => {
 		const identifier = pattern?.type === 'AssignmentPattern' ? pattern.left : pattern;
 		if (identifier?.type !== 'Identifier') return undefined;
-		return bindings.find((entry) => entry.pattern === identifier)?.binding ?? null;
+		return bindings.find((entry) => entry.pattern === identifier)?.binding;
 	};
 	const candidates = [];
 	for (const { decl, bindings } of analysis.declarators) {
 		const init = unwrap(decl.init);
 		const call = unwrap(init?.type === 'MemberExpression' ? init.object : init);
-		if (call?.type !== 'CallExpression' || !STATE_HOOKS.has(callNames.get(call))) continue;
+		if (call?.type !== 'CallExpression') continue;
+		const hook = callNames.get(call);
+		if (!STATE_HOOKS.has(hook)) continue;
 		const id = decl.id;
 		// Each role is absent, a binding to check, or an arbitrary read (undefined).
 		let value = null;
-		let setter;
+		let setter = null;
 		let getter = null;
 		if (init !== call) {
-			// `useState(0)[1]` discards the value and the getter.
-			if (id?.type !== 'Identifier' || staticIndex(init.property, init.computed) !== 1) continue;
-			setter = bindingOf(id, bindings);
+			const index = staticIndex(init.property, init.computed);
+			if (index === 0) value = bindingOf(id, bindings);
+			else if (index === 1 && id?.type === 'Identifier') setter = bindingOf(id, bindings);
+			else continue;
 		} else if (id?.type === 'ArrayPattern') {
 			const elements = id.elements ?? [];
 			if (elements.some((element) => element?.type === 'RestElement')) continue;
 			value = elements[0] == null ? null : bindingOf(elements[0], bindings);
-			setter = elements[1] == null ? undefined : bindingOf(elements[1], bindings);
+			setter = elements[1] == null ? null : bindingOf(elements[1], bindings);
 			getter = elements[2] == null ? null : bindingOf(elements[2], bindings);
 		} else if (id?.type === 'ObjectPattern') {
 			let unknown = false;
@@ -102,10 +108,14 @@ export function analyzeStrongWriteOnlyState(ast, strongHookAnalysis, diagnostic)
 		} else {
 			continue;
 		}
+		if (hook === 'useState' && value !== null && setter === null) {
+			report(STRONG_READ_ONLY_STATE, id, READ_ONLY_MESSAGE, unwrap(call.arguments[0]));
+			continue;
+		}
 		if (setter == null || value === undefined || getter === undefined) continue;
 		candidates.push({ node: id, decl, value, setter, getter, read: false, written: false });
 	}
-	if (candidates.length === 0) return [];
+	if (candidates.length === 0) return;
 
 	const roles = new Map();
 	const names = new Set();
@@ -171,12 +181,10 @@ export function analyzeStrongWriteOnlyState(ast, strongHookAnalysis, diagnostic)
 	}
 	for (const root of roots) scan(root.body, root, 'body', null);
 
-	const diagnostics = [];
 	for (const candidate of candidates) {
 		if (candidate.written && !candidate.read)
-			diagnostics.push(diagnostic(STRONG_WRITE_ONLY_STATE, candidate.node, MESSAGE));
+			report(STRONG_WRITE_ONLY_STATE, candidate.node, WRITE_ONLY_MESSAGE);
 	}
-	return diagnostics;
 }
 
 // Property names, labels, and declaration names are not reads. Declaration

@@ -12,7 +12,7 @@
 // - The framework-agnostic `@tanstack/devtools` core (TanStackDevtoolsCore, Solid) is
 //   reused UNCHANGED, exactly as the React binding does.
 // - `ref` is the normal React-19-style ref prop; native events; no synthetic layer.
-import { createPortal, useEffect, useMemo, useRef, useState } from 'octane';
+import { createPortal, useEffect, useLazyRef, useMemo, useRef, useState } from 'octane';
 import { TanStackDevtoolsCore } from '@tanstack/devtools';
 import type {
 	ClientEventBusConfig,
@@ -194,7 +194,7 @@ export const TanStackDevtools = ({
 			}) ?? [],
 	);
 
-	const [devtools] = useState(() => {
+	const devtoolsRef = useLazyRef(() => {
 		const { customTrigger, ...coreConfig } = config || {};
 		return new TanStackDevtoolsCore({
 			config: {
@@ -212,12 +212,13 @@ export const TanStackDevtools = ({
 	});
 
 	useEffect(() => {
-		devtools.setConfig({
+		devtoolsRef.current.setConfig({
 			plugins: pluginsMap,
 		});
 	});
 
 	useEffect(() => {
+		const devtools = devtoolsRef.current;
 		if (devToolRef.current) {
 			devtools.mount(devToolRef.current);
 		}

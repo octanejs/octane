@@ -14,7 +14,7 @@ function Probe(props) @{
 	<></>
 }
 function LitePair(props) @{
-	const [seen] = useState(() => props.label);
+	const [seen, _setSeen] = useState(() => props.label);
 	const value = seen + ':' + props.read();
 	<>
 		<i id="lite-first">{value as string}</i>
@@ -22,7 +22,7 @@ function LitePair(props) @{
 	</>
 }
 function LiteSingle(props) @{
-	const [seen] = useState(() => props.label);
+	const [seen, _setSeen] = useState(() => props.label);
 	const value = seen + ':' + props.read();
 	<b id="lite-single">{value as string}</b>
 }

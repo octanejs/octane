@@ -174,7 +174,7 @@ export function StrongCustomHookContext(props: { context: typeof StrongTheme }) 
 
 export function StrongAliasedContextRows() @{
 	const [theme, setTheme] = useState('first');
-	const [items] = useState([{ id: 1 }, { id: 2 }]);
+	const [items, _setItems] = useState([{ id: 1 }, { id: 2 }]);
 	<div>
 		<button id="strong-aliased-context-update" onClick={() => setTheme('second')}>
 			update
@@ -198,7 +198,7 @@ const useConstStrongThemeInner = function (context: typeof StrongTheme): string 
 
 export function StrongConstCustomHookContextRows() @{
 	const [theme, setTheme] = useState('first');
-	const [items] = useState([{ id: 1 }, { id: 2 }]);
+	const [items, _setItems] = useState([{ id: 1 }, { id: 2 }]);
 	<div>
 		<button id="strong-const-hook-context-update" onClick={() => setTheme('second')}>
 			update
@@ -218,7 +218,7 @@ function useOptionalStrongTheme(context: typeof StrongTheme): string {
 
 export function StrongOptionalAliasedContextRows() @{
 	const [theme, setTheme] = useState('first');
-	const [items] = useState([{ id: 1 }, { id: 2 }]);
+	const [items, _setItems] = useState([{ id: 1 }, { id: 2 }]);
 	<div>
 		<button id="strong-optional-context-update" onClick={() => setTheme('second')}>
 			update
@@ -242,7 +242,7 @@ export function StrongOptionalAliasedContextRows() @{
 
 export function StrongOptionalNamespaceContextRows() @{
 	const [theme, setTheme] = useState('first');
-	const [items] = useState([{ id: 1 }, { id: 2 }]);
+	const [items, _setItems] = useState([{ id: 1 }, { id: 2 }]);
 	<div>
 		<button id="strong-optional-namespace-context-update" onClick={() => setTheme('second')}>
 			update
@@ -305,7 +305,7 @@ function unrelatedShadowAssignment(): number {
 
 export function StrongShadowedAssignmentContextRows() @{
 	const [theme, setTheme] = useState('first');
-	const [items] = useState([{ id: 1 }]);
+	const [items, _setItems] = useState([{ id: 1 }]);
 	<div>
 		<button id="strong-shadow-context-update" onClick={() => setTheme('second')}>
 			update
