@@ -172,7 +172,7 @@
         {
           "path": "packages/tanstack-devtools/src/devtools.tsrx",
           "role": "support",
-          "sha256": "2fb621ab23d55870fe56ce20ffb94d6af351ee6f33ab415a85eb6f4ff8a34850"
+          "sha256": "adc9a72a7427262508bcb4cee6d3e70811fbec9c87d21b798c75823c1e18f373"
         },
         {
           "path": "packages/tanstack-devtools/typetests/adapted/tsconfig.json",
