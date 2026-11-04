@@ -15,7 +15,7 @@ import {
 
 import type { Note, TransformOptions, TransformResult, Unported } from './types.js';
 
-type Context = { template: boolean };
+type Context = { template: boolean; descriptor?: boolean };
 type Import = {
 	module: string;
 	local: string;
@@ -37,6 +37,7 @@ const LITERAL_NEWLINE = '\u0000NL\u0000';
 
 const TEMPLATE = { template: true };
 const PLAIN = { template: false };
+const DESCRIPTOR = { template: false, descriptor: true };
 /** The local component that wraps an element no island can host and throws its `error`. */
 const NO_PORT = 'NoOctanePort';
 
@@ -633,6 +634,10 @@ class ModuleTransform {
 		const isExported = (statement: ts.Statement) =>
 			ts.canHaveModifiers(statement) &&
 			ts.getModifiers(statement)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+		const descriptorChildren = [...this.descriptorComponents].flatMap((d) => {
+			const statement = ts.isVariableDeclaration(d) ? d.parent.parent : d;
+			return d.name && isExported(statement) ? [d.name.getText(this.sf)] : [];
+		});
 		for (const statement of this.sf.statements) {
 			if (ts.isVariableStatement(statement)) {
 				for (const declaration of statement.declarationList.declarations) {
@@ -645,14 +650,28 @@ class ModuleTransform {
 				statement.exportClause &&
 				ts.isNamedExports(statement.exportClause)
 			) {
-				const pairs = statement.exportClause.elements.map<[string, string]>((element) => [
-					(element.propertyName ?? element.name).text,
-					element.name.text,
-				]);
 				if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+					const pairs = statement.exportClause.elements.map<[string, string]>((element) => [
+						(element.propertyName ?? element.name).text,
+						element.name.text,
+					]);
 					reexports.push({ specifier: statement.moduleSpecifier.text, names: pairs });
 				} else {
-					for (const [local, name] of pairs) if (contexts.has(local)) exported.add(name);
+					for (const element of statement.exportClause.elements) {
+						if (contexts.has((element.propertyName ?? element.name).text))
+							exported.add(element.name.text);
+						if (!this.descriptorComponents.size || statement.isTypeOnly || element.isTypeOnly)
+							continue;
+						const local =
+							this.checker.getExportSpecifierLocalTargetSymbol(element)?.valueDeclaration;
+						if (
+							local &&
+							(ts.isFunctionDeclaration(local) || ts.isVariableDeclaration(local)) &&
+							this.descriptorComponents.has(local)
+						) {
+							descriptorChildren.push(element.name.text);
+						}
+					}
 				}
 			} else if (
 				ts.isExportDeclaration(statement) &&
@@ -664,9 +683,11 @@ class ModuleTransform {
 				if (contexts.has(statement.expression.text)) exported.add('default');
 			}
 		}
+
 		return {
 			contexts: [...exported],
 			reexports,
+			...(descriptorChildren.length ? { descriptorChildren } : {}),
 			...(this.elementChildren.length ? { elementChildren: this.elementChildren } : {}),
 		};
 	}
@@ -789,7 +810,55 @@ class ModuleTransform {
 				`\`<${asset.local}>\` uses a React SVG import convention from \`${asset.module}\`. If your loader returns a React component, render it in a ReactCompat island or provide an Octane component.`,
 			);
 		}
-		for (const element of elements) this.planDescriptorChildren(element);
+		// Follow a local helper's inspected parameter back to its call arguments.
+		// Each parameter is expanded once, including when helpers call one another.
+		let calls: Map<string, ts.CallExpression[]> | undefined;
+		const seen = new Set<ts.ParameterDeclaration>();
+		for (const element of elements) {
+			this.planDescriptorChildren(element);
+			const value = skipWrappers(element);
+			const param = ts.isIdentifier(value) && this.declarationOf(value);
+			if (!param || !ts.isParameter(param) || param.dotDotDotToken || seen.has(param)) continue;
+			seen.add(param);
+			const fn = param.parent;
+			let binding: ts.FunctionDeclaration | ts.VariableDeclaration;
+			if (ts.isFunctionDeclaration(fn)) binding = fn;
+			else if (
+				ts.isVariableDeclaration(fn.parent) &&
+				fn.parent.initializer === fn &&
+				ts.getCombinedNodeFlags(fn.parent) & ts.NodeFlags.Const
+			)
+				binding = fn.parent;
+			else continue;
+			if (!binding.name || !ts.isIdentifier(binding.name)) continue;
+			const index = fn.parameters
+				.filter((p) => !ts.isIdentifier(p.name) || p.name.text !== 'this')
+				.indexOf(param);
+			calls ??= this.namedCalls();
+			for (const call of calls.get(binding.name.text) ?? []) {
+				if (!ts.isIdentifier(call.expression) || this.declarationOf(call.expression) !== binding)
+					continue;
+				if (call.arguments[index] && !call.arguments.slice(0, index + 1).some(ts.isSpreadElement)) {
+					elements.push(call.arguments[index]);
+				}
+			}
+		}
+	}
+
+	/** Indexed only for modules that inspect a local helper parameter. Resolve names at the use site. */
+	namedCalls() {
+		const calls = new Map<string, ts.CallExpression[]>();
+		const visit = (node: ts.Node) => {
+			if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.arguments.length) {
+				const name = node.expression.text;
+				const sites = calls.get(name);
+				if (sites) sites.push(node);
+				else calls.set(name, [node]);
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(this.sf);
+		return calls;
 	}
 
 	/**
@@ -1418,7 +1487,12 @@ class ModuleTransform {
 	span(node: ts.Node, from: number, to: number, ctx: Context) {
 		let out = '';
 		let cursor = from;
-		const childCtx = ts.isJsxElement(node) || ts.isJsxFragment(node) ? ctx : PLAIN;
+		const jsx = ts.isJsxElement(node) || ts.isJsxFragment(node);
+		const childCtx = jsx ? ctx : PLAIN;
+		// JSX in a value position (including a child's initializer) exposes its
+		// prop names to element inspection before it ever renders as a host node.
+		const descriptor =
+			ctx.descriptor || (!ctx.template && (jsx || ts.isJsxSelfClosingElement(node)));
 		node.forEachChild((child) => {
 			if (child.pos === child.end) return;
 			const start = child.getStart(this.sf);
@@ -1435,7 +1509,7 @@ class ModuleTransform {
 				ts.isJsxFragment(child) ||
 				ts.isJsxExpression(child) ||
 				ts.isJsxText(child);
-			out += this.emit(child, jsxChild ? childCtx : PLAIN);
+			out += this.emit(child, descriptor ? DESCRIPTOR : jsxChild ? childCtx : PLAIN);
 			cursor = child.end;
 		});
 		return out + this.source.slice(cursor, to);
@@ -1488,7 +1562,7 @@ class ModuleTransform {
 			if (!ts.isJsxClosingElement(node.parent)) this.count(RULE.documentShell);
 			return this.require('@octanejs/tanstack-router', DOCUMENT_TAGS[node.text], false);
 		}
-		if (ts.isJsxAttributes(node)) return this.rewriteAttributes(node);
+		if (ts.isJsxAttributes(node)) return this.rewriteAttributes(node, ctx);
 		if ((ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) && this.islands.has(node)) {
 			this.count(RULE.reactCompat);
 			const island = this.require('octane/react', 'ReactCompat', false);
@@ -2432,7 +2506,7 @@ class ModuleTransform {
 
 	// ---------------------------------------------------------------- JSX
 
-	rewriteAttributes(node: ts.JsxAttributes) {
+	rewriteAttributes(node: ts.JsxAttributes, ctx: Context) {
 		const element = node.parent;
 		const tag = element.tagName.getText(this.sf);
 		const intrinsic = /^[a-z]/.test(tag);
@@ -2476,6 +2550,7 @@ class ModuleTransform {
 			if (
 				name === 'className' &&
 				intrinsic &&
+				!ctx.descriptor &&
 				this.target === 'tsrx' &&
 				!attributeOf(element, 'class') &&
 				!spread
@@ -2544,12 +2619,16 @@ class ModuleTransform {
 		// A `descriptorChildren` component receives its children as elements, as
 		// in React; `@if` or `@for` there would hand it a fragment instead.
 		const declaration = ts.isIdentifier(tag) ? this.declarationOf(tag) : null;
+		const entry = this.importOf(tag);
+		const imported =
+			entry && !entry.namespace && !entry.typeOnly && entry.module.startsWith('.') ? entry : null;
 		if (
-			declaration &&
-			(ts.isVariableDeclaration(declaration) || ts.isFunctionDeclaration(declaration)) &&
-			this.descriptorComponents.has(declaration)
+			(declaration &&
+				(ts.isVariableDeclaration(declaration) || ts.isFunctionDeclaration(declaration)) &&
+				this.descriptorComponents.has(declaration)) ||
+			(imported && this.options.descriptorChild?.(imported))
 		) {
-			return this.span(node, node.getStart(this.sf), node.end, PLAIN);
+			return this.span(node, node.getStart(this.sf), node.end, DESCRIPTOR);
 		}
 		const name = this.calleeName(tag);
 		const opening = node.openingElement;
@@ -2559,13 +2638,10 @@ class ModuleTransform {
 			ts.isIdentifier(tag) &&
 			isComponentName(tag.text)
 		) {
-			const entry = this.importOf(tag);
 			const binding =
 				declaration && ts.isFunctionDeclaration(declaration)
 					? declaration.getStart(this.sf)
-					: entry && !entry.namespace && !entry.typeOnly && entry.module.startsWith('.')
-						? entry
-						: null;
+					: imported;
 			if (
 				binding !== null &&
 				this.options.elementChild(binding) &&

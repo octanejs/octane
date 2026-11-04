@@ -84,13 +84,16 @@ export async function runCodemod(
 
 	// resolveRename returns only an on-disk source that actually won import resolution.
 	const elementExports = new Map<string, Set<string>>();
+	const descriptorExports = new Map<string, Set<string>>();
 	for (const [from, to] of renames) {
-		const declarations = exports.get(from)?.elementChildren;
-		if (declarations)
+		const record = exports.get(from);
+		if (record?.elementChildren) {
 			elementExports.set(
 				to,
-				new Set(declarations.flatMap((d) => (d.exported ? [d.exported] : []))),
+				new Set(record.elementChildren.flatMap((d) => (d.exported ? [d.exported] : []))),
 			);
+		}
+		if (record?.descriptorChildren) descriptorExports.set(to, new Set(record.descriptorChildren));
 	}
 	const verify = options.verify !== false;
 	const compiler = verify || strong ? await loadCompiler(root) : null;
@@ -112,6 +115,16 @@ export async function runCodemod(
 			const target = resolveModule(file, specifier, known);
 			return target ? contextsOf(target.file).has(name) : null;
 		};
+		const matchesExport = (
+			index: Map<string, Set<string>>,
+			binding: { module: string; imported: string },
+		) => {
+			const to = resolveRename(file, binding.module);
+			return Boolean(
+				to?.startsWith('.') &&
+				index.get(path.resolve(path.dirname(file), to))?.has(binding.imported),
+			);
+		};
 		let types: TransformOptions['types'];
 		const result = transformModule(source, file, {
 			target,
@@ -132,15 +145,13 @@ export async function runCodemod(
 			isContext,
 			elementChild: !elementExports.size
 				? undefined
-				: (binding) => {
-						if (typeof binding === 'number')
-							return exports.get(file)?.elementChildren?.some((x) => x.start === binding) ?? false;
-						const to = resolveRename(file, binding.module);
-						return Boolean(
-							to?.startsWith('.') &&
-							elementExports.get(path.resolve(path.dirname(file), to))?.has(binding.imported),
-						);
-					},
+				: (binding) =>
+						typeof binding === 'number'
+							? (exports.get(file)?.elementChildren?.some((x) => x.start === binding) ?? false)
+							: matchesExport(elementExports, binding),
+			descriptorChild: descriptorExports.size
+				? (binding) => matchesExport(descriptorExports, binding)
+				: undefined,
 			unported: (specifier) => unportedName(specifier, file),
 			reactCompat,
 		});
