@@ -7,13 +7,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { launchBrowser } from '../../../../../test-utils/playwright-browser.js';
 import { compile } from '../../../src/compiler/index.js';
 import type * as Runtime from '../../../src/index.js';
-import type { Deferred, Measured } from './measurement.tsrx';
+import type { EffectResize } from './effect-resize.tsrx';
+import type { Deferred, Measured, MeasuredSibling, SnapshotResize } from './measurement.tsrx';
 
 declare global {
 	interface Window {
-		OctaneLayoutSnapshot: Pick<typeof Runtime, 'createRoot' | 'createElement'> & {
+		OctaneLayoutSnapshot: Pick<typeof Runtime, 'createRoot' | 'createElement' | 'flushSync'> & {
 			Measured: typeof Measured;
 			Deferred: typeof Deferred;
+			EffectResize: typeof EffectResize;
+			MeasuredSibling: typeof MeasuredSibling;
+			SnapshotResize: typeof SnapshotResize;
 		};
 	}
 }
@@ -22,6 +26,7 @@ type Mode = 'production' | 'development';
 const packageRoot = fileURLToPath(new URL('../../..', import.meta.url));
 const packageRequire = createRequire(new URL('../../../package.json', import.meta.url));
 const fixture = fileURLToPath(new URL('./measurement.tsrx', import.meta.url));
+const effectResize = fileURLToPath(new URL('./effect-resize.tsrx', import.meta.url));
 const bundles = new Map<Mode, string>();
 let browser: Browser;
 
@@ -30,8 +35,9 @@ async function bundle(mode: Mode): Promise<string> {
 	const output = await build({
 		stdin: {
 			contents: `
-				export { createRoot, createElement } from 'octane';
-				export { Measured, Deferred } from ${JSON.stringify(fixture)};
+				export { createRoot, createElement, flushSync } from 'octane';
+				export { Measured, Deferred, MeasuredSibling, SnapshotResize } from ${JSON.stringify(fixture)};
+				export { EffectResize } from ${JSON.stringify(effectResize)};
 			`,
 			resolveDir: packageRoot,
 			sourcefile: 'layout-snapshot.js',
@@ -57,7 +63,6 @@ async function bundle(mode: Mode): Promise<string> {
 							mode: 'client',
 							dev,
 							hmr: false,
-							strong: true,
 						});
 						if (compiled.diagnostics.length > 0) {
 							throw new Error(JSON.stringify(compiled.diagnostics, null, 2));
@@ -139,8 +144,45 @@ function runScenario(page: Page, component: 'Measured' | 'Deferred'): Promise<Re
 	}, component);
 }
 
+type LayoutWrite = 'effect' | 'cascade' | 'snapshot';
+
+function runSiblingScenario(page: Page, write: LayoutWrite): Promise<Observation> {
+	return page.evaluate((write) => {
+		const { createRoot, createElement, flushSync, EffectResize, MeasuredSibling, SnapshotResize } =
+			window.OctaneLayoutSnapshot;
+		const container = document.getElementById('root')!;
+		const root = createRoot(container);
+		const target = { current: null };
+		const snapshot = createElement(MeasuredSibling, { target });
+		const writer =
+			write === 'snapshot'
+				? createElement(SnapshotResize, { target })
+				: createElement(EffectResize, { target, immediate: write === 'effect' });
+		const children = write === 'effect' ? [snapshot, writer] : [writer, snapshot];
+		flushSync(() => root.render(createElement('section', null, ...children)));
+		const result = {
+			width: container.querySelector('[data-width]')!.getBoundingClientRect().width,
+			output: container.querySelector('output')!.textContent,
+		};
+		root.unmount();
+		return result;
+	}, write);
+}
+
 describe.sequential('layout snapshots in Chromium at the next rendering opportunity', () => {
 	for (const mode of ['production', 'development'] as const) {
+		for (const write of ['effect', 'cascade', 'snapshot'] as const) {
+			it(`publishes settled sibling geometry after ${write} writes in ${mode}`, async () => {
+				const { page, errors } = await openPage(mode);
+				try {
+					expect(await runSiblingScenario(page, write)).toEqual({ width: 260, output: '260' });
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			});
+		}
+
 		it(`publishes measured geometry by the first frame in Strong ${mode}`, async () => {
 			const { page, errors } = await openPage(mode);
 			try {

@@ -48,6 +48,7 @@ import {
 	countLayoutSnapshotChange,
 	WARM_EVER,
 	recordRealWarmMemo,
+	markLayoutSnapshotEffect,
 } from './engine.js';
 import { PASSIVE, LAYOUT, INSERTION, checkStoreChanged } from './effects.js';
 import { type WarmEntry, WARM_MISS, claimWarmMemoRecord, adoptWarmEntry } from './use.js';
@@ -995,7 +996,7 @@ export function useLayoutSnapshot<T>(
 	});
 	enqueueEffect(
 		box.effectSlot,
-		() => {
+		markLayoutSnapshotEffect(() => {
 			const next = measure();
 			const current = state.value!;
 			if ((options?.equal ?? Object.is)(current.value, next)) {
@@ -1003,10 +1004,8 @@ export function useLayoutSnapshot<T>(
 				return;
 			}
 			if (process.env.NODE_ENV !== 'production') countLayoutSnapshotChange(state, block);
-			// This runs inside a layout effect, so the update is urgent and never joins
-			// a pending Action: it belongs to the commit being measured.
-			state.setter({ value: next, effectSlot: current.effectSlot });
-		},
+			return () => state.setter({ value: next, effectSlot: current.effectSlot });
+		}),
 		undefined,
 		LAYOUT,
 	);
