@@ -283,6 +283,15 @@ export function useCellValue(definition) {
 }
 ```
 
+For a component that already receives an Octane writable signal, Strong migration can
+replace `useSyncExternalStore(notify => cell.subscribe(notify), () => cell.get(), () => cell.get())`
+with `cell.get()` in a module that already opts in to native signal tracking. The receiver must
+be a `const` initialized by `signal$()`, or have the public `WritableSignal` type
+resolved from `octane/signals` in a strict TypeScript project. Import
+`'octane/signals'` for its side effects when you want to enable native tracking
+for all render reads in a module that previously imported only its types. A distinct server
+snapshot or a project-specific reader keeps its original subscription.
+
 Choose a source root containing all consumers. The recipe discovers static
 module references under that root using the supplied TypeScript configuration.
 It accepts primitive initial values (including global `undefined`) and simple
