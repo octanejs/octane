@@ -7,6 +7,12 @@
 // no interleaved comments, and an existing `octane` import to extend. Anything
 // else keeps the message and leaves the rewrite to the author.
 
+import {
+	createLexicalAnalysis,
+	isIdentifierReference,
+	isJsxBindingReference,
+} from './compile-universal.js';
+
 /** The website page whose per-code anchors document every Strong diagnostic. */
 export const STRONG_DOCS_URL = 'https://octanejs.dev/docs/strong-mode';
 
@@ -18,7 +24,7 @@ export function strongDocsUrl(code) {
 	return `${STRONG_DOCS_URL}#${code.toLowerCase().replaceAll('_', '-')}`;
 }
 
-const WALK_SKIP_KEYS = new Set([
+const AST_SKIP_KEYS = new Set([
 	'type',
 	'start',
 	'end',
@@ -28,22 +34,26 @@ const WALK_SKIP_KEYS = new Set([
 	'metadata',
 	'comments',
 	'tokens',
+]);
+
+const WALK_SKIP_KEYS = new Set([
+	...AST_SKIP_KEYS,
 	'typeAnnotation',
 	'returnType',
 	'typeParameters',
 	'typeArguments',
 ]);
 
-function walk(node, visit) {
+function walk(node, visit, skip = WALK_SKIP_KEYS, parent = null, key = null) {
 	if (node == null || typeof node !== 'object') return;
 	if (Array.isArray(node)) {
-		for (const child of node) walk(child, visit);
+		for (const child of node) walk(child, visit, skip, parent, key);
 		return;
 	}
 	if (typeof node.type !== 'string') return;
-	visit(node);
+	visit(node, parent, key);
 	for (const key in node) {
-		if (!WALK_SKIP_KEYS.has(key) && !key.startsWith('_octane')) walk(node[key], visit);
+		if (!skip.has(key) && !key.startsWith('_octane')) walk(node[key], visit, skip, node, key);
 	}
 }
 
@@ -260,7 +270,312 @@ const LAYOUT_PROPERTIES = new Set([
 	'scrollTop',
 	'scrollWidth',
 ]);
-const LAYOUT_METHODS = new Set(['getBoundingClientRect', 'getClientRects', 'getComputedStyle']);
+const LAYOUT_METHODS = new Set([
+	'getBoundingClientRect',
+	'getClientRects',
+	'getComputedStyle',
+	'closest',
+]);
+
+// A layout snapshot measures after every commit. Only an explicit null list
+// establishes that schedule in Octane. A removed [] or an inferred list does not.
+function scalarMeasurement(value, initial) {
+	const chain = (node) => (node?.type === 'ChainExpression' ? node.expression : node);
+	const kind =
+		initial?.type === 'UnaryExpression' && ['+', '-'].includes(initial.operator)
+			? typeof initial.argument.value
+			: initial?.type === 'Literal'
+				? typeof initial.value
+				: null;
+	const nullInitial = initial?.type === 'Literal' && initial.value === null;
+	let read = chain(value);
+	if (read?.type === 'BinaryExpression') {
+		if (
+			(!nullInitial && kind !== 'boolean') ||
+			!['==', '!='].includes(read.operator) ||
+			read.right.type !== 'Literal' ||
+			read.right.value !== null
+		)
+			return null;
+		read = chain(read.left);
+		if (
+			read?.type !== 'CallExpression' ||
+			read.callee.property?.name !== 'closest' ||
+			read.arguments.length !== 1 ||
+			typeof read.arguments[0].value !== 'string'
+		)
+			return null;
+	} else {
+		if (kind !== 'number' && !nullInitial) return null;
+		if (
+			read?.type === 'LogicalExpression' &&
+			read.operator === '??' &&
+			read.right.type === 'Literal' &&
+			typeof read.right.value === 'number'
+		)
+			read = chain(read.left);
+		if (read?.type !== 'MemberExpression' || read.computed) return null;
+		if (LAYOUT_PROPERTIES.has(read.property.name)) return currentOf(read.object);
+		if (
+			!['height', 'width', 'top', 'bottom', 'left', 'right', 'x', 'y'].includes(read.property.name)
+		)
+			return null;
+		read = read.object;
+		if (
+			read?.type !== 'CallExpression' ||
+			read.arguments.length ||
+			read.callee.property?.name !== 'getBoundingClientRect'
+		)
+			return null;
+	}
+	return read.callee.type === 'MemberExpression' && !read.callee.computed
+		? currentOf(read.callee.object)
+		: null;
+}
+
+// Adding a module binding must not capture an existing free reference, including
+// a JSX namespace or a TypeScript value query. The caller caches this module scan.
+export function snapshotImportEditor(ast, source) {
+	const imports = new Map();
+	const groups = [];
+	for (const declaration of ast.body) {
+		if (
+			declaration.type !== 'ImportDeclaration' ||
+			declaration.source.value !== 'octane' ||
+			declaration.importKind === 'type'
+		)
+			continue;
+		const named = declaration.specifiers.filter((spec) => spec.type === 'ImportSpecifier');
+		if (!named.length) continue;
+		const group = { declaration, named };
+		groups.push(group);
+		for (const spec of named) {
+			if (
+				spec.importKind !== 'type' &&
+				['useState', 'useLayoutEffect'].includes(spec.imported.name)
+			) {
+				imports.set(spec.local.name, { spec, sites: new Set(), offered: new Set() });
+			}
+		}
+	}
+	const lexical = createLexicalAnalysis(ast);
+	let collision = false;
+	let dynamic = false;
+	for (const statement of ast.body) {
+		const declaration = statement.declaration ?? statement;
+		const typeQuery =
+			declaration.type === 'TSTypeAliasDeclaration' ? declaration.typeAnnotation : null;
+		walk(
+			statement,
+			(node, parent, key) => {
+				if (
+					node.type === 'WithStatement' ||
+					(node.type === 'CallExpression' &&
+						node.callee?.type === 'Identifier' &&
+						node.callee.name === 'eval')
+				)
+					dynamic = true;
+				if (node.type !== 'Identifier' && node.type !== 'JSXIdentifier') return;
+				if (node.name === 'useLayoutSnapshot') collision = true;
+				const binding = imports.get(node.name);
+				if (!binding) return;
+				// A local type export refers to the imported value as a type. Runtime
+				// lexical analysis deliberately excludes these export specifiers.
+				if (parent?.type === 'ExportSpecifier' && key === 'local' && !statement.source) {
+					binding.sites.add(node.start);
+					return;
+				}
+				const reference =
+					node.type === 'Identifier'
+						? isIdentifierReference(node, parent, key, lexical)
+						: isJsxBindingReference(node, parent, key);
+				if (!reference) return;
+				const scope = lexical.nodeScopes.get(node);
+				if (scope) {
+					if (lexical.resolveBinding(scope, node.name)?.scope === lexical.rootScope)
+						binding.sites.add(node.start);
+				} else if (parent === typeQuery && parent?.type === 'TSTypeQuery' && key === 'exprName') {
+					binding.sites.add(node.start);
+				} else if (!(
+					key === 'key' &&
+					!parent.computed &&
+					(parent.type === 'TSPropertySignature' || parent.type === 'TSMethodSignature')
+				)) {
+					// Other type positions have no runtime scope. Keep the diagnostic
+					// without an import edit when their binding cannot be established.
+					binding.uncertain = true;
+				}
+			},
+			AST_SKIP_KEYS,
+		);
+	}
+
+	return (state, effect, existing) => {
+		const add = !existing;
+		if (dynamic || (add && (collision || !groups.length))) return false;
+		const calls = [state, effect].map((call) => imports.get(call.callee.name)).filter(Boolean);
+		// Leave the last consumer of a shared import for the next fix pass. The
+		// last edit can then remove that import, even when a batch applied all
+		// its siblings together. Each editor action must also work on its own.
+		if (
+			calls.some(
+				(binding) =>
+					binding.uncertain ||
+					(binding.sites.size > 1 && binding.offered.size === binding.sites.size - 1),
+			)
+		)
+			return false;
+		const drop = new Set(
+			calls.filter((binding) => binding.sites.size === 1).map((binding) => binding.spec),
+		);
+		const edits = [];
+		for (const group of groups) {
+			const { declaration, named } = group;
+			const append = add && group === groups[0];
+			const kept = named.filter((spec) => !drop.has(spec));
+			const last = named[named.length - 1];
+			if (kept.length === named.length) {
+				if (append) edits.push({ start: last.end, end: last.end, text: ', useLayoutSnapshot' });
+				continue;
+			}
+			// Preserve comments in import lists. A commented declaration can be
+			// separated by hand without guessing which specifier owns the comment.
+			if (/\/[/*]/.test(source.slice(declaration.start, declaration.end))) return false;
+			const names = kept.map((spec) => source.slice(spec.start, spec.end));
+			if (append) names.push('useLayoutSnapshot');
+			if (names.length) {
+				edits.push({ start: named[0].start, end: last.end, text: names.join(', ') });
+			} else if (named.length === declaration.specifiers.length) {
+				edits.push({ start: declaration.start, end: declaration.end, text: '' });
+			} else {
+				return false;
+			}
+		}
+		for (const call of [state, effect])
+			imports.get(call.callee.name)?.offered.add(call.callee.start);
+		return edits;
+	};
+}
+
+/** A source edit for an adjacent state declaration and its only writer. */
+export function layoutSnapshotEdits(effect, source, calls, snapshotImport) {
+	const call = effect.node;
+	if (
+		calls.get(call) !== 'useLayoutEffect' ||
+		call.arguments.length !== 2 ||
+		call.arguments[1].type !== 'Literal' ||
+		call.arguments[1].value !== null
+	)
+		return;
+	const callback = call.arguments[0];
+	if (callback.type !== 'ArrowFunctionExpression' || callback.async || callback.params.length)
+		return;
+	const body = callback.body;
+	const update =
+		body.type === 'BlockStatement'
+			? body.body.length === 1 &&
+				body.body[0].type === 'ExpressionStatement' &&
+				body.body[0].expression
+			: body;
+	if (
+		update?.type !== 'CallExpression' ||
+		update.callee.type !== 'Identifier' ||
+		update.arguments.length !== 1
+	)
+		return;
+	const statements = effect.caller?.body?.body;
+	if (!Array.isArray(statements)) return;
+	const index = statements.findIndex(
+		(statement) => statement.type === 'ExpressionStatement' && statement.expression === call,
+	);
+	const state = statements[index - 1];
+	if (state?.kind !== 'const' || state.declarations?.length !== 1) return;
+	const { id, init } = state.declarations[0];
+	if (
+		calls.get(init) !== 'useState' ||
+		init.arguments.length !== 1 ||
+		id.type !== 'ArrayPattern' ||
+		id.typeAnnotation ||
+		id.elements.length !== 2
+	)
+		return;
+	const [value, setter] = id.elements;
+	if (
+		value?.type !== 'Identifier' ||
+		setter?.type !== 'Identifier' ||
+		setter.name !== update.callee.name
+	)
+		return;
+	const initial = init.arguments[0];
+	const measurement = update.arguments[0];
+	const ref = scalarMeasurement(measurement, initial);
+	if (!ref || /\/[/*]/.test(source.slice(state.start, statements[index].end))) return;
+
+	// Require a locally owned host ref. A user-defined getter could return an
+	// updater function, which a state setter would call rather than store.
+	const declaration = statements
+		.slice(0, index - 1)
+		.flatMap((statement) => statement.declarations ?? [])
+		.find(
+			(decl) =>
+				decl.id.type === 'Identifier' &&
+				decl.id.name === ref.name &&
+				calls.get(decl.init) === 'useRef',
+		);
+	if (
+		!declaration ||
+		declaration.init.arguments.length !== 1 ||
+		declaration.init.arguments[0].type !== 'Literal' ||
+		declaration.init.arguments[0].value !== null
+	)
+		return;
+	let refUses = 0;
+	let hosts = 0;
+	let setterUses = 0;
+	let dynamic = false;
+	walk(
+		effect.caller,
+		(node) => {
+			// An intrinsic tag or attribute named "ref" is not an expression. JSX
+			// member roots, including lowercase namespaces, do reference bindings.
+			const name =
+				node.type === 'Identifier' || (node.type === 'JSXIdentifier' && !/^[a-z]/.test(node.name))
+					? node.name
+					: node.type === 'JSXMemberExpression'
+						? node.object.name
+						: null;
+			if (name === ref.name) refUses++;
+			if (name === setter.name) setterUses++;
+			if (name === 'eval') dynamic = true;
+			if (
+				node.type === 'JSXOpeningElement' &&
+				node.name.type === 'JSXIdentifier' &&
+				/^[a-z]+$/.test(node.name.name) &&
+				node.attributes.some(
+					(attr) =>
+						attr.type === 'JSXAttribute' &&
+						attr.name.name === 'ref' &&
+						attr.value?.expression?.type === 'Identifier' &&
+						attr.value.expression.name === ref.name,
+				)
+			)
+				hosts++;
+		},
+		AST_SKIP_KEYS,
+	);
+	if (dynamic || setterUses !== 2 || hosts !== 1 || refUses !== 3) return;
+	const importEdits = snapshotImport(effect.callback.scope, init, call);
+	if (importEdits === false) return;
+	const type = init.typeArguments ?? init.typeParameters;
+	const generic = type ? source.slice(type.start, type.end) : '';
+	const replacement = `useLayoutSnapshot${generic}(() => ${source.slice(measurement.start, measurement.end)}, { initial: ${source.slice(initial.start, initial.end)} })`;
+	return [
+		...importEdits,
+		{ start: id.start, end: id.end, text: value.name },
+		{ start: init.start, end: init.end, text: replacement },
+		{ start: state.end, end: statements[index].end, text: '' },
+	];
+}
 
 const NESTED_FUNCTIONS = new Set([
 	'ArrowFunctionExpression',

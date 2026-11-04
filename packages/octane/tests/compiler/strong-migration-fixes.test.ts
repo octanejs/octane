@@ -150,6 +150,82 @@ export function Width() {
 });
 
 describe('Strong migration guidance for measurements copied into state', () => {
+	const measured = (
+		deps = ', null',
+		extra = '',
+		read = 'el.current?.offsetWidth ?? 0',
+		initial = '7',
+	) =>
+		`import { useLayoutEffect as layout, useRef, useState } from 'octane';
+export function Meter() {
+	const el = useRef<HTMLDivElement>(null);
+	const [value, setValue] = useState(${initial});
+	layout(() => { setValue(${read}); }${deps});
+	${extra}
+	return <div ref={el}>{String(value)}</div>;
+}`;
+
+	function measurementEdits(source: string) {
+		return editsOf(errors(source).find((d) => d.code === 'OCTANE_STRONG_EFFECT_STATE_UPDATE'));
+	}
+
+	it.each([
+		['el.current?.offsetWidth ?? 0', '7'],
+		['el.current?.offsetHeight ?? 0', '-1'],
+		['el.current?.offsetHeight ?? 0', 'null'],
+		['el.current?.getBoundingClientRect().width ?? 0', '7'],
+		["el.current?.closest('form') != null", 'true'],
+	])('offers a compilable edit for an every-commit measurement of %s', (read, initial) => {
+		const source = measured(', null', '', read, initial);
+		const fixed = applyEdits(source, measurementEdits(source)!);
+		expect(fixed).toContain(`useLayoutSnapshot(() => ${read}, { initial: ${initial} })`);
+		expect(errors(fixed)).toEqual([]);
+	});
+
+	it('reuses an existing snapshot import and retains the state type argument', () => {
+		const source = measured()
+			.replace('import {', 'import { useLayoutSnapshot,')
+			.replace('useState(7)', 'useState<number>(7)');
+		const fixed = applyEdits(source, measurementEdits(source)!);
+		expect(fixed).toContain('useLayoutSnapshot<number>');
+		expect(errors(fixed)).toEqual([]);
+	});
+
+	it.each([
+		['inferred dependencies', measured('')],
+		['mount-only measurement', measured(', []')],
+		[
+			'a JSX setter reference',
+			measured()
+				.replaceAll('setValue', 'SetValue')
+				.replace('{String(value)}', '<SetValue />{String(value)}'),
+		],
+		[
+			'a JSX namespace capture',
+			measured().replace('{String(value)}', '<useLayoutSnapshot.Label />{String(value)}'),
+		],
+		[
+			'a lowercase JSX member root',
+			measured().replace('{String(value)}', '<setValue.Part />{String(value)}'),
+		],
+		[
+			'a Unicode JSX component binding',
+			measured()
+				.replaceAll('setValue', 'Écriture')
+				.replace('{String(value)}', '<Écriture />{String(value)}'),
+		],
+		['a type query on the setter', measured(', null', 'type Writer = typeof setValue;')],
+		['another writer', measured(', null', 'const update = () => setValue(1);')],
+		['an escaped ref', measured(', null', 'consume(el);')],
+		['a cleanup', measured().replace('0); }', '0); return () => cleanup(); }')],
+		['a passive effect', measured().replace('useLayoutEffect as layout', 'useEffect as layout')],
+		['an import collision', measured(', null', 'const useLayoutSnapshot = () => 1;')],
+		['a comment', measured().replace('layout(()', '/* measured here */ layout(()')],
+		['an object result', measured(', null', '', 'el.current?.getBoundingClientRect()', 'null')],
+	])('leaves %s for manual migration', (_, source) => {
+		expect(measurementEdits(source)).toBeUndefined();
+	});
+
 	it.each([
 		['offsetWidth', 'el.current?.offsetWidth ?? 0'],
 		['getBoundingClientRect', 'el.current?.getBoundingClientRect().width ?? 0'],
