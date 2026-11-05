@@ -1,3 +1,5 @@
+import { createScopedStorePlanner } from './scoped-store-contract.js';
+import { storeInputFactories } from './store-inputs.js';
 import type {
 	CodemodOptions,
 	CodemodResult,
@@ -206,6 +208,59 @@ export async function runCodemod(
 		const specifier = path.relative(dir, adapter).split(path.sep).join('/');
 		return specifier.startsWith('.') ? specifier : './' + specifier;
 	};
+	const helperDir = path.dirname(adapter);
+	const storeBridge = path.join(helperDir, 'octane-store-context.tsrx');
+	const storeSlots = path.join(helperDir, 'octane-store-hooks.ts');
+	const planStoreHook =
+		target === 'tsrx' &&
+		compiler &&
+		reactCompat &&
+		/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(readInstalled(helperDir, 'octane')?.version ?? '')
+			? createScopedStorePlanner(helperDir, storeBridge, config ?? undefined)
+			: null;
+	const inputFactory = storeInputFactories(root, config);
+	const checkedHelpers = new Map<string, { code: string; create: boolean; error?: string }>();
+	const storeHelpers = new Map<string, string>();
+	let storeTemplates: ReadonlyMap<string, string> | undefined;
+	function checkHelper(output: string, code: string) {
+		const cached = checkedHelpers.get(output);
+		if (cached)
+			return cached.code === code
+				? cached.error
+				: 'Two workspace hook sources need different code at ' + path.relative(root, output);
+		const stat = fs.lstatSync(output, { throwIfNoEntry: false });
+		const name = path.relative(root, output);
+		const ownerOf = (file: string) =>
+			owners.has(ts.sys.useCaseSensitiveFileNames ? file : file.toLowerCase());
+		// Bundlers can prefer a JavaScript or JSX sibling over our extensionless .ts import.
+		const shadowed =
+			output.endsWith('.ts') &&
+			['', '.js', '.jsx', '.tsx', '.mjs', '.cjs', '.mts', '.cts', '.json', '.tsrx'].some((ext) => {
+				const sibling = output.slice(0, -3) + ext;
+				return ownerOf(sibling) || fs.lstatSync(sibling, { throwIfNoEntry: false });
+			});
+		let error: string | undefined;
+		if (
+			shadowed ||
+			ownerOf(output) ||
+			(stat && (!stat.isFile() || fs.readFileSync(output, 'utf8') !== code))
+		) {
+			error = 'The workspace hook adapter path is occupied: ' + name;
+		} else {
+			const rejected = output.endsWith('.tsrx')
+				? compile(compiler!, code, output, true).some((d) => d.severity === 'error')
+				: ts
+						.transpileModule(code, {
+							fileName: output,
+							reportDiagnostics: true,
+							compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext },
+						})
+						.diagnostics?.some((d) => d.category === ts.DiagnosticCategory.Error);
+			if (rejected) error = 'The target compiler rejected the workspace hook adapter: ' + name;
+		}
+		checkedHelpers.set(output, { code, create: !stat, error });
+		return error;
+	}
 	const results: FileResult[] = [];
 	for (const file of files) {
 		const conflict = conflicts.get(file);
@@ -235,11 +290,59 @@ export async function runCodemod(
 			target === 'tsrx' && reactCompat && source.includes('react-intl')
 				? intlPath(file)
 				: undefined;
+		const storeErrors = new Set<string>();
+		const resolveStoreHook: TransformOptions['resolveStoreHook'] =
+			!planStoreHook || !renames.has(file)
+				? undefined
+				: (module, name, safeUses) => {
+						if (!unportedName(module, file)) return null;
+						const plan = planStoreHook(module, name, file);
+						if (
+							!plan ||
+							!safeUses((source, name) => {
+								const factory = inputFactory(file, source, name);
+								return !!factory && plan.isSharedExport(factory.module, factory.name, factory.from);
+							})
+						)
+							return null;
+						storeTemplates ??= new Map([
+							[
+								storeBridge,
+								fs.readFileSync(
+									new URL('../templates/octane-store-context.tsrx', import.meta.url),
+									'utf8',
+								),
+							],
+							[
+								storeSlots,
+								fs.readFileSync(
+									new URL('../templates/octane-store-hooks.ts', import.meta.url),
+									'utf8',
+								),
+							],
+						]);
+						const helpers = new Map([...plan.files, ...storeTemplates]);
+						for (const [output, code] of helpers) {
+							const error = checkHelper(output, code);
+							if (error) {
+								storeErrors.add(error);
+								return null;
+							}
+						}
+						for (const [output, code] of helpers) storeHelpers.set(output, code);
+						const relative = path
+							.relative(path.dirname(file), plan.entry)
+							.split(path.sep)
+							.join('/')
+							.replace(/\.ts$/, '');
+						return { from: relative.startsWith('.') ? relative : './' + relative, name: plan.name };
+					};
 		const transform = (captureEffectReceivers = false, notes = extra) =>
 			transformModule(source, file, {
 				captureEffectReceivers,
 				target,
 				reactIntlAdapter: intl,
+				resolveStoreHook,
 				strong,
 				strictNullChecks: strictConfig !== null,
 				get types() {
@@ -290,6 +393,30 @@ export async function runCodemod(
 			}
 		}
 		const result = transform();
+		for (const message of storeErrors) {
+			const note: Note = {
+				rule: 'store-hook',
+				line: 1,
+				severity: 'error',
+				message: write ? message + '. No changes were written.' : message,
+			};
+			if (write)
+				return blockedWrite(
+					root,
+					unchangedFile(path.relative(root, file), source, note),
+					compiler?.from,
+				);
+			extra.push(note);
+		}
+		if (result.rules['store-hook'])
+			extra.push({
+				rule: 'store-hook',
+				line: 1,
+				severity: 'info',
+				message:
+					'React-hosted consumers inherit their store context. At a standalone Octane root, supply the active context and value with NativeStoreProvider.',
+			});
+
 		for (const port of result.unported) {
 			const entry = missing.get(port.name) ?? {
 				name: port.name,
@@ -385,6 +512,22 @@ export async function runCodemod(
 		}
 	}
 
+	for (const [output, code] of storeHelpers) {
+		if (!checkedHelpers.get(output)?.create) continue;
+		const name = path.relative(root, output);
+		if (write) fs.writeFileSync(output, code, { flag: 'wx' });
+		results.push({
+			file: name,
+			output: name,
+			changed: true,
+			code,
+			rules: { 'store-hook-adapter': 1 },
+			notes: [],
+			diagnostics: [],
+			strong: code.startsWith("'use strong'") ? true : null,
+			strongFixes: [],
+		});
+	}
 	if (createAdapter && adapterSource && results.some((file) => file.rules['react-intl'])) {
 		// Create the helper first. A failed or retried write must never overwrite an existing module.
 		if (write) fs.writeFileSync(adapter, adapterSource, { flag: 'wx' });
@@ -409,7 +552,12 @@ export async function runCodemod(
 	const dependencies = addBindings(root, packages, write);
 	if (write) {
 		for (const result of results) {
-			if (!result.changed || result.rules['react-intl-adapter']) continue;
+			if (
+				!result.changed ||
+				result.rules['react-intl-adapter'] ||
+				result.rules['store-hook-adapter']
+			)
+				continue;
 			const output = path.join(root, result.output);
 			fs.writeFileSync(output, result.code, { flag: result.output === result.file ? 'w' : 'wx' });
 			if (result.output !== result.file) fs.rmSync(path.join(root, result.file));
