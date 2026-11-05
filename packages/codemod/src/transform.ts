@@ -3301,11 +3301,15 @@ class ModuleTransform {
 		if (!ts.isCallExpression(iterable) || ts.isOptionalChain(iterable)) return false;
 		const method = iterable.expression;
 		if (!ts.isPropertyAccessExpression(method) || method.name.text !== 'filter') return false;
-		const declaration = this.checker.getSymbolAtLocation(method.name)?.declarations?.[0];
+		const declarations = this.checker.getSymbolAtLocation(method.name)?.declarations;
 		return (
-			declaration?.getSourceFile() === esLib() &&
-			ts.isInterfaceDeclaration(declaration.parent) &&
-			['Array', 'ReadonlyArray'].includes(declaration.parent.name.text)
+			declarations?.length &&
+			declarations.every(
+				(declaration) =>
+					declaration.getSourceFile() === esLib() &&
+					ts.isInterfaceDeclaration(declaration.parent) &&
+					['Array', 'ReadonlyArray'].includes(declaration.parent.name.text),
+			)
 		);
 	}
 

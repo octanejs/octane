@@ -648,12 +648,16 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		const kept = transformModule(captured, 'menu.tsx', { strong: true });
 		expect(compileErrors(kept.code, 'menu.tsrx', true)).toContain('OCTANE_STRONG_MAP_JSX');
 		// A collection can define its own filter and map order.
-		const custom = source.replace(
-			'{ row: string[] }',
-			'{ row: { filter(fn: (v: string) => boolean): { map(fn: (v: string) => unknown): unknown } } }',
-		);
-		const collection = transformModule(custom, 'menu.tsx', { strong: true });
-		expect(compileErrors(collection.code, 'menu.tsrx', true)).toContain('OCTANE_STRONG_MAP_JSX');
+		const custom =
+			'{ filter(fn: (v: string) => boolean): { map(fn: (v: string) => unknown): unknown } }';
+		for (const type of [custom, 'string[] | ' + custom]) {
+			const collection = transformModule(
+				source.replace('row: string[]', 'row: ' + type),
+				'menu.tsx',
+				{ strong: true },
+			);
+			expect(compileErrors(collection.code, 'menu.tsrx', true)).toContain('OCTANE_STRONG_MAP_JSX');
+		}
 	});
 
 	it('keeps a list as `.map()` when an `@for` would change what it reads', () => {
