@@ -19,6 +19,12 @@ export interface TransformOptions {
 	types?: { sourceFile: ts.SourceFile; checker: ts.TypeChecker };
 	/** The new spelling of an import specifier (a renamed module, a binding package), or null to keep it. */
 	resolveSpecifier?(specifier: string): string | null;
+	/** Resolve a source-backed workspace hook after verifying its implementation and its call sites. */
+	resolveStoreHook?(
+		module: string,
+		name: string,
+		safeUses: (sharedInput: (module: string, name: string) => boolean) => boolean,
+	): { from: string; name: string } | null;
 	/** Relative path to the project-local React Intl adapter, when its installed peers support it. */
 	reactIntlAdapter?: string;
 	/** Whether the selected component at this local declaration offset, or this imported name, accepts one explicit element. */

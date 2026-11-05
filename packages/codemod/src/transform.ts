@@ -1,6 +1,7 @@
 import { reactRenderer } from './react-renderer.js';
 import ts from 'typescript';
 import { effectReceivers } from './effect-receivers.js';
+import { isBareSvgTag, storeHookUses } from './store-hook-uses.js';
 import { intlImports } from './react-intl.js';
 import {
 	DEPENDENCY_HOOKS,
@@ -533,6 +534,7 @@ class ModuleTransform {
 	/** Every import, keyed by its declaration. */
 	readonly imports = new Map<ts.Node, Import>();
 	nativeIntl = new Set<ts.ImportSpecifier>();
+	readonly nativeStoreHooks = new Map<ts.ImportSpecifier, { from: string; name: string }>();
 	/** React and Octane imports, by local name. */
 	readonly apiLocals = new Map<string, Import>();
 	/** React-module locals that are still referenced after the rewrite. */
@@ -769,9 +771,38 @@ class ModuleTransform {
 				(fn) => this.isComponent(fn),
 			);
 		}
+		let safeStoreUses: ReturnType<typeof storeHookUses> | undefined;
 		for (const [declaration, entry] of this.imports) {
 			if (entry.typeOnly || (ts.isImportSpecifier(declaration) && this.nativeIntl.has(declaration)))
 				continue;
+			if (
+				this.target === 'tsrx' &&
+				this.options.resolveStoreHook &&
+				ts.isImportSpecifier(declaration) &&
+				/^use[A-Z0-9]/.test(entry.imported) &&
+				/^use[A-Z0-9]/.test(entry.local)
+			) {
+				const statement = declaration.parent.parent.parent;
+				if (!statement.attributes && !/\/\*|\/\//.test(statement.getText(this.sf))) {
+					const from = this.options.resolveStoreHook(
+						entry.module,
+						entry.imported,
+						(sharedInput) => {
+							safeStoreUses ??= storeHookUses(
+								this.sf,
+								this.checker,
+								(fn) => this.isComponent(fn),
+								(expr) => this.typeOf(expr),
+							);
+							return safeStoreUses(declaration, sharedInput);
+						},
+					);
+					if (from) {
+						this.nativeStoreHooks.set(declaration, from);
+						continue;
+					}
+				}
+			}
 			entry.port = this.portOf(entry.module);
 			if (entry.port) portLocals.add(entry.local);
 		}
@@ -798,7 +829,20 @@ class ModuleTransform {
 			ts.forEachChild(node, visit);
 		};
 		visit(this.sf);
+		const checkSvgIssuer =
+			this.nativeStoreHooks.size > 0 &&
+			[...this.imports.values()].some(
+				(entry) => entry.imported === 'default' && /\.svg$/i.test(entry.module),
+			);
 		for (const field of fields) {
+			if (checkSvgIssuer && isBareSvgTag(field.tagName, this.checker)) {
+				this.note(
+					'store-hook',
+					'error',
+					field.tagName,
+					'This JSX tag can resolve to a bare SVG import. Loading the SVG from .tsrx can produce an asset URL. Render the SVG in a React-owned .tsx component through ReactCompat, or configure a native SVG loader for .tsrx.',
+				);
+			}
 			if (this.takesChange(field)) this.planRestChange(field);
 			if (!reactSvgImports.size) continue;
 			const asset = this.importOf(field.tagName);
@@ -1740,26 +1784,48 @@ class ModuleTransform {
 			this.importSlots.push(node);
 			return `\u0000IMPORT${this.importSlots.length - 1}\u0000`;
 		}
-		if (
-			module === 'react-intl' &&
-			node.importClause?.namedBindings &&
-			ts.isNamedImports(node.importClause.namedBindings)
-		) {
-			const clause = node.importClause;
-			const elements = node.importClause.namedBindings.elements;
-			const moved = elements.filter((item) => this.nativeIntl.has(item));
-			if (moved.length) {
-				const names = (items: readonly ts.ImportSpecifier[]) =>
-					`{ ${items.map((item) => item.getText(this.sf)).join(', ')} }`;
-				const kept = elements.filter((item) => !this.nativeIntl.has(item));
-				const original = [clause.name?.text, kept.length ? names(kept) : undefined]
+		const clause = node.importClause;
+		const bindings = clause?.namedBindings;
+		if (clause && bindings && ts.isNamedImports(bindings)) {
+			const moved = new Map<string, string[]>();
+			const kept: ts.ImportSpecifier[] = [];
+			let store = false;
+			for (const item of bindings.elements) {
+				const hook = this.nativeStoreHooks.get(item);
+				const dest =
+					hook?.from ?? (this.nativeIntl.has(item) ? this.options.reactIntlAdapter : undefined);
+				if (!dest) {
+					kept.push(item);
+					continue;
+				}
+				store ||= !!hook;
+				const names = moved.get(dest) ?? [];
+				names.push(
+					hook && hook.name !== (item.propertyName ?? item.name).text
+						? hook.name === item.name.text
+							? hook.name
+							: `${hook.name} as ${item.name.text}`
+						: item.getText(this.sf),
+				);
+				moved.set(dest, names);
+			}
+			if (moved.size) {
+				const original = [
+					clause.name?.text,
+					kept.length ? `{ ${kept.map((x) => x.getText(this.sf)).join(', ')} }` : undefined,
+				]
 					.filter(Boolean)
 					.join(', ');
-				this.count('react-intl');
-				return (
-					(original ? `import ${original} from ${node.moduleSpecifier.getText(this.sf)};\n` : '') +
-					`import ${names(moved)} from ${this.quote}${this.options.reactIntlAdapter}${this.quote};`
-				);
+				const specifier = node.moduleSpecifier.getText(this.sf);
+				const lines: string[] = [];
+				if (original) lines.push(`import ${original} from ${specifier};`);
+				// A workspace package's public entry may also initialize its store.
+				if (store && !clause.name && kept.every((item) => item.isTypeOnly))
+					lines.push(`import ${specifier};`);
+				for (const [dest, names] of moved)
+					lines.push(`import { ${names.join(', ')} } from ${this.quote}${dest}${this.quote};`);
+				this.count(store ? 'store-hook' : 'react-intl');
+				return lines.join('\n');
 			}
 		}
 		const text =

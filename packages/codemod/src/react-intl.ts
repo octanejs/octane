@@ -1,3 +1,4 @@
+import { localUses, scalar } from './local-uses.js';
 import ts from 'typescript';
 
 const scalarMethods = new Set([
@@ -10,19 +11,6 @@ const scalarMethods = new Set([
 	'formatDisplayName',
 ]);
 const descriptor = new Set(['id', 'description', 'defaultMessage', 'ignoreTag']);
-
-function scalar(type: ts.Type): boolean {
-	if (type.isUnion()) return type.types.every(scalar);
-	return !!(
-		type.flags &
-		(ts.TypeFlags.StringLike |
-			ts.TypeFlags.NumberLike |
-			ts.TypeFlags.BooleanLike |
-			ts.TypeFlags.BigIntLike |
-			ts.TypeFlags.Null |
-			ts.TypeFlags.Undefined)
-	);
-}
 
 /** Select whole named imports that the shared adapter can replace without changing renderer-owned values. */
 export function intlImports(
@@ -55,26 +43,7 @@ export function intlImports(
 	});
 	const selected = new Set<ts.ImportSpecifier>();
 	if (!candidates.length) return selected;
-	const refs = new Map<ts.Symbol, ts.Identifier[]>();
-	const symbol = (id: ts.Identifier) =>
-		ts.isShorthandPropertyAssignment(id.parent)
-			? checker.getShorthandAssignmentValueSymbol(id.parent)
-			: ts.isExportSpecifier(id.parent)
-				? checker.getExportSpecifierLocalTargetSymbol(id.parent)
-				: checker.getSymbolAtLocation(id);
-	function visit(node: ts.Node) {
-		if (ts.isIdentifier(node)) {
-			const binding = symbol(node);
-			if (binding) {
-				const ids = refs.get(binding);
-				if (ids) ids.push(node);
-				else refs.set(binding, [node]);
-			}
-		}
-		ts.forEachChild(node, visit);
-	}
-	visit(file);
-	const uses = (id: ts.Identifier) => (refs.get(symbol(id)!) ?? []).filter((ref) => ref !== id);
+	const uses = localUses(file, checker);
 	// Even without substitution values a provider can format rich text into React elements.
 	// Follow const aliases only when every consumer explicitly coerces or compares the result.
 	const knownSinks = new Map<ts.Expression, boolean>();
