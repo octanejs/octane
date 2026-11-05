@@ -19,7 +19,7 @@ async function load(mode) {
 	return bundleRuntime(
 		project,
 		mode,
-		`export * from './page.tsrx'; export * from './rich.tsrx'; export * from './fields.tsrx'; ${entry}
+		`export * from './page.tsrx'; export * from './rich.tsrx'; export * from './fields.tsrx'; export * from './choices.tsrx'; ${entry}
 				export { OctaneCompat } from 'octane/react${mode === 'server' ? '/server' : ''}';
 				export * as react from 'react'; export * as intl from 'react-intl';
 				export { renderToString } from 'react-dom/server';`,
@@ -56,6 +56,24 @@ beforeAll(async () => {
 	expect(fields.notes.filter((note) => note.severity === 'error')).toEqual([]);
 	expect(fields.code).not.toMatch(/from ['"]react-intl['"]/);
 	await writeFile(path.join(project, 'fields.tsrx'), fields.code);
+	const choices = transformModule(
+		`import { ReactCompat as Boundary } from 'octane/react';
+		import * as Bridge from 'octane/react';
+		import { FormattedMessage as Message } from 'react-intl';
+		import { IntlProvider as Provider, intlContexts } from './react-intl.tsrx';
+		export function Choice({first}) { return <Provider locale="en"><Boundary contexts={intlContexts}>
+			{first ? (<Message id="a" defaultMessage="First" />) : <Message id="b" defaultMessage="Second" />}</Boundary></Provider>; }
+		export function Namespaced() { return <Provider locale="en"><Bridge.ReactCompat contexts={intlContexts}>{(<Message id="b" defaultMessage="Second" />)}</Bridge.ReactCompat></Provider>; }`,
+		'choices.tsx',
+		{
+			reactIntlAdapter: './react-intl.tsrx',
+			reactCompat: true,
+			unported: (name) => (['react-intl', 'octane/react'].includes(name) ? name : null),
+		},
+	);
+	expect(choices.notes.filter((note) => note.severity === 'error')).toEqual([]);
+	expect(choices.unported.map((port) => port.name)).not.toContain('octane/react');
+	await writeFile(path.join(project, 'choices.tsrx'), choices.code);
 	const rich = transformModule(
 		"import { FormattedMessage } from 'react-intl';\n" +
 			"export function Rich() { return <FormattedMessage id='rich' values={{bold: part => <strong key='emphasis' className='accent'>\n  {part}\n</strong>}} />; }",
@@ -194,6 +212,19 @@ it('follows a React host locale update and uses the genuine formatter for rich t
 		expect(host.querySelector('p').childElementCount).toBe(0);
 	} finally {
 		await react.act(async () => root.unmount());
+	}
+});
+
+it('transports one original React message from either conditional branch of an authored island', async () => {
+	for (const [component, props, text] of [
+		[server.Choice, { first: true }, 'First'],
+		[server.Choice, { first: false }, 'Second'],
+		[server.Namespaced, {}, 'Second'],
+	]) {
+		const { html } = await server.prerender(component, props);
+		const result = document.createElement('template');
+		result.innerHTML = html;
+		expect(result.content.textContent).toBe(text);
 	}
 });
 

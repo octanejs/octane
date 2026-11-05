@@ -202,6 +202,8 @@ Named `useIntl` imports can move when a component reads its locale or calls a su
 
 Self-closing `FormattedMessage` elements can render text directly, including ICU substitutions such as `values={{ count }}` when the named values are scalar and evaluating them keeps JSX in its original renderer. Custom text wrappers and provider-defined rich content use the installed React component. Supported React display islands receive the nearest real Intl context. A React-hosted Octane component reads the original provider. A standalone Octane root uses the generated `IntlProvider` or `RawIntlProvider`. The codemod moves providers with a closed subtree of native elements and scalar children. Providers surrounding other components need a review of which renderer owns their descendants. React islands retain the [ReactCompat rendering limits](../../docs/react-compat.md).
 
+Inside an authored `ReactCompat` boundary, a single original React component can be selected by a ternary that supplies different props on either branch. A namespaced bridge becomes a named import so the compiler can transport that child. Lists, optional children, and JSX-valued props require a React component to own their rendering.
+
 Inside a retained React component, an inline rich-text callback such as `chunks => <strong>{chunks}</strong>` can keep producing a genuine React element. The codemod recognizes a single native tag with literal attributes and an optional literal key. Its child can be the callback parameter on its own line. Captured values, spreads, refs, and event handlers keep their migration diagnostic.
 
 ## Store hooks in linked workspace packages

@@ -236,13 +236,7 @@ export function intlImports(
 			if (ts.isJsxClosingElement(tag)) return tag.tagName === id && name !== 'FormattedMessage';
 			if ((!ts.isJsxSelfClosingElement(tag) && !ts.isJsxOpeningElement(tag)) || tag.tagName !== id)
 				return false;
-			if (
-				ts.findAncestor(
-					tag,
-					(node) => (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) && inReact(node),
-				)
-			)
-				return false;
+			if (inReact(ts.isJsxOpeningElement(tag) ? tag.parent : tag)) return false;
 			if (name === 'FormattedMessage' && !ts.isJsxSelfClosingElement(tag)) return false;
 			if (
 				name !== 'FormattedMessage' &&

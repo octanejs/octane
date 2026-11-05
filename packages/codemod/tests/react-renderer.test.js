@@ -98,3 +98,57 @@ it('retains the hook diagnostic when producing a placeholder substitution requir
 		expect.objectContaining({ rule: 'bindings', severity: 'error' }),
 	);
 });
+
+it.each([
+	'{ok && <Message id="x" />}',
+	'{ok ? <Message id="x" /> : null}',
+	'{ids.map(id => <Message id={id} />)}',
+	'<Message id="x" /><Message id="y" />',
+	'<Card render={() => <Message id="x" />} />',
+	'{ok ? <Message id="x" /> : <Local />} ',
+	'{ok ? <Message id="x" /> : <React.Fragment />}',
+])(
+	'keeps the original binding and diagnoses unsupported authored island children: %s',
+	(children) => {
+		const result = transformModule(
+			"import {ReactCompat as Bridge} from 'octane/react'; import {FormattedMessage as Message} from 'react-intl';\n" +
+				'export function Page({ok,ids}) { return <Bridge>' +
+				children +
+				'</Bridge>; }',
+			'page.tsx',
+			{
+				reactCompat: true,
+				reactIntlAdapter: './intl.tsrx',
+				unported: (name) => (name === 'react-intl' ? name : null),
+			},
+		);
+		expect(result.code).toContain("from 'react-intl'");
+		expect(result.notes).toContainEqual(
+			expect.objectContaining({
+				rule: 'bindings',
+				severity: 'error',
+				message: expect.stringContaining('one component child'),
+			}),
+		);
+		expect(result.code).not.toContain('<IntlBoundary');
+	},
+);
+
+it('checks JSX-valued props on the original React child of an authored island', () => {
+	const result = transformModule(
+		"import {ReactCompat as Bridge} from 'octane/react'; import {FormattedMessage as Message} from 'react-intl'; export function Page(){return <Bridge><Message id='x' values={{x:<b/>}} /></Bridge>}",
+		'page.tsx',
+		{
+			reactCompat: true,
+			reactIntlAdapter: './intl.tsrx',
+			unported: (name) => (name === 'react-intl' ? name : null),
+		},
+	);
+	expect(result.notes).toContainEqual(
+		expect.objectContaining({
+			rule: 'bindings',
+			severity: 'error',
+			message: expect.stringContaining('props or children'),
+		}),
+	);
+});

@@ -539,6 +539,7 @@ class ModuleTransform {
 	/** Every import, keyed by its declaration. */
 	readonly imports = new Map<ts.Node, Import>();
 	nativeIntl = new Set<ts.ImportSpecifier>();
+	hasReactBridge = false;
 	readonly nativeStoreHooks = new Map<ts.ImportSpecifier, { from: string; name: string }>();
 	/** React and Octane imports, by local name. */
 	readonly apiLocals = new Map<string, Import>();
@@ -742,6 +743,8 @@ class ModuleTransform {
 					port: null,
 				};
 				this.imports.set(declaration, entry);
+				if (module === 'octane/react' || module === 'octane/react/server')
+					this.hasReactBridge = true;
 				if (
 					this.target === 'tsrx' &&
 					!typeOnly &&
@@ -774,7 +777,7 @@ class ModuleTransform {
 				this.checker,
 				(expr) => this.typeOf(expr),
 				(fn) => this.isComponent(fn),
-				(element) => this.inIsland(element),
+				(element) => !!this.authoredIsland(element),
 				(element) => this.hostsInReact(element),
 			);
 		}
@@ -837,6 +840,16 @@ class ModuleTransform {
 			ts.forEachChild(node, visit);
 		};
 		visit(this.sf);
+		if (this.hasReactBridge) {
+			// A namespace used only for the native bridge needs no missing-port report.
+			for (const module of ['octane/react', 'octane/react/server']) {
+				const port = this.ports.get(module);
+				if (port?.name === module && !port.islands && !port.blocked) {
+					this.ports.delete(module);
+					this.unported.delete(module);
+				}
+			}
+		}
 		const checkSvgIssuer =
 			this.nativeStoreHooks.size > 0 &&
 			[...this.imports.values()].some(
@@ -860,7 +873,9 @@ class ModuleTransform {
 					field,
 					(node) =>
 						(ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) &&
-						(this.inIsland(node) || this.islands.has(node)),
+						((ts.isJsxElement(node.parent) &&
+							this.reactCompatTag(node.parent.openingElement.tagName)) ||
+							this.islands.has(node)),
 				)
 			)
 				continue;
@@ -972,7 +987,19 @@ class ModuleTransform {
 			parent.tagName === member
 		) {
 			const element = ts.isJsxOpeningElement(parent) ? parent.parent : parent;
-			if (this.inIsland(element)) return;
+			const authored = this.authoredIsland(element);
+			if (authored) {
+				if (!this.islandRoot(authored, element)) {
+					block(
+						`Keep \`<${text}>\` in React. The codemod can transport one component child or a conditional selecting the same imported component on every branch. Move other selections and nested JSX into a React component.`,
+					);
+				} else if (!this.hostsInReact(element)) {
+					block(
+						`The props or children of \`<${text}>\` contain JSX that cannot cross into an authored ReactCompat boundary.`,
+					);
+				}
+				return;
+			}
 			const reason = !this.hostsInReact(element)
 				? `\`<${text}>\` takes children or props that Octane renders, which cannot cross into a React island.`
 				: this.options.reactCompat
@@ -1077,18 +1104,54 @@ class ModuleTransform {
 		return true;
 	}
 
-	/**
-	 * Whether an element is already the child of a `ReactCompat` island.
-	 */
-	inIsland(element: ts.JsxElement | ts.JsxSelfClosingElement) {
-		const parent = element.parent;
-		if (!ts.isJsxElement(parent)) return false;
-		const tag = parent.openingElement.tagName;
+	reactCompatTag(tag: ts.JsxTagNameExpression) {
 		const entry = this.importOf(ts.isPropertyAccessExpression(tag) ? tag.expression : tag);
 		if (!entry) return false;
-		const name =
-			ts.isPropertyAccessExpression(tag) && entry.namespace ? tag.name.text : entry.imported;
+		const name = ts.isPropertyAccessExpression(tag)
+			? entry.namespace
+				? tag.name.text
+				: ''
+			: entry.imported;
 		return nativeReactCompat(entry.module, name);
+	}
+
+	authoredIsland(element: ts.JsxElement | ts.JsxSelfClosingElement) {
+		if (!this.hasReactBridge) return undefined;
+		return ts.findAncestor(
+			element.parent,
+			(n): n is ts.JsxElement | ts.JsxSelfClosingElement =>
+				(ts.isJsxElement(n) && this.reactCompatTag(n.openingElement.tagName)) ||
+				(ts.isJsxSelfClosingElement(n) && this.reactCompatTag(n.tagName)),
+		);
+	}
+
+	/** The bridge accepts one component descriptor and snapshots its props shallowly. */
+	islandRoot(
+		owner: ts.JsxElement | ts.JsxSelfClosingElement,
+		element: ts.JsxElement | ts.JsxSelfClosingElement,
+	) {
+		if (!ts.isJsxElement(owner)) return false;
+		const children = contentOf(owner);
+		if (children.length !== 1) return false;
+		const tagName = (ts.isJsxElement(element) ? element.openingElement : element).tagName.getText(
+			this.sf,
+		);
+		let selected = false;
+		function component(node: ts.Node): boolean {
+			if (ts.isJsxExpression(node)) return !!node.expression && component(node.expression);
+			if (isWrapper(node)) return component(node.expression);
+			if (ts.isConditionalExpression(node))
+				return component(node.whenTrue) && component(node.whenFalse);
+			const tag = ts.isJsxElement(node)
+				? node.openingElement.tagName
+				: ts.isJsxSelfClosingElement(node)
+					? node.tagName
+					: undefined;
+			if (!tag || tag.getText() !== tagName) return false;
+			if (node === element) selected = true;
+			return true;
+		}
+		return component(children[0]) && selected;
 	}
 
 	/**
@@ -2229,6 +2292,10 @@ class ModuleTransform {
 				ts.isJsxClosingElement(tag) ||
 				ts.isJsxSelfClosingElement(tag)) &&
 			tag.tagName === node;
+		if (isTag && this.hasReactBridge && this.reactCompatTag(tag.tagName)) {
+			// The project compiler recognizes named imports when transporting descriptor children.
+			return this.require(this.importOf(node.expression)!.module, 'ReactCompat', false);
+		}
 		// So is `const P = C.Provider`; a member of the provider (`C.Provider.x`)
 		// or a write to it stays.
 		const isValue =
@@ -3013,6 +3080,7 @@ class ModuleTransform {
 			(declaration &&
 				(ts.isVariableDeclaration(declaration) || ts.isFunctionDeclaration(declaration)) &&
 				this.descriptorComponents.has(declaration)) ||
+			(this.hasReactBridge && this.reactCompatTag(tag)) ||
 			(imported && this.options.descriptorChild?.(imported))
 		) {
 			return this.span(node, node.getStart(this.sf), node.end, DESCRIPTOR);
