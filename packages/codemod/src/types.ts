@@ -11,7 +11,7 @@ export interface TransformOptions {
 	target?: 'tsx' | 'tsrx';
 	/** Emit Strong-mode source: add `"use strong"` and leave omitted dependency lists to the compiler. */
 	strong?: boolean;
-	/** The project checks with `strictNullChecks`, so a TypeScript module's own types may prove a child hole is text. */
+	/** The project checks with `strictNullChecks`, so TypeScript types can prove text holes and boolean guards. */
 	strictNullChecks?: boolean;
 	/** This module in a program over the whole project, whose resolved imports type what the module's own program cannot. */
 	types?: { sourceFile: ts.SourceFile; checker: ts.TypeChecker };
@@ -61,6 +61,8 @@ export interface CodemodOptions {
 	forceStrong?: boolean;
 	/** Compile every migrated module (default true). */
 	verify?: boolean;
+	/** Resolve types through the project graph (default true). False uses only module-local type information. */
+	projectTypes?: boolean;
 	/** Write the result to disk (default true). */
 	write?: boolean;
 	/** The project root, for resolving its compiler. */
