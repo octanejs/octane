@@ -1,12 +1,10 @@
-import { mkdtemp, copyFile, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, copyFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { build } from 'esbuild';
-import { JSDOM } from 'jsdom';
-import { compile } from 'octane/compiler';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
 import { transformModule } from '../dist/index.js';
+import { bundleRuntime, installDOM } from './bundle-runtime.js';
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 let project;
@@ -18,53 +16,19 @@ async function load(mode) {
 		mode === 'server'
 			? "export { prerender } from 'octane/static';"
 			: "export { createRoot, flushSync } from 'octane'; export { createRoot as reactRoot } from 'react-dom/client';";
-	const target = path.join(project, mode + '.mjs');
-	await build({
-		stdin: {
-			resolveDir: project,
-			contents: `export * from './page.tsrx'; export * from './rich.tsrx'; ${entry}
+	return bundleRuntime(
+		project,
+		mode,
+		`export * from './page.tsrx'; export * from './rich.tsrx'; ${entry}
 				export { OctaneCompat } from 'octane/react${mode === 'server' ? '/server' : ''}';
 				export * as react from 'react'; export * as intl from 'react-intl';
 				export { renderToString } from 'react-dom/server';`,
-		},
-		outfile: target,
-		bundle: true,
-		platform: 'node',
-		format: 'esm',
-		external: ['react', 'react-dom', 'react-dom/*', 'react-intl'],
-		plugins: [
-			{
-				name: 'real-tsrx',
-				setup(b) {
-					b.onLoad({ filter: /\.tsrx$/ }, async ({ path: file }) => ({
-						contents: compile(await readFile(file, 'utf8'), file, { mode }).code,
-						loader: 'js',
-						resolveDir: path.dirname(file),
-					}));
-				},
-			},
-		],
-	});
-	return import(/* @vite-ignore */ pathToFileURL(target).href);
+		['react-intl'],
+	);
 }
 
 beforeAll(async () => {
-	dom = new JSDOM('<body></body>', { url: 'http://localhost/' });
-	for (const name of [
-		'window',
-		'document',
-		'Element',
-		'HTMLElement',
-		'Text',
-		'Node',
-		'Comment',
-		'MutationObserver',
-		'Event',
-		'navigator',
-	]) {
-		vi.stubGlobal(name, dom.window[name]);
-	}
-	vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+	dom = installDOM();
 	project = await mkdtemp(path.join(os.tmpdir(), 'octane-intl-'));
 	await symlink(path.join(testDir, '../node_modules'), path.join(project, 'node_modules'), 'dir');
 	await copyFile(

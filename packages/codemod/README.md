@@ -204,6 +204,22 @@ Plain self-closing `FormattedMessage` elements can render text directly. Support
 
 Inside a retained React component, an inline rich-text callback such as `chunks => <strong>{chunks}</strong>` can keep producing a genuine React element. The codemod recognizes a single native tag with literal attributes, whose only dynamic child is the callback parameter. Captured values, spreads, refs, and event handlers keep their migration diagnostic.
 
+## Store hooks in linked workspace packages
+
+The codemod can migrate a named hook from a local `workspace:` dependency when it can read the TypeScript implementation, trace a React context read, and verify that the hook uses the same store code as a renderer-independent public entry. The public entry and hook names can vary. The supported runtime versions match the React Intl adapter above.
+
+Preview shows the native hook sources the codemod would add alongside the shared `octane-store-context.tsrx` and `octane-store-hooks.ts` helpers. The generated hooks call the original store, subscription, and snapshot functions. They retain React’s dependency lists and hook order. The application compiles these sources with its installed toolchain. When the workspace hook implementation changes, rerun the migration from its original React inputs in a clean checkout and review the new companions. A differing file at a generated path blocks the write.
+
+Hosted components inherit the original React provider. To render a converted component in a standalone Octane root, pass its **original React context** and the active store value to the generated provider.
+
+```tsx
+<NativeStoreProvider context={ReadingContext} value={activeStore}>
+  <ReadingPanel />
+</NativeStoreProvider>
+```
+
+The codemod checks how each component uses the hook. Conditions, scalar output, and dependency comparisons can qualify. Rendering an opaque store value, passing the component into an unknown renderer, or writing JSX into a shared store keeps the existing manual migration diagnostic. A package without resolvable workspace source also keeps that diagnostic.
+
 ## Local recipes
 
 Pass a recipe explicitly to use it for a migration:
