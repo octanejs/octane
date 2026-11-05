@@ -229,7 +229,7 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 				'package.json': '{ "name": "app" }',
 				'index.html': '<script type="module" src="./First.tsx"></script>',
 				'First.tsx': 'export const First = () => <div />;',
-				'Item.tsx': 'export const Item = () => <b />;',
+				'Item.tsx': 'import { First } from "./First.tsx"; export const Item = () => <First />;',
 				[other]: other.endsWith('.tsrx')
 					? 'export function Item() @{ <p /> }'
 					: 'export const Item = () => <i />;',
@@ -243,13 +243,57 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 						message: expect.stringMatching(/item\.tsrx/i),
 					}),
 				);
-				expect(result.files.some((file) => file.changed)).toBe(false);
+				expect(result.files.filter((file) => file.changed).map((file) => file.output)).toEqual(
+					write ? [] : ['First.tsrx'],
+				);
+				if (!write) {
+					const conflicts = result.files.filter((file) =>
+						file.notes.some((note) => note.rule === 'rename-conflict'),
+					);
+					const blocked = other.endsWith('.tsrx') ? ['Item.tsx'] : ['Item.tsx', other];
+					expect(conflicts.map((file) => file.file).sort()).toEqual(blocked.sort());
+					for (const file of conflicts) {
+						expect(file.output).toBe(file.file);
+						expect(file.code).toBe(original[file.file]);
+					}
+				}
 				expect(fs.readdirSync(root).sort()).toEqual(Object.keys(original).sort());
 				for (const [name, source] of Object.entries(original))
 					expect(fs.readFileSync(path.join(root, name), 'utf8')).toBe(source);
 			}
 		},
 	);
+
+	it('reports mixed-project collisions alongside other Strong candidates in the CLI', () => {
+		const root = project({
+			'package.json': '{"name":"app"}',
+			'Legacy.tsx': 'export const Legacy = () => <i />;',
+			'Legacy.tsrx': 'export function Legacy() @{ <b /> }',
+			'View.tsx': 'import { Legacy } from "./Legacy.tsx"; export const View = () => <Legacy />;',
+		});
+		const result = spawnSync(
+			process.execPath,
+			[path.join(REPO, 'packages/codemod/dist/bin.js'), root, '--strong', '--print', '--json'],
+			{ encoding: 'utf8' },
+		);
+		expect(result.status).toBe(1);
+		const { files } = JSON.parse(result.stdout);
+		expect(files).toEqual([
+			expect.objectContaining({ file: 'Legacy.tsx', changed: false }),
+			expect.objectContaining({
+				file: 'View.tsx',
+				output: 'View.tsrx',
+				strong: true,
+				code: expect.stringContaining('"./Legacy.tsx"'),
+			}),
+		]);
+		expect(fs.readdirSync(root).sort()).toEqual([
+			'Legacy.tsrx',
+			'Legacy.tsx',
+			'View.tsx',
+			'package.json',
+		]);
+	});
 
 	it('renames template modules and rewrites every import of them', async () => {
 		const root = project({
@@ -451,9 +495,12 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 			},
 		);
 		expect(status).toBe(json ? 0 : 1);
-		if (json)
+		if (json) {
 			expect(JSON.parse(stdout).files[0].code.trimEnd().endsWith('end of input')).toBe(true);
-		else expect(stdout.trimEnd().endsWith('1 error(s) (dry run)')).toBe(true);
+		} else {
+			expect(stdout).toMatch(/^✗ Card\.tsx → Card\.tsrx/);
+			expect(stdout.trimEnd().endsWith('1 error(s) (dry run)')).toBe(true);
+		}
 	});
 
 	it('is idempotent: a second run changes nothing', async () => {
@@ -1390,12 +1437,13 @@ Inline({ dangerouslySetInnerHTML: { __html: 'untrusted' } });`,
 		}
 	});
 
-	it('spells holes as text through imported types, only under strictNullChecks', async () => {
+	it('lowers text and boolean guards through imported types under strictNullChecks', async () => {
 		const files = {
 			'package.json': '{ "name": "app" }',
-			'src/types.ts': 'export interface Story { title: string; score: number; by?: string }\n',
+			'src/types.ts':
+				'export interface Story { title: string; score: number; by?: string; pinned?: boolean }\n',
 			'src/Story.tsx':
-				"import type { Story } from './types.js';\nexport function Row({ story }: { story: Story }) {\n\treturn <p>{story.title} {story.score} {story.by}</p>;\n}\n",
+				"import type { Story } from './types.js';\nexport function Row({ story, expanded }: { story: Story; expanded?: boolean }) {\n\treturn <p>{story.title} {story.score} {story.by}{story.pinned && <b>Pinned</b>}{expanded && <i>Details</i>}</p>;\n}\n",
 		};
 		const strict = project({
 			...files,
@@ -1407,9 +1455,29 @@ Inline({ dangerouslySetInnerHTML: { __html: 'untrusted' } });`,
 				?.code;
 		// An optional `by` may be undefined, which React renders as nothing.
 		expect(await code(strict)).toContain(
-			'<p>{story.title as string} {String(story.score)} {story.by}</p>',
+			'<p>{story.title as string} {String(story.score)} {story.by}@if (story.pinned) { <b>Pinned</b> }@if (expanded) { <i>Details</i> }</p>',
 		);
-		expect(await code(loose)).toContain('<p>{story.title} {story.score} {story.by}</p>');
+		expect(await code(loose)).toContain(
+			'<p>{story.title} {story.score} {story.by}{story.pinned && <b>Pinned</b>}{expanded && <i>Details</i>}</p>',
+		);
+		const result = spawnSync(
+			process.execPath,
+			[
+				path.join(REPO, 'packages/codemod/dist/bin.js'),
+				path.join(strict, 'src/Story.tsx'),
+				'--no-project-types',
+				'--strong',
+				'--print',
+				'--json',
+			],
+			{ encoding: 'utf8' },
+		);
+		expect(result.status).toBe(0);
+		const [local] = JSON.parse(result.stdout).files;
+		expect(local.strong).toBe(true);
+		expect(local.code).toContain(
+			'<p>{story.title} {story.score} {story.by}{story.pinned && <b>Pinned</b>}@if (expanded) { <i>Details</i> }</p>',
+		);
 	});
 
 	it('leaves a text field spread alone when its type has no `onChange`', async () => {

@@ -52,7 +52,9 @@ bundler plugin and `tsconfig` over to Octane and install the dependencies.
 
 Every rewrite keeps React's behavior. Where it cannot be proven equal, the code
 is left alone: `{count && <X />}` stays a hole, because React renders `0` there
-and `@if` would not. `template-text` reads types through the project's
+and `@if` would not. A strict TypeScript project can prove that a guard's value
+is boolean or nullish, so `{visible && <X />}` can become an `@if` even when
+`visible` is optional. `template-text` reads types through the project's
 `tsconfig.json` and runs only on TypeScript modules when that config enables
 `strictNullChecks`; otherwise a `string` may hold null, which React renders as
 nothing.
@@ -132,14 +134,21 @@ compiled in Strong mode. The codemod applies the compiler's own suggested fixes
 meaning exactly: a dependency list the compiler infers identically is dropped,
 and `useState(prop)` becomes `useState(() => prop)`. A module with Strong
 errors left falls back to compatibility mode, so the app still builds, and the
-errors are listed as the work remaining. `--force-strong` keeps the directive
-anyway.
+errors are listed as the work remaining. A React effect with omitted or literal
+`undefined` dependencies keeps its every-commit schedule. In a filtered array
+list, the filter and map callbacks may reuse a parameter name.
+`--force-strong` keeps the directive even when Strong errors remain.
 
 ## What it reports
 
 Class components, `createRef`, `defaultProps`, and anything else without an
 automatic rewrite are listed under **Needs attention** with a file and line.
 The process exits with status 1 when any error remains.
+
+If a migration target already exists or two sources share a target, write mode
+stops before editing the project. `--dry-run` and `--print` report the colliding
+sources and preview the rest. Imports of colliding sources keep their existing
+paths, so check those dependencies before adopting the preview.
 
 The codemod warns when JSX renders an SVG imported with `?react` or the named
 `ReactComponent` export. If your loader returns React components for bare
@@ -177,7 +186,13 @@ hand.
 | `--dry-run` | Report without writing |
 | `--print` | Print each migrated module (implies `--dry-run`) |
 | `--no-verify` | Skip compiling the result |
+| `--no-project-types` | Use module-local types without loading the project type graph |
 | `--json` | Machine-readable result |
+
+For a first pass over a large project, `--dry-run --strong --no-project-types`
+keeps import path resolution and compiler verification. Rewrites that require
+types from other files may be skipped. Use the default project type analysis
+when verifying a smaller batch for adoption.
 
 ## Local recipes
 

@@ -269,6 +269,14 @@ function textKind(type: ts.Type): 0 | 1 | 2 {
 	return kind;
 }
 
+/** Every possible falsy value is one React skips, so a JSX guard can be an `@if`. */
+function isBooleanGuardType(type: ts.Type): boolean {
+	if (type.isUnion()) return type.types.every(isBooleanGuardType);
+	return (
+		(type.flags & (ts.TypeFlags.BooleanLike | ts.TypeFlags.Null | ts.TypeFlags.Undefined)) !== 0
+	);
+}
+
 /**
  * The outermost node of `sf` spanning exactly `[start, end)`.
  */
@@ -377,52 +385,6 @@ function isFunctionLike(node: ts.Node) {
 }
 
 /**
- * Whether evaluating `node` can only produce a boolean, so `node && <X />`
- * renders nothing when it is falsy, exactly as `@if` does. React renders `0`
- * and `NaN` from a numeric left side, so anything unproven stays a hole.
- * `valueOf` gives the initializer a `const` name is bound to, if any.
- */
-function isBoolean(
-	node: ts.Expression,
-	valueOf: (name: ts.Identifier) => ts.Expression | null,
-): boolean {
-	node = skipParens(node);
-	if (ts.isIdentifier(node)) {
-		const value = valueOf(node);
-		return value !== null && isBoolean(value, valueOf);
-	}
-	if (node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword) {
-		return true;
-	}
-	if (ts.isPrefixUnaryExpression(node)) {
-		return node.operator === ts.SyntaxKind.ExclamationToken;
-	}
-	if (ts.isBinaryExpression(node)) {
-		switch (node.operatorToken.kind) {
-			case ts.SyntaxKind.EqualsEqualsEqualsToken:
-			case ts.SyntaxKind.ExclamationEqualsEqualsToken:
-			case ts.SyntaxKind.EqualsEqualsToken:
-			case ts.SyntaxKind.ExclamationEqualsToken:
-			case ts.SyntaxKind.LessThanToken:
-			case ts.SyntaxKind.LessThanEqualsToken:
-			case ts.SyntaxKind.GreaterThanToken:
-			case ts.SyntaxKind.GreaterThanEqualsToken:
-			case ts.SyntaxKind.InstanceOfKeyword:
-			case ts.SyntaxKind.InKeyword:
-				return true;
-			case ts.SyntaxKind.AmpersandAmpersandToken:
-			case ts.SyntaxKind.BarBarToken:
-				return isBoolean(node.left, valueOf) && isBoolean(node.right, valueOf);
-		}
-		return false;
-	}
-	if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
-		return node.expression.text === 'Boolean';
-	}
-	return false;
-}
-
-/**
  * Modules whose exports the codemod knows by name: React's, and Octane's own
  * for code already partly migrated.
  */
@@ -486,8 +448,8 @@ function bindingNames(name: ts.BindingName): string[] {
 /**
  * Whether `node` reads a name `test` accepts.
  */
-function reads(node: ts.Node, test: (name: string) => boolean): boolean {
-	if (ts.isIdentifier(node)) return test(node.text);
+function reads(node: ts.Node, test: (name: ts.Identifier) => boolean): boolean {
+	if (ts.isIdentifier(node)) return test(node);
 	return ts.forEachChild(node, (child) => reads(child, test) || undefined) === true;
 }
 
@@ -538,7 +500,7 @@ class ModuleTransform {
 	readonly valueUses = new Set<string>();
 	hasSignalRuntime?: boolean;
 	routerShell = false;
-	readonly textTypes: boolean;
+	readonly strictTypes: boolean;
 	readonly sf: ts.SourceFile;
 	readonly checker: ts.TypeChecker;
 	readonly notes: Note[] = [];
@@ -594,7 +556,7 @@ class ModuleTransform {
 		this.options = options;
 		this.target = options.target ?? 'tsrx';
 		this.strong = options.strong === true;
-		this.textTypes = options.strictNullChecks === true && /\.[cm]?tsx?$/.test(filename);
+		this.strictTypes = options.strictNullChecks === true && /\.[cm]?tsx?$/.test(filename);
 		const { sf, checker } = bind(filename, source);
 		this.sf = sf;
 		this.checker = checker;
@@ -2291,22 +2253,23 @@ class ModuleTransform {
 	}
 
 	/**
-	 * React runs an effect or memo without a dependency list on every render.
-	 * Compatibility output uses `null` to preserve that schedule. Keep it for
-	 * layout effects in Strong migration too: a measurement of the committed
-	 * DOM must still run when its ref is stable across renders.
+	 * React runs a hook with an omitted or undefined list on every render.
+	 * Octane spells that schedule with `null`, including in Strong migrations.
 	 */
 	rewriteDependencies(node: ts.CallExpression, name: string) {
-		if (node.arguments.length !== DEPENDENCY_HOOKS[name]) return null;
-		if (this.strong && name !== 'useLayoutEffect') {
-			this.note(
-				RULE.deps,
-				'info',
-				node,
-				`\`${name}\` had no dependency list, so React ran it on every render; Strong infers its dependencies.`,
+		const depsIndex = DEPENDENCY_HOOKS[name];
+		if (node.arguments.length === depsIndex + 1) {
+			const deps = skipParens(node.arguments[depsIndex]);
+			if (!ts.isIdentifier(deps) || deps.text !== 'undefined' || this.declarationOf(deps))
+				return null;
+			this.count(RULE.deps);
+			return (
+				this.span(node, node.getStart(this.sf), deps.getStart(this.sf), PLAIN) +
+				'null' +
+				this.source.slice(deps.end, node.end)
 			);
-			return null;
 		}
+		if (node.arguments.length !== depsIndex) return null;
 		this.count(RULE.deps);
 		const last = node.arguments[node.arguments.length - 1];
 		return (
@@ -3023,7 +2986,7 @@ class ModuleTransform {
 	 * renderable hole. React renders those values as text too.
 	 */
 	textHole(node: ts.JsxExpression, expression: ts.Expression) {
-		if (!this.textTypes || isTextSpelling(expression)) return null;
+		if (!this.strictTypes || isTextSpelling(expression)) return null;
 		const kind = textKind(this.typeOf(expression));
 		if (kind === 0) return null;
 		this.count(RULE.text);
@@ -3050,6 +3013,55 @@ class ModuleTransform {
 			text +
 			this.span(node, expression.end, node.end, PLAIN)
 		);
+	}
+
+	/**
+	 * Whether evaluating `node` can only produce a boolean, so `node && <X />`
+	 * renders nothing when it is falsy, exactly as `@if` does. React renders `0`
+	 * and `NaN` from a numeric left side, so anything unproven stays a hole.
+	 */
+	isBoolean(node: ts.Expression, resolving = new Set<ts.Expression>()): boolean {
+		node = skipParens(node);
+		if (ts.isIdentifier(node)) {
+			const value = this.constValue(node);
+			if (value === null || resolving.has(value)) return false;
+			resolving.add(value);
+			const result = this.isBoolean(value, resolving);
+			resolving.delete(value);
+			return result;
+		}
+		if (node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword) {
+			return true;
+		}
+		if (ts.isPrefixUnaryExpression(node)) {
+			return node.operator === ts.SyntaxKind.ExclamationToken;
+		}
+		if (ts.isBinaryExpression(node)) {
+			switch (node.operatorToken.kind) {
+				case ts.SyntaxKind.EqualsEqualsEqualsToken:
+				case ts.SyntaxKind.ExclamationEqualsEqualsToken:
+				case ts.SyntaxKind.EqualsEqualsToken:
+				case ts.SyntaxKind.ExclamationEqualsToken:
+				case ts.SyntaxKind.LessThanToken:
+				case ts.SyntaxKind.LessThanEqualsToken:
+				case ts.SyntaxKind.GreaterThanToken:
+				case ts.SyntaxKind.GreaterThanEqualsToken:
+				case ts.SyntaxKind.InstanceOfKeyword:
+				case ts.SyntaxKind.InKeyword:
+					return true;
+				case ts.SyntaxKind.AmpersandAmpersandToken:
+				case ts.SyntaxKind.BarBarToken:
+					return this.isBoolean(node.left, resolving) && this.isBoolean(node.right, resolving);
+			}
+			return false;
+		}
+		if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+			return (
+				node.expression.text === 'Boolean' &&
+				this.declarationOf(node.expression)?.getSourceFile() === esLib()
+			);
+		}
+		return false;
 	}
 
 	/**
@@ -3114,7 +3126,8 @@ class ModuleTransform {
 		if (
 			ts.isBinaryExpression(node) &&
 			node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
-			isBoolean(node.left, (name) => this.constValue(name))
+			(this.isBoolean(node.left) ||
+				(this.strictTypes && isBooleanGuardType(this.typeOf(node.left))))
 		) {
 			const arm = this.arm(node.right);
 			if (arm === null || arm === '') return null;
@@ -3178,7 +3191,22 @@ class ModuleTransform {
 		if (index && !ts.isIdentifier(index.name)) return null;
 		// `@for (const items of items)` would read `items` in its own TDZ.
 		const bound = new Set([...bindingNames(item.name), ...(index ? bindingNames(index.name) : [])]);
-		if (reads(callee.expression, (name) => bound.has(name))) return null;
+		const iterable = callee.expression;
+		if (reads(iterable, (name) => bound.has(name.text))) {
+			// Array.filter visits present items and produces a dense array. The
+			// property name and the filter's own locals cannot capture a row.
+			if (!this.isArrayFilter(iterable)) return null;
+			if (
+				reads(iterable, (name) => {
+					if (!bound.has(name.text) || isPropertyName(name)) return false;
+					const decl = this.declarationOf(name);
+					return (
+						decl?.getSourceFile() !== this.sf || decl.pos < iterable.pos || decl.end > iterable.end
+					);
+				})
+			)
+				return null;
+		}
 		// A `function` row sees its own `this` and `arguments`; an arm does not.
 		if (ts.isFunctionExpression(fn) && usesOwnThis(fn.body)) return null;
 		// A row that writes an outer variable (`n++`) needs every row to run in
@@ -3269,6 +3297,22 @@ class ModuleTransform {
 		return this.block(header, statements + '\n' + arm);
 	}
 
+	isArrayFilter(iterable: ts.Expression) {
+		if (!ts.isCallExpression(iterable) || ts.isOptionalChain(iterable)) return false;
+		const method = iterable.expression;
+		if (!ts.isPropertyAccessExpression(method) || method.name.text !== 'filter') return false;
+		const declarations = this.checker.getSymbolAtLocation(method.name)?.declarations;
+		return (
+			declarations?.length &&
+			declarations.every(
+				(declaration) =>
+					declaration.getSourceFile() === esLib() &&
+					ts.isInterfaceDeclaration(declaration.parent) &&
+					['Array', 'ReadonlyArray'].includes(declaration.parent.name.text),
+			)
+		);
+	}
+
 	/**
 	 * Whether `fn` assigns a variable declared outside it.
 	 */
@@ -3320,7 +3364,7 @@ class ModuleTransform {
 				.flatMap((statement) => statement.declarationList.declarations)
 				.flatMap((declaration) => bindingNames(declaration.name)),
 		);
-		return reads(expression, (name) => declared.has(name));
+		return reads(expression, (name) => declared.has(name.text));
 	}
 
 	// ---------------------------------------------------------------- components

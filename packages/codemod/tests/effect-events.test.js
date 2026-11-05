@@ -2,7 +2,7 @@
 import { expect, it, vi } from 'vitest';
 import { flushSync } from 'octane';
 import { collectDiagnostics } from 'octane/compiler';
-import { mount } from '../../octane/tests/_helpers.js';
+import { flushEffects, mount } from '../../octane/tests/_helpers.js';
 import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
 import { strengthen } from '../dist/strong.js';
 import { transformModule } from '../dist/transform.js';
@@ -56,3 +56,33 @@ export function Meter() {
 	events.dispatchEvent(new Event('sample'));
 	expect(report).toHaveBeenCalledTimes(2);
 });
+
+it.each(['', ', undefined'])(
+	'preserves an every-commit React effect with dependencies %j',
+	(deps) => {
+		const source = `import { useEffect } from 'react';
+export function Meter({ subscribe, label }) {
+  useEffect(() => subscribe()${deps});
+  return <p>{label}</p>;
+}`;
+		const id = 'meter.tsrx';
+		const { code } = transformModule(source, 'meter.tsx', { strong: true });
+		const result = strengthen({ collectDiagnostics, from: 'octane/compiler' }, code, id);
+		expect(result.strong).toBe(false);
+		const { Meter } = loadCompiledFixtureSource(result.code, { id, mode: 'client' });
+		const unsubscribe = vi.fn();
+		const subscribe = vi.fn(() => unsubscribe);
+		const view = mount(Meter, { subscribe, label: 'first' });
+		try {
+			flushEffects();
+			view.update(Meter, { subscribe, label: 'second' });
+			flushEffects();
+			expect(view.find('p').textContent).toBe('second');
+			expect(subscribe).toHaveBeenCalledTimes(2);
+			expect(unsubscribe).toHaveBeenCalledTimes(1);
+		} finally {
+			view.unmount();
+		}
+		expect(unsubscribe).toHaveBeenCalledTimes(2);
+	},
+);

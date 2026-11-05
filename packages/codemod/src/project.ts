@@ -43,6 +43,14 @@ export async function runCodemod(
 	const renames: Map<string, string> = new Map();
 	const exports: Map<string, TransformResult['exports']> = new Map();
 	const owners: Map<string, string> = new Map();
+	const conflicts: Map<string, FileResult> = new Map();
+	const conflictFor = (file: string, source: string, output: string, reason: string) =>
+		unchangedFile(path.relative(root, file), source, {
+			rule: 'rename-conflict',
+			severity: 'error',
+			line: 1,
+			message: `Cannot migrate to ${path.relative(root, output)} because it ${reason}.`,
+		});
 	for (const file of files) {
 		const source = fs.readFileSync(file, 'utf8');
 		const result = transformModule(source, file, { target });
@@ -52,30 +60,45 @@ export async function runCodemod(
 		if (output === file) continue;
 		const key = ts.sys.useCaseSensitiveFileNames ? output : output.toLowerCase();
 		const previous = owners.get(key);
+		if (!previous) owners.set(key, file);
 		if (previous || fs.lstatSync(output, { throwIfNoEntry: false })) {
 			const reason = previous
 				? `is also the target of ${path.relative(root, previous)}`
 				: 'already exists';
-			const conflict = unchangedFile(path.relative(root, file), source, {
-				rule: 'rename-conflict',
-				severity: 'error',
-				line: 1,
-				message: `Migration stopped because ${path.relative(root, output)} ${reason}.`,
-			});
-			return {
-				root,
-				files: [conflict],
-				packages: [],
-				dependencies: [],
-				patched: [],
-				missing: [],
-				html: [],
-				compiler: null,
-			};
+			const conflict = conflictFor(file, source, output, reason);
+			if (options.write !== false) {
+				return {
+					root,
+					files: [conflict],
+					packages: [],
+					dependencies: [],
+					patched: [],
+					missing: [],
+					html: [],
+					compiler: null,
+				};
+			}
+			conflicts.set(file, conflict);
+			const previousOutput = previous && renames.get(previous);
+			if (previous && previousOutput) {
+				conflicts.set(
+					previous,
+					conflictFor(
+						previous,
+						fs.readFileSync(previous, 'utf8'),
+						previousOutput,
+						`is also the target of ${path.relative(root, file)}`,
+					),
+				);
+				renames.delete(previous);
+			}
+			continue;
 		}
-		owners.set(key, file);
 		renames.set(file, output);
 	}
+	// A colliding source remains in place, so its imports and export contracts
+	// must not participate in the preview as if it had been migrated.
+	for (const file of conflicts.keys()) exports.delete(file);
 	const config = tsconfigOptions(root);
 	const strictConfig = (config?.strictNullChecks ?? config?.strict) ? config : null;
 	let program: ts.Program | undefined;
@@ -106,6 +129,11 @@ export async function runCodemod(
 	);
 	const results: FileResult[] = [];
 	for (const file of files) {
+		const conflict = conflicts.get(file);
+		if (conflict) {
+			results.push(conflict);
+			continue;
+		}
 		const source = fs.readFileSync(file, 'utf8');
 		const extra: Note[] = [];
 		const resolveSpecifier = (specifier: string) =>
@@ -131,7 +159,7 @@ export async function runCodemod(
 			strong,
 			strictNullChecks: strictConfig !== null,
 			get types() {
-				if (types || !strictConfig) return types;
+				if (types || !strictConfig || options.projectTypes === false) return types;
 				// Even one input can import a large graph. Bind it only for a rewrite that needs its types.
 				program ??= ts.createProgram(
 					files.filter((name) => /\.[cm]?tsx?$/.test(name)),
@@ -219,7 +247,7 @@ export async function runCodemod(
 	for (const file of renames.size
 		? collect(root, (name) => SOURCE.test(name) || isTsrx(name))
 		: []) {
-		if (renames.has(file)) continue;
+		if (renames.has(file) || conflicts.has(file)) continue;
 		const result = byFile.get(file);
 		const paths = rewriteModulePaths(
 			result?.code ?? fs.readFileSync(file, 'utf8'),
