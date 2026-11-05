@@ -544,7 +544,7 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		expect(wrapper.code).toContain('export function Input({ nativeInput, onChange, ...props }');
 		expect(wrapper.code).toContain('const { style, ...native } = props;');
 		expect(wrapper.code).toContain(
-			'<input onInput={onChange} {...(native as ComponentProps<"input">)} />',
+			'<input onInput={onChange} {...(native as ReactDOMProps<ComponentProps<"input">>)} />',
 		);
 		expect(wrapper.code).toContain(
 			'<InputPrimitive data-slot="input" onInput={onChange} {...props} />',
