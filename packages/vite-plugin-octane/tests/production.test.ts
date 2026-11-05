@@ -24,6 +24,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { build, createServer, type ViteDevServer } from 'vite';
 import type { ElementHandle, Locator, Request as BrowserRequest } from 'playwright';
 import { createTempProject } from '../../octane/tests/_temp-project.js';
+import { checkFileSchemaRpc } from '../../octane/tests/_file-schema-rpc.js';
 import { createNodeServer } from '../../app-core/src/server/node-http.js';
 
 const fixtureSource = fileURLToPath(new URL('./_fixtures/app', import.meta.url));
@@ -1148,6 +1149,20 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 			}
 		}
 	}, 60_000);
+
+	it('shares file schemas with the client while keeping its data provider on the server', async () => {
+		expect(
+			findBuiltAsset(path.join(distDir, 'client'), '.js', 'Unpublished draft title'),
+		).toBeUndefined();
+		const { chromium } = await import('playwright');
+		const browser = await chromium.launch();
+		try {
+			await checkFileSchemaRpc(browser, devOrigin);
+			await checkFileSchemaRpc(browser, productionOrigin);
+		} finally {
+			await browser.close();
+		}
+	});
 
 	it('bundles module-server exports and executes them through production RPC', async () => {
 		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);

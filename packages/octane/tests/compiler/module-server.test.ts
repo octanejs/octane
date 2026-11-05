@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 import { parseModule } from '@tsrx/core';
 import { describe, expect, it } from 'vitest';
+import { dataSchema } from 'octane/data';
+import * as rpcRuntime from 'octane/internal/server-rpc';
+import { loadCompiledFixtureSource } from '../_server-fixture.js';
 import { compile } from '../../src/compiler/compile.js';
 
 const source = `
@@ -98,6 +101,216 @@ export function App() @{ <button onClick={() => save('draft')}>Save</button> }
 		expect(server).toContain(`id: "${hash('save')}"`);
 		expect(server).toContain(`module: "${filename}"`);
 		expect(server).toContain('export: "save"');
+	});
+
+	it('exposes local parsers to both targets and registers only functions as RPCs', () => {
+		const contract = `
+module server {
+	import { dataSchema as s } from 'octane/data';
+	import { provider } from './private.js';
+	export const unused = s.object({ neverBundleThisField: s.string() });
+	const id = s.integer({ minimum: -1 });
+	const row = s.object({ id, starred: s.boolean(), cursor: s.nullable(s.string()), state: s.enum(['ready', 'failed']) });
+	export const list = s.array(row);
+	export function get() { return list.parse(provider()); }
+}
+import { list as files, list as again, get } from 'server';
+export { files, again, get };
+`;
+		const browser = compile(contract, filename, { mode: 'client' }).code;
+		expect(browser).not.toContain('neverBundleThisField');
+		expect(browser).not.toContain('./private.js');
+		const rows = [
+			{ id: -1, starred: true, cursor: null, state: 'ready' },
+			{ id: 0, starred: false, cursor: 'opaque', state: 'failed' },
+		];
+		const identities = new Set<string>();
+		for (const mode of ['client', 'server'] as const) {
+			const target = loadCompiledFixtureSource(contract, {
+				id: filename,
+				mode,
+				runtimeModules: {
+					'octane/data': { dataSchema },
+					'octane/internal/server-rpc': rpcRuntime,
+					...(mode === 'server' ? { './private.js': { provider: () => rows } } : {}),
+				},
+			});
+			expect(target.files.parse(rows)).toEqual(rows);
+			expect(typeof target.files.identity).toBe('string');
+			identities.add(target.files.identity);
+			expect(target.again).toBe(target.files);
+			expect(() => target.files.parse([{ ...rows[0], id: -2 }])).toThrow();
+			expect(() => target.files.parse([{ ...rows[0], cursor: false }])).toThrow();
+			expect(() => target.files.parse([{ ...rows[0], state: 'unknown' }])).toThrow();
+			if (mode === 'server') {
+				expect(Object.keys(target._$_server_$_)).toEqual(['get']);
+				expect(target.get()).toEqual(rows);
+			}
+		}
+		expect(identities.size).toBe(1);
+	});
+
+	it('exposes public functions and schemas directly to their TSRX file', () => {
+		const source = `module server {
+			import { dataSchema as s } from 'octane/data';
+			import { provider } from './private.js';
+			export const page = s.object({ cursor: s.nullable(s.string()) });
+			export const unused = s.object({ neverShipThisField: s.string() });
+			export function search(input) { return page.parse(provider(input)); }
+		}
+		export const validate = (input) => page.parse(input);
+		export const run = (input) => search(input);`;
+		const client = compile(source, filename, { mode: 'client' }).code;
+		expect(client).not.toContain('neverShipThisField');
+		expect(client).not.toContain('./private.js');
+		for (const mode of ['client', 'server'] as const) {
+			const target = loadCompiledFixtureSource(source, {
+				id: filename,
+				mode,
+				runtimeModules: {
+					'octane/data': { dataSchema },
+					'octane/internal/server-rpc': rpcRuntime,
+					...(mode === 'server' ? { './private.js': { provider: (v: unknown) => v } } : {}),
+				},
+			});
+			expect(target.validate({ cursor: null })).toEqual({ cursor: null });
+			expect(() => target.validate({ cursor: false })).toThrow();
+			if (mode === 'server') {
+				expect(Object.keys(target._$_server_$_)).toEqual(['search']);
+				expect(target.run({ cursor: 'next' })).toEqual({ cursor: 'next' });
+			}
+		}
+	});
+
+	it('supports ordinary file re-exports and preserves lexical shadowing and private exports', () => {
+		const source = `module server {
+			const privateKey = 'server-only';
+			export function read() { return privateKey; }
+			export function shadowed() { return privateKey; }
+		}
+		export { read as readFile };
+		export const choose = (shadowed) => shadowed;
+		export const labels = { shadowed: 'local' };`;
+		const client = compile(source, filename, { mode: 'client' }).code;
+		expect(client).not.toContain('server-only');
+		expect(client).not.toContain('const shadowed =');
+		const server = loadCompiledFixtureSource(source, { id: filename, mode: 'server' });
+		expect(server.readFile()).toBe('server-only');
+		expect(server.choose('caller')).toBe('caller');
+		for (const mode of ['client', 'server'] as const) {
+			for (const invalid of ['privateKey', 'missing']) {
+				expect(() => compile(source + '\nexport { ' + invalid + ' };', filename, { mode })).toThrow(
+					new RegExp(invalid),
+				);
+			}
+		}
+	});
+
+	it('keeps only free values and real typeof queries in TypeScript output', () => {
+		const block = `module server {
+			import { dataSchema as s } from 'octane/data';
+			export const page = s.string();
+			export function read() { return 42; }
+		}`;
+		for (const tail of [
+			'export const names = obj => obj.page + obj.read;',
+			'export function use(read, page) { return read(page); }',
+			'type Local = (page: string) => typeof page;',
+		]) {
+			const code = compile(block + tail, filename, { mode: 'client', output: 'ts' }).code;
+			expect(code).not.toContain('__serverRpc');
+			expect(code).not.toContain('octane/data');
+		}
+		const type = 'export type Input = ReturnType<typeof page.parse>;';
+		const schemaOnly = compile(block + 'export const parse = page.parse;', filename, {
+			mode: 'client',
+		});
+		expect(schemaOnly.code).toContain('octane/data');
+		expect(schemaOnly.code).not.toContain('__serverRpc');
+		expect(compile(block + type, filename, { mode: 'client', output: 'ts' }).code).toContain(
+			'octane/data',
+		);
+		expect(compile(block + type, filename, { mode: 'client' }).code).not.toContain('octane/data');
+	});
+
+	it('creates RPC stubs only for lexical reads of a server function', () => {
+		const block = 'module server { export function read() { return 42; } }';
+		for (const source of [
+			"export { foo as read } from './other.js';",
+			"export * as read from './other.js';",
+			'const foo = 1; export { foo as read };',
+			'export class C { read() {} static read = 1; }',
+			'export function x() { if (true) { var read = 1; } return read; }',
+			'export function x(xs) { for (var read of xs) {} return () => read; }',
+			'if (true) { var read = 1; } export const result = read;',
+			'export class C { static { if (true) { var read = 1; } this.value = read; } }',
+			'export const C = class read { field = read };',
+			'export const object = { read() {}, get prop() { return this.read; } };',
+			'export function go() { read: for (;;) { break read; } }',
+		]) {
+			expect(compile(block + source, filename, { mode: 'client' }).code).not.toContain(
+				'__serverRpc',
+			);
+		}
+		for (const source of [
+			'export { read as fetchValue };',
+			'export class C { [read()]() {} }',
+			'export const object = { read };',
+			'export class C { static field = read(); }',
+			'class C { static { var read = 1; } } export const value = read();',
+			'export function x() { class C { static { var read = 1; } } return read(); }',
+			'export function x() { function nested() { var read = 1; } return read(); }',
+			'export function x(defaultValue = read()) { if (true) { var read = 1; } return defaultValue; }',
+		]) {
+			expect(compile(block + source, filename, { mode: 'client' }).code).toContain(hash('read'));
+		}
+	});
+
+	it('keeps quoted schema imports and authored names independent of generated bindings', () => {
+		const contract = `
+module server {
+	import { 'dataSchema' as __oct_server_import$0 } from 'octane/data';
+	const __octaneServerSchema = __oct_server_import$0.boolean();
+	export const server = __oct_server_import$0.array(__octaneServerSchema);
+	export function useSchema() { return server; }
+}
+import { 'server' as __oct_server_import$0, useSchema as _$_rpc_modules_$_ } from 'server';
+export { __oct_server_import$0 as flags, _$_rpc_modules_$_ as useSchema };
+`;
+		for (const mode of ['client', 'server'] as const) {
+			const target = loadCompiledFixtureSource(contract, {
+				id: filename,
+				mode,
+				runtimeModules: { 'octane/data': { dataSchema }, 'octane/internal/server-rpc': rpcRuntime },
+			});
+			expect(target.flags.parse([true])).toEqual([true]);
+			if (mode === 'server') expect(target.useSchema()).toBe(target.flags);
+			expect(() =>
+				compile(
+					`module server { export function f(){} } import { f as _$_server_$_ } from 'server';`,
+					filename,
+					{ mode },
+				),
+			).toThrow(/reserved/);
+		}
+	});
+
+	it('rejects executable, mutable and untrusted schema definitions on both targets', () => {
+		for (const source of [
+			"import { dataSchema as s } from './private'; export const page = s.string();",
+			"import { dataSchema as s } from 'octane/data'; export let page = s.string();",
+			"import { dataSchema as s } from 'octane/data'; export const page = s.integer({minimum: secret()});",
+			"import { dataSchema as s } from 'octane/data'; export const page = s.object({get id(){return s.string()}});",
+			"import { dataSchema as s } from 'octane/data'; export const page = s.object({...secret});",
+			"import { dataSchema as s } from 'octane/data'; export const page = s.array(later); const later = s.string();",
+			"import { dataSchema as s } from 'octane/data'; export const page = s.array(page);",
+		]) {
+			for (const mode of ['client', 'server'] as const) {
+				expect(() =>
+					compile(`module server {${source}} import {page} from 'server';`, filename, { mode }),
+				).toThrow(/initialized with a function/);
+			}
+		}
 	});
 
 	it('only recognizes the trusted context type in final position', () => {

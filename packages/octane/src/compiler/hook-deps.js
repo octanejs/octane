@@ -4,6 +4,7 @@
 
 import { builders as b } from '@tsrx/core';
 import { REF_HOOKS } from './hook-names.js';
+import { isFunction, visitHoistedVarPatterns } from './lexical-bindings.js';
 import { hookMethodName } from './hook-methods.js';
 import { hasInlineMemoDirectEval } from './inline-hook-memo.js';
 
@@ -171,43 +172,11 @@ function predeclareDirect(statements, scope, hookRuntimeModules, bindingsOnly = 
 }
 
 function collectHoistedVars(node, functionScope, root = true, bindingsOnly = false) {
-	if (!node || typeof node !== 'object') return;
-	if (Array.isArray(node)) {
-		for (const child of node) collectHoistedVars(child, functionScope, false, bindingsOnly);
-		return;
-	}
-	if (!root && (isFunction(node) || node.type === 'JSXCodeBlock')) return;
-	if (
-		['JSXIfExpression', 'JSXForExpression', 'JSXSwitchExpression', 'JSXTryExpression'].includes(
-			node.type,
-		)
-	)
-		return;
-	if (
-		bindingsOnly &&
-		(isFunction(node) ||
-			node.type === 'JSXSwitchExpression' ||
-			(!root && node.type === 'StaticBlock') ||
-			node.type === 'ClassDeclaration' ||
-			node.type === 'ClassExpression' ||
-			node.type === 'TSModuleDeclaration')
-	) {
-		return;
-	}
-	if (node.type === 'VariableDeclaration' && node.kind === 'var') {
-		for (const decl of node.declarations || []) declarePattern(decl.id, functionScope);
-	}
-	for (const key in node) {
-		if (AST_META_KEYS.has(key)) continue;
-		collectHoistedVars(node[key], functionScope, false, bindingsOnly);
-	}
-}
-
-function isFunction(node) {
-	return (
-		node?.type === 'FunctionDeclaration' ||
-		node?.type === 'FunctionExpression' ||
-		node?.type === 'ArrowFunctionExpression'
+	visitHoistedVarPatterns(
+		node,
+		(pattern) => declarePattern(pattern, functionScope),
+		root,
+		bindingsOnly,
 	);
 }
 

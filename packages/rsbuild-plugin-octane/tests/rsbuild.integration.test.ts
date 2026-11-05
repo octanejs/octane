@@ -1,4 +1,5 @@
 import {
+	cpSync,
 	existsSync,
 	lstatSync,
 	mkdtempSync,
@@ -11,12 +12,15 @@ import {
 	writeFileSync,
 } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { once } from 'node:events';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRsbuild } from '@rsbuild/core';
 import { pluginReact } from '@rsbuild/plugin-react';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createNodeServer } from '../../app-core/src/server/node-http.js';
+import { checkFileSchemaRpc } from '../../octane/tests/_file-schema-rpc.js';
 import { pluginOctane } from '../src/index.js';
 
 const repositoryRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
@@ -89,6 +93,11 @@ function writeRoutedApp(
 	{ trustProxy = false } = {},
 ) {
 	const descriptorSlot = render === 'buffered';
+	cpSync(
+		join(repositoryRoot, 'packages/vite-plugin-octane/tests/_fixtures/app/src/file-schema'),
+		join(root, 'src/file-schema'),
+		{ recursive: true },
+	);
 	write(root, 'public/favicon.svg', '<svg data-rsbuild-public="ready"></svg>\n');
 	write(
 		root,
@@ -211,6 +220,7 @@ export default defineConfig({
 	router: {
 		routes: [
 			new RenderRoute({ path: '/', entry: '/src/Page.tsrx', layout: '/src/Layout.tsrx' }),
+			new RenderRoute({ path: '/file-title', entry: ['FileTitle', '/src/file-schema/FileTitle.tsrx'] }),
 			new ServerRoute({
 				path: '/api/health',
 				handler: (context) => compose([])(context, () => Response.json({
@@ -584,6 +594,7 @@ document.querySelector('#root')!.textContent = typeof Counter;
 		const serverRoot = join(root, 'build/server');
 		const clientCode = readJavaScript(clientRoot);
 		const serverCode = readJavaScript(serverRoot);
+		expect(clientCode).not.toContain('Unpublished draft title');
 		expect(clientCode).not.toContain('/src/Page.tsrx#Page');
 		expect(serverCode).not.toContain('/src/Page.tsrx#Page');
 		expect(existsSync(join(clientRoot, 'index.html'))).toBe(false);
@@ -665,6 +676,15 @@ document.querySelector('#root')!.textContent = typeof Counter;
 		};
 		expect(Object.keys(server)).toContain('handler');
 		expect(server.handler).toBeTypeOf('function');
+		const http = createNodeServer(server.handler, { staticDir: clientRoot }).listen(0);
+		try {
+			await once(http, 'listening');
+			const address = http.address();
+			if (!address || typeof address === 'string') throw new Error('Missing test server port');
+			await checkFileSchemaRpc(await getBrowser(), `http://127.0.0.1:${address.port}`);
+		} finally {
+			http.close();
+		}
 		const response = await server.handler(new Request('http://example.test/'));
 		const body = await response.text();
 		expect(response.status).toBe(200);

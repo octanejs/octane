@@ -42,13 +42,25 @@ import {
 	TSRX_ERRORS,
 	withDeferredImports,
 } from '@tsrx/core';
-import { parseModule } from '#octane/compiler-parser';
+import { parseModule as parseSourceModule } from '#octane/compiler-parser';
 import {
+	exposeFileLocalServerBindings,
+	isServerModuleDeclaration,
+	parseWithFileLocalServerExports,
 	collectServerFunctionNodes,
 	serverContextTypeImports,
 	serverFunctionContextIndex,
-	unwrapServerFunctionInitializer,
 } from './server-context.js';
+import { analyzeServerSchemas, emitClientSchemas } from './server-schemas.js';
+import {
+	AST_WALK_SKIP_KEYS,
+	collectBindings,
+	collectFreeIdentifiers,
+	collectModuleTopLevelBindings,
+	identifierName,
+	runtimeExportBindings,
+	unwrapTsExpr,
+} from './lexical-bindings.js';
 import { createStyleScopePass } from './style-scopes.js';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
@@ -3016,37 +3028,6 @@ function mixedStaticStyle(obj) {
  * Collect names bound by a destructuring pattern into `out`. Handles
  * Identifier / ObjectPattern / ArrayPattern / RestElement / AssignmentPattern.
  */
-function collectBindings(pattern, out) {
-	if (!pattern) return;
-	if (pattern.type === 'Identifier') {
-		out.add(pattern.name);
-		return;
-	}
-	if (pattern.type === 'TSParameterProperty') {
-		collectBindings(pattern.parameter, out);
-		return;
-	}
-	if (pattern.type === 'ObjectPattern') {
-		for (const p of pattern.properties || []) {
-			if (p.type === 'RestElement') collectBindings(p.argument, out);
-			else collectBindings(p.value || p.key, out);
-		}
-		return;
-	}
-	if (pattern.type === 'ArrayPattern') {
-		for (const e of pattern.elements || []) collectBindings(e, out);
-		return;
-	}
-	if (pattern.type === 'RestElement') {
-		collectBindings(pattern.argument, out);
-		return;
-	}
-	if (pattern.type === 'AssignmentPattern') {
-		collectBindings(pattern.left, out);
-		return;
-	}
-}
-
 /**
  * Names directly declared at the outer component body — params + top-level
  * `const`/`let`/`var` + `function` declarations. We DON'T recurse into nested
@@ -4650,17 +4631,6 @@ function removeMountEventCallbackDeclarations(statements, sinks) {
 	return out;
 }
 
-// Field names skipped by the generic AST child-walks below: source positions
-// plus the two known back-reference carriers — `metadata` (TSRX CSS ASTs whose
-// `parent_rule` / rule-node arrays form real cycles) and `parent` (acorn-
-// typescript sometimes attaches one). Skipping them is necessary but NOT
-// sufficient: even cycle-free ASTs can carry shared-subtree pointers (compiler
-// passes reuse nodes via spread), so every generic walk ALSO keeps a WeakSet
-// visited guard — without one the `for (k in n)` traversal can re-enter the
-// same subtree combinatorially, observed as a vitest worker hang on the bigger
-// fixture files.
-const AST_WALK_SKIP_KEYS = new Set(['type', 'loc', 'start', 'end', 'range', 'metadata', 'parent']);
-
 // Generated hook declarations live at module scope but are referenced from
 // user scopes, so both top-level duplicates and nested shadowing are unsafe.
 // Seed the allocator from lexical Identifier nodes (not raw source text, which
@@ -4699,319 +4669,6 @@ function allocCompilerName(ctx, preferred) {
 	}
 	ctx.usedCompilerNames.add(name);
 	return name;
-}
-
-/**
- * Walk an AST subtree collecting Identifier references that are NOT bound
- * locally (inside the subtree). Tracks block/function scopes so inner `const`
- * declarations correctly shadow outer references.
- */
-// `ignoreNodes` (optional) hides those exact Identifier nodes from the free
-// set — used as a non-mutating escape oracle (findMountEventCallbackSinks)
-// instead of temporarily blanking names on the (read-only) tree.
-function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
-	const free = new Set();
-	const seen = new WeakSet();
-	walk(root, new Set(initiallyBound));
-	return free;
-
-	/**
-	 * Walk the EXPRESSION positions inside a binding pattern: default
-	 * initialisers and computed keys. `collectBindings` harvests the names a
-	 * pattern declares, but those two positions are ordinary expressions that
-	 * run at binding time and may reference outer values — so they carry free
-	 * identifiers that the pattern's names alone never reveal.
-	 */
-	function walkPatternExpressions(pattern, scope) {
-		if (!pattern || typeof pattern !== 'object') return;
-		switch (pattern.type) {
-			case 'TSParameterProperty':
-				walkPatternExpressions(pattern.parameter, scope);
-				return;
-			case 'AssignmentPattern':
-				walkPatternExpressions(pattern.left, scope);
-				walk(pattern.right, scope);
-				return;
-			case 'ObjectPattern':
-				for (const p of pattern.properties || []) {
-					if (p.type === 'RestElement') {
-						walkPatternExpressions(p.argument, scope);
-						continue;
-					}
-					if (p.computed) walk(p.key, scope);
-					walkPatternExpressions(p.value || p.key, scope);
-				}
-				return;
-			case 'ArrayPattern':
-				for (const e of pattern.elements || []) walkPatternExpressions(e, scope);
-				return;
-			case 'RestElement':
-				walkPatternExpressions(pattern.argument, scope);
-				return;
-			default:
-				return;
-		}
-	}
-
-	function walk(n, scope) {
-		if (!n) return;
-		if (Array.isArray(n)) {
-			for (const x of n) walk(x, scope);
-			return;
-		}
-		if (typeof n !== 'object') return;
-
-		const t = n.type;
-		if (!t) return;
-		if (seen.has(n)) return;
-		seen.add(n);
-		if (ignoreNodes !== null && ignoreNodes.has(n)) return;
-
-		// TypeScript annotations are erased and cannot be reactive dependencies.
-		// Preserve only wrappers whose `.expression` is runtime JavaScript.
-		if (
-			t === 'TSAsExpression' ||
-			t === 'TSTypeAssertion' ||
-			t === 'TSSatisfiesExpression' ||
-			t === 'TSNonNullExpression' ||
-			t === 'TSInstantiationExpression'
-		) {
-			walk(n.expression, scope);
-			return;
-		}
-		// `module server {}` is represented with TypeScript's namespace container
-		// nodes even though its body is runtime code. Isolation validation depends on
-		// seeing those references; only the container name itself is non-reactive.
-		if (t === 'TSModuleDeclaration' || t === 'TSModuleBlock') {
-			walk(n.body, scope);
-			return;
-		}
-		// Enum initializers execute; only their declared names are type syntax.
-		// Member references belong to the enum, not equally named outer bindings.
-		if (t === 'TSEnumDeclaration') {
-			if (n.declare !== true) {
-				const members = n.body?.members ?? n.members ?? [];
-				const enumScope = new Set(scope);
-				collectBindings(n.id, enumScope);
-				for (const member of members) {
-					const name = member.id?.type === 'Identifier' ? member.id.name : member.id?.value;
-					if (!member.computed && typeof name === 'string') enumScope.add(name);
-				}
-				for (const member of members) {
-					if (member.computed) walk(member.id, enumScope);
-					walk(member.initializer, enumScope);
-				}
-			}
-			return;
-		}
-		if (t === 'TSImportEqualsDeclaration') {
-			if (n.importKind !== 'type' && n.moduleReference?.type !== 'TSExternalModuleReference') {
-				let reference = n.moduleReference;
-				while (reference?.type === 'TSQualifiedName') reference = reference.left;
-				walk(reference, scope);
-			}
-			return;
-		}
-		// The compiler's own renderable child hole (a normalized `{expr}` or
-		// `@{ … }` child) shares the prefix, but its expression is runtime code.
-		if (t === 'TSRXExpression') {
-			walk(n.expression, scope);
-			return;
-		}
-		if (t.startsWith('TS')) return;
-
-		if (t === 'Identifier') {
-			if (!scope.has(n.name)) free.add(n.name);
-			return;
-		}
-
-		// JSX tag position: a COMPONENT tag is a real identifier reference — a
-		// per-body local (`const C = props.comp`) used as `<C/>` must show up as
-		// free, or a hoisted helper (Phase 2) would silently drop it from its
-		// env tuple. Host tag names ('div') and attribute NAMES are static —
-		// only component-shaped identifier tags (isCompatTag rule), member-tag
-		// ROOT objects, and dynamic `<{expr}/>` expressions count.
-		if (t === 'Element' || t === 'JSXElement') {
-			const tag = n.openingElement?.name || n.id;
-			if (tag && !ignoreNodes?.has(tag)) {
-				if (
-					(tag.type === 'Identifier' || tag.type === 'JSXIdentifier') &&
-					typeof tag.name === 'string'
-				) {
-					if (!/^[a-z]/.test(tag.name) && !tag.name.includes('-') && !scope.has(tag.name)) {
-						free.add(tag.name);
-					}
-				} else if (tag.type === 'MemberExpression' || tag.type === 'JSXMemberExpression') {
-					let o = tag;
-					while (o && (o.type === 'MemberExpression' || o.type === 'JSXMemberExpression')) {
-						o = o.object;
-					}
-					if (
-						o &&
-						(o.type === 'Identifier' || o.type === 'JSXIdentifier') &&
-						typeof o.name === 'string' &&
-						!scope.has(o.name)
-					) {
-						free.add(o.name);
-					}
-				} else if (tag.type === 'JSXExpressionContainer') {
-					walk(tag.expression, scope);
-				}
-			}
-			const attrs = n.attributes || n.openingElement?.attributes || [];
-			for (const a of attrs) {
-				if (a.type === 'Attribute' || a.type === 'JSXAttribute') walk(a.value, scope);
-				else walk(a.argument ?? a, scope); // spread attribute
-			}
-			walk(n.children, scope);
-			return;
-		}
-
-		// Member access — `obj.prop`: prop is a static name, not a binding ref.
-		if (t === 'MemberExpression' && !n.computed) {
-			walk(n.object, scope);
-			return;
-		}
-		// Object literal property keys are static names (when not computed).
-		if (t === 'Property' && !n.computed) {
-			walk(n.value, scope);
-			return;
-		}
-
-		// Function-like scopes — params introduce new bindings.
-		if (
-			t === 'FunctionExpression' ||
-			t === 'FunctionDeclaration' ||
-			t === 'ArrowFunctionExpression'
-		) {
-			const newScope = new Set(scope);
-			for (const p of n.params || []) collectBindings(p, newScope);
-			// `function name(){}` introduces its own name into the body scope too.
-			if (n.id) collectBindings(n.id, newScope);
-			// A parameter pattern is not only a set of bindings: default
-			// initialisers and computed destructuring keys are EXPRESSIONS that run
-			// when the function is called, and they can reference anything the
-			// function closes over. Walking only the body would miss
-			// `(s, x = outer) => …` and `({ [outer]: v }) => …` entirely.
-			for (const p of n.params || []) walkPatternExpressions(p, newScope);
-			walk(n.body, newScope);
-			return;
-		}
-
-		// Block scope — hoist `var`/`function` + pre-collect `let`/`const` so
-		// forward references work the same way they do at runtime.
-		if (t === 'BlockStatement') {
-			const newScope = new Set(scope);
-			for (const stmt of n.body || []) {
-				if (stmt.type === 'VariableDeclaration') {
-					for (const d of stmt.declarations || []) collectBindings(d.id, newScope);
-				} else if (stmt.type === 'FunctionDeclaration' && stmt.id) {
-					newScope.add(stmt.id.name);
-				}
-			}
-			walk(n.body, newScope);
-			return;
-		}
-
-		// VariableDeclarator's `id` is a binding — but the pattern's defaults and
-		// computed keys are still live expressions (`const { [k]: a, b = c } = o`).
-		if (t === 'VariableDeclarator') {
-			walkPatternExpressions(n.id, scope);
-			walk(n.init, scope);
-			return;
-		}
-
-		// CatchClause introduces its param, and a `@catch (error, reset)` clause
-		// also its reset param.
-		if (t === 'CatchClause') {
-			const newScope = new Set(scope);
-			if (n.param) collectBindings(n.param, newScope);
-			if (n.resetParam) collectBindings(n.resetParam, newScope);
-			if (n.param) walkPatternExpressions(n.param, newScope);
-			walk(n.body, newScope);
-			return;
-		}
-
-		// A `@{ … }` block's setup declarations are scoped to its setup and render
-		// output, like a block statement's. Otherwise a block-local reads as a
-		// capture of any outer name it shares, which a caller would thread from a
-		// call site where that outer name may not be in scope.
-		if (t === 'JSXCodeBlock') {
-			const newScope = new Set(scope);
-			for (const stmt of n.body || []) {
-				if (stmt.type === 'VariableDeclaration') {
-					for (const d of stmt.declarations || []) collectBindings(d.id, newScope);
-				} else if (stmt.type === 'FunctionDeclaration' && stmt.id) {
-					newScope.add(stmt.id.name);
-				}
-			}
-			for (const key in n) {
-				if (AST_WALK_SKIP_KEYS.has(key)) continue;
-				walk(n[key], newScope);
-			}
-			return;
-		}
-
-		// for / for-in / for-of — a DECLARATION left introduces bindings, but a
-		// bare left-hand side is an ASSIGNMENT to something already in scope.
-		if (t === 'ForStatement' || t === 'ForInStatement' || t === 'ForOfStatement') {
-			const newScope = new Set(scope);
-			if (n.left && n.left.type === 'VariableDeclaration') {
-				for (const d of n.left.declarations || []) {
-					collectBindings(d.id, newScope);
-					walkPatternExpressions(d.id, newScope);
-				}
-			} else if (n.left) {
-				// `for (acc of xs)` writes the enclosing `acc` — treating it as a
-				// fresh binding hides that reference, which reads as capture-free
-				// even though the loop mutates outer state.
-				walk(n.left, newScope);
-			}
-			// A CLASSIC for carries its declaration in `init`, not `left`, and that
-			// binding is visible to the test/update/body. Without this, `i` in
-			// `for (let i = 0; i < n; i++)` is reported free, which reads as a
-			// capture of an enclosing `i` that the loop actually shadows.
-			if (n.init && n.init.type === 'VariableDeclaration') {
-				for (const d of n.init.declarations || []) {
-					collectBindings(d.id, newScope);
-					walkPatternExpressions(d.id, newScope);
-				}
-			}
-			walk(n.init, newScope);
-			walk(n.test, newScope);
-			walk(n.update, newScope);
-			walk(n.right, newScope);
-			walk(n.body, newScope);
-			return;
-		}
-		// New TSRX template for-expression. Its item/index bindings are visible to
-		// the key and body, but not to the iterable or @empty arm.
-		if (t === 'JSXForExpression') {
-			const newScope = new Set(scope);
-			if (n.left?.type === 'VariableDeclaration') {
-				for (const d of n.left.declarations || []) {
-					collectBindings(d.id, newScope);
-					walkPatternExpressions(d.id, newScope);
-				}
-			} else if (n.left) {
-				// Same as the JS loops above: a bare left-hand side assigns to an
-				// existing binding rather than introducing one.
-				walk(n.left, newScope);
-			}
-			if (n.index) collectBindings(n.index, newScope);
-			walk(n.right, scope);
-			walk(n.key, newScope);
-			walk(n.body, newScope);
-			walk(n.empty, scope);
-			return;
-		}
-
-		// Default: walk all child fields.
-		for (const key in n) {
-			if (AST_WALK_SKIP_KEYS.has(key)) continue;
-			walk(n[key], scope);
-		}
-	}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -6771,59 +6428,6 @@ function isReassignedComponentDeclaration(node, ctx) {
 	if (!bindings.has(node.id)) return false;
 	const writes = (ctx.authoredComponentWrites ??= collectReassignedBindings(ctx.authoredModuleAst));
 	return writes.has(node.id);
-}
-
-/**
- * Top-level module bindings, split by whether their identity can change after
- * evaluation. `mutable` holds `let`/`var` declarations, class declarations, and
- * function declarations that collectImmutableModuleFunctions demoted: an
- * identity-only survivor skip cannot witness them, so a region reading one
- * must re-render. `all` adds consts, unreassigned functions, enums, and
- * imports; a free name outside it (and outside every enclosing local) is a
- * global. Only top-level declarations count — a same-named parameter or local
- * elsewhere in the module never shadows the global a region actually reads.
- */
-function collectModuleTopLevelBindings(body, immutableFunctions) {
-	const all = new Set();
-	const mutable = new Set();
-	for (const statement of body) {
-		if (statement.type === 'ImportDeclaration') {
-			for (const specifier of statement.specifiers || []) {
-				if (specifier.local) all.add(specifier.local.name);
-			}
-			continue;
-		}
-		const declaration =
-			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
-				? statement.declaration
-				: statement;
-		if (!declaration) continue;
-		if (declaration.type === 'VariableDeclaration') {
-			const names = new Set();
-			for (const d of declaration.declarations || []) collectBindings(d.id, names);
-			for (const name of names) {
-				all.add(name);
-				if (declaration.kind !== 'const') mutable.add(name);
-			}
-		} else if (declaration.type === 'ClassDeclaration' && declaration.id) {
-			all.add(declaration.id.name);
-			mutable.add(declaration.id.name);
-		} else if (
-			declaration.type === 'FunctionDeclaration' &&
-			declaration.id?.type === 'Identifier'
-		) {
-			all.add(declaration.id.name);
-			if (!immutableFunctions.has(declaration.id.name)) mutable.add(declaration.id.name);
-		} else if (
-			(declaration.type === 'TSEnumDeclaration' ||
-				declaration.type === 'TSModuleDeclaration' ||
-				declaration.type === 'TSImportEqualsDeclaration') &&
-			declaration.id?.type === 'Identifier'
-		) {
-			all.add(declaration.id.name);
-		}
-	}
-	return { all, mutable };
 }
 
 // Globals a render-time read may treat as fixed: the value constants and the
@@ -10552,95 +10156,9 @@ function dropTypeOnlyExports(body, typeNames) {
 	return result;
 }
 
-// Each runtime export as [exportName, localName]. `localName` is null when no
-// module binding holds the exported value: a re-export, `export *` (whose
-// exportName is also null), or an anonymous default.
-function runtimeExportBindings(body) {
-	const bindings = [];
-	for (const node of body) {
-		if (node.type === 'ExportAllDeclaration') {
-			bindings.push([null, null]);
-		} else if (node.type === 'ExportDefaultDeclaration') {
-			const value = unwrapTsExpr(node.declaration);
-			bindings.push([
-				'default',
-				value.type === 'Identifier'
-					? value.name
-					: value.type === 'FunctionDeclaration' || value.type === 'ClassDeclaration'
-						? (value.id?.name ?? null)
-						: null,
-			]);
-		} else if (node.type === 'ExportNamedDeclaration' && node.declaration) {
-			const names = new Set();
-			if (node.declaration.type === 'VariableDeclaration') {
-				for (const declarator of node.declaration.declarations)
-					collectBindings(declarator.id, names);
-			} else if (node.declaration.id?.type === 'Identifier') {
-				names.add(node.declaration.id.name);
-			}
-			for (const name of names) bindings.push([name, name]);
-		} else if (node.type === 'ExportNamedDeclaration') {
-			for (const specifier of node.specifiers) {
-				bindings.push([
-					identifierName(specifier.exported),
-					node.source ? null : specifier.local.name,
-				]);
-			}
-		}
-	}
-	return bindings;
-}
-
 // ---------------------------------------------------------------------------
 // `module server` analysis + emit
 // ---------------------------------------------------------------------------
-
-function isServerModuleDeclaration(node) {
-	return node?.type === 'TSModuleDeclaration' && node.declare !== true && node.kind === 'module';
-}
-
-function identifierName(node) {
-	if (node?.type === 'Identifier') return node.name;
-	if (node?.type === 'Literal' && typeof node.value === 'string') return node.value;
-	return null;
-}
-
-function collectServerFunctionBindings(statements) {
-	const functions = new Set();
-	const aliases = new Map();
-
-	for (const statement of statements) {
-		const declaration =
-			statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
-		if (!declaration || isTypeOnlyStatement(declaration)) continue;
-		if (declaration.type === 'FunctionDeclaration' && declaration.id) {
-			functions.add(declaration.id.name);
-			continue;
-		}
-		if (declaration.type !== 'VariableDeclaration') continue;
-		for (const item of declaration.declarations || []) {
-			if (item.id?.type !== 'Identifier' || !item.init) continue;
-			const init = unwrapServerFunctionInitializer(item.init);
-			if (init?.type === 'FunctionExpression' || init?.type === 'ArrowFunctionExpression') {
-				functions.add(item.id.name);
-			} else if (init?.type === 'Identifier') {
-				aliases.set(item.id.name, init.name);
-			}
-		}
-	}
-
-	let changed = true;
-	while (changed) {
-		changed = false;
-		for (const [local, target] of aliases) {
-			if (!functions.has(local) && functions.has(target)) {
-				functions.add(local);
-				changed = true;
-			}
-		}
-	}
-	return functions;
-}
 
 function collectStatementBindings(statement, out) {
 	if (statement?.type === 'ExportNamedDeclaration') {
@@ -10667,6 +10185,10 @@ function collectStatementBindings(statement, out) {
 	) {
 		collectBindings(declaration.id, out);
 	}
+}
+
+function parseModule(source, filename, options) {
+	return parseWithFileLocalServerExports(parseSourceModule, source, filename, options);
 }
 
 function validateServerModuleIsolation(ast, declaration, filename) {
@@ -10775,8 +10297,20 @@ function analyzeServerModule(ast, filename) {
 	}
 
 	const statements = declaration.body?.body || [];
+	// Bundlers discover the server namespace through this fixed ESM export.
+	const outer = ast.body.filter((node) => node !== declaration && !isTypeOnlyStatement(node));
+	if (
+		collectModuleTopLevelBindings(outer, new Set()).all.has('_$_server_$_') ||
+		runtimeExportBindings(outer).some(([name]) => name === '_$_server_$_')
+	) {
+		throw codedError(
+			'OCTANE_SERVER_MODULE_EXPORT',
+			'The top-level name `_$_server_$_` is reserved by `module server`.',
+		);
+	}
 	validateServerModuleIsolation(ast, declaration, filename);
-	const functionBindings = collectServerFunctionBindings(statements);
+	const schemas = analyzeServerSchemas(statements);
+	const schemaExports = new Set();
 	const functionNodes = collectServerFunctionNodes(statements);
 	const contextImports = serverContextTypeImports(statements);
 	for (const statement of statements) {
@@ -10812,10 +10346,14 @@ function analyzeServerModule(ast, filename) {
 							'`module server` exported variables must use identifier bindings.',
 						);
 					}
-					if (!functionBindings.has(item.id.name)) {
+					if (schemas.bindings.has(item.id.name)) {
+						schemaExports.add(item.id.name);
+						continue;
+					}
+					if (!functionNodes.has(item.id.name)) {
 						throw codedError(
 							'OCTANE_SERVER_MODULE_EXPORT',
-							'`module server` exported variables must be initialized with a function.',
+							'`module server` exported variables must be initialized with a function or a static const octane/data schema.',
 						);
 					}
 					exports.set(item.id.name, item.id.name);
@@ -10833,7 +10371,7 @@ function analyzeServerModule(ast, filename) {
 			const local = identifierName(specifier.local);
 			const exported = identifierName(specifier.exported);
 			if (local && exported) {
-				if (!functionBindings.has(local)) {
+				if (!functionNodes.has(local)) {
 					throw codedError(
 						'OCTANE_SERVER_MODULE_EXPORT',
 						'`module server` export specifiers must reference local functions.',
@@ -10848,7 +10386,7 @@ function analyzeServerModule(ast, filename) {
 		for (const specifier of node.specifiers) {
 			if (specifier.importKind === 'type') continue;
 			const imported = identifierName(specifier.imported);
-			if (imported !== null && !exports.has(imported)) {
+			if (imported !== null && !exports.has(imported) && !schemaExports.has(imported)) {
 				throw codedError(
 					'OCTANE_SERVER_MODULE_IMPORT',
 					`Module \`server\` does not export \`${imported}\` in ${filename}.`,
@@ -10865,7 +10403,7 @@ function analyzeServerModule(ast, filename) {
 		if (contextIndex !== -1) contexts.set(exported, contextIndex);
 	}
 
-	return { declaration, imports, exports, contexts, filename };
+	return { declaration, imports, exports, contexts, schemas, schemaExports, filename };
 }
 
 /**
@@ -10879,12 +10417,17 @@ function analyzeServerModule(ast, filename) {
 function emitServerModuleClientStubs(info, ctx) {
 	if (info === null) return [];
 	const nodes = [];
+	const schemaImports = [];
 	for (const node of info.imports) {
 		for (const specifier of node.specifiers) {
 			if (specifier.importKind === 'type') continue;
 			const imported = identifierName(specifier.imported);
 			const local = specifier.local?.name;
 			if (!imported || !local) continue;
+			if (info.schemaExports.has(imported)) {
+				schemaImports.push(specifier);
+				continue;
+			}
 			const hash = strongHash(info.filename + '#' + imported);
 			const contextIndex = info.contexts.get(imported);
 			const target = contextIndex === undefined ? '__serverRpc' : '__serverRpcStream';
@@ -10909,6 +10452,16 @@ function emitServerModuleClientStubs(info, ctx) {
 		ctx.runtimeNeeded.add('__serverRpcPreload');
 		nodes.push(inheritOriginLoc(b.stmt(b.call('_$__serverRpcPreload')), info.imports[0]));
 	}
+	if (schemaImports.length) {
+		nodes.push(
+			...emitClientSchemas(
+				info,
+				schemaImports,
+				allocCompilerName(ctx, '__octaneDataSchema'),
+				inheritOriginLoc,
+			),
+		);
+	}
 	return nodes;
 }
 
@@ -10922,6 +10475,21 @@ function emitServerModuleServerNodes(info, ctx) {
 	const namespaceBody = [];
 	const importLocals = [];
 	let importIndex = 0;
+	// The production RPC manifest enumerates this namespace. Share parser objects
+	// with the outer server module using lexical slots, outside the RPC namespace.
+	const schemaSlots = new Map();
+	for (const node of info.imports) {
+		for (const specifier of node.specifiers) {
+			const name = identifierName(specifier.imported);
+			if (
+				specifier.importKind !== 'type' &&
+				info.schemaExports.has(name) &&
+				!schemaSlots.has(name)
+			) {
+				schemaSlots.set(name, allocCompilerName(ctx, '__octaneServerSchema'));
+			}
+		}
+	}
 
 	for (const statement of info.declaration.body?.body || []) {
 		if (isTypeOnlyStatement(statement)) continue;
@@ -10935,7 +10503,7 @@ function emitServerModuleServerNodes(info, ctx) {
 				continue;
 			}
 			if (valueSpecifiers.length === 0) continue;
-			const moduleName = `__oct_server_import$${importIndex++}`;
+			const moduleName = allocCompilerName(ctx, `__oct_server_import$${importIndex++}`);
 			imports.push(inheritOriginLoc(b.import_all(moduleName, statement.source.value), statement));
 			for (const specifier of valueSpecifiers) {
 				const local = specifier.local?.name;
@@ -10964,8 +10532,14 @@ function emitServerModuleServerNodes(info, ctx) {
 		namespaceBody.push(statement);
 	}
 
+	const localBindings = new Set();
+	for (const statement of importLocals) collectStatementBindings(statement, localBindings);
+	for (const statement of namespaceBody) collectStatementBindings(statement, localBindings);
+	const record = localBindings.has('server')
+		? allocCompilerName(ctx, '__octaneRpcNamespace')
+		: 'server';
 	const serverStatements = [
-		inheritOriginLoc(b.const('server', b.object([])), origin),
+		inheritOriginLoc(b.const(record, b.object([])), origin),
 		...importLocals,
 		...namespaceBody,
 	];
@@ -10991,7 +10565,7 @@ function emitServerModuleServerNodes(info, ctx) {
 				b.stmt(
 					b.assignment(
 						'=',
-						b.member(b.id('server'), b.literal(exported, JSON.stringify(exported)), true),
+						b.member(b.id(record), b.literal(exported, JSON.stringify(exported)), true),
 						value,
 					),
 				),
@@ -10999,19 +10573,34 @@ function emitServerModuleServerNodes(info, ctx) {
 			),
 		);
 	}
-	serverStatements.push(inheritOriginLoc(b.return(b.id('server')), origin));
+	for (const [name, slot] of schemaSlots) {
+		serverStatements.push(
+			inheritOriginLoc(b.stmt(b.assignment('=', b.id(slot), b.id(name))), origin),
+		);
+	}
+	serverStatements.push(inheritOriginLoc(b.return(b.id(record)), origin));
 	const namespace = inheritOriginLoc(
 		b.export(b.const('_$_server_$_', b.call(b.arrow([], b.block(serverStatements))))),
 		origin,
 	);
-	const nodes = [...imports, namespace];
-
-	if (info.exports.size > 0) {
+	const nodes = [...imports];
+	if (schemaSlots.size) {
 		nodes.push(
 			inheritOriginLoc(
-				b.const('_$_rpc_modules_$_', b.member(b.id('globalThis'), 'rpc_modules')),
+				b.declaration(
+					'let',
+					[...schemaSlots.values()].map((slot) => b.declarator(b.id(slot), null)),
+				),
 				origin,
 			),
+		);
+	}
+	nodes.push(namespace);
+
+	if (info.exports.size > 0) {
+		const registry = allocCompilerName(ctx, '_$_rpc_modules_$_');
+		nodes.push(
+			inheritOriginLoc(b.const(registry, b.member(b.id('globalThis'), 'rpc_modules')), origin),
 		);
 		const registrations = [];
 		for (const exported of info.exports.keys()) {
@@ -11020,7 +10609,7 @@ function emitServerModuleServerNodes(info, ctx) {
 				inheritOriginLoc(
 					b.stmt(
 						b.call(
-							b.member(b.id('_$_rpc_modules_$_'), 'set'),
+							b.member(b.id(registry), 'set'),
 							b.literal(hash, JSON.stringify(hash)),
 							b.array([
 								b.literal(info.filename, JSON.stringify(info.filename)),
@@ -11032,9 +10621,7 @@ function emitServerModuleServerNodes(info, ctx) {
 				),
 			);
 		}
-		nodes.push(
-			inheritOriginLoc(b.if(b.id('_$_rpc_modules_$_'), b.block(registrations), null), origin),
-		);
+		nodes.push(inheritOriginLoc(b.if(b.id(registry), b.block(registrations), null), origin));
 	}
 
 	for (const node of info.imports) {
@@ -11047,7 +10634,9 @@ function emitServerModuleServerNodes(info, ctx) {
 				inheritOriginLoc(
 					b.const(
 						local,
-						b.member(b.id('_$_server_$_'), b.literal(imported, JSON.stringify(imported)), true),
+						schemaSlots.has(imported)
+							? b.id(schemaSlots.get(imported))
+							: b.member(b.id('_$_server_$_'), b.literal(imported, JSON.stringify(imported)), true),
 					),
 					specifier,
 				),
@@ -12631,6 +12220,7 @@ function compileInternal(
 	// would leak invalid TS into the .js (or crash the printer), then imports
 	// used only as types, as tsc elides them. Runtime-only; Volar keeps them.
 	if (options?.output !== 'ts') ast = { ...ast, body: dropTypeOnlyCode(ast.body, filename) };
+	ast = exposeFileLocalServerBindings(ast, source, options?.output === 'ts', inheritOriginLoc);
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
@@ -14428,6 +14018,7 @@ function compileServer(
 	// isTypeOnlyStatement), then imports used only as types — same as the client
 	// path; the server HTML-string output is plain JS too.
 	if (options?.output !== 'ts') ast = { ...ast, body: dropTypeOnlyCode(ast.body, filename) };
+	ast = exposeFileLocalServerBindings(ast, source, options?.output === 'ts', inheritOriginLoc);
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
@@ -20134,20 +19725,6 @@ function replaceTsInner(node, inner, replacement) {
 }
 
 // Strip TS value-preserving wrappers (`x as T`, `x!`, `<T>x`, `x satisfies T`).
-function unwrapTsExpr(n) {
-	while (
-		n &&
-		(n.type === 'TSAsExpression' ||
-			n.type === 'TSNonNullExpression' ||
-			n.type === 'TSTypeAssertion' ||
-			n.type === 'TSSatisfiesExpression' ||
-			n.type === 'ParenthesizedExpression')
-	) {
-		n = n.expression;
-	}
-	return n;
-}
-
 // ESTree represents RegExp syntax as a Literal too, but evaluating `/x/`
 // creates a new object every render. Only primitive literal values are safe to
 // use in a component-lifetime identity proof.

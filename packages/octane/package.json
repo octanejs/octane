@@ -95,6 +95,7 @@
     "./dom-binding-projections": "./src/dom-binding-projections.ts",
     "./react/server": "./src/react/server.ts",
     "./server": "./src/server/index.ts",
+    "./data": "./src/data/index.ts",
     "./signals": "./src/signals/index.ts",
     "./signals/client": "./src/signals/client.ts",
     "./signals/server": "./src/signals/server.ts",
@@ -301,6 +302,17 @@
         "import": "./dist/server/index.js",
         "require": "./dist/cjs/server/index.cjs",
         "default": "./dist/server/index.js"
+      },
+      "./data": {
+        "types": "./dist/data/index.d.ts",
+        "node": {
+          "import": "./dist/node/data/index.js",
+          "require": "./dist/cjs/data/index.cjs",
+          "default": "./dist/node/data/index.js"
+        },
+        "import": "./dist/data/index.js",
+        "require": "./dist/cjs/data/index.cjs",
+        "default": "./dist/data/index.js"
       },
       "./signals": {
         "types": "./dist/signals/index.d.ts",

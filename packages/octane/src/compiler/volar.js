@@ -1,4 +1,4 @@
-import { parseEditorModule } from './parser.browser.js';
+import { parseEditorModule as parseEditorSource } from './parser.browser.js';
 /**
  * Volar (IDE language-service) mappings for octane .tsrx files.
  *
@@ -43,9 +43,13 @@ import { isComponentTag } from './render-classification.js';
 import { analyzeStrongMode, withStrongDocs } from './strong-mode.js';
 import { analyzeNativeReadDiagnostics, nativeReadOptions } from './native-read-diagnostics.js';
 import { jsxImportSourcePragmaModule } from './pragma.js';
+import { analyzeServerSchemas } from './server-schemas.js';
 import { inheritHookMemoOrigin } from './inline-hook-memo.js';
 import { lowerNativeAttributeReads } from './native-attribute-reads.js';
 import {
+	exposeFileLocalServerBindings,
+	isServerModuleDeclaration,
+	parseWithFileLocalServerExports,
 	collectServerFunctionNodes,
 	serverContextTypeImports,
 	serverFunctionContextIndex,
@@ -336,17 +340,15 @@ function projectComponentChildren(ast, comments) {
  * the namespace and ordinary function/type aliases retain their authored types.
  * Recognition is shared with runtime registration so editor and wire arity agree.
  */
-function projectServerContextCalls(ast, filename) {
+function projectServerContextCalls(ast, source, filename, errors) {
+	ast = exposeFileLocalServerBindings(ast, source, true, inheritHookMemoOrigin);
 	const declaration = ast.body.find(
-		(node) =>
-			node.type === 'TSModuleDeclaration' &&
-			node.kind === 'module' &&
-			!node.declare &&
-			(node.id?.name ?? node.id?.value) === 'server',
+		(node) => isServerModuleDeclaration(node) && (node.id?.name ?? node.id?.value) === 'server',
 	);
 	if (!Array.isArray(declaration?.body?.body)) return ast;
 	const statements = declaration.body.body;
 	const functions = collectServerFunctionNodes(statements);
+	const { bindings: schemas } = analyzeServerSchemas(statements);
 	const imports = serverContextTypeImports(statements);
 	const contextExports = new Set();
 	const add = (exported, local) => {
@@ -364,10 +366,29 @@ function projectServerContextCalls(ast, filename) {
 		const node = statement.declaration;
 		if (node?.type === 'FunctionDeclaration') add(node.id?.name, node.id?.name);
 		if (node?.type === 'VariableDeclaration') {
-			for (const item of node.declarations) add(item.id?.name, item.id?.name);
+			for (const item of node.declarations) {
+				const name = item.id?.name;
+				if (name && !functions.has(name) && !schemas.has(name)) {
+					collectCompileError(
+						'Export a function or a static const octane/data schema from `module server`.',
+						filename,
+						item.id,
+						errors,
+					);
+				}
+				add(name, name);
+			}
 		}
 		for (const specifier of statement.specifiers ?? []) {
 			if (specifier.exportKind !== 'type') {
+				if (schemas.has(specifier.local.name)) {
+					collectCompileError(
+						'Declare a public schema directly with `export const` in `module server`.',
+						filename,
+						specifier.local,
+						errors,
+					);
+				}
 				add(specifier.exported.name ?? specifier.exported.value, specifier.local.name);
 			}
 		}
@@ -694,7 +715,7 @@ export function compileToVolarMappings(source, filename, options) {
 	const errors = [];
 	/** @type {import('@tsrx/core/types').AST.CommentWithLocation[]} */
 	const comments = [];
-	const ast = parseEditorModule(source, filename, {
+	const ast = parseWithFileLocalServerExports(parseEditorSource, source, filename, {
 		collect: true,
 		loose: !!options?.loose,
 		preserveParens: true,
@@ -809,7 +830,9 @@ export function compileToVolarMappings(source, filename, options) {
 					comments,
 				)
 			: transformAst,
+		source,
 		filename,
+		errors,
 	);
 	const typePragmaModule = jsxImportSourcePragmaModule(
 		(typePragma ?? rendererPragma ?? authoredPragma)?.value ?? '',
@@ -1047,7 +1070,7 @@ export function compileTypesInspection(source, filename, options) {
 	const errors = [];
 	/** @type {import('@tsrx/core/types').AST.CommentWithLocation[]} */
 	const comments = [];
-	const ast = parseEditorModule(source, filename, {
+	const ast = parseWithFileLocalServerExports(parseEditorSource, source, filename, {
 		collect: true,
 		loose: true,
 		preserveParens: true,
@@ -1071,7 +1094,9 @@ export function compileTypesInspection(source, filename, options) {
 			renderer.target === 'dom'
 				? projectComponentChildren(projectNativeDomReads(transformAst), comments)
 				: transformAst,
+			source,
 			filename,
+			errors,
 		),
 		source,
 		filename,

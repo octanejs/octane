@@ -775,25 +775,55 @@ render errors select the catch UI on the server and client (see
 tag; builds now fail with an actionable error when that hydration contract is
 malformed.
 
-Server functions are declared and imported in the same full-compiled `.tsrx` or
-`.tsx` file. The client compiler replaces the local import with an RPC stub; dev
-registers it in Vite's SSR module graph, while production adds a static server
-import:
+A full-compiled TSRX file can declare a server function and the runtime schemas
+for its request and result together. Use their names directly in the rest of the
+file. The browser gets an RPC stub and local validators. The server gets the
+handler, the same validators, and access to its request-scoped dependencies.
 
 ```tsrx
 module server {
-  import { database } from './database.js';
+  import { dataSchema as s } from 'octane/data';
+  import type { ServerCallContext } from 'octane/server';
+  import { booksFor } from './catalog.server';
 
-  export async function saveName(name: string) {
-    return database.users.save({ name });
+  export const bookId = s.integer({ minimum: 1 });
+  export const book = s.object({ id: bookId, title: s.string() });
+
+  export async function findBook(id: number, ctx: ServerCallContext) {
+    const catalog = booksFor(ctx.viewer);
+    return book.parse(await catalog.find(bookId.parse(id), ctx.signal));
   }
 }
 
-import { saveName } from 'server';
+export async function loadBook(id: number) {
+  return book.parse(await findBook(id));
+}
 ```
 
-Only named imports/exports are supported. Arguments and results use devalue, so
-Dates, Maps, Sets, `undefined`, and cyclic values survive the round trip.
+Here the handler checks the request before passing it to the catalog and checks
+the row it returns. The caller validates the reply with its own build's schema.
+The host supplies the viewer and cancellation signal. Each application decides
+which records that viewer may read or change. Declare shared calls `async` and
+`await` them at the call site. A browser RPC always returns a promise, even
+when a synchronous implementation returns a value immediately during SSR.
+
+Use `dataSchema.string({ minLength })`, `integer({ minimum })`, `boolean()`,
+`enum([...])`, `nullable(schema)`, `array(schema)` and `object({ ... })`. Strings
+and integers also work without options. Object schemas require precisely the
+declared fields. `schema.parse(unknown)` returns a typed value or throws.
+`schema.identity` describes the wire shape and its constraints. Equivalent field
+and enum orders have the same identity.
+
+The compiler copies statically declared schemas built from these constructors
+and their local schema dependencies. Keep database access, authorization and
+custom validation inside the server implementation. Existing named imports
+from `'server'` continue to work. An ordinary file-level `export` makes a
+declaration available to another file. RPC arguments and results use devalue,
+including support for dates, maps, sets, `undefined` and cycles.
+
+This separation applies to executable browser modules. A bundler source map
+with `sourcesContent` can include the authored server block. Keep those maps
+private when the original server source is private.
 
 For a strict CSP, middleware can set the documented `Context.state` key. The
 raw nonce is passed to the core renderer and safely attribute-escaped on the

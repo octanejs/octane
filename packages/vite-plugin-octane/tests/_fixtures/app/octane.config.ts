@@ -95,6 +95,10 @@ export default defineConfig({
 			}),
 			new RenderRoute({ path: '/', entry: ['Page', '/src/Page.tsrx'], layout: '/src/Layout.tsrx' }),
 			new RenderRoute({
+				path: '/file-title',
+				entry: ['FileTitle', '/src/file-schema/FileTitle.tsrx'],
+			}),
+			new RenderRoute({
 				path: '/pages/:slug',
 				entry: ['Page', '/src/Page.tsrx'],
 				layout: '/src/Layout.tsrx',

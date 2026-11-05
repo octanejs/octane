@@ -238,6 +238,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	'./dom-binding-controls': ['__createBindingControls'],
 	'./dom-binding-styles': ['__createBindingStyles'],
 	'./dom-binding-projections': ['__createBindingProjections'],
+	'./data': ['dataSchema'],
 	'./signals': [
 		'createResource',
 		'createScope',
