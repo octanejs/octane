@@ -4,6 +4,10 @@ import { type DialogProps } from "@radix-ui/react-dialog";
 import { Slot } from "@octanejs/radix";
 import { useState, type ComponentProps, type ElementRef, type ComponentPropsWithoutRef, type Ref, descriptorChildren, type OctaneElement, type FC, type OctaneNode, type ChangeEvent } from "octane";
 import { ReactCompat } from "octane/react";
+type ReactDOMProps<Props> = {
+  [K in keyof Props]: K extends 'className' ? string | undefined
+    : K extends 'style' ? import("octane").CSSProperties | undefined : Props[K];
+};
 // No Octane port of `@example/react-toast` exists, so its components render in React through ReactCompat.
 import { Toaster, toast } from "@example/react-toast";
 
@@ -13,11 +17,11 @@ import { Toaster, toast } from "@example/react-toast";
 // a component that hands its `children` to a `render` prop, a library with
 // no Octane port, and shadcn's Radix components.
 
-export function Input({ className, type, onChange, ...props }: ComponentProps<"input">) @{
+export function Input({ className, type, onChange, ...props }: ReactDOMProps<ComponentProps<"input">>) @{
   <input type={type} data-slot="input" className={className} onInput={onChange} {...props} />
 }
 
-export function Textarea({ className, onChange, ...props }: ComponentProps<"textarea">) @{
+export function Textarea({ className, onChange, ...props }: ReactDOMProps<ComponentProps<"textarea">>) @{
   <textarea
     data-slot="textarea"
     className={className}
@@ -26,7 +30,7 @@ export function Textarea({ className, onChange, ...props }: ComponentProps<"text
   />
 }
 
-export const DialogHeader = ({ className, ref, ...props }: ComponentPropsWithoutRef<"div"> & { ref?: Ref<ElementRef<"div">> }) => @{ <div ref={ref} className={className} {...props} /> };
+export const DialogHeader = ({ className, ref, ...props }: ReactDOMProps<ComponentPropsWithoutRef<"div">> & { ref?: Ref<ElementRef<"div">> }) => @{ <div ref={ref} className={className} {...props} /> };
 
 // Base UI clones the element `render` gets, which React passes as `children`.
 const TimeTooltip = descriptorChildren(({ children, label }: { children: OctaneElement; label: string }) => @{
@@ -63,7 +67,7 @@ export function Shell({ children }: { children: OctaneNode }) @{
   </main>
 }
 
-export function Button({ asChild, ...props }: ComponentProps<"button"> & { asChild?: boolean }) @{
+export function Button({ asChild, ...props }: ReactDOMProps<ComponentProps<"button">> & { asChild?: boolean }) @{
   const Comp = asChild ? Slot : "button";
   <Comp data-slot="button" {...props} />
 }

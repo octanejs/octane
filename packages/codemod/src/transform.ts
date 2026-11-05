@@ -149,6 +149,25 @@ function esLib() {
 	return es5;
 }
 
+let domTagNames: Set<string> | undefined;
+
+/** The DOM library distinguishes built-in elements from project-specific JSX intrinsics. */
+function isDOMTag(tag: string) {
+	if (!domTagNames) {
+		const file = ts.getDefaultLibFilePath({}).replace(/[^/\\]+$/, 'lib.dom.d.ts');
+		const dom = ts.createSourceFile(file, ts.sys.readFile(file) ?? '', ts.ScriptTarget.Latest);
+		domTagNames = new Set();
+		for (const declaration of dom.statements) {
+			if (!ts.isInterfaceDeclaration(declaration) || !declaration.name.text.endsWith('TagNameMap'))
+				continue;
+			for (const member of declaration.members) {
+				if (member.name && ts.isStringLiteral(member.name)) domTagNames.add(member.name.text);
+			}
+		}
+	}
+	return domTagNames.has(tag);
+}
+
 function scriptKind(filename: string) {
 	if (filename.endsWith('.tsx')) return ts.ScriptKind.TSX;
 	if (filename.endsWith('.jsx')) return ts.ScriptKind.JSX;
@@ -543,6 +562,7 @@ class ModuleTransform {
 	readonly unrenderable = new Map<ts.Node, string>();
 	/** Placeholder index -> import declaration. */
 	readonly importSlots: ts.ImportDeclaration[] = [];
+	intrinsicPropsHelper: string | null = null;
 	hasJsx = false;
 	/** Whether the module imports React, rather than already being Octane. */
 	fromReact = false;
@@ -1492,7 +1512,9 @@ class ModuleTransform {
 		if (ts.isPropertyAccessExpression(node)) return this.rewriteMember(node);
 		if (ts.isQualifiedName(node)) return this.rewriteQualifiedType(node);
 		if (ts.isImportTypeNode(node)) return this.rewriteImportType(node);
-		if (ts.isTypeReferenceNode(node)) return this.rewriteTypeReference(node);
+		if (ts.isTypeReferenceNode(node)) return this.rewriteTypeReference(node, node.typeName);
+		if (ts.isExpressionWithTypeArguments(node) && ts.isHeritageClause(node.parent))
+			return this.rewriteTypeReference(node, node.expression);
 		if (ts.isExpressionStatement(node)) return this.rewriteStatement(node);
 		if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) this.checkClass(node);
 		if (ts.isBinaryExpression(node)) {
@@ -1803,7 +1825,10 @@ class ModuleTransform {
 			module +
 			quote;
 		if (!qualifier || renamed === null || renamed === name) {
-			return head + this.span(node, specifier.end, node.end, PLAIN);
+			const type = head + this.span(node, specifier.end, node.end, PLAIN);
+			return specifier.text === 'react' && !node.isTypeOf && this.isIntrinsicProps(node, name)
+				? this.wrapIntrinsicProps(node, type)
+				: type;
 		}
 		return (
 			head +
@@ -1907,6 +1932,15 @@ class ModuleTransform {
 				`${this.indentUnit}return createElement(type, key === undefined ? props : { ...props, key });`,
 				'}',
 				...rest.map((local) => `const ${local} = ${first};`),
+			);
+		}
+
+		if (this.intrinsicPropsHelper) {
+			lines.push(
+				`type ${this.intrinsicPropsHelper}<Props> = {`,
+				`${this.indentUnit}[K in keyof Props]: K extends 'className' ? string | undefined`,
+				`${this.indentUnit}${this.indentUnit}: K extends 'style' ? import(${quote('octane')}).CSSProperties | undefined : Props[K];`,
+				'};',
 			);
 		}
 
@@ -2070,13 +2104,61 @@ class ModuleTransform {
 		return this.require('octane', name, true);
 	}
 
-	rewriteTypeReference(node: ts.TypeReferenceNode) {
+	rewriteTypeReference(
+		node: ts.TypeReferenceNode | ts.ExpressionWithTypeArguments,
+		name: ts.EntityName | ts.Expression,
+	) {
 		// The global `JSX` namespace React's types declared is Octane's export.
-		const name = node.typeName;
-		if (ts.isQualifiedName(name) && this.isGlobalNamespace(name.left, 'JSX')) {
+		if (ts.isQualifiedName(name) && this.isGlobalNamespace(name.left, 'JSX'))
 			this.require('octane', 'JSX', true);
+		const imported = this.reactTypeName(name);
+		if (!imported || !this.isIntrinsicProps(node, imported)) return null;
+		// Heritage parses a namespace as a property access, but its base is still a type.
+		let base: string;
+		if (ts.isIdentifier(name)) {
+			this.used.add(name.text);
+			base = name.getText(this.sf);
+		} else {
+			base = ts.isExternalModule(this.sf)
+				? this.require('octane', imported, true)
+				: `import(${this.quote}octane${this.quote}).${imported}`;
 		}
-		return null;
+		return this.wrapIntrinsicProps(node, base + this.span(node, name.end, node.end, PLAIN));
+	}
+
+	reactTypeName(name: ts.EntityName | ts.Expression) {
+		if (ts.isQualifiedName(name)) return this.isReactNamespace(name.left) ? name.right.text : null;
+		if (ts.isPropertyAccessExpression(name))
+			return ts.isIdentifier(name.expression) && this.isReactNamespace(name.expression)
+				? name.name.text
+				: null;
+		const entry = this.importOf(name);
+		return entry?.module === 'react' ? entry.imported : null;
+	}
+
+	isIntrinsicProps(node: ts.NodeWithTypeArguments, name: string | null) {
+		const tag = node.typeArguments?.[0];
+		if (!tag || !name || !/^ComponentProps(?:WithRef|WithoutRef)?$/.test(name)) return false;
+		const type = this.checker.getTypeFromTypeNode(tag);
+		return type.isStringLiteral() && isDOMTag(type.value);
+	}
+
+	/** Keep React wrappers' string class and spreadable style while forwarding native host props. */
+	wrapIntrinsicProps(node: ts.NodeWithTypeArguments, props: string) {
+		if (!ts.isExternalModule(this.sf)) {
+			// An import or a top-level helper would change the script's global declarations.
+			const base = `globalThis.Omit<${props}, 'className' | 'style'>`;
+			const fields = `globalThis.Partial<{ className: string | undefined; style: import(${this.quote}octane${this.quote}).CSSProperties | undefined }>`;
+			return ts.isExpressionWithTypeArguments(node)
+				? `${base}, ${fields}`
+				: `(${base} & ${fields})`;
+		}
+		if (!this.intrinsicPropsHelper) {
+			let helper = 'ReactDOMProps';
+			while (this.declared.has(helper) || this.readsGlobal(helper)) helper += '_';
+			this.intrinsicPropsHelper = helper;
+		}
+		return `${this.intrinsicPropsHelper}<${props}>`;
 	}
 
 	rewriteCall(node: ts.CallExpression) {
