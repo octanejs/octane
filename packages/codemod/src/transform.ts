@@ -1131,7 +1131,9 @@ class ModuleTransform {
 		element: ts.JsxElement | ts.JsxSelfClosingElement,
 	) {
 		if (!ts.isJsxElement(owner)) return false;
-		const children = contentOf(owner);
+		const children = contentOf(owner).filter(
+			(child) => !ts.isJsxExpression(child) || child.expression !== undefined,
+		);
 		if (children.length !== 1) return false;
 		const tagName = (ts.isJsxElement(element) ? element.openingElement : element).tagName.getText(
 			this.sf,

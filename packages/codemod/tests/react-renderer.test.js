@@ -100,6 +100,10 @@ it('retains the hook diagnostic when producing a placeholder substitution requir
 });
 
 it.each([
+	' <Message id="x" />',
+	'\t<Message id="x" />',
+	'\u00a0<Message id="x" />',
+	'{" "}<Message id="x" />',
 	'{ok && <Message id="x" />}',
 	'{ok ? <Message id="x" /> : null}',
 	'{ids.map(id => <Message id={id} />)}',

@@ -62,8 +62,9 @@ beforeAll(async () => {
 		import { FormattedMessage as Message } from 'react-intl';
 		import { IntlProvider as Provider, intlContexts } from './react-intl.tsrx';
 		export function Choice({first}) { return <Provider locale="en"><Boundary contexts={intlContexts}>
-			{first ? (<Message id="a" defaultMessage="First" />) : <Message id="b" defaultMessage="Second" />}</Boundary></Provider>; }
-		export function Namespaced() { return <Provider locale="en"><Bridge.ReactCompat contexts={intlContexts}>{(<Message id="b" defaultMessage="Second" />)}</Bridge.ReactCompat></Provider>; }`,
+			{/* Keep this message in React. */}
+			{first ? (<Message id="a" defaultMessage="First" />) : <Message id="b" defaultMessage="Second" />}{}</Boundary></Provider>; }
+		export function Namespaced() { return <Provider locale="en"><Bridge.ReactCompat contexts={intlContexts}>{}{(<Message id="b" defaultMessage="Second" />)}{/* end */}</Bridge.ReactCompat></Provider>; }`,
 		'choices.tsx',
 		{
 			reactIntlAdapter: './react-intl.tsrx',
