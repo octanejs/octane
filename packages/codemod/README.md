@@ -218,7 +218,7 @@ Hosted components inherit the original React provider. To render a converted com
 </NativeStoreProvider>
 ```
 
-The codemod checks how each component uses the hook. Conditions, scalar output, and dependency comparisons can qualify. Rendering an opaque store value, passing the component into an unknown renderer, or writing JSX into a shared store keeps the existing manual migration diagnostic. A package without resolvable workspace source also keeps that diagnostic.
+The codemod checks how each component uses the hook. Conditions, scalar output, and dependency comparisons can qualify. Rendering an opaque store value, passing the component into an unknown renderer, or writing JSX into a shared store keeps the existing manual migration diagnostic. A component that renders a bare SVG import, including through a local alias, also needs review. Changing the importer from `.tsx` to `.tsrx` can cause an SVG loader to return an asset URL.
 
 ## Local recipes
 

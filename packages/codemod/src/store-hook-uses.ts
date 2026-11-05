@@ -1,6 +1,44 @@
 import { localUses, scalar } from './local-uses.js';
 import ts from 'typescript';
 
+/** Bare SVG default imports can switch from a component to an asset URL for a .tsrx issuer. */
+export function isBareSvgTag(tag: ts.JsxTagNameExpression, checker: ts.TypeChecker): boolean {
+	const seen = new Set<ts.Symbol>();
+	function fromSvg(value: ts.Node): boolean {
+		if (
+			ts.isParenthesizedExpression(value) ||
+			ts.isAsExpression(value) ||
+			ts.isSatisfiesExpression(value) ||
+			ts.isNonNullExpression(value)
+		)
+			return fromSvg(value.expression);
+		if (ts.isConditionalExpression(value))
+			return fromSvg(value.whenTrue) || fromSvg(value.whenFalse);
+		if (!ts.isIdentifier(value)) return false;
+		const symbol = checker.getSymbolAtLocation(value);
+		if (!symbol || seen.has(symbol)) return false;
+		seen.add(symbol);
+		const d = symbol.declarations?.[0];
+		if (!d) return false;
+		if (
+			ts.isVariableDeclaration(d) &&
+			d.initializer &&
+			ts.isVariableDeclarationList(d.parent) &&
+			d.parent.flags & ts.NodeFlags.Const
+		)
+			return fromSvg(d.initializer);
+		const clause = ts.isImportClause(d)
+			? d
+			: ts.isImportSpecifier(d) && !d.isTypeOnly && d.propertyName?.text === 'default'
+				? d.parent.parent
+				: undefined;
+		if (!clause || clause.isTypeOnly) return false;
+		const specifier = clause.parent.moduleSpecifier;
+		return ts.isStringLiteral(specifier) && specifier.text.toLowerCase().endsWith('.svg');
+	}
+	return fromSvg(tag);
+}
+
 /**
  * A store can contain React elements or objects that carry them. Follow the
  * result of each direct hook call through local bindings to where it is used.

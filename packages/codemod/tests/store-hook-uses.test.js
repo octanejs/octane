@@ -1,8 +1,9 @@
 import { expect, it } from 'vitest';
 import { transformModule } from '../dist/index.js';
 
-function migrate(source) {
+function migrate(source, target = 'tsrx') {
 	return transformModule(source, 'Panel.tsx', {
+		target,
 		unported: (name) => (name === 'observer' ? name : null),
 		resolveStoreHook: (module, name, safe) =>
 			module === 'observer' && safe((source, name) => source === './counter' && name === 'counter')
@@ -66,4 +67,63 @@ it('requires the original result to establish a scalar type', () => {
 	const result = migrate(`import {useStore} from 'observer';
 		export function Panel() { const text: string = useStore(); return <p>{text}</p>; }`);
 	expect(result.rules['store-hook']).toBeUndefined();
+});
+
+it.each([
+	['direct default', "import Mark from './mark.svg';", '<Mark/>'],
+	['named default', "import {default as Mark} from './mark.svg';", '<Mark/>'],
+	[
+		'selected alias',
+		"import Mark from './mark.svg';",
+		'<Selected/>',
+		'const Copy = Mark; const Selected = active ? Local : (Copy as typeof Mark);',
+	],
+	[
+		'explicit React island',
+		"import Mark from './mark.svg'; import {ReactCompat} from 'octane/react';",
+		'<ReactCompat><Mark/></ReactCompat>',
+	],
+])('reports the %s SVG tag independently of the store hook', (_, imports, jsx, setup = '') => {
+	const result = migrate(`import {useStore} from 'observer'; ${imports}
+		function Local(){ return <b/>; }
+		export function Panel() { const active = Boolean(useStore()); ${setup} return ${jsx}; }`);
+	expect(result.rules['store-hook']).toBe(1);
+	expect(result.unported).toEqual([]);
+	expect(
+		result.notes.filter((n) => n.severity === 'error' && n.message.includes('SVG')),
+	).toHaveLength(1);
+});
+
+it('keeps SVG data uses, shadowed JSX tags and explicit loader conventions separate', () => {
+	const result = migrate(`import {useStore} from 'observer';
+		import Url from './image.svg'; import ReactGlyph from './glyph.svg?react';
+		import {ReactComponent as Named} from './glyph.svg';
+		export function Panel() { const active = Boolean(useStore());
+			function Badge(Url) { return <Url/>; }
+			return <div><img src={active ? Url : ''}/><ReactGlyph/><Named/></div>;
+		}`);
+	expect(result.rules['store-hook']).toBe(1);
+	expect(result.notes.filter((n) => n.severity === 'error' && n.message.includes('SVG'))).toEqual(
+		[],
+	);
+});
+
+it('checks the issuer for SVG tags in the same migrated file', () => {
+	const result = migrate(`import {useStore} from 'observer'; import Mark from './mark.svg';
+		export function Panel(){return <p>{Boolean(useStore())}</p>;}
+		export function Badge(){return <Mark/>;}`);
+	expect(result.rules['store-hook']).toBe(1);
+	expect(
+		result.notes.filter((n) => n.severity === 'error' && n.message.includes('SVG')),
+	).toHaveLength(1);
+});
+
+it('only generates native hook imports for callers compiled as TSRX', () => {
+	const result = migrate(
+		`import {useStore} from 'observer'; import Mark from './mark.svg';
+		export function Panel(){return Boolean(useStore()) ? <Mark/> : null;}`,
+		'tsx',
+	);
+	expect(result.rules['store-hook']).toBeUndefined();
+	expect(result.notes.some((n) => n.rule === 'store-hook')).toBe(false);
 });

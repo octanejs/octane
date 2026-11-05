@@ -1,7 +1,7 @@
 import { reactRenderer } from './react-renderer.js';
 import ts from 'typescript';
 import { effectReceivers } from './effect-receivers.js';
-import { storeHookUses } from './store-hook-uses.js';
+import { isBareSvgTag, storeHookUses } from './store-hook-uses.js';
 import { intlImports } from './react-intl.js';
 import {
 	DEPENDENCY_HOOKS,
@@ -776,6 +776,7 @@ class ModuleTransform {
 			if (entry.typeOnly || (ts.isImportSpecifier(declaration) && this.nativeIntl.has(declaration)))
 				continue;
 			if (
+				this.target === 'tsrx' &&
 				this.options.resolveStoreHook &&
 				ts.isImportSpecifier(declaration) &&
 				/^use[A-Z0-9]/.test(entry.imported) &&
@@ -828,7 +829,20 @@ class ModuleTransform {
 			ts.forEachChild(node, visit);
 		};
 		visit(this.sf);
+		const checkSvgIssuer =
+			this.nativeStoreHooks.size > 0 &&
+			[...this.imports.values()].some(
+				(entry) => entry.imported === 'default' && /\.svg$/i.test(entry.module),
+			);
 		for (const field of fields) {
+			if (checkSvgIssuer && isBareSvgTag(field.tagName, this.checker)) {
+				this.note(
+					'store-hook',
+					'error',
+					field.tagName,
+					'This JSX tag can resolve to a bare SVG import. Loading the SVG from .tsrx can produce an asset URL. Render the SVG in a React-owned .tsx component through ReactCompat, or configure a native SVG loader for .tsrx.',
+				);
+			}
 			if (this.takesChange(field)) this.planRestChange(field);
 			if (!reactSvgImports.size) continue;
 			const asset = this.importOf(field.tagName);
