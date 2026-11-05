@@ -34,6 +34,12 @@ function catalogVersion(name) {
 	return DATA.bindings.find((binding) => binding.name === name)?.version;
 }
 
+/** @param {string} root */
+function typecheckProject(root) {
+	const cli = path.join(REPO, 'scripts/octane-tsc/bin.mjs');
+	execFileSync(process.execPath, [cli, '-p', 'tsconfig.json'], { cwd: root });
+}
+
 describe('runCodemod', () => {
 	it('preserves mapped children passed to an imported inspection component under Vite', async () => {
 		const root = project({
@@ -568,13 +574,100 @@ Inline({ dangerouslySetInnerHTML: { __html: 'untrusted' } });`,
 		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
 		const { files } = await runCodemod([path.join(root, 'Inline.tsx')], { root, strong: true });
 		expect(files).toMatchObject([{ strong: true, diagnostics: [] }]);
-		execFileSync(
-			process.execPath,
-			[path.join(REPO, 'scripts/octane-tsc/bin.mjs'), '-p', 'tsconfig.json'],
-			{
-				cwd: root,
-			},
-		);
+		typecheckProject(root);
+	});
+
+	it('preserves React class and style types on migrated intrinsic prop consumers', async () => {
+		const root = project({
+			'Primitives.tsx': `import type * as React from 'react';
+import type { ComponentPropsWithoutRef as Props } from 'react';
+const classText = (name?: string) => name?.trim() ?? '';
+export function Button({ className, ...rest }: Props<'button'>) {
+	return <button {...rest} className={classText(className)} />;
+}
+export interface PanelProps extends React.ComponentPropsWithRef<'section'> {}
+export function Panel({ style, ...rest }: PanelProps) {
+	return <section {...rest} style={{ ...style, color: 'red' }} />;
+}
+type FieldTag = 'input';
+export type FieldProps = import('react').ComponentProps<FieldTag>;
+export type DialProps = React.ComponentProps<'x-dial'>;
+declare function Badge(props: { className: string[]; style: string }): React.ReactElement;
+export type BadgeProps = React.ComponentProps<typeof Badge>;
+`,
+			'dial.d.ts': `import 'octane/jsx-runtime';
+type Dial = { className: 'dial'; style: number };
+declare module 'react' {
+	namespace JSX { interface IntrinsicElements { 'x-dial': Dial } }
+}
+declare module 'octane/jsx-runtime' {
+	namespace Octane.JSX { interface IntrinsicElements { 'x-dial': Dial } }
+}`,
+			'consumer.ts': `import { Button, Panel, type FieldProps, type BadgeProps, type DialProps } from './Primitives.tsrx';
+Button({ type: 'submit', className: undefined, style: undefined });
+Panel({ className: 'wrapper', style: { display: 'grid' }, ref: node => { node?.focus(); } });
+const field: FieldProps = { type: 'number', style: undefined, className: 'numeric' };
+const badge: BadgeProps = { className: ['accent'], style: 'color:red' };
+const native: import('octane/strong').ComponentProps<'button'> = { className: ['wide'], style: 'display:grid' };
+const dial: DialProps = { className: 'dial', style: 2 };
+// @ts-expect-error A custom element keeps its declared class names.
+const invalidDial: DialProps = { className: 'other', style: 2 };
+// @ts-expect-error React class names are strings.
+Button({ className: ['wide'] });
+// @ts-expect-error React styles are objects.
+Panel({ style: 'display:grid' });
+// @ts-expect-error A button has no href.
+Button({ href: '/next' });
+// @ts-expect-error ComponentPropsWithoutRef omits the ref.
+Button({ ref: () => {} });
+// @ts-expect-error An SVG ref cannot be attached to a section.
+Panel({ ref: (node: SVGSVGElement | null) => { node?.pauseAnimations(); } });
+// @ts-expect-error Inline imports preserve the original class name type too.
+const invalidField: FieldProps = { className: ['numeric'] };`,
+			'tsconfig.json': JSON.stringify({
+				extends: path.join(REPO, 'packages/octane/typetests/tsconfig.json'),
+				compilerOptions: {
+					allowImportingTsExtensions: true,
+					exactOptionalPropertyTypes: true,
+					verbatimModuleSyntax: true,
+				},
+				include: ['Primitives.tsrx', 'consumer.ts', 'dial.d.ts'],
+			}),
+		});
+		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+		const { files } = await runCodemod([root], { strong: true });
+		const wrapper = files.find((file) => file.output === 'Primitives.tsrx');
+		expect(wrapper).toMatchObject({ strong: true, diagnostics: [] });
+		typecheckProject(root);
+		expect(wrapper.code).not.toMatch(/(?:from\s+|import\(\s*)['"]react['"]/);
+		const second = await runCodemod([root], { strong: true });
+		expect(second.files.filter((file) => file.changed)).toEqual([]);
+		expect(fs.readFileSync(path.join(root, 'Primitives.tsrx'), 'utf8')).toBe(wrapper.code);
+	});
+
+	it('keeps migrated type declarations visible across global scripts', async () => {
+		const root = project({
+			'button.ts': "type Action = import('react').ComponentProps<'button'>;",
+			'panel.ts': "type Panel = import('react').ComponentPropsWithoutRef<'section'>;",
+			'use.ts': `const action: Action = { type: 'reset' };
+const panel: Panel = { style: { color: 'red' } };
+// @ts-expect-error Migrated React styles are objects.
+const invalid: Panel = { style: 'color:red' };`,
+			'tsconfig.json': JSON.stringify({
+				extends: path.join(REPO, 'packages/octane/typetests/tsconfig.json'),
+				compilerOptions: { moduleDetection: 'legacy' },
+				include: ['*.ts'],
+			}),
+		});
+		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+		const { files } = await runCodemod([root], { strong: true });
+		expect(
+			files
+				.filter((file) => file.changed)
+				.map((file) => file.output)
+				.sort(),
+		).toEqual(['button.ts', 'panel.ts']);
+		typecheckProject(root);
 	});
 
 	it('reports a module the compiler rejects as an error, not a Strong blocker', async () => {
