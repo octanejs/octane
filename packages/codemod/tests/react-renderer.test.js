@@ -19,6 +19,13 @@ it('keeps closed intrinsic callbacks owned by the receiving React island', () =>
 	expect(result.code).toContain("from 'react/jsx-runtime'");
 	expect(result.code).toContain('<ReactCompat>');
 });
+it('passes boolean and nullish options beside a React-owned callback', () => {
+	const result = migrate(
+		'values={{ enabled: true, disabled: (false), empty: null, absent: (undefined), strong: value => <b>{value}</b> }}',
+	);
+	expect(result.notes.filter((note) => note.severity === 'error')).toEqual([]);
+	expect(result.code).toContain('<ReactCompat>');
+});
 it('retains the renderer diagnostic for callbacks with other behavior or opaque values', () => {
 	for (const [props, before] of [
 		['render={value => <b>{value}</b>}'],
@@ -31,6 +38,11 @@ it('retains the renderer diagnostic for callbacks with other behavior or opaque 
 		['values={{ bold: (x) => <b title="&amp;">{x}</b> }}'],
 		['values={{ bold: (x) => <b {...props}>{x}</b> }}'],
 		['values={{ bold: (x) => <b>{x}</b>, other: opaque }}', 'declare const opaque: unknown;'],
+		['values={{ bold: (x) => <b>{x}</b>, other: undefined }}', 'declare const undefined: unknown;'],
+		[
+			'values={{ bold: (x) => <b>{x}</b>, other: opaque as boolean }}',
+			'declare const opaque: unknown;',
+		],
 		['values={{ ...extra, bold: (x) => <b>{x}</b> }}'],
 		['values={{ bold: renderer }}', 'const renderer=(x)=><b>{x}</b>;'],
 		['values={{ bold: (jsx) => <b>{jsx}</b> }}'],

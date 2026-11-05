@@ -2011,6 +2011,27 @@ export function Locale() { return <IntlProvider locale="en"><b>test</b></IntlPro
 		expect(next.files.some((f) => f.rules['react-intl-adapter'])).toBe(false);
 		expect(fs.readFileSync(helper, 'utf8')).toBe(source);
 	});
+	it('resolves React wrappers before planning component-owned Intl hooks', async () => {
+		const root = setup({
+			'src/Greeting.tsx': `import { useIntl } from 'react-intl';
+import React, { memo as cached } from 'react';
+export const Greeting = cached(() => { const intl = useIntl(); return <p title={intl.locale} />; });
+export const Field = React.forwardRef((props, ref) => { const intl = useIntl(); return <input ref={ref} title={intl.locale} />; });`,
+			'src/Other.tsx': `import {useIntl} from 'react-intl';
+function memo(fn) { return fn; }
+export const Other = memo(() => { const intl = useIntl(); return <p title={intl.locale} />; });`,
+		});
+		const { files } = await runCodemod([root], { root, write: false, strong: true });
+		const wrapped = files.find((f) => f.file === 'src/Greeting.tsx');
+		expect(wrapped.code).toContain("from './octane-react-intl.tsrx'");
+		expect(
+			[...wrapped.notes, ...wrapped.diagnostics].filter((n) => n.severity === 'error'),
+		).toEqual([]);
+		const other = files.find((f) => f.file === 'src/Other.tsx');
+		expect(other.notes.some((n) => n.severity === 'error' && n.message.includes('useIntl'))).toBe(
+			true,
+		);
+	});
 	it('retains errors for an escaping formatter and bridges only a genuine React Intl display', async () => {
 		const root = setup({
 			'src/Greeting.tsx': `import { useIntl, FormattedMessage as Message } from 'react-intl';

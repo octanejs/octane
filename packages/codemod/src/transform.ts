@@ -513,7 +513,7 @@ class ModuleTransform {
 	readonly indentUnit: string;
 	/** Every import, keyed by its declaration. */
 	readonly imports = new Map<ts.Node, Import>();
-	readonly nativeIntl: Set<ts.ImportSpecifier>;
+	nativeIntl = new Set<ts.ImportSpecifier>();
 	/** React and Octane imports, by local name. */
 	readonly apiLocals = new Map<string, Import>();
 	/** React-module locals that are still referenced after the rewrite. */
@@ -567,15 +567,6 @@ class ModuleTransform {
 		const { sf, checker } = bind(filename, source);
 		this.sf = sf;
 		this.checker = checker;
-		this.nativeIntl =
-			options.reactIntlAdapter && source.includes('react-intl')
-				? intlImports(
-						sf,
-						checker,
-						(expr) => this.typeOf(expr),
-						(fn) => this.isComponent(fn),
-					)
-				: new Set();
 		this.indentUnit = /^\t/m.test(source) ? '\t' : '  ';
 	}
 
@@ -715,17 +706,13 @@ class ModuleTransform {
 				imported: string,
 				typeOnly: boolean,
 			) => {
-				const port =
-					typeOnly || (ts.isImportSpecifier(declaration) && this.nativeIntl.has(declaration))
-						? null
-						: this.portOf(module);
 				const entry = {
 					module,
 					local: name.text,
 					imported,
 					namespace: imported === '*',
 					typeOnly,
-					port,
+					port: null,
 				};
 				this.imports.set(declaration, entry);
 				if (
@@ -735,7 +722,6 @@ class ModuleTransform {
 						(imported === 'ReactComponent' && module.endsWith('.svg')))
 				)
 					reactSvgImports.add(entry);
-				if (port) portLocals.add(name.text);
 				if (isApiModule(module)) this.apiLocals.set(name.text, entry);
 			};
 			// A default import of React is the namespace in practice; any other
@@ -753,6 +739,21 @@ class ModuleTransform {
 					record(element, element.name, imported, clause.isTypeOnly || element.isTypeOnly);
 				}
 			}
+		}
+		// Resolve component wrappers through their imports before claiming native Intl hooks.
+		if (this.options.reactIntlAdapter && this.source.includes('react-intl')) {
+			this.nativeIntl = intlImports(
+				this.sf,
+				this.checker,
+				(expr) => this.typeOf(expr),
+				(fn) => this.isComponent(fn),
+			);
+		}
+		for (const [declaration, entry] of this.imports) {
+			if (entry.typeOnly || (ts.isImportSpecifier(declaration) && this.nativeIntl.has(declaration)))
+				continue;
+			entry.port = this.portOf(entry.module);
+			if (entry.port) portLocals.add(entry.local);
 		}
 		const fields: ts.JsxOpeningLikeElement[] = [];
 		/** Values read as an element: cloned, inspected, or a `render` prop. */
@@ -964,7 +965,17 @@ class ModuleTransform {
 									: ts.isShorthandPropertyAssignment(field)
 										? field.name
 										: undefined;
-							return !value || !textKind(this.typeOf(value)) || rendersOctane(field);
+							if (!value) return true;
+							const literal = skipParens(value);
+							const primitive =
+								literal.kind === ts.SyntaxKind.TrueKeyword ||
+								literal.kind === ts.SyntaxKind.FalseKeyword ||
+								literal.kind === ts.SyntaxKind.NullKeyword ||
+								(ts.isIdentifier(literal) &&
+									literal.text === 'undefined' &&
+									!this.declarationOf(literal)) ||
+								textKind(this.typeOf(value)) !== 0;
+							return !primitive || rendersOctane(field);
 						}
 						if (
 							['jsx', 'OctaneJsx'].some((name) =>
