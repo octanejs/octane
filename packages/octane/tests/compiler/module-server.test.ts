@@ -182,6 +182,34 @@ export { files, again, get };
 		}
 	});
 
+	it('shares the runtime shape of schemas with TypeScript-only annotations', () => {
+		const source = `module server {
+			import { dataSchema as s, type DataSchema } from 'octane/data';
+			const rank = (s satisfies typeof s).integer({ minimum: -(1 as const) } as const);
+			const state = (s.enum<'ready' | 'done'>)(['ready' as const, 'done'] as const);
+			const title = (s.string satisfies typeof s.string)({ minLength: (1 as const)! });
+			export const row = s.object({ rank, state: state!, titles: (s.array<string>)(title) } as const) satisfies
+				DataSchema<{ rank: number; state: 'ready' | 'done'; titles: string[] }>;
+		}
+		export { row };`;
+		const expected = dataSchema.object({
+			rank: dataSchema.integer({ minimum: -1 }),
+			state: dataSchema.enum(['ready', 'done']),
+			titles: dataSchema.array(dataSchema.string({ minLength: 1 })),
+		});
+		const value = { rank: -1, state: 'ready', titles: ['Report'] };
+		for (const mode of ['client', 'server'] as const) {
+			const { row } = loadCompiledFixtureSource(source, {
+				id: filename,
+				mode,
+				runtimeModules: { 'octane/data': { dataSchema } },
+			});
+			expect(row.identity).toBe(expected.identity);
+			expect(row.parse(value)).toEqual(value);
+			expect(() => row.parse({ ...value, titles: [''] })).toThrow();
+		}
+	});
+
 	it('supports ordinary file re-exports and preserves lexical shadowing and private exports', () => {
 		const source = `module server {
 			const privateKey = 'server-only';
@@ -304,6 +332,11 @@ export { __oct_server_import$0 as flags, _$_rpc_modules_$_ as useSchema };
 			"import { dataSchema as s } from 'octane/data'; export const page = s.object({...secret});",
 			"import { dataSchema as s } from 'octane/data'; export const page = s.array(later); const later = s.string();",
 			"import { dataSchema as s } from 'octane/data'; export const page = s.array(page);",
+			"import { dataSchema as s } from 'octane/data'; export const page = s.string({ minLength: getPrivateLimit() as number });",
+			"import { dataSchema as s } from 'octane/data'; export const page = (getFactory() as typeof s).boolean();",
+			"import { dataSchema as s } from 'octane/data'; export const page = (s['string'] as typeof s.string)();",
+			"import { dataSchema as s } from 'octane/data'; export const page = ((log(), s) as typeof s).boolean();",
+			"import { dataSchema as s } from 'octane/data'; export const page = (s as typeof s)?.string();",
 		]) {
 			for (const mode of ['client', 'server'] as const) {
 				expect(() =>

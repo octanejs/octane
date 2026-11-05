@@ -1,14 +1,19 @@
 // Only this declarative subset of octane/data can cross a module-server boundary.
 // Rebuild it from validated syntax; never copy a server expression or its comments.
 import { builders as b } from '@tsrx/core';
+import { unwrapTsExpr } from './lexical-bindings.js';
 
-function unparen(node) {
-	while (node?.type === 'ParenthesizedExpression') node = node.expression;
-	return node;
+function schemaExpression(node) {
+	let expression = unwrapTsExpr(node);
+	// A generic such as (s.array<string>) also evaluates to the underlying value.
+	while (expression?.type === 'TSInstantiationExpression') {
+		expression = unwrapTsExpr(expression.expression);
+	}
+	return expression;
 }
 
 function staticFields(node, project) {
-	node = unparen(node);
+	node = schemaExpression(node);
 	if (node?.type !== 'ObjectExpression') return null;
 	const fields = [];
 	const names = new Set();
@@ -31,10 +36,10 @@ function staticFields(node, project) {
 }
 
 function integerOption(node, minimum) {
-	node = unparen(node);
+	node = schemaExpression(node);
 	let numeric;
 	if (node?.type === 'UnaryExpression' && node.operator === '-') {
-		const value = unparen(node.argument);
+		const value = schemaExpression(node.argument);
 		if (value?.type === 'Literal' && typeof value.value === 'number') numeric = -value.value;
 	} else if (node?.type === 'Literal') numeric = node.value;
 	if (!Number.isSafeInteger(numeric) || numeric < minimum) return null;
@@ -42,13 +47,13 @@ function integerOption(node, minimum) {
 }
 
 function projectSchema(node, factories, bindings, deps) {
-	node = unparen(node);
+	node = schemaExpression(node);
 	if (node?.type === 'Identifier' && bindings.has(node.name)) {
 		deps.add(node.name);
 		return b.id(node.name);
 	}
-	const callee = unparen(node?.callee);
-	const receiver = unparen(callee?.object);
+	const callee = schemaExpression(node?.callee);
+	const receiver = schemaExpression(callee?.object);
 	if (
 		node?.type !== 'CallExpression' ||
 		node.optional ||
@@ -77,10 +82,10 @@ function projectSchema(node, factories, bindings, deps) {
 			}
 			break;
 		case 'enum': {
-			const list = unparen(args[0]);
+			const list = schemaExpression(args[0]);
 			if (args.length !== 1 || list?.type !== 'ArrayExpression' || !list.elements.length)
 				return null;
-			const values = list.elements.map((el) => unparen(el));
+			const values = list.elements.map(schemaExpression);
 			if (!values.every((el) => el?.type === 'Literal' && typeof el.value === 'string'))
 				return null;
 			if (new Set(values.map((el) => el.value)).size !== values.length) return null;

@@ -11,10 +11,12 @@ import { compileToVolarMappings } from 'octane/compiler';
 describe('module server schema types', () => {
 	it('preserves local parser values and derives the contextual caller type from their result', () => {
 		const source = `module server {
-			import { dataSchema as s } from 'octane/data';
+			import { dataSchema as s, type DataSchema } from 'octane/data';
 			import type { ServerCallContext } from 'octane/server';
-			export const state = s.enum(['ready', 'failed']);
-			export const page = s.object({ page: s.integer({ minimum: 1 }), cursor: s.nullable(s.string()) });
+			export const state = (s.enum<'ready' | 'failed'>)(['ready', 'failed'] as const);
+			const cursor = s.nullable(s.string()!);
+			export const page = s.object({ page: s.integer({ minimum: 1 } as const), cursor }) satisfies
+				DataSchema<{ page: number; cursor: string | null }>;
 			export function read(input: ReturnType<typeof page.parse>, ctx: ServerCallContext) {
 				return page.parse(input).page;
 			}
