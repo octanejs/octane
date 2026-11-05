@@ -28,6 +28,7 @@
   ],
   "files": [
     "dist",
+    "templates",
     "README.md",
     "LICENSE"
   ],
@@ -56,6 +57,9 @@
     "typescript": "catalog:default"
   },
   "devDependencies": {
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "react-intl": "7.1.14",
     "vitest": "catalog:default"
   }
 }

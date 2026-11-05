@@ -1960,3 +1960,166 @@ describe('scoped signal recipe', () => {
 		}
 	});
 });
+
+describe('React Intl project migration', () => {
+	const localeCode = `import { useIntl as useLocale, FormattedMessage, type IntlShape, defineMessages } from 'react-intl';
+export function Greeting({ count }: { count: number }) {
+	const intl = useLocale();
+	return <p title={intl.formatMessage({id: 'items'}, {count})}><FormattedMessage id="hello" /></p>;
+}`;
+	function setup(extra = {}) {
+		const root = project({ 'package.json': '{}', 'src/Greeting.tsx': localeCode, ...extra });
+		fs.mkdirSync(path.join(root, 'node_modules'));
+		// These public peers share a single instance, as in the consuming application.
+		for (const name of ['octane', 'react', 'react-dom', 'react-intl']) {
+			const installed = fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name));
+			fs.symlinkSync(installed, path.join(root, 'node_modules', name), 'dir');
+		}
+		return root;
+	}
+	it('previews and writes a single shared, compilable helper across separate migrations', async () => {
+		const root = setup({
+			'src/other/Provider.tsx': `import {IntlProvider} from 'react-intl';
+export function Locale() { return <IntlProvider locale="en"><b>test</b></IntlProvider> }`,
+		});
+		const file = path.join(root, 'src/Greeting.tsx');
+		const helper = path.join(root, 'src/octane-react-intl.tsrx');
+		const preview = await runCodemod([file], {
+			root,
+			write: false,
+			strong: true,
+			projectTypes: false,
+		});
+		const result = preview.files.find((f) => f.file === 'src/Greeting.tsx');
+		expect(result.strong).toBe(true);
+		expect([...result.notes, ...result.diagnostics].filter((d) => d.severity === 'error')).toEqual(
+			[],
+		);
+		expect(result.code).toContain(
+			"useIntl as useLocale, FormattedMessage } from './octane-react-intl.tsrx'",
+		);
+		expect(result.code).toContain("type IntlShape, defineMessages } from 'react-intl'");
+		expect(preview.files.filter((f) => f.rules['react-intl-adapter'])).toHaveLength(1);
+		expect(fs.existsSync(helper)).toBe(false);
+		await runCodemod([file], { root, strong: true, projectTypes: false });
+		const source = fs.readFileSync(helper, 'utf8');
+		const next = await runCodemod([path.join(root, 'src/other/Provider.tsx')], {
+			root,
+			strong: true,
+		});
+		expect(next.files.some((f) => f.code.includes("'../octane-react-intl.tsrx'"))).toBe(true);
+		expect(next.files.some((f) => f.rules['react-intl-adapter'])).toBe(false);
+		expect(fs.readFileSync(helper, 'utf8')).toBe(source);
+	});
+	it('retains errors for an escaping formatter and bridges only a genuine React Intl display', async () => {
+		const root = setup({
+			'src/Greeting.tsx': `import { useIntl, FormattedMessage as Message } from 'react-intl';
+export function Greeting({ data }) { const intl = useIntl(); consume(intl); return <Message id="label" values={data} />; }`,
+		});
+		const result = (await runCodemod([path.join(root, 'src/Greeting.tsx')], { root, write: false }))
+			.files[0];
+		expect(result.notes.some((n) => n.severity === 'error' && n.message.includes('useIntl'))).toBe(
+			true,
+		);
+		expect(result.code).toContain('contexts={intlContexts}');
+		expect(result.code).toContain('<Message id="label"');
+	});
+	it('previews other candidates but reports an occupied helper path before writing any changes', async () => {
+		const files = {
+			'src/octane-react-intl.tsrx': 'export const custom = true;',
+			'src/Other.tsx': 'export const Other = () => <p />;',
+			'index.html': '<script type="module" src="/src/Other.tsx"></script>',
+		};
+		const root = setup(files);
+		const preview = await runCodemod([root], { root, write: false });
+		expect(preview.files.find((f) => f.file === 'src/Greeting.tsx').notes).toContainEqual(
+			expect.objectContaining({
+				rule: 'react-intl',
+				severity: 'error',
+				message: expect.stringContaining('already in use'),
+			}),
+		);
+		expect(preview.files).toContainEqual(
+			expect.objectContaining({ file: 'src/Other.tsx', output: 'src/Other.tsrx', changed: true }),
+		);
+		expect(preview.html).toContain('index.html');
+
+		const write = spawnSync(
+			process.execPath,
+			[path.join(REPO, 'packages/codemod/dist/bin.js'), root],
+			{ encoding: 'utf8' },
+		);
+		expect(write.status).toBe(1);
+		expect(write.stdout).toContain('No changes were written.');
+		expect(write.stdout).toContain('0 module(s) migrated, 0 renamed');
+		expect(write.stdout).not.toContain('Updated the entry script');
+		expect(write.stdout).not.toContain('Added');
+		for (const [file, text] of Object.entries({ ...files, 'src/Greeting.tsx': localeCode }))
+			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(text);
+		expect(fs.existsSync(path.join(root, 'src/Greeting.tsrx'))).toBe(false);
+		expect(fs.existsSync(path.join(root, 'src/Other.tsrx'))).toBe(false);
+	});
+	it('ignores an occupied helper path when only React Intl utilities are used', async () => {
+		const utility =
+			'import {defineMessages} from "react-intl"; export const labels = defineMessages({label:{id:"label"}});';
+		const helper = 'export const custom = true;';
+		const root = setup({
+			'src/Greeting.tsx': utility,
+			'src/octane-react-intl.tsrx': helper,
+			'src/Other.tsx': 'export const Other = () => <p />;',
+		});
+		const result = await runCodemod([root], { root });
+		expect(
+			result.files.flatMap((file) => file.notes).filter((note) => note.severity === 'error'),
+		).toEqual([]);
+		expect(fs.existsSync(path.join(root, 'src/Other.tsrx'))).toBe(true);
+		expect(fs.readFileSync(path.join(root, 'src/Greeting.tsrx'), 'utf8')).toMatch(
+			/import\s*{\s*defineMessages\s*}\s*from\s*['"]react-intl['"]/,
+		);
+		expect(fs.readFileSync(path.join(root, 'src/octane-react-intl.tsrx'), 'utf8')).toBe(helper);
+	});
+	it('keeps rich formatter results and opaque provider children on React for review', async () => {
+		const root = setup({
+			'src/Greeting.tsx': `import { useIntl as read, IntlProvider } from 'react-intl';
+import { Other } from './Other';
+export function Panel() { const message = read().formatMessage({id:'rich'}); return <p>{message}</p>; }
+export function Owner() { return <IntlProvider locale="en"><Other /></IntlProvider>; }`,
+		});
+		const result = await runCodemod([path.join(root, 'src/Greeting.tsx')], {
+			root,
+			write: false,
+			strong: true,
+		});
+		const errors = result.files[0].notes
+			.filter((n) => n.severity === 'error')
+			.map((n) => n.message);
+		expect(errors.some((message) => message.includes('read` is a React hook'))).toBe(true);
+		expect(errors.some((message) => message.includes('<IntlProvider>'))).toBe(true);
+		expect(result.files.some((f) => f.rules['react-intl-adapter'])).toBe(false);
+	});
+
+	it.each([
+		['react-intl', './node_modules/react-intl', true],
+		['react-*', './src/substitute.ts', false],
+	])(
+		'checks the resolved package behind the %s path mapping',
+		async (pattern, replacement, generated) => {
+			const root = setup({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: {
+						moduleResolution: 'bundler',
+						module: 'esnext',
+						paths: { [pattern]: [replacement] },
+					},
+				}),
+				'src/substitute.ts': 'export const useIntl = () => ({locale: "other"});',
+			});
+			const result = await runCodemod([path.join(root, 'src/Greeting.tsx')], {
+				root,
+				write: false,
+				strong: true,
+			});
+			expect(result.files.some((file) => file.rules['react-intl-adapter'])).toBe(generated);
+		},
+	);
+});
