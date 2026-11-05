@@ -41,8 +41,12 @@ export function strengthen(
 	compiler: Compiler,
 	code: string,
 	filename: string,
-	{ force = false }: { force?: boolean } = {},
+	{
+		force = false,
+		withEffectReceivers,
+	}: { force?: boolean; withEffectReceivers?: () => string } = {},
 ): StrongResult {
+	const original = code;
 	const fixed: string[] = [];
 	let diagnostics: CompileDiagnostic[] = [];
 	for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -63,6 +67,16 @@ export function strengthen(
 	}
 	const blockers = diagnostics.filter((diagnostic) => diagnostic.severity === 'error').map(finding);
 	if (blockers.length === 0) return { code, strong: true, fixed, blockers };
+	if (
+		withEffectReceivers &&
+		blockers.every((b) => b.code === 'OCTANE_STRONG_EXPLICIT_DEPENDENCIES')
+	) {
+		const candidate = withEffectReceivers();
+		if (candidate !== original) {
+			const checked = strengthen(compiler, candidate, filename);
+			if (checked.strong) return checked;
+		}
+	}
 	return fallback(code, blockers, fixed, force);
 }
 

@@ -8,6 +8,7 @@ import type {
 	TransformResult,
 } from './types.js';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { findRoot, readInstalled, scanSourceFiles } from '@octanejs/cli';
 import { DATA } from '@octanejs/cli/data';
@@ -35,9 +36,16 @@ export async function runCodemod(
 	paths: string[],
 	options: CodemodOptions = {},
 ): Promise<CodemodResult> {
+	const write = options.write !== false;
 	const target = options.target ?? 'tsrx';
 	const strong = options.strong === true && target === 'tsrx';
-	const root = path.resolve(options.root ?? findRoot(paths[0] ?? '.'));
+	const first = path.resolve(paths[0] ?? '.');
+	const root = path.resolve(
+		options.root ??
+			findRoot(
+				fs.statSync(first, { throwIfNoEntry: false })?.isFile() ? path.dirname(first) : first,
+			),
+	);
 	const known = new Set(paths.flatMap((entry) => collect(path.resolve(entry))));
 	const files = [...known];
 	const renames: Map<string, string> = new Map();
@@ -66,18 +74,7 @@ export async function runCodemod(
 				? `is also the target of ${path.relative(root, previous)}`
 				: 'already exists';
 			const conflict = conflictFor(file, source, output, reason);
-			if (options.write !== false) {
-				return {
-					root,
-					files: [conflict],
-					packages: [],
-					dependencies: [],
-					patched: [],
-					missing: [],
-					html: [],
-					compiler: null,
-				};
-			}
+			if (write) return blockedWrite(root, conflict);
 			conflicts.set(file, conflict);
 			const previousOutput = previous && renames.get(previous);
 			if (previous && previousOutput) {
@@ -127,6 +124,88 @@ export async function runCodemod(
 	const reactCompat = ['react', 'react-dom'].every((name) =>
 		/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(root, name)?.version ?? ''),
 	);
+	// One shared context per project, including separate file-by-file migrations.
+	const sourceDir = path.join(root, 'src');
+	const adapter = path.join(
+		fs.lstatSync(sourceDir, { throwIfNoEntry: false })?.isDirectory() ? sourceDir : root,
+		'octane-react-intl.tsrx',
+	);
+	const adapterName = path.relative(root, adapter);
+	const intlDirs = new Map<string, boolean>();
+	let adapterSource: string | undefined;
+	let adapterError: string | undefined;
+	let createAdapter = false;
+	const intlPath = (file: string) => {
+		const dir = path.dirname(file);
+		let supported = intlDirs.get(dir);
+		if (supported === undefined) {
+			const base = path.dirname(adapter);
+			const lib = readInstalled(base, 'react-intl');
+			const octane = readInstalled(base, 'octane')?.version ?? '';
+			const bindings = config ?? { moduleResolution: ts.ModuleResolutionKind.Bundler };
+			const original = ts.resolveModuleName(
+				'react-intl',
+				adapter,
+				{ ...bindings, paths: undefined, baseUrl: undefined },
+				ts.sys,
+			).resolvedModule;
+			supported =
+				!!lib &&
+				lib.manifest.name === 'react-intl' &&
+				/^7\./.test(lib.version) &&
+				/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(octane) &&
+				['react', 'react-dom'].every((name) =>
+					/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(base, name)?.version ?? ''),
+				) &&
+				[file, adapter].every((source) => {
+					const resolved = ts.resolveModuleName(
+						'react-intl',
+						source,
+						bindings,
+						ts.sys,
+					).resolvedModule;
+					return (
+						original &&
+						resolved &&
+						fs.realpathSync(resolved.resolvedFileName) ===
+							fs.realpathSync(original.resolvedFileName) &&
+						fs
+							.realpathSync(original.resolvedFileName)
+							.startsWith(fs.realpathSync(lib.dir) + path.sep)
+					);
+				}) &&
+				['react-intl', 'react', 'react-dom', 'octane', 'octane/react'].every((name) => {
+					try {
+						return createRequire(file).resolve(name) === createRequire(adapter).resolve(name);
+					} catch {
+						return false;
+					}
+				});
+			intlDirs.set(dir, supported);
+		}
+		if (!supported) return undefined;
+		if (adapterSource === undefined) {
+			adapterSource = fs.readFileSync(
+				new URL('../templates/react-intl.tsrx', import.meta.url),
+				'utf8',
+			);
+			const stat = fs.lstatSync(adapter, { throwIfNoEntry: false });
+			if (
+				(stat && (!stat.isFile() || fs.readFileSync(adapter, 'utf8') !== adapterSource)) ||
+				owners.has(ts.sys.useCaseSensitiveFileNames ? adapter : adapter.toLowerCase())
+			) {
+				adapterError = `Cannot generate the React Intl adapter because ${adapterName} is already in use.`;
+			} else if (
+				compiler &&
+				compile(compiler, adapterSource, adapter, true).some((d) => d.severity === 'error')
+			) {
+				adapterError = 'The project compiler cannot compile the React Intl adapter.';
+			}
+			createAdapter = !stat;
+		}
+		const specifier = path.relative(dir, adapter).split(path.sep).join('/');
+		return specifier.startsWith('.') ? specifier : './' + specifier;
+	};
 	const results: FileResult[] = [];
 	for (const file of files) {
 		const conflict = conflicts.get(file);
@@ -136,8 +215,6 @@ export async function runCodemod(
 		}
 		const source = fs.readFileSync(file, 'utf8');
 		const extra: Note[] = [];
-		const resolveSpecifier = (specifier: string) =>
-			resolveRename(file, specifier) ?? resolveBinding(specifier, packages, extra);
 		const isContext = (specifier: string, name: string) => {
 			if (!specifier.startsWith('.')) return null;
 			const target = resolveModule(file, specifier, known);
@@ -154,35 +231,65 @@ export async function runCodemod(
 			);
 		};
 		let types: TransformOptions['types'];
-		const result = transformModule(source, file, {
-			target,
-			strong,
-			strictNullChecks: strictConfig !== null,
-			get types() {
-				if (types || !strictConfig || options.projectTypes === false) return types;
-				// Even one input can import a large graph. Bind it only for a rewrite that needs its types.
-				program ??= ts.createProgram(
-					files.filter((name) => /\.[cm]?tsx?$/.test(name)),
-					{ ...strictConfig, noEmit: true, noUncheckedIndexedAccess: true },
-				);
-				const sourceFile = program.getSourceFile(file);
-				if (sourceFile) types = { sourceFile, checker: program.getTypeChecker() };
-				return types;
-			},
-			resolveSpecifier,
-			isContext,
-			elementChild: !elementExports.size
-				? undefined
-				: (binding) =>
-						typeof binding === 'number'
-							? (exports.get(file)?.elementChildren?.some((x) => x.start === binding) ?? false)
-							: matchesExport(elementExports, binding),
-			descriptorChild: descriptorExports.size
-				? (binding) => matchesExport(descriptorExports, binding)
-				: undefined,
-			unported: (specifier) => unportedName(specifier, file),
-			reactCompat,
-		});
+		let intl =
+			target === 'tsrx' && reactCompat && source.includes('react-intl')
+				? intlPath(file)
+				: undefined;
+		const transform = (captureEffectReceivers = false, notes = extra) =>
+			transformModule(source, file, {
+				captureEffectReceivers,
+				target,
+				reactIntlAdapter: intl,
+				strong,
+				strictNullChecks: strictConfig !== null,
+				get types() {
+					if (types || !strictConfig || options.projectTypes === false) return types;
+					// Even one input can import a large graph. Bind it only for a rewrite that needs its types.
+					program ??= ts.createProgram(
+						files.filter((name) => /\.[cm]?tsx?$/.test(name)),
+						{ ...strictConfig, noEmit: true, noUncheckedIndexedAccess: true },
+					);
+					const sourceFile = program.getSourceFile(file);
+					if (sourceFile) types = { sourceFile, checker: program.getTypeChecker() };
+					return types;
+				},
+				resolveSpecifier: (specifier) =>
+					resolveRename(file, specifier) ?? resolveBinding(specifier, packages, notes),
+				isContext,
+				elementChild: !elementExports.size
+					? undefined
+					: (binding) =>
+							typeof binding === 'number'
+								? (exports.get(file)?.elementChildren?.some((x) => x.start === binding) ?? false)
+								: matchesExport(elementExports, binding),
+				descriptorChild: descriptorExports.size
+					? (binding) => matchesExport(descriptorExports, binding)
+					: undefined,
+				unported: (specifier) => unportedName(specifier, file),
+				reactCompat,
+			});
+		if (intl && adapterError) {
+			// Public utilities such as defineMessages can stay on React Intl without a helper.
+			const needsAdapter = transform(false, []).rules['react-intl'];
+			intl = undefined;
+			if (needsAdapter) {
+				const note: Note = {
+					rule: 'react-intl',
+					line: 1,
+					severity: 'error',
+					message: write ? adapterError + ' No changes were written.' : adapterError,
+				};
+				if (write) {
+					return blockedWrite(
+						root,
+						unchangedFile(path.relative(root, file), source, note),
+						compiler?.from,
+					);
+				}
+				extra.push(note);
+			}
+		}
+		const result = transform();
 		for (const port of result.unported) {
 			const entry = missing.get(port.name) ?? {
 				name: port.name,
@@ -202,7 +309,10 @@ export async function runCodemod(
 		let diagnostics: FileResult['diagnostics'] = [];
 		if (compiler && result.changed) {
 			if (strong && result.template) {
-				const strengthened = strengthen(compiler, code, output, { force: options.forceStrong });
+				const strengthened = strengthen(compiler, code, output, {
+					force: options.forceStrong,
+					withEffectReceivers: () => transform(true, []).code,
+				});
 				code = strengthened.code;
 				isStrong = strengthened.strong;
 				strongFixes = strengthened.fixed;
@@ -275,16 +385,31 @@ export async function runCodemod(
 		}
 	}
 
+	if (createAdapter && adapterSource && results.some((file) => file.rules['react-intl'])) {
+		// Create the helper first. A failed or retried write must never overwrite an existing module.
+		if (write) fs.writeFileSync(adapter, adapterSource, { flag: 'wx' });
+		results.push({
+			file: adapterName,
+			output: adapterName,
+			changed: true,
+			code: adapterSource,
+			rules: { 'react-intl-adapter': 1 },
+			notes: [],
+			diagnostics: [],
+			strong: compiler ? true : null,
+			strongFixes: [],
+		});
+	}
 	const html = rewriteEntryPages(
 		root,
 		paths.map((entry) => path.resolve(entry)),
 		renames,
-		options.write !== false,
+		write,
 	);
-	const dependencies = addBindings(root, packages, options.write !== false);
-	if (options.write !== false) {
+	const dependencies = addBindings(root, packages, write);
+	if (write) {
 		for (const result of results) {
-			if (!result.changed) continue;
+			if (!result.changed || result.rules['react-intl-adapter']) continue;
 			const output = path.join(root, result.output);
 			fs.writeFileSync(output, result.code, { flag: result.output === result.file ? 'w' : 'wx' });
 			if (result.output !== result.file) fs.rmSync(path.join(root, result.file));
@@ -299,6 +424,24 @@ export async function runCodemod(
 		missing: [...missing.values()].sort((a, b) => a.name.localeCompare(b.name)),
 		html,
 		compiler: compiler?.from ?? null,
+	};
+}
+
+/** A write conflict stops the batch before any file, entry page or dependency is updated. */
+function blockedWrite(
+	root: string,
+	conflict: FileResult,
+	compiler: string | null = null,
+): CodemodResult {
+	return {
+		root,
+		files: [conflict],
+		packages: [],
+		dependencies: [],
+		patched: [],
+		missing: [],
+		html: [],
+		compiler,
 	};
 }
 

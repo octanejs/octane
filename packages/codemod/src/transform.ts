@@ -1,4 +1,7 @@
+import { reactRenderer } from './react-renderer.js';
 import ts from 'typescript';
+import { effectReceivers } from './effect-receivers.js';
+import { intlImports } from './react-intl.js';
 import {
 	DEPENDENCY_HOOKS,
 	RADIX_TYPES,
@@ -515,6 +518,7 @@ class ModuleTransform {
 	readonly options: TransformOptions;
 	readonly target: 'tsrx' | 'tsx';
 	readonly strong: boolean;
+	readonly effectAliases?: Map<ts.Identifier, string>;
 	/** React imports read as values, not only as types. */
 	readonly valueUses = new Set<string>();
 	hasSignalRuntime?: boolean;
@@ -528,6 +532,7 @@ class ModuleTransform {
 	readonly indentUnit: string;
 	/** Every import, keyed by its declaration. */
 	readonly imports = new Map<ts.Node, Import>();
+	nativeIntl = new Set<ts.ImportSpecifier>();
 	/** React and Octane imports, by local name. */
 	readonly apiLocals = new Map<string, Import>();
 	/** React-module locals that are still referenced after the rewrite. */
@@ -558,6 +563,7 @@ class ModuleTransform {
 	readonly unported = new Map<string, Unported>();
 	/** Elements to host in a `ReactCompat` island. */
 	readonly islands = new Set<ts.JsxElement | ts.JsxSelfClosingElement>();
+	readonly reactRendererBodies = new Map<ts.Node, string>();
 	/** Elements no island can host, with the error each throws where it renders. */
 	readonly unrenderable = new Map<ts.Node, string>();
 	/** Placeholder index -> import declaration. */
@@ -574,6 +580,7 @@ class ModuleTransform {
 		this.source = source;
 		this.filename = filename;
 		this.options = options;
+		if (options.captureEffectReceivers) this.effectAliases = new Map();
 		this.target = options.target ?? 'tsrx';
 		this.strong = options.strong === true;
 		this.strictTypes = options.strictNullChecks === true && /\.[cm]?tsx?$/.test(filename);
@@ -719,14 +726,13 @@ class ModuleTransform {
 				imported: string,
 				typeOnly: boolean,
 			) => {
-				const port = typeOnly ? null : this.portOf(module);
 				const entry = {
 					module,
 					local: name.text,
 					imported,
 					namespace: imported === '*',
 					typeOnly,
-					port,
+					port: null,
 				};
 				this.imports.set(declaration, entry);
 				if (
@@ -736,7 +742,6 @@ class ModuleTransform {
 						(imported === 'ReactComponent' && module.endsWith('.svg')))
 				)
 					reactSvgImports.add(entry);
-				if (port) portLocals.add(name.text);
 				if (isApiModule(module)) this.apiLocals.set(name.text, entry);
 			};
 			// A default import of React is the namespace in practice; any other
@@ -754,6 +759,21 @@ class ModuleTransform {
 					record(element, element.name, imported, clause.isTypeOnly || element.isTypeOnly);
 				}
 			}
+		}
+		// Resolve component wrappers through their imports before claiming native Intl hooks.
+		if (this.options.reactIntlAdapter && this.source.includes('react-intl')) {
+			this.nativeIntl = intlImports(
+				this.sf,
+				this.checker,
+				(expr) => this.typeOf(expr),
+				(fn) => this.isComponent(fn),
+			);
+		}
+		for (const [declaration, entry] of this.imports) {
+			if (entry.typeOnly || (ts.isImportSpecifier(declaration) && this.nativeIntl.has(declaration)))
+				continue;
+			entry.port = this.portOf(entry.module);
+			if (entry.port) portLocals.add(entry.local);
 		}
 		const fields: ts.JsxOpeningLikeElement[] = [];
 		/** Values read as an element: cloned, inspected, or a `render` prop. */
@@ -873,14 +893,19 @@ class ModuleTransform {
 	 * they are reported.
 	 */
 	planUnported(node: ts.Identifier) {
-		const port = this.inImport(node) ? null : this.importOf(node)?.port;
+		const binding = this.inImport(node) ? null : this.importOf(node);
+		const port = binding?.port;
 		if (!port) return;
 		// `Toast.Bar`, through a namespace or default import, is the member.
 		const member =
 			ts.isPropertyAccessExpression(node.parent) && node.parent.expression === node
 				? node.parent
 				: node;
-		const name = ts.isPropertyAccessExpression(member) ? member.name.text : node.text;
+		const name = ts.isPropertyAccessExpression(member)
+			? member.name.text
+			: binding.imported === 'default' || binding.namespace
+				? node.text
+				: binding.imported;
 		const text = member.getText(this.sf);
 		const parent = member.parent;
 		const block = (message: string) => {
@@ -932,8 +957,57 @@ class ModuleTransform {
 			(ts.isJsxExpression(child) &&
 				(!child.expression || textKind(this.typeOf(child.expression)) !== 0));
 		if (ts.isJsxElement(element) && !element.children.every(text)) return false;
+		const attributes = ts.isJsxElement(element)
+			? element.openingElement.attributes
+			: element.attributes;
+		const callbacks = new Map<ts.Node, string>();
 		const seen = new Set<ts.Declaration>();
 		const rendersOctane: (node: ts.Node) => boolean = (node) => {
+			if (
+				this.options.reactCompat &&
+				ts.isJsxAttribute(node) &&
+				node.parent === attributes &&
+				node.initializer &&
+				ts.isJsxExpression(node.initializer) &&
+				node.initializer.expression &&
+				ts.isObjectLiteralExpression(node.initializer.expression)
+			) {
+				const fields = node.initializer.expression.properties;
+				const wrappers = fields.map(reactRenderer);
+				if (wrappers.some(Boolean)) {
+					if (this.readsGlobal('jsx') || this.readsGlobal('OctaneJsx')) return true;
+					return fields.some((field, index) => {
+						const wrapper = wrappers[index];
+						if (!wrapper) {
+							const value =
+								ts.isPropertyAssignment(field) && !ts.isComputedPropertyName(field.name)
+									? field.initializer
+									: ts.isShorthandPropertyAssignment(field)
+										? field.name
+										: undefined;
+							if (!value) return true;
+							const literal = skipParens(value);
+							const primitive =
+								literal.kind === ts.SyntaxKind.TrueKeyword ||
+								literal.kind === ts.SyntaxKind.FalseKeyword ||
+								literal.kind === ts.SyntaxKind.NullKeyword ||
+								(ts.isIdentifier(literal) &&
+									literal.text === 'undefined' &&
+									!this.declarationOf(literal)) ||
+								textKind(this.typeOf(value)) !== 0;
+							return !primitive || rendersOctane(field);
+						}
+						if (
+							['jsx', 'OctaneJsx'].some((name) =>
+								this.checker.resolveName(name, wrapper.body, ts.SymbolFlags.Value, false),
+							)
+						)
+							return true;
+						callbacks.set(wrapper.body, wrapper.args);
+						return false;
+					});
+				}
+			}
 			if (isJsx(node)) return true;
 			if (ts.isIdentifier(node)) {
 				const project = this.projectType(node);
@@ -951,9 +1025,9 @@ class ModuleTransform {
 			}
 			return ts.forEachChild(node, rendersOctane) ?? false;
 		};
-		return !rendersOctane(
-			ts.isJsxElement(element) ? element.openingElement.attributes : element.attributes,
-		);
+		if (rendersOctane(attributes)) return false;
+		for (const [body, args] of callbacks) this.reactRendererBodies.set(body, args);
+		return true;
 	}
 
 	/**
@@ -1506,6 +1580,34 @@ class ModuleTransform {
 	}
 
 	rewrite(node: ts.Node, ctx: Context): string | null {
+		if (this.effectAliases) {
+			if (ts.isIdentifier(node)) {
+				const alias = this.effectAliases.get(node);
+				if (alias) return alias;
+			}
+			if (ts.isBlock(node)) {
+				const captures = effectReceivers(
+					node,
+					this.checker,
+					(name) => {
+						const hook = this.callee(name);
+						return hook?.module === 'react' ? hook.name : null;
+					},
+					this.effectAliases,
+				);
+				if (captures.length) {
+					const indent = this.indentOf(node) + this.indentUnit;
+					const rest = this.span(node, node.getStart(this.sf) + 1, node.end, ctx);
+					return (
+						'{\n' +
+						indent +
+						captures.join('\n' + indent) +
+						(/^\s*\n/.test(rest) ? '' : '\n' + indent) +
+						rest
+					);
+				}
+			}
+		}
 		if (ts.isImportDeclaration(node)) return this.rewriteImport(node);
 		if (ts.isExportDeclaration(node) && node.moduleSpecifier) return this.rewriteReexport(node);
 		if (ts.isCallExpression(node)) return this.rewriteCall(node);
@@ -1554,11 +1656,28 @@ class ModuleTransform {
 			if (!ts.isJsxClosingElement(node.parent)) this.count(RULE.documentShell);
 			return this.require('@octanejs/tanstack-router', DOCUMENT_TAGS[node.text], false);
 		}
+		const reactArgs = this.reactRendererBodies.get(node);
+		if (reactArgs !== undefined)
+			return this.require('react/jsx-runtime', 'jsx', false) + '(' + reactArgs + ')';
 		if (ts.isJsxAttributes(node)) return this.rewriteAttributes(node, ctx);
 		if ((ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) && this.islands.has(node)) {
 			this.count(RULE.reactCompat);
 			const island = this.require('octane/react', 'ReactCompat', false);
-			return `<${island}>${this.span(node, node.getStart(this.sf), node.end, PLAIN)}</${island}>`;
+			const content = this.span(node, node.getStart(this.sf), node.end, PLAIN);
+			const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
+			const imported = this.importOf(ts.isPropertyAccessExpression(tag) ? tag.expression : tag);
+			const name = ts.isPropertyAccessExpression(tag) ? tag.name.text : imported?.imported;
+			if (
+				this.options.reactIntlAdapter &&
+				imported?.module === 'react-intl' &&
+				/^Formatted[A-Z]/.test(name ?? '')
+			) {
+				const boundary = this.require(this.options.reactIntlAdapter, 'IntlBoundary', false);
+				const contexts = this.require(this.options.reactIntlAdapter, 'intlContexts', false);
+				this.count('react-intl');
+				return `<${boundary}><${island} contexts={${contexts}}>${content}</${island}></${boundary}>`;
+			}
+			return `<${island}>${content}</${island}>`;
 		}
 		// An earlier run's wrapper goes: each run decides again whether its
 		// element throws or renders in an island.
@@ -1620,6 +1739,28 @@ class ModuleTransform {
 		if (module in REACT_MODULES) {
 			this.importSlots.push(node);
 			return `\u0000IMPORT${this.importSlots.length - 1}\u0000`;
+		}
+		if (
+			module === 'react-intl' &&
+			node.importClause?.namedBindings &&
+			ts.isNamedImports(node.importClause.namedBindings)
+		) {
+			const clause = node.importClause;
+			const elements = node.importClause.namedBindings.elements;
+			const moved = elements.filter((item) => this.nativeIntl.has(item));
+			if (moved.length) {
+				const names = (items: readonly ts.ImportSpecifier[]) =>
+					`{ ${items.map((item) => item.getText(this.sf)).join(', ')} }`;
+				const kept = elements.filter((item) => !this.nativeIntl.has(item));
+				const original = [clause.name?.text, kept.length ? names(kept) : undefined]
+					.filter(Boolean)
+					.join(', ');
+				this.count('react-intl');
+				return (
+					(original ? `import ${original} from ${node.moduleSpecifier.getText(this.sf)};\n` : '') +
+					`import ${names(moved)} from ${this.quote}${this.options.reactIntlAdapter}${this.quote};`
+				);
+			}
 		}
 		const text =
 			this.rewritePackageNames(node, module) ?? this.rewriteSpecifier(node, node.moduleSpecifier);
