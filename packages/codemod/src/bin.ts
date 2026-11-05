@@ -21,6 +21,7 @@ Options:
   --dry-run          report without writing
   --print            print each migrated module (implies --dry-run)
   --no-verify        skip compiling the result
+  --no-project-types use module-local types without loading the project graph
   --json             print the result as JSON
   -h, --help         show this help
 `;
@@ -39,6 +40,7 @@ async function main() {
 			'dry-run': { type: 'boolean', default: false },
 			print: { type: 'boolean', default: false },
 			verify: { type: 'boolean', default: true },
+			'project-types': { type: 'boolean', default: true },
 			json: { type: 'boolean', default: false },
 			help: { type: 'boolean', short: 'h', default: false },
 		},
@@ -74,6 +76,7 @@ async function main() {
 		strong: values.strong || values['force-strong'],
 		forceStrong: values['force-strong'],
 		verify: values.verify,
+		projectTypes: values['project-types'],
 		write: !dryRun,
 	});
 
@@ -85,7 +88,8 @@ async function main() {
 			.map((note) => ({ file: file.file, ...note, code: note.rule })),
 		...file.diagnostics.map((diagnostic) => ({ file: file.output, ...diagnostic })),
 	]);
-	const errors = findings.filter((finding) => finding.severity === 'error');
+	const isError = (finding: { severity: string }) => finding.severity === 'error';
+	const errors = findings.filter(isError);
 
 	if (values.json) {
 		const files = result.files.map(({ code, ...file }) =>
@@ -103,9 +107,10 @@ async function main() {
 			.join(', ');
 		const mode =
 			file.strong === null ? '' : file.strong ? colors.green(' strong') : colors.yellow(' compat');
-		const mark = errors.some((error) => error.file === file.output)
-			? colors.red('✗')
-			: colors.green('✓');
+		const mark =
+			file.notes.some(isError) || file.diagnostics.some(isError)
+				? colors.red('✗')
+				: colors.green('✓');
 		process.stdout.write(`${mark} ${file.file}${arrow}${mode}  ${colors.dim(rules)}\n`);
 		if (values.print) process.stdout.write(colors.dim('─'.repeat(60)) + '\n' + file.code + '\n');
 	}

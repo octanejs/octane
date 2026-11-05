@@ -124,6 +124,33 @@ export function Pair() { return <p><Tag />; <Tag /></p>; }`;
 		expect(code).toContain('{ok && <i />}');
 	});
 
+	it('recognizes the global Boolean conversion in JavaScript and leaves circular aliases alone', () => {
+		const input =
+			'export function A({ n }) { const a = b, b = a; return <p>{Boolean(n) && <b />}{a && <i />}</p>; }';
+		const { code } = transformModule(input, 'a.jsx');
+		expect(code).toContain('@if (Boolean(n))');
+		expect(code).toContain('{a && <i />}');
+	});
+
+	it('compiles typed boolean guards while preserving numeric children', () => {
+		const source = `const Boolean = (n: number) => n;
+export function Banner({ visible, count }: { visible?: boolean; count: number }) {
+	return <section>{visible && <i>Visible</i>}{Boolean(count) && <b>Count</b>}</section>;
+}`;
+		const result = transformModule(source, 'banner.tsx', { strong: true, strictNullChecks: true });
+		expect(result.rules['template-if']).toBe(1);
+		const { Banner } = loadCompiledFixtureSource(result.code, {
+			id: 'banner.tsrx',
+			mode: 'server',
+		});
+		const render = (props) => renderToStaticMarkup(Banner, props).html;
+		expect(render({ visible: true, count: 1 })).toBe(
+			'<section><i>Visible</i><b>Count</b></section>',
+		);
+		expect(render({ visible: false, count: 0 })).toBe('<section>0</section>');
+		expect(render({ count: 0 })).toBe('<section>0</section>');
+	});
+
 	it('spells a hole as text only when the project proves it cannot be null', () => {
 		const source =
 			'export function A({ t, n }: { t: string; n: number }) {\n\treturn <p>{t} {n}</p>;\n}\n';
@@ -602,6 +629,31 @@ export function Pair() { return <p><Tag />; <Tag /></p>; }`;
 		// The DOM's `MouseEvent` stays reachable.
 		expect(result.code).toContain('type MouseEvent as OctaneMouseEvent');
 		expect(result.code).toContain("new MouseEvent('focus')");
+	});
+
+	it('renders a keyed list when its iterable uses the row name in a separate scope', () => {
+		const source = `export function Menu(props: { row: string[] }) {
+  return <ul>{props.row.filter(row => row !== 'hidden').map(row => <li key={row}>{row}</li>)}</ul>;
+}`;
+		const { code } = transformModule(source, 'menu.tsx', { strong: true });
+		expect(compileErrors(code, 'menu.tsrx', true)).toEqual([]);
+		const { Menu } = loadCompiledFixtureSource(code, { id: 'menu.tsrx', mode: 'server' });
+		expect(renderToStaticMarkup(Menu, { row: ['B', , 'hidden', 'A'] }).html).toBe(
+			'<ul><li>B</li><li>A</li></ul>',
+		);
+		// A callback that closes over an outer row must keep reading that row.
+		const captured = source
+			.replace('props: { row: string[] }', "props: { row: string[] }, row = 'hidden'")
+			.replace("row => row !== 'hidden'", 'value => value !== row');
+		const kept = transformModule(captured, 'menu.tsx', { strong: true });
+		expect(compileErrors(kept.code, 'menu.tsrx', true)).toContain('OCTANE_STRONG_MAP_JSX');
+		// A collection can define its own filter and map order.
+		const custom = source.replace(
+			'{ row: string[] }',
+			'{ row: { filter(fn: (v: string) => boolean): { map(fn: (v: string) => unknown): unknown } } }',
+		);
+		const collection = transformModule(custom, 'menu.tsx', { strong: true });
+		expect(compileErrors(collection.code, 'menu.tsrx', true)).toContain('OCTANE_STRONG_MAP_JSX');
 	});
 
 	it('keeps a list as `.map()` when an `@for` would change what it reads', () => {
