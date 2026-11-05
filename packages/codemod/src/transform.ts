@@ -1,4 +1,5 @@
 import { reactRenderer } from './react-renderer.js';
+import { walkLocalValues } from './local-uses.js';
 import ts from 'typescript';
 import { effectReceivers } from './effect-receivers.js';
 import { isBareSvgTag, storeHookUses } from './store-hook-uses.js';
@@ -178,6 +179,10 @@ function scriptKind(filename: string) {
 	if (/\.[cm]?ts$/.test(filename)) return ts.ScriptKind.TS;
 	// Plain .js files often hold JSX in React projects.
 	return ts.ScriptKind.JSX;
+}
+
+function nativeReactCompat(module: string, name: string) {
+	return name === 'ReactCompat' && (module === 'octane/react' || module === 'octane/react/server');
 }
 
 function skipParens(node: ts.Expression): ts.Expression {
@@ -769,6 +774,8 @@ class ModuleTransform {
 				this.checker,
 				(expr) => this.typeOf(expr),
 				(fn) => this.isComponent(fn),
+				(element) => this.inIsland(element),
+				(element) => this.hostsInReact(element),
 			);
 		}
 		let safeStoreUses: ReturnType<typeof storeHookUses> | undefined;
@@ -803,6 +810,7 @@ class ModuleTransform {
 					}
 				}
 			}
+			if (nativeReactCompat(entry.module, entry.imported)) continue;
 			entry.port = this.portOf(entry.module);
 			if (entry.port) portLocals.add(entry.local);
 		}
@@ -950,6 +958,7 @@ class ModuleTransform {
 			: binding.imported === 'default' || binding.namespace
 				? node.text
 				: binding.imported;
+		if (nativeReactCompat(binding.module, name)) return;
 		const text = member.getText(this.sf);
 		const parent = member.parent;
 		const block = (message: string) => {
@@ -1005,8 +1014,7 @@ class ModuleTransform {
 			? element.openingElement.attributes
 			: element.attributes;
 		const callbacks = new Map<ts.Node, string>();
-		const seen = new Set<ts.Declaration>();
-		const rendersOctane: (node: ts.Node) => boolean = (node) => {
+		const blocked = walkLocalValues(attributes, this.checker, (node, visit) => {
 			if (
 				this.options.reactCompat &&
 				ts.isJsxAttribute(node) &&
@@ -1039,7 +1047,7 @@ class ModuleTransform {
 									literal.text === 'undefined' &&
 									!this.declarationOf(literal)) ||
 								textKind(this.typeOf(value)) !== 0;
-							return !primitive || rendersOctane(field);
+							return !primitive || visit(field);
 						}
 						if (
 							['jsx', 'OctaneJsx'].some((name) =>
@@ -1061,15 +1069,10 @@ class ModuleTransform {
 					ts.TypeFormatFlags.NoTruncation,
 				);
 				if (/\b(?:React(?:Node|Element)|JSX\.Element)\b/.test(type)) return true;
-				const declaration = this.declarationOf(node);
-				if (declaration?.getSourceFile() === this.sf && !seen.has(declaration)) {
-					seen.add(declaration);
-					if (rendersOctane(declaration)) return true;
-				}
 			}
-			return ts.forEachChild(node, rendersOctane) ?? false;
-		};
-		if (rendersOctane(attributes)) return false;
+			return undefined;
+		});
+		if (blocked) return false;
 		for (const [body, args] of callbacks) this.reactRendererBodies.set(body, args);
 		return true;
 	}
@@ -1080,11 +1083,12 @@ class ModuleTransform {
 	inIsland(element: ts.JsxElement | ts.JsxSelfClosingElement) {
 		const parent = element.parent;
 		if (!ts.isJsxElement(parent)) return false;
-		const entry = this.importOf(parent.openingElement.tagName);
-		return (
-			entry?.imported === 'ReactCompat' &&
-			(entry.module === 'octane/react' || entry.module === 'octane/react/server')
-		);
+		const tag = parent.openingElement.tagName;
+		const entry = this.importOf(ts.isPropertyAccessExpression(tag) ? tag.expression : tag);
+		if (!entry) return false;
+		const name =
+			ts.isPropertyAccessExpression(tag) && entry.namespace ? tag.name.text : entry.imported;
+		return nativeReactCompat(entry.module, name);
 	}
 
 	/**

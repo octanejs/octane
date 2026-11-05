@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import ts from 'typescript';
 import { afterEach, expect, it } from 'vitest';
 import { runCodemod } from '../dist/index.js';
 import { createScopedStorePlanner } from '../dist/scoped-store-contract.js';
@@ -361,6 +362,90 @@ it('requires an imported application handle to come from the original shared fac
 	expect(accepts('reading')).toBe(true);
 	expect(accepts('unknown')).toBe(false);
 	expect(accepts('missing')).toBe(false);
+});
+
+it('follows named input aliases to their original factory and defers ambiguous targets', async () => {
+	const { storeInputFactories } = await import('../dist/store-inputs.js');
+	const { app, root, plan } = fixture({
+		'app/src/handles.ts':
+			"import {valueOf as make} from 'observer/core'; const created=make(1);export {created as reading};",
+		'app/src/barrel.ts': "export {reading as alias} from './handles';",
+		'app/src/public.ts':
+			"import {alias as local} from './barrel';export {local as source};export type {alias as typeOnly} from './barrel';",
+		'app/src/star.ts': "export * from './handles';",
+		'app/src/a.ts': "export {loop} from './b';",
+		'app/src/b.ts': "export {loop} from './a';",
+		'app/src/other.ts': "export {reading} from './handles';",
+		'app/src/other.js': 'export const reading = null;',
+		'app/src/shadow.ts': "export {reading} from '~/other.js';",
+		'node_modules/channels/package.json': '{"name":"channels","main":"index.js"}',
+		'node_modules/channels/index.js': 'exports.reading=null;',
+		'app/src/bare-shadow.ts': "export {reading} from 'channels';",
+	});
+	const factory = storeInputFactories(app, {
+		baseUrl: app,
+		paths: { '~/*': ['src/*'], channels: ['src/handles.ts'] },
+	});
+	const from = path.join(app, 'src/pane.tsx');
+	const target = factory(from, './public', 'source');
+	expect(target && plan().isSharedExport(target.module, target.name, target.from)).toBe(true);
+	for (const [module, name] of [
+		['./public', 'typeOnly'],
+		['./star', 'reading'],
+		['./a', 'loop'],
+		['./shadow', 'reading'],
+		['./bare-shadow', 'reading'],
+	]) {
+		expect(factory(from, module, name)).toBeNull();
+	}
+	const external = path.join(root, 'external.ts');
+	fs.writeFileSync(
+		external,
+		"import {valueOf} from 'observer/core'; export const result=valueOf(1);",
+	);
+	fs.symlinkSync(external, path.join(app, 'src/link.ts'));
+	expect(factory(from, './link', 'result')).toBeNull();
+});
+
+it('emits identical companions from parent and nested links to the same workspace package', () => {
+	const { app, library, plan: outer } = fixture();
+	const feature = path.join(app, 'src/feature');
+	fs.mkdirSync(path.join(feature, 'node_modules'), { recursive: true });
+	fs.symlinkSync(library, path.join(feature, 'node_modules/observer'), 'dir');
+	fs.writeFileSync(
+		path.join(feature, 'package.json'),
+		JSON.stringify({ dependencies: { observer: 'workspace:*' } }),
+	);
+	const file = path.join(feature, 'leaf.tsx');
+	const nestedFirst = createScopedStorePlanner(
+		path.join(app, 'src'),
+		path.join(app, 'src/store-context.tsrx'),
+	);
+	const nested = nestedFirst('observer', 'useSnapshot', file),
+		parent = outer();
+	expect(nested?.files).toEqual(parent?.files);
+	expect(nested?.files.size).toBeGreaterThan(0);
+	fs.writeFileSync(
+		path.join(feature, 'tsconfig.json'),
+		JSON.stringify({
+			compilerOptions: { moduleResolution: 'bundler', module: 'esnext', preserveSymlinks: true },
+		}),
+	);
+	const preserved = createScopedStorePlanner(
+		path.join(app, 'src'),
+		path.join(app, 'src/store-context.tsrx'),
+	);
+	expect(preserved('observer', 'useSnapshot', file)).toBeNull();
+	// The project entry point supplies root compiler options even for nested callers.
+	const rootOptions = createScopedStorePlanner(
+		path.join(app, 'src'),
+		path.join(app, 'src/store-context.tsrx'),
+		{
+			module: ts.ModuleKind.ESNext,
+			moduleResolution: ts.ModuleResolutionKind.Bundler,
+		},
+	);
+	expect(rootOptions('observer', 'useSnapshot', file)).toBeNull();
 });
 
 it('keeps the React compiler from inserting a React dispatcher into native hooks', async () => {

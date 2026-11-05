@@ -19,7 +19,7 @@ async function load(mode) {
 	return bundleRuntime(
 		project,
 		mode,
-		`export * from './page.tsrx'; export * from './rich.tsrx'; ${entry}
+		`export * from './page.tsrx'; export * from './rich.tsrx'; export * from './fields.tsrx'; ${entry}
 				export { OctaneCompat } from 'octane/react${mode === 'server' ? '/server' : ''}';
 				export * as react from 'react'; export * as intl from 'react-intl';
 				export { renderToString } from 'react-dom/server';`,
@@ -39,9 +39,26 @@ beforeAll(async () => {
 		path.join(testDir, 'fixtures/react-intl/page.tsrx'),
 		path.join(project, 'page.tsrx'),
 	);
+	const fields = transformModule(
+		`import { useIntl, FormattedMessage } from 'react-intl';
+		export function Fields({count}: {count: number}) {
+			const intl = useIntl();
+			return <section><input placeholder={intl.formatMessage({id:'hint'})} />
+				<FormattedMessage id="count" values={{count}} /></section>;
+		}`,
+		'fields.tsx',
+		{
+			reactIntlAdapter: './react-intl.tsrx',
+			reactCompat: true,
+			unported: (name) => (name === 'react-intl' ? name : null),
+		},
+	);
+	expect(fields.notes.filter((note) => note.severity === 'error')).toEqual([]);
+	expect(fields.code).not.toMatch(/from ['"]react-intl['"]/);
+	await writeFile(path.join(project, 'fields.tsrx'), fields.code);
 	const rich = transformModule(
 		"import { FormattedMessage } from 'react-intl';\n" +
-			"export function Rich() { return <FormattedMessage id='rich' values={{bold: part => <strong className='accent'>{part}</strong>}} />; }",
+			"export function Rich() { return <FormattedMessage id='rich' values={{bold: part => <strong key='emphasis' className='accent'>\n  {part}\n</strong>}} />; }",
 		'rich.tsx',
 		{
 			reactCompat: true,
@@ -180,6 +197,55 @@ it('follows a React host locale update and uses the genuine formatter for rich t
 	}
 });
 
+it('renders scalar substitutions and localized host attributes like the original React component', async () => {
+	const { react, intl, reactRoot, OctaneCompat, Fields } = client;
+	const h = react.createElement;
+	const reference = document.createElement('div');
+	const migrated = document.createElement('div');
+	const roots = [reactRoot(reference), reactRoot(migrated)];
+	const rendered = (host) => [
+		host.querySelector('input').placeholder,
+		host.querySelector('section').textContent,
+	];
+	try {
+		for (const [locale, count, rich] of [
+			['en', 1, false],
+			['fr', 3, true],
+		]) {
+			const config = {
+				locale,
+				messages: {
+					hint: rich ? '<em>Rechercher</em>' : 'Search',
+					count: rich ? '<em>{count} articles</em>' : '{count} item',
+				},
+				defaultRichTextElements: rich
+					? { em: (parts) => h('em', { key: 'em' }, parts) }
+					: undefined,
+				onWarn() {},
+			};
+			const original = () =>
+				h(
+					'section',
+					null,
+					h('input', { placeholder: intl.useIntl().formatMessage({ id: 'hint' }) }),
+					h(intl.FormattedMessage, { id: 'count', values: { count } }),
+				);
+			await react.act(async () => {
+				roots[0].render(h(intl.IntlProvider, config, h(original)));
+				roots[1].render(
+					h(intl.IntlProvider, config, h(OctaneCompat, { component: Fields, props: { count } })),
+				);
+			});
+			expect(rendered(migrated)).toEqual(rendered(reference));
+			expect(migrated.querySelector('em')?.textContent).toEqual(
+				reference.querySelector('em')?.textContent,
+			);
+		}
+	} finally {
+		await react.act(async () => roots.forEach((root) => root.unmount()));
+	}
+});
+
 it('hands a real React element from a migrated inline callback back to the unported library', async () => {
 	const { react, intl, reactRoot, OctaneCompat, Rich } = client;
 	const h = react.createElement;
@@ -193,7 +259,7 @@ it('hands a real React element from a migrated inline callback back to the unpor
 			outer: (chunks) =>
 				chunks.map((child) => {
 					if (!react.isValidElement(child)) throw new Error('Expected a React element');
-					return react.cloneElement(child, { title: 'From React' });
+					return react.cloneElement(child, { title: 'From React', 'data-key': child.key });
 				}),
 		},
 	};
@@ -204,6 +270,20 @@ it('hands a real React element from a migrated inline callback back to the unpor
 		const result = el.querySelector('strong.accent');
 		expect(result.textContent).toBe('Text');
 		expect(result.title).toBe('From React');
+		const observedKey = result.getAttribute('data-key');
+		await react.act(async () =>
+			root.render(
+				h(
+					intl.IntlProvider,
+					config,
+					h(intl.FormattedMessage, {
+						id: 'rich',
+						values: { bold: (part) => h('strong', { key: 'emphasis', className: 'accent' }, part) },
+					}),
+				),
+			),
+		);
+		expect(observedKey).toBe(el.querySelector('strong').getAttribute('data-key'));
 	} finally {
 		await react.act(async () => root.unmount());
 	}

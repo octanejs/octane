@@ -9,6 +9,7 @@ import type {
 	TransformOptions,
 	TransformResult,
 } from './types.js';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -136,7 +137,7 @@ export async function runCodemod(
 	const intlDirs = new Map<string, boolean>();
 	let adapterSource: string | undefined;
 	let adapterError: string | undefined;
-	let createAdapter = false;
+	let adapterState: IntlAdapterState | undefined;
 	const intlPath = (file: string) => {
 		const dir = path.dirname(file);
 		let supported = intlDirs.get(dir);
@@ -191,9 +192,9 @@ export async function runCodemod(
 				new URL('../templates/react-intl.tsrx', import.meta.url),
 				'utf8',
 			);
-			const stat = fs.lstatSync(adapter, { throwIfNoEntry: false });
+			adapterState = inspectIntlAdapter(adapter, adapterSource);
 			if (
-				(stat && (!stat.isFile() || fs.readFileSync(adapter, 'utf8') !== adapterSource)) ||
+				adapterState.kind === 'conflict' ||
 				owners.has(ts.sys.useCaseSensitiveFileNames ? adapter : adapter.toLowerCase())
 			) {
 				adapterError = `Cannot generate the React Intl adapter because ${adapterName} is already in use.`;
@@ -203,7 +204,6 @@ export async function runCodemod(
 			) {
 				adapterError = 'The project compiler cannot compile the React Intl adapter.';
 			}
-			createAdapter = !stat;
 		}
 		const specifier = path.relative(dir, adapter).split(path.sep).join('/');
 		return specifier.startsWith('.') ? specifier : './' + specifier;
@@ -512,6 +512,49 @@ export async function runCodemod(
 		}
 	}
 
+	const intlConsumer = results.find((file) => file.rules['react-intl']);
+	if (adapterState && adapterSource && intlConsumer) {
+		if (write && !publishIntlAdapter(adapter, adapterSource, adapterState)) {
+			return blockedWrite(
+				root,
+				unchangedFile(
+					intlConsumer.file,
+					fs.readFileSync(path.join(root, intlConsumer.file), 'utf8'),
+					{
+						rule: 'react-intl',
+						severity: 'error',
+						line: 1,
+						message: `Cannot update the React Intl adapter because ${adapterName} changed during migration. No changes were written.`,
+					},
+				),
+				compiler?.from,
+			);
+		}
+		if (adapterState.kind === 'missing' || adapterState.kind === 'previous') {
+			results.push({
+				file: adapterName,
+				output: adapterName,
+				changed: true,
+				code: adapterSource,
+				rules: { 'react-intl-adapter': 1 },
+				notes:
+					adapterState.kind === 'previous'
+						? [
+								{
+									rule: 'react-intl-adapter',
+									severity: 'info',
+									line: 1,
+									message:
+										'Update the previously generated React Intl adapter at its existing path.',
+								},
+							]
+						: [],
+				diagnostics: [],
+				strong: compiler ? true : null,
+				strongFixes: [],
+			});
+		}
+	}
 	for (const [output, code] of storeHelpers) {
 		if (!checkedHelpers.get(output)?.create) continue;
 		const name = path.relative(root, output);
@@ -525,21 +568,6 @@ export async function runCodemod(
 			notes: [],
 			diagnostics: [],
 			strong: code.startsWith("'use strong'") ? true : null,
-			strongFixes: [],
-		});
-	}
-	if (createAdapter && adapterSource && results.some((file) => file.rules['react-intl'])) {
-		// Create the helper first. A failed or retried write must never overwrite an existing module.
-		if (write) fs.writeFileSync(adapter, adapterSource, { flag: 'wx' });
-		results.push({
-			file: adapterName,
-			output: adapterName,
-			changed: true,
-			code: adapterSource,
-			rules: { 'react-intl-adapter': 1 },
-			notes: [],
-			diagnostics: [],
-			strong: compiler ? true : null,
 			strongFixes: [],
 		});
 	}
@@ -573,6 +601,53 @@ export async function runCodemod(
 		html,
 		compiler: compiler?.from ?? null,
 	};
+}
+
+type IntlAdapterState =
+	{ kind: 'missing' | 'current' | 'conflict' } | { kind: 'previous'; mode: number };
+
+// Exact bytes of the helper originally shipped with the React Intl migration.
+const PREVIOUS_INTL_SHA256 = '07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98';
+
+function inspectIntlAdapter(file: string, source: string): IntlAdapterState {
+	const stat = fs.lstatSync(file, { throwIfNoEntry: false });
+	if (!stat) return { kind: 'missing' };
+	if (!stat.isFile()) return { kind: 'conflict' };
+	const bytes = fs.readFileSync(file);
+	if (bytes.equals(Buffer.from(source))) return { kind: 'current' };
+	if (createHash('sha256').update(bytes).digest('hex') === PREVIOUS_INTL_SHA256)
+		return { kind: 'previous', mode: stat.mode & 0o777 };
+	return { kind: 'conflict' };
+}
+
+function publishIntlAdapter(file: string, source: string, planned: IntlAdapterState): boolean {
+	const current = inspectIntlAdapter(file, source);
+	if (current.kind === 'current') return true;
+	if (current.kind !== planned.kind) return false;
+	if (current.kind === 'missing') {
+		try {
+			fs.writeFileSync(file, source, { flag: 'wx' });
+			return true;
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+			return inspectIntlAdapter(file, source).kind === 'current';
+		}
+	}
+
+	if (current.kind !== 'previous') return false;
+	const stage = fs.mkdtempSync(path.join(path.dirname(file), '.octane-react-intl-'));
+	try {
+		const next = path.join(stage, 'next');
+		fs.writeFileSync(next, source, { mode: 0o600 });
+		fs.chmodSync(next, current.mode);
+		const latest = inspectIntlAdapter(file, source);
+		if (latest.kind !== 'previous') return latest.kind === 'current';
+		if (latest.mode !== current.mode) return false;
+		fs.renameSync(next, file);
+		return true;
+	} finally {
+		fs.rmSync(stage, { recursive: true, force: true });
+	}
 }
 
 /** A write conflict stops the batch before any file, entry page or dependency is updated. */

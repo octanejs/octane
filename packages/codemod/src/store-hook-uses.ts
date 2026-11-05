@@ -1,4 +1,4 @@
-import { localUses, scalar } from './local-uses.js';
+import { localUses, portableArguments, scalar } from './local-uses.js';
 import ts from 'typescript';
 
 /** Bare SVG default imports can switch from a component to an asset URL for a .tsrx issuer. */
@@ -95,48 +95,7 @@ export function storeHookUses(
 			})
 		);
 	}
-	// An imported input is forwarded unchanged to the original hook body. For calls
-	// on the returned store, require data: a write can publish its payload to React.
-	function argument(
-		expr: ts.Expression,
-		imported?: (module: string, name: string) => boolean,
-	): boolean {
-		if (ts.isParenthesizedExpression(expr) || ts.isSatisfiesExpression(expr))
-			return argument(expr.expression, imported);
-		if (ts.isAsExpression(expr) || ts.isTypeAssertionExpression(expr))
-			return argument(expr.expression, imported);
-		if (ts.isArrayLiteralExpression(expr))
-			return expr.elements.every((el) => argument(el, imported));
-		if (ts.isObjectLiteralExpression(expr))
-			return expr.properties.every(
-				(p) =>
-					ts.isPropertyAssignment(p) &&
-					!ts.isComputedPropertyName(p.name) &&
-					argument(p.initializer, imported),
-			);
-		if (ts.isIdentifier(expr)) {
-			const declaration = checker.getSymbolAtLocation(expr)?.valueDeclaration;
-			if (declaration && ts.isVariableDeclaration(declaration)) {
-				return (
-					!!declaration.initializer &&
-					declaration.end <= expr.pos &&
-					ts.isVariableDeclarationList(declaration.parent) &&
-					!!(declaration.parent.flags & ts.NodeFlags.Const) &&
-					scalar(typeOf(expr)) &&
-					argument(declaration.initializer, imported)
-				);
-			}
-		}
-		if (ts.isIdentifier(expr) && imported) {
-			const d = checker.getSymbolAtLocation(expr)?.declarations?.[0];
-			if (d && ts.isImportSpecifier(d) && !d.isTypeOnly) {
-				const spec = d.parent.parent.parent.moduleSpecifier;
-				if (ts.isStringLiteral(spec) && imported(spec.text, (d.propertyName ?? d.name).text))
-					return true;
-			}
-		}
-		return scalar(typeOf(expr));
-	}
+	const argument = portableArguments(checker, typeOf);
 	function bound(name: ts.BindingName): boolean {
 		if (ts.isIdentifier(name)) return uses(name).every(safe);
 		return name.elements.every((el) => ts.isOmittedExpression(el) || bound(el.name));

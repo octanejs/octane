@@ -1,4 +1,4 @@
-import { localUses, scalar } from './local-uses.js';
+import { localUses, portableArguments, scalar } from './local-uses.js';
 import ts from 'typescript';
 
 const scalarMethods = new Set([
@@ -20,6 +20,8 @@ export function intlImports(
 	isComponent: (
 		functionNode: ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression,
 	) => boolean,
+	inReact: (element: ts.JsxElement | ts.JsxSelfClosingElement) => boolean,
+	canPassToReact: (element: ts.JsxElement | ts.JsxSelfClosingElement) => boolean,
 ): Set<ts.ImportSpecifier> {
 	const candidates = file.statements.filter(ts.isImportDeclaration).flatMap((decl) => {
 		const named = decl.importClause?.namedBindings;
@@ -108,10 +110,14 @@ export function intlImports(
 			return (
 				(ts.isJsxOpeningElement(tag) || ts.isJsxSelfClosingElement(tag)) &&
 				ts.isIdentifier(tag.tagName) &&
-				/^[a-z]/.test(tag.tagName.text) &&
+				/^[a-z][a-z0-9]*$/.test(tag.tagName.text) &&
 				ts.isIdentifier(attr.name) &&
 				(attr.name.text === 'title' ||
-					attr.name.text === 'aria-label' ||
+					attr.name.text.startsWith('aria-') ||
+					(attr.name.text === 'placeholder' && ['input', 'textarea'].includes(tag.tagName.text)) ||
+					(attr.name.text === 'alt' && ['img', 'input', 'area'].includes(tag.tagName.text)) ||
+					(attr.name.text === 'label' &&
+						['option', 'optgroup', 'track'].includes(tag.tagName.text)) ||
 					attr.name.text.startsWith('data-'))
 			);
 		}
@@ -130,6 +136,31 @@ export function intlImports(
 				(p) => ts.isJsxAttribute(p) && p.name.getText(file) !== 'children',
 			) &&
 			(!ts.isJsxElement(child) || child.children.every(closedChild))
+		);
+	}
+	// A substitution object is shared with the installed React formatter. Check
+	// its data properties before any JSX in this module changes renderer.
+	const portable = portableArguments(checker, typeOf);
+	function scalarValues(values: ts.Expression): boolean {
+		return (
+			ts.isObjectLiteralExpression(values) &&
+			values.properties.every((property) => {
+				const value = ts.isShorthandPropertyAssignment(property)
+					? property.name
+					: ts.isPropertyAssignment(property) && !ts.isComputedPropertyName(property.name)
+						? property.initializer
+						: undefined;
+				if (!value || !portable(value)) return false;
+				let source = value;
+				while (
+					ts.isAsExpression(source) ||
+					ts.isNonNullExpression(source) ||
+					ts.isParenthesizedExpression(source) ||
+					ts.isSatisfiesExpression(source)
+				)
+					source = source.expression;
+				return scalar(typeOf(source));
+			})
 		);
 	}
 	function readsScalar(receiver: ts.Expression): boolean {
@@ -169,15 +200,7 @@ export function intlImports(
 		)
 			return false;
 		const values = call.arguments[1];
-		return (
-			!values ||
-			(ts.isObjectLiteralExpression(values) &&
-				values.properties.every((p) =>
-					ts.isPropertyAssignment(p)
-						? scalar(typeOf(p.initializer))
-						: ts.isShorthandPropertyAssignment(p) && scalar(typeOf(p.name)),
-				))
-		);
+		return !values || scalarValues(values);
 	}
 	function readsIntl(id: ts.Identifier) {
 		const call = id.parent;
@@ -213,6 +236,13 @@ export function intlImports(
 			if (ts.isJsxClosingElement(tag)) return tag.tagName === id && name !== 'FormattedMessage';
 			if ((!ts.isJsxSelfClosingElement(tag) && !ts.isJsxOpeningElement(tag)) || tag.tagName !== id)
 				return false;
+			if (
+				ts.findAncestor(
+					tag,
+					(node) => (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) && inReact(node),
+				)
+			)
+				return false;
 			if (name === 'FormattedMessage' && !ts.isJsxSelfClosingElement(tag)) return false;
 			if (
 				name !== 'FormattedMessage' &&
@@ -225,7 +255,14 @@ export function intlImports(
 					ts.isJsxAttribute(attr) &&
 					ts.isIdentifier(attr.name) &&
 					(name === 'FormattedMessage'
-						? descriptor.has(attr.name.text)
+						? descriptor.has(attr.name.text) ||
+							(attr.name.text === 'values' &&
+								!!attr.initializer &&
+								ts.isJsxExpression(attr.initializer) &&
+								!!attr.initializer.expression &&
+								scalarValues(attr.initializer.expression) &&
+								ts.isJsxSelfClosingElement(tag) &&
+								canPassToReact(tag))
 						: !['ref', 'children', 'defaultRichTextElements', 'textComponent'].includes(
 								attr.name.text,
 							)),

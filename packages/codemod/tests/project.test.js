@@ -2125,6 +2125,30 @@ export const Other = memo(() => { const intl = useIntl(); return <p title={intl.
 			true,
 		);
 	});
+	it('keeps a message inside an authored React island and flags JSX disguised as scalar substitutions', async () => {
+		const root = setup({
+			'src/Island.tsx': `import {ReactCompat as Island} from 'octane/react';
+import {FormattedMessage} from 'react-intl';
+export function Message({count}: {count: number}) { return <Island><FormattedMessage id="count" values={{count}} /></Island>; }`,
+			'src/Unsafe.tsx': `import {FormattedMessage} from 'react-intl';
+export function Unsafe() { const value = (<b/> as unknown as string)!; return <FormattedMessage id="value" values={{value}} />; }`,
+			'src/Custom.tsx': `import {useIntl} from 'react-intl';
+export function Custom() { const intl = useIntl(); return <Widget placeholder={intl.formatMessage({id:'x'})} />; }`,
+		});
+		const names = ['Island', 'Unsafe', 'Custom'].map((name) =>
+			path.join(root, 'src', name + '.tsx'),
+		);
+		const { files } = await runCodemod(names, { root, write: false, projectTypes: false });
+		const island = files.find((f) => f.file === 'src/Island.tsx');
+		expect(island.code).toMatch(/import {\s*FormattedMessage\s*} from 'react-intl'/);
+		expect(island.notes.filter((n) => n.severity === 'error')).toEqual([]);
+		for (const name of ['Unsafe', 'Custom'])
+			expect(
+				files
+					.find((f) => f.file === 'src/' + name + '.tsx')
+					.notes.some((n) => n.severity === 'error'),
+			).toBe(true);
+	});
 	it('retains errors for an escaping formatter and bridges only a genuine React Intl display', async () => {
 		const root = setup({
 			'src/Greeting.tsx': `import { useIntl, FormattedMessage as Message } from 'react-intl';
