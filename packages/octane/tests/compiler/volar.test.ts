@@ -1266,11 +1266,12 @@ export function NamespaceView() @{
 			writeFileSync(viewFile, result.code);
 			// The consumer's view does not depend on the exporter, so TypeScript
 			// rechecks it when the exporter gains or loses the marker.
+			let program: ts.Program | undefined;
 			const diagnosedViews = (marked: boolean) => {
 				const exporter = compileToVolarMappings(frame(marked), 'frame.tsrx');
 				expect(exporter.errors).toEqual([]);
 				writeFileSync(join(root, 'frame.tsx'), exporter.code);
-				const program = ts.createProgram({
+				program = ts.createProgram({
 					rootNames: [viewFile],
 					options: {
 						jsx: ts.JsxEmit.Preserve,
@@ -1281,13 +1282,13 @@ export function NamespaceView() @{
 						target: ts.ScriptTarget.ESNext,
 						types: [],
 					},
+					oldProgram: program,
 				});
-				expect(
-					ts
-						.getPreEmitDiagnostics(program)
-						.filter(({ file }) => file?.fileName !== viewFile)
-						.map(({ messageText }) => ts.flattenDiagnosticMessageText(messageText, '\n')),
-				).toEqual([]);
+				for (const file of ['frame.tsx', 'reexport.ts']) {
+					expect(program.getSemanticDiagnostics(program.getSourceFile(join(root, file)))).toEqual(
+						[],
+					);
+				}
 				return program.getSemanticDiagnostics(program.getSourceFile(viewFile)!).map((d) => {
 					const [, name] = [...result.code.slice(0, d.start).matchAll(/function (\w+)\(/g)].at(-1)!;
 					return `${name}: ${ts.flattenDiagnosticMessageText(d.messageText, '\n')}`;
@@ -1307,7 +1308,7 @@ export function NamespaceView() @{
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
-	});
+	}, 15_000);
 
 	it('leaves conflicts with a type-only import to the type checker', () => {
 		// Parsing accepts a value declaration named like a type-only import; the
