@@ -27,6 +27,8 @@ export interface TransformOptions {
 	): { from: string; name: string } | null;
 	/** Relative path to the project-local React Intl adapter, when its installed peers support it. */
 	reactIntlAdapter?: string;
+	/** Whether a directly imported, selected component forwards this prop only to text attributes. */
+	forwardedText?(module: string, exported: string, prop: string): boolean;
 	/** Whether the selected component at this local declaration offset, or this imported name, accepts one explicit element. */
 	elementChild?(binding: number | { module: string; imported: string }): boolean;
 	/** Whether a selected, directly imported component inspects its child descriptors. */

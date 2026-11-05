@@ -1,3 +1,5 @@
+import { forwardedTextProps } from './forwarded-text.js';
+import type { TransformOptions } from './types.js';
 import { localUses, scalar } from './local-uses.js';
 import ts from 'typescript';
 
@@ -15,6 +17,7 @@ const descriptor = new Set(['id', 'description', 'defaultMessage', 'ignoreTag'])
 /** Select whole named imports that the shared adapter can replace without changing renderer-owned values. */
 export function intlImports(
 	file: ts.SourceFile,
+	importedText: TransformOptions['forwardedText'],
 	checker: ts.TypeChecker,
 	typeOf: (expression: ts.Expression) => ts.Type,
 	isComponent: (
@@ -44,18 +47,21 @@ export function intlImports(
 	const selected = new Set<ts.ImportSpecifier>();
 	if (!candidates.length) return selected;
 	const uses = localUses(file, checker);
+	const forwards = forwardedTextProps(file, checker, uses);
 	// Even without substitution values a provider can format rich text into React elements.
 	// Follow const aliases only when every consumer explicitly coerces or compares the result.
-	const knownSinks = new Map<ts.Expression, boolean>();
-	function textSink(value: ts.Expression): boolean {
+	const localSinks = new Map<ts.Expression, boolean>();
+	const forwardingSinks = new Map<ts.Expression, boolean>();
+	function textSink(value: ts.Expression, allowForwarding: boolean): boolean {
+		const knownSinks = allowForwarding ? forwardingSinks : localSinks;
 		const cached = knownSinks.get(value);
 		if (cached !== undefined) return cached;
 		knownSinks.set(value, false); // A cycle cannot establish safe use.
-		const safe = checkSink(value);
+		const safe = checkSink(value, allowForwarding);
 		knownSinks.set(value, safe);
 		return safe;
 	}
-	function checkSink(value: ts.Expression): boolean {
+	function checkSink(value: ts.Expression, allowForwarding: boolean): boolean {
 		const use = value.parent;
 		if (
 			ts.isParenthesizedExpression(use) ||
@@ -63,7 +69,7 @@ export function intlImports(
 			ts.isNonNullExpression(use) ||
 			ts.isSatisfiesExpression(use)
 		)
-			return textSink(use);
+			return textSink(use, allowForwarding);
 		if (
 			(ts.isTemplateSpan(use) && !ts.isTaggedTemplateExpression(use.parent.parent)) ||
 			ts.isTypeOfExpression(use) ||
@@ -82,7 +88,8 @@ export function intlImports(
 				?.declarations?.every((d) => d.getSourceFile().hasNoDefaultLib)
 		)
 			return true;
-		if (ts.isConditionalExpression(use)) return use.condition === value || textSink(use);
+		if (ts.isConditionalExpression(use))
+			return use.condition === value || textSink(use, allowForwarding);
 		if (ts.isBinaryExpression(use)) {
 			return (
 				[
@@ -101,19 +108,33 @@ export function intlImports(
 			ts.isIdentifier(use.name) &&
 			ts.getCombinedNodeFlags(use) & ts.NodeFlags.Const
 		)
-			return uses(use.name).every(textSink);
+			return uses(use.name).every((ref) => textSink(ref, allowForwarding));
 		if (ts.isJsxExpression(use) && ts.isJsxAttribute(use.parent)) {
 			const attr = use.parent;
 			const tag = attr.parent.parent;
-			return (
-				(ts.isJsxOpeningElement(tag) || ts.isJsxSelfClosingElement(tag)) &&
-				ts.isIdentifier(tag.tagName) &&
-				/^[a-z]/.test(tag.tagName.text) &&
-				ts.isIdentifier(attr.name) &&
-				(attr.name.text === 'title' ||
-					attr.name.text === 'aria-label' ||
-					attr.name.text.startsWith('data-'))
-			);
+			if (!ts.isIdentifier(attr.name) || !ts.isIdentifier(tag.tagName)) return false;
+			const prop = attr.name.text;
+			if (/^[a-z]/.test(tag.tagName.text))
+				return prop === 'title' || prop === 'aria-label' || prop.startsWith('data-');
+			if (
+				!allowForwarding ||
+				!/^[A-Z]/.test(tag.tagName.text) ||
+				tag.attributes.properties.some(
+					(a) =>
+						ts.isJsxSpreadAttribute(a) || (ts.isJsxAttribute(a) && a.name.getText(file) === 'is'),
+				)
+			)
+				return false;
+			const symbol = checker.getSymbolAtLocation(tag.tagName);
+			const decl = symbol?.declarations?.[0];
+			if (decl && ts.isImportSpecifier(decl)) {
+				const module = decl.parent.parent.parent.moduleSpecifier;
+				return (
+					ts.isStringLiteral(module) &&
+					!!importedText?.(module.text, (decl.propertyName ?? decl.name).text, prop)
+				);
+			}
+			return forwards(symbol, prop);
 		}
 		return false;
 	}
@@ -165,7 +186,18 @@ export function intlImports(
 			call.arguments.length < 1 ||
 			call.arguments.length > 3 ||
 			call.arguments.some(ts.isSpreadElement) ||
-			!textSink(call)
+			!textSink(
+				call,
+				call.arguments.length === 1 &&
+					ts.isObjectLiteralExpression(call.arguments[0]) &&
+					call.arguments[0].properties.every(
+						(field) =>
+							ts.isPropertyAssignment(field) &&
+							(ts.isIdentifier(field.name) || ts.isStringLiteral(field.name)) &&
+							descriptor.has(field.name.text) &&
+							ts.isStringLiteralLike(field.initializer),
+					),
+			)
 		)
 			return false;
 		const values = call.arguments[1];
