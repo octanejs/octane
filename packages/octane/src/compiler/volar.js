@@ -261,6 +261,8 @@ function projectComponentChildren(ast, comments) {
 	const jsx = pragma ? jsxImportSourcePragmaModule(pragma.value) : DOM_RENDERER_MODULE;
 	if (jsx !== DOM_RENDERER_MODULE && jsx !== 'octane/strong') return ast;
 	const descriptorTags = collectDescriptorChildrenBindings(ast);
+	// An import the bundler may prove marked: its type decides (see childrenBlock).
+	const importedTags = collectDescriptorChildrenBindings(ast, () => true);
 	const isBlockChildren = (node) =>
 		isComponentTag(node) &&
 		!descriptorTags.has(node.openingElement.name.name) &&
@@ -316,9 +318,14 @@ function projectComponentChildren(ast, comments) {
 		const fragment = b.jsx_fragment(result.children);
 		// Template children still lower their directives, as the parser marks them.
 		fragment.metadata.native_tsrx = true;
+		const name = result.openingElement.name;
+		const args =
+			name.type === 'JSXIdentifier' && importedTags.has(name.name)
+				? [fragment, b.id(name.name)]
+				: [fragment];
 		return {
 			...result,
-			children: [b.jsx_expression_container(b.call(blockHelper(), fragment))],
+			children: [b.jsx_expression_container(b.call(blockHelper(), ...args))],
 		};
 	};
 	const projected = walk(ast, false);

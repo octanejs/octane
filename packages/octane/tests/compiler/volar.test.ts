@@ -1216,6 +1216,99 @@ export function App(props: { name: string; link?: { title: string } }) @{
 		}
 	});
 
+	it('types template children of an imported descriptorChildren component as descriptors (#2348)', () => {
+		// The bundler proves a marked import through the module graph and passes
+		// element descriptors, so `children: JSX.Element` accepts `<b />` there.
+		// An unmarked import, and a namespace member, which the bundler does not
+		// follow, still receive a children block.
+		const frame = (marked: boolean) => `import { descriptorChildren } from 'octane';
+import type { JSX } from 'octane/jsx-runtime';
+
+function Frame(props: { children: JSX.Element }) {
+	return props.children;
+}
+
+export const Marked = ${marked ? 'descriptorChildren(Frame)' : 'Frame'};
+export const Plain = Frame;
+`;
+		const view = `import { Marked, Plain } from './frame';
+import { Marked as Reexported } from './reexport';
+import * as frame from './frame';
+
+export function MarkedView() @{
+	<Marked><b /></Marked>
+}
+
+export function ReexportedView() @{
+	<Reexported><b /></Reexported>
+}
+
+export function PlainView() @{
+	<Plain><b /></Plain>
+}
+
+export function NamespaceView() @{
+	<frame.Marked><b /></frame.Marked>
+}
+`;
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-imported-descriptor-children-'));
+		try {
+			mkdirSync(join(root, 'node_modules'));
+			symlinkSync(
+				fileURLToPath(new URL('../..', import.meta.url)),
+				join(root, 'node_modules/octane'),
+				'dir',
+			);
+			writeFileSync(join(root, 'reexport.ts'), "export { Marked } from './frame';\n");
+			const result = compileToVolarMappings(view, 'view.tsrx');
+			expect(result.errors).toEqual([]);
+			const viewFile = join(root, 'view.tsx');
+			writeFileSync(viewFile, result.code);
+			// The consumer's view does not depend on the exporter, so TypeScript
+			// rechecks it when the exporter gains or loses the marker.
+			const diagnosedViews = (marked: boolean) => {
+				const exporter = compileToVolarMappings(frame(marked), 'frame.tsrx');
+				expect(exporter.errors).toEqual([]);
+				writeFileSync(join(root, 'frame.tsx'), exporter.code);
+				const program = ts.createProgram({
+					rootNames: [viewFile],
+					options: {
+						jsx: ts.JsxEmit.Preserve,
+						module: ts.ModuleKind.ESNext,
+						moduleResolution: ts.ModuleResolutionKind.Bundler,
+						noEmit: true,
+						strict: true,
+						target: ts.ScriptTarget.ESNext,
+						types: [],
+					},
+				});
+				expect(
+					ts
+						.getPreEmitDiagnostics(program)
+						.filter(({ file }) => file?.fileName !== viewFile)
+						.map(({ messageText }) => ts.flattenDiagnosticMessageText(messageText, '\n')),
+				).toEqual([]);
+				return program.getSemanticDiagnostics(program.getSourceFile(viewFile)!).map((d) => {
+					const [, name] = [...result.code.slice(0, d.start).matchAll(/function (\w+)\(/g)].at(-1)!;
+					return `${name}: ${ts.flattenDiagnosticMessageText(d.messageText, '\n')}`;
+				});
+			};
+			const blockToElement = "Type 'ChildrenBlock' is not assignable to type 'Element'.";
+			expect(diagnosedViews(true)).toEqual([
+				`PlainView: ${blockToElement}`,
+				`NamespaceView: ${blockToElement}`,
+			]);
+			expect(diagnosedViews(false)).toEqual([
+				`MarkedView: ${blockToElement}`,
+				`ReexportedView: ${blockToElement}`,
+				`PlainView: ${blockToElement}`,
+				`NamespaceView: ${blockToElement}`,
+			]);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it('leaves conflicts with a type-only import to the type checker', () => {
 		// Parsing accepts a value declaration named like a type-only import; the
 		// type checker still rejects value use and duplicate imports.
@@ -2729,7 +2822,7 @@ export const ordinaryResult: string = ordinary('draft', { count: 1 });
 			);
 			writeFileSync(
 				join(root, 'node_modules/octane/tsrx-boundary.d.ts'),
-				'export declare function childrenBlock(children: unknown): () => never;\n',
+				'export declare function childrenBlock(children: unknown, component?: unknown): () => never;\n',
 			);
 			const files = Object.entries(sources).flatMap(([name, source]) => {
 				const result = compileToVolarMappings(source, `/src/${name}.tsrx`);
