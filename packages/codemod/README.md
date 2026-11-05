@@ -194,6 +194,16 @@ keeps import path resolution and compiler verification. Rewrites that require
 types from other files may be skipped. Use the default project type analysis
 when verifying a smaller batch for adoption.
 
+## React Intl
+
+When an application has React Intl 7, React and React DOM 19.2 or later in the 19 series, and Octane 0.16.7 or later in the 0.16 series, the codemod can generate one shared `octane-react-intl.tsrx` source file. It places it in the project's existing `src` directory or at the project root, and subsequent migrations reuse it. Preview and print include the helper before a write. The app keeps its installed React Intl formatter, messages, and cache.
+
+Named `useIntl` imports can move when a component reads its locale or calls a supported scalar formatter. A provider's rich-text defaults can make `formatMessage` return React elements even with zero substitution values. For these calls the codemod follows local constants to known text or comparison uses, such as a native element's `title` or `aria-label`. Escaping formatters and unproven renderable results retain a binding diagnostic.
+
+Plain self-closing `FormattedMessage` elements can render text directly. Supported React display islands receive the nearest real Intl context. A React-hosted Octane component reads the original provider. A standalone Octane root uses the generated `IntlProvider` or `RawIntlProvider`. The codemod moves providers with a closed subtree of native elements and scalar children. Providers surrounding other components need a review of which renderer owns their descendants. React islands retain the [ReactCompat rendering limits](../../docs/react-compat.md).
+
+Inside a retained React component, an inline rich-text callback such as `chunks => <strong>{chunks}</strong>` can keep producing a genuine React element. The codemod recognizes a single native tag with literal attributes, whose only dynamic child is the callback parameter. Captured values, spreads, refs, and event handlers keep their migration diagnostic.
+
 ## Local recipes
 
 Pass a recipe explicitly to use it for a migration:
@@ -306,6 +316,8 @@ export function useCellValue(definition) {
 	return useSyncExternalStore(subscribe, get, getServer);
 }
 ```
+
+When an effect with dependencies such as `[controller]` reads `controller.value` or calls `controller.start()`, Strong migration can preserve the original object-identity dependency. It attempts this for immutable receivers and verifies the result with the project compiler.
 
 For a component that already receives an Octane writable signal, Strong migration can
 replace `useSyncExternalStore(notify => cell.subscribe(notify), () => cell.get(), () => cell.get())`

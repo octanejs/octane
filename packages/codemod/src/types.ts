@@ -7,6 +7,8 @@ export interface Note {
 	message: string;
 }
 export interface TransformOptions {
+	/** Try receiver captures for a Strong effect with an explicit object dependency. */
+	captureEffectReceivers?: boolean;
 	/** `tsrx` (default) rewrites component bodies as templates; `tsx` keeps JSX and only ports the React APIs. */
 	target?: 'tsx' | 'tsrx';
 	/** Emit Strong-mode source: add `"use strong"` and leave omitted dependency lists to the compiler. */
@@ -17,6 +19,8 @@ export interface TransformOptions {
 	types?: { sourceFile: ts.SourceFile; checker: ts.TypeChecker };
 	/** The new spelling of an import specifier (a renamed module, a binding package), or null to keep it. */
 	resolveSpecifier?(specifier: string): string | null;
+	/** Relative path to the project-local React Intl adapter, when its installed peers support it. */
+	reactIntlAdapter?: string;
 	/** Whether the selected component at this local declaration offset, or this imported name, accepts one explicit element. */
 	elementChild?(binding: number | { module: string; imported: string }): boolean;
 	/** Whether a selected, directly imported component inspects its child descriptors. */
