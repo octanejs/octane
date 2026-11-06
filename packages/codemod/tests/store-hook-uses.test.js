@@ -49,6 +49,60 @@ it.each([
 	expect(result.unported).toHaveLength(1);
 });
 
+it.each([
+	['an opaque method result', 'const value = store.read(counter); return <p>{value}</p>;'],
+	['a foreign handle', 'store.write(other, true);'],
+	['a computed method', 'store[method](counter, true);'],
+	[
+		'a computed destructuring key',
+		'const {[String(<b/>)]: child} = store; child.write(counter,true);',
+	],
+	[
+		'a destructuring default',
+		'const {entry: child = take(<b/>)} = store; child.write(counter,true);',
+	],
+	[
+		'an intermediate method result',
+		'function checked(value): string {return String(value)} const child = store.open(checked(<b/>)); child.write(counter,true);',
+	],
+	['an indexed receiver', 'const channel = store[String(<b/>)]; channel.write(counter, true);'],
+	[
+		'a typed callback with a renderer argument',
+		'const put = (label: string) => { store.write(counter, label); }; put(<b/> as unknown as string);',
+	],
+	['JSX hidden by a cast', 'store.write(counter, <b/> as unknown as string);'],
+	['a local initializer hiding JSX', 'const label = String(<b/>); store.write(counter, label);'],
+	['a callback payload', 'store.write(counter, () => <b/>);'],
+])('keeps the diagnostic for %s in a call with a shared handle', (_, body) => {
+	const result = migrate(`import {useStore} from 'observer';
+		import {counter, other} from './counter';
+		export function Panel() { const store = useStore(); ${body} return <p/>; }`);
+	expect(result.unported).toHaveLength(1);
+});
+
+it('keeps mixed receivers separate from a verified store of known origin', () => {
+	const result = transformModule(
+		`import {useFirst} from 'first'; import {useSecond} from 'second';
+		import {counter} from './counter';
+		export function Panel({active}) {
+			const first = useFirst(), second = useSecond();
+			const store = active ? first : second;
+			store.write(counter, true);
+			return <p/>;
+		}`,
+		'Panel.tsx',
+		{
+			unported: (module) => (['first', 'second'].includes(module) ? module : null),
+			resolveStoreHook: (module, name, safe) =>
+				safe((source, key) => module === 'first' && source === './counter' && key === 'counter')
+					? { from: './bindings.ts', name }
+					: null,
+		},
+	);
+	expect(result.rules['store-hook']).toBeUndefined();
+	expect(result.unported.map((entry) => entry.name)).toEqual(['first', 'second']);
+});
+
 it('defers a component passed to an unknown renderer', () => {
 	const result = migrate(`import {useStore} from 'observer';
 		function Panel() { return <p>{Boolean(useStore())}</p>; } register(Panel);`);

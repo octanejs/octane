@@ -1,6 +1,13 @@
 import { localUses, scalar } from './local-uses.js';
 import ts from 'typescript';
 
+type SharedInput = (module: string, name: string) => boolean;
+type ResultCheck = {
+	item: ts.ImportSpecifier;
+	imported: SharedInput;
+	known: Map<ts.Expression, boolean>;
+};
+
 /** Bare SVG default imports can switch from a component to an asset URL for a .tsrx issuer. */
 export function isBareSvgTag(tag: ts.JsxTagNameExpression, checker: ts.TypeChecker): boolean {
 	const seen = new Set<ts.Symbol>();
@@ -97,10 +104,7 @@ export function storeHookUses(
 	}
 	// An imported input is forwarded unchanged to the original hook body. For calls
 	// on the returned store, require data: a write can publish its payload to React.
-	function argument(
-		expr: ts.Expression,
-		imported?: (module: string, name: string) => boolean,
-	): boolean {
+	function argument(expr: ts.Expression, imported?: SharedInput): boolean {
 		if (ts.isParenthesizedExpression(expr) || ts.isSatisfiesExpression(expr))
 			return argument(expr.expression, imported);
 		if (ts.isAsExpression(expr) || ts.isTypeAssertionExpression(expr))
@@ -127,45 +131,99 @@ export function storeHookUses(
 				);
 			}
 		}
-		if (ts.isIdentifier(expr) && imported) {
-			const d = checker.getSymbolAtLocation(expr)?.declarations?.[0];
-			if (d && ts.isImportSpecifier(d) && !d.isTypeOnly) {
-				const spec = d.parent.parent.parent.moduleSpecifier;
-				if (ts.isStringLiteral(spec) && imported(spec.text, (d.propertyName ?? d.name).text))
-					return true;
-			}
+		return (imported && sharedHandle(expr, imported)) || scalar(typeOf(expr));
+	}
+	function sharedHandle(expr: ts.Expression, imported: SharedInput): boolean {
+		if (!ts.isIdentifier(expr)) return false;
+		const d = checker.getSymbolAtLocation(expr)?.declarations?.[0];
+		if (!d || !ts.isImportSpecifier(d) || d.isTypeOnly || d.parent.parent.isTypeOnly) return false;
+		const spec = d.parent.parent.parent.moduleSpecifier;
+		return ts.isStringLiteral(spec) && imported(spec.text, (d.propertyName ?? d.name).text);
+	}
+	// A call using an original handle can publish its other arguments to another renderer.
+	// Only literals and constants initialized with literals qualify.
+	function plainData(value: ts.Expression): boolean {
+		if (ts.isParenthesizedExpression(value) || ts.isSatisfiesExpression(value))
+			return plainData(value.expression);
+		if (ts.isIdentifier(value)) {
+			const d = checker.getSymbolAtLocation(value)?.valueDeclaration;
+			return (
+				!!d &&
+				ts.isVariableDeclaration(d) &&
+				!!d.initializer &&
+				d.end <= value.pos &&
+				ts.isVariableDeclarationList(d.parent) &&
+				!!(d.parent.flags & ts.NodeFlags.Const) &&
+				plainData(d.initializer)
+			);
 		}
-		return scalar(typeOf(expr));
+		return (
+			ts.isStringLiteralLike(value) ||
+			ts.isNumericLiteral(value) ||
+			ts.isBigIntLiteral(value) ||
+			value.kind === ts.SyntaxKind.TrueKeyword ||
+			value.kind === ts.SyntaxKind.FalseKeyword ||
+			value.kind === ts.SyntaxKind.NullKeyword
+		);
 	}
-	function bound(name: ts.BindingName): boolean {
-		if (ts.isIdentifier(name)) return uses(name).every(safe);
-		return name.elements.every((el) => ts.isOmittedExpression(el) || bound(el.name));
+	// A computed key, destructuring default, or intermediate call can evaluate renderer code.
+	// Only the original hook result, its named properties and simple const aliases gain handle inputs.
+	function originalReceiver(value: ts.Expression, check: ResultCheck): boolean {
+		if (
+			ts.isParenthesizedExpression(value) ||
+			ts.isNonNullExpression(value) ||
+			ts.isSatisfiesExpression(value)
+		)
+			return originalReceiver(value.expression, check);
+		if (ts.isPropertyAccessExpression(value)) return originalReceiver(value.expression, check);
+		if (ts.isCallExpression(value)) {
+			return (
+				ts.isIdentifier(value.expression) &&
+				checker.getSymbolAtLocation(value.expression)?.declarations?.[0] === check.item &&
+				value.arguments.every((arg) => plainData(arg) || sharedHandle(arg, check.imported))
+			);
+		}
+		if (!ts.isIdentifier(value)) return false;
+		const d = checker.getSymbolAtLocation(value)?.valueDeclaration;
+		return (
+			!!d &&
+			ts.isVariableDeclaration(d) &&
+			ts.isIdentifier(d.name) &&
+			!!d.initializer &&
+			d.end <= value.pos &&
+			ts.isVariableDeclarationList(d.parent) &&
+			!!(d.parent.flags & ts.NodeFlags.Const) &&
+			originalReceiver(d.initializer, check)
+		);
 	}
-	const known = new Map<ts.Expression, boolean>();
-	function safe(value: ts.Expression): boolean {
-		const cached = known.get(value);
+	function bound(name: ts.BindingName, check: ResultCheck): boolean {
+		if (ts.isIdentifier(name)) return uses(name).every((use) => safe(use, check));
+		return name.elements.every((el) => ts.isOmittedExpression(el) || bound(el.name, check));
+	}
+	function safe(value: ts.Expression, check: ResultCheck): boolean {
+		const cached = check.known.get(value);
 		if (cached !== undefined) return cached;
-		known.set(value, false);
-		const result = sink(value) || scalar(typeOf(value));
-		known.set(value, result);
+		check.known.set(value, false);
+		const result = sink(value, check) || scalar(typeOf(value));
+		check.known.set(value, result);
 		return result;
 	}
-	function sink(value: ts.Expression): boolean {
+	function sink(value: ts.Expression, check: ResultCheck): boolean {
 		const p = value.parent;
 		if (ts.isParenthesizedExpression(p) || ts.isNonNullExpression(p) || ts.isSatisfiesExpression(p))
-			return safe(p);
+			return safe(p, check);
 		if (
 			ts.isVariableDeclaration(p) &&
 			p.initializer === value &&
 			ts.isVariableDeclarationList(p.parent) &&
 			p.parent.flags & ts.NodeFlags.Const
 		)
-			return !p.type && bound(p.name);
+			return !p.type && bound(p.name, check);
 		if (ts.isExpressionStatement(p) || ts.isVoidExpression(p) || ts.isTypeOfExpression(p))
 			return true;
 		if (ts.isIfStatement(p) || ts.isWhileStatement(p) || ts.isDoStatement(p))
 			return p.expression === value;
-		if (ts.isConditionalExpression(p)) return p.condition === value || safe(p);
+		if (ts.isConditionalExpression(p)) return p.condition === value || safe(p, check);
 		if (ts.isPrefixUnaryExpression(p))
 			return [
 				ts.SyntaxKind.ExclamationToken,
@@ -176,9 +234,9 @@ export function storeHookUses(
 		if (ts.isTemplateSpan(p)) return !ts.isTaggedTemplateExpression(p.parent.parent);
 		if (ts.isBinaryExpression(p)) {
 			const op = p.operatorToken.kind;
-			if (op === ts.SyntaxKind.AmpersandAmpersandToken) return p.left === value || safe(p);
+			if (op === ts.SyntaxKind.AmpersandAmpersandToken) return p.left === value || safe(p, check);
 			if (op === ts.SyntaxKind.BarBarToken || op === ts.SyntaxKind.QuestionQuestionToken)
-				return safe(p);
+				return safe(p, check);
 			return (
 				(op >= ts.SyntaxKind.LessThanToken && op <= ts.SyntaxKind.ExclamationEqualsEqualsToken) ||
 				(op >= ts.SyntaxKind.PlusToken && op <= ts.SyntaxKind.AsteriskAsteriskToken) ||
@@ -186,9 +244,9 @@ export function storeHookUses(
 				op === ts.SyntaxKind.InstanceOfKeyword
 			);
 		}
-		if (ts.isPropertyAccessExpression(p)) return p.expression === value && safe(p);
+		if (ts.isPropertyAccessExpression(p)) return p.expression === value && safe(p, check);
 		if (ts.isElementAccessExpression(p))
-			return p.expression === value && argument(p.argumentExpression) && safe(p);
+			return p.expression === value && argument(p.argumentExpression) && safe(p, check);
 		if (
 			ts.isArrayLiteralExpression(p) &&
 			ts.isCallExpression(p.parent) &&
@@ -197,7 +255,18 @@ export function storeHookUses(
 		)
 			return true;
 		if (ts.isCallExpression(p)) {
-			if (p.expression === value) return p.arguments.every((arg) => argument(arg)) && safe(p);
+			if (p.expression === value) {
+				if (p.arguments.every((arg) => argument(arg))) return safe(p, check);
+				const handle = p.arguments[0];
+				return (
+					ts.isPropertyAccessExpression(value) &&
+					originalReceiver(value.expression, check) &&
+					!!handle &&
+					sharedHandle(handle, check.imported) &&
+					p.arguments.slice(1).every(plainData) &&
+					safe(p, check)
+				);
+			}
 			if (
 				p.arguments.length === 1 &&
 				p.arguments[0] === value &&
@@ -212,7 +281,8 @@ export function storeHookUses(
 		}
 		return false;
 	}
-	return (item: ts.ImportSpecifier, imported: (module: string, name: string) => boolean) => {
+	return (item: ts.ImportSpecifier, imported: SharedInput) => {
+		const check: ResultCheck = { item, imported, known: new Map() };
 		const references = uses(item.name);
 		return (
 			references.length > 0 &&
@@ -228,7 +298,7 @@ export function storeHookUses(
 						ts.isFunctionExpression(owner)) &&
 					componentUses(owner) &&
 					call.arguments.every((arg) => argument(arg, imported)) &&
-					safe(call)
+					safe(call, check)
 				);
 			})
 		);
