@@ -2070,6 +2070,97 @@ export function Greeting({ count }: { count: number }) {
 		}
 		return root;
 	}
+	it('checks the actual selected component before forwarding a formatted attribute', async () => {
+		const root = setup({
+			'tsconfig.json': JSON.stringify({ compilerOptions: { paths: { '@ui/*': ['./src/*'] } } }),
+			'src/Field.tsx':
+				'export function Field({busy, ...rest}) { return <input disabled={busy} {...rest}/>; }',
+			'src/Greeting.tsx': `import {Field as Input} from '@ui/Field'; import {useIntl} from 'react-intl';
+				const Heading = ({caption}) => <h1 title={caption}/>;
+				export function Greeting() { const text = useIntl().formatMessage({id:'title'});
+				return <div><Heading caption={text}/><Input placeholder={text}/></div>; }`,
+		});
+		const file = path.join(root, 'src/Greeting.tsx');
+		const only = await runCodemod([file], {
+			root,
+			write: false,
+			projectTypes: false,
+			strong: true,
+		});
+		expect(only.files.find((f) => f.file === 'src/Greeting.tsx').notes).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+		const both = await runCodemod([file, path.join(root, 'src/Field.tsx')], {
+			root,
+			write: false,
+			projectTypes: false,
+			strong: true,
+		});
+		const page = both.files.find((f) => f.file === 'src/Greeting.tsx');
+		expect(page.rules['react-intl']).toBe(1);
+		expect([...page.notes, ...page.diagnostics].filter((d) => d.severity === 'error')).toEqual([]);
+	});
+	it('keeps the formatter diagnostic when a JavaScript sibling could supply the component at runtime', async () => {
+		const root = setup({
+			'src/Field.tsx': 'export function Field({caption}) { return <div title={caption}/>; }',
+			'src/Field.js': 'export function Field({caption}) { return caption; }',
+			'src/Greeting.tsx': `import {Field} from './Field.js'; import {useIntl} from 'react-intl';
+			export function Greeting(){return <Field caption={useIntl().formatMessage({id:'x'})}/>;}`,
+		});
+		const result = await runCodemod(
+			['src/Greeting.tsx', 'src/Field.tsx'].map((f) => path.join(root, f)),
+			{ root, write: false },
+		);
+		expect(result.files.find((f) => f.file === 'src/Greeting.tsx').notes).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+	});
+	it('keeps the formatter diagnostic when a wrapper may observe or render its raw value', async () => {
+		const wrappers = [
+			'function Label({caption}) { inspect(caption); return <div title={caption}/>; }',
+			'function Label({caption:safe,caption:live}) { return <div title={safe}>{live}</div>; }',
+			'function Label({caption}) { return <div title={caption}>{caption}</div>; }',
+			'function Label({caption}) { return <custom-field title={caption}/>; }',
+			'function Label({caption}) { return <div is="custom-field" title={caption}/>; }',
+			'function Label({caption}) { return <Other caption={caption}/>; }',
+			'function Label(props) { const alias=props; return <div title={alias.caption}/>; }',
+			'function Label(props) { props.caption = replace(); return <div title={props.caption}/>; }',
+			'function Label({caption}) { observe(arguments[0]); return <div title={caption}/>; }',
+			'function Label({caption}) { return <div title={caption}/>; } Label=other;',
+			'function Label({caption}) { return <div title={caption}/>; } eval("Label=other");',
+			'function Label({...rest}) { return <div {...rest} title="overridden"/>; }',
+			'function Label({...rest}) { return <div {...rest} {...unknown}/>; }',
+		];
+		const entries = Object.fromEntries(
+			wrappers.map((wrapper, i) => [
+				`src/Test${i}.tsx`,
+				`import {useIntl} from 'react-intl'; ${wrapper}
+			export function App(){const intl=useIntl(); return <Label ${i >= wrappers.length - 2 ? 'title' : 'caption'}={intl.formatMessage({id:'message'})}/>;}`,
+			]),
+		);
+		for (const [i, props] of [
+			'is="custom-div" title={intl.formatMessage({id:"x"})}',
+			'{...unknown} title={intl.formatMessage({id:"x"})}',
+			'title={intl.formatMessage(descriptor(<b/>))}',
+			'title={intl.formatMessage({get id(){ inspect(<b/>); return "x"; }})}',
+			'title={intl.formatMessage({id:"x"}, {bad: (<b/> as unknown as string)})}',
+		].entries()) {
+			entries[`src/Input${i}.tsx`] =
+				`import {useIntl} from 'react-intl'; function Label({...rest}) { return <div {...rest}/>; }
+			export function App() { const intl=useIntl(); return <Label ${props}/>; }`;
+		}
+		const root = setup(entries);
+		const result = await runCodemod(
+			Object.keys(entries).map((name) => path.join(root, name)),
+			{ root, write: false, projectTypes: false },
+		);
+		for (const file of Object.keys(entries)) {
+			const f = result.files.find((row) => row.file === file);
+			expect(f.notes, f.file).toContainEqual(
+				expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+			);
+		}
+	});
 	it('previews and writes a single shared, compilable helper across separate migrations', async () => {
 		const root = setup({
 			'src/other/Provider.tsx': `import {IntlProvider} from 'react-intl';

@@ -98,7 +98,7 @@ export function transformModule(
  * another; the library gives the module's own types their array and string
  * members.
  */
-function bind(filename: string, source: string) {
+export function bind(filename: string, source: string) {
 	const lib = esLib();
 	const sf = ts.createSourceFile(
 		filename,
@@ -766,6 +766,7 @@ class ModuleTransform {
 		if (this.options.reactIntlAdapter && this.source.includes('react-intl')) {
 			this.nativeIntl = intlImports(
 				this.sf,
+				this.options.forwardedText,
 				this.checker,
 				(expr) => this.typeOf(expr),
 				(fn) => this.isComponent(fn),
