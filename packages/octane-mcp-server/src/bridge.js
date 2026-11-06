@@ -23,7 +23,6 @@ export const KNOWN_BINDINGS = {
 	'mobx-react': '@octanejs/mobx',
 	'@apollo/client': '@octanejs/apollo-client',
 	'@solana/react': '@octanejs/solana-kit',
-	'@tanstack/ai-react': '@octanejs/tanstack-ai',
 	'@tanstack/react-db': '@octanejs/tanstack-db',
 	'@tanstack/react-devtools': '@octanejs/tanstack-devtools',
 	'@tanstack/react-form': '@octanejs/tanstack-form',
@@ -34,7 +33,6 @@ export const KNOWN_BINDINGS = {
 	wagmi: '@octanejs/wagmi',
 	'@rainbow-me/rainbowkit': '@octanejs/rainbowkit',
 	'@tanstack/react-router': '@octanejs/tanstack-router',
-	'@tanstack/react-store': '@octanejs/tanstack-store',
 	'@xstate/react': '@octanejs/xstate',
 	'@xstate/store-react': '@octanejs/xstate-store',
 	'@xyflow/react': '@octanejs/xyflow',
@@ -196,8 +194,10 @@ export const KNOWN_BINDINGS = {
 // React package → Octane adapter published by the upstream library itself.
 // These live outside this workspace, so they stay out of KNOWN_BINDINGS.
 export const UPSTREAM_ADAPTERS = {
+	'@tanstack/ai-react': '@tanstack/ai-octane',
 	'@tanstack/react-hotkeys': '@tanstack/octane-hotkeys',
 	'@tanstack/react-pacer': '@tanstack/octane-pacer',
+	'@tanstack/react-store': '@tanstack/octane-store',
 	'@tanstack/react-table': '@tanstack/octane-table',
 };
 

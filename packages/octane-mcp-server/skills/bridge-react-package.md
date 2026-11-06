@@ -14,11 +14,11 @@ of bridging by hand:
 | `@effect/atom-react` | `@octanejs/effect-atom` |
 | `@pierre/trees/react` | `@octanejs/pierre-trees` |
 | `@apollo/client` | `@octanejs/apollo-client` |
-| `@tanstack/ai-react` | `@octanejs/tanstack-ai` |
+| `@tanstack/ai-react` | `@tanstack/ai-octane` |
 | `@tanstack/react-form` | `@octanejs/tanstack-form` |
 | `@tanstack/react-query` | `@octanejs/tanstack-query` |
 | `@tanstack/react-router` | `@octanejs/tanstack-router` |
-| `@tanstack/react-store` | `@octanejs/tanstack-store` |
+| `@tanstack/react-store` | `@tanstack/octane-store` |
 | `@tanstack/react-table` | `@tanstack/octane-table` |
 | `@tanstack/react-virtual` | `@octanejs/tanstack-virtual` |
 | `@legendapp/list/react` | `@octanejs/legendapp-list` |

@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "6934e494619456718262e46023c87bfa45ff3601a02f5f9c861767256bcf3052"
+      "lockfileSha256": "afc3924c227c5dfabf5ee0de3fb2e01f697f5c033b65df3808fd29cbd5f7336f"
     }
   },
   "lanes": [
@@ -80,7 +80,7 @@
         {
           "path": "scripts/react-parity/run-pristine.mjs",
           "role": "support",
-          "sha256": "a5b5a03d48e013b3fc519a5030fad9f3a3d675db6f7afd8e95229742bc7b22e9"
+          "sha256": "ecf794cc048b5910f1cd1846d1d469ddc270d628c6d7d18df39a05a2da95ca36"
         },
         {
           "path": "packages/alien-signals/audit/pristine-oracle-environment.json",

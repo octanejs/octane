@@ -19,7 +19,6 @@
     "@octanejs/sonner": "workspace:*",
     "@tanstack/octane-hotkeys": "^0.3.0",
     "@tanstack/octane-pacer": "^0.3.0",
-    "@octanejs/tanstack-store": "workspace:*",
     "@octanejs/zustand": "workspace:*",
     "octane": "workspace:*",
     "@octanejs/tanstack-router-ssr-query": "workspace:*",

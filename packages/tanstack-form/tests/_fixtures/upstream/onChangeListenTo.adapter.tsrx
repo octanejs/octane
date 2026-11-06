@@ -3,10 +3,10 @@
 // Octane has no StrictMode double-invoke, so this file stays ordinary coverage.
 import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render } from '@octanejs/testing-library';
-import { useSelector } from '@octanejs/tanstack-store';
+import { useSelector } from '@tanstack/octane-store';
 import { useForm } from '@octanejs/tanstack-form';
 import { sleep } from '../../conformance/utils';
-import type { ReadonlyStore } from '@octanejs/tanstack-store';
+import type { ReadonlyStore } from '@tanstack/octane-store';
 
 function DebugSubscribe({ store }: { store: ReadonlyStore<any> }) {
 	const isFieldsValidating = useSelector(store, (s) => s.isFieldsValidating);

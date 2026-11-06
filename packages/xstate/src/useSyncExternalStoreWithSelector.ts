@@ -5,9 +5,8 @@
 // selection matches the previous one, the previous REFERENCE is kept so the
 // store's uSES bails the re-render out.
 //
-// Byte-compatible with the copies in @octanejs/redux and
-// @octanejs/tanstack-store; kept local so this package's published source has no
-// cross-binding runtime dependency.
+// Byte-compatible with the copy in @octanejs/redux; kept local so this
+// package's published source has no cross-binding runtime dependency.
 import { useSyncExternalStore, useRef, useMemo, useEffect } from 'octane';
 import { splitSlot, subSlot } from './internal.ts';
 

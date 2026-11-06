@@ -1,5 +1,5 @@
 import { FormApi, functionalUpdate, mergeAndUpdate } from '@tanstack/form-core';
-import { useSelector } from '@octanejs/tanstack-store';
+import { useSelector } from '@tanstack/octane-store';
 import { useMemo, useRef, useState } from 'octane';
 import { Field } from './useField.tsrx';
 import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect';
