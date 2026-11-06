@@ -1,4 +1,5 @@
 import type { OctaneNode } from 'octane';
+import type { DescriptorChildrenMarker } from 'octane/tsrx-boundary';
 import type { Assert, Equal } from '../../../../scripts/react-port/type-assertions';
 import {
 	internal,
@@ -78,7 +79,8 @@ const wrongItem = <LegendList<Row> data={[]} renderItem={({ item }: { item: stri
 const wrongFollow = <LegendList<Row> data={[]} renderItem={() => null} maintainScrollAtEnd={1} />;
 
 export type Checks = [
-	Assert<Equal<typeof LegendList, LegendListComponent>>,
+	// The marker types template children of an imported `LegendList` as descriptors.
+	Assert<Equal<typeof LegendList, LegendListComponent & DescriptorChildrenMarker>>,
 	Assert<Equal<ReturnType<LegendListComponent>, OctaneNode>>,
 	Assert<Equal<LegendListProps<Row>['data'], ReadonlyArray<Row> | undefined>>,
 	Assert<

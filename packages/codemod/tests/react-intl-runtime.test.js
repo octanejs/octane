@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, expect, it, vi } from 'vitest';
-import { transformModule } from '../dist/index.js';
+import { runCodemod, transformModule } from '../dist/index.js';
 import { bundleRuntime, installDOM } from './bundle-runtime.js';
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
@@ -19,7 +19,7 @@ async function load(mode) {
 	return bundleRuntime(
 		project,
 		mode,
-		`export * from './page.tsrx'; export * from './rich.tsrx'; export * from './fields.tsrx'; export * from './choices.tsrx'; ${entry}
+		`export * from './page.tsrx'; export * from './rich.tsrx'; export * from './fields.tsrx'; export * from './choices.tsrx'; export * from './reader.tsrx'; ${entry}
 				export { OctaneCompat } from 'octane/react${mode === 'server' ? '/server' : ''}';
 				export * as react from 'react'; export * as intl from 'react-intl';
 				export { renderToString } from 'react-dom/server';`,
@@ -87,6 +87,29 @@ beforeAll(async () => {
 	);
 	expect(rich.notes.filter((n) => n.severity === 'error')).toEqual([]);
 	await writeFile(path.join(project, 'rich.tsrx'), rich.code);
+	const badge = path.join(project, 'badge.tsx'),
+		reader = path.join(project, 'reader.tsx');
+	await writeFile(path.join(project, 'package.json'), '{}');
+	await writeFile(
+		badge,
+		`export function Badge({size,...props}) {return <div data-size={size} {...props}/>;}`,
+	);
+	await writeFile(
+		reader,
+		`import {Badge} from './badge'; import {useIntl} from 'react-intl';
+		export function Label() {const label=useIntl().formatMessage({id:'greeting'}); return <Badge aria-label={label}/>;}`,
+	);
+	const converted = await runCodemod([reader, badge], {
+		root: project,
+		write: true,
+		strong: true,
+		projectTypes: false,
+	});
+	expect(
+		converted.files
+			.flatMap((f) => [...f.diagnostics, ...f.notes])
+			.filter((d) => d.severity === 'error'),
+	).toEqual([]);
 	[client, server] = await Promise.all([load('client'), load('server')]);
 });
 afterAll(async () => {
@@ -316,6 +339,47 @@ it('hands a real React element from a migrated inline callback back to the unpor
 			),
 		);
 		expect(observedKey).toBe(el.querySelector('strong').getAttribute('data-key'));
+	} finally {
+		await react.act(async () => root.unmount());
+	}
+});
+
+it('preserves DOM attribute coercion and locale changes through a migrated prop spread', async () => {
+	const { react, intl, reactRoot, OctaneCompat, Label } = client;
+	const h = react.createElement;
+	function Original() {
+		return h('div', { 'aria-label': intl.useIntl().formatMessage({ id: 'greeting' }) });
+	}
+	const el = document.createElement('main');
+	const root = reactRoot(el);
+	try {
+		for (const [locale, message] of [
+			['en', 'Greeting'],
+			['fr', '<em>Bonjour</em>'],
+			['de', 'Hallo'],
+		]) {
+			const config = {
+				locale,
+				messages: { greeting: message },
+				defaultRichTextElements: { em: (parts) => h('em', { key: 'em' }, parts) },
+				onWarn() {},
+			};
+			await react.act(async () =>
+				root.render(
+					h(
+						intl.IntlProvider,
+						config,
+						h(Original),
+						h(OctaneCompat, { component: Label, props: {} }),
+					),
+				),
+			);
+			const labels = [...el.querySelectorAll('[aria-label]')].map((node) =>
+				node.getAttribute('aria-label'),
+			);
+			const expected = locale === 'fr' ? '[object Object]' : message;
+			expect(labels).toEqual([expected, expected]);
+		}
 	} finally {
 		await react.act(async () => root.unmount());
 	}

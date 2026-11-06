@@ -20,7 +20,8 @@ import ts from 'typescript';
 import { finding, loadCompiler, thrown } from './compiler.js';
 import { PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
-import { transformModule } from './transform.js';
+import { bind, transformModule } from './transform.js';
+import { forwardedTextProps } from './forwarded-text.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
 /** React packages and the Octane package that replaces each. */
@@ -103,7 +104,21 @@ export async function runCodemod(
 	const strictConfig = (config?.strictNullChecks ?? config?.strict) ? config : null;
 	let program: ts.Program | undefined;
 	const contextsOf = contextIndex(exports, known);
-	const resolveRename = renamedImports(root, config, renames);
+	const renamed = renamedImports(root, config, renames);
+	const resolveRename = (from: string, specifier: string) =>
+		renamed(from, specifier)?.specifier ?? null;
+	const propChecks = new Map<string, (name: string, prop: string) => boolean>();
+	function forwardedText(from: string, specifier: string, name: string, prop: string) {
+		const match = renamed(from, specifier);
+		if (!match || (!specifier.startsWith('.') && match.specifier.startsWith('.'))) return false;
+		const selected = match.file;
+		let inspect = propChecks.get(selected);
+		if (!inspect) {
+			inspect = textPropsOf(selected);
+			propChecks.set(selected, inspect);
+		}
+		return inspect(name, prop);
+	}
 
 	// resolveRename returns only an on-disk source that actually won import resolution.
 	const elementExports = new Map<string, Set<string>>();
@@ -342,6 +357,7 @@ export async function runCodemod(
 				captureEffectReceivers,
 				target,
 				reactIntlAdapter: intl,
+				forwardedText: (module, name, prop) => forwardedText(file, module, name, prop),
 				resolveStoreHook,
 				strong,
 				strictNullChecks: strictConfig !== null,
@@ -800,11 +816,39 @@ function renamedImports(
 		// A fixed alias or fallback list may resolve elsewhere after a rename.
 		const alias = matches.length === 1 ? matches[0] : null;
 		if (alias?.directory && target.startsWith(alias.directory)) {
-			return alias.start + target.slice(alias.directory.length).split(path.sep).join('/');
+			return {
+				file: resolved.resolvedFileName,
+				specifier: alias.start + target.slice(alias.directory.length).split(path.sep).join('/'),
+			};
 		}
 		const relative = path.relative(path.dirname(from), target).split(path.sep).join('/');
-		return relative.startsWith('../') ? relative : './' + relative;
+		return {
+			file: resolved.resolvedFileName,
+			specifier: relative.startsWith('../') ? relative : './' + relative,
+		};
 	};
+}
+
+/** Read the selected implementation only when a localized prop needs it. TS may prefer a
+ * .tsx source even when the runtime can load a separate .js sibling or directory entry. */
+function textPropsOf(file: string): (name: string, prop: string) => boolean {
+	const stem = file.slice(0, -path.extname(file).length);
+	const dir = path.dirname(stem);
+	const stems = path.basename(stem) === 'index' ? [stem, dir] : [stem, path.join(stem, 'index')];
+	if (
+		stems.some((base) =>
+			['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts'].some(
+				(ext) => base + ext !== file && fs.existsSync(base + ext),
+			),
+		) ||
+		fs.existsSync(path.join(path.basename(stem) === 'index' ? dir : stem, 'package.json'))
+	)
+		return () => false;
+	const { sf, checker } = bind(file, fs.readFileSync(file, 'utf8'));
+	const module = checker.getSymbolAtLocation(sf);
+	const names = module && new Map(checker.getExportsOfModule(module).map((s) => [s.name, s]));
+	const accepts = forwardedTextProps(sf, checker);
+	return (name, prop) => accepts(names?.get(name), prop);
 }
 
 /** Which names each module exports as a context, following `export … from`. */
