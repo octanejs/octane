@@ -189,7 +189,7 @@ See also: [`docs/apollo-client-port-plan.md`](apollo-client-port-plan.md)
 
 ## @octanejs/aria
 
-[`packages/aria`](../packages/aria) `0.0.65` — ports `react-aria@3.51.0`. Status data: [`packages/aria/status.json`](../packages/aria/status.json).
+[`packages/aria`](../packages/aria) `0.0.66` — ports `react-aria@3.51.0`. Status data: [`packages/aria/status.json`](../packages/aria/status.json).
 
 The `@octanejs/aria/components` entry point matches the complete named public surface of `react-aria-components@1.20.0`: 286 runtime exports and 327 type exports, checked in both directions with no missing or extra names. This includes TokenField, PreviewTrigger, calendar/date/time, color, drag-and-drop, DropZone/FileTrigger, toast, data hooks, and virtualized layout APIs in addition to the previously ported primitives, overlays, collections, Tree, and Table. The root behavior-hook and `/stately` entries remain curated React Aria 3.51.0 / React Stately 3.49.0 surfaces rather than separate full-export claims.
 
@@ -537,7 +537,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/drei
 
-[`packages/drei`](../packages/drei) `0.0.40` — ports `@react-three/drei@10.7.7`. Status data: [`packages/drei/status.json`](../packages/drei/status.json).
+[`packages/drei`](../packages/drei) `0.0.41` — ports `@react-three/drei@10.7.7`. Status data: [`packages/drei/status.json`](../packages/drei/status.json).
 
 Complete port of the pinned @react-three/drei 10.7.7 public web API (commit b8b99fd4ca1dfb8d821335671320512daa6efea4): 379 source exports and 217 runtime exports are accounted for by the executable crosswalk, with 299 parity assertions across 105 test files.
 
@@ -1497,7 +1497,7 @@ Scope/evidence last checked: 2026-08-03.
 
 ## @octanejs/shadcn
 
-[`packages/shadcn`](../packages/shadcn) `0.0.59` — ports `shadcn-ui/ui (component registry)@7c9eaba1c0a6404c990c144a654792e3313c650d + shadcn@4.21.0`. Status data: [`packages/shadcn/status.json`](../packages/shadcn/status.json).
+[`packages/shadcn`](../packages/shadcn) `0.0.60` — ports `shadcn-ui/ui (component registry)@7c9eaba1c0a6404c990c144a654792e3313c650d + shadcn@4.21.0`. Status data: [`packages/shadcn/status.json`](../packages/shadcn/status.json).
 
 Registry-first source binding with Radix (44 families, bare subpaths), React Aria (33, react-aria/<Family>), and Base UI (43, base-ui/<Family>) implementations. The registry emits base-nova (default), radix-nova, and aria-nova styles. The 4.21.0 update migrates class merging to cn@0.2.6 across all existing families while preserving tested Octane adaptations and local style choices. Base UI Select, Navigation Menu, and Scroll Area are transcribed from the release registry, resolved with its Nova style and Lucide icons, and target Base UI 1.8.0. The 44-family inventory is the current Octane scope, not the complete upstream registry: Base UI Sonner and additional upstream families such as Combobox remain outside it. Existing derived styles retain their unverified upstream-fidelity status.
 
@@ -1754,7 +1754,7 @@ Scope/evidence last checked: 2026-08-13.
 
 ## @octanejs/tanstack-devtools
 
-[`packages/tanstack-devtools`](../packages/tanstack-devtools) `0.0.63` — ports `@tanstack/react-devtools@0.10.12`. Status data: [`packages/tanstack-devtools/status.json`](../packages/tanstack-devtools/status.json).
+[`packages/tanstack-devtools`](../packages/tanstack-devtools) `0.0.64` — ports `@tanstack/react-devtools@0.10.12`. Status data: [`packages/tanstack-devtools/status.json`](../packages/tanstack-devtools/status.json).
 
 Surface-present for the pinned adapter's runtime entrypoint, with additive framework-neutral core re-exports. A same-fixture differential covers mount, config synchronization, plugin/title/trigger portals, and teardown. Upstream has no runtime suite; its test:types source compile is recorded as present type evidence with required pristine/adapted type lanes. Provenance is verified; core-version drift and Octane-specific type names/core re-exports stay as explicit divergences.
 
@@ -1834,7 +1834,7 @@ Scope/evidence last checked: 2026-09-30.
 
 ## @octanejs/tanstack-router
 
-[`packages/tanstack-router`](../packages/tanstack-router) `0.3.2` — ports `@tanstack/react-router@1.170.41`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
+[`packages/tanstack-router`](../packages/tanstack-router) `0.3.3` — ports `@tanstack/react-router@1.170.41`. Status data: [`packages/tanstack-router/status.json`](../packages/tanstack-router/status.json).
 
 Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries. The opt-in compiled entry also owns typed code/file-route factories, links, root document shells, and document asset APIs for compiled route trees.
 
@@ -1858,7 +1858,7 @@ See also: [`docs/tanstack-parity-audit.md`](tanstack-parity-audit.md)
 
 ## @octanejs/tanstack-router-ssr-query
 
-[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.1.14` — ports `@tanstack/react-router-ssr-query@1.167.3`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
+[`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) `0.1.15` — ports `@tanstack/react-router-ssr-query@1.167.3`. Status data: [`packages/tanstack-router-ssr-query/status.json`](../packages/tanstack-router-ssr-query/status.json).
 
 Surface-present for the pinned adapter's only runtime entrypoint (`Options` and `setupRouterSsrQueryIntegration`). The metadata-only `./package.json` subpath is intentionally omitted. A representative differential covers provider-backed SSR, existing-wrapper preservation, setup mutations, and the wrapping control; upstream has no runtime suite, and type evidence is the upstream source compile plus the adapted Octane compile, so verification remains recorded-unverified.
 
@@ -1976,7 +1976,7 @@ Scope/evidence last checked: 2026-08-07.
 
 ## @octanejs/three
 
-[`packages/three`](../packages/three) `0.1.62` — ports `@react-three/fiber@9.6.1 (2a528745)`. Status data: [`packages/three/status.json`](../packages/three/status.json).
+[`packages/three`](../packages/three) `0.1.63` — ports `@react-three/fiber@9.6.1 (2a528745)`. Status data: [`packages/three/status.json`](../packages/three/status.json).
 
 Technical-preview Milestones 0–10 surface: renderer configuration and the DOM Canvas boundary, compiler ABI and renderer-local Three intrinsic types, catalogue and both extend forms, primitive/args construction, Three prop application, attachment, ordered placement/recreation, retained visibility, lifecycle/ref delivery, ownership-aware disposal, promise-returning HTMLCanvasElement and OffscreenCanvas roots, Octane act/flushSync scheduling, callback-aware unmountComponentAtNode, callable root state, scene/camera/raycaster and resize/DPR/viewport configuration, shadows/colors, one shared frame loop, controlled WebXR loop handoff, context-restore invalidation, compatible/reconstructing HMR, global effects, useStore/useThree/useFrame/useGraph and managed-instance helpers, the ray/pointer event system with DOM sources and custom managers, a keyed useLoader cache with preload/clear and GLTF graph augmentation, retained Suspense/Activity behavior, client Three-to-DOM pending/error projection, same-renderer createPortal targets with state/event enclaves and physical Three event bubbling, client-only Canvas shell streaming and production Vite/Rsbuild hydration adoption with the matching raw Rspack graph split, the explicit-target low-level DOMRegion boundary, a deterministic testing harness, an asynchronously acknowledged structured-clone transport proof, a checked public API/subpath matrix, Three r156/current compatibility lanes, a packed external consumer, real WebGL failure/recovery coverage, and semantic-checksummed renderer and shipped-size benchmarks.
 

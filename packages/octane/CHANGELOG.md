@@ -1,5 +1,25 @@
 # octane
 
+## 0.16.8
+
+### Patch Changes
+
+- 1246bc0: Compiled client and server modules no longer carry the `"use strong"` directive.
+  It only selects Strong compile-time checks, and Rolldown warned
+  `MODULE_LEVEL_DIRECTIVE` once for every Strong module in production builds.
+  Other authored directives keep their place in the module prologue, now also in
+  modules that declare `signal$`, `derived$`, or `query$` values.
+- a5eb58a: The `.tsrx` type view now accepts element children of a `descriptorChildren` component imported from another module, matching the descriptors the bundler passes there. `descriptorChildren` adds a type-only marker that follows the binding through imports and re-exports, so a consumer is rechecked when its exporter gains or loses the marker.
+- 6112c89: Production builds now keep a keyed `@for` row live when it reads an imported object's member through a TypeScript wrapper, such as `flags!.enabled`, `(flags as Flags).enabled`, or `(flags satisfies Flags).enabled`. Before, the wrapper hid the read from the compiler's live-import check. A row such as `@if (flags!.enabled)` could then keep showing a stale branch after the member changed and the parent re-rendered with the same rows. The plain `flags.enabled` form was already handled.
+- 80e7344: Offer a Strong migration from an every-commit layout effect that copies a scalar DOM measurement into adjacent state to `useLayoutSnapshot`. The codemod preserves the every-commit schedule of React layout effects with omitted dependencies, including when a component stays in compatibility mode.
+- 1c30a9a: Preserve explicitly listed Effect Event dependencies during Strong migration. The compiler now distinguishes a non-reactive Effect Event from a value with stable identity when checking whether a dependency list can be removed.
+- e0928d2: Batch `useLayoutSnapshot` measurements after synchronous layout updates settle. Snapshots see writes queued by layout effects and publish changed values before paint. Corrective commits remeasure participating snapshots within the existing convergence limit.
+- bfacbe5: Strong mode reports `OCTANE_STRONG_READ_ONLY_STATE` when a declaration takes a
+  `useState` value and discards its setter. Derive render values from their inputs
+  and use `useRef` or `useLazyRef` for values kept for events or effects. The TanStack
+  Devtools binding now keeps its imperative instance in a lazy ref.
+- d01d2a5: Start no document View Transition for a commit that reaches no `<ViewTransition>` boundary, matching React 19.3. Suspense reveals and transitions no longer start one when no boundary exists, when the only boundaries are in another root, or when they sit in an unrelated subtree. Chromium sends input to `<html>` while a document transition runs, so these empty transitions could drop a click.
+
 ## 0.16.7
 
 ### Patch Changes
