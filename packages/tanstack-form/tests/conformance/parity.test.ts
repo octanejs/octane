@@ -14,9 +14,8 @@ describe('export surface', () => {
 		expect(binding.formOptions).toBe(core.formOptions);
 	});
 
-	it('uses the Octane TanStack Store adapter', async () => {
-		const store = await import('@octanejs/tanstack-store');
+	it('uses the official TanStack Store adapter', async () => {
+		const store = await import('@tanstack/octane-store');
 		expect(binding.useSelector).toBe(store.useSelector);
-		expect(binding.useStore).toBe(store.useStore);
 	});
 });

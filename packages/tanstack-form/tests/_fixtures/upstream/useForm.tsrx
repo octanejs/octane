@@ -2,9 +2,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, waitFor } from '@octanejs/testing-library';
 import { userEvent } from '@testing-library/user-event';
-import { useStore } from '@octanejs/tanstack-store';
 import { useCallback, useEffect, useState } from 'octane';
-import { mergeForm, useForm } from '@octanejs/tanstack-form';
+import { mergeForm, useForm, useStore } from '@octanejs/tanstack-form';
 import { sleep } from '../../conformance/utils';
 
 const user = userEvent.setup();

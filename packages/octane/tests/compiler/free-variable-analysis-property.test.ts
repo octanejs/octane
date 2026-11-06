@@ -149,7 +149,7 @@ function nest(callback: string, rng: () => number, depth: number): string {
 function compileWithCallback(callback: string, filename: string): string {
 	return compile(
 		`
-      import { useSelector } from '@octanejs/tanstack-store';
+      import { useSelector } from '@tanstack/octane-store';
       const MODULE_KEY = 'k';
       export function App(props) @{
         const outerConst = props.seed;

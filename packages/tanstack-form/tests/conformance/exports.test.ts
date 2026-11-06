@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { useSelector, useStore } from '@octanejs/tanstack-form';
 
 describe('package exports', () => {
-	it('exports useSelector and useStore from @octanejs/tanstack-store', () => {
+	it('exports the useSelector and useStore store hooks', () => {
 		expect(useSelector).toBeTypeOf('function');
 		expect(useStore).toBeTypeOf('function');
 	});

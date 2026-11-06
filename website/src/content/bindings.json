@@ -41,11 +41,6 @@
         "tags": ["streams", "observables"]
       },
       {
-        "packageName": "@octanejs/tanstack-store",
-        "title": "TanStack Store",
-        "tags": ["store"]
-      },
-      {
         "packageName": "@octanejs/use-sync-external-store",
         "title": "use-sync-external-store",
         "searchTerms": ["useSyncExternalStoreWithSelector", "with-selector"],
@@ -102,11 +97,6 @@
         "packageName": "@octanejs/swr",
         "title": "SWR",
         "tags": ["server state", "cache", "data fetching"]
-      },
-      {
-        "packageName": "@octanejs/tanstack-ai",
-        "title": "TanStack AI",
-        "tags": ["ai", "streaming"]
       },
       {
         "packageName": "@octanejs/tanstack-db",
