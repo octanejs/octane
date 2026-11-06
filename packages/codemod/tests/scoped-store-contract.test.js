@@ -2,7 +2,8 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
+import { bundleRuntime, installDOM } from './bundle-runtime.js';
 import { runCodemod } from '../dist/index.js';
 import { createScopedStorePlanner } from '../dist/scoped-store-contract.js';
 
@@ -21,7 +22,9 @@ function fixture(replacements = {}) {
 	const app = path.join(root, 'app');
 	const library = path.join(root, 'observer');
 	const files = {
-		'app/package.json': JSON.stringify({ dependencies: { observer: 'workspace:*' } }),
+		'app/package.json': JSON.stringify({
+			dependencies: { observer: 'workspace:*' },
+		}),
 		'app/tsconfig.json': JSON.stringify({
 			compilerOptions: { module: 'ESNext', moduleResolution: 'bundler' },
 		}),
@@ -137,7 +140,9 @@ it.each([
 
 it('defers a mutable regular expression and an ambiguous relocated module', () => {
 	expect(
-		fixture({ 'observer/react-hooks.ts': 'const pattern=/x/g;\n' + original }).plan(),
+		fixture({
+			'observer/react-hooks.ts': 'const pattern=/x/g;\n' + original,
+		}).plan(),
 	).toBeNull();
 	expect(
 		fixture({
@@ -178,7 +183,9 @@ it('rejects a React dispatcher hidden behind a static CommonJS require', () => {
 
 it('follows the actual linked workspace package when its dependency name is aliased', () => {
 	const f = fixture({
-		'app/package.json': JSON.stringify({ dependencies: { observer: 'workspace:channel-core@*' } }),
+		'app/package.json': JSON.stringify({
+			dependencies: { observer: 'workspace:channel-core@*' },
+		}),
 		'observer/package.json': JSON.stringify({
 			name: 'channel-core',
 			version: '1.0.0',
@@ -218,10 +225,14 @@ it('keeps empty value imports inside the executable graph', () => {
 
 it('requires an actual neutral shared export and a workspace link', () => {
 	expect(
-		fixture({ 'observer/public-store.ts': "export {current} from './renderer';" }).plan(),
+		fixture({
+			'observer/public-store.ts': "export {current} from './renderer';",
+		}).plan(),
 	).toBeNull();
 	expect(
-		fixture({ 'app/package.json': '{"dependencies":{"observer":"^1.0.0"}}' }).plan(),
+		fixture({
+			'app/package.json': '{"dependencies":{"observer":"^1.0.0"}}',
+		}).plan(),
 	).toBeNull();
 });
 
@@ -235,9 +246,7 @@ it('checks resolution again for an importer shadowing a previously accepted pack
 	expect(f.plan('useSnapshot', path.join(f.app, 'src', 'feature', 'pane.tsx'))).toBeNull();
 });
 
-it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
-	const source = `import {useSnapshot as useReading, valueOf} from 'observer';
-export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }`;
+function project(overrides) {
 	const replacements = {
 		'app/package.json': JSON.stringify({
 			type: 'module',
@@ -264,27 +273,31 @@ export function Pane() { const value = useReading(); return <p>{valueOf(1)}{valu
 				jsx: 'react-jsx',
 			},
 		}),
-		'app/src/pane.tsx': source,
+		...overrides,
 	};
-	function project() {
-		const f = fixture(replacements);
-		const modules = path.join(f.root, 'node_modules');
-		fs.rmSync(path.join(modules, 'react'), { recursive: true });
-		for (const name of ['react', 'react-dom'])
-			fs.symlinkSync(
-				path.resolve(import.meta.dirname, '../node_modules', name),
-				path.join(modules, name),
-				'dir',
-			);
-		fs.mkdirSync(path.join(modules, '@types'));
+	const f = fixture(replacements);
+	const modules = path.join(f.root, 'node_modules');
+	fs.rmSync(path.join(modules, 'react'), { recursive: true });
+	for (const name of ['react', 'react-dom'])
 		fs.symlinkSync(
-			path.resolve(import.meta.dirname, '../../octane/node_modules/@types/react'),
-			path.join(modules, '@types/react'),
+			path.resolve(import.meta.dirname, '../node_modules', name),
+			path.join(modules, name),
 			'dir',
 		);
-		return f;
-	}
-	const { app, library } = project();
+	fs.mkdirSync(path.join(modules, '@types'));
+	fs.symlinkSync(
+		path.resolve(import.meta.dirname, '../../octane/node_modules/@types/react'),
+		path.join(modules, '@types/react'),
+		'dir',
+	);
+	return f;
+}
+
+it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
+	const source = `import {useSnapshot as useReading, valueOf} from 'observer';
+export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }`;
+	const originalPane = { 'app/src/pane.tsx': source };
+	const { app, library } = project(originalPane);
 	const originalSources = Object.fromEntries(
 		fs.readdirSync(library).map((n) => [n, fs.readFileSync(path.join(library, n), 'utf8')]),
 	);
@@ -326,7 +339,7 @@ export function Pane() { const value = useReading(); return <p>{valueOf(1)}{valu
 			fs.readdirSync(library).map((n) => [n, fs.readFileSync(path.join(library, n), 'utf8')]),
 		),
 	).toEqual(originalSources);
-	const blocked = project(),
+	const blocked = project(originalPane),
 		conflict = path.join(blocked.app, helpers[0].output);
 	fs.writeFileSync(conflict, '// already owned by the app\n');
 	const independent = 'export function Footer() {return <footer>Contents</footer>}';
@@ -345,6 +358,82 @@ export function Pane() { const value = useReading(); return <p>{valueOf(1)}{valu
 	);
 }, 30_000);
 
+it('preserves the original handle and active store across client writes, provider changes and SSR', async () => {
+	const { app } = project({
+		'observer/public-store.ts': "export { valueOf, key } from './state';",
+		'observer/state.ts':
+			'export function valueOf<T>(x: T) { return x; } export function key(){return {};}',
+		'observer/renderer.ts':
+			"import {createContext} from 'react'; export const current = createContext(new Map<object, string>());",
+		'app/src/handles.ts': "import {key} from 'observer/core'; export const reading = key();",
+		'app/src/pane.tsx': `import {useSnapshot} from 'observer'; import {reading} from './handles';
+			export function Pane() {
+				const store = useSnapshot();
+				return <button onClick={() => { store.set(reading, 'updated'); }}>{String(store.get(reading))}</button>;
+			}`,
+	});
+	const input = path.join(app, 'src/pane.tsx');
+	const result = await runCodemod([input], {
+		root: app,
+		strong: true,
+		verify: true,
+		write: true,
+	});
+	const pane = result.files.find((file) => file.file === 'src/pane.tsx');
+	expect([...pane.notes, ...pane.diagnostics].filter((item) => item.severity === 'error')).toEqual(
+		[],
+	);
+	expect(pane.rules['store-hook']).toBe(1);
+	fs.writeFileSync(
+		path.join(app, 'src/provider.tsrx'),
+		`
+		import {NativeStoreProvider} from './octane-store-context.tsrx';
+		import {current} from '../../observer/renderer';
+		import {Pane} from './pane.tsrx';
+		export function Root({store}) @{ <NativeStoreProvider context={current} value={store}><Pane/></NativeStoreProvider> }`,
+	);
+	const entry = "export {Root} from './src/provider.tsrx'; export {reading} from './src/handles';";
+	const dom = installDOM();
+	try {
+		const server = await bundleRuntime(
+			app,
+			'server',
+			entry + "export {renderToString} from 'octane/server';",
+		);
+		const serverStore = new Map([[server.reading, 'server']]);
+		expect(server.renderToString(server.Root, { store: serverStore }).html).toContain('server');
+		expect(serverStore.get(server.reading)).toBe('server');
+		const client = await bundleRuntime(
+			app,
+			'client',
+			entry + "export {createRoot, act} from 'octane';",
+		);
+		const host = document.createElement('div');
+		const root = client.createRoot(host);
+		try {
+			const first = new Map([[client.reading, 'first']]);
+			const second = new Map([[client.reading, 'second']]);
+			for (const [store, expected] of [
+				[first, 'first'],
+				[second, 'second'],
+			]) {
+				await client.act(async () => root.render(client.Root, { store }));
+				expect(host.textContent).toBe(expected);
+				await client.act(async () => host.querySelector('button').click());
+				expect(store.get(client.reading)).toBe('updated');
+				expect(store.size).toBe(1);
+			}
+			await client.act(async () => root.render(client.Root, { store: first }));
+			expect(host.textContent).toBe('updated');
+		} finally {
+			await client.act(async () => root.unmount());
+		}
+	} finally {
+		dom.window.close();
+		vi.unstubAllGlobals();
+	}
+}, 30_000);
+
 it('requires an imported application handle to come from the original shared factory', async () => {
 	const { storeInputFactories } = await import('../dist/store-inputs.js');
 	const { app, plan } = fixture({
@@ -360,6 +449,9 @@ it('requires an imported application handle to come from the original shared fac
 	};
 	expect(accepts('reading')).toBe(true);
 	expect(accepts('unknown')).toBe(false);
+	fs.writeFileSync(path.join(app, 'src/handles.js'), 'export const reading = {};');
+	expect(factory(path.join(app, 'src/pane.tsx'), './handles.js', 'reading')).toBeNull();
+	expect(factory(path.join(app, 'src/pane.tsx'), './handles', 'reading')).toBeNull();
 	expect(accepts('missing')).toBe(false);
 });
 

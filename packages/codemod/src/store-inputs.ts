@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import ts from 'typescript';
 
 type Factory = { module: string; name: string; from: string };
@@ -10,6 +11,7 @@ export function storeInputFactories(root: string, config: ts.CompilerOptions | n
 	const options = { moduleResolution: ts.ModuleResolutionKind.Bundler, ...config };
 	const cache = ts.createModuleResolutionCache(root, (file) => file, options);
 	const modules = new Map<string, Map<string, Factory>>();
+	const project = fs.realpathSync(root);
 	return (from: string, specifier: string, name: string) => {
 		const file = ts.resolveModuleName(specifier, from, options, ts.sys, cache).resolvedModule
 			?.resolvedFileName;
@@ -19,6 +21,30 @@ export function storeInputFactories(root: string, config: ts.CompilerOptions | n
 			!/(?<!\.d)\.ts$/.test(file) ||
 			file.includes(path.sep + 'node_modules' + path.sep)
 		)
+			return null;
+		const physical = fs.realpathSync(file);
+		if (
+			!physical.startsWith(project + path.sep) ||
+			physical.includes(path.sep + 'node_modules' + path.sep)
+		)
+			return null;
+		// TS may resolve a .ts file alongside a different runtime implementation.
+		if (!specifier.endsWith('.ts')) {
+			const stem = file.slice(0, -3);
+			if (
+				['.js', '.jsx', '.tsx', '.mjs', '.cjs', '.mts', '.cts', ''].some((ext) =>
+					fs.existsSync(stem + ext),
+				)
+			)
+				return null;
+		}
+		let runtime: string | undefined;
+		try {
+			runtime = createRequire(from).resolve(specifier);
+		} catch {
+			// A tsconfig alias or an authored TS file need not resolve through Node.
+		}
+		if (runtime && (!path.isAbsolute(runtime) || fs.realpathSync(runtime) !== physical))
 			return null;
 		let factories = modules.get(file);
 		if (!factories) {
