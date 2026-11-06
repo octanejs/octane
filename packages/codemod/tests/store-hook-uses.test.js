@@ -226,3 +226,20 @@ it('rejects local renderer values hidden behind a branded result, call or destru
 		).toBeUndefined();
 	}
 });
+
+it.each(['for', 'for await'])(
+	'defers store writes of renderer values taken from a %s loop',
+	(loop) => {
+		const result = migrate(`import {useStore} from 'observer';
+		export function Panel() {
+			const store = useStore();
+			async function publish() {
+				const rows = [{details:{id:<b/> as unknown as string}}];
+				${loop} (const {details:{id}} of rows) store.write(0, id);
+			}
+			return <button onClick={publish}/>;
+		}`);
+		expect(result.rules['store-hook']).toBeUndefined();
+		expect(result.unported).toHaveLength(1);
+	},
+);

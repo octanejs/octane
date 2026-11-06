@@ -82,6 +82,23 @@ it.each([
 	},
 );
 
+it.each([
+	['of [<b/> as unknown as string]', true],
+	['of ["label"]', false],
+	['in {label:<b/>}', false],
+])('checks the value supplied to a React component by a loop %s', (source, blocked) => {
+	const result = transformModule(
+		`import {Display} from 'example-ui';
+		export function Page() { for (const label ${source}) return <Display text={label}/>; return null; }`,
+		'page.tsx',
+		{ reactCompat: true, unported: (name) => (name === 'example-ui' ? name : null) },
+	);
+	expect(result.notes.some((note) => note.rule === 'bindings' && note.severity === 'error')).toBe(
+		blocked,
+	);
+	expect(result.rules['react-compat'] ?? 0).toBe(blocked ? 0 : 1);
+});
+
 it('retains the hook diagnostic when producing a placeholder substitution requires React JSX', () => {
 	const result = transformModule(
 		`import {useIntl} from 'react-intl';

@@ -42,17 +42,20 @@ export function walkLocalValues(
 			const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
 			if (declaration?.getSourceFile() === file && visit(declaration)) return true;
 		}
-		// A binding element does not contain the source of its destructuring.
-		if (ts.isBindingElement(node)) {
-			let owner: ts.Node = node;
-			while (ts.isBindingElement(owner)) {
-				if (owner.initializer && visit(owner.initializer)) return true;
-				owner = owner.parent.parent;
-			}
+		// Destructuring stores defaults on individual bindings; its value comes from the owner.
+		let owner = node;
+		while (ts.isBindingElement(owner)) {
+			if (owner.initializer && visit(owner.initializer)) return true;
+			owner = owner.parent.parent;
+		}
+		if (ts.isVariableDeclaration(owner) || ts.isParameter(owner)) {
+			if (owner.initializer && visit(owner.initializer)) return true;
+			const list = owner.parent;
+			// for-of (including for-await-of) yields iterable values; for-in yields property names.
 			if (
-				(ts.isVariableDeclaration(owner) || ts.isParameter(owner)) &&
-				owner.initializer &&
-				visit(owner.initializer)
+				ts.isVariableDeclarationList(list) &&
+				ts.isForOfStatement(list.parent) &&
+				visit(list.parent.expression)
 			)
 				return true;
 		}
