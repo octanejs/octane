@@ -32,24 +32,31 @@ export function reactRenderer(property: ts.ObjectLiteralElementLike) {
 			: null;
 	if (!tag || !ts.isIdentifier(tag.tagName) || !/^[a-z][a-z0-9]*$/.test(tag.tagName.text)) return;
 	const props: string[] = [];
+	let key: string | undefined;
 	for (const attr of tag.attributes.properties) {
 		if (
 			!ts.isJsxAttribute(attr) ||
 			!ts.isIdentifier(attr.name) ||
 			!attr.initializer ||
 			!ts.isStringLiteral(attr.initializer) ||
-			!/^[\w .:/#-]*$/.test(attr.initializer.text) ||
+			/[&\r\n]/.test(attr.initializer.text) ||
 			!/^[a-z][a-zA-Z0-9-]*$/.test(attr.name.text) ||
-			/^(?:key|ref|children|dangerouslySetInnerHTML|is|style)$|^on/i.test(attr.name.text)
+			/^(?:ref|children|dangerouslySetInnerHTML|is|style)$|^on/i.test(attr.name.text)
 		)
 			return;
-		props.push(JSON.stringify(attr.name.text) + ': ' + JSON.stringify(attr.initializer.text));
+		const value = JSON.stringify(attr.initializer.text);
+		if (attr.name.text === 'key') key = value;
+		else props.push(JSON.stringify(attr.name.text) + ': ' + value);
 	}
 	if (ts.isJsxElement(body)) {
-		const [child] = body.children;
+		// JSX discards indentation on empty lines, but a space beside a child is visible.
+		const children = body.children.filter(
+			(child) => !(ts.isJsxText(child) && /^[ \t\r\n]*[\r\n][ \t\r\n]*$/.test(child.text)),
+		);
+		const [child] = children;
 		if (
 			!param ||
-			body.children.length !== 1 ||
+			children.length !== 1 ||
 			!ts.isJsxExpression(child) ||
 			child.dotDotDotToken ||
 			!child.expression ||
@@ -59,5 +66,13 @@ export function reactRenderer(property: ts.ObjectLiteralElementLike) {
 			return;
 		props.push('children: ' + child.expression.text);
 	} else if (param) return;
-	return { body, args: JSON.stringify(tag.tagName.text) + ', { ' + props.join(', ') + ' }' };
+	return {
+		body,
+		args:
+			JSON.stringify(tag.tagName.text) +
+			', { ' +
+			props.join(', ') +
+			' }' +
+			(key === undefined ? '' : ', ' + key),
+	};
 }
