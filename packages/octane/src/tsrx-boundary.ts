@@ -44,7 +44,25 @@ export const TsrxErrorBoundary = typeOnlyBoundary as unknown as (
  */
 export type ChildrenBlock = () => never;
 
-export const childrenBlock = typeOnlyBoundary as unknown as (children: unknown) => ChildrenBlock;
+/**
+ * The type `descriptorChildren` adds to a component. The bundler proves a
+ * marked import through the module graph, which one file's type-only output
+ * cannot see, so that output passes an imported tag to `childrenBlock` and the
+ * tag's type decides. The marker follows re-exports, and a consumer is
+ * rechecked when its exporter gains or loses it.
+ */
+export interface DescriptorChildrenMarker {
+	readonly '~octane.descriptorChildren'?: true;
+}
+
+/**
+ * A marked component's children are descriptors, whose shape this call cannot
+ * see, so they type as `never` and its `children` prop accepts them.
+ */
+export const childrenBlock = typeOnlyBoundary as unknown as <C = unknown>(
+	children: unknown,
+	component?: C,
+) => C extends DescriptorChildrenMarker ? never : ChildrenBlock;
 
 type DynamicTag = string | ((props: any) => unknown);
 

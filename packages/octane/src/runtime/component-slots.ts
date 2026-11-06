@@ -31,6 +31,7 @@ import {
 } from '../signals/owner-context.js';
 import { signalDocumentEnabled } from '../signals/document-owner.js';
 import { profileTrackComponent } from './profile-probes.js';
+import type { DescriptorChildrenMarker } from '../tsrx-boundary.js';
 import type {
 	ComponentBody,
 	HookSlot,
@@ -233,8 +234,8 @@ export function markChildrenBlock<T>(
  * Marks a component binding whose authored JSX children must remain inspectable
  * element descriptors. The compiler consumes the call; runtime identity is unchanged.
  */
-export function descriptorChildren<T>(component: T): T {
-	return component;
+export function descriptorChildren<T>(component: T): T & DescriptorChildrenMarker {
+	return component as T & DescriptorChildrenMarker;
 }
 
 /**

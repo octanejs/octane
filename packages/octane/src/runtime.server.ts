@@ -142,6 +142,7 @@ import {
 	unsupportedAttributeCoercionWarning,
 } from './host-property-diagnostics.js';
 import type { HydrateProps, HydrationStrategy } from './hydration/types.js';
+import type { DescriptorChildrenMarker } from './tsrx-boundary.js';
 import type { IdleHydrationOptions } from './hydration/idle.js';
 import type { VisibleHydrationOptions } from './hydration/visible.js';
 import {
@@ -8371,8 +8372,8 @@ export function markChildrenBlock<T>(fn: T): T {
 }
 
 /** Server twin of the compiler-visible descriptor-children marker. */
-export function descriptorChildren<T>(component: T): T {
-	return component;
+export function descriptorChildren<T>(component: T): T & DescriptorChildrenMarker {
+	return component as T & DescriptorChildrenMarker;
 }
 
 /**
