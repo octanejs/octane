@@ -1,5 +1,51 @@
 # @octanejs/codemod
 
+## 0.2.0
+
+### Minor Changes
+
+- 4c78bee: Run a local migration recipe with `octane-codemod --recipe <file>`. Recipes export a `runCodemod` function and use the CLI's existing options and reports.
+- 3ea5f6e: Migrate supported React store hooks from linked TypeScript workspace packages. The codemod generates native hooks that share the original store and preserves manual diagnostics for renderer-dependent uses.
+- 4ad18ec: Convert a scoped signal declaration and its readers and writers together with a configured migration recipe.
+
+### Patch Changes
+
+- b2c172d: Write the full migration report when the command's output is piped to another process.
+- ddea1b6: Pass a single nested JSX element as an explicit children prop when the selected React component requires element values. Report narrow slots that need caller review.
+- 4271213: Update imports in other modules when migrating a component individually so its callers can still find the renamed TSRX file.
+- bc33c0d: Preserve child descriptors when a component passes its children to a local inspection helper. Preserve mapped JSX children at directly imported, selected components. Keep the original `className` on nested intrinsic descriptors so inspectors can read it.
+- 4ad18ec: Ship the codemod CLI and library from strict TypeScript sources, with generated declaration files and named types for programmatic consumers and local recipes.
+- 72e8118: Report a collision before migrating when a TSRX output already exists or two source files would create the same output. Dry runs report the same conflict.
+- 7098c0a: Continue codemod previews past TSRX rename collisions. Report each conflicting source and preview the remaining files so partially migrated projects can see their remaining work. Write mode still stops before editing the project when a collision is found.
+
+  Convert JSX `&&` guards to `@if` when strict TypeScript types prove the condition can only be boolean or nullish.
+
+  Add `--no-project-types` for previews on large projects. The codemod uses module-local types and keeps compiler verification and import resolution.
+
+  Mark migrated files as blocked in the text report when the codemod found an error in their original source.
+
+  Preserve every-render React hook schedules when requesting Strong mode. Convert filtered array lists when the callback parameter names overlap safely.
+- 6e0ad64: Migrate supported React Intl providers, scalar formatter reads, and plain messages through a shared project-local adapter. Keep the project's React Intl dependency for formatting and preserve its locale across supported React component boundaries. Inline rich-text callbacks with a single native tag can keep producing React elements inside a retained React component.
+
+  Strong migrations can preserve effects keyed by object identity when a callback reads a property or calls a method on an immutable local receiver.
+- 80e7344: Offer a Strong migration from an every-commit layout effect that copies a scalar DOM measurement into adjacent state to `useLayoutSnapshot`. The codemod preserves the every-commit schedule of React layout effects with omitted dependencies, including when a component stays in compatibility mode.
+- 985d06c: Avoid loading the TypeScript dependency graph for component migrations that can be rewritten without project type information.
+- 002d67d: Migrate React Intl formatter reads when a local component forwards the result to a DOM text attribute, including through a rest-prop spread.
+- 52e12e8: Migrate a direct React subscription to a native writable signal into a tracked signal read in Strong components when the client and server read the same value.
+- 3054ea8: Migrate store method calls that use a handle from the original workspace store and pass plain data.
+- 7270785: Warn about rendered SVG imports that request React components when migrating to TSRX.
+- 6274390: Preserve string `className` and object `style` types when migrating React components that wrap intrinsic elements with `ComponentProps`, `ComponentPropsWithRef`, or `ComponentPropsWithoutRef`.
+- Updated dependencies [1246bc0]
+- Updated dependencies [a5eb58a]
+- Updated dependencies [6112c89]
+- Updated dependencies [80e7344]
+- Updated dependencies [1c30a9a]
+- Updated dependencies [e0928d2]
+- Updated dependencies [bfacbe5]
+- Updated dependencies [d01d2a5]
+  - octane@0.16.8
+  - @octanejs/cli@0.3.4
+
 ## 0.1.4
 
 ### Patch Changes
