@@ -3,7 +3,7 @@
     "package": "@tanstack/react-form",
     "version": "1.33.5"
   },
-  "surface": "Ports the complete @tanstack/react-form 1.33.5 adapter surface (`useForm`, `useField`, form and field groups, hook contexts and component composition) while re-exporting @tanstack/form-core 1.33.5 unchanged and using @octanejs/tanstack-store for subscriptions.",
+  "surface": "Ports the complete @tanstack/react-form 1.33.5 adapter surface (`useForm`, `useField`, form and field groups, hook contexts and component composition) while re-exporting @tanstack/form-core 1.33.5 unchanged and using the official @tanstack/octane-store adapter for subscriptions.",
   "divergences": [
     "Octane uses native events: text controls call `field.handleChange` from `onInput`; TanStack Form's `onChange` validator and listener option names remain unchanged.",
     "Octane has no StrictMode double-invoke and always provides `useId`, so the adapter omits StrictMode scenarios and the legacy random-UUID fallback.",

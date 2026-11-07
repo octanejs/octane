@@ -504,15 +504,6 @@ catalogs:
     '@tailwindcss/vite':
       specifier: 4.3.3
       version: 4.3.3
-    '@tanstack/ai':
-      specifier: 0.41.0
-      version: 0.41.0
-    '@tanstack/ai-client':
-      specifier: 0.21.0
-      version: 0.21.0
-    '@tanstack/ai-react':
-      specifier: 0.17.0
-      version: 0.17.0
     '@tanstack/devtools':
       specifier: 0.14.2
       version: 0.14.2
@@ -1319,28 +1310,6 @@ catalogs:
     react-dom:
       specifier: 19.2.7
       version: 19.2.7
-  tanstack-store-react-oracle:
-    '@tanstack/react-store':
-      specifier: 0.11.1
-      version: 0.11.1
-    '@testing-library/react':
-      specifier: 16.3.1
-      version: 16.3.1
-    '@types/react':
-      specifier: 19.2.7
-      version: 19.2.7
-    '@types/react-dom':
-      specifier: 19.2.3
-      version: 19.2.3
-    react:
-      specifier: 19.2.3
-      version: 19.2.3
-    react-dom:
-      specifier: 19.2.3
-      version: 19.2.3
-    use-sync-external-store:
-      specifier: 1.6.0
-      version: 1.6.0
   xstate-react-oracle:
     '@testing-library/react':
       specifier: 16.3.1
@@ -3729,9 +3698,6 @@ importers:
       '@octanejs/tanstack-start':
         specifier: workspace:*
         version: link:../../../packages/tanstack-start
-      '@octanejs/tanstack-store':
-        specifier: workspace:*
-        version: link:../../../packages/tanstack-store
       '@octanejs/visx':
         specifier: workspace:*
         version: link:../../../packages/visx
@@ -9520,43 +9486,6 @@ importers:
         specifier: catalog:default
         version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
-  packages/tanstack-ai:
-    dependencies:
-      '@tanstack/ai-client':
-        specifier: catalog:default
-        version: 0.21.0(@opentelemetry/api@1.9.1)
-    devDependencies:
-      '@octanejs/testing-library':
-        specifier: workspace:*
-        version: link:../testing-library
-      '@tanstack/ai':
-        specifier: catalog:default
-        version: 0.41.0(@opentelemetry/api@1.9.1)
-      '@tanstack/ai-react':
-        specifier: catalog:default
-        version: 0.17.0(@opentelemetry/api@1.9.1)(@tanstack/ai@0.41.0(@opentelemetry/api@1.9.1))(@types/react@19.2.18)(react@19.2.7)
-      '@testing-library/jest-dom':
-        specifier: catalog:default
-        version: 6.9.1
-      '@tsrx/react':
-        specifier: catalog:default
-        version: 0.4.5(react@19.2.7)
-      esbuild:
-        specifier: catalog:default
-        version: 0.28.1
-      octane:
-        specifier: workspace:*
-        version: link:../octane
-      react:
-        specifier: catalog:default
-        version: 19.2.7
-      react-dom:
-        specifier: catalog:default
-        version: 19.2.7(react@19.2.7)
-      vitest:
-        specifier: catalog:default
-        version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
-
   packages/tanstack-db:
     dependencies:
       '@tanstack/db':
@@ -9615,12 +9544,12 @@ importers:
 
   packages/tanstack-form:
     dependencies:
-      '@octanejs/tanstack-store':
-        specifier: workspace:*
-        version: link:../tanstack-store
       '@tanstack/form-core':
         specifier: catalog:default
         version: 1.33.5
+      '@tanstack/octane-store':
+        specifier: ^0.13.0
+        version: 0.13.0(octane@packages+octane)
     devDependencies:
       '@octanejs/testing-library':
         specifier: workspace:*
@@ -9960,58 +9889,6 @@ importers:
       vite:
         specifier: catalog:default
         version: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)
-      vitest:
-        specifier: catalog:default
-        version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
-
-  packages/tanstack-store:
-    dependencies:
-      '@tanstack/store':
-        specifier: 0.11.1
-        version: 0.11.1
-    devDependencies:
-      '@octanejs/testing-library':
-        specifier: workspace:*
-        version: link:../testing-library
-      '@tanstack/react-store':
-        specifier: catalog:tanstack-store-react-oracle
-        version: 0.11.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      '@testing-library/jest-dom':
-        specifier: catalog:default
-        version: 6.9.1
-      '@testing-library/react':
-        specifier: catalog:tanstack-store-react-oracle
-        version: 16.3.1(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      '@testing-library/user-event':
-        specifier: ^14.6.1
-        version: 14.6.1(@testing-library/dom@10.4.1)
-      '@tsrx/react':
-        specifier: catalog:default
-        version: 0.4.5(react@19.2.3)
-      '@types/react':
-        specifier: catalog:tanstack-store-react-oracle
-        version: 19.2.7
-      '@types/react-dom':
-        specifier: catalog:tanstack-store-react-oracle
-        version: 19.2.3(@types/react@19.2.7)
-      '@types/use-sync-external-store':
-        specifier: ^1.5.0
-        version: 1.5.0
-      esbuild:
-        specifier: catalog:default
-        version: 0.28.1
-      octane:
-        specifier: workspace:*
-        version: link:../octane
-      react:
-        specifier: catalog:tanstack-store-react-oracle
-        version: 19.2.3
-      react-dom:
-        specifier: catalog:tanstack-store-react-oracle
-        version: 19.2.3(react@19.2.3)
-      use-sync-external-store:
-        specifier: catalog:tanstack-store-react-oracle
-        version: 1.6.0(react@19.2.3)
       vitest:
         specifier: catalog:default
         version: 4.1.10(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.2(bufferutil@4.1.0)(utf-8-validate@5.0.10))(jsdom@30.0.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
@@ -16472,7 +16349,6 @@ packages:
   '@opentelemetry/sdk-trace-web@2.10.0':
     resolution: {integrity: sha512-6WqXdWSlBH0GNjDhv1gg6SLVtMtIBVhLaWqd1hiKSXS8meXXP13sVPQoYFHz1uVo0feUTUCdP9vMS54KflisAw==}
     engines: {node: ^18.19.0 || >=20.6.0}
-    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': '>=1.0.0 <1.10.0'
 
@@ -20773,9 +20649,6 @@ packages:
   '@tanstack/ai-client@0.11.8':
     resolution: {integrity: sha512-vMXBtBpOQlNkGeaXSbvJJ1BQmJNdBUEFMFy/UyD0l/4nTnIr7IDTukEqCaSgXnAb/rKrPtBXqbR8N6u6AoTaoQ==}
 
-  '@tanstack/ai-client@0.21.0':
-    resolution: {integrity: sha512-Q9QvXoxWU2QqMnB5x7i0rCLi7mKLtSHHlHtWOV407gdEUOAUPEnUJJ0POSeCQl8zhb6d/P5pn27JP0ppitKCmw==}
-
   '@tanstack/ai-event-client@0.3.11':
     resolution: {integrity: sha512-LywHUkj4TV5D/31fiL4stjXdO6UE48ZTcmK36QnGBQEPedFSweCBeiSuCcH63n0uJP7J117F6TtZmwdava55Kg==}
     peerDependencies:
@@ -20786,9 +20659,6 @@ packages:
     peerDependencies:
       '@tanstack/ai': 0.20.1
 
-  '@tanstack/ai-event-client@0.6.8':
-    resolution: {integrity: sha512-h7/HLz9u2LF9ba6uKFMnSZkFlkzQONJ5u3Hi+4qGxpsHyvcGRtW6v186jaFLoklndhEwyC49ytkC4eafi7Qq8w==}
-
   '@tanstack/ai-openai@0.9.6':
     resolution: {integrity: sha512-NdhGR0irVxTGURDpcdrqzZazCs9RK4yuwUm5lk9WjutU99DH80zDHVjkDTBJxgczGxXScjOuyNYX1rL7tEBkIQ==}
     peerDependencies:
@@ -20796,25 +20666,11 @@ packages:
       '@tanstack/ai-client': ^0.11.4
       zod: ^4.0.0
 
-  '@tanstack/ai-react@0.17.0':
-    resolution: {integrity: sha512-xWdSM1NdfHTFjC5/SHgtG6OHZwJUGgQmsl8XiRWilhkh8dgI4BCLJQISJC8e/36ANH4BRp3CSkueFOmMT1sghg==}
-    peerDependencies:
-      '@mcp-ui/client': ^7
-      '@tanstack/ai': ^0.41.0
-      '@types/react': '>=18.0.0'
-      react: '>=18.0.0'
-    peerDependenciesMeta:
-      '@mcp-ui/client':
-        optional: true
-
   '@tanstack/ai-utils@0.2.0':
     resolution: {integrity: sha512-ttFkUEg60sAUHPZZ9bwDuJS0K2pcI6JLpRcJS7FAiqD3+h3CtJZaF38eWG5nBy1w6fJ9zfaG7ExZf2AQpcyzDw==}
 
   '@tanstack/ai-utils@0.2.1':
     resolution: {integrity: sha512-cFsSeaiAOOEtAOWvFWD0jHiLlFSYi+FYmbEPeD70zHntM8ws2YFb4Dgz94+J8rsoffLXIFTkKswTowx5QlTsWg==}
-
-  '@tanstack/ai-utils@0.3.1':
-    resolution: {integrity: sha512-fgbjd5DohL3k5rTWr/KInauLVYMiHVm0cnmTsNrzL3cr4wWhEld5vmFSrjiwUWACAuONjZa+uBXuS+ZSO8fwDQ==}
 
   '@tanstack/ai@0.20.1':
     resolution: {integrity: sha512-cv+OiqeDjtvt1WOw7VlY3V5LODBvMHhFGv0+hxgr8Wj4n0c29mI8IEja2490kS1PAaYuq92FQKVVX1PxEM/VCg==}
@@ -20827,15 +20683,6 @@ packages:
 
   '@tanstack/ai@0.22.0':
     resolution: {integrity: sha512-cV5XGDScrzVBdJZqUQVu7jx3DI7BjlbJ8KXzj1/oM62bK0Rf+DZIw0Ho2W3W5x86jV2vJuSFsWaBFzpMn1twfw==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      '@opentelemetry/api': '>=1.9.0'
-    peerDependenciesMeta:
-      '@opentelemetry/api':
-        optional: true
-
-  '@tanstack/ai@0.41.0':
-    resolution: {integrity: sha512-cq6ye9/rTfcwBDv9z2t1iCUIXL+lGdtM2HZm/KiLu3u6i+MH57W7i4tbB5uTUtcCnDmOlQ7EHD97esyNJpGtNw==}
     engines: {node: '>=18'}
     peerDependencies:
       '@opentelemetry/api': '>=1.9.0'
@@ -48023,14 +47870,6 @@ snapshots:
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
-  '@tanstack/ai-client@0.21.0(@opentelemetry/api@1.9.1)':
-    dependencies:
-      '@tanstack/ai': 0.41.0(@opentelemetry/api@1.9.1)
-      '@tanstack/ai-event-client': 0.6.8
-      '@tanstack/ai-utils': 0.3.1
-    transitivePeerDependencies:
-      - '@opentelemetry/api'
-
   '@tanstack/ai-event-client@0.3.11(@tanstack/ai@0.22.0(@opentelemetry/api@1.9.1))':
     dependencies:
       '@tanstack/ai': 0.22.0(@opentelemetry/api@1.9.1)
@@ -48039,10 +47878,6 @@ snapshots:
   '@tanstack/ai-event-client@0.3.6(@tanstack/ai@0.20.1(@opentelemetry/api@1.9.1))':
     dependencies:
       '@tanstack/ai': 0.20.1(@opentelemetry/api@1.9.1)
-      '@tanstack/devtools-event-client': 0.4.4
-
-  '@tanstack/ai-event-client@0.6.8':
-    dependencies:
       '@tanstack/devtools-event-client': 0.4.4
 
   '@tanstack/ai-openai@0.9.6(@tanstack/ai-client@0.11.8(@opentelemetry/api@1.9.1))(@tanstack/ai@0.20.1(@opentelemetry/api@1.9.1))(ws@8.21.1(bufferutil@4.1.0)(utf-8-validate@5.0.10))(zod@4.4.3)':
@@ -48059,20 +47894,9 @@ snapshots:
       - '@smithy/signature-v4'
       - ws
 
-  '@tanstack/ai-react@0.17.0(@opentelemetry/api@1.9.1)(@tanstack/ai@0.41.0(@opentelemetry/api@1.9.1))(@types/react@19.2.18)(react@19.2.7)':
-    dependencies:
-      '@tanstack/ai': 0.41.0(@opentelemetry/api@1.9.1)
-      '@tanstack/ai-client': 0.21.0(@opentelemetry/api@1.9.1)
-      '@types/react': 19.2.18
-      react: 19.2.7
-    transitivePeerDependencies:
-      - '@opentelemetry/api'
-
   '@tanstack/ai-utils@0.2.0': {}
 
   '@tanstack/ai-utils@0.2.1': {}
-
-  '@tanstack/ai-utils@0.3.1': {}
 
   '@tanstack/ai@0.20.1(@opentelemetry/api@1.9.1)':
     dependencies:
@@ -48087,16 +47911,6 @@ snapshots:
       '@ag-ui/core': 0.0.52
       '@standard-schema/spec': 1.1.0
       '@tanstack/ai-event-client': 0.3.11(@tanstack/ai@0.22.0(@opentelemetry/api@1.9.1))
-      partial-json: 0.1.7
-    optionalDependencies:
-      '@opentelemetry/api': 1.9.1
-
-  '@tanstack/ai@0.41.0(@opentelemetry/api@1.9.1)':
-    dependencies:
-      '@ag-ui/core': 0.0.52
-      '@standard-schema/spec': 1.1.0
-      '@tanstack/ai-event-client': 0.6.8
-      '@tanstack/ai-utils': 0.3.1
       partial-json: 0.1.7
     optionalDependencies:
       '@opentelemetry/api': 1.9.1

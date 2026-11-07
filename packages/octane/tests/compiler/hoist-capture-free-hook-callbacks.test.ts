@@ -28,7 +28,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 	it('lifts a selector that captures nothing from the component', () => {
 		const code = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         export function App(props) @{
           const total = useSelector(props.store, (s) => s.total);
           <p>{total as string}</p>
@@ -45,7 +45,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 	it('keeps a selector that reads component state at its call site', () => {
 		const code = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         export function App(props) @{
           const item = useSelector(props.store, (s) => s.items[props.id]);
           <p>{item as string}</p>
@@ -61,7 +61,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 	it('lifts a selector that only reaches module-scope and global bindings', () => {
 		const code = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         import { pick } from './pick';
         export function App(props) @{
           const a = useSelector(props.store, (s) => pick(s));
@@ -80,7 +80,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 		// instance-specific even though an identically named module import exists.
 		const code = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         import { pick } from './pick';
         export function App(props) @{
           const pick = props.pick;
@@ -99,7 +99,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 		// render scope to run in, so the callback must not move.
 		const code = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         import { useShallow } from 'octane';
         export function App(props) @{
           const a = useSelector(props.store, () => useShallow(1));
@@ -115,7 +115,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 	it('declines a callback that renders JSX or reads `this`', () => {
 		const jsx = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         export function App(props) @{
           const el = useSelector(props.store, () => <span>{'hi'}</span>);
           <div>{el}</div>
@@ -128,7 +128,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 
 		const thisArg = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         export function App(props) @{
           const a = useSelector(props.store, function () { return this; });
           <p>{a as string}</p>
@@ -185,7 +185,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 		// second and lift a callback that reads it.
 		const code = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         export const First = (props) => {
           return useSelector(props.store, (s) => s.a);
         }, Second = (opts) => {
@@ -207,7 +207,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 		// capture-free — and at module scope the write has no binding to land on.
 		const written = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         export function App(props) @{
           let acc;
           const total = useSelector(props.store, (s) => {
@@ -226,7 +226,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 		// Same for `for-in`, and for a destructuring assignment target.
 		const forIn = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         export function App(props) @{
           let key;
           const total = useSelector(props.store, (s) => {
@@ -248,7 +248,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 		// it is an expression that reads the component.
 		const code = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         export function App(props) @{
           const first = useSelector(props.store, (s) => {
             for (const [x = props.seed] of s.pairs) return x;
@@ -270,7 +270,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 		// containing a counting loop look like it captured an enclosing binding.
 		const code = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         export function App(props) @{
           const total = useSelector(props.store, (s) => {
             let sum = 0;
@@ -292,7 +292,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 		// would leave that name unresolvable at module scope.
 		const code = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         export function App(props) @{
           const a = useSelector(props.store, (s, scale = props.factor) => s.a * scale);
           <p>{a as string}</p>
@@ -308,7 +308,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 	it('treats a computed destructuring key that reads the component as a capture', () => {
 		const code = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         export function App(props) @{
           const a = useSelector(props.store, ({ [props.field]: picked }) => picked);
           <p>{a as string}</p>
@@ -326,7 +326,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 		// inline hook-memo tier: a lifted callback has left the component, which
 		// dev tooling and profile attribution both reason about.
 		const source = `
-      import { useSelector } from '@octanejs/tanstack-store';
+      import { useSelector } from '@tanstack/octane-store';
       export function App(props) @{
         const total = useSelector(props.store, (s) => s.total);
         <p>{total as string}</p>
@@ -343,7 +343,7 @@ describe('capture-free hook callbacks are lifted to module scope', () => {
 		// have to reason about which closures left the component.
 		const code = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         export function App(props) @{
           const total = useSelector(props.store, (s) => s.total);
           <p>{total as string}</p>

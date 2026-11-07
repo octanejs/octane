@@ -84,7 +84,7 @@ export function SlashMenu() @{
 
 `FormattingToolbar`, `SideMenu`, `LinkToolbar`, `FilePanel`, and `TableHandles` follow the same pattern. For collision-aware placement, position the element from `referencePos` with a library such as `@octanejs/floating-ui`.
 
-The extension stores are TanStack Stores. If your app already uses `@octanejs/tanstack-store`, `useStore(menu.store, (state) => state?.query)` also works and adds selector-based updates.
+The extension stores are TanStack Stores. If your app already uses `@tanstack/octane-store`, `useStore(menu.store, (state) => state?.query)` also works and adds selector-based updates.
 
 ### Custom blocks
 

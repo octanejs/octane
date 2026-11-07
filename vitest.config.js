@@ -80,9 +80,6 @@ const BASE_UI_REACT_ALIASES = [
 	find: new RegExp(`^${specifier.replaceAll('/', '\\/')}$`),
 	replacement: realpathSync(requireBaseUI.resolve(specifier)),
 }));
-const requireTanstackStore = createRequire(
-	resolve(import.meta.dirname, 'packages/tanstack-store/package.json'),
-);
 const requireXstate = createRequire(resolve(import.meta.dirname, 'packages/xstate/package.json'));
 // The shared differential rig lives under packages/octane, whose React
 // dependency can differ from this package's pinned oracle. Resolve the renderer
@@ -97,18 +94,6 @@ const XSTATE_REACT_ALIASES = [
 	return {
 		find: new RegExp(`^${specifier.replace('/', '\\/')}$`),
 		replacement: realpathSync(requireXstate.resolve(specifier)),
-	};
-});
-const TANSTACK_STORE_REACT_ALIASES = [
-	'react',
-	'react/jsx-runtime',
-	'react/jsx-dev-runtime',
-	'react-dom',
-	'react-dom/client',
-].map(function pinTanstackStoreReactOracle(specifier) {
-	return {
-		find: new RegExp(`^${specifier.replace('/', '\\/')}$`),
-		replacement: realpathSync(requireTanstackStore.resolve(specifier)),
 	};
 });
 
@@ -645,10 +630,6 @@ const BLOCKNOTE_SOURCE_ALIASES = [
 	{
 		find: /^@octanejs\/floating-ui\/(.*)$/,
 		replacement: resolve(import.meta.dirname, 'packages/floating-ui/src') + '/$1.ts',
-	},
-	{
-		find: /^@octanejs\/tanstack-store$/,
-		replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
 	},
 ];
 
@@ -2167,64 +2148,6 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: {
-					group: 'react-parity',
-					include: ['packages/tanstack-store/tests/conformance/upstream-index.test.ts'],
-				},
-				test: {
-					name: 'tanstack-store',
-					include: [
-						'packages/tanstack-store/tests/conformance/**/*.test.ts',
-						'packages/tanstack-store/tests/differential/setup.test.ts',
-					],
-					exclude: [
-						...configDefaults.exclude,
-						'packages/tanstack-store/tests/upstream-original.test.ts',
-					],
-					environment: 'jsdom',
-					setupFiles: ['packages/tanstack-store/tests/conformance/test-setup.ts'],
-					globals: false,
-				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/tanstack-store$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/testing-library$/,
-							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/testing-library\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
-						},
-					],
-				},
-			},
-			{
-				test: {
-					name: 'tanstack-store-ssr',
-					include: ['packages/tanstack-store/tests/ssr/**/*.test.ts'],
-					environment: 'node',
-					globals: false,
-				},
-				plugins: [octane({ ssr: true })],
-				resolve: {
-					alias: [
-						{
-							find: /^octane$/,
-							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
-						},
-						{
-							find: /^@octanejs\/tanstack-store$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
-						},
-					],
-				},
-			},
-			{
 				// Octane-only conformance for the xstate-store binding: hook-slot
 				// independence across selector call sites, selector bail-out, and the
 				// stable-instance contracts for useStore/useAtomState. Parity-owned
@@ -2313,6 +2236,8 @@ export default defineConfig({
 					],
 					environment: 'jsdom',
 					setupFiles: ['packages/tanstack-form/tests/conformance/test-setup.ts'],
+					// The official TanStack Store adapter ships from npm; inline it so Vite compiles it.
+					server: { deps: { inline: [/@tanstack\/octane-/] } },
 					globals: false,
 				},
 				plugins: [octane()],
@@ -2338,6 +2263,8 @@ export default defineConfig({
 					name: 'tanstack-form-ssr',
 					include: ['packages/tanstack-form/tests/ssr/**/*.test.ts'],
 					environment: 'node',
+					// The official TanStack Store adapter ships from npm; inline it so Vite compiles it.
+					server: { deps: { inline: [/@tanstack\/octane-/] } },
 					globals: false,
 				},
 				plugins: [octane({ ssr: true })],
@@ -2350,58 +2277,6 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/tanstack-form$/,
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-form/src/index.ts'),
-						},
-					],
-				},
-			},
-			{
-				// Package-authored TanStack AI contracts stay ordinary. Parity owns
-				// only the dedicated differential project below.
-				test: {
-					name: 'tanstack-ai',
-					include: [
-						'packages/tanstack-ai/tests/conformance/**/*.test.ts',
-						'packages/tanstack-ai/tests/conformance/**/*.test.tsx',
-					],
-					environment: 'jsdom',
-					setupFiles: ['packages/tanstack-ai/tests/conformance/test-setup.ts'],
-					globals: false,
-				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/tanstack-ai$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-ai/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/testing-library$/,
-							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/testing-library\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
-						},
-					],
-				},
-			},
-			{
-				test: {
-					name: 'tanstack-ai-ssr',
-					include: ['packages/tanstack-ai/tests/ssr/**/*.test.ts'],
-					environment: 'node',
-					globals: false,
-				},
-				plugins: [octane({ ssr: true })],
-				resolve: {
-					alias: [
-						{
-							find: /^octane$/,
-							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
-						},
-						{
-							find: /^@octanejs\/tanstack-ai$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-ai/src/index.ts'),
 						},
 					],
 				},
@@ -7192,33 +7067,6 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'react-parity' },
-				test: {
-					name: 'tanstack-ai-differential',
-					include: ['packages/tanstack-ai/tests/differential/**/*.test.ts'],
-					environment: 'jsdom',
-					globalSetup: ['packages/tanstack-ai/tests/differential/_setup.ts'],
-					globals: false,
-				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						{
-							find: /^@octanejs\/tanstack-ai$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-ai/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/testing-library$/,
-							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
-						},
-						{
-							find: /^@octanejs\/testing-library\/(.*)$/,
-							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
-						},
-					],
-				},
-			},
-			{
 				test: {
 					name: 'doom',
 					include: ['playground/octane/src/demos/doom/**/*.test.ts'],
@@ -7352,6 +7200,8 @@ export default defineConfig({
 					include: ['packages/tanstack-form/tests/differential/**/*.test.ts'],
 					environment: 'jsdom',
 					globalSetup: ['packages/tanstack-form/tests/differential/_setup.ts'],
+					// The official TanStack Store adapter ships from npm; inline it so Vite compiles it.
+					server: { deps: { inline: [/@tanstack\/octane-/] } },
 					globals: false,
 				},
 				plugins: [octane()],
@@ -7480,16 +7330,6 @@ export default defineConfig({
 				},
 			},
 			{
-				testExecution: { group: 'react-parity' },
-				test: {
-					name: 'tanstack-store-pristine',
-					include: ['packages/tanstack-store/tests/upstream-original.test.ts'],
-					environment: 'node',
-					globals: false,
-					sequence: { groupOrder: 1 },
-				},
-			},
-			{
 				// Spawns the vendored @xstate/react@6.1.0 suite in a child Vitest run
 				// against real React, after re-hashing every vendored byte. The wrapper
 				// asserts the child's passing identities against the recorded inventory.
@@ -7557,29 +7397,6 @@ export default defineConfig({
 					environment: 'node',
 					globals: false,
 					sequence: { groupOrder: 1 },
-				},
-			},
-			{
-				testExecution: { group: 'react-parity' },
-				test: {
-					name: 'tanstack-store-differential',
-					include: ['packages/tanstack-store/tests/differential/parity.test.ts'],
-					environment: 'jsdom',
-					globalSetup: ['packages/tanstack-store/tests/differential/_setup.ts'],
-					globals: false,
-				},
-				plugins: [octane()],
-				resolve: {
-					alias: [
-						// The shared differential rig lives under packages/octane, whose
-						// React dependency can differ from this package's pinned oracle.
-						// Resolve the renderer and compiled fixture to one React instance.
-						...TANSTACK_STORE_REACT_ALIASES,
-						{
-							find: /^@octanejs\/tanstack-store$/,
-							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
-						},
-					],
 				},
 			},
 			{

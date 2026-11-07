@@ -72,8 +72,6 @@ import { verifyReactTransitionGroupTypes } from './react-transition-group-types-
 import { verifyReactTransitionGroupUpstream } from './react-transition-group-upstream-lib.mjs';
 import { verifySolanaReactTypes } from './solana-kit-types-lib.mjs';
 import { verifyTanstackDevtoolsTestClassifications } from './tanstack-devtools-classifications-lib.mjs';
-import { verifyTanstackStoreTypes } from './tanstack-store-types-lib.mjs';
-import { verifyTanstackStoreUpstreamEvidence } from './tanstack-store-upstream-lib.mjs';
 import { verifyTiptapTestClassifications } from './tiptap-classifications-lib.mjs';
 import { verifyTiptapRuntimeCrosswalk } from './tiptap-runtime-lib.mjs';
 import { verifyTiptapTypes } from './tiptap-types-lib.mjs';
@@ -244,12 +242,6 @@ await captureBinding('alien-signals', 'alien-signals pristine oracle environment
 );
 await captureBinding('alien-signals', 'alien-signals test classifications', () =>
 	verifyAlienSignalsTestClassifications(REPO),
-);
-await captureBinding('tanstack-store', '@octanejs/tanstack-store type evidence', () =>
-	verifyTanstackStoreTypes(REPO),
-);
-await captureBinding('tanstack-store', '@octanejs/tanstack-store upstream evidence', () =>
-	verifyTanstackStoreUpstreamEvidence(REPO),
 );
 await captureBinding('markdown', 'react-markdown type evidence', () =>
 	verifyReactMarkdownTypes(REPO),
