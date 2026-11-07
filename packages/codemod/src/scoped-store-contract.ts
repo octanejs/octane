@@ -713,6 +713,19 @@ export function createScopedStorePlanner(
 	compilerOptions?: ts.CompilerOptions,
 ) {
 	type Lookup = (name: string) => ScopedStoreHookPlan | null;
+	// All generated companions live together. Nested consumers can each declare
+	// a different symlink to the same workspace dependency.
+	const outputManifest = ts.findConfigFile(outputDir, ts.sys.fileExists, 'package.json');
+	function outputLink(pkg: string, packageName: string, imported: string, fallback: string) {
+		if (outputManifest) {
+			const modules = path.join(path.dirname(outputManifest), 'node_modules');
+			for (const name of [packageName, imported]) {
+				const link = path.join(modules, name);
+				if (fs.existsSync(link) && fs.realpathSync(link) === pkg) return link;
+			}
+		}
+		return fallback;
+	}
 	const packages = new Map<string, Lookup | null>();
 	const lookups = new Map<string, Lookup | null>();
 	function lookup(specifier: string, importer: string): Lookup | null {
@@ -772,7 +785,21 @@ export function createScopedStorePlanner(
 		const config = compilerOptions
 			? ''
 			: (ts.findConfigFile(path.dirname(importer), ts.sys.fileExists) ?? '');
-		const key = [link, entry, config].join('\0');
+		const generatedLink = outputLink(pkg, manifestFile.name, specifier, link);
+		if (generatedLink !== link) {
+			const relocated = path.join(generatedLink, path.relative(pkg, entry));
+			// Raw require resolution retains the logical path when Node preserves symlinks.
+			if (
+				options.preserveSymlinks ||
+				ts.findConfigFile(path.dirname(importer), ts.sys.fileExists) !==
+					ts.findConfigFile(outputDir, ts.sys.fileExists) ||
+				createRequire(importer).resolve(specifier) !== entry ||
+				installed('react', relocated) !== react ||
+				installed('octane', relocated) !== octane
+			)
+				return null;
+		}
+		const key = [generatedLink, entry, config].join('\0');
 		if (!packages.has(key)) {
 			const candidates: string[] = [];
 			for (const [key, value] of Object.entries(publicEntries)) {
@@ -789,7 +816,16 @@ export function createScopedStorePlanner(
 			packages.set(
 				key,
 				candidates.length
-					? modulePlan(pkg, project, entry, candidates, link, options, outputDir, contextBridge)
+					? modulePlan(
+							pkg,
+							project,
+							entry,
+							candidates,
+							generatedLink,
+							options,
+							outputDir,
+							contextBridge,
+						)
 					: null,
 			);
 		}

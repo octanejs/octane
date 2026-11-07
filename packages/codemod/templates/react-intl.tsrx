@@ -3,7 +3,12 @@
 import { createContext, useContext, useMemo, type OctaneNode } from 'octane';
 import { ReactCompat } from 'octane/react';
 import type { ChildrenBlock } from 'octane/tsrx-boundary';
-import { createElement as reactElement, Fragment, type ReactNode } from 'react';
+import {
+	createElement as reactElement,
+	Fragment,
+	type ComponentProps,
+	type ReactNode,
+} from 'react';
 import {
 	createIntl,
 	createIntlCache,
@@ -81,13 +86,20 @@ export function IntlProvider({
 	<Locale value={intl}>{children}</Locale>
 }
 
-type MessageProps = MessageDescriptor & { ignoreTag?: boolean };
+type MessageProps = MessageDescriptor &
+	Pick<ComponentProps<typeof ReactMessage>, 'values' | 'ignoreTag'>;
 
 function ReactContent({ content }: { content: ReactNode }) {
 	return content;
 }
 
-export function FormattedMessage({ id, defaultMessage, description, ignoreTag }: MessageProps) @{
+export function FormattedMessage({
+	id,
+	defaultMessage,
+	description,
+	values,
+	ignoreTag,
+}: MessageProps) @{
 	const intl = useIntl();
 	const descriptor = { id, defaultMessage, description };
 	const { textComponent, formatMessage } = intl;
@@ -95,8 +107,8 @@ export function FormattedMessage({ id, defaultMessage, description, ignoreTag }:
 	const requiresReact =
 		(textComponent && textComponent !== Fragment) || intl.defaultRichTextElements;
 	const content = requiresReact
-		? reactElement(ReactMessage, { ...descriptor, ignoreTag })
-		: formatMessage(descriptor, undefined, { ignoreTag });
+		? reactElement(ReactMessage, { ...descriptor, values, ignoreTag })
+		: formatMessage(descriptor, values, { ignoreTag });
 	if (typeof content === 'string') return content;
 	<Locale value={intl}>
 		<ReactCompat component={ReactContent} props={{ content }} contexts={intlContexts} />

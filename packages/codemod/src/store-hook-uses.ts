@@ -1,4 +1,4 @@
-import { localUses, scalar } from './local-uses.js';
+import { localUses, portableArguments, scalar } from './local-uses.js';
 import ts from 'typescript';
 
 type SharedInput = (module: string, name: string) => boolean;
@@ -102,37 +102,7 @@ export function storeHookUses(
 			})
 		);
 	}
-	// An imported input is forwarded unchanged to the original hook body. For calls
-	// on the returned store, require data: a write can publish its payload to React.
-	function argument(expr: ts.Expression, imported?: SharedInput): boolean {
-		if (ts.isParenthesizedExpression(expr) || ts.isSatisfiesExpression(expr))
-			return argument(expr.expression, imported);
-		if (ts.isAsExpression(expr) || ts.isTypeAssertionExpression(expr))
-			return argument(expr.expression, imported);
-		if (ts.isArrayLiteralExpression(expr))
-			return expr.elements.every((el) => argument(el, imported));
-		if (ts.isObjectLiteralExpression(expr))
-			return expr.properties.every(
-				(p) =>
-					ts.isPropertyAssignment(p) &&
-					!ts.isComputedPropertyName(p.name) &&
-					argument(p.initializer, imported),
-			);
-		if (ts.isIdentifier(expr)) {
-			const declaration = checker.getSymbolAtLocation(expr)?.valueDeclaration;
-			if (declaration && ts.isVariableDeclaration(declaration)) {
-				return (
-					!!declaration.initializer &&
-					declaration.end <= expr.pos &&
-					ts.isVariableDeclarationList(declaration.parent) &&
-					!!(declaration.parent.flags & ts.NodeFlags.Const) &&
-					scalar(typeOf(expr)) &&
-					argument(declaration.initializer, imported)
-				);
-			}
-		}
-		return (imported && sharedHandle(expr, imported)) || scalar(typeOf(expr));
-	}
+	const argument = portableArguments(checker, typeOf);
 	function sharedHandle(expr: ts.Expression, imported: SharedInput): boolean {
 		if (!ts.isIdentifier(expr)) return false;
 		const d = checker.getSymbolAtLocation(expr)?.declarations?.[0];
