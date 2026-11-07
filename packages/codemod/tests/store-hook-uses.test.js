@@ -181,3 +181,65 @@ it('only generates native hook imports for callers compiled as TSRX', () => {
 	expect(result.rules['store-hook']).toBeUndefined();
 	expect(result.notes.some((n) => n.rule === 'store-hook')).toBe(false);
 });
+
+it('accepts scalar-branded inputs and conditional choices of the original handle', () => {
+	const prefix = `import {useStore} from 'observer';import {counter} from './counter';
+		type Id=string & {readonly brand: unique symbol};
+		export function Panel({id,on}:{id:Id,on:boolean}){`;
+	const converted = migrate(
+		prefix + 'useStore(on ? counter : null,id);useStore(on && counter,{id});return <p/>;}',
+	);
+	expect(converted.rules['store-hook']).toBe(1);
+	for (const value of [
+		'on ? counter : (<i/> as unknown as string)',
+		'on ? counter : function render(){}',
+		'on && {id: <b/>}',
+		'{id: (<b/> as unknown as string)}',
+	]) {
+		expect(
+			migrate(prefix + `useStore(${value});return <p/>;}`).rules['store-hook'],
+		).toBeUndefined();
+	}
+});
+
+it.each(['any', 'never', 'unknown', '(string & {brand:true}) | {render():unknown}'])(
+	'defers a non-scalar input typed %s',
+	(type) => {
+		const result = migrate(
+			`import {useStore} from 'observer';export function Panel({id}:{id:${type}}){useStore(id);return <p/>;}`,
+		);
+		expect(result.rules['store-hook']).toBeUndefined();
+	},
+);
+
+it('rejects local renderer values hidden behind a branded result, call or destructuring', () => {
+	const base = `import {useStore} from 'observer'; import type {ReactElement} from 'react';
+		type Id=string & {readonly brand:unique symbol}; declare function getId(x: ReactElement):Id;`;
+	for (const body of [
+		'useStore().write(0,getId(<b/>));',
+		'const {id}={id:<b/> as unknown as Id}; useStore().write(0,id);',
+		'const tree=<b/>;function get(){return getId(tree)} useStore().write(0,get());',
+		'const bad=(<b/> as unknown as Id)!;useStore().write(0,{bad});',
+	]) {
+		expect(
+			migrate(base + `export function Panel(){${body}return <p/>;}`).rules['store-hook'],
+		).toBeUndefined();
+	}
+});
+
+it.each(['for', 'for await'])(
+	'defers store writes of renderer values taken from a %s loop',
+	(loop) => {
+		const result = migrate(`import {useStore} from 'observer';
+		export function Panel() {
+			const store = useStore();
+			async function publish() {
+				const rows = [{details:{id:<b/> as unknown as string}}];
+				${loop} (const {details:{id}} of rows) store.write(0, id);
+			}
+			return <button onClick={publish}/>;
+		}`);
+		expect(result.rules['store-hook']).toBeUndefined();
+		expect(result.unported).toHaveLength(1);
+	},
+);
