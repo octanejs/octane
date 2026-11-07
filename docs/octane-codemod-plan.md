@@ -432,8 +432,8 @@ such package under **No Octane port**.
   `LegendList` rows, Clerk's nested React children), so bindings remain the
   work. One is `use-sync-external-store/with-selector`: the codemod now maps
   the package's root and `/shim` entries to Octane's `useSyncExternalStore`,
-  but `useSyncExternalStoreWithSelector` needs a port, which four bindings
-  (redux, tanstack-store, tiptap, xstate) each carry a copy of.
+  but `useSyncExternalStoreWithSelector` needs a port, which three bindings
+  (redux, tiptap, xstate) each carry a copy of.
 
 ## Workstreams
 

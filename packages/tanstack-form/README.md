@@ -79,8 +79,9 @@ export function ProfileForm() @{
 
 The adapter includes `useForm`, `useField`, `useFormGroup`, `useFieldGroup`,
 `createFormHook`, `createFormHookContexts`, and
-`useIsomorphicLayoutEffect`. It also re-exports `@tanstack/form-core` and the
-`useSelector`/`useStore` helpers from `@octanejs/tanstack-store`.
+`useIsomorphicLayoutEffect`. It also re-exports `@tanstack/form-core` and
+`useSelector` from the official `@tanstack/octane-store` adapter, plus the
+deprecated `useStore` alias that `@tanstack/react-form` exports.
 
 Octane uses native DOM events. Text controls should call
 `field.handleChange()` from `onInput`; native `change` fires only on

@@ -15,10 +15,10 @@ import { compile } from 'octane/compiler';
 // The runtime suite executes the declared form with inline lowering both on
 // and off; its cache identity and freshness must not depend on this artifact.
 const PROD = { hmr: false as const, dev: false, inlineHookMemo: false };
-const DECLARED = ['@octanejs/tanstack-store#useSelector'];
+const DECLARED = ['@tanstack/octane-store#useSelector'];
 
 const SOURCE = `
-  import { useSelector } from '@octanejs/tanstack-store';
+  import { useSelector } from '@tanstack/octane-store';
   export function App(props) @{
     const free = useSelector(props.store, (s) => s.total);
     const captured = useSelector(props.store, (s) => s.items[props.id]);
@@ -85,7 +85,7 @@ describe('data-callback hooks', () => {
 		// the callback beneath either could hand the hook a stale closure.
 		const code = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         export function App(props) @{
           const a = useSelector(props.store, (s) => s.items[props.id], null);
           const b = useSelector(props.store, (s) => s.rows[props.id], [props.id]);
@@ -143,7 +143,7 @@ describe('data-callback hooks', () => {
 	it('matches a namespace-imported hook against its own module', () => {
 		const code = compile(
 			`
-        import * as Store from '@octanejs/tanstack-store';
+        import * as Store from '@tanstack/octane-store';
         export function App(props) @{
           const v = Store.useSelector(props.store, (s) => s.items[props.id]);
           <p>{v as string}</p>
@@ -161,7 +161,7 @@ describe('data-callback hooks', () => {
 		// callback should be keyed.
 		const code = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         export function App(props) @{
           const v = useSelector(props.store, (s) => s.items[props.id], undefined);
           <p>{v as string}</p>
@@ -180,7 +180,7 @@ describe('data-callback hooks', () => {
 		for (const deps of ['null as any', '(null)', '[props.id] as const', '[props.id]!']) {
 			const code = compile(
 				`
-          import { useSelector } from '@octanejs/tanstack-store';
+          import { useSelector } from '@tanstack/octane-store';
           export function App(props) @{
             const v = useSelector(props.store, (s) => s.items[props.id], ${deps});
             <p>{v as string}</p>
@@ -199,7 +199,7 @@ describe('data-callback hooks', () => {
 		// per-render identity churn.
 		const code = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         type Sel = (s: any) => any;
         export function App(props) @{
           const free = useSelector(props.store, ((s) => s.total) as Sel);
@@ -221,7 +221,7 @@ describe('data-callback hooks', () => {
 		// the component cannot be dragged along to module scope.
 		const code = compile(
 			`
-        import { useSelector } from '@octanejs/tanstack-store';
+        import { useSelector } from '@tanstack/octane-store';
         export function App(props) @{
           type LocalSel = (s: any) => any;
           const free = useSelector(props.store, ((s) => s.total) as LocalSel);

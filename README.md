@@ -301,7 +301,7 @@ generated inventory; the shape of it is:
   [`@octanejs/mcp-server`](./packages/octane-mcp-server), which exposes Octane
   docs and compile tooling to AI agents over MCP.
 - The `@octanejs/*` bindings, each an Octane port of a React library: state
-  (zustand, jotai, valtio, mobx, redux, redux-toolkit, tanstack-store), data and
+  (zustand, jotai, valtio, mobx, redux, redux-toolkit), data and
   routing (tanstack-query, apollo-client, tanstack-router, remix-router), UI
   (radix, base-ui, aria, shadcn, motion, dnd-kit, sonner, floating-ui, lucide),
   forms and content (hook-form, tanstack-form, lexical, tiptap, mdx, i18next),

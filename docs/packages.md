@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**134 publishable package(s), including 119 framework binding(s) and 3 framework integration(s).**
+**132 publishable package(s), including 117 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -110,7 +110,6 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/stylex` | [`packages/stylex`](../packages/stylex) | framework binding | `0.1.67` | 4 |
 | `@octanejs/swr` | [`packages/swr`](../packages/swr) | framework binding | `0.0.34` | 7 |
 | `@octanejs/syntax-highlighter` | [`packages/syntax-highlighter`](../packages/syntax-highlighter) | framework binding | `0.0.33` | 2634 |
-| `@octanejs/tanstack-ai` | [`packages/tanstack-ai`](../packages/tanstack-ai) | framework binding | `0.0.62` | 1 |
 | `@octanejs/tanstack-db` | [`packages/tanstack-db`](../packages/tanstack-db) | framework binding | `0.0.30` | 1 |
 | `@octanejs/tanstack-devtools` | [`packages/tanstack-devtools`](../packages/tanstack-devtools) | framework binding | `0.0.63` | 1 |
 | `@octanejs/tanstack-form` | [`packages/tanstack-form`](../packages/tanstack-form) | framework binding | `0.0.64` | 1 |
@@ -119,7 +118,6 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/tanstack-router` | [`packages/tanstack-router`](../packages/tanstack-router) | framework binding | `0.3.2` | 8 |
 | `@octanejs/tanstack-router-ssr-query` | [`packages/tanstack-router-ssr-query`](../packages/tanstack-router-ssr-query) | framework binding | `0.1.14` | 1 |
 | `@octanejs/tanstack-start` | [`packages/tanstack-start`](../packages/tanstack-start) | framework integration | `0.2.15` | 15 |
-| `@octanejs/tanstack-store` | [`packages/tanstack-store`](../packages/tanstack-store) | framework binding | `0.0.64` | 1 |
 | `@octanejs/tanstack-virtual` | [`packages/tanstack-virtual`](../packages/tanstack-virtual) | framework binding | `0.1.65` | 1 |
 | `@octanejs/tauri` | [`packages/tauri`](../packages/tauri) | framework binding | `0.0.50` | 1 |
 | `@octanejs/testing-library` | [`packages/testing-library`](../packages/testing-library) | framework binding | `0.1.68` | 2 |

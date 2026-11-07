@@ -1,6 +1,7 @@
 export * from '@tanstack/form-core';
 
-export { useSelector, useStore } from '@octanejs/tanstack-store';
+export { useSelector } from '@tanstack/octane-store';
+export { useStore } from './useStore';
 
 export * from './createFormHook.tsrx';
 export * from './types';

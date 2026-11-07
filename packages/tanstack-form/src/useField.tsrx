@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'octane';
-import { useSelector } from '@octanejs/tanstack-store';
+import { useSelector } from '@tanstack/octane-store';
 import { FieldApi, functionalUpdate } from '@tanstack/form-core';
 import { useIsomorphicLayoutEffect } from './useIsomorphicLayoutEffect';
 import type {

@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "6934e494619456718262e46023c87bfa45ff3601a02f5f9c861767256bcf3052"
+      "lockfileSha256": "afc3924c227c5dfabf5ee0de3fb2e01f697f5c033b65df3808fd29cbd5f7336f"
     }
   },
   "lanes": [
@@ -133,12 +133,12 @@
         {
           "path": "packages/tanstack-form/tests/_fixtures/upstream/useField.tsrx",
           "role": "support",
-          "sha256": "59048dc5ce4fdb02adb39045045639d8215d9d741f462ae44bf44f52b82ee877"
+          "sha256": "ae296aaf53b1477cdeab37d665b0eadeb960e555ebad22225e0ebffb861d6720"
         },
         {
           "path": "packages/tanstack-form/tests/_fixtures/upstream/useForm.tsrx",
           "role": "support",
-          "sha256": "078157bdd42f70365f5b30ae5989a19d2495ce195efeca321ce95d7a6cb065b5"
+          "sha256": "7c2a29a9ed2f327c76cb492a619fd824d5d2aa6c14e302924967490892a139ca"
         },
         {
           "path": "packages/tanstack-form/tests/_fixtures/upstream/useFormGroup.tsrx",

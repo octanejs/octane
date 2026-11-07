@@ -33,8 +33,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@octanejs/tanstack-store": "workspace:*",
-    "@tanstack/form-core": "catalog:default"
+    "@tanstack/form-core": "catalog:default",
+    "@tanstack/octane-store": "^0.13.0"
   },
   "peerDependencies": {
     "octane": "workspace:^0.16.0"
