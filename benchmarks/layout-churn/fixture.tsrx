@@ -8,7 +8,8 @@ interface RowProps {
 	revision: number;
 }
 
-const text = (props: RowProps) => 'row ' + props.id + ' ' + 'x'.repeat((props.id + props.revision) % 7);
+const text = (props: RowProps) =>
+	'row ' + props.id + ' ' + 'x'.repeat((props.id + props.revision) % 7);
 
 // Avoid: each layout effect reads, then writes. The next row's read lays out again.
 function EffectInterleaved(props: RowProps) @{

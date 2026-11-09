@@ -123,7 +123,8 @@ async function measure(browser, variant, count) {
 			{ variant, count },
 		);
 		let revision = 0;
-		for (; revision < WARMUP; revision++) await page.evaluate((r) => globalThis.update(r), revision);
+		for (; revision < WARMUP; revision++)
+			await page.evaluate((r) => globalThis.update(r), revision);
 		const layouts = [];
 		const styles = [];
 		const layoutMs = [];
@@ -179,7 +180,8 @@ const report = {
 	targets,
 	meta: { node: process.version, chromium: browser.version(), source, updates: UPDATES },
 };
-if (process.env.BENCH_JSON) fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(report, null, 2));
+if (process.env.BENCH_JSON)
+	fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(report, null, 2));
 console.table(
 	Object.fromEntries(
 		targets.map(({ name, ops }) => [
