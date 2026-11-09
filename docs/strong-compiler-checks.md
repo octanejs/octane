@@ -98,7 +98,10 @@ An asynchronous state update is cancelled or ignored when one of these holds:
   same-module helper's parameter. The controller itself can also be passed to
   the request, or to a same-module helper that reads its `signal` or calls
   `abort()`.
-  `controller.signal.aborted` also works as a guard.
+  After the last `await`, checking `!controller.signal.aborted` guards the update.
+  The same guard works with `!signal.aborted` when an `AbortSignal.any` array
+  literal includes the cleanup-owned signal, as in
+  `const signal = AbortSignal.any([controller.signal, props.signal])`.
 - The cleanup assigns a flag declared with `let` inside the effect, and the
   update is guarded by that flag after the last `await` or at the start of the
   promise callback. The guard can be `if (!ignore) setData(data)`,
