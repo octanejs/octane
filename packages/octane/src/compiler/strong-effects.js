@@ -223,7 +223,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			if (binding === undefined) return null;
 			if (binding === null) return GLOBAL_OBJECTS.has(node.name) ? 'g:window' : `g:${node.name}`;
 			// A helper parameter names the argument of the call being visited.
-			const argument = depth < 8 ? frameArgument(binding) : null;
+			const argument = !binding.reassigned && depth < 8 ? frameArgument(binding) : null;
 			if (argument !== null) {
 				const key = keyOf(argument, depth + 1);
 				if (key !== null) return key;
@@ -459,7 +459,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 	// The AbortController a binding holds: one created by `new AbortController()`,
 	// reached through stable aliases and the arguments of the helpers being visited.
 	function controllerOf(binding, depth = 0) {
-		if (binding == null || depth > 8) return null;
+		if (binding == null || binding.reassigned || depth > 8) return null;
 		const argument = frameArgument(binding);
 		const source = unwrap(argument ?? stableInit(binding));
 		if (source?.type === 'Identifier') return controllerOf(bindingOf(source), depth + 1);
@@ -576,6 +576,26 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		return false;
 	}
 
+	// A composed signal is live only while every constituent is live. Record each
+	// known controller so cleanup can abort any one of them to guard the write.
+	function liveSignalGuards(guard, tokens) {
+		const node = aliasedValue(guard.object);
+		const callee = node?.type === 'CallExpression' && !node.optional ? unwrap(node.callee) : null;
+		const inputs =
+			!guard.optional &&
+			callee?.type === 'MemberExpression' &&
+			!callee.optional &&
+			memberName(callee) === 'any' &&
+			keyOf(callee.object) === 'g:AbortSignal'
+				? unwrap(node.arguments?.[0])
+				: null;
+		for (const signal of inputs?.type === 'ArrayExpression' ? inputs.elements : [node]) {
+			const controller = signalController(signal);
+			if (controller !== null) (tokens ??= []).push({ controller, segment: flow.segment });
+		}
+		return tokens;
+	}
+
 	function guardTokens(test, truthy, tokens) {
 		const node = unwrap(test);
 		if (node?.type === 'UnaryExpression' && node.operator === '!') {
@@ -602,11 +622,8 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		if (node?.type === 'Identifier') {
 			const binding = bindingOf(node);
 			if (binding) (tokens ??= []).push({ binding, truthy, segment: flow.segment });
-		} else if (node?.type === 'MemberExpression' && memberName(node) === 'aborted') {
-			const controller = signalController(node.object);
-			if (controller !== null) {
-				(tokens ??= []).push({ controller, truthy, segment: flow.segment });
-			}
+		} else if (!truthy && node?.type === 'MemberExpression' && memberName(node) === 'aborted') {
+			return liveSignalGuards(node, tokens);
 		}
 		return tokens;
 	}
@@ -786,7 +803,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 			const token = guard.token;
 			if (token.segment !== write.segment) continue;
 			if (token.controller) {
-				if (!token.truthy && aborts(token.controller, cleanup, record)) return true;
+				if (aborts(token.controller, cleanup, record)) return true;
 				continue;
 			}
 			const values = cleanup.flags.get(token.binding);
@@ -811,18 +828,18 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		return typeof value === 'string' ? value : UNKNOWN;
 	}
 
-	// A listener options argument, through stable aliases and the arguments of
-	// the helpers being visited.
-	function optionsOf(expression, depth = 0) {
+	// Resolve a value through stable aliases and the arguments of helpers being visited.
+	function aliasedValue(expression, depth = 0) {
 		const node = unwrap(expression);
 		if (node?.type !== 'Identifier' || depth > 8) return node;
 		const binding = bindingOf(node);
-		const source = binding == null ? null : (frameArgument(binding) ?? stableInit(binding));
-		return source === null ? node : optionsOf(source, depth + 1);
+		if (binding == null || binding.reassigned) return node;
+		const source = frameArgument(binding) ?? stableInit(binding);
+		return source === null ? node : aliasedValue(source, depth + 1);
 	}
 
 	function captureOf(expression) {
-		const node = optionsOf(expression);
+		const node = aliasedValue(expression);
 		if (node == null) return false;
 		if (node.type === 'ObjectExpression') {
 			let capture = false;
@@ -841,7 +858,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 	}
 
 	function listenerSignal(expression) {
-		const node = optionsOf(expression);
+		const node = aliasedValue(expression);
 		if (node?.type !== 'ObjectExpression') return null;
 		for (const property of node.properties ?? []) {
 			if (

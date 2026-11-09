@@ -167,6 +167,34 @@ describe('Strong asynchronous effect updates', () => {
 			'a different controller',
 			`const first = new AbortController(); const second = new AbortController(); api.get(props.id, { signal: first.signal }).then(setData); return () => second.abort();`,
 		],
+		[
+			'a composed signal with only external constituents',
+			`const controller = new AbortController(); const signal = AbortSignal.any([props.signal]); fetch('/api', { signal }).then(value => { if (!signal.aborted) setData(value); }); return () => controller.abort();`,
+		],
+		[
+			'a shadowed AbortSignal.any',
+			`const AbortSignal = props.factory; const controller = new AbortController(); const signal = AbortSignal.any([controller.signal]); fetch('/api', { signal }).then(value => { if (!signal.aborted) setData(value); }); return () => controller.abort();`,
+		],
+		[
+			'a composed signal checked before the final await',
+			`const controller = new AbortController(); const signal = AbortSignal.any([controller.signal]); (async () => { const response = await fetch('/api', { signal }); if (!signal.aborted) { await api.more(); setData(response); } })(); return () => controller.abort();`,
+		],
+		[
+			'a signal that can select an external constituent alone',
+			`const controller = new AbortController(); const owned = AbortSignal.any([controller.signal, props.signal]); const signal = AbortSignal.any([props.enabled ? owned : props.signal]); fetch('/api', { signal }).then(value => { if (!signal.aborted) setData(value); }); return () => controller.abort();`,
+		],
+		[
+			'a composed signal that might never be created',
+			`const controller = new AbortController(); const signal = AbortSignal.any?.([controller.signal]); api.get(props.id).then(value => { if (!signal?.aborted) setData(value); }); return () => controller.abort();`,
+		],
+		[
+			'a signal composed from a reassigned helper parameter',
+			`const controller = new AbortController(); function load(owner) { owner = props.controller; const signal = AbortSignal.any([owner.signal]); api.get(props.id).then(value => { if (!signal.aborted) setData(value); }); } load(controller); return () => controller.abort();`,
+		],
+		[
+			'a reassigned AbortSignal helper parameter',
+			`const controller = new AbortController(); function load(factory) { factory = props.factory; const signal = factory.any([controller.signal]); api.get(props.id).then(value => { if (!signal.aborted) setData(value); }); } load(AbortSignal); return () => controller.abort();`,
+		],
 		['an opaque cleanup', `api.get(props.id).then(setData); return props.unsubscribe;`],
 		[
 			'a sequence ending in an empty cleanup',
@@ -200,11 +228,30 @@ describe('Strong asynchronous effect updates', () => {
 		`const controller = new AbortController(); api.get(props.id, { ...props.options, signal: controller.signal }).then(setData); return () => controller.abort();`,
 		`const controller = new AbortController(); const signal = controller.signal; (async () => { const r = await fetch('/api', { signal }); setData(await r.json()); })(); return () => controller.abort();`,
 		`const controller = new AbortController(); api.get(props.id).then(value => { if (!controller.signal.aborted) setData(value); }); return () => controller.abort();`,
+		`const first = new AbortController(); const second = new AbortController(); const signal = AbortSignal.any([first.signal, second.signal]); api.get(props.id).then(value => { if (!signal.aborted) setData(value); }); return () => second.abort();`,
+		`const controller = new AbortController(); const signal = AbortSignal.any([props.signal, controller.signal]); api.get(props.id).then(value => { if (!signal.aborted) setData(value); }); return () => controller.abort();`,
 		`const controller = new AbortController(); const alias = controller; api.get(props.id, { signal: alias.signal }).then(setData); return () => controller.abort();`,
 		`const controller = new AbortController(); const alias = controller; api.get(props.id, { signal: controller.signal }).then(setData); return () => alias.abort();`,
 	])('accepts cleanup that cancels or ignores the result: %s', (body) => {
 		accepts(app(`useEffect(() => { ${body} });`));
 	});
+
+	it.each(['client', 'server'] as const)(
+		'accepts a composed signal through a response body read in %s',
+		(mode) => {
+			const source = app(`useEffect(() => {
+  const controller = new AbortController();
+  const signal = AbortSignal.any([controller.signal, props.signal]);
+  void (async () => {
+    const response = await fetch('/api', { signal });
+    const text = await response.text();
+    if (!signal.aborted) setData(text);
+  })();
+  return () => controller.abort();
+});`);
+			expect(() => compile(source, '/src/App.tsrx', { strong: true, mode })).not.toThrow();
+		},
+	);
 
 	const aborted = (body: string) =>
 		`useEffect(() => { const controller = new AbortController(); const { signal } = controller; (async () => { ${body} })(); return () => controller.abort(); });`;
