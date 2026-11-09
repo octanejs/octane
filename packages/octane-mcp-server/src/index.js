@@ -174,6 +174,7 @@ export const BENCHMARK_SUITES = [
 	'descriptor-renderer',
 	'runtime-style-dedup',
 	'empty-host-children',
+	'layout-churn',
 	'passive-scheduling',
 	'client-hot-paths',
 	'compiler-output',
