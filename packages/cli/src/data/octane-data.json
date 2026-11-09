@@ -7190,6 +7190,12 @@
         "replacement": "Return the measurement synchronously, and read asynchronous render data with `use()` or a query binding.",
         "url": "https://octanejs.dev/docs/strong-mode#octane-strong-layout-snapshot-async"
       },
+      "OCTANE_STRONG_LAYOUT_SNAPSHOT_WRITE": {
+        "severity": "error",
+        "detects": "A `useLayoutSnapshot` measurement writes to an element the template renders: its style, class, attributes, children, or scroll offset. Octane runs the queued measurements together so the browser lays out once, and a write between them makes every later read lay out again.",
+        "replacement": "Return the measurement only. Render the value from the snapshot, or move the write to `useLayoutEffect`.",
+        "url": "https://octanejs.dev/docs/strong-mode#octane-strong-layout-snapshot-write"
+      },
       "OCTANE_STRONG_EFFECT_CHAIN": {
         "severity": "error",
         "detects": "An effect reads state written by another effect's own execution or promise continuation in the same component.",

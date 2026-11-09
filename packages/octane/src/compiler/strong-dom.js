@@ -6,6 +6,7 @@ import { createRendererRegionResolver } from './renderer-boundaries.js';
 export const STRONG_MANAGED_DOM_WRITE = 'OCTANE_STRONG_MANAGED_DOM_WRITE';
 export const STRONG_RAW_HTML_WRITE = 'OCTANE_STRONG_RAW_HTML_WRITE';
 export const STRONG_OWN_MARKUP_QUERY = 'OCTANE_STRONG_OWN_MARKUP_QUERY';
+export const STRONG_LAYOUT_SNAPSHOT_WRITE = 'OCTANE_STRONG_LAYOUT_SNAPSHOT_WRITE';
 
 const SKIP_KEYS = new Set([
 	'type',
@@ -48,6 +49,8 @@ const RAW_HTML_METHODS = new Set(['insertAdjacentHTML', 'setHTMLUnsafe']);
 const CLASS_LIST_MUTATORS = new Set(['add', 'remove', 'replace', 'toggle']);
 const ATTRIBUTE_METHODS = new Set(['setAttribute', 'removeAttribute', 'toggleAttribute']);
 const STYLE_METHODS = new Set(['setProperty', 'removeProperty']);
+// Assigning a scroll offset moves content, so a later geometry read lays out again.
+const SCROLL_PROPERTIES = new Set(['scrollLeft', 'scrollTop']);
 const QUERY_METHODS = new Set([
 	'getElementById',
 	'getElementsByClassName',
@@ -74,6 +77,7 @@ const WRITE_NAMES = [
 	'classList',
 	...ATTRIBUTE_METHODS,
 	'style',
+	...SCROLL_PROPERTIES,
 ];
 // A selector with one optional tag and at least one #id/.class part. Combinators,
 // attribute selectors, pseudo-classes and CSS escapes are not proven.
@@ -270,6 +274,8 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 	const elements = [];
 	const writes = [];
 	const queries = [];
+	// The functions `useLayoutSnapshot` runs in its batched read pass.
+	const measurements = new Set();
 	const boundaries = [];
 	const functions = [];
 	// TSRX row and catch bindings are not scopes in the shared hook analysis.
@@ -644,6 +650,7 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 				return;
 			}
 			case 'UpdateExpression':
+				recordWrite(node.argument, node.argument, null);
 				visitWriteTarget(node.argument);
 				return;
 			case 'UnaryExpression':
@@ -659,6 +666,15 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 				return;
 			case 'CallExpression': {
 				const callee = unwrap(node.callee);
+				if (callNames.get(node) === 'useLayoutSnapshot') {
+					// Inline, or an unreassigned local that holds the function.
+					let measure = unwrap(node.arguments[0]);
+					if (measure?.type === 'Identifier') {
+						const declaration = declarations.get(bindingOf(measure));
+						measure = declaration?.current === false ? unwrap(declaration.init) : null;
+					}
+					if (FUNCTIONS.has(measure?.type)) measurements.add(measure);
+				}
 				if (callee?.type === 'MemberExpression') {
 					recordWrite(callee, callee, node.arguments);
 					const method = propertyName(callee);
@@ -695,14 +711,14 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 			else if (first === 'style' && access.path.length === 2) {
 				kind = 'style-property';
 				name = styleKey(second);
-			}
+			} else if (access.path.length === 1 && SCROLL_PROPERTIES.has(first)) kind = 'scroll';
 		} else if (access.path.length === 1 && CHILD_METHODS.has(first)) {
 			kind = 'children';
 		} else if (access.path.length === 1 && RAW_HTML_METHODS.has(first)) {
 			kind = 'html';
 		} else if (access.path.length === 1 && ATTRIBUTE_METHODS.has(first)) {
 			name = staticString(args[0])?.toLowerCase() ?? null;
-			kind = name === 'class' ? 'class' : name === 'style' ? 'style' : name ? 'attribute' : null;
+			kind = name === 'class' ? 'class' : name === 'style' ? 'style' : 'attribute';
 		} else if (
 			access.path.length === 2 &&
 			first === 'classList' &&
@@ -711,13 +727,18 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 			kind = 'class';
 		} else if (access.path.length === 2 && first === 'style' && STYLE_METHODS.has(second)) {
 			name = staticString(args[0]);
-			if (name !== null) {
-				kind = 'style-property';
-				name = styleKey(name);
-			}
+			kind = 'style-property';
+			if (name !== null) name = styleKey(name);
 		}
 		if (kind !== null) {
-			writes.push({ source: access.source, kind, name, node: reportNode, spelling: access.path });
+			writes.push({
+				source: access.source,
+				kind,
+				name,
+				node: reportNode,
+				spelling: access.path,
+				function: functions.at(-1),
+			});
 		}
 	}
 
@@ -817,6 +838,19 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 				}
 				break;
 		}
+	}
+
+	// After the ownership errors, which name the replacement for the same write.
+	for (const write of writes) {
+		if (!measurements.has(write.function)) continue;
+		// Any rendered element counts here: the write dirties layout whoever owns the property.
+		const { element, ref } = write.source;
+		if (element === undefined && (ref.escaped || ref.attachments.length === 0)) continue;
+		report(
+			STRONG_LAYOUT_SNAPSHOT_WRITE,
+			write.node,
+			`Strong mode does not allow \`${write.spelling.join('.')}\` inside a useLayoutSnapshot measurement. Octane runs the queued measurements together so the browser lays out once, and a DOM write between them makes every later read lay out again. Return the measurement only. Render the value from the snapshot, or move the write to useLayoutEffect.`,
+		);
 	}
 
 	for (const query of queries) {

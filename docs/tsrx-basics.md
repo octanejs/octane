@@ -295,7 +295,9 @@ Octane compares snapshots with `Object.is` by default. For measurements that
 return a new object, supply `equal` to compare their contents and avoid
 repeated updates.
 
-Keep the measurement synchronous and free of writes and resource setup. For
+Keep the measurement synchronous and free of writes and resource setup. A
+DOM write there makes every later measurement lay out again, and Strong mode
+rejects it. For
 changes such as resizing or scrolling between component commits, have an
 observer or event callback update state to request another commit and
 measurement. Use this hook in the DOM renderer.

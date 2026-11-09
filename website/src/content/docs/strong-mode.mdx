@@ -583,6 +583,14 @@ A `useLayoutSnapshot` measurement is an `async` or generator function. It return
 
 **Replacement.** Return the measurement synchronously, and read asynchronous render data with `use()` or a query binding.
 
+<h4 id="octane-strong-layout-snapshot-write">
+	<code>OCTANE_STRONG_LAYOUT_SNAPSHOT_WRITE</code>
+</h4>
+
+A `useLayoutSnapshot` measurement writes to an element the template renders: its style, class, attributes, children, or scroll offset. Octane runs the queued measurements together so the browser lays out once, and a write between them makes every later read lay out again.
+
+**Replacement.** Return the measurement only. Render the value from the snapshot, or move the write to `useLayoutEffect`.
+
 <h4 id="octane-strong-effect-chain">
 	<code>OCTANE_STRONG_EFFECT_CHAIN</code>
 </h4>

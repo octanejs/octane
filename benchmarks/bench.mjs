@@ -1422,6 +1422,14 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: () => [] }],
 	},
 	{
+		// Chromium layout passes for measure-then-write rows, against batched controls.
+		name: 'layout-churn',
+		cwd: 'layout-churn',
+		servers: [],
+		iter: { normal: 15, quick: 5 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		name: 'passive-scheduling',
 		cwd: 'passive-scheduling',
 		servers: [],

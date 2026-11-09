@@ -107,6 +107,16 @@ export const STRONG_DIAGNOSTICS = [
 		primitives: ['useLayoutSnapshot', 'use'],
 	},
 	{
+		code: 'OCTANE_STRONG_LAYOUT_SNAPSHOT_WRITE',
+		section: 'effects',
+		severity: 'error',
+		detects:
+			'A `useLayoutSnapshot` measurement writes to an element the template renders: its style, class, attributes, children, or scroll offset. Octane runs the queued measurements together so the browser lays out once, and a write between them makes every later read lay out again.',
+		replacement:
+			'Return the measurement only. Render the value from the snapshot, or move the write to `useLayoutEffect`.',
+		primitives: ['useLayoutSnapshot', 'useLayoutEffect'],
+	},
+	{
 		code: 'OCTANE_STRONG_EFFECT_CHAIN',
 		section: 'effects',
 		severity: 'error',
