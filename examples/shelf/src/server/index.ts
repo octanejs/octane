@@ -21,11 +21,15 @@ export function createShelfServer() {
 			headers: { 'x-shelf-account': namespaceFrom(url.search) + account },
 		});
 		const store = createDataStore({ transport: data.transport(request) });
-		const html = await (page === 'octane' ? renderOctane : renderReact)(
-			serverSession(account, store),
-		);
-		const seed = store.dehydrate();
-		store.retire();
+		let html: string;
+		let seed: string;
+		try {
+			html = await (page === 'octane' ? renderOctane : renderReact)(serverSession(account, store));
+			seed = store.dehydrate();
+		} finally {
+			// A failed render still ends the request's store and its timers.
+			store.retire();
+		}
 		return template
 			.replace('<!--ssr-html-->', () => html)
 			.replace(
