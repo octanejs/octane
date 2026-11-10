@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, expect, it, vi } from 'vitest';
-import { runCodemod } from '../dist/index.js';
+import { runCodemod, transformModule } from '../dist/index.js';
 import { bundleRuntime, installDOM } from './bundle-runtime.js';
 
 const temporary = [];
@@ -280,69 +280,176 @@ it('keeps distinct component types for separate SVG modules with identical sourc
 	}
 });
 
-it('matches React class coercion for values passed to a directly returned icon', async () => {
-	const { root, file } = fixture(`import Mark from './icons/mark.svg';
-		export function Pane({className}) { return <Mark className={className}/>; }`);
-	const result = await runCodemod([file], {
+async function expectSvgClassParity(view, states, count) {
+	const { root, file } = fixture("import Mark from './icons/mark.svg';\n" + view);
+	const reference = asset
+		.replace('<svg ', '<svg {...props} ')
+		.replaceAll('fill-rule=', 'fillRule=')
+		.replaceAll('stroke-width=', 'strokeWidth=');
+	fs.writeFileSync(
+		path.join(root, 'src/reference.tsx'),
+		`function Mark(props) { return ${reference}; }\n${view}`,
+	);
+	const { files } = await runCodemod([file], {
 		root,
 		svgPaths: true,
 		strong: true,
 		verify: true,
 		write: true,
 	});
-	expect(result.files.find((f) => f.file === 'src/pane.tsx').rules['svg-paths']).toBe(1);
+	const converted = files.find((f) => f.file === 'src/pane.tsx');
+	expect(converted.rules['svg-paths']).toBe(count);
+	expect(
+		[...converted.notes, ...converted.diagnostics].filter((n) => n.severity === 'error'),
+	).toEqual([]);
 	const load = (mode, entry) =>
-		bundleRuntime(root, mode, "export {Pane} from './src/pane.tsrx';" + entry, [], {
-			'.svg': 'text',
-		});
+		bundleRuntime(
+			root,
+			mode,
+			"export {Pane} from './src/pane.tsrx'; export {Pane as Original} from './src/reference.tsx';" +
+				entry,
+			[],
+			{ '.svg': 'text' },
+		);
 	const dom = installDOM();
 	try {
 		const server = await load('server', "export {prerender} from 'octane/static';");
 		const client = await load('client', "export {act, createRoot} from 'octane';");
-		const { createRoot: reactRoot } = await import('react-dom/client');
+		const { createRoot } = await import('react-dom/client');
 		const { act } = await import('react');
-		const original = document.createElement('div');
-		const migrated = document.createElement('div');
-		const a = reactRoot(original);
-		const b = client.createRoot(migrated);
+		const original = document.createElement('div'),
+			migrated = document.createElement('div');
+		const react = createRoot(original);
+		const native = client.createRoot(migrated);
 		try {
-			for (const value of [
-				'status',
-				'',
-				undefined,
-				['one', 'two'],
-				{ selected: true },
-				null,
-				0,
-				7n,
-				true,
-				false,
-				Symbol('status'),
-				() => 'status',
-				{ [Symbol.toPrimitive]: (hint) => hint },
-			]) {
-				const reactIcon = createElement('svg', { className: value });
-				await act(async () => a.render(reactIcon));
-				await client.act(async () => b.render(client.Pane, { className: value }));
-				expect(migrated.firstElementChild.getAttribute('class')).toBe(
-					original.firstElementChild.getAttribute('class'),
+			for (const props of states) {
+				const expected = document.createElement('template'),
+					actual = document.createElement('template');
+				expected.innerHTML = renderToStaticMarkup(createElement(server.Original, props));
+				actual.innerHTML = (await server.prerender(server.Pane, props)).html;
+				expect(shape(actual.content.firstElementChild)).toEqual(
+					shape(expected.content.firstElementChild),
 				);
-				const expected = document.createElement('template');
-				expected.innerHTML = renderToStaticMarkup(reactIcon);
-				const actual = document.createElement('template');
-				actual.innerHTML = (await server.prerender(server.Pane, { className: value })).html;
-				expect(actual.content.querySelector('svg').getAttribute('class')).toBe(
-					expected.content.querySelector('svg').getAttribute('class'),
-				);
+				await act(async () => react.render(createElement(client.Original, props)));
+				await client.act(async () => native.render(client.Pane, props));
+				expect(shape(migrated.firstElementChild)).toEqual(shape(original.firstElementChild));
 			}
 		} finally {
-			await act(async () => a.unmount());
-			await client.act(async () => b.unmount());
+			await act(async () => react.unmount());
+			await client.act(async () => native.unmount());
 		}
 	} finally {
 		dom.window.close();
 		vi.unstubAllGlobals();
 	}
+}
+
+it('preserves clsx-selected classes on direct SVG children on the server and after client updates', async () => {
+	await expectSvgClassParity(
+		`import classes, {clsx as join} from 'clsx';
+		export function Pane({active, muted}) { return <button>
+			<Mark className={classes('icon', active ? 'active' : 'idle', !muted && 'visible')}/>
+			<Mark className={join('badge', (active && !muted || muted) ? 'bright' : 'dim')}/>
+		</button>; }`,
+		[
+			{ active: false, muted: false },
+			{ active: true, muted: false },
+			{ active: false, muted: true },
+		],
+		2,
+	);
+});
+
+it.each([
+	['a shadowed clsx binding', 'const cx = read;', "cx('icon', active && 'on')"],
+	['a local lookalike', 'const clsx = read;', "clsx('icon', active && 'on')"],
+	['an arbitrary call', '', "read('icon', active && 'on')"],
+	['a nested effectful call', '', "cx('icon', read() && 'on')"],
+	['an opaque object argument', 'const value = {active};', "cx('icon', value)"],
+	['a JSX value argument', 'const value = <span/>;', "cx('icon', value)"],
+])('retains the bare SVG for %s', async (_reason, setup, expression) => {
+	const { root, file } = fixture(`import Mark from './icons/mark.svg';
+		import cx from 'clsx';
+		export function Pane({active, read}) { ${setup} return <button><Mark className={${expression}}/></button>; }`);
+	const { files } = await runCodemod([file], { root, svgPaths: true, write: false });
+	const pane = files.find((f) => f.file === 'src/pane.tsx');
+	expect(pane.notes.some((n) => n.rule === 'svg-issuer' && n.severity === 'error')).toBe(true);
+	expect(files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
+});
+
+it.each([
+	['clsx', '', 'clsx', true],
+	['clsx', '', './custom', false],
+	['clsx', ' with {type:"json"}', 'clsx', false],
+	['./lookalike', '', './lookalike', false],
+])('checks class selector source %s%s rewritten to %s', (source, attributes, output, supported) => {
+	const { rules, notes } = transformModule(
+		`import {clsx as cx} from '${source}'${attributes};
+			import Mark from './mark.svg';
+			export function Pane({active}) { return <Mark className={cx('icon', active && 'on')}/>; }`,
+		'pane.tsx',
+		{
+			installedClsx: true,
+			resolveSpecifier: (s) => (s === source ? output : null),
+			pathSvgAdapter: () => './native-icon',
+		},
+	);
+	expect(rules['svg-paths'] === 1).toBe(supported);
+	expect(notes.some((n) => n.rule === 'svg-issuer')).toBe(!supported);
+});
+
+it.each(['a remapped clsx import', 'unsupported geometry', 'an unknown receiving component'])(
+	'keeps the SVG issuer diagnostic for a clsx call with %s',
+	async (reason) => {
+		const icon = "<Mark className={cx('icon', active && 'on')}/>";
+		const {
+			root,
+			file,
+			icon: assetFile,
+		} = fixture(`import Mark from './icons/mark.svg';
+			import cx from 'clsx';
+			export function Pane({active, Receiver}) { return ${reason === 'an unknown receiving component' ? `<Receiver>${icon}</Receiver>` : icon}; }`);
+		if (reason === 'unsupported geometry')
+			fs.writeFileSync(assetFile, '<svg><text>title</text></svg>');
+		if (reason === 'a remapped clsx import') {
+			fs.writeFileSync(
+				path.join(root, 'src/style.ts'),
+				"export default function clsx() { return 'custom'; }",
+			);
+			const config = path.join(root, 'tsconfig.json');
+			const tsconfig = JSON.parse(fs.readFileSync(config, 'utf8'));
+			tsconfig.compilerOptions.paths.clsx = ['./src/style.ts'];
+			fs.writeFileSync(config, JSON.stringify(tsconfig));
+		}
+		const { files } = await runCodemod([file], { root, svgPaths: true, write: false });
+		expect(
+			files.find((f) => f.file === 'src/pane.tsx').notes.some((n) => n.rule === 'svg-issuer'),
+		).toBe(true);
+		expect(files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
+	},
+);
+
+it('matches React class coercion for values passed to a directly returned icon', async () => {
+	const classes = [
+		'status',
+		'',
+		undefined,
+		['one', 'two'],
+		{ selected: true },
+		null,
+		0,
+		7n,
+		true,
+		false,
+		Symbol('status'),
+		() => 'status',
+		{ [Symbol.toPrimitive]: (hint) => hint },
+	];
+	await expectSvgClassParity(
+		'export function Pane({className}) { return <Mark className={className}/>; }',
+		classes.map((className) => ({ className })),
+		1,
+	);
 });
 
 it.each([

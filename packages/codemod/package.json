@@ -58,6 +58,7 @@
     "typescript": "catalog:default"
   },
   "devDependencies": {
+    "clsx": "catalog:default",
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "react-intl": "7.1.14",

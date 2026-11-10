@@ -202,23 +202,25 @@ export async function runCodemod(
 		// the installed component or the JSX runtime, even when their packages exist.
 		const pkg = fs.realpathSync(lib.dir);
 		if (!pkg.split(path.sep).includes('node_modules')) return false;
-		const bindings = { moduleResolution: ts.ModuleResolutionKind.Bundler, ...config };
 		return [specifier, 'react/jsx-runtime'].every((module) => {
-			const target = ts.resolveModuleName(module, file, bindings, ts.sys).resolvedModule;
-			const original = ts.resolveModuleName(
-				module,
-				file,
-				{ ...bindings, paths: undefined, baseUrl: undefined },
-				ts.sys,
-			).resolvedModule;
+			const target = originalModule(file, module);
 			return (
 				!!target &&
-				!!original &&
-				target.resolvedFileName === original.resolvedFileName &&
 				(module !== specifier ||
 					fs.realpathSync(target.resolvedFileName).startsWith(pkg + path.sep))
 			);
 		});
+	}
+	function originalModule(file: string, module: string) {
+		const bindings = { moduleResolution: ts.ModuleResolutionKind.Bundler, ...config };
+		const target = ts.resolveModuleName(module, file, bindings, ts.sys).resolvedModule;
+		const original = ts.resolveModuleName(
+			module,
+			file,
+			{ ...bindings, paths: undefined, baseUrl: undefined },
+			ts.sys,
+		).resolvedModule;
+		return target?.resolvedFileName === original?.resolvedFileName ? target : undefined;
 	}
 	// One shared context per project, including separate file-by-file migrations.
 	const sourceDir = path.join(root, 'src');
@@ -446,6 +448,7 @@ export async function runCodemod(
 		const source = fs.readFileSync(file, 'utf8');
 		const extra: Note[] = [];
 		const reactStoreComponents = new Map<string, boolean>();
+		let installedClsx: boolean | undefined;
 		const isContext = (specifier: string, name: string) => {
 			if (!specifier.startsWith('.')) return null;
 			const target = resolveModule(file, specifier, known);
@@ -546,6 +549,15 @@ export async function runCodemod(
 						? (module, name, prop, depth) =>
 								forwardedProp(file, module, name, prop, 'render', true, depth)
 						: undefined,
+				get installedClsx() {
+					if (installedClsx === undefined) {
+						const target = originalModule(file, 'clsx');
+						installedClsx =
+							target?.packageId?.name === 'clsx' &&
+							fs.realpathSync(target.resolvedFileName).split(path.sep).includes('node_modules');
+					}
+					return installedClsx;
+				},
 				pathSvgAdapter:
 					options.svgPaths && renames.has(file)
 						? (specifier) => pathSvgAdapter(file, specifier, svgErrors)
