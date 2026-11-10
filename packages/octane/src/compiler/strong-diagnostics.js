@@ -117,6 +117,15 @@ export const STRONG_DIAGNOSTICS = [
 		primitives: ['useLayoutSnapshot', 'useLayoutEffect'],
 	},
 	{
+		code: 'OCTANE_STRONG_FORCED_LAYOUT',
+		section: 'effects',
+		severity: 'hint',
+		detects:
+			'A function writes to an element the template renders (its style, class, attributes, children, or scroll offset) and then reads its layout, such as `offsetHeight` or `getBoundingClientRect()`, before the browser has laid out. The read makes the browser lay out synchronously. In a loop that does both, every pass lays out again. A read whose value is dropped, such as `void element.offsetHeight`, is a deliberate flush and is not reported.',
+		replacement:
+			'Read first, then write. In a loop, read every value in one pass and write in a second. Leave the read where it is when the value depends on the write.',
+	},
+	{
 		code: 'OCTANE_STRONG_EFFECT_CHAIN',
 		section: 'effects',
 		severity: 'error',

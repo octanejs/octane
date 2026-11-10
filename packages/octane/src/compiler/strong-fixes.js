@@ -256,7 +256,7 @@ export function lazyRefSuggestion(idiom, ast, source) {
 
 // Properties and calls that read the committed layout. A state update in an
 // effect that reads one of these is a measurement, which useLayoutSnapshot owns.
-const LAYOUT_PROPERTIES = new Set([
+export const LAYOUT_PROPERTIES = new Set([
 	'clientHeight',
 	'clientLeft',
 	'clientTop',

@@ -243,6 +243,59 @@ it('checks deeply branching receiver aliases while preserving independent fields
 });
 
 it.each([
+	['const row: Data = {label: read(), icon: ""};', 'label', true],
+	['const row = {label: read(), icon: ""} as Data;', 'label', true],
+	['const row = {label: read(), icon: ""} satisfies Data;', 'label', true],
+	['const row: Data = {label: read(), icon: ""};', 'icon', false],
+])('preserves the declared type of a destructured field: %s %s', (source, field, blocked) => {
+	const result = migrate(
+		'value={model.value}',
+		`import type { ReactNode } from 'react';
+		type Data = {label: ReactNode, icon: string};
+		declare function read(): any;
+		const model = {value: ""}; ${source}
+		({${field}: model.value} = row as {label: string, icon: string});`,
+	);
+	expect(result.notes.some((note) => note.rule === 'bindings' && note.severity === 'error')).toBe(
+		blocked,
+	);
+	expect(result.rules['react-compat'] ?? 0).toBe(blocked ? 0 : 1);
+});
+
+it.each([
+	['row.icon = element; ({label: model.label} = row);', 'model.label', false],
+	['row.label = element; ({label: model.label} = row);', 'model.label', true],
+	['const alias = row; row.icon = element; ({label: model.label} = alias);', 'model.label', false],
+	['const alias = row; alias.label = element; ({label: model.label} = row);', 'model.label', true],
+	['const {label} = {label: "safe", icon: element};', 'label', false],
+	['const nested = {row}; row.label = element; const {row: {label}} = nested;', 'label', true],
+	['let label; ({label} = {label: "safe", icon: element});', 'label', false],
+	['let {label} = row; label = element;', 'label', true],
+	['const {label = element} = {};', 'label', true],
+	[
+		'row.icon = element; ({label: model.label, icon: model.icon} = row);',
+		'[model.label, model.icon]',
+		true,
+	],
+	[
+		'const key = Math.random() ? "icon" : "label"; row[key] = element; ({label: model.label} = row);',
+		'model.label',
+		true,
+	],
+	['const {label} = {get label() {return element;}, icon: "safe"};', 'label', true],
+])('checks only the field supplied by destructuring: %s', (setup, value, blocked) => {
+	const result = migrate(
+		`value={${value}}`,
+		`const element = <b/> as unknown as string;
+		const row = {label: "safe", icon: ""}, model = {label: "", icon: ""}; ${setup}`,
+	);
+	expect(result.notes.some((note) => note.rule === 'bindings' && note.severity === 'error')).toBe(
+		blocked,
+	);
+	expect(result.rules['react-compat'] ?? 0).toBe(blocked ? 0 : 1);
+});
+
+it.each([
 	['function write(row) { row.label = element; } write(model);', 'model.label', true],
 	['const write = row => { row.label = "safe"; }; write(model);', 'model.label', false],
 	['const write = row => { row.label = element; }; write(other);', 'model.label', false],

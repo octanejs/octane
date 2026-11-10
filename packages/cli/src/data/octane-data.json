@@ -7196,6 +7196,12 @@
         "replacement": "Return the measurement only. Render the value from the snapshot, or move the write to `useLayoutEffect`.",
         "url": "https://octanejs.dev/docs/strong-mode#octane-strong-layout-snapshot-write"
       },
+      "OCTANE_STRONG_FORCED_LAYOUT": {
+        "severity": "hint",
+        "detects": "A function writes to an element the template renders (its style, class, attributes, children, or scroll offset) and then reads its layout, such as `offsetHeight` or `getBoundingClientRect()`, before the browser has laid out. The read makes the browser lay out synchronously. In a loop that does both, every pass lays out again. A read whose value is dropped, such as `void element.offsetHeight`, is a deliberate flush and is not reported.",
+        "replacement": "Read first, then write. In a loop, read every value in one pass and write in a second. Leave the read where it is when the value depends on the write.",
+        "url": "https://octanejs.dev/docs/strong-mode#octane-strong-forced-layout"
+      },
       "OCTANE_STRONG_EFFECT_CHAIN": {
         "severity": "error",
         "detects": "An effect reads state written by another effect's own execution or promise continuation in the same component.",
