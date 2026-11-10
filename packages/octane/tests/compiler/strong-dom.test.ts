@@ -8,6 +8,7 @@ const RAW_HTML_WRITE = 'OCTANE_STRONG_RAW_HTML_WRITE';
 const OWN_MARKUP_QUERY = 'OCTANE_STRONG_OWN_MARKUP_QUERY';
 const LAYOUT_SNAPSHOT_WRITE = 'OCTANE_STRONG_LAYOUT_SNAPSHOT_WRITE';
 const DEFERRED_CURRENT_TARGET = 'OCTANE_STRONG_DEFERRED_CURRENT_TARGET';
+const FORCED_LAYOUT = 'OCTANE_STRONG_FORCED_LAYOUT';
 
 const IMPORTS = "import { useEffect, useLayoutEffect, useRef, useState } from 'octane';\n";
 const MODES = [
@@ -772,5 +773,149 @@ export function App() {
 }`,
 			'/src/App.tsrx',
 		);
+	});
+});
+
+describe('Strong forced-layout hints', () => {
+	const DIV = '<div ref={r} />';
+	const found = (source: string, options?: object) =>
+		compile(source, '/src/App.tsrx', options as any).diagnostics.filter(
+			(diagnostic: { code: string }) => diagnostic.code === FORCED_LAYOUT,
+		);
+	/** The hint messages for an effect body, identical in every mode. */
+	const hints = (body: string, element = DIV) => {
+		const source = `"use strong";\n${effect(`const el = r.current; ${body}`, element, '{ items }')}`;
+		const messages = MODES.map((options) =>
+			found(source, options)
+				.map((diagnostic: { severity: string; message: string }) => {
+					expect(diagnostic.severity).toBe('hint');
+					return diagnostic.message;
+				})
+				.join('\n'),
+		);
+		expect(new Set(messages).size).toBe(1);
+		// A hint never fails the module.
+		expect(errors(source, '/src/App.tsrx')).toEqual([]);
+		return messages[0];
+	};
+
+	it.each([
+		[
+			'a style write',
+			"el.style.height = 'auto'; log(el.scrollHeight);",
+			'scrollHeight',
+			'style.height',
+		],
+		[
+			'a class write',
+			"el.classList.add('open'); log(el.offsetWidth);",
+			'offsetWidth',
+			'classList.add',
+		],
+		[
+			'an attribute write',
+			"el.setAttribute('hidden', ''); log(el.getBoundingClientRect());",
+			'getBoundingClientRect()',
+			'setAttribute',
+		],
+		['a scroll write', 'el.scrollTop = 0; log(el.clientHeight);', 'clientHeight', 'scrollTop'],
+		[
+			'a write in a branch that falls through',
+			"if (items) { el.style.width = '1px'; } log(el.offsetWidth);",
+			'offsetWidth',
+			'style.width',
+		],
+		[
+			'a write through the ref itself',
+			"r.current.style.width = '1px'; log(r.current.offsetWidth);",
+			'offsetWidth',
+			'style.width',
+		],
+	])('reports a read after %s', (_label, body, read, write) => {
+		const message = hints(body);
+		expect(message).toContain(`\`${read}\` reads layout after the \`${write}\` write`);
+		expect(message).toContain('read it first');
+	});
+
+	it.each([
+		[
+			'a for…of loop',
+			"for (const item of items) { const width = el.offsetWidth; el.style.width = width + item + 'px'; }",
+		],
+		[
+			'a while loop',
+			"let i = 0; while (i++ < 3) { const width = el.offsetWidth; el.style.width = width + 'px'; }",
+		],
+	])('reports a read before a write in %s', (_label, body) => {
+		const message = hints(body);
+		expect(message).toContain(
+			'`offsetWidth` reads layout in a loop that also writes `style.width`',
+		);
+		expect(message).toContain('then write in a second');
+	});
+
+	it('reports each read once, at the read', () => {
+		const source = `"use strong";\n${effect(
+			"const el = r.current; el.style.width = '1px'; log(el.offsetWidth, el.offsetHeight);",
+			DIV,
+		)}`;
+		expect(
+			found(source).map((diagnostic: any) =>
+				source.slice(diagnostic.start.offset, diagnostic.end.offset),
+			),
+		).toEqual(['el.offsetWidth', 'el.offsetHeight']);
+	});
+
+	it.each([
+		['a read before the write', "const height = el.scrollHeight; el.style.height = height + 'px';"],
+		['a read in the written value', "el.style.height = el.scrollHeight + 'px';"],
+		['a read alone', 'log(el.offsetWidth);'],
+		['a discarded read', "el.classList.add('a'); void el.offsetHeight; el.classList.add('b');"],
+		[
+			'a read after a deliberate flush',
+			"el.classList.add('a'); el.offsetHeight; log(el.offsetTop);",
+		],
+		[
+			'a loop that flushes after its write',
+			'for (const item of items) { log(el.offsetWidth); el.style.width = item; void el.offsetWidth; }',
+		],
+		[
+			'a read in the other branch',
+			"if (items) { el.style.width = '1px'; } else { log(el.offsetWidth); }",
+		],
+		[
+			'a read after a branch that returns',
+			"if (items) { el.style.width = '1px'; return; } log(el.offsetWidth);",
+		],
+		[
+			'a read after an await',
+			"(async () => { el.style.width = '1px'; await ready(); log(el.offsetWidth); })();",
+		],
+		[
+			'a read in a callback',
+			"el.style.width = '1px'; const read = () => el.offsetWidth; later(read);",
+		],
+		['a scroll assignment', "el.style.width = '1px'; el.scrollTop = 0;"],
+		[
+			'a write to an element that is not rendered',
+			"const box = document.createElement('div'); box.style.width = '1px'; log(el.offsetWidth);",
+		],
+		['a member that is not layout', "el.style.width = '1px'; log(el.id, el.dataset.key);"],
+	])('does not report %s', (_label, body) => {
+		expect(hints(body)).toBe('');
+	});
+
+	// `r` is a rendered <div>; `box` belongs to a component, which may not render an element.
+	it.each([
+		['a write through a component ref', "box.current.style.width = '1px'; log(el.offsetWidth);"],
+		['a read through a component ref', "el.style.width = '1px'; log(box.current.offsetWidth);"],
+	])('does not report %s', (_label, body) => {
+		const source = `"use strong";\n${IMPORTS}export function App() {
+  const r = useRef(null);
+  const box = useRef(null);
+  useEffect(() => { const el = r.current; ${body} });
+  return <div ref={r}><Box ref={box} /></div>;
+}`;
+		expect(found(source)).toEqual([]);
 	});
 });
