@@ -153,6 +153,31 @@ export function View(props, items) {
 		).toEqual(['<ConstIcon/>', '<MutableIcon/>', '<ArrayIcon/>']);
 	});
 
+	it('checks whether an inline object supplies the destructured tag', () => {
+		const source = `import Mark from './mark.svg';
+export function View(overrides) {
+  const {icon: Native = Mark} = {...overrides, icon: 'span'};
+  const {icon: Dynamic = Mark} = {icon: 'span', ...overrides};
+  const {icon: Missing = Mark} = {};
+  const {icon: Cleared = Mark} = {icon: void 0};
+  const {'1': Overridden = Mark} = {'1': 'span', 1n: void 0};
+  const {reset, icon: AfterGetter = Mark} = {get reset() {this.icon = undefined}, icon: 'span'};
+  return <>
+    <Native/>
+    <Dynamic/>
+    <Missing/>
+    <Cleared/>
+    <Overridden/>
+    <AfterGetter/>
+  </>;
+}`;
+		const lines = source.split('\n');
+		const { notes } = transformModule(source, 'view.tsx');
+		expect(
+			notes.filter((n) => n.rule === 'svg-issuer').map((n) => lines[n.line - 1].trim()),
+		).toEqual(['<Dynamic/>', '<Missing/>', '<Cleared/>', '<Overridden/>', '<AfterGetter/>']);
+	});
+
 	it('only reports reachable SVG operands in logical tag choices', () => {
 		const choices = [
 			["'button' || Mark", false],

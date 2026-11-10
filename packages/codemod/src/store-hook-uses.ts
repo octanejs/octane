@@ -52,6 +52,39 @@ function literalCondition(expr: ts.Expression) {
 		return 'truthy';
 }
 
+/** A final, defined own property in an inline object prevents its binding default from running. */
+function suppliesBinding(binding: ts.BindingElement) {
+	const pattern = binding.parent;
+	const decl = pattern.parent;
+	// Reading an earlier binding can invoke a getter that mutates the object.
+	if (
+		!ts.isObjectBindingPattern(pattern) ||
+		pattern.elements[0] !== binding ||
+		!ts.isVariableDeclaration(decl) ||
+		!decl.initializer
+	)
+		return false;
+	const source = skipWrappers(decl.initializer);
+	const key = binding.propertyName ?? binding.name;
+	if (
+		!ts.isObjectLiteralExpression(source) ||
+		!(ts.isIdentifier(key) || ts.isStringLiteralLike(key)) ||
+		key.text === '__proto__'
+	)
+		return false;
+	// A later spread or a key we cannot compare may overwrite the value.
+	for (let i = source.properties.length - 1; i >= 0; i--) {
+		const field = source.properties[i];
+		if (!field.name || !(ts.isIdentifier(field.name) || ts.isStringLiteralLike(field.name)))
+			return false;
+		if (field.name.text !== key.text) continue;
+		if (!ts.isPropertyAssignment(field)) return false;
+		const value = skipWrappers(field.initializer);
+		return literal(value) || literalCondition(value) === 'truthy';
+	}
+	return false;
+}
+
 /** Bare SVG default imports can switch from a component to an asset URL for a .tsrx issuer. */
 export function isBareSvgTag(
 	tag: ts.JsxTagNameExpression,
@@ -85,7 +118,7 @@ export function isBareSvgTag(
 		const d = symbol.declarations?.[0];
 		if (!d) return false;
 		if ((ts.isParameter(d) || ts.isBindingElement(d)) && ts.isIdentifier(d.name) && d.initializer)
-			return fromSvg(d.initializer);
+			return !(ts.isBindingElement(d) && suppliesBinding(d)) && fromSvg(d.initializer);
 		if (
 			ts.isVariableDeclaration(d) &&
 			d.initializer &&
