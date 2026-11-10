@@ -1,7 +1,14 @@
 // Every variant ends with each row's bar as wide as its label. They differ only
 // in when the label is measured and when the bar is written. This module is
 // compiled without Strong mode: the first three rows are the patterns to avoid.
-import { useLayoutEffect, useLayoutSnapshot, useRef, useState } from 'octane';
+import {
+	readLayout,
+	useLayoutEffect,
+	useLayoutSnapshot,
+	useRef,
+	useState,
+	writeLayout,
+} from 'octane';
 
 interface RowProps {
 	id: number;
@@ -18,6 +25,27 @@ function EffectInterleaved(props: RowProps) @{
 	useLayoutEffect(() => {
 		bar.current!.style.width = label.current!.offsetWidth + 'px';
 	}, null);
+	<div class="row">
+		<span ref={label}>{text(props)}</span>
+		<i ref={bar} />
+	</div>
+}
+
+// The same effect, with its read and its write queued: every row's read runs
+// before any row's write.
+function EffectPhased(props: RowProps) @{
+	const label = useRef<HTMLSpanElement | null>(null);
+	const bar = useRef<HTMLElement | null>(null);
+	useLayoutEffect(
+		() =>
+			readLayout(() => {
+				const width = label.current!.offsetWidth;
+				writeLayout(() => {
+					bar.current!.style.width = width + 'px';
+				});
+			}),
+		null,
+	);
 	<div class="row">
 		<span ref={label}>{text(props)}</span>
 		<i ref={bar} />
@@ -76,10 +104,12 @@ function Plain(props: RowProps) @{
 
 const ROWS = {
 	'effect-interleaved': EffectInterleaved,
+	'effect-phased': EffectPhased,
 	'snapshot-write': SnapshotWrite,
 	'effect-state': EffectState,
 	snapshot: Snapshot,
 	'handler-interleaved': Plain,
+	'handler-phased': Plain,
 	'handler-batched': Plain,
 };
 
@@ -95,6 +125,17 @@ export function App(props: { variant: Variant; ids: number[]; revision: number }
 			(row.lastElementChild as HTMLElement).style.width = width + 'px';
 		}
 	};
+	// The same loop, with each row's read and write queued.
+	const phased = () => {
+		for (const row of list.current!.children) {
+			readLayout(() => {
+				const width = (row.firstElementChild as HTMLElement).offsetWidth;
+				writeLayout(() => {
+					(row.lastElementChild as HTMLElement).style.width = width + 'px';
+				});
+			});
+		}
+	};
 	const batched = () => {
 		const rows = [...list.current!.children];
 		const widths = rows.map((row) => (row.firstElementChild as HTMLElement).offsetWidth);
@@ -103,7 +144,15 @@ export function App(props: { variant: Variant; ids: number[]; revision: number }
 		});
 	};
 	<main>
-		<button onClick={props.variant === 'handler-interleaved' ? interleaved : batched}>
+		<button
+			onClick={
+				props.variant === 'handler-interleaved'
+					? interleaved
+					: props.variant === 'handler-phased'
+						? phased
+						: batched
+			}
+		>
 			{'Measure'}
 		</button>
 		<section ref={list}>

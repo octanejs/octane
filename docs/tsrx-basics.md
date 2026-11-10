@@ -302,6 +302,46 @@ changes such as resizing or scrolling between component commits, have an
 observer or event callback update state to request another commit and
 measurement. Use this hook in the DOM renderer.
 
+## Batched layout reads and writes
+
+A layout read after a DOM write makes the browser lay out synchronously. Queue
+the read with `readLayout` and the write with `writeLayout`. In the next frame
+Octane runs every queued read, then every queued write, so the browser lays out
+once however many components took part.
+
+```tsx
+import { readLayout, useLayoutEffect, useRef, writeLayout } from 'octane';
+
+export function Underlined(props: { label: string }) @{
+	const label = useRef<HTMLSpanElement | null>(null);
+	const bar = useRef<HTMLElement | null>(null);
+	// `null` runs the effect after every commit, so a new label is measured again.
+	useLayoutEffect(
+		() =>
+			readLayout(() => {
+				const width = label.current!.offsetWidth;
+				writeLayout(() => {
+					bar.current!.style.width = width + 'px';
+				});
+			}),
+		null,
+	);
+
+	<div>
+		<span ref={label}>{props.label}</span>
+		<i ref={bar} />
+	</div>
+}
+```
+
+Each call returns a function that cancels the task if it has not run.
+`flushLayoutSync()` runs the queue now. `getPhase()` returns
+`RenderingPhase.READ` or `RenderingPhase.WRITE` while the queue runs a task of
+that kind, and `RenderingPhase.IDLE` otherwise. The queue runs outside a
+commit, so `flushSync` and `act()` do not wait for it, and it never runs on the
+server. When rendered output depends on the measurement, use
+`useLayoutSnapshot` instead.
+
 ## Conditional hooks
 
 Unlike React, a hook can sit behind a guard or after an early `return`:

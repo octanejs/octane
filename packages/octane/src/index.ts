@@ -39,6 +39,12 @@ export {
 	createRoot,
 	hydrateRoot,
 	flushSync,
+	// Octane extension: read and write phases for layout work.
+	RenderingPhase,
+	getPhase,
+	readLayout,
+	writeLayout,
+	flushLayoutSync,
 	act,
 	isInActScope,
 	type Root,

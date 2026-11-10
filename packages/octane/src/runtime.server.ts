@@ -8343,6 +8343,19 @@ export function flushSync<T>(fn: () => T): T {
 	return fn();
 }
 
+// Layout phases — the server has no layout. Queued work never runs, as with
+// layout effects, and the phase is always IDLE.
+export { RenderingPhase } from './runtime/layout-phases.js';
+export function getPhase(): 0 {
+	return 0;
+}
+export function readLayout(_task: () => void): () => void {
+	return noopLayoutCancel;
+}
+export { readLayout as writeLayout };
+export function flushLayoutSync(): void {}
+function noopLayoutCancel(): void {}
+
 /** @internal The server has no DOM event scheduler. */
 export function __createDiscreteEventListener(listener: EventListener): EventListener {
 	return listener;
