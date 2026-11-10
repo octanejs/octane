@@ -216,6 +216,8 @@ const save = action$('user.save', async (operation, name: string) => {
 });
 ```
 
+An updater passed to `set` is replayed over each newer source value, as `useOptimistic` rebases its updates: a pending edit stays visible on top of a refetch, a stream value or a direct write to the source, and the source's own changes show through it. Overlays apply in the order their operations first wrote. A plain value replaces whatever is below it. While the source has no ready value, the last view stands in for it.
+
 The action's synchronous prefix is batched. After `await`, opaque helpers use `operation.set(visibleUser$, update)` because ambient operation state is deliberately not carried across arbitrary async code. A definitive rejection removes only that operation's overlay. `operation.adopt(value)` updates only the still-matching pinned source selection; it cannot overwrite a later selection. `operation.until(read, { timeout })` observes pinned authority with its own overlay excluded.
 
 For concurrent server writes, configure `compareAuthority(incoming, current)` before dispatch. It must be pure and return a finite number: positive means strictly newer; zero or negative settles the successful operation and removes only its overlay without replacing authority. Comparison uses the current source value, not an optimistic overlay. Thus receipts for revisions 2 then 1 leave authority at revision 2 while both operations settle. Operation IDs and client request order do not establish server freshness.

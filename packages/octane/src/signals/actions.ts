@@ -43,7 +43,16 @@ interface Overlay<T> {
 	readonly operation: Operation;
 	readonly requestKey: string | undefined;
 	readonly selectionAuthority: object | undefined;
+	/** The operation's writes, replayed in order over each newer source value. */
+	readonly updates: (T | ((previous: T) => T))[];
+	/** The view through this overlay when last computed; shown while the source has no value. */
 	value: T;
+}
+
+function step<T>(update: T | ((previous: T) => T), previous: T): T {
+	return typeof update === 'function'
+		? untrack(() => pure(() => (update as (previous: T) => T)(previous)))
+		: update;
 }
 
 const managers = new WeakMap<ScopedNode, OptimisticManager<unknown>>();
@@ -70,59 +79,61 @@ class OptimisticManager<T> {
 		});
 	}
 
+	/**
+	 * The source value with every matching overlay's writes replayed in order, as
+	 * `useOptimistic` rebases its updates: a newer source value keeps each
+	 * pending edit and shows the source's own changes too. An updater sees the
+	 * value below it; a plain value replaces it. While the source has no ready
+	 * value, the newest overlay's last view stands in for it. `exclude` reads
+	 * past one operation's writes without recording views.
+	 */
+	private overlay(
+		snapshot: SignalSnapshot<T>,
+		exclude: Operation | undefined,
+	): { readonly value: T } | undefined {
+		const selectionAuthority = getResourceSelectionAuthority(this.source);
+		let found: Overlay<T> | undefined;
+		let value = snapshot.status === 'ready' ? snapshot.value : (undefined as T);
+		for (const overlay of this.overlays) {
+			if (
+				overlay.operation === exclude ||
+				overlay.requestKey !== snapshot.requestKey ||
+				overlay.selectionAuthority !== selectionAuthority
+			) {
+				continue;
+			}
+			found = overlay;
+			if (snapshot.status !== 'ready') continue;
+			for (const update of overlay.updates) value = step(update, value);
+			if (!exclude) overlay.value = value;
+		}
+		if (!found) return undefined;
+		return { value: snapshot.status === 'ready' ? value : found.value };
+	}
+
 	read(exclude?: Operation): T {
 		const snapshot = this.source.snapshot();
-		const selectionAuthority = getResourceSelectionAuthority(this.source);
-		for (let index = this.overlays.length - 1; index >= 0; index--) {
-			const overlay = this.overlays[index]!;
-			if (
-				overlay.operation !== exclude &&
-				overlay.requestKey === snapshot.requestKey &&
-				overlay.selectionAuthority === selectionAuthority
-			) {
-				return overlay.value;
-			}
-		}
-		return this.source.get();
+		return this.overlay(snapshot, exclude)?.value ?? this.source.get();
 	}
 
 	latest<F>(fallback?: F, exclude?: Operation): T | F | undefined {
 		const snapshot = this.source.snapshot();
-		const selectionAuthority = getResourceSelectionAuthority(this.source);
-		for (let index = this.overlays.length - 1; index >= 0; index--) {
-			const overlay = this.overlays[index]!;
-			if (
-				overlay.operation !== exclude &&
-				overlay.requestKey === snapshot.requestKey &&
-				overlay.selectionAuthority === selectionAuthority
-			) {
-				return overlay.value;
-			}
-		}
-		return this.source.latest(fallback);
+		const overlaid = this.overlay(snapshot, exclude);
+		return overlaid ? overlaid.value : this.source.latest(fallback);
 	}
 
 	snapshot(exclude?: Operation): SignalSnapshot<T> {
 		const snapshot = this.source.snapshot();
-		const selectionAuthority = getResourceSelectionAuthority(this.source);
-		for (let index = this.overlays.length - 1; index >= 0; index--) {
-			const overlay = this.overlays[index]!;
-			if (
-				overlay.operation !== exclude &&
-				overlay.requestKey === snapshot.requestKey &&
-				overlay.selectionAuthority === selectionAuthority
-			) {
-				return Object.freeze({
-					status: 'ready',
-					value: overlay.value,
-					refreshing: snapshot.refreshing,
-					connection: snapshot.connection,
-					complete: snapshot.complete,
-					...(snapshot.requestKey === undefined ? {} : { requestKey: snapshot.requestKey }),
-				});
-			}
-		}
-		return snapshot;
+		const overlaid = this.overlay(snapshot, exclude);
+		if (!overlaid) return snapshot;
+		return Object.freeze({
+			status: 'ready',
+			value: overlaid.value,
+			refreshing: snapshot.refreshing,
+			connection: snapshot.connection,
+			complete: snapshot.complete,
+			...(snapshot.requestKey === undefined ? {} : { requestKey: snapshot.requestKey }),
+		});
 	}
 
 	apply(operation: Operation, value: T | ((previous: T) => T)): Overlay<T> {
@@ -135,21 +146,19 @@ class OptimisticManager<T> {
 		if (!overlay && snapshot.status !== 'ready') {
 			throw new Error(formatClientError(83));
 		}
-		const previous = this.read();
-		const next =
-			typeof value === 'function'
-				? untrack(() => pure(() => (value as (previous: T) => T)(previous)))
-				: value;
+		const next = step(value, this.read());
 		if (!overlay) {
 			overlay = {
 				operation,
 				requestKey: snapshot.requestKey,
 				selectionAuthority: getResourceSelectionAuthority(this.source),
+				updates: [value],
 				value: next,
 			};
 			this.overlays.push(overlay);
 			operation.targets.set(this, overlay);
 		} else {
+			overlay.updates.push(value);
 			overlay.value = next;
 		}
 		this.publish();

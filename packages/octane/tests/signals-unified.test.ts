@@ -906,10 +906,62 @@ describe('optimistic actions', () => {
 		expect(runWithSignalOwner(scope, () => visible$.get())).toBe(11);
 		first.resolve();
 		await expect(failed).rejects.toThrow('rejected');
-		expect(runWithSignalOwner(scope, () => visible$.get())).toBe(11);
+		// The second edit is replayed alone; nothing of the rejected +1 remains.
+		expect(runWithSignalOwner(scope, () => visible$.get())).toBe(10);
 		second.resolve();
 		await succeeded;
 		expect(runWithSignalOwner(scope, () => visible$.get())).toBe(0);
+	});
+
+	it('replays a pending edit over a newer source value, as useOptimistic rebases', async () => {
+		type Book = { title: string; starred: boolean };
+		const source$ = __signalAt<Book>('g:rebase-source', { title: 'Tides', starred: false });
+		const visible$ = optimistic$(source$);
+		const reply = deferred<void>();
+		const star = action$('star', async () => {
+			visible$.set((book) => ({ ...book, starred: true }));
+			await reply.promise;
+			throw new Error('refused');
+		});
+		const scope = owner('document:rebase');
+
+		const starred = runWithSignalOwner(scope, () => star());
+		expect(runWithSignalOwner(scope, () => visible$.get())).toEqual({
+			title: 'Tides',
+			starred: true,
+		});
+
+		// A remote rename arrives while the edit is pending: both show.
+		runWithSignalOwner(scope, () => source$.set({ title: 'Night tides', starred: false }));
+		expect(runWithSignalOwner(scope, () => visible$.get())).toEqual({
+			title: 'Night tides',
+			starred: true,
+		});
+
+		reply.resolve();
+		await expect(starred).rejects.toThrow('refused');
+		expect(runWithSignalOwner(scope, () => visible$.get())).toEqual({
+			title: 'Night tides',
+			starred: false,
+		});
+	});
+
+	it('keeps a plain optimistic value over newer source values', async () => {
+		const source$ = __signalAt('g:absolute-source', 'saved');
+		const visible$ = optimistic$(source$);
+		const reply = deferred<void>();
+		const save = action$('save', async () => {
+			visible$.set('draft');
+			await reply.promise;
+		});
+		const scope = owner('document:absolute');
+
+		const saved = runWithSignalOwner(scope, () => save());
+		runWithSignalOwner(scope, () => source$.set('remote'));
+		expect(runWithSignalOwner(scope, () => visible$.get())).toBe('draft');
+		reply.resolve();
+		await saved;
+		expect(runWithSignalOwner(scope, () => visible$.get())).toBe('remote');
 	});
 
 	it('retains uncertain intent and reports a distinct operation id without retrying', async () => {
