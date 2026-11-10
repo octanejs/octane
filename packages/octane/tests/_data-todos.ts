@@ -16,7 +16,7 @@ export interface TodoItem {
 }
 
 /** A hand-written Standard Schema validator, so the tests need no validator library. */
-function schema<T>(check: (value: any) => boolean): StandardSchema<unknown, T> {
+export function schema<T>(check: (value: any) => boolean): StandardSchema<unknown, T> {
 	return {
 		'~standard': {
 			version: 1,
@@ -27,9 +27,9 @@ function schema<T>(check: (value: any) => boolean): StandardSchema<unknown, T> {
 	};
 }
 
-const isTodo = (value: any) =>
+export const isTodo = (value: any) =>
 	typeof value?.id === 'string' && typeof value.title === 'string' && value.title.length > 0;
-const Todo = entity('todo', schema<TodoItem>(isTodo));
+export const Todo = entity('todo', schema<TodoItem>(isTodo));
 
 export const todos = read({
 	name: 'todos.list',
