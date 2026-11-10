@@ -39,6 +39,8 @@ export interface TransformOptions {
 	unported?(specifier: string): string | null;
 	/** The project has React and React DOM 19.2 or newer in the React 19 series, so `ReactCompat` can host an unported package's components. */
 	reactCompat?: boolean;
+	/** The selected imported component renders every use of this prop directly in native output. */
+	forwardedRender?(module: string, exported: string, prop: string, depth: number): boolean;
 	/** The generated native SVG helper, if the project verified this raw asset. */
 	pathSvgAdapter?(specifier: string): string | null;
 	/** This file uses React's automatic JSX runtime and the component resolves to its original React package. */

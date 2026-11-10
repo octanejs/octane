@@ -1,3 +1,4 @@
+import { forwardedProps, nativeOutputOwner } from './forwarded-props.js';
 import { reactRenderer, staticReactProps } from './react-renderer.js';
 import { localUses, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
@@ -91,6 +92,13 @@ export function transformModule(
 	options: TransformOptions = {},
 ): TransformResult {
 	return new ModuleTransform(source, filename, options).run();
+}
+
+export function projectTypeAt(node: ts.Node, types: TransformOptions['types']) {
+	if (types?.sourceFile.text !== node.getSourceFile().text) return null;
+	const same = nodeSpanning(types.sourceFile, node.getStart(), node.end);
+	if (same?.kind !== node.kind) return null;
+	return { type: types.checker.getTypeAtLocation(same), checker: types.checker };
 }
 
 /**
@@ -256,7 +264,7 @@ function isStringSpelling(node: ts.Expression): boolean {
  * member is a string, number, or bigint and one is not a string, else 0. The
  * compiler's typed-text proof applies the same test.
  */
-function textKind(type: ts.Type): 0 | 1 | 2 {
+export function textKind(type: ts.Type): 0 | 1 | 2 {
 	const { TypeFlags } = ts;
 	const opaque =
 		TypeFlags.Any | TypeFlags.Unknown | TypeFlags.Never | TypeFlags.VoidLike | TypeFlags.Null;
@@ -854,6 +862,7 @@ class ModuleTransform {
 			}
 		}
 		const pathSvgTags = new Set<ts.Node>();
+		const unknownSvgSlots = new Map<ts.Node, string>();
 		if (
 			this.target === 'tsrx' &&
 			this.options.pathSvgAdapter &&
@@ -873,7 +882,15 @@ class ModuleTransform {
 					continue;
 				uses ??= localUses(this.sf, this.checker);
 				const refs = uses(declaration.name);
-				if (!refs.length || !refs.every((ref) => this.nativePathSvgUse(ref, uses!))) continue;
+				const eligible = refs.map((ref) =>
+					this.nativePathSvgUse(ref, uses!, (tag, prop) =>
+						unknownSvgSlots.set(
+							ref,
+							` Cannot prove where <${tag.text}> renders its ${prop === 'children' ? 'children' : prop + ' prop'}.`,
+						),
+					),
+				);
+				if (!eligible.length || eligible.includes(false)) continue;
 				const native = this.options.pathSvgAdapter(binding.module);
 				if (!native) continue;
 				this.pathSvgImports.set(declaration.parent, native);
@@ -893,6 +910,7 @@ class ModuleTransform {
 					'error',
 					field.tagName,
 					'This JSX tag can resolve to a bare SVG import. Loading the SVG from .tsrx can produce an asset URL. Render the SVG in a React-owned .tsx component through ReactCompat, or configure a native SVG loader for .tsrx.' +
+						(unknownSvgSlots.get(field.tagName) ?? '') +
 						(this.options.pathSvgAdapter
 							? ' To prepare a native component for manual integration, run --svg-paths on the SVG file and verify the receiving renderer.'
 							: ''),
@@ -1059,7 +1077,11 @@ class ModuleTransform {
 		}
 	}
 
-	nativePathSvgUse(ref: ts.Identifier, uses: ReturnType<typeof localUses>) {
+	nativePathSvgUse(
+		ref: ts.Identifier,
+		uses: ReturnType<typeof localUses>,
+		unproven: (tag: ts.Identifier, prop: string) => void,
+	) {
 		const tag = ref.parent;
 		if (!ts.isJsxSelfClosingElement(tag) || tag.tagName !== ref || tag.typeArguments) return false;
 		const supported = tag.attributes.properties.every((attr) => {
@@ -1081,67 +1103,99 @@ class ModuleTransform {
 			);
 		});
 		if (!supported) return false;
-		// A native element can cross into React through a prop, a saved value, or a call
-		// even when the SVG has an intrinsic parent. Follow the whole output expression.
-		let value: ts.Node = tag;
-		for (;;) {
-			const parent = value.parent;
-			if (ts.isJsxElement(parent)) {
-				const name = parent.openingElement.tagName;
-				if (
-					!ts.isIdentifier(name) ||
-					!/^[a-z]/.test(name.text) ||
-					!parent.children.some((child) => child === value)
-				)
-					return false;
-			} else if (ts.isReturnStatement(parent)) {
-				const fn = ts.findAncestor(parent, ts.isFunctionLike);
-				return (
-					!!fn &&
-					(ts.isFunctionDeclaration(fn) || ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) &&
-					this.nativeSvgOwner(fn, uses)
-				);
-			} else if (ts.isArrowFunction(parent) && parent.body === value) {
-				return this.nativeSvgOwner(parent, uses);
-			} else if (!(
-				ts.isJsxFragment(parent) ||
-				ts.isJsxExpression(parent) ||
-				ts.isParenthesizedExpression(parent) ||
-				(ts.isConditionalExpression(parent) && parent.condition !== value) ||
-				(ts.isBinaryExpression(parent) &&
-					parent.right === value &&
-					parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken)
-			)) {
-				return false;
-			}
-			value = parent;
-		}
+		return this.nativeSvgOutput(tag, uses, unproven);
 	}
 
-	// A capitalized local function can also be a callback for a different renderer.
-	// Limit this rewrite to standalone exported components with no local consumers.
-	nativeSvgOwner(
-		fn: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction,
+	private nativeSvgProps?: ReturnType<typeof forwardedProps>;
+	private provenSvgOwners?: Set<ts.Node>;
+	private nativeSvgOutput(
+		element: ts.Node,
 		uses: ReturnType<typeof localUses>,
-	) {
-		if (!this.isComponent(fn) || (ts.isFunctionExpression(fn) && fn.name)) return false;
-		const parent = fn.parent;
-		if (ts.isExportAssignment(parent) && parent.parent === this.sf) return true;
-		const variable =
-			ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name) ? parent : null;
-		const statement = variable ? variable.parent.parent : fn;
-		if (
-			statement.parent !== this.sf ||
-			!(ts.isFunctionDeclaration(statement) || ts.isVariableStatement(statement))
-		)
-			return false;
-		const name = variable ? variable.name : fn.name;
-		const refs = name && ts.isIdentifier(name) ? uses(name) : [];
-		return (
-			refs.every((ref) => ts.isExportSpecifier(ref.parent) || ts.isExportAssignment(ref.parent)) &&
-			(refs.length > 0 ||
-				statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) === true)
+		unproven: (tag: ts.Identifier, prop: string) => void,
+	): boolean {
+		const typeOf = (node: ts.Node) => this.typeOf(node);
+		this.nativeSvgProps ??= forwardedProps(
+			this.sf,
+			this.checker,
+			{
+				imported: this.options.forwardedRender,
+				typeOf,
+				text: (ref) => textKind(typeOf(ref)) !== 0,
+			},
+			uses,
 		);
+		const slot = (tag: ts.Identifier, prop: string) => {
+			const known = this.nativeSvgProps!(this.checker.getSymbolAtLocation(tag), prop);
+			if (!known) unproven(tag, prop);
+			return known;
+		};
+		const first = nativeOutputOwner(element, slot, typeOf);
+		if (!first) return false;
+		const pending = [first];
+		const proven = (this.provenSvgOwners ??= new Set());
+		const seen = new Set<ts.Node>();
+		let exported = false;
+		// A local function can hand its return value to another renderer. Follow every
+		// use of its binding, including uses of a component that also has an export.
+		while (pending.length) {
+			const fn = pending.pop()!;
+			if (
+				!this.isComponent(fn) ||
+				fn.asteriskToken ||
+				fn.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) ||
+				(ts.isFunctionExpression(fn) && fn.name)
+			)
+				return false;
+			if (proven.has(fn)) {
+				exported = true;
+				continue;
+			}
+			if (seen.has(fn)) continue;
+			seen.add(fn);
+			const parent = fn.parent;
+			if (ts.isExportAssignment(parent) && parent.parent === this.sf) {
+				exported = true;
+				continue;
+			}
+			const variable =
+				ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name) ? parent : null;
+			const statement = variable ? variable.parent.parent : fn;
+			if (
+				statement.parent !== this.sf ||
+				!(ts.isFunctionDeclaration(statement) || ts.isVariableStatement(statement))
+			)
+				return false;
+			const name = variable ? variable.name : fn.name;
+			const refs = name && ts.isIdentifier(name) ? uses(name) : [];
+			const directExport = statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+			if (!refs.length && !directExport) return false;
+			if (directExport) exported = true;
+			for (const ref of refs) {
+				const tag = ref.parent;
+				if (ts.isExportSpecifier(tag) || ts.isExportAssignment(tag)) {
+					exported = true;
+					continue;
+				}
+				if (
+					!(
+						ts.isJsxSelfClosingElement(tag) ||
+						ts.isJsxOpeningElement(tag) ||
+						ts.isJsxClosingElement(tag)
+					) ||
+					tag.tagName !== ref
+				)
+					return false;
+				const owner = nativeOutputOwner(
+					ts.isJsxSelfClosingElement(tag) ? tag : tag.parent,
+					slot,
+					typeOf,
+				);
+				if (!owner) return false;
+				pending.push(owner);
+			}
+		}
+		if (exported) proven.add(first);
+		return exported;
 	}
 
 	/** Keep the imported React component as the type of the element the service receives. */
@@ -3607,18 +3661,14 @@ class ModuleTransform {
 	 * packages, or null when the program does not have this module.
 	 */
 	projectType(node: ts.Node): { type: ts.Type; checker: ts.TypeChecker } | null {
-		const types = this.options.types;
-		if (types?.sourceFile.text !== this.source) return null;
-		const same = nodeSpanning(types.sourceFile, node.getStart(this.sf), node.end);
-		if (same?.kind !== node.kind) return null;
-		return { type: types.checker.getTypeAtLocation(same), checker: types.checker };
+		return projectTypeAt(node, this.options.types);
 	}
 
 	/**
 	 * The type of `expression`, from the project's program when it has this
 	 * module, else from the module's own.
 	 */
-	typeOf(expression: ts.Expression) {
+	typeOf(expression: ts.Node) {
 		return this.projectType(expression)?.type ?? this.checker.getTypeAtLocation(expression);
 	}
 

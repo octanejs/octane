@@ -21,8 +21,8 @@ import ts from 'typescript';
 import { finding, loadCompiler, thrown } from './compiler.js';
 import { PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
-import { bind, transformModule } from './transform.js';
-import { forwardedTextProps } from './forwarded-text.js';
+import { bind, projectTypeAt, textKind, transformModule } from './transform.js';
+import { forwardedProps } from './forwarded-props.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
 /** React packages and the Octane package that replaces each. */
@@ -104,30 +104,52 @@ export async function runCodemod(
 	const config = tsconfigOptions(root);
 	const strictConfig = (config?.strictNullChecks ?? config?.strict) ? config : null;
 	let program: ts.Program | undefined;
+	function typesOf(file: string): TransformOptions['types'] {
+		if (!strictConfig || options.projectTypes === false) return;
+		// Even one input can import a large graph. Bind it only for a rewrite that needs its types.
+		program ??= ts.createProgram(
+			files.filter((name) => /\.[cm]?tsx?$/.test(name)),
+			{ ...strictConfig, noEmit: true, noUncheckedIndexedAccess: true },
+		);
+		const sourceFile = program.getSourceFile(file);
+		if (sourceFile) return { sourceFile, checker: program.getTypeChecker() };
+	}
 	const contextsOf = contextIndex(exports, known);
 	const renamed = renamedImports(root, config, renames);
 	const resolveRename = (from: string, specifier: string) =>
 		renamed(from, specifier)?.specifier ?? null;
-	const propChecks = new Map<
-		string,
-		(name: string, prop: string, ordinaryCaller?: boolean) => boolean
-	>();
-	function forwardedText(
+	const propChecks = new Map<string, ReturnType<typeof propsOf>>();
+	function forwardedProp(
 		from: string,
 		specifier: string,
 		name: string,
 		prop: string,
+		destination: 'text' | 'render',
 		ordinaryCaller?: boolean,
+		depth = 0,
 	) {
 		const match = renamed(from, specifier);
 		if (!match || (!specifier.startsWith('.') && match.specifier.startsWith('.'))) return false;
-		const selected = match.file;
-		let inspect = propChecks.get(selected);
+		if (
+			destination === 'render' &&
+			(!match.file.startsWith(root + path.sep) ||
+				match.file.split(path.sep).includes('node_modules') ||
+				fs.realpathSync(match.file) !==
+					path.join(fs.realpathSync(root), path.relative(root, match.file)) ||
+				ts.findConfigFile(path.dirname(match.file), ts.sys.fileExists) !== rootProject)
+		)
+			return false;
+		let inspect = propChecks.get(match.file);
 		if (!inspect) {
-			inspect = textPropsOf(selected);
-			propChecks.set(selected, inspect);
+			inspect = propsOf(
+				match.file,
+				(module, name, slot, depth) =>
+					forwardedProp(match.file, module, name, slot, 'render', true, depth),
+				() => typesOf(match.file),
+			);
+			propChecks.set(match.file, inspect);
 		}
-		return inspect(name, prop, ordinaryCaller);
+		return inspect(destination, name, prop, ordinaryCaller, depth);
 	}
 
 	// resolveRename returns only an on-disk source that actually won import resolution.
@@ -498,20 +520,12 @@ export async function runCodemod(
 				target,
 				reactIntlAdapter: intl,
 				forwardedText: (module, name, prop, ordinaryCaller) =>
-					forwardedText(file, module, name, prop, ordinaryCaller),
+					forwardedProp(file, module, name, prop, 'text', ordinaryCaller),
 				resolveStoreHook,
 				strong,
 				strictNullChecks: strictConfig !== null,
 				get types() {
-					if (types || !strictConfig || options.projectTypes === false) return types;
-					// Even one input can import a large graph. Bind it only for a rewrite that needs its types.
-					program ??= ts.createProgram(
-						files.filter((name) => /\.[cm]?tsx?$/.test(name)),
-						{ ...strictConfig, noEmit: true, noUncheckedIndexedAccess: true },
-					);
-					const sourceFile = program.getSourceFile(file);
-					if (sourceFile) types = { sourceFile, checker: program.getTypeChecker() };
-					return types;
+					return (types ??= typesOf(file));
 				},
 				resolveSpecifier: (specifier) =>
 					resolveRename(file, specifier) ?? resolveBinding(specifier, packages, notes),
@@ -527,6 +541,11 @@ export async function runCodemod(
 					: undefined,
 				unported: (specifier) => unportedName(specifier, file),
 				reactCompat,
+				forwardedRender:
+					options.svgPaths && renames.has(file)
+						? (module, name, prop, depth) =>
+								forwardedProp(file, module, name, prop, 'render', true, depth)
+						: undefined,
 				pathSvgAdapter:
 					options.svgPaths && renames.has(file)
 						? (specifier) => pathSvgAdapter(file, specifier, svgErrors)
@@ -1013,9 +1032,17 @@ function renamedImports(
 
 /** Read the selected implementation only when a localized prop needs it. TS may prefer a
  * .tsx source even when the runtime can load a separate .js sibling or directory entry. */
-function textPropsOf(
+function propsOf(
 	file: string,
-): (name: string, prop: string, ordinaryCaller?: boolean) => boolean {
+	importedRender: NonNullable<TransformOptions['forwardedRender']>,
+	types: () => TransformOptions['types'],
+): (
+	destination: 'text' | 'render',
+	name: string,
+	prop: string,
+	ordinaryCaller?: boolean,
+	depth?: number,
+) => boolean {
 	const stem = file.slice(0, -path.extname(file).length);
 	const dir = path.dirname(stem);
 	const stems = path.basename(stem) === 'index' ? [stem, dir] : [stem, path.join(stem, 'index')];
@@ -1031,8 +1058,28 @@ function textPropsOf(
 	const { sf, checker } = bind(file, fs.readFileSync(file, 'utf8'));
 	const module = checker.getSymbolAtLocation(sf);
 	const names = module && new Map(checker.getExportsOfModule(module).map((s) => [s.name, s]));
-	const accepts = forwardedTextProps(sf, checker);
-	return (name, prop, ordinaryCaller) => accepts(names?.get(name), prop, ordinaryCaller);
+	const checks = new Map<'text' | 'render', ReturnType<typeof forwardedProps>>();
+	const typeOf = (node: ts.Node) =>
+		projectTypeAt(node, types())?.type ?? checker.getTypeAtLocation(node);
+	return (destination, name, prop, ordinaryCaller, depth) => {
+		let accepts = checks.get(destination);
+		if (!accepts)
+			checks.set(
+				destination,
+				(accepts = forwardedProps(
+					sf,
+					checker,
+					destination === 'text'
+						? 'text'
+						: {
+								imported: importedRender,
+								typeOf,
+								text: (ref) => textKind(typeOf(ref)) !== 0,
+							},
+				)),
+			);
+		return accepts(names?.get(name), prop, ordinaryCaller, depth);
+	};
 }
 
 /** Which names each module exports as a context, following `export … from`. */

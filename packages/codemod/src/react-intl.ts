@@ -1,4 +1,4 @@
-import { forwardedTextProps, hasPrototypeAccess } from './forwarded-text.js';
+import { forwardedProps, hasPrototypeAccess } from './forwarded-props.js';
 import type { TransformOptions } from './types.js';
 import { localUses, portableArguments, scalar } from './local-uses.js';
 import ts from 'typescript';
@@ -50,7 +50,7 @@ export function intlImports(
 	if (!candidates.length) return selected;
 	const uses = localUses(file, checker);
 	const ordinaryCaller = !hasPrototypeAccess(file);
-	const forwards = forwardedTextProps(file, checker, uses, ordinaryCaller);
+	const forwards = forwardedProps(file, checker, 'text', uses, ordinaryCaller);
 	// Even without substitution values a provider can format rich text into React elements.
 	// Follow const aliases only when every consumer explicitly coerces or compares the result.
 	const localSinks = new Map<ts.Expression, boolean>();
