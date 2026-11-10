@@ -462,6 +462,7 @@ function noticeProject(files) {
 		}),
 		'node_modules/notices/index.js': `import {createContext, createElement, useContext} from 'react';
 			export const Prefix = createContext('default');
+			export function Action({onClick}) { return createElement('button', {onClick}, 'Send'); }
 			export function Notice({label}) { return createElement('b', null, useContext(Prefix) + label); }`,
 		...files,
 	});
@@ -470,14 +471,14 @@ function noticeProject(files) {
 it('delivers the original React element to a store service for rendering under its eventual provider', async () => {
 	const { app, root: workspace } = noticeProject({
 		'app/src/pane.tsx': `import {useSnapshot} from 'observer'; import {reading} from './handles';
-			import {Notice as Label} from 'notices';
+			import {Action, Notice as Label} from 'notices';
 			import {FormattedMessage as Message} from 'react-intl';
 			export function Pane() {
 				const store = useSnapshot();
-				return <button onClick={() => {
+				return <section><Message id="headline"/><Action onClick={() => {
 					store.get(reading).show(<Label label="sent"/>, {sticky: true});
 					store.get(reading).show(<Message id="headline"/>);
-				}}><Message id="headline"/></button>;
+				}}/></section>;
 			}`,
 	});
 	fs.symlinkSync(
@@ -510,10 +511,10 @@ it('delivers the original React element to a store service for rendering under i
 			`
 			export {Root} from './src/provider.tsrx';
 			export {reading} from './src/handles';
-			export {createRoot, act} from 'octane';
+			export {createRoot} from 'octane';
 			export {Notice, Prefix} from 'notices';
 			export {IntlProvider, FormattedMessage} from 'react-intl';
-			export {isValidElement, createElement} from 'react';
+			export {act, isValidElement, createElement} from 'react';
 			export {renderToStaticMarkup} from 'react-dom/server';`,
 			['react-intl'],
 		);
@@ -524,7 +525,7 @@ it('delivers the original React element to a store service for rendering under i
 			await client.act(async () =>
 				root.render(client.Root, { store: new Map([[client.reading, { show }]]) }),
 			);
-			expect(host.textContent).toBe('Octane provider');
+			expect(host.textContent).toBe('Octane providerSend');
 			expect(show).not.toHaveBeenCalled();
 			await client.act(async () => host.querySelector('button').click());
 			expect(show).toHaveBeenCalledTimes(2);
@@ -579,7 +580,14 @@ it('retains the migration diagnostic when a store consumer cannot preserve the o
 	const inputs = Object.fromEntries(
 		Object.entries(cases).map(([name, source]) => ['app/src/' + name + '.tsx', source]),
 	);
-	const { app } = noticeProject({
+	inputs['app/src/island.tsx'] =
+		`import {Action, Notice} from 'notices'; import {useSnapshot} from 'observer';
+		import {reading} from './handles'; declare function other(value: unknown): void;
+		export function Pane() {
+			const store = useSnapshot();
+			return <Action onClick={() => { store.get(reading).show(<Notice/>); other(<i/>); }}/>;
+		}`;
+	const { app, root } = noticeProject({
 		...inputs,
 		'app/src/widgets/package.json': JSON.stringify({
 			name: 'linked-notices',
@@ -598,8 +606,13 @@ it('retains the migration diagnostic when a store consumer cannot preserve the o
 	const options = JSON.parse(fs.readFileSync(config, 'utf8'));
 	options.compilerOptions.paths = { 'notices/public.js': ['./src/widgets/index.tsx'] };
 	fs.writeFileSync(config, JSON.stringify(options));
-	const files = Object.keys(cases).map((name) => path.join(app, 'src/' + name + '.tsx'));
+	const files = Object.keys(inputs).map((name) => path.join(root, name));
 	const result = await runCodemod(files, { root: app, strong: true, verify: true });
+	const island = result.files.find((file) => file.file === 'src/island.tsx');
+	expect(island.rules['store-hook']).toBe(1);
+	expect(island.notes).toContainEqual(
+		expect.objectContaining({ severity: 'error', message: expect.stringContaining('<Action>') }),
+	);
 	for (const name of Object.keys(cases)) {
 		const file = result.files.find((file) => file.file === 'src/' + name + '.tsx');
 		expect(file.rules['store-hook'], name).toBeUndefined();

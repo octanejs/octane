@@ -1128,7 +1128,7 @@ class ModuleTransform {
 					});
 				}
 			}
-			if (isJsx(node)) return true;
+			if (isJsx(node)) return !this.reactRendererBodies.has(node);
 			if (ts.isIdentifier(node)) {
 				const project = this.projectType(node);
 				const type = (project?.checker ?? this.checker).typeToString(
