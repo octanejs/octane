@@ -50,6 +50,7 @@ import {
 } from './slot-hooks.js';
 import { parseModule as parseAuthoredModule } from '#octane/compiler-parser';
 import { declaresStrongMode } from './strong-mode.js';
+import { findStrongDependencies } from './strong-dependencies.js';
 import { lexStaticImportRequests, rewriteServerRuntimeRequests } from './runtime-requests.js';
 import { assertNativeReadOptions } from './native-read-diagnostics.js';
 import { findCssModuleImportRequests } from './css-module-imports.js';
@@ -339,6 +340,30 @@ function importsHookRuntime(code) {
 		/from\s*['"]octane\/signals\/(?:client|server)['"]/.test(code) ||
 		/from\s*['"]octane\/signals['"]/.test(code)
 	);
+}
+
+function escapeRegExp(value) {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** `compiler.strongDependencies`, validated: `{ require?: boolean, allow?: string[] }`. */
+function normalizeStrongDependencies(value) {
+	if (value === undefined) return { require: false, allow: new Set() };
+	if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+		throw new TypeError('Octane compiler `strongDependencies` must be an object when provided.');
+	}
+	if (value.require !== undefined && typeof value.require !== 'boolean') {
+		throw new TypeError('Octane compiler `strongDependencies.require` must be a boolean.');
+	}
+	if (
+		value.allow !== undefined &&
+		(!Array.isArray(value.allow) || value.allow.some((name) => typeof name !== 'string'))
+	) {
+		throw new TypeError(
+			'Octane compiler `strongDependencies.allow` must be an array of package names.',
+		);
+	}
+	return { require: value.require === true, allow: new Set(value.allow ?? []) };
 }
 
 function addMetadata(target, source) {
@@ -883,6 +908,12 @@ class OctaneBundlerCompiler {
 		if (options.strong !== undefined && typeof options.strong !== 'boolean') {
 			throw new TypeError('Octane compiler `strong` must be a boolean when provided.');
 		}
+		const strongDependencies = normalizeStrongDependencies(options.strongDependencies);
+		if (strongDependencies.require && options.strong !== true) {
+			throw new TypeError(
+				'Octane compiler `strongDependencies.require` needs `strong: true`, so that every application re-export is itself checked.',
+			);
+		}
 		this.root = nodePath.resolve(options.root ?? process.cwd());
 		try {
 			this.realRoot = nodeFs.realpathSync(this.root);
@@ -930,6 +961,11 @@ class OctaneBundlerCompiler {
 		// never share nearest-manifest decisions.
 		this.manifestRuleCache = new Map();
 		this.discoveryCache = null;
+		this.strongDependencies = strongDependencies;
+		// Modules the dependency walk has read, and the application modules whose
+		// walk passed, both reset by `invalidate`.
+		this.strongDependencyModules = new Map();
+		this.strongDependencyPassed = new Map();
 	}
 
 	/** Clear cached manifest/discovery decisions after a watched path changes. */
@@ -938,12 +974,18 @@ class OctaneBundlerCompiler {
 		// across client/server and hydrate-query transforms within one generation,
 		// but a fixed and later reintroduced warning must be visible again.
 		this.warnedCompileDiagnostics.clear();
+		// Any edit can change what a passed walk reaches.
+		this.strongDependencyPassed.clear();
 		if (path == null) {
 			this.manifestRuleCache.clear();
 			this.discoveryCache = null;
+			this.strongDependencyModules.clear();
 			return;
 		}
 		const changed = nodePath.resolve(cleanModuleId(path));
+		this.strongDependencyModules.delete(changed);
+		// A manifest decides `exports`, `octane.strong`, and Octane ownership.
+		if (nodePath.basename(changed) === 'package.json') this.strongDependencyModules.clear();
 		// Both cache families retain only present or missing package manifests.
 		// Ordinary source edits still start a diagnostic generation above, but
 		// cannot invalidate either cache.
@@ -989,12 +1031,15 @@ class OctaneBundlerCompiler {
 		let result;
 		if (pkg !== null) {
 			const manual = pkg.octane?.hookSlots?.manual;
+			const strong = pkg.octane?.strong;
 			const usesOctane = packageUsesOctane(pkg, dir);
 			result = {
 				rule: {
 					name: typeof pkg.name === 'string' ? pkg.name : null,
 					root: dir,
 					dirs: Array.isArray(manual) ? manual : [],
+					// `"strong": true` covers the package; a list covers those paths.
+					strong: strong === true ? [''] : Array.isArray(strong) ? strong : [],
 					runtimeDependencies: [
 						...Object.keys(pkg.dependencies ?? {}),
 						...Object.keys(pkg.optionalDependencies ?? {}),
@@ -1024,19 +1069,38 @@ class OctaneBundlerCompiler {
 	}
 
 	_hasManualHookSlots(file, collected) {
+		return this._inPackagePaths(file, collected, 'dirs');
+	}
+
+	/**
+	 * Whether the owning package's `octane.strong` declaration covers the file.
+	 * Only a package that declares something has its manifest watched here, so
+	 * every other module keeps the metadata it had before declarations.
+	 */
+	_packageDeclaresStrong(file, collected) {
+		const scratch = { dependencies: new Set(), missingDependencies: new Set() };
+		const declared = this._inPackagePaths(file, scratch, 'strong');
+		if (this._nearestOctanePackageRule(nodePath.dirname(file)).rule?.strong.length) {
+			addMetadata(collected, finishMetadata(scratch));
+		}
+		return declared;
+	}
+
+	_inPackagePaths(file, collected, key) {
 		const lookup = this._nearestOctanePackageRule(nodePath.dirname(file));
 		addMetadata(collected, lookup);
 		if (lookup.rule === null) return false;
 		const relativeFile = nodePath.relative(lookup.rule.root, file);
-		return lookup.rule.dirs.some((directory) => {
+		return lookup.rule[key].some((directory) => {
 			const relativeDirectory = directory
 				.replace(/[\\/]+$/, '')
 				.split(/[\\/]/)
 				.join(nodePath.sep);
+			// Only `"strong": true` maps to the package root itself.
+			if (relativeDirectory === '') return key === 'strong';
 			return (
-				relativeDirectory !== '' &&
-				(relativeFile === relativeDirectory ||
-					relativeFile.startsWith(relativeDirectory + nodePath.sep))
+				relativeFile === relativeDirectory ||
+				relativeFile.startsWith(relativeDirectory + nodePath.sep)
 			);
 		});
 	}
@@ -1068,24 +1132,21 @@ class OctaneBundlerCompiler {
 	/**
 	 * How Strong mode reaches one module that Octane compiles: through its own
 	 * `"use strong"` directive, through this compiler's application `strong`
-	 * policy, both, or neither. `transform` makes the same decision inline;
-	 * tooling reads it here (`octane analyze` builds its Strong coverage check
+	 * policy, through its package's `octane.strong` declaration, or none.
+	 * `transform` makes the same decision inline; tooling reads it here (`octane analyze` builds its Strong coverage check
 	 * on it) so the policy is never re-derived outside the compiler. Whether
 	 * Octane compiles the module at all (`exclude`, `requireDirective`) is a
 	 * separate question this does not answer.
 	 *
 	 * @param {string} code
 	 * @param {string} id
-	 * @returns {{ strong: boolean, directive: boolean, config: boolean }}
+	 * @returns {{ strong: boolean, directive: boolean, config: boolean, package: boolean }}
 	 */
 	strongModuleStatus(code, id) {
-		const file = cleanModuleId(id);
-		const config =
-			this.defaults.strong === true &&
-			this._isApplicationSource(file, {
-				dependencies: new Set(),
-				missingDependencies: new Set(),
-			});
+		const file = nodePath.resolve(this.root, cleanModuleId(id));
+		const collected = { dependencies: new Set(), missingDependencies: new Set() };
+		const config = this.defaults.strong === true && this._isApplicationSource(file, collected);
+		const declared = this._packageDeclaresStrong(file, collected);
 		const directive =
 			code.includes('use strong') &&
 			declaresStrongMode(
@@ -1093,7 +1154,118 @@ class OctaneBundlerCompiler {
 					? parseAuthoredModule(code, file)
 					: parseHookSource(code, file).ast,
 			);
-		return { strong: config || directive, directive, config };
+		return { strong: config || declared || directive, directive, config, package: declared };
+	}
+
+	/**
+	 * What the given Strong modules reach in other packages that does not
+	 * compile under Strong mode, and the `octane/react` boundaries on the way,
+	 * as this compiler decides each module's mode. `octane analyze
+	 * --strong-dependencies` reports it; `strongDependencies.require` rejects it.
+	 *
+	 * @param {{ roots: string[], display?: (absolute: string) => string, files?: Set<string>, trace?: boolean, source?: string }} input
+	 */
+	findStrongDependencies({ roots, display, files, trace, source }) {
+		return findStrongDependencies({
+			roots,
+			status: (source, absolute) => this.strongModuleStatus(source, absolute),
+			modulePackage: (source, absolute) => this.modulePackage(source, absolute),
+			read: (absolute) => nodeFs.readFileSync(absolute, 'utf8'),
+			display: display ?? ((absolute) => nodePath.relative(this.root, absolute)),
+			cache: this.strongDependencyModules,
+			files,
+			trace,
+			source,
+		});
+	}
+
+	/**
+	 * What `strongDependencies.require` rejects in one application module: each
+	 * module in another package it reaches that does not compile under Strong
+	 * mode, and each `octane/react` boundary, unless `allow` names it. Each
+	 * entry points at the module's own import that leads there. `files`
+	 * collects every module the walk read.
+	 *
+	 * @param {string} code
+	 * @param {string} id
+	 * @param {Set<string>} [files]
+	 * @returns {{ code: 'OCTANE_STRONG_DEPENDENCY', request: string, line: number, column: number, message: string }[]}
+	 */
+	strongDependencyViolations(code, id, files) {
+		const file = nodePath.resolve(this.root, cleanModuleId(id));
+		const { packages, reactCompat } = this.findStrongDependencies({
+			roots: [file],
+			files,
+			trace: true,
+			source: code,
+		});
+		const { allow } = this.strongDependencies;
+		const rejected = [
+			...packages
+				.filter((entry) => !allow.has(entry.name))
+				.map((entry) => ({
+					requests: entry.requests ?? [],
+					message: `reaches ${entry.name} (${entry.modules.join(', ')}), which does not compile under Strong mode. Declare \`"octane": { "strong": … }\` in ${entry.name}'s package.json once it is Strong, or add ${JSON.stringify(entry.name)} to compiler.strongDependencies.allow.`,
+				})),
+			...(allow.has('octane/react')
+				? []
+				: reactCompat.map((entry) => ({
+						requests: entry.requests ?? [],
+						message: `reaches the octane/react (ReactCompat) boundary in ${entry.package} (${entry.module}), which no Strong rule checks. Add "octane/react" to compiler.strongDependencies.allow to keep it.`,
+					}))),
+		];
+		return rejected.flatMap(({ requests, message }) =>
+			requests.map((request) => {
+				const offset =
+					request === '' ? -1 : code.search(new RegExp(`['"]${escapeRegExp(request)}['"]`));
+				const before = offset === -1 ? '' : code.slice(0, offset);
+				return {
+					code: /** @type {const} */ ('OCTANE_STRONG_DEPENDENCY'),
+					request,
+					line: before.split('\n').length,
+					column: offset === -1 ? 0 : offset - before.lastIndexOf('\n') - 1,
+					message: `${request === '' ? 'This module' : `Import ${JSON.stringify(request)}`} ${message}`,
+				};
+			}),
+		);
+	}
+
+	/** Throws the first of `strongDependencyViolations`, and watches what the walk read. */
+	_assertStrongDependencies(code, file, collected) {
+		if (this.strongDependencyPassed.get(file) === code) return;
+		let files = new Set();
+		let violations = this.strongDependencyViolations(code, file, files);
+		if (violations.length > 0) {
+			// A failed transform registers no watch files, so the fix (a manifest
+			// declaration, a directive) may not have reached the caches. Confirm
+			// from disk before failing.
+			this.strongDependencyModules.clear();
+			this.manifestRuleCache.clear();
+			files = new Set();
+			violations = this.strongDependencyViolations(code, file, files);
+		}
+		// Every module the walk read, and its package manifest, decides the
+		// answer, so each one is watched.
+		for (const dependency of files) {
+			if (dependency === file) continue;
+			collected.dependencies.add(dependency);
+			addMetadata(collected, this._nearestOctanePackageRule(nodePath.dirname(dependency)));
+		}
+		if (violations.length === 0) {
+			this.strongDependencyPassed.set(file, code);
+			return;
+		}
+		const [first] = violations;
+		const filename = this._canonicalModuleId(file);
+		const error = new Error(
+			`${first.code}: ${filename}:${first.line}:${first.column + 1}: ${first.message}${
+				violations.length > 1 ? ` (${violations.length - 1} more)` : ''
+			}`,
+		);
+		error.code = first.code;
+		error.filename = filename;
+		error.loc = { file, line: first.line, column: first.column };
+		throw error;
 	}
 
 	/**
@@ -1617,8 +1789,12 @@ class OctaneBundlerCompiler {
 		// project root. Modules may still opt themselves in with their own
 		// directive, which the authored-source compiler resolves separately.
 		const strong =
-			(options.strong ?? this.defaults.strong) === true &&
-			this._isApplicationSource(file, collected);
+			((options.strong ?? this.defaults.strong) === true &&
+				this._isApplicationSource(file, collected)) ||
+			this._packageDeclaresStrong(file, collected);
+		if (strong && this.strongDependencies.require && this._isApplicationSource(file, collected)) {
+			this._assertStrongDependencies(code, nodePath.resolve(this.root, file), collected);
+		}
 		const universalRuntime = normalizeUniversalRuntime(
 			options.universalRuntime ?? this.defaults.universalRuntime,
 		);

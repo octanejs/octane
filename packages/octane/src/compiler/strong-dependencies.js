@@ -1,7 +1,107 @@
-import { realpathSync, statSync } from 'node:fs';
+// What Strong modules reach in other packages that does not compile under
+// Strong mode. `octane analyze --strong-dependencies` reports it, and
+// `compiler.strongDependencies.require` turns each entry into a build error.
+// Both read it from here so the report previews exactly what the build rejects.
+
+import { readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { readInstalled } from '../../kernel/project.js';
-import { codeOnly, runtimeRequests } from './strong-coverage.js';
+
+/**
+ * Comments and template literals, whose text is not code, and quoted strings,
+ * which can hold either opener. A template's `${}` is code, but nothing a
+ * statement scanner reads lives there, and a nested template's backticks pair
+ * up inside it.
+ */
+const TEXT =
+	/\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$)|'(?:\\.|[^'\\\n])*'?|"(?:\\.|[^"\\\n])*"?|`(?:\\[\s\S]|[^`\\])*`?/g;
+
+/**
+ * `source` with comment and template literal text blanked, so a statement
+ * scanner never reads code that is only text, such as a code sample in a
+ * template string. Line breaks stay, and so do a template's backticks, so a
+ * tagged template never reads as a bare name. Quoted strings stay: a specifier
+ * is one, and one ends at its line, so it cannot hold a statement.
+ *
+ * @param {string} source
+ */
+function codeOnly(source) {
+	return source.replace(TEXT, (text) =>
+		text[0] === "'" || text[0] === '"'
+			? text
+			: text.replace(text[0] === '`' ? /[^\n`]/g : /[^\n]/g, ' '),
+	);
+}
+
+/**
+ * An `import … from` or `export … from` statement, capturing its keyword,
+ * clause, and specifier. The clause may span lines but never reaches into the
+ * next statement of either kind, so a semicolon-free module cannot borrow a
+ * later statement's specifier.
+ */
+const STATIC_REQUEST =
+	/^\s*(import|export)\s+((?:(?!\b(?:import|export)\b)[^;])*?)\s*\bfrom\s*['"]([^'"]+)['"]/gm;
+
+/**
+ * The module's imports and re-exports that bind something at runtime, each
+ * with the names it binds as `[name in the target, name here]` pairs, where
+ * `*` stands for the whole target (`* as ns`) or, on both sides, everything it
+ * exports (`export *`). TypeScript erases a `type` clause and every
+ * `type`-marked specifier, so a clause left with no binding leaves no request
+ * behind.
+ *
+ * @param {string} source
+ * @returns {{ request: string, reexport: boolean, bindings: [string, string][] }[]}
+ */
+function runtimeRequests(source) {
+	const requests = [];
+	for (const [, keyword, authored, request] of codeOnly(source).matchAll(STATIC_REQUEST)) {
+		const clause = authored.trim();
+		const reexport = keyword === 'export';
+		// A re-export clause opens with `*` or `{`; anything else is a
+		// declaration that happens to spell `from '…'`.
+		if (/^type\b/.test(clause) || (reexport && !/^[*{]/.test(clause))) continue;
+		/** @type {[string, string][]} */
+		const bindings = [];
+		const named = /\{([\s\S]*)\}/.exec(clause);
+		for (const specifier of named?.[1].split(',') ?? []) {
+			const [name, local = name] = specifier.trim().split(/\s+as\s+/);
+			if (name && !/^type\s/.test(name)) bindings.push([name.replace(/^['"]|['"]$/g, ''), local]);
+		}
+		const outside = clause.replace(/\{[\s\S]*\}/, '');
+		const namespace = /\*(?:\s+as\s+([\w$]+))?/.exec(outside);
+		if (namespace !== null) bindings.push(['*', namespace[1] ?? '*']);
+		const defaultName = /^([\w$]+)\s*(?:,|$)/.exec(outside.trim());
+		if (defaultName !== null) bindings.push(['default', defaultName[1]]);
+		if (bindings.length > 0) requests.push({ request, reexport, bindings });
+	}
+	return requests;
+}
+
+/**
+ * The installed package `name` as Node resolves it from `root`: the nearest
+ * `node_modules/<name>` with a readable manifest.
+ *
+ * @param {string} root
+ * @param {string} name
+ * @returns {{ dir: string, manifest: any } | null}
+ */
+function readInstalled(root, name) {
+	let dir = path.resolve(root);
+	for (;;) {
+		const candidate = path.join(dir, 'node_modules', name);
+		try {
+			return {
+				dir: candidate,
+				manifest: JSON.parse(readFileSync(path.join(candidate, 'package.json'), 'utf8')),
+			};
+		} catch {
+			// Not installed here; keep walking up.
+		}
+		const parent = path.dirname(dir);
+		if (parent === dir) return null;
+		dir = parent;
+	}
+}
 
 /** The conditions a client build resolves a package's `exports` with. */
 const CONDITIONS = new Set(['browser', 'import', 'module', 'default']);
@@ -230,27 +330,50 @@ function takenByRenames(bindings, renamed) {
  * imports are followed too, through every Strong layer to the first module
  * that is not Strong.
  *
+ * Pass the same `cache` to repeated walks, and drop an entry when its file
+ * changes. `files` collects every module the walk read. With `trace`, each
+ * entry also lists the root's own `requests` that lead to it. `source`, when
+ * given, is the text of the only root, which a build may hold before disk does.
+ *
  * @param {{
  *   roots: string[],
- *   status: import('./strong-coverage.js').StrongPolicy['status'],
- *   modulePackage: (source: string, absolute: string) => import('./strong-coverage.js').ModulePackage,
+ *   status: (source: string, absolute: string) => { strong: boolean },
+ *   modulePackage: (source: string, absolute: string) => { name: string | null, root: string | null, compiled: boolean },
  *   read: (absolute: string) => string,
  *   display: (absolute: string) => string,
+ *   cache?: Map<string, any>,
+ *   files?: Set<string>,
+ *   trace?: boolean,
+ *   source?: string,
  * }} input
  */
-export function findStrongDependencies({ roots, status, modulePackage, read, display }) {
-	/** @type {Map<string, { source: string, owner: import('./strong-coverage.js').ModulePackage, name: string, module: string } | null>} */
-	const modules = new Map();
-	/** @param {string} absolute */
-	const moduleAt = (absolute) => {
-		if (modules.has(absolute)) return modules.get(absolute) ?? null;
-		let source;
-		try {
-			source = read(absolute);
-		} catch {
-			// Unreadable: its own build reports it, and it has nothing to follow.
-			modules.set(absolute, null);
-			return null;
+export function findStrongDependencies({
+	roots,
+	status,
+	modulePackage,
+	read,
+	display,
+	cache = new Map(),
+	files,
+	trace = false,
+	source: rootSource,
+}) {
+	/**
+	 * @param {string} absolute
+	 * @param {string} [given] the text to use instead of reading, never cached
+	 */
+	const moduleAt = (absolute, given) => {
+		files?.add(absolute);
+		if (given === undefined && cache.has(absolute)) return cache.get(absolute);
+		let source = given;
+		if (source === undefined) {
+			try {
+				source = read(absolute);
+			} catch {
+				// Unreadable: its own build reports it, and it has nothing to follow.
+				cache.set(absolute, null);
+				return null;
+			}
 		}
 		const owner = modulePackage(source, absolute);
 		const root = owner.root ?? path.dirname(absolute);
@@ -259,8 +382,11 @@ export function findStrongDependencies({ roots, status, modulePackage, read, dis
 			owner,
 			name: owner.name ?? display(root),
 			module: path.relative(root, absolute).split(path.sep).join('/'),
+			requests: runtimeRequests(source),
+			/** @type {boolean | null | undefined} */
+			strong: undefined,
 		};
-		modules.set(absolute, module);
+		if (given === undefined) cache.set(absolute, module);
 		return module;
 	};
 
@@ -269,37 +395,46 @@ export function findStrongDependencies({ roots, status, modulePackage, read, dis
 	 * parse. Then it fails its own build, so, like the coverage measurement, the
 	 * report leaves it out and follows nothing from it.
 	 *
-	 * @param {string} source
+	 * @param {any} module
 	 * @param {string} absolute
 	 */
-	const isStrong = (source, absolute) => {
-		try {
-			return status(source, absolute).strong;
-		} catch {
-			return null;
+	const isStrong = (module, absolute) => {
+		if (module.strong === undefined) {
+			try {
+				module.strong = status(module.source, absolute).strong;
+			} catch {
+				module.strong = null;
+			}
 		}
+		return module.strong;
 	};
 
-	/** @type {Map<string, { name: string, modules: Set<string>, importers: Set<string> }>} */
+	/** @type {Map<string, { name: string, modules: Set<string>, importers: Set<string>, requests: Set<string> }>} */
 	const packages = new Map();
-	/** @type {Map<string, { package: string, module: string, importers: Set<string> }>} */
+	/** @type {Map<string, { package: string, module: string, importers: Set<string>, requests: Set<string> }>} */
 	const reactCompat = new Map();
 	for (const authored of roots) {
-		const root = realpathSync(authored);
+		let root = authored;
+		try {
+			root = realpathSync(authored);
+		} catch {
+			// Not on disk yet: only `source` describes it.
+		}
 		const importer = display(authored);
-		const home = moduleAt(root)?.owner.root;
+		const given = rootSource === undefined ? undefined : moduleAt(root, rootSource);
+		const home = (given ?? moduleAt(root))?.owner.root;
 		const seen = new Set();
 		/**
 		 * @param {string} absolute
 		 * @param {Set<string> | null} wanted the names taken from it; `null` is all
+		 * @param {string} via the root's own request this path started from
 		 */
-		const visit = (absolute, wanted) => {
+		const visit = (absolute, wanted, via) => {
 			const key = `${absolute}\0${wanted === null ? '*' : [...wanted].sort().join()}`;
-			const from = moduleAt(absolute);
+			const from = absolute === root && given !== undefined ? given : moduleAt(absolute);
 			if (seen.has(key) || from === null) return;
 			seen.add(key);
-			const { owner, source } = from;
-			const requests = runtimeRequests(source);
+			const { owner, source, requests } = from;
 			const imported = new Set(
 				requests.flatMap(({ reexport, bindings }) =>
 					reexport ? [] : bindings.map(([, local]) => local),
@@ -308,26 +443,31 @@ export function findStrongDependencies({ roots, status, modulePackage, read, dis
 			// A module that only passes names on is a step, not a dependency.
 			const { provides, renamed } = ownExports(source, wanted, imported);
 			const strong =
-				provides && owner.compiled && owner.root !== home ? isStrong(source, absolute) : null;
+				provides && owner.compiled && owner.root !== home ? isStrong(from, absolute) : null;
 			if (strong === false) {
 				const group = packages.get(from.name) ?? {
 					name: from.name,
 					modules: new Set(),
 					importers: new Set(),
+					requests: new Set(),
 				};
 				group.modules.add(from.module);
 				group.importers.add(importer);
+				group.requests.add(via);
 				packages.set(from.name, group);
 			}
 			for (const { request, reexport, bindings } of requests) {
+				const next = absolute === root ? request : via;
 				if (/^octane\/react(?:\/|$)/.test(request)) {
 					if (!provides) continue;
 					const boundary = reactCompat.get(absolute) ?? {
 						package: from.name,
 						module: from.module,
 						importers: new Set(),
+						requests: new Set(),
 					};
 					boundary.importers.add(importer);
+					boundary.requests.add(next);
 					reactCompat.set(absolute, boundary);
 					continue;
 				}
@@ -338,22 +478,29 @@ export function findStrongDependencies({ roots, status, modulePackage, read, dis
 						? taken(bindings, null)
 						: takenByRenames(bindings, renamed);
 				const target = names?.size === 0 ? null : resolveRequest(request, absolute);
-				if (target !== null) visit(target, names);
+				if (target !== null) visit(target, names, next);
 			}
 		};
-		visit(root, null);
+		visit(root, null, '');
 	}
 
+	/** @param {Set<string>} requests */
+	const traced = (requests) => (trace ? { requests: [...requests].sort() } : null);
 	return {
 		packages: [...packages.values()]
-			.map(({ name, modules, importers }) => ({
+			.map(({ name, modules, importers, requests }) => ({
 				name,
 				modules: [...modules].sort(),
 				importers: [...importers].sort(),
+				...traced(requests),
 			}))
 			.sort((a, b) => a.name.localeCompare(b.name)),
 		reactCompat: [...reactCompat.values()]
-			.map((boundary) => ({ ...boundary, importers: [...boundary.importers].sort() }))
+			.map(({ requests, ...boundary }) => ({
+				...boundary,
+				importers: [...boundary.importers].sort(),
+				...traced(requests),
+			}))
 			.sort((a, b) => a.package.localeCompare(b.package) || a.module.localeCompare(b.module)),
 	};
 }

@@ -41,6 +41,8 @@ export interface OctaneVitePluginOptions {
 	 * @default false
 	 */
 	strong?: boolean;
+	/** What Strong application modules may import from other packages; see `createOctaneCompiler`. */
+	strongDependencies?: import('./bundler.js').OctaneStrongDependenciesOptions;
 	/** Trusted adapter output shapes; imported calls keep one evaluation per native host. */
 	knownAttributeSpreads?: readonly KnownAttributeSpread[];
 	/** Opt in to fixed primitive child props by name. Keep text and IDs live to share extracted programs. */

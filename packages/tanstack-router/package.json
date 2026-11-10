@@ -11,7 +11,30 @@
       "manual": [
         "src"
       ]
-    }
+    },
+    "strong": [
+      "src/ClientOnly.tsrx",
+      "src/ErrorComponent.tsrx",
+      "src/ScriptOnce.tsrx",
+      "src/Transitioner.tsrx",
+      "src/assetComponent.tsrx",
+      "src/compiled/Document.tsrx",
+      "src/compiled/Link.tsrx",
+      "src/compiled/Matches.tsrx",
+      "src/compiled/bindings.ts",
+      "src/compiled/route.tsrx",
+      "src/headContentBinding.ts",
+      "src/hookBindings.ts",
+      "src/internal.ts",
+      "src/linkBinding.ts",
+      "src/linkComponent.tsrx",
+      "src/routeHookBindings.ts",
+      "src/router.ts",
+      "src/routerStateBinding.ts",
+      "src/scriptComponent.tsrx",
+      "src/scriptContentBinding.ts",
+      "src/useStore.ts"
+    ]
   },
   "description": "TanStack Router bindings for the octane renderer — reuses @tanstack/router-core and swaps the React binding for octane's hooks.",
   "author": {

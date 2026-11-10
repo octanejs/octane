@@ -55,6 +55,8 @@ export interface OctaneCompilerOptions extends Pick<
 	 * @default false
 	 */
 	strong?: boolean;
+	/** What Strong application modules may import from other packages. */
+	strongDependencies?: OctaneStrongDependenciesOptions;
 	/** Path fragments excluded from Octane's plain `.ts`/`.js` hook-slot pass. */
 	exclude?: readonly string[];
 	/**
@@ -185,7 +187,10 @@ export interface OctaneCompiler {
 	): string[];
 	/** Classify a bundler-resolved module without loading or evaluating it. */
 	clientReferenceForFile(id: string): OctaneClientReference | null;
-	/** How Strong mode reaches a module: its own directive, the `strong` option, or neither. */
+	/**
+	 * How Strong mode reaches a module: its own directive, the `strong` option,
+	 * its package's `octane.strong` declaration, or none.
+	 */
 	strongModuleStatus(
 		code: string,
 		id: string,
@@ -193,7 +198,34 @@ export interface OctaneCompiler {
 		strong: boolean;
 		directive: boolean;
 		config: boolean;
+		package: boolean;
 	};
+	/**
+	 * What Strong modules reach in other packages that does not compile under
+	 * Strong mode, and the `octane/react` boundaries on the way.
+	 */
+	findStrongDependencies(input: {
+		roots: string[];
+		display?: (absolute: string) => string;
+		files?: Set<string>;
+		trace?: boolean;
+		source?: string;
+	}): OctaneStrongDependencyReport;
+	/**
+	 * What `strongDependencies.require` rejects in one application module, each
+	 * located at the module's own import that leads there.
+	 */
+	strongDependencyViolations(
+		code: string,
+		id: string,
+		files?: Set<string>,
+	): {
+		code: 'OCTANE_STRONG_DEPENDENCY';
+		request: string;
+		line: number;
+		column: number;
+		message: string;
+	}[];
 	/** The package owning a module by its nearest manifest, and whether `transform` may change it. */
 	modulePackage(
 		code: string,
@@ -203,6 +235,23 @@ export interface OctaneCompiler {
 		root: string | null;
 		compiled: boolean;
 	};
+}
+
+export interface OctaneStrongDependenciesOptions {
+	/**
+	 * Fail the build when a Strong application module reaches a module in
+	 * another Octane package that does not compile under Strong mode, or an
+	 * `octane/react` boundary. Needs `strong: true`.
+	 * @default false
+	 */
+	require?: boolean;
+	/** Package names, and `'octane/react'`, that `require` lets through. */
+	allow?: readonly string[];
+}
+
+export interface OctaneStrongDependencyReport {
+	packages: { name: string; modules: string[]; importers: string[]; requests?: string[] }[];
+	reactCompat: { package: string; module: string; importers: string[]; requests?: string[] }[];
 }
 
 export function createOctaneCompiler(options?: OctaneCompilerOptions): OctaneCompiler;
