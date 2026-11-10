@@ -97,7 +97,7 @@ function TreeRow(props: {
 	</div>
 }
 
-export function ComponentsTab(props: { client: OctaneDevtoolsEventClient }): OctaneNode @{
+export function ComponentsTab(props: { client: OctaneDevtoolsEventClient }): OctaneNode {
 	const { client } = props;
 	const [nodes, setNodes] = useState<WireTreeNode[]>([]);
 	const [selected, setSelected, getSelected] = useState<number | null>(null);
@@ -128,74 +128,79 @@ export function ComponentsTab(props: { client: OctaneDevtoolsEventClient }): Oct
 		client.emit('inspect-request', { id });
 	};
 
-	<div class="odt-split">
-		<div class="odt-col odt-col-tree">
-			<div class="odt-h">Component tree</div>
-			@if (nodes.length === 0) {
-				<div class="odt-empty">No mounted roots yet.</div>
-			} @else {
-				@for (const node of nodes; key node.id) {
-					<TreeRow node={node} onSelect={onSelect} selected={selected} />
+	return (
+		<div class="odt-split">
+			<div class="odt-col odt-col-tree">
+				<div class="odt-h">Component tree</div>
+				@if (nodes.length === 0) {
+					<div class="odt-empty">No mounted roots yet.</div>
+				} @else {
+					@for (const node of nodes; key node.id) {
+						<TreeRow node={node} onSelect={onSelect} selected={selected} />
+					}
 				}
-			}
-		</div>
-		<div class="odt-col">
-			@if (detail) {
-				<div>
-					<div class="odt-node-name">
-						{detail.name}
-						<span class="odt-badge">{detail.effectCount} effects</span>
-					</div>
-					<div class="odt-h">Hooks</div>
-					@if (detail.hooks.length === 0) {
-						<div class="odt-empty odt-muted">No tracked hooks.</div>
-					} @else {
-						@for (const cell of detail.hooks; index i) {
-							<div class="odt-kv">
-								<span class="odt-kv-key">{cell.kind}</span>
-								<span class="odt-kv-val"> {JSON.stringify(cell.value)}</span>
+			</div>
+			<div class="odt-col">
+				@if (detail) {
+					<div>
+						<div class="odt-node-name">
+							{detail.name}
+							<span class="odt-badge">{detail.effectCount} effects</span>
+						</div>
+						<div class="odt-h">Hooks</div>
+						@if (detail.hooks.length === 0) {
+							<div class="odt-empty odt-muted">No tracked hooks.</div>
+						} @else {
+							@for (const cell of detail.hooks; index i) {
+								<div class="odt-kv">
+									<span class="odt-kv-key">{cell.kind}</span>
+									<span class="odt-kv-val"> {JSON.stringify(cell.value)}</span>
+								</div>
+							}
+						}
+						@if (detail.context.length > 0) {
+							<>
+								<div class="odt-h">Context</div>
+								@for (const c of detail.context; index i) {
+									<div class="odt-kv">
+										<span class="odt-kv-key">{c.name}</span>
+										<span class="odt-kv-val"> {JSON.stringify(c.value)}</span>
+									</div>
+								}
+							</>
+						}
+						@if (detail.nativeReads) {
+							<div>
+								<div class="odt-h">Native reads</div>
+								<div class="odt-muted">{'Scheduled owner #' + detail.nativeReads.ownerId}</div>
+								<NativeReadRows
+									label="Accepted reads"
+									reads={detail.nativeReads.committed?.reads ?? []}
+								/>
+								@if (detail.nativeReads.committed?.mixed) {
+									<div class="odt-muted">Mixed revisions in this attempt.</div>
+								}
+								@for (const attempt of detail.nativeReads.pending; index i) {
+									<div>
+										<NativeReadRows label="Pending attempt" reads={attempt.reads} />
+										@if (attempt.mixed) {
+											<div class="odt-muted">Mixed revisions in this attempt.</div>
+										}
+									</div>
+								}
+								@if (detail.nativeReads.retry.length > 0) {
+									<NativeReadRows
+										label="Suspended retry sources"
+										reads={detail.nativeReads.retry}
+									/>
+								}
 							</div>
 						}
-					}
-					@if (detail.context.length > 0) {
-						<>
-							<div class="odt-h">Context</div>
-							@for (const c of detail.context; index i) {
-								<div class="odt-kv">
-									<span class="odt-kv-key">{c.name}</span>
-									<span class="odt-kv-val"> {JSON.stringify(c.value)}</span>
-								</div>
-							}
-						</>
-					}
-					@if (detail.nativeReads) {
-						<div>
-							<div class="odt-h">Native reads</div>
-							<div class="odt-muted">{'Scheduled owner #' + detail.nativeReads.ownerId}</div>
-							<NativeReadRows
-								label="Accepted reads"
-								reads={detail.nativeReads.committed?.reads ?? []}
-							/>
-							@if (detail.nativeReads.committed?.mixed) {
-								<div class="odt-muted">Mixed revisions in this attempt.</div>
-							}
-							@for (const attempt of detail.nativeReads.pending; index i) {
-								<div>
-									<NativeReadRows label="Pending attempt" reads={attempt.reads} />
-									@if (attempt.mixed) {
-										<div class="odt-muted">Mixed revisions in this attempt.</div>
-									}
-								</div>
-							}
-							@if (detail.nativeReads.retry.length > 0) {
-								<NativeReadRows label="Suspended retry sources" reads={detail.nativeReads.retry} />
-							}
-						</div>
-					}
-				</div>
-			} @else {
-				<div class="odt-empty">Select a component.</div>
-			}
+					</div>
+				} @else {
+					<div class="odt-empty">Select a component.</div>
+				}
+			</div>
 		</div>
-	</div>
+	);
 }

@@ -1007,7 +1007,7 @@ function SelfSuspending(props) @{
 export function JsxApp(props) @{
   <main>
     <b>{props.selection as string}</b>
-    <Suspense fallback={@{ <p>{('pending ' + props.selection) as string}</p> }}>
+    <Suspense fallback={<p>{('pending ' + props.selection) as string}</p>}>
       <span>{props.selection as string}</span>
       @if (props.wait) { <Hold wait={props.wait} /> }
       <SelfSuspending controls={props.controls} />
@@ -1024,7 +1024,7 @@ function Fails(props) @{
 export function CatchApp(props) @{
   <main>
     <b>{props.selection as string}</b>
-    <ErrorBoundary key="boundary" fallback={@{ <p>{('caught ' + props.selection) as string}</p> }}>
+    <ErrorBoundary key="boundary" fallback={<p>{('caught ' + props.selection) as string}</p>}>
       <Fails controls={props.controls} />
     </ErrorBoundary>
     <Gate gate={props.gate} />

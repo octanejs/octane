@@ -300,9 +300,49 @@ const STRONG_INLINE_CALCULATIONS = `
 	}
 `;
 
+// The React-style form: returned JSX is cached after an authored hook, while a
+// hookless return component stays an ordinary function callable anywhere.
+const STRONG_RETURN_CALCULATIONS = `
+	'use strong';
+	import { useState } from 'octane';
+
+	type Row = { readonly id: number; readonly n: number };
+	type Probes = {
+		project: (rows: readonly Row[]) => readonly string[];
+		identify: (value: object) => string;
+	};
+
+	export function ReturnCalculations({ project, identify }: Probes) {
+		const [rows, setRows] = useState<readonly Row[]>([{ id: 1, n: 1 }]);
+		const [tick, setTick] = useState(0);
+		return (
+			<div>
+				<button id="return-tick" onClick={() => setTick(tick + 1)}>tick</button>
+				<button
+					id="return-add"
+					onClick={() => setRows([...rows, { id: rows.length + 1, n: rows.length + 1 }])}
+				>
+					add
+				</button>
+				<span id="return-identity">{identify(project(rows))}</span>
+				<span id="return-tick-value">{String(tick)}</span>
+			</div>
+		);
+	}
+
+	export function CallableReturn({ project, identify, rows }: Probes & { rows: readonly Row[] }) {
+		return <span id="return-callable">{identify(project(rows))}</span>;
+	}
+`;
+
 describe('auto-calculation — Strong inline render expressions', () => {
 	const client = loadCompiledFixtureSource(STRONG_INLINE_CALCULATIONS, {
 		id: 'strong-inline-calculations.tsrx',
+		mode: 'client',
+		compileOptions: { hmr: false, dev: false },
+	});
+	const returned = loadCompiledFixtureSource(STRONG_RETURN_CALCULATIONS, {
+		id: 'strong-return-calculations.tsrx',
 		mode: 'client',
 		compileOptions: { hmr: false, dev: false },
 	});
@@ -345,6 +385,45 @@ describe('auto-calculation — Strong inline render expressions', () => {
 		expect(r.find('#strong-tick-value').textContent).toBe('2');
 		expect(r.find('#strong-hole-identity').textContent).toBe(nextHole);
 		expect(r.find('#strong-prop-identity').textContent).toBe(nextProp);
+		r.unmount();
+	});
+
+	it('keeps a returned inline calculation stable after an authored hook', () => {
+		const r = mount(returned.ReturnCalculations, probes());
+		const first = r.find('#return-identity').textContent;
+
+		r.click('#return-tick');
+		expect(r.find('#return-tick-value').textContent).toBe('1');
+		expect(r.find('#return-identity').textContent).toBe(first);
+
+		r.click('#return-add');
+		const second = r.find('#return-identity').textContent;
+		expect(second).not.toBe(first);
+
+		r.click('#return-tick');
+		expect(r.find('#return-tick-value').textContent).toBe('2');
+		expect(r.find('#return-identity').textContent).toBe(second);
+		r.unmount();
+	});
+
+	it('keeps a hookless Strong return component an ordinary deferred function', () => {
+		// A direct call returns an element that reads its inputs when it renders.
+		// Caching the hole would read them at the call instead.
+		const reads: object[] = [];
+		const { project, identify } = probes();
+		const props = {
+			project,
+			identify: (value: object) => {
+				reads.push(value);
+				return identify(value);
+			},
+			rows: [{ id: 1, n: 1 }],
+		};
+		expect(() => returned.CallableReturn(props)).not.toThrow();
+		expect(reads).toEqual([]);
+
+		const r = mount(returned.CallableReturn, props);
+		expect(r.find('#return-callable').textContent).toBe('id1');
 		r.unmount();
 	});
 
@@ -483,6 +562,38 @@ const STRONG_CHAINED_CALCULATIONS = `
 	}
 `;
 
+const STRONG_RETURN_CHAINED_CALCULATIONS = `
+	'use strong';
+	import { useState } from 'octane';
+
+	type Row = { readonly id: number; readonly n: number };
+	type Probes = {
+		project: (rows: readonly Row[]) => readonly string[];
+		wrap: (value: object) => { readonly value: object };
+		identify: (value: object) => string;
+	};
+
+	export function StrongReturnChained({ project, wrap, identify }: Probes) {
+		const [rows, setRows] = useState<readonly Row[]>([{ id: 1, n: 1 }]);
+		const [tick, setTick] = useState(0);
+		const labels = project(rows);
+		return (
+			<div>
+				<button id="strong-return-chain-tick" onClick={() => setTick(tick + 1)}>tick</button>
+				<button
+					id="strong-return-chain-add"
+					onClick={() => setRows([...rows, { id: rows.length + 1, n: rows.length + 1 }])}
+				>
+					add
+				</button>
+				<span id="strong-return-chain-identity">{identify(wrap(labels))}</span>
+				<span id="strong-return-chain-values">{labels.join(',')}</span>
+				<span id="strong-return-chain-tick-value">{String(tick)}</span>
+			</div>
+		);
+	}
+`;
+
 describe('auto-calculation — chained calculations', () => {
 	function chainProbes() {
 		let next = 0;
@@ -516,6 +627,11 @@ describe('auto-calculation — chained calculations', () => {
 	});
 	const strongChained = loadCompiledFixtureSource(STRONG_CHAINED_CALCULATIONS, {
 		id: 'strong-chained-calculations.tsrx',
+		mode: 'client',
+		compileOptions,
+	});
+	const strongReturnChained = loadCompiledFixtureSource(STRONG_RETURN_CHAINED_CALCULATIONS, {
+		id: 'strong-return-chained-calculations.tsrx',
 		mode: 'client',
 		compileOptions,
 	});
@@ -577,6 +693,12 @@ describe('auto-calculation — chained calculations', () => {
 	it('caches a const that only a Strong inline calculation reads', () => {
 		const r = mount(strongChained.StrongChained, chainProbes());
 		expectChainStable(r, 'strong-chain', ['r1:1', 'r1:1,r2:2']);
+		r.unmount();
+	});
+
+	it('caches a const that only a Strong returned inline calculation reads', () => {
+		const r = mount(strongReturnChained.StrongReturnChained, chainProbes());
+		expectChainStable(r, 'strong-return-chain', ['r1:1', 'r1:1,r2:2']);
 		r.unmount();
 	});
 });

@@ -596,13 +596,13 @@ describe('Strong prop state intent', () => {
 		);
 	});
 
-	it('keeps hook-named component builders free of prop-state intent checks', () => {
+	it('keeps hook-named JSX builders free of prop-state intent checks', () => {
 		expect(() =>
 			compile(
 				`"use strong";
 import { useState } from 'octane';
-function useDialog(title) { const [label, _setLabel] = useState(title); const Dialog = () => @{ <div>{label as string}</div> }; return Dialog; }
-export function App() @{ const Dialog = useDialog('x'); <div><Dialog /></div> }`,
+function useDialog(title) { const [label, _setLabel] = useState(title); const dialog = <div>{label as string}</div>; return dialog; }
+export function App() @{ const dialog = useDialog('x'); <div>{dialog}</div> }`,
 				'/src/App.tsrx',
 			),
 		).not.toThrow();
@@ -643,7 +643,7 @@ describe('Strong effect diagnostic integration', () => {
 	it('enforces .tsrx components and namespace imports', () => {
 		expect(() =>
 			compile(
-				`"use strong"; import * as O from 'octane'; export function App(props) @{ const [value, _setValue] = O.useState(props.value); <div /> }`,
+				`"use strong"; import * as O from 'octane'; export function App(props) { const [value, _setValue] = O.useState(props.value); return <div />; }`,
 				'/src/App.tsrx',
 			),
 		).toThrow(PROPS);
@@ -675,7 +675,7 @@ describe('Strong effect review regressions', () => {
 				`useEffect(() => subscribe(() => setFirst(1))); useEffect(() => consume(first));`,
 				`useEffect(() => { const onChange = () => Promise.resolve().then(setFirst); return subscribe(onChange); }); useEffect(() => consume(first));`,
 				`${guardedWrite('setFirst(value)')} function Inner() @{ useEffect(() => consume(first)); <i /> }`,
-				`${guardedWrite('setFirst(value)')} const Inner = () => @{ useEffect(() => consume(first)); <i /> };`,
+				`${guardedWrite('setFirst(value)')} const Inner = () => { useEffect(() => consume(first)); return <i />; };`,
 			]) {
 				expect(() =>
 					compile(
@@ -1431,21 +1431,21 @@ export function App(props) @{
 			'/src/App.tsrx',
 			`"use strong";
 import { useState, useEffect, startTransition } from 'octane';
-export function A({ first, last }) @{ const [full, setFull] = useState(''); useEffect(() => { startTransition(() => setFull(first + ' ' + last)); }); <p>{full}</p> }`,
+export function A({ first, last }) { const [full, setFull] = useState(''); useEffect(() => { startTransition(() => setFull(first + ' ' + last)); }); return <p>{full}</p>; }`,
 		],
 		[
 			'.tsrx transitions',
 			'/src/App.tsrx',
 			`"use strong";
 import { useState, useEffect, useTransition } from 'octane';
-export function A({ v }) @{ const [x, setX] = useState(0); const [p, start] = useTransition(); useEffect(() => { start(() => setX(v)); }); <p>{x}</p> }`,
+export function A({ v }) { const [x, setX] = useState(0); const [p, start] = useTransition(); useEffect(() => { start(() => setX(v)); }); return <p>{x}</p>; }`,
 		],
 		[
 			'.tsrx awaits',
 			'/src/App.tsrx',
 			`"use strong";
 import { useState, useEffect } from 'octane';
-export function A({ v }) @{ const [x, setX] = useState(0); useEffect(() => { (async () => { await null; setX(v * 2); })(); }); <p>{x}</p> }`,
+export function A({ v }) { const [x, setX] = useState(0); useEffect(() => { (async () => { await null; setX(v * 2); })(); }); return <p>{x}</p>; }`,
 		],
 	])('enforces %s', (_label, filename, source) => {
 		expect(() => compile(source, filename)).toThrow(UPDATE);
@@ -1724,7 +1724,7 @@ export function useMirror(value) { const [mirror, setMirror] = useThing(); useEf
 		const tsx = `"use strong";
 import { useState, useEffect } from 'octane';
 function useThing() { return useState(0); }
-export function A({ v }) @{ const [x, setX] = useThing(); useEffect(() => { setX(v); }); <p>{x}</p> }`;
+export function A({ v }) { const [x, setX] = useThing(); useEffect(() => { setX(v); }); return <p>{x}</p>; }`;
 		expect(() => compile(tsx, '/src/A.tsrx')).toThrow(UPDATE);
 		expect(() => compile(tsx.replace('"use strong";', ''), '/src/A.tsrx')).not.toThrow();
 	});
@@ -1914,7 +1914,7 @@ export function App(props) @{
 		const tsx = `"use strong";
 import { useState, useEffect } from 'octane';
 let last = 0;
-export function A({ log }) @{ const [c, setC] = useState(0); useEffect(() => { log(last); last = c; }); <button onClick={() => setC(c + 1)}>{c}</button> }`;
+export function A({ log }) { const [c, setC] = useState(0); useEffect(() => { log(last); last = c; }); return <button onClick={() => setC(c + 1)}>{c}</button>; }`;
 		expect(() => compile(tsx, '/src/A.tsrx')).toThrow(HIDDEN);
 		const ts = `"use strong";
 import { useEffect } from 'octane';
@@ -1926,7 +1926,7 @@ export function usePreviousLog(value, log) { useEffect(() => { log(last); last =
 	it('accepts refs and state getters in .tsrx component and plain TypeScript custom-hook effects', () => {
 		const tsx = `"use strong";
 import { useState, useEffect, useRef } from 'octane';
-export function A({ log }) @{ const [c, setC, getC] = useState(0); const last = useRef(0); useEffect(() => { log(last.current, getC()); last.current = c; }); <button onClick={() => setC(c + 1)}>{c}</button> }`;
+export function A({ log }) { const [c, setC, getC] = useState(0); const last = useRef(0); useEffect(() => { log(last.current, getC()); last.current = c; }); return <button onClick={() => setC(c + 1)}>{c}</button>; }`;
 		expect(() => compile(tsx, '/src/A.tsrx')).not.toThrow();
 		expect(errors(tsx, '/src/A.tsrx')).toEqual([]);
 		const ts = `"use strong";
@@ -2078,10 +2078,10 @@ export function usePreviousLog(value, log) { const [count, setCount, getCount] =
 
 	it('treats a callback-attached ref in a .tsrx component as a host element', () => {
 		const source = `import { useLayoutEffect, useRef } from 'octane';
-export function App(props) @{
+export function App(props) {
   const element = useRef(null);
   ${listen}
-  <div ref={(node) => { element.current = node; }} />
+  return <div ref={(node) => { element.current = node; }} />;
 }`;
 		for (const mode of ['client', 'server'] as const) {
 			expect(() => compile(source, '/src/App.tsrx', { mode, strong: true })).toThrow(LEAK);
@@ -2273,12 +2273,12 @@ export function App(props) @{
 		[
 			'a nearer JavaScript-scoped callback reused as an event in a shadowing row',
 			'const attach = (node) => { element.current = node; };',
-			'<section>@for (const attach of props.callbacks; key attach) { const Row = () => @{ const attach = (node) => { element.current = node; }; const alias = attach; <div ref={alias} onClick={attach} /> }; <Row /> }</section>',
+			'<section>@for (const attach of props.callbacks; key attach) { const render = () => { const attach = (node) => { element.current = node; }; const alias = attach; return <div ref={alias} onClick={attach} />; }; <>{render()}</> }</section>',
 		],
 		[
 			'a nearer JavaScript-scoped alias reused as an event in a shadowing row',
 			'const attach = (node) => { element.current = node; };',
-			'<section><div ref={attach} /> @for (const alias of props.callbacks; key alias) { const Row = () => @{ const alias = attach; <button onClick={alias} /> }; <Row /> }</section>',
+			'<section><div ref={attach} /> @for (const alias of props.callbacks; key alias) { const render = () => { const alias = attach; return <button onClick={alias} />; }; <>{render()}</> }</section>',
 		],
 		[
 			'an alias of a shadowed catch callback',
@@ -2824,7 +2824,7 @@ export function App(props) @{
 	it('enforces .tsrx components and plain TypeScript custom hooks', () => {
 		const tsx = `"use strong";
 import { useState, useEffect, useRef } from 'octane';
-export function A() @{ const r = useRef(null); const [h, setH] = useState(0); useEffect(() => { new ResizeObserver(([e]) => setH(e.contentRect.height)).observe(r.current); }); <div ref={r}>{h}</div> }`;
+export function A() { const r = useRef(null); const [h, setH] = useState(0); useEffect(() => { new ResizeObserver(([e]) => setH(e.contentRect.height)).observe(r.current); }); return <div ref={r}>{h}</div>; }`;
 		expect(() => compile(tsx, '/src/A.tsrx')).toThrow(LEAK);
 		const ts = `"use strong";
 import { useState, useEffect } from 'octane';

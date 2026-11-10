@@ -20,13 +20,12 @@ const inspect = (value: unknown) =>
 	Client.isChildrenBlock(value) ? 'body' : Client.isValidElement(value) ? 'element' : typeof value;
 const clone = (value: Client.OctaneNode) =>
 	Client.cloneElement(value as Client.ElementDescriptor, { title: 'cloned' });
-const element = (label: string) => Client.createElement('span', { title: 'original' }, label);
 
 for (const dev of [true, false]) {
 	for (const strong of [true, false]) {
 		it.each([
-			['plain child', '<Child />'],
-			['template child', '<Frame>@if (show) { <Child /> }</Frame>'],
+			['plain child', '@{ <Child /> }'],
+			['template child', '@{ <Frame>@if (show) { <Child /> }</Frame> }'],
 		])(
 			`preserves sibling input while hydrating a %s render block (dev: ${dev}, strong: ${strong})`,
 			(_, content) => {
@@ -41,10 +40,7 @@ for (const dev of [true, false]) {
 		}
 		export function View({ show }) @{
 			<main>
-				<Slot content={${
-					// Strong markup cannot choose a block with an expression.
-					strong ? `@{ <>@if (show) { ${content} }</> }` : `show ? @{ ${content} } : undefined`
-				}} />
+				<Slot content={show ? ${content} : undefined} />
 				<input defaultValue="draft" />
 			</main>
 		}
@@ -108,10 +104,9 @@ for (const mode of ['render', 'hydrate'] as const) {
 		}
 
 		it('distinguishes render bodies from callbacks while retaining descriptor inspection', () => {
-			const props = { label: 'one', element: element('one'), inspect, clone };
+			const props = { label: 'one', inspect, clone };
 			const app = start('RenderValueContracts', props, {
 				...props,
-				element: Server.createElement('span', { title: 'original' }, 'one'),
 				inspect: (value: unknown) =>
 					Server.isChildrenBlock(value)
 						? 'body'
@@ -130,7 +125,7 @@ for (const mode of ['render', 'hydrate'] as const) {
 			expect(container.querySelector('[data-cloned] span')!.getAttribute('title')).toBe('cloned');
 			expect(container.querySelector('[data-body]')!.textContent).toBe('one');
 			expect(container.querySelector('[data-callback]')!.textContent).toBe('one:payload');
-			app.update({ ...props, label: 'two', element: element('two') });
+			app.update({ ...props, label: 'two' });
 			expect(container.querySelector('[data-body]')!.textContent).toBe('two');
 			expect(container.querySelector('[data-cloned]')!.textContent).toBe('two');
 			expect(container.querySelector('[data-callback]')!.textContent).toBe('two:payload');
@@ -484,6 +479,14 @@ for (const mode of ['render', 'hydrate'] as const) {
 			expect(content.textContent).toBe('two');
 		});
 
+		it('retains descriptors in a component descriptor created in setup', () => {
+			const app = start('DescriptorSetupValue', { label: 'one' });
+			expect(container.querySelector('[data-kind]')!.getAttribute('data-kind')).toBe('value');
+			expect(container.querySelector('b')!.textContent).toBe('one');
+			app.update({ label: 'two' });
+			expect(container.querySelector('b')!.textContent).toBe('two');
+		});
+
 		it('replaces different named bodies in one insertion and keeps inactive captures guarded', () => {
 			const props = { label: 'one', detail: null, useSecond: false };
 			const app = start('SelectedRenderValue', props);
@@ -614,15 +617,7 @@ it.each(['client', 'server'] as const)(
 			mode,
 			compileOptions: { hmr: false },
 		});
-		const props = {
-			label: 'ordinary',
-			element:
-				mode === 'server'
-					? Server.createElement('span', { title: 'original' }, 'ordinary')
-					: element('ordinary'),
-			inspect,
-			clone,
-		};
+		const props = { label: 'ordinary', inspect, clone };
 		if (mode === 'server') {
 			container = document.createElement('div');
 			container.innerHTML = Server.renderToString(ordinary.RenderValueContracts, props).html;
@@ -640,6 +635,7 @@ it.each(['client', 'server'] as const)(
 it.each(['client', 'server'] as const)(
 	'renders an ErrorBoundary fallback passed as a render body (%s)',
 	(mode) => {
+		// `key` keeps the runtime ErrorBoundary rather than the compiled @try form.
 		const source = `'use strong';
 		import { ErrorBoundary } from 'octane';
 		function Fails() @{ throw new Error('boom'); <i /> }
@@ -653,11 +649,11 @@ it.each(['client', 'server'] as const)(
 		});
 		container = document.createElement('div');
 		if (mode === 'server') {
-			container.innerHTML = Server.renderToString(view.View, { label: 'A' }).html;
+			container.innerHTML = Server.renderToString(view['View'], { label: 'A' }).html;
 		} else {
 			document.body.appendChild(container);
 			root = Client.createRoot(container);
-			root.render(view.View, { label: 'A' });
+			root.render(view['View'], { label: 'A' });
 			flushEffects();
 		}
 		expect(container.querySelector('p')!.textContent).toBe('caught A');

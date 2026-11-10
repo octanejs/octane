@@ -926,10 +926,7 @@ This form needs no authored `() =>` wrapper and constructs no element descriptor
 for the block itself. `isChildrenBlock(content)` identifies it. Render it with
 `{content}`; do not call it as a callback or inspect it with `Children`,
 `isValidElement`, or `cloneElement`. Ordinary JSX such as
-`content={<span />}` builds an element descriptor, which Strong rejects with
-`OCTANE_STRONG_VALUE_JSX`; outside Strong mode it retains its descriptor
-contract. An `ErrorBoundary` renders a `fallback={@{ … }}` body as a node rather
-than calling it as an `(error, reset)` render prop.
+`content={<span />}` retains its descriptor contract.
 
 The block's setup, hooks, and output run when the receiving component renders
 it, under that insertion's context. Each insertion owns independent state and
@@ -941,8 +938,7 @@ their receiver instead. Setup, conditional reads, and deeper property paths
 conservatively retain ordinary rendering.
 
 This contract applies to direct block attributes on compiled template component
-calls. Strong rejects a block stored in a variable or object property, or chosen
-by an expression, because it builds a descriptor. Blocks returned from callbacks,
+calls. Blocks stored in variables or object properties, returned from callbacks,
 passed to portals, or compiled outside Strong mode keep their existing behavior.
 Universal renderers are unchanged. Use an ordinary function for an API that
 invokes a callback itself.

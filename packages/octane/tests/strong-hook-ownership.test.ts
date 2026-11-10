@@ -7,7 +7,7 @@ describe('Strong cache scope and declaration lifetimes', () => {
 	it.each([false, true])('keeps event payload allocation outside hook scopes in dev=%s', (dev) => {
 		const seen: unknown[] = [];
 		const { App } = loadCompiledFixtureSource(
-			`"use strong"; export function App(props) @{ const onClick = () => { const payload = { id: props.id }; props.open(payload); }; <button onClick={onClick}>open</button> }`,
+			`"use strong"; export function App(props) @{ const onClick = () => { const payload = { id: props.id }; props.open(<b>{payload.id as string}</b>); }; <button onClick={onClick}>open</button> }`,
 			{ id: '/src/HandlerScope.tsrx', mode: 'client', compileOptions: { dev, hmr: false } },
 		);
 		const root = mount(App, { id: 'one', open: (value: unknown) => seen.push(value) });
@@ -23,7 +23,7 @@ describe('Strong cache scope and declaration lifetimes', () => {
 		'keeps render-prop allocations outside component hooks in dev=%s',
 		(dev) => {
 			const { App } = loadCompiledFixtureSource(
-				`"use strong"; function List(props) @{ <ul><props.Item color="red" /></ul> } export function App() @{ <List Item={(item) => @{ const style = { color: item.color }; <li style={style}>row</li> }} /> }`,
+				`"use strong"; function List(props) @{ <ul>{props.renderItem({color:'red'})}</ul> } export function App() @{ <List renderItem={(item) => { const style = { color: item.color }; return <li style={style}>row</li>; }} /> }`,
 				{ id: '/src/RenderPropScope.tsrx', mode: 'client', compileOptions: { dev, hmr: false } },
 			);
 			const root = mount(App);
@@ -111,7 +111,7 @@ describe('Strong cache scope and declaration lifetimes', () => {
 		async (dev) => {
 			const seen: unknown[] = [];
 			const { App } = loadCompiledFixtureSource(
-				`"use strong"; export function App(props) @{ const onClick = async () => { await Promise.resolve(); const payload = { id: props.id }; props.open(payload); }; <button onClick={onClick}>open</button> }`,
+				`"use strong"; export function App(props) @{ const onClick = async () => { await Promise.resolve(); const payload = { id: props.id }; props.open(<b>{payload.id as string}</b>); }; <button onClick={onClick}>open</button> }`,
 				{ id: '/src/AsyncHandlerScope.tsrx', mode: 'client', compileOptions: { dev, hmr: false } },
 			);
 			const root = mount(App, { id: 'one', open: (value: unknown) => seen.push(value) });
@@ -220,12 +220,12 @@ export function useEdited(props) {
 	});
 
 	it.each([
-		`props.items.forEach(item => { const style = { color: item.color }; observe(style); nodes.push(style); });`,
-		`for (const item of props.items) { (() => { const style = { color: item.color }; observe(style); nodes.push(style); })(); }`,
+		`props.items.forEach(item => { const style = { color: item.color }; observe(style); nodes.push(<li style={style}/>); });`,
+		`for (const item of props.items) { (() => { const style = { color: item.color }; observe(style); nodes.push(<li style={style}/>); })(); }`,
 	])('retains independent repeated callback values: %s', (setup) => {
 		const seen: unknown[] = [];
 		const { App } = loadCompiledFixtureSource(
-			`"use strong"; import { observe } from './probe'; export function App(props) @{ const nodes = []; ${setup} <ul>@for (const style of nodes; key style) { <li style={style} /> }</ul> }`,
+			`"use strong"; import { observe } from './probe'; export function App(props) @{ const nodes = []; ${setup} <ul>{nodes}</ul> }`,
 			{
 				id: '/src/RepeatedValue.tsrx',
 				mode: 'client',

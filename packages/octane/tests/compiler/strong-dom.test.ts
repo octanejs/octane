@@ -52,10 +52,10 @@ function messageOf(source: string, filename: string, code: string): string {
 }
 
 const effect = (write: string, element: string, props = '{ label, on, html, color }') =>
-	`${IMPORTS}export function App(${props}) @{
+	`${IMPORTS}export function App(${props}) {
   const r = useRef(null);
   useEffect(() => { ${write} });
-  ${element}
+  return ${element};
 }`;
 
 describe('Strong managed DOM writes through refs', () => {
@@ -161,7 +161,7 @@ describe('Strong managed DOM writes through refs', () => {
 		[
 			'conditional elements',
 			'r.current.textContent = label;',
-			'<div>@if (on) { <p ref={r}>{label}</p> }</div>',
+			'<div>{on && <p ref={r}>{label}</p>}</div>',
 		],
 	])('rejects %s', (_label, write, element) => {
 		const source = effect(write, element, '{ label, on, html, color, extra, other }');
@@ -208,25 +208,25 @@ describe('Strong managed DOM writes through refs', () => {
 
 	it('checks writes in event handlers, layout effects, and callback refs', () => {
 		expectStrongError(
-			`${IMPORTS}export function App({ label }) @{
+			`${IMPORTS}export function App({ label }) {
   const r = useRef(null);
-  <p ref={r} onClick={() => { r.current.textContent = 'clicked'; }}>{label}</p>
+  return <p ref={r} onClick={() => { r.current.textContent = 'clicked'; }}>{label}</p>;
 }`,
 			'/src/App.tsrx',
 			MANAGED_DOM_WRITE,
 		);
 		expectStrongError(
-			`${IMPORTS}export function App({ on }) @{
+			`${IMPORTS}export function App({ on }) {
   const r = useRef(null);
   useLayoutEffect(() => { r.current.classList.add(on ? 'on' : 'off'); });
-  <p ref={r} className="base" />
+  return <p ref={r} className="base" />;
 }`,
 			'/src/App.tsrx',
 			MANAGED_DOM_WRITE,
 		);
 		expectStrongError(
-			`export function App({ label }) @{
-  <p ref={(element) => { if (element) element.textContent = label; }}>{label}</p>
+			`export function App({ label }) {
+  return <p ref={(element) => { if (element) element.textContent = label; }}>{label}</p>;
 }`,
 			'/src/App.tsrx',
 			MANAGED_DOM_WRITE,
@@ -248,10 +248,10 @@ describe('Strong managed DOM writes through refs', () => {
 		],
 	])('recognizes useRef through %s', (_label, imports, ref, useEffect) => {
 		expectStrongError(
-			`${imports}export function App({ label }) @{
+			`${imports}export function App({ label }) {
   const r = ${ref};
   ${useEffect}(() => { r.current.textContent = label; });
-  <p ref={r}>{label}</p>
+  return <p ref={r}>{label}</p>;
 }`,
 			'/src/App.tsrx',
 			MANAGED_DOM_WRITE,
@@ -390,7 +390,7 @@ describe('Strong managed DOM writes through refs', () => {
 		[
 			'a ref attached in a render callback',
 			'r.current.textContent = label;',
-			'<Field render={(n) => @{ <li ref={r}>{n}</li> }} />',
+			'<Field render={(n) => <li ref={r}>{n}</li>} />',
 		],
 		[
 			'a ref whose target is reassigned',
@@ -424,7 +424,7 @@ describe('Strong managed DOM writes through refs', () => {
 		],
 	])('allows %s', (_label, write, element) => {
 		const source = `${effect(write, element, '{ label, on, color, other }')}
-function Field(props) @{ <p>{props.children}</p> }
+function Field(props) { return <p>{props.children}</p>; }
 function measure(ref) { return ref; }`;
 		expectStrongValid(source, '/src/App.tsrx');
 	});
@@ -448,10 +448,10 @@ function measure(ref) { return ref; }`;
 		expectStrongValid(
 			`import { useEffect } from 'octane';
 const useRef = (value) => ({ current: value });
-export function App({ label }) @{
+export function App({ label }) {
   const r = useRef(null);
   useEffect(() => { r.current.textContent = label; });
-  <p ref={r}>{label}</p>
+  return <p ref={r}>{label}</p>;
 }`,
 			'/src/App.tsrx',
 		);
@@ -464,10 +464,10 @@ export function useUppercase(ref, label) {
 	});
 
 	it('keeps compatibility mode and valid Strong output unchanged', () => {
-		const source = `${IMPORTS}export function Ticker({ value }) @{
+		const source = `${IMPORTS}export function Ticker({ value }) {
   const r = useRef(null);
   useEffect(() => { r.current.textContent = String(value); });
-  <div className="ticker"><span ref={r} /></div>
+  return <div className="ticker"><span ref={r} /></div>;
 }`;
 		for (const mode of ['client', 'server'] as const) {
 			const standard = compile(source, '/src/Ticker.tsrx', { mode });
@@ -480,9 +480,9 @@ export function useUppercase(ref, label) {
 
 describe('Strong queries for a component’s own markup', () => {
 	const query = (call: string, element: string) =>
-		`${IMPORTS}export function App({ on }) @{
+		`${IMPORTS}export function App({ on }) {
   useEffect(() => { ${call}; });
-  ${element}
+  return ${element};
 }`;
 
 	it.each([
@@ -511,8 +511,8 @@ describe('Strong queries for a component’s own markup', () => {
 	it('follows document aliases, event handlers, and .tsrx @for rows', () => {
 		expectStrongError(
 			`const doc = document;
-export function App() @{
-  <button id="save" onClick={() => doc.getElementById('save').blur()}>Save</button>
+export function App() {
+  return <button id="save" onClick={() => doc.getElementById('save').blur()}>Save</button>;
 }`,
 			'/src/App.tsrx',
 			OWN_MARKUP_QUERY,
@@ -563,14 +563,14 @@ export function App() @{
 
 	it('scopes markup to one component and respects a shadowed document', () => {
 		expectStrongValid(
-			`${IMPORTS}export function Toolbar() @{
+			`${IMPORTS}export function Toolbar() {
   useEffect(() => { document.getElementById('editor').focus(); });
-  <button>Focus</button>
+  return <button>Focus</button>;
 }
-export function Editor() @{ <textarea id="editor" /> }
-export function Frame({ document }) @{
+export function Editor() { return <textarea id="editor" />; }
+export function Frame({ document }) {
   useEffect(() => { document.getElementById('x').focus(); });
-  <input id="x" />
+  return <input id="x" />;
 }`,
 			'/src/App.tsrx',
 		);
@@ -580,10 +580,10 @@ export function Frame({ document }) @{
 const SNAPSHOT_IMPORTS =
 	"import { useEffect, useLayoutEffect, useLayoutSnapshot, useRef } from 'octane';\n";
 const snapshot = (body: string, element = '<div ref={r}>{String(width)}</div>') =>
-	`${SNAPSHOT_IMPORTS}export function App({ label, name }) @{
+	`${SNAPSHOT_IMPORTS}export function App({ label, name }) {
   const r = useRef(null);
   const width = useLayoutSnapshot(() => { ${body} }, { initial: 0 });
-  ${element}
+  return ${element};
 }`;
 
 describe('Strong DOM writes in a layout snapshot measurement', () => {
@@ -610,11 +610,11 @@ describe('Strong DOM writes in a layout snapshot measurement', () => {
 
 	it('rejects a write in a measurement held by a local', () => {
 		expectStrongError(
-			`${SNAPSHOT_IMPORTS}export function App() @{
+			`${SNAPSHOT_IMPORTS}export function App() {
   const r = useRef(null);
   const measure = () => { r.current.style.width = 'auto'; return r.current.offsetWidth; };
   const width = useLayoutSnapshot(measure, { initial: 0 });
-  <div ref={r}>{String(width)}</div>
+  return <div ref={r}>{String(width)}</div>;
 }`,
 			'/src/App.tsrx',
 			LAYOUT_SNAPSHOT_WRITE,
@@ -657,7 +657,7 @@ describe('Strong DOM writes in a layout snapshot measurement', () => {
 
 	it('allows the same writes in a layout effect and on a ref that holds no element', () => {
 		expectStrongValid(
-			`${SNAPSHOT_IMPORTS}export function App() @{
+			`${SNAPSHOT_IMPORTS}export function App() {
   const r = useRef(null);
   const box = useRef({ style: { width: '' }, scrollTop: 0 });
   useLayoutEffect(() => { r.current.style.width = 'auto'; r.current.scrollTop = 0; });
@@ -666,7 +666,7 @@ describe('Strong DOM writes in a layout snapshot measurement', () => {
     box.current.scrollTop = 1;
     return r.current.offsetWidth;
   }, { initial: 0 });
-  <div ref={r}>{String(width)}</div>
+  return <div ref={r}>{String(width)}</div>;
 }`,
 			'/src/App.tsrx',
 		);
@@ -675,8 +675,8 @@ describe('Strong DOM writes in a layout snapshot measurement', () => {
 
 const ASYNC_HANDLER = 'onClick={async (event) => { BODY }}';
 const handler = (body: string, attribute = 'onClick={(event) => { BODY }}') =>
-	`export function App({ save, element }) @{
-  <button ${attribute.replace('BODY', body)}>Save</button>
+	`export function App({ save, element }) {
+  return <button ${attribute.replace('BODY', body)}>Save</button>;
 }`;
 
 describe('Strong event.currentTarget after the handler returns', () => {
@@ -716,8 +716,8 @@ describe('Strong event.currentTarget after the handler returns', () => {
 	it('rejects a handler held by a local, declared in another statement', () => {
 		expectStrongError(
 			`const press = (event) => { setTimeout(() => event.currentTarget.focus()); };
-export function App() @{
-  <button onClick={press}>Save</button>
+export function App() {
+  return <button onClick={press}>Save</button>;
 }`,
 			'/src/App.tsrx',
 			DEFERRED_CURRENT_TARGET,
@@ -768,8 +768,8 @@ export function App() @{
 	it('allows a deferred read in a callback passed to a component', () => {
 		expectStrongValid(
 			`import { Field } from './Field.tsrx';
-export function App() @{
-  <Field onCommit={(event) => { setTimeout(() => event.currentTarget.focus()); }} />
+export function App() {
+  return <Field onCommit={(event) => { setTimeout(() => event.currentTarget.focus()); }} />;
 }`,
 			'/src/App.tsrx',
 		);
@@ -923,11 +923,11 @@ describe('Strong forced-layout hints', () => {
 		['a write through a component ref', "box.current.style.width = '1px'; log(el.offsetWidth);"],
 		['a read through a component ref', "el.style.width = '1px'; log(box.current.offsetWidth);"],
 	])('does not report %s', (_label, body) => {
-		const source = `"use strong";\n${IMPORTS}export function App() @{
+		const source = `"use strong";\n${IMPORTS}export function App() {
   const r = useRef(null);
   const box = useRef(null);
   useEffect(() => { const el = r.current; ${body} });
-  <div ref={r}><Box ref={box} /></div>
+  return <div ref={r}><Box ref={box} /></div>;
 }`;
 		expect(found(source)).toEqual([]);
 	});

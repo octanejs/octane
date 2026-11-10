@@ -10,7 +10,7 @@ describe('Strong template authoring checks', () => {
 		'rejects a %s module that the directive or global Strong opt-in reaches',
 		(extension) => {
 			const filename = `App.${extension}`;
-			const source = `export function App({ items }) @{ <ul>{items.map(item => <li key={item.id}>{item.name}</li>)}</ul> }`;
+			const source = `export function App({ items }) { return <ul>{items.map(item => <li key={item.id}>{item.name}</li>)}</ul>; }`;
 			for (const mode of ['client', 'server'] as const) {
 				expect(() => compile(source, filename, { mode })).not.toThrow();
 				expect(() => compile(strong(source), filename, { mode })).toThrow(
@@ -30,7 +30,7 @@ describe('Strong template authoring checks', () => {
 	);
 	it.each(['tsx', 'jsx'])('lists the other Strong findings of a %s module', (extension) => {
 		const source = `import { createElement, useRef } from 'octane';
-export function App() @{ const ref = useRef(0); <p>{ref.current}</p> }`;
+export function App() { const ref = useRef(0); return <p>{ref.current}</p>; }`;
 		const { diagnostics, error } = collectDiagnostics(source, `App.${extension}`, {
 			strong: true,
 		});
@@ -62,10 +62,10 @@ export function App() @{ const ref = useRef(0); <p>{ref.current}</p> }`;
 		}`;
 		expect(() => compile(strong(source), 'App.tsrx')).toThrow('OCTANE_STRONG_MAP_JSX');
 	});
-	it('allows data mapping, unused nested render functions, and keyed @for', () => {
+	it('allows data mapping, unused nested JSX functions, and keyed @for', () => {
 		const source = `export function App(props) @{
 			const values = props.items.map(item => item.id);
-			const flags = props.items.map(item => { const component = () => @{ <li /> }; return item.show; });
+			const flags = props.items.map(item => { const component = () => <li />; return item.show; });
 			<ul>@for (const item of props.items; index position; key item.id) { <li>{position as string}</li> }</ul>
 		}`;
 		expect(() => compile(strong(source), 'App.tsrx')).not.toThrow();
@@ -233,7 +233,7 @@ export function App() @{ const ref = useRef(0); <p>{ref.current}</p> }`;
 		`import * as Octane from 'octane/server'; const sync = Octane.flushSync;`,
 		`import * as Octane from 'octane/server'; const { StrictMode } = Octane;`,
 	])('recognizes compatibility APIs from the server entrypoint', (imports) => {
-		const source = `${imports} export function App() @{ <div /> }`;
+		const source = `${imports} export function App() { return <div />; }`;
 		for (const mode of ['client', 'server'] as const) {
 			expect(() => compile(source, 'App.tsrx', { mode })).not.toThrow();
 			expect(() => compile(source, 'App.tsrx', { mode, strong: true })).toThrow(
@@ -301,7 +301,7 @@ export function App(props) @{
 	it('shares adopted renderer regions across HTML, suppression, and native editor checks', () => {
 		const source = strong(`import { Canvas, Html } from '@scene/bridge';
 export function App() @{ <main>@{
-  <><button />
+  <button />
   <Canvas><group>
     <input onChange={() => {}} />
     <div suppressHydrationWarning />
@@ -311,7 +311,7 @@ export function App() @{ <main>@{
       <div suppressHydrationWarning />
       <div dangerouslySetInnerHTML={{ __html: 'raw DOM' }} />
     </section></Html>
-  </group></Canvas></>
+  </group></Canvas>
 }</main> }`);
 		const result = compileToVolarMappings(source, 'App.tsrx', {
 			renderers: {
@@ -346,113 +346,18 @@ export function App() @{ <main>@{
 	});
 });
 
-describe('Strong markup values', () => {
-	const VALUE_JSX = 'OCTANE_STRONG_VALUE_JSX';
-	const valueErrors = (source: string) =>
-		compileToVolarMappings(strong(source), 'App.tsrx')
-			.diagnostics.filter(({ code }) => code === VALUE_JSX)
-			.map(({ start, end }) => strong(source).slice(start.offset, end.offset));
-
-	it.each([
-		[
-			'a returned element',
-			'function Row() { return <li />; } export function App() @{ <Row /> }',
-			'<li />',
-		],
-		['an arrow body', 'const Row = () => <li />; export function App() @{ <Row /> }', '<li />'],
-		['a setup value', 'export function App() @{ const label = <b />; <p>{label}</p> }', '<b />'],
-		[
-			'a prop value',
-			"import { Suspense } from 'octane'; export function App() @{ <Suspense fallback={<i />}><p /></Suspense> }",
-			'<i />',
-		],
-		[
-			'a callback result',
-			'function Field(props) @{ <p /> } export function App() @{ <Field render={() => <i />} /> }',
-			'<i />',
-		],
-		['a logical hole', 'export function App(props) @{ <p>{props.on && <i />}</p> }', '<i />'],
-		[
-			'a conditional hole',
-			'export function App(props) @{ <p>{props.on ? <i /> : null}</p> }',
-			'<i />',
-		],
-		['an expression child', 'export function App() @{ <p>{<i />}</p> }', '<i />'],
-		[
-			'a portal argument',
-			"import { createPortal } from 'octane'; export function App(props) @{ <p>{createPortal(<i />, props.target)}</p> }",
-			'<i />',
-		],
-		[
-			'a block in an object',
-			'function Field(props) @{ <p /> } export function App() @{ <Field slots={{ body: @{ <i /> } }} /> }',
-			'@{ <i /> }',
-		],
-		[
-			'a block chosen by an expression',
-			'function Field(props) @{ <p /> } export function App(props) @{ <Field body={props.on ? @{ <i /> } : null} /> }',
-			'@{ <i /> }',
-		],
-	])('rejects %s', (_label, source, markup) => {
-		expect(() => compile(source, 'App.tsrx')).not.toThrow();
-		expect(() => compile(strong(source), 'App.tsrx')).toThrow(VALUE_JSX);
-		expect(valueErrors(source)).toEqual([markup]);
-	});
-
-	it('reports only the outermost value', () => {
-		expect(valueErrors('const row = <li><b /></li>; export function App() @{ <ul /> }')).toEqual([
-			'<li><b /></li>',
-		]);
-	});
-
-	it('leaves a mapped row to OCTANE_STRONG_MAP_JSX', () => {
-		const source = 'export function App(props) @{ <ul>{props.items.map((item) => <li />)}</ul> }';
-		const codes = compileToVolarMappings(strong(source), 'App.tsrx').diagnostics.map(
-			({ code }) => code,
-		);
-		expect(codes).toEqual(['OCTANE_STRONG_MAP_JSX']);
-	});
-
-	it('allows template output, render bodies, and scoped styles', () => {
-		const source = `import { Suspense, createPortal } from 'octane';
-const theme = (<style>.a { color: red; }</style>);
-function Field(props) @{ <section class={theme.a}>{props.body}<props.Item /></section> }
-export function App(props) @{
-	<div>
-		@if (props.on) { <i /> } @else { <b /> }
-		@switch (props.kind) { @case 'a': { <u /> } @default: { <s /> } }
-		@for (const item of props.items; key item.id) { <li /> } @empty { <hr /> }
-		@try { <em /> } @catch (error) { <q /> }
-		<section>@{ const label = 'x'; <p>{label}</p> }</section>
-		<Suspense fallback={@{ <p>pending</p> }}><Field body={(@{ <b /> }) as any} Item={() => @{ <i /> }} /></Suspense>
-		{createPortal(() => @{ <p /> }, props.target)}
-	</div>
-}`;
-		expect(valueErrors(source)).toEqual([]);
-		expect(() => compile(strong(source), 'App.tsrx')).not.toThrow();
-	});
-
-	it('leaves .tsx and non-Strong modules alone', () => {
-		const source = 'export function App() { return <p />; }';
-		expect(() => compile(source, 'App.tsrx')).not.toThrow();
-		expect(
-			compileToVolarMappings(strong(source), 'App.tsx').diagnostics.map(({ code }) => code),
-		).not.toContain(VALUE_JSX);
-	});
-});
-
 describe('Strong template policy lexical boundaries', () => {
 	it.each([
-		`import * as Octane from 'octane'; export function App() @{ <Octane.StrictMode><div /></Octane.StrictMode> }`,
-		`import * as Octane from 'octane'; const { flushSync: batch } = Octane; export function App() @{ <div /> }`,
-		`import * as Octane from 'octane'; export function App() @{ const { ['StrictMode']: Boundary } = Octane; <Boundary><div /></Boundary> }`,
+		`import * as Octane from 'octane'; export function App() { return <Octane.StrictMode><div /></Octane.StrictMode>; }`,
+		`import * as Octane from 'octane'; const { flushSync: batch } = Octane; export function App() { return <div />; }`,
+		`import * as Octane from 'octane'; export function App() { const { ['StrictMode']: Boundary } = Octane; return <Boundary><div /></Boundary>; }`,
 	])('rejects namespace compatibility JSX and destructuring', (source) => {
 		expect(() => compile(source, 'App.tsrx')).not.toThrow();
 		expect(() => compile(strong(source), 'App.tsrx')).toThrow('OCTANE_STRONG_COMPAT_IMPORT');
 	});
 
 	it('respects shadowed namespaces in JSX and destructuring', () => {
-		const source = `import * as Octane from 'octane'; export function App(Octane) @{ const { StrictMode } = Octane; <Octane.StrictMode><StrictMode /></Octane.StrictMode> }`;
+		const source = `import * as Octane from 'octane'; export function App(Octane) { const { StrictMode } = Octane; return <Octane.StrictMode><StrictMode /></Octane.StrictMode>; }`;
 		expect(() => compile(strong(source), 'App.tsrx')).not.toThrow();
 	});
 
@@ -461,7 +366,7 @@ describe('Strong template policy lexical boundaries', () => {
 		`item => { const node = <li />; const alias = node; return item.show ? alias : null; }`,
 		`item => { { const node = <li />; return node; } }`,
 	])('rejects a JSX mapper returning a local constant alias', (mapper) => {
-		const source = `export function App(props) @{ <ul>{props.items.map(${mapper})}</ul> }`;
+		const source = `export function App(props) { return <ul>{props.items.map(${mapper})}</ul>; }`;
 		expect(() => compile(strong(source), 'App.tsrx')).toThrow('OCTANE_STRONG_MAP_JSX');
 	});
 
@@ -470,12 +375,7 @@ describe('Strong template policy lexical boundaries', () => {
 		`item => { const node = <li />; return item.id; }`,
 		`item => { const first = second; const second = first; return first; }`,
 	])('preserves non-JSX returns and bounded cyclic aliases', (mapper) => {
-		const source = `export function App(props) @{ <ul>{props.items.map(${mapper})}</ul> }`;
-		// An unused element is still a descriptor value, but not a mapped row.
-		const codes = compileToVolarMappings(strong(source), 'App.tsrx').diagnostics.map(
-			({ code }) => code,
-		);
-		expect(codes).not.toContain('OCTANE_STRONG_MAP_JSX');
-		expect(codes.filter((code) => code !== 'OCTANE_STRONG_VALUE_JSX')).toEqual([]);
+		const source = `export function App(props) { return <ul>{props.items.map(${mapper})}</ul>; }`;
+		expect(() => compile(strong(source), 'App.tsrx')).not.toThrow();
 	});
 });

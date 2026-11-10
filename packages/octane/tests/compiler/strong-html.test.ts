@@ -14,7 +14,7 @@ describe('Strong trusted HTML', () => {
 	it.each(['client', 'server'] as const)(
 		'rejects raw HTML objects on DOM elements in %s',
 		(mode) => {
-			const source = `export function App() @{ <div dangerouslySetInnerHTML={{ __html: '<b>raw</b>' }} /> }`;
+			const source = `export function App() { return <div dangerouslySetInnerHTML={{ __html: '<b>raw</b>' }} />; }`;
 			expect(() => compile(source, 'app.tsrx', { mode })).not.toThrow();
 			expect(() => compile(source, 'app.tsrx', { mode, strong: true })).toThrow(CODE);
 		},
@@ -29,7 +29,7 @@ describe('Strong trusted HTML', () => {
 		String.raw`<div {...{ 'dangerouslySetInner\x48TML': { __html: 'raw' } }} />`,
 	])('rejects a visible untrusted final HTML value: %s', (element) => {
 		expect(() =>
-			compile(`export function App(props) @{ ${element} }`, 'app.tsrx', { strong: true }),
+			compile(`export function App(props) { return ${element}; }`, 'app.tsrx', { strong: true }),
 		).toThrow(CODE);
 	});
 
@@ -44,7 +44,7 @@ describe('Strong trusted HTML', () => {
 		(element) => {
 			expect(() =>
 				compile(
-					`import { trustHTML } from 'octane'; import { Child } from './child'; export function App(props) @{ ${element} }`,
+					`import { trustHTML } from 'octane'; import { Child } from './child'; export function App(props) { return ${element}; }`,
 					'app.tsrx',
 					{ strong: true },
 				),

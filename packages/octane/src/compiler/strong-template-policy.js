@@ -14,13 +14,6 @@ const JSX_RUNTIME_EXPORTS = new Set(['jsx', 'jsxs', 'jsxDEV', 'Fragment']);
 const JSX_RUNTIME = /^octane\/(?:strong\/)?jsx(?:-dev)?-runtime$/;
 const SUPPRESSION_PROPS = new Set(['suppressHydrationWarning', 'suppressNativeChangeWarning']);
 const FUNCTIONS = new Set(['ArrowFunctionExpression', 'FunctionExpression', 'FunctionDeclaration']);
-const TRANSPARENT = new Set([
-	'ParenthesizedExpression',
-	'TSAsExpression',
-	'TSSatisfiesExpression',
-	'TSNonNullExpression',
-	'TSTypeAssertion',
-]);
 const SKIP_KEYS = new Set(['type', 'loc', 'start', 'end', 'range', 'metadata', 'parent']);
 
 // These checks share the Strong visitor's lexical bindings. The policy itself
@@ -39,8 +32,6 @@ export function createStrongTemplatePolicy({
 	const pending = [];
 	const seen = new WeakMap();
 	const jsxReturns = new WeakMap();
-	// `.map()` callbacks OCTANE_STRONG_MAP_JSX already reports.
-	const mapCallbacks = new WeakSet();
 	const templateDialect = /\.tsrx(?:[?#]|$)/.test(filename);
 	const domAt =
 		options.rendererRegionResolver ?? createRendererRegionResolver(ast, source, filename, options);
@@ -220,55 +211,6 @@ export function createStrongTemplatePolicy({
 		if (callback?.kind === 'callback') return returnsJSX(callback.node);
 		return callback?.kind === 'callback-choice' && callback.values.some(callbackReturnsJSX);
 	}
-	function markMapCallbacks(callback) {
-		if (callback?.kind === 'callback') mapCallbacks.add(callback.node);
-		else if (callback?.kind === 'callback-choice') callback.values.forEach(markMapCallbacks);
-	}
-	// JSX is template output only as an `@{…}` block's node, an element's child,
-	// or a directive body's statement. A block also renders without a descriptor
-	// as a function body or a component prop. Anywhere else markup is a
-	// value, which builds an element descriptor: returned, assigned, passed as an
-	// argument or object property, or chosen by an expression. A `<style>` value
-	// is a scoped theme, not a node. Parentheses, type assertions, and a prop's
-	// expression container are transparent.
-	function valueJSX(node, parent, key) {
-		if (!node || typeof node !== 'object') return;
-		if (Array.isArray(node)) {
-			for (const child of node) valueJSX(child, parent, key);
-			return;
-		}
-		if (mapCallbacks.has(node)) return;
-		if (
-			TRANSPARENT.has(node.type) ||
-			(node.type === 'JSXExpressionContainer' && parent?.type === 'JSXAttribute')
-		) {
-			valueJSX(node.expression, parent, key);
-			return;
-		}
-		const template =
-			key === 'render' ||
-			(key === 'children' && (parent.type === 'JSXElement' || parent.type === 'JSXFragment')) ||
-			(key === 'body' && parent.type === 'BlockStatement') ||
-			(key === 'consequent' && parent.type === 'SwitchCase');
-		const value =
-			node.type === 'JSXCodeBlock'
-				? !template &&
-					!(key === 'body' && FUNCTIONS.has(parent.type)) &&
-					parent?.type !== 'JSXAttribute'
-				: (node.type === 'JSXElement' || node.type === 'JSXFragment') &&
-					!template &&
-					node.openingElement?.name?.name !== 'style';
-		if (value && domAt(node)) {
-			add(
-				'OCTANE_STRONG_VALUE_JSX',
-				node,
-				'Markup outside template output builds an element descriptor, which renders through the generic descriptor renderer instead of a compiled template. Write a component body as `@{ … }`, pass markup to a component prop as `prop={@{ … }}` or as a component, and choose markup with `@if` or `@switch`.',
-			);
-			return;
-		}
-		for (const child in node)
-			if (!SKIP_KEYS.has(child) && !child.startsWith('_octane')) valueJSX(node[child], node, child);
-	}
 	function suppression(name, node) {
 		if (SUPPRESSION_PROPS.has(name))
 			add(
@@ -347,18 +289,17 @@ export function createStrongTemplatePolicy({
 						? staticPrimitiveValue(callee.property, scope)
 						: callee.property?.name
 					: null;
-			const callback =
-				templateDialect && callee?.type === 'MemberExpression' && name === 'map'
-					? callableValue(node.arguments?.[0], scope)
-					: null;
-			if (callbackReturnsJSX(callback)) {
-				markMapCallbacks(callback);
+			if (
+				templateDialect &&
+				callee?.type === 'MemberExpression' &&
+				name === 'map' &&
+				callbackReturnsJSX(callableValue(node.arguments?.[0], scope))
+			)
 				add(
 					'OCTANE_STRONG_MAP_JSX',
 					node,
 					'Use a keyed `@for` block to render a list instead of `.map()` returning JSX. Choose a stable item identity for its key.',
 				);
-			}
 		} else if (node.type === 'JSXForExpression') {
 			const iterable = unwrap(node.right);
 			if (singleItemArray(iterable)) singleItemFor(node.right);
@@ -389,7 +330,6 @@ export function createStrongTemplatePolicy({
 		enterKey: checkKey,
 		exitKey() {},
 		finish() {
-			if (templateDialect) valueJSX(ast, null, null);
 			if (singleItemConstants.size !== 0 && iteratedNames.size !== 0) reportSingleItemAliases();
 			for (const { code, node, message } of pending) report(code, node, message);
 		},

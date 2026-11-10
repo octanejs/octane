@@ -59,11 +59,7 @@ function TryPair({ fail }: { fail: boolean }) @{
 
 function BoundaryPair({ fail }: { fail: boolean }) @{
 	<>
-		<ErrorBoundary
-			fallback={@{
-				<Item name="error" />
-			}}
-		>
+		<ErrorBoundary fallback={<Item name="error" />}>
 			<Choice fail={fail} />
 		</ErrorBoundary>
 		<Pair name="pair" />

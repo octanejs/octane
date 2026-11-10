@@ -14,9 +14,9 @@ describe('Strong lazy ref factories and ownership', () => {
 		for (const dev of [true, false]) {
 			it(`rejects scheduling in an initializer in ${mode}, dev=${dev}`, () => {
 				const source = `import { useLazyRef } from 'octane';
-					export function App() @{
+					export function App() {
 						useLazyRef(() => { queueMicrotask(() => {}); return {}; });
-						<div />
+						return <div />;
 					}`;
 				expect(() => compile(source, '/src/App.tsrx', { mode, dev, strong: true })).toThrow(
 					'OCTANE_STRONG_RENDER_SIDE_EFFECT',
@@ -24,9 +24,9 @@ describe('Strong lazy ref factories and ownership', () => {
 			});
 			it(`rejects scheduling in a literal-spread initializer in ${mode}, dev=${dev}`, () => {
 				const source = `import { useLazyRef } from 'octane';
-					export function App() @{
+					export function App() {
 						useLazyRef(...[() => { queueMicrotask(() => {}); return {}; }]);
-						<div />
+						return <div />;
 					}`;
 				expect(() => compile(source, '/src/App.tsrx', { mode, dev, strong: true })).toThrow(
 					'OCTANE_STRONG_RENDER_SIDE_EFFECT',
@@ -37,7 +37,7 @@ describe('Strong lazy ref factories and ownership', () => {
 
 	it('does not analyze an ordinary function-valued ref as an initializer', () => {
 		const source = `import { useRef } from 'octane';
-			export function App() @{ useRef(() => queueMicrotask(() => {})); <div /> }`;
+			export function App() { useRef(() => queueMicrotask(() => {})); return <div />; }`;
 		expect(() => compile(source, '/src/App.tsrx', { strong: true })).not.toThrow();
 	});
 
@@ -49,23 +49,23 @@ describe('Strong lazy ref factories and ownership', () => {
 	])('lets the factory read %s like a lazy state initializer', (_, body) => {
 		for (const hook of ['useState', 'useLazyRef']) {
 			const source = `import { ${hook} } from 'octane';
-				export function App() @{ ${hook}(() => { ${body} }); <div /> }`;
+				export function App() { ${hook}(() => { ${body} }); return <div />; }`;
 			expect(() => compile(source, '/src/App.tsrx', { strong: true })).not.toThrow();
 		}
 	});
 
 	it('still rejects clock reads in ordinary render code beside the factory', () => {
 		const source = `import { useLazyRef } from 'octane';
-			export function App() @{ useLazyRef(() => Date.now()); const now = Date.now(); <div /> }`;
+			export function App() { useLazyRef(() => Date.now()); const now = Date.now(); return <div />; }`;
 		expect(errors(source)).toEqual(['OCTANE_STRONG_RENDER_IMPURE_CALL']);
 	});
 
 	it('checks a literal-spread factory once, as render-time work', () => {
 		const source = `import { useLazyRef, useState } from 'octane';
-			export function App() @{
+			export function App() {
 				const [items, _setItems] = useState([]);
 				useLazyRef(...[() => { items.push(1); return 1; }]);
-				<div />
+				return <div />;
 			}`;
 		expect(errors(source)).toEqual(['OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION']);
 	});
@@ -82,22 +82,22 @@ describe('Strong lazy ref factories and ownership', () => {
 		],
 	])('checks a %s passed through a literal spread', (_, call) => {
 		const source = `import { useLinkedState, useReducer, useState } from 'octane';
-			export function App(props) @{ ${call}; <div /> }`;
+			export function App(props) { ${call}; return <div />; }`;
 		expect(errors(source)).toEqual(['OCTANE_STRONG_RENDER_SIDE_EFFECT']);
 	});
 
 	it('checks a reducer passed through a literal spread as a replayed callback', () => {
 		const source = `import { useReducer } from 'octane';
-			export function App() @{
+			export function App() {
 				useReducer(...[(state) => { queueMicrotask(() => {}); return state; }, 0]);
-				<div />
+				return <div />;
 			}`;
 		expect(errors(source)).toEqual(['OCTANE_STRONG_IMPURE_UPDATER']);
 	});
 
 	it('leaves an opaque spread factory unanalyzed', () => {
 		const source = `import { useLazyRef } from 'octane';
-			export function App(props) @{ useLazyRef(...props.args); <div /> }`;
+			export function App(props) { useLazyRef(...props.args); return <div />; }`;
 		expect(errors(source)).toEqual([]);
 	});
 
@@ -113,7 +113,7 @@ describe('Strong lazy ref factories and ownership', () => {
 			'Octane.useLazyRef(() => { queueMicrotask(() => {}); return 1; });',
 		],
 	])('checks a synchronous factory through %s', (_, imports, call) => {
-		const source = `${imports} export function App() @{ ${call} <div /> }`;
+		const source = `${imports} export function App() { ${call} return <div />; }`;
 		expect(() => compile(source, '/src/App.tsrx', { strong: true })).toThrow(
 			'OCTANE_STRONG_RENDER_SIDE_EFFECT',
 		);
@@ -124,7 +124,7 @@ describe('Strong lazy ref factories and ownership', () => {
 		['write', 'ref.current = 2;', 'OCTANE_STRONG_RENDER_REF_WRITE'],
 	])('applies ref ownership to render-time %s', (_, action, diagnostic) => {
 		const source = `import { useLazyRef } from 'octane';
-			export function App() @{ const ref = useLazyRef(() => 1); ${action} <div /> }`;
+			export function App() { const ref = useLazyRef(() => 1); ${action} return <div />; }`;
 		expect(() => compile(source, '/src/App.tsrx', { strong: true })).toThrow(diagnostic);
 	});
 

@@ -62,14 +62,16 @@ function expectUnchangedOutput(source: string, filename: string): void {
 it('does not mistake receivers named after Object.prototype members for known globals', () => {
 	expect(
 		strongCode(
-			tsx(`export function A({ value, store }) @{
+			tsx(`export function A({ value, store }) {
   const [items, setItems] = useState([]);
   const snapshot = useSyncExternalStore(store.subscribe, () => constructor.keys(store));
-  <b onClick={() => { toString.call(items); hasOwnProperty.call(items, 'length'); setItems((current) => valueOf.call(current)); }}>
+  return (
+    <b onClick={() => { toString.call(items); hasOwnProperty.call(items, 'length'); setItems((current) => valueOf.call(current)); }}>
       {items.length}
       {String(snapshot)}
       {String(value)}
     </b>
+  );
 }`),
 		),
 	).toBeNull();
@@ -79,91 +81,91 @@ describe('Strong pure updaters and reducers', () => {
 	it.each([
 		[
 			'fetch in an inline updater',
-			`export function A() @{ const [n, setN] = useState(0); <button onClick={() => setN(p => { fetch('/log'); return p + Date.now(); })}>{n}</button> }`,
+			`export function A() { const [n, setN] = useState(0); return <button onClick={() => setN(p => { fetch('/log'); return p + Date.now(); })}>{n}</button>; }`,
 		],
 		[
 			'fetch in an inline reducer',
-			`export function A() @{ const [s, d] = useReducer((s, a) => { fetch('/log'); return { ...s, t: Date.now() }; }, {}); <button onClick={() => d(1)}>{String(s.t)}</button> }`,
+			`export function A() { const [s, d] = useReducer((s, a) => { fetch('/log'); return { ...s, t: Date.now() }; }, {}); return <button onClick={() => d(1)}>{String(s.t)}</button>; }`,
 		],
 		[
 			'Date.now() in an inline updater',
-			`export function A() @{ const [n, setN] = useState(0); <b onClick={() => setN((p) => p + Date.now())}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); return <b onClick={() => setN((p) => p + Date.now())}>{n}</b>; }`,
 		],
 		[
 			'Math.random() in an inline updater',
-			`export function A() @{ const [n, setN] = useState(0); <b onClick={() => setN((p) => p + Math.random())}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); return <b onClick={() => setN((p) => p + Math.random())}>{n}</b>; }`,
 		],
 		[
 			'performance.now() in an inline updater',
-			`export function A() @{ const [n, setN] = useState(0); <b onClick={() => setN((p) => p + performance.now())}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); return <b onClick={() => setN((p) => p + performance.now())}>{n}</b>; }`,
 		],
 		[
 			'new Date() in a reducer',
-			`export function A() @{ const [s, d] = useReducer((s, a) => ({ ...s, at: new Date() }), {}); <b onClick={() => d(1)}>{String(s.at)}</b> }`,
+			`export function A() { const [s, d] = useReducer((s, a) => ({ ...s, at: new Date() }), {}); return <b onClick={() => d(1)}>{String(s.at)}</b>; }`,
 		],
 		[
 			'a browser global read',
-			`export function A() @{ const [n, setN] = useState(0); <b onClick={() => setN((p) => p + window.innerWidth)}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); return <b onClick={() => setN((p) => p + window.innerWidth)}>{n}</b>; }`,
 		],
 		[
 			'a ref read',
-			`export function A() @{ const [n, setN] = useState(0); const ref = useRef(0); <b onClick={() => setN((p) => p + ref.current)}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); const ref = useRef(0); return <b onClick={() => setN((p) => p + ref.current)}>{n}</b>; }`,
 		],
 		[
 			'a ref write',
-			`export function A() @{ const [n, setN] = useState(0); const ref = useRef(0); <b onClick={() => setN((p) => { ref.current = p; return p + 1; })}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); const ref = useRef(0); return <b onClick={() => setN((p) => { ref.current = p; return p + 1; })}>{n}</b>; }`,
 		],
 		[
 			'a nested state update',
-			`export function A() @{ const [n, setN] = useState(0); const [m, setM] = useState(0); <b onClick={() => setN((p) => { setM(p); return p + 1; })}>{n}{m}</b> }`,
+			`export function A() { const [n, setN] = useState(0); const [m, setM] = useState(0); return <b onClick={() => setN((p) => { setM(p); return p + 1; })}>{n}{m}</b>; }`,
 		],
 		[
 			'another state setter passed as the updater',
-			`export function A() @{ const [n, setN] = useState(0); const [m, setM] = useState(0); <b onClick={() => setN(setM)}>{n}{m}</b> }`,
+			`export function A() { const [n, setN] = useState(0); const [m, setM] = useState(0); return <b onClick={() => setN(setM)}>{n}{m}</b>; }`,
 		],
 		[
 			'a state getter call',
-			`export function A() @{ const [n, setN] = useState(0); const [m, , getM] = useState(0); <b onClick={() => setN((p) => p + getM())}>{n}{m}</b> }`,
+			`export function A() { const [n, setN] = useState(0); const [m, , getM] = useState(0); return <b onClick={() => setN((p) => p + getM())}>{n}{m}</b>; }`,
 		],
 		[
 			'an Effect Event call',
-			`export function A() @{ const [n, setN] = useState(0); const read = useEffectEvent(() => 1); <b onClick={() => setN((p) => p + read())}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); const read = useEffectEvent(() => 1); return <b onClick={() => setN((p) => p + read())}>{n}</b>; }`,
 		],
 		[
 			'a reassigned module variable read',
-			`let counter = 0; export function bump() { counter++; } export function A() @{ const [n, setN] = useState(0); <b onClick={() => setN((p) => p + counter)}>{n}</b> }`,
+			`let counter = 0; export function bump() { counter++; } export function A() { const [n, setN] = useState(0); return <b onClick={() => setN((p) => p + counter)}>{n}</b>; }`,
 		],
 		[
 			'a scheduled promise callback',
-			`export function A() @{ const [n, setN] = useState(0); <b onClick={() => setN((p) => { Promise.resolve().then(() => {}); return p + 1; })}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); return <b onClick={() => setN((p) => { Promise.resolve().then(() => {}); return p + 1; })}>{n}</b>; }`,
 		],
 		[
 			'a same-module updater declaration',
-			`function bump(p) { return p + Math.random(); } export function A() @{ const [n, setN] = useState(0); <b onClick={() => setN(bump)}>{n}</b> }`,
+			`function bump(p) { return p + Math.random(); } export function A() { const [n, setN] = useState(0); return <b onClick={() => setN(bump)}>{n}</b>; }`,
 		],
 		[
 			'a component-local updater constant',
-			`export function A() @{ const [n, setN] = useState(0); const bump = (p) => p + Date.now(); <b onClick={() => setN(bump)}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); const bump = (p) => p + Date.now(); return <b onClick={() => setN(bump)}>{n}</b>; }`,
 		],
 		[
 			'a same-module reducer declaration',
-			`function reducer(state, action) { return { ...state, at: Date.now() }; } export function A() @{ const [s, d] = useReducer(reducer, {}); <b onClick={() => d(1)}>{String(s.at)}</b> }`,
+			`function reducer(state, action) { return { ...state, at: Date.now() }; } export function A() { const [s, d] = useReducer(reducer, {}); return <b onClick={() => d(1)}>{String(s.at)}</b>; }`,
 		],
 		[
 			'a same-module reducer constant',
-			`const reducer = (state, action) => { fetch('/log'); return state; }; export function A() @{ const [s, d] = useReducer(reducer, {}); <b onClick={() => d(1)}>{String(s)}</b> }`,
+			`const reducer = (state, action) => { fetch('/log'); return state; }; export function A() { const [s, d] = useReducer(reducer, {}); return <b onClick={() => d(1)}>{String(s)}</b>; }`,
 		],
 		[
 			'a useLinkedState updater',
-			`export function A(props) @{ const [n, setN] = useLinkedState(props.value, (v) => v); <b onClick={() => setN((p) => p + Date.now())}>{n}</b> }`,
+			`export function A(props) { const [n, setN] = useLinkedState(props.value, (v) => v); return <b onClick={() => setN((p) => p + Date.now())}>{n}</b>; }`,
 		],
 		[
 			'a useOptimistic reducer',
-			`export function A() @{ const [list] = useState([]); const [shown, add] = useOptimistic(list, (current, item) => { fetch('/log'); return [...current, item]; }); <b onClick={() => add(1)}>{shown.length}</b> }`,
+			`export function A() { const [list] = useState([]); const [shown, add] = useOptimistic(list, (current, item) => { fetch('/log'); return [...current, item]; }); return <b onClick={() => add(1)}>{shown.length}</b>; }`,
 		],
 		[
 			'an updater passed from an effect',
-			`export function A() @{ const [n, setN] = useState(0); useEffect(() => { const id = setInterval(() => setN((p) => p + Math.random()), 100); return () => clearInterval(id); }); <b>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); useEffect(() => { const id = setInterval(() => setN((p) => p + Math.random()), 100); return () => clearInterval(id); }); return <b>{n}</b>; }`,
 		],
 	])('rejects %s', (_label, body) => {
 		expect(rejected(body)).toBe(IMPURE_UPDATER);
@@ -194,9 +196,9 @@ describe('Strong pure updaters and reducers', () => {
 		["import * as Octane from 'octane';", 'Octane.useState(0)'],
 		["import * as Octane from 'octane';", 'Octane?.useState(0)'],
 	])('recognizes %s', (imports, hook) => {
-		const body = `export function A() @{ const [n, setN] = ${hook}; <b onClick={() => setN((p) => p + Date.now())}>{n}</b> }`;
+		const body = `export function A() { const [n, setN] = ${hook}; return <b onClick={() => setN((p) => p + Date.now())}>{n}</b>; }`;
 		expect(rejected(body, imports)).toBe(IMPURE_UPDATER);
-		const tuple = `export function A() @{ const tuple = ${hook}; <b onClick={() => tuple[1]((p) => p + Date.now())}>{tuple[0]}</b> }`;
+		const tuple = `export function A() { const tuple = ${hook}; return <b onClick={() => tuple[1]((p) => p + Date.now())}>{tuple[0]}</b>; }`;
 		expect(rejected(tuple, imports)).toBe(IMPURE_UPDATER);
 	});
 
@@ -204,31 +206,31 @@ describe('Strong pure updaters and reducers', () => {
 	it.each([
 		[
 			'moving fetch into a helper',
-			`function log() { fetch('/log'); } export function A() @{ const [n, setN] = useState(0); <b onClick={() => setN((p) => { log(); return p + 1; })}>{n}</b> }`,
+			`function log() { fetch('/log'); } export function A() { const [n, setN] = useState(0); return <b onClick={() => setN((p) => { log(); return p + 1; })}>{n}</b>; }`,
 		],
 		[
 			'moving the clock into a helper',
-			`function stamp() { return Date.now(); } export function A() @{ const [n, setN] = useState(0); <b onClick={() => setN((p) => p + stamp())}>{n}</b> }`,
+			`function stamp() { return Date.now(); } export function A() { const [n, setN] = useState(0); return <b onClick={() => setN((p) => p + stamp())}>{n}</b>; }`,
 		],
 		[
 			'calling fetch through globalThis',
-			`export function A() @{ const [n, setN] = useState(0); <b onClick={() => setN((p) => { globalThis.fetch('/log'); return p + 1; })}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); return <b onClick={() => setN((p) => { globalThis.fetch('/log'); return p + 1; })}>{n}</b>; }`,
 		],
 		[
 			'calling fetch through window',
-			`export function A() @{ const [n, setN] = useState(0); <b onClick={() => setN((p) => { window.fetch('/log'); return p + 1; })}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); return <b onClick={() => setN((p) => { window.fetch('/log'); return p + 1; })}>{n}</b>; }`,
 		],
 		[
 			'aliasing fetch',
-			`export function A() @{ const [n, setN] = useState(0); <b onClick={() => setN((p) => { const send = fetch; send('/log'); return p + 1; })}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); return <b onClick={() => setN((p) => { const send = fetch; send('/log'); return p + 1; })}>{n}</b>; }`,
 		],
 		[
 			'deferring fetch with a timer',
-			`export function A() @{ const [n, setN] = useState(0); <b onClick={() => setN((p) => { setTimeout(() => fetch('/log'), 0); return p + 1; })}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); return <b onClick={() => setN((p) => { setTimeout(() => fetch('/log'), 0); return p + 1; })}>{n}</b>; }`,
 		],
 		[
 			'deferring fetch with a microtask',
-			`export function A() @{ const [n, setN] = useState(0); <b onClick={() => setN((p) => { queueMicrotask(() => fetch('/log')); return p + 1; })}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); return <b onClick={() => setN((p) => { queueMicrotask(() => fetch('/log')); return p + 1; })}>{n}</b>; }`,
 		],
 	])('rejects the rewrite %s', (_label, body) => {
 		expect(rejected(body)).toBe(IMPURE_UPDATER);
@@ -237,10 +239,11 @@ describe('Strong pure updaters and reducers', () => {
 	it('keeps pure updaters, side effects in the handler, and shadowed names legal', () => {
 		expect(
 			strongCode(
-				tsx(`export function A({ step }) @{
+				tsx(`export function A({ step }) {
   const [n, setN] = useState(0);
   const [s, dispatch] = useReducer((state, action) => (typeof action === 'function' ? action(state) : action), 0);
-  <b
+  return (
+    <b
       onClick={() => {
         fetch('/log');
         const now = Date.now();
@@ -254,6 +257,7 @@ describe('Strong pure updaters and reducers', () => {
       {n}
       {s}
     </b>
+  );
 }`),
 			),
 		).toBeNull();
@@ -279,7 +283,7 @@ export function useLog() {
 
 	it('explains the replay and names the replacement', () => {
 		const source = tsx(
-			`export function A() @{ const [n, setN] = useState(0); <b onClick={() => setN((p) => p + Date.now())}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); return <b onClick={() => setN((p) => p + Date.now())}>{n}</b>; }`,
 			IMPORTS,
 			true,
 		);
@@ -294,10 +298,10 @@ export function useLog() {
 	it('preserves emitted client and server code for valid updaters and reducers', () => {
 		expectUnchangedOutput(
 			tsx(`function reducer(state, action) { return action.type === 'add' ? [...state, action.item] : state; }
-export function A({ step }) @{
+export function A({ step }) {
   const [n, setN] = useState(0);
   const [items, dispatch] = useReducer(reducer, []);
-  <b onClick={() => { setN((p) => p + step); dispatch({ type: 'add', item: n }); }}>{items.length}</b>
+  return <b onClick={() => { setN((p) => p + step); dispatch({ type: 'add', item: n }); }}>{items.length}</b>;
 }`),
 			'/src/App.tsrx',
 		);
@@ -308,111 +312,111 @@ describe('Strong state mutation outside render', () => {
 	it.each([
 		[
 			'a pushed array passed back to its setter',
-			`export function A() @{ const [items, setItems] = useState([]); <button onClick={() => { items.push(1); setItems(items); }}>{items.length}</button> }`,
+			`export function A() { const [items, setItems] = useState([]); return <button onClick={() => { items.push(1); setItems(items); }}>{items.length}</button>; }`,
 		],
 		[
 			'a nested array before a spread copy',
-			`export function A() @{ const [s, setS] = useState({ list: [] }); <button onClick={() => { s.list.push(1); setS({ ...s }); }}>{s.list.length}</button> }`,
+			`export function A() { const [s, setS] = useState({ list: [] }); return <button onClick={() => { s.list.push(1); setS({ ...s }); }}>{s.list.length}</button>; }`,
 		],
 		[
 			'a nested array in an effect',
-			`export function A() @{ const [s] = useState({ list: [] }); useEffect(() => { s.list.push(1); }); <p>{s.list.length}</p> }`,
+			`export function A() { const [s] = useState({ list: [] }); useEffect(() => { s.list.push(1); }); return <p>{s.list.length}</p>; }`,
 		],
 		[
 			'a property assignment',
-			`export function A() @{ const [s, setS] = useState({ count: 0 }); <b onClick={() => { s.count = 1; setS({ ...s }); }}>{s.count}</b> }`,
+			`export function A() { const [s, setS] = useState({ count: 0 }); return <b onClick={() => { s.count = 1; setS({ ...s }); }}>{s.count}</b>; }`,
 		],
 		[
 			'an update expression',
-			`export function A() @{ const [s, setS] = useState({ count: 0 }); <b onClick={() => { s.count++; setS({ ...s }); }}>{s.count}</b> }`,
+			`export function A() { const [s, setS] = useState({ count: 0 }); return <b onClick={() => { s.count++; setS({ ...s }); }}>{s.count}</b>; }`,
 		],
 		[
 			'a deletion',
-			`export function A() @{ const [s, setS] = useState({ count: 0 }); <b onClick={() => { delete s.count; setS({ ...s }); }}>{s.count}</b> }`,
+			`export function A() { const [s, setS] = useState({ count: 0 }); return <b onClick={() => { delete s.count; setS({ ...s }); }}>{s.count}</b>; }`,
 		],
 		[
 			'a destructuring assignment target',
-			`export function A() @{ const [s, setS] = useState({ count: 0 }); <b onClick={() => { [s.count] = [1]; setS({ ...s }); }}>{s.count}</b> }`,
+			`export function A() { const [s, setS] = useState({ count: 0 }); return <b onClick={() => { [s.count] = [1]; setS({ ...s }); }}>{s.count}</b>; }`,
 		],
 		[
 			'Object.assign',
-			`export function A() @{ const [s, setS] = useState({ count: 0 }); <b onClick={() => { Object.assign(s, { count: 1 }); setS({ ...s }); }}>{s.count}</b> }`,
+			`export function A() { const [s, setS] = useState({ count: 0 }); return <b onClick={() => { Object.assign(s, { count: 1 }); setS({ ...s }); }}>{s.count}</b>; }`,
 		],
 		[
 			'a Map set',
-			`export function A() @{ const [m, setM] = useState(new Map()); <b onClick={() => { m.set(1, 2); setM(new Map(m)); }}>{m.size}</b> }`,
+			`export function A() { const [m, setM] = useState(new Map()); return <b onClick={() => { m.set(1, 2); setM(new Map(m)); }}>{m.size}</b>; }`,
 		],
 		[
 			'a lazily created Set',
-			`export function A() @{ const [m, setM] = useState(() => new Set()); <b onClick={() => { m.add(1); setM(new Set(m)); }}>{m.size}</b> }`,
+			`export function A() { const [m, setM] = useState(() => new Set()); return <b onClick={() => { m.add(1); setM(new Set(m)); }}>{m.size}</b>; }`,
 		],
 		[
 			'an array length reset in effect cleanup',
-			`export function A() @{ const [items, setItems] = useState([]); useEffect(() => () => { items.length = 0; }); <b onClick={() => setItems([1])}>{items.length}</b> }`,
+			`export function A() { const [items, setItems] = useState([]); useEffect(() => () => { items.length = 0; }); return <b onClick={() => setItems([1])}>{items.length}</b>; }`,
 		],
 		[
 			'a timer callback',
-			`export function A() @{ const [items] = useState([]); useEffect(() => { const id = setTimeout(() => items.push(1)); return () => clearTimeout(id); }); <b>{items.length}</b> }`,
+			`export function A() { const [items] = useState([]); useEffect(() => { const id = setTimeout(() => items.push(1)); return () => clearTimeout(id); }); return <b>{items.length}</b>; }`,
 		],
 		[
 			'reducer state initialized as an array',
-			`export function A() @{ const [s, d] = useReducer((s, a) => [...s, a], []); <b onClick={() => { s.push(1); d(2); }}>{s.length}</b> }`,
+			`export function A() { const [s, d] = useReducer((s, a) => [...s, a], []); return <b onClick={() => { s.push(1); d(2); }}>{s.length}</b>; }`,
 		],
 		[
 			'a tuple index',
-			`export function A() @{ const tuple = useState([]); <b onClick={() => { tuple[0].push(1); tuple[1]([...tuple[0]]); }}>{tuple[0].length}</b> }`,
+			`export function A() { const tuple = useState([]); return <b onClick={() => { tuple[0].push(1); tuple[1]([...tuple[0]]); }}>{tuple[0].length}</b>; }`,
 		],
 		[
 			'a tuple passed to a helper',
-			`function add(pair) { pair[0].push(1); } export function A() @{ const tuple = useState([]); <b onClick={() => { add(tuple); tuple[1]([...tuple[0]]); }}>{tuple[0].length}</b> }`,
+			`function add(pair) { pair[0].push(1); } export function A() { const tuple = useState([]); return <b onClick={() => { add(tuple); tuple[1]([...tuple[0]]); }}>{tuple[0].length}</b>; }`,
 		],
 		[
 			'a destructured tuple parameter',
-			`function add([items, setItems]) { items.push(1); setItems([...items]); } export function A() @{ const tuple = useState([]); <b onClick={() => add(tuple)}>{tuple[0].length}</b> }`,
+			`function add([items, setItems]) { items.push(1); setItems([...items]); } export function A() { const tuple = useState([]); return <b onClick={() => add(tuple)}>{tuple[0].length}</b>; }`,
 		],
 		[
 			'an object-destructured tuple parameter with a default',
-			`function add({ 0: items = [] }) { items.push(1); } export function A() @{ const tuple = useState([]); <b onClick={() => add(tuple)}>{tuple[0].length}</b> }`,
+			`function add({ 0: items = [] }) { items.push(1); } export function A() { const tuple = useState([]); return <b onClick={() => add(tuple)}>{tuple[0].length}</b>; }`,
 		],
 		[
 			'an Effect Event called with the state',
-			`export function A() @{ const [items, setItems] = useState([]); const add = useEffectEvent((list) => { list.push(1); }); <b onClick={() => { add(items); setItems([...items]); }}>{items.length}</b> }`,
+			`export function A() { const [items, setItems] = useState([]); const add = useEffectEvent((list) => { list.push(1); }); return <b onClick={() => { add(items); setItems([...items]); }}>{items.length}</b>; }`,
 		],
 		[
 			'a helper parameter with a default',
-			`function add(list = []) { list.push(1); return list; } export function A() @{ const [items, setItems] = useState([]); <b onClick={() => setItems([...add(items)])}>{items.length}</b> }`,
+			`function add(list = []) { list.push(1); return list; } export function A() { const [items, setItems] = useState([]); return <b onClick={() => setItems([...add(items)])}>{items.length}</b>; }`,
 		],
 		[
 			'a destructured helper parameter with a default',
-			`function add({ list } = { list: [] }) { list.push(1); } export function A() @{ const [s, setS] = useState({ list: [] }); <b onClick={() => { add(s); setS({ ...s }); }}>{s.list.length}</b> }`,
+			`function add({ list } = { list: [] }) { list.push(1); } export function A() { const [s, setS] = useState({ list: [] }); return <b onClick={() => { add(s); setS({ ...s }); }}>{s.list.length}</b>; }`,
 		],
 		[
 			'a linked-state array',
-			`export function A(props) @{ const [items, setItems] = useLinkedState(props.id, () => []); <b onClick={() => { items.push(1); setItems([...items]); }}>{items.length}</b> }`,
+			`export function A(props) { const [items, setItems] = useLinkedState(props.id, () => []); return <b onClick={() => { items.push(1); setItems([...items]); }}>{items.length}</b>; }`,
 		],
 		[
 			'an updater that mutates the state it receives',
-			`export function A() @{ const [items, setItems] = useState([]); <b onClick={() => setItems((prev) => { prev.push(1); return prev; })}>{items.length}</b> }`,
+			`export function A() { const [items, setItems] = useState([]); return <b onClick={() => setItems((prev) => { prev.push(1); return prev; })}>{items.length}</b>; }`,
 		],
 		[
 			'a destructured updater parameter',
-			`export function A() @{ const [s, setS] = useState({ list: [] }); <b onClick={() => setS(({ list }) => { list.push(1); return { list }; })}>{s.list.length}</b> }`,
+			`export function A() { const [s, setS] = useState({ list: [] }); return <b onClick={() => setS(({ list }) => { list.push(1); return { list }; })}>{s.list.length}</b>; }`,
 		],
 		[
 			'a reducer that mutates its state',
-			`function reducer(state, action) { state.list.push(action); return { ...state }; } export function A() @{ const [s, d] = useReducer(reducer, { list: [] }); <b onClick={() => d(1)}>{s.list.length}</b> }`,
+			`function reducer(state, action) { state.list.push(action); return { ...state }; } export function A() { const [s, d] = useReducer(reducer, { list: [] }); return <b onClick={() => d(1)}>{s.list.length}</b>; }`,
 		],
 		[
 			'a useOptimistic reducer that mutates its base state',
-			`export function A() @{ const [s] = useState({ list: [] }); const [shown, add] = useOptimistic(s, (current, item) => { current.list.push(item); return current; }); <b onClick={() => add(1)}>{shown.list.length}</b> }`,
+			`export function A() { const [s] = useState({ list: [] }); const [shown, add] = useOptimistic(s, (current, item) => { current.list.push(item); return current; }); return <b onClick={() => add(1)}>{shown.list.length}</b>; }`,
 		],
 		[
 			'a destructured updater parameter with a default',
-			`export function A() @{ const [s, setS] = useState({ list: [] }); <b onClick={() => setS(({ list } = { list: [] }) => { list.push(1); return { list }; })}>{s.list.length}</b> }`,
+			`export function A() { const [s, setS] = useState({ list: [] }); return <b onClick={() => setS(({ list } = { list: [] }) => { list.push(1); return { list }; })}>{s.list.length}</b>; }`,
 		],
 		[
 			'a reducer state parameter with a default',
-			`function reducer(state = [], action) { state.push(action); return [...state]; } export function A() @{ const [items, dispatch] = useReducer(reducer, []); <b onClick={() => dispatch(1)}>{items.length}</b> }`,
+			`function reducer(state = [], action) { state.push(action); return [...state]; } export function A() { const [items, dispatch] = useReducer(reducer, []); return <b onClick={() => dispatch(1)}>{items.length}</b>; }`,
 		],
 	])('rejects %s', (_label, body) => {
 		expect(rejected(body)).toBe(SNAPSHOT_MUTATION);
@@ -422,35 +426,35 @@ describe('Strong state mutation outside render', () => {
 	it.each([
 		[
 			'a local alias',
-			`export function A() @{ const [items, setItems] = useState([]); <b onClick={() => { const list = items; list.push(1); setItems([...list]); }}>{items.length}</b> }`,
+			`export function A() { const [items, setItems] = useState([]); return <b onClick={() => { const list = items; list.push(1); setItems([...list]); }}>{items.length}</b>; }`,
 		],
 		[
 			'a destructured property',
-			`export function A() @{ const [s, setS] = useState({ list: [] }); <b onClick={() => { const { list } = s; list.push(1); setS({ ...s, list }); }}>{s.list.length}</b> }`,
+			`export function A() { const [s, setS] = useState({ list: [] }); return <b onClick={() => { const { list } = s; list.push(1); setS({ ...s, list }); }}>{s.list.length}</b>; }`,
 		],
 		[
 			'a member alias',
-			`export function A() @{ const [s, setS] = useState({ list: [] }); <b onClick={() => { const list = s.list; list.push(1); setS({ ...s, list }); }}>{s.list.length}</b> }`,
+			`export function A() { const [s, setS] = useState({ list: [] }); return <b onClick={() => { const list = s.list; list.push(1); setS({ ...s, list }); }}>{s.list.length}</b>; }`,
 		],
 		[
 			'a helper that returns the mutated argument',
-			`function add(list, item) { list.push(item); return list; } export function A() @{ const [items, setItems] = useState([]); <b onClick={() => setItems([...add(items, 1)])}>{items.length}</b> }`,
+			`function add(list, item) { list.push(item); return list; } export function A() { const [items, setItems] = useState([]); return <b onClick={() => setItems([...add(items, 1)])}>{items.length}</b>; }`,
 		],
 		[
 			'an updater that returns the same object',
-			`export function A() @{ const [items, setItems] = useState([]); <b onClick={() => setItems((current) => { current.push(1); return current; })}>{items.length}</b> }`,
+			`export function A() { const [items, setItems] = useState([]); return <b onClick={() => setItems((current) => { current.push(1); return current; })}>{items.length}</b>; }`,
 		],
 		[
 			'an optional call',
-			`export function A() @{ const [items, setItems] = useState([]); <b onClick={() => { items?.push(1); setItems([...items]); }}>{items.length}</b> }`,
+			`export function A() { const [items, setItems] = useState([]); return <b onClick={() => { items?.push(1); setItems([...items]); }}>{items.length}</b>; }`,
 		],
 		[
 			'an optional member chain',
-			`export function A() @{ const [s, setS] = useState({ list: [] }); <b onClick={() => { s?.list.push(1); setS({ ...s }); }}>{s.list.length}</b> }`,
+			`export function A() { const [s, setS] = useState({ list: [] }); return <b onClick={() => { s?.list.push(1); setS({ ...s }); }}>{s.list.length}</b>; }`,
 		],
 		[
 			'Object.assign before a spread',
-			`export function A() @{ const [s, setS] = useState({ list: [] }); <b onClick={() => { Object.assign(s, { list: [...s.list, 1] }); setS({ ...s }); }}>{s.list.length}</b> }`,
+			`export function A() { const [s, setS] = useState({ list: [] }); return <b onClick={() => { Object.assign(s, { list: [...s.list, 1] }); setS({ ...s }); }}>{s.list.length}</b>; }`,
 		],
 	])('rejects the rewrite through %s', (_label, body) => {
 		expect(rejected(body)).toBe(SNAPSHOT_MUTATION);
@@ -460,24 +464,24 @@ describe('Strong state mutation outside render', () => {
 		["import { useState as useCell, useEffect } from 'octane';", 'useCell'],
 		["import * as Octane from 'octane'; const { useEffect } = Octane;", 'Octane.useState'],
 	])('recognizes %s', (imports, hook) => {
-		const body = `export function A() @{ const [items, setItems] = ${hook}([]); <b onClick={() => { items.push(1); setItems(items); }}>{items.length}</b> }`;
+		const body = `export function A() { const [items, setItems] = ${hook}([]); return <b onClick={() => { items.push(1); setItems(items); }}>{items.length}</b>; }`;
 		expect(rejected(body, imports)).toBe(SNAPSHOT_MUTATION);
 	});
 
 	it('keeps render-time mutations on the render diagnostic, including nested arrays and collections', () => {
 		expect(
 			rejected(
-				`export function A() @{ const [s] = useState({ list: [] }); s.list.push(1); <b>{s.list.length}</b> }`,
+				`export function A() { const [s] = useState({ list: [] }); s.list.push(1); return <b>{s.list.length}</b>; }`,
 			),
 		).toBe(RENDER_SNAPSHOT_MUTATION);
 		expect(
 			rejected(
-				`export function A() @{ const [m] = useState(new Map()); m.clear(); <b>{m.size}</b> }`,
+				`export function A() { const [m] = useState(new Map()); m.clear(); return <b>{m.size}</b>; }`,
 			),
 		).toBe(RENDER_SNAPSHOT_MUTATION);
 		expect(
 			rejected(
-				`export function A() @{ const [s] = useState({ n: 0 }); Object.assign(s, { n: 1 }); <b>{s.n}</b> }`,
+				`export function A() { const [s] = useState({ n: 0 }); Object.assign(s, { n: 1 }); return <b>{s.n}</b>; }`,
 			),
 		).toBe(RENDER_SNAPSHOT_MUTATION);
 	});
@@ -485,11 +489,11 @@ describe('Strong state mutation outside render', () => {
 	it('follows an Effect Event for the state it receives without treating its captures as stale', () => {
 		expect(
 			strongCode(
-				tsx(`export function A({ save }) @{
+				tsx(`export function A({ save }) {
   const [items, setItems] = useState([]);
   const [count, setCount] = useState(0);
   const record = useEffectEvent((list) => { setCount(count + list.length); });
-  <b onClick={async () => { await save(); record(items); setItems((current) => [...current, 1]); }}>{count}</b>
+  return <b onClick={async () => { await save(); record(items); setItems((current) => [...current, 1]); }}>{count}</b>;
 }`),
 			),
 		).toBeNull();
@@ -498,12 +502,13 @@ describe('Strong state mutation outside render', () => {
 	it('keeps copies, refs, props, object methods, and shadowed globals legal', () => {
 		expect(
 			strongCode(
-				tsx(`export function A(props) @{
+				tsx(`export function A(props) {
   const [items, setItems] = useState([]);
   const [m, setM] = useState(new Map());
   const [s, setS] = useState({ list: [], sort() { return 1; }, set() { return 2; } });
   const ref = useRef([]);
-  <b
+  return (
+    <b
       onClick={() => {
         const copy = [...items];
         copy.push(1);
@@ -523,6 +528,7 @@ describe('Strong state mutation outside render', () => {
       {m.size}
       {s.list.length}
     </b>
+  );
 }`),
 			),
 		).toBeNull();
@@ -548,7 +554,7 @@ export function useList() {
 
 	it('locates the mutation and names the replacement', () => {
 		const source = tsx(
-			`export function A() @{ const [items, setItems] = useState([]); <button onClick={() => { items.push(1); setItems(items); }}>{items.length}</button> }`,
+			`export function A() { const [items, setItems] = useState([]); return <button onClick={() => { items.push(1); setItems(items); }}>{items.length}</button>; }`,
 			IMPORTS,
 			true,
 		);
@@ -561,9 +567,9 @@ export function useList() {
 
 	it('preserves emitted client and server code for immutable updates', () => {
 		expectUnchangedOutput(
-			tsx(`export function A() @{
+			tsx(`export function A() {
   const [items, setItems] = useState([]);
-  <b onClick={() => { setItems([...items, 1]); setItems((current) => current.concat(2)); }}>{items.length}</b>
+  return <b onClick={() => { setItems([...items, 1]); setItems((current) => current.concat(2)); }}>{items.length}</b>;
 }`),
 			'/src/App.tsrx',
 		);
@@ -574,127 +580,127 @@ describe('Strong stale deferred state updates', () => {
 	it.each([
 		[
 			'an update after await',
-			`export function A({ save }) @{ const [n, setN] = useState(0); <button onClick={async () => { await save(); setN(n + 1); }}>{n}</button> }`,
+			`export function A({ save }) { const [n, setN] = useState(0); return <button onClick={async () => { await save(); setN(n + 1); }}>{n}</button>; }`,
 		],
 		[
 			'a timer callback',
-			`export function A() @{ const [n, setN] = useState(0); <button onClick={() => setTimeout(() => setN(n + 1), 500)}>{n}</button> }`,
+			`export function A() { const [n, setN] = useState(0); return <button onClick={() => setTimeout(() => setN(n + 1), 500)}>{n}</button>; }`,
 		],
 		[
 			'an object spread after await',
-			`export function A({ save }) @{ const [s, setS] = useState({ done: false }); <b onClick={async () => { await save(); setS({ ...s, done: true }); }}>{String(s.done)}</b> }`,
+			`export function A({ save }) { const [s, setS] = useState({ done: false }); return <b onClick={async () => { await save(); setS({ ...s, done: true }); }}>{String(s.done)}</b>; }`,
 		],
 		[
 			'a promise continuation',
-			`export function A({ load }) @{ const [items, setItems] = useState([]); <b onClick={() => load().then((item) => setItems([...items, item]))}>{items.length}</b> }`,
+			`export function A({ load }) { const [items, setItems] = useState([]); return <b onClick={() => load().then((item) => setItems([...items, item]))}>{items.length}</b>; }`,
 		],
 		[
 			'a promise rejection handler',
-			`export function A({ load }) @{ const [errors, setErrors] = useState([]); <b onClick={() => load().catch((error) => setErrors(errors.concat(error)))}>{errors.length}</b> }`,
+			`export function A({ load }) { const [errors, setErrors] = useState([]); return <b onClick={() => load().catch((error) => setErrors(errors.concat(error)))}>{errors.length}</b>; }`,
 		],
 		[
 			'an interval started by an effect',
-			`export function A() @{ const [n, setN] = useState(0); useEffect(() => { const id = setInterval(() => setN(n + 1), 1000); return () => clearInterval(id); }); <b>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); useEffect(() => { const id = setInterval(() => setN(n + 1), 1000); return () => clearInterval(id); }); return <b>{n}</b>; }`,
 		],
 		[
 			'an animation frame',
-			`export function A() @{ const [n, setN] = useState(0); <b onClick={() => requestAnimationFrame(() => setN(n + 1))}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); return <b onClick={() => requestAnimationFrame(() => setN(n + 1))}>{n}</b>; }`,
 		],
 		[
 			'a microtask',
-			`export function A() @{ const [n, setN] = useState(0); <b onClick={() => queueMicrotask(() => setN(n + 1))}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); return <b onClick={() => queueMicrotask(() => setN(n + 1))}>{n}</b>; }`,
 		],
 		[
 			'window.setTimeout',
-			`export function A() @{ const [n, setN] = useState(0); <b onClick={() => window.setTimeout(() => setN(n + 1), 500)}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); return <b onClick={() => window.setTimeout(() => setN(n + 1), 500)}>{n}</b>; }`,
 		],
 		[
 			'a named timer callback',
-			`export function A() @{ const [n, setN] = useState(0); const tick = () => setN(n + 1); <b onClick={() => setTimeout(tick, 500)}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); const tick = () => setN(n + 1); return <b onClick={() => setTimeout(tick, 500)}>{n}</b>; }`,
 		],
 		[
 			'a helper called after await',
-			`export function A({ save }) @{ const [n, setN] = useState(0); const bump = () => setN(n + 1); <b onClick={async () => { await save(); bump(); }}>{n}</b> }`,
+			`export function A({ save }) { const [n, setN] = useState(0); const bump = () => setN(n + 1); return <b onClick={async () => { await save(); bump(); }}>{n}</b>; }`,
 		],
 		[
 			'a helper receiving the snapshot after await',
-			`export function A({ save }) @{ const [n, setN] = useState(0); function apply(value) { setN(value + 1); } <b onClick={async () => { await save(); apply(n); }}>{n}</b> }`,
+			`export function A({ save }) { const [n, setN] = useState(0); function apply(value) { setN(value + 1); } return <b onClick={async () => { await save(); apply(n); }}>{n}</b>; }`,
 		],
 		[
 			'an async effect continuation',
-			`export function A({ load }) @{ const [items, setItems] = useState([]); useEffect(() => { (async () => { const item = await load(); setItems([...items, item]); })(); }); <b>{items.length}</b> }`,
+			`export function A({ load }) { const [items, setItems] = useState([]); useEffect(() => { (async () => { const item = await load(); setItems([...items, item]); })(); }); return <b>{items.length}</b>; }`,
 		],
 		[
 			'a snapshot passed to an Effect Event after await',
-			`export function A({ save }) @{ const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value + 1)); <b onClick={async () => { await save(); apply(n); }}>{n}</b> }`,
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value + 1)); return <b onClick={async () => { await save(); apply(n); }}>{n}</b>; }`,
 		],
 		[
 			'a value computed from a stale Effect Event argument',
-			`export function A({ save }) @{ const [n, setN] = useState(0); const apply = useEffectEvent((value) => { const next = value + 1; setN(next); }); <b onClick={async () => { await save(); apply(n); }}>{n}</b> }`,
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value) => { const next = value + 1; setN(next); }); return <b onClick={async () => { await save(); apply(n); }}>{n}</b>; }`,
 		],
 		[
 			'a stale Effect Event argument forwarded to a helper',
-			`export function A({ save }) @{ const [n, setN] = useState(0); const set = (value) => setN(value + 1); const apply = useEffectEvent((value) => set(value)); <b onClick={async () => { await save(); apply(n); }}>{n}</b> }`,
+			`export function A({ save }) { const [n, setN] = useState(0); const set = (value) => setN(value + 1); const apply = useEffectEvent((value) => set(value)); return <b onClick={async () => { await save(); apply(n); }}>{n}</b>; }`,
 		],
 		[
 			'a stale tuple passed to an Effect Event',
-			`export function A({ save }) @{ const tuple = useState(0); const apply = useEffectEvent((pair) => pair[1](pair[0] + 1)); <b onClick={async () => { await save(); apply(tuple); }}>{tuple[0]}</b> }`,
+			`export function A({ save }) { const tuple = useState(0); const apply = useEffectEvent((pair) => pair[1](pair[0] + 1)); return <b onClick={async () => { await save(); apply(tuple); }}>{tuple[0]}</b>; }`,
 		],
 		[
 			'a stale tuple destructured by an Effect Event',
-			`export function A({ save }) @{ const tuple = useState(0); const apply = useEffectEvent(([value, set]) => set(value + 1)); <b onClick={async () => { await save(); apply(tuple); }}>{tuple[0]}</b> }`,
+			`export function A({ save }) { const tuple = useState(0); const apply = useEffectEvent(([value, set]) => set(value + 1)); return <b onClick={async () => { await save(); apply(tuple); }}>{tuple[0]}</b>; }`,
 		],
 		[
 			'a derived value passed to an Effect Event after await',
-			`export function A({ save }) @{ const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value)); <b onClick={async () => { const next = n + 1; await save(); apply(next); }}>{n}</b> }`,
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value)); return <b onClick={async () => { const next = n + 1; await save(); apply(next); }}>{n}</b>; }`,
 		],
 		[
 			'an expression passed to an Effect Event after await',
-			`export function A({ save }) @{ const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value)); <b onClick={async () => { await save(); apply(n + 1); }}>{n}</b> }`,
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value)); return <b onClick={async () => { await save(); apply(n + 1); }}>{n}</b>; }`,
 		],
 		[
 			'an expression passed to an Effect Event from an effect timer',
-			`export function A() @{ const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value)); useEffect(() => { const id = setTimeout(() => apply(n + 1), 100); return () => clearTimeout(id); }); <b>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); const apply = useEffectEvent((value) => setN(value)); useEffect(() => { const id = setTimeout(() => apply(n + 1), 100); return () => clearTimeout(id); }); return <b>{n}</b>; }`,
 		],
 		[
 			'an expression passed to a helper after await',
-			`export function A({ save }) @{ const [n, setN] = useState(0); function apply(value) { setN(value); } <b onClick={async () => { await save(); apply(n + 1); }}>{n}</b> }`,
+			`export function A({ save }) { const [n, setN] = useState(0); function apply(value) { setN(value); } return <b onClick={async () => { await save(); apply(n + 1); }}>{n}</b>; }`,
 		],
 		[
 			'an expression passed to a defaulted Effect Event parameter after await',
-			`export function A({ save }) @{ const [n, setN] = useState(0); const apply = useEffectEvent((value = 0) => setN(value)); <b onClick={async () => { await save(); apply(n + 1); }}>{n}</b> }`,
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent((value = 0) => setN(value)); return <b onClick={async () => { await save(); apply(n + 1); }}>{n}</b>; }`,
 		],
 		[
 			'a derived value passed to a defaulted helper parameter after await',
-			`export function A({ save }) @{ const [n, setN] = useState(0); function apply(value = 0) { setN(value); } <b onClick={async () => { const next = n + 1; await save(); apply(next); }}>{n}</b> }`,
+			`export function A({ save }) { const [n, setN] = useState(0); function apply(value = 0) { setN(value); } return <b onClick={async () => { const next = n + 1; await save(); apply(next); }}>{n}</b>; }`,
 		],
 		[
 			'an awaited snapshot passed to an inline callback',
-			`export function A() @{ const [n, setN] = useState(0); <b onClick={async () => { ((apply, value) => apply(value))(setN, await Promise.resolve(n)); }}>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); return <b onClick={async () => { ((apply, value) => apply(value))(setN, await Promise.resolve(n)); }}>{n}</b>; }`,
 		],
 		[
 			'state read after an await inside an Effect Event',
-			`export function A({ save }) @{ const [n, setN] = useState(0); const apply = useEffectEvent(async () => { await save(); setN(n + 1); }); <b onClick={() => apply()}>{n}</b> }`,
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent(async () => { await save(); setN(n + 1); }); return <b onClick={() => apply()}>{n}</b>; }`,
 		],
 		[
 			'state read after an await inside an Effect Event called from a timer',
-			`export function A({ save }) @{ const [n, setN] = useState(0); const apply = useEffectEvent(async () => { await save(); setN(n + 1); }); useEffect(() => { setTimeout(() => apply(), 100); }); <b>{n}</b> }`,
+			`export function A({ save }) { const [n, setN] = useState(0); const apply = useEffectEvent(async () => { await save(); setN(n + 1); }); useEffect(() => { setTimeout(() => apply(), 100); }); return <b>{n}</b>; }`,
 		],
 		[
 			'a timer created inside an Effect Event',
-			`export function A() @{ const [n, setN] = useState(0); const later = useEffectEvent(() => { setTimeout(() => setN(n + 1), 100); }); useEffect(() => later()); <b>{n}</b> }`,
+			`export function A() { const [n, setN] = useState(0); const later = useEffectEvent(() => { setTimeout(() => setN(n + 1), 100); }); useEffect(() => later()); return <b>{n}</b>; }`,
 		],
 		[
 			'a reducer dispatch after await',
-			`export function A({ save }) @{ const [s, d] = useReducer((s, a) => a, 0); <b onClick={async () => { await save(); d(s + 1); }}>{s}</b> }`,
+			`export function A({ save }) { const [s, d] = useReducer((s, a) => a, 0); return <b onClick={async () => { await save(); d(s + 1); }}>{s}</b>; }`,
 		],
 		[
 			'a setter alias with an optional call',
-			`export function A({ save }) @{ const [n, setN] = useState(0); const update = setN; <b onClick={async () => { await save(); update?.(n + 1); }}>{n}</b> }`,
+			`export function A({ save }) { const [n, setN] = useState(0); const update = setN; return <b onClick={async () => { await save(); update?.(n + 1); }}>{n}</b>; }`,
 		],
 		[
 			'a tuple index',
-			`export function A({ save }) @{ const tuple = useState(0); <b onClick={async () => { await save(); tuple[1](tuple[0] + 1); }}>{tuple[0]}</b> }`,
+			`export function A({ save }) { const tuple = useState(0); return <b onClick={async () => { await save(); tuple[1](tuple[0] + 1); }}>{tuple[0]}</b>; }`,
 		],
 	])('rejects %s', (_label, body) => {
 		expect(rejected(body)).toBe(STALE_STATE_UPDATE);
@@ -712,7 +718,7 @@ describe('Strong stale deferred state updates', () => {
 	])('rejects the rewrite %s', (_label, handler) => {
 		expect(
 			rejected(
-				`export function A({ save }) @{ const [n, setN] = useState(0); <b onClick={async () => { ${handler} }}>{n}</b> }`,
+				`export function A({ save }) { const [n, setN] = useState(0); return <b onClick={async () => { ${handler} }}>{n}</b>; }`,
 			),
 		).toBe(STALE_STATE_UPDATE);
 	});
@@ -721,18 +727,19 @@ describe('Strong stale deferred state updates', () => {
 		["import { useState as useCell } from 'octane';", 'useCell(0)'],
 		["import * as Octane from 'octane';", 'Octane.useState(0)'],
 	])('recognizes %s', (imports, hook) => {
-		const body = `export function A() @{ const [n, setN] = ${hook}; <b onClick={() => setTimeout(() => setN(n + 1))}>{n}</b> }`;
+		const body = `export function A() { const [n, setN] = ${hook}; return <b onClick={() => setTimeout(() => setN(n + 1))}>{n}</b>; }`;
 		expect(rejected(body, imports)).toBe(STALE_STATE_UPDATE);
 	});
 
 	it('keeps synchronous updates, updaters, getters, and fresh values legal', () => {
 		expect(
 			strongCode(
-				tsx(`export function A({ save, maybe, subscribe }) @{
+				tsx(`export function A({ save, maybe, subscribe }) {
   const [n, setN, getN] = useState(0);
   const [m, setM] = useState(0);
   useEffect(() => subscribe(() => setN(n + 1)));
-  <b
+  return (
+    <b
       onClick={async () => {
         setN(n + 1);
         [1, 2].forEach((step) => setN(n + step));
@@ -750,6 +757,7 @@ describe('Strong stale deferred state updates', () => {
       {n}
       {m}
     </b>
+  );
 }`),
 			),
 		).toBeNull();
@@ -758,7 +766,7 @@ describe('Strong stale deferred state updates', () => {
 	it('keeps Effect Events called from timers and promises legal', () => {
 		expect(
 			strongCode(
-				tsx(`export function A({ load }) @{
+				tsx(`export function A({ load }) {
   const [n, setN] = useState(0);
   const tick = useEffectEvent(() => setN(n + 1));
   const step = useEffectEvent(() => { const next = n + 1; setN(next); });
@@ -778,7 +786,7 @@ describe('Strong stale deferred state updates', () => {
     load().then(() => { if (active) tick(); });
     return () => { active = false; clearInterval(id); };
   });
-  <b onClick={() => { apply(n + 1); set(n + 1); setTimeout(() => tick(), 100); }}>{n}</b>
+  return <b onClick={() => { apply(n + 1); set(n + 1); setTimeout(() => tick(), 100); }}>{n}</b>;
 }`),
 			),
 		).toBeNull();
@@ -804,7 +812,7 @@ export function useSave(save) {
 
 	it('locates the snapshot read and names both replacements', () => {
 		const source = tsx(
-			`export function A({ save }) @{ const [n, setN] = useState(0); <button onClick={async () => { await save(); setN(n + 1); }}>{n}</button> }`,
+			`export function A({ save }) { const [n, setN] = useState(0); return <button onClick={async () => { await save(); setN(n + 1); }}>{n}</button>; }`,
 			IMPORTS,
 			true,
 		);
@@ -813,7 +821,7 @@ export function useSave(save) {
 		expect(diagnostic.message).toContain('setValue((current) => current + 1)');
 		expect(diagnostic.message).toContain('state getter');
 		const reducer = tsx(
-			`export function A({ save }) @{ const [s, d] = useReducer((s, a) => a, 0); <b onClick={async () => { await save(); d(s + 1); }}>{s}</b> }`,
+			`export function A({ save }) { const [s, d] = useReducer((s, a) => a, 0); return <b onClick={async () => { await save(); d(s + 1); }}>{s}</b>; }`,
 			IMPORTS,
 			true,
 		);
@@ -824,9 +832,9 @@ export function useSave(save) {
 
 	it('preserves emitted client and server code for deferred updaters', () => {
 		expectUnchangedOutput(
-			tsx(`export function A({ save }) @{
+			tsx(`export function A({ save }) {
   const [n, setN] = useState(0);
-  <b onClick={async () => { await save(); setN((p) => p + 1); setTimeout(() => setN((p) => p - 1)); }}>{n}</b>
+  return <b onClick={async () => { await save(); setN((p) => p + 1); setTimeout(() => setN((p) => p - 1)); }}>{n}</b>;
 }`),
 			'/src/App.tsrx',
 		);
@@ -840,7 +848,9 @@ describe('Strong read-only state', () => {
 		['object destructuring', 'const { 0: value } = useState(0);'],
 		['index access', 'const value = useState(0)[0];'],
 	])('rejects %s that discards the setter', (_label, setup) => {
-		expect(rejected(`export function A() @{ ${setup} <p>{value}</p> }`)).toBe(READ_ONLY_STATE);
+		expect(rejected(`export function A() { ${setup} return <p>{value}</p>; }`)).toBe(
+			READ_ONLY_STATE,
+		);
 	});
 
 	it.each([
@@ -874,7 +884,7 @@ export function useValue(initial: string) {
 	});
 
 	it('allows a retained setter, linked state, and a shadowed hook', () => {
-		const source = tsx(`export function A({ initial }) @{
+		const source = tsx(`export function A({ initial }) {
   const [value, ...controls] = useState(0);
   const [linked] = useLinkedState(initial, () => initial);
   function format() {
@@ -882,7 +892,7 @@ export function useValue(initial: string) {
     const [local] = useState('local');
     return local;
   }
-  <p onClick={() => controls[0](1)}>{value}{linked}{format()}</p>
+  return <p onClick={() => controls[0](1)}>{value}{linked}{format()}</p>;
 }`);
 		expect(strongCode(source)).toBeNull();
 	});
@@ -892,19 +902,19 @@ describe('Strong write-only state', () => {
 	it.each([
 		[
 			'an elided value with an updater',
-			`export function A({ store }) @{ const [, force] = useState(0); useEffect(() => store.subscribe(() => force(x => x + 1))); <p>{store.value}</p> }`,
+			`export function A({ store }) { const [, force] = useState(0); useEffect(() => store.subscribe(() => force(x => x + 1))); return <p>{store.value}</p>; }`,
 		],
 		[
 			'an unused value binding',
-			`export function A({ store }) @{ const [tick, force] = useState(0); useEffect(() => store.subscribe(() => force((x) => x + 1))); <p>{store.value}</p> }`,
+			`export function A({ store }) { const [tick, force] = useState(0); useEffect(() => store.subscribe(() => force((x) => x + 1))); return <p>{store.value}</p>; }`,
 		],
 		[
 			'an unused getter',
-			`export function A({ store }) @{ const [, force, read] = useState(0); useEffect(() => store.subscribe(() => force((x) => x + 1))); <p>{store.value}</p> }`,
+			`export function A({ store }) { const [, force, read] = useState(0); useEffect(() => store.subscribe(() => force((x) => x + 1))); return <p>{store.value}</p>; }`,
 		],
 		[
 			'a linked state tuple',
-			`export function A(props) @{ const [, force] = useLinkedState(props.id, () => 0); <p onClick={() => force(1)}>{props.id}</p> }`,
+			`export function A(props) { const [, force] = useLinkedState(props.id, () => 0); return <p onClick={() => force(1)}>{props.id}</p>; }`,
 		],
 	])('rejects %s', (_label, body) => {
 		expect(rejected(body)).toBe(WRITE_ONLY_STATE);
@@ -929,7 +939,7 @@ describe('Strong write-only state', () => {
 			`const [tick, force] = useState(0); useEffect(() => store.subscribe(() => force(tick + 1)));`,
 		],
 	])('rejects the rewrite %s', (_label, setup) => {
-		expect(rejected(`export function A({ store }) @{ ${setup} <p>{store.value}</p> }`)).toBe(
+		expect(rejected(`export function A({ store }) { ${setup} return <p>{store.value}</p>; }`)).toBe(
 			WRITE_ONLY_STATE,
 		);
 	});
@@ -939,7 +949,7 @@ describe('Strong write-only state', () => {
 		["import * as Octane from 'octane'; const { useEffect } = Octane;", 'Octane.useState(0)'],
 		["import * as Octane from 'octane'; const { useEffect } = Octane;", 'Octane?.useState(0)'],
 	])('recognizes %s', (imports, hook) => {
-		const body = `export function A({ store }) @{ const [, force] = ${hook}; useEffect(() => store.subscribe(() => force({}))); <p>{store.value}</p> }`;
+		const body = `export function A({ store }) { const [, force] = ${hook}; useEffect(() => store.subscribe(() => force({}))); return <p>{store.value}</p>; }`;
 		expect(rejected(body, imports)).toBe(WRITE_ONLY_STATE);
 	});
 
@@ -947,7 +957,7 @@ describe('Strong write-only state', () => {
 		expect(
 			strongCode(
 				tsx(`function useLocal() { return [0, () => {}]; }
-export function A({ store }) @{
+export function A({ store }) {
   const [, setCount, getCount] = useState(0);
   const [Icon, setIcon] = useState(() => 'i');
   const [value, setValue] = useState('');
@@ -956,7 +966,8 @@ export function A({ store }) @{
   const [unused, setUnused] = useState(0);
   const [, setLocal] = useLocal();
   const [, setShadowed] = (() => { const useState = (value) => [value, () => {}]; return useState(0); })();
-  <p
+  return (
+    <p
       onClick={() => {
         setCount(1);
         console.log(getCount());
@@ -972,6 +983,7 @@ export function A({ store }) @{
       <input value={value} />
       {label}
     </p>
+  );
 }`),
 			),
 		).toBeNull();
@@ -1007,7 +1019,7 @@ export function A() @{
 
 	it('locates the tuple and names the replacement', () => {
 		const source = tsx(
-			`export function A({ store }) @{ const [, force] = useState(0); useEffect(() => store.subscribe(() => force(x => x + 1))); <p>{store.value}</p> }`,
+			`export function A({ store }) { const [, force] = useState(0); useEffect(() => store.subscribe(() => force(x => x + 1))); return <p>{store.value}</p>; }`,
 			IMPORTS,
 			true,
 		);
@@ -1020,9 +1032,9 @@ export function A() @{
 
 	it('preserves emitted client and server code for read state', () => {
 		expectUnchangedOutput(
-			tsx(`export function A() @{
+			tsx(`export function A() {
   const [count, setCount] = useState(0);
-  <b onClick={() => setCount(count + 1)}>{count}</b>
+  return <b onClick={() => setCount(count + 1)}>{count}</b>;
 }`),
 			'/src/App.tsrx',
 		);
@@ -1047,7 +1059,7 @@ describe('Strong uncached useSyncExternalStore snapshots', () => {
 	])('rejects %s', (_label, getSnapshot) => {
 		expect(
 			rejected(
-				`export function A({ store }) @{ const s = useSyncExternalStore(store.subscribe, ${getSnapshot}); <p>{String(s)}</p> }`,
+				`export function A({ store }) { const s = useSyncExternalStore(store.subscribe, ${getSnapshot}); return <p>{String(s)}</p>; }`,
 			),
 		).toBe(UNCACHED_STORE_SNAPSHOT);
 	});
@@ -1055,7 +1067,7 @@ describe('Strong uncached useSyncExternalStore snapshots', () => {
 	it('rejects a fresh server snapshot', () => {
 		expect(
 			rejected(
-				`export function A({ store }) @{ const s = useSyncExternalStore(store.subscribe, () => store.value, () => ({ value: 0 })); <p>{String(s)}</p> }`,
+				`export function A({ store }) { const s = useSyncExternalStore(store.subscribe, () => store.value, () => ({ value: 0 })); return <p>{String(s)}</p>; }`,
 			),
 		).toBe(UNCACHED_STORE_SNAPSHOT);
 	});
@@ -1064,15 +1076,15 @@ describe('Strong uncached useSyncExternalStore snapshots', () => {
 	it.each([
 		[
 			'a module selector',
-			`function select(store) { return { a: store.a }; } export function A({ store }) @{ const s = useSyncExternalStore(store.subscribe, () => select(store)); <p>{s.a}</p> }`,
+			`function select(store) { return { a: store.a }; } export function A({ store }) { const s = useSyncExternalStore(store.subscribe, () => select(store)); return <p>{s.a}</p>; }`,
 		],
 		[
 			'a named getSnapshot declaration',
-			`function getSnapshot() { return [globalThis.innerWidth, globalThis.innerHeight]; } export function A({ store }) @{ const s = useSyncExternalStore(store.subscribe, getSnapshot); <p>{s[0]}</p> }`,
+			`function getSnapshot() { return [globalThis.innerWidth, globalThis.innerHeight]; } export function A({ store }) { const s = useSyncExternalStore(store.subscribe, getSnapshot); return <p>{s[0]}</p>; }`,
 		],
 		[
 			'a local constant',
-			`export function A({ store }) @{ const getSnapshot = () => { const snapshot = { a: store.a }; return snapshot; }; const s = useSyncExternalStore(store.subscribe, getSnapshot); <p>{s.a}</p> }`,
+			`export function A({ store }) { const getSnapshot = () => { const snapshot = { a: store.a }; return snapshot; }; const s = useSyncExternalStore(store.subscribe, getSnapshot); return <p>{s.a}</p>; }`,
 		],
 	])('rejects the rewrite through %s', (_label, body) => {
 		expect(rejected(body)).toBe(UNCACHED_STORE_SNAPSHOT);
@@ -1083,7 +1095,7 @@ describe('Strong uncached useSyncExternalStore snapshots', () => {
 		["import * as Octane from 'octane';", 'Octane.useSyncExternalStore'],
 		["import * as Octane from 'octane';", 'Octane?.useSyncExternalStore'],
 	])('recognizes %s', (imports, hook) => {
-		const body = `export function A({ store }) @{ const s = ${hook}(store.subscribe, () => [store.a]); <p>{s[0]}</p> }`;
+		const body = `export function A({ store }) { const s = ${hook}(store.subscribe, () => [store.a]); return <p>{s[0]}</p>; }`;
 		expect(rejected(body, imports)).toBe(UNCACHED_STORE_SNAPSHOT);
 	});
 
@@ -1091,7 +1103,7 @@ describe('Strong uncached useSyncExternalStore snapshots', () => {
 		expect(
 			strongCode(
 				tsx(`const EMPTY = [];
-export function A({ store }) @{
+export function A({ store }) {
   const a = useSyncExternalStore(store.subscribe, () => store.state);
   const b = useSyncExternalStore(store.subscribe, () => JSON.stringify({ a: store.a }));
   const c = useSyncExternalStore(store.subscribe, () => store.items ?? EMPTY);
@@ -1100,7 +1112,7 @@ export function A({ store }) @{
   const f = useSyncExternalStore(store.subscribe, () => { const Map = store.M; return new Map(); });
   const g = useSyncExternalStore(store.subscribe, () => store.title.slice(0, 3));
   { const useSyncExternalStore = (subscribe, read) => read(); useSyncExternalStore(store.subscribe, () => ({ fresh: true })); }
-  <p>{String(a)}{b}{String(c)}{String(d)}{String(e)}{String(f)}{g}</p>
+  return <p>{String(a)}{b}{String(c)}{String(d)}{String(e)}{String(f)}{g}</p>;
 }`),
 			),
 		).toBeNull();
@@ -1127,7 +1139,7 @@ export function useSelection(store) {
 
 	it('locates the fresh value and names the replacement', () => {
 		const source = tsx(
-			`export function A({ store }) @{ const s = useSyncExternalStore(store.subscribe, () => ({ a: store.a, b: store.b })); <p>{s.a}</p> }`,
+			`export function A({ store }) { const s = useSyncExternalStore(store.subscribe, () => ({ a: store.a, b: store.b })); return <p>{s.a}</p>; }`,
 			IMPORTS,
 			true,
 		);
@@ -1139,9 +1151,9 @@ export function useSelection(store) {
 
 	it('preserves emitted client and server code for stable snapshots', () => {
 		expectUnchangedOutput(
-			tsx(`export function A({ store }) @{
+			tsx(`export function A({ store }) {
   const value = useSyncExternalStore(store.subscribe, () => store.value, () => 0);
-  <p>{value}</p>
+  return <p>{value}</p>;
 }`),
 			'/src/App.tsrx',
 		);

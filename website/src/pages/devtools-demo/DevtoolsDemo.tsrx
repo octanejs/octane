@@ -20,17 +20,17 @@ function makeDelayed(label: string, ms: number): Promise<string> {
 const boundaryAPromise = makeDelayed('boundary A loaded', 400);
 const boundaryBPromise = makeDelayed('boundary B loaded', 800);
 
-function Slow(props: { label: string }): OctaneNode @{
+function Slow(props: { label: string }): OctaneNode {
 	// Bounded, deterministic work gives the Profiler a slow render to display
 	// without reading the clock during render.
 	let label = props.label;
 	for (let i = 0; i < 2000; i++) label = label.split('').reverse().reverse().join('');
-	<li>{label as string}</li>
+	return <li>{label as string}</li>;
 }
 
-function AsyncChild(props: { promise: Promise<string> }): OctaneNode @{
+function AsyncChild(props: { promise: Promise<string> }): OctaneNode {
 	const value = use(props.promise);
-	<strong>{value as string}</strong>
+	return <strong>{value as string}</strong>;
 }
 
 function Counter(): OctaneNode @{

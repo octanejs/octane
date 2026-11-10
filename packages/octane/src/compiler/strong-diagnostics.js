@@ -355,15 +355,6 @@ export const STRONG_DIAGNOSTICS = [
 		replacement: 'Use `@for` with a stable item key. Data-only mapping remains valid.',
 	},
 	{
-		code: 'OCTANE_STRONG_VALUE_JSX',
-		section: 'templates',
-		severity: 'error',
-		detects:
-			'In `.tsrx`, JSX outside template output: returned from a function, assigned to a variable, passed as a prop value or argument, or chosen by a conditional or logical expression. A value builds an element descriptor, which renders through the generic descriptor renderer instead of a compiled template. A `.map()` callback that `OCTANE_STRONG_MAP_JSX` reports is not reported again.',
-		replacement:
-			'Write a component body as `@{ … }`, pass markup to a component prop as `prop={@{ … }}`, pass a component where the receiver supplies arguments, and choose markup with `@if` or `@switch`. A `<style>` theme constant stays valid.',
-	},
-	{
 		code: 'OCTANE_STRONG_INDEX_KEY',
 		section: 'templates',
 		severity: 'error',

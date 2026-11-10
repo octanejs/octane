@@ -211,16 +211,6 @@ function asRest(declaration: ts.Declaration | null) {
 		: null;
 }
 
-/**
- * Whether reading the expression twice reads the same value with no side
- * effect: a name or a property path, such as `story.pinned`.
- */
-function isPlainReference(node: ts.Expression): boolean {
-	node = skipParens(node);
-	if (ts.isIdentifier(node) || node.kind === ts.SyntaxKind.ThisKeyword) return true;
-	return ts.isPropertyAccessExpression(node) && isPlainReference(node.expression);
-}
-
 function isJsx(node: ts.Node) {
 	return ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
 }
@@ -3723,21 +3713,14 @@ class ModuleTransform {
 		if (ts.isConditionalExpression(node)) return this.ifDirective(node);
 		if (
 			ts.isBinaryExpression(node) &&
-			node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+			node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+			(this.isBoolean(node.left) ||
+				(this.strictTypes && isBooleanGuardType(this.typeOf(node.left))))
 		) {
-			const boolean =
-				this.isBoolean(node.left) ||
-				(this.strictTypes && isBooleanGuardType(this.typeOf(node.left)));
-			// Strong rejects the element `&&` builds. React renders a falsy left
-			// side such as `0` as text, so the `@else` arm renders it as a hole,
-			// which reads the guard a second time.
-			if (!boolean && !(this.strong && isPlainReference(node.left))) return null;
 			const arm = this.arm(node.right);
 			if (arm === null || arm === '') return null;
 			this.count(RULE.if);
-			const condition = this.emit(node.left, PLAIN);
-			const then = this.block(`@if (${condition})`, arm);
-			return boolean ? then : then + ' ' + this.block('@else', `<>{${condition}}</>`);
+			return this.block(`@if (${this.emit(node.left, PLAIN)})`, arm);
 		}
 		if (ts.isCallExpression(node)) return this.forDirective(node);
 		return null;

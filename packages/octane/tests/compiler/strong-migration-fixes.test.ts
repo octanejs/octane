@@ -50,10 +50,10 @@ describe("Strong migration guidance for React's lazy ref idiom", () => {
 		['??=', 'store.current ??= new Store();'],
 		['||=', 'store.current ||= new Store();'],
 	])('names useLazyRef and rewrites the %s form', (_, init) => {
-		const source = `${STORE}export function Cart() @{
+		const source = `${STORE}export function Cart() {
 	const store = useRef<Store | null>(null);
 	${init}
-	<button onClick={() => store.current?.add()}>Add</button>
+	return <button onClick={() => store.current?.add()}>Add</button>;
 }
 `;
 		const found = errors(source);
@@ -78,10 +78,10 @@ describe("Strong migration guidance for React's lazy ref idiom", () => {
 
 	it('parenthesizes an object literal factory body', () => {
 		const source = `import { useRef } from 'octane';
-export function Counter() @{
+export function Counter() {
 	const state = useRef(null);
 	state.current ??= { count: 0 };
-	<div />
+	return <div />;
 }
 `;
 		const [diagnostic] = errors(source);
@@ -109,9 +109,9 @@ export function Counter() @{
 			'const store = useRef<Store | null>(new Store());\n\tif (store.current === null) store.current = new Store();',
 		],
 	])('names useLazyRef without an edit when there is %s', (_, body) => {
-		const source = `${STORE}export function Cart() @{
+		const source = `${STORE}export function Cart() {
 	${body}
-	<div />
+	return <div />;
 }
 `;
 		const found = errors(source).filter((diagnostic) => diagnostic.code.includes('REF'));
@@ -124,9 +124,9 @@ export function Counter() @{
 
 	it('keeps the generic ref guidance, naming both new hooks, for other render reads', () => {
 		const source = `import { useRef } from 'octane';
-export function Width() @{
+export function Width() {
 	const el = useRef<HTMLDivElement>(null);
-	<div ref={el}>{String(el.current?.offsetWidth)}</div>
+	return <div ref={el}>{String(el.current?.offsetWidth)}</div>;
 }
 `;
 		const [diagnostic] = errors(source);
@@ -157,12 +157,12 @@ describe('Strong migration guidance for measurements copied into state', () => {
 		initial = '7',
 	) =>
 		`import { useLayoutEffect as layout, useRef, useState } from 'octane';
-export function Meter() @{
+export function Meter() {
 	const el = useRef<HTMLDivElement>(null);
 	const [value, setValue] = useState(${initial});
 	layout(() => { setValue(${read}); }${deps});
 	${extra}
-	<div ref={el}>{String(value)}</div>
+	return <div ref={el}>{String(value)}</div>;
 }`;
 
 	function measurementEdits(source: string) {
@@ -232,13 +232,13 @@ export function Meter() @{
 	])('names useLayoutSnapshot when an effect stores %s', (_, measure) => {
 		for (const hook of ['useLayoutEffect', 'useEffect']) {
 			const source = `import { ${hook}, useRef, useState } from 'octane';
-export function Label() @{
+export function Label() {
 	const el = useRef<HTMLSpanElement>(null);
 	const [width, setWidth] = useState(0);
 	${hook}(() => {
 		setWidth(${measure});
 	});
-	<span ref={el}>{String(width)}</span>
+	return <span ref={el}>{String(width)}</span>;
 }
 `;
 			const [diagnostic] = errors(source);
@@ -257,13 +257,13 @@ export function Label() @{
 		['startTransition', 'startTransition(() => setWidth(el.current?.offsetWidth ?? 0));'],
 	])('names useLayoutSnapshot when a measurement is stored from %s', (_, body) => {
 		const source = `import { startTransition, useLayoutEffect, useRef, useState } from 'octane';
-export function Label() @{
+export function Label() {
 	const el = useRef<HTMLSpanElement>(null);
 	const [width, setWidth] = useState(0);
 	useLayoutEffect(() => {
 		${body}
 	});
-	<span ref={el}>{String(width)}</span>
+	return <span ref={el}>{String(width)}</span>;
 }
 `;
 		const diagnostic = errors(source).find(
@@ -285,13 +285,13 @@ export function Label() @{
 		['a layout write', 'if (el.current) el.current.scrollTop = 0;\n\t\tsetValue(name);'],
 	])('does not call it a measurement when layout is only touched in %s', (_, body) => {
 		const source = `import { useEffect, useRef, useState } from 'octane';
-export function Name({ name }: { name: string }) @{
+export function Name({ name }: { name: string }) {
 	const el = useRef<HTMLDivElement>(null);
 	const [value, setValue] = useState('');
 	useEffect(() => {
 		${body}
 	});
-	<div ref={el}>{value}</div>
+	return <div ref={el}>{value}</div>;
 }
 `;
 		const diagnostic = errors(source).find(
@@ -303,12 +303,12 @@ export function Name({ name }: { name: string }) @{
 
 	it('keeps the useLinkedState guidance for a state update that is not a measurement', () => {
 		const source = `import { useEffect, useState } from 'octane';
-export function Name({ name }: { name: string }) @{
+export function Name({ name }: { name: string }) {
 	const [value, setValue] = useState('');
 	useEffect(() => {
 		setValue(name);
 	});
-	<span>{value}</span>
+	return <span>{value}</span>;
 }
 `;
 		const [diagnostic] = errors(source);
@@ -319,10 +319,10 @@ export function Name({ name }: { name: string }) @{
 });
 
 describe('collectDiagnostics', () => {
-	const CLOCK = `export function Clock() @{
+	const CLOCK = `export function Clock() {
 	const now = Date.now();
 	const seed = Math.random();
-	<span>{String(now) + String(seed)}</span>
+	return <span>{String(now) + String(seed)}</span>;
 }
 `;
 
