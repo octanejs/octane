@@ -7,7 +7,7 @@ import {
 	write,
 	type StandardSchema,
 } from '../src/data/index.js';
-import { createDataHandler, handle } from '../src/data/server.js';
+import { createDataHandler } from '../src/data/server.js';
 
 export interface TodoItem {
 	id: string;
@@ -64,7 +64,7 @@ export const removeTodo = write({
 export function createServer() {
 	const rows: TodoItem[] = [{ id: 'a', title: 'Tides', done: false }];
 	const log: string[] = [];
-	const handler = createDataHandler([
+	const handler = createDataHandler({}, (handle) => [
 		handle(todos, () => {
 			log.push('list');
 			return rows.map((row) => ({ ...row }));

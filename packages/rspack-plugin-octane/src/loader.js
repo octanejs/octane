@@ -127,6 +127,9 @@ export default function octaneLoader(source, inputSourceMap) {
 			root,
 			profile,
 			...(options.strong === undefined ? null : { strong: options.strong }),
+			...(options.strongDependencies === undefined
+				? null
+				: { strongDependencies: options.strongDependencies }),
 			...(options.knownAttributeSpreads === undefined
 				? null
 				: { knownAttributeSpreads: options.knownAttributeSpreads }),

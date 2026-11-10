@@ -1462,6 +1462,7 @@ export function octane(inlineOptions = {}) {
 	 *   output?: 'js' | 'ts',
 	 *   profile?: boolean | 'auto',
 	 *   strong?: boolean,
+	 *   strongDependencies?: import('octane/compiler/vite').OctaneVitePluginOptions['strongDependencies'],
 	 *   textTypes?: import('octane/compiler/vite').OctaneVitePluginOptions['textTypes'],
 	 *   knownAttributeSpreads?: import('octane/compiler/vite').OctaneVitePluginOptions['knownAttributeSpreads'],
 	 *   domBindingFixedProps?: import('octane/compiler/vite').OctaneVitePluginOptions['domBindingFixedProps'],
@@ -1508,17 +1509,13 @@ export function octane(inlineOptions = {}) {
 	if (typeof compilerConfigHook === 'function') {
 		compilerPlugin.config = function compilerConfigWithAppOptions(userConfig, env) {
 			const projectRoot = userConfig.root ? path.resolve(userConfig.root) : process.cwd();
-			// Both inline compiler options override app config independently. Preserve
-			// the synchronous path when neither needs to read octane.config.ts.
-			if (inlineOptions.renderers !== undefined && inlineOptions.strong !== undefined) {
-				compilerConfigWatchFiles.clear();
-				return compilerConfigHook.call(this, userConfig, env);
-			}
-
+			// Inline `renderers` and `strong` override app config independently.
+			// `strongDependencies` comes only from octane.config.ts, so it is always read.
 			const configPath = getOctaneConfigPath(projectRoot);
 			if (!octaneConfigExists(projectRoot)) {
 				if (inlineOptions.renderers === undefined) delete compilerOptions.renderers;
 				if (inlineOptions.strong === undefined) delete compilerOptions.strong;
+				delete compilerOptions.strongDependencies;
 				compilerConfigWatchFiles.clear();
 				// A new app config can introduce Strong mode or renderer rules.
 				compilerConfigWatchFiles.add(path.resolve(configPath));
@@ -1533,6 +1530,7 @@ export function octane(inlineOptions = {}) {
 				if (inlineOptions.strong === undefined) {
 					compilerOptions.strong = config.config.compiler.strong;
 				}
+				compilerOptions.strongDependencies = config.config.compiler.strongDependencies;
 				compilerConfigWatchFiles.clear();
 				for (const file of [...config.dependencies, ...config.missingDependencies]) {
 					compilerConfigWatchFiles.add(path.resolve(file));

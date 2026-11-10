@@ -9,7 +9,7 @@ import {
 	write,
 	type Transport,
 } from '../src/data/index.js';
-import { createDataHandler, handle } from '../src/data/server.js';
+import { createDataHandler } from '../src/data/server.js';
 import { addTodo, createServer, firstTodo, removeTodo, setDone, todos } from './_data-todos.js';
 
 /** Observe a read and wait for its first value. */
@@ -403,7 +403,9 @@ describe('octane/data store', () => {
 				},
 			},
 		});
-		const handler = createDataHandler([handle(rename, (input) => void received.push(input))]);
+		const handler = createDataHandler({}, (handle) => [
+			handle(rename, (input) => void received.push(input)),
+		]);
 		const store = createDataStore({
 			transport: httpTransport('https://app.test/data', {
 				fetch: (url, init) => handler(new Request(url as string, init)),
@@ -436,7 +438,13 @@ describe('octane/data store', () => {
 
 		expect(list.getSnapshot().status).toBe('pending');
 		expect(lateInvalidate).toThrow(DataRetiredError);
-		expect(() => store.read(todos, undefined)).toThrow(DataRetiredError);
+		// A render still holding the retired store sees nothing and starts nothing.
+		const stale = store.read(todos, undefined);
+		stale.subscribe(() => {});
+		expect(stale.getSnapshot().status).toBe('pending');
+		await settled();
+		// Only the load that started before retirement reached the server.
+		expect(server.log).toEqual(['list']);
 		expect(() => store.write(setDone, { id: 'a', done: true })).toThrow(DataRetiredError);
 	});
 
@@ -451,5 +459,122 @@ describe('octane/data store', () => {
 		);
 		expect(response.status).toBe(403);
 		expect(server.log).toEqual([]);
+	});
+});
+
+describe('octane/data server render and hydration', () => {
+	const page = new Request('https://app.test/');
+
+	/** Render on the server: load in process, render for `elapsed` ms, then hand the client its seed. */
+	async function serverRender(
+		server: ReturnType<typeof createServer>,
+		contract = todos,
+		elapsed = 0,
+	) {
+		const store = createDataStore({ transport: server.handler.transport(page) });
+		await store.prefetch(contract, undefined);
+		if (elapsed) vi.advanceTimersByTime(elapsed);
+		const seed = store.dehydrate();
+		store.retire();
+		return seed;
+	}
+
+	it('loads in process on the server, and hydrates without waiting or loading again', async () => {
+		const server = createServer();
+		const seed = await serverRender(server);
+		expect(server.log).toEqual(['list']);
+
+		const client = createDataStore({ transport: server.transport, seed });
+		const list = client.read(todos, undefined);
+		// The first render reads the server's value synchronously.
+		expect(list.getSnapshot()).toMatchObject({ status: 'ready', value: [{ title: 'Tides' }] });
+		list.subscribe(() => {});
+		await settled();
+		expect(server.log).toEqual(['list']);
+
+		// The adopted value is ordinary state: edits apply over it.
+		const saved = client.write(setDone, { id: 'a', done: true });
+		expect(list.getSnapshot().value![0].done).toBe(true);
+		await saved;
+	});
+
+	it('runs the same validation in process as over HTTP', async () => {
+		const server = createServer();
+		const transport = server.handler.transport(page);
+		const reply = await transport(
+			{ kind: 'write', name: 'todos.setDone', input: { id: 'a', done: 'yes' }, operationId: 'x' },
+			new AbortController().signal,
+		);
+		expect(reply).toMatchObject({ ok: false, code: 'invalid' });
+		expect(server.log).toEqual([]);
+	});
+
+	it("keeps the server value's age, so freshness and expiry count from the server load", async () => {
+		vi.useFakeTimers();
+		try {
+			const server = createServer();
+			const timed = read({ ...todos, fresh: 1_000, expire: 3_000 } as any) as typeof todos;
+			// The rest of the page took 600 ms to render after the value loaded.
+			const seed = await serverRender(server, timed, 600);
+			const client = createDataStore({ transport: server.transport, seed });
+			const list = client.read(timed, undefined);
+			list.subscribe(() => {})();
+			expect(list.getSnapshot()).toMatchObject({ status: 'ready', stale: false });
+
+			vi.advanceTimersByTime(400);
+			expect(list.getSnapshot().stale).toBe(false);
+			// Snapshots are cached between changes; the next observer sees its age.
+			const stop = list.subscribe(() => {});
+			expect(list.getSnapshot()).toMatchObject({ status: 'ready', refreshing: true });
+			stop();
+
+			// Expiry fires 3 s after the server load, not 3 s after hydration.
+			vi.advanceTimersByTime(2_000);
+			expect(list.getSnapshot().status).toBe('pending');
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('loads normally when a value expired during the render or no longer matches the schema', async () => {
+		vi.useFakeTimers();
+		try {
+			const server = createServer();
+			const timed = read({ ...todos, expire: 500 } as any) as typeof todos;
+			const seed = await serverRender(server, timed, 500);
+			const expired = createDataStore({ transport: server.transport, seed });
+			expect(expired.read(timed, undefined).getSnapshot().status).toBe('pending');
+		} finally {
+			vi.useRealTimers();
+		}
+
+		// The client is a newer build whose schema refuses the value the server sent.
+		const server = createServer();
+		const seed = await serverRender(server);
+		const stricter = read({
+			...todos,
+			output: {
+				'~standard': {
+					version: 1,
+					vendor: 'test',
+					validate: () => ({ issues: [{ message: 'needs a revision' }] }),
+				},
+			},
+		} as any) as typeof todos;
+		const client = createDataStore({ transport: server.transport, seed });
+		const list = client.read(stricter, undefined);
+		expect(list.getSnapshot().status).toBe('pending');
+	});
+
+	it('writes a seed that cannot close the script element it is embedded in', async () => {
+		const server = createServer();
+		server.rows[0].title = '</script><script>alert(1)</script>';
+		const seed = await serverRender(server);
+		expect(seed).not.toContain('<');
+
+		const client = createDataStore({ transport: server.transport, seed });
+		expect(client.read(todos, undefined).getSnapshot().value![0].title).toBe(
+			'</script><script>alert(1)</script>',
+		);
 	});
 });

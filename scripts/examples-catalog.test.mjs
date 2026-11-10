@@ -128,14 +128,16 @@ describe('validateExampleManifest', () => {
 		]);
 	});
 
-	test('accepts the React runtime for a host:"react" application', () => {
-		const example = createValidExample();
-		example.manifest.host = 'react';
-		example.packageManifest.dependencies.react = '^19.0.0';
-		example.packageManifest.dependencies['react-dom'] = '^19.0.0';
+	for (const host of ['react', 'mixed']) {
+		test(`accepts the React runtime for a host:"${host}" application`, () => {
+			const example = createValidExample();
+			example.manifest.host = host;
+			example.packageManifest.dependencies.react = '^19.0.0';
+			example.packageManifest.dependencies['react-dom'] = '^19.0.0';
 
-		assert.deepEqual(validate(example), []);
-	});
+			assert.deepEqual(validate(example), []);
+		});
+	}
 
 	test('still requires octane for a host:"react" application', () => {
 		const example = createValidExample();
@@ -150,6 +152,8 @@ describe('validateExampleManifest', () => {
 		const example = createValidExample();
 		example.manifest.host = 'nuxt';
 
-		assert.deepEqual(validate(example), [`${EXAMPLE_LABEL} "host" must be one of octane, react`]);
+		assert.deepEqual(validate(example), [
+			`${EXAMPLE_LABEL} "host" must be one of octane, react, mixed`,
+		]);
 	});
 });

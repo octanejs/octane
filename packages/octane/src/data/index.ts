@@ -13,4 +13,4 @@ export type {
 	Transport,
 	Write,
 } from './contracts.js';
-export type { DataStore, ReadHandle, ReadSnapshot } from './store.js';
+export type { DataStore, DataStoreOptions, ReadHandle, ReadSnapshot } from './store.js';

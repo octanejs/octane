@@ -41,8 +41,8 @@
       "enum": ["active", "experimental"]
     },
     "host": {
-      "description": "Rendering host framework. Defaults to \"octane\". \"react\" marks a React-hosted application whose Octane islands run through octane/react (OctaneCompat); only such applications may declare the react runtime.",
-      "enum": ["octane", "react"]
+      "description": "Rendering host framework. Defaults to \"octane\". \"react\" marks a React-hosted application whose Octane islands run through octane/react (OctaneCompat). \"mixed\" marks an application with pages owned by each renderer. Only \"react\" and \"mixed\" applications may declare the react runtime.",
+      "enum": ["octane", "react", "mixed"]
     },
     "renderModes": {
       "type": "array",

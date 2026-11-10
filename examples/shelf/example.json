@@ -1,0 +1,91 @@
+{
+  "$schema": "../example.schema.json",
+  "schemaVersion": 1,
+  "id": "shelf",
+  "title": "Shelf",
+  "summary": "One set of octane/data contracts and one server: server-rendered Octane and React pages that hydrate from the server's data, and an Octane page hosting a React island that shares its store.",
+  "status": "experimental",
+  "host": "mixed",
+  "renderModes": ["client", "ssr", "hydration"],
+  "dialects": ["tsrx", "tsx"],
+  "bindings": [],
+  "octaneFeatures": [
+    "data-contracts",
+    "hydration",
+    "optimistic-updates",
+    "react-compat",
+    "ssr",
+    "suspense",
+    "tsrx-control-flow"
+  ],
+  "commands": {
+    "build": ["build"],
+    "typecheck": "typecheck",
+    "e2e": "test:e2e"
+  },
+  "journeys": [
+    {
+      "id": "server-render-hydration",
+      "title": "Arrive server-rendered, readable without JavaScript, and hydrate from the server's data without loading it again",
+      "kind": "ssr-hydration",
+      "spec": "e2e/shelf.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "single-round-trip-edit",
+      "title": "Show an edit before its reply, then settle it with the affected reads returned in the same response",
+      "kind": "golden",
+      "spec": "e2e/shelf.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "create-remove-refuse",
+      "title": "Add and remove books by ID, and roll back a refused add",
+      "kind": "golden",
+      "spec": "e2e/shelf.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "lost-reply-lookup",
+      "title": "Settle a write whose reply was lost by looking up its receipt, without resending it",
+      "kind": "resilience",
+      "spec": "e2e/shelf.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "offline-lookup-rollback",
+      "title": "Keep an offline edit until a lookup shows it never arrived, then roll it back",
+      "kind": "resilience",
+      "spec": "e2e/shelf.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "account-isolation",
+      "title": "Give each account its own store and keep the other account's data out",
+      "kind": "golden",
+      "spec": "e2e/shelf.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "shared-store-across-renderers",
+      "title": "Show one edit and one rollback in an Octane page and its React island",
+      "kind": "golden",
+      "spec": "e2e/shelf.spec.ts",
+      "critical": true
+    }
+  ],
+  "faultScenarios": [
+    {
+      "id": "lost-reply",
+      "description": "Lose the next reply delivers a write and discards its reply, so the edit stays visible as uncertain until a receipt lookup confirms it."
+    },
+    {
+      "id": "offline",
+      "description": "Offline fails requests before they are sent; a later lookup shows the write never arrived and removes its edit."
+    },
+    {
+      "id": "duplicate-title",
+      "description": "Adding a title already on the shelf is refused by the server and the optimistic row is removed."
+    }
+  ]
+}

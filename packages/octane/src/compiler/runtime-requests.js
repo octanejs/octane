@@ -1,4 +1,5 @@
 import { initSync as initModuleLexer, parse as lexModule } from 'es-module-lexer';
+import { SERVER_RUNTIME_REQUESTS } from './server-runtime-requests.js';
 
 let moduleLexerInitialized = false;
 
@@ -41,14 +42,9 @@ export function rewriteServerRuntimeRequests(source, id) {
 	let changed = false;
 	for (let index = imports.length - 1; index >= 0; index--) {
 		const request = imports[index];
-		const target =
-			request.n === 'octane'
-				? 'octane/server'
-				: request.n === 'octane/signals/client'
-					? 'octane/signals/server'
-					: request.n === 'octane/react'
-						? 'octane/react/server'
-						: null;
+		const target = Object.hasOwn(SERVER_RUNTIME_REQUESTS, request.n)
+			? SERVER_RUNTIME_REQUESTS[request.n]
+			: null;
 		if (target === null) continue;
 		if (request.d === -1) {
 			code = code.slice(0, request.s) + target + code.slice(request.e);

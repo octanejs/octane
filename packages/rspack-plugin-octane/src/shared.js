@@ -41,6 +41,7 @@ const LOADER_OPTION_KEYS = new Set([
 	'dev',
 	'profile',
 	'strong',
+	'strongDependencies',
 	'knownAttributeSpreads',
 	'exclude',
 	'renderers',
@@ -267,6 +268,9 @@ function normalizeOptions(value, plugin) {
 		...(options.dev === undefined ? null : { dev: options.dev }),
 		...(options.profile === undefined ? null : { profile: options.profile }),
 		...(options.strong === undefined ? null : { strong: options.strong }),
+		...(options.strongDependencies === undefined
+			? null
+			: { strongDependencies: options.strongDependencies }),
 		...(options.knownAttributeSpreads === undefined
 			? null
 			: { knownAttributeSpreads: options.knownAttributeSpreads }),

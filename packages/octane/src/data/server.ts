@@ -11,8 +11,20 @@ import {
 	type DataReply,
 	type DataRequest,
 	type Read,
+	type Transport,
 	type Write,
 } from './contracts.js';
+
+/** Serves HTTP requests, and the same contracts in process for a server render. */
+export interface DataServer {
+	(request: Request): Promise<Response>;
+	/**
+	 * A transport for a store that renders `request` on this server. Calls run
+	 * in process, under the context `request` authenticates, with the same
+	 * validation as a call over HTTP.
+	 */
+	transport(request: Request): Transport;
+}
 
 export interface DataCall {
 	readonly request: Request;
@@ -28,12 +40,13 @@ export interface DataHandler {
 	readonly run: (input: any, call: any) => unknown;
 }
 
-export function handle<I, O, C = {}>(
+/** Pair a contract with the function that serves it; `call` carries the request's context. */
+export type Handle<C> = <I, O>(
 	contract: Read<I, O> | Write<I, O>,
 	run: (input: I, call: C & DataCall) => O | Promise<O>,
-): DataHandler {
-	return { contract, run };
-}
+) => DataHandler;
+
+const handle: Handle<any> = (contract, run) => ({ contract, run });
 
 /** A write may ask for at most this many reads back; the rest reload on their own. */
 const MAX_REFRESH = 8;
@@ -45,17 +58,21 @@ function respond(status: number, reply: DataReply): Response {
 	});
 }
 
+/**
+ * Options come first so the context type they produce types every handler:
+ * `createDataHandler({ context }, (handle) => [handle(books, (input, call) => …)])`.
+ */
 export function createDataHandler<C extends object = {}>(
-	handlers: readonly DataHandler[],
 	options: {
 		/** Authenticate the request and return what handlers need, such as the viewer. */
 		context?: (request: Request) => C | Promise<C>;
 		/** Origins other than the request's own that may call this endpoint. */
 		allowedOrigins?: readonly string[];
-	} = {},
-): (request: Request) => Promise<Response> {
+	},
+	define: (handle: Handle<C>) => readonly DataHandler[],
+): DataServer {
 	const byName = new Map<string, DataHandler>();
-	for (const handler of handlers) {
+	for (const handler of define(handle)) {
 		const { name } = handler.contract;
 		if (byName.has(name)) throw new Error(`octane/data: two handlers are named "${name}"`);
 		byName.set(name, handler);
@@ -75,7 +92,35 @@ export function createDataHandler<C extends object = {}>(
 		return contract.output ? parse(contract.output, output) : output;
 	}
 
-	return async (request) => {
+	/** Answer one request. Anything but a reply means the outcome is unknown. */
+	async function answer(payload: DataRequest, request: Request): Promise<DataReply> {
+		try {
+			const context = options.context ? await options.context(request) : ({} as C);
+			const call: C & DataCall = {
+				...context,
+				request,
+				signal: request.signal,
+				operationId: payload.kind === 'write' ? String(payload.operationId ?? '') : '',
+				read: (read, input) => run('read', read.name, input, call) as Promise<any>,
+			};
+			const value = await run(payload.kind, payload.name, payload.input, call);
+			if (payload.kind !== 'write' || !Array.isArray(payload.refresh)) return { ok: true, value };
+			// The write has committed. A read that fails here is left for the client to reload.
+			const refreshed = [];
+			for (const item of payload.refresh.slice(0, MAX_REFRESH)) {
+				try {
+					const fresh = await run('read', item.name, item.input, call);
+					refreshed.push({ name: item.name, input: item.input, value: fresh });
+				} catch {}
+			}
+			return { ok: true, value, refreshed };
+		} catch (error) {
+			if (!(error instanceof DataError)) throw error;
+			return { ok: false, code: error.code, data: error.data, issues: error.issues };
+		}
+	}
+
+	const serve = async (request: Request): Promise<Response> => {
 		const origin = request.headers.get('origin');
 		if (
 			request.method !== 'POST' ||
@@ -86,35 +131,17 @@ export function createDataHandler<C extends object = {}>(
 			return respond(403, { ok: false, code: 'forbidden' });
 		}
 		try {
-			const payload = devalue.parse(await request.text()) as DataRequest;
-			const context = options.context ? await options.context(request) : ({} as C);
-			const call: C & DataCall = {
-				...context,
-				request,
-				signal: request.signal,
-				operationId: payload.kind === 'write' ? String(payload.operationId ?? '') : '',
-				read: (read, input) => run('read', read.name, input, call) as Promise<any>,
-			};
-			const value = await run(payload.kind, payload.name, payload.input, call);
-			if (payload.kind !== 'write' || !Array.isArray(payload.refresh)) {
-				return respond(200, { ok: true, value });
-			}
-			// The write has committed. A read that fails here is left for the client to reload.
-			const refreshed = [];
-			for (const item of payload.refresh.slice(0, MAX_REFRESH)) {
-				try {
-					const fresh = await run('read', item.name, item.input, call);
-					refreshed.push({ name: item.name, input: item.input, value: fresh });
-				} catch {}
-			}
-			return respond(200, { ok: true, value, refreshed });
-		} catch (error) {
-			if (error instanceof DataError) {
-				const { code, data, issues } = error;
-				return respond(code === 'invalid' ? 400 : 422, { ok: false, code, data, issues });
-			}
+			// A refusal is an answer, not a transport failure: browsers log every 4xx fetch.
+			return respond(200, await answer(devalue.parse(await request.text()), request));
+		} catch {
 			// Not a reply: the client must not read an unexpected failure as a refusal.
 			return new Response(null, { status: 500 });
 		}
 	};
+	return Object.assign(serve, {
+		transport:
+			(request: Request): Transport =>
+			(payload) =>
+				answer(payload, request),
+	});
 }

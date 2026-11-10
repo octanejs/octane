@@ -459,6 +459,7 @@ Two codes report what it finds, and both are errors:
 | --- | --- | --- |
 | [`OCTANE_STRONG_COVERAGE_REGRESSION`](https://octanejs.dev/docs/strong-mode#octane-strong-coverage-regression) | `octane analyze` with an `octane-strong-baseline.json`: a module compiles without Strong mode and is not listed. It is new, or it lost its directive or moved out of `compiler.strong`'s reach. | Add `"use strong"` before its imports, or enable `compiler.strong`, and fix what Strong then reports. |
 | [`OCTANE_STRONG_COVERAGE_STALE`](https://octanejs.dev/docs/strong-mode#octane-strong-coverage-stale) | A module listed in `octane-strong-baseline.json` is now Strong, no longer exists, or is no longer compiled by Octane. A stale name would let that module leave Strong mode again unnoticed. | Run `octane analyze --strong-baseline update`. |
+| [`OCTANE_STRONG_DEPENDENCY`](https://octanejs.dev/docs/strong-mode#octane-strong-dependency) | With `compiler.strongDependencies.require`, an application import reaches a module in another Octane package that compiles without Strong mode, directly, through re-exports, or behind that package's own Strong modules, or it reaches an `octane/react` (ReactCompat) boundary. The build fails at the import, and `octane analyze` reports the same error. | Make the package Strong and declare it with `"octane": { "strong": true }` or a list of its Strong paths in its package.json, or name the package (or `"octane/react"`) in `compiler.strongDependencies.allow`. |
 <!-- strong-diagnostics:coverage:end -->
 
 `update` only ever removes names, and `init` refuses to overwrite an existing
@@ -500,6 +501,36 @@ Octane, and is not Strong. It also lists the modules on those paths that import
 Octane rule reaches. Packages that Octane does not compile are left out. Import
 aliases and virtual modules from a bundler config are not followed.
 
-The report never fails the run, `--strict` included. The plan for letting
-packages declare Strong mode and letting applications require it is in
+The report never fails the run, `--strict` included.
+
+A package declares Strong mode in its own package.json. `true` covers every
+module of the package that Octane compiles, and a list covers those paths only,
+so a package can keep a compatibility entry beside its Strong modules:
+
+```json
+{ "octane": { "strong": ["src"] } }
+```
+
+The consuming application compiles the declared modules under Strong, so a
+false claim fails the consumer's build at the offending line.
+
+An application requires Strong dependencies in `octane.config.ts`:
+
+```ts
+export default {
+	compiler: {
+		strong: true,
+		strongDependencies: { require: true, allow: [] },
+	},
+};
+```
+
+With `require`, which needs `strong: true`, every application module is walked
+as the report walks it. Reaching a module in another package that is not
+Strong, or an `octane/react` boundary, fails the build at the import with
+`OCTANE_STRONG_DEPENDENCY`, unless `allow` names the package or
+`"octane/react"`. A Strong module inside a package counts as Strong only as
+far as its own imports do, so a declared package's Strong module that renders a
+compatibility module of the same package is rejected too. `octane analyze`
+reports the same errors. The design is in
 [docs/strong-dependencies-plan.md](strong-dependencies-plan.md).

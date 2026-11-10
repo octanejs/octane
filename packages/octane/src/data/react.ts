@@ -23,9 +23,11 @@ export function useDataStore(): DataStore {
 }
 
 /** Observe a read without suspending. The component mounts and unmounts the observation. */
-export function useReadState<I, O>(read: Read<I, O>, input: I): ReadSnapshot<O> {
+export function useReadState<O>(read: Read<void, O>): ReadSnapshot<O>;
+export function useReadState<I, O>(read: Read<I, O>, input: I): ReadSnapshot<O>;
+export function useReadState<I, O>(read: Read<I, O>, input?: I): ReadSnapshot<O> {
 	// Equal inputs resolve to one handle, so its methods are stable across renders.
-	const handle = useDataStore().read(read, input);
+	const handle = useDataStore().read(read, input as I);
 	return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot);
 }
 
@@ -34,12 +36,14 @@ export function useReadState<I, O>(read: Read<I, O>, input: I): ReadSnapshot<O> 
  * arrives and throwing a failed first load to the nearest error boundary.
  * Later reloads keep the last value on screen.
  */
-export function useRead<I, O>(read: Read<I, O>, input: I): O {
+export function useRead<O>(read: Read<void, O>): O;
+export function useRead<I, O>(read: Read<I, O>, input: I): O;
+export function useRead<I, O>(read: Read<I, O>, input?: I): O {
 	const store = useDataStore();
-	const snapshot = useReadState(read, input);
+	const snapshot = useReadState(read, input as I);
 	if (snapshot.status === 'error') throw snapshot.error;
 	// The load in flight is one promise for every caller, as `use` requires.
-	if (snapshot.status === 'pending') use(store.prefetch(read, input));
+	if (snapshot.status === 'pending') use(store.prefetch(read, input as I));
 	return snapshot.value as O;
 }
 

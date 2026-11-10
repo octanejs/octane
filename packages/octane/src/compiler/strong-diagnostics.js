@@ -502,6 +502,15 @@ export const STRONG_DIAGNOSTICS = [
 			'A module listed in `octane-strong-baseline.json` is now Strong, no longer exists, or is no longer compiled by Octane. A stale name would let that module leave Strong mode again unnoticed.',
 		replacement: 'Run `octane analyze --strong-baseline update`.',
 	},
+	{
+		code: 'OCTANE_STRONG_DEPENDENCY',
+		section: 'coverage',
+		severity: 'error',
+		detects:
+			"With `compiler.strongDependencies.require`, an application import reaches a module in another Octane package that compiles without Strong mode, directly, through re-exports, or behind that package's own Strong modules, or it reaches an `octane/react` (ReactCompat) boundary. The build fails at the import, and `octane analyze` reports the same error.",
+		replacement:
+			'Make the package Strong and declare it with `"octane": { "strong": true }` or a list of its Strong paths in its package.json, or name the package (or `"octane/react"`) in `compiler.strongDependencies.allow`.',
+	},
 ];
 
 /** @type {readonly StrongRecipe[]} */
