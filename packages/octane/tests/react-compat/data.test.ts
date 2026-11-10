@@ -116,12 +116,13 @@ describe('octane/data/octane writes in a transition', () => {
 		const container = await page.mount();
 		expect(text(container, '[data-transition-toggle]')).toBe('Idle');
 
-		await run(() =>
-			container.querySelector<HTMLButtonElement>('[data-transition-toggle]')!.click(),
-		);
-		// The optimistic edit is not held back by the transition.
+		// Outside act: urgent work flushes in a microtask, transition work waits for a task.
+		container.querySelector<HTMLButtonElement>('[data-transition-toggle]')!.click();
+		for (let turn = 0; turn < 5; turn++) await Promise.resolve();
+		// The optimistic edit is urgent, as useOptimistic's is: the transition does not hold it.
 		expect(text(container, '[data-octane-done]')).toBe('1');
 		expect(text(container, '[data-octane-toggle]')).toBe('Mark active');
+		await run(() => {});
 		expect(text(container, '[data-transition-toggle]')).toBe('Saving');
 
 		await run(writes.release);

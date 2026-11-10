@@ -2,7 +2,7 @@
 // Relative, like the package's other entries, so the built entry resolves the
 // same runtime module rather than the package's own source export.
 import { createContext, createElement, use, useCallback, useSyncExternalStore } from '../index.js';
-import { enableNativeReadCollection } from '../runtime.js';
+import { enableNativeReadCollection, runUrgent } from '../runtime.js';
 import { reportNativeRead, type NativeReadSource } from '../signals/read-protocol.js';
 import { createOctaneDataBinding } from './octane-binding.js';
 import type { ReadHandle } from './store.js';
@@ -18,6 +18,8 @@ interface Observed {
 }
 const observed = new WeakMap<ReadHandle<unknown>, Observed>();
 
+const call = (fn: () => void) => fn();
+
 /** A store read as a native read source: its version moves when its snapshot does. */
 function observe(handle: ReadHandle<unknown>): void {
 	let entry = observed.get(handle);
@@ -32,7 +34,9 @@ function observe(handle: ReadHandle<unknown>): void {
 					}
 					return created.version;
 				},
-				subscribe: (notify) => handle.subscribe(notify),
+				// A store change is urgent, as useSyncExternalStore's is: a write's
+				// optimistic edit must not wait for the transition that made it.
+				subscribe: (notify) => handle.subscribe(() => runUrgent(call, notify)),
 			},
 			last: handle.getSnapshot(),
 			version: 0,
