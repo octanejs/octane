@@ -28,12 +28,13 @@ export interface DataHandler {
 	readonly run: (input: any, call: any) => unknown;
 }
 
-export function handle<I, O, C = {}>(
+/** Pair a contract with the function that serves it; `call` carries the request's context. */
+export type Handle<C> = <I, O>(
 	contract: Read<I, O> | Write<I, O>,
 	run: (input: I, call: C & DataCall) => O | Promise<O>,
-): DataHandler {
-	return { contract, run };
-}
+) => DataHandler;
+
+const handle: Handle<any> = (contract, run) => ({ contract, run });
 
 /** A write may ask for at most this many reads back; the rest reload on their own. */
 const MAX_REFRESH = 8;
@@ -45,17 +46,21 @@ function respond(status: number, reply: DataReply): Response {
 	});
 }
 
+/**
+ * Options come first so the context type they produce types every handler:
+ * `createDataHandler({ context }, (handle) => [handle(books, (input, call) => …)])`.
+ */
 export function createDataHandler<C extends object = {}>(
-	handlers: readonly DataHandler[],
 	options: {
 		/** Authenticate the request and return what handlers need, such as the viewer. */
 		context?: (request: Request) => C | Promise<C>;
 		/** Origins other than the request's own that may call this endpoint. */
 		allowedOrigins?: readonly string[];
-	} = {},
+	},
+	define: (handle: Handle<C>) => readonly DataHandler[],
 ): (request: Request) => Promise<Response> {
 	const byName = new Map<string, DataHandler>();
-	for (const handler of handlers) {
+	for (const handler of define(handle)) {
 		const { name } = handler.contract;
 		if (byName.has(name)) throw new Error(`octane/data: two handlers are named "${name}"`);
 		byName.set(name, handler);
@@ -111,7 +116,8 @@ export function createDataHandler<C extends object = {}>(
 		} catch (error) {
 			if (error instanceof DataError) {
 				const { code, data, issues } = error;
-				return respond(code === 'invalid' ? 400 : 422, { ok: false, code, data, issues });
+				// A refusal is an answer, not a transport failure: browsers log every 4xx fetch.
+				return respond(200, { ok: false, code, data, issues });
 			}
 			// Not a reply: the client must not read an unexpected failure as a refusal.
 			return new Response(null, { status: 500 });
