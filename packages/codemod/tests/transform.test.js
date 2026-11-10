@@ -96,6 +96,65 @@ export function View({ Mark }) { return <>
 		).toEqual(['<Choice></Choice>', '<ReactCompat><Raw/></ReactCompat>']);
 	});
 
+	it('reports SVG fallback values used as tags and skips values used only as tests', () => {
+		const source = `import Mark from './mark.svg';
+const Nullish = custom ?? Mark;
+const First = Mark ?? other;
+const Fallback = custom || Mark;
+const Preferred = Mark || other;
+const Conditional = enabled && Mark;
+const Guard = Mark && OtherIcon;
+const Branch = Mark ? OtherIcon : AnotherIcon;
+export function Choices() { return <>
+  <Nullish/>
+  <First/>
+  <Fallback/>
+  <Preferred/>
+  <Conditional/>
+  <Guard/>
+  <Branch/>
+</>; }
+export function Slot({ Icon: DefaultIcon = Mark }) { return <DefaultIcon/>; }
+export function render(Icon = Mark) { return <Icon/>; }
+export function Separate({Icon = Mark}) { function Child(Icon) { return <Icon/>; } return <Child/>; }`;
+		const { notes } = transformModule(source, 'view.tsx');
+		const lines = source.split('\n');
+		expect(
+			notes.filter((n) => n.rule === 'svg-issuer').map((n) => lines[n.line - 1].trim()),
+		).toEqual([
+			'<Nullish/>',
+			'<First/>',
+			'<Fallback/>',
+			'<Preferred/>',
+			'<Conditional/>',
+			'export function Slot({ Icon: DefaultIcon = Mark }) { return <DefaultIcon/>; }',
+			'export function render(Icon = Mark) { return <Icon/>; }',
+		]);
+	});
+
+	it('only reports reachable SVG operands in logical tag choices', () => {
+		const choices = [
+			["'button' || Mark", false],
+			['(false && Mark) || Good', false],
+			['(() => <span/>) ?? Mark', false],
+			['false ?? Mark', false],
+			['prop ?? Mark', true],
+			['read() || Mark', true],
+			['null ?? Mark', true],
+			["'' || Mark", true],
+			['true && Mark', true],
+		];
+		for (const [choice, reachable] of choices) {
+			const source = `import Mark from './mark.svg';
+				export function View({prop, read, Good}) { const Tag = ${choice}; return <Tag/>; }`;
+			const { notes } = transformModule(source, 'view.tsx');
+			expect(
+				notes.some((n) => n.rule === 'svg-issuer'),
+				choice,
+			).toBe(reachable);
+		}
+	});
+
 	for (const input of INPUTS) {
 		it(`migrates ${input} to source the compiler accepts`, async () => {
 			const { result, output } = migrate(input);

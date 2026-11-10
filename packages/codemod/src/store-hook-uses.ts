@@ -1,4 +1,5 @@
 import { localUses, portableArguments, scalar } from './local-uses.js';
+import { skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
 
 type SharedInput = (module: string, name: string) => boolean;
@@ -33,6 +34,24 @@ function literalOptions(value: ts.Expression): boolean {
 	return literal(value);
 }
 
+/** The short-circuit behavior of a literal operand, independent of project types. */
+function literalCondition(expr: ts.Expression) {
+	const value = skipWrappers(expr);
+	if (value.kind === ts.SyntaxKind.NullKeyword || ts.isVoidExpression(value)) return 'nullish';
+	if (ts.isStringLiteralLike(value)) return value.text.length ? 'truthy' : 'falsy';
+	if (ts.isNumericLiteral(value)) return Number(value.text) ? 'truthy' : 'falsy';
+	if (value.kind === ts.SyntaxKind.FalseKeyword) return 'falsy';
+	if (
+		value.kind === ts.SyntaxKind.TrueKeyword ||
+		ts.isArrowFunction(value) ||
+		ts.isFunctionExpression(value) ||
+		ts.isClassExpression(value) ||
+		ts.isArrayLiteralExpression(value) ||
+		ts.isObjectLiteralExpression(value)
+	)
+		return 'truthy';
+}
+
 /** Bare SVG default imports can switch from a component to an asset URL for a .tsrx issuer. */
 export function isBareSvgTag(
 	tag: ts.JsxTagNameExpression,
@@ -41,22 +60,39 @@ export function isBareSvgTag(
 ): boolean {
 	if (!ts.isIdentifier(tag) || /^[a-z]|-/.test(tag.text)) return false;
 	const seen = new Set<ts.Symbol>();
-	function fromSvg(value: ts.Node): boolean {
-		if (
-			ts.isParenthesizedExpression(value) ||
-			ts.isAsExpression(value) ||
-			ts.isSatisfiesExpression(value) ||
-			ts.isNonNullExpression(value)
-		)
-			return fromSvg(value.expression);
+	function fromSvg(value: ts.Expression): boolean {
+		value = skipWrappers(value);
 		if (ts.isConditionalExpression(value))
 			return fromSvg(value.whenTrue) || fromSvg(value.whenFalse);
+		if (ts.isBinaryExpression(value)) {
+			const op = value.operatorToken.kind;
+			const left = literalCondition(value.left);
+			// A component or asset URL is truthy; the left side of && only tests it.
+			if (op === ts.SyntaxKind.AmpersandAmpersandToken)
+				return (left === undefined || left === 'truthy') && fromSvg(value.right);
+			if (op === ts.SyntaxKind.BarBarToken)
+				return fromSvg(value.left) || (left !== 'truthy' && fromSvg(value.right));
+			if (op === ts.SyntaxKind.QuestionQuestionToken)
+				return (
+					fromSvg(value.left) ||
+					((left === undefined || left === 'nullish') && fromSvg(value.right))
+				);
+		}
 		if (!ts.isIdentifier(value)) return false;
 		const symbol = checker.getSymbolAtLocation(value);
 		if (!symbol || seen.has(symbol)) return false;
 		seen.add(symbol);
 		const d = symbol.declarations?.[0];
 		if (!d) return false;
+		if (
+			(ts.isParameter(d) ||
+				(ts.isBindingElement(d) &&
+					ts.isObjectBindingPattern(d.parent) &&
+					ts.isParameter(d.parent.parent))) &&
+			ts.isIdentifier(d.name) &&
+			d.initializer
+		)
+			return fromSvg(d.initializer);
 		if (
 			ts.isVariableDeclaration(d) &&
 			d.initializer &&
