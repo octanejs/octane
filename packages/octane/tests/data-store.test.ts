@@ -284,8 +284,8 @@ describe('octane/data store', () => {
 		// Retention ends, the entry is dropped, and observing it again starts a clean load.
 		await new Promise((resolve) => setTimeout(resolve, 20));
 		list.subscribe(() => {});
-		await vi.waitFor(() => expect(list.getSnapshot().refreshing).toBe(false));
-		expect(list.getSnapshot()).toMatchObject({ status: 'ready', error: undefined });
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+		expect(list.getSnapshot().error).toBeUndefined();
 	});
 
 	it('stops showing a value to a mounted reader once it expires', async () => {
@@ -308,6 +308,55 @@ describe('octane/data store', () => {
 		} finally {
 			vi.useRealTimers();
 		}
+	});
+
+	it('reloads for the next reader after a value expired or was evicted unobserved', async () => {
+		const server = createServer();
+		const store = createDataStore({ transport: server.transport });
+		const options = { ...todos, fresh: 10_000 };
+		const cases = [
+			read({ ...options, name: 'todos.list', expire: 10 } as any) as typeof todos,
+			read({ ...options, name: 'todos.list', keep: 5, expire: 30 } as any) as typeof todos,
+		];
+		for (const [index, contract] of cases.entries()) {
+			const list = store.read(contract, { case: index } as any);
+			await store.prefetch(contract, { case: index } as any);
+			expect(list.getSnapshot().status).toBe('ready');
+			server.log.length = 0;
+
+			await new Promise((resolve) => setTimeout(resolve, 40));
+			expect(list.getSnapshot().value).toBeUndefined();
+			list.subscribe(() => {});
+			await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+			expect(server.log).toContain('list');
+		}
+	});
+
+	it('restarts a first load that may predate a write which only names tags', async () => {
+		const server = createServer();
+		const reindex = write({
+			name: 'todos.setDone',
+			input: { '~standard': { version: 1, vendor: 'test', validate: (value) => ({ value }) } },
+			invalidates: ['todo'],
+		});
+		const releases: Array<() => void> = [];
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				const reply = await server.transport(request, signal);
+				if (request.kind === 'read') await new Promise<void>((resolve) => releases.push(resolve));
+				return reply;
+			},
+		});
+		const list = store.read(todos, undefined);
+		list.subscribe(() => {});
+		await vi.waitFor(() => expect(releases).toHaveLength(1));
+
+		// The first load read `done: false`; the write lands before that reply is delivered.
+		await store.write(reindex, { id: 'a', done: true });
+		await vi.waitFor(() => expect(releases).toHaveLength(2));
+		for (const release of releases) release();
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+		expect(list.getSnapshot().value![0].done).toBe(true);
 	});
 
 	it('does not restart an unrelated first load when a write confirms', async () => {

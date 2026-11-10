@@ -231,13 +231,23 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 		for (const entry of entries.values()) if (entry.read.entities) touch(entry);
 	}
 
+	/** Drop the confirmed value, so every later reader loads a new one. */
+	function forget(entry: Entry): void {
+		clearTimeout(entry.expireTimer);
+		entry.base = undefined;
+		entry.hasBase = false;
+		entry.names = new Set();
+		entry.snapshot = null;
+	}
+
 	/** Start the retention clock for an entry nothing observes. */
 	function idle(entry: Entry): void {
 		// A load in flight is demand: retention starts when it lands.
 		if (entry.subscribers.size > 0 || entry.inflight || entry.keepTimer !== undefined) return;
 		entry.keepTimer = setTimeout(() => {
 			entry.keepTimer = undefined;
-			clearTimeout(entry.expireTimer);
+			// A handle outlives its entry; an evicted one must not show what it once held.
+			forget(entry);
 			entries.delete(entry.key);
 			collect();
 		}, entry.read.keep);
@@ -268,8 +278,9 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 		clearTimeout(entry.expireTimer);
 		if (entry.read.expire < 2 ** 31) {
 			entry.expireTimer = setTimeout(() => {
-				if (entry.subscribers.size > 0) invalidateEntry(entry);
-				else touch(entry);
+				forget(entry);
+				if (entry.subscribers.size > 0) void load(entry);
+				touch(entry);
 			}, entry.read.expire);
 		}
 		collect();
@@ -420,9 +431,9 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 		}
 		const tags = writeTags(operation.write);
 		for (const entry of entries.values()) {
-			// A first load of a read that selects entities has no value to compare yet and may
-			// predate the write. Reads that select none are untouched unless a tag names them.
-			const unknown = !entry.hasBase && operation.write.effect && entry.read.entities;
+			// A first load of a read that selects entities has no value yet to say which ones,
+			// and may predate the write. Reads that select none are untouched unless a tag names them.
+			const unknown = !entry.hasBase && entry.read.entities && tags.length > 0;
 			if (!refreshed.has(entry) && (unknown || affects(entry, tags))) invalidateEntry(entry);
 		}
 		if (!operation.write.effect) operations = operations.filter((item) => item !== operation);
