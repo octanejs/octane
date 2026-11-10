@@ -6,7 +6,7 @@
   "description": "One set of octane/data contracts and one server, rendered by an Octane page, a React page, and an Octane page hosting a React island.",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5239 --strictPort",
-    "build": "vite build",
+    "build": "vite build && vite build --ssr src/server/index.ts --outDir dist/server",
     "preview": "vite preview --host 127.0.0.1 --port 5239 --strictPort",
     "typecheck": "octane-tsc -p tsconfig.json",
     "test:e2e": "pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",

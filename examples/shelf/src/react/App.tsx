@@ -1,11 +1,11 @@
 /** @jsxImportSource react */
 import { Suspense, useState, useSyncExternalStore, Component, type ReactNode } from 'react';
-import { DataProvider, useRead, useReadState } from 'octane/data/react';
+import { DataProvider, useRead } from 'octane/data/react';
 import { addBook, books, removeBook, setRead, stats } from '../shared/contracts.ts';
 import {
 	ACCOUNTS,
 	checkSaved,
-	namespaceFromLocation,
+	namespaceFrom,
 	openSession,
 	outcomeText,
 	submit,
@@ -17,11 +17,12 @@ function useExternal<T>(value: ExternalValue<T>): T {
 	return useSyncExternalStore(value.subscribe, value.get, value.get);
 }
 
+/** Suspends, so a server render waits for the counts and the page arrives with them. */
 function Stats() {
-	const state = useReadState(stats);
+	const counts = useRead(stats);
 	return (
 		<p className="stats" aria-live="polite">
-			{state.value ? `${state.value.total} books · ${state.value.read} read` : 'Counting…'}
+			{`${counts.total} books · ${counts.read} read`}
 		</p>
 	);
 }
@@ -154,7 +155,9 @@ class LoadError extends Component<{ children: ReactNode }, { error: Error | null
 function ShelfBody({ session }: { session: Session }) {
 	return (
 		<DataProvider store={session.store}>
-			<Stats />
+			<Suspense fallback={<p className="stats">Counting…</p>}>
+				<Stats />
+			</Suspense>
 			<AddForm session={session} />
 			<Outcome session={session} />
 			<LoadError>
@@ -170,8 +173,9 @@ function ShelfBody({ session }: { session: Session }) {
 	);
 }
 
-export function App() {
-	const [session, setSession] = useState(() => openSession('ada', namespaceFromLocation()));
+/** `session` is the first account's; a server render passes one around its own store. */
+export function App(props: { session: Session }) {
+	const [session, setSession] = useState(props.session);
 	return (
 		<main className="shelf">
 			<header>
@@ -185,7 +189,7 @@ export function App() {
 							onClick={() => {
 								if (session.account === account) return;
 								// The old account's store is retired: its values clear and late replies are ignored.
-								setSession(openSession(account, namespaceFromLocation()));
+								setSession(openSession(account, namespaceFrom(location.search)));
 								session.store.retire();
 							}}
 						>

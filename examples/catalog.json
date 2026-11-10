@@ -1024,21 +1024,30 @@
       "directory": "examples/shelf",
       "id": "shelf",
       "title": "Shelf",
-      "summary": "One set of octane/data contracts and one server, rendered by an Octane page, a React page, and an Octane page hosting a React island that shares its store.",
+      "summary": "One set of octane/data contracts and one server: server-rendered Octane and React pages that hydrate from the server's data, and an Octane page hosting a React island that shares its store.",
       "status": "experimental",
       "host": "mixed",
-      "renderModes": ["client"],
+      "renderModes": ["client", "ssr", "hydration"],
       "dialects": ["tsrx", "tsx"],
       "bindings": [],
       "octaneFeatures": [
         "data-contracts",
+        "hydration",
         "optimistic-updates",
         "react-compat",
+        "ssr",
         "suspense",
         "tsrx-control-flow"
       ],
       "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
       "journeys": [
+        {
+          "id": "server-render-hydration",
+          "title": "Arrive server-rendered, readable without JavaScript, and hydrate from the server's data without loading it again",
+          "kind": "ssr-hydration",
+          "spec": "e2e/shelf.spec.ts",
+          "critical": true
+        },
         {
           "id": "single-round-trip-edit",
           "title": "Show an edit before its reply, then settle it with the affected reads returned in the same response",

@@ -1,38 +1,50 @@
 // Three pages share one set of data contracts and one server. Octane owns every
 // .tsrx file; React owns the .tsx files, which carry a React JSX pragma.
-import { fileURLToPath } from 'node:url';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { createServer, defineConfig, type Plugin, type ViteDevServer } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { octane } from 'octane/compiler/vite';
+import type { createShelfServer, Page } from './src/server/index.ts';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 
+type ShelfServer = ReturnType<typeof createShelfServer>;
+
+/** Server-rendered pages. The mixed page is rendered in the browser only. */
+const PAGES: Record<string, { page: Page; file: string }> = {
+	'/': { page: 'octane', file: 'index.html' },
+	'/index.html': { page: 'octane', file: 'index.html' },
+	'/react.html': { page: 'react', file: 'react.html' },
+};
+
 /**
- * Serve the data handler at /data from the dev and preview servers. The
- * handler and `octane/data` are TypeScript source, so Vite's SSR loader runs
- * them: the dev server's own, or a private one for preview.
+ * Serve /data and render the Octane and React pages, from the dev server (the
+ * source, through Vite's SSR loader) and the preview server (the build).
  */
 function shelfServer(): Plugin {
-	let handler: Promise<(request: Request) => Promise<Response>> | undefined;
-	const load = (vite: ViteDevServer) =>
-		(handler ??= vite
-			.ssrLoadModule('/src/shared/server.ts')
-			.then((module) => module.createShelfHandler()));
-
-	const serve =
-		(vite: () => Promise<ViteDevServer>) =>
+	const middleware =
+		(load: () => Promise<ShelfServer>, template: (file: string, url: URL) => Promise<string>) =>
 		async (request: IncomingMessage, response: ServerResponse, next: () => void) => {
-			if (request.url !== '/data') return next();
+			const url = new URL(request.url!, `http://${request.headers.host}`);
+			const route = request.method === 'GET' ? PAGES[url.pathname] : undefined;
+			if (url.pathname !== '/data' && !route) return next();
+			const server = await load();
+			if (route) {
+				const html = await server.render(route.page, url, await template(route.file, url));
+				response.setHeader('content-type', 'text/html');
+				response.end(html);
+				return;
+			}
 			const chunks: Buffer[] = [];
 			for await (const chunk of request) chunks.push(chunk as Buffer);
 			const headers = new Headers();
 			for (const [name, value] of Object.entries(request.headers)) {
 				if (typeof value === 'string') headers.set(name, value);
 			}
-			const handle: (request: Request) => Promise<Response> = await load(await vite());
-			const reply = await handle(
-				new Request(`http://${request.headers.host}${request.url}`, {
+			const reply = await server.data(
+				new Request(url, {
 					method: request.method,
 					headers,
 					body: request.method === 'POST' ? Buffer.concat(chunks) : undefined,
@@ -44,23 +56,25 @@ function shelfServer(): Plugin {
 		};
 
 	return {
-		name: 'shelf:data-server',
-		configureServer(server) {
-			server.middlewares.use(serve(async () => server));
+		name: 'shelf:server',
+		configureServer(vite) {
+			// One server, and its data, per evaluation of the server module.
+			let current: { module: object; server: ShelfServer } | undefined;
+			const load = async () => {
+				const module = await vite.ssrLoadModule('/src/server/index.ts');
+				if (current?.module !== module) current = { module, server: module.createShelfServer() };
+				return current.server;
+			};
+			const template = async (file: string, url: URL) =>
+				vite.transformIndexHtml(url.pathname + url.search, await readFile(root + file, 'utf8'));
+			vite.middlewares.use(middleware(load, template));
 		},
-		configurePreviewServer(server) {
-			let loader: Promise<ViteDevServer> | undefined;
-			server.middlewares.use(
-				serve(
-					() =>
-						(loader ??= createServer({
-							root,
-							configFile: false,
-							appType: 'custom',
-							server: { middlewareMode: true, hmr: false },
-						})),
-				),
-			);
+		configurePreviewServer(preview) {
+			const server: Promise<ShelfServer> = import(
+				pathToFileURL(`${root}dist/server/index.js`).href
+			).then((module) => module.createShelfServer());
+			const template = (file: string) => readFile(`${root}dist/${file}`, 'utf8');
+			preview.middlewares.use(middleware(() => server, template));
 		},
 	};
 }

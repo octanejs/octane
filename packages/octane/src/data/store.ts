@@ -13,7 +13,11 @@
  * - Every optimistic edit is an absolute patch, an insert by ID or a delete by
  *   ID. Applying one to a value that already includes it changes nothing, so an
  *   edit can be replayed over any newer value without counting twice.
+ * - A seed from a server render is adopted when its read is first asked for,
+ *   so hydration finds the server's value without waiting or loading. It keeps
+ *   its age: freshness and expiry count from when the server loaded it.
  */
+import * as devalue from 'devalue';
 import {
 	DataError,
 	parse,
@@ -75,6 +79,26 @@ export interface DataStore {
 	 * that has not yet received its replacement, shows nothing instead of failing.
 	 */
 	retire(): void;
+	/**
+	 * The confirmed values loaded so far, for a client store to start from.
+	 * The text is safe inside `<script type="application/json">`. On a server,
+	 * call it once the render is complete, then `retire()` the request's store.
+	 */
+	dehydrate(): string;
+}
+
+export interface DataStoreOptions {
+	readonly transport: Transport;
+	/** A server store's `dehydrate()` output. */
+	readonly seed?: string | null | undefined;
+}
+
+interface SeedEntry {
+	readonly name: string;
+	readonly input: unknown;
+	readonly value: unknown;
+	/** Milliseconds since the server loaded the value; clocks are not compared. */
+	readonly age: number;
 }
 
 interface Entry {
@@ -141,6 +165,10 @@ function inputKey(value: unknown): string {
 	);
 }
 
+function entryKey(name: string, input: unknown): string {
+	return `${name}\n${inputKey(input)}`;
+}
+
 /** Copy-on-write replacement of the arrays and objects named in `replace`. */
 function rewrite(value: unknown, replace: Map<unknown, unknown>): unknown {
 	if (replace.has(value)) return replace.get(value);
@@ -162,9 +190,15 @@ function selections(read: Read<any, any>, value: unknown) {
 	return Array.isArray(selected) ? selected : [selected];
 }
 
-export function createDataStore(options: { transport: Transport }): DataStore {
+export function createDataStore(options: DataStoreOptions): DataStore {
 	const { transport } = options;
 	const entries = new Map<string, Entry>();
+	const seeds = new Map<string, SeedEntry>();
+	if (options.seed) {
+		for (const seed of devalue.parse(options.seed) as SeedEntry[]) {
+			seeds.set(entryKey(seed.name, seed.input), seed);
+		}
+	}
 	const queues = new Map<string, Promise<unknown>>();
 	let operations: Operation[] = [];
 	let sequence = 0;
@@ -278,11 +312,11 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 		});
 	}
 
-	function adopt(entry: Entry, value: unknown, startedSeq: number): void {
+	function adopt(entry: Entry, value: unknown, startedSeq: number, age = 0): void {
 		entry.base = value;
 		entry.hasBase = true;
 		entry.names = new Set(selections(entry.read, value).map(({ entity }) => entity.name));
-		entry.fetchedAt = Date.now();
+		entry.fetchedAt = Date.now() - age;
 		entry.baseSeq = startedSeq;
 		entry.stale = false;
 		entry.served = entry.subscribers.size > 0;
@@ -294,9 +328,27 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 				forget(entry);
 				if (entry.subscribers.size > 0) void load(entry);
 				touch(entry);
-			}, entry.read.expire);
+			}, entry.read.expire - age);
 		}
 		collect();
+	}
+
+	/**
+	 * Start an entry from the server's value. Hydration is synchronous, so a
+	 * validator that answers asynchronously, or rejects, leaves an ordinary load.
+	 */
+	function adoptSeed(entry: Entry): void {
+		const seed = seeds.get(entry.key);
+		if (!seed) return;
+		seeds.delete(entry.key);
+		if (seed.age >= entry.read.expire) return;
+		let value: unknown;
+		try {
+			value = parse(entry.read.output, seed.value);
+		} catch {
+			return;
+		}
+		if (!(value instanceof Promise)) adopt(entry, value, 0, seed.age);
 	}
 
 	/** A transport that throws synchronously still reports through the promise. */
@@ -362,7 +414,7 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 	}
 
 	function entryFor(read: Read<any, any>, input: unknown): Entry {
-		const key = `${read.name}\n${inputKey(input)}`;
+		const key = entryKey(read.name, input);
 		let entry = entries.get(key);
 		if (entry) return entry;
 		const created: Entry = {
@@ -410,6 +462,7 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 			snapshot: null,
 		};
 		entries.set(key, created);
+		adoptSeed(created);
 		idle(created);
 		return created;
 	}
@@ -420,7 +473,7 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 		operation.settledSeq = ++sequence;
 		const refreshed = new Set<Entry>();
 		for (const item of reply?.refreshed ?? []) {
-			const entry = entries.get(`${item.name}\n${inputKey(item.input)}`);
+			const entry = entries.get(entryKey(item.name, item.input));
 			if (!entry) continue;
 			refreshed.add(entry);
 			// The refreshed value was read after the write, so it supersedes any load in flight.
@@ -570,11 +623,23 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 				remove(operation);
 			}
 		},
+		dehydrate() {
+			const now = Date.now();
+			const seed: SeedEntry[] = [];
+			for (const entry of entries.values()) {
+				const age = now - entry.fetchedAt;
+				if (!entry.hasBase || age >= entry.read.expire) continue;
+				seed.push({ name: entry.read.name, input: entry.input, value: entry.base, age });
+			}
+			// devalue escapes `<`, so the text cannot close the script element holding it.
+			return devalue.stringify(seed);
+		},
 		retire() {
 			if (retired) return;
 			retired = true;
 			operations = [];
 			queues.clear();
+			seeds.clear();
 			for (const entry of entries.values()) {
 				entry.abort?.abort();
 				clearTimeout(entry.keepTimer);

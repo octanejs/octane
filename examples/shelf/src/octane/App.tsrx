@@ -1,11 +1,11 @@
 import { useState, useSyncExternalStore } from 'octane';
 import type { OctaneNode } from 'octane';
-import { DataProvider, useRead, useReadState } from 'octane/data/octane';
+import { DataProvider, useRead } from 'octane/data/octane';
 import { addBook, books, removeBook, setRead, stats } from '../shared/contracts.ts';
 import {
 	ACCOUNTS,
 	checkSaved,
-	namespaceFromLocation,
+	namespaceFrom,
 	openSession,
 	outcomeText,
 	submit,
@@ -17,15 +17,10 @@ function useExternal<T>(value: ExternalValue<T>): T {
 	return useSyncExternalStore(value.subscribe, value.get, value.get);
 }
 
+/** Suspends, so a server render waits for the counts and the page arrives with them. */
 function Stats() @{
-	const state = useReadState(stats);
-	<p class="stats" aria-live="polite">
-		{
-			(state.value
-				? `${state.value.total} books · ${state.value.read} read`
-				: 'Counting…') as string
-		}
-	</p>
+	const counts = useRead(stats);
+	<p class="stats" aria-live="polite">{`${counts.total} books · ${counts.read} read`}</p>
 }
 
 function BookList(props: { session: Session }) @{
@@ -135,7 +130,11 @@ function Network(props: { session: Session }) @{
 export function ShelfBody(props: { session: Session; children?: OctaneNode }) @{
 	const session = props.session;
 	<DataProvider store={session.store}>
-		<Stats />
+		@try {
+			<Stats />
+		} @pending {
+			<p class="stats">Counting…</p>
+		}
 		<AddForm session={session} />
 		<Outcome session={session} />
 		@try {
@@ -157,10 +156,12 @@ export function ShelfBody(props: { session: Session; children?: OctaneNode }) @{
 
 export function App(props: {
 	title: string;
+	/** The first account's session; a server render passes one around its own store. */
+	session: Session;
 	Island?: (props: { session: Session }) => OctaneNode;
 }) @{
 	const Island = props.Island;
-	const [session, setSession] = useState(() => openSession('ada', namespaceFromLocation()));
+	const [session, setSession] = useState(props.session);
 	<main class="shelf">
 		<header>
 			<h1>{props.title as string}</h1>
@@ -172,7 +173,7 @@ export function App(props: {
 						onClick={() => {
 							if (session.account === account) return;
 							// The old account's store is retired: its values clear and late replies are ignored.
-							setSession(openSession(account, namespaceFromLocation()));
+							setSession(openSession(account, namespaceFrom(location.search)));
 							session.store.retire();
 						}}
 					>

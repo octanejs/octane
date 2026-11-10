@@ -242,6 +242,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	'./data/server': ['createDataHandler'],
 	'./data/react': ['DataProvider', 'useRead', 'useReadState', 'useWrite'],
 	'./data/octane': ['DataProvider', 'useRead', 'useReadState', 'useWrite'],
+	'./data/octane/server': ['DataProvider', 'useRead', 'useReadState', 'useWrite'],
 	'./signals': [
 		'createResource',
 		'createScope',
