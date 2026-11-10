@@ -897,22 +897,28 @@ class ModuleTransform {
 				for (const ref of refs) pathSvgTags.add(ref);
 			}
 		}
-		const checkSvgIssuer =
-			this.nativeStoreHooks.size > 0 &&
-			[...this.imports.values()].some(
-				(entry) => entry.imported === 'default' && /\.svg$/i.test(entry.module),
-			);
+		const bareSvgImports = new Set<ts.Node>();
+		if (this.target === 'tsrx' && /\.(?:jsx?|tsx)$/.test(this.filename)) {
+			// An explicit loader, query, or fragment doesn't use the bare SVG convention.
+			const bare = /^#?[^!?#]*\.svg$/i;
+			for (const [declaration, entry] of this.imports) {
+				if (entry.typeOnly || entry.imported !== 'default' || !bare.test(entry.module)) continue;
+				const statement = ts.findAncestor(declaration, ts.isImportDeclaration);
+				if (!statement?.attributes && bare.test(this.resolve(entry.module) ?? entry.module))
+					bareSvgImports.add(declaration);
+			}
+		}
 		for (const field of fields) {
 			if (pathSvgTags.has(field.tagName)) this.count('svg-paths');
-			else if (checkSvgIssuer && isBareSvgTag(field.tagName, this.checker)) {
+			else if (bareSvgImports.size && isBareSvgTag(field.tagName, this.checker, bareSvgImports)) {
 				this.note(
-					'store-hook',
+					this.nativeStoreHooks.size ? 'store-hook' : 'svg-issuer',
 					'error',
 					field.tagName,
-					'This JSX tag can resolve to a bare SVG import. Loading the SVG from .tsrx can produce an asset URL. Render the SVG in a React-owned .tsx component through ReactCompat, or configure a native SVG loader for .tsrx.' +
+					'This JSX tag can resolve to a bare SVG import. Loading the SVG from .tsrx can produce an asset URL. Import and render the SVG in a React-owned .tsx component hosted by ReactCompat, or configure a native SVG loader for .tsrx.' +
 						(unknownSvgSlots.get(field.tagName) ?? '') +
 						(this.options.pathSvgAdapter
-							? ' To prepare a native component for manual integration, run --svg-paths on the SVG file and verify the receiving renderer.'
+							? ' For a supported path-only asset, run --svg-paths on the SVG file and verify the receiving renderer before using the native component.'
 							: ''),
 				);
 			}

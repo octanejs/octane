@@ -71,6 +71,31 @@ export const Local = ({ Shadowed }: { Shadowed: () => null }) => <Shadowed/>;`;
 		expect(result.code).toContain('ReactComponent as Glyph');
 	});
 
+	it('reports bare SVG component aliases at their JSX sites, including inside ReactCompat', () => {
+		const source = `import { ReactCompat } from 'octane/react';
+import Mark from './mark.svg';
+import { default as Raw, ReactComponent as Named } from './other.svg';
+import Explicit from './mark.svg?react';
+import Inline from '!!@svgr/webpack!./mark.svg';
+import Query from './mark.svg?fallback=.svg';
+import Replaced from './replaced.svg';
+import lower from './lower.svg';
+const Alias = (Mark satisfies unknown)!;
+const Choice = condition ? Fallback : Alias;
+export function View({ Mark }) { return <>
+  <Choice></Choice>
+  <ReactCompat><Raw/></ReactCompat>
+  <img src={Raw}/><Mark/><lower/><Named/><Explicit/><Inline/><Query/><Replaced/>
+</>; }`;
+		const result = transformModule(source, 'view.tsx', {
+			resolveSpecifier: (s) => (s === './replaced.svg' ? './replaced.tsrx' : null),
+		});
+		const lines = source.split('\n');
+		expect(
+			result.notes.filter((n) => n.rule === 'svg-issuer').map((n) => lines[n.line - 1].trim()),
+		).toEqual(['<Choice></Choice>', '<ReactCompat><Raw/></ReactCompat>']);
+	});
+
 	for (const input of INPUTS) {
 		it(`migrates ${input} to source the compiler accepts`, async () => {
 			const { result, output } = migrate(input);

@@ -58,6 +58,45 @@ function shape(element) {
 	];
 }
 
+it('reports an ordinary bare SVG component whose issuer changes to .tsrx', () => {
+	const { root, file, icon } = fixture();
+	fs.writeFileSync(
+		icon,
+		'<svg><defs><linearGradient id="g"/></defs><path fill="url(#g)" d="M0 0h1"/></svg>',
+	);
+	const bin = path.resolve(import.meta.dirname, '../dist/bin.js');
+	const preview = (...args) => {
+		const proc = spawnSync(process.execPath, [bin, '--dry-run', '--json', ...args, file], {
+			cwd: root,
+			encoding: 'utf8',
+		});
+		const result = JSON.parse(proc.stdout).files.find((f) => f.file === 'src/pane.tsx');
+		return { status: proc.status, result };
+	};
+	for (const flags of [[], ['--svg-paths']]) {
+		const { status, result } = preview('--strong', ...flags);
+		expect(status).toBe(1);
+		expect(result.output).toBe('src/pane.tsrx');
+		expect(result.notes).toContainEqual(
+			expect.objectContaining({
+				rule: 'svg-issuer',
+				severity: 'error',
+				line: 2,
+				message: expect.stringContaining('asset URL'),
+			}),
+		);
+	}
+	const tsx = preview('--target', 'tsx');
+	expect(tsx.status).toBe(0);
+	expect(tsx.result.output).toBe('src/pane.tsx');
+	expect(tsx.result.notes.some((n) => n.rule === 'svg-issuer')).toBe(false);
+
+	fs.writeFileSync(path.join(root, 'src/pane.tsrx'), 'export const existing = true;');
+	const conflict = preview();
+	expect(conflict.result.output).toBe('src/pane.tsx');
+	expect(conflict.result.notes.map((n) => n.rule)).toEqual(['rename-conflict']);
+});
+
 it('previews and writes explicitly selected SVG assets without migrating their consumers', async () => {
 	const { root, file, icon } = fixture();
 	const twin = path.join(root, 'src/icons/twin.svg');
@@ -135,7 +174,9 @@ it('preserves the authored SVG root on the server and the client, including subs
 	const unchanged = await runCodemod([file], { ...options, svgPaths: false });
 	expect(unchanged.files.some((f) => f.rules['svg-paths'])).toBe(false);
 	const preview = await runCodemod([file], options);
-	expect(preview.files.find((f) => f.file === 'src/pane.tsx').rules['svg-paths']).toBe(1);
+	const converted = preview.files.find((f) => f.file === 'src/pane.tsx');
+	expect(converted.rules['svg-paths']).toBe(1);
+	expect(converted.notes.some((n) => n.rule === 'svg-issuer')).toBe(false);
 	expect(fs.readFileSync(file, 'utf8')).toBe(pane);
 	expect(fs.existsSync(path.join(root, 'src/octane-path-svg.ts'))).toBe(false);
 	expect(fs.existsSync(icon + '.octane.ts')).toBe(false);

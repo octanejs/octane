@@ -34,7 +34,12 @@ function literalOptions(value: ts.Expression): boolean {
 }
 
 /** Bare SVG default imports can switch from a component to an asset URL for a .tsrx issuer. */
-export function isBareSvgTag(tag: ts.JsxTagNameExpression, checker: ts.TypeChecker): boolean {
+export function isBareSvgTag(
+	tag: ts.JsxTagNameExpression,
+	checker: ts.TypeChecker,
+	imports: Set<ts.Node>,
+): boolean {
+	if (!ts.isIdentifier(tag) || /^[a-z]|-/.test(tag.text)) return false;
 	const seen = new Set<ts.Symbol>();
 	function fromSvg(value: ts.Node): boolean {
 		if (
@@ -59,14 +64,7 @@ export function isBareSvgTag(tag: ts.JsxTagNameExpression, checker: ts.TypeCheck
 			d.parent.flags & ts.NodeFlags.Const
 		)
 			return fromSvg(d.initializer);
-		const clause = ts.isImportClause(d)
-			? d
-			: ts.isImportSpecifier(d) && !d.isTypeOnly && d.propertyName?.text === 'default'
-				? d.parent.parent
-				: undefined;
-		if (!clause || clause.isTypeOnly) return false;
-		const specifier = clause.parent.moduleSpecifier;
-		return ts.isStringLiteral(specifier) && specifier.text.toLowerCase().endsWith('.svg');
+		return imports.has(d);
 	}
 	return fromSvg(tag);
 }
