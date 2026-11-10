@@ -8354,6 +8354,8 @@ export function readLayout(_task: () => void): () => void {
 }
 export { readLayout as writeLayout };
 export function flushLayoutSync(): void {}
+// Snapshots never measure on the server, at either timing.
+export function setLayoutSnapshotTiming(_timing: 'commit' | 'frame'): void {}
 function noopLayoutCancel(): void {}
 
 /** @internal The server has no DOM event scheduler. */

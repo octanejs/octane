@@ -23,7 +23,15 @@ import { renderSlice } from '../render-slice.js';
 import { type BindingHandoff, releaseBindingHandoff } from '../dom-binding-handoff.js';
 import { bumpContextEpoch } from '../context-epoch.js';
 import { postHostTask } from '../host-task.js';
-import { queuePhase, type RenderingPhase } from '../layout-phases.js';
+// Only setLayoutSnapshotTiming names the queue's functions, so bundles that
+// never call it drop them; bundle-size/run-minimal.mjs checks that.
+import {
+	flushLayoutSync,
+	queuePhase,
+	readLayout,
+	writeLayout,
+	type RenderingPhase,
+} from '../layout-phases.js';
 import { hasPendingHostBudget } from '../host-budget.js';
 import {
 	__profileEffect,
@@ -389,6 +397,49 @@ export let LAYOUT_SNAPSHOT_DRIVER: {
 	stage: typeof enqueueLayoutSnapshot;
 	measure: typeof drainLayoutSnapshots;
 } | null = null;
+
+/** The layout queue, as `setLayoutSnapshotTiming('frame')` hands it to the engine. */
+interface LayoutFrameQueue {
+	read: (task: () => void) => void;
+	write: (task: () => void) => void;
+	flush: () => void;
+}
+
+// Set while snapshots measure in the layout queue's READ pass instead of at
+// the end of each commit (#2309). Only `setLayoutSnapshotTiming` installs it,
+// so apps that never call it do not ship the queue.
+export let FRAME_SNAPSHOT_DRIVER: (LayoutFrameQueue & { pending: LayoutSnapshots | null }) | null =
+	null;
+
+/** When `useLayoutSnapshot` measures. */
+export type LayoutSnapshotTiming = 'commit' | 'frame';
+
+/**
+ * Choose when every `useLayoutSnapshot` in the document measures.
+ *
+ * - `'commit'` (the default) measures at the end of each commit, so a changed
+ *   snapshot has rendered when `flushSync` returns.
+ * - `'frame'` measures in the next frame's `readLayout` pass, together with
+ *   any other queued reads. Changed snapshots commit in the following
+ *   `writeLayout` pass, and the measurements that commit queues run in a later
+ *   pass of the same frame. Use it on hosts whose layout is asynchronous, or
+ *   to keep snapshots out of commits that `flushSync` waits for.
+ *
+ * Snapshots already waiting for a measurement switch with the setting.
+ */
+export function setLayoutSnapshotTiming(timing: LayoutSnapshotTiming): void {
+	const previous = FRAME_SNAPSHOT_DRIVER;
+	FRAME_SNAPSHOT_DRIVER =
+		timing === 'frame'
+			? { read: readLayout, write: writeLayout, flush: flushLayoutSync, pending: null }
+			: null;
+	// Snapshots waiting for the old queue's read pass measure with the next commit
+	// (or in the new queue) instead. That queued read then finds nothing to do.
+	const waiting = previous ? previous.pending : null;
+	if (waiting === null) return;
+	previous!.pending = null;
+	for (const effect of waiting.values()) enqueueLayoutSnapshot(effect);
+}
 
 // A ViewTransition's drain renders without committing: its root transactions
 // commit inside the native update callback (vtFlush).
@@ -2792,6 +2843,21 @@ export function markLayoutSnapshotEffect(fn: EffectFn): EffectFn {
 function enqueueLayoutSnapshot(effect: PendingEffect): void {
 	// A superseded entry must not replace the callback from a later commit.
 	if (!layoutSnapshotIsCurrent(effect)) return;
+	const frame = FRAME_SNAPSHOT_DRIVER;
+	// A ViewTransition captures its new state when its update callback returns,
+	// so snapshots committed there measure with the commit, as without the queue.
+	if (frame && !VT_DRAIN) {
+		if (frame.pending === null) {
+			frame.pending = new Map();
+			frame.read(() => {
+				const snapshots = frame.pending;
+				frame.pending = null;
+				if (snapshots !== null) drainLayoutSnapshots(snapshots, frame);
+			});
+		}
+		frame.pending.set(effect.slot, effect);
+		return;
+	}
 	(LAYOUT_SNAPSHOT_DRIVER!.pending ??= new Map()).set(effect.slot, effect);
 	// Detached boundary commits can run without a surrounding scheduler drain.
 	if (!inFlush && !syncFlush && !scheduled) requestFlush();
@@ -2806,7 +2872,16 @@ function layoutSnapshotIsCurrent(effect: PendingEffect): boolean {
 	);
 }
 
-function drainLayoutSnapshots(snapshots: LayoutSnapshots): void {
+/**
+ * Measure `snapshots` together, then publish the changed ones. With `frame`,
+ * this runs in the layout queue's READ pass, and the changes commit in its
+ * WRITE pass. That commit stages the next measurements, which the queue reads
+ * in its next pass of the same frame.
+ */
+function drainLayoutSnapshots(
+	snapshots: LayoutSnapshots,
+	frame: LayoutFrameQueue | null = null,
+): void {
 	const nativeFrame = NATIVE_READ_DRIVER ? NATIVE_READ_DRIVER.pauseLifecycle() : -1;
 	const transitionDepth = TRANSITION_DEPTH;
 	const actionBatch = ACTIVE_TRANSITION_ACTION_BATCH;
@@ -2824,29 +2899,13 @@ function drainLayoutSnapshots(snapshots: LayoutSnapshots): void {
 		} finally {
 			MEASURE_COMMIT_LEVEL = measureLevel;
 		}
-		// Publish only after the whole read batch. These updates belong to the
-		// synchronous layout cascade even though the callbacks have returned.
+		// Publish only after the whole read batch.
 		if (updates.length > 0) {
-			const previousPhase = CURRENT_EFFECT_PHASE;
-			CURRENT_EFFECT_PHASE = LAYOUT;
-			EFFECT_BODY_DEPTH++;
-			try {
-				for (const { effect, publish } of updates) {
-					if (!layoutSnapshotIsCurrent(effect)) continue;
-					try {
-						publish();
-					} catch (error) {
-						if (error instanceof MaximumUpdateDepthError) throw error;
-						reportEffectError(effect.scope.block, error);
-					}
-				}
-			} finally {
-				EFFECT_BODY_DEPTH--;
-				CURRENT_EFFECT_PHASE = previousPhase;
-			}
+			if (frame) frame.write(() => flushSync(() => publishLayoutSnapshots(updates)));
+			else publishLayoutSnapshots(updates);
 		}
 	} catch (error) {
-		LAYOUT_SNAPSHOT_DRIVER!.pending = null;
+		if (!frame) LAYOUT_SNAPSHOT_DRIVER!.pending = null;
 		throw error;
 	} finally {
 		TRANSITION_DEPTH = transitionDepth;
@@ -2856,6 +2915,28 @@ function drainLayoutSnapshots(snapshots: LayoutSnapshots): void {
 		} finally {
 			finishEffectCommit();
 		}
+	}
+}
+
+// These updates belong to the synchronous layout cascade even though the
+// measurements have returned.
+function publishLayoutSnapshots(updates: LayoutSnapshotUpdate[]): void {
+	const previousPhase = CURRENT_EFFECT_PHASE;
+	CURRENT_EFFECT_PHASE = LAYOUT;
+	EFFECT_BODY_DEPTH++;
+	try {
+		for (const { effect, publish } of updates) {
+			if (!layoutSnapshotIsCurrent(effect)) continue;
+			try {
+				publish();
+			} catch (error) {
+				if (error instanceof MaximumUpdateDepthError) throw error;
+				reportEffectError(effect.scope.block, error);
+			}
+		}
+	} finally {
+		EFFECT_BODY_DEPTH--;
+		CURRENT_EFFECT_PHASE = previousPhase;
 	}
 }
 
@@ -4392,6 +4473,8 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 				if (nested) return value;
 				for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
 					await actCheckpoint();
+					if (FRAME_SNAPSHOT_DRIVER && FRAME_SNAPSHOT_DRIVER.pending !== null)
+						FRAME_SNAPSHOT_DRIVER.flush();
 					throwPendingActErrors();
 					const hadWork =
 						hasPendingWork() ||
@@ -4432,6 +4515,9 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 			if (TRANSITION_TASK_DRIVER) TRANSITION_TASK_DRIVER.adopt(true);
 			if (VIEW_TRANSITION_DRIVER && VIEW_TRANSITION_DRIVER.wouldWrap()) flush();
 			else flushSync(() => {});
+			// Frame-timed snapshots measure in the layout queue; act runs it now.
+			if (FRAME_SNAPSHOT_DRIVER && FRAME_SNAPSHOT_DRIVER.pending !== null)
+				FRAME_SNAPSHOT_DRIVER.flush();
 			throwPendingActErrors();
 			drainPassiveEffects();
 			if (!hasPendingWork()) break;
@@ -4450,6 +4536,8 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 		try {
 			for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
 				await actCheckpoint();
+				if (FRAME_SNAPSHOT_DRIVER && FRAME_SNAPSHOT_DRIVER.pending !== null)
+					FRAME_SNAPSHOT_DRIVER.flush();
 				throwPendingActErrors();
 				const hadWork =
 					hasPendingWork() ||

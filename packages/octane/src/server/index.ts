@@ -151,6 +151,7 @@ export {
 	readLayout,
 	writeLayout,
 	flushLayoutSync,
+	setLayoutSnapshotTiming,
 	__createDiscreteEventListener,
 	isChildrenBlock,
 	isValidElement,

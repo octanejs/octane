@@ -44,6 +44,8 @@ export {
 	flushSync,
 	// Octane extension: the layout phase of the running commit or queued task.
 	getPhase,
+	setLayoutSnapshotTiming,
+	type LayoutSnapshotTiming,
 	act,
 	isInActScope,
 	type Root,

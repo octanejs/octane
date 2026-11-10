@@ -21,6 +21,7 @@ import {
 	reportEffectError,
 	runEffectBody,
 	LAYOUT_SNAPSHOT_DRIVER,
+	FRAME_SNAPSHOT_DRIVER,
 } from './engine.js';
 import { nodeProto } from '../dom-focused-move.js';
 import { hydrationStarted } from '../hydration-flag.js';
@@ -228,6 +229,7 @@ export function hasScheduledWork(): boolean {
 		QUEUE.length > 0 ||
 		ROOT_RENDER_TRANSACTIONS.length > 0 ||
 		(LAYOUT_SNAPSHOT_DRIVER !== null && LAYOUT_SNAPSHOT_DRIVER.pending !== null) ||
+		(FRAME_SNAPSHOT_DRIVER ? FRAME_SNAPSHOT_DRIVER.pending !== null : false) ||
 		(TRANSITION_ROOT_DRIVER ? PENDING_SIGNAL_PROMOTIONS !== null : false) ||
 		effectEventQueue.length > 0 ||
 		effectEventCommitActions.length > 0 ||
