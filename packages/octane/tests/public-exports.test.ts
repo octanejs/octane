@@ -106,6 +106,8 @@ describe('published package export contract', () => {
 		expect(publishedRequireEntries(manifest.publishConfig.exports)).toEqual([
 			['.', './dist/cjs/index.cjs'],
 			['./server', './dist/cjs/server/index.cjs'],
+			['./data', './dist/cjs/data/index.cjs'],
+			['./data/server', './dist/cjs/data/server.cjs'],
 			['./signals', './dist/cjs/signals/index.cjs'],
 			['./signals/client', './dist/cjs/signals/client.cjs'],
 			['./signals/server', './dist/cjs/signals/server.cjs'],
