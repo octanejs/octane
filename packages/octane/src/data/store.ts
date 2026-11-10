@@ -10,6 +10,11 @@
  *   uncertain, with its edit still shown, until `settle` names the outcome.
  * - Only a reply for the entry's current attempt, in a store that has not been
  *   retired, can change confirmed state.
+ * - Writes to a record its own create has not confirmed wait for that create.
+ *   They are refused unsent if it is refused, and they carry the server's ID
+ *   if the server assigned one.
+ * - Every value one reply or commit carries is adopted before any reader is
+ *   notified, so no render sees part of a server transaction.
  * - Every optimistic edit is an absolute patch, an insert by ID or a delete by
  *   ID. Applying one to a value that already includes it changes nothing, so an
  *   edit can be replayed over any newer value without counting twice.
@@ -22,6 +27,7 @@ import {
 	DataError,
 	parse,
 	type DataReply,
+	type Entity,
 	type DataRequest,
 	type Read,
 	type Transport,
@@ -70,8 +76,12 @@ export interface DataStore {
 	write<I, O>(write: Write<I, O>, input: I): Promise<O>;
 	/** Mark reads with one of these tags or entity names stale; observed ones reload. */
 	invalidate(tags: readonly string[]): void;
-	/** Name the outcome of an uncertain write, once a receipt lookup has established it. */
-	settle(operationId: string, confirmed: boolean): void;
+	/**
+	 * Name the outcome of an uncertain write, once a receipt lookup has
+	 * established it. For a create whose server assigns IDs, pass the created
+	 * record as `value`, or writes waiting on it are refused.
+	 */
+	settle(operationId: string, confirmed: boolean, value?: unknown): void;
 	/**
 	 * End this grant: clear every value and ignore late replies. Later writes,
 	 * invalidations and settlements throw. Later reads stay pending without
@@ -129,9 +139,14 @@ interface Entry {
 interface Operation {
 	readonly id: string;
 	readonly write: Write<any, any>;
-	readonly input: unknown;
-	readonly entityId: string;
-	readonly draft: unknown;
+	/** The validated input the optimistic edit uses. */
+	input: unknown;
+	/** What the caller passed, which is what the server validates. */
+	raw: unknown;
+	entityId: string;
+	draft: unknown;
+	/** A create's hold on later writes to its record; settles when the create does. */
+	gate: { promise: Promise<void>; resolve(): void; reject(error: unknown): void } | null;
 	status: 'pending' | 'uncertain' | 'confirmed';
 	/** Store sequence when the write was confirmed; values loaded later include it. */
 	settledSeq: number;
@@ -165,6 +180,13 @@ function inputKey(value: unknown): string {
 	);
 }
 
+/** `value` with its entity ID changed from `from` to `to`, copied; other values unchanged. */
+function renameId(entity: Entity<any>, value: unknown, from: string, to: string): unknown {
+	return value !== null && typeof value === 'object' && (value as any)[entity.key] === from
+		? { ...value, [entity.key]: to }
+		: value;
+}
+
 function entryKey(name: string, input: unknown): string {
 	return `${name}\n${inputKey(input)}`;
 }
@@ -194,6 +216,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	const { transport } = options;
 	const entries = new Map<string, Entry>();
 	const seeds = new Map<string, SeedEntry>();
+	/** Created records' operation IDs, by entity, mapped to the IDs their servers assigned. */
+	const assigned = new Map<string, string>();
 	if (options.seed) {
 		for (const seed of devalue.parse(options.seed) as SeedEntry[]) {
 			seeds.set(entryKey(seed.name, seed.input), seed);
@@ -257,25 +281,38 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	}
 
 	/** Recompute an entry's snapshot and notify its observers only when it changed. */
-	function touch(entry: Entry): void {
-		const previous = entry.snapshot;
-		const next = buildSnapshot(entry);
-		if (
-			previous !== null &&
-			previous.status === next.status &&
-			previous.value === next.value &&
-			previous.error === next.error &&
-			previous.refreshing === next.refreshing &&
-			previous.stale === next.stale
-		) {
-			return;
+	/**
+	 * Recompute snapshots, then notify the readers of those that changed. Every
+	 * snapshot is current before any reader runs, so a reader of one view never
+	 * sees another mid-change.
+	 */
+	function commit(changed: Iterable<Entry>): void {
+		const notify: Entry[] = [];
+		for (const entry of changed) {
+			const previous = entry.snapshot;
+			const next = buildSnapshot(entry);
+			if (
+				previous !== null &&
+				previous.status === next.status &&
+				previous.value === next.value &&
+				previous.error === next.error &&
+				previous.refreshing === next.refreshing &&
+				previous.stale === next.stale
+			) {
+				continue;
+			}
+			entry.snapshot = next;
+			notify.push(entry);
 		}
-		entry.snapshot = next;
-		for (const notify of [...entry.subscribers]) notify();
+		for (const entry of notify) for (const reader of [...entry.subscribers]) reader();
+	}
+
+	function touch(entry: Entry): void {
+		commit([entry]);
 	}
 
 	function touchEntities(): void {
-		for (const entry of entries.values()) if (entry.read.entities) touch(entry);
+		commit([...entries.values()].filter((entry) => entry.read.entities));
 	}
 
 	/** Drop the confirmed value, so every later reader loads a new one. */
@@ -467,11 +504,50 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		return created;
 	}
 
+	/** Move every edit to a created record from its operation ID to the server's ID. */
+	/**
+	 * Move every edit to a created record from its operation ID to the server's
+	 * ID. Writes already queued keep their order: the record's queue moves to the
+	 * new key, and a later write that still names the operation ID is rewritten.
+	 */
+	function assignId(operation: Operation, serverId: string): void {
+		const { entity } = operation.write.effect!;
+		const local = operation.entityId;
+		const localKey = `${entity.name}\n${local}`;
+		const serverKey = `${entity.name}\n${serverId}`;
+		assigned.set(localKey, serverId);
+		for (const item of operations) {
+			if (item.write.effect?.entity.name !== entity.name || item.entityId !== local) continue;
+			item.entityId = serverId;
+			item.input = renameId(entity, item.input, local, serverId);
+			item.raw = renameId(entity, item.raw, local, serverId);
+			item.draft = renameId(entity, item.draft, local, serverId);
+		}
+		const tail = queues.get(localKey);
+		if (tail && !queues.has(serverKey)) {
+			queues.set(serverKey, tail);
+			const release = () => {
+				if (queues.get(serverKey) === tail) queues.delete(serverKey);
+			};
+			tail.then(release, release);
+		}
+	}
+
 	/** A confirmed write refreshes the reads it returned and marks the rest it affects stale. */
-	function confirm(operation: Operation, reply?: DataReply & { ok: true }): void {
+	function confirm(operation: Operation, reply?: DataReply & { ok: true }, output?: unknown): void {
+		const { write } = operation;
+		if (write.effect?.kind === 'create' && write.serverId) {
+			if (output === undefined) {
+				operation.gate?.reject(new DataError('dependency'));
+			} else {
+				assignId(operation, write.serverId(output));
+			}
+		}
 		operation.status = 'confirmed';
 		operation.settledSeq = ++sequence;
+		operation.gate?.resolve();
 		const refreshed = new Set<Entry>();
+		const pending: Promise<() => Entry | undefined>[] = [];
 		for (const item of reply?.refreshed ?? []) {
 			const entry = entries.get(entryKey(item.name, item.input));
 			if (!entry) continue;
@@ -482,18 +558,29 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			entry.abort?.abort();
 			entry.abort = null;
 			entry.inflight = null;
-			Promise.resolve()
-				.then(() => parse(entry.read.output, item.value))
-				.then(
-					(value) => {
-						if (retired || entry.attempt !== attempt) return;
-						adopt(entry, value, startedSeq);
-						touch(entry);
-					},
-					() => {
-						if (!retired && entry.attempt === attempt) invalidateEntry(entry);
-					},
-				);
+			const current = () => !retired && entry.attempt === attempt;
+			pending.push(
+				Promise.resolve()
+					.then(() => parse(entry.read.output, item.value))
+					.then(
+						(value) => () => {
+							if (!current()) return undefined;
+							adopt(entry, value, startedSeq);
+							return entry;
+						},
+						() => () => {
+							if (current()) invalidateEntry(entry);
+							return undefined;
+						},
+					),
+			);
+		}
+		// One reply is one server transaction: adopt every value, then notify.
+		if (pending.length > 0) {
+			void Promise.all(pending).then((commits) => {
+				const adopted = commits.map((adopt) => adopt());
+				commit(adopted.filter((entry): entry is Entry => entry !== undefined));
+			});
 		}
 		const tags = writeTags(operation.write);
 		for (const entry of entries.values()) {
@@ -519,17 +606,28 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	function send(write: Write<any, any>, input: unknown, raw: unknown): Promise<any> {
 		const id = crypto.randomUUID();
 		const { effect } = write;
+		const creates = effect?.kind === 'create';
+		let entityId = effect ? (creates ? id : effect.entity.id(input)) : '';
+		const serverId =
+			effect && !creates ? assigned.get(`${effect.entity.name}\n${entityId}`) : undefined;
+		if (serverId !== undefined) {
+			// The caller still holds the operation ID of a record the server has since named.
+			input = renameId(effect!.entity, input, entityId, serverId);
+			raw = renameId(effect!.entity, raw, entityId, serverId);
+			entityId = serverId;
+		}
 		const operation: Operation = {
 			id,
 			write,
 			input,
-			entityId: effect ? (effect.kind === 'create' ? id : effect.entity.id(input)) : '',
-			draft:
-				effect?.kind === 'create'
-					? write.draft
-						? write.draft(input, id)
-						: { ...(input as object), id }
-					: undefined,
+			raw,
+			entityId,
+			draft: creates
+				? write.draft
+					? write.draft(input, id)
+					: { ...(input as object), [effect!.entity.key]: id }
+				: undefined,
+			gate: null,
 			status: 'pending',
 			settledSeq: 0,
 		};
@@ -545,36 +643,74 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					refresh.push({ name: entry.read.name, input: entry.input });
 				}
 			}
+			// Read at send time: a server-assigned ID may have replaced the operation ID.
 			return request(
-				{ kind: 'write', name: write.name, input: raw, operationId: id, refresh },
+				{ kind: 'write', name: write.name, input: operation.raw, operationId: id, refresh },
 				new AbortController().signal,
 			);
 		};
 
-		// Writes to one entity are sent in submission order, so the last edit wins on the server too.
+		// Writes to one entity are sent in submission order, so the last edit wins on the
+		// server too. After a write that failed to arrive, the next is still sent; after a
+		// refused create, writes to its record are refused unsent.
 		const queueKey = effect ? `${effect.entity.name}\n${operation.entityId}` : undefined;
 		const previous = queueKey === undefined ? undefined : queues.get(queueKey);
-		const sent = previous ? previous.then(dispatch, dispatch) : dispatch();
+		const sent = previous
+			? previous.then(dispatch, (error) => {
+					if (retired || error instanceof DataError) throw error;
+					return dispatch();
+				})
+			: dispatch();
 		if (queueKey !== undefined) {
-			queues.set(queueKey, sent);
+			// A create holds its record's queue until its outcome is known, even if uncertain.
+			let held: Promise<unknown> = sent;
+			if (creates) {
+				let resolve!: () => void;
+				let reject!: (error: unknown) => void;
+				const promise = new Promise<void>((done, fail) => {
+					resolve = done;
+					reject = fail;
+				});
+				promise.catch(() => {});
+				operation.gate = { promise, resolve, reject };
+				held = promise;
+			}
+			queues.set(queueKey, held);
 			const release = () => {
-				if (queues.get(queueKey) === sent) queues.delete(queueKey);
+				if (queues.get(queueKey) === held) queues.delete(queueKey);
 			};
-			sent.then(release, release);
+			held.then(release, release);
 		}
 
 		return sent.then(
-			(reply) => {
+			async (reply) => {
 				if (retired) throw new DataRetiredError();
 				if (!reply.ok) {
 					remove(operation);
+					operation.gate?.reject(new DataError('dependency'));
 					throw new DataError(reply.code, reply.data, reply.issues);
 				}
-				confirm(operation, reply);
-				return write.output ? parse(write.output, reply.value) : reply.value;
+				let output: unknown;
+				try {
+					output = write.output ? await parse(write.output, reply.value) : reply.value;
+				} catch (error) {
+					// The server applied the write; only its reply is unreadable.
+					if (!retired) confirm(operation, reply);
+					throw error;
+				}
+				if (retired) throw new DataRetiredError();
+				confirm(operation, reply, output);
+				if (write.serverId) touchEntities();
+				return output;
 			},
 			(error) => {
 				if (retired) throw new DataRetiredError();
+				if (error instanceof DataError) {
+					// A create this write depended on was refused; it was never sent.
+					remove(operation);
+					operation.gate?.reject(error);
+					throw error;
+				}
 				operation.status = 'uncertain';
 				throw new DataUncertainError(id, error);
 			},
@@ -613,14 +749,16 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			assertLive();
 			for (const entry of entries.values()) if (affects(entry, tags)) invalidateEntry(entry);
 		},
-		settle(operationId, confirmed) {
+		settle(operationId, confirmed, value) {
 			assertLive();
 			const operation = operations.find((item) => item.id === operationId);
 			if (operation?.status !== 'uncertain') return;
 			if (confirmed) {
-				confirm(operation);
+				confirm(operation, undefined, value);
+				touchEntities();
 			} else {
 				remove(operation);
+				operation.gate?.reject(new DataError('dependency'));
 			}
 		},
 		dehydrate() {
@@ -637,8 +775,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		retire() {
 			if (retired) return;
 			retired = true;
+			// Writes waiting on a create must settle too, or they would never end.
+			for (const operation of operations) operation.gate?.reject(new DataRetiredError());
 			operations = [];
 			queues.clear();
+			assigned.clear();
 			seeds.clear();
 			for (const entry of entries.values()) {
 				entry.abort?.abort();

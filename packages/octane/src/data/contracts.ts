@@ -61,6 +61,8 @@ export interface EntitySelection<T = any> {
 export interface Entity<T> {
 	readonly name: string;
 	readonly schema: StandardSchema<unknown, T>;
+	/** The property that holds a record's ID. The store reads it, and rewrites it when a server assigns one. */
+	readonly key: string;
 	readonly id: (value: T) => string;
 	/** Mark where this entity appears in a read's output. */
 	from(source: T | readonly T[]): EntitySelection<T>;
@@ -73,9 +75,15 @@ export interface Entity<T> {
 export function entity<T>(
 	name: string,
 	schema: StandardSchema<unknown, T>,
-	id: (value: T) => string = (value) => (value as { id: string }).id,
+	key: keyof T & string = 'id' as keyof T & string,
 ): Entity<T> {
-	const self: Entity<T> = { name, schema, id, from: (source) => ({ entity: self, source }) };
+	const self: Entity<T> = {
+		name,
+		schema,
+		key,
+		id: (value) => String((value as Record<string, unknown>)[key]),
+		from: (source) => ({ entity: self, source }),
+	};
 	return self;
 }
 
@@ -104,6 +112,8 @@ export interface Write<Input, Output> {
 		{ readonly kind: 'create' | 'patch' | 'remove'; readonly entity: Entity<any> } | undefined;
 	/** The optimistic row for a create; defaults to the input plus the new ID. */
 	readonly draft: ((input: Input, id: string) => unknown) | undefined;
+	/** For a create whose server assigns the ID: where the ID is in the validated reply. */
+	readonly serverId: ((output: Output) => string) | undefined;
 	readonly invalidates: readonly string[];
 }
 
@@ -138,6 +148,12 @@ export function write<Input, Output = unknown>(options: {
 	patches?: Entity<any>;
 	removes?: Entity<any>;
 	draft?: (input: Input, id: string) => unknown;
+	/**
+	 * The server assigns the new record's ID instead of using the operation ID.
+	 * Until the reply names it, the record shows under the operation ID, and
+	 * later writes to it wait; the store then sends them with the server's ID.
+	 */
+	serverId?: (output: Output) => string;
 	invalidates?: readonly string[];
 }): Write<Input, Output> {
 	const { creates, patches, removes } = options;
@@ -154,6 +170,7 @@ export function write<Input, Output = unknown>(options: {
 					? { kind: 'remove', entity: removes }
 					: undefined,
 		draft: options.draft,
+		serverId: options.serverId,
 		invalidates: options.invalidates ?? [],
 	};
 }
