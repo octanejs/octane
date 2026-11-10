@@ -705,6 +705,58 @@ describe('octane/data server-assigned IDs and server transactions', () => {
 		expect(server.rows[0]).toMatchObject({ id: 'srv-1', done: true });
 	});
 
+	it('keeps writes to a created record in order across the server naming it', async () => {
+		const server = assigningServer();
+		let setDones = 0;
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				// The first edit is the slowest to arrive.
+				if (request.name === 'todos.setDone' && setDones++ === 0) {
+					await new Promise((resolve) => setTimeout(resolve, 30));
+				}
+				return server.transport(request, signal);
+			},
+		});
+		const list = store.read(todos, undefined);
+		list.subscribe(() => {});
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+
+		const added = store.write(addAssigned, { title: 'Tides' });
+		const local = list.getSnapshot().value![0].id;
+		const starred = store.write(setDone, { id: local, done: true });
+		server.release();
+		await added;
+		// The view now shows the server's ID; an edit through it queues behind the first.
+		const unstarred = store.write(setDone, { id: 'srv-1', done: false });
+		// A stale handler still holding the operation ID is rewritten and queued too.
+		const stale = store.write(setDone, { id: local, done: false });
+		await Promise.all([starred, unstarred, stale]);
+		expect(server.log).toEqual([
+			'add Tides',
+			'setDone srv-1 true',
+			'setDone srv-1 false',
+			'setDone srv-1 false',
+		]);
+		expect(server.rows[0].done).toBe(false);
+	});
+
+	it('ends writes waiting on a create when the store is retired', async () => {
+		const server = assigningServer();
+		const store = createDataStore({ transport: server.transport });
+		const list = store.read(todos, undefined);
+		list.subscribe(() => {});
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+
+		void store.write(addAssigned, { title: 'Tides' }).catch(() => {});
+		const local = list.getSnapshot().value![0].id;
+		const starred = store.write(setDone, { id: local, done: true });
+		store.retire();
+		await expect(starred).rejects.toBeInstanceOf(DataRetiredError);
+		server.release();
+		await settled();
+		expect(server.log).not.toContainEqual(expect.stringMatching(/^setDone/));
+	});
+
 	it('adopts every read a reply carries before notifying any reader', async () => {
 		const server = createServer();
 		const store = createDataStore({ transport: server.transport });

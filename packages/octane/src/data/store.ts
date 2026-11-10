@@ -27,6 +27,7 @@ import {
 	DataError,
 	parse,
 	type DataReply,
+	type Entity,
 	type DataRequest,
 	type Read,
 	type Transport,
@@ -179,6 +180,13 @@ function inputKey(value: unknown): string {
 	);
 }
 
+/** `value` with its entity ID changed from `from` to `to`, copied; other values unchanged. */
+function renameId(entity: Entity<any>, value: unknown, from: string, to: string): unknown {
+	return value !== null && typeof value === 'object' && (value as any)[entity.key] === from
+		? { ...value, [entity.key]: to }
+		: value;
+}
+
 function entryKey(name: string, input: unknown): string {
 	return `${name}\n${inputKey(input)}`;
 }
@@ -208,6 +216,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	const { transport } = options;
 	const entries = new Map<string, Entry>();
 	const seeds = new Map<string, SeedEntry>();
+	/** Created records' operation IDs, by entity, mapped to the IDs their servers assigned. */
+	const assigned = new Map<string, string>();
 	if (options.seed) {
 		for (const seed of devalue.parse(options.seed) as SeedEntry[]) {
 			seeds.set(entryKey(seed.name, seed.input), seed);
@@ -495,19 +505,31 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	}
 
 	/** Move every edit to a created record from its operation ID to the server's ID. */
+	/**
+	 * Move every edit to a created record from its operation ID to the server's
+	 * ID. Writes already queued keep their order: the record's queue moves to the
+	 * new key, and a later write that still names the operation ID is rewritten.
+	 */
 	function assignId(operation: Operation, serverId: string): void {
 		const { entity } = operation.write.effect!;
 		const local = operation.entityId;
-		const rename = (value: unknown) =>
-			value !== null && typeof value === 'object' && (value as any)[entity.key] === local
-				? { ...value, [entity.key]: serverId }
-				: value;
+		const localKey = `${entity.name}\n${local}`;
+		const serverKey = `${entity.name}\n${serverId}`;
+		assigned.set(localKey, serverId);
 		for (const item of operations) {
 			if (item.write.effect?.entity.name !== entity.name || item.entityId !== local) continue;
 			item.entityId = serverId;
-			item.input = rename(item.input);
-			item.raw = rename(item.raw);
-			item.draft = rename(item.draft);
+			item.input = renameId(entity, item.input, local, serverId);
+			item.raw = renameId(entity, item.raw, local, serverId);
+			item.draft = renameId(entity, item.draft, local, serverId);
+		}
+		const tail = queues.get(localKey);
+		if (tail && !queues.has(serverKey)) {
+			queues.set(serverKey, tail);
+			const release = () => {
+				if (queues.get(serverKey) === tail) queues.delete(serverKey);
+			};
+			tail.then(release, release);
 		}
 	}
 
@@ -585,12 +607,21 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const id = crypto.randomUUID();
 		const { effect } = write;
 		const creates = effect?.kind === 'create';
+		let entityId = effect ? (creates ? id : effect.entity.id(input)) : '';
+		const serverId =
+			effect && !creates ? assigned.get(`${effect.entity.name}\n${entityId}`) : undefined;
+		if (serverId !== undefined) {
+			// The caller still holds the operation ID of a record the server has since named.
+			input = renameId(effect!.entity, input, entityId, serverId);
+			raw = renameId(effect!.entity, raw, entityId, serverId);
+			entityId = serverId;
+		}
 		const operation: Operation = {
 			id,
 			write,
 			input,
 			raw,
-			entityId: effect ? (creates ? id : effect.entity.id(input)) : '',
+			entityId,
 			draft: creates
 				? write.draft
 					? write.draft(input, id)
@@ -626,7 +657,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const previous = queueKey === undefined ? undefined : queues.get(queueKey);
 		const sent = previous
 			? previous.then(dispatch, (error) => {
-					if (error instanceof DataError) throw error;
+					if (retired || error instanceof DataError) throw error;
 					return dispatch();
 				})
 			: dispatch();
@@ -744,8 +775,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		retire() {
 			if (retired) return;
 			retired = true;
+			// Writes waiting on a create must settle too, or they would never end.
+			for (const operation of operations) operation.gate?.reject(new DataRetiredError());
 			operations = [];
 			queues.clear();
+			assigned.clear();
 			seeds.clear();
 			for (const entry of entries.values()) {
 				entry.abort?.abort();
