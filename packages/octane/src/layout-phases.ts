@@ -7,10 +7,10 @@
 // out once however many callers took part.
 //
 // The queue is global because layout belongs to the document, not to a root.
-// It imports nothing from the engine: an app that never queues layout work
+// It lives outside `runtime/` and imports nothing from the engine: an app that never queues layout work
 // does not ship it.
 
-import { postHostTask } from '../host-task.js';
+import { postHostTask } from './host-task.js';
 
 declare const process: { env: { NODE_ENV?: string } };
 

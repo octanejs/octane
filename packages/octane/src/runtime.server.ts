@@ -8345,7 +8345,7 @@ export function flushSync<T>(fn: () => T): T {
 
 // Layout phases — the server has no layout. Queued work never runs, as with
 // layout effects, and the phase is always IDLE.
-export { RenderingPhase } from './runtime/layout-phases.js';
+export { RenderingPhase } from './layout-phases.js';
 export function getPhase(): 0 {
 	return 0;
 }

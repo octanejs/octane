@@ -138,13 +138,6 @@ export {
 } from './runtime/engine.js';
 export { renderWritesForbidden, drainPassiveEffects, hasPendingWork } from './runtime/effects.js';
 export {
-	RenderingPhase,
-	getPhase,
-	readLayout,
-	writeLayout,
-	flushLayoutSync,
-} from './runtime/layout-phases.js';
-export {
 	ViewTransitionPseudoElement,
 	addTransitionType,
 	__vtSeen,
