@@ -1,0 +1,15 @@
+{
+  "name": "octane-data-store-comparison",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Compares octane/data's cached-response store with a normalized store that runs client-side queries in a worker, on the same library journeys.",
+  "scripts": {
+    "compare": "node build.mjs && node dist/run.js"
+  },
+  "dependencies": {
+    "devalue": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*"
+  }
+}
