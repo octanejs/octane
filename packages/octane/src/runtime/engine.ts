@@ -23,6 +23,8 @@ import { renderSlice } from '../render-slice.js';
 import { type BindingHandoff, releaseBindingHandoff } from '../dom-binding-handoff.js';
 import { bumpContextEpoch } from '../context-epoch.js';
 import { postHostTask } from '../host-task.js';
+// Only setLayoutSnapshotTiming names the queue's functions, so bundles that
+// never call it drop them; bundle-size/run-minimal.mjs checks that.
 import {
 	flushLayoutSync,
 	queuePhase,

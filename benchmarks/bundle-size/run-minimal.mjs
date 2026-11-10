@@ -330,6 +330,9 @@ const contextDependencyDeclarations = [
 	'refreshBlockForContext',
 ];
 const memoBailDeclarations = ['tryMemoBail', 'shallowEqualProps'];
+// The layout queue ships only to apps that call it or setLayoutSnapshotTiming,
+// although the engine imports it to read its phase.
+const layoutQueueDeclarations = ['readLayout', 'writeLayout', 'flushLayoutSync'];
 const featureControls = {
 	'descriptor-children': {
 		dropped: [
@@ -348,7 +351,12 @@ const featureControls = {
 		kept: ['childSlot', 'renderPreparedChildList'],
 	},
 	context: {
-		dropped: [...signalOwnerDeclarations, ...memoBailDeclarations, 'rendererRegionOwnerForBlock'],
+		dropped: [
+			...signalOwnerDeclarations,
+			...memoBailDeclarations,
+			'rendererRegionOwnerForBlock',
+			...layoutQueueDeclarations,
+		],
 		kept: ['useContextInternal', ...contextDependencyDeclarations],
 	},
 	'memo-context': {
@@ -361,6 +369,7 @@ const featureControls = {
 		kept: ['restoreControlledElement'],
 	},
 	'signal-counter': { dropped: ['childSlot', 'bindSignalChild'], kept: ['enableSignalBindings'] },
+	'hooks-state': { dropped: layoutQueueDeclarations, kept: [] },
 	// Only an entry that can drop a render installs its rollback; an error
 	// boundary, an uncaught error and a failed root replacement need none. A
 	// catch-only @try is an error boundary, so it ships no tryBlock either.
@@ -416,6 +425,7 @@ const splitControls = {
 const declarationSources = {
 	presentDerivedView: 'signals/computations.ts',
 	promoteDeclarationView: 'signals/graph.ts',
+	...Object.fromEntries(layoutQueueDeclarations.map((name) => [name, 'layout-phases.ts'])),
 	...Object.fromEntries(RENDER_ROLLBACK_DECLARATIONS.map(({ name, source }) => [name, source])),
 };
 const runtimeRanges = (names) =>
