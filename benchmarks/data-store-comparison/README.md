@@ -71,52 +71,52 @@ Network latency per hop: 40 ms
 | Journey | Design | Intended state shown (ms) | Settled correctly | Requests | KB fetched | KB across worker | Impossible states |
 | --- | --- | ---: | --- | ---: | ---: | ---: | ---: |
 | 1. Add a book and star it before the create returns | A: cached responses | never | yes | 16 | 39.0 | 0.0 | 0 |
-| 1. Add a book and star it before the create returns | B: normalized, worker, every book | 8 | yes | 4 | 0.4 | 12.7 | 0 |
-| 1. Add a book and star it before the create returns | C: normalized, worker, view windows | 3 | yes | 4 | 0.4 | 12.7 | 0 |
-| 2. Rename a starred book across a sorted list and pages | A: cached responses | 49 | yes | 8 | 19.5 | 0.0 | 0 |
-| 2. Rename a starred book across a sorted list and pages | B: normalized, worker, every book | 3 | yes | 2 | 0.2 | 5.1 | 0 |
-| 2. Rename a starred book across a sorted list and pages | C: normalized, worker, view windows | 5 | yes | 2 | 0.2 | 5.1 | 0 |
-| 3. A star is refused after another user renames the book | A: cached responses | 49 | yes | 15 | 29.4 | 0.0 | 0 |
-| 3. A star is refused after another user renames the book | B: normalized, worker, every book | 45 | yes | 3 | 0.4 | 2.7 | 0 |
-| 3. A star is refused after another user renames the book | C: normalized, worker, view windows | 42 | yes | 3 | 0.4 | 2.7 | 0 |
+| 1. Add a book and star it before the create returns | B: normalized, worker, every book | 9 | yes | 4 | 0.4 | 12.7 | 0 |
+| 1. Add a book and star it before the create returns | C: normalized, worker, view windows | 4 | yes | 4 | 0.4 | 12.7 | 0 |
+| 2. Rename a starred book across a sorted list and pages | A: cached responses | 46 | yes | 8 | 19.5 | 0.0 | 0 |
+| 2. Rename a starred book across a sorted list and pages | B: normalized, worker, every book | 6 | yes | 2 | 0.2 | 5.1 | 0 |
+| 2. Rename a starred book across a sorted list and pages | C: normalized, worker, view windows | 4 | yes | 2 | 0.2 | 5.1 | 0 |
+| 3. A star is refused after another user renames the book | A: cached responses | 97 | yes | 8 | 9.8 | 0.0 | 0 |
+| 3. A star is refused after another user renames the book | B: normalized, worker, every book | 47 | yes | 1 | 0.1 | 2.7 | 0 |
+| 3. A star is refused after another user renames the book | C: normalized, worker, view windows | 44 | yes | 1 | 0.1 | 2.7 | 0 |
 | 4. Another user moves a book between shelves | A: cached responses | 94 | yes | 7 | 9.8 | 0.0 | 1 |
-| 4. Another user moves a book between shelves | B: normalized, worker, every book | 46 | yes | 1 | 0.1 | 3.7 | 0 |
+| 4. Another user moves a book between shelves | B: normalized, worker, every book | 48 | yes | 1 | 0.1 | 3.7 | 0 |
 | 4. Another user moves a book between shelves | C: normalized, worker, view windows | 45 | yes | 1 | 0.1 | 3.7 | 0 |
-| 5. Rename the first book in the library so it sorts last | A: cached responses | 46 | yes | 8 | 19.4 | 0.0 | 0 |
-| 5. Rename the first book in the library so it sorts last | B: normalized, worker, every book | 3 | yes | 2 | 0.2 | 3.8 | 0 |
-| 5. Rename the first book in the library so it sorts last | C: normalized, worker, view windows | 4 | yes | 2 | 0.2 | 3.8 | 0 |
+| 5. Rename the first book in the library so it sorts last | A: cached responses | 50 | yes | 8 | 19.4 | 0.0 | 0 |
+| 5. Rename the first book in the library so it sorts last | B: normalized, worker, every book | 6 | yes | 2 | 0.2 | 3.8 | 0 |
+| 5. Rename the first book in the library so it sorts last | C: normalized, worker, view windows | 3 | yes | 2 | 0.2 | 3.8 | 0 |
 
 | 6. Cold start | First load (ms) | Requests | KB fetched | KB across worker | KB persisted | Restore (ms) | Restore requests | Restored views correct |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| A: cached responses | 44 | 6 | 9.6 | 0.0 | 9.6 | 1 | 0 | yes |
-| B: normalized, worker, every book | 73 | 1 | 177.3 | 7.5 | 177.4 | 26 | 0 | yes |
-| C: normalized, worker, view windows | 58 | 6 | 21.2 | 7.5 | 14.5 | 23 | 0 | yes |
+| A: cached responses | 45 | 6 | 9.6 | 0.0 | 9.6 | 1 | 0 | yes |
+| B: normalized, worker, every book | 74 | 1 | 177.3 | 7.5 | 177.4 | 23 | 0 | yes |
+| C: normalized, worker, view windows | 57 | 6 | 21.2 | 7.5 | 14.5 | 17 | 0 | yes |
 
 ## 20,000 books
 
 | Journey | Design | Intended state shown (ms) | Settled correctly | Requests | KB fetched | KB across worker | Impossible states |
 | --- | --- | ---: | --- | ---: | ---: | ---: | ---: |
 | 1. Add a book and star it before the create returns | A: cached responses | never | yes | 16 | 39.6 | 0.0 | 0 |
-| 1. Add a book and star it before the create returns | B: normalized, worker, every book | 46 | yes | 4 | 0.5 | 12.9 | 0 |
-| 1. Add a book and star it before the create returns | C: normalized, worker, view windows | 24 | yes | 4 | 0.5 | 12.9 | 0 |
-| 2. Rename a starred book across a sorted list and pages | A: cached responses | 82 | yes | 8 | 19.8 | 0.0 | 0 |
-| 2. Rename a starred book across a sorted list and pages | B: normalized, worker, every book | 32 | yes | 2 | 0.2 | 5.1 | 0 |
-| 2. Rename a starred book across a sorted list and pages | C: normalized, worker, view windows | 16 | yes | 2 | 0.2 | 5.1 | 0 |
-| 3. A star is refused after another user renames the book | A: cached responses | 85 | yes | 15 | 29.8 | 0.0 | 0 |
-| 3. A star is refused after another user renames the book | B: normalized, worker, every book | 65 | yes | 3 | 0.4 | 2.7 | 0 |
-| 3. A star is refused after another user renames the book | C: normalized, worker, view windows | 57 | yes | 3 | 0.4 | 2.7 | 0 |
-| 4. Another user moves a book between shelves | A: cached responses | 137 | yes | 7 | 9.9 | 0.0 | 1 |
-| 4. Another user moves a book between shelves | B: normalized, worker, every book | 70 | yes | 1 | 0.1 | 3.8 | 0 |
-| 4. Another user moves a book between shelves | C: normalized, worker, view windows | 56 | yes | 1 | 0.1 | 3.8 | 0 |
+| 1. Add a book and star it before the create returns | B: normalized, worker, every book | 44 | yes | 4 | 0.5 | 12.9 | 0 |
+| 1. Add a book and star it before the create returns | C: normalized, worker, view windows | 22 | yes | 4 | 0.5 | 12.9 | 0 |
+| 2. Rename a starred book across a sorted list and pages | A: cached responses | 75 | yes | 8 | 19.8 | 0.0 | 0 |
+| 2. Rename a starred book across a sorted list and pages | B: normalized, worker, every book | 30 | yes | 2 | 0.2 | 5.1 | 0 |
+| 2. Rename a starred book across a sorted list and pages | C: normalized, worker, view windows | 15 | yes | 2 | 0.2 | 5.1 | 0 |
+| 3. A star is refused after another user renames the book | A: cached responses | 163 | yes | 8 | 10.0 | 0.0 | 0 |
+| 3. A star is refused after another user renames the book | B: normalized, worker, every book | 65 | yes | 1 | 0.1 | 2.7 | 0 |
+| 3. A star is refused after another user renames the book | C: normalized, worker, view windows | 54 | yes | 1 | 0.1 | 2.7 | 0 |
+| 4. Another user moves a book between shelves | A: cached responses | 139 | yes | 7 | 9.9 | 0.0 | 1 |
+| 4. Another user moves a book between shelves | B: normalized, worker, every book | 67 | yes | 1 | 0.1 | 3.8 | 0 |
+| 4. Another user moves a book between shelves | C: normalized, worker, view windows | 58 | yes | 1 | 0.1 | 3.8 | 0 |
 | 5. Rename the first book in the library so it sorts last | A: cached responses | 83 | yes | 8 | 19.8 | 0.0 | 0 |
-| 5. Rename the first book in the library so it sorts last | B: normalized, worker, every book | 31 | yes | 2 | 0.2 | 3.9 | 0 |
-| 5. Rename the first book in the library so it sorts last | C: normalized, worker, view windows | 20 | yes | 2 | 0.2 | 3.9 | 0 |
+| 5. Rename the first book in the library so it sorts last | B: normalized, worker, every book | 30 | yes | 2 | 0.2 | 3.9 | 0 |
+| 5. Rename the first book in the library so it sorts last | C: normalized, worker, view windows | 17 | yes | 2 | 0.2 | 3.9 | 0 |
 
 | 6. Cold start | First load (ms) | Requests | KB fetched | KB across worker | KB persisted | Restore (ms) | Restore requests | Restored views correct |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | A: cached responses | 56 | 6 | 9.8 | 0.0 | 9.8 | 0 | 0 | yes |
-| B: normalized, worker, every book | 135 | 1 | 1900.2 | 7.6 | 1900.2 | 40 | 0 | yes |
-| C: normalized, worker, view windows | 63 | 6 | 21.6 | 7.6 | 15.0 | 22 | 0 | yes |
+| B: normalized, worker, every book | 136 | 1 | 1900.2 | 7.6 | 1900.2 | 37 | 0 | yes |
+| C: normalized, worker, view windows | 63 | 6 | 21.6 | 7.6 | 15.0 | 19 | 0 | yes |
 
 Feature code: A 30 lines; B 8 lines.
 
@@ -155,7 +155,7 @@ Feature code: A 30 lines; B 8 lines.
    about 170 records instead of 20,000. The prototype still evaluates every
    view on every change, with no indexes.
 6. **After the first load, A pays per edit.** Every A write reloads the views
-   it affects, 20 to 39 KB per edit. B and C fetch only the written record,
+   it affects, 10 to 39 KB per edit. B and C fetch only the written record,
    under 1 KB.
 7. **B and C need less feature code: 8 lines against 30.** A has to know which
    writes and events move books between lists. B and C declare each list once.

@@ -89,10 +89,15 @@ export const JOURNEYS: readonly Journey[] = [
 	},
 	{
 		name: '3. A star is refused after another user renames the book',
-		prepare: (server) => server.refuseStar.add('Harbor'),
+		prepare: (server) => server.refuseStar.add('b2'),
 		intended: (server) => edit(server, 'b2', { starred: true, title: 'Night harbor' }),
 		async act({ design, server }) {
-			const starred = design.update('b2', { starred: true }).catch(() => 'refused');
+			const starred = design.update('b2', { starred: true }).then(
+				() => {
+					throw new Error('journey 3 expects the server to refuse the star');
+				},
+				() => 'refused',
+			);
 			server.update('b2', { title: 'Night harbor' }, 'other');
 			return starred;
 		},

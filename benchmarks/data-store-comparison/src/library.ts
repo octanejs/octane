@@ -92,7 +92,7 @@ export class LibraryServer {
 	revision = 0;
 	bytesSent = 0;
 	requests = 0;
-	/** Titles a star is refused for, to model a domain refusal. */
+	/** Books a star is refused for, by ID, to model a domain refusal. A rename does not escape it. */
 	readonly refuseStar = new Set<string>();
 	private readonly listeners = new Set<(event: ServerEvent) => void>();
 	private next = 0;
@@ -128,7 +128,7 @@ export class LibraryServer {
 	update(id: string, patch: Partial<Book>, by: 'me' | 'other' = 'me'): Book {
 		const book = this.books.get(id);
 		if (!book) throw new Error(`missing ${id}`);
-		if (by === 'me' && patch.starred && this.refuseStar.has(book.title)) throw new Error('refused');
+		if (by === 'me' && patch.starred && this.refuseStar.has(id)) throw new Error('refused');
 		Object.assign(book, patch);
 		this.commit([{ kind: 'put', book: { ...book } }]);
 		return { ...book };
