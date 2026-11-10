@@ -1,4 +1,5 @@
 import ts from 'typescript';
+import { localCalls, type Invocation, type CallContext } from './local-calls.js';
 
 export function scalar(type: ts.Type): boolean {
 	if (type.isUnion()) return type.types.every(scalar);
@@ -82,9 +83,23 @@ function sourcePath(selection: Selection[], path: Key[], writing: boolean): Key[
 	return path;
 }
 
+// Bound the number of distinct nested call paths explored for a write or returned value.
+const MAX_CALL_CONTEXTS = 64;
+
 type LocalWrites = {
+	calls: ReturnType<typeof localCalls>;
 	bindings: Map<ts.Symbol, AssignmentSource[]>;
-	members: (node: ts.Node, visit: (source: ts.Expression) => boolean) => boolean;
+	arguments: (
+		node: ts.Identifier,
+		d: ts.Declaration,
+		frame: CallContext,
+		visit: (source: ts.Expression, frame?: CallContext) => boolean,
+	) => boolean | undefined;
+	members: (
+		node: ts.Node,
+		visit: (source: ts.Expression, frame?: CallContext) => boolean,
+		frame?: CallContext,
+	) => boolean;
 };
 // A file can be queried once per island or store argument. Index its writes once
 // for the checker that owns its symbols, and release them with the source file.
@@ -95,10 +110,17 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 	if (cached?.checker === checker) return cached.writes;
 	const bindings = new Map<ts.Symbol, AssignmentSource[]>();
 	const bindingDefaults = new Set<ts.Node>();
-	const members = new Map<ts.Symbol, (AssignmentSource & { path: Key[] })[]>();
+	const calls = localCalls(file, checker, (symbol) => bindings.has(symbol));
+	const possibleCalls: ts.CallExpression[] = [];
+	const members = new Map<
+		ts.Symbol,
+		(AssignmentSource & { path: Key[]; frame?: CallContext; instance?: CallContext })[]
+	>();
 	const pending: (AssignmentSource & {
-		target: ts.PropertyAccessExpression | ts.ElementAccessExpression;
+		receiver: ts.Expression;
+		key: Key | null; // A shallow copy preserves the source's field names.
 	})[] = [];
+	const assigns = new Set<ts.CallExpression>();
 
 	function keyOf(node: ts.Expression): Key {
 		if (isWrapper(node)) return keyOf(node.expression);
@@ -121,48 +143,199 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 		return ts.isPropertyAccessExpression(node) ? node.name.text : keyOf(node.argumentExpression);
 	}
 
+	function bindingStep(d: ts.BindingElement): Selection {
+		const index = ts.isArrayBindingPattern(d.parent) ? d.parent.elements.indexOf(d) : undefined;
+		if (d.dotDotDotToken) return { offset: index };
+		return index === undefined ? propertyName(d.propertyName ?? d.name) : String(index);
+	}
+
+	function definitelyPresent(value: ts.Expression): boolean {
+		if (isWrapper(value)) return definitelyPresent(value.expression);
+		if (ts.isIdentifier(value)) {
+			const d = localSymbol(checker, value)?.valueDeclaration;
+			return (
+				!!d &&
+				ts.isVariableDeclaration(d) &&
+				!!d.initializer &&
+				d.end <= value.pos &&
+				ts.isVariableDeclarationList(d.parent) &&
+				!!(d.parent.flags & ts.NodeFlags.Const) &&
+				definitelyPresent(d.initializer)
+			);
+		}
+		return (
+			ts.isLiteralExpression(value) ||
+			ts.isObjectLiteralExpression(value) ||
+			ts.isArrayLiteralExpression(value) ||
+			ts.isNewExpression(value) ||
+			ts.isFunctionExpression(value) ||
+			ts.isArrowFunction(value) ||
+			value.kind === ts.SyntaxKind.TrueKeyword ||
+			value.kind === ts.SyntaxKind.FalseKeyword ||
+			value.kind === ts.SyntaxKind.NullKeyword
+		);
+	}
+
+	function inputs(
+		d: ts.ParameterDeclaration,
+		call: ts.CallExpression,
+		path: Key[],
+		writing: boolean,
+		visit: (arg: ts.Expression, path: Key[]) => boolean,
+		fallback: () => boolean,
+	): boolean {
+		const fn = calls.targets.get(call)!;
+		const offset = fn.parameters[0]?.name.getText(file) === 'this' ? 1 : 0;
+		let index = fn.parameters.indexOf(d) - offset;
+		if (index < 0) return false;
+		let many = false;
+		if (d.dotDotDotToken) {
+			if (!path.length && writing) return false;
+			const key = path[0];
+			if (key === undefined) many = true;
+			else if (/^(0|[1-9]\d*)$/.test(key)) index += Number(key);
+			else return false;
+			path = path.slice(1);
+		}
+		let position = 0;
+		let uncertain = false;
+		let present = false;
+		function actual(arg: ts.Expression): boolean {
+			if (ts.isSpreadElement(arg)) {
+				if (ts.isArrayLiteralExpression(arg.expression))
+					return arg.expression.elements.some(actual);
+				// An unknown iterable can supply any remaining slot, including none.
+				uncertain = true;
+				return (many || position <= index) && visit(arg.expression, [undefined, ...path]);
+			}
+			const slot = position++;
+			if (d.initializer && !uncertain && slot === index) present = definitelyPresent(arg);
+			const matches = many
+				? uncertain || slot >= index
+				: slot === index || (uncertain && slot < index);
+			return matches && visit(arg, path);
+		}
+		return call.arguments.some(actual) || (!!d.initializer && !present && fallback());
+	}
+
+	function argumentSources(
+		node: ts.Identifier,
+		declaration: ts.Declaration,
+		frame: CallContext,
+		visit: (source: ts.Expression, frame?: CallContext) => boolean,
+	): boolean | undefined {
+		let d = declaration;
+		let path: Key[] | undefined = [];
+		let ref: ts.Node = node;
+		while (
+			(isMember(ref.parent) && ref.parent.expression === ref) ||
+			(isWrapper(ref.parent) && ref.parent.expression === ref)
+		) {
+			ref = ref.parent;
+			if (isMember(ref)) path.push(memberKey(ref));
+		}
+		const defaults: ts.Expression[] = [];
+		while (path && ts.isBindingElement(d)) {
+			if (d.initializer) defaults.push(d.initializer);
+			path = sourcePath([bindingStep(d)], path, false);
+			d = d.parent.parent;
+		}
+		if (!path || !ts.isParameter(d)) return;
+		if (defaults.some((value) => visit(value, frame))) return true;
+		const invocation = calls.enclosing(frame, d.parent);
+		const read = (call: ts.CallExpression) =>
+			inputs(
+				d,
+				call,
+				path!,
+				false,
+				(arg, keys) => visit(selected(arg, keys) ?? arg, invocation?.outer ?? null),
+				() => visit(d.initializer!, frame),
+			);
+		return invocation ? read(invocation.call) : calls.sites(d.parent).some(read);
+	}
+
 	// Visit the storage locations a local reference may name, including a binding's
 	// initializer and subsequent assignments. Unknown computed keys match any field.
 	function locations(
 		node: ts.Node,
 		writing: boolean,
-		match: (root: ts.Symbol, path: Key[]) => boolean,
+		match: (root: ts.Symbol, path: Key[], instance?: CallContext) => boolean,
+		initial?: CallContext,
+		unbound?: (fn: ts.SignatureDeclaration) => void,
 	): boolean {
-		const active = new Set<ts.Symbol>();
-		const visited = new Map<ts.Symbol, Set<string>>();
-		function trace(node: ts.Node, path: Key[]): boolean {
-			if (isWrapper(node)) return trace(node.expression, path);
+		const states = new Map<
+			CallContext,
+			{ active: Set<ts.Symbol>; visited: Map<ts.Symbol, Set<string>> }
+		>();
+		const activeReturns = new Set<ts.CallExpression>();
+		const joinedReturns = new Map<ts.CallExpression, Set<string>>();
+		let returnVisits = 0;
+		function trace(node: ts.Node, path: Key[], frame: CallContext): boolean {
+			if (isWrapper(node)) return trace(node.expression, path, frame);
 			if (isMember(node)) {
-				return trace(node.expression, [memberKey(node), ...path]);
+				return trace(node.expression, [memberKey(node), ...path], frame);
+			}
+			if (ts.isCallExpression(node) && assigns.has(node)) {
+				// Object.assign returns the target. Its source objects only share nested values.
+				return node.arguments.some(
+					(arg, i) => (i === 0 || path.length > 0) && trace(arg, path, frame),
+				);
+			}
+			if (ts.isCallExpression(node)) {
+				const fn = calls.targets.get(node);
+				if (fn && !activeReturns.has(node)) {
+					const joined = frame === null || ++returnVisits > MAX_CALL_CONTEXTS;
+					if (joined) {
+						const key = JSON.stringify(path);
+						let paths = joinedReturns.get(node);
+						if (paths?.has(key)) return false;
+						if (!paths) joinedReturns.set(node, (paths = new Set()));
+						paths.add(key);
+					}
+					activeReturns.add(node);
+					const next = joined ? null : calls.frame(node, frame);
+					const found = calls.returns(fn).some((result) => trace(result, path, next));
+					activeReturns.delete(node);
+					return found;
+				}
 			}
 			if (ts.isConditionalExpression(node))
-				return trace(node.whenTrue, path) || trace(node.whenFalse, path);
-			if (isLogical(node)) return trace(node.left, path) || trace(node.right, path);
+				return trace(node.whenTrue, path, frame) || trace(node.whenFalse, path, frame);
+			if (isLogical(node)) return trace(node.left, path, frame) || trace(node.right, path, frame);
 			if ((path.length || !writing) && ts.isArrayLiteralExpression(node)) {
 				const [index, ...rest] = path;
 				if (index === undefined || node.elements.some(ts.isSpreadElement)) {
 					return node.elements.some((el) =>
-						ts.isSpreadElement(el) ? trace(el.expression, [undefined, ...rest]) : trace(el, rest),
+						ts.isSpreadElement(el)
+							? trace(el.expression, [undefined, ...rest], frame)
+							: trace(el, rest, frame),
 					);
 				}
 				const item = /^(0|[1-9]\d*)$/.test(index) && node.elements[Number(index)];
-				return !!item && trace(item, rest);
+				return !!item && trace(item, rest, frame);
 			}
 			if ((path.length || !writing) && ts.isObjectLiteralExpression(node)) {
 				const [key, ...rest] = path;
 				return node.properties.some((field) => {
-					if (ts.isSpreadAssignment(field)) return trace(field.expression, path);
+					if (ts.isSpreadAssignment(field)) return trace(field.expression, path, frame);
 					if (!ts.isPropertyAssignment(field) && !ts.isShorthandPropertyAssignment(field))
 						return false;
 					const name = propertyName(field.name);
 					return (
 						(key === undefined || name === undefined || key === name) &&
-						trace(ts.isPropertyAssignment(field) ? field.initializer : field.name, rest)
+						trace(ts.isPropertyAssignment(field) ? field.initializer : field.name, rest, frame)
 					);
 				});
 			}
 			if (!ts.isIdentifier(node)) return false;
 			const symbol = localSymbol(checker, node);
+			let state = states.get(frame);
+			if (!state) {
+				state = { active: new Set(), visited: new Map() };
+				states.set(frame, state);
+			}
+			const { active, visited } = state;
 			if (!symbol || active.has(symbol)) return false;
 			// Conditional aliases can name exponentially many paths. After 64 distinct
 			// paths on one binding, keep the first field and depth and allow any nested keys.
@@ -178,37 +351,59 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 				paths.add(group);
 				path = [path[0], ...Array<Key>(path.length - 1).fill(undefined)];
 			} else paths.add(exact);
-			if (match(symbol, path)) return true;
 			let d = symbol.valueDeclaration;
+			const invocation = frame && d && calls.enclosing(frame, calls.owner(d));
+			// A helper's parameters and locals are fresh at each invocation.
+			if (match(symbol, path, invocation)) return true;
 			if (d?.getSourceFile() !== file) return false;
 			active.add(symbol);
 			let from: Key[] | undefined = path;
 			while (from && ts.isBindingElement(d)) {
-				if (d.initializer && trace(d.initializer, from)) return true;
-				const index = ts.isArrayBindingPattern(d.parent) ? d.parent.elements.indexOf(d) : undefined;
-				const step = d.dotDotDotToken
-					? { offset: index }
-					: index === undefined
-						? propertyName(d.propertyName ?? d.name)
-						: String(index);
-				from = sourcePath([step], from, writing);
+				if (d.initializer && trace(d.initializer, from, frame)) return true;
+				from = sourcePath([bindingStep(d)], from, writing);
 				d = d.parent.parent;
 			}
 			let found = false;
 			if (from && (ts.isVariableDeclaration(d) || ts.isParameter(d))) {
-				if (d.initializer) found = trace(d.initializer, from);
+				if (ts.isParameter(d)) {
+					const parameter = d;
+					if (invocation)
+						found = inputs(
+							parameter,
+							invocation.call,
+							from,
+							writing,
+							(arg, keys) => trace(arg, keys, invocation.outer),
+							() => trace(parameter.initializer!, from!, frame),
+						);
+					else {
+						if (frame === null) {
+							found = calls.sites(d.parent).some((call) =>
+								inputs(
+									parameter,
+									call,
+									from!,
+									writing,
+									(arg, keys) => trace(arg, keys, null),
+									() => trace(parameter.initializer!, from!, null),
+								),
+							);
+						} else unbound?.(d.parent);
+						if (d.initializer) found ||= trace(d.initializer, from, frame);
+					}
+				} else if (d.initializer) found = trace(d.initializer, from, frame);
 				const list = d.parent;
 				if (ts.isVariableDeclarationList(list) && ts.isForOfStatement(list.parent))
-					found ||= trace(list.parent.expression, [undefined, ...from]);
+					found ||= trace(list.parent.expression, [undefined, ...from], frame);
 			}
 			found ||= !!bindings.get(symbol)?.some(({ source, selection }) => {
 				const origin = sourcePath(selection, path, writing);
-				return origin !== undefined && trace(source, origin);
+				return origin !== undefined && trace(source, origin, frame);
 			});
 			active.delete(symbol);
 			return found;
 		}
-		return trace(node, []);
+		return trace(node, [], initial);
 	}
 
 	function propertyName(name: ts.PropertyName | ts.BindingName): Key {
@@ -236,7 +431,11 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 		return source;
 	}
 
-	function memberSources(node: ts.Node, visit: (source: ts.Expression) => boolean): boolean {
+	function memberSources(
+		node: ts.Node,
+		visit: (source: ts.Expression, frame?: CallContext) => boolean,
+		frame?: CallContext,
+	): boolean {
 		if (!members.size) return false;
 		// Check a reference at its consuming use. Its receiver or alias initializer
 		// alone would select the whole object and incorrectly include sibling writes.
@@ -254,6 +453,9 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 				outer = parent.parent;
 			else if (
 				(isWrapper(parent) && parent.expression === outer) ||
+				(ts.isCallExpression(parent) &&
+					((assigns.has(parent) && parent.arguments[0] === outer) ||
+						calls.forwardedArgument(parent) === outer)) ||
 				ts.isArrayLiteralExpression(parent) ||
 				isLogical(parent) ||
 				(ts.isConditionalExpression(parent) &&
@@ -279,15 +481,23 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 		return locations(
 			node,
 			false,
-			(root, read) =>
-				!!members.get(root)?.some(({ path, source, selection }) => {
-					if (
-						!path.every((key, i) => key === undefined || read[i] === undefined || key === read[i])
-					)
-						return false;
-					const origin = sourcePath(selection, read.slice(path.length), false)!;
-					return visit(selected(source, origin) ?? source);
-				}),
+			(root, read, instance) =>
+				!!members
+					.get(root)
+					?.some(({ path, source, selection, frame: originFrame, instance: written }) => {
+						const sourceFrame = calls.atRead(originFrame, written, instance);
+						if (sourceFrame === false) return false;
+						if (
+							!path.every((key, i) => key === undefined || read[i] === undefined || key === read[i])
+						)
+							return false;
+						const origin = sourcePath(selection, read.slice(path.length), false)!;
+						return visit(
+							selected(source, origin) ?? source,
+							sourceFrame === undefined ? frame : sourceFrame,
+						);
+					}),
+			frame,
 		);
 	}
 
@@ -301,7 +511,8 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 				else bindings.set(symbol, [{ source, selection }]);
 			}
 		} else if (isMember(target)) {
-			if (source) pending.push({ target, source, selection });
+			if (source)
+				pending.push({ receiver: target.expression, key: memberKey(target), source, selection });
 		} else if (ts.isArrayLiteralExpression(target)) {
 			target.elements.forEach((entry, index) => {
 				if (ts.isSpreadElement(entry))
@@ -333,7 +544,44 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 		}
 	}
 
+	function recordAssign(node: ts.CallExpression) {
+		const method = node.expression;
+		const receiver = node.arguments[0];
+		if (
+			!receiver ||
+			!isMember(method) ||
+			!ts.isIdentifier(method.expression) ||
+			method.expression.text !== 'Object' ||
+			memberKey(method) !== 'assign' ||
+			!localSymbol(checker, method.expression)?.valueDeclaration?.getSourceFile().hasNoDefaultLib
+		)
+			return;
+		assigns.add(node);
+		function copy(source: ts.Expression) {
+			while (isWrapper(source)) source = source.expression;
+			if (!ts.isObjectLiteralExpression(source)) {
+				pending.push({ receiver, key: null, source, selection: [] });
+				return;
+			}
+			for (const field of source.properties) {
+				if (ts.isSpreadAssignment(field)) copy(field.expression);
+				else {
+					const key = propertyName(field.name);
+					const value = ts.isPropertyAssignment(field)
+						? field.initializer
+						: ts.isShorthandPropertyAssignment(field)
+							? field.name
+							: source;
+					pending.push({ receiver, key, source: value, selection: [] });
+				}
+			}
+		}
+		for (let i = 1; i < node.arguments.length; i++) copy(node.arguments[i]);
+	}
+
 	function scan(node: ts.Node) {
+		if (ts.isCallExpression(node)) possibleCalls.push(node);
+		if (ts.isCallExpression(node)) recordAssign(node);
 		if (
 			ts.isBinaryExpression(node) &&
 			node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
@@ -350,18 +598,52 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 		ts.forEachChild(node, scan);
 	}
 	scan(file);
-	for (const { target, source, selection } of pending) {
-		// Resolve the receiver only. Replacing box.row leaves the old row object untouched.
-		const key = memberKey(target);
-		locations(target.expression, true, (root, receiver) => {
-			const path = [...receiver, key];
-			const values = members.get(root);
-			if (values) values.push({ path, source, selection });
-			else members.set(root, [{ path, source, selection }]);
-			return false;
-		});
+	if (pending.length) for (const call of possibleCalls) calls.scan(call);
+	for (const { receiver, key, source, selection } of pending) {
+		const indexed = new Set<CallContext>();
+		function append(frame: Invocation | undefined, call: ts.CallExpression): Invocation {
+			return frame ? calls.frame(frame.call, append(frame.outer, call)) : calls.frame(call);
+		}
+		function index(frame?: CallContext) {
+			if (indexed.has(frame)) return;
+			// One pair of helpers can call each other on exponentially many paths.
+			// Join their possible arguments when exact call-site indexing exceeds the file budget.
+			if (frame?.outer && indexed.size >= MAX_CALL_CONTEXTS) {
+				index(null);
+				return;
+			}
+			indexed.add(frame);
+			const missing = new Set<ts.CallExpression>();
+			locations(
+				receiver,
+				true,
+				(root, location, instance) => {
+					const path = key === null ? location : [...location, key];
+					const values = members.get(root);
+					const entry = { path, source, selection, frame, instance };
+					if (values) values.push(entry);
+					else members.set(root, [entry]);
+					return false;
+				},
+				frame,
+				(fn) => {
+					if (calls.enclosing(frame, fn)) return;
+					for (const call of calls.sites(fn)) missing.add(call);
+				},
+			);
+			for (const call of missing) index(append(frame ?? undefined, call));
+		}
+		const owner = calls.owner(receiver);
+		const sites = owner && calls.sites(owner);
+		if (sites?.length) for (const call of sites) index(calls.frame(call));
+		else index();
 	}
-	const writes = { bindings, members: memberSources };
+	const writes = {
+		calls,
+		arguments: argumentSources,
+		bindings,
+		members: memberSources,
+	};
 	writesByFile.set(file, { checker, writes });
 	return writes;
 }
@@ -374,23 +656,46 @@ export function walkLocalValues(
 	inspect: (node: ts.Node, visit: (node: ts.Node) => boolean) => boolean | undefined,
 ): boolean {
 	const file = root.getSourceFile();
-	const seen = new Set<ts.Node>();
-	const followed = new Set<ts.Symbol>();
-	function visit(node: ts.Node): boolean {
+	const states = new Map<CallContext, { seen: Set<ts.Node>; followed: Set<ts.Symbol> }>();
+	function walk(node: ts.Node, frame?: CallContext): boolean {
+		let state = states.get(frame);
+		if (!state) {
+			state = { seen: new Set(), followed: new Set() };
+			states.set(frame, state);
+		}
+		const { seen, followed } = state;
+		const visit = (child: ts.Node) => walk(child, frame);
 		if (seen.has(node)) return false;
 		seen.add(node);
 		const result = inspect(node, visit);
 		if (result !== undefined) return result;
+		if (ts.isCallExpression(node)) {
+			const writes = localWrites(file, checker);
+			const fn = writes.calls.targets.get(node);
+			if (fn?.body) {
+				if (writes.calls.forwardedArgument(node)) return node.arguments.some(visit);
+				const context =
+					frame === null || states.size > MAX_CALL_CONTEXTS || writes.calls.enclosing(frame, fn)
+						? null
+						: writes.calls.frame(node, frame);
+				return walk(fn.body, context) || node.arguments.some(visit);
+			}
+		}
 		if (ts.isIdentifier(node) || isMember(node)) {
 			const writes = localWrites(file, checker);
-			if (writes.members(node, visit)) return true;
+			if (writes.members(node, walk, frame)) return true;
 			if (ts.isIdentifier(node)) {
 				const symbol = localSymbol(checker, node);
 				const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
+				const actual =
+					frame !== undefined && declaration
+						? writes.arguments(node, declaration, frame, walk)
+						: undefined;
+				if (actual) return true;
 				if (symbol && declaration?.getSourceFile() === file && !followed.has(symbol)) {
 					followed.add(symbol);
 					if (
-						visit(declaration) ||
+						(actual === undefined && visit(declaration)) ||
 						writes.bindings.get(symbol)?.some(({ source }) => visit(source))
 					)
 						return true;
@@ -416,7 +721,7 @@ export function walkLocalValues(
 		}
 		return !!ts.forEachChild(node, visit);
 	}
-	return visit(root);
+	return walk(root);
 }
 
 /** Values that can cross a renderer boundary, optionally including a verified original store input. */
