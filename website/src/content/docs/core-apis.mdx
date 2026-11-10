@@ -706,12 +706,16 @@ pass of that frame, up to 50 passes; work still queued then waits for the next
 frame. If a task throws, the rest still run and the first error is rethrown.
 
 `flushLayoutSync()` runs the queued work now instead of in the next frame.
-`getPhase()` returns `RenderingPhase.READ` or `RenderingPhase.WRITE` while the
-queue runs a task of that kind, and `RenderingPhase.IDLE` otherwise, which lets
-a library check that its own reads and writes run in the right phase. Commits,
-effects and event handlers currently run in `IDLE`. The queued work runs outside
-a commit, so `flushSync` and `act()` do not wait for it. On the server the queue
-never runs.
+`getPhase()` lets a library check that its own reads and writes run in the
+right phase. It returns `RenderingPhase.READ` in a `readLayout` task and in a
+`useLayoutSnapshot` measurement. It returns `RenderingPhase.WRITE` in a
+`writeLayout` task and during a commit: its DOM mutations, refs, insertion and
+layout effects, and a root's unmount. Everything else is `RenderingPhase.IDLE`,
+including renders, passive effects and event handlers. The queued work runs
+outside a commit, so `act()` does not wait for it. A `flushSync` called from a
+`readLayout` task does not commit there, because a commit would write between
+the queued reads: its updates commit right after the queue has run. On the
+server the queue never runs and the phase is always `IDLE`.
 
 When rendered output depends on the measurement, use
 [`useLayoutSnapshot`](#use-layout-snapshot) instead.
