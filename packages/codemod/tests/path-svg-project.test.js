@@ -452,6 +452,26 @@ it.each([
 		'function Inner() { return <Action><Mark/></Action>; } consume(Inner);',
 	],
 	[
+		'an owner exported only as a type',
+		action,
+		'function Pane(){return <Action><Mark/></Action>} export type { Pane };',
+	],
+	[
+		'an asset import used in its public type',
+		action,
+		'export function Pane(){return <Action><Mark/></Action>} export type Asset = typeof Mark;',
+	],
+	[
+		'a runtime typeof check on the receiver',
+		action,
+		'capture(typeof Action); export function Pane(){return <Action><Mark/></Action>}',
+	],
+	[
+		'a slot used only in a type query',
+		'function Action({children}) { type T = typeof children; return <button/>; }',
+		'export function Pane(){return <Action><Mark/></Action>}',
+	],
+	[
 		'a receiver parameter escape',
 		'function Action(props) { capture(props); return <button>{props.children}</button>; }',
 		'export function Pane() { return <Action><Mark/></Action>; }',
