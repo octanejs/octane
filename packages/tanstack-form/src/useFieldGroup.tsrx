@@ -82,7 +82,8 @@ export type AppFieldExtendedOctaneFieldGroupApi<
 		 */
 		Subscribe: <TSelected = NoInfer<FieldGroupState<TFieldGroupData>>>(props: {
 			selector?: (state: NoInfer<FieldGroupState<TFieldGroupData>>) => TSelected;
-			children: ((state: NoInfer<TSelected>) => FieldGroupRenderable) | FieldGroupRenderable;
+			// Spell out the static values so unknown cannot absorb the callback signature.
+			children: ((state: NoInfer<TSelected>) => FieldGroupRenderable) | {} | null | undefined;
 		}) => ReturnType<FieldGroupFunctionComponent>;
 	};
 

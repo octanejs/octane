@@ -105,7 +105,8 @@ export interface OctaneFormApi<
 				>
 			>,
 		) => TSelected;
-		children: ((state: NoInfer<TSelected>) => FormRenderable) | FormRenderable;
+		// Spell out the static values so unknown cannot absorb the callback signature.
+		children: ((state: NoInfer<TSelected>) => FormRenderable) | {} | null | undefined;
 	}) => ReturnType<FormFunctionComponent>;
 }
 
