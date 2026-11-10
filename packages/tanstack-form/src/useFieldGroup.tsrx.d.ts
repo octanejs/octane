@@ -24,7 +24,7 @@ export type AppFieldExtendedOctaneFieldGroupApi<TFormData, TFieldGroupData, TFie
      */
     Subscribe: <TSelected = NoInfer<FieldGroupState<TFieldGroupData>>>(props: {
         selector?: (state: NoInfer<FieldGroupState<TFieldGroupData>>) => TSelected;
-        children: ((state: NoInfer<TSelected>) => FieldGroupRenderable) | FieldGroupRenderable;
+        children: ((state: NoInfer<TSelected>) => FieldGroupRenderable) | {} | null | undefined;
     }) => ReturnType<FieldGroupFunctionComponent>;
 };
 export declare function useFieldGroup<TFormData, TFieldGroupData, TFields extends DeepKeysOfType<TFormData, TFieldGroupData | null | undefined> | FieldsMap<TFormData, TFieldGroupData>, TOnMount extends undefined | FormValidateOrFn<TFormData>, TOnChange extends undefined | FormValidateOrFn<TFormData>, TOnChangeAsync extends undefined | FormAsyncValidateOrFn<TFormData>, TOnBlur extends undefined | FormValidateOrFn<TFormData>, TOnBlurAsync extends undefined | FormAsyncValidateOrFn<TFormData>, TOnSubmit extends undefined | FormValidateOrFn<TFormData>, TOnSubmitAsync extends undefined | FormAsyncValidateOrFn<TFormData>, TOnDynamic extends undefined | FormValidateOrFn<TFormData>, TOnDynamicAsync extends undefined | FormAsyncValidateOrFn<TFormData>, TOnServer extends undefined | FormAsyncValidateOrFn<TFormData>, TComponents extends Record<string, FieldGroupComponentType<any>>, TFormComponents extends Record<string, FieldGroupComponentType<any>>, TSubmitMeta = never>(opts: {

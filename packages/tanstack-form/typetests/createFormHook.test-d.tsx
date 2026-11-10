@@ -58,6 +58,25 @@ const { useAppForm, withForm, withFieldGroup } = createFormHook({
 });
 
 describe('createFormHook', () => {
+	it('infers Subscribe children from form and field group selectors', () => {
+		const form = useAppForm({ defaultValues: { count: 0 } });
+		form.Subscribe({
+			selector: (state) => state.values.count,
+			children: (count) => expectTypeOf(count).toEqualTypeOf<number>(),
+		});
+
+		withFieldGroup({
+			defaultValues: { name: '' },
+			render: ({ group, children }) => {
+				group.Subscribe({ children });
+				return group.Subscribe({
+					selector: (state) => state.values.name,
+					children: (name) => expectTypeOf(name).toEqualTypeOf<string>(),
+				});
+			},
+		});
+	});
+
 	it('should not break with an infinite type on large schemas', () => {
 		const ActivityKind0_Names = ['Work', 'Rest', 'OnCall'] as const;
 		type ActivityKind0 = (typeof ActivityKind0_Names)[number];

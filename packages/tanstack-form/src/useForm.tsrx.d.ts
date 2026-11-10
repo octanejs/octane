@@ -19,7 +19,7 @@ export interface OctaneFormApi<in out TFormData, in out TOnMount extends undefin
      */
     Subscribe: <TSelected = NoInfer<FormState<TFormData, TOnMount, TOnChange, TOnChangeAsync, TOnBlur, TOnBlurAsync, TOnSubmit, TOnSubmitAsync, TOnDynamic, TOnDynamicAsync, TOnServer>>>(props: {
         selector?: (state: NoInfer<FormState<TFormData, TOnMount, TOnChange, TOnChangeAsync, TOnBlur, TOnBlurAsync, TOnSubmit, TOnSubmitAsync, TOnDynamic, TOnDynamicAsync, TOnServer>>) => TSelected;
-        children: ((state: NoInfer<TSelected>) => FormRenderable) | FormRenderable;
+        children: ((state: NoInfer<TSelected>) => FormRenderable) | {} | null | undefined;
     }) => ReturnType<FormFunctionComponent>;
 }
 /**
