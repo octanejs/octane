@@ -1,5 +1,5 @@
 import { reactRenderer } from './react-renderer.js';
-import { walkLocalValues } from './local-uses.js';
+import { isWrapper, walkLocalValues } from './local-uses.js';
 import ts from 'typescript';
 import { effectReceivers } from './effect-receivers.js';
 import { isBareSvgTag, storeHookUses } from './store-hook-uses.js';
@@ -188,26 +188,6 @@ function nativeReactCompat(module: string, name: string) {
 function skipParens(node: ts.Expression): ts.Expression {
 	while (ts.isParenthesizedExpression(node)) node = node.expression;
 	return node;
-}
-
-/**
- * Whether `node` wraps an expression only for grouping or the type checker.
- */
-function isWrapper(
-	node: ts.Node,
-): node is
-	| ts.ParenthesizedExpression
-	| ts.AsExpression
-	| ts.SatisfiesExpression
-	| ts.NonNullExpression
-	| ts.TypeAssertion {
-	return (
-		ts.isParenthesizedExpression(node) ||
-		ts.isAsExpression(node) ||
-		ts.isSatisfiesExpression(node) ||
-		ts.isNonNullExpression(node) ||
-		ts.isTypeAssertionExpression(node)
-	);
 }
 
 function skipWrappers(node: ts.Expression): ts.Expression {

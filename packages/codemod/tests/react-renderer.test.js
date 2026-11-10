@@ -136,6 +136,112 @@ it.each([
 	expect(result.rules['react-compat'] ?? 0).toBe(blocked ? 0 : 1);
 });
 
+it.each([
+	['model.label = element;', 'model.label', true],
+	['model.label = element; const label = model.label;', 'label', true],
+	["const alias = model; alias['label'] = element;", 'model.label', true],
+	['const alias = model; model.label = element;', 'alias.label', true],
+	['model.label = element;', 'model', true],
+	['model.label = element;', 'model.icon', false],
+	['model.label = element; const alias = model;', 'alias.icon', false],
+	['model.label = "updated";', 'model.label', false],
+	['const other: Model = {label: "", icon: ""}; other.label = element;', 'model.label', false],
+	['const key = Math.random() ? "label" : "icon"; model[key] = element;', 'model.label', true],
+	['model.label = element; const key = Math.random() ? "label" : "icon";', 'model[key]', true],
+	['const box = {left: model, right: model}; box.left.label = element;', 'box.left', true],
+	['let alias; alias = model; alias.label = element;', 'model.label', true],
+	[
+		'const box = { model }; const { model: alias } = box; alias.label = element;',
+		'box.model.label',
+		true,
+	],
+	['const { missing: alias = model } = {}; alias.label = element;', 'model.label', true],
+	['const pick = Math.random() ? model : {label: ""}; pick.label = element;', 'model.label', true],
+	['model.icon = element; const {label: title} = model;', 'title', false],
+	['const key = "icon"; model[key] = element;', 'model.label', false],
+	['const {...copy} = model; copy.label = element;', 'model.label', false],
+	['const rows = ["", ""]; const [,...copy] = rows; copy[0] = element;', 'rows[1]', false],
+	[
+		'const rows = [{}, model]; const [,...copy] = rows; copy[0].label = element;',
+		'rows[1].label',
+		true,
+	],
+	['const box = {row: model}; box.row = {label: "safe", icon: element};', 'box.row.label', false],
+	['const box = {row: model}; box.row = {label: element, icon: "safe"};', 'box.row.label', true],
+	[
+		'const box = {row: model}; ({item:box.row} = {item:{label:element}, label:"decoy"});',
+		'box.row.label',
+		true,
+	],
+	[
+		'const box = {row: model}; ({item:box.row} = {item:{label:"safe"}, label:element});',
+		'box.row.label',
+		false,
+	],
+	['const box = {row:model}; let a; ({row:a}=box); a.label=element;', 'box.row.label', true],
+	['const box = {row:model}; let a; ({row:a}=box); a.label=element;', 'box.row.icon', false],
+	['let a; ({row:a}={row:model}); a.label=element;', 'model.label', true],
+	['let a; ({row:a}={row:model}); a.label=element;', 'model.icon', false],
+	[
+		'const rows=[{},model]; let rest; [,...rest]=rows; rest[0].label=element;',
+		'rows[1].label',
+		true,
+	],
+	[
+		'const rows=[{label:""},model]; let rest; [,...rest]=rows; rest[0].label=element;',
+		'rows[0].label',
+		false,
+	],
+	['let rest; ({...rest}=model); rest.label=element;', 'model.label', false],
+	['const rows=[{row:model}]; let a; for ({row:a} of rows) a.label=element;', 'model.label', true],
+	[
+		'const rows=[{row:model}]; for (const {row:a} of rows) a.label=element;',
+		'rows[0].row.label',
+		true,
+	],
+	[
+		'const source={left:model,right:{label:""}}; const key=Math.random()?"left":"right"; let a; ({[key]:a}=source); a.label=element;',
+		'model.label',
+		true,
+	],
+	['const box={row:model}; box.row={label:element,icon:""};', 'model.label', false],
+	['function update(a=model) { a.label=element; } update();', 'model.label', true],
+	[
+		'const box={row:model}; function update({row:a}=box){ a.label=element; } update();',
+		'model.label',
+		true,
+	],
+	['const pick = Math.random() > 0.5 && model; if (pick) pick.label=element;', 'model.label', true],
+	['for (model.label of [element]) {}', 'model.label', true],
+])('checks property writes before passing %s %s to React', (setup, value, blocked) => {
+	const result = migrate(
+		`value={${value}}`,
+		`
+		type Model = { label: string, icon: string };
+		const model: Model = {label: "", icon: ""};
+		const element = <b/> as unknown as string;
+		${setup}`,
+	);
+	expect(result.notes.some((note) => note.rule === 'bindings' && note.severity === 'error')).toBe(
+		blocked,
+	);
+	expect(result.rules['react-compat'] ?? 0).toBe(blocked ? 0 : 1);
+});
+
+it('checks deeply branching receiver aliases while preserving independent fields', () => {
+	const depth = 24;
+	const aliases = Array.from(
+		{ length: depth },
+		(_, i) => `const row${i + 1} = flag ? row${i}.left : row${i}.right;`,
+	).join('\n');
+	const setup = `declare const flag: boolean, row0: any; ${aliases} row${depth}.label = <b/>;`;
+	const path = 'row0' + '.right'.repeat(depth) + '.label';
+	expect(migrate(`value={${path}}`, setup).notes).toContainEqual(
+		expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+	);
+	expect(migrate('value={row0.other}', setup).rules['react-compat']).toBe(1);
+});
+
 it('checks values assigned by an async iterator before they cross into React', () => {
 	const result = transformModule(
 		`import { Display } from 'example-ui';
@@ -224,4 +330,45 @@ it('checks JSX-valued props on the original React child of an authored island', 
 			message: expect.stringContaining('props or children'),
 		}),
 	);
+});
+
+it.each([
+	...['||', '??', '&&'].flatMap((operator) => [
+		[`const pick = model ${operator} other;`, 'pick.label', false],
+		[`const pick = other ${operator} model;`, 'pick.label', false],
+		[`const pick = model ${operator} model;`, 'pick.icon', true],
+		[`const pick = consume(model) ${operator} other;`, 'pick.label', true],
+	]),
+	['const pick = choose ? model : other;', 'pick.label', false],
+	['const {missing: pick = model} = {};', 'pick.label', false],
+	['const {missing: pick = choose ? (model) : other} = {};', 'pick.label', false],
+	['let pick; ({missing: pick = model} = {});', 'pick.label', false],
+	['let pick; ({pick = model} = {});', 'pick.label', false],
+	['let pick; [[pick = model]] = [[]];', 'pick.label', false],
+	['let pick; ({pick = model} = {});', 'pick', true],
+	['const pick = {row: other}; ({value: pick.row = model} = {});', 'pick.row.icon', true],
+	['const box = {row: model};', 'box.row.label', false],
+	['const box = {model};', 'box', true],
+	['const box = [other, {model}];', 'box[1].model.icon', true],
+	['const box = [other, {model}];', 'box[1].model.label', false],
+	['', '{row: model}', true],
+	['const pick = choose ? model : other;', 'pick.icon', true],
+	['const {missing: pick = model} = {};', 'pick.icon', true],
+	['const pick = model.icon ? other : model;', 'pick.label', true],
+	['const pick = choose ? consume(model) : other;', 'pick.label', true],
+])('checks the selected field of an alias from %s', (setup, read, blocked) => {
+	const result = migrate(
+		`label={${read}}`,
+		`
+		const choose = Math.random() > 0.5;
+		const model = {label: '', icon: ''};
+		const other = {label: '', icon: ''};
+		declare function consume(value: typeof model): typeof model;
+		model.icon = <b/> as unknown as string;
+		${setup}`,
+	);
+	expect(result.notes.some((note) => note.rule === 'bindings' && note.severity === 'error')).toBe(
+		blocked,
+	);
+	expect(result.rules['react-compat'] ?? 0).toBe(blocked ? 0 : 1);
 });
