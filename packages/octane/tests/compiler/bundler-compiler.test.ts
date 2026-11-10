@@ -2162,6 +2162,7 @@ export function App() @{ <Boundary fallback={async (error) => String(error)}><sp
 			`export { ReactCompat } from 'octane/react';`,
 			`const compat = import('octane/react');`,
 			`const compatText = 'octane/react';`,
+			`export { useRead } from 'octane/data/octane';`,
 		].join('\n');
 		const compiler = createOctaneCompiler({ root: '/project' });
 
@@ -2185,6 +2186,7 @@ export function App() @{ <Boundary fallback={async (error) => String(error)}><sp
 		expect(server?.code).toContain(`export { ReactCompat } from 'octane/react/server';`);
 		expect(server?.code).toContain(`const compat = import('octane/react/server');`);
 		expect(server?.code).toContain(`const compatText = 'octane/react';`);
+		expect(server?.code).toContain(`export { useRead } from 'octane/data/octane/server';`);
 	});
 
 	it('returns manifest watch metadata for transforms and pass-through decisions', () => {

@@ -198,6 +198,19 @@ describe('descriptorChildren component marker', () => {
 		}
 	});
 
+	it("imports the data binding's server twin in server output", () => {
+		const source = `import { useRead } from 'octane/data/octane';
+			import { books } from './books.ts';
+			export function List() @{ const list = useRead(books); <p>{String(list.length)}</p> }`;
+		const sources = (code: string) =>
+			parseModule(code, 'compiled.js')
+				.body.filter((node: any) => node.type === 'ImportDeclaration')
+				.map((node: any) => node.source.value);
+		expect(sources(clientCode(source))).toContain('octane/data/octane');
+		expect(sources(serverCode(source))).toContain('octane/data/octane/server');
+		expect(sources(serverCode(source))).not.toContain('octane/data/octane');
+	});
+
 	it('does not special-case an unrelated component named ReactCompat', () => {
 		const source = `import { ReactCompat } from './ordinary.tsrx';
 			export function App() @{ <ReactCompat><button>child</button></ReactCompat> }`;

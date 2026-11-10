@@ -23,9 +23,9 @@ test.afterEach(async ({ page }, testInfo) => {
 });
 
 const PAGES = [
-	{ name: 'Octane', path: '/' },
-	{ name: 'React', path: '/react.html' },
-	{ name: 'Octane with a React island', path: '/mixed.html' },
+	{ name: 'Octane', path: '/', serverRendered: true },
+	{ name: 'React', path: '/react.html', serverRendered: true },
+	{ name: 'Octane with a React island', path: '/mixed.html', serverRendered: false },
 ];
 
 let namespace = 0;
@@ -60,8 +60,39 @@ const book = (page: Page, title: string) =>
 const status = (page: Page) => page.getByRole('status');
 const network = (page: Page) => page.getByRole('region', { name: 'Network' });
 
-for (const { name, path } of PAGES) {
+for (const { name, path, serverRendered } of PAGES) {
 	test.describe(name, () => {
+		if (serverRendered) {
+			test('arrives rendered, and hydrates without loading its data again', async ({
+				page,
+				browser,
+			}) => {
+				const url = `${path}?ns=${Date.now()}-${++namespace}`;
+
+				// Without JavaScript the server's page is the whole page.
+				const context = await browser.newContext({ javaScriptEnabled: false });
+				const staticPage = await context.newPage();
+				await staticPage.goto(url);
+				await expect(book(staticPage, 'Kindred')).toBeVisible();
+				await expect(staticPage.getByText('3 books · 0 read')).toBeVisible();
+				await context.close();
+
+				const loads: string[] = [];
+				page.on('request', (request) => {
+					if (new URL(request.url()).pathname === '/data') loads.push(request.postData() ?? '');
+				});
+				await page.goto(url);
+				await expect(page.getByText('3 books · 0 read')).toBeVisible();
+				// Hydration is complete once an edit works; nothing was loaded to get there.
+				await book(page, 'Kindred').getByRole('checkbox').click();
+				await expect(status(page)).toHaveText('Saved');
+				// The edit is the only request the page has made.
+				expect(loads).toHaveLength(1);
+				expect(loads[0]).toContain('books.setRead');
+				await expect(page.getByText('3 books · 1 read')).toBeVisible();
+			});
+		}
+
 		test('shows an edit before the reply and settles it in one round trip', async ({ page }) => {
 			await open(page, path);
 			const writes = await holdWrites(page);
