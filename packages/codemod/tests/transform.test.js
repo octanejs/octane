@@ -71,6 +71,136 @@ export const Local = ({ Shadowed }: { Shadowed: () => null }) => <Shadowed/>;`;
 		expect(result.code).toContain('ReactComponent as Glyph');
 	});
 
+	it('reports bare SVG component aliases at their JSX sites, including inside ReactCompat', () => {
+		const source = `import { ReactCompat } from 'octane/react';
+import Mark from './mark.svg';
+import { default as Raw, ReactComponent as Named } from './other.svg';
+import Explicit from './mark.svg?react';
+import Inline from '!!@svgr/webpack!./mark.svg';
+import Query from './mark.svg?fallback=.svg';
+import Replaced from './replaced.svg';
+import lower from './lower.svg';
+const Alias = (Mark satisfies unknown)!;
+const Choice = condition ? Fallback : Alias;
+export function View({ Mark }) { return <>
+  <Choice></Choice>
+  <ReactCompat><Raw/></ReactCompat>
+  <img src={Raw}/><Mark/><lower/><Named/><Explicit/><Inline/><Query/><Replaced/>
+</>; }`;
+		const result = transformModule(source, 'view.tsx', {
+			resolveSpecifier: (s) => (s === './replaced.svg' ? './replaced.tsrx' : null),
+		});
+		const lines = source.split('\n');
+		expect(
+			result.notes.filter((n) => n.rule === 'svg-issuer').map((n) => lines[n.line - 1].trim()),
+		).toEqual(['<Choice></Choice>', '<ReactCompat><Raw/></ReactCompat>']);
+	});
+
+	it('reports SVG fallback values used as tags and skips values used only as tests', () => {
+		const source = `import Mark from './mark.svg';
+const Nullish = custom ?? Mark;
+const First = Mark ?? other;
+const Fallback = custom || Mark;
+const Preferred = Mark || other;
+const Conditional = enabled && Mark;
+const Guard = Mark && OtherIcon;
+const Branch = Mark ? OtherIcon : AnotherIcon;
+export function Choices() { return <>
+  <Nullish/>
+  <First/>
+  <Fallback/>
+  <Preferred/>
+  <Conditional/>
+  <Guard/>
+  <Branch/>
+</>; }
+export function Slot({ Icon: DefaultIcon = Mark }) { return <DefaultIcon/>; }
+export function render(Icon = Mark) { return <Icon/>; }
+export function Separate({Icon = Mark}) { function Child(Icon) { return <Icon/>; } return <Child/>; }`;
+		const { notes } = transformModule(source, 'view.tsx');
+		const lines = source.split('\n');
+		expect(
+			notes.filter((n) => n.rule === 'svg-issuer').map((n) => lines[n.line - 1].trim()),
+		).toEqual([
+			'<Nullish/>',
+			'<First/>',
+			'<Fallback/>',
+			'<Preferred/>',
+			'<Conditional/>',
+			'export function Slot({ Icon: DefaultIcon = Mark }) { return <DefaultIcon/>; }',
+			'export function render(Icon = Mark) { return <Icon/>; }',
+		]);
+	});
+
+	it('reports bare SVG defaults selected by local destructuring', () => {
+		const source = `import Mark from './mark.svg';
+export function View(props, items) {
+  const { icon: ConstIcon = Mark, plain: Plain } = props;
+  let { icon: MutableIcon = Mark } = props;
+  const [ArrayIcon = Mark] = items;
+  return <>
+    <ConstIcon/>
+    <MutableIcon/>
+    <ArrayIcon/>
+    <Plain/>
+    <img src={MutableIcon}/>
+  </>;
+}`;
+		const lines = source.split('\n');
+		const { notes } = transformModule(source, 'view.tsx');
+		expect(
+			notes.filter((n) => n.rule === 'svg-issuer').map((n) => lines[n.line - 1].trim()),
+		).toEqual(['<ConstIcon/>', '<MutableIcon/>', '<ArrayIcon/>']);
+	});
+
+	it('checks whether an inline object supplies the destructured tag', () => {
+		const source = `import Mark from './mark.svg';
+export function View(overrides) {
+  const {icon: Native = Mark} = {...overrides, icon: 'span'};
+  const {icon: Dynamic = Mark} = {icon: 'span', ...overrides};
+  const {icon: Missing = Mark} = {};
+  const {icon: Cleared = Mark} = {icon: void 0};
+  const {'1': Overridden = Mark} = {'1': 'span', 1n: void 0};
+  const {reset, icon: AfterGetter = Mark} = {get reset() {this.icon = undefined}, icon: 'span'};
+  return <>
+    <Native/>
+    <Dynamic/>
+    <Missing/>
+    <Cleared/>
+    <Overridden/>
+    <AfterGetter/>
+  </>;
+}`;
+		const lines = source.split('\n');
+		const { notes } = transformModule(source, 'view.tsx');
+		expect(
+			notes.filter((n) => n.rule === 'svg-issuer').map((n) => lines[n.line - 1].trim()),
+		).toEqual(['<Dynamic/>', '<Missing/>', '<Cleared/>', '<Overridden/>', '<AfterGetter/>']);
+	});
+
+	it('only reports reachable SVG operands in logical tag choices', () => {
+		const choices = [
+			["'button' || Mark", false],
+			['(false && Mark) || Good', false],
+			['(() => <span/>) ?? Mark', false],
+			['false ?? Mark', false],
+			['prop ?? Mark', true],
+			['read() || Mark', true],
+			['null ?? Mark', true],
+			["'' || Mark", true],
+			['true && Mark', true],
+		];
+		for (const [choice, reachable] of choices) {
+			const source = `import Mark from './mark.svg';
+				export function View({prop, read, Good}) { const Tag = ${choice}; return <Tag/>; }`;
+			const { notes } = transformModule(source, 'view.tsx');
+			expect(
+				notes.some((n) => n.rule === 'svg-issuer'),
+				choice,
+			).toBe(reachable);
+		}
+	});
+
 	for (const input of INPUTS) {
 		it(`migrates ${input} to source the compiler accepts`, async () => {
 			const { result, output } = migrate(input);

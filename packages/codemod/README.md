@@ -226,9 +226,11 @@ The codemod checks how each component uses the hook. Conditions, scalar output, 
 
 When the file uses the project’s React 19.2+ automatic JSX runtime, a service read with a verified handle can receive a self-closing component from an installed React package with literal props, for example `store.read(notices).show(<Message id="saved" />)`. The generated code creates the original React element, so the service can render it later under its React provider.
 
-Dynamic JSX payloads, opaque store values rendered as children, and components passed to unknown renderers still require manual migration. A component that renders a bare SVG import, including through a local alias, also needs review. Changing the importer from `.tsx` to `.tsrx` can cause an SVG loader to return an asset URL.
+Dynamic JSX payloads, opaque store values rendered as children, and components passed to unknown renderers still require manual migration.
 
 ## Path-only SVG components
+
+When a file becomes `.tsrx`, its bundler may resolve a bare default SVG import to an asset URL. The codemod reports an error at each JSX tag that still uses that import, including tags selected through local aliases, fallback expressions or default values on parameters and destructured bindings, and tags inside `ReactCompat`. The check follows a binding’s declared default even when a caller always supplies the property. Configure the SVG loader for `.tsrx`, or move the import and rendering into a React-owned `.tsx` component hosted by `ReactCompat`. Using an SVG URL as an image source is unaffected.
 
 Use `--svg-paths` (or `svgPaths: true` in the JavaScript API) when your bundler's bare default SVG import renders the authored SVG geometry, applies caller props to its root, and the same asset with `?raw` imports its XML as a string. For aliased requests, the bundler and TypeScript paths must resolve to the same local file. Check both your development and production loaders before enabling this option. Custom SVG templates, optimizers that rewrite the rendered geometry, and URL-producing loaders can have different behavior.
 
@@ -238,7 +240,7 @@ The codemod follows an icon through local components and directly imported compo
 
 The generated SVG uses the native SVG namespace. In a client mount, Octane places an explicit `xmlns` attribute in the XMLNS namespace; React sets that attribute without a namespace. Applications that inspect the namespace of the attribute itself should keep their existing rendering path.
 
-Shared component values, React island uses, refs, spread props, and SVGs with unsupported elements keep their original imports. The default migration keeps the existing diagnostics for bare SVGs.
+Shared component values, React island uses, refs, spread props, and SVGs with unsupported elements keep their original imports.
 
 ## Local recipes
 
