@@ -94,6 +94,15 @@ function renderType(type: ts.Type) {
 	return members.some((t) => !!(t.flags & (ts.TypeFlags.Object | ts.TypeFlags.BooleanLike)));
 }
 
+// Type queries and type-only exports cannot hand a component or its children to a renderer.
+export function renderUses(refs: ts.Identifier[]) {
+	return refs.filter((ref) => {
+		let name: ts.EntityName = ref;
+		while (ts.isQualifiedName(name.parent)) name = name.parent;
+		return !ts.isTypeQueryNode(name.parent) && !ts.isTypeOnlyExportDeclaration(ref.parent);
+	});
+}
+
 /** Follow the value being rendered all the way to its containing component's return. */
 export function nativeOutputOwner(
 	value: ts.Node,
@@ -224,6 +233,7 @@ export function forwardedProps(
 		contains(file, (node) => ts.isIdentifier(node) && node.text === 'eval')
 	)
 		return () => false;
+	const references = destination === 'text' ? uses : (id: ts.Identifier) => renderUses(uses(id));
 	const directOnly = new Map<ts.Symbol, Map<string, boolean>>();
 	const withSiblings = new Map<ts.Symbol, Map<string, boolean>>();
 	function check(symbol: ts.Symbol, prop: string, allowSiblings: boolean, depth: number): boolean {
@@ -262,7 +272,7 @@ export function forwardedProps(
 				(destination !== 'text' && ts.isVariableDeclaration(decl))) &&
 			decl.name &&
 			ts.isIdentifier(decl.name) &&
-			!uses(decl.name).every((ref) => {
+			!references(decl.name).every((ref) => {
 				const p = ref.parent;
 				if (destination !== 'text' && (ts.isExportSpecifier(p) || ts.isExportAssignment(p)))
 					return true;
@@ -287,7 +297,7 @@ export function forwardedProps(
 			)
 		)
 			return false;
-		const refs = uses(binding.name);
+		const refs = references(binding.name);
 		if (destination !== 'text') {
 			// Direct destructuring prevents another call from observing this slot through the props object.
 			return (

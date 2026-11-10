@@ -555,6 +555,36 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		expect(app).toContain('<Tooltip.Provider />');
 	});
 
+	it('migrates an SVG through a receiver and owner with public type queries', async () => {
+		const root = project({
+			'mark.svg': '<svg viewBox="0 0 10 10"><path d="M0 0L5 5Z"/></svg>',
+			'Pane.tsx': `import type { ComponentProps, ReactNode } from 'react';
+import Mark from './mark.svg';
+function Button({ children }: { children: ReactNode }) {
+	type Child = typeof children;
+	return <button>{children}</button>;
+}
+export function Pane({ label }: { label: string }) {
+	return <Button><Mark className={label} /></Button>;
+}
+export type Props = ComponentProps<typeof Pane>;
+export type ButtonProps = ComponentProps<typeof Button>;`,
+			'consumer.ts': `import type { Props } from './Pane.tsrx';
+const valid: Props = { label: 'ok' };
+// @ts-expect-error The migrated component still requires a string label.
+const invalid: Props = { label: 42 };`,
+			'raw.d.ts': "declare module '*?raw' { const xml: string; export default xml; }",
+			'tsconfig.json': JSON.stringify({
+				extends: path.join(REPO, 'packages/octane/typetests/tsconfig.json'),
+				include: ['Pane.tsrx', '*.ts'],
+			}),
+		});
+		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+		const { files } = await runCodemod([path.join(root, 'Pane.tsx')], { root, svgPaths: true });
+		expect(files.find((file) => file.file === 'Pane.tsx').rules['svg-paths']).toBe(1);
+		typecheckProject(root);
+	});
+
 	it('typechecks the generated Strong span wrapper and its callers', async () => {
 		const root = project({
 			'Inline.tsx': `import type { ComponentProps as Props, ReactElement } from 'react';
