@@ -83,6 +83,9 @@ const theme = (
 			font-size: 0.85rem;
 			box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 		}
+		.popup:focus {
+			outline: none;
+		}
 		.item {
 			display: flex;
 			justify-content: space-between;
@@ -189,6 +192,7 @@ export function PlaygroundVersionCombobox(props: PlaygroundVersionComboboxProps)
 	const showAll = () => show(Math.max(items.indexOf(value), 0));
 	const choose = (item: string) => {
 		close();
+		input.current?.focus();
 		if (item !== value) onSelect(item);
 	};
 	const onKeyDown = (event: KeyboardEvent) => {
@@ -210,7 +214,17 @@ export function PlaygroundVersionCombobox(props: PlaygroundVersionComboboxProps)
 		<label class={theme.label} for="pg-octane-version">
 			Octane version
 		</label>
-		<div class={theme.field}>
+		<div
+			class={theme.field}
+			onKeyDown={onKeyDown}
+			// The list can hold focus too (a press on its padding or scrollbar), so
+			// the popup closes only once focus leaves the whole field.
+			onFocusOut={(event: FocusEvent) => {
+				if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) {
+					close();
+				}
+			}}
+		>
 			<input
 				ref={input}
 				id="pg-octane-version"
@@ -230,11 +244,9 @@ export function PlaygroundVersionCombobox(props: PlaygroundVersionComboboxProps)
 					setDraft((event.currentTarget as HTMLInputElement).value);
 					show(0);
 				}}
-				onKeyDown={onKeyDown}
 				onClick={() => {
 					if (!open) showAll();
 				}}
-				onBlur={close}
 			/>
 			<button
 				type="button"
@@ -269,9 +281,7 @@ export function PlaygroundVersionCombobox(props: PlaygroundVersionComboboxProps)
 				role="listbox"
 				aria-label="Octane versions"
 				hidden={!open}
-				// Keep focus in the input on any press inside the list, so its blur
-				// does not close the popup.
-				onMouseDown={(event: MouseEvent) => event.preventDefault()}
+				tabIndex={-1}
 			>
 				@for (const item of options; key item) {
 					<li
