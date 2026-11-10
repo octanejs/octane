@@ -7,6 +7,7 @@ const MANAGED_DOM_WRITE = 'OCTANE_STRONG_MANAGED_DOM_WRITE';
 const RAW_HTML_WRITE = 'OCTANE_STRONG_RAW_HTML_WRITE';
 const OWN_MARKUP_QUERY = 'OCTANE_STRONG_OWN_MARKUP_QUERY';
 const LAYOUT_SNAPSHOT_WRITE = 'OCTANE_STRONG_LAYOUT_SNAPSHOT_WRITE';
+const DEFERRED_CURRENT_TARGET = 'OCTANE_STRONG_DEFERRED_CURRENT_TARGET';
 
 const IMPORTS = "import { useEffect, useLayoutEffect, useRef, useState } from 'octane';\n";
 const MODES = [
@@ -665,6 +666,109 @@ describe('Strong DOM writes in a layout snapshot measurement', () => {
     return r.current.offsetWidth;
   }, { initial: 0 });
   return <div ref={r}>{String(width)}</div>;
+}`,
+			'/src/App.tsrx',
+		);
+	});
+});
+
+const ASYNC_HANDLER = 'onClick={async (event) => { BODY }}';
+const handler = (body: string, attribute = 'onClick={(event) => { BODY }}') =>
+	`export function App({ save, element }) {
+  return <button ${attribute.replace('BODY', body)}>Save</button>;
+}`;
+
+describe('Strong event.currentTarget after the handler returns', () => {
+	it.each([
+		['a timer callback', 'setTimeout(() => event.currentTarget.focus(), 100);'],
+		['an animation frame', 'window.requestAnimationFrame(() => { event.currentTarget.blur(); });'],
+		['a promise continuation', 'save().then(() => { event.currentTarget.disabled = false; });'],
+		['an optional read', 'queueMicrotask(() => event?.currentTarget?.focus());'],
+		[
+			'a callback created in a timer',
+			'setTimeout(() => [1].forEach(() => event.currentTarget.focus()));',
+		],
+		['code after an await', 'await save(); event.currentTarget.disabled = false;', ASYNC_HANDLER],
+		[
+			'a branch after an awaited value',
+			'const ok = await save(); if (ok) { event.currentTarget.focus(); }',
+			ASYNC_HANDLER,
+		],
+		[
+			'a callback created after an await',
+			'await save(); [1].forEach(() => event.currentTarget.focus());',
+			ASYNC_HANDLER,
+		],
+		[
+			'an await in a nested async function',
+			'(async () => { await save(); event.currentTarget.focus(); })();',
+		],
+		[
+			'a capture handler',
+			'setTimeout(() => event.currentTarget.focus());',
+			'onClickCapture={(event) => { BODY }}',
+		],
+	])('rejects %s', (_label, body, attribute?: string) => {
+		expectStrongError(handler(body, attribute), '/src/App.tsrx', DEFERRED_CURRENT_TARGET);
+	});
+
+	it('rejects a handler held by a local, declared in another statement', () => {
+		expectStrongError(
+			`const press = (event) => { setTimeout(() => event.currentTarget.focus()); };
+export function App() {
+  return <button onClick={press}>Save</button>;
+}`,
+			'/src/App.tsrx',
+			DEFERRED_CURRENT_TARGET,
+		);
+	});
+
+	it('names the parameter and the capture to write', () => {
+		const message = messageOf(
+			handler('setTimeout(() => e.currentTarget.focus());', 'onClick={(e) => { BODY }}'),
+			'/src/App.tsrx',
+			DEFERRED_CURRENT_TARGET,
+		);
+		expect(message).toContain('`e.currentTarget`');
+		expect(message).toContain('const element = e.currentTarget');
+	});
+
+	it.each([
+		['a synchronous read', 'event.currentTarget.focus();'],
+		[
+			'an element captured before the timer',
+			'const el = event.currentTarget; setTimeout(() => el.focus());',
+		],
+		[
+			'a read before the await',
+			'const el = event.currentTarget; await save(); el.disabled = false;',
+			ASYNC_HANDLER,
+		],
+		[
+			'a read after an await that may be skipped',
+			'if (element) { await save(); } event.currentTarget.focus();',
+			ASYNC_HANDLER,
+		],
+		['a synchronous callback', '[1].forEach(() => event.currentTarget.focus());'],
+		['event.target in a timer', 'setTimeout(() => event.target.focus());'],
+		[
+			'a timer callback with its own parameter',
+			'setTimeout((event) => event.currentTarget.focus(), 0, element);',
+		],
+		[
+			'a shadowed timer',
+			'const setTimeout = (run) => run(); setTimeout(() => event.currentTarget.focus());',
+		],
+		['an object that is not the event', 'setTimeout(() => element.currentTarget.focus());'],
+	])('allows %s', (_label, body, attribute?: string) => {
+		expectStrongValid(handler(body, attribute), '/src/App.tsrx');
+	});
+
+	it('allows a deferred read in a callback passed to a component', () => {
+		expectStrongValid(
+			`import { Field } from './Field.tsrx';
+export function App() {
+  return <Field onCommit={(event) => { setTimeout(() => event.currentTarget.focus()); }} />;
 }`,
 			'/src/App.tsrx',
 		);

@@ -23,14 +23,14 @@ const SKIP_KEYS = new Set([
 	'returnType',
 	'typeParameters',
 ]);
-const TIMER_GLOBALS = new Set([
+export const TIMER_GLOBALS = new Set([
 	'setTimeout',
 	'setInterval',
 	'requestAnimationFrame',
 	'requestIdleCallback',
 	'queueMicrotask',
 ]);
-const PROMISE_CONTINUATIONS = new Set(['then', 'catch', 'finally']);
+export const PROMISE_CONTINUATIONS = new Set(['then', 'catch', 'finally']);
 const ARRAY_MUTATORS = new Set([
 	'copyWithin',
 	'fill',

@@ -2,11 +2,13 @@ import { ATTRIBUTE_ALIASES } from '../dom-tables.js';
 import { analyzeStrongHookBindings } from './hook-deps.js';
 import { REF_HOOKS } from './hook-names.js';
 import { createRendererRegionResolver } from './renderer-boundaries.js';
+import { PROMISE_CONTINUATIONS, TIMER_GLOBALS } from './strong-state.js';
 
 export const STRONG_MANAGED_DOM_WRITE = 'OCTANE_STRONG_MANAGED_DOM_WRITE';
 export const STRONG_RAW_HTML_WRITE = 'OCTANE_STRONG_RAW_HTML_WRITE';
 export const STRONG_OWN_MARKUP_QUERY = 'OCTANE_STRONG_OWN_MARKUP_QUERY';
 export const STRONG_LAYOUT_SNAPSHOT_WRITE = 'OCTANE_STRONG_LAYOUT_SNAPSHOT_WRITE';
+export const STRONG_DEFERRED_CURRENT_TARGET = 'OCTANE_STRONG_DEFERRED_CURRENT_TARGET';
 
 const SKIP_KEYS = new Set([
 	'type',
@@ -95,14 +97,25 @@ const REF_PROP = /\bref\s*=\s*\{|\{\s*ref\s*\}/;
 const WRITE_ACCESS = new RegExp(`(?:\\.|\\[\\s*['"\`])\\s*(?:${WRITE_NAMES.join('|')})\\b`);
 const QUERY_METHOD = /\b(?:getElementById|getElementsByClassName|querySelector)/;
 
+// Code that runs after an event handler returns: after an `await`, or in a
+// timer or promise callback.
+const DEFERRAL = new RegExp(
+	`\\bawait\\b|\\b(?:${[...TIMER_GLOBALS].join('|')})\\b|\\.\\s*(?:${[...PROMISE_CONTINUATIONS].join('|')})\\b`,
+);
+
 function mayWrite(text) {
 	return REF_PROP.test(text) && WRITE_ACCESS.test(text);
+}
+
+function mayDefer(text) {
+	return text.includes('currentTarget') && DEFERRAL.test(text);
 }
 
 export function mayHaveStrongDOM(source) {
 	return (
 		ESCAPED_NAME.test(source) ||
 		mayWrite(source) ||
+		mayDefer(source) ||
 		(source.includes('document') && QUERY_METHOD.test(source))
 	);
 }
@@ -276,6 +289,14 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 	const queries = [];
 	// The functions `useLayoutSnapshot` runs in its batched read pass.
 	const measurements = new Set();
+	// The event parameter of each handler on a rendered element, and every
+	// `name.currentTarget` read with the functions around it.
+	const eventParameters = new Map();
+	const currentTargets = [];
+	const deferredCallbacks = new Set();
+	// Per enclosing function: it runs after the task that created it, or the
+	// statement being visited follows an `await` in it.
+	const late = [];
 	const boundaries = [];
 	const functions = [];
 	// TSRX row and catch bindings are not scopes in the shared hook analysis.
@@ -517,14 +538,28 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 			case 'ArrowFunctionExpression':
 				boundaries.push(node);
 				functions.push(node);
+				late.push(deferredCallbacks.has(node));
 				try {
 					for (const parameter of node.params) visitPattern(parameter);
 					visit(node.body);
 				} finally {
 					boundaries.pop();
 					functions.pop();
+					late.pop();
 				}
 				return;
+			case 'BlockStatement': {
+				if (functions.at(-1)?.async !== true) break;
+				// Statements after one that awaits run in a later task. A block
+				// may be skipped, so the code after it is not proven to.
+				const before = late.at(-1);
+				for (const statement of node.body) {
+					visit(statement);
+					if (awaits(statement)) late[late.length - 1] = true;
+				}
+				late[late.length - 1] = before;
+				return;
+			}
 			case 'VariableDeclarator': {
 				const record = refDeclarators.get(node);
 				if (record !== undefined) record.boundary = boundaries.at(-1);
@@ -588,6 +623,7 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 						? recordElement(node)
 						: null;
 				for (const attribute of opening.attributes) {
+					if (element !== null) recordHandler(attribute);
 					if (
 						element !== null &&
 						attribute.type === 'JSXAttribute' &&
@@ -635,6 +671,19 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 				return;
 			case 'MemberExpression': {
 				if (refCurrent(node) !== null) return;
+				if (propertyName(node) === 'currentTarget') {
+					const object = unwrap(node.object);
+					const binding = object?.type === 'Identifier' ? bindingOf(object) : null;
+					if (binding) {
+						currentTargets.push({
+							node,
+							binding,
+							name: object.name,
+							functions: functions.slice(),
+							late: late.lastIndexOf(true),
+						});
+					}
+				}
 				visit(node.object);
 				if (node.computed) visit(node.property);
 				return;
@@ -667,13 +716,14 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 			case 'CallExpression': {
 				const callee = unwrap(node.callee);
 				if (callNames.get(node) === 'useLayoutSnapshot') {
-					// Inline, or an unreassigned local that holds the function.
-					let measure = unwrap(node.arguments[0]);
-					if (measure?.type === 'Identifier') {
-						const declaration = declarations.get(bindingOf(measure));
-						measure = declaration?.current === false ? unwrap(declaration.init) : null;
+					const measure = localFunction(node.arguments[0]);
+					if (measure !== null) measurements.add(measure);
+				}
+				if (runsLater(callee)) {
+					for (const argument of node.arguments) {
+						const callback = unwrap(argument);
+						if (FUNCTIONS.has(callback?.type)) deferredCallbacks.add(callback);
 					}
-					if (FUNCTIONS.has(measure?.type)) measurements.add(measure);
 				}
 				if (callee?.type === 'MemberExpression') {
 					recordWrite(callee, callee, node.arguments);
@@ -692,6 +742,58 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 		for (const key in node) {
 			if (!SKIP_KEYS.has(key) && !key.startsWith('_octane')) visit(node[key]);
 		}
+	}
+
+	// Inline, or an unreassigned local that holds the function.
+	function localFunction(expression) {
+		let value = unwrap(expression);
+		if (value?.type === 'Identifier') {
+			const declaration = declarations.get(bindingOf(value));
+			value = declaration?.current === false ? unwrap(declaration.init) : null;
+		}
+		return FUNCTIONS.has(value?.type) ? value : null;
+	}
+
+	function recordHandler(attribute) {
+		if (
+			attribute.type !== 'JSXAttribute' ||
+			!/^on[A-Z]/.test(attributeName(attribute) ?? '') ||
+			attribute.value?.type !== 'JSXExpressionContainer'
+		) {
+			return;
+		}
+		const handler = localFunction(attribute.value.expression);
+		const parameter = handler?.params[0];
+		if (parameter?.type !== 'Identifier') return;
+		const binding = analysis.functionScopes.get(handler)?.bindings.get(parameter.name);
+		if (binding && !binding.reassigned) eventParameters.set(binding, handler);
+	}
+
+	function globalName(expression) {
+		const value = unwrap(expression);
+		return value?.type === 'Identifier' && bindingOf(value) === null ? value.name : null;
+	}
+
+	// A timer, or a promise continuation: its callbacks run in a later task.
+	function runsLater(callee) {
+		if (callee?.type !== 'MemberExpression') return TIMER_GLOBALS.has(globalName(callee));
+		const name = propertyName(callee);
+		const object = globalName(callee.object);
+		return (
+			PROMISE_CONTINUATIONS.has(name) ||
+			(TIMER_GLOBALS.has(name) && (object === 'window' || object === 'globalThis'))
+		);
+	}
+
+	function awaits(statement) {
+		if (statement.type === 'VariableDeclaration') {
+			return statement.declarations.some(
+				(declaration) => unwrap(declaration.init)?.type === 'AwaitExpression',
+			);
+		}
+		let expression = statement.type === 'ExpressionStatement' ? unwrap(statement.expression) : null;
+		if (expression?.type === 'AssignmentExpression') expression = unwrap(expression.right);
+		return expression?.type === 'AwaitExpression';
 	}
 
 	function recordWrite(target, reportNode, args) {
@@ -745,9 +847,16 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 	// Refs, their aliases and a query's markup all belong to one top-level
 	// statement's functions, so statements without those spellings are skipped.
 	const mayQuery = source.includes('document') || ESCAPED_NAME.test(source);
+	// A handler may be declared in one statement and attached in another.
+	const defers = mayDefer(source);
 	for (const statement of ast.body ?? []) {
 		const text = source.slice(statement.start, statement.end);
-		if (ESCAPED_NAME.test(text) || mayWrite(text) || (mayQuery && QUERY_METHOD.test(text))) {
+		if (
+			defers ||
+			ESCAPED_NAME.test(text) ||
+			mayWrite(text) ||
+			(mayQuery && QUERY_METHOD.test(text))
+		) {
 			visit(statement);
 		}
 	}
@@ -850,6 +959,16 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 			STRONG_LAYOUT_SNAPSHOT_WRITE,
 			write.node,
 			`Strong mode does not allow \`${write.spelling.join('.')}\` inside a useLayoutSnapshot measurement. Octane runs the queued measurements together so the browser lays out once, and a DOM write between them makes every later read lay out again. Return the measurement only. Render the value from the snapshot, or move the write to useLayoutEffect.`,
+		);
+	}
+
+	for (const read of currentTargets) {
+		const handler = eventParameters.get(read.binding);
+		if (handler === undefined || read.late < read.functions.indexOf(handler)) continue;
+		report(
+			STRONG_DEFERRED_CURRENT_TARGET,
+			read.node,
+			`Strong mode does not allow \`${read.name}.currentTarget\` after the event handler has returned: after an \`await\`, or in a timer or promise callback. \`currentTarget\` names the element only while the event is dispatched, so this read is empty. Capture it first with \`const element = ${read.name}.currentTarget\` at the top of the handler, then use \`element\`.`,
 		);
 	}
 

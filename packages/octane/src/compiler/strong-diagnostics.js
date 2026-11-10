@@ -459,6 +459,15 @@ export const STRONG_DIAGNOSTICS = [
 		replacement: 'Attach a ref to the element and use `ref.current` in the event or effect.',
 	},
 	{
+		code: 'OCTANE_STRONG_DEFERRED_CURRENT_TARGET',
+		section: 'dom',
+		severity: 'error',
+		detects:
+			"An event handler on a rendered element reads its event's `currentTarget` after it has returned: after an `await`, or in a timer or promise callback. `currentTarget` names the element only while the event is dispatched, so the read is empty.",
+		replacement:
+			'Capture the element with `const element = event.currentTarget` at the top of the handler and use `element` afterwards.',
+	},
+	{
 		code: 'OCTANE_STRONG_UNTRUSTED_HTML',
 		section: 'dom',
 		severity: 'error',
