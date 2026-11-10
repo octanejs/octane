@@ -437,21 +437,27 @@ function lowerRenderCallback(fn, state) {
 	return { ...fn, body: withOrigin(b.block(writerBody(fn, state)), fn.body), expression: false };
 }
 
+function needsCallbackContext(node) {
+	if (node.type === 'ParenthesizedExpression') return needsCallbackContext(node.expression);
+	if (node.type === 'ConditionalExpression')
+		return needsCallbackContext(node.consequent) || needsCallbackContext(node.alternate);
+	return (
+		FUNCTION_TYPES.has(node.type) && node.params.some((parameter) => !parameter.typeAnnotation)
+	);
+}
+
 function componentProp(value, state, element, prop) {
 	const fn = unwrap(value);
-	if (!FUNCTION_TYPES.has(fn?.type)) return assertNoTemplate(value, state, 'JSX-valued attributes');
-	// Preserve any authored assertions or contextual annotations around the function.
-	const wrap = (node) =>
-		node === fn ? lowerRenderCallback(fn, state) : { ...node, expression: wrap(node.expression) };
-	const lowered = hasOwnTemplate(fn.body)
-		? wrap(value)
-		: assertNoTemplate(value, state, 'JSX-valued attributes');
-	if (
-		state.output !== 'ts' ||
-		value !== fn ||
-		!fn.params.some((parameter) => !parameter.typeAnnotation)
-	)
-		return lowered;
+	let lowered;
+	if (FUNCTION_TYPES.has(fn?.type) && hasOwnTemplate(fn.body)) {
+		// Preserve authored assertions around a render callback when lowering its template.
+		const wrap = (node) =>
+			node === fn ? lowerRenderCallback(fn, state) : { ...node, expression: wrap(node.expression) };
+		lowered = wrap(value);
+	} else {
+		lowered = assertNoTemplate(value, state, 'JSX-valued attributes');
+	}
+	if (state.output !== 'ts' || !needsCallbackContext(value)) return lowered;
 	// Writer setters accept unknown. Restore the context JSX gave the callback
 	// using the receiver's prop type, Parameters<typeof Child>[0]["row"].
 	const parameters = b.ts_type_reference(

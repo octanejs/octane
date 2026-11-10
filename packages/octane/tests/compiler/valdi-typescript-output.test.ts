@@ -148,6 +148,26 @@ describe.each(['native', 'javascript'])(
 			expect(typecheck(result.code, '')).toEqual([]);
 		});
 
+		it('infers conditional callback parameters from the receiving component prop', () => {
+			parser.javascript = parserName === 'javascript';
+			const result = compile(
+				`function Dial<T>(props: { label?: (step: T) => string }) @{ <view /> }
+				export function Panel(props: { compact: boolean; visible: boolean }) @{
+					<Dial<number> label={props.compact ? step => step.toFixed()
+						: props.visible ? step => step.missing() : undefined} />
+				}`,
+				'/src/Panel.tsrx',
+				{ renderer, hmr: false, output: 'ts' },
+			);
+			expect(typecheck(result.code, '')).toEqual([
+				{
+					file: 'scene.ts',
+					code: 2339,
+					message: "Property 'missing' does not exist on type 'number'.",
+				},
+			]);
+		});
+
 		it('keeps typed conditionals, keyed loops and ordinary spreads valid TypeScript', () => {
 			parser.javascript = parserName === 'javascript';
 			vi.stubEnv('OCTANE_COMPILE_ASSERT_LOC', '1');
