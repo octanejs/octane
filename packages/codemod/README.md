@@ -230,7 +230,7 @@ Dynamic JSX payloads, opaque store values rendered as children, and components p
 
 ## Path-only SVG components
 
-When a file becomes `.tsrx`, its bundler may resolve a bare default SVG import to an asset URL. The codemod reports an error at each JSX tag that still uses that import, including tags selected through local aliases, fallback expressions or parameter defaults, and tags inside `ReactCompat`. Configure the SVG loader for `.tsrx`, or move the import and rendering into a React-owned `.tsx` component hosted by `ReactCompat`. Using an SVG URL as an image source is unaffected.
+When a file becomes `.tsrx`, its bundler may resolve a bare default SVG import to an asset URL. The codemod reports an error at each JSX tag that still uses that import, including tags selected through local aliases, fallback expressions or default values on parameters and destructured bindings, and tags inside `ReactCompat`. The check follows a binding’s declared default even when a caller always supplies the property. Configure the SVG loader for `.tsrx`, or move the import and rendering into a React-owned `.tsx` component hosted by `ReactCompat`. Using an SVG URL as an image source is unaffected.
 
 Use `--svg-paths` (or `svgPaths: true` in the JavaScript API) when your bundler's bare default SVG import renders the authored SVG geometry, applies caller props to its root, and the same asset with `?raw` imports its XML as a string. For aliased requests, the bundler and TypeScript paths must resolve to the same local file. Check both your development and production loaders before enabling this option. Custom SVG templates, optimizers that rewrite the rendered geometry, and URL-producing loaders can have different behavior.
 

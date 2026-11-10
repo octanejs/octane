@@ -132,6 +132,27 @@ export function Separate({Icon = Mark}) { function Child(Icon) { return <Icon/>;
 		]);
 	});
 
+	it('reports bare SVG defaults selected by local destructuring', () => {
+		const source = `import Mark from './mark.svg';
+export function View(props, items) {
+  const { icon: ConstIcon = Mark, plain: Plain } = props;
+  let { icon: MutableIcon = Mark } = props;
+  const [ArrayIcon = Mark] = items;
+  return <>
+    <ConstIcon/>
+    <MutableIcon/>
+    <ArrayIcon/>
+    <Plain/>
+    <img src={MutableIcon}/>
+  </>;
+}`;
+		const lines = source.split('\n');
+		const { notes } = transformModule(source, 'view.tsx');
+		expect(
+			notes.filter((n) => n.rule === 'svg-issuer').map((n) => lines[n.line - 1].trim()),
+		).toEqual(['<ConstIcon/>', '<MutableIcon/>', '<ArrayIcon/>']);
+	});
+
 	it('only reports reachable SVG operands in logical tag choices', () => {
 		const choices = [
 			["'button' || Mark", false],

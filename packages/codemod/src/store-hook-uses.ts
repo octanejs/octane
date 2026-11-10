@@ -84,14 +84,7 @@ export function isBareSvgTag(
 		seen.add(symbol);
 		const d = symbol.declarations?.[0];
 		if (!d) return false;
-		if (
-			(ts.isParameter(d) ||
-				(ts.isBindingElement(d) &&
-					ts.isObjectBindingPattern(d.parent) &&
-					ts.isParameter(d.parent.parent))) &&
-			ts.isIdentifier(d.name) &&
-			d.initializer
-		)
+		if ((ts.isParameter(d) || ts.isBindingElement(d)) && ts.isIdentifier(d.name) && d.initializer)
 			return fromSvg(d.initializer);
 		if (
 			ts.isVariableDeclaration(d) &&
