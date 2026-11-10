@@ -113,7 +113,9 @@ class OptimisticManager<T> {
 
 	read(exclude?: Operation): T {
 		const snapshot = this.source.snapshot();
-		return this.overlay(snapshot, exclude)?.value ?? this.source.get();
+		const overlaid = this.overlay(snapshot, exclude);
+		// An overlay may produce undefined, such as an optimistic clear.
+		return overlaid ? overlaid.value : this.source.get();
 	}
 
 	latest<F>(fallback?: F, exclude?: Operation): T | F | undefined {

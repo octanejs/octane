@@ -946,6 +946,23 @@ describe('optimistic actions', () => {
 		});
 	});
 
+	it('shows an optimistic clear to undefined', async () => {
+		const source$ = __signalAt<string | undefined>('g:clear-source', 'saved');
+		const visible$ = optimistic$(source$);
+		const reply = deferred<void>();
+		const clear = action$('clear', async () => {
+			visible$.set(undefined);
+			await reply.promise;
+		});
+		const scope = owner('document:clear');
+
+		const cleared = runWithSignalOwner(scope, () => clear());
+		expect(runWithSignalOwner(scope, () => visible$.get())).toBeUndefined();
+		expect(runWithSignalOwner(scope, () => visible$.latest('fallback'))).toBeUndefined();
+		reply.resolve();
+		await cleared;
+	});
+
 	it('keeps a plain optimistic value over newer source values', async () => {
 		const source$ = __signalAt('g:absolute-source', 'saved');
 		const visible$ = optimistic$(source$);
