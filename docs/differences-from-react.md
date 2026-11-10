@@ -1027,7 +1027,10 @@ What differs is the event API and synthesis layer:
 
 - Handlers receive the browser's real `Event` object, not a React
   `SyntheticEvent` wrapper. There is no event pooling, and
-  `event.currentTarget` is the handler's element.
+  `event.currentTarget` is the handler's element while the event is
+  dispatched and empty afterwards, as in the browser and in React. Capture it
+  before an `await` or a timer; Strong mode rejects a later read as
+  `OCTANE_STRONG_DEFERRED_CURRENT_TARGET`.
 - `mouseenter`/`pointerenter` families are the real per-element native events —
   no synthesis from `over`/`out`.
 - `onFocus`/`onBlur` use the browser's bubbling `focusin`/`focusout` events,
