@@ -1894,6 +1894,18 @@ importers:
         specifier: workspace:*
         version: link:../../packages/octane
 
+  benchmarks/data-store-comparison:
+    dependencies:
+      devalue:
+        specifier: catalog:default
+        version: 6.0.3
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+
   benchmarks/dbmon:
     dependencies:
       playwright:
