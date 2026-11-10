@@ -40,23 +40,44 @@ function HydrationRangeOwner(props: Pick<BodyProps, 'children'>) {
 	}
 )[HYDRATION_RANGE_BOUNDARY] = 'owner';
 
+// The document elements are built imperatively, as element descriptors, and
+// only the server renders them. A client build resolves `isServer` to `false`,
+// so each of these folds to `null` and the bundle drops its server document.
+function DocumentHtml(props: HtmlProps) @{
+	const { children, ...attrs } = props;
+	<html {...attrs}>{children}</html>
+}
+function DocumentHead(props: HeadProps) @{
+	const { children, ...attrs } = props;
+	<head {...attrs}>{children}</head>
+}
+function DocumentBody(props: BodyProps) @{
+	const { children, ...attrs } = props;
+	<body {...attrs}>
+		<div id="__app">
+			<HydrationRangeOwner children={children} />
+		</div>
+	</body>
+}
+const ServerHtml = (isServer === false ? null : DocumentHtml) as typeof DocumentHtml;
+const ServerHead = (isServer === false ? null : DocumentHead) as typeof DocumentHead;
+const ServerBody = (isServer === false ? null : DocumentBody) as typeof DocumentBody;
+
 // Preserve the ordinary document and hydration-range ownership. Start owns
 // the outer passthrough boundary; this entry reads the compiled router context.
 export function Html(props: HtmlProps) @{
 	const router = useRouter();
-	const { children, ...attrs } = props;
 	@if (isServer ?? router.isServer) {
-		<html {...attrs}>{children}</html>
+		<ServerHtml {...props} />
 	} @else {
-		<>{children}</>
+		<>{props.children}</>
 	}
 }
 
 export function Head(props: HeadProps) @{
 	const router = useRouter();
-	const { children, ...attrs } = props;
 	@if (isServer ?? router.isServer) {
-		<head {...attrs}>{children}</head>
+		<ServerHead {...props} />
 	} @else {
 		// The head portal participates in the first client hydration render, so its
 		// children and the body keep the server's shared useId sequence.
@@ -64,7 +85,7 @@ export function Head(props: HeadProps) @{
 		@if (target) {
 			<>
 				{createPortal(() => @{
-					<>{children}</>
+					<>{props.children}</>
 				}, target)}
 			</>
 		}
@@ -73,15 +94,10 @@ export function Head(props: HeadProps) @{
 
 export function Body(props: BodyProps) @{
 	const router = useRouter();
-	const { children, ...attrs } = props;
 	@if (isServer ?? router.isServer) {
-		<body {...attrs}>
-			<div id="__app">
-				<HydrationRangeOwner children={children} />
-			</div>
-		</body>
+		<ServerBody {...props} />
 	} @else {
-		<HydrationRangeOwner children={children} />
+		<HydrationRangeOwner children={props.children} />
 	}
 }
 export const Asset = createAsset(useRouter);
