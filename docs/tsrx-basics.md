@@ -336,10 +336,14 @@ export function Underlined(props: { label: string }) @{
 
 Each call returns a function that cancels the task if it has not run.
 `flushLayoutSync()` runs the queue now. `getPhase()` returns
-`RenderingPhase.READ` or `RenderingPhase.WRITE` while the queue runs a task of
-that kind, and `RenderingPhase.IDLE` otherwise. The queue runs outside a
-commit, so `flushSync` and `act()` do not wait for it, and it never runs on the
-server. When rendered output depends on the measurement, use
+`RenderingPhase.READ` in a `readLayout` task and in a `useLayoutSnapshot`
+measurement. It returns `RenderingPhase.WRITE` in a `writeLayout` task and
+during a commit: its DOM mutations, refs, insertion and layout effects, and a
+root's unmount. Everything else is `RenderingPhase.IDLE`, including renders,
+passive effects and event handlers. The queue runs outside a commit, so `act()`
+does not wait for it, and it never runs on the server. A `flushSync` called
+from a `readLayout` task does not commit there: its updates commit right after
+the queue has run. When rendered output depends on the measurement, use
 `useLayoutSnapshot` instead.
 
 ## Conditional hooks

@@ -130,6 +130,7 @@ export {
 	isInActScope,
 	setIsOctaneActEnvironment,
 	flushSync,
+	getPhase,
 	__useCommittedState,
 	__createDiscreteEventListener,
 	act,

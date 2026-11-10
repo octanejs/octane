@@ -2,13 +2,7 @@ export { trustHTML, type TrustedHTML } from './trusted-html.js';
 export { createResizeObserver } from './resize-observer.js';
 // Read and write phases for layout work. Kept apart from the reconciling
 // runtime so an app that never queues layout work does not ship the queue.
-export {
-	RenderingPhase,
-	getPhase,
-	readLayout,
-	writeLayout,
-	flushLayoutSync,
-} from './layout-phases.js';
+export { RenderingPhase, readLayout, writeLayout, flushLayoutSync } from './layout-phases.js';
 // Keep package metadata behind an isolated re-export: applications that do not
 // read `version` can tree-shake this module and the package.json payload in full.
 export { version } from './version.js';
@@ -48,6 +42,8 @@ export {
 	createRoot,
 	hydrateRoot,
 	flushSync,
+	// Octane extension: the layout phase of the running commit or queued task.
+	getPhase,
 	act,
 	isInActScope,
 	type Root,

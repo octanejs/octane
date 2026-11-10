@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as Server from 'octane/server';
+import { flushEffects, mount } from './_helpers.js';
+import { loadCompiledFixtureSource } from './_server-fixture.js';
 import {
 	RenderingPhase,
 	flushLayoutSync,
+	flushSync,
 	getPhase,
 	readLayout,
 	writeLayout,
@@ -188,6 +191,187 @@ describe('layout read and write phases', () => {
 		frames.frame();
 		expect(reads).toBe(120);
 		expect(getPhase()).toBe(RenderingPhase.IDLE);
+	});
+});
+
+const source = `
+import { flushSync, useEffect, useLayoutEffect, useLayoutSnapshot, useState } from 'octane';
+
+export function Phases(props) @{
+	const [count, setCount] = useState(0);
+	props.expose(setCount);
+	props.note('render');
+	useLayoutEffect(() => {
+		props.note('layout effect');
+		return () => props.note('layout cleanup');
+	}, null);
+	useEffect(() => {
+		props.note('passive effect');
+		if (props.value === 'nested' && count === 0) {
+			// A commit inside the passive drain, then the rest of the drain.
+			flushSync(() => setCount(1));
+			props.note('passive after nested commit');
+		}
+		return () => props.note('passive cleanup');
+	}, null);
+	const measured = useLayoutSnapshot(
+		() => {
+			props.note('measurement');
+			return props.value;
+		},
+		{ initial: 'initial' },
+	);
+	<div>
+		<button
+			ref={(element) => props.note(element ? 'ref attach' : 'ref detach')}
+			onClick={() => props.note('click')}
+		>
+			{(measured + ' ' + count) as string}
+		</button>
+		<phase-probe data-value={props.value} data-count={count} />
+	</div>
+}
+`;
+
+// A custom element reacts while the commit applies its DOM mutations, before
+// any ref or effect runs.
+let noteMutation: (label: string) => void = () => {};
+customElements.define(
+	'phase-probe',
+	class extends HTMLElement {
+		static observedAttributes = ['data-value', 'data-count'];
+		attributeChangedCallback(_name: string, previous: string | null) {
+			if (previous !== null) noteMutation('mutation');
+		}
+	},
+);
+
+describe.each([true, false])('the phase of a commit (dev: %s)', (dev) => {
+	const { Phases } = loadCompiledFixtureSource(source, {
+		id: '/packages/octane/tests/_fixtures/layout-phases.tsrx',
+		mode: 'client',
+		compileOptions: { dev, hmr: false },
+	});
+
+	/** Mount Phases, recording the phases each kind of callback ran in. */
+	function mountPhases() {
+		const seen = new Map<string, Set<string>>();
+		let setCount: (count: number) => void = () => {};
+		const props = (value: string) => ({
+			value,
+			note(label: string) {
+				let phases = seen.get(label);
+				if (phases === undefined) seen.set(label, (phases = new Set()));
+				phases.add(NAMES[getPhase()]);
+			},
+			expose(set: (count: number) => void) {
+				setCount = set;
+			},
+		});
+		const view = mount(Phases, props('first'));
+		noteMutation = props('').note;
+		return {
+			view,
+			seen,
+			phasesOf: (label: string) => [...(seen.get(label) ?? [])],
+			update: (value: string) => view.update(Phases, props(value)),
+			setCount: (count: number) => setCount(count),
+		};
+	}
+
+	it('reports WRITE for refs and layout effects, READ for measurements, IDLE elsewhere', () => {
+		const { view, seen, phasesOf, update } = mountPhases();
+		try {
+			expect(view.find('button').textContent).toBe('first 0');
+			flushEffects();
+			// A second and third commit run every cleanup, and follow a passive
+			// drain and a measurement pass that must each have ended their phase.
+			update('second');
+			flushEffects();
+			update('third');
+			flushEffects();
+			(view.find('button') as HTMLButtonElement).click();
+			expect(view.find('button').textContent).toBe('third 0');
+
+			expect(phasesOf('mutation')).toEqual(['WRITE']);
+			expect(phasesOf('ref attach')).toEqual(['WRITE']);
+			expect(phasesOf('layout effect')).toEqual(['WRITE']);
+			expect(phasesOf('layout cleanup')).toEqual(['WRITE']);
+			expect(phasesOf('measurement')).toEqual(['READ']);
+			expect(phasesOf('passive effect')).toEqual(['IDLE']);
+			expect(phasesOf('passive cleanup')).toEqual(['IDLE']);
+			expect(phasesOf('click')).toEqual(['IDLE']);
+			expect(phasesOf('render')).toEqual(['IDLE']);
+			expect(getPhase()).toBe(RenderingPhase.IDLE);
+		} finally {
+			view.unmount();
+		}
+		// Unmounting the root removes the tree, so its teardown is a write too.
+		expect(phasesOf('ref detach')).toEqual(['WRITE']);
+		expect(phasesOf('layout cleanup')).toEqual(['WRITE']);
+		expect(getPhase()).toBe(RenderingPhase.IDLE);
+	});
+
+	it('reports WRITE for a commit nested in a passive effect, and IDLE around it', () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const { view, seen, phasesOf, update } = mountPhases();
+		try {
+			flushEffects();
+			seen.clear();
+			update('nested');
+			flushEffects();
+			expect(view.find('button').textContent).toBe('nested 1');
+			expect(phasesOf('mutation')).toEqual(['WRITE']);
+			expect(phasesOf('passive after nested commit')).toEqual(['IDLE']);
+			expect(phasesOf('passive effect')).toEqual(['IDLE']);
+			expect(phasesOf('layout effect')).toEqual(['WRITE']);
+			expect(phasesOf('ref attach')).toEqual(['WRITE']);
+			expect(phasesOf('measurement')).toEqual(['READ']);
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('reports the queue phase from a queued task', () => {
+		const { view } = mountPhases();
+		try {
+			const log: string[] = [];
+			readLayout(() => log.push(NAMES[getPhase()]));
+			writeLayout(() => log.push(NAMES[getPhase()]));
+			flushLayoutSync();
+			expect(log).toEqual(['READ', 'WRITE']);
+		} finally {
+			view.unmount();
+		}
+	});
+
+	it('does not commit a flushSync from a queued read until the queue has run', async () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const { view, setCount } = mountPhases();
+		try {
+			const button = view.find('button');
+			const log: string[] = [];
+			readLayout(() => {
+				flushSync(() => setCount(1));
+				log.push(`read 1: ${button.textContent}`);
+			});
+			readLayout(() => log.push(`read 2: ${button.textContent}`));
+			writeLayout(() => log.push(`write: ${button.textContent}`));
+			flushLayoutSync();
+			expect(log).toEqual(['read 1: first 0', 'read 2: first 0', 'write: first 0']);
+			if (process.env['OCTANE_TEST_COMPILE_MODE'] !== 'prod') {
+				expect(error).toHaveBeenCalledWith(expect.stringContaining('from a readLayout task'));
+			}
+
+			await Promise.resolve();
+			expect(button.textContent).toBe('first 1');
+
+			// Outside the queue, flushSync still commits before it returns.
+			flushSync(() => setCount(2));
+			expect(button.textContent).toBe('first 2');
+		} finally {
+			view.unmount();
+		}
 	});
 });
 
