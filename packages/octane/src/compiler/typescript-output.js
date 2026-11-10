@@ -218,23 +218,23 @@ export function prepareWebTypeScript(program, ctx, allocateName) {
 		...(optional ? { optional: true } : null),
 	});
 	const seen = [new WeakSet(), new WeakSet()];
-	const find = (node, inFunction = false, opaque = false) => {
-		if (!node || typeof node !== 'object' || seen[+inFunction].has(node)) return;
-		seen[+inFunction].add(node);
+	const find = (node, nested = false, opaque = false) => {
+		if (!node || typeof node !== 'object' || seen[+nested].has(node)) return;
+		seen[+nested].add(node);
 		if (Array.isArray(node)) {
-			for (const child of node) find(child, inFunction, opaque);
+			for (const child of node) find(child, nested, opaque);
 			return;
 		}
 		if (FUNCTIONS.has(node.type)) {
 			const generated = node._octaneTypedBody === true || !authoredFunctions.has(functionKey(node));
-			if (!inFunction) {
+			if (!nested) {
 				const scope = restoreTypeScope(node, typeContexts, allocateName, localTypeQuery);
 				if (scope) {
 					typeScopes.set(node, scope);
 					liftedTypes.push(...scope.declarations);
 				}
 			}
-			const relocated = !inFunction && authoredFunctions.get(functionKey(node)) === true;
+			const relocated = !nested && authoredFunctions.get(functionKey(node)) === true;
 			if (generated || opaque || relocated) {
 				for (let index = 0; index < (node.params?.length ?? 0); index++) {
 					const param = node.params[index];
@@ -257,9 +257,12 @@ export function prepareWebTypeScript(program, ctx, allocateName) {
 				}
 			}
 			opaque ||= generated || relocated;
+			nested = true;
+		} else if (node.type === 'ClassBody') {
+			// Methods and field initializers still see the enclosing class's type parameters.
+			nested = true;
 		}
-		for (const key of Object.keys(node))
-			if (!SKIP.has(key)) find(node[key], inFunction || FUNCTIONS.has(node.type), opaque);
+		for (const key of Object.keys(node)) if (!SKIP.has(key)) find(node[key], nested, opaque);
 	};
 	find(program);
 	const copies = new WeakMap();

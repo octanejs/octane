@@ -167,6 +167,30 @@ const Specialized = Generic<{ label: string; count: number }>;`;
 for (const parserName of ['native', 'javascript']) {
 	for (const mode of ['client', 'server'] as const) {
 		describe(`web TypeScript output with the ${parserName} parser in ${mode} mode`, () => {
+			it('keeps generic class members in their enclosing type scope', () => {
+				parser.javascript = parserName === 'javascript';
+				const result = compile(
+					`export class Selection<T> {
+						constructor(readonly current: T) {}
+					}
+					export const Cursor = class<T> extends Selection<T> {
+						read(): T { return this.current; }
+					};`,
+					'/src/selection.ts',
+					{ mode, hmr: false, output: 'ts' },
+				);
+				expect(
+					typecheck({
+						'selection.ts': result.code,
+						'consumer.ts': `import { Cursor } from './selection';
+							const cursor = new Cursor(42);
+							cursor.read().toFixed();
+							// @ts-expect-error The inferred entry is a number.
+							cursor.read().toUpperCase();`,
+					}),
+				).toEqual([]);
+			});
+
 			it('preserves authored component props and generic declarations for TypeScript consumers', () => {
 				parser.javascript = parserName === 'javascript';
 				const files: Record<string, string> = {};
