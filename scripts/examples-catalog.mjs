@@ -23,9 +23,10 @@ const REQUIRED_TOP_LEVEL_FIELDS = new Set([
 	'faultScenarios',
 ]);
 // `host` is optional (absent means "octane"): a "react" host marks a React-owned
-// application whose Octane islands run through octane/react (OctaneCompat).
+// application whose Octane islands run through octane/react (OctaneCompat), and
+// a "mixed" host has pages owned by each renderer.
 const ALLOWED_TOP_LEVEL_FIELDS = new Set([...REQUIRED_TOP_LEVEL_FIELDS, 'host']);
-const HOST_VALUES = new Set(['octane', 'react']);
+const HOST_VALUES = new Set(['octane', 'react', 'mixed']);
 const COMMAND_FIELDS = new Set(['build', 'typecheck', 'e2e']);
 const JOURNEY_FIELDS = new Set(['id', 'title', 'kind', 'spec', 'critical']);
 const FAULT_FIELDS = new Set(['id', 'description']);
@@ -209,9 +210,9 @@ export function validateExampleManifest(example, errors = []) {
 		if (typeof dependencies.octane !== 'string') {
 			errors.push(`examples/${directoryName}/package.json must declare octane`);
 		}
-		// A React-hosted application (host: "react") legitimately declares the React
-		// runtime its shell runs on; every other app must stay React-free.
-		if (manifest.host !== 'react') {
+		// A React-hosted or mixed application legitimately declares the React
+		// runtime its React pages run on; every other app must stay React-free.
+		if (manifest.host !== 'react' && manifest.host !== 'mixed') {
 			for (const reactRuntime of ['react', 'react-dom']) {
 				if (reactRuntime in dependencies) {
 					errors.push(

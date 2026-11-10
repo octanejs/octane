@@ -9,7 +9,7 @@ import {
 	write,
 	type Transport,
 } from '../src/data/index.js';
-import { createDataHandler, handle } from '../src/data/server.js';
+import { createDataHandler } from '../src/data/server.js';
 import { addTodo, createServer, firstTodo, removeTodo, setDone, todos } from './_data-todos.js';
 
 /** Observe a read and wait for its first value. */
@@ -403,7 +403,9 @@ describe('octane/data store', () => {
 				},
 			},
 		});
-		const handler = createDataHandler([handle(rename, (input) => void received.push(input))]);
+		const handler = createDataHandler({}, (handle) => [
+			handle(rename, (input) => void received.push(input)),
+		]);
 		const store = createDataStore({
 			transport: httpTransport('https://app.test/data', {
 				fetch: (url, init) => handler(new Request(url as string, init)),
@@ -436,7 +438,13 @@ describe('octane/data store', () => {
 
 		expect(list.getSnapshot().status).toBe('pending');
 		expect(lateInvalidate).toThrow(DataRetiredError);
-		expect(() => store.read(todos, undefined)).toThrow(DataRetiredError);
+		// A render still holding the retired store sees nothing and starts nothing.
+		const stale = store.read(todos, undefined);
+		stale.subscribe(() => {});
+		expect(stale.getSnapshot().status).toBe('pending');
+		await settled();
+		// Only the load that started before retirement reached the server.
+		expect(server.log).toEqual(['list']);
 		expect(() => store.write(setDone, { id: 'a', done: true })).toThrow(DataRetiredError);
 	});
 

@@ -68,7 +68,12 @@ export interface DataStore {
 	invalidate(tags: readonly string[]): void;
 	/** Name the outcome of an uncertain write, once a receipt lookup has established it. */
 	settle(operationId: string, confirmed: boolean): void;
-	/** End this grant: clear every value and refuse later calls and late replies. */
+	/**
+	 * End this grant: clear every value and ignore late replies. Later writes,
+	 * invalidations and settlements throw. Later reads stay pending without
+	 * loading, so a render that still holds this store, such as a React island
+	 * that has not yet received its replacement, shows nothing instead of failing.
+	 */
 	retire(): void;
 }
 
@@ -114,6 +119,14 @@ const PENDING: ReadSnapshot<any> = {
 	error: undefined,
 	refreshing: false,
 	stale: false,
+};
+
+/** What a retired store's reads wait on: nothing will arrive. */
+const NEVER = new Promise<void>(() => {});
+const RETIRED_HANDLE: ReadHandle<any> = {
+	getSnapshot: () => PENDING,
+	subscribe: () => () => {},
+	refresh: () => NEVER,
 };
 
 /** A server-side cap also applies; this bounds what one write asks for. */
@@ -360,7 +373,7 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 			handle: {
 				getSnapshot: () => (retired ? PENDING : (created.snapshot ??= buildSnapshot(created))),
 				subscribe(notify) {
-					assertLive();
+					if (retired) return () => {};
 					// A handle outlives its entry's retention; observing it again restores the entry.
 					if (!entries.has(key)) entries.set(key, created);
 					clearTimeout(created.keepTimer);
@@ -376,7 +389,7 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 					};
 				},
 				refresh() {
-					assertLive();
+					if (retired) return NEVER;
 					invalidateEntry(created);
 					return load(created);
 				},
@@ -520,11 +533,10 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 			return retired;
 		},
 		read(read, input) {
-			assertLive();
-			return entryFor(read, input).handle;
+			return retired ? RETIRED_HANDLE : entryFor(read, input).handle;
 		},
 		prefetch(read, input) {
-			assertLive();
+			if (retired) return NEVER;
 			const entry = entryFor(read, input);
 			return entry.hasBase && !isStale(entry) ? Promise.resolve() : load(entry);
 		},

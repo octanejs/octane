@@ -1,0 +1,70 @@
+:root {
+	color-scheme: light dark;
+	font-family: system-ui, sans-serif;
+	line-height: 1.5;
+}
+body {
+	margin: 0;
+}
+.shelf {
+	max-width: 44rem;
+	margin: 0 auto;
+	padding: 2rem 1rem;
+}
+header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+}
+h1 {
+	font-size: 1.5rem;
+	margin: 0;
+}
+h2 {
+	font-size: 1rem;
+	margin: 0 0 0.5rem;
+}
+nav button[aria-pressed='true'] {
+	font-weight: 700;
+	text-decoration: underline;
+}
+.books {
+	list-style: none;
+	padding: 0;
+}
+.books li {
+	display: flex;
+	justify-content: space-between;
+	padding: 0.5rem 0;
+	border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+}
+.add {
+	display: flex;
+	gap: 0.5rem;
+}
+.add input {
+	flex: 1;
+}
+.outcome {
+	min-height: 1.5em;
+}
+.tools {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 1rem;
+	margin-top: 1.5rem;
+	font-size: 0.875rem;
+}
+.network ol {
+	margin: 0;
+	padding-left: 1.25rem;
+}
+.island {
+	margin-top: 1.5rem;
+	padding: 1rem;
+	border: 1px dashed currentColor;
+}
+.error {
+	color: #c0392b;
+}
