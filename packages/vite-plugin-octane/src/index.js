@@ -1509,13 +1509,8 @@ export function octane(inlineOptions = {}) {
 	if (typeof compilerConfigHook === 'function') {
 		compilerPlugin.config = function compilerConfigWithAppOptions(userConfig, env) {
 			const projectRoot = userConfig.root ? path.resolve(userConfig.root) : process.cwd();
-			// Both inline compiler options override app config independently. Preserve
-			// the synchronous path when neither needs to read octane.config.ts.
-			if (inlineOptions.renderers !== undefined && inlineOptions.strong !== undefined) {
-				compilerConfigWatchFiles.clear();
-				return compilerConfigHook.call(this, userConfig, env);
-			}
-
+			// Inline `renderers` and `strong` override app config independently.
+			// `strongDependencies` comes only from octane.config.ts, so it is always read.
 			const configPath = getOctaneConfigPath(projectRoot);
 			if (!octaneConfigExists(projectRoot)) {
 				if (inlineOptions.renderers === undefined) delete compilerOptions.renderers;

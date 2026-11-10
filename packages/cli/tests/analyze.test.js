@@ -772,6 +772,14 @@ describe('octane analyze Strong coverage', () => {
 		const allowed = await run(app({ ...config("['@kit/cards']"), ...files }).root);
 		expect(allowed.json().findings).toEqual([]);
 		expect(allowed.exitCode).toBe(0);
+
+		// With no views to compile, the plain modules are still checked.
+		const { 'src/App.tsrx': _view, ...barrelOnly } = files;
+		const barrel = await run(app({ ...config('[]'), ...barrelOnly }).root);
+		expect(barrel.exitCode).not.toBe(0);
+		expect(barrel.json().findings).toEqual([
+			expect.objectContaining({ file: 'src/cards.ts', code: 'OCTANE_STRONG_DEPENDENCY' }),
+		]);
 	});
 });
 

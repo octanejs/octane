@@ -269,6 +269,9 @@ export function PlaygroundVersionCombobox(props: PlaygroundVersionComboboxProps)
 				role="listbox"
 				aria-label="Octane versions"
 				hidden={!open}
+				// Keep focus in the input on any press inside the list, so its blur
+				// does not close the popup.
+				onMouseDown={(event: MouseEvent) => event.preventDefault()}
 			>
 				@for (const item of options; key item) {
 					<li
@@ -278,7 +281,6 @@ export function PlaygroundVersionCombobox(props: PlaygroundVersionComboboxProps)
 						aria-selected={item === value}
 						data-highlighted={options.indexOf(item) === active ? '' : undefined}
 						data-selected={item === value ? '' : undefined}
-						onMouseDown={(event: MouseEvent) => event.preventDefault()}
 						onMouseMove={() => setHighlight(options.indexOf(item))}
 						onClick={() => choose(item)}
 					>

@@ -375,7 +375,7 @@ export default defineCommand({
 			);
 		}
 
-		if (targets.length === 0 && !measureCoverage && !reportDependencies) {
+		if (targets.length === 0 && !measureCoverage && !reportDependencies && !requireDependencies) {
 			ctx.ui.intro('octane analyze');
 			ctx.ui.outro('No Octane modules found.');
 			return { json: { ok: true, analyzed: 0, findings: [] } };
