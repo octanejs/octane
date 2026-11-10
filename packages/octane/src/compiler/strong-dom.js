@@ -612,9 +612,10 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 			case 'ForStatement':
 			case 'WhileStatement':
 			case 'DoWhileStatement': {
+				// The initializer runs once, so the body's writes never precede it.
+				visit(node.init);
 				const first = reads.length;
 				const before = dirty.at(-1);
-				visit(node.init);
 				visit(node.test);
 				visit(node.update);
 				visit(node.body);
@@ -776,11 +777,12 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 				return;
 			case 'ForInStatement':
 			case 'ForOfStatement': {
-				const first = reads.length;
-				const before = dirty.at(-1);
 				if (node.left.type === 'VariableDeclaration') visit(node.left);
 				else visitPattern(node.left);
+				// The iterated value is read once, before the first pass.
 				visit(node.right);
+				const first = reads.length;
+				const before = dirty.at(-1);
 				visit(node.body);
 				repeatWrites(first, before);
 				return;

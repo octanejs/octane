@@ -842,6 +842,7 @@ describe('Strong forced-layout hints', () => {
 			'a for…of loop',
 			"for (const item of items) { const width = el.offsetWidth; el.style.width = width + item + 'px'; }",
 		],
+		['a for condition', "for (let i = 0; i < el.offsetWidth; i++) { el.style.width = i + 'px'; }"],
 		[
 			'a while loop',
 			"let i = 0; while (i++ < 3) { const width = el.offsetWidth; el.style.width = width + 'px'; }",
@@ -896,6 +897,14 @@ describe('Strong forced-layout hints', () => {
 			"el.style.width = '1px'; const read = () => el.offsetWidth; later(read);",
 		],
 		['a scroll assignment', "el.style.width = '1px'; el.scrollTop = 0;"],
+		[
+			'a read in a for initializer',
+			"for (let i = 0, width = el.offsetWidth; i < 3; i++) { el.style.width = width + i + 'px'; }",
+		],
+		[
+			'a read in the iterated value',
+			"for (const item of items.slice(el.clientWidth)) { el.style.width = item + 'px'; }",
+		],
 		[
 			'a write to an element that is not rendered',
 			"const box = document.createElement('div'); box.style.width = '1px'; log(el.offsetWidth);",
