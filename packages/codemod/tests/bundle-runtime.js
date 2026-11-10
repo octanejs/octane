@@ -6,7 +6,7 @@ import { compile } from 'octane/compiler';
 import { JSDOM } from 'jsdom';
 import { vi } from 'vitest';
 
-export async function bundleRuntime(project, mode, contents, external = []) {
+export async function bundleRuntime(project, mode, contents, external = [], loader) {
 	const target = path.join(project, mode + '.mjs');
 	await build({
 		stdin: {
@@ -17,6 +17,7 @@ export async function bundleRuntime(project, mode, contents, external = []) {
 		bundle: true,
 		platform: 'node',
 		format: 'esm',
+		loader,
 		external: ['react', 'react-dom', 'react-dom/*', ...external],
 		plugins: [
 			{
