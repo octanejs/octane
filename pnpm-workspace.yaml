@@ -12,6 +12,7 @@ packages:
   - benchmarks/spa-navigation/*
   - benchmarks/signal-favoring
   - benchmarks/signal-favoring/*
+  - benchmarks/data-store-comparison
   - benchmarks/scoped-signals
   - benchmarks/dbmon
   - benchmarks/dbmon/*
