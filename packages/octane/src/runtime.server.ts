@@ -6759,7 +6759,7 @@ export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
 				null,
 				(error, s, reset) =>
 					ssrChild(
-						typeof props.fallback === 'function'
+						typeof props.fallback === 'function' && !isChildrenBlock(props.fallback)
 							? (props.fallback as (error: unknown, reset: () => void) => unknown)(error, reset)
 							: props.fallback,
 						s,

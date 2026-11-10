@@ -631,3 +631,31 @@ it.each(['client', 'server'] as const)(
 		expect(container.querySelector('[data-cloned] span')!.getAttribute('title')).toBe('cloned');
 	},
 );
+
+it.each(['client', 'server'] as const)(
+	'renders an ErrorBoundary fallback passed as a render body (%s)',
+	(mode) => {
+		// `key` keeps the runtime ErrorBoundary rather than the compiled @try form.
+		const source = `'use strong';
+		import { ErrorBoundary } from 'octane';
+		function Fails() @{ throw new Error('boom'); <i /> }
+		export function View(props) @{
+			<ErrorBoundary key="boundary" fallback={@{ <p>{('caught ' + props.label) as string}</p> }}><Fails /></ErrorBoundary>
+		}`;
+		const view = loadCompiledFixtureSource(source, {
+			id: `/error-boundary-render-body-${mode}.tsrx`,
+			mode,
+			compileOptions: { hmr: false },
+		});
+		container = document.createElement('div');
+		if (mode === 'server') {
+			container.innerHTML = Server.renderToString(view['View'], { label: 'A' }).html;
+		} else {
+			document.body.appendChild(container);
+			root = Client.createRoot(container);
+			root.render(view['View'], { label: 'A' });
+			flushEffects();
+		}
+		expect(container.querySelector('p')!.textContent).toBe('caught A');
+	},
+);

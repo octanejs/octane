@@ -71,10 +71,18 @@ export function DevtoolsDemo(): OctaneNode @{
 		<p>Open the Octane panel (bottom corner) and explore the four tabs.</p>
 		<Counter />
 		<FilterList />
-		<Suspense fallback={<em>loading A…</em>}>
+		<Suspense
+			fallback={@{
+				<em>loading A…</em>
+			}}
+		>
 			<AsyncChild promise={boundaryAPromise} />
 		</Suspense>
-		<Suspense fallback={<em>loading B…</em>}>
+		<Suspense
+			fallback={@{
+				<em>loading B…</em>
+			}}
+		>
 			<AsyncChild promise={boundaryBPromise} />
 		</Suspense>
 		@if (showDevtools) {
