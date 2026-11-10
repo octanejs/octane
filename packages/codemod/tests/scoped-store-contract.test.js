@@ -784,3 +784,42 @@ it('keeps the React compiler from inserting a React dispatcher into native hooks
 	expect(compile(source)).not.toContain('react/compiler-runtime');
 	expect(compile(source.replace("'use no memo';", ''))).toContain('react/compiler-runtime');
 });
+
+it('keeps the receiver-specific bare SVG diagnostics when other slots in the same store consumer are proven', async () => {
+	const asset = '<svg><path d="M0 0L1 1"/></svg>';
+	const { app } = project({
+		'app/src/accepted.svg': asset,
+		'app/src/nested.svg': asset,
+		'app/src/named.svg': asset,
+		'app/src/pane.tsx': `import {useSnapshot} from 'observer';
+			import Accepted from './accepted.svg';
+			import Nested from './nested.svg';
+			import Named from './named.svg';
+			import {Opaque} from 'foreign-renderer';
+			function Native({children}) { return <button>{children}</button>; }
+			function Button({children}) { return <Opaque>{children}</Opaque>; }
+			function Row({icon}) { return <Opaque icon={icon}/>; }
+			export function Pane() {
+				const value = useSnapshot();
+				return <main><Native><Accepted/></Native><Button><Nested/></Button><Row icon={<Named/>}/>{value}</main>;
+			}`,
+	});
+	const { files } = await runCodemod([path.join(app, 'src/pane.tsx')], {
+		root: app,
+		strong: true,
+		verify: true,
+		svgPaths: true,
+	});
+	const pane = files.find((f) => f.file === 'src/pane.tsx');
+	expect(pane.rules['store-hook']).toBe(1);
+	expect(pane.rules['svg-paths']).toBe(1);
+	const notes = pane.notes.filter((n) => n.severity === 'error' && n.message.includes('bare SVG'));
+	expect(notes).toHaveLength(2);
+	expect(notes.map((n) => n.message)).toEqual([
+		expect.stringMatching(/<Button> renders its children/),
+		expect.stringMatching(/<Row> renders its icon prop/),
+	]);
+	expect(files.filter((f) => f.output.endsWith('.svg.octane.ts')).map((f) => f.output)).toEqual([
+		'src/accepted.svg.octane.ts',
+	]);
+});

@@ -365,3 +365,239 @@ it.each(['unowned helper', 'unowned sidecar', 'mixed uses', 'unsupported asset']
 		else expect(fs.existsSync(icon + '.octane.ts')).toBe(false);
 	},
 );
+
+const action = `export function Action({children, onClick}) {
+	return <button type="button" onClick={onClick}>{children}</button>;
+}`;
+
+it.each(['./action', '@/action'])(
+	'traces an SVG child through a selected receiver imported from %s',
+	async (specifier) => {
+		const { root, file } = fixture(`import Mark from './icons/mark.svg';
+			import {Action as Control} from '${specifier}';
+			export function Pane() { return <Control><Mark/></Control>; }`);
+		const receiver = path.join(root, 'src/action.tsx');
+		fs.writeFileSync(receiver, action);
+		const options = { root, svgPaths: true, write: false };
+		const alone = await runCodemod([file], options);
+		expect(alone.files.find((f) => f.file === 'src/pane.tsx').rules['svg-paths']).toBeUndefined();
+		const together = await runCodemod([file, receiver], options);
+		expect(together.files.find((f) => f.file === 'src/pane.tsx').rules['svg-paths']).toBe(1);
+	},
+);
+
+it('renders an SVG passed through selected local slots as a direct button child on the server and client', async () => {
+	const { root, file } = fixture(`import Mark from './icons/mark.svg';
+		function Frame({children}) { return <section>{children}</section>; }
+		${action}
+		function Row({icon, onClick}) { return <Action onClick={onClick}>{icon}</Action>; }
+		function Item({className, onClick}) { return <Row icon={<Mark className={className}/>} onClick={onClick}/>; }
+		export function Pane({className, onClick}) { return <Frame><Item className={className} onClick={onClick}/></Frame>; }`);
+	const { files } = await runCodemod([file], { root, svgPaths: true, verify: true, write: true });
+	const migrated = files.find((f) => f.file === 'src/pane.tsx');
+	expect(migrated.rules['svg-paths']).toBe(1);
+	expect(
+		[...migrated.notes, ...migrated.diagnostics].filter((n) => n.severity === 'error'),
+	).toEqual([]);
+	const load = (mode, entry) =>
+		bundleRuntime(root, mode, "export {Pane} from './src/pane.tsrx';" + entry, [], {
+			'.svg': 'text',
+		});
+	const dom = installDOM();
+	try {
+		const server = await load('server', "export {renderToString} from 'octane/server';");
+		const container = document.createElement('div');
+		const onClick = vi.fn();
+		const props = { className: 'initial', onClick };
+		container.innerHTML = server.renderToString(server.Pane, props).html;
+		const icon = container.querySelector('section > button > svg');
+		expect(icon?.getAttribute('class')).toBe('initial');
+		const firstPath = icon.firstElementChild;
+		expect(firstPath?.getAttribute('d')).toBe('M0 0L6 4Z');
+		const client = await load('client', "export {act, hydrateRoot} from 'octane';");
+		const mounted = client.hydrateRoot(container, client.Pane, props);
+		try {
+			expect(container.querySelector('button > svg')).toBe(icon);
+			expect(icon.firstElementChild).toBe(firstPath);
+			container.querySelector('button').click();
+			expect(onClick).toHaveBeenCalledTimes(1);
+			await client.act(async () => mounted.render(client.Pane, { className: 'next', onClick }));
+			expect(container.querySelector('button > svg')).toBe(icon);
+			expect(icon.firstElementChild).toBe(firstPath);
+			expect(icon.getAttribute('class')).toBe('next');
+		} finally {
+			mounted.unmount();
+		}
+	} finally {
+		dom.window.close();
+		vi.unstubAllGlobals();
+	}
+});
+
+it.each([
+	[
+		'a shadowing caller parameter',
+		action,
+		'export function Pane({Action}) { return <Action><Mark/></Action>; }',
+	],
+	[
+		'an opaque alias',
+		action + ' const Other = Action;',
+		'export function Pane() { return <Other><Mark/></Other>; }',
+	],
+	[
+		'an owner passed to a call',
+		action,
+		'function Inner() { return <Action><Mark/></Action>; } consume(Inner);',
+	],
+	[
+		'a receiver parameter escape',
+		'function Action(props) { capture(props); return <button>{props.children}</button>; }',
+		'export function Pane() { return <Action><Mark/></Action>; }',
+	],
+	[
+		'a receiver that invokes an unverified renderer hook',
+		'import { useExternal as read } from "external-react"; function Action({children}) { const id = read(); return <button id={id}>{children}</button>; }',
+		'export function Pane() { return <Action><Mark/></Action>; }',
+	],
+	[
+		'a hook called through a local alias',
+		'import * as hooks from "external-react"; const read = hooks["useExternal"]; function Action({children}) { (read)(); return <button>{children}</button>; }',
+		'export function Pane() { return <Action><Mark/></Action>; }',
+	],
+	[
+		'an escaped arguments object despite destructuring',
+		'function Action({children}) { capture(arguments[0]); return <button>{children}</button>; }',
+		'export function Pane() { return <Action><Mark/></Action>; }',
+	],
+	[
+		'a cloned child',
+		'function Action({children}) { return <button>{clone(children)}</button>; }',
+		'export function Pane() { return <Action><Mark/></Action>; }',
+	],
+	[
+		'a polymorphic render callback',
+		'function Action({children, renderLink}) { if (renderLink) return renderLink(children); return <button>{children}</button>; }',
+		'export function Pane({renderLink}) { return <Action renderLink={renderLink}><Mark/></Action>; }',
+	],
+	[
+		'a React island inside the receiver',
+		'import {ReactCompat} from "octane/react"; import {Foreign} from "foreign"; function Action({children}) { return <ReactCompat><Foreign>{children}</Foreign></ReactCompat>; }',
+		'export function Pane() { return <Action><Mark/></Action>; }',
+	],
+	[
+		'a cycle in the selected children slots',
+		'function Action({children}) { return <Frame slot={children}/>; } function Frame({slot}) { return <Action>{slot}</Action>; }',
+		'export function Pane() { return <Action><Mark/></Action>; }',
+	],
+	[
+		'an explicit children prop overridden by the JSX body',
+		action,
+		'export function Pane() { return <Action children={<Mark/>}><span>visible</span></Action>; }',
+	],
+	[
+		'an async receiver',
+		'async function Action({children}) { return <button>{children}</button>; }',
+		'export function Pane() { return <Action><Mark/></Action>; }',
+	],
+	[
+		'a generator receiver',
+		'function* Action({children}) { return <button>{children}</button>; }',
+		'export function Pane() { return <Action><Mark/></Action>; }',
+	],
+	[
+		'a raw text host',
+		'function Action({children}) { return <textarea>{children}</textarea>; }',
+		'export function Pane() { return <Action><Mark/></Action>; }',
+	],
+	[
+		'a nested foreign slot',
+		'import {External} from "foreign"; function Action({children}) { return <Frame icon={children}/>; } function Frame({icon}) { return <External>{icon}</External>; }',
+		'export function Pane() { return <Action><Mark/></Action>; }',
+	],
+	[
+		'a nested slot that also sends its value to a callback',
+		'function Action({children}) { return <Frame icon={children}/>; } function Frame({icon}) { inspect(icon); return <button>{icon}</button>; }',
+		'export function Pane() { return <Action><Mark/></Action>; }',
+	],
+	[
+		'an unchecked sibling prop',
+		'function Action({icon, other}) { inspect(other); return <button>{icon}</button>; }',
+		'export function Pane() { return <Action other={<Mark/>}/>; }',
+	],
+])(
+	'retains the original asset when a selected receiver has %s',
+	async (_case, declaration, usage) => {
+		const { root, file } = fixture(
+			"import Mark from './icons/mark.svg';\n" + declaration + '\n' + usage,
+		);
+		const { files } = await runCodemod([file], { root, svgPaths: true, write: false });
+		expect(files.find((f) => f.file === 'src/pane.tsx').rules['svg-paths']).toBeUndefined();
+		expect(files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
+	},
+);
+
+it('retains the original asset if the selected imported receiver collides with an existing native module', async () => {
+	const { root, file } = fixture(`import {Action} from './action';
+		import Mark from './icons/mark.svg';
+		export function Pane() { return <Action><Mark/></Action>; }`);
+	const receiver = path.join(root, 'src/action.tsx');
+	fs.writeFileSync(receiver, action);
+	fs.writeFileSync(path.join(root, 'src/action.tsrx'), 'export function Different() @{ <div/> }');
+	const { files } = await runCodemod([receiver, file], { root, svgPaths: true, write: false });
+	expect(files.find((f) => f.file === 'src/pane.tsx').rules['svg-paths']).toBeUndefined();
+	expect(files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
+});
+
+it.each(['inline slot type', 'imported slot type'])(
+	'keeps an SVG passed from an unchecked caller out of a text hole with an %s',
+	async (kind) => {
+		const { root, file } = fixture(`// @ts-nocheck
+			import Mark from './icons/mark.svg';
+			import {Row} from './row';
+			export function Pane() { return <Row icon={<Mark/>}/>; }`);
+		const config = path.join(root, 'tsconfig.json');
+		const tsconfig = JSON.parse(fs.readFileSync(config, 'utf8'));
+		tsconfig.compilerOptions.strict = true;
+		fs.writeFileSync(config, JSON.stringify(tsconfig));
+		const receiver = path.join(root, 'src/row.tsx');
+		const imported = kind === 'imported slot type';
+		fs.writeFileSync(
+			path.join(root, 'src/model.ts'),
+			'export interface RowProps { icon: string; }',
+		);
+		fs.writeFileSync(
+			receiver,
+			(imported ? "import type {RowProps} from './model';" : '') +
+				`export function Row({icon}: ${imported ? 'RowProps' : '{icon:string}'}) { return <button>{icon}</button>; }`,
+		);
+		const options = { root, strong: true, verify: true, write: false, projectTypes: imported };
+		const migrated = await runCodemod([file, receiver], { ...options, svgPaths: true });
+		const original = await runCodemod([file, receiver], { ...options, svgPaths: false });
+		const row = (result) => result.files.find((f) => f.file === 'src/row.tsx').code;
+		expect(row(migrated)).toMatch(/\{icon as string\}/);
+		expect(row(migrated)).toBe(row(original));
+		const caller = migrated.files.find((f) => f.file === 'src/pane.tsx');
+		expect(caller.rules['svg-paths']).toBeUndefined();
+		expect(caller.code).toContain('./icons/mark.svg');
+		expect(migrated.files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
+	},
+);
+
+it('bounds a deep slot chain without discarding the proof for a shorter path into the same chain', async () => {
+	const wrappers = Array.from({ length: 48 }, (_, index) =>
+		index === 47
+			? 'function Slot47({children}) { return <span>{children}</span>; }'
+			: `function Slot${index}({children}) { return <Slot${index + 1}>{children}</Slot${index + 1}>; }`,
+	);
+	const { root, file, icon } = fixture(`import Deep from './icons/mark.svg';
+		import Shallow from './icons/other.svg';
+		${wrappers.join('\n')}
+		export function Pane() { return <div><Slot0><Deep/></Slot0><Slot30><Shallow/></Slot30></div>; }`);
+	fs.copyFileSync(icon, path.join(root, 'src/icons/other.svg'));
+	const { files } = await runCodemod([file], { root, svgPaths: true, write: false });
+	expect(files.find((f) => f.file === 'src/pane.tsx').rules['svg-paths']).toBe(1);
+	expect(files.filter((f) => f.output.endsWith('.svg.octane.ts')).map((f) => f.output)).toEqual([
+		'src/icons/other.svg.octane.ts',
+	]);
+});
