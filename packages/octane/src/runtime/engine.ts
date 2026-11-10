@@ -4624,9 +4624,10 @@ export function getPhase(): RenderingPhase {
 	const READ = 1;
 	const WRITE = 2;
 	if (queuePhase !== IDLE) return queuePhase;
-	// Applying a commit's DOM mutations, wherever that commit was started.
-	if (COMMITTING_OWNER !== null) return WRITE;
-	if (EFFECT_COMMIT_DEPTH === 0) return ROOT_TEARDOWN_DEPTH === 0 ? IDLE : WRITE;
+	// Applying a commit's DOM mutations, or removing a root's tree, wherever
+	// either was started: a passive effect or a measurement may unmount a root.
+	if (COMMITTING_OWNER !== null || ROOT_TEARDOWN_DEPTH !== 0) return WRITE;
+	if (EFFECT_COMMIT_DEPTH === 0) return IDLE;
 	if (EFFECT_COMMIT_DEPTH === MEASURE_COMMIT_LEVEL) return READ;
 	return EFFECT_COMMIT_DEPTH === PASSIVE_COMMIT_LEVEL ? IDLE : WRITE;
 }

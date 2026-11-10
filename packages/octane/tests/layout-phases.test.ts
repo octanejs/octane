@@ -254,7 +254,7 @@ describe.each([true, false])('the phase of a commit (dev: %s)', (dev) => {
 	});
 
 	/** Mount Phases, recording the phases each kind of callback ran in. */
-	function mountPhases() {
+	function mountPhases(onNote?: (label: string) => void) {
 		const seen = new Map<string, Set<string>>();
 		let setCount: (count: number) => void = () => {};
 		const props = (value: string) => ({
@@ -263,6 +263,7 @@ describe.each([true, false])('the phase of a commit (dev: %s)', (dev) => {
 				let phases = seen.get(label);
 				if (phases === undefined) seen.set(label, (phases = new Set()));
 				phases.add(NAMES[getPhase()]);
+				onNote?.(label);
 			},
 			expose(set: (count: number) => void) {
 				setCount = set;
@@ -329,6 +330,33 @@ describe.each([true, false])('the phase of a commit (dev: %s)', (dev) => {
 			expect(phasesOf('measurement')).toEqual(['READ']);
 		} finally {
 			view.unmount();
+		}
+	});
+
+	it('reports WRITE for a root unmounted from a passive effect', () => {
+		const inner = mountPhases();
+		let unmountInner: (() => void) | null = null;
+		const outer = mountPhases((label) => {
+			if (label !== 'passive effect' || unmountInner === null) return;
+			const unmount = unmountInner;
+			unmountInner = null;
+			unmount();
+		});
+		try {
+			flushEffects();
+			inner.seen.clear();
+			unmountInner = inner.view.unmount;
+			outer.update('second');
+			flushEffects();
+			expect(unmountInner).toBe(null);
+			expect(inner.phasesOf('ref detach')).toEqual(['WRITE']);
+			expect(inner.phasesOf('layout cleanup')).toEqual(['WRITE']);
+			expect(inner.phasesOf('passive cleanup')).toEqual(['WRITE']);
+			// The rest of the outer passive drain is idle again.
+			expect(outer.phasesOf('passive effect')).toEqual(['IDLE']);
+			expect(getPhase()).toBe(RenderingPhase.IDLE);
+		} finally {
+			outer.view.unmount();
 		}
 	});
 
