@@ -4,9 +4,12 @@ import {
 	DataError,
 	DataRetiredError,
 	DataUncertainError,
+	httpTransport,
 	read,
+	write,
 	type Transport,
 } from '../src/data/index.js';
+import { createDataHandler, handle } from '../src/data/server.js';
 import { addTodo, createServer, firstTodo, removeTodo, setDone, todos } from './_data-todos.js';
 
 /** Observe a read and wait for its first value. */
@@ -260,6 +263,106 @@ describe('octane/data store', () => {
 		} finally {
 			vi.useRealTimers();
 		}
+	});
+
+	it('lands an unobserved load even when retention is short, and reloads cleanly after eviction', async () => {
+		const server = createServer();
+		const brief = read({ ...todos, keep: 5 } as any) as typeof todos;
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				await new Promise((resolve) => setTimeout(resolve, 20));
+				// Like fetch, this transport fails a request whose signal was aborted.
+				signal.throwIfAborted();
+				return server.transport(request, signal);
+			},
+		});
+		const list = store.read(brief, undefined);
+
+		await store.prefetch(brief, undefined);
+		expect(list.getSnapshot()).toMatchObject({ status: 'ready', error: undefined });
+
+		// Retention ends, the entry is dropped, and observing it again starts a clean load.
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		list.subscribe(() => {});
+		await vi.waitFor(() => expect(list.getSnapshot().refreshing).toBe(false));
+		expect(list.getSnapshot()).toMatchObject({ status: 'ready', error: undefined });
+	});
+
+	it('stops showing a value to a mounted reader once it expires', async () => {
+		vi.useFakeTimers();
+		try {
+			const server = createServer();
+			const shortLived = read({ ...todos, fresh: 10_000, expire: 1_000 } as any) as typeof todos;
+			const store = createDataStore({ transport: server.transport });
+			const list = store.read(shortLived, undefined);
+			const notify = vi.fn();
+			list.subscribe(notify);
+			await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+			notify.mockClear();
+
+			vi.advanceTimersByTime(1_000);
+			expect(list.getSnapshot()).toMatchObject({ status: 'pending', value: undefined });
+			expect(notify).toHaveBeenCalled();
+			await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+			expect(server.log).toEqual(['list', 'list']);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('does not restart an unrelated first load when a write confirms', async () => {
+		const server = createServer();
+		const settings = read({
+			name: 'settings',
+			output: { '~standard': { version: 1, vendor: 'test', validate: (value) => ({ value }) } },
+		});
+		let settingsLoads = 0;
+		let release!: () => void;
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				if (request.name !== 'settings') return server.transport(request, signal);
+				settingsLoads++;
+				await new Promise<void>((resolve) => (release = resolve));
+				return { ok: true, value: { theme: 'dark' } };
+			},
+		});
+		const list = store.read(todos, undefined);
+		await observe(list);
+		const page = store.read(settings, undefined);
+		page.subscribe(() => {});
+
+		await store.write(setDone, { id: 'a', done: true });
+		await settled();
+		release();
+		await vi.waitFor(() => expect(page.getSnapshot().status).toBe('ready'));
+		expect(settingsLoads).toBe(1);
+	});
+
+	it("sends the caller's input, so a schema that transforms it validates on the server too", async () => {
+		const received: unknown[] = [];
+		const rename = write({
+			name: 'rename',
+			// Accepts a string and produces a number; its own output would be refused.
+			input: {
+				'~standard': {
+					version: 1,
+					vendor: 'test',
+					validate: (value) =>
+						typeof value === 'string'
+							? { value: Number(value) }
+							: { issues: [{ message: 'expected a string' }] },
+				},
+			},
+		});
+		const handler = createDataHandler([handle(rename, (input) => void received.push(input))]);
+		const store = createDataStore({
+			transport: httpTransport('https://app.test/data', {
+				fetch: (url, init) => handler(new Request(url as string, init)),
+			}),
+		});
+
+		await store.write(rename, '42' as any);
+		expect(received).toEqual([42]);
 	});
 
 	it('refuses work for a retired account and ignores its late replies', async () => {

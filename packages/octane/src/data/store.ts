@@ -93,6 +93,7 @@ interface Entry {
 	inflight: Promise<void> | null;
 	abort: AbortController | null;
 	keepTimer: ReturnType<typeof setTimeout> | undefined;
+	expireTimer: ReturnType<typeof setTimeout> | undefined;
 	snapshot: ReadSnapshot<any> | null;
 }
 
@@ -180,6 +181,8 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 					items = items.slice();
 					items[index] = { ...(items[index] as object), ...(operation.input as object) };
 				} else if (effect.kind === 'remove') {
+					// A single selected item stays until the reload: the read's output has
+					// no shape for "absent", so removing it could not satisfy its schema.
 					if (index >= 0 && list) items = items.filter((_, at) => at !== index);
 				} else if (index < 0 && list) {
 					items = [...items, operation.draft];
@@ -230,9 +233,11 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 
 	/** Start the retention clock for an entry nothing observes. */
 	function idle(entry: Entry): void {
-		if (entry.subscribers.size > 0 || entry.keepTimer !== undefined) return;
+		// A load in flight is demand: retention starts when it lands.
+		if (entry.subscribers.size > 0 || entry.inflight || entry.keepTimer !== undefined) return;
 		entry.keepTimer = setTimeout(() => {
-			entry.abort?.abort();
+			entry.keepTimer = undefined;
+			clearTimeout(entry.expireTimer);
 			entries.delete(entry.key);
 			collect();
 		}, entry.read.keep);
@@ -259,6 +264,14 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 		entry.stale = false;
 		entry.served = entry.subscribers.size > 0;
 		entry.error = undefined;
+		// A mounted reader must stop seeing the value at `expire`, not at its next change.
+		clearTimeout(entry.expireTimer);
+		if (entry.read.expire < 2 ** 31) {
+			entry.expireTimer = setTimeout(() => {
+				if (entry.subscribers.size > 0) invalidateEntry(entry);
+				else touch(entry);
+			}, entry.read.expire);
+		}
 		collect();
 	}
 
@@ -273,6 +286,8 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 		const startedSeq = ++sequence;
 		const abort = (entry.abort = new AbortController());
 		const { read } = entry;
+		clearTimeout(entry.keepTimer);
+		entry.keepTimer = undefined;
 		const current = () => !retired && entry.attempt === attempt;
 		const done = request({ kind: 'read', name: read.name, input: entry.input }, abort.signal)
 			.then((reply) => {
@@ -306,8 +321,12 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 		entry.abort?.abort();
 		entry.abort = null;
 		entry.inflight = null;
-		if (entry.subscribers.size > 0) void load(entry);
-		else touch(entry);
+		if (entry.subscribers.size > 0) {
+			void load(entry);
+		} else {
+			touch(entry);
+			idle(entry);
+		}
 	}
 
 	function affects(entry: Entry, tags: readonly string[]): boolean {
@@ -363,6 +382,7 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 			inflight: null,
 			abort: null,
 			keepTimer: undefined,
+			expireTimer: undefined,
 			snapshot: null,
 		};
 		entries.set(key, created);
@@ -400,8 +420,10 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 		}
 		const tags = writeTags(operation.write);
 		for (const entry of entries.values()) {
-			// A first load in flight has no value to compare yet and may predate the write.
-			if (!refreshed.has(entry) && (!entry.hasBase || affects(entry, tags))) invalidateEntry(entry);
+			// A first load of a read that selects entities has no value to compare yet and may
+			// predate the write. Reads that select none are untouched unless a tag names them.
+			const unknown = !entry.hasBase && operation.write.effect && entry.read.entities;
+			if (!refreshed.has(entry) && (unknown || affects(entry, tags))) invalidateEntry(entry);
 		}
 		if (!operation.write.effect) operations = operations.filter((item) => item !== operation);
 		collect();
@@ -412,7 +434,12 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 		touchEntities();
 	}
 
-	function send(write: Write<any, any>, input: unknown): Promise<any> {
+	/**
+	 * `input` is the validated value the optimistic edit uses. `raw` is what the caller
+	 * passed, and it is what crosses the wire: the server validates again, and a schema
+	 * that transforms its input would refuse its own output.
+	 */
+	function send(write: Write<any, any>, input: unknown, raw: unknown): Promise<any> {
 		const id = crypto.randomUUID();
 		const { effect } = write;
 		const operation: Operation = {
@@ -442,7 +469,7 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 				}
 			}
 			return request(
-				{ kind: 'write', name: write.name, input, operationId: id, refresh },
+				{ kind: 'write', name: write.name, input: raw, operationId: id, refresh },
 				new AbortController().signal,
 			);
 		};
@@ -502,9 +529,9 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 			return parsed instanceof Promise
 				? parsed.then((value) => {
 						assertLive();
-						return send(write, value);
+						return send(write, value, input);
 					})
-				: send(write, parsed);
+				: send(write, parsed, input);
 		},
 		invalidate(tags) {
 			assertLive();
@@ -528,6 +555,7 @@ export function createDataStore(options: { transport: Transport }): DataStore {
 			for (const entry of entries.values()) {
 				entry.abort?.abort();
 				clearTimeout(entry.keepTimer);
+				clearTimeout(entry.expireTimer);
 				entry.snapshot = null;
 				for (const notify of [...entry.subscribers]) notify();
 			}
