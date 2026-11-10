@@ -435,6 +435,215 @@ it('preserves the original handle and active store across client writes, provide
 	}
 }, 30_000);
 
+function noticePane(statement, pragma = '') {
+	return `${pragma}
+		import {useSnapshot} from 'observer';
+		import {reading} from './handles';
+		import {Notice as Label} from 'notices';
+		export function Pane() {
+			const store = useSnapshot();
+			return <button onClick={() => { ${statement} }}>Send</button>;
+		}`;
+}
+
+function noticeProject(files) {
+	return project({
+		'observer/public-store.ts': "export {valueOf, key} from './state';",
+		'observer/state.ts':
+			'export function valueOf<T>(x:T) { return x; } export function key() { return {}; }',
+		'observer/renderer.ts':
+			"import {createContext} from 'react'; export const current = createContext(new Map());",
+		'app/src/handles.ts': "import {key} from 'observer/core'; export const reading = key();",
+		'node_modules/notices/package.json': JSON.stringify({
+			name: 'notices',
+			main: 'index.js',
+			type: 'module',
+			peerDependencies: { react: '^19' },
+		}),
+		'node_modules/notices/index.js': `import {createContext, createElement, useContext} from 'react';
+			export const Prefix = createContext('default');
+			export function Notice({label}) { return createElement('b', null, useContext(Prefix) + label); }`,
+		...files,
+	});
+}
+
+it('delivers the original React element to a store service for rendering under its eventual provider', async () => {
+	const { app, root: workspace } = noticeProject({
+		'app/src/pane.tsx': `import {useSnapshot} from 'observer'; import {reading} from './handles';
+			import {Notice as Label} from 'notices';
+			import {FormattedMessage as Message} from 'react-intl';
+			export function Pane() {
+				const store = useSnapshot();
+				return <button onClick={() => {
+					store.get(reading).show(<Label label="sent"/>, {sticky: true});
+					store.get(reading).show(<Message id="headline"/>);
+				}}><Message id="headline"/></button>;
+			}`,
+	});
+	fs.symlinkSync(
+		path.resolve(import.meta.dirname, '../node_modules/react-intl'),
+		path.join(workspace, 'node_modules/react-intl'),
+		'dir',
+	);
+	const input = path.join(app, 'src/pane.tsx');
+	const result = await runCodemod([input], { root: app, strong: true, verify: true, write: true });
+	const pane = result.files.find((file) => file.file === 'src/pane.tsx');
+	expect(pane.rules['store-hook']).toBe(1);
+	expect(pane.rules['react-intl']).toBe(1);
+	expect([...pane.notes, ...pane.diagnostics].filter((item) => item.severity === 'error')).toEqual(
+		[],
+	);
+	fs.writeFileSync(
+		path.join(app, 'src/provider.tsrx'),
+		`
+		import {NativeStoreProvider} from './octane-store-context.tsrx';
+		import {current} from '../../observer/renderer';
+		import {IntlProvider} from './octane-react-intl.tsrx';
+		import {Pane} from './pane.tsrx';
+		export function Root({store}) @{ <NativeStoreProvider context={current} value={store}><IntlProvider locale="en" messages={{headline:'Octane provider'}}><Pane/></IntlProvider></NativeStoreProvider> }`,
+	);
+	const dom = installDOM();
+	try {
+		const client = await bundleRuntime(
+			app,
+			'client',
+			`
+			export {Root} from './src/provider.tsrx';
+			export {reading} from './src/handles';
+			export {createRoot, act} from 'octane';
+			export {Notice, Prefix} from 'notices';
+			export {IntlProvider, FormattedMessage} from 'react-intl';
+			export {isValidElement, createElement} from 'react';
+			export {renderToStaticMarkup} from 'react-dom/server';`,
+			['react-intl'],
+		);
+		const show = vi.fn();
+		const host = document.createElement('div');
+		const root = client.createRoot(host);
+		try {
+			await client.act(async () =>
+				root.render(client.Root, { store: new Map([[client.reading, { show }]]) }),
+			);
+			expect(host.textContent).toBe('Octane provider');
+			expect(show).not.toHaveBeenCalled();
+			await client.act(async () => host.querySelector('button').click());
+			expect(show).toHaveBeenCalledTimes(2);
+			const [element, options] = show.mock.calls[0];
+			expect(client.isValidElement(element)).toBe(true);
+			expect(element.type).toBe(client.Notice);
+			expect(element.props).toEqual({ label: 'sent' });
+			expect(options).toEqual({ sticky: true });
+			expect(
+				client.renderToStaticMarkup(
+					client.createElement(client.Prefix.Provider, { value: 'later: ' }, element),
+				),
+			).toBe('<b>later: sent</b>');
+			const [message] = show.mock.calls[1];
+			expect(message.type).toBe(client.FormattedMessage);
+			expect(
+				client.renderToStaticMarkup(
+					client.createElement(
+						client.IntlProvider,
+						{ locale: 'en', messages: { headline: 'React provider' } },
+						message,
+					),
+				),
+			).toBe('React provider');
+		} finally {
+			await client.act(async () => root.unmount());
+		}
+	} finally {
+		dom.window.close();
+		vi.unstubAllGlobals();
+	}
+}, 30_000);
+
+it('retains the migration diagnostic when a store consumer cannot preserve the original React descriptor', async () => {
+	const deliver = (argument) => `store.get(reading).show(${argument});`;
+	const valid = deliver('<Label label="sent"/>');
+	const cases = {
+		mixed: noticePane(valid + ' store.get(reading).show(<i/>);'),
+		'unknown-handle': noticePane('store.get({}).show(<Label/>);'),
+		'wrong-receiver': noticePane('store.get(reading).replace().show(<Label/>);'),
+		'linked-tag': noticePane(valid).replace("'notices'", "'linked-notices'"),
+		'mapped-tag': noticePane(valid).replace("'notices'", "'notices/public.js'"),
+		alias: noticePane('const Copy = Label; ' + deliver('<Copy/>')),
+		shadow: noticePane('{const Label = () => <i/>; ' + deliver('<Label/>') + '}'),
+		local: noticePane('function Local() {return <i/>;} ' + deliver('<Local/>')),
+		children: noticePane(deliver('<Label>sent</Label>')),
+		spread: noticePane(deliver('<Label {...config}/>')),
+		opaque: noticePane(deliver('<Label label={compute()}/>')),
+		classic: noticePane(valid, '/** @jsxRuntime classic */'),
+		custom: noticePane(valid, '/** @jsxImportSource custom-renderer */'),
+	};
+	const inputs = Object.fromEntries(
+		Object.entries(cases).map(([name, source]) => ['app/src/' + name + '.tsx', source]),
+	);
+	const { app } = noticeProject({
+		...inputs,
+		'app/src/widgets/package.json': JSON.stringify({
+			name: 'linked-notices',
+			main: 'index.tsx',
+			peerDependencies: { react: '^19' },
+		}),
+		'app/src/widgets/index.tsx': 'export function Notice() { return <i/>; }',
+		'node_modules/notices/public.js': "export {Notice} from './index.js';",
+	});
+	fs.symlinkSync(
+		path.join(app, 'src/widgets'),
+		path.join(app, 'node_modules/linked-notices'),
+		'dir',
+	);
+	const config = path.join(app, 'tsconfig.json');
+	const options = JSON.parse(fs.readFileSync(config, 'utf8'));
+	options.compilerOptions.paths = { 'notices/public.js': ['./src/widgets/index.tsx'] };
+	fs.writeFileSync(config, JSON.stringify(options));
+	const files = Object.keys(cases).map((name) => path.join(app, 'src/' + name + '.tsx'));
+	const result = await runCodemod(files, { root: app, strong: true, verify: true });
+	for (const name of Object.keys(cases)) {
+		const file = result.files.find((file) => file.file === 'src/' + name + '.tsx');
+		expect(file.rules['store-hook'], name).toBeUndefined();
+		expect(file.notes, name).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					severity: 'error',
+					message: expect.stringContaining('observer'),
+				}),
+			]),
+		);
+	}
+}, 30_000);
+
+it.each([
+	['react', 'react-jsx'],
+	['react-jsx', 'react'],
+])(
+	'keeps the diagnostic when the root and nearest project use %s and %s',
+	async (rootJsx, nearestJsx) => {
+		const { app } = noticeProject({
+			'app/src/pane.tsx': noticePane('store.get(reading).show(<Label label="sent"/>);'),
+			'app/src/tsconfig.json': JSON.stringify({
+				extends: '../tsconfig.json',
+				compilerOptions: { jsx: nearestJsx },
+			}),
+		});
+		const config = path.join(app, 'tsconfig.json');
+		const root = JSON.parse(fs.readFileSync(config, 'utf8'));
+		root.compilerOptions.jsx = rootJsx;
+		fs.writeFileSync(config, JSON.stringify(root));
+		const result = await runCodemod([path.join(app, 'src/pane.tsx')], {
+			root: app,
+			strong: true,
+			verify: true,
+		});
+		const pane = result.files.find((file) => file.file === 'src/pane.tsx');
+		expect(pane.rules['store-hook']).toBeUndefined();
+		expect(pane.notes).toContainEqual(
+			expect.objectContaining({ severity: 'error', message: expect.stringContaining('observer') }),
+		);
+	},
+);
+
 it('requires an imported application handle to come from the original shared factory', async () => {
 	const { storeInputFactories } = await import('../dist/store-inputs.js');
 	const { app, plan } = fixture({

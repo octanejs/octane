@@ -1,5 +1,5 @@
-import { reactRenderer } from './react-renderer.js';
-import { walkLocalValues } from './local-uses.js';
+import { reactRenderer, staticReactProps } from './react-renderer.js';
+import { localUses, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
 import { effectReceivers } from './effect-receivers.js';
@@ -548,6 +548,8 @@ class ModuleTransform {
 	/** Elements to host in a `ReactCompat` island. */
 	readonly islands = new Set<ts.JsxElement | ts.JsxSelfClosingElement>();
 	readonly reactRendererBodies = new Map<ts.Node, string>();
+	readonly originalStoreTags = new Map<ts.ImportSpecifier, string>();
+	storeSourceNames?: Set<string>;
 	/** Elements no island can host, with the error each throws where it renders. */
 	readonly unrenderable = new Map<ts.Node, string>();
 	/** Placeholder index -> import declaration. */
@@ -759,6 +761,7 @@ class ModuleTransform {
 			);
 		}
 		let safeStoreUses: ReturnType<typeof storeHookUses> | undefined;
+		const descriptors = new Map<ts.Node, { item: ts.ImportSpecifier; props: string }>();
 		for (const [declaration, entry] of this.imports) {
 			if (entry.typeOnly || (ts.isImportSpecifier(declaration) && this.nativeIntl.has(declaration)))
 				continue;
@@ -771,6 +774,7 @@ class ModuleTransform {
 			) {
 				const statement = declaration.parent.parent.parent;
 				if (!statement.attributes && !/\/\*|\/\//.test(statement.getText(this.sf))) {
+					const pending: typeof descriptors = new Map();
 					const from = this.options.resolveStoreHook(
 						entry.module,
 						entry.imported,
@@ -781,10 +785,17 @@ class ModuleTransform {
 								(fn) => this.isComponent(fn),
 								(expr) => this.typeOf(expr),
 							);
-							return safeStoreUses(declaration, sharedInput);
+							pending.clear();
+							return safeStoreUses(declaration, sharedInput, (elements) => {
+								const args = elements.map((element) => this.storeReactDescriptor(element));
+								if (!args.every((arg) => arg !== null)) return false;
+								for (const [index, arg] of args.entries()) pending.set(elements[index], arg);
+								return true;
+							});
 						},
 					);
 					if (from) {
+						for (const [element, args] of pending) descriptors.set(element, args);
 						this.nativeStoreHooks.set(declaration, from);
 						continue;
 					}
@@ -793,6 +804,17 @@ class ModuleTransform {
 			if (nativeReactCompat(entry.module, entry.imported)) continue;
 			entry.port = this.portOf(entry.module);
 			if (entry.port) portLocals.add(entry.local);
+		}
+		let uses: ReturnType<typeof localUses> | undefined;
+		for (const [element, { item, props }] of descriptors) {
+			if (this.nativeIntl.has(item) && !this.originalStoreTags.has(item)) {
+				uses ??= localUses(this.sf, this.checker);
+				if (uses(item.name).every((ref) => descriptors.has(ref.parent)))
+					this.nativeIntl.delete(item);
+				else this.originalStoreTags.set(item, 'OriginalReact' + item.name.text);
+			}
+			const tag = this.originalStoreTags.get(item) ?? item.name.text;
+			this.reactRendererBodies.set(element, tag + ', ' + props);
 		}
 		const fields: ts.JsxOpeningLikeElement[] = [];
 		/** Values read as an element: cloned, inspected, or a `render` prop. */
@@ -937,6 +959,7 @@ class ModuleTransform {
 	 * they are reported.
 	 */
 	planUnported(node: ts.Identifier) {
+		if (this.reactRendererBodies.has(node.parent)) return;
 		const binding = this.inImport(node) ? null : this.importOf(node);
 		const port = binding?.port;
 		if (!port) return;
@@ -999,6 +1022,47 @@ class ModuleTransform {
 		) {
 			block(`\`${text}\` is a React context, which Octane cannot read.`);
 		}
+	}
+
+	/** Keep the imported React component as the type of the element the service receives. */
+	storeReactDescriptor(element: ts.JsxSelfClosingElement) {
+		const tag = element.tagName;
+		if (
+			!ts.isIdentifier(tag) ||
+			!/^[A-Z]/.test(tag.text) ||
+			/@jsx(?:ImportSource|Runtime|Frag)?\b/i.test(this.source)
+		)
+			return null;
+		const item = this.checker.getSymbolAtLocation(tag)?.declarations?.[0];
+		const binding = this.importOf(tag);
+		if (
+			!item ||
+			!ts.isImportSpecifier(item) ||
+			!binding ||
+			binding.typeOnly ||
+			binding.imported === 'default' ||
+			item.parent.parent.parent.attributes ||
+			!this.options.reactStoreComponent?.(binding.module) ||
+			this.resolve(binding.module) !== null
+		)
+			return null;
+		// The inserted names must be free both at module scope and at each call site.
+		if (!this.storeSourceNames) {
+			const names = new Set<string>();
+			const visit = (node: ts.Node) => {
+				if (ts.isIdentifier(node)) names.add(node.text);
+				ts.forEachChild(node, visit);
+			};
+			visit(this.sf);
+			this.storeSourceNames = names;
+		}
+		if (
+			this.storeSourceNames.has('jsx') ||
+			(this.nativeIntl.has(item) && this.storeSourceNames.has('OriginalReact' + tag.text))
+		)
+			return null;
+		const props = staticReactProps(element);
+		return props === null ? null : { item, props };
 	}
 
 	/**
@@ -1835,8 +1899,12 @@ class ModuleTransform {
 		if (clause && bindings && ts.isNamedImports(bindings)) {
 			const moved = new Map<string, string[]>();
 			const kept: ts.ImportSpecifier[] = [];
+			const originals: string[] = [];
 			let store = false;
 			for (const item of bindings.elements) {
+				const alias = this.originalStoreTags.get(item);
+				if (alias)
+					originals.push(`${(item.propertyName ?? item.name).getText(this.sf)} as ${alias}`);
 				const hook = this.nativeStoreHooks.get(item);
 				const dest =
 					hook?.from ?? (this.nativeIntl.has(item) ? this.options.reactIntlAdapter : undefined);
@@ -1856,9 +1924,10 @@ class ModuleTransform {
 				moved.set(dest, names);
 			}
 			if (moved.size) {
+				const remaining = [...kept.map((x) => x.getText(this.sf)), ...originals];
 				const original = [
 					clause.name?.text,
-					kept.length ? `{ ${kept.map((x) => x.getText(this.sf)).join(', ')} }` : undefined,
+					remaining.length ? `{ ${remaining.join(', ')} }` : undefined,
 				]
 					.filter(Boolean)
 					.join(', ');

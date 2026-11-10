@@ -222,7 +222,11 @@ Hosted components inherit the original React provider. To render a converted com
 </NativeStoreProvider>
 ```
 
-The codemod checks how each component uses the hook. Conditions, scalar output, and dependency comparisons can qualify. This includes branded primitive IDs, conditional choices of verified inputs, and named re-exports of the original store handle from local TypeScript modules. A named method on the returned store can take an imported handle created by that store’s verified factory, followed by literals or constants initialized with literals. The codemod also checks how the method result is used. Rendering an opaque store value, passing the component into an unknown renderer, or writing JSX into a shared store keeps the existing manual migration diagnostic. A component that renders a bare SVG import, including through a local alias, also needs review. Changing the importer from `.tsx` to `.tsrx` can cause an SVG loader to return an asset URL.
+The codemod checks how each component uses the hook. Conditions, scalar output, and dependency comparisons can qualify. This includes branded primitive IDs, conditional choices of verified inputs, and named re-exports of the original store handle from local TypeScript modules. A named method on the returned store can take an imported handle created by that store’s verified factory, followed by literals or constants initialized with literals. The codemod also checks how the method result is used.
+
+When the file uses the project’s React 19.2+ automatic JSX runtime, a service read with a verified handle can receive a self-closing component from an installed React package with literal props, for example `store.read(notices).show(<Message id="saved" />)`. The generated code creates the original React element, so the service can render it later under its React provider.
+
+Dynamic JSX payloads, opaque store values rendered as children, and components passed to unknown renderers still require manual migration. A component that renders a bare SVG import, including through a local alias, also needs review. Changing the importer from `.tsx` to `.tsrx` can cause an SVG loader to return an asset URL.
 
 ## Local recipes
 
