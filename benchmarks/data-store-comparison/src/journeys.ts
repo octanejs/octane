@@ -47,6 +47,10 @@ interface Journey {
 	forbids?(views: Map<string, readonly Book[]>): boolean;
 }
 
+const firstInLibrary = (server: LibraryServer) =>
+	server.view(VIEWS.find((view) => view.name === 'library-1')!)[0]!.id;
+const shownBookmark = (server: LibraryServer) =>
+	server.view(VIEWS.find((view) => view.name === 'bookmarks')!)[5]!.id;
 const books = (server: LibraryServer) => [...server.books.values()].map((book) => ({ ...book }));
 const edit = (server: LibraryServer, id: string, patch: Partial<Book>) =>
 	books(server).map((book) => (book.id === id ? { ...book, ...patch } : book));
@@ -79,8 +83,9 @@ export const JOURNEYS: readonly Journey[] = [
 	},
 	{
 		name: '2. Rename a starred book across a sorted list and pages',
-		intended: (server) => edit(server, 'b0', { title: 'Abyss' }),
-		act: ({ design }) => design.update('b0', { title: 'Abyss' }),
+		// A book the user can see: the sixth row of Bookmarks, renamed to sort first everywhere.
+		intended: (server) => edit(server, shownBookmark(server), { title: 'Abyss' }),
+		act: ({ design, server }) => design.update(shownBookmark(server), { title: 'Abyss' }),
 	},
 	{
 		name: '3. A star is refused after another user renames the book',
@@ -100,6 +105,12 @@ export const JOURNEYS: readonly Journey[] = [
 			const on = (name: string) => (views.get(name) ?? []).some((book) => book.id === 'b1');
 			return on('shelf-A') === on('shelf-B');
 		},
+	},
+	{
+		name: '5. Rename the first book in the library so it sorts last',
+		// Page 2 now needs a row past the edge of a window, so a windowed store must fetch it.
+		intended: (server) => edit(server, firstInLibrary(server), { title: 'Zzz last' }),
+		act: ({ design, server }) => design.update(firstInLibrary(server), { title: 'Zzz last' }),
 	},
 ];
 
@@ -144,7 +155,7 @@ export async function runJourney(
 	return result;
 }
 
-/** Journey 5: start once from the network, persist, then start a new session from storage. */
+/** Journey 6: start once from the network, persist, then start a new session from storage. */
 export async function runColdStart(factory: DesignFactory, count: number) {
 	const server = new LibraryServer(count);
 	const first = factory(server);

@@ -4,7 +4,11 @@ import { normalizedDesign } from './normalized/design.ts';
 import { JOURNEYS, runColdStart, runJourney, type Result } from './journeys.ts';
 import { LATENCY_MS } from './library.ts';
 
-const designs = [cachedDesign, normalizedDesign];
+const designs = [
+	cachedDesign,
+	(server: Parameters<typeof normalizedDesign>[0]) => normalizedDesign(server, 'all'),
+	(server: Parameters<typeof normalizedDesign>[0]) => normalizedDesign(server, 'windows'),
+];
 const sizes = (process.env.SIZES ?? '2000,20000').split(',').map(Number);
 
 /** Non-blank lines between the FEATURE markers in a source file. */
@@ -33,7 +37,7 @@ for (const count of sizes) {
 		}
 	}
 	console.log(
-		'\n| 5. Cold start | First load (ms) | Requests | KB fetched | KB across worker | KB persisted | Restore (ms) | Restore requests | Restored views correct |',
+		'\n| 6. Cold start | First load (ms) | Requests | KB fetched | KB across worker | KB persisted | Restore (ms) | Restore requests | Restored views correct |',
 	);
 	console.log('| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |');
 	for (const factory of designs) {

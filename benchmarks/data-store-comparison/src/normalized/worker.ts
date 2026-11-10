@@ -6,8 +6,16 @@
  */
 import * as devalue from 'devalue';
 import { parentPort, type MessagePort } from 'node:worker_threads';
-import { VIEWS, evaluate, type Book } from '../library.ts';
-import type { FromWorker, NetMessage, NetRequest, Op, ToWorker, Without } from './protocol.ts';
+import { VIEWS, comparator, evaluate, type Book, type ViewDef } from '../library.ts';
+import type {
+	Coverage,
+	FromWorker,
+	NetMessage,
+	NetRequest,
+	Op,
+	ToWorker,
+	Without,
+} from './protocol.ts';
 
 interface Pending {
 	id: string;
@@ -23,6 +31,59 @@ const assigned = new Map<string, string>();
 /** Writes to one record run in order; a create holds its record until the server names it. */
 const queues = new Map<string, Promise<unknown>>();
 let revision = 0;
+let coverage: Coverage = 'all';
+
+/** Rows loaded either side of what a view shows, so small moves need no fetch. */
+const MARGIN = 20;
+
+/**
+ * The part of a view's full order this worker holds: every record between
+ * `first` and `last` in the view's order, starting at absolute position
+ * `start`. A null bound means the window reaches that end of the list.
+ */
+interface Window {
+	start: number;
+	first: Book | null;
+	last: Book | null;
+}
+const windows = new Map<string, Window>();
+const fetching = new Set<string>();
+
+async function loadWindow(view: ViewDef): Promise<void> {
+	fetching.add(view.name);
+	const start = Math.max(0, view.offset - MARGIN);
+	const count = view.offset - start + view.limit + MARGIN;
+	const reply = await request({ kind: 'window', view: view.name, start, count });
+	const { rows, atEnd } = reply.value as { rows: Book[]; atEnd: boolean };
+	for (const book of rows) records.set(book.id, book);
+	windows.set(view.name, {
+		start,
+		first: start === 0 ? null : rows[0]!,
+		last: atEnd ? null : rows[rows.length - 1]!,
+	});
+	fetching.delete(view.name);
+}
+
+/**
+ * A view's rows from the records inside its window. Returns null when an edit
+ * moved rows out and the window no longer holds enough to fill the view.
+ */
+function evaluateWindow(view: ViewDef, books: Iterable<Book>): Book[] | null {
+	const window = windows.get(view.name);
+	if (!window) return [];
+	const order = comparator(view);
+	const region = [...books]
+		.filter(
+			(book) =>
+				view.where(book) &&
+				(!window.first || order(window.first, book) <= 0) &&
+				(!window.last || order(book, window.last) <= 0),
+		)
+		.sort(order);
+	const from = view.offset - window.start;
+	if (window.last && region.length < from + view.limit) return null;
+	return region.slice(from, from + view.limit).map((book) => ({ ...book }));
+}
 let net: MessagePort;
 let netSeq = 0;
 let localSeq = 0;
@@ -51,7 +112,13 @@ function publish(): void {
 	const views: Record<string, Book[]> = {};
 	let moved = false;
 	for (const view of VIEWS) {
-		const rows = evaluate(view, merged.values());
+		const rows =
+			coverage === 'all' ? evaluate(view, merged.values()) : evaluateWindow(view, merged.values());
+		if (rows === null) {
+			// Past the edge of what is held: fetch the window again, then show it.
+			if (!fetching.has(view.name)) void loadWindow(view).then(publish);
+			continue;
+		}
 		const key = JSON.stringify(rows);
 		if (shown.get(view.name) === key) continue;
 		shown.set(view.name, key);
@@ -115,6 +182,7 @@ async function write(op: Op): Promise<void> {
 parentPort!.on('message', async (message: ToWorker) => {
 	if (message.type === 'start') {
 		net = message.net;
+		coverage = message.coverage;
 		net.on('message', (incoming: NetMessage) => {
 			if (incoming.type === 'reply') {
 				waiting.get(incoming.seq)?.(incoming);
@@ -131,19 +199,30 @@ parentPort!.on('message', async (message: ToWorker) => {
 			publish();
 		});
 		if (message.persisted) {
-			const saved = devalue.parse(message.persisted) as { revision: number; books: Book[] };
+			const saved = devalue.parse(message.persisted) as {
+				revision: number;
+				books: Book[];
+				windows: [string, Window][];
+			};
 			revision = saved.revision;
 			for (const book of saved.books) records.set(book.id, book);
-		} else {
+			for (const [name, window] of saved.windows) windows.set(name, window);
+		} else if (coverage === 'all') {
 			// The covering read: every book the viewer can access.
 			const reply = await request({ kind: 'all' });
 			for (const book of reply.value as Book[]) records.set(book.id, book);
+		} else {
+			await Promise.all(VIEWS.map(loadWindow));
 		}
 		publish();
 		return;
 	}
 	if (message.type === 'persist') {
-		const value = devalue.stringify({ revision, books: [...records.values()] });
+		const value = devalue.stringify({
+			revision,
+			books: [...records.values()],
+			windows: [...windows],
+		});
 		post({ type: 'done', seq: message.seq, value });
 		return;
 	}

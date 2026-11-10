@@ -5,10 +5,10 @@
 import { serialize } from 'node:v8';
 import { MessageChannel, Worker, type MessagePort } from 'node:worker_threads';
 import type { Design } from '../design.ts';
-import { hop, type Book, type LibraryServer } from '../library.ts';
-import type { FromWorker, NetRequest, ToWorker, Without } from './protocol.ts';
+import { VIEWS, evaluate, hop, type Book, type LibraryServer } from '../library.ts';
+import type { Coverage, FromWorker, NetRequest, ToWorker, Without } from './protocol.ts';
 
-export function normalizedDesign(server: LibraryServer): Design {
+export function normalizedDesign(server: LibraryServer, coverage: Coverage = 'all'): Design {
 	const worker = new Worker(new URL('./worker.js', import.meta.url));
 	const views = new Map<string, readonly Book[]>();
 	const listeners = new Set<() => void>();
@@ -30,6 +30,13 @@ export function normalizedDesign(server: LibraryServer): Design {
 		listeners.forEach((listener) => listener());
 	});
 
+	/** Rows `start` to `start + count` of a view's full order, and whether that reaches its end. */
+	function window(name: string, start: number, count: number) {
+		const view = VIEWS.find((item) => item.name === name)!;
+		const rows = evaluate({ ...view, offset: start, limit: count }, server.books.values());
+		return { rows, atEnd: rows.length < count };
+	}
+
 	function send(message: ToWorker, transfer: MessagePort[] = []): void {
 		if (message.type !== 'start') bytes += serialize(message).length;
 		worker.postMessage(message, transfer);
@@ -46,7 +53,10 @@ export function normalizedDesign(server: LibraryServer): Design {
 	}
 
 	return {
-		name: 'B: normalized records, queries in a worker',
+		name:
+			coverage === 'all'
+				? 'B: normalized, worker, every book'
+				: 'C: normalized, worker, view windows',
 		async start(persisted) {
 			const { port1: ours, port2: theirs } = new MessageChannel();
 			ours.on('message', async (request: NetRequest) => {
@@ -55,9 +65,11 @@ export function normalizedDesign(server: LibraryServer): Design {
 					const value =
 						request.kind === 'all'
 							? [...server.books.values()]
-							: request.kind === 'add'
-								? server.add(request.title)
-								: server.update(request.id, request.patch);
+							: request.kind === 'window'
+								? window(request.view, request.start, request.count)
+								: request.kind === 'add'
+									? server.add(request.title)
+									: server.update(request.id, request.patch);
 					ours.postMessage({
 						type: 'reply',
 						seq: request.seq,
@@ -75,7 +87,7 @@ export function normalizedDesign(server: LibraryServer): Design {
 				() => ours.close(),
 			);
 			const shown = new Promise<void>((resolve) => (ready = resolve));
-			send({ type: 'start', persisted, net: theirs }, [theirs]);
+			send({ type: 'start', persisted, net: theirs, coverage }, [theirs]);
 			await shown;
 			ready = undefined;
 		},

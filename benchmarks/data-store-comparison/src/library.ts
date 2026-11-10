@@ -23,9 +23,9 @@ export interface ViewDef {
 	readonly limit: number;
 }
 
-const byTitle = (a: Book, b: Book) =>
+export const byTitle = (a: Book, b: Book) =>
 	a.title < b.title ? -1 : a.title > b.title ? 1 : a.id < b.id ? -1 : 1;
-const byRank = (a: Book, b: Book) => b.rank - a.rank || byTitle(a, b);
+export const byRank = (a: Book, b: Book) => b.rank - a.rank || byTitle(a, b);
 
 // FEATURE START: what an app declares for these screens with the normalized design.
 export const VIEWS: readonly ViewDef[] = [
@@ -37,6 +37,9 @@ export const VIEWS: readonly ViewDef[] = [
 	{ name: 'shelf-B', where: (book) => book.shelf === 'B', order: 'title', offset: 0, limit: 20 },
 ];
 // FEATURE END
+
+/** A view's sort order, for the store to place edited records locally. */
+export const comparator = (view: ViewDef) => (view.order === 'title' ? byTitle : byRank);
 
 export function evaluate(view: ViewDef, books: Iterable<Book>): Book[] {
 	const rows = [...books].filter(view.where).sort(view.order === 'title' ? byTitle : byRank);
