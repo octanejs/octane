@@ -317,6 +317,23 @@ it.each([
 		true,
 	],
 	['function use(a,b,v){a.label=v;} use(...[model,""],element);', 'model.label', true],
+	...['as typeof put', 'satisfies typeof put', '!'].flatMap((wrapper) => [
+		[`function put(row){row.label=element;} (put ${wrapper})(model);`, 'model.label', true],
+		[
+			`const put = (row) => {row.label=element;}; const alias = put ${wrapper}; alias(other);`,
+			'other.label',
+			true,
+		],
+		[
+			`const put = (row) => {row.label=element;}; const alias = put ${wrapper}; alias(other);`,
+			'model.label',
+			false,
+		],
+	]),
+	...['as typeof row', 'satisfies typeof row', '!'].flatMap((wrapper) => [
+		[`function id(row){return (row ${wrapper});} model.icon=element;`, 'id(model).label', false],
+		[`function id(row){return (row ${wrapper});} model.icon=element;`, 'id(model).icon', true],
+	]),
 ])('follows writes through local calls: %s', (setup, value, blocked) => {
 	const result = migrate(
 		`value={${value}}`,
@@ -508,6 +525,9 @@ it.each([
 		'model.label',
 		false,
 	],
+	['(Object.assign as typeof Object.assign)(model, {label: element});', 'model.label', true],
+	['(Object satisfies typeof Object).assign(model, {icon: element});', 'model.label', false],
+	['(Object!).assign(model, {label: element});', 'model.label', true],
 ])('checks the selected field copied by Object.assign in %s', (setup, read, blocked) => {
 	const result = migrate(
 		`value={${read}}`,

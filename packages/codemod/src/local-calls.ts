@@ -1,4 +1,5 @@
 import ts from 'typescript';
+import { isWrapper, skipWrappers } from './expression-wrappers.js';
 
 type Helper = ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction;
 export type Invocation = { call: ts.CallExpression; helper: Helper; outer?: Invocation };
@@ -33,8 +34,8 @@ export function localCalls(
 	function scan(call: ts.CallExpression) {
 		let expr: ts.Node = call.expression;
 		const aliases = new Set<ts.Symbol>();
-		while (ts.isIdentifier(expr) || ts.isParenthesizedExpression(expr)) {
-			if (ts.isParenthesizedExpression(expr)) {
+		while (ts.isIdentifier(expr) || isWrapper(expr)) {
+			if (isWrapper(expr)) {
 				expr = expr.expression;
 				continue;
 			}
@@ -111,7 +112,8 @@ export function localCalls(
 		if (!fn?.body) return;
 		let index = identityParameters.get(fn);
 		if (index === undefined) {
-			const [result] = returns(fn);
+			const [returned] = returns(fn);
+			const result = returned && skipWrappers(returned);
 			const single =
 				!ts.isBlock(fn.body) ||
 				(fn.body.statements.length === 1 && ts.isReturnStatement(fn.body.statements[0]));

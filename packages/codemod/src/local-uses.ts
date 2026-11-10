@@ -1,4 +1,5 @@
 import ts from 'typescript';
+import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import { localCalls, type Invocation, type CallContext } from './local-calls.js';
 
 export function scalar(type: ts.Type): boolean {
@@ -22,26 +23,6 @@ function localSymbol(checker: ts.TypeChecker, id: ts.Identifier) {
 		: ts.isExportSpecifier(id.parent)
 			? checker.getExportSpecifierLocalTargetSymbol(id.parent)
 			: checker.getSymbolAtLocation(id);
-}
-
-/**
- * Whether `node` wraps an expression only for grouping or the type checker.
- */
-export function isWrapper(
-	node: ts.Node,
-): node is
-	| ts.ParenthesizedExpression
-	| ts.AsExpression
-	| ts.SatisfiesExpression
-	| ts.NonNullExpression
-	| ts.TypeAssertion {
-	return (
-		ts.isParenthesizedExpression(node) ||
-		ts.isAsExpression(node) ||
-		ts.isSatisfiesExpression(node) ||
-		ts.isNonNullExpression(node) ||
-		ts.isTypeAssertionExpression(node)
-	);
 }
 
 type Key = string | undefined; // An unknown computed key can select any member.
@@ -416,7 +397,7 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 	// selected field supplies it. Fall back to inspecting the source for opaque shapes.
 	function selected(source: ts.Expression, path: Key[]): ts.Expression | undefined {
 		for (const key of path) {
-			while (isWrapper(source)) source = source.expression;
+			source = skipWrappers(source);
 			if (key === undefined || !ts.isObjectLiteralExpression(source)) return;
 			let value: ts.Expression | undefined;
 			for (const field of source.properties) {
@@ -545,20 +526,20 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 	}
 
 	function recordAssign(node: ts.CallExpression) {
-		const method = node.expression;
+		const method = skipWrappers(node.expression);
 		const receiver = node.arguments[0];
+		if (!receiver || !isMember(method)) return;
+		const object = skipWrappers(method.expression);
 		if (
-			!receiver ||
-			!isMember(method) ||
-			!ts.isIdentifier(method.expression) ||
-			method.expression.text !== 'Object' ||
+			!ts.isIdentifier(object) ||
+			object.text !== 'Object' ||
 			memberKey(method) !== 'assign' ||
-			!localSymbol(checker, method.expression)?.valueDeclaration?.getSourceFile().hasNoDefaultLib
+			!localSymbol(checker, object)?.valueDeclaration?.getSourceFile().hasNoDefaultLib
 		)
 			return;
 		assigns.add(node);
 		function copy(source: ts.Expression) {
-			while (isWrapper(source)) source = source.expression;
+			source = skipWrappers(source);
 			if (!ts.isObjectLiteralExpression(source)) {
 				pending.push({ receiver, key: null, source, selection: [] });
 				return;
@@ -580,8 +561,10 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 	}
 
 	function scan(node: ts.Node) {
-		if (ts.isCallExpression(node)) possibleCalls.push(node);
-		if (ts.isCallExpression(node)) recordAssign(node);
+		if (ts.isCallExpression(node)) {
+			possibleCalls.push(node);
+			recordAssign(node);
+		}
 		if (
 			ts.isBinaryExpression(node) &&
 			node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
