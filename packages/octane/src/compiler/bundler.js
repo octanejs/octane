@@ -1258,7 +1258,7 @@ class OctaneBundlerCompiler {
 		const [first] = violations;
 		const filename = this._canonicalModuleId(file);
 		const error = new Error(
-			`${first.code}: ${filename}:${first.line}:${first.column + 1}: ${first.message}${
+			`OCTANE_STRONG_DEPENDENCY: ${filename}:${first.line}:${first.column + 1}: ${first.message}${
 				violations.length > 1 ? ` (${violations.length - 1} more)` : ''
 			}`,
 		);
