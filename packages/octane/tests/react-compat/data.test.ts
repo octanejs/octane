@@ -108,6 +108,29 @@ describe('octane/data/octane', () => {
 	});
 });
 
+describe('octane/data/octane writes in a transition', () => {
+	it('shows the edit at once and keeps the transition pending until the write settles', async () => {
+		const server = createServer();
+		const writes = heldWrites(server);
+		const page = setup(false, writes.transport);
+		const container = await page.mount();
+		expect(text(container, '[data-transition-toggle]')).toBe('Idle');
+
+		await run(() =>
+			container.querySelector<HTMLButtonElement>('[data-transition-toggle]')!.click(),
+		);
+		// The optimistic edit is not held back by the transition.
+		expect(text(container, '[data-octane-done]')).toBe('1');
+		expect(text(container, '[data-octane-toggle]')).toBe('Mark active');
+		expect(text(container, '[data-transition-toggle]')).toBe('Saving');
+
+		await run(writes.release);
+		await settle();
+		expect(text(container, '[data-transition-toggle]')).toBe('Idle');
+		expect(text(container, '[data-octane-done]')).toBe('1');
+	});
+});
+
 describe('one store across a ReactCompat boundary', () => {
 	it('shares one load between the Octane page and the React island', async () => {
 		const page = setup(true);

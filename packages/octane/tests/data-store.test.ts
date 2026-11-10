@@ -51,6 +51,23 @@ describe('octane/data store', () => {
 		expect(list.getSnapshot().value).toEqual([{ id: 'a', title: 'Tides', done: false }]);
 	});
 
+	it('calls the transport after the synchronous work that started a load', async () => {
+		const server = createServer();
+		const calls: string[] = [];
+		const store = createDataStore({
+			transport: (request, signal) => {
+				calls.push(request.name);
+				return server.transport(request, signal);
+			},
+		});
+
+		// A component that reads unloaded data starts the load while it renders.
+		const load = store.prefetch(todos, undefined);
+		expect(calls).toEqual([]);
+		await load;
+		expect(calls).toEqual(['todos.list']);
+	});
+
 	it('shows a patch in every view at once and settles it in one round trip', async () => {
 		const server = createServer();
 		const store = createDataStore({ transport: server.transport });
@@ -616,12 +633,19 @@ describe('octane/data server-assigned IDs and server transactions', () => {
 		const http = httpTransport('https://app.test/data', {
 			fetch: (url, init) => handler(new Request(url as string, init)),
 		});
+		// Creates wait until released; the store calls its transport asynchronously,
+		// so a release may come before the create has reached the transport.
+		let released = false;
 		const transport: Transport = async (request, signal) => {
-			if (request.name === 'todos.addAssigned')
+			if (request.name === 'todos.addAssigned' && !released)
 				await new Promise<void>((resolve) => held.push(resolve));
 			return http(request, signal);
 		};
-		return { rows, log, transport, release: () => held.splice(0).forEach((resolve) => resolve()) };
+		const release = () => {
+			released = true;
+			held.splice(0).forEach((resolve) => resolve());
+		};
+		return { rows, log, transport, release };
 	}
 
 	const addAssigned = write({
