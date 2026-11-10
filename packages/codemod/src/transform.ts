@@ -516,6 +516,7 @@ class ModuleTransform {
 	readonly imports = new Map<ts.Node, Import>();
 	nativeIntl = new Set<ts.ImportSpecifier>();
 	hasReactBridge = false;
+	readonly pathSvgImports = new Map<ts.ImportDeclaration, string>();
 	readonly nativeStoreHooks = new Map<ts.ImportSpecifier, { from: string; name: string }>();
 	/** React and Octane imports, by local name. */
 	readonly apiLocals = new Map<string, Import>();
@@ -816,11 +817,14 @@ class ModuleTransform {
 			const tag = this.originalStoreTags.get(item) ?? item.name.text;
 			this.reactRendererBodies.set(element, tag + ', ' + props);
 		}
+		let hasEval = false;
 		const fields: ts.JsxOpeningLikeElement[] = [];
 		/** Values read as an element: cloned, inspected, or a `render` prop. */
 		const elements: ts.Expression[] = [];
 		const visit = (node: ts.Node) => {
 			if (ts.isIdentifier(node) && declaresName(node)) this.declared.add(node.text);
+			if (this.options.pathSvgAdapter && ts.isIdentifier(node) && node.text === 'eval')
+				hasEval = true;
 			if (ts.isIdentifier(node) && portLocals.has(node.text)) this.planUnported(node);
 			if (isJsx(node)) this.hasJsx = true;
 			if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) fields.push(node);
@@ -849,18 +853,49 @@ class ModuleTransform {
 				}
 			}
 		}
+		const pathSvgTags = new Set<ts.Node>();
+		if (
+			this.target === 'tsrx' &&
+			this.options.pathSvgAdapter &&
+			!hasEval &&
+			!/@jsx(?:ImportSource|Runtime|Frag)?\b/i.test(this.source)
+		) {
+			for (const [declaration, binding] of this.imports) {
+				if (
+					!ts.isImportClause(declaration) ||
+					!ts.isImportDeclaration(declaration.parent) ||
+					!declaration.name ||
+					declaration.namedBindings ||
+					declaration.parent.attributes ||
+					binding.typeOnly ||
+					!/\.svg$/i.test(binding.module)
+				)
+					continue;
+				uses ??= localUses(this.sf, this.checker);
+				const refs = uses(declaration.name);
+				if (!refs.length || !refs.every((ref) => this.nativePathSvgUse(ref, uses!))) continue;
+				const native = this.options.pathSvgAdapter(binding.module);
+				if (!native) continue;
+				this.pathSvgImports.set(declaration.parent, native);
+				for (const ref of refs) pathSvgTags.add(ref);
+			}
+		}
 		const checkSvgIssuer =
 			this.nativeStoreHooks.size > 0 &&
 			[...this.imports.values()].some(
 				(entry) => entry.imported === 'default' && /\.svg$/i.test(entry.module),
 			);
 		for (const field of fields) {
-			if (checkSvgIssuer && isBareSvgTag(field.tagName, this.checker)) {
+			if (pathSvgTags.has(field.tagName)) this.count('svg-paths');
+			else if (checkSvgIssuer && isBareSvgTag(field.tagName, this.checker)) {
 				this.note(
 					'store-hook',
 					'error',
 					field.tagName,
-					'This JSX tag can resolve to a bare SVG import. Loading the SVG from .tsrx can produce an asset URL. Render the SVG in a React-owned .tsx component through ReactCompat, or configure a native SVG loader for .tsrx.',
+					'This JSX tag can resolve to a bare SVG import. Loading the SVG from .tsrx can produce an asset URL. Render the SVG in a React-owned .tsx component through ReactCompat, or configure a native SVG loader for .tsrx.' +
+						(this.options.pathSvgAdapter
+							? ' To prepare a native component for manual integration, run --svg-paths on the SVG file and verify the receiving renderer.'
+							: ''),
 				);
 			}
 			if (this.takesChange(field)) this.planRestChange(field);
@@ -1022,6 +1057,91 @@ class ModuleTransform {
 		) {
 			block(`\`${text}\` is a React context, which Octane cannot read.`);
 		}
+	}
+
+	nativePathSvgUse(ref: ts.Identifier, uses: ReturnType<typeof localUses>) {
+		const tag = ref.parent;
+		if (!ts.isJsxSelfClosingElement(tag) || tag.tagName !== ref || tag.typeArguments) return false;
+		const supported = tag.attributes.properties.every((attr) => {
+			if (!ts.isJsxAttribute(attr) || !ts.isIdentifier(attr.name)) return false;
+			const value = attr.initializer;
+			if (attr.name.text === 'className')
+				return (
+					!!value &&
+					(ts.isStringLiteral(value) ||
+						(ts.isJsxExpression(value) && !!value.expression && ts.isIdentifier(value.expression)))
+				);
+			return (
+				attr.name.text === 'aria-hidden' &&
+				(!value ||
+					ts.isStringLiteral(value) ||
+					(ts.isJsxExpression(value) &&
+						(value.expression?.kind === ts.SyntaxKind.TrueKeyword ||
+							value.expression?.kind === ts.SyntaxKind.FalseKeyword)))
+			);
+		});
+		if (!supported) return false;
+		// A native element can cross into React through a prop, a saved value, or a call
+		// even when the SVG has an intrinsic parent. Follow the whole output expression.
+		let value: ts.Node = tag;
+		for (;;) {
+			const parent = value.parent;
+			if (ts.isJsxElement(parent)) {
+				const name = parent.openingElement.tagName;
+				if (
+					!ts.isIdentifier(name) ||
+					!/^[a-z]/.test(name.text) ||
+					!parent.children.some((child) => child === value)
+				)
+					return false;
+			} else if (ts.isReturnStatement(parent)) {
+				const fn = ts.findAncestor(parent, ts.isFunctionLike);
+				return (
+					!!fn &&
+					(ts.isFunctionDeclaration(fn) || ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) &&
+					this.nativeSvgOwner(fn, uses)
+				);
+			} else if (ts.isArrowFunction(parent) && parent.body === value) {
+				return this.nativeSvgOwner(parent, uses);
+			} else if (!(
+				ts.isJsxFragment(parent) ||
+				ts.isJsxExpression(parent) ||
+				ts.isParenthesizedExpression(parent) ||
+				(ts.isConditionalExpression(parent) && parent.condition !== value) ||
+				(ts.isBinaryExpression(parent) &&
+					parent.right === value &&
+					parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken)
+			)) {
+				return false;
+			}
+			value = parent;
+		}
+	}
+
+	// A capitalized local function can also be a callback for a different renderer.
+	// Limit this rewrite to standalone exported components with no local consumers.
+	nativeSvgOwner(
+		fn: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction,
+		uses: ReturnType<typeof localUses>,
+	) {
+		if (!this.isComponent(fn) || (ts.isFunctionExpression(fn) && fn.name)) return false;
+		const parent = fn.parent;
+		if (ts.isExportAssignment(parent) && parent.parent === this.sf) return true;
+		const variable =
+			ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name) ? parent : null;
+		const statement = variable ? variable.parent.parent : fn;
+		if (
+			statement.parent !== this.sf ||
+			!(ts.isFunctionDeclaration(statement) || ts.isVariableStatement(statement))
+		)
+			return false;
+		const name = variable ? variable.name : fn.name;
+		const refs = name && ts.isIdentifier(name) ? uses(name) : [];
+		return (
+			refs.every((ref) => ts.isExportSpecifier(ref.parent) || ts.isExportAssignment(ref.parent)) &&
+			(refs.length > 0 ||
+				statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) === true)
+		);
 	}
 
 	/** Keep the imported React component as the type of the element the service receives. */
@@ -1880,6 +2000,15 @@ class ModuleTransform {
 	// ---------------------------------------------------------------- imports
 
 	rewriteImport(node: ts.ImportDeclaration) {
+		const native = this.pathSvgImports.get(node);
+		if (native) {
+			const spec = node.moduleSpecifier;
+			return (
+				this.source.slice(node.getStart(this.sf), spec.getStart(this.sf)) +
+				JSON.stringify(native) +
+				this.source.slice(spec.end, node.end)
+			);
+		}
 		const module = (node.moduleSpecifier as ts.StringLiteral).text;
 		if (module === 'octane') return null;
 		if (module === '@react-three/fiber' && this.hasJsx) {

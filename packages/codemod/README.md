@@ -228,6 +228,18 @@ When the file uses the project’s React 19.2+ automatic JSX runtime, a service 
 
 Dynamic JSX payloads, opaque store values rendered as children, and components passed to unknown renderers still require manual migration. A component that renders a bare SVG import, including through a local alias, also needs review. Changing the importer from `.tsx` to `.tsrx` can cause an SVG loader to return an asset URL.
 
+## Path-only SVG components
+
+Use `--svg-paths` (or `svgPaths: true` in the JavaScript API) when your bundler's bare default SVG import renders the authored SVG geometry, applies caller props to its root, and the same asset with `?raw` imports its XML as a string. For aliased requests, the bundler and TypeScript paths must resolve to the same local file. Check both your development and production loaders before enabling this option. Custom SVG templates, optimizers that rewrite the rendered geometry, and URL-producing loaders can have different behavior.
+
+For example, `<Mark className="icon" aria-hidden />` can remain a direct SVG child of a button. The codemod checks the asset and each use of the import. It supports an SVG root containing self-closing paths, including common dimensions, viewBox, fills, and strokes. Each supported import points to a small native component beside the asset. That component reads the live SVG through `?raw`, so changes to supported geometry appear on the next build. Editing the asset to use unsupported markup produces an explicit error.
+
+Automatic rewrites follow direct returns and intrinsic JSX children of standalone exported components. When an icon passes through another component’s props or children, you can prepare its native module separately with `octane-codemod --svg-paths src/icons/mark.svg`. This writes the native component beside the asset and leaves callers available for review. Confirm the receiving component renders Octane elements before switching its import to `./mark.svg.octane`.
+
+The generated SVG uses the native SVG namespace. In a client mount, Octane places an explicit `xmlns` attribute in the XMLNS namespace; React sets that attribute without a namespace. Applications that inspect the namespace of the attribute itself should keep their existing rendering path.
+
+Shared component values, React island uses, refs, spread props, and SVGs with unsupported elements keep their original imports. The default migration keeps the existing diagnostics for bare SVGs.
+
 ## Local recipes
 
 Pass a recipe explicitly to use it for a migration:

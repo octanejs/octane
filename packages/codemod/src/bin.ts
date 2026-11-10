@@ -18,6 +18,9 @@ Options:
   --force-strong     keep "use strong" even where Strong errors remain
   --target <tsrx|tsx> tsrx (default) rewrites components as templates;
                      tsx keeps JSX and only ports the React APIs
+  --svg-paths        migrate simple path icons when bare SVGs render their authored
+                     geometry with caller props and ?raw imports read their source;
+                     pass SVG file paths to prepare native components separately
   --dry-run          report without writing
   --print            print each migrated module (implies --dry-run)
   --no-verify        skip compiling the result
@@ -36,6 +39,7 @@ async function main() {
 			recipe: { type: 'string' },
 			strong: { type: 'boolean', default: false },
 			'force-strong': { type: 'boolean', default: false },
+			'svg-paths': { type: 'boolean' },
 			target: { type: 'string', default: 'tsrx' },
 			'dry-run': { type: 'boolean', default: false },
 			print: { type: 'boolean', default: false },
@@ -75,6 +79,7 @@ async function main() {
 		target: values.target,
 		strong: values.strong || values['force-strong'],
 		forceStrong: values['force-strong'],
+		svgPaths: values['svg-paths'],
 		verify: values.verify,
 		projectTypes: values['project-types'],
 		write: !dryRun,

@@ -1,0 +1,60 @@
+const space = /^[ \t\r\n]*$/;
+const number = '[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?';
+const length = new RegExp('^' + number + '(?:px|em|rem|%)?$');
+const separator = '(?: *, *| +)';
+const paint = /^(?:[a-zA-Z]+|#[\da-fA-F]{3,4}|#[\da-fA-F]{6}(?:[\da-fA-F]{2})?)$/;
+const rootAttributes = {
+	xmlns: /^http:\/\/www\.w3\.org\/2000\/svg$/,
+	width: length,
+	height: length,
+	viewBox: new RegExp('^' + number + '(?:' + separator + number + '){3}$'),
+	fill: paint,
+};
+const fillRule = /^(?:evenodd|nonzero)$/;
+const pathAttributes = {
+	d: /^[Mm] *[+\-.\d][MmLlHhVvCcSsQqTtAaZzEe0-9.,+\- ]+$/,
+	fill: paint,
+	stroke: paint,
+	'stroke-width': length,
+	'fill-rule': fillRule,
+	'clip-rule': fillRule,
+};
+
+function attributes(text: string, allowed: Record<string, RegExp>) {
+	const values: Record<string, string> = {};
+	const field =
+		/[ \t\r\n]+([A-Za-z][A-Za-z-]*)[ \t\r\n]*=[ \t\r\n]*(?:"([^"&<>\t\r\n]*)"|'([^'&<>\t\r\n]*)')/gy;
+	let end = 0;
+	for (let match; (match = field.exec(text)); end = field.lastIndex) {
+		const name = match[1]!;
+		const value = (match[2] ?? match[3])!;
+		if (name in values || !Object.prototype.hasOwnProperty.call(allowed, name)) return null;
+		const rule = allowed[name]!;
+		if (!rule.test(value)) return null;
+		// SVG component loaders can emit a numeric literal for unitless lengths.
+		if (rule === length && !Number.isNaN(Number(value)) && String(Number(value)) !== value)
+			return null;
+		values[name] = value;
+	}
+	return space.test(text.slice(end)) ? values : null;
+}
+
+/** Read a single authored SVG containing only attribute data and self-closing paths. */
+export function parsePathSvg(source: string) {
+	const svg =
+		typeof source === 'string' &&
+		/^[ \t\r\n]*<svg([^<>]*)>([\s\S]*)<\/svg>[ \t\r\n]*$/.exec(source);
+	if (!svg) return null;
+	const root = attributes(svg[1]!, rootAttributes);
+	if (!root) return null;
+	const body = svg[2]!;
+	const paths: Record<string, string>[] = [];
+	const tag = /[ \t\r\n]*<path([^<>]*?)\/>/gy;
+	let end = 0;
+	for (let match; (match = tag.exec(body)); end = tag.lastIndex) {
+		const props = attributes(match[1]!, pathAttributes);
+		if (!props?.d) return null;
+		paths.push(props);
+	}
+	return paths.length && space.test(body.slice(end)) ? { root, paths } : null;
+}

@@ -29,6 +29,7 @@
   "files": [
     "dist",
     "templates",
+    "src/path-svg.ts",
     "README.md",
     "LICENSE"
   ],
