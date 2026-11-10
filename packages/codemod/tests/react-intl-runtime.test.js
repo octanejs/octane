@@ -92,12 +92,15 @@ beforeAll(async () => {
 	await writeFile(path.join(project, 'package.json'), '{}');
 	await writeFile(
 		badge,
-		`export function Badge({size,...props}) {return <div data-size={size} {...props}/>;}`,
+		`export function Badge({size,...props}) {
+			if (props.href) return <a {...props}/>;
+			return <button type="button" data-size={size} {...props}/>;
+		}`,
 	);
 	await writeFile(
 		reader,
 		`import {Badge} from './badge'; import {useIntl} from 'react-intl';
-		export function Label() {const label=useIntl().formatMessage({id:'greeting'}); return <Badge aria-label={label}/>;}`,
+		export function Label({href}) {const label=useIntl().formatMessage({id:'greeting'}); return <Badge href={href} aria-label={label}/>;}`,
 	);
 	const converted = await runCodemod([reader, badge], {
 		root: project,
@@ -344,18 +347,21 @@ it('hands a real React element from a migrated inline callback back to the unpor
 	}
 });
 
-it('preserves DOM attribute coercion and locale changes through a migrated prop spread', async () => {
+it('keeps forwarded accessibility labels in sync with React across locale and element changes', async () => {
 	const { react, intl, reactRoot, OctaneCompat, Label } = client;
 	const h = react.createElement;
-	function Original() {
-		return h('div', { 'aria-label': intl.useIntl().formatMessage({ id: 'greeting' }) });
+	function Original({ href }) {
+		return h(href ? 'a' : 'button', {
+			href,
+			'aria-label': intl.useIntl().formatMessage({ id: 'greeting' }),
+		});
 	}
 	const el = document.createElement('main');
 	const root = reactRoot(el);
 	try {
-		for (const [locale, message] of [
+		for (const [locale, message, href] of [
 			['en', 'Greeting'],
-			['fr', '<em>Bonjour</em>'],
+			['fr', '<em>Bonjour</em>', '#details'],
 			['de', 'Hallo'],
 		]) {
 			const config = {
@@ -369,12 +375,12 @@ it('preserves DOM attribute coercion and locale changes through a migrated prop 
 					h(
 						intl.IntlProvider,
 						config,
-						h(Original),
-						h(OctaneCompat, { component: Label, props: {} }),
+						h(Original, { href }),
+						h(OctaneCompat, { component: Label, props: { href } }),
 					),
 				),
 			);
-			const labels = [...el.querySelectorAll('[aria-label]')].map((node) =>
+			const labels = [...el.querySelectorAll(href ? 'a[href="#details"]' : 'button')].map((node) =>
 				node.getAttribute('aria-label'),
 			);
 			const expected = locale === 'fr' ? '[object Object]' : message;
