@@ -7,10 +7,12 @@ reach the same final geometry and differ only in when they read and write:
 | Variant | Pattern | Reads and writes |
 | --- | --- | --- |
 | `effect-interleaved` | a layout effect per row reads the label, then writes the bar | interleaved |
+| `effect-phased` | the same effect, with its read in `readLayout` and its write in `writeLayout` | batched |
 | `snapshot-write` | a `useLayoutSnapshot` measurement per row that also writes the bar | interleaved |
 | `effect-state` | a layout effect per row copies the width into state | batched, two renders |
 | `snapshot` | a `useLayoutSnapshot` per row, with the bar width rendered from it | batched |
 | `handler-interleaved` | one click handler loops over the rows, reading then writing | interleaved |
+| `handler-phased` | the same loop, with each row's read in `readLayout` and its write in `writeLayout` | batched |
 | `handler-batched` | one click handler reads every row, then writes every row | batched |
 
 The fixture compiles without Strong mode, because Strong rejects `snapshot-write`

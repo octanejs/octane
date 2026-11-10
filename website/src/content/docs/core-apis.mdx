@@ -664,6 +664,58 @@ oscillating measurement reaches the update depth limit. For changes such as
 resizing between component commits, have an observer callback update state to
 request another commit and measurement. Use this hook in the DOM renderer.
 
+<h3 id="layout-phases">
+	Batch layout reads and writes with <code>readLayout</code> and <code>writeLayout</code>
+</h3>
+
+A layout read after a DOM write makes the browser lay out synchronously. When
+many components each read and then write, the browser lays out once per
+component. Queue the read with `readLayout` and the write with `writeLayout`
+instead. In the next frame Octane runs every queued read, then every queued
+write, so the browser lays out once however many components took part:
+
+```tsrx
+import { readLayout, useLayoutEffect, useRef, writeLayout } from 'octane';
+
+export function Underlined(props: { label: string }) @{
+	const label = useRef<HTMLSpanElement | null>(null);
+	const bar = useRef<HTMLElement | null>(null);
+	// `null` runs the effect after every commit, so a new label is measured again.
+	useLayoutEffect(
+		() =>
+			readLayout(() => {
+				const width = label.current!.offsetWidth;
+				writeLayout(() => {
+					bar.current!.style.width = width + 'px';
+				});
+			}),
+		null,
+	);
+
+	<div>
+		<span ref={label}>{props.label}</span>
+		<i ref={bar} />
+	</div>
+}
+```
+
+Both functions return a function that cancels the task if it has not run, so
+the effect above drops a stale read when it reruns or unmounts. A write queued
+by a read runs in the same frame. A read queued by a write runs in a further
+pass of that frame, up to 50 passes; work still queued then waits for the next
+frame. If a task throws, the rest still run and the first error is rethrown.
+
+`flushLayoutSync()` runs the queued work now instead of in the next frame.
+`getPhase()` returns `RenderingPhase.READ` or `RenderingPhase.WRITE` while the
+queue runs a task of that kind, and `RenderingPhase.IDLE` otherwise, which lets
+a library check that its own reads and writes run in the right phase. Commits,
+effects and event handlers currently run in `IDLE`. The queued work runs outside
+a commit, so `flushSync` and `act()` do not wait for it. On the server the queue
+never runs.
+
+When rendered output depends on the measurement, use
+[`useLayoutSnapshot`](#use-layout-snapshot) instead.
+
 <h3 id="createResizeObserver">
 	Measure resizes with <code>createResizeObserver</code>
 </h3>
@@ -1528,6 +1580,12 @@ handlers; return here when you have a specific problem to solve.
 			<li>
 				<code>useLayoutSnapshot</code>
 				<span>Render from a committed layout measurement before paint.</span>
+			</li>
+			<li>
+				<code>readLayout</code>
+				{' / '}
+				<code>writeLayout</code>
+				<span>Queue layout reads before DOM writes so a frame lays out once.</span>
 			</li>
 			<li>
 				<code>createResizeObserver</code>

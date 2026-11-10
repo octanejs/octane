@@ -113,10 +113,10 @@ const NON_CONTRAST_BASELINE: Record<string, readonly DeferredFinding[]> = {
 	// API reference tables plus the tab panel — same deferred class.
 	...forRoute('/docs/core-apis', [
 		{ ruleId: 'scrollable-region-focusable', nodeSelector: '#\\:in-1\\:-panel' },
-		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(115)' },
-		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(139)' },
-		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(144)' },
-		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(205)' },
+		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(121)' },
+		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(145)' },
+		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(150)' },
+		{ ruleId: 'scrollable-region-focusable', nodeSelector: '.table-scroll:nth-child(211)' },
 	]),
 	// CodeMirror: the contenteditable surface has no accessible field name and
 	// its scroller is not focusable. Editor chrome, not site styles.

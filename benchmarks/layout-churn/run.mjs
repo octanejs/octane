@@ -19,21 +19,29 @@ const UPDATES = Number(process.argv[2] ?? 15);
 const WARMUP = 3;
 const VARIANTS = [
 	'effect-interleaved',
+	'effect-phased',
 	'snapshot-write',
 	'effect-state',
 	'snapshot',
 	'handler-interleaved',
+	'handler-phased',
 	'handler-batched',
 ];
 // These read every label before writing any bar, so their layout work must not
 // grow with the row count. The other variants are the patterns under study and
 // carry no bound: a runtime that batches them is an improvement, not a failure.
-const BATCHED = new Set(['effect-state', 'snapshot', 'handler-batched']);
+const BATCHED = new Set([
+	'effect-phased',
+	'effect-state',
+	'snapshot',
+	'handler-phased',
+	'handler-batched',
+]);
 const MAX_BATCHED_LAYOUTS = 3;
 
 const built = await build({
 	stdin: {
-		contents: `export { createRoot, flushSync } from 'octane'; export { App } from ${JSON.stringify(fixture)};`,
+		contents: `export { createRoot, flushLayoutSync, flushSync } from 'octane'; export { App } from ${JSON.stringify(fixture)};`,
 		resolveDir: repo,
 	},
 	bundle: true,
@@ -98,7 +106,7 @@ async function measure(browser, variant, count) {
 		};
 		await page.evaluate(
 			({ variant, count }) => {
-				const { createRoot, flushSync, App } = globalThis.layoutChurn;
+				const { createRoot, flushLayoutSync, flushSync, App } = globalThis.layoutChurn;
 				const ids = Array.from({ length: count }, (_, id) => id);
 				const root = createRoot(document.getElementById('root'));
 				const button = () => document.querySelector('button');
@@ -107,6 +115,8 @@ async function measure(browser, variant, count) {
 					const start = performance.now();
 					flushSync(() => root.render(App, { variant, ids, revision }));
 					if (handler) button().click();
+					// The phased variants queue their work for the frame; run it inside the timing.
+					flushLayoutSync();
 					// Charge layout the update left pending to the update.
 					document.body.offsetHeight;
 					const elapsed = performance.now() - start;
