@@ -19,10 +19,13 @@
       "src/Transitioner.tsrx",
       "src/assetComponent.tsrx",
       "src/compiled/Document.tsrx",
+      "src/compiled/HydrationRangeOwner.tsrx",
       "src/compiled/Link.tsrx",
       "src/compiled/Matches.tsrx",
       "src/compiled/bindings.ts",
       "src/compiled/route.tsrx",
+      "src/compiled/serverDocument.client.ts",
+      "src/compiled/serverDocument.tsrx",
       "src/headContentBinding.ts",
       "src/hookBindings.ts",
       "src/internal.ts",
@@ -96,5 +99,11 @@
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "vitest": "catalog:default"
+  },
+  "imports": {
+    "#server-document": {
+      "browser": "./src/compiled/serverDocument.client.ts",
+      "default": "./src/compiled/serverDocument.tsrx"
+    }
   }
 }
