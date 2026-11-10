@@ -23,6 +23,7 @@ import { renderSlice } from '../render-slice.js';
 import { type BindingHandoff, releaseBindingHandoff } from '../dom-binding-handoff.js';
 import { bumpContextEpoch } from '../context-epoch.js';
 import { postHostTask } from '../host-task.js';
+import { queuePhase, type RenderingPhase } from '../layout-phases.js';
 import { hasPendingHostBudget } from '../host-budget.js';
 import {
 	__profileEffect,
@@ -521,6 +522,13 @@ export let CURRENT_EFFECT_PHASE = -1;
 // Recovery starts after all callbacks in the current commit/passive pass finish.
 // Successful commits allocate no error queue.
 let EFFECT_COMMIT_DEPTH = 0;
+// The EFFECT_COMMIT_DEPTH at which the innermost passive drain, and the
+// innermost layout snapshot read pass, is running: `getPhase` reports a commit
+// as WRITE unless it is one of these. A commit nested inside either is deeper.
+let PASSIVE_COMMIT_LEVEL = 0;
+let MEASURE_COMMIT_LEVEL = 0;
+// root.unmount() removes a tree outside any commit. `getPhase` reports WRITE there.
+let ROOT_TEARDOWN_DEPTH = 0;
 let COMMIT_PHASE_ERRORS: Array<{
 	block: Block | null;
 	error: unknown;
@@ -2804,12 +2812,17 @@ function drainLayoutSnapshots(snapshots: LayoutSnapshots): void {
 	const actionBatch = ACTIVE_TRANSITION_ACTION_BATCH;
 	TRANSITION_DEPTH = 0;
 	ACTIVE_TRANSITION_ACTION_BATCH = null;
-	EFFECT_COMMIT_DEPTH++;
+	const measureLevel = MEASURE_COMMIT_LEVEL;
+	MEASURE_COMMIT_LEVEL = ++EFFECT_COMMIT_DEPTH;
 	try {
 		const updates: LayoutSnapshotUpdate[] = [];
-		for (const effect of snapshots.values()) {
-			if (layoutSnapshotIsCurrent(effect)) runEffectBody(effect, updates);
-			else snapshots.delete(effect.slot);
+		try {
+			for (const effect of snapshots.values()) {
+				if (layoutSnapshotIsCurrent(effect)) runEffectBody(effect, updates);
+				else snapshots.delete(effect.slot);
+			}
+		} finally {
+			MEASURE_COMMIT_LEVEL = measureLevel;
 		}
 		// Publish only after the whole read batch. These updates belong to the
 		// synchronous layout cascade even though the callbacks have returned.
@@ -3619,7 +3632,16 @@ export function flushSync<T>(fn: () => T): T {
 	// schedules — drainQueue picks up mid-pass appends, and the microtask
 	// scheduler backstops work queued after the render pass (see `inFlush`).
 	// The engine registers its batch hooks once; bundles without it call fn directly.
-	if (inFlush) return nativeBatchHooks ? runNativeBatch(fn) : fn();
+	//
+	// A `readLayout` task is the same case: a commit there would write between
+	// the queued reads, so its updates commit in the microtask after the queue.
+	// 1 is RenderingPhase.READ: a literal keeps that object out of every bundle.
+	if (process.env.NODE_ENV !== 'production' && queuePhase === 1) {
+		console.error(
+			'flushSync was called from a readLayout task. Its updates commit after the queued layout work, so that the remaining reads do not each lay out again.',
+		);
+	}
+	if (inFlush || queuePhase === 1) return nativeBatchHooks ? runNativeBatch(fn) : fn();
 	// A preparing view transition is skipped so the sync drain can commit now.
 	// A running animation survives; the urgent update changes the live DOM under it.
 	if (VIEW_TRANSITION_DRIVER) VIEW_TRANSITION_DRIVER.interrupt();
@@ -4562,7 +4584,8 @@ export function drainRegisteredPassivePhase(): void {
 		// rather than strand the held effects.
 		settleNestedUpdateChain();
 	}
-	EFFECT_COMMIT_DEPTH++;
+	const passiveLevel = PASSIVE_COMMIT_LEVEL;
+	PASSIVE_COMMIT_LEVEL = ++EFFECT_COMMIT_DEPTH;
 	try {
 		drainDeferredPassiveUnmounts();
 		const pending = effectQueues[PASSIVE];
@@ -4580,8 +4603,33 @@ export function drainRegisteredPassivePhase(): void {
 			runEffectBody(e);
 		}
 	} finally {
+		PASSIVE_COMMIT_LEVEL = passiveLevel;
 		finishEffectCommit();
 	}
+}
+
+/**
+ * The layout phase the caller runs in (#2309).
+ *
+ * - READ: a `readLayout` task, or a `useLayoutSnapshot` measurement.
+ * - WRITE: a `writeLayout` task, or a commit: its DOM mutations, refs,
+ *   insertion and layout effects and store syncs, and a root's unmount. An
+ *   event the browser fires from inside one reports WRITE too.
+ * - IDLE: everything else, including renders, passive effects and event
+ *   handlers. A render touches no DOM the page shows.
+ */
+export function getPhase(): RenderingPhase {
+	// Literals, so a bundle without the queue keeps no RenderingPhase object.
+	const IDLE = 0;
+	const READ = 1;
+	const WRITE = 2;
+	if (queuePhase !== IDLE) return queuePhase;
+	// Applying a commit's DOM mutations, or removing a root's tree, wherever
+	// either was started: a passive effect or a measurement may unmount a root.
+	if (COMMITTING_OWNER !== null || ROOT_TEARDOWN_DEPTH !== 0) return WRITE;
+	if (EFFECT_COMMIT_DEPTH === 0) return IDLE;
+	if (EFFECT_COMMIT_DEPTH === MEASURE_COMMIT_LEVEL) return READ;
+	return EFFECT_COMMIT_DEPTH === PASSIVE_COMMIT_LEVEL ? IDLE : WRITE;
 }
 
 // Only bindings opting into committed state allocate this companion setter.
@@ -5926,6 +5974,7 @@ export function makeRoot(
 			renderOwner.wakeable = null;
 			renderOwner.request = null;
 			if (renderOwner.transaction !== null) rollbackRootRender(renderOwner.transaction);
+			ROOT_TEARDOWN_DEPTH++;
 			try {
 				if (rootBlock) {
 					DOM_ROOT_DISPOSERS.delete(rootBlock);
@@ -5956,6 +6005,7 @@ export function makeRoot(
 					currentKey = null;
 				}
 			} finally {
+				ROOT_TEARDOWN_DEPTH--;
 				// An unresolved wakeable may retain its ping indefinitely. Leave it
 				// only the disposed owner token, not a tree, hydration closure or props.
 				idState.signalState?.opaqueKeys?.clear();
