@@ -99,6 +99,58 @@ it.each([
 	expect(result.rules['react-compat'] ?? 0).toBe(blocked ? 0 : 1);
 });
 
+it.each([
+	['const label = <b/> as unknown as string;', true],
+	['let label = ""; label = <b/> as unknown as string;', true],
+	['let label = ""; const next = <b/> as unknown as string; label = next;', true],
+	['let label = ""; label ||= <b/> as unknown as string;', true],
+	['let label = ""; (label satisfies string) = <b/> as unknown as string;', true],
+	['let label = ""; for (label of [<b/> as unknown as string]) {}', true],
+	['let label = ""; for ({label = <b/> as unknown as string} in {key: 1}) {}', true],
+	['let label = ""; [label] = [<b/> as unknown as string];', true],
+	['let label = ""; [label = <b/> as unknown as string] = [];', true],
+	['let labels = []; [...labels] = [<b/> as unknown as string]; const label = labels[0];', true],
+	['let label = ""; ({text: label} = {text: <b/> as unknown as string});', true],
+	['let label = ""; ({label = <b/> as unknown as string} = {});', true],
+	['let label = ""; for ([label] of [[<b/> as unknown as string]]) {}', true],
+	['let label = ""; label = "updated";', false],
+	['let label = ""; label ||= "updated";', false],
+	['let label = ""; for (label of ["updated"]) {}', false],
+	['let label = ""; [label] = ["updated"];', false],
+	['let label = ""; ({text: label} = {text: "updated"});', false],
+	['let label = ""; for (label in {text: <b/>}) {}', false],
+	['let label = ""; let next = ""; label = next; next = label;', false],
+	['let label = ""; const values = {}; values[label] = <b/>;', false],
+	['let label = ""; let unused; ({[label]: unused} = {text: <b/>});', false],
+	['let label = ""; { let label = ""; label = <b/> as unknown as string; }', false],
+])('checks reassigned React island props: %s', (setup, blocked) => {
+	const result = transformModule(
+		`import {Display} from 'example-ui';
+		export function Page() { ${setup} return <Display label={label}/>; }`,
+		'page.tsx',
+		{ reactCompat: true, unported: (name) => (name === 'example-ui' ? name : null) },
+	);
+	expect(result.notes.some((note) => note.rule === 'bindings' && note.severity === 'error')).toBe(
+		blocked,
+	);
+	expect(result.rules['react-compat'] ?? 0).toBe(blocked ? 0 : 1);
+});
+
+it('checks values assigned by an async iterator before they cross into React', () => {
+	const result = transformModule(
+		`import { Display } from 'example-ui';
+		let label = "";
+		export async function update() { for await (label of [<b/> as unknown as string]) {} }
+		export function Page() { return <Display label={label}/>; }`,
+		'page.tsx',
+		{ reactCompat: true, unported: (name) => (name === 'example-ui' ? name : null) },
+	);
+	expect(result.notes).toContainEqual(
+		expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+	);
+	expect(result.rules['react-compat'] ?? 0).toBe(0);
+});
+
 it('retains the hook diagnostic when producing a placeholder substitution requires React JSX', () => {
 	const result = transformModule(
 		`import {useIntl} from 'react-intl';

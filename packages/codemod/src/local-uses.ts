@@ -23,7 +23,73 @@ function localSymbol(checker: ts.TypeChecker, id: ts.Identifier) {
 			: checker.getSymbolAtLocation(id);
 }
 
-/** Inspect syntax and the declarations supplying its values in this module.
+// A file can be queried once per island or store argument. Index its writes once
+// for the checker that owns its symbols, and release them with the source file.
+type LocalWrites = Map<ts.Symbol, ts.Expression[]>;
+const writesByFile = new WeakMap<ts.SourceFile, { checker: ts.TypeChecker; writes: LocalWrites }>();
+
+function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites {
+	const cached = writesByFile.get(file);
+	if (cached?.checker === checker) return cached.writes;
+	const writes: LocalWrites = new Map();
+
+	function record(target: ts.Node, source: ts.Expression | undefined) {
+		if (ts.isIdentifier(target)) {
+			if (!source) return;
+			const symbol = localSymbol(checker, target);
+			if (symbol) {
+				const values = writes.get(symbol);
+				if (values) values.push(source);
+				else writes.set(symbol, [source]);
+			}
+		} else if (ts.isArrayLiteralExpression(target) || ts.isObjectLiteralExpression(target)) {
+			const entries = ts.isArrayLiteralExpression(target) ? target.elements : target.properties;
+			for (const entry of entries) record(entry, source);
+		} else if (ts.isPropertyAssignment(target)) {
+			record(target.initializer, source);
+		} else if (ts.isShorthandPropertyAssignment(target)) {
+			record(target.name, source);
+			if (target.objectAssignmentInitializer)
+				record(target.name, target.objectAssignmentInitializer);
+		} else if (
+			ts.isBinaryExpression(target) &&
+			target.operatorToken.kind === ts.SyntaxKind.EqualsToken
+		) {
+			// The file traversal also visits this default assignment and records its right side.
+			record(target.left, source);
+		} else if (
+			ts.isSpreadElement(target) ||
+			ts.isSpreadAssignment(target) ||
+			ts.isParenthesizedExpression(target) ||
+			ts.isAsExpression(target) ||
+			ts.isSatisfiesExpression(target) ||
+			ts.isTypeAssertionExpression(target) ||
+			ts.isNonNullExpression(target)
+		) {
+			record(target.expression, source);
+		}
+	}
+
+	function scan(node: ts.Node) {
+		if (
+			ts.isBinaryExpression(node) &&
+			node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+			node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+		) {
+			record(node.left, node.right);
+		} else if (ts.isForOfStatement(node) || ts.isForInStatement(node)) {
+			// for-in supplies string keys, but defaults in its binding pattern can still run.
+			if (!ts.isVariableDeclarationList(node.initializer))
+				record(node.initializer, ts.isForOfStatement(node) ? node.expression : undefined);
+		}
+		ts.forEachChild(node, scan);
+	}
+	scan(file);
+	writesByFile.set(file, { checker, writes });
+	return writes;
+}
+
+/** Inspect syntax and the declarations and assignments supplying its values in this module.
  * Returning false skips a subtree; undefined follows its children and local values. */
 export function walkLocalValues(
 	root: ts.Node,
@@ -32,6 +98,7 @@ export function walkLocalValues(
 ): boolean {
 	const file = root.getSourceFile();
 	const seen = new Set<ts.Node>();
+	const followed = new Set<ts.Symbol>();
 	function visit(node: ts.Node): boolean {
 		if (seen.has(node)) return false;
 		seen.add(node);
@@ -40,7 +107,10 @@ export function walkLocalValues(
 		if (ts.isIdentifier(node)) {
 			const symbol = localSymbol(checker, node);
 			const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
-			if (declaration?.getSourceFile() === file && visit(declaration)) return true;
+			if (symbol && declaration?.getSourceFile() === file && !followed.has(symbol)) {
+				followed.add(symbol);
+				if (visit(declaration) || localWrites(file, checker).get(symbol)?.some(visit)) return true;
+			}
 		}
 		// Destructuring stores defaults on individual bindings; its value comes from the owner.
 		let owner = node;
