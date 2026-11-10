@@ -136,6 +136,64 @@ it.each([
 	expect(result.rules['react-compat'] ?? 0).toBe(blocked ? 0 : 1);
 });
 
+it.each([
+	['model.label = element;', 'model.label', true],
+	['model.label = element; const label = model.label;', 'label', true],
+	["const alias = model; alias['label'] = element;", 'model.label', true],
+	['const alias = model; model.label = element;', 'alias.label', true],
+	['model.label = element;', 'model', true],
+	['model.label = element;', 'model.icon', false],
+	['model.label = element; const alias = model;', 'alias.icon', false],
+	['model.label = "updated";', 'model.label', false],
+	['const other: Model = {label: "", icon: ""}; other.label = element;', 'model.label', false],
+	['const key = Math.random() ? "label" : "icon"; model[key] = element;', 'model.label', true],
+	['model.label = element; const key = Math.random() ? "label" : "icon";', 'model[key]', true],
+	['const box = {left: model, right: model}; box.left.label = element;', 'box.left', true],
+	['let alias; alias = model; alias.label = element;', 'model.label', true],
+	[
+		'const box = { model }; const { model: alias } = box; alias.label = element;',
+		'box.model.label',
+		true,
+	],
+	['const { missing: alias = model } = {}; alias.label = element;', 'model.label', true],
+	['const pick = Math.random() ? model : {label: ""}; pick.label = element;', 'model.label', true],
+	['model.icon = element; const {label: title} = model;', 'title', false],
+	['const key = "icon"; model[key] = element;', 'model.label', false],
+	['const {...copy} = model; copy.label = element;', 'model.label', false],
+	['const rows = ["", ""]; const [,...copy] = rows; copy[0] = element;', 'rows[1]', false],
+	[
+		'const rows = [{}, model]; const [,...copy] = rows; copy[0].label = element;',
+		'rows[1].label',
+		true,
+	],
+	['const box = {row: model}; box.row = {label: "safe", icon: element};', 'box.row.label', false],
+	['const box = {row: model}; box.row = {label: element, icon: "safe"};', 'box.row.label', true],
+	[
+		'const box = {row: model}; ({item:box.row} = {item:{label:element}, label:"decoy"});',
+		'box.row.label',
+		true,
+	],
+	[
+		'const box = {row: model}; ({item:box.row} = {item:{label:"safe"}, label:element});',
+		'box.row.label',
+		false,
+	],
+	['for (model.label of [element]) {}', 'model.label', true],
+])('checks property writes before passing %s %s to React', (setup, value, blocked) => {
+	const result = migrate(
+		`value={${value}}`,
+		`
+		type Model = { label: string, icon: string };
+		const model: Model = {label: "", icon: ""};
+		const element = <b/> as unknown as string;
+		${setup}`,
+	);
+	expect(result.notes.some((note) => note.rule === 'bindings' && note.severity === 'error')).toBe(
+		blocked,
+	);
+	expect(result.rules['react-compat'] ?? 0).toBe(blocked ? 0 : 1);
+});
+
 it('checks values assigned by an async iterator before they cross into React', () => {
 	const result = transformModule(
 		`import { Display } from 'example-ui';

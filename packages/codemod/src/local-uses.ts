@@ -23,50 +23,218 @@ function localSymbol(checker: ts.TypeChecker, id: ts.Identifier) {
 			: checker.getSymbolAtLocation(id);
 }
 
+/**
+ * Whether `node` wraps an expression only for grouping or the type checker.
+ */
+export function isWrapper(
+	node: ts.Node,
+): node is
+	| ts.ParenthesizedExpression
+	| ts.AsExpression
+	| ts.SatisfiesExpression
+	| ts.NonNullExpression
+	| ts.TypeAssertion {
+	return (
+		ts.isParenthesizedExpression(node) ||
+		ts.isAsExpression(node) ||
+		ts.isSatisfiesExpression(node) ||
+		ts.isNonNullExpression(node) ||
+		ts.isTypeAssertionExpression(node)
+	);
+}
+
 // A file can be queried once per island or store argument. Index its writes once
 // for the checker that owns its symbols, and release them with the source file.
-type LocalWrites = Map<ts.Symbol, ts.Expression[]>;
+type Key = string | undefined; // An unknown computed key can select any member.
+function isMember(node: ts.Node): node is ts.PropertyAccessExpression | ts.ElementAccessExpression {
+	return ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node);
+}
+
+type LocalWrites = {
+	bindings: Map<ts.Symbol, ts.Expression[]>;
+	members: (node: ts.Node, visit: (source: ts.Expression) => boolean) => boolean;
+};
 const writesByFile = new WeakMap<ts.SourceFile, { checker: ts.TypeChecker; writes: LocalWrites }>();
 
 function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites {
 	const cached = writesByFile.get(file);
 	if (cached?.checker === checker) return cached.writes;
-	const writes: LocalWrites = new Map();
+	const bindings = new Map<ts.Symbol, ts.Expression[]>();
+	const members = new Map<ts.Symbol, { path: Key[]; source: ts.Expression; exact: boolean }[]>();
+	const pending: { target: ts.Expression; source: ts.Expression; exact: boolean }[] = [];
 
-	function record(target: ts.Node, source: ts.Expression | undefined) {
+	function keyOf(node: ts.Expression): Key {
+		if (isWrapper(node)) return keyOf(node.expression);
+		if (ts.isStringLiteralLike(node) || ts.isNumericLiteral(node)) return node.text;
+		if (ts.isIdentifier(node)) {
+			const d = localSymbol(checker, node)?.valueDeclaration;
+			if (
+				d &&
+				ts.isVariableDeclaration(d) &&
+				d.initializer &&
+				ts.isVariableDeclarationList(d.parent) &&
+				d.parent.flags & ts.NodeFlags.Const &&
+				d.end <= node.pos
+			)
+				return keyOf(d.initializer);
+		}
+	}
+
+	// Visit the storage locations a local reference may name, including a binding's
+	// initializer and subsequent assignments. Unknown computed keys match any field.
+	function locations(
+		node: ts.Node,
+		writing: boolean,
+		match: (root: ts.Symbol, path: Key[]) => boolean,
+	): boolean {
+		const active = new Set<ts.Symbol>();
+		const visited = new Map<ts.Symbol, Key[][]>();
+		function trace(node: ts.Node, path: Key[]): boolean {
+			if (isWrapper(node)) return trace(node.expression, path);
+			if (isMember(node)) {
+				const key = ts.isPropertyAccessExpression(node)
+					? node.name.text
+					: keyOf(node.argumentExpression);
+				return trace(node.expression, [key, ...path]);
+			}
+			if (ts.isConditionalExpression(node))
+				return trace(node.whenTrue, path) || trace(node.whenFalse, path);
+			if (!ts.isIdentifier(node)) return false;
+			const symbol = localSymbol(checker, node);
+			if (!symbol || active.has(symbol)) return false;
+			// A binding can receive the same alias on many control-flow paths.
+			const paths = visited.get(symbol);
+			if (paths?.some((p) => p.length === path.length && p.every((key, i) => key === path[i])))
+				return false;
+			if (paths) paths.push(path);
+			else visited.set(symbol, [path]);
+			if (match(symbol, path)) return true;
+			let d = symbol.valueDeclaration;
+			if (d?.getSourceFile() !== file) return false;
+			active.add(symbol);
+			let from = path;
+			while (ts.isBindingElement(d)) {
+				if (d.initializer && trace(d.initializer, from)) return true;
+				const field = d.propertyName ?? d.name;
+				if (d.dotDotDotToken) {
+					// Rest copies its slots. Only writes below a copied object reach the original.
+					if (writing && from.length <= 1) break;
+					if (ts.isArrayBindingPattern(d.parent) && from.length) {
+						const index = from[0];
+						from = [
+							index !== undefined && /^(0|[1-9]\d*)$/.test(index)
+								? String(d.parent.elements.indexOf(d) + Number(index))
+								: undefined,
+							...from.slice(1),
+						];
+					}
+				} else {
+					const key = ts.isArrayBindingPattern(d.parent)
+						? String(d.parent.elements.indexOf(d))
+						: propertyName(field);
+					from = [key, ...from];
+				}
+				d = d.parent.parent;
+			}
+			const found =
+				!!(ts.isVariableDeclaration(d) && d.initializer && trace(d.initializer, from)) ||
+				!!bindings.get(symbol)?.some((source) => trace(source, path));
+			active.delete(symbol);
+			return found;
+		}
+		return trace(node, []);
+	}
+
+	function propertyName(name: ts.PropertyName | ts.BindingName): Key {
+		if (ts.isComputedPropertyName(name)) return keyOf(name.expression);
+		if (ts.isIdentifier(name) || ts.isStringLiteralLike(name) || ts.isNumericLiteral(name))
+			return name.text;
+	}
+
+	// A parent replacement can supply a child. In a plain literal, only the
+	// selected field supplies it. Fall back to inspecting the source for opaque shapes.
+	function selected(source: ts.Expression, path: Key[], start: number): ts.Expression | undefined {
+		for (const key of path.slice(start)) {
+			while (isWrapper(source)) source = source.expression;
+			if (key === undefined || !ts.isObjectLiteralExpression(source)) return;
+			let value: ts.Expression | undefined;
+			for (const field of source.properties) {
+				if (!ts.isPropertyAssignment(field) && !ts.isShorthandPropertyAssignment(field)) return;
+				const name = propertyName(field.name);
+				if (name === undefined) return;
+				if (name === key) value = ts.isPropertyAssignment(field) ? field.initializer : field.name;
+			}
+			if (!value) return;
+			source = value;
+		}
+		return source;
+	}
+
+	function memberSources(node: ts.Node, visit: (source: ts.Expression) => boolean): boolean {
+		if (!members.size) return false;
+		// Check a reference at its consuming use. Its receiver or alias initializer
+		// alone would select the whole object and incorrectly include sibling writes.
+		let outer: ts.Node = node;
+		while (isWrapper(outer.parent) && outer.parent.expression === outer) outer = outer.parent;
+		const p = outer.parent;
+		if (
+			(isMember(p) && p.expression === outer) ||
+			ts.isVariableDeclaration(p) ||
+			(ts.isBindingElement(p) && p.initializer !== outer) ||
+			(ts.isBinaryExpression(p) &&
+				p.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+				ts.isIdentifier(p.left) &&
+				ts.isExpressionStatement(p.parent))
+		)
+			return false;
+
+		return locations(
+			node,
+			false,
+			(root, read) =>
+				!!members.get(root)?.some(({ path, source, exact }) => {
+					if (
+						!path.every((key, i) => key === undefined || read[i] === undefined || key === read[i])
+					)
+						return false;
+					return visit((exact && selected(source, read, path.length)) || source);
+				}),
+		);
+	}
+
+	function record(target: ts.Node, source: ts.Expression | undefined, exact: boolean) {
 		if (ts.isIdentifier(target)) {
 			if (!source) return;
 			const symbol = localSymbol(checker, target);
 			if (symbol) {
-				const values = writes.get(symbol);
+				const values = bindings.get(symbol);
 				if (values) values.push(source);
-				else writes.set(symbol, [source]);
+				else bindings.set(symbol, [source]);
 			}
+		} else if (isMember(target)) {
+			if (source) pending.push({ target, source, exact });
 		} else if (ts.isArrayLiteralExpression(target) || ts.isObjectLiteralExpression(target)) {
 			const entries = ts.isArrayLiteralExpression(target) ? target.elements : target.properties;
-			for (const entry of entries) record(entry, source);
+			for (const entry of entries) {
+				if (ts.isPropertyAssignment(entry) && isMember(entry.initializer) && source && exact) {
+					const value = selected(source, [propertyName(entry.name)], 0);
+					record(entry.initializer, value ?? source, value !== undefined);
+				} else record(entry, source, false);
+			}
 		} else if (ts.isPropertyAssignment(target)) {
-			record(target.initializer, source);
+			record(target.initializer, source, exact);
 		} else if (ts.isShorthandPropertyAssignment(target)) {
-			record(target.name, source);
+			record(target.name, source, exact);
 			if (target.objectAssignmentInitializer)
-				record(target.name, target.objectAssignmentInitializer);
+				record(target.name, target.objectAssignmentInitializer, true);
 		} else if (
 			ts.isBinaryExpression(target) &&
 			target.operatorToken.kind === ts.SyntaxKind.EqualsToken
 		) {
 			// The file traversal also visits this default assignment and records its right side.
-			record(target.left, source);
-		} else if (
-			ts.isSpreadElement(target) ||
-			ts.isSpreadAssignment(target) ||
-			ts.isParenthesizedExpression(target) ||
-			ts.isAsExpression(target) ||
-			ts.isSatisfiesExpression(target) ||
-			ts.isTypeAssertionExpression(target) ||
-			ts.isNonNullExpression(target)
-		) {
-			record(target.expression, source);
+			record(target.left, source, exact);
+		} else if (ts.isSpreadElement(target) || ts.isSpreadAssignment(target) || isWrapper(target)) {
+			record(target.expression, source, exact);
 		}
 	}
 
@@ -76,15 +244,24 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 			node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
 			node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
 		) {
-			record(node.left, node.right);
+			record(node.left, node.right, true);
 		} else if (ts.isForOfStatement(node) || ts.isForInStatement(node)) {
 			// for-in supplies string keys, but defaults in its binding pattern can still run.
 			if (!ts.isVariableDeclarationList(node.initializer))
-				record(node.initializer, ts.isForOfStatement(node) ? node.expression : undefined);
+				record(node.initializer, ts.isForOfStatement(node) ? node.expression : undefined, false);
 		}
 		ts.forEachChild(node, scan);
 	}
 	scan(file);
+	for (const { target, source, exact } of pending) {
+		locations(target, true, (root, path) => {
+			const values = members.get(root);
+			if (values) values.push({ path, source, exact });
+			else members.set(root, [{ path, source, exact }]);
+			return false;
+		});
+	}
+	const writes = { bindings, members: memberSources };
 	writesByFile.set(file, { checker, writes });
 	return writes;
 }
@@ -104,12 +281,16 @@ export function walkLocalValues(
 		seen.add(node);
 		const result = inspect(node, visit);
 		if (result !== undefined) return result;
-		if (ts.isIdentifier(node)) {
-			const symbol = localSymbol(checker, node);
-			const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
-			if (symbol && declaration?.getSourceFile() === file && !followed.has(symbol)) {
-				followed.add(symbol);
-				if (visit(declaration) || localWrites(file, checker).get(symbol)?.some(visit)) return true;
+		if (ts.isIdentifier(node) || isMember(node)) {
+			const writes = localWrites(file, checker);
+			if (writes.members(node, visit)) return true;
+			if (ts.isIdentifier(node)) {
+				const symbol = localSymbol(checker, node);
+				const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
+				if (symbol && declaration?.getSourceFile() === file && !followed.has(symbol)) {
+					followed.add(symbol);
+					if (visit(declaration) || writes.bindings.get(symbol)?.some(visit)) return true;
+				}
 			}
 		}
 		// Destructuring stores defaults on individual bindings; its value comes from the owner.
