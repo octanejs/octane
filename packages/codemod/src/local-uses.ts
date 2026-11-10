@@ -72,7 +72,7 @@ type LocalWrites = {
 	calls: ReturnType<typeof localCalls>;
 	bindings: Map<ts.Symbol, AssignmentSource[]>;
 	bindingStep: (d: ts.BindingElement) => Selection;
-	selected: (source: ts.Expression, path: Key[]) => ts.Expression | undefined;
+	selected: (source: ts.Expression, path: Key[]) => ts.Expression | null | undefined;
 	arguments: (
 		node: ts.Identifier,
 		d: ts.Declaration,
@@ -393,9 +393,110 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 			return name.text;
 	}
 
-	// A parent replacement can supply a child. In a plain literal, only the
-	// selected field supplies it. Fall back to inspecting the source for opaque shapes.
-	function selected(source: ts.Expression, path: Key[]): ts.Expression | undefined {
+	// Only direct statement copies consume the RHS without exposing it as the
+	// result of an assignment expression. Its statement also pins execution order.
+	function copyStatement(read: ts.Node, objectOnly = false): ts.Statement | undefined {
+		while (isWrapper(read.parent)) read = read.parent;
+		const copy = read.parent;
+		if (
+			ts.isVariableDeclaration(copy) &&
+			copy.initializer === read &&
+			(ts.isObjectBindingPattern(copy.name) || (!objectOnly && ts.isArrayBindingPattern(copy.name)))
+		) {
+			return ts.isVariableStatement(copy.parent.parent) ? copy.parent.parent : undefined;
+		}
+		if (
+			!ts.isBinaryExpression(copy) ||
+			copy.right !== read ||
+			copy.operatorToken.kind !== ts.SyntaxKind.EqualsToken ||
+			!(
+				ts.isObjectLiteralExpression(copy.left) ||
+				(!objectOnly && ts.isArrayLiteralExpression(copy.left))
+			)
+		)
+			return;
+		let result: ts.Node = copy;
+		while (isWrapper(result.parent)) result = result.parent;
+		return ts.isExpressionStatement(result.parent) ? result.parent : undefined;
+	}
+
+	// A local array can have a custom iterator, and a missing key can be inherited.
+	// Narrow those reads only while the literal stays in tracked data operations.
+	let references: ReturnType<typeof localUses> | undefined;
+	// Prototype access and eval can change what these locals expose without a
+	// statically visible use of the receiver.
+	let dynamicAccess = false;
+	function plainField(field: ts.ObjectLiteralElementLike): boolean {
+		if (!ts.isPropertyAssignment(field) && !ts.isShorthandPropertyAssignment(field)) return false;
+		const name = propertyName(field.name);
+		return name !== undefined && name !== '__proto__';
+	}
+	function confined(literal: ts.Expression, read: ts.Node, seen = new Set<ts.Node>()): boolean {
+		if (dynamicAccess || !copyStatement(read)) return false;
+		function local(value: ts.Node): boolean {
+			if (value === read || seen.has(value)) return true;
+			seen.add(value);
+			const parent = value.parent;
+			if (isWrapper(parent)) return local(parent);
+			if (isMember(parent) && parent.expression === value) {
+				const key = memberKey(parent);
+				return key !== undefined && !(key in Object.prototype) && key !== 'length' && local(parent);
+			}
+			if (
+				ts.isBinaryExpression(parent) &&
+				parent.left === value &&
+				isMember(value) &&
+				parent.operatorToken.kind === ts.SyntaxKind.EqualsToken
+			)
+				return true;
+			if (
+				(ts.isPropertyAssignment(parent) && parent.initializer === value) ||
+				(ts.isShorthandPropertyAssignment(parent) && parent.name === value)
+			)
+				return (
+					ts.isObjectLiteralExpression(parent.parent) &&
+					parent.parent.properties.every(plainField) &&
+					local(parent.parent)
+				);
+			if (
+				ts.isVariableDeclaration(parent) &&
+				parent.initializer === value &&
+				ts.isIdentifier(parent.name) &&
+				ts.isVariableDeclarationList(parent.parent) &&
+				parent.parent.flags & ts.NodeFlags.Const &&
+				!(ts.getCombinedModifierFlags(parent) & ts.ModifierFlags.Export)
+			) {
+				references ??= localUses(file, checker);
+				return references(parent.name).every(local);
+			}
+			return false;
+		}
+		if (local(literal)) return true;
+		// Discard tentative paths when any use of this literal escaped.
+		seen.clear();
+		return false;
+	}
+
+	// A parent replacement can supply a child. Return its value, null for a
+	// missing property, or undefined to inspect the whole source when the read is opaque.
+	function selected(
+		source: ts.Expression,
+		path: Key[],
+		read?: ts.Expression,
+		confinedNodes?: Set<ts.Node>,
+	): ts.Expression | null | undefined {
+		const origin = read ?? source;
+		function selectMember(
+			access: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+			rest: Key[],
+		) {
+			return selected(
+				access.expression,
+				[memberKey(access), ...rest],
+				origin,
+				(confinedNodes ??= new Set()),
+			);
+		}
 		function scalarField(annotation: ts.TypeNode, start: number): boolean {
 			let type = checker.getTypeAtLocation(annotation);
 			for (let i = start; i < path.length; i++) {
@@ -436,7 +537,24 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 					return;
 				source = d.initializer;
 			}
-			if (!ts.isObjectLiteralExpression(source)) return;
+			if (isMember(source)) return selectMember(source, path.slice(i));
+			if (ts.isArrayLiteralExpression(source)) {
+				if (
+					!/^(0|[1-9]\d*)$/.test(key) ||
+					source.elements.some(ts.isSpreadElement) ||
+					!confined(source, origin, confinedNodes)
+				)
+					return;
+				const item = source.elements[Number(key)];
+				if (!item || ts.isOmittedExpression(item)) return;
+				source = item;
+				continue;
+			}
+			if (
+				!ts.isObjectLiteralExpression(source) ||
+				(read && !confined(source, origin, confinedNodes))
+			)
+				return;
 			let value: ts.Expression | undefined;
 			for (const field of source.properties) {
 				if (!ts.isPropertyAssignment(field) && !ts.isShorthandPropertyAssignment(field)) return;
@@ -444,8 +562,20 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 				if (name === undefined) return;
 				if (name === key) value = ts.isPropertyAssignment(field) ? field.initializer : field.name;
 			}
-			if (!value) return;
+			if (!value) {
+				if (
+					i === path.length - 1 &&
+					!(key in Object.prototype) &&
+					confined(source, origin, confinedNodes)
+				)
+					return null;
+				return;
+			}
 			source = value;
+		}
+		if (isMember(source)) {
+			const projected = selectMember(source, []);
+			if (projected !== undefined) return projected;
 		}
 		return source;
 	}
@@ -492,17 +622,70 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 		);
 	}
 
+	// A field replacement cannot change a scalar already copied from a fresh
+	// receiver in this execution. Shared receivers can survive another iteration or call.
+	function afterSnapshot(
+		root: ts.Symbol,
+		read: ts.Node,
+		key: string,
+		source: ts.Expression,
+		projected: boolean,
+	): boolean {
+		const write = source.parent;
+		if (
+			!ts.isBinaryExpression(write) ||
+			write.operatorToken.kind !== ts.SyntaxKind.EqualsToken ||
+			write.right !== source ||
+			!isMember(write.left) ||
+			!ts.isExpressionStatement(write.parent)
+		)
+			return false;
+		if (!projected) {
+			const d = ts.isIdentifier(read) && localSymbol(checker, read)?.valueDeclaration;
+			if (!d || !ts.isBindingElement(d) || d.initializer || bindingStep(d) !== key) return false;
+			const owner = d.parent.parent;
+			if (
+				!ts.isVariableDeclaration(owner) ||
+				!owner.initializer ||
+				!ts.isVariableDeclarationList(owner.parent) ||
+				!(owner.parent.flags & ts.NodeFlags.Const) ||
+				!ts.isIdentifier(owner.initializer) ||
+				localSymbol(checker, owner.initializer) !== root
+			)
+				return false;
+			read = owner.initializer;
+		}
+		if (write.pos <= read.end) return false;
+		const scope = write.parent.parent;
+		const d = root.valueDeclaration;
+		if (
+			!d ||
+			!ts.isVariableDeclaration(d) ||
+			!d.initializer ||
+			!ts.isObjectLiteralExpression(d.initializer) ||
+			!ts.isVariableDeclarationList(d.parent) ||
+			!(d.parent.flags & ts.NodeFlags.Const) ||
+			bindings.has(root) ||
+			!ts.isVariableStatement(d.parent.parent) ||
+			d.parent.parent.parent !== scope
+		)
+			return false;
+		if (copyStatement(read, true)?.parent !== scope || !confined(d.initializer, read)) return false;
+		const value = selected(d.initializer, [key]);
+		return !!value && scalar(checker.getTypeAtLocation(skipWrappers(value)));
+	}
+
 	function memberSources(
 		node: ts.Node,
 		visit: VisitSource,
 		frame?: CallContext,
-		path?: Key[],
+		selectionPath?: Key[],
 	): boolean {
-		if (!members.size || (!path && !consumingUse(node))) return false;
+		if (!members.size || (!selectionPath && !consumingUse(node))) return false;
 
 		return locations(
 			node,
-			path ?? [],
+			selectionPath ?? [],
 			false,
 			(root, read, instance) =>
 				!!members
@@ -512,6 +695,15 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 						if (sourceFrame === false) return false;
 						if (
 							!path.every((key, i) => key === undefined || read[i] === undefined || key === read[i])
+						)
+							return false;
+						if (
+							(!selectionPath || selectionPath.length === 1) &&
+							read.length === 1 &&
+							path.length === 1 &&
+							path[0] !== undefined &&
+							path[0] === read[0] &&
+							afterSnapshot(root, node, path[0], source, !!selectionPath)
 						)
 							return false;
 						const origin = sourcePath(selection, read.slice(path.length), false)!;
@@ -600,6 +792,13 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 	}
 
 	function scan(node: ts.Node) {
+		if (!dynamicAccess && (ts.isIdentifier(node) || ts.isStringLiteralLike(node))) {
+			dynamicAccess =
+				node.text === 'eval' ||
+				node.text === 'prototype' ||
+				node.text === '__proto__' ||
+				node.text === 'getPrototypeOf';
+		}
 		if (ts.isCallExpression(node)) {
 			possibleCalls.push(node);
 			recordAssign(node);
@@ -699,7 +898,7 @@ export function walkLocalValues(
 		if (path?.length && ts.isExpression(node)) {
 			const writes = localWrites(file, checker);
 			const value = writes.selected(node, path);
-			if (value) {
+			if (value !== undefined) {
 				// A source can supply multiple fields, including through cyclic assignments.
 				let paths = selections.get(node);
 				if (!paths) selections.set(node, (paths = new Set()));
@@ -709,7 +908,7 @@ export function walkLocalValues(
 				if (paths.has(key)) return false;
 				paths.add(key);
 				if (key === 'all') return writes.members(node, walk, frame, []) || walk(node, frame);
-				return writes.members(node, walk, frame, path) || walk(value, frame);
+				return writes.members(node, walk, frame, path) || (!!value && walk(value, frame));
 			}
 		}
 		const visit = (child: ts.Node) => walk(child, frame);

@@ -264,6 +264,74 @@ it.each([
 
 it.each([
 	['row.icon = element; ({label: model.label} = row);', 'model.label', false],
+	[
+		'const values = ["safe", element]; const holder = {values, get swap(){this.values.reverse(); return 0}}; const swap = holder.swap; [model.label] = values;',
+		'model.label',
+		true,
+	],
+	[
+		'const values = ["safe", element]; eval("values.reverse()"); [model.label] = values;',
+		'model.label',
+		true,
+	],
+	[
+		'const data = {label: "safe", icon: element}; Object.defineProperty(data, "label", {get(){return this.icon}}); ({value: model.label} = {value: data.label});',
+		'model.label',
+		true,
+	],
+	[
+		'const box = {row}; row.icon = element; ({label: model.label} = box.row);',
+		'model.label',
+		false,
+	],
+	[
+		'const box = {row}; row.label = element; ({label: model.label} = box.row);',
+		'model.label',
+		true,
+	],
+	[
+		'const data = {label: "safe", icon: element}; ({text: model.label} = {text: data.label, icon: data.icon});',
+		'model.label',
+		false,
+	],
+	[
+		'const data = {label: "safe", icon: element}; ({text: model.label} = {text: data.icon});',
+		'model.label',
+		true,
+	],
+	[
+		'const values = ["safe", ""]; values[1] = element; [model.label] = values;',
+		'model.label',
+		false,
+	],
+	[
+		'const values = ["safe", ""]; values[1] = element; [,model.label] = values;',
+		'model.label',
+		true,
+	],
+	[
+		'const values = ["safe", element]; values.reverse(); [model.label] = values;',
+		'model.label',
+		true,
+	],
+	[
+		'const values = ["safe", element]; values[Symbol.iterator] = function*(){yield this[1]}; [model.label] = values;',
+		'model.label',
+		true,
+	],
+	['row.icon = element; ({missing: model.label = "safe"} = row);', 'model.label', false],
+	['row.missing = element; ({missing: model.label = "safe"} = row);', 'model.label', true],
+	['row.icon = element; ({missing: model.label = element} = row);', 'model.label', true],
+	[
+		'const data = {__proto__: {missing: element}, icon: element}; ({missing: model.label = "safe"} = data);',
+		'model.label',
+		true,
+	],
+	[
+		'const data = {icon: element}; Object.setPrototypeOf(data, {missing: element}); ({missing: model.label = "safe"} = data);',
+		'model.label',
+		true,
+	],
 	['row.label = element; ({label: model.label} = row);', 'model.label', true],
 	['const alias = row; row.icon = element; ({label: model.label} = alias);', 'model.label', false],
 	['const alias = row; alias.label = element; ({label: model.label} = row);', 'model.label', true],
@@ -586,6 +654,34 @@ it.each([
 		`value={${read}}`,
 		`const model = {label: "", icon: ""}; const other = {label: "", icon: ""};
 		const element = <b/> as unknown as string; ${setup}`,
+	);
+	expect(result.notes.some((note) => note.rule === 'bindings' && note.severity === 'error')).toBe(
+		blocked,
+	);
+	expect(result.rules['react-compat'] ?? 0).toBe(blocked ? 0 : 1);
+});
+
+it.each([
+	['({label: model.label} = row); row.label = element;', false],
+	['row.label = element; ({label: model.label} = row);', true],
+	['const alias = row; ({label: model.label} = row); alias.label = element;', false],
+	['({label: model.label} = row); const alias = model; alias.label = element;', true],
+	['const {label} = row; row.label = element; model.label = label;', false],
+	['for (let i=0; i<2; i++) { ({label: model.label} = row); row.label = element; }', true],
+	['function save() { ({label: model.label} = row); row.label = element; } save(); save();', true],
+	['const save = () => ({label: model.label} = row); row.label = element; save();', true],
+	[
+		'const box = {child: row}; ({child: model.copy} = box); row.label = element; model.label = model.copy.label;',
+		true,
+	],
+])('preserves the captured field value across later writes in %s', (setup, blocked) => {
+	const result = migrate(
+		'value={model.label}',
+		`
+		const element = <b/> as unknown as string;
+		const model = {label: ""}, row = {label: "safe"};
+		${setup}
+	`,
 	);
 	expect(result.notes.some((note) => note.rule === 'bindings' && note.severity === 'error')).toBe(
 		blocked,
