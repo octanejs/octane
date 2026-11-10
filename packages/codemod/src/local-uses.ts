@@ -255,7 +255,7 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 			else if (
 				(isWrapper(parent) && parent.expression === outer) ||
 				ts.isArrayLiteralExpression(parent) ||
-				(isLogical(parent) && parent.right === outer) ||
+				isLogical(parent) ||
 				(ts.isConditionalExpression(parent) &&
 					(parent.whenTrue === outer || parent.whenFalse === outer))
 			)

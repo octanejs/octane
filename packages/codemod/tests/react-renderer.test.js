@@ -333,6 +333,12 @@ it('checks JSX-valued props on the original React child of an authored island', 
 });
 
 it.each([
+	...['||', '??', '&&'].flatMap((operator) => [
+		[`const pick = model ${operator} other;`, 'pick.label', false],
+		[`const pick = other ${operator} model;`, 'pick.label', false],
+		[`const pick = model ${operator} model;`, 'pick.icon', true],
+		[`const pick = consume(model) ${operator} other;`, 'pick.label', true],
+	]),
 	['const pick = choose ? model : other;', 'pick.label', false],
 	['const {missing: pick = model} = {};', 'pick.label', false],
 	['const {missing: pick = choose ? (model) : other} = {};', 'pick.label', false],
