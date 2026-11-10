@@ -599,6 +599,7 @@ DOM ownership and trusted HTML:
 - `OCTANE_STRONG_MANAGED_DOM_WRITE`: Render the value from state or props in the template.
 - `OCTANE_STRONG_RAW_HTML_WRITE`: Use `dangerouslySetInnerHTML={trustHTML(html)}` for trusted or already sanitized HTML.
 - `OCTANE_STRONG_OWN_MARKUP_QUERY`: Attach a ref to the element and use `ref.current` in the event or effect.
+- `OCTANE_STRONG_DEFERRED_CURRENT_TARGET`: Capture the element with `const element = event.currentTarget` at the top of the handler and use `element` afterwards.
 - `OCTANE_STRONG_UNTRUSTED_HTML`: Pass `trustHTML(html)` after applying the application's sanitization policy. `trustHTML` marks trust and does not sanitize.
 
 Coverage:

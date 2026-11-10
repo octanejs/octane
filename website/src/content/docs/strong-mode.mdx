@@ -903,6 +903,14 @@ A write through a ref to what the template owns on its element: its children, it
 
 **Replacement.** Attach a ref to the element and use `ref.current` in the event or effect.
 
+<h4 id="octane-strong-deferred-current-target">
+	<code>OCTANE_STRONG_DEFERRED_CURRENT_TARGET</code>
+</h4>
+
+An event handler on a rendered element reads its event's `currentTarget` after it has returned: after an `await`, or in a timer or promise callback. `currentTarget` names the element only while the event is dispatched, so the read is empty.
+
+**Replacement.** Capture the element with `const element = event.currentTarget` at the top of the handler and use `element` afterwards.
+
 <h4 id="octane-strong-untrusted-html">
 	<code>OCTANE_STRONG_UNTRUSTED_HTML</code>
 </h4>

@@ -7424,6 +7424,12 @@
         "replacement": "Attach a ref to the element and use `ref.current` in the event or effect.",
         "url": "https://octanejs.dev/docs/strong-mode#octane-strong-own-markup-query"
       },
+      "OCTANE_STRONG_DEFERRED_CURRENT_TARGET": {
+        "severity": "error",
+        "detects": "An event handler on a rendered element reads its event's `currentTarget` after it has returned: after an `await`, or in a timer or promise callback. `currentTarget` names the element only while the event is dispatched, so the read is empty.",
+        "replacement": "Capture the element with `const element = event.currentTarget` at the top of the handler and use `element` afterwards.",
+        "url": "https://octanejs.dev/docs/strong-mode#octane-strong-deferred-current-target"
+      },
       "OCTANE_STRONG_UNTRUSTED_HTML": {
         "severity": "error",
         "detects": "A visibly raw value is passed to a Strong DOM intrinsic's `dangerouslySetInnerHTML`.",
