@@ -388,9 +388,10 @@ it.each(['./action', '@/action'])(
 
 it('renders an SVG passed through selected local slots as a direct button child on the server and client', async () => {
 	const { root, file } = fixture(`import Mark from './icons/mark.svg';
-		function Frame({children}) { return <section>{children}</section>; }
+		type Content = {type: unknown} | string | null;
+		function Frame({children}: {children: Content}) { return <section>{children! satisfies Content}</section>; }
 		${action}
-		function Row({icon, onClick}) { return <Action onClick={onClick}>{icon}</Action>; }
+		function Row({icon, onClick}) { return <Action onClick={onClick}>{icon as Content}</Action>; }
 		function Item({className, onClick}) { return <Row icon={<Mark className={className}/>} onClick={onClick}/>; }
 		export function Pane({className, onClick}) { return <Frame><Item className={className} onClick={onClick}/></Frame>; }`);
 	const { files } = await runCodemod([file], { root, svgPaths: true, verify: true, write: true });
@@ -583,6 +584,62 @@ it.each(['inline slot type', 'imported slot type'])(
 		expect(migrated.files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
 	},
 );
+
+it('only accepts a renderable cast in a selected receiver when its imported type resolves', async () => {
+	const { root, file } = fixture(`import Mark from './icons/mark.svg';
+		import {Row} from './row';
+		export function Pane() { return <Row icon={<Mark/>}/>; }`);
+	const config = path.join(root, 'tsconfig.json');
+	const tsconfig = JSON.parse(fs.readFileSync(config, 'utf8'));
+	tsconfig.compilerOptions.strict = true;
+	fs.writeFileSync(config, JSON.stringify(tsconfig));
+	fs.writeFileSync(
+		path.join(root, 'src/model.ts'),
+		'export type Content = string | {type: unknown};',
+	);
+	const receiver = path.join(root, 'src/row.tsx');
+	fs.writeFileSync(
+		receiver,
+		`import type {Content} from './model';
+		export function Row({icon}: {icon: unknown}) { return <button>{icon as Content}</button>; }`,
+	);
+	const options = { root, svgPaths: true, write: false };
+	const caller = (result) => result.files.find((f) => f.file === 'src/pane.tsx');
+	expect(
+		caller(await runCodemod([file, receiver], { ...options, projectTypes: false })).rules[
+			'svg-paths'
+		],
+	).toBeUndefined();
+	expect(caller(await runCodemod([file, receiver], options)).rules['svg-paths']).toBe(1);
+});
+
+it.each([
+	'icon as string',
+	'icon satisfies string',
+	'icon as Scalar',
+	'icon as string | number',
+	'icon as T',
+	'icon as UnknownAlias',
+	'(icon as string) as Content',
+])('keeps a forwarded SVG out of a text or unverified child cast: %s', async (expression) => {
+	const { root, file } = fixture(`import Mark from './icons/mark.svg';
+		import type {UnknownAlias} from 'unresolved';
+		type Scalar = string;
+		type Content = string | {type: unknown};
+		function Row<T extends string>({icon}) { return <button>{${expression}}</button>; }
+		export function Pane() { return <Row icon={<Mark/>}/>; }`);
+	const { files } = await runCodemod([file], { root, svgPaths: true, write: false });
+	expect(files.find((f) => f.file === 'src/pane.tsx').rules['svg-paths']).toBeUndefined();
+	expect(files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
+});
+
+it('keeps a directly used SVG out of a string child assertion', async () => {
+	const { root, file } = fixture(`import Mark from './icons/mark.svg';
+		export function Pane() { return <button>{<Mark/> as string}</button>; }`);
+	const { files } = await runCodemod([file], { root, svgPaths: true, write: false });
+	expect(files.find((f) => f.file === 'src/pane.tsx').rules['svg-paths']).toBeUndefined();
+	expect(files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
+});
 
 it('bounds a deep slot chain without discarding the proof for a shorter path into the same chain', async () => {
 	const wrappers = Array.from({ length: 48 }, (_, index) =>

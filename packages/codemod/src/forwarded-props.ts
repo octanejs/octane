@@ -1,5 +1,5 @@
 import ts from 'typescript';
-import { skipWrappers } from './expression-wrappers.js';
+import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import { localUses } from './local-uses.js';
 
 function contains(node: ts.Node, matches: (node: ts.Node) => boolean): boolean {
@@ -87,10 +87,18 @@ const nonElementHosts =
 	/^(?:textarea|title|script|style|option|noscript|iframe|noembed|noframes|xmp|plaintext|area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$/;
 const hookName = /^use(?:[A-Z0-9]|$)/;
 
+// A scalar assertion can turn a child into a text binding. Require a member
+// that the compiler cannot classify as primitive text, even through aliases.
+function renderType(type: ts.Type) {
+	const members = type.isUnion() ? type.types : [type];
+	return members.some((t) => !!(t.flags & (ts.TypeFlags.Object | ts.TypeFlags.BooleanLike)));
+}
+
 /** Follow the value being rendered all the way to its containing component's return. */
 export function nativeOutputOwner(
 	value: ts.Node,
 	slot: (tag: ts.Identifier, prop: string) => boolean,
+	typeOf: (node: ts.Node) => ts.Type,
 ) {
 	for (;;) {
 		const parent = value.parent;
@@ -144,6 +152,16 @@ export function nativeOutputOwner(
 			value = ts.isJsxOpeningElement(element) ? element.parent : element;
 			continue;
 		}
+		if (isWrapper(parent) && !ts.isParenthesizedExpression(parent)) {
+			if (
+				parent.expression !== value ||
+				!renderType(typeOf(parent)) ||
+				(ts.isSatisfiesExpression(parent) && !renderType(typeOf(parent.type)))
+			)
+				return;
+			value = parent;
+			continue;
+		}
 		if (!(
 			ts.isJsxFragment(parent) ||
 			(ts.isJsxExpression(parent) && !parent.dotDotDotToken) ||
@@ -194,6 +212,7 @@ export function forwardedProps(
 		| {
 				imported?: (module: string, name: string, prop: string, depth: number) => boolean;
 				text: (ref: ts.Identifier) => boolean;
+				typeOf: (node: ts.Node) => ts.Type;
 		  },
 	uses = localUses(file, checker),
 	ordinaryProps = !hasPrototypeAccess(file),
@@ -279,8 +298,10 @@ export function forwardedProps(
 				refs.every(
 					(ref) =>
 						!destination.text(ref) &&
-						nativeOutputOwner(ref, (tag, slot) =>
-							accepts(checker.getSymbolAtLocation(tag), slot, true, depth + 1),
+						nativeOutputOwner(
+							ref,
+							(tag, slot) => accepts(checker.getSymbolAtLocation(tag), slot, true, depth + 1),
+							destination.typeOf,
 						) === fn,
 				)
 			);

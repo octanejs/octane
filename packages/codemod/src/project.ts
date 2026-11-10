@@ -1059,6 +1059,8 @@ function propsOf(
 	const module = checker.getSymbolAtLocation(sf);
 	const names = module && new Map(checker.getExportsOfModule(module).map((s) => [s.name, s]));
 	const checks = new Map<'text' | 'render', ReturnType<typeof forwardedProps>>();
+	const typeOf = (node: ts.Node) =>
+		projectTypeAt(node, types())?.type ?? checker.getTypeAtLocation(node);
 	return (destination, name, prop, ordinaryCaller, depth) => {
 		let accepts = checks.get(destination);
 		if (!accepts)
@@ -1071,9 +1073,8 @@ function propsOf(
 						? 'text'
 						: {
 								imported: importedRender,
-								text: (ref) =>
-									textKind(projectTypeAt(ref, types())?.type ?? checker.getTypeAtLocation(ref)) !==
-									0,
+								typeOf,
+								text: (ref) => textKind(typeOf(ref)) !== 0,
 							},
 				)),
 			);

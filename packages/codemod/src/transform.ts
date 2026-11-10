@@ -1113,10 +1113,15 @@ class ModuleTransform {
 		uses: ReturnType<typeof localUses>,
 		unproven: (tag: ts.Identifier, prop: string) => void,
 	): boolean {
+		const typeOf = (node: ts.Node) => this.typeOf(node);
 		this.nativeSvgProps ??= forwardedProps(
 			this.sf,
 			this.checker,
-			{ imported: this.options.forwardedRender, text: (ref) => textKind(this.typeOf(ref)) !== 0 },
+			{
+				imported: this.options.forwardedRender,
+				typeOf,
+				text: (ref) => textKind(typeOf(ref)) !== 0,
+			},
 			uses,
 		);
 		const slot = (tag: ts.Identifier, prop: string) => {
@@ -1124,7 +1129,7 @@ class ModuleTransform {
 			if (!known) unproven(tag, prop);
 			return known;
 		};
-		const first = nativeOutputOwner(element, slot);
+		const first = nativeOutputOwner(element, slot, typeOf);
 		if (!first) return false;
 		const pending = [first];
 		const proven = (this.provenSvgOwners ??= new Set());
@@ -1180,7 +1185,11 @@ class ModuleTransform {
 					tag.tagName !== ref
 				)
 					return false;
-				const owner = nativeOutputOwner(ts.isJsxSelfClosingElement(tag) ? tag : tag.parent, slot);
+				const owner = nativeOutputOwner(
+					ts.isJsxSelfClosingElement(tag) ? tag : tag.parent,
+					slot,
+					typeOf,
+				);
 				if (!owner) return false;
 				pending.push(owner);
 			}
@@ -3659,7 +3668,7 @@ class ModuleTransform {
 	 * The type of `expression`, from the project's program when it has this
 	 * module, else from the module's own.
 	 */
-	typeOf(expression: ts.Expression) {
+	typeOf(expression: ts.Node) {
 		return this.projectType(expression)?.type ?? this.checker.getTypeAtLocation(expression);
 	}
 
