@@ -219,7 +219,7 @@ export function PlaygroundVersionCombobox(props: PlaygroundVersionComboboxProps)
 			onKeyDown={onKeyDown}
 			// The list can hold focus too (a press on its padding or scrollbar), so
 			// the popup closes only once focus leaves the whole field.
-			onFocusOut={(event: FocusEvent) => {
+			onBlur={(event: FocusEvent) => {
 				if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) {
 					close();
 				}
