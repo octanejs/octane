@@ -242,6 +242,125 @@ it('checks deeply branching receiver aliases while preserving independent fields
 	expect(migrate('value={row0.other}', setup).rules['react-compat']).toBe(1);
 });
 
+it.each([
+	['function write(row) { row.label = element; } write(model);', 'model.label', true],
+	['const write = row => { row.label = "safe"; }; write(model);', 'model.label', false],
+	['const write = row => { row.label = element; }; write(other);', 'model.label', false],
+	['const write = row => { row.icon = element; }; write(model);', 'model.label', false],
+	[
+		'function put(row, value) { row.label=value; } put(model,"safe"); put(other,element);',
+		'model.label',
+		false,
+	],
+	[
+		'function put(row, value) { row.label=value; } put(model,"safe"); put(other,element);',
+		'other.label',
+		true,
+	],
+	['function put(value) { model.label=value; } put(element);', 'model.label', true],
+	['const get=()=>model; get().label=element;', 'model.label', true],
+	['function id(row){return row;} id(model).label=element;', 'other.label', false],
+	['function id(row){return row;} id(model).label=element;', 'model.label', true],
+	['function id(row){return row;} model.icon=element;', 'id(model).label', false],
+	[
+		'function put(row,v){row.label=v;} function apply(row,v){put(row,v);} apply(model,"safe");apply(other,element);',
+		'model.label',
+		false,
+	],
+	[
+		'function put(row,v){row.label=v;} function apply(row,v){put(row,v);} apply(model,"safe");apply(other,element);',
+		'other.label',
+		true,
+	],
+	[
+		'function put(m,v){const scratch={s:""}; scratch.s=v; m.label=scratch.s;} put(model,element);put(other,"safe");',
+		'model.label',
+		true,
+	],
+	[
+		'function put(m,v){const scratch={s:""}; scratch.s=v; m.label=scratch.s;} put(model,element);put(other,"safe");',
+		'other.label',
+		false,
+	],
+	[
+		'function set(v){model.label=v;} const forward=x=>set(x); forward(element);',
+		'model.label',
+		true,
+	],
+	['function put(m=model){m.label=element;} put(other);', 'model.label', false],
+	['function put(m=model){m.label=element;} put();', 'model.label', true],
+	[
+		'function put(m,row){m.label=row.label;} put(model,{label:"ok",icon:element});',
+		'model.label',
+		false,
+	],
+	['function put(m,{label:v}){m.label=v;} put(model,{label:element});', 'model.label', true],
+	['function put(m,...args){m.label=args[0];} put(model,element);', 'model.label', true],
+	[
+		'function put(m,v){const scratch={s:""};scratch.s=v;m.label=scratch.s;} function send(m,v){put(m,v);} send(model,element);send(other,"");',
+		'model.label',
+		true,
+	],
+	[
+		'function put(m,v){const scratch={s:""};scratch.s=v;m.label=scratch.s;} function send(m,v){put(m,v);} send(model,element);send(other,"");',
+		'other.label',
+		false,
+	],
+	[
+		'function make(){const fresh={label:""};return fresh} const a=make(),b=make(); b.label=element;',
+		'a.label',
+		false,
+	],
+	[
+		'function use(a,b,v){a.label=v;} const args=[model,""]; use(...args,element);',
+		'model.label',
+		true,
+	],
+	['function use(a,b,v){a.label=v;} use(...[model,""],element);', 'model.label', true],
+	...['as typeof put', 'satisfies typeof put', '!'].flatMap((wrapper) => [
+		[`function put(row){row.label=element;} (put ${wrapper})(model);`, 'model.label', true],
+		[
+			`const put = (row) => {row.label=element;}; const alias = put ${wrapper}; alias(other);`,
+			'other.label',
+			true,
+		],
+		[
+			`const put = (row) => {row.label=element;}; const alias = put ${wrapper}; alias(other);`,
+			'model.label',
+			false,
+		],
+	]),
+	...['as typeof row', 'satisfies typeof row', '!'].flatMap((wrapper) => [
+		[`function id(row){return (row ${wrapper});} model.icon=element;`, 'id(model).label', false],
+		[`function id(row){return (row ${wrapper});} model.icon=element;`, 'id(model).icon', true],
+	]),
+])('follows writes through local calls: %s', (setup, value, blocked) => {
+	const result = migrate(
+		`value={${value}}`,
+		`
+		const model={label:"",icon:""},other={label:"",icon:""};
+		const element=<b/> as unknown as string;
+		${setup}`,
+	);
+	expect(result.notes.some((note) => note.rule === 'bindings' && note.severity === 'error')).toBe(
+		blocked,
+	);
+	expect(result.rules['react-compat'] ?? 0).toBe(blocked ? 0 : 1);
+});
+
+it('keeps the diagnostic when many nested helper invocations can carry JSX', () => {
+	const wrappers = Array.from(
+		{ length: 18 },
+		(_, i) => `function set${i + 1}(row,v){set${i}(row,v);set${i}(row,v);}`,
+	).join('\n');
+	const setup = `const model={label:"",icon:""}; function set0(row,v){row.label=v;} ${wrappers}
+		set18(model,<b/> as unknown as string);`;
+	expect(migrate('value={model.label}', setup).notes).toContainEqual(
+		expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+	);
+	expect(migrate('value={model.icon}', setup).rules['react-compat']).toBe(1);
+});
+
 it('checks values assigned by an async iterator before they cross into React', () => {
 	const result = transformModule(
 		`import { Display } from 'example-ui';
@@ -366,6 +485,54 @@ it.each([
 		declare function consume(value: typeof model): typeof model;
 		model.icon = <b/> as unknown as string;
 		${setup}`,
+	);
+	expect(result.notes.some((note) => note.rule === 'bindings' && note.severity === 'error')).toBe(
+		blocked,
+	);
+	expect(result.rules['react-compat'] ?? 0).toBe(blocked ? 0 : 1);
+});
+
+it.each([
+	['Object.assign(model, {label: element});', 'model.label', true],
+	['Object.assign(model, {icon: element});', 'model.label', false],
+	['Object.assign(model, {label: "scalar"});', 'model.label', false],
+	['Object.assign(other, {label: element});', 'model.label', false],
+	['Object.assign(model, {icon: ""}, {label: element});', 'model.label', true],
+	['const label = element; Object.assign(model, {label});', 'model.label', true],
+	['Object.assign(model, {["label"]: element});', 'model.label', true],
+	['Object["assign"](model, {get label() { return element; }});', 'model.label', true],
+	['Object.assign(model, {...({icon: element} as const)});', 'model.label', false],
+	['Object.assign(model, {...{row: {name: element}, name: "decoy"}});', 'model.row.name', true],
+	['const source = {label: element}; Object.assign(model, source);', 'model.label', true],
+	['const source = {label: element}; Object.assign(model, {...source});', 'model.label', true],
+	[
+		'const source = {label: ""}; source.label = element; Object.assign(model, source);',
+		'model.label',
+		true,
+	],
+	['const alias = Object.assign(model, {}); alias.label = element;', 'model.label', true],
+	['Object.assign({}, {row: model}).row.label = element;', 'model.label', true],
+	['const copy = Object.assign({}, model); copy.label = element;', 'model.label', false],
+	['const alias = Object.assign(model, {}); model.label = element;', 'alias.label', true],
+	['const alias = Object.assign(model, {}); model.icon = element;', 'alias.label', false],
+	[
+		'const alias = Object.assign(model, {}); Object.assign(other, {label: element});',
+		'alias.label',
+		false,
+	],
+	[
+		'const Object = {assign: (target, source) => source}; Object.assign(model, {label: element});',
+		'model.label',
+		false,
+	],
+	['(Object.assign as typeof Object.assign)(model, {label: element});', 'model.label', true],
+	['(Object satisfies typeof Object).assign(model, {icon: element});', 'model.label', false],
+	['(Object!).assign(model, {label: element});', 'model.label', true],
+])('checks the selected field copied by Object.assign in %s', (setup, read, blocked) => {
+	const result = migrate(
+		`value={${read}}`,
+		`const model = {label: "", icon: ""}; const other = {label: "", icon: ""};
+		const element = <b/> as unknown as string; ${setup}`,
 	);
 	expect(result.notes.some((note) => note.rule === 'bindings' && note.severity === 'error')).toBe(
 		blocked,
