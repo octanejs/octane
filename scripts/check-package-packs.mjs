@@ -1101,7 +1101,7 @@ export function renderProbe() {
 	// part of the packed contract. React-hosted entries require their intentionally
 	// optional React peer and remain covered by the package build's fresh imports.
 	const packedRuntimeSpecifiers = Object.keys(REQUIRED_PUBLIC_VALUE_EXPORTS)
-		.filter((subpath) => subpath !== './react' && subpath !== './react/server')
+		.filter((subpath) => !['./react', './react/server', './data/react'].includes(subpath))
 		.map((subpath) => [subpath, subpath === '.' ? 'octane' : `octane/${subpath.slice(2)}`]);
 	const packedRuntimeExports = JSON.parse(
 		execFileSync(
