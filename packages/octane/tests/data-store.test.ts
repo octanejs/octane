@@ -10,7 +10,18 @@ import {
 	type Transport,
 } from '../src/data/index.js';
 import { createDataHandler } from '../src/data/server.js';
-import { addTodo, createServer, firstTodo, removeTodo, setDone, todos } from './_data-todos.js';
+import {
+	addTodo,
+	createServer,
+	firstTodo,
+	isTodo,
+	removeTodo,
+	schema,
+	setDone,
+	Todo,
+	todos,
+	type TodoItem,
+} from './_data-todos.js';
 
 /** Observe a read and wait for its first value. */
 async function observe<T>(handle: { getSnapshot(): { value: T | undefined }; subscribe: any }) {
@@ -576,5 +587,199 @@ describe('octane/data server render and hydration', () => {
 		expect(client.read(todos, undefined).getSnapshot().value![0].title).toBe(
 			'</script><script>alert(1)</script>',
 		);
+	});
+});
+
+describe('octane/data server-assigned IDs and server transactions', () => {
+	/** A server that assigns its own IDs and can refuse a title, holding create replies until released. */
+	function assigningServer(refuse = '') {
+		const rows: TodoItem[] = [];
+		const log: string[] = [];
+		const held: Array<() => void> = [];
+		let next = 0;
+		const handler = createDataHandler({}, (handle) => [
+			handle(todos, () => rows.map((row) => ({ ...row }))),
+			handle(addAssigned, (input) => {
+				log.push(`add ${input.title}`);
+				if (input.title === refuse) throw new DataError('duplicate');
+				const row = { id: `srv-${++next}`, title: input.title, done: false };
+				rows.push(row);
+				return { ...row };
+			}),
+			handle(setDone, (input) => {
+				log.push(`setDone ${input.id} ${input.done}`);
+				const row = rows.find((item) => item.id === input.id);
+				if (!row) throw new DataError('missing');
+				row.done = input.done;
+			}),
+		]);
+		const http = httpTransport('https://app.test/data', {
+			fetch: (url, init) => handler(new Request(url as string, init)),
+		});
+		const transport: Transport = async (request, signal) => {
+			if (request.name === 'todos.addAssigned')
+				await new Promise<void>((resolve) => held.push(resolve));
+			return http(request, signal);
+		};
+		return { rows, log, transport, release: () => held.splice(0).forEach((resolve) => resolve()) };
+	}
+
+	const addAssigned = write({
+		name: 'todos.addAssigned',
+		input: schema<{ title: string }>((value) => typeof value?.title === 'string'),
+		output: schema<TodoItem>(isTodo),
+		creates: Todo,
+		draft: (input, id) => ({ id, title: input.title, done: false }),
+		serverId: (row) => row.id,
+	});
+
+	it('holds an edit to a new record until the server names it, then sends it with that ID', async () => {
+		const server = assigningServer();
+		const store = createDataStore({ transport: server.transport });
+		const list = store.read(todos, undefined);
+		list.subscribe(() => {});
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+
+		const added = store.write(addAssigned, { title: 'Tides' });
+		const local = list.getSnapshot().value![0].id;
+		const starred = store.write(setDone, { id: local, done: true });
+		expect(list.getSnapshot().value).toEqual([{ id: local, title: 'Tides', done: true }]);
+		await settled();
+		// The create is still on its way, and the edit waits for it.
+		expect(server.log).toEqual([]);
+
+		server.release();
+		await Promise.all([added, starred]);
+		await vi.waitFor(() => expect(list.getSnapshot().refreshing).toBe(false));
+		expect(server.log).toEqual(['add Tides', 'setDone srv-1 true']);
+		expect(server.rows).toEqual([{ id: 'srv-1', title: 'Tides', done: true }]);
+		expect(list.getSnapshot().value).toEqual([{ id: 'srv-1', title: 'Tides', done: true }]);
+	});
+
+	it('refuses edits to a record whose create was refused, without sending them', async () => {
+		const server = assigningServer('Tides');
+		const store = createDataStore({ transport: server.transport });
+		const list = store.read(todos, undefined);
+		list.subscribe(() => {});
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+
+		const added = store.write(addAssigned, { title: 'Tides' }).catch((error) => error);
+		const local = list.getSnapshot().value![0].id;
+		const starred = store.write(setDone, { id: local, done: true }).catch((error) => error);
+		server.release();
+
+		expect(await added).toMatchObject({ code: 'duplicate' });
+		expect(await starred).toMatchObject({ name: 'DataError', code: 'dependency' });
+		expect(server.log).toEqual(['add Tides']);
+		expect(list.getSnapshot().value).toEqual([]);
+	});
+
+	it('keeps edits waiting while a create is uncertain, and sends them once a lookup settles it', async () => {
+		const server = assigningServer();
+		let dropCreate = true;
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				const reply = await server.transport(request, signal);
+				if (request.name === 'todos.addAssigned' && dropCreate) throw new Error('connection reset');
+				return reply;
+			},
+		});
+		const list = store.read(todos, undefined);
+		list.subscribe(() => {});
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+
+		const added = store.write(addAssigned, { title: 'Tides' }).catch((error) => error);
+		const local = list.getSnapshot().value![0].id;
+		const starred = store.write(setDone, { id: local, done: true });
+		server.release();
+		const error = (await added) as DataUncertainError;
+		expect(error).toBeInstanceOf(DataUncertainError);
+		await settled();
+		expect(server.log).toEqual(['add Tides']);
+
+		// A receipt lookup found the created record.
+		dropCreate = false;
+		store.settle(error.operationId, true, { ...server.rows[0] });
+		await starred;
+		expect(server.log).toEqual(['add Tides', 'setDone srv-1 true']);
+		expect(server.rows[0]).toMatchObject({ id: 'srv-1', done: true });
+	});
+
+	it('keeps writes to a created record in order across the server naming it', async () => {
+		const server = assigningServer();
+		let setDones = 0;
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				// The first edit is the slowest to arrive.
+				if (request.name === 'todos.setDone' && setDones++ === 0) {
+					await new Promise((resolve) => setTimeout(resolve, 30));
+				}
+				return server.transport(request, signal);
+			},
+		});
+		const list = store.read(todos, undefined);
+		list.subscribe(() => {});
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+
+		const added = store.write(addAssigned, { title: 'Tides' });
+		const local = list.getSnapshot().value![0].id;
+		const starred = store.write(setDone, { id: local, done: true });
+		server.release();
+		await added;
+		// The view now shows the server's ID; an edit through it queues behind the first.
+		const unstarred = store.write(setDone, { id: 'srv-1', done: false });
+		// A stale handler still holding the operation ID is rewritten and queued too.
+		const stale = store.write(setDone, { id: local, done: false });
+		await Promise.all([starred, unstarred, stale]);
+		expect(server.log).toEqual([
+			'add Tides',
+			'setDone srv-1 true',
+			'setDone srv-1 false',
+			'setDone srv-1 false',
+		]);
+		expect(server.rows[0].done).toBe(false);
+	});
+
+	it('ends writes waiting on a create when the store is retired', async () => {
+		const server = assigningServer();
+		const store = createDataStore({ transport: server.transport });
+		const list = store.read(todos, undefined);
+		list.subscribe(() => {});
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+
+		void store.write(addAssigned, { title: 'Tides' }).catch(() => {});
+		const local = list.getSnapshot().value![0].id;
+		const starred = store.write(setDone, { id: local, done: true });
+		store.retire();
+		await expect(starred).rejects.toBeInstanceOf(DataRetiredError);
+		server.release();
+		await settled();
+		expect(server.log).not.toContainEqual(expect.stringMatching(/^setDone/));
+	});
+
+	it('adopts every read a reply carries before notifying any reader', async () => {
+		const server = createServer();
+		const store = createDataStore({ transport: server.transport });
+		const list = store.read(todos, undefined);
+		const first = store.read(firstTodo, undefined);
+		const seen: boolean[] = [];
+		list.subscribe(() => {
+			// A reader of one view must never see the other mid-transaction.
+			const listTitle = list.getSnapshot().value?.[0]?.title;
+			const firstTitle = first.getSnapshot().value?.todo.title;
+			if (listTitle !== undefined && firstTitle !== undefined) seen.push(listTitle === firstTitle);
+		});
+		first.subscribe(() => {});
+		await vi.waitFor(() => expect(first.getSnapshot().status).toBe('ready'));
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+
+		// The row changes on the server outside the store, then a write returns both reads.
+		server.rows[0].title = 'Night tides';
+		seen.length = 0;
+		await store.write(setDone, { id: 'a', done: true });
+		await vi.waitFor(() => expect(list.getSnapshot().value![0].title).toBe('Night tides'));
+		await vi.waitFor(() => expect(first.getSnapshot().value!.todo.title).toBe('Night tides'));
+		expect(seen.length).toBeGreaterThan(0);
+		expect(seen.every(Boolean)).toBe(true);
 	});
 });
