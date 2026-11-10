@@ -1,4 +1,4 @@
-import { forwardedProps, nativeOutputOwner } from './forwarded-props.js';
+import { forwardedProps, nativeOutputOwner, renderUses } from './forwarded-props.js';
 import { reactRenderer, staticReactProps } from './react-renderer.js';
 import { localUses, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
@@ -1166,7 +1166,7 @@ class ModuleTransform {
 			)
 				return false;
 			const name = variable ? variable.name : fn.name;
-			const refs = name && ts.isIdentifier(name) ? uses(name) : [];
+			const refs = name && ts.isIdentifier(name) ? renderUses(uses(name)) : [];
 			const directExport = statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
 			if (!refs.length && !directExport) return false;
 			if (directExport) exported = true;
