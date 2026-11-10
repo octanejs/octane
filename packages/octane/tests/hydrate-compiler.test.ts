@@ -181,7 +181,7 @@ function Draft(props) @{
   <button id="strong-draft" onClick={() => setValue(value + '!')}>{value as string}</button>
 }
 export function App(props) @{
-  <Suspense fallback={<p id="strong-pending">loading</p>}>
+  <Suspense fallback={@{ <p id="strong-pending">loading</p> }}>
     <Draft source={props.source} resource={props.resource} />
   </Suspense>
 }
@@ -229,7 +229,7 @@ export function App(props) @{
 import { Hydrate, Suspense, useLinkedState } from 'octane';
 export function App(props) @{
   const [value, setValue] = useLinkedState(props.value);
-  <Suspense fallback={<p>loading</p>}>
+  <Suspense fallback={@{ <p>loading</p> }}>
     <Hydrate when={props.ready}>
       <button onClick={() => setValue('updated')}>{value as string}</button>
     </Hydrate>
@@ -258,7 +258,7 @@ import { Hydrate, Suspense, useState } from 'octane';
 export function App(props) @{
   const [value, setValue] = useState(props.value);
   if (value !== props.value) setValue(props.value);
-  <Suspense fallback={<p>loading</p>}>
+  <Suspense fallback={@{ <p>loading</p> }}>
     <Hydrate when={props.ready}><p>{value as string}</p></Hydrate>
   </Suspense>
 }

@@ -202,8 +202,10 @@ function Contracts(props: {
 	</div>
 }
 
+// Strong markup cannot build a descriptor, so the element arrives as a prop.
 export function RenderValueContracts(props: {
 	label: string;
+	element: OctaneNode;
 	inspect: (value: unknown) => string;
 	clone: (value: OctaneNode) => OctaneNode;
 }) @{
@@ -211,14 +213,8 @@ export function RenderValueContracts(props: {
 		content={@{
 			<b>{props.label}</b>
 		}}
-		element={<span title="original">{props.label}</span>}
-		slots={{
-			content: (
-				@{
-					<i>{props.label}</i>
-				}
-			),
-		}}
+		element={props.element}
+		slots={{ content: props.element }}
 		callback={(label) => `${props.label}:${label}`}
 		inspect={props.inspect}
 		clone={props.clone}
@@ -265,19 +261,6 @@ export function StyledRenderValue(props: { label: string }) @{
 			outside
 		</span>
 	</div>
-}
-
-export function DescriptorSetupValue(props: { label: string }) @{
-	const element = (
-		<Slot
-			visible={true}
-			channel="receiver"
-			content={@{
-				<b>{props.label}</b>
-			}}
-		/>
-	);
-	<main>{element}</main>
 }
 
 function PureSlot(props: { content: OctaneNode; visible: boolean }) @{

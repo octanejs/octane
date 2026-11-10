@@ -263,7 +263,13 @@ it('aborts a scoped resource on key replacement and ignores its late result', as
 
 it('preserves keyed Fragment refs and SVG namespaces in Strong mode', () => {
 	const id = 'packages/octane/tests/_fixtures/template-keyed-fragment.tsrx';
-	const strong = loadCompiledFixtureSource(`'use strong';\n${readFileSync(id, 'utf8')}`, {
+	// The fixture's returned-JSX component covers compatibility mode; Strong
+	// rejects returned JSX, so it is left out here.
+	const source = readFileSync(id, 'utf8').replace(
+		/export function ReturnedWithDirective[\s\S]*?\n}\n/,
+		'',
+	);
+	const strong = loadCompiledFixtureSource(`'use strong';\n${source}`, {
 		id,
 		mode: 'client',
 		compileOptions: { dev: false, hmr: false },

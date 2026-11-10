@@ -25,21 +25,21 @@ const codes = (source: string, filename?: string) =>
 const label = (setup: string, ref: string, tag = 'span') => `
 import { startTransition, useRef, useState } from 'octane';
 declare function load(): Promise<number>;
-export function Label({ text, wide }: { text: string; wide: boolean }) {
+export function Label({ text, wide }: { text: string; wide: boolean }) @{
 	const el = useRef<HTMLElement | null>(null);
 	const [width, setWidth] = useState(0);
 	const [node, setNode] = useState<HTMLElement | null>(null);
 	${setup}
-	return <${tag} ref={${ref}}>{text + ' ' + width + ' ' + String(node)}</${tag}>;
+	<${tag} ref={${ref}}>{text + ' ' + width + ' ' + String(node)}</${tag}>
 }
 `;
 
 describe('Strong callback ref state updates', () => {
 	it('rejects a measurement copied into state, naming useLayoutSnapshot', () => {
 		const [diagnostic, ...rest] = errors(`import { useState } from 'octane';
-export function Label({ text }: { text: string }) {
+export function Label({ text }: { text: string }) @{
 	const [width, setWidth] = useState(0);
-	return <span ref={(el) => { if (el) setWidth(el.offsetWidth); }}>{text + ' ' + width}</span>;
+	<span ref={(el) => { if (el) setWidth(el.offsetWidth); }}>{text + ' ' + width}</span>
 }
 `);
 		expect(rest).toEqual([]);
@@ -191,9 +191,9 @@ export function Label({ text }: { text: string }) @{
 	it('leaves a component ref prop to the component that calls it', () => {
 		const source = `import { useState } from 'octane';
 import { Field } from './field';
-export function Form() {
+export function Form() @{
 	const [node, setNode] = useState<HTMLElement | null>(null);
-	return <Field ref={(el: HTMLElement | null) => setNode(el)} label={String(node)} />;
+	<Field ref={(el: HTMLElement | null) => setNode(el)} label={String(node)} />
 }
 `;
 		expect(codes(source)).toEqual([]);
@@ -214,9 +214,9 @@ export function Form() {
 		// A callback ref has no dependency list, so reading the latest state through
 		// a getter is not a hidden dependency.
 		const source = `import { useState } from 'octane';
-export function Label({ text }: { text: string }) {
+export function Label({ text }: { text: string }) @{
 	const [width, setWidth, getWidth] = useState(0);
-	return <span ref={(el) => { if (el && getWidth() === 0) requestAnimationFrame(() => setWidth(el.offsetWidth)); }}>{text + ' ' + width}</span>;
+	<span ref={(el) => { if (el && getWidth() === 0) requestAnimationFrame(() => setWidth(el.offsetWidth)); }}>{text + ' ' + width}</span>
 }
 `;
 		expect(codes(source)).toEqual([]);

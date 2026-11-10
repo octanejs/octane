@@ -74,7 +74,7 @@ function SuspendingMeasurement(props) @{
 }
 
 export function Suspended(props) @{
-	<Suspense fallback={<p>pending</p>}>
+	<Suspense fallback={@{ <p>pending</p> }}>
 		<SuspendingMeasurement promise={props.promise} measure={props.measure} />
 	</Suspense>
 }
@@ -86,7 +86,7 @@ function LayoutBeforeSuspending(props) @{
 }
 
 export function OrdinarySuspended(props) @{
-	<Suspense fallback={<p>pending</p>}>
+	<Suspense fallback={@{ <p>pending</p> }}>
 		<LayoutBeforeSuspending promise={props.promise} onLayout={props.onLayout} />
 	</Suspense>
 }

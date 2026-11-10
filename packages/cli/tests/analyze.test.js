@@ -821,7 +821,11 @@ describe('octane analyze Strong migration', () => {
 		'}\n';
 
 	it('reports every Strong violation in a file, not only the first', async () => {
-		const result = await analyze({ 'src/Clock.tsrx': CLOCK });
+		const result = await analyze({
+			'src/Clock.tsrx': CLOCK.replace('Clock() {', 'Clock() @{')
+				.replace('return <span>', '<span>')
+				.replace('</span>;', '</span>'),
+		});
 
 		expect(result.json().findings).toEqual([
 			expect.objectContaining({ code: 'OCTANE_STRONG_RENDER_IMPURE_CALL', line: 3 }),

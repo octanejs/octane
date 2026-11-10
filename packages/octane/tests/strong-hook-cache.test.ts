@@ -728,10 +728,10 @@ export function App(props) @{
 import { createContext, useContext, useEffect } from 'octane';
 import { Outer, subscribe } from './source';
 const Channel = createContext({ name: 'default' });
-function Reader() {
+function Reader() @{
   const channel = useContext(Channel);
   useEffect(() => subscribe(channel), [channel]);
-  return <output>{channel.name as string}</output>;
+  <output>{channel.name as string}</output>
 }
 export function App(props) @{
   const context = { name: props.name };
@@ -837,16 +837,16 @@ export function App(props) @{
 	);
 });
 
-// Strong compiles only `.tsrx`, so both component forms are `.tsrx` modules.
-describe.each([
-	{ form: 'template body', extension: 'tsrx', open: '@{', render: '', close: '}' },
-	{ form: 'returned JSX', extension: 'tsrx', open: '{', render: 'return (', close: '); }' },
-])('Strong inline template values ($form)', ({ extension, open, render, close }) => {
-	it.each([false, true])(
-		'keeps ref attachments until an inline array member changes (dev=%s)',
-		(dev) => {
-			const { App } = loadCompiledFixtureSource(
-				`/** @jsxImportSource octane */
+// Strong compiles only `.tsrx` template bodies: returned JSX is a descriptor,
+// which OCTANE_STRONG_VALUE_JSX rejects.
+describe.each([{ form: 'template body', extension: 'tsrx', open: '@{', render: '', close: '}' }])(
+	'Strong inline template values ($form)',
+	({ extension, open, render, close }) => {
+		it.each([false, true])(
+			'keeps ref attachments until an inline array member changes (dev=%s)',
+			(dev) => {
+				const { App } = loadCompiledFixtureSource(
+					`/** @jsxImportSource octane */
 "use strong";
 import { useState } from 'octane';
 export function App(props) ${open}
@@ -854,71 +854,75 @@ export function App(props) ${open}
   ${render}
   <span data-revision={props.revision} ref={[props.elementRef, props.observe]} onClick={() => setNoise(noise + 1)}>{noise as string}</span>
 ${close}`,
-				{
-					id: `/src/StrongInlineRef.${extension}`,
-					mode: 'client',
-					compileOptions: { dev, hmr: false },
-				},
-			);
-			const lifecycle: string[] = [];
-			const firstRef: { current: Element | null } = { current: null };
-			const secondRef: { current: Element | null } = { current: null };
-			const observeFirst = (element: Element | null) => {
-				lifecycle.push(element ? 'first:attach' : 'first:null');
-				return () => lifecycle.push('first:cleanup');
-			};
-			const observeSecond = (element: Element | null) => {
-				lifecycle.push(element ? 'second:attach' : 'second:null');
-				return () => lifecycle.push('second:cleanup');
-			};
-			const mounted = mount(App, { elementRef: firstRef, observe: observeFirst, revision: 'one' });
-			try {
-				const element = mounted.find('span');
-				expect(firstRef.current).toBe(element);
-				expect(lifecycle).toEqual(['first:attach']);
-				mounted.click('span');
-				expect(element.textContent).toBe('1');
-				expect(firstRef.current).toBe(element);
-				expect(lifecycle).toEqual(['first:attach']);
-				mounted.update(App, { elementRef: firstRef, observe: observeFirst, revision: 'two' });
-				expect(element.getAttribute('data-revision')).toBe('two');
-				expect(firstRef.current).toBe(element);
-				expect(lifecycle).toEqual(['first:attach']);
+					{
+						id: `/src/StrongInlineRef.${extension}`,
+						mode: 'client',
+						compileOptions: { dev, hmr: false },
+					},
+				);
+				const lifecycle: string[] = [];
+				const firstRef: { current: Element | null } = { current: null };
+				const secondRef: { current: Element | null } = { current: null };
+				const observeFirst = (element: Element | null) => {
+					lifecycle.push(element ? 'first:attach' : 'first:null');
+					return () => lifecycle.push('first:cleanup');
+				};
+				const observeSecond = (element: Element | null) => {
+					lifecycle.push(element ? 'second:attach' : 'second:null');
+					return () => lifecycle.push('second:cleanup');
+				};
+				const mounted = mount(App, {
+					elementRef: firstRef,
+					observe: observeFirst,
+					revision: 'one',
+				});
+				try {
+					const element = mounted.find('span');
+					expect(firstRef.current).toBe(element);
+					expect(lifecycle).toEqual(['first:attach']);
+					mounted.click('span');
+					expect(element.textContent).toBe('1');
+					expect(firstRef.current).toBe(element);
+					expect(lifecycle).toEqual(['first:attach']);
+					mounted.update(App, { elementRef: firstRef, observe: observeFirst, revision: 'two' });
+					expect(element.getAttribute('data-revision')).toBe('two');
+					expect(firstRef.current).toBe(element);
+					expect(lifecycle).toEqual(['first:attach']);
 
-				mounted.update(App, { elementRef: secondRef, observe: observeFirst, revision: 'two' });
-				expect(element.textContent).toBe('1');
-				expect(firstRef.current).toBeNull();
-				expect(secondRef.current).toBe(element);
-				expect(lifecycle).toEqual(['first:attach', 'first:cleanup', 'first:attach']);
-				mounted.update(App, { elementRef: secondRef, observe: observeSecond, revision: 'two' });
-				expect(element.textContent).toBe('1');
-				expect(secondRef.current).toBe(element);
+					mounted.update(App, { elementRef: secondRef, observe: observeFirst, revision: 'two' });
+					expect(element.textContent).toBe('1');
+					expect(firstRef.current).toBeNull();
+					expect(secondRef.current).toBe(element);
+					expect(lifecycle).toEqual(['first:attach', 'first:cleanup', 'first:attach']);
+					mounted.update(App, { elementRef: secondRef, observe: observeSecond, revision: 'two' });
+					expect(element.textContent).toBe('1');
+					expect(secondRef.current).toBe(element);
+					expect(lifecycle).toEqual([
+						'first:attach',
+						'first:cleanup',
+						'first:attach',
+						'first:cleanup',
+						'second:attach',
+					]);
+				} finally {
+					mounted.unmount();
+				}
+				expect(secondRef.current).toBeNull();
 				expect(lifecycle).toEqual([
 					'first:attach',
 					'first:cleanup',
 					'first:attach',
 					'first:cleanup',
 					'second:attach',
+					'second:cleanup',
 				]);
-			} finally {
-				mounted.unmount();
-			}
-			expect(secondRef.current).toBeNull();
-			expect(lifecycle).toEqual([
-				'first:attach',
-				'first:cleanup',
-				'first:attach',
-				'first:cleanup',
-				'second:attach',
-				'second:cleanup',
-			]);
-		},
-	);
+			},
+		);
 
-	it('keeps a regular function in a ref array attached until its captures change', () => {
-		const lifecycle: string[] = [];
-		const { App } = loadCompiledFixtureSource(
-			`/** @jsxImportSource octane */
+		it('keeps a regular function in a ref array attached until its captures change', () => {
+			const lifecycle: string[] = [];
+			const { App } = loadCompiledFixtureSource(
+				`/** @jsxImportSource octane */
 "use strong";
 import { useState } from 'octane';
 export function App(props) ${open}
@@ -930,53 +934,60 @@ export function App(props) ${open}
       ref={[function(node) { return props.observe(props.name, node); }]} />
   </div>
 ${close}`,
-			{
-				id: `/src/StrongFunctionRef.${extension}`,
-				mode: 'client',
-				compileOptions: { dev: false, hmr: false },
-			},
-		);
-		const observe = (name: string, node: Element | null) => {
-			lifecycle.push(name + (node ? ':attach' : ':null'));
-			return () => lifecycle.push(name + ':cleanup');
-		};
-		const mounted = mount(App, { name: 'first', revision: 'one', observe });
-		try {
-			expect(lifecycle).toEqual(['first:attach']);
-			mounted.click('button');
-			expect(mounted.find('button').textContent).toBe('1');
-			expect(lifecycle).toEqual(['first:attach']);
-			mounted.update(App, { name: 'first', revision: 'two', observe });
-			expect(mounted.find('span').getAttribute('data-revision')).toBe('two');
-			expect(lifecycle).toEqual(['first:attach']);
-			mounted.update(App, { name: 'second', revision: 'two', observe });
-			expect(lifecycle).toEqual(['first:attach', 'first:cleanup', 'second:attach']);
-		} finally {
-			mounted.unmount();
-		}
-		expect(lifecycle).toEqual(['first:attach', 'first:cleanup', 'second:attach', 'second:cleanup']);
-	});
+				{
+					id: `/src/StrongFunctionRef.${extension}`,
+					mode: 'client',
+					compileOptions: { dev: false, hmr: false },
+				},
+			);
+			const observe = (name: string, node: Element | null) => {
+				lifecycle.push(name + (node ? ':attach' : ':null'));
+				return () => lifecycle.push(name + ':cleanup');
+			};
+			const mounted = mount(App, { name: 'first', revision: 'one', observe });
+			try {
+				expect(lifecycle).toEqual(['first:attach']);
+				mounted.click('button');
+				expect(mounted.find('button').textContent).toBe('1');
+				expect(lifecycle).toEqual(['first:attach']);
+				mounted.update(App, { name: 'first', revision: 'two', observe });
+				expect(mounted.find('span').getAttribute('data-revision')).toBe('two');
+				expect(lifecycle).toEqual(['first:attach']);
+				mounted.update(App, { name: 'second', revision: 'two', observe });
+				expect(lifecycle).toEqual(['first:attach', 'first:cleanup', 'second:attach']);
+			} finally {
+				mounted.unmount();
+			}
+			expect(lifecycle).toEqual([
+				'first:attach',
+				'first:cleanup',
+				'second:attach',
+				'second:cleanup',
+			]);
+		});
 
-	it.each([
-		[false, 'inline'],
-		[false, 'named'],
-		[false, 'nested named'],
-		[true, 'inline'],
-		[true, 'named'],
-		[true, 'nested named'],
-	])('retains a context subscription until a provider value changes (dev=%s, %s)', (dev, form) => {
-		const lifecycle: string[] = [];
-		const { App } = loadCompiledFixtureSource(
-			`/** @jsxImportSource octane */
+		it.each([
+			[false, 'inline'],
+			[false, 'named'],
+			[false, 'nested named'],
+			[true, 'inline'],
+			[true, 'named'],
+			[true, 'nested named'],
+		])(
+			'retains a context subscription until a provider value changes (dev=%s, %s)',
+			(dev, form) => {
+				const lifecycle: string[] = [];
+				const { App } = loadCompiledFixtureSource(
+					`/** @jsxImportSource octane */
 "use strong";
 import { createContext, useContext, useEffect, useState } from 'octane';
 import { subscribe } from './subscription';
 import { Outer } from './outer';
 const Channel = createContext({ name: 'default' });
-function Reader() {
+function Reader() @{
   const channel = useContext(Channel);
   useEffect(() => subscribe(channel), [channel]);
-  return <output>{channel.name as string}</output>;
+  <output>{channel.name as string}</output>
 }
 export function App(props) ${open}
   const [noise, setNoise] = useState(0);
@@ -989,66 +1000,67 @@ export function App(props) ${open}
     ${form === 'nested named' ? '</Outer>' : ''}
   </div>
 ${close}`,
-			{
-				id: `/src/StrongInlineContext.${extension}`,
-				mode: 'client',
-				compileOptions: { dev, hmr: false },
-				runtimeModules: {
-					'./outer': { Outer: createContext(false) },
-					'./subscription': {
-						subscribe: (channel: { name: string }) => {
-							lifecycle.push('subscribe:' + channel.name);
-							return () => lifecycle.push('unsubscribe:' + channel.name);
+					{
+						id: `/src/StrongInlineContext.${extension}`,
+						mode: 'client',
+						compileOptions: { dev, hmr: false },
+						runtimeModules: {
+							'./outer': { Outer: createContext(false) },
+							'./subscription': {
+								subscribe: (channel: { name: string }) => {
+									lifecycle.push('subscribe:' + channel.name);
+									return () => lifecycle.push('unsubscribe:' + channel.name);
+								},
+							},
 						},
 					},
-				},
+				);
+				const mounted = mount(App, { name: 'news', revision: 'one' });
+				try {
+					flushEffects();
+					expect(mounted.find('output').textContent).toBe('news');
+					expect(lifecycle).toEqual(['subscribe:news']);
+					mounted.click('button');
+					flushEffects();
+					expect(mounted.find('button').textContent).toBe('1');
+					expect(mounted.find('output').textContent).toBe('news');
+					expect(lifecycle).toEqual(['subscribe:news']);
+					mounted.update(App, { name: 'news', revision: 'two' });
+					flushEffects();
+					expect(mounted.find('button').getAttribute('data-revision')).toBe('two');
+					expect(mounted.find('output').textContent).toBe('news');
+					expect(lifecycle).toEqual(['subscribe:news']);
+
+					mounted.update(App, { name: 'weather', revision: 'two' });
+					flushEffects();
+					expect(mounted.find('output').textContent).toBe('weather');
+					expect(lifecycle).toEqual(['subscribe:news', 'unsubscribe:news', 'subscribe:weather']);
+				} finally {
+					mounted.unmount();
+				}
+				expect(lifecycle).toEqual([
+					'subscribe:news',
+					'unsubscribe:news',
+					'subscribe:weather',
+					'unsubscribe:weather',
+				]);
 			},
 		);
-		const mounted = mount(App, { name: 'news', revision: 'one' });
-		try {
-			flushEffects();
-			expect(mounted.find('output').textContent).toBe('news');
-			expect(lifecycle).toEqual(['subscribe:news']);
-			mounted.click('button');
-			flushEffects();
-			expect(mounted.find('button').textContent).toBe('1');
-			expect(mounted.find('output').textContent).toBe('news');
-			expect(lifecycle).toEqual(['subscribe:news']);
-			mounted.update(App, { name: 'news', revision: 'two' });
-			flushEffects();
-			expect(mounted.find('button').getAttribute('data-revision')).toBe('two');
-			expect(mounted.find('output').textContent).toBe('news');
-			expect(lifecycle).toEqual(['subscribe:news']);
 
-			mounted.update(App, { name: 'weather', revision: 'two' });
-			flushEffects();
-			expect(mounted.find('output').textContent).toBe('weather');
-			expect(lifecycle).toEqual(['subscribe:news', 'unsubscribe:news', 'subscribe:weather']);
-		} finally {
-			mounted.unmount();
-		}
-		expect(lifecycle).toEqual([
-			'subscribe:news',
-			'unsubscribe:news',
-			'subscribe:weather',
-			'unsubscribe:weather',
-		]);
-	});
-
-	it.each([false, true])(
-		'leaves inline child prop evaluation with a component that can withhold children (dev=%s)',
-		(dev) => {
-			const reads: string[] = [];
-			const { App } = loadCompiledFixtureSource(
-				`/** @jsxImportSource octane */
+		it.each([false, true])(
+			'leaves inline child prop evaluation with a component that can withhold children (dev=%s)',
+			(dev) => {
+				const reads: string[] = [];
+				const { App } = loadCompiledFixtureSource(
+					`/** @jsxImportSource octane */
 "use strong";
 import { useState } from 'octane';
 import { read } from './source';
-function Deferred(props) {
-  return props.show ? <>{props.children}</> : <span>hidden</span>;
+function Deferred(props) @{
+  <>@if (props.show) { <>{props.children}</> } @else { <span>hidden</span> }</>
 }
-function Reader(props) {
-  return <output>{props.value.name as string}</output>;
+function Reader(props) @{
+  <output>{props.value.name as string}</output>
 }
 export function App(props) ${open}
   const [revision, setRevision] = useState(0);
@@ -1060,54 +1072,54 @@ export function App(props) ${open}
     </Deferred>
   </div>
 ${close}`,
-				{
-					id: `/src/StrongDeferredProps.${extension}`,
-					mode: 'client',
-					compileOptions: { dev, hmr: false },
-					runtimeModules: {
-						'./source': {
-							read(name: string) {
-								reads.push(name);
-								return name;
+					{
+						id: `/src/StrongDeferredProps.${extension}`,
+						mode: 'client',
+						compileOptions: { dev, hmr: false },
+						runtimeModules: {
+							'./source': {
+								read(name: string) {
+									reads.push(name);
+									return name;
+								},
 							},
 						},
 					},
-				},
-			);
-			const mounted = mount(App, { show: false, name: 'news' });
-			try {
-				expect(mounted.find('span').textContent).toBe('hidden');
-				expect(reads).toEqual([]);
-				mounted.click('button');
-				expect(mounted.find('button').textContent).toBe('1');
-				expect(reads).toEqual([]);
-				mounted.update(App, { show: false, name: 'weather' });
-				expect(mounted.find('span').textContent).toBe('hidden');
-				expect(reads).toEqual([]);
-				mounted.update(App, { show: true, name: 'weather' });
-				expect(mounted.find('output').textContent).toBe('weather');
-				expect(reads).toEqual(['weather']);
-			} finally {
-				mounted.unmount();
-			}
-		},
-	);
+				);
+				const mounted = mount(App, { show: false, name: 'news' });
+				try {
+					expect(mounted.find('span').textContent).toBe('hidden');
+					expect(reads).toEqual([]);
+					mounted.click('button');
+					expect(mounted.find('button').textContent).toBe('1');
+					expect(reads).toEqual([]);
+					mounted.update(App, { show: false, name: 'weather' });
+					expect(mounted.find('span').textContent).toBe('hidden');
+					expect(reads).toEqual([]);
+					mounted.update(App, { show: true, name: 'weather' });
+					expect(mounted.find('output').textContent).toBe('weather');
+					expect(reads).toEqual(['weather']);
+				} finally {
+					mounted.unmount();
+				}
+			},
+		);
 
-	it.each(['named', 'inline'])(
-		'keeps a provider subscription for a regular function until its captures change (%s)',
-		(form) => {
-			const lifecycle: string[] = [];
-			const literal = '{ name: function() { return props.name; } }';
-			const { App } = loadCompiledFixtureSource(
-				`/** @jsxImportSource octane */
+		it.each(['named', 'inline'])(
+			'keeps a provider subscription for a regular function until its captures change (%s)',
+			(form) => {
+				const lifecycle: string[] = [];
+				const literal = '{ name: function() { return props.name; } }';
+				const { App } = loadCompiledFixtureSource(
+					`/** @jsxImportSource octane */
 "use strong";
 import { createContext, useContext, useEffect, useState } from 'octane';
 import { subscribe } from './subscription';
 const Channel = createContext(null);
-function Reader() {
+function Reader() @{
   const channel = useContext(Channel);
   useEffect(() => subscribe(channel), [channel]);
-  return <output>{channel.name() as string}</output>;
+  <output>{channel.name() as string}</output>
 }
 export function App(props) ${open}
   const [noise, setNoise] = useState(0);
@@ -1118,65 +1130,65 @@ export function App(props) ${open}
     <Channel value={${form === 'named' ? 'context' : literal}}><Reader /></Channel>
   </div>
 ${close}`,
-				{
-					id: `/src/StrongFunctionContext.${extension}`,
-					mode: 'client',
-					compileOptions: { dev: false, hmr: false },
-					runtimeModules: {
-						'./subscription': {
-							subscribe: (channel: { name: () => string }) => {
-								const name = channel.name();
-								lifecycle.push('subscribe:' + name);
-								return () => lifecycle.push('unsubscribe:' + name);
+					{
+						id: `/src/StrongFunctionContext.${extension}`,
+						mode: 'client',
+						compileOptions: { dev: false, hmr: false },
+						runtimeModules: {
+							'./subscription': {
+								subscribe: (channel: { name: () => string }) => {
+									const name = channel.name();
+									lifecycle.push('subscribe:' + name);
+									return () => lifecycle.push('unsubscribe:' + name);
+								},
 							},
 						},
 					},
-				},
-			);
-			const mounted = mount(App, { name: 'news', revision: 'one' });
-			try {
-				flushEffects();
-				expect(mounted.find('output').textContent).toBe('news');
-				expect(lifecycle).toEqual(['subscribe:news']);
-				mounted.click('button');
-				flushEffects();
-				expect(mounted.find('button').textContent).toBe('1');
-				expect(lifecycle).toEqual(['subscribe:news']);
-				mounted.update(App, { name: 'news', revision: 'two' });
-				flushEffects();
-				expect(mounted.find('button').getAttribute('data-revision')).toBe('two');
-				expect(lifecycle).toEqual(['subscribe:news']);
-				mounted.update(App, { name: 'weather', revision: 'two' });
-				flushEffects();
-				expect(mounted.find('output').textContent).toBe('weather');
-				expect(lifecycle).toEqual(['subscribe:news', 'unsubscribe:news', 'subscribe:weather']);
-			} finally {
-				mounted.unmount();
-			}
-			expect(lifecycle).toEqual([
-				'subscribe:news',
-				'unsubscribe:news',
-				'subscribe:weather',
-				'unsubscribe:weather',
-			]);
-		},
-	);
+				);
+				const mounted = mount(App, { name: 'news', revision: 'one' });
+				try {
+					flushEffects();
+					expect(mounted.find('output').textContent).toBe('news');
+					expect(lifecycle).toEqual(['subscribe:news']);
+					mounted.click('button');
+					flushEffects();
+					expect(mounted.find('button').textContent).toBe('1');
+					expect(lifecycle).toEqual(['subscribe:news']);
+					mounted.update(App, { name: 'news', revision: 'two' });
+					flushEffects();
+					expect(mounted.find('button').getAttribute('data-revision')).toBe('two');
+					expect(lifecycle).toEqual(['subscribe:news']);
+					mounted.update(App, { name: 'weather', revision: 'two' });
+					flushEffects();
+					expect(mounted.find('output').textContent).toBe('weather');
+					expect(lifecycle).toEqual(['subscribe:news', 'unsubscribe:news', 'subscribe:weather']);
+				} finally {
+					mounted.unmount();
+				}
+				expect(lifecycle).toEqual([
+					'subscribe:news',
+					'unsubscribe:news',
+					'subscribe:weather',
+					'unsubscribe:weather',
+				]);
+			},
+		);
 
-	it.each([
-		['direct assignment', 'value.count++;', '() => {}'],
-		['alias assignment', 'const alias = value; alias.count++;', '() => {}'],
-		['eager event-producer callback', '', '(() => { value.count++; return () => {}; })()'],
-	])('creates a fresh mutable child prop after %s', (_name, mutation, event) => {
-		const { App } = loadCompiledFixtureSource(
-			`/** @jsxImportSource octane */
+		it.each([
+			['direct assignment', 'value.count++;', '() => {}'],
+			['alias assignment', 'const alias = value; alias.count++;', '() => {}'],
+			['eager event-producer callback', '', '(() => { value.count++; return () => {}; })()'],
+		])('creates a fresh mutable child prop after %s', (_name, mutation, event) => {
+			const { App } = loadCompiledFixtureSource(
+				`/** @jsxImportSource octane */
 "use strong";
 import { useState } from 'octane';
-function Display(props) {
-  return <div>
+function Display(props) @{
+  <div>
     <output>{props.revision + ':' + props.value.count + ':' + props.noise as string}</output>
     <button id="noise" onClick={props.advance}>advance</button>
     <button id="value" onClick={props.onPress}>value</button>
-  </div>;
+  </div>
 }
 export function App(props) ${open}
   const [noise, setNoise] = useState(0);
@@ -1186,49 +1198,49 @@ export function App(props) ${open}
   <Display value={value} revision={props.revision} noise={noise}
     advance={() => setNoise(noise + 1)} onPress={${event}} />
 ${close}`,
-			{
-				id: `/src/StrongMutableChild.${extension}`,
-				mode: 'client',
-				compileOptions: { dev: false, hmr: false },
-			},
-		);
-		const mounted = mount(App, { revision: 'one' });
-		try {
-			expect(mounted.find('output').textContent).toBe('one:1:0');
-			mounted.click('#noise');
-			expect(mounted.find('output').textContent).toBe('one:1:1');
-			mounted.update(App, { revision: 'two' });
-			expect(mounted.find('output').textContent).toBe('two:1:1');
-		} finally {
-			mounted.unmount();
-		}
-	});
+				{
+					id: `/src/StrongMutableChild.${extension}`,
+					mode: 'client',
+					compileOptions: { dev: false, hmr: false },
+				},
+			);
+			const mounted = mount(App, { revision: 'one' });
+			try {
+				expect(mounted.find('output').textContent).toBe('one:1:0');
+				mounted.click('#noise');
+				expect(mounted.find('output').textContent).toBe('one:1:1');
+				mounted.update(App, { revision: 'two' });
+				expect(mounted.find('output').textContent).toBe('two:1:1');
+			} finally {
+				mounted.unmount();
+			}
+		});
 
-	it.each([
-		['named', 'method', '{ count: 0, next() { return ++this.count; } }'],
-		['inline', 'method', '{ count: 0, next() { return ++this.count; } }'],
-		[
-			'named',
-			'default arrow',
-			'{ count: 0, next: function(read = () => ++this.count) { return read(); } }',
-		],
-		[
-			'inline',
-			'default arrow',
-			'{ count: 0, next: function(read = () => ++this.count) { return read(); } }',
-		],
-	])(
-		'starts a fresh child value after an event mutates its method receiver (%s, %s)',
-		(form, _kind, literal) => {
-			const { App } = loadCompiledFixtureSource(
-				`/** @jsxImportSource octane */
+		it.each([
+			['named', 'method', '{ count: 0, next() { return ++this.count; } }'],
+			['inline', 'method', '{ count: 0, next() { return ++this.count; } }'],
+			[
+				'named',
+				'default arrow',
+				'{ count: 0, next: function(read = () => ++this.count) { return read(); } }',
+			],
+			[
+				'inline',
+				'default arrow',
+				'{ count: 0, next: function(read = () => ++this.count) { return read(); } }',
+			],
+		])(
+			'starts a fresh child value after an event mutates its method receiver (%s, %s)',
+			(form, _kind, literal) => {
+				const { App } = loadCompiledFixtureSource(
+					`/** @jsxImportSource octane */
 "use strong";
 import { useState } from 'octane';
-function Display(props) {
-  return <div>
+function Display(props) @{
+  <div>
     <output>{props.noise + ':' + props.model.count as string}</output>
     <button id="value" onClick={() => props.model.next()}>change</button>
-  </div>;
+  </div>
 }
 export function App() ${open}
   const [noise, setNoise] = useState(0);
@@ -1239,8 +1251,45 @@ export function App() ${open}
     <Display model={${form === 'named' ? 'model' : literal}} noise={noise} />
   </div>
 ${close}`,
+					{
+						id: `/src/StrongMethodMutableChild.${extension}`,
+						mode: 'client',
+						compileOptions: { dev: false, hmr: false },
+					},
+				);
+				const mounted = mount(App);
+				try {
+					expect(mounted.find('output').textContent).toBe('0:0');
+					mounted.click('#value');
+					mounted.click('#noise');
+					expect(mounted.find('output').textContent).toBe('1:0');
+				} finally {
+					mounted.unmount();
+				}
+			},
+		);
+
+		it('does not carry an event mutation of a child prop into a later render', () => {
+			const { App } = loadCompiledFixtureSource(
+				`/** @jsxImportSource octane */
+"use strong";
+import { useState } from 'octane';
+function Display(props) @{
+  <div>
+    <output>{props.value.count + ':' + props.noise as string}</output>
+    <button id="noise" onClick={props.advance}>advance</button>
+    <button id="value" onClick={props.change}>change</button>
+  </div>
+}
+export function App() ${open}
+  const [noise, setNoise] = useState(0);
+  const value = { count: 0 };
+  ${render}
+  <Display value={value} noise={noise} advance={() => setNoise(noise + 1)}
+    change={() => { value.count++; }} />
+${close}`,
 				{
-					id: `/src/StrongMethodMutableChild.${extension}`,
+					id: `/src/StrongEventMutableChild.${extension}`,
 					mode: 'client',
 					compileOptions: { dev: false, hmr: false },
 				},
@@ -1250,60 +1299,23 @@ ${close}`,
 				expect(mounted.find('output').textContent).toBe('0:0');
 				mounted.click('#value');
 				mounted.click('#noise');
-				expect(mounted.find('output').textContent).toBe('1:0');
+				expect(mounted.find('output').textContent).toBe('0:1');
 			} finally {
 				mounted.unmount();
 			}
-		},
-	);
+		});
 
-	it('does not carry an event mutation of a child prop into a later render', () => {
-		const { App } = loadCompiledFixtureSource(
-			`/** @jsxImportSource octane */
+		it('creates a fresh named function when an event mutates the function itself', () => {
+			const seen: number[] = [];
+			const { App } = loadCompiledFixtureSource(
+				`/** @jsxImportSource octane */
 "use strong";
 import { useState } from 'octane';
-function Display(props) {
-  return <div>
-    <output>{props.value.count + ':' + props.noise as string}</output>
-    <button id="noise" onClick={props.advance}>advance</button>
-    <button id="value" onClick={props.change}>change</button>
-  </div>;
-}
-export function App() ${open}
-  const [noise, setNoise] = useState(0);
-  const value = { count: 0 };
-  ${render}
-  <Display value={value} noise={noise} advance={() => setNoise(noise + 1)}
-    change={() => { value.count++; }} />
-${close}`,
-			{
-				id: `/src/StrongEventMutableChild.${extension}`,
-				mode: 'client',
-				compileOptions: { dev: false, hmr: false },
-			},
-		);
-		const mounted = mount(App);
-		try {
-			expect(mounted.find('output').textContent).toBe('0:0');
-			mounted.click('#value');
-			mounted.click('#noise');
-			expect(mounted.find('output').textContent).toBe('0:1');
-		} finally {
-			mounted.unmount();
-		}
-	});
-
-	it('creates a fresh named function when an event mutates the function itself', () => {
-		const seen: number[] = [];
-		const { App } = loadCompiledFixtureSource(
-			`/** @jsxImportSource octane */
-"use strong";
-import { useState } from 'octane';
-function Display(props) {
-  return <div>
+function Display(props) @{
+  <div>
     <output>{props.noise as string}</output>
     <button id="value" onClick={() => props.observe(props.model.next())}>next</button>
-  </div>;
+  </div>
 }
 export function App(props) ${open}
   const [noise, setNoise] = useState(0);
@@ -1319,22 +1331,23 @@ export function App(props) ${open}
     <Display model={model} noise={noise} observe={props.observe} />
   </div>
 ${close}`,
-			{
-				id: `/src/StrongNamedFunctionMutation.${extension}`,
-				mode: 'client',
-				compileOptions: { dev: false, hmr: false },
-			},
-		);
-		const mounted = mount(App, { observe: (value: number) => seen.push(value) });
-		try {
-			mounted.click('#value');
-			expect(seen).toEqual([1]);
-			mounted.click('#noise');
-			expect(mounted.find('output').textContent).toBe('1');
-			mounted.click('#value');
-			expect(seen).toEqual([1, 1]);
-		} finally {
-			mounted.unmount();
-		}
-	});
-});
+				{
+					id: `/src/StrongNamedFunctionMutation.${extension}`,
+					mode: 'client',
+					compileOptions: { dev: false, hmr: false },
+				},
+			);
+			const mounted = mount(App, { observe: (value: number) => seen.push(value) });
+			try {
+				mounted.click('#value');
+				expect(seen).toEqual([1]);
+				mounted.click('#noise');
+				expect(mounted.find('output').textContent).toBe('1');
+				mounted.click('#value');
+				expect(seen).toEqual([1, 1]);
+			} finally {
+				mounted.unmount();
+			}
+		});
+	},
+);

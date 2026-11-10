@@ -137,7 +137,8 @@ export function Pair() { return <p><Tag />; <Tag /></p>; }`;
 export function Banner({ visible, count }: { visible?: boolean; count: number }) {
 	return <section>{visible && <i>Visible</i>}{Boolean(count) && <b>Count</b>}</section>;
 }`;
-		const result = transformModule(source, 'banner.tsx', { strong: true, strictNullChecks: true });
+		// A call guard stays `&&`, which Strong rejects, so this compiles in compatibility mode.
+		const result = transformModule(source, 'banner.tsx', { strictNullChecks: true });
 		expect(result.rules['template-if']).toBe(1);
 		const { Banner } = loadCompiledFixtureSource(result.code, {
 			id: 'banner.tsrx',

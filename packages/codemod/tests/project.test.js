@@ -1569,7 +1569,7 @@ const invalid: Panel = { style: 'color:red' };`,
 		const [local] = JSON.parse(result.stdout).files;
 		expect(local.strong).toBe(true);
 		expect(local.code).toContain(
-			'<p>{story.title} {story.score} {story.by}{story.pinned && <b>Pinned</b>}@if (expanded) { <i>Details</i> }</p>',
+			'<p>{story.title} {story.score} {story.by}@if (story.pinned) { <b>Pinned</b> } @else { <>{story.pinned}</> }@if (expanded) { <i>Details</i> }</p>',
 		);
 	});
 
@@ -1659,9 +1659,14 @@ const invalid: Panel = { style: 'color:red' };`,
 				.filter((file) => file.strong === false)
 				.flatMap((file) => file.diagnostics.map((d) => d.code)),
 		);
-		// Only raw HTML, which needs a person to vouch for it with trustHTML(),
-		// keeps a module out of Strong mode.
-		expect([...blockers]).toEqual(['OCTANE_STRONG_UNTRUSTED_HTML']);
+		// Raw HTML needs a person to vouch for it with trustHTML(). Markup the
+		// codemod does not lower to a template yet also keeps a module out of
+		// Strong mode: an `Array.from` row callback, an ErrorBoundary render-prop
+		// fallback, and a root element built in a variable.
+		expect([...blockers].sort()).toEqual([
+			'OCTANE_STRONG_UNTRUSTED_HTML',
+			'OCTANE_STRONG_VALUE_JSX',
+		]);
 		expect(
 			strong.files
 				.filter((file) => file.strong === true)
@@ -1670,11 +1675,8 @@ const invalid: Panel = { style: 'color:red' };`,
 		).toEqual([
 			'App.tsrx',
 			'NotFound.tsrx',
-			'Pending.tsrx',
-			'RootLayout.tsrx',
 			'StoriesPage.tsrx',
 			'StoryRow.tsrx',
-			'entry-client.tsrx',
 			'entry-server.tsrx',
 		]);
 	}, 30_000);

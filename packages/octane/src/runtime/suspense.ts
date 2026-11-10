@@ -157,7 +157,7 @@ import { registeredEnqueueInlineCaughtError, noteRecoverableHydrationError } fro
 import { isAdoptionControl, markHydrationDiscard } from './hydration-presentation.js';
 import { applyStyleValue, applyStyleProperty } from './host-props.js';
 import type { OctaneNode } from './elements.js';
-import { childrenTryBlock, discardOffscreenCapture } from './component-slots.js';
+import { childrenTryBlock, discardOffscreenCapture, isChildrenBlock } from './component-slots.js';
 import { childSlot } from './child-slots.js';
 import { freshSlotEnd, settleFreshSlot } from './branches.js';
 import { forEachSubtreeChild, collectVisibleSubtreeRefs, deactivateScope } from './activity.js';
@@ -259,8 +259,9 @@ export const ErrorBoundary: ComponentBody<{
 >(
 	function ErrorBoundary(props, scope) {
 		const catchBody: ComponentBody<{ err: unknown; reset: () => void }> = (catchProps, s) => {
+			// A `fallback={@{ … }}` render body is a renderable, not a render prop.
 			const fb =
-				typeof props.fallback === 'function'
+				typeof props.fallback === 'function' && !isChildrenBlock(props.fallback)
 					? (props.fallback as (e: unknown, r: () => void) => unknown)(
 							catchProps.err,
 							catchProps.reset,

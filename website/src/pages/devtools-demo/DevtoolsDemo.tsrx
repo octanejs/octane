@@ -20,17 +20,17 @@ function makeDelayed(label: string, ms: number): Promise<string> {
 const boundaryAPromise = makeDelayed('boundary A loaded', 400);
 const boundaryBPromise = makeDelayed('boundary B loaded', 800);
 
-function Slow(props: { label: string }): OctaneNode {
+function Slow(props: { label: string }): OctaneNode @{
 	// Bounded, deterministic work gives the Profiler a slow render to display
 	// without reading the clock during render.
 	let label = props.label;
 	for (let i = 0; i < 2000; i++) label = label.split('').reverse().reverse().join('');
-	return <li>{label as string}</li>;
+	<li>{label as string}</li>
 }
 
-function AsyncChild(props: { promise: Promise<string> }): OctaneNode {
+function AsyncChild(props: { promise: Promise<string> }): OctaneNode @{
 	const value = use(props.promise);
-	return <strong>{value as string}</strong>;
+	<strong>{value as string}</strong>
 }
 
 function Counter(): OctaneNode @{
@@ -71,10 +71,18 @@ export function DevtoolsDemo(): OctaneNode @{
 		<p>Open the Octane panel (bottom corner) and explore the four tabs.</p>
 		<Counter />
 		<FilterList />
-		<Suspense fallback={<em>loading A…</em>}>
+		<Suspense
+			fallback={@{
+				<em>loading A…</em>
+			}}
+		>
 			<AsyncChild promise={boundaryAPromise} />
 		</Suspense>
-		<Suspense fallback={<em>loading B…</em>}>
+		<Suspense
+			fallback={@{
+				<em>loading B…</em>
+			}}
+		>
 			<AsyncChild promise={boundaryBPromise} />
 		</Suspense>
 		@if (showDevtools) {

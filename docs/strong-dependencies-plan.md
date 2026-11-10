@@ -265,9 +265,13 @@ redux, motion, and so on). Before declaring, each needs one
   application renders. The exceptions are exactly the packages in `allow`, and
   every React island is listed there as `octane/react`.
 - **A descriptor-free tree.** With every package Strong, a Strong application
-  outside its `allow` list never creates an element descriptor. A runtime that
-  drops descriptor reconciliation for such builds would need that guarantee.
-  This plan does not propose that runtime.
+  outside its `allow` list never creates an element descriptor: the element
+  APIs are rejected by `OCTANE_STRONG_ELEMENT_API`, `.tsx` modules by
+  `OCTANE_STRONG_TSX_MODULE`, and returned or value-position markup by
+  `OCTANE_STRONG_VALUE_JSX`. The compiler still builds descriptors for hosts it
+  creates imperatively, such as `<html>`, `<head>`, `<body>`, keyed hosts, and
+  parser-repaired trees. A runtime that drops descriptor reconciliation for such
+  builds would need that guarantee. This plan does not propose that runtime.
 
 ## Rollout
 

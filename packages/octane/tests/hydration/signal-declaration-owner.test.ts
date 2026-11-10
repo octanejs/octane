@@ -34,11 +34,11 @@ function frames(output: string): Record<string, string> {
 		children: `@try { <Card>${output}</Card> } @pending { <i>waiting</i> }`,
 		'forwarded children': `@try { <Wrapper>${output}</Wrapper> } @pending { <i>waiting</i> }`,
 		'row children': `@try { <ul>@for (const item of props.items; key item) { <li><Card>${output}</Card></li> }</ul> } @pending { <i>waiting</i> }`,
-		Suspense: `<Suspense fallback={<i>waiting</i>}>${output}</Suspense>`,
-		'Suspense row': `<Suspense fallback={<i>waiting</i>}><ul>@for (const item of props.items; key item) { <li>${output}</li> }</ul></Suspense>`,
+		Suspense: `<Suspense fallback={@{ <i>waiting</i> }}>${output}</Suspense>`,
+		'Suspense row': `<Suspense fallback={@{ <i>waiting</i> }}><ul>@for (const item of props.items; key item) { <li>${output}</li> }</ul></Suspense>`,
 		ViewTransition: `@try { <ViewTransition>${output}</ViewTransition> } @pending { <i>waiting</i> }`,
 		// An alias keeps the component form the compiler would otherwise inline.
-		ErrorBoundary: `@try { <Boundary fallback={<b>error</b>}>${output}</Boundary> } @pending { <i>waiting</i> }`,
+		ErrorBoundary: `@try { <Boundary fallback={@{ <b>error</b> }}>${output}</Boundary> } @pending { <i>waiting</i> }`,
 		provider: `@try { <Context value="provided">${output}</Context> } @pending { <i>waiting</i> }`,
 		// A Hydrate boundary renders its children in a frame of its own: inline
 		// (split={false}), from the module the compiler splits them into, or on the
@@ -112,6 +112,8 @@ const MODES =
 				{ name: 'strong', dev: false, strong: true },
 			]
 		: [{ name: 'dev', dev: true, strong: false }];
+// Strong rejects returned and value-position JSX (OCTANE_STRONG_VALUE_JSX).
+const VALUE_JSX_MODES = MODES.filter((mode) => !mode.strong);
 
 function cases(shapes: string[]) {
 	return MODES.flatMap((mode) =>
@@ -635,7 +637,7 @@ export function App(props) @{
 
 	// A hookless child renders value JSX through a renderer below its DOM
 	// stand-in. A nested block there still reads the handle in the child's cell.
-	it.each(MODES)(
+	it.each(VALUE_JSX_MODES)(
 		"reads a handle prop in a hookless child's value JSX from the child's cell ($name)",
 		async ({ dev, strong }) => {
 			const view = await mountClient(
@@ -734,7 +736,7 @@ ${nested ? 'export function App(props) @{\n <main><Feature {...props} /></main>\
 }`;
 	}
 
-	it.each(MODES.flatMap((mode) => [false, true].map((nested) => ({ ...mode, nested }))))(
+	it.each(VALUE_JSX_MODES.flatMap((mode) => [false, true].map((nested) => ({ ...mode, nested }))))(
 		'starts one query for a nested block in returned JSX (nested: $nested, $name)',
 		async ({ dev, strong, nested }) => {
 			const view = await mountClient(returnedSource('snapshot()', nested), { dev, strong });
@@ -765,7 +767,7 @@ export function App(props) @{
 }`;
 	}
 
-	it.each(MODES)(
+	it.each(VALUE_JSX_MODES)(
 		"starts one query for a block nested in its block's value JSX ($name)",
 		async ({ dev, strong }) => {
 			const view = await mountClient(valueSource('snapshot()'), { dev, strong });
@@ -780,14 +782,14 @@ export function App(props) @{
 		},
 	);
 
-	it.each(MODES)(
+	it.each(VALUE_JSX_MODES)(
 		"resumes the server query for a block nested in its block's value JSX ($name)",
 		async ({ dev, strong }) => {
 			await hydrateServerOutput(valueSource('get()'), { dev, strong });
 		},
 	);
 
-	it.each(MODES.flatMap((mode) => [false, true].map((nested) => ({ ...mode, nested }))))(
+	it.each(VALUE_JSX_MODES.flatMap((mode) => [false, true].map((nested) => ({ ...mode, nested }))))(
 		'resumes the server query for a nested block in returned JSX (nested: $nested, $name)',
 		async ({ dev, strong, nested }) => {
 			await hydrateServerOutput(returnedSource('get()', nested), {

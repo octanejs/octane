@@ -287,9 +287,9 @@ describe('Strong mode nondeterministic render calls', () => {
 		const source = `"use strong";
 import { lazy } from 'octane';
 const memo = (callback) => callback;
-const App = memo(() => <div>{Date.now()}</div>);
+const App = memo(() => ({ at: Date.now() }));
 const Deferred = lazy(() => { Date.now(); return import('./Deferred'); });
-export function Controls() { return <button onClick={App}>Create preview</button>; }`;
+export function Controls() @{ <button onClick={App}>Create preview</button> }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
 
@@ -298,9 +298,9 @@ export function Controls() { return <button onClick={App}>Create preview</button
 import { useState } from 'octane';
 function InitialTime() { return Date.now(); }
 function Clock() { this.started = Date.now(); }
-export function App() {
+export function App() @{
   const [time, _setTime] = useState(InitialTime);
-  return <button onClick={() => new Clock()}>{time}</button>;
+  <button onClick={() => new Clock()}>{time}</button>
 }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 	});
@@ -785,13 +785,13 @@ export function App(props) @{
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(EVENT_HANDLER_LOCALITY);
 	});
 
-	it('treats JSX-returning callbacks as helpers and parenthesized components as boundaries', () => {
+	it('treats called callbacks as helpers and arrow components as boundaries', () => {
 		const helper = `"use strong";
 import { useState } from 'octane';
 export function App() @{
   const [count, _setCount] = useState(0);
-  const renderLabel = () => (<span>{count as string}</span>);
-  <div>@{ <section>{renderLabel()}</section> }</div>
+  const renderLabel = () => String(count);
+  <div>@{ <section>{renderLabel() as string}</section> }</div>
 }`;
 		expect(compileToVolarMappings(helper, '/src/App.tsrx').diagnostics).toContainEqual(
 			expect.objectContaining({
@@ -803,7 +803,7 @@ export function App() @{
 import { useState } from 'octane';
 export function App() @{
   const [count, _setCount] = useState(0);
-  const Child = () => (<span>{count as string}</span>);
+  const Child = () => @{ <span>{count as string}</span> };
   <div>@{ <Child /> }</div>
 }`;
 		for (const mode of ['client', 'server'] as const) {
@@ -1509,10 +1509,8 @@ export function App(props) @{
 
 	it.each([
 		'function Child() @{ <span>{count as string}</span> }',
-		'function Child() { return <span>{count as string}</span>; }',
-		'function Child() { if (props.ready) return <span>{count as string}</span>; return <i />; }',
-		'const Child = () => props.ready ? <span>{count as string}</span> : <i />;',
-		'const Child = () => { const view = <span>{count as string}</span>; return view; };',
+		'function Child() @{ <>@if (props.ready) { <span>{count as string}</span> } @else { <i /> }</> }',
+		'const Child = () => @{ <span>{count as string}</span> };',
 	])('keeps parent state captured by a nested component at its original owner', (child) => {
 		const source = `"use strong";
 import { useState } from 'octane';
@@ -4203,10 +4201,10 @@ export function App() @{
 		const source = `/** @jsxImportSource octane */
 'use strong';
 import { useState } from 'octane';
-export function App() {
+export function App() @{
   const [count, setCount] = useState(0);
   setCount(count + 1);
-  return <button onClick={() => setCount(count + 1)}>{count}</button>;
+  <button onClick={() => setCount(count + 1)}>{count}</button>
 }`;
 
 		expect(() => compile(source, '/src/App.tsrx')).toThrow(RENDER_STATE_UPDATE);
@@ -4487,9 +4485,9 @@ export function useValue() {
 		const component = `/** @jsxImportSource octane */
 "use strong";
 import { useRef } from 'octane';
-export function App() {
+export function App() @{
   const ref = useRef(0);
-  return <p>{ref.current}</p>;
+  <p>{ref.current}</p>
 }`;
 
 		expect(() => slotHooks(hook, '/src/useValue.ts')).toThrow(RENDER_REF_READ);
@@ -4692,9 +4690,9 @@ export function useCurrent() {
 		const tsx = `/** @jsxImportSource octane */
 "use strong";
 import { useReducer } from 'octane';
-export function App() {
+export function App() @{
   const [, , get] = useReducer((value) => value, 0);
-  return <p>{get()}</p>;
+  <p>{get()}</p>
 }`;
 		expect(() => slotHooks(plain, '/src/useCurrent.ts')).toThrow(RENDER_STATE_GETTER_CALL);
 		expect(() => compile(tsx, '/src/App.tsrx')).toThrow(RENDER_STATE_GETTER_CALL);
@@ -5028,11 +5026,15 @@ export function App(props) @{
 			'let revision = 0; function advance() { revision++; } const captured = revision;',
 			'<p>{captured as string}</p>',
 		],
-		['an intrinsic tag', 'let Current = () => <p />; Current = () => <span />;', '<div />'],
+		[
+			'an intrinsic tag',
+			'let Current = () => @{ <p /> }; Current = () => @{ <span /> };',
+			'<div />',
+		],
 		[
 			'a shadowed component tag',
-			'let Current = () => <p />; Current = () => <span />;',
-			'const Current = () => <p />; <Current />',
+			'let Current = () => @{ <p /> }; Current = () => @{ <span /> };',
+			'const Current = () => @{ <p /> }; <Current />',
 		],
 		[
 			'an optional chain that cannot evaluate its key',
@@ -5148,7 +5150,7 @@ export function App() @{
 		const source = `/** @jsxImportSource octane */
 let revision = (value) => value;
 function advance() { revision = (value) => value; }
-export function App() { ${declaration} return <p />; }`;
+export function App() @{ ${declaration} <p /> }`;
 		expect(() => compile(source, '/src/App.tsrx')).not.toThrow();
 		expect(() => compile(`"use strong";\n${source}`, '/src/App.tsrx')).toThrow(
 			RENDER_MODULE_STATE_READ,
@@ -5212,7 +5214,7 @@ export function useRevision() { return revision; }`;
 "use strong";
 let revision = 0;
 function advance() { revision++; }
-export function App() { return <p>{revision}</p>; }`;
+export function App() @{ <p>{revision}</p> }`;
 		expect(() => slotHooks(plain, '/src/useRevision.ts')).toThrow(RENDER_MODULE_STATE_READ);
 		expect(() => compile(tsx, '/src/App.tsrx')).toThrow(RENDER_MODULE_STATE_READ);
 	});
@@ -5577,7 +5579,7 @@ export function App() @{
 	it('rejects ambient reads in plain custom hooks and Octane TSX components', () => {
 		const plain = '"use strong"; export function useViewportWidth() { return window.innerWidth; }';
 		const tsx =
-			'/** @jsxImportSource octane */\n"use strong"; export function App() { return <p>{document.visibilityState}</p>; }';
+			'/** @jsxImportSource octane */\n"use strong"; export function App() @{ <p>{document.visibilityState}</p> }';
 		expect(() => slotHooks(plain, '/src/useViewportWidth.ts')).toThrow(RENDER_AMBIENT_READ);
 		expect(() => compile(tsx, '/src/App.tsrx')).toThrow(RENDER_AMBIENT_READ);
 		expect(compileToVolarMappings(tsx, '/src/App.tsrx').diagnostics).toContainEqual(

@@ -196,11 +196,24 @@ function Fails(props) @{
 export function ElementApp(props) @{
   <main>
     <b>{props.selection as string}</b>
-    <ErrorBoundary fallback={<p>{('caught ' + props.selection) as string}</p>}>
+    <ErrorBoundary fallback={@{ <p>{('caught ' + props.selection) as string}</p> }}>
       <Fails controls={props.controls} />
     </ErrorBoundary>
     <Gate gate={props.gate} />
   </main>
+}
+`;
+
+// Strong cannot write a callback that returns markup; its form is @try/@catch.
+// The render-prop fallback keeps its compatibility-mode coverage.
+const ROLLED_BACK_RENDER_PROP = `
+import { ErrorBoundary, use, useState } from 'octane';
+function Gate(props) @{ if (props.gate) use(props.gate); <u>{'gate'}</u> }
+function Fails(props) @{
+  const [failed, setFailed] = useState(false);
+  props.controls.fail = () => setFailed(true);
+  if (failed) throw new Error('boom');
+  <q>{'ok'}</q>
 }
 export function RenderPropApp(props) @{
   <main>
@@ -214,13 +227,19 @@ export function RenderPropApp(props) @{
 `;
 
 describe.each([false, true])('ErrorBoundary after a rolled-back root render (dev=%s)', (dev) => {
-	const { ElementApp, RenderPropApp } = loadCompiledFixtureSource<
-		Record<'ElementApp' | 'RenderPropApp', any>
-	>(ROLLED_BACK_CATCH, {
+	const { ElementApp } = loadCompiledFixtureSource<Record<'ElementApp', any>>(ROLLED_BACK_CATCH, {
 		id: `/src/rolled-back-catch-${dev ? 'dev' : 'prod'}.tsrx`,
 		mode: 'client',
 		compileOptions: { strong: true, dev, hmr: false },
 	});
+	const { RenderPropApp } = loadCompiledFixtureSource<Record<'RenderPropApp', any>>(
+		ROLLED_BACK_RENDER_PROP,
+		{
+			id: `/src/rolled-back-render-prop-${dev ? 'dev' : 'prod'}.tsrx`,
+			mode: 'client',
+			compileOptions: { dev, hmr: false },
+		},
+	);
 	const never = () => new Promise<never>(() => {});
 	const fallbacks = [
 		['element', ElementApp, 'caught'],

@@ -120,7 +120,7 @@ describe('state updaters and reducers can run more than once', () => {
 describe('mutating state outside render', () => {
 	it('does not re-render when the mutated array is passed back to its setter', async () => {
 		const { A } = fixture(
-			`export function A() { const [items, setItems] = useState([]); return <button onClick={() => { items.push(1); setItems(items); }}>{items.length}</button>; }`,
+			`export function A() @{ const [items, setItems] = useState([]); <button onClick={() => { items.push(1); setItems(items); }}>{items.length}</button> }`,
 		);
 		const root = mount(A);
 		try {
@@ -135,8 +135,8 @@ describe('mutating state outside render', () => {
 
 	it('leaves identity-based consumers stale when only the outer object is copied', async () => {
 		const { A } = fixture(
-			`const Count = memo(function Count({ list }) { return <i>{list.length}</i>; });
-export function A() { const [s, setS] = useState({ list: [], n: 0 }); return <button onClick={() => { s.list.push(1); setS({ ...s, n: s.n + 1 }); }}><Count list={s.list} />{s.n}</button>; }`,
+			`const Count = memo(function Count({ list }) @{ <i>{list.length}</i> });
+export function A() @{ const [s, setS] = useState({ list: [], n: 0 }); <button onClick={() => { s.list.push(1); setS({ ...s, n: s.n + 1 }); }}><Count list={s.list} />{s.n}</button> }`,
 		);
 		const root = mount(A);
 		try {
@@ -150,15 +150,15 @@ export function A() { const [s, setS] = useState({ list: [], n: 0 }); return <bu
 	});
 
 	it('changes the value useOptimistic reverts to after a failed Action', async () => {
-		const body = `export function A({ save, mutate }) {
+		const body = `export function A({ save, mutate }) @{
   const [s, setS] = useState({ list: ['a'] });
   const [shown, add] = useOptimistic(s, (current, item) => ({ list: [...current.list, item] }));
   const [pending, start] = useTransition();
-  return <button onClick={() => start(async () => {
+  <button onClick={() => start(async () => {
     add('b');
     if (mutate) s.list.push('b');
     try { await save(); setS({ ...s }); } catch {}
-  })}>{shown.list.join(',') + (pending ? '...' : '')}</button>;
+  })}>{shown.list.join(',') + (pending ? '...' : '')}</button>
 }`;
 		const results: Record<string, string> = {};
 		for (const mutate of [false, true]) {
@@ -183,7 +183,7 @@ export function A() { const [s, setS] = useState({ list: [], n: 0 }); return <bu
 
 	it('never renders a mutation made by an effect', async () => {
 		const { A } = fixture(
-			`export function A() { const [s] = useState({ list: [] }); useEffect(() => { s.list.push(1); }); return <p>{s.list.length}</p>; }`,
+			`export function A() @{ const [s] = useState({ list: [] }); useEffect(() => { s.list.push(1); }); <p>{s.list.length}</p> }`,
 		);
 		const root = mount(A);
 		try {
@@ -202,7 +202,7 @@ describe('deferred updates computed from a render snapshot', () => {
 	] as const) {
 		it(`counts overlapping saves with ${label}`, async () => {
 			const { A } = fixture(
-				`export function A({ save }) { const [n, setN] = useState(0); return <button onClick={async () => { await save(); ${update}; }}>{n}</button>; }`,
+				`export function A({ save }) @{ const [n, setN] = useState(0); <button onClick={async () => { await save(); ${update}; }}>{n}</button> }`,
 				strong,
 			);
 			const request = deferred();
@@ -223,7 +223,7 @@ describe('deferred updates computed from a render snapshot', () => {
 		it(`counts overlapping timers with ${label}`, async () => {
 			vi.useFakeTimers();
 			const { A } = fixture(
-				`export function A() { const [n, setN] = useState(0); return <button onClick={() => setTimeout(() => ${update}, 500)}>{n}</button>; }`,
+				`export function A() @{ const [n, setN] = useState(0); <button onClick={() => setTimeout(() => ${update}, 500)}>{n}</button> }`,
 				strong,
 			);
 			const root = mount(A);
@@ -248,7 +248,7 @@ describe('write-only state as a store subscription', () => {
 	it('misses a store change made before its passive subscription', async () => {
 		const { A } = fixture(
 			`${mutator}
-export function A({ store }) { const [, force] = useState(0); useEffect(() => store.subscribe(() => force((x) => x + 1))); return <p>{store.value}<Mutator store={store} /></p>; }`,
+export function A({ store }) @{ const [, force] = useState(0); useEffect(() => store.subscribe(() => force((x) => x + 1))); <p>{store.value}<Mutator store={store} /></p> }`,
 		);
 		const root = mount(A, { store: createStore(1) });
 		try {
@@ -262,7 +262,7 @@ export function A({ store }) { const [, force] = useState(0); useEffect(() => st
 	it('renders that change through useSyncExternalStore', async () => {
 		const { A } = fixture(
 			`${mutator}
-export function A({ store }) { const value = useSyncExternalStore(store.subscribe, () => store.value, () => 0); return <p>{value}<Mutator store={store} /></p>; }`,
+export function A({ store }) @{ const value = useSyncExternalStore(store.subscribe, () => store.value, () => 0); <p>{value}<Mutator store={store} /></p> }`,
 			true,
 		);
 		const root = mount(A, { store: createStore(1) });
@@ -279,7 +279,7 @@ describe('useSyncExternalStore snapshots', () => {
 	it('loops until the update-depth limit when getSnapshot allocates', async () => {
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const { A } = fixture(
-			`export function A({ store }) { const s = useSyncExternalStore(store.subscribe, () => ({ a: store.value })); return <p>{s.a}</p>; }`,
+			`export function A({ store }) @{ const s = useSyncExternalStore(store.subscribe, () => ({ a: store.value })); <p>{s.a}</p> }`,
 		);
 		const store = createStore(1);
 		let root: ReturnType<typeof mount> | undefined;
@@ -297,7 +297,7 @@ describe('useSyncExternalStore snapshots', () => {
 
 	it('renders a snapshot the store keeps', async () => {
 		const { A } = fixture(
-			`export function A({ store }) { const value = useSyncExternalStore(store.subscribe, () => store.value, () => 0); return <p>{value}</p>; }`,
+			`export function A({ store }) @{ const value = useSyncExternalStore(store.subscribe, () => store.value, () => 0); <p>{value}</p> }`,
 			true,
 		);
 		const store = createStore(1);
@@ -316,7 +316,7 @@ describe('useSyncExternalStore snapshots', () => {
 		'resubscribes an inline subscribe on every render (strong=%s)',
 		async (strong) => {
 			const { A } = fixture(
-				`export function A({ store }) { const [n, setN] = useState(0); const value = useSyncExternalStore((cb) => store.subscribe(cb), () => store.value, () => 0); return <button onClick={() => setN(n + 1)}>{value}{n}</button>; }`,
+				`export function A({ store }) @{ const [n, setN] = useState(0); const value = useSyncExternalStore((cb) => store.subscribe(cb), () => store.value, () => 0); <button onClick={() => setN(n + 1)}>{value}{n}</button> }`,
 				strong,
 			);
 			let subscriptions = 0;
