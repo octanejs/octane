@@ -1,4 +1,5 @@
 import { localUses, portableArguments, scalar } from './local-uses.js';
+import { skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
 
 type SharedInput = (module: string, name: string) => boolean;
@@ -33,25 +34,91 @@ function literalOptions(value: ts.Expression): boolean {
 	return literal(value);
 }
 
+/** The short-circuit behavior of a literal operand, independent of project types. */
+function literalCondition(expr: ts.Expression) {
+	const value = skipWrappers(expr);
+	if (value.kind === ts.SyntaxKind.NullKeyword || ts.isVoidExpression(value)) return 'nullish';
+	if (ts.isStringLiteralLike(value)) return value.text.length ? 'truthy' : 'falsy';
+	if (ts.isNumericLiteral(value)) return Number(value.text) ? 'truthy' : 'falsy';
+	if (value.kind === ts.SyntaxKind.FalseKeyword) return 'falsy';
+	if (
+		value.kind === ts.SyntaxKind.TrueKeyword ||
+		ts.isArrowFunction(value) ||
+		ts.isFunctionExpression(value) ||
+		ts.isClassExpression(value) ||
+		ts.isArrayLiteralExpression(value) ||
+		ts.isObjectLiteralExpression(value)
+	)
+		return 'truthy';
+}
+
+/** A final, defined own property in an inline object prevents its binding default from running. */
+function suppliesBinding(binding: ts.BindingElement) {
+	const pattern = binding.parent;
+	const decl = pattern.parent;
+	// Reading an earlier binding can invoke a getter that mutates the object.
+	if (
+		!ts.isObjectBindingPattern(pattern) ||
+		pattern.elements[0] !== binding ||
+		!ts.isVariableDeclaration(decl) ||
+		!decl.initializer
+	)
+		return false;
+	const source = skipWrappers(decl.initializer);
+	const key = binding.propertyName ?? binding.name;
+	if (
+		!ts.isObjectLiteralExpression(source) ||
+		!(ts.isIdentifier(key) || ts.isStringLiteralLike(key)) ||
+		key.text === '__proto__'
+	)
+		return false;
+	// A later spread or a key we cannot compare may overwrite the value.
+	for (let i = source.properties.length - 1; i >= 0; i--) {
+		const field = source.properties[i];
+		if (!field.name || !(ts.isIdentifier(field.name) || ts.isStringLiteralLike(field.name)))
+			return false;
+		if (field.name.text !== key.text) continue;
+		if (!ts.isPropertyAssignment(field)) return false;
+		const value = skipWrappers(field.initializer);
+		return literal(value) || literalCondition(value) === 'truthy';
+	}
+	return false;
+}
+
 /** Bare SVG default imports can switch from a component to an asset URL for a .tsrx issuer. */
-export function isBareSvgTag(tag: ts.JsxTagNameExpression, checker: ts.TypeChecker): boolean {
+export function isBareSvgTag(
+	tag: ts.JsxTagNameExpression,
+	checker: ts.TypeChecker,
+	imports: Set<ts.Node>,
+): boolean {
+	if (!ts.isIdentifier(tag) || /^[a-z]|-/.test(tag.text)) return false;
 	const seen = new Set<ts.Symbol>();
-	function fromSvg(value: ts.Node): boolean {
-		if (
-			ts.isParenthesizedExpression(value) ||
-			ts.isAsExpression(value) ||
-			ts.isSatisfiesExpression(value) ||
-			ts.isNonNullExpression(value)
-		)
-			return fromSvg(value.expression);
+	function fromSvg(value: ts.Expression): boolean {
+		value = skipWrappers(value);
 		if (ts.isConditionalExpression(value))
 			return fromSvg(value.whenTrue) || fromSvg(value.whenFalse);
+		if (ts.isBinaryExpression(value)) {
+			const op = value.operatorToken.kind;
+			const left = literalCondition(value.left);
+			// A component or asset URL is truthy; the left side of && only tests it.
+			if (op === ts.SyntaxKind.AmpersandAmpersandToken)
+				return (left === undefined || left === 'truthy') && fromSvg(value.right);
+			if (op === ts.SyntaxKind.BarBarToken)
+				return fromSvg(value.left) || (left !== 'truthy' && fromSvg(value.right));
+			if (op === ts.SyntaxKind.QuestionQuestionToken)
+				return (
+					fromSvg(value.left) ||
+					((left === undefined || left === 'nullish') && fromSvg(value.right))
+				);
+		}
 		if (!ts.isIdentifier(value)) return false;
 		const symbol = checker.getSymbolAtLocation(value);
 		if (!symbol || seen.has(symbol)) return false;
 		seen.add(symbol);
 		const d = symbol.declarations?.[0];
 		if (!d) return false;
+		if ((ts.isParameter(d) || ts.isBindingElement(d)) && ts.isIdentifier(d.name) && d.initializer)
+			return !(ts.isBindingElement(d) && suppliesBinding(d)) && fromSvg(d.initializer);
 		if (
 			ts.isVariableDeclaration(d) &&
 			d.initializer &&
@@ -59,14 +126,7 @@ export function isBareSvgTag(tag: ts.JsxTagNameExpression, checker: ts.TypeCheck
 			d.parent.flags & ts.NodeFlags.Const
 		)
 			return fromSvg(d.initializer);
-		const clause = ts.isImportClause(d)
-			? d
-			: ts.isImportSpecifier(d) && !d.isTypeOnly && d.propertyName?.text === 'default'
-				? d.parent.parent
-				: undefined;
-		if (!clause || clause.isTypeOnly) return false;
-		const specifier = clause.parent.moduleSpecifier;
-		return ts.isStringLiteral(specifier) && specifier.text.toLowerCase().endsWith('.svg');
+		return imports.has(d);
 	}
 	return fromSvg(tag);
 }
