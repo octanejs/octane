@@ -207,6 +207,8 @@ export function PlaygroundVersionCombobox(props: PlaygroundVersionComboboxProps)
 		} else if (event.key === 'Escape' && (open || draft !== null)) {
 			event.preventDefault();
 			close();
+			// The list may hold focus; hiding it must not drop focus to the page.
+			input.current?.focus();
 		}
 	};
 
