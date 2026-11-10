@@ -302,6 +302,18 @@ changes such as resizing or scrolling between component commits, have an
 observer or event callback update state to request another commit and
 measurement. Use this hook in the DOM renderer.
 
+By default a snapshot measures at the end of each commit, so its value has
+rendered when `flushSync` returns. Call `setLayoutSnapshotTiming('frame')` once,
+before rendering, to measure every snapshot in the next frame's
+`readLayout` pass instead, together with any other queued
+reads. Changed snapshots then commit in the following `writeLayout` pass, and
+the measurements that commit queues run in a later pass of the same frame.
+`act()` runs the queue, and a ViewTransition update still measures with its
+commit, so the new-state capture includes the settled value. Until the frame,
+the snapshot keeps its previous value, so `flushSync` no longer waits for it.
+`setLayoutSnapshotTiming('commit')` switches back; snapshots still waiting then
+measure with the next commit.
+
 ## Batched layout reads and writes
 
 A layout read after a DOM write makes the browser lay out synchronously. Queue

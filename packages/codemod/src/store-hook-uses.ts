@@ -6,7 +6,32 @@ type ResultCheck = {
 	item: ts.ImportSpecifier;
 	imported: SharedInput;
 	known: Map<ts.Expression, boolean>;
+	descriptors: (elements: ts.JsxSelfClosingElement[]) => boolean;
 };
+
+function literal(value: ts.Expression) {
+	return (
+		ts.isStringLiteralLike(value) ||
+		ts.isNumericLiteral(value) ||
+		ts.isBigIntLiteral(value) ||
+		value.kind === ts.SyntaxKind.TrueKeyword ||
+		value.kind === ts.SyntaxKind.FalseKeyword ||
+		value.kind === ts.SyntaxKind.NullKeyword
+	);
+}
+
+function literalOptions(value: ts.Expression): boolean {
+	if (ts.isArrayLiteralExpression(value)) return value.elements.every(literalOptions);
+	if (ts.isObjectLiteralExpression(value))
+		return value.properties.every(
+			(p) =>
+				ts.isPropertyAssignment(p) &&
+				(ts.isIdentifier(p.name) || ts.isStringLiteral(p.name)) &&
+				p.name.text !== '__proto__' &&
+				literalOptions(p.initializer),
+		);
+	return literal(value);
+}
 
 /** Bare SVG default imports can switch from a component to an asset URL for a .tsrx issuer. */
 export function isBareSvgTag(tag: ts.JsxTagNameExpression, checker: ts.TypeChecker): boolean {
@@ -127,27 +152,22 @@ export function storeHookUses(
 				plainData(d.initializer)
 			);
 		}
-		return (
-			ts.isStringLiteralLike(value) ||
-			ts.isNumericLiteral(value) ||
-			ts.isBigIntLiteral(value) ||
-			value.kind === ts.SyntaxKind.TrueKeyword ||
-			value.kind === ts.SyntaxKind.FalseKeyword ||
-			value.kind === ts.SyntaxKind.NullKeyword
-		);
+		return literal(value);
 	}
 	// A computed key, destructuring default, or intermediate call can evaluate renderer code.
 	// Only the original hook result, its named properties and simple const aliases gain handle inputs.
-	function originalReceiver(value: ts.Expression, check: ResultCheck): boolean {
+	function originalReceiver(value: ts.Expression, check: ResultCheck, direct = false): boolean {
 		if (
 			ts.isParenthesizedExpression(value) ||
 			ts.isNonNullExpression(value) ||
 			ts.isSatisfiesExpression(value)
 		)
+			return originalReceiver(value.expression, check, direct);
+		if (!direct && ts.isPropertyAccessExpression(value))
 			return originalReceiver(value.expression, check);
-		if (ts.isPropertyAccessExpression(value)) return originalReceiver(value.expression, check);
 		if (ts.isCallExpression(value)) {
 			return (
+				(!direct || !value.questionDotToken) &&
 				ts.isIdentifier(value.expression) &&
 				checker.getSymbolAtLocation(value.expression)?.declarations?.[0] === check.item &&
 				value.arguments.every((arg) => plainData(arg) || sharedHandle(arg, check.imported))
@@ -163,7 +183,27 @@ export function storeHookUses(
 			d.end <= value.pos &&
 			ts.isVariableDeclarationList(d.parent) &&
 			!!(d.parent.flags & ts.NodeFlags.Const) &&
-			originalReceiver(d.initializer, check)
+			originalReceiver(d.initializer, check, direct)
+		);
+	}
+	// Only a service read directly from the original store with one verified handle
+	// receives descriptor arguments. Other calls retain the ordinary data checks.
+	function serviceMethod(method: ts.PropertyAccessExpression, check: ResultCheck) {
+		const read = method.expression;
+		const named = (member: ts.PropertyAccessExpression) =>
+			!member.questionDotToken &&
+			ts.isIdentifier(member.name) &&
+			!(member.name.text in Function.prototype) &&
+			member.name.text !== 'prototype';
+		return (
+			named(method) &&
+			ts.isCallExpression(read) &&
+			!read.questionDotToken &&
+			read.arguments.length === 1 &&
+			sharedHandle(read.arguments[0], check.imported) &&
+			ts.isPropertyAccessExpression(read.expression) &&
+			named(read.expression) &&
+			originalReceiver(read.expression.expression, check, true)
 		);
 	}
 	function bound(name: ts.BindingName, check: ResultCheck): boolean {
@@ -227,6 +267,15 @@ export function storeHookUses(
 		if (ts.isCallExpression(p)) {
 			if (p.expression === value) {
 				if (p.arguments.every((arg) => argument(arg))) return safe(p, check);
+				if (
+					!p.questionDotToken &&
+					ts.isPropertyAccessExpression(value) &&
+					p.arguments.some(ts.isJsxSelfClosingElement) &&
+					serviceMethod(value, check) &&
+					p.arguments.every((arg) => ts.isJsxSelfClosingElement(arg) || literalOptions(arg)) &&
+					safe(p, check)
+				)
+					return check.descriptors(p.arguments.filter(ts.isJsxSelfClosingElement));
 				const handle = p.arguments[0];
 				return (
 					ts.isPropertyAccessExpression(value) &&
@@ -251,8 +300,12 @@ export function storeHookUses(
 		}
 		return false;
 	}
-	return (item: ts.ImportSpecifier, imported: SharedInput) => {
-		const check: ResultCheck = { item, imported, known: new Map() };
+	return (
+		item: ts.ImportSpecifier,
+		imported: SharedInput,
+		descriptors: ResultCheck['descriptors'],
+	) => {
+		const check: ResultCheck = { item, imported, known: new Map(), descriptors };
 		const references = uses(item.name);
 		return (
 			references.length > 0 &&
