@@ -11,7 +11,10 @@
       "manual": [
         "src"
       ]
-    }
+    },
+    "strong": [
+      "src"
+    ]
   },
   "description": "Octane DevTools — a TanStack Devtools plugin exposing live Octane runtime diagnostics (component tree, state, profiler).",
   "author": {

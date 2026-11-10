@@ -724,6 +724,63 @@ describe('octane analyze Strong coverage', () => {
 			reactCompat: [],
 		});
 	});
+
+	it('reports what compiler.strongDependencies.require rejects as build errors', async () => {
+		const config = (/** @type {string} */ allow) => ({
+			'octane.config.ts': `export default { compiler: { strong: true, strongDependencies: { require: true, allow: ${allow} } } };\n`,
+		});
+		const files = {
+			'src/App.tsrx':
+				"import { Card } from '@kit/cards';\n" +
+				"import { Clean } from '@kit/clean';\n" +
+				'export function App() @{ <><Card /><Clean /></> }\n',
+			// A plain module is an application module too; a test never reaches a build.
+			'src/cards.ts': "export { Card } from '@kit/cards';\n",
+			'src/App.test.ts': "import { Card } from '@kit/cards';\nexport const card = Card;\n",
+			'node_modules/@kit/cards/package.json': {
+				name: '@kit/cards',
+				peerDependencies: { octane: '*' },
+				exports: './src/Card.tsrx',
+			},
+			'node_modules/@kit/cards/src/Card.tsrx': 'export function Card() @{ <b /> }\n',
+			// Declared Strong in its manifest, with no directive of its own.
+			'node_modules/@kit/clean/package.json': {
+				name: '@kit/clean',
+				peerDependencies: { octane: '*' },
+				exports: './src/Clean.tsrx',
+				octane: { strong: ['src'] },
+			},
+			'node_modules/@kit/clean/src/Clean.tsrx': 'export function Clean() @{ <i /> }\n',
+		};
+
+		const rejected = await run(app({ ...config('[]'), ...files }).root);
+		expect(rejected.exitCode).not.toBe(0);
+		const findings = rejected
+			.json()
+			.findings.filter((/** @type {any} */ finding) => finding.code === 'OCTANE_STRONG_DEPENDENCY');
+		expect(findings).toEqual([
+			expect.objectContaining({
+				file: 'src/App.tsrx',
+				line: 1,
+				column: 22,
+				severity: 'error',
+				message: expect.stringContaining('@kit/cards (src/Card.tsrx)'),
+			}),
+			expect.objectContaining({ file: 'src/cards.ts', line: 1, column: 22 }),
+		]);
+
+		const allowed = await run(app({ ...config("['@kit/cards']"), ...files }).root);
+		expect(allowed.json().findings).toEqual([]);
+		expect(allowed.exitCode).toBe(0);
+
+		// With no views to compile, the plain modules are still checked.
+		const { 'src/App.tsrx': _view, ...barrelOnly } = files;
+		const barrel = await run(app({ ...config('[]'), ...barrelOnly }).root);
+		expect(barrel.exitCode).not.toBe(0);
+		expect(barrel.json().findings).toEqual([
+			expect.objectContaining({ file: 'src/cards.ts', code: 'OCTANE_STRONG_DEPENDENCY' }),
+		]);
+	});
 });
 
 describe('octane analyze Strong migration', () => {

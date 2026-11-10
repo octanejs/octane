@@ -1,7 +1,28 @@
 # Strong dependencies
 
-Status: proposal. Nothing here is implemented except the report in step 1.
-Numbers are measured at `f7b41dcccb`.
+Status: the report, the package declaration (section 1), and the application
+requirement (section 2) are implemented. The website runs with
+`strongDependencies: { require: true, allow: [] }` (#2059). Converting the
+remaining bindings (section 4) is still open. Numbers are measured at
+`f7b41dcccb`.
+
+What shipped differs from the sketch below in three ways:
+
+- **The declaration takes a path list.** `"strong": ["src"]` covers those paths,
+  and `true` covers the package. `@octanejs/tanstack-router`,
+  `@octanejs/tanstack-start`, and `@octanejs/three` list only their Strong
+  modules beside their compatibility entries. Packages declare `src` rather
+  than `true` so that their own tests keep their mode.
+- **The check is per module, not per package.** `require` walks each
+  application module the way `octane analyze --strong-dependencies` does: into
+  other packages, through re-exports, and through every Strong module to the
+  first module that is not Strong. That also covers the same-package case: a
+  declared package's Strong module that imports one of its compatibility
+  modules is rejected. The walk and the report share one implementation in the
+  compiler (`packages/octane/src/compiler/strong-dependencies.js`).
+- **The check runs in the shared compiler `transform`.** Vite, Rspack, and
+  Rsbuild get it from the same place, and every module the walk reads is a
+  watched dependency of the application module.
 
 A Strong application can only promise what its own modules do. The components
 it renders from `@octanejs/*` and other Octane packages compile in whatever mode

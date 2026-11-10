@@ -32,6 +32,7 @@ export function Counter() @{
 		strong: true,
 		directive: false,
 		config: true,
+		package: false,
 	});
 	expect(() => compiler.transform(source, application)).toThrow(
 		/OCTANE_STRONG_RENDER_STATE_UPDATE|useLinkedState/,
@@ -40,6 +41,7 @@ export function Counter() @{
 		strong: false,
 		directive: false,
 		config: false,
+		package: false,
 	});
 	expect(compiler.transform(source, dependency)).not.toBeNull();
 });

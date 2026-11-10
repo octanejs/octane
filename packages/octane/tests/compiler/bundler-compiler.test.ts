@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
 	CLIENT_REFERENCE_MANIFEST_VERSION,
@@ -956,6 +956,27 @@ export function Pair(props) @{ 'use dom bindings'; <section>
 				join(nested, 'package.json'),
 				JSON.stringify({ name: '@example/nested', dependencies: { octane: '*' } }),
 			);
+			// One package declares Strong for `src`, one for the whole package.
+			const declared = join(root, 'packages', 'declared');
+			mkdirSync(declared, { recursive: true });
+			writeFileSync(
+				join(declared, 'package.json'),
+				JSON.stringify({
+					name: '@example/declared',
+					dependencies: { octane: '*' },
+					octane: { strong: ['src'] },
+				}),
+			);
+			const whole = join(root, 'packages', 'whole');
+			mkdirSync(whole, { recursive: true });
+			writeFileSync(
+				join(whole, 'package.json'),
+				JSON.stringify({
+					name: '@example/whole',
+					dependencies: { octane: '*' },
+					octane: { strong: true },
+				}),
+			);
 			const app = createOctaneCompiler({ root, strong: true });
 			const perModule = createOctaneCompiler({ root, strong: false });
 			const hook =
@@ -984,6 +1005,11 @@ export function Pair(props) @{ 'use dom bindings'; <section>
 					false,
 				],
 				[perModule, `'use strong';\n${hook}`, join(root, 'src/use-broken.ts'), true, true, false],
+				[perModule, RENDER_STATE_UPDATE, join(declared, 'src/App.tsrx'), true, false, false, true],
+				[perModule, hook, join(declared, 'src/use-broken.ts'), true, false, false, true],
+				[perModule, RENDER_STATE_UPDATE, join(declared, 'compat/App.tsrx'), false, false, false],
+				[perModule, RENDER_STATE_UPDATE, join(declared, 'src-extra/App.tsrx'), false, false, false],
+				[perModule, RENDER_STATE_UPDATE, join(whole, 'tests/App.tsrx'), true, false, false, true],
 				[
 					perModule,
 					hook.replace('{ const', "{ 'use strong'; const"),
@@ -994,11 +1020,12 @@ export function Pair(props) @{ 'use dom bindings'; <section>
 				],
 			] as const;
 
-			for (const [compiler, source, filename, strong, directive, config] of cases) {
+			for (const [compiler, source, filename, strong, directive, config, declaration] of cases) {
 				expect(compiler.strongModuleStatus(source, filename)).toEqual({
 					strong,
 					directive,
 					config,
+					package: declaration ?? false,
 				});
 				let message = '';
 				try {
@@ -1011,6 +1038,115 @@ export function Pair(props) @{ 'use dom bindings'; <section>
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	it('rejects Strong application imports that reach non-Strong packages under strongDependencies.require', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-strong-require-'));
+		try {
+			const write = (file: string, text: string) => {
+				mkdirSync(dirname(file), { recursive: true });
+				writeFileSync(file, text);
+			};
+			const card = (name: string) => `export function ${name}() @{\n  <div />\n}\n`;
+			write(
+				join(root, 'package.json'),
+				JSON.stringify({ name: 'app', dependencies: { octane: '*' } }),
+			);
+			const kit = join(root, 'node_modules', '@example', 'kit');
+			write(
+				join(kit, 'package.json'),
+				JSON.stringify({
+					name: '@example/kit',
+					exports: './src/index.ts',
+					peerDependencies: { octane: '*' },
+				}),
+			);
+			write(join(kit, 'src/index.ts'), "export { Card } from './Card.tsrx';\n");
+			write(join(kit, 'src/Card.tsrx'), card('Card'));
+			// Strong for `src`, whose Card renders a compatibility module of its own.
+			const split = join(root, 'node_modules', '@example', 'split');
+			write(
+				join(split, 'package.json'),
+				JSON.stringify({
+					name: '@example/split',
+					exports: { '.': './src/Card.tsrx', './clean': './src/Clean.tsrx' },
+					peerDependencies: { octane: '*' },
+					octane: { strong: ['src'] },
+				}),
+			);
+			write(
+				join(split, 'src/Card.tsrx'),
+				"import { Legacy } from '../compat/Legacy.tsrx';\n" + card('Card'),
+			);
+			write(join(split, 'src/Clean.tsrx'), card('Clean'));
+			write(join(split, 'compat/Legacy.tsrx'), card('Legacy'));
+			const plain = join(root, 'node_modules', 'plain');
+			write(join(plain, 'package.json'), JSON.stringify({ name: 'plain', main: 'index.js' }));
+			write(join(plain, 'index.js'), 'export const size = 1;\n');
+
+			const app = (allow: string[] = []) =>
+				createOctaneCompiler({ root, strong: true, strongDependencies: { require: true, allow } });
+			const failure = (compiler: ReturnType<typeof app>, source: string) => {
+				try {
+					compiler.transform(source, join(root, 'src/App.tsrx'));
+					return null;
+				} catch (error) {
+					return error as Error & { code?: string; loc?: { line: number; column: number } };
+				}
+			};
+			const body = card('App');
+
+			const kitError = failure(
+				app(),
+				`import { size } from 'plain';\nimport { Card } from '@example/kit';\n${body}`,
+			);
+			expect(kitError?.code).toBe('OCTANE_STRONG_DEPENDENCY');
+			expect(kitError?.message).toContain('@example/kit (src/Card.tsrx)');
+			expect(kitError?.message).toContain('compiler.strongDependencies.allow');
+			expect(kitError?.loc).toMatchObject({ line: 2, column: 21 });
+			expect(failure(app(['@example/kit']), `import { Card } from '@example/kit';\n${body}`)).toBe(
+				null,
+			);
+			expect(failure(app(), `import type { Card } from '@example/kit';\n${body}`)).toBe(null);
+			// A declared package is checked past its own Strong layer.
+			expect(failure(app(), `import { Card } from '@example/split';\n${body}`)?.message).toContain(
+				'@example/split (compat/Legacy.tsrx)',
+			);
+			expect(failure(app(), `import { Clean } from '@example/split/clean';\n${body}`)).toBe(null);
+			expect(
+				failure(app(), `import { createRoot } from 'octane/react';\n${body}`)?.message,
+			).toContain('octane/react (ReactCompat) boundary');
+			expect(
+				failure(app(['octane/react']), `import { createRoot } from 'octane/react';\n${body}`),
+			).toBe(null);
+			// Without `require`, the same import compiles.
+			expect(() =>
+				createOctaneCompiler({ root, strong: true }).transform(
+					`import { Card } from '@example/kit';\n${body}`,
+					join(root, 'src/App.tsrx'),
+				),
+			).not.toThrow();
+			// The walk's modules are watched, so an edit there re-runs the check.
+			const passed = app(['@example/kit']).transform(
+				`import { Card } from '@example/kit';\n${body}`,
+				join(root, 'src/App.tsrx'),
+			);
+			expect(passed?.dependencies).toContain(realpathSync(join(kit, 'src/Card.tsrx')));
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('validates strongDependencies', () => {
+		expect(() => createOctaneCompiler({ strongDependencies: { require: true } })).toThrow(
+			/needs `strong: true`/,
+		);
+		expect(() =>
+			createOctaneCompiler({ strong: true, strongDependencies: { allow: 'x' as never } }),
+		).toThrow(/array of package names/);
+		expect(() =>
+			createOctaneCompiler({ strong: true, strongDependencies: { require: 'yes' as never } }),
+		).toThrow(/must be a boolean/);
 	});
 
 	it('reports the package that owns a module and whether transform compiles it', () => {

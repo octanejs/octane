@@ -19,7 +19,6 @@ import {
 	writeBaseline,
 } from './strong-coverage.js';
 import { applyFixes, pruneImports } from './fix.js';
-import { findStrongDependencies } from './strong-dependencies.js';
 
 /**
  * @typedef {Object} Finding
@@ -279,7 +278,8 @@ export default defineCommand({
 				"List what Strong modules import from other packages' Octane modules,\n" +
 				'directly or through re-exports, that compiles without Strong mode, by\n' +
 				'package, and the octane/react (ReactCompat) boundaries they reach. A report\n' +
-				'only: it never fails the run.',
+				'only: it never fails the run. compiler.strongDependencies.require turns\n' +
+				'the same findings into OCTANE_STRONG_DEPENDENCY errors.',
 		},
 	},
 
@@ -314,12 +314,15 @@ export default defineCommand({
 		const { policy, reason } = await loadStrongPolicy(project, {
 			required: measureCoverage || reportDependencies,
 		});
-		const modulePackage = policy?.modulePackage ?? null;
-		if (reportDependencies && modulePackage === null) {
+		if (reportDependencies && policy != null && policy.findStrongDependencies === null) {
 			throw new CliError(
-				'The installed octane cannot report which package owns a module. Update octane.',
+				'The installed octane cannot report what Strong modules import. Update octane.',
 			);
 		}
+		// `compiler.strongDependencies.require` fails the build, so analyze
+		// reports the same violations as errors.
+		const requireDependencies =
+			policy?.requireDependencies === true && policy.dependencyViolations !== null;
 		const jsxImportSource = project.tsconfig?.config?.compilerOptions?.jsxImportSource;
 
 		/** @type {Map<string, string>} */
@@ -372,7 +375,7 @@ export default defineCommand({
 			);
 		}
 
-		if (targets.length === 0 && !measureCoverage && !reportDependencies) {
+		if (targets.length === 0 && !measureCoverage && !reportDependencies && !requireDependencies) {
 			ctx.ui.intro('octane analyze');
 			ctx.ui.outro('No Octane modules found.');
 			return { json: { ok: true, analyzed: 0, findings: [] } };
@@ -497,7 +500,7 @@ export default defineCommand({
 		const modules = [];
 		/** @type {Set<string>} */
 		const unmeasured = new Set();
-		if ((measureCoverage || reportDependencies) && policy !== null) {
+		if ((measureCoverage || reportDependencies || requireDependencies) && policy !== null) {
 			for (const absolute of whole ? project.sourceFiles : targets) {
 				const file = projectPath(project.root, absolute);
 				if (file.startsWith('../') || path.isAbsolute(file)) continue;
@@ -580,20 +583,56 @@ export default defineCommand({
 			};
 		}
 
+		if (requireDependencies && policy !== null) {
+			// The build walks every application module, whether or not Octane
+			// compiles it, so a plain barrel or helper counts as well. Test files
+			// never reach an application build, so they are left to their runner.
+			for (const absolute of whole ? project.sourceFiles : targets) {
+				const file = projectPath(project.root, absolute);
+				if (
+					absolute.endsWith('.d.ts') ||
+					TEST_FILE.test(file) ||
+					file.startsWith('../') ||
+					path.isAbsolute(file)
+				) {
+					continue;
+				}
+				let violations;
+				try {
+					const source = read(absolute);
+					if (!statusOf(absolute, source)?.config) continue;
+					violations = policy.dependencyViolations?.(source, absolute) ?? [];
+				} catch {
+					// Unreadable or unparseable: reported above in the module's own terms.
+					continue;
+				}
+				for (const violation of violations) {
+					findings.push({
+						file,
+						line: violation.line,
+						column: violation.column + 1,
+						severity: 'error',
+						code: violation.code,
+						message: violation.message,
+						suggestions: [],
+					});
+				}
+			}
+		}
+
 		const selected = input.flags.code?.length
 			? findings.filter((finding) => input.flags.code.includes(finding.code))
 			: findings;
 
 		render(ctx, selected, targets.length);
 
-		/** @type {ReturnType<typeof findStrongDependencies> | undefined} */
+		/** @type {import('./strong-coverage.js').StrongDependencies | undefined} */
 		let strongDependencies;
-		if (reportDependencies && policy !== null && modulePackage !== null) {
-			strongDependencies = findStrongDependencies({
-				roots: modules.filter((module) => module.status.strong).map((module) => module.absolute),
-				status: policy.status,
-				modulePackage,
-				read,
+		if (reportDependencies && policy?.findStrongDependencies) {
+			strongDependencies = policy.findStrongDependencies({
+				roots: modules
+					.filter((module) => module.status.strong && !TEST_FILE.test(module.file))
+					.map((module) => module.absolute),
 				display: (absolute) => projectPath(project.root, absolute),
 			});
 			renderDependencies(ctx, strongDependencies);
@@ -641,6 +680,12 @@ export default defineCommand({
 		};
 	},
 });
+
+/**
+ * A test file, which reaches its runner but never an application build, so
+ * the Strong dependency report and requirement leave it out.
+ */
+const TEST_FILE = /\.(?:test|spec)\.[^/]+$/;
 
 /**
  * Project-relative where that is meaningful, otherwise relative to the invoking
@@ -738,7 +783,7 @@ function renderPreview(ctx, byCode, modules) {
  * Non-Strong dependency modules by package, then the ReactCompat boundaries.
  *
  * @param {import('../../kernel/context.js').Ctx} ctx
- * @param {ReturnType<typeof findStrongDependencies>} report
+ * @param {import('./strong-coverage.js').StrongDependencies} report
  */
 function renderDependencies(ctx, { packages, reactCompat }) {
 	const { colors } = ctx.ui;

@@ -11357,9 +11357,6 @@ importers:
       '@codemirror/view':
         specifier: catalog:default
         version: 6.43.6
-      '@octanejs/base-ui':
-        specifier: workspace:*
-        version: link:../packages/base-ui
       '@octanejs/devtools':
         specifier: workspace:*
         version: link:../packages/devtools

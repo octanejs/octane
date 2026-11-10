@@ -175,6 +175,7 @@ function configSignature(config, strongOverride) {
 		compiler: {
 			renderers: config.compiler.renderers.signature,
 			strong: strongOverride ?? config.compiler.strong,
+			strongDependencies: config.compiler.strongDependencies,
 		},
 	});
 }
@@ -287,6 +288,7 @@ export function pluginOctane(inlineOptions = {}) {
 			const initialConfig = initialLoaded?.config ?? null;
 			assertSupportedHydration(initialConfig);
 			const strong = inlineOptions.strong ?? initialConfig?.compiler.strong;
+			const strongDependencies = initialConfig?.compiler.strongDependencies;
 			const appEnabled = hasRoutes(initialConfig);
 			const buildTargetPlan =
 				initialConfig?.build.target === undefined
@@ -296,6 +298,7 @@ export function pluginOctane(inlineOptions = {}) {
 				? createOctaneCompiler({
 						root,
 						...(strong === undefined ? null : { strong }),
+						...(strongDependencies === undefined ? null : { strongDependencies }),
 					})
 				: null;
 			let currentConfig = initialConfig;
@@ -599,6 +602,7 @@ export function pluginOctane(inlineOptions = {}) {
 							? null
 							: { textTypes: inlineOptions.textTypes }),
 						...(strong === undefined ? null : { strong }),
+						...(strongDependencies === undefined ? null : { strongDependencies }),
 						...(inlineOptions.hmr === undefined ? null : { hmr: inlineOptions.hmr }),
 						...(inlineOptions.profile === undefined
 							? null

@@ -457,6 +457,15 @@ export interface OctaneConfigOptions {
 	compiler?: {
 		/** Assert pure immutable-snapshot renders and reject detectable violations. @default false */
 		strong?: boolean;
+		/**
+		 * What Strong application modules may import from other Octane packages.
+		 * With `require: true` (which needs `strong: true`), an import that reaches
+		 * a module in another package compiling without Strong mode, or an
+		 * `octane/react` boundary, fails the build unless `allow` names its package
+		 * (or `'octane/react'`). Packages declare Strong with `"octane": { "strong": true }`
+		 * or a list of paths in their package.json. @default { require: false, allow: [] }
+		 */
+		strongDependencies?: { require?: boolean; allow?: readonly string[] };
 		renderers?: ExperimentalRendererConfigOptions;
 	};
 	router?: {
@@ -523,6 +532,7 @@ export interface ResolvedOctaneConfig {
 	compiler: {
 		/** @default false */
 		strong: boolean;
+		strongDependencies: { require: boolean; allow: string[] };
 		renderers: ExperimentalResolvedRendererConfig;
 	};
 	router: {
