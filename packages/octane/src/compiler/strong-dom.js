@@ -2,6 +2,7 @@ import { ATTRIBUTE_ALIASES } from '../dom-tables.js';
 import { analyzeStrongHookBindings } from './hook-deps.js';
 import { REF_HOOKS } from './hook-names.js';
 import { createRendererRegionResolver } from './renderer-boundaries.js';
+import { LAYOUT_PROPERTIES } from './strong-fixes.js';
 import { PROMISE_CONTINUATIONS, TIMER_GLOBALS } from './strong-state.js';
 
 export const STRONG_MANAGED_DOM_WRITE = 'OCTANE_STRONG_MANAGED_DOM_WRITE';
@@ -9,6 +10,7 @@ export const STRONG_RAW_HTML_WRITE = 'OCTANE_STRONG_RAW_HTML_WRITE';
 export const STRONG_OWN_MARKUP_QUERY = 'OCTANE_STRONG_OWN_MARKUP_QUERY';
 export const STRONG_LAYOUT_SNAPSHOT_WRITE = 'OCTANE_STRONG_LAYOUT_SNAPSHOT_WRITE';
 export const STRONG_DEFERRED_CURRENT_TARGET = 'OCTANE_STRONG_DEFERRED_CURRENT_TARGET';
+export const STRONG_FORCED_LAYOUT = 'OCTANE_STRONG_FORCED_LAYOUT';
 
 const SKIP_KEYS = new Set([
 	'type',
@@ -53,6 +55,10 @@ const ATTRIBUTE_METHODS = new Set(['setAttribute', 'removeAttribute', 'toggleAtt
 const STYLE_METHODS = new Set(['setProperty', 'removeProperty']);
 // Assigning a scroll offset moves content, so a later geometry read lays out again.
 const SCROLL_PROPERTIES = new Set(['scrollLeft', 'scrollTop']);
+const LAYOUT_METHODS = new Set(['getBoundingClientRect', 'getClientRects']);
+const EXITS = new Set(['ReturnStatement', 'ThrowStatement', 'BreakStatement', 'ContinueStatement']);
+// No write since the last layout.
+const CLEAN = [];
 const QUERY_METHODS = new Set([
 	'getElementById',
 	'getElementsByClassName',
@@ -297,6 +303,13 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 	// Per enclosing function: it runs after the task that created it, or the
 	// statement being visited follows an `await` in it.
 	const late = [];
+	// Layout reads on an element, and per enclosing function the element writes
+	// that no layout has followed yet. Each list is replaced, never mutated, so
+	// a read keeps the one it saw.
+	const reads = [];
+	const dirty = [];
+	// The target of a plain assignment, which is not read.
+	let assigned = null;
 	const boundaries = [];
 	const functions = [];
 	// TSRX row and catch bindings are not scopes in the shared hook analysis.
@@ -539,6 +552,7 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 				boundaries.push(node);
 				functions.push(node);
 				late.push(deferredCallbacks.has(node));
+				dirty.push(CLEAN);
 				try {
 					for (const parameter of node.params) visitPattern(parameter);
 					visit(node.body);
@@ -546,6 +560,7 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 					boundaries.pop();
 					functions.pop();
 					late.pop();
+					dirty.pop();
 				}
 				return;
 			case 'BlockStatement': {
@@ -558,6 +573,53 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 					if (awaits(statement)) late[late.length - 1] = true;
 				}
 				late[late.length - 1] = before;
+				return;
+			}
+			case 'ExpressionStatement': {
+				visit(node.expression);
+				// A read whose value is dropped is a deliberate flush.
+				let value = unwrap(node.expression);
+				if (value?.type === 'UnaryExpression' && value.operator === 'void') {
+					value = unwrap(value.argument);
+				}
+				if (reads.length > 0 && reads.at(-1).node === value) {
+					reads.pop();
+					dirty[dirty.length - 1] = CLEAN;
+				}
+				return;
+			}
+			case 'AwaitExpression':
+			case 'YieldExpression':
+				visit(node.argument);
+				// The browser may lay out before the function resumes.
+				if (dirty.length > 0) dirty[dirty.length - 1] = CLEAN;
+				return;
+			case 'IfStatement':
+			case 'ConditionalExpression': {
+				if (dirty.length === 0) break;
+				visit(node.test);
+				// Only one branch runs, so neither sees the other's writes.
+				const top = dirty.length - 1;
+				const before = dirty[top];
+				visit(node.consequent);
+				const after = exits(node.consequent) ? before : dirty[top];
+				dirty[top] = before;
+				visit(node.alternate);
+				if (exits(node.alternate)) dirty[top] = after;
+				else if (after !== dirty[top]) dirty[top] = [...new Set([...after, ...dirty[top]])];
+				return;
+			}
+			case 'ForStatement':
+			case 'WhileStatement':
+			case 'DoWhileStatement': {
+				// The initializer runs once, so the body's writes never precede it.
+				visit(node.init);
+				const first = reads.length;
+				const before = dirty.at(-1);
+				visit(node.test);
+				visit(node.update);
+				visit(node.body);
+				repeatWrites(first, before);
 				return;
 			}
 			case 'VariableDeclarator': {
@@ -671,6 +733,7 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 				return;
 			case 'MemberExpression': {
 				if (refCurrent(node) !== null) return;
+				if (node !== assigned) recordRead(node, node, LAYOUT_PROPERTIES);
 				if (propertyName(node) === 'currentTarget') {
 					const object = unwrap(node.object);
 					const binding = object?.type === 'Identifier' ? bindingOf(object) : null;
@@ -692,27 +755,39 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 				if (node.left.type === 'ObjectPattern' || node.left.type === 'ArrayPattern') {
 					visitPattern(node.left);
 				} else {
-					recordWrite(node.left, node.left, null);
+					const write = recordWrite(node.left, node.left, null);
+					if (node.operator === '=') assigned = unwrap(node.left);
 					visitWriteTarget(node.left);
+					visit(node.right);
+					soil(write);
+					return;
 				}
 				visit(node.right);
 				return;
 			}
-			case 'UpdateExpression':
-				recordWrite(node.argument, node.argument, null);
+			case 'UpdateExpression': {
+				const write = recordWrite(node.argument, node.argument, null);
 				visitWriteTarget(node.argument);
+				soil(write);
 				return;
+			}
 			case 'UnaryExpression':
 				if (node.operator === 'delete') visitWriteTarget(node.argument);
 				else visit(node.argument);
 				return;
 			case 'ForInStatement':
-			case 'ForOfStatement':
+			case 'ForOfStatement': {
+				// The iterated value is read once, before the first pass. The
+				// binding, with any defaults it evaluates, is assigned on every pass.
+				visit(node.right);
+				const first = reads.length;
+				const before = dirty.at(-1);
 				if (node.left.type === 'VariableDeclaration') visit(node.left);
 				else visitPattern(node.left);
-				visit(node.right);
 				visit(node.body);
+				repeatWrites(first, before);
 				return;
+			}
 			case 'CallExpression': {
 				const callee = unwrap(node.callee);
 				if (callNames.get(node) === 'useLayoutSnapshot') {
@@ -725,8 +800,10 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 						if (FUNCTIONS.has(callback?.type)) deferredCallbacks.add(callback);
 					}
 				}
+				let write = null;
 				if (callee?.type === 'MemberExpression') {
-					recordWrite(callee, callee, node.arguments);
+					recordRead(node, callee, LAYOUT_METHODS);
+					write = recordWrite(callee, callee, node.arguments);
 					const method = propertyName(callee);
 					const text = QUERY_METHODS.has(method) ? staticString(node.arguments[0]) : null;
 					if (text !== null && documentValue(callee.object)) {
@@ -736,6 +813,7 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 				}
 				visit(node.callee);
 				visit(node.arguments);
+				soil(write);
 				return;
 			}
 		}
@@ -796,9 +874,46 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 		return expression?.type === 'AwaitExpression';
 	}
 
+	function recordRead(node, member, names) {
+		if (dirty.length === 0 || !names.has(propertyName(member))) return;
+		const source = elementSource(member.object);
+		if (source === null) return;
+		reads.push({
+			node,
+			source,
+			name: names === LAYOUT_METHODS ? `${propertyName(member)}()` : propertyName(member),
+			function: functions.at(-1),
+			causes: dirty.at(-1),
+			// Later entries come from a loop running its body again.
+			seen: dirty.at(-1).length,
+		});
+	}
+
+	// The write has happened: its operands, which may read, are evaluated first.
+	function soil(write) {
+		if (write !== null && dirty.length > 0) dirty[dirty.length - 1] = [...dirty.at(-1), write];
+	}
+
+	// A loop body runs again, so its reads also follow the writes it leaves behind.
+	function repeatWrites(first, before) {
+		if (before === undefined) return;
+		const added = dirty.at(-1).filter((write) => !before.includes(write));
+		if (added.length === 0) return;
+		for (let index = first; index < reads.length; index++) {
+			const read = reads[index];
+			if (read.function !== functions.at(-1)) continue;
+			read.causes = [...read.causes, ...added];
+		}
+	}
+
+	function exits(statement) {
+		if (statement?.type === 'BlockStatement') statement = statement.body.at(-1);
+		return EXITS.has(statement?.type);
+	}
+
 	function recordWrite(target, reportNode, args) {
 		const access = elementAccess(target);
-		if (access === null || access.path.length === 0) return;
+		if (access === null || access.path.length === 0) return null;
 		const [first, second] = access.path;
 		let kind = null;
 		let name = null;
@@ -832,16 +947,17 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 			kind = 'style-property';
 			if (name !== null) name = styleKey(name);
 		}
-		if (kind !== null) {
-			writes.push({
-				source: access.source,
-				kind,
-				name,
-				node: reportNode,
-				spelling: access.path,
-				function: functions.at(-1),
-			});
-		}
+		if (kind === null) return null;
+		const write = {
+			source: access.source,
+			kind,
+			name,
+			node: reportNode,
+			spelling: access.path,
+			function: functions.at(-1),
+		};
+		writes.push(write);
+		return write;
 	}
 
 	// Refs, their aliases and a query's markup all belong to one top-level
@@ -861,7 +977,7 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 		}
 	}
 
-	function report(code, node, message) {
+	function report(code, node, message, severity = 'error') {
 		if (reported.has(node)) return;
 		reported.add(node);
 		const position = (edge) => ({
@@ -871,7 +987,7 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 		});
 		diagnostics.push({
 			code,
-			severity: 'error',
+			severity,
 			filename,
 			start: position('start'),
 			end: position('end'),
@@ -949,16 +1065,35 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 		}
 	}
 
+	// Any rendered element: a write dirties layout whoever owns the property.
+	function rendered({ element, ref }) {
+		return element !== undefined || (!ref.escaped && ref.attachments.length > 0);
+	}
+
 	// After the ownership errors, which name the replacement for the same write.
 	for (const write of writes) {
 		if (!measurements.has(write.function)) continue;
-		// Any rendered element counts here: the write dirties layout whoever owns the property.
-		const { element, ref } = write.source;
-		if (element === undefined && (ref.escaped || ref.attachments.length === 0)) continue;
+		if (!rendered(write.source)) continue;
 		report(
 			STRONG_LAYOUT_SNAPSHOT_WRITE,
 			write.node,
 			`Strong mode does not allow \`${write.spelling.join('.')}\` inside a useLayoutSnapshot measurement. Octane runs the queued measurements together so the browser lays out once, and a DOM write between them makes every later read lay out again. Return the measurement only. Render the value from the snapshot, or move the write to useLayoutEffect.`,
+		);
+	}
+
+	for (const read of reads) {
+		// A write in a measurement is already an error.
+		if (measurements.has(read.function) || !rendered(read.source)) continue;
+		const write = read.causes.find((cause) => rendered(cause.source));
+		if (write === undefined) continue;
+		const spelling = write.spelling.join('.');
+		report(
+			STRONG_FORCED_LAYOUT,
+			read.node,
+			read.causes.indexOf(write) >= read.seen
+				? `\`${read.name}\` reads layout in a loop that also writes \`${spelling}\`, so the browser lays out again on every pass. Read every value in one loop, then write in a second.`
+				: `\`${read.name}\` reads layout after the \`${spelling}\` write in the same function, so the browser lays out synchronously for it. If the value does not depend on that write, read it first.`,
+			'hint',
 		);
 	}
 
