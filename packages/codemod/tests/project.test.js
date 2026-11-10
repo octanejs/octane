@@ -2115,8 +2115,33 @@ export function Greeting({ count }: { count: number }) {
 			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
 		);
 	});
+	it('forwards a formatted fallback past unrelated prop reads to a native field', async () => {
+		const root = setup({
+			'src/Field.tsx': `export function Field({busy, ...props}) {
+				if (props.disabled) return <div data-tone={props['tone']}><input {...props}/></div>;
+				return <input disabled={busy} {...props}/>;
+			}`,
+			'src/Greeting.tsx': `import {Field} from './Field'; import {useIntl} from 'react-intl';
+			export function Page() { const intl=useIntl(); return <Field placeholder={intl.formatMessage({id:'caption'}, {count: 2}) || 'Untitled'}/>; }`,
+			'src/Getter.tsx': `
+			import {Field} from './Field'; import {useIntl} from 'react-intl';
+			Object.defineProperty(Object.prototype, 'disabled', {get(){ observe(this.placeholder); return true; }});
+			export function Page() { return <Field placeholder={useIntl().formatMessage({id:'caption'})}/>; }`,
+		});
+		const { files } = await runCodemod(
+			['src/Greeting.tsx', 'src/Getter.tsx', 'src/Field.tsx'].map((name) => path.join(root, name)),
+			{ root, write: false, strong: true, projectTypes: false },
+		);
+		const page = files.find((f) => f.file === 'src/Greeting.tsx');
+		expect(files.find((f) => f.file === 'src/Getter.tsx').notes).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+		expect(page.rules['react-intl']).toBe(1);
+		expect([...page.notes, ...page.diagnostics].filter((n) => n.severity === 'error')).toEqual([]);
+	});
 	it('keeps the formatter diagnostic when a wrapper may observe or render its raw value', async () => {
 		const wrappers = [
+			'function Label({caption}) { return <div>{caption ?? "fallback"}</div>; }',
 			'function Label({caption}) { inspect(caption); return <div title={caption}/>; }',
 			'function Label({caption:safe,caption:live}) { return <div title={safe}>{live}</div>; }',
 			'function Label({caption}) { return <div title={caption}>{caption}</div>; }',
@@ -2128,14 +2153,24 @@ export function Greeting({ count }: { count: number }) {
 			'function Label({caption}) { observe(arguments[0]); return <div title={caption}/>; }',
 			'function Label({caption}) { return <div title={caption}/>; } Label=other;',
 			'function Label({caption}) { return <div title={caption}/>; } eval("Label=other");',
+		];
+		const bagWrappers = [
+			`Object.defineProperty(Object.prototype, 'busy', {get(){ observe(this.title); return true; }});
+			function Label(props) { if (props.busy) return null; return <input {...props}/>; }`,
+			'function Label(props) { props.observe(); return <input {...props}/>; }',
+			'function Label(props) { if (props.mode) observe(props); return <input {...props}/>; }',
+			'function Label(props) { if (props[key]) return null; return <input {...props}/>; }',
 			'function Label({...rest}) { return <div {...rest} title="overridden"/>; }',
 			'function Label({...rest}) { return <div {...rest} {...unknown}/>; }',
 		];
 		const entries = Object.fromEntries(
-			wrappers.map((wrapper, i) => [
+			[
+				...wrappers.map((wrapper) => [wrapper, 'caption']),
+				...bagWrappers.map((wrapper) => [wrapper, 'title']),
+			].map(([wrapper, prop], i) => [
 				`src/Test${i}.tsx`,
 				`import {useIntl} from 'react-intl'; ${wrapper}
-			export function App(){const intl=useIntl(); return <Label ${i >= wrappers.length - 2 ? 'title' : 'caption'}={intl.formatMessage({id:'message'})}/>;}`,
+			export function App(){const intl=useIntl(); return <Label ${prop}={intl.formatMessage({id:'message'}) ?? 'Untitled'}/>;}`,
 			]),
 		);
 		for (const [i, props] of [

@@ -107,8 +107,17 @@ export async function runCodemod(
 	const renamed = renamedImports(root, config, renames);
 	const resolveRename = (from: string, specifier: string) =>
 		renamed(from, specifier)?.specifier ?? null;
-	const propChecks = new Map<string, (name: string, prop: string) => boolean>();
-	function forwardedText(from: string, specifier: string, name: string, prop: string) {
+	const propChecks = new Map<
+		string,
+		(name: string, prop: string, ordinaryCaller?: boolean) => boolean
+	>();
+	function forwardedText(
+		from: string,
+		specifier: string,
+		name: string,
+		prop: string,
+		ordinaryCaller?: boolean,
+	) {
 		const match = renamed(from, specifier);
 		if (!match || (!specifier.startsWith('.') && match.specifier.startsWith('.'))) return false;
 		const selected = match.file;
@@ -117,7 +126,7 @@ export async function runCodemod(
 			inspect = textPropsOf(selected);
 			propChecks.set(selected, inspect);
 		}
-		return inspect(name, prop);
+		return inspect(name, prop, ordinaryCaller);
 	}
 
 	// resolveRename returns only an on-disk source that actually won import resolution.
@@ -357,7 +366,8 @@ export async function runCodemod(
 				captureEffectReceivers,
 				target,
 				reactIntlAdapter: intl,
-				forwardedText: (module, name, prop) => forwardedText(file, module, name, prop),
+				forwardedText: (module, name, prop, ordinaryCaller) =>
+					forwardedText(file, module, name, prop, ordinaryCaller),
 				resolveStoreHook,
 				strong,
 				strictNullChecks: strictConfig !== null,
@@ -831,7 +841,9 @@ function renamedImports(
 
 /** Read the selected implementation only when a localized prop needs it. TS may prefer a
  * .tsx source even when the runtime can load a separate .js sibling or directory entry. */
-function textPropsOf(file: string): (name: string, prop: string) => boolean {
+function textPropsOf(
+	file: string,
+): (name: string, prop: string, ordinaryCaller?: boolean) => boolean {
 	const stem = file.slice(0, -path.extname(file).length);
 	const dir = path.dirname(stem);
 	const stems = path.basename(stem) === 'index' ? [stem, dir] : [stem, path.join(stem, 'index')];
@@ -848,7 +860,7 @@ function textPropsOf(file: string): (name: string, prop: string) => boolean {
 	const module = checker.getSymbolAtLocation(sf);
 	const names = module && new Map(checker.getExportsOfModule(module).map((s) => [s.name, s]));
 	const accepts = forwardedTextProps(sf, checker);
-	return (name, prop) => accepts(names?.get(name), prop);
+	return (name, prop, ordinaryCaller) => accepts(names?.get(name), prop, ordinaryCaller);
 }
 
 /** Which names each module exports as a context, following `export … from`. */

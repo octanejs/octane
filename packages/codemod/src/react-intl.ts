@@ -1,4 +1,4 @@
-import { forwardedTextProps } from './forwarded-text.js';
+import { forwardedTextProps, hasPrototypeAccess } from './forwarded-text.js';
 import type { TransformOptions } from './types.js';
 import { localUses, portableArguments, scalar } from './local-uses.js';
 import ts from 'typescript';
@@ -49,7 +49,8 @@ export function intlImports(
 	const selected = new Set<ts.ImportSpecifier>();
 	if (!candidates.length) return selected;
 	const uses = localUses(file, checker);
-	const forwards = forwardedTextProps(file, checker, uses);
+	const ordinaryCaller = !hasPrototypeAccess(file);
+	const forwards = forwardedTextProps(file, checker, uses, ordinaryCaller);
 	// Even without substitution values a provider can format rich text into React elements.
 	// Follow const aliases only when every consumer explicitly coerces or compares the result.
 	const localSinks = new Map<ts.Expression, boolean>();
@@ -93,14 +94,21 @@ export function intlImports(
 		if (ts.isConditionalExpression(use))
 			return use.condition === value || textSink(use, allowForwarding);
 		if (ts.isBinaryExpression(use)) {
+			const op = use.operatorToken.kind;
+			if (
+				op === ts.SyntaxKind.AmpersandAmpersandToken ||
+				op === ts.SyntaxKind.BarBarToken ||
+				op === ts.SyntaxKind.QuestionQuestionToken
+			)
+				return textSink(use, allowForwarding);
 			return (
 				[
 					ts.SyntaxKind.EqualsEqualsEqualsToken,
 					ts.SyntaxKind.ExclamationEqualsEqualsToken,
 					ts.SyntaxKind.EqualsEqualsToken,
 					ts.SyntaxKind.ExclamationEqualsToken,
-				].includes(use.operatorToken.kind) ||
-				(use.operatorToken.kind === ts.SyntaxKind.PlusToken &&
+				].includes(op) ||
+				(op === ts.SyntaxKind.PlusToken &&
 					(ts.isStringLiteralLike(use.left) || ts.isStringLiteralLike(use.right)))
 			);
 		}
@@ -140,7 +148,7 @@ export function intlImports(
 				const module = decl.parent.parent.parent.moduleSpecifier;
 				return (
 					ts.isStringLiteral(module) &&
-					!!importedText?.(module.text, (decl.propertyName ?? decl.name).text, prop)
+					!!importedText?.(module.text, (decl.propertyName ?? decl.name).text, prop, ordinaryCaller)
 				);
 			}
 			return forwards(symbol, prop);
@@ -222,7 +230,7 @@ export function intlImports(
 			call.arguments.some(ts.isSpreadElement) ||
 			!textSink(
 				call,
-				call.arguments.length === 1 &&
+				call.arguments.length <= 2 &&
 					ts.isObjectLiteralExpression(call.arguments[0]) &&
 					call.arguments[0].properties.every(
 						(field) =>
