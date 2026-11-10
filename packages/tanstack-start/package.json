@@ -12,7 +12,10 @@
       "manual": [
         "src"
       ]
-    }
+    },
+    "strong": [
+      "src/compiled"
+    ]
   },
   "author": {
     "name": "Dominic Gannaway",

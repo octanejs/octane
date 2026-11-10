@@ -945,4 +945,12 @@ A module listed in `octane-strong-baseline.json` is now Strong, no longer exists
 
 **Replacement.** Run `octane analyze --strong-baseline update`.
 
+<h4 id="octane-strong-dependency">
+	<code>OCTANE_STRONG_DEPENDENCY</code>
+</h4>
+
+With `compiler.strongDependencies.require`, an application import reaches a module in another Octane package that compiles without Strong mode, directly, through re-exports, or behind that package's own Strong modules, or it reaches an `octane/react` (ReactCompat) boundary. The build fails at the import, and `octane analyze` reports the same error.
+
+**Replacement.** Make the package Strong and declare it with `"octane": { "strong": true }` or a list of its Strong paths in its package.json, or name the package (or `"octane/react"`) in `compiler.strongDependencies.allow`.
+
 {/* strong-diagnostics:reference:end */}

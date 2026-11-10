@@ -607,6 +607,7 @@ Coverage:
 
 - `OCTANE_STRONG_COVERAGE_REGRESSION`: Add `"use strong"` before its imports, or enable `compiler.strong`, and fix what Strong then reports.
 - `OCTANE_STRONG_COVERAGE_STALE`: Run `octane analyze --strong-baseline update`.
+- `OCTANE_STRONG_DEPENDENCY`: Make the package Strong and declare it with `"octane": { "strong": true }` or a list of its Strong paths in its package.json, or name the package (or `"octane/react"`) in `compiler.strongDependencies.allow`.
 
 Each code is documented at https://octanejs.dev/docs/strong-mode#<code-in-kebab-case>.
 

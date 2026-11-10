@@ -12,7 +12,15 @@
       "manual": [
         "src"
       ]
-    }
+    },
+    "strong": [
+      "src/core/hooks.ts",
+      "src/core/loop.ts",
+      "src/core/root.ts",
+      "src/core/store.ts",
+      "src/web/Canvas.tsrx",
+      "src/web/events.ts"
+    ]
   },
   "description": "React Three Fiber-compatible web bindings for Octane's universal renderer.",
   "author": {

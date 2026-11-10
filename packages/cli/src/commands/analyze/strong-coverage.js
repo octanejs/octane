@@ -22,18 +22,26 @@ export const REGRESSION = 'OCTANE_STRONG_COVERAGE_REGRESSION';
 export const STALE = 'OCTANE_STRONG_COVERAGE_STALE';
 
 /**
- * @typedef {{ strong: boolean, directive: boolean, config: boolean }} StrongStatus
+ * @typedef {{ strong: boolean, directive: boolean, config: boolean, package?: boolean }} StrongStatus
  *
  * @typedef {Object} StrongPolicy
  * @property {boolean} configured `compiler.strong` from octane.config
  * @property {(source: string, absolute: string) => StrongStatus} status
  * @property {(source: string) => string | null} jsxPragma the leading
  *   `@jsxImportSource` module, read by the compiler's own scanner
- * @property {((source: string, absolute: string) => ModulePackage) | null} modulePackage
- *   the package that owns a module and whether Octane compiles it; `null`
- *   when the installed octane predates the answer
+ * @property {((input: { roots: string[], display: (absolute: string) => string }) => StrongDependencies) | null} findStrongDependencies
+ *   what Strong modules reach in other packages that is not Strong, as the
+ *   compiler decides it; `null` when the installed octane predates the answer
+ * @property {boolean} requireDependencies `compiler.strongDependencies.require`
+ * @property {((source: string, absolute: string) => DependencyViolation[]) | null} dependencyViolations
+ *   what that requirement rejects in one module
  *
- * @typedef {{ name: string | null, root: string | null, compiled: boolean }} ModulePackage
+ * @typedef {{
+ *   packages: { name: string, modules: string[], importers: string[] }[],
+ *   reactCompat: { package: string, module: string, importers: string[] }[],
+ * }} StrongDependencies
+ *
+ * @typedef {{ code: string, line: number, column: number, message: string }} DependencyViolation
  *
  * @typedef {Object} CoverageModule
  * @property {string} file project-relative, `/`-separated
@@ -73,6 +81,8 @@ export async function loadStrongPolicy(project, { required }) {
 	};
 
 	let configured = false;
+	/** @type {{ require?: boolean, allow?: string[] } | undefined} */
+	let strongDependencies;
 	if (project.octaneConfigPath !== null) {
 		const file = path.basename(project.octaneConfigPath);
 		const load = await resolveConfigLoader(project.root);
@@ -82,7 +92,9 @@ export async function loadStrongPolicy(project, { required }) {
 			);
 		}
 		try {
-			configured = (await load(project.root)).compiler?.strong === true;
+			const { compiler } = await load(project.root);
+			configured = compiler?.strong === true;
+			strongDependencies = compiler?.strongDependencies;
 		} catch (error) {
 			return unavailable(
 				`${file} failed to load, so its compiler.strong setting is unknown: ${
@@ -101,7 +113,11 @@ export async function loadStrongPolicy(project, { required }) {
 	} catch {
 		return unavailable('Could not resolve `octane/compiler/bundler` from this project.');
 	}
-	const compiler = bundler.createOctaneCompiler?.({ root: project.root, strong: configured });
+	const compiler = bundler.createOctaneCompiler?.({
+		root: project.root,
+		strong: configured,
+		...(strongDependencies === undefined ? null : { strongDependencies }),
+	});
 	if (
 		typeof compiler?.strongModuleStatus !== 'function' ||
 		typeof bundler.findLeadingJsxImportSourcePragma !== 'function'
@@ -116,9 +132,14 @@ export async function loadStrongPolicy(project, { required }) {
 			configured,
 			status: (source, absolute) => compiler.strongModuleStatus(source, absolute),
 			jsxPragma: bundler.findLeadingJsxImportSourcePragma,
-			modulePackage:
-				typeof compiler.modulePackage === 'function'
-					? (source, absolute) => compiler.modulePackage(source, absolute)
+			findStrongDependencies:
+				typeof compiler.findStrongDependencies === 'function'
+					? (input) => compiler.findStrongDependencies(input)
+					: null,
+			requireDependencies: strongDependencies?.require === true,
+			dependencyViolations:
+				typeof compiler.strongDependencyViolations === 'function'
+					? (source, absolute) => compiler.strongDependencyViolations(source, absolute)
 					: null,
 		},
 	};

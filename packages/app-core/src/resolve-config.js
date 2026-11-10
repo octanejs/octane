@@ -182,6 +182,34 @@ export function resolveOctaneConfig(raw, options = {}) {
 	if (raw.compiler?.strong !== undefined && typeof raw.compiler.strong !== 'boolean') {
 		throw new Error('[octane] compiler.strong must be a boolean when provided.');
 	}
+	const strongDependencies = raw.compiler?.strongDependencies;
+	if (strongDependencies !== undefined) {
+		if (
+			!strongDependencies ||
+			typeof strongDependencies !== 'object' ||
+			Array.isArray(strongDependencies)
+		) {
+			throw new Error('[octane] compiler.strongDependencies must be an object when provided.');
+		}
+		if (
+			strongDependencies.require !== undefined &&
+			typeof strongDependencies.require !== 'boolean'
+		) {
+			throw new Error('[octane] compiler.strongDependencies.require must be a boolean.');
+		}
+		if (
+			strongDependencies.allow !== undefined &&
+			(!Array.isArray(strongDependencies.allow) ||
+				strongDependencies.allow.some((name) => typeof name !== 'string'))
+		) {
+			throw new Error(
+				'[octane] compiler.strongDependencies.allow must be an array of package names.',
+			);
+		}
+		if (strongDependencies.require === true && raw.compiler?.strong !== true) {
+			throw new Error('[octane] compiler.strongDependencies.require needs compiler.strong: true.');
+		}
+	}
 
 	if (raw.router?.routes !== undefined && !Array.isArray(raw.router.routes)) {
 		throw new Error('[octane] router.routes must be an array.');
@@ -265,6 +293,10 @@ export function resolveOctaneConfig(raw, options = {}) {
 		adapter: raw.adapter,
 		compiler: {
 			strong: raw.compiler?.strong ?? false,
+			strongDependencies: {
+				require: strongDependencies?.require ?? false,
+				allow: [...(strongDependencies?.allow ?? [])],
+			},
 			// App config declares no Valdi target, so its normalized form has none.
 			renderers: /** @type {ResolvedOctaneConfig['compiler']['renderers']} */ (
 				normalizeRendererConfig(raw.compiler?.renderers)
