@@ -8,8 +8,10 @@
  * The compiler appends each call site's hook slot as the last argument. The
  * hooks forward it to the one slot-keyed hook each of them calls.
  */
-import { createContext, createElement, use, useCallback, useSyncExternalStore } from 'octane';
-import type { OctaneNode } from 'octane';
+// Relative, like the package's other entries, so the built entry resolves the
+// same runtime module rather than the package's own source export.
+import { createContext, createElement, use, useCallback, useSyncExternalStore } from '../index.js';
+import type { OctaneNode } from '../index.js';
 import type { Read, Write } from './contracts.js';
 import type { DataStore, ReadSnapshot } from './store.js';
 
