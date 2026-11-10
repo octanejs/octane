@@ -72,8 +72,11 @@ function describe(request: DataRequest): string {
 	return `${request.kind} ${request.name}${refreshed}`;
 }
 
-/** `namespace` keeps parallel browser tests on separate server data. */
-export function openSession(account: Account, namespace = ''): Session {
+/**
+ * A browser session. `namespace` keeps parallel browser tests on separate
+ * server data; `seed` is the server render's data, so hydration loads nothing.
+ */
+export function openSession(account: Account, namespace = '', seed?: string | null): Session {
 	const http = httpTransport('/data', { headers: { 'x-shelf-account': namespace + account } });
 	const faults: Faults = { dropNextReply: false, offline: false };
 	const network = externalValue<readonly NetworkEntry[]>([]);
@@ -88,13 +91,21 @@ export function openSession(account: Account, namespace = ''): Session {
 		}
 		return reply;
 	};
-	return {
-		account,
-		store: createDataStore({ transport }),
-		faults,
-		network,
-		outcome: externalValue<Outcome>({ kind: 'idle' }),
-	};
+	return sessionFor(account, createDataStore({ transport, seed }), faults, network);
+}
+
+/** A server render's session, around a store that calls the data handler in process. */
+export function serverSession(account: Account, store: DataStore): Session {
+	return sessionFor(account, store, { dropNextReply: false, offline: false }, externalValue([]));
+}
+
+function sessionFor(
+	account: Account,
+	store: DataStore,
+	faults: Faults,
+	network: ExternalValue<readonly NetworkEntry[]>,
+): Session {
+	return { account, store, faults, network, outcome: externalValue<Outcome>({ kind: 'idle' }) };
 }
 
 const MESSAGES: Record<string, string> = {
@@ -153,8 +164,8 @@ export function outcomeText(outcome: Outcome): string {
 	}
 }
 
-/** The URL's namespace, so browser tests can isolate their server data. */
-export function namespaceFromLocation(): string {
-	const value = new URLSearchParams(location.search).get('ns');
+/** A URL's namespace, so browser tests can isolate their server data. */
+export function namespaceFrom(search: string): string {
+	const value = new URLSearchParams(search).get('ns');
 	return value ? `${value}:` : '';
 }

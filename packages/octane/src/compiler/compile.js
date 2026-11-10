@@ -42,6 +42,7 @@ import {
 	TSRX_ERRORS,
 	withDeferredImports,
 } from '@tsrx/core';
+import { SERVER_RUNTIME_REQUESTS } from './server-runtime-requests.js';
 import { parseModule } from '#octane/compiler-parser';
 import {
 	collectServerFunctionNodes,
@@ -14626,18 +14627,13 @@ function compileServer(
 			(node.type === 'ImportDeclaration' ||
 				node.type === 'ExportNamedDeclaration' ||
 				node.type === 'ExportAllDeclaration') &&
-			(node.source?.value === 'octane/signals/client' || node.source?.value === 'octane/react')
+			node.source?.value !== 'octane' &&
+			Object.hasOwn(SERVER_RUNTIME_REQUESTS, node.source?.value)
 		) {
+			const target = SERVER_RUNTIME_REQUESTS[node.source.value];
 			bodyNodes.push({
 				...node,
-				source: {
-					...node.source,
-					value:
-						node.source.value === 'octane/react' ? 'octane/react/server' : 'octane/signals/server',
-					raw: JSON.stringify(
-						node.source.value === 'octane/react' ? 'octane/react/server' : 'octane/signals/server',
-					),
-				},
+				source: { ...node.source, value: target, raw: JSON.stringify(target) },
 			});
 		} else {
 			const fnName = node.id?.name || node.declaration?.id?.name || 'module';

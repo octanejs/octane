@@ -99,6 +99,7 @@
     "./data/server": "./src/data/server.ts",
     "./data/react": "./src/data/react.ts",
     "./data/octane": "./src/data/octane.ts",
+    "./data/octane/server": "./src/data/octane.server.ts",
     "./signals": "./src/signals/index.ts",
     "./signals/client": "./src/signals/client.ts",
     "./signals/server": "./src/signals/server.ts",
@@ -332,6 +333,11 @@
         "types": "./dist/data/octane.d.ts",
         "node": "./dist/node/data/octane.js",
         "default": "./dist/data/octane.js"
+      },
+      "./data/octane/server": {
+        "types": "./dist/data/octane.server.d.ts",
+        "node": "./dist/node/data/octane.server.js",
+        "default": "./dist/data/octane.server.js"
       },
       "./data/react": {
         "types": "./dist/data/react.d.ts",

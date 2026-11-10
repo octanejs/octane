@@ -5,9 +5,9 @@ contracts and one server:
 
 | Page | Renderer | Binding |
 | --- | --- | --- |
-| `/` | Octane (`.tsrx`) | `octane/data/octane` |
-| `/react.html` | React 19 (`.tsx`) | `octane/data/react` |
-| `/mixed.html` | Octane, hosting a React island through `ReactCompat` | both, sharing one store |
+| `/` | Octane (`.tsrx`), server-rendered | `octane/data/octane` |
+| `/react.html` | React 19 (`.tsx`), server-rendered | `octane/data/react` |
+| `/mixed.html` | Octane, hosting a React island through `ReactCompat`, browser-rendered | both, sharing one store |
 
 The Octane and React pages differ only in their view code and binding import.
 Everything else is shared:
@@ -20,8 +20,16 @@ Everything else is shared:
   a lookup can say whether it landed.
 - [`src/shared/session.ts`](src/shared/session.ts) opens a store per account,
   injects network faults, and settles uncertain writes by receipt lookup.
+- [`src/server/index.ts`](src/server/index.ts) renders a page with its own
+  store, which calls the data handler in process (`handler.transport(request)`)
+  under the page request's account. `store.dehydrate()` goes into the page, and
+  the browser's store starts from it, so hydration loads nothing.
 
 ## What to try
+
+- **Load `/` or `/react.html` with JavaScript turned off.** The shelf and its
+  counts are in the HTML. With JavaScript on, the Network panel stays empty
+  until your first edit: hydration reuses the server's data.
 
 - **Toggle a book.** The checkbox changes before the server replies. The
   Network panel shows one request: the write, with the list and the counts it
@@ -46,5 +54,6 @@ pnpm --filter shelf-example typecheck
 pnpm --filter shelf-example test:e2e   # production build and preview
 ```
 
-The development and preview servers both serve the data handler at `/data`
-through a small Vite plugin in [`vite.config.ts`](vite.config.ts).
+A small Vite plugin in [`vite.config.ts`](vite.config.ts) serves `/data` and
+renders the two server-rendered pages: from source through Vite's SSR loader in
+development, and from `dist/server` in preview.
