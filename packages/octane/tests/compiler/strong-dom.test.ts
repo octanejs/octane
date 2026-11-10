@@ -6,6 +6,7 @@ import { compileToVolarMappings } from '../../src/compiler/volar.js';
 const MANAGED_DOM_WRITE = 'OCTANE_STRONG_MANAGED_DOM_WRITE';
 const RAW_HTML_WRITE = 'OCTANE_STRONG_RAW_HTML_WRITE';
 const OWN_MARKUP_QUERY = 'OCTANE_STRONG_OWN_MARKUP_QUERY';
+const LAYOUT_SNAPSHOT_WRITE = 'OCTANE_STRONG_LAYOUT_SNAPSHOT_WRITE';
 
 const IMPORTS = "import { useEffect, useLayoutEffect, useRef, useState } from 'octane';\n";
 const MODES = [
@@ -568,6 +569,102 @@ export function Editor() { return <textarea id="editor" />; }
 export function Frame({ document }) {
   useEffect(() => { document.getElementById('x').focus(); });
   return <input id="x" />;
+}`,
+			'/src/App.tsrx',
+		);
+	});
+});
+
+const SNAPSHOT_IMPORTS =
+	"import { useEffect, useLayoutEffect, useLayoutSnapshot, useRef } from 'octane';\n";
+const snapshot = (body: string, element = '<div ref={r}>{String(width)}</div>') =>
+	`${SNAPSHOT_IMPORTS}export function App({ label, name }) {
+  const r = useRef(null);
+  const width = useLayoutSnapshot(() => { ${body} }, { initial: 0 });
+  return ${element};
+}`;
+
+describe('Strong DOM writes in a layout snapshot measurement', () => {
+	it.each([
+		['a style property', "r.current.style.width = '10px';"],
+		['a dynamic style property', "r.current.style.setProperty(name, '1px');"],
+		['cssText', "r.current.style.cssText = 'width: 10px';"],
+		['className', "r.current.className = 'wide';"],
+		['classList', "r.current.classList.add('wide');"],
+		['an attribute', "r.current.setAttribute('data-wide', '');"],
+		['a dynamic attribute', 'r.current.removeAttribute(name);'],
+		['children', "r.current.append('more');", '<p><i ref={r} />{String(width)}</p>'],
+		['a scroll offset', 'r.current.scrollTop = 0;'],
+		['a compound scroll offset', 'r.current.scrollTop += 10;'],
+		['a scroll offset update', 'r.current.scrollLeft++;'],
+		['an alias', "const el = r.current; el.style.width = '10px';"],
+	])('rejects %s', (_label, write, element?: string) => {
+		expectStrongError(
+			snapshot(`${write} return r.current.offsetWidth;`, element),
+			'/src/App.tsrx',
+			LAYOUT_SNAPSHOT_WRITE,
+		);
+	});
+
+	it('rejects a write in a measurement held by a local', () => {
+		expectStrongError(
+			`${SNAPSHOT_IMPORTS}export function App() {
+  const r = useRef(null);
+  const measure = () => { r.current.style.width = 'auto'; return r.current.offsetWidth; };
+  const width = useLayoutSnapshot(measure, { initial: 0 });
+  return <div ref={r}>{String(width)}</div>;
+}`,
+			'/src/App.tsrx',
+			LAYOUT_SNAPSHOT_WRITE,
+		);
+	});
+
+	it('names the write and the replacement', () => {
+		const message = messageOf(
+			snapshot("r.current.style.width = 'auto'; return r.current.offsetWidth;"),
+			'/src/App.tsrx',
+			LAYOUT_SNAPSHOT_WRITE,
+		);
+		expect(message).toContain('`style.width`');
+		expect(message).toContain('useLayoutEffect');
+	});
+
+	it('keeps the ownership error for a write the template also owns', () => {
+		const source = snapshot(
+			"r.current.className = 'wide'; return r.current.offsetWidth;",
+			'<div ref={r} class="box">{String(width)}</div>',
+		);
+		expectStrongError(source, '/src/App.tsrx', MANAGED_DOM_WRITE);
+		expect(errors(`"use strong";\n${source}`, '/src/App.tsrx')).toHaveLength(1);
+	});
+
+	it.each([
+		['reads', 'return r.current.offsetWidth + r.current.scrollTop;'],
+		['a read of an inline style', 'return r.current.style.width;'],
+		[
+			'a write in a callback that runs later',
+			"requestAnimationFrame(() => { r.current.style.width = 'auto'; }); return 0;",
+		],
+		[
+			'a write to a detached element',
+			"const el = document.createElement('i'); el.style.width = '1px'; return el.offsetWidth;",
+		],
+	])('allows %s', (_label, body) => {
+		expectStrongValid(snapshot(body), '/src/App.tsrx');
+	});
+
+	it('allows the same writes in a layout effect and on a ref that holds no element', () => {
+		expectStrongValid(
+			`${SNAPSHOT_IMPORTS}export function App() {
+  const r = useRef(null);
+  const box = useRef({ style: { width: '' }, scrollTop: 0 });
+  useLayoutEffect(() => { r.current.style.width = 'auto'; r.current.scrollTop = 0; });
+  const width = useLayoutSnapshot(() => {
+    box.current.style.width = 'auto';
+    box.current.scrollTop = 1;
+    return r.current.offsetWidth;
+  }, { initial: 0 });
+  return <div ref={r}>{String(width)}</div>;
 }`,
 			'/src/App.tsrx',
 		);
