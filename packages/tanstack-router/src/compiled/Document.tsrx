@@ -2,13 +2,7 @@
 
 declare const process: { env: { NODE_ENV?: string } };
 
-import {
-	useEffect,
-	useId,
-	HYDRATION_RANGE_BOUNDARY,
-	createPortal,
-	useSyncExternalStore,
-} from 'octane';
+import { useEffect, useId, createPortal, useSyncExternalStore } from 'octane';
 import { DEV_STYLES_ATTR } from '@tanstack/router-core';
 import type { AssetCrossOriginConfig } from '@tanstack/router-core';
 import { createAsset } from '../assetComponent.tsrx';
@@ -18,6 +12,8 @@ import { createScripts } from '../scriptComponent.tsrx';
 import { getAssetKeys } from '../assetKeys';
 import { useHydrated } from '../ClientOnly.tsrx';
 import { useRouter } from './bindings';
+import { HydrationRangeOwner } from './HydrationRangeOwner.tsrx';
+import { ServerBody, ServerHead, ServerHtml } from '#server-document';
 
 import { isServer } from '@tanstack/router-core/isServer';
 
@@ -27,41 +23,6 @@ import type { BodyProps } from '../Body';
 
 const subscribeToHead = () => () => {};
 const getHead = () => (typeof document === 'undefined' ? null : document.head);
-
-// This boundary returns the authored children directly, as the ordinary Body
-// owner does. Adding a template frame here changes the SSR range it claims.
-function HydrationRangeOwner(props: Pick<BodyProps, 'children'>) {
-	return props.children;
-}
-
-(
-	HydrationRangeOwner as typeof HydrationRangeOwner & {
-		[HYDRATION_RANGE_BOUNDARY]: 'owner';
-	}
-)[HYDRATION_RANGE_BOUNDARY] = 'owner';
-
-// The document elements are built imperatively, as element descriptors, and
-// only the server renders them. A client build resolves `isServer` to `false`,
-// so each of these folds to `null` and the bundle drops its server document.
-function DocumentHtml(props: HtmlProps) @{
-	const { children, ...attrs } = props;
-	<html {...attrs}>{children}</html>
-}
-function DocumentHead(props: HeadProps) @{
-	const { children, ...attrs } = props;
-	<head {...attrs}>{children}</head>
-}
-function DocumentBody(props: BodyProps) @{
-	const { children, ...attrs } = props;
-	<body {...attrs}>
-		<div id="__app">
-			<HydrationRangeOwner children={children} />
-		</div>
-	</body>
-}
-const ServerHtml = (isServer === false ? null : DocumentHtml) as typeof DocumentHtml;
-const ServerHead = (isServer === false ? null : DocumentHead) as typeof DocumentHead;
-const ServerBody = (isServer === false ? null : DocumentBody) as typeof DocumentBody;
 
 // Preserve the ordinary document and hydration-range ownership. Start owns
 // the outer passthrough boundary; this entry reads the compiled router context.
