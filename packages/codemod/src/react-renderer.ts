@@ -1,5 +1,36 @@
 import ts from 'typescript';
 
+/** The props object for a self-closing React element with closed literal attributes. */
+export function staticReactProps(element: ts.JsxSelfClosingElement) {
+	if (element.typeArguments) return null;
+	const props: string[] = [];
+	const seen = new Set(['key', 'ref', '__proto__', '__self', '__source']);
+	for (const attr of element.attributes.properties) {
+		if (!ts.isJsxAttribute(attr) || !ts.isIdentifier(attr.name) || seen.has(attr.name.text))
+			return null;
+		seen.add(attr.name.text);
+		const init = attr.initializer;
+		let value: string;
+		if (!init) value = 'true';
+		else if (ts.isStringLiteral(init) && !/[&\r\n]/.test(init.text))
+			value = JSON.stringify(init.text);
+		else if (ts.isJsxExpression(init) && init.expression && !init.dotDotDotToken) {
+			const expr = init.expression;
+			if (!(
+				ts.isStringLiteralLike(expr) ||
+				ts.isNumericLiteral(expr) ||
+				expr.kind === ts.SyntaxKind.TrueKeyword ||
+				expr.kind === ts.SyntaxKind.FalseKeyword ||
+				expr.kind === ts.SyntaxKind.NullKeyword
+			))
+				return null;
+			value = ts.isStringLiteralLike(expr) ? JSON.stringify(expr.text) : expr.getText();
+		} else return null;
+		props.push(JSON.stringify(attr.name.text) + ': ' + value);
+	}
+	return '{ ' + props.join(', ') + ' }';
+}
+
 /** A closed callback in an inline options object. Its React caller owns the argument. */
 export function reactRenderer(property: ts.ObjectLiteralElementLike) {
 	if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(property.name)) return;

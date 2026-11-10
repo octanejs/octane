@@ -151,6 +151,52 @@ export async function runCodemod(
 	const reactCompat = ['react', 'react-dom'].every((name) =>
 		/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(root, name)?.version ?? ''),
 	);
+	const rootProject = ts.findConfigFile(root, ts.sys.fileExists);
+	function reactStoreComponent(file: string, specifier: string) {
+		if (!reactCompat || !unportedName(specifier, file)) return false;
+		const dir = path.dirname(file);
+		// A nested project and the migration root can both include this file but
+		// compile its JSX with different factories or module resolution.
+		if (
+			config?.jsx !== ts.JsxEmit.ReactJSX ||
+			config.jsxFactory ||
+			config.jsxFragmentFactory ||
+			(config.jsxImportSource && config.jsxImportSource !== 'react') ||
+			ts.findConfigFile(dir, ts.sys.fileExists) !== rootProject
+		)
+			return false;
+		const name = packageName(specifier);
+		const lib = readInstalled(dir, name);
+		if (
+			!lib ||
+			lib.manifest.name !== name ||
+			!['peerDependencies', 'dependencies'].some(
+				(field) => record(lib.manifest[field]).react !== undefined,
+			)
+		)
+			return false;
+		// A linked workspace package can itself migrate. A paths alias can also shadow
+		// the installed component or the JSX runtime, even when their packages exist.
+		const pkg = fs.realpathSync(lib.dir);
+		if (!pkg.split(path.sep).includes('node_modules')) return false;
+		const bindings = { moduleResolution: ts.ModuleResolutionKind.Bundler, ...config };
+		return [specifier, 'react/jsx-runtime'].every((module) => {
+			const target = ts.resolveModuleName(module, file, bindings, ts.sys).resolvedModule;
+			const original = ts.resolveModuleName(
+				module,
+				file,
+				{ ...bindings, paths: undefined, baseUrl: undefined },
+				ts.sys,
+			).resolvedModule;
+			return (
+				!!target &&
+				!!original &&
+				target.resolvedFileName === original.resolvedFileName &&
+				(module !== specifier ||
+					fs.realpathSync(target.resolvedFileName).startsWith(pkg + path.sep))
+			);
+		});
+	}
 	// One shared context per project, including separate file-by-file migrations.
 	const sourceDir = path.join(root, 'src');
 	const adapter = path.join(
@@ -294,6 +340,7 @@ export async function runCodemod(
 		}
 		const source = fs.readFileSync(file, 'utf8');
 		const extra: Note[] = [];
+		const reactStoreComponents = new Map<string, boolean>();
 		const isContext = (specifier: string, name: string) => {
 			if (!specifier.startsWith('.')) return null;
 			const target = resolveModule(file, specifier, known);
@@ -396,6 +443,11 @@ export async function runCodemod(
 					: undefined,
 				unported: (specifier) => unportedName(specifier, file),
 				reactCompat,
+				reactStoreComponent: (specifier) => {
+					if (!reactStoreComponents.has(specifier))
+						reactStoreComponents.set(specifier, reactStoreComponent(file, specifier));
+					return reactStoreComponents.get(specifier)!;
+				},
 			});
 		if (intl && adapterError) {
 			// Public utilities such as defineMessages can stay on React Intl without a helper.

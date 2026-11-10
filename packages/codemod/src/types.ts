@@ -39,6 +39,8 @@ export interface TransformOptions {
 	unported?(specifier: string): string | null;
 	/** The project has React and React DOM 19.2 or newer in the React 19 series, so `ReactCompat` can host an unported package's components. */
 	reactCompat?: boolean;
+	/** This file uses React's automatic JSX runtime and the component resolves to its original React package. */
+	reactStoreComponent?(specifier: string): boolean;
 }
 /** A React package with no Octane port, and how migrated code uses it. */
 export interface Unported {
