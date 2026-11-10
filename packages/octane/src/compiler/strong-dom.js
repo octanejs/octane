@@ -777,12 +777,13 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 				return;
 			case 'ForInStatement':
 			case 'ForOfStatement': {
-				if (node.left.type === 'VariableDeclaration') visit(node.left);
-				else visitPattern(node.left);
-				// The iterated value is read once, before the first pass.
+				// The iterated value is read once, before the first pass. The
+				// binding, with any defaults it evaluates, is assigned on every pass.
 				visit(node.right);
 				const first = reads.length;
 				const before = dirty.at(-1);
+				if (node.left.type === 'VariableDeclaration') visit(node.left);
+				else visitPattern(node.left);
 				visit(node.body);
 				repeatWrites(first, before);
 				return;
