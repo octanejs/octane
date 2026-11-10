@@ -70,21 +70,25 @@ function subscribeToHistory(router: AnyRouter, history: AnyRouter['history']) {
 		return unsub;
 	}
 
-	const resolvedLocation = router.stores.resolvedLocation.get();
+	// A completed load leaves a transaction on the router. Only a pending load
+	// for this history entry can own its upcoming render and lifecycle events.
+	const pending = router.stores.status.get() === 'pending';
+	const loadLocation = pending
+		? router.stores.location.get()
+		: router.stores.resolvedLocation.get();
 	if (
-		resolvedLocation?.href === location.href &&
-		resolvedLocation.state.__TSR_key === location.state.__TSR_key
+		loadLocation?.href !== location.href ||
+		loadLocation.state.__TSR_key !== location.state.__TSR_key
 	) {
-		// Hydration acknowledges the already-committed tree, which does not trigger
-		// another render for the navigation acknowledgement effect to observe.
-		router.emit({
-			type: 'onRendered',
-			...getLocationChangeInfo(resolvedLocation, resolvedLocation),
-			fromLocation: resolvedLocation,
-		});
-	} else if (!router._tx) {
 		router.load({ sync: true }).catch((err: unknown) => {
 			console.error(err);
+		});
+	} else if (!pending) {
+		// The already-committed tree will not rerender to acknowledge hydration.
+		router.emit({
+			type: 'onRendered',
+			...getLocationChangeInfo(loadLocation, loadLocation),
+			fromLocation: loadLocation,
 		});
 	}
 	return unsub;

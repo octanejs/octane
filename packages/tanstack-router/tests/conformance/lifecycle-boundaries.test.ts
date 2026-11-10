@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { mount, nextPaint } from '../_helpers';
 import { RouterProvider } from '@octanejs/tanstack-router';
+import { CompiledRouterProvider } from '@octanejs/tanstack-router/compiled';
+import { makeCompiledRouter } from '../_fixtures/compiled-router.tsrx';
 import { makeLifecycleRouter, createDeferred, setThrow } from '../_fixtures/lifecycle.tsrx';
 
 async function flush() {
@@ -15,6 +17,53 @@ async function flush() {
 // resolvedLocation) and Match.tsx OnRendered (onRendered after the subtree
 // below the root layout commits).
 describe('@octanejs/tanstack-router — event lifecycle', () => {
+	it.each([
+		{ name: 'standard', Provider: RouterProvider, makeRouter: makeLifecycleRouter },
+		{ name: 'compiled', Provider: CompiledRouterProvider, makeRouter: makeCompiledRouter },
+	])(
+		'resolves a same-URL history replacement before the $name provider mounts',
+		async ({ Provider, makeRouter }) => {
+			const router = makeRouter('/');
+			await router.load();
+			router.history.replace('/', { marker: 'replacement' });
+			const view = mount(Provider as any, { router });
+			try {
+				await flush();
+				expect(router.state.resolvedLocation?.state).toMatchObject({ marker: 'replacement' });
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'reconciles an in-flight load at mount (Back to the resolved entry: %s)',
+		async (goBack) => {
+			const deferred = createDeferred<string>();
+			const router = makeLifecycleRouter('/plain', { deferred });
+			await router.load();
+			router.history.push('/slow-loader');
+			const load = router.load();
+			const onBeforeLoad = vi.fn();
+			const unsubscribe = router.subscribe('onBeforeLoad', onBeforeLoad);
+			if (goBack) router.history.back();
+			const view = mount(RouterProvider as any, { router });
+			try {
+				deferred.resolve('ready');
+				await load;
+				await flush();
+				expect(router.state.resolvedLocation?.pathname).toBe(goBack ? '/plain' : '/slow-loader');
+				expect(view.find(goBack ? '.plain' : '.loader-done').textContent).toBe(
+					goBack ? 'Plain' : 'loader done',
+				);
+				if (!goBack) expect(onBeforeLoad).not.toHaveBeenCalled();
+			} finally {
+				unsubscribe();
+				view.unmount();
+			}
+		},
+	);
+
 	it('emits onLoad → onBeforeRouteMount → onResolved → onRendered on navigation', async () => {
 		const router = makeLifecycleRouter('/');
 		await router.load();
