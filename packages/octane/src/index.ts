@@ -3,7 +3,6 @@ export { createResizeObserver } from './resize-observer.js';
 // Read and write phases for layout work. Kept apart from the reconciling
 // runtime so an app that never queues layout work does not ship the queue.
 export { RenderingPhase, readLayout, writeLayout, flushLayoutSync } from './layout-phases.js';
-export { setLayoutSnapshotTiming, type LayoutSnapshotTiming } from './layout-snapshot-timing.js';
 // Keep package metadata behind an isolated re-export: applications that do not
 // read `version` can tree-shake this module and the package.json payload in full.
 export { version } from './version.js';
@@ -45,6 +44,8 @@ export {
 	flushSync,
 	// Octane extension: the layout phase of the running commit or queued task.
 	getPhase,
+	setLayoutSnapshotTiming,
+	type LayoutSnapshotTiming,
 	act,
 	isInActScope,
 	type Root,

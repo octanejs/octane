@@ -23,7 +23,13 @@ import { renderSlice } from '../render-slice.js';
 import { type BindingHandoff, releaseBindingHandoff } from '../dom-binding-handoff.js';
 import { bumpContextEpoch } from '../context-epoch.js';
 import { postHostTask } from '../host-task.js';
-import { queuePhase, type RenderingPhase } from '../layout-phases.js';
+import {
+	flushLayoutSync,
+	queuePhase,
+	readLayout,
+	writeLayout,
+	type RenderingPhase,
+} from '../layout-phases.js';
 import { hasPendingHostBudget } from '../host-budget.js';
 import {
 	__profileEffect,
@@ -391,7 +397,7 @@ export let LAYOUT_SNAPSHOT_DRIVER: {
 } | null = null;
 
 /** The layout queue, as `setLayoutSnapshotTiming('frame')` hands it to the engine. */
-export interface LayoutFrameQueue {
+interface LayoutFrameQueue {
 	read: (task: () => void) => void;
 	write: (task: () => void) => void;
 	flush: () => void;
@@ -403,13 +409,28 @@ export interface LayoutFrameQueue {
 export let FRAME_SNAPSHOT_DRIVER: (LayoutFrameQueue & { pending: LayoutSnapshots | null }) | null =
 	null;
 
-/** @internal Route layout snapshots through `queue`, or back to the commit with null. */
-export function setFrameLayoutSnapshots(queue: LayoutFrameQueue | null): void {
+/** When `useLayoutSnapshot` measures. */
+export type LayoutSnapshotTiming = 'commit' | 'frame';
+
+/**
+ * Choose when every `useLayoutSnapshot` in the document measures.
+ *
+ * - `'commit'` (the default) measures at the end of each commit, so a changed
+ *   snapshot has rendered when `flushSync` returns.
+ * - `'frame'` measures in the next frame's `readLayout` pass, together with
+ *   any other queued reads. Changed snapshots commit in the following
+ *   `writeLayout` pass, and the measurements that commit queues run in a later
+ *   pass of the same frame. Use it on hosts whose layout is asynchronous, or
+ *   to keep snapshots out of commits that `flushSync` waits for.
+ *
+ * Snapshots already waiting for a measurement switch with the setting.
+ */
+export function setLayoutSnapshotTiming(timing: LayoutSnapshotTiming): void {
 	const previous = FRAME_SNAPSHOT_DRIVER;
 	FRAME_SNAPSHOT_DRIVER =
-		queue === null
-			? null
-			: { read: queue.read, write: queue.write, flush: queue.flush, pending: null };
+		timing === 'frame'
+			? { read: readLayout, write: writeLayout, flush: flushLayoutSync, pending: null }
+			: null;
 	// Snapshots waiting for the old queue's read pass measure with the next commit
 	// (or in the new queue) instead. That queued read then finds nothing to do.
 	const waiting = previous ? previous.pending : null;

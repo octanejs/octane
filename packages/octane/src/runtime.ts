@@ -131,6 +131,8 @@ export {
 	setIsOctaneActEnvironment,
 	flushSync,
 	getPhase,
+	setLayoutSnapshotTiming,
+	type LayoutSnapshotTiming,
 	__useCommittedState,
 	__createDiscreteEventListener,
 	act,
