@@ -1,4 +1,5 @@
 import { createScopedStorePlanner } from './scoped-store-contract.js';
+import { parsePathSvg } from './path-svg.js';
 import { storeInputFactories } from './store-inputs.js';
 import type {
 	CodemodOptions,
@@ -290,14 +291,70 @@ export async function runCodemod(
 			: null;
 	const inputFactory = storeInputFactories(root, config);
 	const checkedHelpers = new Map<string, { code: string; create: boolean; error?: string }>();
-	const storeHelpers = new Map<string, string>();
+	const generatedHelpers = new Map<string, string>();
+	const svgHelpers = new Set<string>();
+	const svgHelper = path.join(helperDir, 'octane-path-svg.ts');
+	const svgAssets = new Map<string, boolean>();
+	let svgHelperCode: string | undefined;
+	function nativeSvgModule(asset: string, errors: Set<string>): string | null {
+		if (
+			!asset.startsWith(root + path.sep) ||
+			asset.split(path.sep).includes('node_modules') ||
+			/[!%?#]/.test(path.relative(root, asset))
+		)
+			return null;
+		if (!svgAssets.has(asset)) {
+			const stat = fs.lstatSync(asset, { throwIfNoEntry: false });
+			svgAssets.set(
+				asset,
+				!!stat?.isFile() &&
+					fs.realpathSync(asset) === path.join(fs.realpathSync(root), path.relative(root, asset)) &&
+					!!parsePathSvg(fs.readFileSync(asset, 'utf8')),
+			);
+		}
+		if (!svgAssets.get(asset)) return null;
+		svgHelperCode ??=
+			fs.readFileSync(new URL('../templates/octane-path-svg.ts', import.meta.url), 'utf8') +
+			'\n' +
+			fs.readFileSync(new URL('../src/path-svg.ts', import.meta.url), 'utf8');
+		const sidecar = asset + '.octane.ts';
+		const code =
+			'import source from ' +
+			JSON.stringify('./' + path.basename(asset) + '?raw') +
+			';\n' +
+			'import { pathSvg } from ' +
+			JSON.stringify(relativeTsImport(sidecar, svgHelper)) +
+			';\n\nexport default pathSvg(source);\n';
+		const conflict = checkHelper(svgHelper, svgHelperCode) || checkHelper(sidecar, code);
+		if (conflict) {
+			errors.add(conflict);
+			return null;
+		}
+		generatedHelpers.set(svgHelper, svgHelperCode);
+		generatedHelpers.set(sidecar, code);
+		svgHelpers.add(svgHelper);
+		svgHelpers.add(sidecar);
+		return sidecar;
+	}
+	function pathSvgAdapter(file: string, specifier: string, errors: Set<string>) {
+		if (
+			(config?.jsxImportSource && config.jsxImportSource !== 'react') ||
+			config?.jsxFactory ||
+			config?.jsxFragmentFactory ||
+			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject
+		)
+			return null;
+		const asset = svgAsset(root, path.dirname(file), specifier, config);
+		const sidecar = asset && nativeSvgModule(asset, errors);
+		return sidecar ? relativeTsImport(file, sidecar) : null;
+	}
 	let storeTemplates: ReadonlyMap<string, string> | undefined;
 	function checkHelper(output: string, code: string) {
 		const cached = checkedHelpers.get(output);
 		if (cached)
 			return cached.code === code
 				? cached.error
-				: 'Two workspace hook sources need different code at ' + path.relative(root, output);
+				: 'Two generated adapters need different code at ' + path.relative(root, output);
 		const stat = fs.lstatSync(output, { throwIfNoEntry: false });
 		const name = path.relative(root, output);
 		const ownerOf = (file: string) =>
@@ -315,7 +372,11 @@ export async function runCodemod(
 			ownerOf(output) ||
 			(stat && (!stat.isFile() || fs.readFileSync(output, 'utf8') !== code))
 		) {
-			error = 'The workspace hook adapter path is occupied: ' + name;
+			error =
+				'The ' +
+				(output === svgHelper || output.endsWith('.svg.octane.ts') ? 'SVG' : 'workspace hook') +
+				' adapter path is occupied: ' +
+				name;
 		} else {
 			const rejected = output.endsWith('.tsrx')
 				? compile(compiler!, code, output, true).some((d) => d.severity === 'error')
@@ -332,6 +393,28 @@ export async function runCodemod(
 		return error;
 	}
 	const results: FileResult[] = [];
+	if (options.svgPaths && target === 'tsrx') {
+		// Explicit SVG inputs prepare a native component even if a caller's renderer is unknown.
+		// Directory scans still generate components only for verified JSX uses.
+		for (const entry of new Set(
+			paths.filter((name) => /\.svg$/i.test(name)).map((name) => path.resolve(name)),
+		)) {
+			if (fs.lstatSync(entry).isDirectory()) continue;
+			const errors = new Set<string>();
+			if (nativeSvgModule(entry, errors)) continue;
+			const file = unchangedFile(path.relative(root, entry), '', {
+				rule: 'svg-paths',
+				severity: 'error',
+				line: 1,
+				message:
+					[...errors].join('; ') ||
+					'Cannot generate a native SVG component for this asset. Expected supported path geometry inside the project.',
+			});
+			if (write) return blockedWrite(root, file, compiler?.from);
+			results.push(file);
+		}
+	}
+
 	for (const file of files) {
 		const conflict = conflicts.get(file);
 		if (conflict) {
@@ -362,6 +445,7 @@ export async function runCodemod(
 				? intlPath(file)
 				: undefined;
 		const storeErrors = new Set<string>();
+		const svgErrors = new Set<string>();
 		const resolveStoreHook: TransformOptions['resolveStoreHook'] =
 			!planStoreHook || !renames.has(file)
 				? undefined
@@ -400,7 +484,7 @@ export async function runCodemod(
 								return null;
 							}
 						}
-						for (const [output, code] of helpers) storeHelpers.set(output, code);
+						for (const [output, code] of helpers) generatedHelpers.set(output, code);
 						const relative = path
 							.relative(path.dirname(file), plan.entry)
 							.split(path.sep)
@@ -443,6 +527,10 @@ export async function runCodemod(
 					: undefined,
 				unported: (specifier) => unportedName(specifier, file),
 				reactCompat,
+				pathSvgAdapter:
+					options.svgPaths && renames.has(file)
+						? (specifier) => pathSvgAdapter(file, specifier, svgErrors)
+						: undefined,
 				reactStoreComponent: (specifier) => {
 					if (!reactStoreComponents.has(specifier))
 						reactStoreComponents.set(specifier, reactStoreComponent(file, specifier));
@@ -471,9 +559,9 @@ export async function runCodemod(
 			}
 		}
 		const result = transform();
-		for (const message of storeErrors) {
+		for (const message of [...storeErrors, ...svgErrors]) {
 			const note: Note = {
-				rule: 'store-hook',
+				rule: svgErrors.has(message) ? 'svg-paths' : 'store-hook',
 				line: 1,
 				severity: 'error',
 				message: write ? message + '. No changes were written.' : message,
@@ -633,7 +721,7 @@ export async function runCodemod(
 			});
 		}
 	}
-	for (const [output, code] of storeHelpers) {
+	for (const [output, code] of generatedHelpers) {
 		if (!checkedHelpers.get(output)?.create) continue;
 		const name = path.relative(root, output);
 		if (write) fs.writeFileSync(output, code, { flag: 'wx' });
@@ -642,7 +730,7 @@ export async function runCodemod(
 			output: name,
 			changed: true,
 			code,
-			rules: { 'store-hook-adapter': 1 },
+			rules: { [svgHelpers.has(output) ? 'svg-paths-adapter' : 'store-hook-adapter']: 1 },
 			notes: [],
 			diagnostics: [],
 			strong: code.startsWith("'use strong'") ? true : null,
@@ -661,7 +749,8 @@ export async function runCodemod(
 			if (
 				!result.changed ||
 				result.rules['react-intl-adapter'] ||
-				result.rules['store-hook-adapter']
+				result.rules['store-hook-adapter'] ||
+				result.rules['svg-paths-adapter']
 			)
 				continue;
 			const output = path.join(root, result.output);
@@ -835,6 +924,37 @@ function resolveModule(
 		if (files.has(file)) return { file, index: true };
 	}
 	return null;
+}
+
+function relativeTsImport(from: string, to: string) {
+	const specifier = path.relative(path.dirname(from), to).split(path.sep).join('/').slice(0, -3);
+	return specifier.startsWith('.') ? specifier : './' + specifier;
+}
+
+/** Only relative assets and unambiguous directory aliases have a local file to inspect. */
+function svgAsset(root: string, dir: string, specifier: string, config: ts.CompilerOptions | null) {
+	if (!/\.svg$/i.test(specifier) || /[!%?#\\]/.test(specifier)) return null;
+	if (specifier.startsWith('./') || specifier.startsWith('../'))
+		return path.resolve(dir, specifier);
+	const matches = Object.entries(config?.paths ?? {}).filter(([key]) => {
+		const star = key.indexOf('*');
+		return star < 0
+			? key === specifier
+			: specifier.startsWith(key.slice(0, star)) && specifier.endsWith(key.slice(star + 1));
+	});
+	if (matches.length !== 1) return null;
+	const [key, targets] = matches[0];
+	if (
+		key.indexOf('*') !== key.length - 1 ||
+		!key.endsWith('/*') ||
+		targets.length !== 1 ||
+		targets[0].indexOf('*') !== targets[0].length - 1 ||
+		!targets[0].endsWith('/*')
+	)
+		return null;
+	const base =
+		config?.baseUrl ?? (typeof config?.pathsBasePath === 'string' ? config.pathsBasePath : root);
+	return path.resolve(base, targets[0].slice(0, -1), specifier.slice(key.length - 1));
 }
 
 /**

@@ -39,6 +39,8 @@ export interface TransformOptions {
 	unported?(specifier: string): string | null;
 	/** The project has React and React DOM 19.2 or newer in the React 19 series, so `ReactCompat` can host an unported package's components. */
 	reactCompat?: boolean;
+	/** The generated native SVG helper, if the project verified this raw asset. */
+	pathSvgAdapter?(specifier: string): string | null;
 	/** This file uses React's automatic JSX runtime and the component resolves to its original React package. */
 	reactStoreComponent?(specifier: string): boolean;
 }
@@ -68,6 +70,8 @@ export interface TransformResult {
 	unported: Unported[];
 }
 export interface CodemodOptions {
+	/** Bare SVG components render the authored geometry and ?raw loads the same asset as text. */
+	svgPaths?: boolean;
 	target?: 'tsrx' | 'tsx';
 	/** Migrate to Strong mode where the compiler accepts it, falling back to compatibility mode per module. */
 	strong?: boolean;
