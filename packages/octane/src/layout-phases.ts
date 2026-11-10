@@ -24,15 +24,14 @@ type Entry = { task: (() => void) | null };
 // that never settles, the same limit a commit gives nested layout updates.
 const PASS_LIMIT = 50;
 
-let phase: RenderingPhase = RenderingPhase.IDLE;
+/**
+ * What the queue is running. The engine reads it: `getPhase` reports it ahead
+ * of a commit's own phase, and `flushSync` does not commit during READ.
+ */
+export let queuePhase: RenderingPhase = RenderingPhase.IDLE;
 let reads: Entry[] = [];
 let writes: Entry[] = [];
 let frameRequested = false;
-
-/** The phase the layout queue is in: READ and WRITE only while it runs tasks. */
-export function getPhase(): RenderingPhase {
-	return phase;
-}
 
 /**
  * Queue a layout read for the next frame. Reads run together, before any queued
@@ -85,7 +84,7 @@ function requestFrame(): void {
  * that task queued.
  */
 export function flushLayoutSync(): void {
-	if (phase !== RenderingPhase.IDLE) return;
+	if (queuePhase !== RenderingPhase.IDLE) return;
 	let failure: { error: unknown } | null = null;
 	const run = (batch: Entry[]) => {
 		for (const entry of batch) {
@@ -112,18 +111,18 @@ export function flushLayoutSync(): void {
 				// What is left was queued during this flush, which armed a frame.
 				break;
 			}
-			phase = RenderingPhase.READ;
+			queuePhase = RenderingPhase.READ;
 			let batch = reads;
 			reads = [];
 			run(batch);
-			phase = RenderingPhase.WRITE;
+			queuePhase = RenderingPhase.WRITE;
 			// Work a task queues waits for the next pass, which keeps the bound.
 			batch = writes;
 			writes = [];
 			run(batch);
 		}
 	} finally {
-		phase = RenderingPhase.IDLE;
+		queuePhase = RenderingPhase.IDLE;
 	}
 	if (failure !== null) throw (failure as { error: unknown }).error;
 }
