@@ -372,6 +372,11 @@ function nodeSpanning(sf: ts.SourceFile, start: number, end: number): ts.Node | 
 	}
 }
 
+function rowKeyLiteral(node: ts.Expression) {
+	node = skipWrappers(node);
+	return ts.isStringLiteralLike(node) || ts.isNumericLiteral(node) || ts.isBigIntLiteral(node);
+}
+
 /**
  * The attribute an element sets by `name`.
  */
@@ -4331,6 +4336,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				return null;
 			}
 		}
+		if (key && setup.length && !this.rowKeyCanMove(key, item, iterable, setup)) {
+			this.note(
+				RULE.for,
+				'warning',
+				key,
+				'This row runs setup before reading its key, so the list stays a `.map()`.',
+			);
+			return null;
+		}
 		const hoisted = key ? (keys as ts.JsxAttribute[]) : [];
 		/** A keyed `<Fragment>` is a bare row. */
 		const fragments: ts.JsxElement[] = [];
@@ -4435,6 +4449,41 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		};
 		statements.forEach(visit);
 		return ok;
+	}
+
+	/** An @for header evaluates its key before the row body runs. */
+	rowKeyCanMove(
+		key: ts.Expression,
+		item: ts.ParameterDeclaration,
+		iterable: ts.Expression,
+		setup: ts.Statement[],
+	) {
+		if (!ts.isIdentifier(item.name)) return false;
+		if (rowKeyLiteral(key)) return true;
+		key = skipWrappers(key);
+		const source = skipWrappers(iterable);
+		if (
+			ts.isIdentifier(key) &&
+			this.declarationOf(key) === item &&
+			ts.isArrayLiteralExpression(source) &&
+			source.elements.every(rowKeyLiteral) &&
+			fixedBinding(this.checker, key, key)
+		) {
+			return true;
+		}
+
+		// Even an accessor key can precede initialization that reads nothing.
+		return (
+			setup.every(
+				(statement) =>
+					ts.isVariableStatement(statement) &&
+					(statement.declarationList.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
+					statement.declarationList.declarations.every(
+						({ name, initializer }) =>
+							ts.isIdentifier(name) && initializer !== undefined && rowKeyLiteral(initializer),
+					),
+			) && !reads(key, (name) => name.text === 'eval' && !isPropertyName(name))
+		);
 	}
 
 	readsLocals(expression: ts.Node, statements: ts.Statement[]) {
