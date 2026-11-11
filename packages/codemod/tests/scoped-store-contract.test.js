@@ -580,38 +580,47 @@ it('defers workspace helpers when the renderer, arguments, callee or returned va
 	}
 }, 30_000);
 
-it('defers a store helper when a re-export redirects its React component to Octane', async () => {
-	const { app } = project({
-		'observer/state.ts': 'export function valueOf<T>(x: T) { return x; }',
-		'observer/renderer.ts':
-			"import {createContext} from 'react'; export const current = createContext(new Map<string, string>());",
-		'app/src/pane.tsx': `import {useSnapshot} from 'observer'; import {run} from './command';
+it.each([
+	['re-export', "export {View} from './view';", 'registry'],
+	['class base', "export class View extends (await import('./relay')).View {}", 'relay'],
+])(
+	'defers a store helper when its %s reaches a migrated component',
+	async (_edge, registry, reexport) => {
+		const { app } = project({
+			'observer/state.ts': 'export function valueOf<T>(x: T) { return x; }',
+			'observer/renderer.ts':
+				"import {createContext} from 'react'; export const current = createContext(new Map<string, string>());",
+			'app/src/pane.tsx': `import {useSnapshot} from 'observer'; import {run} from './command';
 			export function Pane() {
 				const store = useSnapshot();
 				return <button onClick={() => { run(store); }}>Render</button>;
 			}`,
-		'app/src/command.ts': `import {createElement} from 'react';
+			'app/src/command.ts': `import {createElement} from 'react';
 			import {renderToStaticMarkup} from 'react-dom/server';
 			import {View} from './registry';
 			export function run(store) { store.set('html', renderToStaticMarkup(createElement(View))); }`,
-		'app/src/registry.ts': "export {View} from './view';",
-		'app/src/view.tsx': 'export function View() { return <b>original</b>; }',
-	});
-	const { files } = await runCodemod(
-		['pane.tsx', 'registry.ts', 'view.tsx'].map((name) => path.join(app, 'src', name)),
-		{ root: app, strong: true, verify: true, write: false },
-	);
-	const pane = files.find((file) => file.file === 'src/pane.tsx');
-	expect(files.find((file) => file.file === 'src/view.tsx').output).toBe('src/view.tsrx');
-	expect(files.find((file) => file.file === 'src/registry.ts').code).toContain('./view.tsrx');
-	expect(pane.notes).toContainEqual(
-		expect.objectContaining({
-			rule: 'bindings',
-			severity: 'error',
-			message: expect.stringContaining('useSnapshot'),
-		}),
-	);
-});
+			'app/src/registry.ts': registry,
+			'app/src/relay.ts': "export {View} from './view';",
+			'app/src/view.tsx': 'export function View() { return <b>original</b>; }',
+		});
+		const { files } = await runCodemod(
+			['pane.tsx', 'registry.ts', 'relay.ts', 'view.tsx'].map((name) =>
+				path.join(app, 'src', name),
+			),
+			{ root: app, strong: true, verify: true, write: false },
+		);
+		const pane = files.find((file) => file.file === 'src/pane.tsx');
+		expect(files.find((file) => file.file === 'src/view.tsx').output).toBe('src/view.tsrx');
+		expect(files.find((file) => file.file === `src/${reexport}.ts`).code).toContain('./view.tsrx');
+		expect(pane.notes).toContainEqual(
+			expect.objectContaining({
+				rule: 'bindings',
+				severity: 'error',
+				message: expect.stringContaining('useSnapshot'),
+			}),
+		);
+	},
+);
 
 it('delivers the original React element to a store service for rendering under its eventual provider', async () => {
 	const { app, root: workspace } = noticeProject({

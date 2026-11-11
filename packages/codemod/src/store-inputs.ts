@@ -187,6 +187,7 @@ export function storeSources(
 					);
 				}
 				if (ts.isImportEqualsDeclaration(node)) return !node.isTypeOnly;
+				if (ts.isExpressionWithTypeArguments(node)) return unsafe(node.expression);
 				if (ts.isTypeNode(node)) return false;
 				if (
 					node.kind === ts.SyntaxKind.ImportKeyword ||
