@@ -256,7 +256,7 @@ function callsHook(node: ts.Node, checker: ts.TypeChecker) {
 	);
 }
 
-export function literalSvgAttribute(attr: ts.JsxAttributeLike) {
+export function literalJsxAttribute(attr: ts.JsxAttributeLike) {
 	if (!ts.isJsxAttribute(attr)) return false;
 	const value = attr.initializer;
 	return (
@@ -342,7 +342,7 @@ export function svgLocalReads(
 					: undefined;
 		if (!name || !ts.isIdentifier(name)) return;
 		// Literal props have the same value at assignment and at the render outlet.
-		if (!element.attributes.properties.every(literalSvgAttribute)) return;
+		if (!element.attributes.properties.every(literalJsxAttribute)) return;
 		const symbol = checker.getSymbolAtLocation(name);
 		const decl = symbol?.valueDeclaration;
 		if (
