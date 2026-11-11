@@ -382,20 +382,12 @@ function attributeOf(element: ts.JsxOpeningLikeElement, name: string) {
 	);
 }
 
-/**
- * The elements a list row can render: the row itself, or each arm of a
- * conditional row. Null when an arm renders anything else.
- */
-function rowElements(
-	node: ts.Expression,
-): (ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment)[] | null {
+/** Find a key on a row or one of its conditional arms. */
+function rowKey(node: ts.Expression): ts.JsxAttribute | undefined {
 	node = skipParens(node);
-	if (isJsx(node)) return [node];
-	if (isNullish(node)) return [];
-	if (!ts.isConditionalExpression(node)) return null;
-	const whenTrue = rowElements(node.whenTrue);
-	const whenFalse = rowElements(node.whenFalse);
-	return whenTrue && whenFalse && [...whenTrue, ...whenFalse];
+	if (ts.isConditionalExpression(node)) return rowKey(node.whenTrue) ?? rowKey(node.whenFalse);
+	if (ts.isJsxElement(node)) return attributeOf(node.openingElement, 'key');
+	if (ts.isJsxSelfClosingElement(node)) return attributeOf(node, 'key');
 }
 
 /**
@@ -4315,66 +4307,51 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		if (this.writesOuter(fn)) return null;
 
 		let setup: ts.Statement[] = [];
+		let skipsRow = false;
 		let output: ts.Expression;
 		if (ts.isBlock(fn.body)) {
 			const statements = fn.body.statements;
 			const last = statements[statements.length - 1];
 			if (!last || !ts.isReturnStatement(last) || !last.expression) return null;
 			setup = statements.slice(0, -1);
-			if (!this.armReturnsOnlyEmpty(setup)) return null;
+			const exit = this.emptyArmExit(setup);
+			if (exit === null) return null;
+			skipsRow = exit;
 			output = last.expression;
 		} else output = fn.body;
 		const root = skipParens(output);
 		if (!isJsx(root) && !ts.isConditionalExpression(root)) return null;
 
-		// Every element the row can render carries the item's key, so it moves
-		// to the header once: the same key on each arm of a conditional row.
-		const elements = (rowElements(root) ?? []).filter((element) => !ts.isJsxFragment(element));
-		const keys = elements.map((element) => {
-			return attributeOf(ts.isJsxElement(element) ? element.openingElement : element, 'key');
-		});
+		const attribute = rowKey(root);
 		let key: ts.Expression | null = null;
-		if (keys.some(Boolean)) {
-			const values = keys.map((attribute) => {
-				const value = attribute?.initializer;
-				return value && ts.isJsxExpression(value) ? value.expression : value;
-			});
-			const text = values[0]?.getText(this.sf);
-			if (!values[0] || values.some((value) => value?.getText(this.sf) !== text)) return null;
-			key = values[0];
+		if (attribute) {
+			// The original callback evaluates its guard before it reads the row key.
+			if (skipsRow || ts.isConditionalExpression(root)) return null;
+			const value = attribute.initializer;
+			key = (value && ts.isJsxExpression(value) ? value.expression : value) ?? null;
+			if (!key) return null;
 			if (this.readsLocals(key, setup)) {
 				this.note(
 					RULE.for,
 					'warning',
-					keys[0] as ts.JsxAttribute,
+					attribute,
 					'This row key reads a value computed in the row, so the list stays a `.map()`.',
 				);
 				return null;
 			}
-		}
-		const hoisted = key ? (keys as ts.JsxAttribute[]) : [];
-		/** A keyed `<Fragment>` is a bare row. */
-		const fragments: ts.JsxElement[] = [];
-		for (const attribute of hoisted) {
 			this.removed.add(attribute);
 			const opening = attribute.parent.parent;
 			if (
 				ts.isJsxOpeningElement(opening) &&
 				opening.attributes.properties.length === 1 &&
 				this.calleeName(opening.tagName) === 'Fragment'
-			) {
-				fragments.push(opening.parent);
+			)
 				this.bare.add(opening.parent);
-			}
 		}
 		const arm = ts.isConditionalExpression(root)
 			? this.ifDirective(root)
 			: this.relative(this.emit(root, TEMPLATE), root);
-		if (arm === null) {
-			for (const attribute of hoisted) this.removed.delete(attribute);
-			for (const fragment of fragments) this.bare.delete(fragment);
-			return null;
-		}
+		if (arm === null) return null;
 		this.count(RULE.for);
 		let source = this.emit(callee.expression, PLAIN);
 		if (callee.questionDotToken) source = `${source} ?? []`;
@@ -4443,19 +4420,18 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return visit(fn.body);
 	}
 
-	/**
-	 * Whether every `return` in a list row's setup leaves the row empty, the
-	 * only early exit a directive arm allows.
-	 */
-	armReturnsOnlyEmpty(statements: ts.Statement[]) {
-		let ok = true;
-		const visit = (node: ts.Node) => {
+	/** True for an early empty exit, null for an early exit with a value. */
+	emptyArmExit(statements: ts.Statement[]): boolean | null {
+		let exits = false;
+		const exitsWithValue = (node: ts.Node): true | undefined => {
 			if (isFunctionLike(node)) return;
-			if (ts.isReturnStatement(node) && node.expression && !isNullish(node.expression)) ok = false;
-			node.forEachChild(visit);
+			if (ts.isReturnStatement(node)) {
+				exits = true;
+				return node.expression && !isNullish(node.expression) ? true : undefined;
+			}
+			return node.forEachChild(exitsWithValue);
 		};
-		statements.forEach(visit);
-		return ok;
+		return statements.some(exitsWithValue) ? null : exits;
 	}
 
 	readsLocals(expression: ts.Node, statements: ts.Statement[]) {
@@ -4553,7 +4529,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		// Setup before the first guard stays in the body, which may return a
 		// value early; the rest moves into arms, which may only return nothing.
 		const rest = statements.slice(first + 1, -1).filter((statement) => !guardReturn(statement));
-		if (returnsJsx(statements.slice(0, first)) || !this.armReturnsOnlyEmpty(rest)) return null;
+		if (returnsJsx(statements.slice(0, first)) || this.emptyArmExit(rest) === null) return null;
 		const output = this.arm(last.expression as ts.Expression);
 		if (output === null) return null;
 		const chain: (from: number) => string = (from) => {
