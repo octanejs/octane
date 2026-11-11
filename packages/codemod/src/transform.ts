@@ -215,6 +215,30 @@ function isJsx(node: ts.Node) {
 	return ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
 }
 
+/** In a clsx argument an identifier can select a token, but its object keys are not portable. */
+function svgClassToken(expr: ts.Expression, truthTest = false): boolean {
+	expr = skipWrappers(expr);
+	if (ts.isStringLiteralLike(expr)) return true;
+	if (ts.isIdentifier(expr)) return truthTest;
+	if (ts.isPrefixUnaryExpression(expr) && expr.operator === ts.SyntaxKind.ExclamationToken)
+		return svgClassToken(expr.operand, true);
+	if (ts.isConditionalExpression(expr))
+		return (
+			svgClassToken(expr.condition, true) &&
+			svgClassToken(expr.whenTrue, truthTest) &&
+			svgClassToken(expr.whenFalse, truthTest)
+		);
+	if (ts.isBinaryExpression(expr)) {
+		const op = expr.operatorToken.kind;
+		if (op === ts.SyntaxKind.AmpersandAmpersandToken || op === ts.SyntaxKind.BarBarToken)
+			return (
+				svgClassToken(expr.left, truthTest || op === ts.SyntaxKind.AmpersandAmpersandToken) &&
+				svgClassToken(expr.right, truthTest)
+			);
+	}
+	return false;
+}
+
 /**
  * What a module's import of a package with no Octane port leaves to do.
  */
@@ -1097,7 +1121,9 @@ class ModuleTransform {
 				return (
 					!!value &&
 					(ts.isStringLiteral(value) ||
-						(ts.isJsxExpression(value) && !!value.expression && ts.isIdentifier(value.expression)))
+						(ts.isJsxExpression(value) &&
+							!!value.expression &&
+							this.svgClassName(value.expression)))
 				);
 			return (
 				attr.name.text === 'aria-hidden' &&
@@ -1110,6 +1136,22 @@ class ModuleTransform {
 		});
 		if (!supported) return false;
 		return this.nativeSvgOutput(tag, uses, unproven);
+	}
+
+	private svgClassName(expr: ts.Expression) {
+		if (ts.isIdentifier(expr)) return true;
+		if (!ts.isCallExpression(expr) || !ts.isIdentifier(expr.expression)) return false;
+		const declaration = this.declarationOf(expr.expression);
+		const binding = declaration && this.imports.get(declaration);
+		return (
+			binding?.module === 'clsx' &&
+			!binding.typeOnly &&
+			(binding.imported === 'default' || binding.imported === 'clsx') &&
+			!ts.findAncestor(declaration!, ts.isImportDeclaration)?.attributes &&
+			(this.resolve('clsx') ?? 'clsx') === 'clsx' &&
+			expr.arguments.every((arg) => svgClassToken(arg)) &&
+			this.options.installedClsx === true
+		);
 	}
 
 	private nativeSvgProps?: ReturnType<typeof forwardedProps>;
