@@ -357,6 +357,45 @@ export function svgLocalReads(
 	};
 }
 
+/** The returned native tree must own the element before its props can reach another renderer. */
+export function returnedTextReceiver(
+	tag: ts.JsxOpeningLikeElement,
+	types: RenderTypes,
+	uses: ReturnType<typeof localUses>,
+) {
+	const element = ts.isJsxOpeningElement(tag) ? tag.parent : tag;
+	const owner = nativeOutputOwner(element, () => false, types);
+	return owner &&
+		ts.isFunctionDeclaration(owner) &&
+		!owner.asteriskToken &&
+		!owner.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) &&
+		ts.isSourceFile(owner.parent) &&
+		owner.name &&
+		ts.findAncestor(element, ts.isFunctionLike) === owner &&
+		uses(owner.name).every(
+			(ref) =>
+				(ts.isJsxOpeningElement(ref.parent) ||
+					ts.isJsxClosingElement(ref.parent) ||
+					ts.isJsxSelfClosingElement(ref.parent)) &&
+				ref.parent.tagName === ref,
+		)
+		? owner
+		: undefined;
+}
+
+/** A competing prop, custom element, or spread can change which receiver observes the value. */
+export function closedForwardedAttribute(attr: ts.JsxAttribute) {
+	return attr.parent.properties.every(
+		(a) =>
+			ts.isJsxAttribute(a) &&
+			ts.isIdentifier(a.name) &&
+			!['key', 'ref', 'children', '__proto__', 'is'].includes(a.name.text) &&
+			(a === attr || a.name.text !== attr.name.getText()),
+	);
+}
+
+type TextPath = RenderTypes & { next?: (module: string, name: string, prop: string) => boolean };
+
 /** Prove where a selected component delivers every reference to an incoming prop. */
 export function forwardedProps(
 	file: ts.SourceFile,
@@ -368,10 +407,11 @@ export function forwardedProps(
 		  }),
 	uses = localUses(file, checker),
 	ordinaryProps = !hasPrototypeAccess(file),
+	textPath?: TextPath,
 ) {
 	// Direct eval may read any local or reassign a component declaration by spelling alone.
 	if (
-		(destination !== 'text' &&
+		((destination !== 'text' || textPath) &&
 			(/@jsx(?:ImportSource|Runtime|Frag)?\b/i.test(file.text) || !ordinaryProps)) ||
 		contains(file, (node) => ts.isIdentifier(node) && node.text === 'eval')
 	)
@@ -436,11 +476,45 @@ export function forwardedProps(
 				fn,
 				(node) =>
 					(ts.isIdentifier(node) && node.text === 'arguments') ||
-					(destination !== 'text' && callsHook(node, checker)),
+					((destination !== 'text' || !!textPath) && callsHook(node, checker)),
 			)
 		)
 			return false;
 		const refs = references(binding.name);
+		if (textPath) {
+			if (binding.bag || !refs.length) return false;
+			return refs.every((ref) => {
+				const expr = ref.parent;
+				if (!ts.isJsxExpression(expr) || !ts.isJsxAttribute(expr.parent)) return false;
+				const attr = expr.parent;
+				const tag = attr.parent.parent;
+				if (!ts.isIdentifier(attr.name) || returnedTextReceiver(tag, textPath, uses) !== fn)
+					return false;
+				if (hostAttribute(attr, attr.name.text)) return true;
+				if (
+					!textPath.next ||
+					!ts.isIdentifier(tag.tagName) ||
+					!/^[A-Z]/.test(tag.tagName.text) ||
+					!closedForwardedAttribute(attr)
+				)
+					return false;
+				const declarations = checker.getSymbolAtLocation(tag.tagName)?.declarations;
+				const spec = declarations?.length === 1 ? declarations[0] : undefined;
+				if (!spec || !ts.isImportSpecifier(spec) || spec.isTypeOnly) return false;
+				const clause = spec.parent.parent;
+				const imp = clause.parent;
+				return (
+					!clause.isTypeOnly &&
+					!imp.attributes &&
+					ts.isStringLiteral(imp.moduleSpecifier) &&
+					textPath.next(
+						imp.moduleSpecifier.text,
+						(spec.propertyName ?? spec.name).text,
+						attr.name.text,
+					)
+				);
+			});
+		}
 		if (destination !== 'text') {
 			// Direct destructuring prevents another call from observing this slot through the props object.
 			if (

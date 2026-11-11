@@ -2130,6 +2130,116 @@ export function Greeting({ count }: { count: number }) {
 		expect(page.rules['react-intl']).toBe(1);
 		expect([...page.notes, ...page.diagnostics].filter((d) => d.severity === 'error')).toEqual([]);
 	});
+	it('follows a localized prop through one selected component into its returned input', async () => {
+		const pages = {
+			Greeting: `import {useIntl} from 'react-intl';import {Field} from './Field';
+				export function Greeting(){return <Field caption={useIntl().formatMessage({id:'name'})}/>} `,
+			Field: `import {Input} from './Input';
+				export function Field({caption, show}){return <label>{show && <Input text={caption}/>}</label>}`,
+			Input: `export function Input({text}) {return <input aria-label={text}/>}`,
+		};
+		for (const [expected, change] of [
+			[true, {}],
+			[
+				false,
+				{
+					Field: pages.Field.replace('import {Input}', 'import {Input as widget}').replace(
+						'<Input ',
+						'<widget ',
+					),
+				},
+			],
+			[
+				false,
+				{
+					Field: pages.Field.replace(
+						'show && <Input text={caption}/>',
+						'(show ? <Input text={caption}/> : null) as unknown as string',
+					),
+				},
+			],
+			[false, { Field: pages.Field.replace('function Field', 'async function Field') }],
+			[false, { Input: pages.Input.replace('function Input', 'function* Input') }],
+			[
+				false,
+				{
+					Greeting: pages.Greeting.replace(
+						"from './Field';",
+						"from './Field' with { type: 'virtual' };",
+					),
+				},
+			],
+			[
+				false,
+				{
+					Field: pages.Field.replace(
+						'<Input text={caption}/>',
+						'<Other><Input text={caption}/></Other>',
+					),
+				},
+			],
+			[false, { Field: pages.Field.replace('text={caption}', 'text={caption} {...props}') }],
+			[
+				false,
+				{
+					Input:
+						'export function Input({text}) {const n=<input aria-label={text}/>;inspect(n.props);return n}',
+				},
+			],
+			[
+				false,
+				{
+					Input:
+						'export function Input({text}) {useCustomHook();return <input aria-label={text}/>}',
+				},
+			],
+			[
+				false,
+				{
+					Greeting: pages.Greeting.replace('return <Field', 'const n=<Field').replace(
+						'/>}',
+						'/>;return inspect(n)}',
+					),
+				},
+			],
+		]) {
+			const files = Object.fromEntries(
+				Object.entries({ ...pages, ...change }).map(([name, source]) => [
+					'src/' + name + '.tsx',
+					source,
+				]),
+			);
+			const root = setup(files);
+			const { files: results } = await runCodemod(
+				Object.keys(files).map((f) => path.join(root, f)),
+				{ root, write: false, strong: true, projectTypes: false },
+			);
+			const page = results.find((f) => f.file === 'src/Greeting.tsx');
+			expect(page.notes.some((n) => n.rule === 'bindings' && n.severity === 'error')).toBe(
+				!expected,
+			);
+			if (expected) expect(page.rules['react-intl']).toBe(1);
+		}
+	});
+	it('defers a forwarded attribute when the caller resolves components in a nested project', async () => {
+		const root = setup({
+			'tsconfig.json': JSON.stringify({ compilerOptions: { paths: { '@ui/*': ['./good/*'] } } }),
+			'src/tsconfig.json': JSON.stringify({
+				extends: '../tsconfig.json',
+				compilerOptions: { paths: { '@ui/*': ['../other/*'] } },
+			}),
+			'src/Greeting.tsx': `import {useIntl} from 'react-intl';import {Field} from '@ui/Field';
+				export function Greeting(){return <Field caption={useIntl().formatMessage({id:'name'})}/>} `,
+			'good/Field.tsx':
+				"import {Input} from './Input';export function Field({caption}){return <Input text={caption}/>}",
+			'good/Input.tsx': 'export function Input({text}) {return <input aria-label={text}/>}',
+			'other/Field.tsx': 'export function Field({caption}) { return <div>{caption}</div> }',
+		});
+		const { files } = await runCodemod([root], { root, write: false, strong: true });
+		expect(files.find((f) => f.file === 'src/Greeting.tsx').notes).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+	});
 	it('keeps the formatter diagnostic when a JavaScript sibling could supply the component at runtime', async () => {
 		const root = setup({
 			'src/Field.tsx': 'export function Field({caption}) { return <div title={caption}/>; }',

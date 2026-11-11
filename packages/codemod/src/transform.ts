@@ -2,6 +2,7 @@ import {
 	forwardedProps,
 	literalSvgAttribute,
 	nativeOutputOwner,
+	returnedTextReceiver,
 	renderUses,
 	svgLocalReads,
 } from './forwarded-props.js';
@@ -830,6 +831,15 @@ class ModuleTransform {
 				(fn) => this.isComponent(fn),
 				(element) => !!this.authoredIsland(element),
 				(element) => this.hostsInReact(element),
+				(tag) =>
+					!!returnedTextReceiver(
+						tag,
+						{
+							typeOf: (n) => this.typeOf(n),
+							text: (n) => textKind(this.typeOf(n)) !== 0,
+						},
+						this.localUses,
+					),
 			);
 		}
 		let safeStoreUses: ReturnType<typeof storeHookUses> | undefined;
