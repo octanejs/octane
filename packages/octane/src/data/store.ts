@@ -51,6 +51,11 @@ export interface ReadSnapshot<T> {
 	readonly error: unknown;
 	readonly refreshing: boolean;
 	readonly stale: boolean;
+	/**
+	 * For a view, whether the list goes on past the rows shown, so a later
+	 * window has rows. Always false for any other read.
+	 */
+	readonly more: boolean;
 }
 
 export interface ReadHandle<T> {
@@ -157,6 +162,8 @@ interface Span {
 	readonly last: unknown;
 	/** Whether a short span has already been reloaded once, so a list that shrank cannot loop. */
 	reloaded: boolean;
+	/** Whether the view's last evaluation found rows past its window, or the span goes on past its rows. */
+	more: boolean;
 	/**
 	 * The view's index into the shared records: every confirmed record within
 	 * the span, by ID. Evaluating the view reads these and the records pending
@@ -224,6 +231,7 @@ const PENDING: ReadSnapshot<any> = {
 	error: undefined,
 	refreshing: false,
 	stale: false,
+	more: false,
 };
 
 /** What a retired store's reads wait on: nothing will arrive. */
@@ -293,7 +301,8 @@ function renameId(entity: Entity<any>, value: unknown, from: string, to: string)
 		: value;
 }
 
-function entryKey(name: string, input: unknown): string {
+/** @internal Equal reads of equal inputs share one key. */
+export function entryKey(name: string, input: unknown): string {
 	return `${name}\n${inputKey(input)}`;
 }
 
@@ -497,7 +506,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const { of, compare } = (entry.read as View<any, any>).view;
 		const { offset, limit } = shown(entry);
 		// A window past the end of the list holds no records to bound it.
-		if (span.start > 0 && span.first === null) return EMPTY as unknown[];
+		if (span.start > 0 && span.first === null) {
+			span.more = false;
+			return EMPTY as unknown[];
+		}
 		const table = records.get(of.name);
 		const merged = new Map(span.rows);
 		// An edit can move a record into the span from anywhere in the table.
@@ -550,6 +562,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				}
 			});
 		}
+		span.more = rows.length > from + limit || span.last !== null;
 		const next = rows.slice(Math.max(0, from), Math.max(0, from + limit));
 		const previous = entry.snapshot?.value as unknown[] | undefined;
 		return previous !== undefined &&
@@ -630,6 +643,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			error: entry.error,
 			refreshing: usable && entry.inflight !== null,
 			stale: usable && isStale(entry),
+			// After `value`, whose evaluation sets it.
+			more: usable && entry.span !== null && entry.span.more,
 		};
 	}
 
@@ -650,7 +665,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				previous.value === next.value &&
 				previous.error === next.error &&
 				previous.refreshing === next.refreshing &&
-				previous.stale === next.stale
+				previous.stale === next.stale &&
+				previous.more === next.more
 			) {
 				continue;
 			}
@@ -749,6 +765,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				first: offset > 0 ? (rows[0] ?? null) : null,
 				last: rows.length < limit ? null : rows[rows.length - 1],
 				reloaded: false,
+				more: false,
 				rows: new Map(),
 			};
 			const { of } = entry.read.view;
@@ -865,7 +882,12 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				const reload = new Set<Entry>();
 				adopt(entry, value, 0, age, reload);
 				if (entry.span) {
-					entry.span = { ...(stored.span as Span), reloaded: false, rows: new Map() };
+					entry.span = {
+						...(stored.span as Span),
+						reloaded: false,
+						more: false,
+						rows: new Map(),
+					};
 					index(entry);
 				}
 				entry.stale = stored.stale;
