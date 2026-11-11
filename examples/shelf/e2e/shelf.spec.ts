@@ -199,6 +199,8 @@ for (const { name, path, serverRendered } of PAGES) {
 			await page.getByRole('textbox', { name: 'Book title' }).fill('kindred');
 			await page.getByRole('button', { name: 'Add' }).click();
 			await expect(book(page, 'kindred')).toBeVisible();
+			// A durable write is sent once it is in the journal, so wait for it to reach the network.
+			await expect.poll(writes.count).toBe(1);
 			await writes.release();
 			await expect(status(page)).toHaveText('That book is already on the shelf');
 			await expect(book(page, 'kindred')).toHaveCount(0);
@@ -303,6 +305,33 @@ test('starts the lists from the encrypted cache after a reload, without loading 
 	expect(saved).not.toContain('Kindred');
 });
 
+test('settles a write left unsettled by a reload from its receipt, without sending it again', async ({
+	page,
+}) => {
+	await open(page, '/mixed.html');
+	await page.getByRole('checkbox', { name: 'Offline' }).check();
+	await book(page, 'Piranesi').getByRole('checkbox').click();
+	await expect(status(page)).toContainText('The reply was lost');
+
+	// Hold the receipt lookup, so the recovered edit can be seen before it settles.
+	const held: Route[] = [];
+	const writes: string[] = [];
+	await page.route('**/data', (route) => {
+		const body = route.request().postData() ?? '';
+		if (body.includes('"write"')) writes.push(body);
+		if (body.includes('books.receipt')) held.push(route);
+		else void route.continue();
+	});
+	await page.reload();
+	await expect(book(page, 'Piranesi').getByRole('checkbox')).toBeChecked();
+	await expect.poll(() => held.length).toBe(1);
+
+	// The server never received it, so the receipt rolls the edit back.
+	for (const route of held.splice(0)) await route.continue();
+	await expect(book(page, 'Piranesi').getByRole('checkbox')).not.toBeChecked();
+	expect(writes).toEqual([]);
+});
+
 test('a React island and its Octane page show the same edit and the same rollback', async ({
 	page,
 }) => {
@@ -313,6 +342,7 @@ test('a React island and its Octane page show the same edit and the same rollbac
 	await island.getByRole('button', { name: 'Mark Kindred read from React' }).click();
 	await expect(book(page, 'Kindred').getByRole('checkbox')).toBeChecked();
 	await expect(island.getByText('Kindred')).toHaveCount(0);
+	await expect.poll(writes.count).toBe(1);
 	await writes.release();
 	await expect(page.getByText('3 books · 1 read')).toBeVisible();
 

@@ -18,13 +18,16 @@
  *   each tag and entity name keeps the time it was last marked, and each
  *   value the time it was saved and the names it holds.
  * - Saves are coalesced into one storage transaction per host task.
+ * - A durable write is in the journal before it is sent, and leaves it only
+ *   once its outcome is known. A restart finds it there, shows its edit again
+ *   and settles it by its receipt; it is never sent twice.
  * - The partition stays within its budget: after each save, expired values go
  *   first, then the least recently used, down to 90% of the budget. Values a
  *   mounted component is showing are never purged.
  */
 import * as devalue from 'devalue';
 import { postHostTask } from '../host-task.js';
-import type { Read } from './contracts.js';
+import type { Read, Write } from './contracts.js';
 
 /** What the store keeps in memory about each saved value. */
 export interface StoredMeta {
@@ -85,6 +88,26 @@ export interface PersistOptions {
 	readonly key: CacheKey | (() => CacheKey | Promise<CacheKey>);
 	/** The most the partition may hold, in characters of saved text; `'auto'` sizes it by device. */
 	readonly budget?: number | 'auto' | ((device: DeviceHints) => number);
+	/**
+	 * Keep these writes until their outcome is known, even across a restart.
+	 * Each is saved before it is sent. After a restart its edit shows again
+	 * while `receipt`, read with its operation ID, says whether the server
+	 * applied it; the store then keeps or rolls back the edit, and never
+	 * sends the write again. A create whose server assigns IDs needs `value`,
+	 * the created record, in an applied receipt.
+	 */
+	readonly journal?: {
+		readonly writes: ReadonlyArray<Write<any, any>>;
+		readonly receipt: Read<{ operationId: string }, { applied: boolean; value?: unknown }>;
+	};
+}
+
+/** A durable write as the journal keeps it: enough to show its edit again and look up its receipt. */
+export interface Journaled {
+	readonly id: string;
+	readonly name: string;
+	/** What the caller passed, which the write's schema validates again on recovery. */
+	readonly raw: unknown;
 }
 
 const MB = 1024 * 1024;
@@ -134,6 +157,12 @@ export interface Persistence {
 	mark(key: string): void;
 	/** Drop a saved value that failed validation or expired. */
 	discard(key: string): void;
+	/** Save a durable write; resolves once it is stored, or once storage has failed. */
+	journal(write: Journaled): Promise<void>;
+	/** Remove a write from the journal once its outcome is known. */
+	unjournal(id: string): void;
+	/** The writes a previous session left in the journal. */
+	recover(): Promise<Journaled[]>;
 	/** Values saved before now that hold one of these tags are restored stale. */
 	invalidated(tags: readonly string[]): void;
 	/** Clear the partition and stop saving. */
@@ -229,6 +258,13 @@ export function createPersistence(
 	const { storage } = options;
 	let cipher!: Awaited<ReturnType<typeof createCipher>>;
 	let partition = '';
+	/** The journal is its own partition, which purging never touches. */
+	let journalPartition = '';
+	/** Journaled operation IDs, and their hashed names. */
+	const journaled = new Map<string, string>();
+	/** Breaks ties between writes journaled in the same millisecond. */
+	let submitted = 0;
+	const ended = new Set<string>();
 	/** When each tag was last marked stale, kept in its own partition. */
 	let marksPartition = '';
 	const marks = new Map<string, number>();
@@ -250,6 +286,7 @@ export function createPersistence(
 	const ready = (async () => {
 		cipher = await createCipher(options.key);
 		partition = await cipher.name(`partition\n${options.partition}`);
+		journalPartition = await cipher.name(`journal\n${options.partition}`);
 		const [index, hints] = await Promise.all([storage.index(partition), deviceHints()]);
 		const { budget: setting = 'auto' } = options;
 		budget =
@@ -358,6 +395,14 @@ export function createPersistence(
 		if (!cleared && (kept.length > 0 || remove.length > 0)) {
 			await storage.commit(partition, kept, remove).catch(() => {});
 		}
+		if (!cleared && ended.size > 0) {
+			const done = [...ended];
+			ended.clear();
+			await storage.commit(journalPartition, [], done).catch(() => {
+				// A write left in the journal would come back after the next start: try again at the next save.
+				for (const name of done) ended.add(name);
+			});
+		}
 		if (!cleared && marksChanged) {
 			marksChanged = false;
 			const value = await cipher.seal(devalue.stringify([...marks]), marksPartition);
@@ -423,6 +468,55 @@ export function createPersistence(
 				if (!cleared) forget(await nameOf(key));
 			});
 		},
+		journal(write) {
+			const saving = writing.then(async () => {
+				await ready;
+				if (cleared) return;
+				const name = await cipher.name(`write\n${write.id}`);
+				// Storage lists the journal by hashed name, so the entry carries its submission order.
+				const order = [Date.now(), ++submitted];
+				const value = await cipher.seal(devalue.stringify({ ...write, order }), name);
+				const now = Date.now();
+				const meta = {
+					key: name,
+					size: value.length,
+					savedAt: now,
+					expiresAt: null,
+					lastUsed: now,
+					version: '',
+				};
+				await storage.commit(journalPartition, [{ meta, value }], []);
+				journaled.set(write.id, name);
+			});
+			// A write is still sent when storage fails; it is only not durable.
+			writing = saving.catch(() => {});
+			return writing;
+		},
+		unjournal(id) {
+			const name = journaled.get(id);
+			if (name === undefined) return;
+			journaled.delete(id);
+			ended.add(name);
+			schedule();
+		},
+		async recover() {
+			await ready;
+			if (cleared) return [];
+			const writes: Array<Journaled & { order: [number, number] }> = [];
+			const metas = await storage.index(journalPartition).catch(() => []);
+			for (const { key: name } of metas) {
+				try {
+					const text = await storage.get(journalPartition, name);
+					const write = devalue.parse(await cipher.open(text!, name));
+					journaled.set(write.id, name);
+					writes.push(write);
+				} catch {
+					ended.add(name);
+					schedule();
+				}
+			}
+			return writes.sort((a, b) => a.order[0] - b.order[0] || a.order[1] - b.order[1]);
+		},
 		invalidated(tags) {
 			const now = Date.now();
 			for (const tag of tags) marks.set(tag, now);
@@ -442,7 +536,11 @@ export function createPersistence(
 				.then(() => ready)
 				.then(async () => {
 					if (partition) {
-						await Promise.all([storage.clear(partition), storage.clear(marksPartition)]);
+						await Promise.all([
+							storage.clear(partition),
+							storage.clear(journalPartition),
+							storage.clear(marksPartition),
+						]);
 					}
 				})
 				.catch(() => {});

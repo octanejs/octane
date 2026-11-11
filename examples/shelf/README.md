@@ -55,6 +55,10 @@ Everything else is shared:
   IndexedDB cache (`persist` in [`session.ts`](src/shared/session.ts)), so only
   the counts, which are never fresh, load again. A real app takes the cache key
   from its signed-in session.
+- **Go offline, toggle a book, then reload.** The writes are durable
+  (`journal` in [`session.ts`](src/shared/session.ts)): the edit comes back
+  after the reload, and a receipt lookup rolls it back, because the server
+  never got it. Nothing is sent twice.
 - **Switch account.** The old account's store is retired: its values clear,
   its cache is deleted, and late replies are ignored.
 - **On the mixed page, mark a book read from the React island.** The Octane list

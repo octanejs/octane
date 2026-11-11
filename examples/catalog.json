@@ -1105,6 +1105,13 @@
           "kind": "golden",
           "spec": "e2e/shelf.spec.ts",
           "critical": true
+        },
+        {
+          "id": "durable-write-reload",
+          "title": "Show a write left unsettled by a reload again, and settle it by its receipt without sending it twice",
+          "kind": "resilience",
+          "spec": "e2e/shelf.spec.ts",
+          "critical": true
         }
       ],
       "faultScenarios": [
