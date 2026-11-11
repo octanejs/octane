@@ -4,8 +4,7 @@
 import { createContext, createElement, use, useCallback, useSyncExternalStore } from '../index.js';
 import { enableNativeReadCollection, runUrgent } from '../runtime.js';
 import { reportNativeRead, type NativeReadSource } from '../signals/read-protocol.js';
-import { createOctaneDataBinding } from './octane-binding.js';
-import type { ReadHandle } from './store.js';
+import { createOctaneDataBinding, type Observable } from './octane-binding.js';
 
 // Reads are collected around each component's render from the first render on,
 // so collection must be on before any component that imports this renders.
@@ -16,12 +15,12 @@ interface Observed {
 	last: unknown;
 	version: number;
 }
-const observed = new WeakMap<ReadHandle<unknown>, Observed>();
+const observed = new WeakMap<Observable, Observed>();
 
 const call = (fn: () => void) => fn();
 
 /** A store read as a native read source: its version moves when its snapshot does. */
-function observe(handle: ReadHandle<unknown>): void {
+function observe(handle: Observable): void {
 	let entry = observed.get(handle);
 	if (!entry) {
 		const created: Observed = {
@@ -46,7 +45,7 @@ function observe(handle: ReadHandle<unknown>): void {
 	reportNativeRead(entry.source, entry.source.getVersion());
 }
 
-export const { DataProvider, useDataStore, useRead, useReadState, useWrite } =
+export const { DataProvider, useDataStore, useForm, useRead, useReadState, useWrite } =
 	createOctaneDataBinding({
 		createContext,
 		createElement,

@@ -28,28 +28,24 @@ function shelfServer(): Plugin {
 		(load: () => Promise<ShelfServer>, template: (file: string, url: URL) => Promise<string>) =>
 		async (request: IncomingMessage, response: ServerResponse, next: () => void) => {
 			const url = new URL(request.url!, `http://${request.headers.host}`);
-			const route = request.method === 'GET' ? PAGES[url.pathname] : undefined;
+			const route = PAGES[url.pathname];
 			if (url.pathname !== '/data' && !route) return next();
 			const server = await load();
-			if (route) {
-				const html = await server.render(route.page, url, await template(route.file, url));
-				response.setHeader('content-type', 'text/html');
-				response.end(html);
-				return;
-			}
 			const chunks: Buffer[] = [];
 			for await (const chunk of request) chunks.push(chunk as Buffer);
 			const headers = new Headers();
 			for (const [name, value] of Object.entries(request.headers)) {
 				if (typeof value === 'string') headers.set(name, value);
 			}
-			const reply = await server.data(
-				new Request(url, {
-					method: request.method,
-					headers,
-					body: request.method === 'POST' ? Buffer.concat(chunks) : undefined,
-				}),
-			);
+			const incoming = new Request(url, {
+				method: request.method,
+				headers,
+				body: request.method === 'POST' ? Buffer.concat(chunks) : undefined,
+			});
+			// A page takes GET, and POST from its forms before hydration or without JavaScript.
+			const reply = route
+				? await server.render(route.page, incoming, await template(route.file, url))
+				: await server.data(incoming);
 			response.statusCode = reply.status;
 			reply.headers.forEach((value, name) => response.setHeader(name, value));
 			response.end(Buffer.from(await reply.arrayBuffer()));
