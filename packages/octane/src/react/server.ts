@@ -25,7 +25,7 @@
  *   element with `suppressHydrationWarning`; the client's stable opaque
  *   sentinel keeps React from ever touching the descendants (§9.3).
  */
-export { ReactCompat } from './react-compat-server.js';
+export { ReactCompat, ReactCompatInline } from './react-compat-server.js';
 export { bridgeReactContext } from './react-compat-shared.js';
 export type {
 	ReactCompatProps,

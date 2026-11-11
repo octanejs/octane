@@ -6,10 +6,15 @@ import * as Client from 'octane';
 import { prerender } from 'octane/static';
 import {
 	ReactCompat,
+	ReactCompatInline,
 	bridgeReactContext,
 	type OctaneCompatComponentProps,
 } from 'octane/react/server';
-import { ReactCompat as ClientReactCompat, type ReactCompatComponentProps } from 'octane/react';
+import {
+	ReactCompat as ClientReactCompat,
+	ReactCompatInline as ClientReactCompatInline,
+	type ReactCompatComponentProps,
+} from 'octane/react';
 import { getServerRenderResourceContext, puMemo } from '../src/runtime.server.js';
 
 function deferred<T>() {
@@ -60,6 +65,60 @@ describe('ReactCompat buffered server rendering', () => {
 			root.unmount();
 			container.remove();
 		}
+	});
+
+	it('hydrates an inline React island inside its server-rendered paragraph', async () => {
+		const ref = React.createRef<HTMLButtonElement>();
+		function Counter() {
+			const [count, setCount] = React.useState(0);
+			return React.createElement('button', { ref, onClick: () => setCount(count + 1) }, count);
+		}
+
+		function ServerPage({ suffix }: { suffix: string }) {
+			return Server.createElement(
+				'p',
+				null,
+				'Before ',
+				Server.createElement(ReactCompatInline, { component: Counter }),
+				suffix,
+			);
+		}
+		function ClientPage({ suffix }: { suffix: string }) {
+			return Client.createElement(
+				'p',
+				null,
+				'Before ',
+				Client.createElement<ReactCompatComponentProps<Record<string, never>>>(
+					ClientReactCompatInline,
+					{ component: Counter },
+				),
+				suffix,
+			);
+		}
+
+		const props = { suffix: ' after' };
+		const container = document.createElement('div');
+		container.innerHTML = (await prerender(ServerPage, props)).html;
+		document.body.appendChild(container);
+		const paragraph = container.querySelector('p')!;
+		const host = paragraph.querySelector('span[data-react-compat]')!;
+		const button = host.querySelector('button')!;
+		let root: Client.Root | undefined;
+		try {
+			expect(paragraph.textContent).toBe('Before 0 after');
+			root = Client.hydrateRoot(container, ClientPage, props);
+			await vi.waitFor(() => expect(ref.current).toBe(button));
+			button.click();
+			await vi.waitFor(() => expect(paragraph.textContent).toBe('Before 1 after'));
+			root.render(ClientPage, { suffix: ' updated' });
+			await vi.waitFor(() => expect(paragraph.textContent).toBe('Before 1 updated'));
+			expect(ref.current).toBe(button);
+			expect(container.querySelector('[data-react-compat]')).toBe(host);
+		} finally {
+			root?.unmount();
+			container.remove();
+		}
+		await vi.waitFor(() => expect(ref.current).toBeNull());
 	});
 
 	it('hydrates existing DOM, ids, input state, refs, and events without touching Octane siblings', async () => {
