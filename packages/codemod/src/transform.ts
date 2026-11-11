@@ -9,7 +9,7 @@ import { reactRenderer, staticReactProps } from './react-renderer.js';
 import { localUses, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
-import { effectReceivers } from './effect-receivers.js';
+import { effectReceivers, fixedBinding } from './effect-receivers.js';
 import { isBareSvgTag, storeHookUses } from './store-hook-uses.js';
 import { intlImports } from './react-intl.js';
 import {
@@ -221,25 +221,32 @@ function isJsx(node: ts.Node) {
 	return ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
 }
 
-/** In a clsx argument an identifier can select a token, but its object keys are not portable. */
-function svgClassToken(expr: ts.Expression, truthTest = false): boolean {
+/** A deferred clsx call may test a binding only if its truth value stays fixed. */
+function svgClassToken(
+	expr: ts.Expression,
+	fixedGuard: (name: ts.Identifier) => boolean,
+	truthTest = false,
+): boolean {
 	expr = skipWrappers(expr);
 	if (ts.isStringLiteralLike(expr)) return true;
-	if (ts.isIdentifier(expr)) return truthTest;
+	if (ts.isIdentifier(expr)) return truthTest && fixedGuard(expr);
 	if (ts.isPrefixUnaryExpression(expr) && expr.operator === ts.SyntaxKind.ExclamationToken)
-		return svgClassToken(expr.operand, true);
+		return svgClassToken(expr.operand, fixedGuard, true);
 	if (ts.isConditionalExpression(expr))
 		return (
-			svgClassToken(expr.condition, true) &&
-			svgClassToken(expr.whenTrue, truthTest) &&
-			svgClassToken(expr.whenFalse, truthTest)
+			svgClassToken(expr.condition, fixedGuard, true) &&
+			svgClassToken(expr.whenTrue, fixedGuard, truthTest) &&
+			svgClassToken(expr.whenFalse, fixedGuard, truthTest)
 		);
 	if (ts.isBinaryExpression(expr)) {
 		const op = expr.operatorToken.kind;
 		if (op === ts.SyntaxKind.AmpersandAmpersandToken || op === ts.SyntaxKind.BarBarToken)
 			return (
-				svgClassToken(expr.left, truthTest || op === ts.SyntaxKind.AmpersandAmpersandToken) &&
-				svgClassToken(expr.right, truthTest)
+				svgClassToken(
+					expr.left,
+					fixedGuard,
+					truthTest || op === ts.SyntaxKind.AmpersandAmpersandToken,
+				) && svgClassToken(expr.right, fixedGuard, truthTest)
 			);
 	}
 	return false;
@@ -1197,6 +1204,7 @@ class ModuleTransform {
 		return this.cssClassBindings.has(decl);
 	}
 
+	private fixedSvgParameters?: Map<ts.Symbol, boolean>;
 	private svgClassName(expr: ts.Expression) {
 		if (ts.isIdentifier(expr)) return true;
 		if (ts.isPropertyAccessExpression(expr)) return this.svgCssClass(expr);
@@ -1209,15 +1217,19 @@ class ModuleTransform {
 			(binding.imported === 'default' || binding.imported === 'clsx') &&
 			!ts.findAncestor(declaration!, ts.isImportDeclaration)?.attributes &&
 			(this.resolve('clsx') ?? 'clsx') === 'clsx' &&
-			(expr.arguments.every((arg) => svgClassToken(arg)) ||
+			this.options.installedClsx === true &&
+			(expr.arguments.every((arg) =>
+				svgClassToken(arg, (name) =>
+					fixedBinding(this.checker, name, expr, (this.fixedSvgParameters ??= new Map())),
+				),
+			) ||
 				expr.arguments.every((arg) => {
 					const token = skipWrappers(arg);
 					return (
 						ts.isStringLiteralLike(token) ||
 						(ts.isPropertyAccessExpression(token) && this.svgCssClass(token))
 					);
-				})) &&
-			this.options.installedClsx === true
+				}))
 		);
 	}
 
