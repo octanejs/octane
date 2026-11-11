@@ -9243,17 +9243,40 @@ function mapCallToForOf(expr, ctx) {
 	// Pull a `key={…}` attribute off the returned element → the for-of header key,
 	// and drop it from the element (it's not a DOM attribute). makeForCall then
 	// keys via the header, falling back to `item.id ?? item` when there's no key.
-	const attrsOf = (el) => el.openingElement?.attributes || el.attributes || [];
 	const nameOf = (a) => a?.name?.name || a?.name;
+	const attributes = body.openingElement?.attributes || body.attributes || [];
+	const keyIndex = attributes.findIndex((attr) => nameOf(attr) === 'key');
+	// A later key or spread can determine the descriptor's actual identity.
+	if (
+		attributes.some(
+			(attr, index) =>
+				index > keyIndex &&
+				(nameOf(attr) === 'key' ||
+					attr.type === 'SpreadAttribute' ||
+					attr.type === 'JSXSpreadAttribute'),
+		)
+	) {
+		return null;
+	}
 	let keyExpr = null;
 	let bodyEl = body;
-	const keyAttr = attrsOf(body).find((a) => nameOf(a) === 'key');
+	const keyAttr = attributes[keyIndex];
 	if (keyAttr) {
 		keyExpr =
 			keyAttr.value && keyAttr.value.type === 'JSXExpressionContainer'
 				? keyAttr.value.expression
 				: keyAttr.value;
-		const kept = attrsOf(body).filter((a) => nameOf(a) !== 'key');
+		// The list probes keys before rendering rows. Earlier JSX reads must keep
+		// their authored order when the key itself can observe them.
+		if (
+			!isInvariantLiteral(unwrapTsExpr(keyExpr)) &&
+			(jsxValueRootNeedsRenderScope(body, null, keyAttr) ||
+				descriptorTagKind(ctx, body.openingElement?.name || body.id, isComponentTag(body)) ===
+					'dynamic')
+		) {
+			return null;
+		}
+		const kept = attributes.filter((attr) => attr !== keyAttr);
 		bodyEl = body.openingElement
 			? { ...body, openingElement: { ...body.openingElement, attributes: kept } }
 			: { ...body, attributes: kept };
@@ -26159,7 +26182,7 @@ function isStaticJsxValueExpression(expression, stableNames = null) {
 
 // A root member tag, spread, or dynamic prop can invoke user code before its
 // descriptor exists. Defer the complete record rather than just its children.
-function jsxValueRootNeedsRenderScope(node, stableNames = null) {
+function jsxValueRootNeedsRenderScope(node, stableNames = null, before = null) {
 	const name = node.openingElement?.name || node.id;
 	if (
 		name?.type === 'MemberExpression' ||
@@ -26169,6 +26192,7 @@ function jsxValueRootNeedsRenderScope(node, stableNames = null) {
 		return true;
 	}
 	for (const attr of node.attributes || node.openingElement?.attributes || []) {
+		if (attr === before) break;
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') return true;
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		if (attr.value?.type !== 'JSXExpressionContainer') continue;
