@@ -2359,33 +2359,48 @@ class ModuleTransform {
 	}
 
 	rewriteReexport(node: ts.ExportDeclaration) {
-		const module = (node.moduleSpecifier as ts.StringLiteral).text;
+		const specifier = node.moduleSpecifier as ts.StringLiteral;
+		const module = specifier.text;
 		const exports = node.exportClause;
-		if (
-			module === 'react' &&
-			exports &&
-			ts.isNamedExports(exports) &&
-			exports.elements.some((item) =>
-				['SubmitEvent', 'SubmitEventHandler'].includes((item.propertyName ?? item.name).text),
-			)
-		) {
-			this.note(
-				RULE.unsupported,
-				'error',
-				node,
-				'Review the React submit event re-export and define an explicit native event type.',
-			);
-			return null;
+		if (module === 'react' && exports && ts.isNamedExports(exports)) {
+			const retained: string[] = [];
+			const migrated: string[] = [];
+			for (const [index, item] of exports.elements.entries()) {
+				const text = this.source.slice(
+					item.getFullStart(),
+					exports.elements[index + 1]?.getFullStart() ?? exports.end - 1,
+				);
+				const name = (item.propertyName ?? item.name).text;
+				if (name === 'SubmitEvent' || name === 'SubmitEventHandler') {
+					retained.push(text);
+					this.note(
+						RULE.unsupported,
+						'error',
+						item,
+						'Review the React submit event re-export and define an explicit native event type.',
+					);
+				} else {
+					migrated.push(text);
+				}
+			}
+			if (retained.length) {
+				if (!migrated.length) return null;
+				this.count(RULE.import);
+				const start = this.source.slice(node.getStart(this.sf), exports.getStart(this.sf) + 1);
+				const end = this.source.slice(exports.end - 1, specifier.getStart(this.sf));
+				const tail = this.source.slice(specifier.end, node.end);
+				const quote = this.source[specifier.getStart(this.sf)];
+				const statement = (items: string[], from: string) =>
+					start + items.join('') + end + quote + from + quote + tail;
+				return statement(retained, module) + '\n' + statement(migrated, 'octane');
+			}
 		}
 		const mapped = REACT_MODULES[module];
 		if (mapped) {
 			this.count(RULE.import);
-			return this.replaceSpecifier(node, node.moduleSpecifier as ts.Expression, mapped);
+			return this.replaceSpecifier(node, specifier, mapped);
 		}
-		return (
-			this.rewritePackageNames(node, module) ??
-			this.rewriteSpecifier(node, node.moduleSpecifier as ts.Expression)
-		);
+		return this.rewritePackageNames(node, module) ?? this.rewriteSpecifier(node, specifier);
 	}
 
 	rewriteSpecifier(node: ts.Node, specifier: ts.Expression) {
@@ -3288,40 +3303,86 @@ class ModuleTransform {
 		return name === 'SubmitEventHandler' ? `${type('EventHandler')}<${event}>` : event;
 	}
 
-	private hasSubmitType(type: ts.TypeNode | undefined, eventValue = false) {
+	private hasSubmitType(
+		type: ts.TypeNode | undefined,
+		eventValue = false,
+		indices: readonly number[] = [],
+	) {
 		if (!type) return false;
 		let aliases: Set<ts.TypeAliasDeclaration> | undefined;
-		const submit = (name: string | null) =>
-			name === 'SubmitEvent' || (!eventValue && name === 'SubmitEventHandler');
-		const visit = (node: ts.Node): boolean => {
+		const submit = eventValue ? 'SubmitEvent' : 'SubmitEventHandler';
+		const visit = (node: ts.TypeNode, depth: number): boolean => {
+			if (ts.isParenthesizedTypeNode(node) || ts.isOptionalTypeNode(node))
+				return visit(node.type, depth);
+			if (ts.isTypeOperatorNode(node) && node.operator === ts.SyntaxKind.ReadonlyKeyword)
+				return visit(node.type, depth);
+			if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node))
+				return node.types.some((part) => visit(part, depth));
 			if (ts.isTypeReferenceNode(node)) {
-				if (submit(this.reactTypeName(node.typeName))) return true;
+				if (depth === indices.length && this.reactTypeName(node.typeName) === submit) return true;
 				const alias = ts.isIdentifier(node.typeName) && this.declarationOf(node.typeName);
 				if (alias && ts.isTypeAliasDeclaration(alias) && !aliases?.has(alias)) {
 					(aliases ??= new Set()).add(alias);
-					if (visit(alias.type)) return true;
+					return visit(alias.type, depth);
 				}
 			}
-			if (
+			if (depth < indices.length) {
+				if (ts.isArrayTypeNode(node)) return visit(node.elementType, depth + 1);
+				if (ts.isTupleTypeNode(node)) {
+					const index = indices[depth];
+					const member = node.elements[index];
+					if (
+						!member ||
+						node.elements
+							.slice(0, index + 1)
+							.some(
+								(element) =>
+									ts.isRestTypeNode(element) ||
+									(ts.isNamedTupleMember(element) && !!element.dotDotDotToken),
+							)
+					)
+						return false;
+					return visit(ts.isNamedTupleMember(member) ? member.type : member, depth + 1);
+				}
+				if (
+					ts.isTypeReferenceNode(node) &&
+					ts.isIdentifier(node.typeName) &&
+					['Array', 'ReadonlyArray'].includes(node.typeName.text) &&
+					this.declarationOf(node.typeName)?.getSourceFile().hasNoDefaultLib &&
+					node.typeArguments?.[0]
+				)
+					return visit(node.typeArguments[0], depth + 1);
+				return false;
+			}
+			if (!eventValue && ts.isFunctionTypeNode(node))
+				return this.hasSubmitType(node.parameters[0]?.type, true);
+			return (
 				ts.isImportTypeNode(node) &&
 				!node.isTypeOf &&
 				ts.isLiteralTypeNode(node.argument) &&
 				ts.isStringLiteral(node.argument.literal) &&
 				node.argument.literal.text === 'react' &&
-				node.qualifier &&
+				!!node.qualifier &&
 				ts.isIdentifier(node.qualifier) &&
-				submit(node.qualifier.text)
-			)
-				return true;
-			return (
-				(!eventValue ||
-					ts.isParenthesizedTypeNode(node) ||
-					ts.isUnionTypeNode(node) ||
-					ts.isIntersectionTypeNode(node)) &&
-				ts.forEachChild(node, visit) === true
+				node.qualifier.text === submit
 			);
 		};
-		return visit(type);
+		return visit(type, 0);
+	}
+
+	private hasSubmitProperty(type: ts.Type | undefined, name: ts.Node, indices: readonly number[]) {
+		if (!ts.isIdentifier(name) && !ts.isStringLiteral(name) && !ts.isNumericLiteral(name))
+			return false;
+		return (
+			type?.getProperty(name.text)?.declarations?.some((declaration) => {
+				if (ts.isPropertySignature(declaration))
+					return this.hasSubmitType(declaration.type, false, indices);
+				return (
+					ts.isMethodSignature(declaration) &&
+					this.hasSubmitType(declaration.parameters[0]?.type, true)
+				);
+			}) ?? false
+		);
 	}
 
 	private isSubmitParameter(param: ts.ParameterDeclaration) {
@@ -3360,33 +3421,39 @@ class ModuleTransform {
 		}
 		let value: ts.Node = handler;
 		let context = value.parent;
-		while (
-			ts.isParenthesizedExpression(context) ||
-			ts.isPropertyAssignment(context) ||
-			ts.isObjectLiteralExpression(context) ||
-			ts.isArrayLiteralExpression(context)
-		) {
+		const indices: number[] = [];
+		while (ts.isParenthesizedExpression(context) || ts.isArrayLiteralExpression(context)) {
+			if (ts.isArrayLiteralExpression(context)) {
+				const index = context.elements.findIndex((element) => element === value);
+				if (index < 0 || context.elements.slice(0, index).some(ts.isSpreadElement)) return false;
+				indices.unshift(index);
+			}
 			value = context;
 			context = value.parent;
 		}
+		const typed = (type: ts.TypeNode | undefined) => this.hasSubmitType(type, false, indices);
+		if (ts.isPropertyAssignment(context) && ts.isObjectLiteralExpression(context.parent))
+			return this.hasSubmitProperty(
+				this.checker.getContextualType(context.parent),
+				context.name,
+				indices,
+			);
+		if (ts.isObjectLiteralExpression(context) && ts.isMethodDeclaration(handler))
+			return this.hasSubmitProperty(this.checker.getContextualType(context), handler.name, indices);
 		if (
 			(ts.isVariableDeclaration(context) && context.initializer === value) ||
 			ts.isSatisfiesExpression(context) ||
 			ts.isAsExpression(context)
 		)
-			return this.hasSubmitType(context.type);
+			return typed(context.type);
 		if (ts.isJsxExpression(context) && ts.isJsxAttribute(context.parent)) {
 			const { name, parent } = context.parent;
-			if (!ts.isIdentifier(name)) return false;
 			const element = parent.parent;
 			const props = this.checker.getResolvedSignature(element)?.getParameters()[0];
-			const property =
-				props && this.checker.getTypeOfSymbolAtLocation(props, element).getProperty(name.text);
-			return (
-				property?.declarations?.some(
-					(declaration) =>
-						ts.isPropertySignature(declaration) && this.hasSubmitType(declaration.type),
-				) ?? false
+			return this.hasSubmitProperty(
+				props && this.checker.getTypeOfSymbolAtLocation(props, element),
+				name,
+				indices,
 			);
 		}
 		if (
@@ -3397,26 +3464,21 @@ class ModuleTransform {
 			const target = ts.isPropertyAccessExpression(context.left) ? context.left.name : context.left;
 			const declaration = this.checker.getSymbolAtLocation(target)?.valueDeclaration;
 			if (declaration && ts.isPropertyAssignment(declaration))
-				return (
-					ts.isAsExpression(declaration.initializer) &&
-					this.hasSubmitType(declaration.initializer.type)
-				);
+				return ts.isAsExpression(declaration.initializer) && typed(declaration.initializer.type);
 			return (
 				!!declaration &&
 				(ts.isVariableDeclaration(declaration) || ts.isPropertyDeclaration(declaration)) &&
-				this.hasSubmitType(declaration.type)
+				typed(declaration.type)
 			);
 		}
 		if (ts.isReturnStatement(context))
-			return this.hasSubmitType(ts.findAncestor(context, ts.isFunctionLike)?.type);
+			return typed(ts.findAncestor(context, ts.isFunctionLike)?.type);
 		if (ts.isCallExpression(context)) {
 			const index = context.arguments.findIndex((argument) => argument === value);
 			const signature = this.checker.getResolvedSignature(context)?.getDeclaration();
-			return index !== -1 && this.hasSubmitType(signature?.parameters[index]?.type);
+			return index !== -1 && typed(signature?.parameters[index]?.type);
 		}
-		return (
-			ts.isArrowFunction(context) && context.body === value && this.hasSubmitType(context.type)
-		);
+		return ts.isArrowFunction(context) && context.body === value && typed(context.type);
 	}
 
 	private checkSubmitParameter(param: ts.ParameterDeclaration) {

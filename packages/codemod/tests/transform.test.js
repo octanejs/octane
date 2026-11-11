@@ -577,6 +577,45 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		);
 	});
 
+	it('migrates sibling exports and keeps comments on the React submit type re-export', () => {
+		const { code, notes } = transformModule(
+			"export { /* hook */ useState, /* event */ type SubmitEvent as Submission } from 'react';\n" +
+				"export type {SubmitEventHandler, ReactNode as Node} from 'react';",
+			'form-types.ts',
+		);
+		expect(code).toMatch(/export \{\s*\/\* hook \*\/ useState,?\s*\} from 'octane';/);
+		expect(code).toMatch(
+			/export \{\s*\/\* event \*\/ type SubmitEvent as Submission\s*\} from 'react';/,
+		);
+		expect(code).toMatch(/export type \{\s*ReactNode as Node\s*\} from 'octane';/);
+		expect(
+			notes.filter((note) => note.rule === 'unsupported-api' && note.severity === 'error'),
+		).toHaveLength(2);
+	});
+
+	it.each([
+		`const handlers: { submit: Submit; change: (v: {value: string}) => void } = {
+			submit(e) { e.isDefaultPrevented(); },
+			change(v) { inspect(v.value); },
+		};`,
+		`const handlers: readonly [React.SubmitEventHandler, (v: {value: string}) => void] = [
+			(e) => e.isDefaultPrevented(),
+			(v) => inspect(v.value),
+		];`,
+		`const handlers: Array<import('react').SubmitEventHandler> = [
+			(e) => e.isDefaultPrevented(),
+		];`,
+	])('checks only the submit handler in a typed callback collection', (body) => {
+		const { notes } = transformModule(
+			`import type {SubmitEventHandler as Submit} from 'react';
+			${body}`,
+			'form.tsx',
+		);
+		expect(
+			notes.filter((note) => note.rule === 'event-object' && note.severity === 'error'),
+		).toHaveLength(1);
+	});
+
 	it.each([
 		'event.target.elements',
 		'event.constructor === globalThis.SubmitEvent',
