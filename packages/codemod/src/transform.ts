@@ -829,9 +829,8 @@ class ModuleTransform {
 			}
 		}
 		// Resolve component wrappers through their imports before claiming native Intl hooks.
-		const hasIntl = this.options.reactIntlAdapter && this.source.includes('react-intl');
-		const selectIntl = (services?: ReadonlySet<ts.CallExpression>) =>
-			intlImports(
+		if (this.options.reactIntlAdapter && this.source.includes('react-intl')) {
+			this.nativeIntl = intlImports(
 				this.sf,
 				this.options.forwardedText,
 				this.checker,
@@ -848,10 +847,9 @@ class ModuleTransform {
 						},
 						this.localUses,
 					),
-				services,
+				() => this.options.reactStoreComponent?.('react-intl') === true,
 			);
-		if (hasIntl) this.nativeIntl = selectIntl();
-		const serviceArguments = new Set<ts.CallExpression>();
+		}
 		let safeStoreUses: ReturnType<typeof storeHookUses> | undefined;
 		const descriptors = new Map<ts.Node, { item: ts.ImportSpecifier; props: string }>();
 		for (const [declaration, entry] of this.imports) {
@@ -867,7 +865,6 @@ class ModuleTransform {
 				const statement = declaration.parent.parent.parent;
 				if (!statement.attributes && !/\/\*|\/\//.test(statement.getText(this.sf))) {
 					const pending: typeof descriptors = new Map();
-					const service = hasIntl ? new Set<ts.CallExpression>() : undefined;
 					const from = this.options.resolveStoreHook(
 						entry.module,
 						entry.imported,
@@ -879,7 +876,6 @@ class ModuleTransform {
 								(expr) => this.typeOf(expr),
 							);
 							pending.clear();
-							service?.clear();
 							return safeStoreUses(
 								declaration,
 								sharedInput,
@@ -890,31 +886,17 @@ class ModuleTransform {
 									return true;
 								},
 								unchangedHelper,
-								service,
 							);
 						},
 					);
 					if (from) {
-						if (service) for (const arg of service) serviceArguments.add(arg);
 						for (const [element, args] of pending) descriptors.set(element, args);
 						this.nativeStoreHooks.set(declaration, from);
 						continue;
 					}
 				}
 			}
-		}
-		// Store descriptor decisions above use the already selected display imports.
-		// Only useIntl can gain a sink from an accepted original service.
-		if (serviceArguments.size && this.options.reactStoreComponent?.('react-intl'))
-			for (const item of selectIntl(serviceArguments)) this.nativeIntl.add(item);
-		for (const [declaration, entry] of this.imports) {
-			if (
-				entry.typeOnly ||
-				(ts.isImportSpecifier(declaration) &&
-					(this.nativeStoreHooks.has(declaration) || this.nativeIntl.has(declaration))) ||
-				nativeReactCompat(entry.module, entry.imported)
-			)
-				continue;
+			if (nativeReactCompat(entry.module, entry.imported)) continue;
 			entry.port = this.portOf(entry.module);
 			if (entry.port) portLocals.add(entry.local);
 		}

@@ -230,8 +230,6 @@ A verified hook result can also go to a named function exported directly from an
 
 When the file uses the project’s React 19.2+ automatic JSX runtime, a service read with a verified handle can receive a self-closing component from an installed React package with literal props, for example `store.read(notices).show(<Message id="saved" />)`. The generated code creates the original React element, so the service can render it later under its React provider.
 
-After a completed `await`, a standalone call to a verified store service can receive the original `intl.formatMessage({ id: 'saved' })` result as its first argument. This accepts literal message descriptors without substitutions and literal data in the remaining service arguments. The application keeps the original provider's result, including any React elements.
-
 Dynamic JSX payloads, opaque store values rendered as children, and components passed to unknown renderers still require manual migration.
 
 <a id="path-only-svg-components"></a>

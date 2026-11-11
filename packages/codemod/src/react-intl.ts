@@ -1,4 +1,9 @@
-import { closedForwardedAttribute, forwardedProps, hasPrototypeAccess } from './forwarded-props.js';
+import {
+	closedForwardedAttribute,
+	forwardedProps,
+	hasPrototypeAccess,
+	renderUses,
+} from './forwarded-props.js';
 import type { TransformOptions } from './types.js';
 import { localUses, portableArguments, scalar } from './local-uses.js';
 import ts from 'typescript';
@@ -26,7 +31,7 @@ export function intlImports(
 	inReact: (element: ts.JsxElement | ts.JsxSelfClosingElement) => boolean,
 	canPassToReact: (element: ts.JsxElement | ts.JsxSelfClosingElement) => boolean,
 	returnedReceiver: (tag: ts.JsxOpeningLikeElement) => boolean,
-	serviceArguments?: ReadonlySet<ts.CallExpression>,
+	originalReact: () => boolean,
 ): Set<ts.ImportSpecifier> {
 	const candidates = file.statements.filter(ts.isImportDeclaration).flatMap((decl) => {
 		const named = decl.importClause?.namedBindings;
@@ -67,14 +72,6 @@ export function intlImports(
 		return safe;
 	}
 	function checkSink(value: ts.Expression, allowForwarding: boolean): boolean {
-		if (
-			allowForwarding &&
-			ts.isCallExpression(value) &&
-			value.arguments.length === 1 &&
-			!value.questionDotToken &&
-			serviceArguments?.has(value)
-		)
-			return true;
 		const use = value.parent;
 		if (
 			ts.isParenthesizedExpression(use) ||
@@ -264,7 +261,121 @@ export function intlImports(
 		const values = call.arguments[1];
 		return !values || scalarValues(values);
 	}
-	function readsIntl(id: ts.Identifier) {
+	function localeView(
+		owner: ts.FunctionDeclaration,
+		decl: ts.VariableDeclaration,
+		name: ts.Identifier,
+	) {
+		const body = owner.body?.statements;
+		const [bind, output] = body ?? [];
+		if (
+			owner.parameters.length ||
+			body?.length !== 2 ||
+			!ts.isVariableStatement(bind) ||
+			bind.declarationList !== decl.parent ||
+			bind.declarationList.declarations.length !== 1 ||
+			!ts.isReturnStatement(output) ||
+			!output.expression
+		)
+			return false;
+		const view = output.expression;
+		const tag = ts.isJsxElement(view) ? view.openingElement : view;
+		if (
+			(!ts.isJsxOpeningElement(tag) && !ts.isJsxSelfClosingElement(tag)) ||
+			!ts.isIdentifier(tag.tagName) ||
+			!/^(?:div|span|p|b|strong|em|small|label|output|h[1-6])$/.test(tag.tagName.text)
+		)
+			return false;
+		const readsLocale = (node: ts.JsxExpression) =>
+			!node.dotDotDotToken &&
+			!!node.expression &&
+			ts.isIdentifier(node.expression) &&
+			node.expression.text === name.text;
+		const [attr, extra] = tag.attributes.properties;
+		if (
+			extra ||
+			(attr &&
+				(!ts.isJsxAttribute(attr) ||
+					!ts.isIdentifier(attr.name) ||
+					attr.name.text !== 'lang' ||
+					!attr.initializer ||
+					!ts.isJsxExpression(attr.initializer) ||
+					!readsLocale(attr.initializer)))
+		)
+			return false;
+		const children = ts.isJsxElement(view)
+			? view.children.filter((child) => !ts.isJsxText(child) || child.text.trim())
+			: [];
+		const [child, sibling] = children;
+		return !sibling && (child ? ts.isJsxExpression(child) && readsLocale(child) : !!attr);
+	}
+	// Only a private component with a closed JSX use can prove its nearest provider.
+	function localeProvider(owner: ts.FunctionDeclaration) {
+		if (
+			!ordinaryCaller ||
+			/@jsx(?:ImportSource|Runtime|Frag)?\b|\beval\b/i.test(file.text) ||
+			owner.parent !== file ||
+			owner.asteriskToken ||
+			owner.modifiers ||
+			!owner.name
+		)
+			return;
+		const [ref, extra] = renderUses(uses(owner.name));
+		const leaf = ref?.parent;
+		if (
+			extra ||
+			!leaf ||
+			!ts.isJsxSelfClosingElement(leaf) ||
+			leaf.tagName !== ref ||
+			leaf.typeArguments ||
+			leaf.attributes.properties.length
+		)
+			return;
+		const tree = leaf.parent;
+		if (
+			!ts.isJsxElement(tree) ||
+			inReact(tree) ||
+			!tree.children.every((child) => child === leaf || (ts.isJsxText(child) && !child.text.trim()))
+		)
+			return;
+		const { tagName, attributes } = tree.openingElement;
+		const closing = tree.closingElement.tagName;
+		const [attr, other] = attributes.properties;
+		if (
+			!ts.isIdentifier(tagName) ||
+			!ts.isIdentifier(closing) ||
+			other ||
+			!attr ||
+			!ts.isJsxAttribute(attr) ||
+			!ts.isIdentifier(attr.name) ||
+			attr.name.text !== 'locale' ||
+			!attr.initializer ||
+			!ts.isStringLiteral(attr.initializer) ||
+			/[&\r\n]/.test(attr.initializer.text)
+		)
+			return;
+		const provider = candidates.find((item) => {
+			if ((item.propertyName ?? item.name).text !== 'IntlProvider') return false;
+			const refs = renderUses(uses(item.name));
+			return refs.length === 2 && refs.includes(tagName) && refs.includes(closing);
+		});
+		if (!provider || !originalReact()) return;
+		let output: ts.Node = tree;
+		while (ts.isParenthesizedExpression(output.parent)) output = output.parent;
+		if (!ts.isReturnStatement(output.parent)) return;
+		const root = ts.findAncestor(output.parent, ts.isFunctionLike);
+		if (
+			root &&
+			(ts.isFunctionDeclaration(root) ||
+				ts.isFunctionExpression(root) ||
+				ts.isArrowFunction(root)) &&
+			!root.asteriskToken &&
+			!root.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
+			isComponent(root)
+		)
+			return provider;
+	}
+	function readsIntl(id: ts.Identifier, allowLocale = false) {
 		const call = id.parent;
 		if (!ts.isCallExpression(call) || call.expression !== id || call.arguments.length) return false;
 		const owner = ts.findAncestor(call, ts.isFunctionLike);
@@ -280,21 +391,45 @@ export function intlImports(
 			return false;
 		if (readsScalar(call)) return true;
 		const decl = call.parent;
-		return (
-			ts.isVariableDeclaration(decl) &&
-			decl.initializer === call &&
-			ts.isIdentifier(decl.name) &&
-			!!(ts.getCombinedNodeFlags(decl) & ts.NodeFlags.Const) &&
-			uses(decl.name).every(readsScalar)
-		);
+		if (
+			!ts.isVariableDeclaration(decl) ||
+			decl.initializer !== call ||
+			!(ts.getCombinedNodeFlags(decl) & ts.NodeFlags.Const)
+		)
+			return false;
+		if (ts.isIdentifier(decl.name)) return uses(decl.name).every(readsScalar);
+		if (!allowLocale || !ts.isObjectBindingPattern(decl.name) || decl.name.elements.length !== 1)
+			return false;
+		const [binding] = decl.name.elements;
+		const key = binding.propertyName ?? binding.name;
+		if (
+			binding.dotDotDotToken ||
+			binding.initializer ||
+			!ts.isIdentifier(binding.name) ||
+			(!ts.isIdentifier(key) && !ts.isStringLiteral(key)) ||
+			key.text !== 'locale' ||
+			!ts.isFunctionDeclaration(owner) ||
+			!localeView(owner, decl, binding.name)
+		)
+			return false;
+		return localeProvider(owner) ?? false;
 	}
 	for (const item of candidates) {
 		const name = (item.propertyName ?? item.name).text;
-		if (serviceArguments && name !== 'useIntl') continue;
 		const locations = uses(item.name);
 		if (!locations.length) continue;
+		if (name === 'useIntl') {
+			const proof =
+				locations.length === 1
+					? readsIntl(locations[0], true)
+					: locations.every((id) => readsIntl(id));
+			if (proof) {
+				selected.add(item);
+				if (proof !== true) selected.add(proof);
+			}
+			continue;
+		}
 		const supported = locations.every((id) => {
-			if (name === 'useIntl') return readsIntl(id);
 			const tag = id.parent;
 			if (ts.isJsxClosingElement(tag)) return tag.tagName === id && name !== 'FormattedMessage';
 			if ((!ts.isJsxSelfClosingElement(tag) && !ts.isJsxOpeningElement(tag)) || tag.tagName !== id)
