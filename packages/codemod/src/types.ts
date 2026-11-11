@@ -23,7 +23,10 @@ export interface TransformOptions {
 	resolveStoreHook?(
 		module: string,
 		name: string,
-		safeUses: (sharedInput: (module: string, name: string) => boolean) => boolean,
+		safeUses: (
+			sharedInput: (module: string, name: string) => boolean,
+			unchangedHelper?: (module: string, name: string) => boolean,
+		) => boolean,
 	): { from: string; name: string } | null;
 	/** Relative path to the project-local React Intl adapter, when its installed peers support it. */
 	reactIntlAdapter?: string;

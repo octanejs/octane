@@ -857,7 +857,7 @@ class ModuleTransform {
 					const from = this.options.resolveStoreHook(
 						entry.module,
 						entry.imported,
-						(sharedInput) => {
+						(sharedInput, unchangedHelper) => {
 							safeStoreUses ??= storeHookUses(
 								this.sf,
 								this.checker,
@@ -865,12 +865,17 @@ class ModuleTransform {
 								(expr) => this.typeOf(expr),
 							);
 							pending.clear();
-							return safeStoreUses(declaration, sharedInput, (elements) => {
-								const args = elements.map((element) => this.storeReactDescriptor(element));
-								if (!args.every((arg) => arg !== null)) return false;
-								for (const [index, arg] of args.entries()) pending.set(elements[index], arg);
-								return true;
-							});
+							return safeStoreUses(
+								declaration,
+								sharedInput,
+								(elements) => {
+									const args = elements.map((element) => this.storeReactDescriptor(element));
+									if (!args.every((arg) => arg !== null)) return false;
+									for (const [index, arg] of args.entries()) pending.set(elements[index], arg);
+									return true;
+								},
+								unchangedHelper,
+							);
 						},
 					);
 					if (from) {
