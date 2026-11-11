@@ -21,6 +21,9 @@
  * - A view's records are shared: one table per entity holds the newest
  *   confirmed copy of each record any view has loaded, and every view of the
  *   entity is evaluated over that table with outstanding edits applied.
+ * - A read only the server can order keeps the order and membership it was
+ *   sent, but shares records with the views: its load gives them any newer
+ *   copy, and it shows any copy newer than its own load.
  * - A seed from a server render is adopted when its read is first asked for,
  *   so hydration finds the server's value without waiting or loading. It keeps
  *   its age: freshness and expiry count from when the server loaded it.
@@ -173,6 +176,8 @@ interface Entry {
 	span: Span | null;
 	/** Whether persistent storage has been asked for this entry's value. */
 	checkedStorage: boolean;
+	/** The last projection of a read's value, so an unchanged one keeps its identity. */
+	projected: { base: unknown; parts: Map<unknown, unknown>; value: unknown } | null;
 }
 
 interface Operation {
@@ -512,11 +517,22 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 
 	/** The confirmed value with every outstanding edit applied, in submission order. */
 	function project(entry: Entry): unknown {
-		if (operations.length === 0 || !entry.read.entities) return entry.base;
+		if (!entry.read.entities || (operations.length === 0 && records.size === 0)) return entry.base;
 		const replace = new Map<unknown, unknown>();
 		for (const { entity, source } of selections(entry.read, entry.base)) {
 			const list = Array.isArray(source);
 			let items: unknown[] = list ? source : [source];
+			// A copy of a record newer than this read's load, from a view or another read.
+			const table = records.get(entity.name);
+			if (table) {
+				for (let index = 0; index < items.length; index++) {
+					const record = table.get(entity.id(items[index]));
+					if (record && record.seq > entry.baseSeq && !sameRow(record.value, items[index])) {
+						if (items === source) items = items.slice();
+						items[index] = record.value;
+					}
+				}
+			}
 			for (const operation of operations) {
 				const { effect } = operation.write;
 				if (effect?.entity.name !== entity.name || !shows(operation, entry)) continue;
@@ -536,7 +552,26 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			if (list ? items !== source : items[0] !== source)
 				replace.set(source, list ? items : items[0]);
 		}
-		return replace.size === 0 ? entry.base : rewrite(entry.base, replace);
+		if (replace.size === 0) return entry.base;
+		// Unchanged parts keep the last value, so a reader is not told of a change that is not one.
+		const last = entry.projected;
+		if (last !== null && last.base === entry.base && last.parts.size === replace.size) {
+			const { parts } = last;
+			let same = true;
+			for (const [source, part] of replace) {
+				const previous = parts.get(source);
+				same &&=
+					sameRow(previous, part) ||
+					(Array.isArray(previous) &&
+						Array.isArray(part) &&
+						previous.length === part.length &&
+						previous.every((item, index) => sameRow(item, part[index])));
+			}
+			if (same) return last.value;
+		}
+		const value = rewrite(entry.base, replace);
+		entry.projected = { base: entry.base, parts: replace, value };
+		return value;
 	}
 
 	function isStale(entry: Entry): boolean {
@@ -591,9 +626,25 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 
 	/** Commit `entry`, and with it every view that reads the records its value carried. */
 	function touchWithViews(entry: Entry): void {
-		commit(
-			isView(entry.read) ? new Set([entry, ...viewEntries(entry.read.view.of.name)]) : [entry],
-		);
+		commit(withSharing([entry]));
+	}
+
+	/** These entries, and every read that shares a record their values may have changed. */
+	function withSharing(changed: readonly Entry[]): Set<Entry> {
+		const all = new Set(changed);
+		const names = new Set<string>();
+		for (const entry of changed)
+			if (entry.read.entities) for (const name of entry.names) names.add(name);
+		if (names.size === 0) return all;
+		for (const other of entries.values()) {
+			for (const name of other.names) {
+				if (names.has(name)) {
+					all.add(other);
+					break;
+				}
+			}
+		}
+		return all;
 	}
 
 	function reloadAll(reload: Set<Entry>): void {
@@ -668,6 +719,23 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					if (other !== entry && inSpan(other, record.value)) later.add(other);
 				}
 				records.get(of.name)!.delete(id);
+			}
+			if (!reload) reloadAll(later);
+		} else if (entry.read.entities) {
+			// Records the server ordered: views get a newer copy of a record they hold, and
+			// nothing else moves. A record no view holds stays out: the views' own loads say
+			// which records they show, and this one may be older than theirs.
+			const later = reload ?? new Set();
+			for (const { entity, source } of selections(entry.read, value)) {
+				const table = records.get(entity.name);
+				if (table === undefined) continue;
+				let shared = false;
+				for (const item of Array.isArray(source) ? source : [source]) {
+					if (!table.has(entity.id(item))) continue;
+					putRecord(entity, item, startedSeq, entry, later);
+					shared = true;
+				}
+				if (shared) for (const view of viewEntries(entity.name)) persisted?.mark(view.key);
 			}
 			if (!reload) reloadAll(later);
 		}
@@ -894,6 +962,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			snapshot: null,
 			span: null,
 			checkedStorage: false,
+			projected: null,
 		};
 		entries.set(key, created);
 		adoptSeed(created);
@@ -998,7 +1067,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (pending.length > 0) {
 			void Promise.all(pending).then((commits) => {
 				const adopted = commits.map((adopt) => adopt());
-				commit(adopted.filter((entry): entry is Entry => entry !== undefined));
+				commit(withSharing(adopted.filter((entry): entry is Entry => entry !== undefined)));
 			});
 		}
 		const tags = writeTags(operation.write);

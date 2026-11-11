@@ -644,6 +644,24 @@ describe('octane/data persistent cache', () => {
 		expect(remote.log).toEqual([]);
 	});
 
+	it('saves the views a server-ordered read gave a newer copy of a record', async () => {
+		const storage = memoryStorage();
+		const first = server(books());
+		const before = createDataStore({ transport: first.transport, persist: cache(storage, 'ada') });
+		await value(before, unread);
+		await saved();
+		// Another user renames a book; the shelf, ordered by the server, brings the new title.
+		first.books[1]!.title = 'Piranesi (revised)';
+		await value(before, shelf);
+		await saved();
+
+		const remote = server(first.books);
+		const after = createDataStore({ transport: remote.transport, persist: cache(storage, 'ada') });
+		const restored = await value<Book[]>(after, unread);
+		expect(restored.value.map((book) => book.title)).toContain('Piranesi (revised)');
+		expect(remote.log).toEqual([]);
+	});
+
 	it('sizes the automatic budget by device', () => {
 		const MB = 1024 * 1024;
 		const device = { memory: undefined, saveData: false, quota: undefined };
