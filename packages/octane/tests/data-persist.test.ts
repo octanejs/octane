@@ -956,6 +956,29 @@ describe('octane/data live updates and cache lifecycle', () => {
 		expect(remote.log).toEqual([]);
 	});
 
+	it('keeps the saved value of a read whose published value is refused', async () => {
+		const storage = memoryStorage();
+		const first = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await value(first, shelf);
+		await saved();
+
+		// Nothing loaded the shelf in this session.
+		const second = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await expect(second.publish(shelf, undefined, [{ id: 'd' }])).rejects.toBeDefined();
+		await saved();
+
+		const remote = server(books());
+		const third = createDataStore({ transport: remote.transport, persist: cache(storage, 'ada') });
+		await value(third, shelf);
+		expect(remote.log).toEqual([]);
+	});
+
 	it.each(['restore', 'fetch'])(
 		'erases a read while its %s is in flight, and keeps the others',
 		async (pending) => {

@@ -1364,24 +1364,40 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			}
 			const entry = entryFor(read, input);
 			const attempt = supersede(entry);
-			entry.checkedStorage = true;
+			// Taken now, as a load does: a write confirmed while this validates is newer.
+			const startedSeq = ++sequence;
 			const current = () => !retired && entry.attempt === attempt;
-			return Promise.resolve()
+			let refused = false;
+			let reason: unknown;
+			// Readers that ask while it validates join it rather than superseding it with a load.
+			const done = Promise.resolve()
 				.then(() => parse(read.output, value))
 				.then(
 					(parsed) => {
 						if (!current()) return;
-						adopt(entry, parsed, ++sequence);
+						adopt(entry, parsed, startedSeq);
 						save(entry);
-						touchWithViews(entry);
-						idle(entry);
 					},
 					(error) => {
-						// What it holds is older than the value that failed, and the load it superseded is gone.
-						if (current()) invalidateEntry(entry);
-						throw error;
+						refused = true;
+						reason = error;
+						// A newer value exists, so what memory holds is stale; storage keeps its copy.
+						if (current() && entry.hasBase) entry.stale = true;
 					},
-				);
+				)
+				.then(() => {
+					if (!current()) return;
+					entry.inflight = null;
+					touchWithViews(entry);
+					// A refused value leaves an observer the load it superseded.
+					if (entry.subscribers.size > 0 && (!entry.hasBase || entry.stale)) void load(entry);
+					else idle(entry);
+				});
+			entry.inflight = done;
+			touch(entry);
+			return done.then(() => {
+				if (refused) throw reason;
+			});
 		},
 		forget(read, input) {
 			assertLive();

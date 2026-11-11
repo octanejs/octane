@@ -810,6 +810,22 @@ describe('octane/data server-assigned IDs and server transactions', () => {
 });
 
 describe('octane/data publish and forget', () => {
+	/** Validates asynchronously: a list whose first title is 'Older' takes longest. */
+	const slow = read({
+		name: 'todos.list',
+		output: {
+			'~standard': {
+				version: 1,
+				vendor: 'test',
+				validate: (value: any) =>
+					new Promise((resolve) =>
+						setTimeout(() => resolve({ value }), value[0].title === 'Older' ? 20 : 0),
+					),
+			},
+		},
+		entities: (list: TodoItem[]) => Todo.from(list),
+	});
+
 	/** A server whose writes wait until the returned function is called. */
 	function holdingWrites(server: ReturnType<typeof createServer>) {
 		let release!: () => void;
@@ -854,20 +870,6 @@ describe('octane/data publish and forget', () => {
 
 	it('keeps the later publish when an earlier one finishes validating last', async () => {
 		const server = createServer();
-		const slow = read({
-			name: 'todos.list',
-			output: {
-				'~standard': {
-					version: 1,
-					vendor: 'test',
-					validate: (value: any) =>
-						new Promise((resolve) =>
-							setTimeout(() => resolve({ value }), value[0].title === 'Older' ? 20 : 0),
-						),
-				},
-			},
-			entities: (list: TodoItem[]) => Todo.from(list),
-		});
 		const store = createDataStore({ transport: server.transport });
 		const list = store.read(slow, undefined);
 		await observe(list);
@@ -876,6 +878,20 @@ describe('octane/data publish and forget', () => {
 		const newer = store.publish(slow, undefined, [{ id: 'a', title: 'Newer', done: false }]);
 		await Promise.all([older, newer]);
 		expect(list.getSnapshot().value![0].title).toBe('Newer');
+		// The confirmed value too, which the next change to any reader would show.
+		expect(store.dehydrate()).toContain('Newer');
+		expect(store.dehydrate()).not.toContain('Older');
+	});
+
+	it('lets a read asked for while a publish validates wait for it, not load over it', async () => {
+		const server = createServer();
+		const store = createDataStore({ transport: server.transport });
+		const list = store.read(slow, undefined);
+		const published = store.publish(slow, undefined, [{ id: 'a', title: 'Live', done: false }]);
+		await Promise.all([published, store.prefetch(slow, undefined)]);
+		await observe(list);
+		expect(list.getSnapshot().value![0].title).toBe('Live');
+		expect(server.log).toEqual([]);
 	});
 
 	it.each([
