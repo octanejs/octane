@@ -847,6 +847,7 @@ class ModuleTransform {
 						},
 						this.localUses,
 					),
+				() => this.options.reactStoreComponent?.('react-intl') === true,
 			);
 		}
 		let safeStoreUses: ReturnType<typeof storeHookUses> | undefined;
