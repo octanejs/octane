@@ -39,3 +39,11 @@ The package's older differential lane remains supplemental evidence: it
 compiles one repository fixture for React and Octane and compares independent
 hook placement output. Real Chromium layout and `autoUpdate` coverage remains
 in the ordinary `floating-ui-browser` project.
+
+## Positioning-only entry
+
+The `@octanejs/floating-ui/react-dom` entry tracks `@floating-ui/react-dom@2.1.9` at
+[`12d94738472e922e1b3fa31b02b2b61b9ed77e6a`](https://github.com/floating-ui/floating-ui/tree/12d94738472e922e1b3fa31b02b2b61b9ed77e6a/packages/react-dom).
+The npm tarball integrity is `sha512-JDjEFGCpImxDCA7JJKviA0M9+RtmJdj0m/NVU5IMgBK+AmZouAQQ7/+2GLH0GXXY0YMw9oXPB8hKdbPYg5QLYg==`.
+The positioning hook and reactive middleware have the same runtime implementation as the vendored 2.1.8 sources.
+The 2.1.9 declarations accept explicit `undefined` in optional arrow padding and positioning options.

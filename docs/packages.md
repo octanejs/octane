@@ -49,7 +49,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/email` | [`packages/email`](../packages/email) | framework binding | `0.0.19` | 1 |
 | `@octanejs/email-cli` | [`packages/email-cli`](../packages/email-cli) | framework binding | `0.0.19` | 2 |
 | `@octanejs/embla-carousel` | [`packages/embla-carousel`](../packages/embla-carousel) | framework binding | `0.0.33` | 2 |
-| `@octanejs/floating-ui` | [`packages/floating-ui`](../packages/floating-ui) | framework binding | `0.1.69` | 1 |
+| `@octanejs/floating-ui` | [`packages/floating-ui`](../packages/floating-ui) | framework binding | `0.1.69` | 2 |
 | `@octanejs/formisch` | [`packages/formisch`](../packages/formisch) | framework binding | `0.0.22` | 1 |
 | `@octanejs/gsap` | [`packages/gsap`](../packages/gsap) | framework binding | `0.0.36` | 1 |
 | `@octanejs/hook-form` | [`packages/hook-form`](../packages/hook-form) | framework binding | `0.1.64` | 1 |
