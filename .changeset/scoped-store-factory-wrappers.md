@@ -2,4 +2,4 @@
 '@octanejs/codemod': patch
 ---
 
-Recognize an imported workspace store handle created through local functions that directly return the original shared factory’s result.
+Keep the workspace-store binding diagnostic for inputs traced to local factory wrappers, including primitive keys that can dispatch to renderer-owned callbacks.

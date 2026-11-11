@@ -366,10 +366,8 @@ it('preserves the original handle and passes the active store to unchanged helpe
 			'export function valueOf<T>(x: T) { return x; } export function key(){return {};}',
 		'observer/renderer.ts':
 			"import {createContext} from 'react'; export const current = createContext(new Map<object, string>());",
-		'app/src/handles.ts': `import {key as create} from 'observer/core';
-			function outer(value) { return inner(value); }
-			function inner(value) { return create(value); }
-			export const reading = outer(1);`,
+		'app/src/handles.ts':
+			"import {key as create} from 'observer/core'; export const reading=create();",
 		'app/src/records.ts': 'export const calls = new WeakMap<Map<object, string>, string[]>();',
 		'app/src/record.ts': `import {calls} from './records'; export {calls};
 			export function record(store: Map<object, string>, phase: string) {
@@ -833,6 +831,72 @@ it('requires an imported application handle to come from the original shared fac
 	expect(factory(path.join(app, 'src/pane.tsx'), './handles.js', 'reading')).toBeNull();
 	expect(factory(path.join(app, 'src/pane.tsx'), './handles', 'reading')).toBeNull();
 	expect(accepts('missing')).toBe(false);
+});
+
+it('retains the bindings diagnostic for wrapped keys that can dispatch into React', async () => {
+	const pane = (name) => `import {useSnapshot} from 'observer'; import {${name}} from './handles';
+		export function Pane() {const store=useSnapshot();return <b>{String(store.get(${name}))}</b>;}`;
+	const { app } = project({
+		'observer/public-store.ts': "export {valueOf,key} from './state';",
+		'observer/state.ts': `export function valueOf(x){return x;}
+			export function key(value){if (value === 'primitive') return value;
+				return value === 'fixed' ? Object.freeze({value}) : {read:()=>value};}`,
+		'app/src/handles.ts': `import {key} from 'observer/core'; import {useState} from 'react';
+			function wrap(value){return key(value);}
+			function wrapKey(value: string): string {return key(value) as string;}
+			export const changed=wrap('changed'), fixed=wrap('fixed'), callback=wrap(()=>useState('callback')[0]);
+			export const primitive = wrapKey('primitive');`,
+		'app/src/change.ts': `import {changed} from './handles'; import {useState} from 'react';
+			changed.read=()=>useState('changed')[0];`,
+		'app/src/public.ts': "export {fixed,primitive} from './handles';",
+		'app/src/changed.tsx': pane('changed'),
+		'app/src/fixed.tsx': pane('fixed'),
+		'app/src/callback.tsx': pane('callback'),
+		'app/src/primitive.tsx': pane('primitive').replace("'./handles'", "'./public'"),
+		'app/src/alias.tsx': `import {useSnapshot} from 'observer';
+			import {changed as queued,changed as direct} from './handles'; import './change';
+			export function Pane(){const store=useSnapshot();const later=async()=>{await 0;store.get(queued);};
+				return <b onClick={later}>{String(direct.read())}</b>;}`,
+		'app/src/awaited.tsx': `import {useSnapshot} from 'observer'; import {fixed} from './public';
+			export function Pane({wait}) {const store=useSnapshot();
+				return <button onClick={async()=>{await wait;store.get(fixed);}}>Read</button>;}`,
+		'app/src/root.tsx': `import './change'; import {fixed,callback,primitive} from './handles'; import {useState} from 'react';
+			import {current} from '../../observer/renderer'; import {Pane as Changed} from './changed';
+			import {Pane as Fixed} from './fixed'; import {Pane as Callback} from './callback'; import {Pane as Alias} from './alias';
+			import {Pane as Primitive} from './primitive';
+			const registry=new Map([[fixed,()=>useState('registered')[0]],[callback, callback.read()],[primitive,()=>useState('primitive')[0]]]);
+			const store={get(key){return (registry.get(key) ?? key.read)();}};
+			export function Root(){return <current.Provider value={store}><Changed/><Fixed/><Callback/><Alias/><Primitive/></current.Provider>;}`,
+	});
+	const reference = await bundleRuntime(
+		app,
+		'server',
+		"export {Root} from './src/root'; export {fixed} from './src/handles';",
+	);
+	const { renderToStaticMarkup } = await import('react-dom/server');
+	const { createElement } = await import('react');
+	expect(Object.isFrozen(reference.fixed)).toBe(true);
+	expect(renderToStaticMarkup(createElement(reference.Root))).toBe(
+		'<b>changed</b><b>registered</b><b>callback</b><b>changed</b><b>primitive</b>',
+	);
+	const files = ['changed', 'fixed', 'callback', 'alias', 'primitive', 'awaited'].map(
+		(name) => 'src/' + name + '.tsx',
+	);
+	const result = await runCodemod(
+		files.map((file) => path.join(app, file)),
+		{ root: app, strong: true, verify: true, projectTypes: true },
+	);
+	for (const name of files) {
+		const file = result.files.find((f) => f.file === name);
+		expect(file.notes, name).toContainEqual(
+			expect.objectContaining({
+				rule: 'bindings',
+				severity: 'error',
+				message: expect.stringContaining('observer'),
+			}),
+		);
+		expect(file.rules['store-hook'], name).toBeUndefined();
+	}
 });
 
 it('defers wrapped handles whose factory or original module can change', async () => {

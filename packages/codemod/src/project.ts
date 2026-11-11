@@ -319,32 +319,27 @@ export async function runCodemod(
 		/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(readInstalled(helperDir, 'octane')?.version ?? '')
 			? createScopedStorePlanner(helperDir, storeBridge, config ?? undefined)
 			: null;
-	const { inputFactory, helperFunction } = storeSources(
-		root,
-		config,
-		(file, source, unselected) => {
-			if (
-				(unselected && known.has(file)) ||
-				renames.has(file) ||
-				ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject ||
-				rewriteModulePaths(source, file, root, renames, resolveRename)
-			)
-				return false;
-			if (!known.has(file) || conflicts.has(file)) return true;
-			// A plain helper selected in a directory run can still have its imports ported.
-			return !transformModule(source, file, {
-				target,
-				strong,
-				reactIntlAdapter: reactCompat && source.includes('react-intl') ? intlPath(file) : undefined,
-				strictNullChecks: strictConfig !== null,
-				get types() {
-					return typesOf(file);
-				},
-				resolveSpecifier: (specifier) =>
-					resolveRename(file, specifier) ?? resolveBinding(specifier, new Map(), []),
-			}).changed;
-		},
-	);
+	const { inputFactory, helperFunction } = storeSources(root, config, (file, source) => {
+		if (
+			renames.has(file) ||
+			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject ||
+			rewriteModulePaths(source, file, root, renames, resolveRename)
+		)
+			return false;
+		if (!known.has(file) || conflicts.has(file)) return true;
+		// A plain helper selected in a directory run can still have its imports ported.
+		return !transformModule(source, file, {
+			target,
+			strong,
+			reactIntlAdapter: reactCompat && source.includes('react-intl') ? intlPath(file) : undefined,
+			strictNullChecks: strictConfig !== null,
+			get types() {
+				return typesOf(file);
+			},
+			resolveSpecifier: (specifier) =>
+				resolveRename(file, specifier) ?? resolveBinding(specifier, new Map(), []),
+		}).changed;
+	});
 	const checkedHelpers = new Map<string, { code: string; state: AdapterState; error?: string }>();
 	const generatedHelpers = new Map<string, string>();
 	const svgHelpers = new Set<string>();
@@ -512,11 +507,10 @@ export async function runCodemod(
 							!plan ||
 							!safeUses(
 								(source, name) => {
-									if (catalogName(source) !== null || resolveRename(file, source)) return false;
-									const factory = inputFactory(file, source, name);
-									return (
-										!!factory && plan.isSharedExport(factory.module, factory.name, factory.from)
-									);
+									const input = inputFactory(file, source, name);
+									if (!input) return false;
+									if ('opaque' in input) return 'opaque';
+									return plan.isSharedExport(input.module, input.name, input.from);
 								},
 								(source, name) =>
 									!resolveRename(file, source) &&

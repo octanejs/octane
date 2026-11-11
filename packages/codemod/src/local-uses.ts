@@ -982,14 +982,13 @@ export function walkLocalValues(
 }
 
 /** Values that can cross a renderer boundary, optionally including a verified original store input. */
+type ImportedArgument = (module: string, name: string) => boolean | 'reject';
+
 export function portableArguments(
 	checker: ts.TypeChecker,
 	typeOf: (expr: ts.Expression) => ts.Type,
 ) {
-	function argument(
-		expr: ts.Expression,
-		imported?: (module: string, name: string) => boolean,
-	): boolean {
+	function argument(expr: ts.Expression, imported?: ImportedArgument): boolean {
 		if (
 			ts.isParenthesizedExpression(expr) ||
 			ts.isSatisfiesExpression(expr) ||
@@ -1041,8 +1040,11 @@ export function portableArguments(
 				!d.parent.parent.parent.attributes
 			) {
 				const spec = d.parent.parent.parent.moduleSpecifier;
-				if (ts.isStringLiteral(spec) && imported(spec.text, (d.propertyName ?? d.name).text))
-					return true;
+				if (ts.isStringLiteral(spec)) {
+					const verdict = imported(spec.text, (d.propertyName ?? d.name).text);
+					if (verdict === 'reject') return false;
+					if (verdict) return true;
+				}
 			}
 		}
 		if (ts.isCallExpression(expr) && !expr.arguments.every((arg) => argument(arg, imported)))
@@ -1050,7 +1052,7 @@ export function portableArguments(
 		return scalar(typeOf(expr));
 	}
 	const clean = new Map<ts.Expression, boolean>();
-	return (expr: ts.Expression, imported?: (module: string, name: string) => boolean) => {
+	return (expr: ts.Expression, imported?: ImportedArgument) => {
 		if (!argument(expr, imported)) return false;
 		let safe = clean.get(expr);
 		if (safe === undefined) {
