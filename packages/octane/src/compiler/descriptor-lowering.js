@@ -37,7 +37,7 @@ export function collectDescriptorChildrenBindings(ast, isDescriptorChildrenImpor
 			// Public transport boundaries work with the standalone compiler too,
 			// where no bundler module-graph metadata is available (the playground).
 			if (
-				imported === 'ReactCompat' &&
+				(imported === 'ReactCompat' || imported === 'ReactCompatInline') &&
 				(statement.source.value === 'octane/react' ||
 					statement.source.value === 'octane/react/server')
 			) {

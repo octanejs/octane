@@ -116,46 +116,51 @@ function bufferReactIsland(
 	return result;
 }
 
-function ReactCompatServer<C extends import('react').ComponentClass<any>>(
-	props: ReactCompatClassComponentProps<C>,
-): OctaneNode;
-function ReactCompatServer<P>(props: ReactCompatComponentProps<P>): OctaneNode;
-function ReactCompatServer(props: ReactCompatProps): OctaneNode;
-function ReactCompatServer(
-	props: ReactCompatProps | ReactCompatComponentProps<unknown>,
-): OctaneNode {
-	const child = resolveReactIsland(props);
-	const contexts = validateReactContextBridges(props.contexts).map(({ source, target }) => ({
-		context: target,
-		value: useContext(source as ServerContext<unknown>),
-	}));
-	const identifierPrefix = `react-compat-${useId()}`;
-	const owner = getServerRenderResourceContext();
-	if (owner === null) {
-		throw new Error(
-			'<ReactCompat> server rendering requires an owned Octane render request. ' +
-				'Nesting it inside React-hosted <OctaneCompat> on the server is not supported.',
+function createReactCompat(host: 'div' | 'span') {
+	function ReactCompatServer<C extends import('react').ComponentClass<any>>(
+		props: ReactCompatClassComponentProps<C>,
+	): OctaneNode;
+	function ReactCompatServer<P>(props: ReactCompatComponentProps<P>): OctaneNode;
+	function ReactCompatServer(props: ReactCompatProps): OctaneNode;
+	function ReactCompatServer(
+		props: ReactCompatProps | ReactCompatComponentProps<unknown>,
+	): OctaneNode {
+		const child = resolveReactIsland(props);
+		const contexts = validateReactContextBridges(props.contexts).map(({ source, target }) => ({
+			context: target,
+			value: useContext(source as ServerContext<unknown>),
+		}));
+		const identifierPrefix = `react-compat-${useId()}`;
+		const owner = getServerRenderResourceContext();
+		if (owner === null) {
+			throw new Error(
+				'<ReactCompat> server rendering requires an owned Octane render request. ' +
+					'Nesting it inside React-hosted <OctaneCompat> on the server is not supported.',
+			);
+		}
+		// Frame/async-scope ownership, rather than reconstructed props identity,
+		// preserves one request-local Fizz attempt across every Octane retry.
+		const pending = puMemo(
+			() =>
+				bufferReactIsland(
+					createReactCompatTree(createReactIslandElement(child), contexts, null),
+					identifierPrefix,
+					owner,
+				),
+			[child.type, child.key, identifierPrefix],
+			SERVER_RENDER_SLOT,
 		);
+		const html = use(pending, SERVER_RESULT_SLOT);
+		return createElement(host, {
+			'data-react-compat': '',
+			style: 'display: contents',
+			suppressHydrationWarning: true,
+			dangerouslySetInnerHTML: { __html: html },
+		});
 	}
-	// Frame/async-scope ownership, rather than reconstructed props identity,
-	// preserves one request-local Fizz attempt across every Octane retry.
-	const pending = puMemo(
-		() =>
-			bufferReactIsland(
-				createReactCompatTree(createReactIslandElement(child), contexts, null),
-				identifierPrefix,
-				owner,
-			),
-		[child.type, child.key, identifierPrefix],
-		SERVER_RENDER_SLOT,
-	);
-	const html = use(pending, SERVER_RESULT_SLOT);
-	return createElement('div', {
-		'data-react-compat': '',
-		style: 'display: contents',
-		suppressHydrationWarning: true,
-		dangerouslySetInnerHTML: { __html: html },
-	});
+	return descriptorChildren(ReactCompatServer);
 }
 
-export const ReactCompat = descriptorChildren(ReactCompatServer);
+export const ReactCompat = /* @__PURE__ */ createReactCompat('div');
+/** Host phrasing React content inside a span with display: contents. */
+export const ReactCompatInline = /* @__PURE__ */ createReactCompat('span');
