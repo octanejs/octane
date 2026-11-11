@@ -43,6 +43,8 @@ export interface TransformOptions {
 	forwardedRender?(module: string, exported: string, prop: string, depth: number): boolean;
 	/** The file imports the installed clsx package through its original entry point. */
 	installedClsx?: boolean;
+	/** The physical CSS Modules stylesheet for a plain relative request, if present. */
+	cssModuleFile?(specifier: string): string | undefined;
 	/** The generated native SVG helper, if the project verified this raw asset. */
 	pathSvgAdapter?(specifier: string): string | null;
 	/** This file uses React's automatic JSX runtime and the component resolves to its original React package. */
