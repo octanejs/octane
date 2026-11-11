@@ -9260,6 +9260,7 @@ function mapCallToForOf(expr, ctx) {
 	}
 	let keyExpr = null;
 	let bodyEl = body;
+	let keyReadsTag = false;
 	const keyAttr = attributes[keyIndex];
 	if (keyAttr) {
 		keyExpr =
@@ -9268,13 +9269,25 @@ function mapCallToForOf(expr, ctx) {
 				: keyAttr.value;
 		// The list probes keys before rendering rows. Earlier JSX reads must keep
 		// their authored order when the key itself can observe them.
-		if (
-			!isInvariantLiteral(unwrapTsExpr(keyExpr)) &&
-			(jsxValueRootNeedsRenderScope(body, null, keyAttr) ||
-				descriptorTagKind(ctx, body.openingElement?.name || body.id, isComponentTag(body)) ===
-					'dynamic')
-		) {
-			return null;
+		const key = unwrapTsExpr(keyExpr);
+		const componentTag = isComponentTag(body);
+		const ordinalKey =
+			!componentTag &&
+			params[0].type === 'Identifier' &&
+			key?.type === 'Identifier' &&
+			key.name === params[1]?.name &&
+			!directCallAssignedNames(arrow).has(key.name) &&
+			!hasInlineMemoDirectEval(arrow);
+		if (!isInvariantLiteral(key) && !ordinalKey) {
+			if (jsxValueRootNeedsRenderScope(body, null, keyAttr)) return null;
+			const tag = body.openingElement?.name || body.id;
+			if (descriptorTagKind(ctx, tag, componentTag) === 'dynamic') {
+				if (!isModuleConstTag(tag, ctx)) return null;
+				// The module const binding cannot change. Read it at the authored
+				// point so a TDZ error still precedes the key's effects.
+				keyExpr = inheritOriginLoc(b.sequence([jsxNameToExpr(tag), keyExpr]), keyExpr);
+				keyReadsTag = true;
+			}
 		}
 		const kept = attributes.filter((attr) => attr !== keyAttr);
 		bodyEl = body.openingElement
@@ -9308,9 +9321,29 @@ function mapCallToForOf(expr, ctx) {
 			methodName,
 			directReceiver,
 			callback: arrow,
+			keyReadsTag,
 		},
 	});
 	return inheritOriginLoc(forNode, expr);
+}
+
+function isModuleConstTag(tag, ctx) {
+	if (tag?.type !== 'JSXIdentifier' && tag?.type !== 'Identifier') return false;
+	const module = ctx.activityModuleAst;
+	if (module == null) return false;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(module));
+	if (lexical.resolveBinding(lexical.nodeScopes.get(tag), tag.name)?.scope !== lexical.rootScope)
+		return false;
+	ctx.mapConstTags ??= new Set(
+		module.body.flatMap((statement) => {
+			const declaration =
+				statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+			return declaration?.type === 'VariableDeclaration' && declaration.kind === 'const'
+				? declaration.declarations.flatMap(({ id }) => (id.type === 'Identifier' ? [id.name] : []))
+				: [];
+		}),
+	);
+	return ctx.mapConstTags.has(tag.name);
 }
 
 function mapCallbackPatternCapturesLexicalReceiver(pattern) {
@@ -38406,7 +38439,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					if (local?.singleRoot === true) {
 						singleRoot = true;
 						detachRoot = local.hostRoot === true;
-					} else if (isImmutableComponentTag(tagName, ctx)) singleRootExpr = compName;
+					} else if (!node.nativeArrayMap?.keyReadsTag && isImmutableComponentTag(tagName, ctx)) {
+						// The tag belongs to the callback, which may never run.
+						singleRootExpr = compName;
+					}
 				}
 			}
 		}

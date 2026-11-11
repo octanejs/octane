@@ -2859,6 +2859,67 @@ it('reads a mutable mapped component tag before evaluating its key', () => {
 	);
 });
 
+it('uses the index after an earlier mapped prop assigns to it', () => {
+	const source = `export function List({ rows }) @{
+		<ul>{rows.map((row, index) => <li data-id={(index += row.shift, row.id)} key={index} />)}</ul>
+	}`;
+	const { List } = loadCompiledFixtureSource(source, {
+		id: 'mapped-assigned-index.tsrx',
+		mode: 'client',
+	});
+	const props = (shift: number) => ({
+		rows: [
+			{ id: 'a', shift },
+			{ id: 'b', shift },
+		],
+	});
+	const view = mount(List, props(0));
+	try {
+		const before = view.findAll('li');
+		view.update(List, props(1));
+		const after = view.findAll('li');
+		expect(after.map((row) => row.getAttribute('data-id'))).toEqual(['a', 'b']);
+		expect(after[0]).toBe(before[1]);
+	} finally {
+		view.unmount();
+	}
+});
+
+it('leaves a mapped component tag unread when the callback is never invoked', () => {
+	let calls = 0;
+	const source = `
+		import { memo } from 'octane';
+		import { observe } from './observe';
+		function Row() { return <li />; }
+		export function List({ rows }) {
+			return <ul>{rows.map((row) => <Ahead key={row.id} />)}</ul>;
+		}
+		observe(List);
+		const Ahead = memo(Row);
+	`;
+	loadCompiledFixtureSource(source, {
+		id: 'mapped-unread-tag.tsx',
+		mode: 'client',
+		compileOptions: { autoMemo: true },
+		runtimeModules: {
+			'./observe': {
+				observe(List: ComponentBody<{ rows: unknown }>) {
+					const custom = { map: () => (calls++, []) };
+					for (const rows of [[], custom]) {
+						const view = mount(List, { rows });
+						try {
+							expect(view.find('ul').children).toHaveLength(0);
+						} finally {
+							view.unmount();
+						}
+					}
+				},
+			},
+		},
+	});
+	expect(calls).toBe(1);
+});
+
 describe.each([
 	['@for', HostBindingList],
 	['native map', HostMappedBindingList],

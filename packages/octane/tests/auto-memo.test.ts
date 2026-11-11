@@ -4536,7 +4536,7 @@ describe('compiler-owned component-region memoization', () => {
 
 	it('preserves keyed component state and effects across native and custom map receivers', () => {
 		const compiled = compile(
-			`import { Row } from './row';
+			`function Row(props) { return <li>{props.label}</li>; }
 			export function App(props) {
 				const rows = props.rows;
 				return <ul>{rows.map((item, index) => <Row key={item.id} label={index} />)}</ul>;
@@ -7882,8 +7882,8 @@ describe('compiler-owned component-region memoization', () => {
 			`export function Rows(props) {
 				return (
 					<ul>
-						{props.rows.map((r) => (
-							<li key={r.id} className={r.cls} {...r.attrs}>{r.label}</li>
+						{props.rows.map((r, index) => (
+							<li className={r.cls} {...r.attrs} key={index}>{r.label}</li>
 						))}
 					</ul>
 				);
