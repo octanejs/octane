@@ -98,7 +98,9 @@ async function submission(
 ) {
 	const session = await server.handler.forms(page({ 'x-account': options.account ?? 'ada' }));
 	const store = createDataStore({ transport: server.transport, form: session.form });
-	const hidden = store.form(options.write ?? addNote, options.key).hidden() as Array<[string, string]>;
+	const hidden = store.form(options.write ?? addNote, options.key).hidden() as Array<
+		[string, string]
+	>;
 	return [...hidden, ...fields];
 }
 
@@ -191,7 +193,9 @@ describe('octane/data forms on the server', () => {
 		expect(switched.form.outcome!.error).toBe('forbidden');
 
 		const forged = fields.map(([name, value]): [string, string] =>
-			name === '$token' ? [name, value.replace(/^./, (c) => (c === 'A' ? 'B' : 'A'))] : [name, value],
+			name === '$token'
+				? [name, value.replace(/^./, (c) => (c === 'A' ? 'B' : 'A'))]
+				: [name, value],
 		);
 		expect((await server.handler.forms(post(forged, { 'x-account': 'grace' }))).status).toBe(403);
 
@@ -311,7 +315,10 @@ describe('octane/data forms in the store', () => {
 		expect(form.getSnapshot()).toMatchObject({ pending: false, error: null });
 
 		await expect(form.submit(data(''))).rejects.toMatchObject({ code: 'invalid' });
-		expect(form.getSnapshot()).toMatchObject({ error: 'invalid', issues: { title: 'Enter a title' } });
+		expect(form.getSnapshot()).toMatchObject({
+			error: 'invalid',
+			issues: { title: 'Enter a title' },
+		});
 		// An invalid submission is refused before anything is sent.
 		expect(held).toHaveLength(2);
 	});
@@ -321,7 +328,8 @@ describe('octane/data forms in the store', () => {
 		const store = createDataStore({ transport: server.transport });
 		const form = store.form(addNote);
 		const element = document.createElement('form');
-		element.innerHTML = '<input name="title"><input name="priority" value="1"><input name="password" type="password"><button>Add</button>';
+		element.innerHTML =
+			'<input name="title"><input name="priority" value="1"><input name="password" type="password"><button>Add</button>';
 		document.body.append(element);
 		const title = element.elements.namedItem('title') as HTMLInputElement;
 		const submitWith = () => {

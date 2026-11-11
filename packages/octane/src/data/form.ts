@@ -122,7 +122,10 @@ export interface FormHandle<I = unknown, O = unknown> {
 const sameEntries = (a: FormData, b: FormData) => {
 	const left = [...a];
 	const right = [...b];
-	return left.length === right.length && left.every(([k, v], i) => k === right[i][0] && v === right[i][1]);
+	return (
+		left.length === right.length &&
+		left.every(([k, v], i) => k === right[i][0] && v === right[i][1])
+	);
 };
 
 /**
@@ -229,7 +232,10 @@ export interface FormView<I, O, N> extends FormState {
 
 /** A renderer's form views, one per handle and snapshot, so an unchanged form is the same object. */
 export function formViews<N>(createElement: (type: string, props: object) => N) {
-	const cache = new WeakMap<FormHandle<any, any>, { state: FormState; view: FormView<any, any, N> }>();
+	const cache = new WeakMap<
+		FormHandle<any, any>,
+		{ state: FormState; view: FormView<any, any, N> }
+	>();
 	return <I, O>(handle: FormHandle<I, O>, state: FormState): FormView<I, O, N> => {
 		const cached = cache.get(handle);
 		if (cached?.state === state) return cached.view;
@@ -244,7 +250,9 @@ export function formViews<N>(createElement: (type: string, props: object) => N) 
 			hidden: (values) =>
 				handle
 					.hidden(values)
-					.map(([name, value]) => createElement('input', { key: name, type: 'hidden', name, value })),
+					.map(([name, value]) =>
+						createElement('input', { key: name, type: 'hidden', name, value }),
+					),
 			submit: handle.submit,
 		};
 		cache.set(handle, { state, view });
