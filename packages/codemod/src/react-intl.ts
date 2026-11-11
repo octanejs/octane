@@ -26,6 +26,7 @@ export function intlImports(
 	inReact: (element: ts.JsxElement | ts.JsxSelfClosingElement) => boolean,
 	canPassToReact: (element: ts.JsxElement | ts.JsxSelfClosingElement) => boolean,
 	returnedReceiver: (tag: ts.JsxOpeningLikeElement) => boolean,
+	serviceArguments?: ReadonlySet<ts.CallExpression>,
 ): Set<ts.ImportSpecifier> {
 	const candidates = file.statements.filter(ts.isImportDeclaration).flatMap((decl) => {
 		const named = decl.importClause?.namedBindings;
@@ -66,6 +67,14 @@ export function intlImports(
 		return safe;
 	}
 	function checkSink(value: ts.Expression, allowForwarding: boolean): boolean {
+		if (
+			allowForwarding &&
+			ts.isCallExpression(value) &&
+			value.arguments.length === 1 &&
+			!value.questionDotToken &&
+			serviceArguments?.has(value)
+		)
+			return true;
 		const use = value.parent;
 		if (
 			ts.isParenthesizedExpression(use) ||
@@ -281,6 +290,7 @@ export function intlImports(
 	}
 	for (const item of candidates) {
 		const name = (item.propertyName ?? item.name).text;
+		if (serviceArguments && name !== 'useIntl') continue;
 		const locations = uses(item.name);
 		if (!locations.length) continue;
 		const supported = locations.every((id) => {

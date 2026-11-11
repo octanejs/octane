@@ -626,13 +626,18 @@ it('delivers the original React element to a store service for rendering under i
 	const { app, root: workspace } = noticeProject({
 		'app/src/pane.tsx': `import {useSnapshot} from 'observer'; import {reading} from './handles';
 			import {Action, Notice as Label} from 'notices';
-			import {FormattedMessage as Message} from 'react-intl';
-			export function Pane() {
+			import {FormattedMessage as Message, useIntl} from 'react-intl';
+			export function Pane({wait}) {
 				const store = useSnapshot();
+				const intl = useIntl();
+				const command = {async send() {
+					await wait;
+					store.get(reading).show(intl.formatMessage({id:'title'}));
+				}};
 				return <section><Message id="headline"/><Action onClick={() => {
 					store.get(reading).show(<Label label="sent"/>, {sticky: true});
 					store.get(reading).show(<Message id="headline"/>);
-				}}/></section>;
+				}}/><button onClick={() => {void command.send();}}>Later</button></section>;
 			}`,
 	});
 	fs.symlinkSync(
@@ -641,7 +646,13 @@ it('delivers the original React element to a store service for rendering under i
 		'dir',
 	);
 	const input = path.join(app, 'src/pane.tsx');
-	const result = await runCodemod([input], { root: app, strong: true, verify: true, write: true });
+	const result = await runCodemod([input], {
+		root: app,
+		strong: true,
+		verify: true,
+		write: true,
+		projectTypes: true,
+	});
 	const pane = result.files.find((file) => file.file === 'src/pane.tsx');
 	expect(pane.rules['store-hook']).toBe(1);
 	expect(pane.rules['react-intl']).toBe(1);
@@ -655,7 +666,7 @@ it('delivers the original React element to a store service for rendering under i
 		import {current} from '../../observer/renderer';
 		import {IntlProvider} from './octane-react-intl.tsrx';
 		import {Pane} from './pane.tsrx';
-		export function Root({store}) @{ <NativeStoreProvider context={current} value={store}><IntlProvider locale="en" messages={{headline:'Octane provider'}}><Pane/></IntlProvider></NativeStoreProvider> }`,
+		export function Root({store, wait, messages, rich}) @{ <NativeStoreProvider context={current} value={store}><IntlProvider locale="en" messages={messages} defaultRichTextElements={rich}><Pane wait={wait}/></IntlProvider></NativeStoreProvider> }`,
 	);
 	const dom = installDOM();
 	try {
@@ -676,10 +687,18 @@ it('delivers the original React element to a store service for rendering under i
 		const host = document.createElement('div');
 		const root = client.createRoot(host);
 		try {
-			await client.act(async () =>
-				root.render(client.Root, { store: new Map([[client.reading, { show }]]) }),
-			);
-			expect(host.textContent).toBe('Octane providerSend');
+			let release;
+			const wait = new Promise((done) => {
+				release = done;
+			});
+			const props = {
+				store: new Map([[client.reading, { show }]]),
+				wait,
+				messages: { headline: 'Octane provider', title: 'Before <rich>switch</rich>' },
+				rich: { rich: (chunks) => client.createElement('em', null, chunks) },
+			};
+			await client.act(async () => root.render(client.Root, props));
+			expect(host.textContent).toBe('Octane providerSendLater');
 			expect(show).not.toHaveBeenCalled();
 			await client.act(async () => host.querySelector('button').click());
 			expect(show).toHaveBeenCalledTimes(2);
@@ -704,6 +723,20 @@ it('delivers the original React element to a store service for rendering under i
 					),
 				),
 			).toBe('React provider');
+			await client.act(async () => host.querySelectorAll('button')[1].click());
+			const nextShow = vi.fn();
+			await client.act(async () =>
+				root.render(client.Root, {
+					...props,
+					store: new Map([[client.reading, { show: nextShow }]]),
+					messages: { headline: 'Switched', title: 'After switch' },
+				}),
+			);
+			expect(show).toHaveBeenCalledTimes(2);
+			await client.act(async () => release());
+			expect(show).toHaveBeenCalledTimes(3);
+			expect(client.renderToStaticMarkup(show.mock.calls[2][0])).toBe('Before <em>switch</em>');
+			expect(nextShow).not.toHaveBeenCalled();
 		} finally {
 			await client.act(async () => root.unmount());
 		}
@@ -711,6 +744,53 @@ it('delivers the original React element to a store service for rendering under i
 		dom.window.close();
 		vi.unstubAllGlobals();
 	}
+}, 30_000);
+
+it('keeps formatted service results behind their original receiver and completed await', async () => {
+	const msg = "intl.formatMessage({id:'title'})";
+	const deliver = (value = msg, service = 'store.get(reading)', options = '') =>
+		service + '.show(' + value + options + ')';
+	const rows = {
+		render: deliver() + ';',
+		eager: 'return <button onClick={()=>{' + deliver() + ';}}/>;',
+		effect: 'useEffect(()=>{' + deliver() + ';},[]);',
+		catch: 'try{await tick()}catch{' + deliver() + ';}',
+		conditional: 'if(ready)await tick();' + deliver() + ';',
+		field: 'await tick();class A{b=class {static {' + deliver() + ';}}};publish(A);',
+		payload: 'await tick();' + deliver("intl.formatMessage({id:'title'},{tag:<b/>})") + ';',
+		input: 'await tick();' + deliver('intl.formatMessage(make())') + ';',
+		handle: 'await tick();' + deliver(msg, 'store.get(other)') + ';',
+		sibling: 'await tick();' + deliver(msg, undefined, ',{done:()=>null}') + ';',
+		spread: 'await tick();' + deliver(msg, undefined, ',...other') + ';',
+		result: 'await tick();publish(' + deliver() + ');',
+	};
+	const inputs = Object.fromEntries(
+		Object.entries(rows).map(([name, body]) => [
+			'app/src/' + name + '.tsx',
+			`${name === 'eager' ? '/** @jsxImportSource eager-factory */' : ''}
+		import {useSnapshot} from 'observer'; import {reading} from './handles'; import {useIntl} from 'react-intl';
+		import {useEffect} from 'react';
+		export function Pane({other,tick,ready,publish,make}) {const store=useSnapshot(); const intl=useIntl();
+			${['render', 'effect', 'eager'].includes(name) ? body : 'const action={async send(){' + body + '}};'}
+			return <i/>;}`,
+		]),
+	);
+	const { app, root } = noticeProject(inputs);
+	fs.symlinkSync(
+		path.resolve(import.meta.dirname, '../node_modules/react-intl'),
+		path.join(root, 'node_modules/react-intl'),
+		'dir',
+	);
+	const { files } = await runCodemod(
+		Object.keys(inputs).map((f) => path.join(root, f)),
+		{ root: app, strong: true, verify: true, projectTypes: true },
+	);
+	for (const file of files.filter(
+		(f) => f.file.startsWith('src/') && Object.hasOwn(inputs, 'app/' + f.file),
+	))
+		expect(file.notes, file.file).toContainEqual(
+			expect.objectContaining({ severity: 'error', message: expect.stringContaining('useIntl') }),
+		);
 }, 30_000);
 
 it('retains the migration diagnostic when a store consumer cannot preserve the original React descriptor', async () => {

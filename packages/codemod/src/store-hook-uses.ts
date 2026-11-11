@@ -10,6 +10,7 @@ type ResultCheck = {
 	known: Map<ts.Expression, boolean>;
 	descriptors: (elements: ts.JsxSelfClosingElement[]) => boolean;
 	unchangedHelper?: (module: string, name: string) => boolean;
+	serviceArguments?: Set<ts.CallExpression>;
 };
 
 function literal(value: ts.Expression) {
@@ -189,6 +190,42 @@ export function storeHookUses(
 				typeOf,
 				text: (node) => scalar(typeOf(node)),
 			}) === ts.findAncestor(hook, ts.isFunctionLike)
+		);
+	}
+	function afterAwait(call: ts.CallExpression, fn: ts.Node) {
+		const expression = ts.isVoidExpression(call.parent) ? call.parent : call;
+		if (!ts.isExpressionStatement(expression.parent)) return false;
+		// Reaching a statement after a completed await resumes on a new stack.
+		for (let node: ts.Node = expression.parent; node !== fn; node = node.parent) {
+			// A field may initialize later, when a different renderer owns the stack.
+			if (ts.isClassLike(node)) return false;
+			const block = node.parent;
+			if (!ts.isBlock(block)) continue;
+			for (const statement of block.statements) {
+				if (statement === node) break;
+				if (
+					(ts.isExpressionStatement(statement) &&
+						ts.isAwaitExpression(skipWrappers(statement.expression))) ||
+					(ts.isVariableStatement(statement) &&
+						statement.declarationList.declarations.some(
+							(decl) => decl.initializer && ts.isAwaitExpression(skipWrappers(decl.initializer)),
+						))
+				)
+					return true;
+			}
+		}
+		return false;
+	}
+	function afterServiceAwait(call: ts.CallExpression) {
+		const fn = ts.findAncestor(call, ts.isFunctionLike);
+		return (
+			!!fn &&
+			((ts.isMethodDeclaration(fn) && ts.isObjectLiteralExpression(fn.parent)) ||
+				((ts.isFunctionExpression(fn) || ts.isArrowFunction(fn) || ts.isFunctionDeclaration(fn)) &&
+					!isComponent(fn))) &&
+			!fn.asteriskToken &&
+			fn.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) &&
+			afterAwait(call, fn)
 		);
 	}
 	function runsAfterRender(call: ts.CallExpression, hook: ts.CallExpression) {
@@ -398,7 +435,22 @@ export function storeHookUses(
 			return true;
 		if (ts.isCallExpression(p)) {
 			if (p.expression === value) {
-				if (p.arguments.every((arg) => argument(arg))) return safe(p, check);
+				if (p.arguments.every((arg) => argument(arg))) {
+					const first = p.arguments[0];
+					if (
+						check.serviceArguments &&
+						first &&
+						ts.isCallExpression(first) &&
+						!p.questionDotToken &&
+						ts.isExpressionStatement(p.parent) &&
+						ts.isPropertyAccessExpression(value) &&
+						serviceMethod(value, check) &&
+						p.arguments.slice(1).every(literalOptions) &&
+						afterServiceAwait(p)
+					)
+						check.serviceArguments.add(first);
+					return safe(p, check);
+				}
 				if (
 					!p.questionDotToken &&
 					ts.isPropertyAccessExpression(value) &&
@@ -437,8 +489,16 @@ export function storeHookUses(
 		imported: SharedInput,
 		descriptors: ResultCheck['descriptors'],
 		unchangedHelper?: ResultCheck['unchangedHelper'],
+		serviceArguments?: Set<ts.CallExpression>,
 	) => {
-		const check: ResultCheck = { item, imported, known: new Map(), descriptors, unchangedHelper };
+		const check: ResultCheck = {
+			item,
+			imported,
+			known: new Map(),
+			descriptors,
+			unchangedHelper,
+			serviceArguments,
+		};
 		const references = uses(item.name);
 		return (
 			references.length > 0 &&
