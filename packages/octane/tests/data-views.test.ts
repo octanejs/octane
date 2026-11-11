@@ -409,6 +409,31 @@ describe('octane/data views', () => {
 		await vi.waitFor(() => expect(all.getSnapshot().value![0]).toMatchObject({ starred: false }));
 	});
 
+	it('forgets the records of a view nothing observes, without disturbing the views that remain', async () => {
+		const server = libraryServer();
+		const store = createDataStore({ transport: server.transport });
+		// The library, served by the same handler, kept only briefly once unobserved.
+		const brief = view({ name: library.name, of: Book, order: [['title', 'asc']], keep: 1 });
+		const passing = store.read(brief, undefined);
+		const stop = passing.subscribe(() => {});
+		await vi.waitFor(() => expect(passing.getSnapshot().status).toBe('ready'));
+		stop();
+		// Past `keep`, the view and the records only it held are gone.
+		await quiet();
+
+		const marks = store.read(bookmarks, undefined);
+		await ready(marks);
+		expect(titles(marks)).toEqual(['Book 00', 'Book 02', 'Book 04']);
+		server.hold();
+		const starring = store.write(star, { id: 'b1', starred: true });
+		// Only the evicted view held b1, so no old copy of it shows before the server's record.
+		await quiet();
+		expect(titles(marks)).toEqual(['Book 00', 'Book 02', 'Book 04']);
+		server.release();
+		await starring;
+		expect(titles(marks)).toEqual(['Book 00', 'Book 01', 'Book 02']);
+	});
+
 	it('shows an empty window past the end of the list, through edits', async () => {
 		const server = libraryServer();
 		const store = createDataStore({ transport: server.transport });
