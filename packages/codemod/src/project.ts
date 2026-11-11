@@ -557,6 +557,13 @@ export async function runCodemod(
 					}
 					return installedClsx;
 				},
+				cssModuleFile: (specifier) => {
+					if (!/^\.\.?\/[^!%?#\\]+\.module\.css$/.test(specifier)) return;
+					const sheet = path.resolve(path.dirname(file), specifier);
+					if (!ts.sys.fileExists(sheet)) return;
+					const real = fs.realpathSync(sheet);
+					return real.endsWith('.module.css') ? real : undefined;
+				},
 				pathSvgAdapter:
 					options.svgPaths && renames.has(file)
 						? (specifier) => pathSvgAdapter(file, specifier, svgErrors)
