@@ -178,9 +178,14 @@ describe('.tsx return-form component children — server matches client (descrip
 });
 
 describe('descriptorChildren component marker', () => {
-	it('recognizes public ReactCompat and an import alias without bundler metadata', () => {
-		for (const imported of ['ReactCompat', 'ReactCompat as Island']) {
-			const name = imported.endsWith('Island') ? 'Island' : 'ReactCompat';
+	it('transports the element child for public React islands without bundler metadata', () => {
+		for (const imported of [
+			'ReactCompat',
+			'ReactCompat as Island',
+			'ReactCompatInline',
+			'ReactCompatInline as Island',
+		]) {
+			const name = imported.split(' ').at(-1);
 			const source = `import { ${imported} } from 'octane/react';
 				import Counter from './Counter.react.tsx';
 				export function App() @{ <${name}><Counter start={3}/></${name}> }`;

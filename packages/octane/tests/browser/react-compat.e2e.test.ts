@@ -77,10 +77,14 @@ describe.sequential('public ReactCompat with browser scheduling and production R
 				],
 				{ env: { ...process.env, NODE_ENV: 'production' }, timeout: DEADLINE },
 			);
-			const html = JSON.parse(stdout) as { counter: string; context: string };
+			const html = JSON.parse(stdout) as { counter: string; context: string; inline: string };
 			page = await browser.newPage();
 			await page.setContent(
-				`<section id="counter">${html.counter}</section><section id="context">${html.context}</section>`,
+				`<section id="counter">${html.counter}</section><section id="context">${html.context}</section><section id="inline">${html.inline}</section>`,
+			);
+			expect(await page.locator('#inline p').textContent()).toBe('Before count:3 after');
+			expect(await page.locator('#inline p span[data-react-compat] button').textContent()).toBe(
+				'count:3',
 			);
 			expect(await page.locator('#counter [data-sibling]').textContent()).toBe('SSR <counter>');
 			expect(await page.locator('#counter [data-react-compat] button').textContent()).toBe(
