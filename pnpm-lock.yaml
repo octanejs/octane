@@ -5739,6 +5739,9 @@ importers:
         specifier: catalog:default
         version: 5.9.3
     devDependencies:
+      clsx:
+        specifier: catalog:default
+        version: 2.1.1
       react:
         specifier: catalog:default
         version: 19.2.7
