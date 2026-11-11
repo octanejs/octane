@@ -18,7 +18,7 @@ Options:
   --force-strong     keep "use strong" even where Strong errors remain
   --target <tsrx|tsx> tsrx (default) rewrites components as templates;
                      tsx keeps JSX and only ports the React APIs
-  --svg-paths        migrate simple path icons when bare SVGs render their authored
+  --svg-paths        migrate static SVG geometry when bare SVGs render their authored
                      geometry with caller props and ?raw imports read their source;
                      pass SVG file paths to prepare native components separately
   --dry-run          report without writing
