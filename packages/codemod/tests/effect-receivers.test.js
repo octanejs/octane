@@ -32,12 +32,13 @@ function migrate(source) {
 	}
 }
 
-const source = `import { useEffect } from 'react';
-export function Probe({ receiver, revision }) {
-	useEffect(() => {
+const blockEffect = `() => {
 		receiver.record('start', receiver.value);
 		return () => receiver.record('stop', receiver.value);
-	}, [receiver]);
+	}`;
+const source = `import { useEffect } from 'react';
+export function Probe({ receiver, revision }) {
+	useEffect(${blockEffect}, [receiver]);
 	return <p>{String(revision)}</p>;
 }`;
 
@@ -45,24 +46,31 @@ const propertySource = source
 	.replace('{ receiver, revision }', '{ receiver, revision, trigger }')
 	.replace('[receiver]', '[receiver, trigger.value, trigger.value, trigger.nested?.end]');
 
-it.each(['receiver', 'revision', 'properties'])('matches React for %s', async (kind) => {
-	const withProperties = kind === 'properties';
-	const withRevision = kind === 'revision';
+it.each([
+	['block', false],
+	['block', true],
+	['expression', false],
+	['expression', true],
+	['properties', false],
+])('matches React for a %s effect with revision dependency %s', async (form, withRevision) => {
+	const withProperties = form === 'properties';
+	const comment = form === 'expression' && withRevision ? '// keep with the expression\n' : '';
+	const effect = form === 'expression' ? `() => ${comment}receiver.attach()` : blockEffect;
+	const input = withProperties ? propertySource : source.replace(blockEffect, effect);
 	const migrated = migrate(
-		withProperties
-			? propertySource
-			: withRevision
-				? source.replace('[receiver]', '[receiver, revision]')
-				: source,
+		withRevision ? input.replace('[receiver]', '[receiver, revision]') : input,
 	);
 	expect(migrated.strong).toBe(true);
+	if (comment) expect(migrated.code).toContain(comment.trim());
 	const native = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
 	function Reference({ receiver, revision, trigger }) {
 		useEffect(
-			() => {
-				receiver.record('start', receiver.value);
-				return () => receiver.record('stop', receiver.value);
-			},
+			form === 'expression'
+				? () => receiver.attach()
+				: () => {
+						receiver.record('start', receiver.value);
+						return () => receiver.record('stop', receiver.value);
+					},
 			withProperties
 				? [receiver, trigger.value, trigger.value, trigger.nested?.end]
 				: withRevision
@@ -84,6 +92,10 @@ it.each(['receiver', 'revision', 'properties'])('matches React for %s', async (k
 			}
 			record(kind, value) {
 				log.push(kind + ' ' + this.name + ' ' + value);
+			}
+			attach() {
+				this.record('start', this.value);
+				return () => this.record('stop', this.value);
 			}
 		}
 		const a = new Receiver('a'),
@@ -209,6 +221,10 @@ it.each([
 	[
 		'guarded hook expression',
 		propertySource.replace('useEffect(() =>', 'revision && useEffect(() =>'),
+	],
+	[
+		'property triggers in a concise body',
+		propertySource.replace(blockEffect, '() => receiver.attach()'),
 	],
 	['dependency comment', propertySource.replace('trigger.nested', '/* keep */ trigger.nested')],
 	[

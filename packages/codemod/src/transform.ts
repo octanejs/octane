@@ -2111,8 +2111,8 @@ class ModuleTransform {
 				const alias = aliases.get(node);
 				if (alias) return alias;
 			}
-			if (ts.isBlock(node)) {
-				const snapshots = this.effectSnapshots;
+			if (ts.isArrowFunction(node)) {
+				const snapshots = ts.isBlock(node.body) ? this.effectSnapshots : undefined;
 				const captures = effectReceivers(
 					node,
 					this.checker,
@@ -2131,13 +2131,28 @@ class ModuleTransform {
 						}),
 				);
 				if (captures.length) {
-					const indent = this.indentOf(node) + this.indentUnit;
-					const rest = this.span(node, node.getStart(this.sf) + 1, node.end, ctx);
+					const { body } = node;
+					const block = ts.isBlock(body);
+					const bodyStart = body.getStart(this.sf);
+					const start = block ? bodyStart : body.pos;
+					const head = this.span(node, node.getStart(this.sf), start, ctx);
+					const indent = this.indentOf(block ? body : node);
+					const line = '\n' + indent + this.indentUnit;
+					let rest: string;
+					if (block) {
+						rest = this.span(body, start + 1, body.end, ctx);
+					} else {
+						const trivia = this.source.slice(start, bodyStart).trimStart();
+						const value = this.emit(body, ctx);
+						const expression = trivia ? `(${trivia}${value})` : value;
+						rest = `return ${expression};\n${indent}}`;
+					}
 					return (
-						'{\n' +
-						indent +
-						captures.join('\n' + indent) +
-						(/^\s*\n/.test(rest) ? '' : '\n' + indent) +
+						head +
+						(block ? '{' : ' {') +
+						line +
+						captures.join(line) +
+						(/^\s*\n/.test(rest) ? '' : line) +
 						rest
 					);
 				}

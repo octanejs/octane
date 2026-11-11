@@ -81,7 +81,7 @@ function initializedBefore(checker: ts.TypeChecker, name: ts.Identifier, call: t
  * and leave the property accesses where React executed them, including cleanup.
  */
 export function effectReceivers(
-	body: ts.Block,
+	callback: ts.ArrowFunction,
 	checker: ts.TypeChecker,
 	reactHook: (name: ts.Expression) => string | null,
 	aliases: Map<ts.Expression, string>,
@@ -91,11 +91,11 @@ export function effectReceivers(
 		name: string,
 	) => void,
 ): string[] {
-	const callback = body.parent;
+	const { body } = callback;
 	if (
-		!ts.isArrowFunction(callback) ||
 		callback.parameters.length ||
-		(body.statements.length &&
+		(ts.isBlock(body) &&
+			body.statements.length &&
 			ts.isExpressionStatement(body.statements[0]) &&
 			ts.isStringLiteral(body.statements[0].expression))
 	)
