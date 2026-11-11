@@ -168,8 +168,55 @@ it.each(['unsupported SVG', 'existing sidecar', 'existing shared helper'])(
 	},
 );
 
+it('upgrades only the exact previous shared SVG helper and keeps existing sidecars usable', async () => {
+	const { root, icon } = fixture();
+	const options = { root, svgPaths: true, write: true };
+	const name = 'src/octane-path-svg.ts';
+	const helper = path.join(root, name);
+	const previous = fs.readFileSync(new URL('./fixtures/path-svg-v1.txt', import.meta.url), 'utf8');
+	fs.writeFileSync(helper, previous, { mode: 0o640 });
+	const mode = fs.statSync(helper).mode & 0o777;
+	const sidecar =
+		'import source from "./mark.svg?raw";\nimport { pathSvg } from "../octane-path-svg";\n\nexport default pathSvg(source);\n';
+	fs.writeFileSync(icon + '.octane.ts', sidecar);
+	fs.writeFileSync(icon, '<svg><rect width="4" height="6"/></svg>');
+	const preview = await runCodemod([icon], { ...options, write: false });
+	const changed = preview.files.filter((f) => f.changed);
+	expect(changed.map((f) => f.output)).toEqual([name]);
+	expect(fs.readFileSync(helper, 'utf8')).toBe(previous);
+
+	await runCodemod([icon], options);
+	expect(fs.readFileSync(helper, 'utf8')).toBe(changed[0].code);
+	expect(fs.statSync(helper).mode & 0o777).toBe(mode);
+	expect(fs.readFileSync(icon + '.octane.ts', 'utf8')).toBe(sidecar);
+	expect((await runCodemod([icon], options)).files.some((f) => f.changed)).toBe(false);
+	const server = await bundleRuntime(
+		root,
+		'server',
+		"export {default as Mark} from './src/icons/mark.svg.octane.ts'; export {prerender} from 'octane/static';",
+		[],
+		{ '.svg': 'text' },
+	);
+	expect((await server.prerender(server.Mark, {})).html).toContain('<rect width="4" height="6"');
+
+	const edited = previous + '\n// Application edit\n';
+	fs.writeFileSync(helper, edited);
+	const blocked = await runCodemod([icon], options);
+	expect(blocked.files.flatMap((f) => f.notes)).toContainEqual(
+		expect.objectContaining({ severity: 'error', message: expect.stringContaining(name) }),
+	);
+	expect(fs.readFileSync(helper, 'utf8')).toBe(edited);
+	expect(fs.readFileSync(icon + '.octane.ts', 'utf8')).toBe(sidecar);
+});
+
 it('preserves the authored SVG root on the server and the client, including subsequent asset edits', async () => {
 	const { root, file, icon } = fixture();
+	const drawing = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="none" role="img" focusable="false">
+		<rect x="1" y="2" width="8" height="7" rx="2" fill="var(--surface)"/>
+		<g transform="translate(0 -1) scale(1.5)"><g><path d="M0 0L6 4Z" fill="currentColor" fill-rule="evenodd"/></g></g>
+		<path d="M1 1L3 3" stroke="#fff" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="bevel" opacity="0.3"/>
+	</svg>`;
+	fs.writeFileSync(icon, '<!-- Drawing metadata -->\n' + drawing);
 	const options = { root, svgPaths: true, strong: true, verify: true, write: false };
 	const unchanged = await runCodemod([file], { ...options, svgPaths: false });
 	expect(unchanged.files.some((f) => f.rules['svg-paths'])).toBe(false);
@@ -197,41 +244,56 @@ it('preserves the authored SVG root on the server and the client, including subs
 	const rerun = await runCodemod([root], { ...options, write: true });
 	expect(rerun.files.filter((f) => f.changed)).toEqual([]);
 
-	const load = (mode, runtime) =>
-		bundleRuntime(root, mode, "export { Pane } from './src/pane.tsrx';" + runtime, [], {
-			'.svg': 'text',
-		});
+	const load = (mode, svg, runtime) => {
+		const reference = svg
+			.replace('<svg ', '<svg {...props} ')
+			.replace(/(fill|stroke)-([a-z])/g, (_, prefix, letter) => prefix + letter.toUpperCase());
+		fs.writeFileSync(
+			path.join(root, 'src/reference.tsx'),
+			pane.replace(
+				"import Mark from '@/icons/mark.svg';",
+				`function Mark(props) { return ${reference}; }`,
+			),
+		);
+		return bundleRuntime(
+			root,
+			mode,
+			"export { Pane } from './src/pane.tsrx'; export { Pane as Original } from './src/reference.tsx';" +
+				runtime,
+			[],
+			{
+				'.svg': 'text',
+			},
+		);
+	};
 	const dom = installDOM();
 	try {
-		const server = await load('server', "export {prerender} from 'octane/static';");
+		const server = await load('server', drawing, "export {prerender} from 'octane/static';");
 		const rendered = document.createElement('template');
 		rendered.innerHTML = (await server.prerender(server.Pane, {})).html;
 		const expected = document.createElement('template');
-		const reactIcon = createElement(
-			'svg',
-			{
-				xmlns: 'http://www.w3.org/2000/svg',
-				viewBox: '0 0 12 12',
-				fill: 'none',
-				className: 'status',
-				'aria-hidden': true,
-			},
-			createElement('path', { d: 'M0 0L6 4Z', fill: 'currentColor', fillRule: 'evenodd' }),
-			createElement('path', { d: 'M1 1L3 3', stroke: '#fff', strokeWidth: '0.5' }),
+		expected.innerHTML = renderToStaticMarkup(createElement(server.Original));
+		expect(shape(rendered.content.firstElementChild)).toEqual(
+			shape(expected.content.firstElementChild),
 		);
-		expected.innerHTML = renderToStaticMarkup(reactIcon);
-		const reference = expected.content.firstElementChild;
-		expect(shape(rendered.content.querySelector('button > svg'))).toEqual(shape(reference));
-		fs.writeFileSync(icon, asset.replace('0 0 12 12', '0 0 24 24').replace('M1 1L3 3', 'M2 2L7 7'));
-		const client = await load('client', "export {createRoot} from 'octane';");
+		const edited = drawing
+			.replace('0 0 12 12', '0 0 24 24')
+			.replace('M1 1L3 3', 'M2 2L7 7')
+			.replace('--surface', '--accent');
+		fs.writeFileSync(icon, edited);
+		const client = await load('client', edited, "export {createRoot} from 'octane';");
+		const { createRoot } = await import('react-dom/client');
+		const { act } = await import('react');
+		const original = document.createElement('div');
+		const react = createRoot(original);
 		const container = document.createElement('div');
 		const mounted = client.createRoot(container);
 		try {
+			await act(async () => react.render(createElement(client.Original)));
 			mounted.render(client.Pane, {});
-			reference.setAttribute('viewBox', '0 0 24 24');
-			reference.lastElementChild.setAttribute('d', 'M2 2L7 7');
-			expect(shape(container.querySelector('button > svg'))).toEqual(shape(reference));
+			expect(shape(container.firstElementChild)).toEqual(shape(original.firstElementChild));
 		} finally {
+			await act(async () => react.unmount());
 			mounted.unmount();
 		}
 	} finally {
