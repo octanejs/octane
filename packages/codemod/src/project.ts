@@ -1,5 +1,5 @@
 import { createScopedStorePlanner } from './scoped-store-contract.js';
-import { parsePathSvg } from './path-svg.js';
+import { parseStaticSvg } from './path-svg.js';
 import { storeInputFactories } from './store-inputs.js';
 import type {
 	CodemodOptions,
@@ -232,7 +232,7 @@ export async function runCodemod(
 	const intlDirs = new Map<string, boolean>();
 	let adapterSource: string | undefined;
 	let adapterError: string | undefined;
-	let adapterState: IntlAdapterState | undefined;
+	let adapterState: AdapterState | undefined;
 	const intlPath = (file: string) => {
 		const dir = path.dirname(file);
 		let supported = intlDirs.get(dir);
@@ -287,7 +287,7 @@ export async function runCodemod(
 				new URL('../templates/react-intl.tsrx', import.meta.url),
 				'utf8',
 			);
-			adapterState = inspectIntlAdapter(adapter, adapterSource);
+			adapterState = inspectAdapter(adapter, adapterSource, PREVIOUS_INTL_SHA256);
 			if (
 				adapterState.kind === 'conflict' ||
 				owners.has(ts.sys.useCaseSensitiveFileNames ? adapter : adapter.toLowerCase())
@@ -314,7 +314,7 @@ export async function runCodemod(
 			? createScopedStorePlanner(helperDir, storeBridge, config ?? undefined)
 			: null;
 	const inputFactory = storeInputFactories(root, config);
-	const checkedHelpers = new Map<string, { code: string; create: boolean; error?: string }>();
+	const checkedHelpers = new Map<string, { code: string; state: AdapterState; error?: string }>();
 	const generatedHelpers = new Map<string, string>();
 	const svgHelpers = new Set<string>();
 	const svgHelper = path.join(helperDir, 'octane-path-svg.ts');
@@ -333,7 +333,7 @@ export async function runCodemod(
 				asset,
 				!!stat?.isFile() &&
 					fs.realpathSync(asset) === path.join(fs.realpathSync(root), path.relative(root, asset)) &&
-					!!parsePathSvg(fs.readFileSync(asset, 'utf8')),
+					!!parseStaticSvg(fs.readFileSync(asset, 'utf8')),
 			);
 		}
 		if (!svgAssets.get(asset)) return null;
@@ -379,7 +379,6 @@ export async function runCodemod(
 			return cached.code === code
 				? cached.error
 				: 'Two generated adapters need different code at ' + path.relative(root, output);
-		const stat = fs.lstatSync(output, { throwIfNoEntry: false });
 		const name = path.relative(root, output);
 		const ownerOf = (file: string) =>
 			owners.has(ts.sys.useCaseSensitiveFileNames ? file : file.toLowerCase());
@@ -390,12 +389,12 @@ export async function runCodemod(
 				const sibling = output.slice(0, -3) + ext;
 				return ownerOf(sibling) || fs.lstatSync(sibling, { throwIfNoEntry: false });
 			});
+		const state: AdapterState =
+			shadowed || ownerOf(output)
+				? { kind: 'conflict' }
+				: inspectAdapter(output, code, output === svgHelper ? PREVIOUS_SVG_SHA256 : undefined);
 		let error: string | undefined;
-		if (
-			shadowed ||
-			ownerOf(output) ||
-			(stat && (!stat.isFile() || fs.readFileSync(output, 'utf8') !== code))
-		) {
+		if (state.kind === 'conflict') {
 			error =
 				'The ' +
 				(output === svgHelper || output.endsWith('.svg.octane.ts') ? 'SVG' : 'workspace hook') +
@@ -413,7 +412,7 @@ export async function runCodemod(
 						.diagnostics?.some((d) => d.category === ts.DiagnosticCategory.Error);
 			if (rejected) error = 'The target compiler rejected the workspace hook adapter: ' + name;
 		}
-		checkedHelpers.set(output, { code, create: !stat, error });
+		checkedHelpers.set(output, { code, state, error });
 		return error;
 	}
 	const results: FileResult[] = [];
@@ -432,7 +431,7 @@ export async function runCodemod(
 				line: 1,
 				message:
 					[...errors].join('; ') ||
-					'Cannot generate a native SVG component for this asset. Expected supported path geometry inside the project.',
+					'Cannot generate a native SVG component for this asset. Expected supported static SVG geometry inside the project.',
 			});
 			if (write) return blockedWrite(root, file, compiler?.from);
 			results.push(file);
@@ -710,23 +709,55 @@ export async function runCodemod(
 	}
 
 	const intlConsumer = results.find((file) => file.rules['react-intl']);
-	if (adapterState && adapterSource && intlConsumer) {
-		if (write && !publishIntlAdapter(adapter, adapterSource, adapterState)) {
+	const svg = generatedHelpers.has(svgHelper) && checkedHelpers.get(svgHelper);
+	if (write) {
+		const updates: {
+			file: string;
+			source: string;
+			state: AdapterState;
+			previous: string;
+			rule: string;
+		}[] = [];
+		if (adapterState && adapterSource && intlConsumer)
+			updates.push({
+				file: adapter,
+				source: adapterSource,
+				state: adapterState,
+				previous: PREVIOUS_INTL_SHA256,
+				rule: 'react-intl',
+			});
+		if (svg)
+			updates.push({
+				file: svgHelper,
+				source: svg.code,
+				state: svg.state,
+				previous: PREVIOUS_SVG_SHA256,
+				rule: 'svg-paths',
+			});
+		// Check both shared helpers before writing either. Recheck again at publication.
+		const conflict =
+			updates.find(
+				({ file, source, state, previous }) =>
+					!canPublishAdapter(inspectAdapter(file, source, previous), state),
+			) ??
+			updates.find(
+				({ file, source, state, previous }) => !publishAdapter(file, source, state, previous),
+			);
+		if (conflict) {
+			const name = path.relative(root, conflict.file);
 			return blockedWrite(
 				root,
-				unchangedFile(
-					intlConsumer.file,
-					fs.readFileSync(path.join(root, intlConsumer.file), 'utf8'),
-					{
-						rule: 'react-intl',
-						severity: 'error',
-						line: 1,
-						message: `Cannot update the React Intl adapter because ${adapterName} changed during migration. No changes were written.`,
-					},
-				),
+				unchangedFile(name, '', {
+					rule: conflict.rule,
+					severity: 'error',
+					line: 1,
+					message: `Cannot update ${name} because it changed during migration. No caller files were written.`,
+				}),
 				compiler?.from,
 			);
 		}
+	}
+	if (adapterState && adapterSource && intlConsumer) {
 		if (adapterState.kind === 'missing' || adapterState.kind === 'previous') {
 			results.push({
 				file: adapterName,
@@ -753,9 +784,10 @@ export async function runCodemod(
 		}
 	}
 	for (const [output, code] of generatedHelpers) {
-		if (!checkedHelpers.get(output)?.create) continue;
+		const { state } = checkedHelpers.get(output)!;
+		if (state.kind !== 'missing' && state.kind !== 'previous') continue;
 		const name = path.relative(root, output);
-		if (write) fs.writeFileSync(output, code, { flag: 'wx' });
+		if (write && output !== svgHelper) fs.writeFileSync(output, code, { flag: 'wx' });
 		results.push({
 			file: name,
 			output: name,
@@ -801,44 +833,59 @@ export async function runCodemod(
 	};
 }
 
-type IntlAdapterState =
+type AdapterState =
 	{ kind: 'missing' | 'current' | 'conflict' } | { kind: 'previous'; mode: number };
 
-// Exact bytes of the helper originally shipped with the React Intl migration.
+// Hash only previously shipped helpers. A locally edited file belongs to the application.
 const PREVIOUS_INTL_SHA256 = '07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98';
 
-function inspectIntlAdapter(file: string, source: string): IntlAdapterState {
+const PREVIOUS_SVG_SHA256 = '3becf859871f17914f6f0631e8db8058aa4932fd4a9817718b98eb247a902b24';
+
+function inspectAdapter(file: string, source: string, previous?: string): AdapterState {
 	const stat = fs.lstatSync(file, { throwIfNoEntry: false });
 	if (!stat) return { kind: 'missing' };
 	if (!stat.isFile()) return { kind: 'conflict' };
 	const bytes = fs.readFileSync(file);
 	if (bytes.equals(Buffer.from(source))) return { kind: 'current' };
-	if (createHash('sha256').update(bytes).digest('hex') === PREVIOUS_INTL_SHA256)
+	if (previous && createHash('sha256').update(bytes).digest('hex') === previous)
 		return { kind: 'previous', mode: stat.mode & 0o777 };
 	return { kind: 'conflict' };
 }
 
-function publishIntlAdapter(file: string, source: string, planned: IntlAdapterState): boolean {
-	const current = inspectIntlAdapter(file, source);
+function canPublishAdapter(current: AdapterState, planned: AdapterState): boolean {
+	return (
+		current.kind === 'current' ||
+		(current.kind === 'missing' && planned.kind === 'missing') ||
+		(current.kind === 'previous' && planned.kind === 'previous' && current.mode === planned.mode)
+	);
+}
+
+function publishAdapter(
+	file: string,
+	source: string,
+	planned: AdapterState,
+	previous: string,
+): boolean {
+	const current = inspectAdapter(file, source, previous);
 	if (current.kind === 'current') return true;
-	if (current.kind !== planned.kind) return false;
+	if (!canPublishAdapter(current, planned)) return false;
 	if (current.kind === 'missing') {
 		try {
 			fs.writeFileSync(file, source, { flag: 'wx' });
 			return true;
 		} catch (error) {
 			if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-			return inspectIntlAdapter(file, source).kind === 'current';
+			return inspectAdapter(file, source, previous).kind === 'current';
 		}
 	}
 
 	if (current.kind !== 'previous') return false;
-	const stage = fs.mkdtempSync(path.join(path.dirname(file), '.octane-react-intl-'));
+	const stage = fs.mkdtempSync(path.join(path.dirname(file), '.octane-adapter-'));
 	try {
 		const next = path.join(stage, 'next');
 		fs.writeFileSync(next, source, { mode: 0o600 });
 		fs.chmodSync(next, current.mode);
-		const latest = inspectIntlAdapter(file, source);
+		const latest = inspectAdapter(file, source, previous);
 		if (latest.kind !== 'previous') return latest.kind === 'current';
 		if (latest.mode !== current.mode) return false;
 		fs.renameSync(next, file);
