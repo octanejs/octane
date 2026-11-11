@@ -9,14 +9,16 @@ export const Tree = memo(function Tree({ items, status }: { items: Item[]; statu
       @if (status === 'loading') { <span>Loading…</span> } @else {
         @if (items.length === 0) { <span>Empty</span> } @else {
           <ul>
-            @for (const item of items; key item.id) {
+            {items.map((item) => {
               if (item.hidden) return null;
               const label = item.label.toUpperCase();
-              <li>
-                {label as string}
-                @if (item.children) { <Tree items={item.children} status="idle" /> }
-              </li>
-            }
+              return (
+                <li key={item.id}>
+                  {label}
+                  {item.children ? <Tree items={item.children} status="idle" /> : null}
+                </li>
+              );
+            })}
           </ul>
         }
       }
