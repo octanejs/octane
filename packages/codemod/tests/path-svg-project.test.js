@@ -343,8 +343,12 @@ it('keeps distinct component types for separate SVG modules with identical sourc
 	}
 });
 
-async function expectSvgRenderParity(view, states, count) {
+async function expectSvgRenderParity(view, states, count, projectFiles = {}) {
 	const { root, file } = fixture("import Mark from './icons/mark.svg';\n" + view);
+	for (const [name, contents] of Object.entries(projectFiles)) {
+		fs.writeFileSync(path.join(root, 'src', name), contents);
+	}
+	const classes = [];
 	const reference = asset
 		.replace('<svg ', '<svg {...props} ')
 		.replaceAll('fill-rule=', 'fillRule=')
@@ -396,6 +400,7 @@ async function expectSvgRenderParity(view, states, count) {
 				await act(async () => react.render(createElement(client.Original, props)));
 				await client.act(async () => native.render(client.Pane, props));
 				expect(shape(migrated.firstElementChild)).toEqual(shape(original.firstElementChild));
+				classes.push(migrated.querySelector('svg')?.getAttribute('class'));
 			}
 		} finally {
 			await act(async () => react.unmount());
@@ -405,7 +410,143 @@ async function expectSvgRenderParity(view, states, count) {
 		dom.window.close();
 		vi.unstubAllGlobals();
 	}
+	return { root, classes };
 }
+
+it('preserves scoped and composed CSS module classes on SVGs on the server and client', async () => {
+	const {
+		root,
+		classes: [plain, paired, restored],
+	} = await expectSvgRenderParity(
+		`import glyphs from './status.module.css';
+		import {clsx as join} from 'clsx';
+		export function Pane({accent}) {
+			return <button>{accent ? <Mark className={join(glyphs.glyph, glyphs.accent)}/> : <Mark className={glyphs.glyph}/>}</button>;
+		}`,
+		[{ accent: false }, { accent: true }, { accent: false }],
+		2,
+		{
+			'status.module.css':
+				'.base { fill: red; } .glyph { composes: base; } .glyph > path { stroke: blue; } .accent { opacity: 0.5; }',
+		},
+	);
+	const direct = plain.split(' ');
+	const combined = paired.split(' ');
+	expect(direct).toHaveLength(2);
+	expect(combined).toHaveLength(3);
+	expect(combined.slice(0, 2)).toEqual(direct);
+	expect(new Set(combined).size).toBe(3);
+	const css = fs.readFileSync(path.join(root, 'client.css'), 'utf8');
+	for (const token of combined) {
+		expect(['', 'base', 'glyph', 'accent']).not.toContain(token);
+		expect(css).toContain('.' + token);
+	}
+	expect(restored).toBe(plain);
+});
+
+it.each([
+	['a shadowing parameter', 'import sheet from "./status.module.css"', 'sheet', 'sheet.glyph'],
+	['a JavaScript module', 'import sheet from "./lookalike"', '', 'sheet.glyph'],
+	['a missing stylesheet', 'import sheet from "./missing.module.css"', '', 'sheet.glyph'],
+	[
+		'a stylesheet symlink to JavaScript',
+		'import sheet from "./linked.module.css"',
+		'',
+		'sheet.glyph',
+	],
+	['a resource query', 'import sheet from "./status.module.css?raw"', '', 'sheet.glyph'],
+	['a namespace import', 'import * as sheet from "./status.module.css"', '', 'sheet.glyph'],
+	['a named import', 'import {tokens as sheet} from "./status.module.css"', '', 'sheet.glyph'],
+	['a computed key', 'import sheet from "./status.module.css"', 'key', 'sheet[key]'],
+	['optional access', 'import sheet from "./status.module.css"', '', 'sheet?.glyph'],
+	[
+		'import attributes',
+		'import sheet from "./status.module.css" with {type:"css"}',
+		'',
+		'sheet.glyph',
+	],
+	['a chained read', 'import sheet from "./status.module.css"', '', 'sheet.glyph.value'],
+	['a prototype property', 'import sheet from "./status.module.css"', '', 'sheet.constructor'],
+	[
+		'an unverified selector',
+		'import sheet from "./status.module.css"',
+		'join',
+		'join(sheet.glyph)',
+	],
+])(
+	'preserves the SVG diagnostic for %s in a CSS class expression',
+	async (_case, imports, props, expression) => {
+		const { root, file } = fixture(`${imports}; import Mark from './icons/mark.svg';
+		export function Pane({${props}}) { return <Mark className={${expression}}/>; }`);
+		fs.writeFileSync(path.join(root, 'src/status.module.css'), '.glyph { fill: red; }');
+		fs.writeFileSync(path.join(root, 'src/lookalike.ts'), 'export default { glyph: "different" };');
+		fs.writeFileSync(
+			path.join(root, 'src/missing.module.css.js'),
+			'export default { glyph: "different" };',
+		);
+		fs.symlinkSync('missing.module.css.js', path.join(root, 'src/linked.module.css'));
+		const { files } = await runCodemod([file], { root, svgPaths: true, write: false });
+		const converted = files.find((f) => f.file === 'src/pane.tsx');
+		expect(converted.notes).toContainEqual(
+			expect.objectContaining({ rule: 'svg-issuer', severity: 'error' }),
+		);
+		expect(files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
+	},
+);
+
+it.each([
+	['the stylesheet directly', '', 'sheet.glyph = "after"'],
+	['the stylesheet via a local alias', '', 'const copy = sheet; copy.glyph = "after"'],
+	['an escaped stylesheet', 'function update(map) { map.glyph = "after" }', 'update(sheet)'],
+	[
+		'a second stylesheet import',
+		'import alias from "././status.module.css";',
+		'alias.glyph = "after"',
+	],
+	[
+		'a flag selecting a CSS module class',
+		"import cx from 'clsx'; let active = true;",
+		'active = false',
+		'cx(active && sheet.glyph)',
+	],
+	[
+		'a flag beside a CSS module class',
+		"import cx from 'clsx'; let active = true;",
+		'active = false',
+		'cx(sheet.glyph, active && "on")',
+	],
+])(
+	'defers SVG adoption when a wrapper changes %s',
+	async (_case, setup, write, classes = 'sheet.glyph') => {
+		const { root, file } = fixture(`import sheet from "./status.module.css";
+		import Mark from "./icons/mark.svg"; ${setup}
+		function Wrapper({icon}) { ${write}; return <span>{icon}</span>; }
+		export function Pane() { return <Wrapper icon={<Mark className={${classes}}/>}/>; }`);
+		fs.writeFileSync(path.join(root, 'src/status.module.css'), '.glyph { fill: red; }');
+		const { files } = await runCodemod([file], { root, svgPaths: true, write: false });
+		const converted = files.find((f) => f.file === 'src/pane.tsx');
+		expect(converted.notes).toContainEqual(
+			expect.objectContaining({ rule: 'svg-issuer', severity: 'error' }),
+		);
+		expect(files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
+	},
+);
+
+it('keeps the SVG diagnostic when the stylesheet import is rewritten to a JavaScript module', () => {
+	const stylesheet = './status.module.css';
+	const { rules, notes } = transformModule(
+		`import sheet from '${stylesheet}'; import Mark from './mark.svg';
+		export function Pane() { return <Mark className={sheet.glyph}/>; }`,
+		'pane.tsx',
+		{
+			cssModuleFile: (s) => (s === stylesheet ? stylesheet : undefined),
+			resolveSpecifier: (s) => (s === stylesheet ? './replacement.js' : null),
+			pathSvgAdapter: () => './native-icon',
+		},
+	);
+	expect(rules['svg-paths']).toBeUndefined();
+	expect(notes.some((n) => n.rule === 'svg-issuer')).toBe(true);
+});
 
 it('preserves SVG classes selected by stable clsx guards on the server and after client updates', async () => {
 	await expectSvgRenderParity(
