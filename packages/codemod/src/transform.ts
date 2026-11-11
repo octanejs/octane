@@ -4253,7 +4253,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		const bound = new Set([...bindingNames(item.name), ...(index ? bindingNames(index.name) : [])]);
 		const iterable = callee.expression;
 		if (reads(iterable, (name) => bound.has(name.text))) {
-			const literal = skipParens(iterable);
+			const literal = skipWrappers(iterable);
 			const dense =
 				ts.isArrayLiteralExpression(literal) && !literal.elements.some(ts.isOmittedExpression);
 			if (!dense && !this.isArrayFilter(iterable)) return null;

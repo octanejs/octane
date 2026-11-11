@@ -1039,14 +1039,21 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
   return <ul>{${items}.map(row => <li key={row.row}>{row.row as string}</li>)}</ul>;
 }`;
 		const literal = '[{row:"A"}, {row:((row) => row.toUpperCase())("b")}]';
-		const { code } = transformModule(source(literal), 'menu.tsx', { strong: true });
-		expect(compileErrors(code, 'menu.tsrx', true)).toEqual([]);
-		const { Menu } = loadCompiledFixtureSource(code, { id: 'menu.tsrx', mode: 'server' });
-		expect(renderToStaticMarkup(Menu, {}).html).toBe('<ul><li>A</li><li>B</li></ul>');
+		for (const iterable of [
+			literal,
+			`(${literal} as const)`,
+			`(${literal} satisfies { row: string }[])`,
+			`(${literal}!)`,
+		]) {
+			const { code } = transformModule(source(iterable), 'menu.tsx', { strong: true });
+			expect(compileErrors(code, 'menu.tsrx', true), iterable).toEqual([]);
+			const { Menu } = loadCompiledFixtureSource(code, { id: 'menu.tsrx', mode: 'server' });
+			expect(renderToStaticMarkup(Menu, {}).html).toBe('<ul><li>A</li><li>B</li></ul>');
+		}
 		for (const retained of [
 			'[{row}]',
 			'[{[row]:"value",row:"B"}]',
-			'[, {row:"B"}]',
+			'([, {row:"B"}] as const)',
 			'[{row:eval("row")}]',
 			'[{row:eval("__items")}]',
 		]) {
