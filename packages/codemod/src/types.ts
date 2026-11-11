@@ -24,7 +24,7 @@ export interface TransformOptions {
 		module: string,
 		name: string,
 		safeUses: (
-			sharedInput: (module: string, name: string) => boolean,
+			sharedInput: (module: string, name: string) => boolean | 'opaque',
 			unchangedHelper?: (module: string, name: string) => boolean,
 		) => boolean,
 	): { from: string; name: string } | null;

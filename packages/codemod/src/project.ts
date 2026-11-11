@@ -507,10 +507,10 @@ export async function runCodemod(
 							!plan ||
 							!safeUses(
 								(source, name) => {
-									const factory = inputFactory(file, source, name);
-									return (
-										!!factory && plan.isSharedExport(factory.module, factory.name, factory.from)
-									);
+									const input = inputFactory(file, source, name);
+									if (!input) return false;
+									if ('opaque' in input) return 'opaque';
+									return plan.isSharedExport(input.module, input.name, input.from);
 								},
 								(source, name) =>
 									!resolveRename(file, source) &&
