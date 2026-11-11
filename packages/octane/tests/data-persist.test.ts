@@ -405,12 +405,15 @@ describe('octane/data persistent cache', () => {
 			persist: cache(storage, 'ada'),
 		});
 		await value(before, shelf);
-		await saved();
+		await vi.waitFor(() => expect(listPartitions(storage)).toHaveLength(1));
 		// Nothing the storage holds names the account, the read or a title.
 		const index = await Promise.all(
 			listPartitions(storage).map((name) => everything(storage, name)),
 		);
-		expect(index.join('')).not.toMatch(/ada|shelf|Kindred/);
+		// These words can occur inside a random Base64 value.
+		expect(index.join('')).not.toMatch(
+			/(?<![A-Za-z0-9+/=])(?:ada|shelf|Kindred)(?![A-Za-z0-9+/=])/,
+		);
 
 		// Another user on the same browser, under the same account name, starts empty.
 		const remote = server(books());
@@ -616,12 +619,12 @@ describe('octane/data persistent cache', () => {
 		const first = server(books());
 		const before = createDataStore({ transport: first.transport, persist: cache(storage, 'ada') });
 		(await value(before, tally)).stop();
-		await saved();
+		await vi.waitFor(() => expect(listPartitions(storage)).toHaveLength(1));
 
 		createDataStore({ transport: first.transport, persist: cache(storage, 'ada') }).invalidate([
 			'count',
 		]);
-		await saved();
+		await vi.waitFor(() => expect(listPartitions(storage)).toHaveLength(2));
 
 		const remote = server(books());
 		const after = createDataStore({ transport: remote.transport, persist: cache(storage, 'ada') });
