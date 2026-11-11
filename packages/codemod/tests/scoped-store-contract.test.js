@@ -510,6 +510,14 @@ it('defers workspace helpers when the renderer, arguments, callee or returned va
 	const cases = {
 		render: ['./render-read', 'run(store); return <button/>;'],
 		memo: ['./render-read', 'useMemo(() => run(store), [store]); return <button/>;'],
+		'called-prop': [
+			'./render-read',
+			'const button = <button onClick={() => {run(store);}}/>; button.props.onClick(); return <i/>;',
+		],
+		'called-builder': [
+			'./render-read',
+			'function Build() { return <button onClick={() => {run(store);}}/>; } Build().props.onClick(); return <i/>;',
+		],
 		composite: ['./command', 'return <Action onClick={() => { run(store); }}/>;'],
 		named: [
 			'./command',

@@ -1,3 +1,4 @@
+import { nativeOutputOwner } from './forwarded-props.js';
 import { localUses, portableArguments, scalar } from './local-uses.js';
 import { skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
@@ -141,7 +142,7 @@ export function storeHookUses(
 	file: ts.SourceFile,
 	checker: ts.TypeChecker,
 	isComponent: (fn: ts.FunctionDeclaration | ts.ArrowFunction | ts.FunctionExpression) => boolean,
-	typeOf: (expression: ts.Expression) => ts.Type,
+	typeOf: (node: ts.Node) => ts.Type,
 ) {
 	// Direct eval can reference the hook or a local result by spelling alone.
 	if (file.text.includes('eval')) {
@@ -172,7 +173,7 @@ export function storeHookUses(
 			reactHook(call.expression, ['useEffect', 'useLayoutEffect'])
 		);
 	}
-	function clickHandler(value: ts.Node) {
+	function clickHandler(value: ts.Node, hook: ts.CallExpression) {
 		let outer = value;
 		while (ts.isParenthesizedExpression(outer.parent)) outer = outer.parent;
 		const hole = outer.parent;
@@ -183,13 +184,17 @@ export function storeHookUses(
 			ts.isIdentifier(host.tagName) &&
 			/^[a-z][a-z0-9]*$/.test(host.tagName.text) &&
 			ts.isIdentifier(attr.name) &&
-			/^onClick(?:Capture)?$/.test(attr.name.text)
+			/^onClick(?:Capture)?$/.test(attr.name.text) &&
+			nativeOutputOwner(ts.isJsxOpeningElement(host) ? host.parent : host, () => false, {
+				typeOf,
+				text: (node) => scalar(typeOf(node)),
+			}) === ts.findAncestor(hook, ts.isFunctionLike)
 		);
 	}
-	function runsAfterRender(call: ts.CallExpression) {
+	function runsAfterRender(call: ts.CallExpression, hook: ts.CallExpression) {
 		const fn = ts.findAncestor(call, ts.isFunctionLike);
 		if (!fn) return false;
-		if (effectCallback(fn) || clickHandler(fn)) return true;
+		if (effectCallback(fn) || clickHandler(fn, hook)) return true;
 		const parent = fn.parent;
 		if (!ts.isReturnStatement(parent) || parent.expression !== fn) return false;
 		const setup = ts.findAncestor(parent, ts.isFunctionLike);
@@ -251,7 +256,11 @@ export function storeHookUses(
 	}
 	// A computed key, destructuring default, or intermediate call can evaluate renderer code.
 	// Only the original hook result, its named properties and simple const aliases gain handle inputs.
-	function originalReceiver(value: ts.Expression, check: ResultCheck, direct = false): boolean {
+	function originalReceiver(
+		value: ts.Expression,
+		check: ResultCheck,
+		direct = false,
+	): ts.CallExpression | undefined {
 		if (
 			ts.isParenthesizedExpression(value) ||
 			ts.isNonNullExpression(value) ||
@@ -261,26 +270,29 @@ export function storeHookUses(
 		if (!direct && ts.isPropertyAccessExpression(value))
 			return originalReceiver(value.expression, check);
 		if (ts.isCallExpression(value)) {
-			return (
+			if (
 				(!direct || !value.questionDotToken) &&
 				ts.isIdentifier(value.expression) &&
 				checker.getSymbolAtLocation(value.expression)?.declarations?.[0] === check.item &&
 				value.arguments.every((arg) => plainData(arg) || sharedHandle(arg, check.imported))
-			);
+			)
+				return value;
+			return;
 		}
-		if (!ts.isIdentifier(value)) return false;
+		if (!ts.isIdentifier(value)) return;
 		const d = checker.getSymbolAtLocation(value)?.valueDeclaration;
-		return (
-			!!d &&
+		if (
+			d &&
 			ts.isVariableDeclaration(d) &&
 			ts.isIdentifier(d.name) &&
-			!!d.initializer &&
+			d.initializer &&
 			d.end <= value.pos &&
 			ts.isVariableDeclarationList(d.parent) &&
-			!!(d.parent.flags & ts.NodeFlags.Const) &&
-			originalReceiver(d.initializer, check, direct)
-		);
+			d.parent.flags & ts.NodeFlags.Const
+		)
+			return originalReceiver(d.initializer, check, direct);
 	}
+
 	// Only a service read directly from the original store with one verified handle
 	// receives descriptor arguments. Other calls retain the ordinary data checks.
 	function serviceMethod(method: ts.PropertyAccessExpression, check: ResultCheck) {
@@ -298,7 +310,7 @@ export function storeHookUses(
 			sharedHandle(read.arguments[0], check.imported) &&
 			ts.isPropertyAccessExpression(read.expression) &&
 			named(read.expression) &&
-			originalReceiver(read.expression.expression, check, true)
+			!!originalReceiver(read.expression.expression, check, true)
 		);
 	}
 	// The same helper can use React APIs if called during render. Preserve
@@ -316,11 +328,12 @@ export function storeHookUses(
 		if (!item || !ts.isImportSpecifier(item) || item.isTypeOnly || item.parent.parent.isTypeOnly)
 			return false;
 		const statement = item.parent.parent.parent;
+		const hook = originalReceiver(value, check, true);
 		return (
 			!statement.attributes &&
 			ts.isStringLiteral(statement.moduleSpecifier) &&
-			originalReceiver(value, check, true) &&
-			runsAfterRender(call) &&
+			!!hook &&
+			runsAfterRender(call, hook) &&
 			call.arguments.every((arg) => arg === value || plainData(arg) || literalOptions(arg)) &&
 			check.unchangedHelper(statement.moduleSpecifier.text, (item.propertyName ?? item.name).text)
 		);
@@ -398,7 +411,7 @@ export function storeHookUses(
 				const handle = p.arguments[0];
 				return (
 					ts.isPropertyAccessExpression(value) &&
-					originalReceiver(value.expression, check) &&
+					!!originalReceiver(value.expression, check) &&
 					!!handle &&
 					sharedHandle(handle, check.imported) &&
 					p.arguments.slice(1).every(plainData) &&
