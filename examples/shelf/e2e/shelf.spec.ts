@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page, type Request, type Route } from '@playwright/test';
 import {
 	collectBrowserDiagnostics,
 	settleBrowserFrames,
@@ -30,6 +30,17 @@ const PAGES = [
 
 let namespace = 0;
 
+/** Every store request is a call to `data`, the shelf's one server function. */
+const isData = (url: URL) => url.pathname.startsWith('/_$_ripple_rpc_$_/');
+
+/** The store request a call to `data` sends: the strings in its encoded arguments. */
+function storeRequest(request: Request): string | null {
+	if (!isData(new URL(request.url()))) return null;
+	const strings = (value: unknown): string[] =>
+		typeof value === 'string' ? [value] : Array.isArray(value) ? value.flatMap(strings) : [];
+	return strings(JSON.parse(request.postData() ?? '[]')).join('\n');
+}
+
 /** Open a page on server data no other test shares. */
 async function open(page: Page, path: string): Promise<void> {
 	await page.goto(`${path}?ns=${Date.now()}-${++namespace}`);
@@ -40,8 +51,8 @@ async function open(page: Page, path: string): Promise<void> {
 /** Hold write requests at the network until `release` is called. */
 async function holdWrites(page: Page) {
 	const held: Route[] = [];
-	await page.route('**/data', (route) => {
-		if (route.request().postData()?.includes('"write"')) held.push(route);
+	await page.route(isData, (route) => {
+		if (storeRequest(route.request())!.includes('"write"')) held.push(route);
 		else void route.continue();
 	});
 	return {
@@ -80,7 +91,8 @@ for (const { name, path, serverRendered } of PAGES) {
 
 				const loads: string[] = [];
 				page.on('request', (request) => {
-					if (new URL(request.url()).pathname === '/data') loads.push(request.postData() ?? '');
+					const sent = storeRequest(request);
+					if (sent !== null) loads.push(sent);
 				});
 				await page.goto(url);
 				await expect(page.getByText('3 books · 0 read')).toBeVisible();
@@ -280,7 +292,8 @@ test('starts the lists from the encrypted cache after a reload, without loading 
 
 	const reads: string[] = [];
 	page.on('request', (request) => {
-		if (new URL(request.url()).pathname === '/data') reads.push(request.postData() ?? '');
+		const sent = storeRequest(request);
+		if (sent !== null) reads.push(sent);
 	});
 	await page.reload();
 	await expect(book(page, 'Kindred').getByRole('checkbox')).toBeChecked();
@@ -316,8 +329,8 @@ test('settles a write left unsettled by a reload from its receipt, without sendi
 	// Hold the receipt lookup, so the recovered edit can be seen before it settles.
 	const held: Route[] = [];
 	const writes: string[] = [];
-	await page.route('**/data', (route) => {
-		const body = route.request().postData() ?? '';
+	await page.route(isData, (route) => {
+		const body = storeRequest(route.request())!;
 		if (body.includes('"write"')) writes.push(body);
 		if (body.includes('books.receipt')) held.push(route);
 		else void route.continue();
