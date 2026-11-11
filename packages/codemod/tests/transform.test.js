@@ -1060,6 +1060,20 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 			'row',
 			'<b>ROW</b><b>NEXT</b>',
 		],
+		[
+			'already-bound primitive keys',
+			'[true, false, null, +1, -2, -3n]',
+			'const label = String(row);',
+			'row',
+			'<b>true</b><b>false</b><b>null</b><b>1</b><b>-2</b><b>-3</b>',
+		],
+		[
+			'a signed numeric initializer',
+			"[{ id: 'row' }, { id: 'next' }]",
+			'const label = -2;',
+			'row.id',
+			'<b>-2</b><b>-2</b>',
+		],
 	])('migrates a keyed row with %s', (_name, rows, setup, key, html) => {
 		const source = `export function List() {
 			return <div>{${rows}.map(row => {
@@ -1087,17 +1101,39 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		);
 	});
 
-	it.each(['"row"', "{'row'}"])('migrates a literal key %s after row setup', (key) => {
-		const source = `export function List({ rows }: { rows: string[] }) {
+	it.each(['"row"', "{'row'}", '{true}', '{false}', '{null}', '{+1}', '{-2}', '{-3n}'])(
+		'migrates a literal key %s after row setup',
+		(key) => {
+			const source = `export function List({ rows }: { rows: string[] }) {
 			return <div>{rows.map(row => {
 				const label = row.toUpperCase();
 				return <b key=${key}>{label}</b>;
 			})}</div>;
 		}`;
-		const { code } = transformModule(source, 'list.tsx', { strong: true });
-		expect(compileErrors(code, 'list.tsrx', true)).toEqual([]);
+			const { code } = transformModule(source, 'list.tsx', { strong: true });
+			expect(compileErrors(code, 'list.tsrx', true)).toEqual([]);
+			const { List } = loadCompiledFixtureSource(code, { id: 'list.tsrx', mode: 'server' });
+			expect(renderToStaticMarkup(List, { rows: ['row'] }).html).toBe('<div><b>ROW</b></div>');
+		},
+	);
+
+	it('preserves setup before a bigint key that throws during unary plus', () => {
+		const source = `export function List({ check }: { check(): void }) {
+			return <div>{[1].map(row => {
+				check();
+				return <b key={+1n}>{row}</b>;
+			})}</div>;
+		}`;
+		const { code } = transformModule(source, 'list.tsx');
 		const { List } = loadCompiledFixtureSource(code, { id: 'list.tsrx', mode: 'server' });
-		expect(renderToStaticMarkup(List, { rows: ['row'] }).html).toBe('<div><b>ROW</b></div>');
+		expect(() =>
+			renderToStaticMarkup(List, {
+				check() {
+					throw new Error('setup-first');
+				},
+			}),
+		).toThrow('setup-first');
+		expect(() => renderToStaticMarkup(List, { check() {} })).toThrow(TypeError);
 	});
 
 	it('keeps a `.map()` whose row writes an outer variable', () => {

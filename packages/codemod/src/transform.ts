@@ -374,7 +374,22 @@ function nodeSpanning(sf: ts.SourceFile, start: number, end: number): ts.Node | 
 
 function rowKeyLiteral(node: ts.Expression) {
 	node = skipWrappers(node);
-	return ts.isStringLiteralLike(node) || ts.isNumericLiteral(node) || ts.isBigIntLiteral(node);
+	if (ts.isPrefixUnaryExpression(node)) {
+		const operand = skipWrappers(node.operand);
+		if (node.operator === ts.SyntaxKind.PlusToken) return ts.isNumericLiteral(operand);
+		return (
+			node.operator === ts.SyntaxKind.MinusToken &&
+			(ts.isNumericLiteral(operand) || ts.isBigIntLiteral(operand))
+		);
+	}
+	return (
+		ts.isStringLiteralLike(node) ||
+		ts.isNumericLiteral(node) ||
+		ts.isBigIntLiteral(node) ||
+		node.kind === ts.SyntaxKind.TrueKeyword ||
+		node.kind === ts.SyntaxKind.FalseKeyword ||
+		node.kind === ts.SyntaxKind.NullKeyword
+	);
 }
 
 /**
