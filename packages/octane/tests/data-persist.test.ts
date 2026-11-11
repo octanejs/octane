@@ -96,6 +96,7 @@ function server(books: Book[]) {
 	return {
 		log,
 		transport,
+		books,
 		/** Hold requests, or only writes, until the returned function is called. */
 		hold(kind: 'all' | 'write' = 'all') {
 			holding = kind;
@@ -440,15 +441,34 @@ describe('octane/data persistent cache', () => {
 				await saved();
 			}
 			mounted.stop();
-			return (await storage.index(listPartitions(storage)[0]!)).map((meta) => meta.size);
+			return storage;
 		}
-		const [shelfSize, unreadSize, countSize] = await fill(Infinity);
+		const measured = await fill(Infinity);
+		const [shelfSize, unreadSize, countSize] = (
+			await measured.index(listPartitions(measured)[0]!)
+		).map((meta) => meta.size);
 
-		// Room for the shelf and the count, but not the view as well.
-		const budget = Math.ceil((shelfSize! + countSize!) / 0.9);
+		// Room for the shelf and the count, with slack for sizes that vary by a few characters,
+		// but not for the view as well.
+		const budget = Math.ceil((shelfSize! + countSize! + 40) / 0.9);
 		expect(shelfSize! + unreadSize! + countSize!).toBeGreaterThan(budget);
-		// The mounted shelf is the oldest, but only `unread`, the least recently used of the rest, goes.
-		expect((await fill(budget)).sort()).toEqual([shelfSize, countSize].sort());
+		const storage = await fill(budget);
+
+		// The mounted shelf is the oldest, but only `unread`, the least recently used of the rest, went.
+		const remote = server(books());
+		remote.hold();
+		const after = createDataStore({ transport: remote.transport, persist: cache(storage, 'ada') });
+		const handles = [shelf, count, unread].map((contract) => {
+			const handle = after.read(contract as any, undefined);
+			handle.subscribe(() => {});
+			return handle;
+		});
+		await saved();
+		expect(handles.map((handle) => handle.getSnapshot().status)).toEqual([
+			'ready',
+			'ready',
+			'pending',
+		]);
 	});
 
 	it('counts a value restored this session as recently used', async () => {
@@ -467,8 +487,10 @@ describe('octane/data persistent cache', () => {
 			(meta) => meta.size,
 		);
 
-		// Room for the two saved values, and not for one more of the count's size.
-		const budget = Math.ceil((shelfSize! + countSize!) / 0.9);
+		// Room for the two saved values, with slack for sizes that vary by a few characters,
+		// and not for one more of the count's size.
+		const budget = Math.ceil((shelfSize! + countSize! + 40) / 0.9);
+		expect(shelfSize! + 2 * countSize!).toBeGreaterThan(budget);
 		const store = createDataStore({
 			transport: server(books()).transport,
 			persist: cache(storage, 'ada', { budget }),
@@ -489,6 +511,83 @@ describe('octane/data persistent cache', () => {
 		await saved();
 		expect(kept.getSnapshot().status).toBe('ready');
 		expect(gone.getSnapshot().status).toBe('pending');
+	});
+
+	it('never purges at startup what a component is waiting to restore', async () => {
+		const storage = memoryStorage();
+		const seed = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada', { budget: Infinity }),
+		});
+		for (const contract of [shelf, unread]) {
+			(await value(seed, contract)).stop();
+			await saved();
+		}
+		const [shelfSize] = (await storage.index(listPartitions(storage)[0]!)).map((meta) => meta.size);
+
+		// A budget that holds less than the shelf: over budget from the moment it starts.
+		const remote = server(books());
+		const store = createDataStore({
+			transport: remote.transport,
+			persist: cache(storage, 'ada', { budget: shelfSize! - 1 }),
+		});
+		await value(store, shelf);
+		expect(remote.log).toEqual([]);
+	});
+
+	it('marks saved values stale when a write changes what they hold, though nothing loaded them', async () => {
+		const storage = memoryStorage();
+		const first = server(books());
+		const before = createDataStore({ transport: first.transport, persist: cache(storage, 'ada') });
+		(await value(before, shelf)).stop();
+		await saved();
+
+		// The next session writes to a book without loading the shelf.
+		const second = server(first.books);
+		const writer = createDataStore({ transport: second.transport, persist: cache(storage, 'ada') });
+		await writer.write(setRead, { id: 'a', read: true });
+		await saved();
+
+		// The shelf saved before the write is still fresh, yet it no longer matches the server.
+		const third = server(first.books);
+		const after = createDataStore({ transport: third.transport, persist: cache(storage, 'ada') });
+		const shown = await value<Book[]>(after, shelf);
+		await vi.waitFor(() => expect(shown.handle.getSnapshot().value![0]!.read).toBe(true));
+		expect(third.log).toEqual(['read shelf']);
+	});
+
+	it('marks saved values stale when the app invalidates their tag, though nothing loaded them', async () => {
+		const storage = memoryStorage();
+		const tally = read({ name: 'count', output: count.output, tags: ['count'], fresh: 60_000 });
+		const first = server(books());
+		const before = createDataStore({ transport: first.transport, persist: cache(storage, 'ada') });
+		(await value(before, tally)).stop();
+		await saved();
+
+		createDataStore({ transport: first.transport, persist: cache(storage, 'ada') }).invalidate([
+			'count',
+		]);
+		await saved();
+
+		const remote = server(books());
+		const after = createDataStore({ transport: remote.transport, persist: cache(storage, 'ada') });
+		await value(after, tally);
+		await vi.waitFor(() => expect(remote.log).toEqual(['read count']));
+	});
+
+	it('keeps fresh a value saved with the write already in it', async () => {
+		const storage = memoryStorage();
+		const first = server(books());
+		const before = createDataStore({ transport: first.transport, persist: cache(storage, 'ada') });
+		// Mounted, the shelf comes back in the write's reply and is saved with the write.
+		await value(before, shelf);
+		await before.write(setRead, { id: 'a', read: true });
+		await saved();
+
+		const remote = server(first.books);
+		const after = createDataStore({ transport: remote.transport, persist: cache(storage, 'ada') });
+		expect((await value<Book[]>(after, shelf)).value[0]!.read).toBe(true);
+		expect(remote.log).toEqual([]);
 	});
 
 	it('sizes the automatic budget by device', () => {
