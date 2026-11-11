@@ -887,10 +887,12 @@ class ModuleTransform {
 			this.reactRendererBodies.set(element, tag + ', ' + props);
 		}
 		let hasEval = false;
+		const submitEvents = this.source.includes('SubmitEvent');
 		const fields: ts.JsxOpeningLikeElement[] = [];
 		/** Values read as an element: cloned, inspected, or a `render` prop. */
 		const elements: ts.Expression[] = [];
 		const visit = (node: ts.Node) => {
+			if (submitEvents && ts.isParameter(node)) this.checkSubmitParameter(node);
 			if (ts.isIdentifier(node) && declaresName(node)) this.declared.add(node.text);
 			if (this.options.pathSvgAdapter && ts.isIdentifier(node) && node.text === 'eval')
 				hasEval = true;
@@ -1939,7 +1941,8 @@ class ModuleTransform {
 		const collides =
 			(this.declared.has(name) || this.readsGlobal(name)) &&
 			!(prior && mapReactImport(prior.module, prior.imported, prior.typeOnly)?.name === name);
-		const local = collides ? `Octane${name[0].toUpperCase()}${name.slice(1)}` : name;
+		let local = collides ? `Octane${name[0].toUpperCase()}${name.slice(1)}` : name;
+		while (collides && (this.declared.has(local) || this.readsGlobal(local))) local += '_';
 		names.set(name, { local, typeOnly });
 		return local;
 	}
@@ -2357,6 +2360,23 @@ class ModuleTransform {
 
 	rewriteReexport(node: ts.ExportDeclaration) {
 		const module = (node.moduleSpecifier as ts.StringLiteral).text;
+		const exports = node.exportClause;
+		if (
+			module === 'react' &&
+			exports &&
+			ts.isNamedExports(exports) &&
+			exports.elements.some((item) =>
+				['SubmitEvent', 'SubmitEventHandler'].includes((item.propertyName ?? item.name).text),
+			)
+		) {
+			this.note(
+				RULE.unsupported,
+				'error',
+				node,
+				'Review the React submit event re-export and define an explicit native event type.',
+			);
+			return null;
+		}
 		const mapped = REACT_MODULES[module];
 		if (mapped) {
 			this.count(RULE.import);
@@ -2449,6 +2469,10 @@ class ModuleTransform {
 		this.count(RULE.import);
 		const qualifier = node.qualifier;
 		const name = qualifier && ts.isIdentifier(qualifier) ? qualifier.text : null;
+		if (specifier.text === 'react' && !node.isTypeOf) {
+			const event = this.nativeSubmitType(node, name);
+			if (event) return event;
+		}
 		const renamed = name === null ? null : mapQualifiedType(name);
 		if (name !== null && renamed === null) {
 			this.note(RULE.unsupported, 'warning', node, `Octane has no type \`${name}\`.`);
@@ -2751,6 +2775,11 @@ class ModuleTransform {
 		if (ts.isQualifiedName(name) && this.isGlobalNamespace(name.left, 'JSX'))
 			this.require('octane', 'JSX', true);
 		const imported = this.reactTypeName(name);
+		const event = this.nativeSubmitType(node, imported);
+		if (event) {
+			this.count(RULE.import);
+			return event;
+		}
 		if (!imported || !this.isIntrinsicProps(node, imported)) return null;
 		// Heritage parses a namespace as a property access, but its base is still a type.
 		let base: string;
@@ -3232,9 +3261,194 @@ class ModuleTransform {
 		return { fn: param.parent, param };
 	}
 
+	private nativeSubmitType(node: ts.NodeWithTypeArguments, name: string | null) {
+		if (name !== 'SubmitEvent' && name !== 'SubmitEventHandler') return null;
+		const global = this.checker.resolveName(
+			'globalThis',
+			node,
+			ts.SymbolFlags.Namespace | ts.SymbolFlags.Type | ts.SymbolFlags.Value,
+			false,
+		);
+		if (this.declaresHere(global)) {
+			this.note(
+				RULE.unsupported,
+				'error',
+				node,
+				'The local globalThis binding shadows the DOM submit event type. Review this annotation.',
+			);
+			return null;
+		}
+		const target = node.typeArguments?.[0];
+		const type = (name: string) =>
+			ts.isExternalModule(this.sf)
+				? this.require('octane', name, true)
+				: `import(${this.quote}octane${this.quote}).${name}`;
+		const host = target ? this.emit(target, PLAIN) : 'globalThis.Element';
+		const event = `${type('NativeEvent')}<${host}, globalThis.SubmitEvent>`;
+		return name === 'SubmitEventHandler' ? `${type('EventHandler')}<${event}>` : event;
+	}
+
+	private hasSubmitType(type: ts.TypeNode | undefined, eventValue = false) {
+		if (!type) return false;
+		let aliases: Set<ts.TypeAliasDeclaration> | undefined;
+		const submit = (name: string | null) =>
+			name === 'SubmitEvent' || (!eventValue && name === 'SubmitEventHandler');
+		const visit = (node: ts.Node): boolean => {
+			if (ts.isTypeReferenceNode(node)) {
+				if (submit(this.reactTypeName(node.typeName))) return true;
+				const alias = ts.isIdentifier(node.typeName) && this.declarationOf(node.typeName);
+				if (alias && ts.isTypeAliasDeclaration(alias) && !aliases?.has(alias)) {
+					(aliases ??= new Set()).add(alias);
+					if (visit(alias.type)) return true;
+				}
+			}
+			if (
+				ts.isImportTypeNode(node) &&
+				!node.isTypeOf &&
+				ts.isLiteralTypeNode(node.argument) &&
+				ts.isStringLiteral(node.argument.literal) &&
+				node.argument.literal.text === 'react' &&
+				node.qualifier &&
+				ts.isIdentifier(node.qualifier) &&
+				submit(node.qualifier.text)
+			)
+				return true;
+			return (
+				(!eventValue ||
+					ts.isParenthesizedTypeNode(node) ||
+					ts.isUnionTypeNode(node) ||
+					ts.isIntersectionTypeNode(node)) &&
+				ts.forEachChild(node, visit) === true
+			);
+		};
+		return visit(type);
+	}
+
+	private isSubmitParameter(param: ts.ParameterDeclaration) {
+		if (this.hasSubmitType(param.type, true)) return true;
+		const handler = param.parent;
+		if (handler.parameters[0] !== param) return false;
+		if (ts.isArrowFunction(handler) || ts.isFunctionExpression(handler)) {
+			const type = this.checker.getContextualType(handler);
+			// With no module resolution, the checker still retains the name of a
+			// named import in contextual types, including JSX props and assignments.
+			const alias = type?.aliasSymbol;
+			if (alias) {
+				const declaration = this.checker.resolveName(
+					alias.name,
+					handler,
+					ts.SymbolFlags.Type | ts.SymbolFlags.Alias,
+					false,
+				)?.declarations?.[0];
+				if (
+					(declaration &&
+						ts.isImportSpecifier(declaration) &&
+						this.reactTypeName(declaration.name) === 'SubmitEventHandler') ||
+					(declaration &&
+						ts.isTypeAliasDeclaration(declaration) &&
+						this.hasSubmitType(declaration.type))
+				)
+					return true;
+			}
+			if (
+				type?.getCallSignatures().some((signature) => {
+					const parameter = signature.getDeclaration()?.parameters[0];
+					return this.hasSubmitType(parameter?.type, true);
+				})
+			)
+				return true;
+		}
+		let value: ts.Node = handler;
+		let context = value.parent;
+		while (
+			ts.isParenthesizedExpression(context) ||
+			ts.isPropertyAssignment(context) ||
+			ts.isObjectLiteralExpression(context) ||
+			ts.isArrayLiteralExpression(context)
+		) {
+			value = context;
+			context = value.parent;
+		}
+		if (
+			(ts.isVariableDeclaration(context) && context.initializer === value) ||
+			ts.isSatisfiesExpression(context) ||
+			ts.isAsExpression(context)
+		)
+			return this.hasSubmitType(context.type);
+		if (
+			ts.isBinaryExpression(context) &&
+			context.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+			context.right === value &&
+			ts.isIdentifier(context.left)
+		) {
+			const declaration = this.declarationOf(context.left);
+			return (
+				!!declaration &&
+				ts.isVariableDeclaration(declaration) &&
+				this.hasSubmitType(declaration.type)
+			);
+		}
+		if (ts.isReturnStatement(context))
+			return this.hasSubmitType(ts.findAncestor(context, ts.isFunctionLike)?.type);
+		if (ts.isCallExpression(context)) {
+			const index = context.arguments.findIndex((argument) => argument === value);
+			const signature = this.checker.getResolvedSignature(context)?.getDeclaration();
+			return index !== -1 && this.hasSubmitType(signature?.parameters[index]?.type);
+		}
+		return (
+			ts.isArrowFunction(context) && context.body === value && this.hasSubmitType(context.type)
+		);
+	}
+
+	private checkSubmitParameter(param: ts.ParameterDeclaration) {
+		if (!this.isSubmitParameter(param)) return;
+		const report = (node: ts.Node) =>
+			this.note(
+				RULE.eventObject,
+				'error',
+				node,
+				'This React SubmitEvent use needs review. Octane passes a native SubmitEvent with a typed currentTarget.',
+			);
+		if (!ts.isIdentifier(param.name) || param.dotDotDotToken) {
+			report(param);
+			return;
+		}
+		for (const ref of renderUses(this.localUses(param.name))) {
+			const access = ref.parent;
+			if (
+				!ts.isPropertyAccessExpression(access) ||
+				access.expression !== ref ||
+				ts.findAncestor(access, ts.isFunctionLike) !== param.parent
+			) {
+				report(ref);
+				continue;
+			}
+			const member = access.name.text;
+			const use = access.parent;
+			if (member === 'preventDefault' || member === 'stopPropagation') {
+				if (ts.isCallExpression(use) && use.expression === access) continue;
+			}
+			// The native currentTarget is dispatch-scoped and read-only.
+			if (
+				member === 'currentTarget' &&
+				(ts.isPropertyAccessExpression(use) || ts.isElementAccessExpression(use)) &&
+				use.expression === access &&
+				!(
+					ts.canHaveModifiers(param.parent) &&
+					ts
+						.getModifiers(param.parent)
+						?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword)
+				)
+			)
+				continue;
+			report(access);
+		}
+	}
+
 	isEventParameter(node: ts.Node) {
 		const found = this.parameterOf(node);
 		if (!found) return false;
+		if (this.source.includes('SubmitEvent') && this.isSubmitParameter(found.param)) return false;
 		const type = found.param.type;
 		if (type && ts.isTypeReferenceNode(type) && /Event$/.test(type.typeName.getText(this.sf))) {
 			return true;
