@@ -1033,6 +1033,48 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		expect(result.code).toContain("new MouseEvent('focus')");
 	});
 
+	it('lowers a dense array with separate row names and preserves real receiver captures', () => {
+		const source = (items) => `export function Menu(row = "outer") {
+  const __items = "outer";
+  return <ul>{${items}.map(row => <li key={row.row}>{row.row as string}</li>)}</ul>;
+}`;
+		const literal = '[{row:"A"}, {row:((row) => row.toUpperCase())("b")}]';
+		for (const iterable of [
+			literal,
+			`(${literal} as const)`,
+			`(${literal} satisfies { row: string }[])`,
+			`(${literal}!)`,
+		]) {
+			const { code } = transformModule(source(iterable), 'menu.tsx', { strong: true });
+			expect(compileErrors(code, 'menu.tsrx', true), iterable).toEqual([]);
+			const { Menu } = loadCompiledFixtureSource(code, { id: 'menu.tsrx', mode: 'server' });
+			expect(renderToStaticMarkup(Menu, {}).html).toBe('<ul><li>A</li><li>B</li></ul>');
+		}
+		for (const retained of [
+			'[{row}]',
+			'[{[row]:"value",row:"B"}]',
+			'([, {row:"B"}] as const)',
+			'[{row:eval("row")}]',
+			'[{row:eval("__items")}]',
+		]) {
+			const kept = transformModule(source(retained), 'menu.tsx', { strong: true });
+			expect(compileErrors(kept.code, 'menu.tsrx', true), retained).toContain(
+				'OCTANE_STRONG_MAP_JSX',
+			);
+		}
+	});
+
+	it('retains a dense array map when its callback can observe the call arguments', () => {
+		const source = `export function Menu() {
+  return <ul>{[{row:'A'}].map(function ({row}) {
+    const size = eval('arguments[2].length');
+    return <li key={row}>{String(size)}</li>;
+  })}</ul>;
+}`;
+		const { code } = transformModule(source, 'menu.tsx', { strong: true });
+		expect(compileErrors(code, 'menu.tsrx', true)).toContain('OCTANE_STRONG_MAP_JSX');
+	});
+
 	it('renders a keyed list when its iterable uses the row name in a separate scope', () => {
 		const source = `export function Menu(props: { row: string[] }) {
   return <ul>{props.row.filter(row => row !== 'hidden').map(row => <li key={row}>{row}</li>)}</ul>;

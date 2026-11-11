@@ -22,3 +22,17 @@ export function httpTransport(
 		return devalue.parse(await response.text()) as DataReply;
 	};
 }
+
+/**
+ * Send requests through a `module server` function that answers them with
+ * `DataServer.serve`. In the browser the compiler's stub sends each one as a
+ * server call, under the app's origin checks and middleware; during a server
+ * render the same call runs in process. A failed call rejects, so the store
+ * treats a write's outcome as unknown.
+ */
+export function serverTransport(
+	send: (request: string, options?: { signal?: AbortSignal }) => Promise<string>,
+): Transport {
+	return async (request: DataRequest, signal: AbortSignal): Promise<DataReply> =>
+		devalue.parse(await send(devalue.stringify(request), { signal })) as DataReply;
+}

@@ -795,6 +795,91 @@ import { saveName } from 'server';
 Only named imports/exports are supported. Arguments and results use devalue, so
 Dates, Maps, Sets, `undefined`, and cyclic values survive the round trip.
 
+### Serving `octane/data` through a server function
+
+An `octane/data` store can send every read and write through one server
+function, so the app needs no data route of its own. Requests then pass the
+same origin checks, body limits and middleware as any server function, and a
+server render calls the same function in process, under the page's request.
+
+Keep the handlers in a server-only module, so middleware can use them too:
+
+```ts
+// src/data.server.ts
+import { createDataHandler } from 'octane/data/server';
+import { books, addBook } from './contracts.ts';
+
+export const handler = createDataHandler(
+	{
+		// `caller` carries the viewer middleware authenticated, for server calls and forms alike.
+		context: (request, caller) => ({ viewer: caller?.viewer }),
+		secret: process.env.FORM_SECRET,
+		grant: ({ viewer }) => String(viewer),
+	},
+	(handle) => [
+		handle(books, (input, { viewer }) => listBooks(viewer, input)),
+		handle(addBook, (input, { viewer, operationId }) => saveBook(viewer, input, operationId)),
+	],
+);
+```
+
+Export one function that answers the store's requests, and give the store a
+`serverTransport` over it:
+
+```tsrx
+// src/data.tsrx
+module server {
+	import type { ServerCallContext } from 'octane/server';
+	import { handler } from './data.server.ts';
+
+	export async function data(request: string, call: ServerCallContext) {
+		return handler.serve(request, call);
+	}
+}
+
+import { createDataStore, serverTransport } from 'octane/data';
+import { data } from 'server';
+
+export const openStore = (seed?: string | null) =>
+	createDataStore({ transport: serverTransport(data), seed });
+```
+
+`serverTransport` encodes each request with devalue, as `httpTransport` does,
+so the values a contract carries survive although a server call carries only
+plain data. A call that fails rejects, so the store treats the write's outcome
+as unknown, exactly as for a lost HTTP reply.
+
+Native form submissions post to the page itself. Run them in the page's
+`before` middleware: an accepted one answers with the 303 back to the page.
+Keep the session in `Context.state`, so the page can pass its `form` to the
+store it renders with and that store's `dehydrate()` carries it to the browser:
+
+```ts
+// octane.config.ts
+import { defineConfig, RenderRoute, type Middleware } from '@octanejs/vite-plugin';
+import { handler } from './src/data.server.ts';
+
+export const FORMS = 'data.forms';
+
+// After the middleware that authenticates `context.viewer`.
+const forms: Middleware = async (context, next) => {
+	const session = await handler.forms(context.request, context);
+	if (session.response) return session.response;
+	context.state.set(FORMS, session);
+	const page = await next();
+	return session.status === 200
+		? page
+		: new Response(page.body, { status: session.status, headers: page.headers });
+};
+
+export default defineConfig({
+	router: { routes: [new RenderRoute({ path: '/', entry: '/src/App.tsrx', before: [forms] })] },
+});
+```
+
+The page renders its store's `dehydrate()` output into its own script, and the
+browser's store starts from it: route state is not serialized automatically.
+
 For a strict CSP, middleware can set the documented `Context.state` key. The
 raw nonce is passed to the core renderer and safely attribute-escaped on the
 hydration-data and hydrate-module scripts in both dev and production:

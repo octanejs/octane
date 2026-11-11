@@ -61,7 +61,7 @@ class ReactIslandController {
 	status: 0 | 1 | 2 = 0;
 	payload: unknown = null;
 	notify: () => void = () => {};
-	private host: HTMLDivElement | null = null;
+	private host: HTMLElement | null = null;
 	private root: Root | null = null;
 	private disposed = false;
 	private child: TransportedReactChild | null = null;
@@ -81,7 +81,7 @@ class ReactIslandController {
 
 	constructor(private scope: Scope) {}
 
-	readonly ref = (host: HTMLDivElement | null): void => {
+	readonly ref = (host: HTMLElement | null): void => {
 		// Octane disconnects refs on visibility changes as well as deletion.
 		// The insertion-effect lifetime below is the authoritative disposal.
 		if (host !== null && !this.disposed) this.host = host;
@@ -248,52 +248,57 @@ class ReactIslandController {
 	}
 }
 
-function ReactCompatImpl<C extends import('react').ComponentClass<any>>(
-	props: ReactCompatClassComponentProps<C>,
-): OctaneNode;
-function ReactCompatImpl<P>(props: ReactCompatComponentProps<P>): OctaneNode;
-function ReactCompatImpl(props: ReactCompatProps): OctaneNode;
-function ReactCompatImpl(
-	props: ReactCompatProps | ReactCompatComponentProps<unknown>,
-	scope?: Scope,
-): OctaneNode {
-	const [controller] = useState(() => new ReactIslandController(scope!), CONTROLLER_SLOT);
-	const [, invalidate] = useState(0, INVALIDATE_SLOT);
-	controller.notify = () => invalidate((value) => value + 1);
-	// Only the committed layout publishes these render-local snapshots.
-	const child = resolveReactIsland(props);
-	const contexts = controller.readContexts(validateReactContextBridges(props.contexts));
-	const identifierPrefix = `react-compat-${useId(ID_SLOT)}`;
-	if (controller.status === 2) throw controller.payload;
-	if (controller.status === 1) useRendererThenable(controller.payload as Promise<void>);
-	useInsertionEffect(() => () => controller.dispose(), [], LIFETIME_SLOT);
-	useLayoutEffect(
-		() => {
-			controller.visibilityChanged();
-			return () => controller.visibilityChanged();
-		},
-		[],
-		VISIBILITY_SLOT,
-	);
-	// Activity can hide a primary whose layout effects were already disconnected
-	// by Suspense. Its passive disconnect is the additional visibility signal.
-	useEffect(
-		() => {
-			controller.visibilityChanged();
-			return () => controller.visibilityChanged();
-		},
-		[],
-		ACTIVITY_SLOT,
-	);
-	useLayoutEffect(() => controller.commit(child, contexts, identifierPrefix), null, PUBLISH_SLOT);
-	return createElement('div', {
-		'data-react-compat': '',
-		style: 'display: contents',
-		ref: controller.ref,
-		suppressHydrationWarning: true,
-		dangerouslySetInnerHTML: SENTINEL,
-	});
+function createReactCompat(host: 'div' | 'span') {
+	function ReactCompatImpl<C extends import('react').ComponentClass<any>>(
+		props: ReactCompatClassComponentProps<C>,
+	): OctaneNode;
+	function ReactCompatImpl<P>(props: ReactCompatComponentProps<P>): OctaneNode;
+	function ReactCompatImpl(props: ReactCompatProps): OctaneNode;
+	function ReactCompatImpl(
+		props: ReactCompatProps | ReactCompatComponentProps<unknown>,
+		scope?: Scope,
+	): OctaneNode {
+		const [controller] = useState(() => new ReactIslandController(scope!), CONTROLLER_SLOT);
+		const [, invalidate] = useState(0, INVALIDATE_SLOT);
+		controller.notify = () => invalidate((value) => value + 1);
+		// Only the committed layout publishes these render-local snapshots.
+		const child = resolveReactIsland(props);
+		const contexts = controller.readContexts(validateReactContextBridges(props.contexts));
+		const identifierPrefix = `react-compat-${useId(ID_SLOT)}`;
+		if (controller.status === 2) throw controller.payload;
+		if (controller.status === 1) useRendererThenable(controller.payload as Promise<void>);
+		useInsertionEffect(() => () => controller.dispose(), [], LIFETIME_SLOT);
+		useLayoutEffect(
+			() => {
+				controller.visibilityChanged();
+				return () => controller.visibilityChanged();
+			},
+			[],
+			VISIBILITY_SLOT,
+		);
+		// Activity can hide a primary whose layout effects were already disconnected
+		// by Suspense. Its passive disconnect is the additional visibility signal.
+		useEffect(
+			() => {
+				controller.visibilityChanged();
+				return () => controller.visibilityChanged();
+			},
+			[],
+			ACTIVITY_SLOT,
+		);
+		useLayoutEffect(() => controller.commit(child, contexts, identifierPrefix), null, PUBLISH_SLOT);
+		return createElement(host, {
+			'data-react-compat': '',
+			style: 'display: contents',
+			ref: controller.ref,
+			suppressHydrationWarning: true,
+			dangerouslySetInnerHTML: SENTINEL,
+		});
+	}
+	return descriptorChildren(ReactCompatImpl);
 }
 
 /** Host one React component under Octane, with real React hooks and events. */
-export const ReactCompat = descriptorChildren(ReactCompatImpl);
+export const ReactCompat = /* @__PURE__ */ createReactCompat('div');
+/** Host phrasing React content inside a span with display: contents. */
+export const ReactCompatInline = /* @__PURE__ */ createReactCompat('span');
