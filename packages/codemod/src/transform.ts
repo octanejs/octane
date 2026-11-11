@@ -1,4 +1,4 @@
-import { forwardedProps, nativeOutputOwner, renderUses } from './forwarded-props.js';
+import { forwardedProps, nativeOutputOwner, renderUses, svgLocalReads } from './forwarded-props.js';
 import { reactRenderer, staticReactProps } from './react-renderer.js';
 import { localUses, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
@@ -1154,6 +1154,7 @@ class ModuleTransform {
 		);
 	}
 
+	private svgRead?: ReturnType<typeof svgLocalReads>;
 	private nativeSvgProps?: ReturnType<typeof forwardedProps>;
 	private provenSvgOwners?: Set<ts.Node>;
 	private nativeSvgOutput(
@@ -1173,7 +1174,14 @@ class ModuleTransform {
 			if (!known) unproven(tag, prop);
 			return known;
 		};
-		const first = nativeOutputOwner(element, slot, destination);
+		this.svgRead ??= svgLocalReads(
+			this.checker,
+			uses,
+			typeOf,
+			(type) => ts.isTypeReferenceNode(type) && this.reactTypeName(type.typeName) === 'ReactNode',
+		);
+		const ownerOf = (value: ts.Node) => nativeOutputOwner(value, slot, destination, this.svgRead);
+		const first = ownerOf(element);
 		if (!first) return false;
 		const pending = [first];
 		const proven = (this.provenSvgOwners ??= new Set());
@@ -1229,11 +1237,7 @@ class ModuleTransform {
 					tag.tagName !== ref
 				)
 					return false;
-				const owner = nativeOutputOwner(
-					ts.isJsxSelfClosingElement(tag) ? tag : tag.parent,
-					slot,
-					destination,
-				);
+				const owner = ownerOf(ts.isJsxSelfClosingElement(tag) ? tag : tag.parent);
 				if (!owner) return false;
 				pending.push(owner);
 			}

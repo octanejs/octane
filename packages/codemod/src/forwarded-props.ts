@@ -113,6 +113,7 @@ export function nativeOutputOwner(
 	value: ts.Node,
 	slot: (tag: ts.Identifier, prop: string) => boolean,
 	{ typeOf, text }: RenderTypes,
+	localRead?: (value: ts.Node) => ts.Identifier | undefined,
 ) {
 	for (;;) {
 		const parent = value.parent;
@@ -187,8 +188,13 @@ export function nativeOutputOwner(
 				parent.right === value &&
 				(parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
 					parent.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken))
-		))
-			return;
+		)) {
+			const read = localRead?.(value);
+			if (!read) return;
+			value = read;
+			localRead = undefined;
+			continue;
+		}
 		value = parent;
 	}
 }
@@ -254,6 +260,84 @@ function callsHook(node: ts.Node, checker: ts.TypeChecker) {
 		ts.isStringLiteralLike(callee.argumentExpression) &&
 		hookName.test(callee.argumentExpression.text)
 	);
+}
+
+function standaloneWrite(node: ts.Node): node is ts.BinaryExpression {
+	return (
+		ts.isBinaryExpression(node) &&
+		node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+		ts.isExpressionStatement(node.parent)
+	);
+}
+
+/** Follow one stored SVG value to its only runtime read, inside the same component body. */
+export function svgLocalReads(
+	checker: ts.TypeChecker,
+	uses: ReturnType<typeof localUses>,
+	typeOf: RenderTypes['typeOf'],
+	reactNode: (annotation: ts.TypeNode) => boolean,
+) {
+	const reads = new Map<ts.VariableDeclaration, ts.Identifier | undefined>();
+	const hooked = new Map<ts.Node, boolean>();
+
+	function outlet(decl: ts.VariableDeclaration, name: ts.Identifier) {
+		const list = decl.parent;
+		if (
+			!ts.isVariableDeclarationList(list) ||
+			!(list.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const)) ||
+			list.flags & ts.NodeFlags.Using ||
+			!ts.isVariableStatement(list.parent)
+		)
+			return;
+		const body = list.parent.parent;
+		if (!ts.isBlock(body)) return;
+		const fn = body.parent;
+		if (
+			!(ts.isFunctionDeclaration(fn) || ts.isFunctionExpression(fn) || ts.isArrowFunction(fn)) ||
+			fn.body !== body
+		)
+			return;
+		const annotation = decl.type ?? ts.getJSDocType(decl);
+		if (annotation && !renderType(typeOf(annotation)) && !reactNode(annotation)) return;
+
+		let read: ts.Identifier | undefined;
+		for (const ref of renderUses(uses(name))) {
+			if (ts.findAncestor(ref, ts.isFunctionLike) !== fn) return;
+			if (standaloneWrite(ref.parent) && ref.parent.left === ref) continue;
+			if (read) return;
+			read = ref;
+		}
+		if (!read) return;
+		if (!hooked.has(fn))
+			hooked.set(
+				fn,
+				contains(fn, (node) => callsHook(node, checker)),
+			);
+		return hooked.get(fn) ? undefined : read;
+	}
+
+	return (value: ts.Node) => {
+		const parent = value.parent;
+		// A chained assignment or call can receive the element independently of the local.
+		const name =
+			ts.isVariableDeclaration(parent) && parent.initializer === value
+				? parent.name
+				: standaloneWrite(parent) && parent.right === value
+					? parent.left
+					: undefined;
+		if (!name || !ts.isIdentifier(name)) return;
+		const symbol = checker.getSymbolAtLocation(name);
+		const decl = symbol?.valueDeclaration;
+		if (
+			!decl ||
+			symbol.declarations?.length !== 1 ||
+			!ts.isVariableDeclaration(decl) ||
+			!ts.isIdentifier(decl.name)
+		)
+			return;
+		if (!reads.has(decl)) reads.set(decl, outlet(decl, decl.name));
+		return reads.get(decl);
+	};
 }
 
 /** Prove where a selected component delivers every reference to an incoming prop. */
