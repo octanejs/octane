@@ -1,7 +1,7 @@
 import { useState, useSyncExternalStore } from 'octane';
 import type { OctaneNode } from 'octane';
 import { DataProvider, useRead } from 'octane/data/octane';
-import { addBook, books, removeBook, setRead, stats } from '../shared/contracts.ts';
+import { addBook, books, finished, removeBook, setRead, stats } from '../shared/contracts.ts';
 import {
 	ACCOUNTS,
 	checkSaved,
@@ -53,6 +53,23 @@ function BookList(props: { session: Session }) @{
 			}
 		</ul>
 	}
+}
+
+/** Marking a book read moves it here before the server replies. */
+function FinishedList() @{
+	const list = useRead(finished);
+	<section class="finished" aria-label="Finished">
+		<h2>Finished</h2>
+		@if (list.length === 0) {
+			<p class="empty">Nothing finished yet.</p>
+		} @else {
+			<ol>
+				@for (const book of list; key book.id) {
+					<li>{book.title as string}</li>
+				}
+			</ol>
+		}
+	</section>
 }
 
 function AddForm(props: { session: Session }) @{
@@ -145,6 +162,11 @@ export function ShelfBody(props: { session: Session; children?: OctaneNode }) @{
 			<p class="error" role="alert">
 				{`Could not load the shelf: ${(error as Error).message}` as string}
 			</p>
+		}
+		@try {
+			<FinishedList />
+		} @pending {
+			<p class="loading">Loading finished books…</p>
 		}
 		<div class="tools">
 			<Faults session={session} />

@@ -18,6 +18,9 @@
  * - Every optimistic edit is an absolute patch, an insert by ID or a delete by
  *   ID. Applying one to a value that already includes it changes nothing, so an
  *   edit can be replayed over any newer value without counting twice.
+ * - A view's records are shared: one table per entity holds the newest
+ *   confirmed copy of each record any view has loaded, and every view of the
+ *   entity is evaluated over that table with outstanding edits applied.
  * - A seed from a server render is adopted when its read is first asked for,
  *   so hydration finds the server's value without waiting or loading. It keeps
  *   its age: freshness and expiry count from when the server loaded it.
@@ -31,6 +34,8 @@ import {
 	type DataRequest,
 	type Read,
 	type Transport,
+	type View,
+	type ViewWindow,
 	type Write,
 } from './contracts.js';
 
@@ -111,6 +116,25 @@ interface SeedEntry {
 	readonly age: number;
 }
 
+/**
+ * The part of a view's full order an entry holds: every record from `first` to
+ * `last` in that order, where `first` sits at position `start`. A null `last`
+ * means the window reaches the end of the list; `first` is null only at the top.
+ */
+interface Span {
+	readonly start: number;
+	readonly first: unknown;
+	readonly last: unknown;
+	/** Whether a short span has already been reloaded once, so a list that shrank cannot loop. */
+	reloaded: boolean;
+}
+
+interface StoredRecord {
+	readonly value: unknown;
+	/** Store sequence of the load or write that produced the value. */
+	readonly seq: number;
+}
+
 interface Entry {
 	readonly read: Read<any, any>;
 	readonly input: unknown;
@@ -134,6 +158,8 @@ interface Entry {
 	keepTimer: ReturnType<typeof setTimeout> | undefined;
 	expireTimer: ReturnType<typeof setTimeout> | undefined;
 	snapshot: ReadSnapshot<any> | null;
+	/** A view entry's span; null for a read and for a view with no value. */
+	span: Span | null;
 }
 
 interface Operation {
@@ -170,6 +196,45 @@ const RETIRED_HANDLE: ReadHandle<any> = {
 
 /** A server-side cap also applies; this bounds what one write asks for. */
 const MAX_REFRESH = 8;
+
+/** Rows a view loads either side of what it shows, so small moves need no reload. */
+const MARGIN = 20;
+
+const EMPTY: readonly unknown[] = [];
+
+const isView = (read: Read<any, any>): read is View<any, any> => 'view' in read;
+
+/** The window a view entry shows, from its input. */
+function shown(entry: Entry): { offset: number; limit: number } {
+	const window = (entry.input ?? {}) as ViewWindow;
+	return {
+		offset: window.offset ?? 0,
+		limit: window.limit ?? (entry.read as View<any, any>).view.limit,
+	};
+}
+
+/**
+ * What a load asks the server for. A view asks for its window plus a margin
+ * either side, and one row more, which says whether the list ends inside it.
+ */
+function wireInput(entry: Entry): unknown {
+	if (!isView(entry.read)) return entry.input;
+	const { offset, limit } = shown(entry);
+	// The margins give way to the view's cap; the window itself never does, so the server refuses it.
+	const start = Math.max(0, offset - Math.min(MARGIN, Math.max(0, entry.read.view.max - limit)));
+	const asked = offset - start + limit;
+	const count = Math.max(asked, Math.min(entry.read.view.max, asked + MARGIN + 1));
+	return { ...(entry.input as object), offset: start, limit: count };
+}
+
+/** Whether two rows show the same fields, so an unchanged view keeps its array. */
+function sameRow(a: unknown, b: unknown): boolean {
+	if (a === b) return true;
+	if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
+	const keys = Object.keys(a);
+	if (keys.length !== Object.keys(b).length) return false;
+	return keys.every((key) => Object.is((a as any)[key], (b as any)[key]));
+}
 
 /** A stable key for plain input: object keys sorted, so `{a,b}` and `{b,a}` share an entry. */
 function inputKey(value: unknown): string {
@@ -224,6 +289,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		}
 	}
 	const queues = new Map<string, Promise<unknown>>();
+	/** Confirmed records that views have loaded, by entity name and then ID. */
+	const records = new Map<string, Map<string, StoredRecord>>();
 	let operations: Operation[] = [];
 	let sequence = 0;
 	let retired = false;
@@ -233,7 +300,158 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	}
 
 	function shows(operation: Operation, entry: Entry): boolean {
-		return operation.status !== 'confirmed' || entry.baseSeq < operation.settledSeq;
+		if (operation.status !== 'confirmed') return true;
+		if (entry.baseSeq >= operation.settledSeq) return false;
+		if (!entry.span) return true;
+		// A view reads the shared record, which may postdate the view's own load.
+		const record = records.get(operation.write.effect!.entity.name)?.get(operation.entityId);
+		if (!record) return operation.write.effect!.kind !== 'remove';
+		return record.seq < operation.settledSeq;
+	}
+
+	function viewEntries(name: string): Entry[] {
+		const views: Entry[] = [];
+		for (const entry of entries.values()) {
+			if (entry.span && (entry.read as View<any, any>).view.of.name === name) views.push(entry);
+		}
+		return views;
+	}
+
+	/** Whether `value` counts toward the rows above a view's span. */
+	function above(entry: Entry, value: unknown): boolean {
+		const { where, compare } = (entry.read as View<any, any>).view;
+		const { first } = entry.span!;
+		return first !== null && where(value, entry.input) && compare(value, first) < 0;
+	}
+
+	function inSpan(entry: Entry, value: unknown): boolean {
+		const { where, compare } = (entry.read as View<any, any>).view;
+		const { first, last } = entry.span!;
+		return (
+			where(value, entry.input) &&
+			(first === null || compare(first, value) <= 0) &&
+			(last === null || compare(value, last) <= 0)
+		);
+	}
+
+	/**
+	 * Store a confirmed record unless a newer copy is held. A view whose span
+	 * starts below the top knows its position only by count; a change that moves
+	 * a record across that edge shifts every row, so the view reloads, unless its
+	 * own load is newer than the change and so already counts it. A record with
+	 * no earlier copy is new only when this store's own create made it; one that
+	 * another load brought was already where the server put it.
+	 */
+	function putRecord(
+		entity: Entity<any>,
+		value: unknown,
+		seq: number,
+		source: Entry | null,
+		reload: Set<Entry>,
+		created = false,
+	): void {
+		let table = records.get(entity.name);
+		if (!table) records.set(entity.name, (table = new Map()));
+		const id = entity.id(value);
+		const old = table.get(id);
+		if (old && old.seq > seq) return;
+		table.set(id, { value, seq });
+		if (!old && !created) return;
+		for (const entry of viewEntries(entity.name)) {
+			if (entry === source || entry.span!.start === 0 || seq < entry.baseSeq) continue;
+			if ((old !== undefined && above(entry, old.value)) !== above(entry, value)) {
+				reload.add(entry);
+			}
+		}
+	}
+
+	/** Delete a record a confirmed write removed; views that counted it above their span reload. */
+	function deleteRecord(entity: Entity<any>, id: string, reload: Set<Entry>): void {
+		const table = records.get(entity.name);
+		const old = table?.get(id);
+		if (!old) return;
+		table!.delete(id);
+		for (const entry of viewEntries(entity.name)) {
+			if (entry.span!.start > 0 && above(entry, old.value)) reload.add(entry);
+		}
+	}
+
+	/** Drop records no remaining view's span holds. */
+	function collectRecords(name: string): void {
+		const table = records.get(name);
+		if (!table) return;
+		const views = viewEntries(name);
+		for (const [id, record] of table) {
+			if (!views.some((entry) => inSpan(entry, record.value))) table.delete(id);
+		}
+	}
+
+	/**
+	 * A view's rows: the shared records with every outstanding edit applied,
+	 * filtered by its rule, in its order, within its span. When edits leave the
+	 * span too few rows to fill the window, the view shows what it has and
+	 * reloads once.
+	 */
+	function evaluate(entry: Entry): unknown[] {
+		const span = entry.span!;
+		const { of, compare } = (entry.read as View<any, any>).view;
+		const { offset, limit } = shown(entry);
+		// A window past the end of the list holds no records to bound it.
+		if (span.start > 0 && span.first === null) return EMPTY as unknown[];
+		const table = records.get(of.name);
+		const merged = new Map<string, unknown>();
+		if (table) for (const [id, record] of table) merged.set(id, record.value);
+		const edited = new Set<string>();
+		let unsettled = false;
+		for (const operation of operations) {
+			const { effect } = operation.write;
+			if (effect?.entity.name !== of.name || !shows(operation, entry)) continue;
+			if (operation.status !== 'confirmed') unsettled = true;
+			const id = operation.entityId;
+			const current = merged.get(id);
+			if (effect.kind === 'patch') {
+				if (current === undefined) continue;
+				merged.set(id, { ...(current as object), ...(operation.input as object) });
+			} else if (effect.kind === 'remove') {
+				merged.delete(id);
+			} else if (current === undefined) {
+				merged.set(id, operation.draft);
+			}
+			edited.add(id);
+		}
+		// An edit that moves a record across the top of the span moves every row in it.
+		let shift = 0;
+		if (span.start > 0) {
+			for (const id of edited) {
+				const confirmed = table?.get(id)?.value;
+				const value = merged.get(id);
+				if (value !== undefined && above(entry, value)) shift++;
+				if (confirmed !== undefined && above(entry, confirmed)) shift--;
+			}
+		}
+		const rows: unknown[] = [];
+		for (const value of merged.values()) if (inSpan(entry, value)) rows.push(value);
+		rows.sort(compare);
+		const from = offset - span.start - shift;
+		// A reload cannot fill the window until the server has the edits that emptied it;
+		// each one that settles evaluates the view again.
+		const short = from < 0 || (span.last !== null && rows.length < from + limit);
+		if (short && !unsettled && !span.reloaded) {
+			span.reloaded = true;
+			// Not inside the render that asked for the snapshot.
+			queueMicrotask(() => {
+				if (!retired && entry.span === span && entries.get(entry.key) === entry) {
+					invalidateEntry(entry);
+				}
+			});
+		}
+		const next = rows.slice(Math.max(0, from), Math.max(0, from + limit));
+		const previous = entry.snapshot?.value as unknown[] | undefined;
+		return previous !== undefined &&
+			previous.length === next.length &&
+			previous.every((row, index) => sameRow(row, next[index]))
+			? previous
+			: next;
 	}
 
 	/** The confirmed value with every outstanding edit applied, in submission order. */
@@ -273,7 +491,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const usable = entry.hasBase && Date.now() - entry.fetchedAt < entry.read.expire;
 		return {
 			status: usable ? 'ready' : entry.error === undefined ? 'pending' : 'error',
-			value: usable ? project(entry) : undefined,
+			value: usable ? (entry.span ? evaluate(entry) : project(entry)) : undefined,
 			error: entry.error,
 			refreshing: usable && entry.inflight !== null,
 			stale: usable && isStale(entry),
@@ -315,6 +533,17 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		commit([...entries.values()].filter((entry) => entry.read.entities));
 	}
 
+	/** Commit `entry`, and with it every view that reads the records its value carried. */
+	function touchWithViews(entry: Entry): void {
+		commit(
+			isView(entry.read) ? new Set([entry, ...viewEntries(entry.read.view.of.name)]) : [entry],
+		);
+	}
+
+	function reloadAll(reload: Set<Entry>): void {
+		for (const entry of reload) if (entries.get(entry.key) === entry) invalidateEntry(entry);
+	}
+
 	/** Drop the confirmed value, so every later reader loads a new one. */
 	function forget(entry: Entry): void {
 		clearTimeout(entry.expireTimer);
@@ -322,6 +551,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		entry.hasBase = false;
 		entry.names = new Set();
 		entry.snapshot = null;
+		entry.span = null;
 	}
 
 	/** Start the retention clock for an entry nothing observes. */
@@ -331,8 +561,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		entry.keepTimer = setTimeout(() => {
 			entry.keepTimer = undefined;
 			// A handle outlives its entry; an evicted one must not show what it once held.
+			const view = isView(entry.read) ? entry.read.view.of.name : undefined;
 			forget(entry);
 			entries.delete(entry.key);
+			if (view !== undefined) collectRecords(view);
 			collect();
 		}, entry.read.keep);
 	}
@@ -349,7 +581,40 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		});
 	}
 
-	function adopt(entry: Entry, value: unknown, startedSeq: number, age = 0): void {
+	/** `reload` collects views that a change to shared records left unable to place their rows. */
+	function adopt(
+		entry: Entry,
+		value: unknown,
+		startedSeq: number,
+		age = 0,
+		reload?: Set<Entry>,
+	): void {
+		if (isView(entry.read)) {
+			const rows = value as unknown[];
+			const { offset, limit } = wireInput(entry) as { offset: number; limit: number };
+			entry.span = {
+				start: offset,
+				first: offset > 0 ? (rows[0] ?? null) : null,
+				last: rows.length < limit ? null : rows[rows.length - 1],
+				reloaded: false,
+			};
+			const { of } = entry.read.view;
+			const later = reload ?? new Set();
+			const loaded = new Set<string>();
+			for (const row of rows) {
+				loaded.add(of.id(row));
+				putRecord(of, row, startedSeq, entry, later);
+			}
+			// An older copy inside this span that the server left out has changed since.
+			for (const [id, record] of records.get(of.name) ?? []) {
+				if (record.seq >= startedSeq || loaded.has(id) || !inSpan(entry, record.value)) continue;
+				for (const other of viewEntries(of.name)) {
+					if (other !== entry && inSpan(other, record.value)) later.add(other);
+				}
+				records.get(of.name)!.delete(id);
+			}
+			if (!reload) reloadAll(later);
+		}
 		entry.base = value;
 		entry.hasBase = true;
 		entry.names = new Set(selections(entry.read, value).map(({ entity }) => entity.name));
@@ -385,7 +650,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		} catch {
 			return;
 		}
-		if (!(value instanceof Promise)) adopt(entry, value, 0, seed.age);
+		if (value instanceof Promise) return;
+		const reload = new Set<Entry>();
+		adopt(entry, value, 0, seed.age, reload);
+		// A seed is adopted while a render asks for its read.
+		if (reload.size > 0) queueMicrotask(() => !retired && reloadAll(reload));
 	}
 
 	/**
@@ -408,7 +677,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		clearTimeout(entry.keepTimer);
 		entry.keepTimer = undefined;
 		const current = () => !retired && entry.attempt === attempt;
-		const done = request({ kind: 'read', name: read.name, input: entry.input }, abort.signal)
+		const done = request({ kind: 'read', name: read.name, input: wireInput(entry) }, abort.signal)
 			.then((reply) => {
 				if (!reply.ok) throw new DataError(reply.code, reply.data, reply.issues);
 				return parse(read.output, reply.value);
@@ -425,7 +694,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				if (!current()) return;
 				entry.inflight = null;
 				entry.abort = null;
-				touch(entry);
+				touchWithViews(entry);
 				idle(entry);
 			});
 		entry.inflight = done;
@@ -454,6 +723,22 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 
 	function writeTags(write: Write<any, any>): readonly string[] {
 		return write.effect ? [...write.invalidates, write.effect.entity.name] : write.invalidates;
+	}
+
+	/**
+	 * The tags a write affects `entry` through. A view settles a removal, or a
+	 * write whose reply carries its record, from the shared table, so only the
+	 * write's own `invalidates` tags reach it.
+	 */
+	function viewTags(entry: Entry, write: Write<any, any>, tags: readonly string[], local: boolean) {
+		return entry.span && local ? write.invalidates : tags;
+	}
+
+	/** Whether a write's views can settle from the shared table, before its reply is read. */
+	function settlesLocally(write: Write<any, any>): boolean {
+		return (
+			write.effect?.kind === 'remove' || (write.effect !== undefined && write.record !== undefined)
+		);
 	}
 
 	function entryFor(read: Read<any, any>, input: unknown): Entry {
@@ -503,6 +788,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			keepTimer: undefined,
 			expireTimer: undefined,
 			snapshot: null,
+			span: null,
 		};
 		entries.set(key, created);
 		adoptSeed(created);
@@ -552,10 +838,31 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		operation.status = 'confirmed';
 		operation.settledSeq = ++sequence;
 		operation.gate?.resolve();
+		// Views take a removal or a returned record into the shared table, so they need no reload.
+		// A reply that could not be read carries no record, and its views reload.
+		const reload = new Set<Entry>();
+		const { effect } = write;
+		let local = false;
+		if (effect?.kind === 'remove') {
+			deleteRecord(effect.entity, operation.entityId, reload);
+			local = true;
+		} else if (effect && write.record && output !== undefined) {
+			const created = effect.kind === 'create';
+			putRecord(effect.entity, write.record(output), operation.settledSeq, null, reload, created);
+			local = true;
+		}
 		const refreshed = new Set<Entry>();
 		const pending: Promise<() => Entry | undefined>[] = [];
 		for (const item of reply?.refreshed ?? []) {
-			const entry = entries.get(entryKey(item.name, item.input));
+			const key = entryKey(item.name, item.input);
+			let entry = entries.get(key);
+			// A view asked for its window with a margin, so the reply names that input.
+			for (const candidate of entry ? [] : entries.values()) {
+				if (candidate.span && entryKey(candidate.read.name, wireInput(candidate)) === key) {
+					entry = candidate;
+					break;
+				}
+			}
 			if (!entry) continue;
 			refreshed.add(entry);
 			// The refreshed value was read after the write, so it supersedes any load in flight.
@@ -593,8 +900,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			// A first load of a read that selects entities has no value yet to say which ones,
 			// and may predate the write. Reads that select none are untouched unless a tag names them.
 			const unknown = !entry.hasBase && entry.read.entities && tags.length > 0;
-			if (!refreshed.has(entry) && (unknown || affects(entry, tags))) invalidateEntry(entry);
+			if (refreshed.has(entry)) continue;
+			if (unknown || affects(entry, viewTags(entry, write, tags, local))) reload.add(entry);
 		}
+		reloadAll(reload);
 		if (!operation.write.effect) operations = operations.filter((item) => item !== operation);
 		collect();
 	}
@@ -645,8 +954,9 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			const refresh: { name: string; input: unknown }[] = [];
 			for (const entry of entries.values()) {
 				if (refresh.length === MAX_REFRESH) break;
-				if (entry.subscribers.size > 0 && affects(entry, tags)) {
-					refresh.push({ name: entry.read.name, input: entry.input });
+				const viewed = viewTags(entry, write, tags, settlesLocally(write));
+				if (entry.subscribers.size > 0 && affects(entry, viewed)) {
+					refresh.push({ name: entry.read.name, input: wireInput(entry) });
 				}
 			}
 			// Read at send time: a server-assigned ID may have replaced the operation ID.
@@ -706,7 +1016,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				}
 				if (retired) throw new DataRetiredError();
 				confirm(operation, reply, output);
-				if (write.serverId) touchEntities();
+				if (write.serverId || settlesLocally(write)) touchEntities();
 				return output;
 			},
 			(error) => {
@@ -786,6 +1096,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			operations = [];
 			queues.clear();
 			assigned.clear();
+			records.clear();
 			seeds.clear();
 			for (const entry of entries.values()) {
 				entry.abort?.abort();

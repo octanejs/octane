@@ -68,7 +68,8 @@ function externalValue<T>(initial: T): ExternalValue<T> {
 }
 
 function describe(request: DataRequest): string {
-	const refreshed = request.refresh?.length ? ` + ${request.refresh.length} reads back` : '';
+	const count = request.refresh?.length ?? 0;
+	const refreshed = count === 0 ? '' : ` + ${count} read${count === 1 ? '' : 's'} back`;
 	return `${request.kind} ${request.name}${refreshed}`;
 }
 

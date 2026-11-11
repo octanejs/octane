@@ -5,7 +5,17 @@
  */
 import { DataError } from 'octane/data';
 import { createDataHandler } from 'octane/data/server';
-import { addBook, books, receipt, removeBook, setRead, stats, type Book } from './contracts.ts';
+import {
+	addBook,
+	books,
+	finished,
+	receipt,
+	removeBook,
+	setRead,
+	stats,
+	unread,
+	type Book,
+} from './contracts.ts';
 
 interface Shelf {
 	books: Book[];
@@ -53,28 +63,37 @@ export function createShelfHandler(options: { latency?: number } = {}) {
 	}
 
 	return createDataHandler({ context: (request) => ({ shelf: shelfFor(request) }) }, (handle) => [
-		handle(books, async (_, { shelf }) => {
-			await delay(latency / 2);
-			return shelf.books.map((book) => ({ ...book }));
-		}),
+		// A view's handler serves its rule's window, in exactly the view's order.
+		...[books, finished, unread].map((list) =>
+			handle(list, async (input, { shelf }) => {
+				await delay(latency / 2);
+				return shelf.books
+					.filter((book) => list.view.where(book, input))
+					.sort(list.view.compare)
+					.slice(input.offset, input.offset + input.limit)
+					.map((book) => ({ ...book }));
+			}),
+		),
 		handle(stats, (_, { shelf }) => ({
 			total: shelf.books.length,
 			read: shelf.books.filter((book) => book.read).length,
 		})),
-		handle(addBook, (input, { shelf, operationId }) => {
+		handle(addBook, async (input, { shelf, operationId }) => {
 			const title = input.title.toLowerCase();
 			if (shelf.books.some((book) => book.title.toLowerCase() === title)) {
 				throw new DataError('duplicate');
 			}
-			return apply(shelf, operationId, () => {
+			await apply(shelf, operationId, () => {
 				shelf.books.push({ id: operationId, title: input.title, read: false });
 			});
+			return { ...find(shelf, operationId) };
 		}),
-		handle(setRead, (input, { shelf, operationId }) =>
-			apply(shelf, operationId, () => {
+		handle(setRead, async (input, { shelf, operationId }) => {
+			await apply(shelf, operationId, () => {
 				find(shelf, input.id).read = input.read;
-			}),
-		),
+			});
+			return { ...find(shelf, input.id) };
+		}),
 		handle(removeBook, (input, { shelf, operationId }) =>
 			apply(shelf, operationId, () => {
 				find(shelf, input.id);

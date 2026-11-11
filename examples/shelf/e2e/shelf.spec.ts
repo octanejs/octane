@@ -57,6 +57,7 @@ const book = (page: Page, title: string) =>
 		.getByRole('list', { name: 'Books' })
 		.getByRole('listitem')
 		.filter({ has: page.getByText(title, { exact: true }) });
+const finishedList = (page: Page) => page.getByRole('region', { name: 'Finished' });
 const status = (page: Page) => page.getByRole('status');
 const network = (page: Page) => page.getByRole('region', { name: 'Network' });
 
@@ -99,15 +100,18 @@ for (const { name, path, serverRendered } of PAGES) {
 
 			await book(page, 'Kindred').getByRole('checkbox').click();
 			await expect(book(page, 'Kindred').getByRole('checkbox')).toBeChecked();
+			// The finished list is a view, so the book moves into it before the reply.
+			await expect(finishedList(page).getByRole('listitem')).toHaveText(['Kindred']);
 			await expect.poll(writes.count).toBe(1);
 			await expect(status(page)).toHaveText('');
 
 			await writes.release();
 			await expect(status(page)).toHaveText('Saved');
 			await expect(page.getByText('3 books · 1 read')).toBeVisible();
-			// The write's reply carried the list and the counts back, so neither reloads.
+			await expect(finishedList(page).getByRole('listitem')).toHaveText(['Kindred']);
+			// The reply carried the saved book, which the views take, and the counts back.
 			await expect(network(page).getByRole('listitem').first()).toHaveText(
-				'write books.setRead + 2 reads back',
+				'write books.setRead + 1 read back',
 			);
 		});
 
@@ -117,6 +121,13 @@ for (const { name, path, serverRendered } of PAGES) {
 			await page.getByRole('textbox', { name: 'Book title' }).fill('Station Eleven');
 			await page.getByRole('button', { name: 'Add' }).click();
 			await expect(book(page, 'Station Eleven')).toBeVisible();
+			// The list is ordered by title, and a new book takes its place in that order.
+			await expect(page.getByRole('list', { name: 'Books' }).getByRole('listitem')).toHaveText([
+				/Kindred/,
+				/Piranesi/,
+				/Station Eleven/,
+				/The Left Hand of Darkness/,
+			]);
 			await expect(status(page)).toHaveText('Saved');
 			await expect(page.getByText('4 books · 0 read')).toBeVisible();
 

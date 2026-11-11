@@ -31,9 +31,12 @@ Everything else is shared:
   counts are in the HTML. With JavaScript on, the Network panel stays empty
   until your first edit: hydration reuses the server's data.
 
-- **Toggle a book.** The checkbox changes before the server replies. The
-  Network panel shows one request: the write, with the list and the counts it
-  affected returned in the same response.
+- **Toggle a book.** The checkbox changes, and the book moves into or out of
+  **Finished**, before the server replies. Both lists and the React island's
+  list are views (`view()` in the contracts), so the store keeps each one
+  sorted and complete under any edit. The Network panel shows one request: the
+  write, whose reply carries the saved book for the views and the counts it
+  affected.
 - **Add a title already on the shelf.** The new row appears, then disappears
   when the server refuses it.
 - **Lose the next reply, then add a book.** The server saves it but the reply is
