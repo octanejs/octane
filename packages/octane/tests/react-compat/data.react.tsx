@@ -1,8 +1,8 @@
 /** @jsxImportSource react */
 import { Suspense } from 'react';
 import type { DataStore } from 'octane/data';
-import { DataProvider, useRead, useReadState, useWrite } from 'octane/data/react';
-import { setDone, todos } from '../_data-todos.js';
+import { DataProvider, usePages, useRead, useReadState, useWrite } from 'octane/data/react';
+import { setDone, todoPages, todos } from '../_data-todos.js';
 
 function ReactDoneCount() {
 	const { value } = useReadState(todos);
@@ -34,5 +34,28 @@ export function ReactTodoPanel(props: { store: DataStore }) {
 				<ReactToggle />
 			</Suspense>
 		</DataProvider>
+	);
+}
+
+/** The same paged list as the Octane page's, through the React binding. */
+export function ReactPages(props: { store: DataStore }) {
+	return (
+		<DataProvider store={props.store}>
+			<ReactPageList />
+		</DataProvider>
+	);
+}
+
+function ReactPageList() {
+	const pages = usePages(todoPages);
+	return (
+		<section data-react-pages="">
+			<ul>
+				{pages.value?.map((todo) => (
+					<li key={todo.id}>{todo.title}</li>
+				))}
+			</ul>
+			{pages.more ? <button onClick={() => void pages.loadMore()}>More</button> : null}
+		</section>
 	);
 }
