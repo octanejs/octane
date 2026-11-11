@@ -1035,6 +1035,7 @@
         "forms",
         "hydration",
         "optimistic-updates",
+        "persistent-cache",
         "react-compat",
         "ssr",
         "suspense",
@@ -1094,6 +1095,13 @@
         {
           "id": "shared-store-across-renderers",
           "title": "Show one edit and one rollback in an Octane page and its React island",
+          "kind": "golden",
+          "spec": "e2e/shelf.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "encrypted-cache-reload",
+          "title": "Start the lists from the encrypted cache after a reload, without loading them, and keep titles unreadable at rest",
           "kind": "golden",
           "spec": "e2e/shelf.spec.ts",
           "critical": true
