@@ -1,6 +1,6 @@
 import {
 	forwardedProps,
-	literalSvgAttribute,
+	literalJsxAttribute,
 	nativeOutputOwner,
 	renderUses,
 	svgLocalReads,
@@ -1166,7 +1166,7 @@ class ModuleTransform {
 							!!value.expression &&
 							this.svgClassName(value.expression)))
 				);
-			return attr.name.text === 'aria-hidden' && literalSvgAttribute(attr);
+			return attr.name.text === 'aria-hidden' && literalJsxAttribute(attr);
 		});
 		if (!supported) return false;
 		return this.nativeSvgOutput(tag, uses, unproven);
@@ -1390,7 +1390,7 @@ class ModuleTransform {
 		const attributes = ts.isJsxElement(element)
 			? element.openingElement.attributes
 			: element.attributes;
-		const callbacks = new Map<ts.Node, string>();
+		const renderers = new Map<ts.Node, string>();
 		const blocked = walkLocalValues(attributes, this.checker, (node, visit) => {
 			if (
 				this.options.reactCompat &&
@@ -1405,6 +1405,31 @@ class ModuleTransform {
 				const wrappers = fields.map(reactRenderer);
 				if (wrappers.some(Boolean)) {
 					if (this.readsGlobal('jsx') || this.readsGlobal('OctaneJsx')) return true;
+					const hasValue = wrappers.some((wrapper) => wrapper?.value);
+					// An island can defer the whole props expression, including
+					// reads next to the React value.
+					if (hasValue) {
+						if (
+							!this.options.reactIntlAdapter ||
+							!ts.isJsxSelfClosingElement(element) ||
+							!ts.isIdentifier(element.tagName) ||
+							this.authoredIsland(element) ||
+							/@jsx(?:ImportSource|Runtime|Frag)?\b/i.test(this.source) ||
+							attributes.properties.some((attr) => attr !== node && !literalJsxAttribute(attr))
+						)
+							return true;
+						const declaration = this.declarationOf(element.tagName);
+						const binding = declaration && this.imports.get(declaration);
+						if (
+							!declaration ||
+							!ts.isImportSpecifier(declaration) ||
+							declaration.parent.parent.parent.attributes ||
+							binding?.module !== 'react-intl' ||
+							binding.imported !== 'FormattedMessage' ||
+							!this.options.reactStoreComponent?.(binding.module)
+						)
+							return true;
+					}
 					return fields.some((field, index) => {
 						const wrapper = wrappers[index];
 						if (!wrapper) {
@@ -1423,7 +1448,11 @@ class ModuleTransform {
 								(ts.isIdentifier(literal) &&
 									literal.text === 'undefined' &&
 									!this.declarationOf(literal)) ||
-								textKind(this.typeOf(value)) !== 0;
+								(hasValue
+									? ts.isStringLiteralLike(literal) ||
+										ts.isNumericLiteral(literal) ||
+										ts.isBigIntLiteral(literal)
+									: textKind(this.typeOf(value)) !== 0);
 							return !primitive || visit(field);
 						}
 						if (
@@ -1432,7 +1461,7 @@ class ModuleTransform {
 							)
 						)
 							return true;
-						callbacks.set(wrapper.body, wrapper.args);
+						renderers.set(wrapper.body, wrapper.args);
 						return false;
 					});
 				}
@@ -1450,7 +1479,7 @@ class ModuleTransform {
 			return undefined;
 		});
 		if (blocked) return false;
-		for (const [body, args] of callbacks) this.reactRendererBodies.set(body, args);
+		for (const [body, args] of renderers) this.reactRendererBodies.set(body, args);
 		return true;
 	}
 

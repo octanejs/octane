@@ -206,7 +206,7 @@ Self-closing `FormattedMessage` elements can render text directly, including ICU
 
 Inside an authored `ReactCompat` boundary, a single original React component can be selected by a ternary that supplies different props on either branch. A namespaced bridge becomes a named import so the compiler can transport that child. Lists, optional children, and JSX-valued props require a React component to own their rendering.
 
-Inside a retained React component, an inline rich-text callback such as `chunks => <strong>{chunks}</strong>` can keep producing a genuine React element. The codemod recognizes a single native tag with literal attributes and an optional literal key. Its child can be the callback parameter on its own line. Captured values, spreads, refs, and event handlers keep their migration diagnostic.
+Inside a retained React component, a rich-text callback such as `chunks => <strong>{chunks}</strong>` can keep producing a genuine React element. When the codemod creates a React island for `FormattedMessage`, an inline substitution such as `values={{ lineBreak: <br /> }}` also stays in React if the other props and substitutions cannot observe a change in evaluation timing. The codemod recognizes a single intrinsic tag with literal attributes and an optional literal key. Callbacks can use their parameter as the sole child. Spreads, refs, and event handlers retain a migration diagnostic.
 
 ## Store hooks in linked workspace packages
 
