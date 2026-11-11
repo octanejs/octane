@@ -38,6 +38,7 @@ import {
 	type ViewWindow,
 	type Write,
 } from './contracts.js';
+import { createFormHandle, NO_FORM_SEED, type FormHandle, type FormSeed } from './form.js';
 import { createPersistence, type PersistOptions, type Stored } from './persist.js';
 
 export interface ReadSnapshot<T> {
@@ -80,6 +81,8 @@ export interface DataStore {
 	read<I, O>(read: Read<I, O>, input: I): ReadHandle<O>;
 	prefetch<I, O>(read: Read<I, O>, input: I): Promise<void>;
 	write<I, O>(write: Write<I, O>, input: I): Promise<O>;
+	/** A form for a write that declares `form` fields; `key` separates instances, such as rows. */
+	form<I, O>(write: Write<I, O>, key?: string): FormHandle<I, O>;
 	/** Mark reads with one of these tags or entity names stale; observed ones reload. */
 	invalidate(tags: readonly string[]): void;
 	/**
@@ -107,6 +110,8 @@ export interface DataStoreOptions {
 	readonly transport: Transport;
 	/** A server store's `dehydrate()` output. */
 	readonly seed?: string | null | undefined;
+	/** On a server, the request's `forms(request).form`; `dehydrate()` carries it to the browser. */
+	readonly form?: FormSeed | undefined;
 	/**
 	 * Save confirmed values to persistent storage, and start reads from them
 	 * after a restart. Reads with `persist: false` are left out.
@@ -291,11 +296,14 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	const seeds = new Map<string, SeedEntry>();
 	/** Created records' operation IDs, by entity, mapped to the IDs their servers assigned. */
 	const assigned = new Map<string, string>();
-	if (options.seed) {
-		for (const seed of devalue.parse(options.seed) as SeedEntry[]) {
-			seeds.set(entryKey(seed.name, seed.input), seed);
-		}
-	}
+	const parsed = options.seed
+		? (devalue.parse(options.seed) as { reads: SeedEntry[]; form: FormSeed })
+		: null;
+	for (const seed of parsed?.reads ?? []) seeds.set(entryKey(seed.name, seed.input), seed);
+	const formSeed = options.form ?? parsed?.form ?? NO_FORM_SEED;
+	/** A refused submission's outcome goes to the first form that matches it, once. */
+	let formOutcome = formSeed;
+	const forms = new Map<string, FormHandle<any, any>>();
 	const queues = new Map<string, Promise<unknown>>();
 	/** Confirmed records that views have loaded, by entity name and then ID. */
 	const records = new Map<string, Map<string, StoredRecord>>();
@@ -1128,7 +1136,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		);
 	}
 
-	return {
+	const store: DataStore = {
 		get retired() {
 			return retired;
 		},
@@ -1156,6 +1164,20 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					})
 				: send(write, parsed, input);
 		},
+		form(write, key = '') {
+			assertLive();
+			const formKey = `${write.name}\n${key}`;
+			let handle = forms.get(formKey);
+			if (!handle) {
+				const run = (input: unknown) => store.write(write, input as any);
+				handle = createFormHandle(write, key, formOutcome, run, () => forms.delete(formKey));
+				if (formOutcome.outcome && handle.getSnapshot().error !== null) {
+					formOutcome = { ...formSeed, outcome: null };
+				}
+				forms.set(formKey, handle);
+			}
+			return handle;
+		},
 		invalidate(tags) {
 			assertLive();
 			for (const entry of entries.values()) if (affects(entry, tags)) invalidateEntry(entry);
@@ -1181,7 +1203,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				seed.push({ name: entry.read.name, input: entry.input, value: entry.base, age });
 			}
 			// devalue escapes `<`, so the text cannot close the script element holding it.
-			return devalue.stringify(seed);
+			return devalue.stringify({ reads: seed, form: formSeed });
 		},
 		retire() {
 			if (retired) return;
@@ -1195,6 +1217,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			assigned.clear();
 			records.clear();
 			seeds.clear();
+			forms.clear();
 			for (const entry of entries.values()) {
 				entry.abort?.abort();
 				clearTimeout(entry.keepTimer);
@@ -1205,4 +1228,5 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			entries.clear();
 		},
 	};
+	return store;
 }

@@ -15,6 +15,15 @@ import {
 	type View,
 	type Write,
 } from './contracts.js';
+import {
+	decodeForm,
+	FORM_KEY,
+	FORM_OPERATION,
+	FORM_TOKEN,
+	FORM_WRITE,
+	issueMap,
+	type FormSeed,
+} from './form.js';
 
 /** Serves HTTP requests, and the same contracts in process for a server render. */
 export interface DataServer {
@@ -25,6 +34,20 @@ export interface DataServer {
 	 * validation as a call over HTTP.
 	 */
 	transport(request: Request): Transport;
+	/**
+	 * Call before rendering a page. Signs the page's forms for the request's
+	 * account and, when the request is a form's native POST, runs its write.
+	 */
+	forms(request: Request): Promise<FormSession>;
+}
+
+export interface FormSession {
+	/** Send this instead of the page: a 303 back to the page once a submission is accepted. */
+	readonly response: Response | null;
+	/** The page's status: 200, or 400 or 403 when it shows a refused submission. */
+	readonly status: number;
+	/** Pass to the page's `createDataStore({ form })`, whose seed carries it to the browser. */
+	readonly form: FormSeed;
 }
 
 export interface DataCall {
@@ -65,6 +88,15 @@ const handle: Handle<any> = (contract: DataHandler['contract'], run: DataHandler
 	run,
 });
 
+/** Compare a submitted token in time independent of where it differs. */
+function same(submitted: unknown, token: string): boolean {
+	if (typeof submitted !== 'string' || submitted.length !== token.length) return false;
+	let difference = 0;
+	for (let i = 0; i < token.length; i++)
+		difference |= submitted.charCodeAt(i) ^ token.charCodeAt(i);
+	return difference === 0;
+}
+
 /** A write may ask for at most this many reads back; the rest reload on their own. */
 const MAX_REFRESH = 8;
 
@@ -85,6 +117,10 @@ export function createDataHandler<C extends object = {}>(
 		context?: (request: Request) => C | Promise<C>;
 		/** Origins other than the request's own that may call this endpoint. */
 		allowedOrigins?: readonly string[];
+		/** Signs form tokens. Required for `forms()`; keep it out of client code. */
+		secret?: string;
+		/** The account a request acts for. A form signed for one account is refused for another. */
+		grant?: (context: C) => string;
 	},
 	define: (handle: Handle<C>) => readonly DataHandler[],
 ): DataServer {
@@ -109,17 +145,34 @@ export function createDataHandler<C extends object = {}>(
 		return contract.output ? parse(contract.output, output) : output;
 	}
 
+	const contextFor = async (request: Request) =>
+		options.context ? await options.context(request) : ({} as C);
+
+	function callFor(context: C, request: Request, operationId: string): C & DataCall {
+		const call: C & DataCall = {
+			...context,
+			request,
+			signal: request.signal,
+			operationId,
+			read: (read, input) => run('read', read.name, input, call) as Promise<any>,
+		};
+		return call;
+	}
+
+	const allowed = (request: Request) => {
+		const origin = request.headers.get('origin');
+		return (
+			origin === null ||
+			origin === new URL(request.url).origin ||
+			!!options.allowedOrigins?.includes(origin)
+		);
+	};
+
 	/** Answer one request. Anything but a reply means the outcome is unknown. */
 	async function answer(payload: DataRequest, request: Request): Promise<DataReply> {
 		try {
-			const context = options.context ? await options.context(request) : ({} as C);
-			const call: C & DataCall = {
-				...context,
-				request,
-				signal: request.signal,
-				operationId: payload.kind === 'write' ? String(payload.operationId ?? '') : '',
-				read: (read, input) => run('read', read.name, input, call) as Promise<any>,
-			};
+			const operationId = payload.kind === 'write' ? String(payload.operationId ?? '') : '';
+			const call = callFor(await contextFor(request), request, operationId);
 			const value = await run(payload.kind, payload.name, payload.input, call);
 			if (payload.kind !== 'write' || !Array.isArray(payload.refresh)) return { ok: true, value };
 			// The write has committed. A read that fails here is left for the client to reload.
@@ -138,13 +191,7 @@ export function createDataHandler<C extends object = {}>(
 	}
 
 	const serve = async (request: Request): Promise<Response> => {
-		const origin = request.headers.get('origin');
-		if (
-			request.method !== 'POST' ||
-			(origin !== null &&
-				origin !== new URL(request.url).origin &&
-				!options.allowedOrigins?.includes(origin))
-		) {
+		if (request.method !== 'POST' || !allowed(request)) {
 			return respond(403, { ok: false, code: 'forbidden' });
 		}
 		try {
@@ -155,10 +202,86 @@ export function createDataHandler<C extends object = {}>(
 			return new Response(null, { status: 500 });
 		}
 	};
+	let signing: Promise<CryptoKey> | undefined;
+	/** An HMAC of the account, so a token is valid only for the account it was issued to. */
+	async function sign(grant: string): Promise<string> {
+		const { secret } = options;
+		if (!secret) throw new Error('octane/data: forms() needs a `secret`');
+		const encoder = new TextEncoder();
+		signing ??= crypto.subtle.importKey(
+			'raw',
+			encoder.encode(secret),
+			{ name: 'HMAC', hash: 'SHA-256' },
+			false,
+			['sign'],
+		);
+		const mac = await crypto.subtle.sign('HMAC', await signing, encoder.encode(`form\n${grant}`));
+		return btoa(String.fromCharCode(...new Uint8Array(mac)))
+			.replace(/\+/g, '-')
+			.replace(/\//g, '_')
+			.replace(/=+$/, '');
+	}
+
+	async function forms(request: Request): Promise<FormSession> {
+		const context = await contextFor(request);
+		const form: FormSeed = {
+			token: await sign(options.grant?.(context) ?? ''),
+			nonce: crypto.randomUUID(),
+			outcome: null,
+		};
+		const type = request.headers.get('content-type') ?? '';
+		const submitted =
+			request.method === 'POST' &&
+			(type.startsWith('application/x-www-form-urlencoded') ||
+				type.startsWith('multipart/form-data'));
+		const data = submitted ? await request.formData() : null;
+		const name = data?.get(FORM_WRITE);
+		if (!data || typeof name !== 'string') return { response: null, status: 200, form };
+
+		const key = String(data.get(FORM_KEY) ?? '');
+		const handler = byName.get(name);
+		const fields = handler?.contract.kind === 'write' ? handler.contract.form : undefined;
+		const decoded = fields ? decodeForm(fields, data) : undefined;
+		try {
+			if (!decoded) throw new DataError('not_found');
+			if (!allowed(request) || !same(data.get(FORM_TOKEN), form.token)) {
+				throw new DataError('forbidden');
+			}
+			if (decoded.issues.length > 0) throw new DataError('invalid', undefined, decoded.issues);
+			const operation = data.get(FORM_OPERATION);
+			const operationId =
+				typeof operation === 'string' && operation.length > 0 && operation.length <= 200
+					? operation
+					: crypto.randomUUID();
+			await run('write', name, decoded.input, callFor(context, request, operationId));
+		} catch (error) {
+			if (!(error instanceof DataError)) throw error;
+			const values = decoded?.values ?? {};
+			const outcome = {
+				write: name,
+				key,
+				pending: false,
+				values,
+				issues: issueMap(error.issues),
+				error: error.code,
+			};
+			return {
+				response: null,
+				status: error.code === 'forbidden' ? 403 : 400,
+				form: { ...form, outcome },
+			};
+		}
+		// Back to the page, now rendered with the write applied.
+		const { pathname, search } = new URL(request.url);
+		const response = new Response(null, { status: 303, headers: { location: pathname + search } });
+		return { response, status: 303, form };
+	}
+
 	return Object.assign(serve, {
 		transport:
 			(request: Request): Transport =>
 			(payload) =>
 				answer(payload, request),
+		forms,
 	});
 }

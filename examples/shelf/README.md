@@ -23,7 +23,9 @@ Everything else is shared:
 - [`src/server/index.ts`](src/server/index.ts) renders a page with its own
   store, which calls the data handler in process (`handler.transport(request)`)
   under the page request's account. `store.dehydrate()` goes into the page, and
-  the browser's store starts from it, so hydration loads nothing.
+  the browser's store starts from it, so hydration loads nothing. A page also
+  takes POST: `handler.forms(request)` runs a form's native submission, then
+  redirects back to the page or renders it again with the form's issues.
 
 ## What to try
 
@@ -38,7 +40,12 @@ Everything else is shared:
   write, whose reply carries the saved book for the views and the counts it
   affected.
 - **Add a title already on the shelf.** The new row appears, then disappears
-  when the server refuses it.
+  when the server refuses it. The title stays in the box, with the reason
+  under it.
+- **Add and remove books with JavaScript turned off.** Both are native forms
+  (`useForm` over a write that declares `form` fields). Each submission posts to
+  the page, and the server redirects back or shows the refusal. With JavaScript
+  on, the same forms submit through the store instead.
 - **Lose the next reply, then add a book.** The server saves it but the reply is
   dropped. The row stays, marked as uncertain, until **Check saved result** asks
   the server. Nothing is sent twice.

@@ -123,8 +123,21 @@ export interface Write<Input, Output> {
 	readonly serverId: ((output: Output) => string) | undefined;
 	/** Where the written record is in the validated reply, so views take it without reloading. */
 	readonly record: ((output: Output) => unknown) | undefined;
+	/** The fields a native form submits, by name; a write without them takes no form POST. */
+	readonly form: FormFields | undefined;
 	readonly invalidates: readonly string[];
 }
+
+/**
+ * How one submitted field becomes an input value. Each appears exactly once,
+ * except a checkbox, which is `true` when present and `false` when absent.
+ * - `text`: the string as submitted.
+ * - `secret`: text that a refused submission never sends back to the page.
+ * - `number`: a finite number.
+ * - `boolean`: exactly `"true"` or `"false"`, as a hidden field writes it.
+ */
+export type FieldCodec = 'text' | 'secret' | 'number' | 'boolean' | 'checkbox';
+export type FormFields = Readonly<Record<string, FieldCodec>>;
 
 /** Which rows of a view to show: `limit` rows from position `offset` of its order. */
 export interface ViewWindow {
@@ -306,6 +319,11 @@ export function write<Input, Output = unknown>(options: {
 	 * record in place of reloading their windows.
 	 */
 	record?: (output: Output) => unknown;
+	/**
+	 * Accept this write as a native form POST with these fields, so its form
+	 * works before hydration and without JavaScript. Any other field is refused.
+	 */
+	form?: { readonly [K in keyof Input & string]?: FieldCodec };
 	invalidates?: readonly string[];
 }): Write<Input, Output> {
 	const { creates, patches, removes } = options;
@@ -324,6 +342,7 @@ export function write<Input, Output = unknown>(options: {
 		draft: options.draft,
 		serverId: options.serverId,
 		record: options.record,
+		form: options.form as FormFields | undefined,
 		invalidates: options.invalidates ?? [],
 	};
 }

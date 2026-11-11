@@ -11,6 +11,7 @@
   "bindings": [],
   "octaneFeatures": [
     "data-contracts",
+    "forms",
     "hydration",
     "optimistic-updates",
     "persistent-cache",
@@ -43,6 +44,13 @@
       "id": "create-remove-refuse",
       "title": "Add and remove books by ID, and roll back a refused add",
       "kind": "golden",
+      "spec": "e2e/shelf.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "native-forms",
+      "title": "Add, refuse and remove books with JavaScript off, then hydrate a refused submission and submit it through the store",
+      "kind": "ssr-hydration",
       "spec": "e2e/shelf.spec.ts",
       "critical": true
     },
