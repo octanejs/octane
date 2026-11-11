@@ -2186,12 +2186,21 @@ export function scheduleRender(
 
 /** Schedule an urgent update independently of any ambient Action. */
 export function scheduleUrgentRender(block: Block): void {
+	runUrgent(scheduleRender, block);
+}
+
+/**
+ * @internal Run `fn(arg)` outside any ambient or async transition, so the
+ * updates it schedules are urgent: an external store's notification, like
+ * useSyncExternalStore's, is never held by the transition that caused it.
+ */
+export function runUrgent<A>(fn: (arg: A) => void, arg: A): void {
 	const depth = TRANSITION_DEPTH;
 	const asyncCount = ASYNC_TRANSITION_COUNT;
 	TRANSITION_DEPTH = 0;
 	ASYNC_TRANSITION_COUNT = 0;
 	try {
-		scheduleRender(block);
+		fn(arg);
 	} finally {
 		TRANSITION_DEPTH = depth;
 		ASYNC_TRANSITION_COUNT = asyncCount;

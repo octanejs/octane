@@ -7,7 +7,10 @@
  *
  * The client and server runtimes each build the binding from their own hooks
  * and context (`octane/data/octane` and `octane/data/octane/server`); the
- * server compiler retargets the client entry to the server one.
+ * server compiler retargets the client entry to the server one. On the client
+ * a read is a native signal read: the renderer subscribes the component that
+ * made it, as it does for `signal$` and `query$`, so no hook slot is used. The
+ * server reads snapshots through `useSyncExternalStore`.
  *
  * The compiler appends each call site's hook slot as the last argument. The
  * hooks forward it to the one slot-keyed hook each of them calls.
@@ -15,12 +18,15 @@
 import type * as Client from '../index.js';
 import type { OctaneNode } from '../index.js';
 import type { Read, Write } from './contracts.js';
-import type { DataStore, ReadSnapshot } from './store.js';
+import type { DataStore, ReadHandle, ReadSnapshot } from './store.js';
 
 type Runtime = Pick<
 	typeof Client,
 	'createContext' | 'createElement' | 'use' | 'useCallback' | 'useSyncExternalStore'
->;
+> & {
+	/** Report a render's read of a handle to the renderer, which subscribes the reader. */
+	observe?: (handle: ReadHandle<unknown>) => void;
+};
 
 export interface OctaneDataBinding {
 	DataProvider(props: { store: DataStore; children?: OctaneNode }): OctaneNode;
@@ -49,7 +55,7 @@ function split(input: unknown, slot: symbol | undefined): [unknown, symbol | und
 }
 
 export function createOctaneDataBinding(runtime: Runtime): OctaneDataBinding {
-	const { createContext, createElement, use, useCallback, useSyncExternalStore } = runtime;
+	const { createContext, createElement, use, useCallback, useSyncExternalStore, observe } = runtime;
 	const StoreContext = createContext<DataStore | null>(null);
 
 	function useDataStore(): DataStore {
@@ -62,6 +68,10 @@ export function createOctaneDataBinding(runtime: Runtime): OctaneDataBinding {
 		const [value, hookSlot] = split(input, slot);
 		// Equal inputs resolve to one handle, so its methods are stable across renders.
 		const handle = useDataStore().read(read, value);
+		if (observe) {
+			observe(handle);
+			return handle.getSnapshot();
+		}
 		return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot, hookSlot);
 	}
 
