@@ -6,6 +6,7 @@ import {
 	DataUncertainError,
 	httpTransport,
 	read,
+	view,
 	write,
 	type Transport,
 } from '../src/data/index.js';
@@ -805,5 +806,135 @@ describe('octane/data server-assigned IDs and server transactions', () => {
 		await vi.waitFor(() => expect(first.getSnapshot().value!.todo.title).toBe('Night tides'));
 		expect(seen.length).toBeGreaterThan(0);
 		expect(seen.every(Boolean)).toBe(true);
+	});
+});
+
+describe('octane/data publish and forget', () => {
+	/** A server whose writes wait until the returned function is called. */
+	function holdingWrites(server: ReturnType<typeof createServer>) {
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		const transport: Transport = async (request, signal) => {
+			if (request.kind === 'write') await gate;
+			return server.transport(request, signal);
+		};
+		return { transport, release };
+	}
+
+	it('shows a published value to readers, and a delayed older reply does not replace it', async () => {
+		const server = createServer();
+		let releaseRead!: () => void;
+		let held = false;
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				const reply = await server.transport(request, signal);
+				if (held) await new Promise<void>((resolve) => (releaseRead = resolve));
+				return reply;
+			},
+		});
+		const list = store.read(todos, undefined);
+		const { notify } = await observe(list);
+		held = true;
+		void list.refresh();
+		await vi.waitFor(() => expect(releaseRead).toBeDefined());
+
+		notify.mockClear();
+		await store.publish(todos, undefined, [{ id: 'a', title: 'Night tides', done: true }]);
+		expect(notify).toHaveBeenCalled();
+		expect(list.getSnapshot()).toMatchObject({
+			status: 'ready',
+			refreshing: false,
+			value: [{ id: 'a', title: 'Night tides', done: true }],
+		});
+
+		releaseRead();
+		await settled();
+		expect(list.getSnapshot().value![0].title).toBe('Night tides');
+	});
+
+	it('keeps the later publish when an earlier one finishes validating last', async () => {
+		const server = createServer();
+		const slow = read({
+			name: 'todos.list',
+			output: {
+				'~standard': {
+					version: 1,
+					vendor: 'test',
+					validate: (value: any) =>
+						new Promise((resolve) =>
+							setTimeout(() => resolve({ value }), value[0].title === 'Older' ? 20 : 0),
+						),
+				},
+			},
+			entities: (list: TodoItem[]) => Todo.from(list),
+		});
+		const store = createDataStore({ transport: server.transport });
+		const list = store.read(slow, undefined);
+		await observe(list);
+
+		const older = store.publish(slow, undefined, [{ id: 'a', title: 'Older', done: false }]);
+		const newer = store.publish(slow, undefined, [{ id: 'a', title: 'Newer', done: false }]);
+		await Promise.all([older, newer]);
+		expect(list.getSnapshot().value![0].title).toBe('Newer');
+	});
+
+	it.each([
+		['settles', true],
+		['rolls back', false],
+	])('%s a pending edit over a published value', async (_, applied) => {
+		const server = createServer();
+		const { transport, release } = holdingWrites(server);
+		const store = createDataStore({ transport });
+		const list = store.read(todos, undefined);
+		await observe(list);
+
+		server.rows[0].title = 'Night tides';
+		// A refused write: the record was deleted on the server.
+		if (!applied) server.rows.length = 0;
+		const saved = store.write(setDone, { id: 'a', done: true });
+		await store.publish(todos, undefined, [{ id: 'a', title: 'Night tides', done: false }]);
+		expect(list.getSnapshot().value![0]).toMatchObject({ title: 'Night tides', done: true });
+
+		release();
+		await saved.catch(() => {});
+		await settled();
+		expect(list.getSnapshot().value![0]).toMatchObject({ title: 'Night tides', done: applied });
+	});
+
+	it('refuses a value its schema refuses, a view, and a retired store', async () => {
+		const store = createDataStore({ transport: createServer().transport });
+		await expect(store.publish(todos, undefined, [{ id: 'a' }])).rejects.toBeDefined();
+		const open = view({
+			name: 'todos.open',
+			of: Todo,
+			where: (todo) => !todo.done,
+			order: [['title', 'asc']],
+		});
+		expect(() => store.publish(open, {}, [])).toThrow(TypeError);
+		void store.retire();
+		expect(() => store.publish(todos, undefined, [])).toThrow(DataRetiredError);
+		expect(() => store.forget(todos, undefined)).toThrow(DataRetiredError);
+	});
+
+	it('shows a forgotten read pending without reloading it, until it is asked for again', async () => {
+		const server = createServer();
+		const store = createDataStore({ transport: server.transport });
+		const list = store.read(todos, undefined);
+		const first = store.read(firstTodo, undefined);
+		const { notify } = await observe(list);
+		await observe(first);
+		server.log.length = 0;
+
+		notify.mockClear();
+		await store.forget(todos, undefined);
+		expect(notify).toHaveBeenCalled();
+		expect(list.getSnapshot().status).toBe('pending');
+		expect(first.getSnapshot().value!.todo.title).toBe('Tides');
+		await settled();
+		expect(server.log).toEqual([]);
+
+		await store.prefetch(todos, undefined);
+		expect(list.getSnapshot().value).toEqual([{ id: 'a', title: 'Tides', done: false }]);
+		expect(server.log).toEqual(['list']);
 	});
 });

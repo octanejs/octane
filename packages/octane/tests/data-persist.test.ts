@@ -912,3 +912,178 @@ describe('octane/data durable writes', () => {
 		expect(remote.log).toEqual([]);
 	});
 });
+
+describe('octane/data live updates and cache lifecycle', () => {
+	/** The shelf's count, fresh for a minute, so a restored copy needs no request. */
+	const tally = read({ name: 'count', output: count.output, fresh: 60_000 });
+
+	/** A memory adapter whose commits wait while `held` and fail while `failing`. */
+	function faultyStorage() {
+		const inner = memoryStorage();
+		const state = { held: null as Promise<void> | null, failing: false, commits: 0, clears: 0 };
+		const storage: PersistentStorage = {
+			...inner,
+			async commit(partition, put, remove) {
+				state.commits++;
+				await state.held;
+				if (state.failing) throw new Error('disk failed');
+				return inner.commit(partition, put, remove);
+			},
+			async clear(partition) {
+				state.clears++;
+				if (state.failing) throw new Error('disk failed');
+				return inner.clear(partition);
+			},
+		};
+		return { inner, storage, state };
+	}
+
+	it('saves a published value, which a reopened store restores without loading', async () => {
+		const storage = memoryStorage();
+		const before = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		const shown = await value<Book[]>(before, shelf);
+		const kelp = [{ id: 'd', title: 'Kelp', read: false }];
+		await before.publish(shelf, undefined, kelp);
+		expect(shown.handle.getSnapshot().value).toEqual(kelp);
+		await saved();
+
+		const remote = server(books());
+		const after = createDataStore({ transport: remote.transport, persist: cache(storage, 'ada') });
+		expect((await value<Book[]>(after, shelf)).value).toEqual(kelp);
+		expect(remote.log).toEqual([]);
+	});
+
+	it.each(['restore', 'fetch'])(
+		'erases a read while its %s is in flight, and keeps the others',
+		async (pending) => {
+			const storage = memoryStorage();
+			const first = createDataStore({
+				transport: server(books()).transport,
+				persist: cache(storage, 'ada'),
+			});
+			await value(first, shelf);
+			await value(first, tally);
+			await saved();
+
+			const remote = server(books());
+			const store = createDataStore({
+				transport: remote.transport,
+				persist: cache(storage, 'ada'),
+			});
+			const handle = store.read(shelf, undefined);
+			if (pending === 'fetch') await value(store, shelf);
+			else handle.subscribe(() => {});
+			const release = remote.hold();
+			if (pending === 'fetch') void handle.refresh();
+			await store.forget(shelf, undefined);
+			release();
+			await saved();
+			expect(handle.getSnapshot().status).toBe('pending');
+
+			const next = server(books());
+			const after = createDataStore({ transport: next.transport, persist: cache(storage, 'ada') });
+			expect((await value<number>(after, tally)).value).toBe(3);
+			await value(after, shelf);
+			expect(next.log).toEqual(['read shelf']);
+		},
+	);
+
+	it('reports a storage failure to the caller that erases a read', async () => {
+		const { storage, state } = faultyStorage();
+		const store = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await value(store, shelf);
+		await saved();
+		state.failing = true;
+		await expect(store.forget(shelf, undefined)).rejects.toThrow('disk failed');
+	});
+
+	it('empties the partition before awaited retirement settles, after a save in flight', async () => {
+		const { inner, storage, state } = faultyStorage();
+		const remote = server(books());
+		const store = createDataStore({
+			transport: remote.transport,
+			persist: cache(storage, 'ada', { journal: { writes: [setRead], receipt } }),
+		});
+		// A value, an uncertain journaled write, and a stale mark: one in each partition.
+		const shown = await value(store, shelf);
+		remote.faults.lose = 'reply';
+		await store.write(setRead, { id: 'a', read: true }).catch(() => {});
+		store.invalidate(['count']);
+		await saved();
+		const partitions = listPartitions(inner);
+		expect(partitions).toHaveLength(3);
+
+		let release!: () => void;
+		state.held = new Promise((resolve) => (release = resolve));
+		const commits = state.commits;
+		await shown.handle.refresh();
+		await vi.waitFor(() => expect(state.commits).toBe(commits + 1));
+		const retiring = store.retire();
+		expect(store.retire()).toBe(retiring);
+		release();
+		await retiring;
+		for (const partition of partitions) expect(await storage.index(partition)).toEqual([]);
+		expect(state.clears).toBe(3);
+	});
+
+	it('reports a failed retirement cleanup to every caller that awaits it', async () => {
+		const { storage, state } = faultyStorage();
+		const store = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await value(store, shelf);
+		await saved();
+		state.failing = true;
+		const retiring = store.retire();
+		await expect(retiring).rejects.toThrow('disk failed');
+		await expect(store.retire()).rejects.toThrow('disk failed');
+		expect(state.clears).toBe(3);
+
+		// One that does not wait is not told.
+		const other = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'grace'),
+		});
+		void other.retire();
+		await saved();
+	});
+
+	it('derives its keys from a non-exportable CryptoKey, which only the same key opens', async () => {
+		const opaque = () =>
+			crypto.subtle.importKey('raw', crypto.getRandomValues(new Uint8Array(32)), 'HKDF', false, [
+				'deriveKey',
+			]);
+		const key = await opaque();
+		const storage = memoryStorage();
+		const before = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada', { key }),
+		});
+		await value(before, shelf);
+		await saved();
+
+		// A worker reopening the same handle, through a provider.
+		const same = server(books());
+		const after = createDataStore({
+			transport: same.transport,
+			persist: cache(storage, 'ada', { key: async () => key }),
+		});
+		await value(after, shelf);
+		expect(same.log).toEqual([]);
+
+		const other = server(books());
+		const stranger = createDataStore({
+			transport: other.transport,
+			persist: cache(storage, 'ada', { key: await opaque() }),
+		});
+		await value(stranger, shelf);
+		expect(other.log).toEqual(['read shelf']);
+	});
+});
