@@ -428,27 +428,48 @@ it('renders a selected SVG from a block-scoped local on the server and across cl
 		`import {useState} from 'react';
 		export function Sibling() { const [open] = useState(false); return <aside hidden={!open}/>; }
 		function Frame({children}) { return <button>{children}</button>; }
-		export function Pane({mode, className}) {
-			const fixed = <Mark className="fixed"/>;
+		export function Pane({mode}) {
+			const fixed = (<Mark className="fixed"/>);
 			let choice = <em/>;
 			switch (mode) {
-				case 'svg': choice = <Mark className={className} aria-hidden/>; break;
+				case 'svg': choice = (<Mark className="optional" aria-hidden/>); break;
 				case 'empty': choice = null; break;
 			}
-			return <section>{fixed}<Frame>{choice}</Frame></section>;
+			return <section>{mode === 'fixed' ? fixed : <Frame>{choice}</Frame>}</section>;
 		}`,
 		[
-			{ mode: 'svg', className: 'first' },
-			{ mode: 'svg', className: 'updated' },
+			{ mode: 'fixed' },
+			{ mode: 'svg' },
 			{ mode: 'other' },
 			{ mode: 'empty' },
-			{ mode: 'svg', className: 'back' },
+			{ mode: 'svg' },
+			{ mode: 'fixed' },
 		],
 		2,
 	);
 });
 
 it.each([
+	[
+		'an effectful stored parent',
+		'const icon = <span data-x={observe()}><Mark/></span>; return <main>{icon}</main>;',
+	],
+	[
+		'a stored component wrapper',
+		'function Frame({children}) { return <i>{children}</i>; } const icon = <Frame><Mark/></Frame>; return <main>{icon}</main>;',
+	],
+	[
+		'a dynamic class captured before reassignment',
+		'let name = "first"; const icon = <Mark className={name}/>; name = "later"; return <span>{icon}</span>;',
+	],
+	[
+		'a native outlet before the SVG is assigned',
+		'let icon; if (early) return <span>{icon}</span>; icon = <Mark/>; return <button/>;',
+	],
+	[
+		'an early return before the SVG assignment and outlet',
+		'let icon; if (early) return <button/>; icon = <Mark/>; return <span>{icon}</span>;',
+	],
 	[
 		'an observed assignment result',
 		'let icon; observe(icon = <Mark/>); return <span>{icon}</span>;',
@@ -474,7 +495,7 @@ it.each([
 	['a text outlet', 'let icon: string; icon = <Mark/>; return <span>{icon}</span>;'],
 ])('keeps a local SVG with %s guarded', async (_reason, body, imports = '') => {
 	const { root, file } = fixture(`import Mark from './icons/mark.svg'; ${imports}
-		export function Pane({observe, register, Unknown}) { ${body} }`);
+		export function Pane({observe, register, Unknown, early}) { ${body} }`);
 	const { files } = await runCodemod([file], { root, svgPaths: true, write: false });
 	const caller = files.find((f) => f.file === 'src/pane.tsx');
 	expect(caller.rules['svg-paths']).toBeUndefined();

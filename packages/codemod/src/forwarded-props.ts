@@ -113,7 +113,6 @@ export function nativeOutputOwner(
 	value: ts.Node,
 	slot: (tag: ts.Identifier, prop: string) => boolean,
 	{ typeOf, text }: RenderTypes,
-	localRead?: (value: ts.Node) => ts.Identifier | undefined,
 ) {
 	for (;;) {
 		const parent = value.parent;
@@ -188,13 +187,8 @@ export function nativeOutputOwner(
 				parent.right === value &&
 				(parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
 					parent.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken))
-		)) {
-			const read = localRead?.(value);
-			if (!read) return;
-			value = read;
-			localRead = undefined;
-			continue;
-		}
+		))
+			return;
 		value = parent;
 	}
 }
@@ -262,6 +256,18 @@ function callsHook(node: ts.Node, checker: ts.TypeChecker) {
 	);
 }
 
+export function literalSvgAttribute(attr: ts.JsxAttributeLike) {
+	if (!ts.isJsxAttribute(attr)) return false;
+	const value = attr.initializer;
+	return (
+		!value ||
+		ts.isStringLiteral(value) ||
+		(ts.isJsxExpression(value) &&
+			(value.expression?.kind === ts.SyntaxKind.TrueKeyword ||
+				value.expression?.kind === ts.SyntaxKind.FalseKeyword))
+	);
+}
+
 function standaloneWrite(node: ts.Node): node is ts.BinaryExpression {
 	return (
 		ts.isBinaryExpression(node) &&
@@ -278,7 +284,7 @@ export function svgLocalReads(
 	reactNode: (annotation: ts.TypeNode) => boolean,
 ) {
 	const reads = new Map<ts.VariableDeclaration, ts.Identifier | undefined>();
-	const hooked = new Map<ts.Node, boolean>();
+	const eligibleBodies = new Map<ts.Block, boolean>();
 
 	function outlet(decl: ts.VariableDeclaration, name: ts.Identifier) {
 		const list = decl.parent;
@@ -290,13 +296,8 @@ export function svgLocalReads(
 		)
 			return;
 		const body = list.parent.parent;
-		if (!ts.isBlock(body)) return;
+		if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent)) return;
 		const fn = body.parent;
-		if (
-			!(ts.isFunctionDeclaration(fn) || ts.isFunctionExpression(fn) || ts.isArrowFunction(fn)) ||
-			fn.body !== body
-		)
-			return;
 		const annotation = decl.type ?? ts.getJSDocType(decl);
 		if (annotation && !renderType(typeOf(annotation)) && !reactNode(annotation)) return;
 
@@ -308,15 +309,29 @@ export function svgLocalReads(
 			read = ref;
 		}
 		if (!read) return;
-		if (!hooked.has(fn))
-			hooked.set(
-				fn,
-				contains(fn, (node) => callsHook(node, checker)),
+		if (!eligibleBodies.has(body)) {
+			const last = body.statements.at(-1);
+			// Early returns can split mutable locals across compiler-generated functions.
+			eligibleBodies.set(
+				body,
+				!!last &&
+					ts.isReturnStatement(last) &&
+					!contains(
+						fn,
+						(node) =>
+							callsHook(node, checker) ||
+							(ts.isReturnStatement(node) &&
+								node !== last &&
+								ts.findAncestor(node, ts.isFunctionLike) === fn),
+					),
 			);
-		return hooked.get(fn) ? undefined : read;
+		}
+		return eligibleBodies.get(body) ? read : undefined;
 	}
 
-	return (value: ts.Node) => {
+	return (element: ts.JsxSelfClosingElement) => {
+		let value: ts.Node = element;
+		while (ts.isParenthesizedExpression(value.parent)) value = value.parent;
 		const parent = value.parent;
 		// A chained assignment or call can receive the element independently of the local.
 		const name =
@@ -326,6 +341,8 @@ export function svgLocalReads(
 					? parent.left
 					: undefined;
 		if (!name || !ts.isIdentifier(name)) return;
+		// Literal props have the same value at assignment and at the render outlet.
+		if (!element.attributes.properties.every(literalSvgAttribute)) return;
 		const symbol = checker.getSymbolAtLocation(name);
 		const decl = symbol?.valueDeclaration;
 		if (

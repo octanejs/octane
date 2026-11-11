@@ -1,4 +1,10 @@
-import { forwardedProps, nativeOutputOwner, renderUses, svgLocalReads } from './forwarded-props.js';
+import {
+	forwardedProps,
+	literalSvgAttribute,
+	nativeOutputOwner,
+	renderUses,
+	svgLocalReads,
+} from './forwarded-props.js';
 import { reactRenderer, staticReactProps } from './react-renderer.js';
 import { localUses, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
@@ -1125,14 +1131,7 @@ class ModuleTransform {
 							!!value.expression &&
 							this.svgClassName(value.expression)))
 				);
-			return (
-				attr.name.text === 'aria-hidden' &&
-				(!value ||
-					ts.isStringLiteral(value) ||
-					(ts.isJsxExpression(value) &&
-						(value.expression?.kind === ts.SyntaxKind.TrueKeyword ||
-							value.expression?.kind === ts.SyntaxKind.FalseKeyword)))
-			);
+			return attr.name.text === 'aria-hidden' && literalSvgAttribute(attr);
 		});
 		if (!supported) return false;
 		return this.nativeSvgOutput(tag, uses, unproven);
@@ -1158,7 +1157,7 @@ class ModuleTransform {
 	private nativeSvgProps?: ReturnType<typeof forwardedProps>;
 	private provenSvgOwners?: Set<ts.Node>;
 	private nativeSvgOutput(
-		element: ts.Node,
+		element: ts.JsxSelfClosingElement,
 		uses: ReturnType<typeof localUses>,
 		unproven: (tag: ts.Identifier, prop: string) => void,
 	): boolean {
@@ -1180,8 +1179,7 @@ class ModuleTransform {
 			typeOf,
 			(type) => ts.isTypeReferenceNode(type) && this.reactTypeName(type.typeName) === 'ReactNode',
 		);
-		const ownerOf = (value: ts.Node) => nativeOutputOwner(value, slot, destination, this.svgRead);
-		const first = ownerOf(element);
+		const first = nativeOutputOwner(this.svgRead(element) ?? element, slot, destination);
 		if (!first) return false;
 		const pending = [first];
 		const proven = (this.provenSvgOwners ??= new Set());
@@ -1237,7 +1235,11 @@ class ModuleTransform {
 					tag.tagName !== ref
 				)
 					return false;
-				const owner = ownerOf(ts.isJsxSelfClosingElement(tag) ? tag : tag.parent);
+				const owner = nativeOutputOwner(
+					ts.isJsxSelfClosingElement(tag) ? tag : tag.parent,
+					slot,
+					destination,
+				);
 				if (!owner) return false;
 				pending.push(owner);
 			}
