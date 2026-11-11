@@ -356,6 +356,22 @@ describe('octane/data forms in the store', () => {
 		element.remove();
 	});
 
+	it('lets go of a form that unmounted while its submission was in flight', async () => {
+		const server = createServer();
+		const store = createDataStore({ transport: server.transport });
+		const form = store.form(addNote, 'row');
+		const stop = form.subscribe(() => {});
+		const fields = new FormData();
+		fields.set('title', 'Tides');
+		fields.set('priority', '1');
+		fields.set('password', '');
+		const saving = form.submit(fields);
+		// The row unmounts on its optimistic edit, before the reply.
+		stop();
+		await saving;
+		expect(store.form(addNote, 'row')).not.toBe(form);
+	});
+
 	it('refuses a form handle for a write without form fields', () => {
 		const store = createDataStore({ transport: createServer().transport });
 		expect(() => store.form(clearNotes)).toThrow(/declares no form fields/);

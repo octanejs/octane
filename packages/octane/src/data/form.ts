@@ -152,6 +152,8 @@ export function createFormHandle<I, O>(
 	const set = (next: FormState) => {
 		state = next;
 		for (const notify of [...subscribers]) notify();
+		// A form that unmounted mid-submission, as a removed row does, lets go once it settles.
+		if (next === IDLE && subscribers.size === 0) release();
 	};
 	const base: Array<readonly [string, string]> = [[FORM_WRITE, write.name]];
 	if (key) base.push([FORM_KEY, key]);
