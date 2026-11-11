@@ -388,8 +388,14 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (!(value instanceof Promise)) adopt(entry, value, 0, seed.age);
 	}
 
-	/** A transport that throws synchronously still reports through the promise. */
+	/**
+	 * Call the transport after the caller's synchronous work. A component that
+	 * reads unloaded data starts its load while rendering; the transport, and any
+	 * state it updates, must not run inside that render. A transport that throws
+	 * synchronously still reports through the promise.
+	 */
 	async function request(payload: DataRequest, signal: AbortSignal): Promise<DataReply> {
+		await undefined;
 		return transport(payload, signal);
 	}
 

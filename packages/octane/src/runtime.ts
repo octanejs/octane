@@ -138,6 +138,7 @@ export {
 	act,
 	useSyncExternalStore,
 	useTransition,
+	runUrgent,
 } from './runtime/engine.js';
 export { renderWritesForbidden, drainPassiveEffects, hasPendingWork } from './runtime/effects.js';
 export {

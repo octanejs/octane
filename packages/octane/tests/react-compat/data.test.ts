@@ -108,6 +108,30 @@ describe('octane/data/octane', () => {
 	});
 });
 
+describe('octane/data/octane writes in a transition', () => {
+	it('shows the edit at once and keeps the transition pending until the write settles', async () => {
+		const server = createServer();
+		const writes = heldWrites(server);
+		const page = setup(false, writes.transport);
+		const container = await page.mount();
+		expect(text(container, '[data-transition-toggle]')).toBe('Idle');
+
+		// Outside act: urgent work flushes in a microtask, transition work waits for a task.
+		container.querySelector<HTMLButtonElement>('[data-transition-toggle]')!.click();
+		for (let turn = 0; turn < 5; turn++) await Promise.resolve();
+		// The optimistic edit is urgent, as useOptimistic's is: the transition does not hold it.
+		expect(text(container, '[data-octane-done]')).toBe('1');
+		expect(text(container, '[data-octane-toggle]')).toBe('Mark active');
+		await run(() => {});
+		expect(text(container, '[data-transition-toggle]')).toBe('Saving');
+
+		await run(writes.release);
+		await settle();
+		expect(text(container, '[data-transition-toggle]')).toBe('Idle');
+		expect(text(container, '[data-octane-done]')).toBe('1');
+	});
+});
+
 describe('one store across a ReactCompat boundary', () => {
 	it('shares one load between the Octane page and the React island', async () => {
 		const page = setup(true);
