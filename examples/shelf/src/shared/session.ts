@@ -8,6 +8,7 @@ import {
 	DataUncertainError,
 	createDataStore,
 	httpTransport,
+	indexedDBStorage,
 	type DataRequest,
 	type DataStore,
 	type FormState,
@@ -93,7 +94,14 @@ export function openSession(account: Account, namespace = '', seed?: string | nu
 		}
 		return reply;
 	};
-	return sessionFor(account, createDataStore({ transport, seed }), faults, network);
+	const partition = namespace + account;
+	const persist = {
+		storage: indexedDBStorage({ name: 'shelf' }),
+		partition,
+		// A real app takes a random per-user secret from its signed-in session; the demo has no sign-in.
+		key: `shelf demo key for ${partition}`,
+	};
+	return sessionFor(account, createDataStore({ transport, seed, persist }), faults, network);
 }
 
 /** A server render's session, around a store that calls the data handler in process. */
