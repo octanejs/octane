@@ -3916,9 +3916,13 @@ class ModuleTransform {
 		const bound = new Set([...bindingNames(item.name), ...(index ? bindingNames(index.name) : [])]);
 		const iterable = callee.expression;
 		if (reads(iterable, (name) => bound.has(name.text))) {
-			// Array.filter visits present items and produces a dense array. The
-			// property name and the filter's own locals cannot capture a row.
-			if (!this.isArrayFilter(iterable)) return null;
+			const literal = skipParens(iterable);
+			const dense =
+				ts.isArrayLiteralExpression(literal) && !literal.elements.some(ts.isOmittedExpression);
+			if (!dense && !this.isArrayFilter(iterable)) return null;
+			// Direct eval can observe the callback arguments or the generated loop's bindings.
+			if (dense && reads(node, (name) => name.text === 'eval' && !isPropertyName(name)))
+				return null;
 			if (
 				reads(iterable, (name) => {
 					if (!bound.has(name.text) || isPropertyName(name)) return false;
