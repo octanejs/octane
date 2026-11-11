@@ -60,3 +60,31 @@ class RpcRegistry extends Map {
 export function createRpcRegistry() {
 	return new RpcRegistry();
 }
+
+/**
+ * Name every server function id, built once per handler or server.
+ *
+ * `build_rpc_lookup` keeps only the namespace object and export name, but a
+ * middleware policy needs the declaring module before the function is resolved.
+ *
+ * @param {Record<string, Record<string, Function>>} rpcModules
+ * @param {(value: string) => string} hashFn
+ * @returns {Map<string, { module: string, export: string }>}
+ */
+export function buildRpcDescriptors(rpcModules, hashFn) {
+	/** @type {Map<string, { module: string, export: string }>} */
+	const descriptors = new Map();
+	for (const [entryPath, serverObj] of Object.entries(rpcModules)) {
+		for (const funcName of Object.keys(serverObj)) {
+			const id = hashFn(entryPath + '#' + funcName);
+			// Each manifest entry is listed once, so an id already taken here is a
+			// genuine collision. `build_rpc_lookup` would resolve it by overwriting.
+			const existing = descriptors.get(id);
+			if (existing !== undefined) {
+				throw rpcIdCollision(id, existing, { module: entryPath, export: funcName });
+			}
+			descriptors.set(id, { module: entryPath, export: funcName });
+		}
+	}
+	return descriptors;
+}

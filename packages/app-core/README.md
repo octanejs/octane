@@ -8,6 +8,7 @@ Bundler-neutral app primitives shared by Octane's Vite and Rsbuild integrations.
 - `@octanejs/app-core/config-loader` loads TypeScript config files with either an injected development module runner or a neutral esbuild evaluator. `loadOctaneConfigWithMetadata` reports existing and missing dependencies for watch and cache invalidation.
 - `@octanejs/app-core/routes` and `/middleware` provide the router and Fetch API request pipeline.
 - `@octanejs/app-core/html`, `/production`, and `/node` provide streaming HTML composition, the production Fetch handler, and the optional Node HTTP bridge.
+- `@octanejs/app-core/server-functions` serves `module server` functions from a Node server an integration does not own, under any bundler: `createServerFunctions({ modules, middlewares })` answers their calls and runs other requests so a server render's calls run in process.
 - `@octanejs/app-core/codegen` generates client hydration entries, template-free server manifests, and production server entries. Runtime module IDs, integration module IDs, generated-file directories, and application import specifiers are explicit inputs so generators remain usable across bundlers and renderer targets.
 
 Development integrations should inject their native module runner into `loadOctaneConfigWithMetadata`. The neutral evaluator is intended for configuration/build discovery: it bundles static JS, TS, and server-compiled TSRX helpers, while preserving dynamic application imports as lazy watched references so config loading never traverses renderer-only asset graphs.
