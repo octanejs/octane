@@ -157,6 +157,12 @@ interface Span {
 	readonly last: unknown;
 	/** Whether a short span has already been reloaded once, so a list that shrank cannot loop. */
 	reloaded: boolean;
+	/**
+	 * The view's index into the shared records: every confirmed record within
+	 * the span, by ID. Evaluating the view reads these and the records pending
+	 * edits touch, never the whole table.
+	 */
+	readonly rows: Map<string, unknown>;
 }
 
 interface StoredRecord {
@@ -235,6 +241,7 @@ const MAX_REFRESH = 8;
 const MARGIN = 20;
 
 const EMPTY: readonly unknown[] = [];
+const NO_VIEWS: ReadonlySet<never> = new Set();
 
 const isView = (read: Read<any, any>): read is View<any, any> => 'view' in read;
 
@@ -328,6 +335,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	const queues = new Map<string, Promise<unknown>>();
 	/** Confirmed records that views have loaded, by entity name and then ID. */
 	const records = new Map<string, Map<string, StoredRecord>>();
+	/** The entries holding a view's span, by entity name. */
+	const views = new Map<string, Set<Entry>>();
 	let operations: Operation[] = [];
 	let sequence = 0;
 	let retired = false;
@@ -363,12 +372,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 
 	/** The confirmed records within a view's span, in its order. */
 	function confirmedRows(entry: Entry): unknown[] {
-		const { of, compare } = (entry.read as View<any, any>).view;
-		const rows: unknown[] = [];
-		for (const record of records.get(of.name)?.values() ?? []) {
-			if (inSpan(entry, record.value)) rows.push(record.value);
-		}
-		return rows.sort(compare);
+		return [...entry.span!.rows.values()].sort((entry.read as View<any, any>).view.compare);
 	}
 
 	function assertLive(): void {
@@ -385,12 +389,20 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		return record.seq < operation.settledSeq;
 	}
 
-	function viewEntries(name: string): Entry[] {
-		const views: Entry[] = [];
-		for (const entry of entries.values()) {
-			if (entry.span && (entry.read as View<any, any>).view.of.name === name) views.push(entry);
+	function viewEntries(name: string): ReadonlySet<Entry> {
+		return views.get(name) ?? NO_VIEWS;
+	}
+
+	/** Give a view whose span was just set its index of the records the span holds. */
+	function index(entry: Entry): void {
+		const { name } = (entry.read as View<any, any>).view.of;
+		let held = views.get(name);
+		if (!held) views.set(name, (held = new Set()));
+		held.add(entry);
+		const { rows } = entry.span!;
+		for (const [id, record] of records.get(name) ?? []) {
+			if (inSpan(entry, record.value)) rows.set(id, record.value);
 		}
-		return views;
 	}
 
 	/** Whether `value` counts toward the rows above a view's span. */
@@ -432,22 +444,30 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const old = table.get(id);
 		if (old && old.seq > seq) return;
 		table.set(id, { value, seq });
-		if (source === null) for (const view of viewEntries(entity.name)) persisted?.mark(view.key);
-		if (!old && !created) return;
+		const moved = old !== undefined || created;
 		for (const entry of viewEntries(entity.name)) {
-			if (entry === source || entry.span!.start === 0 || seq < entry.baseSeq) continue;
+			const { rows, start } = entry.span!;
+			if (inSpan(entry, value)) rows.set(id, value);
+			else rows.delete(id);
+			if (source === null) persisted?.mark(entry.key);
+			if (!moved || entry === source || start === 0 || seq < entry.baseSeq) continue;
 			if ((old !== undefined && above(entry, old.value)) !== above(entry, value)) {
 				reload.add(entry);
 			}
 		}
 	}
 
+	/** Delete a record from the shared table and from every view's index. */
+	function dropRecord(name: string, id: string): void {
+		records.get(name)!.delete(id);
+		for (const entry of viewEntries(name)) entry.span!.rows.delete(id);
+	}
+
 	/** Delete a record a confirmed write removed; views that counted it above their span reload. */
 	function deleteRecord(entity: Entity<any>, id: string, reload: Set<Entry>): void {
-		const table = records.get(entity.name);
-		const old = table?.get(id);
+		const old = records.get(entity.name)?.get(id);
 		if (!old) return;
-		table!.delete(id);
+		dropRecord(entity.name, id);
 		for (const entry of viewEntries(entity.name)) {
 			persisted?.mark(entry.key);
 			if (entry.span!.start > 0 && above(entry, old.value)) reload.add(entry);
@@ -458,9 +478,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	function collectRecords(name: string): void {
 		const table = records.get(name);
 		if (!table) return;
-		const views = viewEntries(name);
-		for (const [id, record] of table) {
-			if (!views.some((entry) => inSpan(entry, record.value))) table.delete(id);
+		const held = viewEntries(name);
+		for (const id of table.keys()) {
+			let kept = false;
+			for (const entry of held) if ((kept = entry.span!.rows.has(id))) break;
+			if (!kept) table.delete(id);
 		}
 	}
 
@@ -477,8 +499,13 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		// A window past the end of the list holds no records to bound it.
 		if (span.start > 0 && span.first === null) return EMPTY as unknown[];
 		const table = records.get(of.name);
-		const merged = new Map<string, unknown>();
-		if (table) for (const [id, record] of table) merged.set(id, record.value);
+		const merged = new Map(span.rows);
+		// An edit can move a record into the span from anywhere in the table.
+		for (const { write, entityId } of operations) {
+			if (write.effect?.entity.name !== of.name || merged.has(entityId)) continue;
+			const record = table?.get(entityId);
+			if (record) merged.set(entityId, record.value);
+		}
 		const edited = new Set<string>();
 		let unsettled = false;
 		for (const operation of operations) {
@@ -675,6 +702,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		entry.hasBase = false;
 		entry.names = new Set();
 		entry.snapshot = null;
+		if (entry.span) views.get((entry.read as View<any, any>).view.of.name)!.delete(entry);
 		entry.span = null;
 	}
 
@@ -721,6 +749,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				first: offset > 0 ? (rows[0] ?? null) : null,
 				last: rows.length < limit ? null : rows[rows.length - 1],
 				reloaded: false,
+				rows: new Map(),
 			};
 			const { of } = entry.read.view;
 			const later = reload ?? new Set();
@@ -733,10 +762,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			for (const [id, record] of records.get(of.name) ?? []) {
 				if (record.seq >= startedSeq || loaded.has(id) || !inSpan(entry, record.value)) continue;
 				for (const other of viewEntries(of.name)) {
-					if (other !== entry && inSpan(other, record.value)) later.add(other);
+					if (other !== entry && other.span!.rows.has(id)) later.add(other);
 				}
-				records.get(of.name)!.delete(id);
+				dropRecord(of.name, id);
 			}
+			index(entry);
 			if (!reload) reloadAll(later);
 		} else if (entry.read.entities) {
 			// Records the server ordered: views get a newer copy of a record they hold, and
@@ -834,7 +864,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				if (!current()) return;
 				const reload = new Set<Entry>();
 				adopt(entry, value, 0, age, reload);
-				if (entry.span) entry.span = { ...(stored.span as Span), reloaded: false };
+				if (entry.span) {
+					entry.span = { ...(stored.span as Span), reloaded: false, rows: new Map() };
+					index(entry);
+				}
 				entry.stale = stored.stale;
 				reloadAll(reload);
 			})
@@ -1438,6 +1471,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			queues.clear();
 			assigned.clear();
 			records.clear();
+			views.clear();
 			seeds.clear();
 			forms.clear();
 			for (const entry of entries.values()) {
