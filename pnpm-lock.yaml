@@ -4971,6 +4971,9 @@ importers:
 
   examples/shelf:
     dependencies:
+      '@octanejs/app-core':
+        specifier: workspace:*
+        version: link:../../packages/app-core
       octane:
         specifier: workspace:*
         version: link:../../packages/octane
@@ -4984,9 +4987,15 @@ importers:
         specifier: catalog:default
         version: 3.25.76
     devDependencies:
+      '@octanejs/rspack-plugin':
+        specifier: workspace:*
+        version: link:../../packages/rspack-plugin-octane
       '@playwright/test':
         specifier: ^1.61.1
         version: 1.61.1
+      '@rspack/core':
+        specifier: catalog:default
+        version: 2.1.4(@swc/helpers@0.5.23)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3

@@ -1,10 +1,11 @@
 /**
- * An in-memory shelf per account, served through `createDataHandler`. Each
+ * An in-memory shelf per account, served through `createDataHandler`. Server
+ * code only: the browser reaches it through `data` in `data.tsrx`. Each
  * write records its operation ID with its effect, so a retried or looked-up
  * write is applied once and its receipt can be read back.
  */
 import { DataError } from 'octane/data';
-import { createDataHandler } from 'octane/data/server';
+import { createDataHandler, type DataCaller } from 'octane/data/server';
 import {
 	addBook,
 	books,
@@ -61,8 +62,9 @@ export function createShelfHandler(options: { latency?: number } = {}) {
 		return book;
 	}
 
-	const context = (request: Request) => {
-		const account = request.headers.get('x-shelf-account') ?? 'ada';
+	// The account the server's middleware authenticated for this call.
+	const context = (_request: Request, caller?: DataCaller) => {
+		const account = String(caller?.viewer ?? 'ada');
 		return { account, shelf: shelfFor(account) };
 	};
 
@@ -112,3 +114,6 @@ export function createShelfHandler(options: { latency?: number } = {}) {
 		handle(receipt, (input, { shelf }) => ({ applied: shelf.applied.has(input.operationId) })),
 	]);
 }
+
+/** The server's one shelf handler, for `data` and for each page's forms. */
+export const handler = createShelfHandler();

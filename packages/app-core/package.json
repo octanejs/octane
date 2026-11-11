@@ -72,6 +72,11 @@
       "types": "./types/node.d.ts",
       "import": "./src/server/node-http.js",
       "default": "./src/server/node-http.js"
+    },
+    "./server-functions": {
+      "types": "./types/server-functions.d.ts",
+      "import": "./src/server/server-functions.js",
+      "default": "./src/server/server-functions.js"
     }
   },
   "dependencies": {
