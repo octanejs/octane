@@ -3,6 +3,7 @@ import {
 	createDataStore,
 	DataError,
 	entity,
+	pages,
 	read,
 	view,
 	write,
@@ -507,6 +508,8 @@ describe('octane/data views', () => {
 		await ready(page);
 		expect(titles(page)).toHaveLength(10);
 		expect(titles(page)![0]).toBe('Book 10');
+		// The window was its maximum, so no rows past it loaded; a full window says the list goes on.
+		expect(page.getSnapshot().more).toBe(true);
 	});
 
 	it('refuses a window larger than the view allows', async () => {
@@ -669,5 +672,137 @@ describe('octane/data server-ordered reads', () => {
 		expect(results.getSnapshot()).toBe(before);
 		expect(notify).not.toHaveBeenCalled();
 		server.release();
+	});
+});
+
+describe('octane/data pages', () => {
+	const allTitles = (count: number) =>
+		Array.from({ length: count }, (_, index) => `Book ${String(index).padStart(2, '0')}`);
+
+	it('says whether a view goes on past the rows it shows', async () => {
+		const server = libraryServer();
+		const store = createDataStore({ transport: server.transport });
+		const top = store.read(library, undefined);
+		const end = store.read(library, { offset: 9 });
+		const found = store.read(search, { q: 'Book' });
+		await Promise.all([ready(top), ready(end), ready(found)]);
+		expect(top.getSnapshot().more).toBe(true);
+		expect(end.getSnapshot().more).toBe(false);
+		// Only a view has a next window.
+		expect(found.getSnapshot().more).toBe(false);
+	});
+
+	it("tells a view's readers when an edit past its window ends the list", async () => {
+		const server = libraryServer();
+		const store = createDataStore({ transport: server.transport });
+		const last = store.read(library, { offset: 6 });
+		const notify = await ready(last);
+		expect(last.getSnapshot()).toMatchObject({ more: true });
+		const before = last.getSnapshot().value;
+
+		notify.mockClear();
+		await store.write(remove, { id: 'b9' });
+		// The rows shown are the same; only the end of the list moved.
+		expect(last.getSnapshot().value).toBe(before);
+		expect(last.getSnapshot().more).toBe(false);
+		expect(notify).toHaveBeenCalled();
+	});
+
+	it('grows one list a page at a time until the view ends', async () => {
+		const server = libraryServer();
+		const store = createDataStore({ transport: server.transport });
+		const list = pages(store, library);
+		expect(pages(store, library, undefined, 3)).toBe(list);
+		const notify = vi.fn();
+		list.subscribe(notify);
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+		expect(list.getSnapshot()).toMatchObject({ more: true, loadingMore: false });
+		expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(allTitles(3));
+
+		const loading = list.getSnapshot().loadMore();
+		// The rows shown stay put while the next page loads.
+		expect(list.getSnapshot()).toMatchObject({ more: false, loadingMore: true });
+		expect(list.getSnapshot().value).toHaveLength(3);
+		await loading;
+		expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(allTitles(6));
+		await list.loadMore();
+		await list.loadMore();
+		expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(allTitles(10));
+		expect(list.getSnapshot().more).toBe(false);
+
+		// Past the end, asking for more loads nothing.
+		const requests = server.log.length;
+		await list.loadMore();
+		expect(server.log).toHaveLength(requests);
+		expect(list.getSnapshot().value).toHaveLength(10);
+	});
+
+	it('shows a page that another reader already loaded as soon as it is added', async () => {
+		const server = libraryServer();
+		const store = createDataStore({ transport: server.transport });
+		// The library, fresh for a minute, so observing a loaded page does not reload it.
+		const lasting = view({
+			name: library.name,
+			of: Book,
+			order: [['title', 'asc']],
+			limit: 3,
+			fresh: 60_000,
+		});
+		await ready(store.read(lasting, { offset: 3, limit: 3 }));
+		const list = pages(store, lasting);
+		const notify = vi.fn();
+		list.subscribe(notify);
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+
+		notify.mockClear();
+		void list.loadMore();
+		expect(notify).toHaveBeenCalled();
+		expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(allTitles(6));
+	});
+
+	it('keeps the joined list in order through an edit that moves a row to a later page', async () => {
+		const server = libraryServer();
+		const store = createDataStore({ transport: server.transport });
+		const list = pages(store, library);
+		list.subscribe(() => {});
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+		await list.loadMore();
+		await list.loadMore();
+		expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(allTitles(9));
+
+		server.hold();
+		const renaming = store.write(rename, { id: 'b0', title: 'Book 99' });
+		// Every page has moved up by one row, before the reply.
+		const moved = [...allTitles(10).slice(1)];
+		expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(moved);
+		server.release();
+		await renaming;
+		await quiet();
+		expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(moved);
+	});
+
+	it('shows the pages before one that failed, and loads that page again', async () => {
+		const server = libraryServer();
+		let fail = false;
+		const store = createDataStore({
+			transport: (request, signal) =>
+				fail && request.kind === 'read'
+					? Promise.reject(new Error('offline'))
+					: server.transport(request, signal),
+		});
+		const list = pages(store, library);
+		list.subscribe(() => {});
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+
+		fail = true;
+		await list.loadMore();
+		await vi.waitFor(() => expect(list.getSnapshot().error).toBeInstanceOf(Error));
+		expect(list.getSnapshot()).toMatchObject({ status: 'ready', more: true, loadingMore: false });
+		expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(allTitles(3));
+
+		fail = false;
+		await list.loadMore();
+		await vi.waitFor(() => expect(list.getSnapshot().value).toHaveLength(6));
+		expect(list.getSnapshot().error).toBeUndefined();
 	});
 });
