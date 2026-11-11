@@ -8,6 +8,7 @@ import react from '@vitejs/plugin-react';
 import { octane } from 'octane/compiler/vite';
 import { nodeRequestToWebRequest, sendWebResponse } from '@octanejs/app-core/node';
 import type { createShelfServer } from './src/server/index.ts';
+import { isShelfPath } from './src/server/routes.ts';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 
@@ -21,6 +22,8 @@ function shelfServer(): Plugin {
 	const middleware =
 		(load: () => Promise<ShelfServer>, template: (file: string, url: URL) => Promise<string>) =>
 		async (request: IncomingMessage, response: ServerResponse, next: () => void) => {
+			// Vite's own requests and assets pass through untouched, whatever state the server module is in.
+			if (!isShelfPath(new URL(request.url!, 'http://localhost').pathname)) return next();
 			const incoming = nodeRequestToWebRequest(request, response);
 			const url = new URL(incoming.url);
 			const reply = await (await load()).fetch(incoming, (file) => template(file, url));

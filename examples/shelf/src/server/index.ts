@@ -13,15 +13,7 @@ import { handler } from '../shared/server.ts';
 import { ACCOUNT_COOKIE, namespaceFrom, serverSession } from '../shared/session.ts';
 import { renderOctane } from '../octane/server.ts';
 import { renderReact } from '../react/server.tsx';
-
-type Page = 'octane' | 'react';
-
-/** Server-rendered pages, by path, with their HTML file. The mixed page is rendered in the browser only. */
-const PAGES: Record<string, { page: Page; file: string }> = {
-	'/': { page: 'octane', file: 'index.html' },
-	'/index.html': { page: 'octane', file: 'index.html' },
-	'/react.html': { page: 'react', file: 'react.html' },
-};
+import { PAGES, type Page } from './routes.ts';
 
 /**
  * A browser call acts for the account its cookie names. A page renders for its

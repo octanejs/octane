@@ -10,8 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { nodeRequestToWebRequest, sendWebResponse, serveStaticFile } from '@octanejs/app-core/node';
 import { createShelfServer } from './index.ts';
 
-// This file is built to dist-rspack/server/index.js, beside the client build.
-const client = join(dirname(fileURLToPath(import.meta.url)), '..');
+// This file is built to dist-rspack/server/index.js, beside dist-rspack/client.
+const client = join(dirname(fileURLToPath(import.meta.url)), '..', 'client');
 const shelf = createShelfServer();
 const template = (file: string) => readFile(join(client, file), 'utf8');
 

@@ -1,5 +1,6 @@
 // The same three pages and server as vite.config.ts, built with Rspack.
-// `node rspack.mjs` builds into dist-rspack; `--watch` rebuilds on each change
+// `node rspack.mjs` builds into dist-rspack/client and dist-rspack/server, each
+// compiler cleaning only its own folder; `--watch` rebuilds on each change
 // and restarts the server. Octane owns every .tsrx file; React owns the .tsx
 // files, which carry a React JSX pragma.
 import { spawn } from 'node:child_process';
@@ -59,7 +60,7 @@ const configs = [
 			mixed: './src/mixed/main.tsrx',
 		},
 		output: {
-			path: out,
+			path: `${out}client/`,
 			filename: 'static/[name].[contenthash:8].js',
 			publicPath: '/',
 			clean: true,
