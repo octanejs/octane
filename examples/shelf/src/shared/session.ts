@@ -14,7 +14,7 @@ import {
 	type FormState,
 	type Transport,
 } from 'octane/data';
-import { receipt } from './contracts.ts';
+import { addBook, receipt, removeBook, setRead } from './contracts.ts';
 
 export const ACCOUNTS = ['ada', 'grace'] as const;
 export type Account = (typeof ACCOUNTS)[number];
@@ -100,6 +100,8 @@ export function openSession(account: Account, namespace = '', seed?: string | nu
 		partition,
 		// A real app takes a random per-user secret from its signed-in session; the demo has no sign-in.
 		key: `shelf demo key for ${partition}`,
+		// A write still unsettled when the page closes is shown again on the next load, then settled by its receipt.
+		journal: { writes: [addBook, setRead, removeBook], receipt },
 	};
 	return sessionFor(account, createDataStore({ transport, seed, persist }), faults, network);
 }
