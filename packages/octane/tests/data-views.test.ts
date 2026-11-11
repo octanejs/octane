@@ -425,6 +425,49 @@ describe('octane/data views', () => {
 		await vi.waitFor(() => expect(titles(all)).toEqual(['Book 01', 'Book 02', 'Book 03']));
 	});
 
+	it('waits for edits that leave a window short to settle before reloading it', async () => {
+		const server = libraryServer(40);
+		const store = createDataStore({ transport: server.transport });
+		const all = store.read(library, undefined);
+		await ready(all);
+		server.log.length = 0;
+
+		server.hold();
+		const removals = [];
+		for (let index = 0; index < 22; index++) {
+			removals.push(store.write(remove, { id: `b${index}` }));
+		}
+		await quiet();
+		// The server has not applied the removals yet, so a reload could not fill the window.
+		expect(server.log).toEqual([]);
+		expect(titles(all)).toEqual(['Book 22', 'Book 23']);
+		server.release();
+		await Promise.all(removals);
+		await vi.waitFor(() => expect(titles(all)).toEqual(['Book 22', 'Book 23', 'Book 24']));
+		expect(server.log.filter((line) => line.startsWith('books.'))).toEqual(['books.library 0+24']);
+	});
+
+	it('serves a later page of a view whose window is its maximum', async () => {
+		const server = libraryServer(40);
+		const store = createDataStore({ transport: server.transport });
+		const tight = view({ name: 'books.tight', of: Book, order: [['title', 'asc']], max: 10 });
+		const handler = createDataHandler({}, (handle) => [
+			handle(tight, (input) => {
+				server.log.push(`books.tight ${input.offset}+${input.limit}`);
+				return [...server.books.values()]
+					.sort(tight.view.compare)
+					.slice(input.offset, input.offset + input.limit);
+			}),
+		]);
+		const local = createDataStore({
+			transport: handler.transport(new Request('https://app.test/data')),
+		});
+		const page = local.read(tight, { offset: 10 });
+		await ready(page);
+		expect(titles(page)).toHaveLength(10);
+		expect(titles(page)![0]).toBe('Book 10');
+	});
+
 	it('refuses a window larger than the view allows', async () => {
 		const server = libraryServer();
 		const store = createDataStore({ transport: server.transport });

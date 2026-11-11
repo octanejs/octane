@@ -210,8 +210,8 @@ export function view<T, P = void>(options: {
 	expire?: number;
 }): View<P, T> {
 	const { of, order, input: params, where: rule, limit: shown, max: most, ...rest } = options;
-	const limit = shown ?? 20;
 	const max = most ?? 500;
+	const limit = Math.min(shown ?? 20, max);
 	const compare = (a: T, b: T): number => {
 		for (const [field, direction] of order) {
 			const result = compareValues((a as any)[field], (b as any)[field]);

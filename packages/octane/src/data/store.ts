@@ -220,8 +220,8 @@ function shown(entry: Entry): { offset: number; limit: number } {
 function wireInput(entry: Entry): unknown {
 	if (!isView(entry.read)) return entry.input;
 	const { offset, limit } = shown(entry);
-	const start = Math.max(0, offset - MARGIN);
-	// The margin gives way to the view's cap; the window itself never does, so the server refuses it.
+	// The margins give way to the view's cap; the window itself never does, so the server refuses it.
+	const start = Math.max(0, offset - Math.min(MARGIN, Math.max(0, entry.read.view.max - limit)));
 	const asked = offset - start + limit;
 	const count = Math.max(asked, Math.min(entry.read.view.max, asked + MARGIN + 1));
 	return { ...(entry.input as object), offset: start, limit: count };
@@ -402,9 +402,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const merged = new Map<string, unknown>();
 		if (table) for (const [id, record] of table) merged.set(id, record.value);
 		const edited = new Set<string>();
+		let unsettled = false;
 		for (const operation of operations) {
 			const { effect } = operation.write;
 			if (effect?.entity.name !== of.name || !shows(operation, entry)) continue;
+			if (operation.status !== 'confirmed') unsettled = true;
 			const id = operation.entityId;
 			const current = merged.get(id);
 			if (effect.kind === 'patch') {
@@ -431,7 +433,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		for (const value of merged.values()) if (inSpan(entry, value)) rows.push(value);
 		rows.sort(compare);
 		const from = offset - span.start - shift;
-		if ((from < 0 || (span.last !== null && rows.length < from + limit)) && !span.reloaded) {
+		// A reload cannot fill the window until the server has the edits that emptied it;
+		// each one that settles evaluates the view again.
+		const short = from < 0 || (span.last !== null && rows.length < from + limit);
+		if (short && !unsettled && !span.reloaded) {
 			span.reloaded = true;
 			// Not inside the render that asked for the snapshot.
 			queueMicrotask(() => {
