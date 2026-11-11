@@ -33,8 +33,7 @@ export function createShelfHandler(options: { latency?: number } = {}) {
 	const latency = options.latency ?? 250;
 	const shelves = new Map<string, Shelf>();
 
-	function shelfFor(request: Request): Shelf {
-		const key = request.headers.get('x-shelf-account') ?? 'ada';
+	function shelfFor(key: string): Shelf {
 		let shelf = shelves.get(key);
 		if (!shelf) {
 			const account = key.slice(key.lastIndexOf(':') + 1);
@@ -62,7 +61,17 @@ export function createShelfHandler(options: { latency?: number } = {}) {
 		return book;
 	}
 
-	return createDataHandler({ context: (request) => ({ shelf: shelfFor(request) }) }, (handle) => [
+	const context = (request: Request) => {
+		const account = request.headers.get('x-shelf-account') ?? 'ada';
+		return { account, shelf: shelfFor(account) };
+	};
+
+	// A real app keeps its secret out of the source; it signs each page's forms for its account.
+	const forms = {
+		secret: 'shelf example secret',
+		grant: ({ account }: { account: string }) => account,
+	};
+	return createDataHandler({ context, ...forms }, (handle) => [
 		// A view's handler serves its rule's window, in exactly the view's order.
 		...[books, finished, unread].map((list) =>
 			handle(list, async (input, { shelf }) => {

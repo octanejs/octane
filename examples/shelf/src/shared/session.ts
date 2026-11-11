@@ -10,6 +10,7 @@ import {
 	httpTransport,
 	type DataRequest,
 	type DataStore,
+	type FormState,
 	type Transport,
 } from 'octane/data';
 import { receipt } from './contracts.ts';
@@ -113,6 +114,11 @@ const MESSAGES: Record<string, string> = {
 	duplicate: 'That book is already on the shelf',
 	missing: 'That book is no longer on the shelf',
 };
+
+/** What a form shows under its field after a refused submission. */
+export function formMessage(form: FormState, field: string): string {
+	return form.issues[field] ?? (form.error ? (MESSAGES[form.error] ?? '') : '');
+}
 
 /** Run a write and report how it ended. The store already shows and rolls back its edit. */
 export async function submit(session: Session, run: (store: DataStore) => Promise<unknown>) {

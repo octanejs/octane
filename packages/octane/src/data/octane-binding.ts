@@ -18,14 +18,21 @@
 import type * as Client from '../index.js';
 import type { OctaneNode } from '../index.js';
 import type { Read, View, Write } from './contracts.js';
-import type { DataStore, ReadHandle, ReadSnapshot } from './store.js';
+import { formViews, type FormView } from './form.js';
+import type { DataStore, ReadSnapshot } from './store.js';
+
+/** A store value a render can read: a read's handle or a form's. */
+export interface Observable {
+	getSnapshot(): unknown;
+	subscribe(notify: () => void): () => void;
+}
 
 type Runtime = Pick<
 	typeof Client,
 	'createContext' | 'createElement' | 'use' | 'useCallback' | 'useSyncExternalStore'
 > & {
 	/** Report a render's read of a handle to the renderer, which subscribes the reader. */
-	observe?: (handle: ReadHandle<unknown>) => void;
+	observe?: (handle: Observable) => void;
 };
 
 export interface OctaneDataBinding {
@@ -49,6 +56,11 @@ export interface OctaneDataBinding {
 	};
 	/** A stable function that submits a write through the store. */
 	useWrite<I, O>(write: Write<I, O>): (input: I) => Promise<O>;
+	/**
+	 * A native form for a write that declares `form` fields. `key` separates
+	 * instances, such as one per row, so each keeps its own state.
+	 */
+	useForm<I, O>(write: Write<I, O>, key?: string): FormView<I, O, OctaneNode>;
 }
 
 /** A read whose input is omitted receives the slot in the input position. */
@@ -87,6 +99,24 @@ export function createOctaneDataBinding(runtime: Runtime): OctaneDataBinding {
 		return snapshot.value;
 	}
 
+	const formView = formViews(createElement as (type: string, props: object) => OctaneNode);
+
+	function useForm(write: Write<any, any>, key?: unknown, slot?: symbol) {
+		const [formKey, hookSlot] = split(key, slot);
+		const handle = useDataStore().form(write, formKey as string | undefined);
+		if (observe) {
+			observe(handle);
+			return formView(handle, handle.getSnapshot());
+		}
+		const state = useSyncExternalStore(
+			handle.subscribe,
+			handle.getSnapshot,
+			handle.getSnapshot,
+			hookSlot,
+		);
+		return formView(handle, state);
+	}
+
 	function useWrite(write: Write<any, any>, slot?: symbol) {
 		const store = useDataStore();
 		return useCallback((input: unknown) => store.write(write, input), [store, write], slot);
@@ -98,5 +128,6 @@ export function createOctaneDataBinding(runtime: Runtime): OctaneDataBinding {
 		useReadState,
 		useRead,
 		useWrite,
+		useForm,
 	} as OctaneDataBinding;
 }
