@@ -1037,7 +1037,8 @@ export function portableArguments(
 				d &&
 				ts.isImportSpecifier(d) &&
 				!d.isTypeOnly &&
-				!d.parent.parent.isTypeOnly
+				!d.parent.parent.isTypeOnly &&
+				!d.parent.parent.parent.attributes
 			) {
 				const spec = d.parent.parent.parent.moduleSpecifier;
 				if (ts.isStringLiteral(spec) && imported(spec.text, (d.propertyName ?? d.name).text))

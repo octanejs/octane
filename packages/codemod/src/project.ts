@@ -313,7 +313,16 @@ export async function runCodemod(
 		/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(readInstalled(helperDir, 'octane')?.version ?? '')
 			? createScopedStorePlanner(helperDir, storeBridge, config ?? undefined)
 			: null;
-	const inputFactory = storeInputFactories(root, config);
+	const inputFactory = storeInputFactories(
+		root,
+		config,
+		(file, source) =>
+			!known.has(file) &&
+			fs.realpathSync(file) === path.join(fs.realpathSync(root), path.relative(root, file)) &&
+			!fs.existsSync(file.slice(0, -3) + '.tsrx') &&
+			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) === rootProject &&
+			!rewriteModulePaths(source, file, root, renames, resolveRename),
+	);
 	const checkedHelpers = new Map<string, { code: string; state: AdapterState; error?: string }>();
 	const generatedHelpers = new Map<string, string>();
 	const svgHelpers = new Set<string>();
@@ -479,6 +488,7 @@ export async function runCodemod(
 						if (
 							!plan ||
 							!safeUses((source, name) => {
+								if (catalogName(source) !== null || resolveRename(file, source)) return false;
 								const factory = inputFactory(file, source, name);
 								return !!factory && plan.isSharedExport(factory.module, factory.name, factory.from);
 							})

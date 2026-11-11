@@ -222,7 +222,7 @@ Hosted components inherit the original React provider. To render a converted com
 </NativeStoreProvider>
 ```
 
-The codemod checks how each component uses the hook. Conditions, scalar output, and dependency comparisons can qualify. This includes branded primitive IDs, conditional choices of verified inputs, and named re-exports of the original store handle from local TypeScript modules. A named method on the returned store can take an imported handle created by that store’s verified factory, followed by literals or constants initialized with literals. The codemod also checks how the method result is used.
+The codemod checks how each component uses the hook. Conditions, scalar output, and dependency comparisons can qualify. This includes branded primitive IDs, conditional choices of verified inputs, and named re-exports of the original store handle from local TypeScript modules. A named method on the returned store can take an imported handle created by that store’s verified factory, followed by literals or constants initialized with literals. A handle imported directly from an unchanged, unselected local TypeScript module can also be created through same-file functions that each return a direct call to the next factory. The codemod also checks how the method result is used.
 
 When the file uses the project’s React 19.2+ automatic JSX runtime, a service read with a verified handle can receive a self-closing component from an installed React package with literal props, for example `store.read(notices).show(<Message id="saved" />)`. The generated code creates the original React element, so the service can render it later under its React provider.
 

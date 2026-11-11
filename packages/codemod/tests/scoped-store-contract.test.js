@@ -366,7 +366,10 @@ it('preserves the original handle and active store across client writes, provide
 			'export function valueOf<T>(x: T) { return x; } export function key(){return {};}',
 		'observer/renderer.ts':
 			"import {createContext} from 'react'; export const current = createContext(new Map<object, string>());",
-		'app/src/handles.ts': "import {key} from 'observer/core'; export const reading = key();",
+		'app/src/handles.ts': `import {key as create} from 'observer/core';
+			function outer(value) { return inner(value); }
+			function inner(value) { return create(value); }
+			export const reading = outer(1);`,
 		'app/src/pane.tsx': `import {useSnapshot} from 'observer'; import {reading} from './handles';
 			export function Pane() {
 				const store = useSnapshot();
@@ -676,6 +679,62 @@ it('requires an imported application handle to come from the original shared fac
 	expect(factory(path.join(app, 'src/pane.tsx'), './handles.js', 'reading')).toBeNull();
 	expect(factory(path.join(app, 'src/pane.tsx'), './handles', 'reading')).toBeNull();
 	expect(accepts('missing')).toBe(false);
+});
+
+it('defers wrapped handles whose factory or original module can change', async () => {
+	const valid = 'function wrap(x) { return make(x); }';
+	const cases = {
+		reassigned: valid + ' function replace() { wrap = other; }',
+		destructuring: valid + ' ({ wrap } = other);',
+		loop: valid + ' for (wrap of choices) {}',
+		shadow: 'function wrap({make}) { return make(); }',
+		async: 'async function wrap(x) { return make(x); }',
+		generator: 'function* wrap(x) { return make(x); }',
+		alternative: 'function wrap(x) { return x ? make(x) : other(x); }',
+		cycle: 'function wrap(x) { return inner(x); } function inner(x) { return wrap(x); }',
+		evaluated: valid + ' function change(source) { eval(source); }',
+		opaque: 'function wrap(x) { return other(x); }',
+		'attributed-factory': valid,
+		'attributed-handle': valid,
+		'attributed-hook-input': valid,
+		selected: valid,
+	};
+	const modules = {
+		'observer/state.ts': 'export function valueOf(value: unknown) { return {value}; }',
+	};
+	const inputs = [];
+	for (const [name, body] of Object.entries(cases)) {
+		const handle = 'src/' + name + '-handle.ts';
+		const view = 'src/' + name + '.tsx';
+		const attributes = ' with { mode: "custom" }';
+		const factoryAttributes = name === 'attributed-factory' ? attributes : '';
+		const handleAttributes =
+			name === 'attributed-handle' || name === 'attributed-hook-input' ? attributes : '';
+		const read =
+			name === 'attributed-hook-input'
+				? "return <b>{useSnapshot(reading) ? 'yes' : 'no'}</b>;"
+				: 'const store = useSnapshot(); return <b>{String(store.get(reading))}</b>;';
+		modules['app/' + handle] = `import {valueOf as make} from 'observer/core'${factoryAttributes};
+			${body} export const reading = wrap(1);`;
+		modules['app/' + view] = `import {useSnapshot} from 'observer';
+			import {reading} from './${name}-handle'${handleAttributes};
+			export function Pane() { ${read} }`;
+		inputs.push(view);
+		if (name === 'selected') inputs.push(handle);
+	}
+	const { app } = project(modules);
+	const result = await runCodemod(
+		inputs.map((file) => path.join(app, file)),
+		{ root: app, strong: true, verify: true },
+	);
+	const views = result.files.filter((f) => f.file.endsWith('.tsx'));
+	expect(views).toHaveLength(Object.keys(cases).length);
+	for (const file of views) {
+		expect(file.notes, file.file).toContainEqual(
+			expect.objectContaining({ severity: 'error', message: expect.stringContaining('observer') }),
+		);
+		expect(file.rules['store-hook'], file.file).toBeUndefined();
+	}
 });
 
 it('follows named input aliases to their original factory and defers ambiguous targets', async () => {

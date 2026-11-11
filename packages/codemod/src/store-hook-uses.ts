@@ -193,7 +193,11 @@ export function storeHookUses(
 		const d = checker.getSymbolAtLocation(expr)?.declarations?.[0];
 		if (!d || !ts.isImportSpecifier(d) || d.isTypeOnly || d.parent.parent.isTypeOnly) return false;
 		const spec = d.parent.parent.parent.moduleSpecifier;
-		return ts.isStringLiteral(spec) && imported(spec.text, (d.propertyName ?? d.name).text);
+		return (
+			!d.parent.parent.parent.attributes &&
+			ts.isStringLiteral(spec) &&
+			imported(spec.text, (d.propertyName ?? d.name).text)
+		);
 	}
 	// A call using an original handle can publish its other arguments to another renderer.
 	// Only literals and constants initialized with literals qualify.
