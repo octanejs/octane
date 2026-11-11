@@ -38,19 +38,24 @@ export function Probe({ receiver, revision }) {
 		receiver.record('start', receiver.value);
 		return () => receiver.record('stop', receiver.value);
 	}, [receiver]);
-	return <p>{revision}</p>;
+	return <p>{String(revision)}</p>;
 }`;
 
-it('tracks object identity and reads methods and getters only when React does', async () => {
-	const migrated = migrate(source);
+it.each([false, true])('matches React with revision dependency %s', async (withRevision) => {
+	const migrated = migrate(
+		withRevision ? source.replace('[receiver]', '[receiver, revision]') : source,
+	);
 	expect(migrated.strong).toBe(true);
 	const native = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
 	function Reference({ receiver, revision }) {
-		useEffect(() => {
-			receiver.record('start', receiver.value);
-			return () => receiver.record('stop', receiver.value);
-		}, [receiver]);
-		return createElement('p', null, revision);
+		useEffect(
+			() => {
+				receiver.record('start', receiver.value);
+				return () => receiver.record('stop', receiver.value);
+			},
+			withRevision ? [receiver, revision] : [receiver],
+		);
+		return createElement('p', null, String(revision));
 	}
 	async function exercise(react) {
 		const log = [];
@@ -81,11 +86,13 @@ it('tracks object identity and reads methods and getters only when React does', 
 			expect(host.textContent).toBe(String(revision));
 		};
 		try {
-			await render(a, 1);
+			await render(a, NaN);
 			a.x = 2;
-			await render(a, 2);
+			await render(a, NaN);
+			await render(a, 0);
+			await render(a, -0);
 			b.x = 2;
-			await render(b, 3);
+			await render(b, -0);
 			b.x = 3;
 		} finally {
 			if (react) await act(() => root.unmount());
@@ -100,9 +107,11 @@ it('tracks object identity and reads methods and getters only when React does', 
 	globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 	try {
 		const reference = await exercise(true);
+		const restart = ['read a', 'stop a 2', 'read a', 'start a 2'];
 		expect(reference).toEqual([
 			'read a',
 			'start a 1',
+			...(withRevision ? [...restart, ...restart] : []),
 			'read a',
 			'stop a 2',
 			'read b',
@@ -152,7 +161,20 @@ it.each([
 		'indirectly spelled direct eval',
 		source.replace('useEffect(() =>', "(eval)('receiver = revision'); useEffect(() =>"),
 	],
-	['additional changed dependency', source.replace('[receiver]', '[receiver, revision]')],
+	['spread dependency list', source.replace('[receiver]', '[receiver, ...revision]')],
+	[
+		'reassigned trigger',
+		source
+			.replace('useEffect(() =>', 'revision++; useEffect(() =>')
+			.replace('[receiver]', '[receiver, revision]'),
+	],
+	[
+		'missing dependency',
+		source
+			.replace('{ receiver, revision }', '{ receiver, revision, label }')
+			.replace("receiver.record('start'", 'receiver.record(label')
+			.replace('[receiver]', '[receiver, revision]'),
+	],
 ])('keeps the original effect when it cannot prove the %s case', async (_case, input) => {
 	const migrated = migrate(input);
 	expect(migrated.strong).toBe(false);
@@ -164,13 +186,16 @@ it.each([
 
 it('respects local shadows, fresh alias names and comments', async () => {
 	const migrated = migrate(
-		source.replace(
-			"receiver.record('start', receiver.value);",
-			'const currentReceiver = [1].map(receiver => receiver.toString()); /* keep */\nreceiver.record(currentReceiver, receiver.value);',
-		),
+		source
+			.replaceAll('revision', 'currentReceiverValue')
+			.replace('[receiver]', '[receiver, currentReceiverValue]')
+			.replace(
+				"receiver.record('start', receiver.value);",
+				'const currentReceiver = [1].map(receiver => receiver.toString()); /* keep */\nreceiver.record(currentReceiver, receiver.value);',
+			),
 	);
 	expect(migrated.strong).toBe(true);
 	expect(migrated.code).toContain('receiver => receiver.toString()');
-	expect(migrated.code).toContain('const currentReceiverValue = receiver;');
+	expect(migrated.code).toContain('const currentReceiverValueValue = receiver;');
 	expect(migrated.code).toContain('/* keep */');
 });

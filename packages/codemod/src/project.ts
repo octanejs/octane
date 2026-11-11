@@ -124,14 +124,19 @@ export async function runCodemod(
 		specifier: string,
 		name: string,
 		prop: string,
-		destination: 'text' | 'render',
+		destination: PropDestination,
 		ordinaryCaller?: boolean,
 		depth = 0,
 	) {
+		if (
+			destination === 'forwarded-text' &&
+			ts.findConfigFile(path.dirname(from), ts.sys.fileExists) !== rootProject
+		)
+			return false;
 		const match = renamed(from, specifier);
 		if (!match || (!specifier.startsWith('.') && match.specifier.startsWith('.'))) return false;
 		if (
-			destination === 'render' &&
+			destination !== 'text' &&
 			(!match.file.startsWith(root + path.sep) ||
 				match.file.split(path.sep).includes('node_modules') ||
 				fs.realpathSync(match.file) !==
@@ -145,6 +150,7 @@ export async function runCodemod(
 				match.file,
 				(module, name, slot, depth) =>
 					forwardedProp(match.file, module, name, slot, 'render', true, depth),
+				(module, name, prop) => forwardedProp(match.file, module, name, prop, 'host-text', true),
 				() => typesOf(match.file),
 			);
 			propChecks.set(match.file, inspect);
@@ -559,8 +565,15 @@ export async function runCodemod(
 				captureEffectReceivers,
 				target,
 				reactIntlAdapter: intl,
-				forwardedText: (module, name, prop, ordinaryCaller) =>
-					forwardedProp(file, module, name, prop, 'text', ordinaryCaller),
+				forwardedText: (module, name, prop, ordinaryCaller, through) =>
+					forwardedProp(
+						file,
+						module,
+						name,
+						prop,
+						through ? 'forwarded-text' : 'text',
+						ordinaryCaller,
+					),
 				resolveStoreHook,
 				strong,
 				strictNullChecks: strictConfig !== null,
@@ -1136,12 +1149,14 @@ function renamedImports(
 
 /** Read the selected implementation only when a localized prop needs it. TS may prefer a
  * .tsx source even when the runtime can load a separate .js sibling or directory entry. */
+type PropDestination = 'text' | 'render' | 'forwarded-text' | 'host-text';
 function propsOf(
 	file: string,
 	importedRender: NonNullable<TransformOptions['forwardedRender']>,
+	hostText: (module: string, name: string, prop: string) => boolean,
 	types: () => TransformOptions['types'],
 ): (
-	destination: 'text' | 'render',
+	destination: PropDestination,
 	name: string,
 	prop: string,
 	ordinaryCaller?: boolean,
@@ -1162,9 +1177,10 @@ function propsOf(
 	const { sf, checker } = bind(file, fs.readFileSync(file, 'utf8'));
 	const module = checker.getSymbolAtLocation(sf);
 	const names = module && new Map(checker.getExportsOfModule(module).map((s) => [s.name, s]));
-	const checks = new Map<'text' | 'render', ReturnType<typeof forwardedProps>>();
+	const checks = new Map<PropDestination, ReturnType<typeof forwardedProps>>();
 	const typeOf = (node: ts.Node) =>
 		projectTypeAt(node, types())?.type ?? checker.getTypeAtLocation(node);
+	const renderTypes = { typeOf, text: (ref: ts.Node) => textKind(typeOf(ref)) !== 0 };
 	return (destination, name, prop, ordinaryCaller, depth) => {
 		let accepts = checks.get(destination);
 		if (!accepts)
@@ -1173,13 +1189,12 @@ function propsOf(
 				(accepts = forwardedProps(
 					sf,
 					checker,
-					destination === 'text'
-						? 'text'
-						: {
-								imported: importedRender,
-								typeOf,
-								text: (ref) => textKind(typeOf(ref)) !== 0,
-							},
+					destination === 'render' ? { imported: importedRender, ...renderTypes } : 'text',
+					undefined,
+					undefined,
+					destination === 'forwarded-text' || destination === 'host-text'
+						? { ...renderTypes, next: destination === 'forwarded-text' ? hostText : undefined }
+						: undefined,
 				)),
 			);
 		return accepts(names?.get(name), prop, ordinaryCaller, depth);
