@@ -15,12 +15,20 @@ export type Page = 'octane' | 'react';
 export function createShelfServer() {
 	const data = createShelfHandler();
 
-	async function render(page: Page, url: URL, template: string): Promise<string> {
+	/**
+	 * Render a page, or run the native form POST that reached it. An accepted
+	 * submission redirects back to the page; a refused one renders the page with
+	 * the form's values and issues.
+	 */
+	async function render(page: Page, request: Request, template: string): Promise<Response> {
 		const account = 'ada';
-		const request = new Request(url, {
-			headers: { 'x-shelf-account': namespaceFrom(url.search) + account },
-		});
-		const store = createDataStore({ transport: data.transport(request) });
+		const url = new URL(request.url);
+		const headers = new Headers(request.headers);
+		headers.set('x-shelf-account', namespaceFrom(url.search) + account);
+		const authenticated = new Request(request, { headers });
+		const forms = await data.forms(authenticated);
+		if (forms.response) return forms.response;
+		const store = createDataStore({ transport: data.transport(authenticated), form: forms.form });
 		let html: string;
 		let seed: string;
 		try {
@@ -30,12 +38,13 @@ export function createShelfServer() {
 			// A failed render still ends the request's store and its timers.
 			store.retire();
 		}
-		return template
+		const body = template
 			.replace('<!--ssr-html-->', () => html)
 			.replace(
 				'<!--ssr-seed-->',
 				() => `<script type="application/json" id="shelf-seed">${seed}</script>`,
 			);
+		return new Response(body, { status: forms.status, headers: { 'content-type': 'text/html' } });
 	}
 
 	return { data, render };

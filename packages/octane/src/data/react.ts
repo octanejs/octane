@@ -8,6 +8,7 @@
 import { createContext, createElement, use, useCallback, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import type { Read, View, Write } from './contracts.js';
+import { formViews, type FormView } from './form.js';
 import type { DataStore, ReadSnapshot } from './store.js';
 
 const StoreContext = createContext<DataStore | null>(null);
@@ -54,4 +55,16 @@ export function useRead<I, O>(read: Read<I, O>, input?: I): O {
 export function useWrite<I, O>(write: Write<I, O>): (input: I) => Promise<O> {
 	const store = useDataStore();
 	return useCallback((input: I) => store.write(write, input), [store, write]);
+}
+
+const formView = formViews<ReactNode>(createElement);
+
+/**
+ * A native form for a write that declares `form` fields. `key` separates
+ * instances, such as one per row, so each keeps its own state.
+ */
+export function useForm<I, O>(write: Write<I, O>, key?: string): FormView<I, O, ReactNode> {
+	const handle = useDataStore().form(write, key);
+	const state = useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot);
+	return formView(handle, state);
 }

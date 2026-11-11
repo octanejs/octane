@@ -92,6 +92,66 @@ for (const { name, path, serverRendered } of PAGES) {
 				expect(loads[0]).toContain('books.setRead');
 				await expect(page.getByText('3 books · 1 read')).toBeVisible();
 			});
+
+			test('adds, refuses and removes books with JavaScript off', async ({ browser }) => {
+				const context = await browser.newContext({ javaScriptEnabled: false });
+				const staticPage = await context.newPage();
+				const url = `${path}?ns=${Date.now()}-${++namespace}`;
+				await staticPage.goto(url);
+				const title = staticPage.getByRole('textbox', { name: 'Book title' });
+				const error = staticPage.locator('.field-error');
+
+				// Each submission posts to the page; an accepted one redirects back to it.
+				await title.fill('Station Eleven');
+				await staticPage.getByRole('button', { name: 'Add' }).click();
+				await expect(book(staticPage, 'Station Eleven')).toBeVisible();
+				await expect(staticPage.getByText('4 books · 0 read')).toBeVisible();
+				expect(new URL(staticPage.url()).search).toBe(new URL(url, 'http://x').search);
+				await expect(title).toHaveValue('');
+
+				// A refused one renders the page again, keeping what was typed and saying why.
+				await title.fill('kindred');
+				await staticPage.getByRole('button', { name: 'Add' }).click();
+				await expect(error).toHaveText('That book is already on the shelf');
+				await expect(title).toHaveValue('kindred');
+				await title.fill('');
+				await staticPage.getByRole('button', { name: 'Add' }).click();
+				await expect(error).toHaveText('Enter a title');
+
+				await staticPage.getByRole('button', { name: 'Remove Piranesi' }).click();
+				await expect(book(staticPage, 'Piranesi')).toHaveCount(0);
+				await expect(staticPage.getByText('3 books · 0 read')).toBeVisible();
+				await context.close();
+			});
+
+			test('hydrates a page that shows a refused submission, then submits through the store', async ({
+				page,
+			}) => {
+				// The refused page's 400 status is expected; a hydration mismatch is not.
+				runtimeDiagnostics.get(page)!.stop();
+				runtimeDiagnostics.set(
+					page,
+					collectBrowserDiagnostics(page, {
+						failOnHydrationWarnings: true,
+						ignore: (diagnostic) => diagnostic.message.includes('status of 400'),
+					}),
+				);
+				await open(page, path);
+				const title = page.getByRole('textbox', { name: 'Book title' });
+				await title.fill('kindred');
+				// `submit()` skips the submit event, so the form posts natively even once hydrated.
+				await page.locator('form.add').evaluate((form: HTMLFormElement) => form.submit());
+				await expect(page.locator('.field-error')).toHaveText('That book is already on the shelf');
+				await expect(title).toHaveValue('kindred');
+
+				// The page that came back hydrates with the same refusal, and takes the next submission in place.
+				await title.fill('Station Eleven');
+				await page.getByRole('button', { name: 'Add' }).click();
+				await expect(status(page)).toHaveText('Saved');
+				await expect(page.locator('.field-error')).toHaveCount(0);
+				await expect(title).toHaveValue('');
+				await expect(network(page).getByText('write books.add')).toHaveCount(1);
+			});
 		}
 
 		test('shows an edit before the reply and settles it in one round trip', async ({ page }) => {
@@ -143,9 +203,13 @@ for (const { name, path, serverRendered } of PAGES) {
 			await expect(status(page)).toHaveText('That book is already on the shelf');
 			await expect(book(page, 'kindred')).toHaveCount(0);
 			await expect(book(page, 'Kindred')).toHaveCount(1);
+			// A refused submission keeps what was typed.
+			await expect(page.getByRole('textbox', { name: 'Book title' })).toHaveValue('kindred');
 
+			await page.getByRole('textbox', { name: 'Book title' }).fill('');
 			await page.getByRole('button', { name: 'Add' }).click();
 			await expect(status(page)).toHaveText('Enter a title');
+			await expect(page.locator('.field-error')).toHaveText('Enter a title');
 		});
 
 		test('settles a write whose reply was lost by looking it up, without resending it', async ({

@@ -7,6 +7,8 @@ export type {
 	DataRequest,
 	Entity,
 	EntitySelection,
+	FieldCodec,
+	FormFields,
 	Read,
 	SchemaIssue,
 	StandardSchema,
@@ -18,3 +20,4 @@ export type {
 	Write,
 } from './contracts.js';
 export type { DataStore, DataStoreOptions, ReadHandle, ReadSnapshot } from './store.js';
+export type { FormHandle, FormSeed, FormState, FormView } from './form.js';
