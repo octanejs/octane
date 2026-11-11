@@ -1,4 +1,4 @@
-import { forwardedProps, hasPrototypeAccess } from './forwarded-props.js';
+import { closedForwardedAttribute, forwardedProps, hasPrototypeAccess } from './forwarded-props.js';
 import type { TransformOptions } from './types.js';
 import { localUses, portableArguments, scalar } from './local-uses.js';
 import ts from 'typescript';
@@ -25,6 +25,7 @@ export function intlImports(
 	) => boolean,
 	inReact: (element: ts.JsxElement | ts.JsxSelfClosingElement) => boolean,
 	canPassToReact: (element: ts.JsxElement | ts.JsxSelfClosingElement) => boolean,
+	returnedReceiver: (tag: ts.JsxOpeningLikeElement) => boolean,
 ): Set<ts.ImportSpecifier> {
 	const candidates = file.statements.filter(ts.isImportDeclaration).flatMap((decl) => {
 		const named = decl.importClause?.namedBindings;
@@ -146,9 +147,18 @@ export function intlImports(
 			const decl = symbol?.declarations?.[0];
 			if (decl && ts.isImportSpecifier(decl)) {
 				const module = decl.parent.parent.parent.moduleSpecifier;
+				if (!ts.isStringLiteral(module) || !importedText) return false;
+				const name = (decl.propertyName ?? decl.name).text;
+				if (importedText(module.text, name, prop, ordinaryCaller)) return true;
 				return (
-					ts.isStringLiteral(module) &&
-					!!importedText?.(module.text, (decl.propertyName ?? decl.name).text, prop, ordinaryCaller)
+					!decl.isTypeOnly &&
+					!decl.parent.parent.isTypeOnly &&
+					!decl.parent.parent.parent.attributes &&
+					ordinaryCaller &&
+					!/@jsx(?:ImportSource|Runtime|Frag)?\b|\beval\b/i.test(file.text) &&
+					closedForwardedAttribute(attr) &&
+					returnedReceiver(tag) &&
+					importedText(module.text, name, prop, true, true)
 				);
 			}
 			return forwards(symbol, prop);
