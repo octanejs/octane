@@ -3,7 +3,7 @@
  * module: declaring a contract does no I/O, so it is safe on either side.
  */
 import { z } from 'zod';
-import { entity, read, write } from 'octane/data';
+import { entity, read, view, write } from 'octane/data';
 
 const bookShape = z.object({
 	id: z.string(),
@@ -15,10 +15,33 @@ export type Book = z.infer<typeof bookShape>;
 /** Every read that selects a book shares its fields: one edit updates each copy. */
 export const Book = entity('book', bookShape);
 
-export const books = read({
+/**
+ * Lists declared by a rule. The store keeps each one sorted and complete under
+ * any edit, so marking a book read moves it between them before the reply.
+ */
+export const books = view({
 	name: 'books.list',
-	output: z.array(bookShape),
-	entities: (list) => Book.from(list),
+	of: Book,
+	order: [['title', 'asc']],
+	limit: 50,
+	fresh: 30_000,
+});
+
+export const finished = view({
+	name: 'books.finished',
+	of: Book,
+	where: (book) => book.read,
+	order: [['title', 'asc']],
+	limit: 50,
+	fresh: 30_000,
+});
+
+export const unread = view({
+	name: 'books.unread',
+	of: Book,
+	where: (book) => !book.read,
+	order: [['title', 'asc']],
+	limit: 50,
 	fresh: 30_000,
 });
 
@@ -32,15 +55,20 @@ export const stats = read({
 export const addBook = write({
 	name: 'books.add',
 	input: bookShape.pick({ title: true }),
+	output: bookShape,
 	creates: Book,
 	draft: (input, id) => ({ id, title: input.title, read: false }),
+	/** The reply is the saved book, so the lists take it without reloading. */
+	record: (book) => book,
 	invalidates: ['shelf'],
 });
 
 export const setRead = write({
 	name: 'books.setRead',
 	input: bookShape.pick({ id: true, read: true }),
+	output: bookShape,
 	patches: Book,
+	record: (book) => book,
 	invalidates: ['shelf'],
 });
 

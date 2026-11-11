@@ -17,7 +17,7 @@
  */
 import type * as Client from '../index.js';
 import type { OctaneNode } from '../index.js';
-import type { Read, Write } from './contracts.js';
+import type { Read, View, Write } from './contracts.js';
 import type { DataStore, ReadHandle, ReadSnapshot } from './store.js';
 
 type Runtime = Pick<
@@ -34,6 +34,7 @@ export interface OctaneDataBinding {
 	/** Observe a read without suspending. The component mounts and unmounts the observation. */
 	useReadState: {
 		<O>(read: Read<void, O>): ReadSnapshot<O>;
+		<T>(read: View<void, T>): ReadSnapshot<T[]>;
 		<I, O>(read: Read<I, O>, input: I): ReadSnapshot<O>;
 	};
 	/**
@@ -43,6 +44,7 @@ export interface OctaneDataBinding {
 	 */
 	useRead: {
 		<O>(read: Read<void, O>): O;
+		<T>(read: View<void, T>): T[];
 		<I, O>(read: Read<I, O>, input: I): O;
 	};
 	/** A stable function that submits a write through the store. */

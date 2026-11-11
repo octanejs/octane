@@ -12,6 +12,7 @@ import {
 	type DataRequest,
 	type Read,
 	type Transport,
+	type View,
 	type Write,
 } from './contracts.js';
 
@@ -40,13 +41,29 @@ export interface DataHandler {
 	readonly run: (input: any, call: any) => unknown;
 }
 
-/** Pair a contract with the function that serves it; `call` carries the request's context. */
-export type Handle<C> = <I, O>(
-	contract: Read<I, O> | Write<I, O>,
-	run: (input: I, call: C & DataCall) => O | Promise<O>,
-) => DataHandler;
+/**
+ * Pair a contract with the function that serves it; `call` carries the
+ * request's context. A view's handler receives its parameters and the window
+ * to serve, and returns that window's records in the view's order.
+ */
+export interface Handle<C> {
+	<P, T>(
+		contract: View<P, T>,
+		run: (
+			input: ([P] extends [void] ? {} : P) & { readonly offset: number; readonly limit: number },
+			call: C & DataCall,
+		) => T[] | Promise<T[]>,
+	): DataHandler;
+	<I, O>(
+		contract: Read<I, O> | Write<I, O>,
+		run: (input: I, call: C & DataCall) => O | Promise<O>,
+	): DataHandler;
+}
 
-const handle: Handle<any> = (contract, run) => ({ contract, run });
+const handle: Handle<any> = (contract: DataHandler['contract'], run: DataHandler['run']) => ({
+	contract,
+	run,
+});
 
 /** A write may ask for at most this many reads back; the rest reload on their own. */
 const MAX_REFRESH = 8;

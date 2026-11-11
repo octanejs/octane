@@ -114,7 +114,133 @@ export interface Write<Input, Output> {
 	readonly draft: ((input: Input, id: string) => unknown) | undefined;
 	/** For a create whose server assigns the ID: where the ID is in the validated reply. */
 	readonly serverId: ((output: Output) => string) | undefined;
+	/** Where the written record is in the validated reply, so views take it without reloading. */
+	readonly record: ((output: Output) => unknown) | undefined;
 	readonly invalidates: readonly string[];
+}
+
+/** Which rows of a view to show: `limit` rows from position `offset` of its order. */
+export interface ViewWindow {
+	readonly offset?: number;
+	readonly limit?: number;
+}
+
+/** A view's input: its parameters, if it declares any, and the window to show. */
+export type ViewInput<P> = [P] extends [void] ? ViewWindow | void : P & ViewWindow;
+
+/** Sort keys, most significant first. The entity's key breaks remaining ties. */
+export type ViewOrder<T> = ReadonlyArray<readonly [keyof T & string, 'asc' | 'desc']>;
+
+export interface ViewRule<T> {
+	readonly of: Entity<T>;
+	readonly where: (record: T, input: any) => boolean;
+	/** The view's full order, including the key tiebreak. */
+	readonly compare: (a: T, b: T) => number;
+	/** Rows shown when the input names no `limit`. */
+	readonly limit: number;
+	/** The most rows one request may ask for; the server refuses more. */
+	readonly max: number;
+}
+
+/**
+ * A list defined by a rule over an entity, not by a server response. Its read
+ * value is the window's rows. The handler serves `limit` records from position
+ * `offset` of the view's order, filtered by its rule, and must sort exactly as
+ * `order` says, comparing values as JavaScript's `<` does, then by the key.
+ */
+export interface View<P, T> extends Read<ViewInput<P>, T[]> {
+	readonly view: ViewRule<T>;
+}
+
+function compareValues(a: unknown, b: unknown): number {
+	if (a === b) return 0;
+	if (a == null) return -1;
+	if (b == null) return 1;
+	const left = a instanceof Date ? a.getTime() : a;
+	const right = b instanceof Date ? b.getTime() : b;
+	return (left as any) < (right as any) ? -1 : (left as any) > (right as any) ? 1 : 0;
+}
+
+/** Validate every item, synchronously when every item's validator is. */
+function arrayOf<T>(item: StandardSchema<unknown, T>): StandardSchema<unknown, T[]> {
+	return {
+		'~standard': {
+			version: 1,
+			vendor: 'octane',
+			validate(value) {
+				if (!Array.isArray(value)) return { issues: [{ message: 'Expected an array' }] };
+				const results = value.map((entry) => item['~standard'].validate(entry));
+				const collect = (settled: SchemaResult<T>[]): SchemaResult<T[]> => {
+					const values: T[] = [];
+					for (const result of settled) {
+						if (result.issues) return { issues: result.issues };
+						values.push(result.value);
+					}
+					return { value: values };
+				};
+				return results.some((result) => result instanceof Promise)
+					? Promise.all(results).then(collect)
+					: collect(results as SchemaResult<T>[]);
+			},
+		},
+	};
+}
+
+const isCount = (value: unknown, min: number, max: number) =>
+	value === undefined ||
+	(Number.isInteger(value) && (value as number) >= min && (value as number) <= max);
+
+/**
+ * A list the store keeps right under every edit. It loads the window it shows
+ * plus a margin, shares those records with every other view of the entity,
+ * and evaluates `where` and `order` locally, so an edit moves a record into,
+ * out of or across a view in the task that made it.
+ */
+export function view<T, P = void>(options: {
+	name: string;
+	of: Entity<T>;
+	input?: StandardSchema<unknown, P>;
+	where?: (record: T, input: P) => boolean;
+	order: ViewOrder<T>;
+	limit?: number;
+	max?: number;
+	tags?: readonly string[];
+	fresh?: number;
+	keep?: number;
+	expire?: number;
+}): View<P, T> {
+	const { of, order, input: params, where: rule, limit: shown, max: most, ...rest } = options;
+	const limit = shown ?? 20;
+	const max = most ?? 500;
+	const compare = (a: T, b: T): number => {
+		for (const [field, direction] of order) {
+			const result = compareValues((a as any)[field], (b as any)[field]);
+			if (result !== 0) return direction === 'asc' ? result : -result;
+		}
+		return compareValues(of.id(a), of.id(b));
+	};
+	const input: StandardSchema<unknown, ViewInput<P>> = {
+		'~standard': {
+			version: 1,
+			vendor: 'octane',
+			validate(value) {
+				const { offset, limit: count, ...values } = (value ?? {}) as ViewWindow;
+				if (!isCount(offset, 0, Number.MAX_SAFE_INTEGER) || !isCount(count, 0, max)) {
+					return { issues: [{ message: `Expected a window of at most ${max} rows` }] };
+				}
+				const window = { offset: offset ?? 0, limit: count ?? limit };
+				if (!params) return { value: window as ViewInput<P> };
+				const result = params['~standard'].validate(values);
+				const merge = (parsed: SchemaResult<P>): SchemaResult<ViewInput<P>> =>
+					parsed.issues ? parsed : { value: { ...parsed.value, ...window } as ViewInput<P> };
+				return result instanceof Promise ? result.then(merge) : merge(result);
+			},
+		},
+	};
+	return {
+		...read({ ...rest, input, output: arrayOf(of.schema), entities: (rows) => of.from(rows) }),
+		view: { of, where: rule ?? (() => true), compare, limit, max },
+	};
 }
 
 export function read<Output, Input = void>(options: {
@@ -154,6 +280,11 @@ export function write<Input, Output = unknown>(options: {
 	 * later writes to it wait; the store then sends them with the server's ID.
 	 */
 	serverId?: (output: Output) => string;
+	/**
+	 * Where the written record is in the reply. Views then take the server's
+	 * record in place of reloading their windows.
+	 */
+	record?: (output: Output) => unknown;
 	invalidates?: readonly string[];
 }): Write<Input, Output> {
 	const { creates, patches, removes } = options;
@@ -171,6 +302,7 @@ export function write<Input, Output = unknown>(options: {
 					: undefined,
 		draft: options.draft,
 		serverId: options.serverId,
+		record: options.record,
 		invalidates: options.invalidates ?? [],
 	};
 }

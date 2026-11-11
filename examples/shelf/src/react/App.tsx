@@ -1,7 +1,7 @@
 /** @jsxImportSource react */
 import { Suspense, useState, useSyncExternalStore, Component, type ReactNode } from 'react';
 import { DataProvider, useRead } from 'octane/data/react';
-import { addBook, books, removeBook, setRead, stats } from '../shared/contracts.ts';
+import { addBook, books, finished, removeBook, setRead, stats } from '../shared/contracts.ts';
 import {
 	ACCOUNTS,
 	checkSaved,
@@ -54,6 +54,25 @@ function BookList({ session }: { session: Session }) {
 				</li>
 			))}
 		</ul>
+	);
+}
+
+/** Marking a book read moves it here before the server replies. */
+function FinishedList() {
+	const list = useRead(finished);
+	return (
+		<section className="finished" aria-label="Finished">
+			<h2>Finished</h2>
+			{list.length === 0 ? (
+				<p className="empty">Nothing finished yet.</p>
+			) : (
+				<ol>
+					{list.map((book) => (
+						<li key={book.id}>{book.title}</li>
+					))}
+				</ol>
+			)}
+		</section>
 	);
 }
 
@@ -165,6 +184,9 @@ function ShelfBody({ session }: { session: Session }) {
 					<BookList session={session} />
 				</Suspense>
 			</LoadError>
+			<Suspense fallback={<p className="loading">Loading finished books…</p>}>
+				<FinishedList />
+			</Suspense>
 			<div className="tools">
 				<Faults session={session} />
 				<Network session={session} />
