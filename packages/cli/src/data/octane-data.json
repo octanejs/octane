@@ -628,7 +628,7 @@
       ],
       "ssr": "No dedicated SSR/hydration lane; the supported claims are client positioning and interactions.",
       "verified": "2026-08-26",
-      "exports": []
+      "exports": ["./react-dom"]
     },
     {
       "name": "@octanejs/formisch",

@@ -367,7 +367,7 @@ export function findNonDisabledListIndex(
 	_temp?: {
 		startingIndex?: number;
 		decrement?: boolean;
-		disabledIndices?: DisabledIndices;
+		disabledIndices?: DisabledIndices | undefined;
 		amount?: number;
 	},
 ): number {
