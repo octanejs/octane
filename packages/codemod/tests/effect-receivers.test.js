@@ -41,19 +41,33 @@ export function Probe({ receiver, revision }) {
 	return <p>{String(revision)}</p>;
 }`;
 
-it.each([false, true])('matches React with revision dependency %s', async (withRevision) => {
+const propertySource = source
+	.replace('{ receiver, revision }', '{ receiver, revision, trigger }')
+	.replace('[receiver]', '[receiver, trigger.value, trigger.value, trigger.nested?.end]');
+
+it.each(['receiver', 'revision', 'properties'])('matches React for %s', async (kind) => {
+	const withProperties = kind === 'properties';
+	const withRevision = kind === 'revision';
 	const migrated = migrate(
-		withRevision ? source.replace('[receiver]', '[receiver, revision]') : source,
+		withProperties
+			? propertySource
+			: withRevision
+				? source.replace('[receiver]', '[receiver, revision]')
+				: source,
 	);
 	expect(migrated.strong).toBe(true);
 	const native = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
-	function Reference({ receiver, revision }) {
+	function Reference({ receiver, revision, trigger }) {
 		useEffect(
 			() => {
 				receiver.record('start', receiver.value);
 				return () => receiver.record('stop', receiver.value);
 			},
-			withRevision ? [receiver, revision] : [receiver],
+			withProperties
+				? [receiver, trigger.value, trigger.value, trigger.nested?.end]
+				: withRevision
+					? [receiver, revision]
+					: [receiver],
 		);
 		return createElement('p', null, String(revision));
 	}
@@ -76,8 +90,28 @@ it.each([false, true])('matches React with revision dependency %s', async (withR
 			b = new Receiver('b');
 		const host = document.createElement('div');
 		const root = react ? reactRoot(host) : createRoot(host);
-		const render = async (receiver, revision) => {
-			const props = { receiver, revision };
+		let value, optional, reads;
+		const nested = {
+			get end() {
+				log.push('trigger end');
+				return 'end';
+			},
+		};
+		const trigger = {
+			get value() {
+				log.push('trigger value');
+				return ++reads === 1 ? NaN : value;
+			},
+			get nested() {
+				log.push('trigger nested');
+				return optional ? nested : null;
+			},
+		};
+		const render = async (receiver, revision, enabled = true) => {
+			value = revision;
+			optional = enabled;
+			reads = 0;
+			const props = { receiver, revision, trigger };
 			if (react) await act(() => root.render(createElement(Reference, props)));
 			else {
 				root.render(native.Probe, props);
@@ -91,6 +125,7 @@ it.each([false, true])('matches React with revision dependency %s', async (withR
 			await render(a, NaN);
 			await render(a, 0);
 			await render(a, -0);
+			if (withProperties) await render(a, -0, false);
 			b.x = 2;
 			await render(b, -0);
 			b.x = 3;
@@ -108,10 +143,23 @@ it.each([false, true])('matches React with revision dependency %s', async (withR
 	try {
 		const reference = await exercise(true);
 		const restart = ['read a', 'stop a 2', 'read a', 'start a 2'];
-		expect(reference).toEqual([
+		if (withProperties) {
+			const optional = ['trigger value', 'trigger value', 'trigger nested'];
+			const full = [...optional, 'trigger end'];
+			expect(reference.filter((entry) => entry.startsWith('trigger'))).toEqual([
+				...full,
+				...full,
+				...full,
+				...full,
+				...optional,
+				...full,
+			]);
+		}
+		expect(reference.filter((entry) => !entry.startsWith('trigger'))).toEqual([
 			'read a',
 			'start a 1',
-			...(withRevision ? [...restart, ...restart] : []),
+			...(withRevision || withProperties ? [...restart, ...restart] : []),
+			...(withProperties ? restart : []),
 			'read a',
 			'stop a 2',
 			'read b',
@@ -155,6 +203,27 @@ it.each([
 			.replace('{ receiver, revision }', '{ receiver, revision, other }')
 			.replace("receiver.record('start'", "void other.value; receiver.record('start'")
 			.replace('[receiver]', '[receiver, other.value, other.value]'),
+	],
+	['computed property', propertySource.replaceAll('trigger.value', "trigger['value']")],
+	['property calls', propertySource.replaceAll('trigger.value', 'trigger.read()')],
+	[
+		'guarded hook expression',
+		propertySource.replace('useEffect(() =>', 'revision && useEffect(() =>'),
+	],
+	['dependency comment', propertySource.replace('trigger.nested', '/* keep */ trigger.nested')],
+	[
+		'statement directive',
+		propertySource.replace('useEffect(() =>', '// @ts-expect-error preserve\nuseEffect(() =>'),
+	],
+	[
+		'skipped switch initialization',
+		propertySource
+			.replace(
+				'useEffect(() =>',
+				'switch (revision) { case 1: const key = 1; break; case 2: { useEffect(() =>',
+			)
+			.replace('[receiver,', '[key, receiver,')
+			.replace('return <p>', '} } return <p>'),
 	],
 	['member dependency', source.replace('[receiver]', '[receiver.value]')],
 	[

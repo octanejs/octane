@@ -579,7 +579,8 @@ class ModuleTransform {
 	readonly options: TransformOptions;
 	readonly target: 'tsrx' | 'tsx';
 	readonly strong: boolean;
-	readonly effectAliases?: Map<ts.Identifier, string>;
+	readonly effectAliases?: Map<ts.Expression, string>;
+	readonly effectSnapshots?: Map<ts.ExpressionStatement, string[]>;
 	/** React imports read as values, not only as types. */
 	readonly valueUses = new Set<string>();
 	hasSignalRuntime?: boolean;
@@ -646,7 +647,9 @@ class ModuleTransform {
 		this.source = source;
 		this.filename = filename;
 		this.options = options;
-		if (options.captureEffectReceivers) this.effectAliases = new Map();
+		if (options.captureEffectReceivers || options.snapshotEffectProperties)
+			this.effectAliases = new Map();
+		if (options.snapshotEffectProperties) this.effectSnapshots = new Map();
 		this.target = options.target ?? 'tsrx';
 		this.strong = options.strong === true;
 		this.strictTypes = options.strictNullChecks === true && /\.[cm]?tsx?$/.test(filename);
@@ -2045,6 +2048,14 @@ class ModuleTransform {
 		const replaced = this.rewrite(node, ctx);
 		if (replaced !== null) return replaced;
 		const text = this.span(node, start ?? node.getStart(this.sf), node.end, ctx);
+		if (this.effectSnapshots && ts.isExpressionStatement(node)) {
+			const declarations = this.effectSnapshots.get(node);
+			if (declarations) {
+				const indent = this.indentOf(node);
+				const line = '\n' + indent + this.indentUnit;
+				return '{' + line + declarations.join(line) + line + text + '\n' + indent + '}';
+			}
+		}
 		if ((ts.isStringLiteral(node) || ts.isTemplateLiteral(node)) && text.includes('\n')) {
 			return text.replaceAll('\n', LITERAL_NEWLINE);
 		}
@@ -2094,12 +2105,14 @@ class ModuleTransform {
 	}
 
 	rewrite(node: ts.Node, ctx: Context): string | null {
-		if (this.effectAliases) {
-			if (ts.isIdentifier(node)) {
-				const alias = this.effectAliases.get(node);
+		const aliases = this.effectAliases;
+		if (aliases) {
+			if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) {
+				const alias = aliases.get(node);
 				if (alias) return alias;
 			}
 			if (ts.isBlock(node)) {
+				const snapshots = this.effectSnapshots;
 				const captures = effectReceivers(
 					node,
 					this.checker,
@@ -2107,7 +2120,15 @@ class ModuleTransform {
 						const hook = this.callee(name);
 						return hook?.module === 'react' ? hook.name : null;
 					},
-					this.effectAliases,
+					aliases,
+					snapshots &&
+						((statement, member, name) => {
+							if (aliases.has(member)) return;
+							const declarations = snapshots.get(statement) ?? [];
+							declarations.push(`const ${name} = ${this.emit(member, PLAIN)};`);
+							snapshots.set(statement, declarations);
+							aliases.set(member, name);
+						}),
 				);
 				if (captures.length) {
 					const indent = this.indentOf(node) + this.indentUnit;
