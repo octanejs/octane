@@ -942,7 +942,7 @@ class ModuleTransform {
 					'This JSX tag can resolve to a bare SVG import. Loading the SVG from .tsrx can produce an asset URL. Import and render the SVG in a React-owned .tsx component hosted by ReactCompat, or configure a native SVG loader for .tsrx.' +
 						(unknownSvgSlots.get(field.tagName) ?? '') +
 						(this.options.pathSvgAdapter
-							? ' For a supported path-only asset, run --svg-paths on the SVG file and verify the receiving renderer before using the native component.'
+							? ' For an asset with supported static geometry, run --svg-paths on the SVG file and verify the receiving renderer before using the native component.'
 							: ''),
 				);
 			}
