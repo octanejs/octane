@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { createRequire } from 'node:module';
+import { createRequire, isBuiltin } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
 
@@ -138,6 +138,70 @@ export function storeSources(
 		}
 	}
 
+	// A byte-identical helper can still reach a module whose renderer changed.
+	function originalHelper(file: string) {
+		const pending = [file];
+		const seen = new Set<string>();
+		let entry: ts.SourceFile | undefined;
+		while (pending.length) {
+			const current = pending.pop()!;
+			if (seen.has(current)) continue;
+			seen.add(current);
+			// A linked path may be selected for a rewrite under its physical name.
+			if (
+				fs.realpathSync(current) !== path.join(project, path.relative(root, current)) ||
+				fs.existsSync(current.slice(0, -3) + '.tsrx')
+			)
+				return;
+			const source = fs.readFileSync(current, 'utf8');
+			if (!unchanged(current, source)) return;
+			const sf = ts.createSourceFile(current, source, ts.ScriptTarget.Latest);
+			entry ??= sf;
+			function unsafe(node: ts.Node): boolean {
+				if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+					const spec = node.moduleSpecifier;
+					const typeOnly = ts.isImportDeclaration(node)
+						? node.importClause?.isTypeOnly
+						: node.isTypeOnly;
+					if (!spec || typeOnly) return false;
+					if (node.attributes || !ts.isStringLiteral(spec)) return true;
+					if (spec.text === 'node:module' || spec.text === 'module') return true;
+					const local = localFile(current, spec.text);
+					if (local) {
+						pending.push(local);
+						return false;
+					}
+					const resolved = ts.resolveModuleName(
+						spec.text,
+						current,
+						options,
+						ts.sys,
+						cache,
+					).resolvedModule;
+					if (!resolved) return !isBuiltin(spec.text);
+					if (!resolved.isExternalLibraryImport) return true;
+					const physical = fs.realpathSync(resolved.resolvedFileName);
+					return (
+						physical.startsWith(project + path.sep) &&
+						!physical.includes(path.sep + 'node_modules' + path.sep)
+					);
+				}
+				if (ts.isImportEqualsDeclaration(node)) return !node.isTypeOnly;
+				if (ts.isExpressionWithTypeArguments(node)) return unsafe(node.expression);
+				if (ts.isTypeNode(node)) return false;
+				if (
+					node.kind === ts.SyntaxKind.ImportKeyword ||
+					(ts.isMetaProperty(node) && node.keywordToken === ts.SyntaxKind.ImportKeyword) ||
+					(ts.isIdentifier(node) && (node.text === 'eval' || node.text === 'require'))
+				)
+					return true;
+				return !!ts.forEachChild(node, unsafe);
+			}
+			if (ts.forEachChild(sf, unsafe)) return;
+		}
+		return entry;
+	}
+
 	const helpers = new Map<string, Set<string>>();
 	function helperFunction(from: string, specifier: string, name: string) {
 		if (/^use[A-Z0-9]/.test(name) || /[!%?#\\]/.test(specifier)) return false;
@@ -147,15 +211,8 @@ export function storeSources(
 		if (!exported) {
 			exported = new Set();
 			helpers.set(file, exported);
-			// A linked path may be selected for a rewrite under its physical name.
-			if (
-				fs.realpathSync(file) !== path.join(project, path.relative(root, file)) ||
-				fs.existsSync(file.slice(0, -3) + '.tsrx')
-			)
-				return false;
-			const source = fs.readFileSync(file, 'utf8');
-			if (!unchanged(file, source)) return false;
-			const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest);
+			const sf = originalHelper(file);
+			if (!sf) return false;
 			for (const statement of sf.statements) {
 				if (
 					ts.isFunctionDeclaration(statement) &&

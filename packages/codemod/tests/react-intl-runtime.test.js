@@ -77,12 +77,15 @@ beforeAll(async () => {
 	await writeFile(path.join(project, 'choices.tsrx'), choices.code);
 	const rich = transformModule(
 		"import { FormattedMessage } from 'react-intl';\n" +
-			"export function Rich() { return <FormattedMessage id='rich' values={{bold: part => <strong key='emphasis' className='accent'>\n  {part}\n</strong>}} />; }",
+			"import { RawIntlProvider as Provider } from './react-intl.tsrx';\n" +
+			"export function Rich() { return <FormattedMessage id='rich' values={{bold: part => <strong key='emphasis' className='accent'>\n  {part}\n</strong>, person: (<span key='person' id='person'/>), lineBreak: <br/>}} />; }\n" +
+			'export function NativeRich({formatter}) { return <Provider value={formatter}><Rich/></Provider>; }',
 		'rich.tsx',
 		{
 			reactCompat: true,
 			unported: (name) => (name === 'react-intl' ? name : null),
 			reactIntlAdapter: './react-intl.tsrx',
+			reactStoreComponent: (name) => name === 'react-intl',
 		},
 	);
 	expect(rich.notes.filter((n) => n.severity === 'error')).toEqual([]);
@@ -304,14 +307,14 @@ it('renders scalar substitutions and localized host attributes like the original
 	}
 });
 
-it('hands a real React element from a migrated inline callback back to the unported library', async () => {
-	const { react, intl, reactRoot, OctaneCompat, Rich } = client;
-	const h = react.createElement;
-	const el = document.createElement('div');
-	const root = reactRoot(el);
-	const config = {
-		locale: 'en',
-		messages: { rich: '<outer><bold>Text</bold></outer>' },
+it('keeps React ownership of inline rich substitutions on the client and server', async () => {
+	const { react, reactRoot } = client;
+	const reference = document.createElement('div');
+	const migrated = document.createElement('div');
+	const roots = [reactRoot(reference), reactRoot(migrated)];
+	const config = (react, locale, text) => ({
+		locale,
+		messages: { rich: `<outer><bold>${text}</bold>{person}{lineBreak}</outer>` },
 		onWarn() {},
 		defaultRichTextElements: {
 			outer: (chunks) =>
@@ -320,32 +323,93 @@ it('hands a real React element from a migrated inline callback back to the unpor
 					return react.cloneElement(child, { title: 'From React', 'data-key': child.key });
 				}),
 		},
-	};
-	try {
-		await react.act(async () =>
-			root.render(h(intl.IntlProvider, config, h(OctaneCompat, { component: Rich, props: {} }))),
-		);
-		const result = el.querySelector('strong.accent');
-		expect(result.textContent).toBe('Text');
-		expect(result.title).toBe('From React');
-		const observedKey = result.getAttribute('data-key');
-		await react.act(async () =>
-			root.render(
-				h(
-					intl.IntlProvider,
-					config,
-					h(intl.FormattedMessage, {
+	});
+	const display = ({ react, intl, OctaneCompat, Rich }, locale, text, migrated) => {
+		const h = react.createElement;
+		return h(
+			intl.IntlProvider,
+			config(react, locale, text),
+			migrated
+				? h(OctaneCompat, { component: Rich, props: {} })
+				: h(intl.FormattedMessage, {
 						id: 'rich',
-						values: { bold: (part) => h('strong', { key: 'emphasis', className: 'accent' }, part) },
+						values: {
+							bold: (part) => h('strong', { key: 'emphasis', className: 'accent' }, part),
+							person: h('span', { key: 'person', id: 'person' }),
+							lineBreak: h('br'),
+						},
 					}),
-				),
-			),
 		);
-		expect(observedKey).toBe(el.querySelector('strong').getAttribute('data-key'));
+	};
+	const observed = (host) =>
+		Array.from(host.querySelectorAll('strong, #person, br'), (node) => [
+			node.localName,
+			node.className,
+			node.textContent,
+			node.title,
+			node.getAttribute('data-key'),
+		]);
+	try {
+		for (const [locale, text] of [
+			['en', 'Text'],
+			['fr', 'Texte'],
+		]) {
+			await react.act(async () => {
+				roots[0].render(display(client, locale, text, false));
+				roots[1].render(display(client, locale, text, true));
+			});
+			expect(observed(migrated).map(([tag, , content]) => [tag, content])).toEqual([
+				['strong', text],
+				['span', ''],
+				['br', ''],
+			]);
+			const expected = observed(reference);
+			expect(observed(migrated)).toEqual(expected);
+			const ssr = await server.prerender(server.NativeRich, {
+				formatter: server.intl.createIntl(config(server.react, locale, text)),
+			});
+			for (const html of [server.renderToString(display(server, locale, text, false)), ssr.html]) {
+				const markup = document.createElement('template');
+				markup.innerHTML = html;
+				expect(observed(markup.content)).toEqual(expected);
+			}
+		}
 	} finally {
-		await react.act(async () => root.unmount());
+		await react.act(async () => roots.forEach((root) => root.unmount()));
 	}
 });
+
+it.each([
+	['a custom JSX runtime', '/** @jsxImportSource custom-renderer */', 'id="rich"', ''],
+	['an effectful attribute', '', 'id={read()}', ''],
+	['an effectful substitution', '', 'id="rich"', ', sibling: read()'],
+	['an attributed import', '', 'id="rich"', '', ' with {variant: "other"}'],
+])(
+	'keeps a diagnostic for an inline rich value with %s',
+	(_label, pragma, id, sibling, attributes = '') => {
+		const result = transformModule(
+			`${pragma}
+		import {FormattedMessage} from 'react-intl'${attributes};
+		let phase = "before";
+		function read() { return phase; }
+		function Frame({children}) { phase = "after"; return <div>{children}</div>; }
+		export function Rich() {
+			phase = "before";
+			return <Frame><FormattedMessage ${id} values={{break: <br/>${sibling}}}/></Frame>;
+		}`,
+			'rich.tsx',
+			{
+				reactCompat: true,
+				unported: (name) => (name === 'react-intl' ? name : null),
+				reactIntlAdapter: './react-intl.tsrx',
+				reactStoreComponent: (name) => name === 'react-intl',
+			},
+		);
+		expect(result.notes).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+	},
+);
 
 it('keeps forwarded accessibility labels in sync with React across locale and element changes', async () => {
 	const { react, intl, reactRoot, OctaneCompat, Label } = client;

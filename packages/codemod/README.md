@@ -50,6 +50,8 @@ bundler plugin and `tsconfig` over to Octane and install the dependencies.
 | `strict-mode` | `<StrictMode>…</StrictMode>` | its children (Octane's is a pass-through) |
 | `react-compat` | `<Toaster position="top-right" />` from a React package with no Octane port | `<ReactCompat><Toaster position="top-right" /></ReactCompat>`, rendered by React |
 
+React submit event annotations become Octane's native `NativeEvent<T, globalThis.SubmitEvent>` or its `EventHandler`. Uses of the synthetic event, an untyped target, or an event passed into another function need review. A callback's `currentTarget` still refers to the listener's element.
+
 Every rewrite keeps React's behavior. Where it cannot be proven equal, the code
 is left alone: `{count && <X />}` stays a hole, because React renders `0` there
 and `@if` would not. A strict TypeScript project can prove that a guard's value
@@ -200,13 +202,13 @@ When an application has React Intl 7, React and React DOM 19.2 or later in the 1
 
 Named `useIntl` imports can move when a component reads its locale or calls a supported scalar formatter. A provider's rich-text defaults can make `formatMessage` return React elements even with zero substitution values. For these calls the codemod follows local constants to known text or comparison uses, including ARIA attributes on intrinsic elements, input placeholders, image alt text, and option labels. Escaping formatters and unproven renderable results retain a binding diagnostic.
 
-For a literal message descriptor with optional scalar substitutions, the codemod also follows the result through local components and directly imported named components selected in the same run. For example, a field can read its disabled state and forward a localized placeholder through a props spread to a native input. The codemod checks the uses of the props object on every branch, including when the caller supplies a fallback label. This sibling-property check assumes ordinary data props and defers when either module accesses object prototypes. A wrapper that gives the formatted value or its props bag to a custom renderer still needs review.
+For a literal message descriptor with optional scalar substitutions, the codemod also follows the result through local components and directly imported named components selected in the same run. For example, a field can read its disabled state and forward a localized placeholder through a props spread to a native input. The codemod checks the uses of the props object on every branch, including when the caller supplies a fallback label. This sibling-property check assumes ordinary data props and defers when either module accesses object prototypes. A wrapper that gives the formatted value or its props bag to a custom renderer still needs review. When both selected functions return their markup directly, the prop can also pass through one named attribute on an imported function before reaching the native attribute.
 
 Self-closing `FormattedMessage` elements can render text directly, including ICU substitutions such as `values={{ count }}` when the named values are scalar and evaluating them keeps JSX in its original renderer. Custom text wrappers and provider-defined rich content use the installed React component. Supported React display islands receive the nearest real Intl context. A React-hosted Octane component reads the original provider. A standalone Octane root uses the generated `IntlProvider` or `RawIntlProvider`. The codemod moves providers with a closed subtree of native elements and scalar children. Providers surrounding other components need a review of which renderer owns their descendants. React islands retain the [ReactCompat rendering limits](../../docs/react-compat.md).
 
 Inside an authored `ReactCompat` boundary, a single original React component can be selected by a ternary that supplies different props on either branch. A namespaced bridge becomes a named import so the compiler can transport that child. Lists, optional children, and JSX-valued props require a React component to own their rendering.
 
-Inside a retained React component, an inline rich-text callback such as `chunks => <strong>{chunks}</strong>` can keep producing a genuine React element. The codemod recognizes a single native tag with literal attributes and an optional literal key. Its child can be the callback parameter on its own line. Captured values, spreads, refs, and event handlers keep their migration diagnostic.
+Inside a retained React component, a rich-text callback such as `chunks => <strong>{chunks}</strong>` can keep producing a genuine React element. When the codemod creates a React island for `FormattedMessage`, an inline substitution such as `values={{ lineBreak: <br /> }}` also stays in React if the other props and substitutions cannot observe a change in evaluation timing. The codemod recognizes a single intrinsic tag with literal attributes and an optional literal key. Callbacks can use their parameter as the sole child. Spreads, refs, and event handlers retain a migration diagnostic.
 
 ## Store hooks in linked workspace packages
 
@@ -224,7 +226,7 @@ Hosted components inherit the original React provider. To render a converted com
 
 The codemod checks how each component uses the hook. Conditions, scalar output, and dependency comparisons can qualify. This includes branded primitive IDs, conditional choices of verified inputs, and named re-exports of the original store handle from local TypeScript modules. A named method on the returned store can take an imported handle created by that store’s verified factory, followed by literals or constants initialized with literals. The codemod also checks how the method result is used.
 
-A verified hook result can also go to a named function exported directly from an unchanged local TypeScript module. The call must run inside a React effect, its cleanup, or an inline click handler on an intrinsic element in the component’s rendered output. For example, `useEffect(() => { syncSettings(store, 'startup'); }, [store])` keeps the same function and store. The other arguments must be literal data or local constants initialized with literals, and the call must discard the result. Calls during render and callbacks passed to custom components need review.
+A verified hook result can also go to a named function exported directly from an unchanged local TypeScript module whose local runtime dependencies also remain unchanged. The call must run inside a React effect, its cleanup, or an inline click handler on an intrinsic element in the component’s rendered output. For example, `useEffect(() => { syncSettings(store, 'startup'); }, [store])` keeps the same function and store. The other arguments must be literal data or local constants initialized with literals, and the call must discard the result. Calls during render and callbacks passed to custom components need review.
 
 When the file uses the project’s React 19.2+ automatic JSX runtime, a service read with a verified handle can receive a self-closing component from an installed React package with literal props, for example `store.read(notices).show(<Message id="saved" />)`. The generated code creates the original React element, so the service can render it later under its React provider.
 
@@ -363,7 +365,7 @@ export function useCellValue(definition) {
 }
 ```
 
-When an effect with dependencies such as `[controller]` reads `controller.value` or calls `controller.start()`, Strong migration can preserve the original object-identity dependency. It attempts this for immutable receivers and verifies the result with the project compiler.
+When an effect with dependencies such as `[controller]` reads `controller.value` or calls `controller.start()`, Strong migration can preserve the original object-identity dependency. For an unused dependency such as `revision` in `[controller, revision]`, the codemod can emit `void revision` inside the effect so a revision change still triggers cleanup and setup. It attempts these rewrites for immutable bindings and verifies the resulting dependencies with the project compiler.
 
 For a component that already receives an Octane writable signal, Strong migration can
 replace `useSyncExternalStore(notify => cell.subscribe(notify), () => cell.get(), () => cell.get())`
