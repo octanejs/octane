@@ -50,6 +50,8 @@ bundler plugin and `tsconfig` over to Octane and install the dependencies.
 | `strict-mode` | `<StrictMode>…</StrictMode>` | its children (Octane's is a pass-through) |
 | `react-compat` | `<Toaster position="top-right" />` from a React package with no Octane port | `<ReactCompat><Toaster position="top-right" /></ReactCompat>`, rendered by React |
 
+React submit event annotations become Octane's native `NativeEvent<T, globalThis.SubmitEvent>` or its `EventHandler`. Uses of the synthetic event, an untyped target, or an event passed into another function need review. A callback's `currentTarget` still refers to the listener's element.
+
 Every rewrite keeps React's behavior. Where it cannot be proven equal, the code
 is left alone: `{count && <X />}` stays a hole, because React renders `0` there
 and `@if` would not. A strict TypeScript project can prove that a guard's value

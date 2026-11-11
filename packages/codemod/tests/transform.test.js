@@ -425,6 +425,278 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		expect(transformModule(shadowed, 'b.ts').code).toBe(shadowed);
 	});
 
+	it('migrates React submit events and keeps the browser event type reachable', () => {
+		const { code, notes } = transformModule(
+			`import type * as R from 'react';
+			import type {SubmitEvent as Submission, SubmitEventHandler as SubmitHandler} from 'react';
+			export type BrowserSubmit = SubmitEvent;
+			export type NativeEvent = 'first';
+			export type OctaneNativeEvent = 'local';
+			export type ReactSubmit = R.SubmitEvent<HTMLFormElement>;
+			export function Form() {
+				const submit: SubmitHandler<HTMLFormElement> = (event) => {
+					event.preventDefault();
+					event.stopPropagation();
+				};
+				function reset(event: Submission<HTMLFormElement>) {
+					event.currentTarget.reset();
+				}
+				return <form onSubmit={submit} onSubmitCapture={reset}/>;
+			}`,
+			'form.tsx',
+		);
+		expect(notes.filter((n) => n.severity === 'error')).toEqual([]);
+		expect(code).toContain('NativeEvent as OctaneNativeEvent_');
+		expect(code).toContain(
+			'EventHandler<OctaneNativeEvent_<HTMLFormElement, globalThis.SubmitEvent>>',
+		);
+		expect(code).toContain('type BrowserSubmit = SubmitEvent');
+		expect(code).toContain("type OctaneNativeEvent = 'local'");
+		expect(code).toContain(
+			'type ReactSubmit = OctaneNativeEvent_<HTMLFormElement, globalThis.SubmitEvent>',
+		);
+		expect(code).toContain('event.preventDefault()');
+		expect(code).toContain('event.stopPropagation()');
+		expect(code).toContain('event.currentTarget.reset()');
+	});
+
+	it('rewrites React submit types without changing script scope', () => {
+		const { code, notes } = transformModule(
+			`type Submit = import('react').SubmitEventHandler;
+			type Plain = React.SubmitEvent;`,
+			'form-types.ts',
+		);
+		const native = "import('octane').NativeEvent<globalThis.Element, globalThis.SubmitEvent>";
+		expect(notes.filter((n) => n.severity === 'error')).toEqual([]);
+		expect(code).toContain("type Submit = import('octane').EventHandler<" + native + '>');
+		expect(code).toContain('type Plain = ' + native);
+		expect(code).not.toMatch(/^import type/m);
+	});
+
+	it('retains synthetic operations in a contextually typed React submit handler for review', () => {
+		const { code, notes } = transformModule(
+			`import type {SubmitEventHandler as Submission} from 'react';
+			const submit: Submission<HTMLFormElement> = (event) => event.nativeEvent;
+			export function Form() { return <form onSubmit={submit}/>; }`,
+			'form.tsx',
+		);
+		expect(code).toContain('event.nativeEvent');
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'event-object', severity: 'error' }),
+		);
+	});
+
+	it.each(['React.SubmitEvent | null', '(React.SubmitEvent)'])(
+		'checks synthetic reads with a wrapped %s annotation',
+		(type) => {
+			const { notes } = transformModule(
+				`export function Form() {
+					return <form onSubmit={(event: ${type}) => event?.isDefaultPrevented()}/>;
+				}`,
+				'form.tsx',
+			);
+			expect(notes).toContainEqual(
+				expect.objectContaining({ rule: 'event-object', severity: 'error' }),
+			);
+		},
+	);
+
+	it.each([
+		'let submit: Submit; submit = (event) => event.isDefaultPrevented();',
+		'const callbacks: {onSubmit: Submit} = {onSubmit(event) { event.isDefaultPrevented(); }}; const submit = callbacks.onSubmit;',
+		'function make(): Submit { return (event) => event.isDefaultPrevented(); } const submit = make();',
+		'function keep(handler: Submit) { return handler; } const submit = keep((event) => event.isDefaultPrevented());',
+		'const config = {handler: null as any as Submit}; config.handler = (event) => event.isDefaultPrevented(); const submit = config.handler;',
+		'const config = {handler: null as any as React.SubmitEventHandler}; config.handler = (event) => event.isDefaultPrevented(); const submit = config.handler;',
+		'const submit: Submit = (event: any) => event.isDefaultPrevented();',
+		'const submit: Submit = async (event) => { await 0; event.currentTarget.getAttribute("name"); };',
+	])('checks contextual submit handlers in %s', (body) => {
+		const { notes } = transformModule(
+			`import type {SubmitEventHandler as Submit} from 'react';
+			${body}
+			export function Form() { return <form onSubmit={submit}/>; }`,
+			'form.tsx',
+		);
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'event-object', severity: 'error' }),
+		);
+	});
+
+	it.each(['Submit', 'R.SubmitEventHandler', "import('react').SubmitEventHandler"])(
+		'checks a forwarded JSX callback typed as %s',
+		(handler) => {
+			const { notes } = transformModule(
+				`import type {SubmitEventHandler as Submit} from 'react';
+			import type * as R from 'react';
+			function Inner(props: {onSubmit: ${handler}<HTMLFormElement>}) {
+				return <form onSubmit={props.onSubmit}/>;
+			}
+			export function Form() {
+				return <Inner onSubmit={(event) => event.isDefaultPrevented()}/>;
+			}`,
+				'form.tsx',
+			);
+			expect(notes).toContainEqual(
+				expect.objectContaining({ rule: 'event-object', severity: 'error' }),
+			);
+		},
+	);
+
+	it('keeps the handler itself and its props bag distinct from the submit event', () => {
+		const { code, notes } = transformModule(
+			`import type {SubmitEventHandler as Submit} from 'react';
+			function forward(callback: Submit<HTMLFormElement>) { register(callback); }
+			export function Form(props: {onSubmit: Submit<HTMLFormElement>}) {
+				forward(props.onSubmit);
+				return <form onSubmit={props.onSubmit}/>;
+			}`,
+			'form.tsx',
+		);
+		expect(notes.filter((n) => n.severity === 'error')).toEqual([]);
+		expect(code).toContain('register(callback)');
+	});
+
+	it.each(['SubmitEvent', 'SubmitEventHandler'])(
+		'keeps the React %s import type when globalThis is shadowed',
+		(name) => {
+			const { code, notes } = transformModule(
+				`declare namespace globalThis { type Element = string; type SubmitEvent = string; }
+			export type Submit = import('react').${name}<HTMLFormElement>;`,
+				'form-types.ts',
+			);
+			expect(code).toContain(`import('react').${name}<HTMLFormElement>`);
+			expect(notes.filter((n) => n.rule === 'unsupported-api')).toEqual([
+				expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+			]);
+		},
+	);
+
+	it('retains a React submit event re-export for review', () => {
+		const source = "export type {SubmitEvent as Submit} from 'react';";
+		const { code, notes } = transformModule(source, 'form-types.ts');
+		expect(code).toBe(source);
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+		);
+	});
+
+	it('migrates sibling exports and keeps comments on the React submit type re-export', () => {
+		const { code, notes } = transformModule(
+			"export { /* hook */ useState, /* event */ type SubmitEvent as Submission } from 'react';\n" +
+				"export type {SubmitEventHandler, ReactNode as Node} from 'react';",
+			'form-types.ts',
+		);
+		expect(code).toMatch(/export \{\s*\/\* hook \*\/ useState,?\s*\} from 'octane';/);
+		expect(code).toMatch(
+			/export \{\s*\/\* event \*\/ type SubmitEvent as Submission\s*\} from 'react';/,
+		);
+		expect(code).toMatch(/export type \{\s*ReactNode as Node\s*\} from 'octane';/);
+		expect(
+			notes.filter((note) => note.rule === 'unsupported-api' && note.severity === 'error'),
+		).toHaveLength(2);
+	});
+
+	it.each([
+		`const handlers: { submit: Submit; change: (v: {value: string}) => void } = {
+			submit(e) { e.isDefaultPrevented(); },
+			change(v) { inspect(v.value); },
+		};`,
+		`const handlers: readonly [React.SubmitEventHandler, (v: {value: string}) => void] = [
+			(e) => e.isDefaultPrevented(),
+			(v) => inspect(v.value),
+		];`,
+		`const handlers: Array<import('react').SubmitEventHandler> = [
+			(e) => e.isDefaultPrevented(),
+		];`,
+		`const handlers = ({
+			submit(e: any) { e.isDefaultPrevented(); },
+			change(v) { inspect(v.value); },
+		}) as { submit: Submit; change: (v: {value: string}) => void };`,
+		`const handlers: Readonly<[Submit, (v: {value: string}) => void]> = [
+			(e) => e.isDefaultPrevented(),
+			(v) => inspect(v.value),
+		];`,
+		'const submit: NonNullable<Submit | undefined> = (e) => e.isDefaultPrevented();',
+		'type Identity<T> = T; const submit: Identity<Submit> = (e) => e.isDefaultPrevented();',
+	])('checks only the submit handler in a typed callback collection', (body) => {
+		const { notes } = transformModule(
+			`import type {SubmitEventHandler as Submit} from 'react';
+			${body}`,
+			'form.tsx',
+		);
+		expect(
+			notes.filter((note) => note.rule === 'event-object' && note.severity === 'error'),
+		).toHaveLength(1);
+	});
+
+	it('checks the imported submit type without treating a local React type as synthetic', () => {
+		const { notes } = transformModule(
+			`declare namespace React { interface SubmitEvent { value: string } }
+			function local(event: React.SubmitEvent) { inspect(event.value); }
+			export function native(event: import('react').SubmitEvent) { event.isDefaultPrevented(); }`,
+			'form.tsx',
+		);
+		expect(
+			notes.filter((note) => note.rule === 'event-object' && note.severity === 'error'),
+		).toHaveLength(1);
+	});
+
+	it('checks escaped React imports and avoids a decoded marker-name collision', () => {
+		const { notes } = transformModule(
+			String.raw`import type {Submit\u0045vent as Event} from 'react';
+			function submit<__octaneSubm\u0069tEvent>(e: Event | any) { e.isDefaultPrevented(); }`,
+			'form.tsx',
+		);
+		expect(
+			notes.filter((note) => note.rule === 'event-object' && note.severity === 'error'),
+		).toHaveLength(1);
+	});
+
+	it('keeps type projections that select synthetic-only submit members for review', () => {
+		const { notes } = transformModule(
+			`import type {SubmitEvent as Submission} from 'react';
+			type Event = Submission<HTMLFormElement>;
+			export type ReactPersist = Pick<Event, 'persist'>;
+			export type ReactNative = Event['nativeEvent'];
+			export type Form = Pick<Event, 'currentTarget'>;
+			function submit(event: ReactPersist) { event.persist(); }`,
+			'form-types.ts',
+		);
+		expect(
+			notes.filter((note) => note.rule === 'unsupported-api' && note.severity === 'error'),
+		).toHaveLength(2);
+		expect(
+			notes.filter((note) => note.rule === 'event-object' && note.severity === 'error'),
+		).toHaveLength(1);
+	});
+
+	it.each([
+		'event.target.elements',
+		'event.constructor === globalThis.SubmitEvent',
+		'event.currentTarget = document.createElement("form")',
+		'queueMicrotask(() => event.eventPhase)',
+		'queueMicrotask(() => event.currentTarget.reset())',
+		'event.isDefaultPrevented()',
+		'event.isPropagationStopped()',
+		'event.persist()',
+		'event.nativeEvent.submitter',
+		'event["target"]',
+		'publish(event)',
+		'publish(event.preventDefault)',
+		'(() => { const {target} = event; return target; })()',
+	])('reports unsupported React submit event behavior for %s', (expression) => {
+		const { notes } = transformModule(
+			`import type { SubmitEvent as Submission } from 'react';
+			type FormSubmitEvent = Submission<HTMLFormElement>;
+			function submit(event: FormSubmitEvent) { ${expression}; }
+			export function Form() { return <form onSubmit={submit}/>; }`,
+			'form.tsx',
+		);
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'event-object', severity: 'error' }),
+		);
+	});
+
 	it('marks a component that reads its `children` as an element `descriptorChildren`', () => {
 		const migrate = (/** @type {string} */ source) => transformModule(source, 'tip.tsx');
 		// Base UI clones `render`; React hands the component an element.
