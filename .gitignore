@@ -5,6 +5,7 @@ node_modules
 /docs/plans/
 dist
 dist-redact
+dist-rspack
 build
 .output
 *.tsbuildinfo

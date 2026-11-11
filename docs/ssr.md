@@ -632,7 +632,8 @@ its match tree). `module server` functions are executed through
 `executeServerFunction`. For a custom server (see `examples/hacker-news`), write
 your own `entry-server.ts` around `prerender()` or the streaming renderers and
 serialize any app data (for example a dehydrated query-client cache) into your
-own inline script.
+own inline script. A custom server serves `module server` functions with
+`createServerFunctions` ([below](#module-server-functions-in-a-custom-server)).
 
 Development SSR validates native HTML element nesting while it renders,
 including relationships that cross component boundaries. When the browser
@@ -879,6 +880,38 @@ export default defineConfig({
 
 The page renders its store's `dehydrate()` output into its own script, and the
 browser's store starts from it: route state is not serialized automatically.
+
+### `module server` functions in a custom server
+
+A server that does its own routing, such as one that also renders React pages,
+serves `module server` functions with `createServerFunctions` from
+`@octanejs/app-core/server-functions`. It works under any bundler that compiles
+`.tsrx` for the server: `octane/compiler/vite`, `@octanejs/rspack-plugin`, or
+an Octane integration. Pass the server build of each module that declares a
+`module server` block, keyed by its path from the project root, as the compiler
+names it:
+
+```ts
+import { createServerFunctions } from '@octanejs/app-core/server-functions';
+import * as data from './data.tsrx';
+
+const functions = createServerFunctions({
+	modules: { '/src/data.tsrx': data },
+	middlewares: [authenticate],
+});
+
+async function fetch(request: Request): Promise<Response> {
+	// A browser's call, with the same origin checks, body limit and middleware as an Octane app.
+	const call = functions.handle(request);
+	if (call) return call;
+	// Anything else runs through the middleware too, so the server functions a
+	// page render calls run in process under the viewer it authenticated.
+	return functions.respond(request, (context) => renderPage(context));
+}
+```
+
+`examples/shelf` serves `octane/data` this way, with the same server built by
+Vite and by Rspack.
 
 For a strict CSP, middleware can set the documented `Context.state` key. The
 raw nonce is passed to the core renderer and safely attribute-escaped on the
