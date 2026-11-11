@@ -836,6 +836,15 @@ it('requires an imported application handle to come from the original shared fac
 it('retains the bindings diagnostic for wrapped keys that can dispatch into React', async () => {
 	const pane = (name) => `import {useSnapshot} from 'observer'; import {${name}} from './handles';
 		export function Pane() {const store=useSnapshot();return <b>{String(store.get(${name}))}</b>;}`;
+	const typedKeys = [
+		'parenthesized',
+		'asserted',
+		'present',
+		'satisfied',
+		'wrappedCallee',
+		'instantiatedCallee',
+		'directObject',
+	];
 	const { app } = project({
 		'observer/public-store.ts': "export {valueOf,key} from './state';",
 		'observer/state.ts': `export function valueOf(x){return x;}
@@ -843,16 +852,34 @@ it('retains the bindings diagnostic for wrapped keys that can dispatch into Reac
 				return value === 'fixed' ? Object.freeze({value}) : {read:()=>value};}`,
 		'app/src/handles.ts': `import {key} from 'observer/core'; import {useState} from 'react';
 			function wrap(value){return key(value);}
-			function wrapKey(value: string): string {return key(value) as string;}
+			function wrapKey<T extends string>(value: T): string {return key(value) as string;}
 			export const changed=wrap('changed'), fixed=wrap('fixed'), callback=wrap(()=>useState('callback')[0]);
-			export const primitive = wrapKey('primitive');`,
+			export const primitive = wrapKey('primitive');
+			export const parenthesized = (wrapKey('primitive'));
+			export const asserted = wrapKey('primitive') as string;
+			export const present = wrapKey('primitive')!;
+			export const satisfied = wrapKey('primitive') satisfies string;
+			export const wrappedCallee = (wrapKey)('primitive');
+			export const instantiatedCallee = (wrapKey<string>)('primitive');
+			export const directObject = (key('fixed') as object);`,
 		'app/src/change.ts': `import {changed} from './handles'; import {useState} from 'react';
 			changed.read=()=>useState('changed')[0];`,
 		'app/src/public.ts': "export {fixed,primitive} from './handles';",
+		'app/src/attributed-public.ts':
+			"export {primitive as viaAttributes} from './handles' with {mode:'custom'};",
 		'app/src/changed.tsx': pane('changed'),
 		'app/src/fixed.tsx': pane('fixed'),
 		'app/src/callback.tsx': pane('callback'),
 		'app/src/primitive.tsx': pane('primitive').replace("'./handles'", "'./public'"),
+		...Object.fromEntries(typedKeys.map((name) => ['app/src/' + name + '.tsx', pane(name)])),
+		'app/src/attributed.tsx': pane('primitive').replace(
+			"'./handles';",
+			"'./handles' with {mode:'custom'};",
+		),
+		'app/src/attributedReexport.tsx': pane('viaAttributes').replace(
+			"'./handles'",
+			"'./attributed-public'",
+		),
 		'app/src/alias.tsx': `import {useSnapshot} from 'observer';
 			import {changed as queued,changed as direct} from './handles'; import './change';
 			export function Pane(){const store=useSnapshot();const later=async()=>{await 0;store.get(queued);};
@@ -879,9 +906,17 @@ it('retains the bindings diagnostic for wrapped keys that can dispatch into Reac
 	expect(renderToStaticMarkup(createElement(reference.Root))).toBe(
 		'<b>changed</b><b>registered</b><b>callback</b><b>changed</b><b>primitive</b>',
 	);
-	const files = ['changed', 'fixed', 'callback', 'alias', 'primitive', 'awaited'].map(
-		(name) => 'src/' + name + '.tsx',
-	);
+	const files = [
+		'changed',
+		'fixed',
+		'callback',
+		'alias',
+		'primitive',
+		'awaited',
+		'attributed',
+		'attributedReexport',
+		...typedKeys,
+	].map((name) => 'src/' + name + '.tsx');
 	const result = await runCodemod(
 		files.map((file) => path.join(app, file)),
 		{ root: app, strong: true, verify: true, projectTypes: true },

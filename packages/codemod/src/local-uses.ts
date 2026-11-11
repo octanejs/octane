@@ -1036,14 +1036,14 @@ export function portableArguments(
 				d &&
 				ts.isImportSpecifier(d) &&
 				!d.isTypeOnly &&
-				!d.parent.parent.isTypeOnly &&
-				!d.parent.parent.parent.attributes
+				!d.parent.parent.isTypeOnly
 			) {
-				const spec = d.parent.parent.parent.moduleSpecifier;
+				const importDeclaration = d.parent.parent.parent;
+				const spec = importDeclaration.moduleSpecifier;
 				if (ts.isStringLiteral(spec)) {
 					const verdict = imported(spec.text, (d.propertyName ?? d.name).text);
 					if (verdict === 'reject') return false;
-					if (verdict) return true;
+					if (verdict && !importDeclaration.attributes) return true;
 				}
 			}
 		}
