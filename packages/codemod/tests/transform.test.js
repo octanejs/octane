@@ -605,12 +605,63 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		`const handlers: Array<import('react').SubmitEventHandler> = [
 			(e) => e.isDefaultPrevented(),
 		];`,
+		`const handlers = ({
+			submit(e: any) { e.isDefaultPrevented(); },
+			change(v) { inspect(v.value); },
+		}) as { submit: Submit; change: (v: {value: string}) => void };`,
+		`const handlers: Readonly<[Submit, (v: {value: string}) => void]> = [
+			(e) => e.isDefaultPrevented(),
+			(v) => inspect(v.value),
+		];`,
+		'const submit: NonNullable<Submit | undefined> = (e) => e.isDefaultPrevented();',
+		'type Identity<T> = T; const submit: Identity<Submit> = (e) => e.isDefaultPrevented();',
 	])('checks only the submit handler in a typed callback collection', (body) => {
 		const { notes } = transformModule(
 			`import type {SubmitEventHandler as Submit} from 'react';
 			${body}`,
 			'form.tsx',
 		);
+		expect(
+			notes.filter((note) => note.rule === 'event-object' && note.severity === 'error'),
+		).toHaveLength(1);
+	});
+
+	it('checks the imported submit type without treating a local React type as synthetic', () => {
+		const { notes } = transformModule(
+			`declare namespace React { interface SubmitEvent { value: string } }
+			function local(event: React.SubmitEvent) { inspect(event.value); }
+			export function native(event: import('react').SubmitEvent) { event.isDefaultPrevented(); }`,
+			'form.tsx',
+		);
+		expect(
+			notes.filter((note) => note.rule === 'event-object' && note.severity === 'error'),
+		).toHaveLength(1);
+	});
+
+	it('checks escaped React imports and avoids a decoded marker-name collision', () => {
+		const { notes } = transformModule(
+			String.raw`import type {Submit\u0045vent as Event} from 'react';
+			function submit<__octaneSubm\u0069tEvent>(e: Event | any) { e.isDefaultPrevented(); }`,
+			'form.tsx',
+		);
+		expect(
+			notes.filter((note) => note.rule === 'event-object' && note.severity === 'error'),
+		).toHaveLength(1);
+	});
+
+	it('keeps type projections that select synthetic-only submit members for review', () => {
+		const { notes } = transformModule(
+			`import type {SubmitEvent as Submission} from 'react';
+			type Event = Submission<HTMLFormElement>;
+			export type ReactPersist = Pick<Event, 'persist'>;
+			export type ReactNative = Event['nativeEvent'];
+			export type Form = Pick<Event, 'currentTarget'>;
+			function submit(event: ReactPersist) { event.persist(); }`,
+			'form-types.ts',
+		);
+		expect(
+			notes.filter((note) => note.rule === 'unsupported-api' && note.severity === 'error'),
+		).toHaveLength(2);
 		expect(
 			notes.filter((note) => note.rule === 'event-object' && note.severity === 'error'),
 		).toHaveLength(1);

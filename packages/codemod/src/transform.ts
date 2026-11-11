@@ -53,6 +53,12 @@ const PLAIN = { template: false };
 const DESCRIPTOR = { template: false, descriptor: true };
 /** The local component that wraps an element no island can host and throws its `error`. */
 const NO_PORT = 'NoOctanePort';
+const syntheticSubmitMembers = {
+	nativeEvent: 'unknown',
+	persist: '() => void',
+	isDefaultPrevented: '() => boolean',
+	isPropagationStopped: '() => boolean',
+};
 
 /** Rule names, as reported. */
 const RULE = {
@@ -568,6 +574,7 @@ function isComponentName(name: string) {
 class ModuleTransform {
 	readonly source: string;
 	readonly filename: string;
+	private submitParameters?: Set<ts.ParameterDeclaration>;
 	readonly options: TransformOptions;
 	readonly target: 'tsrx' | 'tsx';
 	readonly strong: boolean;
@@ -887,12 +894,13 @@ class ModuleTransform {
 			this.reactRendererBodies.set(element, tag + ', ' + props);
 		}
 		let hasEval = false;
-		const submitEvents = this.source.includes('SubmitEvent');
+		if (this.source.includes('SubmitEvent') || this.source.includes('\\u'))
+			this.submitParameters = this.indexSubmitParameters();
 		const fields: ts.JsxOpeningLikeElement[] = [];
 		/** Values read as an element: cloned, inspected, or a `render` prop. */
 		const elements: ts.Expression[] = [];
 		const visit = (node: ts.Node) => {
-			if (submitEvents && ts.isParameter(node)) this.checkSubmitParameter(node);
+			if (ts.isParameter(node) && this.submitParameters?.has(node)) this.checkSubmitParameter(node);
 			if (ts.isIdentifier(node) && declaresName(node)) this.declared.add(node.text);
 			if (this.options.pathSvgAdapter && ts.isIdentifier(node) && node.text === 'eval')
 				hasEval = true;
@@ -3303,186 +3311,178 @@ class ModuleTransform {
 		return name === 'SubmitEventHandler' ? `${type('EventHandler')}<${event}>` : event;
 	}
 
-	private hasSubmitType(
-		type: ts.TypeNode | undefined,
-		eventValue = false,
-		indices: readonly number[] = [],
-	) {
-		if (!type) return false;
-		let aliases: Set<ts.TypeAliasDeclaration> | undefined;
-		const submit = eventValue ? 'SubmitEvent' : 'SubmitEventHandler';
-		const visit = (node: ts.TypeNode, depth: number): boolean => {
-			if (ts.isParenthesizedTypeNode(node) || ts.isOptionalTypeNode(node))
-				return visit(node.type, depth);
-			if (ts.isTypeOperatorNode(node) && node.operator === ts.SyntaxKind.ReadonlyKeyword)
-				return visit(node.type, depth);
-			if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node))
-				return node.types.some((part) => visit(part, depth));
+	/** Let the isolated checker propagate the original React types through
+	 * assertions and contextual signatures, without changing ordinary binding. */
+	private indexSubmitParameters() {
+		const names = new Set<string>();
+		const edits: { start: number; end: number; handler: boolean }[] = [];
+		const original: ts.ParameterDeclaration[] = [];
+		const projections: ts.Node[] = [];
+		const projection = (node: ts.Node): [ts.TypeNode, ts.TypeNode] | undefined => {
+			if (ts.isIndexedAccessTypeNode(node)) return [node.objectType, node.indexType];
+			if (
+				ts.isTypeReferenceNode(node) &&
+				ts.isIdentifier(node.typeName) &&
+				node.typeName.text === 'Pick' &&
+				node.typeArguments?.length === 2
+			)
+				return [node.typeArguments[0], node.typeArguments[1]];
+		};
+		const replace = (name: string | null, first: ts.Node, last = first) => {
+			if (name === 'SubmitEvent' || name === 'SubmitEventHandler')
+				edits.push({
+					start: first.getStart(this.sf),
+					end: last.end,
+					handler: name === 'SubmitEventHandler',
+				});
+		};
+		const collect = (node: ts.Node) => {
+			if (ts.isIdentifier(node)) names.add(node.text);
+			if (ts.isParameter(node)) original.push(node);
+			if (projection(node)) projections.push(node);
 			if (ts.isTypeReferenceNode(node)) {
-				if (depth === indices.length && this.reactTypeName(node.typeName) === submit) return true;
-				const alias = ts.isIdentifier(node.typeName) && this.declarationOf(node.typeName);
-				if (alias && ts.isTypeAliasDeclaration(alias) && !aliases?.has(alias)) {
-					(aliases ??= new Set()).add(alias);
-					return visit(alias.type, depth);
-				}
-			}
-			if (depth < indices.length) {
-				if (ts.isArrayTypeNode(node)) return visit(node.elementType, depth + 1);
-				if (ts.isTupleTypeNode(node)) {
-					const index = indices[depth];
-					const member = node.elements[index];
-					if (
-						!member ||
-						node.elements
-							.slice(0, index + 1)
-							.some(
-								(element) =>
-									ts.isRestTypeNode(element) ||
-									(ts.isNamedTupleMember(element) && !!element.dotDotDotToken),
-							)
-					)
-						return false;
-					return visit(ts.isNamedTupleMember(member) ? member.type : member, depth + 1);
-				}
-				if (
-					ts.isTypeReferenceNode(node) &&
-					ts.isIdentifier(node.typeName) &&
-					['Array', 'ReadonlyArray'].includes(node.typeName.text) &&
-					this.declarationOf(node.typeName)?.getSourceFile().hasNoDefaultLib &&
-					node.typeArguments?.[0]
-				)
-					return visit(node.typeArguments[0], depth + 1);
-				return false;
-			}
-			if (!eventValue && ts.isFunctionTypeNode(node))
-				return this.hasSubmitType(node.parameters[0]?.type, true);
-			return (
+				replace(this.reactTypeName(node.typeName), node.typeName);
+			} else if (
 				ts.isImportTypeNode(node) &&
 				!node.isTypeOf &&
 				ts.isLiteralTypeNode(node.argument) &&
 				ts.isStringLiteral(node.argument.literal) &&
 				node.argument.literal.text === 'react' &&
-				!!node.qualifier &&
-				ts.isIdentifier(node.qualifier) &&
-				node.qualifier.text === submit
-			);
+				node.qualifier &&
+				ts.isIdentifier(node.qualifier)
+			) {
+				replace(node.qualifier.text, node, node.qualifier);
+			}
+			ts.forEachChild(node, collect);
 		};
-		return visit(type, 0);
-	}
-
-	private hasSubmitProperty(type: ts.Type | undefined, name: ts.Node, indices: readonly number[]) {
-		if (!ts.isIdentifier(name) && !ts.isStringLiteral(name) && !ts.isNumericLiteral(name))
-			return false;
-		return (
-			type?.getProperty(name.text)?.declarations?.some((declaration) => {
-				if (ts.isPropertySignature(declaration))
-					return this.hasSubmitType(declaration.type, false, indices);
-				return (
-					ts.isMethodSignature(declaration) &&
-					this.hasSubmitType(declaration.parameters[0]?.type, true)
-				);
-			}) ?? false
-		);
-	}
-
-	private isSubmitParameter(param: ts.ParameterDeclaration) {
-		if (this.hasSubmitType(param.type, true)) return true;
-		const handler = param.parent;
-		if (handler.parameters[0] !== param) return false;
-		if (ts.isArrowFunction(handler) || ts.isFunctionExpression(handler)) {
-			const type = this.checker.getContextualType(handler);
-			// With no module resolution, the checker still retains the name of a
-			// named import in contextual types, including JSX props and assignments.
-			const alias = type?.aliasSymbol;
-			if (alias) {
-				const declaration = this.checker.resolveName(
-					alias.name,
-					handler,
-					ts.SymbolFlags.Type | ts.SymbolFlags.Alias,
-					false,
-				)?.declarations?.[0];
-				if (
-					(declaration &&
-						ts.isImportSpecifier(declaration) &&
-						this.reactTypeName(declaration.name) === 'SubmitEventHandler') ||
-					(declaration &&
-						ts.isTypeAliasDeclaration(declaration) &&
-						this.hasSubmitType(declaration.type))
-				)
-					return true;
-			}
-			if (
-				type?.getCallSignatures().some((signature) => {
-					const parameter = signature.getDeclaration()?.parameters[0];
-					return this.hasSubmitType(parameter?.type, true);
-				})
-			)
-				return true;
-		}
-		let value: ts.Node = handler;
-		let context = value.parent;
-		const indices: number[] = [];
-		while (ts.isParenthesizedExpression(context) || ts.isArrayLiteralExpression(context)) {
-			if (ts.isArrayLiteralExpression(context)) {
-				const index = context.elements.findIndex((element) => element === value);
-				if (index < 0 || context.elements.slice(0, index).some(ts.isSpreadElement)) return false;
-				indices.unshift(index);
-			}
-			value = context;
-			context = value.parent;
-		}
-		const typed = (type: ts.TypeNode | undefined) => this.hasSubmitType(type, false, indices);
-		if (ts.isPropertyAssignment(context) && ts.isObjectLiteralExpression(context.parent))
-			return this.hasSubmitProperty(
-				this.checker.getContextualType(context.parent),
-				context.name,
-				indices,
-			);
-		if (ts.isObjectLiteralExpression(context) && ts.isMethodDeclaration(handler))
-			return this.hasSubmitProperty(this.checker.getContextualType(context), handler.name, indices);
-		if (
-			(ts.isVariableDeclaration(context) && context.initializer === value) ||
-			ts.isSatisfiesExpression(context) ||
-			ts.isAsExpression(context)
+		collect(this.sf);
+		if (!edits.length || (!original.length && !projections.length)) return undefined;
+		let markerName = '__octaneSubmit';
+		while (
+			[markerName, markerName + 'Event', markerName + 'Handler'].some((name) => names.has(name))
 		)
-			return typed(context.type);
-		if (ts.isJsxExpression(context) && ts.isJsxAttribute(context.parent)) {
-			const { name, parent } = context.parent;
-			const element = parent.parent;
-			const props = this.checker.getResolvedSignature(element)?.getParameters()[0];
-			return this.hasSubmitProperty(
-				props && this.checker.getTypeOfSymbolAtLocation(props, element),
-				name,
-				indices,
-			);
+			markerName += '_';
+		const event = markerName + 'Event';
+		const handler = markerName + 'Handler';
+
+		// Only replace type names that the original binder resolved to React.
+		// The virtual declarations stay out of both the emitted source and its checker.
+		const pieces: string[] = [];
+		let offset = 0;
+		for (const edit of edits.sort((a, b) => a.start - b.start)) {
+			pieces.push(this.source.slice(offset, edit.start), edit.handler ? handler : event);
+			offset = edit.end;
 		}
-		if (
-			ts.isBinaryExpression(context) &&
-			context.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-			context.right === value
-		) {
-			const target = ts.isPropertyAccessExpression(context.left) ? context.left.name : context.left;
-			const declaration = this.checker.getSymbolAtLocation(target)?.valueDeclaration;
-			if (declaration && ts.isPropertyAssignment(declaration))
-				return ts.isAsExpression(declaration.initializer) && typed(declaration.initializer.type);
-			return (
-				!!declaration &&
-				(ts.isVariableDeclaration(declaration) || ts.isPropertyDeclaration(declaration)) &&
-				typed(declaration.type)
-			);
+		pieces.push(this.source.slice(offset));
+		const analysis = pieces.join('');
+		const synthetic = Object.entries(syntheticSubmitMembers)
+			.map(([name, type]) => `${name}: ${type};`)
+			.join(' ');
+		const { sf, checker } = bind(
+			this.filename,
+			analysis +
+				`\ndeclare const ${markerName}: unique symbol;
+interface ${event}<T = unknown> { readonly [${markerName}]: true; currentTarget: T; ${synthetic} }
+type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'];
+`,
+		);
+		const declaration = sf.statements.at(-2);
+		if (!declaration || !ts.isInterfaceDeclaration(declaration) || declaration.name.text !== event)
+			return undefined;
+		const members = new Set<ts.Declaration>(
+			declaration.members.filter((member) => member.name?.getText(sf) !== 'currentTarget'),
+		);
+		const isEvent = (type: ts.Type): boolean =>
+			type.isUnionOrIntersection()
+				? type.types.some(isEvent)
+				: type
+						.getProperties()
+						.some((property) => property.declarations?.some((item) => members.has(item)));
+		const annotated = (type: ts.TypeNode, seen = new Set<ts.TypeAliasDeclaration>()): boolean => {
+			if (ts.isUnionTypeNode(type) || ts.isIntersectionTypeNode(type))
+				return type.types.some((member) => annotated(member, seen));
+			if (ts.isParenthesizedTypeNode(type)) return annotated(type.type, seen);
+			if (ts.isTypeReferenceNode(type)) {
+				const alias = checker.getSymbolAtLocation(type.typeName)?.declarations?.[0];
+				if (alias && ts.isTypeAliasDeclaration(alias) && !seen.has(alias)) {
+					seen.add(alias);
+					if (annotated(alias.type, seen)) return true;
+				}
+			}
+			return isEvent(checker.getTypeFromTypeNode(type));
+		};
+		const contextual = (fn: ts.SignatureDeclaration): ts.Type | undefined => {
+			if (ts.isArrowFunction(fn) || ts.isFunctionExpression(fn))
+				return checker.getContextualType(fn);
+			if (!ts.isMethodDeclaration(fn) || !ts.isObjectLiteralExpression(fn.parent)) return;
+			if (!ts.isIdentifier(fn.name) && !ts.isStringLiteral(fn.name)) return;
+			const object = fn.parent;
+			let parent = object.parent;
+			while (ts.isParenthesizedExpression(parent)) parent = parent.parent;
+			const type =
+				checker.getContextualType(object) ??
+				(ts.isAsExpression(parent) ||
+				ts.isSatisfiesExpression(parent) ||
+				ts.isTypeAssertionExpression(parent)
+					? checker.getTypeFromTypeNode(parent.type)
+					: undefined);
+			const property = type?.getProperty(fn.name.text);
+			return property && checker.getTypeOfSymbolAtLocation(property, fn);
+		};
+		const analyzed: ts.ParameterDeclaration[] = [];
+		const selections: [ts.TypeNode, ts.TypeNode][] = [];
+		const gather = (node: ts.Node) => {
+			if (ts.isParameter(node)) analyzed.push(node);
+			const selection = projection(node);
+			if (selection) selections.push(selection);
+			ts.forEachChild(node, gather);
+		};
+		for (const statement of sf.statements.slice(0, -3)) gather(statement);
+		const syntheticKey = (type: ts.Type): boolean =>
+			type.isUnion()
+				? type.types.some(syntheticKey)
+				: type.isStringLiteral() && Object.hasOwn(syntheticSubmitMembers, type.value);
+		if (selections.length === projections.length) {
+			for (const [index, [object, key]] of selections.entries()) {
+				const source = projections[index];
+				if (
+					(!ts.isTypeReferenceNode(source) ||
+						(ts.isIdentifier(source.typeName) &&
+							this.declarationOf(source.typeName)?.getSourceFile() === esLib())) &&
+					isEvent(checker.getTypeFromTypeNode(object)) &&
+					syntheticKey(checker.getTypeFromTypeNode(key))
+				)
+					this.note(
+						RULE.unsupported,
+						'error',
+						source,
+						'This submit event type selects a member available only on React synthetic events. Review the native annotation.',
+					);
+			}
 		}
-		if (ts.isReturnStatement(context))
-			return typed(ts.findAncestor(context, ts.isFunctionLike)?.type);
-		if (ts.isCallExpression(context)) {
-			const index = context.arguments.findIndex((argument) => argument === value);
-			const signature = this.checker.getResolvedSignature(context)?.getDeclaration();
-			return index !== -1 && typed(signature?.parameters[index]?.type);
+		// Type-name edits preserve the order and number of parameter declarations.
+		if (analyzed.length !== original.length) return undefined;
+		const result = new Set<ts.ParameterDeclaration>();
+		for (const [index, parameter] of analyzed.entries()) {
+			const fn = parameter.parent;
+			if (!('body' in fn) || !fn.body) continue;
+			if (
+				isEvent(checker.getTypeAtLocation(parameter)) ||
+				(parameter.type && annotated(parameter.type)) ||
+				(fn.parameters[0] === parameter &&
+					contextual(fn)
+						?.getCallSignatures()
+						.some((signature) => {
+							const first = signature.getParameters()[0];
+							return first && isEvent(checker.getTypeOfSymbolAtLocation(first, parameter));
+						}))
+			)
+				result.add(original[index]);
 		}
-		return ts.isArrowFunction(context) && context.body === value && typed(context.type);
+		return result;
 	}
 
 	private checkSubmitParameter(param: ts.ParameterDeclaration) {
-		if (!this.isSubmitParameter(param)) return;
 		const report = (node: ts.Node) =>
 			this.note(
 				RULE.eventObject,
@@ -3529,7 +3529,7 @@ class ModuleTransform {
 	isEventParameter(node: ts.Node) {
 		const found = this.parameterOf(node);
 		if (!found) return false;
-		if (this.source.includes('SubmitEvent') && this.isSubmitParameter(found.param)) return false;
+		if (this.submitParameters?.has(found.param)) return false;
 		const type = found.param.type;
 		if (type && ts.isTypeReferenceNode(type) && /Event$/.test(type.typeName.getText(this.sf))) {
 			return true;
