@@ -760,6 +760,46 @@ describe('octane/data pages', () => {
 		expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(allTitles(6));
 	});
 
+	it('keeps the later pages shown while an expired earlier page reloads', async () => {
+		const server = libraryServer();
+		let holding = false;
+		const held: Array<() => void> = [];
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				if (holding && request.kind === 'read') await new Promise<void>((go) => held.push(go));
+				return server.transport(request, signal);
+			},
+		});
+		// The library, whose values are never shown past 400 ms.
+		const brief = view({
+			name: library.name,
+			of: Book,
+			order: [['title', 'asc']],
+			limit: 3,
+			expire: 400,
+		});
+		const list = pages(store, brief);
+		list.subscribe(() => {});
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+		await new Promise((resolve) => setTimeout(resolve, 250));
+		await list.loadMore();
+		expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(allTitles(6));
+
+		// The first page expires and reloads while the second is still current.
+		holding = true;
+		await vi.waitFor(
+			() =>
+				expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(allTitles(6).slice(3)),
+			{ timeout: 300 },
+		);
+		expect(list.getSnapshot()).toMatchObject({ status: 'ready', refreshing: true, more: true });
+		holding = false;
+		held.splice(0).forEach((go) => go());
+		await vi.waitFor(() =>
+			expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(allTitles(6)),
+		);
+	});
+
 	it('keeps the joined list in order through an edit that moves a row to a later page', async () => {
 		const server = libraryServer();
 		const store = createDataStore({ transport: server.transport });

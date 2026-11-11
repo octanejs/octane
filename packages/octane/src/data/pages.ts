@@ -99,25 +99,25 @@ function createPages<P, T>(
 		const current = pages.map((page) => page.getSnapshot());
 		if (snapshot && current.every((part, index) => part === parts[index])) return snapshot;
 		parts = current;
-		const [first] = current;
+		const first = current[0]!;
+		const last = current[current.length - 1]!;
 		const rows: T[] = [];
-		let shown = 0;
-		// Pages show in order: one still loading hides the pages after it.
+		let holes = false;
+		// A page that is not ready, such as an expired one reloading, leaves only
+		// its own rows out: the pages after it are still current.
 		for (const part of current) {
-			if (part.status !== 'ready') break;
-			rows.push(...part.value!);
-			shown++;
+			if (part.status === 'ready') rows.push(...part.value!);
+			else if (part !== last) holes = true;
 		}
-		const last = current[shown - 1];
-		const next = current[shown];
+		const ready = current.some((part) => part.status === 'ready');
 		snapshot = {
-			status: first!.status,
-			value: first!.status === 'ready' ? rows : undefined,
-			error: next?.status === 'error' ? next.error : first!.error,
-			refreshing: current.some((part) => part.refreshing),
+			status: ready ? 'ready' : first.status,
+			value: ready ? rows : undefined,
+			error: current.find((part) => part.status === 'error')?.error ?? first.error,
+			refreshing: holes || current.some((part) => part.refreshing),
 			stale: current.some((part) => part.stale),
-			more: next === undefined ? (last?.more ?? false) : next.status !== 'pending',
-			loadingMore: shown > 0 && next?.status === 'pending',
+			more: last.status === 'ready' ? last.more : last.status === 'error',
+			loadingMore: current.length > 1 && last.status === 'pending',
 			loadMore,
 		};
 		return snapshot;
