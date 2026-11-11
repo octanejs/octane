@@ -66,6 +66,12 @@ keeps its React shape, but Octane's leaves the commit's `useEffect`s queued
 where React runs them before returning. React Three Fiber scenes need moving
 into `.three.tsrx` modules by hand.
 
+When an exported native host component begins setup with a call to an unselected
+local TypeScript hook, the codemod reports a binding error if the original named
+export begins by calling a named React import of `useState` or
+`useSyncExternalStore`. Give native callers a compiled Octane hook and retain the
+original for React callers.
+
 Every module with JSX becomes `.tsrx`, entries and helpers without a component
 included, so Strong mode can reach all of them; one that was JavaScript gains
 `// @ts-nocheck`, so it stays as unchecked as it was. Every import of a renamed

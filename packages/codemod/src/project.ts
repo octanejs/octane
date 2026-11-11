@@ -22,6 +22,7 @@ import { finding, loadCompiler, thrown } from './compiler.js';
 import { PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
 import { bind, projectTypeAt, textKind, transformModule } from './transform.js';
+import { directReactHooks } from './local-react-hook.js';
 import { forwardedProps } from './forwarded-props.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
@@ -319,7 +320,7 @@ export async function runCodemod(
 		/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(readInstalled(helperDir, 'octane')?.version ?? '')
 			? createScopedStorePlanner(helperDir, storeBridge, config ?? undefined)
 			: null;
-	const { inputFactory, helperFunction } = storeSources(root, config, (file, source) => {
+	const { inputFactory, helperFunction, localFile } = storeSources(root, config, (file, source) => {
 		if (
 			renames.has(file) ||
 			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject ||
@@ -340,6 +341,53 @@ export async function runCodemod(
 				resolveRename(file, specifier) ?? resolveBinding(specifier, new Map(), []),
 		}).changed;
 	});
+	const localHooks = new Map<string, Map<string, string>>();
+	let selectedInPlace: Set<string> | undefined;
+	function localReactHook(from: string, module: string, name: string) {
+		if (
+			catalogName(module) !== null ||
+			resolveRename(from, module) ||
+			/[!%?#\\]/.test(module) ||
+			ts.findConfigFile(path.dirname(from), ts.sys.fileExists) !== rootProject
+		)
+			return;
+		const file = localFile(from, module);
+		if (
+			!file ||
+			known.has(file) ||
+			path.basename(file) === 'index.ts' ||
+			fs.existsSync(file.slice(0, -3) + '.tsrx') ||
+			(path.extname(module) && !module.endsWith('.ts')) ||
+			fs.realpathSync(file) !== path.join(fs.realpathSync(root), path.relative(root, file)) ||
+			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject
+		)
+			return;
+		let hooks = localHooks.get(file);
+		if (!hooks) {
+			const source = fs.readFileSync(file, 'utf8');
+			hooks = new Map();
+			if (
+				(/\b(?:useState|useSyncExternalStore)\b/.test(source) || source.includes('\\u')) &&
+				originalModule(file, 'react') &&
+				readInstalled(path.dirname(file), 'react')?.manifest.name === 'react'
+			) {
+				const existing = program?.getSourceFile(file);
+				const bound =
+					existing && program
+						? { sf: existing, checker: program.getTypeChecker() }
+						: bind(file, source);
+				hooks = directReactHooks(bound.sf, bound.checker);
+			}
+			localHooks.set(file, hooks);
+		}
+		const hook = hooks.get(name);
+		if (!hook || fs.statSync(file).nlink > 1) return;
+		// Writing an unrenamed selection through a symlink changes its physical target.
+		selectedInPlace ??= new Set(
+			[...known].filter((f) => !renames.has(f) && !conflicts.has(f)).map((f) => fs.realpathSync(f)),
+		);
+		if (!selectedInPlace.has(fs.realpathSync(file))) return hook;
+	}
 	const checkedHelpers = new Map<string, { code: string; state: AdapterState; error?: string }>();
 	const generatedHelpers = new Map<string, string>();
 	const svgHelpers = new Set<string>();
@@ -569,6 +617,9 @@ export async function runCodemod(
 						ordinaryCaller,
 					),
 				resolveStoreHook,
+				localReactHook: renames.has(file)
+					? (module, name) => localReactHook(file, module, name)
+					: undefined,
 				strong,
 				strictNullChecks: strictConfig !== null,
 				get types() {

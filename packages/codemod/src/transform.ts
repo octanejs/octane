@@ -7,6 +7,7 @@ import {
 	svgLocalReads,
 } from './forwarded-props.js';
 import { reactRenderer, staticReactProps } from './react-renderer.js';
+import { nativeSetupHook } from './local-react-hook.js';
 import { localUses, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
@@ -2285,6 +2286,26 @@ class ModuleTransform {
 				const dest =
 					hook?.from ?? (this.nativeIntl.has(item) ? this.options.reactIntlAdapter : undefined);
 				if (!dest) {
+					const name = (item.propertyName ?? item.name).text;
+					if (
+						this.options.localReactHook &&
+						!node.attributes &&
+						!clause.isTypeOnly &&
+						!item.isTypeOnly &&
+						/^use[A-Z0-9]/.test(name)
+					) {
+						const call = this.localUses(item.name).find((ref) =>
+							nativeSetupHook(ref, this.localUses),
+						);
+						const hook = call && this.options.localReactHook(module, name);
+						if (hook)
+							this.note(
+								RULE.bindings,
+								'error',
+								call,
+								`The unchanged ${module} export ${name} calls React's ${hook}. Provide a compiled Octane hook for native callers or keep this component under a React renderer.`,
+							);
+					}
 					kept.push(item);
 					continue;
 				}
