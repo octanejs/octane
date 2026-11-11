@@ -1162,22 +1162,18 @@ class ModuleTransform {
 		unproven: (tag: ts.Identifier, prop: string) => void,
 	): boolean {
 		const typeOf = (node: ts.Node) => this.typeOf(node);
-		this.nativeSvgProps ??= forwardedProps(
-			this.sf,
-			this.checker,
-			{
-				imported: this.options.forwardedRender,
-				typeOf,
-				text: (ref) => textKind(typeOf(ref)) !== 0,
-			},
-			uses,
-		);
+		const destination = {
+			typeOf,
+			text: (node: ts.Node) => textKind(typeOf(node)) !== 0,
+			imported: this.options.forwardedRender,
+		};
+		this.nativeSvgProps ??= forwardedProps(this.sf, this.checker, destination, uses);
 		const slot = (tag: ts.Identifier, prop: string) => {
 			const known = this.nativeSvgProps!(this.checker.getSymbolAtLocation(tag), prop);
 			if (!known) unproven(tag, prop);
 			return known;
 		};
-		const first = nativeOutputOwner(element, slot, typeOf);
+		const first = nativeOutputOwner(element, slot, destination);
 		if (!first) return false;
 		const pending = [first];
 		const proven = (this.provenSvgOwners ??= new Set());
@@ -1236,7 +1232,7 @@ class ModuleTransform {
 				const owner = nativeOutputOwner(
 					ts.isJsxSelfClosingElement(tag) ? tag : tag.parent,
 					slot,
-					typeOf,
+					destination,
 				);
 				if (!owner) return false;
 				pending.push(owner);

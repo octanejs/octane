@@ -103,11 +103,16 @@ export function renderUses(refs: ts.Identifier[]) {
 	});
 }
 
+type RenderTypes = {
+	typeOf: (node: ts.Node) => ts.Type;
+	text: (node: ts.Node) => boolean;
+};
+
 /** Follow the value being rendered all the way to its containing component's return. */
 export function nativeOutputOwner(
 	value: ts.Node,
 	slot: (tag: ts.Identifier, prop: string) => boolean,
-	typeOf: (node: ts.Node) => ts.Type,
+	{ typeOf, text }: RenderTypes,
 ) {
 	for (;;) {
 		const parent = value.parent;
@@ -173,14 +178,53 @@ export function nativeOutputOwner(
 		}
 		if (!(
 			ts.isJsxFragment(parent) ||
-			(ts.isJsxExpression(parent) && !parent.dotDotDotToken) ||
+			(ts.isJsxExpression(parent) &&
+				!parent.dotDotDotToken &&
+				(ts.isJsxAttribute(parent.parent) || !text(value))) ||
 			ts.isParenthesizedExpression(parent) ||
 			(ts.isConditionalExpression(parent) && parent.condition !== value) ||
 			(ts.isBinaryExpression(parent) &&
 				parent.right === value &&
-				parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken)
+				(parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
+					parent.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken))
 		))
 			return;
+		value = parent;
+	}
+}
+
+// Logical operators can return the original value. Follow them to the test
+// that consumes it, or to a rendered && whose left operand only gates its right.
+function testsPresence(value: ts.Node, rendered: (node: ts.Node) => boolean): boolean {
+	for (;;) {
+		const parent = value.parent;
+		if (ts.isBinaryExpression(parent)) {
+			const op = parent.operatorToken.kind;
+			if (op === ts.SyntaxKind.AmpersandAmpersandToken || op === ts.SyntaxKind.BarBarToken) {
+				if (
+					op === ts.SyntaxKind.AmpersandAmpersandToken &&
+					parent.left === value &&
+					rendered(parent)
+				)
+					return true;
+			} else {
+				const other = parent.left === value ? parent.right : parent.left;
+				return (
+					other.kind === ts.SyntaxKind.NullKeyword &&
+					(op === ts.SyntaxKind.EqualsEqualsToken ||
+						op === ts.SyntaxKind.ExclamationEqualsToken ||
+						op === ts.SyntaxKind.EqualsEqualsEqualsToken ||
+						op === ts.SyntaxKind.ExclamationEqualsEqualsToken)
+				);
+			}
+		} else if (!ts.isParenthesizedExpression(parent)) {
+			return (
+				(ts.isPrefixUnaryExpression(parent) &&
+					parent.operator === ts.SyntaxKind.ExclamationToken) ||
+				(ts.isConditionalExpression(parent) && parent.condition === value) ||
+				(ts.isIfStatement(parent) && parent.expression === value)
+			);
+		}
 		value = parent;
 	}
 }
@@ -218,11 +262,9 @@ export function forwardedProps(
 	checker: ts.TypeChecker,
 	destination:
 		| 'text'
-		| {
+		| (RenderTypes & {
 				imported?: (module: string, name: string, prop: string, depth: number) => boolean;
-				text: (ref: ts.Identifier) => boolean;
-				typeOf: (node: ts.Node) => ts.Type;
-		  },
+		  }),
 	uses = localUses(file, checker),
 	ordinaryProps = !hasPrototypeAccess(file),
 ) {
@@ -300,21 +342,35 @@ export function forwardedProps(
 		const refs = references(binding.name);
 		if (destination !== 'text') {
 			// Direct destructuring prevents another call from observing this slot through the props object.
-			return (
-				!binding.bag &&
-				!fn.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) &&
-				!fn.asteriskToken &&
-				refs.length > 0 &&
-				refs.every(
-					(ref) =>
-						!destination.text(ref) &&
-						nativeOutputOwner(
-							ref,
-							(tag, slot) => accepts(checker.getSymbolAtLocation(tag), slot, true, depth + 1),
-							destination.typeOf,
-						) === fn,
+			if (
+				binding.bag ||
+				fn.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) ||
+				fn.asteriskToken
+			)
+				return false;
+			const rendered = (node: ts.Node) =>
+				nativeOutputOwner(
+					node,
+					(tag, slot) => accepts(checker.getSymbolAtLocation(tag), slot, true, depth + 1),
+					destination,
+				) === fn;
+			let hasRender = false;
+			for (const ref of refs) {
+				if (!destination.text(ref) && rendered(ref)) {
+					hasRender = true;
+					continue;
+				}
+				// Implicit children can be a truthy render body even when empty.
+				// A forwarded slot may have started as children in another component.
+				if (
+					depth !== 0 ||
+					prop === 'children' ||
+					!testsPresence(ref, rendered) ||
+					ts.findAncestor(ref, ts.isFunctionLike) !== fn
 				)
-			);
+					return false;
+			}
+			return hasRender;
 		}
 		return (
 			refs.length > 0 &&
