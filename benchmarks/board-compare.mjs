@@ -23,13 +23,27 @@ function suiteRatios(dir, suite, baseCol) {
   const d = JSON.parse(fs.readFileSync(f));
   const targets = {};
   for (const t of d.targets ?? []) targets[t.name] = t.ops ?? {};
-  const solidKey = Object.keys(targets).find(k => k === "solid" || k.startsWith("solid"));
-  const baseKey = Object.keys(targets).find(k => k === baseCol || k.startsWith(baseCol));
-  if (!solidKey || !baseKey) return null;
+  // Pair Solid with the baseline inside each target group. Most suites have
+  // one group (targets named `solid`, `octane-tsrx`, ...); some prefix a
+  // workload (ssr-throughput: `news-50/solid` beside `news-50/octane-tsrx`).
+  // An exact name wins over a prefix match, so uibench's `solid` is
+  // compared, not `solid-reconcile`.
+  const groups = new Map();
+  for (const k of Object.keys(targets)) {
+    const i = k.lastIndexOf("/");
+    const g = i < 0 ? "" : k.slice(0, i + 1);
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(k.slice(i + 1));
+  }
+  const pick = (names, want) => names.find(n => n === want) ?? names.find(n => n.startsWith(want));
   const rs = [];
-  for (const [op, v] of Object.entries(targets[solidKey])) {
-    const b = targets[baseKey][op];
-    if (v?.score && b?.score) rs.push(v.score / b.score);
+  for (const [g, names] of groups) {
+    const s = pick(names, "solid"), b = pick(names, baseCol);
+    if (!s || !b) continue;
+    for (const [op, v] of Object.entries(targets[g + s])) {
+      const w = targets[g + b][op];
+      if (v?.score && w?.score) rs.push(v.score / w.score);
+    }
   }
   return rs.length ? geo(rs) : null;
 }
