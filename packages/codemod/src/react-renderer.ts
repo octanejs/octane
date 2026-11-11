@@ -31,19 +31,17 @@ export function staticReactProps(element: ts.JsxSelfClosingElement) {
 	return '{ ' + props.join(', ') + ' }';
 }
 
-/** A closed callback in an inline options object. Its React caller owns the argument. */
+/** A React-owned value or renderer in an inline options object. */
 export function reactRenderer(property: ts.ObjectLiteralElementLike) {
 	if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(property.name)) return;
-	const arrow = property.initializer;
+	const initializer = property.initializer;
+	const arrow = ts.isArrowFunction(initializer) ? initializer : null;
 	if (
-		!ts.isArrowFunction(arrow) ||
-		arrow.modifiers ||
-		arrow.type ||
-		arrow.typeParameters ||
-		arrow.parameters.length > 1
+		arrow &&
+		(arrow.modifiers || arrow.type || arrow.typeParameters || arrow.parameters.length > 1)
 	)
 		return;
-	const param = arrow.parameters[0];
+	const param = arrow?.parameters[0];
 	if (
 		param &&
 		(!ts.isIdentifier(param.name) ||
@@ -54,8 +52,9 @@ export function reactRenderer(property: ts.ObjectLiteralElementLike) {
 			param.modifiers)
 	)
 		return;
-	let body = arrow.body;
+	let body = arrow?.body ?? initializer;
 	while (ts.isParenthesizedExpression(body)) body = body.expression;
+	if (!arrow && !ts.isJsxSelfClosingElement(body)) return;
 	const tag = ts.isJsxElement(body)
 		? body.openingElement
 		: ts.isJsxSelfClosingElement(body)
@@ -99,6 +98,7 @@ export function reactRenderer(property: ts.ObjectLiteralElementLike) {
 	} else if (param) return;
 	return {
 		body,
+		value: arrow === null,
 		args:
 			JSON.stringify(tag.tagName.text) +
 			', { ' +
