@@ -98,6 +98,95 @@ describe('bare-left @for row bindings', () => {
 		]);
 	});
 
+	it.each([
+		['inline', client.ReadOnceRows],
+		['folded', client.ReadOnceFoldedRows],
+	] as const)(
+		'%s rows share the destructured value between key selection and output',
+		(_, Component) => {
+			const row = (prefix: string) => {
+				let reads = 0;
+				return {
+					get id() {
+						return `${prefix}-${++reads}`;
+					},
+				};
+			};
+			const view = mount(Component, { rows: [row('a'), row('b')], scope: 'list' });
+			cleanups.push(() => view.unmount());
+			const [a, b] = view.findAll('li');
+			expect(text([a, b])).toEqual(['a-1', 'b-1']);
+
+			view.update(Component, { rows: [row('b'), row('a')], scope: 'list' });
+			expect(text(view.findAll('li'))).toEqual(['b-1', 'a-1']);
+			expectAdopted(view.findAll('li'), [b, a]);
+		},
+	);
+
+	it('updates a stable keyed row when a newly bound value changes', () => {
+		let label = 'first';
+		const row = {
+			id: 'stable',
+			get label() {
+				return label;
+			},
+		};
+		const view = mount(client.ReadOnceRows, { rows: [row], scope: 'list' });
+		cleanups.push(() => view.unmount());
+		const node = view.find('li');
+		expect(node.textContent).toBe('first');
+
+		label = 'second';
+		view.update(client.ReadOnceRows, { rows: [row], scope: 'list' });
+		expect(view.find('li')).toBe(node);
+		expect(node.textContent).toBe('second');
+	});
+
+	it('adopts a stateful row using the same destructured values as the server', () => {
+		const props = () => {
+			let reads = 0;
+			return {
+				rows: [
+					{
+						id: 'row',
+						get label() {
+							return `label-${++reads}`;
+						},
+					},
+				],
+				onPick: () => {},
+			};
+		};
+		const host = container(renderToString(server.Rows, props()).html);
+		const button = host.querySelector('button')!;
+		expect(button.textContent).toBe('label-1 0');
+
+		const errors: unknown[] = [];
+		const root = hydrateRoot(host, client.Rows, props(), {
+			onRecoverableError: (error) => errors.push(error),
+		});
+		cleanups.push(() => root.unmount());
+		flushSync(() => {});
+		expect(host.querySelector('button')).toBe(button);
+		expect(button.textContent).toBe('label-1 0');
+		expect(errors).toEqual([]);
+		flushSync(() => button.click());
+		expect(button.textContent).toBe('label-1 1');
+	});
+
+	it('keeps a default closure in the row binding scope while evaluating the key', () => {
+		const props = { rows: [{ id: 1 }] };
+		const host = container(renderToString(server.KeyedDefault, props).html);
+		const node = host.querySelector('li');
+		expect(node?.textContent).toBe('2');
+
+		const root = hydrateRoot(host, client.KeyedDefault, props);
+		cleanups.push(() => root.unmount());
+		flushSync(() => {});
+		expect(host.querySelector('li')).toBe(node);
+		expect(node?.textContent).toBe('2');
+	});
+
 	it('server-renders rows and hydrates them in place', () => {
 		const props = { rows: [{ id: 'x', label: 'first' }, { id: 'y' }], onPick: () => {} };
 		const host = container(renderToString(server.Rows, props).html);
