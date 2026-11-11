@@ -60,6 +60,8 @@ export const addBook = write({
 	draft: (input, id) => ({ id, title: input.title, read: false }),
 	/** The reply is the saved book, so the lists take it without reloading. */
 	record: (book) => book,
+	/** A native form can submit it, so adding works before hydration and without JavaScript. */
+	form: { title: 'text' },
 	invalidates: ['shelf'],
 });
 
@@ -76,6 +78,7 @@ export const removeBook = write({
 	name: 'books.remove',
 	input: bookShape.pick({ id: true }),
 	removes: Book,
+	form: { id: 'text' },
 	invalidates: ['shelf'],
 });
 

@@ -1,10 +1,19 @@
 /** @jsxImportSource react */
 import { Suspense, useState, useSyncExternalStore, Component, type ReactNode } from 'react';
-import { DataProvider, useRead } from 'octane/data/react';
-import { addBook, books, finished, removeBook, setRead, stats } from '../shared/contracts.ts';
+import { DataProvider, useForm, useRead } from 'octane/data/react';
+import {
+	addBook,
+	books,
+	finished,
+	removeBook,
+	setRead,
+	stats,
+	type Book,
+} from '../shared/contracts.ts';
 import {
 	ACCOUNTS,
 	checkSaved,
+	formMessage,
 	namespaceFrom,
 	openSession,
 	outcomeText,
@@ -44,13 +53,7 @@ function BookList({ session }: { session: Session }) {
 						/>
 						<span>{book.title}</span>
 					</label>
-					<button
-						type="button"
-						aria-label={`Remove ${book.title}`}
-						onClick={() => submit(session, (store) => store.write(removeBook, { id: book.id }))}
-					>
-						Remove
-					</button>
+					<RemoveForm session={session} book={book} />
 				</li>
 			))}
 		</ul>
@@ -76,24 +79,40 @@ function FinishedList() {
 	);
 }
 
+/** A native form per row: removing works before hydration and without JavaScript. */
+function RemoveForm({ session, book }: { session: Session; book: Book }) {
+	const remove = useForm(removeBook, book.id);
+	return (
+		<form {...remove.attrs} onSubmit={(event) => submit(session, () => remove.submit(event))}>
+			{remove.hidden({ id: book.id })}
+			<button aria-label={`Remove ${book.title}`}>Remove</button>
+		</form>
+	);
+}
+
+/**
+ * Posts natively until hydrated, then through the store. A refused submission
+ * keeps what was typed and shows why, after either path.
+ */
 function AddForm({ session }: { session: Session }) {
-	const [title, setTitle] = useState('');
+	const add = useForm(addBook);
+	const message = formMessage(add, 'title');
 	return (
 		<form
 			className="add"
-			onSubmit={(event) => {
-				event.preventDefault();
-				setTitle('');
-				void submit(session, (store) => store.write(addBook, { title }));
-			}}
+			{...add.attrs}
+			onSubmit={(event) => submit(session, () => add.submit(event))}
 		>
+			{add.hidden()}
 			<input
+				name="title"
 				aria-label="Book title"
+				aria-invalid={message ? 'true' : undefined}
 				placeholder="Add a book"
-				value={title}
-				onChange={(event) => setTitle(event.currentTarget.value)}
+				defaultValue={add.values.title ?? ''}
 			/>
 			<button type="submit">Add</button>
+			{message && <p className="field-error">{message}</p>}
 		</form>
 	);
 }

@@ -41,7 +41,13 @@ nav button[aria-pressed='true'] {
 }
 .add {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 0.5rem;
+}
+.field-error {
+	flex-basis: 100%;
+	margin: 0;
+	color: #b3261e;
 }
 .add input {
 	flex: 1;
