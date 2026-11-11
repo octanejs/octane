@@ -556,6 +556,40 @@ describe('octane/data persistent cache', () => {
 		expect(third.log).toEqual(['read shelf']);
 	});
 
+	it('saves marks again after storage fails to save them', async () => {
+		const inner = memoryStorage();
+		let failMarks = false;
+		const storage: PersistentStorage = {
+			...inner,
+			commit(partition, put, remove) {
+				// The marks are the only value saved under their partition's own name.
+				if (failMarks && put[0]?.meta.key === partition) {
+					failMarks = false;
+					return Promise.reject(new Error('quota exceeded'));
+				}
+				return inner.commit(partition, put, remove);
+			},
+		};
+		const first = server(books());
+		const before = createDataStore({ transport: first.transport, persist: cache(storage, 'ada') });
+		(await value(before, shelf)).stop();
+		await saved();
+
+		failMarks = true;
+		const writer = createDataStore({ transport: first.transport, persist: cache(storage, 'ada') });
+		await writer.write(setRead, { id: 'a', read: true });
+		await saved();
+		expect(failMarks).toBe(false);
+		// Any later save writes the marks that failed.
+		(await value(writer, count)).stop();
+		await saved();
+
+		const remote = server(first.books);
+		const after = createDataStore({ transport: remote.transport, persist: cache(storage, 'ada') });
+		await value(after, shelf);
+		await vi.waitFor(() => expect(remote.log).toContain('read shelf'));
+	});
+
 	it('marks saved values stale when the app invalidates their tag, though nothing loaded them', async () => {
 		const storage = memoryStorage();
 		const tally = read({ name: 'count', output: count.output, tags: ['count'], fresh: 60_000 });

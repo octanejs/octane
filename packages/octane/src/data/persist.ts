@@ -369,7 +369,10 @@ export function createPersistence(
 				lastUsed: now,
 				version: '',
 			};
-			await storage.commit(marksPartition, [{ meta, value }], []).catch(() => {});
+			await storage.commit(marksPartition, [{ meta, value }], []).catch(() => {
+				// Marks keep restored values honest, so a failed save is tried again at the next one.
+				marksChanged = true;
+			});
 		}
 	}
 
