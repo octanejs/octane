@@ -43,7 +43,8 @@ beforeAll(async () => {
 		`import { useIntl, FormattedMessage } from 'react-intl';
 		export function Fields({count}: {count: number}) {
 			const intl = useIntl();
-			return <section><input placeholder={intl.formatMessage({id:'hint'})} />
+			const { 'locale': language } = useIntl();
+			return <section lang={language}><input placeholder={intl.formatMessage({id:'hint'})} />
 				<FormattedMessage id="count" values={{count}} /></section>;
 		}`,
 		'fields.tsx',
@@ -266,6 +267,7 @@ it('renders scalar substitutions and localized host attributes like the original
 	const roots = [reactRoot(reference), reactRoot(migrated)];
 	const rendered = (host) => [
 		host.querySelector('input').placeholder,
+		host.querySelector('section').lang,
 		host.querySelector('section').textContent,
 	];
 	try {
@@ -284,13 +286,16 @@ it('renders scalar substitutions and localized host attributes like the original
 					: undefined,
 				onWarn() {},
 			};
-			const original = () =>
-				h(
+			const original = () => {
+				const formatter = intl.useIntl();
+				const { locale: language } = intl.useIntl();
+				return h(
 					'section',
-					null,
-					h('input', { placeholder: intl.useIntl().formatMessage({ id: 'hint' }) }),
+					{ lang: language },
+					h('input', { placeholder: formatter.formatMessage({ id: 'hint' }) }),
 					h(intl.FormattedMessage, { id: 'count', values: { count } }),
 				);
+			};
 			await react.act(async () => {
 				roots[0].render(h(intl.IntlProvider, config, h(original)));
 				roots[1].render(

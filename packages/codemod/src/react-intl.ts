@@ -271,12 +271,22 @@ export function intlImports(
 			return false;
 		if (readsScalar(call)) return true;
 		const decl = call.parent;
+		if (
+			!ts.isVariableDeclaration(decl) ||
+			decl.initializer !== call ||
+			!(ts.getCombinedNodeFlags(decl) & ts.NodeFlags.Const)
+		)
+			return false;
+		if (ts.isIdentifier(decl.name)) return uses(decl.name).every(readsScalar);
+		if (!ts.isObjectBindingPattern(decl.name) || decl.name.elements.length !== 1) return false;
+		const [binding] = decl.name.elements;
+		const key = binding.propertyName ?? binding.name;
 		return (
-			ts.isVariableDeclaration(decl) &&
-			decl.initializer === call &&
-			ts.isIdentifier(decl.name) &&
-			!!(ts.getCombinedNodeFlags(decl) & ts.NodeFlags.Const) &&
-			uses(decl.name).every(readsScalar)
+			!binding.dotDotDotToken &&
+			!binding.initializer &&
+			ts.isIdentifier(binding.name) &&
+			(ts.isIdentifier(key) || ts.isStringLiteral(key)) &&
+			key.text === 'locale'
 		);
 	}
 	for (const item of candidates) {

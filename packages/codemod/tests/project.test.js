@@ -2100,6 +2100,42 @@ export function Greeting({ count }: { count: number }) {
 		}
 		return root;
 	}
+	it('migrates a locale binding and retains diagnostics for other formatter bindings', async () => {
+		const patterns = [
+			'{ locale }',
+			'{ locale, ...rest }',
+			"{ ['locale']: locale }",
+			'{ locale = fallback() }',
+			'{ formatMessage: locale }',
+		];
+		const sources = Object.fromEntries(
+			patterns.map((pattern, i) => [
+				`src/Locale${i}.tsx`,
+				`import {useIntl} from 'react-intl';
+			 export function Locale() { const ${pattern} = useIntl(); return <p lang={locale}/>; }`,
+			]),
+		);
+		const root = setup(sources);
+		const { files } = await runCodemod(
+			Object.keys(sources).map((file) => path.join(root, file)),
+			{
+				root,
+				write: false,
+				strong: true,
+				projectTypes: false,
+			},
+		);
+		for (const [i, file] of Object.keys(sources).entries()) {
+			const result = files.find((result) => result.file === file);
+			const errors = [...result.notes, ...result.diagnostics].filter((d) => d.severity === 'error');
+			if (i === 0) {
+				expect(result.strong).toBe(true);
+				expect(errors).toEqual([]);
+			} else {
+				expect(errors).toContainEqual(expect.objectContaining({ rule: 'bindings' }));
+			}
+		}
+	});
 	it('checks the actual selected component before forwarding a formatted attribute', async () => {
 		const root = setup({
 			'tsconfig.json': JSON.stringify({ compilerOptions: { paths: { '@ui/*': ['./src/*'] } } }),
