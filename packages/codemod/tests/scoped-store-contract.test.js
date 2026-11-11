@@ -359,7 +359,7 @@ export function Pane() { const value = useReading(); return <p>{valueOf(1)}{valu
 	);
 }, 30_000);
 
-it('preserves the original handle and active store across client writes, provider changes and SSR', async () => {
+it('preserves the original handle and passes the active store to unchanged helpers at effect and click time', async () => {
 	const { app } = project({
 		'observer/public-store.ts': "export { valueOf, key } from './state';",
 		'observer/state.ts':
@@ -370,19 +370,30 @@ it('preserves the original handle and active store across client writes, provide
 			function outer(value) { return inner(value); }
 			function inner(value) { return create(value); }
 			export const reading = outer(1);`,
+		'app/src/record.ts': `export const calls = new WeakMap<Map<object, string>, string[]>();
+			export function record(store: Map<object, string>, phase: string) {
+				calls.set(store, [...(calls.get(store) ?? []), phase]);
+			}`,
 		'app/src/pane.tsx': `import {useSnapshot} from 'observer'; import {reading} from './handles';
+			import {useEffect, useLayoutEffect} from 'react'; import {record as publish} from './record';
 			export function Pane() {
 				const store = useSnapshot();
-				return <button onClick={() => { store.set(reading, 'updated'); }}>{String(store.get(reading))}</button>;
+				useEffect(() => { publish(store, 'effect'); }, [store]);
+				useLayoutEffect(() => { return () => { publish(store, 'cleanup'); }; }, [store]);
+				return <button onClick={() => { publish(store, 'click'); store.set(reading, 'updated'); }}>{String(store.get(reading))}</button>;
 			}`,
 	});
 	const input = path.join(app, 'src/pane.tsx');
-	const result = await runCodemod([input], {
+	const helper = path.join(app, 'src/record.ts');
+	const originalHelper = fs.readFileSync(helper);
+	fs.copyFileSync(input, path.join(app, 'src/reference.tsx'));
+	const result = await runCodemod([input, helper], {
 		root: app,
 		strong: true,
 		verify: true,
 		write: true,
 	});
+	expect(fs.readFileSync(helper)).toEqual(originalHelper);
 	const pane = result.files.find((file) => file.file === 'src/pane.tsx');
 	expect([...pane.notes, ...pane.diagnostics].filter((item) => item.severity === 'error')).toEqual(
 		[],
@@ -396,16 +407,29 @@ it('preserves the original handle and active store across client writes, provide
 		import {Pane} from './pane.tsrx';
 		export function Root({store}) @{ <NativeStoreProvider context={current} value={store}><Pane/></NativeStoreProvider> }`,
 	);
-	const entry = "export {Root} from './src/provider.tsrx'; export {reading} from './src/handles';";
+	const entry = `export {Root} from './src/provider.tsrx'; export {reading} from './src/handles';
+		export {calls} from './src/record'; export {current} from '../observer/renderer';
+		export {Pane as Reference} from './src/reference.tsx';`;
 	const dom = installDOM();
 	try {
+		const { createElement, act } = await import('react');
+		const { createRoot } = await import('react-dom/client');
+		const { renderToStaticMarkup } = await import('react-dom/server');
+		const reference = (module, store) =>
+			createElement(module.current.Provider, { value: store }, createElement(module.Reference));
 		const server = await bundleRuntime(
 			app,
 			'server',
 			entry + "export {renderToString} from 'octane/server';",
 		);
 		const serverStore = new Map([[server.reading, 'server']]);
-		expect(server.renderToString(server.Root, { store: serverStore }).html).toContain('server');
+		const parsed = document.createElement('template');
+		parsed.innerHTML = server.renderToString(server.Root, { store: serverStore }).html;
+		expect(parsed.content.querySelector('button').textContent).toBe('server');
+		const expected = document.createElement('template');
+		expected.innerHTML = renderToStaticMarkup(reference(server, serverStore));
+		expect(parsed.content.textContent).toBe(expected.content.textContent);
+		expect(server.calls.has(serverStore)).toBe(false);
 		expect(serverStore.get(server.reading)).toBe('server');
 		const client = await bundleRuntime(
 			app,
@@ -414,23 +438,36 @@ it('preserves the original handle and active store across client writes, provide
 		);
 		const host = document.createElement('div');
 		const root = client.createRoot(host);
+		const reactHost = document.createElement('div');
+		const reactRoot = createRoot(reactHost);
 		try {
 			const first = new Map([[client.reading, 'first']]);
 			const second = new Map([[client.reading, 'second']]);
-			for (const [store, expected] of [
-				[first, 'first'],
-				[second, 'second'],
+			const firstReact = new Map(first);
+			const secondReact = new Map(second);
+			for (const [store, reactStore, expected] of [
+				[first, firstReact, 'first'],
+				[second, secondReact, 'second'],
 			]) {
 				await client.act(async () => root.render(client.Root, { store }));
+				await act(async () => reactRoot.render(reference(client, reactStore)));
 				expect(host.textContent).toBe(expected);
+				expect(host.textContent).toBe(reactHost.textContent);
 				await client.act(async () => host.querySelector('button').click());
+				await act(async () => reactHost.querySelector('button').click());
 				expect(store.get(client.reading)).toBe('updated');
+				expect(store.get(client.reading)).toBe(reactStore.get(client.reading));
 				expect(store.size).toBe(1);
+				expect(client.calls.get(store)).toEqual(['effect', 'click']);
+				expect(client.calls.get(store)).toEqual(client.calls.get(reactStore));
 			}
+			expect(client.calls.get(first)).toEqual(['effect', 'click', 'cleanup']);
+			expect(client.calls.get(first)).toEqual(client.calls.get(firstReact));
 			await client.act(async () => root.render(client.Root, { store: first }));
 			expect(host.textContent).toBe('updated');
 		} finally {
 			await client.act(async () => root.unmount());
+			await act(async () => reactRoot.unmount());
 		}
 	} finally {
 		dom.window.close();
@@ -470,6 +507,80 @@ function noticeProject(files) {
 		...files,
 	});
 }
+
+it('defers workspace helpers when the renderer, arguments, callee or returned value can change behavior', async () => {
+	const click = (call) => `return <button onClick={() => { ${call}; }}/>;`;
+	const cases = {
+		render: ['./render-read', 'run(store); return <button/>;'],
+		memo: ['./render-read', 'useMemo(() => run(store), [store]); return <button/>;'],
+		'called-prop': [
+			'./render-read',
+			'const button = <button onClick={() => {run(store);}}/>; button.props.onClick(); return <i/>;',
+		],
+		'called-builder': [
+			'./render-read',
+			'function Build() { return <button onClick={() => {run(store);}}/>; } Build().props.onClick(); return <i/>;',
+		],
+		composite: ['./command', 'return <Action onClick={() => { run(store); }}/>;'],
+		named: [
+			'./command',
+			'const handleClick = () => { run(store); }; return <button onClick={handleClick}/>;',
+		],
+		opaque: ['vendor-command', click('run(store)')],
+		reexport: ['./barrel', click('run(store)')],
+		sibling: ['./split', click('run(store)')],
+		payload: ['./command', click('run(store, make(<b/>))')],
+		escape: ['./command', click('consume(run(store))')],
+	};
+	const inputs = Object.fromEntries(
+		Object.entries(cases).map(([name, [from, body]]) => [
+			'app/src/' + name + '.tsx',
+			`import {useSnapshot} from 'observer'; import {useMemo} from 'react'; import {Action} from 'notices';
+			import {run} from '${from}';
+			export function Pane({make, consume}) { const store = useSnapshot(); ${body} }`,
+		]),
+	);
+	inputs['app/src/asserted.tsx'] =
+		`import {useSnapshot} from 'observer'; import {run} from './command';
+		export function Pane({name}: {name:string}) { const store = useSnapshot(); return <button onClick={() => {run(store,name);}}/>; }`;
+	inputs['app/src/nested/leaf.tsx'] =
+		`import {useSnapshot} from 'observer'; import {useEffect} from 'react'; import {run} from '../command';
+		export function Pane() { const store = useSnapshot(); useEffect(() => {run(store);}, [store]); return <b/>; }`;
+	const command =
+		'export function run(store: Map<string, unknown>, payload?: unknown) { store.set("last", payload); return store; }';
+	const { app } = noticeProject({
+		...inputs,
+		'app/src/asserted-caller.tsx': `import {Pane} from './asserted';
+			export function App() { return <Pane name={<i/> as unknown as string}/>; }`,
+		'app/src/nested/tsconfig.json': JSON.stringify({
+			extends: '../../tsconfig.json',
+			compilerOptions: { paths: { react: ['./eager.ts'] } },
+		}),
+		'app/src/nested/eager.ts': 'export function useEffect(callback: () => void) { callback(); }',
+		'app/src/command.ts': command,
+		'app/src/barrel.ts': "export {run} from './command';",
+		'app/src/split.ts': command,
+		'app/src/split.js': 'export function run() { return null; }',
+		'node_modules/vendor-command/package.json':
+			'{"name":"vendor-command","type":"module","main":"index.js","types":"index.d.ts"}',
+		'node_modules/vendor-command/index.js': 'export function run(store) { return store; }',
+		'node_modules/vendor-command/index.d.ts': 'export function run<T>(store:T):T;',
+		'app/src/render-read.ts':
+			"import {useId} from 'react'; export function run(store: Map<string, unknown>) {return store.get(useId());}",
+	});
+	const names = Object.keys(inputs).map((name) => path.relative('app', name));
+	const { files } = await runCodemod(
+		[...names, 'src/asserted-caller.tsx'].map((name) => path.join(app, name)),
+		{ root: app, strong: true, verify: true, projectTypes: true },
+	);
+	for (const name of names) {
+		const pane = files.find((file) => file.file === name);
+		expect(pane.rules['store-hook'], name).toBeUndefined();
+		expect(pane.notes, name).toContainEqual(
+			expect.objectContaining({ severity: 'error', message: expect.stringContaining('observer') }),
+		);
+	}
+}, 30_000);
 
 it('delivers the original React element to a store service for rendering under its eventual provider', async () => {
 	const { app, root: workspace } = noticeProject({
@@ -661,13 +772,13 @@ it.each([
 );
 
 it('requires an imported application handle to come from the original shared factory', async () => {
-	const { storeInputFactories } = await import('../dist/store-inputs.js');
+	const { storeSources } = await import('../dist/store-inputs.js');
 	const { app, plan } = fixture({
 		'app/src/handles.ts': `import {valueOf as make} from 'observer/core';
 			import {useSnapshot as other} from 'observer';
 			export const reading = make(1), unknown = other();`,
 	});
-	const factory = storeInputFactories(app, null);
+	const { inputFactory: factory } = storeSources(app, null, () => false);
 	const planned = plan();
 	const accepts = (name) => {
 		const target = factory(path.join(app, 'src/pane.tsx'), './handles', name);
@@ -738,7 +849,7 @@ it('defers wrapped handles whose factory or original module can change', async (
 });
 
 it('follows named input aliases to their original factory and defers ambiguous targets', async () => {
-	const { storeInputFactories } = await import('../dist/store-inputs.js');
+	const { storeSources } = await import('../dist/store-inputs.js');
 	const { app, root, plan } = fixture({
 		'app/src/handles.ts':
 			"import {valueOf as make} from 'observer/core'; const created=make(1);export {created as reading};",
@@ -755,10 +866,14 @@ it('follows named input aliases to their original factory and defers ambiguous t
 		'node_modules/channels/index.js': 'exports.reading=null;',
 		'app/src/bare-shadow.ts': "export {reading} from 'channels';",
 	});
-	const factory = storeInputFactories(app, {
-		baseUrl: app,
-		paths: { '~/*': ['src/*'], channels: ['src/handles.ts'] },
-	});
+	const { inputFactory: factory } = storeSources(
+		app,
+		{
+			baseUrl: app,
+			paths: { '~/*': ['src/*'], channels: ['src/handles.ts'] },
+		},
+		() => false,
+	);
 	const from = path.join(app, 'src/pane.tsx');
 	const target = factory(from, './public', 'source');
 	expect(target && plan().isSharedExport(target.module, target.name, target.from)).toBe(true);

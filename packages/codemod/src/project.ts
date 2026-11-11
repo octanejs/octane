@@ -1,6 +1,6 @@
 import { createScopedStorePlanner } from './scoped-store-contract.js';
 import { parseStaticSvg } from './path-svg.js';
-import { storeInputFactories } from './store-inputs.js';
+import { storeSources } from './store-inputs.js';
 import type {
 	CodemodOptions,
 	CodemodResult,
@@ -313,15 +313,31 @@ export async function runCodemod(
 		/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(readInstalled(helperDir, 'octane')?.version ?? '')
 			? createScopedStorePlanner(helperDir, storeBridge, config ?? undefined)
 			: null;
-	const inputFactory = storeInputFactories(
+	const { inputFactory, helperFunction } = storeSources(
 		root,
 		config,
-		(file, source) =>
-			!known.has(file) &&
-			fs.realpathSync(file) === path.join(fs.realpathSync(root), path.relative(root, file)) &&
-			!fs.existsSync(file.slice(0, -3) + '.tsrx') &&
-			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) === rootProject &&
-			!rewriteModulePaths(source, file, root, renames, resolveRename),
+		(file, source, unselected) => {
+			if (
+				(unselected && known.has(file)) ||
+				renames.has(file) ||
+				ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject ||
+				rewriteModulePaths(source, file, root, renames, resolveRename)
+			)
+				return false;
+			if (!known.has(file) || conflicts.has(file)) return true;
+			// A plain helper selected in a directory run can still have its imports ported.
+			return !transformModule(source, file, {
+				target,
+				strong,
+				reactIntlAdapter: reactCompat && source.includes('react-intl') ? intlPath(file) : undefined,
+				strictNullChecks: strictConfig !== null,
+				get types() {
+					return typesOf(file);
+				},
+				resolveSpecifier: (specifier) =>
+					resolveRename(file, specifier) ?? resolveBinding(specifier, new Map(), []),
+			}).changed;
+		},
 	);
 	const checkedHelpers = new Map<string, { code: string; state: AdapterState; error?: string }>();
 	const generatedHelpers = new Map<string, string>();
@@ -479,6 +495,7 @@ export async function runCodemod(
 				: undefined;
 		const storeErrors = new Set<string>();
 		const svgErrors = new Set<string>();
+		let originalReact: boolean | undefined;
 		const resolveStoreHook: TransformOptions['resolveStoreHook'] =
 			!planStoreHook || !renames.has(file)
 				? undefined
@@ -487,11 +504,22 @@ export async function runCodemod(
 						const plan = planStoreHook(module, name, file);
 						if (
 							!plan ||
-							!safeUses((source, name) => {
-								if (catalogName(source) !== null || resolveRename(file, source)) return false;
-								const factory = inputFactory(file, source, name);
-								return !!factory && plan.isSharedExport(factory.module, factory.name, factory.from);
-							})
+							!safeUses(
+								(source, name) => {
+									if (catalogName(source) !== null || resolveRename(file, source)) return false;
+									const factory = inputFactory(file, source, name);
+									return (
+										!!factory && plan.isSharedExport(factory.module, factory.name, factory.from)
+									);
+								},
+								(source, name) =>
+									!resolveRename(file, source) &&
+									catalogName(source) === null &&
+									(originalReact ??=
+										ts.findConfigFile(path.dirname(file), ts.sys.fileExists) === rootProject &&
+										!!originalModule(file, 'react')) &&
+									helperFunction(file, source, name),
+							)
 						)
 							return null;
 						storeTemplates ??= new Map([

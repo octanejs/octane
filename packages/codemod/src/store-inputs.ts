@@ -66,18 +66,24 @@ function wrapperFactories(sf: ts.SourceFile, imports: Map<string, Factory>) {
 	return found;
 }
 
-/** Trace named application inputs to the factory that created them. The hook's
- * package planner checks the factory against the original store's public exports. */
-export function storeInputFactories(
+/** Resolve application source used by a workspace store consumer. */
+export function storeSources(
 	root: string,
 	config: ts.CompilerOptions | null,
-	unchanged?: (file: string, source: string) => boolean,
+	unchanged: (file: string, source: string, unselected?: boolean) => boolean,
 ) {
 	const rootConfig = ts.findConfigFile(root, ts.sys.fileExists);
 	const options = { moduleResolution: ts.ModuleResolutionKind.Bundler, ...config };
 	const cache = ts.createModuleResolutionCache(root, (file) => file, options);
 	const modules = new Map<string, Map<string, Input>>();
 	const project = fs.realpathSync(root);
+	function canUseOriginal(file: string) {
+		// A linked path may be selected for a rewrite under its physical name.
+		return (
+			fs.realpathSync(file) === path.join(project, path.relative(root, file)) &&
+			!fs.existsSync(file.slice(0, -3) + '.tsrx')
+		);
+	}
 	function inputs(file: string) {
 		const saved = modules.get(file);
 		if (saved) return saved;
@@ -122,10 +128,14 @@ export function storeInputFactories(
 				if (callee && 'reexport' in callee) {
 					input = { factory: callee.reexport };
 				} else {
-					if (!unchanged || d.initializer.questionDotToken) continue;
+					if (d.initializer.questionDotToken) continue;
 					wrappers ??= wrapperFactories(sf, imports);
 					const factory = wrappers.get(d.initializer.expression.text);
-					if (!factory || !(originalWrapperSource ??= unchanged(file, sf.text))) continue;
+					if (
+						!factory ||
+						!(originalWrapperSource ??= canUseOriginal(file) && unchanged(file, sf.text, true))
+					)
+						continue;
 					input = { factory, wrapped: true };
 				}
 				locals.set(d.name.text, input);
@@ -156,43 +166,51 @@ export function storeInputFactories(
 		modules.set(file, exported);
 		return exported;
 	}
-	return (from: string, specifier: string, name: string): Factory | null => {
+	function localFile(from: string, specifier: string) {
+		const file = ts.resolveModuleName(specifier, from, options, ts.sys, cache).resolvedModule
+			?.resolvedFileName;
+		if (
+			!file ||
+			!file.startsWith(root + path.sep) ||
+			!/(?<!\.d)\.ts$/.test(file) ||
+			file.includes(path.sep + 'node_modules' + path.sep)
+		)
+			return null;
+		const physical = fs.realpathSync(file);
+		if (
+			!physical.startsWith(project + path.sep) ||
+			physical.includes(path.sep + 'node_modules' + path.sep)
+		)
+			return null;
+		// A JS sibling or directory can implement a different export even for a tsconfig alias.
+		if (!specifier.endsWith('.ts')) {
+			const stem = file.slice(0, -3);
+			if (
+				['.js', '.jsx', '.tsx', '.mjs', '.cjs', '.mts', '.cts', ''].some((ext) =>
+					fs.existsSync(stem + ext),
+				)
+			)
+				return null;
+		}
+		let runtime: string | undefined;
+		try {
+			runtime = createRequire(from).resolve(specifier);
+		} catch {
+			// A tsconfig alias or an authored TS file need not resolve through Node.
+		}
+		if (runtime && (!path.isAbsolute(runtime) || fs.realpathSync(runtime) !== physical))
+			return null;
+		return file;
+	}
+
+	// Trace named inputs to a factory the hook planner can check against the
+	// original store's public exports.
+	function inputFactory(from: string, specifier: string, name: string): Factory | null {
 		let ref: Factory = { module: specifier, name, from };
 		const seen = new Set<string>();
 		for (;;) {
-			const file = ts.resolveModuleName(ref.module, ref.from, options, ts.sys, cache).resolvedModule
-				?.resolvedFileName;
-			if (
-				!file ||
-				!file.startsWith(root + path.sep) ||
-				!/(?<!\.d)\.ts$/.test(file) ||
-				file.includes(path.sep + 'node_modules' + path.sep)
-			)
-				return null;
-			const physical = fs.realpathSync(file);
-			if (
-				!physical.startsWith(project + path.sep) ||
-				physical.includes(path.sep + 'node_modules' + path.sep)
-			)
-				return null;
-			// A JS sibling or directory can implement a different export even for a tsconfig alias.
-			if (!ref.module.endsWith('.ts')) {
-				const stem = file.slice(0, -3);
-				if (
-					['.js', '.jsx', '.tsx', '.mjs', '.cjs', '.mts', '.cts', ''].some((ext) =>
-						fs.existsSync(stem + ext),
-					)
-				)
-					return null;
-			}
-			let runtime: string | undefined;
-			try {
-				runtime = createRequire(ref.from).resolve(ref.module);
-			} catch {
-				// A tsconfig alias or an authored TS file need not resolve through Node.
-			}
-			if (runtime && (!path.isAbsolute(runtime) || fs.realpathSync(runtime) !== physical))
-				return null;
+			const file = localFile(ref.from, ref.module);
+			if (!file) return null;
 			const key = file + '\0' + ref.name;
 			if (seen.has(key)) return null;
 			seen.add(key);
@@ -209,5 +227,33 @@ export function storeInputFactories(
 			}
 			ref = input.reexport;
 		}
-	};
+	}
+
+	const helpers = new Map<string, Set<string>>();
+	function helperFunction(from: string, specifier: string, name: string) {
+		if (/^use[A-Z0-9]/.test(name) || /[!%?#\\]/.test(specifier)) return false;
+		const file = localFile(from, specifier);
+		if (!file) return false;
+		let exported = helpers.get(file);
+		if (!exported) {
+			exported = new Set();
+			helpers.set(file, exported);
+			if (!canUseOriginal(file)) return false;
+			const source = fs.readFileSync(file, 'utf8');
+			if (!unchanged(file, source)) return false;
+			const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest);
+			for (const statement of sf.statements) {
+				if (
+					ts.isFunctionDeclaration(statement) &&
+					statement.name &&
+					statement.body &&
+					statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) &&
+					!statement.modifiers.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)
+				)
+					exported.add(statement.name.text);
+			}
+		}
+		return exported.has(name);
+	}
+	return { inputFactory, helperFunction };
 }

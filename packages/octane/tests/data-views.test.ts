@@ -3,6 +3,7 @@ import {
 	createDataStore,
 	DataError,
 	entity,
+	read,
 	view,
 	write,
 	type ReadHandle,
@@ -73,6 +74,14 @@ const remove = write({
 	removes: Book,
 });
 
+/** Results only the server can order: here, most recently added first. */
+const search = read({
+	name: 'books.search',
+	input: schema<{ q: string }>((value) => typeof value?.q === 'string'),
+	output: schema<BookRow[]>((value) => Array.isArray(value) && value.every(isBook)),
+	entities: (books) => Book.from(books),
+});
+
 const titles = (handle: ReadHandle<BookRow[]>) =>
 	handle.getSnapshot().value?.map((book) => book.title);
 
@@ -115,6 +124,13 @@ function libraryServer(count = 10) {
 		handle(library, serve(library)),
 		handle(bookmarks, serve(bookmarks)),
 		handle(shelf, serve(shelf)),
+		handle(search, (input) => {
+			log.push(`books.search ${input.q}`);
+			return [...books.values()]
+				.filter((book) => book.title.includes(input.q))
+				.reverse()
+				.map((book) => ({ ...book }));
+		}),
 		handle(star, patch),
 		handle(rename, patch),
 		handle(renameBlind, (input) => void patch(input)),
@@ -497,5 +513,136 @@ describe('octane/data views', () => {
 		expect(titles(marks)).toEqual(['Book 00', 'Book 01', 'Book 02']);
 		await quiet();
 		expect(server.log).toEqual(['patch b1']);
+	});
+});
+
+describe('octane/data server-ordered reads', () => {
+	it("shows a newer copy of a record that a view loaded, in the server's order, without reloading", async () => {
+		const server = libraryServer(4);
+		const store = createDataStore({ transport: server.transport });
+		const results = store.read(search, { q: 'Book' });
+		await ready(results);
+		const page = store.read(library, undefined);
+		await ready(page);
+		expect(titles(results)).toEqual(['Book 03', 'Book 02', 'Book 01', 'Book 00']);
+
+		// Another user renames a book; the library reloads and brings the new title.
+		server.books.get('b1')!.title = 'Book 01 (revised)';
+		server.log.length = 0;
+		await page.refresh();
+		expect(titles(results)).toEqual(['Book 03', 'Book 02', 'Book 01 (revised)', 'Book 00']);
+		expect(server.log).toEqual(['books.library 0+24']);
+	});
+
+	it('gives views the newer copy of a record that a server-ordered read loaded', async () => {
+		const server = libraryServer(4);
+		const store = createDataStore({ transport: server.transport });
+		const page = store.read(library, undefined);
+		await ready(page);
+
+		server.books.get('b1')!.title = 'Book 01 (revised)';
+		await ready(store.read(search, { q: 'Book' }));
+		expect(titles(page)).toEqual(['Book 00', 'Book 01 (revised)', 'Book 02']);
+		expect(server.log).toEqual(['books.library 0+24', 'books.search Book']);
+	});
+
+	it('keeps a newer copy when an older load lands after it', async () => {
+		const server = libraryServer(4);
+		let release: (() => void) | null = null;
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				// The search reads the server now, but its reply arrives later.
+				const reply = server.transport(request, signal);
+				if (request.name === 'books.search') await new Promise<void>((done) => (release = done));
+				return reply;
+			},
+		});
+		const page = store.read(library, undefined);
+		await ready(page);
+		const results = store.read(search, { q: 'Book' });
+		results.subscribe(() => {});
+		await vi.waitFor(() => expect(release).not.toBeNull());
+
+		// The library loads after the rename and lands first; the search, read before it, lands last.
+		server.books.get('b1')!.title = 'Book 01 (revised)';
+		await page.refresh();
+		release!();
+		await vi.waitFor(() => expect(results.getSnapshot().status).toBe('ready'));
+		expect(titles(page)).toEqual(['Book 00', 'Book 01 (revised)', 'Book 02']);
+		expect(titles(results)).toContain('Book 01 (revised)');
+	});
+
+	it('never adds a record a view does not hold, even from a search that lands late', async () => {
+		const server = libraryServer(4);
+		let release: (() => void) | null = null;
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				const reply = server.transport(request, signal);
+				if (request.name === 'books.search') await new Promise<void>((done) => (release = done));
+				return reply;
+			},
+		});
+		const page = store.read(library, undefined);
+		await ready(page);
+		const results = store.read(search, { q: 'Book' });
+		results.subscribe(() => {});
+		await vi.waitFor(() => expect(release).not.toBeNull());
+
+		// The search read b1 before another user removed it; the library reloads without it.
+		server.books.delete('b1');
+		await page.refresh();
+		expect(titles(page)).toEqual(['Book 00', 'Book 02', 'Book 03']);
+		release!();
+		await vi.waitFor(() => expect(results.getSnapshot().status).toBe('ready'));
+		expect(titles(page)).toEqual(['Book 00', 'Book 02', 'Book 03']);
+	});
+
+	it("tells views of a newer copy that a write's reply carried back in a search", async () => {
+		const server = libraryServer(4);
+		const store = createDataStore({ transport: server.transport });
+		const page = store.read(library, undefined);
+		await ready(page);
+		await ready(store.read(search, { q: 'Book' }));
+
+		// The rename settles the library from its record; the search comes back in the reply.
+		server.books.get('b2')!.title = 'Book 02 (revised)';
+		await store.write(rename, { id: 'b0', title: 'Book 00 (renamed)' });
+		await vi.waitFor(() =>
+			expect(titles(page)).toEqual(['Book 00 (renamed)', 'Book 01', 'Book 02 (revised)']),
+		);
+	});
+
+	it('keeps the same snapshot when nothing it shows changed', async () => {
+		const server = libraryServer(4);
+		const store = createDataStore({ transport: server.transport });
+		const results = store.read(search, { q: 'Book' });
+		const notify = await ready(results);
+		const page = store.read(library, undefined);
+		await ready(page);
+		const before = results.getSnapshot();
+		notify.mockClear();
+
+		await page.refresh();
+		expect(results.getSnapshot()).toBe(before);
+		expect(notify).not.toHaveBeenCalled();
+	});
+
+	it('keeps the same snapshot while an edit it shows is pending', async () => {
+		const server = libraryServer(4);
+		const store = createDataStore({ transport: server.transport });
+		const results = store.read(search, { q: 'Book' });
+		const notify = await ready(results);
+		const page = store.read(library, undefined);
+		await ready(page);
+		server.hold();
+		void store.write(star, { id: 'b1', starred: true }).catch(() => {});
+		const before = results.getSnapshot();
+		expect(before.value!.find((book) => book.id === 'b1')!.starred).toBe(true);
+		notify.mockClear();
+
+		await page.refresh();
+		expect(results.getSnapshot()).toBe(before);
+		expect(notify).not.toHaveBeenCalled();
+		server.release();
 	});
 });
