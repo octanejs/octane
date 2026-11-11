@@ -7,17 +7,24 @@ import {
 	DataError,
 	DataUncertainError,
 	createDataStore,
-	httpTransport,
 	indexedDBStorage,
+	serverTransport,
 	type DataRequest,
 	type DataStore,
 	type FormState,
 	type Transport,
 } from 'octane/data';
 import { addBook, receipt, removeBook, setRead } from './contracts.ts';
+import { data } from './data.tsrx';
 
 export const ACCOUNTS = ['ada', 'grace'] as const;
 export type Account = (typeof ACCOUNTS)[number];
+
+/**
+ * The signed-in account, which the server authenticates each call by. A real
+ * app's session cookie is set by its sign-in, HttpOnly; the demo has no sign-in.
+ */
+export const ACCOUNT_COOKIE = 'shelf-account';
 
 export interface Faults {
 	/** Deliver the next write, then lose its reply. */
@@ -80,14 +87,15 @@ function describe(request: DataRequest): string {
  * server data; `seed` is the server render's data, so hydration loads nothing.
  */
 export function openSession(account: Account, namespace = '', seed?: string | null): Session {
-	const http = httpTransport('/data', { headers: { 'x-shelf-account': namespace + account } });
+	document.cookie = `${ACCOUNT_COOKIE}=${encodeURIComponent(namespace + account)}; path=/; SameSite=Strict`;
+	const call = serverTransport(data);
 	const faults: Faults = { dropNextReply: false, offline: false };
 	const network = externalValue<readonly NetworkEntry[]>([]);
 	let sequence = 0;
 	const transport: Transport = async (request, signal) => {
 		if (faults.offline) throw new Error('offline');
 		network.set([{ id: ++sequence, label: describe(request) }, ...network.get()].slice(0, 6));
-		const reply = await http(request, signal);
+		const reply = await call(request, signal);
 		if (request.kind === 'write' && faults.dropNextReply) {
 			faults.dropNextReply = false;
 			throw new Error('connection reset after the server replied');
@@ -106,7 +114,7 @@ export function openSession(account: Account, namespace = '', seed?: string | nu
 	return sessionFor(account, createDataStore({ transport, seed, persist }), faults, network);
 }
 
-/** A server render's session, around a store that calls the data handler in process. */
+/** A server render's session, around a store whose `data` calls run in process. */
 export function serverSession(account: Account, store: DataStore): Session {
 	return sessionFor(account, store, { dropNextReply: false, offline: false }, externalValue([]));
 }

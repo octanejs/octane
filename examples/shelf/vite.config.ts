@@ -6,49 +6,29 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { octane } from 'octane/compiler/vite';
-import type { createShelfServer, Page } from './src/server/index.ts';
+import { nodeRequestToWebRequest, sendWebResponse } from '@octanejs/app-core/node';
+import type { createShelfServer } from './src/server/index.ts';
+import { isShelfPath } from './src/server/routes.ts';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 
 type ShelfServer = ReturnType<typeof createShelfServer>;
 
-/** Server-rendered pages. The mixed page is rendered in the browser only. */
-const PAGES: Record<string, { page: Page; file: string }> = {
-	'/': { page: 'octane', file: 'index.html' },
-	'/index.html': { page: 'octane', file: 'index.html' },
-	'/react.html': { page: 'react', file: 'react.html' },
-};
-
 /**
- * Serve /data and render the Octane and React pages, from the dev server (the
- * source, through Vite's SSR loader) and the preview server (the build).
+ * Serve the pages and calls to `data`, from the dev server (the source, through
+ * Vite's SSR loader) and the preview server (the build).
  */
 function shelfServer(): Plugin {
 	const middleware =
 		(load: () => Promise<ShelfServer>, template: (file: string, url: URL) => Promise<string>) =>
 		async (request: IncomingMessage, response: ServerResponse, next: () => void) => {
-			const url = new URL(request.url!, `http://${request.headers.host}`);
-			const route = PAGES[url.pathname];
-			if (url.pathname !== '/data' && !route) return next();
-			const server = await load();
-			const chunks: Buffer[] = [];
-			for await (const chunk of request) chunks.push(chunk as Buffer);
-			const headers = new Headers();
-			for (const [name, value] of Object.entries(request.headers)) {
-				if (typeof value === 'string') headers.set(name, value);
-			}
-			const incoming = new Request(url, {
-				method: request.method,
-				headers,
-				body: request.method === 'POST' ? Buffer.concat(chunks) : undefined,
-			});
-			// A page takes GET, and POST from its forms before hydration or without JavaScript.
-			const reply = route
-				? await server.render(route.page, incoming, await template(route.file, url))
-				: await server.data(incoming);
-			response.statusCode = reply.status;
-			reply.headers.forEach((value, name) => response.setHeader(name, value));
-			response.end(Buffer.from(await reply.arrayBuffer()));
+			// Vite's own requests and assets pass through untouched, whatever state the server module is in.
+			if (!isShelfPath(new URL(request.url!, 'http://localhost').pathname)) return next();
+			const incoming = nodeRequestToWebRequest(request, response);
+			const url = new URL(incoming.url);
+			const reply = await (await load()).fetch(incoming, (file) => template(file, url));
+			if (reply) await sendWebResponse(response, reply);
+			else next();
 		};
 
 	return {
