@@ -714,6 +714,49 @@ it('delivers the original React element to a store service for rendering under i
 	}
 }, 30_000);
 
+it('retains the React Intl diagnostic for deferred calls into an opaque store service', async () => {
+	const service = "await wait; void store.get(reading).show(intl.formatMessage({ id: 'title' }));";
+	const bodies = {
+		renderStarted: `const assets = { async load() { ${service} } };
+			begin(assets.load);
+			return <b>Ready</b>;`,
+		click: `return <button onClick={async () => { ${service} }}>Load</button>;`,
+	};
+	const inputs = Object.fromEntries(
+		Object.entries(bodies).map(([name, body]) => [
+			'app/src/' + name + '.tsx',
+			`import { useSnapshot } from 'observer';
+			import { useIntl } from 'react-intl';
+			import { reading } from './handles';
+			export function Pane({ begin, wait }) {
+				const store = useSnapshot();
+				const intl = useIntl();
+				${body}
+			}`,
+		]),
+	);
+	const { app, root } = noticeProject(inputs);
+	fs.symlinkSync(
+		path.resolve(import.meta.dirname, '../node_modules/react-intl'),
+		path.join(root, 'node_modules/react-intl'),
+		'dir',
+	);
+	const { files } = await runCodemod(
+		Object.keys(inputs).map((file) => path.join(root, file)),
+		{ root: app, strong: true, verify: true, projectTypes: true },
+	);
+	for (const name of Object.keys(bodies)) {
+		const result = files.find((file) => file.file === `src/${name}.tsx`);
+		expect(result.notes, name).toContainEqual(
+			expect.objectContaining({
+				rule: 'bindings',
+				severity: 'error',
+				message: expect.stringContaining('useIntl'),
+			}),
+		);
+	}
+}, 30_000);
+
 it('retains the migration diagnostic when a store consumer cannot preserve the original React descriptor', async () => {
 	const deliver = (argument) => `store.get(reading).show(${argument});`;
 	const valid = deliver('<Label label="sent"/>');
