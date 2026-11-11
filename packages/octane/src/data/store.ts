@@ -38,6 +38,7 @@ import {
 	type ViewWindow,
 	type Write,
 } from './contracts.js';
+import { createPersistence, type PersistOptions, type Stored } from './persist.js';
 
 export interface ReadSnapshot<T> {
 	readonly status: 'pending' | 'ready' | 'error';
@@ -106,6 +107,11 @@ export interface DataStoreOptions {
 	readonly transport: Transport;
 	/** A server store's `dehydrate()` output. */
 	readonly seed?: string | null | undefined;
+	/**
+	 * Save confirmed values to persistent storage, and start reads from them
+	 * after a restart. Reads with `persist: false` are left out.
+	 */
+	readonly persist?: PersistOptions | undefined;
 }
 
 interface SeedEntry {
@@ -160,6 +166,8 @@ interface Entry {
 	snapshot: ReadSnapshot<any> | null;
 	/** A view entry's span; null for a read and for a view with no value. */
 	span: Span | null;
+	/** Whether persistent storage has been asked for this entry's value. */
+	checkedStorage: boolean;
 }
 
 interface Operation {
@@ -294,6 +302,41 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	let operations: Operation[] = [];
 	let sequence = 0;
 	let retired = false;
+	const persisted = options.persist
+		? createPersistence(options.persist, saving, (key) => !!entries.get(key)?.subscribers.size)
+		: null;
+
+	/** What persistent storage keeps for an entry: its confirmed value, never a pending edit. */
+	function saving(key: string) {
+		const entry = entries.get(key);
+		if (!entry?.read.persist) return undefined;
+		if (!entry.hasBase) return null;
+		const { span } = entry;
+		const stored: Stored = {
+			value: span ? confirmedRows(entry) : entry.base,
+			savedAt: entry.fetchedAt,
+			stale: entry.stale,
+			span: span && { start: span.start, first: span.first, last: span.last },
+		};
+		return { stored, read: entry.read };
+	}
+
+	/** Save an entry once its confirmed value changes; a view's change is every view's of its entity. */
+	function save(entry: Entry): void {
+		if (!persisted) return;
+		if (!isView(entry.read)) persisted.mark(entry.key);
+		else for (const view of viewEntries(entry.read.view.of.name)) persisted.mark(view.key);
+	}
+
+	/** The confirmed records within a view's span, in its order. */
+	function confirmedRows(entry: Entry): unknown[] {
+		const { of, compare } = (entry.read as View<any, any>).view;
+		const rows: unknown[] = [];
+		for (const record of records.get(of.name)?.values() ?? []) {
+			if (inSpan(entry, record.value)) rows.push(record.value);
+		}
+		return rows.sort(compare);
+	}
 
 	function assertLive(): void {
 		if (retired) throw new DataRetiredError();
@@ -356,6 +399,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const old = table.get(id);
 		if (old && old.seq > seq) return;
 		table.set(id, { value, seq });
+		if (source === null) for (const view of viewEntries(entity.name)) persisted?.mark(view.key);
 		if (!old && !created) return;
 		for (const entry of viewEntries(entity.name)) {
 			if (entry === source || entry.span!.start === 0 || seq < entry.baseSeq) continue;
@@ -372,6 +416,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (!old) return;
 		table!.delete(id);
 		for (const entry of viewEntries(entity.name)) {
+			persisted?.mark(entry.key);
 			if (entry.span!.start > 0 && above(entry, old.value)) reload.add(entry);
 		}
 	}
@@ -653,6 +698,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (value instanceof Promise) return;
 		const reload = new Set<Entry>();
 		adopt(entry, value, 0, seed.age, reload);
+		save(entry);
 		// A seed is adopted while a render asks for its read.
 		if (reload.size > 0) queueMicrotask(() => !retired && reloadAll(reload));
 	}
@@ -668,8 +714,52 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		return transport(payload, signal);
 	}
 
+	/**
+	 * Start an entry from persistent storage, as from a seed. A fresh value
+	 * needs no load; a stale one shows while its load runs.
+	 */
+	function restore(entry: Entry): Promise<void> {
+		entry.checkedStorage = true;
+		const attempt = entry.attempt;
+		const current = () => !retired && entry.attempt === attempt && !entry.hasBase;
+		const done = persisted!
+			.restore(entry.key, entry.read)
+			.then(async (stored) => {
+				if (!stored || !current()) return;
+				const age = Math.max(0, Date.now() - stored.savedAt);
+				let value: unknown;
+				try {
+					if (age >= entry.read.expire) throw new Error('expired');
+					value = await parse(entry.read.output, stored.value);
+				} catch {
+					persisted!.discard(entry.key);
+					return;
+				}
+				if (!current()) return;
+				const reload = new Set<Entry>();
+				adopt(entry, value, 0, age, reload);
+				if (entry.span) entry.span = { ...(stored.span as Span), reloaded: false };
+				entry.stale = stored.stale;
+				reloadAll(reload);
+			})
+			.then(() => {
+				if (retired || entry.inflight !== done) return;
+				entry.inflight = null;
+				touchWithViews(entry);
+				if (!entry.hasBase) return load(entry);
+				if (entry.subscribers.size > 0 && isStale(entry)) void load(entry);
+				else idle(entry);
+			});
+		entry.inflight = done;
+		touch(entry);
+		return done;
+	}
+
 	function load(entry: Entry): Promise<void> {
 		if (entry.inflight) return entry.inflight;
+		if (persisted && !entry.hasBase && !entry.checkedStorage && entry.read.persist) {
+			return restore(entry);
+		}
 		const attempt = ++entry.attempt;
 		const startedSeq = ++sequence;
 		const abort = (entry.abort = new AbortController());
@@ -684,7 +774,9 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			})
 			.then(
 				(value) => {
-					if (current()) adopt(entry, value, startedSeq);
+					if (!current()) return;
+					adopt(entry, value, startedSeq);
+					save(entry);
 				},
 				(error) => {
 					if (current()) entry.error = error;
@@ -705,6 +797,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	/** Discard any load in flight, since it may predate the change, and reload if observed. */
 	function invalidateEntry(entry: Entry): void {
 		entry.stale = true;
+		persisted?.mark(entry.key);
 		entry.attempt++;
 		entry.abort?.abort();
 		entry.abort = null;
@@ -789,6 +882,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			expireTimer: undefined,
 			snapshot: null,
 			span: null,
+			checkedStorage: false,
 		};
 		entries.set(key, created);
 		adoptSeed(created);
@@ -1091,6 +1185,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		retire() {
 			if (retired) return;
 			retired = true;
+			// Signing out leaves nothing of the account on the device.
+			persisted?.clear();
 			// Writes waiting on a create must settle too, or they would never end.
 			for (const operation of operations) operation.gate?.reject(new DataRetiredError());
 			operations = [];

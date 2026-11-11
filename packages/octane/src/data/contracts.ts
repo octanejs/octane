@@ -12,6 +12,9 @@ export interface StandardSchema<Input = unknown, Output = Input> {
 		readonly vendor: string;
 		readonly validate: (value: unknown) => SchemaResult<Output> | Promise<SchemaResult<Output>>;
 		readonly types?: { readonly input: Input; readonly output: Output } | undefined;
+		/** The Standard JSON Schema extension, which Zod 4.2+, ArkType and Valibot provide. */
+		readonly jsonSchema?:
+			{ readonly output: (options: { readonly target: string }) => unknown } | undefined;
 	};
 }
 
@@ -100,6 +103,10 @@ export interface Read<Input, Output> {
 	readonly keep: number;
 	/** Milliseconds after which a value is never shown. */
 	readonly expire: number;
+	/** Whether a store with `persist` saves this read's value. */
+	readonly persist: boolean;
+	/** Change it when a saved value would mean something else, such as a view's new rule. */
+	readonly version: string;
 }
 
 export interface Write<Input, Output> {
@@ -182,6 +189,12 @@ function arrayOf<T>(item: StandardSchema<unknown, T>): StandardSchema<unknown, T
 					? Promise.all(results).then(collect)
 					: collect(results as SchemaResult<T>[]);
 			},
+			jsonSchema: item['~standard'].jsonSchema && {
+				output: (options) => ({
+					type: 'array',
+					items: item['~standard'].jsonSchema!.output(options),
+				}),
+			},
 		},
 	};
 }
@@ -208,6 +221,8 @@ export function view<T, P = void>(options: {
 	fresh?: number;
 	keep?: number;
 	expire?: number;
+	persist?: boolean;
+	version?: string;
 }): View<P, T> {
 	const { of, order, input: params, where: rule, limit: shown, max: most, ...rest } = options;
 	const max = most ?? 500;
@@ -252,6 +267,10 @@ export function read<Output, Input = void>(options: {
 	fresh?: number;
 	keep?: number;
 	expire?: number;
+	/** Set to false to keep a value out of persistent storage, such as one holding secrets. */
+	persist?: boolean;
+	/** Saved values from another version are discarded. */
+	version?: string;
 }): Read<Input, Output> {
 	return {
 		kind: 'read',
@@ -263,6 +282,8 @@ export function read<Output, Input = void>(options: {
 		fresh: options.fresh ?? 0,
 		keep: options.keep ?? 300_000,
 		expire: options.expire ?? Infinity,
+		persist: options.persist ?? true,
+		version: options.version ?? '',
 	};
 }
 

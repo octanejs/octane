@@ -44,8 +44,12 @@ Everything else is shared:
   the server. Nothing is sent twice.
 - **Go offline and toggle a book.** The edit stays until a lookup, once back
   online, shows it never arrived. Then it is removed.
-- **Switch account.** The old account's store is retired: its values clear and
-  late replies are ignored.
+- **Reload `/mixed.html`.** The lists come from the store's encrypted
+  IndexedDB cache (`persist` in [`session.ts`](src/shared/session.ts)), so only
+  the counts, which are never fresh, load again. A real app takes the cache key
+  from its signed-in session.
+- **Switch account.** The old account's store is retired: its values clear,
+  its cache is deleted, and late replies are ignored.
 - **On the mixed page, mark a book read from the React island.** The Octane list
   updates in the same moment, and a rollback reaches both.
 

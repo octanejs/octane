@@ -204,6 +204,41 @@ for (const { name, path, serverRendered } of PAGES) {
 	});
 }
 
+test('starts the lists from the encrypted cache after a reload, without loading them', async ({
+	page,
+}) => {
+	await open(page, '/mixed.html');
+	await book(page, 'Kindred').getByRole('checkbox').click();
+	await expect(page.getByText('3 books · 1 read')).toBeVisible();
+	await expect(finishedList(page).getByRole('listitem')).toHaveText(['Kindred']);
+
+	const reads: string[] = [];
+	page.on('request', (request) => {
+		if (new URL(request.url()).pathname === '/data') reads.push(request.postData() ?? '');
+	});
+	await page.reload();
+	await expect(book(page, 'Kindred').getByRole('checkbox')).toBeChecked();
+	await expect(finishedList(page).getByRole('listitem')).toHaveText(['Kindred']);
+	await expect(page.getByText('3 books · 1 read')).toBeVisible();
+	// The lists are fresh for 30 seconds, so only the counts, which are never fresh, reload.
+	expect(
+		reads.filter((body) => body.includes('books.list') || body.includes('books.finished')),
+	).toEqual([]);
+	// What the cache holds is encrypted: no title is readable in IndexedDB.
+	const saved = await page.evaluate(
+		() =>
+			new Promise<string>((resolve) => {
+				const opening = indexedDB.open('shelf');
+				opening.onsuccess = () => {
+					const all = opening.result.transaction('value').objectStore('value').getAll();
+					all.onsuccess = () => resolve(JSON.stringify(all.result));
+				};
+			}),
+	);
+	expect(saved.length).toBeGreaterThan(100);
+	expect(saved).not.toContain('Kindred');
+});
+
 test('a React island and its Octane page show the same edit and the same rollback', async ({
 	page,
 }) => {

@@ -534,6 +534,7 @@
     "@wagmi/connectors": "catalog:default",
     "@wagmi/core": "catalog:default",
     "esbuild": "catalog:default",
+    "fake-indexeddb": "catalog:default",
     "happy-dom": "catalog:default",
     "playwright": "catalog:default",
     "react": "catalog:default",
