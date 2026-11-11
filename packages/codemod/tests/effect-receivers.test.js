@@ -32,27 +32,39 @@ function migrate(source) {
 	}
 }
 
-const source = `import { useEffect } from 'react';
-export function Probe({ receiver, revision }) {
-	useEffect(() => {
+const blockEffect = `() => {
 		receiver.record('start', receiver.value);
 		return () => receiver.record('stop', receiver.value);
-	}, [receiver]);
+	}`;
+const source = `import { useEffect } from 'react';
+export function Probe({ receiver, revision }) {
+	useEffect(${blockEffect}, [receiver]);
 	return <p>{String(revision)}</p>;
 }`;
 
-it.each([false, true])('matches React with revision dependency %s', async (withRevision) => {
+it.each([
+	['block', false],
+	['block', true],
+	['expression', false],
+	['expression', true],
+])('matches React for a %s effect with revision dependency %s', async (form, withRevision) => {
+	const comment = form === 'expression' && withRevision ? '// keep with the expression\n' : '';
+	const effect = form === 'expression' ? `() => ${comment}receiver.attach()` : blockEffect;
+	const input = source.replace(blockEffect, effect);
 	const migrated = migrate(
-		withRevision ? source.replace('[receiver]', '[receiver, revision]') : source,
+		withRevision ? input.replace('[receiver]', '[receiver, revision]') : input,
 	);
 	expect(migrated.strong).toBe(true);
+	if (comment) expect(migrated.code).toContain(comment.trim());
 	const native = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
 	function Reference({ receiver, revision }) {
 		useEffect(
-			() => {
-				receiver.record('start', receiver.value);
-				return () => receiver.record('stop', receiver.value);
-			},
+			form === 'expression'
+				? () => receiver.attach()
+				: () => {
+						receiver.record('start', receiver.value);
+						return () => receiver.record('stop', receiver.value);
+					},
 			withRevision ? [receiver, revision] : [receiver],
 		);
 		return createElement('p', null, String(revision));
@@ -70,6 +82,10 @@ it.each([false, true])('matches React with revision dependency %s', async (withR
 			}
 			record(kind, value) {
 				log.push(kind + ' ' + this.name + ' ' + value);
+			}
+			attach() {
+				this.record('start', this.value);
+				return () => this.record('stop', this.value);
 			}
 		}
 		const a = new Receiver('a'),
