@@ -19,7 +19,7 @@ async function load(mode) {
 	return bundleRuntime(
 		project,
 		mode,
-		`export * from './page.tsrx'; export * from './rich.tsrx'; export * from './fields.tsrx'; export * from './choices.tsrx'; export * from './reader.tsrx'; ${entry}
+		`export * from './page.tsrx'; export * from './rich.tsrx'; export * from './fields.tsrx'; export * from './locale.tsrx'; export * from './choices.tsrx'; export * from './reader.tsrx'; ${entry}
 				export { OctaneCompat } from 'octane/react${mode === 'server' ? '/server' : ''}';
 				export * as react from 'react'; export * as intl from 'react-intl';
 				export { renderToString } from 'react-dom/server';`,
@@ -43,8 +43,7 @@ beforeAll(async () => {
 		`import { useIntl, FormattedMessage } from 'react-intl';
 		export function Fields({count}: {count: number}) {
 			const intl = useIntl();
-			const { 'locale': language } = useIntl();
-			return <section lang={language}><input placeholder={intl.formatMessage({id:'hint'})} />
+			return <section><input placeholder={intl.formatMessage({id:'hint'})} />
 				<FormattedMessage id="count" values={{count}} /></section>;
 		}`,
 		'fields.tsx',
@@ -57,6 +56,20 @@ beforeAll(async () => {
 	expect(fields.notes.filter((note) => note.severity === 'error')).toEqual([]);
 	expect(fields.code).not.toMatch(/from ['"]react-intl['"]/);
 	await writeFile(path.join(project, 'fields.tsrx'), fields.code);
+	const locale = transformModule(
+		`import {IntlProvider as Provider, useIntl} from 'react-intl';
+		function Language() { const { 'locale': lang } = useIntl(); return <p lang={lang}>{lang}</p>; }
+		export function OwnedLocale() { return <Provider locale="fr"><Language/></Provider>; }`,
+		'locale.tsx',
+		{
+			reactIntlAdapter: './react-intl.tsrx',
+			reactCompat: true,
+			reactStoreComponent: (name) => name === 'react-intl',
+			unported: (name) => (name === 'react-intl' ? name : null),
+		},
+	);
+	expect(locale.notes.filter((note) => note.severity === 'error')).toEqual([]);
+	await writeFile(path.join(project, 'locale.tsrx'), locale.code);
 	const choices = transformModule(
 		`import { ReactCompat as Boundary } from 'octane/react';
 		import * as Bridge from 'octane/react';
@@ -168,6 +181,19 @@ it('uses the nearest native or React-owned formatter and respects an explicitly 
 	}
 });
 
+it('preserves a locale binding under the component’s own Intl provider during SSR', async () => {
+	const { intl, react, renderToString, prerender, OwnedLocale } = server;
+	const h = react.createElement;
+	function Language() {
+		const { locale: lang } = intl.useIntl();
+		return h('p', { lang }, lang);
+	}
+	const original = h(intl.IntlProvider, { locale: 'fr' }, h(Language));
+	expect(paragraph((await prerender(OwnedLocale, {})).html)).toEqual(
+		paragraph(renderToString(original)),
+	);
+});
+
 it('updates native text and formatter configuration, and preserves the formatter through child-only updates', () => {
 	const container = document.createElement('div');
 	const root = client.createRoot(container);
@@ -267,7 +293,6 @@ it('renders scalar substitutions and localized host attributes like the original
 	const roots = [reactRoot(reference), reactRoot(migrated)];
 	const rendered = (host) => [
 		host.querySelector('input').placeholder,
-		host.querySelector('section').lang,
 		host.querySelector('section').textContent,
 	];
 	try {
@@ -286,16 +311,13 @@ it('renders scalar substitutions and localized host attributes like the original
 					: undefined,
 				onWarn() {},
 			};
-			const original = () => {
-				const formatter = intl.useIntl();
-				const { locale: language } = intl.useIntl();
-				return h(
+			const original = () =>
+				h(
 					'section',
-					{ lang: language },
-					h('input', { placeholder: formatter.formatMessage({ id: 'hint' }) }),
+					null,
+					h('input', { placeholder: intl.useIntl().formatMessage({ id: 'hint' }) }),
 					h(intl.FormattedMessage, { id: 'count', values: { count } }),
 				);
-			};
 			await react.act(async () => {
 				roots[0].render(h(intl.IntlProvider, config, h(original)));
 				roots[1].render(

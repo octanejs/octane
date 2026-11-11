@@ -2100,39 +2100,56 @@ export function Greeting({ count }: { count: number }) {
 		}
 		return root;
 	}
-	it('migrates a locale binding and retains diagnostics for other formatter bindings', async () => {
-		const patterns = [
-			'{ locale }',
-			'{ locale, ...rest }',
-			"{ ['locale']: locale }",
-			'{ locale = fallback() }',
-			'{ formatMessage: locale }',
-		];
-		const sources = Object.fromEntries(
-			patterns.map((pattern, i) => [
-				`src/Locale${i}.tsx`,
-				`import {useIntl} from 'react-intl';
-			 export function Locale() { const ${pattern} = useIntl(); return <p lang={locale}/>; }`,
-			]),
-		);
-		const root = setup(sources);
+	it('migrates a locale binding only below its own React Intl provider', async () => {
+		const enclosed = `import {IntlProvider as Provider, useIntl} from 'react-intl';
+			function Locale() { const { locale } = useIntl(); return <p lang={locale}/>; }
+			export function Page() { return <Provider locale="fr"><Locale/></Provider>; }`;
+		const sources = {
+			'src/Owned.tsx': enclosed,
+			'src/Exported.tsx': enclosed.replace('function Locale', 'export function Locale'),
+			'src/Escaped.tsx': enclosed + '\nexport {Locale as Consumer};',
+			'src/Nested.tsx': enclosed
+				.replace('Provider, useIntl', 'Provider, IntlContext, useIntl')
+				.replace(
+					'<p lang={locale}/>',
+					'<IntlContext.Consumer>{() => <b lang={locale}/>}</IntlContext.Consumer>',
+				),
+			'src/Raw.tsx': enclosed
+				.replace('IntlProvider as Provider', 'RawIntlProvider as Provider')
+				.replace('Page()', 'Page({formatter})')
+				.replace('locale="fr"', 'value={formatter}'),
+			'src/Spread.tsx': enclosed
+				.replace('Page()', 'Page({props})')
+				.replace('locale="fr"', 'locale="fr" {...props}'),
+			'src/Opaque.tsx': enclosed + '\nexport function Other() { consume(useIntl()); return <b/>; }',
+			'src/Rest.tsx': enclosed.replace('{ locale }', '{ locale, ...rest }'),
+			'src/Computed.tsx': enclosed.replace('{ locale }', "{ ['locale']: locale }"),
+			'src/Default.tsx': enclosed.replace('{ locale }', '{ locale = fallback() }'),
+			'src/Method.tsx': enclosed.replace('{ locale }', '{ formatMessage: locale }'),
+		};
+		const root = setup({
+			...sources,
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: { jsx: 'react-jsx', module: 'esnext', moduleResolution: 'bundler' },
+			}),
+		});
 		const { files } = await runCodemod(
 			Object.keys(sources).map((file) => path.join(root, file)),
-			{
-				root,
-				write: false,
-				strong: true,
-				projectTypes: false,
-			},
+			{ root, write: false, strong: true, projectTypes: true },
 		);
-		for (const [i, file] of Object.keys(sources).entries()) {
+		for (const file of Object.keys(sources)) {
 			const result = files.find((result) => result.file === file);
 			const errors = [...result.notes, ...result.diagnostics].filter((d) => d.severity === 'error');
-			if (i === 0) {
+			if (file === 'src/Owned.tsx') {
 				expect(result.strong).toBe(true);
 				expect(errors).toEqual([]);
 			} else {
-				expect(errors).toContainEqual(expect.objectContaining({ rule: 'bindings' }));
+				expect(errors).toContainEqual(
+					expect.objectContaining({
+						rule: 'bindings',
+						message: expect.stringContaining('useIntl'),
+					}),
+				);
 			}
 		}
 	});

@@ -2,4 +2,4 @@
 "@octanejs/codemod": patch
 ---
 
-Migrate component-owned React Intl hooks that destructure just the locale through the existing formatter adapter.
+Migrate React Intl locale destructuring when a private component reads from its proven local IntlProvider.
