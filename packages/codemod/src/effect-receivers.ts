@@ -114,6 +114,12 @@ export function effectReceivers(
 	});
 	if (names.has('eval') || !identifiers.every((dep) => fixedBinding(checker, dep, call))) return [];
 	const declarations = [];
+	// An otherwise unused dependency can intentionally restart the effect.
+	for (const { text } of identifiers) {
+		if (names.has(text)) continue;
+		declarations.push(`void ${text};`);
+		names.add(text);
+	}
 	for (const dep of identifiers) {
 		const symbol = checker.getSymbolAtLocation(dep);
 		const uses = symbol && members.get(symbol);
