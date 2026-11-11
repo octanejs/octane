@@ -28,3 +28,7 @@ import { useFloating, useInteractions, useHover, offset, flip } from '@octanejs/
 Current scope, known divergences, and verification status are tracked in the
 generated [bindings status table](../../docs/bindings-status.md), sourced from
 this package's [`status.json`](./status.json).
+
+For positioning without interaction context, import `useFloating` and middleware from
+`@octanejs/floating-ui/react-dom`. It exposes the `@floating-ui/react-dom` positioning API,
+including middleware dependency lists and the DOM library's `autoUpdate`.

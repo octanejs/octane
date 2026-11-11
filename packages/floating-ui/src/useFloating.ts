@@ -12,6 +12,7 @@ import type {
 } from '@floating-ui/dom';
 import { flushSync, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'octane';
 
+import type { UseFloatingOptions, UseFloatingReturn } from './react-dom';
 import { splitSlot, subSlot } from './internal';
 import { deepEqual, getDPR, roundByDPR } from './utils';
 import type {
@@ -52,9 +53,29 @@ export function usePositionFloating<RT extends ReferenceType = any>(
 // Loose fallback: pre-typing callers built untyped option bags in plain `.ts`;
 // they keep compiling while still receiving the typed return.
 export function usePositionFloating(args: unknown[]): UsePositionFloatingReturn<any>;
-export function usePositionFloating(args: any[]): any {
+export function usePositionFloating(args: unknown[]): UsePositionFloatingReturn<any> {
 	const [user, slot] = splitSlot(args);
-	const options = (user[0] as UsePositionFloatingOptions) ?? {};
+	return usePositionCore(user[0], slot, 'interactions');
+}
+
+export function useFloating<RT extends ReferenceType = ReferenceType>(
+	options?: UseFloatingOptions,
+): UseFloatingReturn<RT>;
+export function useFloating(
+	options?: UseFloatingOptions | symbol,
+	slot: symbol | undefined = undefined,
+): UseFloatingReturn<any> {
+	// A compiled call without options passes its slot as the first argument.
+	if (typeof options === 'symbol') return usePositionCore(undefined, options, 'positioning');
+	return usePositionCore(options, slot, 'positioning');
+}
+
+function usePositionCore(
+	input: UsePositionFloatingOptions | UseFloatingOptions | undefined,
+	slot: symbol | undefined,
+	mode: 'interactions' | 'positioning',
+): UsePositionFloatingReturn<any> {
+	const options = input ?? {};
 
 	const placement = options.placement ?? 'bottom';
 	const strategy = options.strategy ?? 'absolute';
@@ -88,6 +109,7 @@ export function usePositionFloating(args: any[]): any {
 		latestMiddlewareRef.current.revision += 1;
 	}
 	const middlewareRevision = latestMiddlewareRef.current.revision;
+	const middlewareAtRender = latestMiddlewareRef.current.value;
 
 	const [_reference, _setReference] = useState<ReferenceType | null>(null, subSlot(slot, 'ref'));
 	const [_floating, _setFloating] = useState<HTMLElement | null>(null, subSlot(slot, 'flo'));
@@ -100,7 +122,7 @@ export function usePositionFloating(args: any[]): any {
 	const setReference = useCallback(
 		(node: ReferenceType | null) => {
 			const detach = ++referenceDetachRef.current;
-			if (node === null) {
+			if (node === null && mode === 'interactions') {
 				queueMicrotask(() => {
 					const current = referenceRef.current;
 					if (
@@ -125,7 +147,7 @@ export function usePositionFloating(args: any[]): any {
 	const setFloating = useCallback(
 		(node: HTMLElement | null) => {
 			const detach = ++floatingDetachRef.current;
-			if (node === null) {
+			if (node === null && mode === 'interactions') {
 				queueMicrotask(() => {
 					const current = floatingRef.current;
 					if (floatingDetachRef.current === detach && current !== null && !current.isConnected) {
@@ -162,7 +184,8 @@ export function usePositionFloating(args: any[]): any {
 			const config: Partial<ComputePositionConfig> = {
 				placement,
 				strategy,
-				middleware: latestMiddlewareRef.current.value,
+				// A positioning update retained from an earlier render keeps its middleware.
+				middleware: mode === 'positioning' ? middlewareAtRender : latestMiddlewareRef.current.value,
 			};
 			if (platformRef.current) {
 				config.platform = platformRef.current;

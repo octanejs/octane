@@ -457,6 +457,12 @@ const ordinaryClassifications = [
 		reason: 'Published package metadata and tree-shaking boundary coverage.',
 	},
 	{
+		path: 'packages/floating-ui/tests/react-dom.test.ts',
+		disposition: 'octane-only-framework-contract',
+		reason:
+			'Checks DOM function identity, middleware dependencies, retained updates, and ref cleanup on the positioning-only entry.',
+	},
+	{
 		path: 'packages/floating-ui/tests/upstream-original.test.ts',
 		disposition: 'unmodified-upstream-suite-wrapper',
 		oracle:
@@ -467,6 +473,12 @@ const ordinaryClassifications = [
 		disposition: 'octane-only-type-conformance',
 		reason:
 			'Port-authored Octane public API probes that predate the one-for-one upstream declaration programs; supplemental type conformance, not upstream-suite identity evidence.',
+	},
+	{
+		path: 'packages/floating-ui/typetests/react-dom.test-d.ts',
+		disposition: 'octane-only-type-conformance',
+		reason:
+			'Checks positioning options, reference element types, and the mount cleanup signature on the positioning-only entry.',
 	},
 	{
 		path: 'packages/floating-ui/tests/adapted-divergences.test.ts',

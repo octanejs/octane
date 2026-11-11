@@ -73,8 +73,12 @@ export interface DeviceHints {
 	readonly quota: number | undefined;
 }
 
-/** Key material: a random secret of at least 128 bits, never a password. */
-export type CacheKey = string | BufferSource;
+/**
+ * Key material: a random secret of at least 128 bits, never a password, or an
+ * HKDF `CryptoKey` with `deriveKey` usage, which may be non-exportable, such
+ * as a handle a worker keeps in IndexedDB.
+ */
+export type CacheKey = string | BufferSource | CryptoKey;
 
 export interface PersistOptions {
 	readonly storage: PersistentStorage;
@@ -165,8 +169,10 @@ export interface Persistence {
 	recover(): Promise<Journaled[]>;
 	/** Values saved before now that hold one of these tags are restored stale. */
 	invalidated(tags: readonly string[]): void;
-	/** Clear the partition and stop saving. */
-	clear(): void;
+	/** Delete the saved value for `key`; rejects when storage fails. */
+	forget(key: string): Promise<void>;
+	/** Stop saving and clear the partition; rejects when storage fails. */
+	clear(): Promise<void>;
 }
 
 const encoder = new TextEncoder();
@@ -189,8 +195,16 @@ function fromBase64(text: string): Uint8Array<ArrayBuffer> {
 /** AES-GCM for values and HMAC for names, both derived from the session's key with HKDF. */
 async function createCipher(source: PersistOptions['key']) {
 	const secret = typeof source === 'function' ? await source() : source;
-	const material = typeof secret === 'string' ? encoder.encode(secret) : secret;
-	const base = await crypto.subtle.importKey('raw', material, 'HKDF', false, ['deriveKey']);
+	const base =
+		secret instanceof CryptoKey
+			? secret
+			: await crypto.subtle.importKey(
+					'raw',
+					typeof secret === 'string' ? encoder.encode(secret) : secret,
+					'HKDF',
+					false,
+					['deriveKey'],
+				);
 	const derive = (
 		info: string,
 		algorithm: AesKeyGenParams | HmacKeyGenParams,
@@ -517,6 +531,21 @@ export function createPersistence(
 			}
 			return writes.sort((a, b) => a.order[0] - b.order[0] || a.order[1] - b.order[1]);
 		},
+		forget(key) {
+			dirty.delete(key);
+			// After any save already under way, which may hold the value.
+			const forgetting = writing.then(async () => {
+				await ready;
+				if (cleared) return;
+				const name = await nameOf(key);
+				metas.delete(name);
+				touched.delete(name);
+				removed.delete(name);
+				await storage.commit(partition, [], [name]);
+			});
+			writing = forgetting.catch(() => {});
+			return forgetting;
+		},
 		invalidated(tags) {
 			const now = Date.now();
 			for (const tag of tags) marks.set(tag, now);
@@ -532,7 +561,7 @@ export function createPersistence(
 			touched.clear();
 			removed.clear();
 			// After any save already under way, so the clear is the last write.
-			writing = writing
+			const clearing = writing
 				.then(() => ready)
 				.then(async () => {
 					if (partition) {
@@ -542,8 +571,9 @@ export function createPersistence(
 							storage.clear(marksPartition),
 						]);
 					}
-				})
-				.catch(() => {});
+				});
+			writing = clearing.catch(() => {});
+			return clearing;
 		},
 	};
 }

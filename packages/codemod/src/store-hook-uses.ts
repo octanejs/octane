@@ -3,7 +3,7 @@ import { localUses, portableArguments, scalar } from './local-uses.js';
 import { skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
 
-type SharedInput = (module: string, name: string) => boolean;
+type SharedInput = (module: string, name: string) => boolean | 'opaque';
 type ResultCheck = {
 	item: ts.ImportSpecifier;
 	imported: SharedInput;
@@ -264,13 +264,24 @@ export function storeHookUses(
 			})
 		);
 	}
-	const argument = portableArguments(checker, typeOf);
-	function sharedHandle(expr: ts.Expression, imported: SharedInput): boolean {
+	const portable = portableArguments(checker, typeOf);
+	function argument(expr: ts.Expression, check: ResultCheck, allowShared = false) {
+		return portable(expr, (module, name) => {
+			const input = check.imported(module, name);
+			// A scalar key can still dispatch to renderer-owned code through the store.
+			return input === 'opaque' ? 'reject' : allowShared && input;
+		});
+	}
+	function sharedHandle(expr: ts.Expression, imported: SharedInput) {
 		if (!ts.isIdentifier(expr)) return false;
 		const d = checker.getSymbolAtLocation(expr)?.declarations?.[0];
 		if (!d || !ts.isImportSpecifier(d) || d.isTypeOnly || d.parent.parent.isTypeOnly) return false;
 		const spec = d.parent.parent.parent.moduleSpecifier;
-		return ts.isStringLiteral(spec) && imported(spec.text, (d.propertyName ?? d.name).text);
+		return (
+			!d.parent.parent.parent.attributes &&
+			ts.isStringLiteral(spec) &&
+			imported(spec.text, (d.propertyName ?? d.name).text)
+		);
 	}
 	// A call using an original handle can publish its other arguments to another renderer.
 	// Only literals and constants initialized with literals qualify.
@@ -311,7 +322,7 @@ export function storeHookUses(
 				(!direct || !value.questionDotToken) &&
 				ts.isIdentifier(value.expression) &&
 				checker.getSymbolAtLocation(value.expression)?.declarations?.[0] === check.item &&
-				value.arguments.every((arg) => plainData(arg) || sharedHandle(arg, check.imported))
+				value.arguments.every((arg) => plainData(arg) || sharedHandle(arg, check.imported) === true)
 			)
 				return value;
 			return;
@@ -344,7 +355,7 @@ export function storeHookUses(
 			ts.isCallExpression(read) &&
 			!read.questionDotToken &&
 			read.arguments.length === 1 &&
-			sharedHandle(read.arguments[0], check.imported) &&
+			sharedHandle(read.arguments[0], check.imported) === true &&
 			ts.isPropertyAccessExpression(read.expression) &&
 			named(read.expression) &&
 			!!originalReceiver(read.expression.expression, check, true)
@@ -425,7 +436,7 @@ export function storeHookUses(
 		}
 		if (ts.isPropertyAccessExpression(p)) return p.expression === value && safe(p, check);
 		if (ts.isElementAccessExpression(p))
-			return p.expression === value && argument(p.argumentExpression) && safe(p, check);
+			return p.expression === value && argument(p.argumentExpression, check) && safe(p, check);
 		if (
 			ts.isArrayLiteralExpression(p) &&
 			ts.isCallExpression(p.parent) &&
@@ -435,7 +446,7 @@ export function storeHookUses(
 			return true;
 		if (ts.isCallExpression(p)) {
 			if (p.expression === value) {
-				if (p.arguments.every((arg) => argument(arg))) {
+				if (p.arguments.every((arg) => argument(arg, check))) {
 					const first = p.arguments[0];
 					if (
 						check.serviceArguments &&
@@ -464,7 +475,7 @@ export function storeHookUses(
 					ts.isPropertyAccessExpression(value) &&
 					!!originalReceiver(value.expression, check) &&
 					!!handle &&
-					sharedHandle(handle, check.imported) &&
+					sharedHandle(handle, check.imported) === true &&
 					p.arguments.slice(1).every(plainData) &&
 					safe(p, check)
 				);
@@ -512,7 +523,7 @@ export function storeHookUses(
 						ts.isArrowFunction(owner) ||
 						ts.isFunctionExpression(owner)) &&
 					componentUses(owner) &&
-					call.arguments.every((arg) => argument(arg, imported)) &&
+					call.arguments.every((arg) => argument(arg, check, true)) &&
 					safe(call, check)
 				);
 			})
