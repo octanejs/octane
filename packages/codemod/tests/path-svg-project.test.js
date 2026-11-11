@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { createElement } from 'react';
@@ -342,7 +343,7 @@ it('keeps distinct component types for separate SVG modules with identical sourc
 	}
 });
 
-async function expectSvgClassParity(view, states, count, projectFiles = {}) {
+async function expectSvgRenderParity(view, states, count, projectFiles = {}) {
 	const { root, file } = fixture("import Mark from './icons/mark.svg';\n" + view);
 	for (const [name, contents] of Object.entries(projectFiles)) {
 		fs.writeFileSync(path.join(root, 'src', name), contents);
@@ -416,7 +417,7 @@ it('preserves scoped and composed CSS module classes on SVGs on the server and c
 	const {
 		root,
 		classes: [plain, paired, restored],
-	} = await expectSvgClassParity(
+	} = await expectSvgRenderParity(
 		`import glyphs from './status.module.css';
 		import {clsx as join} from 'clsx';
 		export function Pane({accent}) {
@@ -548,7 +549,7 @@ it('keeps the SVG diagnostic when the stylesheet import is rewritten to a JavaSc
 });
 
 it('preserves clsx-selected classes on direct SVG children on the server and after client updates', async () => {
-	await expectSvgClassParity(
+	await expectSvgRenderParity(
 		`import classes, {clsx as join} from 'clsx';
 		export function Pane({active, muted}) { return <button>
 			<Mark className={classes('icon', active ? 'active' : 'idle', !muted && 'visible')}/>
@@ -561,6 +562,127 @@ it('preserves clsx-selected classes on direct SVG children on the server and aft
 		],
 		2,
 	);
+});
+
+it('renders a selected SVG from a block-scoped local on the server and across client updates', async () => {
+	await expectSvgRenderParity(
+		`import {useState} from 'react';
+		export function Sibling() { const [open] = useState(false); return <aside hidden={!open}/>; }
+		function Frame({children}) { return <button>{children}</button>; }
+		export function Pane({mode}) {
+			const fixed = (<Mark className="fixed"/>);
+			let choice = <em/>;
+			switch (mode) {
+				case 'svg': choice = (<Mark className="optional" aria-hidden/>); break;
+				case 'empty': choice = null; break;
+			}
+			return <section>{mode === 'fixed' ? fixed : <Frame>{choice}</Frame>}</section>;
+		}`,
+		[
+			{ mode: 'fixed' },
+			{ mode: 'svg' },
+			{ mode: 'other' },
+			{ mode: 'empty' },
+			{ mode: 'svg' },
+			{ mode: 'fixed' },
+		],
+		2,
+	);
+});
+
+it.each([
+	[
+		'an effectful stored parent',
+		'const icon = <span data-x={observe()}><Mark/></span>; return <main>{icon}</main>;',
+	],
+	[
+		'a stored component wrapper',
+		'function Frame({children}) { return <i>{children}</i>; } const icon = <Frame><Mark/></Frame>; return <main>{icon}</main>;',
+	],
+	[
+		'a dynamic class captured before reassignment',
+		'let name = "first"; const icon = <Mark className={name}/>; name = "later"; return <span>{icon}</span>;',
+	],
+	[
+		'a native outlet before the SVG is assigned',
+		'let icon; if (early) return <span>{icon}</span>; icon = <Mark/>; return <button/>;',
+	],
+	[
+		'an early return before the SVG assignment and outlet',
+		'let icon; if (early) return <button/>; icon = <Mark/>; return <span>{icon}</span>;',
+	],
+	[
+		'an observed assignment result',
+		'let icon; observe(icon = <Mark/>); return <span>{icon}</span>;',
+	],
+	[
+		'a chained assignment',
+		'let other, icon; other = icon = <Mark/>; observe(other); return <span>{icon}</span>;',
+	],
+	['a disposal binding', 'using icon = <Mark/>; return <span>{icon}</span>;'],
+	[
+		'an unverified hook in its owner',
+		'useRemote(); const icon = <Mark/>; return <span>{icon}</span>;',
+		'import {useRemote} from "external-renderer";',
+	],
+	['an escaping read', 'const icon = <Mark/>; observe(icon); return <span>{icon}</span>;'],
+	['a captured read', 'const icon = <Mark/>; register(() => icon); return <span>{icon}</span>;'],
+	[
+		'a captured write',
+		'let icon; register(() => { icon = <Mark/>; }); return <span>{icon}</span>;',
+	],
+	['two render outlets', 'const icon = <Mark/>; return <div>{icon}{icon}</div>;'],
+	['an unproven renderer', 'const icon = <Mark/>; return <Unknown>{icon}</Unknown>;'],
+	['a text outlet', 'let icon: string; icon = <Mark/>; return <span>{icon}</span>;'],
+])('keeps a local SVG with %s guarded', async (_reason, body, imports = '') => {
+	const { root, file } = fixture(`import Mark from './icons/mark.svg'; ${imports}
+		export function Pane({observe, register, Unknown, early}) { ${body} }`);
+	const { files } = await runCodemod([file], { root, svgPaths: true, write: false });
+	const caller = files.find((f) => f.file === 'src/pane.tsx');
+	expect(caller.rules['svg-paths']).toBeUndefined();
+	expect(caller.notes).toContainEqual(
+		expect.objectContaining({ rule: 'svg-issuer', severity: 'error' }),
+	);
+	expect(files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
+});
+
+it('requires a resolved renderable annotation for a typed SVG local', async () => {
+	const { root, file } = fixture(`import Mark from './icons/mark.svg';
+		import type { ReactNode } from 'react';
+		import type { Caption } from './model';
+		export function Pane({show}) {
+			let icon: ReactNode;
+			if (show) icon = <Mark/>;
+			return <button>{icon}</button>;
+		}`);
+	const model = path.join(root, 'src/model.ts');
+	fs.writeFileSync(model, 'export type Caption = string;');
+	const types = path.join(root, 'src/node_modules/@types');
+	fs.mkdirSync(types, { recursive: true });
+	const require = createRequire(import.meta.resolve('react-intl'));
+	fs.symlinkSync(
+		path.dirname(require.resolve('@types/react/package.json')),
+		path.join(types, 'react'),
+		'dir',
+	);
+	const config = path.join(root, 'tsconfig.json');
+	const tsconfig = JSON.parse(fs.readFileSync(config, 'utf8'));
+	tsconfig.compilerOptions.strict = true;
+	fs.writeFileSync(config, JSON.stringify(tsconfig));
+	const options = { root, svgPaths: true, projectTypes: true, write: false };
+	const caller = (result) => result.files.find((f) => f.file === 'src/pane.tsx');
+	expect(caller(await runCodemod([file], options)).rules['svg-paths']).toBe(1);
+	fs.writeFileSync(
+		file,
+		fs.readFileSync(file, 'utf8').replace('let icon: ReactNode;', 'let icon: Caption;'),
+	);
+	for (const projectTypes of [true, false]) {
+		const result = caller(await runCodemod([file], { ...options, projectTypes }));
+		expect(result.rules['svg-paths']).toBeUndefined();
+		expect(result.notes).toContainEqual(
+			expect.objectContaining({ rule: 'svg-issuer', severity: 'error' }),
+		);
+	}
 });
 
 it.each([
@@ -648,7 +770,7 @@ it('matches React class coercion for values passed to a directly returned icon',
 		() => 'status',
 		{ [Symbol.toPrimitive]: (hint) => hint },
 	];
-	await expectSvgClassParity(
+	await expectSvgRenderParity(
 		'export function Pane({className}) { return <Mark className={className}/>; }',
 		classes.map((className) => ({ className })),
 		1,

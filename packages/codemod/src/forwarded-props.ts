@@ -256,6 +256,107 @@ function callsHook(node: ts.Node, checker: ts.TypeChecker) {
 	);
 }
 
+export function literalSvgAttribute(attr: ts.JsxAttributeLike) {
+	if (!ts.isJsxAttribute(attr)) return false;
+	const value = attr.initializer;
+	return (
+		!value ||
+		ts.isStringLiteral(value) ||
+		(ts.isJsxExpression(value) &&
+			(value.expression?.kind === ts.SyntaxKind.TrueKeyword ||
+				value.expression?.kind === ts.SyntaxKind.FalseKeyword))
+	);
+}
+
+function standaloneWrite(node: ts.Node): node is ts.BinaryExpression {
+	return (
+		ts.isBinaryExpression(node) &&
+		node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+		ts.isExpressionStatement(node.parent)
+	);
+}
+
+/** Follow one stored SVG value to its only runtime read, inside the same component body. */
+export function svgLocalReads(
+	checker: ts.TypeChecker,
+	uses: ReturnType<typeof localUses>,
+	typeOf: RenderTypes['typeOf'],
+	reactNode: (annotation: ts.TypeNode) => boolean,
+) {
+	const reads = new Map<ts.VariableDeclaration, ts.Identifier | undefined>();
+	const eligibleBodies = new Map<ts.Block, boolean>();
+
+	function outlet(decl: ts.VariableDeclaration, name: ts.Identifier) {
+		const list = decl.parent;
+		if (
+			!ts.isVariableDeclarationList(list) ||
+			!(list.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const)) ||
+			list.flags & ts.NodeFlags.Using ||
+			!ts.isVariableStatement(list.parent)
+		)
+			return;
+		const body = list.parent.parent;
+		if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent)) return;
+		const fn = body.parent;
+		const annotation = decl.type ?? ts.getJSDocType(decl);
+		if (annotation && !renderType(typeOf(annotation)) && !reactNode(annotation)) return;
+
+		let read: ts.Identifier | undefined;
+		for (const ref of renderUses(uses(name))) {
+			if (ts.findAncestor(ref, ts.isFunctionLike) !== fn) return;
+			if (standaloneWrite(ref.parent) && ref.parent.left === ref) continue;
+			if (read) return;
+			read = ref;
+		}
+		if (!read) return;
+		if (!eligibleBodies.has(body)) {
+			const last = body.statements.at(-1);
+			// Early returns can split mutable locals across compiler-generated functions.
+			eligibleBodies.set(
+				body,
+				!!last &&
+					ts.isReturnStatement(last) &&
+					!contains(
+						fn,
+						(node) =>
+							callsHook(node, checker) ||
+							(ts.isReturnStatement(node) &&
+								node !== last &&
+								ts.findAncestor(node, ts.isFunctionLike) === fn),
+					),
+			);
+		}
+		return eligibleBodies.get(body) ? read : undefined;
+	}
+
+	return (element: ts.JsxSelfClosingElement) => {
+		let value: ts.Node = element;
+		while (ts.isParenthesizedExpression(value.parent)) value = value.parent;
+		const parent = value.parent;
+		// A chained assignment or call can receive the element independently of the local.
+		const name =
+			ts.isVariableDeclaration(parent) && parent.initializer === value
+				? parent.name
+				: standaloneWrite(parent) && parent.right === value
+					? parent.left
+					: undefined;
+		if (!name || !ts.isIdentifier(name)) return;
+		// Literal props have the same value at assignment and at the render outlet.
+		if (!element.attributes.properties.every(literalSvgAttribute)) return;
+		const symbol = checker.getSymbolAtLocation(name);
+		const decl = symbol?.valueDeclaration;
+		if (
+			!decl ||
+			symbol.declarations?.length !== 1 ||
+			!ts.isVariableDeclaration(decl) ||
+			!ts.isIdentifier(decl.name)
+		)
+			return;
+		if (!reads.has(decl)) reads.set(decl, outlet(decl, decl.name));
+		return reads.get(decl);
+	};
+}
+
 /** Prove where a selected component delivers every reference to an incoming prop. */
 export function forwardedProps(
 	file: ts.SourceFile,

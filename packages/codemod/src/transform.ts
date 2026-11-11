@@ -1,4 +1,10 @@
-import { forwardedProps, nativeOutputOwner, renderUses } from './forwarded-props.js';
+import {
+	forwardedProps,
+	literalSvgAttribute,
+	nativeOutputOwner,
+	renderUses,
+	svgLocalReads,
+} from './forwarded-props.js';
 import { reactRenderer, staticReactProps } from './react-renderer.js';
 import { localUses, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
@@ -1148,14 +1154,7 @@ class ModuleTransform {
 							!!value.expression &&
 							this.svgClassName(value.expression)))
 				);
-			return (
-				attr.name.text === 'aria-hidden' &&
-				(!value ||
-					ts.isStringLiteral(value) ||
-					(ts.isJsxExpression(value) &&
-						(value.expression?.kind === ts.SyntaxKind.TrueKeyword ||
-							value.expression?.kind === ts.SyntaxKind.FalseKeyword)))
-			);
+			return attr.name.text === 'aria-hidden' && literalSvgAttribute(attr);
 		});
 		if (!supported) return false;
 		return this.nativeSvgOutput(tag, uses, unproven);
@@ -1222,10 +1221,11 @@ class ModuleTransform {
 		);
 	}
 
+	private svgRead?: ReturnType<typeof svgLocalReads>;
 	private nativeSvgProps?: ReturnType<typeof forwardedProps>;
 	private provenSvgOwners?: Set<ts.Node>;
 	private nativeSvgOutput(
-		element: ts.Node,
+		element: ts.JsxSelfClosingElement,
 		uses: ReturnType<typeof localUses>,
 		unproven: (tag: ts.Identifier, prop: string) => void,
 	): boolean {
@@ -1241,7 +1241,13 @@ class ModuleTransform {
 			if (!known) unproven(tag, prop);
 			return known;
 		};
-		const first = nativeOutputOwner(element, slot, destination);
+		this.svgRead ??= svgLocalReads(
+			this.checker,
+			uses,
+			typeOf,
+			(type) => ts.isTypeReferenceNode(type) && this.reactTypeName(type.typeName) === 'ReactNode',
+		);
+		const first = nativeOutputOwner(this.svgRead(element) ?? element, slot, destination);
 		if (!first) return false;
 		const pending = [first];
 		const proven = (this.provenSvgOwners ??= new Set());
