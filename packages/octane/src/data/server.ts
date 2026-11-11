@@ -24,6 +24,17 @@ import {
 	issueMap,
 	type FormSeed,
 } from './form.js';
+import type { ServerCallContext } from '../server-call.js';
+
+/**
+ * What a server integration knows of a request beyond the `Request` itself:
+ * the viewer its middleware authenticated and its platform bindings. A server
+ * call's context and a middleware `Context` both have this shape.
+ */
+export interface DataCaller {
+	readonly viewer?: unknown;
+	readonly platform?: unknown;
+}
 
 /** Serves HTTP requests, and the same contracts in process for a server render. */
 export interface DataServer {
@@ -35,10 +46,25 @@ export interface DataServer {
 	 */
 	transport(request: Request): Transport;
 	/**
+	 * Answer one store request sent through a `module server` function, as
+	 * `serverTransport` encodes it. The call's request and signal stand in for
+	 * an HTTP request's, so the same handlers serve both:
+	 *
+	 * ```tsrx
+	 * module server {
+	 *   export async function data(request: string, call: ServerCallContext) {
+	 *     return handler.serve(request, call);
+	 *   }
+	 * }
+	 * ```
+	 */
+	serve(request: string, call: ServerCallContext): Promise<string>;
+	/**
 	 * Call before rendering a page. Signs the page's forms for the request's
 	 * account and, when the request is a form's native POST, runs its write.
+	 * Middleware passes its context as `caller`, so `context` sees its viewer.
 	 */
-	forms(request: Request): Promise<FormSession>;
+	forms(request: Request, caller?: DataCaller): Promise<FormSession>;
 }
 
 export interface FormSession {
@@ -114,7 +140,7 @@ function respond(status: number, reply: DataReply): Response {
 export function createDataHandler<C extends object = {}>(
 	options: {
 		/** Authenticate the request and return what handlers need, such as the viewer. */
-		context?: (request: Request) => C | Promise<C>;
+		context?: (request: Request, caller?: DataCaller) => C | Promise<C>;
 		/** Origins other than the request's own that may call this endpoint. */
 		allowedOrigins?: readonly string[];
 		/** Signs form tokens. Required for `forms()`; keep it out of client code. */
@@ -145,14 +171,19 @@ export function createDataHandler<C extends object = {}>(
 		return contract.output ? parse(contract.output, output) : output;
 	}
 
-	const contextFor = async (request: Request) =>
-		options.context ? await options.context(request) : ({} as C);
+	const contextFor = async (request: Request, caller?: DataCaller) =>
+		options.context ? await options.context(request, caller) : ({} as C);
 
-	function callFor(context: C, request: Request, operationId: string): C & DataCall {
+	function callFor(
+		context: C,
+		request: Request,
+		operationId: string,
+		signal = request.signal,
+	): C & DataCall {
 		const call: C & DataCall = {
 			...context,
 			request,
-			signal: request.signal,
+			signal,
 			operationId,
 			read: (read, input) => run('read', read.name, input, call) as Promise<any>,
 		};
@@ -169,10 +200,15 @@ export function createDataHandler<C extends object = {}>(
 	};
 
 	/** Answer one request. Anything but a reply means the outcome is unknown. */
-	async function answer(payload: DataRequest, request: Request): Promise<DataReply> {
+	async function answer(
+		payload: DataRequest,
+		request: Request,
+		server?: ServerCallContext,
+	): Promise<DataReply> {
 		try {
 			const operationId = payload.kind === 'write' ? String(payload.operationId ?? '') : '';
-			const call = callFor(await contextFor(request), request, operationId);
+			const context = await contextFor(request, server);
+			const call = callFor(context, request, operationId, server?.signal);
 			const value = await run(payload.kind, payload.name, payload.input, call);
 			if (payload.kind !== 'write' || !Array.isArray(payload.refresh)) return { ok: true, value };
 			// The write has committed. A read that fails here is left for the client to reload.
@@ -222,8 +258,8 @@ export function createDataHandler<C extends object = {}>(
 			.replace(/=+$/, '');
 	}
 
-	async function forms(request: Request): Promise<FormSession> {
-		const context = await contextFor(request);
+	async function forms(request: Request, caller?: DataCaller): Promise<FormSession> {
+		const context = await contextFor(request, caller);
 		const form: FormSeed = {
 			token: await sign(options.grant?.(context) ?? ''),
 			nonce: crypto.randomUUID(),
@@ -283,5 +319,8 @@ export function createDataHandler<C extends object = {}>(
 			(payload) =>
 				answer(payload, request),
 		forms,
+		// devalue on both sides, as over HTTP: a server call carries only plain data.
+		serve: async (request: string, call: ServerCallContext) =>
+			devalue.stringify(await answer(devalue.parse(request), call.request, call)),
 	});
 }
