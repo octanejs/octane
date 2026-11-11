@@ -2494,13 +2494,16 @@ class ModuleTransform {
 		const specifier = argument.literal;
 		const module = REACT_MODULES[specifier.text];
 		if (module === undefined) return this.rewriteSpecifier(node, specifier);
-		this.count(RULE.import);
 		const qualifier = node.qualifier;
 		const name = qualifier && ts.isIdentifier(qualifier) ? qualifier.text : null;
 		if (specifier.text === 'react' && !node.isTypeOf) {
 			const event = this.nativeSubmitType(node, name);
-			if (event) return event;
+			if (event !== undefined) {
+				if (event !== null) this.count(RULE.import);
+				return event;
+			}
 		}
+		this.count(RULE.import);
 		const renamed = name === null ? null : mapQualifiedType(name);
 		if (name !== null && renamed === null) {
 			this.note(RULE.unsupported, 'warning', node, `Octane has no type \`${name}\`.`);
@@ -3290,7 +3293,7 @@ class ModuleTransform {
 	}
 
 	private nativeSubmitType(node: ts.NodeWithTypeArguments, name: string | null) {
-		if (name !== 'SubmitEvent' && name !== 'SubmitEventHandler') return null;
+		if (name !== 'SubmitEvent' && name !== 'SubmitEventHandler') return undefined;
 		const global = this.checker.resolveName(
 			'globalThis',
 			node,

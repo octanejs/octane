@@ -556,17 +556,20 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		expect(code).toContain('register(callback)');
 	});
 
-	it('defers native submit type conversion when the DOM namespace is shadowed', () => {
-		const { code, notes } = transformModule(
-			`declare namespace globalThis { type Element = string; type SubmitEvent = string; }
-			export type Submit = import('react').SubmitEvent;`,
-			'form-types.ts',
-		);
-		expect(code).not.toContain('NativeEvent<globalThis.Element');
-		expect(notes).toContainEqual(
-			expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
-		);
-	});
+	it.each(['SubmitEvent', 'SubmitEventHandler'])(
+		'keeps the React %s import type when globalThis is shadowed',
+		(name) => {
+			const { code, notes } = transformModule(
+				`declare namespace globalThis { type Element = string; type SubmitEvent = string; }
+			export type Submit = import('react').${name}<HTMLFormElement>;`,
+				'form-types.ts',
+			);
+			expect(code).toContain(`import('react').${name}<HTMLFormElement>`);
+			expect(notes.filter((n) => n.rule === 'unsupported-api')).toEqual([
+				expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+			]);
+		},
+	);
 
 	it('retains a React submit event re-export for review', () => {
 		const source = "export type {SubmitEvent as Submit} from 'react';";
