@@ -1,4 +1,10 @@
-import { forwardedProps, nativeOutputOwner, renderUses } from './forwarded-props.js';
+import {
+	forwardedProps,
+	literalSvgAttribute,
+	nativeOutputOwner,
+	renderUses,
+	svgLocalReads,
+} from './forwarded-props.js';
 import { reactRenderer, staticReactProps } from './react-renderer.js';
 import { localUses, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
@@ -237,6 +243,32 @@ function svgClassToken(expr: ts.Expression, truthTest = false): boolean {
 			);
 	}
 	return false;
+}
+
+// A renderer can evaluate a child prop later than React. Keep the class map private
+// to reads of individual tokens, including through another import of the same sheet.
+function readsCssToken(ref: ts.Identifier) {
+	const member = ref.parent;
+	if (
+		!ts.isPropertyAccessExpression(member) ||
+		member.expression !== ref ||
+		!ts.isIdentifier(member.name) ||
+		Object.hasOwn(Object.prototype, member.name.text)
+	)
+		return false;
+	let value: ts.Expression = member;
+	while (isWrapper(value.parent) && value.parent.expression === value) value = value.parent;
+	const use = value.parent;
+	return (
+		ts.isJsxExpression(use) ||
+		(ts.isCallExpression(use) && use.arguments.includes(value)) ||
+		(ts.isVariableDeclaration(use) && use.initializer === value) ||
+		ts.isConditionalExpression(use) ||
+		(ts.isPrefixUnaryExpression(use) && use.operator === ts.SyntaxKind.ExclamationToken) ||
+		(ts.isBinaryExpression(use) &&
+			(use.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
+				use.operatorToken.kind === ts.SyntaxKind.BarBarToken))
+	);
 }
 
 /**
@@ -838,11 +870,9 @@ class ModuleTransform {
 			entry.port = this.portOf(entry.module);
 			if (entry.port) portLocals.add(entry.local);
 		}
-		let uses: ReturnType<typeof localUses> | undefined;
 		for (const [element, { item, props }] of descriptors) {
 			if (this.nativeIntl.has(item) && !this.originalStoreTags.has(item)) {
-				uses ??= localUses(this.sf, this.checker);
-				if (uses(item.name).every((ref) => descriptors.has(ref.parent)))
+				if (this.localUses(item.name).every((ref) => descriptors.has(ref.parent)))
 					this.nativeIntl.delete(item);
 				else this.originalStoreTags.set(item, 'OriginalReact' + item.name.text);
 			}
@@ -904,10 +934,9 @@ class ModuleTransform {
 					!/\.svg$/i.test(binding.module)
 				)
 					continue;
-				uses ??= localUses(this.sf, this.checker);
-				const refs = uses(declaration.name);
+				const refs = this.localUses(declaration.name);
 				const eligible = refs.map((ref) =>
-					this.nativePathSvgUse(ref, uses!, (tag, prop) =>
+					this.nativePathSvgUse(ref, this.localUses, (tag, prop) =>
 						unknownSvgSlots.set(
 							ref,
 							` Cannot prove where <${tag.text}> renders its ${prop === 'children' ? 'children' : prop + ' prop'}.`,
@@ -1125,21 +1154,52 @@ class ModuleTransform {
 							!!value.expression &&
 							this.svgClassName(value.expression)))
 				);
-			return (
-				attr.name.text === 'aria-hidden' &&
-				(!value ||
-					ts.isStringLiteral(value) ||
-					(ts.isJsxExpression(value) &&
-						(value.expression?.kind === ts.SyntaxKind.TrueKeyword ||
-							value.expression?.kind === ts.SyntaxKind.FalseKeyword)))
-			);
+			return attr.name.text === 'aria-hidden' && literalSvgAttribute(attr);
 		});
 		if (!supported) return false;
 		return this.nativeSvgOutput(tag, uses, unproven);
 	}
 
+	private references?: ReturnType<typeof localUses>;
+	private get localUses() {
+		return (this.references ??= localUses(this.sf, this.checker));
+	}
+
+	private cssClassBindings?: Set<ts.Node>;
+	private findCssClassBindings() {
+		const files = new Map<ts.Node, string>();
+		const mutable = new Set<string>();
+		for (const [decl, binding] of this.imports) {
+			if (binding.typeOnly) continue;
+			const file = this.options.cssModuleFile?.(binding.module);
+			if (!file) continue;
+			files.set(decl, file);
+			if (
+				binding.imported !== 'default' ||
+				!(ts.isImportClause(decl) || ts.isImportSpecifier(decl)) ||
+				!decl.name ||
+				ts.findAncestor(decl, ts.isImportDeclaration)?.attributes ||
+				(this.resolve(binding.module) ?? binding.module) !== binding.module ||
+				!renderUses(this.localUses(decl.name)).every(readsCssToken)
+			)
+				mutable.add(file);
+		}
+		const safe = new Set<ts.Node>();
+		for (const [decl, file] of files) if (!mutable.has(file)) safe.add(decl);
+		return safe;
+	}
+
+	private svgCssClass(expr: ts.PropertyAccessExpression) {
+		if (expr.questionDotToken || !ts.isIdentifier(expr.expression)) return false;
+		const decl = this.declarationOf(expr.expression);
+		if (!decl || !this.imports.get(decl)?.module.endsWith('.module.css')) return false;
+		this.cssClassBindings ??= this.findCssClassBindings();
+		return this.cssClassBindings.has(decl);
+	}
+
 	private svgClassName(expr: ts.Expression) {
 		if (ts.isIdentifier(expr)) return true;
+		if (ts.isPropertyAccessExpression(expr)) return this.svgCssClass(expr);
 		if (!ts.isCallExpression(expr) || !ts.isIdentifier(expr.expression)) return false;
 		const declaration = this.declarationOf(expr.expression);
 		const binding = declaration && this.imports.get(declaration);
@@ -1149,15 +1209,23 @@ class ModuleTransform {
 			(binding.imported === 'default' || binding.imported === 'clsx') &&
 			!ts.findAncestor(declaration!, ts.isImportDeclaration)?.attributes &&
 			(this.resolve('clsx') ?? 'clsx') === 'clsx' &&
-			expr.arguments.every((arg) => svgClassToken(arg)) &&
+			(expr.arguments.every((arg) => svgClassToken(arg)) ||
+				expr.arguments.every((arg) => {
+					const token = skipWrappers(arg);
+					return (
+						ts.isStringLiteralLike(token) ||
+						(ts.isPropertyAccessExpression(token) && this.svgCssClass(token))
+					);
+				})) &&
 			this.options.installedClsx === true
 		);
 	}
 
+	private svgRead?: ReturnType<typeof svgLocalReads>;
 	private nativeSvgProps?: ReturnType<typeof forwardedProps>;
 	private provenSvgOwners?: Set<ts.Node>;
 	private nativeSvgOutput(
-		element: ts.Node,
+		element: ts.JsxSelfClosingElement,
 		uses: ReturnType<typeof localUses>,
 		unproven: (tag: ts.Identifier, prop: string) => void,
 	): boolean {
@@ -1173,7 +1241,13 @@ class ModuleTransform {
 			if (!known) unproven(tag, prop);
 			return known;
 		};
-		const first = nativeOutputOwner(element, slot, destination);
+		this.svgRead ??= svgLocalReads(
+			this.checker,
+			uses,
+			typeOf,
+			(type) => ts.isTypeReferenceNode(type) && this.reactTypeName(type.typeName) === 'ReactNode',
+		);
+		const first = nativeOutputOwner(this.svgRead(element) ?? element, slot, destination);
 		if (!first) return false;
 		const pending = [first];
 		const proven = (this.provenSvgOwners ??= new Set());

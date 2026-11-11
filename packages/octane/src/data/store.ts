@@ -327,6 +327,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			savedAt: entry.fetchedAt,
 			stale: entry.stale,
 			span: span && { start: span.start, first: span.first, last: span.last },
+			tags: [...entry.read.tags, ...entry.names],
 		};
 		return { stored, read: entry.read };
 	}
@@ -1001,6 +1002,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			});
 		}
 		const tags = writeTags(operation.write);
+		// Saved values no entry holds now are marked too, for the session that restores them.
+		persisted?.invalidated(tags);
 		for (const entry of entries.values()) {
 			// A first load of a read that selects entities has no value yet to say which ones,
 			// and may predate the write. Reads that select none are untouched unless a tag names them.
@@ -1256,6 +1259,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		},
 		invalidate(tags) {
 			assertLive();
+			persisted?.invalidated(tags);
 			for (const entry of entries.values()) if (affects(entry, tags)) invalidateEntry(entry);
 		},
 		settle(operationId, confirmed, value) {

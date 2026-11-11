@@ -13,6 +13,10 @@
  * - A value saved under another shape of its read's output schema, where the
  *   validator describes one, or another `version`, is discarded unread. One
  *   that fails validation when restored is discarded too.
+ * - A saved value that a later write or `invalidate()` marked stale, in this
+ *   session or another, is restored stale, though it was never loaded then:
+ *   each tag and entity name keeps the time it was last marked, and each
+ *   value the time it was saved and the names it holds.
  * - Saves are coalesced into one storage transaction per host task.
  * - A durable write is in the journal before it is sent, and leaves it only
  *   once its outcome is known. A restart finds it there, shows its edit again
@@ -139,6 +143,8 @@ export interface Stored {
 	readonly savedAt: number;
 	readonly stale: boolean;
 	readonly span: unknown;
+	/** The read's tags and the entity names its value holds, which writes mark stale. */
+	readonly tags: readonly string[];
 }
 
 /** A value to save, and the read it belongs to. */
@@ -157,6 +163,8 @@ export interface Persistence {
 	unjournal(id: string): void;
 	/** The writes a previous session left in the journal. */
 	recover(): Promise<Journaled[]>;
+	/** Values saved before now that hold one of these tags are restored stale. */
+	invalidated(tags: readonly string[]): void;
 	/** Clear the partition and stop saving. */
 	clear(): void;
 }
@@ -255,6 +263,10 @@ export function createPersistence(
 	/** Journaled operation IDs, and their hashed names. */
 	const journaled = new Map<string, string>();
 	const ended = new Set<string>();
+	/** When each tag was last marked stale, kept in its own partition. */
+	let marksPartition = '';
+	const marks = new Map<string, number>();
+	let marksChanged = false;
 	/** Saved values' metadata, by hashed name. */
 	let metas = new Map<string, StoredMeta>();
 	/** Hashed names of keys seen this session, and the reverse. */
@@ -279,7 +291,16 @@ export function createPersistence(
 			typeof setting === 'number' ? setting : (setting === 'auto' ? autoBudget : setting)(hints);
 		// Keys saved while the index loaded are newer than what it lists.
 		for (const meta of index) if (!metas.has(meta.key)) metas.set(meta.key, meta);
-		purge(Date.now());
+		marksPartition = await cipher.name(`marks\n${options.partition}`);
+		const saved = await storage.get(marksPartition, marksPartition);
+		if (saved !== undefined) {
+			for (const [tag, at] of devalue.parse(await cipher.open(saved, marksPartition))) {
+				// Marks made while the index loaded are newer.
+				if (!marks.has(tag)) marks.set(tag, at);
+			}
+		}
+		// Only what has expired: which values are in use is known once components ask for them.
+		purge(Date.now(), Infinity);
 		if (removed.size > 0) schedule();
 	})().catch(() => {
 		// Storage that cannot be read, such as a private window's, or no key leaves the store in memory only.
@@ -315,15 +336,15 @@ export function createPersistence(
 	}
 
 	/** Delete expired values, then the least recently used, until the partition fits. */
-	function purge(now: number): void {
+	function purge(now: number, limit = budget): void {
 		let total = 0;
 		for (const meta of metas.values()) total += meta.size;
-		if (total <= budget && ![...metas.values()].some((meta) => expired(meta, now))) return;
+		if (total <= limit && ![...metas.values()].some((meta) => expired(meta, now))) return;
 		const order = [...metas.values()]
 			.filter((meta) => !inUse(owners.get(meta.key) ?? ''))
 			.sort((a, b) => Number(expired(b, now)) - Number(expired(a, now)) || a.lastUsed - b.lastUsed);
 		for (const meta of order) {
-			if (!expired(meta, now) && total <= budget * 0.9) break;
+			if (!expired(meta, now) && total <= limit * 0.9) break;
 			total -= meta.size;
 			metas.delete(meta.key);
 			removed.add(meta.key);
@@ -346,7 +367,8 @@ export function createPersistence(
 				continue;
 			}
 			const { stored, read } = saving;
-			const value = await cipher.seal(devalue.stringify(stored), name);
+			// `at` is when the value was last known current, which marks are compared with.
+			const value = await cipher.seal(devalue.stringify({ ...stored, at: now }), name);
 			const meta: StoredMeta = {
 				key: name,
 				size: value.length,
@@ -376,6 +398,22 @@ export function createPersistence(
 			ended.clear();
 			await storage.commit(journalPartition, [], done).catch(() => {});
 		}
+		if (!cleared && marksChanged) {
+			marksChanged = false;
+			const value = await cipher.seal(devalue.stringify([...marks]), marksPartition);
+			const meta = {
+				key: marksPartition,
+				size: value.length,
+				savedAt: now,
+				expiresAt: null,
+				lastUsed: now,
+				version: '',
+			};
+			await storage.commit(marksPartition, [{ meta, value }], []).catch(() => {
+				// Marks keep restored values honest, so a failed save is tried again at the next one.
+				marksChanged = true;
+			});
+		}
 	}
 
 	function forget(name: string): void {
@@ -404,12 +442,13 @@ export function createPersistence(
 			const text = await storage.get(partition, name).catch(() => undefined);
 			if (cleared || text === undefined) return undefined;
 			try {
-				const stored = devalue.parse(await cipher.open(text, name)) as Stored;
+				const stored = devalue.parse(await cipher.open(text, name)) as Stored & { at: number };
 				// Purging reads this order, so it must see the use now, not after the next save.
 				metas.set(name, { ...meta, lastUsed: Date.now() });
 				touched.add(name);
 				schedule();
-				return stored;
+				const marked = stored.tags.some((tag) => (marks.get(tag) ?? 0) > stored.at);
+				return marked ? { ...stored, stale: true } : stored;
 			} catch {
 				forget(name);
 				return undefined;
@@ -471,10 +510,17 @@ export function createPersistence(
 			}
 			return writes;
 		},
+		invalidated(tags) {
+			const now = Date.now();
+			for (const tag of tags) marks.set(tag, now);
+			marksChanged = true;
+			schedule();
+		},
 		clear() {
 			cleared = true;
 			document?.removeEventListener('visibilitychange', hidden);
 			metas = new Map();
+			marks.clear();
 			dirty.clear();
 			touched.clear();
 			removed.clear();
@@ -482,8 +528,13 @@ export function createPersistence(
 			writing = writing
 				.then(() => ready)
 				.then(async () => {
-					if (partition)
-						await Promise.all([storage.clear(partition), storage.clear(journalPartition)]);
+					if (partition) {
+						await Promise.all([
+							storage.clear(partition),
+							storage.clear(journalPartition),
+							storage.clear(marksPartition),
+						]);
+					}
 				})
 				.catch(() => {});
 		},
