@@ -302,15 +302,47 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		);
 	});
 
-	it('moves a key every arm of a conditional row shares to the `@for` header', () => {
-		const row = (/** @type {string} */ other) =>
-			`export function L({ xs }: { xs: { id: string; a: boolean }[] }) {\n\treturn <ul>{xs.map((x) => (x.a ? <li key={x.id}>a</li> : <b key={${other}}>b</b>))}</ul>;\n}\n`;
-		const { code } = transformModule(row('x.id'), 'l.tsx');
-		expect(code).toContain('@for (const x of xs; key x.id) {');
-		expect(code).toContain('<li>a</li>');
-		expect(code).not.toContain('key={');
-		// Arms keyed differently stay a `.map()`, so each keeps its own key.
-		expect(transformModule(row("'b' + x.id"), 'l.tsx').code).toContain('{xs.map((x) =>');
+	it.each([
+		['a null branch', 'row => row === null ? null : <b key={row.id}>kept</b>', ''],
+		[
+			'an early return',
+			'row => { if (row === null) return null; return <b key={row.id}>kept</b>; }',
+			'',
+		],
+		[
+			'an unkeyed fragment branch',
+			'row => row === null ? <><i>missing</i></> : <b key={row.id}>kept</b>',
+			'<i>missing</i>',
+		],
+	])('keeps row keys lazy with %s', (_name, row, before) => {
+		const source = `export function List({ rows }) {
+			return <div>{rows.map(${row})}</div>;
+		}`;
+		const { code } = transformModule(source, 'list.tsx');
+		const { List } = loadCompiledFixtureSource(code, { id: 'list.tsrx', mode: 'server' });
+		expect(renderToStaticMarkup(List, { rows: [null, { id: 'kept' }] }).html).toBe(
+			`<div>${before}<b>kept</b></div>`,
+		);
+	});
+
+	it('evaluates a row condition before reading a key shared by both arms', () => {
+		const source = `export function List({ rows }) {
+			return <div>{rows.map(row => row.active ? <b key={row.id}>first</b> : <b key={row.id}>late</b>)}</div>;
+		}`;
+		const { code } = transformModule(source, 'list.tsx');
+		const { List } = loadCompiledFixtureSource(code, { id: 'list.tsrx', mode: 'server' });
+		let readKey = false;
+		const row = {
+			get id() {
+				readKey = true;
+				return 'row';
+			},
+			get active() {
+				return !readKey;
+			},
+		};
+		expect(renderToStaticMarkup(List, { rows: [row] }).html).toBe('<div><b>first</b></div>');
+		expect(readKey).toBe(true);
 	});
 
 	it('turns `if (c) return <A />` guards into `@if`/`@else`', () => {
