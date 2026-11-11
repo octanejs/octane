@@ -3375,16 +3375,35 @@ class ModuleTransform {
 			ts.isAsExpression(context)
 		)
 			return this.hasSubmitType(context.type);
+		if (ts.isJsxExpression(context) && ts.isJsxAttribute(context.parent)) {
+			const { name, parent } = context.parent;
+			if (!ts.isIdentifier(name)) return false;
+			const element = parent.parent;
+			const props = this.checker.getResolvedSignature(element)?.getParameters()[0];
+			const property =
+				props && this.checker.getTypeOfSymbolAtLocation(props, element).getProperty(name.text);
+			return (
+				property?.declarations?.some(
+					(declaration) =>
+						ts.isPropertySignature(declaration) && this.hasSubmitType(declaration.type),
+				) ?? false
+			);
+		}
 		if (
 			ts.isBinaryExpression(context) &&
 			context.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-			context.right === value &&
-			ts.isIdentifier(context.left)
+			context.right === value
 		) {
-			const declaration = this.declarationOf(context.left);
+			const target = ts.isPropertyAccessExpression(context.left) ? context.left.name : context.left;
+			const declaration = this.checker.getSymbolAtLocation(target)?.valueDeclaration;
+			if (declaration && ts.isPropertyAssignment(declaration))
+				return (
+					ts.isAsExpression(declaration.initializer) &&
+					this.hasSubmitType(declaration.initializer.type)
+				);
 			return (
 				!!declaration &&
-				ts.isVariableDeclaration(declaration) &&
+				(ts.isVariableDeclaration(declaration) || ts.isPropertyDeclaration(declaration)) &&
 				this.hasSubmitType(declaration.type)
 			);
 		}

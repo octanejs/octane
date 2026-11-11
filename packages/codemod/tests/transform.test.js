@@ -507,6 +507,7 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		'function make(): Submit { return (event) => event.isDefaultPrevented(); } const submit = make();',
 		'function keep(handler: Submit) { return handler; } const submit = keep((event) => event.isDefaultPrevented());',
 		'const config = {handler: null as any as Submit}; config.handler = (event) => event.isDefaultPrevented(); const submit = config.handler;',
+		'const config = {handler: null as any as React.SubmitEventHandler}; config.handler = (event) => event.isDefaultPrevented(); const submit = config.handler;',
 		'const submit: Submit = (event: any) => event.isDefaultPrevented();',
 		'const submit: Submit = async (event) => { await 0; event.currentTarget.getAttribute("name"); };',
 	])('checks contextual submit handlers in %s', (body) => {
@@ -521,21 +522,25 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		);
 	});
 
-	it('checks a contextually typed JSX callback forwarded to a native form', () => {
-		const { notes } = transformModule(
-			`import type {SubmitEventHandler as Submit} from 'react';
-			function Inner(props: {onSubmit: Submit<HTMLFormElement>}) {
+	it.each(['Submit', 'R.SubmitEventHandler', "import('react').SubmitEventHandler"])(
+		'checks a forwarded JSX callback typed as %s',
+		(handler) => {
+			const { notes } = transformModule(
+				`import type {SubmitEventHandler as Submit} from 'react';
+			import type * as R from 'react';
+			function Inner(props: {onSubmit: ${handler}<HTMLFormElement>}) {
 				return <form onSubmit={props.onSubmit}/>;
 			}
 			export function Form() {
 				return <Inner onSubmit={(event) => event.isDefaultPrevented()}/>;
 			}`,
-			'form.tsx',
-		);
-		expect(notes).toContainEqual(
-			expect.objectContaining({ rule: 'event-object', severity: 'error' }),
-		);
-	});
+				'form.tsx',
+			);
+			expect(notes).toContainEqual(
+				expect.objectContaining({ rule: 'event-object', severity: 'error' }),
+			);
+		},
+	);
 
 	it('keeps the handler itself and its props bag distinct from the submit event', () => {
 		const { code, notes } = transformModule(
