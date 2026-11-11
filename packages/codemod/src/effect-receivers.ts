@@ -6,7 +6,12 @@ function visit(node: ts.Node, read: (node: ts.Node) => void) {
 }
 
 /** A const already initialized in this function, or a parameter it never reassigns. */
-export function fixedBinding(checker: ts.TypeChecker, name: ts.Identifier, read: ts.Expression) {
+export function fixedBinding(
+	checker: ts.TypeChecker,
+	name: ts.Identifier,
+	read: ts.Expression,
+	parameters?: Map<ts.Symbol, boolean>,
+) {
 	const symbol = checker.getSymbolAtLocation(name);
 	if (symbol?.declarations?.length !== 1 || !symbol.valueDeclaration) return false;
 	let declaration = symbol.valueDeclaration;
@@ -21,6 +26,8 @@ export function fixedBinding(checker: ts.TypeChecker, name: ts.Identifier, read:
 		);
 	}
 	if (!ts.isParameter(declaration)) return false;
+	const known = parameters?.get(symbol);
+	if (known !== undefined) return known;
 
 	let fixed = true;
 	visit(owner, (node) => {
@@ -49,6 +56,7 @@ export function fixedBinding(checker: ts.TypeChecker, name: ts.Identifier, read:
 			});
 		}
 	});
+	parameters?.set(symbol, fixed);
 	return fixed;
 }
 

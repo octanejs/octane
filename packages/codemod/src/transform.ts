@@ -1204,6 +1204,7 @@ class ModuleTransform {
 		return this.cssClassBindings.has(decl);
 	}
 
+	private fixedSvgParameters?: Map<ts.Symbol, boolean>;
 	private svgClassName(expr: ts.Expression) {
 		if (ts.isIdentifier(expr)) return true;
 		if (ts.isPropertyAccessExpression(expr)) return this.svgCssClass(expr);
@@ -1218,7 +1219,9 @@ class ModuleTransform {
 			(this.resolve('clsx') ?? 'clsx') === 'clsx' &&
 			this.options.installedClsx === true &&
 			(expr.arguments.every((arg) =>
-				svgClassToken(arg, (name) => fixedBinding(this.checker, name, expr)),
+				svgClassToken(arg, (name) =>
+					fixedBinding(this.checker, name, expr, (this.fixedSvgParameters ??= new Map())),
+				),
 			) ||
 				expr.arguments.every((arg) => {
 					const token = skipWrappers(arg);
