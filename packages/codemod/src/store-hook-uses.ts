@@ -8,6 +8,7 @@ type ResultCheck = {
 	imported: SharedInput;
 	known: Map<ts.Expression, boolean>;
 	descriptors: (elements: ts.JsxSelfClosingElement[]) => boolean;
+	unchangedHelper?: (module: string, name: string) => boolean;
 };
 
 function literal(value: ts.Expression) {
@@ -156,11 +157,45 @@ export function storeHookUses(
 			return false;
 		const statement = item.parent.parent.parent;
 		return (
+			!statement.attributes &&
 			ts.isStringLiteral(statement.moduleSpecifier) &&
 			statement.moduleSpecifier.text === 'react' &&
 			names.includes((item.propertyName ?? item.name).text)
 		);
 	}
+	function effectCallback(fn: ts.Node) {
+		const call = fn.parent;
+		return (
+			ts.isCallExpression(call) &&
+			!call.questionDotToken &&
+			call.arguments[0] === fn &&
+			reactHook(call.expression, ['useEffect', 'useLayoutEffect'])
+		);
+	}
+	function clickHandler(value: ts.Node) {
+		let outer = value;
+		while (ts.isParenthesizedExpression(outer.parent)) outer = outer.parent;
+		const hole = outer.parent;
+		if (!ts.isJsxExpression(hole) || !ts.isJsxAttribute(hole.parent)) return false;
+		const attr = hole.parent;
+		const host = attr.parent.parent;
+		return (
+			ts.isIdentifier(host.tagName) &&
+			/^[a-z][a-z0-9]*$/.test(host.tagName.text) &&
+			ts.isIdentifier(attr.name) &&
+			/^onClick(?:Capture)?$/.test(attr.name.text)
+		);
+	}
+	function runsAfterRender(call: ts.CallExpression) {
+		const fn = ts.findAncestor(call, ts.isFunctionLike);
+		if (!fn) return false;
+		if (effectCallback(fn) || clickHandler(fn)) return true;
+		const parent = fn.parent;
+		if (!ts.isReturnStatement(parent) || parent.expression !== fn) return false;
+		const setup = ts.findAncestor(parent, ts.isFunctionLike);
+		return !!setup && effectCallback(setup);
+	}
+
 	function componentUses(fn: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction) {
 		if (!isComponent(fn)) return false;
 		const wrapper = fn.parent;
@@ -266,6 +301,30 @@ export function storeHookUses(
 			originalReceiver(read.expression.expression, check, true)
 		);
 	}
+	// The same helper can use React APIs if called during render. Preserve
+	// calls that are already deferred to an effect or a host click.
+	function passesOriginalStore(call: ts.CallExpression, value: ts.Expression, check: ResultCheck) {
+		if (
+			!check.unchangedHelper ||
+			call.questionDotToken ||
+			!(ts.isExpressionStatement(call.parent) || ts.isVoidExpression(call.parent)) ||
+			!ts.isIdentifier(call.expression) ||
+			!call.arguments.includes(value)
+		)
+			return false;
+		const item = checker.getSymbolAtLocation(call.expression)?.declarations?.[0];
+		if (!item || !ts.isImportSpecifier(item) || item.isTypeOnly || item.parent.parent.isTypeOnly)
+			return false;
+		const statement = item.parent.parent.parent;
+		return (
+			!statement.attributes &&
+			ts.isStringLiteral(statement.moduleSpecifier) &&
+			originalReceiver(value, check, true) &&
+			runsAfterRender(call) &&
+			call.arguments.every((arg) => arg === value || plainData(arg) || literalOptions(arg)) &&
+			check.unchangedHelper(statement.moduleSpecifier.text, (item.propertyName ?? item.name).text)
+		);
+	}
 	function bound(name: ts.BindingName, check: ResultCheck): boolean {
 		if (ts.isIdentifier(name)) return uses(name).every((use) => safe(use, check));
 		return name.elements.every((el) => ts.isOmittedExpression(el) || bound(el.name, check));
@@ -356,7 +415,7 @@ export function storeHookUses(
 					?.declarations?.every((d) => d.getSourceFile().hasNoDefaultLib)
 			)
 				return true;
-			return false;
+			return passesOriginalStore(p, value, check);
 		}
 		return false;
 	}
@@ -364,8 +423,9 @@ export function storeHookUses(
 		item: ts.ImportSpecifier,
 		imported: SharedInput,
 		descriptors: ResultCheck['descriptors'],
+		unchangedHelper?: ResultCheck['unchangedHelper'],
 	) => {
-		const check: ResultCheck = { item, imported, known: new Map(), descriptors };
+		const check: ResultCheck = { item, imported, known: new Map(), descriptors, unchangedHelper };
 		const references = uses(item.name);
 		return (
 			references.length > 0 &&
