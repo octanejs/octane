@@ -7,7 +7,7 @@
  */
 import { createContext, createElement, use, useCallback, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
-import type { Read, Write } from './contracts.js';
+import type { Read, View, Write } from './contracts.js';
 import type { DataStore, ReadSnapshot } from './store.js';
 
 const StoreContext = createContext<DataStore | null>(null);
@@ -24,6 +24,8 @@ export function useDataStore(): DataStore {
 
 /** Observe a read without suspending. The component mounts and unmounts the observation. */
 export function useReadState<O>(read: Read<void, O>): ReadSnapshot<O>;
+/** A view with no parameters shows its default window when the input is omitted. */
+export function useReadState<T>(read: View<void, T>): ReadSnapshot<T[]>;
 export function useReadState<I, O>(read: Read<I, O>, input: I): ReadSnapshot<O>;
 export function useReadState<I, O>(read: Read<I, O>, input?: I): ReadSnapshot<O> {
 	// Equal inputs resolve to one handle, so its methods are stable across renders.
@@ -37,6 +39,7 @@ export function useReadState<I, O>(read: Read<I, O>, input?: I): ReadSnapshot<O>
  * Later reloads keep the last value on screen.
  */
 export function useRead<O>(read: Read<void, O>): O;
+export function useRead<T>(read: View<void, T>): T[];
 export function useRead<I, O>(read: Read<I, O>, input: I): O;
 export function useRead<I, O>(read: Read<I, O>, input?: I): O {
 	const store = useDataStore();
