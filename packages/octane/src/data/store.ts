@@ -973,6 +973,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 						(value) => () => {
 							if (!current()) return undefined;
 							adopt(entry, value, startedSeq);
+							save(entry);
 							return entry;
 						},
 						() => () => {

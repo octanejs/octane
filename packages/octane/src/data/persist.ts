@@ -365,6 +365,8 @@ export function createPersistence(
 			if (cleared || text === undefined) return undefined;
 			try {
 				const stored = devalue.parse(await cipher.open(text, name)) as Stored;
+				// Purging reads this order, so it must see the use now, not after the next save.
+				metas.set(name, { ...meta, lastUsed: Date.now() });
 				touched.add(name);
 				schedule();
 				return stored;

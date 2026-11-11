@@ -71,20 +71,27 @@ function server(books: Book[]) {
 	const log: string[] = [];
 	let hold: Promise<void> | null = null;
 	let holding: DataRequest['kind'] | 'all' = 'all';
+	const answer = (name: string, input: unknown): unknown => {
+		if (name === 'count') return books.length;
+		if (name === 'secret') return 'hunter2';
+		if (name === 'serial') return 7;
+		const sorted = books.map((book) => ({ ...book })).sort((a, b) => (a.title < b.title ? -1 : 1));
+		if (name === 'shelf') return sorted;
+		const { offset, limit } = input as { offset: number; limit: number };
+		return sorted.filter((book) => !book.read).slice(offset, offset + limit);
+	};
 	const transport = async (request: DataRequest): Promise<DataReply> => {
 		if (holding === 'all' || holding === request.kind) await hold;
 		log.push(`${request.kind} ${request.name}`);
-		if (request.kind === 'write') {
-			const { id, read } = request.input as { id: string; read: boolean };
-			books.find((book) => book.id === id)!.read = read;
-			return { ok: true, value: null };
-		}
-		if (request.name === 'count') return { ok: true, value: books.length };
-		if (request.name === 'secret') return { ok: true, value: 'hunter2' };
-		const sorted = books.map((book) => ({ ...book })).sort((a, b) => (a.title < b.title ? -1 : 1));
-		if (request.name === 'shelf') return { ok: true, value: sorted };
-		const { offset, limit } = request.input as { offset: number; limit: number };
-		return { ok: true, value: sorted.filter((b) => !b.read).slice(offset, offset + limit) };
+		if (request.kind === 'read') return { ok: true, value: answer(request.name, request.input) };
+		const { id, read } = request.input as { id: string; read: boolean };
+		books.find((book) => book.id === id)!.read = read;
+		// Like the data handler, the reply carries back the reads on screen that the write affects.
+		const refreshed = (request.refresh ?? []).map((item) => ({
+			...item,
+			value: answer(item.name, item.input),
+		}));
+		return { ok: true, value: null, refreshed };
 	};
 	return {
 		log,
@@ -222,6 +229,23 @@ describe('octane/data persistent cache', () => {
 			persist: cache(storage, 'ada'),
 		});
 		expect((await value<Book[]>(after, shelf)).value[0]!.read).toBe(false);
+	});
+
+	it('saves the reads a write reply carries back', async () => {
+		const storage = memoryStorage();
+		const before = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada'),
+		});
+		await value(before, shelf);
+		await before.write(setRead, { id: 'a', read: true });
+		await saved();
+
+		const remote = server(books());
+		const after = createDataStore({ transport: remote.transport, persist: cache(storage, 'ada') });
+		// The shelf is fresh, so the saved copy is all that shows: it must include the write.
+		expect((await value<Book[]>(after, shelf)).value[0]!.read).toBe(true);
+		expect(remote.log).toEqual([]);
 	});
 
 	it('keeps a stale mark across a restart, so the value reloads although it is fresh', async () => {
@@ -425,6 +449,46 @@ describe('octane/data persistent cache', () => {
 		expect(shelfSize! + unreadSize! + countSize!).toBeGreaterThan(budget);
 		// The mounted shelf is the oldest, but only `unread`, the least recently used of the rest, goes.
 		expect((await fill(budget)).sort()).toEqual([shelfSize, countSize].sort());
+	});
+
+	it('counts a value restored this session as recently used', async () => {
+		const storage = memoryStorage();
+		const serial = read({ name: 'serial', output: count.output });
+		const seed = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada', { budget: Infinity }),
+		});
+		// The shelf is saved first, so before this session it is the least recently used.
+		for (const contract of [shelf, count]) {
+			(await value(seed, contract)).stop();
+			await saved();
+		}
+		const [shelfSize, countSize] = (await storage.index(listPartitions(storage)[0]!)).map(
+			(meta) => meta.size,
+		);
+
+		// Room for the two saved values, and not for one more of the count's size.
+		const budget = Math.ceil((shelfSize! + countSize!) / 0.9);
+		const store = createDataStore({
+			transport: server(books()).transport,
+			persist: cache(storage, 'ada', { budget }),
+		});
+		(await value(store, shelf)).stop();
+		await saved();
+		(await value(store, serial)).stop();
+		await saved();
+
+		// The count, unused this session, goes; the shelf, restored and shown, stays.
+		const remote = server(books());
+		remote.hold();
+		const after = createDataStore({ transport: remote.transport, persist: cache(storage, 'ada') });
+		const kept = after.read(shelf, undefined);
+		kept.subscribe(() => {});
+		const gone = after.read(count, undefined);
+		gone.subscribe(() => {});
+		await saved();
+		expect(kept.getSnapshot().status).toBe('ready');
+		expect(gone.getSnapshot().status).toBe('pending');
 	});
 
 	it('sizes the automatic budget by device', () => {
