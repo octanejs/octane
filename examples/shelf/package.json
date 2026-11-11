@@ -3,23 +3,31 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "One set of octane/data contracts and one server, rendered by an Octane page, a React page, and an Octane page hosting a React island.",
+  "description": "One set of octane/data contracts and one server, rendered by an Octane page, a React page, and an Octane page hosting a React island, built with Vite or Rspack.",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5239 --strictPort",
+    "dev:rspack": "node rspack.mjs --watch",
     "build": "vite build && vite build --ssr src/server/index.ts --outDir dist/server",
+    "build:rspack": "node rspack.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 5239 --strictPort",
+    "preview:rspack": "node dist-rspack/server/index.js",
     "typecheck": "octane-tsc -p tsconfig.json",
-    "test:e2e": "pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
+    "test:e2e": "pnpm test:e2e:vite && pnpm test:e2e:rspack",
+    "test:e2e:vite": "pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
+    "test:e2e:rspack": "pnpm build:rspack && SHELF_BUNDLER=rspack playwright test --config e2e/playwright.config.ts",
     "test:e2e:dev": "playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
+    "@octanejs/app-core": "workspace:*",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "zod": "catalog:default"
   },
   "devDependencies": {
+    "@octanejs/rspack-plugin": "workspace:*",
     "@playwright/test": "catalog:default",
+    "@rspack/core": "catalog:default",
     "@types/node": "catalog:default",
     "@types/react": "catalog:default",
     "@types/react-dom": "catalog:default",

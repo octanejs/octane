@@ -1,7 +1,7 @@
 # Shelf
 
 A reading list built on `octane/data`, rendered three ways from one set of
-contracts and one server:
+contracts and one server, built with Vite or with Rspack:
 
 | Page | Renderer | Binding |
 | --- | --- | --- |
@@ -18,13 +18,19 @@ Everything else is shared:
 - [`src/shared/server.ts`](src/shared/server.ts) serves them with
   `createDataHandler`. Each write records its operation ID with its effect, so
   a lookup can say whether it landed.
-- [`src/shared/session.ts`](src/shared/session.ts) opens a store per account,
-  injects network faults, and settles uncertain writes by receipt lookup.
-- [`src/server/index.ts`](src/server/index.ts) renders a page with its own
-  store, which calls the data handler in process (`handler.transport(request)`)
-  under the page request's account. `store.dehydrate()` goes into the page, and
-  the browser's store starts from it, so hydration loads nothing. A page also
-  takes POST: `handler.forms(request)` runs a form's native submission, then
+- [`src/shared/data.tsrx`](src/shared/data.tsrx) exports `data`, a
+  `module server` function that answers every store request. In the browser it
+  is the compiler's stub, which calls the server; there is no data route.
+- [`src/shared/session.ts`](src/shared/session.ts) opens a store per account
+  over `serverTransport(data)`, injects network faults, and settles uncertain
+  writes by receipt lookup. Its account cookie stands in for a sign-in.
+- [`src/server/index.ts`](src/server/index.ts) answers calls to `data` and
+  renders the pages, through `createServerFunctions` from
+  `@octanejs/app-core/server-functions`. One middleware authenticates both. A
+  page renders with its own store, whose `data` calls run in process under the
+  page request's account. `store.dehydrate()` goes into the page, and the
+  browser's store starts from it, so hydration loads nothing. A page also takes
+  POST: `handler.forms(request, context)` runs a form's native submission, then
   redirects back to the page or renders it again with the form's issues.
 
 ## What to try
@@ -67,11 +73,15 @@ Everything else is shared:
 ## Commands
 
 ```bash
-pnpm --filter shelf-example dev        # http://127.0.0.1:5239
+pnpm --filter shelf-example dev          # Vite, http://127.0.0.1:5239
+pnpm --filter shelf-example dev:rspack   # Rspack, rebuilt and restarted on each change
 pnpm --filter shelf-example typecheck
-pnpm --filter shelf-example test:e2e   # production build and preview
+pnpm --filter shelf-example test:e2e     # both production builds
 ```
 
-A small Vite plugin in [`vite.config.ts`](vite.config.ts) serves `/data` and
-renders the two server-rendered pages: from source through Vite's SSR loader in
-development, and from `dist/server` in preview.
+Both builds run the same server, `createShelfServer().fetch`. A small Vite
+plugin in [`vite.config.ts`](vite.config.ts) mounts it: from source through
+Vite's SSR loader in development, and from `dist/server` in preview.
+[`rspack.mjs`](rspack.mjs) builds the pages and
+[`src/server/node.ts`](src/server/node.ts), a Node server over the same
+`fetch`, into `dist-rspack`.
