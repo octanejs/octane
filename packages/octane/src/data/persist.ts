@@ -262,6 +262,8 @@ export function createPersistence(
 	let journalPartition = '';
 	/** Journaled operation IDs, and their hashed names. */
 	const journaled = new Map<string, string>();
+	/** Breaks ties between writes journaled in the same millisecond. */
+	let submitted = 0;
 	const ended = new Set<string>();
 	/** When each tag was last marked stale, kept in its own partition. */
 	let marksPartition = '';
@@ -396,7 +398,10 @@ export function createPersistence(
 		if (!cleared && ended.size > 0) {
 			const done = [...ended];
 			ended.clear();
-			await storage.commit(journalPartition, [], done).catch(() => {});
+			await storage.commit(journalPartition, [], done).catch(() => {
+				// A write left in the journal would come back after the next start: try again at the next save.
+				for (const name of done) ended.add(name);
+			});
 		}
 		if (!cleared && marksChanged) {
 			marksChanged = false;
@@ -468,7 +473,9 @@ export function createPersistence(
 				await ready;
 				if (cleared) return;
 				const name = await cipher.name(`write\n${write.id}`);
-				const value = await cipher.seal(devalue.stringify(write), name);
+				// Storage lists the journal by hashed name, so the entry carries its submission order.
+				const order = [Date.now(), ++submitted];
+				const value = await cipher.seal(devalue.stringify({ ...write, order }), name);
 				const now = Date.now();
 				const meta = {
 					key: name,
@@ -495,12 +502,12 @@ export function createPersistence(
 		async recover() {
 			await ready;
 			if (cleared) return [];
-			const writes: Journaled[] = [];
+			const writes: Array<Journaled & { order: [number, number] }> = [];
 			const metas = await storage.index(journalPartition).catch(() => []);
 			for (const { key: name } of metas) {
 				try {
 					const text = await storage.get(journalPartition, name);
-					const write = devalue.parse(await cipher.open(text!, name)) as Journaled;
+					const write = devalue.parse(await cipher.open(text!, name));
 					journaled.set(write.id, name);
 					writes.push(write);
 				} catch {
@@ -508,7 +515,7 @@ export function createPersistence(
 					schedule();
 				}
 			}
-			return writes;
+			return writes.sort((a, b) => a.order[0] - b.order[0] || a.order[1] - b.order[1]);
 		},
 		invalidated(tags) {
 			const now = Date.now();

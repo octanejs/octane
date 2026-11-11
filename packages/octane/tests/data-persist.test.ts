@@ -809,6 +809,57 @@ describe('octane/data durable writes', () => {
 		await vi.waitFor(() => expect(remote.log).toEqual(['read receipt']));
 	});
 
+	it('recovers writes in the order they were submitted, whatever order storage lists them in', async () => {
+		const inner = memoryStorage();
+		const storage: PersistentStorage = {
+			...inner,
+			index: async (partition) => (await inner.index(partition)).reverse(),
+		};
+		const first = server(books());
+		const before = createDataStore({ transport: first.transport, persist: durable(storage) });
+		await value(before, shelf);
+		await saved();
+		for (const read of [true, false]) {
+			first.faults.lose = 'request';
+			await before.write(setRead, { id: 'a', read }).catch(() => {});
+		}
+		await saved();
+
+		const { remote, store } = restart(storage, first);
+		remote.hold('read');
+		const shown = await value<Book[]>(store, shelf);
+		await saved();
+		// The later edit wins, as it did before the restart.
+		expect(shown.handle.getSnapshot().value![0]!.read).toBe(false);
+	});
+
+	it('removes a settled write from the journal after a failed removal', async () => {
+		const inner = memoryStorage();
+		let failRemoval = true;
+		const storage: PersistentStorage = {
+			...inner,
+			commit(partition, put, remove) {
+				if (failRemoval && put.length === 0 && remove.length > 0) {
+					failRemoval = false;
+					return Promise.reject(new Error('quota exceeded'));
+				}
+				return inner.commit(partition, put, remove);
+			},
+		};
+		const first = server(books());
+		const before = createDataStore({ transport: first.transport, persist: durable(storage) });
+		await before.write(setRead, { id: 'a', read: true });
+		await saved();
+		expect(failRemoval).toBe(false);
+		// Any later save retries the removal.
+		await before.write(setRead, { id: 'b', read: true });
+		await saved();
+
+		const { remote } = restart(storage, first);
+		await saved();
+		expect(remote.log).toEqual([]);
+	});
+
 	it('journals only the writes it lists', async () => {
 		const storage = memoryStorage();
 		const first = server(books());
