@@ -11,8 +11,9 @@ export interface PagesSnapshot<T> extends ReadSnapshot<T[]> {
 	/** The next page is loading. */
 	readonly loadingMore: boolean;
 	/**
-	 * Show the next page, when `more` says there is one. After a page failed to
-	 * load, it loads that page again. Resolves once the page has loaded.
+	 * Show the next page, when `more` says there is one. While a page has failed
+	 * to load, wherever it is in the list, it loads that page again instead.
+	 * Resolves once the page has loaded.
 	 */
 	readonly loadMore: () => Promise<void>;
 }
@@ -85,9 +86,9 @@ function createPages<P, T>(
 	let snapshot: PagesSnapshot<T> | null = null;
 
 	function loadMore(): Promise<void> {
-		const last = pages[pages.length - 1]!;
-		const state = last.getSnapshot();
-		if (state.status === 'error') return last.refresh();
+		const failed = pages.find((page) => page.getSnapshot().status === 'error');
+		if (failed) return failed.refresh();
+		const state = pages[pages.length - 1]!.getSnapshot();
 		if (state.status !== 'ready' || !state.more) return Promise.resolve();
 		const index = pages.length;
 		add();
@@ -102,21 +103,23 @@ function createPages<P, T>(
 		const first = current[0]!;
 		const last = current[current.length - 1]!;
 		const rows: T[] = [];
-		let holes = false;
+		let reloading = false;
 		// A page that is not ready, such as an expired one reloading, leaves only
 		// its own rows out: the pages after it are still current.
 		for (const part of current) {
 			if (part.status === 'ready') rows.push(...part.value!);
-			else if (part !== last) holes = true;
+			else if (part !== last && part.status === 'pending') reloading = true;
 		}
+		const failed = current.find((part) => part.status === 'error');
 		const ready = current.some((part) => part.status === 'ready');
 		snapshot = {
 			status: ready ? 'ready' : first.status,
 			value: ready ? rows : undefined,
-			error: current.find((part) => part.status === 'error')?.error ?? first.error,
-			refreshing: holes || current.some((part) => part.refreshing),
+			error: failed ? failed.error : first.error,
+			refreshing: reloading || current.some((part) => part.refreshing),
 			stale: current.some((part) => part.stale),
-			more: last.status === 'ready' ? last.more : last.status === 'error',
+			// A failed page, anywhere, is what `loadMore` does next.
+			more: failed !== undefined || (last.status === 'ready' && last.more),
 			loadingMore: current.length > 1 && last.status === 'pending',
 			loadMore,
 		};

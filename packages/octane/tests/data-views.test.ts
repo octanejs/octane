@@ -800,6 +800,45 @@ describe('octane/data pages', () => {
 		);
 	});
 
+	it('retries an earlier page whose reload failed, keeping the later pages shown', async () => {
+		const server = libraryServer();
+		let failing = false;
+		const store = createDataStore({
+			transport: (request, signal) =>
+				failing && request.kind === 'read'
+					? Promise.reject(new Error('offline'))
+					: server.transport(request, signal),
+		});
+		const brief = view({
+			name: library.name,
+			of: Book,
+			order: [['title', 'asc']],
+			limit: 3,
+			expire: 400,
+		});
+		const list = pages(store, brief);
+		list.subscribe(() => {});
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+		await new Promise((resolve) => setTimeout(resolve, 250));
+		await list.loadMore();
+
+		// The first page expires and its reload fails while the second is still current.
+		failing = true;
+		await vi.waitFor(() => expect(list.getSnapshot().error).toBeInstanceOf(Error), {
+			timeout: 300,
+		});
+		expect(list.getSnapshot()).toMatchObject({ status: 'ready', refreshing: false, more: true });
+		expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(allTitles(6).slice(3));
+
+		// Loading more retries that page before adding another.
+		failing = false;
+		await list.loadMore();
+		await vi.waitFor(() =>
+			expect(list.getSnapshot().value!.map((book) => book.title)).toEqual(allTitles(6)),
+		);
+		expect(list.getSnapshot().error).toBeUndefined();
+	});
+
 	it('keeps the joined list in order through an edit that moves a row to a later page', async () => {
 		const server = libraryServer();
 		const store = createDataStore({ transport: server.transport });
