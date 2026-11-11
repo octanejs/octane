@@ -645,7 +645,107 @@ it('renders an SVG passed through selected local slots as a direct button child 
 	}
 });
 
+it('hydrates and updates a named SVG slot with presence checks and a nullish fallback', async () => {
+	const { root, file } = fixture(`import Mark from './icons/mark.svg';
+		import { Badge } from './badge';
+		export function Pane({present, keepWrapper, preferred, gated}) {
+			return <Badge icon={present ? <Mark className="badge"/> : null} keepWrapper={keepWrapper} preferred={preferred} gated={gated}/>;
+		}`);
+	const receiver = path.join(root, 'src/badge.tsx');
+	fs.writeFileSync(
+		receiver,
+		`export function Badge({icon, keepWrapper, preferred, gated}) {
+		if (gated) return <b>{icon && <i>{icon}</i>}</b>;
+		if (icon || keepWrapper) return <span>{!icon ? 'waiting' : (preferred ?? icon)}</span>;
+		return <small>{icon == null ? 'empty' : 'other'}</small>;
+	}`,
+	);
+	const { files } = await runCodemod([file, receiver], {
+		root,
+		svgPaths: true,
+		strong: true,
+		verify: true,
+		write: true,
+	});
+	expect(files.find((f) => f.file === 'src/pane.tsx').rules['svg-paths']).toBe(1);
+	expect(
+		files.flatMap((f) => [...f.notes, ...f.diagnostics]).filter((n) => n.severity === 'error'),
+	).toEqual([]);
+	const load = (mode, entry) =>
+		bundleRuntime(root, mode, "export { Pane } from './src/pane.tsrx';" + entry, [], {
+			'.svg': 'text',
+		});
+	const dom = installDOM();
+	try {
+		const server = await load('server', "export {renderToString} from 'octane/server';");
+		const client = await load('client', "export {hydrateRoot, act} from 'octane';");
+		const states = [
+			[{ present: true }, 'span > svg.badge', ''],
+			[{ present: true, preferred: 'override' }, 'span', 'override'],
+			[{ present: true, preferred: 0 }, 'span', '0'],
+			[{ present: true, preferred: '' }, 'span', ''],
+			[{ present: false, keepWrapper: true }, 'span', 'waiting'],
+			[{ present: false }, 'small', 'empty'],
+			[{ present: true, gated: true }, 'b > i > svg.badge', ''],
+			[{ present: false, gated: true }, 'b', ''],
+			[{ present: true }, 'span > svg.badge', ''],
+		];
+		const host = document.createElement('div');
+		host.innerHTML = server.renderToString(server.Pane, states[0][0]).html;
+		const icon = host.querySelector('span > svg.badge');
+		expect(icon?.firstElementChild?.getAttribute('d')).toBe('M0 0L6 4Z');
+		const mounted = client.hydrateRoot(host, client.Pane, states[0][0]);
+		try {
+			expect(host.querySelector('svg')).toBe(icon);
+			for (const [props, selector, text] of states.slice(1)) {
+				const expected = document.createElement('div');
+				expected.innerHTML = server.renderToString(server.Pane, props).html;
+				expect(expected.querySelector(selector)?.textContent).toBe(text);
+				expect(expected.querySelector('svg') !== null).toBe(selector.includes('svg'));
+				await client.act(async () => mounted.render(client.Pane, props));
+				expect(host.querySelector(selector)?.textContent).toBe(text);
+				expect(shape(host.firstElementChild)).toEqual(shape(expected.firstElementChild));
+			}
+		} finally {
+			mounted.unmount();
+		}
+	} finally {
+		dom.window.close();
+		vi.unstubAllGlobals();
+	}
+});
+
 it.each([
+	[
+		'an implicit child tested for presence',
+		'function Action({children}) { return <button>{children ? children : null}</button>; }',
+		'export function Pane() { return <Action><Mark/></Action>; }',
+	],
+	[
+		'an implicit child forwarded to a presence-tested named slot',
+		'function Action({children}) { return <Frame icon={children}/>; } function Frame({icon}) { return <button>{icon ? icon : null}</button>; }',
+		'export function Pane() { return <Action><Mark/></Action>; }',
+	],
+	[
+		'a named slot that is only observed',
+		'function Action({icon}) { return <button>{icon ? "present" : "absent"}</button>; }',
+		'export function Pane() { return <Action icon={<Mark/>}/>; }',
+	],
+	[
+		'a truthy value that escapes',
+		'function Action({icon}) { consume(icon || "empty"); return <button>{icon}</button>; }',
+		'export function Pane() { return <Action icon={<Mark/>}/>; }',
+	],
+	[
+		'a presence check captured by a callback',
+		'function Action({icon}) { register(() => !icon); return <button>{icon}</button>; }',
+		'export function Pane() { return <Action icon={<Mark/>}/>; }',
+	],
+	[
+		'a presence-tested slot passed to an unverified renderer',
+		'import {External} from "foreign"; function Action({icon}) { return icon ? <External>{icon}</External> : null; }',
+		'export function Pane() { return <Action icon={<Mark/>}/>; }',
+	],
 	[
 		'a shadowing caller parameter',
 		action,
@@ -814,6 +914,28 @@ it.each(['inline slot type', 'imported slot type'])(
 		expect(migrated.files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
 	},
 );
+
+it('keeps a nullish SVG fallback out of a child expression emitted as text', async () => {
+	const { root, file } = fixture(`import Mark from './icons/mark.svg';
+		function Row({label, icon}: {label: string; icon: object}) {
+			return <button>{label ?? icon}</button>;
+		}
+		export function Pane() { return <Row label={null!} icon={<Mark/>}/>; }`);
+	const config = path.join(root, 'tsconfig.json');
+	const tsconfig = JSON.parse(fs.readFileSync(config, 'utf8'));
+	tsconfig.compilerOptions.strict = true;
+	fs.writeFileSync(config, JSON.stringify(tsconfig));
+	const { files } = await runCodemod([file], {
+		root,
+		svgPaths: true,
+		projectTypes: true,
+		write: false,
+	});
+	const caller = files.find((f) => f.file === 'src/pane.tsx');
+	expect(caller.code).toMatch(/\(label \?\? icon\) as string/);
+	expect(caller.rules['svg-paths']).toBeUndefined();
+	expect(files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
+});
 
 it('only accepts a renderable cast in a selected receiver when its imported type resolves', async () => {
 	const { root, file } = fixture(`import Mark from './icons/mark.svg';
