@@ -2,9 +2,11 @@ import fs from 'node:fs';
 import { createRequire, isBuiltin } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
+import { skipWrappers } from './expression-wrappers.js';
 
 type Factory = { module: string; name: string; from: string };
-type Input = { factory: Factory } | { reexport: Factory };
+type Opaque = { opaque: true };
+type Input = { factory: Factory } | { reexport: Factory } | Opaque;
 
 /** Resolve application source used by a workspace store consumer. */
 export function storeSources(
@@ -21,8 +23,10 @@ export function storeSources(
 		if (saved) return saved;
 		const exported = new Map<string, Input>();
 		const locals = new Map<string, Input>();
+		const localFunctions = new Set<string>();
 		const sf = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest);
 		for (const s of sf.statements) {
+			if (ts.isFunctionDeclaration(s) && s.name && s.body) localFunctions.add(s.name.text);
 			if (
 				!ts.isImportDeclaration(s) ||
 				!ts.isStringLiteral(s.moduleSpecifier) ||
@@ -45,16 +49,22 @@ export function storeSources(
 		for (const s of sf.statements) {
 			if (!ts.isVariableStatement(s) || !(s.declarationList.flags & ts.NodeFlags.Const)) continue;
 			for (const d of s.declarationList.declarations) {
-				if (
-					!ts.isIdentifier(d.name) ||
-					!d.initializer ||
-					!ts.isCallExpression(d.initializer) ||
-					!ts.isIdentifier(d.initializer.expression)
-				)
-					continue;
-				const callee = locals.get(d.initializer.expression.text);
-				if (!callee || !('reexport' in callee)) continue;
-				const input = { factory: callee.reexport };
+				if (!ts.isIdentifier(d.name) || !d.initializer) continue;
+				const call = skipWrappers(d.initializer);
+				if (!ts.isCallExpression(call)) continue;
+				let target = skipWrappers(call.expression);
+				while (ts.isExpressionWithTypeArguments(target)) target = skipWrappers(target.expression);
+				if (!ts.isIdentifier(target)) continue;
+				const name = target.text;
+				const callee = locals.get(name);
+				// Type wrappers preserve an opaque origin without adding a direct factory proof.
+				const input: Input | null =
+					call === d.initializer && target === call.expression && callee && 'reexport' in callee
+						? { factory: callee.reexport }
+						: localFunctions.has(name)
+							? { opaque: true }
+							: null;
+				if (!input) continue;
 				locals.set(d.name.text, input);
 				if (s.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword))
 					exported.set(d.name.text, input);
@@ -64,13 +74,17 @@ export function storeSources(
 			if (
 				!ts.isExportDeclaration(s) ||
 				s.isTypeOnly ||
-				s.attributes ||
 				!s.exportClause ||
 				!ts.isNamedExports(s.exportClause)
 			)
 				continue;
 			for (const item of s.exportClause.elements) {
 				if (item.isTypeOnly) continue;
+				if (s.attributes) {
+					// Attributes can select a different implementation at runtime.
+					exported.set(item.name.text, { opaque: true });
+					continue;
+				}
 				const name = (item.propertyName ?? item.name).text;
 				const input = s.moduleSpecifier
 					? ts.isStringLiteral(s.moduleSpecifier)
@@ -120,9 +134,8 @@ export function storeSources(
 		return file;
 	}
 
-	// Trace named inputs to a factory the hook planner can check against the
-	// original store's public exports.
-	function inputFactory(from: string, specifier: string, name: string): Factory | null {
+	// Follow named re-exports to a direct factory or an opaque local initializer.
+	function inputFactory(from: string, specifier: string, name: string): Factory | Opaque | null {
 		let ref: Factory = { module: specifier, name, from };
 		const seen = new Set<string>();
 		for (;;) {
@@ -134,6 +147,7 @@ export function storeSources(
 			const input = inputs(file).get(ref.name);
 			if (!input) return null;
 			if ('factory' in input) return input.factory;
+			if ('opaque' in input) return input;
 			ref = input.reexport;
 		}
 	}
