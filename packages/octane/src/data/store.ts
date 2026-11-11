@@ -313,6 +313,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	const persisted = options.persist
 		? createPersistence(options.persist, saving, (key) => !!entries.get(key)?.subscribers.size)
 		: null;
+	const durable = new Set(options.persist?.journal?.writes);
+	if (options.persist?.journal) void recover(options.persist.journal);
 
 	/** What persistent storage keeps for an entry: its confirmed value, never a pending edit. */
 	function saving(key: string) {
@@ -1009,11 +1011,68 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		reloadAll(reload);
 		if (!operation.write.effect) operations = operations.filter((item) => item !== operation);
 		collect();
+		persisted?.unjournal(operation.id);
 	}
 
 	function remove(operation: Operation): void {
 		operations = operations.filter((item) => item !== operation);
 		touchEntities();
+		persisted?.unjournal(operation.id);
+	}
+
+	/** Name an uncertain write's outcome once a receipt has established it. */
+	function settleOperation(operation: Operation, confirmed: boolean, value: unknown): void {
+		if (confirmed) {
+			confirm(operation, undefined, value);
+			touchEntities();
+		} else {
+			remove(operation);
+			operation.gate?.reject(new DataError('dependency'));
+		}
+	}
+
+	/**
+	 * Show the durable writes a previous session left unsettled, then settle
+	 * each by its receipt. Nothing is sent again; a write whose receipt cannot be
+	 * read stays uncertain, and in the journal for the next start.
+	 */
+	async function recover(journal: NonNullable<PersistOptions['journal']>): Promise<void> {
+		const recovered: Operation[] = [];
+		for (const { id, name, raw } of await persisted!.recover()) {
+			const write = journal.writes.find((item) => item.name === name);
+			let input: unknown;
+			try {
+				if (!write) throw new Error('unknown write');
+				input = await parse(write.input, raw);
+			} catch {
+				// A write this build no longer declares, or whose input it no longer accepts.
+				persisted!.unjournal(id);
+				continue;
+			}
+			recovered.push(operationFor(id, write, input, raw, 'uncertain'));
+		}
+		if (retired || recovered.length === 0) return;
+		// They were submitted before anything this session submitted.
+		operations = [...recovered, ...operations];
+		touchEntities();
+		for (const operation of recovered) {
+			void request(
+				{ kind: 'read', name: journal.receipt.name, input: { operationId: operation.id } },
+				new AbortController().signal,
+			)
+				.then((reply) => {
+					if (!reply.ok) throw new DataError(reply.code);
+					return parse(journal.receipt.output, reply.value);
+				})
+				.then(
+					({ applied, value }) => {
+						if (!retired && operation.status === 'uncertain') {
+							settleOperation(operation, applied, value);
+						}
+					},
+					() => {},
+				);
+		}
 	}
 
 	/**
@@ -1021,8 +1080,13 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	 * passed, and it is what crosses the wire: the server validates again, and a schema
 	 * that transforms its input would refuse its own output.
 	 */
-	function send(write: Write<any, any>, input: unknown, raw: unknown): Promise<any> {
-		const id = crypto.randomUUID();
+	function operationFor(
+		id: string,
+		write: Write<any, any>,
+		input: unknown,
+		raw: unknown,
+		status: Operation['status'],
+	): Operation {
 		const { effect } = write;
 		const creates = effect?.kind === 'create';
 		let entityId = effect ? (creates ? id : effect.entity.id(input)) : '';
@@ -1034,7 +1098,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			raw = renameId(effect!.entity, raw, entityId, serverId);
 			entityId = serverId;
 		}
-		const operation: Operation = {
+		return {
 			id,
 			write,
 			input,
@@ -1046,13 +1110,24 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					: { ...(input as object), [effect!.entity.key]: id }
 				: undefined,
 			gate: null,
-			status: 'pending',
+			status,
 			settledSeq: 0,
 		};
+	}
+
+	function send(write: Write<any, any>, input: unknown, raw: unknown): Promise<any> {
+		const id = crypto.randomUUID();
+		const operation = operationFor(id, write, input, raw, 'pending');
+		const { effect } = write;
+		const creates = effect?.kind === 'create';
 		operations.push(operation);
 		if (effect) touchEntities();
+		// A durable write is in the journal before it can reach the server.
+		const journaled = durable.has(write)
+			? persisted!.journal({ id, name: write.name, raw: operation.raw })
+			: null;
 
-		const dispatch = () => {
+		const deliver = () => {
 			const tags = writeTags(write);
 			const refresh: { name: string; input: unknown }[] = [];
 			for (const entry of entries.values()) {
@@ -1068,6 +1143,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				new AbortController().signal,
 			);
 		};
+		const dispatch = journaled ? () => journaled.then(deliver) : deliver;
 
 		// Writes to one entity are sent in submission order, so the last edit wins on the
 		// server too. After a write that failed to arrive, the next is still sent; after a
@@ -1185,14 +1261,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		settle(operationId, confirmed, value) {
 			assertLive();
 			const operation = operations.find((item) => item.id === operationId);
-			if (operation?.status !== 'uncertain') return;
-			if (confirmed) {
-				confirm(operation, undefined, value);
-				touchEntities();
-			} else {
-				remove(operation);
-				operation.gate?.reject(new DataError('dependency'));
-			}
+			if (operation?.status === 'uncertain') settleOperation(operation, confirmed, value);
 		},
 		dehydrate() {
 			const now = Date.now();

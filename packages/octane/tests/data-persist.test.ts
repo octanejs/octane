@@ -66,9 +66,18 @@ const setRead = write({
 	invalidates: ['count'],
 });
 
+/** Whether the server applied a write, by the operation ID it was sent with. */
+const receipt = read({
+	name: 'receipt',
+	input: schema<{ operationId: string }>((v) => typeof v?.operationId === 'string'),
+	output: schema<{ applied: boolean }>((v) => typeof v?.applied === 'boolean'),
+});
+
 /** A server over `books`, logging each request it answers. */
-function server(books: Book[]) {
+function server(books: Book[], applied = new Set<string>()) {
 	const log: string[] = [];
+	/** Make the next request fail before the server sees it, or after it applied a write. */
+	const faults = { lose: null as 'request' | 'reply' | null };
 	let hold: Promise<void> | null = null;
 	let holding: DataRequest['kind'] | 'all' = 'all';
 	const answer = (name: string, input: unknown): unknown => {
@@ -82,10 +91,19 @@ function server(books: Book[]) {
 	};
 	const transport = async (request: DataRequest): Promise<DataReply> => {
 		if (holding === 'all' || holding === request.kind) await hold;
+		const lose = faults.lose;
+		faults.lose = null;
+		if (lose === 'request') throw new Error('offline');
 		log.push(`${request.kind} ${request.name}`);
+		if (request.name === 'receipt') {
+			const { operationId } = request.input as { operationId: string };
+			return { ok: true, value: { applied: applied.has(operationId) } };
+		}
 		if (request.kind === 'read') return { ok: true, value: answer(request.name, request.input) };
 		const { id, read } = request.input as { id: string; read: boolean };
 		books.find((book) => book.id === id)!.read = read;
+		applied.add(request.operationId!);
+		if (lose === 'reply') throw new Error('connection reset after the server applied the write');
 		// Like the data handler, the reply carries back the reads on screen that the write affects.
 		const refreshed = (request.refresh ?? []).map((item) => ({
 			...item,
@@ -96,8 +114,11 @@ function server(books: Book[]) {
 	return {
 		log,
 		transport,
-		/** Hold requests, or only writes, until the returned function is called. */
-		hold(kind: 'all' | 'write' = 'all') {
+		faults,
+		books,
+		applied,
+		/** Hold requests, or one kind of them, until the returned function is called. */
+		hold(kind: DataRequest['kind'] | 'all' = 'all') {
 			holding = kind;
 			let release!: () => void;
 			hold = new Promise((resolve) => (release = resolve));
@@ -550,6 +571,140 @@ describe('indexedDBStorage', () => {
 			persist: cache(indexedDBStorage(), 'ada'),
 		});
 		expect((await value<Book[]>(after, shelf)).value).toHaveLength(3);
+		expect(remote.log).toEqual([]);
+	});
+});
+
+describe('octane/data durable writes', () => {
+	const durable = (storage: PersistentStorage) =>
+		cache(storage, 'ada', { journal: { writes: [setRead], receipt } });
+
+	/** A restart: a new store over the same storage and server data. */
+	function restart(storage: PersistentStorage, previous: ReturnType<typeof server>) {
+		const remote = server(previous.books, previous.applied);
+		return {
+			remote,
+			store: createDataStore({ transport: remote.transport, persist: durable(storage) }),
+		};
+	}
+
+	it('saves a durable write before sending it', async () => {
+		const events: string[] = [];
+		const inner = memoryStorage();
+		const storage: PersistentStorage = {
+			...inner,
+			async commit(partition, put, remove) {
+				await inner.commit(partition, put, remove);
+				if (put.length > 0) events.push('saved');
+			},
+		};
+		const remote = server(books());
+		const store = createDataStore({
+			transport: (request) => {
+				events.push(`sent ${request.name}`);
+				return remote.transport(request);
+			},
+			persist: durable(storage),
+		});
+		await store.write(setRead, { id: 'a', read: true });
+		expect(events).toEqual(['saved', 'sent setRead']);
+	});
+
+	it('shows a write left uncertain before a restart, and keeps it once its receipt says it landed', async () => {
+		const storage = memoryStorage();
+		const first = server(books());
+		const before = createDataStore({ transport: first.transport, persist: durable(storage) });
+		await value(before, shelf);
+		first.faults.lose = 'reply';
+		await expect(before.write(setRead, { id: 'a', read: true })).rejects.toThrow(/unknown/);
+		await saved();
+
+		const { remote, store } = restart(storage, first);
+		const shown = await value<Book[]>(store, shelf);
+		// Confirmed by its receipt, the write reloads the reads it affects; it is not sent again.
+		await vi.waitFor(() => expect(remote.log).toEqual(['read receipt', 'read shelf']));
+		expect(shown.handle.getSnapshot().value![0]!.read).toBe(true);
+
+		// Settled, it leaves the journal: the next start looks nothing up.
+		await saved();
+		const again = restart(storage, remote);
+		await value(again.store, shelf);
+		await saved();
+		expect(again.remote.log).toEqual([]);
+	});
+
+	it('rolls back a write left uncertain before a restart once its receipt says it never arrived', async () => {
+		const storage = memoryStorage();
+		const first = server(books());
+		const before = createDataStore({ transport: first.transport, persist: durable(storage) });
+		await value(before, shelf);
+		await saved();
+		first.faults.lose = 'request';
+		await expect(before.write(setRead, { id: 'a', read: true })).rejects.toThrow(/unknown/);
+		await saved();
+
+		const { remote, store } = restart(storage, first);
+		const release = remote.hold('read');
+		const shown = await value<Book[]>(store, shelf);
+		// The saved shelf predates the write; the journal puts the edit back over it.
+		await vi.waitFor(() => expect(shown.handle.getSnapshot().value![0]!.read).toBe(true));
+		release();
+		await vi.waitFor(() => expect(shown.handle.getSnapshot().value![0]!.read).toBe(false));
+		expect(remote.log).toEqual(['read receipt']);
+
+		// Rolled back, it leaves the journal too.
+		await saved();
+		const again = restart(storage, remote);
+		await value(again.store, shelf);
+		await saved();
+		expect(again.remote.log).toEqual([]);
+	});
+
+	it('keeps a write whose receipt cannot be read for the next start', async () => {
+		const storage = memoryStorage();
+		const first = server(books());
+		const before = createDataStore({ transport: first.transport, persist: durable(storage) });
+		first.faults.lose = 'reply';
+		await before.write(setRead, { id: 'a', read: true }).catch(() => {});
+		await saved();
+
+		const offline = server(first.books, first.applied);
+		offline.faults.lose = 'request';
+		createDataStore({ transport: offline.transport, persist: durable(storage) });
+		await saved();
+
+		const { remote } = restart(storage, offline);
+		await vi.waitFor(() => expect(remote.log).toEqual(['read receipt']));
+	});
+
+	it('journals only the writes it lists', async () => {
+		const storage = memoryStorage();
+		const first = server(books());
+		const before = createDataStore({
+			transport: first.transport,
+			persist: cache(storage, 'ada', { journal: { writes: [], receipt } }),
+		});
+		first.faults.lose = 'reply';
+		await before.write(setRead, { id: 'a', read: true }).catch(() => {});
+		await saved();
+
+		const { remote } = restart(storage, first);
+		await saved();
+		expect(remote.log).toEqual([]);
+	});
+
+	it('forgets settled writes, and every write when the store is retired', async () => {
+		const storage = memoryStorage();
+		const first = server(books());
+		const before = createDataStore({ transport: first.transport, persist: durable(storage) });
+		await before.write(setRead, { id: 'b', read: true });
+		first.faults.lose = 'reply';
+		await before.write(setRead, { id: 'c', read: true }).catch(() => {});
+		before.retire();
+		await saved();
+
+		const { remote } = restart(storage, first);
+		await saved();
 		expect(remote.log).toEqual([]);
 	});
 });
