@@ -95,12 +95,28 @@ export interface DataStore {
 	 */
 	settle(operationId: string, confirmed: boolean, value?: unknown): void;
 	/**
+	 * Take a confirmed value for a read from elsewhere, such as the app's own
+	 * live subscription, as if a load had returned it: validated, shared with
+	 * other reads of its records, saved, with pending edits still on top. It
+	 * supersedes any load, restore or publish started before it. A view needs
+	 * the window it was fetched for, so it cannot be published.
+	 */
+	publish<I, O>(read: Read<I, O>, input: I, value: unknown): Promise<void>;
+	/**
+	 * Erase one read's confirmed value, in memory and in persistent storage,
+	 * and supersede any load or restore in flight. Observers see it pending; it
+	 * loads again only when asked. Rejects when storage fails.
+	 */
+	forget<I, O>(read: Read<I, O>, input: I): Promise<void>;
+	/**
 	 * End this grant: clear every value and ignore late replies. Later writes,
 	 * invalidations and settlements throw. Later reads stay pending without
 	 * loading, so a render that still holds this store, such as a React island
 	 * that has not yet received its replacement, shows nothing instead of failing.
+	 * Memory is cleared at once; the returned promise settles once persistent
+	 * storage is cleared, and every call returns the same one.
 	 */
-	retire(): void;
+	retire(): Promise<void>;
 	/**
 	 * The confirmed values loaded so far, for a client store to start from.
 	 * The text is safe inside `<script type="application/json">`. On a server,
@@ -315,6 +331,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	let operations: Operation[] = [];
 	let sequence = 0;
 	let retired = false;
+	let retirement: Promise<void> | null = null;
 	const persisted = options.persist
 		? createPersistence(options.persist, saving, (key) => !!entries.get(key)?.subscribers.size)
 		: null;
@@ -873,14 +890,19 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		return done;
 	}
 
+	/** Discard any load or restore in flight; returns the attempt that supersedes it. */
+	function supersede(entry: Entry): number {
+		entry.abort?.abort();
+		entry.abort = null;
+		entry.inflight = null;
+		return ++entry.attempt;
+	}
+
 	/** Discard any load in flight, since it may predate the change, and reload if observed. */
 	function invalidateEntry(entry: Entry): void {
 		entry.stale = true;
 		persisted?.mark(entry.key);
-		entry.attempt++;
-		entry.abort?.abort();
-		entry.abort = null;
-		entry.inflight = null;
+		supersede(entry);
 		if (entry.subscribers.size > 0) {
 			void load(entry);
 		} else {
@@ -1040,11 +1062,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			if (!entry) continue;
 			refreshed.add(entry);
 			// The refreshed value was read after the write, so it supersedes any load in flight.
-			const attempt = ++entry.attempt;
+			const attempt = supersede(entry);
 			const startedSeq = ++sequence;
-			entry.abort?.abort();
-			entry.abort = null;
-			entry.inflight = null;
 			const current = () => !retired && entry.attempt === attempt;
 			pending.push(
 				Promise.resolve()
@@ -1336,6 +1355,65 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			const operation = operations.find((item) => item.id === operationId);
 			if (operation?.status === 'uncertain') settleOperation(operation, confirmed, value);
 		},
+		publish(read, input, value) {
+			assertLive();
+			if (isView(read)) {
+				throw new TypeError(
+					'octane/data: a view needs its fetched window, so it cannot be published',
+				);
+			}
+			const entry = entryFor(read, input);
+			const attempt = supersede(entry);
+			// Taken now, as a load does: a write confirmed while this validates is newer.
+			const startedSeq = ++sequence;
+			const current = () => !retired && entry.attempt === attempt;
+			let refused = false;
+			let reason: unknown;
+			// Readers that ask while it validates join it rather than superseding it with a load.
+			const done = Promise.resolve()
+				.then(() => parse(read.output, value))
+				.then(
+					(parsed) => {
+						if (!current()) return;
+						adopt(entry, parsed, startedSeq);
+						save(entry);
+					},
+					(error) => {
+						refused = true;
+						reason = error;
+						// A newer value exists, so what memory holds is stale; storage keeps its copy.
+						if (current() && entry.hasBase) entry.stale = true;
+					},
+				)
+				.then(() => {
+					if (!current()) return;
+					entry.inflight = null;
+					touchWithViews(entry);
+					// A refused value leaves an observer the load it superseded.
+					if (entry.subscribers.size > 0 && (!entry.hasBase || entry.stale)) void load(entry);
+					else idle(entry);
+				});
+			entry.inflight = done;
+			touch(entry);
+			return done.then(() => {
+				if (refused) throw reason;
+			});
+		},
+		forget(read, input) {
+			assertLive();
+			const key = entryKey(read.name, input);
+			seeds.delete(key);
+			const entry = entries.get(key);
+			if (entry) {
+				supersede(entry);
+				entry.checkedStorage = true;
+				forget(entry);
+				entry.error = undefined;
+				touch(entry);
+				idle(entry);
+			}
+			return persisted ? persisted.forget(key) : Promise.resolve();
+		},
 		dehydrate() {
 			const now = Date.now();
 			const seed: SeedEntry[] = [];
@@ -1348,10 +1426,12 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			return devalue.stringify({ reads: seed, form: formSeed });
 		},
 		retire() {
-			if (retired) return;
+			if (retirement) return retirement;
 			retired = true;
 			// Signing out leaves nothing of the account on the device.
-			persisted?.clear();
+			retirement = persisted ? persisted.clear() : Promise.resolve();
+			// A caller that does not wait for the cleanup is not told it failed.
+			retirement.catch(() => {});
 			// Writes waiting on a create must settle too, or they would never end.
 			for (const operation of operations) operation.gate?.reject(new DataRetiredError());
 			operations = [];
@@ -1368,6 +1448,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				for (const notify of [...entry.subscribers]) notify();
 			}
 			entries.clear();
+			return retirement;
 		},
 	};
 	return store;
