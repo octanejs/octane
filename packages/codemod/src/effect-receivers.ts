@@ -5,22 +5,29 @@ function visit(node: ts.Node, read: (node: ts.Node) => void) {
 	ts.forEachChild(node, (child) => visit(child, read));
 }
 
-/** A const in this render, or a parameter this render never reassigns. */
-function fixedReceiver(checker: ts.TypeChecker, receiver: ts.Identifier, call: ts.CallExpression) {
-	const symbol = checker.getSymbolAtLocation(receiver);
-	let declaration = symbol?.valueDeclaration;
-	if (!declaration) return false;
+/** A const already initialized in this function, or a parameter it never reassigns. */
+export function fixedBinding(
+	checker: ts.TypeChecker,
+	name: ts.Identifier,
+	read: ts.Expression,
+	parameters?: Map<ts.Symbol, boolean>,
+) {
+	const symbol = checker.getSymbolAtLocation(name);
+	if (symbol?.declarations?.length !== 1 || !symbol.valueDeclaration) return false;
+	let declaration = symbol.valueDeclaration;
 	while (ts.isBindingElement(declaration)) declaration = declaration.parent.parent;
-	const owner = ts.findAncestor(call, ts.isFunctionLike);
+	const owner = ts.findAncestor(read, ts.isFunctionLike);
 	if (!owner || owner !== ts.findAncestor(declaration, ts.isFunctionLike)) return false;
 	if (ts.isVariableDeclaration(declaration)) {
 		return Boolean(
-			declaration.end <= call.getStart() &&
+			declaration.end <= read.getStart() &&
 			ts.isVariableDeclarationList(declaration.parent) &&
 			declaration.parent.flags & ts.NodeFlags.Const,
 		);
 	}
 	if (!ts.isParameter(declaration)) return false;
+	const known = parameters?.get(symbol);
+	if (known !== undefined) return known;
 
 	let fixed = true;
 	visit(owner, (node) => {
@@ -49,6 +56,7 @@ function fixedReceiver(checker: ts.TypeChecker, receiver: ts.Identifier, call: t
 			});
 		}
 	});
+	parameters?.set(symbol, fixed);
 	return fixed;
 }
 
@@ -104,8 +112,7 @@ export function effectReceivers(
 		uses.push(receiver);
 		members.set(symbol, uses);
 	});
-	if (names.has('eval') || !identifiers.every((dep) => fixedReceiver(checker, dep, call)))
-		return [];
+	if (names.has('eval') || !identifiers.every((dep) => fixedBinding(checker, dep, call))) return [];
 	const declarations = [];
 	for (const dep of identifiers) {
 		const symbol = checker.getSymbolAtLocation(dep);

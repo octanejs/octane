@@ -548,11 +548,12 @@ it('keeps the SVG diagnostic when the stylesheet import is rewritten to a JavaSc
 	expect(notes.some((n) => n.rule === 'svg-issuer')).toBe(true);
 });
 
-it('preserves clsx-selected classes on direct SVG children on the server and after client updates', async () => {
+it('preserves SVG classes selected by stable clsx guards on the server and after client updates', async () => {
 	await expectSvgRenderParity(
 		`import classes, {clsx as join} from 'clsx';
-		export function Pane({active, muted}) { return <button>
-			<Mark className={classes('icon', active ? 'active' : 'idle', !muted && 'visible')}/>
+		function Frame({children}) { return <b>{children}</b>; }
+		export function Pane({active, muted}) { const visible = !muted; return <button>
+			<Frame><Mark className={classes('icon', active ? 'active' : 'idle', visible && 'visible')}/></Frame>
 			<Mark className={join('badge', (active && !muted || muted) ? 'bright' : 'dim')}/>
 		</button>; }`,
 		[
@@ -589,6 +590,29 @@ it('renders a selected SVG from a block-scoped local on the server and across cl
 		2,
 	);
 });
+
+it.each([
+	['a module variable', 'let active = true;', '', 'active = false'],
+	['a reassigned parameter', '', '{active}', 'active = false'],
+	['a destructuring assignment', '', '{active}', '[active] = [false]'],
+	['an update expression', '', '{active}', 'active--'],
+	['a global binding', 'globalThis.active = true;', '', 'globalThis.active = false'],
+	['a parameter redeclared in finally', '', 'active', '', 'var active = false'],
+])(
+	'keeps the SVG diagnostic for a clsx guard changed by %s',
+	async (_case, setup, params, write, finalizer) => {
+		const view = `return <Frame change={() => { ${write} }}><Mark className={cx(active && "on")}/></Frame>;`;
+		const { root, file } = fixture(`import Mark from './icons/mark.svg'; import cx from 'clsx';
+		${setup} function Frame({change, children}) { change(); return <b>{children}</b>; }
+		export function Pane(${params}) { ${finalizer ? `try { ${view} } finally { ${finalizer} }` : view} }`);
+		const { files } = await runCodemod([file], { root, svgPaths: true, write: false });
+		const caller = files.find((f) => f.file === 'src/pane.tsx');
+		expect(caller.notes).toContainEqual(
+			expect.objectContaining({ rule: 'svg-issuer', severity: 'error' }),
+		);
+		expect(files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
+	},
+);
 
 it.each([
 	[
