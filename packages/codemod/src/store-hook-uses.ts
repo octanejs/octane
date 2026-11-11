@@ -442,7 +442,6 @@ export function storeHookUses(
 						first &&
 						ts.isCallExpression(first) &&
 						!p.questionDotToken &&
-						ts.isExpressionStatement(p.parent) &&
 						ts.isPropertyAccessExpression(value) &&
 						serviceMethod(value, check) &&
 						p.arguments.slice(1).every(literalOptions) &&

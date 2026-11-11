@@ -632,7 +632,7 @@ it('delivers the original React element to a store service for rendering under i
 				const intl = useIntl();
 				const command = {async send() {
 					await wait;
-					store.get(reading).show(intl.formatMessage({id:'title'}));
+					void store.get(reading).show(intl.formatMessage({id:'title'}));
 				}};
 				return <section><Message id="headline"/><Action onClick={() => {
 					store.get(reading).show(<Label label="sent"/>, {sticky: true});
