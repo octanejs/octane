@@ -572,6 +572,46 @@ describe('octane/data server-ordered reads', () => {
 		expect(titles(results)).toContain('Book 01 (revised)');
 	});
 
+	it('never adds a record a view does not hold, even from a search that lands late', async () => {
+		const server = libraryServer(4);
+		let release: (() => void) | null = null;
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				const reply = server.transport(request, signal);
+				if (request.name === 'books.search') await new Promise<void>((done) => (release = done));
+				return reply;
+			},
+		});
+		const page = store.read(library, undefined);
+		await ready(page);
+		const results = store.read(search, { q: 'Book' });
+		results.subscribe(() => {});
+		await vi.waitFor(() => expect(release).not.toBeNull());
+
+		// The search read b1 before another user removed it; the library reloads without it.
+		server.books.delete('b1');
+		await page.refresh();
+		expect(titles(page)).toEqual(['Book 00', 'Book 02', 'Book 03']);
+		release!();
+		await vi.waitFor(() => expect(results.getSnapshot().status).toBe('ready'));
+		expect(titles(page)).toEqual(['Book 00', 'Book 02', 'Book 03']);
+	});
+
+	it("tells views of a newer copy that a write's reply carried back in a search", async () => {
+		const server = libraryServer(4);
+		const store = createDataStore({ transport: server.transport });
+		const page = store.read(library, undefined);
+		await ready(page);
+		await ready(store.read(search, { q: 'Book' }));
+
+		// The rename settles the library from its record; the search comes back in the reply.
+		server.books.get('b2')!.title = 'Book 02 (revised)';
+		await store.write(rename, { id: 'b0', title: 'Book 00 (renamed)' });
+		await vi.waitFor(() =>
+			expect(titles(page)).toEqual(['Book 00 (renamed)', 'Book 01', 'Book 02 (revised)']),
+		);
+	});
+
 	it('keeps the same snapshot when nothing it shows changed', async () => {
 		const server = libraryServer(4);
 		const store = createDataStore({ transport: server.transport });

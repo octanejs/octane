@@ -626,19 +626,25 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 
 	/** Commit `entry`, and with it every view that reads the records its value carried. */
 	function touchWithViews(entry: Entry): void {
-		if (!entry.read.entities) return commit([entry]);
-		// Its load may have changed records that every read of those entities shares.
-		const changed = [entry];
+		commit(withSharing([entry]));
+	}
+
+	/** These entries, and every read that shares a record their values may have changed. */
+	function withSharing(changed: readonly Entry[]): Set<Entry> {
+		const all = new Set(changed);
+		const names = new Set<string>();
+		for (const entry of changed)
+			if (entry.read.entities) for (const name of entry.names) names.add(name);
+		if (names.size === 0) return all;
 		for (const other of entries.values()) {
-			if (other === entry) continue;
-			for (const name of entry.names) {
-				if (other.names.has(name)) {
-					changed.push(other);
+			for (const name of other.names) {
+				if (names.has(name)) {
+					all.add(other);
 					break;
 				}
 			}
 		}
-		commit(changed);
+		return all;
 	}
 
 	function reloadAll(reload: Set<Entry>): void {
@@ -716,13 +722,20 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			}
 			if (!reload) reloadAll(later);
 		} else if (entry.read.entities) {
-			// Records the server ordered: views get any newer copy, and nothing else moves.
+			// Records the server ordered: views get a newer copy of a record they hold, and
+			// nothing else moves. A record no view holds stays out: the views' own loads say
+			// which records they show, and this one may be older than theirs.
 			const later = reload ?? new Set();
 			for (const { entity, source } of selections(entry.read, value)) {
-				if (!records.has(entity.name)) continue;
+				const table = records.get(entity.name);
+				if (table === undefined) continue;
+				let shared = false;
 				for (const item of Array.isArray(source) ? source : [source]) {
+					if (!table.has(entity.id(item))) continue;
 					putRecord(entity, item, startedSeq, entry, later);
+					shared = true;
 				}
+				if (shared) for (const view of viewEntries(entity.name)) persisted?.mark(view.key);
 			}
 			if (!reload) reloadAll(later);
 		}
@@ -1054,7 +1067,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (pending.length > 0) {
 			void Promise.all(pending).then((commits) => {
 				const adopted = commits.map((adopt) => adopt());
-				commit(adopted.filter((entry): entry is Entry => entry !== undefined));
+				commit(withSharing(adopted.filter((entry): entry is Entry => entry !== undefined)));
 			});
 		}
 		const tags = writeTags(operation.write);
