@@ -9,6 +9,7 @@ export interface Note {
 export interface TransformOptions {
 	/** Try receiver captures for a Strong effect with an explicit object dependency. */
 	captureEffectReceivers?: boolean;
+	captureEffectSnapshots?: boolean;
 	/** `tsrx` (default) rewrites component bodies as templates; `tsx` keeps JSX and only ports the React APIs. */
 	target?: 'tsx' | 'tsrx';
 	/** Emit Strong-mode source: add `"use strong"` and leave omitted dependency lists to the compiler. */

@@ -44,7 +44,12 @@ export function strengthen(
 	{
 		force = false,
 		withEffectReceivers,
-	}: { force?: boolean; withEffectReceivers?: () => string } = {},
+		withEffectSnapshots,
+	}: {
+		force?: boolean;
+		withEffectReceivers?: () => string;
+		withEffectSnapshots?: () => string;
+	} = {},
 ): StrongResult {
 	const original = code;
 	const fixed: string[] = [];
@@ -67,11 +72,17 @@ export function strengthen(
 	}
 	const blockers = diagnostics.filter((diagnostic) => diagnostic.severity === 'error').map(finding);
 	if (blockers.length === 0) return { code, strong: true, fixed, blockers };
-	if (
-		withEffectReceivers &&
-		blockers.every((b) => b.code === 'OCTANE_STRONG_EXPLICIT_DEPENDENCIES')
-	) {
-		const candidate = withEffectReceivers();
+	const retry = blockers.every((b) => b.code === 'OCTANE_STRONG_EXPLICIT_DEPENDENCIES')
+		? withEffectReceivers
+		: blockers.every(
+					(b) =>
+						b.code === 'OCTANE_STRONG_EXPLICIT_DEPENDENCIES' ||
+						b.code === 'OCTANE_STRONG_READ_ONLY_STATE',
+			  )
+			? withEffectSnapshots
+			: undefined;
+	if (retry) {
+		const candidate = retry();
 		if (candidate !== original) {
 			const checked = strengthen(compiler, candidate, filename);
 			if (checked.strong) return checked;
