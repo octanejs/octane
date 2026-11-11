@@ -9,7 +9,7 @@ import {
 	type UniversalComponent,
 } from '../src/universal.js';
 import { mount } from './_helpers.js';
-import { loadServerFixture } from './_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 import * as client from './_fixtures/for-bare-binding.tsrx';
 import { Rows, type RowsProps } from './_fixtures/for-bare-binding.object.tsrx';
 
@@ -185,6 +185,22 @@ describe('bare-left @for row bindings', () => {
 		flushSync(() => {});
 		expect(host.querySelector('li')).toBe(node);
 		expect(node?.textContent).toBe('2');
+	});
+
+	it('rejects writing a const destructured key binding on both client and server', () => {
+		// Compile directly so the runtime is exercised even without TypeScript checking.
+		const source = `
+			function Row({ id }) @{ <li>{String(id)}</li> }
+			export function List({ rows }) @{
+				<ul>@for (const { id } of rows; key id++) { <Row id={id} /> }</ul>
+			}
+		`;
+		const id = 'const-row-key.tsrx';
+		const props = { rows: [{ id: 1 }] };
+		const { List: ClientList } = loadCompiledFixtureSource(source, { id, mode: 'client' });
+		const { List: ServerList } = loadCompiledFixtureSource(source, { id, mode: 'server' });
+		expect(() => mount(ClientList, props)).toThrow(TypeError);
+		expect(() => renderToString(ServerList, props)).toThrow(TypeError);
 	});
 
 	it('server-renders rows and hydrates them in place', () => {

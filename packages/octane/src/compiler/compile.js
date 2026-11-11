@@ -17744,13 +17744,15 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	let preparation = null;
 	if (snapshot !== null) {
 		const record = b.id(allocCompilerName(ctx, '__rowRecord'));
-		const params = node.index ? [node.index, itemId] : [itemId];
+		const item = b.id(allocCompilerName(ctx, '__rowInput'));
+		const params = node.index ? [node.index, item] : [item];
 		preparation = inheritOriginLoc(
 			b.const(
 				prepare,
 				b.arrow(
 					params,
 					b.block([
+						inheritOriginLoc(b.declaration(node.left.kind, [b.declarator(itemId, item)]), itemId),
 						b.const(record, b.array([b.void0, ...snapshot.values])),
 						b.stmt(b.assignment('=', b.member(record, b.literal(0), true), explicitKey)),
 						b.return(record),
