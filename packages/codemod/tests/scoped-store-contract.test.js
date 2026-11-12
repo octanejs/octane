@@ -340,7 +340,8 @@ it.each([
 
 it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
 	const source = `import {useSnapshot as useReading, valueOf} from 'observer';
-export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }`;
+export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }
+export type PaneParameters = Parameters<typeof Pane>;`;
 	const originalPane = { 'app/src/pane.tsx': source };
 	const { app, library } = project(originalPane);
 	const originalSources = Object.fromEntries(
@@ -370,10 +371,7 @@ export function Pane() { const value = useReading(); return <p>{valueOf(1)}{valu
 	const helperBytes = Object.fromEntries(
 		helpers.map((f) => [f.output, fs.readFileSync(path.join(app, f.output), 'utf8')]),
 	);
-	fs.writeFileSync(
-		path.join(app, 'src/second.tsx'),
-		source.replace('function Pane', 'function Other'),
-	);
+	fs.writeFileSync(path.join(app, 'src/second.tsx'), source.replaceAll('Pane', 'Other'));
 	// The normal directory entry now also sees the generated ordinary TypeScript files.
 	const second = await migrate(app, ['src'], true);
 	expect(second.files.find((f) => f.file === 'src/second.tsx')?.rules['store-hook']).toBe(1);
@@ -403,7 +401,7 @@ export function Pane() { const value = useReading(); return <p>{valueOf(1)}{valu
 	);
 }, 30_000);
 
-it('preserves the original handle and passes the active store to unchanged helpers at effect and click time', async () => {
+it('preserves an aliased handle and passes the active store to unchanged helpers at effect and click time', async () => {
 	const { app } = project({
 		'observer/public-store.ts': "export { valueOf, key } from './state';",
 		'observer/state.ts':
@@ -411,7 +409,7 @@ it('preserves the original handle and passes the active store to unchanged helpe
 		'observer/renderer.ts':
 			"import {createContext} from 'react'; export const current = createContext(new Map<object, string>());",
 		'app/src/handles.ts':
-			"import {key as create} from 'observer/core'; export const reading=create();",
+			"import {key as create} from 'observer/core'; const canonical=create(), same=canonical; export {canonical}; export const reading=same;",
 		'app/src/records.ts': 'export const calls = new WeakMap<Map<object, string>, string[]>();',
 		'app/src/record.ts': `import {calls} from './records'; export {calls};
 			export function record(store: Map<object, string>, phase: string) {
@@ -450,7 +448,7 @@ it('preserves the original handle and passes the active store to unchanged helpe
 		import {Pane} from './pane.tsrx';
 		export function Root({store}) @{ <NativeStoreProvider context={current} value={store}><Pane/></NativeStoreProvider> }`,
 	);
-	const entry = `export {Root} from './src/provider.tsrx'; export {reading} from './src/handles';
+	const entry = `export {Root} from './src/provider.tsrx'; export {canonical as reading} from './src/handles';
 		export {calls} from './src/record'; export {current} from '../observer/renderer';
 		export {Pane as Reference} from './src/reference.tsx';`;
 	const dom = installDOM();
@@ -902,9 +900,17 @@ it.each([
 it('requires an imported application handle to come from the original shared factory', async () => {
 	const { storeSources } = await import('../dist/store-inputs.js');
 	const { app, plan } = fixture({
+		'observer/state.ts': 'export function valueOf<T>(x: T) { return x; }',
 		'app/src/handles.ts': `import {valueOf as make} from 'observer/core';
 			import {useSnapshot as other} from 'observer';
-			export const reading = make(1), unknown = other();`,
+			export const reading = make(1), unknown = other();
+			let mutable = reading;
+			export const snapshot = mutable, wrapped = (reading), property = {reading}.reading;
+			export const opaqueAlias = unknown;
+			await using disposed = make({[Symbol.asyncDispose]() {}});
+			export {disposed};`,
+		'app/src/attributed.ts': `import {valueOf as make} from 'observer/core' with {mode:'alternate'};
+			export const direct = make(1), alias = direct;`,
 	});
 	const { inputFactory: factory } = storeSources(app, null, () => false);
 	const planned = plan();
@@ -913,11 +919,16 @@ it('requires an imported application handle to come from the original shared fac
 		return !!target && planned.isSharedExport(target.module, target.name, target.from);
 	};
 	expect(accepts('reading')).toBe(true);
-	expect(accepts('unknown')).toBe(false);
+	for (const name of ['unknown', 'snapshot', 'wrapped', 'property', 'opaqueAlias', 'disposed']) {
+		expect(accepts(name), name).toBe(false);
+	}
 	fs.writeFileSync(path.join(app, 'src/handles.js'), 'export const reading = {};');
 	expect(factory(path.join(app, 'src/pane.tsx'), './handles.js', 'reading')).toBeNull();
 	expect(factory(path.join(app, 'src/pane.tsx'), './handles', 'reading')).toBeNull();
 	expect(accepts('missing')).toBe(false);
+	for (const name of ['direct', 'alias']) {
+		expect(factory(path.join(app, 'src/pane.tsx'), './attributed', name), name).toBeNull();
+	}
 });
 
 it('retains the bindings diagnostic for wrapped keys that can dispatch into React', async () => {

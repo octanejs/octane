@@ -161,8 +161,8 @@
       "section": "state",
       "severity": "error",
       "detects": "A declaration takes the value from a `useState` call and discards its setter, for example `const [value] = useState(initial)` or `const value = useState(initial)[0]`. This includes lazy initializers.",
-      "replacement": "Derive render values from their inputs. For values kept for events or effects, use `useRef(value)` or `useLazyRef(() => createValue())` for one-time initialization.",
-      "primitives": ["useRef", "useLazyRef"],
+      "replacement": "Derive render values from their inputs. Use `useInitialValue(value)` for a deliberate initial render snapshot. Pass a factory to initialize lazily. Use `useRef(value)` or `useLazyRef(() => createValue())` for mutable values kept for events or effects.",
+      "primitives": ["useInitialValue", "useRef", "useLazyRef"],
       "url": "https://octanejs.dev/docs/strong-mode#octane-strong-read-only-state"
     },
     {
@@ -441,6 +441,16 @@
     }
   ],
   "recipes": [
+    {
+      "id": "initial-value",
+      "title": "Capture an initial render value",
+      "react": "const [value] = useState(() => initial);",
+      "strong": "const value = useInitialValue(() => initial);",
+      "codes": ["OCTANE_STRONG_READ_ONLY_STATE"],
+      "before": "\"use strong\";\nimport { useState } from 'octane';\nexport function Example({ initial }: { initial: string }) @{\n  const [value] = useState(() => initial);\n  <p>{value as string}</p>\n}",
+      "after": "\"use strong\";\n\"use strong\";\nimport { useInitialValue } from 'octane';\nexport function Example({ initial }: { initial: string }) @{\n  const value = useInitialValue(() => initial);\n  <p>{value as string}</p>\n}",
+      "note": "The factory captures the initial value for this mount. Use a derived value when it should follow later inputs."
+    },
     {
       "id": "lazy-ref",
       "title": "Create a value once",

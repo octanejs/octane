@@ -9,6 +9,10 @@ function contains(node: ts.Node, matches: (node: ts.Node) => boolean): boolean {
 	);
 }
 
+export function hasEval(file: ts.SourceFile) {
+	return contains(file, (node) => ts.isIdentifier(node) && node.text === 'eval');
+}
+
 export function hasPrototypeAccess(file: ts.SourceFile) {
 	return contains(
 		file,
@@ -413,7 +417,7 @@ export function forwardedProps(
 	if (
 		((destination !== 'text' || textPath) &&
 			(/@jsx(?:ImportSource|Runtime|Frag)?\b/i.test(file.text) || !ordinaryProps)) ||
-		contains(file, (node) => ts.isIdentifier(node) && node.text === 'eval')
+		hasEval(file)
 	)
 		return () => false;
 	const references = destination === 'text' ? uses : (id: ts.Identifier) => renderUses(uses(id));

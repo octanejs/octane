@@ -1,7 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { JSDOM } from 'jsdom';
 import { collectDiagnostics } from 'octane/compiler';
+import * as ReactServerBridge from 'octane/react/server';
 import { renderToStaticMarkup } from 'octane/server';
+import { prerender } from 'octane/static';
+import { createElement as reactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
 import { loadCompiler, strengthen, transformModule } from '../dist/index.js';
@@ -453,6 +457,25 @@ root.render(<App />);`;
 		expect(transformModule(source.replaceAll("'", '"'), 'a.tsx').code).toContain(
 			'import { type ReactNode, useState } from "octane";',
 		);
+	});
+
+	it('keeps ref allocator re-exports and type queries on the original React API', () => {
+		const { code, notes } = transformModule(
+			`import type * as R from 'react';
+export { createRef as allocate, useState } from 'react';
+export type { createRef as RefFactory } from 'react';
+export type Direct = typeof import('react').createRef;
+export type Qualified = typeof R.createRef;`,
+			'refs.ts',
+		);
+		expect(notes).toEqual([]);
+		expect(code).toMatch(/export \{\s*createRef as allocate,?\s*\} from 'react'/);
+		expect(code).toMatch(/export \{\s*useState\s*\} from 'octane'/);
+		expect(code).toContain("export type { createRef as RefFactory } from 'react';");
+		expect(code).toContain("typeof import('react').createRef");
+		const imported = /import type \{\s*createRef(?: as (\w+))?\s*\} from 'react'/.exec(code);
+		expect(imported).not.toBeNull();
+		expect(code).toContain(`export type Qualified = typeof ${imported?.[1] ?? 'createRef'};`);
 	});
 
 	it("imports `useSyncExternalStore` from Octane, not React's shim for it", () => {
@@ -966,6 +989,46 @@ root.render(<App />);`;
 		]);
 	});
 
+	it.each([
+		['named alias', "import { ReactCompatInline as Inline } from 'octane/react';", 'Inline'],
+		[
+			'server namespace',
+			"import * as Bridge from 'octane/react/server';",
+			'Bridge.ReactCompatInline',
+		],
+	])('keeps a %s inline React boundary inside its paragraph', async (_, imported, tag) => {
+		const source = `${imported}
+			import { Badge } from 'badge-kit';
+			export function View() {
+				return <p><${tag}><Badge /></${tag}></p>;
+			}`;
+		const result = transformModule(source, 'View.tsx', {
+			target: 'tsrx',
+			strong: true,
+			reactCompat: true,
+			unported: (module) => (module === 'badge-kit' ? module : null),
+		});
+		expect(result.notes.filter((note) => note.severity === 'error')).toEqual([]);
+		expect(result.rules['react-compat']).toBeUndefined();
+		const { View } = loadCompiledFixtureSource(result.code, {
+			id: 'View.tsrx',
+			mode: 'server',
+			runtimeModules: {
+				'octane/react/server': ReactServerBridge,
+				'badge-kit': { Badge: () => reactElement('b', null, 'badge') },
+			},
+		});
+		const { html } = await prerender(View, {});
+		const dom = new JSDOM(html);
+		try {
+			const { document } = dom.window;
+			expect(document.querySelector('p > span[data-react-compat] > b')?.textContent).toBe('badge');
+			expect(document.querySelectorAll('[data-react-compat]')).toHaveLength(1);
+		} finally {
+			dom.window.close();
+		}
+	});
+
 	it('passes a text field wrapper its rest props `onChange` as `onInput`', () => {
 		const migrate = (/** @type {string} */ body) =>
 			transformModule(
@@ -1418,8 +1481,9 @@ describe('strengthen', () => {
 		const result = strengthen(compiler, code, path.join(FIXTURES, 'raw.tsrx'));
 		expect(result.strong).toBe(false);
 		expect(result.code).not.toContain('use strong');
+		expect(result.fixed).toEqual(['OCTANE_STRONG_READ_ONLY_STATE']);
+		expect(result.code).toContain('const open = useInitialValue(false);');
 		expect(result.blockers.map((b) => `${b.severity} ${b.code}`)).toEqual([
-			'warning OCTANE_STRONG_READ_ONLY_STATE',
 			'warning OCTANE_STRONG_UNTRUSTED_HTML',
 		]);
 		expect(compileErrors(result.code, 'raw.tsrx')).toEqual([]);

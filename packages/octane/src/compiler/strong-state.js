@@ -241,7 +241,7 @@ export function createStrongStatePolicy(api) {
 		 * proof for known mutator methods, including nested literal properties.
 		 */
 		initialShape(hook, node, scope) {
-			if (hook === 'useState') {
+			if (hook === 'useState' || hook === 'useInitialValue') {
 				const initial = unwrap(node.arguments?.[0]);
 				return FUNCTIONS.has(initial?.type)
 					? returnedShape(initial, scope)

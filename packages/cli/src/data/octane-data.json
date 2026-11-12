@@ -7260,7 +7260,7 @@
       "OCTANE_STRONG_READ_ONLY_STATE": {
         "severity": "error",
         "detects": "A declaration takes the value from a `useState` call and discards its setter, for example `const [value] = useState(initial)` or `const value = useState(initial)[0]`. This includes lazy initializers.",
-        "replacement": "Derive render values from their inputs. For values kept for events or effects, use `useRef(value)` or `useLazyRef(() => createValue())` for one-time initialization.",
+        "replacement": "Derive render values from their inputs. Use `useInitialValue(value)` for a deliberate initial render snapshot. Pass a factory to initialize lazily. Use `useRef(value)` or `useLazyRef(() => createValue())` for mutable values kept for events or effects.",
         "url": "https://octanejs.dev/docs/strong-mode#octane-strong-read-only-state"
       },
       "OCTANE_STRONG_WRITE_ONLY_STATE": {
@@ -7463,6 +7463,13 @@
       }
     },
     "recipes": [
+      {
+        "id": "initial-value",
+        "title": "Capture an initial render value",
+        "react": "const [value] = useState(() => initial);",
+        "strong": "const value = useInitialValue(() => initial);",
+        "codes": ["OCTANE_STRONG_READ_ONLY_STATE"]
+      },
       {
         "id": "lazy-ref",
         "title": "Create a value once",
