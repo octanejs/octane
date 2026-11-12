@@ -3,8 +3,25 @@ import { contains, renderUses } from './forwarded-props.js';
 import { localUses } from './local-uses.js';
 import { skipWrappers } from './expression-wrappers.js';
 
+function literalDeclaration(declaration: ts.VariableDeclaration) {
+	if (!ts.isIdentifier(declaration.name) || declaration.parent.flags & ts.NodeFlags.Using)
+		return false;
+	if (!declaration.initializer) return true;
+	const value = skipWrappers(declaration.initializer);
+	return (
+		ts.isLiteralExpression(value) ||
+		value.kind === ts.SyntaxKind.TrueKeyword ||
+		value.kind === ts.SyntaxKind.FalseKeyword ||
+		value.kind === ts.SyntaxKind.NullKeyword
+	);
+}
+
 /** A direct initialization in an ordinary component returning a native host. */
-export function nativeSetupHook(ref: ts.Identifier, uses: ReturnType<typeof localUses>) {
+export function nativeSetupHook(
+	ref: ts.Identifier,
+	uses: ReturnType<typeof localUses>,
+	mode: 'sidecar' | 'diagnostic' = 'sidecar',
+) {
 	const call = ref.parent;
 	if (!ts.isCallExpression(call) || call.expression !== ref) return false;
 	const decl = call.parent;
@@ -15,8 +32,26 @@ export function nativeSetupHook(ref: ts.Identifier, uses: ReturnType<typeof loca
 		!ts.isVariableStatement(decl.parent.parent)
 	)
 		return false;
-	const block = decl.parent.parent.parent;
-	if (!ts.isBlock(block) || block.statements[0] !== decl.parent.parent) return false;
+	const statement = decl.parent.parent;
+	const block = statement.parent;
+	if (!ts.isBlock(block)) return false;
+	const position = block.statements.indexOf(statement);
+	if (mode === 'sidecar') {
+		if (position !== 0) return false;
+	} else {
+		const declarations = decl.parent.declarations;
+		if (
+			!block.statements
+				.slice(0, position)
+				.every(
+					(prior) =>
+						ts.isVariableStatement(prior) &&
+						prior.declarationList.declarations.every(literalDeclaration),
+				) ||
+			!declarations.slice(0, declarations.indexOf(decl)).every(literalDeclaration)
+		)
+			return false;
+	}
 	const fn = block.parent;
 	if (
 		!ts.isFunctionDeclaration(fn) ||

@@ -2316,7 +2316,7 @@ class ModuleTransform {
 						/^use[A-Z0-9]/.test(name)
 					) {
 						const call = this.localUses(item.name).find((ref) =>
-							nativeSetupHook(ref, this.localUses),
+							nativeSetupHook(ref, this.localUses, 'diagnostic'),
 						);
 						const hook = call && this.options.localReactHook(module, name);
 						if (hook)

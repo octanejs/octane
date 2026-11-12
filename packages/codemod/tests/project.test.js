@@ -63,6 +63,20 @@ export function Panel() { const label = read(); return <b>{label}</b>; }`;
 				.replace('useLabel', 'useQuery')
 				.replace('./use-label', '@tanstack/react-query'),
 			'Panel.tsx': panel + '\nexport type View = typeof Panel;',
+			'AfterSetup.tsx': `import { useLabel as read } from './use-label';
+export function AfterSetup() {
+	const title = 'Label';
+	const label = read();
+	return <b title={title}>{label}</b>;
+}`,
+			'Skipped.tsx': panel.replace(
+				'const label = read();',
+				"const before = (() => { throw new Error('setup failed'); })(), label = read();",
+			),
+			'Disposal.tsx': panel.replace(
+				'const label = read();',
+				"using before = 'text' as unknown as Disposable; const label = read();",
+			),
 			'WithParam.tsx': panel
 				.replace('./use-label', './with-param')
 				.replace('read()', "read('ready')"),
@@ -122,6 +136,7 @@ export function useLabel() { const later = () => useState('ready'); return 'read
 					.map((n) => [f.file, n.rule, n.line, n.message]),
 			);
 			expect(errors).toEqual([
+				['AfterSetup.tsx', 'bindings', 4, expect.stringMatching(/useLabel.*React.*useState/)],
 				[
 					'External.tsx',
 					'bindings',
