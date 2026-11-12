@@ -12,6 +12,7 @@ import {
 	type ServerCallBatchOptions,
 	type ServerResultLimits,
 } from './server-rpc-protocol.js';
+import { setHostTimeout, clearHostTimeout } from './host-task.js';
 
 export const SERVER_BATCH_CONTENT_TYPE = 'application/x-octane-rpc-batch+ndjson';
 
@@ -94,7 +95,7 @@ function dispatch(batch: Batch): void {
 	if (members.length === 0) return;
 	const limits = serverResultLimits(batch.options);
 	const transport = new AbortController();
-	const timer = setTimeout(
+	const timer = setHostTimeout(
 		() => transport.abort(new DOMException('Server batch timed out', 'TimeoutError')),
 		limits.timeoutMs,
 	);
@@ -110,7 +111,7 @@ function dispatch(batch: Batch): void {
 	}
 	// A request that fails before the reader arrives settles its members now.
 	const fail = (error: unknown) => {
-		clearTimeout(timer);
+		clearHostTimeout(timer);
 		transport.abort();
 		rejectServerBatch(members, new ServerCallUncertainError(error));
 	};
