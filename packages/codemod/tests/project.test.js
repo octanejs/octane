@@ -540,7 +540,9 @@ function Cell({before, after, children}: { before: string; after: string; childr
 	return <span id={useId()} data-before={before} data-after={after}>{children}</span>;
 }
 export function List({rows}: { rows: Row[] }) {
-	return <main>{[...rows].map(row => <Cell before={row.attr()} key={row.id} after={row.attr()}>{row.child()}</Cell>)}</main>;
+	return <main>{[...rows].map(row => <Cell before={row.attr()} key={row.id} after={row.attr()}>
+		{row.child()}
+	</Cell>)}</main>;
 }
 export function Host({rows}: { rows: Row[] }) {
 	return <main>{rows.map(row => <span data-before={row.attr()} key={row.id} data-after={row.attr()}>{row.child()}</span>)}</main>;
@@ -610,6 +612,36 @@ export function Host({rows}: { rows: Row[] }) {
 				expect.objectContaining({ rule: 'template-for', severity: 'error' }),
 			);
 		}
+	});
+
+	it('keeps visible or ambiguous JSX text and authored comments in keyed map rows', async () => {
+		const children = [
+			' {row.child()}',
+			'\n&nbsp;{row.child()}',
+			'\n\u00a0{row.child()}',
+			'{/* keep */}{row.child()}',
+		];
+		const root = project({
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			...Object.fromEntries(
+				children.map((child, i) => [
+					`Row${i}.tsx`,
+					`export function List({rows}) { return <ul>{[...rows].map(row => <li key={row.id}>${child}</li>)}</ul>; }`,
+				]),
+			),
+		});
+		fs.symlinkSync(
+			path.join(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const { files } = await runCodemod([root], { root, write: false, strong: true, verify: true });
+		expect(files).toHaveLength(children.length);
+		for (const file of files)
+			expect(file.notes).toContainEqual(
+				expect.objectContaining({ rule: 'template-for', severity: 'error' }),
+			);
+		expect(files.find((file) => file.file === 'Row3.tsx').code).toContain('/* keep */');
 	});
 
 	it('keeps custom and sparse map calls in compatibility mode', async () => {

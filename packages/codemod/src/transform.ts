@@ -592,6 +592,13 @@ function contentOf(node: ts.JsxElement | ts.JsxFragment) {
 	);
 }
 
+/** JSX emitters agree on empty ASCII indentation; spaces on a single line are children. */
+function withoutJsxIndentation(children: readonly ts.JsxChild[]) {
+	return children.filter(
+		(child) => !(ts.isJsxText(child) && /^[\t ]*[\r\n][\t\r\n ]*$/.test(child.text)),
+	);
+}
+
 /**
  * A comment's text without its delimiters, to wrap as a JSX comment.
  */
@@ -1185,10 +1192,7 @@ class ModuleTransform {
 			closingElement.getText(this.sf) !== `</${openingElement.tagName.getText(this.sf)}>`
 		)
 			return null;
-		// Only line breaks and ASCII layout whitespace vanish in rendered JSX.
-		const content = children.filter(
-			(child) => !(ts.isJsxText(child) && /^[\t ]*[\r\n][\t\r\n ]*$/.test(child.text)),
-		);
+		const content = withoutJsxIndentation(children);
 		const [child] = content;
 		return content.length === 1 && (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child))
 			? child
@@ -5449,11 +5453,12 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				return null;
 			names.add(prop.name.text);
 		}
-		const [child] = children;
+		const content = withoutJsxIndentation(children);
+		const [child] = content;
 		if (
-			children.length &&
+			content.length &&
 			!(
-				children.length === 1 &&
+				content.length === 1 &&
 				ts.isJsxExpression(child) &&
 				child.expression &&
 				!child.dotDotDotToken &&
