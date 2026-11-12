@@ -1,4 +1,4 @@
-import { nativeOutputOwner } from './forwarded-props.js';
+import { nativeOutputOwner, renderUses } from './forwarded-props.js';
 import { localUses, portableArguments, scalar } from './local-uses.js';
 import { skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
@@ -217,7 +217,7 @@ export function storeHookUses(
 		else if (!ts.isExportAssignment(outer.parent)) return false;
 		return (
 			!name ||
-			uses(name).every((ref) => {
+			renderUses(uses(name)).every((ref) => {
 				const p = ref.parent;
 				return ts.isJsxOpeningElement(p) ||
 					ts.isJsxClosingElement(p) ||
