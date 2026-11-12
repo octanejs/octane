@@ -41,6 +41,36 @@ function typecheckProject(root) {
 }
 
 describe('runCodemod', () => {
+	it.each(['', ', undefined'])(
+		'keeps fresh imperative handles in Strong mode with deps %j',
+		async (deps) => {
+			const root = project({
+				'Fresh.tsx': `import { useImperativeHandle } from 'react';
+export function Fresh({ ref, label }) {
+	function read() { return label; }
+	useImperativeHandle(ref, () => ({ read })${deps});
+	return <p onClick={() => read()}>{String(label)}</p>;
+}`,
+				'Stable.tsx': `import { useImperativeHandle } from 'react';
+function stable() { return 'shared'; }
+export function Stable({ ref }) {
+	function read() { return 'initial'; }
+	read = stable;
+	useImperativeHandle(ref, () => ({ read })${deps});
+	return <p>shared</p>;
+}`,
+			});
+			const { files } = await runCodemod([root], { write: false, strong: true });
+			const fresh = files.find((file) => file.file === 'Fresh.tsx');
+			const stable = files.find((file) => file.file === 'Stable.tsx');
+			expect(fresh).toMatchObject({ strong: true, diagnostics: [] });
+			expect(stable).toMatchObject({ strong: false });
+			expect(stable.diagnostics).toContainEqual(
+				expect.objectContaining({ code: 'OCTANE_STRONG_UNTRACKED_EFFECT' }),
+			);
+		},
+	);
+
 	it('preserves mapped children passed to an imported inspection component under Vite', async () => {
 		const root = project({
 			'package.json': '{"type":"module"}',
