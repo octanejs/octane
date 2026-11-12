@@ -240,9 +240,9 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	'./dom-binding-projections': ['__createBindingProjections'],
 	'./data': ['createDataStore', 'entity', 'read', 'write'],
 	'./data/server': ['createDataHandler'],
-	'./data/react': ['DataProvider', 'useRead', 'useReadState', 'useWrite'],
-	'./data/octane': ['DataProvider', 'useRead', 'useReadState', 'useWrite'],
-	'./data/octane/server': ['DataProvider', 'useRead', 'useReadState', 'useWrite'],
+	'./data/react': ['DataProvider', 'usePages', 'useRead', 'useReadState', 'useWrite'],
+	'./data/octane': ['DataProvider', 'usePages', 'useRead', 'useReadState', 'useWrite'],
+	'./data/octane/server': ['DataProvider', 'usePages', 'useRead', 'useReadState', 'useWrite'],
 	'./signals': [
 		'createResource',
 		'createScope',

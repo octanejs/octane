@@ -4,6 +4,7 @@ import {
 	entity,
 	httpTransport,
 	read,
+	view,
 	write,
 	type StandardSchema,
 } from '../src/data/index.js';
@@ -61,10 +62,25 @@ export const removeTodo = write({
 });
 
 /** A server with one account's todos, and a log of every request that reached a handler. */
+/** The todos by title, two at a time. */
+export const todoPages = view({
+	name: 'todos.byTitle',
+	of: Todo,
+	order: [['title', 'asc']],
+	limit: 2,
+});
+
 export function createServer() {
 	const rows: TodoItem[] = [{ id: 'a', title: 'Tides', done: false }];
 	const log: string[] = [];
 	const handler = createDataHandler({}, (handle) => [
+		handle(todoPages, (input) => {
+			log.push(`page ${input.offset}`);
+			return [...rows]
+				.sort(todoPages.view.compare)
+				.slice(input.offset, input.offset + input.limit)
+				.map((row) => ({ ...row }));
+		}),
 		handle(todos, () => {
 			log.push('list');
 			return rows.map((row) => ({ ...row }));
