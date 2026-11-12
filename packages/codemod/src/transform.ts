@@ -5340,7 +5340,9 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		const node = skipParens(expression);
 		if (isJsx(node)) return this.relative(this.emit(node, TEMPLATE), node);
 		if (isNullish(node)) return '';
-		return this.directive(node);
+		const directive = this.directive(node);
+		// A retained map is a JSX hole, which needs a fragment inside a directive arm.
+		return directive?.startsWith('{') ? `<>${directive}</>` : directive;
 	}
 
 	/** The same unkeyed input keeps its live value when only its default changes. */
