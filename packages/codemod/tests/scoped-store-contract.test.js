@@ -294,9 +294,54 @@ function project(overrides) {
 	return f;
 }
 
+it.each([
+	['0.17.0', true],
+	['0.18.0', false],
+])('gates the generated adapters on installed Octane %s', async (version, supported) => {
+	const { app, root } = project({
+		'app/src/pane.tsx': `import {useSnapshot} from 'observer';
+		import {useIntl} from 'react-intl';
+		export function Pane() {
+			const value = useSnapshot();
+			const intl = useIntl();
+			return <p>{String(value)}{intl.formatNumber(1234)}</p>;
+		}`,
+	});
+	const original = fs.realpathSync(path.join(root, 'node_modules/octane'));
+	const installed = path.join(app, 'node_modules/octane');
+	const manifest = JSON.parse(fs.readFileSync(path.join(original, 'package.json'), 'utf8'));
+	fs.mkdirSync(installed);
+	fs.writeFileSync(path.join(installed, 'package.json'), JSON.stringify({ ...manifest, version }));
+	fs.symlinkSync(path.join(original, 'src'), path.join(installed, 'src'), 'dir');
+	fs.symlinkSync(
+		path.resolve(import.meta.dirname, '../node_modules/react-intl'),
+		path.join(app, 'node_modules/react-intl'),
+		'dir',
+	);
+
+	const result = await runCodemod([path.join(app, 'src/pane.tsx')], {
+		root: app,
+		strong: true,
+		verify: true,
+		write: false,
+	});
+	const pane = result.files.find((file) => file.file === 'src/pane.tsx');
+	expect(pane.strong).toBe(true);
+	const errors = [...pane.notes, ...pane.diagnostics].filter(
+		(finding) => finding.severity === 'error',
+	);
+	expect(errors.map((finding) => finding.rule)).toEqual(supported ? [] : ['bindings', 'bindings']);
+	const expectedHelpers = ['src/octane-react-intl.tsrx', 'src/octane-store-context.tsrx'];
+	const helpers = result.files
+		.map((file) => file.output)
+		.filter((output) => expectedHelpers.includes(output));
+	expect(helpers.sort()).toEqual(supported ? expectedHelpers : []);
+});
+
 it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
 	const source = `import {useSnapshot as useReading, valueOf} from 'observer';
-export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }`;
+export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }
+export type PaneParameters = Parameters<typeof Pane>;`;
 	const originalPane = { 'app/src/pane.tsx': source };
 	const { app, library } = project(originalPane);
 	const originalSources = Object.fromEntries(
@@ -326,10 +371,7 @@ export function Pane() { const value = useReading(); return <p>{valueOf(1)}{valu
 	const helperBytes = Object.fromEntries(
 		helpers.map((f) => [f.output, fs.readFileSync(path.join(app, f.output), 'utf8')]),
 	);
-	fs.writeFileSync(
-		path.join(app, 'src/second.tsx'),
-		source.replace('function Pane', 'function Other'),
-	);
+	fs.writeFileSync(path.join(app, 'src/second.tsx'), source.replaceAll('Pane', 'Other'));
 	// The normal directory entry now also sees the generated ordinary TypeScript files.
 	const second = await migrate(app, ['src'], true);
 	expect(second.files.find((f) => f.file === 'src/second.tsx')?.rules['store-hook']).toBe(1);
@@ -359,7 +401,79 @@ export function Pane() { const value = useReading(); return <p>{valueOf(1)}{valu
 	);
 }, 30_000);
 
-it('preserves the original handle and passes the active store to unchanged helpers at effect and click time', async () => {
+it.each([
+	['a method assignment', 'reading.resolve = () => 2;', false],
+	[
+		'a method assignment to a type-asserted handle',
+		'(reading as any).resolve = () => 2;',
+		false,
+		'export const reading = create(3) as unknown as number;',
+	],
+	[
+		'a method assignment to the original handle behind an exported alias',
+		'original.resolve = () => 2;',
+		false,
+		'const original = create(3); const alias = original; export const reading = alias as unknown as number;',
+	],
+	[
+		'a computed assignment through an alias',
+		'const alias = reading; alias["resolve"] = () => 2;',
+		false,
+	],
+	['Object.assign', 'Object.assign(reading, { resolve: () => 2 });', false],
+	[
+		'a property definition',
+		'Object.defineProperty(reading, "resolve", { value: () => 2 });',
+		false,
+	],
+	['Reflect.set', 'Reflect.set(reading, "resolve", () => 2);', false],
+	['Reflect.set with a separate receiver', 'Reflect.set({}, "resolve", () => 2, reading);', false],
+	['a property deletion', 'delete reading.resolve;', false],
+	['a property update', 'reading.version++;', false],
+	['a read', 'reading.resolve?.();', true],
+	['a write on a separate handle', 'const other = create(4); other.resolve = () => 2;', true],
+	[
+		'an imported name that shadows Reflect',
+		'import { readOnlyTools as Reflect } from "./read-only-tools"; Reflect.set(reading, "resolve", () => 2);',
+		true,
+	],
+	[
+		'a shadowing parameter',
+		'function update(reading: { resolve: () => number }) { reading.resolve = () => 2; }',
+		true,
+	],
+])(
+	'checks the original store handle after %s',
+	async (_label, use, migrated, setup = 'export const reading = create(3);') => {
+		const { app } = project({
+			'observer/public-store.ts': "export { valueOf, create } from './state';",
+			'observer/state.ts': `type Handle = { resolve?: () => number; version: number };
+			export function create(value: number): Handle { return { resolve: () => value, version: 0 }; }
+			export function valueOf(base: number, handle: Handle) { return base + (handle.resolve?.() ?? handle.version); }`,
+			'observer/react-hooks.ts': `import {use} from 'react'; import {current} from './renderer';
+			import {create, valueOf} from './state';
+			export function useChannel(handle: ReturnType<typeof create>) { return valueOf(use(current), handle); }`,
+			'app/src/reading.ts': `import { create } from 'observer/core'; ${setup} ${use}`,
+			'app/src/read-only-tools.ts':
+				'export const readOnlyTools = { set(value: unknown, _key: string, _next: unknown) { return value; } };',
+			'app/src/pane.tsx': `import {useSnapshot} from 'observer'; import {reading} from './reading';
+			export function Pane() { return <p>{String(useSnapshot(reading))}</p>; }`,
+		});
+		const result = await runCodemod([path.join(app, 'src/pane.tsx')], {
+			root: app,
+			strong: true,
+			verify: true,
+			write: false,
+		});
+		const pane = result.files.find((file) => file.file === 'src/pane.tsx');
+		expect(Boolean(pane.rules['store-hook'])).toBe(migrated);
+		expect(pane.notes.some((note) => note.rule === 'bindings' && note.severity === 'error')).toBe(
+			!migrated,
+		);
+	},
+);
+
+it('preserves an aliased handle and passes the active store to unchanged helpers at effect and click time', async () => {
 	const { app } = project({
 		'observer/public-store.ts': "export { valueOf, key } from './state';",
 		'observer/state.ts':
@@ -367,7 +481,7 @@ it('preserves the original handle and passes the active store to unchanged helpe
 		'observer/renderer.ts':
 			"import {createContext} from 'react'; export const current = createContext(new Map<object, string>());",
 		'app/src/handles.ts':
-			"import {key as create} from 'observer/core'; export const reading=create();",
+			"import {key as create} from 'observer/core'; const canonical=create(), same=canonical; export {canonical}; export const reading=same;",
 		'app/src/records.ts': 'export const calls = new WeakMap<Map<object, string>, string[]>();',
 		'app/src/record.ts': `import {calls} from './records'; export {calls};
 			export function record(store: Map<object, string>, phase: string) {
@@ -406,7 +520,7 @@ it('preserves the original handle and passes the active store to unchanged helpe
 		import {Pane} from './pane.tsrx';
 		export function Root({store}) @{ <NativeStoreProvider context={current} value={store}><Pane/></NativeStoreProvider> }`,
 	);
-	const entry = `export {Root} from './src/provider.tsrx'; export {reading} from './src/handles';
+	const entry = `export {Root} from './src/provider.tsrx'; export {canonical as reading} from './src/handles';
 		export {calls} from './src/record'; export {current} from '../observer/renderer';
 		export {Pane as Reference} from './src/reference.tsx';`;
 	const dom = installDOM();
@@ -996,11 +1110,19 @@ it('defers store factory inputs linked to React work during a read', async () =>
 it('requires an imported application handle to come from the original shared factory', async () => {
 	const { storeSources } = await import('../dist/store-inputs.js');
 	const { app, plan } = fixture({
+		'observer/state.ts': 'export function valueOf<T>(x: T) { return x; }',
 		'app/src/handles.ts': `import {valueOf as make} from 'observer/core';
 			import {useSnapshot as other} from 'observer';
 			export const reading = make(1), unknown = other();
 			const makeSnapshot = make;
-			export const copiedFactory = makeSnapshot(1);`,
+			export const copiedFactory = makeSnapshot(1);
+			let mutable = reading;
+			export const snapshot = mutable, wrapped = (reading), property = {reading}.reading;
+			export const opaqueAlias = unknown;
+			await using disposed = make({[Symbol.asyncDispose]() {}});
+			export {disposed};`,
+		'app/src/attributed.ts': `import {valueOf as make} from 'observer/core' with {mode:'alternate'};
+			export const direct = make(1), alias = direct;`,
 	});
 	const { inputFactory: factory } = storeSources(app, null, () => false);
 	const planned = plan();
@@ -1009,12 +1131,24 @@ it('requires an imported application handle to come from the original shared fac
 		return !!target && planned.isSharedExport(target.module, target.name, target.from);
 	};
 	expect(accepts('reading')).toBe(true);
-	expect(accepts('unknown')).toBe(false);
-	expect(accepts('copiedFactory')).toBe(false);
+	for (const name of [
+		'copiedFactory',
+		'unknown',
+		'snapshot',
+		'wrapped',
+		'property',
+		'opaqueAlias',
+		'disposed',
+	]) {
+		expect(accepts(name), name).toBe(false);
+	}
 	fs.writeFileSync(path.join(app, 'src/handles.js'), 'export const reading = {};');
 	expect(factory(path.join(app, 'src/pane.tsx'), './handles.js', 'reading')).toBeNull();
 	expect(factory(path.join(app, 'src/pane.tsx'), './handles', 'reading')).toBeNull();
 	expect(accepts('missing')).toBe(false);
+	for (const name of ['direct', 'alias']) {
+		expect(factory(path.join(app, 'src/pane.tsx'), './attributed', name), name).toBeNull();
+	}
 });
 
 it('retains the bindings diagnostic for wrapped keys that can dispatch into React', async () => {

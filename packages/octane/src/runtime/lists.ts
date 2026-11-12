@@ -106,6 +106,9 @@ declare const __OCTANE_PROFILE_ENABLED__: boolean;
 // Control flow: forBlock with LIS-based keyed reconciliation
 // ---------------------------------------------------------------------------
 
+type ForRowBindings = Record<number, readonly unknown[]>;
+type ForEnvironment = any[] & { __rowBindings?: ForRowBindings };
+
 export interface ForSlot {
 	__kind: 'forBlockSlot';
 	// Inline row owners need a call-site namespace without consuming the list
@@ -143,7 +146,7 @@ export interface ForSlot {
 	// doubles as the item/empty helpers' captured-locals tuple — refreshed by
 	// forBlock every parent render and stamped as `block.extra` on every item
 	// block (mount + survivor re-render) and on the @empty block.
-	env: any[] | undefined;
+	env: ForEnvironment | undefined;
 	// One-shot adoption queue for the pure-host → blocks upgrade (see childSlot's
 	// upgrade branch): the adopted element's existing raw child nodes in DOM
 	// order, each pre-keyed like the incoming items, so reconcileKeyed's
@@ -1239,6 +1242,25 @@ function removeOwnedContent([parent, from, to]: [Node, Node | null, Node | null]
 	}
 }
 
+// The row can retain its output when every binding still matches. Give it
+// the current environment even when it skips so it does not retain an entire
+// table from an earlier render.
+function refreshMatchingRowBindings(env: ForEnvironment, block: Block, index: number): boolean {
+	if (block.itemIndex !== index) return false;
+	const previous = (block.extra as ForEnvironment | undefined)?.__rowBindings?.[index];
+	const next = env.__rowBindings![index];
+	if (previous === undefined || next === undefined || previous.length !== next.length) return false;
+	// Cell zero is the key, which the reconciler already matched.
+	for (let i = 1; i < next.length; i++) {
+		if (!Object.is(previous[i], next[i])) return false;
+	}
+	if (block.extra !== env) {
+		journalRootProperty(block, 'extra', block.extra);
+		block.extra = env;
+	}
+	return true;
+}
+
 export function reconcileKeyed<T>(
 	parentBlock: Block,
 	state: ForSlot,
@@ -1261,6 +1283,7 @@ export function reconcileKeyed<T>(
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_RECONCILE);
 	const oldItems = state.items;
+	const preparedEnv = pure && state.env?.__rowBindings !== undefined ? state.env : undefined;
 	const oldSize = state.size;
 	const newLen = items.length;
 	const parentNode = state.end.parentNode!;
@@ -1331,6 +1354,10 @@ export function reconcileKeyed<T>(
 		if (oldFirst.key !== newKey) break;
 		if (observeKey !== undefined) observeKey(prefixLen, newKey);
 		const block = oldFirst;
+		const rowPure =
+			pure &&
+			(preparedEnv === undefined ||
+				(block.props === newItem && refreshMatchingRowBindings(preparedEnv, block, prefixLen)));
 		// Stable-survivor skip: updateSurvivor writes itemIndex/body only when
 		// they differ, journals only on a difference, and renders only when the
 		// item (or index, for an index-reading body) changed. A pure body whose
@@ -1340,7 +1367,7 @@ export function reconcileKeyed<T>(
 		// unchanged. The env tuple is never consumed by the pure branch, and a
 		// non-pure body still enters updateSurvivor for its renderBlock.
 		if (
-			!pure ||
+			!rowPure ||
 			block.props !== newItem ||
 			block.body !== itemBody ||
 			block.itemIndex !== prefixLen
@@ -1349,7 +1376,16 @@ export function reconcileKeyed<T>(
 				record = journalForSlot(state, true);
 				journalShape = false;
 			}
-			updateSurvivor(block, newItem, prefixLen, itemBody, pure, lite, indexIndependent, state.env);
+			updateSurvivor(
+				block,
+				newItem,
+				prefixLen,
+				itemBody,
+				rowPure,
+				lite,
+				indexIndependent,
+				state.env,
+			);
 		}
 		oldFirst = block.nextSibling!;
 		prefixLen++;
@@ -1368,20 +1404,38 @@ export function reconcileKeyed<T>(
 		if (oldLast.key !== newKey) break;
 		if (observeKey !== undefined) observeKey(newEnd, newKey);
 		const block = oldLast;
+		const rowPure =
+			pure &&
+			(preparedEnv === undefined ||
+				(block.props === newItem && refreshMatchingRowBindings(preparedEnv, block, newEnd)));
 		// Same stable-survivor skip as the prefix walk (see above).
-		if (!pure || block.props !== newItem || block.body !== itemBody || block.itemIndex !== newEnd) {
+		if (
+			!rowPure ||
+			block.props !== newItem ||
+			block.body !== itemBody ||
+			block.itemIndex !== newEnd
+		) {
 			if (TRANSITION_JOURNAL && journalShape && block.itemIndex !== newEnd) {
 				record = journalForSlot(state, true);
 				journalShape = false;
 			}
 			// Mirror updateSurvivor's pure branch when its body is also unchanged.
 			// Keep profiling and index bookkeeping aligned with that branch.
-			if (pure && indexIndependent && block.props === newItem && block.body === itemBody) {
+			if (rowPure && indexIndependent && block.props === newItem && block.body === itemBody) {
 				if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 					__profileCount(ProfileCounter.LIST_UPDATE);
 				block.itemIndex = newEnd;
 			} else {
-				updateSurvivor(block, newItem, newEnd, itemBody, pure, lite, indexIndependent, state.env);
+				updateSurvivor(
+					block,
+					newItem,
+					newEnd,
+					itemBody,
+					rowPure,
+					lite,
+					indexIndependent,
+					state.env,
+				);
 			}
 		}
 		oldLast = block.prevSibling!;
@@ -1617,9 +1671,13 @@ export function reconcileKeyed<T>(
 				patched++;
 				const newIdx = prefixLen + newRelIdx;
 				const newItem = items[newIdx];
+				const rowPure =
+					pure &&
+					(preparedEnv === undefined ||
+						(cur!.props === newItem && refreshMatchingRowBindings(preparedEnv, cur!, newIdx)));
 				// Same stable-survivor skip as the prefix walk (see above).
 				if (
-					!pure ||
+					!rowPure ||
 					cur!.props !== newItem ||
 					cur!.body !== itemBody ||
 					cur!.itemIndex !== newIdx
@@ -1628,7 +1686,16 @@ export function reconcileKeyed<T>(
 						record = journalForSlot(state, true);
 						journalShape = false;
 					}
-					updateSurvivor(cur!, newItem, newIdx, itemBody, pure, lite, indexIndependent, state.env);
+					updateSurvivor(
+						cur!,
+						newItem,
+						newIdx,
+						itemBody,
+						rowPure,
+						lite,
+						indexIndependent,
+						state.env,
+					);
 				}
 			}
 			cur = following;

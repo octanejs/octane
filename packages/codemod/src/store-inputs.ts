@@ -3,6 +3,8 @@ import { createRequire, isBuiltin } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
 import { skipWrappers } from './expression-wrappers.js';
+import { hasLocalMemberWrite } from './local-uses.js';
+import { bind } from './transform.js';
 import { hasRuntimeDependency } from './scoped-store-contract.js';
 
 type Factory = { module: string; name: string; from: string };
@@ -88,12 +90,13 @@ export function storeSources(
 		const exported = new Map<string, Input>();
 		const locals = new Map<string, Input>();
 		const localFunctions = new Set<string>();
-		const sf = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest);
+		const { sf, checker } = bind(file, fs.readFileSync(file, 'utf8'));
 		for (const s of sf.statements) {
 			if (ts.isFunctionDeclaration(s) && s.name && s.body) localFunctions.add(s.name.text);
 			if (
 				!ts.isImportDeclaration(s) ||
 				!ts.isStringLiteral(s.moduleSpecifier) ||
+				s.attributes ||
 				s.importClause?.isTypeOnly
 			)
 				continue;
@@ -111,7 +114,11 @@ export function storeSources(
 				}
 		}
 		for (const s of sf.statements) {
-			if (!ts.isVariableStatement(s) || !(s.declarationList.flags & ts.NodeFlags.Const)) continue;
+			if (
+				!ts.isVariableStatement(s) ||
+				(s.declarationList.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const
+			)
+				continue;
 			for (const d of s.declarationList.declarations) {
 				if (!ts.isIdentifier(d.name) || !d.initializer) continue;
 				const call = skipWrappers(d.initializer);
@@ -119,18 +126,23 @@ export function storeSources(
 				let input: Input | undefined;
 				if (alias) {
 					if ('reexport' in alias) input = { ...alias, opaqueOnly: true };
-					else input = 'factory' in alias ? { ...alias, direct: false } : alias;
+					else if ('factory' in alias && call !== d.initializer)
+						input = { ...alias, direct: false };
+					else input = alias;
 				} else if (ts.isCallExpression(call)) {
 					let target = skipWrappers(call.expression);
 					while (ts.isExpressionWithTypeArguments(target)) target = skipWrappers(target.expression);
 					if (!ts.isIdentifier(target)) continue;
 					const callee = locals.get(target.text);
 					if (callee && 'reexport' in callee) {
-						input = {
-							factory: callee.reexport,
-							direct: !callee.opaqueOnly && call === d.initializer && target === call.expression,
-							data: call.arguments.every((arg) => dataInput(arg, locals)),
-						};
+						// A type assertion cannot make a modified handle portable.
+						if (hasLocalMemberWrite(d.name, checker)) input = { opaque: true };
+						else
+							input = {
+								factory: callee.reexport,
+								direct: !callee.opaqueOnly && call === d.initializer && target === call.expression,
+								data: call.arguments.every((arg) => dataInput(arg, locals)),
+							};
 					} else if (localFunctions.has(target.text)) input = { opaque: true };
 				} else if (inertLiteral(call)) input = { literal: true };
 				if (!input) continue;

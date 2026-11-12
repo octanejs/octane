@@ -5,7 +5,7 @@ const extent = new RegExp('^(?!-)' + number + '(?:px|em|rem|%)?$');
 const separator = '(?: *, *| +)';
 const paint =
 	/^(?:[a-zA-Z]+|#[\da-fA-F]{3,4}|#[\da-fA-F]{6}(?:[\da-fA-F]{2})?|var\(--[A-Za-z_][A-Za-z0-9_-]*\))$/;
-const opacity = /^(?:0(?:\.\d+)?|1)$/;
+const opacity = /^(?:0|0?\.\d+|1)$/;
 const operation = '(?:scale|translate)\\(' + number + '(?:' + separator + number + ')?\\)';
 const transform = new RegExp('^' + operation + '(?:' + separator + operation + ')*$');
 const transformNumbers = new RegExp(number, 'g');
@@ -18,6 +18,11 @@ const rootAttributes = {
 	role: /^img$/,
 	focusable: /^(?:true|false)$/,
 };
+
+export function svgLiteralRootOverride(name: string, value: string) {
+	return (name === 'fill' || name === 'focusable') && rootAttributes[name].test(value);
+}
+
 const fillRule = /^(?:evenodd|nonzero)$/;
 const presentation = {
 	fill: paint,
@@ -51,10 +56,12 @@ function attributes(text: string, allowed: Record<string, RegExp>) {
 	let end = 0;
 	for (let match; (match = field.exec(text)); end = field.lastIndex) {
 		const name = match[1]!;
-		const value = (match[2] ?? match[3])!;
+		let value = (match[2] ?? match[3])!;
 		if (name in values || !Object.prototype.hasOwnProperty.call(allowed, name)) return null;
 		const rule = allowed[name]!;
 		if (!rule.test(value)) return null;
+		// SVGR emits a numeric literal for a leading-dot opacity.
+		if (rule === opacity && value.startsWith('.')) value = '0' + value;
 		// SVG component loaders can emit a numeric literal for unitless lengths.
 		if (rule === length || rule === extent || rule === opacity) {
 			const n = Number(value);
@@ -72,6 +79,11 @@ function attributes(text: string, allowed: Record<string, RegExp>) {
 		values[name] = value;
 	}
 	return space.test(text.slice(end)) ? values : null;
+}
+
+// Hydration and React interop use reserved data attributes.
+export function svgDataAttribute(name: string): name is `data-${string}` {
+	return /^data-(?!oct(?:ane)?(?:-|$)|react-compat$)[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(name);
 }
 
 type StaticSvgNode = {

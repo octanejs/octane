@@ -25,8 +25,10 @@ import { bind, projectTypeAt, textKind, transformModule } from './transform.js';
 import { forwardedProps } from './forwarded-props.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
-/** React packages and the Octane package that replaces each. */
+const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|17\.(?:0|[1-9]\d*))$/;
+/** React packages and the Octane entry point that replaces each. */
 const CATALOG = { ...DATA.reactPackages, ...PORTED_PACKAGES };
+const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies'];
 /** A package that, by its name, renders through React. */
 const REACT_PACKAGE = /^(?:react-|@[^/]+\/react(?:-|\/|$)|[^/]+\/react$)|-react(?:\/|$)/;
 
@@ -217,8 +219,8 @@ export async function runCodemod(
 			);
 		});
 	}
-	function originalModule(file: string, module: string) {
-		const bindings = { moduleResolution: ts.ModuleResolutionKind.Bundler, ...config };
+	function originalModule(file: string, module: string, options = config) {
+		const bindings = { moduleResolution: ts.ModuleResolutionKind.Bundler, ...options };
 		const target = ts.resolveModuleName(module, file, bindings, ts.sys).resolvedModule;
 		const original = ts.resolveModuleName(
 			module,
@@ -226,8 +228,72 @@ export async function runCodemod(
 			{ ...bindings, paths: undefined, baseUrl: undefined },
 			ts.sys,
 		).resolvedModule;
-		return target?.resolvedFileName === original?.resolvedFileName ? target : undefined;
+		return target?.resolvedFileName === original?.resolvedFileName ? (target ?? null) : undefined;
 	}
+	const inlineCompatDirs = new Map<string, boolean>();
+	function supportsInlineReactCompat(file: string) {
+		const issuer = path.dirname(file);
+		if (ts.findConfigFile(issuer, ts.sys.fileExists) !== rootProject) return false;
+		const installed = readInstalled(issuer, 'octane');
+		if (installed?.manifest.name !== 'octane') return false;
+		const dir = fs.realpathSync(installed.dir);
+		if (compiler) {
+			try {
+				if (createRequire(file).resolve('octane/compiler') !== compiler.from) return false;
+			} catch {
+				return false;
+			}
+		}
+		const exports = record(installed.manifest.exports);
+		return ['react', 'react/server'].every((name) => {
+			const entry = exports['./' + name];
+			const conditions = record(entry);
+			const types = typeof entry === 'string' ? entry : conditions.types;
+			const target = originalModule(file, 'octane/' + name)?.resolvedFileName;
+			if (
+				typeof types !== 'string' ||
+				!target ||
+				fs.realpathSync(target) !== path.resolve(dir, types)
+			)
+				return false;
+			if (typeof entry !== 'string' && typeof conditions.default !== 'string') return false;
+			// Published packages resolve types separately from the Node and bundler code.
+			const entries = typeof entry === 'string' ? [entry] : Object.values(conditions);
+			return entries.every((value) => {
+				if (typeof value !== 'string' || !value.startsWith('./')) return false;
+				const file = path.resolve(dir, value);
+				if (!ts.sys.fileExists(file) || !fs.realpathSync(file).startsWith(dir + path.sep))
+					return false;
+				const source = ts.createSourceFile(
+					file,
+					fs.readFileSync(file, 'utf8'),
+					ts.ScriptTarget.Latest,
+				);
+				return source.statements.some(
+					(statement) =>
+						ts.isExportDeclaration(statement) &&
+						!statement.isTypeOnly &&
+						statement.exportClause &&
+						ts.isNamedExports(statement.exportClause) &&
+						statement.exportClause.elements.some(
+							(item) => !item.isTypeOnly && item.name.text === 'ReactCompatInline',
+						),
+				);
+			});
+		});
+	}
+	const bindingProject = {
+		root,
+		original(file: string, module: string) {
+			const dir = path.dirname(file);
+			const options =
+				ts.findConfigFile(dir, ts.sys.fileExists) === rootProject ? config : tsconfigOptions(dir);
+			return (
+				(!options?.paths && !options?.baseUrl) ||
+				originalModule(file, module, options) !== undefined
+			);
+		},
+	};
 	// One shared context per project, including separate file-by-file migrations.
 	const sourceDir = path.join(root, 'src');
 	const adapter = path.join(
@@ -257,7 +323,7 @@ export async function runCodemod(
 				!!lib &&
 				lib.manifest.name === 'react-intl' &&
 				/^7\./.test(lib.version) &&
-				/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(octane) &&
+				ADAPTER_OCTANE_VERSION.test(octane) &&
 				['react', 'react-dom'].every((name) =>
 					/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(base, name)?.version ?? ''),
 				) &&
@@ -316,7 +382,7 @@ export async function runCodemod(
 		target === 'tsrx' &&
 		compiler &&
 		reactCompat &&
-		/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(readInstalled(helperDir, 'octane')?.version ?? '')
+		ADAPTER_OCTANE_VERSION.test(readInstalled(helperDir, 'octane')?.version ?? '')
 			? createScopedStorePlanner(helperDir, storeBridge, config ?? undefined)
 			: null;
 	const { inputFactory, helperFunction } = storeSources(root, config, (file, source) => {
@@ -337,7 +403,8 @@ export async function runCodemod(
 				return typesOf(file);
 			},
 			resolveSpecifier: (specifier) =>
-				resolveRename(file, specifier) ?? resolveBinding(specifier, new Map(), []),
+				resolveRename(file, specifier) ??
+				resolveBinding(specifier, file, bindingProject, new Map(), []),
 		}).changed;
 	});
 	const checkedHelpers = new Map<string, { code: string; state: AdapterState; error?: string }>();
@@ -346,7 +413,7 @@ export async function runCodemod(
 	const svgHelper = path.join(helperDir, 'octane-path-svg.ts');
 	const svgAssets = new Map<string, boolean>();
 	let svgHelperCode: string | undefined;
-	function nativeSvgModule(asset: string, errors: Set<string>): string | null {
+	function nativeSvgModule(asset: string, errors: Set<string>, color?: string): string | null {
 		if (
 			!asset.startsWith(root + path.sep) ||
 			asset.split(path.sep).includes('node_modules') ||
@@ -367,15 +434,23 @@ export async function runCodemod(
 			fs.readFileSync(new URL('../templates/octane-path-svg.ts', import.meta.url), 'utf8') +
 			'\n' +
 			fs.readFileSync(new URL('../src/path-svg.ts', import.meta.url), 'utf8');
-		const sidecar = asset + '.octane.ts';
+		const sidecar = asset + (color ? '.octane-color-' + color.slice(2) : '.octane') + '.ts';
 		const code =
 			'import source from ' +
 			JSON.stringify('./' + path.basename(asset) + '?raw') +
 			';\n' +
 			'import { pathSvg } from ' +
 			JSON.stringify(relativeTsImport(sidecar, svgHelper)) +
-			';\n\nexport default pathSvg(source);\n';
-		const conflict = checkHelper(svgHelper, svgHelperCode) || checkHelper(sidecar, code);
+			';\n\nexport default pathSvg(source' +
+			(color ? ', ' + JSON.stringify('color:var(' + color + ')') : '') +
+			');\n';
+		let conflict: string | undefined;
+		try {
+			conflict = checkHelper(svgHelper, svgHelperCode, 'SVG') || checkHelper(sidecar, code, 'SVG');
+		} catch (error) {
+			if (!color || (error as NodeJS.ErrnoException).code !== 'ENAMETOOLONG') throw error;
+			conflict = 'The SVG adapter path is too long: ' + path.relative(root, sidecar);
+		}
 		if (conflict) {
 			errors.add(conflict);
 			return null;
@@ -386,7 +461,7 @@ export async function runCodemod(
 		svgHelpers.add(sidecar);
 		return sidecar;
 	}
-	function pathSvgAdapter(file: string, specifier: string, errors: Set<string>) {
+	function pathSvgAdapter(file: string, specifier: string, errors: Set<string>, color?: string) {
 		if (
 			(config?.jsxImportSource && config.jsxImportSource !== 'react') ||
 			config?.jsxFactory ||
@@ -395,11 +470,11 @@ export async function runCodemod(
 		)
 			return null;
 		const asset = svgAsset(root, path.dirname(file), specifier, config);
-		const sidecar = asset && nativeSvgModule(asset, errors);
+		const sidecar = asset && nativeSvgModule(asset, errors, color);
 		return sidecar ? relativeTsImport(file, sidecar) : null;
 	}
 	let storeTemplates: ReadonlyMap<string, string> | undefined;
-	function checkHelper(output: string, code: string) {
+	function checkHelper(output: string, code: string, kind = 'workspace hook') {
 		const cached = checkedHelpers.get(output);
 		if (cached)
 			return cached.code === code
@@ -421,11 +496,7 @@ export async function runCodemod(
 				: inspectAdapter(output, code, output === svgHelper ? PREVIOUS_SVG_SHA256 : undefined);
 		let error: string | undefined;
 		if (state.kind === 'conflict') {
-			error =
-				'The ' +
-				(output === svgHelper || output.endsWith('.svg.octane.ts') ? 'SVG' : 'workspace hook') +
-				' adapter path is occupied: ' +
-				name;
+			error = 'The ' + kind + ' adapter path is occupied: ' + name;
 		} else {
 			const rejected = output.endsWith('.tsrx')
 				? compile(compiler!, code, output, true).some((d) => d.severity === 'error')
@@ -436,7 +507,7 @@ export async function runCodemod(
 							compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext },
 						})
 						.diagnostics?.some((d) => d.category === ts.DiagnosticCategory.Error);
-			if (rejected) error = 'The target compiler rejected the workspace hook adapter: ' + name;
+			if (rejected) error = 'The target compiler rejected the ' + kind + ' adapter: ' + name;
 		}
 		checkedHelpers.set(output, { code, state, error });
 		return error;
@@ -554,10 +625,19 @@ export async function runCodemod(
 							.replace(/\.ts$/, '');
 						return { from: relative.startsWith('.') ? relative : './' + relative, name: plan.name };
 					};
-		const transform = (captureEffectReceivers: boolean | 'properties' = false, notes = extra) =>
+		const svgAdapter =
+			options.svgPaths && renames.has(file)
+				? (specifier: string, color?: string) => pathSvgAdapter(file, specifier, svgErrors, color)
+				: undefined;
+		const transform = (
+			captureEffectReceivers: boolean | 'properties' = false,
+			notes = extra,
+			captureEffectSnapshots = false,
+		) =>
 			transformModule(source, file, {
 				captureEffectReceivers: !!captureEffectReceivers,
 				snapshotEffectProperties: captureEffectReceivers === 'properties',
+				captureEffectSnapshots,
 				target,
 				reactIntlAdapter: intl,
 				forwardedText: (module, name, prop, ordinaryCaller, through) =>
@@ -576,7 +656,8 @@ export async function runCodemod(
 					return (types ??= typesOf(file));
 				},
 				resolveSpecifier: (specifier) =>
-					resolveRename(file, specifier) ?? resolveBinding(specifier, packages, notes),
+					resolveRename(file, specifier) ??
+					resolveBinding(specifier, file, bindingProject, packages, notes),
 				isContext,
 				elementChild: !elementExports.size
 					? undefined
@@ -589,6 +670,12 @@ export async function runCodemod(
 					: undefined,
 				unported: (specifier) => unportedName(specifier, file),
 				reactCompat,
+				get reactCompatInline() {
+					const dir = path.dirname(file);
+					if (!inlineCompatDirs.has(dir))
+						inlineCompatDirs.set(dir, supportsInlineReactCompat(file));
+					return inlineCompatDirs.get(dir);
+				},
 				forwardedRender:
 					options.svgPaths && renames.has(file)
 						? (module, name, prop, depth) =>
@@ -610,10 +697,8 @@ export async function runCodemod(
 					const real = fs.realpathSync(sheet);
 					return real.endsWith('.module.css') ? real : undefined;
 				},
-				pathSvgAdapter:
-					options.svgPaths && renames.has(file)
-						? (specifier) => pathSvgAdapter(file, specifier, svgErrors)
-						: undefined,
+				pathSvgAdapter: svgAdapter,
+				fixedColorSvgAdapter: svgAdapter,
 				reactStoreComponent: (specifier) => {
 					if (!reactStoreComponents.has(specifier))
 						reactStoreComponents.set(specifier, reactStoreComponent(file, specifier));
@@ -689,6 +774,7 @@ export async function runCodemod(
 					force: options.forceStrong,
 					withEffectReceivers: () => transform(true, []).code,
 					withEffectProperties: () => transform('properties', []).code,
+					withEffectSnapshots: () => transform(true, [], true).code,
 				});
 				code = strengthened.code;
 				isStrong = strengthened.strong;
@@ -769,7 +855,7 @@ export async function runCodemod(
 			file: string;
 			source: string;
 			state: AdapterState;
-			previous: string;
+			previous: readonly string[];
 			rule: string;
 		}[] = [];
 		if (adapterState && adapterSource && intlConsumer)
@@ -888,21 +974,30 @@ export async function runCodemod(
 }
 
 type AdapterState =
-	{ kind: 'missing' | 'current' | 'conflict' } | { kind: 'previous'; mode: number };
+	{ kind: 'missing' | 'current' | 'conflict' } | { kind: 'previous'; mode: number; hash: string };
 
 // Hash only previously shipped helpers. A locally edited file belongs to the application.
-const PREVIOUS_INTL_SHA256 = '07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98';
+const PREVIOUS_INTL_SHA256 = ['07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98'];
 
-const PREVIOUS_SVG_SHA256 = '3becf859871f17914f6f0631e8db8058aa4932fd4a9817718b98eb247a902b24';
+const PREVIOUS_SVG_SHA256 = [
+	'62ef936e3ce64cfe809297e08e74538f0c409f0bde6a926ca7b88de93161a38d',
+	'a3d611226ba955f4f5601caa4c6987f0a5a943fab97362843d16f02c686c6944',
+	'058f232bcee5d0caf24d72ec8f9864152b7eb6a9e882614bff3209ff0d145d00',
+	'3becf859871f17914f6f0631e8db8058aa4932fd4a9817718b98eb247a902b24',
+	'1dbf34eea75c07c21c8ab3814d54e58115e833aa140fc5f34b5f2cba91d018c3',
+	'b53641cfbe77205a174179b4d0de60989b34cf4073690fc98536c22a68ee844a',
+];
 
-function inspectAdapter(file: string, source: string, previous?: string): AdapterState {
+function inspectAdapter(file: string, source: string, previous?: readonly string[]): AdapterState {
 	const stat = fs.lstatSync(file, { throwIfNoEntry: false });
 	if (!stat) return { kind: 'missing' };
 	if (!stat.isFile()) return { kind: 'conflict' };
 	const bytes = fs.readFileSync(file);
 	if (bytes.equals(Buffer.from(source))) return { kind: 'current' };
-	if (previous && createHash('sha256').update(bytes).digest('hex') === previous)
-		return { kind: 'previous', mode: stat.mode & 0o777 };
+	if (previous) {
+		const hash = createHash('sha256').update(bytes).digest('hex');
+		if (previous.includes(hash)) return { kind: 'previous', mode: stat.mode & 0o777, hash };
+	}
 	return { kind: 'conflict' };
 }
 
@@ -910,7 +1005,10 @@ function canPublishAdapter(current: AdapterState, planned: AdapterState): boolea
 	return (
 		current.kind === 'current' ||
 		(current.kind === 'missing' && planned.kind === 'missing') ||
-		(current.kind === 'previous' && planned.kind === 'previous' && current.mode === planned.mode)
+		(current.kind === 'previous' &&
+			planned.kind === 'previous' &&
+			current.mode === planned.mode &&
+			current.hash === planned.hash)
 	);
 }
 
@@ -918,7 +1016,7 @@ function publishAdapter(
 	file: string,
 	source: string,
 	planned: AdapterState,
-	previous: string,
+	previous: readonly string[],
 ): boolean {
 	const current = inspectAdapter(file, source, previous);
 	if (current.kind === 'current') return true;
@@ -941,7 +1039,7 @@ function publishAdapter(
 		fs.chmodSync(next, current.mode);
 		const latest = inspectAdapter(file, source, previous);
 		if (latest.kind !== 'previous') return latest.kind === 'current';
-		if (latest.mode !== current.mode) return false;
+		if (!canPublishAdapter(latest, current)) return false;
 		fs.renameSync(next, file);
 		return true;
 	} finally {
@@ -1225,22 +1323,57 @@ function contextIndex(
  * The binding that replaces a React package import, recorded so the report
  * can list the dependency changes.
  */
-function resolveBinding(specifier: string, packages: Map<string, string>, notes: Note[]) {
+function resolveBinding(
+	specifier: string,
+	file: string,
+	project: { root: string; original: (file: string, module: string) => boolean },
+	packages: Map<string, string>,
+	notes: Note[],
+) {
+	if (specifier === 'radix-ui' && !project.original(file, specifier)) {
+		notes.push({
+			rule: 'bindings',
+			severity: 'error',
+			line: 1,
+			message:
+				'`radix-ui` resolves to a different module through a TypeScript alias. Review the local component before migrating this import.',
+		});
+		return null;
+	}
 	const name = catalogName(specifier);
 	if (name === null) return null;
-	const binding = CATALOG[name];
-	packages.set(name, binding);
+	const target = CATALOG[name];
+	const binding = packageName(target);
 	const entry = DATA.bindings.find((candidate) => candidate.name === binding);
+	const subpath = target.slice(binding.length) + specifier.slice(name.length);
+	const served = entry && entry.exports.some((key) => serves(key, `.${subpath}`));
+	if (target !== binding) {
+		const shadowed = [specifier, binding + subpath].find((name) => !project.original(file, name));
+		const message = shadowed
+			? `Resolve \`${shadowed}\` to its original package before migrating this import.`
+			: !served || !canUseBindingSubpath(file, project.root, binding, subpath, entry.version)
+				? `Install a version of \`${binding}\` that exports \`.${subpath}\` before migrating this import.`
+				: null;
+		if (message) {
+			notes.push({ rule: 'bindings', severity: 'error', line: 1, message });
+			return null;
+		}
+	}
+	packages.set(name, binding);
 	// An aggregate binding (`@octanejs/visx`, for `@visx/visx`) serves each
 	// package of its scope from a subpath: `@visx/hierarchy` is
 	// `@octanejs/visx/hierarchy`.
 	const upstream = entry?.upstream?.package;
 	const aggregate = upstream?.match(/^@([^/]+)\/\1$/);
-	if (aggregate && name !== upstream && name.startsWith(`@${aggregate[1]}/`)) {
+	if (
+		target === binding &&
+		aggregate &&
+		name !== upstream &&
+		name.startsWith(`@${aggregate[1]}/`)
+	) {
 		return `${binding}/${name.slice(aggregate[1].length + 2)}${specifier.slice(name.length)}`;
 	}
-	const subpath = specifier.slice(name.length);
-	if (subpath === '' || entry?.exports.some((key) => serves(key, `.${subpath}`))) {
+	if (subpath === '' || served) {
 		return binding + subpath;
 	}
 	// A binding outside the catalog has exports the codemod cannot see.
@@ -1260,6 +1393,49 @@ function resolveBinding(specifier: string, packages: Map<string, string>, notes:
 				},
 	);
 	return binding + subpath;
+}
+
+function canUseBindingSubpath(
+	file: string,
+	root: string,
+	binding: string,
+	subpath: string,
+	version: string,
+) {
+	const dir = path.dirname(file);
+	const installed = readInstalled(dir, binding);
+	if (installed) {
+		if (installed.manifest.name !== binding) return false;
+		const entry = record(installed.manifest.exports)[`.${subpath}`];
+		let target = entry;
+		if (isRecord(entry)) {
+			const conditions = Object.entries(entry);
+			if (conditions.some(([key]) => !['types', 'import', 'require', 'default'].includes(key)))
+				return false;
+			target = conditions.find(([key]) => key === 'import' || key === 'default')?.[1];
+		}
+		if (typeof target !== 'string' || !target.startsWith('./')) return false;
+		const resolved = path.resolve(installed.dir, target);
+		return (
+			resolved.startsWith(installed.dir + path.sep) &&
+			fs.statSync(resolved, { throwIfNoEntry: false })?.isFile()
+		);
+	}
+	// New dependencies use the catalog version. For a different declaration,
+	// require an installed export before rewriting its imports.
+	for (const project of new Set([root, findRoot(dir)])) {
+		const manifestFile = path.join(project, 'package.json');
+		if (!fs.existsSync(manifestFile)) continue;
+		const manifest = record(JSON.parse(fs.readFileSync(manifestFile, 'utf8')));
+		if (
+			DEPENDENCY_FIELDS.some((field) => {
+				const spec = record(manifest[field])[binding];
+				return spec !== undefined && spec !== version && spec !== `^${version}`;
+			})
+		)
+			return false;
+	}
+	return true;
 }
 
 /**
@@ -1335,16 +1511,15 @@ function addBindings(
 	const text = fs.readFileSync(file, 'utf8');
 	const manifest: unknown = JSON.parse(text);
 	if (packages.size === 0) return [];
-	const fields = ['dependencies', 'devDependencies', 'peerDependencies'];
 	if (
 		!isRecord(manifest) ||
-		fields.some((field) => manifest[field] !== undefined && !isRecord(manifest[field]))
+		DEPENDENCY_FIELDS.some((field) => manifest[field] !== undefined && !isRecord(manifest[field]))
 	) {
 		throw new Error('Cannot add bindings to malformed package.json dependency fields.');
 	}
 	const added: CodemodResult['dependencies'] = [];
 	for (const [from, to] of packages) {
-		if (fields.some((field) => record(manifest[field])[to] !== undefined)) continue;
+		if (DEPENDENCY_FIELDS.some((field) => record(manifest[field])[to] !== undefined)) continue;
 		const version = DATA.bindings.find((binding) => binding.name === to)?.version;
 		const range = version ? `^${version}` : 'latest';
 		const field = record(manifest.devDependencies)[packageName(from)]

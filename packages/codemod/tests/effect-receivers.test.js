@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { act, createElement, useEffect } from 'react';
+import { act, createElement, useEffect, useImperativeHandle, useState } from 'react';
 import { createRoot as reactRoot } from 'react-dom/client';
 import { createRoot } from 'octane';
 import { expect, it } from 'vitest';
@@ -284,3 +284,259 @@ it('respects local shadows, fresh alias names and comments', async () => {
 	expect(migrated.code).toContain('const currentReceiverValueValue = receiver;');
 	expect(migrated.code).toContain('/* keep */');
 });
+
+const handleFactory = '() => ({ created: receiver.value, read: () => receiver.read() })';
+const imperativeSource = `import { useImperativeHandle } from 'react';
+export function Probe({ receiver, handleRef, revision }) {
+	useImperativeHandle(handleRef, ${handleFactory}, [receiver]);
+	return <p>{String(revision)}</p>;
+}`;
+
+it('preserves receiver identity, layout attachment and cleanup for an imperative handle', async () => {
+	const migrated = migrate(imperativeSource);
+	expect(migrated.strong).toBe(true);
+	const native = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
+
+	function Reference({ receiver, handleRef, revision }) {
+		useImperativeHandle(
+			handleRef,
+			() => ({ created: receiver.value, read: () => receiver.read() }),
+			[receiver],
+		);
+		return createElement('p', null, String(revision));
+	}
+
+	async function exercise(react) {
+		const log = [];
+		const host = document.createElement('div');
+		const receiver = (name) => ({
+			name,
+			count: 1,
+			get value() {
+				log.push(`create ${this.read()} at ${host.textContent}`);
+				return this.read();
+			},
+			read() {
+				return this.name + this.count;
+			},
+		});
+		const a = receiver('a');
+		const b = receiver('b');
+		let held;
+		const callbackRef = (value) => {
+			held = value;
+			log.push('attach ' + value?.created);
+			return () => {
+				held = null;
+				log.push('cleanup ' + value.created);
+			};
+		};
+		const objectRef = { current: null };
+		const root = react ? reactRoot(host) : createRoot(host);
+		const render = async (receiver, handleRef, revision) => {
+			const props = { receiver, handleRef, revision };
+			if (react) await act(() => root.render(createElement(Reference, props)));
+			else root.render(native.Probe, props);
+		};
+
+		try {
+			const unreadable = {
+				get value() {
+					throw new Error('A null ref must not read the handle');
+				},
+			};
+			await render(unreadable, null, 0);
+			await render(a, callbackRef, 1);
+			const first = held;
+			expect(first.created).toBe('a1');
+
+			a.count = 2;
+			await render(a, callbackRef, 2);
+			expect(held).toBe(first);
+			expect(held.read()).toBe('a2');
+
+			await render(a, objectRef, 3);
+			expect(held).toBeNull();
+			expect(objectRef.current.created).toBe('a2');
+			const second = objectRef.current;
+
+			b.count = 2;
+			await render(b, objectRef, 4);
+			expect(objectRef.current).not.toBe(second);
+			expect(objectRef.current.created).toBe('b2');
+		} finally {
+			if (react) await act(() => root.unmount());
+			else root.unmount();
+		}
+		expect(objectRef.current).toBeNull();
+		return log;
+	}
+
+	const before = globalThis.IS_REACT_ACT_ENVIRONMENT;
+	globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+	try {
+		const original = await exercise(true);
+		expect(original).toEqual([
+			'create a1 at 1',
+			'attach a1',
+			'cleanup a1',
+			'create a2 at 3',
+			'create b2 at 4',
+		]);
+		expect(await exercise(false)).toEqual(original);
+	} finally {
+		globalThis.IS_REACT_ACT_ENVIRONMENT = before;
+	}
+});
+
+it('keeps a getter dependency after the imperative handle ref expression', () => {
+	const migrated = migrate(
+		imperativeSource
+			.replace('{ receiver, handleRef, revision }', '{ receiver, handleRef, revision, trigger }')
+			.replace('useImperativeHandle(handleRef,', 'useImperativeHandle(handleRef(),')
+			.replace(handleFactory, '() => { return { created: receiver.value }; }')
+			.replace('[receiver]', '[receiver, trigger.value]'),
+	);
+	expect(migrated.strong).toBe(false);
+	expect(migrated.code).toMatch(
+		/useImperativeHandle\(handleRef\(\),[\s\S]*\[receiver, trigger\.value\]/,
+	);
+});
+
+it('retains explicit dependencies when an imperative handle reads another reactive value', () => {
+	const migrated = migrate(
+		imperativeSource.replace('created: receiver.value', 'created: receiver.value + revision'),
+	);
+	expect(migrated.strong).toBe(false);
+	expect(migrated.diagnostics.some((d) => d.code === 'OCTANE_STRONG_EXPLICIT_DEPENDENCIES')).toBe(
+		true,
+	);
+});
+
+it('preserves a lazy mount value through effect updates and cleanup', async () => {
+	const source = `import { useState as state, useEffect as effect } from 'react';
+	export function Probe({ read, record, revision }) {
+		const[value] = state(() => ({ read, revision }));
+		effect(() => {
+			const valueRef = { value };
+			record('start', revision, valueRef.value, value.read());
+			return () => record('stop', revision, value, value.read());
+		}, [record, value, revision]);
+		return revision ? <p data-revision={String(revision)}/> : null;
+	}`;
+	const migrated = migrate(`${source}\nconst useInitialValue = 0;`);
+	expect(migrated.strong).toBe(true);
+	expect(migrated.code).toContain('useLazyRef');
+	const native = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
+	function Reference({ read, record, revision }) {
+		const [value] = useState(() => ({ read, revision }));
+		useEffect(() => {
+			record('start', revision, value, value.read());
+			return () => record('stop', revision, value, value.read());
+		}, [record, value, revision]);
+		return createElement('p', null, String(revision));
+	}
+	async function exercise(react) {
+		const log = [];
+		const functions = new Set();
+		const record = (phase, revision, value, unbound) => {
+			functions.add(value);
+			log.push([phase, revision, unbound]);
+		};
+		const root = react
+			? reactRoot(document.createElement('div'))
+			: createRoot(document.createElement('div'));
+		try {
+			for (const revision of [1, 1, 2]) {
+				const props = {
+					read() {
+						return this.revision;
+					},
+					record,
+					revision,
+				};
+				if (react) await act(() => root.render(createElement(Reference, props)));
+				else {
+					root.render(native.Probe, props);
+					await flushEffects();
+				}
+			}
+		} finally {
+			if (react) await act(() => root.unmount());
+			else {
+				root.unmount();
+				await flushEffects();
+			}
+		}
+		return { log, values: functions.size };
+	}
+	const expected = await exercise(true);
+	expect(expected.values).toBe(1);
+	expect(expected.log[0]).toEqual(['start', 1, 1]);
+	expect(expected.log.at(-1)).toEqual(['stop', 2, 1]);
+	expect(await exercise(false)).toEqual(expected);
+});
+
+it.each([
+	['eager initializer', '{ seed }', ''],
+	['render read', '() => ({ seed })', 'observe(value);'],
+	['custom hook', '() => ({ seed })', 'useOther(() => observe(value), [value]);'],
+	[
+		'nested owner',
+		'() => ({ seed })',
+		'function useNested() { useEffect(() => { observe(value); }, [value]); }',
+	],
+	['dependency expression', '() => ({ seed })', 'useEffect(() => {}, [value.seed]);'],
+	['dynamic lookup', '() => ({ seed })', 'eval("value");'],
+	[
+		'nested element consumed by an opaque component',
+		'() => ({ seed })',
+		'return <Store><b/></Store>;',
+	],
+	['element in initializer', '() => ({ seed: <b/> })', ''],
+	[
+		'direct platform write',
+		'() => ({ seed: Date.now() })',
+		'Date.now = () => <b/> as unknown as number;',
+	],
+	[
+		'reflective platform write',
+		'() => ({ seed: Date.now() })',
+		'',
+		'',
+		"Object.defineProperty(Date, 'now', { value: () => <b/> });",
+	],
+	[
+		'element handed out inside the template',
+		'() => ({ seed })',
+		'return <p>{(seed.current = <b/>, null)}</p>;',
+	],
+	['local factory', '() => ({ seed: make() })', ''],
+	['async factory', 'async () => ({ seed })', ''],
+	['quoted prototype setter', '() => ({ "__proto__": seed })', ''],
+	['element in effect', '() => ({ seed })', '', 'observe(<b>{value.seed}</b>);'],
+	['helper in effect', '() => ({ seed })', '', 'observe(make());'],
+	[
+		'local JSX consumer',
+		'() => ({ seed })',
+		'',
+		'',
+		'export function Parent() { return <Probe seed={<b/>}/>; }',
+	],
+	['retained comment', '() => ({ seed })', '', '', '', '[/* keep */ value]'],
+])(
+	'keeps a read-only state diagnostic for %s when useInitialValue is shadowed',
+	(_case, initial, extra, effect = '', suffix = '', binding = '[value]') => {
+		const migrated = migrate(`import { useState, useEffect } from 'react';
+		const useInitialValue = 0;
+		${(initial + effect).includes('make()') ? 'function make() { return <b/>; }' : ''}
+		export function Probe({ seed, observe, useOther }) {
+			const ${binding} = useState(${initial});
+			useEffect(() => { observe(value); ${effect} }, [value, observe]);
+			${extra}
+			return <p/>;
+		}
+		${suffix}`);
+		expect(migrated.diagnostics.map((d) => d.code)).toContain('OCTANE_STRONG_READ_ONLY_STATE');
+	},
+);

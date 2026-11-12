@@ -1,6 +1,7 @@
 import {
 	closedForwardedAttribute,
 	forwardedProps,
+	hasEval,
 	hasPrototypeAccess,
 	renderUses,
 } from './forwarded-props.js';
@@ -161,7 +162,7 @@ export function intlImports(
 					!decl.parent.parent.isTypeOnly &&
 					!decl.parent.parent.parent.attributes &&
 					ordinaryCaller &&
-					!/@jsx(?:ImportSource|Runtime|Frag)?\b|\beval\b/i.test(file.text) &&
+					!/@jsx(?:ImportSource|Runtime|Frag)?\b/i.test(file.text) &&
 					closedForwardedAttribute(attr) &&
 					returnedReceiver(tag) &&
 					importedText(module.text, name, prop, true, true)
@@ -211,7 +212,7 @@ export function intlImports(
 			})
 		);
 	}
-	function readsScalar(receiver: ts.Expression): boolean {
+	function callsScalarMethod(receiver: ts.Expression): boolean {
 		const access = receiver.parent;
 		if (
 			!ts.isPropertyAccessExpression(access) ||
@@ -219,23 +220,6 @@ export function intlImports(
 			access.questionDotToken
 		)
 			return false;
-		if (access.name.text === 'locale') {
-			const use = access.parent;
-			return (
-				!(
-					ts.isBinaryExpression(use) &&
-					use.left === access &&
-					use.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
-					use.operatorToken.kind <= ts.SyntaxKind.LastAssignment
-				) &&
-				!ts.isDeleteExpression(use) &&
-				!ts.isPostfixUnaryExpression(use) &&
-				!(
-					ts.isPrefixUnaryExpression(use) &&
-					[ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(use.operator)
-				)
-			);
-		}
 		const call = access.parent;
 		if (!ts.isCallExpression(call) || call.expression !== access) return false;
 		if (scalarMethods.has(access.name.text)) return true;
@@ -313,7 +297,7 @@ export function intlImports(
 	function localeProvider(owner: ts.FunctionDeclaration) {
 		if (
 			!ordinaryCaller ||
-			/@jsx(?:ImportSource|Runtime|Frag)?\b|\beval\b/i.test(file.text) ||
+			/@jsx(?:ImportSource|Runtime|Frag)?\b/i.test(file.text) ||
 			owner.parent !== file ||
 			owner.asteriskToken ||
 			owner.modifiers ||
@@ -389,36 +373,55 @@ export function intlImports(
 			!isComponent(owner)
 		)
 			return false;
-		if (readsScalar(call)) return true;
-		const decl = call.parent;
+		if (callsScalarMethod(call)) return true;
+		const access = call.parent;
+		const directLocale =
+			ts.isPropertyAccessExpression(access) &&
+			access.expression === call &&
+			!access.questionDotToken &&
+			access.name.text === 'locale';
+		const initializer = directLocale ? access : call;
+		const decl = initializer.parent;
 		if (
 			!ts.isVariableDeclaration(decl) ||
-			decl.initializer !== call ||
+			decl.initializer !== initializer ||
 			!(ts.getCombinedNodeFlags(decl) & ts.NodeFlags.Const)
 		)
 			return false;
-		if (ts.isIdentifier(decl.name)) return uses(decl.name).every(readsScalar);
-		if (!allowLocale || !ts.isObjectBindingPattern(decl.name) || decl.name.elements.length !== 1)
-			return false;
-		const [binding] = decl.name.elements;
-		const key = binding.propertyName ?? binding.name;
-		if (
-			binding.dotDotDotToken ||
-			binding.initializer ||
-			!ts.isIdentifier(binding.name) ||
-			(!ts.isIdentifier(key) && !ts.isStringLiteral(key)) ||
-			key.text !== 'locale' ||
-			!ts.isFunctionDeclaration(owner) ||
-			!localeView(owner, decl, binding.name)
-		)
-			return false;
-		return localeProvider(owner) ?? false;
+		let name: ts.Identifier;
+		if (ts.isIdentifier(decl.name)) {
+			if (!directLocale) return uses(decl.name).every(callsScalarMethod);
+			name = decl.name;
+		} else {
+			if (directLocale || !ts.isObjectBindingPattern(decl.name) || decl.name.elements.length !== 1)
+				return false;
+			const [binding] = decl.name.elements;
+			const key = binding.propertyName ?? binding.name;
+			if (
+				binding.dotDotDotToken ||
+				binding.initializer ||
+				!ts.isIdentifier(binding.name) ||
+				(!ts.isIdentifier(key) && !ts.isStringLiteral(key)) ||
+				key.text !== 'locale'
+			)
+				return false;
+			name = binding.name;
+		}
+		// A custom provider can perform React DOM resource work in its locale getter.
+		return (
+			allowLocale &&
+			ts.isFunctionDeclaration(owner) &&
+			localeView(owner, decl, name) &&
+			(localeProvider(owner) ?? false)
+		);
 	}
 	for (const item of candidates) {
 		const name = (item.propertyName ?? item.name).text;
 		const locations = uses(item.name);
 		if (!locations.length) continue;
 		if (name === 'useIntl') {
+			// Direct eval can read the imported hook or its formatter through an untracked name.
+			if (hasEval(file)) continue;
 			const proof =
 				locations.length === 1
 					? readsIntl(locations[0], true)

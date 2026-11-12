@@ -6740,6 +6740,13 @@ export function useLazyRef<T>(factory: () => T, slot?: unknown): { current: T } 
 	return hook?.kind === 'ref' ? hook.value : createRefHook(owner, resolved, factory());
 }
 
+/** Capture a render value once for the lifetime of this hook. */
+export function useInitialValue<T>(initial: T | (() => T), slot?: unknown): NoInfer<T> {
+	return typeof initial === 'function'
+		? useLazyRef(initial as () => T, slot).current
+		: useRef(initial, slot).current;
+}
+
 function createRefHook<T>(owner: DraftOwner, resolved: unknown, initial: T): { current: T } {
 	const record = owner.record;
 	// What the ref holds when no render or commit owns its cell, as after the
@@ -7674,15 +7681,18 @@ export function useImperativeHandle<T>(
 ): void {
 	useLayoutEffect(
 		() => {
-			const value = create();
-			if (typeof ref === 'function') ref(value);
-			else if (ref !== null) ref.current = value;
+			if (ref == null) return;
+			let cleanup: unknown;
+			if (typeof ref === 'function') cleanup = ref(create());
+			else ref.current = create();
 			return () => {
-				if (typeof ref === 'function') ref(null);
-				else if (ref !== null) ref.current = null;
+				if (typeof cleanup === 'function') cleanup();
+				else if (typeof ref === 'function') ref(null);
+				else ref.current = null;
 			};
 		},
-		deps,
+		// Match React’s indexed dependencies even when the array has a custom iterator.
+		Array.isArray(deps) ? deps.concat([ref]) : deps,
 		slot,
 	);
 }

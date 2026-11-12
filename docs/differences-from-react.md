@@ -1952,6 +1952,10 @@ createPortal(<Menu />, overlay, 'menu');
 createPortal(Menu, overlay, { open: true });
 ```
 
+DOM portals also accept `createPortal(<Menu />, 'body')`. The client resolves
+the current browser document's body. Server rendering emits the usual empty
+portal placeholder without looking up a document.
+
 The object overload does not supply a reconciliation key. Use a keyed element
 inside the portal or the keyed renderable overload when identity must change.
 
@@ -2083,6 +2087,18 @@ requiring cleanup. Strong mode checks the factory like a lazy `useState`
 initializer: it may read a clock, randomness, or browser state for the initial
 value, but it may not schedule work. The experimental Valdi writer's existing
 adapter ABI does not support this hook.
+
+### Initial render values
+
+Use `useInitialValue(initial)` when a render deliberately needs the
+initial value for the lifetime of a mount. A value argument is evaluated on
+every render. Pass a factory to defer its computation until initialization.
+The snapshot survives prop changes and hot edits that keep the compiler-assigned
+hook site. Treat the result as an immutable snapshot. Derive values that should follow later inputs in
+render. The factory has the same render, retry, and hydration rules as a lazy
+state initializer. Like `useLazyRef`, this hook requires a renderer that
+supports lazy initialization and is unavailable in the Valdi writer ABI.
+Keep each explicit manual slot assigned to one hook site and hook kind.
 
 ### Fragment refs
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createElement, Suspense, use } from 'octane';
+import { Slot, Slottable } from '@octanejs/radix';
 import { mount } from '../../octane/tests/_helpers';
 import { usePrevious } from '../src/use-previous';
 import { SepPlain, SepDecorative, LabelPlain, SepAsChild, SlotMerge } from './_fixtures/proof.tsx';
@@ -61,6 +62,73 @@ describe('@octanejs/radix — Slot / asChild', () => {
 		expect(btn.textContent).toBe('go'); // child children preserved
 		expect(btn.className.split(' ').sort()).toEqual(['btn', 'from-slot']); // class composes
 		r.unmount();
+	});
+	it('projects a single unmarked element supplied through an iterable array child', () => {
+		const elements = (function* () {
+			yield createElement('button', { type: 'button' }, 'press');
+		})();
+		const r = mount(() => createElement(Slot, { 'data-slot': 'yes', children: [null, elements] }));
+		try {
+			expect(r.find('button[data-slot="yes"]').textContent).toBe('press');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('Slottable projects a single host and keeps its siblings and refs', () => {
+		const slotRef = { current: null as HTMLButtonElement | null };
+		const childRef = { current: null as HTMLButtonElement | null };
+		const r = mount(() =>
+			createElement(Slot, {
+				'data-slot': 'yes',
+				ref: slotRef,
+				children: [
+					createElement('i', { key: 'before' }, 'before'),
+					createElement(Slottable, {
+						key: 'target',
+						children: createElement('button', { type: 'button', ref: childRef }, 'press'),
+					}),
+					null,
+					createElement('em', { key: 'after' }, 'after'),
+				],
+			}),
+		);
+		try {
+			const button = r.find('button[data-slot="yes"]');
+			expect(Array.from(button.children, (element) => element.localName)).toEqual(['i', 'em']);
+			expect(button.getAttribute('type')).toBe('button');
+			expect(button.textContent).toBe('beforepressafter');
+			expect(slotRef.current).toBe(button);
+			expect(childRef.current).toBe(button);
+		} finally {
+			r.unmount();
+		}
+		expect(slotRef.current).toBeNull();
+		expect(childRef.current).toBeNull();
+	});
+
+	it('projects onto the last Slottable host and retains each marker’s content', () => {
+		const r = mount(() =>
+			createElement(Slot, {
+				'data-slot': 'yes',
+				children: [
+					createElement(Slottable, {
+						key: 'first',
+						children: createElement('button', { type: 'button' }, 'one'),
+					}),
+					createElement(Slottable, {
+						key: 'second',
+						children: createElement('a', { href: '#' }, 'two'),
+					}),
+				],
+			}),
+		);
+		try {
+			expect(r.find('a[data-slot="yes"]').textContent).toBe('onetwo');
+			expect(r.container.querySelector('button')).toBeNull();
+		} finally {
+			r.unmount();
+		}
 	});
 });
 

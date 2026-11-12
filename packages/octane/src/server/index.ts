@@ -128,6 +128,7 @@ export {
 	useCallback,
 	useRef,
 	useLazyRef,
+	useInitialValue,
 	useId,
 	useEffectEvent,
 	useTransition,

@@ -1310,6 +1310,40 @@ describe('hmr — runtime wrapper', () => {
 		}
 	});
 
+	it('retains an initial snapshot across edits without reusing an earlier mutable ref', async () => {
+		const oldRef = await compileHmrComponent(
+			`"use strong";
+import { useLazyRef } from 'octane';
+export function Value({ report }) @{
+  const initial = useLazyRef(() => ({ label: 'old' }));
+  <button onClick={() => report(initial)}>{'old'}</button>
+}`,
+			'Value',
+		);
+		const source = (version: string) => `"use strong";
+import { useInitialValue } from 'octane';
+export function Value() @{
+  const initial = useInitialValue(() => ({ label: '${version}' }));
+  <button>{('${version}:' + initial.label) as string}</button>
+}`;
+		const first = await compileHmrComponent(source('first'), 'Value');
+		const second = await compileHmrComponent(source('second'), 'Value');
+		const report = vi.fn();
+		const view = mount(oldRef, { report });
+		try {
+			view.click('button');
+			const holder = report.mock.calls[0][0];
+			flushSync(() => expect((oldRef as any)[HMR].update(first)).toBe(true));
+			expect(view.find('button').textContent).toBe('first:first');
+
+			holder.current = { label: 'external' };
+			flushSync(() => expect((oldRef as any)[HMR].update(second)).toBe(true));
+			expect(view.find('button').textContent).toBe('second:first');
+		} finally {
+			view.unmount();
+		}
+	});
+
 	it('webpack HMR preserves named and default wrapper identity across repeated updates', async () => {
 		const { compile } = await import('octane/compiler');
 		const runtime = new Proxy(

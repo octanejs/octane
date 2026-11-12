@@ -4,11 +4,18 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { DATA } from '@octanejs/cli/data';
+import { JSDOM } from 'jsdom';
+import * as ReactServerBridge from 'octane/react/server';
+import { prerender } from 'octane/static';
+import { createElement as reactElement } from 'react';
 import { compileTypesInspection } from 'octane/compiler/volar';
 import ts from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
 import { createScopedSignalRecipe, runCodemod } from '../dist/index.js';
+import { bundleRuntime, installDOM } from './bundle-runtime.js';
 
 const REPO = path.resolve(import.meta.dirname, '../../..');
 /** @type {string[]} */
@@ -41,6 +48,50 @@ function typecheckProject(root) {
 }
 
 describe('runCodemod', () => {
+	it.each(['', ', undefined'])(
+		'keeps fresh imperative handles in Strong mode with deps %j',
+		async (deps) => {
+			const root = project({
+				'Fresh.tsx': `import { useImperativeHandle } from 'react';
+export function Fresh({ ref, label }) {
+	function read() { return label; }
+	useImperativeHandle(ref, () => ({ read })${deps});
+	return <p onClick={() => read()}>{String(label)}</p>;
+}`,
+				'Stable.tsx': `import { useImperativeHandle } from 'react';
+function stable() { return 'shared'; }
+export function Stable({ ref }) {
+	function read() { return 'initial'; }
+	read = stable;
+	useImperativeHandle(ref, () => ({ read })${deps});
+	return <p>shared</p>;
+}`,
+				'Redeclared.jsx': `import { useImperativeHandle } from 'react';
+const shared = () => 'shared';
+function useHandle(ref, label) {
+	function read() { return label; }
+	var read = shared;
+	useImperativeHandle(ref, () => ({ read })${deps});
+}
+export function Redeclared({ ref, label }) {
+	useHandle(ref, label);
+	return <p>shared</p>;
+}`,
+			});
+			const { files } = await runCodemod([root], { write: false, strong: true });
+			const fresh = files.find((file) => file.file === 'Fresh.tsx');
+			const stable = files.find((file) => file.file === 'Stable.tsx');
+			expect(fresh).toMatchObject({ strong: true, diagnostics: [] });
+			const redeclared = files.find((file) => file.file === 'Redeclared.jsx');
+			for (const file of [stable, redeclared]) {
+				expect(file).toMatchObject({ strong: false });
+				expect(file.diagnostics).toContainEqual(
+					expect.objectContaining({ code: 'OCTANE_STRONG_UNTRACKED_EFFECT' }),
+				);
+			}
+		},
+	);
+
 	it('preserves mapped children passed to an imported inspection component under Vite', async () => {
 		const root = project({
 			'package.json': '{"type":"module"}',
@@ -485,7 +536,7 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		const root = project({
 			'package.json': '{}',
 			'Card.tsx': [
-				json ? '' : "import { createRef } from 'react'; export const ref = createRef();",
+				json ? '' : "import { findDOMNode } from 'react-dom'; export const find = findDOMNode;",
 				'export const Card = () => <p />;',
 				'// ' + 'x'.repeat(1024 * 1024) + ' end of input',
 			].join('\n'),
@@ -506,6 +557,61 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		} else {
 			expect(stdout).toMatch(/^✗ Card\.tsx → Card\.tsrx/);
 			expect(stdout.trimEnd().endsWith('1 error(s) (dry run)')).toBe(true);
+		}
+	});
+
+	it('uses the original ref allocator for refs mounted by a Strong component', async () => {
+		const root = project({
+			'View.tsx': `import * as React from 'react';
+import { createRef as allocate, type RefObject } from 'react';
+export const named = allocate<HTMLButtonElement>();
+export const qualified = React.createRef<HTMLButtonElement>();
+export function View(props: { target: RefObject<HTMLButtonElement | null> }) {
+	return <button ref={props.target}>Ready</button>;
+}`,
+		});
+		fs.symlinkSync(
+			path.resolve(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const [file] = (await runCodemod([root], { root, write: false, strong: true })).files;
+		expect(file).toMatchObject({ strong: true, notes: [], diagnostics: [] });
+		fs.writeFileSync(path.join(root, file.output), file.code);
+		const dom = installDOM();
+		try {
+			const { act, createRoot, reactRef, View, named, qualified } = await bundleRuntime(
+				root,
+				'client',
+				`export { act, createRoot } from 'octane';
+export { createRef as reactRef } from 'react';
+export * from './View.tsrx';`,
+			);
+			expect(named).not.toBe(qualified);
+			const original = reactRef();
+			for (const ref of [named, qualified]) {
+				expect(Object.getOwnPropertyDescriptor(ref, 'current')).toEqual(
+					Object.getOwnPropertyDescriptor(original, 'current'),
+				);
+				expect(Object.isSealed(ref)).toBe(Object.isSealed(original));
+			}
+			const container = dom.window.document.body;
+			const app = createRoot(container);
+			try {
+				await act(async () => app.render(View, { target: named }));
+				const button = container.querySelector('button');
+				expect(button?.textContent).toBe('Ready');
+				expect(named.current).toBe(button);
+				await act(async () => app.render(View, { target: qualified }));
+				expect(named.current).toBeNull();
+				expect(qualified.current).toBe(button);
+			} finally {
+				await act(async () => app.unmount());
+			}
+			expect(qualified.current).toBeNull();
+		} finally {
+			vi.unstubAllGlobals();
+			dom.window.close();
 		}
 	});
 
@@ -605,6 +711,81 @@ Inline({ dangerouslySetInnerHTML: { __html: 'untrusted' } });`,
 		const { files } = await runCodemod([path.join(root, 'Inline.tsx')], { root, strong: true });
 		expect(files).toMatchObject([{ strong: true, diagnostics: [] }]);
 		typecheckProject(root);
+	});
+
+	it('migrates generic React event handlers with a native currentTarget type', async () => {
+		const root = project({
+			'Frame.tsx': `import type { ReactEventHandler as LoadHandler } from 'react';
+export function Frame(props: { onLoad: LoadHandler<HTMLIFrameElement> }) {
+	return <iframe onLoad={props.onLoad} />;
+}`,
+			'consumer.ts': `import { Frame } from './Frame.tsrx';
+Frame({ onLoad(event) {
+	const src: string = event.currentTarget.src;
+	// @ts-expect-error Read native event properties directly.
+	event.nativeEvent;
+	// @ts-expect-error currentTarget exposes iframe members.
+	event.currentTarget.reset();
+} });`,
+			'tsconfig.json': JSON.stringify({
+				extends: path.join(REPO, 'packages/octane/typetests/tsconfig.json'),
+				include: ['Frame.tsrx', 'consumer.ts'],
+			}),
+		});
+		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+		const { files } = await runCodemod([path.join(root, 'Frame.tsx')], { root, strong: true });
+		expect(files).toMatchObject([{ strong: true, notes: [], diagnostics: [] }]);
+		typecheckProject(root);
+	});
+
+	it('reports synthetic methods on event types imported through a migrated module', async () => {
+		const root = project({
+			'Frame.tsx': `import type { ReactEventHandler } from 'react';
+export type Load = ReactEventHandler<HTMLIFrameElement>;
+export function Frame(props: { onLoad: Load }) {
+	return <iframe onLoad={props.onLoad} />;
+}`,
+			'ReactFrame.ts': `import type { ReactEventHandler } from 'react';
+export function ReactFrame(props: { onLoad: ReactEventHandler<HTMLIFrameElement> }) { return null; }`,
+			'App.tsx': `import { ReactCompat } from 'octane/react';
+import { Frame, type Load } from './Frame';
+import { ReactFrame } from './ReactFrame';
+const listener: Load = (event) => event['isDefaultPrevented']();
+export function App() {
+	return <>
+		<Frame onLoad={listener} />
+		<Frame onLoad={(event) => event.isPropagationStopped()} />
+		<ReactCompat><ReactFrame onLoad={(event) => event.isDefaultPrevented()} /></ReactCompat>
+	</>;
+}
+export function inspect(value: { isDefaultPrevented(): boolean }) {
+	return value.isDefaultPrevented();
+}`,
+			'tsconfig.json': JSON.stringify({
+				extends: path.join(REPO, 'packages/octane/typetests/tsconfig.json'),
+				compilerOptions: {
+					paths: {
+						react: [path.join(REPO, 'packages/octane/node_modules/@types/react/index.d.ts')],
+						'react/jsx-runtime': [
+							path.join(REPO, 'packages/octane/node_modules/@types/react/jsx-runtime.d.ts'),
+						],
+					},
+				},
+				include: ['*.tsx'],
+			}),
+		});
+		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+		const inputs = ['App.tsx', 'Frame.tsx'].map((file) => path.join(root, file));
+		const { files } = await runCodemod(inputs, {
+			root,
+			write: false,
+			strong: true,
+			projectTypes: true,
+		});
+		const app = files.find((file) => file.file === 'App.tsx');
+		expect(
+			app.notes.filter((note) => note.rule === 'event-object' && note.severity === 'error'),
+		).toHaveLength(2);
 	});
 
 	it('preserves React class and style types on migrated intrinsic prop consumers', async () => {
@@ -808,6 +989,130 @@ const invalid: Panel = { style: 'color:red' };`,
 		expect(code('src/Chart.tsx')).toContain("from '@octanejs/tanstack-start'");
 		expect(result.missing.map((port) => port.name)).toEqual(['@tanstack/markdown/react']);
 	});
+
+	it.each(['new', 'declared'])(
+		'maps standalone Floating UI positioning for a %s binding',
+		async (state) => {
+			const range = `^${catalogVersion('@octanejs/floating-ui')}`;
+			const before = {
+				'@floating-ui/react-dom': '^2.1.8',
+				...(state === 'declared' ? { '@octanejs/floating-ui': range } : {}),
+			};
+			const root = project({
+				'package.json': JSON.stringify({ name: 'app', dependencies: before }),
+				'src/Position.tsx': `
+import { autoUpdate, offset, useFloating } from '@floating-ui/react-dom';
+import type { Placement } from '@floating-ui/react-dom';
+export function Position({ placement }: { placement: Placement }) {
+	const { floatingStyles, refs } = useFloating({
+		placement,
+		middleware: [offset(8)],
+		whileElementsMounted: autoUpdate,
+	});
+	return <div ref={refs.setFloating} style={floatingStyles} />;
+}
+`,
+			});
+			const { files, dependencies, packages, missing } = await runCodemod([root], {
+				write: true,
+				strong: true,
+			});
+			const position = files.find((file) => file.output === 'src/Position.tsrx');
+			expect(position?.code).toContain(
+				"import { autoUpdate, offset, useFloating } from '@octanejs/floating-ui/react-dom';",
+			);
+			expect(position?.code).toContain(
+				"import type { Placement } from '@octanejs/floating-ui/react-dom';",
+			);
+			expect(position?.strong).toBe(true);
+			expect(position?.notes.filter((note) => note.severity === 'error')).toEqual([]);
+			expect(missing).toEqual([]);
+			expect(packages).toEqual([{ from: '@floating-ui/react-dom', to: '@octanejs/floating-ui' }]);
+			expect(dependencies).toEqual(
+				state === 'new' ? [{ name: '@octanejs/floating-ui', range }] : [],
+			);
+			expect(
+				JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).dependencies,
+			).toEqual({ '@floating-ui/react-dom': '^2.1.8', '@octanejs/floating-ui': range });
+		},
+	);
+
+	it.each([
+		['uninstalled', undefined],
+		['older', { '.': './index.js' }],
+		['type-only', { './react-dom': { types: './index.d.ts', import: null } }],
+		['blocked', { './*': './*', './react-dom': null }],
+		['conditional', { './react-dom': { node: null, default: './index.js' } }],
+	])(
+		'keeps the positioning import when the %s binding cannot serve its subpath',
+		async (_state, exports) => {
+			const root = project({
+				'package.json': '{"name":"app","dependencies":{"@octanejs/floating-ui":"0.1.68"}}',
+				'Position.tsx': `import { useFloating } from '@floating-ui/react-dom';
+export function Position() {
+	const { refs } = useFloating();
+	return <div ref={refs.setFloating} />;
+}`,
+				...(exports
+					? {
+							'node_modules/@octanejs/floating-ui/package.json': JSON.stringify({
+								name: '@octanejs/floating-ui',
+								version: '0.1.68',
+								exports,
+							}),
+							'node_modules/@octanejs/floating-ui/index.js': 'export const useFloating = () => {};',
+						}
+					: {}),
+			});
+			const { files, dependencies, packages } = await runCodemod([root], { write: false });
+			const position = files.find((file) => file.file === 'Position.tsx');
+			expect(position?.code).toContain("from '@floating-ui/react-dom'");
+			expect(position?.notes).toContainEqual(
+				expect.objectContaining({
+					rule: 'bindings',
+					severity: 'error',
+					message: expect.stringContaining('exports `./react-dom`'),
+				}),
+			);
+			expect(dependencies).toEqual([]);
+			expect(packages).toEqual([]);
+		},
+	);
+
+	it.each(['@floating-ui/react-dom', '@octanejs/floating-ui/react-dom'])(
+		'keeps the positioning import when project resolution shadows %s',
+		async (specifier) => {
+			const root = project({
+				'package.json': '{"name":"app"}',
+				'nested/tsconfig.json': JSON.stringify({
+					compilerOptions: {
+						moduleResolution: 'bundler',
+						paths: { [specifier]: ['./local.ts'] },
+					},
+				}),
+				'nested/local.ts': 'export const useFloating = () => ({ label: "local" });',
+				'nested/Position.tsx': `import { useFloating } from '@floating-ui/react-dom';
+export function Position() {
+	const { label } = useFloating();
+	return <div title={label} />;
+}`,
+			});
+			const { files, dependencies } = await runCodemod([root], {
+				write: false,
+				projectTypes: false,
+			});
+			const position = files.find((file) => file.file === 'nested/Position.tsx');
+			expect(position?.code).toContain("from '@floating-ui/react-dom'");
+			expect(position?.notes).toContainEqual(
+				expect.objectContaining({
+					rule: 'bindings',
+					severity: 'error',
+					message: expect.stringContaining(specifier),
+				}),
+			);
+			expect(dependencies).toEqual([]);
+		},
+	);
 
 	it('maps next-themes, which has no React-shaped name, to its binding', async () => {
 		const root = project({
@@ -1021,6 +1326,97 @@ const invalid: Panel = { style: 'color:red' };`,
 		]);
 		expect(new Set(result.packages.map((entry) => entry.to))).toEqual(new Set(['@octanejs/radix']));
 		expect(result.missing.map((entry) => entry.name)).toEqual(['@radix-ui/react-icons']);
+	});
+
+	it('maps direct consolidated Radix Slot members to flat binding exports', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'src/named.tsx': `import { Slot as Projection } from 'radix-ui';
+export function App() { return <Projection.Root><button>Press</button></Projection.Root>; }`,
+			'src/plain.tsx': `import { Slot } from 'radix-ui';
+export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`,
+			'src/slottable.tsx': `import { Slot } from 'radix-ui';
+export function App() { return <Slot.Slottable children={<button>Press</button>} />; }`,
+			'src/namespace.tsx': `import * as Radix from 'radix-ui';
+export type Projection = typeof Radix.Slot.Slot;
+export function App() { return <Radix.Slot.Slottable children={<button>Press</button>} />; }`,
+			'src/factory.tsx': `import { Slot } from 'radix-ui';
+export const Wrapped = Slot.createSlot('Wrapped');`,
+			'src/alias.tsx': `import { Slot } from 'radix-ui';
+const Wrapper = Slot.Root;
+export function App() { return <Wrapper><button>Press</button></Wrapper>; }`,
+			'src/children.tsx': `import { Slot } from 'radix-ui';
+export function App({ child }) { return <Slot.Root>{child}</Slot.Root>; }`,
+			'src/array.tsx': `import { Slot } from 'radix-ui';
+export function App() { return <Slot.Root children={[<button>Press</button>]} />; }`,
+			'src/spread.tsx': `import { Slot } from 'radix-ui';
+export function App(props) { return <Slot.Root {...props} />; }`,
+			'src/marker.tsx': `import { Slot } from 'radix-ui';
+export function App() {
+	return <Slot.Root data-mark="merged"><Slot.Slottable><button>Press</button></Slot.Slottable></Slot.Root>;
+}`,
+			'src/whole.tsx': `export * from 'radix-ui';
+export * as Radix from 'radix-ui';
+export type Projection = typeof import('radix-ui').Slot.Root;
+export const load = () => import('radix-ui');`,
+		});
+		const { files } = await runCodemod([root], { write: false });
+		const named = files.find(({ file }) => file === 'src/named.tsx');
+		const plain = files.find(({ file }) => file === 'src/plain.tsx');
+		const slottable = files.find(({ file }) => file === 'src/slottable.tsx');
+		const namespace = files.find(({ file }) => file === 'src/namespace.tsx');
+		expect(named?.code).toContain("import { Slot as Projection } from '@octanejs/radix';");
+		expect(named?.code).toContain('<Projection children={<button>Press</button>}');
+		expect(named?.notes.filter(({ severity }) => severity === 'error')).toEqual([]);
+		expect(plain?.code).toContain("import { Slot } from '@octanejs/radix';");
+		expect(plain?.code).toContain('<Slot children={<button>Press</button>}');
+		expect(slottable?.code).toContain("import { Slottable } from '@octanejs/radix';");
+		expect(slottable?.code).toContain('<Slottable children={<button>Press</button>}');
+		expect(namespace?.code).toContain('export type Projection = typeof Radix.Slot;');
+		expect(namespace?.code).toContain('<Radix.Slottable');
+		expect(namespace?.notes.filter(({ severity }) => severity === 'error')).toEqual([]);
+		for (const source of ['factory', 'alias', 'children', 'array', 'spread', 'marker']) {
+			const retained = files.find(({ file }) => file === `src/${source}.tsx`);
+			expect(retained?.code).toContain("from 'radix-ui'");
+			expect(retained?.notes).toEqual(
+				expect.arrayContaining([expect.objectContaining({ rule: 'bindings', severity: 'error' })]),
+			);
+		}
+		const whole = files.find(({ file }) => file === 'src/whole.tsx');
+		expect(whole?.code).not.toContain('@octanejs/radix');
+		expect(
+			whole?.notes.filter(({ rule, severity }) => rule === 'bindings' && severity === 'error'),
+		).toHaveLength(4);
+	});
+
+	it('keeps a local module that shadows the consolidated Radix package', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'tsconfig.json': '{ "compilerOptions": { "strict": true, "moduleResolution": "bundler" } }',
+			'src/tsconfig.json':
+				'{ "extends": "../tsconfig.json", "compilerOptions": { "paths": { "radix-ui": ["./other.ts"] } } }',
+			'src/other.ts': 'export const Slot = { Root: () => "local" };',
+			'src/view.tsx': `import { Slot } from 'radix-ui';
+export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`,
+		});
+		for (const projectTypes of [false, true]) {
+			const { files } = await runCodemod([path.join(root, 'src/view.tsx')], {
+				root,
+				write: false,
+				projectTypes,
+			});
+			expect(files[0].code).toContain("from 'radix-ui'");
+			expect(files[0].code).toContain('<Slot.Root>');
+			expect(files[0].notes).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						rule: 'bindings',
+						severity: 'error',
+						message: expect.stringContaining('TypeScript alias'),
+					}),
+				]),
+			);
+		}
 	});
 
 	it('reports exactly the Radix exports `@octanejs/radix` lacks', async () => {
@@ -1516,6 +1912,213 @@ const invalid: Panel = { style: 'color:red' };`,
 			expect(file.code).not.toMatch(/ReactCompat|octane\/react/);
 			expect(file.diagnostics.filter((diagnostic) => diagnostic.rule === 'bindings')).toEqual([]);
 		}
+	});
+
+	it('keeps an automatically hosted React child inside its paragraph in server HTML', async () => {
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'src/App.tsx': `import React, { Fragment as Group } from 'react';
+				import { Badge } from 'react-badge-kit';
+				export function App() { return <p>Before <Badge /> after.</p>; }
+				export function Conditional({ enabled }: { enabled: boolean }) {
+					return <>
+						<p id="conditional">Before {enabled ? (<><Badge /></>) : null} after.</p>
+						<p id="logical">Before {enabled && <Badge />} after.</p>
+						<p id="named">Before {enabled ? <Group key="stable"><Badge /></Group> : null} after.</p>
+						<p id="qualified">Before <React.Fragment><Badge /></React.Fragment> after.</p>
+					</>;
+				}
+				export function Panel() { return <section><Badge /></section>; }`,
+		});
+		const modules = path.join(root, 'node_modules');
+		fs.mkdirSync(modules);
+		for (const name of ['octane', 'react', 'react-dom'])
+			fs.symlinkSync(
+				fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+				path.join(modules, name),
+				'dir',
+			);
+		const file = path.join(root, 'src/App.tsx');
+		const [migrated] = (await runCodemod([file], { root, write: false, strong: true })).files;
+		expect(
+			[...migrated.notes, ...migrated.diagnostics].filter((n) => n.severity === 'error'),
+		).toEqual([]);
+		const { App, Conditional, Panel } = loadCompiledFixtureSource(migrated.code, {
+			id: 'App.tsrx',
+			mode: 'server',
+			runtimeModules: {
+				'octane/react/server': ReactServerBridge,
+				'react-badge-kit': { Badge: () => reactElement('b', null, 'badge') },
+			},
+		});
+		const { html } = await prerender(App, {});
+		const conditional = await prerender(Conditional, { enabled: true });
+		const panel = await prerender(Panel, {});
+		const dom = new JSDOM(html + conditional.html + panel.html);
+		try {
+			const { document } = dom.window;
+			expect(document.querySelector('p')?.textContent).toBe('Before badge after.');
+			expect(document.querySelector('p > span[data-react-compat] > b')?.textContent).toBe('badge');
+			expect(document.querySelector('#conditional')?.textContent).toBe('Before badge after.');
+			expect(
+				document.querySelector('#conditional > span[data-react-compat] > b')?.textContent,
+			).toBe('badge');
+			expect(document.querySelector('#logical')?.textContent).toBe('Before badge after.');
+			expect(document.querySelector('#named')?.textContent).toBe('Before badge after.');
+			expect(document.querySelector('#qualified')?.textContent).toBe('Before badge after.');
+			expect(document.querySelector('section > div[data-react-compat] > b')?.textContent).toBe(
+				'badge',
+			);
+		} finally {
+			dom.window.close();
+		}
+
+		// A compiler with inline lowering does not prove this issuer can import the host.
+		const config = path.join(root, 'tsconfig.json');
+		fs.writeFileSync(
+			config,
+			'{"compilerOptions":{"moduleResolution":"bundler","paths":{"octane/react/server":["./server.ts"]}}}',
+		);
+		fs.writeFileSync(path.join(root, 'server.ts'), 'export {};');
+		const preview = async () =>
+			(await runCodemod([file], { root, write: false, target: 'tsx' })).files[0];
+		const unavailable = expect.objectContaining({
+			severity: 'error',
+			message: expect.stringContaining('ReactCompatInline'),
+		});
+		const aliased = await preview();
+		expect(aliased.notes).toContainEqual(unavailable);
+		fs.writeFileSync(file, aliased.code);
+		const retry = await preview();
+		expect(retry.notes).toContainEqual(unavailable);
+		expect(retry.code).toBe(aliased.code);
+
+		fs.rmSync(config);
+		const nested = path.join(path.dirname(file), 'tsconfig.json');
+		fs.writeFileSync(
+			nested,
+			'{"compilerOptions":{"moduleResolution":"bundler","paths":{"octane/react/server":["../server.ts"]}}}',
+		);
+		expect((await preview()).notes).toContainEqual(unavailable);
+		fs.rmSync(nested);
+		const upgraded = await preview();
+		expect(upgraded.notes.filter((n) => n.severity === 'error')).toEqual([]);
+		expect(upgraded.code).toMatch(/<p>Before <ReactCompatInline><Badge\s*\/>/);
+		fs.writeFileSync(file, upgraded.code);
+		expect((await preview()).code).toBe(upgraded.code);
+	});
+
+	it('verifies both runtime conditions of the published inline React host', async () => {
+		const octane = 'node_modules/octane';
+		const manifest = JSON.parse(
+			fs.readFileSync(path.join(REPO, 'packages/octane/package.json'), 'utf8'),
+		);
+		const exports = manifest.publishConfig.exports;
+		const compilerUrl = pathToFileURL(
+			path.join(REPO, 'packages/octane/src/compiler/index.js'),
+		).href;
+		const files = {
+			'package.json': '{"type":"module"}',
+			'App.tsx':
+				"import { Badge } from 'react-badge-kit'; export function App() { return <p><Badge /></p>; }",
+			[octane + '/package.json']: JSON.stringify({
+				name: 'octane',
+				type: 'module',
+				version: manifest.version,
+				exports: Object.fromEntries(
+					['./compiler', './react', './react/server'].map((name) => [name, exports[name]]),
+				),
+			}),
+			[path.join(octane, exports['./compiler'].default)]:
+				`export { collectDiagnostics } from ${JSON.stringify(compilerUrl)};`,
+		};
+		for (const name of ['./react', './react/server']) {
+			const types = path.join(octane, exports[name].types);
+			files[types] = "export { ReactCompatInline } from './inline.js';";
+			files[path.join(path.dirname(types), 'inline.d.ts')] =
+				'export declare const ReactCompatInline: unknown;';
+			for (const condition of ['node', 'default'])
+				files[path.join(octane, exports[name][condition])] =
+					'const ReactCompatInline = null; export { ReactCompatInline };';
+		}
+		const root = project(files);
+		for (const name of ['react', 'react-dom'])
+			fs.symlinkSync(
+				fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+				path.join(root, 'node_modules', name),
+				'dir',
+			);
+		const preview = async () =>
+			(await runCodemod([path.join(root, 'App.tsx')], { root, write: false, strong: true }))
+				.files[0];
+		const result = await preview();
+		expect([...result.notes, ...result.diagnostics].filter((n) => n.severity === 'error')).toEqual(
+			[],
+		);
+		expect(result.code).toMatch(/<ReactCompatInline><Badge\s*\/>/);
+
+		const unavailable = expect.objectContaining({
+			severity: 'error',
+			message: expect.stringContaining('ReactCompatInline'),
+		});
+		for (const [name, condition] of [
+			['./react', 'default'],
+			['./react/server', 'node'],
+			['./react', 'types'],
+		]) {
+			const entry = path.join(root, octane, exports[name][condition]);
+			fs.writeFileSync(entry, 'export {};');
+			expect((await preview()).notes).toContainEqual(unavailable);
+			fs.writeFileSync(entry, files[path.relative(root, entry)]);
+		}
+	});
+
+	it('requires the same Octane compiler at the React island issuer', async () => {
+		const issuer = 'src/node_modules/octane';
+		const other = issuer + '/node_modules/octane';
+		const manifest = { name: 'octane', version: '0.16.7', type: 'module' };
+		const exports = { './compiler': './compiler.js' };
+		const compilerUrl = pathToFileURL(
+			path.join(REPO, 'packages/octane/src/compiler/index.js'),
+		).href;
+		const compiler = `export { collectDiagnostics } from ${JSON.stringify(compilerUrl)};`;
+		const inline = "export { ReactCompatInline } from './inline.js';";
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'src/App.tsx':
+				"import { Badge } from 'react-badge-kit'; export function App() { return <p><Badge /></p>; }",
+			[issuer + '/package.json']: JSON.stringify({
+				...manifest,
+				exports: { ...exports, './react': './react.ts', './react/server': './server.ts' },
+			}),
+			[other + '/package.json']: JSON.stringify({ ...manifest, exports }),
+			[issuer + '/compiler.js']: compiler,
+			[other + '/compiler.js']: compiler,
+			[issuer + '/react.ts']: inline,
+			[issuer + '/server.ts']: inline,
+			[issuer + '/inline.js']: 'export const ReactCompatInline = null;',
+		});
+		const modules = path.join(root, 'node_modules');
+		fs.mkdirSync(modules);
+		fs.symlinkSync(path.join(root, other), path.join(modules, 'octane'), 'dir');
+		for (const name of ['react', 'react-dom'])
+			fs.symlinkSync(
+				fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+				path.join(modules, name),
+				'dir',
+			);
+		const result = await runCodemod([path.join(root, 'src/App.tsx')], {
+			root,
+			write: false,
+			strong: true,
+		});
+		expect(result.compiler).toBe(fs.realpathSync(path.join(root, other, 'compiler.js')));
+		expect(result.files[0].notes).toContainEqual(
+			expect.objectContaining({
+				severity: 'error',
+				message: expect.stringContaining('ReactCompatInline'),
+			}),
+		);
 	});
 
 	it('reports TSRX written for React, which it cannot read', async () => {
@@ -2104,8 +2707,25 @@ export function Greeting({ count }: { count: number }) {
 		const enclosed = `import {IntlProvider as Provider, useIntl} from 'react-intl';
 			function Locale() { const { locale } = useIntl(); return <p lang={locale}/>; }
 			export function Page() { return <Provider locale="fr"><Locale/></Provider>; }`;
+		const direct = enclosed.replace('{ locale } = useIntl()', 'locale = useIntl().locale');
 		const sources = {
 			'src/Owned.tsx': enclosed,
+			'src/OwnedMember.tsx': direct,
+			'src/ExternalMember.tsx': direct.replace('function Locale', 'export function Locale'),
+			'src/ReflectiveReceiver.tsx': `import {useIntl} from 'react-intl';
+				export function Leaf() {
+					const intl = useIntl();
+					return <b title={intl.formatNumber(1)}>{eval('intl.locale')}</b>;
+				}`,
+			'src/ReflectiveHook.tsx': String.raw`import {useIntl} from 'react-intl';
+				export function Leaf() {
+					return <b title={useIntl().formatNumber(1)}>{\u0065val('useIntl().locale')}</b>;
+				}`,
+			'src/ExternalReceiver.tsx': `import {useIntl} from 'react-intl';
+				export function Leaf() {
+					const intl = useIntl();
+					return <b title={intl.formatNumber(1)}>{intl.locale}</b>;
+				}`,
 			'src/Exported.tsx': enclosed.replace('function Locale', 'export function Locale'),
 			'src/Escaped.tsx': enclosed + '\nexport {Locale as Consumer};',
 			'src/Nested.tsx': enclosed
@@ -2140,11 +2760,11 @@ export function Greeting({ count }: { count: number }) {
 		for (const file of Object.keys(sources)) {
 			const result = files.find((result) => result.file === file);
 			const errors = [...result.notes, ...result.diagnostics].filter((d) => d.severity === 'error');
-			if (file === 'src/Owned.tsx') {
+			if (file === 'src/Owned.tsx' || file === 'src/OwnedMember.tsx') {
 				expect(result.strong).toBe(true);
-				expect(errors).toEqual([]);
+				expect.soft(errors, file).toEqual([]);
 			} else {
-				expect(errors).toContainEqual(
+				expect.soft(errors, file).toContainEqual(
 					expect.objectContaining({
 						rule: 'bindings',
 						message: expect.stringContaining('useIntl'),
@@ -2427,11 +3047,11 @@ export function Locale() { return <IntlProvider locale="en"><b>test</b></IntlPro
 		const root = setup({
 			'src/Greeting.tsx': `import { useIntl } from 'react-intl';
 import React, { memo as cached } from 'react';
-export const Greeting = cached(() => { const intl = useIntl(); return <p title={intl.locale} />; });
-export const Field = React.forwardRef((props, ref) => { const intl = useIntl(); return <input ref={ref} title={intl.locale} />; });`,
+export const Greeting = cached(() => { const intl = useIntl(); return <p title={intl.formatNumber(1)} />; });
+export const Field = React.forwardRef((props, ref) => { const intl = useIntl(); return <input ref={ref} title={intl.formatNumber(1)} />; });`,
 			'src/Other.tsx': `import {useIntl} from 'react-intl';
 function memo(fn) { return fn; }
-export const Other = memo(() => { const intl = useIntl(); return <p title={intl.locale} />; });`,
+export const Other = memo(() => { const intl = useIntl(); return <p title={intl.formatNumber(1)} />; });`,
 		});
 		const { files } = await runCodemod([root], { root, write: false, strong: true });
 		const wrapped = files.find((f) => f.file === 'src/Greeting.tsx');

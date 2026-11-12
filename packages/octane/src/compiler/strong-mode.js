@@ -22,7 +22,7 @@ import {
 	collectLazyRefIdioms,
 	lazyRefSuggestion,
 	layoutSnapshotEdits,
-	snapshotImportEditor,
+	hookImportEditor,
 	readsLayout,
 	strongDocsUrl,
 } from './strong-fixes.js';
@@ -53,6 +53,7 @@ const LOCAL_VALUE_HOOKS = new Set([
 	'useCallback',
 	'useRef',
 	'useLazyRef',
+	'useInitialValue',
 	'useId',
 	'useEffectEvent',
 	'useDeferredValue',
@@ -1989,8 +1990,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		const existing = resolve(scope, 'useLayoutSnapshot');
 		if (existing && (existing.kind !== 'hook' || existing.hook !== 'useLayoutSnapshot'))
 			return false;
-		snapshotImports ??= snapshotImportEditor(ast, source);
-		return snapshotImports(state, effect, existing);
+		snapshotImports ??= hookImportEditor(ast, source, 'useLayoutSnapshot', [
+			'useState',
+			'useLayoutEffect',
+		]);
+		return snapshotImports([state, effect], existing);
 	}
 
 	const layoutReaders = new WeakMap();
@@ -3584,6 +3588,11 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		}
 	}
 
+	function stateSnapshot(node, hook, scope) {
+		const shape = statePolicy.initialShape(hook, node, scope);
+		return { kind: 'snapshot', state: node, array: statePolicy.shapeIsArray(shape), shape };
+	}
+
 	function stateTupleBinding(expression, scope) {
 		const node = unwrap(expression);
 		if (node?.type === 'Identifier') {
@@ -3600,15 +3609,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		// about arbitrary methods on object snapshots or opaque hook outputs.
 		let tuple = stateTuples.get(node);
 		if (tuple === undefined) {
-			const shape = statePolicy.initialShape(hook, node, scope);
 			tuple = {
 				kind: 'state-tuple',
-				snapshot: {
-					kind: 'snapshot',
-					state: node,
-					array: statePolicy.shapeIsArray(shape),
-					shape,
-				},
+				snapshot: stateSnapshot(node, hook, scope),
 				setter: { kind: 'setter', state: node },
 				getter: STATE_GETTER_BINDING,
 			};
@@ -3622,6 +3625,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (node?.type === 'Identifier') {
 			const binding = resolve(scope, node.name);
 			return binding?.kind === 'snapshot' ? binding : null;
+		}
+		if (node?.type === 'CallExpression' && importedHook(node.callee, scope) === 'useInitialValue') {
+			return stateSnapshot(node, 'useInitialValue', scope);
 		}
 		if (node?.type !== 'MemberExpression') return null;
 		const tuple = stateTupleBinding(node.object, scope);
@@ -5593,14 +5599,15 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					return;
 				}
 				let executionPhase = phaseAfter(node.callee, phase, true, node.optional === true);
+				const lazyInitializer =
+					hook === 'useState' || hook === 'useLazyRef' || hook === 'useInitialValue';
 				const synchronousCallbackIndex =
 					hook === 'useLinkedState'
 						? 1
 						: hook === 'useReducer'
 							? 2
-							: hook === 'useState' ||
+							: lazyInitializer ||
 								  hook === 'useMemo' ||
-								  hook === 'useLazyRef' ||
 								  hook === 'useLayoutSnapshot' ||
 								  EFFECT_HOOKS.has(hook)
 								? 0
@@ -5724,7 +5731,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 					propProjection(node.arguments?.[1], scope)
 				)
 					unlinkedPropInitializers.add(unwrap(node.arguments[1]));
-				if (hook === 'useState' || hook === 'useMemo' || hook === 'useLazyRef') {
+				if (lazyInitializer || hook === 'useMemo') {
 					if (
 						hook === 'useState' &&
 						executionPhase === 'render' &&
@@ -6248,11 +6255,39 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 
 	for (const statement of ast.body ?? []) visit(statement, moduleScope, 'module');
-	analyzeStrongStateUsage(ast, strongHookAnalysis, (code, node, message, initializer) => {
+	let initialValueImports;
+	function initialValueSuggestion({ decl, call, scope }) {
+		if (!options.rendererRegionResolver(call)) return [];
+		const id = decl.id.elements[0];
+		if (
+			source.slice(decl.id.start, id.start).trim() !== '[' ||
+			source.slice(id.end, decl.id.end).trim() !== ']'
+		)
+			return [];
+		const existing = resolve(scope, 'useInitialValue');
+		if (existing && existing.octaneImport !== 'useInitialValue') return [];
+		initialValueImports ??= hookImportEditor(ast, source, 'useInitialValue', ['useState']);
+		const imports = initialValueImports([call], existing, true);
+		if (imports === false) return [];
+		// The bracket can touch the declaration keyword, unlike the replacement identifier.
+		const bindingText = /[a-z]/.test(source.charAt(decl.id.start - 1)) ? ' ' + id.name : id.name;
+		return [
+			{
+				hook: 'useInitialValue',
+				message: 'Retain the initial render value.',
+				edits: [
+					...imports,
+					{ start: decl.id.start, end: decl.id.end, text: bindingText },
+					{ start: call.callee.start, end: call.callee.end, text: 'useInitialValue' },
+				],
+			},
+		];
+	}
+	analyzeStrongStateUsage(ast, strongHookAnalysis, (code, node, message, initializer, capture) => {
 		// Report the discarded setter instead of suggesting a lazy state initializer
 		// for an eager prop capture that would still have no way to update.
 		if (initializer !== undefined) unlinkedPropInitializers.delete(initializer);
-		report(code, node, message);
+		report(code, node, message, capture ? initialValueSuggestion(capture) : []);
 	});
 	for (const initial of unlinkedPropInitializers) {
 		report(

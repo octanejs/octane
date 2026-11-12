@@ -61,7 +61,7 @@ export function fixedBinding(
 }
 
 /** An identifier moved past a getter must already be initialized, even across switch cases. */
-function initializedBefore(checker: ts.TypeChecker, name: ts.Identifier, call: ts.CallExpression) {
+export function initializedBefore(checker: ts.TypeChecker, name: ts.Identifier, call: ts.Node) {
 	let declaration = checker.getSymbolAtLocation(name)?.valueDeclaration;
 	while (declaration && ts.isBindingElement(declaration)) declaration = declaration.parent.parent;
 	if (!declaration) return false;
@@ -76,9 +76,9 @@ function initializedBefore(checker: ts.TypeChecker, name: ts.Identifier, call: t
 }
 
 /**
- * An explicit [owner] observes object identity, even when the effect reads
- * owner.value or calls owner.method(). Read that same binding into the effect
- * and leave the property accesses where React executed them, including cleanup.
+ * An explicit [owner] observes object identity even when the callback reads
+ * owner.value or calls owner.method(). Read the binding inside the callback
+ * and leave property accesses where React executed them, including cleanup.
  */
 export function effectReceivers(
 	callback: ts.ArrowFunction,
@@ -101,21 +101,24 @@ export function effectReceivers(
 	)
 		return [];
 	const call = callback.parent;
+	if (!ts.isCallExpression(call)) return [];
+	const hook = reactHook(call.expression);
+	const imperative = hook === 'useImperativeHandle';
+	const callbackIndex = imperative ? 1 : 0;
 	if (
-		!ts.isCallExpression(call) ||
-		call.arguments.length !== 2 ||
-		call.arguments[0] !== callback ||
-		!['useEffect', 'useLayoutEffect', 'useInsertionEffect'].includes(
-			reactHook(call.expression) ?? '',
-		)
+		(!imperative && !['useEffect', 'useLayoutEffect', 'useInsertionEffect'].includes(hook ?? '')) ||
+		call.arguments.length !== callbackIndex + 2 ||
+		call.arguments[callbackIndex] !== callback ||
+		(imperative && ts.isSpreadElement(call.arguments[0]!))
 	)
 		return [];
-	const deps = call.arguments[1];
+	const deps = call.arguments[callbackIndex + 1]!;
 	if (!ts.isArrayLiteralExpression(deps)) return [];
 
 	const identifiers = deps.elements.filter(ts.isIdentifier);
 	const hasProperties = identifiers.length !== deps.elements.length;
-	if (hasProperties && !snapshot) return [];
+	// A property snapshot would run before the imperative handle evaluates its ref.
+	if (hasProperties && (imperative || !snapshot)) return [];
 
 	const names = new Set<string>();
 	const members = new Map<ts.Symbol, ts.Identifier[]>();
