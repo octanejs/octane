@@ -258,6 +258,7 @@ const TANSTACK_ADAPTERS: Record<string, Record<string, string>> = {
  * `@octanejs/radix` serves as namespaces.
  */
 export const PORTED_PACKAGES = {
+	'@floating-ui/react-dom': '@octanejs/floating-ui/react-dom',
 	'@tanstack/react-start': '@octanejs/tanstack-start',
 	...Object.fromEntries(
 		Object.keys(TANSTACK_ADAPTERS).map((name) => [name, name.replace('/react-', '/octane-')]),
