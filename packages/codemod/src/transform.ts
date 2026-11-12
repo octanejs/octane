@@ -604,8 +604,8 @@ class ModuleTransform {
 	readonly indentUnit: string;
 	/** Every import, keyed by its declaration. */
 	readonly imports = new Map<ts.Node, Import>();
-	radixSlotMembers?: Map<ts.MemberName, { root?: string; name: string }>;
-	retainedRadixSlots?: Set<ts.Identifier>;
+	radixSlotMembers?: Map<ts.MemberName, { replacement?: string; name: string }>;
+	radixSlotImports?: Map<ts.Identifier, 'original' | 'native'>;
 	nativeIntl = new Set<ts.ImportSpecifier>();
 	hasReactBridge = false;
 	readonly pathSvgImports = new Map<ts.ImportDeclaration, string>();
@@ -1149,7 +1149,7 @@ class ModuleTransform {
 					reason = 'The codemod can only migrate Radix Slot with a single intrinsic element child.';
 			}
 			if (!member || !name || reason) {
-				(this.retainedRadixSlots ??= new Set()).add(binding);
+				(this.radixSlotImports ??= new Map()).set(binding, 'original');
 				this.note(
 					RULE.binding,
 					'error',
@@ -1160,11 +1160,15 @@ class ModuleTransform {
 			}
 			members.set(member, name);
 		}
-		for (const [member, name] of members)
-			(this.radixSlotMembers ??= new Map()).set(member, {
-				root: namespace ? binding.text : undefined,
-				name,
-			});
+		for (const [member, name] of members) {
+			const replacement = namespace
+				? `${binding.text}.${name}`
+				: name === 'Slot'
+					? binding.text
+					: undefined;
+			if (!namespace && replacement) (this.radixSlotImports ??= new Map()).set(binding, 'native');
+			(this.radixSlotMembers ??= new Map()).set(member, { replacement, name });
+		}
 	}
 
 	/** An intrinsic child cannot be a Slottable marker or an alias of one. */
@@ -2404,7 +2408,11 @@ class ModuleTransform {
 		}
 		const clause = node.importClause;
 		const bindings = clause?.namedBindings;
-		if (bindings && ts.isNamespaceImport(bindings) && this.retainedRadixSlots?.has(bindings.name))
+		if (
+			bindings &&
+			ts.isNamespaceImport(bindings) &&
+			this.radixSlotImports?.get(bindings.name) === 'original'
+		)
 			return null;
 		if (clause && bindings && ts.isNamedImports(bindings)) {
 			const moved = new Map<string, string[]>();
@@ -2509,8 +2517,13 @@ class ModuleTransform {
 						'The Octane binding has no Radix Slot namespace to re-export.',
 					);
 					kept.push(element.getText(this.sf));
-				} else if (this.retainedRadixSlots?.has(element.name)) {
+					continue;
+				}
+				const plan = this.radixSlotImports?.get(element.name);
+				if (plan === 'original') {
 					kept.push(element.getText(this.sf));
+				} else if (plan === 'native') {
+					values.push(element.getText(this.sf));
 				} else {
 					renamed = true;
 				}
@@ -2557,9 +2570,10 @@ class ModuleTransform {
 		const slot = this.radixSlotMembers?.get(member);
 		if (slot) {
 			this.count(RULE.import);
-			return slot.root
-				? `${slot.root}.${slot.name}`
-				: this.require('@octanejs/radix', slot.name, ts.isQualifiedName(member.parent));
+			return (
+				slot.replacement ??
+				this.require('@octanejs/radix', slot.name, ts.isQualifiedName(member.parent))
+			);
 		}
 		const entry = this.importOf(namespace);
 		if (!entry?.namespace) return null;

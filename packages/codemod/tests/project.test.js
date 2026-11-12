@@ -1028,6 +1028,10 @@ const invalid: Panel = { style: 'color:red' };`,
 			'package.json': '{ "name": "app" }',
 			'src/named.tsx': `import { Slot as Projection } from 'radix-ui';
 export function App() { return <Projection.Root><button>Press</button></Projection.Root>; }`,
+			'src/plain.tsx': `import { Slot } from 'radix-ui';
+export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`,
+			'src/slottable.tsx': `import { Slot } from 'radix-ui';
+export function App() { return <Slot.Slottable children={<button>Press</button>} />; }`,
 			'src/namespace.tsx': `import * as Radix from 'radix-ui';
 export type Projection = typeof Radix.Slot.Slot;
 export function App() { return <Radix.Slot.Slottable children={<button>Press</button>} />; }`,
@@ -1053,11 +1057,16 @@ export const load = () => import('radix-ui');`,
 		});
 		const { files } = await runCodemod([root], { write: false });
 		const named = files.find(({ file }) => file === 'src/named.tsx');
+		const plain = files.find(({ file }) => file === 'src/plain.tsx');
+		const slottable = files.find(({ file }) => file === 'src/slottable.tsx');
 		const namespace = files.find(({ file }) => file === 'src/namespace.tsx');
-		expect(named?.code).toContain("from '@octanejs/radix'");
-		expect(named?.code).not.toContain('Projection.Root');
-		expect(named?.code).toContain('children={<button>Press</button>}');
+		expect(named?.code).toContain("import { Slot as Projection } from '@octanejs/radix';");
+		expect(named?.code).toContain('<Projection children={<button>Press</button>}');
 		expect(named?.notes.filter(({ severity }) => severity === 'error')).toEqual([]);
+		expect(plain?.code).toContain("import { Slot } from '@octanejs/radix';");
+		expect(plain?.code).toContain('<Slot children={<button>Press</button>}');
+		expect(slottable?.code).toContain("import { Slottable } from '@octanejs/radix';");
+		expect(slottable?.code).toContain('<Slottable children={<button>Press</button>}');
 		expect(namespace?.code).toContain('export type Projection = typeof Radix.Slot;');
 		expect(namespace?.code).toContain('<Radix.Slottable');
 		expect(namespace?.notes.filter(({ severity }) => severity === 'error')).toEqual([]);
