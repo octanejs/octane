@@ -6,7 +6,15 @@ const separator = '(?: *, *| +)';
 const paint =
 	/^(?:[a-zA-Z]+|#[\da-fA-F]{3,4}|#[\da-fA-F]{6}(?:[\da-fA-F]{2})?|var\(--[A-Za-z_][A-Za-z0-9_-]*\))$/;
 const opacity = /^(?:0(?:\.\d+)?|1)$/;
-const operation = '(?:scale|translate)\\(' + number + '(?:' + separator + number + ')?\\)';
+const nextNumber = '(?:' + separator + number + ')';
+const operation =
+	'(?:(?:scale|translate)\\(' +
+	number +
+	nextNumber +
+	'?\\)|matrix\\(' +
+	number +
+	nextNumber +
+	'{5}\\))';
 const transform = new RegExp('^' + operation + '(?:' + separator + operation + ')*$');
 const transformNumbers = new RegExp(number, 'g');
 const localPaint = /^url\(#[A-Za-z_][A-Za-z0-9_-]*\)$/;

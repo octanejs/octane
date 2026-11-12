@@ -604,7 +604,10 @@ it('preserves path transforms and fixed string classes across server and client 
 		[{ tone: 'quiet' }, { tone: '' }, { tone: 'bright warm' }],
 		1,
 		{
-			'icons/mark.svg': asset.replace('<path ', '<path transform="translate(2 1) scale(1.5)" '),
+			'icons/mark.svg': asset.replace(
+				'<path ',
+				'<path transform="translate(2 1) scale(1.5) matrix(1, 0, 0, .75, 3, -2)" ',
+			),
 		},
 	);
 });
