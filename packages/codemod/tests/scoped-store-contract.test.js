@@ -870,6 +870,8 @@ it('defers store factory inputs linked to React work during a read', async () =>
 		viaSibling: './sibling-handle',
 		plain: './handles',
 		pure: './pure',
+		explicitJs: './explicit-js-key',
+		portalOnly: './portal-key',
 	};
 	const { app } = project({
 		'observer/public-store.ts': "export {valueOf, select, selectOptions, read} from './state';",
@@ -912,8 +914,8 @@ it('defers store factory inputs linked to React work during a read', async () =>
 		'app/src/barrel.ts': "export {dependent as nested} from './dependent';",
 		'app/src/snapshot-key.ts':
 			"import {direct} from './handles'; export const snapshot = direct as string;",
-		'app/src/resource.tsx': `import {preload} from 'react-dom';
-			export function readTsx() {preload('/tsx-preview.png', {as: 'image'}); return 'ready';}`,
+		'app/src/resource.tsx': `import {preload as hint} from 'react-dom';
+			export function readTsx() {hint('/tsx-preview.png', {as: 'image'}); return 'ready';}`,
 		'app/src/script-resource.js': `import {preload} from 'react-dom';
 			export function readJs() {preload('/js-preview.png', {as: 'image'}); return 'ready';}`,
 		'app/src/choice.ts': "export const readChoice = () => 'ready';",
@@ -925,6 +927,15 @@ it('defers store factory inputs linked to React work during a read', async () =>
 			"import {select} from 'observer/core'; import {readJs} from './script-resource.js'; export const viaJs = select(readJs);",
 		'app/src/sibling-handle.ts':
 			"import {select} from 'observer/core'; import {readChoice} from './choice.js'; export const viaSibling = select(readChoice);",
+		'app/src/neutral.js': "export const readNeutral = () => 'ready';",
+		'app/src/neutral.mjs': `import {preload} from 'react-dom';
+			export function readNeutral() {preload('/unrelated.png', {as: 'image'}); return 'ready';}`,
+		'app/src/explicit-js-key.ts':
+			"import {select} from 'observer/core'; import {readNeutral} from './neutral.js'; export const explicitJs = select(readNeutral);",
+		'app/src/portal-only.tsx': `import {createPortal, flushSync} from 'react-dom';
+			export function readNeutral() {void createPortal; void flushSync; return 'ready';}`,
+		'app/src/portal-key.ts':
+			"import {select} from 'observer/core'; import {readNeutral} from './portal-only'; export const portalOnly = select(readNeutral);",
 		'app/src/pure-format.tsx': 'export function format(value: string) {return value;}',
 		'app/src/pure.ts': `import {select} from 'observer/core';
 			import type {preload} from 'react-dom';
@@ -971,7 +982,9 @@ it('defers store factory inputs linked to React work during a read', async () =>
 		const errors = [...file.notes, ...file.diagnostics].filter(
 			(entry) => entry.severity === 'error',
 		);
-		if (name === 'src/plain.tsx' || name === 'src/pure.tsx') {
+		if (
+			['src/plain.tsx', 'src/pure.tsx', 'src/explicitJs.tsx', 'src/portalOnly.tsx'].includes(name)
+		) {
 			expect(file.strong, name).toBe(true);
 			expect(errors, name).toEqual([]);
 		} else {

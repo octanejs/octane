@@ -13,6 +13,28 @@ type Input =
 	| { literal: true }
 	| Opaque;
 
+const sourceExtensions = ['.ts', '.tsx', '.js', '.jsx', '.mts', '.mjs', '.cts', '.cjs'];
+const resourceHints = new Set([
+	'default',
+	'preconnect',
+	'prefetchDNS',
+	'preinit',
+	'preinitModule',
+	'preload',
+	'preloadModule',
+]);
+
+function importsResourceHint(statement: ts.ImportDeclaration | ts.ExportDeclaration) {
+	const imported = ts.isImportDeclaration(statement);
+	if (imported && !statement.importClause) return false;
+	const bindings = imported ? statement.importClause?.namedBindings : statement.exportClause;
+	if ((imported && statement.importClause?.name) || !bindings) return true;
+	if (!ts.isNamedImports(bindings) && !ts.isNamedExports(bindings)) return true;
+	return bindings.elements.some(
+		(item) => !item.isTypeOnly && resourceHints.has((item.propertyName ?? item.name).text),
+	);
+}
+
 function dataInput(expr: ts.Expression, locals: ReadonlyMap<string, Input>): boolean {
 	const value = skipWrappers(expr);
 	if (ts.isIdentifier(value)) {
@@ -188,12 +210,12 @@ export function storeSources(
 		const candidates = new Set<string>();
 		if (typed && inProject(typed, root)) {
 			candidates.add(typed);
-			// Bundlers can select a JS or JSX sibling where TypeScript picks authored types.
-			if (!/\.(?:[cm]?ts|tsx)$/.test(specifier)) {
-				const stem = typed.replace(/(?:\.d)?\.(?:[cm]?[jt]s|[jt]sx)$/, '');
-				if (stem !== typed)
-					for (const extension of ['.ts', '.tsx', '.js', '.jsx', '.mts', '.mjs', '.cts', '.cjs'])
-						candidates.add(stem + extension);
+			// TypeScript can substitute authored types for an explicit JS path.
+			const stem = typed.replace(/(?:\.d)?\.(?:[cm]?[jt]s|[jt]sx)$/, '');
+			if (stem !== typed) {
+				const extension = path.extname(specifier);
+				const siblings = sourceExtensions.includes(extension) ? [extension] : sourceExtensions;
+				for (const suffix of siblings) candidates.add(stem + suffix);
 			}
 		}
 		if (candidates.size || specifier.startsWith('.')) {
@@ -202,7 +224,7 @@ export function storeSources(
 		}
 		return [...candidates].filter(
 			(file) =>
-				/\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) &&
+				sourceExtensions.includes(path.extname(file)) &&
 				!/\.d\.[cm]?ts$/.test(file) &&
 				inProject(file, root) &&
 				fs.statSync(file, { throwIfNoEntry: false })?.isFile() &&
@@ -210,18 +232,18 @@ export function storeSources(
 		);
 	}
 
-	const reactDOMFiles = new Map<string, boolean>();
-	function reachesReactDOM(file: string): boolean {
-		const known = reactDOMFiles.get(file);
+	const resourceFiles = new Map<string, boolean>();
+	function reachesResourceHint(file: string): boolean {
+		const known = resourceFiles.get(file);
 		if (known !== undefined) return known;
 		const pending = [file];
 		const seen = new Set<string>();
 		while (pending.length) {
 			const current = pending.pop()!;
-			const cached = reactDOMFiles.get(current);
+			const cached = resourceFiles.get(current);
 			if (cached === false || seen.has(current)) continue;
 			if (cached === true) {
-				reactDOMFiles.set(file, true);
+				resourceFiles.set(file, true);
 				return true;
 			}
 			seen.add(current);
@@ -239,14 +261,14 @@ export function storeSources(
 				)
 					continue;
 				const specifier = statement.moduleSpecifier.text;
-				if (specifier === 'react-dom' || specifier.startsWith('react-dom/')) {
-					reactDOMFiles.set(file, true);
+				if (specifier === 'react-dom' && importsResourceHint(statement)) {
+					resourceFiles.set(file, true);
 					return true;
 				}
 				pending.push(...executableFiles(current, specifier));
 			}
 		}
-		for (const current of seen) reactDOMFiles.set(current, false);
+		for (const current of seen) resourceFiles.set(current, false);
 		return false;
 	}
 
@@ -274,7 +296,7 @@ export function storeSources(
 				if (
 					!input.data &&
 					shared(factory.module, factory.name, factory.from) &&
-					reachesReactDOM(factory.from)
+					reachesResourceHint(factory.from)
 				)
 					return { opaque: true };
 				return input.direct && !opaqueOnly ? factory : null;
