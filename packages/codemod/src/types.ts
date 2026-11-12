@@ -12,6 +12,8 @@ export interface TransformOptions {
 	/** Also preserve eligible property triggers at the original effect statement. */
 	snapshotEffectProperties?: boolean;
 	captureEffectSnapshots?: boolean;
+	/** Retry a render-time state update with an equivalent linked boolean. */
+	linkRenderState?: boolean;
 	/** `tsrx` (default) rewrites component bodies as templates; `tsx` keeps JSX and only ports the React APIs. */
 	target?: 'tsx' | 'tsrx';
 	/** Emit Strong-mode source: add `"use strong"` and leave omitted dependency lists to the compiler. */
@@ -63,6 +65,8 @@ export interface TransformOptions {
 	cssModuleFile?(specifier: string): string | undefined;
 	/** The generated native SVG helper, if the project verified this raw asset. */
 	pathSvgAdapter?(specifier: string): string | null;
+	/** With pathSvgAdapter, supplies a native SVG adapter with the requested fixed root color. */
+	fixedColorSvgAdapter?(specifier: string, color: string): string | null;
 	/** This file uses React's automatic JSX runtime and the component resolves to its original React package. */
 	reactStoreComponent?(specifier: string): boolean;
 }

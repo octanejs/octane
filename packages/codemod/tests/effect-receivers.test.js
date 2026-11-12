@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { act, createElement, useEffect, useImperativeHandle, useState } from 'react';
 import { createRoot as reactRoot } from 'react-dom/client';
-import { createRoot } from 'octane';
+import { Activity, createElement as octaneElement, createRoot } from 'octane';
 import { expect, it } from 'vitest';
 import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
 import { flushEffects } from '../../octane/tests/_helpers.js';
@@ -183,6 +183,68 @@ it.each([
 	} finally {
 		globalThis.IS_REACT_ACT_ENVIRONMENT = before;
 	}
+});
+
+it('preserves property reads and the current layout setup when Activity reconnects', () => {
+	const migrated = migrate(`import { useEffectEvent, useLayoutEffect } from 'react';
+export function Probe({ receiver, revision, record }) {
+	useLayoutEffect(() => {
+		const value = receiver.value;
+		record('setup', receiver.name, value, revision);
+		return () => record('cleanup', receiver.name, value, revision);
+	}, [receiver.value, receiver.value]);
+	return <p>{String(revision)}</p>;
+}`);
+	expect(migrated.strong).toBe(true);
+	const { Probe } = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
+	const reads = [];
+	const effects = [];
+	const receiver = (name, value) => ({
+		name,
+		get value() {
+			reads.push(name);
+			return value;
+		},
+	});
+	const a = receiver('a', 1);
+	const b = receiver('b', 1);
+	const c = receiver('c', 2);
+	const record = (...entry) => effects.push(entry);
+	const host = document.createElement('div');
+	const root = createRoot(host);
+	const render = (mode, receiver, revision) => {
+		root.render(
+			octaneElement(Activity, {
+				mode,
+				children: octaneElement(Probe, {
+					receiver,
+					revision,
+					record,
+				}),
+			}),
+		);
+		flushEffects();
+	};
+	try {
+		render('visible', a, 1);
+		render('visible', b, 2);
+		render('hidden', b, 3);
+		render('visible', b, 4);
+		expect(host.textContent).toBe('4');
+		render('visible', c, 5);
+	} finally {
+		root.unmount();
+		flushEffects();
+	}
+	expect(reads).toEqual(['a', 'a', 'a', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'c', 'c', 'c']);
+	expect(effects).toEqual([
+		['setup', 'a', 1, 1],
+		['cleanup', 'a', 1, 1],
+		['setup', 'b', 1, 4],
+		['cleanup', 'b', 1, 4],
+		['setup', 'c', 2, 5],
+		['cleanup', 'c', 2, 5],
+	]);
 });
 
 it.each([

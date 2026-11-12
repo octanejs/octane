@@ -1,5 +1,5 @@
 import { nativeOutputOwner, renderUses } from './forwarded-props.js';
-import { localUses, portableArguments, scalar } from './local-uses.js';
+import { componentTagOrExport, localUses, portableArguments, scalar } from './local-uses.js';
 import { skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
 
@@ -215,17 +215,7 @@ export function storeHookUses(
 		else if (ts.isVariableDeclaration(outer.parent) && ts.isIdentifier(outer.parent.name))
 			name = outer.parent.name;
 		else if (!ts.isExportAssignment(outer.parent)) return false;
-		return (
-			!name ||
-			renderUses(uses(name)).every((ref) => {
-				const p = ref.parent;
-				return ts.isJsxOpeningElement(p) ||
-					ts.isJsxClosingElement(p) ||
-					ts.isJsxSelfClosingElement(p)
-					? p.tagName === ref
-					: ts.isExportSpecifier(p) || ts.isExportAssignment(p);
-			})
-		);
+		return !name || renderUses(uses(name)).every(componentTagOrExport);
 	}
 	const portable = portableArguments(checker, typeOf);
 	function argument(expr: ts.Expression, check: ResultCheck, allowShared = false) {

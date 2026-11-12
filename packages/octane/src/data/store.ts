@@ -35,6 +35,7 @@ import {
 	type DataReply,
 	type Entity,
 	type DataRequest,
+	type Listener,
 	type Read,
 	type Transport,
 	type View,
@@ -141,7 +142,31 @@ export interface DataStoreOptions {
 	 * after a restart. Reads with `persist: false` are left out.
 	 */
 	readonly persist?: PersistOptions | undefined;
+	/** Where feeds connect; `listen(store, feed)` needs one. */
+	readonly listen?: Listener | undefined;
 }
+
+/**
+ * @internal What `listen` and `receive` in feeds.ts need of a store. Only they
+ * read it, so an app that uses no feed ships none of their code.
+ */
+export interface StoreInternals {
+	readonly listen: Listener | undefined;
+	/** Aborts when the store retires. */
+	readonly retired: AbortSignal;
+	readonly entries: ReadonlyMap<string, Entry>;
+	/** Whether a view holds the record `id`, or would show `value` or move its rows for it. */
+	viewed(entity: Entity<any>, id: string, value?: unknown): boolean;
+	/** Take a record into the views, newer than every load already started; `null` removes it. */
+	record(entity: Entity<any>, id: string, value: unknown, reload: Set<Entry>): void;
+	/** Give a read a new confirmed value; `edited` keeps its load's age and sequence, for a value changed in part. */
+	rebase(entry: Entry, value: unknown, edited: boolean, reload: Set<Entry>): void;
+	/** Reload `reload`, then notify the readers of `changed` and of every read showing a record of `names`. */
+	finish(reload: Set<Entry>, changed: readonly Entry[], names: ReadonlySet<string>): void;
+}
+
+/** @internal */
+export const internals = new WeakMap<DataStore, StoreInternals>();
 
 interface SeedEntry {
 	readonly name: string;
@@ -178,7 +203,8 @@ interface StoredRecord {
 	readonly seq: number;
 }
 
-interface Entry {
+/** @internal */
+export interface Entry {
 	readonly read: Read<any, any>;
 	readonly input: unknown;
 	readonly key: string;
@@ -306,8 +332,8 @@ export function entryKey(name: string, input: unknown): string {
 	return `${name}\n${inputKey(input)}`;
 }
 
-/** Copy-on-write replacement of the arrays and objects named in `replace`. */
-function rewrite(value: unknown, replace: Map<unknown, unknown>): unknown {
+/** @internal Copy-on-write replacement of the arrays and objects named in `replace`. */
+export function rewrite(value: unknown, replace: Map<unknown, unknown>): unknown {
 	if (replace.has(value)) return replace.get(value);
 	if (value === null || typeof value !== 'object') return value;
 	const array = Array.isArray(value);
@@ -322,7 +348,8 @@ function rewrite(value: unknown, replace: Map<unknown, unknown>): unknown {
 	return copy ?? value;
 }
 
-function selections(read: Read<any, any>, value: unknown) {
+/** @internal */
+export function selections(read: Read<any, any>, value: unknown) {
 	const selected = read.entities ? read.entities(value) : [];
 	return Array.isArray(selected) ? selected : [selected];
 }
@@ -349,6 +376,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	let operations: Operation[] = [];
 	let sequence = 0;
 	let retired = false;
+	const retiring = new AbortController();
 	let retirement: Promise<void> | null = null;
 	const persisted = options.persist
 		? createPersistence(options.persist, saving, (key) => !!entries.get(key)?.subscribers.size)
@@ -1487,6 +1515,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			retirement = persisted ? persisted.clear() : Promise.resolve();
 			// A caller that does not wait for the cleanup is not told it failed.
 			retirement.catch(() => {});
+			retiring.abort(new DataRetiredError());
 			// Writes waiting on a create must settle too, or they would never end.
 			for (const operation of operations) operation.gate?.reject(new DataRetiredError());
 			operations = [];
@@ -1507,5 +1536,42 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			return retirement;
 		},
 	};
+	internals.set(store, {
+		listen: options.listen,
+		retired: retiring.signal,
+		entries,
+		viewed: (entity, id, value) =>
+			!!records.get(entity.name)?.has(id) ||
+			(value !== undefined &&
+				[...viewEntries(entity.name)].some(
+					// A record above a lower window moves every row in it.
+					(entry) => inSpan(entry, value) || (entry.span!.start > 0 && above(entry, value)),
+				)),
+		record(entity, id, value, reload) {
+			if (value === null) deleteRecord(entity, id, reload);
+			else putRecord(entity, value, ++sequence, null, reload, true);
+		},
+		rebase(entry, value, edited, reload) {
+			if (edited) {
+				// The rest of the value is as old, and as stale, as before.
+				const { stale } = entry;
+				adopt(entry, value, entry.baseSeq, Date.now() - entry.fetchedAt, reload);
+				entry.stale = stale;
+			} else {
+				supersede(entry);
+				adopt(entry, value, ++sequence, 0, reload);
+				idle(entry);
+			}
+			save(entry);
+		},
+		finish(reload, changed, names) {
+			reloadAll(reload);
+			const all = new Set(changed);
+			for (const entry of entries.values()) {
+				for (const name of names) if (entry.names.has(name)) all.add(entry);
+			}
+			commit(all);
+		},
+	});
 	return store;
 }

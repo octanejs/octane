@@ -46,11 +46,13 @@ export function strengthen(
 		withEffectReceivers,
 		withEffectProperties,
 		withEffectSnapshots,
+		withLinkedState,
 	}: {
 		force?: boolean;
 		withEffectReceivers?: () => string;
 		withEffectProperties?: () => string;
 		withEffectSnapshots?: () => string;
+		withLinkedState?: () => string;
 	} = {},
 ): StrongResult {
 	const original = code;
@@ -83,7 +85,9 @@ export function strengthen(
 						b.code === 'OCTANE_STRONG_READ_ONLY_STATE',
 			  )
 			? [withEffectSnapshots]
-			: null;
+			: withLinkedState && blockers.every((b) => b.code === 'OCTANE_STRONG_RENDER_STATE_UPDATE')
+				? [withLinkedState]
+				: null;
 	if (retries) {
 		let previous = original;
 		for (const retry of retries) {

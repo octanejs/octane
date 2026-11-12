@@ -901,6 +901,64 @@ export default defineConfig({
 });
 ```
 
+### Live data with feeds
+
+A feed keeps loaded values current as the server changes them, such as
+another tab's or another user's edit. Declare one beside the reads it keeps
+current. `changes` says what each event did: `put` a record as the server now
+holds it, `remove` a record it deleted, set a `read`'s whole value, or
+`invalidates` tags for a change the event does not carry:
+
+```ts
+export const bookChanges = feed({
+	name: 'books.changes',
+	event: z.object({ book: bookShape, counts }),
+	changes: (event) => [
+		{ put: Book, value: event.book },
+		{ read: stats, value: event.counts },
+	],
+	// Reads to reload when the store may have missed events.
+	covers: ['book', 'shelf'],
+});
+```
+
+Serve it with a handler that yields frames for one connection: an event, its
+`id`, which lets the store drop a duplicate, and the `cursor` to resume from
+after it. When it cannot resume from `call.cursor`, it yields `{ gap: true }`
+first, and the store reloads what the feed covers. Stream it through a second
+`module server` function, and give the store a `serverListener` over it:
+
+```tsrx
+module server {
+	export function events(request: string, call: ServerCallContext) {
+		return handler.listen(request, call);
+	}
+}
+
+import { createDataStore, serverListener, serverTransport } from 'octane/data';
+import { data, events } from 'server';
+
+const store = createDataStore({
+	transport: serverTransport(data),
+	listen: serverListener(events),
+});
+```
+
+A component that calls `useFeed(bookChanges)` keeps the feed open while it is
+mounted, and returns its status: `connecting`, `live`, or `offline` while it
+waits to try again. Every component listening with equal parameters shares one
+connection, which closes when the last one unmounts. Outside a component,
+`listen(store, feed, params)` returns the same handle. A server render never
+connects.
+
+Each event applies to every read that holds its records, with no request. A
+read whose load was in flight reloads, because that load may predate the
+event. The store keeps nothing for a record none of its reads holds. A server call's stream lasts at most 30 seconds, so
+`handler.listen` ends each connection after 25, and the store connects again
+at once from its cursor. A source with no cursor cannot resume: when its
+connection comes back, the store reloads what the feed covers. A change made
+between a read's load and the feed's first connection is not replayed.
+
 ### Route seeds
 
 The `data` module is built on route seeds, which any other cache can use too.

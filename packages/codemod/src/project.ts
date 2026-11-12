@@ -231,6 +231,19 @@ export async function runCodemod(
 		).resolvedModule;
 		return target?.resolvedFileName === original?.resolvedFileName ? (target ?? null) : undefined;
 	}
+	function installedReact(file: string) {
+		const dir = path.dirname(file);
+		if (ts.findConfigFile(dir, ts.sys.fileExists) !== rootProject) return false;
+		const target = originalModule(file, 'react');
+		if (!target || !['react', '@types/react'].includes(target.packageId?.name ?? '')) return false;
+		// TypeScript can resolve @types/react even when the runtime is missing or linked locally.
+		const runtime = readInstalled(dir, 'react');
+		return (
+			runtime?.manifest.name === 'react' &&
+			fs.realpathSync(runtime.dir).split(path.sep).includes('node_modules') &&
+			fs.realpathSync(target.resolvedFileName).split(path.sep).includes('node_modules')
+		);
+	}
 	const inlineCompatDirs = new Map<string, boolean>();
 	function supportsInlineReactCompat(file: string) {
 		const issuer = path.dirname(file);
@@ -461,7 +474,7 @@ export async function runCodemod(
 	const svgHelper = path.join(helperDir, 'octane-path-svg.ts');
 	const svgAssets = new Map<string, boolean>();
 	let svgHelperCode: string | undefined;
-	function nativeSvgModule(asset: string, errors: Set<string>): string | null {
+	function nativeSvgModule(asset: string, errors: Set<string>, color?: string): string | null {
 		if (
 			!asset.startsWith(root + path.sep) ||
 			asset.split(path.sep).includes('node_modules') ||
@@ -482,15 +495,23 @@ export async function runCodemod(
 			fs.readFileSync(new URL('../templates/octane-path-svg.ts', import.meta.url), 'utf8') +
 			'\n' +
 			fs.readFileSync(new URL('../src/path-svg.ts', import.meta.url), 'utf8');
-		const sidecar = asset + '.octane.ts';
+		const sidecar = asset + (color ? '.octane-color-' + color.slice(2) : '.octane') + '.ts';
 		const code =
 			'import source from ' +
 			JSON.stringify('./' + path.basename(asset) + '?raw') +
 			';\n' +
 			'import { pathSvg } from ' +
 			JSON.stringify(relativeTsImport(sidecar, svgHelper)) +
-			';\n\nexport default pathSvg(source);\n';
-		const conflict = checkHelper(svgHelper, svgHelperCode) || checkHelper(sidecar, code);
+			';\n\nexport default pathSvg(source' +
+			(color ? ', ' + JSON.stringify('color:var(' + color + ')') : '') +
+			');\n';
+		let conflict: string | undefined;
+		try {
+			conflict = checkHelper(svgHelper, svgHelperCode, 'SVG') || checkHelper(sidecar, code, 'SVG');
+		} catch (error) {
+			if (!color || (error as NodeJS.ErrnoException).code !== 'ENAMETOOLONG') throw error;
+			conflict = 'The SVG adapter path is too long: ' + path.relative(root, sidecar);
+		}
 		if (conflict) {
 			errors.add(conflict);
 			return null;
@@ -501,7 +522,7 @@ export async function runCodemod(
 		svgHelpers.add(sidecar);
 		return sidecar;
 	}
-	function pathSvgAdapter(file: string, specifier: string, errors: Set<string>) {
+	function pathSvgAdapter(file: string, specifier: string, errors: Set<string>, color?: string) {
 		if (
 			(config?.jsxImportSource && config.jsxImportSource !== 'react') ||
 			config?.jsxFactory ||
@@ -510,11 +531,11 @@ export async function runCodemod(
 		)
 			return null;
 		const asset = svgAsset(root, path.dirname(file), specifier, config);
-		const sidecar = asset && nativeSvgModule(asset, errors);
+		const sidecar = asset && nativeSvgModule(asset, errors, color);
 		return sidecar ? relativeTsImport(file, sidecar) : null;
 	}
 	let storeTemplates: ReadonlyMap<string, string> | undefined;
-	function checkHelper(output: string, code: string) {
+	function checkHelper(output: string, code: string, kind = 'workspace hook') {
 		const cached = checkedHelpers.get(output);
 		if (cached)
 			return cached.code === code
@@ -536,11 +557,7 @@ export async function runCodemod(
 				: inspectAdapter(output, code, output === svgHelper ? PREVIOUS_SVG_SHA256 : undefined);
 		let error: string | undefined;
 		if (state.kind === 'conflict') {
-			error =
-				'The ' +
-				(output === svgHelper || output.endsWith('.svg.octane.ts') ? 'SVG' : 'workspace hook') +
-				' adapter path is occupied: ' +
-				name;
+			error = 'The ' + kind + ' adapter path is occupied: ' + name;
 		} else {
 			const rejected = output.endsWith('.tsrx')
 				? compile(compiler!, code, output, true).some((d) => d.severity === 'error')
@@ -551,7 +568,7 @@ export async function runCodemod(
 							compilerOptions: { target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext },
 						})
 						.diagnostics?.some((d) => d.category === ts.DiagnosticCategory.Error);
-			if (rejected) error = 'The target compiler rejected the workspace hook adapter: ' + name;
+			if (rejected) error = 'The target compiler rejected the ' + kind + ' adapter: ' + name;
 		}
 		checkedHelpers.set(output, { code, state, error });
 		return error;
@@ -669,15 +686,22 @@ export async function runCodemod(
 							.replace(/\.ts$/, '');
 						return { from: relative.startsWith('.') ? relative : './' + relative, name: plan.name };
 					};
+		const svgAdapter =
+			options.svgPaths && renames.has(file)
+				? (specifier: string, color?: string) => pathSvgAdapter(file, specifier, svgErrors, color)
+				: undefined;
 		const transform = (
-			captureEffectReceivers: boolean | 'properties' = false,
 			notes = extra,
-			captureEffectSnapshots = false,
+			retry?: 'effectReceivers' | 'effectProperties' | 'effectSnapshots' | 'linkedState',
 		) =>
 			transformModule(source, file, {
-				captureEffectReceivers: !!captureEffectReceivers,
-				snapshotEffectProperties: captureEffectReceivers === 'properties',
-				captureEffectSnapshots,
+				captureEffectReceivers:
+					retry === 'effectReceivers' ||
+					retry === 'effectProperties' ||
+					retry === 'effectSnapshots',
+				snapshotEffectProperties: retry === 'effectProperties',
+				captureEffectSnapshots: retry === 'effectSnapshots',
+				linkRenderState: retry === 'linkedState' && installedReact(file),
 				target,
 				reactIntlAdapter: intl,
 				forwardedText: (module, name, prop, ordinaryCaller, through) =>
@@ -740,10 +764,8 @@ export async function runCodemod(
 					const real = fs.realpathSync(sheet);
 					return real.endsWith('.module.css') ? real : undefined;
 				},
-				pathSvgAdapter:
-					options.svgPaths && renames.has(file)
-						? (specifier) => pathSvgAdapter(file, specifier, svgErrors)
-						: undefined,
+				pathSvgAdapter: svgAdapter,
+				fixedColorSvgAdapter: svgAdapter,
 				reactStoreComponent: (specifier) => {
 					if (!reactStoreComponents.has(specifier))
 						reactStoreComponents.set(specifier, reactStoreComponent(file, specifier));
@@ -752,7 +774,7 @@ export async function runCodemod(
 			});
 		if (intl && adapterError) {
 			// Public utilities such as defineMessages can stay on React Intl without a helper.
-			const needsAdapter = transform(false, []).rules['react-intl'];
+			const needsAdapter = transform([]).rules['react-intl'];
 			intl = undefined;
 			if (needsAdapter) {
 				const note: Note = {
@@ -817,9 +839,10 @@ export async function runCodemod(
 			if (strong && result.template) {
 				const strengthened = strengthen(compiler, code, output, {
 					force: options.forceStrong,
-					withEffectReceivers: () => transform(true, []).code,
-					withEffectProperties: () => transform('properties', []).code,
-					withEffectSnapshots: () => transform(true, [], true).code,
+					withEffectReceivers: () => transform([], 'effectReceivers').code,
+					withEffectProperties: () => transform([], 'effectProperties').code,
+					withEffectSnapshots: () => transform([], 'effectSnapshots').code,
+					withLinkedState: () => transform([], 'linkedState').code,
 				});
 				code = strengthened.code;
 				isStrong = strengthened.strong;
@@ -1027,8 +1050,10 @@ const PREVIOUS_INTL_SHA256 = ['07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102
 const PREVIOUS_SVG_SHA256 = [
 	'62ef936e3ce64cfe809297e08e74538f0c409f0bde6a926ca7b88de93161a38d',
 	'a3d611226ba955f4f5601caa4c6987f0a5a943fab97362843d16f02c686c6944',
+	'058f232bcee5d0caf24d72ec8f9864152b7eb6a9e882614bff3209ff0d145d00',
 	'3becf859871f17914f6f0631e8db8058aa4932fd4a9817718b98eb247a902b24',
 	'1dbf34eea75c07c21c8ab3814d54e58115e833aa140fc5f34b5f2cba91d018c3',
+	'b53641cfbe77205a174179b4d0de60989b34cf4073690fc98536c22a68ee844a',
 ];
 
 function inspectAdapter(file: string, source: string, previous?: readonly string[]): AdapterState {

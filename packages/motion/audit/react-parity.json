@@ -391,6 +391,17 @@
   ],
   "ordinaryEvidence": [
     {
+      "path": "packages/motion/tests/conformance/lazyMotion.test.ts",
+      "sha256": "bbc2776238e6c72e50d17095959a8523485f787d2a38be9f50f6bddd88d3dd19",
+      "cases": [
+        {
+          "id": "conformance:lazy-initial-false-first-frame",
+          "testName": "preserves the displayed keyframes when async features arrive",
+          "fullName": "LazyMotion and motion/react-m compatibility preserves the displayed keyframes when async features arrive"
+        }
+      ]
+    },
+    {
       "path": "packages/motion/tests/conformance/exit.test.ts",
       "sha256": "0b27f6d201fe78402600854568860e1e53863f22d8777e957a21c32ad9a12b17",
       "cases": [
@@ -436,6 +447,18 @@
     }
   ],
   "divergences": [
+    {
+      "id": "motion-lazy-initial-false-first-frame",
+      "caseIds": ["conformance:lazy-initial-false-first-frame"],
+      "upstreamResult": "Motion 12.42.2 replays an unchanged keyframe target when asynchronous LazyMotion features load after hydration, even with initial={false}.",
+      "octaneResult": "The host keeps the displayed final keyframe. A target changed while waiting animates when the bundle loads.",
+      "rationale": "The final keyframe is already visible before animation features load.",
+      "classification": "framework-integration",
+      "consumerImpact": "Loading the feature bundle alone does not cause a visible jump back to the first keyframe.",
+      "migrationGuidance": "Change the animate target to start a new animation after loading features.",
+      "owner": "@octanejs/motion",
+      "reviewCondition": "Recheck when Motion changes how a lazy visual element handles initial={false}."
+    },
     {
       "id": "motion-exit-cleanup-before-detach",
       "caseIds": ["conformance:exit-cleanup-before-detach"],
