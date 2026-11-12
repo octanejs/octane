@@ -100,6 +100,7 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 				const event = await parse(feed.event, frame.event);
 				if (signal.aborted) return;
 				const changes = feed.changes(event, params);
+				// The connection signal also aborts synchronously when the store retires.
 				if (signal.aborted) return;
 				receive(store, Array.isArray(changes) ? changes : [changes as never]);
 			} catch {
