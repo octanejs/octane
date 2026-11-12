@@ -1735,7 +1735,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 	}
 	predeclareHoistedVars(ast, moduleScope);
 
-	function report(code, node, message, suggestions = []) {
+	function report(code, node, message, suggestions = [], severity = 'error') {
 		if (insidePureCallback) {
 			const pure = statePolicy.pureDiagnostic(code);
 			if (pure !== null) {
@@ -1748,7 +1748,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		if (codes?.has(code)) return;
 		if (codes === undefined) reportedDiagnostics.set(node, (codes = new Set()));
 		codes.add(code);
-		diagnostics.push(diagnostic(code, filename, node, message, suggestions));
+		diagnostics.push({ ...diagnostic(code, filename, node, message, suggestions), severity });
 	}
 
 	function reportSetter(node, phase) {
@@ -2810,6 +2810,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		const guards = currentEffect === null ? undefined : effectPolicy.saveGuards();
 		for (const statement of statements ?? []) {
 			visit(statement, scope, executionPhase);
+			if (executionPhase !== 'render' && executionPhase !== 'effect') {
+				statePolicy.recordUpdate(statement, scope);
+			}
 			if (
 				statement.type === 'ReturnStatement' ||
 				statement.type === 'ThrowStatement' ||
@@ -5110,6 +5113,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 				recordJump(node);
 				return;
 			case 'Identifier':
+				if (readAccess) statePolicy.checkReadAfterUpdate(node, resolve(scope, node.name), scope);
 				if (readAccess && collectEffectReads && currentEffect !== null) {
 					const binding = resolve(scope, node.name);
 					if (binding?.kind === 'snapshot' && binding.state) {
@@ -5544,6 +5548,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						(fallthroughPhase == null || fallthroughPhase === 'deferred')
 							? 'deferred'
 							: phase;
+					// A case may be entered directly, so it never sees another case's updates.
+					switchScope.updatedStates = null;
 					const executionPhase = visitStatements(branch.consequent, switchScope, branchPhase);
 					const last = branch.consequent?.[branch.consequent.length - 1];
 					fallthroughPhase =

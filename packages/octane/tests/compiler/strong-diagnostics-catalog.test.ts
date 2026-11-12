@@ -27,11 +27,12 @@ function reportedCodes() {
 	return codes;
 }
 
-function errorCodes(source: string, filename: string) {
+/** Strong errors, plus the hints a recipe teaches. */
+function errorCodes(source: string, filename: string, hints: readonly string[] = []) {
 	const { diagnostics, error } = collectDiagnostics(`"use strong";\n${source}`, filename);
 	expect(error, String(error)).toBe(null);
 	return diagnostics
-		.filter((diagnostic) => diagnostic.severity === 'error')
+		.filter((diagnostic) => diagnostic.severity === 'error' || hints.includes(diagnostic.code))
 		.map((diagnostic) => diagnostic.code);
 }
 
@@ -60,10 +61,10 @@ describe('Strong diagnostic catalog', () => {
 	for (const recipe of STRONG_RECIPES) {
 		it(`recipe ${recipe.id}: the React idiom reports its codes and the replacement compiles`, () => {
 			const filename = `/src/${recipe.id}.tsrx`;
-			expect([...new Set(errorCodes(recipe.before, filename))].sort()).toEqual(
+			expect([...new Set(errorCodes(recipe.before, filename, recipe.codes))].sort()).toEqual(
 				[...recipe.codes].sort(),
 			);
-			expect(errorCodes(recipe.after, filename)).toEqual([]);
+			expect(errorCodes(recipe.after, filename, recipe.codes)).toEqual([]);
 		});
 	}
 });

@@ -32,6 +32,7 @@ export {
 } from './control-capture.js';
 import { HYDRATE_STREAM_TOKEN_ATTR, isRendererStreamBoundaryTemplate } from '../stream-protocol.js';
 import { HYDRATE_MARKER_SELECTOR, HYDRATE_WHEN_ATTR } from '../hydration-protocol.js';
+import { setHostTimeout } from '../host-task.js';
 
 // DOM constructors are realm-specific. Capture can be installed for an iframe
 // document, so use the platform nodeType contract instead of the ambient
@@ -378,7 +379,7 @@ function handleEarlyHydrationIntent(
 				HYDRATE_PENDING_INTENTS.set(candidate!, pending);
 			}
 		};
-		if (event.isTrusted) setTimeout(activate, 0);
+		if (event.isTrusted) setHostTimeout(activate, 0);
 		else queueMicrotask(activate);
 		return;
 	}
@@ -441,7 +442,7 @@ export function captureNativeHydrationIntent(
 			HYDRATE_PENDING_INTENTS.set(marker, pending);
 		}
 	};
-	if (event.isTrusted) setTimeout(activate, 0);
+	if (event.isTrusted) setHostTimeout(activate, 0);
 	else queueMicrotask(activate);
 }
 

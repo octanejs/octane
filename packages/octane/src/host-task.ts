@@ -57,6 +57,8 @@ export function postHostTask(callback: () => void): void {
  */
 export interface HostClock {
 	now(): number;
+	/** `Date.now()` on the clock: the date at install, moved as the clock moves. */
+	dateNow(): number;
 	/** A frame callback runs at the next frame boundary; otherwise at now + delay. */
 	schedule(callback: () => void, delay: number, frame: boolean): HostClockTimer;
 	/** Run one callback that is already due, without moving time. act() drains these. */
@@ -88,6 +90,11 @@ export function hostNow(): number {
 	return typeof performance === 'object' ? performance.now() : Date.now();
 }
 
+/** `Date.now()`, for timestamps that are stored or compared across launches. */
+export function hostDateNow(): number {
+	return HOST_CLOCK ? HOST_CLOCK.dateNow() : Date.now();
+}
+
 export function setHostTimeout(callback: () => void, delay: number): unknown {
 	if (HOST_CLOCK) return HOST_CLOCK.schedule(callback, delay, false);
 	return setTimeout(callback, delay);
@@ -100,13 +107,13 @@ export function clearHostTimeout(handle: unknown): void {
 
 /**
  * Whether a frame will come: a hidden page or a host without
- * `requestAnimationFrame` may never get one. An installed clock is a visible page.
+ * `requestAnimationFrame` may never get one. An installed clock draws frames
+ * whenever the page is not hidden.
  */
 export function hostFramesRun(): boolean {
-	if (HOST_CLOCK) return true;
 	const host = globalThis as HostFrames;
 	return (
-		typeof host.requestAnimationFrame === 'function' &&
+		(HOST_CLOCK !== null || typeof host.requestAnimationFrame === 'function') &&
 		(host.document === undefined || host.document.visibilityState !== 'hidden')
 	);
 }

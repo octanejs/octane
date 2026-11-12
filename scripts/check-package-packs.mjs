@@ -1830,6 +1830,26 @@ async function validatePackedJavascriptConsumer(tempRoot, archives) {
 			timeout: 30_000,
 		}),
 	);
+	// Exercise the compiler as installed so the platform parser resolves
+	// through its own package and the consumer gets the stock OXC facade.
+	execFileSync(
+		process.execPath,
+		[
+			'--input-type=module',
+			'-e',
+			`import assert from 'node:assert/strict';
+import { compile } from 'octane/compiler';
+const { code } = compile([
+	'import type { Model } from "./types-only.mjs";',
+	'export type Data = typeof import("./data.json", { with: { type: "json" } });',
+	'export const value: Model = 3;',
+].join('\\n'), 'model.ts', { mode: 'client', hmr: false });
+const compiled = await import('data:text/javascript,' + encodeURIComponent(code));
+assert.equal(compiled.value, 3);
+`,
+		],
+		{ cwd: consumerDirectory, stdio: ['ignore', 'pipe', 'pipe'], timeout: 30_000 },
+	);
 	const compilerPluginEntry = consumerRequire.resolve('octane/compiler/vite');
 	const { octane } = await import(pathToFileURL(compilerPluginEntry).href);
 	const { build: viteBuild } = await import(pathToFileURL(viteToolRequire.resolve('vite')).href);

@@ -43,7 +43,13 @@ import {
 	type Write,
 } from './contracts.js';
 import { createFormHandle, NO_FORM_SEED, type FormHandle, type FormSeed } from './form.js';
-import { createPersistence, type PersistOptions, type Stored } from './persist.js';
+import {
+	createPersistence,
+	type Persistence,
+	type PersistOptions,
+	type Stored,
+} from './persist.js';
+import { setHostTimeout, clearHostTimeout, hostDateNow } from '../host-task.js';
 
 export interface ReadSnapshot<T> {
 	readonly status: 'pending' | 'ready' | 'error';
@@ -154,6 +160,8 @@ export interface StoreInternals {
 	readonly listen: Listener | undefined;
 	/** Aborts when the store retires. */
 	readonly retired: AbortSignal;
+	/** Where feeds save their cursors, when the store persists. */
+	readonly persisted: Persistence | null;
 	readonly entries: ReadonlyMap<string, Entry>;
 	/** Whether a view holds the record `id`, or would show `value` or move its rows for it. */
 	viewed(entity: Entity<any>, id: string, value?: unknown): boolean;
@@ -224,8 +232,8 @@ export interface Entry {
 	attempt: number;
 	inflight: Promise<void> | null;
 	abort: AbortController | null;
-	keepTimer: ReturnType<typeof setTimeout> | undefined;
-	expireTimer: ReturnType<typeof setTimeout> | undefined;
+	keepTimer: unknown | undefined;
+	expireTimer: unknown | undefined;
 	snapshot: ReadSnapshot<any> | null;
 	/** A view entry's span; null for a read and for a view with no value. */
 	span: Span | null;
@@ -660,11 +668,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	}
 
 	function isStale(entry: Entry): boolean {
-		return entry.stale || Date.now() - entry.fetchedAt >= entry.read.fresh;
+		return entry.stale || hostDateNow() - entry.fetchedAt >= entry.read.fresh;
 	}
 
 	function buildSnapshot(entry: Entry): ReadSnapshot<any> {
-		const usable = entry.hasBase && Date.now() - entry.fetchedAt < entry.read.expire;
+		const usable = entry.hasBase && hostDateNow() - entry.fetchedAt < entry.read.expire;
 		return {
 			status: usable ? 'ready' : entry.error === undefined ? 'pending' : 'error',
 			value: usable ? (entry.span ? evaluate(entry) : project(entry)) : undefined,
@@ -741,7 +749,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 
 	/** Drop the confirmed value, so every later reader loads a new one. */
 	function forget(entry: Entry): void {
-		clearTimeout(entry.expireTimer);
+		clearHostTimeout(entry.expireTimer);
 		entry.base = undefined;
 		entry.hasBase = false;
 		entry.names = new Set();
@@ -754,7 +762,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	function idle(entry: Entry): void {
 		// A load in flight is demand: retention starts when it lands.
 		if (entry.subscribers.size > 0 || entry.inflight || entry.keepTimer !== undefined) return;
-		entry.keepTimer = setTimeout(() => {
+		entry.keepTimer = setHostTimeout(() => {
 			entry.keepTimer = undefined;
 			// A handle outlives its entry; an evicted one must not show what it once held.
 			const view = isView(entry.read) ? entry.read.view.of.name : undefined;
@@ -834,15 +842,15 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		entry.base = value;
 		entry.hasBase = true;
 		entry.names = new Set(selections(entry.read, value).map(({ entity }) => entity.name));
-		entry.fetchedAt = Date.now() - age;
+		entry.fetchedAt = hostDateNow() - age;
 		entry.baseSeq = startedSeq;
 		entry.stale = false;
 		entry.served = entry.subscribers.size > 0;
 		entry.error = undefined;
 		// A mounted reader must stop seeing the value at `expire`, not at its next change.
-		clearTimeout(entry.expireTimer);
+		clearHostTimeout(entry.expireTimer);
 		if (entry.read.expire < 2 ** 31) {
-			entry.expireTimer = setTimeout(() => {
+			entry.expireTimer = setHostTimeout(() => {
 				forget(entry);
 				if (entry.subscribers.size > 0) void load(entry);
 				touch(entry);
@@ -897,7 +905,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			.restore(entry.key, entry.read)
 			.then(async (stored) => {
 				if (!stored || !current()) return;
-				const age = Math.max(0, Date.now() - stored.savedAt);
+				const age = Math.max(0, hostDateNow() - stored.savedAt);
 				let value: unknown;
 				try {
 					if (age >= entry.read.expire) throw new Error('expired');
@@ -943,7 +951,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const startedSeq = ++sequence;
 		const abort = (entry.abort = new AbortController());
 		const { read } = entry;
-		clearTimeout(entry.keepTimer);
+		clearHostTimeout(entry.keepTimer);
 		entry.keepTimer = undefined;
 		const current = () => !retired && entry.attempt === attempt;
 		const done = request({ kind: 'read', name: read.name, input: wireInput(entry) }, abort.signal)
@@ -1033,7 +1041,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					if (retired) return () => {};
 					// A handle outlives its entry's retention; observing it again restores the entry.
 					if (!entries.has(key)) entries.set(key, created);
-					clearTimeout(created.keepTimer);
+					clearHostTimeout(created.keepTimer);
 					created.keepTimer = undefined;
 					// Age reloads a value only for the first observer of a value already served.
 					const aged = created.subscribers.size === 0 && created.served && isStale(created);
@@ -1498,7 +1506,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			return persisted ? persisted.forget(key) : Promise.resolve();
 		},
 		dehydrate() {
-			const now = Date.now();
+			const now = hostDateNow();
 			const seed: SeedEntry[] = [];
 			for (const entry of entries.values()) {
 				const age = now - entry.fetchedAt;
@@ -1527,8 +1535,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			forms.clear();
 			for (const entry of entries.values()) {
 				entry.abort?.abort();
-				clearTimeout(entry.keepTimer);
-				clearTimeout(entry.expireTimer);
+				clearHostTimeout(entry.keepTimer);
+				clearHostTimeout(entry.expireTimer);
 				entry.snapshot = null;
 				for (const notify of [...entry.subscribers]) notify();
 			}
@@ -1539,6 +1547,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	internals.set(store, {
 		listen: options.listen,
 		retired: retiring.signal,
+		persisted,
 		entries,
 		viewed: (entity, id, value) =>
 			!!records.get(entity.name)?.has(id) ||
@@ -1555,7 +1564,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			if (edited) {
 				// The rest of the value is as old, and as stale, as before.
 				const { stale } = entry;
-				adopt(entry, value, entry.baseSeq, Date.now() - entry.fetchedAt, reload);
+				adopt(entry, value, entry.baseSeq, hostDateNow() - entry.fetchedAt, reload);
 				entry.stale = stale;
 			} else {
 				supersede(entry);
