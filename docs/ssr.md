@@ -973,7 +973,10 @@ createDataStore({ transport: serverTransport(data), feeds: [bookChanges] });
 A store with `persist` saves each feed's cursor with its saved values, so the
 next session resumes where the last one stopped and replays what happened
 while the page was closed. A saved value that missed an event because it was
-not in memory is restored stale and reloads when it is shown.
+not in memory is restored stale and reloads when it is shown. If the server
+render and the cache have different positions for the same feed, the browser
+resumes from the page's position and refreshes the reads that feed covers.
+A covered read first opened later also refreshes when it is observed.
 
 #### Over a WebSocket or a broker
 

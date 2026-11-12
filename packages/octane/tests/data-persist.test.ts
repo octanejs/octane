@@ -1151,6 +1151,120 @@ describe('octane/data feeds across restarts', () => {
 	const durable = (storage: PersistentStorage) =>
 		cache(storage, 'ada', { journal: { writes: [setRead], receipt } });
 
+	it.each([
+		{ page: 'first', savedCursor: 'second', observedEarly: false, mismatch: true },
+		{ page: 'second', savedCursor: 'first', observedEarly: true, mismatch: true },
+		{ page: 'equal', savedCursor: 'equal', observedEarly: false, mismatch: false },
+	])(
+		'reconciles page cursor $page with saved cursor $savedCursor',
+		async ({ page, savedCursor, observedEarly, mismatch }) => {
+			const persist = cache(memoryStorage(), 'ada');
+			const rendering = createDataStore({
+				feeds: [bookChanges],
+				transport: async (request) => ({
+					ok: true,
+					value: request.kind === 'position' ? page : request.name === 'shelf' ? books() : 42,
+				}),
+			});
+			await Promise.all([
+				rendering.prefetch(shelf, undefined),
+				rendering.prefetch(count, undefined),
+			]);
+			const positions: Array<string | null> = [];
+			const source = (position: string): Listener =>
+				async function* (request, signal) {
+					positions.push(request.cursor);
+					yield { cursor: position };
+					if (!signal.aborted)
+						await new Promise<void>((resolve) =>
+							signal.addEventListener('abort', () => resolve(), { once: true }),
+						);
+				};
+			const previous = createDataStore({
+				transport: server(books()).transport,
+				persist,
+				listen: source(savedCursor),
+			});
+			const previousFeed = listen(previous, bookChanges);
+			const stop = previousFeed.subscribe(() => {});
+			await vi.waitFor(() => expect(previousFeed.getSnapshot().status).toBe('live'));
+			await saved();
+			stop();
+			const remote = server(books());
+			remote.books[0]!.title = 'Current';
+			const client = createDataStore({
+				transport: remote.transport,
+				persist,
+				seed: rendering.dehydrate(),
+				listen: source(page),
+			});
+			if (observedEarly) stops.push(client.read(shelf, undefined).subscribe(() => {}));
+			const connected = listen(client, bookChanges);
+			// A fresh subscriber joins while the first subscriber's cursor lookup is pending.
+			connected.subscribe(() => {})();
+			stops.push(connected.subscribe(() => {}));
+			await vi.waitFor(() => expect(connected.getSnapshot().status).toBe('live'));
+			expect(positions).toEqual([null, page]);
+
+			const list = client.read(shelf, undefined);
+			if (!observedEarly) stops.push(list.subscribe(() => {}));
+			await vi.waitFor(() =>
+				expect(list.getSnapshot().value?.[0]?.title).toBe(mismatch ? 'Current' : 'Kindred'),
+			);
+			const other = client.read(count, undefined);
+			stops.push(other.subscribe(() => {}));
+			expect(other.getSnapshot().value).toBe(42);
+			await saved();
+			expect(remote.log).toEqual(mismatch ? ['read shelf'] : []);
+		},
+	);
+
+	it.each(['entity update', 'read replacement'])(
+		'keeps a late server-seeded read current after a replayed %s',
+		async (change) => {
+			const remote = server(books());
+			const rendering = createDataStore({ transport: remote.transport });
+			await rendering.prefetch(shelf, undefined);
+			await rendering.prefetch(count, undefined);
+			const seed = rendering.dehydrate();
+			const renamed = { ...remote.books[0]!, title: 'Current' };
+			remote.books[0] = renamed;
+			remote.log.length = 0;
+			const stream = feed({
+				name: 'changes',
+				event: schema<Book>(isBook),
+				covers: ['book'],
+				changes: (book) =>
+					change === 'entity update'
+						? { put: Book, value: book }
+						: { read: shelf, input: undefined, value: [book] },
+			});
+			let applied = false;
+			const client = createDataStore({
+				transport: remote.transport,
+				seed,
+				listen: async function* (_, signal) {
+					yield { event: renamed, cursor: 'next' };
+					applied = true;
+					await new Promise<void>((resolve) =>
+						signal.addEventListener('abort', () => resolve(), { once: true }),
+					);
+				},
+			});
+			stops.push(listen(client, stream).subscribe(() => {}));
+			await vi.waitFor(() => expect(applied).toBe(true));
+
+			const shown = client.read(shelf, undefined);
+			stops.push(shown.subscribe(() => {}));
+			await vi.waitFor(() => expect(shown.getSnapshot().value?.[0]?.title).toBe('Current'));
+			const other = client.read(count, undefined);
+			stops.push(other.subscribe(() => {}));
+			expect(other.getSnapshot().value).toBe(3);
+			await saved();
+			expect(remote.log).toEqual(['read shelf']);
+		},
+	);
+
 	it('catches up after a restart on what it missed: a rename shows and a refused write rolls back, with nothing reloaded', async () => {
 		const storage = memoryStorage();
 		const feedLog = history();
