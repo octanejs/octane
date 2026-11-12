@@ -16,8 +16,7 @@ type Input =
 	| Opaque;
 
 const sourceExtensions = ['.ts', '.tsx', '.js', '.jsx', '.mts', '.mjs', '.cts', '.cjs'];
-const resourceHints = new Set([
-	'default',
+export const resourceHints = new Set([
 	'preconnect',
 	'prefetchDNS',
 	'preinit',
@@ -33,7 +32,10 @@ function importsResourceHint(statement: ts.ImportDeclaration | ts.ExportDeclarat
 	if ((imported && statement.importClause?.name) || !bindings) return true;
 	if (!ts.isNamedImports(bindings) && !ts.isNamedExports(bindings)) return true;
 	return bindings.elements.some(
-		(item) => !item.isTypeOnly && resourceHints.has((item.propertyName ?? item.name).text),
+		(item) =>
+			!item.isTypeOnly &&
+			((item.propertyName ?? item.name).text === 'default' ||
+				resourceHints.has((item.propertyName ?? item.name).text)),
 	);
 }
 
