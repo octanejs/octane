@@ -6,6 +6,7 @@ import ts from 'typescript';
 import { compile } from '../src/compiler/compile.js';
 import { lowerUniversalRendererRegionAst } from '../src/compiler/compile-universal.js';
 import { normalizeRendererConfig } from '../src/compiler/renderers.js';
+import * as NativeUniversalRuntime from '../src/universal-native.js';
 import * as UniversalRuntime from '../src/universal.js';
 import { act } from '../src/index.js';
 import {
@@ -4720,6 +4721,77 @@ describe('universal logical topology and transactions', () => {
 		expect(events.at(-1)).toBe(null);
 		expect(objectRef.current).toBe(null);
 		expect(container.children).toEqual([]);
+	});
+
+	it.each([
+		['universal', UniversalRuntime],
+		['universal/native', NativeUniversalRuntime],
+	] as const)('preserves imperative handle attachment and cleanup in %s', (_, runtime) => {
+		type Ref = { current: number | null } | ((value: number | null) => void) | null;
+		const container = runtime.createObjectContainer();
+		const root = runtime.createUniversalRoot(container, runtime.createObjectDriver());
+		const plan = runtime.universalPlan('object', { kind: 'host', type: 'node' });
+		const calls: Array<string | number | null> = [];
+		let created = 0;
+		const Component = runtime.defineUniversalComponent(
+			'object',
+			({ target, deps }: { target: Ref; deps?: readonly number[] | null }) => {
+				runtime.useImperativeHandle(
+					target,
+					() => {
+						expect(container.children).toHaveLength(1);
+						return ++created;
+					},
+					deps,
+					'imperative-handle',
+				);
+				return runtime.universalValue(plan);
+			},
+		);
+		const a = { current: null as number | null };
+		const b = { current: null as number | null };
+		const callback = (value: number | null) => {
+			calls.push(value);
+			return () => {
+				calls.push('returned cleanup');
+			};
+		};
+		const fallback = (value: number | null) => {
+			calls.push(value);
+		};
+		try {
+			root.render(Component, { target: null, deps: [0] });
+			expect(created).toBe(0);
+
+			root.render(Component, { target: a, deps: [0] });
+			expect(a.current).toBe(1);
+			root.render(Component, { target: a, deps: [0] });
+			expect(a.current).toBe(1);
+
+			root.render(Component, { target: b, deps: [0] });
+			expect([a.current, b.current]).toEqual([null, 2]);
+			const changedDeps = [1];
+			changedDeps[Symbol.iterator] = () => [0].values();
+			root.render(Component, { target: b, deps: changedDeps });
+			expect(b.current).toBe(3);
+
+			root.render(Component, { target: callback, deps: [1] });
+			expect(b.current).toBeNull();
+			root.render(Component, { target: fallback, deps: [1] });
+			expect(calls).toEqual([4, 'returned cleanup', 5]);
+
+			root.render(Component, { target: a });
+			expect(calls).toEqual([4, 'returned cleanup', 5, null]);
+			root.render(Component, { target: a });
+			expect(a.current).toBe(7);
+
+			root.render(Component, { target: a, deps: null });
+			root.render(Component, { target: a, deps: null });
+			expect(a.current).toBe(9);
+		} finally {
+			root.unmount();
+		}
+		expect(a.current).toBeNull();
 	});
 
 	it('orders insertion, ref, layout, and passive work around one host batch', async () => {
