@@ -9,13 +9,17 @@ import {
 	autoBudget,
 	createDataStore,
 	entity,
+	feed,
 	indexedDBStorage,
+	listen,
 	memoryStorage as createMemoryStorage,
 	read,
 	view,
 	write,
 	type DataReply,
 	type DataRequest,
+	type FeedFrame,
+	type Listener,
 	type PersistentStorage,
 	type ReadHandle,
 	type StandardSchema,
@@ -1109,4 +1113,135 @@ describe('octane/data live updates and cache lifecycle', () => {
 		await value(stranger, shelf);
 		expect(other.log).toEqual(['read shelf']);
 	});
+});
+
+describe('octane/data feeds across restarts', () => {
+	const bookChanges = feed({
+		name: 'books.changes',
+		event: schema<Book>(isBook),
+		changes: (book) => ({ put: Book, value: book }),
+		covers: ['book'],
+	});
+
+	/** A feed source with retained history: a connection resumes after its cursor. */
+	function history() {
+		const events: Book[] = [];
+		const cursors: Array<string | null> = [];
+		let wake = () => {};
+		const listener: Listener = (request, signal) => ({
+			async *[Symbol.asyncIterator](): AsyncGenerator<FeedFrame> {
+				cursors.push(request.cursor);
+				let seen = request.cursor === null ? events.length : Number(request.cursor);
+				yield { cursor: String(seen) };
+				while (!signal.aborted) {
+					while (seen < events.length) {
+						const event = events[seen++];
+						yield { event, id: String(seen), cursor: String(seen) };
+					}
+					await new Promise<void>((resolve) => {
+						wake = resolve;
+						signal.addEventListener('abort', () => resolve(), { once: true });
+					});
+				}
+			},
+		});
+		return { listener, cursors, publish: (book: Book) => (events.push(book), wake()) };
+	}
+
+	const durable = (storage: PersistentStorage) =>
+		cache(storage, 'ada', { journal: { writes: [setRead], receipt } });
+
+	it('catches up after a restart on what it missed: a rename shows and a refused write rolls back, with nothing reloaded', async () => {
+		const storage = memoryStorage();
+		const feedLog = history();
+		const first = server(books());
+		const before = createDataStore({
+			transport: first.transport,
+			persist: durable(storage),
+			listen: feedLog.listener,
+		});
+		await value(before, shelf);
+		const stop = listen(before, bookChanges).subscribe(() => {});
+		await vi.waitFor(() => expect(feedLog.cursors).toEqual([null]));
+		// A bookmark that never reached the server, so its outcome is unknown.
+		first.faults.lose = 'request';
+		await expect(before.write(setRead, { id: 'a', read: true })).rejects.toThrow(/unknown/);
+		await saved();
+		stop();
+
+		// While the page is closed, the book is renamed; the bookmark never arrived.
+		const renamed = { id: 'b', title: 'Piranesi, revised', read: false };
+		first.books[1] = renamed;
+		feedLog.publish(renamed);
+
+		const remote = server(first.books, first.applied);
+		const store = createDataStore({
+			transport: remote.transport,
+			persist: durable(storage),
+			listen: feedLog.listener,
+		});
+		const shown = await value<Book[]>(store, shelf);
+		stops.push(listen(store, bookChanges).subscribe(() => {}));
+		await vi.waitFor(() =>
+			expect(shown.handle.getSnapshot().value!.map((book) => book.title)).toContain(
+				'Piranesi, revised',
+			),
+		);
+		await vi.waitFor(() => expect(shown.handle.getSnapshot().value![0]!.read).toBe(false));
+		// It resumed after the cursor the first session saved, and loaded only the receipt.
+		expect(feedLog.cursors).toEqual([null, '0']);
+		expect(remote.log).toEqual(['read receipt']);
+		shown.stop();
+	});
+
+	it('restores stale a saved value that missed an event because it was not in memory', async () => {
+		const storage = memoryStorage();
+		const feedLog = history();
+		const first = server(books());
+		// An earlier session saved the shelf.
+		const earlier = createDataStore({ transport: first.transport, persist: cache(storage, 'ada') });
+		(await value(earlier, shelf)).stop();
+		await saved();
+
+		const before = createDataStore({
+			transport: first.transport,
+			persist: cache(storage, 'ada'),
+			listen: feedLog.listener,
+		});
+		const shownBefore = await value<Book[]>(before, unread, undefined);
+		stops.push(listen(before, bookChanges).subscribe(() => {}));
+		await vi.waitFor(() => expect(feedLog.cursors).toEqual([null]));
+		await saved();
+
+		// This session never loaded the shelf, so only the unread list takes the rename.
+		const renamed = { id: 'b', title: 'Piranesi, revised', read: false };
+		first.books[1] = renamed;
+		feedLog.publish(renamed);
+		await vi.waitFor(() =>
+			expect(shownBefore.handle.getSnapshot().value!.map((book) => book.title)).toContain(
+				'Piranesi, revised',
+			),
+		);
+		await saved();
+
+		const remote = server(first.books);
+		const store = createDataStore({ transport: remote.transport, persist: cache(storage, 'ada') });
+		const unreadAfter = await value<Book[]>(store, unread, undefined);
+		const shelfAfter = await value<Book[]>(store, shelf);
+		await vi.waitFor(() =>
+			expect(shelfAfter.handle.getSnapshot().value!.map((book) => book.title)).toContain(
+				'Piranesi, revised',
+			),
+		);
+		// The unread list was saved with the rename; the shelf, saved before it, reloaded.
+		expect(unreadAfter.value.map((book) => book.title)).toContain('Piranesi, revised');
+		expect(remote.log).toEqual(['read shelf']);
+		unreadAfter.stop();
+		shelfAfter.stop();
+	});
+});
+
+const stops: Array<() => void> = [];
+afterEach(() => {
+	for (const stop of stops.splice(0)) stop();
 });
