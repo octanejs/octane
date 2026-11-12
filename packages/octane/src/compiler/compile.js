@@ -17550,6 +17550,129 @@ function ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash, compon
 	);
 }
 
+function forPatternSnapshot(pattern) {
+	const names = [...collectPatternNames(pattern, new Set())];
+	return {
+		binding: inheritOriginLoc(
+			b.object_pattern(
+				names.map((name, index) => b.prop('init', b.literal(index + 1), b.id(name, pattern))),
+			),
+			pattern,
+		),
+		values: names.map((name) => b.id(name, pattern)),
+	};
+}
+
+// A fresh rest record or literal default can be compared by the field the row
+// displays only when neither the key nor any other expression sees its identity.
+function projectForPatternSnapshot(node, key, ctx, snapshot) {
+	const pattern = node.left.declarations[0].id;
+	const [root] = node.body.body;
+	if (
+		pattern.type !== 'ObjectPattern' ||
+		node.left.kind !== 'const' ||
+		key.type !== 'Identifier' ||
+		node.body.body.length !== 1 ||
+		!isPlainHostRoot(root) ||
+		(root.attributes ?? root.openingElement?.attributes ?? []).length !== 0 ||
+		root.children?.length !== 1 ||
+		root.children[0].type !== 'JSXExpressionContainer'
+	)
+		return snapshot;
+	// A renderable child can change its contents while retaining its identity.
+	const expression = root.children[0].expression;
+	if (!isKnownTextChildExpression(expression, ctx.knownStringChildLocals)) return snapshot;
+	const read = unwrapValueExpression(expression);
+	if (
+		read?.type !== 'MemberExpression' ||
+		read.optional ||
+		read.object.type !== 'Identifier' ||
+		read.object.name === key.name
+	)
+		return snapshot;
+
+	// A computed property or later default could observe the original binding.
+	const name = read.object.name;
+	const prop = pattern.properties.find((p) =>
+		p.type === 'RestElement'
+			? p.argument.name === name
+			: p.value?.type === 'AssignmentPattern' && p.value.left.name === name,
+	);
+	if (
+		!prop ||
+		prop.computed ||
+		pattern.properties.some(
+			(p) => p !== prop && (p.type !== 'Property' || p.computed || p.value.type !== 'Identifier'),
+		) ||
+		!pattern.properties.some((p) => p.type === 'Property' && p.value.name === key.name)
+	)
+		return snapshot;
+
+	const index = snapshot.values.findIndex((value) => value.name === name);
+	const fields = snapshot.binding.properties.slice();
+	if (prop.type === 'Property') {
+		const array = prop.value.right;
+		const position = read.property.value;
+		if (
+			array.type !== 'ArrayExpression' ||
+			!read.computed ||
+			!Number.isInteger(position) ||
+			position < 0 ||
+			position >= array.elements.length ||
+			!array.elements.every(
+				(e) =>
+					e?.type === 'Literal' &&
+					(e.value === null || ['boolean', 'number', 'string'].includes(typeof e.value)),
+			)
+		)
+			return snapshot;
+		// Compare the raw input. Only a missing value creates this literal, and
+		// its selected own index can be read just as well when the row runs.
+		fields[index] = { ...fields[index], value: prop.value };
+		return {
+			...snapshot,
+			binding: { ...snapshot.binding, properties: fields },
+			pattern: {
+				...pattern,
+				properties: pattern.properties.map((p) => (p === prop ? { ...p, value: p.value.left } : p)),
+			},
+		};
+	}
+	const field = staticMemberName(read);
+	if (field === null || field === '__proto__') return snapshot;
+	const record = snapshot.values[index];
+	const own = b.id(allocCompilerName(ctx, '__rowHasField'));
+	const value = b.id(allocCompilerName(ctx, '__rowField'));
+	const values = snapshot.values.slice();
+	fields[index] = { ...fields[index], value };
+	// Rest copies enumerable source properties into ordinary own data fields.
+	// A missing field may instead invoke an inherited getter with the complete
+	// record as its receiver. Keep that record and read it in the row as usual.
+	values[index] = b.conditional(own, b.member(record, b.literal(field), true), b.void0);
+	values.push(b.conditional(own, b.void0, record));
+	fields.push(
+		b.prop(
+			'init',
+			b.literal(values.length),
+			b.assignment_pattern(record, b.object([b.prop('init', b.literal(field), value)])),
+		),
+	);
+	return {
+		binding: { ...snapshot.binding, properties: fields },
+		values,
+		// Both operands are ordinary objects. A prototype that supplies the
+		// field stays on the receiver-preserving path, even if the record owns it.
+		setup: b.const(
+			own,
+			b.logical(
+				'&&',
+				b.binary('in', b.literal(field), record),
+				b.unary('!', b.binary('in', b.literal(field), b.object([]))),
+			),
+		),
+	};
+}
+
 function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	const bindingSite = node._octaneBindingSite;
 	const itemBody = forItemTemplateBody(node, ctx);
@@ -17571,6 +17694,26 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		false,
 		true,
 	);
+	// ssrArm exists solely to make use()/component identity distinct per item.
+	// Skip it when the item is compiler-proven synchronous and transparent:
+	// no render-time calls, nested components/control flow, or renderable child
+	// helper that could execute an opaque descriptor. Property reads and text /
+	// attribute serialization stay on the allocation-free path, matching the
+	// client forBlock's existing PURE-body proof.
+	const itemNeedsIdentity =
+		containsComponentCallOrControlFlow(itemBody) ||
+		containsRenderCall(itemBody) ||
+		ssrAstCallsAny(itemSub.fn, ['_$ssrChild', '_$ssrComponent']);
+	const explicitKey = forRowKeyAttribute(node, ctx) ?? node.key ?? null;
+	const snapshot =
+		itemId.type !== 'Identifier' && explicitKey !== null && (itemNeedsIdentity || bindingSite)
+			? forPatternSnapshot(itemId)
+			: null;
+	const row = snapshot === null ? b.id('__it') : b.id(allocCompilerName(ctx, '__rowBindings'));
+	const prepare = snapshot === null ? null : allocCompilerName(ctx, '__prepareRow');
+	if (snapshot !== null) {
+		itemSub.fn = { ...itemSub.fn, params: [snapshot.binding, ...itemSub.fn.params.slice(1)] };
+	}
 	inlinedSubs.push(itemSub.fn);
 	let emptyCall = ssrHtmlTemplate([], node, ctx);
 	let emptyFnName = null;
@@ -17612,8 +17755,9 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		node,
 	);
 	let keyDeclaration = null;
-	const explicitKey = forRowKeyAttribute(node, ctx) ?? node.key ?? null;
-	if (explicitKey !== null) {
+	if (snapshot !== null) {
+		itemKey = b.member(row, b.literal(0), true);
+	} else if (explicitKey !== null) {
 		const keyParams = [itemId];
 		if (node.index) keyParams.push(node.index);
 		// The synthesized key arrow maps to the authored key expression.
@@ -17621,32 +17765,18 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		const keyName = allocCompilerName(ctx, '__itemKey');
 		keyDeclaration = inheritOriginLoc(b.const(keyName, keyFn), explicitKey);
 		itemKey = inheritOriginLoc(
-			b.call(keyName, b.id('__it'), ...(node.index ? [b.id('__i')] : [])),
+			b.call(keyName, row, ...(node.index ? [b.id('__i')] : [])),
 			explicitKey,
 		);
 	} else if (node.index) {
 		itemKey = inheritOriginLoc(b.id('__i'), node.index);
 	}
 	const markerlessItem = isSsrMarkerlessForItem(node, itemBody);
-	// ssrArm exists solely to make use()/component identity distinct per item.
-	// Skip it when the item is compiler-proven synchronous and transparent:
-	// no render-time calls, nested components/control flow, or renderable child
-	// helper that could execute an opaque descriptor. Property reads and text /
-	// attribute serialization stay on the allocation-free path, matching the
-	// client forBlock's existing PURE-body proof.
-	const itemNeedsIdentity =
-		containsComponentCallOrControlFlow(itemBody) ||
-		containsRenderCall(itemBody) ||
-		ssrAstCallsAny(itemSub.fn, ['_$ssrChild', '_$ssrComponent']);
 	const signalSite =
 		mapCall === null && (ctx.signalBindingsUsed || ctx.nativeReads) && containsRenderCall(itemBody)
 			? ssrControlKey('for', node)
 			: null;
-	const itemCall = ssrSubCall(
-		itemSub.fnName,
-		node.index ? [b.id('__it'), b.id('__i')] : [b.id('__it')],
-		node,
-	);
+	const itemCall = ssrSubCall(itemSub.fnName, node.index ? [row, b.id('__i')] : [row], node);
 	const sharedItemRange = !bindingSite && markerlessItem;
 	const itemHtml =
 		sharedItemRange || bindingSite ? itemCall : ssrCall('ssrBlock', [itemCall], node);
@@ -17656,7 +17786,7 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 				[
 					bindingSite ? b.id('__bindingKeyValue') : itemKey,
 					b.id(itemSub.fnName),
-					b.id('__it'),
+					row,
 					node.index ? b.id('__i') : ssrVoid(node),
 					b.id('__s'),
 					b.literal(!sharedItemRange && !bindingSite),
@@ -17694,6 +17824,9 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	const index = b.id('__i');
 	const loopBody = b.block([
 		b.const('__it', b.member(items, index, true)),
+		...(prepare === null
+			? []
+			: [b.const(row, b.call(prepare, ...(node.index ? [index] : []), b.id('__it')))]),
 		...(bindingSite
 			? [
 					b.const('__bindingKeyValue', itemKey),
@@ -17718,6 +17851,27 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 					node,
 				)
 			: ssrCall('ssrForBlock', [content, b.literal(hasItems)], node);
+	let preparation = null;
+	if (snapshot !== null) {
+		const record = b.id(allocCompilerName(ctx, '__rowRecord'));
+		const item = b.id(allocCompilerName(ctx, '__rowInput'));
+		const params = node.index ? [node.index, item] : [item];
+		preparation = inheritOriginLoc(
+			b.const(
+				prepare,
+				b.arrow(
+					params,
+					b.block([
+						inheritOriginLoc(b.declaration(node.left.kind, [b.declarator(itemId, item)]), itemId),
+						b.const(record, b.array([b.void0, ...snapshot.values])),
+						b.stmt(b.assignment('=', b.member(record, b.literal(0), true), explicitKey)),
+						b.return(record),
+					]),
+				),
+			),
+			itemId,
+		);
+	}
 	const render = b.arrow(
 		[],
 		b.block([
@@ -17732,6 +17886,7 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 				b.return(forRange(emptyCall, false)),
 				null,
 			),
+			...(preparation === null ? [] : [preparation]),
 			...((itemNeedsIdentity || bindingSite) && keyDeclaration !== null ? [keyDeclaration] : []),
 			...(bindingSite ? [b.const('__bindingKeys', b.new(b.id('Set'), node))] : []),
 			b.let('__html', b.literal('')),
@@ -24902,6 +25057,11 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html', inDescriptor =
 			const rec = makeForCall(forNode, ctx, fc.compInlinedSubs, fc.parentNs, fc.cssHash);
 			// See the `@else` claim above — the same rewrite happens here.
 			registerClauseOrigin(ctx, forNode.emptyKeyword, [rec.emptyHelper]);
+			if (rec.preparedKey && rec.inlineKey !== null) {
+				const keyHole = `h${holeProps.length}`;
+				holeProps.push(objectProp(keyHole, rec.inlineKey));
+				rec.inlineKey = memberProps(keyHole, forNode);
+			}
 			const itemsHole = `h${holeProps.length}`;
 			const mapCall = forNode.nativeArrayMap;
 			const itemsValue = mapCall
@@ -24966,6 +25126,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html', inDescriptor =
 			if (rec.depNames.length) {
 				if (
 					mapCall &&
+					!rec.preparedKey &&
 					rec.hasPerItemEventClosure &&
 					rec.autoMemoDeps === null &&
 					rec.depNames.length > 1
@@ -30455,7 +30616,7 @@ function planJsx(
 		// deps doubles as the Phase 2 env tuple — emitted whenever the item/empty
 		// helpers captured anything, not only for the dep-pure promotion. A deps
 		// arg forces the flags placeholder too (positional alignment).
-		const hasDeps = fc.depNames.length > 0;
+		const hasDeps = fc.depNames.length > 0 || fc.preparedKey;
 		const depNode = depNodeFor(fc);
 		// Whole-list projection caches use SameValue just like their nested
 		// component/item guards. A certified keyed-selection dependency is the one
@@ -30492,8 +30653,27 @@ function planJsx(
 				),
 			);
 		}
-		const keyNode = fc.inlineKey || helperRefNode(fc.keyHelper);
-		const depsNode = fc.packedDepsExpr || b.array(fc.depNames.map(depNode));
+		let keyNode = fc.inlineKey || helperRefNode(fc.keyHelper);
+		let depsNode = fc.packedDepsExpr || b.array(fc.depNames.map(depNode));
+		let rowSetup = null;
+		if (fc.preparedKey) {
+			const table = b.id(allocCompilerName(ctx, '__rowBindings'));
+			const env = b.id(allocCompilerName(ctx, '__rowEnv'));
+			const item = b.id(allocCompilerName(ctx, '__row'));
+			const index = b.id(allocCompilerName(ctx, '__rowIndex'));
+			// Carry the snapshot with the row's committed environment, outside
+			// its indexed dependency witnesses so equality still sees those inputs.
+			rowSetup = [
+				b.const(table, b.object([b.prop('init', b.id('__proto__'), b.literal(null))])),
+				b.const(env, depsNode),
+				b.stmt(b.assignment('=', b.member(env, '__rowBindings'), table)),
+			];
+			keyNode = b.arrow([item, index], b.call(keyNode, item, index, table));
+			depsNode = env;
+		}
+		const withRowSetup = (statement) =>
+			rowSetup === null ? statement : b.block([...rowSetup, statement]);
+		const pushFor = (statement) => pushAfterStmt(fc.id, org, withRowSetup(statement));
 		const tailArgs = [keyNode, helperRefNode(fc.bodyHelper)];
 		if (flags || fc.singleRootExpr || hasDeps || hasEmpty || hasAnchor) tailArgs.push(flagsExpr);
 		if (hasDeps) tailArgs.push(depsNode);
@@ -30550,7 +30730,7 @@ function planJsx(
 					ctx,
 					['_v', ...fc.autoMemoDeps],
 					slotIndex,
-					mappedCall,
+					withRowSetup(mappedCall),
 					customMiss,
 					fc.autoMemoContextAware,
 					depNode,
@@ -30562,9 +30742,7 @@ function planJsx(
 				);
 				pushAfterStmt(fc.id, org, b.block([...prefix, guarded]));
 			} else {
-				pushAfterStmt(
-					fc.id,
-					org,
+				pushFor(
 					b.stmt(
 						b.call(
 							rtAlias(forHelper),
@@ -30591,14 +30769,16 @@ function planJsx(
 				ctx,
 				['_v', ...fc.autoMemoDeps],
 				slotIndex,
-				b.stmt(
-					b.call(
-						rtAlias(forHelper),
-						b.id('__s'),
-						b.literal(slotIndex),
-						hostExpr(),
-						b.id('_v'),
-						...tailArgs,
+				withRowSetup(
+					b.stmt(
+						b.call(
+							rtAlias(forHelper),
+							b.id('__s'),
+							b.literal(slotIndex),
+							hostExpr(),
+							b.id('_v'),
+							...tailArgs,
+						),
 					),
 				),
 				null,
@@ -30612,9 +30792,7 @@ function planJsx(
 			);
 			pushAfterStmt(fc.id, org, b.block([b.const('_v', fc.itemsExpr), guarded]));
 		} else {
-			pushAfterStmt(
-				fc.id,
-				org,
+			pushFor(
 				b.stmt(
 					b.call(
 						rtAlias(forHelper),
@@ -37893,11 +38071,16 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		: null;
 	const leftDeclId = node.left.declarations[0].id;
 	const isDestructured = leftDeclId.type !== 'Identifier';
-	// `itemName` is the identifier used in the body signature + keyFn. For a
-	// plain `const x of …`, that's `x`. For a destructured `const {id} of …`,
-	// we synthesize a fresh name and emit the destructuring inside the body so
-	// the keyFn still gets the whole item and the body still sees the fields.
-	const itemName = isDestructured ? '_item' : leftDeclId.name;
+	const explicitKey = forRowKeyAttribute(node, ctx) ?? node.key ?? null;
+	const snapshot =
+		isDestructured && explicitKey !== null
+			? projectForPatternSnapshot(node, explicitKey, ctx, forPatternSnapshot(leftDeclId))
+			: null;
+	const itemName = isDestructured
+		? snapshot === null
+			? '_item'
+			: allocCompilerName(ctx, '__rowInput')
+		: leftDeclId.name;
 	const subStmts = forItemTemplateBody(node, ctx);
 
 	// Key resolution priority (matches @tsrx/core's build_hoisted_for_of_with_hooks):
@@ -37905,24 +38088,39 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	//   2. `for (const x of y; key x.id) { ... }` — TSRX for-of header.
 	//   3. `for (const x, i of y) { ... }` — second loop param treated as the key.
 	//   4. Fallback: `x.id ?? x` (object identity).
-	// Builds `(item, index) => keyExpr` when the for-of declares an index.
-	// For a destructured head, the item param uses the same pattern so both its
-	// fields and the declared index remain in scope for the authored key.
-	function mkKeyFn(keyExpr) {
-		// The synthesized arrow and its params map to the authored expression and
-		// bindings without mutating their parsed AST nodes.
-		const param = isDestructured ? leftDeclId : b.id(itemName, leftDeclId);
-		const params = [param];
+	// Keyed destructuring creates one snapshot per input index. The reconciler
+	// may probe the same row again after a prefix or suffix mismatch, and the
+	// item helper must see exactly the values used to pick its identity.
+	let keyFn = null;
+	if (snapshot !== null) {
+		const item = b.id(itemName, leftDeclId);
+		const index = node.index ?? b.id(allocCompilerName(ctx, '__rowIndex'));
+		const table = b.id(allocCompilerName(ctx, '__rowTable'));
+		const cached = b.id(allocCompilerName(ctx, '__rowCached'));
+		const entry = b.member(table, index, true);
+		keyFn = inheritOriginLoc(
+			b.arrow(
+				[item, index, table],
+				b.block([
+					b.let(cached, entry),
+					b.if(cached, b.return(b.member(cached, b.literal(0), true)), null),
+					inheritOriginLoc(
+						b.declaration(node.left.kind, [b.declarator(snapshot.pattern ?? leftDeclId, item)]),
+						leftDeclId,
+					),
+					...(snapshot.setup ? [snapshot.setup] : []),
+					b.stmt(b.assignment('=', cached, b.array([b.void0, ...snapshot.values]))),
+					b.stmt(b.assignment('=', b.member(cached, b.literal(0), true), explicitKey)),
+					b.stmt(b.assignment('=', entry, cached)),
+					b.return(b.member(cached, b.literal(0), true)),
+				]),
+			),
+			explicitKey,
+		);
+	} else if (explicitKey !== null) {
+		const params = [b.id(itemName, leftDeclId)];
 		if (node.index) params.push(b.id(node.index.name, node.index));
-		return inheritOriginLoc(b.arrow(params, keyExpr), keyExpr);
-	}
-
-	// New TSRX surfaces `key` on the JSXForExpression itself (read via `node.key`
-	// below). The legacy `<li key={…}>` attribute spelling takes precedence.
-	const attributeKey = forRowKeyAttribute(node, ctx);
-	let keyFn = attributeKey === null ? null : mkKeyFn(attributeKey);
-	if (!keyFn && node.key) {
-		keyFn = mkKeyFn(node.key);
+		keyFn = inheritOriginLoc(b.arrow(params, explicitKey), explicitKey);
 	}
 	if (!keyFn && node.index) {
 		// Index identifier — caller iterates with index, key by index.
@@ -37959,6 +38157,9 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	);
 	const inlineKey =
 		keyCapturesParent ||
+		(snapshot !== null &&
+			(mapCallbackPatternCapturesLexicalReceiver(leftDeclId) ||
+				mapCallbackCapturesLexicalReceiver(explicitKey))) ||
 		(node.nativeArrayMap !== undefined &&
 			mapCallbackHasEventClosure(node.nativeArrayMap.callback) &&
 			!isDestructured &&
@@ -38429,11 +38630,31 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// The existing direct-host-row proof also scopes inline binding guards to
 	// this repeatedly invoked body. Do not inherit that emission policy into
 	// other helpers, or widen it based on a list's observed size or key shape.
+	const renderStmts =
+		snapshot === null
+			? itemAllStmts
+			: [
+					...indexInjection,
+					inheritOriginLoc(
+						b.declaration(node.left.kind, [
+							b.declarator(
+								snapshot.binding,
+								b.member(
+									b.member(b.id('__extra'), '__rowBindings'),
+									b.member(b.id('__block'), 'itemIndex'),
+									true,
+								),
+							),
+						]),
+						leftDeclId,
+					),
+					...subStmts,
+				];
 	const itemHelperName = hoistBodyHelper(
 		ctx,
 		inlinedSubs,
 		'__item',
-		itemAllStmts,
+		renderStmts,
 		itemParams,
 		parentNs,
 		cssHash,
@@ -38478,6 +38699,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		mapCallbackExpr: mapCall ? rewriteMapCallbackJsxValues(mapCall.callback, ctx) : null,
 		keyHelper,
 		inlineKey: inlineKey ? keyFn : null,
+		preparedKey: snapshot !== null,
 		bodyHelper: itemHelperName,
 		signalSite,
 		selectionHelper: signalSite === null ? (keyedSelection?.helper ?? null) : null,
@@ -38508,7 +38730,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// observe an item's position, so a pure reorder (same item ref, position
 		// changed) need not re-render the survivor. Conservative: an index binding
 		// (or any uncertainty) leaves this false and keeps the re-render.
-		indexIndependent: !node.index,
+		indexIndependent: !node.index && snapshot === null,
 		// `@empty` branch helper name (or literal 'null' when none).
 		emptyHelper: emptyHelperName,
 		// The authored `@empty` keyword. The clause is a plain BlockStatement
