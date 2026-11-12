@@ -11,7 +11,7 @@ import { reactRenderer, staticReactProps } from './react-renderer.js';
 import { localUses, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
-import { effectReceivers, fixedBinding } from './effect-receivers.js';
+import { effectReceivers, fixedBinding, initializedBefore } from './effect-receivers.js';
 import { isBareSvgTag, storeHookUses } from './store-hook-uses.js';
 import { intlImports } from './react-intl.js';
 import {
@@ -4323,7 +4323,42 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return this.directive(node);
 	}
 
+	/** The same unkeyed input keeps its live value when only its default changes. */
+	private conditionalInputDefault(node: ts.ConditionalExpression) {
+		const test = skipParens(node.condition);
+		if (!ts.isIdentifier(test)) return null;
+		const [yes, no] = [node.whenTrue, node.whenFalse].map((arm) => {
+			const element = skipParens(arm);
+			if (
+				!ts.isJsxSelfClosingElement(element) ||
+				!ts.isIdentifier(element.tagName) ||
+				element.tagName.text !== 'input' ||
+				element.typeArguments ||
+				element.attributes.properties.length !== 1
+			)
+				return null;
+			const [attribute] = element.attributes.properties;
+			if (!ts.isJsxAttribute(attribute) || attribute.name.getText(this.sf) !== 'defaultValue')
+				return null;
+			const value = attribute.initializer;
+			return value && ts.isStringLiteral(value) && !/[&\r\n]/.test(value.text) ? value.text : null;
+		});
+		if (
+			yes === null ||
+			no === null ||
+			!fixedBinding(this.checker, test, node) ||
+			!initializedBefore(this.checker, test, node) ||
+			this.lostComments(node.getStart(this.sf), node.end, '').length
+		)
+			return null;
+		this.count(RULE.if);
+		const condition = this.emit(test, PLAIN);
+		return `<input defaultValue={${condition} ? ${JSON.stringify(yes)} : ${JSON.stringify(no)}} />`;
+	}
+
 	ifDirective(node: ts.ConditionalExpression) {
+		const shared = this.conditionalInputDefault(node);
+		if (shared !== null) return shared;
 		let whenTrue = this.arm(node.whenTrue);
 		let whenFalse = this.arm(node.whenFalse);
 		// A ternary between two values is a value; one with an element on
