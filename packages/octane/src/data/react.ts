@@ -7,7 +7,8 @@
  */
 import { createContext, createElement, use, useCallback, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
-import type { Read, View, Write } from './contracts.js';
+import type { Feed, Read, View, Write } from './contracts.js';
+import { listen, type FeedSnapshot } from './feeds.js';
 import { formViews, type FormView } from './form.js';
 import { pages, type PagesSnapshot } from './pages.js';
 import type { DataStore, ReadSnapshot } from './store.js';
@@ -61,6 +62,19 @@ export function usePages<P, T>(view: View<P, T>, params: P): PagesSnapshot<T>;
 export function usePages<P, T>(view: View<P, T>, params?: P): PagesSnapshot<T> {
 	// Equal arguments resolve to one handle, so its methods are stable across renders.
 	const handle = pages(useDataStore(), view, params as P);
+	return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot);
+}
+
+/**
+ * Listen to a feed while the component is mounted, so its events keep the
+ * store's reads current. Components listening to equal arguments share one
+ * connection. Returns the connection's status.
+ */
+export function useFeed<E>(feed: Feed<void, E>): FeedSnapshot;
+export function useFeed<P, E>(feed: Feed<P, E>, params: P): FeedSnapshot;
+export function useFeed<P, E>(feed: Feed<P, E>, params?: P): FeedSnapshot {
+	// Equal arguments resolve to one handle, so its methods are stable across renders.
+	const handle = listen(useDataStore(), feed, params as P);
 	return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot);
 }
 

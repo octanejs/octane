@@ -38,7 +38,9 @@ function storeRequest(request: Request): string | null {
 	if (!isData(new URL(request.url()))) return null;
 	const strings = (value: unknown): string[] =>
 		typeof value === 'string' ? [value] : Array.isArray(value) ? value.flatMap(strings) : [];
-	return strings(JSON.parse(request.postData() ?? '[]')).join('\n');
+	const body = strings(JSON.parse(request.postData() ?? '[]')).join('\n');
+	// A connection to the shelf's feed, through `events`, loads nothing.
+	return body.includes('books.changes') ? null : body;
 }
 
 /** Open a page on server data no other test shares. */
@@ -52,7 +54,7 @@ async function open(page: Page, path: string): Promise<void> {
 async function holdWrites(page: Page) {
 	const held: Route[] = [];
 	await page.route(isData, (route) => {
-		if (storeRequest(route.request())!.includes('"write"')) held.push(route);
+		if ((storeRequest(route.request()) ?? '').includes('"write"')) held.push(route);
 		else void route.continue();
 	});
 	return {
@@ -165,6 +167,37 @@ for (const { name, path, serverRendered } of PAGES) {
 				await expect(network(page).getByText('write books.add')).toHaveCount(1);
 			});
 		}
+
+		test("shows another tab's edits as they happen, without loading them", async ({ page }) => {
+			const url = `${path}?ns=${Date.now()}-${++namespace}`;
+			await page.goto(url);
+			await expect(page.getByText('Live', { exact: true })).toBeVisible();
+			const other = await page.context().newPage();
+			await other.goto(url);
+			await expect(other.getByText('3 books · 0 read')).toBeVisible();
+			await expect(other.getByText('Live', { exact: true })).toBeVisible();
+
+			const loads: string[] = [];
+			page.on('request', (request) => {
+				const sent = storeRequest(request);
+				if (sent !== null) loads.push(sent);
+			});
+			await book(other, 'Kindred').getByRole('checkbox').click();
+			await expect(book(page, 'Kindred').getByRole('checkbox')).toBeChecked();
+			await expect(finishedList(page).getByRole('listitem')).toHaveText(['Kindred']);
+			await expect(page.getByText('3 books · 1 read')).toBeVisible();
+
+			await other.getByRole('textbox', { name: 'Book title' }).fill('Station Eleven');
+			await other.getByRole('button', { name: 'Add' }).click();
+			await expect(book(page, 'Station Eleven')).toBeVisible();
+			await book(other, 'Station Eleven')
+				.getByRole('button', { name: /Remove/ })
+				.click();
+			await expect(book(page, 'Station Eleven')).toHaveCount(0);
+			await expect(page.getByText('3 books · 1 read')).toBeVisible();
+			expect(loads).toEqual([]);
+			await other.close();
+		});
 
 		test('shows an edit before the reply and settles it in one round trip', async ({ page }) => {
 			await open(page, path);
@@ -330,7 +363,7 @@ test('settles a write left unsettled by a reload from its receipt, without sendi
 	const held: Route[] = [];
 	const writes: string[] = [];
 	await page.route(isData, (route) => {
-		const body = storeRequest(route.request())!;
+		const body = storeRequest(route.request()) ?? '';
 		if (body.includes('"write"')) writes.push(body);
 		if (body.includes('books.receipt')) held.push(route);
 		else void route.continue();
