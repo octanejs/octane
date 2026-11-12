@@ -2958,12 +2958,13 @@ class ModuleTransform {
 			const kept: ts.ImportSpecifier[] = [];
 			const originals: string[] = [];
 			let store = false;
+			let intl = false;
 			for (const item of bindings.elements) {
 				const alias = this.originalStoreTags.get(item);
 				if (alias)
 					originals.push(`${(item.propertyName ?? item.name).getText(this.sf)} as ${alias}`);
 				const hook = this.nativeStoreHooks.get(item);
-				const dest =
+				let dest =
 					hook?.from ?? (this.nativeIntl.has(item) ? this.options.reactIntlAdapter : undefined);
 				if (!dest) {
 					const name = (item.propertyName ?? item.name).text;
@@ -2974,25 +2975,46 @@ class ModuleTransform {
 						!item.isTypeOnly &&
 						/^use[A-Z0-9]/.test(name)
 					) {
-						const call = this.localUses(item.name).find((ref) =>
-							nativeSetupHook(ref, this.localUses, {
-								calleeName: (callee) => this.calleeName(callee),
-								nativeOutput: (element) => this.nativeOutput(element, this.localUses),
-							}),
+						const refs = renderUses(this.localUses(item.name));
+						const sites = refs.map((ref) => nativeSetupHook(ref, this.localUses, this.checker));
+						// Relative imports use the compiler's custom slot-keyed hook naming rule.
+						const slotKeyed = [name, item.name.text].every(
+							(spelling) => /^use[A-Z]/.test(spelling) && spelling !== 'useContext',
 						);
-						const hook = call && this.options.localReactHook(module, name);
-						if (hook)
+						const nativeOnly =
+							sites.length > 0 &&
+							sites.every(Boolean) &&
+							(!sites.includes('afterRefs') || this.options.originalReact === true);
+						const call =
+							refs[sites.indexOf('first')] ??
+							(nativeOnly
+								? refs[0]
+								: refs.find((ref) =>
+										nativeSetupHook(ref, this.localUses, this.checker, {
+											calleeName: (callee) => this.calleeName(callee),
+											nativeOutput: (element) => this.nativeOutput(element, this.localUses),
+										}),
+									));
+						const local =
+							call && this.options.localReactHook(module, name, slotKeyed && nativeOnly);
+						if (local && typeof local !== 'string') {
+							dest = local.from;
+							this.count('native-external-store');
+						} else if (local && call)
 							this.note(
 								RULE.bindings,
 								'error',
 								call,
-								`The unchanged ${module} export ${name} calls React's ${hook}. Provide a compiled Octane hook for native callers or keep this component under a React renderer.`,
+								`The unchanged ${module} export ${name} calls React's ${local}. Provide a compiled Octane hook for native callers or keep this component under a React renderer.`,
 							);
 					}
-					kept.push(item);
-					continue;
+					if (!dest) {
+						kept.push(item);
+						continue;
+					}
 				}
 				store ||= !!hook;
+				intl ||= this.nativeIntl.has(item);
 				const names = moved.get(dest) ?? [];
 				names.push(
 					hook && hook.name !== (item.propertyName ?? item.name).text
@@ -3019,7 +3041,8 @@ class ModuleTransform {
 					lines.push(`import ${specifier};`);
 				for (const [dest, names] of moved)
 					lines.push(`import { ${names.join(', ')} } from ${this.quote}${dest}${this.quote};`);
-				this.count(store ? 'store-hook' : 'react-intl');
+				if (store) this.count('store-hook');
+				else if (intl) this.count('react-intl');
 				return lines.join('\n');
 			}
 		}

@@ -22,7 +22,7 @@ import { finding, loadCompiler, thrown } from './compiler.js';
 import { PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
 import { bind, projectTypeAt, textKind, transformModule } from './transform.js';
-import { directReactHooks } from './local-react-hook.js';
+import { directReactHooks, nativeExternalStore } from './local-react-hook.js';
 import { forwardedProps } from './forwarded-props.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
@@ -423,7 +423,7 @@ export async function runCodemod(
 	});
 	const localHooks = new Map<string, Map<string, string>>();
 	let selectedInPlace: Set<string> | undefined;
-	function localReactHook(from: string, module: string, name: string) {
+	function localReactHook(from: string, module: string, name: string, nativeOnly: boolean) {
 		if (
 			catalogName(module) !== null ||
 			resolveRename(from, module) ||
@@ -466,7 +466,47 @@ export async function runCodemod(
 		selectedInPlace ??= new Set(
 			[...known].filter((f) => !renames.has(f) && !conflicts.has(f)).map((f) => fs.realpathSync(f)),
 		);
-		if (!selectedInPlace.has(fs.realpathSync(file))) return hook;
+		if (selectedInPlace.has(fs.realpathSync(file))) return;
+		if (
+			nativeOnly &&
+			compiler &&
+			hook === 'useSyncExternalStore' &&
+			originalModule(file, 'octane')
+		) {
+			try {
+				const issuer = createRequire(from);
+				const owner = createRequire(file);
+				if (
+					issuer.resolve('octane/compiler') !== compiler.from ||
+					issuer.resolve('octane') !== owner.resolve('octane') ||
+					!originalModule(from, 'octane')
+				)
+					return hook;
+			} catch {
+				return hook;
+			}
+			const code = nativeExternalStore(file, fs.readFileSync(file, 'utf8'), name, (specifier) => {
+				const leaf = localFile(file, specifier);
+				if (
+					!leaf ||
+					known.has(leaf) ||
+					selectedInPlace!.has(fs.realpathSync(leaf)) ||
+					ts.findConfigFile(path.dirname(leaf), ts.sys.fileExists) !== rootProject
+				)
+					return;
+				return bind(leaf, fs.readFileSync(leaf, 'utf8'));
+			});
+			const output = file.slice(0, -3) + '.octane.ts';
+			if (
+				code &&
+				!compile(compiler, code, output, true).some((finding) => finding.severity === 'error') &&
+				!checkHelper(output, code)
+			) {
+				generatedHelpers.set(output, code);
+				return { from: relativeTsImport(from, output) };
+			}
+		}
+		return hook;
 	}
 	const checkedHelpers = new Map<string, { code: string; state: AdapterState; error?: string }>();
 	const generatedHelpers = new Map<string, string>();
@@ -715,8 +755,11 @@ export async function runCodemod(
 						ordinaryCaller,
 					),
 				resolveStoreHook,
+				get originalReact() {
+					return installedReact(file);
+				},
 				localReactHook: renames.has(file)
-					? (module, name) => localReactHook(file, module, name)
+					? (module, name, nativeOnly) => localReactHook(file, module, name, nativeOnly)
 					: undefined,
 				strong,
 				strictNullChecks: strictConfig !== null,

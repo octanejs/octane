@@ -26,8 +26,14 @@ export interface TransformOptions {
 	types?: { sourceFile: ts.SourceFile; checker: ts.TypeChecker };
 	/** The new spelling of an import specifier (a renamed module, a binding package), or null to keep it. */
 	resolveSpecifier?(specifier: string): string | null;
+	/** The issuer resolves the original installed React runtime and types. */
+	originalReact?: boolean;
 	/** A dispatcher hook directly called by an unchanged local TypeScript export. */
-	localReactHook?(module: string, name: string): string | undefined;
+	localReactHook?(
+		module: string,
+		name: string,
+		nativeOnly: boolean,
+	): string | { from: string } | undefined;
 	/** Resolve a source-backed workspace hook after verifying its implementation and its call sites. */
 	resolveStoreHook?(
 		module: string,
