@@ -29,7 +29,7 @@
  * @property {string} title
  * @property {string} react the rejected idiom, in one line
  * @property {string} strong its replacement, in one line
- * @property {readonly string[]} codes every error code `before` reports
+ * @property {readonly string[]} codes every error code `before` reports, and any hint it teaches
  * @property {string} before
  * @property {string} after
  * @property {string} note
@@ -206,6 +206,15 @@ export const STRONG_DIAGNOSTICS = [
 			'After an `await`, or in a timer or promise callback, a setter or dispatch argument reads the render snapshot of the same state, including through a local computed from it, a copied alias, or a closure.',
 		replacement:
 			'Use the updater form, `setValue((current) => current + 1)`, compute from the state a reducer receives, or read the latest value with the state getter (the third tuple member).',
+	},
+	{
+		code: 'OCTANE_STRONG_READ_AFTER_SET',
+		section: 'state',
+		severity: 'hint',
+		detects:
+			'A function calls a state setter or reducer dispatch as a statement, then reads that state later in the same block or a nested one, for example `setDraft(""); if (draft) send(draft)` or `setCount(count + 1); log(count)`. The read sees the render snapshot, not the value just set. Reads in the setter argument, in updater functions, in nested functions, through the state getter, through a parameter or local alias, and in a sibling branch are not reported.',
+		replacement:
+			'Compute the next value once and use it for both: `const next = count + 1; setCount(next); log(next)`. When the old value is what you mean, name it first: `const previous = count; setCount(0); log(previous)`.',
 	},
 	{
 		code: 'OCTANE_STRONG_READ_ONLY_STATE',
@@ -533,6 +542,41 @@ export function Example({ initial }: { initial: string }) @{
   <p>{value as string}</p>
 }`,
 		note: 'The factory captures the initial value for this mount. Use a derived value when it should follow later inputs.',
+	},
+	{
+		id: 'next-state-value',
+		title: 'Use the value you just set',
+		react: "setDraft(''); if (draft) send(draft);",
+		strong: "const message = draft; setDraft(''); if (message) send(message);",
+		codes: ['OCTANE_STRONG_READ_AFTER_SET'],
+		before: `import { useState } from 'octane';
+export function Composer({ send }: { send: (text: string) => void }) @{
+  const [draft, setDraft] = useState('');
+  <form
+    onSubmit={(event) => {
+      event.preventDefault();
+      setDraft('');
+      if (draft) send(draft);
+    }}
+  >
+    <input value={draft} onInput={(event) => setDraft(event.currentTarget.value)} />
+  </form>
+}`,
+		after: `import { useState } from 'octane';
+export function Composer({ send }: { send: (text: string) => void }) @{
+  const [draft, setDraft] = useState('');
+  <form
+    onSubmit={(event) => {
+      event.preventDefault();
+      const message = draft;
+      setDraft('');
+      if (message) send(message);
+    }}
+  >
+    <input value={draft} onInput={(event) => setDraft(event.currentTarget.value)} />
+  </form>
+}`,
+		note: 'A setter schedules a re-render; it does not change the value this render captured. Naming the value once makes clear which one each read means, and it stays correct if the code is reordered.',
 	},
 	{
 		id: 'lazy-ref',
