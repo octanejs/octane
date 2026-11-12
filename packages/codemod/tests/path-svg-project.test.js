@@ -379,7 +379,7 @@ async function expectSvgRenderParity(view, states, count, projectFiles = {}) {
 		fs.writeFileSync(path.join(root, 'src', name), contents);
 	}
 	const classes = [];
-	const reference = asset
+	const reference = (projectFiles['icons/mark.svg'] ?? asset)
 		.replace('<svg ', '<svg {...props} ')
 		.replaceAll('fill-rule=', 'fillRule=')
 		.replaceAll('stroke-width=', 'strokeWidth=');
@@ -595,6 +595,42 @@ it('preserves SVG classes selected by stable clsx guards on the server and after
 	);
 });
 
+it('preserves path transforms and fixed string classes across server and client rendering', async () => {
+	await expectSvgRenderParity(
+		`import {clsx as join} from 'clsx';
+		export function Pane({tone}: {tone: string}) {
+			return <button><Mark className={join('badge', tone)}/></button>;
+		}`,
+		[{ tone: 'quiet' }, { tone: '' }, { tone: 'bright warm' }],
+		1,
+		{
+			'icons/mark.svg': asset.replace('<path ', '<path transform="translate(2 1) scale(1.5)" '),
+		},
+	);
+});
+
+it('keeps the SVG diagnostic when a string token may be uninitialized', () => {
+	const result = transformModule(
+		`import Mark from './mark.svg';
+		import cx from 'clsx';
+		export function Pane({mode}) {
+			switch (mode) {
+				case 'init':
+					const tone = 'quiet';
+					break;
+				case 'show':
+					return <button><Mark className={cx('badge', tone)}/></button>;
+			}
+			return <span/>;
+		}`,
+		'pane.tsx',
+		{ installedClsx: true, pathSvgAdapter: () => './native-icon' },
+	);
+	expect(result.notes).toContainEqual(
+		expect.objectContaining({ rule: 'svg-issuer', severity: 'error' }),
+	);
+});
+
 it('renders a selected SVG from a block-scoped local on the server and across client updates', async () => {
 	await expectSvgRenderParity(
 		`import {useState} from 'react';
@@ -745,6 +781,11 @@ it.each([
 	['an arbitrary call', '', "read('icon', active && 'on')"],
 	['a nested effectful call', '', "cx('icon', read() && 'on')"],
 	['an opaque object argument', 'const value = {active};', "cx('icon', value)"],
+	[
+		'an object asserted as a string',
+		'const value = {active} as unknown as string;',
+		"cx('icon', value)",
+	],
 	['a JSX value argument', 'const value = <span/>;', "cx('icon', value)"],
 ])('retains the bare SVG for %s', async (_reason, setup, expression) => {
 	const { root, file } = fixture(`import Mark from './icons/mark.svg';

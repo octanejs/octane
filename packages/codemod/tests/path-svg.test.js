@@ -4,7 +4,7 @@ import { parsePathSvg, parseStaticSvg } from '../dist/path-svg.js';
 describe('static SVG assets', () => {
 	it('reads root attributes and ordered paths without interpreting their data', () => {
 		const source = `<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="24" viewBox="-1, 0, 24, 24" fill="none">
-			<path d="M0 0L1.5 2z" fill="currentColor"/>
+			<path d="M0 0L1.5 2z" fill="currentColor" transform="translate(2 1) scale(1.5)"/>
 			<path d='m3-2a2 2 0 0 1 1 1' stroke='#abcdef80' stroke-width='0.5' fill-rule='evenodd' clip-rule='nonzero' />
 		</svg>`;
 		expect(parseStaticSvg(source)).toEqual({
@@ -16,7 +16,15 @@ describe('static SVG assets', () => {
 				fill: 'none',
 			},
 			children: [
-				{ tag: 'path', attributes: { d: 'M0 0L1.5 2z', fill: 'currentColor' }, children: [] },
+				{
+					tag: 'path',
+					attributes: {
+						d: 'M0 0L1.5 2z',
+						fill: 'currentColor',
+						transform: 'translate(2 1) scale(1.5)',
+					},
+					children: [],
+				},
 				{
 					tag: 'path',
 					attributes: {
@@ -130,7 +138,8 @@ describe('static SVG assets', () => {
 		['unknown XML namespaces', `<svg xmlns="urn:other">${path}</svg>`],
 		['entities', '<svg><path d="M0&#x20;0"/></svg>'],
 		['document type declarations', `<!DOCTYPE svg><svg>${path}</svg>`],
-		['unknown attributes', '<svg><path d="M0 0" transform="scale(2)"/></svg>'],
+		['unknown attributes', '<svg><path d="M0 0" stroke-dasharray="2"/></svg>'],
+		['unsupported path transform', '<svg><path d="M0 0" transform="rotate(2)"/></svg>'],
 		['numeric loader normalization', `<svg width="01.00">${path}</svg>`],
 		['noncanonical stroke width', '<svg><path d="M0 0" stroke-width=".5"/></svg>'],
 		['duplicate attributes', `<svg width="1" width="2">${path}</svg>`],

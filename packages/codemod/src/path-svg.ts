@@ -32,6 +32,7 @@ const presentation = {
 };
 const pathAttributes = {
 	...presentation,
+	transform,
 	d: /^[Mm] *[+\-.\d][MmLlHhVvCcSsQqTtAaZzEe0-9.,+\- ]+$/,
 	'fill-rule': fillRule,
 	'clip-rule': fillRule,
