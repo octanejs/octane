@@ -704,6 +704,12 @@ class ModuleTransform {
 		this.indentUnit = /^\t/m.test(source) ? '\t' : '  ';
 	}
 
+	private get emitsTsrx() {
+		return (
+			this.template || (this.target === 'tsrx' && (this.hasJsx || /\.[jt]sx$/.test(this.filename)))
+		);
+	}
+
 	run(): TransformResult {
 		this.analyze();
 		let code = this.emit(this.sf, PLAIN, 0);
@@ -716,8 +722,7 @@ class ModuleTransform {
 				: ['', ''];
 			code = `${code.trimEnd()}\n\nfunction ${NO_PORT}({ error }${props})${result} {\n${this.indentUnit}throw new Error(error);\n}\n`;
 		}
-		const tsrx =
-			this.template || (this.target === 'tsrx' && (this.hasJsx || /\.[jt]sx$/.test(this.filename)));
+		const tsrx = this.emitsTsrx;
 		if (tsrx) code = code.replace(/^\/\*\*\s*@jsxImportSource\s+\S+\s*\*\/[ \t]*\r?\n/m, '');
 		// A JavaScript module was never type-checked; as TSRX it stays unchecked.
 		if (tsrx && /\.[cm]?jsx?$/.test(this.filename)) {
@@ -3975,7 +3980,9 @@ class ModuleTransform {
 		// Spreads, computed names and accessors can redefine the property.
 		return (
 			object.properties.every(
-				(field) => ts.isPropertyAssignment(field) && !ts.isComputedPropertyName(field.name),
+				(field) =>
+					(ts.isPropertyAssignment(field) && !ts.isComputedPropertyName(field.name)) ||
+					(ts.isShorthandPropertyAssignment(field) && !field.objectAssignmentInitializer),
 			) &&
 			object.properties.some(
 				({ name }) =>
@@ -3986,7 +3993,7 @@ class ModuleTransform {
 
 	private checkEffectDependencyReads(node: ts.CallExpression, deps: ts.Expression) {
 		const list = skipWrappers(deps);
-		if (this.target !== 'tsrx' || !this.hasJsx || !ts.isArrayLiteralExpression(list)) return;
+		if (!this.emitsTsrx || !ts.isArrayLiteralExpression(list)) return;
 		const opaque = list.elements.find((expr) => {
 			const member = skipWrappers(expr);
 			return (

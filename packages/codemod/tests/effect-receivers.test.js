@@ -99,11 +99,27 @@ it('reports an opaque effect dependency whose getter registers a React SSR style
 	for (const strong of [false, true])
 		expect(migrate(input, strong).notes).toContainEqual(dependencyError);
 
+	const jsxLess = input
+		.replace(
+			'import { useEffect, useEffectEvent }',
+			'import { createElement, useEffect, useEffectEvent }',
+		)
+		.replace('return <b>ok</b>;', 'return createElement("b", null, "ok");');
+	expect(jsxLess).toContain('return createElement');
+	for (const strong of [false, true])
+		expect(migrate(jsxLess, strong).notes).toContainEqual(dependencyError);
+
 	const literal = input.replace(
 		'({ probe }: { probe: { value: number } }) {',
 		'() { const probe = { "value": 1 };',
 	);
 	expect(migrate(literal).notes).not.toContainEqual(dependencyError);
+	const shorthand = literal.replace(
+		'const probe = { "value": 1 };',
+		'const value = 1; const probe = { value };',
+	);
+	expect(shorthand).toContain('const probe = { value };');
+	expect(migrate(shorthand).notes).not.toContainEqual(dependencyError);
 	const alias = literal.replace(
 		'const work',
 		'const alias = probe; Object.defineProperty(alias, "value", { get() { return 2; } }); const work',
@@ -112,7 +128,7 @@ it('reports an opaque effect dependency whose getter registers a React SSR style
 	expect(
 		migrate(input.replace('[probe.value]', '[({trigger: probe.value}).trigger]')).notes,
 	).toContainEqual(dependencyError);
-});
+}, 20_000);
 
 it.each([
 	['block', false],
