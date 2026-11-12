@@ -319,14 +319,16 @@ function sameRow(a: unknown, b: unknown): boolean {
 	return keys.every((key) => Object.is((a as any)[key], (b as any)[key]));
 }
 
-/** A stable key for plain input: object keys sorted, so `{a,b}` and `{b,a}` share an entry. */
-function inputKey(value: unknown): string {
-	return JSON.stringify(value, (_, item) =>
-		item !== null && typeof item === 'object' && !Array.isArray(item)
-			? Object.fromEntries(Object.entries(item).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
-			: item,
-	);
-}
+/** Canonicalize object field order while retaining the types and references used on the wire. */
+const keyEncoding: NonNullable<Parameters<typeof devalue.stringify>[2]> = {
+	operations: {
+		shapeOf(value) {
+			const shape = devalue.defaultStringifyOperations.shapeOf(value);
+			if (shape.kind === 'plain' || shape.kind === 'null-proto') shape.keys.sort();
+			return shape;
+		},
+	},
+};
 
 /** `value` with its entity ID changed from `from` to `to`, copied; other values unchanged. */
 function renameId(entity: Entity<any>, value: unknown, from: string, to: string): unknown {
@@ -335,9 +337,11 @@ function renameId(entity: Entity<any>, value: unknown, from: string, to: string)
 		: value;
 }
 
-/** @internal Equal reads of equal inputs share one key. */
+/** @internal Reads and feed cursors use the same key format. A new cursor cannot cover old cached reads. */
 export function entryKey(name: string, input: unknown): string {
-	return `${name}\n${inputKey(input)}`;
+	const encoded =
+		input === undefined ? 'undefined' : devalue.stringify(input, undefined, keyEncoding);
+	return `${name}\nwire:${encoded}`;
 }
 
 /** @internal Copy-on-write replacement of the arrays and objects named in `replace`. */
@@ -1036,11 +1040,17 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			key,
 			subscribers: new Set(),
 			handle: {
-				getSnapshot: () => (retired ? PENDING : (created.snapshot ??= buildSnapshot(created))),
+				getSnapshot() {
+					if (retired) return PENDING;
+					const current = entries.get(key) ?? created;
+					return (current.snapshot ??= buildSnapshot(current));
+				},
 				subscribe(notify) {
 					if (retired) return () => {};
 					// A handle outlives its entry's retention; observing it again restores the entry.
-					if (!entries.has(key)) entries.set(key, created);
+					const current = entries.get(key);
+					if (current && current !== created) return current.handle.subscribe(notify);
+					if (!current) entries.set(key, created);
 					clearHostTimeout(created.keepTimer);
 					created.keepTimer = undefined;
 					// Age reloads a value only for the first observer of a value already served.
@@ -1055,8 +1065,9 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				},
 				refresh() {
 					if (retired) return NEVER;
-					invalidateEntry(created);
-					return load(created);
+					const current = entryFor(read, input);
+					invalidateEntry(current);
+					return load(current);
 				},
 			},
 			base: undefined,

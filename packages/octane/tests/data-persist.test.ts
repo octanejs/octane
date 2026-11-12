@@ -3,6 +3,7 @@
  * restart. Each test restarts by creating a second store over the same storage.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createPersistence } from '../src/data/persist.js';
 import { IDBFactory } from 'fake-indexeddb';
 import 'fake-indexeddb/auto';
 import {
@@ -1150,6 +1151,47 @@ describe('octane/data feeds across restarts', () => {
 
 	const durable = (storage: PersistentStorage) =>
 		cache(storage, 'ada', { journal: { writes: [setRead], receipt } });
+
+	it('reloads a covered legacy read first observed after its feed connects with new input keys', async () => {
+		const storage = memoryStorage();
+		const legacy = createPersistence(
+			cache(storage, 'ada'),
+			() => ({
+				read: shelf,
+				stored: { value: books(), savedAt: Date.now(), stale: false, span: null, tags: ['book'] },
+			}),
+			() => false,
+		);
+		// The previous format gave Map and {} the same key, even though their feeds can differ.
+		legacy.mark('shelf\nundefined');
+		legacy.keepCursor('books.changes\n{}', '0');
+		await vi.waitFor(() => expect(listPartitions(storage)).toHaveLength(2));
+
+		const feedLog = history();
+		const remote = server(books());
+		remote.books[0].title = 'New edition';
+		feedLog.publish(remote.books[0]);
+		const store = createDataStore({
+			transport: remote.transport,
+			persist: cache(storage, 'ada'),
+			listen: feedLog.listener,
+		});
+		const byFilter = feed({
+			name: bookChanges.name,
+			event: bookChanges.event,
+			covers: bookChanges.covers,
+			changes: (book) => ({ put: Book, value: book }),
+			params: schema<Map<string, string>>((value) => value instanceof Map),
+		});
+		const stop = listen(store, byFilter, new Map([['section', 'fiction']])).subscribe(() => {});
+		await vi.waitFor(() => expect(feedLog.cursors).toEqual([null]));
+		const shown = await value<Book[]>(store, shelf);
+		expect(shown.value.map((book) => book.title)).toContain('New edition');
+		expect(remote.log).toEqual(['read shelf']);
+		stop();
+		shown.stop();
+		await store.retire();
+	});
 
 	it('catches up after a restart on what it missed: a rename shows and a refused write rolls back, with nothing reloaded', async () => {
 		const storage = memoryStorage();

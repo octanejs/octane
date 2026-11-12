@@ -53,6 +53,64 @@ describe('octane/data store', () => {
 		expect(list.getSnapshot().value).toEqual([{ id: 'a', title: 'Tides', done: false }]);
 	});
 
+	it('keeps distinct wire inputs separate while sharing equivalent plain objects', async () => {
+		const query = read({
+			name: 'lookup',
+			input: schema<unknown>(() => true),
+			output: schema<number>(() => true),
+		});
+		let calls = 0;
+		const store = createDataStore({ transport: async () => ({ ok: true, value: ++calls }) });
+		const cyclic: unknown[] = [];
+		cyclic.push(cyclic);
+		const inputs = [
+			cyclic,
+			new Map([['q', 1]]),
+			new Map([['q', 2]]),
+			{},
+			new Set([1]),
+			null,
+			NaN,
+			{ x: undefined },
+			'2020-01-01T00:00:00.000Z',
+			new Date('2020-01-01'),
+			1n,
+			{ a: 1, b: 2 },
+		];
+		for (const input of inputs) await store.prefetch(query, input);
+		expect(inputs.map((input) => store.read(query, input).getSnapshot().value)).toEqual(
+			inputs.map((_, i) => i + 1),
+		);
+		expect(store.read(query, { b: 2, a: 1 })).toBe(store.read(query, { a: 1, b: 2 }));
+		await store.retire();
+	});
+
+	it('rejoins the current read when an evicted handle is observed or refreshed', async () => {
+		const clock = installTestClock();
+		try {
+			const server = createServer();
+			const contract = { ...todos, keep: 5, fresh: 60_000 };
+			const store = createDataStore({ transport: server.transport });
+			const old = store.read(contract, undefined);
+			await store.prefetch(contract, undefined);
+			await clock.advance(6);
+			const current = store.read(contract, undefined);
+			const stop = current.subscribe(() => {});
+			const stopOld = old.subscribe(() => {});
+			await store.prefetch(contract, undefined);
+			expect(server.log).toEqual(['list', 'list']);
+			server.rows[0]!.title = 'Atoll';
+			await old.refresh();
+			expect(current.getSnapshot().value?.[0]?.title).toBe('Atoll');
+			expect(old.getSnapshot()).toBe(current.getSnapshot());
+			stopOld();
+			stop();
+			await store.retire();
+		} finally {
+			clock.uninstall();
+		}
+	});
+
 	it('calls the transport after the synchronous work that started a load', async () => {
 		const server = createServer();
 		const calls: string[] = [];
