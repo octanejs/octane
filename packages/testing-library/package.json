@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/testing-library",
-  "version": "0.1.68",
+  "version": "0.1.69",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -42,7 +42,7 @@
   },
   "peerDependencies": {
     "@testing-library/dom": "^10.4.1",
-    "octane": "workspace:^0.16.0"
+    "octane": "workspace:^0.17.0"
   },
   "devDependencies": {
     "@testing-library/dom": "catalog:default",
