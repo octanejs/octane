@@ -11,6 +11,7 @@ import {
 	type Transport,
 } from '../src/data/index.js';
 import { createDataHandler } from '../src/data/server.js';
+import { installTestClock } from 'octane/testing';
 import {
 	addTodo,
 	createServer,
@@ -270,7 +271,7 @@ describe('octane/data store', () => {
 	});
 
 	it('serves a fresh value without reloading and keeps a stale one visible while it reloads', async () => {
-		vi.useFakeTimers();
+		const clock = installTestClock();
 		try {
 			const server = createServer();
 			const fresh = read({ ...todos, name: 'todos.list', fresh: 1_000 } as any) as typeof todos;
@@ -283,14 +284,18 @@ describe('octane/data store', () => {
 			list.subscribe(() => {})();
 			expect(server.log).toEqual(['list']);
 
-			vi.advanceTimersByTime(1_000);
+			await clock.advance(999);
+			list.subscribe(() => {})();
+			expect(server.log).toEqual(['list']);
+
+			await clock.advance(1);
 			list.subscribe(() => {});
 			expect(list.getSnapshot()).toMatchObject({ status: 'ready', refreshing: true });
 			expect(list.getSnapshot().value).toHaveLength(1);
 			await vi.waitFor(() => expect(list.getSnapshot().refreshing).toBe(false));
 			expect(server.log).toEqual(['list', 'list']);
 		} finally {
-			vi.useRealTimers();
+			clock.uninstall();
 		}
 	});
 

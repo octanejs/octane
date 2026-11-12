@@ -1,4 +1,5 @@
 import { beginNativeBatch, endNativeBatch, type NativeBatchHooks } from './read-protocol.js';
+import { setHostTimeout } from '../host-task.js';
 
 interface NativeEventBatch {
 	hooks: NativeBatchHooks | null;
@@ -60,6 +61,6 @@ export function endNativeEventBatch(
 			onError(error);
 		}
 	};
-	if (event.isTrusted) setTimeout(fallback, 0);
+	if (event.isTrusted) setHostTimeout(fallback, 0);
 	else queueMicrotask(fallback);
 }
