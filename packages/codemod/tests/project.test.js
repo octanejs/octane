@@ -1075,6 +1075,36 @@ export const load = () => import('radix-ui');`,
 		).toHaveLength(4);
 	});
 
+	it('keeps a local module that shadows the consolidated Radix package', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'tsconfig.json': '{ "compilerOptions": { "strict": true, "moduleResolution": "bundler" } }',
+			'src/tsconfig.json':
+				'{ "extends": "../tsconfig.json", "compilerOptions": { "paths": { "radix-ui": ["./other.ts"] } } }',
+			'src/other.ts': 'export const Slot = { Root: () => "local" };',
+			'src/view.tsx': `import { Slot } from 'radix-ui';
+export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`,
+		});
+		for (const projectTypes of [false, true]) {
+			const { files } = await runCodemod([path.join(root, 'src/view.tsx')], {
+				root,
+				write: false,
+				projectTypes,
+			});
+			expect(files[0].code).toContain("from 'radix-ui'");
+			expect(files[0].code).toContain('<Slot.Root>');
+			expect(files[0].notes).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						rule: 'bindings',
+						severity: 'error',
+						message: expect.stringContaining('TypeScript alias'),
+					}),
+				]),
+			);
+		}
+	});
+
 	it('reports exactly the Radix exports `@octanejs/radix` lacks', async () => {
 		const radix = path.join(REPO, 'packages/radix');
 		// The binding's own dev dependency on `radix-ui` installs every primitive package.

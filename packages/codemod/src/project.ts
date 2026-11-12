@@ -217,8 +217,9 @@ export async function runCodemod(
 			);
 		});
 	}
-	function originalModule(file: string, module: string) {
-		const bindings = { moduleResolution: ts.ModuleResolutionKind.Bundler, ...config };
+	// Null identifies a resolved alias, while undefined means TypeScript found no source.
+	function originalModule(file: string, module: string, project = config) {
+		const bindings = { moduleResolution: ts.ModuleResolutionKind.Bundler, ...project };
 		const target = ts.resolveModuleName(module, file, bindings, ts.sys).resolvedModule;
 		const original = ts.resolveModuleName(
 			module,
@@ -226,7 +227,33 @@ export async function runCodemod(
 			{ ...bindings, paths: undefined, baseUrl: undefined },
 			ts.sys,
 		).resolvedModule;
-		return target?.resolvedFileName === original?.resolvedFileName ? target : undefined;
+		return target && target.resolvedFileName !== original?.resolvedFileName ? null : target;
+	}
+	function projectSpecifier(
+		file: string,
+		specifier: string,
+		packages: Map<string, string>,
+		notes: Note[],
+	) {
+		const rename = resolveRename(file, specifier);
+		if (rename) return rename;
+		if (specifier === 'radix-ui') {
+			const bindings = tsconfigOptions(path.dirname(file));
+			if (
+				(bindings?.paths || bindings?.baseUrl) &&
+				originalModule(file, specifier, bindings) === null
+			) {
+				notes.push({
+					rule: 'bindings',
+					severity: 'error',
+					line: 1,
+					message:
+						'`radix-ui` resolves to a different module through a TypeScript alias. Review the local component before migrating this import.',
+				});
+				return null;
+			}
+		}
+		return resolveBinding(specifier, packages, notes);
 	}
 	// One shared context per project, including separate file-by-file migrations.
 	const sourceDir = path.join(root, 'src');
@@ -336,8 +363,7 @@ export async function runCodemod(
 			get types() {
 				return typesOf(file);
 			},
-			resolveSpecifier: (specifier) =>
-				resolveRename(file, specifier) ?? resolveBinding(specifier, new Map(), []),
+			resolveSpecifier: (specifier) => projectSpecifier(file, specifier, new Map(), []),
 		}).changed;
 	});
 	const checkedHelpers = new Map<string, { code: string; state: AdapterState; error?: string }>();
@@ -575,8 +601,7 @@ export async function runCodemod(
 				get types() {
 					return (types ??= typesOf(file));
 				},
-				resolveSpecifier: (specifier) =>
-					resolveRename(file, specifier) ?? resolveBinding(specifier, packages, notes),
+				resolveSpecifier: (specifier) => projectSpecifier(file, specifier, packages, notes),
 				isContext,
 				elementChild: !elementExports.size
 					? undefined
