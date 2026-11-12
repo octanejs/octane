@@ -50,6 +50,30 @@ export function ReadOnceRows({ rows, scope }: ReadOnceProps) @{
 	</ul>
 }
 
+export function RestFieldRows({ rows }: { rows: { id: string; rowCaption?: string }[] }) @{
+	<ul>
+		@for (const { id, ...record } of rows; key id) {
+			<li>{record.rowCaption as string}</li>
+		}
+	</ul>
+}
+
+export function RestChildRows({ rows }: { rows: { id: string; content: string[] }[] }) @{
+	<ul>
+		@for (const { id, ...record } of rows; key id) {
+			<li>{record.content}</li>
+		}
+	</ul>
+}
+
+export function DefaultFieldRows({ rows }: { rows: { id: string; labels?: string[] }[] }) @{
+	<ul>
+		@for (const { id, labels = ['untitled'] } of rows; key id) {
+			<li>{labels[0] as string}</li>
+		}
+	</ul>
+}
+
 export function ReadOnceFoldedRows({ rows, scope }: ReadOnceProps) {
 	return (
 		<ul>

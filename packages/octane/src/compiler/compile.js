@@ -17563,6 +17563,116 @@ function forPatternSnapshot(pattern) {
 	};
 }
 
+// A fresh rest record or literal default can be compared by the field the row
+// displays only when neither the key nor any other expression sees its identity.
+function projectForPatternSnapshot(node, key, ctx, snapshot) {
+	const pattern = node.left.declarations[0].id;
+	const [root] = node.body.body;
+	if (
+		pattern.type !== 'ObjectPattern' ||
+		node.left.kind !== 'const' ||
+		key.type !== 'Identifier' ||
+		node.body.body.length !== 1 ||
+		!isPlainHostRoot(root) ||
+		(root.attributes ?? root.openingElement?.attributes ?? []).length !== 0 ||
+		root.children?.length !== 1 ||
+		root.children[0].type !== 'JSXExpressionContainer'
+	)
+		return snapshot;
+	// A renderable child can change its contents while retaining its identity.
+	const expression = root.children[0].expression;
+	if (!isKnownTextChildExpression(expression, ctx.knownStringChildLocals)) return snapshot;
+	const read = unwrapValueExpression(expression);
+	if (
+		read?.type !== 'MemberExpression' ||
+		read.optional ||
+		read.object.type !== 'Identifier' ||
+		read.object.name === key.name
+	)
+		return snapshot;
+
+	// A computed property or later default could observe the original binding.
+	const name = read.object.name;
+	const prop = pattern.properties.find((p) =>
+		p.type === 'RestElement'
+			? p.argument.name === name
+			: p.value?.type === 'AssignmentPattern' && p.value.left.name === name,
+	);
+	if (
+		!prop ||
+		prop.computed ||
+		pattern.properties.some(
+			(p) => p !== prop && (p.type !== 'Property' || p.computed || p.value.type !== 'Identifier'),
+		) ||
+		!pattern.properties.some((p) => p.type === 'Property' && p.value.name === key.name)
+	)
+		return snapshot;
+
+	const index = snapshot.values.findIndex((value) => value.name === name);
+	const fields = snapshot.binding.properties.slice();
+	if (prop.type === 'Property') {
+		const array = prop.value.right;
+		const position = read.property.value;
+		if (
+			array.type !== 'ArrayExpression' ||
+			!read.computed ||
+			!Number.isInteger(position) ||
+			position < 0 ||
+			position >= array.elements.length ||
+			!array.elements.every(
+				(e) =>
+					e?.type === 'Literal' &&
+					(e.value === null || ['boolean', 'number', 'string'].includes(typeof e.value)),
+			)
+		)
+			return snapshot;
+		// Compare the raw input. Only a missing value creates this literal, and
+		// its selected own index can be read just as well when the row runs.
+		fields[index] = { ...fields[index], value: prop.value };
+		return {
+			...snapshot,
+			binding: { ...snapshot.binding, properties: fields },
+			pattern: {
+				...pattern,
+				properties: pattern.properties.map((p) => (p === prop ? { ...p, value: p.value.left } : p)),
+			},
+		};
+	}
+	const field = staticMemberName(read);
+	if (field === null || field === '__proto__') return snapshot;
+	const record = snapshot.values[index];
+	const own = b.id(allocCompilerName(ctx, '__rowHasField'));
+	const value = b.id(allocCompilerName(ctx, '__rowField'));
+	const values = snapshot.values.slice();
+	fields[index] = { ...fields[index], value };
+	// Rest copies enumerable source properties into ordinary own data fields.
+	// A missing field may instead invoke an inherited getter with the complete
+	// record as its receiver. Keep that record and read it in the row as usual.
+	values[index] = b.conditional(own, b.member(record, b.literal(field), true), b.void0);
+	values.push(b.conditional(own, b.void0, record));
+	fields.push(
+		b.prop(
+			'init',
+			b.literal(values.length),
+			b.assignment_pattern(record, b.object([b.prop('init', b.literal(field), value)])),
+		),
+	);
+	return {
+		binding: { ...snapshot.binding, properties: fields },
+		values,
+		// Both operands are ordinary objects. A prototype that supplies the
+		// field stays on the receiver-preserving path, even if the record owns it.
+		setup: b.const(
+			own,
+			b.logical(
+				'&&',
+				b.binary('in', b.literal(field), record),
+				b.unary('!', b.binary('in', b.literal(field), b.object([]))),
+			),
+		),
+	};
+}
+
 function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	const bindingSite = node._octaneBindingSite;
 	const itemBody = forItemTemplateBody(node, ctx);
@@ -37962,7 +38072,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	const leftDeclId = node.left.declarations[0].id;
 	const isDestructured = leftDeclId.type !== 'Identifier';
 	const explicitKey = forRowKeyAttribute(node, ctx) ?? node.key ?? null;
-	const snapshot = isDestructured && explicitKey !== null ? forPatternSnapshot(leftDeclId) : null;
+	const snapshot =
+		isDestructured && explicitKey !== null
+			? projectForPatternSnapshot(node, explicitKey, ctx, forPatternSnapshot(leftDeclId))
+			: null;
 	const itemName = isDestructured
 		? snapshot === null
 			? '_item'
@@ -37992,9 +38105,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					b.let(cached, entry),
 					b.if(cached, b.return(b.member(cached, b.literal(0), true)), null),
 					inheritOriginLoc(
-						b.declaration(node.left.kind, [b.declarator(leftDeclId, item)]),
+						b.declaration(node.left.kind, [b.declarator(snapshot.pattern ?? leftDeclId, item)]),
 						leftDeclId,
 					),
+					...(snapshot.setup ? [snapshot.setup] : []),
 					b.stmt(b.assignment('=', cached, b.array([b.void0, ...snapshot.values]))),
 					b.stmt(b.assignment('=', b.member(cached, b.literal(0), true), explicitKey)),
 					b.stmt(b.assignment('=', entry, cached)),

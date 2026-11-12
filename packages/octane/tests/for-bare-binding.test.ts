@@ -142,6 +142,92 @@ describe('bare-left @for row bindings', () => {
 		expect(node.textContent).toBe('second');
 	});
 
+	it('updates a copied rest field and reads an inherited getter on its original receiver', () => {
+		let caption = 'first';
+		const reads: string[] = [];
+		const row = {
+			id: 'own',
+			get rowCaption() {
+				reads.push('own');
+				return caption;
+			},
+		};
+		const missing = { id: 'missing', fallback: 'inherited' };
+		const props = () => ({ rows: [row, missing] });
+		const isEnumerable = Object.prototype.propertyIsEnumerable;
+		Object.prototype.propertyIsEnumerable = function (key) {
+			if (key === 'rowCaption') throw new Error('unexpected call to propertyIsEnumerable');
+			return isEnumerable.call(this, key);
+		};
+		try {
+			const view = mount(client.RestFieldRows, { rows: [row] });
+			cleanups.push(() => view.unmount());
+			const node = view.find('li');
+			expect(node.textContent).toBe('first');
+			caption = 'second';
+			view.update(client.RestFieldRows, { rows: [row] });
+			expect(view.find('li')).toBe(node);
+			expect(node.textContent).toBe('second');
+			Object.defineProperty(Object.prototype, 'rowCaption', {
+				configurable: true,
+				get(this: { fallback: string }) {
+					reads.push(this.fallback);
+					return this.fallback;
+				},
+			});
+			view.update(client.RestFieldRows, props());
+			const nodes = view.findAll('li');
+			expect(text(nodes)).toEqual(['second', 'inherited']);
+			missing.fallback = 'new fallback';
+			view.update(client.RestFieldRows, props());
+			expectAdopted(view.findAll('li'), nodes);
+			expect(text(nodes)).toEqual(['second', 'new fallback']);
+			expect(reads).toEqual(['own', 'own', 'own', 'inherited', 'own', 'new fallback']);
+		} finally {
+			Reflect.deleteProperty(Object.prototype, 'rowCaption');
+			Object.prototype.propertyIsEnumerable = isEnumerable;
+		}
+	});
+
+	it('renders changed contents of the same array in a rest-field child hole', () => {
+		const row = { id: 'row', content: ['first'] };
+		const view = mount(client.RestChildRows, { rows: [row] });
+		cleanups.push(() => view.unmount());
+		const node = view.find('li');
+		expect(node.textContent).toBe('first');
+		row.content[0] = 'second';
+		view.update(client.RestChildRows, { rows: [row] });
+		expect(view.find('li')).toBe(node);
+		expect(node.textContent).toBe('second');
+	});
+
+	it('switches a literal default to a supplied array without probing its properties', () => {
+		const row: { id: string; labels?: string[] } = { id: 'row' };
+		const props = () => ({ rows: [row] });
+		const view = mount(client.DefaultFieldRows, props());
+		cleanups.push(() => view.unmount());
+		const node = view.find('li');
+		expect(node.textContent).toBe('untitled');
+		const reads: PropertyKey[] = [];
+		row.labels = new Proxy(['provided'], {
+			get(target, key, receiver) {
+				reads.push(key);
+				return Reflect.get(target, key, receiver);
+			},
+			getOwnPropertyDescriptor() {
+				throw new Error('unexpected array reflection');
+			},
+		});
+		view.update(client.DefaultFieldRows, props());
+		view.update(client.DefaultFieldRows, props());
+		expect(node.textContent).toBe('provided');
+		expect(reads).toEqual(['0']);
+		delete row.labels;
+		view.update(client.DefaultFieldRows, props());
+		expect(view.find('li')).toBe(node);
+		expect(node.textContent).toBe('untitled');
+	});
+
 	it('adopts a stateful row using the same destructured values as the server', () => {
 		const props = () => {
 			let reads = 0;
