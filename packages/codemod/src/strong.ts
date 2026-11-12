@@ -1,6 +1,7 @@
 import type { CompileDiagnostic } from 'octane/compiler';
 import type { Compiler, Finding, StrongResult } from './types.js';
 import { applyFixes, pruneImports } from '@octanejs/cli/fix';
+import { parseSync, type Argument, type CallExpression } from '@tsrx/oxc/parser';
 import { finding, thrown } from './compiler.js';
 
 /**
@@ -20,6 +21,7 @@ function withoutDirective(code: string) {
 	};
 }
 const MAX_ROUNDS = 6;
+const UNLINKED_PROP_STATE = 'OCTANE_STRONG_UNLINKED_PROP_STATE';
 
 /**
  * Compile a module the codemod emitted in Strong mode and repair what the
@@ -30,8 +32,8 @@ const MAX_ROUNDS = 6;
  *
  * - an explicit dependency list the compiler reports as equivalent to the one
  *   it infers is dropped;
- * - state initialized from a prop is captured lazily, `useState(() => prop)`,
- *   which is what `useState(prop)` meant in React.
+ * - state initialized from a prop is captured once, with the argument
+ *   evaluated on every render and a callable initializer run at mount.
  *
  * Strong errors that remain mean the module needs a person. With `force`
  * unset the module falls back to compatibility mode so the migrated app still
@@ -67,7 +69,8 @@ export function strengthen(
 			return fallback(code, compat.error == null ? [thrown(result.error)] : [], fixed, force);
 		}
 		diagnostics = result.diagnostics;
-		const fixes = diagnostics.flatMap((diagnostic) => fixesFor(code, diagnostic));
+		const stateArguments = propStateArguments(code, filename, diagnostics);
+		const fixes = diagnostics.flatMap((diagnostic) => fixesFor(code, diagnostic, stateArguments));
 		if (fixes.length === 0) break;
 		const { text, applied } = applyFixes(code, fixes);
 		if (applied.length === 0) break;
@@ -124,6 +127,7 @@ function fallback(
 function fixesFor(
 	code: string,
 	diagnostic: CompileDiagnostic,
+	stateArguments: ReturnType<typeof propStateArguments>,
 ): { code: string; edits: { start: number; end: number; text: string }[] }[] {
 	const fixes: { code: string; edits: { start: number; end: number; text: string }[] }[] = [];
 	for (const suggestion of diagnostic.suggestions ?? []) {
@@ -144,22 +148,70 @@ function fixesFor(
 			fixes.push({ code: diagnostic.code, edits: [{ start: comma.index, end, text: '' }] });
 		}
 	}
-	if (diagnostic.code === 'OCTANE_STRONG_UNLINKED_PROP_STATE') {
-		const before = /\S\s*$/.exec(code.slice(0, start))?.[0][0];
-		const value = code.slice(start, end);
-		if (before === '(') {
-			// useState(prop): React captured the value once, as a lazy
-			// initializer does.
-			const body = /^[\w$.]+$/.test(value) ? value : `(${value})`;
-			fixes.push({ code: diagnostic.code, edits: [{ start, end, text: `() => ${body}` }] });
-		} else if (before === ',') {
-			// useReducer(reducer, prop): an explicit initializer is the
-			// deliberate capture.
+	if (diagnostic.code === UNLINKED_PROP_STATE) {
+		const match = stateArguments?.get(`${start}:${end}`);
+		if (!match) return fixes;
+		const { start: from, end: to } = match.argument;
+		if (match.reducer) {
 			fixes.push({
 				code: diagnostic.code,
-				edits: [{ start: end, end, text: ', (initial) => initial' }],
+				edits: [{ start: to, end: to, text: ', (initial) => initial' }],
 			});
+		} else {
+			// Preserve eager evaluation and keep the original type for hook overload inference.
+			const capture =
+				"(<Input,>(initial: Input): Input => typeof initial === 'function' ? initial : (() => initial) as Input)";
+			const text = `${capture}(${code.slice(from, to)})`;
+			fixes.push({ code: diagnostic.code, edits: [{ start: from, end: to, text }] });
 		}
 	}
 	return fixes;
+}
+
+function propStateArguments(code: string, filename: string, diagnostics: CompileDiagnostic[]) {
+	const diagnosticsForState = diagnostics.filter(
+		(diagnostic) => diagnostic.code === UNLINKED_PROP_STATE,
+	);
+	if (diagnosticsForState.length === 0) return;
+	const ranges = new Set(
+		diagnosticsForState.map(({ start, end }) => `${start?.offset}:${end?.offset}`),
+	);
+	const { program, errors } = parseSync(filename, code, { preserveParens: true });
+	if (errors.length > 0) return;
+	const matches = new Map<string, { argument: Argument; reducer: boolean }>();
+	function visit(node: unknown): void {
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (!node || typeof node !== 'object' || !('type' in node)) return;
+		if (node.type === 'CallExpression') {
+			const { arguments: args } = node as CallExpression;
+			const argument = args.at(-1);
+			if (argument && args.length <= 2 && args.every(({ type }) => type !== 'SpreadElement')) {
+				// The diagnostic points to the expression inside any wrappers.
+				const { start, end } = unwrapArgument(argument);
+				const range = `${start}:${end}`;
+				if (ranges.has(range)) matches.set(range, { argument, reducer: args.length === 2 });
+			}
+		}
+		for (const child of Object.values(node)) visit(child);
+	}
+	visit(program);
+	return matches;
+}
+
+function unwrapArgument(argument: Argument): Argument {
+	switch (argument.type) {
+		case 'ChainExpression':
+		case 'ParenthesizedExpression':
+		case 'TSAsExpression':
+		case 'TSInstantiationExpression':
+		case 'TSNonNullExpression':
+		case 'TSSatisfiesExpression':
+		case 'TSTypeAssertion':
+			return unwrapArgument(argument.expression);
+		default:
+			return argument;
+	}
 }
