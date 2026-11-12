@@ -10,12 +10,21 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
+import {
+	preconnect as reactPreconnect,
+	prefetchDNS as reactPrefetchDNS,
+	preinit as reactPreinit,
+	preinitModule as reactPreinitModule,
+	preload as reactPreload,
+	preloadModule as reactPreloadModule,
+} from 'react-dom';
 import { renderToString as reactRenderToString, renderToPipeableStream } from 'react-dom/server';
 import { PassThrough } from 'node:stream';
 import { join } from 'node:path';
 import { OctaneCompat } from 'octane/react';
 import { act as octaneAct } from 'octane';
 import { OctaneCompat as OctaneCompatServer } from 'octane/react/server';
+import { renderToString as renderOctaneToString } from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
 import { createLog } from '../_helpers.js';
 import { h, mountReactHost, reactAct } from './_react-host.js';
@@ -675,6 +684,110 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 		}
 	});
 
+	it.each([true, false])(
+		'sends resource hints from an island to its React host (dev=%s)',
+		(dev) => {
+			const { HintIsland, NestedHint } = loadCompiledFixtureSource(
+				`import { preconnect, prefetchDNS, preinit, preinitModule, preload, preloadModule } from 'octane';
+			export function HintIsland({ renderNested }) @{
+				renderNested();
+				preconnect('https://cdn.example');
+				prefetchDNS('https://dns.example');
+				preload('/hosted.woff2', { as: 'font' });
+				preinit('/hosted.css', { as: 'style' });
+				preloadModule('/hosted-preload.js');
+				preinitModule('/hosted-execute.js');
+				<p>ready</p>
+			}
+			export function NestedHint() @{
+				preinit('/nested.css', { as: 'style' });
+				<p>nested</p>
+			}`,
+				{ id: 'hosted-resource-hints.tsrx', mode: 'server', compileOptions: { hmr: false, dev } },
+			);
+			function Reference() {
+				reactPreload('/hosted.css', { as: 'style', integrity: 'sha256-example' });
+				reactPreconnect('https://cdn.example');
+				reactPrefetchDNS('https://dns.example');
+				reactPreload('/hosted.woff2', { as: 'font' });
+				reactPreinit('/hosted.css', { as: 'style' });
+				reactPreloadModule('/hosted-preload.js');
+				reactPreinitModule('/hosted-execute.js');
+				return h('p', null, 'ready');
+			}
+			let nestedHtml = '';
+			function Host() {
+				reactPreload('/hosted.css', { as: 'style', integrity: 'sha256-example' });
+				return h(
+					OctaneCompatServer,
+					null,
+					h(HintIsland, {
+						renderNested() {
+							nestedHtml = renderOctaneToString(NestedHint).html;
+						},
+					}),
+				);
+			}
+			const expected = reactRenderToString(h(Reference, null));
+			const actual = reactRenderToString(h(Host, null));
+			const resources = /<(?:link|script)\b[^>]*>/g;
+			expect(actual.match(resources)).toEqual(expected.match(resources));
+			expect(actual).toContain('<p>ready</p>');
+			expect(nestedHtml).toContain('href="/nested.css"');
+			expect(nestedHtml).toContain('<p>nested</p>');
+		},
+	);
+
+	it('adopts a document module preload while hydrating a hosted island', async () => {
+		const source = `
+			import { preloadModule } from 'octane';
+			export function HintIsland({ hint }) @{
+				if (hint) preloadModule('/hosted-hydration.js', { as: 'worker' });
+				<p>ready</p>
+			}
+		`;
+		const id = 'hosted-hint-hydration.tsrx';
+		const compileOptions = { hmr: false, dev: false };
+		const { HintIsland: ServerHintIsland } = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'server',
+			compileOptions,
+		});
+		const { HintIsland: ClientHintIsland } = loadCompiledFixtureSource(source, {
+			id,
+			mode: 'client',
+			compileOptions,
+		});
+		const container = document.createElement('div');
+		container.innerHTML = reactRenderToString(
+			h(OctaneCompatServer, null, h(ServerHintIsland, { hint: false })),
+		);
+		document.body.appendChild(container);
+		const body = container.querySelector('p');
+		const selector = 'link[rel="modulepreload"][href="/hosted-hydration.js"]';
+		// Seed the document separately so React SSR doesn't also exercise
+		// the client hint dispatcher in this shared jsdom process.
+		const resource = document.createElement('link');
+		resource.setAttribute('rel', 'modulepreload');
+		resource.setAttribute('href', '/hosted-hydration.js');
+		resource.setAttribute('as', 'worker');
+		document.head.appendChild(resource);
+		expect(body?.textContent).toBe('ready');
+		const { hydrateRoot } = await import('react-dom/client');
+		let root!: ReturnType<typeof hydrateRoot>;
+		try {
+			await reactAct(async () => {
+				root = hydrateRoot(container, h(OctaneCompat, null, h(ClientHintIsland, { hint: true })));
+			});
+			expect(container.querySelector('p')).toBe(body);
+			expect([...document.querySelectorAll(selector)]).toEqual([resource]);
+		} finally {
+			await reactAct(async () => root?.unmount());
+			container.remove();
+			for (const node of document.querySelectorAll(selector)) node.remove();
+		}
+	});
+
 	it('rejects hoisted head content from islands (§9.2 v1) — at hosted-render time', () => {
 		// Head hoisting (from any depth) is a supported server feature now, so the
 		// compiler accepts the fixture; the §9.2 v1 policy is enforced by
@@ -692,6 +805,44 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 });
 
 describe('octane/react/server — Fizz streaming retry state (§9.1)', () => {
+	it('sends hints from a retried island to the matching streamed request', async () => {
+		const { HintIsland } = loadCompiledFixtureSource(
+			`import { preinit, use } from 'octane';
+			export function HintIsland({ resource }) @{
+				const href = use(resource);
+				preinit(href, { as: 'style' });
+				<p>ready</p>
+			}`,
+			{ id: 'streamed-hints.tsrx', mode: 'server' },
+		);
+		const first = deferred<string>();
+		const second = deferred<string>();
+		function start(resource: Promise<string>) {
+			return streamPage(
+				h(
+					React.Suspense,
+					{ fallback: h('p', null, 'loading') },
+					h(OctaneCompatServer, null, h(HintIsland, { resource })),
+				),
+			);
+		}
+		const a = start(first.promise);
+		const b = start(second.promise);
+		await nextTurns();
+		second.resolve('/second-hint.css');
+		await b.done;
+		first.resolve('/first-hint.css');
+		await a.done;
+		expect(a.errors).toEqual([]);
+		expect(b.errors).toEqual([]);
+		expect(a.html().match(/<link\b[^>]*>/g)).toEqual([
+			expect.stringContaining('href="/first-hint.css"'),
+		]);
+		expect(b.html().match(/<link\b[^>]*>/g)).toEqual([
+			expect.stringContaining('href="/second-hint.css"'),
+		]);
+	});
+
 	it('completes a suspended island through Fizz with a request-local session (no fresh-pass loop)', async () => {
 		const log = createLog();
 		const resource = deferred<string>();
