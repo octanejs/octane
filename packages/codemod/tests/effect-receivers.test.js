@@ -1,16 +1,26 @@
 // @vitest-environment jsdom
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { act, createElement, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import {
+	act,
+	createElement,
+	useEffect,
+	useEffectEvent,
+	useImperativeHandle,
+	useRef,
+	useState,
+} from 'react';
+import { preinit } from 'react-dom';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { createRoot as reactRoot } from 'react-dom/client';
 import { Activity, createElement as octaneElement, createRoot } from 'octane';
 import { expect, it } from 'vitest';
 import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
 import { flushEffects } from '../../octane/tests/_helpers.js';
 
-function migrate(source) {
+function migrate(source, strong = true) {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'effect-receivers-'));
 	try {
 		fs.writeFileSync(path.join(root, 'package.json'), '{"type":"module"}');
@@ -21,12 +31,19 @@ function migrate(source) {
 			'dir',
 		);
 		const bin = path.resolve(import.meta.dirname, '../dist/bin.js');
-		const result = execFileSync(
-			process.execPath,
-			[bin, '--strong', '--print', '--json', 'Probe.tsx'],
-			{ cwd: root, encoding: 'utf8' },
+		const args = [bin, '--print', '--json', 'Probe.tsx'];
+		if (strong) args.push('--strong');
+		const result = spawnSync(process.execPath, args, { cwd: root, encoding: 'utf8' });
+		expect(result.error).toBeUndefined();
+		const file = JSON.parse(result.stdout).files[0];
+		const ownership = file.notes.some(
+			(note) =>
+				note.severity === 'error' &&
+				note.rule === 'hook-dependencies' &&
+				note.message.includes('getter owned by React'),
 		);
-		return JSON.parse(result).files[0];
+		expect(result.status, result.stdout + result.stderr).toBe(ownership ? 1 : 0);
+		return file;
 	} finally {
 		fs.rmSync(root, { recursive: true, force: true });
 	}
@@ -46,6 +63,57 @@ const propertySource = source
 	.replace('{ receiver, revision }', '{ receiver, revision, trigger }')
 	.replace('[receiver]', '[receiver, trigger.value, trigger.value, trigger.nested?.end]');
 
+const dependencyError = expect.objectContaining({
+	rule: 'hook-dependencies',
+	severity: 'error',
+	message: expect.stringContaining('getter owned by React'),
+});
+
+it('reports an opaque effect dependency whose getter registers a React SSR stylesheet', () => {
+	function Reference({ probe }) {
+		const work = useEffectEvent(() => {});
+		useEffect(() => {
+			return work();
+		}, [probe.value]);
+		return createElement('b', null, 'ok');
+	}
+	const html = renderToStaticMarkup(
+		createElement(Reference, {
+			probe: {
+				get value() {
+					preinit('/snapshot.css', { as: 'style' });
+					return 1;
+				},
+			},
+		}),
+	);
+	expect(html).toContain('<link rel="stylesheet" href="/snapshot.css"');
+	expect(html).toContain('<b>ok</b>');
+
+	const input = `import { useEffect, useEffectEvent } from 'react';
+		export function Probe({ probe }: { probe: { value: number } }) {
+			const work = useEffectEvent(() => {});
+			useEffect(() => { return work(); }, [probe.value]);
+			return <b>ok</b>;
+		}`;
+	for (const strong of [false, true])
+		expect(migrate(input, strong).notes).toContainEqual(dependencyError);
+
+	const literal = input.replace(
+		'({ probe }: { probe: { value: number } }) {',
+		'() { const probe = { "value": 1 };',
+	);
+	expect(migrate(literal).notes).not.toContainEqual(dependencyError);
+	const alias = literal.replace(
+		'const work',
+		'const alias = probe; Object.defineProperty(alias, "value", { get() { return 2; } }); const work',
+	);
+	expect(migrate(alias).notes).toContainEqual(dependencyError);
+	expect(
+		migrate(input.replace('[probe.value]', '[({trigger: probe.value}).trigger]')).notes,
+	).toContainEqual(dependencyError);
+});
+
 it.each([
 	['block', false],
 	['block', true],
@@ -61,6 +129,7 @@ it.each([
 		withRevision ? input.replace('[receiver]', '[receiver, revision]') : input,
 	);
 	expect(migrated.strong).toBe(true);
+	if (withProperties) expect(migrated.notes).toContainEqual(dependencyError);
 	if (comment) expect(migrated.code).toContain(comment.trim());
 	const native = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
 	function Reference({ receiver, revision, trigger }) {

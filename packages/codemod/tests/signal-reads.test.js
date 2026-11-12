@@ -58,7 +58,11 @@ it.each([
 ])(
 	'follows the current signal through hydration, replacement and unmount in %s',
 	(_mode, source, strong) => {
-		const migrated = migrate("import 'octane/signals';\n" + source);
+		const migrated = migrate("import 'octane/signals';\n" + source, strong);
+		if (!strong)
+			expect(migrated.notes).toContainEqual(
+				expect.objectContaining({ rule: 'hook-dependencies', severity: 'error' }),
+			);
 		expect(migrated.rules['native-signal-read']).toBe(1);
 		expect(migrated.strong).toBe(strong);
 		expect(migrated.code).not.toContain('useSyncExternalStore');

@@ -383,6 +383,8 @@ export function useCellValue(definition) {
 
 When an effect with dependencies such as `[controller]` reads `controller.value` or calls `controller.start()`, Strong migration can preserve the original object-identity dependency. For an unused dependency such as `revision` in `[controller, revision]`, the codemod can emit `void revision` inside the effect so a revision change still triggers cleanup and setup. It attempts these rewrites for immutable bindings and verifies the resulting dependencies with the project compiler. An imperative handle can use the same rewrite with a list of fixed bindings, keeping property reads inside its factory.
 
+A property in an explicit `useEffect` dependency list is read during rendering. The codemod reports reads that can invoke an opaque getter, including in compatibility output. A private, fixed local object with a known own data field can still be used as a dependency.
+
 For a component that already receives an Octane writable signal, Strong migration can
 replace `useSyncExternalStore(notify => cell.subscribe(notify), () => cell.get(), () => cell.get())`
 with `cell.get()` in a module that already opts in to native signal tracking. The receiver must
