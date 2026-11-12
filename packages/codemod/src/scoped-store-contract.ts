@@ -40,8 +40,9 @@ function relative(from: string, to: string) {
 	const spec = path.relative(path.dirname(from), to).split(path.sep).join('/').replace(/\.ts$/, '');
 	return spec.startsWith('../') || spec.startsWith('./') ? spec : './' + spec;
 }
-function runtime(s: ts.ImportDeclaration | ts.ExportDeclaration) {
+function runtime(s: ts.ImportDeclaration | ts.ExportDeclaration, verbatim = false) {
 	if ((ts.isImportDeclaration(s) ? s.importClause : s)?.isTypeOnly) return false;
+	if (verbatim) return true;
 	const bindings = ts.isExportDeclaration(s)
 		? s.exportClause
 		: s.importClause?.name
