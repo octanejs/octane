@@ -26,6 +26,8 @@ export function pathSvg(source: string) {
 	return function PathSvg(props: {
 		className?: unknown;
 		'aria-hidden'?: string | boolean;
+		fill?: string;
+		focusable?: string;
 		[name: `data-${string}`]: string | undefined;
 	}) {
 		const attributes: Record<string, unknown> = {
@@ -35,7 +37,10 @@ export function pathSvg(source: string) {
 			children: children.map((render) => render()),
 		};
 		for (const name in props) {
-			if (svgDataAttribute(name) && Object.prototype.hasOwnProperty.call(props, name)) {
+			if (
+				(name === 'fill' || name === 'focusable' || svgDataAttribute(name)) &&
+				Object.prototype.hasOwnProperty.call(props, name)
+			) {
 				const value = props[name];
 				if (typeof value === 'string') attributes[name] = value;
 			}
