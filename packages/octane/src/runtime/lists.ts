@@ -29,7 +29,12 @@ import {
 	renderingFocus,
 	captureFocusedMovement,
 } from './engine.js';
-import { isSuspenseException, retainDiscardedWarmMemos } from './use.js';
+import {
+	type TrackedThenable,
+	isSuspenseException,
+	retainDiscardedWarmMemos,
+	suspensionOnAll,
+} from './use.js';
 import { registerRootOptions } from './drivers.js';
 import { CONTEXT_DEPENDENCIES, isHostContextRequest } from './context.js';
 import { CURSOR, isRendererHydrationStyle, auditHydrationProbe } from './hydration.js';
@@ -957,9 +962,53 @@ function updateSurvivor<T>(
 			// body's third arg (the same slot renderBlock forwards block.extra to).
 			renderLiteListItem(block, itemBody as ComponentBody, env);
 		} else {
-			renderBlock(block);
+			try {
+				renderBlock(block);
+			} catch (error) {
+				if (!deferRowSuspension(error)) throw error;
+			}
 		}
 	}
+}
+
+// Thenables that rows of the list rendering now suspended on, from index
+// ROWS_FROM; -1 while no list collects them. A row that suspends ends only its
+// own render: the rows after it still render, so each one's use() starts or
+// observes its thenable in this pass, and the list suspends once, on all of
+// them. Suspending at the first row instead retried once per suspending row,
+// and every retry rendered all the rows before the next pending one again.
+// Only a survivor's update and a first fill defer: a row they leave suspended
+// changes no list structure, as a mount between surviving rows would.
+const SUSPENDED_ROWS: TrackedThenable<unknown>[] = [];
+let ROWS_FROM = -1;
+
+/** Open a list's collection; returns the enclosing list's, for closeRows. */
+function openRows(): number {
+	const outer = ROWS_FROM;
+	// Hydration adopts server rows in order, so a row it cannot finish stays where
+	// the cursor stopped.
+	ROWS_FROM = ROOT_ROLLBACK ? (hydrating ? -1 : SUSPENDED_ROWS.length) : -1;
+	return outer;
+}
+
+function deferRowSuspension(error: unknown): boolean {
+	if (ROWS_FROM < 0 || !isSuspenseException(error)) return false;
+	SUSPENDED_ROWS.push(error.thenable);
+	return true;
+}
+
+/**
+ * Close the list's collection, opened at `from`. Returns what the list throws:
+ * `error`, which ended the list early (null when it completed), unless rows
+ * before it suspended. Their suspension wins, as it did when it ended the list
+ * before a later row rendered.
+ */
+function closeRows(outer: number, from: number, error: unknown): unknown {
+	ROWS_FROM = outer;
+	if (from < 0 || SUSPENDED_ROWS.length === from) return error;
+	const members = SUSPENDED_ROWS.splice(from);
+	if (isSuspenseException(error)) members.push(error.thenable);
+	return suspensionOnAll(members);
 }
 
 export type ListKeySource<T> = readonly any[] | ((item: T, index: number) => any);
@@ -1057,6 +1106,8 @@ export function mountItemsLinear<T>(
 	let run: DocumentFragment | null = null;
 	let wraps: any[] | null = null;
 	let prev: Block | null = null;
+	const outer = openRows();
+	const from = ROWS_FROM;
 	try {
 		for (let i = 0; i < newLen; i++) {
 			const item = items[i];
@@ -1073,33 +1124,41 @@ export function mountItemsLinear<T>(
 					adoptByKey.set(key, -candidate - 1);
 				} else into = run ??= queueFrontier(parentBlock, parentNode, null);
 			}
-			const block: Block =
-				hydrating && passthroughList
-					? mountPassthroughListItem(
-							parentBlock,
-							parentNode,
-							anchor!,
-							item,
-							i,
-							key,
-							itemBody,
-							state,
-						)
-					: mountItem(
-							parentBlock,
-							into,
-							anchor,
-							item,
-							i,
-							key,
-							itemBody,
-							state,
-							singleRoot,
-							ssrMarkerless,
-							adoptNode,
-							false,
-							next,
-						);
+			let block: Block;
+			try {
+				block =
+					hydrating && passthroughList
+						? mountPassthroughListItem(
+								parentBlock,
+								parentNode,
+								anchor!,
+								item,
+								i,
+								key,
+								itemBody,
+								state,
+							)
+						: mountItem(
+								parentBlock,
+								into,
+								anchor,
+								item,
+								i,
+								key,
+								itemBody,
+								state,
+								singleRoot,
+								ssrMarkerless,
+								adoptNode,
+								false,
+								next,
+							);
+			} catch (error) {
+				// mountItem discarded the row. The fill cannot complete, and its catch
+				// below discards the rows after it too.
+				if (deferRowSuspension(error)) continue;
+				throw error;
+			}
 			if (adoptNode !== null && block.startMarker !== adoptNode)
 				(wraps ??= []).push(block, adoptNode);
 			oldItems.set(key, block);
@@ -1109,9 +1168,12 @@ export function mountItemsLinear<T>(
 			else state.head = block;
 			prev = block;
 		}
+		const suspended = closeRows(outer, from, null);
+		if (suspended !== null) throw suspended;
 		state.tail = prev;
 		state.size = newLen;
-	} catch (error) {
+	} catch (thrown) {
+		const error = closeRows(outer, from, thrown);
 		// Adopted nodes still belong to the committed raw host tree and the cleanup
 		// below deliberately leaves them connected. Keep the full queue so the root
 		// rollback/retry can adopt the same prefix instead of mounting duplicates.
@@ -1279,6 +1341,42 @@ export function reconcileKeyed<T>(
 	// a sole-component row, markerless on the client only (mountItem).
 	ssrMarkerless: boolean | 2 = false,
 	normalizeKey: boolean = false,
+): void {
+	const outer = openRows();
+	const from = ROWS_FROM;
+	try {
+		reconcileRows(
+			parentBlock,
+			state,
+			items,
+			keySource,
+			itemBody,
+			pure,
+			singleRoot,
+			lite,
+			indexIndependent,
+			ssrMarkerless,
+			normalizeKey,
+		);
+	} catch (error) {
+		throw closeRows(outer, from, error);
+	}
+	const suspended = closeRows(outer, from, null);
+	if (suspended !== null) throw suspended;
+}
+
+function reconcileRows<T>(
+	parentBlock: Block,
+	state: ForSlot,
+	items: ArrayLike<T>,
+	keySource: ListKeySource<T>,
+	itemBody: (item: T, scope: Scope) => void,
+	pure: boolean,
+	singleRoot: boolean | 2,
+	lite: boolean,
+	indexIndependent: boolean,
+	ssrMarkerless: boolean | 2,
+	normalizeKey: boolean,
 ): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_RECONCILE);

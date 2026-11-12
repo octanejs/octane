@@ -245,6 +245,34 @@ export function resumeOnSettle(wakeable: PromiseLike<unknown>, retry: () => void
 	wakeable.then(onSettle, onSettle);
 }
 
+/**
+ * One suspension on every member: the retry waits until all of them fulfil, or
+ * for the first rejection. A single member is suspended on DIRECTLY, with semantics
+ * (and microtask hop count) identical to a plain use() suspension, so
+ * attachResume's pendingThenable dedup keeps working on its stable identity.
+ * The combined wakeable is fresh on every attempt, so it carries the members'
+ * settled history: once it settles they count as seen, and one that suspends
+ * again paces its retry by a macrotask, as resumeOnSettle does for one.
+ */
+export function suspensionOnAll(members: TrackedThenable<any>[]): SuspenseException {
+	if (members.length === 1) return new SuspenseException(members[0]);
+	let remaining = members.length;
+	let seen = false;
+	const combined: TrackedThenable<void> = new Promise<void>((resolve, reject) => {
+		for (let i = 0; i < members.length; i++) {
+			if (SETTLED_WAKEABLES?.has(members[i]) === true) seen = true;
+			members[i].then(() => {
+				if (--remaining !== 0) return;
+				const settled = (SETTLED_WAKEABLES ??= new WeakSet());
+				for (let j = 0; j < members.length; j++) settled.add(members[j]);
+				resolve();
+			}, reject);
+		}
+	});
+	if (seen) SETTLED_WAKEABLES!.add(combined);
+	return new SuspenseException(combined);
+}
+
 // Tag a thenable's `status`/`value`/`reason` expandos and attach the settle
 // listeners exactly once (a thenable that already carries a status — React 19
 // cache() shape, or one we tagged earlier — is left untouched).
@@ -348,20 +376,7 @@ function useBatchImpl(items: any[], warm?: () => void): void {
 	}
 	if (pending === null) return;
 	runActiveWarmPlans(warm);
-	// Single pending member: suspend on it DIRECTLY — semantics (and microtask
-	// hop count) identical to a plain use() suspension, and attachResume's
-	// pendingThenable dedup keeps working on the stable promise identity.
-	if (pending.length === 1) throw new SuspenseException(pending[0]);
-	const members = pending;
-	let remaining = members.length;
-	const combined: TrackedThenable<void> = new Promise<void>((resolve, reject) => {
-		for (let i = 0; i < members.length; i++) {
-			members[i].then(() => {
-				if (--remaining === 0) resolve();
-			}, reject);
-		}
-	});
-	throw new SuspenseException(combined);
+	throw suspensionOnAll(pending);
 }
 export const useBatch: typeof useBatchImpl = /* @__PURE__ */ rollbackEntry(useBatchImpl);
 

@@ -1839,6 +1839,12 @@ and remains sequential.
   suspended data (compiled `__warm` plans, depth-capped recursion), so a nested
   async chain loads in max(latency), not levels × latency —
   `benchmarks/async-waterfall`: 20.1ms vs React's 307.3ms on a 10-level chain.
+- **Suspending rows of one keyed list start together**: the rows after a
+  suspended row still render in that pass, so the list suspends once, on every
+  row's thenable, and retries once. React replays the suspended row once its
+  data lands and then continues to the next, so requests that rows create while
+  rendering start one after another. Rows behind a suspended one cannot report
+  an error before it settles, as in React.
 - Unwrap order, hydration-seed order, rejection routing (`@catch` receives the
   first-in-order reason), and `@pending`/transition semantics are unchanged.
 - Runtime safety nets (React parity): a replay that
