@@ -9,7 +9,7 @@ import { DATA } from '@octanejs/cli/data';
 import { JSDOM } from 'jsdom';
 import * as ReactServerBridge from 'octane/react/server';
 import { prerender } from 'octane/static';
-import { createElement as reactElement } from 'react';
+import { createElement as reactElement, isValidElement } from 'react';
 import { renderToStaticMarkup as renderReact } from 'react-dom/server';
 import { compileTypesInspection } from 'octane/compiler/volar';
 import { renderToStaticMarkup } from 'octane/server';
@@ -495,7 +495,7 @@ export function App({ rows }: { rows: string[] }) {
 	return <Panel>{rows.map((label, i) => <b key={i} className={label}>{label}</b>)}</Panel>;
 }
 export function Other({ Panel, rows }) {
-	return <Panel>{rows.map(label => <b key={label}>{label}</b>)}</Panel>;
+	return <Panel>{[...rows].map(label => <b key={label}>{label}</b>)}</Panel>;
 }`,
 		});
 		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
@@ -601,6 +601,11 @@ export function Host({rows}: { rows: Row[] }) {
 			expect(observe((rows) => renderToStaticMarkup(migrated[name], { rows }).html)).toEqual(react);
 		}
 		expect(file.strong).toBe(false);
+		expect(
+			file.notes.filter(
+				({ rule, message }) => rule === 'template-for' && message.includes('override .map()'),
+			),
+		).toEqual([expect.objectContaining({ severity: 'error' })]);
 
 		for (const config of ['"jsx":"react"', '"jsx":"react-jsx","jsxImportSource":"other"']) {
 			fs.writeFileSync(path.join(root, 'tsconfig.json'), '{"compilerOptions":{' + config + '}}');
@@ -664,8 +669,8 @@ export function Optional({ rows }: { rows: Rows | null }) {
 	const rows = ['first', , 'last'];
 	return <ul>{rows.map(label => <li key={label ?? 'hole'}>{label ?? 'hole'}</li>)}</ul>;
 }`,
-			'Native.tsx': `export function Native({ rows }: { rows: ReadonlyArray<string> }) {
-	return <ul>{rows.map(label => <li key={label}>{label}</li>)}</ul>;
+			'Native.tsx': `export function Native() {
+	return <ul>{['first', 'last'].map(label => <li key={label}>{label}</li>)}</ul>;
 }`,
 		});
 		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
@@ -703,6 +708,53 @@ export function Optional({ rows }: { rows: Rows | null }) {
 		expect(html).toContain('>last</li>');
 		expect(html).not.toContain('hole');
 	});
+
+	it.each([false, true])(
+		'reports a runtime map override for typed array props (project types: %s)',
+		async (projectTypes) => {
+			const root = project({
+				'tsconfig.json': '{"compilerOptions":{"strict":true,"jsx":"react-jsx"}}',
+				'View.tsx': `export function View({rows}: {rows: Array<{id: string}>}) {
+				return <main>{rows.map(row => <b key={row.id}>row</b>)}</main>;
+			}`,
+			});
+			fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+			const [file] = (await runCodemod([root], { strong: true, verify: true, projectTypes })).files;
+			expect(file.strong).toBe(false);
+			expect(file.notes).toContainEqual(
+				expect.objectContaining({
+					rule: 'template-for',
+					severity: 'error',
+					message: expect.stringContaining('inspect the React elements'),
+				}),
+			);
+			expect(file.code).toContain('rows.map(');
+			expect(file.code).not.toContain('@for');
+			const { View } = loadCompiledFixtureSource(file.code, { id: file.output, mode: 'server' });
+			const calls = [];
+			const rows = [{ id: 'first' }];
+			Object.defineProperty(rows, 'map', {
+				value(callback) {
+					const valid = isValidElement(callback(this[0], 0, this));
+					calls.push(valid);
+					return [valid ? 'react-row' : 'foreign-row'];
+				},
+			});
+			const original = renderReact(
+				reactElement(
+					'main',
+					null,
+					rows.map((row) => reactElement('b', { key: row.id }, 'row')),
+				),
+			);
+			expect(original).toBe('<main>react-row</main>');
+			expect(calls).toEqual([true]);
+			calls.length = 0;
+			const html = renderToStaticMarkup(View, { rows }).html;
+			expect(calls).toHaveLength(1);
+			expect(html).toBe(calls[0] ? original : '<main>foreign-row</main>');
+		},
+	);
 
 	it('warns for element-valued template children and preserves the caller contract', async () => {
 		const root = project({
@@ -2853,7 +2905,7 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 				.filter((file) => file.strong === false)
 				.flatMap((file) => file.diagnostics.map((d) => d.code)),
 		);
-		// Raw HTML and mapped rows with observable key evaluation need review.
+		// Raw HTML, opaque map dispatch, and observable row-key order need review.
 		expect([...blockers].sort()).toEqual(['OCTANE_STRONG_MAP_JSX', 'OCTANE_STRONG_UNTRUSTED_HTML']);
 		expect(
 			strong.files
@@ -3247,6 +3299,11 @@ describe('scoped signal recipe', () => {
 });
 
 describe('React Intl project migration', () => {
+	const opaqueFormatter = expect.objectContaining({
+		rule: 'bindings',
+		severity: 'error',
+		message: expect.stringContaining('React Intl formatter'),
+	});
 	const localeCode = `import { useIntl as useLocale, FormattedMessage, type IntlShape, defineMessages } from 'react-intl';
 export function Greeting({ count }: { count: number }) {
 	const intl = useLocale();
@@ -3262,6 +3319,38 @@ export function Greeting({ count }: { count: number }) {
 		}
 		return root;
 	}
+	it.each([false, true])(
+		'reports opaque formatter ownership in native calls and generated rich islands (projectTypes=%s)',
+		async (projectTypes) => {
+			const direct = `import {useIntl} from 'react-intl'; export function Text() {
+				const intl=useIntl(); return <p title={intl.formatMessage({id:'label',defaultMessage:'Ready'})}/>;
+			}`;
+			const rich = `import {FormattedMessage as Message} from 'react-intl'; export function Rich(){
+				return <div><Message id="more" defaultMessage="Read <em>more</em>" values={{em: part => <em>{part}</em>}}/></div>;
+			}`;
+			const root = setup({
+				'Direct.tsx': direct,
+				'Rich.tsx': rich,
+				'Closed.tsx': `import './setup'; import {IntlProvider} from 'react-intl';
+					${direct.replace('export function Text', 'function Text')}
+					export function Page(){return <IntlProvider locale="en"><Text/></IntlProvider>;}`,
+				'setup.ts': `import {IntlProvider} from 'react-intl';
+					IntlProvider.defaultProps = {...IntlProvider.defaultProps, messages: {label:'patched'}};`,
+			});
+			const result = await runCodemod(
+				['Direct.tsx', 'Rich.tsx', 'Closed.tsx'].map((name) => path.join(root, name)),
+				{ root, write: false, strong: true, projectTypes },
+			);
+			for (const name of ['Direct.tsx', 'Rich.tsx', 'Closed.tsx']) {
+				const file = result.files.find((f) => f.file === name);
+				const isRich = file.file === 'Rich.tsx';
+				expect(file.notes.filter((d) => d.message.includes('React Intl formatter'))).toEqual([
+					opaqueFormatter,
+				]);
+				expect(file.code).toContain(isRich ? 'IntlBoundary' : 'intl.formatMessage(');
+			}
+		},
+	);
 	it('migrates a locale binding only below its own React Intl provider', async () => {
 		const enclosed = `import {IntlProvider as Provider, useIntl} from 'react-intl';
 			function Locale() { const { locale } = useIntl(); return <p lang={locale}/>; }
@@ -3360,7 +3449,9 @@ export function Greeting({ count }: { count: number }) {
 		});
 		const page = both.files.find((f) => f.file === 'src/Greeting.tsx');
 		expect(page.rules['react-intl']).toBe(1);
-		expect([...page.notes, ...page.diagnostics].filter((d) => d.severity === 'error')).toEqual([]);
+		expect([...page.notes, ...page.diagnostics].filter((d) => d.severity === 'error')).toEqual([
+			opaqueFormatter,
+		]);
 	});
 	it('follows a localized prop through one selected component into its returned input', async () => {
 		const pages = {
@@ -3447,10 +3538,15 @@ export function Greeting({ count }: { count: number }) {
 				{ root, write: false, strong: true, projectTypes: false },
 			);
 			const page = results.find((f) => f.file === 'src/Greeting.tsx');
-			expect(page.notes.some((n) => n.rule === 'bindings' && n.severity === 'error')).toBe(
-				!expected,
-			);
-			if (expected) expect(page.rules['react-intl']).toBe(1);
+			const errors = page.notes.filter((n) => n.rule === 'bindings' && n.severity === 'error');
+			if (expected) {
+				expect(errors).toEqual([opaqueFormatter]);
+				expect(page.rules['react-intl']).toBe(1);
+			} else {
+				expect(errors).toContainEqual(
+					expect.objectContaining({ message: expect.stringContaining('is a React hook') }),
+				);
+			}
 		}
 	});
 	it('defers a forwarded attribute when the caller resolves components in a nested project', async () => {
@@ -3509,7 +3605,9 @@ export function Greeting({ count }: { count: number }) {
 			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
 		);
 		expect(page.rules['react-intl']).toBe(1);
-		expect([...page.notes, ...page.diagnostics].filter((n) => n.severity === 'error')).toEqual([]);
+		expect([...page.notes, ...page.diagnostics].filter((n) => n.severity === 'error')).toEqual([
+			opaqueFormatter,
+		]);
 	});
 	it('keeps the formatter diagnostic when a wrapper may observe or render its raw value', async () => {
 		const wrappers = [
@@ -3583,9 +3681,9 @@ export function Locale() { return <IntlProvider locale="en"><b>test</b></IntlPro
 		});
 		const result = preview.files.find((f) => f.file === 'src/Greeting.tsx');
 		expect(result.strong).toBe(true);
-		expect([...result.notes, ...result.diagnostics].filter((d) => d.severity === 'error')).toEqual(
-			[],
-		);
+		expect([...result.notes, ...result.diagnostics].filter((d) => d.severity === 'error')).toEqual([
+			opaqueFormatter,
+		]);
 		expect(result.code).toContain(
 			"useIntl as useLocale, FormattedMessage } from './octane-react-intl.tsrx'",
 		);

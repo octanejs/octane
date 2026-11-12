@@ -32,7 +32,7 @@ bundler plugin and `tsconfig` over to Octane and install the dependencies.
 | `template-component` | `function C() { …; return <div /> }` | `function C() @{ …; <div /> }` |
 | `template-if` | `{a ? <A /> : <B />}`, `{a > 0 && <A />}` (also through a `const`) | `@if (a) { <A /> } @else { <B /> }` |
 | `template-if` | `if (a) return <A />; …; return <B />` in a component | `@if (a) { <A /> } @else { …; <B /> }` |
-| `template-for` | `{xs.map((x, i) => <li key={x.id} />)}` | `@for (const x of xs; index i; key x.id) { <li /> }` |
+| `template-for` | `{[1, 2].map(x => <li key={x} />)}` | `@for (const x of [1, 2]; key x) { <li /> }` |
 | `template-try` | `<Suspense fallback={f}>…</Suspense>` | `@try { … } @pending { f }` |
 | `template-text` | `{title}` with `title: string`, `{count}` with `count: number` | `{title as string}`, `{String(count)}`: text bindings, not renderable holes |
 | `hook-dependencies` | `useEffect(fn)` (runs every render) | `useEffect(fn, null)`: an omitted list is inferred in Octane |
@@ -124,6 +124,11 @@ Octane's Vite and Rspack integrations resolve descriptor markers across imports.
 If a custom build compiles each file in isolation, supply the compiler's
 `isDescriptorChildrenImport` option or pass explicit `children={elements}`.
 With `--strong`, descriptor inspection still requires compatibility mode.
+
+The `@for` rewrite handles fresh array literals without holes and assumes the
+standard `Array.prototype.map`. An array supplied by a caller can override
+`.map()` and inspect the React elements its callback returns. The codemod keeps
+that call for review. Keep the list in React if its method relies on element identity.
 
 React's automatic JSX runtime evaluates a row's props and children before its
 separate key argument. For a simple row where that order is observable, the
@@ -224,6 +229,8 @@ Self-closing `FormattedMessage` elements can render text directly, including ICU
 Inside an authored `ReactCompat` boundary, a single original React component can be selected by a ternary that supplies different props on either branch. A namespaced bridge becomes a named import so the compiler can transport that child. Lists, optional children, and JSX-valued props require a React component to own their rendering.
 
 Inside a retained React component, a rich-text callback such as `chunks => <strong>{chunks}</strong>` can keep producing a genuine React element. When the codemod creates a React island for `FormattedMessage`, an inline substitution such as `values={{ lineBreak: <br /> }}` also stays in React if the other props and substitutions cannot observe a change in evaluation timing. The codemod recognizes a single intrinsic tag with literal attributes and an optional literal key. Callbacks can use their parameter as the sole child. Spreads, refs, and event handlers retain a migration diagnostic.
+
+A native `formatMessage` call can return the expected string while losing resource hints scheduled by a provider-supplied formatter. An automatically generated `FormattedMessage` island can also lose access to other React ancestor contexts. The codemod retains the preview and reports a blocking diagnostic for these calls and islands. Review the actual provider and formatter before adopting them. A local `IntlProvider` can inherit configuration from its mutable class defaults. Explicitly authored React boundaries keep their existing contract.
 
 ## Store hooks in linked workspace packages
 
@@ -387,6 +394,8 @@ export function useCellValue(definition) {
 	return useSyncExternalStore(subscribe, get, getServer);
 }
 ```
+
+Strong migration can preserve a typed `useState<Element | null>(null)` setter used only as one native host `ref` in an ordinary React JSX project. The generated component uses `useSyncExternalStore` to observe attachment and detachment. This also covers ref commits owned by an ancestor Suspense boundary.
 
 When an effect with dependencies such as `[controller]` reads `controller.value` or calls `controller.start()`, Strong migration can preserve the original object-identity dependency. For an unused dependency such as `revision` in `[controller, revision]`, the codemod can emit `void revision` inside the effect so a revision change still triggers cleanup and setup. It attempts these rewrites for immutable bindings and verifies the resulting dependencies with the project compiler. An imperative handle can use the same rewrite with a list of fixed bindings, keeping property reads inside its factory.
 

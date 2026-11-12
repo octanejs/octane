@@ -1245,7 +1245,7 @@ export type Qualified = typeof R.createRef;`,
 		'migrates a literal key %s after row setup',
 		(key) => {
 			const source = `export function List({ rows }: { rows: string[] }) {
-			return <div>{rows.map(row => {
+			return <div>{[...rows].map(row => {
 				const label = row.toUpperCase();
 				return <b key=${key}>{label}</b>;
 			})}</div>;
@@ -1372,12 +1372,12 @@ export type Qualified = typeof R.createRef;`,
 		expect(compileErrors(code, 'menu.tsrx', true)).toContain('OCTANE_STRONG_MAP_JSX');
 	});
 
-	it('renders a keyed list when its iterable uses the row name in a separate scope', () => {
+	it('retains map dispatch on filtered collections even when the row binding is separate', () => {
 		const source = `export function Menu(props: { row: string[] }) {
   return <ul>{props.row.filter(row => row !== 'hidden').map(row => <li key={row}>{row}</li>)}</ul>;
 }`;
-		const { code } = transformModule(source, 'menu.tsx', { strong: true });
-		expect(compileErrors(code, 'menu.tsrx', true)).toEqual([]);
+		const { code } = transformModule(source, 'menu.tsx');
+		expect(compileErrors(code, 'menu.tsrx', true)).toContain('OCTANE_STRONG_MAP_JSX');
 		const { Menu } = loadCompiledFixtureSource(code, { id: 'menu.tsrx', mode: 'server' });
 		expect(renderToStaticMarkup(Menu, { row: ['B', , 'hidden', 'A'] }).html).toBe(
 			'<ul><li>B</li><li>A</li></ul>',

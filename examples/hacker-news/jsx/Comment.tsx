@@ -34,7 +34,7 @@ export function Comment({ id, depth }: { id: number; depth: number }) {
 				dangerouslySetInnerHTML={{ __html: data.text ?? '' }}
 			/>
 			{depth < MAX_DEPTH &&
-				kids.map((kid) => {
+				[...kids].map((kid) => {
 					const fallback = <div {...stylex.props(styles.comment)}>…</div>;
 					const child = <Comment id={kid} depth={depth + 1} />;
 					return <Suspense fallback={fallback} children={child} key={kid} />;

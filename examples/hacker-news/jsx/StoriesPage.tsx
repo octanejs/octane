@@ -28,7 +28,7 @@ function StoriesList({
 
 	return (
 		<div data-testid="stories-page" data-feed={feed} data-page={page}>
-			{items.map((story, i) => {
+			{[...items].map((story, i) => {
 				const rank = start + i + 1;
 				return <StoryRow rank={rank} story={story} key={story.id} />;
 			})}
