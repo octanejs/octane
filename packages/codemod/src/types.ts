@@ -9,6 +9,8 @@ export interface Note {
 export interface TransformOptions {
 	/** Try receiver captures for a Strong effect with an explicit object dependency. */
 	captureEffectReceivers?: boolean;
+	/** Retry empty effect dependency lists with their source-verified ref helpers. */
+	captureEffectHelpers?: boolean;
 	/** Also preserve eligible property triggers at the original effect statement. */
 	snapshotEffectProperties?: boolean;
 	captureEffectSnapshots?: boolean;
