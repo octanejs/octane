@@ -953,11 +953,45 @@ connects.
 
 Each event applies to every read that holds its records, with no request. A
 read whose load was in flight reloads, because that load may predate the
-event. The store keeps nothing for a record none of its reads holds. A server call's stream lasts at most 30 seconds, so
-`handler.listen` ends each connection after 25, and the store connects again
-at once from its cursor. A source with no cursor cannot resume: when its
-connection comes back, the store reloads what the feed covers. A change made
-between a read's load and the feed's first connection is not replayed.
+event. The store keeps nothing for a record none of its reads holds. A server
+call's stream lasts at most 30 seconds, so `handler.listen` ends each
+connection after 25, and the store connects again at once from its cursor. A
+source with no cursor cannot resume: when its connection comes back, the store
+reloads what the feed covers. A change made between a read's load and the
+feed's first connection is not replayed.
+
+A store with `persist` saves each feed's cursor with its saved values, so the
+next session resumes where the last one stopped and replays what happened
+while the page was closed. A saved value that missed an event because it was
+not in memory is restored stale and reloads when it is shown.
+
+#### Over a WebSocket or a broker
+
+A WebSocket connection has no time limit. Give the store a `webSocketListener`,
+and serve each socket with `handler.accept` once the host has upgraded the
+request and authenticated it:
+
+```ts
+// In the browser
+const store = createDataStore({
+	transport: serverTransport(data),
+	listen: webSocketListener(`wss://${location.host}/feeds`),
+});
+
+// On the server, in the host's upgrade handler (Bun, Deno, Workers or `ws`)
+handler.accept(socket, request, { viewer });
+```
+
+`accept` refuses a request from another origin, because a page on any site
+can open a socket with the user's cookies. A socket service with its own
+protocol can still feed the store: pass `encode` to write the message that
+subscribes, and `decode` to read each message as a frame.
+
+`pubSubListener(subscribe, { topic, decode })` listens through a message broker
+the page already uses: `subscribe(topic, deliver)` returns how to stop. Each
+message is the event unless `decode` reads it as a frame. A broker without
+retained history has no cursor, so when a dropped subscription comes back, the
+store reloads what the feed covers.
 
 ### Route seeds
 

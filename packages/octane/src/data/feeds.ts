@@ -6,10 +6,11 @@
  * - Frames apply in the order the source sends them. Feeds are independent:
  *   nothing orders one feed's events against another's.
  * - An event whose ID the connection has seen recently applies once.
- * - The store resumes from the last cursor a frame carried. When it may have
- *   missed events, it marks the feed's `covers` stale: on a gap frame, on an
- *   event it cannot validate or apply, and when a connection without a cursor
- *   comes back after a live one dropped.
+ * - The store resumes from the last cursor a frame carried, which a
+ *   persistent store saves for its next session. When it may have missed
+ *   events, it marks the feed's `covers` stale: on a gap frame, on an event it
+ *   cannot validate or apply, and when a connection without a cursor comes
+ *   back after a live one dropped.
  * - The connection closes when its last observer leaves, and when the store
  *   retires. A failed connection retries with growing, jittered delays.
  */
@@ -63,11 +64,11 @@ export function listen<P, E>(store: DataStore, feed: Feed<P, E>, params: P): Fee
 	if (!byKey) handles.set(store, (byKey = new Map()));
 	const key = entryKey(feed.name, params);
 	let handle = byKey.get(key);
-	if (!handle) byKey.set(key, (handle = createFeed(store, feed, params)));
+	if (!handle) byKey.set(key, (handle = createFeed(store, feed, params, key)));
 	return handle;
 }
 
-function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P): FeedHandle {
+function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: string): FeedHandle {
 	const source = internals.get(store)!;
 	const observers = new Set<() => void>();
 	const seen = new Set<string>();
@@ -75,6 +76,8 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P): FeedHa
 	let cursor: string | null = null;
 	/** Whether a connection has been live, so one that comes back without a cursor missed events. */
 	let wasLive = false;
+	/** Whether the cursor a previous session saved has been read. */
+	let restored = false;
 	/** Aborts the current run, when the last observer leaves. */
 	let running: AbortController | null = null;
 
@@ -103,12 +106,21 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P): FeedHa
 				if (seen.size > SEEN) seen.delete(seen.values().next().value!);
 			}
 		}
-		if (frame.cursor !== undefined) cursor = frame.cursor;
+		if (frame.cursor !== undefined && frame.cursor !== cursor) {
+			cursor = frame.cursor;
+			// Saved after the values this frame and the ones before it changed.
+			source.persisted?.keepCursor(key, cursor);
+		}
 	}
 
 	async function run(stop: AbortSignal): Promise<void> {
 		const connect = source.listen!;
 		const signal = AbortSignal.any([stop, source.retired]);
+		if (!restored && source.persisted) {
+			restored = true;
+			cursor ??= await source.persisted.cursor(key);
+			if (signal.aborted) return;
+		}
 		let failures = 0;
 		while (!signal.aborted) {
 			let live = false;
@@ -177,7 +189,7 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P): FeedHa
  */
 export function receive(store: DataStore, changes: readonly FeedChange[]): void {
 	if (store.retired) throw new DataRetiredError();
-	const { entries, viewed, record, rebase, finish } = internals.get(store)!;
+	const { entries, persisted, viewed, record, rebase, finish } = internals.get(store)!;
 	const reload = new Set<Entry>();
 	const changed: Entry[] = [];
 	const names = new Set<string>();
@@ -193,12 +205,13 @@ export function receive(store: DataStore, changes: readonly FeedChange[]): void 
 					'octane/data: a view needs its fetched window, so an event cannot set it',
 				);
 			}
-			// Only a read the store holds takes it.
-			const entry = entries.get(entryKey(change.read.name, change.input));
+			// Only a read the store holds takes it; a saved copy of one it does not is out of date.
+			const key = entryKey(change.read.name, change.input);
+			const entry = entries.get(key);
 			if (entry) {
 				rebase(entry, change.value, false, reload);
 				changed.push(entry);
-			}
+			} else persisted?.discard(key);
 			continue;
 		}
 		const value = 'put' in change ? change.value : null;
@@ -213,6 +226,8 @@ export function receive(store: DataStore, changes: readonly FeedChange[]): void 
 		}
 	}
 	if (tags.length > 0) store.invalidate(tags);
+	// A saved value of these records that is not in memory, and so not saved again now, is restored stale.
+	if (names.size > 0) persisted?.invalidated([...names]);
 	finish(reload, changed, names);
 
 	/** Put or remove the record in a read the server ordered, which views do not cover. */
