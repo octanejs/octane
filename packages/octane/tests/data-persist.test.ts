@@ -1151,6 +1151,41 @@ describe('octane/data feeds across restarts', () => {
 	const durable = (storage: PersistentStorage) =>
 		cache(storage, 'ada', { journal: { writes: [setRead], receipt } });
 
+	it('waits for the durable cursor when a new observer replaces one during restoration', async () => {
+		const storage = memoryStorage();
+		const feedLog = history();
+		const remote = server(books());
+		const first = createDataStore({
+			transport: remote.transport,
+			persist: cache(storage, 'ada'),
+			listen: feedLog.listener,
+		});
+		const stop = listen(first, bookChanges).subscribe(() => {});
+		await vi.waitFor(() => expect(feedLog.cursors).toEqual([null]));
+		await saved();
+		stop();
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		const waiting = vi.fn(async (partition: string) => {
+			await gate;
+			return storage.index(partition);
+		});
+		const after = createDataStore({
+			transport: remote.transport,
+			persist: cache({ ...storage, index: waiting }, 'ada'),
+			listen: feedLog.listener,
+		});
+		const handle = listen(after, bookChanges);
+		const leave = handle.subscribe(() => {});
+		await vi.waitFor(() => expect(waiting).toHaveBeenCalled());
+		leave();
+		const finish = handle.subscribe(() => {});
+		release();
+		await vi.waitFor(() => expect(feedLog.cursors).toEqual([null, '0']));
+		finish();
+		await after.retire();
+	});
+
 	it.each([
 		{ page: 'first', savedCursor: 'second', observedEarly: false, mismatch: true },
 		{ page: 'second', savedCursor: 'first', observedEarly: true, mismatch: true },

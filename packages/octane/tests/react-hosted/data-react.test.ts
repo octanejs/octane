@@ -8,7 +8,7 @@ import * as React from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { createDataStore, type DataStore } from '../../src/data/index.js';
-import { DataProvider, useRead, useReadState, useWrite } from '../../src/data/react.js';
+import { DataProvider, useForm, useRead, useReadState, useWrite } from '../../src/data/react.js';
 import { createServer, setDone, todos } from '../_data-todos.js';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -69,6 +69,41 @@ afterEach(() => {
 });
 
 describe('octane/data/react', () => {
+	it('clears a mounted form after its store retires', async () => {
+		const contract = { ...setDone, form: { id: 'text', done: 'checkbox' } as const };
+		const store = createDataStore({
+			transport: createServer().transport,
+			form: {
+				token: 'token',
+				nonce: 'page',
+				outcome: {
+					write: contract.name,
+					key: '',
+					pending: false,
+					values: { id: 'previous account' },
+					issues: {},
+					error: 'invalid',
+				},
+			},
+		});
+		function Fields() {
+			const form = useForm(contract);
+			return h('form', form.attrs, h('output', null, form.values['id'] ?? 'empty'), form.hidden());
+		}
+		container = document.createElement('div');
+		root = createRoot(container);
+		await act(() => root!.render(h(DataProvider, { store }, h(Boundary, null, h(Fields)))));
+		expect(container.querySelector('output')?.textContent).toBe('previous account');
+		await act(() => store.retire());
+		expect(container.querySelector('output')?.textContent).toBe('empty');
+		expect(container.querySelectorAll('input')).toHaveLength(0);
+		const submit = new Event('submit', { bubbles: true, cancelable: true });
+		await act(async () => {
+			container.querySelector('form')!.dispatchEvent(submit);
+		});
+		expect(submit.defaultPrevented).toBe(true);
+	});
+
 	it('suspends until the first value and shares one load between components', async () => {
 		const server = createServer();
 		await mount(createDataStore({ transport: server.transport }));

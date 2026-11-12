@@ -43,7 +43,14 @@ import {
 	type ViewWindow,
 	type Write,
 } from './contracts.js';
-import { createFormHandle, NO_FORM_SEED, type FormHandle, type FormSeed } from './form.js';
+import {
+	createFormHandle,
+	IDLE,
+	NO_FORM_SEED,
+	rejectSubmission,
+	type FormHandle,
+	type FormSeed,
+} from './form.js';
 import {
 	createPersistence,
 	type Persistence,
@@ -297,6 +304,13 @@ const RETIRED_HANDLE: ReadHandle<any> = {
 	getSnapshot: () => PENDING,
 	subscribe: () => () => {},
 	refresh: () => NEVER,
+};
+
+const RETIRED_FORM: FormHandle<any, never> = {
+	getSnapshot: () => IDLE,
+	subscribe: () => () => {},
+	hidden: () => [],
+	submit: (source) => rejectSubmission(source, new DataRetiredError()),
 };
 
 /** A server-side cap also applies; this bounds what one write asks for. */
@@ -1569,12 +1583,21 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				: send(write, parsed, input);
 		},
 		form(write, key = '') {
-			assertLive();
+			if (retired) return RETIRED_FORM;
 			const formKey = `${write.name}\n${key}`;
 			let handle = forms.get(formKey);
 			if (!handle) {
 				const run = (input: unknown) => store.write(write, input as any);
-				handle = createFormHandle(write, key, formOutcome, run, () => forms.delete(formKey));
+				handle = createFormHandle(
+					write,
+					key,
+					formOutcome,
+					run,
+					() => {
+						if (forms.get(formKey) === handle) forms.delete(formKey);
+					},
+					retiring.signal,
+				);
 				if (formOutcome.outcome && handle.getSnapshot().error !== null) {
 					formOutcome = { ...formSeed, outcome: null };
 				}
