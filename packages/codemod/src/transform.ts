@@ -13,7 +13,12 @@ import { nativeSetupHook } from './local-react-hook.js';
 import { componentTagOrExport, localUses, scalar, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
-import { effectReceivers, fixedBinding, initializedBefore } from './effect-receivers.js';
+import {
+	effectHelpers,
+	effectReceivers,
+	fixedBinding,
+	initializedBefore,
+} from './effect-receivers.js';
 import { isBareSvgTag, storeHookUses } from './store-hook-uses.js';
 import { intlImports } from './react-intl.js';
 import {
@@ -628,8 +633,9 @@ class ModuleTransform {
 	readonly strong: boolean;
 	readonly effectAliases?: Map<ts.Expression, string>;
 	readonly effectSnapshots?: Map<ts.ExpressionStatement, string[]>;
-	private snapshotEdits?: Map<ts.Node, string>;
+	private effectEdits?: Map<ts.Node, string>;
 	private snapshotCaptures?: Map<ts.ArrowFunction, string[]>;
+	private effectHelperCaptures?: Map<ts.ArrowFunction, ts.VariableStatement[]>;
 	private linkedStateEdits?: Map<ts.Statement, string>;
 	private nativeRefStoreFactory?: string;
 	private linkedStateNames?: [string, string, string, string];
@@ -1010,6 +1016,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		}
 		let hasEval = false;
 		const snapshots: ts.VariableDeclaration[] = [];
+		const helperCalls: ts.CallExpression[] | undefined =
+			this.effectAliases && this.options.captureEffectHelpers ? [] : undefined;
 		if (
 			this.source.includes('SubmitEvent') ||
 			this.source.includes('ReactEventHandler') ||
@@ -1031,13 +1039,21 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			)
 				snapshots.push(node);
 			if (
-				(this.options.pathSvgAdapter ||
+				(helperCalls ||
+					this.options.pathSvgAdapter ||
 					this.options.captureEffectSnapshots ||
 					this.options.linkRenderState) &&
 				ts.isIdentifier(node) &&
 				node.text === 'eval'
 			)
 				hasEval = true;
+			if (
+				helperCalls &&
+				ts.isCallExpression(node) &&
+				node.arguments.length === 2 &&
+				ts.isArrowFunction(node.arguments[0]!)
+			)
+				helperCalls.push(node);
 			if (ts.isIdentifier(node) && portLocals.has(node.text)) this.planUnported(node);
 			if (isJsx(node)) this.hasJsx = true;
 			if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) fields.push(node);
@@ -1056,6 +1072,24 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			ts.forEachChild(node, visit);
 		};
 		visit(this.sf);
+		for (const call of helperCalls ?? []) {
+			const plan = effectHelpers(
+				call,
+				this.checker,
+				(name) => this.reactHook(name),
+				this.localUses,
+				!hasEval,
+			);
+			if (!plan) continue;
+			const captures = (this.effectHelperCaptures ??= new Map());
+			captures.set(
+				plan.callback,
+				plan.declarations.map(({ statement }) => statement),
+			);
+			for (const { statement, move } of plan.declarations) {
+				if (move) (this.effectEdits ??= new Map()).set(statement, DROP);
+			}
+		}
 		if (!hasEval) for (const decl of snapshots) this.planEffectSnapshot(decl);
 		if (!hasEval && this.options.linkRenderState && this.strong && this.target === 'tsrx') {
 			for (const statement of this.sf.statements) {
@@ -1768,7 +1802,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		let cell = name.text + 'Ref';
 		while (this.declared.has(cell) || this.readsGlobal(cell)) cell += '_';
 		this.declared.add(cell);
-		const edits = (this.snapshotEdits ??= new Map());
+		const edits = (this.effectEdits ??= new Map());
 		const joined = decl.name.getStart(this.sf) === decl.parent.getStart(this.sf) + 'const'.length;
 		edits.set(decl.name, joined ? ' ' + cell : cell);
 		edits.set(call, this.require('octane', 'useLazyRef', false));
@@ -2612,6 +2646,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		return this.callee(node)?.name ?? null;
 	}
 
+	reactHook(node: ts.Expression) {
+		const callee = this.callee(node);
+		return callee?.module === 'react' ? callee.name : null;
+	}
+
 	callee(node: ts.Node): { name: string; module: string } | null {
 		if (ts.isIdentifier(node)) {
 			const entry = this.importOf(node);
@@ -2770,11 +2809,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			const state = this.nativeRefState(node);
 			if (state) return state;
 		}
-		const snapshot = this.snapshotEdits?.get(node);
-		if (snapshot)
+		const effectEdit = this.effectEdits?.get(node);
+		if (effectEdit)
 			return ts.isCallExpression(node)
-				? snapshot + this.span(node, node.expression.end, node.end, ctx)
-				: snapshot;
+				? effectEdit + this.span(node, node.expression.end, node.end, ctx)
+				: effectEdit;
 		const stored = ts.isArrowFunction(node) ? this.snapshotCaptures?.get(node) : undefined;
 		const aliases = this.effectAliases;
 		if (aliases || stored) {
@@ -2803,10 +2842,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					? effectReceivers(
 							node,
 							this.checker,
-							(name) => {
-								const hook = this.callee(name);
-								return hook?.module === 'react' ? hook.name : null;
-							},
+							(name) => this.reactHook(name),
 							aliases,
 							snapshots &&
 								((statement, member, name) => {
@@ -2824,10 +2860,17 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 										layoutEvent = true;
 									}
 								: undefined,
-							this.options.captureEffectHelpers ? this.localUses : undefined,
-							(arrow) => this.emit(arrow, PLAIN),
 						)
 					: [];
+				for (const statement of this.effectHelperCaptures?.get(node) ?? []) {
+					const declaration = this.span(
+						statement,
+						statement.getStart(this.sf),
+						statement.end,
+						PLAIN,
+					);
+					captures.push(declaration.endsWith(';') ? declaration : declaration + ';');
+				}
 				if (stored) captures.unshift(...stored);
 				if (captures.length) {
 					const { body } = node;
