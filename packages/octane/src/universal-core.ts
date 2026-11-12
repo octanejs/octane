@@ -54,6 +54,7 @@ import {
 	type UniversalTrackedThenable,
 } from './owner-kernel/hooks.js';
 import { isThenable } from './signals/handle-protocol.js';
+import { setHostTimeout } from './host-task.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -1510,7 +1511,7 @@ let SETTLED_UNIVERSAL_WAKEABLES: WeakSet<PromiseLike<unknown>> | null = null;
 function resumeOnSettle(wakeable: PromiseLike<unknown>, retry: () => void): void {
 	const onSettle =
 		SETTLED_UNIVERSAL_WAKEABLES?.has(wakeable) === true
-			? () => void setTimeout(retry, 0)
+			? () => void setHostTimeout(retry, 0)
 			: () => {
 					(SETTLED_UNIVERSAL_WAKEABLES ??= new WeakSet()).add(wakeable);
 					retry();

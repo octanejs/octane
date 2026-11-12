@@ -1,5 +1,6 @@
 import { formatClientError } from './error-codes.client.generated.js';
 import { BINDING_HANDOFF } from './signals/control-handoff.js';
+import { setHostTimeout } from './host-task.js';
 
 export { BINDING_HANDOFF };
 
@@ -95,7 +96,7 @@ export function markBindingEvent(event: Event, node: Node, capture: boolean): vo
 			if (delivered.get(event) === nodes) delivered.delete(event);
 		};
 		// Trusted native dispatch can checkpoint microtasks between listeners.
-		if (event.isTrusted) setTimeout(cleanup, 0);
+		if (event.isTrusted) setHostTimeout(cleanup, 0);
 		else queueMicrotask(cleanup);
 	}
 	nodes.set(node, (nodes.get(node) ?? 0) | (capture ? 2 : 1));

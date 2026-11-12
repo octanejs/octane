@@ -29,7 +29,7 @@
  *   mounted component is showing are never purged.
  */
 import * as devalue from 'devalue';
-import { postHostTask } from '../host-task.js';
+import { hostDateNow, postHostTask } from '../host-task.js';
 import type { Read, Write } from './contracts.js';
 
 /** What the store keeps in memory about each saved value. */
@@ -329,7 +329,7 @@ export function createPersistence(
 			for (const [key, cursor] of savedCursors) if (!cursors.has(key)) cursors.set(key, cursor);
 		}
 		// Only what has expired: which values are in use is known once components ask for them.
-		purge(Date.now(), Infinity);
+		purge(hostDateNow(), Infinity);
 		if (removed.size > 0) schedule();
 	})().catch(() => {
 		// Storage that cannot be read, such as a private window's, or no key leaves the store in memory only.
@@ -383,7 +383,7 @@ export function createPersistence(
 	async function flush(): Promise<void> {
 		await ready;
 		if (cleared) return;
-		const now = Date.now();
+		const now = hostDateNow();
 		const keys = [...dirty];
 		dirty.clear();
 		const put: Array<{ meta: StoredMeta; value?: string }> = [];
@@ -468,7 +468,7 @@ export function createPersistence(
 			const name = await nameOf(key);
 			const meta = metas.get(name);
 			if (!meta) return undefined;
-			if (meta.version !== (await versionOf(read)) || expired(meta, Date.now())) {
+			if (meta.version !== (await versionOf(read)) || expired(meta, hostDateNow())) {
 				forget(name);
 				return undefined;
 			}
@@ -477,7 +477,7 @@ export function createPersistence(
 			try {
 				const stored = devalue.parse(await cipher.open(text, name)) as Stored & { at: number };
 				// Purging reads this order, so it must see the use now, not after the next save.
-				metas.set(name, { ...meta, lastUsed: Date.now() });
+				metas.set(name, { ...meta, lastUsed: hostDateNow() });
 				touched.add(name);
 				schedule();
 				const marked = stored.tags.some((tag) => (marks.get(tag) ?? 0) > stored.at);
@@ -502,9 +502,9 @@ export function createPersistence(
 				if (cleared) return;
 				const name = await cipher.name(`write\n${write.id}`);
 				// Storage lists the journal by hashed name, so the entry carries its submission order.
-				const order = [Date.now(), ++submitted];
+				const order = [hostDateNow(), ++submitted];
 				const value = await cipher.seal(devalue.stringify({ ...write, order }), name);
-				const now = Date.now();
+				const now = hostDateNow();
 				const meta = {
 					key: name,
 					size: value.length,
@@ -561,7 +561,7 @@ export function createPersistence(
 			return forgetting;
 		},
 		invalidated(tags) {
-			const now = Date.now();
+			const now = hostDateNow();
 			for (const tag of tags) marks.set(tag, now);
 			marksChanged = true;
 			schedule();
