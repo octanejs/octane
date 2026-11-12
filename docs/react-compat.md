@@ -38,6 +38,11 @@ have server implementations in `octane/react/server`. Like the `ReactCompat`
 host below, the `div[data-octane-compat]` host is styled `display: contents`,
 so the island's own root element is the parent's flex or grid item.
 
+Resource hints such as `preload` and `preinit` issued during an
+`OctaneCompat` render use the React host's document resource handling.
+Place declarative document metadata such as `<title>` and `<meta>` in the
+React tree.
+
 ## Storybook with Octane components
 
 The [Storybook example](../examples/storybook/README.md) uses `OctaneCompat` in

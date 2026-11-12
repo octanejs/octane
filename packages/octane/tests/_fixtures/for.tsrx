@@ -618,6 +618,14 @@ export function FastHostMappedList(props: {
 	</ul>
 }
 
+export function MappedPropBeforeKey({ rows }: { rows: { id: string; read(): string }[] }) @{
+	<ul>
+		{rows.map((row) => (
+			<li data-marker={row.read()} key={row.id} />
+		))}
+	</ul>
+}
+
 export function FastHostCustomList(props: { items: SelectionRow[] }) @{
 	<ul id="fast-host-custom-list">
 		@for (const row of props.items; key row.id) {

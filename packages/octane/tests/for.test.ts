@@ -45,6 +45,7 @@ import {
 	FastHostKeyedList,
 	FastHostConvertedList,
 	FastHostMappedList,
+	MappedPropBeforeKey,
 	FastHostCustomList,
 	FastHostRefList,
 	FastHostControlledList,
@@ -2786,6 +2787,167 @@ describe('nested keyed list reordering', () => {
 		expect(picked).toEqual([[1, 112]]);
 		r.unmount();
 	});
+});
+
+it('reads a mapped prop before the following key during mount and hydration', () => {
+	function props() {
+		let marker = '-';
+		return {
+			rows: ['a', 'b'].map((id) => ({
+				get id() {
+					marker = id;
+					return id;
+				},
+				read: () => marker,
+			})),
+		};
+	}
+	const markers = (host: Element) =>
+		Array.from(host.querySelectorAll('li'), (row) => row.getAttribute('data-marker'));
+	const expected = ['-', 'a'];
+	const view = mount(MappedPropBeforeKey, props());
+	try {
+		expect(markers(view.container)).toEqual(expected);
+	} finally {
+		view.unmount();
+	}
+
+	const server = loadServerFixture<{ MappedPropBeforeKey: typeof MappedPropBeforeKey }>(
+		'packages/octane/tests/_fixtures/for.tsrx',
+	);
+	const host = document.body.appendChild(document.createElement('div'));
+	try {
+		host.innerHTML = ServerRuntime.renderToString(server.MappedPropBeforeKey, props()).html;
+		expect(markers(host)).toEqual(expected);
+		const rows = Array.from(host.querySelectorAll('li'));
+		const errors: unknown[] = [];
+		const root = hydrateRoot(host, MappedPropBeforeKey, props(), {
+			onRecoverableError: (error) => errors.push(error),
+		});
+		try {
+			flushSync(() => {});
+			expect(markers(host)).toEqual(expected);
+			Array.from(host.querySelectorAll('li')).forEach((row, i) => expect(row).toBe(rows[i]));
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	} finally {
+		host.remove();
+	}
+});
+
+it.each([
+	['a trailing spread key', 'key={row.id} {...row.props}'],
+	['a spread-only key', '{...row.props}'],
+	['the last explicit key', 'key={row.id} key={row.props.key}'],
+])('uses %s for mapped row identity', (_, attributes) => {
+	const source = `export function List({ rows }) @{
+		<ul>{rows.map(row => <li ${attributes} />)}</ul>
+	}`;
+	const { List } = loadCompiledFixtureSource(source, { id: 'mapped-keys.tsrx', mode: 'client' });
+	const props = (revision: number) => ({
+		rows: ['a', 'b'].map((id) => ({ id, props: { key: id + revision } })),
+	});
+	const view = mount(List, props(0));
+	try {
+		const first = view.findAll('li');
+		view.update(List, props(1));
+		const second = view.findAll('li');
+		expect(second).toHaveLength(2);
+		second.forEach((row, i) => expect(row).not.toBe(first[i]));
+	} finally {
+		view.unmount();
+	}
+});
+
+it('reads a mutable mapped component tag before evaluating its key', () => {
+	const source = `
+		function Early() @{ <li>early</li> }
+		function Late() @{ <li>late</li> }
+		let Selected = Early;
+		function select(row) {
+			Selected = Late;
+			return row.id;
+		}
+		export function List({ rows }) @{
+			<ul>{rows.map(row => <Selected key={select(row)} />)}</ul>
+		}
+	`;
+	const id = 'mapped-tag.tsrx';
+	const props = { rows: [{ id: 'a' }, { id: 'b' }] };
+	const { List: ClientList } = loadCompiledFixtureSource(source, { id, mode: 'client' });
+	const { List: ServerList } = loadCompiledFixtureSource(source, { id, mode: 'server' });
+	const view = mount(ClientList, props);
+	try {
+		expect(labels(view)).toEqual(['early', 'late']);
+	} finally {
+		view.unmount();
+	}
+	expect(ServerRuntime.renderToStaticMarkup(ServerList, props).html).toBe(
+		'<ul><li>early</li><li>late</li></ul>',
+	);
+});
+
+it('uses the index after an earlier mapped prop assigns to it', () => {
+	const source = `export function List({ rows }) @{
+		<ul>{rows.map((row, index) => <li data-id={(index += row.shift, row.id)} key={index} />)}</ul>
+	}`;
+	const { List } = loadCompiledFixtureSource(source, {
+		id: 'mapped-assigned-index.tsrx',
+		mode: 'client',
+	});
+	const props = (shift: number) => ({
+		rows: [
+			{ id: 'a', shift },
+			{ id: 'b', shift },
+		],
+	});
+	const view = mount(List, props(0));
+	try {
+		const before = view.findAll('li');
+		view.update(List, props(1));
+		const after = view.findAll('li');
+		expect(after.map((row) => row.getAttribute('data-id'))).toEqual(['a', 'b']);
+		expect(after[0]).toBe(before[1]);
+	} finally {
+		view.unmount();
+	}
+});
+
+it('leaves a mapped component tag unread when the callback is never invoked', () => {
+	let calls = 0;
+	const source = `
+		import { memo } from 'octane';
+		import { observe } from './observe';
+		function Row() { return <li />; }
+		export function List({ rows }) {
+			return <ul>{rows.map((row) => <Ahead key={row.id} />)}</ul>;
+		}
+		observe(List);
+		const Ahead = memo(Row);
+	`;
+	loadCompiledFixtureSource(source, {
+		id: 'mapped-unread-tag.tsx',
+		mode: 'client',
+		compileOptions: { autoMemo: true },
+		runtimeModules: {
+			'./observe': {
+				observe(List: ComponentBody<{ rows: unknown }>) {
+					const custom = { map: () => (calls++, []) };
+					for (const rows of [[], custom]) {
+						const view = mount(List, { rows });
+						try {
+							expect(view.find('ul').children).toHaveLength(0);
+						} finally {
+							view.unmount();
+						}
+					}
+				},
+			},
+		},
+	});
+	expect(calls).toBe(1);
 });
 
 describe.each([
