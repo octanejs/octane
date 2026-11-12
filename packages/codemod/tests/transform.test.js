@@ -360,6 +360,24 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		expect(transformModule(commented, 'node.tsx').code.match(/\/\/ Recurse\./g)).toHaveLength(1);
 	});
 
+	it('migrates React DOM root types with the renderer', () => {
+		const source = `import { createRoot, type Root as ClientRoot } from 'react-dom/client';
+import type * as ReactDOM from 'react-dom/client';
+import { App } from './App';
+const root: ClientRoot = createRoot(document.body);
+export const mounted: ReactDOM.Root = root;
+export const imported: import('react-dom/client').Root = mounted;
+root.render(<App />);`;
+		const { code, notes } = transformModule(source, 'main.tsx');
+		expect(notes).toEqual([]);
+		expect(code).toContain('type Root as ClientRoot');
+		expect(code).toContain('type Root as OctaneRoot');
+		expect(code).toContain('export const mounted: OctaneRoot = root;');
+		expect(code).toContain("import('octane').Root");
+		expect(code).toContain('root.render(App);');
+		expect(code).not.toContain('react-dom/client');
+	});
+
 	it('mounts a root by component, not by element', () => {
 		const source = (/** @type {string} */ call) =>
 			`import { createElement, StrictMode } from 'react';\nimport { createRoot, hydrateRoot } from 'react-dom/client';\nimport { renderToString } from 'react-dom/server';\nimport { App } from './App';\nconst root = createRoot(document.body);\n${call};\n`;
