@@ -46,17 +46,29 @@ const local = property
 	.replace('const [seen', 'const open = model.app != null || model.id != null;\n const [seen')
 	.replace('!!model.open', 'open')
 	.replace('model.open &&', 'open &&');
+const typedProperty = (type) =>
+	property
+		.replace('Probe(model)', `Probe(model: { open: ${type} })`)
+		.replace('!!model.open', 'model.open');
+const strict = {
+	'tsconfig.json': JSON.stringify({
+		compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+	}),
+};
 
 it.each([
 	['property', property],
 	['local', local],
-])('preserves the %s getter trace and initial value on the server', async (kind, source) => {
-	const migrated = await migrate(source);
+	['boolean property', typedProperty('boolean | null | undefined'), strict],
+])('preserves the %s getter trace and initial value on the server', (kind, source, files) => {
+	const migrated = migrate(source, files);
 	expect(migrated.strong).toBe(true);
 	const { Probe } = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'server' });
 	function Reference({ model }) {
 		const local = kind === 'local' && (model.app != null || model.id != null);
-		const [seen, mark] = useState(kind === 'local' ? local : !!model.open);
+		const initial =
+			kind === 'local' ? local : kind === 'boolean property' ? model.open : !!model.open;
+		const [seen, mark] = useState(initial);
 		if ((kind === 'local' ? local : model.open) && !seen) mark(true);
 		return seen ? reactElement('b') : null;
 	}
@@ -126,7 +138,8 @@ it.each([
 		property + ' export function Caller(){ return <p>{Probe({open:true})}</p>; }',
 	],
 	['component alias', property + ' export const Other = Probe;'],
-	['raw callable initializer', property.replace('!!model.open', 'model.open')],
+	['untyped initializer', property.replace('!!model.open', 'model.open')],
+	['callable initializer', typedProperty('() => boolean'), strict],
 	['opaque setup', property.replace('const [seen', 'model.observe(); const [seen')],
 	['different guard order', property.replace('model.open && !seen', '!seen && model.open')],
 	['second setter use', property.replace('<b/>', '<b onClick={mark}/>')],
@@ -135,8 +148,8 @@ it.each([
 	['unrelated state hook', property.replace("from 'react'", "from './custom'")],
 	['async owner', property.replace('function Probe', 'async function Probe')],
 	['intervening comment', property.replace('if (model', '/* retain */ if (model')],
-])('leaves %s outside the linked-state rewrite', async (_name, source) => {
-	const result = await migrate(source);
+])('leaves %s outside the linked-state rewrite', (_name, source, files) => {
+	const result = migrate(source, files);
 	expect(result.code).not.toContain('useLinkedState');
 });
 
