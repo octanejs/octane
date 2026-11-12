@@ -1527,12 +1527,15 @@ const invalid: Panel = { style: 'color:red' };`,
 	it('keeps an automatically hosted React child inside its paragraph in server HTML', async () => {
 		const root = project({
 			'package.json': '{"type":"module"}',
-			'src/App.tsx': `import { Badge } from 'react-badge-kit';
+			'src/App.tsx': `import React, { Fragment as Group } from 'react';
+				import { Badge } from 'react-badge-kit';
 				export function App() { return <p>Before <Badge /> after.</p>; }
 				export function Conditional({ enabled }: { enabled: boolean }) {
 					return <>
 						<p id="conditional">Before {enabled ? (<><Badge /></>) : null} after.</p>
 						<p id="logical">Before {enabled && <Badge />} after.</p>
+						<p id="named">Before {enabled ? <Group key="stable"><Badge /></Group> : null} after.</p>
+						<p id="qualified">Before <React.Fragment><Badge /></React.Fragment> after.</p>
 					</>;
 				}
 				export function Panel() { return <section><Badge /></section>; }`,
@@ -1571,6 +1574,8 @@ const invalid: Panel = { style: 'color:red' };`,
 				document.querySelector('#conditional > span[data-react-compat] > b')?.textContent,
 			).toBe('badge');
 			expect(document.querySelector('#logical')?.textContent).toBe('Before badge after.');
+			expect(document.querySelector('#named')?.textContent).toBe('Before badge after.');
+			expect(document.querySelector('#qualified')?.textContent).toBe('Before badge after.');
 			expect(document.querySelector('section > div[data-react-compat] > b')?.textContent).toBe(
 				'badge',
 			);

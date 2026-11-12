@@ -54,32 +54,6 @@ const PLAIN = { template: false };
 const DESCRIPTOR = { template: false, descriptor: true };
 /** The local component that wraps an element no island can host and throws its `error`. */
 const NO_PORT = 'NoOctanePort';
-
-/** Find the paragraph receiving an island through transparent child syntax. */
-function inParagraph(value: ts.Node) {
-	for (;;) {
-		const parent = value.parent;
-		if (ts.isJsxElement(parent)) {
-			const tag = parent.openingElement.tagName;
-			if (!ts.isIdentifier(tag) || !parent.children.some((child) => child === value)) return false;
-			// The emitter removes an earlier run's fallback around the original element.
-			if (tag.text !== NO_PORT) return tag.text === 'p';
-		} else if (!(
-			ts.isJsxFragment(parent) ||
-			(ts.isJsxExpression(parent) && !parent.dotDotDotToken) ||
-			isWrapper(parent) ||
-			(ts.isConditionalExpression(parent) && parent.condition !== value) ||
-			(ts.isBinaryExpression(parent) &&
-				(parent.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
-					parent.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken ||
-					(parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
-						parent.right === value)))
-		)) {
-			return false;
-		}
-		value = parent;
-	}
-}
 const syntheticSubmitMembers = {
 	nativeEvent: 'unknown',
 	persist: '() => void',
@@ -1124,6 +1098,34 @@ class ModuleTransform {
 		return port;
 	}
 
+	/** Find the paragraph receiving an island through transparent child syntax. */
+	private inParagraph(value: ts.Node) {
+		for (;;) {
+			const parent = value.parent;
+			if (ts.isJsxElement(parent)) {
+				const tag = parent.openingElement.tagName;
+				if (this.calleeName(tag) !== 'Fragment') {
+					if (!ts.isIdentifier(tag)) return false;
+					// The emitter removes an earlier run's fallback around the original element.
+					if (tag.text !== NO_PORT) return tag.text === 'p';
+				}
+			} else if (!(
+				ts.isJsxFragment(parent) ||
+				(ts.isJsxExpression(parent) && !parent.dotDotDotToken) ||
+				isWrapper(parent) ||
+				(ts.isConditionalExpression(parent) && parent.condition !== value) ||
+				(ts.isBinaryExpression(parent) &&
+					(parent.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+						parent.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken ||
+						(parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+							parent.right === value)))
+			)) {
+				return false;
+			}
+			value = parent;
+		}
+	}
+
 	/**
 	 * A component from a package with no Octane port renders in React, inside
 	 * a `ReactCompat` island, when its element hands React nothing Octane
@@ -1172,7 +1174,7 @@ class ModuleTransform {
 				}
 				return;
 			}
-			const paragraph = inParagraph(element);
+			const paragraph = this.inParagraph(element);
 			let reason = !this.hostsInReact(element)
 				? `\`<${text}>\` takes children or props that Octane renders, which cannot cross into a React island.`
 				: this.options.reactCompat
