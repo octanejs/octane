@@ -2121,6 +2121,8 @@ class ModuleTransform {
 							snapshots.set(statement, declarations);
 							aliases.set(member, name);
 						}),
+					this.options.captureEffectHelpers ? this.localUses : undefined,
+					(arrow) => this.emit(arrow, PLAIN),
 				);
 				if (captures.length) {
 					const { body } = node;

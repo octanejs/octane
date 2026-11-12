@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { act, createElement, useEffect } from 'react';
+import { act, createElement, useEffect, useRef } from 'react';
 import { createRoot as reactRoot } from 'react-dom/client';
 import { createRoot } from 'octane';
 import { expect, it } from 'vitest';
@@ -283,4 +283,132 @@ it('respects local shadows, fresh alias names and comments', async () => {
 	expect(migrated.code).toContain('receiver => receiver.toString()');
 	expect(migrated.code).toContain('const currentReceiverValueValue = receiver;');
 	expect(migrated.code).toContain('/* keep */');
+});
+
+const helperSource = `import { useEffect, useRef } from 'react';
+export function Probe({ value }) {
+	const latest = useRef(0);
+	const initial = useRef(value);
+	const read = (add: number): number => Math.max(latest.current + add, initial.current);
+	const record = () => { window.records.push(latest.current); };
+	useEffect(() => {
+		window.records.push(read(1));
+		return () => { record(); };
+	}, []);
+	return <button onClick={() => { latest.current = value; window.records.push(read(1)); record(); }}>Record</button>;
+}`;
+
+it('preserves ref reads at setup, event and cleanup when local helpers are called from an effect', async () => {
+	const migrated = migrate(helperSource);
+	expect(migrated.strong).toBe(true);
+	const native = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
+	function Reference({ value }) {
+		const latest = useRef(0);
+		const initial = useRef(value);
+		const read = (add) => Math.max(latest.current + add, initial.current);
+		const record = () => {
+			window.records.push(latest.current);
+		};
+		useEffect(() => {
+			window.records.push(read(1));
+			return () => {
+				record();
+			};
+		}, []);
+		return createElement(
+			'button',
+			{
+				onClick() {
+					latest.current = value;
+					window.records.push(read(1));
+					record();
+				},
+			},
+			'Record',
+		);
+	}
+	async function exercise(react) {
+		const host = document.createElement('div');
+		const root = react ? reactRoot(host) : createRoot(host);
+		window.records = [];
+		try {
+			for (const value of [2, 7]) {
+				if (react) await act(() => root.render(createElement(Reference, { value })));
+				else {
+					root.render(native.Probe, { value });
+					flushEffects();
+				}
+				host.querySelector('button').click();
+			}
+		} finally {
+			if (react) await act(() => root.unmount());
+			else {
+				root.unmount();
+				flushEffects();
+			}
+		}
+		return window.records;
+	}
+	const before = globalThis.IS_REACT_ACT_ENVIRONMENT;
+	globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+	try {
+		const expected = await exercise(true);
+		expect(expected).toEqual([2, 3, 2, 8, 7, 7]);
+		expect(await exercise(false)).toEqual(expected);
+	} finally {
+		globalThis.IS_REACT_ACT_ENVIRONMENT = before;
+		delete window.records;
+	}
+});
+
+it.each([
+	['changing prop', 'window.records.push(value)'],
+	['tagged template identity', 'window.records.push(latest.current\`token\`)'],
+	['lexical arguments', 'window.records.push(arguments.length, latest.current)'],
+	['direct eval', 'eval("window.records.push(latest.current)")'],
+	['recursive binding', 'window.records.push(record, latest.current)'],
+])('retains the dependency for a helper with %s', (_, body) => {
+	const source = helperSource.replace('window.records.push(latest.current);', body + ';');
+	expect(migrate(source).strong).toBe(false);
+});
+
+it.each([
+	[
+		'an effect-only helper',
+		helperSource.replace(
+			'window.records.push(read(1)); record();',
+			'window.records.push(read(1));',
+		),
+	],
+	[
+		'a contextually typed declaration',
+		helperSource.replace('const record =', 'const record: () => void ='),
+	],
+	[
+		'an escaping helper identity',
+		helperSource.replace(
+			'return () => { record(); };',
+			'window.original = record; return () => { record(); };',
+		),
+	],
+	[
+		'direct eval in the effect',
+		helperSource.replace(
+			'return () => { record(); };',
+			'eval("record"); return () => { record(); };',
+		),
+	],
+	[
+		'a shadowed capture',
+		helperSource.replace('useEffect(() => {', 'useEffect(() => { const latest = {current: 9};'),
+	],
+	[
+		'a shadowed parameter type',
+		helperSource
+			.replace('export function Probe', 'type Step = number;\nexport function Probe')
+			.replace('add: number', 'add: Step')
+			.replace('useEffect(() => {', 'useEffect(() => { type Step = string;'),
+	],
+])('keeps an empty effect dependency list for %s', (_, input) => {
+	expect(migrate(input).strong).toBe(false);
 });
