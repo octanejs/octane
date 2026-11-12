@@ -531,6 +531,21 @@ describe('feed presets', () => {
 		expect(order).toEqual(['position', 'read']);
 	});
 
+	it("stops a server render's position request when its store retires", async () => {
+		let signal: AbortSignal | undefined;
+		const store = createDataStore({
+			transport: (request, given) => {
+				signal = given;
+				return new Promise(() => {});
+			},
+			feeds: [todoChanges],
+		});
+		await vi.waitFor(() => expect(signal).toBeDefined());
+		expect(signal!.aborted).toBe(false);
+		void store.retire();
+		expect(signal!.aborted).toBe(true);
+	});
+
 	it("listens through the page's own broker, one subscription per topic, live once subscribed", async () => {
 		const topics = new Map<string, Set<(message: unknown) => void>>();
 		const broker = (topic: string, deliver: (message: unknown) => void) => {

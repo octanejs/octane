@@ -407,7 +407,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 							.then(() =>
 								transport(
 									{ kind: 'position', name: feed.name, input: undefined },
-									new AbortController().signal,
+									// A retired render, cancelled or failed, stops asking.
+									retiring.signal,
 								),
 							)
 							.then(
