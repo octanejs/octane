@@ -3,7 +3,7 @@ import { contains, renderUses } from './forwarded-props.js';
 import { localUses } from './local-uses.js';
 import { skipWrappers } from './expression-wrappers.js';
 
-function reactImport(name: ts.Identifier, checker: ts.TypeChecker) {
+function rendererImport(name: ts.Identifier, checker: ts.TypeChecker, module = 'react') {
 	const binding = checker.getSymbolAtLocation(name)?.declarations?.[0];
 	if (!binding || !ts.isImportSpecifier(binding) || binding.isTypeOnly) return;
 	const clause = binding.parent.parent;
@@ -13,7 +13,7 @@ function reactImport(name: ts.Identifier, checker: ts.TypeChecker) {
 		ts.isImportDeclaration(imp) &&
 		!imp.attributes &&
 		ts.isStringLiteral(imp.moduleSpecifier) &&
-		imp.moduleSpecifier.text === 'react'
+		imp.moduleSpecifier.text === module
 	)
 		return (binding.propertyName ?? binding.name).text;
 }
@@ -32,7 +32,7 @@ function nullRef(statement: ts.Statement, checker: ts.TypeChecker) {
 		initializer.arguments.length === 1 &&
 		initializer.arguments[0].kind === ts.SyntaxKind.NullKeyword &&
 		ts.isIdentifier(initializer.expression) &&
-		reactImport(initializer.expression, checker) === 'useRef'
+		rendererImport(initializer.expression, checker) === 'useRef'
 	);
 }
 
@@ -163,11 +163,15 @@ export function nativeSetupHook(
 	return diagnostic ? 'diagnostic' : position === 0 ? 'first' : 'afterRefs';
 }
 
-/** Only a call in the first evaluated statement witnesses a hook in this export.
- * An import used by a sibling or a deferred callback says nothing about it. */
-export function directReactHooks(sf: ts.SourceFile, checker: ts.TypeChecker) {
-	const hooks = new Map<string, string>();
-	if (contains(sf, (n) => ts.isIdentifier(n) && n.text === 'eval')) return hooks;
+/** Only a call in the first evaluated statement witnesses renderer work in this export. */
+export function directRendererCalls(
+	sf: ts.SourceFile,
+	checker: ts.TypeChecker,
+	module: 'react' | 'react-dom',
+	accepts: (name: string) => boolean,
+) {
+	const calls = new Map<string, string>();
+	if (contains(sf, (n) => ts.isIdentifier(n) && n.text === 'eval')) return calls;
 	const uses = localUses(sf, checker);
 	for (const fn of sf.statements) {
 		if (
@@ -188,8 +192,8 @@ export function directReactHooks(sf: ts.SourceFile, checker: ts.TypeChecker) {
 				? first.expression
 				: undefined;
 		if (!value || !ts.isCallExpression(value) || !ts.isIdentifier(value.expression)) continue;
-		const hook = reactImport(value.expression, checker);
-		if (hook !== 'useState' && hook !== 'useSyncExternalStore') continue;
+		const name = rendererImport(value.expression, checker, module);
+		if (!name || !accepts(name)) continue;
 		// A local write can replace the exported function before the importer calls it.
 		if (
 			renderUses(uses(fn.name)).some(
@@ -197,9 +201,9 @@ export function directReactHooks(sf: ts.SourceFile, checker: ts.TypeChecker) {
 			)
 		)
 			continue;
-		hooks.set(fn.name.text, hook);
+		calls.set(fn.name.text, name);
 	}
-	return hooks;
+	return calls;
 }
 
 function scalarLiteral(node: ts.Node) {
