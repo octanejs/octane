@@ -1,3 +1,4 @@
+import { svgDataAttribute } from './path-svg.js';
 import {
 	forwardedProps,
 	literalJsxAttribute,
@@ -1207,6 +1208,7 @@ class ModuleTransform {
 							!!value.expression &&
 							this.svgClassName(value.expression)))
 				);
+			if (svgDataAttribute(attr.name.text)) return !!value && ts.isStringLiteral(value);
 			return attr.name.text === 'aria-hidden' && literalJsxAttribute(attr);
 		});
 		if (!supported) return false;
