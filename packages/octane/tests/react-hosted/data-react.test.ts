@@ -97,6 +97,11 @@ describe('octane/data/react', () => {
 		await act(() => store.retire());
 		expect(container.querySelector('output')?.textContent).toBe('empty');
 		expect(container.querySelectorAll('input')).toHaveLength(0);
+		const submit = new Event('submit', { bubbles: true, cancelable: true });
+		await act(async () => {
+			container.querySelector('form')!.dispatchEvent(submit);
+		});
+		expect(submit.defaultPrevented).toBe(true);
 	});
 
 	it('suspends until the first value and shares one load between components', async () => {
