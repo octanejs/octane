@@ -372,7 +372,7 @@ export async function runCodemod(
 				new URL('../templates/react-intl.tsrx', import.meta.url),
 				'utf8',
 			);
-			adapterState = inspectAdapter(adapter, adapterSource, PREVIOUS_INTL_SHA256);
+			adapterState = inspectAdapter(adapter, adapterSource, PREVIOUS_INTL_HASHES);
 			if (
 				adapterState.kind === 'conflict' ||
 				owners.has(ts.sys.useCaseSensitiveFileNames ? adapter : adapter.toLowerCase())
@@ -506,7 +506,7 @@ export async function runCodemod(
 		const state: AdapterState =
 			shadowed || ownerOf(output)
 				? { kind: 'conflict' }
-				: inspectAdapter(output, code, output === svgHelper ? PREVIOUS_SVG_SHA256 : undefined);
+				: inspectAdapter(output, code, output === svgHelper ? PREVIOUS_SVG_HASHES : undefined);
 		let error: string | undefined;
 		if (state.kind === 'conflict') {
 			error = 'The ' + kind + ' adapter path is occupied: ' + name;
@@ -880,7 +880,7 @@ export async function runCodemod(
 				file: adapter,
 				source: adapterSource,
 				state: adapterState,
-				previous: PREVIOUS_INTL_SHA256,
+				previous: PREVIOUS_INTL_HASHES,
 				rule: 'react-intl',
 			});
 		if (svg)
@@ -888,7 +888,7 @@ export async function runCodemod(
 				file: svgHelper,
 				source: svg.code,
 				state: svg.state,
-				previous: PREVIOUS_SVG_SHA256,
+				previous: PREVIOUS_SVG_HASHES,
 				rule: 'svg-paths',
 			});
 		// Check both shared helpers before writing either. Recheck again at publication.
@@ -994,9 +994,10 @@ type AdapterState =
 	{ kind: 'missing' | 'current' | 'conflict' } | { kind: 'previous'; mode: number; hash: string };
 
 // Hash only previously shipped helpers. A locally edited file belongs to the application.
-const PREVIOUS_INTL_SHA256 = ['07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98'];
+const PREVIOUS_INTL_HASHES = ['07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98'];
 
-const PREVIOUS_SVG_SHA256 = [
+const PREVIOUS_SVG_HASHES = [
+	'88de6c9053abe0f94934ebb7cd54cd681e4d2544b3facab0dbdf3d4c588649a5',
 	'62ef936e3ce64cfe809297e08e74538f0c409f0bde6a926ca7b88de93161a38d',
 	'a3d611226ba955f4f5601caa4c6987f0a5a943fab97362843d16f02c686c6944',
 	'058f232bcee5d0caf24d72ec8f9864152b7eb6a9e882614bff3209ff0d145d00',

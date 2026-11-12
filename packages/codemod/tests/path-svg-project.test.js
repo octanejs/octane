@@ -246,6 +246,31 @@ it.each([
 	},
 );
 
+it('preserves a different supported SVG helper installed during an upgrade', async () => {
+	const { root, file, icon } = fixture();
+	const helper = path.join(root, 'src/octane-path-svg.ts');
+	const previous = (version) =>
+		fs.readFileSync(new URL(`./fixtures/path-svg-${version}.txt`, import.meta.url));
+	const replacement = previous('v2');
+	fs.writeFileSync(helper, previous('v1'));
+	const mkdtemp = fs.mkdtempSync;
+	const race = vi.spyOn(fs, 'mkdtempSync').mockImplementation((prefix, ...args) => {
+		if (path.basename(prefix) === '.octane-adapter-') fs.writeFileSync(helper, replacement);
+		return mkdtemp(prefix, ...args);
+	});
+	try {
+		const result = await runCodemod([file], { root, svgPaths: true, write: true });
+		expect(result.files.flatMap((f) => f.notes)).toContainEqual(
+			expect.objectContaining({ rule: 'svg-paths', severity: 'error' }),
+		);
+		expect(fs.readFileSync(helper)).toEqual(replacement);
+		expect(fs.existsSync(icon + '.octane.ts')).toBe(false);
+		expect(fs.existsSync(file.replace(/\.tsx$/, '.tsrx'))).toBe(false);
+	} finally {
+		race.mockRestore();
+	}
+});
+
 it('preserves the authored SVG root on the server and the client, including subsequent asset edits', async () => {
 	const withData = pane.replace(
 		'className="status"',
@@ -254,13 +279,20 @@ it('preserves the authored SVG root on the server and the client, including subs
 	const { root, file, icon } = fixture(withData);
 	const drawing = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="none" role="img" focusable="false">
 		<rect x="1" y="2" width="8" height="7" rx="2" fill="var(--surface)"/>
-		<g transform="translate(0 -1) scale(1.5)"><g><path d="M0 0L6 4Z" fill="currentColor" fill-rule="evenodd"/></g></g>
+		<g transform="translate(0 -1) scale(1.5)" clip-path="url(#sample)"><g><path d="M0 0L6 4Z" fill="currentColor" fill-rule="evenodd"/></g></g>
 		<path d="M1 1L3 3" stroke="#fff" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="bevel" opacity=".3"/>
+		<defs><clipPath id="sample"><rect width="4" height="6"/></clipPath></defs>
 	</svg>`;
 	fs.writeFileSync(icon, '<!-- Drawing metadata -->\n' + drawing);
 	const options = { root, svgPaths: true, strong: true, verify: true, write: false };
 	const unchanged = await runCodemod([file], { ...options, svgPaths: false });
 	expect(unchanged.files.some((f) => f.rules['svg-paths'])).toBe(false);
+	fs.writeFileSync(icon, drawing.replace('url(#sample)', 'url(#missing)'));
+	const unresolved = await runCodemod([file], options);
+	expect(unresolved.files.find((f) => f.file === 'src/pane.tsx').notes).toContainEqual(
+		expect.objectContaining({ rule: 'svg-issuer', severity: 'error' }),
+	);
+	fs.writeFileSync(icon, '<!-- Drawing metadata -->\n' + drawing);
 	const preview = await runCodemod([file], options);
 	const converted = preview.files.find((f) => f.file === 'src/pane.tsx');
 	expect(converted.rules['svg-paths']).toBe(1);
@@ -289,7 +321,7 @@ it('preserves the authored SVG root on the server and the client, including subs
 		const reference = svg
 			.replace('<svg ', '<svg {...props} ')
 			.replace('opacity=".3"', 'opacity={0.3}')
-			.replace(/(fill|stroke)-([a-z])/g, (_, prefix, letter) => prefix + letter.toUpperCase());
+			.replace(/(clip|fill|stroke)-([a-z])/g, (_, prefix, letter) => prefix + letter.toUpperCase());
 		fs.writeFileSync(
 			path.join(root, 'src/reference.tsx'),
 			withData.replace(

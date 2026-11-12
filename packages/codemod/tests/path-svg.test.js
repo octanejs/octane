@@ -68,6 +68,42 @@ describe('static SVG assets', () => {
 			],
 		});
 	});
+	const clip = '<clipPath id="swatch"><rect width="3" height="5"/></clipPath>';
+	const defs = '<defs>' + clip + '</defs>';
+	const clipped = '<g clip-path="url(#swatch)">' + path + '</g>';
+	it('preserves a single rectangular definition shared by clipped groups in source order', () => {
+		for (const body of [defs + clipped + clipped, clipped + defs + clipped]) {
+			const source = '<svg>' + body + '</svg>';
+			const result = parseStaticSvg(source);
+			expect(result?.children.map((node) => node.tag)).toEqual(
+				body.startsWith(defs) ? ['defs', 'g', 'g'] : ['g', 'defs', 'g'],
+			);
+			expect(parsePathSvg(source)).toBeNull();
+		}
+	});
+	it.each([
+		['an unresolved clip', clipped],
+		['an unused clip', defs + path],
+		['a second definition', defs + clipped + defs],
+		['another identifier', defs + clipped + clipped.replace('#swatch', '#second')],
+		['a nonlocal URL', defs + clipped.replace('#swatch', 'icons.svg#swatch')],
+		['a definition inside a group', '<g>' + defs + '</g>' + clipped],
+		['a clipped group inside a group', defs + '<g>' + clipped + '</g>'],
+		['a clip outside definitions', clip + clipped],
+		['a rectangle directly in definitions', '<defs><rect width="3" height="5"/></defs>' + clipped],
+		[
+			'multiple rectangles',
+			defs.replace('</clipPath>', '<rect width="1" height="1"/></clipPath>') + clipped,
+		],
+		['no rectangle', defs.replace(/<rect[^>]*\/>/, '') + clipped],
+		[
+			'clip units',
+			defs.replace('<clipPath ', '<clipPath clipPathUnits="objectBoundingBox" ') + clipped,
+		],
+	])('declines %s', (_, body) => {
+		expect(parseStaticSvg('<svg>' + body + '</svg>')).toBeNull();
+	});
+
 	it('retains an authored unitful root length as a string', () => {
 		expect(parseStaticSvg(`<svg width="1e999px">${path}</svg>`)?.root.width).toBe('1e999px');
 	});
