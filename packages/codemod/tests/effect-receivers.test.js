@@ -133,13 +133,20 @@ it('reports an opaque effect dependency whose getter registers a React SSR style
 it.each([
 	['block', false],
 	['block', true],
+	['block with a property named after the trigger', true],
+	['block with a type query for the trigger', true],
 	['expression', false],
 	['expression', true],
 	['properties', false],
 ])('matches React for a %s effect with revision dependency %s', async (form, withRevision) => {
 	const withProperties = form === 'properties';
 	const comment = form === 'expression' && withRevision ? '// keep with the expression\n' : '';
-	const effect = form === 'expression' ? `() => ${comment}receiver.attach()` : blockEffect;
+	let effect = blockEffect;
+	if (form === 'expression') effect = `() => ${comment}receiver.attach()`;
+	if (form === 'block with a property named after the trigger')
+		effect = blockEffect.replace("'start'", "{ revision: 'start' }.revision");
+	if (form === 'block with a type query for the trigger')
+		effect = blockEffect.replace("'start'", "('start' as typeof revision)");
 	const input = withProperties ? propertySource : source.replace(blockEffect, effect);
 	const migrated = migrate(
 		withRevision ? input.replace('[receiver]', '[receiver, revision]') : input,
@@ -398,6 +405,13 @@ it.each([
 		'reassigned trigger',
 		source
 			.replace('useEffect(() =>', 'revision++; useEffect(() =>')
+			.replace('[receiver]', '[receiver, revision]'),
+	],
+	[
+		'a shadowed trigger',
+		source
+			.replace('useEffect(() => {', 'useEffect(() => { const revision = 1;')
+			.replace("'start'", 'String(revision)')
 			.replace('[receiver]', '[receiver, revision]'),
 	],
 	[

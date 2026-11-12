@@ -17,12 +17,19 @@ export function scalar(type: ts.Type): boolean {
 	);
 }
 
-function localSymbol(checker: ts.TypeChecker, id: ts.Identifier) {
+export function localSymbol(checker: ts.TypeChecker, id: ts.Identifier) {
 	return ts.isShorthandPropertyAssignment(id.parent) && id.parent.name === id
 		? checker.getShorthandAssignmentValueSymbol(id.parent)
 		: ts.isExportSpecifier(id.parent)
 			? checker.getExportSpecifierLocalTargetSymbol(id.parent)
 			: checker.getSymbolAtLocation(id);
+}
+
+/** A type query reads only the type. Class heritage reads the actual value. */
+export function inTypeNode(node: ts.Identifier) {
+	let parent = node.parent;
+	while (ts.isQualifiedName(parent)) parent = parent.parent;
+	return ts.isTypeNode(parent) && !ts.isExpressionWithTypeArguments(parent);
 }
 
 type Key = string | undefined; // An unknown computed key can select any member.
