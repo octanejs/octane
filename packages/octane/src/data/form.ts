@@ -139,6 +139,7 @@ export function createFormHandle<I, O>(
 	seed: FormSeed,
 	run: (input: unknown) => Promise<O>,
 	release: () => void,
+	retiring: AbortSignal,
 ): FormHandle<I, O> {
 	const fields = write.form;
 	if (!fields) throw new Error(`octane/data: write "${write.name}" declares no form fields`);
@@ -155,21 +156,30 @@ export function createFormHandle<I, O>(
 		// A form that unmounted mid-submission, as a removed row does, lets go once it settles.
 		if (next === IDLE && subscribers.size === 0) release();
 	};
+	function retired() {
+		state = IDLE;
+		for (const notify of [...subscribers]) notify();
+		subscribers.clear();
+	}
 	const base: Array<readonly [string, string]> = [[FORM_WRITE, write.name]];
 	if (key) base.push([FORM_KEY, key]);
 	if (seed.token) base.push([FORM_TOKEN, seed.token]);
 	if (seed.nonce) base.push([FORM_OPERATION, `${seed.nonce}.${write.name}.${key}`]);
 
 	return {
-		getSnapshot: () => state,
+		getSnapshot: () => (retiring.aborted ? IDLE : state),
 		subscribe(notify) {
+			if (retiring.aborted) return () => {};
+			if (subscribers.size === 0) retiring.addEventListener('abort', retired, { once: true });
 			subscribers.add(notify);
 			return () => {
 				subscribers.delete(notify);
+				if (subscribers.size === 0) retiring.removeEventListener('abort', retired);
 				if (subscribers.size === 0 && state === IDLE) release();
 			};
 		},
 		hidden(values) {
+			if (retiring.aborted) return [];
 			const entries = base.slice();
 			for (const name in values) {
 				const value = values[name];
@@ -180,6 +190,10 @@ export function createFormHandle<I, O>(
 			return entries;
 		},
 		submit(source) {
+			if (retiring.aborted) {
+				if (!(source instanceof FormData)) source.preventDefault();
+				return Promise.reject(retiring.reason);
+			}
 			let form: HTMLFormElement | null = null;
 			let submitter: HTMLElement | null = null;
 			let data: FormData;
@@ -193,7 +207,7 @@ export function createFormHandle<I, O>(
 			const id = ++latest;
 			const decoded = decodeForm(fields, data);
 			const refuse = (error: unknown): never => {
-				if (id === latest && !(error instanceof Error && error.name === 'DataRetiredError')) {
+				if (!retiring.aborted && id === latest) {
 					const code = error instanceof DataError ? error.code : 'uncertain';
 					const issues = error instanceof DataError ? issueMap(error.issues) : IDLE.issues;
 					set({ pending: false, values: decoded.values, issues, error: code });
@@ -209,7 +223,7 @@ export function createFormHandle<I, O>(
 			}
 			set({ pending: true, values: IDLE.values, issues: IDLE.issues, error: null });
 			return run(decoded.input).then((output) => {
-				if (id === latest) {
+				if (!retiring.aborted && id === latest) {
 					set(IDLE);
 					if (form && sameEntries(new FormData(form, submitter), data)) form.reset();
 				}

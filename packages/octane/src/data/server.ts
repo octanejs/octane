@@ -345,7 +345,7 @@ export function createDataHandler<C extends object = {}>(
 
 	let signing: Promise<CryptoKey> | undefined;
 	/** An HMAC of the account, so a token is valid only for the account it was issued to. */
-	async function sign(grant: string): Promise<string> {
+	async function sign(message: string): Promise<string> {
 		const { secret } = options;
 		if (!secret) throw new Error('octane/data: forms() needs a `secret`');
 		const encoder = new TextEncoder();
@@ -356,7 +356,7 @@ export function createDataHandler<C extends object = {}>(
 			false,
 			['sign'],
 		);
-		const mac = await crypto.subtle.sign('HMAC', await signing, encoder.encode(`form\n${grant}`));
+		const mac = await crypto.subtle.sign('HMAC', await signing, encoder.encode(message));
 		return btoa(String.fromCharCode(...new Uint8Array(mac)))
 			.replace(/\+/g, '-')
 			.replace(/\//g, '_')
@@ -366,8 +366,8 @@ export function createDataHandler<C extends object = {}>(
 	async function forms(request: Request, caller?: DataCaller): Promise<FormSession> {
 		const context = await contextFor(request, caller);
 		const form: FormSeed = {
-			token: await sign(options.grant?.(context) ?? ''),
-			nonce: crypto.randomUUID(),
+			token: await sign(`form\n${options.grant?.(context) ?? ''}`),
+			nonce: `v2:${crypto.randomUUID()}`,
 			outcome: null,
 		};
 		const type = request.headers.get('content-type') ?? '';
@@ -391,9 +391,22 @@ export function createDataHandler<C extends object = {}>(
 			if (decoded.issues.length > 0) throw new DataError('invalid', undefined, decoded.issues);
 			const operation = data.get(FORM_OPERATION);
 			const operationId =
-				typeof operation === 'string' && operation.length > 0 && operation.length <= 200
-					? operation
-					: crypto.randomUUID();
+				typeof operation === 'string' && operation.startsWith('v2:')
+					? await sign(
+							JSON.stringify([
+								'submission',
+								form.token,
+								name,
+								key,
+								operation,
+								Object.keys(decoded.input)
+									.sort()
+									.map((field) => [field, decoded.input[field]]),
+							]),
+						)
+					: typeof operation === 'string' && operation.length > 0 && operation.length <= 200
+						? operation
+						: crypto.randomUUID();
 			await run('write', name, decoded.input, callFor(context, request, operationId));
 		} catch (error) {
 			if (!(error instanceof DataError)) throw error;

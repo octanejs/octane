@@ -1428,7 +1428,16 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			let handle = forms.get(formKey);
 			if (!handle) {
 				const run = (input: unknown) => store.write(write, input as any);
-				handle = createFormHandle(write, key, formOutcome, run, () => forms.delete(formKey));
+				handle = createFormHandle(
+					write,
+					key,
+					formOutcome,
+					run,
+					() => {
+						if (forms.get(formKey) === handle) forms.delete(formKey);
+					},
+					retiring.signal,
+				);
 				if (formOutcome.outcome && handle.getSnapshot().error !== null) {
 					formOutcome = { ...formSeed, outcome: null };
 				}
