@@ -22,6 +22,7 @@ import {
 	type ReactCompatComponentProps,
 	type ReactCompatProps,
 } from './react-compat-shared.js';
+import { setHostTimeout, clearHostTimeout } from '../host-task.js';
 
 const SERVER_RENDER_SLOT = Symbol('octane.react-compat.server.render');
 const SERVER_RESULT_SLOT = Symbol('octane.react-compat.server.result');
@@ -37,7 +38,7 @@ function bufferReactIsland(
 	const controller = new AbortController();
 	let finished = false;
 	let failure: { reason: unknown } | undefined;
-	let timeout: ReturnType<typeof setTimeout> | undefined;
+	let timeout: unknown | undefined;
 	let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 	let fullyRead = false;
 
@@ -56,7 +57,7 @@ function bufferReactIsland(
 	if (owner.signal?.aborted) onAbort();
 	else owner.signal?.addEventListener('abort', onAbort, { once: true });
 	if (owner.timeoutMs > 0) {
-		timeout = setTimeout(() => {
+		timeout = setHostTimeout(() => {
 			abort(new Error(`<ReactCompat> server rendering exceeded ${owner.timeoutMs}ms.`));
 		}, owner.timeoutMs);
 	}
@@ -99,7 +100,7 @@ function bufferReactIsland(
 			}
 		} finally {
 			finished = true;
-			if (timeout !== undefined) clearTimeout(timeout);
+			if (timeout !== undefined) clearHostTimeout(timeout);
 			owner.signal?.removeEventListener('abort', onAbort);
 			release();
 			if (!fullyRead) {
