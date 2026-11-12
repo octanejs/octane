@@ -35,6 +35,7 @@ import {
 	type DataReply,
 	type Entity,
 	type DataRequest,
+	type Feed,
 	type Listener,
 	type Read,
 	type Transport,
@@ -152,6 +153,12 @@ export interface DataStoreOptions {
 	readonly persist?: PersistOptions | undefined;
 	/** Where feeds connect; `listen(store, feed)` needs one. */
 	readonly listen?: Listener | undefined;
+	/**
+	 * Feeds the page listens to. A store with no `listen`, a server render's,
+	 * asks each for its position before its first read, and its seed carries
+	 * them, so the browser's feed resumes from before the page's values loaded.
+	 */
+	readonly feeds?: ReadonlyArray<Feed<void, any>> | undefined;
 }
 
 /**
@@ -164,6 +171,8 @@ export interface StoreInternals {
 	readonly retired: AbortSignal;
 	/** Where feeds save their cursors, when the store persists. */
 	readonly persisted: Persistence | null;
+	/** Each feed's position when the server render that seeded this store began. */
+	readonly seeded: ReadonlyMap<string, string>;
 	readonly entries: ReadonlyMap<string, Entry>;
 	/** Whether a view holds the record `id`, or would show `value` or move its rows for it. */
 	viewed(entity: Entity<any>, id: string, value?: unknown): boolean;
@@ -373,7 +382,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	/** Created records' operation IDs, by entity, mapped to the IDs their servers assigned. */
 	const assigned = new Map<string, string>();
 	const parsed = options.seed
-		? (devalue.parse(options.seed) as { reads: SeedEntry[]; form: FormSeed })
+		? (devalue.parse(options.seed) as {
+				reads: SeedEntry[];
+				form: FormSeed;
+				cursors?: Array<[string, string]>;
+			})
 		: null;
 	const seedAge = options.seedAge ?? 0;
 	if (!Number.isFinite(seedAge) || seedAge < 0) throw new RangeError('Invalid seed age');
@@ -392,6 +405,32 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	let sequence = 0;
 	let retired = false;
 	const retiring = new AbortController();
+	/** The feeds' positions a server render took before its first read, for its seed. */
+	const cursors: Array<[string, string]> = [];
+	const positions =
+		options.feeds?.length && !options.listen && !options.seed
+			? Promise.all(
+					options.feeds.map((feed) =>
+						Promise.resolve()
+							.then(() =>
+								transport(
+									{ kind: 'position', name: feed.name, input: undefined },
+									// A retired render, cancelled or failed, stops asking.
+									retiring.signal,
+								),
+							)
+							.then(
+								(reply) => {
+									if (reply.ok && typeof reply.value === 'string') {
+										cursors.push([entryKey(feed.name, undefined), reply.value]);
+									}
+								},
+								// Without a position the browser's feed starts from its connection.
+								() => {},
+							),
+					),
+				)
+			: null;
 	let retirement: Promise<void> | null = null;
 	const persisted = options.persist
 		? createPersistence(options.persist, saving, (key) => !!entries.get(key)?.subscribers.size)
@@ -928,6 +967,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	 */
 	async function request(payload: DataRequest, signal: AbortSignal): Promise<DataReply> {
 		await undefined;
+		// Read after the feeds' positions, so no change falls between them and a value.
+		if (positions) await positions;
 		return transport(payload, signal);
 	}
 
@@ -1560,7 +1601,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				});
 			}
 			// devalue escapes `<`, so the text cannot close the script element holding it.
-			return devalue.stringify({ reads: seed, form: formSeed });
+			return devalue.stringify({ reads: seed, form: formSeed, cursors });
 		},
 		retire() {
 			if (retirement) return retirement;
@@ -1594,6 +1635,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		listen: options.listen,
 		retired: retiring.signal,
 		persisted,
+		seeded: new Map(parsed?.cursors),
 		entries,
 		viewed: (entity, id, value) =>
 			!!records.get(entity.name)?.has(id) ||
