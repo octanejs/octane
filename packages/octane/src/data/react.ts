@@ -9,6 +9,7 @@ import { createContext, createElement, use, useCallback, useSyncExternalStore } 
 import type { ReactNode } from 'react';
 import type { Read, View, Write } from './contracts.js';
 import { formViews, type FormView } from './form.js';
+import { pages, type PagesSnapshot } from './pages.js';
 import type { DataStore, ReadSnapshot } from './store.js';
 
 const StoreContext = createContext<DataStore | null>(null);
@@ -49,6 +50,18 @@ export function useRead<I, O>(read: Read<I, O>, input?: I): O {
 	// The load in flight is one promise for every caller, as `use` requires.
 	if (snapshot.status === 'pending') use(store.prefetch(read, input as I));
 	return snapshot.value as O;
+}
+
+/**
+ * A view read a page at a time, as one list. `more` says whether another page
+ * has rows, and `loadMore` shows it. Like `useReadState`, it does not suspend.
+ */
+export function usePages<T>(view: View<void, T>): PagesSnapshot<T>;
+export function usePages<P, T>(view: View<P, T>, params: P): PagesSnapshot<T>;
+export function usePages<P, T>(view: View<P, T>, params?: P): PagesSnapshot<T> {
+	// Equal arguments resolve to one handle, so its methods are stable across renders.
+	const handle = pages(useDataStore(), view, params as P);
+	return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot);
 }
 
 /** A stable function that submits a write through the store. */

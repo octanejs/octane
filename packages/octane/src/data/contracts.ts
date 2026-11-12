@@ -221,6 +221,11 @@ const isCount = (value: unknown, min: number, max: number) =>
  * plus a margin, shares those records with every other view of the entity,
  * and evaluates `where` and `order` locally, so an edit moves a record into,
  * out of or across a view in the task that made it.
+ *
+ * Read one window with `store.read(view, { offset, limit })`; its snapshot's
+ * `more` says whether rows follow. Read a growing list a page at a time with
+ * `pages(store, view)` or `usePages(view)`, which joins the pages loaded so far
+ * and adds the next with `loadMore()`.
  */
 export function view<T, P = void>(options: {
 	name: string;
