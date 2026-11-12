@@ -33,7 +33,7 @@ import { handleServerRoute } from './server-route.js';
 import { composeHtmlStream } from './html-stream.js';
 import { serializeRouteData } from './route-data.js';
 import { provideRouteData } from './data-route.js';
-import { beforeBodyEnd, endRoute, routeEnding, routeSeedScripts } from '../seeds.js';
+import { beforeBodyEnd, endRoute, failRoute, routeEnding, routeSeedScripts } from '../seeds.js';
 import {
 	applyHydrationNonce,
 	getContextNonce,
@@ -440,7 +440,7 @@ export function createHandler(manifest, deps) {
 				}
 				return await handleServerRoute(match.route, context, globalMiddlewares);
 			} catch (error) {
-				endRoute(context);
+				failRoute(context);
 				console.error('[octane] Request error:', error);
 				return new Response('Internal Server Error', { status: 500 });
 			}

@@ -19,6 +19,7 @@ const SEED_NAME = /^[\w.-]+$/;
  *   seeds: Map<string, () => unknown>,
  *   releases: Array<() => void>,
  *   ended: boolean,
+ *   stream: ReadableStream<Uint8Array> | null,
  * }} RouteSeeds
  */
 
@@ -28,7 +29,9 @@ const routes = new WeakMap();
 /** @param {object} context */
 function routeOf(context) {
 	let route = routes.get(context);
-	if (!route) routes.set(context, (route = { seeds: new Map(), releases: [], ended: false }));
+	if (!route) {
+		routes.set(context, (route = { seeds: new Map(), releases: [], ended: false, stream: null }));
+	}
 	return route;
 }
 
@@ -104,6 +107,21 @@ export async function routeSeedScripts(context, nonceAttribute) {
 }
 
 /**
+ * @internal End a route whose request failed. A response already streaming is
+ * cancelled, which stops its render and ends the route; otherwise the route
+ * ends now.
+ * @param {object} context
+ */
+export function failRoute(context) {
+	const stream = routes.get(context)?.stream;
+	if (stream && !stream.locked) {
+		void stream.cancel().catch(() => {});
+		return;
+	}
+	endRoute(context);
+}
+
+/**
  * @internal End the route: run each release once.
  * @param {object} context
  */
@@ -140,6 +158,9 @@ export function beforeBodyEnd(document, html) {
  */
 export function routeEnding(context, nonceAttribute) {
 	return {
+		hold: (/** @type {ReadableStream<Uint8Array>} */ stream) => {
+			routeOf(context).stream = stream;
+		},
 		tail: async (/** @type {string} */ suffix) =>
 			beforeBodyEnd(suffix, await routeSeedScripts(context, nonceAttribute)),
 		end: () => endRoute(context),

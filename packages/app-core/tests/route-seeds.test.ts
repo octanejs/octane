@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createContext } from '../src/server/middleware.js';
 import { composeHtmlStream } from '../src/server/html-stream.js';
-import { onRouteEnd, readRouteSeed, routeEnding, routeSeed } from '../src/seeds.js';
+import { failRoute, onRouteEnd, readRouteSeed, routeEnding, routeSeed } from '../src/seeds.js';
 import { resolveOctaneConfig } from '../src/resolve-config.js';
 import { create_client_entry_source } from '../src/codegen.js';
 
@@ -102,6 +102,30 @@ describe('route seeds', () => {
 		expect(produce).not.toHaveBeenCalled();
 	});
 
+	it("cancels a failed request's live stream, which ends its render and releases the route", async () => {
+		const route = context();
+		const released = vi.fn();
+		const cancelled = vi.fn();
+		onRouteEnd(route, released);
+		composeHtmlStream(
+			'<p>',
+			new ReadableStream<Uint8Array>({ pull() {}, cancel: cancelled }),
+			'</p>',
+			'',
+			routeEnding(route, ''),
+		);
+		failRoute(route);
+		await vi.waitFor(() => expect(released).toHaveBeenCalledTimes(1));
+		expect(cancelled).toHaveBeenCalledTimes(1);
+
+		// A request that failed before streaming ends at once.
+		const early = context();
+		const releasedEarly = vi.fn();
+		onRouteEnd(early, releasedEarly);
+		failRoute(early);
+		expect(releasedEarly).toHaveBeenCalledTimes(1);
+	});
+
 	it('refuses a name that could not be an element id', () => {
 		expect(() => routeSeed(context(), 'two words', () => '')).toThrow(/may only use/);
 	});
@@ -121,5 +145,10 @@ describe('config data module', () => {
 		};
 		expect(create_client_entry_source(ids)).not.toContain('data-root');
 		expect(create_client_entry_source({ ...ids, data: true })).toContain('"data-root"');
+		// DataRoot wraps the route in a body no void proof covers.
+		expect(create_client_entry_source({ ...ids, voidRoot: true })).toContain('__hydrateVoidRoot');
+		expect(create_client_entry_source({ ...ids, voidRoot: true, data: true })).not.toContain(
+			'__hydrateVoidRoot',
+		);
 	});
 });

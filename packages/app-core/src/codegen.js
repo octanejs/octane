@@ -378,7 +378,8 @@ async function bootstrapDocumentLifecycle() {}
  *     whole document, opens the page's store from the server's seed, and
  *     renders the route inside `DataRoot`, as the server did. Off by default,
  *     so an app without one never loads `octane/data`.
- *   - `voidRoot: true` hydrates without returned-value reconciliation. Only a
+ *   - `voidRoot: true` hydrates without returned-value reconciliation. A `data`
+ *     entry ignores it: its root is `DataRoot`, which no build proves void. Only a
  *     build that proved every page and layout it can render is a void `@{}`
  *     body, with no root boundary, may set it (see compiler/void-roots.js).
  *
@@ -421,7 +422,7 @@ import { readRouteSeed } from ${JSON.stringify(
 			)};`
 		: '';
 	const imports = [
-		options.voidRoot ? '__hydrateVoidRoot as hydrateRoot' : 'hydrateRoot',
+		options.voidRoot && !data ? '__hydrateVoidRoot as hydrateRoot' : 'hydrateRoot',
 		'initializeHydrationEventCapture',
 		...(rootBoundary ? ['Suspense', 'ErrorBoundary', 'createElement'] : []),
 	];

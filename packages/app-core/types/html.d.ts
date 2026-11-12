@@ -31,6 +31,8 @@ export function composeHtmlStream(
 export interface RouteEnding {
 	tail(suffix: string): Promise<string>;
 	end(): void;
+	/** Handed the composed stream, so a failed request can cancel it. */
+	hold?(stream: ReadableStream<Uint8Array>): void;
 }
 /** A route's seeds go before `</body>`, and the route ends with the stream. */
 export function routeEnding(context: object, nonceAttribute: string): RouteEnding;

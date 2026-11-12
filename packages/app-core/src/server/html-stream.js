@@ -10,8 +10,9 @@
  * @param {ReadableStream<Uint8Array>} renderStream
  * @param {string} suffix
  * @param {string} [afterShell] Owned bootstrap after the renderer's first complete shell chunk.
- * @param {{ tail(suffix: string): Promise<string>, end(): void }} [ending] Computes the
- *   suffix once the render has finished, and runs `end` however the stream ends.
+ * @param {{ tail(suffix: string): Promise<string>, end(): void, hold?(stream: ReadableStream<Uint8Array>): void }} [ending]
+ *   Computes the suffix once the render has finished, runs `end` however the stream
+ *   ends, and is handed the stream, so a failed request can cancel it.
  * @returns {ReadableStream<Uint8Array>}
  */
 export function composeHtmlStream(prefix, renderStream, suffix, afterShell = '', ending) {
@@ -27,7 +28,7 @@ export function composeHtmlStream(prefix, renderStream, suffix, afterShell = '',
 		reader.releaseLock();
 	}
 
-	return new ReadableStream(
+	const stream = new ReadableStream(
 		{
 			async pull(controller) {
 				try {
@@ -85,4 +86,6 @@ export function composeHtmlStream(prefix, renderStream, suffix, afterShell = '',
 		},
 		{ highWaterMark: 0 },
 	);
+	ending?.hold?.(stream);
+	return stream;
 }

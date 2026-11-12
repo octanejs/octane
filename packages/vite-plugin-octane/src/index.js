@@ -451,8 +451,10 @@ async function hydrate_entry_features(context, config, entries, clientBuild, pro
 		rootBoundary,
 		independentHydration: clientBuild.metadata().capabilities.independentHydration,
 		streamedSignals: clientBuild.hasStreamedSignals,
+		// A root boundary or the data module's DataRoot wraps the route in a body no proof covers.
 		voidRoot:
 			!rootBoundary &&
+			!config.data &&
 			imports.length > 0 &&
 			(await provenVoidImports(context, RESOLVED_VIRTUAL_HYDRATE_ID, imports)).length ===
 				imports.length,
