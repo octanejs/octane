@@ -1105,6 +1105,14 @@ export function portableArguments(
 	};
 }
 
+/** Whether this value is only named as a JSX component or a module export. */
+export function componentTagOrExport(ref: ts.Identifier) {
+	const p = ref.parent;
+	return ts.isJsxOpeningElement(p) || ts.isJsxClosingElement(p) || ts.isJsxSelfClosingElement(p)
+		? p.tagName === ref
+		: ts.isExportSpecifier(p) || ts.isExportAssignment(p);
+}
+
 export function localUses(file: ts.SourceFile, checker: ts.TypeChecker) {
 	const refs = new Map<ts.Symbol, ts.Identifier[]>();
 
