@@ -36,6 +36,7 @@ export type {
 } from './react-compat-shared.js';
 
 import * as React from 'react';
+import { reactResourceHints } from './resource-hints.js';
 import { createElement as createOctaneServerElement } from '../server/index.js';
 import {
 	createHostedServerSession,
@@ -88,7 +89,7 @@ const SESSIONS = new WeakMap<object, HostedServerSession>();
 function sessionFor(key: object): HostedServerSession {
 	let session = SESSIONS.get(key);
 	if (session === undefined) {
-		session = createHostedServerSession();
+		session = createHostedServerSession(reactResourceHints);
 		SESSIONS.set(key, session);
 	}
 	return session;

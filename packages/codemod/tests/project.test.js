@@ -663,6 +663,81 @@ Inline({ dangerouslySetInnerHTML: { __html: 'untrusted' } });`,
 		typecheckProject(root);
 	});
 
+	it('migrates generic React event handlers with a native currentTarget type', async () => {
+		const root = project({
+			'Frame.tsx': `import type { ReactEventHandler as LoadHandler } from 'react';
+export function Frame(props: { onLoad: LoadHandler<HTMLIFrameElement> }) {
+	return <iframe onLoad={props.onLoad} />;
+}`,
+			'consumer.ts': `import { Frame } from './Frame.tsrx';
+Frame({ onLoad(event) {
+	const src: string = event.currentTarget.src;
+	// @ts-expect-error Read native event properties directly.
+	event.nativeEvent;
+	// @ts-expect-error currentTarget exposes iframe members.
+	event.currentTarget.reset();
+} });`,
+			'tsconfig.json': JSON.stringify({
+				extends: path.join(REPO, 'packages/octane/typetests/tsconfig.json'),
+				include: ['Frame.tsrx', 'consumer.ts'],
+			}),
+		});
+		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+		const { files } = await runCodemod([path.join(root, 'Frame.tsx')], { root, strong: true });
+		expect(files).toMatchObject([{ strong: true, notes: [], diagnostics: [] }]);
+		typecheckProject(root);
+	});
+
+	it('reports synthetic methods on event types imported through a migrated module', async () => {
+		const root = project({
+			'Frame.tsx': `import type { ReactEventHandler } from 'react';
+export type Load = ReactEventHandler<HTMLIFrameElement>;
+export function Frame(props: { onLoad: Load }) {
+	return <iframe onLoad={props.onLoad} />;
+}`,
+			'ReactFrame.ts': `import type { ReactEventHandler } from 'react';
+export function ReactFrame(props: { onLoad: ReactEventHandler<HTMLIFrameElement> }) { return null; }`,
+			'App.tsx': `import { ReactCompat } from 'octane/react';
+import { Frame, type Load } from './Frame';
+import { ReactFrame } from './ReactFrame';
+const listener: Load = (event) => event['isDefaultPrevented']();
+export function App() {
+	return <>
+		<Frame onLoad={listener} />
+		<Frame onLoad={(event) => event.isPropagationStopped()} />
+		<ReactCompat><ReactFrame onLoad={(event) => event.isDefaultPrevented()} /></ReactCompat>
+	</>;
+}
+export function inspect(value: { isDefaultPrevented(): boolean }) {
+	return value.isDefaultPrevented();
+}`,
+			'tsconfig.json': JSON.stringify({
+				extends: path.join(REPO, 'packages/octane/typetests/tsconfig.json'),
+				compilerOptions: {
+					paths: {
+						react: [path.join(REPO, 'packages/octane/node_modules/@types/react/index.d.ts')],
+						'react/jsx-runtime': [
+							path.join(REPO, 'packages/octane/node_modules/@types/react/jsx-runtime.d.ts'),
+						],
+					},
+				},
+				include: ['*.tsx'],
+			}),
+		});
+		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+		const inputs = ['App.tsx', 'Frame.tsx'].map((file) => path.join(root, file));
+		const { files } = await runCodemod(inputs, {
+			root,
+			write: false,
+			strong: true,
+			projectTypes: true,
+		});
+		const app = files.find((file) => file.file === 'App.tsx');
+		expect(
+			app.notes.filter((note) => note.rule === 'event-object' && note.severity === 'error'),
+		).toHaveLength(2);
+	});
+
 	it('preserves React class and style types on migrated intrinsic prop consumers', async () => {
 		const root = project({
 			'Primitives.tsx': `import type * as React from 'react';

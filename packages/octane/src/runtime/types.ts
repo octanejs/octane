@@ -6,6 +6,7 @@
 // module.
 
 import type { BindingHandoff } from '../dom-binding-handoff.js';
+import type { ResourceHintHost } from '../resource-hint-diagnostics.js';
 import type { ControlHandoff } from '../signals/control-handoff.js';
 import type {
 	HydrationStrategy,
@@ -61,6 +62,7 @@ export type HookSlot = symbol | number;
 /** @internal Cross-renderer parent ownership carried on compiler-created region props. */
 export interface RendererRegionOwnerBridge {
 	readonly active: boolean;
+	readonly resourceHints?: ResourceHintHost;
 	readContext<T>(context: Context<T>): T;
 	routeError(error: unknown): boolean;
 	routeSuspense(thenable: PromiseLike<unknown>): boolean;

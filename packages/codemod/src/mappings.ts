@@ -71,7 +71,7 @@ const OCTANE_SERVER_VALUES = new Set([
 	'renderToString',
 ]);
 
-/** React type names `octane` exports as-is. */
+/** React and React DOM type names `octane` exports as-is. */
 const OCTANE_TYPES = new Set(
 	(
 		'AllHTMLAttributes AnchorHTMLAttributes AnimationEvent AnimationEventHandler AreaHTMLAttributes ' +
@@ -95,7 +95,7 @@ const OCTANE_TYPES = new Set(
 		'OutputHTMLAttributes ParamHTMLAttributes PointerEvent PointerEventHandler ProgressHTMLAttributes ' +
 		'PropsWithChildren PropsWithRef PropsWithoutRef Provider ProviderProps QuoteHTMLAttributes ' +
 		'ReactElement ReactHTMLElement ReactNode ReactPortal ReactSVGElement Reducer ReducerAction ' +
-		'ReducerState ReducerStateWithoutAction ReducerWithoutAction Ref RefAttributes RefCallback RefObject ' +
+		'ReducerState ReducerStateWithoutAction ReducerWithoutAction Ref RefAttributes RefCallback RefObject Root ' +
 		'SVGAttributes SVGLineElementAttributes SVGProps SVGTextElementAttributes ScriptHTMLAttributes ' +
 		'SelectHTMLAttributes SetStateAction SlotHTMLAttributes SourceHTMLAttributes StrictModeProps ' +
 		'StyleHTMLAttributes SuspenseProps TableHTMLAttributes TdHTMLAttributes TextareaHTMLAttributes ' +
