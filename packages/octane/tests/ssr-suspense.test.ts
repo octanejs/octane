@@ -1,5 +1,6 @@
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { describe, it, expect, vi } from 'vitest';
+import { installTestClock } from 'octane/testing';
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -532,17 +533,26 @@ describe('SSR — resource-thrown thenables', () => {
 		const settled = Promise.resolve();
 		const errors: unknown[] = [];
 		let reads = 0;
-		const work = stalledRender(
-			'boundary',
-			() => {
-				reads++;
-				throw settled;
-			},
-			{ timeoutMs: 100, onError: (error) => errors.push(error) },
-		);
-		await expect(work).rejects.toThrow(
-			'a component kept throwing already-settled thenables outside use() for 100ms',
-		);
+		const clock = installTestClock();
+		try {
+			const work = stalledRender(
+				'boundary',
+				() => {
+					reads++;
+					throw settled;
+				},
+				{ timeoutMs: 100, onError: (error) => errors.push(error) },
+			);
+			work.catch(() => {});
+			await clock.advance(99);
+			expect(errors).toEqual([]);
+			await clock.advance(1);
+			await expect(work).rejects.toThrow(
+				'a component kept throwing already-settled thenables outside use() for 100ms',
+			);
+		} finally {
+			clock.uninstall();
+		}
 		expect(errors).toHaveLength(1);
 		// Stalled retries back off instead of re-rendering on every task.
 		expect(reads).toBeLessThan(50);
