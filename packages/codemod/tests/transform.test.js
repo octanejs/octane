@@ -455,6 +455,25 @@ root.render(<App />);`;
 		);
 	});
 
+	it('keeps ref allocator re-exports and type queries on the original React API', () => {
+		const { code, notes } = transformModule(
+			`import type * as R from 'react';
+export { createRef as allocate, useState } from 'react';
+export type { createRef as RefFactory } from 'react';
+export type Direct = typeof import('react').createRef;
+export type Qualified = typeof R.createRef;`,
+			'refs.ts',
+		);
+		expect(notes).toEqual([]);
+		expect(code).toMatch(/export \{\s*createRef as allocate,?\s*\} from 'react'/);
+		expect(code).toMatch(/export \{\s*useState\s*\} from 'octane'/);
+		expect(code).toContain("export type { createRef as RefFactory } from 'react';");
+		expect(code).toContain("typeof import('react').createRef");
+		const imported = /import type \{\s*createRef(?: as (\w+))?\s*\} from 'react'/.exec(code);
+		expect(imported).not.toBeNull();
+		expect(code).toContain(`export type Qualified = typeof ${imported?.[1] ?? 'createRef'};`);
+	});
+
 	it("imports `useSyncExternalStore` from Octane, not React's shim for it", () => {
 		const { code } = transformModule(
 			"import { useEffect } from 'react';\nimport { useSyncExternalStore } from 'use-sync-external-store/shim';\nexport const useOnline = (s: { on(f: () => void): () => void; get(): boolean }) => {\n\tuseEffect(() => {}, []);\n\treturn useSyncExternalStore(s.on, s.get);\n};\n",

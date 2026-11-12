@@ -2241,7 +2241,7 @@ class ModuleTransform {
 	}
 
 	/**
-	 * Request an import from Octane and return the local name to use.
+	 * Request an import and return the local name to use.
 	 */
 	require(module: string, name: string, typeOnly: boolean) {
 		let names = this.added.get(module);
@@ -2734,6 +2734,10 @@ class ModuleTransform {
 					exports.elements[index + 1]?.getFullStart() ?? exports.end - 1,
 				);
 				const name = (item.propertyName ?? item.name).text;
+				if (mapReactImport(module, name, node.isTypeOnly || item.isTypeOnly)?.module === module) {
+					retained.push(text);
+					continue;
+				}
 				if (
 					name === 'SubmitEvent' ||
 					name === 'SubmitEventHandler' ||
@@ -2850,6 +2854,13 @@ class ModuleTransform {
 		if (module === undefined) return this.rewriteSpecifier(node, specifier);
 		const qualifier = node.qualifier;
 		const name = qualifier && ts.isIdentifier(qualifier) ? qualifier.text : null;
+		if (
+			node.isTypeOf &&
+			name &&
+			mapReactImport(specifier.text, name, true)?.module === specifier.text
+		) {
+			return null;
+		}
 		if (specifier.text === 'react' && !node.isTypeOf) {
 			const event = this.nativeEventType(node, name);
 			if (event !== undefined) {
@@ -3136,6 +3147,14 @@ class ModuleTransform {
 				: !this.isGlobalNamespace(node.left, 'React')
 		) {
 			return null;
+		}
+		if (ts.isTypeQueryNode(node.parent)) {
+			const mapped = mapReactImport(namespace?.module ?? 'react', node.right.text, true);
+			if (mapped?.module === 'react') {
+				if (!namespace) return null;
+				this.count(RULE.import);
+				return this.require(mapped.module, mapped.name, true);
+			}
 		}
 		const name = mapQualifiedType(node.right.text);
 		if (!name) {
