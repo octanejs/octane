@@ -47,7 +47,7 @@ export interface FormSeed {
 
 export const NO_FORM_SEED: FormSeed = { token: '', nonce: '', outcome: null };
 
-const IDLE: FormState = { pending: false, values: {}, issues: {}, error: null };
+export const IDLE: FormState = { pending: false, values: {}, issues: {}, error: null };
 
 type Entries = Iterable<readonly [string, FormDataEntryValue]>;
 
@@ -117,6 +117,12 @@ export interface FormHandle<I = unknown, O = unknown> {
 	 * Rejects as `write` does; a refusal also shows in the snapshot.
 	 */
 	submit(source: SubmitLike | FormData): Promise<O>;
+}
+
+/** A retired form must also cancel the browser's native POST. */
+export function rejectSubmission(source: SubmitLike | FormData, reason: unknown): Promise<never> {
+	if (!(source instanceof FormData)) source.preventDefault();
+	return Promise.reject(reason);
 }
 
 const sameEntries = (a: FormData, b: FormData) => {
@@ -190,10 +196,7 @@ export function createFormHandle<I, O>(
 			return entries;
 		},
 		submit(source) {
-			if (retiring.aborted) {
-				if (!(source instanceof FormData)) source.preventDefault();
-				return Promise.reject(retiring.reason);
-			}
+			if (retiring.aborted) return rejectSubmission(source, retiring.reason);
 			let form: HTMLFormElement | null = null;
 			let submitter: HTMLElement | null = null;
 			let data: FormData;
