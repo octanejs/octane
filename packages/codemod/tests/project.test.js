@@ -1328,6 +1328,97 @@ export function Position() {
 		expect(result.missing.map((entry) => entry.name)).toEqual(['@radix-ui/react-icons']);
 	});
 
+	it('maps direct consolidated Radix Slot members to flat binding exports', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'src/named.tsx': `import { Slot as Projection } from 'radix-ui';
+export function App() { return <Projection.Root><button>Press</button></Projection.Root>; }`,
+			'src/plain.tsx': `import { Slot } from 'radix-ui';
+export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`,
+			'src/slottable.tsx': `import { Slot } from 'radix-ui';
+export function App() { return <Slot.Slottable children={<button>Press</button>} />; }`,
+			'src/namespace.tsx': `import * as Radix from 'radix-ui';
+export type Projection = typeof Radix.Slot.Slot;
+export function App() { return <Radix.Slot.Slottable children={<button>Press</button>} />; }`,
+			'src/factory.tsx': `import { Slot } from 'radix-ui';
+export const Wrapped = Slot.createSlot('Wrapped');`,
+			'src/alias.tsx': `import { Slot } from 'radix-ui';
+const Wrapper = Slot.Root;
+export function App() { return <Wrapper><button>Press</button></Wrapper>; }`,
+			'src/children.tsx': `import { Slot } from 'radix-ui';
+export function App({ child }) { return <Slot.Root>{child}</Slot.Root>; }`,
+			'src/array.tsx': `import { Slot } from 'radix-ui';
+export function App() { return <Slot.Root children={[<button>Press</button>]} />; }`,
+			'src/spread.tsx': `import { Slot } from 'radix-ui';
+export function App(props) { return <Slot.Root {...props} />; }`,
+			'src/marker.tsx': `import { Slot } from 'radix-ui';
+export function App() {
+	return <Slot.Root data-mark="merged"><Slot.Slottable><button>Press</button></Slot.Slottable></Slot.Root>;
+}`,
+			'src/whole.tsx': `export * from 'radix-ui';
+export * as Radix from 'radix-ui';
+export type Projection = typeof import('radix-ui').Slot.Root;
+export const load = () => import('radix-ui');`,
+		});
+		const { files } = await runCodemod([root], { write: false });
+		const named = files.find(({ file }) => file === 'src/named.tsx');
+		const plain = files.find(({ file }) => file === 'src/plain.tsx');
+		const slottable = files.find(({ file }) => file === 'src/slottable.tsx');
+		const namespace = files.find(({ file }) => file === 'src/namespace.tsx');
+		expect(named?.code).toContain("import { Slot as Projection } from '@octanejs/radix';");
+		expect(named?.code).toContain('<Projection children={<button>Press</button>}');
+		expect(named?.notes.filter(({ severity }) => severity === 'error')).toEqual([]);
+		expect(plain?.code).toContain("import { Slot } from '@octanejs/radix';");
+		expect(plain?.code).toContain('<Slot children={<button>Press</button>}');
+		expect(slottable?.code).toContain("import { Slottable } from '@octanejs/radix';");
+		expect(slottable?.code).toContain('<Slottable children={<button>Press</button>}');
+		expect(namespace?.code).toContain('export type Projection = typeof Radix.Slot;');
+		expect(namespace?.code).toContain('<Radix.Slottable');
+		expect(namespace?.notes.filter(({ severity }) => severity === 'error')).toEqual([]);
+		for (const source of ['factory', 'alias', 'children', 'array', 'spread', 'marker']) {
+			const retained = files.find(({ file }) => file === `src/${source}.tsx`);
+			expect(retained?.code).toContain("from 'radix-ui'");
+			expect(retained?.notes).toEqual(
+				expect.arrayContaining([expect.objectContaining({ rule: 'bindings', severity: 'error' })]),
+			);
+		}
+		const whole = files.find(({ file }) => file === 'src/whole.tsx');
+		expect(whole?.code).not.toContain('@octanejs/radix');
+		expect(
+			whole?.notes.filter(({ rule, severity }) => rule === 'bindings' && severity === 'error'),
+		).toHaveLength(4);
+	});
+
+	it('keeps a local module that shadows the consolidated Radix package', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'tsconfig.json': '{ "compilerOptions": { "strict": true, "moduleResolution": "bundler" } }',
+			'src/tsconfig.json':
+				'{ "extends": "../tsconfig.json", "compilerOptions": { "paths": { "radix-ui": ["./other.ts"] } } }',
+			'src/other.ts': 'export const Slot = { Root: () => "local" };',
+			'src/view.tsx': `import { Slot } from 'radix-ui';
+export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`,
+		});
+		for (const projectTypes of [false, true]) {
+			const { files } = await runCodemod([path.join(root, 'src/view.tsx')], {
+				root,
+				write: false,
+				projectTypes,
+			});
+			expect(files[0].code).toContain("from 'radix-ui'");
+			expect(files[0].code).toContain('<Slot.Root>');
+			expect(files[0].notes).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						rule: 'bindings',
+						severity: 'error',
+						message: expect.stringContaining('TypeScript alias'),
+					}),
+				]),
+			);
+		}
+	});
+
 	it('reports exactly the Radix exports `@octanejs/radix` lacks', async () => {
 		const radix = path.join(REPO, 'packages/radix');
 		// The binding's own dev dependency on `radix-ui` installs every primitive package.

@@ -1321,6 +1321,16 @@ function resolveBinding(
 	packages: Map<string, string>,
 	notes: Note[],
 ) {
+	if (specifier === 'radix-ui' && !project.original(file, specifier)) {
+		notes.push({
+			rule: 'bindings',
+			severity: 'error',
+			line: 1,
+			message:
+				'`radix-ui` resolves to a different module through a TypeScript alias. Review the local component before migrating this import.',
+		});
+		return null;
+	}
 	const name = catalogName(specifier);
 	if (name === null) return null;
 	const target = CATALOG[name];
