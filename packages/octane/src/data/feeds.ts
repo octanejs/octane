@@ -117,9 +117,11 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 	async function run(stop: AbortSignal): Promise<void> {
 		const connect = source.listen!;
 		const signal = AbortSignal.any([stop, source.retired]);
-		if (!restored && source.persisted) {
+		if (!restored) {
 			restored = true;
-			cursor ??= await source.persisted.cursor(key);
+			// A previous session's cursor is older than the page's, so it replays everything this page missed.
+			if (source.persisted) cursor ??= await source.persisted.cursor(key);
+			cursor ??= source.seeded.get(key) ?? null;
 			if (signal.aborted) return;
 		}
 		let failures = 0;
