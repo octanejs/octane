@@ -59,32 +59,28 @@ export function Slot(props: any): any {
 	const slot = S('Slot');
 	const { children, ...slotProps } = props ?? {};
 
-	// Resolve the element to project onto. With a `<Slottable>` marker among the children,
-	// its child is the projection target and the siblings become the new children.
-	const childrenArray = Children.toArray(children);
-	const slottable = childrenArray.find(isSlottable);
-	let targetChild: any = children;
-	// octane convention: children are often passed as an ARRAY prop (that's how a .tsrx
-	// caller provides enumerable children — see Dialog.Portal). React's Children.only
-	// rejects arrays outright; here a single-element array unwraps to its element.
-	if (!slottable && Array.isArray(children) && childrenArray.length === 1) {
-		targetChild = childrenArray[0];
-	}
-	let newChildren: any = null;
-	let hasSlottable = false;
-	if (slottable) {
-		hasSlottable = true;
-		const newElement = (slottable as any).props.children;
-		newChildren = Children.map(children, (child: any) => {
-			if (child === slottable) {
-				if (Children.count(newElement) > 1) return Children.only(null as any);
-				return isValidElement(newElement) ? (newElement as any).props.children : null;
+	let targetChild = children;
+	let projectedChildren: any[] | undefined;
+	if (!isValidElement(children) || children.type === Slottable) {
+		const content: any[] = [];
+		// The callback sees the original children before map normalizes their keys.
+		// Each marker contributes its inner children, and the last selects the target.
+		const normalized = Children.map(children, (child) => {
+			if (isSlottable(child)) {
+				const element = child.props.children;
+				if (Children.count(element) > 1) Children.only(null);
+				targetChild = isValidElement(element) ? element : null;
+				projectedChildren = content;
+				content.push(targetChild?.props.children);
+			} else {
+				content.push(child);
 			}
 			return child;
 		});
-		targetChild = isValidElement(newElement)
-			? cloneElement(newElement as any, undefined, newChildren)
-			: null;
+		// Octane also accepts a one-element array of descriptors from .tsrx callers.
+		if (!projectedChildren && Array.isArray(children) && normalized?.length === 1) {
+			targetChild = normalized[0];
+		}
 	}
 
 	const childIsElement = isValidElement(targetChild);
@@ -97,7 +93,7 @@ export function Slot(props: any): any {
 	if (childIsElement) {
 		const merged = mergeProps(slotProps, (targetChild as any).props ?? {});
 		merged.ref = slotRef !== undefined ? composedRef : childRef;
-		if (hasSlottable) merged.children = newChildren;
+		if (projectedChildren) merged.children = projectedChildren;
 		return cloneElement(targetChild as any, merged);
 	}
 	// 0 children → nothing; >1 → Children.only throws (like Radix).
