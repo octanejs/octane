@@ -38,6 +38,8 @@ import { get_route_entry_export_name, get_route_entry_path } from '../routes.js'
  * @property {Route[]} routes - Route definitions from octane.config.ts
  * @property {string} octaneConfigPath - Absolute path to octane.config.ts
  * @property {RootBoundaryOptions} [rootBoundary] - Importable app-wide boundary entries
+ * @property {string} [data] - The config's `data` module: project-root ID of its store opener
+ * @property {string} [dataRootModuleId] - App-core's `DataRoot` module ID
  * @property {string[]} [rpcModulePaths] - Project-root module IDs containing `module server`
  * @property {Record<string, ClientAssetEntry>} [clientAssetMap] - Route entry path → built client asset paths
  * @property {string} [clientAssetMapFile] - JSON asset map, resolved beside the built server entry at runtime
@@ -67,6 +69,8 @@ export function generateServerEntry(options) {
 		routes,
 		octaneConfigPath,
 		rootBoundary = {},
+		data,
+		dataRootModuleId = '@octanejs/app-core/data-root',
 		rpcModulePaths = [],
 		clientAssetMap = {},
 		clientAssetMapFile,
@@ -150,6 +154,15 @@ export function generateServerEntry(options) {
 			);
 		}
 	}
+	if (data) {
+		import_lines.push(
+			`import * as _data from ${JSON.stringify(import_specifier(data))};`,
+			`import { DataRoot } from ${JSON.stringify(dataRootModuleId)};`,
+		);
+	}
+	const data_entry = data
+		? `{ path: ${JSON.stringify(data)}, open: _data.default, Root: DataRoot }`
+		: 'null';
 
 	// The manifest maps MODULE PATHS to module namespaces; createHandler picks
 	// the export per-route with the same `get_component_export` dev uses.
@@ -325,6 +338,7 @@ export const manifest = {
 	rootBoundary,
 	rootBoundaryEntries,
 	preHydrate: octaneConfig.router.preHydrate ?? null,
+	data: ${data_entry},
 	rpcModules,
 	runtime,
 	clientAssets,
@@ -448,6 +462,7 @@ export const handler = createHandler(
 		rootBoundary,
 		rootBoundaryEntries,
 		preHydrate: octaneConfig.router.preHydrate ?? null,
+		data: ${data_entry},
 		rpcModules,
 		runtime,
 		clientAssets,

@@ -78,6 +78,7 @@ describe('createHandler', () => {
 				params: {},
 				url: '/?q=1',
 				preHydrate: null,
+				data: null,
 				rootBoundary: { pending: null, catch: null },
 			}),
 		);
