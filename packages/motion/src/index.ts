@@ -314,7 +314,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 			() =>
 				({
 					host: { current: null as HTMLElement | null },
-					skipInitialAnimation: initialLabel === false,
+					initialAnimationKey: initialLabel === false ? true : null,
 					frame: firstFrame(
 						tag,
 						svg,
@@ -410,14 +410,21 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// `animate`: animate to the (resolved) target on mount and whenever it changes.
 		// If we're a stagger child, fold in our per-child delay (our index + the sibling
 		// count are both known by now — all children registered during the parent render).
+		const animationKey = stableKey(resolvedAnimate);
+		// The first-frame style is captured during render, including hidden Activity
+		// mounts whose first layout effect may see a different target.
+		if (latest.initialAnimationKey === true) latest.initialAnimationKey = animationKey;
 		useLayoutEffect(
 			() => {
 				const node: HTMLElement = latest.host.current;
-				if (latest.skipInitialAnimation) {
-					latest.skipInitialAnimation = false;
-					return;
+				if (!animationEnabled) return;
+				// OCTANE DIVERGENCE[motion-lazy-initial-false-first-frame][conformance:lazy-initial-false-first-frame]
+				if (latest.initialAnimationKey !== null) {
+					const skip = latest.initialAnimationKey === animationKey;
+					latest.initialAnimationKey = null;
+					if (skip) return;
 				}
-				if (animationEnabled && resolvedAnimate) {
+				if (resolvedAnimate) {
 					let t = transition;
 					const o = latest.staggerParent;
 					if (o && o.active) {
@@ -438,7 +445,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					return () => controls.stop();
 				}
 			},
-			[animationEnabled, stableKey(resolvedAnimate), stableKey(transition), shouldReduceMotion],
+			[animationEnabled, animationKey, stableKey(transition), shouldReduceMotion],
 			ANIMATE,
 		);
 

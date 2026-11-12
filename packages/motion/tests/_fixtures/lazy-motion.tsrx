@@ -1,5 +1,6 @@
 import { LazyMotion, domMax, motion } from '@octanejs/motion';
 import * as m from '@octanejs/motion/react-m';
+import { Activity } from 'octane';
 
 export function LazyMotionSurface() @{
 	<LazyMotion features={domMax}>
@@ -17,9 +18,17 @@ export function UnloadedMotionSurface() @{
 
 export function AsyncLazyMotionSurface(props) @{
 	<LazyMotion features={props.features}>
-		<m.div id="async-lazy-div" initial={props.initial} animate={{ opacity: 1 }}>
+		<m.div id="async-lazy-div" initial={props.initial} animate={props.animate ?? { opacity: 1 }}>
 			{'async'}
 		</m.div>
+	</LazyMotion>
+}
+
+export function HiddenLazyMotionSurface(props) @{
+	<LazyMotion features={props.features}>
+		<Activity mode={props.mode}>
+			<m.div initial={false} animate={{ opacity: props.opacity }} />
+		</Activity>
 	</LazyMotion>
 }
 
