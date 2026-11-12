@@ -9243,17 +9243,53 @@ function mapCallToForOf(expr, ctx) {
 	// Pull a `key={…}` attribute off the returned element → the for-of header key,
 	// and drop it from the element (it's not a DOM attribute). makeForCall then
 	// keys via the header, falling back to `item.id ?? item` when there's no key.
-	const attrsOf = (el) => el.openingElement?.attributes || el.attributes || [];
 	const nameOf = (a) => a?.name?.name || a?.name;
+	const attributes = body.openingElement?.attributes || body.attributes || [];
+	const keyIndex = attributes.findIndex((attr) => nameOf(attr) === 'key');
+	// A later key or spread can determine the descriptor's actual identity.
+	if (
+		attributes.some(
+			(attr, index) =>
+				index > keyIndex &&
+				(nameOf(attr) === 'key' ||
+					attr.type === 'SpreadAttribute' ||
+					attr.type === 'JSXSpreadAttribute'),
+		)
+	) {
+		return null;
+	}
 	let keyExpr = null;
 	let bodyEl = body;
-	const keyAttr = attrsOf(body).find((a) => nameOf(a) === 'key');
+	let keyReadsTag = false;
+	const keyAttr = attributes[keyIndex];
 	if (keyAttr) {
 		keyExpr =
 			keyAttr.value && keyAttr.value.type === 'JSXExpressionContainer'
 				? keyAttr.value.expression
 				: keyAttr.value;
-		const kept = attrsOf(body).filter((a) => nameOf(a) !== 'key');
+		// The list probes keys before rendering rows. Earlier JSX reads must keep
+		// their authored order when the key itself can observe them.
+		const key = unwrapTsExpr(keyExpr);
+		const componentTag = isComponentTag(body);
+		const ordinalKey =
+			!componentTag &&
+			params[0].type === 'Identifier' &&
+			key?.type === 'Identifier' &&
+			key.name === params[1]?.name &&
+			!directCallAssignedNames(arrow).has(key.name) &&
+			!hasInlineMemoDirectEval(arrow);
+		if (!isInvariantLiteral(key) && !ordinalKey) {
+			if (jsxValueRootNeedsRenderScope(body, null, keyAttr)) return null;
+			const tag = body.openingElement?.name || body.id;
+			if (descriptorTagKind(ctx, tag, componentTag) === 'dynamic') {
+				if (!isModuleConstTag(tag, ctx)) return null;
+				// The module const binding cannot change. Read it at the authored
+				// point so a TDZ error still precedes the key's effects.
+				keyExpr = inheritOriginLoc(b.sequence([jsxNameToExpr(tag), keyExpr]), keyExpr);
+				keyReadsTag = true;
+			}
+		}
+		const kept = attributes.filter((attr) => attr !== keyAttr);
 		bodyEl = body.openingElement
 			? { ...body, openingElement: { ...body.openingElement, attributes: kept } }
 			: { ...body, attributes: kept };
@@ -9285,9 +9321,29 @@ function mapCallToForOf(expr, ctx) {
 			methodName,
 			directReceiver,
 			callback: arrow,
+			keyReadsTag,
 		},
 	});
 	return inheritOriginLoc(forNode, expr);
+}
+
+function isModuleConstTag(tag, ctx) {
+	if (tag?.type !== 'JSXIdentifier' && tag?.type !== 'Identifier') return false;
+	const module = ctx.activityModuleAst;
+	if (module == null) return false;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(module));
+	if (lexical.resolveBinding(lexical.nodeScopes.get(tag), tag.name)?.scope !== lexical.rootScope)
+		return false;
+	ctx.mapConstTags ??= new Set(
+		module.body.flatMap((statement) => {
+			const declaration =
+				statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+			return declaration?.type === 'VariableDeclaration' && declaration.kind === 'const'
+				? declaration.declarations.flatMap(({ id }) => (id.type === 'Identifier' ? [id.name] : []))
+				: [];
+		}),
+	);
+	return ctx.mapConstTags.has(tag.name);
 }
 
 function mapCallbackPatternCapturesLexicalReceiver(pattern) {
@@ -26320,7 +26376,7 @@ function isStaticJsxValueExpression(expression, stableNames = null) {
 
 // A root member tag, spread, or dynamic prop can invoke user code before its
 // descriptor exists. Defer the complete record rather than just its children.
-function jsxValueRootNeedsRenderScope(node, stableNames = null) {
+function jsxValueRootNeedsRenderScope(node, stableNames = null, before = null) {
 	const name = node.openingElement?.name || node.id;
 	if (
 		name?.type === 'MemberExpression' ||
@@ -26330,6 +26386,7 @@ function jsxValueRootNeedsRenderScope(node, stableNames = null) {
 		return true;
 	}
 	for (const attr of node.attributes || node.openingElement?.attributes || []) {
+		if (attr === before) break;
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') return true;
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		if (attr.value?.type !== 'JSXExpressionContainer') continue;
@@ -38583,7 +38640,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					if (local?.singleRoot === true) {
 						singleRoot = true;
 						detachRoot = local.hostRoot === true;
-					} else if (isImmutableComponentTag(tagName, ctx)) singleRootExpr = compName;
+					} else if (!node.nativeArrayMap?.keyReadsTag && isImmutableComponentTag(tagName, ctx)) {
+						// The tag belongs to the callback, which may never run.
+						singleRootExpr = compName;
+					}
 				}
 			}
 		}
