@@ -29901,7 +29901,7 @@ function planJsx(
 					step = typedPath(b.call('_$child', b.id(parentVar)));
 					if (k > 0) step = typedPath(b.call('_$sibling', step, ...siblingCount(k)));
 				} else {
-					step = typedPath(b.member(b.id(parentVar), 'firstChild'));
+					step = b.member(typedPath(b.id(parentVar)), 'firstChild');
 					for (let n = 0; n < k; n++) step = typedPath(b.member(step, 'nextSibling'));
 				}
 			}

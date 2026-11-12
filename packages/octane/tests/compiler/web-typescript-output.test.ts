@@ -40,7 +40,10 @@ const PATHS = {
 
 // Resolve against the runtime's actual signatures: synthetic adapters cannot
 // catch a generated numeric slot or helper call that its real declaration rejects.
-function typecheck(files: Record<string, string>) {
+function typecheck(
+	files: Record<string, string>,
+	lib = ['lib.esnext.d.ts', 'lib.dom.d.ts', 'lib.dom.iterable.d.ts'],
+) {
 	const directory = mkdtempSync(join(tmpdir(), 'octane-web-ts-'));
 	try {
 		for (const [name, source] of Object.entries(files))
@@ -55,7 +58,7 @@ function typecheck(files: Record<string, string>) {
 				verbatimModuleSyntax: true,
 				skipLibCheck: true,
 				target: ts.ScriptTarget.ESNext,
-				lib: ['lib.esnext.d.ts', 'lib.dom.d.ts', 'lib.dom.iterable.d.ts'],
+				lib,
 				types: [],
 				paths: PATHS,
 			},
@@ -81,6 +84,28 @@ function typecheck(files: Record<string, string>) {
 		rmSync(directory, { recursive: true, force: true });
 	}
 }
+
+it('typechecks generated traversal when the host exposes an opaque Node', () => {
+	const result = compile(
+		`export function Scene(props: { label: string }) @{
+			<div><span title={props.label} /><div><span title={props.label} /></div></div>
+		}`,
+		'/src/scene.tsrx',
+		{ mode: 'client', hmr: false, output: 'ts' },
+	);
+	expect(result.diagnostics).toEqual([]);
+	expect(
+		typecheck(
+			{
+				'host.d.ts': 'interface Node {} interface Element extends Node {}',
+				'scene.ts': result.code,
+				'consumer.ts':
+					'declare const node: Node;\n// @ts-expect-error Host nodes are opaque.\nnode.firstChild;',
+			},
+			['lib.esnext.d.ts'],
+		),
+	).toEqual([]);
+});
 
 it.each([
 	'request$.get() as typeof props.domain',
