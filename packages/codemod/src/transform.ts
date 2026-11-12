@@ -3738,6 +3738,21 @@ class ModuleTransform {
 		// An Octane hook without a list already means "inferred".
 		if (!callee || callee.module === 'octane') return null;
 		const name = callee.name;
+		if (name === 'useState' && callee.module === 'react' && this.options.initializerResourceHint) {
+			const [initializer] = node.arguments;
+			const value = initializer && skipWrappers(initializer);
+			const imported = value && ts.isIdentifier(value) && this.importOf(value);
+			if (imported && !imported.typeOnly && !imported.namespace) {
+				const hint = this.options.initializerResourceHint(imported.module, imported.imported);
+				if (hint)
+					this.note(
+						RULE.bindings,
+						'error',
+						initializer,
+						`The initializer \`${imported.imported}\` calls React DOM ${hint} from plain TypeScript. Move the resource hint into Octane-compiled code so the server renderer can collect it.`,
+					);
+			}
+		}
 		if (name === 'useSyncExternalStore' && this.strong && this.target === 'tsrx')
 			return this.nativeSignalRead(node);
 		if (name === 'forwardRef') return this.rewriteForwardRef(node);
