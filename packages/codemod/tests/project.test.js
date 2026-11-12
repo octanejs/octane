@@ -138,6 +138,104 @@ export function useLabel() { const later = () => useState('ready'); return 'read
 		}
 	});
 
+	it('shares a stateless external store with unchanged React callers', async () => {
+		const wrapper = `import { useSyncExternalStore as useStore } from 'react';
+import { subscribe, read } from './attribute-store';
+export function useValue() { return useStore(subscribe, read, server); }
+function server() { return null; }`;
+		const consumer = `import { useValue as useAttribute } from './use-value';
+export function Pane() { const value = useAttribute(); return <p>{value === null ? 'server' : value ? 'on' : 'off'}</p>; }`;
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'tsconfig.json':
+				'{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler","strict":true}}',
+			'attribute-store.ts': `export function read() { return document.documentElement.dataset.label === 'on'; }
+export function subscribe(listener: () => void) {
+	const observer = new MutationObserver(listener);
+	observer.observe(document.documentElement, {attributes:true, attributeFilter:['data-label']});
+	return () => observer.disconnect();
+}`,
+			'use-value.ts': wrapper,
+			'Pane.tsx': consumer,
+			'Other.tsx': consumer.replace('function Pane', 'function Other'),
+			'Unchanged.tsx': consumer.replace('function Pane', 'function Unchanged'),
+			'Mixed.tsx': consumer + '\nexport function ReactValue() { return useAttribute(); }',
+		});
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const inputs = ['Pane.tsx', 'Other.tsx'].map((name) => path.join(root, name));
+		const expectBlocked = async (files) => {
+			const preview = await runCodemod(files, { root, strong: true, write: false });
+			expect(preview.files.some((file) => file.file.endsWith('.octane.ts'))).toBe(false);
+			expect(preview.files[0].notes).toContainEqual(
+				expect.objectContaining({
+					severity: 'error',
+					message: expect.stringContaining("calls React's useSyncExternalStore"),
+				}),
+			);
+		};
+		await expectBlocked([path.join(root, 'Mixed.tsx')]);
+		for (const alias of ['readAttribute', 'use3Value', 'useContext', 'use']) {
+			const input = path.join(root, 'Alias.tsx');
+			fs.writeFileSync(input, consumer.replaceAll('useAttribute', alias));
+			await expectBlocked([input]);
+		}
+		const leaf = path.join(root, 'attribute-store.ts');
+		const source = fs.readFileSync(leaf, 'utf8');
+		fs.writeFileSync(
+			leaf,
+			source.replace("document.documentElement.dataset.label === 'on'", 'document.documentElement'),
+		);
+		await expectBlocked([inputs[0]]);
+		fs.writeFileSync(leaf, "import { Fragment } from 'react';\n" + source);
+		await expectBlocked([inputs[0]]);
+		fs.writeFileSync(leaf, source);
+		const occupied = path.join(root, 'use-value.octane.ts');
+		fs.writeFileSync(occupied, 'export const custom = true;');
+		await expectBlocked([inputs[0]]);
+		expect(fs.readFileSync(occupied, 'utf8')).toBe('export const custom = true;');
+		fs.rmSync(occupied);
+
+		const migrated = await runCodemod(inputs, { root, strong: true });
+		for (const input of ['Pane.tsx', 'Other.tsx']) {
+			const file = migrated.files.find((result) => result.file === input);
+			expect(file?.strong).toBe(true);
+			expect([...file.notes, ...file.diagnostics].filter((n) => n.severity === 'error')).toEqual(
+				[],
+			);
+		}
+		expect(fs.readFileSync(path.join(root, 'use-value.ts'), 'utf8')).toBe(wrapper);
+		expect(fs.readFileSync(path.join(root, 'Unchanged.tsx'), 'utf8')).toBe(
+			consumer.replace('function Pane', 'function Unchanged'),
+		);
+		expect(migrated.files.filter((file) => file.file.endsWith('.octane.ts'))).toHaveLength(1);
+
+		fs.writeFileSync(
+			path.join(root, 'entry.ts'),
+			`import { Pane } from './Pane.tsrx';
+import { renderToStaticMarkup } from 'octane/server';
+export const render = () => renderToStaticMarkup(Pane, {}).html;`,
+		);
+		const { createServer } = await import('vite');
+		const { octane } = await import('octane/compiler/vite');
+		const server = await createServer({
+			root,
+			configFile: false,
+			logLevel: 'silent',
+			server: { middlewareMode: true, hmr: false },
+			plugins: [octane({ hmr: false })],
+		});
+		try {
+			const { render } = await server.ssrLoadModule('/entry.ts');
+			expect(render()).toBe('<p>server</p>');
+		} finally {
+			await server.close();
+		}
+	}, 30_000);
+
 	it('recognizes a local hook selected for an in-place rewrite through a symlink', async () => {
 		const root = project({
 			'Panel.tsx':
