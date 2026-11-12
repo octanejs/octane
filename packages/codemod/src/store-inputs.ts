@@ -3,10 +3,52 @@ import { createRequire, isBuiltin } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
 import { skipWrappers } from './expression-wrappers.js';
+import { hasRuntimeDependency } from './scoped-store-contract.js';
 
 type Factory = { module: string; name: string; from: string };
 type Opaque = { opaque: true };
-type Input = { factory: Factory } | { reexport: Factory } | Opaque;
+type Input =
+	| { factory: Factory; direct: boolean; data: boolean }
+	| { reexport: Factory; opaqueOnly?: true }
+	| { literal: true }
+	| Opaque;
+
+function dataInput(expr: ts.Expression, locals: ReadonlyMap<string, Input>): boolean {
+	const value = skipWrappers(expr);
+	if (ts.isIdentifier(value)) {
+		const input = locals.get(value.text);
+		return !!input && 'literal' in input;
+	}
+	if (ts.isArrayLiteralExpression(value))
+		return value.elements.every((element) => dataInput(element, locals));
+	if (ts.isObjectLiteralExpression(value))
+		return value.properties.every(
+			(field) =>
+				ts.isPropertyAssignment(field) &&
+				(ts.isIdentifier(field.name) ||
+					ts.isStringLiteral(field.name) ||
+					ts.isNumericLiteral(field.name)) &&
+				field.name.text !== '__proto__' &&
+				dataInput(field.initializer, locals),
+		);
+	return inertLiteral(value);
+}
+
+function inertLiteral(value: ts.Expression) {
+	if (ts.isPrefixUnaryExpression(value))
+		return (
+			(value.operator === ts.SyntaxKind.PlusToken || value.operator === ts.SyntaxKind.MinusToken) &&
+			(ts.isNumericLiteral(value.operand) || ts.isBigIntLiteral(value.operand))
+		);
+	return (
+		ts.isStringLiteralLike(value) ||
+		ts.isNumericLiteral(value) ||
+		ts.isBigIntLiteral(value) ||
+		value.kind === ts.SyntaxKind.TrueKeyword ||
+		value.kind === ts.SyntaxKind.FalseKeyword ||
+		value.kind === ts.SyntaxKind.NullKeyword
+	);
+}
 
 /** Resolve application source used by a workspace store consumer. */
 export function storeSources(
@@ -51,19 +93,24 @@ export function storeSources(
 			for (const d of s.declarationList.declarations) {
 				if (!ts.isIdentifier(d.name) || !d.initializer) continue;
 				const call = skipWrappers(d.initializer);
-				if (!ts.isCallExpression(call)) continue;
-				let target = skipWrappers(call.expression);
-				while (ts.isExpressionWithTypeArguments(target)) target = skipWrappers(target.expression);
-				if (!ts.isIdentifier(target)) continue;
-				const name = target.text;
-				const callee = locals.get(name);
-				// Type wrappers preserve an opaque origin without adding a direct factory proof.
-				const input: Input | null =
-					call === d.initializer && target === call.expression && callee && 'reexport' in callee
-						? { factory: callee.reexport }
-						: localFunctions.has(name)
-							? { opaque: true }
-							: null;
+				const alias = ts.isIdentifier(call) && locals.get(call.text);
+				let input: Input | undefined;
+				if (alias) {
+					if ('reexport' in alias) input = { ...alias, opaqueOnly: true };
+					else input = 'factory' in alias ? { ...alias, direct: false } : alias;
+				} else if (ts.isCallExpression(call)) {
+					let target = skipWrappers(call.expression);
+					while (ts.isExpressionWithTypeArguments(target)) target = skipWrappers(target.expression);
+					if (!ts.isIdentifier(target)) continue;
+					const callee = locals.get(target.text);
+					if (callee && 'reexport' in callee) {
+						input = {
+							factory: callee.reexport,
+							direct: !callee.opaqueOnly && call === d.initializer && target === call.expression,
+							data: call.arguments.every((arg) => dataInput(arg, locals)),
+						};
+					} else if (localFunctions.has(target.text)) input = { opaque: true };
+				} else if (inertLiteral(call)) input = { literal: true };
 				if (!input) continue;
 				locals.set(d.name.text, input);
 				if (s.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword))
@@ -134,9 +181,56 @@ export function storeSources(
 		return file;
 	}
 
+	const reactDOMFiles = new Map<string, boolean>();
+	function reachesReactDOM(file: string): boolean {
+		const known = reactDOMFiles.get(file);
+		if (known !== undefined) return known;
+		const pending = [file];
+		const seen = new Set<string>();
+		while (pending.length) {
+			const current = pending.pop()!;
+			const cached = reactDOMFiles.get(current);
+			if (cached === false || seen.has(current)) continue;
+			if (cached === true) {
+				reactDOMFiles.set(file, true);
+				return true;
+			}
+			seen.add(current);
+			const source = ts.createSourceFile(
+				current,
+				fs.readFileSync(current, 'utf8'),
+				ts.ScriptTarget.Latest,
+			);
+			for (const statement of source.statements) {
+				if (
+					(!ts.isImportDeclaration(statement) && !ts.isExportDeclaration(statement)) ||
+					!hasRuntimeDependency(statement) ||
+					!statement.moduleSpecifier ||
+					!ts.isStringLiteral(statement.moduleSpecifier)
+				)
+					continue;
+				const specifier = statement.moduleSpecifier.text;
+				if (specifier === 'react-dom' || specifier.startsWith('react-dom/')) {
+					reactDOMFiles.set(file, true);
+					return true;
+				}
+				const local = localFile(current, specifier);
+				if (local) pending.push(local);
+			}
+		}
+		for (const current of seen) reactDOMFiles.set(current, false);
+		return false;
+	}
+
 	// Follow named re-exports to a direct factory or an opaque local initializer.
-	function inputFactory(from: string, specifier: string, name: string): Factory | Opaque | null {
+	function inputFactory(
+		from: string,
+		specifier: string,
+		name: string,
+		shared: (module: string, name: string, from: string) => boolean = () => false,
+	): Factory | Opaque | null {
 		let ref: Factory = { module: specifier, name, from };
+		let opaqueOnly = false;
 		const seen = new Set<string>();
 		for (;;) {
 			const file = localFile(ref.from, ref.module);
@@ -146,8 +240,21 @@ export function storeSources(
 			seen.add(key);
 			const input = inputs(file).get(ref.name);
 			if (!input) return null;
-			if ('factory' in input) return input.factory;
+			if ('factory' in input) {
+				const { factory } = input;
+				// A read can invoke an initializer callback after migration, under a different renderer.
+				if (
+					!input.data &&
+					shared(factory.module, factory.name, factory.from) &&
+					reachesReactDOM(factory.from)
+				)
+					return { opaque: true };
+				return input.direct && !opaqueOnly ? factory : null;
+			}
+			if ('literal' in input) return null;
 			if ('opaque' in input) return input;
+			// A snapshot can propagate a rejection without establishing factory identity.
+			opaqueOnly ||= !!input.opaqueOnly;
 			ref = input.reexport;
 		}
 	}

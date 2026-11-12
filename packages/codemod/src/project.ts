@@ -507,7 +507,7 @@ export async function runCodemod(
 							!plan ||
 							!safeUses(
 								(source, name) => {
-									const input = inputFactory(file, source, name);
+									const input = inputFactory(file, source, name, plan.isSharedExport);
 									if (!input) return false;
 									if ('opaque' in input) return 'opaque';
 									return plan.isSharedExport(input.module, input.name, input.from);
