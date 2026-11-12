@@ -77,8 +77,8 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 	let cursor: string | null = source.seeded.get(key) ?? null;
 	/** Whether a connection has been live, so one that comes back without a cursor missed events. */
 	let wasLive = false;
-	/** Re-subscribing during startup must join the same initial cursor lookup. */
-	let restoring: Promise<void> | undefined;
+	/** Only a subscribed run reconciles page and disk after storage is ready. */
+	let restored = false;
 	/** Aborts the current run, when the last observer leaves. */
 	let running: AbortController | null = null;
 
@@ -117,14 +117,13 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 	async function run(stop: AbortSignal): Promise<void> {
 		const connect = source.listen!;
 		const signal = AbortSignal.any([stop, source.retired]);
-		if (source.persisted) {
-			restoring ??= source.persisted.cursor(key).then((saved) => {
-				// Positions are opaque. Refresh covered values when cache and page disagree.
-				if (saved !== null && cursor !== null && saved !== cursor) missed();
-				cursor ??= saved;
-			});
-			await restoring;
+		if (!restored && source.persisted) {
+			const saved = await source.persisted.cursor(key);
 			if (signal.aborted) return;
+			restored = true;
+			// Positions are opaque. Refresh covered values when cache and page disagree.
+			if (saved !== null && cursor !== null && saved !== cursor) missed();
+			cursor ??= saved;
 		}
 		let failures = 0;
 		while (!signal.aborted) {

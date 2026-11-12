@@ -1155,9 +1155,10 @@ describe('octane/data feeds across restarts', () => {
 		{ page: 'first', savedCursor: 'second', observedEarly: false, mismatch: true },
 		{ page: 'second', savedCursor: 'first', observedEarly: true, mismatch: true },
 		{ page: 'equal', savedCursor: 'equal', observedEarly: false, mismatch: false },
+		{ page: 'page', savedCursor: 'saved', observedEarly: true, mismatch: true, cancel: true },
 	])(
 		'reconciles page cursor $page with saved cursor $savedCursor',
-		async ({ page, savedCursor, observedEarly, mismatch }) => {
+		async ({ page, savedCursor, observedEarly, mismatch, cancel = false }) => {
 			const persist = cache(memoryStorage(), 'ada');
 			const rendering = createDataStore({
 				feeds: [bookChanges],
@@ -1192,9 +1193,18 @@ describe('octane/data feeds across restarts', () => {
 			stop();
 			const remote = server(books());
 			remote.books[0]!.title = 'Current';
+			let release!: () => void;
+			const gate = new Promise<void>((resolve) => (release = resolve));
+			const storage = {
+				...persist.storage,
+				async index(partition: string) {
+					await gate;
+					return persist.storage.index(partition);
+				},
+			};
 			const client = createDataStore({
 				transport: remote.transport,
-				persist,
+				persist: { ...persist, storage },
 				seed: rendering.dehydrate(),
 				listen: source(page),
 			});
@@ -1202,7 +1212,16 @@ describe('octane/data feeds across restarts', () => {
 			const connected = listen(client, bookChanges);
 			// A fresh subscriber joins while the first subscriber's cursor lookup is pending.
 			connected.subscribe(() => {})();
+			if (cancel) {
+				release();
+				// This unseeded read waits on the same pending index before reaching the server.
+				await client.prefetch(read({ name: 'serial', output: count.output }), undefined);
+				expect(remote.log).toEqual(['read serial']);
+				expect(positions).toEqual([null]);
+				remote.log.length = 0;
+			}
 			stops.push(connected.subscribe(() => {}));
+			release();
 			await vi.waitFor(() => expect(connected.getSnapshot().status).toBe('live'));
 			expect(positions).toEqual([null, page]);
 
