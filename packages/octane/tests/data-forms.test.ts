@@ -2,7 +2,7 @@
  * Native forms for writes: the server's `forms(request)` runs a form's native
  * POST, and a store's form handle submits the same fields once hydrated.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
 	createDataStore,
 	DataError,
@@ -49,12 +49,11 @@ const pinNote = write({
 /** A write that declares no form fields, so it takes no native POST. */
 const clearNotes = write({ name: 'notes.clear', input: noteSchema });
 
-function createServer() {
-	const notes: Array<Note & { operationId: string }> = [];
+function createServer(contract = addNote, notes: Array<Note & { operationId: string }> = []) {
 	const log: string[] = [];
 	const add = (input: Note, operationId: string) => {
-		if (notes.some((note) => note.title === input.title)) throw new DataError('duplicate');
 		if (notes.some((note) => note.operationId === operationId)) return;
+		if (notes.some((note) => note.title === input.title)) throw new DataError('duplicate');
 		log.push(`add ${input.title}`);
 		notes.push({ ...input, operationId });
 	};
@@ -65,7 +64,7 @@ function createServer() {
 			grant: (context) => context.account,
 		},
 		(handle) => [
-			handle(addNote, (input, call) => add(input, call.operationId)),
+			handle(contract, (input, call) => add(input, call.operationId)),
 			handle(pinNote, (input, call) => add(input, call.operationId)),
 			handle(clearNotes, () => {
 				log.push('clear');
@@ -105,6 +104,65 @@ async function submission(
 }
 
 describe('octane/data forms on the server', () => {
+	it('treats an edited restored native form as a new operation', async () => {
+		const server = createServer();
+		const fields = await submission(server, [
+			['title', 'First'],
+			['priority', '1'],
+			['password', ''],
+		]);
+		expect((await server.handler.forms(post(fields))).status).toBe(303);
+		const edited = fields.map(([name, value]): [string, string] => [
+			name,
+			name === 'title' ? 'Second' : value,
+		]);
+		expect((await server.handler.forms(post(edited))).status).toBe(303);
+		expect(server.notes.map((note) => note.title)).toEqual(['First', 'Second']);
+		expect(server.notes[0]!.operationId).not.toBe(server.notes[1]!.operationId);
+	});
+
+	it('replays a native submission after field declarations change order', async () => {
+		const first = createServer();
+		const fields = await submission(first, [
+			['title', 'First'],
+			['priority', '1'],
+			['password', ''],
+		]);
+		expect((await first.handler.forms(post(fields))).status).toBe(303);
+		const deployed = createServer(
+			write({
+				name: addNote.name,
+				input: noteSchema,
+				form: { password: 'secret', priority: 'number', pinned: 'checkbox', title: 'text' },
+			}),
+			first.notes,
+		);
+		expect((await deployed.handler.forms(post(fields))).status).toBe(303);
+		expect(first.notes).toHaveLength(1);
+	});
+
+	it('clears a held form and its subscribers when its owner retires', async () => {
+		const server = createServer();
+		const store = createDataStore({ transport: server.transport });
+		const form = store.form(addNote);
+		const data = new FormData();
+		data.set('title', 'old draft');
+		await expect(form.submit(data)).rejects.toMatchObject({ code: 'invalid' });
+		expect(form.getSnapshot().values['title']).toBe('old draft');
+		const notify = vi.fn();
+		form.subscribe(notify);
+		await store.retire();
+		expect(notify).toHaveBeenCalled();
+		expect(form.getSnapshot()).toMatchObject({
+			pending: false,
+			values: {},
+			issues: {},
+			error: null,
+		});
+		await expect(form.submit(data)).rejects.toMatchObject({ name: 'DataRetiredError' });
+		expect(form.getSnapshot().values).toEqual({});
+	});
+
 	it('runs an accepted native submission once and answers 303 back to the page', async () => {
 		const server = createServer();
 		const fields = await submission(server, [
@@ -121,7 +179,7 @@ describe('octane/data forms on the server', () => {
 		expect(server.notes).toMatchObject([{ title: 'Tides', pinned: true, priority: 2 }]);
 
 		// Submitting the same rendered page again carries the same operation ID.
-		await server.handler.forms(post(fields));
+		expect((await server.handler.forms(post(fields))).status).toBe(303);
 		expect(server.log).toEqual(['add Tides']);
 	});
 
