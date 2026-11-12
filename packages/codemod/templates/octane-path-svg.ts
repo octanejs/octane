@@ -14,14 +14,15 @@ function reactClassName(value: unknown) {
 // Prepare static props once and create fresh elements for each mounted icon.
 function prepareShape(node: StaticSvgNode, key: number): () => OctaneNode {
 	const props = { ...node.attributes, key };
-	if (node.tag !== 'g') return () => createElement(node.tag, props);
+	if (node.tag === 'path' || node.tag === 'rect') return () => createElement(node.tag, props);
 	const children = node.children.map(prepareShape);
-	return () => createElement('g', { ...props, children: children.map((render) => render()) });
+	return () => createElement(node.tag, { ...props, children: children.map((render) => render()) });
 }
 
-export function pathSvg(source: string) {
+export function pathSvg(source: string, fixedStyle?: string) {
 	const geometry = parseStaticSvg(source);
 	if (!geometry) throw new Error('Expected a raw SVG containing only supported static geometry.');
+	const root = fixedStyle === undefined ? geometry.root : { ...geometry.root, style: fixedStyle };
 	const children = geometry.children.map(prepareShape);
 	return function PathSvg(props: {
 		className?: unknown;
@@ -29,9 +30,10 @@ export function pathSvg(source: string) {
 		fill?: string;
 		focusable?: string;
 		[name: `data-${string}`]: string | undefined;
+		style?: { transform: string };
 	}) {
 		const attributes: Record<string, unknown> = {
-			...geometry.root,
+			...root,
 			className: reactClassName(props.className),
 			'aria-hidden': props['aria-hidden'],
 			children: children.map((render) => render()),
@@ -44,6 +46,10 @@ export function pathSvg(source: string) {
 				const value = props[name];
 				if (typeof value === 'string') attributes[name] = value;
 			}
+		}
+		if (Object.prototype.hasOwnProperty.call(props, 'style')) {
+			const transform = props.style?.transform;
+			if (typeof transform === 'string') attributes.style = { __proto__: null, transform };
 		}
 		return createElement('svg', attributes);
 	};

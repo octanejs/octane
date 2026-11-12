@@ -1,7 +1,8 @@
 /** Contracts and the data store. This entry imports no renderer and no compiler. */
-export { DataError, entity, read, view, write } from './contracts.js';
+export { DataError, entity, feed, read, view, write } from './contracts.js';
 export { createDataStore, DataRetiredError, DataUncertainError } from './store.js';
-export { httpTransport, serverTransport } from './transport.js';
+export { httpTransport, serverListener, serverTransport } from './transport.js';
+export { listen, receive } from './feeds.js';
 export { pages } from './pages.js';
 export { autoBudget, indexedDBStorage, memoryStorage } from './persist.js';
 export type { DeviceHints, PersistentStorage, PersistOptions, StoredMeta } from './persist.js';
@@ -10,8 +11,13 @@ export type {
 	DataRequest,
 	Entity,
 	EntitySelection,
+	Feed,
+	FeedChange,
+	FeedFrame,
+	FeedRequest,
 	FieldCodec,
 	FormFields,
+	Listener,
 	Read,
 	SchemaIssue,
 	StandardSchema,
@@ -25,3 +31,4 @@ export type {
 export type { DataStore, DataStoreOptions, ReadHandle, ReadSnapshot } from './store.js';
 export type { FormHandle, FormSeed, FormState, FormView } from './form.js';
 export type { PagesHandle, PagesSnapshot } from './pages.js';
+export type { FeedHandle, FeedSnapshot } from './feeds.js';

@@ -19,8 +19,9 @@ Everything else is shared:
   `createDataHandler`. Each write records its operation ID with its effect, so
   a lookup can say whether it landed.
 - [`src/shared/data.tsrx`](src/shared/data.tsrx) exports `data`, a
-  `module server` function that answers every store request. In the browser it
-  is the compiler's stub, which calls the server; there is no data route.
+  `module server` function that answers every store request, and `events`,
+  which streams the shelf's changes. In the browser each is the compiler's
+  stub, which calls the server; there is no data route.
 - [`src/shared/session.ts`](src/shared/session.ts) opens a store per account
   over `serverTransport(data)`, injects network faults, and settles uncertain
   writes by receipt lookup. Its account cookie stands in for a sign-in.
@@ -67,6 +68,10 @@ Everything else is shared:
   never got it. Nothing is sent twice.
 - **Switch account.** The old account's store is retired: its values clear,
   its cache is deleted, and late replies are ignored.
+- **Open the same page in a second tab, then edit the shelf in one.** The
+  other tab shows the change at once, counts included, and its Network panel
+  stays empty: each page listens to `shelfChanges` (`useFeed`), and each event
+  carries the changed book and the new counts.
 - **On the mixed page, mark a book read from the React island.** The Octane list
   updates in the same moment, and a rollback reaches both.
 

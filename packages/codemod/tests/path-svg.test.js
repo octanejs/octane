@@ -4,7 +4,7 @@ import { parsePathSvg, parseStaticSvg } from '../dist/path-svg.js';
 describe('static SVG assets', () => {
 	it('reads root attributes and ordered paths without interpreting their data', () => {
 		const source = `<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="24" viewBox="-1, 0, 24, 24" fill="none">
-			<path d="M0 0L1.5 2z" fill="currentColor"/>
+			<path d="M0 0L1.5 2z" fill="currentColor" transform="translate(2 1) scale(1.5)"/>
 			<path d='m3-2a2 2 0 0 1 1 1' stroke='#abcdef80' stroke-width='0.5' fill-rule='evenodd' clip-rule='nonzero' />
 		</svg>`;
 		expect(parseStaticSvg(source)).toEqual({
@@ -16,7 +16,15 @@ describe('static SVG assets', () => {
 				fill: 'none',
 			},
 			children: [
-				{ tag: 'path', attributes: { d: 'M0 0L1.5 2z', fill: 'currentColor' }, children: [] },
+				{
+					tag: 'path',
+					attributes: {
+						d: 'M0 0L1.5 2z',
+						fill: 'currentColor',
+						transform: 'translate(2 1) scale(1.5)',
+					},
+					children: [],
+				},
 				{
 					tag: 'path',
 					attributes: {
@@ -38,7 +46,7 @@ describe('static SVG assets', () => {
 			<!-- Original drawing <rect/> -->
 			<rect x="-1.5" y="0" width="12" height="2em" rx="2" ry="1" fill="var(--surface-color)"/>
 			<g transform="translate(0 -5.5) scale(4.4)"><g>${path}</g></g>
-			<path d="M1 1Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="bevel" opacity="0.3"/>
+			<path d="M1 1Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="bevel" opacity=".3"/>
 		</svg><!-- End of drawing -->`;
 		const leaf = (tag, attributes) => ({ tag, attributes, children: [] });
 		expect(parseStaticSvg(source)).toEqual({
@@ -68,6 +76,101 @@ describe('static SVG assets', () => {
 			],
 		});
 	});
+	const clip = '<clipPath id="swatch"><rect width="3" height="5"/></clipPath>';
+	const defs = '<defs>' + clip + '</defs>';
+	const clipped = '<g clip-path="url(#swatch)">' + path + '</g>';
+	it('preserves a single rectangular definition shared by clipped groups in source order', () => {
+		for (const body of [defs + clipped + clipped, clipped + defs + clipped]) {
+			const source = '<svg>' + body + '</svg>';
+			const result = parseStaticSvg(source);
+			expect(result?.children.map((node) => node.tag)).toEqual(
+				body.startsWith(defs) ? ['defs', 'g', 'g'] : ['g', 'defs', 'g'],
+			);
+			expect(parsePathSvg(source)).toBeNull();
+		}
+	});
+	it.each([
+		['an unresolved clip', clipped],
+		['an unused clip', defs + path],
+		['a second definition', defs + clipped + defs],
+		['another identifier', defs + clipped + clipped.replace('#swatch', '#second')],
+		['a nonlocal URL', defs + clipped.replace('#swatch', 'icons.svg#swatch')],
+		['a definition inside a group', '<g>' + defs + '</g>' + clipped],
+		['a clipped group inside a group', defs + '<g>' + clipped + '</g>'],
+		['a clip outside definitions', clip + clipped],
+		['a rectangle directly in definitions', '<defs><rect width="3" height="5"/></defs>' + clipped],
+		[
+			'multiple rectangles',
+			defs.replace('</clipPath>', '<rect width="1" height="1"/></clipPath>') + clipped,
+		],
+		['no rectangle', defs.replace(/<rect[^>]*\/>/, '') + clipped],
+		[
+			'clip units',
+			defs.replace('<clipPath ', '<clipPath clipPathUnits="objectBoundingBox" ') + clipped,
+		],
+	])('declines %s', (_, body) => {
+		expect(parseStaticSvg('<svg>' + body + '</svg>')).toBeNull();
+	});
+
+	const tile = '<pattern id="tile" width="2" height="3" patternUnits="userSpaceOnUse">';
+	const tilePath = '<path d="M0 0L2 3" stroke="currentColor" stroke-opacity="0.5"/>';
+	const painted = '<rect width="10" height="12" fill="url(#tile)"/>';
+	const definition = `<defs>${tile}${tilePath}</pattern></defs>`;
+
+	it('preserves a locally referenced single-path pattern in document order', () => {
+		const source = `<svg preserveAspectRatio="none">${painted}${definition}</svg>`;
+		expect(parseStaticSvg(source)).toEqual({
+			root: { preserveAspectRatio: 'none' },
+			children: [
+				{
+					tag: 'rect',
+					attributes: { width: '10', height: '12', fill: 'url(#tile)' },
+					children: [],
+				},
+				{
+					tag: 'defs',
+					attributes: {},
+					children: [
+						{
+							tag: 'pattern',
+							attributes: { id: 'tile', width: '2', height: '3', patternUnits: 'userSpaceOnUse' },
+							children: [
+								{
+									tag: 'path',
+									attributes: { d: 'M0 0L2 3', stroke: 'currentColor', 'stroke-opacity': '0.5' },
+									children: [],
+								},
+							],
+						},
+					],
+				},
+			],
+		});
+		expect(parsePathSvg(source)).toBeNull();
+	});
+
+	it.each([
+		['a pattern with no local reference', `${path}${definition}`],
+		['an unresolved paint server', `${painted.replace('#tile', '#other')}${definition}`],
+		['an external paint server', `${painted.replace('#tile', 'other.svg#tile')}${definition}`],
+		[
+			'an implicit pattern coordinate system',
+			`${painted}${definition.replace(' patternUnits="userSpaceOnUse"', '')}`,
+		],
+		['a noncanonical tile size', `${painted}${definition.replace('width="2"', 'width="02"')}`],
+		['more than one tile child', `${painted}${definition.replace(tilePath, tilePath + path)}`],
+		['a nested pattern definition', `${painted}<g>${definition}</g>`],
+		['multiple definitions', `${painted}${definition}${definition}`],
+	])('declines %s', (_, geometry) => {
+		expect(parseStaticSvg(`<svg>${geometry}</svg>`)).toBeNull();
+	});
+
+	it('declines mixed clip and pattern definitions in either order', () => {
+		for (const content of [defs + definition, definition + defs]) {
+			expect(parseStaticSvg('<svg>' + clipped + painted + content + '</svg>')).toBeNull();
+		}
+	});
+
 	it('retains an authored unitful root length as a string', () => {
 		expect(parseStaticSvg(`<svg width="1e999px">${path}</svg>`)?.root.width).toBe('1e999px');
 	});
@@ -77,7 +180,8 @@ describe('static SVG assets', () => {
 		['unknown XML namespaces', `<svg xmlns="urn:other">${path}</svg>`],
 		['entities', '<svg><path d="M0&#x20;0"/></svg>'],
 		['document type declarations', `<!DOCTYPE svg><svg>${path}</svg>`],
-		['unknown attributes', '<svg><path d="M0 0" transform="scale(2)"/></svg>'],
+		['unknown attributes', '<svg><path d="M0 0" stroke-dasharray="2"/></svg>'],
+		['unsupported path transform', '<svg><path d="M0 0" transform="rotate(2)"/></svg>'],
 		['numeric loader normalization', `<svg width="01.00">${path}</svg>`],
 		['noncanonical stroke width', '<svg><path d="M0 0" stroke-width=".5"/></svg>'],
 		['duplicate attributes', `<svg width="1" width="2">${path}</svg>`],
@@ -96,8 +200,11 @@ describe('static SVG assets', () => {
 		['inline styles', `<svg><g style="opacity:0.5">${path}</g></svg>`],
 		['extra transform operations', `<svg><g transform="scale(1) rotate(2)">${path}</g></svg>`],
 		['extra transform arguments', `<svg><g transform="translate(1 2 3)">${path}</g></svg>`],
+		['incomplete matrix', '<svg><path d="M0 0" transform="matrix(1 0 0 1 2)"/></svg>'],
+		['extra matrix argument', '<svg><path d="M0 0" transform="matrix(1 0 0 1 2 3 4)"/></svg>'],
+		['nonfinite matrix', '<svg><path d="M0 0" transform="matrix(1 0 0 1 2 1e999)"/></svg>'],
 		['noncanonical rectangle dimensions', '<svg><rect width="01" height="2"/></svg>'],
-		['noncanonical opacity', '<svg><path d="M1 1" opacity=".3"/></svg>'],
+		['noncanonical opacity', '<svg><path d="M1 1" opacity=".30"/></svg>'],
 		['out of range opacity', '<svg><path d="M1 1" opacity="2"/></svg>'],
 		['unknown line caps', '<svg><path d="M1 1" stroke-linecap="circle"/></svg>'],
 		['CSS variable fallbacks', '<svg><path d="M1 1" fill="var(--theme, red)"/></svg>'],

@@ -1036,11 +1036,12 @@
       "upstream": { "package": "motion", "version": "12.42.2" },
       "surface": "Core surface: `motion.<tag>` (animate, gestures, variants with propagation/stagger, drag, layout basics), `AnimatePresence`, `MotionConfig`, live `useReducedMotion`, reduced-motion enforcement, `LayoutGroup` layoutId namespaces, `LazyMotion` with `domAnimation`/`domMax`, the `m` proxy and complete `./react-m` named host entry, plus the motion-value hooks (`useMotionValue`, `useScroll`, `useTransform`, `useSpring`, `useAnimate`, `useMotionValueEvent`); motion-dom's animation engine and gesture primitives are reused verbatim.",
       "divergences": [
+        "Async LazyMotion feature loading preserves the displayed keyframes for an unchanged initial={false} target. React Motion 12.42.2 replays the mount animation in this case.",
         "Exit animations run via cleanup-before-detach instead of React's deferred-deletion machinery.",
         "`layout`/`layoutId` use single-element FLIP, not the full projection tree.",
         "An `initial` target without an `animate` target does not materialize inline initial styles; set the starting style explicitly or provide an animation target."
       ],
-      "ssr": "No SSR-specific surface; no dedicated SSR tests.",
+      "ssr": "Motion hosts render their first-frame props and children on the server and hydrate the existing host through the standard Vite entry.",
       "verified": "2026-08-02",
       "exports": ["./react-m"]
     },
@@ -7259,7 +7260,7 @@
       "OCTANE_STRONG_READ_ONLY_STATE": {
         "severity": "error",
         "detects": "A declaration takes the value from a `useState` call and discards its setter, for example `const [value] = useState(initial)` or `const value = useState(initial)[0]`. This includes lazy initializers.",
-        "replacement": "Derive render values from their inputs. For values kept for events or effects, use `useRef(value)` or `useLazyRef(() => createValue())` for one-time initialization.",
+        "replacement": "Derive render values from their inputs. Use `useInitialValue(value)` for a deliberate initial render snapshot. Pass a factory to initialize lazily. Use `useRef(value)` or `useLazyRef(() => createValue())` for mutable values kept for events or effects.",
         "url": "https://octanejs.dev/docs/strong-mode#octane-strong-read-only-state"
       },
       "OCTANE_STRONG_WRITE_ONLY_STATE": {
@@ -7462,6 +7463,13 @@
       }
     },
     "recipes": [
+      {
+        "id": "initial-value",
+        "title": "Capture an initial render value",
+        "react": "const [value] = useState(() => initial);",
+        "strong": "const value = useInitialValue(() => initial);",
+        "codes": ["OCTANE_STRONG_READ_ONLY_STATE"]
+      },
       {
         "id": "lazy-ref",
         "title": "Create a value once",

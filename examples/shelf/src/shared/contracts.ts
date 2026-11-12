@@ -3,7 +3,7 @@
  * module: declaring a contract does no I/O, so it is safe on either side.
  */
 import { z } from 'zod';
-import { entity, read, view, write } from 'octane/data';
+import { entity, feed, read, view, write } from 'octane/data';
 
 const bookShape = z.object({
 	id: z.string(),
@@ -87,4 +87,24 @@ export const receipt = read({
 	name: 'books.receipt',
 	input: z.object({ operationId: z.string() }),
 	output: z.object({ applied: z.boolean() }),
+});
+
+const counts = z.object({ total: z.number().int(), read: z.number().int() });
+
+/**
+ * Every change to the account's shelf, from any tab or device, with the
+ * counts after it. A page listening to it shows another tab's edit at once,
+ * without loading anything.
+ */
+export const shelfChanges = feed({
+	name: 'books.changes',
+	event: z.discriminatedUnion('kind', [
+		z.object({ kind: z.literal('put'), book: bookShape, counts }),
+		z.object({ kind: z.literal('removed'), id: z.string(), counts }),
+	]),
+	changes: (event) => [
+		event.kind === 'put' ? { put: Book, value: event.book } : { remove: Book, id: event.id },
+		{ read: stats, value: event.counts },
+	],
+	covers: ['book', 'shelf'],
 });

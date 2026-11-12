@@ -18,7 +18,8 @@
  */
 import type * as Client from '../index.js';
 import type { OctaneNode } from '../index.js';
-import type { Read, View, Write } from './contracts.js';
+import type { Feed, Read, View, Write } from './contracts.js';
+import { listen, type FeedSnapshot } from './feeds.js';
 import { formViews, type FormView } from './form.js';
 import { pages, type PagesSnapshot } from './pages.js';
 import type { DataStore, ReadSnapshot } from './store.js';
@@ -54,6 +55,15 @@ export interface OctaneDataBinding {
 	usePages: {
 		<T>(view: View<void, T>): PagesSnapshot<T>;
 		<P, T>(view: View<P, T>, params: P): PagesSnapshot<T>;
+	};
+	/**
+	 * Listen to a feed while the component is mounted, so its events keep the
+	 * store's reads current. Components listening to equal arguments share one
+	 * connection. Returns the connection's status.
+	 */
+	useFeed: {
+		<E>(feed: Feed<void, E>): FeedSnapshot;
+		<P, E>(feed: Feed<P, E>, params: P): FeedSnapshot;
 	};
 	/** A stable function that submits a write through the store. */
 	useWrite<I, O>(write: Write<I, O>): (input: I) => Promise<O>;
@@ -103,6 +113,13 @@ export function createOctaneDataBinding(runtime: Runtime): OctaneDataBinding {
 		return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot, hookSlot);
 	}
 
+	function useFeed(feed: Feed<any, any>, params?: unknown, slot?: symbol) {
+		const [value, hookSlot] = split(params, slot);
+		// Equal arguments resolve to one handle, so its methods are stable across renders.
+		const handle = listen(useDataStore(), feed, value);
+		return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot, hookSlot);
+	}
+
 	const formView = formViews(createElement as (type: string, props: object) => OctaneNode);
 
 	function useForm(write: Write<any, any>, key?: unknown, slot?: symbol) {
@@ -128,6 +145,7 @@ export function createOctaneDataBinding(runtime: Runtime): OctaneDataBinding {
 		useReadState,
 		useRead,
 		usePages,
+		useFeed,
 		useWrite,
 		useForm,
 	} as OctaneDataBinding;

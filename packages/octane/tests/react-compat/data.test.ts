@@ -7,11 +7,12 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import * as React from 'react';
 import { act as octaneAct, drainPassiveEffects, flushSync } from 'octane';
-import { createDataStore, type Transport } from '../../src/data/index.js';
+import { createDataStore, type FeedFrame, type Transport } from '../../src/data/index.js';
 import { mount } from '../_helpers.js';
 import { createServer } from '../_data-todos.js';
 import { DataPage } from './data.tsrx';
 import { PagesPage } from './data-pages.tsrx';
+import { FeedPage } from './data-feed.tsrx';
 
 const environment = globalThis as typeof globalThis & {
 	IS_REACT_ACT_ENVIRONMENT?: boolean | undefined;
@@ -215,5 +216,52 @@ describe('usePages', () => {
 		expect(shown('react')).toEqual(['Kelp', 'Moss', 'Reef', 'Tides']);
 		expect(more('octane')).toBeNull();
 		expect(more('react')).toBeNull();
+	});
+});
+
+describe('useFeed', () => {
+	it('keeps an Octane page and its React island current over one connection, closed on unmount', async () => {
+		const server = createServer();
+		const connections: Array<{ signal: AbortSignal; send(frame: FeedFrame): void }> = [];
+		const store = createDataStore({
+			transport: server.transport,
+			listen: (_request, signal) => ({
+				async *[Symbol.asyncIterator]() {
+					const queue: FeedFrame[] = [];
+					let wake = () => {};
+					connections.push({ signal, send: (frame) => (queue.push(frame), wake()) });
+					while (!signal.aborted) {
+						if (queue.length > 0) yield queue.shift()!;
+						else await new Promise<void>((resolve) => (wake = resolve));
+					}
+				},
+			}),
+		});
+		let mounted!: ReturnType<typeof mount>;
+		await run(() => {
+			mounted = mount(FeedPage, { store, island: true });
+		});
+		await settle();
+		const shown = (renderer: string) =>
+			[...mounted.container.querySelectorAll(`[data-${renderer}-feed] p`)].map(
+				(item) => item.textContent,
+			);
+		const status = (renderer: string) =>
+			mounted.container
+				.querySelector(`[data-${renderer}-feed]`)
+				?.getAttribute(`data-${renderer}-feed`);
+		expect(connections).toHaveLength(1);
+		expect(status('octane')).toBe('connecting');
+
+		await run(() => connections[0]!.send({ event: { id: 'a', title: 'Atoll', done: false } }));
+		await settle();
+		expect(shown('octane')).toEqual(['Atoll']);
+		expect(shown('react')).toEqual(['Atoll']);
+		expect(status('octane')).toBe('live');
+		expect(status('react')).toBe('live');
+		expect(server.log).toEqual(['list']);
+
+		await run(() => mounted.unmount());
+		expect(connections[0]!.signal.aborted).toBe(true);
 	});
 });

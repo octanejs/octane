@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
-import { compile } from '../src/compiler/compile.js';
+import { collectDiagnostics, compile } from '../src/compiler/compile.js';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 import { createWriterRecorder } from './_valdi-writer.js';
 
@@ -21,6 +21,30 @@ describe('Valdi ABI 1 lazy ref boundary', () => {
 		expect(() => compile(source, '/src/Scene.tsrx', { renderer })).toThrow(
 			/runtime import "useLazyRef" has no Valdi writer implementation/,
 		);
+	});
+
+	it('rejects initial values when the writer cannot initialize lazily', () => {
+		const source = `import { useInitialValue } from 'octane';
+			export function Scene() @{
+				const value = useInitialValue(() => 1);
+				<view value={value} />
+			}`;
+		expect(() => compile(source, '/src/Scene.tsrx', { renderer })).toThrow(
+			/runtime import "useInitialValue" has no Valdi writer implementation/,
+		);
+	});
+
+	it('keeps the read-only state diagnostic without an unsupported edit', () => {
+		const source = `"use strong";
+			import { useState } from 'octane';
+			export function Scene() @{
+				const [value] = useState(() => 1);
+				<view value={value} />
+			}`;
+		const { diagnostics } = collectDiagnostics(source, '/src/Scene.tsrx', { renderer });
+		const readOnly = diagnostics.find((item) => item.code === 'OCTANE_STRONG_READ_ONLY_STATE');
+		expect(readOnly).toBeDefined();
+		expect(readOnly?.suggestions?.some((suggestion) => 'edits' in suggestion)).toBeFalsy();
 	});
 
 	it('rejects namespace imports', () => {
