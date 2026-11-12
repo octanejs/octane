@@ -104,14 +104,21 @@ export function clearHostTimeout(handle: unknown): void {
  */
 export function hostFramesRun(): boolean {
 	if (HOST_CLOCK) return true;
+	const host = globalThis as HostFrames;
 	return (
-		typeof requestAnimationFrame === 'function' &&
-		(typeof document === 'undefined' || document.visibilityState !== 'hidden')
+		typeof host.requestAnimationFrame === 'function' &&
+		(host.document === undefined || host.document.visibilityState !== 'hidden')
 	);
 }
 
 /** Callers check `hostFramesRun()` first. */
 export function requestHostFrame(callback: () => void): void {
 	if (HOST_CLOCK) HOST_CLOCK.schedule(callback, 0, true);
-	else requestAnimationFrame(callback);
+	else (globalThis as HostFrames).requestAnimationFrame!(callback);
+}
+
+// This module is shared with DOM-free programs, so it names no DOM globals.
+interface HostFrames {
+	requestAnimationFrame?: (callback: () => void) => unknown;
+	document?: { visibilityState?: string };
 }

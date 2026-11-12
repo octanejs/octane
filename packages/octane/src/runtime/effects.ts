@@ -643,6 +643,7 @@ function initPostAfterPaint(): (generation: number) => void {
 function schedulePostPaint(cb: () => void): void {
 	_postPaintCbs.push(cb);
 	if (_postPaintCbs.length !== 1) return;
+	const postAfterPaint = initPostAfterPaint();
 	const generation = ++_postPaintGeneration;
 	const framesRun = hostFramesRun();
 	// Background tabs and occluded WebViews may never receive an animation
@@ -653,7 +654,7 @@ function schedulePostPaint(cb: () => void): void {
 		requestHostFrame(() => {
 			// The installed test clock orders the post-paint task with every other one.
 			if (HOST_CLOCK) HOST_CLOCK.schedule(() => drainPostPaint(generation), 0, false);
-			else initPostAfterPaint()(generation);
+			else postAfterPaint(generation);
 		});
 	}
 }
