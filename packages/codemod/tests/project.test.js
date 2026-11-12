@@ -9,7 +9,8 @@ import { DATA } from '@octanejs/cli/data';
 import { JSDOM } from 'jsdom';
 import * as ReactServerBridge from 'octane/react/server';
 import { prerender } from 'octane/static';
-import { createElement as reactElement } from 'react';
+import { createElement as reactElement, isValidElement } from 'react';
+import { renderToStaticMarkup as renderReact } from 'react-dom/server';
 import { compileTypesInspection } from 'octane/compiler/volar';
 import { renderToStaticMarkup } from 'octane/server';
 import ts from 'typescript';
@@ -494,7 +495,7 @@ export function App({ rows }: { rows: string[] }) {
 	return <Panel>{rows.map((label, i) => <b key={i} className={label}>{label}</b>)}</Panel>;
 }
 export function Other({ Panel, rows }) {
-	return <Panel>{rows.map(label => <b key={label}>{label}</b>)}</Panel>;
+	return <Panel>{[...rows].map(label => <b key={label}>{label}</b>)}</Panel>;
 }`,
 		});
 		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
@@ -548,8 +549,8 @@ export function Optional({ rows }: { rows: Rows | null }) {
 	const rows = ['first', , 'last'];
 	return <ul>{rows.map(label => <li key={label ?? 'hole'}>{label ?? 'hole'}</li>)}</ul>;
 }`,
-			'Native.tsx': `export function Native({ rows }: { rows: ReadonlyArray<string> }) {
-	return <ul>{rows.map(label => <li key={label}>{label}</li>)}</ul>;
+			'Native.tsx': `export function Native() {
+	return <ul>{['first', 'last'].map(label => <li key={label}>{label}</li>)}</ul>;
 }`,
 		});
 		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
@@ -587,6 +588,53 @@ export function Optional({ rows }: { rows: Rows | null }) {
 		expect(html).toContain('>last</li>');
 		expect(html).not.toContain('hole');
 	});
+
+	it.each([false, true])(
+		'reports a runtime map override for typed array props (project types: %s)',
+		async (projectTypes) => {
+			const root = project({
+				'tsconfig.json': '{"compilerOptions":{"strict":true,"jsx":"react-jsx"}}',
+				'View.tsx': `export function View({rows}: {rows: Array<{id: string}>}) {
+				return <main>{rows.map(row => <b key={row.id}>row</b>)}</main>;
+			}`,
+			});
+			fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+			const [file] = (await runCodemod([root], { strong: true, verify: true, projectTypes })).files;
+			expect(file.strong).toBe(false);
+			expect(file.notes).toContainEqual(
+				expect.objectContaining({
+					rule: 'template-for',
+					severity: 'error',
+					message: expect.stringContaining('inspect the React elements'),
+				}),
+			);
+			expect(file.code).toContain('rows.map(');
+			expect(file.code).not.toContain('@for');
+			const { View } = loadCompiledFixtureSource(file.code, { id: file.output, mode: 'server' });
+			const calls = [];
+			const rows = [{ id: 'first' }];
+			Object.defineProperty(rows, 'map', {
+				value(callback) {
+					const valid = isValidElement(callback(this[0], 0, this));
+					calls.push(valid);
+					return [valid ? 'react-row' : 'foreign-row'];
+				},
+			});
+			const original = renderReact(
+				reactElement(
+					'main',
+					null,
+					rows.map((row) => reactElement('b', { key: row.id }, 'row')),
+				),
+			);
+			expect(original).toBe('<main>react-row</main>');
+			expect(calls).toEqual([true]);
+			calls.length = 0;
+			const html = renderToStaticMarkup(View, { rows }).html;
+			expect(calls).toHaveLength(1);
+			expect(html).toBe(calls[0] ? original : '<main>foreign-row</main>');
+		},
+	);
 
 	it('warns for element-valued template children and preserves the caller contract', async () => {
 		const root = project({
@@ -2737,8 +2785,7 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 				.filter((file) => file.strong === false)
 				.flatMap((file) => file.diagnostics.map((d) => d.code)),
 		);
-		// Only raw HTML, which needs a person to vouch for it with trustHTML(),
-		// keeps a module out of Strong mode.
+		// The fresh story arrays can use keyed @for. Only raw HTML needs review.
 		expect([...blockers]).toEqual(['OCTANE_STRONG_UNTRUSTED_HTML']);
 		expect(
 			strong.files

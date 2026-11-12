@@ -37,11 +37,11 @@ export function Rows({
     <p>{rows[0]?.label}</p>
     <p>{flag}</p>
     <ul>
-      @for (const row of rows; key row.id) {
-        <li>
-          {String(row.id)}: {row.label as string} {row.note}
+      {rows.map((row) => (
+        <li key={row.id}>
+          {row.id}: {row.label} {row.note}
         </li>
-      }
+      ))}
     </ul>
   </section>
 }

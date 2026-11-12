@@ -1,4 +1,4 @@
-import { memo, useImperativeHandle, useRef, type Ref } from 'octane';
+import { memo, useImperativeHandle, useRef, Fragment, type Ref } from 'octane';
 
 type Item = { id: string; label: string; hidden?: boolean; children?: Item[] };
 
@@ -22,12 +22,12 @@ export const Tree = memo(function Tree({ items, status }: { items: Item[]; statu
           </ul>
         }
       }
-      @for (const item of items; key item.id) {
-        <>
-          <dt>{item.label as string}</dt>
-          <dd>{item.id as string}</dd>
-        </>
-      }
+      {items.map((item) => (
+        <Fragment key={item.id}>
+          <dt>{item.label}</dt>
+          <dd>{item.id}</dd>
+        </Fragment>
+      ))}
     </div>
   }
 });
