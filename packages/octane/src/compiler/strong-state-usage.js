@@ -121,7 +121,9 @@ export function analyzeStrongStateUsage(ast, strongHookAnalysis, report) {
 				initializer?.type !== 'SpreadElement' &&
 				id.type === 'ArrayPattern' &&
 				id.elements.length === 1 &&
-				id.elements[0]?.type === 'Identifier' &&
+				(id.elements[0].type === 'Identifier' ||
+					id.elements[0].type === 'ObjectPattern' ||
+					id.elements[0].type === 'ArrayPattern') &&
 				id.typeAnnotation == null
 					? { decl, call, scope }
 					: undefined;
