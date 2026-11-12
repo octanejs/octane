@@ -517,10 +517,9 @@ describe('octane/data store', () => {
 	it('refuses work for a retired account and ignores its late replies', async () => {
 		const server = createServer();
 		let release!: () => void;
-		const gate = new Promise<void>((resolve) => (release = resolve));
 		const store = createDataStore({
 			transport: async (request, signal) => {
-				await gate;
+				await new Promise<void>((resolve) => (release = resolve));
 				return server.transport(request, signal);
 			},
 		});
@@ -531,7 +530,7 @@ describe('octane/data store', () => {
 		// A callback that began under this account still holds this store.
 		const lateInvalidate = () => store.invalidate(['todo']);
 		// Let the read reach the transport before retiring its account.
-		await Promise.resolve();
+		await vi.waitFor(() => expect(release).toBeDefined());
 		store.retire();
 		release();
 		await settled();

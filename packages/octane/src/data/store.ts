@@ -413,6 +413,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					options.feeds.map((feed) =>
 						Promise.resolve()
 							.then(() => {
+								// Position probes bypass request(), which waits on these probes itself.
 								assertLive();
 								return transport(
 									{ kind: 'position', name: feed.name, input: undefined },
