@@ -32,6 +32,8 @@ import { buildRpcDescriptors } from './rpc-registry.js';
 import { handleServerRoute } from './server-route.js';
 import { composeHtmlStream } from './html-stream.js';
 import { serializeRouteData } from './route-data.js';
+import { provideRouteData } from './data-route.js';
+import { beforeBodyEnd, endRoute, routeEnding, routeSeedScripts } from '../seeds.js';
 import {
 	applyHydrationNonce,
 	getContextNonce,
@@ -59,6 +61,7 @@ import {
 import { patch_global_fetch, build_rpc_lookup, is_rpc_request } from '@ripple-ts/adapter/rpc';
 
 export { resolveOctaneConfig } from '../resolve-config.js';
+export { provideRouteData } from './data-route.js';
 
 const HEAD_MARKER = '<!--ssr-head-->';
 const BODY_MARKER = '<!--ssr-body-->';
@@ -437,6 +440,7 @@ export function createHandler(manifest, deps) {
 				}
 				return await handleServerRoute(match.route, context, globalMiddlewares);
 			} catch (error) {
+				endRoute(context);
 				console.error('[octane] Request error:', error);
 				return new Response('Internal Server Error', { status: 500 });
 			}
@@ -509,6 +513,7 @@ export function createHandler(manifest, deps) {
 			},
 			deps,
 		);
+		RootComponent = provideRouteData(context, manifest.data, RootComponent);
 
 		// Share payload ordering and script escaping with the dev handler.
 		const streamedSignals =
@@ -526,6 +531,7 @@ export function createHandler(manifest, deps) {
 			params: context.params,
 			url: requestUrl,
 			preHydrate: manifest.preHydrate ?? null,
+			data: manifest.data?.path ?? null,
 			rootBoundary: manifest.rootBoundaryEntries ?? { pending: null, catch: null },
 			clientBuild,
 			streamedSignals,
@@ -589,7 +595,12 @@ export function createHandler(manifest, deps) {
 				},
 			});
 			const [prefix, suffix] = splitAroundBody(head ?? '');
-			return new Response(prefix + css + body + suffix, { status, headers });
+			const seeds = await routeSeedScripts(context, nonceAttribute(nonce));
+			endRoute(context);
+			return new Response(prefix + css + body + beforeBodyEnd(suffix, seeds), {
+				status,
+				headers,
+			});
 		}
 
 		// Streaming (default): shell flushes at first await, suspense segments
@@ -617,7 +628,13 @@ export function createHandler(manifest, deps) {
 		});
 
 		const [prefix, suffix, afterShell] = splitAroundBody(hoistedHead, earlyHydration);
-		const body = composeHtmlStream(prefix, renderStream, suffix, afterShell);
+		const body = composeHtmlStream(
+			prefix,
+			renderStream,
+			suffix,
+			afterShell,
+			routeEnding(context, nonceAttribute(nonce)),
+		);
 
 		return new Response(body, { status, headers });
 	}

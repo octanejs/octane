@@ -10,9 +10,11 @@
  * @param {ReadableStream<Uint8Array>} renderStream
  * @param {string} suffix
  * @param {string} [afterShell] Owned bootstrap after the renderer's first complete shell chunk.
+ * @param {{ tail(suffix: string): Promise<string>, end(): void }} [ending] Computes the
+ *   suffix once the render has finished, and runs `end` however the stream ends.
  * @returns {ReadableStream<Uint8Array>}
  */
-export function composeHtmlStream(prefix, renderStream, suffix, afterShell = '') {
+export function composeHtmlStream(prefix, renderStream, suffix, afterShell = '', ending) {
 	const encoder = new TextEncoder();
 	const reader = renderStream.getReader();
 	let phase = 0; // 0 prefix, 1 renderer, 2 suffix, 3 closed
@@ -56,8 +58,10 @@ export function composeHtmlStream(prefix, renderStream, suffix, afterShell = '')
 
 						if (phase === 2) {
 							phase = 3;
-							if (suffix !== '') controller.enqueue(encoder.encode(suffix));
+							const tail = ending ? await ending.tail(suffix) : suffix;
+							if (tail !== '') controller.enqueue(encoder.encode(tail));
 							controller.close();
+							ending?.end();
 							return;
 						}
 						return;
@@ -66,6 +70,7 @@ export function composeHtmlStream(prefix, renderStream, suffix, afterShell = '')
 					release();
 					phase = 3;
 					controller.error(error);
+					ending?.end();
 				}
 			},
 			async cancel(reason) {
@@ -74,6 +79,7 @@ export function composeHtmlStream(prefix, renderStream, suffix, afterShell = '')
 					await reader.cancel(reason);
 				} finally {
 					release();
+					ending?.end();
 				}
 			},
 		},
