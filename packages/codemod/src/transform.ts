@@ -1,4 +1,4 @@
-import { svgDataAttribute } from './path-svg.js';
+import { svgDataAttribute, svgLiteralRootOverride } from './path-svg.js';
 import {
 	forwardedProps,
 	literalJsxAttribute,
@@ -1223,7 +1223,12 @@ class ModuleTransform {
 							!!value.expression &&
 							this.svgClassName(value.expression)))
 				);
-			if (svgDataAttribute(attr.name.text)) return !!value && ts.isStringLiteral(value);
+			if (
+				value &&
+				ts.isStringLiteral(value) &&
+				(svgDataAttribute(attr.name.text) || svgLiteralRootOverride(attr.name.text, value.text))
+			)
+				return true;
 			return attr.name.text === 'aria-hidden' && literalJsxAttribute(attr);
 		});
 		if (!supported) return false;
