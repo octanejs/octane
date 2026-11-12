@@ -3477,6 +3477,76 @@ export function View() { return <section><FormattedList /></section>; }`,
 			expect(file.notes.filter((d) => d.message.includes('React Intl formatter'))).toEqual([]);
 		},
 	);
+	it('keeps an Intl package export selected only by a nested runtime condition', async () => {
+		const view = `import {useIntl} from 'react-intl';
+export function View() { return <b>{useIntl().formatNumber(3)}</b>; }`;
+		const root = setup({
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: { jsx: 'react-jsx', module: 'esnext', moduleResolution: 'bundler' },
+			}),
+			'src/conditional/tsconfig.json': JSON.stringify({
+				extends: '../../tsconfig.json',
+				compilerOptions: { customConditions: ['local-formatter'] },
+			}),
+			'src/ordinary/tsconfig.json': JSON.stringify({
+				extends: '../../tsconfig.json',
+				compilerOptions: { customConditions: ['unused-condition'] },
+			}),
+			'src/conditional/View.tsx': view,
+			'src/ordinary/View.tsx': view,
+		});
+		const modules = path.join(root, 'node_modules');
+		const intl = path.join(modules, 'react-intl');
+		fs.renameSync(intl, path.join(modules, 'stock-intl'));
+		fs.mkdirSync(intl);
+		fs.writeFileSync(
+			path.join(intl, 'package.json'),
+			JSON.stringify({
+				name: 'react-intl',
+				version: '7.1.0',
+				type: 'module',
+				peerDependencies: { react: '^19.0.0' },
+				exports: {
+					'.': { types: './index.d.ts', 'local-formatter': './local.js', default: './index.js' },
+					'./other': { 'unused-condition': './local.js', default: './index.js' },
+				},
+			}),
+		);
+		fs.writeFileSync(path.join(intl, 'index.d.ts'), "export * from 'stock-intl';");
+		fs.writeFileSync(path.join(intl, 'index.js'), "export * from 'stock-intl';");
+		fs.writeFileSync(
+			path.join(intl, 'local.js'),
+			"export function useIntl() { return {formatNumber: n => 'local:' + n}; }",
+		);
+		const names = ['src/conditional/View.tsx', 'src/ordinary/View.tsx'];
+		const { files } = await runCodemod(
+			names.map((file) => path.join(root, file)),
+			{
+				root,
+				strong: true,
+				write: false,
+			},
+		);
+		const conditional = files.find((file) => file.file === names[0]);
+		expect(conditional.code).toContain("from 'react-intl'");
+		expect(conditional.notes).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+		expect(files.find((file) => file.file === names[1]).code).toContain('octane-react-intl.tsrx');
+
+		// A condition in the adapter's config can change its runtime entry too.
+		fs.writeFileSync(
+			path.join(root, 'src/tsconfig.json'),
+			JSON.stringify({
+				extends: '../tsconfig.json',
+				compilerOptions: { customConditions: ['local-formatter'] },
+			}),
+		);
+		const [adapterConditional] = (
+			await runCodemod([path.join(root, names[1])], { root, strong: true, write: false })
+		).files;
+		expect(adapterConditional.code).toContain("from 'react-intl'");
+	});
 	it('migrates a locale binding only below its own React Intl provider', async () => {
 		const enclosed = `import {IntlProvider as Provider, useIntl} from 'react-intl';
 			function Locale() { const { locale } = useIntl(); return <p lang={locale}/>; }
