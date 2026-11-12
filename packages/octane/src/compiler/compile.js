@@ -4710,7 +4710,7 @@ function allocCompilerName(ctx, preferred) {
 // `ignoreNodes` (optional) hides those exact Identifier nodes from the free
 // set — used as a non-mutating escape oracle (findMountEventCallbackSinks)
 // instead of temporarily blanking names on the (read-only) tree.
-function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
+function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null, freeWrites = null) {
 	const free = new Set();
 	const seen = new WeakSet();
 	walk(root, new Set(initiallyBound));
@@ -4820,6 +4820,20 @@ function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 			return;
 		}
 		if (t.startsWith('TS')) return;
+
+		if (
+			freeWrites !== null &&
+			(t === 'AssignmentExpression' ||
+				t === 'UpdateExpression' ||
+				t === 'ForOfStatement' ||
+				t === 'ForInStatement' ||
+				t === 'JSXForExpression')
+		) {
+			const target = t === 'UpdateExpression' ? n.argument : n.left;
+			for (const name of collectPatternNames(target, new Set())) {
+				if (!scope.has(name)) freeWrites.add(name);
+			}
+		}
 
 		if (t === 'Identifier') {
 			if (!scope.has(n.name)) free.add(n.name);
@@ -35924,16 +35938,20 @@ function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, css
 // component's locals, extended per enclosing hoisted helper (see
 // hoistBodyHelper). `__pu$N` parallel-use temps are compiler-generated
 // component-body locals minted AFTER collectComponentLocals ran, so they are
-// matched by name shape. Returns null when there is no component context —
-// the caller then keeps the legacy inline (closure) placement.
-function helperCaptures(ctx, stmts, params) {
+// matched by name shape. Keep the helper inline when it needs a writable
+// capture or has no component context.
+function helperCaptures(ctx, stmts, params, checkWrites = false) {
 	if (!ctx.currentComponentLocals) return null;
+	const freeWrites = checkWrites ? new Set() : null;
 	const scope = new Set();
 	for (const p of params || []) collectBindings(p, scope);
-	const free = collectFreeIdentifiers(b.block(stmts), scope);
+	const free = collectFreeIdentifiers(b.block(stmts), scope, null, freeWrites);
 	const env = [];
 	for (const n of free) {
-		if (ctx.currentComponentLocals.has(n) || /^__pu\$\d+$/.test(n)) env.push(n);
+		if (!ctx.currentComponentLocals.has(n) && !/^__pu\$\d+$/.test(n)) continue;
+		// An inline helper keeps the writable binding shared with other closures.
+		if (freeWrites?.has(n)) return null;
+		env.push(n);
 	}
 	env.sort();
 	return env;
@@ -35942,13 +35960,13 @@ function helperCaptures(ctx, stmts, params) {
 // A construct's helpers (then+else, all switch cases, try+pending+catch,
 // item+empty) share ONE env tuple — `block.extra` is per construct block and
 // every helper reads from the same layout — so the emitted array is the
-// sorted UNION of each body's captures. Null propagates (no component
-// context → all of the construct's helpers stay inline).
+// sorted UNION of each body's captures. If any arm requires inline placement,
+// all helpers in the construct stay inline.
 function unionEnv(ctx, bodies) {
 	let all = null;
 	for (const b of bodies) {
 		if (!b) continue;
-		const c = helperCaptures(ctx, b.stmts, b.params);
+		const c = helperCaptures(ctx, b.stmts, b.params, true);
 		if (c === null) return null;
 		if (all === null) all = new Set();
 		for (const n of c) all.add(n);
