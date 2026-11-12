@@ -33,6 +33,10 @@ it.each([
 		'const value = <b/> as unknown as string; useStore().write(0, value);',
 	],
 	['a dynamically accessed binding', "const owner = useStore(); (eval)('owner.mutate()');"],
+	[
+		'a dynamically accessed binding using an escaped eval identifier',
+		String.raw`const owner = useStore(); (ev\u0061l)('owner.mutate()');`,
+	],
 	['a method writing an element', 'const scope = useStore(); scope.write(0, {icon: <b/>});'],
 	['an escaped callback', 'const { write } = useStore(); write(0, () => ({icon: <b/>}));'],
 	['a renderer-owned hook input', 'const value = useStore(<b/>); void value;'],

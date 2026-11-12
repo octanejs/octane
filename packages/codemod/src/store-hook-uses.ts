@@ -145,7 +145,7 @@ export function storeHookUses(
 	typeOf: (node: ts.Node) => ts.Type,
 ) {
 	// Direct eval can reference the hook or a local result by spelling alone.
-	if (file.text.includes('eval')) {
+	if (file.text.includes('eval') || file.text.includes('\\u')) {
 		const directEval = (n: ts.Node): boolean =>
 			(ts.isIdentifier(n) && n.text === 'eval') || !!ts.forEachChild(n, directEval);
 		if (directEval(file)) return () => false;
