@@ -251,5 +251,5 @@ export function storeSources(
 		}
 		return exported.has(name);
 	}
-	return { inputFactory, helperFunction };
+	return { inputFactory, helperFunction, localFile };
 }
