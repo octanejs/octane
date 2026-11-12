@@ -990,6 +990,21 @@ describe('Strong reads after a synchronous state update', () => {
 
 describe('Strong read-only state', () => {
 	it.each([
+		'[{ value } = {}]',
+		'[/* keep */ { value }]',
+		'[{ value }, , getValue]',
+		'[{ value }]: [{ value: string }]',
+	])('leaves the state capture %s for review', (binding) => {
+		const source = tsx(`export function A({ initial }) {
+  const ${binding} = useState(initial);
+  return <p>{value}</p>;
+}`);
+		const { diagnostics } = collectDiagnostics(source, '/src/A.tsrx', { strong: true });
+		const finding = diagnostics.find((item) => item.code === READ_ONLY_STATE);
+		expect(finding).toBeDefined();
+		expect(finding?.suggestions ?? []).toEqual([]);
+	});
+	it.each([
 		['array destructuring', 'const [value] = useState(0);'],
 		['a lazy initializer and getter', 'const [value, , getValue] = useState(() => 0);'],
 		['object destructuring', 'const { 0: value } = useState(0);'],
