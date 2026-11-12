@@ -169,49 +169,73 @@ it.each(['unsupported SVG', 'existing sidecar', 'existing shared helper'])(
 	},
 );
 
-it.each(['v1', 'v2'])('upgrades only the exact %s SVG helper', async (version) => {
-	const { root, icon } = fixture();
-	const options = { root, svgPaths: true, write: true };
-	const name = 'src/octane-path-svg.ts';
-	const helper = path.join(root, name);
-	const previous = fs.readFileSync(
-		new URL(`./fixtures/path-svg-${version}.txt`, import.meta.url),
-		'utf8',
-	);
-	fs.writeFileSync(helper, previous, { mode: 0o640 });
-	const mode = fs.statSync(helper).mode & 0o777;
-	const sidecar =
-		'import source from "./mark.svg?raw";\nimport { pathSvg } from "../octane-path-svg";\n\nexport default pathSvg(source);\n';
-	fs.writeFileSync(icon + '.octane.ts', sidecar);
-	fs.writeFileSync(icon, '<svg><rect width="4" height="6"/></svg>');
-	const preview = await runCodemod([icon], { ...options, write: false });
-	const changed = preview.files.filter((f) => f.changed);
-	expect(changed.map((f) => f.output)).toEqual([name]);
-	expect(fs.readFileSync(helper, 'utf8')).toBe(previous);
+it.each(['v1', 'v2', 'v3'])(
+	'upgrades only the pristine %s shared SVG helper and keeps existing sidecars usable',
+	async (version) => {
+		const { root, icon } = fixture();
+		const options = { root, svgPaths: true, write: true };
+		const name = 'src/octane-path-svg.ts';
+		const helper = path.join(root, name);
+		const previous = fs.readFileSync(
+			new URL(`./fixtures/path-svg-${version}.txt`, import.meta.url),
+			'utf8',
+		);
+		fs.writeFileSync(helper, previous, { mode: 0o640 });
+		const mode = fs.statSync(helper).mode & 0o777;
+		const sidecar =
+			'import source from "./mark.svg?raw";\nimport { pathSvg } from "../octane-path-svg";\n\nexport default pathSvg(source);\n';
+		fs.writeFileSync(icon + '.octane.ts', sidecar);
+		fs.writeFileSync(icon, '<svg><rect width="4" height="6"/></svg>');
+		const preview = await runCodemod([icon], { ...options, write: false });
+		const changed = preview.files.filter((f) => f.changed);
+		expect(changed.map((f) => f.output)).toEqual([name]);
+		expect(fs.readFileSync(helper, 'utf8')).toBe(previous);
 
-	await runCodemod([icon], options);
-	expect(fs.readFileSync(helper, 'utf8')).toBe(changed[0].code);
-	expect(fs.statSync(helper).mode & 0o777).toBe(mode);
-	expect(fs.readFileSync(icon + '.octane.ts', 'utf8')).toBe(sidecar);
-	expect((await runCodemod([icon], options)).files.some((f) => f.changed)).toBe(false);
-	const server = await bundleRuntime(
-		root,
-		'server',
-		"export {default as Mark} from './src/icons/mark.svg.octane.ts'; export {prerender} from 'octane/static';",
-		[],
-		{ '.svg': 'text' },
-	);
-	expect((await server.prerender(server.Mark, {})).html).toContain('<rect width="4" height="6"');
+		await runCodemod([icon], options);
+		expect(fs.readFileSync(helper, 'utf8')).toBe(changed[0].code);
+		expect(fs.statSync(helper).mode & 0o777).toBe(mode);
+		expect(fs.readFileSync(icon + '.octane.ts', 'utf8')).toBe(sidecar);
+		expect((await runCodemod([icon], options)).files.some((f) => f.changed)).toBe(false);
+		const server = await bundleRuntime(
+			root,
+			'server',
+			"export {default as Mark} from './src/icons/mark.svg.octane.ts'; export {prerender} from 'octane/static';",
+			[],
+			{ '.svg': 'text' },
+		);
+		expect((await server.prerender(server.Mark, {})).html).toContain('<rect width="4" height="6"');
 
-	const edited = previous + '\n// Application edit\n';
-	fs.writeFileSync(helper, edited);
-	const blocked = await runCodemod([icon], options);
-	expect(blocked.files.flatMap((f) => f.notes)).toContainEqual(
-		expect.objectContaining({ severity: 'error', message: expect.stringContaining(name) }),
-	);
-	expect(fs.readFileSync(helper, 'utf8')).toBe(edited);
-	expect(fs.readFileSync(icon + '.octane.ts', 'utf8')).toBe(sidecar);
-});
+		const edited = previous + '\n// Application edit\n';
+		fs.writeFileSync(helper, edited);
+		const blocked = await runCodemod([icon], options);
+		expect(blocked.files.flatMap((f) => f.notes)).toContainEqual(
+			expect.objectContaining({ severity: 'error', message: expect.stringContaining(name) }),
+		);
+		expect(fs.readFileSync(helper, 'utf8')).toBe(edited);
+		expect(fs.readFileSync(icon + '.octane.ts', 'utf8')).toBe(sidecar);
+	},
+);
+
+it.each([
+	'data-kind={value}',
+	'data-enabled',
+	'data-state={false}',
+	'data-oct-s="7"',
+	'data-octane="x"',
+	'data-react-compat="yes"',
+])(
+	'keeps an SVG with an unsupported data attribute in its original renderer: %s',
+	async (attribute) => {
+		const { root, file } = fixture(
+			`import Mark from './icons/mark.svg'; export function Pane({value}) { return <div><Mark ${attribute}/></div>; }`,
+		);
+		const { files } = await runCodemod([file], { root, svgPaths: true, write: false });
+		expect(files.find((f) => f.file === 'src/pane.tsx').notes).toContainEqual(
+			expect.objectContaining({ rule: 'svg-issuer', severity: 'error' }),
+		);
+		expect(files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
+	},
+);
 
 it('preserves a different supported SVG helper installed during an upgrade', async () => {
 	const { root, file, icon } = fixture();
@@ -239,7 +263,11 @@ it('preserves a different supported SVG helper installed during an upgrade', asy
 });
 
 it('preserves the authored SVG root on the server and the client, including subsequent asset edits', async () => {
-	const { root, file, icon } = fixture();
+	const withData = pane.replace(
+		'className="status"',
+		'className="status" data-testid="status-mark" data-caption="A &amp; B" data-empty=""',
+	);
+	const { root, file, icon } = fixture(withData);
 	const drawing = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="none" role="img" focusable="false">
 		<rect x="1" y="2" width="8" height="7" rx="2" fill="var(--surface)"/>
 		<g transform="translate(0 -1) scale(1.5)" clip-path="url(#sample)"><g><path d="M0 0L6 4Z" fill="currentColor" fill-rule="evenodd"/></g></g>
@@ -260,7 +288,7 @@ it('preserves the authored SVG root on the server and the client, including subs
 	const converted = preview.files.find((f) => f.file === 'src/pane.tsx');
 	expect(converted.rules['svg-paths']).toBe(1);
 	expect(converted.notes.some((n) => n.rule === 'svg-issuer')).toBe(false);
-	expect(fs.readFileSync(file, 'utf8')).toBe(pane);
+	expect(fs.readFileSync(file, 'utf8')).toBe(withData);
 	expect(fs.existsSync(path.join(root, 'src/octane-path-svg.ts'))).toBe(false);
 	expect(fs.existsSync(icon + '.octane.ts')).toBe(false);
 	const result = await runCodemod([file], { ...options, write: true });
@@ -286,7 +314,7 @@ it('preserves the authored SVG root on the server and the client, including subs
 			.replace(/(clip|fill|stroke)-([a-z])/g, (_, prefix, letter) => prefix + letter.toUpperCase());
 		fs.writeFileSync(
 			path.join(root, 'src/reference.tsx'),
-			pane.replace(
+			withData.replace(
 				"import Mark from '@/icons/mark.svg';",
 				`function Mark(props) { return ${reference}; }`,
 			),

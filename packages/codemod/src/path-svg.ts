@@ -80,6 +80,11 @@ function attributes(text: string, allowed: Record<string, RegExp>) {
 	return space.test(text.slice(end)) ? values : null;
 }
 
+// Hydration and React interop use reserved data attributes.
+export function svgDataAttribute(name: string): name is `data-${string}` {
+	return /^data-(?!oct(?:ane)?(?:-|$)|react-compat$)[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(name);
+}
+
 type StaticSvgNode = {
 	tag: keyof typeof shapeAttributes;
 	attributes: Record<string, string>;

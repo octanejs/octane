@@ -7674,15 +7674,18 @@ export function useImperativeHandle<T>(
 ): void {
 	useLayoutEffect(
 		() => {
-			const value = create();
-			if (typeof ref === 'function') ref(value);
-			else if (ref !== null) ref.current = value;
+			if (ref == null) return;
+			let cleanup: unknown;
+			if (typeof ref === 'function') cleanup = ref(create());
+			else ref.current = create();
 			return () => {
-				if (typeof ref === 'function') ref(null);
-				else if (ref !== null) ref.current = null;
+				if (typeof cleanup === 'function') cleanup();
+				else if (typeof ref === 'function') ref(null);
+				else ref.current = null;
 			};
 		},
-		deps,
+		// Match React’s indexed dependencies even when the array has a custom iterator.
+		Array.isArray(deps) ? deps.concat([ref]) : deps,
 		slot,
 	);
 }
