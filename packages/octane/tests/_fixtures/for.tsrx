@@ -16,6 +16,20 @@ export function List(props: { items: Array<{ id: number; label: string }> }) @{
 	</ul>
 }
 
+export function MappedKeyOnly({
+	rows,
+	__items,
+}: {
+	rows: { id: string }[];
+	__items: (row: { id: string }) => string;
+}) @{
+	<ul>
+		{rows.map((row) => (
+			<li key={__items(row)} />
+		))}
+	</ul>
+}
+
 // `@for (...) @empty { ... }` — empty branch mounts when the iterable is empty,
 // unmounts when items return. Hooks declared in the empty body have their own
 // Block boundary, so re-entering the empty state mounts a fresh state.
@@ -600,6 +614,14 @@ export function FastHostMappedList(props: {
 			>
 				{row.label as string}
 			</li>
+		))}
+	</ul>
+}
+
+export function MappedPropBeforeKey({ rows }: { rows: { id: string; read(): string }[] }) @{
+	<ul>
+		{rows.map((row) => (
+			<li data-marker={row.read()} key={row.id} />
 		))}
 	</ul>
 }

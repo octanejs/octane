@@ -16,6 +16,7 @@ export function serializeRouteData(data) {
 		params: data.params,
 		url: data.url,
 		preHydrate: data.preHydrate ?? null,
+		data: data.data ?? null,
 		rootBoundary: data.rootBoundary ?? { pending: null, catch: null },
 		clientBuild: data.clientBuild,
 		streamedSignals: data.streamedSignals,

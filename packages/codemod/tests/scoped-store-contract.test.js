@@ -294,9 +294,54 @@ function project(overrides) {
 	return f;
 }
 
+it.each([
+	['0.17.0', true],
+	['0.18.0', false],
+])('gates the generated adapters on installed Octane %s', async (version, supported) => {
+	const { app, root } = project({
+		'app/src/pane.tsx': `import {useSnapshot} from 'observer';
+		import {useIntl} from 'react-intl';
+		export function Pane() {
+			const value = useSnapshot();
+			const intl = useIntl();
+			return <p>{String(value)}{intl.formatNumber(1234)}</p>;
+		}`,
+	});
+	const original = fs.realpathSync(path.join(root, 'node_modules/octane'));
+	const installed = path.join(app, 'node_modules/octane');
+	const manifest = JSON.parse(fs.readFileSync(path.join(original, 'package.json'), 'utf8'));
+	fs.mkdirSync(installed);
+	fs.writeFileSync(path.join(installed, 'package.json'), JSON.stringify({ ...manifest, version }));
+	fs.symlinkSync(path.join(original, 'src'), path.join(installed, 'src'), 'dir');
+	fs.symlinkSync(
+		path.resolve(import.meta.dirname, '../node_modules/react-intl'),
+		path.join(app, 'node_modules/react-intl'),
+		'dir',
+	);
+
+	const result = await runCodemod([path.join(app, 'src/pane.tsx')], {
+		root: app,
+		strong: true,
+		verify: true,
+		write: false,
+	});
+	const pane = result.files.find((file) => file.file === 'src/pane.tsx');
+	expect(pane.strong).toBe(true);
+	const errors = [...pane.notes, ...pane.diagnostics].filter(
+		(finding) => finding.severity === 'error',
+	);
+	expect(errors.map((finding) => finding.rule)).toEqual(supported ? [] : ['bindings', 'bindings']);
+	const expectedHelpers = ['src/octane-react-intl.tsrx', 'src/octane-store-context.tsrx'];
+	const helpers = result.files
+		.map((file) => file.output)
+		.filter((output) => expectedHelpers.includes(output));
+	expect(helpers.sort()).toEqual(supported ? expectedHelpers : []);
+});
+
 it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
 	const source = `import {useSnapshot as useReading, valueOf} from 'observer';
-export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }`;
+export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }
+export type PaneParameters = Parameters<typeof Pane>;`;
 	const originalPane = { 'app/src/pane.tsx': source };
 	const { app, library } = project(originalPane);
 	const originalSources = Object.fromEntries(
@@ -326,10 +371,7 @@ export function Pane() { const value = useReading(); return <p>{valueOf(1)}{valu
 	const helperBytes = Object.fromEntries(
 		helpers.map((f) => [f.output, fs.readFileSync(path.join(app, f.output), 'utf8')]),
 	);
-	fs.writeFileSync(
-		path.join(app, 'src/second.tsx'),
-		source.replace('function Pane', 'function Other'),
-	);
+	fs.writeFileSync(path.join(app, 'src/second.tsx'), source.replaceAll('Pane', 'Other'));
 	// The normal directory entry now also sees the generated ordinary TypeScript files.
 	const second = await migrate(app, ['src'], true);
 	expect(second.files.find((f) => f.file === 'src/second.tsx')?.rules['store-hook']).toBe(1);
