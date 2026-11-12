@@ -2132,6 +2132,21 @@ class ModuleTransform {
 			}
 			if (ts.isArrowFunction(node)) {
 				const snapshots = ts.isBlock(node.body) ? this.effectSnapshots : undefined;
+				const importedEvent = snapshots && this.apiLocals.get('useEffectEvent');
+				const canBridgeLayout =
+					snapshots &&
+					(!importedEvent ||
+						this.checker
+							.resolveName(
+								'useEffectEvent',
+								node.parent,
+								ts.SymbolFlags.Value | ts.SymbolFlags.Alias,
+								false,
+							)
+							?.declarations?.some(
+								(declaration) => this.imports.get(declaration) === importedEvent,
+							));
+				let layoutEvent = false;
 				const captures = effectReceivers(
 					node,
 					this.checker,
@@ -2148,15 +2163,24 @@ class ModuleTransform {
 							snapshots.set(statement, declarations);
 							aliases.set(member, name);
 						}),
+					canBridgeLayout
+						? (statement, name) => {
+								const event = this.require('octane', 'useEffectEvent', false);
+								const setup = this.span(node, node.getStart(this.sf), node.end, ctx);
+								snapshots.get(statement)!.push(`const ${name} = ${event}(${setup});`);
+								layoutEvent = true;
+							}
+						: undefined,
 				);
 				if (captures.length) {
 					const { body } = node;
 					const block = ts.isBlock(body);
 					const bodyStart = body.getStart(this.sf);
 					const start = block ? bodyStart : body.pos;
-					const head = this.span(node, node.getStart(this.sf), start, ctx);
 					const indent = this.indentOf(block ? body : node);
 					const line = '\n' + indent + this.indentUnit;
+					if (layoutEvent) return '() => {' + line + captures.join(line) + '\n' + indent + '}';
+					const head = this.span(node, node.getStart(this.sf), start, ctx);
 					let rest: string;
 					if (block) {
 						rest = this.span(body, start + 1, body.end, ctx);
