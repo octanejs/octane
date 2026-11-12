@@ -5,6 +5,7 @@ import {
 	SettledHiddenActivity,
 	SettledJsxBoundary,
 	SettledRoot,
+	SettledRowsBoundary,
 	SettledTemplateBoundary,
 	SettledUseBoundary,
 } from './_fixtures/settled-wakeable.tsrx';
@@ -65,6 +66,39 @@ async function drainMicrotasks(): Promise<void> {
 }
 
 describe('Suspense retries on an already-settled wakeable', () => {
+	it.each([
+		['resolved', () => Promise.resolve()],
+		[
+			'rejected',
+			() => {
+				const rejected = Promise.reject(new Error('stale'));
+				rejected.catch(() => {});
+				return rejected;
+			},
+		],
+	] as const)(
+		'lets a timer end a suspension that several rows share on %s promises',
+		async (_name, settled) => {
+			const first = settledGate(settled(), 'a');
+			const second = settledGate(settled(), 'b');
+			const r = mount(SettledRowsBoundary, { reads: [first.read, second.read] });
+			expect(r.find('.fallback').textContent).toBe('loading');
+			await act(async () => {
+				await new Promise<void>((resolve) =>
+					setTimeout(() => {
+						first.open = true;
+						second.open = true;
+						resolve();
+					}, 0),
+				);
+				await nextTask();
+			});
+			expect(first.starved || second.starved).toBe(false);
+			expect(r.findAll('.resolved').map((p) => p.textContent)).toEqual(['a', 'b']);
+			r.unmount();
+		},
+	);
+
 	describe.each([
 		['template', SettledTemplateBoundary],
 		['JSX', SettledJsxBoundary],

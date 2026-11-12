@@ -957,8 +957,18 @@ event. The store keeps nothing for a record none of its reads holds. A server
 call's stream lasts at most 30 seconds, so `handler.listen` ends each
 connection after 25, and the store connects again at once from its cursor. A
 source with no cursor cannot resume: when its connection comes back, the store
-reloads what the feed covers. A change made between a read's load and the
-feed's first connection is not replayed.
+reloads what the feed covers.
+
+A server-rendered page is current when its reads load, and its feed connects
+later. Pass the feeds the page listens to as the server store's `feeds`: before
+its first read it asks each for its position, and its seed carries them, so the
+browser's feed starts from there and replays a change made in between. A
+handler that resumes yields its position first when `call.cursor` is null; a
+feed whose handler yields none starts from the browser's connection.
+
+```ts
+createDataStore({ transport: serverTransport(data), feeds: [bookChanges] });
+```
 
 A store with `persist` saves each feed's cursor with its saved values, so the
 next session resumes where the last one stopped and replays what happened
