@@ -330,7 +330,10 @@ it.each([
 	const errors = [...pane.notes, ...pane.diagnostics].filter(
 		(finding) => finding.severity === 'error',
 	);
-	expect(errors.map((finding) => finding.rule)).toEqual(supported ? [] : ['bindings', 'bindings']);
+	expect(errors.map((finding) => finding.rule)).toEqual(
+		supported ? ['bindings'] : ['bindings', 'bindings'],
+	);
+	if (supported) expect(errors[0].message).toContain('this formatNumber call');
 	const expectedHelpers = ['src/octane-react-intl.tsrx', 'src/octane-store-context.tsrx'];
 	const helpers = result.files
 		.map((file) => file.output)
