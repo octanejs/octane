@@ -10,6 +10,7 @@ import {
 	type StreamFrameIdentity,
 } from '../streamed-signals-protocol.js';
 import type { HistoricalFrameLease, StreamedRegionRegistration } from './stream-receiver.js';
+import { setHostTimeout, clearHostTimeout } from '../host-task.js';
 
 export interface StreamedResultConsumer {
 	/** False defers this validated frame; reattaching the same consumer retries its bounded mailbox. */
@@ -61,7 +62,7 @@ interface ResultState {
 	frameSizes: number[];
 	bytes: number;
 	consumer?: StreamedResultConsumer | undefined;
-	timer?: ReturnType<typeof setTimeout>;
+	timer?: unknown;
 	failure?: StreamedReceiverError;
 }
 
@@ -168,7 +169,7 @@ export function createStreamedResultReceiverState(
 				state.result.frameSizes.length = 0;
 				state.result.bytes = 0;
 			}
-			if (state.result.timer !== undefined) clearTimeout(state.result.timer);
+			if (state.result.timer !== undefined) clearHostTimeout(state.result.timer);
 			state.result.terminal = true;
 		}
 		options.onError?.(error);
@@ -189,8 +190,8 @@ export function createStreamedResultReceiverState(
 	const isCurrent = (state: StreamedSelectionState, identity: StreamFrameIdentity): boolean =>
 		!disposed && state.failure === undefined && current(identity) === state;
 	const renewResultTimeout = (state: StreamedSelectionState): void => {
-		if (state.result.timer !== undefined) clearTimeout(state.result.timer);
-		state.result.timer = setTimeout(() => {
+		if (state.result.timer !== undefined) clearHostTimeout(state.result.timer);
+		state.result.timer = setHostTimeout(() => {
 			report(new StreamedReceiverError('timeout', formatClientError(252)), state);
 		}, timeoutMs);
 	};
@@ -211,7 +212,7 @@ export function createStreamedResultReceiverState(
 		const previous = selections.get(key);
 		if (previous !== undefined) {
 			previous.pendingPlacement?.cancel();
-			if (previous.result.timer !== undefined) clearTimeout(previous.result.timer);
+			if (previous.result.timer !== undefined) clearHostTimeout(previous.result.timer);
 			previous.historical?.release();
 		}
 		const state: StreamedSelectionState = {
@@ -318,7 +319,7 @@ export function createStreamedResultReceiverState(
 		}
 		if (frame.kind === 'complete' || frame.kind === 'error') {
 			result.terminal = true;
-			if (result.timer !== undefined) clearTimeout(result.timer);
+			if (result.timer !== undefined) clearHostTimeout(result.timer);
 		} else if (!result.terminal && isCurrent(state, frame.identity)) renewResultTimeout(state);
 		if (frame.kind === 'complete') retainCompletedResult(result);
 		return 'accepted';

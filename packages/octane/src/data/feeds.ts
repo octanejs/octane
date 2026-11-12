@@ -14,6 +14,7 @@
  * - The connection closes when its last observer leaves, and when the store
  *   retires. A failed connection retries with growing, jittered delays.
  */
+import { clearHostTimeout, setHostTimeout } from '../host-task.js';
 import { parse, type Entity, type Feed, type FeedChange, type FeedFrame } from './contracts.js';
 import {
 	DataRetiredError,
@@ -147,10 +148,10 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 			set({ status: 'offline', error });
 			const delay = Math.min(MAX_DELAY, 1000 * 2 ** (failures - 1)) * (0.5 + Math.random() / 2);
 			await new Promise<void>((resolve) => {
-				const timer = setTimeout(done, delay);
+				const timer = setHostTimeout(done, delay);
 				signal.addEventListener('abort', done, { once: true });
 				function done() {
-					clearTimeout(timer);
+					clearHostTimeout(timer);
 					signal.removeEventListener('abort', done);
 					resolve();
 				}
