@@ -28,6 +28,19 @@ export function SettledJsxBoundary(props: SettledReaderProps) @{
 	</SettledSuspense>
 }
 
+// Rows of one list each re-suspend on their own wakeable.
+export function SettledRowsBoundary(props: { reads: (() => string)[] }) @{
+	<>
+		@try {
+			@for (const read of props.reads; key props.reads.indexOf(read)) {
+				<SettledReader read={read} />
+			}
+		} @pending {
+			<p class="fallback">loading</p>
+		}
+	</>
+}
+
 export function SettledRoot(props: SettledReaderProps) @{
 	<section>
 		<SettledReader read={props.read} />
