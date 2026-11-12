@@ -24,6 +24,7 @@ export function linkedRenderState(
 	checker: ts.TypeChecker,
 	uses: (name: ts.Identifier) => ts.Identifier[],
 	isReactState: (expr: ts.Expression) => boolean,
+	isBooleanValue: (expr: ts.Expression) => boolean,
 ) {
 	if (
 		!owner.body ||
@@ -115,8 +116,14 @@ export function linkedRenderState(
 	const initial = ungroup(hook.arguments[0]);
 	if (body.length === 3) {
 		const once = negated(initial);
-		const read = once && negated(once);
-		if (read && prop(read) && prop(flag) && read.name.text === flag.name.text) {
+		const read = (once && negated(once)) ?? initial;
+		if (
+			prop(read) &&
+			prop(flag) &&
+			read.name.text === flag.name.text &&
+			// A raw callable prop would run as a React state initializer.
+			(read !== initial || isBooleanValue(initial))
+		) {
 			return { state, guard, name: value.name.text, flag, eager: initial, replay: [read, flag] };
 		}
 	} else {
