@@ -61,7 +61,7 @@ export function fixedBinding(
 }
 
 /** An identifier moved past a getter must already be initialized, even across switch cases. */
-function initializedBefore(checker: ts.TypeChecker, name: ts.Identifier, call: ts.CallExpression) {
+export function initializedBefore(checker: ts.TypeChecker, name: ts.Identifier, call: ts.Node) {
 	let declaration = checker.getSymbolAtLocation(name)?.valueDeclaration;
 	while (declaration && ts.isBindingElement(declaration)) declaration = declaration.parent.parent;
 	if (!declaration) return false;

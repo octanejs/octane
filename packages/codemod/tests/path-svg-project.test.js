@@ -54,7 +54,12 @@ function shape(element) {
 	return [
 		element.namespaceURI,
 		element.localName,
-		Object.fromEntries(Array.from(element.attributes, (a) => [a.name, a.value])),
+		Object.fromEntries(
+			Array.from(element.attributes, (a) => [
+				a.name,
+				a.name === 'style' ? a.value.replace(/;$/, '') : a.value,
+			]),
+		),
 		Array.from(element.children, shape),
 	];
 }
@@ -473,6 +478,40 @@ it('preserves scoped and composed CSS module classes on SVGs on the server and c
 		expect(css).toContain('.' + token);
 	}
 	expect(restored).toBe(plain);
+});
+
+it('preserves SVG inline transforms on the server and across client updates', async () => {
+	await expectSvgRenderParity(
+		`export function Pane({open}) {
+			return <button>
+				<Mark style={{transform: \`rotate(\${open ? 0 : -90}deg)\`}}/>
+				<Mark style={{transform: "scale(1.5)"}}/>
+			</button>;
+		}`,
+		[{ open: true }, { open: false }, { open: true }],
+		2,
+	);
+});
+
+it.each([
+	'style={{ transform: angle }}',
+	'style={{ transform: "rotate(0deg) !important" }}',
+	'style={{ transform: "rotate(0deg); color:red" }}',
+	'style={{ transform: " " }}',
+	'style={{ ...other, transform: "none" }}',
+	'style={{ transform: "none", color: "red" }}',
+	'style={{ get transform() { return "none"; } }}',
+	'style={{ transform: "none" }} style={{ transform: "scale(2)" }}',
+	'style={{ transform: `rotate(${readAngle()}deg)` }}',
+])('retains the SVG diagnostic for unverified inline style %s', async (attribute) => {
+	const { root, file } = fixture(
+		`import Mark from './icons/mark.svg';
+		export function Pane({angle, other, readAngle}) { return <button><Mark ${attribute}/></button>; }`,
+	);
+	const { files } = await runCodemod([file], { root, svgPaths: true, write: false });
+	expect(files.find((f) => f.file === 'src/pane.tsx').notes).toContainEqual(
+		expect.objectContaining({ rule: 'svg-issuer', severity: 'error' }),
+	);
 });
 
 it.each([
