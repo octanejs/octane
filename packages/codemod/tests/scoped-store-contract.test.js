@@ -488,12 +488,13 @@ it('preserves an aliased handle and passes the active store to unchanged helpers
 				calls.set(store, [...(calls.get(store) ?? []), phase]);
 			}`,
 		'app/src/pane.tsx': `import {useSnapshot} from 'observer'; import {reading} from './handles';
-			import {useEffect, useLayoutEffect} from 'react'; import {record as publish} from './record';
+			import {useEffect, useLayoutEffect, useState} from 'react'; import {record as publish} from './record';
 			export function Pane() {
 				const store = useSnapshot();
-				useEffect(() => { publish(store, 'effect'); }, [store]);
+				const [text, setText] = useState('');
+				useEffect(() => { publish(store, 'effect'); setText(String(store.get(reading))); }, [store]);
 				useLayoutEffect(() => { return () => { publish(store, 'cleanup'); }; }, [store]);
-				return <button onClick={() => { publish(store, 'click'); store.set(reading, 'updated'); }}>{String(store.get(reading))}</button>;
+				return <button onClick={() => { publish(store, 'click'); store.set(reading, 'updated'); }}>{text}</button>;
 			}`,
 	});
 	const input = path.join(app, 'src/pane.tsx');
@@ -538,7 +539,7 @@ it('preserves an aliased handle and passes the active store to unchanged helpers
 		const serverStore = new Map([[server.reading, 'server']]);
 		const parsed = document.createElement('template');
 		parsed.innerHTML = server.renderToString(server.Root, { store: serverStore }).html;
-		expect(parsed.content.querySelector('button').textContent).toBe('server');
+		expect(parsed.content.querySelector('button').textContent).toBe('');
 		const expected = document.createElement('template');
 		expected.innerHTML = renderToStaticMarkup(reference(server, serverStore));
 		expect(parsed.content.textContent).toBe(expected.content.textContent);
@@ -740,14 +741,14 @@ it.each([
 it('delivers the original React element to a store service for rendering under its eventual provider', async () => {
 	const { app, root: workspace } = noticeProject({
 		'app/src/pane.tsx': `import {useSnapshot} from 'observer'; import {reading} from './handles';
-			import {Action, Notice as Label} from 'notices';
+			import {Notice as Label} from 'notices';
 			import {FormattedMessage as Message} from 'react-intl';
 			export function Pane() {
 				const store = useSnapshot();
-				return <section><Message id="headline"/><Action onClick={() => {
+				return <section><Message id="headline"/><button onClick={() => {
 					store.get(reading).show(<Label label="sent"/>, {sticky: true});
 					store.get(reading).show(<Message id="headline"/>);
-				}}/></section>;
+				}}>Send</button></section>;
 			}`,
 	});
 	fs.symlinkSync(
@@ -921,7 +922,10 @@ it('retains the migration diagnostic when a store consumer cannot preserve the o
 	const files = Object.keys(inputs).map((name) => path.join(root, name));
 	const result = await runCodemod(files, { root: app, strong: true, verify: true });
 	const island = result.files.find((file) => file.file === 'src/island.tsx');
-	expect(island.rules['store-hook']).toBe(1);
+	expect(island.rules['store-hook']).toBeUndefined();
+	expect(island.notes).toContainEqual(
+		expect.objectContaining({ severity: 'error', message: expect.stringContaining('observer') }),
+	);
 	expect(island.notes).toContainEqual(
 		expect.objectContaining({ severity: 'error', message: expect.stringContaining('<Action>') }),
 	);
@@ -1169,6 +1173,80 @@ it('requires an imported application handle to come from the original shared fac
 	for (const name of ['direct', 'alias']) {
 		expect(factory(path.join(app, 'src/pane.tsx'), './attributed', name), name).toBeNull();
 	}
+});
+
+it('reports render-time reads of members supplied by the active scoped store provider', async () => {
+	const pane = (
+		handle,
+		body,
+	) => `import {useSnapshot} from 'observer'; import {useMemo} from 'react';
+		import {${handle} as reading} from './handles';
+		export function Pane() { const store = useSnapshot(); ${body} }`;
+	const { app } = project({
+		'observer/public-store.ts': "export { valueOf, key } from './state';",
+		'observer/state.ts': `export function valueOf<T>(value: T) { return value; }
+			export function key<T>(value: T) { return value; }`,
+		'observer/renderer.ts':
+			"import {createContext} from 'react'; export const current = createContext(new Map());",
+		'app/src/handles.ts': `import {key} from 'observer/core';
+			export const object = key({read: () => 'label'});
+			export const primitive = key('stable-key');`,
+		'app/src/object.tsx': pane('object', 'return <b>{String(store.get(reading))}</b>;'),
+		'app/src/primitive.tsx': pane('primitive', 'return <b>{String(store.get(reading))}</b>;'),
+		'app/src/memo.tsx': pane(
+			'primitive',
+			'const text = useMemo(() => String(store.get(reading)), []); return <b>{text}</b>;',
+		),
+		'app/src/inline.tsx': pane('object', 'return <b>{(() => String(store.get(reading)))()}</b>;'),
+		'app/src/memo-alias.tsx': pane(
+			'primitive',
+			'const read = () => String(store.get(reading)); const text = useMemo(read, []); return <b>{text}</b>;',
+		),
+		'app/src/wrapped.tsx': pane('primitive', 'return <b>{String(((store.get))(reading))}</b>;'),
+		'app/src/extracted.tsx': pane(
+			'object',
+			'const get = store.get; return <b>{String(get(reading))}</b>;',
+		),
+		'app/src/destructured.tsx': pane(
+			'object',
+			'const {get} = store; return <b>{String(get(reading))}</b>;',
+		),
+		'app/src/getter.tsx': pane('primitive', 'return <b>{String(store.size)}</b>;'),
+		'app/src/computed.tsx': pane('object', 'return <b>{String(store["get"](reading))}</b>;'),
+		'app/src/click.tsx': pane(
+			'primitive',
+			'return <button onClick={() => {store.get(reading);}}>Read</button>;',
+		),
+	});
+	const render = [
+		'object',
+		'primitive',
+		'memo',
+		'inline',
+		'memo-alias',
+		'wrapped',
+		'extracted',
+		'destructured',
+		'getter',
+		'computed',
+	];
+	const paths = [...render, 'click'].map((name) => path.join(app, `src/${name}.tsx`));
+	const result = await runCodemod(paths, {
+		root: app,
+		strong: true,
+		verify: true,
+		projectTypes: true,
+	});
+	for (const name of render) {
+		const view = result.files.find((file) => file.file === `src/${name}.tsx`);
+		expect(view.notes).toContainEqual(
+			expect.objectContaining({ severity: 'error', rule: 'bindings' }),
+		);
+		expect(view.rules['store-hook']).toBeUndefined();
+	}
+	const click = result.files.find((file) => file.file === 'src/click.tsx');
+	expect(click.rules['store-hook']).toBe(1);
+	expect(click.notes.filter((note) => note.severity === 'error')).toEqual([]);
 });
 
 it('retains the bindings diagnostic for wrapped keys that can dispatch into React', async () => {

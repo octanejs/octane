@@ -191,8 +191,8 @@ export function storeHookUses(
 			}) === ts.findAncestor(hook, ts.isFunctionLike)
 		);
 	}
-	function runsAfterRender(call: ts.CallExpression, hook: ts.CallExpression) {
-		const fn = ts.findAncestor(call, ts.isFunctionLike);
+	function runsAfterRender(use: ts.Node, hook: ts.CallExpression) {
+		const fn = ts.findAncestor(use, ts.isFunctionLike);
 		if (!fn) return false;
 		if (effectCallback(fn) || clickHandler(fn, hook)) return true;
 		const parent = fn.parent;
@@ -360,8 +360,10 @@ export function storeHookUses(
 			p.initializer === value &&
 			ts.isVariableDeclarationList(p.parent) &&
 			p.parent.flags & ts.NodeFlags.Const
-		)
-			return !p.type && bound(p.name, check);
+		) {
+			const hook = !ts.isIdentifier(p.name) && originalReceiver(value, check, true);
+			return !p.type && (!hook || runsAfterRender(p, hook)) && bound(p.name, check);
+		}
 		if (ts.isExpressionStatement(p) || ts.isVoidExpression(p) || ts.isTypeOfExpression(p))
 			return true;
 		if (ts.isIfStatement(p) || ts.isWhileStatement(p) || ts.isDoStatement(p))
@@ -387,9 +389,16 @@ export function storeHookUses(
 				op === ts.SyntaxKind.InstanceOfKeyword
 			);
 		}
-		if (ts.isPropertyAccessExpression(p)) return p.expression === value && safe(p, check);
-		if (ts.isElementAccessExpression(p))
-			return p.expression === value && argument(p.argumentExpression, check) && safe(p, check);
+		if (ts.isPropertyAccessExpression(p) || ts.isElementAccessExpression(p)) {
+			if (p.expression !== value) return false;
+			// The provider owns the member. Even retrieving it can execute a getter.
+			const hook = originalReceiver(value, check, true);
+			return (
+				(!hook || runsAfterRender(p, hook)) &&
+				(!ts.isElementAccessExpression(p) || argument(p.argumentExpression, check)) &&
+				safe(p, check)
+			);
+		}
 		if (
 			ts.isArrayLiteralExpression(p) &&
 			ts.isCallExpression(p.parent) &&
