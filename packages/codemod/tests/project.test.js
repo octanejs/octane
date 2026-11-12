@@ -940,6 +940,130 @@ const invalid: Panel = { style: 'color:red' };`,
 		expect(result.missing.map((port) => port.name)).toEqual(['@tanstack/markdown/react']);
 	});
 
+	it.each(['new', 'declared'])(
+		'maps standalone Floating UI positioning for a %s binding',
+		async (state) => {
+			const range = `^${catalogVersion('@octanejs/floating-ui')}`;
+			const before = {
+				'@floating-ui/react-dom': '^2.1.8',
+				...(state === 'declared' ? { '@octanejs/floating-ui': range } : {}),
+			};
+			const root = project({
+				'package.json': JSON.stringify({ name: 'app', dependencies: before }),
+				'src/Position.tsx': `
+import { autoUpdate, offset, useFloating } from '@floating-ui/react-dom';
+import type { Placement } from '@floating-ui/react-dom';
+export function Position({ placement }: { placement: Placement }) {
+	const { floatingStyles, refs } = useFloating({
+		placement,
+		middleware: [offset(8)],
+		whileElementsMounted: autoUpdate,
+	});
+	return <div ref={refs.setFloating} style={floatingStyles} />;
+}
+`,
+			});
+			const { files, dependencies, packages, missing } = await runCodemod([root], {
+				write: true,
+				strong: true,
+			});
+			const position = files.find((file) => file.output === 'src/Position.tsrx');
+			expect(position?.code).toContain(
+				"import { autoUpdate, offset, useFloating } from '@octanejs/floating-ui/react-dom';",
+			);
+			expect(position?.code).toContain(
+				"import type { Placement } from '@octanejs/floating-ui/react-dom';",
+			);
+			expect(position?.strong).toBe(true);
+			expect(position?.notes.filter((note) => note.severity === 'error')).toEqual([]);
+			expect(missing).toEqual([]);
+			expect(packages).toEqual([{ from: '@floating-ui/react-dom', to: '@octanejs/floating-ui' }]);
+			expect(dependencies).toEqual(
+				state === 'new' ? [{ name: '@octanejs/floating-ui', range }] : [],
+			);
+			expect(
+				JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).dependencies,
+			).toEqual({ '@floating-ui/react-dom': '^2.1.8', '@octanejs/floating-ui': range });
+		},
+	);
+
+	it.each([
+		['uninstalled', undefined],
+		['older', { '.': './index.js' }],
+		['type-only', { './react-dom': { types: './index.d.ts', import: null } }],
+		['blocked', { './*': './*', './react-dom': null }],
+		['conditional', { './react-dom': { node: null, default: './index.js' } }],
+	])(
+		'keeps the positioning import when the %s binding cannot serve its subpath',
+		async (_state, exports) => {
+			const root = project({
+				'package.json': '{"name":"app","dependencies":{"@octanejs/floating-ui":"0.1.68"}}',
+				'Position.tsx': `import { useFloating } from '@floating-ui/react-dom';
+export function Position() {
+	const { refs } = useFloating();
+	return <div ref={refs.setFloating} />;
+}`,
+				...(exports
+					? {
+							'node_modules/@octanejs/floating-ui/package.json': JSON.stringify({
+								name: '@octanejs/floating-ui',
+								version: '0.1.68',
+								exports,
+							}),
+							'node_modules/@octanejs/floating-ui/index.js': 'export const useFloating = () => {};',
+						}
+					: {}),
+			});
+			const { files, dependencies, packages } = await runCodemod([root], { write: false });
+			const position = files.find((file) => file.file === 'Position.tsx');
+			expect(position?.code).toContain("from '@floating-ui/react-dom'");
+			expect(position?.notes).toContainEqual(
+				expect.objectContaining({
+					rule: 'bindings',
+					severity: 'error',
+					message: expect.stringContaining('exports `./react-dom`'),
+				}),
+			);
+			expect(dependencies).toEqual([]);
+			expect(packages).toEqual([]);
+		},
+	);
+
+	it.each(['@floating-ui/react-dom', '@octanejs/floating-ui/react-dom'])(
+		'keeps the positioning import when project resolution shadows %s',
+		async (specifier) => {
+			const root = project({
+				'package.json': '{"name":"app"}',
+				'nested/tsconfig.json': JSON.stringify({
+					compilerOptions: {
+						moduleResolution: 'bundler',
+						paths: { [specifier]: ['./local.ts'] },
+					},
+				}),
+				'nested/local.ts': 'export const useFloating = () => ({ label: "local" });',
+				'nested/Position.tsx': `import { useFloating } from '@floating-ui/react-dom';
+export function Position() {
+	const { label } = useFloating();
+	return <div title={label} />;
+}`,
+			});
+			const { files, dependencies } = await runCodemod([root], {
+				write: false,
+				projectTypes: false,
+			});
+			const position = files.find((file) => file.file === 'nested/Position.tsx');
+			expect(position?.code).toContain("from '@floating-ui/react-dom'");
+			expect(position?.notes).toContainEqual(
+				expect.objectContaining({
+					rule: 'bindings',
+					severity: 'error',
+					message: expect.stringContaining(specifier),
+				}),
+			);
+			expect(dependencies).toEqual([]);
+		},
+	);
+
 	it('maps next-themes, which has no React-shaped name, to its binding', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',
