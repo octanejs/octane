@@ -3,19 +3,26 @@
 // Reuses motion's framework-agnostic animation engine (`animate`), gesture
 // primitives (`hover`, `press`, `inView`), MotionValues, and scoped animation, and
 // reimplements the `motion.*` components on octane. Each `motion.tag` renders a real
-// host `<tag>` (via octane's `hostComponent` primitive), captures its node, and
+// host descriptor, captures its committed node by ref, and
 // drives animation/gesture/layout/drag from layout effects — exactly the refs +
 // effects + rendering path this is meant to exercise.
 import { animate, hover, press, inView } from 'motion';
 import {
-	childSlot,
-	hostComponent,
+	buildHTMLStyles,
+	buildSVGAttrs,
+	isVariantLabel,
+	resolveMotionValue,
+	scrapeHTMLMotionValuesFromProps,
+	scrapeSVGMotionValuesFromProps,
+} from 'motion-dom';
+import {
+	createElement,
 	useContext,
 	useEffect,
 	useLayoutEffect,
 	useMemo,
 	useState,
-	provideContext,
+	type OctaneElement,
 } from 'octane';
 import {
 	LayoutGroupContext,
@@ -46,6 +53,8 @@ import { LayoutAnimation } from './layout-animation';
 // A plain-TS component gets its OWN block per instance (componentSlot), so fixed
 // slot symbols don't collide across instances — and these are distinct within one.
 const REFS = Symbol.for('octane-motion:refs');
+const FRAME = Symbol.for('octane-motion:frame');
+const HOST_REF = Symbol.for('octane-motion:hostRef');
 const ENTER = Symbol.for('octane-motion:enter');
 const ANIMATE = Symbol.for('octane-motion:animate');
 const GESTURE = Symbol.for('octane-motion:gesture');
@@ -77,6 +86,8 @@ const MOTION_PROPS = new Set([
 	'initial',
 	'animate',
 	'transition',
+	'transformTemplate',
+	'custom',
 	'whileHover',
 	'whileTap',
 	'whileFocus',
@@ -97,23 +108,39 @@ const MOTION_PROPS = new Set([
 	'children',
 ]);
 
-function domProps(props: any): Record<string, any> {
+// Pinned Motion distinguishes these lowercase SVG tags and mixed-case SVG names
+// from HTML and dashed custom elements (render/dom/utils/is-svg-component).
+const svgHost =
+	/^(?:animate|circle|defs|desc|ellipse|g|image|line|filter|marker|mask|metadata|path|pattern|polygon|polyline|rect|stop|switch|symbol|svg|text|tspan|use|view)$/;
+
+// Drop a projected field permanently after an authored value takes over. Ordinary
+// refreshes reuse the existing frame and the copy is installed only after commit.
+function retained(values: Record<string, any>, original: Record<string, any>, current: any) {
+	let next = values;
+	for (const key in values) {
+		if (Object.is(original[key], current?.[key])) continue;
+		if (next === values) next = { ...values };
+		delete next[key];
+	}
+	return next;
+}
+
+function domProps(props: any, svg: boolean) {
 	const out: Record<string, any> = {};
-	for (const k in props) {
-		if (MOTION_PROPS.has(k)) continue;
-		if (k === 'style' && props.style && typeof props.style === 'object') {
-			// Motion values + transform shorthands (x/y/scale/…) are applied by the
-			// motion-value effect, not written to the DOM as raw style.
-			const s: Record<string, any> = {};
-			for (const sk in props.style) {
-				const v = props.style[sk];
-				if (isMotionValue(v) || isTransformKey(sk)) continue;
-				s[sk] = v;
-			}
-			out.style = s;
-		} else {
-			out[k] = props[k];
+	for (const key in props) {
+		if (!MOTION_PROPS.has(key)) {
+			const value = props[key];
+			out[key] = svg && isMotionValue(value) ? resolveMotionValue(value) : value;
 		}
+	}
+	const raw = props.style;
+	if (raw && typeof raw === 'object') {
+		const style: Record<string, any> = {};
+		for (const key in raw) {
+			const value = raw[key];
+			if (!isMotionValue(value) && !isTransformKey(key)) style[key] = value;
+		}
+		out.style = style;
 	}
 	return out;
 }
@@ -184,17 +211,64 @@ function animateTarget(
 	return animate(node, values, reducedTransition(values, transition, shouldReduceMotion));
 }
 
-export type MotionComponent = (props: any, scope: any) => void;
+// Retain target values from the first render. Later target changes animate from
+// the committed host, while ordinary style props continue to update independently.
+function firstFrame(tag: string, svg: boolean, props: any, target: any, atEnd: boolean) {
+	const raw = props.style;
+	if (!svg && !raw && !target && !props.transformTemplate) return;
+	const scraped = svg
+		? scrapeSVGMotionValuesFromProps(props, {})
+		: scrapeHTMLMotionValuesFromProps(props, {});
+	let values: Record<string, any> | undefined;
+	for (const key in scraped) {
+		const value = resolveMotionValue(scraped[key]);
+		if (value != null) (values ??= {})[key] = value;
+	}
+	if (target && typeof target === 'object') {
+		values ??= {};
+		for (const variant of Array.isArray(target) ? target : [target]) {
+			if (!variant) continue;
+			for (const key in variant) {
+				if (key === 'transition' || key === 'transitionEnd') continue;
+				const keyframes = variant[key];
+				const value = Array.isArray(keyframes)
+					? keyframes[atEnd ? keyframes.length - 1 : 0]
+					: keyframes;
+				if (value != null) values[key] = value;
+			}
+			Object.assign(values, variant.transitionEnd);
+		}
+	}
+	if (!values && !props.transformTemplate) return;
+	values ??= {};
+	const state = {
+		style: {} as Record<string, any>,
+		vars: {},
+		transform: {},
+		transformOrigin: {},
+		attrs: {} as Record<string, any>,
+	};
+	if (svg) buildSVGAttrs(state, values, tag === 'svg', props.transformTemplate, raw);
+	else buildHTMLStyles(state, values, props.transformTemplate);
+	const style = Object.assign(state.style, state.vars);
+	const originalStyle: Record<string, any> = {};
+	for (const key in style) originalStyle[key] = raw?.[key];
+	const originalAttrs: Record<string, any> = {};
+	for (const key in state.attrs) originalAttrs[key] = resolveMotionValue(props[key]);
+	return { style, attrs: state.attrs, originalAttrs, originalStyle };
+}
+
+export type MotionComponent = (props: any, scope: any) => OctaneElement;
 
 function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionComponent {
-	return function MotionComponent(props: any, scope: any): void {
+	const svg = !tag.includes('-') && (svgHost.test(tag) || /[A-Z]/.test(tag));
+	return function MotionComponent(props: any) {
 		const config = useContext(MotionConfigContext);
 		const layoutGroup = useContext(LayoutGroupContext);
 		const lazy = useContext(LazyMotionContext);
 		const inherited = useContext(VariantContext);
 		// Read the PARENT's stagger orchestration before providing our own below.
 		const parentStagger = useContext(StaggerContext);
-		const variants = props.variants;
 		const features = preloadedFeatures ? domMax : lazy.features;
 		const animationEnabled = preloadedFeatures || features?.animation === true;
 		const gesturesEnabled = preloadedFeatures || features?.gestures === true;
@@ -227,15 +301,36 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		const animateLabel = props.animate !== undefined ? props.animate : inherited.animate;
 		// A child PARTICIPATES in its parent's stagger when it animates via an inherited
 		// label rather than its own `animate`.
-		const inheritsAnimate = props.animate === undefined && typeof inherited.animate === 'string';
-		const { values: resolvedInitial } = splitVariant(resolveVariant(initialLabel, variants));
-		const { values: resolvedAnimate, transition: animateVariantTransition } = splitVariant(
-			resolveVariant(animateLabel, variants),
-		);
+		const inheritsAnimate = props.animate === undefined && isVariantLabel(inherited.animate);
+		const initial = resolveVariant(initialLabel, props);
+		const animateTargets = resolveVariant(animateLabel, props);
+		const { values: resolvedInitial } = splitVariant(initial);
+		const { values: resolvedAnimate, transition: animateVariantTransition } =
+			splitVariant(animateTargets);
 		const transition = animateVariantTransition ?? props.transition ?? config.transition;
 
 		// Stable holder (also our stagger token) — created before we register/provide.
-		const [latest] = useState(() => ({ layout: null, layoutActive: false }) as any, REFS);
+		const [latest] = useState(
+			() =>
+				({
+					host: { current: null as HTMLElement | null },
+					skipInitialAnimation: initialLabel === false,
+					frame: firstFrame(
+						tag,
+						svg,
+						props,
+						resolvedAnimate && (initialLabel === false ? animateTargets : initial),
+						initialLabel === false,
+					),
+					layout: null,
+					layoutActive: false,
+				}) as any,
+			REFS,
+		);
+		const ref =
+			props.ref == null
+				? latest.host
+				: useMemo(() => [latest.host, props.ref], [props.ref], HOST_REF);
 
 		// As a child: register with the parent's orchestration to get a stable index.
 		if (parentStagger && parentStagger.active && inheritsAnimate) {
@@ -267,27 +362,15 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 			orch.delayChildren > 0 ||
 			typeof orch.delayChildren === 'function';
 
-		// Propagate the active labels + stagger orchestration to descendants (passing
-		// through inherited labels), before rendering children.
-		provideContext(scope, VariantContext, {
-			initial: typeof initialLabel === 'string' ? initialLabel : inherited.initial,
-			animate: typeof animateLabel === 'string' ? animateLabel : inherited.animate,
-		});
-		provideContext(scope, StaggerContext, orch);
-
-		// Slot 0 of this component's own block (one hostComponent per motion instance).
-		const node = hostComponent(scope, 0, tag, domProps(props), props.children) as HTMLElement;
-
 		// Resolve a gesture/exit target to its values + its own (per-variant) transition,
 		// so a variant target carrying a `transition` key honors it (like `animate` does).
-		const rsv = (v: any) => splitVariant(resolveVariant(v, variants));
+		const rsv = (v: any) => splitVariant(resolveVariant(v, props));
 		const exitS = rsv(props.exit);
 		const hoverS = rsv(props.whileHover);
 		const tapS = rsv(props.whileTap);
 		const focusS = rsv(props.whileFocus);
 		const inViewS = rsv(props.whileInView);
 
-		latest.node = node;
 		latest.transition = transition;
 		latest.exit = exitS.values;
 		latest.exitTransition = exitS.transition;
@@ -315,6 +398,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// OCTANE DIVERGENCE[motion-initial-only-no-style-materialization][conformance:initial-only-no-style-materialization]
 		useLayoutEffect(
 			() => {
+				const node: HTMLElement = latest.host.current;
 				if (animationEnabled && resolvedInitial) {
 					animate(node, resolvedInitial, { duration: 0 });
 				}
@@ -328,6 +412,11 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// count are both known by now — all children registered during the parent render).
 		useLayoutEffect(
 			() => {
+				const node: HTMLElement = latest.host.current;
+				if (latest.skipInitialAnimation) {
+					latest.skipInitialAnimation = false;
+					return;
+				}
 				if (animationEnabled && resolvedAnimate) {
 					let t = transition;
 					const o = latest.staggerParent;
@@ -393,6 +482,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		if (!sameMotionStyles) latest.styleMvDeps = styleMvDeps;
 		useLayoutEffect(
 			() => {
+				const node: HTMLElement = latest.host.current;
 				// Clear only keys this effect previously managed that are absent from the
 				// new style bag. Patch transform functions in place so animate/layout/drag
 				// values on `style.transform` survive a MotionValue rebind.
@@ -452,6 +542,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// read from `latest`, so prop changes take effect without re-binding.
 		useLayoutEffect(
 			() => {
+				const node: HTMLElement = latest.host.current;
 				if (!gesturesEnabled) return;
 				const cleanups: Array<() => void> = [];
 				const gesture = (
@@ -500,6 +591,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// when it leaves (unless `viewport.once`). Reuses motion's `inView`.
 		useLayoutEffect(
 			() => {
+				const node: HTMLElement = latest.host.current;
 				if (!gesturesEnabled || !props.whileInView) return;
 				const stop = inView(
 					node,
@@ -528,6 +620,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// (`drag="x"`/`"y"`) and `dragConstraints` (a box of left/right/top/bottom px).
 		useLayoutEffect(
 			() => {
+				const node: HTMLElement = latest.host.current;
 				if (!dragEnabled || !props.drag) return;
 				let active = false;
 				let startX = 0;
@@ -583,6 +676,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// OCTANE DIVERGENCE[motion-bounded-layout-flip][conformance:bounded-layout-flip]
 		useLayoutEffect(
 			() => {
+				const node: HTMLElement = latest.host.current;
 				if (latest.shouldReduceMotion) latest.layout?.stop();
 				if (!layoutEnabled || !props.layout) {
 					if (!layoutEnabled || latest.layoutActive || !layoutIdKey) latest.layout?.reset();
@@ -609,6 +703,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// OCTANE DIVERGENCE[motion-bounded-layoutId][conformance:bounded-layoutId]
 		useLayoutEffect(
 			() => {
+				const node: HTMLElement = latest.host.current;
 				if (!layoutEnabled) return;
 				const id = layoutIdKey;
 				if (!id) return;
@@ -631,7 +726,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		// OCTANE DIVERGENCE[motion-exit-cleanup-before-detach][conformance:exit-cleanup-before-detach]
 		useLayoutEffect(
 			() => () => {
-				const n: HTMLElement | null = latest.node;
+				const n: HTMLElement | null = latest.host.current;
 				const layoutId = latest.layoutIdKey;
 				if (latest.layoutEnabled && layoutId && n?.isConnected) {
 					recordLayoutCell(layoutId, boxOf(n));
@@ -660,6 +755,45 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 			EXIT,
 		);
 		useLayoutEffect(() => () => latest.layout?.stop(), [], LAYOUT_CLEANUP);
+
+		const host = domProps(props, svg);
+		const frame = latest.frame;
+		if (frame) {
+			const attrs = retained(frame.attrs, frame.originalAttrs, host);
+			const style = retained(frame.style, frame.originalStyle, props.style);
+			Object.assign(host, attrs);
+			host.style = Object.assign(host.style ?? {}, style);
+			if (attrs !== frame.attrs || style !== frame.style) {
+				useLayoutEffect(
+					() => {
+						latest.frame = { ...frame, attrs, style };
+					},
+					[attrs, style],
+					FRAME,
+				);
+			}
+		}
+		host.ref = ref;
+		const children = props.children;
+		return createElement(
+			tag,
+			host,
+			children == null
+				? children
+				: createElement(
+						VariantContext,
+						{
+							value: {
+								initial:
+									initialLabel === false || isVariantLabel(initialLabel)
+										? initialLabel
+										: inherited.initial,
+								animate: isVariantLabel(animateLabel) ? animateLabel : inherited.animate,
+							},
+						},
+						createElement(StaggerContext, { value: orch }, children),
+					),
+		);
 	};
 }
 
@@ -702,8 +836,8 @@ export const m = motionProxy(false);
 // AnimatePresence — renders its children; each `motion.*` with an `exit` prop
 // self-animates its own removal (see the exit cleanup above), so this is a thin
 // passthrough that exists for drop-in compatibility with Framer Motion's API.
-export function AnimatePresence(props: any, scope: any): void {
-	renderTransparentChildren(props.children, scope);
+export function AnimatePresence(props: any, _scope?: unknown) {
+	return props.children;
 }
 
 export interface LayoutGroupProps {
@@ -712,7 +846,7 @@ export interface LayoutGroupProps {
 	inherit?: boolean | 'id';
 }
 
-export function LayoutGroup(props: LayoutGroupProps, scope: any): void {
+export function LayoutGroup(props: LayoutGroupProps, _scope?: unknown) {
 	const parent = useContext(LayoutGroupContext);
 	const value = useMemo(
 		() => {
@@ -734,25 +868,30 @@ export function LayoutGroup(props: LayoutGroupProps, scope: any): void {
 		[parent.id, parent.layoutIdNamespace, props.id, props.inherit],
 		LAYOUT_GROUP_STATE,
 	);
-	provideContext(scope, LayoutGroupContext, value);
-	renderTransparentChildren(props.children, scope);
+	return createElement(LayoutGroupContext, { value }, props.children);
 }
 
 // MotionConfig — provides global defaults (transition, reduced motion) to every
 // motion element below it. A plain-TS component: stamps the config context, then
 // renders children.
-export function MotionConfig(props: any, scope: any): void {
+export function MotionConfig(props: any, _scope?: unknown) {
 	const parent = useContext(MotionConfigContext);
 	const reducedMotion = props.reducedMotion ?? parent.reducedMotion ?? 'never';
 	// Octane slots hooks by call site, so this subscription can stay conditional.
 	// Avoid paying for matchMedia listeners when the policy never consults it.
 	const userPreference = reducedMotion === 'user' ? useReducedMotionAtSlot(CONFIG_REDUCED) : false;
-	provideContext(scope, MotionConfigContext, {
-		transition: props.transition ?? parent.transition,
-		reducedMotion,
-		shouldReduceMotion: reducedMotion === 'always' || (reducedMotion === 'user' && userPreference),
-	});
-	renderTransparentChildren(props.children, scope);
+	return createElement(
+		MotionConfigContext,
+		{
+			value: {
+				transition: props.transition ?? parent.transition,
+				reducedMotion,
+				shouldReduceMotion:
+					reducedMotion === 'always' || (reducedMotion === 'user' && userPreference),
+			},
+		},
+		props.children,
+	);
 }
 
 export type LazyMotionFeatures =
@@ -779,7 +918,7 @@ function normalizeFeatures(
 	return 'default' in value ? value.default : value;
 }
 
-export function LazyMotion(props: LazyMotionProps, scope: any): void {
+export function LazyMotion(props: LazyMotionProps, _scope?: unknown) {
 	const [loaded, setLoaded] = useState<LoadedLazyFeatures>(() => ({ features: null }), LAZY_STATE);
 	const source = props.features;
 	const isLoader = typeof source === 'function';
@@ -818,16 +957,17 @@ export function LazyMotion(props: LazyMotionProps, scope: any): void {
 		LAZY_EFFECT,
 	);
 
-	provideContext(scope, LazyMotionContext, {
-		features,
-		strict: props.strict === true,
-		provided: true,
-	});
-	renderTransparentChildren(props.children, scope);
-}
-
-function renderTransparentChildren(children: unknown, scope: any): void {
-	childSlot(scope, 0, scope.block.parentNode, children, scope.block.endMarker);
+	return createElement(
+		LazyMotionContext,
+		{
+			value: {
+				features,
+				strict: props.strict === true,
+				provided: true,
+			},
+		},
+		props.children,
+	);
 }
 
 export { useAnimate } from './useAnimate';

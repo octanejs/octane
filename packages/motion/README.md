@@ -2,6 +2,8 @@
 
 [Framer Motion](https://motion.dev) for the [octane](https://github.com/octanejs/octane) UI framework.
 
+Motion hosts support server rendering and hydration. When an animation target is present, `initial` determines the first frame. With `initial={false}`, the host starts at the final keyframe of its animation target.
+
 ## Installation
 
 ```sh
