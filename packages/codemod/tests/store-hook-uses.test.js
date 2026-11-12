@@ -33,6 +33,10 @@ it.each([
 		'const value = <b/> as unknown as string; useStore().write(0, value);',
 	],
 	['a dynamically accessed binding', "const owner = useStore(); (eval)('owner.mutate()');"],
+	[
+		'a dynamically accessed binding using an escaped eval identifier',
+		String.raw`const owner = useStore(); (ev\u0061l)('owner.mutate()');`,
+	],
 	['a method writing an element', 'const scope = useStore(); scope.write(0, {icon: <b/>});'],
 	['an escaped callback', 'const { write } = useStore(); write(0, () => ({icon: <b/>}));'],
 	['a renderer-owned hook input', 'const value = useStore(<b/>); void value;'],
@@ -103,12 +107,17 @@ it('keeps mixed receivers separate from a verified store of known origin', () =>
 	expect(result.unported.map((entry) => entry.name)).toEqual(['first', 'second']);
 });
 
-it('defers a component passed to an unknown renderer', () => {
-	const result = migrate(`import {useStore} from 'observer';
-		function Panel() { return <p>{Boolean(useStore())}</p>; } register(Panel);`);
-	expect(result.rules['store-hook']).toBeUndefined();
-	expect(result.unported).toHaveLength(1);
-});
+it.each(['register(Panel)', 'register(typeof Panel)'])(
+	'defers a runtime component reference in %s',
+	(reference) => {
+		const result = migrate(`import {useStore} from 'observer';
+			function Panel() { return <p>{Boolean(useStore())}</p>; }
+			export type PanelParameters = Parameters<typeof Panel>;
+			${reference};`);
+		expect(result.rules['store-hook']).toBeUndefined();
+		expect(result.unported).toHaveLength(1);
+	},
+);
 
 it('rejects a renderer-specific imported input even when the hook returns a condition', () => {
 	const result = migrate(`import {useStore} from 'observer'; import {createElement} from 'react';
