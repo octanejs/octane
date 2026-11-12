@@ -33,6 +33,7 @@ export function intlImports(
 	canPassToReact: (element: ts.JsxElement | ts.JsxSelfClosingElement) => boolean,
 	returnedReceiver: (tag: ts.JsxOpeningLikeElement) => boolean,
 	originalReact: () => boolean,
+	unknownFormatter: (call: ts.CallExpression) => void,
 ): Set<ts.ImportSpecifier> {
 	const candidates = file.statements.filter(ts.isImportDeclaration).flatMap((decl) => {
 		const named = decl.importClause?.namedBindings;
@@ -212,6 +213,7 @@ export function intlImports(
 			})
 		);
 	}
+	const nativeMessages = new Set<ts.CallExpression>();
 	function callsScalarMethod(receiver: ts.Expression): boolean {
 		const access = receiver.parent;
 		if (
@@ -243,7 +245,9 @@ export function intlImports(
 		)
 			return false;
 		const values = call.arguments[1];
-		return !values || scalarValues(values);
+		if (values && !scalarValues(values)) return false;
+		nativeMessages.add(call);
+		return true;
 	}
 	function localeView(
 		owner: ts.FunctionDeclaration,
@@ -422,6 +426,7 @@ export function intlImports(
 		if (name === 'useIntl') {
 			// Direct eval can read the imported hook or its formatter through an untracked name.
 			if (hasEval(file)) continue;
+			nativeMessages.clear();
 			const proof =
 				locations.length === 1
 					? readsIntl(locations[0], true)
@@ -429,6 +434,7 @@ export function intlImports(
 			if (proof) {
 				selected.add(item);
 				if (proof !== true) selected.add(proof);
+				for (const call of nativeMessages) unknownFormatter(call);
 			}
 			continue;
 		}
