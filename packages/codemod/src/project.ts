@@ -555,10 +555,15 @@ export async function runCodemod(
 							.replace(/\.ts$/, '');
 						return { from: relative.startsWith('.') ? relative : './' + relative, name: plan.name };
 					};
-		const transform = (captureEffectReceivers: boolean | 'properties' = false, notes = extra) =>
+		const transform = (
+			captureEffectReceivers: boolean | 'properties' = false,
+			notes = extra,
+			captureEffectSnapshots = false,
+		) =>
 			transformModule(source, file, {
 				captureEffectReceivers: !!captureEffectReceivers,
 				snapshotEffectProperties: captureEffectReceivers === 'properties',
+				captureEffectSnapshots,
 				target,
 				reactIntlAdapter: intl,
 				forwardedText: (module, name, prop, ordinaryCaller, through) =>
@@ -690,6 +695,7 @@ export async function runCodemod(
 					force: options.forceStrong,
 					withEffectReceivers: () => transform(true, []).code,
 					withEffectProperties: () => transform('properties', []).code,
+					withEffectSnapshots: () => transform(true, [], true).code,
 				});
 				code = strengthened.code;
 				isStrong = strengthened.strong;
