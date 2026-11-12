@@ -191,14 +191,56 @@ export function storeHookUses(
 			}) === ts.findAncestor(hook, ts.isFunctionLike)
 		);
 	}
+	function effectSetup(fn: ts.Node) {
+		if (effectCallback(fn)) return fn;
+		const parent = fn.parent;
+		if (!ts.isReturnStatement(parent) || parent.expression !== fn) return;
+		const setup = ts.findAncestor(parent, ts.isFunctionLike);
+		if (setup && effectCallback(setup)) return setup;
+	}
+	function effectBoundary(node: ts.Node) {
+		return ts.isFunctionLike(node) || ts.isClassLike(node);
+	}
+	function effectEventCallback(fn: ts.Node, hook: ts.CallExpression, use: ts.Node) {
+		const event = fn.parent;
+		if (
+			!ts.isCallExpression(event) ||
+			event.questionDotToken ||
+			event.arguments[0] !== fn ||
+			!reactHook(event.expression, ['useEffectEvent'])
+		)
+			return false;
+		const declaration = event.parent;
+		const owner = ts.findAncestor(hook, ts.isFunctionLike);
+		if (
+			!owner ||
+			ts.findAncestor(event, effectBoundary) !== owner ||
+			ts.findAncestor(use, effectBoundary) !== fn ||
+			!ts.isVariableDeclaration(declaration) ||
+			declaration.initializer !== event ||
+			!ts.isIdentifier(declaration.name) ||
+			!(ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const)
+		)
+			return false;
+		// Every reference must be a direct call in this component's effects.
+		const refs = uses(declaration.name);
+		return (
+			refs.length > 0 &&
+			refs.every((ref) => {
+				const call = ref.parent;
+				if (!ts.isCallExpression(call) || call.expression !== ref || call.questionDotToken)
+					return false;
+				const caller = ts.findAncestor(call, effectBoundary);
+				const setup = caller && ts.isFunctionLike(caller) && effectSetup(caller);
+				return !!setup && ts.findAncestor(setup.parent, effectBoundary) === owner;
+			})
+		);
+	}
 	function runsAfterRender(use: ts.Node, hook: ts.CallExpression) {
 		const fn = ts.findAncestor(use, ts.isFunctionLike);
-		if (!fn) return false;
-		if (effectCallback(fn) || clickHandler(fn, hook)) return true;
-		const parent = fn.parent;
-		if (!ts.isReturnStatement(parent) || parent.expression !== fn) return false;
-		const setup = ts.findAncestor(parent, ts.isFunctionLike);
-		return !!setup && effectCallback(setup);
+		return (
+			!!fn && (!!effectSetup(fn) || clickHandler(fn, hook) || effectEventCallback(fn, hook, use))
+		);
 	}
 
 	function componentUses(fn: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction) {
