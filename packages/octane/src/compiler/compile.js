@@ -9240,6 +9240,9 @@ function mapCallToForOf(expr, ctx) {
 	// component). Block bodies and fragment roots keep the childSlot path.
 	const body = arrow.body;
 	if (!body || (body.type !== 'JSXElement' && body.type !== 'Element')) return null;
+	// A fused loop renders each row before invoking the next callback. Keep
+	// potentially observable calls in the authored map so they run in array order.
+	if (containsRenderCall([body])) return null;
 	// Pull a `key={…}` attribute off the returned element → the for-of header key,
 	// and drop it from the element (it's not a DOM attribute). makeForCall then
 	// keys via the header, falling back to `item.id ?? item` when there's no key.
