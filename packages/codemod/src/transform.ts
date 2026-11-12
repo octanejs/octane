@@ -1557,6 +1557,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				const hook = this.callee(expr);
 				return hook?.module === 'react' && hook.name === 'useState';
 			},
+			(expr) => this.strictTypes && isBooleanGuardType(this.typeOf(expr)),
 		);
 		if (!plan) return;
 		const fresh = (base: string) => {
