@@ -65,6 +65,19 @@ describe('runCodemod', () => {
 			['Owner.tsx', 'Native.tsx', 'Leaf.tsx'],
 		],
 		['unselected issuer', 'Owner.tsx', islandOwner, ['Leaf.tsx']],
+		...[
+			['short-circuit child', '<Island>{shown && <Leaf/>}</Island>'],
+			['short-circuit component', '<Island component={shown && Leaf}/>'],
+			['first OR component', '<Island component={Leaf || other}/>'],
+			['fallback OR component', '<Island component={other || Leaf}/>'],
+			['first nullish component', '<Island component={Leaf ?? other}/>'],
+			['fallback nullish component', '<Island component={other ?? Leaf}/>'],
+		].map(([name, jsx]) => [
+			name,
+			'Owner.tsx',
+			boundaryImports + `export function Owner({shown,other}){return ${jsx}}`,
+			['Leaf.tsx'],
+		]),
 		[
 			'explicit undefined component',
 			'Owner.tsx',
@@ -224,6 +237,13 @@ describe('runCodemod', () => {
 
 	it.each([
 		['unchanged React leaf', islandOwner, 'Owner.tsx', {}],
+		[
+			'truthiness-only import',
+			boundaryImports +
+				'export function Owner({other}){return <Island component={Leaf && other}/>}',
+			'Leaf.tsx',
+			{},
+		],
 		[
 			'separate unfinished native module',
 			'export const untouched=true;',

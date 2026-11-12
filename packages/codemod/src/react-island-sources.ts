@@ -60,6 +60,15 @@ export async function islandComponents(
 			component(node.whenFalse);
 			return;
 		}
+		if (ts.isBinaryExpression(node)) {
+			const op = node.operatorToken.kind;
+			if (op === ts.SyntaxKind.AmpersandAmpersandToken) component(node.right);
+			else if (op === ts.SyntaxKind.BarBarToken || op === ts.SyntaxKind.QuestionQuestionToken) {
+				component(node.left);
+				component(node.right);
+			}
+			return;
+		}
 		const ref = ts.isJsxElement(node)
 			? node.openingElement.tagName
 			: ts.isJsxSelfClosingElement(node)
