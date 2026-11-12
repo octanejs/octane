@@ -1529,6 +1529,12 @@ const invalid: Panel = { style: 'color:red' };`,
 			'package.json': '{"type":"module"}',
 			'src/App.tsx': `import { Badge } from 'react-badge-kit';
 				export function App() { return <p>Before <Badge /> after.</p>; }
+				export function Conditional({ enabled }: { enabled: boolean }) {
+					return <>
+						<p id="conditional">Before {enabled ? (<><Badge /></>) : null} after.</p>
+						<p id="logical">Before {enabled && <Badge />} after.</p>
+					</>;
+				}
 				export function Panel() { return <section><Badge /></section>; }`,
 		});
 		const modules = path.join(root, 'node_modules');
@@ -1544,7 +1550,7 @@ const invalid: Panel = { style: 'color:red' };`,
 		expect(
 			[...migrated.notes, ...migrated.diagnostics].filter((n) => n.severity === 'error'),
 		).toEqual([]);
-		const { App, Panel } = loadCompiledFixtureSource(migrated.code, {
+		const { App, Conditional, Panel } = loadCompiledFixtureSource(migrated.code, {
 			id: 'App.tsrx',
 			mode: 'server',
 			runtimeModules: {
@@ -1553,12 +1559,18 @@ const invalid: Panel = { style: 'color:red' };`,
 			},
 		});
 		const { html } = await prerender(App, {});
+		const conditional = await prerender(Conditional, { enabled: true });
 		const panel = await prerender(Panel, {});
-		const dom = new JSDOM(html + panel.html);
+		const dom = new JSDOM(html + conditional.html + panel.html);
 		try {
 			const { document } = dom.window;
 			expect(document.querySelector('p')?.textContent).toBe('Before badge after.');
 			expect(document.querySelector('p > span[data-react-compat] > b')?.textContent).toBe('badge');
+			expect(document.querySelector('#conditional')?.textContent).toBe('Before badge after.');
+			expect(
+				document.querySelector('#conditional > span[data-react-compat] > b')?.textContent,
+			).toBe('badge');
+			expect(document.querySelector('#logical')?.textContent).toBe('Before badge after.');
 			expect(document.querySelector('section > div[data-react-compat] > b')?.textContent).toBe(
 				'badge',
 			);
