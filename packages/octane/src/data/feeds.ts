@@ -122,7 +122,10 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 			if (signal.aborted) return;
 			restored = true;
 			// Positions are opaque. Refresh covered values when cache and page disagree.
-			if (saved !== null && cursor !== null && saved !== cursor) missed();
+			if (saved !== null && cursor !== null && saved !== cursor) {
+				missed();
+				source.persisted.keepCursor(key, cursor);
+			}
 			cursor ??= saved;
 		}
 		let failures = 0;

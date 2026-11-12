@@ -1172,10 +1172,10 @@ describe('octane/data feeds across restarts', () => {
 				rendering.prefetch(count, undefined),
 			]);
 			const positions: Array<string | null> = [];
-			const source = (position: string): Listener =>
+			const source = (position: string | null): Listener =>
 				async function* (request, signal) {
 					positions.push(request.cursor);
-					yield { cursor: position };
+					if (position !== null) yield { cursor: position };
 					if (!signal.aborted)
 						await new Promise<void>((resolve) =>
 							signal.addEventListener('abort', () => resolve(), { once: true }),
@@ -1206,7 +1206,7 @@ describe('octane/data feeds across restarts', () => {
 				transport: remote.transport,
 				persist: { ...persist, storage },
 				seed: rendering.dehydrate(),
-				listen: source(page),
+				listen: source(observedEarly ? null : page),
 			});
 			if (observedEarly) stops.push(client.read(shelf, undefined).subscribe(() => {}));
 			const connected = listen(client, bookChanges);
@@ -1222,8 +1222,7 @@ describe('octane/data feeds across restarts', () => {
 			}
 			stops.push(connected.subscribe(() => {}));
 			release();
-			await vi.waitFor(() => expect(connected.getSnapshot().status).toBe('live'));
-			expect(positions).toEqual([null, page]);
+			await vi.waitFor(() => expect(positions).toEqual([null, page]));
 
 			const list = client.read(shelf, undefined);
 			if (!observedEarly) stops.push(list.subscribe(() => {}));
@@ -1235,6 +1234,15 @@ describe('octane/data feeds across restarts', () => {
 			expect(other.getSnapshot().value).toBe(42);
 			await saved();
 			expect(remote.log).toEqual(mismatch ? ['read shelf'] : []);
+
+			// A session without another server seed resumes even if the source was idle or only echoed.
+			const restarted = createDataStore({
+				transport: remote.transport,
+				persist,
+				listen: source(null),
+			});
+			stops.push(listen(restarted, bookChanges).subscribe(() => {}));
+			await vi.waitFor(() => expect(positions).toEqual([null, page, page]));
 		},
 	);
 
