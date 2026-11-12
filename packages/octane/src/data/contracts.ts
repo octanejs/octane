@@ -401,9 +401,12 @@ export function feed<Event, Params = void>(options: {
 	};
 }
 
-/** One request on the wire. A write carries the reads on screen it should refresh. */
+/**
+ * One request on the wire. A write carries the reads on screen it should
+ * refresh. A `position` asks a feed for its cursor now, which its value is.
+ */
 export interface DataRequest {
-	readonly kind: 'read' | 'write';
+	readonly kind: 'read' | 'write' | 'position';
 	readonly name: string;
 	readonly input: unknown;
 	readonly operationId?: string;

@@ -145,7 +145,9 @@ export interface Handle<C> {
 	/**
 	 * A feed's handler yields its frames for one connection, from just after
 	 * `call.cursor` when the client has one, until `call.signal` aborts. When it
-	 * cannot resume from that cursor it yields `{ gap: true }` first.
+	 * cannot resume from that cursor it yields `{ gap: true }` first. A handler
+	 * that resumes yields its position first when `call.cursor` is null: a
+	 * server render reads it to start the page's feed from it.
 	 */
 	<P, E>(
 		contract: Feed<P, E>,
@@ -256,6 +258,32 @@ export function createDataHandler<C extends object = {}>(
 		);
 	};
 
+	/**
+	 * A feed's cursor now: the first frame its handler yields when it starts with
+	 * no cursor, or null when that frame carries none.
+	 */
+	async function position(name: unknown, input: unknown, call: C & DataCall) {
+		const handler = typeof name === 'string' ? byName.get(name) : undefined;
+		if (!handler || handler.contract.kind !== 'feed') throw new DataError('not_found');
+		const { contract } = handler;
+		const params = contract.params ? await parse(contract.params, input) : undefined;
+		const ended = new AbortController();
+		const signal = AbortSignal.any([call.signal, ended.signal]);
+		const frames = handler.run(params, {
+			...call,
+			signal,
+			cursor: null,
+		}) as AsyncIterable<FeedFrame>;
+		const iterator = frames[Symbol.asyncIterator]();
+		try {
+			const first = await iterator.next();
+			return !first.done && typeof first.value.cursor === 'string' ? first.value.cursor : null;
+		} finally {
+			ended.abort();
+			void Promise.resolve(iterator.return?.()).catch(() => {});
+		}
+	}
+
 	/** Answer one request. Anything but a reply means the outcome is unknown. */
 	async function answer(
 		payload: DataRequest,
@@ -266,6 +294,9 @@ export function createDataHandler<C extends object = {}>(
 			const operationId = payload.kind === 'write' ? String(payload.operationId ?? '') : '';
 			const context = await contextFor(request, server);
 			const call = callFor(context, request, operationId, server?.signal);
+			if (payload.kind === 'position') {
+				return { ok: true, value: await position(payload.name, payload.input, call) };
+			}
 			const value = await run(payload.kind, payload.name, payload.input, call);
 			if (payload.kind !== 'write' || !Array.isArray(payload.refresh)) return { ok: true, value };
 			// The write has committed. A read that fails here is left for the client to reload.
