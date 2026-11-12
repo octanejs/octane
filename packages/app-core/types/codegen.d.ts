@@ -45,6 +45,15 @@ export interface ClientEntryOptions {
 	resolveImport?: (id: string) => string;
 	runtimeModuleId?: string;
 	generatedBy?: string;
+	/**
+	 * The config names a `data` module: open the page's store from the server's
+	 * seed and render the route inside `DataRoot`. Off by default.
+	 */
+	data?: boolean;
+	/** App-core's `DataRoot` module, compiled for the client. */
+	dataRootModuleId?: string;
+	/** App-core's browser-safe seeds module. */
+	seedsModuleId?: string;
 }
 
 export function create_client_entry_source(options?: ClientEntryOptions): string;
@@ -55,6 +64,10 @@ export interface ServerEntryOptions {
 	routes: Route[];
 	octaneConfigPath: string;
 	rootBoundary?: RootBoundaryOptions;
+	/** The config's `data` module: project-root ID of its store opener. */
+	data?: string;
+	/** App-core's `DataRoot` module, compiled for the server. */
+	dataRootModuleId?: string;
 	rpcModulePaths?: string[];
 	clientAssetMap?: Record<string, ClientAssetEntry>;
 	/** JSON file resolved beside the built server entry at module evaluation. */

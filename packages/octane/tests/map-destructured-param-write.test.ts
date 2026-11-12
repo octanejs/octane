@@ -44,6 +44,18 @@ function clickRow(container: Element, id: string): void {
 }
 
 describe('native .map() callback parameters stay writable', () => {
+	it('uses one iterator snapshot for the mapped row key and output', () => {
+		let reads = 0;
+		const pair: [string, string] = ['a', 'label'];
+		pair[Symbol.iterator] = () => ['a', `label-${++reads}`].values();
+		const view = mount(ArrayRows, { xs: [pair], on: () => {} });
+		try {
+			expect(labels(view.container)).toEqual(['label-1']);
+		} finally {
+			view.unmount();
+		}
+	});
+
 	it.each(cases)('%s: a row handler reassigns its own binding', (_, Component, __, xs) => {
 		const log: string[] = [];
 		const view = mount(Component as any, { xs, on: (value: string) => log.push(value) });

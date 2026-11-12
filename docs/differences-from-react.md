@@ -1952,6 +1952,10 @@ createPortal(<Menu />, overlay, 'menu');
 createPortal(Menu, overlay, { open: true });
 ```
 
+DOM portals also accept `createPortal(<Menu />, 'body')`. The client resolves
+the current browser document's body. Server rendering emits the usual empty
+portal placeholder without looking up a document.
+
 The object overload does not supply a reconciliation key. Use a keyed element
 inside the portal or the keyed renderable overload when identity must change.
 

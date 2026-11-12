@@ -11,6 +11,7 @@ export interface TransformOptions {
 	captureEffectReceivers?: boolean;
 	/** Also preserve eligible property triggers at the original effect statement. */
 	snapshotEffectProperties?: boolean;
+	captureEffectSnapshots?: boolean;
 	/** `tsrx` (default) rewrites component bodies as templates; `tsx` keeps JSX and only ports the React APIs. */
 	target?: 'tsx' | 'tsrx';
 	/** Emit Strong-mode source: add `"use strong"` and leave omitted dependency lists to the compiler. */
