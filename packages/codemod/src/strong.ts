@@ -44,10 +44,12 @@ export function strengthen(
 	{
 		force = false,
 		withEffectReceivers,
+		withEffectProperties,
 		withEffectSnapshots,
 	}: {
 		force?: boolean;
 		withEffectReceivers?: () => string;
+		withEffectProperties?: () => string;
 		withEffectSnapshots?: () => string;
 	} = {},
 ): StrongResult {
@@ -72,20 +74,24 @@ export function strengthen(
 	}
 	const blockers = diagnostics.filter((diagnostic) => diagnostic.severity === 'error').map(finding);
 	if (blockers.length === 0) return { code, strong: true, fixed, blockers };
-	const retry = blockers.every((b) => b.code === 'OCTANE_STRONG_EXPLICIT_DEPENDENCIES')
-		? withEffectReceivers
-		: blockers.every(
+	const retries = blockers.every((b) => b.code === 'OCTANE_STRONG_EXPLICIT_DEPENDENCIES')
+		? [withEffectReceivers, withEffectProperties]
+		: withEffectSnapshots &&
+			  blockers.every(
 					(b) =>
 						b.code === 'OCTANE_STRONG_EXPLICIT_DEPENDENCIES' ||
 						b.code === 'OCTANE_STRONG_READ_ONLY_STATE',
 			  )
-			? withEffectSnapshots
-			: undefined;
-	if (retry) {
-		const candidate = retry();
-		if (candidate !== original) {
+			? [withEffectSnapshots]
+			: null;
+	if (retries) {
+		let previous = original;
+		for (const retry of retries) {
+			const candidate = retry?.();
+			if (!candidate || candidate === previous || candidate === original) continue;
 			const checked = strengthen(compiler, candidate, filename);
 			if (checked.strong) return checked;
+			previous = candidate;
 		}
 	}
 	return fallback(code, blockers, fixed, force);

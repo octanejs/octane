@@ -555,12 +555,13 @@ export async function runCodemod(
 						return { from: relative.startsWith('.') ? relative : './' + relative, name: plan.name };
 					};
 		const transform = (
-			captureEffectReceivers = false,
+			captureEffectReceivers: boolean | 'properties' = false,
 			notes = extra,
 			captureEffectSnapshots = false,
 		) =>
 			transformModule(source, file, {
-				captureEffectReceivers,
+				captureEffectReceivers: !!captureEffectReceivers,
+				snapshotEffectProperties: captureEffectReceivers === 'properties',
 				captureEffectSnapshots,
 				target,
 				reactIntlAdapter: intl,
@@ -692,6 +693,7 @@ export async function runCodemod(
 				const strengthened = strengthen(compiler, code, output, {
 					force: options.forceStrong,
 					withEffectReceivers: () => transform(true, []).code,
+					withEffectProperties: () => transform('properties', []).code,
 					withEffectSnapshots: () => transform(true, [], true).code,
 				});
 				code = strengthened.code;
