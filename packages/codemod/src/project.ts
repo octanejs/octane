@@ -243,6 +243,58 @@ export async function runCodemod(
 			fs.realpathSync(target.resolvedFileName).split(path.sep).includes('node_modules')
 		);
 	}
+	const inlineCompatDirs = new Map<string, boolean>();
+	function supportsInlineReactCompat(file: string) {
+		const issuer = path.dirname(file);
+		if (ts.findConfigFile(issuer, ts.sys.fileExists) !== rootProject) return false;
+		const installed = readInstalled(issuer, 'octane');
+		if (installed?.manifest.name !== 'octane') return false;
+		const dir = fs.realpathSync(installed.dir);
+		if (compiler) {
+			try {
+				if (createRequire(file).resolve('octane/compiler') !== compiler.from) return false;
+			} catch {
+				return false;
+			}
+		}
+		const exports = record(installed.manifest.exports);
+		return ['react', 'react/server'].every((name) => {
+			const entry = exports['./' + name];
+			const conditions = record(entry);
+			const types = typeof entry === 'string' ? entry : conditions.types;
+			const target = originalModule(file, 'octane/' + name)?.resolvedFileName;
+			if (
+				typeof types !== 'string' ||
+				!target ||
+				fs.realpathSync(target) !== path.resolve(dir, types)
+			)
+				return false;
+			if (typeof entry !== 'string' && typeof conditions.default !== 'string') return false;
+			// Published packages resolve types separately from the Node and bundler code.
+			const entries = typeof entry === 'string' ? [entry] : Object.values(conditions);
+			return entries.every((value) => {
+				if (typeof value !== 'string' || !value.startsWith('./')) return false;
+				const file = path.resolve(dir, value);
+				if (!ts.sys.fileExists(file) || !fs.realpathSync(file).startsWith(dir + path.sep))
+					return false;
+				const source = ts.createSourceFile(
+					file,
+					fs.readFileSync(file, 'utf8'),
+					ts.ScriptTarget.Latest,
+				);
+				return source.statements.some(
+					(statement) =>
+						ts.isExportDeclaration(statement) &&
+						!statement.isTypeOnly &&
+						statement.exportClause &&
+						ts.isNamedExports(statement.exportClause) &&
+						statement.exportClause.elements.some(
+							(item) => !item.isTypeOnly && item.name.text === 'ReactCompatInline',
+						),
+				);
+			});
+		});
+	}
 	const bindingProject = {
 		root,
 		original(file: string, module: string) {
@@ -626,6 +678,12 @@ export async function runCodemod(
 					: undefined,
 				unported: (specifier) => unportedName(specifier, file),
 				reactCompat,
+				get reactCompatInline() {
+					const dir = path.dirname(file);
+					if (!inlineCompatDirs.has(dir))
+						inlineCompatDirs.set(dir, supportsInlineReactCompat(file));
+					return inlineCompatDirs.get(dir);
+				},
 				forwardedRender:
 					options.svgPaths && renames.has(file)
 						? (module, name, prop, depth) =>
@@ -933,6 +991,7 @@ type AdapterState =
 const PREVIOUS_INTL_SHA256 = ['07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98'];
 
 const PREVIOUS_SVG_SHA256 = [
+	'62ef936e3ce64cfe809297e08e74538f0c409f0bde6a926ca7b88de93161a38d',
 	'a3d611226ba955f4f5601caa4c6987f0a5a943fab97362843d16f02c686c6944',
 	'3becf859871f17914f6f0631e8db8058aa4932fd4a9817718b98eb247a902b24',
 	'1dbf34eea75c07c21c8ab3814d54e58115e833aa140fc5f34b5f2cba91d018c3',
@@ -1280,6 +1339,16 @@ function resolveBinding(
 	packages: Map<string, string>,
 	notes: Note[],
 ) {
+	if (specifier === 'radix-ui' && !project.original(file, specifier)) {
+		notes.push({
+			rule: 'bindings',
+			severity: 'error',
+			line: 1,
+			message:
+				'`radix-ui` resolves to a different module through a TypeScript alias. Review the local component before migrating this import.',
+		});
+		return null;
+	}
 	const name = catalogName(specifier);
 	if (name === null) return null;
 	const target = CATALOG[name];
