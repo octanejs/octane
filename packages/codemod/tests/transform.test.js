@@ -1504,6 +1504,68 @@ describe('strengthen', () => {
 		expect(compileErrors(result.code, 'strong.strong.tsrx', true)).toEqual([]);
 	});
 
+	it.each([
+		{
+			name: 'a callable state initializer',
+			hook: 'useState',
+			type: 'number | (() => number)',
+			args: 'props.initial',
+			initial: () => 7,
+			strong: true,
+		},
+		{
+			name: 'a parenthesized reducer initial value',
+			hook: 'useReducer',
+			type: 'number',
+			args: '(value: number, next: number) => next, (props.initial),',
+			initial: 7,
+			strong: true,
+		},
+		{
+			name: 'a reducer initializer supplied by a spread',
+			hook: 'useReducer',
+			type: '[number, (value: number) => number]',
+			args: '(value: number, next: number) => next, ...props.initial',
+			initial: [3, (value) => value + 4],
+			strong: false,
+		},
+		{
+			name: 'the effect of an explicitly undefined reducer initializer',
+			hook: 'useReducer',
+			type: 'number; observe: () => void',
+			args: '(value: number, next: number) => next, props.initial, void props.observe()',
+			initial: 7,
+			strong: false,
+			observations: 1,
+		},
+	])(
+		'preserves $name during Strong conversion',
+		async ({ hook, type, args, initial, strong, observations = 0 }) => {
+			const source = `import { ${hook} } from 'react';
+export function Counter(props: {initial: ${type}}) {
+	const [value, update] = ${hook}(${args});
+	return <button onClick={() => update(9)}>{String(value)}</button>;
+}`;
+			const compiler = await loadCompiler(import.meta.dirname);
+			const { code } = transformModule(source, 'counter.tsx', { strong: true });
+			const result = strengthen(compiler, code, 'counter.tsrx');
+			expect(result).toMatchObject({
+				strong,
+				blockers: strong ? [] : [{ code: 'OCTANE_STRONG_UNLINKED_PROP_STATE' }],
+			});
+			const { Counter } = loadCompiledFixtureSource(result.code, {
+				id: 'counter.tsrx',
+				mode: 'server',
+			});
+			let observed = 0;
+			const observe = () => {
+				observed++;
+			};
+			expect(renderToStaticMarkup(Counter, { initial, observe }).html).toBe('<button>7</button>');
+			expect(observed).toBe(observations);
+		},
+	);
+
 	it('falls back to compatibility mode and reports what blocks Strong', async () => {
 		const compiler = await loadCompiler(import.meta.dirname);
 		const source =
