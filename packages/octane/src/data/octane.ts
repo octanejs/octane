@@ -4,5 +4,19 @@
 import { createContext, createElement, use, useCallback, useSyncExternalStore } from '../index.js';
 import { createOctaneDataBinding } from './octane-binding.js';
 
-export const { DataProvider, useDataStore, useForm, usePages, useRead, useReadState, useWrite } =
-	createOctaneDataBinding({ createContext, createElement, use, useCallback, useSyncExternalStore });
+export const {
+	DataProvider,
+	useDataStore,
+	useFeed,
+	useForm,
+	usePages,
+	useRead,
+	useReadState,
+	useWrite,
+} = createOctaneDataBinding({
+	createContext,
+	createElement,
+	use,
+	useCallback,
+	useSyncExternalStore,
+});

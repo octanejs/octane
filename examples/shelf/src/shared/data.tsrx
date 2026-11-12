@@ -10,8 +10,13 @@ module server {
 	export async function data(request: string, call: ServerCallContext) {
 		return handler.serve(request, call);
 	}
+
+	/** The shelf's changes, streamed to a listening store. */
+	export function events(request: string, call: ServerCallContext) {
+		return handler.listen(request, call);
+	}
 }
 
-import { data } from 'server';
+import { data, events } from 'server';
 
-export { data };
+export { data, events };
