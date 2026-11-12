@@ -1246,6 +1246,22 @@ describe('octane/data feeds across restarts', () => {
 		},
 	);
 
+	it('keeps a server-invalidated seed stale when an unrelated feed also invalidates lazy reads', async () => {
+		const tally = read({ name: 'count', output: count.output, tags: ['total'], fresh: Infinity });
+		const rendering = createDataStore({ transport: server(books()).transport });
+		await rendering.prefetch(tally, undefined);
+		rendering.invalidate(['total']);
+
+		const remote = server([]);
+		const client = createDataStore({ transport: remote.transport, seed: rendering.dehydrate() });
+		client.invalidate(['book']);
+		const handle = client.read(tally, undefined);
+		expect(handle.getSnapshot()).toMatchObject({ value: 3, stale: true });
+		stops.push(handle.subscribe(() => {}));
+		await vi.waitFor(() => expect(handle.getSnapshot().value).toBe(0));
+		expect(remote.log).toEqual(['read count']);
+	});
+
 	it.each(['entity update', 'read replacement'])(
 		'keeps a late server-seeded read current after a replayed %s',
 		async (change) => {

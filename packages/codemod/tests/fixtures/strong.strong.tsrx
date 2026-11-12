@@ -5,7 +5,7 @@ import { useEffect, useState, useLazyRef } from 'octane';
 type Props = { userId: string; initialCount: number; rows: { id: number; name: string }[] };
 
 export function Profile({ userId, initialCount, rows }: Props) @{
-  const [count, setCount] = useState(() => initialCount);
+  const [count, setCount] = useState((<Input,>(initial: Input): Input => typeof initial === 'function' ? initial : (() => initial) as Input)(initialCount));
   const cache = useLazyRef(() => new Map());
 
   useEffect(() => {

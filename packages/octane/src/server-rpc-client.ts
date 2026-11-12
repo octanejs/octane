@@ -1,4 +1,5 @@
 import { stringify } from 'devalue';
+import { clearHostTimeout, hostDateNow, setHostTimeout } from './host-task.js';
 import type { ServerCallOptions } from './server-call.js';
 import {
 	SERVER_RESULT_CONTENT_TYPE,
@@ -157,12 +158,12 @@ function send(
 	callerSignal: AbortSignal | undefined,
 	limits: ResolvedServerResultLimits | undefined,
 ): Promise<unknown> {
-	const deadline = limits === undefined ? undefined : Date.now() + limits.timeoutMs;
+	const deadline = limits === undefined ? undefined : hostDateNow() + limits.timeoutMs;
 	const cancellation = limits === undefined ? undefined : new AbortController();
 	const timer =
 		limits === undefined
 			? undefined
-			: setTimeout(() => {
+			: setHostTimeout(() => {
 					cancellation!.abort(new DOMException('Server function timed out', 'TimeoutError'));
 				}, limits.timeoutMs);
 	const signal =
@@ -185,7 +186,7 @@ function send(
 		let failed = false;
 		response.catch((cause) => {
 			failed = true;
-			clearTimeout(timer);
+			clearHostTimeout(timer);
 			reject(requestFailed(cause));
 		});
 		loadResponseReader().then(
@@ -193,7 +194,7 @@ function send(
 				if (!failed) resolve(module.readServerResponse(response, timer, deadline, limits, signal));
 			},
 			(error) => {
-				clearTimeout(timer);
+				clearHostTimeout(timer);
 				reject(new ServerCallUncertainError(error));
 			},
 		);

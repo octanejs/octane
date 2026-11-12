@@ -8,6 +8,7 @@ import {
 	type ServerResultLimits,
 } from './server-rpc-protocol.js';
 import type { EncodedSignalValue } from './signals/types.js';
+import { setHostTimeout, clearHostTimeout } from './host-task.js';
 
 /** A single-consumer result; iterator.return() cancels only this invocation. */
 export async function readServerResult(
@@ -22,7 +23,7 @@ export async function readServerResult(
 	const read = serverResultReader(reader, limits, () => finished);
 	let failure: unknown;
 	const cleanup = () => {
-		clearTimeout(timer);
+		clearHostTimeout(timer);
 		options.signal?.removeEventListener('abort', abort);
 	};
 	const close = async () => {
@@ -44,7 +45,7 @@ export async function readServerResult(
 		);
 		void close();
 	};
-	const timer = setTimeout(() => {
+	const timer = setHostTimeout(() => {
 		failure = new ServerCallUncertainError(
 			new DOMException('Server function timed out', 'TimeoutError'),
 		);

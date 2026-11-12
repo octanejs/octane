@@ -63,16 +63,22 @@ export function DismissableLayer(props: any): any {
 	const isDeferredPointerDownOutsideRef = useRef(false, subSlot(slot, 'deferred'));
 	const pointerDownOutside = usePointerDownOutside(
 		(event: any) => {
-			const target = event.target;
-			if (!(target instanceof Node)) return;
-			const isPointerDownOnBranch = [...context.branches].some((branch) => branch.contains(target));
-			if (!isPointerEventsEnabled || isPointerDownOnBranch) return;
 			onPointerDownOutside?.(event);
 			onInteractOutside?.(event);
 			if (!event.defaultPrevented) onDismiss?.();
 		},
 		{
 			ownerDocument,
+			shouldHandlePointerDownOutside: useEffectEvent(
+				(target: EventTarget | null) => {
+					if (!isPointerEventsEnabled || !(target instanceof Node)) return false;
+					for (const branch of context.branches) {
+						if (branch.contains(target)) return false;
+					}
+					return true;
+				},
+				subSlot(slot, 'pointerAdmission'),
+			),
 			deferPointerDownOutside,
 			isDeferredPointerDownOutsideRef,
 			dismissableSurfaces: context.dismissableSurfaces,
@@ -236,6 +242,7 @@ function usePointerDownOutside(
 	onPointerDownOutside: (event: any) => void,
 	args: {
 		ownerDocument: Document;
+		shouldHandlePointerDownOutside: (target: EventTarget | null) => boolean;
 		deferPointerDownOutside: boolean;
 		isDeferredPointerDownOutsideRef: { current: boolean };
 		dismissableSurfaces: Set<HTMLElement>;
@@ -244,6 +251,7 @@ function usePointerDownOutside(
 ): { onPointerDownCapture: () => void } {
 	const {
 		ownerDocument,
+		shouldHandlePointerDownOutside,
 		deferPointerDownOutside,
 		isDeferredPointerDownOutsideRef,
 		dismissableSurfaces,
@@ -287,7 +295,7 @@ function usePointerDownOutside(
 				}
 			}
 			const handlePointerDown = (event: PointerEvent): void => {
-				if (event.target && !isPointerInsideReactTreeRef.current) {
+				if (!isPointerInsideReactTreeRef.current && shouldHandlePointerDownOutside(event.target)) {
 					const eventDetail = { originalEvent: event };
 					const handleAndDispatchPointerDownOutsideEvent = (): void => {
 						ownerDocument.removeEventListener('click', handleClickRef.current);

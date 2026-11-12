@@ -3407,6 +3407,73 @@ export function Greeting({ count }: { count: number }) {
 		return root;
 	}
 	it.each([false, true])(
+		'reports direct render-phase date, time and number formatters (projectTypes=%s)',
+		async (projectTypes) => {
+			const number = `import {useIntl} from 'react-intl';
+				export function View() { return <b>{useIntl().formatNumber(12)}</b>; }`;
+			const root = setup({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				'OtherFactory.tsx': '/** @jsxImportSource octane */\n' + number,
+				'nested/View.tsx': number,
+				'nested/tsconfig.json': JSON.stringify({
+					compilerOptions: { jsx: 'react-jsx', paths: { 'react-intl': ['./intl-service.ts'] } },
+				}),
+				'nested/intl-service.ts': `export const useIntl = () => ({formatNumber: String});`,
+				'Direct.tsx': `import {useIntl} from 'react-intl';
+					export function Direct() {
+						const intl = useIntl();
+						const date = intl.formatDate(0);
+						return <b title={intl.formatTime(0)}>{date}{intl.formatNumber(12)}</b>;
+					}`,
+				'Deferred.tsx': `import {useIntl} from 'react-intl';
+					export function Deferred() {
+						const intl = useIntl();
+						return <button onClick={() => { void intl.formatTime(0); }}>Later</button>;
+					}`,
+			});
+			const types = path.join(root, 'node_modules/@types');
+			fs.mkdirSync(types);
+			fs.symlinkSync(
+				path.join(REPO, 'packages/octane/node_modules/@types/react'),
+				path.join(types, 'react'),
+				'dir',
+			);
+			const { files } = await runCodemod(
+				['Direct.tsx', 'Deferred.tsx', 'OtherFactory.tsx', 'nested/View.tsx'].map((f) =>
+					path.join(root, f),
+				),
+				{
+					root,
+					strong: true,
+					verify: true,
+					write: false,
+					projectTypes,
+				},
+			);
+			const direct = files.find((f) => f.file === 'Direct.tsx');
+			const deferred = files.find((f) => f.file === 'Deferred.tsx');
+			expect(direct.notes.filter((n) => n.severity === 'error')).toEqual(
+				['formatDate', 'formatTime', 'formatNumber'].map((method) =>
+					expect.objectContaining({
+						rule: 'bindings',
+						message: expect.stringContaining(`this ${method} call`),
+					}),
+				),
+			);
+			expect(deferred.notes.filter((n) => n.severity === 'error')).toEqual([]);
+			for (const file of ['OtherFactory.tsx', 'nested/View.tsx']) {
+				const result = files.find((f) => f.file === file);
+				expect(result.notes).not.toContainEqual(
+					expect.objectContaining({ message: expect.stringContaining('this formatNumber call') }),
+				);
+			}
+			for (const selected of [direct, deferred])
+				expect(selected.code).toContain('octane-react-intl.tsrx');
+		},
+	);
+	it.each([false, true])(
 		'reports opaque formatter ownership in native calls and generated rich islands (projectTypes=%s)',
 		async (projectTypes) => {
 			const direct = `import {useIntl} from 'react-intl'; export function Text() {
@@ -3477,6 +3544,76 @@ export function View() { return <section><FormattedList /></section>; }`,
 			expect(file.notes.filter((d) => d.message.includes('React Intl formatter'))).toEqual([]);
 		},
 	);
+	it('keeps an Intl package export selected only by a nested runtime condition', async () => {
+		const view = `import {useIntl} from 'react-intl';
+export function View() { return <b>{useIntl().formatNumber(3)}</b>; }`;
+		const root = setup({
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: { jsx: 'react-jsx', module: 'esnext', moduleResolution: 'bundler' },
+			}),
+			'src/conditional/tsconfig.json': JSON.stringify({
+				extends: '../../tsconfig.json',
+				compilerOptions: { customConditions: ['local-formatter'] },
+			}),
+			'src/ordinary/tsconfig.json': JSON.stringify({
+				extends: '../../tsconfig.json',
+				compilerOptions: { customConditions: ['unused-condition'] },
+			}),
+			'src/conditional/View.tsx': view,
+			'src/ordinary/View.tsx': view,
+		});
+		const modules = path.join(root, 'node_modules');
+		const intl = path.join(modules, 'react-intl');
+		fs.renameSync(intl, path.join(modules, 'stock-intl'));
+		fs.mkdirSync(intl);
+		fs.writeFileSync(
+			path.join(intl, 'package.json'),
+			JSON.stringify({
+				name: 'react-intl',
+				version: '7.1.0',
+				type: 'module',
+				peerDependencies: { react: '^19.0.0' },
+				exports: {
+					'.': { types: './index.d.ts', 'local-formatter': './local.js', default: './index.js' },
+					'./other': { 'unused-condition': './local.js', default: './index.js' },
+				},
+			}),
+		);
+		fs.writeFileSync(path.join(intl, 'index.d.ts'), "export * from 'stock-intl';");
+		fs.writeFileSync(path.join(intl, 'index.js'), "export * from 'stock-intl';");
+		fs.writeFileSync(
+			path.join(intl, 'local.js'),
+			"export function useIntl() { return {formatNumber: n => 'local:' + n}; }",
+		);
+		const names = ['src/conditional/View.tsx', 'src/ordinary/View.tsx'];
+		const { files } = await runCodemod(
+			names.map((file) => path.join(root, file)),
+			{
+				root,
+				strong: true,
+				write: false,
+			},
+		);
+		const conditional = files.find((file) => file.file === names[0]);
+		expect(conditional.code).toContain("from 'react-intl'");
+		expect(conditional.notes).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+		expect(files.find((file) => file.file === names[1]).code).toContain('octane-react-intl.tsrx');
+
+		// A condition in the adapter's config can change its runtime entry too.
+		fs.writeFileSync(
+			path.join(root, 'src/tsconfig.json'),
+			JSON.stringify({
+				extends: '../tsconfig.json',
+				compilerOptions: { customConditions: ['local-formatter'] },
+			}),
+		);
+		const [adapterConditional] = (
+			await runCodemod([path.join(root, names[1])], { root, strong: true, write: false })
+		).files;
+		expect(adapterConditional.code).toContain("from 'react-intl'");
+	});
 	it('migrates a locale binding only below its own React Intl provider', async () => {
 		const enclosed = `import {IntlProvider as Provider, useIntl} from 'react-intl';
 			function Locale() { const { locale } = useIntl(); return <p lang={locale}/>; }

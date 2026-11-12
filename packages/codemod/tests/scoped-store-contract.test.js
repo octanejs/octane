@@ -330,7 +330,10 @@ it.each([
 	const errors = [...pane.notes, ...pane.diagnostics].filter(
 		(finding) => finding.severity === 'error',
 	);
-	expect(errors.map((finding) => finding.rule)).toEqual(supported ? [] : ['bindings', 'bindings']);
+	expect(errors.map((finding) => finding.rule)).toEqual(
+		supported ? ['bindings'] : ['bindings', 'bindings'],
+	);
+	if (supported) expect(errors[0].message).toContain('this formatNumber call');
 	const expectedHelpers = ['src/octane-react-intl.tsrx', 'src/octane-store-context.tsrx'];
 	const helpers = result.files
 		.map((file) => file.output)
@@ -473,7 +476,7 @@ it.each([
 	},
 );
 
-it('preserves an aliased handle and passes the active store to unchanged helpers at effect and click time', async () => {
+it('preserves the active store and aliased handle through effects, Effect Events and clicks', async () => {
 	const { app } = project({
 		'observer/public-store.ts': "export { valueOf, key } from './state';",
 		'observer/state.ts':
@@ -481,19 +484,26 @@ it('preserves an aliased handle and passes the active store to unchanged helpers
 		'observer/renderer.ts':
 			"import {createContext} from 'react'; export const current = createContext(new Map<object, string>());",
 		'app/src/handles.ts':
-			"import {key as create} from 'observer/core'; const canonical=create(), same=canonical; export {canonical}; export const reading=same;",
+			"import {key as create} from 'observer/core'; const canonical=create(), same=canonical; export {canonical}; export const reading=same, cleaned=create();",
 		'app/src/records.ts': 'export const calls = new WeakMap<Map<object, string>, string[]>();',
 		'app/src/record.ts': `import {calls} from './records'; export {calls};
 			export function record(store: Map<object, string>, phase: string) {
 				calls.set(store, [...(calls.get(store) ?? []), phase]);
 			}`,
-		'app/src/pane.tsx': `import {useSnapshot} from 'observer'; import {reading} from './handles';
-			import {useEffect, useLayoutEffect, useState} from 'react'; import {record as publish} from './record';
+		'app/src/pane.tsx': `import {useSnapshot} from 'observer'; import {reading, cleaned} from './handles';
+			import {useEffect, useEffectEvent as effectEvent, useLayoutEffect, useState} from 'react';
+			import {record as publish} from './record';
 			export function Pane() {
 				const store = useSnapshot();
 				const [text, setText] = useState('');
-				useEffect(() => { publish(store, 'effect'); setText(String(store.get(reading))); }, [store]);
-				useLayoutEffect(() => { return () => { publish(store, 'cleanup'); }; }, [store]);
+				const update = effectEvent(() => { store.set(reading, 'after effect'); });
+				const clean = effectEvent(() => { store.set(cleaned, 'cleanup event'); });
+				useEffect(() => {
+					publish(store, 'effect');
+					setText(String(store.get(reading)));
+					update();
+				}, [store]);
+				useLayoutEffect(() => { return () => { publish(store, 'cleanup'); clean(); }; }, [store]);
 				return <button onClick={() => { publish(store, 'click'); store.set(reading, 'updated'); }}>{text}</button>;
 			}`,
 	});
@@ -521,7 +531,7 @@ it('preserves an aliased handle and passes the active store to unchanged helpers
 		import {Pane} from './pane.tsrx';
 		export function Root({store}) @{ <NativeStoreProvider context={current} value={store}><Pane/></NativeStoreProvider> }`,
 	);
-	const entry = `export {Root} from './src/provider.tsrx'; export {canonical as reading} from './src/handles';
+	const entry = `export {Root} from './src/provider.tsrx'; export {canonical as reading, cleaned} from './src/handles';
 		export {calls} from './src/record'; export {current} from '../observer/renderer';
 		export {Pane as Reference} from './src/reference.tsx';`;
 	const dom = installDOM();
@@ -545,6 +555,7 @@ it('preserves an aliased handle and passes the active store to unchanged helpers
 		expect(parsed.content.textContent).toBe(expected.content.textContent);
 		expect(server.calls.has(serverStore)).toBe(false);
 		expect(serverStore.get(server.reading)).toBe('server');
+		expect(serverStore.has(server.cleaned)).toBe(false);
 		const client = await bundleRuntime(
 			app,
 			'client',
@@ -567,14 +578,19 @@ it('preserves an aliased handle and passes the active store to unchanged helpers
 				await act(async () => reactRoot.render(reference(client, reactStore)));
 				expect(host.textContent).toBe(expected);
 				expect(host.textContent).toBe(reactHost.textContent);
+				expect(store.get(client.reading)).toBe('after effect');
+				expect(store.get(client.reading)).toBe(reactStore.get(client.reading));
 				await client.act(async () => host.querySelector('button').click());
 				await act(async () => reactHost.querySelector('button').click());
 				expect(store.get(client.reading)).toBe('updated');
 				expect(store.get(client.reading)).toBe(reactStore.get(client.reading));
-				expect(store.size).toBe(1);
+				expect(store.get(client.cleaned)).toBe(reactStore.get(client.cleaned));
+				expect(store.size).toBe(reactStore.size);
 				expect(client.calls.get(store)).toEqual(['effect', 'click']);
 				expect(client.calls.get(store)).toEqual(client.calls.get(reactStore));
 			}
+			expect(first.has(client.cleaned)).toBe(false);
+			expect(second.get(client.cleaned)).toBe('cleanup event');
 			expect(client.calls.get(first)).toEqual(['effect', 'click', 'cleanup']);
 			expect(client.calls.get(first)).toEqual(client.calls.get(firstReact));
 			await client.act(async () => root.render(client.Root, { store: first }));
@@ -588,6 +604,73 @@ it('preserves an aliased handle and passes the active store to unchanged helpers
 		vi.unstubAllGlobals();
 	}
 }, 30_000);
+
+it.each([
+	['render-time calls', { run: 'useEffect(() => update(), []); update();' }],
+	['click-time calls', { run: '', output: '<button onClick={() => update()}>Send</button>' }],
+	['an escaped callback', { run: 'useEffect(() => queueMicrotask(update), []);' }],
+	[
+		'a call in a deferred class field',
+		{
+			run: 'useEffect(() => { class Deferred { value = update(); } queueMicrotask(() => new Deferred()); }, []);',
+		},
+	],
+	[
+		'a store write in a deferred class field',
+		{
+			body: 'class Deferred { value = void store.set(reading, 1); } queueMicrotask(() => new Deferred());',
+		},
+	],
+	[
+		'an effect owned by a nested component',
+		{
+			run: 'function Child() { useEffect(() => update(), []); return <p />; }',
+			output: '<Child />',
+		},
+	],
+	['a shadowed Effect Event hook', { setup: 'const useEffectEvent = (callback) => callback;' }],
+	['a shadowed effect hook', { setup: 'const useEffect = (callback) => callback();' }],
+	['React JSX store data', { body: 'store.set(reading, <b />);' }],
+])(
+	'defers scoped-store Effect Events with %s',
+	async (
+		_name,
+		{
+			setup = '',
+			run = 'useEffect(() => update(), []);',
+			output = '<p />',
+			body = 'store.set(reading, 1);',
+		},
+	) => {
+		const { app } = project({
+			'observer/public-store.ts': "export { valueOf, key } from './state';",
+			'observer/state.ts':
+				'export function valueOf<T>(x: T) { return x; } export function key() { return {}; }',
+			'observer/renderer.ts':
+				"import {createContext} from 'react'; export const current = createContext(new Map<object, number>());",
+			'app/src/handles.ts': "import {key} from 'observer/core'; export const reading = key();",
+			'app/src/pane.tsx': `import {useSnapshot} from 'observer'; import {reading} from './handles';
+			import {useEffect, useEffectEvent} from 'react';
+			export function Pane() {
+				${setup}
+				const store = useSnapshot();
+				const update = useEffectEvent(() => { ${body} });
+				${run}
+				return ${output};
+			}`,
+		});
+		const result = await runCodemod([path.join(app, 'src/pane.tsx')], {
+			root: app,
+			strong: true,
+			verify: true,
+			write: false,
+		});
+		const pane = result.files.find((file) => file.file === 'src/pane.tsx');
+		expect(pane.notes.some((note) => note.rule === 'bindings' && note.severity === 'error')).toBe(
+			true,
+		);
+	},
+);
 
 function noticePane(statement, pragma = '') {
 	return `${pragma}
@@ -979,6 +1062,9 @@ it('defers store factory inputs linked to React work during a read', async () =>
 		wrapped: './handles',
 		parenthesized: './handles',
 		mutated: './handles',
+		escaped: './handles',
+		escapedIndirect: './handles',
+		escapedAlias: './handles',
 		alias: './handles',
 		calleeAlias: './handles',
 		snapshot: './snapshot-key',
@@ -993,7 +1079,8 @@ it('defers store factory inputs linked to React work during a read', async () =>
 		portalOnly: './portal-key',
 	};
 	const { app } = project({
-		'observer/public-store.ts': "export {valueOf, select, selectOptions, read} from './state';",
+		'observer/public-store.ts':
+			"export {valueOf, select, selectOptions, read, replace} from './state';",
 		'observer/state.ts': `const readings = new Map<string, () => string>();
 			export function valueOf<T>(value: T) {return value;}
 			export function select(read: () => string): string {
@@ -1004,6 +1091,7 @@ it('defers store factory inputs linked to React work during a read', async () =>
 			export function selectOptions(options: {read?: () => string}) {
 				return select(() => options.read?.() ?? 'ready');
 			}
+			export function replace(key: string, read: () => string) {readings.set(key, read);}
 			export function read(key: string) {return readings.get(key)!();}`,
 		'observer/renderer.ts': `import {createContext} from 'react';
 			export const current = createContext<{get(key: string): string} | null>(null);`,
@@ -1016,6 +1104,7 @@ it('defers store factory inputs linked to React work during a read', async () =>
 			}`,
 		'app/src/handles.ts': `import {select, selectOptions, valueOf} from 'observer/core';
 			import {preload} from 'react-dom';
+			import {decorate} from './decorate';
 			const callback = () => {preload('/preview.png', {as: 'image'}); return 'ready';};
 			export const direct = select(callback);
 			export const wrapped = select(callback) as string;
@@ -1026,7 +1115,22 @@ it('defers store factory inputs linked to React work during a read', async () =>
 			const options = valueOf<{read?: () => string}>({});
 			options.read = callback;
 			export const mutated = selectOptions(options);
-			export const plain = selectOptions({});`,
+			export const escaped = selectOptions({});
+			decorate(escaped);
+			export const escapedIndirect = selectOptions({});
+			const saved = {escapedIndirect};
+			decorate(saved.escapedIndirect);
+			export const escapedAlias = selectOptions({});
+			const renamed = escapedAlias;
+			decorate(renamed);
+			const ordinary = selectOptions({});
+			const plain = ordinary;
+			export {plain};`,
+		'app/src/decorate.ts': `import {replace} from 'observer/core';
+			import {preload} from 'react-dom';
+			export function decorate(key: string) {
+				replace(key, () => {preload('/escaped.png', {as: 'image'}); return 'ready';});
+			}`,
 		'app/src/dependent.ts': `import {select, read} from 'observer/core';
 			import {direct} from './handles';
 			export const dependent = select(() => read(direct));`,
@@ -1072,13 +1176,16 @@ it('defers store factory inputs linked to React work during a read', async () =>
 			import {Pane as Direct} from './direct';
 			import {Pane as Wrapped} from './wrapped';
 			import {Pane as Mutated} from './mutated';
+			import {Pane as Escaped} from './escaped';
+			import {Pane as EscapedIndirect} from './escapedIndirect';
+			import {Pane as EscapedAlias} from './escapedAlias';
 			import {Pane as ViaTsx} from './viaTsx';
 			import {Pane as ViaJs} from './viaJs';
 			import {Pane as ViaSibling} from './viaSibling';
 			import {Pane as ViaDirectory} from './viaDirectory';
 			export function Root() {
 				return <current.Provider value={{get: read}}>
-					<Direct/><Wrapped/><Mutated/><ViaTsx/><ViaJs/><ViaSibling/><ViaDirectory/>
+					<Direct/><Wrapped/><Mutated/><Escaped/><EscapedIndirect/><EscapedAlias/><ViaTsx/><ViaJs/><ViaSibling/><ViaDirectory/>
 				</current.Provider>;
 			}`,
 		...Object.fromEntries(
@@ -1093,10 +1200,10 @@ it('defers store factory inputs linked to React work during a read', async () =>
 	const { renderToStaticMarkup } = await import('react-dom/server');
 	const { createElement } = await import('react');
 	const html = renderToStaticMarkup(createElement(reference.Root));
-	for (const resource of ['preview', 'tsx-preview', 'js-preview', 'choice-preview']) {
+	for (const resource of ['preview', 'tsx-preview', 'js-preview', 'choice-preview', 'escaped']) {
 		expect(html).toContain('<link rel="preload" href="/' + resource + '.png" as="image"/>');
 	}
-	expect(html.match(/<b>ready<\/b>/g)).toHaveLength(7);
+	expect(html.match(/<b>ready<\/b>/g)).toHaveLength(10);
 
 	const names = Object.keys(panes).map((name) => 'src/' + name + '.tsx');
 	const physicalApp = fs.realpathSync(app);
