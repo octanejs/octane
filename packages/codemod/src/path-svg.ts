@@ -18,6 +18,11 @@ const rootAttributes = {
 	role: /^img$/,
 	focusable: /^(?:true|false)$/,
 };
+
+export function svgLiteralRootOverride(name: string, value: string) {
+	return (name === 'fill' || name === 'focusable') && rootAttributes[name].test(value);
+}
+
 const fillRule = /^(?:evenodd|nonzero)$/;
 const presentation = {
 	fill: paint,

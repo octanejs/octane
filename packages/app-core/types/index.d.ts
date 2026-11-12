@@ -483,6 +483,13 @@ export interface OctaneConfigOptions {
 	 * selects a named export.
 	 */
 	rootBoundary?: RootBoundaryOptions;
+	/**
+	 * Project-root module ID (e.g. '/src/data.ts') whose default export is a
+	 * {@link RouteDataOpener}. Every render route then runs inside the store it
+	 * opens: one per request on the server, seeded into the page once it has
+	 * rendered, and one in the browser, started from that seed.
+	 */
+	data?: string;
 	/** Global middlewares applied to all routes */
 	middlewares?: Middleware[];
 	platform?: {
@@ -540,6 +547,7 @@ export interface ResolvedOctaneConfig {
 		preHydrate?: string;
 	};
 	rootBoundary: RootBoundaryOptions;
+	data?: string;
 	/** @default [] */
 	middlewares: Middleware[];
 	platform: {
@@ -629,3 +637,32 @@ export interface LoadedOctaneConfig {
 	dependencies: string[];
 	missingDependencies: string[];
 }
+
+/**
+ * The default export of the config's `data` module: open a data store, such as
+ * `octane/data`'s, for a route. On the server `seed` is `null` and `context`
+ * is the request's, once its middleware has run; in the browser `seed` is the
+ * server's `dehydrate()` text, or `null` on a page rendered only there, and
+ * `context` is `null`.
+ */
+export type RouteDataOpener = (seed: string | null, context: Context | null) => RouteDataStore;
+
+/** What app-core needs of a route's data store. `octane/data`'s `DataStore` is one. */
+export interface RouteDataStore {
+	/** Its loaded values, for the browser's store to start from. */
+	dehydrate(): string;
+	/** End it on the server once the response is complete. */
+	retire(): unknown;
+}
+
+/**
+ * Hand the browser `produce()`'s text under `name`, read there with
+ * `readRouteSeed(name)` from `@octanejs/app-core/seeds`. `produce` runs once
+ * the page has finished rendering, and not at all when the render fails; the
+ * text is written as a script just before `</body>`.
+ */
+export function routeSeed(
+	context: Context,
+	name: string,
+	produce: () => string | Promise<string>,
+): void;

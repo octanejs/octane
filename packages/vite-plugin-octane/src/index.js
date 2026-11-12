@@ -67,6 +67,7 @@ export {
 	handleRpcRequest,
 	handleServerRoute,
 	is_rpc_request,
+	routeSeed,
 	runMiddlewareChain,
 } from '@octanejs/app-core';
 export {
@@ -381,7 +382,7 @@ function createIslandsShellWarnings(server, projectRoot) {
 
 /**
  * Every module path the server can name in #__octane_data — page entries,
- * layouts, the preHydrate hook, and root boundaries. The generated hydrate
+ * layouts, the preHydrate hook, the data module, and root boundaries. The generated hydrate
  * entry maps each as a LITERAL `() => import('/src/…')`. Production needs the
  * map so Rollup chunks and hashes the modules; dev needs it so the imports go
  * through Vite's import analysis and share URL identity with every other
@@ -397,6 +398,7 @@ function collect_hydrate_module_paths(config) {
 		.filter((r) => r.type === 'render')
 		.flatMap((r) => [get_route_entry_path(/** @type {RenderRoute} */ (r).entry), r.layout]);
 	if (cfg.router.preHydrate) entries.push(cfg.router.preHydrate);
+	if (cfg.data) entries.push(cfg.data);
 	entries.push(
 		get_route_entry_path(cfg.rootBoundary.pending),
 		get_route_entry_path(cfg.rootBoundary.catch),
@@ -449,8 +451,10 @@ async function hydrate_entry_features(context, config, entries, clientBuild, pro
 		rootBoundary,
 		independentHydration: clientBuild.metadata().capabilities.independentHydration,
 		streamedSignals: clientBuild.hasStreamedSignals,
+		// A root boundary or the data module's DataRoot wraps the route in a body no proof covers.
 		voidRoot:
 			!rootBoundary &&
+			!config.data &&
 			imports.length > 0 &&
 			(await provenVoidImports(context, RESOLVED_VIRTUAL_HYDRATE_ID, imports)).length ===
 				imports.length,
@@ -897,10 +901,10 @@ export function octane(inlineOptions = {}) {
 								compilerPlugin.api.provenVoidImports,
 							)
 						: null;
-				if (!isBuild) {
-					const loaded = octaneConfig ?? (await loadStartupConfig(root))?.config ?? null;
-					entries = collect_hydrate_module_paths(loaded);
-				}
+				const loaded = isBuild
+					? buildOctaneConfig
+					: (octaneConfig ?? (await loadStartupConfig(root))?.config ?? null);
+				if (!isBuild) entries = collect_hydrate_module_paths(loaded);
 				const file = write_project_generated_file(
 					config,
 					'client-entry.js',
@@ -910,6 +914,7 @@ export function octane(inlineOptions = {}) {
 						clientBuildId: clientBuild.buildId,
 						devClientBuild: !isBuild,
 						...features,
+						data: Boolean(loaded?.data),
 					}),
 				);
 				return fs.readFileSync(file, 'utf-8');
@@ -1324,6 +1329,8 @@ export function octane(inlineOptions = {}) {
 					routes: cfg.router.routes,
 					octaneConfigPath: getOctaneConfigPath(root),
 					rootBoundary: cfg.rootBoundary,
+					data: cfg.data,
+					dataRootModuleId: requireFromPlugin.resolve('@octanejs/app-core/data-root'),
 					rpcModulePaths: [...serverModuleModules],
 					clientAssetMap,
 					clientBuild: completedClientBuild,
