@@ -50,6 +50,7 @@ import {
 	handleResumeError,
 } from './suspense.js';
 import { hydrating } from '../hydration-flag.js';
+import { clearHostTimeout } from '../host-task.js';
 import { INITIAL_ADOPTION_INPUT_CHANGED } from '../hydration-input-control.js';
 import { renderSlice, type RenderSlice } from '../render-slice.js';
 import { EPOCH_CELL } from '../context-epoch.js';
@@ -2567,7 +2568,7 @@ function attemptHiddenRevealInner(
 		publishHiddenRevealActions(state);
 		queueCurrentHiddenRefs(state);
 		if (state.transitionTimeoutId !== null) {
-			clearTimeout(state.transitionTimeoutId);
+			clearHostTimeout(state.transitionTimeoutId);
 			state.transitionTimeoutId = null;
 		}
 		if (state.transitionHeld) {

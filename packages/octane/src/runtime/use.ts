@@ -14,6 +14,7 @@ import {
 	publishMemoEntry,
 } from './hooks.js';
 import { hydrating } from '../hydration-flag.js';
+import { setHostTimeout } from '../host-task.js';
 import { EXTERNAL_HYDRATION_PROMISE } from '../constants.js';
 import { __profileCount, ProfileCounter } from '../profiling.js';
 import {
@@ -236,7 +237,7 @@ let SETTLED_WAKEABLES: WeakSet<PromiseLike<unknown>> | null = null;
 export function resumeOnSettle(wakeable: PromiseLike<unknown>, retry: () => void): void {
 	const onSettle =
 		SETTLED_WAKEABLES?.has(wakeable) === true
-			? () => void setTimeout(retry, 0)
+			? () => void setHostTimeout(retry, 0)
 			: () => {
 					(SETTLED_WAKEABLES ??= new WeakSet()).add(wakeable);
 					retry();

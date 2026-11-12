@@ -1,4 +1,4 @@
-import { postHostTask } from './host-task.js';
+import { hostNow, postHostTask } from './host-task.js';
 
 // All callers in this host share one window. A cold I/O wait
 // lets the sentinel reset it; a ready backlog cannot reset it per producer.
@@ -18,7 +18,7 @@ export function hasPendingHostBudget(): boolean {
  * This bounds successive units, never the duration of one user callback.
  */
 export function yieldForHostBudget(): Promise<void> | undefined {
-	const now = typeof performance === 'object' ? performance.now() : Date.now();
+	const now = hostNow();
 	if (sentinel === undefined) {
 		started = now;
 		sentinel = new Promise<void>((resolve) => {
