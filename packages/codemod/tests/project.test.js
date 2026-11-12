@@ -94,6 +94,70 @@ export function Redeclared({ ref, label }) {
 		},
 	);
 
+	it.each([true, false])(
+		'reports React DOM hints in a plain TypeScript state initializer with strong %s',
+		async (strong) => {
+			const view = (name) => `import { useState } from 'react';
+import { ${name} as initialize } from './factory';
+export function View() { const [value] = useState(initialize); return <p>{value}</p>; }`;
+			const root = project({
+				'View.tsx': view('withHint'),
+				'Ordinary.tsx': view('ordinary'),
+				'Deferred.tsx': view('deferred'),
+				'CompiledHint.tsx': `import { preload as hint } from 'react-dom';
+import { useState } from 'react';
+import { ordinary } from './factory';
+export function View() {
+	const [value] = useState(() => { hint('/sample.png', { as: 'image' }); return ordinary(); });
+	return <p>{value}</p>;
+}`,
+				'factory.ts': String.raw`import { preload as hint } from 'react\x2ddom';
+export function withHint() { hint('/sample.png', { as: 'image' }); return 'ready'; }
+export function ordinary() { return 'ready'; }
+export function deferred() { return () => hint('/later.png', { as: 'image' }); }`,
+			});
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules'),
+				path.join(root, 'node_modules'),
+			);
+			const options = { root, strong, write: false };
+			const run = (...files) =>
+				runCodemod(
+					files.map((file) => path.join(root, file)),
+					options,
+				);
+			const unselected = await run('View.tsx', 'Ordinary.tsx', 'Deferred.tsx');
+			const selected = await run('View.tsx', 'factory.ts', 'CompiledHint.tsx');
+			for (const report of [unselected, selected])
+				expect(report.files.find((file) => file.file === 'View.tsx').notes).toContainEqual(
+					expect.objectContaining({
+						severity: 'error',
+						message: expect.stringContaining('React DOM preload'),
+					}),
+				);
+			for (const name of ['Ordinary.tsx', 'Deferred.tsx'])
+				expect(unselected.files.find((file) => file.file === name).notes).toEqual([]);
+
+			const compiled = selected.files.find((file) => file.file === 'CompiledHint.tsx');
+			expect(compiled.notes).toEqual([]);
+			for (const file of selected.files) fs.writeFileSync(path.join(root, file.output), file.code);
+			const { render } = await bundleRuntime(
+				root,
+				'server',
+				`
+				import { View } from './CompiledHint.tsrx';
+				import { createElement, renderToStaticMarkup } from 'octane/server';
+				export const render = () => renderToStaticMarkup(createElement(View)).html;
+			`,
+			);
+			const { document } = new JSDOM(render()).window;
+			expect(
+				document.querySelectorAll('link[rel="preload"][href="/sample.png"][as="image"]'),
+			).toHaveLength(1);
+			expect(document.querySelector('p')?.textContent).toBe('ready');
+		},
+	);
+
 	it('reports a native setup call into a React hook left in an unselected local module', () => {
 		const helper = `import { useState as state } from 'react';
 export function useLabel() { const [label] = state('ready'); return label; }`;
