@@ -969,6 +969,164 @@ it.each([
 	},
 );
 
+it('defers store factory inputs linked to React work during a read', async () => {
+	const panes = {
+		direct: './handles',
+		wrapped: './handles',
+		parenthesized: './handles',
+		mutated: './handles',
+		alias: './handles',
+		calleeAlias: './handles',
+		snapshot: './snapshot-key',
+		nested: './barrel',
+		viaTsx: './tsx-handle',
+		viaJs: './js-handle',
+		viaSibling: './sibling-handle',
+		viaDirectory: './directory-handle',
+		plain: './handles',
+		pure: './pure',
+		explicitJs: './explicit-js-key',
+		portalOnly: './portal-key',
+	};
+	const { app } = project({
+		'observer/public-store.ts': "export {valueOf, select, selectOptions, read} from './state';",
+		'observer/state.ts': `const readings = new Map<string, () => string>();
+			export function valueOf<T>(value: T) {return value;}
+			export function select(read: () => string): string {
+				const key = String(readings.size);
+				readings.set(key, read);
+				return key;
+			}
+			export function selectOptions(options: {read?: () => string}) {
+				return select(() => options.read?.() ?? 'ready');
+			}
+			export function read(key: string) {return readings.get(key)!();}`,
+		'observer/renderer.ts': `import {createContext} from 'react';
+			export const current = createContext<{get(key: string): string} | null>(null);`,
+		'observer/react-hooks.ts': `import {useContext} from 'react';
+			import {current} from './renderer';
+			import {valueOf} from './state';
+			export function useChannel(key: string) {
+				const store = useContext(current);
+				return valueOf(store!.get(key));
+			}`,
+		'app/src/handles.ts': `import {select, selectOptions, valueOf} from 'observer/core';
+			import {preload} from 'react-dom';
+			const callback = () => {preload('/preview.png', {as: 'image'}); return 'ready';};
+			export const direct = select(callback);
+			export const wrapped = select(callback) as string;
+			export const parenthesized = (select)(callback);
+			export const alias = (direct as string);
+			const choose = select;
+			export const calleeAlias = choose(callback);
+			const options = valueOf<{read?: () => string}>({});
+			options.read = callback;
+			export const mutated = selectOptions(options);
+			export const plain = selectOptions({});`,
+		'app/src/dependent.ts': `import {select, read} from 'observer/core';
+			import {direct} from './handles';
+			export const dependent = select(() => read(direct));`,
+		'app/src/barrel.ts': "export {dependent as nested} from './dependent';",
+		'app/src/snapshot-key.ts':
+			"import {direct} from './handles'; export const snapshot = direct as string;",
+		'app/src/directory-handle.ts': `import {select} from 'observer/core';
+			import {readDirectory} from './directory';
+			export const viaDirectory = select(readDirectory);`,
+		'app/src/directory/package.json': JSON.stringify({ types: 'shape.d.ts', main: 'runtime.js' }),
+		'app/src/directory/shape.d.ts': 'export declare function readDirectory(): string;',
+		'app/src/directory/runtime.js': "export {readTsx as readDirectory} from '../resource';",
+		'app/src/resource.tsx': `import {preload as hint} from 'react-dom';
+			export function readTsx() {hint('/tsx-preview.png', {as: 'image'}); return 'ready';}`,
+		'app/src/script-resource.js': `import {preload} from 'react-dom';
+			export function readJs() {preload('/js-preview.png', {as: 'image'}); return 'ready';}`,
+		'app/src/choice.ts': "export const readChoice = () => 'ready';",
+		'app/src/choice.js': `import {preload} from 'react-dom';
+			export function readChoice() {preload('/choice-preview.png', {as: 'image'}); return 'ready';}`,
+		'app/src/tsx-handle.ts':
+			"import {select} from 'observer/core'; import {readTsx} from './resource'; export const viaTsx = select(readTsx);",
+		'app/src/js-handle.ts':
+			"import {select} from 'observer/core'; import {readJs} from './script-resource.js'; export const viaJs = select(readJs);",
+		'app/src/sibling-handle.ts':
+			"import {select} from 'observer/core'; import {readChoice} from './choice.js'; export const viaSibling = select(readChoice);",
+		'app/src/neutral.js': "export const readNeutral = () => 'ready';",
+		'app/src/neutral.mjs': `import {preload} from 'react-dom';
+			export function readNeutral() {preload('/unrelated.png', {as: 'image'}); return 'ready';}`,
+		'app/src/explicit-js-key.ts':
+			"import {select} from 'observer/core'; import {readNeutral} from './neutral.js'; export const explicitJs = select(readNeutral);",
+		'app/src/portal-only.tsx': `import {createPortal, flushSync} from 'react-dom';
+			export function readNeutral() {void createPortal; void flushSync; return 'ready';}`,
+		'app/src/portal-key.ts':
+			"import {select} from 'observer/core'; import {readNeutral} from './portal-only'; export const portalOnly = select(readNeutral);",
+		'app/src/pure-format.tsx': 'export function format(value: string) {return value;}',
+		'app/src/pure.ts': `import {select} from 'observer/core';
+			import type {preload} from 'react-dom';
+			import {format} from './pure-format';
+			const value: Parameters<typeof preload>[0] = 'ready';
+			export const pure = select(() => format(value));`,
+		'app/src/root.tsx': `import {current} from '../../observer/renderer';
+			import {read} from 'observer/core';
+			import {Pane as Direct} from './direct';
+			import {Pane as Wrapped} from './wrapped';
+			import {Pane as Mutated} from './mutated';
+			import {Pane as ViaTsx} from './viaTsx';
+			import {Pane as ViaJs} from './viaJs';
+			import {Pane as ViaSibling} from './viaSibling';
+			import {Pane as ViaDirectory} from './viaDirectory';
+			export function Root() {
+				return <current.Provider value={{get: read}}>
+					<Direct/><Wrapped/><Mutated/><ViaTsx/><ViaJs/><ViaSibling/><ViaDirectory/>
+				</current.Provider>;
+			}`,
+		...Object.fromEntries(
+			Object.entries(panes).map(([name, source]) => [
+				'app/src/' + name + '.tsx',
+				`import {useSnapshot} from 'observer'; import {${name}} from '${source}';
+				export function Pane() {const value = useSnapshot(${name}); return <b>{String(value)}</b>;}`,
+			]),
+		),
+	});
+	const reference = await bundleRuntime(app, 'server', "export {Root} from './src/root';");
+	const { renderToStaticMarkup } = await import('react-dom/server');
+	const { createElement } = await import('react');
+	const html = renderToStaticMarkup(createElement(reference.Root));
+	for (const resource of ['preview', 'tsx-preview', 'js-preview', 'choice-preview']) {
+		expect(html).toContain('<link rel="preload" href="/' + resource + '.png" as="image"/>');
+	}
+	expect(html.match(/<b>ready<\/b>/g)).toHaveLength(7);
+
+	const names = Object.keys(panes).map((name) => 'src/' + name + '.tsx');
+	const physicalApp = fs.realpathSync(app);
+	const options = { strong: true, verify: true, projectTypes: true, write: false };
+	const { files } = await runCodemod(
+		names.map((name) => path.join(physicalApp, name)),
+		{ ...options, root: physicalApp },
+	);
+	for (const name of names) {
+		const file = files.find((entry) => entry.file === name);
+		const errors = [...file.notes, ...file.diagnostics].filter(
+			(entry) => entry.severity === 'error',
+		);
+		if (
+			['src/plain.tsx', 'src/pure.tsx', 'src/explicitJs.tsx', 'src/portalOnly.tsx'].includes(name)
+		) {
+			expect(file.strong, name).toBe(true);
+			expect(errors, name).toEqual([]);
+		} else {
+			expect(errors, name).toContainEqual(expect.objectContaining({ rule: 'bindings' }));
+		}
+	}
+
+	const linkedApp = path.join(path.dirname(app), 'linked-app');
+	fs.symlinkSync(app, linkedApp, 'dir');
+	const linked = await runCodemod([path.join(linkedApp, 'src/viaDirectory.tsx')], {
+		...options,
+		root: linkedApp,
+	});
+	expect(linked.files.find((file) => file.file === 'src/viaDirectory.tsx').notes).toContainEqual(
+		expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+	);
+});
+
 it('requires an imported application handle to come from the original shared factory', async () => {
 	const { storeSources } = await import('../dist/store-inputs.js');
 	const { app, plan } = fixture({
@@ -976,6 +1134,8 @@ it('requires an imported application handle to come from the original shared fac
 		'app/src/handles.ts': `import {valueOf as make} from 'observer/core';
 			import {useSnapshot as other} from 'observer';
 			export const reading = make(1), unknown = other();
+			const makeSnapshot = make;
+			export const copiedFactory = makeSnapshot(1);
 			let mutable = reading;
 			export const snapshot = mutable, wrapped = (reading), property = {reading}.reading;
 			export const opaqueAlias = unknown;
@@ -991,7 +1151,15 @@ it('requires an imported application handle to come from the original shared fac
 		return !!target && planned.isSharedExport(target.module, target.name, target.from);
 	};
 	expect(accepts('reading')).toBe(true);
-	for (const name of ['unknown', 'snapshot', 'wrapped', 'property', 'opaqueAlias', 'disposed']) {
+	for (const name of [
+		'copiedFactory',
+		'unknown',
+		'snapshot',
+		'wrapped',
+		'property',
+		'opaqueAlias',
+		'disposed',
+	]) {
 		expect(accepts(name), name).toBe(false);
 	}
 	fs.writeFileSync(path.join(app, 'src/handles.js'), 'export const reading = {};');
