@@ -51,9 +51,8 @@ function isNativeSyntaxRejection(error, source) {
  */
 export function parseModule(source, filename = 'module.tsrx', options) {
 	const resolvedFilename = filename || 'module.tsrx';
-	// The native facade returns an untyped AST for `.ts`, which turns `import type`
-	// into a value import and drops parameter properties. TypeScript's grammar
-	// keeps them; the native parser still reports what that grammar rejects.
+	// Use the same TypeScript parser as the browser when it can parse the
+	// module. The native fallback handles syntax that parser does not support.
 	const typeScript = parseTypeScriptModule(source, resolvedFilename, options);
 	if (typeScript !== null) return adoptTemplateShape(typeScript);
 	const nativeOptions = isolateOutputOptions(options);
