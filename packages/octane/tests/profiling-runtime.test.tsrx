@@ -874,7 +874,37 @@ function BatchedBoundary(props: { first: Promise<string>; second: Promise<string
 	</Suspense>
 }
 
+function SettledRow(props: { promise: Promise<string> }) @{
+	const value = use(props.promise);
+	<li>{value as string}</li>
+}
+
+// The parent creates every row's promise, and each has settled before any row
+// renders, but use() learns that only once it first sees the promise.
+function SettledRows(props: { promises: Promise<string>[] }) @{
+	<ul>
+		<Suspense fallback={<li>waiting</li>}>
+			@for (const promise of props.promises; key props.promises.indexOf(promise)) {
+				<SettledRow promise={promise} />
+			}
+		</Suspense>
+	</ul>
+}
+
 describe('profile work lifecycle', () => {
+	it('suspends a list of suspending rows once and retries it once', async () => {
+		const promises = Array.from({ length: 12 }, (_, i) => Promise.resolve(`v${i}`));
+		await Promise.all(promises);
+		const view = mount(SettledRows, { promises });
+		await act(async () => {
+			await Promise.all(promises);
+		});
+		expect(view.container.querySelectorAll('li:not([style])')).toHaveLength(12);
+		expect(profiler.counters()['boundary.suspend']).toBe(1);
+		expect(profiler.counters()['boundary.retry']).toBe(1);
+		view.unmount();
+	});
+
 	it('counts real ref writes and render-phase replays', () => {
 		const nodes: Array<HTMLElement | null> = [];
 		const view = mount(RefCounter, { ref: (node) => nodes.push(node) });
