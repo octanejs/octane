@@ -7257,6 +7257,12 @@
         "replacement": "Use the updater form, `setValue((current) => current + 1)`, compute from the state a reducer receives, or read the latest value with the state getter (the third tuple member).",
         "url": "https://octanejs.dev/docs/strong-mode#octane-strong-stale-state-update"
       },
+      "OCTANE_STRONG_READ_AFTER_SET": {
+        "severity": "hint",
+        "detects": "A function calls a state setter or reducer dispatch as a statement, then reads that state later in the same block or a nested one, for example `setDraft(\"\"); if (draft) send(draft)` or `setCount(count + 1); log(count)`. The read sees the render snapshot, not the value just set. Reads in the setter argument, in updater functions, in nested functions, through the state getter, through a parameter or local alias, and in a sibling branch are not reported.",
+        "replacement": "Compute the next value once and use it for both: `const next = count + 1; setCount(next); log(next)`. When the old value is what you mean, name it first: `const previous = count; setCount(0); log(previous)`.",
+        "url": "https://octanejs.dev/docs/strong-mode#octane-strong-read-after-set"
+      },
       "OCTANE_STRONG_READ_ONLY_STATE": {
         "severity": "error",
         "detects": "A declaration takes the value from a `useState` call and discards its setter, for example `const [value] = useState(initial)` or `const value = useState(initial)[0]`. This includes lazy initializers.",
@@ -7469,6 +7475,13 @@
         "react": "const [value] = useState(() => initial);",
         "strong": "const value = useInitialValue(() => initial);",
         "codes": ["OCTANE_STRONG_READ_ONLY_STATE"]
+      },
+      {
+        "id": "next-state-value",
+        "title": "Use the value you just set",
+        "react": "setDraft(''); if (draft) send(draft);",
+        "strong": "const message = draft; setDraft(''); if (message) send(message);",
+        "codes": ["OCTANE_STRONG_READ_AFTER_SET"]
       },
       {
         "id": "lazy-ref",

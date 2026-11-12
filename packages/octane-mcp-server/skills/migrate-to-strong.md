@@ -56,6 +56,7 @@ terminal. Reference: https://octanejs.dev/docs/strong-mode
 
 | React idiom | Strong replacement | Codes |
 | --- | --- | --- |
+| `setDraft(''); if (draft) send(draft)` | `const message = draft; setDraft(''); if (message) send(message)` (`next-state-value`) | `OCTANE_STRONG_READ_AFTER_SET` (hint) |
 | `const [value] = useState(initial)` | `const value = useInitialValue(initial)` (`initial-value`) | `OCTANE_STRONG_READ_ONLY_STATE` |
 | `if (ref.current === null) ref.current = create()` | `const ref = useLazyRef(() => create())` (`lazy-ref`) | `OCTANE_STRONG_RENDER_REF_READ`, `OCTANE_STRONG_RENDER_REF_WRITE` |
 | `useLayoutEffect(() => setWidth(el.current.offsetWidth))` | `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 })` (`layout-measurement`) | `OCTANE_STRONG_EFFECT_STATE_UPDATE` |
