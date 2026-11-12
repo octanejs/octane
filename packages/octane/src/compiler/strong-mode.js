@@ -6267,7 +6267,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		const existing = resolve(scope, 'useInitialValue');
 		if (existing && existing.octaneImport !== 'useInitialValue') return [];
 		initialValueImports ??= hookImportEditor(ast, source, 'useInitialValue', ['useState']);
-		const imports = initialValueImports([call], existing);
+		const imports = initialValueImports([call], existing, true);
 		if (imports === false) return [];
 		return [
 			{

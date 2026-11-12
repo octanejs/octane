@@ -414,16 +414,17 @@ export function hookImportEditor(ast, source, replacement, replaced) {
 		);
 	}
 
-	return (sites, existing) => {
+	return (sites, existing, requireNamedImports = false) => {
 		const add = !existing;
-		if (dynamic || (add ? collision || !groups.length : !replacementImported)) return false;
+		if (dynamic || (add && (collision || !groups.length))) return false;
 		const calls = sites
 			.map((call) => {
 				const binding = imports.get(call.callee.name);
 				return binding?.sites.has(call.callee.start) ? binding : undefined;
 			})
 			.filter(Boolean);
-		if (calls.length === 0) return false;
+		if (requireNamedImports && (calls.length !== sites.length || (!add && !replacementImported)))
+			return false;
 		// Leave the last consumer of a shared import for the next fix pass. The
 		// last edit can then remove that import, even when a batch applied all
 		// its siblings together. Each editor action must also work on its own.
