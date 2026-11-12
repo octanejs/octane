@@ -1,4 +1,5 @@
 import ts from 'typescript';
+import { inTypeNode, localSymbol } from './local-uses.js';
 
 function visit(node: ts.Node, read: (node: ts.Node) => void) {
 	read(node);
@@ -260,10 +261,19 @@ export function effectReceivers(
 	// A property snapshot would run before the imperative handle evaluates its ref.
 	if (hasProperties && (imperative || !snapshot)) return [];
 
+	const dependencies = new Map(
+		identifiers.map((dep) => [dep.text, checker.getSymbolAtLocation(dep)]),
+	);
+	const captured = new Set<ts.Symbol>();
 	const names = new Set<string>();
 	const members = new Map<ts.Symbol, ts.Identifier[]>();
 	visit(body, (node) => {
-		if (ts.isIdentifier(node)) names.add(node.text);
+		if (ts.isIdentifier(node)) {
+			names.add(node.text);
+			const dependency = dependencies.get(node.text);
+			if (dependency && !inTypeNode(node) && localSymbol(checker, node) === dependency)
+				captured.add(dependency);
+		}
 		if (
 			(!ts.isPropertyAccessExpression(node) && !ts.isElementAccessExpression(node)) ||
 			!ts.isIdentifier(node.expression)
@@ -345,9 +355,14 @@ export function effectReceivers(
 			return declarations;
 		}
 	}
-	// An otherwise unused dependency can intentionally restart the effect.
-	for (const { text } of identifiers) {
-		if (names.has(text)) continue;
+	// A property label can share the name of a deliberate restart trigger.
+	for (const [text, symbol] of dependencies) {
+		if (
+			!symbol ||
+			captured.has(symbol) ||
+			checker.resolveName(text, body, ts.SymbolFlags.Value, false) !== symbol
+		)
+			continue;
 		declarations.push(`void ${text};`);
 		names.add(text);
 	}
