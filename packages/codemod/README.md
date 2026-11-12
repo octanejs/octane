@@ -143,9 +143,13 @@ list, the filter and map callbacks may reuse a parameter name.
 
 ## What it reports
 
-Class components, `createRef`, `defaultProps`, and anything else without an
+Class components, `defaultProps`, and anything else without an
 automatic rewrite are listed under **Needs attention** with a file and line.
 The process exits with status 1 when any error remains.
+
+Named imports and re-exports, dotted namespace access, and direct type queries
+for React's `createRef` keep the original allocator. Octane can attach and
+clear the ref object it returns.
 
 If a migration target already exists or two sources share a target, write mode
 stops before editing the project. `--dry-run` and `--print` report the colliding

@@ -4,7 +4,7 @@
  * Values and types are listed separately because Octane exports React's type
  * names as migration aliases (`ReactNode`, `ChangeEvent`, `FC`, ...), while
  * several React values have no Octane counterpart at all and need a rewrite or a
- * person (`forwardRef`, class components, `createRef`).
+ * person (`forwardRef`, class components).
  */
 
 /** React value exports that exist in `octane` under the same name. */
@@ -326,8 +326,6 @@ export const UNSUPPORTED_VALUES: Record<string, string> = {
 	cache: 'Server Components are not supported, so `cache` has no Octane equivalent.',
 	cacheSignal: 'Server Components are not supported, so `cacheSignal` has no Octane equivalent.',
 	captureOwnerStack: 'Octane does not collect owner stacks.',
-	createRef:
-		'Octane has no `createRef`; use `useRef` in a function component or a `{ current: null }` object.',
 	findDOMNode: 'Octane has no `findDOMNode`; pass a ref to the host element.',
 	forwardRef: 'Refs are props in Octane; the codemod unwraps `forwardRef` where it can.',
 	hydrate: 'Legacy roots are not supported; the codemod rewrites calls to `hydrateRoot`.',
@@ -339,14 +337,15 @@ export const UNSUPPORTED_VALUES: Record<string, string> = {
 /**
  * @param module a key of {@link REACT_MODULES}
  * @param name the imported name
- * @returns null when Octane has no
-such export
+ * @returns null when the import needs a manual migration
  */
 export function mapReactImport(
 	module: string,
 	name: string,
 	typeOnly: boolean,
 ): { module: string; name: string } | null {
+	// The allocator is renderer-independent and preserves React's ref object shape.
+	if (module === 'react' && name === 'createRef') return { module, name };
 	if (module === 'react-dom/server' || module.startsWith('react-dom/server.')) {
 		return OCTANE_SERVER_VALUES.has(name) ? { module: 'octane/server', name } : null;
 	}
