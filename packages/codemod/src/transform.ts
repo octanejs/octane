@@ -205,7 +205,10 @@ function scriptKind(filename: string) {
 }
 
 function nativeReactCompat(module: string, name: string) {
-	return name === 'ReactCompat' && (module === 'octane/react' || module === 'octane/react/server');
+	return (
+		(name === 'ReactCompat' || name === 'ReactCompatInline') &&
+		(module === 'octane/react' || module === 'octane/react/server')
+	);
 }
 
 function skipParens(node: ts.Expression): ts.Expression {
@@ -3075,7 +3078,7 @@ class ModuleTransform {
 			tag.tagName === node;
 		if (isTag && this.hasReactBridge && this.reactCompatTag(tag.tagName)) {
 			// The project compiler recognizes named imports when transporting descriptor children.
-			return this.require(this.importOf(node.expression)!.module, 'ReactCompat', false);
+			return this.require(this.importOf(node.expression)!.module, node.name.text, false);
 		}
 		// So is `const P = C.Provider`; a member of the provider (`C.Provider.x`)
 		// or a write to it stays.
