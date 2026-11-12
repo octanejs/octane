@@ -12,6 +12,7 @@ import {
 	_dispatchDepth,
 } from './events.js';
 import { hydrating, hydrationStarted } from '../hydration-flag.js';
+import { setHostTimeout, clearHostTimeout } from '../host-task.js';
 import { EVENT_DISCRETE, EVENT_CAPTURE, EVENT_RESTORE } from '../event-names.js';
 import { formAuthoringDiagnostics } from '../form-diagnostics.js';
 import { nativeBatchHooks } from '../signals/read-protocol.js';
@@ -153,7 +154,7 @@ export interface ControlledState {
 	/** True during IME composition and while its final committed input can arrive. */
 	composing: boolean;
 	/** undefined until text composition is armed; null or the pending completion task. */
-	compositionEndTask: ReturnType<typeof setTimeout> | null | undefined;
+	compositionEndTask: unknown;
 	/** Select re-projection already queued for the pending commit. */
 	queued: boolean;
 	/** Whether the compiler's spread-aware form aggregation path has committed. */
@@ -312,7 +313,7 @@ function onCtrlCompositionStart(e: Event): void {
 	const ctrl = (el as any).$$ctrl as ControlledState | undefined;
 	if (ctrl === undefined) return;
 	if (ctrl.compositionEndTask !== undefined && ctrl.compositionEndTask !== null) {
-		clearTimeout(ctrl.compositionEndTask);
+		clearHostTimeout(ctrl.compositionEndTask);
 		ctrl.compositionEndTask = null;
 	}
 	ctrl.composing = true;
@@ -324,7 +325,7 @@ export function onCtrlCompositionEnd(e: Event): void {
 	if (ctrl === undefined) return;
 	el.removeEventListener('blur', onCtrlCompositionEnd);
 	if (ctrl.compositionEndTask !== undefined && ctrl.compositionEndTask !== null) {
-		clearTimeout(ctrl.compositionEndTask);
+		clearHostTimeout(ctrl.compositionEndTask);
 	}
 	// Android keyboards can dispatch the committed input after compositionend,
 	// a microtask checkpoint, and the next task. Give that input a full turn;
@@ -337,9 +338,9 @@ export function onCtrlCompositionEnd(e: Event): void {
 	};
 	ctrl.compositionEndTask =
 		e.type === 'blur'
-			? setTimeout(settleComposition, 0)
-			: setTimeout(() => {
-					ctrl.compositionEndTask = setTimeout(settleComposition, 0);
+			? setHostTimeout(settleComposition, 0)
+			: setHostTimeout(() => {
+					ctrl.compositionEndTask = setHostTimeout(settleComposition, 0);
 				}, 0);
 }
 
@@ -1535,14 +1536,14 @@ export function maybeEnqueueRestore(
 			inputType === 'deleteCompositionText';
 		if (composingInput) {
 			if (ctrl.compositionEndTask !== null) {
-				clearTimeout(ctrl.compositionEndTask);
+				clearHostTimeout(ctrl.compositionEndTask);
 				ctrl.compositionEndTask = null;
 			}
 			if (!ctrl.composing) t.addEventListener('blur', onCtrlCompositionEnd);
 			ctrl.composing = true;
 		} else if (ctrl.composing && typeof inputEvent.isComposing === 'boolean') {
 			if (ctrl.compositionEndTask !== null) {
-				clearTimeout(ctrl.compositionEndTask);
+				clearHostTimeout(ctrl.compositionEndTask);
 				ctrl.compositionEndTask = null;
 			}
 			t.removeEventListener('blur', onCtrlCompositionEnd);
@@ -1568,7 +1569,7 @@ export function maybeEnqueueRestore(
 			// after the browser finishes its post-click work, reassert the latest
 			// rendered state if delegated change did not complete the sequence.
 			t.$$checkableActivation = true;
-			setTimeout(() => {
+			setHostTimeout(() => {
 				if (t.$$checkableActivation === true) {
 					t.$$checkableActivation = false;
 					if (t === activationCheckable) activationCheckable = null;
@@ -1590,7 +1591,7 @@ export function maybeEnqueueRestore(
 		// fallback settles a sequence `change` never completes (a stopped
 		// propagation below the root, or a synthetic lone `input`).
 		t.$$selectPick = true;
-		setTimeout(() => {
+		setHostTimeout(() => {
 			if (t.$$selectPick === true) {
 				t.$$selectPick = false;
 				restoreControlledElement(t);

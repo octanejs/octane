@@ -22,7 +22,7 @@ import { hydrationStarted, hydrating } from '../hydration-flag.js';
 import { renderSlice } from '../render-slice.js';
 import { type BindingHandoff, releaseBindingHandoff } from '../dom-binding-handoff.js';
 import { bumpContextEpoch } from '../context-epoch.js';
-import { postHostTask } from '../host-task.js';
+import { HOST_CLOCK, postHostTask, setHostTimeout } from '../host-task.js';
 // Only setLayoutSnapshotTiming names the queue's functions, so bundles that
 // never call it drop them; bundle-size/run-minimal.mjs checks that.
 import {
@@ -4416,15 +4416,23 @@ function mergePendingActErrors(error: unknown): unknown {
 	return errors === null ? error : new AggregateError([...errors, error], formatClientError(64));
 }
 
-function actCheckpoint(): Promise<void> {
+/**
+ * Resolves true when it ran a task the installed test clock held. act() runs
+ * clock work that is due now, and never moves the clock's time.
+ */
+function actCheckpoint(): Promise<boolean> {
 	// A task runs after the entire promise queue, regardless of middleware chain
 	// depth. MessageChannel also remains live when a test freezes timeout clocks.
-	return new Promise((resolve) => {
+	return new Promise((resolve, reject) => {
 		const channel = new MessageChannel();
 		channel.port1.onmessage = () => {
 			channel.port1.close();
 			channel.port2.close();
-			resolve();
+			try {
+				resolve(HOST_CLOCK ? HOST_CLOCK.step() : false);
+			} catch (error) {
+				reject(error);
+			}
 		};
 		channel.port2.postMessage(null);
 	});
@@ -4481,11 +4489,12 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 				}
 				if (nested) return value;
 				for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
-					await actCheckpoint();
+					const clockRan = await actCheckpoint();
 					if (FRAME_SNAPSHOT_DRIVER && FRAME_SNAPSHOT_DRIVER.pending !== null)
 						FRAME_SNAPSHOT_DRIVER.flush();
 					throwPendingActErrors();
 					const hadWork =
+						clockRan ||
 						hasPendingWork() ||
 						DEFERRED_SWAPS !== null ||
 						transitionTask !== 0 ||
@@ -4544,11 +4553,12 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 	return (async () => {
 		try {
 			for (let i = 0; i < ACT_DRAIN_LIMIT; i++) {
-				await actCheckpoint();
+				const clockRan = await actCheckpoint();
 				if (FRAME_SNAPSHOT_DRIVER && FRAME_SNAPSHOT_DRIVER.pending !== null)
 					FRAME_SNAPSHOT_DRIVER.flush();
 				throwPendingActErrors();
 				const hadWork =
+					clockRan ||
 					hasPendingWork() ||
 					DEFERRED_SWAPS !== null ||
 					transitionTask !== 0 ||
@@ -5273,7 +5283,7 @@ export function changeEventRootMembership(target: Node, delta: number): void {
 		// remounts a root. Retain membership history through this native delivery,
 		// then release it. Only root lifecycle changes allocate/schedule here;
 		// events retain a number, never a snapshot holding root DOM nodes alive.
-		setTimeout(() => {
+		setHostTimeout(() => {
 			const current = _eventRoots.get(target);
 			if (current !== undefined) current.previous = undefined;
 		}, 0);
