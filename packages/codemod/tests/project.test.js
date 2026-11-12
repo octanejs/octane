@@ -9,6 +9,7 @@ import { compileTypesInspection } from 'octane/compiler/volar';
 import ts from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createScopedSignalRecipe, runCodemod } from '../dist/index.js';
+import { bundleRuntime, installDOM } from './bundle-runtime.js';
 
 const REPO = path.resolve(import.meta.dirname, '../../..');
 /** @type {string[]} */
@@ -41,6 +42,50 @@ function typecheckProject(root) {
 }
 
 describe('runCodemod', () => {
+	it.each(['', ', undefined'])(
+		'keeps fresh imperative handles in Strong mode with deps %j',
+		async (deps) => {
+			const root = project({
+				'Fresh.tsx': `import { useImperativeHandle } from 'react';
+export function Fresh({ ref, label }) {
+	function read() { return label; }
+	useImperativeHandle(ref, () => ({ read })${deps});
+	return <p onClick={() => read()}>{String(label)}</p>;
+}`,
+				'Stable.tsx': `import { useImperativeHandle } from 'react';
+function stable() { return 'shared'; }
+export function Stable({ ref }) {
+	function read() { return 'initial'; }
+	read = stable;
+	useImperativeHandle(ref, () => ({ read })${deps});
+	return <p>shared</p>;
+}`,
+				'Redeclared.jsx': `import { useImperativeHandle } from 'react';
+const shared = () => 'shared';
+function useHandle(ref, label) {
+	function read() { return label; }
+	var read = shared;
+	useImperativeHandle(ref, () => ({ read })${deps});
+}
+export function Redeclared({ ref, label }) {
+	useHandle(ref, label);
+	return <p>shared</p>;
+}`,
+			});
+			const { files } = await runCodemod([root], { write: false, strong: true });
+			const fresh = files.find((file) => file.file === 'Fresh.tsx');
+			const stable = files.find((file) => file.file === 'Stable.tsx');
+			expect(fresh).toMatchObject({ strong: true, diagnostics: [] });
+			const redeclared = files.find((file) => file.file === 'Redeclared.jsx');
+			for (const file of [stable, redeclared]) {
+				expect(file).toMatchObject({ strong: false });
+				expect(file.diagnostics).toContainEqual(
+					expect.objectContaining({ code: 'OCTANE_STRONG_UNTRACKED_EFFECT' }),
+				);
+			}
+		},
+	);
+
 	it('preserves mapped children passed to an imported inspection component under Vite', async () => {
 		const root = project({
 			'package.json': '{"type":"module"}',
@@ -485,7 +530,7 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		const root = project({
 			'package.json': '{}',
 			'Card.tsx': [
-				json ? '' : "import { createRef } from 'react'; export const ref = createRef();",
+				json ? '' : "import { findDOMNode } from 'react-dom'; export const find = findDOMNode;",
 				'export const Card = () => <p />;',
 				'// ' + 'x'.repeat(1024 * 1024) + ' end of input',
 			].join('\n'),
@@ -506,6 +551,61 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		} else {
 			expect(stdout).toMatch(/^✗ Card\.tsx → Card\.tsrx/);
 			expect(stdout.trimEnd().endsWith('1 error(s) (dry run)')).toBe(true);
+		}
+	});
+
+	it('uses the original ref allocator for refs mounted by a Strong component', async () => {
+		const root = project({
+			'View.tsx': `import * as React from 'react';
+import { createRef as allocate, type RefObject } from 'react';
+export const named = allocate<HTMLButtonElement>();
+export const qualified = React.createRef<HTMLButtonElement>();
+export function View(props: { target: RefObject<HTMLButtonElement | null> }) {
+	return <button ref={props.target}>Ready</button>;
+}`,
+		});
+		fs.symlinkSync(
+			path.resolve(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const [file] = (await runCodemod([root], { root, write: false, strong: true })).files;
+		expect(file).toMatchObject({ strong: true, notes: [], diagnostics: [] });
+		fs.writeFileSync(path.join(root, file.output), file.code);
+		const dom = installDOM();
+		try {
+			const { act, createRoot, reactRef, View, named, qualified } = await bundleRuntime(
+				root,
+				'client',
+				`export { act, createRoot } from 'octane';
+export { createRef as reactRef } from 'react';
+export * from './View.tsrx';`,
+			);
+			expect(named).not.toBe(qualified);
+			const original = reactRef();
+			for (const ref of [named, qualified]) {
+				expect(Object.getOwnPropertyDescriptor(ref, 'current')).toEqual(
+					Object.getOwnPropertyDescriptor(original, 'current'),
+				);
+				expect(Object.isSealed(ref)).toBe(Object.isSealed(original));
+			}
+			const container = dom.window.document.body;
+			const app = createRoot(container);
+			try {
+				await act(async () => app.render(View, { target: named }));
+				const button = container.querySelector('button');
+				expect(button?.textContent).toBe('Ready');
+				expect(named.current).toBe(button);
+				await act(async () => app.render(View, { target: qualified }));
+				expect(named.current).toBeNull();
+				expect(qualified.current).toBe(button);
+			} finally {
+				await act(async () => app.unmount());
+			}
+			expect(qualified.current).toBeNull();
+		} finally {
+			vi.unstubAllGlobals();
+			dom.window.close();
 		}
 	});
 
@@ -883,6 +983,130 @@ const invalid: Panel = { style: 'color:red' };`,
 		expect(code('src/Chart.tsx')).toContain("from '@octanejs/tanstack-start'");
 		expect(result.missing.map((port) => port.name)).toEqual(['@tanstack/markdown/react']);
 	});
+
+	it.each(['new', 'declared'])(
+		'maps standalone Floating UI positioning for a %s binding',
+		async (state) => {
+			const range = `^${catalogVersion('@octanejs/floating-ui')}`;
+			const before = {
+				'@floating-ui/react-dom': '^2.1.8',
+				...(state === 'declared' ? { '@octanejs/floating-ui': range } : {}),
+			};
+			const root = project({
+				'package.json': JSON.stringify({ name: 'app', dependencies: before }),
+				'src/Position.tsx': `
+import { autoUpdate, offset, useFloating } from '@floating-ui/react-dom';
+import type { Placement } from '@floating-ui/react-dom';
+export function Position({ placement }: { placement: Placement }) {
+	const { floatingStyles, refs } = useFloating({
+		placement,
+		middleware: [offset(8)],
+		whileElementsMounted: autoUpdate,
+	});
+	return <div ref={refs.setFloating} style={floatingStyles} />;
+}
+`,
+			});
+			const { files, dependencies, packages, missing } = await runCodemod([root], {
+				write: true,
+				strong: true,
+			});
+			const position = files.find((file) => file.output === 'src/Position.tsrx');
+			expect(position?.code).toContain(
+				"import { autoUpdate, offset, useFloating } from '@octanejs/floating-ui/react-dom';",
+			);
+			expect(position?.code).toContain(
+				"import type { Placement } from '@octanejs/floating-ui/react-dom';",
+			);
+			expect(position?.strong).toBe(true);
+			expect(position?.notes.filter((note) => note.severity === 'error')).toEqual([]);
+			expect(missing).toEqual([]);
+			expect(packages).toEqual([{ from: '@floating-ui/react-dom', to: '@octanejs/floating-ui' }]);
+			expect(dependencies).toEqual(
+				state === 'new' ? [{ name: '@octanejs/floating-ui', range }] : [],
+			);
+			expect(
+				JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).dependencies,
+			).toEqual({ '@floating-ui/react-dom': '^2.1.8', '@octanejs/floating-ui': range });
+		},
+	);
+
+	it.each([
+		['uninstalled', undefined],
+		['older', { '.': './index.js' }],
+		['type-only', { './react-dom': { types: './index.d.ts', import: null } }],
+		['blocked', { './*': './*', './react-dom': null }],
+		['conditional', { './react-dom': { node: null, default: './index.js' } }],
+	])(
+		'keeps the positioning import when the %s binding cannot serve its subpath',
+		async (_state, exports) => {
+			const root = project({
+				'package.json': '{"name":"app","dependencies":{"@octanejs/floating-ui":"0.1.68"}}',
+				'Position.tsx': `import { useFloating } from '@floating-ui/react-dom';
+export function Position() {
+	const { refs } = useFloating();
+	return <div ref={refs.setFloating} />;
+}`,
+				...(exports
+					? {
+							'node_modules/@octanejs/floating-ui/package.json': JSON.stringify({
+								name: '@octanejs/floating-ui',
+								version: '0.1.68',
+								exports,
+							}),
+							'node_modules/@octanejs/floating-ui/index.js': 'export const useFloating = () => {};',
+						}
+					: {}),
+			});
+			const { files, dependencies, packages } = await runCodemod([root], { write: false });
+			const position = files.find((file) => file.file === 'Position.tsx');
+			expect(position?.code).toContain("from '@floating-ui/react-dom'");
+			expect(position?.notes).toContainEqual(
+				expect.objectContaining({
+					rule: 'bindings',
+					severity: 'error',
+					message: expect.stringContaining('exports `./react-dom`'),
+				}),
+			);
+			expect(dependencies).toEqual([]);
+			expect(packages).toEqual([]);
+		},
+	);
+
+	it.each(['@floating-ui/react-dom', '@octanejs/floating-ui/react-dom'])(
+		'keeps the positioning import when project resolution shadows %s',
+		async (specifier) => {
+			const root = project({
+				'package.json': '{"name":"app"}',
+				'nested/tsconfig.json': JSON.stringify({
+					compilerOptions: {
+						moduleResolution: 'bundler',
+						paths: { [specifier]: ['./local.ts'] },
+					},
+				}),
+				'nested/local.ts': 'export const useFloating = () => ({ label: "local" });',
+				'nested/Position.tsx': `import { useFloating } from '@floating-ui/react-dom';
+export function Position() {
+	const { label } = useFloating();
+	return <div title={label} />;
+}`,
+			});
+			const { files, dependencies } = await runCodemod([root], {
+				write: false,
+				projectTypes: false,
+			});
+			const position = files.find((file) => file.file === 'nested/Position.tsx');
+			expect(position?.code).toContain("from '@floating-ui/react-dom'");
+			expect(position?.notes).toContainEqual(
+				expect.objectContaining({
+					rule: 'bindings',
+					severity: 'error',
+					message: expect.stringContaining(specifier),
+				}),
+			);
+			expect(dependencies).toEqual([]);
+		},
+	);
 
 	it('maps next-themes, which has no React-shaped name, to its binding', async () => {
 		const root = project({
@@ -2179,8 +2403,25 @@ export function Greeting({ count }: { count: number }) {
 		const enclosed = `import {IntlProvider as Provider, useIntl} from 'react-intl';
 			function Locale() { const { locale } = useIntl(); return <p lang={locale}/>; }
 			export function Page() { return <Provider locale="fr"><Locale/></Provider>; }`;
+		const direct = enclosed.replace('{ locale } = useIntl()', 'locale = useIntl().locale');
 		const sources = {
 			'src/Owned.tsx': enclosed,
+			'src/OwnedMember.tsx': direct,
+			'src/ExternalMember.tsx': direct.replace('function Locale', 'export function Locale'),
+			'src/ReflectiveReceiver.tsx': `import {useIntl} from 'react-intl';
+				export function Leaf() {
+					const intl = useIntl();
+					return <b title={intl.formatNumber(1)}>{eval('intl.locale')}</b>;
+				}`,
+			'src/ReflectiveHook.tsx': String.raw`import {useIntl} from 'react-intl';
+				export function Leaf() {
+					return <b title={useIntl().formatNumber(1)}>{\u0065val('useIntl().locale')}</b>;
+				}`,
+			'src/ExternalReceiver.tsx': `import {useIntl} from 'react-intl';
+				export function Leaf() {
+					const intl = useIntl();
+					return <b title={intl.formatNumber(1)}>{intl.locale}</b>;
+				}`,
 			'src/Exported.tsx': enclosed.replace('function Locale', 'export function Locale'),
 			'src/Escaped.tsx': enclosed + '\nexport {Locale as Consumer};',
 			'src/Nested.tsx': enclosed
@@ -2215,11 +2456,11 @@ export function Greeting({ count }: { count: number }) {
 		for (const file of Object.keys(sources)) {
 			const result = files.find((result) => result.file === file);
 			const errors = [...result.notes, ...result.diagnostics].filter((d) => d.severity === 'error');
-			if (file === 'src/Owned.tsx') {
+			if (file === 'src/Owned.tsx' || file === 'src/OwnedMember.tsx') {
 				expect(result.strong).toBe(true);
-				expect(errors).toEqual([]);
+				expect.soft(errors, file).toEqual([]);
 			} else {
-				expect(errors).toContainEqual(
+				expect.soft(errors, file).toContainEqual(
 					expect.objectContaining({
 						rule: 'bindings',
 						message: expect.stringContaining('useIntl'),
@@ -2502,11 +2743,11 @@ export function Locale() { return <IntlProvider locale="en"><b>test</b></IntlPro
 		const root = setup({
 			'src/Greeting.tsx': `import { useIntl } from 'react-intl';
 import React, { memo as cached } from 'react';
-export const Greeting = cached(() => { const intl = useIntl(); return <p title={intl.locale} />; });
-export const Field = React.forwardRef((props, ref) => { const intl = useIntl(); return <input ref={ref} title={intl.locale} />; });`,
+export const Greeting = cached(() => { const intl = useIntl(); return <p title={intl.formatNumber(1)} />; });
+export const Field = React.forwardRef((props, ref) => { const intl = useIntl(); return <input ref={ref} title={intl.formatNumber(1)} />; });`,
 			'src/Other.tsx': `import {useIntl} from 'react-intl';
 function memo(fn) { return fn; }
-export const Other = memo(() => { const intl = useIntl(); return <p title={intl.locale} />; });`,
+export const Other = memo(() => { const intl = useIntl(); return <p title={intl.formatNumber(1)} />; });`,
 		});
 		const { files } = await runCodemod([root], { root, write: false, strong: true });
 		const wrapped = files.find((f) => f.file === 'src/Greeting.tsx');

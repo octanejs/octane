@@ -32,6 +32,7 @@ export function storeSources(
 			if (
 				!ts.isImportDeclaration(s) ||
 				!ts.isStringLiteral(s.moduleSpecifier) ||
+				s.attributes ||
 				s.importClause?.isTypeOnly
 			)
 				continue;
@@ -49,14 +50,19 @@ export function storeSources(
 				}
 		}
 		for (const s of sf.statements) {
-			if (!ts.isVariableStatement(s) || !(s.declarationList.flags & ts.NodeFlags.Const)) continue;
+			if (
+				!ts.isVariableStatement(s) ||
+				(s.declarationList.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const
+			)
+				continue;
 			for (const d of s.declarationList.declarations) {
 				if (!ts.isIdentifier(d.name) || !d.initializer) continue;
 				const value = skipWrappers(d.initializer);
 				let input: Input | undefined;
 				if (ts.isIdentifier(value)) {
 					const origin = locals.get(value.text);
-					if (origin && 'opaque' in origin) input = origin;
+					if (origin && ('opaque' in origin || ('factory' in origin && value === d.initializer)))
+						input = origin;
 				} else if (ts.isCallExpression(value)) {
 					let target = skipWrappers(value.expression);
 					while (ts.isExpressionWithTypeArguments(target)) target = skipWrappers(target.expression);

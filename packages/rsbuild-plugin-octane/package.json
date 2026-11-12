@@ -45,6 +45,11 @@
       "types": "./types/node.d.ts",
       "import": "./src/node.js",
       "default": "./src/node.js"
+    },
+    "./seeds": {
+      "types": "./types/seeds.d.ts",
+      "import": "./src/seeds.js",
+      "default": "./src/seeds.js"
     }
   },
   "dependencies": {

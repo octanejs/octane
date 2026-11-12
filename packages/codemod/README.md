@@ -143,9 +143,13 @@ list, the filter and map callbacks may reuse a parameter name.
 
 ## What it reports
 
-Class components, `createRef`, `defaultProps`, and anything else without an
+Class components, `defaultProps`, and anything else without an
 automatic rewrite are listed under **Needs attention** with a file and line.
 The process exits with status 1 when any error remains.
+
+Named imports and re-exports, dotted namespace access, and direct type queries
+for React's `createRef` keep the original allocator. Octane can attach and
+clear the ref object it returns.
 
 If a migration target already exists or two sources share a target, write mode
 stops before editing the project. `--dry-run` and `--print` report the colliding
@@ -200,7 +204,7 @@ when verifying a smaller batch for adoption.
 
 When an application has React Intl 7, React and React DOM 19.2 or later in the 19 series, and either Octane 0.16.7 or later in the 0.16 series or a stable Octane 0.17 release, the codemod can generate one shared `octane-react-intl.tsrx` source file. It places it in the project's existing `src` directory or at the project root, and subsequent migrations reuse it. Preview and print include the helper before a write. If an earlier migration created the original helper and its contents still match, the codemod previews and upgrades it at the same path so existing providers continue to share context. A locally edited helper requires a manual merge. The app keeps its installed React Intl formatter, messages, and cache.
 
-Named `useIntl` imports can move when a component reads its locale or calls a supported scalar formatter. A provider's rich-text defaults can make `formatMessage` return React elements even with zero substitution values. For these calls the codemod follows local constants to known text or comparison uses, including ARIA attributes on intrinsic elements, input placeholders, image alt text, and option labels. Escaping formatters and unproven renderable results retain a binding diagnostic.
+Named `useIntl` imports can move when a component calls a supported scalar formatter. A locale read can also move when a private component displays the value from its own literal `IntlProvider`. An external provider can supply a getter that performs React DOM work during server rendering. A provider's rich-text defaults can make `formatMessage` return React elements even with zero substitution values. For these calls the codemod follows local constants to known text or comparison uses, including ARIA attributes on intrinsic elements, input placeholders, image alt text, and option labels. Escaping formatters and unproven renderable results retain a binding diagnostic.
 
 For a literal message descriptor with optional scalar substitutions, the codemod also follows the result through local components and directly imported named components selected in the same run. For example, a field can read its disabled state and forward a localized placeholder through a props spread to a native input. The codemod checks the uses of the props object on every branch, including when the caller supplies a fallback label. This sibling-property check assumes ordinary data props and defers when either module accesses object prototypes. A wrapper that gives the formatted value or its props bag to a custom renderer still needs review. When both selected functions return their markup directly, the prop can also pass through one named attribute on an imported function before reaching the native attribute.
 
@@ -212,7 +216,7 @@ Inside a retained React component, a rich-text callback such as `chunks => <stro
 
 ## Store hooks in linked workspace packages
 
-The codemod can migrate a named hook from a local `workspace:` dependency when it can read the TypeScript implementation, trace a React context read, and verify that the hook uses the same store code as a renderer-independent public entry. The public entry and hook names can vary. The supported runtime versions match the React Intl adapter above.
+The codemod can migrate a named hook from a local `workspace:` dependency when it can read the TypeScript implementation, trace a React context read, and verify that the hook uses the same store code as a renderer-independent public entry. The public entry and hook names can vary. The supported runtime versions match the React Intl adapter above. A top-level `const` can expose a second name for a handle already created by a verified shared factory. Consumers keep the original handle identity.
 
 Preview shows the native hook sources the codemod would add alongside the shared `octane-store-context.tsrx` and `octane-store-hooks.ts` helpers. The generated hooks call the original store, subscription, and snapshot functions. They retain React’s dependency lists and hook order. The application compiles these sources with its installed toolchain. When the workspace hook implementation changes, rerun the migration from its original React inputs in a clean checkout and review the new companions. A differing file at a generated path blocks the write.
 
@@ -243,6 +247,8 @@ Use `--svg-paths` (or `svgPaths: true` in the JavaScript API) when your bundler'
 For example, `<Mark className="icon" aria-hidden data-testid="status-icon" />` can remain a direct SVG child of a button. The codemod checks the asset and each use of the import. The generated component forwards quoted string values for lowercase `data-*` attributes outside Octane's reserved renderer markers. It also accepts classes such as `className={cx("icon", open && "expanded")}` when `cx` imports the default or named `clsx` export from the installed package. A truth test can use a local const initialized earlier in the same function or a parameter that the function never reassigns. Passing objects to `clsx` or calling an arbitrary class builder keeps the import for review. Supported geometry includes ordered, self-closing paths and rectangles, optionally nested in groups with scale or translate transforms. The helper preserves supported dimensions, fills, strokes, opacity, and single CSS custom-property paints such as `var(--icon-fill)`. Gradients, masks, clip paths and other element references require review. Each supported import points to a small native component beside the asset. That component reads the live SVG through `?raw`, so changes to supported geometry appear on the next build. Editing the asset to use unsupported markup produces an explicit error.
 
 The SVG class can also come from a CSS Module. For example, after `import styles from './badge.module.css'`, both `className={styles.mark}` and `className={cx(styles.mark, styles.accent)}` keep the stylesheet's scoped and composed class names. A `clsx` call that reads the stylesheet must use only string literals and direct class reads. This requires the original and migrated modules to load the same CSS class map, with stable, side-effect-free string exports throughout the application. The codemod checks plain relative default imports and their uses in the current source file. Passing the imported map to another function or assigning to a property keeps the SVG diagnostic.
+
+Quoted `fill` and `focusable` props can override the corresponding SVG root attributes. For example, `<Mark fill="currentColor" focusable="false" />` uses the caller's paint and focusability. Omitting either prop preserves the value from the asset. The override must pass the same validation as the corresponding attribute in the SVG file.
 
 A component can also store an SVG with literal attributes directly in a local before rendering it. For example, `let icon = null; if (active) icon = <Mark />; return <span>{icon}</span>;` has a single render outlet. The local must be declared directly in the component body with `let` or `const`, and that body must end in a single return. Each additional write must be a standalone assignment, and the only runtime read must lead to a proven render destination in the same function. A captured local, a second read, or a recognized hook call in that function keeps the SVG diagnostic.
 

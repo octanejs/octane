@@ -5898,6 +5898,7 @@ const STRONG_LITE_HOOKS = new Set([
 	'useReducer',
 	'useRef',
 	'useLazyRef',
+	'useInitialValue',
 	'useEffect',
 	'useLayoutEffect',
 	'useInsertionEffect',
@@ -6359,6 +6360,7 @@ const SETUP_SYNC_FACTORY_HOOKS = new Set([
 	'useMemo',
 	'useState',
 	'useLazyRef',
+	'useInitialValue',
 	'useLinkedState',
 	'useReducer',
 	'useSyncExternalStore',
@@ -9240,6 +9242,9 @@ function mapCallToForOf(expr, ctx) {
 	// component). Block bodies and fragment roots keep the childSlot path.
 	const body = arrow.body;
 	if (!body || (body.type !== 'JSXElement' && body.type !== 'Element')) return null;
+	// A fused loop renders each row before invoking the next callback. Keep
+	// potentially observable calls in the authored map so they run in array order.
+	if (containsRenderCall([body])) return null;
 	// Pull a `key={…}` attribute off the returned element → the for-of header key,
 	// and drop it from the element (it's not a DOM attribute). makeForCall then
 	// keys via the header, falling back to `item.id ?? item` when there's no key.
@@ -17828,6 +17833,21 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		itemKey = inheritOriginLoc(b.id('__i'), node.index);
 	}
 	const markerlessItem = isSsrMarkerlessForItem(node, itemBody);
+	const mappedRow = mapCall?.callback.body;
+	const mappedAttrs = mappedRow?.openingElement?.attributes ?? mappedRow?.attributes;
+	const mapKey = unwrapTsExpr(explicitKey);
+	// Even a static map row evaluates its authored key. A key-only empty row
+	// has no prop or deferred child evaluation to reorder.
+	const evaluateMapKey =
+		!itemNeedsIdentity &&
+		!bindingSite &&
+		explicitKey !== null &&
+		itemId.type === 'Identifier' &&
+		mappedAttrs?.length === 1 &&
+		!mappedRow.children?.length &&
+		!isInvariantLiteral(mapKey) &&
+		(mapKey.type !== 'Identifier' || mapKey.name !== node.index?.name) &&
+		!hasInlineMemoDirectEval(mapKey);
 	const signalSite =
 		mapCall === null && (ctx.signalBindingsUsed || ctx.nativeReads) && containsRenderCall(itemBody)
 			? ssrControlKey('for', node)
@@ -17876,8 +17896,14 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	// matching the client's existing singleRoot path; general item shapes retain
 	// their own block pair. Identity-transparent items also skip ssrArm; opaque or
 	// suspending bodies retain it so use() and child component frames stay keyed.
-	const items = b.id('__items');
+	const items = b.id(evaluateMapKey ? allocCompilerName(ctx, '__items') : '__items');
 	const index = b.id('__i');
+	const html = b.id(evaluateMapKey ? allocCompilerName(ctx, '__html') : '__html');
+	// A key getter can append or delete entries. Like native map, snapshot
+	// length and test each position again before invoking the callback.
+	const mapLength = evaluateMapKey ? allocCompilerName(ctx, '__mapLength') : null;
+	const itemCount = b.member(items, 'length');
+	const loopLimit = mapLength === null ? itemCount : b.id(mapLength);
 	const loopBody = b.block([
 		b.const('__it', b.member(items, index, true)),
 		...(prepare === null
@@ -17892,7 +17918,9 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 					),
 				]
 			: []),
-		b.stmt(b.assignment('+=', b.id('__html'), renderItem)),
+		// Match createElement's coercion, including object hooks and symbol errors.
+		...(evaluateMapKey ? [b.stmt(b.binary('+', b.literal(''), itemKey))] : []),
+		b.stmt(b.assignment('+=', html, renderItem)),
 	]);
 	const forRange = (content, hasItems) =>
 		bindingSite
@@ -17932,27 +17960,26 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		[],
 		b.block([
 			b.const(
-				'__items',
+				items.name,
 				mapCall !== null
 					? itemsExpr
 					: b.call(b.member(b.id('Array'), 'from'), b.logical('??', itemsExpr, b.array([]))),
 			),
-			b.if(
-				b.binary('===', b.member(items, 'length'), b.literal(0)),
-				b.return(forRange(emptyCall, false)),
-				null,
-			),
+			...(mapLength !== null ? [b.const(mapLength, itemCount)] : []),
+			b.if(b.binary('===', loopLimit, b.literal(0)), b.return(forRange(emptyCall, false)), null),
 			...(preparation === null ? [] : [preparation]),
-			...((itemNeedsIdentity || bindingSite) && keyDeclaration !== null ? [keyDeclaration] : []),
+			...((itemNeedsIdentity || bindingSite || evaluateMapKey) && keyDeclaration !== null
+				? [keyDeclaration]
+				: []),
 			...(bindingSite ? [b.const('__bindingKeys', b.new(b.id('Set'), node))] : []),
-			b.let('__html', b.literal('')),
+			b.let(html.name, b.literal('')),
 			b.for(
 				b.let('__i', b.literal(0)),
-				b.binary('<', index, b.member(items, 'length')),
+				b.binary('<', index, loopLimit),
 				b.update('++', index),
-				loopBody,
+				evaluateMapKey ? b.if(b.binary('in', index, items), loopBody, null) : loopBody,
 			),
-			b.return(forRange(b.id('__html'), true)),
+			b.return(forRange(html, true)),
 		]),
 	);
 	const fast = ssrCall('ssrControl', [b.literal(ssrControlKey('for', node)), render], node);
@@ -22537,6 +22564,7 @@ const NUMERIC_HOOK_SLOT_POSITION = {
 	useCallback: 2,
 	useRef: 1,
 	useLazyRef: 1,
+	useInitialValue: 1,
 	useEffectEvent: 1,
 	useImperativeHandle: 3,
 	useActionState: 3,
@@ -22556,7 +22584,7 @@ function appendHookSlotArgument(name, args, slot, numeric, origin, ctx) {
 	// Lazy refs reserve numeric slots for the compiler; their authored API only
 	// accepts manual Symbols. The runtime already supports this private ABI.
 	const typedSlot =
-		ctx.typescriptWeb && numeric && name === 'useLazyRef'
+		ctx.typescriptWeb && numeric && (name === 'useLazyRef' || name === 'useInitialValue')
 			? b.ts_as(expression, b.ts_keyword_type('any'))
 			: expression;
 	out.push({

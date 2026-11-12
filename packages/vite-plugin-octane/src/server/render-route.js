@@ -3,7 +3,8 @@ import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { createRpcRegistry } from '@octanejs/app-core';
-import { composeHtmlStream } from './html-stream.js';
+import { createRequire } from 'node:module';
+import { composeHtmlStream, endRoute, routeEnding } from './html-stream.js';
 import {
 	getContextNonce,
 	injectHydrationEntry,
@@ -16,12 +17,16 @@ import {
 	createLayoutWrapper,
 	createPropsWrapper,
 	createRootBoundaryWrapper,
+	provideRouteData,
 } from './component-wrappers.js';
 import {
 	get_component_export,
 	get_route_entry_export_name,
 	get_route_entry_path,
 } from '../routes.js';
+
+/** App-core's `DataRoot`, compiled for the server through Vite's SSR loader. */
+const DATA_ROOT_MODULE = createRequire(import.meta.url).resolve('@octanejs/app-core/data-root');
 
 /**
  * @typedef {import('@octanejs/vite-plugin').Context} Context
@@ -208,6 +213,16 @@ export async function handleRenderRoute(
 			{ pending: PendingComponent, catch: CatchComponent },
 			/** @type {any} */ (serverRuntime),
 		);
+		const dataPath = octaneConfig?.data;
+		if (dataPath) {
+			const dataModule = await vite.ssrLoadModule(dataPath);
+			const { DataRoot } = await vite.ssrLoadModule(DATA_ROOT_MODULE);
+			RootComponent = provideRouteData(
+				context,
+				{ path: dataPath, open: dataModule.default, Root: DataRoot },
+				RootComponent,
+			);
+		}
 		// Discovery runs while loading the page/layout above. Snapshot capability
 		// afterwards; its live registry also resolves widgets compiled lazily later.
 		const clientBuild = getClientBuild?.();
@@ -232,6 +247,7 @@ export async function handleRenderRoute(
 			params: context.params,
 			url: requestUrl,
 			preHydrate: octaneConfig?.router.preHydrate ?? null,
+			data: octaneConfig?.data ?? null,
 			rootBoundary: {
 				pending: serializeComponentEntry(pendingEntry),
 				catch: serializeComponentEntry(catchEntry),
@@ -314,10 +330,17 @@ export async function handleRenderRoute(
 
 		// Feature-bearing documents activate after the complete shell and its
 		// selection authority; open result channels must not hold input hostage.
-		const body = composeHtmlStream(prefix, renderStream, suffix, preparedTemplate.afterShell);
+		const body = composeHtmlStream(
+			prefix,
+			renderStream,
+			suffix,
+			preparedTemplate.afterShell,
+			routeEnding(context, nonceAttribute(nonce)),
+		);
 
 		return new Response(body, { status, headers });
 	} catch (error) {
+		endRoute(context);
 		console.error('[octane] SSR render error:', error);
 
 		const errorHtml = generateErrorHtml(error, route);
