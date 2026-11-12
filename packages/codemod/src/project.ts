@@ -922,10 +922,11 @@ type AdapterState =
 const PREVIOUS_INTL_SHA256 = ['07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98'];
 
 const PREVIOUS_SVG_SHA256 = [
+	'62ef936e3ce64cfe809297e08e74538f0c409f0bde6a926ca7b88de93161a38d',
 	'a3d611226ba955f4f5601caa4c6987f0a5a943fab97362843d16f02c686c6944',
+	'058f232bcee5d0caf24d72ec8f9864152b7eb6a9e882614bff3209ff0d145d00',
 	'3becf859871f17914f6f0631e8db8058aa4932fd4a9817718b98eb247a902b24',
 	'1dbf34eea75c07c21c8ab3814d54e58115e833aa140fc5f34b5f2cba91d018c3',
-	'62ef936e3ce64cfe809297e08e74538f0c409f0bde6a926ca7b88de93161a38d',
 ];
 
 function inspectAdapter(file: string, source: string, previous?: readonly string[]): AdapterState {
