@@ -59,15 +59,29 @@ export function Stable({ ref }) {
 	useImperativeHandle(ref, () => ({ read })${deps});
 	return <p>shared</p>;
 }`,
+				'Redeclared.jsx': `import { useImperativeHandle } from 'react';
+const shared = () => 'shared';
+function useHandle(ref, label) {
+	function read() { return label; }
+	var read = shared;
+	useImperativeHandle(ref, () => ({ read })${deps});
+}
+export function Redeclared({ ref, label }) {
+	useHandle(ref, label);
+	return <p>shared</p>;
+}`,
 			});
 			const { files } = await runCodemod([root], { write: false, strong: true });
 			const fresh = files.find((file) => file.file === 'Fresh.tsx');
 			const stable = files.find((file) => file.file === 'Stable.tsx');
 			expect(fresh).toMatchObject({ strong: true, diagnostics: [] });
-			expect(stable).toMatchObject({ strong: false });
-			expect(stable.diagnostics).toContainEqual(
-				expect.objectContaining({ code: 'OCTANE_STRONG_UNTRACKED_EFFECT' }),
-			);
+			const redeclared = files.find((file) => file.file === 'Redeclared.jsx');
+			for (const file of [stable, redeclared]) {
+				expect(file).toMatchObject({ strong: false });
+				expect(file.diagnostics).toContainEqual(
+					expect.objectContaining({ code: 'OCTANE_STRONG_UNTRACKED_EFFECT' }),
+				);
+			}
 		},
 	);
 

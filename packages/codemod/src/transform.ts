@@ -3168,13 +3168,22 @@ class ModuleTransform {
 			!method ||
 			!ts.isFunctionDeclaration(method) ||
 			method.parent !== statement.parent ||
-			!method.name ||
-			!method.body ||
-			this.localUses(method.name).some(
+			!method.body
+		)
+			return;
+		const binding = method.name;
+		if (
+			!binding ||
+			this.localUses(binding).some(
 				(use) =>
 					use !== field.name && !(ts.isCallExpression(use.parent) && use.parent.expression === use),
 			) ||
-			reads(statement.parent, (id) => id.text === 'eval')
+			// TypeScript can bind a function and a same-named var to separate symbols.
+			reads(
+				statement.parent.parent,
+				(id) =>
+					id.text === 'eval' || (id !== binding && id.text === binding.text && declaresName(id)),
+			)
 		)
 			return;
 		return `[${field.name.getText(this.sf)}]`;
