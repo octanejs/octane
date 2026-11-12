@@ -55,6 +55,8 @@ function runtime(s: ts.ImportDeclaration | ts.ExportDeclaration) {
 	return !items?.length || items.some((item) => !item.isTypeOnly);
 }
 
+export { runtime as hasRuntimeDependency };
+
 function resolveOptions(importer: string): ts.CompilerOptions {
 	const file = ts.findConfigFile(path.dirname(importer), ts.sys.fileExists);
 	const settings = file && ts.readConfigFile(file, ts.sys.readFile);
