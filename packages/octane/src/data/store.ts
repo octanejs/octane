@@ -328,6 +328,17 @@ function sameRow(a: unknown, b: unknown): boolean {
 	return keys.every((key) => Object.is((a as any)[key], (b as any)[key]));
 }
 
+/** Compare confirmed read outputs only when a bundled refresh and a newer full value raced. */
+function sameWireValue(a: unknown, b: unknown): boolean {
+	if (Object.is(a, b)) return true;
+	try {
+		return devalue.stringify(a) === devalue.stringify(b);
+	} catch {
+		// A custom transport can return objects the wire codec cannot represent.
+		return false;
+	}
+}
+
 /** A stable key for plain input: object keys sorted, so `{a,b}` and `{b,a}` share an entry. */
 function inputKey(value: unknown): string {
 	return JSON.stringify(value, (_, item) =>
@@ -1199,21 +1210,37 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			if (!entry) continue;
 			// Another request, invalidation or write reply overtook this write. The server
 			// gives no ordering between them, so reload rather than publishing an older value.
-			if (entry.attempt > dispatchedAt) {
+			const overtaken = entry.attempt > dispatchedAt;
+			if (
+				overtaken &&
+				(entry.baseSeq <= dispatchedAt || entry.stale || entry.inflight || entry.span)
+			) {
 				reload.add(entry);
 				continue;
 			}
 			refreshed.add(entry);
 			// The refreshed value supersedes any load that preceded this write.
-			const attempt = supersede(entry);
+			const attempt = overtaken ? entry.attempt : supersede(entry);
 			const startedSeq = ++sequence;
-			const current = () => !retired && entry.attempt === attempt;
+			const current = () => {
+				if (retired || entries.get(entry.key) !== entry) return false;
+				if (entry.attempt === attempt) return true;
+				// A partial feed edit can supersede the refresh while its schema validates.
+				// The edit cannot account for the rest of the reply; a later full load can.
+				if (!entry.inflight && !entry.stale && entry.baseSeq < startedSeq) invalidateEntry(entry);
+				return false;
+			};
 			pending.push(
 				Promise.resolve()
 					.then(() => parse(entry.read.output, item.value))
 					.then(
 						(value) => () => {
 							if (!current()) return undefined;
+							if (overtaken) {
+								// The feed can echo this write before its reply arrives.
+								if (!sameWireValue(entry.base, value)) invalidateEntry(entry);
+								return undefined;
+							}
 							adopt(entry, value, startedSeq);
 							save(entry);
 							return entry;

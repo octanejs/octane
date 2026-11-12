@@ -5,6 +5,7 @@ import {
 	DataRetiredError,
 	DataUncertainError,
 	httpTransport,
+	receive,
 	read,
 	view,
 	write,
@@ -785,6 +786,67 @@ describe('octane/data server-assigned IDs and server transactions', () => {
 		server.release();
 		await settled();
 		expect(server.log).not.toContainEqual(expect.stringMatching(/^setDone/));
+	});
+
+	it('keeps a write to one round trip when its feed already supplied the same read', async () => {
+		const counts = read({
+			name: 'counts',
+			tags: ['todo'],
+			output: schema<{ done: number }>((v) => typeof v?.done === 'number'),
+		});
+		const requests: string[] = [];
+		const store = createDataStore({
+			transport: async (request) => {
+				requests.push(request.kind);
+				if (request.kind === 'read') return { ok: true, value: { done: 0 } };
+				receive(store, [{ read: counts, value: { done: 1 } }]);
+				return {
+					ok: true,
+					value: { id: 'a', title: 'Tides', done: true },
+					refreshed: [{ name: counts.name, input: undefined, value: { done: 1 } }],
+				};
+			},
+		});
+		const count = store.read(counts, undefined);
+		await observe(count);
+		await store.write(setDone, { id: 'a', done: true });
+		await settled();
+		expect(requests).toEqual(['read', 'write']);
+		expect(count.getSnapshot().value).toEqual({ done: 1 });
+	});
+
+	it('rechecks the whole read if a partial feed edit overtakes a validating write refresh', async () => {
+		let resume!: () => void;
+		let hold = false;
+		const listRead = read({
+			name: todos.name,
+			entities: (list: TodoItem[]) => Todo.from(list),
+			output: {
+				'~standard': {
+					version: 1,
+					vendor: 'test',
+					validate: async (value: unknown) => {
+						if (hold) {
+							hold = false;
+							await new Promise<void>((resolve) => (resume = resolve));
+						}
+						return { value: value as TodoItem[] };
+					},
+				},
+			},
+		});
+		const add = write({ name: addTodo.name, input: addTodo.input, invalidates: ['todo'] });
+		const server = createServer();
+		const store = createDataStore({ transport: server.transport });
+		const list = store.read(listRead, undefined);
+		await observe(list);
+		hold = true;
+		await store.write(add, { title: 'New book' });
+		await vi.waitFor(() => expect(resume).toBeDefined());
+		server.rows[0]!.title = 'Renamed';
+		receive(store, [{ put: Todo, value: { ...server.rows[0]! } }]);
+		resume();
+		await vi.waitFor(() => expect(list.getSnapshot().value).toEqual(server.rows));
 	});
 
 	it('rechecks a shared read when concurrent writes deliver their refreshed values out of order', async () => {
