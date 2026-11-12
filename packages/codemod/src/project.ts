@@ -25,6 +25,7 @@ import { bind, projectTypeAt, textKind, transformModule } from './transform.js';
 import { forwardedProps } from './forwarded-props.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
+const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|17\.(?:0|[1-9]\d*))$/;
 /** React packages and the Octane package that replaces each. */
 const CATALOG = { ...DATA.reactPackages, ...PORTED_PACKAGES };
 /** A package that, by its name, renders through React. */
@@ -257,7 +258,7 @@ export async function runCodemod(
 				!!lib &&
 				lib.manifest.name === 'react-intl' &&
 				/^7\./.test(lib.version) &&
-				/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(octane) &&
+				ADAPTER_OCTANE_VERSION.test(octane) &&
 				['react', 'react-dom'].every((name) =>
 					/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(base, name)?.version ?? ''),
 				) &&
@@ -316,7 +317,7 @@ export async function runCodemod(
 		target === 'tsrx' &&
 		compiler &&
 		reactCompat &&
-		/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(readInstalled(helperDir, 'octane')?.version ?? '')
+		ADAPTER_OCTANE_VERSION.test(readInstalled(helperDir, 'octane')?.version ?? '')
 			? createScopedStorePlanner(helperDir, storeBridge, config ?? undefined)
 			: null;
 	const { inputFactory, helperFunction } = storeSources(root, config, (file, source) => {
@@ -896,6 +897,7 @@ const PREVIOUS_INTL_HASHES = ['07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102
 const PREVIOUS_SVG_HASHES = [
 	'3becf859871f17914f6f0631e8db8058aa4932fd4a9817718b98eb247a902b24',
 	'1dbf34eea75c07c21c8ab3814d54e58115e833aa140fc5f34b5f2cba91d018c3',
+	'a3d611226ba955f4f5601caa4c6987f0a5a943fab97362843d16f02c686c6944',
 ];
 
 function inspectAdapter(file: string, source: string, previous?: readonly string[]): AdapterState {
@@ -948,7 +950,7 @@ function publishAdapter(
 		fs.writeFileSync(next, source, { mode: 0o600 });
 		fs.chmodSync(next, current.mode);
 		const latest = inspectAdapter(file, source, previous);
-		if (latest.kind === 'current') return true;
+		if (latest.kind !== 'previous') return latest.kind === 'current';
 		if (!canPublishAdapter(latest, current)) return false;
 		fs.renameSync(next, file);
 		return true;

@@ -520,7 +520,7 @@
     },
     {
       "path": "packages/drei/tests/pivot-controls.test.ts",
-      "sha256": "5fe5ec520719322cfeebccc530e8996f97ed94223f4102216174ca930b4dae22",
+      "sha256": "c6f818f0cee953bf2de3222d0a639f8b74182055d5d8d34b14295dfc320f7a11",
       "assertionCount": 7,
       "assertionInventorySha256": "7fbdde852bd8236d4747a8dac085c175e1cf4552c1039b3ee2074b9f0f57b4c3"
     },

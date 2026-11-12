@@ -10,7 +10,10 @@
     "integrity": "sha256:13ec9fc26559a2ab7e09132d80519d13bb0a67e4accd6a48e4a8bf0fde8f1d18",
     "verification": "verified"
   },
-  "upstreamSuites": { "runtime": "insufficient", "types": "absent" },
+  "upstreamSuites": {
+    "runtime": "insufficient",
+    "types": "absent"
+  },
   "adaptedRoots": {
     "source": {
       "roots": ["packages/drei/src"],
@@ -170,7 +173,7 @@
         {
           "path": "packages/drei/audit/runtime-evidence.json",
           "role": "support",
-          "sha256": "0bd780fb186b46f48ccd2d660daeea34761566621fd34d4327cf83a49688e709"
+          "sha256": "f1028c2a97720012770a28f0e4e0ac13114f4fd925b626279ad7a49c18b241a5"
         },
         {
           "path": "packages/drei/audit/test-classifications.json",
