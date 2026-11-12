@@ -2086,10 +2086,11 @@ adapter ABI does not support this hook.
 
 ### Initial render values
 
-Use `useInitialValue(() => value)` when a render deliberately needs the
-initial value for the lifetime of a mount. It retains the result when props or
-the factory change and through hot edits that keep the compiler-assigned hook
-site. Treat the result as an immutable snapshot. Derive values that should follow later inputs in
+Use `useInitialValue(initial)` when a render deliberately needs the
+initial value for the lifetime of a mount. A value argument is evaluated on
+every render. Pass a factory to defer its computation until initialization.
+The snapshot survives prop changes and hot edits that keep the compiler-assigned
+hook site. Treat the result as an immutable snapshot. Derive values that should follow later inputs in
 render. The factory has the same render, retry, and hydration rules as a lazy
 state initializer. Like `useLazyRef`, this hook requires a renderer that
 supports lazy initialization and is unavailable in the Valdi writer ABI.

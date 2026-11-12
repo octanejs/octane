@@ -6272,7 +6272,7 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		return [
 			{
 				hook: 'useInitialValue',
-				message: 'Retain the value returned by the lazy initializer.',
+				message: 'Retain the initial render value.',
 				edits: [
 					...imports,
 					{ start: decl.id.start, end: decl.id.end, text: id.name },

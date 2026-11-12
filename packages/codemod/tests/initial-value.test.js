@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { collectDiagnostics } from 'octane/compiler';
+import { renderToStaticMarkup } from 'octane/server';
 import { mount } from '../../octane/tests/_helpers.js';
 import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
 import { strengthen } from '../dist/strong.js';
 import { transformModule } from '../dist/transform.js';
 
-function migrate(body) {
+function migrate(body, props = '{ initial }: { initial: string }') {
 	const source = `import { useState as state, useRef } from 'react';
-export function Example({ initial }: { initial: string }) {
+export function Example(${props}) {
 	${body}
 }`;
 	const { code } = transformModule(source, 'example.tsx', { strong: true });
@@ -37,6 +38,57 @@ it('preserves lazy initial values and removes the superseded import after both f
 	}
 });
 
+it.each(['value', 'factory'])(
+	'evaluates eager %s inputs on every render and keeps the initial result',
+	(kind) => {
+		const result = migrate(
+			`const [value] = state(source.input); return <p>{value}</p>;`,
+			'{ source }: { source: { input: string | (() => string) } }',
+		);
+		expect(result.strong).toBe(true);
+		const id = 'example.tsrx';
+		const { Example: ServerExample } = loadCompiledFixtureSource(result.code, {
+			id,
+			mode: 'server',
+		});
+		const { Example } = loadCompiledFixtureSource(result.code, { id, mode: 'client' });
+		const firstFactory = vi.fn(function () {
+			expect(this).toBeUndefined();
+			return 'first';
+		});
+		const nextFactory = vi.fn(() => 'next');
+		const firstRead = vi.fn(() => (kind === 'factory' ? firstFactory : 'first'));
+		const nextRead = vi.fn(() => (kind === 'factory' ? 'next' : nextFactory));
+		const first = {
+			source: {
+				get input() {
+					return firstRead();
+				},
+			},
+		};
+		const next = {
+			source: {
+				get input() {
+					return nextRead();
+				},
+			},
+		};
+		expect(renderToStaticMarkup(ServerExample, first).html).toContain('<p>first</p>');
+		const view = mount(Example, first);
+		try {
+			expect(view.find('p').textContent).toBe('first');
+			view.update(Example, next);
+			expect(view.find('p').textContent).toBe('first');
+			expect(firstRead).toHaveBeenCalledTimes(2);
+			expect(nextRead).toHaveBeenCalledTimes(1);
+			expect(firstFactory).toHaveBeenCalledTimes(kind === 'factory' ? 2 : 0);
+			expect(nextFactory).not.toHaveBeenCalled();
+		} finally {
+			view.unmount();
+		}
+	},
+);
+
 it.each([
 	[
 		'ref read in the initializer',
@@ -52,8 +104,9 @@ it.each([
 		'OCTANE_STRONG_SNAPSHOT_MUTATION',
 	],
 	[
-		'initializer whose value is eager',
-		`const [value] = state(initial);
+		'spread arguments',
+		`const args: [string] = [initial];
+		const [value] = state(...args);
 		return <p>{value}</p>;`,
 		'OCTANE_STRONG_READ_ONLY_STATE',
 	],

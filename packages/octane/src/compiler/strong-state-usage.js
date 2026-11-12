@@ -33,7 +33,7 @@ const SKIP_KEYS = new Set([
 	'typeParameters',
 ]);
 const READ_ONLY_MESSAGE =
-	'Strong mode does not allow capturing a useState value while discarding its setter. Derive render values from their inputs, or explicitly retain an initial render snapshot with useInitialValue(() => value). For a value kept for events or effects, use useRef(value) or useLazyRef(() => createValue()) to initialize it once.';
+	'Strong mode does not allow capturing a useState value while discarding its setter. Derive render values from their inputs, or explicitly retain an initial render snapshot with useInitialValue(value). Pass a factory to initialize lazily. For a value kept for events or effects, use useRef(value) or useLazyRef(() => createValue()) to initialize it once.';
 const WRITE_ONLY_MESSAGE =
 	'Strong mode does not allow write-only state. Nothing reads this state value or its getter, so the setter only forces a re-render. Subscribe to external data with useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot) and render its snapshot, or remove the unused state.';
 
@@ -118,8 +118,7 @@ export function analyzeStrongStateUsage(ast, strongHookAnalysis, report) {
 				call.callee.type === 'Identifier' &&
 				resolveBinding(scope, call.callee.name)?.octaneImport === 'useState' &&
 				call.arguments.length === 1 &&
-				(initializer?.type === 'ArrowFunctionExpression' ||
-					initializer?.type === 'FunctionExpression') &&
+				initializer?.type !== 'SpreadElement' &&
 				id.type === 'ArrayPattern' &&
 				id.elements.length === 1 &&
 				id.elements[0]?.type === 'Identifier' &&

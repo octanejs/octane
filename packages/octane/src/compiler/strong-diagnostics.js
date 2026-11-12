@@ -214,7 +214,7 @@ export const STRONG_DIAGNOSTICS = [
 		detects:
 			'A declaration takes the value from a `useState` call and discards its setter, for example `const [value] = useState(initial)` or `const value = useState(initial)[0]`. This includes lazy initializers.',
 		replacement:
-			'Derive render values from their inputs. Use `useInitialValue(() => value)` for a deliberate initial render snapshot, or `useRef(value)` or `useLazyRef(() => createValue())` for mutable values kept for events or effects.',
+			'Derive render values from their inputs. Use `useInitialValue(value)` for a deliberate initial render snapshot. Pass a factory to initialize lazily. Use `useRef(value)` or `useLazyRef(() => createValue())` for mutable values kept for events or effects.',
 		primitives: ['useInitialValue', 'useRef', 'useLazyRef'],
 	},
 	{

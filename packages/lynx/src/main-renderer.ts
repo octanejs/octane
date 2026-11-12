@@ -1561,9 +1561,9 @@ export function useLazyRef<T>(factory: () => T, _slot?: unknown): { current: T }
 	return { current: factory() };
 }
 
-export function useInitialValue<T>(factory: () => T, _slot?: unknown): T {
+export function useInitialValue<T>(initial: T | (() => T), _slot?: unknown): NoInfer<T> {
 	currentOwner();
-	return factory();
+	return typeof initial === 'function' ? (initial as () => T)() : initial;
 }
 
 export function useId(_slot?: unknown): string {

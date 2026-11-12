@@ -1386,9 +1386,11 @@ export function useLazyRef<T>(factory: () => T, slot?: HookSlot): { current: T }
 	return ref;
 }
 
-/** Capture a render value once for the lifetime of this hook. */
-export function useInitialValue<T>(factory: () => T, slot?: symbol): T {
-	return useLazyRef(factory, slot).current;
+/** Capture a render value for this mount, with the same initial-value inference as useState. */
+export function useInitialValue<T>(initial: T | (() => T), slot?: symbol): NoInfer<T> {
+	return typeof initial === 'function'
+		? useLazyRef(initial as () => T, slot).current
+		: useRef(initial, slot).current;
 }
 
 /**

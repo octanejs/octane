@@ -1,4 +1,4 @@
-import { useInitialValue, useLazyRef, useRef } from 'octane';
+import { useInitialValue, useLazyRef, useRef, useState } from 'octane';
 import {
 	useInitialValue as useServerInitialValue,
 	useLazyRef as useServerLazyRef,
@@ -45,8 +45,16 @@ useServerLazyRef(() => 1, 'slot');
 const initialized: { count: number } = useInitialValue(() => ({ count: 1 }));
 const initializedFunction: () => number = useServerInitialValue(() => callback, slot);
 const initializedUndefined: undefined = useUniversalInitialValue(() => undefined);
-// @ts-expect-error Initial values require a factory.
-useInitialValue(123);
+const [stateLiteral] = useState('first');
+const initialLiteral = useInitialValue('first');
+const initialLiteralAssignment: typeof initialLiteral = 'later';
+const stateLiteralAssignment: typeof stateLiteral = initialLiteralAssignment;
+const exactLiteral: 'first' = useInitialValue('first' as const);
+const eagerConst = 'first';
+const eagerConstSnapshot = useInitialValue(eagerConst);
+const eagerConstAssignment: typeof eagerConstSnapshot = stateLiteralAssignment;
+const eagerObject: { count: number } = useInitialValue({ count: 1 });
+const explicitNumber: number = useInitialValue<number>(1);
 // @ts-expect-error Numeric slots are compiler-owned.
 useInitialValue(() => 1, 5);
 
@@ -66,4 +74,8 @@ void [
 	initialized,
 	initializedFunction,
 	initializedUndefined,
+	exactLiteral,
+	eagerConstAssignment,
+	eagerObject,
+	explicitNumber,
 ];
