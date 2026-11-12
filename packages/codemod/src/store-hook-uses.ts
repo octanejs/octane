@@ -1,12 +1,12 @@
 import { nativeOutputOwner, renderUses } from './forwarded-props.js';
 import { componentTagOrExport, localUses, portableArguments, scalar } from './local-uses.js';
 import { skipWrappers } from './expression-wrappers.js';
+import type { StoreInputCheck } from './store-inputs.js';
 import ts from 'typescript';
 
-type SharedInput = (module: string, name: string) => boolean | 'opaque';
 type ResultCheck = {
 	item: ts.ImportSpecifier;
-	imported: SharedInput;
+	imported: StoreInputCheck;
 	known: Map<ts.Expression, boolean>;
 	descriptors: (elements: ts.JsxSelfClosingElement[]) => boolean;
 	unchangedHelper?: (module: string, name: string) => boolean;
@@ -261,13 +261,13 @@ export function storeHookUses(
 	}
 	const portable = portableArguments(checker, typeOf);
 	function argument(expr: ts.Expression, check: ResultCheck, allowShared = false) {
-		return portable(expr, (module, name) => {
-			const input = check.imported(module, name);
+		return portable(expr, (module, name, selection) => {
+			const input = check.imported(module, name, selection);
 			// A scalar key can still dispatch to renderer-owned code through the store.
 			return input === 'opaque' ? 'reject' : allowShared && input;
 		});
 	}
-	function sharedHandle(expr: ts.Expression, imported: SharedInput) {
+	function sharedHandle(expr: ts.Expression, imported: StoreInputCheck) {
 		if (!ts.isIdentifier(expr)) return false;
 		const d = checker.getSymbolAtLocation(expr)?.declarations?.[0];
 		if (!d || !ts.isImportSpecifier(d) || d.isTypeOnly || d.parent.parent.isTypeOnly) return false;
@@ -486,7 +486,7 @@ export function storeHookUses(
 	}
 	return (
 		item: ts.ImportSpecifier,
-		imported: SharedInput,
+		imported: StoreInputCheck,
 		descriptors: ResultCheck['descriptors'],
 		unchangedHelper?: ResultCheck['unchangedHelper'],
 	) => {

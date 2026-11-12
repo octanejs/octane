@@ -476,6 +476,87 @@ it.each([
 	},
 );
 
+it('defers store arguments carrying JSX from a converted producer through unchanged relays', async () => {
+	const pane = (setup, value = 'id') => `import { useSnapshot } from 'observer';
+${setup}
+export function Pane() { return <p>{useSnapshot({ id: ${value} })}</p>; }`;
+	const relayed = [
+		'destructured',
+		'returned',
+		'projected',
+		'scalar',
+		'conditional',
+		'inspected',
+		'discarded',
+		'retained',
+		'nested',
+	];
+	const { app } = project({
+		'observer/react-hooks.ts': `import {use} from 'react'; import {current} from './renderer';
+import {valueOf} from './state';
+export function useChannel(key: {id: string}) { return valueOf(use(current)) + ':' + key.id; }`,
+		'app/src/producer.tsx': `const badge = <b/> as unknown as string;
+export const bag = { badge, scalar: 'safe' };
+export const { badge: destructured } = bag;
+const readBadge = () => bag.badge;
+export const returned = readBadge();
+export const conditional = badge ? 'safe' : 'missing';
+export const inspected = typeof badge;
+export const discarded = (badge, 'safe');
+export type Label = string;
+export default badge;`,
+		'app/src/unchanged.tsx':
+			"import type { Label } from './producer.tsx'; export const retained = <b/> as unknown as Label;",
+		'app/src/nested/tsconfig.json': '{"extends":"../../tsconfig.json"}',
+		'app/src/nested/original.tsx': 'export const nested = <b/> as unknown as string;',
+		'app/src/relay.ts': `import { bag } from './producer';
+export { destructured, returned, conditional, inspected, discarded } from './producer';
+export { retained } from './unchanged';
+export { nested } from './nested/original';
+export const projected = bag.badge;
+export const scalar = bag.scalar;`,
+		...Object.fromEntries(
+			relayed.map((name) => [
+				'app/src/' + name + '.tsx',
+				pane(`import { ${name} as id } from './relay';`),
+			]),
+		),
+		'app/src/defaultArg.tsx': pane("import id from './producer';"),
+		'app/src/namespaceArg.tsx': pane("import * as source from './producer';", 'source.bag.badge'),
+		'app/src/discardedArg.tsx': pane(
+			"import { bag } from './producer'; const select = (_label: string, value: string) => value;",
+			"select(bag.badge, 'safe')",
+		),
+	});
+	const rejected = ['destructured', 'returned', 'projected', 'defaultArg', 'namespaceArg'];
+	const accepted = [
+		'scalar',
+		'conditional',
+		'inspected',
+		'discarded',
+		'retained',
+		'nested',
+		'discardedArg',
+	];
+	const result = await runCodemod(
+		['producer', ...rejected, ...accepted].map((name) => path.join(app, 'src', name + '.tsx')),
+		{ root: app, strong: true, verify: true, projectTypes: true, write: false },
+	);
+	for (const name of rejected) {
+		const file = result.files.find((entry) => entry.file === 'src/' + name + '.tsx');
+		expect(file.notes).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+	}
+	for (const name of accepted) {
+		const file = result.files.find((entry) => entry.file === 'src/' + name + '.tsx');
+		expect(file.rules['store-hook']).toBe(1);
+		expect(
+			[...file.notes, ...file.diagnostics].filter((item) => item.severity === 'error'),
+		).toEqual([]);
+	}
+});
+
 it('preserves the active store and aliased handle through effects, Effect Events and clicks', async () => {
 	const { app } = project({
 		'observer/public-store.ts': "export { valueOf, key } from './state';",
