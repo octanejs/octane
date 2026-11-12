@@ -146,6 +146,10 @@ function server() { return null; }`;
 		const consumer = `import { useValue as useAttribute } from './use-value';
 type Snapshot = ReturnType<typeof useAttribute>;
 export function Pane() { const value: Snapshot = useAttribute(); return <p>{value === null ? 'server' : value ? 'on' : 'off'}</p>; }`;
+		const withRefs = `import { useRef as emptyRef } from 'react';\n${consumer.replace(
+			'const value:',
+			'const first=emptyRef(null); const second=emptyRef(null); const value:',
+		)}`;
 		const root = project({
 			'package.json': '{"type":"module"}',
 			'tsconfig.json':
@@ -156,9 +160,10 @@ export function subscribe(listener: () => void) {
 	observer.observe(document.documentElement, {attributes:true, attributeFilter:['data-label']});
 	return () => observer.disconnect();
 }`,
+			'other-ref.ts': "export { useRef } from 'react';",
 			'use-value.ts': wrapper,
 			'Pane.tsx': consumer,
-			'Other.tsx': consumer.replace('function Pane', 'function Other'),
+			'Other.tsx': withRefs.replace('function Pane', 'function Other'),
 			'Unchanged.tsx': consumer.replace('function Pane', 'function Unchanged'),
 			'Mixed.tsx': consumer + '\nexport function ReactValue() { return useAttribute(); }',
 		});
@@ -179,6 +184,39 @@ export function subscribe(listener: () => void) {
 			);
 		};
 		await expectBlocked([path.join(root, 'Mixed.tsx')]);
+		for (const source of [
+			withRefs.replace('emptyRef(null)', 'emptyRef(Math.random())'),
+			withRefs.replace('const first', 'let first'),
+			withRefs.replace('const first', 'await using first'),
+			withRefs.replace('const value:', 'using value:'),
+			withRefs.replace('const value:', 'const earlier = Math.random(), value:'),
+			withRefs.replace("from 'react'", "from './other-ref'"),
+		]) {
+			const file = path.join(root, 'Unproved.tsx');
+			fs.writeFileSync(file, source);
+			const preview = await runCodemod([file], { root, strong: true, write: false });
+			expect(preview.files[0].code).toContain("from './use-value'");
+			expect(preview.files[0].notes.filter((note) => note.rule === 'bindings')).toEqual([]);
+		}
+
+		const shadow = path.join(root, 'shadow');
+		const localReact = path.join(root, 'local-react');
+		fs.mkdirSync(path.join(shadow, 'node_modules'), { recursive: true });
+		fs.mkdirSync(localReact);
+		fs.writeFileSync(
+			path.join(localReact, 'package.json'),
+			'{"name":"react","version":"19.2.0","types":"./index.d.ts"}',
+		);
+		fs.writeFileSync(
+			path.join(localReact, 'index.d.ts'),
+			'export declare function useRef(value: null): { current: null };',
+		);
+		fs.symlinkSync(localReact, path.join(shadow, 'node_modules/react'), 'dir');
+		const shadowed = path.join(shadow, 'View.tsx');
+		fs.writeFileSync(shadowed, withRefs.replace('./use-value', '../use-value'));
+		const preview = await runCodemod([shadowed], { root, strong: true, write: false });
+		expect(preview.files[0].code).toContain("from '../use-value'");
+		expect(preview.files.some((file) => file.file.endsWith('.octane.ts'))).toBe(false);
 		for (const alias of ['readAttribute', 'use3Value', 'useContext', 'use']) {
 			const input = path.join(root, 'Alias.tsx');
 			fs.writeFileSync(input, consumer.replaceAll('useAttribute', alias));
@@ -204,6 +242,7 @@ export function subscribe(listener: () => void) {
 		for (const input of ['Pane.tsx', 'Other.tsx']) {
 			const file = migrated.files.find((result) => result.file === input);
 			expect(file?.strong).toBe(true);
+			expect(file.code).toContain("from './use-value.octane'");
 			expect([...file.notes, ...file.diagnostics].filter((n) => n.severity === 'error')).toEqual(
 				[],
 			);

@@ -3,8 +3,45 @@ import { contains, renderUses } from './forwarded-props.js';
 import { localUses } from './local-uses.js';
 import { skipWrappers } from './expression-wrappers.js';
 
+function reactImport(name: ts.Identifier, checker: ts.TypeChecker) {
+	const binding = checker.getSymbolAtLocation(name)?.declarations?.[0];
+	if (!binding || !ts.isImportSpecifier(binding) || binding.isTypeOnly) return;
+	const clause = binding.parent.parent;
+	const imp = clause.parent;
+	if (
+		!clause.isTypeOnly &&
+		ts.isImportDeclaration(imp) &&
+		!imp.attributes &&
+		ts.isStringLiteral(imp.moduleSpecifier) &&
+		imp.moduleSpecifier.text === 'react'
+	)
+		return (binding.propertyName ?? binding.name).text;
+}
+
+function nullRef(statement: ts.Statement, checker: ts.TypeChecker) {
+	if (!ts.isVariableStatement(statement)) return false;
+	const { flags, declarations } = statement.declarationList;
+	if (!(flags & ts.NodeFlags.Const) || flags & ts.NodeFlags.Using || declarations.length !== 1)
+		return false;
+	const { name, initializer } = declarations[0];
+	return (
+		ts.isIdentifier(name) &&
+		!!initializer &&
+		ts.isCallExpression(initializer) &&
+		!initializer.questionDotToken &&
+		initializer.arguments.length === 1 &&
+		initializer.arguments[0].kind === ts.SyntaxKind.NullKeyword &&
+		ts.isIdentifier(initializer.expression) &&
+		reactImport(initializer.expression, checker) === 'useRef'
+	);
+}
+
 /** A direct initialization in an ordinary component returning a native host. */
-export function nativeSetupHook(ref: ts.Identifier, uses: ReturnType<typeof localUses>) {
+export function nativeSetupHook(
+	ref: ts.Identifier,
+	uses: ReturnType<typeof localUses>,
+	checker: ts.TypeChecker,
+) {
 	const call = ref.parent;
 	if (!ts.isCallExpression(call) || call.expression !== ref) return false;
 	const decl = call.parent;
@@ -16,7 +53,21 @@ export function nativeSetupHook(ref: ts.Identifier, uses: ReturnType<typeof loca
 	)
 		return false;
 	const block = decl.parent.parent.parent;
-	if (!ts.isBlock(block) || block.statements[0] !== decl.parent.parent) return false;
+	if (!ts.isBlock(block)) return false;
+	const first = block.statements[0] === decl.parent.parent;
+	if (!first) {
+		if (
+			decl.parent.flags & ts.NodeFlags.Using ||
+			call.questionDotToken ||
+			call.arguments.length ||
+			decl.parent.declarations.length !== 1
+		)
+			return false;
+		for (const statement of block.statements) {
+			if (statement === decl.parent.parent) break;
+			if (!nullRef(statement, checker)) return false;
+		}
+	}
 	const fn = block.parent;
 	if (
 		!ts.isFunctionDeclaration(fn) ||
@@ -38,7 +89,8 @@ export function nativeSetupHook(ref: ts.Identifier, uses: ReturnType<typeof loca
 		: ts.isJsxSelfClosingElement(value)
 			? value.tagName
 			: undefined;
-	return !!tag && ts.isIdentifier(tag) && /^[a-z]/.test(tag.text);
+	if (!tag || !ts.isIdentifier(tag) || !/^[a-z]/.test(tag.text)) return false;
+	return first ? 'first' : 'afterRefs';
 }
 
 /** Only a call in the first evaluated statement witnesses a hook in this export.
@@ -66,19 +118,7 @@ export function directReactHooks(sf: ts.SourceFile, checker: ts.TypeChecker) {
 				? first.expression
 				: undefined;
 		if (!value || !ts.isCallExpression(value) || !ts.isIdentifier(value.expression)) continue;
-		const binding = checker.getSymbolAtLocation(value.expression)?.declarations?.[0];
-		if (!binding || !ts.isImportSpecifier(binding) || binding.isTypeOnly) continue;
-		const clause = binding.parent.parent;
-		const imp = clause.parent;
-		if (
-			clause.isTypeOnly ||
-			!ts.isImportDeclaration(imp) ||
-			imp.attributes ||
-			!ts.isStringLiteral(imp.moduleSpecifier) ||
-			imp.moduleSpecifier.text !== 'react'
-		)
-			continue;
-		const hook = (binding.propertyName ?? binding.name).text;
+		const hook = reactImport(value.expression, checker);
 		if (hook !== 'useState' && hook !== 'useSyncExternalStore') continue;
 		// A local write can replace the exported function before the importer calls it.
 		if (

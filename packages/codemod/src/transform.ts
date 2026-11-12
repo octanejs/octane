@@ -2317,19 +2317,23 @@ class ModuleTransform {
 						/^use[A-Z0-9]/.test(name)
 					) {
 						const refs = renderUses(this.localUses(item.name));
-						const native = refs.filter((ref) => nativeSetupHook(ref, this.localUses));
-						const call = native[0];
+						const sites = refs.map((ref) => nativeSetupHook(ref, this.localUses, this.checker));
+						const call = refs[sites.indexOf('first')];
 						// Relative imports use the compiler's custom slot-keyed hook naming rule.
 						const slotKeyed = [name, item.name.text].every(
 							(spelling) => /^use[A-Z]/.test(spelling) && spelling !== 'useContext',
 						);
+						const nativeOnly =
+							slotKeyed &&
+							sites.length > 0 &&
+							sites.every(Boolean) &&
+							(!sites.includes('afterRefs') || this.options.originalReact === true);
 						const local =
-							call &&
-							this.options.localReactHook(module, name, slotKeyed && native.length === refs.length);
+							(call || nativeOnly) && this.options.localReactHook(module, name, nativeOnly);
 						if (local && typeof local !== 'string') {
 							dest = local.from;
 							this.count('native-external-store');
-						} else if (local)
+						} else if (local && call)
 							this.note(
 								RULE.bindings,
 								'error',
