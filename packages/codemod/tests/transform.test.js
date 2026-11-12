@@ -49,6 +49,18 @@ function migrate(name) {
 }
 
 describe('transformModule', () => {
+	it('distinguishes a custom Array type from the default library', () => {
+		const source = `/// <reference no-default-lib="true"/>
+declare namespace Vendor {
+	interface Array<T> { map<U>(render: (value: T) => U): U[] }
+}
+export function List({ rows }: { rows: Vendor.Array<string> }) {
+	return <ul>{rows.map(label => <li key={label}>{label}</li>)}</ul>;
+}`;
+		const { code } = transformModule(source, 'list.tsx');
+		expect(code).toContain('rows.map(');
+	});
+
 	it('flags React SVG import conventions only where their components render in Octane', () => {
 		const source = `import { ReactCompat } from 'octane/react';
 import { ReactCompat as ServerCompat } from 'octane/react/server';
