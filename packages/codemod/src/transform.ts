@@ -2738,6 +2738,8 @@ class ModuleTransform {
 										layoutEvent = true;
 									}
 								: undefined,
+							this.options.captureEffectHelpers ? this.localUses : undefined,
+							(arrow) => this.emit(arrow, PLAIN),
 						)
 					: [];
 				if (stored) captures.unshift(...stored);

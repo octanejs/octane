@@ -652,6 +652,7 @@ export async function runCodemod(
 					retry === 'effectProperties' ||
 					retry === 'effectSnapshots',
 				snapshotEffectProperties: retry === 'effectProperties',
+				captureEffectHelpers: retry === 'effectProperties' && installedReact(file),
 				captureEffectSnapshots: retry === 'effectSnapshots',
 				linkRenderState: retry === 'linkedState' && installedReact(file),
 				target,
