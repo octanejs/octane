@@ -76,25 +76,40 @@ export function initializedBefore(checker: ts.TypeChecker, name: ts.Identifier, 
 }
 
 /** Keep calls to ref-only helpers at their original effect, event or cleanup phase. */
-function effectHelpers(
-	body: ts.Block,
+export function effectHelpers(
+	effect: ts.CallExpression,
 	checker: ts.TypeChecker,
 	reactHook: (name: ts.Expression) => string | null,
 	uses: (name: ts.Identifier) => ts.Identifier[],
-	emit: (arrow: ts.ArrowFunction) => string,
+	canMove: boolean,
 ) {
-	const effect = body.parent.parent;
+	if (effect.questionDotToken || effect.arguments.length !== 2) return;
+	const hook = reactHook(effect.expression);
+	if (hook !== 'useEffect' && hook !== 'useLayoutEffect') return;
+	const [callback, deps] = effect.arguments;
+	if (
+		!ts.isArrowFunction(callback) ||
+		callback.parameters.length ||
+		!ts.isBlock(callback.body) ||
+		!ts.isArrayLiteralExpression(deps) ||
+		deps.elements.length
+	)
+		return;
+	const body = callback.body;
 	const scope = effect.parent.parent;
 	const destination = body.statements[0];
 	if (
 		!destination ||
+		(ts.isExpressionStatement(destination) && ts.isStringLiteral(destination.expression)) ||
 		!ts.isExpressionStatement(effect.parent) ||
 		!ts.isBlock(scope) ||
 		!ts.isFunctionLike(scope.parent)
 	)
-		return [];
+		return;
 	const helpers = new Set<ts.VariableDeclaration>();
+	let hasEval = false;
 	visit(body, (node) => {
+		if (ts.isIdentifier(node) && node.text === 'eval') hasEval = true;
 		if (!ts.isCallExpression(node) || !ts.isIdentifier(node.expression)) return;
 		const decl = checker.getSymbolAtLocation(node.expression)?.valueDeclaration;
 		if (
@@ -112,7 +127,8 @@ function effectHelpers(
 		)
 			helpers.add(decl);
 	});
-	const declarations = [];
+	if (hasEval) return;
+	const declarations: { statement: ts.VariableStatement; move: boolean }[] = [];
 	for (const decl of helpers) {
 		const arrow = decl.initializer as ts.ArrowFunction;
 		if (
@@ -126,13 +142,21 @@ function effectHelpers(
 			continue;
 		const refs = uses(decl.name);
 		const inside = refs.filter((ref) => ref.pos >= body.pos && ref.end <= body.end);
+		const statement = decl.parent.parent as ts.VariableStatement;
+		const source = statement.getSourceFile().text;
+		const move =
+			canMove &&
+			inside.length === refs.length &&
+			!/\/[/*]/.test(source.slice(statement.pos, statement.getStart())) &&
+			!ts.getTrailingCommentRanges(source, statement.end)?.length;
 		if (
-			!refs.some(
-				(ref) =>
-					(ref.pos < body.pos || ref.end > body.end) &&
-					ts.isCallExpression(ref.parent) &&
-					ref.parent.expression === ref,
-			) ||
+			(!move &&
+				!refs.some(
+					(ref) =>
+						(ref.pos < body.pos || ref.end > body.end) &&
+						ts.isCallExpression(ref.parent) &&
+						ref.parent.expression === ref,
+				)) ||
 			!inside.length ||
 			!inside.every(
 				(ref) =>
@@ -207,9 +231,9 @@ function effectHelpers(
 			} else if (captured.declarations?.some((d) => d.getSourceFile() === arrow.getSourceFile()))
 				safe = false;
 		});
-		if (safe && readsRef) declarations.push(`const ${decl.name.text} = ${emit(arrow)};`);
+		if (safe && readsRef) declarations.push({ statement, move });
 	}
-	return declarations;
+	if (declarations.length) return { callback, declarations };
 }
 
 /**
@@ -228,8 +252,6 @@ export function effectReceivers(
 		name: string,
 	) => void,
 	bridgeLayout?: (statement: ts.ExpressionStatement, name: string) => void,
-	helperUses?: (name: ts.Identifier) => ts.Identifier[],
-	emitHelper?: (arrow: ts.ArrowFunction) => string,
 ): string[] {
 	const { body } = callback;
 	if (
@@ -277,15 +299,6 @@ export function effectReceivers(
 		members.set(symbol, uses);
 	});
 	if (names.has('eval') || !identifiers.every((dep) => fixedBinding(checker, dep, call))) return [];
-	if (
-		helperUses &&
-		emitHelper &&
-		!deps.elements.length &&
-		ts.isBlock(body) &&
-		!call.questionDotToken &&
-		(hook === 'useEffect' || hook === 'useLayoutEffect')
-	)
-		return effectHelpers(body, checker, reactHook, helperUses, emitHelper);
 	const declarations = [];
 	if (hasProperties) {
 		const properties = deps.elements.filter(ts.isPropertyAccessExpression);

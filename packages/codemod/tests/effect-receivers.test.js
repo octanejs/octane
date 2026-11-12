@@ -701,8 +701,16 @@ export function Probe({ value }) {
 	return <button onClick={() => { latest.current = value; window.records.push(read(1)); record(); }}>Record</button>;
 }`;
 
-it('preserves ref reads at setup, event and cleanup when local helpers are called from an effect', async () => {
-	const migrated = migrate(helperSource);
+const effectOnlyHelperSource = helperSource.replace(
+	'window.records.push(read(1)); record();',
+	'window.records.push(read(1));',
+);
+
+it.each([
+	['shared', helperSource, [2, 3, 2, 8, 7, 7]],
+	['effect-only', effectOnlyHelperSource, [2, 3, 8, 7]],
+])('preserves setup, event and cleanup ref reads for %s helpers', async (kind, input, expected) => {
+	const migrated = migrate(input);
 	expect(migrated.strong).toBe(true);
 	const native = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
 	function Reference({ value }) {
@@ -724,7 +732,7 @@ it('preserves ref reads at setup, event and cleanup when local helpers are calle
 				onClick() {
 					latest.current = value;
 					window.records.push(read(1));
-					record();
+					if (kind === 'shared') record();
 				},
 			},
 			'Record',
@@ -755,8 +763,7 @@ it('preserves ref reads at setup, event and cleanup when local helpers are calle
 	const before = globalThis.IS_REACT_ACT_ENVIRONMENT;
 	globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 	try {
-		const expected = await exercise(true);
-		expect(expected).toEqual([2, 3, 2, 8, 7, 7]);
+		expect(await exercise(true)).toEqual(expected);
 		expect(await exercise(false)).toEqual(expected);
 	} finally {
 		globalThis.IS_REACT_ACT_ENVIRONMENT = before;
@@ -777,11 +784,12 @@ it.each([
 
 it.each([
 	[
-		'an effect-only helper',
-		helperSource.replace(
-			'window.records.push(read(1)); record();',
-			'window.records.push(read(1));',
-		),
+		'an effect-only helper visible to eval',
+		effectOnlyHelperSource.replace('return <button', 'eval("record"); return <button'),
+	],
+	[
+		'an effect-only helper with an attached directive',
+		effectOnlyHelperSource.replace('const record =', '// @ts-expect-error\n\tconst record ='),
 	],
 	[
 		'a contextually typed declaration',
