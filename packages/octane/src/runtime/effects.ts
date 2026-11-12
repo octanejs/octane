@@ -25,6 +25,13 @@ import {
 } from './engine.js';
 import { nodeProto } from '../dom-focused-move.js';
 import { hydrationStarted } from '../hydration-flag.js';
+import {
+	HOST_CLOCK,
+	clearHostTimeout,
+	hostFramesRun,
+	requestHostFrame,
+	setHostTimeout,
+} from '../host-task.js';
 import { __profileQueueCleanup, __profileWorkEnter, __profileRootExit } from '../profiling.js';
 import type { NativeAdoptionState } from '../signals/native-adoption.js';
 import type { FragmentInstance } from './refs.js';
@@ -597,7 +604,7 @@ export function drainQueuedStoreSyncs(): void {
 
 // `schedulePostPaint` — fires after the next paint (React's scheduler trick).
 let _postPaintCbs: Array<() => void> = [];
-let _postPaintTimeout: ReturnType<typeof setTimeout> | null = null;
+let _postPaintTimeout: unknown = null;
 let _postPaintGeneration = 0;
 
 function cancelPostPaint(): void {
@@ -605,7 +612,7 @@ function cancelPostPaint(): void {
 	_postPaintCbs = [];
 	_postPaintGeneration++;
 	if (_postPaintTimeout !== null) {
-		clearTimeout(_postPaintTimeout);
+		clearHostTimeout(_postPaintTimeout);
 		_postPaintTimeout = null;
 	}
 	// Preserve the already-requested frame: sibling imperative focus callbacks
@@ -638,18 +645,16 @@ function schedulePostPaint(cb: () => void): void {
 	if (_postPaintCbs.length !== 1) return;
 	const postAfterPaint = initPostAfterPaint();
 	const generation = ++_postPaintGeneration;
-	const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
-	const hasAnimationFrame = typeof requestAnimationFrame === 'function';
+	const framesRun = hostFramesRun();
 	// Background tabs and occluded WebViews may never receive an animation
 	// frame. One bounded timer per batch prevents passive effects starving while
 	// the ordinary visible-page path still waits for rAF and its post-paint task.
-	_postPaintTimeout = setTimeout(
-		() => drainPostPaint(generation),
-		hidden || !hasAnimationFrame ? 0 : 250,
-	);
-	if (!hidden && hasAnimationFrame) {
-		requestAnimationFrame(() => {
-			postAfterPaint(generation);
+	_postPaintTimeout = setHostTimeout(() => drainPostPaint(generation), framesRun ? 250 : 0);
+	if (framesRun) {
+		requestHostFrame(() => {
+			// The installed test clock orders the post-paint task with every other one.
+			if (HOST_CLOCK) HOST_CLOCK.schedule(() => drainPostPaint(generation), 0, false);
+			else postAfterPaint(generation);
 		});
 	}
 }

@@ -5,6 +5,7 @@
 
 import { HYDRATE_STREAM_ERROR_ATTR, reserveHydrationIds } from './hydrate-boundary.js';
 import { changePendingInitialHydrations, hydrationStarted, hydrating } from '../hydration-flag.js';
+import { setHostTimeout, clearHostTimeout, hostNow } from '../host-task.js';
 import {
 	STREAM_BOUNDARY_ATTR,
 	SUSPENSE_RESOLVED_SEED_ATTR,
@@ -339,7 +340,7 @@ interface SuspenseRetryError {
 }
 interface SuspenseRetryBatch {
 	states: Map<TrySlot, OffscreenCapture | SuspenseRetryError | null>;
-	timer: ReturnType<typeof setTimeout> | null;
+	timer: unknown;
 	queued: boolean;
 	flushing: boolean;
 	/** Cold observers recheck readiness after a commit or a superseding render. */
@@ -377,7 +378,7 @@ function notifySuspenseRetryObservers(batch: SuspenseRetryBatch): void {
 
 function releaseSuspenseRetryBatch(root: Block, batch: SuspenseRetryBatch): void {
 	if (batch.states.size !== 0 || batch.flushing) return;
-	if (batch.timer !== null) clearTimeout(batch.timer);
+	if (batch.timer !== null) clearHostTimeout(batch.timer);
 	SUSPENSE_RETRIES.delete(root);
 	// No extra root walk on ordinary scheduled renders once the last pending
 	// retry commits or is canceled. The existing visibility driver owns the hook.
@@ -399,15 +400,15 @@ function scheduleSuspenseRetryBatch(root: Block, batch: SuspenseRetryBatch): voi
 	queueMicrotask(() => {
 		batch.queued = false;
 		if (SUSPENSE_RETRIES.get(root) !== batch) return;
-		if (batch.timer !== null) clearTimeout(batch.timer);
+		if (batch.timer !== null) clearHostTimeout(batch.timer);
 		batch.timer = null;
-		const remaining = mostRecentSuspenseCommit + SUSPENSE_RETRY_THROTTLE_MS - performance.now();
+		const remaining = mostRecentSuspenseCommit + SUSPENSE_RETRY_THROTTLE_MS - hostNow();
 		if (actScopeDepth !== 0 || remaining <= 10) {
 			flushSuspenseRetryBatch(root, batch);
 		} else {
 			// Do not recalculate at fire time: another root can commit a fallback
 			// meanwhile without postponing this root's already-scheduled reveal.
-			batch.timer = setTimeout(() => flushSuspenseRetryBatch(root, batch), remaining);
+			batch.timer = setHostTimeout(() => flushSuspenseRetryBatch(root, batch), remaining);
 		}
 	});
 }
@@ -469,12 +470,12 @@ export function recordSuspenseCommit(state: TrySlot): void {
 	// Hidden Activity is different: its committed fallbacks still advance React's
 	// retry window, even though Activity owns an additional visibility hide.
 	if (findSuspenseHiddenTry(state.parentBlock) !== null) return;
-	mostRecentSuspenseCommit = performance.now();
+	mostRecentSuspenseCommit = hostNow();
 }
 
 function flushSuspenseRetryBatch(root: Block, batch: SuspenseRetryBatch): void {
 	if (SUSPENSE_RETRIES.get(root) !== batch) return;
-	if (batch.timer !== null) clearTimeout(batch.timer);
+	if (batch.timer !== null) clearHostTimeout(batch.timer);
 	batch.timer = null;
 	const run = (): void => {
 		if (SUSPENSE_RETRIES.get(root) !== batch) return;
@@ -2201,7 +2202,7 @@ export function releaseHeldTransition(state: TrySlot): void {
 	// transition, so the prior DOM is being replaced eagerly and a timeout-
 	// driven @pending swap would race with the urgent commit.
 	if (state.transitionTimeoutId !== null) {
-		clearTimeout(state.transitionTimeoutId);
+		clearHostTimeout(state.transitionTimeoutId);
 		state.transitionTimeoutId = null;
 	}
 }
@@ -2289,10 +2290,10 @@ export function handleSuspense(
 			(state.transitionTimeoutId === null || state.pendingThenable !== thenable)
 		) {
 			if (state.transitionTimeoutId !== null) {
-				clearTimeout(state.transitionTimeoutId);
+				clearHostTimeout(state.transitionTimeoutId);
 				state.transitionTimeoutId = null;
 			}
-			state.transitionTimeoutId = setTimeout(() => {
+			state.transitionTimeoutId = setHostTimeout(() => {
 				state.transitionTimeoutId = null;
 				// Only swap if we're still in the same suspended-transition state
 				// (a fresher render or a resolve may have already moved us).
@@ -3054,7 +3055,7 @@ export function attachResume(state: TrySlot, thenable: TrackedThenable<any>): vo
 		// before the timeout would have swapped to @pending, so the prior DOM
 		// stays put and the just-resolved render commits over it directly.
 		if (state.transitionTimeoutId !== null) {
-			clearTimeout(state.transitionTimeoutId);
+			clearHostTimeout(state.transitionTimeoutId);
 			state.transitionTimeoutId = null;
 		}
 		const persistent = state.tryBlock;
@@ -3194,7 +3195,7 @@ function switchToCatchInner(state: TrySlot, err: any, reportInline: boolean): vo
 	// state, so a timeout-driven swap to @pending would conflict with the
 	// catch branch about to mount.
 	if (state.transitionTimeoutId !== null) {
-		clearTimeout(state.transitionTimeoutId);
+		clearHostTimeout(state.transitionTimeoutId);
 		state.transitionTimeoutId = null;
 	}
 	// Catch is a fresh terminal state — discard any preserved try-body hook
