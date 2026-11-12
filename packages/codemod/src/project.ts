@@ -25,6 +25,7 @@ import { bind, projectTypeAt, textKind, transformModule } from './transform.js';
 import { forwardedProps } from './forwarded-props.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
+const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|17\.(?:0|[1-9]\d*))$/;
 /** React packages and the Octane entry point that replaces each. */
 const CATALOG = { ...DATA.reactPackages, ...PORTED_PACKAGES };
 const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies'];
@@ -270,7 +271,7 @@ export async function runCodemod(
 				!!lib &&
 				lib.manifest.name === 'react-intl' &&
 				/^7\./.test(lib.version) &&
-				/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(octane) &&
+				ADAPTER_OCTANE_VERSION.test(octane) &&
 				['react', 'react-dom'].every((name) =>
 					/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(base, name)?.version ?? ''),
 				) &&
@@ -329,7 +330,7 @@ export async function runCodemod(
 		target === 'tsrx' &&
 		compiler &&
 		reactCompat &&
-		/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(readInstalled(helperDir, 'octane')?.version ?? '')
+		ADAPTER_OCTANE_VERSION.test(readInstalled(helperDir, 'octane')?.version ?? '')
 			? createScopedStorePlanner(helperDir, storeBridge, config ?? undefined)
 			: null;
 	const { inputFactory, helperFunction } = storeSources(root, config, (file, source) => {
@@ -784,7 +785,7 @@ export async function runCodemod(
 			file: string;
 			source: string;
 			state: AdapterState;
-			previous: string;
+			previous: readonly string[];
 			rule: string;
 		}[] = [];
 		if (adapterState && adapterSource && intlConsumer)
@@ -903,21 +904,26 @@ export async function runCodemod(
 }
 
 type AdapterState =
-	{ kind: 'missing' | 'current' | 'conflict' } | { kind: 'previous'; mode: number };
+	{ kind: 'missing' | 'current' | 'conflict' } | { kind: 'previous'; mode: number; hash: string };
 
 // Hash only previously shipped helpers. A locally edited file belongs to the application.
-const PREVIOUS_INTL_SHA256 = '07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98';
+const PREVIOUS_INTL_SHA256 = ['07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98'];
 
-const PREVIOUS_SVG_SHA256 = '3becf859871f17914f6f0631e8db8058aa4932fd4a9817718b98eb247a902b24';
+const PREVIOUS_SVG_SHA256 = [
+	'3becf859871f17914f6f0631e8db8058aa4932fd4a9817718b98eb247a902b24',
+	'1dbf34eea75c07c21c8ab3814d54e58115e833aa140fc5f34b5f2cba91d018c3',
+];
 
-function inspectAdapter(file: string, source: string, previous?: string): AdapterState {
+function inspectAdapter(file: string, source: string, previous?: readonly string[]): AdapterState {
 	const stat = fs.lstatSync(file, { throwIfNoEntry: false });
 	if (!stat) return { kind: 'missing' };
 	if (!stat.isFile()) return { kind: 'conflict' };
 	const bytes = fs.readFileSync(file);
 	if (bytes.equals(Buffer.from(source))) return { kind: 'current' };
-	if (previous && createHash('sha256').update(bytes).digest('hex') === previous)
-		return { kind: 'previous', mode: stat.mode & 0o777 };
+	if (previous) {
+		const hash = createHash('sha256').update(bytes).digest('hex');
+		if (previous.includes(hash)) return { kind: 'previous', mode: stat.mode & 0o777, hash };
+	}
 	return { kind: 'conflict' };
 }
 
@@ -925,7 +931,10 @@ function canPublishAdapter(current: AdapterState, planned: AdapterState): boolea
 	return (
 		current.kind === 'current' ||
 		(current.kind === 'missing' && planned.kind === 'missing') ||
-		(current.kind === 'previous' && planned.kind === 'previous' && current.mode === planned.mode)
+		(current.kind === 'previous' &&
+			planned.kind === 'previous' &&
+			current.mode === planned.mode &&
+			current.hash === planned.hash)
 	);
 }
 
@@ -933,7 +942,7 @@ function publishAdapter(
 	file: string,
 	source: string,
 	planned: AdapterState,
-	previous: string,
+	previous: readonly string[],
 ): boolean {
 	const current = inspectAdapter(file, source, previous);
 	if (current.kind === 'current') return true;
@@ -956,7 +965,7 @@ function publishAdapter(
 		fs.chmodSync(next, current.mode);
 		const latest = inspectAdapter(file, source, previous);
 		if (latest.kind !== 'previous') return latest.kind === 'current';
-		if (latest.mode !== current.mode) return false;
+		if (!canPublishAdapter(latest, current)) return false;
 		fs.renameSync(next, file);
 		return true;
 	} finally {

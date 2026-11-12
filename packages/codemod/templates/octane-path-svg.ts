@@ -23,12 +23,23 @@ export function pathSvg(source: string) {
 	const geometry = parseStaticSvg(source);
 	if (!geometry) throw new Error('Expected a raw SVG containing only supported static geometry.');
 	const children = geometry.children.map(prepareShape);
-	return function PathSvg(props: { className?: unknown; 'aria-hidden'?: string | boolean }) {
-		return createElement('svg', {
+	return function PathSvg(props: {
+		className?: unknown;
+		'aria-hidden'?: string | boolean;
+		[name: `data-${string}`]: string | undefined;
+	}) {
+		const attributes: Record<string, unknown> = {
 			...geometry.root,
 			className: reactClassName(props.className),
 			'aria-hidden': props['aria-hidden'],
 			children: children.map((render) => render()),
-		});
+		};
+		for (const name in props) {
+			if (svgDataAttribute(name) && Object.prototype.hasOwnProperty.call(props, name)) {
+				const value = props[name];
+				if (typeof value === 'string') attributes[name] = value;
+			}
+		}
+		return createElement('svg', attributes);
 	};
 }
