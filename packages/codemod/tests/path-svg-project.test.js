@@ -174,7 +174,7 @@ it.each(['unsupported SVG', 'existing sidecar', 'existing shared helper'])(
 	},
 );
 
-it.each(['v1', 'v2'])(
+it.each(['v1', 'v2', 'v3'])(
 	'upgrades only the pristine %s shared SVG helper and keeps existing sidecars usable',
 	async (version) => {
 		const { root, icon } = fixture();
@@ -872,6 +872,111 @@ it.each(['a remapped clsx import', 'unsupported geometry', 'an unknown receiving
 		expect(files.some((f) => f.output.endsWith('.svg.octane.ts'))).toBe(false);
 	},
 );
+
+it('preserves a fixed SVG color on the server and client without styling ordinary uses', async () => {
+	const { root } = await expectSvgRenderParity(
+		`export function Pane({ className }) {
+			return <span><Mark className={className} style={{ color: 'var(--ink)' }} /></span>;
+		}`,
+		[{ className: 'initial' }, { className: 'updated' }],
+		1,
+	);
+	const ordinary = path.join(root, 'src/ordinary.tsx');
+	fs.writeFileSync(ordinary, pane);
+	const options = { root, svgPaths: true, strong: true, verify: true, write: true };
+	const { files } = await runCodemod([ordinary], options);
+	expect(files.find((file) => file.file === 'src/ordinary.tsx').rules['svg-paths']).toBe(1);
+	const server = await bundleRuntime(
+		path.join(root, 'src'),
+		'server',
+		"export { Pane } from './ordinary.tsrx'; export { prerender } from 'octane/static';",
+		[],
+		{ '.svg': 'text' },
+	);
+	const { html } = await server.prerender(server.Pane, {});
+	expect(html).toContain('<svg');
+	expect(html).not.toContain('style=');
+	for (const file of ['src/reference.tsx', 'src/server.mjs', 'server.mjs', 'client.mjs'])
+		fs.unlinkSync(path.join(root, file));
+	expect((await runCodemod([root], options)).files.filter((file) => file.changed)).toEqual([]);
+});
+
+it.each([
+	['a dynamic color', '<Mark style={{color}} />'],
+	['a fallback value', '<Mark style={{color: "var(--ink, blue)"}} />'],
+	['a comment on the style', '<Mark style={{/* authored color */color: "var(--ink)"}} />'],
+	['a CSS declaration list', '<Mark style={{color: "red;display:none"}} />'],
+	['additional style keys', '<Mark style={{color: "var(--ink)", opacity: 1}} />'],
+	[
+		'duplicate style attributes',
+		'<Mark style={{color: "var(--ink)"}} style={{color: "var(--other)"}} />',
+	],
+	['conditional placement', '<span>{show && <Mark style={{color: "var(--ink)"}} />}</span>'],
+	['mixed uses', '<span><Mark /><Mark style={{color: "var(--ink)"}} /></span>'],
+])('retains the bare SVG diagnostic for %s', async (_label, jsx) => {
+	const { root, file } = fixture(`import Mark from './icons/mark.svg';
+		export function Pane({ color, show }) { return ${jsx}; }`);
+	const { files } = await runCodemod([file], { root, svgPaths: true, write: false });
+	expect(files.find((entry) => entry.file === 'src/pane.tsx').notes).toContainEqual(
+		expect.objectContaining({ rule: 'svg-issuer', severity: 'error' }),
+	);
+	expect(files.some((entry) => entry.rules['svg-paths-adapter'])).toBe(false);
+});
+
+it('keeps styled SVGs out of a generic transformModule adapter', () => {
+	const source = pane.replace('aria-hidden', 'style={{ color: "var(--ink)" }} aria-hidden');
+	const result = transformModule(source, 'pane.tsx', { pathSvgAdapter: () => './native-icon' });
+	expect(result.notes).toContainEqual(
+		expect.objectContaining({ rule: 'svg-issuer', severity: 'error' }),
+	);
+	expect(result.code).toContain('var(--ink)');
+	expect(result.code).not.toContain('./native-icon');
+});
+
+it('preserves the original SVG use when its styled adapter path is occupied', async () => {
+	const source = pane.replace('aria-hidden', 'style={{ color: "var(--ink)" }} aria-hidden');
+	const { root, file, icon } = fixture(source);
+	const adapter = icon + '.octane-color-ink.ts';
+	const authored = 'export const occupied = true;\n';
+	fs.writeFileSync(adapter, authored);
+	const { files } = await runCodemod([file], { root, svgPaths: true, write: true });
+	expect(files.find((entry) => entry.file === 'src/pane.tsx').notes).toContainEqual(
+		expect.objectContaining({
+			rule: 'svg-paths',
+			message: expect.stringContaining('SVG adapter path is occupied'),
+		}),
+	);
+	expect(fs.readFileSync(file, 'utf8')).toBe(source);
+	expect(fs.readFileSync(adapter, 'utf8')).toBe(authored);
+	expect(fs.existsSync(path.join(root, 'src/octane-path-svg.ts'))).toBe(false);
+});
+
+it('keeps a batch unchanged when a styled adapter name is too long', async () => {
+	const { root, file, icon } = fixture();
+	const assetName = 'a'.repeat(225) + '.svg';
+	const plain = pane.replace('@/icons/mark.svg', './icons/' + assetName);
+	const styled = plain.replace(
+		'aria-hidden',
+		'style={{ color: "var(--abcdefghijabcdefghijabcdefghij)" }} aria-hidden',
+	);
+	const ordinary = path.join(root, 'src/ordinary.tsx');
+	fs.renameSync(icon, path.join(path.dirname(icon), assetName));
+	fs.writeFileSync(file, styled);
+	fs.writeFileSync(ordinary, plain);
+	const { files } = await runCodemod([file, ordinary], { root, svgPaths: true, write: true });
+	expect(files.find((entry) => entry.file === 'src/pane.tsx').notes).toContainEqual(
+		expect.objectContaining({
+			rule: 'svg-paths',
+			message: expect.stringContaining('SVG adapter path is too long'),
+		}),
+	);
+	expect(fs.readFileSync(file, 'utf8')).toBe(styled);
+	expect(fs.readFileSync(ordinary, 'utf8')).toBe(plain);
+	expect(fs.existsSync(path.join(root, 'src/octane-path-svg.ts'))).toBe(false);
+	const retry = await runCodemod([ordinary], { root, svgPaths: true, write: true });
+	expect(retry.files.find((entry) => entry.file === 'src/ordinary.tsx').rules['svg-paths']).toBe(1);
+	expect(fs.existsSync(path.join(root, 'src/ordinary.tsrx'))).toBe(true);
+});
 
 it('matches React class coercion for values passed to a directly returned icon', async () => {
 	const classes = [
