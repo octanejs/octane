@@ -29,6 +29,7 @@ export function pathSvg(source: string) {
 		fill?: string;
 		focusable?: string;
 		[name: `data-${string}`]: string | undefined;
+		style?: { transform: string };
 	}) {
 		const attributes: Record<string, unknown> = {
 			...geometry.root,
@@ -44,6 +45,10 @@ export function pathSvg(source: string) {
 				const value = props[name];
 				if (typeof value === 'string') attributes[name] = value;
 			}
+		}
+		if (Object.prototype.hasOwnProperty.call(props, 'style')) {
+			const transform = props.style?.transform;
+			if (typeof transform === 'string') attributes.style = { __proto__: null, transform };
 		}
 		return createElement('svg', attributes);
 	};

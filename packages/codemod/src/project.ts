@@ -978,6 +978,7 @@ const PREVIOUS_SVG_SHA256 = [
 	'a3d611226ba955f4f5601caa4c6987f0a5a943fab97362843d16f02c686c6944',
 	'3becf859871f17914f6f0631e8db8058aa4932fd4a9817718b98eb247a902b24',
 	'1dbf34eea75c07c21c8ab3814d54e58115e833aa140fc5f34b5f2cba91d018c3',
+	'b53641cfbe77205a174179b4d0de60989b34cf4073690fc98536c22a68ee844a',
 ];
 
 function inspectAdapter(file: string, source: string, previous?: readonly string[]): AdapterState {
