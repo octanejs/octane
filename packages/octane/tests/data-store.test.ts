@@ -148,6 +148,38 @@ describe('octane/data store', () => {
 		expect(server.log).toEqual([]);
 	});
 
+	it('keeps a committed write with an invalid server output uncertain until its receipt is known', async () => {
+		const positive = schema<number>((value) => typeof value === 'number' && value > 0);
+		const mark = write({
+			name: setDone.name,
+			input: setDone.input,
+			patches: Todo,
+			output: positive,
+		});
+		const applied: string[] = [];
+		const handler = createDataHandler({}, (handle) => [
+			handle(todos, () => [{ id: 'a', title: 'Tides', done: applied.length > 0 }]),
+			handle(mark, (_input, call) => {
+				applied.push(call.operationId);
+				return 0;
+			}),
+		]);
+		const store = createDataStore({
+			transport: handler.transport(new Request('https://app.test/')),
+		});
+		const list = store.read(todos, undefined);
+		await observe(list);
+
+		const result = await store.write(mark, { id: 'a', done: true }).catch((error) => error);
+		expect(result).toBeInstanceOf(DataUncertainError);
+		expect(applied).toEqual([result.operationId]);
+		expect(list.getSnapshot().value![0].done).toBe(true);
+		store.settle(result.operationId, true);
+		await vi.waitFor(() => expect(list.getSnapshot().refreshing).toBe(false));
+		expect(list.getSnapshot().value![0].done).toBe(true);
+		expect(applied).toHaveLength(1);
+	});
+
 	it('keeps an uncertain edit without counting it twice, until its outcome is named', async () => {
 		const server = createServer();
 		let dropReply = true;
@@ -191,6 +223,25 @@ describe('octane/data store', () => {
 		expect(offlineList.getSnapshot().value).toHaveLength(1);
 		offline.settle(failed.operationId, false);
 		expect(offlineList.getSnapshot().value).toHaveLength(2);
+	});
+
+	it('can settle a write when its transport rejected with a DataError after committing', async () => {
+		const server = createServer();
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				const reply = await server.transport(request, signal);
+				if (request.kind === 'write') throw new DataError('unreadable');
+				return reply;
+			},
+		});
+		const list = store.read(todos, undefined);
+		await observe(list);
+		const error = await store.write(setDone, { id: 'a', done: true }).catch((reason) => reason);
+		expect(error).toBeInstanceOf(DataUncertainError);
+		expect(list.getSnapshot().value![0].done).toBe(true);
+		store.settle(error.operationId, true);
+		await vi.waitFor(() => expect(list.getSnapshot().refreshing).toBe(false));
+		expect(server.log.filter((line) => line.startsWith('setDone'))).toEqual(['setDone true']);
 	});
 
 	it('sends writes to one entity in the order they were submitted', async () => {
@@ -450,6 +501,19 @@ describe('octane/data store', () => {
 		expect(received).toEqual([42]);
 	});
 
+	it('retires queued writes before invoking their transport', async () => {
+		const server = createServer();
+		const store = createDataStore({ transport: server.transport });
+		const first = store.write(setDone, { id: 'a', done: true });
+		const second = store.write(setDone, { id: 'a', done: false });
+		store.retire();
+
+		await Promise.all(
+			[first, second].map((result) => expect(result).rejects.toBeInstanceOf(DataRetiredError)),
+		);
+		expect(server.log).toEqual([]);
+	});
+
 	it('refuses work for a retired account and ignores its late replies', async () => {
 		const server = createServer();
 		let release!: () => void;
@@ -466,6 +530,8 @@ describe('octane/data store', () => {
 
 		// A callback that began under this account still holds this store.
 		const lateInvalidate = () => store.invalidate(['todo']);
+		// Let the read reach the transport before retiring its account.
+		await Promise.resolve();
 		store.retire();
 		release();
 		await settled();

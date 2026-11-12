@@ -218,7 +218,14 @@ export function createDataHandler<C extends object = {}>(
 		const { contract } = handler;
 		const parsed = contract.input ? await parse(contract.input, input) : undefined;
 		const output = await handler.run(parsed, call);
-		return contract.output ? parse(contract.output, output) : output;
+		if (!contract.output) return output;
+		if (kind === 'read') return parse(contract.output, output);
+		try {
+			return await parse(contract.output, output);
+		} catch (cause) {
+			// The handler finished. A bad result cannot establish that its write was refused.
+			throw new Error('octane/data: invalid write result', { cause });
+		}
 	}
 
 	const contextFor = async (request: Request, caller?: DataCaller) =>

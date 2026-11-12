@@ -83,6 +83,13 @@ export class DataUncertainError extends Error {
 	}
 }
 
+/** The prerequisite create was refused, so this queued edit never reached the transport. */
+class DependencyError extends DataError {
+	constructor() {
+		super('dependency');
+	}
+}
+
 /** The store belonged to a grant that has ended, such as a signed-out account. */
 export class DataRetiredError extends Error {
 	constructor() {
@@ -890,6 +897,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	 */
 	async function request(payload: DataRequest, signal: AbortSignal): Promise<DataReply> {
 		await undefined;
+		assertLive();
 		return transport(payload, signal);
 	}
 
@@ -1117,7 +1125,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const { write } = operation;
 		if (write.effect?.kind === 'create' && write.serverId) {
 			if (output === undefined) {
-				operation.gate?.reject(new DataError('dependency'));
+				operation.gate?.reject(new DependencyError());
 			} else {
 				assignId(operation, write.serverId(output));
 			}
@@ -1209,7 +1217,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			touchEntities();
 		} else {
 			remove(operation);
-			operation.gate?.reject(new DataError('dependency'));
+			operation.gate?.reject(new DependencyError());
 		}
 	}
 
@@ -1334,7 +1342,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const previous = queueKey === undefined ? undefined : queues.get(queueKey);
 		const sent = previous
 			? previous.then(dispatch, (error) => {
-					if (retired || error instanceof DataError) throw error;
+					if (retired || error instanceof DependencyError) throw error;
 					return dispatch();
 				})
 			: dispatch();
@@ -1364,7 +1372,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				if (retired) throw new DataRetiredError();
 				if (!reply.ok) {
 					remove(operation);
-					operation.gate?.reject(new DataError('dependency'));
+					operation.gate?.reject(new DependencyError());
 					throw new DataError(reply.code, reply.data, reply.issues);
 				}
 				let output: unknown;
@@ -1382,7 +1390,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			},
 			(error) => {
 				if (retired) throw new DataRetiredError();
-				if (error instanceof DataError) {
+				if (error instanceof DependencyError) {
 					// A create this write depended on was refused; it was never sent.
 					remove(operation);
 					operation.gate?.reject(error);
