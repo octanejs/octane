@@ -78,11 +78,28 @@ export interface DataServer {
 	 */
 	listen(request: string, call: ServerCallContext): AsyncIterable<string>;
 	/**
+	 * Serve feeds over a WebSocket the host has accepted for `request`, to a
+	 * store whose `listen` is a `webSocketListener`. The socket's first message
+	 * asks for one feed; each frame is a message after it, with no time limit.
+	 * Pass the viewer the host's middleware authenticated as `caller`. A
+	 * request from another origin is refused, since a page on any site can
+	 * open a socket with the user's cookies.
+	 */
+	accept(socket: FeedSocket, request: Request, caller?: DataCaller): void;
+	/**
 	 * Call before rendering a page. Signs the page's forms for the request's
 	 * account and, when the request is a form's native POST, runs its write.
 	 * Middleware passes its context as `caller`, so `context` sees its viewer.
 	 */
 	forms(request: Request, caller?: DataCaller): Promise<FormSession>;
+}
+
+/** The part of a server's WebSocket `accept` uses, as Bun, Deno, Workers and `ws` provide it. */
+export interface FeedSocket {
+	send(data: string): void;
+	close(code?: number, reason?: string): void;
+	addEventListener(type: 'message', listener: (event: { readonly data: unknown }) => void): void;
+	addEventListener(type: 'close', listener: () => void): void;
 }
 
 export interface FormSession {
@@ -271,30 +288,36 @@ export function createDataHandler<C extends object = {}>(
 			return new Response(null, { status: 500 });
 		}
 	};
-	/** One feed connection's frames, each event validated, until the connection's time is up. */
+	/**
+	 * One feed connection's frames: an empty one once it is open, then each
+	 * event validated, until `lifetime` ends.
+	 */
 	async function* frames(
 		payload: FeedRequest,
 		request: Request,
-		server: ServerCallContext,
+		caller: DataCaller & { readonly signal: AbortSignal },
+		lifetime: number,
 	): AsyncGenerator<FeedFrame> {
 		const handler = typeof payload.name === 'string' ? byName.get(payload.name) : undefined;
 		if (!handler || handler.contract.kind !== 'feed') throw new DataError('not_found');
 		const contract = handler.contract;
 		const params = contract.params ? await parse(contract.params, payload.params) : undefined;
 		const ended = new AbortController();
-		const signal = AbortSignal.any([server.signal, ended.signal]);
+		const signal = AbortSignal.any([caller.signal, ended.signal]);
 		const call = {
-			...callFor(await contextFor(request, server), request, '', signal),
+			...callFor(await contextFor(request, caller), request, '', signal),
 			cursor: typeof payload.cursor === 'string' ? payload.cursor : null,
 		};
 		const iterator = (handler.run(params, call) as AsyncIterable<FeedFrame>)[
 			Symbol.asyncIterator
 		]();
 		const timeUp = new Promise<null>((resolve) => {
-			const timer = setTimeout(() => resolve(null), FEED_CONNECTION);
+			if (lifetime === Infinity) return;
+			const timer = setTimeout(() => resolve(null), lifetime);
 			signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
 		});
 		try {
+			yield {};
 			while (true) {
 				const next = await Promise.race([iterator.next(), timeUp]);
 				if (next === null || next.done) return;
@@ -405,9 +428,37 @@ export function createDataHandler<C extends object = {}>(
 		serve: async (request: string, call: ServerCallContext) =>
 			devalue.stringify(await answer(devalue.parse(request), call.request, call)),
 		async *listen(request: string, call: ServerCallContext) {
-			for await (const frame of frames(devalue.parse(request), call.request, call)) {
+			for await (const frame of frames(
+				devalue.parse(request),
+				call.request,
+				call,
+				FEED_CONNECTION,
+			)) {
 				yield devalue.stringify(frame);
 			}
+		},
+		accept(socket: FeedSocket, request: Request, caller?: DataCaller) {
+			// A browser opens a socket to any origin, with the user's cookies: refuse other pages.
+			if (!allowed(request)) return socket.close(1008, 'forbidden');
+			const closed = new AbortController();
+			socket.addEventListener('close', () => closed.abort());
+			let started = false;
+			socket.addEventListener('message', (message) => {
+				if (started) return;
+				started = true;
+				void (async () => {
+					try {
+						const payload = devalue.parse(String(message.data));
+						const connection = { ...caller, signal: closed.signal };
+						for await (const frame of frames(payload, request, connection, Infinity)) {
+							socket.send(devalue.stringify(frame));
+						}
+						socket.close(1000);
+					} catch {
+						if (!closed.signal.aborted) socket.close(1011);
+					}
+				})();
+			});
 		},
 	});
 }

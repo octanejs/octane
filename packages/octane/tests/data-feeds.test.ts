@@ -9,8 +9,10 @@ import {
 	createDataStore,
 	feed,
 	listen,
+	pubSubListener,
 	read,
 	receive,
+	webSocketListener,
 	type FeedFrame,
 	type FeedRequest,
 	type Listener,
@@ -23,10 +25,12 @@ import {
 	isTodo,
 	schema,
 	Todo,
+	todoChanges,
 	todoPages,
 	todos,
 	type TodoItem,
 } from './_data-todos.js';
+import { createDataHandler, type DataServer, type FeedSocket } from '../src/data/server.js';
 
 type TodoEvent =
 	{ kind: 'put'; todo: TodoItem } | { kind: 'remove'; id: string } | { kind: 'added' };
@@ -354,5 +358,137 @@ describe('feeds', () => {
 		stops.push(listen(other.store, changes).subscribe(() => {}));
 		void other.store.retire();
 		expect(other.connections[0]!.signal.aborted).toBe(true);
+	});
+});
+
+/**
+ * A WebSocket class whose sockets connect in memory to `server.accept`, as a
+ * host's upgrade handler would, for a page on `origin`.
+ */
+function sockets(server: DataServer, origin: string, viewer: string) {
+	const closed: number[] = [];
+	class MemorySocket extends EventTarget {
+		readonly peer: FeedSocket;
+		constructor(url: string | URL) {
+			super();
+			const listeners = {
+				message: [] as Array<(event: { data: unknown }) => void>,
+				close: [] as Array<() => void>,
+			};
+			let open = true;
+			const finish = (code: number) => {
+				if (!open) return;
+				open = false;
+				closed.push(code);
+				for (const listener of listeners.close) listener();
+				const event = Object.assign(new Event('close'), { code, wasClean: code === 1000 });
+				queueMicrotask(() => this.dispatchEvent(event));
+			};
+			this.peer = {
+				send: (data) =>
+					queueMicrotask(
+						() => open && this.dispatchEvent(Object.assign(new Event('message'), { data })),
+					),
+				close: (code = 1000) => finish(code),
+				addEventListener: (type: 'message' | 'close', listener: any) =>
+					listeners[type].push(listener),
+			};
+			this.close = (code = 1000) => finish(code);
+			this.send = (data: string) =>
+				queueMicrotask(() => {
+					for (const listener of listeners.message) listener({ data });
+				});
+			// The upgrade request, over HTTPS as the host receives it.
+			const request = new Request(String(url).replace(/^wss:/, 'https:'), { headers: { origin } });
+			server.accept(this.peer, request, { viewer });
+			queueMicrotask(() => open && this.dispatchEvent(new Event('open')));
+		}
+		close: (code?: number) => void;
+		send: (data: string) => void;
+	}
+	return { WebSocket: MemorySocket as unknown as typeof WebSocket, closed };
+}
+
+describe('feed presets', () => {
+	function feedServer() {
+		const heard: Array<{ viewer: string; signal: AbortSignal }> = [];
+		let push: (todo: TodoItem) => void = () => {};
+		const handler = createDataHandler(
+			{ context: (_request, caller) => ({ viewer: String(caller?.viewer) }) },
+			(handle) => [
+				handle(todos, () => [{ id: 'a', title: 'Tides', done: false }]),
+				handle(todoChanges, async function* (_, { viewer, signal }) {
+					heard.push({ viewer, signal });
+					while (!signal.aborted) {
+						const todo = await new Promise<TodoItem | null>((resolve) => {
+							push = resolve;
+							signal.addEventListener('abort', () => resolve(null), { once: true });
+						});
+						if (todo) yield { event: todo };
+					}
+				}),
+			],
+		);
+		return { handler, heard, push: (todo: TodoItem) => push(todo) };
+	}
+
+	it('streams a feed over a WebSocket, for the viewer the host authenticated, until the store stops', async () => {
+		const { handler, heard, push } = feedServer();
+		const { WebSocket, closed } = sockets(handler, 'https://app.test', 'ada');
+		const store = createDataStore({
+			transport: handler.transport(new Request('https://app.test/')),
+			listen: webSocketListener('wss://app.test/feeds', { WebSocket }),
+		});
+		const list = await observed(store.read(todos, undefined));
+		const handle = listen(store, todoChanges);
+		const stop = handle.subscribe(() => {});
+		await vi.waitFor(() => expect(handle.getSnapshot().status).toBe('live'));
+		await vi.waitFor(() => expect(heard).toHaveLength(1));
+		expect(heard[0]!.viewer).toBe('ada');
+
+		push({ id: 'a', title: 'Atoll', done: false });
+		await vi.waitFor(() => expect(list()[0]!.title).toBe('Atoll'));
+
+		stop();
+		await vi.waitFor(() => expect(heard[0]!.signal.aborted).toBe(true));
+		expect(closed).toEqual([1000]);
+	});
+
+	it('refuses a socket opened from another origin', async () => {
+		const { handler, heard } = feedServer();
+		const { WebSocket, closed } = sockets(handler, 'https://evil.test', 'ada');
+		const store = createDataStore({
+			transport: handler.transport(new Request('https://app.test/')),
+			listen: webSocketListener('wss://app.test/feeds', { WebSocket }),
+		});
+		const handle = listen(store, todoChanges);
+		stops.push(handle.subscribe(() => {}));
+		await vi.waitFor(() => expect(handle.getSnapshot().status).toBe('offline'));
+		expect(closed[0]).toBe(1008);
+		expect(heard).toEqual([]);
+	});
+
+	it("listens through the page's own broker, one subscription per topic, live once subscribed", async () => {
+		const topics = new Map<string, Set<(message: unknown) => void>>();
+		const broker = (topic: string, deliver: (message: unknown) => void) => {
+			if (!topics.has(topic)) topics.set(topic, new Set());
+			topics.get(topic)!.add(deliver);
+			return () => topics.get(topic)!.delete(deliver);
+		};
+		const live = createDataStore({
+			transport: async () => ({ ok: true, value: [{ id: 'a', title: 'Tides', done: false }] }),
+			listen: pubSubListener(broker),
+		});
+		const list = await observed(live.read(todos, undefined));
+		const handle = listen(live, todoChanges);
+		const stop = handle.subscribe(() => {});
+		await vi.waitFor(() => expect(handle.getSnapshot().status).toBe('live'));
+		expect(topics.get('todos.changes')!.size).toBe(1);
+
+		for (const deliver of topics.get('todos.changes')!)
+			deliver({ id: 'a', title: 'Atoll', done: false });
+		await vi.waitFor(() => expect(list()[0]!.title).toBe('Atoll'));
+		stop();
+		await vi.waitFor(() => expect(topics.get('todos.changes')!.size).toBe(0));
 	});
 });
