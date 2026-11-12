@@ -884,6 +884,11 @@ describe('Strong reads after a synchronous state update', () => {
 			'open); }',
 		],
 		[
+			'a read in the same switch case',
+			`export function A({ log }) { const [count, setCount] = useState(0); return <button onClick={() => { switch (log) { case 1: setCount(0); log(count); break; } }}>{count}</button>; }`,
+			'count); break',
+		],
+		[
 			'reducer state after a dispatch',
 			`export function A({ log }) { const [s, dispatch] = useReducer((s, a) => s + a, 0); return <button onClick={() => { dispatch(1); log(s); }}>{s}</button>; }`,
 			's); }',
@@ -924,6 +929,10 @@ describe('Strong reads after a synchronous state update', () => {
 		[
 			'a read in a sibling branch',
 			`export function A({ log }) { const [count, setCount] = useState(0); return <button onClick={() => { if (count) { setCount(0); } else { log(count); } }}>{count}</button>; }`,
+		],
+		[
+			'a read in a later switch case',
+			`export function A({ log }) { const [count, setCount] = useState(0); return <button onClick={() => { switch (log) { case 1: setCount(0); break; default: log(count); } }}>{count}</button>; }`,
 		],
 		[
 			'a read after a block that updated',

@@ -5548,6 +5548,8 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 						(fallthroughPhase == null || fallthroughPhase === 'deferred')
 							? 'deferred'
 							: phase;
+					// A case may be entered directly, so it never sees another case's updates.
+					switchScope.updatedStates = null;
 					const executionPhase = visitStatements(branch.consequent, switchScope, branchPhase);
 					const last = branch.consequent?.[branch.consequent.length - 1];
 					fallthroughPhase =
