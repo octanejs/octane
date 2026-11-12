@@ -1,4 +1,4 @@
-import { Dialog } from '@octanejs/radix';
+import { Dialog, Toast } from '@octanejs/radix';
 
 // Modal dialog exercising the full chain: Portal (array children → faithful per-child
 // Presence+Portal), Overlay (scroll lock + dismissable surface), Content (FocusScope trap
@@ -20,6 +20,22 @@ export function DialogApp() {
 					]}
 				/>
 			</Dialog.Root>
+			<button data-testid="outside">outside</button>
+		</div>
+	);
+}
+
+export function NonModalDialogWithToast() {
+	return (
+		<div>
+			<Dialog.Root defaultOpen modal={false}>
+				<Dialog.Content data-testid="content">
+					<button>inside</button>
+				</Dialog.Content>
+			</Dialog.Root>
+			<Toast.Provider>
+				<Toast.Viewport data-testid="viewport" />
+			</Toast.Provider>
 			<button data-testid="outside">outside</button>
 		</div>
 	);
