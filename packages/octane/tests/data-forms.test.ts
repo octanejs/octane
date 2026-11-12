@@ -148,7 +148,7 @@ describe('octane/data forms on the server', () => {
 		const data = new FormData();
 		data.set('title', 'old draft');
 		await expect(form.submit(data)).rejects.toMatchObject({ code: 'invalid' });
-		expect(form.getSnapshot().values.title).toBe('old draft');
+		expect(form.getSnapshot().values['title']).toBe('old draft');
 		const notify = vi.fn();
 		form.subscribe(notify);
 		await store.retire();
