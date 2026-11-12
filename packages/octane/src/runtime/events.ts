@@ -11,6 +11,7 @@ import {
 } from './actions.js';
 import { beginBindingEvent, consumeBindingEvent } from '../dom-binding-handoff.js';
 import { hydrating } from '../hydration-flag.js';
+import { setHostTimeout } from '../host-task.js';
 import { CURSOR } from './hydration.js';
 import {
 	isDelegatedEventProp,
@@ -1305,7 +1306,7 @@ function finishCaptureDispatch(event: Event, type: DelegatedEventType): void {
 	// the bubble segment) and remains the earliest correct fallback there: a
 	// stopped controlled-select change restores in the same microtask batch as
 	// its handlers' updates, before the dispatcher's next task.
-	if (event.isTrusted) setTimeout(fallback, 0);
+	if (event.isTrusted) setHostTimeout(fallback, 0);
 	else queueMicrotask(fallback);
 }
 

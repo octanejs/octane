@@ -10,7 +10,7 @@
 // It lives outside `runtime/` and imports nothing from the engine: an app that never queues layout work
 // does not ship it.
 
-import { postHostTask } from './host-task.js';
+import { hostFramesRun, postHostTask, requestHostFrame } from './host-task.js';
 
 declare const process: { env: { NODE_ENV?: string } };
 
@@ -68,14 +68,8 @@ function requestFrame(): void {
 	};
 	// The work must land before paint, so it takes the frame. A hidden page may
 	// never get one, and nothing paints there, so a host task does.
-	if (
-		typeof requestAnimationFrame === 'function' &&
-		(typeof document === 'undefined' || document.visibilityState !== 'hidden')
-	) {
-		requestAnimationFrame(run);
-	} else {
-		postHostTask(run);
-	}
+	if (hostFramesRun()) requestHostFrame(run);
+	else postHostTask(run);
 }
 
 /**
