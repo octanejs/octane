@@ -26,16 +26,68 @@ export function Labels(props: { labels: string[]; onPick: (value: string) => voi
 
 export function Rows(props: { rows: Row[]; onPick: (value: string) => void }) @{
 	<ul>
-		@for ({ id, label: text = 'untitled' } of props.rows; key id) {
+		@for ({ id: __it, label: text = 'untitled' } of props.rows; key __it) {
 			const [count, setCount] = useState(0);
-			<li data-id={id}>
+			<li data-id={__it}>
 				<button
 					onClick={() => {
 						setCount(count + 1);
-						props.onPick(`${id}:${text}`);
+						props.onPick(`${__it}:${text}`);
 					}}
 				>{`${text} ${count}`}</button>
 			</li>
+		}
+	</ul>
+}
+
+type ReadOnceProps = { rows: { id: string; label?: string }[]; scope: string };
+
+export function ReadOnceRows({ rows, scope }: ReadOnceProps) @{
+	<ul>
+		@for (const { id, label } of rows; key id + scope) {
+			<li>{(label ?? id) as string}</li>
+		}
+	</ul>
+}
+
+export function RestFieldRows({ rows }: { rows: { id: string; rowCaption?: string }[] }) @{
+	<ul>
+		@for (const { id, ...record } of rows; key id) {
+			<li>{record.rowCaption as string}</li>
+		}
+	</ul>
+}
+
+export function RestChildRows({ rows }: { rows: { id: string; content: string[] }[] }) @{
+	<ul>
+		@for (const { id, ...record } of rows; key id) {
+			<li>{record.content}</li>
+		}
+	</ul>
+}
+
+export function DefaultFieldRows({ rows }: { rows: { id: string; labels?: string[] }[] }) @{
+	<ul>
+		@for (const { id, labels = ['untitled'] } of rows; key id) {
+			<li>{labels[0] as string}</li>
+		}
+	</ul>
+}
+
+export function ReadOnceFoldedRows({ rows, scope }: ReadOnceProps) {
+	return (
+		<ul>
+			@for (const { id, label } of rows; key id + scope) {
+				<li>{(label ?? id) as string}</li>
+			}
+		</ul>
+	);
+}
+
+export function KeyedDefault({ rows }: { rows: { id: number; read?: () => number }[] }) @{
+	<ul>
+		@for (let { id, read = () => id } of rows; key id++) {
+			<li>{String(read())}</li>
 		}
 	</ul>
 }

@@ -166,6 +166,7 @@ export function collectClientEntries(config) {
 		.filter((route) => route.type === 'render')
 		.flatMap((route) => [get_route_entry_path(route.entry), route.layout]);
 	if (config.router.preHydrate) entries.push(config.router.preHydrate);
+	if (config.data) entries.push(config.data);
 	entries.push(
 		get_route_entry_path(config.rootBoundary.pending),
 		get_route_entry_path(config.rootBoundary.catch),

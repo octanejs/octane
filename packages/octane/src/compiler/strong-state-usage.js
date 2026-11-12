@@ -33,7 +33,7 @@ const SKIP_KEYS = new Set([
 	'typeParameters',
 ]);
 const READ_ONLY_MESSAGE =
-	'Strong mode does not allow capturing a useState value while discarding its setter. Derive render values from their inputs. For a value kept for events or effects, use useRef(value) or useLazyRef(() => createValue()) to initialize it once.';
+	'Strong mode does not allow capturing a useState value while discarding its setter. Derive render values from their inputs, or explicitly retain an initial render snapshot with useInitialValue(value). Pass a factory to initialize lazily. For a value kept for events or effects, use useRef(value) or useLazyRef(() => createValue()) to initialize it once.';
 const WRITE_ONLY_MESSAGE =
 	'Strong mode does not allow write-only state. Nothing reads this state value or its getter, so the setter only forces a re-render. Subscribe to external data with useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot) and render its snapshot, or remove the unused state.';
 
@@ -62,7 +62,7 @@ function staticIndex(node, computed) {
 /**
  * @param {any} ast
  * @param {{ analysis: any, callNames: Map<any, string> }} strongHookAnalysis
- * @param {(code: string, node: any, message: string, initializer?: any) => void} report
+ * @param {(code: string, node: any, message: string, initializer?: any, capture?: { decl: any, call: any, scope: any }) => void} report
  */
 export function analyzeStrongStateUsage(ast, strongHookAnalysis, report) {
 	const { analysis, callNames } = strongHookAnalysis;
@@ -72,7 +72,7 @@ export function analyzeStrongStateUsage(ast, strongHookAnalysis, report) {
 		return bindings.find((entry) => entry.pattern === identifier)?.binding;
 	};
 	const candidates = [];
-	for (const { decl, bindings } of analysis.declarators) {
+	for (const { decl, bindings, kind } of analysis.declarators) {
 		const init = unwrap(decl.init);
 		const call = unwrap(init?.type === 'MemberExpression' ? init.object : init);
 		if (call?.type !== 'CallExpression') continue;
@@ -109,7 +109,23 @@ export function analyzeStrongStateUsage(ast, strongHookAnalysis, report) {
 			continue;
 		}
 		if (hook === 'useState' && value !== null && setter === null) {
-			report(STRONG_READ_ONLY_STATE, id, READ_ONLY_MESSAGE, unwrap(call.arguments[0]));
+			const initializer = unwrap(call.arguments[0]);
+			const scope = analysis.nodeScopes.get(call);
+			const capture =
+				kind === 'const' &&
+				decl.init === call &&
+				call.optional !== true &&
+				call.callee.type === 'Identifier' &&
+				resolveBinding(scope, call.callee.name)?.octaneImport === 'useState' &&
+				call.arguments.length === 1 &&
+				initializer?.type !== 'SpreadElement' &&
+				id.type === 'ArrayPattern' &&
+				id.elements.length === 1 &&
+				id.elements[0]?.type === 'Identifier' &&
+				id.typeAnnotation == null
+					? { decl, call, scope }
+					: undefined;
+			report(STRONG_READ_ONLY_STATE, id, READ_ONLY_MESSAGE, initializer, capture);
 			continue;
 		}
 		if (setter == null || value === undefined || getter === undefined) continue;

@@ -1,7 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { JSDOM } from 'jsdom';
 import { collectDiagnostics } from 'octane/compiler';
+import * as ReactServerBridge from 'octane/react/server';
 import { renderToStaticMarkup } from 'octane/server';
+import { prerender } from 'octane/static';
+import { createElement as reactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
 import { loadCompiler, strengthen, transformModule } from '../dist/index.js';
@@ -372,6 +376,24 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		expect(transformModule(commented, 'node.tsx').code.match(/\/\/ Recurse\./g)).toHaveLength(1);
 	});
 
+	it('migrates React DOM root types with the renderer', () => {
+		const source = `import { createRoot, type Root as ClientRoot } from 'react-dom/client';
+import type * as ReactDOM from 'react-dom/client';
+import { App } from './App';
+const root: ClientRoot = createRoot(document.body);
+export const mounted: ReactDOM.Root = root;
+export const imported: import('react-dom/client').Root = mounted;
+root.render(<App />);`;
+		const { code, notes } = transformModule(source, 'main.tsx');
+		expect(notes).toEqual([]);
+		expect(code).toContain('type Root as ClientRoot');
+		expect(code).toContain('type Root as OctaneRoot');
+		expect(code).toContain('export const mounted: OctaneRoot = root;');
+		expect(code).toContain("import('octane').Root");
+		expect(code).toContain('root.render(App);');
+		expect(code).not.toContain('react-dom/client');
+	});
+
 	it('mounts a root by component, not by element', () => {
 		const source = (/** @type {string} */ call) =>
 			`import { createElement, StrictMode } from 'react';\nimport { createRoot, hydrateRoot } from 'react-dom/client';\nimport { renderToString } from 'react-dom/server';\nimport { App } from './App';\nconst root = createRoot(document.body);\n${call};\n`;
@@ -447,6 +469,25 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		expect(transformModule(source.replaceAll("'", '"'), 'a.tsx').code).toContain(
 			'import { type ReactNode, useState } from "octane";',
 		);
+	});
+
+	it('keeps ref allocator re-exports and type queries on the original React API', () => {
+		const { code, notes } = transformModule(
+			`import type * as R from 'react';
+export { createRef as allocate, useState } from 'react';
+export type { createRef as RefFactory } from 'react';
+export type Direct = typeof import('react').createRef;
+export type Qualified = typeof R.createRef;`,
+			'refs.ts',
+		);
+		expect(notes).toEqual([]);
+		expect(code).toMatch(/export \{\s*createRef as allocate,?\s*\} from 'react'/);
+		expect(code).toMatch(/export \{\s*useState\s*\} from 'octane'/);
+		expect(code).toContain("export type { createRef as RefFactory } from 'react';");
+		expect(code).toContain("typeof import('react').createRef");
+		const imported = /import type \{\s*createRef(?: as (\w+))?\s*\} from 'react'/.exec(code);
+		expect(imported).not.toBeNull();
+		expect(code).toContain(`export type Qualified = typeof ${imported?.[1] ?? 'createRef'};`);
 	});
 
 	it("imports `useSyncExternalStore` from Octane, not React's shim for it", () => {
@@ -528,6 +569,31 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		expect(notes).toContainEqual(
 			expect.objectContaining({ rule: 'event-object', severity: 'error' }),
 		);
+	});
+
+	it('reports synthetic operations in contextually typed generic React event handlers', () => {
+		const { notes } = transformModule(
+			`import type { ReactEventHandler as LoadHandler } from 'react';
+			function Frame(props: { onLoad: LoadHandler<HTMLIFrameElement> }) {
+				return <iframe onLoad={props.onLoad} />;
+			}
+			export function App() {
+				return <Frame onLoad={(event) => event.isDefaultPrevented()} />;
+			}`,
+			'frame.tsx',
+		);
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'event-object', severity: 'error' }),
+		);
+	});
+
+	it('rewrites a generic React handler import type without changing script scope', () => {
+		const { code, notes } = transformModule(
+			"type Load = import('react').ReactEventHandler;",
+			'frame-types.ts',
+		);
+		expect(notes.filter((n) => n.severity === 'error')).toEqual([]);
+		expect(code).toBe("type Load = import('octane').EventHandler<import('octane').NativeEvent>;");
 	});
 
 	it.each(['React.SubmitEvent | null', '(React.SubmitEvent)'])(
@@ -615,14 +681,17 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		},
 	);
 
-	it('retains a React submit event re-export for review', () => {
-		const source = "export type {SubmitEvent as Submit} from 'react';";
-		const { code, notes } = transformModule(source, 'form-types.ts');
-		expect(code).toBe(source);
-		expect(notes).toContainEqual(
-			expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
-		);
-	});
+	it.each(['SubmitEvent', 'ReactEventHandler'])(
+		'retains a React %s re-export for review',
+		(name) => {
+			const source = `export type {${name} as EventType} from 'react';`;
+			const { code, notes } = transformModule(source, 'form-types.ts');
+			expect(code).toBe(source);
+			expect(notes).toContainEqual(
+				expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+			);
+		},
+	);
 
 	it('migrates sibling exports and keeps comments on the React submit type re-export', () => {
 		const { code, notes } = transformModule(
@@ -688,7 +757,7 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 	it('checks escaped React imports and avoids a decoded marker-name collision', () => {
 		const { notes } = transformModule(
 			String.raw`import type {Submit\u0045vent as Event} from 'react';
-			function submit<__octaneSubm\u0069tEvent>(e: Event | any) { e.isDefaultPrevented(); }`,
+			function submit<__octaneChec\u006bedEvent>(e: Event | any) { e.isDefaultPrevented(); }`,
 			'form.tsx',
 		);
 		expect(
@@ -932,6 +1001,46 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		]);
 	});
 
+	it.each([
+		['named alias', "import { ReactCompatInline as Inline } from 'octane/react';", 'Inline'],
+		[
+			'server namespace',
+			"import * as Bridge from 'octane/react/server';",
+			'Bridge.ReactCompatInline',
+		],
+	])('keeps a %s inline React boundary inside its paragraph', async (_, imported, tag) => {
+		const source = `${imported}
+			import { Badge } from 'badge-kit';
+			export function View() {
+				return <p><${tag}><Badge /></${tag}></p>;
+			}`;
+		const result = transformModule(source, 'View.tsx', {
+			target: 'tsrx',
+			strong: true,
+			reactCompat: true,
+			unported: (module) => (module === 'badge-kit' ? module : null),
+		});
+		expect(result.notes.filter((note) => note.severity === 'error')).toEqual([]);
+		expect(result.rules['react-compat']).toBeUndefined();
+		const { View } = loadCompiledFixtureSource(result.code, {
+			id: 'View.tsrx',
+			mode: 'server',
+			runtimeModules: {
+				'octane/react/server': ReactServerBridge,
+				'badge-kit': { Badge: () => reactElement('b', null, 'badge') },
+			},
+		});
+		const { html } = await prerender(View, {});
+		const dom = new JSDOM(html);
+		try {
+			const { document } = dom.window;
+			expect(document.querySelector('p > span[data-react-compat] > b')?.textContent).toBe('badge');
+			expect(document.querySelectorAll('[data-react-compat]')).toHaveLength(1);
+		} finally {
+			dom.window.close();
+		}
+	});
+
 	it('passes a text field wrapper its rest props `onChange` as `onInput`', () => {
 		const migrate = (/** @type {string} */ body) =>
 			transformModule(
@@ -1021,6 +1130,131 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		const blur =
 			'export function F({ set }: { set(v: string): void }) {\n\treturn <input onBlur={(e) => set(e.target.value)} />;\n}\n';
 		expect(transformModule(blur, 'f.tsx').code).toContain('set(e.currentTarget.value)');
+	});
+
+	it('runs map setup before a row key that can throw', () => {
+		const source = `export function List({ rows }: { rows: { check(): void; id: string }[] }) {
+			return <div>{rows.map(row => {
+				row.check();
+				return <b key={row.id} />;
+			})}</div>;
+		}`;
+		const { code } = transformModule(source, 'list.tsx');
+		const { List } = loadCompiledFixtureSource(code, { id: 'list.tsrx', mode: 'server' });
+		const row = {
+			check() {
+				throw new Error('setup-first');
+			},
+			get id() {
+				throw new Error('key-first');
+			},
+		};
+		expect(() => renderToStaticMarkup(List, { rows: [row] })).toThrow('setup-first');
+	});
+
+	it('keeps a row setup read ahead of a key that mutates its source', () => {
+		const source = `export function List() {
+			let label = 'before';
+			const rows = [{ get id() { label = 'after'; return 'row'; } }];
+			return <div>{rows.map(row => {
+				const saved = label;
+				return <b key={row.id}>{saved}</b>;
+			})}</div>;
+		}`;
+		const { code } = transformModule(source, 'list.tsx');
+		const { List } = loadCompiledFixtureSource(code, { id: 'list.tsrx', mode: 'server' });
+		expect(renderToStaticMarkup(List, {}).html).toBe('<div><b>before</b></div>');
+	});
+
+	it.each([
+		[
+			'literal setup',
+			"[{ id: 'row' }, { id: 'next' }]",
+			"const label = 'ready';",
+			'row.id',
+			'<b>ready</b><b>ready</b>',
+		],
+		[
+			'an already-bound string key',
+			"['row', 'next']",
+			'const label = row.toUpperCase();',
+			'row',
+			'<b>ROW</b><b>NEXT</b>',
+		],
+		[
+			'already-bound primitive keys',
+			'[true, false, null, +1, -2, -3n]',
+			'const label = String(row);',
+			'row',
+			'<b>true</b><b>false</b><b>null</b><b>1</b><b>-2</b><b>-3</b>',
+		],
+		[
+			'a signed numeric initializer',
+			"[{ id: 'row' }, { id: 'next' }]",
+			'const label = -2;',
+			'row.id',
+			'<b>-2</b><b>-2</b>',
+		],
+	])('migrates a keyed row with %s', (_name, rows, setup, key, html) => {
+		const source = `export function List() {
+			return <div>{${rows}.map(row => {
+				${setup}
+				return <b key={${key}}>{label}</b>;
+			})}</div>;
+		}`;
+		const result = transformModule(source, 'list.tsx', { strong: true });
+		expect(compileErrors(result.code, 'list.tsrx', true)).toEqual([]);
+		const { List } = loadCompiledFixtureSource(result.code, { id: 'list.tsrx', mode: 'server' });
+		expect(renderToStaticMarkup(List, {}).html).toBe(`<div>${html}</div>`);
+	});
+
+	it('keeps a row key that can read setup through eval', () => {
+		const source = `export function List({ rows }: { rows: string[] }) {
+			return <div>{rows.map(row => {
+				const label = 'ready';
+				return <b key={eval('label')} data-row={row}>{label}</b>;
+			})}</div>;
+		}`;
+		const { code } = transformModule(source, 'list.tsx');
+		const { List } = loadCompiledFixtureSource(code, { id: 'list.tsrx', mode: 'server' });
+		expect(renderToStaticMarkup(List, { rows: ['row'] }).html).toBe(
+			'<div><b data-row="row">ready</b></div>',
+		);
+	});
+
+	it.each(['"row"', "{'row'}", '{true}', '{false}', '{null}', '{+1}', '{-2}', '{-3n}'])(
+		'migrates a literal key %s after row setup',
+		(key) => {
+			const source = `export function List({ rows }: { rows: string[] }) {
+			return <div>{rows.map(row => {
+				const label = row.toUpperCase();
+				return <b key=${key}>{label}</b>;
+			})}</div>;
+		}`;
+			const { code } = transformModule(source, 'list.tsx', { strong: true });
+			expect(compileErrors(code, 'list.tsrx', true)).toEqual([]);
+			const { List } = loadCompiledFixtureSource(code, { id: 'list.tsrx', mode: 'server' });
+			expect(renderToStaticMarkup(List, { rows: ['row'] }).html).toBe('<div><b>ROW</b></div>');
+		},
+	);
+
+	it('preserves setup before a bigint key that throws during unary plus', () => {
+		const source = `export function List({ check }: { check(): void }) {
+			return <div>{[1].map(row => {
+				check();
+				return <b key={+1n}>{row}</b>;
+			})}</div>;
+		}`;
+		const { code } = transformModule(source, 'list.tsx');
+		const { List } = loadCompiledFixtureSource(code, { id: 'list.tsrx', mode: 'server' });
+		expect(() =>
+			renderToStaticMarkup(List, {
+				check() {
+					throw new Error('setup-first');
+				},
+			}),
+		).toThrow('setup-first');
+		expect(() => renderToStaticMarkup(List, { check() {} })).toThrow(TypeError);
 	});
 
 	it('keeps a `.map()` whose row writes an outer variable', () => {
@@ -1259,8 +1493,9 @@ describe('strengthen', () => {
 		const result = strengthen(compiler, code, path.join(FIXTURES, 'raw.tsrx'));
 		expect(result.strong).toBe(false);
 		expect(result.code).not.toContain('use strong');
+		expect(result.fixed).toEqual(['OCTANE_STRONG_READ_ONLY_STATE']);
+		expect(result.code).toContain('const open = useInitialValue(false);');
 		expect(result.blockers.map((b) => `${b.severity} ${b.code}`)).toEqual([
-			'warning OCTANE_STRONG_READ_ONLY_STATE',
 			'warning OCTANE_STRONG_UNTRUSTED_HTML',
 		]);
 		expect(compileErrors(result.code, 'raw.tsrx')).toEqual([]);

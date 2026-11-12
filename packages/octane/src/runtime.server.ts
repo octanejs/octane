@@ -127,7 +127,7 @@ import {
 } from './independent-hydration-protocol.js';
 import { hasOwnProp } from './has-own.js';
 import { headOwnershipSuffix } from './head-ownership.js';
-import { resourceHintWarning } from './resource-hint-diagnostics.js';
+import { resourceHintWarning, type ResourceHintHost } from './resource-hint-diagnostics.js';
 import {
 	ariaAttributeWarning,
 	isAriaAttributeName,
@@ -8085,6 +8085,13 @@ export function useLazyRef<T>(factory: () => T, slot?: ServerHookSlot): { curren
 	return rec.ref as { current: T };
 }
 
+/** Capture a render value once for the lifetime of this hook. */
+export function useInitialValue<T>(initial: T | (() => T), slot?: symbol): NoInfer<T> {
+	return typeof initial === 'function'
+		? useLazyRef(initial as () => T, slot).current
+		: useRef(initial, slot).current;
+}
+
 /** React's `useDebugValue` — devtools-only on the client, no-op everywhere. */
 export function useDebugValue(_value?: unknown, _format?: unknown, _slot?: ServerHookSlot): void;
 export function useDebugValue(_value?: unknown, _format?: unknown): void {}
@@ -10334,6 +10341,13 @@ export async function prerenderToNodeStream(
 // Read hook for FOREIGN host contexts during a hosted pass (§6.4): the server
 // wrapper reads React contexts directly (React.use) — no mirror or registry.
 let HOSTED_FOREIGN_CONTEXT_READER: ((context: object) => unknown) | null = null;
+let HOSTED_SESSION: HostedServerSession | null = null;
+
+function hostedResourceHints() {
+	const session = HOSTED_SESSION;
+	// A nested standalone render has its own resolved map and head collector.
+	return session && RESOLVED === session.resolved ? session.resourceHints : undefined;
+}
 
 function readHostedForeignContext<T>(usable: unknown, api: string): T {
 	if (usable !== null && typeof usable === 'object' && HOSTED_FOREIGN_CONTEXT_READER !== null) {
@@ -10345,13 +10359,14 @@ function readHostedForeignContext<T>(usable: unknown, api: string): T {
 /** @internal hosted-host ABI. Opaque outside octane/react/server. */
 export interface HostedServerSession {
 	resolved: ResolvedMap;
+	readonly resourceHints: ResourceHintHost;
 	/** Identity-stable settled-work aggregates, one per suspension stratum. */
 	strata: (PromiseLike<void> & { status?: string })[];
 }
 
 /** @internal hosted-host ABI. */
-export function createHostedServerSession(): HostedServerSession {
-	return { resolved: newResolvedMap(), strata: [] };
+export function createHostedServerSession(resourceHints: ResourceHintHost): HostedServerSession {
+	return { resolved: newResolvedMap(), resourceHints, strata: [] };
 }
 
 export interface HostedAttemptOptions {
@@ -10423,7 +10438,9 @@ export function renderHostedAttempt(
 ): HostedAttemptResult {
 	const nonceAttr = nonceAttrOf(options as RenderOptions | undefined);
 	const previousReader = HOSTED_FOREIGN_CONTEXT_READER;
+	const previousSession = HOSTED_SESSION;
 	HOSTED_FOREIGN_CONTEXT_READER = options?.readForeignContext ?? null;
+	HOSTED_SESSION = session;
 	let pass: FullPassResult;
 	try {
 		pass = withStream(null, () =>
@@ -10437,6 +10454,7 @@ export function renderHostedAttempt(
 		);
 	} finally {
 		HOSTED_FOREIGN_CONTEXT_READER = previousReader;
+		HOSTED_SESSION = previousSession;
 	}
 	// Delegate to the host ONLY for a bare suspension that escaped the root.
 	// A suspension OWNED by a local @try ships its @pending arm in this pass's
@@ -13467,6 +13485,8 @@ function coerceHintHref(href: unknown): string | null {
 
 /** React DOM `preload(href, {as, …})`. */
 export function preload(href: string, options: { as: string } & Record<string, unknown>): void {
+	const hints = hostedResourceHints();
+	if (hints) return hints.preload(href, options);
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preload', href, options);
 		if (warning !== null) console.error(warning);
@@ -13548,6 +13568,8 @@ export function preload(href: string, options: { as: string } & Record<string, u
  * `<script async src>`), mirroring the client.
  */
 export function preinit(href: string, options: { as: string } & Record<string, unknown>): void {
+	const hints = hostedResourceHints();
+	if (hints) return hints.preinit(href, options);
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preinit', href, options);
 		if (warning !== null) console.error(warning);
@@ -13587,6 +13609,8 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 
 /** React DOM `preconnect(href, {crossOrigin?})`. */
 export function preconnect(href: string, options?: { crossOrigin?: string }): void {
+	const hints = hostedResourceHints();
+	if (hints) return hints.preconnect(href, options);
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preconnect', href, options);
 		if (warning !== null) console.error(warning);
@@ -13615,6 +13639,12 @@ export function preconnect(href: string, options?: { crossOrigin?: string }): vo
 
 /** React DOM `prefetchDNS(href)`. */
 export function prefetchDNS(href: string): void {
+	const hints = hostedResourceHints();
+	if (hints) {
+		if (process.env.NODE_ENV !== 'production' && arguments.length > 1)
+			return Reflect.apply(hints.prefetchDNS, undefined, arguments);
+		return hints.prefetchDNS(href);
+	}
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('prefetchDNS', href, arguments[1], arguments.length > 1);
 		if (warning !== null) console.error(warning);
@@ -13785,6 +13815,8 @@ export function ssrScriptResource(attrs: Record<string, unknown> | null): string
 
 /** React DOM `preloadModule(href, options?)` — `<link rel="modulepreload">`, keyed by href. */
 export function preloadModule(href: string, options?: Record<string, unknown>): void {
+	const hints = hostedResourceHints();
+	if (hints) return hints.preloadModule(href, options);
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preloadModule', href, options);
 		if (warning !== null) console.error(warning);
@@ -13821,6 +13853,8 @@ export function preinitModule(
 	href: string,
 	options?: { as?: string } & Record<string, unknown>,
 ): void {
+	const hints = hostedResourceHints();
+	if (hints) return hints.preinitModule(href, options);
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preinitModule', href, options);
 		if (warning !== null) console.error(warning);
