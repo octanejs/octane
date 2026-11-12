@@ -622,7 +622,10 @@ class ModuleTransform {
 	/** Unported packages, by name. */
 	readonly unported = new Map<string, Unported>();
 	/** Elements to host in a `ReactCompat` island. */
-	readonly islands = new Set<ts.JsxElement | ts.JsxSelfClosingElement>();
+	readonly islands = new Map<
+		ts.JsxElement | ts.JsxSelfClosingElement,
+		'ReactCompat' | 'ReactCompatInline'
+	>();
 	readonly reactRendererBodies = new Map<ts.Node, string>();
 	readonly originalStoreTags = new Map<ts.ImportSpecifier, string>();
 	storeSourceNames?: Set<string>;
@@ -1143,14 +1146,26 @@ class ModuleTransform {
 				}
 				return;
 			}
-			const reason = !this.hostsInReact(element)
+			const enclosure = element.parent;
+			// The emitter removes an earlier run's fallback before inserting the new island.
+			const host =
+				ts.isJsxElement(enclosure) && enclosure.openingElement.tagName.getText(this.sf) === NO_PORT
+					? enclosure.parent
+					: enclosure;
+			const paragraph =
+				ts.isJsxElement(host) &&
+				ts.isIdentifier(host.openingElement.tagName) &&
+				host.openingElement.tagName.text === 'p';
+			let reason = !this.hostsInReact(element)
 				? `\`<${text}>\` takes children or props that Octane renders, which cannot cross into a React island.`
 				: this.options.reactCompat
 					? null
 					: `\`<${text}>\` can render in a \`ReactCompat\` island only with React and React DOM 19.2 or newer in the React 19 series.`;
+			if (reason === null && paragraph && !this.options.reactCompatInline)
+				reason = `<${text}> needs ReactCompatInline to stay inside this paragraph. Install an Octane release that exports it or keep the paragraph in React.`;
 			if (reason === null) {
 				port.islands++;
-				this.islands.add(element);
+				this.islands.set(element, paragraph ? 'ReactCompatInline' : 'ReactCompat');
 			} else {
 				// Octane fails on a React component deep in its renderer, naming
 				// neither it nor its package, so it throws this error there instead.
@@ -2207,7 +2222,7 @@ class ModuleTransform {
 		if (ts.isJsxAttributes(node)) return this.rewriteAttributes(node, ctx);
 		if ((ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) && this.islands.has(node)) {
 			this.count(RULE.reactCompat);
-			const island = this.require('octane/react', 'ReactCompat', false);
+			const island = this.require('octane/react', this.islands.get(node)!, false);
 			const content = this.span(node, node.getStart(this.sf), node.end, PLAIN);
 			const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
 			const imported = this.importOf(ts.isPropertyAccessExpression(tag) ? tag.expression : tag);

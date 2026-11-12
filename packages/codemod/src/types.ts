@@ -50,6 +50,8 @@ export interface TransformOptions {
 	unported?(specifier: string): string | null;
 	/** The project has React and React DOM 19.2 or newer in the React 19 series, so `ReactCompat` can host an unported package's components. */
 	reactCompat?: boolean;
+	/** Both installed Octane entry points support inline React islands. */
+	reactCompatInline?: boolean;
 	/** The selected imported component renders every use of this prop directly in native output. */
 	forwardedRender?(module: string, exported: string, prop: string, depth: number): boolean;
 	/** The file imports the installed clsx package through its original entry point. */

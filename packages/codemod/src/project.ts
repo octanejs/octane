@@ -228,6 +228,47 @@ export async function runCodemod(
 		).resolvedModule;
 		return target?.resolvedFileName === original?.resolvedFileName ? target : undefined;
 	}
+	const inlineCompatDirs = new Map<string, boolean>();
+	function supportsInlineReactCompat(file: string) {
+		const issuer = path.dirname(file);
+		if (ts.findConfigFile(issuer, ts.sys.fileExists) !== rootProject) return false;
+		const installed = readInstalled(issuer, 'octane');
+		if (installed?.manifest.name !== 'octane') return false;
+		const dir = fs.realpathSync(installed.dir);
+		if (compiler) {
+			try {
+				if (createRequire(file).resolve('octane/compiler') !== compiler.from) return false;
+			} catch {
+				return false;
+			}
+		}
+		const exports = record(installed.manifest.exports);
+		return ['react', 'react/server'].every((name) => {
+			const entry = exports['./' + name];
+			const target = originalModule(file, 'octane/' + name)?.resolvedFileName;
+			if (
+				typeof entry !== 'string' ||
+				!target ||
+				fs.realpathSync(target) !== path.resolve(dir, entry)
+			)
+				return false;
+			const source = ts.createSourceFile(
+				target,
+				fs.readFileSync(target, 'utf8'),
+				ts.ScriptTarget.Latest,
+			);
+			return source.statements.some(
+				(statement) =>
+					ts.isExportDeclaration(statement) &&
+					!statement.isTypeOnly &&
+					statement.exportClause &&
+					ts.isNamedExports(statement.exportClause) &&
+					statement.exportClause.elements.some(
+						(item) => !item.isTypeOnly && item.name.text === 'ReactCompatInline',
+					),
+			);
+		});
+	}
 	// One shared context per project, including separate file-by-file migrations.
 	const sourceDir = path.join(root, 'src');
 	const adapter = path.join(
@@ -589,6 +630,12 @@ export async function runCodemod(
 					: undefined,
 				unported: (specifier) => unportedName(specifier, file),
 				reactCompat,
+				get reactCompatInline() {
+					const dir = path.dirname(file);
+					if (!inlineCompatDirs.has(dir))
+						inlineCompatDirs.set(dir, supportsInlineReactCompat(file));
+					return inlineCompatDirs.get(dir);
+				},
 				forwardedRender:
 					options.svgPaths && renames.has(file)
 						? (module, name, prop, depth) =>

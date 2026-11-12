@@ -4,10 +4,16 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { DATA } from '@octanejs/cli/data';
+import { JSDOM } from 'jsdom';
+import * as ReactServerBridge from 'octane/react/server';
+import { prerender } from 'octane/static';
+import { createElement as reactElement } from 'react';
 import { compileTypesInspection } from 'octane/compiler/volar';
 import ts from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
 import { createScopedSignalRecipe, runCodemod } from '../dist/index.js';
 
 const REPO = path.resolve(import.meta.dirname, '../../..');
@@ -1516,6 +1522,131 @@ const invalid: Panel = { style: 'color:red' };`,
 			expect(file.code).not.toMatch(/ReactCompat|octane\/react/);
 			expect(file.diagnostics.filter((diagnostic) => diagnostic.rule === 'bindings')).toEqual([]);
 		}
+	});
+
+	it('keeps an automatically hosted React child inside its paragraph in server HTML', async () => {
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'src/App.tsx': `import { Badge } from 'react-badge-kit';
+				export function App() { return <p>Before <Badge /> after.</p>; }
+				export function Panel() { return <section><Badge /></section>; }`,
+		});
+		const modules = path.join(root, 'node_modules');
+		fs.mkdirSync(modules);
+		for (const name of ['octane', 'react', 'react-dom'])
+			fs.symlinkSync(
+				fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+				path.join(modules, name),
+				'dir',
+			);
+		const file = path.join(root, 'src/App.tsx');
+		const [migrated] = (await runCodemod([file], { root, write: false, strong: true })).files;
+		expect(
+			[...migrated.notes, ...migrated.diagnostics].filter((n) => n.severity === 'error'),
+		).toEqual([]);
+		const { App, Panel } = loadCompiledFixtureSource(migrated.code, {
+			id: 'App.tsrx',
+			mode: 'server',
+			runtimeModules: {
+				'octane/react/server': ReactServerBridge,
+				'react-badge-kit': { Badge: () => reactElement('b', null, 'badge') },
+			},
+		});
+		const { html } = await prerender(App, {});
+		const panel = await prerender(Panel, {});
+		const dom = new JSDOM(html + panel.html);
+		try {
+			const { document } = dom.window;
+			expect(document.querySelector('p')?.textContent).toBe('Before badge after.');
+			expect(document.querySelector('p > span[data-react-compat] > b')?.textContent).toBe('badge');
+			expect(document.querySelector('section > div[data-react-compat] > b')?.textContent).toBe(
+				'badge',
+			);
+		} finally {
+			dom.window.close();
+		}
+
+		// A compiler with inline lowering does not prove this issuer can import the host.
+		const config = path.join(root, 'tsconfig.json');
+		fs.writeFileSync(
+			config,
+			'{"compilerOptions":{"moduleResolution":"bundler","paths":{"octane/react/server":["./server.ts"]}}}',
+		);
+		fs.writeFileSync(path.join(root, 'server.ts'), 'export {};');
+		const preview = async () =>
+			(await runCodemod([file], { root, write: false, target: 'tsx' })).files[0];
+		const unavailable = expect.objectContaining({
+			severity: 'error',
+			message: expect.stringContaining('ReactCompatInline'),
+		});
+		const aliased = await preview();
+		expect(aliased.notes).toContainEqual(unavailable);
+		fs.writeFileSync(file, aliased.code);
+		const retry = await preview();
+		expect(retry.notes).toContainEqual(unavailable);
+		expect(retry.code).toBe(aliased.code);
+
+		fs.rmSync(config);
+		const nested = path.join(path.dirname(file), 'tsconfig.json');
+		fs.writeFileSync(
+			nested,
+			'{"compilerOptions":{"moduleResolution":"bundler","paths":{"octane/react/server":["../server.ts"]}}}',
+		);
+		expect((await preview()).notes).toContainEqual(unavailable);
+		fs.rmSync(nested);
+		const upgraded = await preview();
+		expect(upgraded.notes.filter((n) => n.severity === 'error')).toEqual([]);
+		expect(upgraded.code).toMatch(/<p>Before <ReactCompatInline><Badge\s*\/>/);
+		fs.writeFileSync(file, upgraded.code);
+		expect((await preview()).code).toBe(upgraded.code);
+	});
+
+	it('requires the same Octane compiler at the React island issuer', async () => {
+		const issuer = 'src/node_modules/octane';
+		const other = issuer + '/node_modules/octane';
+		const manifest = { name: 'octane', version: '0.16.7', type: 'module' };
+		const exports = { './compiler': './compiler.js' };
+		const compilerUrl = pathToFileURL(
+			path.join(REPO, 'packages/octane/src/compiler/index.js'),
+		).href;
+		const compiler = `export { collectDiagnostics } from ${JSON.stringify(compilerUrl)};`;
+		const inline = "export { ReactCompatInline } from './inline.js';";
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'src/App.tsx':
+				"import { Badge } from 'react-badge-kit'; export function App() { return <p><Badge /></p>; }",
+			[issuer + '/package.json']: JSON.stringify({
+				...manifest,
+				exports: { ...exports, './react': './react.ts', './react/server': './server.ts' },
+			}),
+			[other + '/package.json']: JSON.stringify({ ...manifest, exports }),
+			[issuer + '/compiler.js']: compiler,
+			[other + '/compiler.js']: compiler,
+			[issuer + '/react.ts']: inline,
+			[issuer + '/server.ts']: inline,
+			[issuer + '/inline.js']: 'export const ReactCompatInline = null;',
+		});
+		const modules = path.join(root, 'node_modules');
+		fs.mkdirSync(modules);
+		fs.symlinkSync(path.join(root, other), path.join(modules, 'octane'), 'dir');
+		for (const name of ['react', 'react-dom'])
+			fs.symlinkSync(
+				fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+				path.join(modules, name),
+				'dir',
+			);
+		const result = await runCodemod([path.join(root, 'src/App.tsx')], {
+			root,
+			write: false,
+			strong: true,
+		});
+		expect(result.compiler).toBe(fs.realpathSync(path.join(root, other, 'compiler.js')));
+		expect(result.files[0].notes).toContainEqual(
+			expect.objectContaining({
+				severity: 'error',
+				message: expect.stringContaining('ReactCompatInline'),
+			}),
+		);
 	});
 
 	it('reports TSRX written for React, which it cannot read', async () => {
