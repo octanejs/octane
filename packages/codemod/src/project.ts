@@ -1,6 +1,6 @@
 import { createScopedStorePlanner } from './scoped-store-contract.js';
 import { parseStaticSvg } from './path-svg.js';
-import { storeSources } from './store-inputs.js';
+import { resourceHints, storeSources } from './store-inputs.js';
 import type {
 	CodemodOptions,
 	CodemodResult,
@@ -22,7 +22,7 @@ import { finding, loadCompiler, thrown } from './compiler.js';
 import { PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
 import { bind, projectTypeAt, textKind, transformModule } from './transform.js';
-import { directReactHooks, nativeExternalStore } from './local-react-hook.js';
+import { directRendererCalls, nativeExternalStore } from './local-react-hook.js';
 import { forwardedProps } from './forwarded-props.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
@@ -231,15 +231,16 @@ export async function runCodemod(
 		).resolvedModule;
 		return target?.resolvedFileName === original?.resolvedFileName ? (target ?? null) : undefined;
 	}
-	function installedReact(file: string) {
+	function installedReact(file: string, module: 'react' | 'react-dom' = 'react') {
 		const dir = path.dirname(file);
 		if (ts.findConfigFile(dir, ts.sys.fileExists) !== rootProject) return false;
-		const target = originalModule(file, 'react');
-		if (!target || !['react', '@types/react'].includes(target.packageId?.name ?? '')) return false;
-		// TypeScript can resolve @types/react even when the runtime is missing or linked locally.
-		const runtime = readInstalled(dir, 'react');
+		const target = originalModule(file, module);
+		if (!target || ![module, `@types/${module}`].includes(target.packageId?.name ?? ''))
+			return false;
+		// TypeScript can resolve declarations even when the runtime is missing or linked locally.
+		const runtime = readInstalled(dir, module);
 		return (
-			runtime?.manifest.name === 'react' &&
+			runtime?.manifest.name === module &&
 			fs.realpathSync(runtime.dir).split(path.sep).includes('node_modules') &&
 			fs.realpathSync(target.resolvedFileName).split(path.sep).includes('node_modules')
 		);
@@ -421,6 +422,31 @@ export async function runCodemod(
 				resolveBinding(specifier, file, bindingProject, new Map(), []),
 		}).changed;
 	});
+	const localHints = new Map<string, Map<string, string>>();
+	function initializerResourceHint(from: string, module: string, name: string) {
+		const file = localFile(from, module);
+		if (
+			!file ||
+			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject ||
+			!installedReact(from)
+		)
+			return;
+		let calls = localHints.get(file);
+		if (!calls) {
+			calls = new Map();
+			const source = fs.readFileSync(file, 'utf8');
+			if (
+				(source.includes('react-dom') || source.includes('\\')) &&
+				installedReact(file, 'react-dom')
+			) {
+				const { sf, checker } = bind(file, source);
+				calls = directRendererCalls(sf, checker, 'react-dom', (api) => resourceHints.has(api));
+			}
+			localHints.set(file, calls);
+		}
+		return calls.get(name);
+	}
+
 	const localHooks = new Map<string, Map<string, string>>();
 	let selectedInPlace: Set<string> | undefined;
 	function localReactHook(from: string, module: string, name: string, nativeOnly: boolean) {
@@ -456,7 +482,12 @@ export async function runCodemod(
 					existing && program
 						? { sf: existing, checker: program.getTypeChecker() }
 						: bind(file, source);
-				hooks = directReactHooks(bound.sf, bound.checker);
+				hooks = directRendererCalls(
+					bound.sf,
+					bound.checker,
+					'react',
+					(name) => name === 'useState' || name === 'useSyncExternalStore',
+				);
 			}
 			localHooks.set(file, hooks);
 		}
@@ -758,6 +789,9 @@ export async function runCodemod(
 				get originalReact() {
 					return installedReact(file);
 				},
+				initializerResourceHint: renames.has(file)
+					? (module, name) => initializerResourceHint(file, module, name)
+					: undefined,
 				localReactHook: renames.has(file)
 					? (module, name, nativeOnly) => localReactHook(file, module, name, nativeOnly)
 					: undefined,
