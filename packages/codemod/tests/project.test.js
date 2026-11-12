@@ -173,13 +173,13 @@ export function subscribe(listener: () => void) {
 			'dir',
 		);
 		const inputs = ['Pane.tsx', 'Other.tsx'].map((name) => path.join(root, name));
-		const expectBlocked = async (files) => {
+		const expectBlocked = async (files, hook = 'useSyncExternalStore') => {
 			const preview = await runCodemod(files, { root, strong: true, write: false });
 			expect(preview.files.some((file) => file.file.endsWith('.octane.ts'))).toBe(false);
 			expect(preview.files[0].notes).toContainEqual(
 				expect.objectContaining({
 					severity: 'error',
-					message: expect.stringContaining("calls React's useSyncExternalStore"),
+					message: expect.stringContaining(`calls React's ${hook}`),
 				}),
 			);
 		};
@@ -221,6 +221,8 @@ export function subscribe(listener: () => void) {
 			const input = path.join(root, 'Alias.tsx');
 			fs.writeFileSync(input, consumer.replaceAll('useAttribute', alias));
 			await expectBlocked([input]);
+			fs.writeFileSync(input, withRefs.replaceAll('useAttribute', alias));
+			await expectBlocked([input]);
 		}
 		const leaf = path.join(root, 'attribute-store.ts');
 		const source = fs.readFileSync(leaf, 'utf8');
@@ -229,14 +231,23 @@ export function subscribe(listener: () => void) {
 			source.replace("document.documentElement.dataset.label === 'on'", 'document.documentElement'),
 		);
 		await expectBlocked([inputs[0]]);
+		await expectBlocked([inputs[1]]);
 		fs.writeFileSync(leaf, "import { Fragment } from 'react';\n" + source);
 		await expectBlocked([inputs[0]]);
 		fs.writeFileSync(leaf, source);
 		const occupied = path.join(root, 'use-value.octane.ts');
 		fs.writeFileSync(occupied, 'export const custom = true;');
 		await expectBlocked([inputs[0]]);
+		await expectBlocked([inputs[1]]);
 		expect(fs.readFileSync(occupied, 'utf8')).toBe('export const custom = true;');
 		fs.rmSync(occupied);
+		const hookFile = path.join(root, 'use-value.ts');
+		fs.writeFileSync(
+			hookFile,
+			"import { useState } from 'react'; export function useValue() { const [value] = useState(false); return value; }",
+		);
+		await expectBlocked([inputs[1]], 'useState');
+		fs.writeFileSync(hookFile, wrapper);
 
 		const migrated = await runCodemod(inputs, { root, strong: true });
 		for (const input of ['Pane.tsx', 'Other.tsx']) {
