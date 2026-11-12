@@ -567,9 +567,13 @@ export async function runCodemod(
 							.replace(/\.ts$/, '');
 						return { from: relative.startsWith('.') ? relative : './' + relative, name: plan.name };
 					};
-		const transform = (notes = extra, retry?: 'effectReceivers' | 'linkedState') =>
+		const transform = (
+			notes = extra,
+			retry?: 'effectReceivers' | 'effectProperties' | 'linkedState',
+		) =>
 			transformModule(source, file, {
-				captureEffectReceivers: retry === 'effectReceivers',
+				captureEffectReceivers: retry === 'effectReceivers' || retry === 'effectProperties',
+				snapshotEffectProperties: retry === 'effectProperties',
 				linkRenderState: retry === 'linkedState' && installedReact(file),
 				target,
 				reactIntlAdapter: intl,
@@ -701,6 +705,7 @@ export async function runCodemod(
 				const strengthened = strengthen(compiler, code, output, {
 					force: options.forceStrong,
 					withEffectReceivers: () => transform([], 'effectReceivers').code,
+					withEffectProperties: () => transform([], 'effectProperties').code,
 					withLinkedState: () => transform([], 'linkedState').code,
 				});
 				code = strengthened.code;
