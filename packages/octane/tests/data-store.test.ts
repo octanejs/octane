@@ -237,7 +237,7 @@ describe('octane/data store', () => {
 		const list = store.read(todos, undefined);
 		await observe(list);
 		const error = await store.write(setDone, { id: 'a', done: true }).catch((reason) => reason);
-		expect(error).toBeInstanceOf(DataUncertainError);
+		if (!(error instanceof DataUncertainError)) throw new Error('expected an uncertain write');
 		expect(list.getSnapshot().value![0].done).toBe(true);
 		store.settle(error.operationId, true);
 		await vi.waitFor(() => expect(list.getSnapshot().refreshing).toBe(false));
