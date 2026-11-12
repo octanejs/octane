@@ -45,7 +45,7 @@ export function ItemPage() {
 			)}
 			<div {...stylex.props(styles.meta)}>{comments + ' ' + pluralize(comments, 'comment')}</div>
 			<div data-testid="comments">
-				{kids.map((kid) => (
+				{[...kids].map((kid) => (
 					<Suspense key={kid} fallback={<div {...stylex.props(styles.comment)}>…</div>}>
 						<Comment id={kid} depth={0} />
 					</Suspense>
