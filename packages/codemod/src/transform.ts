@@ -10,7 +10,7 @@ import {
 import { reactRenderer, staticReactProps } from './react-renderer.js';
 import { linkedRenderState } from './linked-state.js';
 import { nativeSetupHook } from './local-react-hook.js';
-import { localUses, scalar, walkLocalValues } from './local-uses.js';
+import { componentTagOrExport, localUses, scalar, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
 import { effectReceivers, fixedBinding, initializedBefore } from './effect-receivers.js';
@@ -103,6 +103,7 @@ const RULE = {
 	documentShell: 'document-shell',
 	nativeChange: 'native-text-change',
 	nativeSignal: 'native-signal-read',
+	nativeRefState: 'native-ref-state',
 	className: 'class-attribute',
 	provider: 'context-provider',
 	strictMode: 'strict-mode',
@@ -620,6 +621,7 @@ class ModuleTransform {
 	private snapshotEdits?: Map<ts.Node, string>;
 	private snapshotCaptures?: Map<ts.ArrowFunction, string[]>;
 	private linkedStateEdits?: Map<ts.Statement, string>;
+	private nativeRefStoreFactory?: string;
 	private linkedStateNames?: [string, string, string, string];
 	/** React imports read as values, not only as types. */
 	readonly valueUses = new Set<string>();
@@ -721,6 +723,27 @@ class ModuleTransform {
 				? [': { error: string; children?: unknown }', ': never']
 				: ['', ''];
 			code = `${code.trimEnd()}\n\nfunction ${NO_PORT}({ error }${props})${result} {\n${this.indentUnit}throw new Error(error);\n}\n`;
+		}
+		if (this.nativeRefStoreFactory) {
+			code = `${code.trimEnd()}
+
+function ${this.nativeRefStoreFactory}<T>(initial: T) {
+	let current = initial;
+	let notify: (() => void) | null = null;
+	return {
+		get: () => current,
+		subscribe(listener: () => void) {
+			notify = listener;
+			return () => { if (notify === listener) notify = null; };
+		},
+		attach(next: T) {
+			if (current === next) return;
+			current = next;
+			notify?.();
+		},
+	};
+}
+`;
 		}
 		const tsrx = this.emitsTsrx;
 		if (tsrx) code = code.replace(/^\/\*\*\s*@jsxImportSource\s+\S+\s*\*\/[ \t]*\r?\n/m, '');
@@ -907,6 +930,13 @@ class ModuleTransform {
 						this.localUses,
 					),
 				() => this.options.reactStoreComponent?.('react-intl') === true,
+				(call) =>
+					this.note(
+						RULE.bindings,
+						'error',
+						call,
+						'A React Intl formatter can schedule React DOM resources on the original request. Verify this formatMessage call runs without renderer-owned effects, or keep it in the original React render.',
+					),
 			);
 		}
 		let safeStoreUses: ReturnType<typeof storeHookUses> | undefined;
@@ -1368,6 +1398,13 @@ class ModuleTransform {
 				reason = `<${text}> needs ReactCompatInline to stay inside this paragraph. Install an Octane release that exports it or keep the paragraph in React.`;
 			if (reason === null) {
 				port.islands++;
+				if (binding.module === 'react-intl' && name === 'FormattedMessage')
+					this.note(
+						RULE.bindings,
+						'error',
+						element,
+						'A React Intl formatter can depend on ancestor contexts or schedule React DOM resources outside this generated island. Verify the provider and its formatters, or keep this message under its original React ancestors.',
+					);
 				this.islands.set(element, paragraph ? 'ReactCompatInline' : 'ReactCompat');
 			} else {
 				// Octane fails on a React component deep in its renderer, naming
@@ -2715,6 +2752,10 @@ class ModuleTransform {
 			const linked = this.linkedStateEdits.get(node);
 			if (linked) return linked;
 		}
+		if (this.strong && this.target === 'tsrx' && ts.isVariableStatement(node)) {
+			const state = this.nativeRefState(node);
+			if (state) return state;
+		}
 		const snapshot = this.snapshotEdits?.get(node);
 		if (snapshot)
 			return ts.isCallExpression(node)
@@ -3776,6 +3817,120 @@ class ModuleTransform {
 			this.checkEffectDependencyReads(node, node.arguments[1]);
 		if (name in DEPENDENCY_HOOKS) return this.rewriteDependencies(node, name);
 		return null;
+	}
+
+	/** Publish an exclusive native host ref through the existing external-store hook. */
+	private nativeRefState(statement: ts.VariableStatement) {
+		const { declarationList } = statement;
+		if (!(declarationList.flags & ts.NodeFlags.Const) || declarationList.declarations.length !== 1)
+			return null;
+		const [{ name, initializer, type: annotation }] = declarationList.declarations;
+		if (
+			annotation ||
+			!ts.isArrayBindingPattern(name) ||
+			name.elements.length !== 2 ||
+			!initializer ||
+			!ts.isCallExpression(initializer) ||
+			initializer.questionDotToken ||
+			initializer.arguments.length !== 1 ||
+			initializer.arguments[0].kind !== ts.SyntaxKind.NullKeyword ||
+			initializer.typeArguments?.length !== 1
+		)
+			return null;
+		const hook = this.callee(initializer.expression);
+		if (hook?.module !== 'react' || hook.name !== 'useState' || !this.options.automaticReactJsx)
+			return null;
+		const [value, setter] = name.elements;
+		if (
+			!ts.isBindingElement(value) ||
+			!ts.isBindingElement(setter) ||
+			!ts.isIdentifier(value.name) ||
+			!ts.isIdentifier(setter.name) ||
+			value.initializer ||
+			setter.initializer ||
+			value.dotDotDotToken ||
+			setter.dotDotDotToken
+		)
+			return null;
+		const refs = this.localUses(setter.name);
+		if (refs.length !== 1) return null;
+		const [ref] = refs;
+		const expression = ref.parent;
+		if (!ts.isJsxExpression(expression) || expression.expression !== ref) return null;
+		const attribute = expression.parent;
+		if (
+			!ts.isJsxAttribute(attribute) ||
+			attribute.initializer !== expression ||
+			!ts.isIdentifier(attribute.name) ||
+			attribute.name.text !== 'ref'
+		)
+			return null;
+		const host = attribute.parent.parent;
+		if (
+			!ts.isIdentifier(host.tagName) ||
+			!/^[a-z]/.test(host.tagName.text) ||
+			host.attributes.properties.some(ts.isJsxSpreadAttribute)
+		)
+			return null;
+		const owner = ts.findAncestor(statement, isFunctionLike);
+		const output = ts.isJsxOpeningElement(host) ? host.parent : host;
+		if (
+			!owner ||
+			!(
+				ts.isFunctionDeclaration(owner) ||
+				ts.isFunctionExpression(owner) ||
+				ts.isArrowFunction(owner)
+			) ||
+			owner.body !== statement.parent ||
+			owner.asteriskToken ||
+			owner.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) ||
+			!this.isComponent(owner) ||
+			nativeOutputOwner(output, () => false, {
+				typeOf: (node) => this.typeOf(node),
+				text: (node) => scalar(this.typeOf(node)),
+			}) !== owner ||
+			reads(owner, (name) => name.text === 'eval') ||
+			this.lostComments(statement.getStart(this.sf), statement.end, '').length
+		)
+			return null;
+
+		let binding = owner.name;
+		if (!ts.isFunctionDeclaration(owner)) {
+			const declaration = owner.parent;
+			if (
+				!ts.isVariableDeclaration(declaration) ||
+				declaration.initializer !== owner ||
+				!ts.isIdentifier(declaration.name) ||
+				!(ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const)
+			)
+				return null;
+			binding = declaration.name;
+		}
+		if (
+			(binding && !this.localUses(binding).every(componentTagOrExport)) ||
+			(owner.name &&
+				owner.name !== binding &&
+				!this.localUses(owner.name).every(componentTagOrExport))
+		)
+			return null;
+
+		const fresh = (base: string) => {
+			while (this.declared.has(base) || this.readsGlobal(base)) base += '_';
+			this.declared.add(base);
+			return base;
+		};
+		const factory = (this.nativeRefStoreFactory ??= fresh('createNativeRefStore'));
+		const cell = fresh(value.name.text + 'RefStore');
+		const memo = this.require('octane', 'useMemo', false);
+		const read = this.require('octane', 'useSyncExternalStore', false);
+		const type = this.emit(initializer.typeArguments[0], PLAIN);
+		const line = '\n' + this.indentOf(statement);
+		this.count(RULE.nativeRefState);
+		return (
+			`const ${cell} = ${memo}(() => ${factory}<${type}>(null));${line}` +
+			`const ${value.name.getText(this.sf)} = ${read}(${cell}.subscribe, ${cell}.get, ${cell}.get);${line}` +
+			`const ${setter.name.getText(this.sf)} = ${cell}.attach;`
+		);
 	}
 
 	/** Replace only a direct render subscription to one native writable cell, with identical SSR and client reads. */

@@ -220,6 +220,8 @@ Inside an authored `ReactCompat` boundary, a single original React component can
 
 Inside a retained React component, a rich-text callback such as `chunks => <strong>{chunks}</strong>` can keep producing a genuine React element. When the codemod creates a React island for `FormattedMessage`, an inline substitution such as `values={{ lineBreak: <br /> }}` also stays in React if the other props and substitutions cannot observe a change in evaluation timing. The codemod recognizes a single intrinsic tag with literal attributes and an optional literal key. Callbacks can use their parameter as the sole child. Spreads, refs, and event handlers retain a migration diagnostic.
 
+A native `formatMessage` call can return the expected string while losing resource hints scheduled by a provider-supplied formatter. An automatically generated `FormattedMessage` island can also lose access to other React ancestor contexts. The codemod retains the preview and reports a blocking diagnostic for these calls and islands. Review the actual provider and formatter before adopting them. A local `IntlProvider` can inherit configuration from its mutable class defaults. Explicitly authored React boundaries keep their existing contract.
+
 ## Store hooks in linked workspace packages
 
 The codemod can migrate a named hook from a local `workspace:` dependency when it can read the TypeScript implementation, trace a React context read, and verify that the hook uses the same store code as a renderer-independent public entry. The public entry and hook names can vary. The supported runtime versions match the React Intl adapter above. A top-level `const` can expose a second name for a handle already created by a verified shared factory. Consumers keep the original handle identity.
@@ -238,7 +240,9 @@ The codemod checks how each component uses the hook. Conditions, scalar output, 
 
 A verified hook result can also go to a named function exported directly from an unchanged local TypeScript module whose local runtime dependencies also remain unchanged. The call must run inside a React effect, its cleanup, or an inline click handler on an intrinsic element in the component’s rendered output. For example, `useEffect(() => { syncSettings(store, 'startup'); }, [store])` keeps the same function and store. The other arguments must be literal data or local constants initialized with literals, and the call must discard the result. Calls during render and callbacks passed to custom components need review.
 
-When the file uses the project’s React 19.2+ automatic JSX runtime, a service read with a verified handle can receive a self-closing component from an installed React package with literal props, for example `store.read(notices).show(<Message id="saved" />)`. The generated code creates the original React element, so the service can render it later under its React provider.
+The codemod preserves reads of provider-owned store members in proven post-render paths, such as inline effects and intrinsic click handlers. A verified handle establishes the input’s origin. The active provider supplies the store methods and getters.
+
+When the file uses the project’s React 19.2+ automatic JSX runtime, a deferred service read with a verified handle can receive a self-closing component from an installed React package with literal props, for example `store.read(notices).show(<Message id="saved" />)`. The generated code creates the original React element, so the service can render it later under its React provider.
 
 Dynamic JSX payloads, opaque store values rendered as children, and components passed to unknown renderers still require manual migration.
 
@@ -380,6 +384,8 @@ export function useCellValue(definition) {
 	return useSyncExternalStore(subscribe, get, getServer);
 }
 ```
+
+Strong migration can preserve a typed `useState<Element | null>(null)` setter used only as one native host `ref` in an ordinary React JSX project. The generated component uses `useSyncExternalStore` to observe attachment and detachment. This also covers ref commits owned by an ancestor Suspense boundary.
 
 When an effect with dependencies such as `[controller]` reads `controller.value` or calls `controller.start()`, Strong migration can preserve the original object-identity dependency. For an unused dependency such as `revision` in `[controller, revision]`, the codemod can emit `void revision` inside the effect so a revision change still triggers cleanup and setup. It attempts these rewrites for immutable bindings and verifies the resulting dependencies with the project compiler. An imperative handle can use the same rewrite with a list of fixed bindings, keeping property reads inside its factory.
 

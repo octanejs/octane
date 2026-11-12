@@ -1,4 +1,4 @@
-import { useState } from 'octane';
+import { useState, type OctaneNode } from 'octane';
 
 // Simple early-return: render nothing when condition holds.
 // Old syntax: `if (props.hide) return;` before the JSX.
@@ -46,4 +46,17 @@ export function NoBraces(props) @{
 			<p class="visible">{'visible'}</p>
 		}
 	</>
+}
+
+export function MutableCapture({ off }: { off: boolean }) {
+	let item: OctaneNode = <i />;
+	const read = () => item;
+	if (off) return <em />;
+	item = null;
+	return (
+		<span>
+			{item}
+			{read()}
+		</span>
+	);
 }
