@@ -9,6 +9,7 @@ import {
 } from '../server-rpc-protocol.js';
 import { readServerResult } from '../server-rpc-stream-client.js';
 import { createServerResultStream } from './rpc-stream.js';
+import { setHostTimeout, clearHostTimeout } from '../host-task.js';
 
 export type { ServerCallBatchOptions } from '../server-rpc-protocol.js';
 
@@ -82,7 +83,7 @@ export function executeServerFunctionBatch(
 			void (async () => {
 				const timeout = new AbortController();
 				const memberSignal = AbortSignal.any([signal, timeout.signal]);
-				const timer = setTimeout(
+				const timer = setHostTimeout(
 					() => timeout.abort(new DOMException('Server batch member timed out', 'TimeoutError')),
 					limits.timeoutMs,
 				);
@@ -126,7 +127,7 @@ export function executeServerFunctionBatch(
 						'Server batch member did not produce an authoritative result',
 					];
 				} finally {
-					clearTimeout(timer);
+					clearHostTimeout(timer);
 					memberSignal.removeEventListener('abort', abort);
 				}
 				if (!closed) {

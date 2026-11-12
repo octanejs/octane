@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
 import { prerender } from 'octane/static';
+import { installTestClock } from 'octane/testing';
 
 // RenderOptions surface (renderToString / prerender): CSP nonce stamping,
 // AbortSignal, and the per-render suspense deadline override. The nonce applies
@@ -98,8 +99,25 @@ describe('RenderOptions — signal (prerender)', () => {
 
 describe('RenderOptions — timeoutMs (prerender)', () => {
 	it('overrides the global suspense deadline for one render', async () => {
-		await expect(
-			prerender(suspense.AsyncLeaf, { promise: new Promise(() => {}) }, { timeoutMs: 20 }),
-		).rejects.toThrow('did not settle within 20ms');
+		const clock = installTestClock();
+		try {
+			let settled = false;
+			// A minute-long deadline, reached at once on the clock.
+			const work = prerender(
+				suspense.AsyncLeaf,
+				{ promise: new Promise(() => {}) },
+				{ timeoutMs: 60_000 },
+			).finally(() => {
+				settled = true;
+			});
+			work.catch(() => {});
+			await clock.advance(59_999);
+			expect(settled).toBe(false);
+			await clock.advance(1);
+			expect(settled).toBe(true);
+			await expect(work).rejects.toThrow('did not settle within 60000ms');
+		} finally {
+			clock.uninstall();
+		}
 	});
 });

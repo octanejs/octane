@@ -29,6 +29,7 @@ export { readNativeDomStyle, readNativeDomProps } from './signals/read-protocol.
 // ---------------------------------------------------------------------------
 
 import { resolveHookPath } from './hook-slot-cache.js';
+import { clearHostTimeout, hostNow, setHostTimeout } from './host-task.js';
 import type {
 	useEffect as ClientUseEffect,
 	useImperativeHandle as ClientUseImperativeHandle,
@@ -9570,12 +9571,15 @@ async function raceSettleGuards(
 	signal: AbortSignal | undefined,
 ): Promise<void> {
 	const racers: Promise<unknown>[] = [work];
-	let timer: ReturnType<typeof setTimeout> | undefined;
+	let timer: unknown;
 	let removeAbort: (() => void) | undefined;
 	if (timeoutMs > 0) {
 		racers.push(
 			new Promise<never>((_, reject) => {
-				timer = setTimeout(() => reject(new Error(formatServerError(32, timeoutMs))), timeoutMs);
+				timer = setHostTimeout(
+					() => reject(new Error(formatServerError(32, timeoutMs))),
+					timeoutMs,
+				);
 				// Don't let the deadline timer hold the event loop open if the render
 				// settles first (Node-only; harmless where unref is absent).
 				(timer as any)?.unref?.();
@@ -9594,7 +9598,7 @@ async function raceSettleGuards(
 	try {
 		await (racers.length === 1 ? work : Promise.race(racers));
 	} finally {
-		clearTimeout(timer);
+		clearHostTimeout(timer);
 		removeAbort?.();
 	}
 }
@@ -9650,12 +9654,12 @@ interface SuspenseStall {
 function nextStalledRetryDelay(stall: SuspenseStall, timeoutMs: number, width: number): number {
 	if (stall.waves === 0 || width < stall.width) {
 		stall.waves = 0;
-		stall.since = Date.now();
+		stall.since = hostNow();
 		stall.width = width;
 	}
 	const waves = ++stall.waves;
 	const remainingMs =
-		timeoutMs > 0 ? stall.since + timeoutMs - Date.now() : Number.POSITIVE_INFINITY;
+		timeoutMs > 0 ? stall.since + timeoutMs - hostNow() : Number.POSITIVE_INFINITY;
 	if (remainingMs <= 0) return -1;
 	return Math.min(2 ** (waves - 1), STALLED_RETRY_MAX_DELAY_MS, remainingMs);
 }
@@ -9885,9 +9889,9 @@ async function settleFirstOfWave(
 	if (delayMs < 0) throw new Error(formatServerError(332, timeoutMs));
 	// Other members may still be pending on real I/O. Their settlement ends the
 	// wait at once instead of holding their boundaries behind this backoff.
-	let timer: ReturnType<typeof setTimeout> | undefined;
+	let timer: unknown;
 	const progress = new Promise<void>((resolve) => {
-		timer = setTimeout(resolve, delayMs);
+		timer = setHostTimeout(resolve, delayMs);
 		settlements.wake = () => {
 			if (waveLanded(suspended, settlements)) resolve();
 		};
@@ -9895,7 +9899,7 @@ async function settleFirstOfWave(
 	try {
 		await raceSettleGuards(progress, 0, signal);
 	} finally {
-		clearTimeout(timer);
+		clearHostTimeout(timer);
 		settlements.wake = null;
 	}
 	if (waveLanded(suspended, settlements)) {
@@ -10082,7 +10086,11 @@ async function runBuffered(
 					options?.onError?.(err);
 					throw err;
 				}
-				await raceSettleGuards(new Promise((resolve) => setTimeout(resolve, delayMs)), 0, signal);
+				await raceSettleGuards(
+					new Promise<void>((resolve) => setHostTimeout(resolve, delayMs)),
+					0,
+					signal,
+				);
 			} else {
 				stall.waves = 0;
 			}

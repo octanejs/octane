@@ -4,6 +4,7 @@ import {
 	type ServerResultFrame,
 	type ServerResultLimits,
 } from '../server-rpc-protocol.js';
+import { setHostTimeout, clearHostTimeout } from '../host-task.js';
 
 /**
  * One invocation, one bounded result channel. next() is demand-driven: a slow
@@ -25,9 +26,9 @@ export function createServerResultStream(
 	// Observe rejection even if the transport never asks for the first frame.
 	void pending.catch(() => {});
 	let controller: ReadableStreamDefaultController<Uint8Array>;
-	let timer: ReturnType<typeof setTimeout>;
+	let timer: unknown;
 	const cleanup = () => {
-		clearTimeout(timer);
+		clearHostTimeout(timer);
 		options.signal?.removeEventListener('abort', abort);
 		const abandoned = pending;
 		pending = undefined;
@@ -84,7 +85,7 @@ export function createServerResultStream(
 		{
 			start(streamController) {
 				controller = streamController;
-				timer = setTimeout(() => fail('Server function timed out'), limits.timeoutMs);
+				timer = setHostTimeout(() => fail('Server function timed out'), limits.timeoutMs);
 				options.signal?.addEventListener('abort', abort, { once: true });
 				if (options.signal?.aborted) abort();
 			},

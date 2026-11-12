@@ -28,6 +28,7 @@ import {
 	type FormSeed,
 } from './form.js';
 import type { ServerCallContext } from '../server-call.js';
+import { setHostTimeout, clearHostTimeout } from '../host-task.js';
 
 /**
  * What a server integration knows of a request beyond the `Request` itself:
@@ -344,8 +345,8 @@ export function createDataHandler<C extends object = {}>(
 		]();
 		const timeUp = new Promise<null>((resolve) => {
 			if (lifetime === Infinity) return;
-			const timer = setTimeout(() => resolve(null), lifetime);
-			signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
+			const timer = setHostTimeout(() => resolve(null), lifetime);
+			signal.addEventListener('abort', () => clearHostTimeout(timer), { once: true });
 		});
 		try {
 			yield {};
