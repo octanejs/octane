@@ -66,6 +66,7 @@ export {
 	useCallback,
 	useRef,
 	useLazyRef,
+	useInitialValue,
 	useId,
 	useImperativeHandle,
 	useEffectEvent,
