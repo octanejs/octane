@@ -228,6 +228,19 @@ export async function runCodemod(
 		).resolvedModule;
 		return target?.resolvedFileName === original?.resolvedFileName ? target : undefined;
 	}
+	function installedReact(file: string) {
+		const dir = path.dirname(file);
+		if (ts.findConfigFile(dir, ts.sys.fileExists) !== rootProject) return false;
+		const target = originalModule(file, 'react');
+		if (!target || !['react', '@types/react'].includes(target.packageId?.name ?? '')) return false;
+		// TypeScript can resolve @types/react even when the runtime is missing or linked locally.
+		const runtime = readInstalled(dir, 'react');
+		return (
+			runtime?.manifest.name === 'react' &&
+			fs.realpathSync(runtime.dir).split(path.sep).includes('node_modules') &&
+			fs.realpathSync(target.resolvedFileName).split(path.sep).includes('node_modules')
+		);
+	}
 	// One shared context per project, including separate file-by-file migrations.
 	const sourceDir = path.join(root, 'src');
 	const adapter = path.join(
@@ -554,9 +567,10 @@ export async function runCodemod(
 							.replace(/\.ts$/, '');
 						return { from: relative.startsWith('.') ? relative : './' + relative, name: plan.name };
 					};
-		const transform = (captureEffectReceivers = false, notes = extra) =>
+		const transform = (notes = extra, retry?: 'effectReceivers' | 'linkedState') =>
 			transformModule(source, file, {
-				captureEffectReceivers,
+				captureEffectReceivers: retry === 'effectReceivers',
+				linkRenderState: retry === 'linkedState' && installedReact(file),
 				target,
 				reactIntlAdapter: intl,
 				forwardedText: (module, name, prop, ordinaryCaller, through) =>
@@ -621,7 +635,7 @@ export async function runCodemod(
 			});
 		if (intl && adapterError) {
 			// Public utilities such as defineMessages can stay on React Intl without a helper.
-			const needsAdapter = transform(false, []).rules['react-intl'];
+			const needsAdapter = transform([]).rules['react-intl'];
 			intl = undefined;
 			if (needsAdapter) {
 				const note: Note = {
@@ -686,7 +700,8 @@ export async function runCodemod(
 			if (strong && result.template) {
 				const strengthened = strengthen(compiler, code, output, {
 					force: options.forceStrong,
-					withEffectReceivers: () => transform(true, []).code,
+					withEffectReceivers: () => transform([], 'effectReceivers').code,
+					withLinkedState: () => transform([], 'linkedState').code,
 				});
 				code = strengthened.code;
 				isStrong = strengthened.strong;

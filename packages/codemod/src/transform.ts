@@ -7,6 +7,7 @@ import {
 	svgLocalReads,
 } from './forwarded-props.js';
 import { reactRenderer, staticReactProps } from './react-renderer.js';
+import { linkedRenderState } from './linked-state.js';
 import { localUses, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
@@ -572,6 +573,8 @@ class ModuleTransform {
 	readonly target: 'tsrx' | 'tsx';
 	readonly strong: boolean;
 	readonly effectAliases?: Map<ts.Identifier, string>;
+	private linkedStateEdits?: Map<ts.Statement, string>;
+	private linkedStateNames?: [string, string, string, string];
 	/** React imports read as values, not only as types. */
 	readonly valueUses = new Set<string>();
 	hasSignalRuntime?: boolean;
@@ -910,7 +913,11 @@ class ModuleTransform {
 		const visit = (node: ts.Node) => {
 			if (ts.isParameter(node) && this.submitParameters?.has(node)) this.checkSubmitParameter(node);
 			if (ts.isIdentifier(node) && declaresName(node)) this.declared.add(node.text);
-			if (this.options.pathSvgAdapter && ts.isIdentifier(node) && node.text === 'eval')
+			if (
+				(this.options.pathSvgAdapter || this.options.linkRenderState) &&
+				ts.isIdentifier(node) &&
+				node.text === 'eval'
+			)
 				hasEval = true;
 			if (ts.isIdentifier(node) && portLocals.has(node.text)) this.planUnported(node);
 			if (isJsx(node)) this.hasJsx = true;
@@ -930,6 +937,12 @@ class ModuleTransform {
 			ts.forEachChild(node, visit);
 		};
 		visit(this.sf);
+		if (!hasEval && this.options.linkRenderState && this.strong && this.target === 'tsrx') {
+			for (const statement of this.sf.statements) {
+				if (ts.isFunctionDeclaration(statement) && this.isComponent(statement))
+					this.planLinkedState(statement);
+			}
+		}
 		if (this.hasReactBridge) {
 			// A namespace used only for the native bridge needs no missing-port report.
 			for (const module of ['octane/react', 'octane/react/server']) {
@@ -1183,6 +1196,50 @@ class ModuleTransform {
 		});
 		if (!supported) return false;
 		return this.nativeSvgOutput(tag, uses, unproven);
+	}
+
+	private planLinkedState(owner: ts.FunctionDeclaration) {
+		const plan = linkedRenderState(
+			owner,
+			this.checker,
+			(name) => this.localUses(name),
+			(expr) => {
+				const hook = this.callee(expr);
+				return hook?.module === 'react' && hook.name === 'useState';
+			},
+		);
+		if (!plan) return;
+		const fresh = (base: string) => {
+			let name = base;
+			while (this.declared.has(name) || this.readsGlobal(name)) name += '_';
+			this.declared.add(name);
+			return name;
+		};
+		const hook = this.require('octane', 'useLinkedState', false);
+		// These locals live in separate component scopes. Reserve names against the source once.
+		const [active, previous, seen, initialName] = (this.linkedStateNames ??= [
+			fresh('active'),
+			fresh('previous'),
+			fresh('seen'),
+			fresh('initial'),
+		]);
+		const initial = plan.eager ? initialName : active;
+		const indent = this.indentOf(plan.state),
+			line = '\n' + indent,
+			inner = line + this.indentUnit;
+		const flag = plan.flag.getText(this.sf);
+		const eager = plan.eager ? `const ${initial} = ${plan.eager.getText(this.sf)};${line}` : '';
+		const input = plan.eager ? `!!(${flag})` : flag;
+		const replay = plan.replay.map((read) => `void (${read.getText(this.sf)});`).join(' ');
+		// Re-read the original prelude before publication: a retrying getter can suspend.
+		const replacement =
+			eager +
+			`const [${plan.name}] = ${hook}(${input}, (${active}, ${previous}): boolean => {${inner}` +
+			`const ${seen} = (${previous}?.value ?? ${initial}) === true;${inner}` +
+			`if (${active} && !${seen}) { ${replay} }${inner}return ${seen} || ${active};${line}});`;
+		const edits = (this.linkedStateEdits ??= new Map());
+		edits.set(plan.state, replacement);
+		edits.set(plan.guard, DROP);
 	}
 
 	private references?: ReturnType<typeof localUses>;
@@ -2086,6 +2143,10 @@ class ModuleTransform {
 	}
 
 	rewrite(node: ts.Node, ctx: Context): string | null {
+		if (this.linkedStateEdits && ts.isStatement(node)) {
+			const linked = this.linkedStateEdits.get(node);
+			if (linked) return linked;
+		}
 		if (this.effectAliases) {
 			if (ts.isIdentifier(node)) {
 				const alias = this.effectAliases.get(node);
