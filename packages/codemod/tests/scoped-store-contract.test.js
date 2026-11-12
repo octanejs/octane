@@ -359,6 +359,78 @@ export function Pane() { const value = useReading(); return <p>{valueOf(1)}{valu
 	);
 }, 30_000);
 
+it.each([
+	['a method assignment', 'reading.resolve = () => 2;', false],
+	[
+		'a method assignment to a type-asserted handle',
+		'(reading as any).resolve = () => 2;',
+		false,
+		'export const reading = create(3) as unknown as number;',
+	],
+	[
+		'a method assignment to the original handle behind an exported alias',
+		'original.resolve = () => 2;',
+		false,
+		'const original = create(3); const alias = original; export const reading = alias as unknown as number;',
+	],
+	[
+		'a computed assignment through an alias',
+		'const alias = reading; alias["resolve"] = () => 2;',
+		false,
+	],
+	['Object.assign', 'Object.assign(reading, { resolve: () => 2 });', false],
+	[
+		'a property definition',
+		'Object.defineProperty(reading, "resolve", { value: () => 2 });',
+		false,
+	],
+	['Reflect.set', 'Reflect.set(reading, "resolve", () => 2);', false],
+	['Reflect.set with a separate receiver', 'Reflect.set({}, "resolve", () => 2, reading);', false],
+	['a property deletion', 'delete reading.resolve;', false],
+	['a property update', 'reading.version++;', false],
+	['a read', 'reading.resolve?.();', true],
+	['a write on a separate handle', 'const other = create(4); other.resolve = () => 2;', true],
+	[
+		'an imported name that shadows Reflect',
+		'import { readOnlyTools as Reflect } from "./read-only-tools"; Reflect.set(reading, "resolve", () => 2);',
+		true,
+	],
+	[
+		'a shadowing parameter',
+		'function update(reading: { resolve: () => number }) { reading.resolve = () => 2; }',
+		true,
+	],
+])(
+	'checks the original store handle after %s',
+	async (_label, use, migrated, setup = 'export const reading = create(3);') => {
+		const { app } = project({
+			'observer/public-store.ts': "export { valueOf, create } from './state';",
+			'observer/state.ts': `type Handle = { resolve?: () => number; version: number };
+			export function create(value: number): Handle { return { resolve: () => value, version: 0 }; }
+			export function valueOf(base: number, handle: Handle) { return base + (handle.resolve?.() ?? handle.version); }`,
+			'observer/react-hooks.ts': `import {use} from 'react'; import {current} from './renderer';
+			import {create, valueOf} from './state';
+			export function useChannel(handle: ReturnType<typeof create>) { return valueOf(use(current), handle); }`,
+			'app/src/reading.ts': `import { create } from 'observer/core'; ${setup} ${use}`,
+			'app/src/read-only-tools.ts':
+				'export const readOnlyTools = { set(value: unknown, _key: string, _next: unknown) { return value; } };',
+			'app/src/pane.tsx': `import {useSnapshot} from 'observer'; import {reading} from './reading';
+			export function Pane() { return <p>{String(useSnapshot(reading))}</p>; }`,
+		});
+		const result = await runCodemod([path.join(app, 'src/pane.tsx')], {
+			root: app,
+			strong: true,
+			verify: true,
+			write: false,
+		});
+		const pane = result.files.find((file) => file.file === 'src/pane.tsx');
+		expect(Boolean(pane.rules['store-hook'])).toBe(migrated);
+		expect(pane.notes.some((note) => note.rule === 'bindings' && note.severity === 'error')).toBe(
+			!migrated,
+		);
+	},
+);
+
 it('preserves the original handle and passes the active store to unchanged helpers at effect and click time', async () => {
 	const { app } = project({
 		'observer/public-store.ts': "export { valueOf, key } from './state';",
