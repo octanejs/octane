@@ -28,9 +28,10 @@ function StoriesList({
 
 	return (
 		<div data-testid="stories-page" data-feed={feed} data-page={page}>
-			{[...items].map((story, i) => (
-				<StoryRow key={story.id} rank={start + i + 1} story={story} />
-			))}
+			{[...items].map((story, i) => {
+				const rank = start + i + 1;
+				return <StoryRow rank={rank} story={story} key={story.id} />;
+			})}
 			<nav data-testid="pager" {...stylex.props(styles.pager)}>
 				{hasPrev ? (
 					<Link

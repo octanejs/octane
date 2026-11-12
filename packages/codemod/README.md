@@ -130,6 +130,11 @@ standard `Array.prototype.map`. An array supplied by a caller can override
 `.map()` and inspect the React elements its callback returns. The codemod keeps
 that call for review. Keep the list in React if its method relies on element identity.
 
+React's automatic JSX runtime evaluates a row's props and children before its
+separate key argument. For a simple row where that order is observable, the
+codemod keeps the map callback and evaluates the children as an explicit prop
+before the key. It reports more complex rows for review.
+
 ## Strong mode
 
 A React layout effect with no dependency list runs after every commit. When its
