@@ -2104,8 +2104,25 @@ export function Greeting({ count }: { count: number }) {
 		const enclosed = `import {IntlProvider as Provider, useIntl} from 'react-intl';
 			function Locale() { const { locale } = useIntl(); return <p lang={locale}/>; }
 			export function Page() { return <Provider locale="fr"><Locale/></Provider>; }`;
+		const direct = enclosed.replace('{ locale } = useIntl()', 'locale = useIntl().locale');
 		const sources = {
 			'src/Owned.tsx': enclosed,
+			'src/OwnedMember.tsx': direct,
+			'src/ExternalMember.tsx': direct.replace('function Locale', 'export function Locale'),
+			'src/ReflectiveReceiver.tsx': `import {useIntl} from 'react-intl';
+				export function Leaf() {
+					const intl = useIntl();
+					return <b title={intl.formatNumber(1)}>{eval('intl.locale')}</b>;
+				}`,
+			'src/ReflectiveHook.tsx': String.raw`import {useIntl} from 'react-intl';
+				export function Leaf() {
+					return <b title={useIntl().formatNumber(1)}>{\u0065val('useIntl().locale')}</b>;
+				}`,
+			'src/ExternalReceiver.tsx': `import {useIntl} from 'react-intl';
+				export function Leaf() {
+					const intl = useIntl();
+					return <b title={intl.formatNumber(1)}>{intl.locale}</b>;
+				}`,
 			'src/Exported.tsx': enclosed.replace('function Locale', 'export function Locale'),
 			'src/Escaped.tsx': enclosed + '\nexport {Locale as Consumer};',
 			'src/Nested.tsx': enclosed
@@ -2140,11 +2157,11 @@ export function Greeting({ count }: { count: number }) {
 		for (const file of Object.keys(sources)) {
 			const result = files.find((result) => result.file === file);
 			const errors = [...result.notes, ...result.diagnostics].filter((d) => d.severity === 'error');
-			if (file === 'src/Owned.tsx') {
+			if (file === 'src/Owned.tsx' || file === 'src/OwnedMember.tsx') {
 				expect(result.strong).toBe(true);
-				expect(errors).toEqual([]);
+				expect.soft(errors, file).toEqual([]);
 			} else {
-				expect(errors).toContainEqual(
+				expect.soft(errors, file).toContainEqual(
 					expect.objectContaining({
 						rule: 'bindings',
 						message: expect.stringContaining('useIntl'),
@@ -2427,11 +2444,11 @@ export function Locale() { return <IntlProvider locale="en"><b>test</b></IntlPro
 		const root = setup({
 			'src/Greeting.tsx': `import { useIntl } from 'react-intl';
 import React, { memo as cached } from 'react';
-export const Greeting = cached(() => { const intl = useIntl(); return <p title={intl.locale} />; });
-export const Field = React.forwardRef((props, ref) => { const intl = useIntl(); return <input ref={ref} title={intl.locale} />; });`,
+export const Greeting = cached(() => { const intl = useIntl(); return <p title={intl.formatNumber(1)} />; });
+export const Field = React.forwardRef((props, ref) => { const intl = useIntl(); return <input ref={ref} title={intl.formatNumber(1)} />; });`,
 			'src/Other.tsx': `import {useIntl} from 'react-intl';
 function memo(fn) { return fn; }
-export const Other = memo(() => { const intl = useIntl(); return <p title={intl.locale} />; });`,
+export const Other = memo(() => { const intl = useIntl(); return <p title={intl.formatNumber(1)} />; });`,
 		});
 		const { files } = await runCodemod([root], { root, write: false, strong: true });
 		const wrapped = files.find((f) => f.file === 'src/Greeting.tsx');
