@@ -946,11 +946,12 @@ describe('parallel use() — independent asynchronous keyed-list children', () =
 		const root = mount(client.App, { load: resources.load, version: 0 });
 
 		try {
-			expect(resources.calls).toEqual(['activity:0']);
+			// Every row's request starts in the list's first render, from the list's
+			// current contents, never from its declared ones.
+			expect(resources.calls).toEqual(['activity:0', 'replacement:0']);
 			await act(() => resources.settle('activity', 0));
-			expect(resources.calls).toContain('replacement:0');
-			expect(resources.calls).not.toContain('insights:0');
 			await act(() => resources.settle('replacement', 0));
+			expect(resources.calls).not.toContain('insights:0');
 			expect(root.findAll('.mutable-keyed-panel').map((node) => node.textContent)).toEqual([
 				'activity-v0',
 				'replacement-v0',
@@ -960,7 +961,7 @@ describe('parallel use() — independent asynchronous keyed-list children', () =
 		}
 	});
 
-	it('does not run a later row or its key before an earlier keyed row resolves', () => {
+	it('runs each keyed row and its key once, in order, without speculating on them', () => {
 		const source = `
 			import { use } from 'octane';
 
@@ -1011,7 +1012,9 @@ describe('parallel use() — independent asynchronous keyed-list children', () =
 		});
 
 		try {
-			expect(events).toEqual(['key:activity', 'load:activity']);
+			// The list renders its rows after the first one suspends, so each row's
+			// request starts now. Nothing evaluates a key or a row ahead of the list.
+			expect(events).toEqual(['key:activity', 'load:activity', 'key:insights', 'load:insights']);
 		} finally {
 			root.unmount();
 		}

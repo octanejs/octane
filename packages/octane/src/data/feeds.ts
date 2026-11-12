@@ -123,10 +123,10 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 	async function run(stop: AbortSignal): Promise<void> {
 		const connect = source.listen!;
 		const signal = AbortSignal.any([stop, source.retired]);
-		if (!restored && source.persisted) {
-			const saved = await source.persisted.cursor(key);
+		if (!restored) {
+			const saved = source.persisted ? await source.persisted.cursor(key) : null;
 			if (signal.aborted) return;
-			cursor ??= saved;
+			cursor ??= saved ?? source.seeded.get(key) ?? null;
 			restored = true;
 		}
 		let failures = 0;

@@ -527,6 +527,77 @@ describe('feed presets', () => {
 		expect(closed).toEqual([1008]);
 	});
 
+	it("resumes the page's feed from before the server render read its values", async () => {
+		const rows: TodoItem[] = [{ id: 'a', title: 'Tides', done: false }];
+		const events: TodoItem[] = [];
+		const order: string[] = [];
+		let wake = () => {};
+		const handler = createDataHandler({}, (handle) => [
+			handle(todos, () => {
+				order.push('read');
+				return rows.map((row) => ({ ...row }));
+			}),
+			handle(todoChanges, async function* (_, { cursor, signal }) {
+				let seen = cursor === null ? events.length : Number(cursor);
+				if (cursor === null) {
+					// A slow position: the render's first read still waits for it.
+					await new Promise((resolve) => setTimeout(resolve, 20));
+					order.push('position');
+				}
+				yield { cursor: String(seen) };
+				while (!signal.aborted) {
+					while (seen < events.length) {
+						const event = events[seen++]!;
+						yield { event, cursor: String(seen) };
+					}
+					await new Promise<void>((resolve) => {
+						wake = resolve;
+						signal.addEventListener('abort', () => resolve(), { once: true });
+					});
+				}
+			}),
+		]);
+		const page = new Request('https://app.test/');
+		const rendering = createDataStore({ transport: handler.transport(page), feeds: [todoChanges] });
+		await rendering.prefetch(todos, undefined);
+		// The position is taken first, so no change can fall between it and the value.
+		expect(order).toEqual(['position', 'read']);
+		const seed = rendering.dehydrate();
+		void rendering.retire();
+
+		// Renamed after the server read it, before the browser connects.
+		rows[0] = { id: 'a', title: 'Atoll', done: false };
+		events.push(rows[0]);
+		wake();
+
+		const { WebSocket } = sockets(handler, 'https://app.test', 'ada');
+		const store = createDataStore({
+			transport: handler.transport(page),
+			seed,
+			listen: webSocketListener('wss://app.test/feeds', { WebSocket }),
+		});
+		const list = await observed(store.read(todos, undefined));
+		expect(list()[0]!.title).toBe('Tides');
+		stops.push(listen(store, todoChanges).subscribe(() => {}));
+		await vi.waitFor(() => expect(list()[0]!.title).toBe('Atoll'));
+		expect(order).toEqual(['position', 'read']);
+	});
+
+	it("stops a server render's position request when its store retires", async () => {
+		let signal: AbortSignal | undefined;
+		const store = createDataStore({
+			transport: (request, given) => {
+				signal = given;
+				return new Promise(() => {});
+			},
+			feeds: [todoChanges],
+		});
+		await vi.waitFor(() => expect(signal).toBeDefined());
+		expect(signal!.aborted).toBe(false);
+		void store.retire();
+		expect(signal!.aborted).toBe(true);
+	});
+
 	it("listens through the page's own broker, one subscription per topic, live once subscribed", async () => {
 		const topics = new Map<string, Set<(message: unknown) => void>>();
 		const broker = (topic: string, deliver: (message: unknown) => void) => {
