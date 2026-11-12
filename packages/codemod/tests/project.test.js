@@ -529,6 +529,126 @@ export const render = (rows: string[]) => renderToStaticMarkup(App, {rows}).html
 		}
 	}, 30_000);
 
+	it('evaluates mapped React JSX props and children before the key', async () => {
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'tsconfig.json':
+				'{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler","strict":true}}',
+			'List.tsx': `import { useId } from 'react';
+type Row = { readonly id: string; attr(): string; child(): string };
+function Cell({before, after, children}: { before: string; after: string; children: string }) {
+	return <span id={useId()} data-before={before} data-after={after}>{children}</span>;
+}
+export function List({rows}: { rows: Row[] }) {
+	return <main>{[...rows].map(row => <Cell before={row.attr()} key={row.id} after={row.attr()}>
+		{row.child()}
+	</Cell>)}</main>;
+}
+export function Host({rows}: { rows: Row[] }) {
+	return <main>{rows.map(row => <span data-before={row.attr()} key={row.id} data-after={row.attr()}>{row.child()}</span>)}</main>;
+}`,
+		});
+		fs.symlinkSync(
+			path.join(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const source = path.join(root, 'List.tsx');
+		const [file] = (
+			await runCodemod([source], {
+				root,
+				strong: true,
+				verify: true,
+				projectTypes: true,
+				write: false,
+			})
+		).files;
+		const original = await bundleRuntime(root, 'server', "export { List, Host } from './List.tsx'");
+		const migrated = loadCompiledFixtureSource(file.code, { id: file.output, mode: 'server' });
+		const observe = (render) => {
+			const trace = [];
+			let last = '-';
+			const rows = ['a', 'b'].map((id) => ({
+				get id() {
+					trace.push('key ' + id);
+					return (last = id);
+				},
+				attr() {
+					trace.push('prop ' + last);
+					return last;
+				},
+				child() {
+					trace.push('child ' + last);
+					return last;
+				},
+			}));
+			const dom = new JSDOM(render(rows));
+			return {
+				trace,
+				spans: [...dom.window.document.querySelectorAll('span')].map((span) => [
+					span.dataset.before,
+					span.dataset.after,
+					span.textContent,
+				]),
+			};
+		};
+		for (const name of ['List', 'Host']) {
+			const react = observe((rows) => renderReact(reactElement(original[name], { rows })));
+			expect(react.spans).toEqual([
+				['-', '-', '-'],
+				['a', 'a', 'a'],
+			]);
+			expect(observe((rows) => renderToStaticMarkup(migrated[name], { rows }).html)).toEqual(react);
+		}
+		expect(file.strong).toBe(false);
+		expect(
+			file.notes.filter(
+				({ rule, message }) => rule === 'template-for' && message.includes('override .map()'),
+			),
+		).toEqual([expect.objectContaining({ severity: 'error' })]);
+
+		for (const config of ['"jsx":"react"', '"jsx":"react-jsx","jsxImportSource":"other"']) {
+			fs.writeFileSync(path.join(root, 'tsconfig.json'), '{"compilerOptions":{' + config + '}}');
+			const [unknown] = (
+				await runCodemod([source], { root, strong: true, verify: true, write: false })
+			).files;
+			expect(unknown.strong).toBe(false);
+			expect(unknown.notes).toContainEqual(
+				expect.objectContaining({ rule: 'template-for', severity: 'error' }),
+			);
+		}
+	});
+
+	it('keeps visible or ambiguous JSX text and authored comments in keyed map rows', async () => {
+		const children = [
+			' {row.child()}',
+			'\n&nbsp;{row.child()}',
+			'\n\u00a0{row.child()}',
+			'{/* keep */}{row.child()}',
+		];
+		const root = project({
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			...Object.fromEntries(
+				children.map((child, i) => [
+					`Row${i}.tsx`,
+					`export function List({rows}) { return <ul>{[...rows].map(row => <li key={row.id}>${child}</li>)}</ul>; }`,
+				]),
+			),
+		});
+		fs.symlinkSync(
+			path.join(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const { files } = await runCodemod([root], { root, write: false, strong: true, verify: true });
+		expect(files).toHaveLength(children.length);
+		for (const file of files)
+			expect(file.notes).toContainEqual(
+				expect.objectContaining({ rule: 'template-for', severity: 'error' }),
+			);
+		expect(files.find((file) => file.file === 'Row3.tsx').code).toContain('/* keep */');
+	});
+
 	it('keeps custom and sparse map calls in compatibility mode', async () => {
 		const root = project({
 			'package.json': '{"type":"module"}',
@@ -2785,8 +2905,8 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 				.filter((file) => file.strong === false)
 				.flatMap((file) => file.diagnostics.map((d) => d.code)),
 		);
-		// The fresh story arrays can use keyed @for. Only raw HTML needs review.
-		expect([...blockers]).toEqual(['OCTANE_STRONG_UNTRUSTED_HTML']);
+		// Raw HTML, opaque map dispatch, and observable row-key order need review.
+		expect([...blockers].sort()).toEqual(['OCTANE_STRONG_MAP_JSX', 'OCTANE_STRONG_UNTRUSTED_HTML']);
 		expect(
 			strong.files
 				.filter((file) => file.strong === true)
@@ -2797,7 +2917,6 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 			'NotFound.tsrx',
 			'Pending.tsrx',
 			'RootLayout.tsrx',
-			'StoriesPage.tsrx',
 			'StoryRow.tsrx',
 			'entry-client.tsrx',
 			'entry-server.tsrx',

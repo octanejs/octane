@@ -450,13 +450,15 @@ function guardReturn(statement: ts.Statement): ts.Expression | null {
 	return isJsx(skipParens(then.expression)) ? then.expression : null;
 }
 
+function hasJsx(node: ts.Node): boolean {
+	return isJsx(node) || (ts.forEachChild(node, hasJsx) ?? false);
+}
+
 /**
  * Whether any `return` in `statements`, outside nested functions, returns
  * JSX.
  */
 function returnsJsx(statements: readonly ts.Statement[]) {
-	const hasJsx: (node: ts.Node) => boolean = (node) =>
-		isJsx(node) || (ts.forEachChild(node, hasJsx) ?? false);
 	const visit: (node: ts.Node) => boolean = (node) => {
 		if (isFunctionLike(node)) return false;
 		if (ts.isReturnStatement(node) && node.expression && hasJsx(node.expression)) return true;
@@ -588,6 +590,13 @@ function usesOwnThis(node: ts.Node): boolean {
 function contentOf(node: ts.JsxElement | ts.JsxFragment) {
 	return node.children.filter(
 		(child) => !(ts.isJsxText(child) && child.containsOnlyTriviaWhiteSpaces),
+	);
+}
+
+/** JSX emitters agree on empty ASCII indentation; spaces on a single line are children. */
+function withoutJsxIndentation(children: readonly ts.JsxChild[]) {
+	return children.filter(
+		(child) => !(ts.isJsxText(child) && /^[\t ]*[\r\n][\t\r\n ]*$/.test(child.text)),
 	);
 }
 
@@ -1218,10 +1227,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			closingElement.getText(this.sf) !== `</${openingElement.tagName.getText(this.sf)}>`
 		)
 			return null;
-		// Only line breaks and ASCII layout whitespace vanish in rendered JSX.
-		const content = children.filter(
-			(child) => !(ts.isJsxText(child) && /^[\t ]*[\r\n][\t\r\n ]*$/.test(child.text)),
-		);
+		const content = withoutJsxIndentation(children);
 		const [child] = content;
 		return content.length === 1 && (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child))
 			? child
@@ -5487,8 +5493,41 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				node,
 				'This receiver can override .map() and inspect the React elements its callback returns. Keep this list in React or verify its map behavior before porting it.',
 			);
-			return null;
 		}
+		if (attribute && key && !this.stableRowKey(key, item, iterable)) {
+			const open = attribute.parent.parent;
+			const children = ts.isJsxElement(root) ? root.children : [];
+			const dynamic = (value: ts.JsxAttributeValue | ts.JsxChild | undefined) => {
+				if (!value || ts.isJsxText(value) || ts.isStringLiteral(value)) return false;
+				if (!ts.isJsxExpression(value)) return true;
+				if (!value.expression) return false;
+				const expression = skipWrappers(value.expression);
+				return !(
+					rowKeyLiteral(expression) ||
+					(ts.isIdentifier(expression) &&
+						fixedBinding(this.checker, expression, expression) &&
+						initializedBefore(this.checker, expression, expression))
+				);
+			};
+			if (
+				!ts.isIdentifier(open.tagName) ||
+				open.attributes.properties.some(
+					(a) => a !== attribute && (ts.isJsxSpreadAttribute(a) || dynamic(a.initializer)),
+				) ||
+				children.some(dynamic)
+			) {
+				const ordered = this.orderedMapRow(node, fn, open, attribute, children);
+				if (ordered !== null) return ordered;
+				this.note(
+					RULE.for,
+					'error',
+					attribute,
+					'This row can evaluate JSX props or children before its key. Keep their original evaluation order before porting the list.',
+				);
+				return null;
+			}
+		}
+		if (!literal) return null;
 		if (attribute) {
 			this.removed.add(attribute);
 			const opening = attribute.parent.parent;
@@ -5569,6 +5608,82 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return statements.some(exitsWithValue) ? null : exits;
 	}
 
+	// The automatic JSX runtime receives props (including children) before its
+	// separate key argument. Keep a block-body map so the compiler builds every
+	// row value before rendering any of them.
+	private orderedMapRow(
+		call: ts.CallExpression,
+		fn: ts.ArrowFunction | ts.FunctionExpression,
+		open: ts.JsxOpeningLikeElement,
+		key: ts.JsxAttribute,
+		children: readonly ts.JsxChild[],
+	) {
+		const tag = open.tagName;
+		const props = open.attributes.properties;
+		const declaration = ts.isIdentifier(tag) && this.declarationOf(tag);
+		if (
+			!ts.isArrowFunction(fn) ||
+			ts.isBlock(fn.body) ||
+			fn.modifiers?.length ||
+			!ts.isIdentifier(tag) ||
+			open.typeArguments ||
+			!(
+				(declaration && ts.isFunctionDeclaration(declaration)) ||
+				/^[a-z][a-z0-9]*$/.test(tag.text)
+			) ||
+			!this.options.automaticReactJsx ||
+			this.lostComments(call.getStart(this.sf), call.end, '').length
+		)
+			return null;
+		const names = new Set<string>();
+		for (const prop of props) {
+			if (
+				!ts.isJsxAttribute(prop) ||
+				!ts.isIdentifier(prop.name) ||
+				names.has(prop.name.text) ||
+				(prop.initializer && hasJsx(prop.initializer)) ||
+				/^(?:children|ref|dangerouslySetInnerHTML)$|^on[A-Z]/.test(prop.name.text)
+			)
+				return null;
+			names.add(prop.name.text);
+		}
+		const content = withoutJsxIndentation(children);
+		const [child] = content;
+		if (
+			content.length &&
+			!(
+				content.length === 1 &&
+				ts.isJsxExpression(child) &&
+				child.expression &&
+				!child.dotDotDotToken &&
+				!hasJsx(child.expression)
+			)
+		)
+			return null;
+		const fields = props.filter((prop) => prop !== key).map((prop) => this.emit(prop, PLAIN));
+		if (child) fields.push('children=' + this.emit(child, DESCRIPTOR));
+		fields.push(this.emit(key, PLAIN));
+		const row = '<' + this.emit(tag, PLAIN) + ' ' + fields.join(' ') + ' />';
+		const head =
+			this.span(call, call.getStart(this.sf), fn.getStart(this.sf), PLAIN) +
+			this.span(fn, fn.getStart(this.sf), fn.body.getStart(this.sf), PLAIN);
+		const tail = this.span(call, fn.end, call.end, PLAIN);
+		return '{' + head + '{ return ' + row + '; }' + tail + '}';
+	}
+
+	private stableRowKey(key: ts.Expression, item: ts.ParameterDeclaration, iterable: ts.Expression) {
+		if (rowKeyLiteral(key)) return true;
+		key = skipWrappers(key);
+		const source = skipWrappers(iterable);
+		return (
+			ts.isIdentifier(key) &&
+			this.declarationOf(key) === item &&
+			ts.isArrayLiteralExpression(source) &&
+			source.elements.every(rowKeyLiteral) &&
+			fixedBinding(this.checker, key, key)
+		);
+	}
+
 	/** An @for header evaluates its key before the row body runs. */
 	rowKeyCanMove(
 		key: ts.Expression,
@@ -5577,18 +5692,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		setup: ts.Statement[],
 	) {
 		if (!ts.isIdentifier(item.name)) return false;
-		if (rowKeyLiteral(key)) return true;
-		key = skipWrappers(key);
-		const source = skipWrappers(iterable);
-		if (
-			ts.isIdentifier(key) &&
-			this.declarationOf(key) === item &&
-			ts.isArrayLiteralExpression(source) &&
-			source.elements.every(rowKeyLiteral) &&
-			fixedBinding(this.checker, key, key)
-		) {
-			return true;
-		}
+		if (this.stableRowKey(key, item, iterable)) return true;
 
 		// Even an accessor key can precede initialization that reads nothing.
 		return (
