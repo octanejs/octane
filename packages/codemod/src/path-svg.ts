@@ -42,7 +42,13 @@ const rectAttributes = {
 	rx: extent,
 	ry: extent,
 };
-const groupAttributes = { transform };
+const shapeAttributes = {
+	path: pathAttributes,
+	rect: rectAttributes,
+	g: { transform, 'clip-path': /^url\(#[A-Za-z_][A-Za-z0-9_-]*\)$/ },
+	defs: {},
+	clipPath: { id: /^[A-Za-z_][A-Za-z0-9_-]*$/ },
+};
 
 function attributes(text: string, allowed: Record<string, RegExp>) {
 	const values: Record<string, string> = {};
@@ -75,59 +81,73 @@ function attributes(text: string, allowed: Record<string, RegExp>) {
 }
 
 type StaticSvgNode = {
-	tag: 'path' | 'rect' | 'g';
+	tag: keyof typeof shapeAttributes;
 	attributes: Record<string, string>;
 	children: StaticSvgNode[];
 };
 
-/** Read authored geometry without expanding XML or resolving element references. */
+/** Read authored geometry, including a group clipped by a rectangle in the same SVG. */
 export function parseStaticSvg(source: string) {
 	if (typeof source !== 'string') return null;
 	let root: Record<string, string> | null = null;
 	const children: StaticSvgNode[] = [];
-	const groups: StaticSvgNode[][] = [];
+	const open: { tag: 'svg' | StaticSvgNode['tag']; children: StaticSvgNode[] }[] = [];
+	let clipId: string | undefined;
+	let reference: string | undefined;
 	const token =
-		/[ \t\r\n]*(?:<!--([\s\S]*?)-->|<\/(svg|g)[ \t\r\n]*>|<(svg|g|rect|path)([^<>]*?)(\/?)>)/gy;
+		/[ \t\r\n]*(?:<!--([\s\S]*?)-->|<\/(svg|g|defs|clipPath)[ \t\r\n]*>|<(svg|g|rect|path|defs|clipPath)([^<>]*?)(\/?)>)/gy;
 	let hasShape = false;
 	let end = 0;
 	for (let match; (match = token.exec(source)); end = token.lastIndex) {
 		const [, comment, closing, tag, fields, selfClosing] = match;
+		const parent = open[open.length - 1];
 		if (comment !== undefined) {
 			if (/--|-$|[^\t\r\n\u0020-\uD7FF\uE000-\uFFFD\u{10000}-\u{10FFFF}]/u.test(comment))
 				return null;
 		} else if (closing) {
-			if (!groups.length || closing !== (groups.length === 1 ? 'svg' : 'g')) return null;
-			groups.pop();
+			if (!parent || closing !== parent.tag) return null;
+			if ((closing === 'defs' || closing === 'clipPath') && parent.children.length !== 1)
+				return null;
+			open.pop();
 		} else if (tag === 'svg') {
 			if (root || selfClosing) return null;
 			root = attributes(fields!, rootAttributes);
 			if (!root) return null;
-			groups.push(children);
+			open.push({ tag, children });
 		} else {
-			if (!groups.length) return null;
-			const group = tag === 'g';
-			if (group ? selfClosing || groups.length > 32 : !selfClosing) return null;
-			const props = attributes(
-				fields!,
-				group ? groupAttributes : tag === 'path' ? pathAttributes : rectAttributes,
-			);
+			if (!parent) return null;
+			const name = tag as StaticSvgNode['tag'];
+			if (
+				(name === 'defs' && parent.tag !== 'svg') ||
+				(name === 'clipPath') !== (parent.tag === 'defs') ||
+				(parent.tag === 'clipPath' && name !== 'rect')
+			)
+				return null;
+			const container = name !== 'path' && name !== 'rect';
+			if (container ? selfClosing || open.length > 32 : !selfClosing) return null;
+			const props = attributes(fields!, shapeAttributes[name]);
 			if (
 				!props ||
 				(tag === 'path' && !props.d) ||
 				(tag === 'rect' && !(props.width && props.height))
 			)
 				return null;
-			const node: StaticSvgNode = {
-				tag: tag as StaticSvgNode['tag'],
-				attributes: props,
-				children: [],
-			};
-			groups[groups.length - 1]!.push(node);
-			if (group) groups.push(node.children);
-			else hasShape = true;
+			if (name === 'clipPath') {
+				if (!props.id || clipId !== undefined) return null;
+				clipId = props.id;
+			}
+			if (props['clip-path']) {
+				const id = props['clip-path'].slice(5, -1);
+				if (parent.tag !== 'svg' || (reference !== undefined && reference !== id)) return null;
+				reference = id;
+			}
+			const node: StaticSvgNode = { tag: name, attributes: props, children: [] };
+			parent.children.push(node);
+			if (container) open.push(node);
+			else if (parent.tag !== 'clipPath') hasShape = true;
 		}
 	}
-	return root && hasShape && !groups.length && space.test(source.slice(end))
+	return root && hasShape && !open.length && clipId === reference && space.test(source.slice(end))
 		? { root, children }
 		: null;
 }

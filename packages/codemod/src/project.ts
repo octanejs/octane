@@ -293,7 +293,7 @@ export async function runCodemod(
 				new URL('../templates/react-intl.tsrx', import.meta.url),
 				'utf8',
 			);
-			adapterState = inspectAdapter(adapter, adapterSource, PREVIOUS_INTL_SHA256);
+			adapterState = inspectAdapter(adapter, adapterSource, PREVIOUS_INTL_HASHES);
 			if (
 				adapterState.kind === 'conflict' ||
 				owners.has(ts.sys.useCaseSensitiveFileNames ? adapter : adapter.toLowerCase())
@@ -418,7 +418,7 @@ export async function runCodemod(
 		const state: AdapterState =
 			shadowed || ownerOf(output)
 				? { kind: 'conflict' }
-				: inspectAdapter(output, code, output === svgHelper ? PREVIOUS_SVG_SHA256 : undefined);
+				: inspectAdapter(output, code, output === svgHelper ? PREVIOUS_SVG_HASHES : undefined);
 		let error: string | undefined;
 		if (state.kind === 'conflict') {
 			error =
@@ -769,7 +769,7 @@ export async function runCodemod(
 			file: string;
 			source: string;
 			state: AdapterState;
-			previous: string;
+			previous: readonly string[];
 			rule: string;
 		}[] = [];
 		if (adapterState && adapterSource && intlConsumer)
@@ -777,7 +777,7 @@ export async function runCodemod(
 				file: adapter,
 				source: adapterSource,
 				state: adapterState,
-				previous: PREVIOUS_INTL_SHA256,
+				previous: PREVIOUS_INTL_HASHES,
 				rule: 'react-intl',
 			});
 		if (svg)
@@ -785,7 +785,7 @@ export async function runCodemod(
 				file: svgHelper,
 				source: svg.code,
 				state: svg.state,
-				previous: PREVIOUS_SVG_SHA256,
+				previous: PREVIOUS_SVG_HASHES,
 				rule: 'svg-paths',
 			});
 		// Check both shared helpers before writing either. Recheck again at publication.
@@ -888,21 +888,26 @@ export async function runCodemod(
 }
 
 type AdapterState =
-	{ kind: 'missing' | 'current' | 'conflict' } | { kind: 'previous'; mode: number };
+	{ kind: 'missing' | 'current' | 'conflict' } | { kind: 'previous'; mode: number; hash: string };
 
 // Hash only previously shipped helpers. A locally edited file belongs to the application.
-const PREVIOUS_INTL_SHA256 = '07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98';
+const PREVIOUS_INTL_HASHES = ['07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98'];
 
-const PREVIOUS_SVG_SHA256 = '3becf859871f17914f6f0631e8db8058aa4932fd4a9817718b98eb247a902b24';
+const PREVIOUS_SVG_HASHES = [
+	'3becf859871f17914f6f0631e8db8058aa4932fd4a9817718b98eb247a902b24',
+	'1dbf34eea75c07c21c8ab3814d54e58115e833aa140fc5f34b5f2cba91d018c3',
+];
 
-function inspectAdapter(file: string, source: string, previous?: string): AdapterState {
+function inspectAdapter(file: string, source: string, previous?: readonly string[]): AdapterState {
 	const stat = fs.lstatSync(file, { throwIfNoEntry: false });
 	if (!stat) return { kind: 'missing' };
 	if (!stat.isFile()) return { kind: 'conflict' };
 	const bytes = fs.readFileSync(file);
 	if (bytes.equals(Buffer.from(source))) return { kind: 'current' };
-	if (previous && createHash('sha256').update(bytes).digest('hex') === previous)
-		return { kind: 'previous', mode: stat.mode & 0o777 };
+	if (previous) {
+		const hash = createHash('sha256').update(bytes).digest('hex');
+		if (previous.includes(hash)) return { kind: 'previous', mode: stat.mode & 0o777, hash };
+	}
 	return { kind: 'conflict' };
 }
 
@@ -910,7 +915,10 @@ function canPublishAdapter(current: AdapterState, planned: AdapterState): boolea
 	return (
 		current.kind === 'current' ||
 		(current.kind === 'missing' && planned.kind === 'missing') ||
-		(current.kind === 'previous' && planned.kind === 'previous' && current.mode === planned.mode)
+		(current.kind === 'previous' &&
+			planned.kind === 'previous' &&
+			current.mode === planned.mode &&
+			current.hash === planned.hash)
 	);
 }
 
@@ -918,7 +926,7 @@ function publishAdapter(
 	file: string,
 	source: string,
 	planned: AdapterState,
-	previous: string,
+	previous: readonly string[],
 ): boolean {
 	const current = inspectAdapter(file, source, previous);
 	if (current.kind === 'current') return true;
@@ -940,8 +948,8 @@ function publishAdapter(
 		fs.writeFileSync(next, source, { mode: 0o600 });
 		fs.chmodSync(next, current.mode);
 		const latest = inspectAdapter(file, source, previous);
-		if (latest.kind !== 'previous') return latest.kind === 'current';
-		if (latest.mode !== current.mode) return false;
+		if (latest.kind === 'current') return true;
+		if (!canPublishAdapter(latest, current)) return false;
 		fs.renameSync(next, file);
 		return true;
 	} finally {
