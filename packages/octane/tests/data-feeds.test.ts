@@ -320,6 +320,58 @@ describe('feeds', () => {
 		expect(connections[1]!.request.cursor).toBe('c1');
 	});
 
+	it('ignores a gap after the last observer leaves while being told the stream is live', async () => {
+		const { store, connections, server } = setup();
+		await observed(store.read(todos, undefined));
+		const handle = listen(store, changes);
+		const leave = handle.subscribe(() => {
+			if (handle.getSnapshot().status === 'live') leave();
+		});
+		connections[0]!.send({ gap: true, cursor: 'discarded' });
+		await vi.waitFor(() => expect(connections[0]!.signal.aborted).toBe(true));
+		const finish = handle.subscribe(() => {});
+		expect(connections[1]!.request.cursor).toBeNull();
+		expect(server.log).toEqual(['list']);
+		finish();
+	});
+
+	it('ignores a frame whose validation finishes after its connection was replaced', async () => {
+		const { store, connections } = setup();
+		const title = read({ name: 'title', output: schema<string>((v) => typeof v === 'string') });
+		await store.publish(title, undefined, 'initial');
+		let release!: () => void;
+		const stream = feed({
+			name: 'titles',
+			event: {
+				'~standard': {
+					version: 1,
+					vendor: 'test',
+					async validate(value) {
+						if (value === 'old') await new Promise<void>((resolve) => (release = resolve));
+						return { value: String(value) };
+					},
+				},
+			},
+			changes: (value) => ({ read: title, value }),
+			covers: [],
+		});
+		const state = store.read(title, undefined);
+		const handle = listen(store, stream);
+		const leave = handle.subscribe(() => {});
+		connections[0]!.send({ event: 'old', cursor: 'one' });
+		await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+		leave();
+		const leaveAgain = handle.subscribe(() => {});
+		connections[1]!.send({ event: 'new', cursor: 'two' });
+		await vi.waitFor(() => expect(state.getSnapshot().value).toBe('new'));
+		release();
+		await settle();
+		expect(state.getSnapshot().value).toBe('new');
+		leaveAgain();
+		stops.push(handle.subscribe(() => {}));
+		expect(connections[2]!.request.cursor).toBe('two');
+	});
+
 	it('keeps feeds with other parameters apart, each in its own order', async () => {
 		const room = feed({
 			name: 'room',
