@@ -169,12 +169,15 @@ it.each(['unsupported SVG', 'existing sidecar', 'existing shared helper'])(
 	},
 );
 
-it('upgrades only the exact previous shared SVG helper and keeps existing sidecars usable', async () => {
+it.each(['v1', 'v2'])('upgrades only the exact %s SVG helper', async (version) => {
 	const { root, icon } = fixture();
 	const options = { root, svgPaths: true, write: true };
 	const name = 'src/octane-path-svg.ts';
 	const helper = path.join(root, name);
-	const previous = fs.readFileSync(new URL('./fixtures/path-svg-v1.txt', import.meta.url), 'utf8');
+	const previous = fs.readFileSync(
+		new URL(`./fixtures/path-svg-${version}.txt`, import.meta.url),
+		'utf8',
+	);
 	fs.writeFileSync(helper, previous, { mode: 0o640 });
 	const mode = fs.statSync(helper).mode & 0o777;
 	const sidecar =
@@ -210,12 +213,39 @@ it('upgrades only the exact previous shared SVG helper and keeps existing sideca
 	expect(fs.readFileSync(icon + '.octane.ts', 'utf8')).toBe(sidecar);
 });
 
+it('preserves a different supported SVG helper installed during an upgrade', async () => {
+	const { root, file, icon } = fixture();
+	const helper = path.join(root, 'src/octane-path-svg.ts');
+	const previous = (version) =>
+		fs.readFileSync(new URL(`./fixtures/path-svg-${version}.txt`, import.meta.url));
+	const replacement = previous('v2');
+	fs.writeFileSync(helper, previous('v1'));
+	const mkdtemp = fs.mkdtempSync;
+	const race = vi.spyOn(fs, 'mkdtempSync').mockImplementation((prefix, ...args) => {
+		if (path.basename(prefix) === '.octane-adapter-') fs.writeFileSync(helper, replacement);
+		return mkdtemp(prefix, ...args);
+	});
+	try {
+		const result = await runCodemod([file], { root, svgPaths: true, write: true });
+		expect(result.files.flatMap((f) => f.notes)).toContainEqual(
+			expect.objectContaining({ rule: 'svg-paths', severity: 'error' }),
+		);
+		expect(fs.readFileSync(helper)).toEqual(replacement);
+		expect(fs.existsSync(icon + '.octane.ts')).toBe(false);
+		expect(fs.existsSync(file.replace(/\.tsx$/, '.tsrx'))).toBe(false);
+	} finally {
+		race.mockRestore();
+	}
+});
+
 it('preserves the authored SVG root on the server and the client, including subsequent asset edits', async () => {
 	const { root, file, icon } = fixture();
-	const drawing = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="none" role="img" focusable="false">
+	const drawing = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" preserveAspectRatio="none" fill="none" role="img" focusable="false">
 		<rect x="1" y="2" width="8" height="7" rx="2" fill="var(--surface)"/>
 		<g transform="translate(0 -1) scale(1.5)"><g><path d="M0 0L6 4Z" fill="currentColor" fill-rule="evenodd"/></g></g>
 		<path d="M1 1L3 3" stroke="#fff" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="bevel" opacity="0.3"/>
+		<rect width="12" height="12" fill="url(#tile)"/>
+		<defs><pattern id="tile" width="2" height="3" patternUnits="userSpaceOnUse"><path d="M0 0L2 3" stroke="currentColor" stroke-opacity="0.5"/></pattern></defs>
 	</svg>`;
 	fs.writeFileSync(icon, '<!-- Drawing metadata -->\n' + drawing);
 	const options = { root, svgPaths: true, strong: true, verify: true, write: false };

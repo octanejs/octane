@@ -68,6 +68,59 @@ describe('static SVG assets', () => {
 			],
 		});
 	});
+	const tile = '<pattern id="tile" width="2" height="3" patternUnits="userSpaceOnUse">';
+	const tilePath = '<path d="M0 0L2 3" stroke="currentColor" stroke-opacity="0.5"/>';
+	const painted = '<rect width="10" height="12" fill="url(#tile)"/>';
+	const definition = `<defs>${tile}${tilePath}</pattern></defs>`;
+
+	it('preserves a locally referenced single-path pattern in document order', () => {
+		const source = `<svg preserveAspectRatio="none">${painted}${definition}</svg>`;
+		expect(parseStaticSvg(source)).toEqual({
+			root: { preserveAspectRatio: 'none' },
+			children: [
+				{
+					tag: 'rect',
+					attributes: { width: '10', height: '12', fill: 'url(#tile)' },
+					children: [],
+				},
+				{
+					tag: 'defs',
+					attributes: {},
+					children: [
+						{
+							tag: 'pattern',
+							attributes: { id: 'tile', width: '2', height: '3', patternUnits: 'userSpaceOnUse' },
+							children: [
+								{
+									tag: 'path',
+									attributes: { d: 'M0 0L2 3', stroke: 'currentColor', 'stroke-opacity': '0.5' },
+									children: [],
+								},
+							],
+						},
+					],
+				},
+			],
+		});
+		expect(parsePathSvg(source)).toBeNull();
+	});
+
+	it.each([
+		['a pattern with no local reference', `${path}${definition}`],
+		['an unresolved paint server', `${painted.replace('#tile', '#other')}${definition}`],
+		['an external paint server', `${painted.replace('#tile', 'other.svg#tile')}${definition}`],
+		[
+			'an implicit pattern coordinate system',
+			`${painted}${definition.replace(' patternUnits="userSpaceOnUse"', '')}`,
+		],
+		['a noncanonical tile size', `${painted}${definition.replace('width="2"', 'width="02"')}`],
+		['more than one tile child', `${painted}${definition.replace(tilePath, tilePath + path)}`],
+		['a nested pattern definition', `${painted}<g>${definition}</g>`],
+		['multiple definitions', `${painted}${definition}${definition}`],
+	])('declines %s', (_, geometry) => {
+		expect(parseStaticSvg(`<svg>${geometry}</svg>`)).toBeNull();
+	});
+
 	it('retains an authored unitful root length as a string', () => {
 		expect(parseStaticSvg(`<svg width="1e999px">${path}</svg>`)?.root.width).toBe('1e999px');
 	});
