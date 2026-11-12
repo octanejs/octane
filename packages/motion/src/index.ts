@@ -125,12 +125,25 @@ function retained(values: Record<string, any>, original: Record<string, any>, cu
 	return next;
 }
 
-function domProps(props: any, svg: boolean) {
-	const out: Record<string, any> = {};
+function readDomProps(
+	props: any,
+	svg: boolean,
+	out: Record<string, any>,
+	frame: ReturnType<typeof firstFrame>,
+) {
+	const originalAttrs = frame?.attrs;
+	const motionAttrs = frame?.motionAttrs;
+	let attrs = originalAttrs;
 	for (const key in props) {
 		if (!MOTION_PROPS.has(key)) {
 			const value = props[key];
-			out[key] = svg && isMotionValue(value) ? resolveMotionValue(value) : value;
+			const motion = svg && isMotionValue(value);
+			out[key] = motion ? resolveMotionValue(value) : value;
+			// An authored static value takes over even if it equals the MotionValue's sample.
+			if (!motion && value != null && motionAttrs?.has(key) && attrs && Object.hasOwn(attrs, key)) {
+				if (attrs === originalAttrs) attrs = { ...attrs };
+				delete attrs[key];
+			}
 		}
 	}
 	const raw = props.style;
@@ -142,7 +155,7 @@ function domProps(props: any, svg: boolean) {
 		}
 		out.style = style;
 	}
-	return out;
+	return attrs;
 }
 
 // Cheap structural key so a layout effect re-runs only when the target actually
@@ -254,8 +267,13 @@ function firstFrame(tag: string, svg: boolean, props: any, target: any, atEnd: b
 	const originalStyle: Record<string, any> = {};
 	for (const key in style) originalStyle[key] = raw?.[key];
 	const originalAttrs: Record<string, any> = {};
-	for (const key in state.attrs) originalAttrs[key] = resolveMotionValue(props[key]);
-	return { style, attrs: state.attrs, originalAttrs, originalStyle };
+	let motionAttrs: Set<string> | undefined;
+	for (const key in state.attrs) {
+		const source = props[key];
+		originalAttrs[key] = resolveMotionValue(source);
+		if (isMotionValue(source)) (motionAttrs ??= new Set()).add(key);
+	}
+	return { style, attrs: state.attrs, originalAttrs, motionAttrs, originalStyle };
 }
 
 export type MotionComponent = (props: any, scope: any) => OctaneElement;
@@ -763,10 +781,11 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		);
 		useLayoutEffect(() => () => latest.layout?.stop(), [], LAYOUT_CLEANUP);
 
-		const host = domProps(props, svg);
 		const frame = latest.frame;
-		if (frame) {
-			const attrs = retained(frame.attrs, frame.originalAttrs, host);
+		const host: Record<string, any> = {};
+		const retainedAttrs = readDomProps(props, svg, host, frame);
+		if (frame && retainedAttrs) {
+			const attrs = retained(retainedAttrs, frame.originalAttrs, host);
 			const style = retained(frame.style, frame.originalStyle, props.style);
 			Object.assign(host, attrs);
 			host.style = Object.assign(host.style ?? {}, style);

@@ -66,7 +66,7 @@ export function AuthoredFrame({
 	animate,
 }: {
 	opacity?: number | MotionValue<number>;
-	cx?: number;
+	cx?: number | MotionValue<number>;
 	animate: boolean;
 }) {
 	return (

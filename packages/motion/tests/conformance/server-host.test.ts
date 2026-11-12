@@ -96,3 +96,31 @@ it('clears an initial MotionValue after a static style takes ownership and is re
 		r.unmount();
 	}
 });
+
+it.each([
+	['MotionValue', 'number', '2'],
+	['MotionValue', 'MotionValue', '6'],
+	['number', 'MotionValue', '6'],
+	['MotionValue', 'updated MotionValue', '8'],
+] as const)(
+	'handles a first-frame SVG attribute changing from %s to %s',
+	async (original, replacement, expected) => {
+		const cx = motionValue(2);
+		const initial = original === 'number' ? 2 : cx;
+		const r = mount(AuthoredFrame, { cx: initial, animate: true });
+		try {
+			const circle = r.container.querySelector('circle')!;
+			expect(circle.getAttribute('cx')).toBe('6');
+			await act(() => r.update(AuthoredFrame, { cx: initial, animate: false }));
+			expect(circle.getAttribute('cx')).toBe('6');
+			if (replacement === 'updated MotionValue') cx.set(8);
+			const next =
+				replacement === 'number' ? 2 : replacement === 'MotionValue' ? motionValue(2) : cx;
+			await act(() => r.update(AuthoredFrame, { cx: next, animate: false }));
+			expect(r.container.querySelector('circle')).toBe(circle);
+			expect(circle.getAttribute('cx')).toBe(expected);
+		} finally {
+			r.unmount();
+		}
+	},
+);
