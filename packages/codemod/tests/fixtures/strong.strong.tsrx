@@ -15,7 +15,7 @@ export function Profile({ userId, initialCount, rows }: Props) @{
   <section>
     <button onClick={() => setCount((value) => value + 1)}>{count}</button>
     <ul>
-      @for (const row of rows; key row.id) { <li>{row.name}</li> }
+      @for (const row of [...rows]; key row.id) { <li>{row.name}</li> }
     </ul>
   </section>
 }

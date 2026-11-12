@@ -15,7 +15,7 @@ export function Profile({ userId, initialCount, rows }: Props) {
     <section>
       <button onClick={() => setCount((value) => value + 1)}>{count}</button>
       <ul>
-        {rows.map((row) => (
+        {[...rows].map((row) => (
           <li key={row.id}>{row.name}</li>
         ))}
       </ul>

@@ -5347,14 +5347,12 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		// `@for (const items of items)` would read `items` in its own TDZ.
 		const bound = new Set([...bindingNames(item.name), ...(index ? bindingNames(index.name) : [])]);
 		const iterable = callee.expression;
-		if (reads(iterable, (name) => bound.has(name.text))) {
-			const literal = skipWrappers(iterable);
-			const dense =
-				ts.isArrayLiteralExpression(literal) && !literal.elements.some(ts.isOmittedExpression);
-			if (!dense && !this.isArrayFilter(iterable)) return null;
+		const receiver = skipWrappers(iterable);
+		const literal = ts.isArrayLiteralExpression(receiver) ? receiver : null;
+		if (literal?.elements.some(ts.isOmittedExpression)) return null;
+		if (literal && reads(iterable, (name) => bound.has(name.text))) {
 			// Direct eval can observe the callback arguments or the generated loop's bindings.
-			if (dense && reads(node, (name) => name.text === 'eval' && !isPropertyName(name)))
-				return null;
+			if (reads(node, (name) => name.text === 'eval' && !isPropertyName(name))) return null;
 			if (
 				reads(iterable, (name) => {
 					if (!bound.has(name.text) || isPropertyName(name)) return false;
@@ -5388,27 +5386,6 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		const root = skipParens(output);
 		if (!isJsx(root) && !ts.isConditionalExpression(root)) return null;
 
-		// Custom maps and explicit array holes keep the original callback dispatch.
-		const receiver = skipWrappers(iterable);
-		const initializer = ts.isIdentifier(receiver) ? this.constValue(receiver) : null;
-		const array = initializer ? skipWrappers(initializer) : receiver;
-		if (ts.isArrayLiteralExpression(array) && array.elements.some(ts.isOmittedExpression))
-			return null;
-		const declarations = this.typeOf(iterable)
-			.getNonNullableType()
-			.getProperty('map')?.declarations;
-		if (
-			declarations?.some((declaration) => {
-				const file = declaration.getSourceFile();
-				return (
-					(file !== esLib() && file.fileName !== ES5_LIB_PATH) ||
-					!ts.isInterfaceDeclaration(declaration.parent) ||
-					!['Array', 'ReadonlyArray'].includes(declaration.parent.name.text)
-				);
-			})
-		)
-			return null;
-
 		const attribute = rowKey(root);
 		let key: ts.Expression | null = null;
 		if (attribute) {
@@ -5435,6 +5412,17 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				);
 				return null;
 			}
+		}
+		if (!literal) {
+			this.note(
+				RULE.for,
+				'error',
+				node,
+				'This receiver can override .map() and inspect the React elements its callback returns. Keep this list in React or verify its map behavior before porting it.',
+			);
+			return null;
+		}
+		if (attribute) {
 			this.removed.add(attribute);
 			const opening = attribute.parent.parent;
 			if (
@@ -5469,22 +5457,6 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			setup[0],
 		);
 		return this.block(header, statements + '\n' + arm);
-	}
-
-	isArrayFilter(iterable: ts.Expression) {
-		if (!ts.isCallExpression(iterable) || ts.isOptionalChain(iterable)) return false;
-		const method = iterable.expression;
-		if (!ts.isPropertyAccessExpression(method) || method.name.text !== 'filter') return false;
-		const declarations = this.checker.getSymbolAtLocation(method.name)?.declarations;
-		return (
-			declarations?.length &&
-			declarations.every(
-				(declaration) =>
-					declaration.getSourceFile() === esLib() &&
-					ts.isInterfaceDeclaration(declaration.parent) &&
-					['Array', 'ReadonlyArray'].includes(declaration.parent.name.text),
-			)
-		);
 	}
 
 	/**
