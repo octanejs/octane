@@ -33,6 +33,7 @@ import {
 	type SignalOwner,
 	type SignalSnapshot,
 } from './types.js';
+import { setHostTimeout, clearHostTimeout } from '../host-task.js';
 
 const uncertainReceipts = new WeakSet<object>();
 const noAuthority = Symbol();
@@ -423,12 +424,12 @@ class Operation implements ActionOperation {
 		}
 		return new Promise<void>((resolve, reject) => {
 			let ended = false;
-			let timer: ReturnType<typeof setTimeout> | undefined;
+			let timer: unknown | undefined;
 			const stops: (() => void)[] = [];
 			const finish = (error?: unknown) => {
 				if (ended) return;
 				ended = true;
-				if (timer !== undefined) clearTimeout(timer);
+				if (timer !== undefined) clearHostTimeout(timer);
 				for (const stop of stops) stop();
 				this.waits?.delete(check);
 				if (error === undefined) resolve();
@@ -470,7 +471,7 @@ class Operation implements ActionOperation {
 			(this.waits ??= new Set()).add(check);
 			for (const manager of managers) stops.push(subscribeNode(manager.source, check));
 			if (timeout !== undefined) {
-				timer = setTimeout(() => finish(new Error(formatClientError(105))), timeout);
+				timer = setHostTimeout(() => finish(new Error(formatClientError(105))), timeout);
 			}
 			check();
 		});

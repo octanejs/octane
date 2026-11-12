@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { installTestClock, type TestClock } from 'octane/testing';
 import { mount, act } from './_helpers';
 import {
 	startTransition,
@@ -44,6 +45,8 @@ function fulfilled<T>(value: T): Promise<T> & { status: string; value: T } {
 	return promise;
 }
 
+let clock: TestClock;
+
 async function expectStandaloneTransitionHold(kind: 'root.render' | 'useState'): Promise<void> {
 	const first = deferred<string>();
 	const second = deferred<string>();
@@ -61,7 +64,7 @@ async function expectStandaloneTransitionHold(kind: 'root.render' | 'useState'):
 					});
 	});
 	try {
-		await act(() => vi.advanceTimersByTime(400));
+		await clock.advance(400);
 		expect(r.findAll(fallbackSelector)).toHaveLength(1);
 		await act(() => first.resolve('first'));
 		const content = r.find(valueSelector) as HTMLElement;
@@ -83,7 +86,7 @@ async function expectStandaloneTransitionHold(kind: 'root.render' | 'useState'):
 				}
 			});
 			for (const elapsed of step.elapsed) {
-				await act(() => vi.advanceTimersByTime(elapsed));
+				await clock.advance(elapsed);
 				expect(r.findAll(fallbackSelector)).toHaveLength(0);
 				expect(r.find(valueSelector)).toBe(content);
 				expect(content.isConnected).toBe(true);
@@ -105,10 +108,10 @@ async function expectStandaloneTransitionHold(kind: 'root.render' | 'useState'):
 // an opt-in extension, covered with the same visible DOM and pending lifecycle.
 describe('useTransition — transition-timeout fallback', () => {
 	beforeEach(() => {
-		vi.useFakeTimers({ shouldAdvanceTime: false });
+		clock = installTestClock();
 	});
 	afterEach(() => {
-		vi.useRealTimers();
+		clock.uninstall();
 	});
 
 	it('shows outer Suspense immediately when a finite-timeout fallback suspends', async () => {
@@ -134,7 +137,7 @@ describe('useTransition — transition-timeout fallback', () => {
 					r.update(TimedSuspendingFallback, { promise: primary.promise, readFallback });
 				});
 			});
-			await vi.advanceTimersByTimeAsync(99);
+			await clock.advance(99);
 			expect(r.find('.leaf')).toBe(leaf);
 			expect(leaf.style.display).toBe('');
 			expect(r.findAll('#timed-outer-fallback')).toHaveLength(0);
@@ -142,7 +145,7 @@ describe('useTransition — transition-timeout fallback', () => {
 			// The timeout runs outside a render stack. Once the inner primary is
 			// hidden, its suspending fallback must not start another transition hold
 			// on that now-blank subtree; the outer fallback is urgent at this deadline.
-			await vi.advanceTimersByTimeAsync(1);
+			await clock.advance(1);
 			expect(r.find('#timed-outer-fallback').textContent).toBe('outer loading');
 			expect(leaf.isConnected).toBe(true);
 			expect(leaf.style.display).toBe('none');
@@ -202,9 +205,7 @@ describe('useTransition — transition-timeout fallback', () => {
 			// Advance time PAST the timeout — the runtime shows @pending while
 			// keeping the committed primary connected and visually hidden.
 			// isPending stays true (the transition is still in progress).
-			await act(() => {
-				vi.advanceTimersByTime(150);
-			});
+			await clock.advance(150);
 			expect(r.find('.leaf')).toBe(leaf);
 			expect(leaf.isConnected).toBe(true);
 			expect(leaf.style.display).toBe('none');
@@ -254,19 +255,15 @@ describe('useTransition — transition-timeout fallback', () => {
 			expect(r.find('#pending').textContent).toBe('1');
 
 			// Resolve fast — well before the 100ms budget.
-			await act(() => {
-				vi.advanceTimersByTime(20); // 20ms < 100ms
-				next.resolve('second');
-			});
+			await clock.advance(20); // 20ms < 100ms
+			await act(() => next.resolve('second'));
 			expect(r.findAll('#fallback')).toHaveLength(0);
 			expect(r.find('.leaf').textContent).toBe('second');
 			expect(readyRef.current).toBe(r.find('.leaf'));
 			expect(r.find('#pending').textContent).toBe('0');
 
 			// Advance past where the timeout WOULD HAVE fired — no fallback flicker.
-			await act(() => {
-				vi.advanceTimersByTime(200);
-			});
+			await clock.advance(200);
 			expect(r.findAll('#fallback')).toHaveLength(0);
 			r.unmount();
 		} finally {
@@ -297,7 +294,7 @@ describe('useTransition — transition-timeout fallback', () => {
 			parentObservations.length = 0;
 
 			await act(() => r.click('#nested-ref-swap'));
-			await act(() => vi.advanceTimersByTime(150));
+			await clock.advance(150);
 			expect(r.find('#nested-ref-fallback').textContent).toBe('loading');
 			expect(childRef.current).toBeNull();
 
@@ -334,7 +331,7 @@ describe('useTransition — transition-timeout fallback', () => {
 			expect(r.find('#pending').textContent).toBe('1');
 
 			for (const elapsed of [5_000, 95_000]) {
-				await act(() => vi.advanceTimersByTime(elapsed));
+				await clock.advance(elapsed);
 				expect(r.findAll('#fallback')).toHaveLength(0);
 				expect(r.find('.leaf')).toBe(leaf);
 				expect(leaf.isConnected).toBe(true);
@@ -380,7 +377,7 @@ describe('useTransition — transition-timeout fallback', () => {
 		});
 		try {
 			await act(() => r.click('#swap-trans'));
-			await act(() => vi.advanceTimersByTime(100_000));
+			await clock.advance(100_000);
 			expect(r.find('#value').textContent).toBe('first');
 			expect(r.findAll('#fallback')).toHaveLength(0);
 			expect(r.find('#pending').textContent).toBe('1');
@@ -389,10 +386,8 @@ describe('useTransition — transition-timeout fallback', () => {
 			expect(r.find('#value').textContent).toBe('urgent');
 			expect(r.find('#pending').textContent).toBe('0');
 
-			await act(() => {
-				next.resolve('superseded');
-				vi.advanceTimersByTime(100_000);
-			});
+			await act(() => next.resolve('superseded'));
+			await clock.advance(100_000);
 			expect(r.find('#value').textContent).toBe('urgent');
 			expect(r.findAll('#fallback')).toHaveLength(0);
 			expect(r.find('#pending').textContent).toBe('0');
@@ -412,7 +407,7 @@ describe('useTransition — transition-timeout fallback', () => {
 		});
 		try {
 			await act(() => r.click('#entangle-both'));
-			await act(() => vi.advanceTimersByTime(100_000));
+			await clock.advance(100_000);
 			expect(r.findAll('#entangled-a-fallback, #entangled-b-fallback')).toHaveLength(0);
 			expect(r.find('#entangled-a').textContent).toBe('A:a1');
 			expect(r.find('#entangled-b').textContent).toBe('B:b1');
@@ -456,7 +451,7 @@ describe('useTransition — transition-timeout fallback', () => {
 				expect(r.findAll('#outer-fallback')).toHaveLength(0);
 				expect(r.find('#nested-pending').textContent).toBe('0');
 
-				await act(() => vi.advanceTimersByTime(100_000));
+				await clock.advance(100_000);
 				expect(r.find('#nested-shell')).toBe(shell);
 				expect(r.find('#nested-fallback').textContent).toBe('loading nested content');
 				expect(r.findAll('#outer-fallback')).toHaveLength(0);
@@ -492,7 +487,7 @@ describe('useTransition — transition-timeout fallback', () => {
 				const container = r.container;
 				r.unmount();
 				r = undefined;
-				await act(() => vi.advanceTimersByTime(100_000));
+				await clock.advance(100_000);
 				await act(() => next.resolve('second'));
 				expect(container.innerHTML).toBe('');
 				expect(readyRef.current).toBeNull();
@@ -545,9 +540,7 @@ describe('useTransition — transition-timeout fallback', () => {
 			expect(r.find('#entangled-a').textContent).toBe('A:a1');
 			expect(r.find('#entangled-b').textContent).toBe('B:b1');
 
-			await act(() => {
-				vi.advanceTimersByTime(150);
-			});
+			await clock.advance(150);
 			expect(r.find('#entangled-a-fallback').textContent).toBe('A loading');
 			expect(r.find('#entangled-b-fallback').textContent).toBe('B loading');
 
@@ -599,7 +592,7 @@ describe('useTransition — transition-timeout fallback', () => {
 			});
 			await act(() => {});
 			r.click('#entangle-both');
-			await act(() => vi.advanceTimersByTime(150));
+			await clock.advance(150);
 			expect(r.find('#entangled-a-fallback').textContent).toBe('A loading');
 			expect(r.find('#entangled-b-fallback').textContent).toBe('B loading');
 
@@ -660,7 +653,7 @@ describe('useTransition — transition-timeout fallback', () => {
 			await act(() => {});
 			revealLog.length = 0;
 			r.click('#entangle-both');
-			await act(() => vi.advanceTimersByTime(150));
+			await clock.advance(150);
 			commitLog.length = 0;
 
 			// Stage the right sibling first. The final commit still follows source
@@ -703,7 +696,7 @@ describe('useTransition — transition-timeout fallback', () => {
 			});
 			await act(() => {});
 			r.click('#waterfall-start');
-			await act(() => vi.advanceTimersByTime(150));
+			await clock.advance(150);
 			refLog.length = 0;
 			layoutLog.length = 0;
 
@@ -745,7 +738,7 @@ describe('useTransition — transition-timeout fallback', () => {
 			});
 			await act(() => {});
 			r.click('#reject-swap');
-			await act(() => vi.advanceTimersByTime(150));
+			await clock.advance(150);
 			expect(r.find('#rejection-fallback').textContent).toBe('loading');
 
 			await act(() => rejected.reject(new Error('boom')));
@@ -793,9 +786,7 @@ describe('useTransition — transition-timeout fallback', () => {
 			expect(effectLog).toEqual(['setup:old']);
 
 			r.click('#hide-hidden-retry');
-			await act(() => {
-				vi.advanceTimersByTime(150);
-			});
+			await clock.advance(150);
 			expect(r.find('#hidden-retry-fallback').textContent).toBe('primary loading');
 			expect(r.find('#hidden-retry-other-fallback').textContent).toBe('other loading');
 

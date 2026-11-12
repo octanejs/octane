@@ -1,3 +1,4 @@
+import { clearHostTimeout, HOST_CLOCK, setHostTimeout } from '../host-task.js';
 import type { HydrationPrefetchStrategy } from './types.js';
 
 const idleType = 'idle';
@@ -26,6 +27,11 @@ export function idle(
 			const callback = prefetch ?? gate?.resolve;
 			if (!callback) return;
 
+			// The test clock runs an idle callback as a task, due now.
+			if (HOST_CLOCK) {
+				const timer = setHostTimeout(callback, 0);
+				return () => clearHostTimeout(timer);
+			}
 			if (schedule.requestIdleCallback) {
 				const handle = schedule.requestIdleCallback(callback, { timeout });
 				return () => schedule.cancelIdleCallback?.(handle);

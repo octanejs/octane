@@ -11,6 +11,7 @@ import {
 	type StreamedFrameDisposition,
 	type StreamedResultReceiver,
 } from './stream-result-receiver.js';
+import { setHostTimeout, clearHostTimeout } from '../host-task.js';
 
 type StreamedDeliveryReceiver = Pick<StreamedResultReceiver, 'receive' | 'failSelection'>;
 
@@ -118,7 +119,7 @@ function createDelivery(
 				};
 				aborters.add(abort);
 			});
-			const timer = setTimeout(
+			const timer = setHostTimeout(
 				() => abort(new StreamedReceiverError('timeout', formatClientError(225))),
 				timeoutMs,
 			);
@@ -146,7 +147,7 @@ function createDelivery(
 					throw error;
 				})
 				.finally(() => {
-					clearTimeout(timer);
+					clearHostTimeout(timer);
 					aborters.delete(abort);
 					pending.delete(delivery);
 					pendingBytes -= bytes;
@@ -198,15 +199,12 @@ export function installStreamedRendererGlobal(
 	}
 	const maxOpenResults = positiveLimit(options.maxPendingFrames, DEFAULT_PENDING_FRAMES);
 	const resultTimeoutMs = positiveLimit(options.timeoutMs, DEFAULT_TIMEOUT_MS);
-	const openResults = new Map<
-		string,
-		{ identity: StreamFrameIdentity; timer: ReturnType<typeof setTimeout> }
-	>();
+	const openResults = new Map<string, { identity: StreamFrameIdentity; timer: unknown }>();
 	function forgetResult(identity: StreamFrameIdentity) {
 		const key = streamFrameIdentityKey(identity);
 		const result = openResults.get(key);
 		if (result === undefined) return;
-		clearTimeout(result.timer);
+		clearHostTimeout(result.timer);
 		openResults.delete(key);
 	}
 	const delivery = createDelivery(receiver, options, (frame, disposition) => {
@@ -216,10 +214,10 @@ export function installStreamedRendererGlobal(
 		} else {
 			const key = streamFrameIdentityKey(frame.identity);
 			const previous = openResults.get(key);
-			if (previous !== undefined) clearTimeout(previous.timer);
+			if (previous !== undefined) clearHostTimeout(previous.timer);
 			else if (openResults.size >= maxOpenResults)
 				throw new StreamedReceiverError('overflow', formatClientError(229));
-			const timer = setTimeout(() => {
+			const timer = setHostTimeout(() => {
 				forgetResult(frame.identity);
 				try {
 					receiver.failSelection(
@@ -265,7 +263,7 @@ export function installStreamedRendererGlobal(
 		const error = new StreamedReceiverError('terminal', formatClientError(231));
 		delivery.close(error);
 		for (const { identity, timer } of openResults.values()) {
-			clearTimeout(timer);
+			clearHostTimeout(timer);
 			try {
 				receiver.failSelection(identity, error);
 			} catch {
@@ -368,7 +366,7 @@ export async function readStreamedRendererResponse(
 			}
 			// Local delivery backpressure has its own bounded wait. Only time
 			// spent waiting for the transport belongs to the response deadline.
-			const timer = setTimeout(() => {
+			const timer = setHostTimeout(() => {
 				failure ??= new StreamedReceiverError('timeout', formatClientError(235));
 				abort();
 			}, timeoutMs);
@@ -376,7 +374,7 @@ export async function readStreamedRendererResponse(
 			try {
 				next = await reader.read();
 			} finally {
-				clearTimeout(timer);
+				clearHostTimeout(timer);
 			}
 			if (next.done) break;
 			totalBytes += next.value.byteLength;
