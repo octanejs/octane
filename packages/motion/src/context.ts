@@ -1,3 +1,4 @@
+import { resolveVariantFromProps } from 'motion-dom';
 // Contexts shared across motion components.
 import { createContext, useContext } from 'octane';
 
@@ -44,8 +45,8 @@ export const LazyMotionContext = createContext<LazyMotionValue>({
 // child with `variants` but no explicit `animate` inherits the parent's active
 // label (Framer Motion's variant propagation).
 export interface VariantLabels {
-	initial?: string;
-	animate?: string;
+	initial?: false | string | string[];
+	animate?: string | string[];
 }
 export const VariantContext = createContext<VariantLabels>({});
 
@@ -73,15 +74,18 @@ export function useInheritedVariants(): VariantLabels {
 
 // Resolve a target that may be a variant label (string) against a `variants` map,
 // or pass an inline target object straight through.
-export function resolveVariant(value: any, variants: any): any {
-	if (typeof value === 'string') return variants ? variants[value] : undefined;
-	return value;
+export function resolveVariant(value: any, props: any): any {
+	if (Array.isArray(value)) return value.map((label) => resolveVariantFromProps(props, label));
+	return typeof value === 'string' || typeof value === 'function'
+		? resolveVariantFromProps(props, value)
+		: value;
 }
 
 // Split a variant target into its animatable values and its `transition` (Framer
 // puts orchestration + per-variant transition options under a `transition` key on the
 // target object; the engine's `animate(el, values, options)` wants them separated).
 export function splitVariant(v: any): { values: any; transition: any } {
+	if (Array.isArray(v)) v = Object.assign({}, ...v);
 	if (v && typeof v === 'object' && !Array.isArray(v) && 'transition' in v) {
 		const { transition, ...values } = v;
 		return { values, transition };
