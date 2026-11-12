@@ -1,5 +1,15 @@
 # @octanejs/cli
 
+## 0.3.4
+
+### Patch Changes
+
+- 21f3bbf: Packages can declare Strong mode in their package.json with `"octane": { "strong": true }`, or with a list of paths such as `["src"]`. Declared modules compile under Strong in every consumer. Applications can require Strong dependencies with `compiler.strongDependencies: { require: true, allow: [] }` (needs `compiler.strong`). The build then fails with `OCTANE_STRONG_DEPENDENCY` at any import that reaches a non-Strong module in another Octane package, or an `octane/react` boundary, unless `allow` names the package or `"octane/react"`. `octane analyze` reports the same errors, and `--strong-dependencies` now shares the compiler's walk.
+- 3378352: Strong mode reports `OCTANE_STRONG_READ_ONLY_STATE` when a declaration takes a
+  `useState` value and discards its setter. Derive render values from their inputs
+  and use `useRef` or `useLazyRef` for values kept for events or effects. The TanStack
+  Devtools binding now keeps its imperative instance in a lazy ref.
+
 ## 0.3.3
 
 ### Patch Changes
