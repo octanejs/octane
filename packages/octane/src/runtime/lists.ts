@@ -1005,7 +1005,8 @@ function deferRowSuspension(error: unknown): boolean {
  */
 function closeRows(outer: number, from: number, error: unknown): unknown {
 	ROWS_FROM = outer;
-	if (from < 0 || SUSPENDED_ROWS.length === from) return error;
+	// A bundle that cannot suspend folds the rest away (rollback-flag.ts).
+	if (!ROOT_ROLLBACK || from < 0 || SUSPENDED_ROWS.length === from) return error;
 	const members = SUSPENDED_ROWS.splice(from);
 	if (isSuspenseException(error)) members.push(error.thenable);
 	return suspensionOnAll(members);

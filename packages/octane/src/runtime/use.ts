@@ -251,8 +251,9 @@ export function resumeOnSettle(wakeable: PromiseLike<unknown>, retry: () => void
  * (and microtask hop count) identical to a plain use() suspension, so
  * attachResume's pendingThenable dedup keeps working on its stable identity.
  * The combined wakeable is fresh on every attempt, so it carries the members'
- * settled history: once it settles they count as seen, and one that suspends
- * again paces its retry by a macrotask, as resumeOnSettle does for one.
+ * settled history: each member counts as seen once it fulfils or rejects, and
+ * a combined wakeable over one already seen paces its retry by a macrotask, as
+ * resumeOnSettle does for a single wakeable.
  */
 export function suspensionOnAll(members: TrackedThenable<any>[]): SuspenseException {
 	if (members.length === 1) return new SuspenseException(members[0]);
@@ -260,13 +261,18 @@ export function suspensionOnAll(members: TrackedThenable<any>[]): SuspenseExcept
 	let seen = false;
 	const combined: TrackedThenable<void> = new Promise<void>((resolve, reject) => {
 		for (let i = 0; i < members.length; i++) {
-			if (SETTLED_WAKEABLES?.has(members[i]) === true) seen = true;
-			members[i].then(() => {
-				if (--remaining !== 0) return;
-				const settled = (SETTLED_WAKEABLES ??= new WeakSet());
-				for (let j = 0; j < members.length; j++) settled.add(members[j]);
-				resolve();
-			}, reject);
+			const member = members[i];
+			if (SETTLED_WAKEABLES?.has(member) === true) seen = true;
+			member.then(
+				() => {
+					(SETTLED_WAKEABLES ??= new WeakSet()).add(member);
+					if (--remaining === 0) resolve();
+				},
+				(reason) => {
+					(SETTLED_WAKEABLES ??= new WeakSet()).add(member);
+					reject(reason);
+				},
+			);
 		}
 	});
 	if (seen) SETTLED_WAKEABLES!.add(combined);
