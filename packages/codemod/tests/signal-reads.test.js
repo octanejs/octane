@@ -52,7 +52,7 @@ it.each([
 		'compatibility fallback',
 		input
 			.replace('useSyncExternalStore as useStore', 'useEffect, useSyncExternalStore as useStore')
-			.replace('const label =', 'useEffect(() => {}, [props.value]);\n  const label ='),
+			.replace('const label =', "useEffect(() => {}, [props['value']]);\n  const label ="),
 		false,
 	],
 ])(

@@ -11,6 +11,7 @@ import { createDataStore, type Transport } from '../../src/data/index.js';
 import { mount } from '../_helpers.js';
 import { createServer } from '../_data-todos.js';
 import { DataPage } from './data.tsrx';
+import { PagesPage } from './data-pages.tsrx';
 
 const environment = globalThis as typeof globalThis & {
 	IS_REACT_ACT_ENVIRONMENT?: boolean | undefined;
@@ -180,5 +181,39 @@ describe('one store across a ReactCompat boundary', () => {
 		expect(text(container, '[data-octane-done]')).toBe('0');
 		expect(text(container, '[data-react-done]')).toBe('0');
 		expect(text(container, 'li span')).toBe('Tides');
+	});
+});
+
+describe('usePages', () => {
+	it('pages one list in an Octane page and its React island, which grow together', async () => {
+		const server = createServer();
+		server.rows.push(
+			{ id: 'b', title: 'Kelp', done: false },
+			{ id: 'c', title: 'Moss', done: false },
+			{ id: 'd', title: 'Reef', done: false },
+		);
+		const store = createDataStore({ transport: server.transport });
+		let mounted!: ReturnType<typeof mount>;
+		await run(() => {
+			mounted = mount(PagesPage, { store });
+			dispose.push(() => mounted.unmount());
+		});
+		await settle();
+		const shown = (renderer: string) =>
+			[...mounted.container.querySelectorAll(`[data-${renderer}-pages] li`)].map(
+				(item) => item.textContent,
+			);
+		const more = (renderer: string) =>
+			mounted.container.querySelector<HTMLButtonElement>(`[data-${renderer}-pages] button`);
+		expect(shown('octane')).toEqual(['Kelp', 'Moss']);
+		expect(shown('react')).toEqual(['Kelp', 'Moss']);
+
+		// Both renderers page the same list, so loading more in one grows both.
+		await run(() => more('octane')!.click());
+		await settle();
+		expect(shown('octane')).toEqual(['Kelp', 'Moss', 'Reef', 'Tides']);
+		expect(shown('react')).toEqual(['Kelp', 'Moss', 'Reef', 'Tides']);
+		expect(more('octane')).toBeNull();
+		expect(more('react')).toBeNull();
 	});
 });
