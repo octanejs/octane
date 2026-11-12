@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/livestore",
-  "version": "0.0.38",
+  "version": "0.0.39",
   "license": "Apache-2.0",
   "type": "module",
   "sideEffects": false,
@@ -55,7 +55,7 @@
   },
   "peerDependencies": {
     "@opentelemetry/api": "^1.9.0",
-    "octane": "workspace:^0.16.0"
+    "octane": "workspace:^0.17.0"
   },
   "devDependencies": {
     "@livestore/adapter-web": "catalog:default",

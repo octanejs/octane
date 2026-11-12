@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/pierre-trees",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -43,7 +43,7 @@
   },
   "peerDependencies": {
     "@pierre/trees": "^1.0.0-beta.6",
-    "octane": "workspace:^0.16.0"
+    "octane": "workspace:^0.17.0"
   },
   "devDependencies": {
     "@pierre/trees": "1.0.0-beta.6",

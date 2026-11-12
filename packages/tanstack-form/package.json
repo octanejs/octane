@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-form",
-  "version": "0.0.64",
+  "version": "0.0.65",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -37,7 +37,7 @@
     "@tanstack/octane-store": "^0.13.0"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.16.0"
+    "octane": "workspace:^0.17.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
