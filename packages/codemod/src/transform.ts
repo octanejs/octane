@@ -237,7 +237,7 @@ function scriptKind(filename: string) {
 	return ts.ScriptKind.JSX;
 }
 
-function nativeReactCompat(module: string, name: string) {
+export function nativeReactCompat(module: string, name: string) {
 	return (
 		(name === 'ReactCompat' || name === 'ReactCompatInline') &&
 		(module === 'octane/react' || module === 'octane/react/server')

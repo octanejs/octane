@@ -50,6 +50,220 @@ function typecheckProject(root) {
 }
 
 describe('runCodemod', () => {
+	const reactLeaf =
+		"import {useState} from 'react'; export default function Leaf(){const [n]=useState(1);return <button>{n}</button>}";
+	const boundaryImports =
+		"import {ReactCompat as Island} from 'octane/react'; import Leaf from './Leaf';";
+	const islandOwner =
+		boundaryImports + 'export function Owner(){return <Island component={Leaf}/>}';
+
+	it.each([
+		[
+			'selected island and mixed caller',
+			'Owner.tsx',
+			islandOwner,
+			['Owner.tsx', 'Native.tsx', 'Leaf.tsx'],
+		],
+		['unselected issuer', 'Owner.tsx', islandOwner, ['Leaf.tsx']],
+		[
+			'explicit undefined component',
+			'Owner.tsx',
+			boundaryImports + 'export const Owner=()=> <Island component={undefined}><Leaf/></Island>',
+			['Leaf.tsx'],
+		],
+		[
+			'escaped module',
+			'Owner.tsx',
+			islandOwner.replace('octane/react', String.raw`octane/react`),
+			['Leaf.tsx'],
+		],
+		[
+			'native issuer and conditional children',
+			'Owner.tsrx',
+			boundaryImports +
+				'export function Owner({shown})@{<Island>{shown ? <Leaf/> : <Leaf/>}</Island>}',
+			['Leaf.tsx'],
+		],
+		[
+			'namespace and conditional component prop',
+			'Owner.tsx',
+			"import * as Bridge from 'octane/react/server'; import * as Views from './Leaf'; export function Owner({shown}){return <Bridge.ReactCompatInline component={shown ? Views.default : Views.default}/>}",
+			['Leaf.tsx'],
+		],
+	])('keeps React island sources on disk for a %s', async (_, issuer, source, selected) => {
+		const sources = {
+			[issuer]: source,
+			'Leaf.tsx': reactLeaf,
+			'Native.tsx': "import Leaf from './Leaf'; export function Native(){return <Leaf/>}",
+			'index.html': '<script type="module" src="./Leaf.tsx"></script>',
+		};
+		const root = project(sources);
+		for (const write of [false, true]) {
+			const result = await runCodemod(
+				selected.map((f) => path.join(root, f)),
+				{ root, write },
+			);
+			if (!write) expect(result.files.map((f) => f.file)).toEqual(expect.arrayContaining(selected));
+			expect(result.files.flatMap((f) => f.notes)).toContainEqual(
+				expect.objectContaining({
+					rule: 'react-compat',
+					severity: 'error',
+					message: expect.stringContaining('Leaf.tsx'),
+				}),
+			);
+			for (const [f, original] of Object.entries(sources))
+				expect(fs.readFileSync(path.join(root, f), 'utf8')).toBe(original);
+			expect(fs.existsSync(path.join(root, 'Leaf.tsrx'))).toBe(false);
+		}
+	});
+
+	it.each([
+		[
+			'statically re-exported hook',
+			"import {useLabel} from './public'; export default function Leaf(){return <b>{useLabel()}</b>}",
+			false,
+			true,
+		],
+		[
+			'side-effect import',
+			"import './public'; export default function Leaf(){return <b/>}",
+			false,
+			true,
+		],
+		[
+			'literal dynamic import',
+			"export default async function Leaf(){ const {useLabel}=await import('./public');return <b>{useLabel()}</b> }",
+			false,
+			true,
+		],
+		[
+			'possibly executable unused import',
+			"import {useLabel} from './public'; export default function Leaf(){return <b/>}",
+			false,
+			true,
+		],
+		[
+			'declaration type import',
+			"import type {Label} from './state'; export default function Leaf(){return <b/>}",
+			true,
+			false,
+		],
+		[
+			'elided named type',
+			"import {type Label} from './state'; export default function Leaf(){return <b/>}",
+			false,
+			false,
+		],
+		[
+			'retained empty import',
+			"import {type Label} from './state'; export default function Leaf(){return <b/>}",
+			true,
+			true,
+		],
+	])(
+		'protects the original React execution graph for a %s',
+		async (_, source, verbatimModuleSyntax, rejected) => {
+			const hook =
+				"import {useState} from 'react'; export type Label=string; export function useLabel(){const [v]=useState('ok');return v}";
+			const root = project({
+				'Owner.tsx': islandOwner,
+				'Leaf.tsx': source,
+				'public.ts': "export {useLabel} from './state';",
+				'state.ts': hook,
+				'tsconfig.json': JSON.stringify({ compilerOptions: { verbatimModuleSyntax } }),
+			});
+			const r = await runCodemod([path.join(root, 'state.ts')], { root, write: true });
+			expect(
+				r.files.some((f) =>
+					f.notes.some((n) => n.rule === 'react-compat' && n.severity === 'error'),
+				),
+			).toBe(rejected);
+			expect(fs.readFileSync(path.join(root, 'state.ts'), 'utf8') === hook).toBe(rejected);
+		},
+	);
+
+	it('reports each changed React dependency in preview and blocks the whole write', async () => {
+		const root = project({
+			'Owner.tsx': islandOwner,
+			'Leaf.tsx': "import Child from './Child'; export default function Leaf(){return <Child/>}",
+			'Child.tsx': reactLeaf,
+			'Other.tsx': 'export function Other(){return <aside/>}',
+		});
+		const selected = ['Leaf', 'Child', 'Other'].map((name) => path.join(root, name + '.tsx'));
+		const preview = await runCodemod(selected, { root, write: false });
+		expect(
+			preview.files
+				.filter((f) => f.notes.some((n) => n.rule === 'react-compat'))
+				.map((f) => f.file)
+				.sort(),
+		).toEqual(['Child.tsx', 'Leaf.tsx']);
+		expect(preview.files.find((f) => f.file === 'Other.tsx')?.changed).toBe(true);
+		const result = await runCodemod(selected, { root, write: true });
+		expect(result.files.some((f) => f.notes.some((n) => n.rule === 'react-compat'))).toBe(true);
+		expect(
+			selected.every((f) => fs.existsSync(f) && !fs.existsSync(f.replace('.tsx', '.tsrx'))),
+		).toBe(true);
+	});
+
+	it('keeps an explicitly selected workspace React source reached through another path', async () => {
+		const workspace = project({
+			'app/Owner.tsx': islandOwner.replace('./Leaf', 'leaf'),
+			'app/node_modules/.keep': '',
+			'lib/package.json': '{"name":"leaf","main":"Leaf.tsx"}',
+			'lib/Leaf.tsx': reactLeaf,
+		});
+		const root = path.join(workspace, 'app');
+		const linked = path.join(root, 'node_modules/leaf');
+		fs.symlinkSync(path.join(workspace, 'lib'), linked, 'dir');
+		const result = await runCodemod([path.join(linked, 'Leaf.tsx')], { root, write: true });
+		expect(result.files.flatMap((f) => f.notes)).toContainEqual(
+			expect.objectContaining({ rule: 'react-compat', severity: 'error' }),
+		);
+		expect(fs.readFileSync(path.join(linked, 'Leaf.tsx'), 'utf8')).toBe(reactLeaf);
+	});
+
+	it.each([
+		['unchanged React leaf', islandOwner, 'Owner.tsx', {}],
+		[
+			'separate unfinished native module',
+			'export const untouched=true;',
+			'Leaf.tsx',
+			{ 'Unfinished.tsrx': boundaryImports + 'export function Draft()@{<' },
+		],
+		[
+			'shadowed boundary',
+			islandOwner.replace('function Owner()', 'function Owner(Island)'),
+			'Leaf.tsx',
+			{},
+		],
+		[
+			'shadowed component',
+			islandOwner.replace('function Owner()', 'function Owner(Leaf)'),
+			'Leaf.tsx',
+			{},
+		],
+		['different package', islandOwner.replace('octane/react', 'other'), 'Leaf.tsx', {}],
+		[
+			'redirected boundary',
+			islandOwner,
+			'Leaf.tsx',
+			{
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { paths: { 'octane/react': ['./other.ts'] } },
+				}),
+				'other.ts': 'export function ReactCompat(){return null}',
+			},
+		],
+	])('allows migration with a %s', async (_, source, selected, extra) => {
+		const root = project({ 'Owner.tsx': source, 'Leaf.tsx': reactLeaf, ...extra });
+		const r = await runCodemod([path.join(root, selected)], { root, write: true });
+		expect(
+			r.files
+				.flatMap((f) => f.notes)
+				.filter((n) => n.rule === 'react-compat' && n.severity === 'error'),
+		).toEqual([]);
+		expect(fs.existsSync(path.join(root, selected.replace('.tsx', '.tsrx')))).toBe(true);
+	});
 	it.each(['', ', undefined'])(
 		'keeps fresh imperative handles in Strong mode with deps %j',
 		async (deps) => {
