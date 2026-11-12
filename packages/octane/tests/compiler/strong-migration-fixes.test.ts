@@ -412,3 +412,17 @@ export function Loop({ value }) @{
 		);
 	});
 });
+
+it('keeps the layout snapshot edit with an existing server import', () => {
+	const source = `import { useState as state, useLayoutEffect as layout, useRef, useLayoutSnapshot } from 'octane/server';
+export function Measured() @{
+	const element = useRef<HTMLDivElement | null>(null);
+	const [value, setValue] = state(7);
+	layout(() => { setValue(element.current?.offsetWidth ?? 0); }, null);
+	<div ref={element}>{String(value)}</div>
+}`;
+	const diagnostic = errors(source).find((item) => editsOf(item));
+	expect(diagnostic?.suggestions?.[0].hook).toBe('useLayoutSnapshot');
+	const fixed = applyEdits(source, editsOf(diagnostic) ?? []);
+	expect(fixed).toContain('const value = useLayoutSnapshot(');
+});

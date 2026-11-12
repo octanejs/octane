@@ -195,6 +195,10 @@ function compiledFirstScreenHookImports(observeGetter: boolean): Set<string> {
 				<view id={${output}} />
 			}
 		`;
+	return compiledFirstScreenImports(source);
+}
+
+function compiledFirstScreenImports(source: string): Set<string> {
 	const repository = fileURLToPath(new URL('../../../', import.meta.url));
 	const result = execFileSync(
 		process.execPath,
@@ -236,6 +240,17 @@ process.stdout.write(JSON.stringify(imports));`,
 	);
 	return new Set(JSON.parse(result) as string[]);
 }
+
+it('links initial values to the first-screen runtime', () => {
+	const imports = compiledFirstScreenImports(`"use strong";
+		import { useInitialValue } from 'octane';
+		export function Initial() @{
+			const value = useInitialValue(() => 'initial');
+			<view id={value} />
+		}`);
+	expect(imports.has('useInitialValue')).toBe(true);
+	expect(typeof firstScreenRenderer.useInitialValue).toBe('function');
+});
 
 const backgroundPlan = universalPlan('lynx', {
 	kind: 'host',
