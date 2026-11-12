@@ -6740,6 +6740,13 @@ export function useLazyRef<T>(factory: () => T, slot?: unknown): { current: T } 
 	return hook?.kind === 'ref' ? hook.value : createRefHook(owner, resolved, factory());
 }
 
+/** Capture a render value once for the lifetime of this hook. */
+export function useInitialValue<T>(initial: T | (() => T), slot?: unknown): NoInfer<T> {
+	return typeof initial === 'function'
+		? useLazyRef(initial as () => T, slot).current
+		: useRef(initial, slot).current;
+}
+
 function createRefHook<T>(owner: DraftOwner, resolved: unknown, initial: T): { current: T } {
 	const record = owner.record;
 	// What the ref holds when no render or commit owns its cell, as after the

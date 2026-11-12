@@ -179,6 +179,7 @@ export {
 	hookMemoPublishInvariant,
 	useRef,
 	useLazyRef,
+	useInitialValue,
 	useDebugValue,
 	useImperativeHandle,
 	useId,
