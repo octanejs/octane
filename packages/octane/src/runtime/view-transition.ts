@@ -5,6 +5,7 @@
 
 import { PASSIVE, effectQueues, drainPassiveEffects, pendingPassiveUnmounts } from './effects.js';
 import { hydrating } from '../hydration-flag.js';
+import { setHostTimeout, clearHostTimeout } from '../host-task.js';
 import { markComponentFlags, COMPONENT_FLAG_BOUNDARY } from '../component-flags.js';
 import {
 	VIEW_TRANSITION_SCOPE_STYLE_ID as VT_SCOPE_STYLE_ID,
@@ -1046,9 +1047,9 @@ export function vtWaitForResources(
 	}
 	if (waits.length === 0) return null;
 	return new Promise<void>((resolve) => {
-		const timer = setTimeout(done, 500);
+		const timer = setHostTimeout(done, 500);
 		function done(): void {
-			clearTimeout(timer);
+			clearHostTimeout(timer);
 			for (const cleanup of release) cleanup();
 			resolve();
 		}
