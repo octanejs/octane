@@ -246,7 +246,7 @@ it('preserves the authored SVG root on the server and the client, including subs
 	const drawing = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="none" role="img" focusable="false">
 		<rect x="1" y="2" width="8" height="7" rx="2" fill="var(--surface)"/>
 		<g transform="translate(0 -1) scale(1.5)"><g><path d="M0 0L6 4Z" fill="currentColor" fill-rule="evenodd"/></g></g>
-		<path d="M1 1L3 3" stroke="#fff" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="bevel" opacity="0.3"/>
+		<path d="M1 1L3 3" stroke="#fff" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="bevel" opacity=".3"/>
 	</svg>`;
 	fs.writeFileSync(icon, '<!-- Drawing metadata -->\n' + drawing);
 	const options = { root, svgPaths: true, strong: true, verify: true, write: false };
@@ -279,6 +279,7 @@ it('preserves the authored SVG root on the server and the client, including subs
 	const load = (mode, svg, runtime) => {
 		const reference = svg
 			.replace('<svg ', '<svg {...props} ')
+			.replace('opacity=".3"', 'opacity={0.3}')
 			.replace(/(fill|stroke)-([a-z])/g, (_, prefix, letter) => prefix + letter.toUpperCase());
 		fs.writeFileSync(
 			path.join(root, 'src/reference.tsx'),
@@ -546,6 +547,12 @@ it.each([
 		'active = false',
 		'cx(sheet.glyph, active && "on")',
 	],
+	[
+		'a flag in a conditional class',
+		'let active = true;',
+		'active = false',
+		'active ? "on" : "off"',
+	],
 ])(
 	'defers SVG adoption when a wrapper changes %s',
 	async (_case, setup, write, classes = 'sheet.glyph') => {
@@ -579,20 +586,21 @@ it('keeps the SVG diagnostic when the stylesheet import is rewritten to a JavaSc
 	expect(notes.some((n) => n.rule === 'svg-issuer')).toBe(true);
 });
 
-it('preserves SVG classes selected by stable clsx guards on the server and after client updates', async () => {
+it('preserves SVG classes selected by stable conditional and clsx guards on the server and after client updates', async () => {
 	await expectSvgRenderParity(
 		`import classes, {clsx as join} from 'clsx';
 		function Frame({children}) { return <b>{children}</b>; }
 		export function Pane({active, muted}) { const visible = !muted; return <button>
 			<Frame><Mark className={classes('icon', active ? 'active' : 'idle', visible && 'visible')}/></Frame>
 			<Mark className={join('badge', (active && !muted || muted) ? 'bright' : 'dim')}/>
+			<Frame><Mark className={active ? 'on' : 'off'}/></Frame>
 		</button>; }`,
 		[
 			{ active: false, muted: false },
 			{ active: true, muted: false },
 			{ active: false, muted: true },
 		],
-		2,
+		3,
 	);
 });
 

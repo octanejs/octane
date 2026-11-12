@@ -11,7 +11,7 @@ import { reactRenderer, staticReactProps } from './react-renderer.js';
 import { localUses, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
-import { effectReceivers, fixedBinding } from './effect-receivers.js';
+import { effectReceivers, fixedBinding, initializedBefore } from './effect-receivers.js';
 import { isBareSvgTag, storeHookUses } from './store-hook-uses.js';
 import { intlImports } from './react-intl.js';
 import {
@@ -1256,6 +1256,17 @@ class ModuleTransform {
 	private svgClassName(expr: ts.Expression) {
 		if (ts.isIdentifier(expr)) return true;
 		if (ts.isPropertyAccessExpression(expr)) return this.svgCssClass(expr);
+		if (ts.isConditionalExpression(expr))
+			return (
+				ts.isStringLiteralLike(skipWrappers(expr.whenTrue)) &&
+				ts.isStringLiteralLike(skipWrappers(expr.whenFalse)) &&
+				svgClassToken(
+					expr,
+					(name) =>
+						fixedBinding(this.checker, name, expr, (this.fixedSvgParameters ??= new Map())) &&
+						initializedBefore(this.checker, name, expr),
+				)
+			);
 		if (!ts.isCallExpression(expr) || !ts.isIdentifier(expr.expression)) return false;
 		const declaration = this.declarationOf(expr.expression);
 		const binding = declaration && this.imports.get(declaration);
