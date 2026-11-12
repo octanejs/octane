@@ -15,6 +15,7 @@ import { mount, nextPaint } from '../_helpers';
 import {
 	AsyncLazyMotionSurface,
 	FeatureBundleSurface,
+	HiddenLazyMotionSurface,
 	LazyMotionErrorSurface,
 	LazyMotionSurface,
 	StrictLazyMotionSurface,
@@ -137,6 +138,59 @@ describe('LazyMotion and motion/react-m compatibility', () => {
 			undefined,
 		);
 		result.unmount();
+	});
+
+	// @parity-case conformance:lazy-initial-false-first-frame
+	it('preserves the displayed keyframes when async features arrive', async () => {
+		animateMock.mockClear();
+		const load = deferred<typeof domMax>();
+		const features = () => load.promise;
+		const props = (end: number) => ({ features, initial: false, animate: { opacity: [0.1, end] } });
+		const stable = mount(AsyncLazyMotionSurface, props(0.6));
+		const changed = mount(AsyncLazyMotionSurface, props(0.6));
+		try {
+			await nextPaint();
+			const stableHost = stable.find('#async-lazy-div') as HTMLElement;
+			const changedHost = changed.find('#async-lazy-div') as HTMLElement;
+			stable.update(AsyncLazyMotionSurface, props(0.6));
+			changed.update(AsyncLazyMotionSurface, props(0.8));
+			await nextPaint();
+			expect([stableHost.style.opacity, changedHost.style.opacity]).toEqual(['0.6', '0.6']);
+			expect(animateMock).not.toHaveBeenCalled();
+
+			load.resolve(domMax);
+			await settleAsyncFeatures();
+			expect(animateMock.mock.calls).toEqual([[changedHost, { opacity: [0.1, 0.8] }, undefined]]);
+
+			animateMock.mockClear();
+			stable.update(AsyncLazyMotionSurface, props(0.4));
+			await nextPaint();
+			expect(animateMock.mock.calls).toEqual([[stableHost, { opacity: [0.1, 0.4] }, undefined]]);
+		} finally {
+			stable.unmount();
+			changed.unmount();
+		}
+	});
+
+	it('animates a target changed before the first visible layout', async () => {
+		animateMock.mockClear();
+		const load = deferred<typeof domMax>();
+		const features = () => load.promise;
+		const result = mount(HiddenLazyMotionSurface, { features, mode: 'hidden', opacity: 0.6 });
+		try {
+			await nextPaint();
+			result.update(HiddenLazyMotionSurface, { features, mode: 'hidden', opacity: 0.8 });
+			await nextPaint();
+			load.resolve(domMax);
+			await settleAsyncFeatures();
+			expect(animateMock).not.toHaveBeenCalled();
+
+			result.update(HiddenLazyMotionSurface, { features, mode: 'visible', opacity: 0.8 });
+			await nextPaint();
+			expect(animateMock.mock.calls).toEqual([[result.find('div'), { opacity: 0.8 }, undefined]]);
+		} finally {
+			result.unmount();
+		}
 	});
 
 	it('routes async feature load failures through the nearest error boundary', async () => {

@@ -2,6 +2,7 @@
 import {
 	DataError,
 	entity,
+	feed,
 	httpTransport,
 	read,
 	view,
@@ -61,7 +62,14 @@ export const removeTodo = write({
 	removes: Todo,
 });
 
-/** A server with one account's todos, and a log of every request that reached a handler. */
+/** Todos as the server changes them. */
+export const todoChanges = feed({
+	name: 'todos.changes',
+	event: schema<TodoItem>(isTodo),
+	changes: (todo) => ({ put: Todo, value: todo }),
+	covers: ['todo'],
+});
+
 /** The todos by title, two at a time. */
 export const todoPages = view({
 	name: 'todos.byTitle',

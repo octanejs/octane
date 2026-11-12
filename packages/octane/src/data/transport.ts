@@ -1,5 +1,5 @@
 import * as devalue from 'devalue';
-import type { DataReply, DataRequest, Transport } from './contracts.js';
+import type { DataReply, DataRequest, FeedFrame, Listener, Transport } from './contracts.js';
 
 /**
  * Send requests to a `createDataHandler` endpoint. The body is devalue on both
@@ -35,4 +35,22 @@ export function serverTransport(
 ): Transport {
 	return async (request: DataRequest, signal: AbortSignal): Promise<DataReply> =>
 		devalue.parse(await send(devalue.stringify(request), { signal })) as DataReply;
+}
+
+/**
+ * Listen to feeds through a `module server` function that answers them with
+ * `DataServer.listen`. Each connection is one streamed server call, under the
+ * app's origin checks and middleware.
+ */
+export function serverListener(
+	send: (
+		request: string,
+		options?: { signal?: AbortSignal },
+	) => Promise<AsyncIterable<string>> | AsyncIterable<string>,
+): Listener {
+	return async function* (request, signal) {
+		for await (const text of await send(devalue.stringify(request), { signal })) {
+			yield devalue.parse(text) as FeedFrame;
+		}
+	};
 }

@@ -352,6 +352,55 @@ export function write<Input, Output = unknown>(options: {
 	};
 }
 
+/**
+ * What one event says the server did. `put` is a record as the server now
+ * holds it, `remove` a record it deleted, `read` a read's whole new value,
+ * such as a count, and `invalidates` marks reads with these tags or entity
+ * names stale, for a change the event does not carry, such as a new row in a
+ * list only the server can order.
+ */
+export type FeedChange =
+	| { readonly put: Entity<any>; readonly value: unknown }
+	| { readonly remove: Entity<any>; readonly id: string }
+	| { readonly read: Read<any, any>; readonly input?: unknown; readonly value: unknown }
+	| { readonly invalidates: readonly string[] };
+
+export interface Feed<Params, Event> {
+	readonly kind: 'feed';
+	readonly name: string;
+	readonly params: StandardSchema<unknown, Params> | undefined;
+	readonly event: StandardSchema<unknown, Event>;
+	readonly changes: (event: Event, params: Params) => FeedChange | readonly FeedChange[];
+	/** Tags and entity names of the reads this feed keeps current; missed events mark them stale. */
+	readonly covers: readonly string[];
+}
+
+/**
+ * Server events that keep loaded values current. The store listens while a
+ * component observes the feed, shares one connection among observers, and
+ * applies each event's `changes` to every read that holds the records.
+ *
+ * When the store may have missed events, because the source reports a gap or
+ * a connection without a cursor drops and comes back, it marks every read in
+ * `covers` stale, and observed ones reload.
+ */
+export function feed<Event, Params = void>(options: {
+	name: string;
+	params?: StandardSchema<unknown, Params>;
+	event: StandardSchema<unknown, Event>;
+	changes: (event: Event, params: Params) => FeedChange | readonly FeedChange[];
+	covers: readonly string[];
+}): Feed<Params, Event> {
+	return {
+		kind: 'feed',
+		name: options.name,
+		params: options.params,
+		event: options.event,
+		changes: options.changes,
+		covers: options.covers,
+	};
+}
+
 /** One request on the wire. A write carries the reads on screen it should refresh. */
 export interface DataRequest {
 	readonly kind: 'read' | 'write';
@@ -383,3 +432,28 @@ export type DataReply =
  * definitive. Rejecting means the outcome is unknown: a write may have landed.
  */
 export type Transport = (request: DataRequest, signal: AbortSignal) => Promise<DataReply>;
+
+/** A request to listen to a feed, from just after `cursor` when the store has one. */
+export interface FeedRequest {
+	readonly name: string;
+	readonly params: unknown;
+	readonly cursor: string | null;
+}
+
+/**
+ * One message from a feed's source. `event` is an event, `id` lets the store
+ * drop a duplicate, and `cursor` is the position to resume from after it.
+ * `gap` says events were missed, such as a cursor too old to resume from.
+ */
+export interface FeedFrame {
+	readonly event?: unknown;
+	readonly id?: string;
+	readonly cursor?: string;
+	readonly gap?: boolean;
+}
+
+/**
+ * Opens one connection to a feed. Frames arrive in order until the iterable
+ * ends or throws; the store then connects again, from its cursor.
+ */
+export type Listener = (request: FeedRequest, signal: AbortSignal) => AsyncIterable<FeedFrame>;
