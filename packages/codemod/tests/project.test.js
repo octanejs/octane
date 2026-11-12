@@ -42,6 +42,50 @@ function typecheckProject(root) {
 }
 
 describe('runCodemod', () => {
+	it.each(['', ', undefined'])(
+		'keeps fresh imperative handles in Strong mode with deps %j',
+		async (deps) => {
+			const root = project({
+				'Fresh.tsx': `import { useImperativeHandle } from 'react';
+export function Fresh({ ref, label }) {
+	function read() { return label; }
+	useImperativeHandle(ref, () => ({ read })${deps});
+	return <p onClick={() => read()}>{String(label)}</p>;
+}`,
+				'Stable.tsx': `import { useImperativeHandle } from 'react';
+function stable() { return 'shared'; }
+export function Stable({ ref }) {
+	function read() { return 'initial'; }
+	read = stable;
+	useImperativeHandle(ref, () => ({ read })${deps});
+	return <p>shared</p>;
+}`,
+				'Redeclared.jsx': `import { useImperativeHandle } from 'react';
+const shared = () => 'shared';
+function useHandle(ref, label) {
+	function read() { return label; }
+	var read = shared;
+	useImperativeHandle(ref, () => ({ read })${deps});
+}
+export function Redeclared({ ref, label }) {
+	useHandle(ref, label);
+	return <p>shared</p>;
+}`,
+			});
+			const { files } = await runCodemod([root], { write: false, strong: true });
+			const fresh = files.find((file) => file.file === 'Fresh.tsx');
+			const stable = files.find((file) => file.file === 'Stable.tsx');
+			expect(fresh).toMatchObject({ strong: true, diagnostics: [] });
+			const redeclared = files.find((file) => file.file === 'Redeclared.jsx');
+			for (const file of [stable, redeclared]) {
+				expect(file).toMatchObject({ strong: false });
+				expect(file.diagnostics).toContainEqual(
+					expect.objectContaining({ code: 'OCTANE_STRONG_UNTRACKED_EFFECT' }),
+				);
+			}
+		},
+	);
+
 	it('reports a native setup call into a React hook left in an unselected local module', () => {
 		const helper = `import { useState as state } from 'react';
 export function useLabel() { const [label] = state('ready'); return label; }`;
@@ -63,6 +107,24 @@ export function Panel() { const label = read(); return <b>{label}</b>; }`;
 			'Catalog.tsx': panel
 				.replace('useLabel', 'useQuery')
 				.replace('./use-label', '@tanstack/react-query'),
+			'Arrow.tsx': panel.replace('function Panel()', 'const Panel = () =>'),
+			'Function.tsx': panel.replace('function Panel()', 'const Panel = function()'),
+			'Memo.tsx': `import { memo as wrap } from 'react';
+${panel.replace('function Panel()', 'const Panel = wrap(() =>')})`,
+			'Forward.tsx': `import * as React from 'react';
+${panel.replace('function Panel()', 'const Panel = React.forwardRef(function Inner(props, ref)')})`,
+			'Sibling.tsx': panel + '\nexport function App() { return <Panel/>; }',
+			'ReactOwned.tsx':
+				"import {ReactCompat} from 'octane/react';\n" +
+				panel +
+				'\nexport function App() { return <ReactCompat><Panel/></ReactCompat>; }',
+			'EscapedInner.tsx': panel
+				.replace('function Panel()', 'const Panel = function Inner()')
+				.replace('return <b>', 'publish(Inner); return <b>'),
+			'UnknownWrapper.tsx':
+				'const wrap = callback => callback;\n' +
+				panel.replace('function Panel()', 'const Panel = wrap(() =>') +
+				')',
 			'Panel.tsx': panel + '\nexport type View = typeof Panel;',
 			'AfterSetup.tsx': `import { useLabel as read } from './use-label';
 export function AfterSetup() {
@@ -138,13 +200,18 @@ export function useLabel() { const later = () => useState('ready'); return 'read
 			);
 			expect(errors).toEqual([
 				['AfterSetup.tsx', 'bindings', 4, expect.stringMatching(/useLabel.*React.*useState/)],
+				['Arrow.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
 				[
 					'External.tsx',
 					'bindings',
 					2,
 					expect.stringMatching(/useLabel.*React.*useSyncExternalStore/),
 				],
+				['Forward.tsx', 'bindings', 3, expect.stringMatching(/useLabel.*React.*useState/)],
+				['Function.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
+				['Memo.tsx', 'bindings', 3, expect.stringMatching(/useLabel.*React.*useState/)],
 				['Panel.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
+				['Sibling.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
 				['WithParam.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
 			]);
 			expect(files.find((f) => f.file === 'Catalog.tsx').code).toContain(
@@ -2496,8 +2563,25 @@ export function Greeting({ count }: { count: number }) {
 		const enclosed = `import {IntlProvider as Provider, useIntl} from 'react-intl';
 			function Locale() { const { locale } = useIntl(); return <p lang={locale}/>; }
 			export function Page() { return <Provider locale="fr"><Locale/></Provider>; }`;
+		const direct = enclosed.replace('{ locale } = useIntl()', 'locale = useIntl().locale');
 		const sources = {
 			'src/Owned.tsx': enclosed,
+			'src/OwnedMember.tsx': direct,
+			'src/ExternalMember.tsx': direct.replace('function Locale', 'export function Locale'),
+			'src/ReflectiveReceiver.tsx': `import {useIntl} from 'react-intl';
+				export function Leaf() {
+					const intl = useIntl();
+					return <b title={intl.formatNumber(1)}>{eval('intl.locale')}</b>;
+				}`,
+			'src/ReflectiveHook.tsx': String.raw`import {useIntl} from 'react-intl';
+				export function Leaf() {
+					return <b title={useIntl().formatNumber(1)}>{\u0065val('useIntl().locale')}</b>;
+				}`,
+			'src/ExternalReceiver.tsx': `import {useIntl} from 'react-intl';
+				export function Leaf() {
+					const intl = useIntl();
+					return <b title={intl.formatNumber(1)}>{intl.locale}</b>;
+				}`,
 			'src/Exported.tsx': enclosed.replace('function Locale', 'export function Locale'),
 			'src/Escaped.tsx': enclosed + '\nexport {Locale as Consumer};',
 			'src/Nested.tsx': enclosed
@@ -2532,11 +2616,11 @@ export function Greeting({ count }: { count: number }) {
 		for (const file of Object.keys(sources)) {
 			const result = files.find((result) => result.file === file);
 			const errors = [...result.notes, ...result.diagnostics].filter((d) => d.severity === 'error');
-			if (file === 'src/Owned.tsx') {
+			if (file === 'src/Owned.tsx' || file === 'src/OwnedMember.tsx') {
 				expect(result.strong).toBe(true);
-				expect(errors).toEqual([]);
+				expect.soft(errors, file).toEqual([]);
 			} else {
-				expect(errors).toContainEqual(
+				expect.soft(errors, file).toContainEqual(
 					expect.objectContaining({
 						rule: 'bindings',
 						message: expect.stringContaining('useIntl'),
@@ -2819,11 +2903,11 @@ export function Locale() { return <IntlProvider locale="en"><b>test</b></IntlPro
 		const root = setup({
 			'src/Greeting.tsx': `import { useIntl } from 'react-intl';
 import React, { memo as cached } from 'react';
-export const Greeting = cached(() => { const intl = useIntl(); return <p title={intl.locale} />; });
-export const Field = React.forwardRef((props, ref) => { const intl = useIntl(); return <input ref={ref} title={intl.locale} />; });`,
+export const Greeting = cached(() => { const intl = useIntl(); return <p title={intl.formatNumber(1)} />; });
+export const Field = React.forwardRef((props, ref) => { const intl = useIntl(); return <input ref={ref} title={intl.formatNumber(1)} />; });`,
 			'src/Other.tsx': `import {useIntl} from 'react-intl';
 function memo(fn) { return fn; }
-export const Other = memo(() => { const intl = useIntl(); return <p title={intl.locale} />; });`,
+export const Other = memo(() => { const intl = useIntl(); return <p title={intl.formatNumber(1)} />; });`,
 		});
 		const { files } = await runCodemod([root], { root, write: false, strong: true });
 		const wrapped = files.find((f) => f.file === 'src/Greeting.tsx');

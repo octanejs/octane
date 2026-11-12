@@ -38,3 +38,27 @@ describe('compiled universal lazy refs', () => {
 		}
 	});
 });
+
+it('captures the initial value through the universal compiler', () => {
+	const source = `"use strong";
+		import { useInitialValue } from 'octane';
+		export function Scene({ factory, label }) @{
+			const initial = useInitialValue(factory);
+			<view initial={initial} label={label} />
+		}`;
+	const { Scene } = loadCompiledFixtureSource(source, {
+		id: '/src/initial.object.tsrx',
+		mode: 'client',
+		compileOptions: { renderer, hmr: false },
+		runtimeModules: { 'octane/universal': Universal },
+	});
+	const container = Universal.createObjectContainer();
+	const root = Universal.createUniversalRoot(container, Universal.createObjectDriver());
+	try {
+		root.render(Scene, { factory: () => 'first', label: 'one' });
+		root.render(Scene, { factory: () => 'second', label: 'two' });
+		expect(container.children[0].props).toMatchObject({ initial: 'first', label: 'two' });
+	} finally {
+		root.unmount();
+	}
+});

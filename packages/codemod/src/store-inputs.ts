@@ -30,6 +30,7 @@ export function storeSources(
 			if (
 				!ts.isImportDeclaration(s) ||
 				!ts.isStringLiteral(s.moduleSpecifier) ||
+				s.attributes ||
 				s.importClause?.isTypeOnly
 			)
 				continue;
@@ -47,23 +48,33 @@ export function storeSources(
 				}
 		}
 		for (const s of sf.statements) {
-			if (!ts.isVariableStatement(s) || !(s.declarationList.flags & ts.NodeFlags.Const)) continue;
+			if (
+				!ts.isVariableStatement(s) ||
+				(s.declarationList.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const
+			)
+				continue;
 			for (const d of s.declarationList.declarations) {
 				if (!ts.isIdentifier(d.name) || !d.initializer) continue;
+				const alias = ts.isIdentifier(d.initializer) && locals.get(d.initializer.text);
 				const call = skipWrappers(d.initializer);
-				if (!ts.isCallExpression(call)) continue;
-				let target = skipWrappers(call.expression);
-				while (ts.isExpressionWithTypeArguments(target)) target = skipWrappers(target.expression);
-				if (!ts.isIdentifier(target)) continue;
-				const name = target.text;
-				const callee = locals.get(name);
-				// Type wrappers preserve an opaque origin without adding a direct factory proof.
-				const input: Input | null =
-					call === d.initializer && target === call.expression && callee && 'reexport' in callee
-						? { factory: callee.reexport }
-						: localFunctions.has(name)
-							? { opaque: true }
-							: null;
+				let input: Input | undefined;
+				if (alias && 'factory' in alias) {
+					input = alias;
+				} else if (ts.isCallExpression(call)) {
+					let target = skipWrappers(call.expression);
+					while (ts.isExpressionWithTypeArguments(target)) target = skipWrappers(target.expression);
+					if (!ts.isIdentifier(target)) continue;
+					const callee = locals.get(target.text);
+					// Type wrappers preserve an opaque origin without adding a direct factory proof.
+					if (
+						call === d.initializer &&
+						target === call.expression &&
+						callee &&
+						'reexport' in callee
+					)
+						input = { factory: callee.reexport };
+					else if (localFunctions.has(target.text)) input = { opaque: true };
+				}
 				if (!input) continue;
 				locals.set(d.name.text, input);
 				if (s.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword))

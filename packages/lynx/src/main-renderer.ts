@@ -1561,6 +1561,11 @@ export function useLazyRef<T>(factory: () => T, _slot?: unknown): { current: T }
 	return { current: factory() };
 }
 
+export function useInitialValue<T>(initial: T | (() => T), _slot?: unknown): NoInfer<T> {
+	currentOwner();
+	return typeof initial === 'function' ? (initial as () => T)() : initial;
+}
+
 export function useId(_slot?: unknown): string {
 	const attempt = currentAttempt();
 	const index = attempt.nextUniversalId++;

@@ -206,7 +206,10 @@ function scriptKind(filename: string) {
 }
 
 function nativeReactCompat(module: string, name: string) {
-	return name === 'ReactCompat' && (module === 'octane/react' || module === 'octane/react/server');
+	return (
+		(name === 'ReactCompat' || name === 'ReactCompatInline') &&
+		(module === 'octane/react' || module === 'octane/react/server')
+	);
 }
 
 function skipParens(node: ts.Expression): ts.Expression {
@@ -1233,7 +1236,13 @@ class ModuleTransform {
 			return attr.name.text === 'aria-hidden' && literalJsxAttribute(attr);
 		});
 		if (!supported) return false;
-		return this.nativeSvgOutput(tag, uses, unproven);
+		this.svgRead ??= svgLocalReads(
+			this.checker,
+			uses,
+			(node) => this.typeOf(node),
+			(type) => ts.isTypeReferenceNode(type) && this.reactTypeName(type.typeName) === 'ReactNode',
+		);
+		return this.nativeOutput(this.svgRead(tag) ?? tag, uses, unproven);
 	}
 
 	/** In a candidate module, locally constructed elements can leave only as this component's output. */
@@ -1525,10 +1534,10 @@ class ModuleTransform {
 	private svgRead?: ReturnType<typeof svgLocalReads>;
 	private nativeSvgProps?: ReturnType<typeof forwardedProps>;
 	private provenSvgOwners?: Set<ts.Node>;
-	private nativeSvgOutput(
-		element: ts.JsxSelfClosingElement,
+	private nativeOutput(
+		value: ts.Node,
 		uses: ReturnType<typeof localUses>,
-		unproven: (tag: ts.Identifier, prop: string) => void,
+		unproven?: (tag: ts.Identifier, prop: string) => void,
 	): boolean {
 		const typeOf = (node: ts.Node) => this.typeOf(node);
 		const destination = {
@@ -1539,16 +1548,10 @@ class ModuleTransform {
 		this.nativeSvgProps ??= forwardedProps(this.sf, this.checker, destination, uses);
 		const slot = (tag: ts.Identifier, prop: string) => {
 			const known = this.nativeSvgProps!(this.checker.getSymbolAtLocation(tag), prop);
-			if (!known) unproven(tag, prop);
+			if (!known) unproven?.(tag, prop);
 			return known;
 		};
-		this.svgRead ??= svgLocalReads(
-			this.checker,
-			uses,
-			typeOf,
-			(type) => ts.isTypeReferenceNode(type) && this.reactTypeName(type.typeName) === 'ReactNode',
-		);
-		const first = nativeOutputOwner(this.svgRead(element) ?? element, slot, destination);
+		const first = nativeOutputOwner(value, slot, destination);
 		if (!first) return false;
 		const pending = [first];
 		const proven = (this.provenSvgOwners ??= new Set());
@@ -2598,7 +2601,10 @@ class ModuleTransform {
 						/^use[A-Z0-9]/.test(name)
 					) {
 						const call = this.localUses(item.name).find((ref) =>
-							nativeSetupHook(ref, this.localUses, 'diagnostic'),
+							nativeSetupHook(ref, this.localUses, {
+								calleeName: (callee) => this.calleeName(callee),
+								nativeOutput: (element) => this.nativeOutput(element, this.localUses),
+							}),
 						);
 						const hook = call && this.options.localReactHook(module, name);
 						if (hook)
@@ -3096,7 +3102,7 @@ class ModuleTransform {
 			tag.tagName === node;
 		if (isTag && this.hasReactBridge && this.reactCompatTag(tag.tagName)) {
 			// The project compiler recognizes named imports when transporting descriptor children.
-			return this.require(this.importOf(node.expression)!.module, 'ReactCompat', false);
+			return this.require(this.importOf(node.expression)!.module, node.name.text, false);
 		}
 		// So is `const P = C.Provider`; a member of the provider (`C.Provider.x`)
 		// or a write to it stays.
@@ -3428,8 +3434,59 @@ class ModuleTransform {
 	}
 
 	/**
+	 * A render-local function has a fresh identity each time the component runs.
+	 * Tracking that identity refreshes the handle on each render.
+	 */
+	freshHandleDependency(node: ts.CallExpression, name: string) {
+		const [ref, factory] = node.arguments;
+		const statement = node.parent;
+		if (
+			!this.strong ||
+			name !== 'useImperativeHandle' ||
+			node.questionDotToken ||
+			ts.isSpreadElement(ref) ||
+			!ts.isArrowFunction(factory) ||
+			factory.modifiers?.length ||
+			factory.parameters.length ||
+			ts.isBlock(factory.body) ||
+			!ts.isExpressionStatement(statement) ||
+			!ts.isBlock(statement.parent) ||
+			!isFunctionLike(statement.parent.parent)
+		)
+			return;
+		const object = skipParens(factory.body);
+		if (!ts.isObjectLiteralExpression(object) || object.properties.length !== 1) return;
+		const [field] = object.properties;
+		if (!ts.isShorthandPropertyAssignment(field) || field.objectAssignmentInitializer) return;
+		const method = this.declarationOf(field.name);
+		if (
+			!method ||
+			!ts.isFunctionDeclaration(method) ||
+			method.parent !== statement.parent ||
+			!method.body
+		)
+			return;
+		const binding = method.name;
+		if (
+			!binding ||
+			this.localUses(binding).some(
+				(use) =>
+					use !== field.name && !(ts.isCallExpression(use.parent) && use.parent.expression === use),
+			) ||
+			// TypeScript can bind a function and a same-named var to separate symbols.
+			reads(
+				statement.parent.parent,
+				(id) =>
+					id.text === 'eval' || (id !== binding && id.text === binding.text && declaresName(id)),
+			)
+		)
+			return;
+		return `[${field.name.getText(this.sf)}]`;
+	}
+
+	/**
 	 * React runs a hook with an omitted or undefined list on every render.
-	 * Octane spells that schedule with `null`, including in Strong migrations.
+	 * Octane spells that schedule with `null` or a fresh dependency.
 	 */
 	rewriteDependencies(node: ts.CallExpression, name: string) {
 		const depsIndex = DEPENDENCY_HOOKS[name];
@@ -3440,16 +3497,18 @@ class ModuleTransform {
 			this.count(RULE.deps);
 			return (
 				this.span(node, node.getStart(this.sf), deps.getStart(this.sf), PLAIN) +
-				'null' +
+				(this.freshHandleDependency(node, name) ?? 'null') +
 				this.source.slice(deps.end, node.end)
 			);
 		}
 		if (node.arguments.length !== depsIndex) return null;
 		this.count(RULE.deps);
 		const last = node.arguments[node.arguments.length - 1];
+		const deps = this.freshHandleDependency(node, name) ?? 'null';
 		return (
 			this.span(node, node.getStart(this.sf), last.end, PLAIN) +
-			', null' +
+			', ' +
+			deps +
 			this.source.slice(last.end, node.end)
 		);
 	}

@@ -11,6 +11,7 @@ export const HOOK_NAMES = new Set([
 	'useCallback',
 	'useRef',
 	'useLazyRef',
+	'useInitialValue',
 	'useId',
 	'useEffectEvent',
 	'useImperativeHandle',
@@ -31,7 +32,7 @@ export const REF_HOOKS = new Set(['useRef', 'useLazyRef']);
 // Builtins whose first argument is an initial value or initializer. A compiler
 // slot never takes that position: an empty call keeps an explicit `undefined`
 // there.
-export const INITIAL_VALUE_HOOKS = new Set(['useState', 'useRef', 'useLazyRef']);
+export const INITIAL_VALUE_HOOKS = new Set(['useState', 'useRef', 'useLazyRef', 'useInitialValue']);
 
 // Builtins whose trailing slot could land in an authored position when the call
 // spreads its arguments (an initializer, or useLayoutSnapshot's optional

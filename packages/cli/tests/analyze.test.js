@@ -898,29 +898,26 @@ describe('octane analyze Strong migration', () => {
 		const file = path.join(root, 'src/Cart.tsx');
 
 		const dry = await run(root, ['--strong-preview', '--fix', '--dry-run']);
-		expect(dry.json().fixed).toEqual({ findings: 1, files: ['src/Cart.tsx'] });
+		expect(dry.json().fixed).toEqual({ findings: 2, files: ['src/Cart.tsx'] });
 		expect(readFileSync(file, 'utf8')).toBe(CART);
 
 		const result = await run(root, ['--strong-preview', '--fix']);
-		expect(result.json().fixed).toEqual({ findings: 1, files: ['src/Cart.tsx'] });
+		expect(result.json().fixed).toEqual({ findings: 2, files: ['src/Cart.tsx'] });
 		expect(readFileSync(file, 'utf8')).toBe(
-			"import { useCallback, useMemo, useState, useLazyRef } from 'octane';\n" +
+			"import { useCallback, useMemo, useInitialValue, useLazyRef } from 'octane';\n" +
 				'class Store { add() {} }\n' +
 				'export function Cart({ items }: { items: number[] }) {\n' +
 				'  const store = useLazyRef(() => new Store());\n' +
 				'  const total = useMemo(() => items.reduce((a, b) => a + b, 0), [items]);\n' +
 				'  const add = useCallback(() => store.current?.add(), []);\n' +
-				'  const [open] = useState(false);\n' +
+				'  const open = useInitialValue(false);\n' +
 				'  return <button onClick={add}>{String(total) + String(open)}</button>;\n' +
 				'}\n',
 		);
-		expect(result.json().findings).toEqual(
-			expect.arrayContaining([
-				expect.objectContaining({ code: 'OCTANE_STRONG_TSX_MODULE', preview: true }),
-				expect.objectContaining({ code: 'OCTANE_STRONG_READ_ONLY_STATE', preview: true }),
-			]),
-		);
-		expect(result.json().strongPreview.findings).toBe(2);
+		expect(result.json().findings).toEqual([
+			expect.objectContaining({ code: 'OCTANE_STRONG_TSX_MODULE', preview: true }),
+		]);
+		expect(result.json().strongPreview.findings).toBe(1);
 	});
 
 	it('falls back to the first error with an older compiler that cannot collect', async () => {
