@@ -649,6 +649,43 @@ export function Host({rows}: { rows: Row[] }) {
 		expect(files.find((file) => file.file === 'Row3.tsx').code).toContain('/* keep */');
 	});
 
+	it('preserves promise and iterator results from JSX map callbacks', async () => {
+		const root = project({
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			'AsyncRows.tsx': `import { Suspense } from 'react';
+export function App() {
+	return <main><Suspense fallback={<b>waiting</b>}>
+		<ul>{['a', 'b'].map(async label => <li key={label}>{label}</li>)}</ul>
+	</Suspense></main>;
+}`,
+			'GeneratorRows.tsx': `export function App() {
+	return <main><ul>{['a', 'b'].map(function* (label) {
+		return <li key={label}>{label}</li>;
+	})}</ul></main>;
+}`,
+		});
+		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+		const { files } = await runCodemod([root], { root, strong: true, verify: true, write: false });
+		for (const [name, expected] of [
+			['AsyncRows', 'waiting'],
+			['GeneratorRows', ''],
+		]) {
+			const file = files.find((entry) => entry.file === name + '.tsx');
+			const { App } = loadCompiledFixtureSource(file.code, { id: file.output, mode: 'server' });
+			const { html } = renderToStaticMarkup(App);
+			const document = new JSDOM(html).window.document;
+			expect(document.querySelector('main').textContent).toBe(expected);
+			expect(document.querySelector('li')).toBeNull();
+			expect(file.notes).toContainEqual(
+				expect.objectContaining({
+					rule: 'template-for',
+					severity: 'error',
+					message: expect.stringContaining('promise or iterator'),
+				}),
+			);
+		}
+	});
+
 	it('keeps custom and sparse map calls in compatibility mode', async () => {
 		const root = project({
 			'package.json': '{"type":"module"}',
