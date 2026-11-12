@@ -2785,8 +2785,8 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 				.filter((file) => file.strong === false)
 				.flatMap((file) => file.diagnostics.map((d) => d.code)),
 		);
-		// The comments contain raw HTML, and the story lists take arrays from data.
-		expect([...blockers].sort()).toEqual(['OCTANE_STRONG_MAP_JSX', 'OCTANE_STRONG_UNTRUSTED_HTML']);
+		// The fresh story arrays can use keyed @for. Only raw HTML needs review.
+		expect([...blockers]).toEqual(['OCTANE_STRONG_UNTRUSTED_HTML']);
 		expect(
 			strong.files
 				.filter((file) => file.strong === true)
@@ -2797,6 +2797,7 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 			'NotFound.tsrx',
 			'Pending.tsrx',
 			'RootLayout.tsrx',
+			'StoriesPage.tsrx',
 			'StoryRow.tsrx',
 			'entry-client.tsrx',
 			'entry-server.tsrx',
