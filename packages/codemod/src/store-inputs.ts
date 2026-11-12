@@ -144,22 +144,28 @@ export function storeSources(
 		modules.set(file, exported);
 		return exported;
 	}
-	function localFile(from: string, specifier: string) {
-		const file = ts.resolveModuleName(specifier, from, options, ts.sys, cache).resolvedModule
+	function typedFile(from: string, specifier: string) {
+		return ts.resolveModuleName(specifier, from, options, ts.sys, cache).resolvedModule
 			?.resolvedFileName;
-		if (
-			!file ||
-			!file.startsWith(root + path.sep) ||
-			!/(?<!\.d)\.ts$/.test(file) ||
-			file.includes(path.sep + 'node_modules' + path.sep)
-		)
-			return null;
+	}
+	function inProject(file: string, directory: string) {
+		return (
+			file.startsWith(directory + path.sep) && !file.includes(path.sep + 'node_modules' + path.sep)
+		);
+	}
+	function runtimeFile(from: string, specifier: string) {
+		try {
+			return createRequire(from).resolve(specifier);
+		} catch {
+			// A tsconfig alias or an authored TS file need not resolve through Node.
+			return undefined;
+		}
+	}
+	function localFile(from: string, specifier: string) {
+		const file = typedFile(from, specifier);
+		if (!file || !/(?<!\.d)\.ts$/.test(file) || !inProject(file, root)) return null;
 		const physical = fs.realpathSync(file);
-		if (
-			!physical.startsWith(project + path.sep) ||
-			physical.includes(path.sep + 'node_modules' + path.sep)
-		)
-			return null;
+		if (!inProject(physical, project)) return null;
 		// A JS sibling or directory can implement a different export even for a tsconfig alias.
 		if (!specifier.endsWith('.ts')) {
 			const stem = file.slice(0, -3);
@@ -170,15 +176,38 @@ export function storeSources(
 			)
 				return null;
 		}
-		let runtime: string | undefined;
-		try {
-			runtime = createRequire(from).resolve(specifier);
-		} catch {
-			// A tsconfig alias or an authored TS file need not resolve through Node.
-		}
+		const runtime = runtimeFile(from, specifier);
 		if (runtime && (!path.isAbsolute(runtime) || fs.realpathSync(runtime) !== physical))
 			return null;
 		return file;
+	}
+
+	// Renderer evidence can come from any plausible executable source. It never proves factory identity.
+	function executableFiles(from: string, specifier: string) {
+		const typed = typedFile(from, specifier);
+		const candidates = new Set<string>();
+		if (typed && inProject(typed, root)) {
+			candidates.add(typed);
+			// Bundlers can select a JS or JSX sibling where TypeScript picks authored types.
+			if (!/\.(?:[cm]?ts|tsx)$/.test(specifier)) {
+				const stem = typed.replace(/(?:\.d)?\.(?:[cm]?[jt]s|[jt]sx)$/, '');
+				if (stem !== typed)
+					for (const extension of ['.ts', '.tsx', '.js', '.jsx', '.mts', '.mjs', '.cts', '.cjs'])
+						candidates.add(stem + extension);
+			}
+		}
+		if (candidates.size || specifier.startsWith('.')) {
+			const runtime = runtimeFile(from, specifier);
+			if (runtime) candidates.add(runtime);
+		}
+		return [...candidates].filter(
+			(file) =>
+				/\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) &&
+				!/\.d\.[cm]?ts$/.test(file) &&
+				inProject(file, root) &&
+				fs.statSync(file, { throwIfNoEntry: false })?.isFile() &&
+				inProject(fs.realpathSync(file), project),
+		);
 	}
 
 	const reactDOMFiles = new Map<string, boolean>();
@@ -214,8 +243,7 @@ export function storeSources(
 					reactDOMFiles.set(file, true);
 					return true;
 				}
-				const local = localFile(current, specifier);
-				if (local) pending.push(local);
+				pending.push(...executableFiles(current, specifier));
 			}
 		}
 		for (const current of seen) reactDOMFiles.set(current, false);

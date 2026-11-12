@@ -865,6 +865,9 @@ it('defers store factory inputs linked to React work during a read', async () =>
 		calleeAlias: './handles',
 		snapshot: './snapshot-key',
 		nested: './barrel',
+		viaTsx: './tsx-handle',
+		viaJs: './js-handle',
+		viaSibling: './sibling-handle',
 		plain: './handles',
 		pure: './pure',
 	};
@@ -909,17 +912,37 @@ it('defers store factory inputs linked to React work during a read', async () =>
 		'app/src/barrel.ts': "export {dependent as nested} from './dependent';",
 		'app/src/snapshot-key.ts':
 			"import {direct} from './handles'; export const snapshot = direct as string;",
+		'app/src/resource.tsx': `import {preload} from 'react-dom';
+			export function readTsx() {preload('/tsx-preview.png', {as: 'image'}); return 'ready';}`,
+		'app/src/script-resource.js': `import {preload} from 'react-dom';
+			export function readJs() {preload('/js-preview.png', {as: 'image'}); return 'ready';}`,
+		'app/src/choice.ts': "export const readChoice = () => 'ready';",
+		'app/src/choice.js': `import {preload} from 'react-dom';
+			export function readChoice() {preload('/choice-preview.png', {as: 'image'}); return 'ready';}`,
+		'app/src/tsx-handle.ts':
+			"import {select} from 'observer/core'; import {readTsx} from './resource'; export const viaTsx = select(readTsx);",
+		'app/src/js-handle.ts':
+			"import {select} from 'observer/core'; import {readJs} from './script-resource.js'; export const viaJs = select(readJs);",
+		'app/src/sibling-handle.ts':
+			"import {select} from 'observer/core'; import {readChoice} from './choice.js'; export const viaSibling = select(readChoice);",
+		'app/src/pure-format.tsx': 'export function format(value: string) {return value;}',
 		'app/src/pure.ts': `import {select} from 'observer/core';
 			import type {preload} from 'react-dom';
+			import {format} from './pure-format';
 			const value: Parameters<typeof preload>[0] = 'ready';
-			export const pure = select(() => String(value));`,
+			export const pure = select(() => format(value));`,
 		'app/src/root.tsx': `import {current} from '../../observer/renderer';
 			import {read} from 'observer/core';
 			import {Pane as Direct} from './direct';
 			import {Pane as Wrapped} from './wrapped';
 			import {Pane as Mutated} from './mutated';
+			import {Pane as ViaTsx} from './viaTsx';
+			import {Pane as ViaJs} from './viaJs';
+			import {Pane as ViaSibling} from './viaSibling';
 			export function Root() {
-				return <current.Provider value={{get: read}}><Direct/><Wrapped/><Mutated/></current.Provider>;
+				return <current.Provider value={{get: read}}>
+					<Direct/><Wrapped/><Mutated/><ViaTsx/><ViaJs/><ViaSibling/>
+				</current.Provider>;
 			}`,
 		...Object.fromEntries(
 			Object.entries(panes).map(([name, source]) => [
@@ -932,9 +955,11 @@ it('defers store factory inputs linked to React work during a read', async () =>
 	const reference = await bundleRuntime(app, 'server', "export {Root} from './src/root';");
 	const { renderToStaticMarkup } = await import('react-dom/server');
 	const { createElement } = await import('react');
-	expect(renderToStaticMarkup(createElement(reference.Root))).toBe(
-		'<link rel="preload" href="/preview.png" as="image"/><b>ready</b><b>ready</b><b>ready</b>',
-	);
+	const html = renderToStaticMarkup(createElement(reference.Root));
+	for (const resource of ['preview', 'tsx-preview', 'js-preview', 'choice-preview']) {
+		expect(html).toContain('<link rel="preload" href="/' + resource + '.png" as="image"/>');
+	}
+	expect(html.match(/<b>ready<\/b>/g)).toHaveLength(6);
 
 	const names = Object.keys(panes).map((name) => 'src/' + name + '.tsx');
 	const { files } = await runCodemod(
