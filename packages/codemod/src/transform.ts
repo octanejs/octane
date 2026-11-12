@@ -75,6 +75,7 @@ const PLAIN = { template: false };
 const DESCRIPTOR = { template: false, descriptor: true };
 /** The local component that wraps an element no island can host and throws its `error`. */
 const NO_PORT = 'NoOctanePort';
+const INTL_FORMATTER = /^Formatted[A-Z]/;
 const syntheticEventMembers = {
 	nativeEvent: 'unknown',
 	persist: '() => void',
@@ -1404,12 +1405,19 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				reason = `<${text}> needs ReactCompatInline to stay inside this paragraph. Install an Octane release that exports it or keep the paragraph in React.`;
 			if (reason === null) {
 				port.islands++;
-				if (binding.module === 'react-intl' && name === 'FormattedMessage')
+				const importedName = ts.isPropertyAccessExpression(member)
+					? member.name.text
+					: binding.imported;
+				if (
+					binding.module === 'react-intl' &&
+					(name === 'FormattedMessage' ||
+						(this.options.reactIntlAdapter && INTL_FORMATTER.test(importedName)))
+				)
 					this.note(
 						RULE.bindings,
 						'error',
 						element,
-						'A React Intl formatter can depend on ancestor contexts or schedule React DOM resources outside this generated island. Verify the provider and its formatters, or keep this message under its original React ancestors.',
+						'A React Intl formatter can depend on ancestor contexts or schedule React DOM resources outside this generated island. Verify the provider and its formatters, or keep the formatter under its original React ancestors.',
 					);
 				this.islands.set(element, paragraph ? 'ReactCompatInline' : 'ReactCompat');
 			} else {
@@ -2918,7 +2926,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			if (
 				this.options.reactIntlAdapter &&
 				imported?.module === 'react-intl' &&
-				/^Formatted[A-Z]/.test(name ?? '')
+				INTL_FORMATTER.test(name ?? '')
 			) {
 				const boundary = this.require(this.options.reactIntlAdapter, 'IntlBoundary', false);
 				const contexts = this.require(this.options.reactIntlAdapter, 'intlContexts', false);

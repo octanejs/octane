@@ -3328,9 +3328,14 @@ export function Greeting({ count }: { count: number }) {
 			const rich = `import {FormattedMessage as Message} from 'react-intl'; export function Rich(){
 				return <div><Message id="more" defaultMessage="Read <em>more</em>" values={{em: part => <em>{part}</em>}}/></div>;
 			}`;
+			const list = `import {FormattedList as List} from 'react-intl';
+				export function Items(){ return <section><List value={['a', 'b']} /></section>; }`;
+			const islands = ['Rich.tsx', 'List.tsx'];
+			const names = ['Direct.tsx', 'Closed.tsx', ...islands];
 			const root = setup({
 				'Direct.tsx': direct,
 				'Rich.tsx': rich,
+				'List.tsx': list,
 				'Closed.tsx': `import './setup'; import {IntlProvider} from 'react-intl';
 					${direct.replace('export function Text', 'function Text')}
 					export function Page(){return <IntlProvider locale="en"><Text/></IntlProvider>;}`,
@@ -3338,17 +3343,51 @@ export function Greeting({ count }: { count: number }) {
 					IntlProvider.defaultProps = {...IntlProvider.defaultProps, messages: {label:'patched'}};`,
 			});
 			const result = await runCodemod(
-				['Direct.tsx', 'Rich.tsx', 'Closed.tsx'].map((name) => path.join(root, name)),
+				names.map((name) => path.join(root, name)),
 				{ root, write: false, strong: true, projectTypes },
 			);
-			for (const name of ['Direct.tsx', 'Rich.tsx', 'Closed.tsx']) {
+			for (const name of names) {
 				const file = result.files.find((f) => f.file === name);
-				const isRich = file.file === 'Rich.tsx';
 				expect(file.notes.filter((d) => d.message.includes('React Intl formatter'))).toEqual([
 					opaqueFormatter,
 				]);
-				expect(file.code).toContain(isRich ? 'IntlBoundary' : 'intl.formatMessage(');
+				expect(file.code).toContain(
+					islands.includes(name) ? 'IntlBoundary' : 'intl.formatMessage(',
+				);
 			}
+		},
+	);
+	it.each([false, true])(
+		'keeps formatter ownership checks on the original React Intl package (nested: %s)',
+		async (nested) => {
+			const dir = nested ? 'src/' : '';
+			const options = {
+				baseUrl: '.',
+				paths: { 'react-intl': ['./custom.ts'] },
+				jsx: 'react-jsx',
+				moduleResolution: 'bundler',
+			};
+			const root = setup({
+				...(nested && { 'tsconfig.json': '{}' }),
+				[dir + 'tsconfig.json']: JSON.stringify({
+					...(nested && { extends: '../tsconfig.json' }),
+					compilerOptions: options,
+				}),
+				[dir + 'custom.ts']: 'export function FormattedList() { return "custom"; }',
+				[dir + 'View.tsx']: `import { FormattedList } from 'react-intl';
+export function View() { return <section><FormattedList /></section>; }`,
+			});
+			const [file] = (
+				await runCodemod([path.join(root, dir, 'View.tsx')], {
+					root,
+					write: false,
+					strong: true,
+					projectTypes: true,
+				})
+			).files;
+			expect(file.code).toContain('ReactCompat');
+			expect(file.code).not.toContain('IntlBoundary');
+			expect(file.notes.filter((d) => d.message.includes('React Intl formatter'))).toEqual([]);
 		},
 	);
 	it('migrates a locale binding only below its own React Intl provider', async () => {
