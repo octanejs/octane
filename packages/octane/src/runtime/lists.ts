@@ -961,12 +961,14 @@ function updateSurvivor<T>(
 			// Lite survivors bypass renderBlock — pass the tuple directly as the
 			// body's third arg (the same slot renderBlock forwards block.extra to).
 			renderLiteListItem(block, itemBody as ComponentBody, env);
-		} else {
+		} else if (ROOT_ROLLBACK) {
 			try {
 				renderBlock(block);
 			} catch (error) {
 				if (!deferRowSuspension(error)) throw error;
 			}
+		} else {
+			renderBlock(block);
 		}
 	}
 }
@@ -982,13 +984,54 @@ function updateSurvivor<T>(
 const SUSPENDED_ROWS: TrackedThenable<unknown>[] = [];
 let ROWS_FROM = -1;
 
+// The list whose reconcileKeyed call collectRows is making.
+let ROWS_ENTRY: ForSlot | null = null;
+
 /** Open a list's collection; returns the enclosing list's, for closeRows. */
 function openRows(): number {
 	const outer = ROWS_FROM;
 	// Hydration adopts server rows in order, so a row it cannot finish stays where
 	// the cursor stopped.
-	ROWS_FROM = ROOT_ROLLBACK ? (hydrating ? -1 : SUSPENDED_ROWS.length) : -1;
+	ROWS_FROM = hydrating ? -1 : SUSPENDED_ROWS.length;
 	return outer;
+}
+
+/** reconcileKeyed, collecting its rows' suspensions. */
+function collectRows<T>(
+	parentBlock: Block,
+	state: ForSlot,
+	items: ArrayLike<T>,
+	keySource: ListKeySource<T>,
+	itemBody: (item: T, scope: Scope) => void,
+	pure: boolean,
+	singleRoot: boolean | 2,
+	lite: boolean,
+	indexIndependent: boolean,
+	ssrMarkerless: boolean | 2,
+	normalizeKey: boolean,
+): void {
+	const outer = openRows();
+	const from = ROWS_FROM;
+	ROWS_ENTRY = state;
+	try {
+		reconcileKeyed(
+			parentBlock,
+			state,
+			items,
+			keySource,
+			itemBody,
+			pure,
+			singleRoot,
+			lite,
+			indexIndependent,
+			ssrMarkerless,
+			normalizeKey,
+		);
+	} catch (error) {
+		throw closeRows(outer, from, error);
+	}
+	const suspended = closeRows(outer, from, null);
+	if (suspended !== null) throw suspended;
 }
 
 function deferRowSuspension(error: unknown): boolean {
@@ -1005,8 +1048,7 @@ function deferRowSuspension(error: unknown): boolean {
  */
 function closeRows(outer: number, from: number, error: unknown): unknown {
 	ROWS_FROM = outer;
-	// A bundle that cannot suspend folds the rest away (rollback-flag.ts).
-	if (!ROOT_ROLLBACK || from < 0 || SUSPENDED_ROWS.length === from) return error;
+	if (from < 0 || SUSPENDED_ROWS.length === from) return error;
 	const members = SUSPENDED_ROWS.splice(from);
 	if (isSuspenseException(error)) members.push(error.thenable);
 	return suspensionOnAll(members);
@@ -1107,8 +1149,9 @@ export function mountItemsLinear<T>(
 	let run: DocumentFragment | null = null;
 	let wraps: any[] | null = null;
 	let prev: Block | null = null;
-	const outer = openRows();
-	const from = ROWS_FROM;
+	// A bundle that cannot suspend never collects (rollback-flag.ts).
+	const outer = ROOT_ROLLBACK ? openRows() : -1;
+	const from = ROOT_ROLLBACK ? ROWS_FROM : -1;
 	try {
 		for (let i = 0; i < newLen; i++) {
 			const item = items[i];
@@ -1157,7 +1200,7 @@ export function mountItemsLinear<T>(
 			} catch (error) {
 				// mountItem discarded the row. The fill cannot complete, and its catch
 				// below discards the rows after it too.
-				if (deferRowSuspension(error)) continue;
+				if (ROOT_ROLLBACK && deferRowSuspension(error)) continue;
 				throw error;
 			}
 			if (adoptNode !== null && block.startMarker !== adoptNode)
@@ -1169,12 +1212,14 @@ export function mountItemsLinear<T>(
 			else state.head = block;
 			prev = block;
 		}
-		const suspended = closeRows(outer, from, null);
-		if (suspended !== null) throw suspended;
+		if (ROOT_ROLLBACK) {
+			const suspended = closeRows(outer, from, null);
+			if (suspended !== null) throw suspended;
+		}
 		state.tail = prev;
 		state.size = newLen;
 	} catch (thrown) {
-		const error = closeRows(outer, from, thrown);
+		const error = ROOT_ROLLBACK ? closeRows(outer, from, thrown) : thrown;
 		// Adopted nodes still belong to the committed raw host tree and the cleanup
 		// below deliberately leaves them connected. Keep the full queue so the root
 		// rollback/retry can adopt the same prefix instead of mounting duplicates.
@@ -1343,42 +1388,26 @@ export function reconcileKeyed<T>(
 	ssrMarkerless: boolean | 2 = false,
 	normalizeKey: boolean = false,
 ): void {
-	const outer = openRows();
-	const from = ROWS_FROM;
-	try {
-		reconcileRows(
-			parentBlock,
-			state,
-			items,
-			keySource,
-			itemBody,
-			pure,
-			singleRoot,
-			lite,
-			indexIndependent,
-			ssrMarkerless,
-			normalizeKey,
-		);
-	} catch (error) {
-		throw closeRows(outer, from, error);
+	if (ROOT_ROLLBACK) {
+		// Enter through collectRows, which calls back in to reconcile.
+		if (ROWS_ENTRY !== state) {
+			collectRows(
+				parentBlock,
+				state,
+				items,
+				keySource,
+				itemBody,
+				pure,
+				singleRoot,
+				lite,
+				indexIndependent,
+				ssrMarkerless,
+				normalizeKey,
+			);
+			return;
+		}
+		ROWS_ENTRY = null;
 	}
-	const suspended = closeRows(outer, from, null);
-	if (suspended !== null) throw suspended;
-}
-
-function reconcileRows<T>(
-	parentBlock: Block,
-	state: ForSlot,
-	items: ArrayLike<T>,
-	keySource: ListKeySource<T>,
-	itemBody: (item: T, scope: Scope) => void,
-	pure: boolean,
-	singleRoot: boolean | 2,
-	lite: boolean,
-	indexIndependent: boolean,
-	ssrMarkerless: boolean | 2,
-	normalizeKey: boolean,
-): void {
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileCount(ProfileCounter.LIST_RECONCILE);
 	const oldItems = state.items;
