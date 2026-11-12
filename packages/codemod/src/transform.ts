@@ -10,7 +10,13 @@ import {
 import { reactRenderer, staticReactProps } from './react-renderer.js';
 import { linkedRenderState } from './linked-state.js';
 import { nativeSetupHook } from './local-react-hook.js';
-import { componentTagOrExport, localUses, scalar, walkLocalValues } from './local-uses.js';
+import {
+	componentTagOrExport,
+	inTypeNode,
+	localUses,
+	scalar,
+	walkLocalValues,
+} from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
 import {
@@ -479,17 +485,6 @@ const DOCUMENT_TAGS: Record<string, string> = {
 	head: 'Head',
 	body: 'Body',
 };
-
-/**
- * Whether an identifier is read in a type, where an import needs no value.
- * A `typeof X` query is a type, which `import type` serves; `extends Base`
- * reads a value, so heritage counts as one.
- */
-function inTypeNode(node: ts.Identifier) {
-	let parent = node.parent;
-	while (ts.isQualifiedName(parent)) parent = parent.parent;
-	return ts.isTypeNode(parent) && !ts.isExpressionWithTypeArguments(parent);
-}
 
 function isNullish(node: ts.Node) {
 	return (
