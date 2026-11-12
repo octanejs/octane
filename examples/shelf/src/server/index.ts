@@ -8,6 +8,7 @@
 import type { Middleware } from '@octanejs/app-core';
 import { createServerFunctions } from '@octanejs/app-core/server-functions';
 import { createDataStore, serverTransport } from 'octane/data';
+import { shelfChanges } from '../shared/contracts.ts';
 import * as dataModule from '../shared/data.tsrx';
 import { handler } from '../shared/server.ts';
 import { ACCOUNT_COOKIE, namespaceFrom, serverSession } from '../shared/session.ts';
@@ -49,6 +50,8 @@ export function createShelfServer() {
 			const store = createDataStore({
 				transport: serverTransport(dataModule.data),
 				form: forms.form,
+				// The page's seed carries the feed's position, so a change before the browser listens still arrives.
+				feeds: [shelfChanges],
 			});
 			let html: string;
 			let seed: string;
