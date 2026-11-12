@@ -25,6 +25,7 @@ import { bind, projectTypeAt, textKind, transformModule } from './transform.js';
 import { forwardedProps } from './forwarded-props.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
+const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|17\.(?:0|[1-9]\d*))$/;
 /** React packages and the Octane package that replaces each. */
 const CATALOG = { ...DATA.reactPackages, ...PORTED_PACKAGES };
 /** A package that, by its name, renders through React. */
@@ -257,7 +258,7 @@ export async function runCodemod(
 				!!lib &&
 				lib.manifest.name === 'react-intl' &&
 				/^7\./.test(lib.version) &&
-				/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(octane) &&
+				ADAPTER_OCTANE_VERSION.test(octane) &&
 				['react', 'react-dom'].every((name) =>
 					/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(base, name)?.version ?? ''),
 				) &&
@@ -316,7 +317,7 @@ export async function runCodemod(
 		target === 'tsrx' &&
 		compiler &&
 		reactCompat &&
-		/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(readInstalled(helperDir, 'octane')?.version ?? '')
+		ADAPTER_OCTANE_VERSION.test(readInstalled(helperDir, 'octane')?.version ?? '')
 			? createScopedStorePlanner(helperDir, storeBridge, config ?? undefined)
 			: null;
 	const { inputFactory, helperFunction } = storeSources(root, config, (file, source) => {
