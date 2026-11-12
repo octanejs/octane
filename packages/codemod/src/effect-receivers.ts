@@ -1,5 +1,6 @@
 import ts from 'typescript';
-import { inTypeNode, localSymbol } from './local-uses.js';
+import { skipWrappers } from './expression-wrappers.js';
+import { inTypeNode, localSymbol, localUses } from './local-uses.js';
 
 function visit(node: ts.Node, read: (node: ts.Node) => void) {
 	read(node);
@@ -73,6 +74,119 @@ export function initializedBefore(checker: ts.TypeChecker, name: ts.Identifier, 
 		ts.isBlock(statement.parent) &&
 		statement.end <= call.getStart() &&
 		!!ts.findAncestor(call, (n) => n === statement.parent)
+	);
+}
+
+const propScopes = new WeakMap<ts.SourceFile, ReturnType<typeof propScope>>();
+
+function propScope(file: ts.SourceFile, checker: ts.TypeChecker) {
+	const uses = localUses(file, checker);
+	const imported = new Set<ts.Declaration>();
+	let opaque = false;
+	const target = (symbol: ts.Symbol | undefined) =>
+		symbol && symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+	// An authored declaration can describe a different runtime export.
+	const localDeclaration = (symbol: ts.Symbol | undefined) =>
+		symbol?.declarations?.some((declaration) => {
+			const source = declaration.getSourceFile();
+			return source.isDeclarationFile && !/[/\\]node_modules[/\\]/.test(source.fileName);
+		});
+	function mark(symbol: ts.Symbol | undefined) {
+		const resolved = target(symbol);
+		if (resolved && (resolved.flags & ts.SymbolFlags.ValueModule || localDeclaration(resolved)))
+			opaque = true;
+		const decl = resolved?.valueDeclaration;
+		const source = decl?.getSourceFile();
+		if (decl && source === file) imported.add(decl);
+		else if (
+			source?.text === file.text &&
+			ts.sys.realpath?.(source.fileName) === ts.sys.realpath?.(file.fileName)
+		) {
+			// Relative symlinks can give one runtime module two checker source files.
+			opaque = true;
+		}
+	}
+	function markModule(symbol: ts.Symbol | undefined) {
+		const module = target(symbol);
+		if (module && module.flags & ts.SymbolFlags.Module && !localDeclaration(module))
+			for (const entry of checker.getExportsOfModule(module)) mark(entry);
+		else opaque = true;
+	}
+	visit(file, (node) => {
+		if (ts.isImportClause(node) && !node.isTypeOnly) {
+			if (node.name) mark(checker.getSymbolAtLocation(node.name));
+			const bindings = node.namedBindings;
+			if (
+				(node.name ||
+					(bindings &&
+						(ts.isNamespaceImport(bindings) ||
+							bindings.elements.some((item) => !item.isTypeOnly)))) &&
+				localDeclaration(checker.getSymbolAtLocation(node.parent.moduleSpecifier))
+			)
+				opaque = true;
+			if (bindings && ts.isNamespaceImport(bindings))
+				markModule(checker.getSymbolAtLocation(bindings.name));
+			else if (bindings)
+				for (const item of bindings.elements)
+					if (!item.isTypeOnly) mark(checker.getSymbolAtLocation(item.name));
+		} else if (ts.isCallExpression(node)) {
+			const expression = skipWrappers(node.expression);
+			const args = node.arguments;
+			if (expression.kind === ts.SyntaxKind.ImportKeyword)
+				markModule(
+					args[0] && ts.isStringLiteralLike(args[0])
+						? checker.getSymbolAtLocation(args[0])
+						: undefined,
+				);
+			else if (ts.isIdentifier(expression) && expression.text === 'require') opaque = true;
+		} else if (ts.isImportEqualsDeclaration(node) && !node.isTypeOnly) opaque = true;
+	});
+	return { checker, uses, imported, opaque, fixed: new Map<ts.Symbol, boolean>() };
+}
+
+function plainObjectBinding(name: ts.BindingName): boolean {
+	return (
+		ts.isIdentifier(name) ||
+		(ts.isObjectBindingPattern(name) &&
+			name.elements.every(
+				(element) =>
+					!element.initializer &&
+					!element.dotDotDotToken &&
+					(!element.propertyName || !ts.isComputedPropertyName(element.propertyName)) &&
+					plainObjectBinding(element.name),
+			))
+	);
+}
+
+/** Trust a destructured prop only when this file cannot change or supply it. */
+export function stableExportedProp(symbol: ts.Symbol | undefined, checker: ts.TypeChecker) {
+	const binding = symbol?.valueDeclaration;
+	if (!binding || !ts.isBindingElement(binding) || !ts.isIdentifier(binding.name)) return false;
+	let declaration: ts.Node = binding;
+	while (ts.isBindingElement(declaration)) declaration = declaration.parent.parent;
+	if (
+		!ts.isParameter(declaration) ||
+		declaration.initializer ||
+		!plainObjectBinding(declaration.name)
+	)
+		return false;
+	const owner = declaration.parent;
+	if (
+		!ts.isFunctionDeclaration(owner) ||
+		!owner.name ||
+		!/^[A-Z]/.test(owner.name.text) ||
+		declaration !== owner.parameters[0] ||
+		!(ts.getCombinedModifierFlags(owner) & ts.ModifierFlags.Export)
+	)
+		return false;
+	const file = owner.getSourceFile();
+	let scope = propScopes.get(file);
+	if (scope?.checker !== checker) propScopes.set(file, (scope = propScope(file, checker)));
+	return (
+		!scope.opaque &&
+		!scope.imported.has(owner) &&
+		scope.uses(owner.name).every((ref) => ts.isExportSpecifier(ref.parent) || inTypeNode(ref)) &&
+		fixedBinding(checker, binding.name, binding.name, scope.fixed)
 	);
 }
 
