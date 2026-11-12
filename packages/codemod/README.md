@@ -125,6 +125,11 @@ If a custom build compiles each file in isolation, supply the compiler's
 `isDescriptorChildrenImport` option or pass explicit `children={elements}`.
 With `--strong`, descriptor inspection still requires compatibility mode.
 
+React's automatic JSX runtime evaluates a row's props and children before its
+separate key argument. For a simple row where that order is observable, the
+codemod keeps the map callback and evaluates the children as an explicit prop
+before the key. It reports more complex rows for review.
+
 ## Strong mode
 
 A React layout effect with no dependency list runs after every commit. When its

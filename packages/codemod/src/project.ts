@@ -184,19 +184,19 @@ export async function runCodemod(
 		/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(root, name)?.version ?? ''),
 	);
 	const rootProject = ts.findConfigFile(root, ts.sys.fileExists);
+	function automaticReactJsx(file: string) {
+		// A nested project can compile the same file with another JSX factory.
+		return (
+			config?.jsx === ts.JsxEmit.ReactJSX &&
+			!config.jsxFactory &&
+			!config.jsxFragmentFactory &&
+			(!config.jsxImportSource || config.jsxImportSource === 'react') &&
+			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) === rootProject
+		);
+	}
 	function reactStoreComponent(file: string, specifier: string) {
-		if (!reactCompat || !unportedName(specifier, file)) return false;
+		if (!reactCompat || !unportedName(specifier, file) || !automaticReactJsx(file)) return false;
 		const dir = path.dirname(file);
-		// A nested project and the migration root can both include this file but
-		// compile its JSX with different factories or module resolution.
-		if (
-			config?.jsx !== ts.JsxEmit.ReactJSX ||
-			config.jsxFactory ||
-			config.jsxFragmentFactory ||
-			(config.jsxImportSource && config.jsxImportSource !== 'react') ||
-			ts.findConfigFile(dir, ts.sys.fileExists) !== rootProject
-		)
-			return false;
 		const name = packageName(specifier);
 		const lib = readInstalled(dir, name);
 		if (
@@ -646,6 +646,7 @@ export async function runCodemod(
 		const extra: Note[] = [];
 		const reactStoreComponents = new Map<string, boolean>();
 		let installedClsx: boolean | undefined;
+		let reactJsx: boolean | undefined;
 		const isContext = (specifier: string, name: string) => {
 			if (!specifier.startsWith('.')) return null;
 			const target = resolveModule(file, specifier, known);
@@ -792,6 +793,13 @@ export async function runCodemod(
 						? (module, name, prop, depth) =>
 								forwardedProp(file, module, name, prop, 'render', true, depth)
 						: undefined,
+				get automaticReactJsx() {
+					return (reactJsx ??=
+						!/@jsx(?:ImportSource|Runtime|Frag)?\b/i.test(source) &&
+						automaticReactJsx(file) &&
+						!!originalModule(file, 'react/jsx-runtime') &&
+						installedReact(file));
+				},
 				get installedClsx() {
 					if (installedClsx === undefined) {
 						const target = originalModule(file, 'clsx');

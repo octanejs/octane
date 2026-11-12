@@ -10,6 +10,7 @@ import { JSDOM } from 'jsdom';
 import * as ReactServerBridge from 'octane/react/server';
 import { prerender } from 'octane/static';
 import { createElement as reactElement } from 'react';
+import { renderToStaticMarkup as renderReact } from 'react-dom/server';
 import { compileTypesInspection } from 'octane/compiler/volar';
 import { renderToStaticMarkup } from 'octane/server';
 import ts from 'typescript';
@@ -463,6 +464,89 @@ export const render = (rows: string[]) => renderToStaticMarkup(App, {rows}).html
 			await server.close();
 		}
 	}, 30_000);
+
+	it('evaluates mapped React JSX props and children before the key', async () => {
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'tsconfig.json':
+				'{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler","strict":true}}',
+			'List.tsx': `import { useId } from 'react';
+type Row = { readonly id: string; attr(): string; child(): string };
+function Cell({before, after, children}: { before: string; after: string; children: string }) {
+	return <span id={useId()} data-before={before} data-after={after}>{children}</span>;
+}
+export function List({rows}: { rows: Row[] }) {
+	return <main>{[...rows].map(row => <Cell before={row.attr()} key={row.id} after={row.attr()}>{row.child()}</Cell>)}</main>;
+}
+export function Host({rows}: { rows: Row[] }) {
+	return <main>{rows.map(row => <span data-before={row.attr()} key={row.id} data-after={row.attr()}>{row.child()}</span>)}</main>;
+}`,
+		});
+		fs.symlinkSync(
+			path.join(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const source = path.join(root, 'List.tsx');
+		const [file] = (
+			await runCodemod([source], {
+				root,
+				strong: true,
+				verify: true,
+				projectTypes: true,
+				write: false,
+			})
+		).files;
+		const original = await bundleRuntime(root, 'server', "export { List, Host } from './List.tsx'");
+		const migrated = loadCompiledFixtureSource(file.code, { id: file.output, mode: 'server' });
+		const observe = (render) => {
+			const trace = [];
+			let last = '-';
+			const rows = ['a', 'b'].map((id) => ({
+				get id() {
+					trace.push('key ' + id);
+					return (last = id);
+				},
+				attr() {
+					trace.push('prop ' + last);
+					return last;
+				},
+				child() {
+					trace.push('child ' + last);
+					return last;
+				},
+			}));
+			const dom = new JSDOM(render(rows));
+			return {
+				trace,
+				spans: [...dom.window.document.querySelectorAll('span')].map((span) => [
+					span.dataset.before,
+					span.dataset.after,
+					span.textContent,
+				]),
+			};
+		};
+		for (const name of ['List', 'Host']) {
+			const react = observe((rows) => renderReact(reactElement(original[name], { rows })));
+			expect(react.spans).toEqual([
+				['-', '-', '-'],
+				['a', 'a', 'a'],
+			]);
+			expect(observe((rows) => renderToStaticMarkup(migrated[name], { rows }).html)).toEqual(react);
+		}
+		expect(file.strong).toBe(false);
+
+		for (const config of ['"jsx":"react"', '"jsx":"react-jsx","jsxImportSource":"other"']) {
+			fs.writeFileSync(path.join(root, 'tsconfig.json'), '{"compilerOptions":{' + config + '}}');
+			const [unknown] = (
+				await runCodemod([source], { root, strong: true, verify: true, write: false })
+			).files;
+			expect(unknown.strong).toBe(false);
+			expect(unknown.notes).toContainEqual(
+				expect.objectContaining({ rule: 'template-for', severity: 'error' }),
+			);
+		}
+	});
 
 	it('keeps custom and sparse map calls in compatibility mode', async () => {
 		const root = project({
@@ -2673,9 +2757,8 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 				.filter((file) => file.strong === false)
 				.flatMap((file) => file.diagnostics.map((d) => d.code)),
 		);
-		// Only raw HTML, which needs a person to vouch for it with trustHTML(),
-		// keeps a module out of Strong mode.
-		expect([...blockers]).toEqual(['OCTANE_STRONG_UNTRUSTED_HTML']);
+		// Raw HTML and mapped rows with observable key evaluation need review.
+		expect([...blockers].sort()).toEqual(['OCTANE_STRONG_MAP_JSX', 'OCTANE_STRONG_UNTRUSTED_HTML']);
 		expect(
 			strong.files
 				.filter((file) => file.strong === true)
@@ -2686,7 +2769,6 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 			'NotFound.tsrx',
 			'Pending.tsrx',
 			'RootLayout.tsrx',
-			'StoriesPage.tsrx',
 			'StoryRow.tsrx',
 			'entry-client.tsrx',
 			'entry-server.tsrx',

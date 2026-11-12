@@ -1132,6 +1132,25 @@ export type Qualified = typeof R.createRef;`,
 		expect(transformModule(blur, 'f.tsx').code).toContain('set(e.currentTarget.value)');
 	});
 
+	it.each([
+		'<Cell {...row.props} key={row.id}>{row.read()}</Cell>',
+		'<Cell ref={row.ref} key={row.id}>{row.read()}</Cell>',
+		'<Cell value={row.read()} key={row.id} key={row.other}/>',
+		'<Cell value={row.read()} key={row.id}><i>{row.read()}</i></Cell>',
+		'<Cell value={row.read()} key={row.id}>{row.ok && <i />}</Cell>',
+		'<ns.Cell value={row.read()} key={row.id}/>',
+	])('reports an unproven mapped JSX evaluation order for %s', (row) => {
+		const source =
+			'function Cell(props) {return <b/>} export function List({rows}) {return <main>{rows.map(row => ' +
+			row +
+			')}</main>}';
+		const result = transformModule(source, 'list.tsx', { automaticReactJsx: true });
+		expect(result.notes).toContainEqual(
+			expect.objectContaining({ rule: 'template-for', severity: 'error' }),
+		);
+		expect(result.code).not.toContain('@for');
+	});
+
 	it('runs map setup before a row key that can throw', () => {
 		const source = `export function List({ rows }: { rows: { check(): void; id: string }[] }) {
 			return <div>{rows.map(row => {
@@ -1314,7 +1333,7 @@ export type Qualified = typeof R.createRef;`,
 	it('lowers a dense array with separate row names and preserves real receiver captures', () => {
 		const source = (items) => `export function Menu(row = "outer") {
   const __items = "outer";
-  return <ul>{${items}.map(row => <li key={row.row}>{row.row as string}</li>)}</ul>;
+  return <ul>{${items}.map(({row}) => <li key={row}>{row as string}</li>)}</ul>;
 }`;
 		const literal = '[{row:"A"}, {row:((row) => row.toUpperCase())("b")}]';
 		for (const iterable of [
