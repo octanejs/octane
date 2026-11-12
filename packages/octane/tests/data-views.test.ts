@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import * as devalue from 'devalue';
 import {
 	createDataStore,
 	DataError,
@@ -519,6 +520,71 @@ describe('octane/data views', () => {
 		huge.subscribe(() => {});
 		await vi.waitFor(() => expect(huge.getSnapshot().status).toBe('error'));
 		expect(huge.getSnapshot().error).toMatchObject({ code: 'invalid' });
+	});
+
+	it('hydrates the confirmed window after a record changes on the server render', async () => {
+		const server = libraryServer();
+		const rendering = createDataStore({ transport: server.transport });
+		await rendering.prefetch(library, undefined);
+		await rendering.write(rename, { id: 'b0', title: 'Atlas' });
+		const expected = titles(rendering.read(library, undefined));
+		expect(expected?.[0]).toBe('Atlas');
+		const client = createDataStore({ transport: server.transport, seed: rendering.dehydrate() });
+		expect(titles(client.read(library, undefined))).toEqual(expected);
+		await rendering.retire();
+		await client.retire();
+	});
+
+	it('hydrates server-ordered results from confirmed shared records without a pending edit', async () => {
+		const server = libraryServer(4);
+		const rendering = createDataStore({ transport: server.transport });
+		const input = { q: 'Book' };
+		await rendering.prefetch(search, input);
+		server.books.get('b0')!.title = 'Confirmed';
+		await rendering.prefetch(library, undefined);
+		expect(titles(rendering.read(search, input))).toEqual([
+			'Book 03',
+			'Book 02',
+			'Book 01',
+			'Confirmed',
+		]);
+		server.hold();
+		const pending = rendering.write(rename, { id: 'b0', title: 'Pending' });
+		expect(titles(rendering.read(search, input))!.at(-1)).toBe('Pending');
+		await quiet();
+		try {
+			const client = createDataStore({ transport: server.transport, seed: rendering.dehydrate() });
+			expect(titles(client.read(search, input))).toEqual([
+				'Book 03',
+				'Book 02',
+				'Book 01',
+				'Confirmed',
+			]);
+			expect(titles(client.read(library, undefined))).toEqual(['Book 01', 'Book 02', 'Book 03']);
+			await client.retire();
+		} finally {
+			server.release();
+			await pending;
+			await rendering.retire();
+		}
+	});
+
+	it.each([
+		{ start: -1, first: null, last: null },
+		{ start: 0, first: null, last: { title: 'invalid' } },
+	])('loads a view when its saved bounds no longer match the window or entity', async (bounds) => {
+		const server = libraryServer(4);
+		const rendering = createDataStore({ transport: server.transport });
+		await rendering.prefetch(library, undefined);
+		const saved = devalue.parse(rendering.dehydrate());
+		saved.reads[0].span = bounds;
+		const client = createDataStore({ transport: server.transport, seed: devalue.stringify(saved) });
+		const list = client.read(library, undefined);
+		expect(list.getSnapshot().status).toBe('pending');
+		await ready(list);
+		expect(titles(list)).toEqual(['Book 00', 'Book 01', 'Book 02']);
+		await client.retire();
+		await rendering.retire();
 	});
 
 	it('hydrates a view from a server render without loading it', async () => {

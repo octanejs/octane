@@ -12,6 +12,7 @@ import {
 import type { StreamInjectionSource } from '../runtime.server.js';
 import type { ServerSignalQueryAttempt } from '../signals/query-attempt-observer.js';
 import { createServerSignalQueryAttemptObservations } from './signal-query-observation.js';
+import { setHostTimeout, clearHostTimeout } from '../host-task.js';
 
 export interface StreamedRendererLimits {
 	readonly maxFrameBytes?: number;
@@ -226,9 +227,9 @@ export function createStreamedRendererFrameStream(
 	let totalBytes = 0;
 	let finished = false;
 	let controller: ReadableStreamDefaultController<Uint8Array>;
-	let timer: ReturnType<typeof setTimeout> | undefined;
+	let timer: unknown | undefined;
 	const cleanup = (): void => {
-		clearTimeout(timer);
+		clearHostTimeout(timer);
 		options.signal?.removeEventListener('abort', abort);
 	};
 	const closeIterator = (): void => {
@@ -256,10 +257,10 @@ export function createStreamedRendererFrameStream(
 			},
 			async pull() {
 				if (finished) return;
-				timer = setTimeout(() => fail(new Error(formatServerError(235))), budget.timeoutMs);
+				timer = setHostTimeout(() => fail(new Error(formatServerError(235))), budget.timeoutMs);
 				try {
 					const next = await iterator.next();
-					clearTimeout(timer);
+					clearHostTimeout(timer);
 					if (finished) return;
 					if (next.done) {
 						finished = true;
@@ -363,9 +364,9 @@ function createSignalInjection(
 		resolveDone = resolve;
 		rejectDone = reject;
 	});
-	let timer: ReturnType<typeof setTimeout> | undefined;
+	let timer: unknown | undefined;
 	const cleanup = (): void => {
-		clearTimeout(timer);
+		clearHostTimeout(timer);
 		options.signal?.removeEventListener('abort', abort);
 	};
 	const closeIterator = (): void => {
@@ -385,11 +386,11 @@ function createSignalInjection(
 	const pump = (): void => {
 		if (!subscribed || pending || awaitingAcceptance || queued !== '' || finished) return;
 		pending = true;
-		timer = setTimeout(() => fail(new Error(timeoutMessage)), budget.timeoutMs);
+		timer = setHostTimeout(() => fail(new Error(timeoutMessage)), budget.timeoutMs);
 		void iterator.next().then(
 			(next) => {
 				pending = false;
-				clearTimeout(timer);
+				clearHostTimeout(timer);
 				if (finished) return;
 				if (next.done) {
 					finished = true;

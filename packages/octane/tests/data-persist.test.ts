@@ -914,6 +914,7 @@ describe('octane/data durable writes', () => {
 			vi.spyOn(Date, 'now').mockReturnValue(now);
 			const before = createDataStore({ transport: first.transport, persist: durable(storage) });
 			await before.prefetch(cachedShelf, undefined);
+			const seed = before.dehydrate();
 			await saved();
 			first.faults.lose = outcome === 'refused' ? 'request' : 'reply';
 			await expect(before.write(setRead, { id: 'a', read: true })).rejects.toThrow(/unknown/);
@@ -923,7 +924,8 @@ describe('octane/data durable writes', () => {
 			const intermediate = server(first.books, first.applied);
 			if (outcome === 'offline') intermediate.faults.lose = 'request';
 			let receipts = 0;
-			createDataStore({
+			const hydrating = createDataStore({
+				seed,
 				transport(request) {
 					if (request.name === 'receipt') receipts++;
 					return intermediate.transport(request);
@@ -942,6 +944,11 @@ describe('octane/data durable writes', () => {
 				await saved();
 				expect(remote.log).toEqual(outcome === 'applied' ? ['read shelf'] : []);
 			}
+			// This read was still buffered in the SSR seed when the journal checked the receipt.
+			expect(hydrating.read(cachedShelf, undefined).getSnapshot()).toMatchObject({
+				status: 'ready',
+				stale: outcome === 'applied',
+			});
 		},
 	);
 

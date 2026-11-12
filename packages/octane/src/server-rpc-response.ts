@@ -11,6 +11,7 @@ import {
 	type ResolvedServerResultLimits,
 } from './server-rpc-protocol.js';
 import { readServerResult } from './server-rpc-stream-client.js';
+import { clearHostTimeout, hostDateNow } from './host-task.js';
 
 // Loaded by server-rpc-client.ts on a page's first server call, while that
 // call's request is already in flight.
@@ -18,7 +19,7 @@ import { readServerResult } from './server-rpc-stream-client.js';
 /** Settles one call; `limits` selects the streamed result protocol. */
 export async function readServerResponse(
 	pending: Promise<Response>,
-	timer: ReturnType<typeof setTimeout> | undefined,
+	timer: unknown | undefined,
 	deadline: number | undefined,
 	limits: ResolvedServerResultLimits | undefined,
 	signal: AbortSignal | undefined,
@@ -67,7 +68,7 @@ export async function readServerResponse(
 					new Error('The server does not support the requested result protocol'),
 				);
 			}
-			const remaining = deadline! - Date.now();
+			const remaining = deadline! - hostDateNow();
 			if (remaining <= 0) {
 				void response.body?.cancel().catch(() => {});
 				throw new ServerCallUncertainError(
@@ -98,7 +99,7 @@ export async function readServerResponse(
 			throw new ServerCallUncertainError(error);
 		}
 	} finally {
-		clearTimeout(timer);
+		clearHostTimeout(timer);
 	}
 }
 
@@ -108,7 +109,7 @@ export async function readServerBatch(
 	pending: Promise<Response>,
 	limits: ResolvedServerResultLimits,
 	transport: AbortController,
-	timer: ReturnType<typeof setTimeout>,
+	timer: unknown,
 ): Promise<void> {
 	let definitiveRejection = false;
 	try {
@@ -164,7 +165,7 @@ export async function readServerBatch(
 				: new ServerCallUncertainError(error),
 		);
 	} finally {
-		clearTimeout(timer);
+		clearHostTimeout(timer);
 		transport.abort();
 	}
 }

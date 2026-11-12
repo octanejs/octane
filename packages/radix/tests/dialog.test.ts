@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { mount, flushEffects } from '../../octane/tests/_helpers';
 import { flushSync } from '../../octane/src/index.js';
-import { DialogApp } from './_fixtures/dialog.tsx';
+import { DialogApp, NonModalDialogWithToast } from './_fixtures/dialog';
 
 // The full modal Dialog chain: Portal → Presence → Overlay (scroll lock + dismissable
 // surface) → Content (FocusScope trap + DismissableLayer + hideOthers) → Title /
@@ -132,6 +132,7 @@ describe('@octanejs/radix — Dialog (modal)', () => {
 		flushSync(() => {
 			overlay.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
 		});
+		expect($('[data-testid="content"]')).not.toBeNull();
 		flushSync(() => {
 			overlay.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
 		});
@@ -155,4 +156,23 @@ describe('@octanejs/radix — Dialog (modal)', () => {
 		expect(content.contains(document.activeElement)).toBe(true);
 		r.unmount();
 	});
+});
+
+it('dismisses a non-modal dialog when focus leaves after a press on the toast viewport', async () => {
+	const r = mount(NonModalDialogWithToast);
+	try {
+		await settle();
+		const outside = $('[data-testid="outside"]')!;
+		outside.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }));
+		$('[data-testid="viewport"]')!.dispatchEvent(
+			new MouseEvent('pointerdown', { bubbles: true, button: 0 }),
+		);
+		expect($('[data-testid="content"]')).not.toBeNull();
+		outside.focus();
+		await settle();
+		expect($('[data-testid="content"]')).toBeNull();
+	} finally {
+		r.unmount();
+		await settle();
+	}
 });

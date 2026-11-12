@@ -133,13 +133,20 @@ it('reports an opaque effect dependency whose getter registers a React SSR style
 it.each([
 	['block', false],
 	['block', true],
+	['block with a property named after the trigger', true],
+	['block with a type query for the trigger', true],
 	['expression', false],
 	['expression', true],
 	['properties', false],
 ])('matches React for a %s effect with revision dependency %s', async (form, withRevision) => {
 	const withProperties = form === 'properties';
 	const comment = form === 'expression' && withRevision ? '// keep with the expression\n' : '';
-	const effect = form === 'expression' ? `() => ${comment}receiver.attach()` : blockEffect;
+	let effect = blockEffect;
+	if (form === 'expression') effect = `() => ${comment}receiver.attach()`;
+	if (form === 'block with a property named after the trigger')
+		effect = blockEffect.replace("'start'", "{ revision: 'start' }.revision");
+	if (form === 'block with a type query for the trigger')
+		effect = blockEffect.replace("'start'", "('start' as typeof revision)");
 	const input = withProperties ? propertySource : source.replace(blockEffect, effect);
 	const migrated = migrate(
 		withRevision ? input.replace('[receiver]', '[receiver, revision]') : input,
@@ -398,6 +405,13 @@ it.each([
 		'reassigned trigger',
 		source
 			.replace('useEffect(() =>', 'revision++; useEffect(() =>')
+			.replace('[receiver]', '[receiver, revision]'),
+	],
+	[
+		'a shadowed trigger',
+		source
+			.replace('useEffect(() => {', 'useEffect(() => { const revision = 1;')
+			.replace("'start'", 'String(revision)')
 			.replace('[receiver]', '[receiver, revision]'),
 	],
 	[
@@ -701,8 +715,16 @@ export function Probe({ value }) {
 	return <button onClick={() => { latest.current = value; window.records.push(read(1)); record(); }}>Record</button>;
 }`;
 
-it('preserves ref reads at setup, event and cleanup when local helpers are called from an effect', async () => {
-	const migrated = migrate(helperSource);
+const effectOnlyHelperSource = helperSource.replace(
+	'window.records.push(read(1)); record();',
+	'window.records.push(read(1));',
+);
+
+it.each([
+	['shared', helperSource, [2, 3, 2, 8, 7, 7]],
+	['effect-only', effectOnlyHelperSource, [2, 3, 8, 7]],
+])('preserves setup, event and cleanup ref reads for %s helpers', async (kind, input, expected) => {
+	const migrated = migrate(input);
 	expect(migrated.strong).toBe(true);
 	const native = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
 	function Reference({ value }) {
@@ -724,7 +746,7 @@ it('preserves ref reads at setup, event and cleanup when local helpers are calle
 				onClick() {
 					latest.current = value;
 					window.records.push(read(1));
-					record();
+					if (kind === 'shared') record();
 				},
 			},
 			'Record',
@@ -755,8 +777,7 @@ it('preserves ref reads at setup, event and cleanup when local helpers are calle
 	const before = globalThis.IS_REACT_ACT_ENVIRONMENT;
 	globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 	try {
-		const expected = await exercise(true);
-		expect(expected).toEqual([2, 3, 2, 8, 7, 7]);
+		expect(await exercise(true)).toEqual(expected);
 		expect(await exercise(false)).toEqual(expected);
 	} finally {
 		globalThis.IS_REACT_ACT_ENVIRONMENT = before;
@@ -777,11 +798,12 @@ it.each([
 
 it.each([
 	[
-		'an effect-only helper',
-		helperSource.replace(
-			'window.records.push(read(1)); record();',
-			'window.records.push(read(1));',
-		),
+		'an effect-only helper visible to eval',
+		effectOnlyHelperSource.replace('return <button', 'eval("record"); return <button'),
+	],
+	[
+		'an effect-only helper with an attached directive',
+		effectOnlyHelperSource.replace('const record =', '// @ts-expect-error\n\tconst record ='),
 	],
 	[
 		'a contextually typed declaration',

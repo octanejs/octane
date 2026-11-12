@@ -28,6 +28,7 @@ import {
 	type FormSeed,
 } from './form.js';
 import type { ServerCallContext } from '../server-call.js';
+import { setHostTimeout, clearHostTimeout } from '../host-task.js';
 
 /**
  * What a server integration knows of a request beyond the `Request` itself:
@@ -220,7 +221,14 @@ export function createDataHandler<C extends object = {}>(
 		const { contract } = handler;
 		const parsed = contract.input ? await parse(contract.input, input) : undefined;
 		const output = await handler.run(parsed, call);
-		return contract.output ? parse(contract.output, output) : output;
+		if (!contract.output) return output;
+		if (kind === 'read') return parse(contract.output, output);
+		try {
+			return await parse(contract.output, output);
+		} catch (cause) {
+			// The handler finished. A bad result cannot establish that its write was refused.
+			throw new Error('octane/data: invalid write result', { cause });
+		}
 	}
 
 	const contextFor = async (request: Request, caller?: DataCaller) =>
@@ -344,8 +352,8 @@ export function createDataHandler<C extends object = {}>(
 		]();
 		const timeUp = new Promise<null>((resolve) => {
 			if (lifetime === Infinity) return;
-			const timer = setTimeout(() => resolve(null), lifetime);
-			signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
+			const timer = setHostTimeout(() => resolve(null), lifetime);
+			signal.addEventListener('abort', () => clearHostTimeout(timer), { once: true });
 		});
 		try {
 			yield {};

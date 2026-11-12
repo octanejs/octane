@@ -330,7 +330,10 @@ it.each([
 	const errors = [...pane.notes, ...pane.diagnostics].filter(
 		(finding) => finding.severity === 'error',
 	);
-	expect(errors.map((finding) => finding.rule)).toEqual(supported ? [] : ['bindings', 'bindings']);
+	expect(errors.map((finding) => finding.rule)).toEqual(
+		supported ? ['bindings'] : ['bindings', 'bindings'],
+	);
+	if (supported) expect(errors[0].message).toContain('this formatNumber call');
 	const expectedHelpers = ['src/octane-react-intl.tsrx', 'src/octane-store-context.tsrx'];
 	const helpers = result.files
 		.map((file) => file.output)
@@ -979,6 +982,9 @@ it('defers store factory inputs linked to React work during a read', async () =>
 		wrapped: './handles',
 		parenthesized: './handles',
 		mutated: './handles',
+		escaped: './handles',
+		escapedIndirect: './handles',
+		escapedAlias: './handles',
 		alias: './handles',
 		calleeAlias: './handles',
 		snapshot: './snapshot-key',
@@ -993,7 +999,8 @@ it('defers store factory inputs linked to React work during a read', async () =>
 		portalOnly: './portal-key',
 	};
 	const { app } = project({
-		'observer/public-store.ts': "export {valueOf, select, selectOptions, read} from './state';",
+		'observer/public-store.ts':
+			"export {valueOf, select, selectOptions, read, replace} from './state';",
 		'observer/state.ts': `const readings = new Map<string, () => string>();
 			export function valueOf<T>(value: T) {return value;}
 			export function select(read: () => string): string {
@@ -1004,6 +1011,7 @@ it('defers store factory inputs linked to React work during a read', async () =>
 			export function selectOptions(options: {read?: () => string}) {
 				return select(() => options.read?.() ?? 'ready');
 			}
+			export function replace(key: string, read: () => string) {readings.set(key, read);}
 			export function read(key: string) {return readings.get(key)!();}`,
 		'observer/renderer.ts': `import {createContext} from 'react';
 			export const current = createContext<{get(key: string): string} | null>(null);`,
@@ -1016,6 +1024,7 @@ it('defers store factory inputs linked to React work during a read', async () =>
 			}`,
 		'app/src/handles.ts': `import {select, selectOptions, valueOf} from 'observer/core';
 			import {preload} from 'react-dom';
+			import {decorate} from './decorate';
 			const callback = () => {preload('/preview.png', {as: 'image'}); return 'ready';};
 			export const direct = select(callback);
 			export const wrapped = select(callback) as string;
@@ -1026,7 +1035,22 @@ it('defers store factory inputs linked to React work during a read', async () =>
 			const options = valueOf<{read?: () => string}>({});
 			options.read = callback;
 			export const mutated = selectOptions(options);
-			export const plain = selectOptions({});`,
+			export const escaped = selectOptions({});
+			decorate(escaped);
+			export const escapedIndirect = selectOptions({});
+			const saved = {escapedIndirect};
+			decorate(saved.escapedIndirect);
+			export const escapedAlias = selectOptions({});
+			const renamed = escapedAlias;
+			decorate(renamed);
+			const ordinary = selectOptions({});
+			const plain = ordinary;
+			export {plain};`,
+		'app/src/decorate.ts': `import {replace} from 'observer/core';
+			import {preload} from 'react-dom';
+			export function decorate(key: string) {
+				replace(key, () => {preload('/escaped.png', {as: 'image'}); return 'ready';});
+			}`,
 		'app/src/dependent.ts': `import {select, read} from 'observer/core';
 			import {direct} from './handles';
 			export const dependent = select(() => read(direct));`,
@@ -1072,13 +1096,16 @@ it('defers store factory inputs linked to React work during a read', async () =>
 			import {Pane as Direct} from './direct';
 			import {Pane as Wrapped} from './wrapped';
 			import {Pane as Mutated} from './mutated';
+			import {Pane as Escaped} from './escaped';
+			import {Pane as EscapedIndirect} from './escapedIndirect';
+			import {Pane as EscapedAlias} from './escapedAlias';
 			import {Pane as ViaTsx} from './viaTsx';
 			import {Pane as ViaJs} from './viaJs';
 			import {Pane as ViaSibling} from './viaSibling';
 			import {Pane as ViaDirectory} from './viaDirectory';
 			export function Root() {
 				return <current.Provider value={{get: read}}>
-					<Direct/><Wrapped/><Mutated/><ViaTsx/><ViaJs/><ViaSibling/><ViaDirectory/>
+					<Direct/><Wrapped/><Mutated/><Escaped/><EscapedIndirect/><EscapedAlias/><ViaTsx/><ViaJs/><ViaSibling/><ViaDirectory/>
 				</current.Provider>;
 			}`,
 		...Object.fromEntries(
@@ -1093,10 +1120,10 @@ it('defers store factory inputs linked to React work during a read', async () =>
 	const { renderToStaticMarkup } = await import('react-dom/server');
 	const { createElement } = await import('react');
 	const html = renderToStaticMarkup(createElement(reference.Root));
-	for (const resource of ['preview', 'tsx-preview', 'js-preview', 'choice-preview']) {
+	for (const resource of ['preview', 'tsx-preview', 'js-preview', 'choice-preview', 'escaped']) {
 		expect(html).toContain('<link rel="preload" href="/' + resource + '.png" as="image"/>');
 	}
-	expect(html.match(/<b>ready<\/b>/g)).toHaveLength(7);
+	expect(html.match(/<b>ready<\/b>/g)).toHaveLength(10);
 
 	const names = Object.keys(panes).map((name) => 'src/' + name + '.tsx');
 	const physicalApp = fs.realpathSync(app);

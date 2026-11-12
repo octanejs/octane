@@ -6275,8 +6275,9 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		initialValueImports ??= hookImportEditor(ast, source, 'useInitialValue', ['useState']);
 		const imports = initialValueImports([call], existing, true);
 		if (imports === false) return [];
-		// The bracket can touch the declaration keyword, unlike the replacement identifier.
-		const bindingText = /[a-z]/.test(source.charAt(decl.id.start - 1)) ? ' ' + id.name : id.name;
+		// Keep compact declarations separated from their unwrapped binding.
+		const separator = /[a-z]/.test(source.charAt(decl.id.start - 1)) ? ' ' : '';
+		const bindingText = separator + source.slice(id.start, id.end);
 		return [
 			{
 				hook: 'useInitialValue',

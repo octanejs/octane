@@ -1159,6 +1159,18 @@ export function App(props) @{
 			'a queueMicrotask alias',
 			`useEffect(() => { const defer = queueMicrotask; defer(() => ${write}); });`,
 		],
+		[
+			'a bound microtask scheduler',
+			`useEffect(() => { const queue = window.queueMicrotask.bind(window); queue(() => ${write}); });`,
+		],
+		[
+			'a bound timer without delay',
+			`useEffect(() => { const later = setTimeout.bind(globalThis); later(() => ${write}); });`,
+		],
+		[
+			'a zero-delay bound timer alias',
+			`useEffect(() => { const later = self.setTimeout.bind(self); const schedule = later; schedule(() => ${write}, 0); });`,
+		],
 		['Promise.resolve().then', `useEffect(() => { Promise.resolve().then(() => ${write}); });`],
 		[
 			'Promise.resolve of a string',
@@ -1379,6 +1391,30 @@ export function App(props) @{
 		[
 			'a requestAnimationFrame destructured from window',
 			`useEffect(() => { const { requestAnimationFrame: frame } = window; const id = frame(() => ${write}); return () => cancelAnimationFrame(id); });`,
+		],
+		[
+			'a bound timer with a positive or unknown delay',
+			`useEffect(() => { const later = setTimeout.bind(window); later(() => ${write}, 20); later(() => ${write}, props.delay); });`,
+		],
+		[
+			'a shadowed or reassigned bound scheduler',
+			`useEffect(() => { const queueMicrotask = props.schedule; queueMicrotask.bind(window)(() => ${write}); let later = setTimeout.bind(window); later = props.schedule; later(() => ${write}); });`,
+		],
+		[
+			'a partially applied timer or an ignored microtask argument',
+			`useEffect(() => { const later = setTimeout.bind(window, props.work, 10); later(() => ${write}); const queue = queueMicrotask.bind(window); queue(props.work, () => ${write}); });`,
+		],
+		[
+			'a bound scheduler alias read before initialization',
+			`useEffect(() => { const queue = later; var later = queueMicrotask.bind(window); queue?.(() => ${write}); });`,
+		],
+		[
+			'a bound scheduler on a short-circuited global alias',
+			`useEffect(() => { const queue = host?.queueMicrotask.bind(host); var host = window; queue?.(() => ${write}); });`,
+		],
+		[
+			'a bound scheduler called with a spread',
+			`useEffect(() => { const queue = queueMicrotask.bind(window); queue(...[props.work, () => ${write}]); });`,
 		],
 		['an external subscription', `useEffect(() => props.subscribe(() => ${write}));`],
 		[
