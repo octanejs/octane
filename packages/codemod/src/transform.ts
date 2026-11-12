@@ -5528,6 +5528,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			}
 		}
 		if (!literal) return null;
+		if (fn.asteriskToken || fn.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword)) {
+			this.note(
+				RULE.for,
+				'error',
+				node,
+				'An @for row would discard this callback’s promise or iterator. Review the retained .map() call for suspension or iteration.',
+			);
+			return null;
+		}
 		if (attribute) {
 			this.removed.add(attribute);
 			const opening = attribute.parent.parent;
