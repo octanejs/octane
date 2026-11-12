@@ -21,8 +21,8 @@ export const TodoList: FC<{ todos: Todo[]; onToggle: (id: string) => void }> = (
     />
     @if (visible.length === 0) { <p class="empty">Nothing to do</p> } @else {
       <ul>
-        @for (const todo of visible; index index; key todo.id) {
-          <li class={todo.done ? 'done' : undefined}>
+        {visible.map((todo, index) => (
+          <li key={todo.id} className={todo.done ? 'done' : undefined}>
             <label htmlFor={`todo-${todo.id}`}>
               {index + 1}. {todo.title}
             </label>
@@ -33,7 +33,7 @@ export const TodoList: FC<{ todos: Todo[]; onToggle: (id: string) => void }> = (
               onChange={() => onToggle(todo.id)}
             />
           </li>
-        }
+        ))}
       </ul>
     }
   </section>

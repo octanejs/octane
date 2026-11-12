@@ -32,7 +32,7 @@ bundler plugin and `tsconfig` over to Octane and install the dependencies.
 | `template-component` | `function C() { …; return <div /> }` | `function C() @{ …; <div /> }` |
 | `template-if` | `{a ? <A /> : <B />}`, `{a > 0 && <A />}` (also through a `const`) | `@if (a) { <A /> } @else { <B /> }` |
 | `template-if` | `if (a) return <A />; …; return <B />` in a component | `@if (a) { <A /> } @else { …; <B /> }` |
-| `template-for` | `{xs.map((x, i) => <li key={x.id} />)}` | `@for (const x of xs; index i; key x.id) { <li /> }` |
+| `template-for` | `{[1, 2].map(x => <li key={x} />)}` | `@for (const x of [1, 2]; key x) { <li /> }` |
 | `template-try` | `<Suspense fallback={f}>…</Suspense>` | `@try { … } @pending { f }` |
 | `template-text` | `{title}` with `title: string`, `{count}` with `count: number` | `{title as string}`, `{String(count)}`: text bindings, not renderable holes |
 | `hook-dependencies` | `useEffect(fn)` (runs every render) | `useEffect(fn, null)`: an omitted list is inferred in Octane |
@@ -124,6 +124,11 @@ Octane's Vite and Rspack integrations resolve descriptor markers across imports.
 If a custom build compiles each file in isolation, supply the compiler's
 `isDescriptorChildrenImport` option or pass explicit `children={elements}`.
 With `--strong`, descriptor inspection still requires compatibility mode.
+
+The `@for` rewrite handles fresh array literals without holes and assumes the
+standard `Array.prototype.map`. An array supplied by a caller can override
+`.map()` and inspect the React elements its callback returns. The codemod keeps
+that call for review. Keep the list in React if its method relies on element identity.
 
 ## Strong mode
 
