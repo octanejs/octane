@@ -256,6 +256,8 @@ The codemod follows an icon through local components and directly imported compo
 
 The generated SVG uses the native SVG namespace. In a client mount, Octane places an explicit `xmlns` attribute in the XMLNS namespace; React sets that attribute without a namespace. Applications that inspect the namespace of the attribute itself should keep their existing rendering path.
 
+An inline style can set a single `transform` declaration. The value can be a string literal or a template with numeric literals selected by a fixed, initialized binding, such as `style={{ transform: \`rotate(\${open ? 0 : -90}deg)\` }}`. Octane preserves the declaration across updates and can add a trailing semicolon to the server-rendered style attribute.
+
 Shared component values, React island uses, refs, spread props, and SVGs with unsupported elements keep their original imports.
 
 ## Local recipes

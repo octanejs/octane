@@ -1367,6 +1367,8 @@ class ModuleTransform {
 		const supported = tag.attributes.properties.every((attr) => {
 			if (!ts.isJsxAttribute(attr) || !ts.isIdentifier(attr.name)) return false;
 			const value = attr.initializer;
+			if (attr.name.text === 'style')
+				return attributeOf(tag, 'style') === attr && this.svgInlineTransform(value);
 			if (attr.name.text === 'className')
 				return (
 					!!value &&
@@ -1682,6 +1684,48 @@ class ModuleTransform {
 					);
 				}))
 		);
+	}
+
+	private svgInlineTransform(value: ts.JsxAttributeValue | undefined) {
+		if (!value || !ts.isJsxExpression(value) || value.dotDotDotToken || !value.expression)
+			return false;
+		const object = skipWrappers(value.expression);
+		if (!ts.isObjectLiteralExpression(object) || object.properties.length !== 1) return false;
+		const [field] = object.properties;
+		if (
+			!ts.isPropertyAssignment(field) ||
+			!ts.isIdentifier(field.name) ||
+			field.name.text !== 'transform'
+		)
+			return false;
+		const text = skipWrappers(field.initializer);
+		// Keep exactly one declaration, with no renderer-specific priority handling.
+		if (ts.isStringLiteralLike(text)) return text.text.trim() !== '' && !/[!;]/.test(text.text);
+		if (!ts.isTemplateExpression(text) || /[!;]/.test(text.head.text)) return false;
+		const numeric = (node: ts.Expression) => {
+			node = skipWrappers(node);
+			return (
+				ts.isNumericLiteral(node) ||
+				(ts.isPrefixUnaryExpression(node) &&
+					(node.operator === ts.SyntaxKind.MinusToken ||
+						node.operator === ts.SyntaxKind.PlusToken) &&
+					ts.isNumericLiteral(skipWrappers(node.operand)))
+			);
+		};
+		return text.templateSpans.every(({ expression, literal }) => {
+			if (/[!;]/.test(literal.text)) return false;
+			const part = skipWrappers(expression);
+			if (numeric(part)) return true;
+			if (!ts.isConditionalExpression(part)) return false;
+			const test = skipWrappers(part.condition);
+			return (
+				ts.isIdentifier(test) &&
+				fixedBinding(this.checker, test, part, (this.fixedSvgParameters ??= new Map())) &&
+				initializedBefore(this.checker, test, part) &&
+				numeric(part.whenTrue) &&
+				numeric(part.whenFalse)
+			);
+		});
 	}
 
 	private svgRead?: ReturnType<typeof svgLocalReads>;
