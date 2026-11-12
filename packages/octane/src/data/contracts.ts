@@ -443,7 +443,8 @@ export interface FeedRequest {
 /**
  * One message from a feed's source. `event` is an event, `id` lets the store
  * drop a duplicate, and `cursor` is the position to resume from after it.
- * `gap` says events were missed, such as a cursor too old to resume from.
+ * `gap` says events were missed, such as a cursor too old to resume from. An
+ * empty frame says the connection is open.
  */
 export interface FeedFrame {
 	readonly event?: unknown;

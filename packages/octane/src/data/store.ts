@@ -43,7 +43,12 @@ import {
 	type Write,
 } from './contracts.js';
 import { createFormHandle, NO_FORM_SEED, type FormHandle, type FormSeed } from './form.js';
-import { createPersistence, type PersistOptions, type Stored } from './persist.js';
+import {
+	createPersistence,
+	type Persistence,
+	type PersistOptions,
+	type Stored,
+} from './persist.js';
 
 export interface ReadSnapshot<T> {
 	readonly status: 'pending' | 'ready' | 'error';
@@ -154,6 +159,8 @@ export interface StoreInternals {
 	readonly listen: Listener | undefined;
 	/** Aborts when the store retires. */
 	readonly retired: AbortSignal;
+	/** Where feeds save their cursors, when the store persists. */
+	readonly persisted: Persistence | null;
 	readonly entries: ReadonlyMap<string, Entry>;
 	/** Whether a view holds the record `id`, or would show `value` or move its rows for it. */
 	viewed(entity: Entity<any>, id: string, value?: unknown): boolean;
@@ -1539,6 +1546,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	internals.set(store, {
 		listen: options.listen,
 		retired: retiring.signal,
+		persisted,
 		entries,
 		viewed: (entity, id, value) =>
 			!!records.get(entity.name)?.has(id) ||

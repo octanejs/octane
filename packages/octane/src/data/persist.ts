@@ -18,6 +18,9 @@
  *   each tag and entity name keeps the time it was last marked, and each
  *   value the time it was saved and the names it holds.
  * - Saves are coalesced into one storage transaction per host task.
+ * - A feed's cursor is saved with the stale marks, in one transaction, after
+ *   the values the events before it changed. A restart resumes the feed from
+ *   it, so a value saved after an event is never shown with that event lost.
  * - A durable write is in the journal before it is sent, and leaves it only
  *   once its outcome is known. A restart finds it there, shows its edit again
  *   and settles it by its receipt; it is never sent twice.
@@ -169,6 +172,10 @@ export interface Persistence {
 	recover(): Promise<Journaled[]>;
 	/** Values saved before now that hold one of these tags are restored stale. */
 	invalidated(tags: readonly string[]): void;
+	/** The cursor a feed last saved, by its key; null when there is none. */
+	cursor(key: string): Promise<string | null>;
+	/** Save a feed's cursor, after every value already marked to save. */
+	keepCursor(key: string, cursor: string): void;
 	/** Delete the saved value for `key`; rejects when storage fails. */
 	forget(key: string): Promise<void>;
 	/** Stop saving and clear the partition; rejects when storage fails. */
@@ -282,6 +289,8 @@ export function createPersistence(
 	/** When each tag was last marked stale, kept in its own partition. */
 	let marksPartition = '';
 	const marks = new Map<string, number>();
+	/** Each feed's last cursor, kept with the marks so both commit together. */
+	const cursors = new Map<string, string>();
 	let marksChanged = false;
 	/** Saved values' metadata, by hashed name. */
 	let metas = new Map<string, StoredMeta>();
@@ -310,10 +319,14 @@ export function createPersistence(
 		marksPartition = await cipher.name(`marks\n${options.partition}`);
 		const saved = await storage.get(marksPartition, marksPartition);
 		if (saved !== undefined) {
-			for (const [tag, at] of devalue.parse(await cipher.open(saved, marksPartition))) {
-				// Marks made while the index loaded are newer.
-				if (!marks.has(tag)) marks.set(tag, at);
-			}
+			const record = devalue.parse(await cipher.open(saved, marksPartition));
+			// Saved before cursors were, the record is the marks alone.
+			const [savedMarks, savedCursors] = Array.isArray(record)
+				? [record, []]
+				: [record.marks, record.cursors];
+			// Marks and cursors from while the index loaded are newer.
+			for (const [tag, at] of savedMarks) if (!marks.has(tag)) marks.set(tag, at);
+			for (const [key, cursor] of savedCursors) if (!cursors.has(key)) cursors.set(key, cursor);
 		}
 		// Only what has expired: which values are in use is known once components ask for them.
 		purge(Date.now(), Infinity);
@@ -419,7 +432,8 @@ export function createPersistence(
 		}
 		if (!cleared && marksChanged) {
 			marksChanged = false;
-			const value = await cipher.seal(devalue.stringify([...marks]), marksPartition);
+			const record = { marks: [...marks], cursors: [...cursors] };
+			const value = await cipher.seal(devalue.stringify(record), marksPartition);
 			const meta = {
 				key: marksPartition,
 				size: value.length,
@@ -552,11 +566,21 @@ export function createPersistence(
 			marksChanged = true;
 			schedule();
 		},
+		async cursor(key) {
+			await ready;
+			return cleared ? null : (cursors.get(key) ?? null);
+		},
+		keepCursor(key, cursor) {
+			cursors.set(key, cursor);
+			marksChanged = true;
+			schedule();
+		},
 		clear() {
 			cleared = true;
 			document?.removeEventListener('visibilitychange', hidden);
 			metas = new Map();
 			marks.clear();
+			cursors.clear();
 			dirty.clear();
 			touched.clear();
 			removed.clear();
