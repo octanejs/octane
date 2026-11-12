@@ -121,7 +121,7 @@ function registerPortalTarget(portal: PortalSlot): void {
 export function portal(
 	parentScope: Scope,
 	slotKey: number,
-	target: Element | DocumentFragment,
+	target: Element | DocumentFragment | 'body',
 	body: ComponentBody,
 	props: any,
 	host?: Node,
@@ -133,6 +133,7 @@ export function portal(
 	fragmentAnchor?: Node,
 ): void {
 	if (CURRENT_BLOCK?.pending && !CURRENT_BLOCK.crossRenderUpdate) return;
+	if (target === 'body') target = document.body;
 	const prev = parentScope.slots[slotKey] as PortalSlot | undefined;
 	const key = portalKey(props);
 	if (
@@ -639,9 +640,10 @@ export interface PortalDescriptor {
 /* @__NO_SIDE_EFFECTS__ */
 export function createPortal(
 	body: ComponentBody | ElementDescriptor | unknown,
-	target: Element | DocumentFragment,
+	target: Element | DocumentFragment | 'body',
 	props: any = undefined,
 ): PortalDescriptor {
+	if (target === 'body') target = document.body;
 	PORTAL_CHILD = renderPortalChild;
 	const key = portalKey(props);
 	return { $$kind: PORTAL_TAG, body, target, key, props: key === null ? props : undefined };
