@@ -289,6 +289,8 @@ export function createPersistence(
 	/** When each tag was last marked stale, kept in its own partition. */
 	let marksPartition = '';
 	const marks = new Map<string, number>();
+	/** A logical timestamp keeps later invalidations distinct within one clock tick. */
+	let markTime = 0;
 	/** Each feed's last cursor, kept with the marks so both commit together. */
 	const cursors = new Map<string, string>();
 	let marksChanged = false;
@@ -324,8 +326,11 @@ export function createPersistence(
 			const [savedMarks, savedCursors] = Array.isArray(record)
 				? [record, []]
 				: [record.marks, record.cursors];
-			// Marks and cursors from while the index loaded are newer.
-			for (const [tag, at] of savedMarks) if (!marks.has(tag)) marks.set(tag, at);
+			// Seed the logical clock before applying invalidations queued during startup.
+			for (const [tag, at] of savedMarks) {
+				marks.set(tag, at);
+				markTime = Math.max(markTime, at);
+			}
 			for (const [key, cursor] of savedCursors) if (!cursors.has(key)) cursors.set(key, cursor);
 		}
 		// Only what has expired: which values are in use is known once components ask for them.
@@ -384,8 +389,14 @@ export function createPersistence(
 		await ready;
 		if (cleared) return;
 		const now = hostDateNow();
+		const at = Math.max(now, markTime);
 		const keys = [...dirty];
 		dirty.clear();
+		// Later frames can arrive while encryption or storage is pending. Their
+		// checkpoints belong to the next batch, with the values they changed.
+		const checkpoint = marksChanged ? { marks: [...marks], cursors: [...cursors] } : null;
+		marksChanged = false;
+		const settled = ended.size ? [...ended] : null;
 		const put: Array<{ meta: StoredMeta; value?: string }> = [];
 		for (const key of keys) {
 			const saving = collect(key);
@@ -397,7 +408,7 @@ export function createPersistence(
 			}
 			const { stored, read } = saving;
 			// `at` is when the value was last known current, which marks are compared with.
-			const value = await cipher.seal(devalue.stringify({ ...stored, at: now }), name);
+			const value = await cipher.seal(devalue.stringify({ ...stored, at }), name);
 			const meta: StoredMeta = {
 				key: name,
 				size: value.length,
@@ -420,20 +431,19 @@ export function createPersistence(
 		removed.clear();
 		const kept = put.filter(({ meta }) => metas.has(meta.key));
 		if (!cleared && (kept.length > 0 || remove.length > 0)) {
-			await storage.commit(partition, kept, remove).catch(() => {});
+			try {
+				await storage.commit(partition, kept, remove);
+			} catch {
+				// Drop any old durable copies unless a later save can replace them.
+				// Keep the previous checkpoint until those updates or deletions commit.
+				for (const key of keys) dirty.add(key);
+				for (const name of remove) removed.add(name);
+				if (checkpoint) marksChanged = true;
+				return;
+			}
 		}
-		if (!cleared && ended.size > 0) {
-			const done = [...ended];
-			ended.clear();
-			await storage.commit(journalPartition, [], done).catch(() => {
-				// A write left in the journal would come back after the next start: try again at the next save.
-				for (const name of done) ended.add(name);
-			});
-		}
-		if (!cleared && marksChanged) {
-			marksChanged = false;
-			const record = { marks: [...marks], cursors: [...cursors] };
-			const value = await cipher.seal(devalue.stringify(record), marksPartition);
+		if (!cleared && checkpoint) {
+			const value = await cipher.seal(devalue.stringify(checkpoint), marksPartition);
 			const meta = {
 				key: marksPartition,
 				size: value.length,
@@ -442,10 +452,21 @@ export function createPersistence(
 				lastUsed: now,
 				version: '',
 			};
-			await storage.commit(marksPartition, [{ meta, value }], []).catch(() => {
-				// Marks keep restored values honest, so a failed save is tried again at the next one.
+			try {
+				await storage.commit(marksPartition, [{ meta, value }], []);
+			} catch {
 				marksChanged = true;
-			});
+				return;
+			}
+		}
+		if (!cleared && settled) {
+			// A crash before the values and invalidations commit must still find the receipt.
+			try {
+				await storage.commit(journalPartition, [], settled);
+				for (const name of settled) ended.delete(name);
+			} catch {
+				// The next save retries removal.
+			}
 		}
 	}
 
@@ -533,9 +554,10 @@ export function createPersistence(
 			const writes: Array<Journaled & { order: [number, number] }> = [];
 			const metas = await storage.index(journalPartition).catch(() => []);
 			for (const { key: name } of metas) {
+				const text = await storage.get(journalPartition, name).catch(() => undefined);
+				if (text === undefined) continue;
 				try {
-					const text = await storage.get(journalPartition, name);
-					const write = devalue.parse(await cipher.open(text!, name));
+					const write = devalue.parse(await cipher.open(text, name));
 					journaled.set(write.id, name);
 					writes.push(write);
 				} catch {
@@ -561,10 +583,14 @@ export function createPersistence(
 			return forgetting;
 		},
 		invalidated(tags) {
-			const now = hostDateNow();
-			for (const tag of tags) marks.set(tag, now);
-			marksChanged = true;
-			schedule();
+			void ready.then(() => {
+				if (cleared) return;
+				// A later invalidation must outrank earlier saves, even in the same millisecond.
+				markTime = Math.max(markTime + 1, hostDateNow() + 1);
+				for (const tag of tags) marks.set(tag, markTime);
+				marksChanged = true;
+				schedule();
+			});
 		},
 		async cursor(key) {
 			await ready;

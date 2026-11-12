@@ -395,7 +395,9 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	/** What persistent storage keeps for an entry: its confirmed value, never a pending edit. */
 	function saving(key: string) {
 		const entry = entries.get(key);
-		if (!entry?.read.persist) return undefined;
+		// An evicted dirty read can no longer replace its older durable copy.
+		if (!entry) return null;
+		if (!entry.read.persist) return undefined;
 		if (!entry.hasBase) return null;
 		const { span } = entry;
 		const stored: Stored = {
@@ -1222,13 +1224,12 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const recovered: Operation[] = [];
 		for (const { id, name, raw } of await persisted!.recover()) {
 			const write = journal.writes.find((item) => item.name === name);
+			if (!write) continue;
 			let input: unknown;
 			try {
-				if (!write) throw new Error('unknown write');
 				input = await parse(write.input, raw);
 			} catch {
-				// A write this build no longer declares, or whose input it no longer accepts.
-				persisted!.unjournal(id);
+				// A compatible build can still recover this operation by its original ID.
 				continue;
 			}
 			recovered.push(operationFor(id, write, input, raw, 'uncertain'));

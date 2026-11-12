@@ -187,6 +187,7 @@ async function value<T>(store: ReturnType<typeof createDataStore>, contract: any
 }
 
 afterEach(() => {
+	vi.restoreAllMocks();
 	vi.useRealTimers();
 });
 
@@ -617,7 +618,8 @@ describe('octane/data persistent cache', () => {
 		await vi.waitFor(() => expect(remote.log).toContain('read shelf'));
 	});
 
-	it('marks saved values stale when the app invalidates their tag, though nothing loaded them', async () => {
+	it('marks a saved value stale when its tag is invalidated later in the same millisecond', async () => {
+		vi.spyOn(Date, 'now').mockReturnValue(Date.now());
 		const storage = memoryStorage();
 		const tally = read({ name: 'count', output: count.output, tags: ['count'], fresh: 60_000 });
 		const first = server(books());
@@ -636,7 +638,8 @@ describe('octane/data persistent cache', () => {
 		await vi.waitFor(() => expect(remote.log).toEqual(['read count']));
 	});
 
-	it('keeps fresh a value saved with the write already in it', async () => {
+	it('keeps fresh a value saved in the same millisecond with the write already in it', async () => {
+		vi.spyOn(Date, 'now').mockReturnValue(Date.now());
 		const storage = memoryStorage();
 		const first = server(books());
 		const before = createDataStore({ transport: first.transport, persist: cache(storage, 'ada') });
@@ -817,6 +820,48 @@ describe('octane/data durable writes', () => {
 		expect(again.remote.log).toEqual([]);
 	});
 
+	it.each(['storage read fails', 'write no longer declared', 'input schema changed'] as const)(
+		'preserves a journaled write for a later restart when %s',
+		async (reason) => {
+			const inner = memoryStorage();
+			let failRead = false;
+			const storage: PersistentStorage = {
+				...inner,
+				get(partition, key) {
+					if (failRead && partition !== key) {
+						failRead = false;
+						return Promise.reject(new Error('storage temporarily unavailable'));
+					}
+					return inner.get(partition, key);
+				},
+			};
+			const first = server(books());
+			first.faults.lose = 'reply';
+			const before = createDataStore({ transport: first.transport, persist: durable(storage) });
+			await expect(before.write(setRead, { id: 'a', read: true })).rejects.toThrow(/unknown/);
+
+			const incompatible = write({ name: setRead.name, input: schema(() => false) });
+			const writes = {
+				'storage read fails': [setRead],
+				'write no longer declared': [],
+				'input schema changed': [incompatible],
+			}[reason];
+			failRead = reason === 'storage read fails';
+			const intermediate = server(first.books, first.applied);
+			createDataStore({
+				transport: intermediate.transport,
+				persist: cache(storage, 'ada', { journal: { writes, receipt } }),
+			});
+			await saved();
+			expect(failRead).toBe(false);
+			expect(intermediate.log).toEqual([]);
+
+			const { remote } = restart(storage, first);
+			await vi.waitFor(() => expect(remote.log).toEqual(['read receipt']));
+			expect(first.applied.size).toBe(1);
+		},
+	);
+
 	it('keeps a write whose receipt cannot be read for the next start', async () => {
 		const storage = memoryStorage();
 		const first = server(books());
@@ -856,6 +901,34 @@ describe('octane/data durable writes', () => {
 		await saved();
 		// The later edit wins, as it did before the restart.
 		expect(shown.handle.getSnapshot().value![0]!.read).toBe(false);
+	});
+
+	it('keeps a settled write recoverable until its invalidations are durable', async () => {
+		const inner = memoryStorage();
+		let rejectMarks = true;
+		let failed = false;
+		const storage: PersistentStorage = {
+			...inner,
+			commit(partition, put, remove) {
+				if (rejectMarks && put.some(({ meta }) => meta.key === partition)) {
+					failed = true;
+					return Promise.reject(new Error('could not save invalidations'));
+				}
+				return inner.commit(partition, put, remove);
+			},
+		};
+		const first = server(books());
+		const before = createDataStore({ transport: first.transport, persist: durable(storage) });
+		await before.write(setRead, { id: 'a', read: true });
+		await vi.waitFor(() => expect(failed).toBe(true));
+
+		rejectMarks = false;
+		const { remote } = restart(storage, first);
+		await vi.waitFor(() => expect(remote.log).toEqual(['read receipt']));
+		await saved();
+		const again = restart(storage, remote);
+		await saved();
+		expect(again.remote.log).toEqual([]);
 	});
 
 	it('removes a settled write from the journal after a failed removal', async () => {
@@ -1192,6 +1265,64 @@ describe('octane/data feeds across restarts', () => {
 		expect(feedLog.cursors).toEqual([null, '0']);
 		expect(remote.log).toEqual(['read receipt']);
 		shown.stop();
+	});
+
+	it('resumes before a feed update whose value could not be saved', async () => {
+		const inner = memoryStorage();
+		let failValues = false;
+		let failed = false;
+		const storage: PersistentStorage = {
+			...inner,
+			commit(partition, put, remove) {
+				if (
+					failValues &&
+					put.some(({ meta, value }) => value !== undefined && meta.key !== partition)
+				) {
+					failed = true;
+					return Promise.reject(new Error('value store unavailable'));
+				}
+				return inner.commit(partition, put, remove);
+			},
+		};
+		const collection = read({
+			name: shelf.name,
+			output: shelf.output,
+			fresh: 60_000,
+		});
+		const replacements = feed({
+			name: 'first-book',
+			event: schema<Book>(isBook),
+			changes: (book) => ({ read: collection, input: undefined, value: [book] }),
+			covers: [],
+		});
+		const feedLog = history();
+		const remote = server(books());
+		const open = () =>
+			createDataStore({
+				transport: remote.transport,
+				persist: cache(storage, 'ada'),
+				listen: feedLog.listener,
+			});
+		const before = open();
+		const original = await value<Book[]>(before, collection);
+		const stop = listen(before, replacements).subscribe(() => {});
+		await vi.waitFor(() => expect(feedLog.cursors).toEqual([null]));
+		await saved();
+
+		failValues = true;
+		const renamed = { ...books()[0]!, title: 'New title' };
+		feedLog.publish(renamed);
+		await vi.waitFor(() => expect(original.handle.getSnapshot().value![0]).toEqual(renamed));
+		await vi.waitFor(() => expect(failed).toBe(true));
+		stop();
+		await saved();
+
+		failValues = false;
+		const after = open();
+		const shown = await value<Book[]>(after, collection);
+		stops.push(listen(after, replacements).subscribe(() => {}));
+		await vi.waitFor(() => expect(feedLog.cursors).toEqual([null, '0']));
+		await vi.waitFor(() => expect(shown.handle.getSnapshot().value![0]).toEqual(renamed));
 	});
 
 	it('restores stale a saved value that missed an event because it was not in memory', async () => {
