@@ -20,6 +20,7 @@ import type * as Client from '../index.js';
 import type { OctaneNode } from '../index.js';
 import type { Read, View, Write } from './contracts.js';
 import { formViews, type FormView } from './form.js';
+import { pages, type PagesSnapshot } from './pages.js';
 import type { DataStore, ReadSnapshot } from './store.js';
 
 type Runtime = Pick<
@@ -45,6 +46,14 @@ export interface OctaneDataBinding {
 		<O>(read: Read<void, O>): O;
 		<T>(read: View<void, T>): T[];
 		<I, O>(read: Read<I, O>, input: I): O;
+	};
+	/**
+	 * A view read a page at a time, as one list. `more` says whether another page
+	 * has rows, and `loadMore` shows it. Like `useReadState`, it does not suspend.
+	 */
+	usePages: {
+		<T>(view: View<void, T>): PagesSnapshot<T>;
+		<P, T>(view: View<P, T>, params: P): PagesSnapshot<T>;
 	};
 	/** A stable function that submits a write through the store. */
 	useWrite<I, O>(write: Write<I, O>): (input: I) => Promise<O>;
@@ -87,6 +96,13 @@ export function createOctaneDataBinding(runtime: Runtime): OctaneDataBinding {
 		return snapshot.value;
 	}
 
+	function usePages(view: View<any, any>, params?: unknown, slot?: symbol) {
+		const [value, hookSlot] = split(params, slot);
+		// Equal arguments resolve to one handle, so its methods are stable across renders.
+		const handle = pages(useDataStore(), view, value);
+		return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot, hookSlot);
+	}
+
 	const formView = formViews(createElement as (type: string, props: object) => OctaneNode);
 
 	function useForm(write: Write<any, any>, key?: unknown, slot?: symbol) {
@@ -111,6 +127,7 @@ export function createOctaneDataBinding(runtime: Runtime): OctaneDataBinding {
 		useDataStore,
 		useReadState,
 		useRead,
+		usePages,
 		useWrite,
 		useForm,
 	} as OctaneDataBinding;
