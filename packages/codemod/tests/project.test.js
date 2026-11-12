@@ -42,6 +42,50 @@ function typecheckProject(root) {
 }
 
 describe('runCodemod', () => {
+	it.each(['', ', undefined'])(
+		'keeps fresh imperative handles in Strong mode with deps %j',
+		async (deps) => {
+			const root = project({
+				'Fresh.tsx': `import { useImperativeHandle } from 'react';
+export function Fresh({ ref, label }) {
+	function read() { return label; }
+	useImperativeHandle(ref, () => ({ read })${deps});
+	return <p onClick={() => read()}>{String(label)}</p>;
+}`,
+				'Stable.tsx': `import { useImperativeHandle } from 'react';
+function stable() { return 'shared'; }
+export function Stable({ ref }) {
+	function read() { return 'initial'; }
+	read = stable;
+	useImperativeHandle(ref, () => ({ read })${deps});
+	return <p>shared</p>;
+}`,
+				'Redeclared.jsx': `import { useImperativeHandle } from 'react';
+const shared = () => 'shared';
+function useHandle(ref, label) {
+	function read() { return label; }
+	var read = shared;
+	useImperativeHandle(ref, () => ({ read })${deps});
+}
+export function Redeclared({ ref, label }) {
+	useHandle(ref, label);
+	return <p>shared</p>;
+}`,
+			});
+			const { files } = await runCodemod([root], { write: false, strong: true });
+			const fresh = files.find((file) => file.file === 'Fresh.tsx');
+			const stable = files.find((file) => file.file === 'Stable.tsx');
+			expect(fresh).toMatchObject({ strong: true, diagnostics: [] });
+			const redeclared = files.find((file) => file.file === 'Redeclared.jsx');
+			for (const file of [stable, redeclared]) {
+				expect(file).toMatchObject({ strong: false });
+				expect(file.diagnostics).toContainEqual(
+					expect.objectContaining({ code: 'OCTANE_STRONG_UNTRACKED_EFFECT' }),
+				);
+			}
+		},
+	);
+
 	it('preserves mapped children passed to an imported inspection component under Vite', async () => {
 		const root = project({
 			'package.json': '{"type":"module"}',

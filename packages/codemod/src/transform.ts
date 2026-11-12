@@ -3410,8 +3410,59 @@ class ModuleTransform {
 	}
 
 	/**
+	 * A render-local function has a fresh identity each time the component runs.
+	 * Tracking that identity refreshes the handle on each render.
+	 */
+	freshHandleDependency(node: ts.CallExpression, name: string) {
+		const [ref, factory] = node.arguments;
+		const statement = node.parent;
+		if (
+			!this.strong ||
+			name !== 'useImperativeHandle' ||
+			node.questionDotToken ||
+			ts.isSpreadElement(ref) ||
+			!ts.isArrowFunction(factory) ||
+			factory.modifiers?.length ||
+			factory.parameters.length ||
+			ts.isBlock(factory.body) ||
+			!ts.isExpressionStatement(statement) ||
+			!ts.isBlock(statement.parent) ||
+			!isFunctionLike(statement.parent.parent)
+		)
+			return;
+		const object = skipParens(factory.body);
+		if (!ts.isObjectLiteralExpression(object) || object.properties.length !== 1) return;
+		const [field] = object.properties;
+		if (!ts.isShorthandPropertyAssignment(field) || field.objectAssignmentInitializer) return;
+		const method = this.declarationOf(field.name);
+		if (
+			!method ||
+			!ts.isFunctionDeclaration(method) ||
+			method.parent !== statement.parent ||
+			!method.body
+		)
+			return;
+		const binding = method.name;
+		if (
+			!binding ||
+			this.localUses(binding).some(
+				(use) =>
+					use !== field.name && !(ts.isCallExpression(use.parent) && use.parent.expression === use),
+			) ||
+			// TypeScript can bind a function and a same-named var to separate symbols.
+			reads(
+				statement.parent.parent,
+				(id) =>
+					id.text === 'eval' || (id !== binding && id.text === binding.text && declaresName(id)),
+			)
+		)
+			return;
+		return `[${field.name.getText(this.sf)}]`;
+	}
+
+	/**
 	 * React runs a hook with an omitted or undefined list on every render.
-	 * Octane spells that schedule with `null`, including in Strong migrations.
+	 * Octane spells that schedule with `null` or a fresh dependency.
 	 */
 	rewriteDependencies(node: ts.CallExpression, name: string) {
 		const depsIndex = DEPENDENCY_HOOKS[name];
@@ -3422,16 +3473,18 @@ class ModuleTransform {
 			this.count(RULE.deps);
 			return (
 				this.span(node, node.getStart(this.sf), deps.getStart(this.sf), PLAIN) +
-				'null' +
+				(this.freshHandleDependency(node, name) ?? 'null') +
 				this.source.slice(deps.end, node.end)
 			);
 		}
 		if (node.arguments.length !== depsIndex) return null;
 		this.count(RULE.deps);
 		const last = node.arguments[node.arguments.length - 1];
+		const deps = this.freshHandleDependency(node, name) ?? 'null';
 		return (
 			this.span(node, node.getStart(this.sf), last.end, PLAIN) +
-			', null' +
+			', ' +
+			deps +
 			this.source.slice(last.end, node.end)
 		);
 	}
