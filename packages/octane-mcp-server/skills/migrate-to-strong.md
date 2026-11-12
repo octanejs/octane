@@ -19,8 +19,8 @@ terminal. Reference: https://octanejs.dev/docs/strong-mode
    module as if it were Strong and reports the findings by code without failing
    the run. Note which modules are already clean and which idioms dominate.
 2. **Apply the mechanical rewrites.** Run `octane analyze --strong-preview --fix`
-   (add `--dry-run` to preview). It rewrites React's lazy ref initialization to
-   `useLazyRef`. Manual `useMemo` and `useCallback` calls remain valid. Without
+   (add `--dry-run` to preview). It can migrate setter-less state to
+   `useInitialValue` and lazy ref initialization to `useLazyRef`. Manual `useMemo` and `useCallback` calls remain valid. Without
    `--strong-preview`, `--fix` only rewrites modules that are already Strong.
    Review the diff and run the tests before going further.
 3. **Opt in one module.** Put `"use strong"` at the top of the file, before
@@ -56,6 +56,7 @@ terminal. Reference: https://octanejs.dev/docs/strong-mode
 
 | React idiom | Strong replacement | Codes |
 | --- | --- | --- |
+| `const [value] = useState(initial)` | `const value = useInitialValue(initial)` (`initial-value`) | `OCTANE_STRONG_READ_ONLY_STATE` |
 | `if (ref.current === null) ref.current = create()` | `const ref = useLazyRef(() => create())` (`lazy-ref`) | `OCTANE_STRONG_RENDER_REF_READ`, `OCTANE_STRONG_RENDER_REF_WRITE` |
 | `useLayoutEffect(() => setWidth(el.current.offsetWidth))` | `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 })` (`layout-measurement`) | `OCTANE_STRONG_EFFECT_STATE_UPDATE` |
 | `ref={(el) => { if (el) setWidth(el.offsetWidth); }}` | `ref={el}` and `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 })` (`ref-measurement`) | `OCTANE_STRONG_REF_STATE_UPDATE` |
