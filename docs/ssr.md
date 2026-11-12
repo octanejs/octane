@@ -866,6 +866,12 @@ code of their own:
   hydration loads nothing. It waits for the document to finish parsing first,
   because the seed follows the page's content.
 
+A data seed carries each read's age when the server finishes the render. The
+browser adds the time spent in its store before a read is first used. If the
+host knows how long a seed spent in transit or in an HTML cache, pass that
+duration in milliseconds as `seedAge` to `createDataStore`. The default is
+zero. Server and browser clocks can differ.
+
 `@octanejs/vite-plugin` and `@octanejs/rsbuild-plugin` both do this.
 
 `serverTransport` encodes each request with devalue, as `httpTransport` does,

@@ -532,6 +532,69 @@ describe('octane/data server render and hydration', () => {
 		await saved;
 	});
 
+	it('refreshes a read invalidated before the server sent its seed', async () => {
+		const server = createServer();
+		const contract = { ...todos, tags: ['shelf'], fresh: 60_000 };
+		const rendering = createDataStore({ transport: server.transport });
+		await rendering.prefetch(contract, undefined);
+		rendering.invalidate(['shelf']);
+		const client = createDataStore({ transport: server.transport, seed: rendering.dehydrate() });
+		const list = client.read(contract, undefined);
+		expect(list.getSnapshot().stale).toBe(true);
+		const stop = list.subscribe(() => {});
+		await vi.waitFor(() => expect(server.log).toEqual(['list', 'list']));
+		stop();
+		await rendering.retire();
+		await client.retire();
+	});
+
+	it.each([-86_400_000, 86_400_000])(
+		'counts elapsed client time and supplied seed age with a client clock skew of %i ms',
+		async (skew) => {
+			vi.useFakeTimers();
+			try {
+				const server = createServer();
+				const contract = { ...todos, expire: 100, fresh: 100 };
+				const seed = await serverRender(server, contract);
+				vi.setSystemTime(Date.now() + skew);
+				const open = (seedAge?: number) =>
+					createDataStore({ transport: server.transport, seed, seedAge });
+				const immediately = open();
+				expect(immediately.read(contract, undefined).getSnapshot().status).toBe('ready');
+				const late = open();
+				const inTransit = open(75);
+				vi.advanceTimersByTime(30);
+				expect(inTransit.read(contract, undefined).getSnapshot().status).toBe('pending');
+				vi.advanceTimersByTime(70);
+				expect(late.read(contract, undefined).getSnapshot().status).toBe('pending');
+				await Promise.all([immediately.retire(), late.retire(), inTransit.retire()]);
+			} finally {
+				vi.useRealTimers();
+			}
+		},
+	);
+
+	it('falls back to a load when asynchronous seed validation rejects', async () => {
+		const server = createServer();
+		const seed = await serverRender(server);
+		const output = {
+			'~standard': {
+				...todos.output['~standard'],
+				async validate(value: unknown) {
+					if ((value as TodoItem[])[0]?.title === 'Tides') throw new Error('old value');
+					return { value: value as TodoItem[] };
+				},
+			},
+		};
+		server.rows[0]!.title = 'Atoll';
+		const contract = { ...todos, output };
+		const client = createDataStore({ transport: server.transport, seed });
+		await client.prefetch(contract, undefined);
+		expect(client.read(contract, undefined).getSnapshot().value?.[0]?.title).toBe('Atoll');
+		await settled();
+		await client.retire();
+	});
+
 	it('runs the same validation in process as over HTTP', async () => {
 		const server = createServer();
 		const transport = server.handler.transport(page);
@@ -823,7 +886,7 @@ describe('octane/data publish and forget', () => {
 				version: 1,
 				vendor: 'test',
 				validate: (value: any) =>
-					new Promise((resolve) =>
+					new Promise<{ value: TodoItem[] }>((resolve) =>
 						setTimeout(() => resolve({ value }), value[0].title === 'Older' ? 20 : 0),
 					),
 			},
