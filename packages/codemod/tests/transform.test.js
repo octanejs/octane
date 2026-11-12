@@ -1,7 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { JSDOM } from 'jsdom';
 import { collectDiagnostics } from 'octane/compiler';
+import * as ReactServerBridge from 'octane/react/server';
 import { renderToStaticMarkup } from 'octane/server';
+import { prerender } from 'octane/static';
+import { createElement as reactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
 import { loadCompiler, strengthen, transformModule } from '../dist/index.js';
@@ -918,6 +922,46 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		expect(migrate("export { Toaster } from 'toast-kit';\n").notes).toMatchObject([
 			{ rule: 'bindings', severity: 'warning' },
 		]);
+	});
+
+	it.each([
+		['named alias', "import { ReactCompatInline as Inline } from 'octane/react';", 'Inline'],
+		[
+			'server namespace',
+			"import * as Bridge from 'octane/react/server';",
+			'Bridge.ReactCompatInline',
+		],
+	])('keeps a %s inline React boundary inside its paragraph', async (_, imported, tag) => {
+		const source = `${imported}
+			import { Badge } from 'badge-kit';
+			export function View() {
+				return <p><${tag}><Badge /></${tag}></p>;
+			}`;
+		const result = transformModule(source, 'View.tsx', {
+			target: 'tsrx',
+			strong: true,
+			reactCompat: true,
+			unported: (module) => (module === 'badge-kit' ? module : null),
+		});
+		expect(result.notes.filter((note) => note.severity === 'error')).toEqual([]);
+		expect(result.rules['react-compat']).toBeUndefined();
+		const { View } = loadCompiledFixtureSource(result.code, {
+			id: 'View.tsrx',
+			mode: 'server',
+			runtimeModules: {
+				'octane/react/server': ReactServerBridge,
+				'badge-kit': { Badge: () => reactElement('b', null, 'badge') },
+			},
+		});
+		const { html } = await prerender(View, {});
+		const dom = new JSDOM(html);
+		try {
+			const { document } = dom.window;
+			expect(document.querySelector('p > span[data-react-compat] > b')?.textContent).toBe('badge');
+			expect(document.querySelectorAll('[data-react-compat]')).toHaveLength(1);
+		} finally {
+			dom.window.close();
+		}
 	});
 
 	it('passes a text field wrapper its rest props `onChange` as `onInput`', () => {
