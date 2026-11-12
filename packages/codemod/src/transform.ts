@@ -1,3 +1,4 @@
+import { svgDataAttribute } from './path-svg.js';
 import {
 	forwardedProps,
 	literalJsxAttribute,
@@ -7,7 +8,7 @@ import {
 	svgLocalReads,
 } from './forwarded-props.js';
 import { reactRenderer, staticReactProps } from './react-renderer.js';
-import { localUses, walkLocalValues } from './local-uses.js';
+import { localUses, scalar, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
 import { effectReceivers, fixedBinding } from './effect-receivers.js';
@@ -54,7 +55,7 @@ const PLAIN = { template: false };
 const DESCRIPTOR = { template: false, descriptor: true };
 /** The local component that wraps an element no island can host and throws its `error`. */
 const NO_PORT = 'NoOctanePort';
-const syntheticSubmitMembers = {
+const syntheticEventMembers = {
 	nativeEvent: 'unknown',
 	persist: '() => void',
 	isDefaultPrevented: '() => boolean',
@@ -372,6 +373,26 @@ function nodeSpanning(sf: ts.SourceFile, start: number, end: number): ts.Node | 
 	}
 }
 
+function rowKeyLiteral(node: ts.Expression) {
+	node = skipWrappers(node);
+	if (ts.isPrefixUnaryExpression(node)) {
+		const operand = skipWrappers(node.operand);
+		if (node.operator === ts.SyntaxKind.PlusToken) return ts.isNumericLiteral(operand);
+		return (
+			node.operator === ts.SyntaxKind.MinusToken &&
+			(ts.isNumericLiteral(operand) || ts.isBigIntLiteral(operand))
+		);
+	}
+	return (
+		ts.isStringLiteralLike(node) ||
+		ts.isNumericLiteral(node) ||
+		ts.isBigIntLiteral(node) ||
+		node.kind === ts.SyntaxKind.TrueKeyword ||
+		node.kind === ts.SyntaxKind.FalseKeyword ||
+		node.kind === ts.SyntaxKind.NullKeyword
+	);
+}
+
 /**
  * The attribute an element sets by `name`.
  */
@@ -567,12 +588,14 @@ function isComponentName(name: string) {
 class ModuleTransform {
 	readonly source: string;
 	readonly filename: string;
-	private submitParameters?: Set<ts.ParameterDeclaration>;
+	private reactEventParameters?: Set<ts.ParameterDeclaration>;
 	readonly options: TransformOptions;
 	readonly target: 'tsrx' | 'tsx';
 	readonly strong: boolean;
 	readonly effectAliases?: Map<ts.Expression, string>;
 	readonly effectSnapshots?: Map<ts.ExpressionStatement, string[]>;
+	private snapshotEdits?: Map<ts.Node, string>;
+	private snapshotCaptures?: Map<ts.ArrowFunction, string[]>;
 	/** React imports read as values, not only as types. */
 	readonly valueUses = new Set<string>();
 	hasSignalRuntime?: boolean;
@@ -905,15 +928,32 @@ class ModuleTransform {
 			this.reactRendererBodies.set(element, tag + ', ' + props);
 		}
 		let hasEval = false;
-		if (this.source.includes('SubmitEvent') || this.source.includes('\\u'))
-			this.submitParameters = this.indexSubmitParameters();
+		const snapshots: ts.VariableDeclaration[] = [];
+		if (
+			this.source.includes('SubmitEvent') ||
+			this.source.includes('ReactEventHandler') ||
+			this.source.includes('\\u')
+		)
+			this.reactEventParameters = this.indexReactEventParameters();
 		const fields: ts.JsxOpeningLikeElement[] = [];
 		/** Values read as an element: cloned, inspected, or a `render` prop. */
 		const elements: ts.Expression[] = [];
 		const visit = (node: ts.Node) => {
-			if (ts.isParameter(node) && this.submitParameters?.has(node)) this.checkSubmitParameter(node);
+			if (ts.isParameter(node) && this.reactEventParameters?.has(node))
+				this.checkReactEventParameter(node);
 			if (ts.isIdentifier(node) && declaresName(node)) this.declared.add(node.text);
-			if (this.options.pathSvgAdapter && ts.isIdentifier(node) && node.text === 'eval')
+			if (
+				this.options.captureEffectSnapshots &&
+				ts.isVariableDeclaration(node) &&
+				ts.isArrayBindingPattern(node.name) &&
+				node.name.elements.length === 1
+			)
+				snapshots.push(node);
+			if (
+				(this.options.pathSvgAdapter || this.options.captureEffectSnapshots) &&
+				ts.isIdentifier(node) &&
+				node.text === 'eval'
+			)
 				hasEval = true;
 			if (ts.isIdentifier(node) && portLocals.has(node.text)) this.planUnported(node);
 			if (isJsx(node)) this.hasJsx = true;
@@ -933,6 +973,7 @@ class ModuleTransform {
 			ts.forEachChild(node, visit);
 		};
 		visit(this.sf);
+		if (!hasEval) for (const decl of snapshots) this.planEffectSnapshot(decl);
 		if (this.hasReactBridge) {
 			// A namespace used only for the native bridge needs no missing-port report.
 			for (const module of ['octane/react', 'octane/react/server']) {
@@ -1182,10 +1223,231 @@ class ModuleTransform {
 							!!value.expression &&
 							this.svgClassName(value.expression)))
 				);
+			if (svgDataAttribute(attr.name.text)) return !!value && ts.isStringLiteral(value);
 			return attr.name.text === 'aria-hidden' && literalJsxAttribute(attr);
 		});
 		if (!supported) return false;
 		return this.nativeSvgOutput(tag, uses, unproven);
+	}
+
+	/** In a candidate module, locally constructed elements can leave only as this component's output. */
+	private elementsOnlyInReturn(owner: ts.FunctionDeclaration) {
+		const hooks = new Set(['useState', 'useEffect', 'useRef']);
+		const escapes = (node: ts.Node): boolean => {
+			if (isJsx(node)) {
+				if (!ts.isJsxSelfClosingElement(node)) return true;
+				let output: ts.Node = node;
+				while (
+					ts.isParenthesizedExpression(output.parent) ||
+					(ts.isConditionalExpression(output.parent) && output !== output.parent.condition)
+				)
+					output = output.parent;
+				if (
+					!ts.isReturnStatement(output.parent) ||
+					ts.findAncestor(output.parent, ts.isFunctionLike) !== owner
+				)
+					return true;
+			}
+			if (
+				ts.isCallExpression(node) &&
+				(node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+					(ts.isIdentifier(node.expression) && node.expression.text === 'require'))
+			)
+				return true;
+			if (
+				ts.isIdentifier(node) &&
+				this.apiLocals.has(node.text) &&
+				!this.inImport(node) &&
+				!inTypeNode(node)
+			) {
+				const api = this.importOf(node);
+				if (api && !api.typeOnly) {
+					const name =
+						api.namespace &&
+						ts.isPropertyAccessExpression(node.parent) &&
+						node.parent.expression === node
+							? node.parent.name.text
+							: api.imported;
+					if (api.module !== 'react' || !hooks.has(name)) return true;
+				}
+			}
+			return ts.forEachChild(node, (child) => escapes(child) || undefined) === true;
+		};
+		return !escapes(this.sf);
+	}
+
+	/** Standard library scalar observations can be captured at the same instant. */
+	private platformScalar(expr: ts.Expression): boolean {
+		const types = this.options.types;
+		const peer =
+			types?.sourceFile.text === this.source
+				? nodeSpanning(types.sourceFile, expr.getStart(), expr.end)
+				: expr;
+		if (!peer || peer.kind !== expr.kind) return false;
+		const check = peer === expr ? this.checker : types!.checker;
+		const member = ts.isCallExpression(peer) && !peer.arguments.length ? peer.expression : peer;
+		return (
+			ts.isPropertyAccessExpression(member) &&
+			ts.isIdentifier(member.expression) &&
+			[member.expression, member.name].every(
+				(id) => check.getSymbolAtLocation(id)?.valueDeclaration?.getSourceFile().hasNoDefaultLib,
+			) &&
+			scalar(check.getTypeAtLocation(peer))
+		);
+	}
+
+	/** Keep an immutable mount value in a ref when only sibling React effects observe it. */
+	private planEffectSnapshot(decl: ts.VariableDeclaration) {
+		const call = decl.initializer;
+		const element = ts.isArrayBindingPattern(decl.name) ? decl.name.elements[0] : undefined;
+		if (
+			!ts.isVariableDeclarationList(decl.parent) ||
+			!(decl.parent.flags & ts.NodeFlags.Const) ||
+			decl.type ||
+			!element ||
+			!ts.isBindingElement(element) ||
+			!ts.isIdentifier(element.name) ||
+			element.initializer ||
+			element.dotDotDotToken ||
+			!call ||
+			!ts.isCallExpression(call) ||
+			call.questionDotToken ||
+			call.arguments.length !== 1 ||
+			!ts.isArrowFunction(call.arguments[0]) ||
+			call.arguments[0].modifiers?.length
+		)
+			return;
+		const state = this.callee(call.expression);
+		if (
+			state?.module !== 'react' ||
+			state.name !== 'useState' ||
+			/\/[*/]/.test(decl.name.getText(this.sf)) ||
+			/\/[*/]/.test(call.expression.getText(this.sf))
+		)
+			return;
+
+		const name = element.name;
+		const owner = ts.findAncestor(decl, ts.isFunctionLike);
+		if (
+			!owner ||
+			!ts.isFunctionDeclaration(owner) ||
+			!owner.name ||
+			!ts.isSourceFile(owner.parent) ||
+			this.localUses(owner.name).some((ref) => !inTypeNode(ref))
+		)
+			return;
+		// Forward unchanged arguments, literals, and platform scalars in ordinary records.
+		// A callable or a local component result could have renderer-specific identity.
+		const data = (input: ts.Expression): boolean => {
+			const expr = skipWrappers(input);
+			if (ts.isObjectLiteralExpression(expr))
+				return expr.properties.every(
+					(field) =>
+						(ts.isPropertyAssignment(field) &&
+							(ts.isIdentifier(field.name) ||
+								ts.isStringLiteralLike(field.name) ||
+								ts.isNumericLiteral(field.name)) &&
+							field.name.text !== '__proto__' &&
+							data(field.initializer)) ||
+						(ts.isShorthandPropertyAssignment(field) &&
+							!field.objectAssignmentInitializer &&
+							data(field.name)),
+				);
+			if (ts.isIdentifier(expr)) {
+				const symbol = ts.isShorthandPropertyAssignment(expr.parent)
+					? this.checker.getShorthandAssignmentValueSymbol(expr.parent)
+					: this.checker.getSymbolAtLocation(expr);
+				const binding = symbol?.valueDeclaration;
+				if (
+					!binding ||
+					!(ts.isParameter(binding) || ts.isBindingElement(binding)) ||
+					!ts.isIdentifier(binding.name)
+				)
+					return false;
+				let param: ts.Node = binding;
+				while (ts.isBindingElement(param) && !param.initializer) param = param.parent.parent;
+				return (
+					ts.isParameter(param) &&
+					param.parent === owner &&
+					!param.initializer &&
+					fixedBinding(this.checker, binding.name, call)
+				);
+			}
+			if (ts.isBinaryExpression(expr) && expr.operatorToken.kind === ts.SyntaxKind.PlusToken)
+				return data(expr.left) && data(expr.right);
+			return (
+				ts.isStringLiteralLike(expr) ||
+				ts.isNumericLiteral(expr) ||
+				expr.kind === ts.SyntaxKind.NullKeyword ||
+				expr.kind === ts.SyntaxKind.TrueKeyword ||
+				expr.kind === ts.SyntaxKind.FalseKeyword ||
+				this.platformScalar(expr)
+			);
+		};
+		const body = call.arguments[0].body;
+		if (ts.isBlock(body) || !ts.isObjectLiteralExpression(skipWrappers(body)) || !data(body))
+			return;
+		const effectCallback = (call: ts.Node) => {
+			if (
+				!ts.isCallExpression(call) ||
+				call.questionDotToken ||
+				call.arguments.length !== 2 ||
+				!ts.isArrayLiteralExpression(call.arguments[1])
+			)
+				return;
+			const [callback] = call.arguments;
+			const hook = this.callee(call.expression);
+			if (
+				hook?.module !== 'react' ||
+				hook.name !== 'useEffect' ||
+				!ts.isArrowFunction(callback) ||
+				!ts.isBlock(callback.body) ||
+				callback.parameters.length ||
+				callback.modifiers?.length ||
+				ts.findAncestor(call, ts.isFunctionLike) !== owner
+			)
+				return;
+			// A capture must not displace a directive prologue.
+			const first = callback.body.statements[0];
+			if (first && ts.isExpressionStatement(first) && ts.isStringLiteral(first.expression)) return;
+			return callback;
+		};
+		const callbacks = new Set<ts.ArrowFunction>();
+		const deps: ts.Identifier[] = [];
+		for (const ref of this.localUses(name)) {
+			const list = ref.parent;
+			if (
+				ts.isArrayLiteralExpression(list) &&
+				ts.isCallExpression(list.parent) &&
+				list.parent.arguments[1] === list &&
+				effectCallback(list.parent)
+			) {
+				deps.push(ref);
+				continue;
+			}
+			const arrow = ts.findAncestor(
+				ref,
+				(n): n is ts.ArrowFunction =>
+					ts.isArrowFunction(n) && ref.pos >= n.body.pos && effectCallback(n.parent) === n,
+			);
+			if (!arrow) return;
+			callbacks.add(arrow);
+		}
+		if (!callbacks.size || !this.elementsOnlyInReturn(owner)) return;
+		let cell = name.text + 'Ref';
+		while (this.declared.has(cell) || this.readsGlobal(cell)) cell += '_';
+		this.declared.add(cell);
+		const edits = (this.snapshotEdits ??= new Map());
+		const joined = decl.name.getStart(this.sf) === decl.parent.getStart(this.sf) + 'const'.length;
+		edits.set(decl.name, joined ? ' ' + cell : cell);
+		edits.set(call, this.require('octane', 'useLazyRef', false));
+		for (const dep of deps) edits.set(dep, cell);
+		for (const cb of callbacks) {
+			const captures = (this.snapshotCaptures ??= new Map());
+			const prev = captures.get(cb) ?? [];
+			prev.push(`const ${name.text} = ${cell}.current;`);
+			captures.set(cb, prev);
+		}
 	}
 
 	private references?: ReturnType<typeof localUses>;
@@ -2097,31 +2359,40 @@ class ModuleTransform {
 	}
 
 	rewrite(node: ts.Node, ctx: Context): string | null {
+		const snapshot = this.snapshotEdits?.get(node);
+		if (snapshot)
+			return ts.isCallExpression(node)
+				? snapshot + this.span(node, node.expression.end, node.end, ctx)
+				: snapshot;
+		const stored = ts.isArrowFunction(node) ? this.snapshotCaptures?.get(node) : undefined;
 		const aliases = this.effectAliases;
-		if (aliases) {
-			if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) {
+		if (aliases || stored) {
+			if (aliases && (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node))) {
 				const alias = aliases.get(node);
 				if (alias) return alias;
 			}
 			if (ts.isArrowFunction(node)) {
 				const snapshots = ts.isBlock(node.body) ? this.effectSnapshots : undefined;
-				const captures = effectReceivers(
-					node,
-					this.checker,
-					(name) => {
-						const hook = this.callee(name);
-						return hook?.module === 'react' ? hook.name : null;
-					},
-					aliases,
-					snapshots &&
-						((statement, member, name) => {
-							if (aliases.has(member)) return;
-							const declarations = snapshots.get(statement) ?? [];
-							declarations.push(`const ${name} = ${this.emit(member, PLAIN)};`);
-							snapshots.set(statement, declarations);
-							aliases.set(member, name);
-						}),
-				);
+				const captures = aliases
+					? effectReceivers(
+							node,
+							this.checker,
+							(name) => {
+								const hook = this.callee(name);
+								return hook?.module === 'react' ? hook.name : null;
+							},
+							aliases,
+							snapshots &&
+								((statement, member, name) => {
+									if (aliases.has(member)) return;
+									const declarations = snapshots.get(statement) ?? [];
+									declarations.push(`const ${name} = ${this.emit(member, PLAIN)};`);
+									snapshots.set(statement, declarations);
+									aliases.set(member, name);
+								}),
+						)
+					: [];
+				if (stored) captures.unshift(...stored);
 				if (captures.length) {
 					const { body } = node;
 					const block = ts.isBlock(body);
@@ -2153,7 +2424,13 @@ class ModuleTransform {
 		if (ts.isImportDeclaration(node)) return this.rewriteImport(node);
 		if (ts.isExportDeclaration(node) && node.moduleSpecifier) return this.rewriteReexport(node);
 		if (ts.isCallExpression(node)) return this.rewriteCall(node);
-		if (ts.isPropertyAccessExpression(node)) return this.rewriteMember(node);
+		if (ts.isPropertyAccessExpression(node)) {
+			const text = this.rewriteMember(node);
+			if (text === null) this.checkProjectReactEventMember(node, node.name.text);
+			return text;
+		}
+		if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression))
+			this.checkProjectReactEventMember(node, node.argumentExpression.text);
 		if (ts.isQualifiedName(node)) return this.rewriteQualifiedType(node);
 		if (ts.isImportTypeNode(node)) return this.rewriteImportType(node);
 		if (ts.isTypeReferenceNode(node)) return this.rewriteTypeReference(node, node.typeName);
@@ -2452,13 +2729,17 @@ class ModuleTransform {
 					exports.elements[index + 1]?.getFullStart() ?? exports.end - 1,
 				);
 				const name = (item.propertyName ?? item.name).text;
-				if (name === 'SubmitEvent' || name === 'SubmitEventHandler') {
+				if (
+					name === 'SubmitEvent' ||
+					name === 'SubmitEventHandler' ||
+					name === 'ReactEventHandler'
+				) {
 					retained.push(text);
 					this.note(
 						RULE.unsupported,
 						'error',
 						item,
-						'Review the React submit event re-export and define an explicit native event type.',
+						'Review the React event re-export and define an explicit native event type.',
 					);
 				} else {
 					migrated.push(text);
@@ -2565,7 +2846,7 @@ class ModuleTransform {
 		const qualifier = node.qualifier;
 		const name = qualifier && ts.isIdentifier(qualifier) ? qualifier.text : null;
 		if (specifier.text === 'react' && !node.isTypeOf) {
-			const event = this.nativeSubmitType(node, name);
+			const event = this.nativeEventType(node, name);
 			if (event !== undefined) {
 				if (event !== null) this.count(RULE.import);
 				return event;
@@ -2874,7 +3155,7 @@ class ModuleTransform {
 		if (ts.isQualifiedName(name) && this.isGlobalNamespace(name.left, 'JSX'))
 			this.require('octane', 'JSX', true);
 		const imported = this.reactTypeName(name);
-		const event = this.nativeSubmitType(node, imported);
+		const event = this.nativeEventType(node, imported);
 		if (event) {
 			this.count(RULE.import);
 			return event;
@@ -3360,8 +3641,20 @@ class ModuleTransform {
 		return { fn: param.parent, param };
 	}
 
-	private nativeSubmitType(node: ts.NodeWithTypeArguments, name: string | null) {
-		if (name !== 'SubmitEvent' && name !== 'SubmitEventHandler') return undefined;
+	private nativeEventType(node: ts.NodeWithTypeArguments, name: string | null) {
+		const genericHandler = name === 'ReactEventHandler';
+		if (!genericHandler && name !== 'SubmitEvent' && name !== 'SubmitEventHandler')
+			return undefined;
+		const target = node.typeArguments?.[0];
+		const type = (name: string) =>
+			ts.isExternalModule(this.sf)
+				? this.require('octane', name, true)
+				: `import(${this.quote}octane${this.quote}).${name}`;
+		if (genericHandler) {
+			const native = type('NativeEvent');
+			const event = target ? `${native}<${this.emit(target, PLAIN)}>` : native;
+			return `${type('EventHandler')}<${event}>`;
+		}
 		const global = this.checker.resolveName(
 			'globalThis',
 			node,
@@ -3377,11 +3670,6 @@ class ModuleTransform {
 			);
 			return null;
 		}
-		const target = node.typeArguments?.[0];
-		const type = (name: string) =>
-			ts.isExternalModule(this.sf)
-				? this.require('octane', name, true)
-				: `import(${this.quote}octane${this.quote}).${name}`;
 		const host = target ? this.emit(target, PLAIN) : 'globalThis.Element';
 		const event = `${type('NativeEvent')}<${host}, globalThis.SubmitEvent>`;
 		return name === 'SubmitEventHandler' ? `${type('EventHandler')}<${event}>` : event;
@@ -3389,7 +3677,7 @@ class ModuleTransform {
 
 	/** Let the isolated checker propagate the original React types through
 	 * assertions and contextual signatures, without changing ordinary binding. */
-	private indexSubmitParameters() {
+	private indexReactEventParameters() {
 		const names = new Set<string>();
 		const edits: { start: number; end: number; handler: boolean }[] = [];
 		const original: ts.ParameterDeclaration[] = [];
@@ -3405,11 +3693,12 @@ class ModuleTransform {
 				return [node.typeArguments[0], node.typeArguments[1]];
 		};
 		const replace = (name: string | null, first: ts.Node, last = first) => {
-			if (name === 'SubmitEvent' || name === 'SubmitEventHandler')
+			const handler = name === 'SubmitEventHandler' || name === 'ReactEventHandler';
+			if (name === 'SubmitEvent' || handler)
 				edits.push({
 					start: first.getStart(this.sf),
 					end: last.end,
-					handler: name === 'SubmitEventHandler',
+					handler,
 				});
 		};
 		const collect = (node: ts.Node) => {
@@ -3433,7 +3722,7 @@ class ModuleTransform {
 		};
 		collect(this.sf);
 		if (!edits.length || (!original.length && !projections.length)) return undefined;
-		let markerName = '__octaneSubmit';
+		let markerName = '__octaneChecked';
 		while (
 			[markerName, markerName + 'Event', markerName + 'Handler'].some((name) => names.has(name))
 		)
@@ -3451,7 +3740,7 @@ class ModuleTransform {
 		}
 		pieces.push(this.source.slice(offset));
 		const analysis = pieces.join('');
-		const synthetic = Object.entries(syntheticSubmitMembers)
+		const synthetic = Object.entries(syntheticEventMembers)
 			.map(([name, type]) => `${name}: ${type};`)
 			.join(' ');
 		const { sf, checker } = bind(
@@ -3517,7 +3806,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		const syntheticKey = (type: ts.Type): boolean =>
 			type.isUnion()
 				? type.types.some(syntheticKey)
-				: type.isStringLiteral() && Object.hasOwn(syntheticSubmitMembers, type.value);
+				: type.isStringLiteral() && Object.hasOwn(syntheticEventMembers, type.value);
 		if (selections.length === projections.length) {
 			for (const [index, [object, key]] of selections.entries()) {
 				const source = projections[index];
@@ -3532,7 +3821,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 						RULE.unsupported,
 						'error',
 						source,
-						'This submit event type selects a member available only on React synthetic events. Review the native annotation.',
+						'This event type selects a member available only on React synthetic events. Review the native annotation.',
 					);
 			}
 		}
@@ -3558,16 +3847,9 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return result;
 	}
 
-	private checkSubmitParameter(param: ts.ParameterDeclaration) {
-		const report = (node: ts.Node) =>
-			this.note(
-				RULE.eventObject,
-				'error',
-				node,
-				'This React SubmitEvent use needs review. Octane passes a native SubmitEvent with a typed currentTarget.',
-			);
+	private checkReactEventParameter(param: ts.ParameterDeclaration) {
 		if (!ts.isIdentifier(param.name) || param.dotDotDotToken) {
-			report(param);
+			this.reportReactEventUse(param);
 			return;
 		}
 		for (const ref of renderUses(this.localUses(param.name))) {
@@ -3577,7 +3859,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				access.expression !== ref ||
 				ts.findAncestor(access, ts.isFunctionLike) !== param.parent
 			) {
-				report(ref);
+				this.reportReactEventUse(ref);
 				continue;
 			}
 			const member = access.name.text;
@@ -3598,14 +3880,60 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				)
 			)
 				continue;
-			report(access);
+			this.reportReactEventUse(access);
 		}
+	}
+
+	private checkProjectReactEventMember(
+		node: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+		name: string,
+	) {
+		if (!Object.hasOwn(syntheticEventMembers, name)) return;
+		const parameter = this.parameterOf(node.expression);
+		if (parameter && this.reactEventParameters?.has(parameter.param)) return;
+		// A contextual handler can acquire its synthetic event type in another module.
+		const event = this.projectType(node.expression)?.type.getNonNullableType();
+		if (event?.getSymbol()?.name !== 'SyntheticEvent') return;
+		if (
+			!event
+				.getProperty(name)
+				?.declarations?.some(
+					(member) =>
+						ts.isInterfaceDeclaration(member.parent) &&
+						member.parent.name.text === 'BaseSyntheticEvent' &&
+						/[/\\]node_modules[/\\]@types[/\\]react[/\\]/.test(member.getSourceFile().fileName),
+				)
+		)
+			return;
+		if (
+			ts.findAncestor(
+				node,
+				(parent) =>
+					(ts.isJsxElement(parent) || ts.isJsxSelfClosingElement(parent)) &&
+					(this.islands.has(parent) ||
+						this.reactRendererBodies.has(parent) ||
+						this.reactCompatTag(
+							ts.isJsxElement(parent) ? parent.openingElement.tagName : parent.tagName,
+						)),
+			)
+		)
+			return;
+		this.reportReactEventUse(node);
+	}
+
+	private reportReactEventUse(node: ts.Node) {
+		this.note(
+			RULE.eventObject,
+			'error',
+			node,
+			'This React event use needs review. Octane passes a native event with a typed currentTarget.',
+		);
 	}
 
 	isEventParameter(node: ts.Node) {
 		const found = this.parameterOf(node);
 		if (!found) return false;
-		if (this.submitParameters?.has(found.param)) return false;
+		if (this.reactEventParameters?.has(found.param)) return false;
 		const type = found.param.type;
 		if (type && ts.isTypeReferenceNode(type) && /Event$/.test(type.typeName.getText(this.sf))) {
 			return true;
@@ -4339,6 +4667,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				);
 				return null;
 			}
+			if (setup.length && !this.rowKeyCanMove(key, item, iterable, setup)) {
+				this.note(
+					RULE.for,
+					'warning',
+					attribute,
+					'This row runs setup before reading its key, so the list stays a `.map()`.',
+				);
+				return null;
+			}
 			this.removed.add(attribute);
 			const opening = attribute.parent.parent;
 			if (
@@ -4432,6 +4769,41 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			return node.forEachChild(exitsWithValue);
 		};
 		return statements.some(exitsWithValue) ? null : exits;
+	}
+
+	/** An @for header evaluates its key before the row body runs. */
+	rowKeyCanMove(
+		key: ts.Expression,
+		item: ts.ParameterDeclaration,
+		iterable: ts.Expression,
+		setup: ts.Statement[],
+	) {
+		if (!ts.isIdentifier(item.name)) return false;
+		if (rowKeyLiteral(key)) return true;
+		key = skipWrappers(key);
+		const source = skipWrappers(iterable);
+		if (
+			ts.isIdentifier(key) &&
+			this.declarationOf(key) === item &&
+			ts.isArrayLiteralExpression(source) &&
+			source.elements.every(rowKeyLiteral) &&
+			fixedBinding(this.checker, key, key)
+		) {
+			return true;
+		}
+
+		// Even an accessor key can precede initialization that reads nothing.
+		return (
+			setup.every(
+				(statement) =>
+					ts.isVariableStatement(statement) &&
+					(statement.declarationList.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
+					statement.declarationList.declarations.every(
+						({ name, initializer }) =>
+							ts.isIdentifier(name) && initializer !== undefined && rowKeyLiteral(initializer),
+					),
+			) && !reads(key, (name) => name.text === 'eval' && !isPropertyName(name))
+		);
 	}
 
 	readsLocals(expression: ts.Node, statements: ts.Statement[]) {

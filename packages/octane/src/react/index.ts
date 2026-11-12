@@ -88,6 +88,7 @@ export type {
 } from './shared.js';
 import { drainPassiveEffects } from '../runtime.js';
 import { readNearestProviderValue } from './fiber-adapter.js';
+import { reactResourceHints } from './resource-hints.js';
 
 // Structural bench/test hook (§13): provider walks happen only at discovery.
 export { __hostContextFiberWalks } from './fiber-adapter.js';
@@ -172,6 +173,7 @@ function shallowEqualProps(a: Record<string, unknown>, b: Record<string, unknown
 class HostedIslandController {
 	// ── RendererRegionOwnerBridge ──────────────────────────────────────────
 	active = true;
+	readonly resourceHints = reactResourceHints;
 
 	// ── controller state ───────────────────────────────────────────────────
 	host: HTMLElement | null = null;

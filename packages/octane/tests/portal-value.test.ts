@@ -1,6 +1,10 @@
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
+import { renderToString } from 'octane/server';
 import { mount } from './_helpers';
-import { createElement, createPortal, textSlot, flushSync } from '../src/index.js';
+import { loadServerFixture } from './_server-fixture.js';
+import { createElement, createPortal, textSlot, flushSync, hydrateRoot } from '../src/index.js';
+import { BodyPortalChild, BodyPortalValue } from './_fixtures/body-portal.tsrx';
 import {
 	ReturnPortal,
 	TernaryPortal,
@@ -15,6 +19,54 @@ import {
 	TextPortalFlip,
 	PortalCounter,
 } from './_fixtures/portal-value.tsrx';
+
+describe('document body portals', () => {
+	const server = loadServerFixture(join(import.meta.dirname, '_fixtures/body-portal.tsrx'));
+
+	it.each([
+		['BodyPortalValue', BodyPortalValue],
+		['BodyPortalChild', BodyPortalChild],
+	] as const)('hydrates and updates %s in the document body', (name, Portal) => {
+		const browserDocument = Object.getOwnPropertyDescriptor(globalThis, 'document')!;
+		let html: string;
+		Object.defineProperty(globalThis, 'document', { configurable: true, value: undefined });
+		try {
+			html = renderToString(server[name], { label: 'initial' }).html;
+		} finally {
+			Object.defineProperty(globalThis, 'document', browserDocument);
+		}
+
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		expect(container.textContent).toBe('');
+		document.body.append(container);
+		try {
+			const errors: unknown[] = [];
+			const root = hydrateRoot(
+				container,
+				Portal,
+				{ label: 'initial' },
+				{ onRecoverableError: (error) => errors.push(error) },
+			);
+			try {
+				flushSync(() => {});
+				const portal = document.body.querySelector('[data-body-portal]');
+				expect(portal?.textContent).toBe('initial');
+				expect(container.querySelector('[data-body-portal]')).toBeNull();
+
+				flushSync(() => root.render(Portal, { label: 'updated' }));
+				expect(document.body.querySelector('[data-body-portal]')).toBe(portal);
+				expect(portal?.textContent).toBe('updated');
+				expect(errors).toEqual([]);
+			} finally {
+				root.unmount();
+			}
+			expect(document.body.querySelector('[data-body-portal]')).toBeNull();
+		} finally {
+			container.remove();
+		}
+	});
+});
 
 // A createPortal(...) VALUE should render wherever any renderable value renders —
 // it must NOT require sitting at a host-element child position.

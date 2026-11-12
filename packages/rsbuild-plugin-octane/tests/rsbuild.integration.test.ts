@@ -228,6 +228,90 @@ export default defineConfig({
 	);
 }
 
+/** A routed app whose config names a `data` module: one store per request, seeded into the page. */
+function writeDataApp(root: string) {
+	write(
+		root,
+		'index.html',
+		`<!doctype html>
+<html>
+	<head><!--ssr-head--></head>
+	<body><div id="root"><!--ssr-body--></div></body>
+</html>
+`,
+	);
+	write(
+		root,
+		'src/data.ts',
+		`import { createDataStore, read, type DataStore, type StandardSchema } from 'octane/data';
+
+const list: StandardSchema<unknown, string[]> = {
+	'~standard': { version: 1, vendor: 'fixture', validate: (value) => ({ value: value as string[] }) },
+};
+export const notes = read({ name: 'notes', output: list });
+
+const fixture = globalThis as typeof globalThis & {
+	__fixtureDataRequests?: string[];
+	__fixtureStores?: DataStore[];
+};
+
+export default function open(seed: string | null): DataStore {
+	const store = createDataStore({
+		seed,
+		transport: async (request) => {
+			(fixture.__fixtureDataRequests ??= []).push(request.name);
+			return { ok: true, value: ['Tides', 'Kelp'] };
+		},
+	});
+	(fixture.__fixtureStores ??= []).push(store);
+	return store;
+}
+`,
+	);
+	write(
+		root,
+		'src/Notes.tsrx',
+		`import { useState } from 'octane';
+import { useRead } from 'octane/data/octane';
+import { notes } from './data.ts';
+
+function List() @{
+	const list = useRead(notes);
+	<ul data-notes="">
+		@for (const note of list; key note) {
+			<li>{note}</li>
+		}
+	</ul>
+}
+
+export function Notes() @{
+	const [clicks, setClicks] = useState(0);
+	<main>
+		<button data-clicks="" onClick={() => setClicks((count) => count + 1)}>{'clicks ' + clicks}</button>
+		@try {
+			<List />
+		} @pending {
+			<p>{'Loading'}</p>
+		}
+	</main>
+}
+`,
+	);
+	write(
+		root,
+		'octane.config.ts',
+		`import { defineConfig, RenderRoute } from '@octanejs/rsbuild-plugin';
+
+export default defineConfig({
+	build: { outDir: 'build', minify: false },
+	data: '/src/data.ts',
+	router: { routes: [new RenderRoute({ path: '/', entry: '/src/Notes.tsrx' })] },
+	server: { render: 'streaming' },
+});
+`,
+	);
+}
+
 function writeClientOnlyRendererApp(root: string) {
 	write(
 		root,
@@ -766,6 +850,71 @@ document.querySelector('#root')!.textContent = typeof Counter;
 			expect(rpcResponse.status, scenario.name).toBe(scenario.status);
 		}
 	}, 120_000);
+
+	it("opens the config's data store per request, seeds the page, and hydrates from the seed", async () => {
+		writeDataApp(root);
+		await build(root, { plugins: [pluginOctane({ hmr: false })] });
+
+		const fixture = globalThis as typeof globalThis & {
+			__fixtureDataRequests?: string[];
+			__fixtureStores?: Array<{ retired: boolean }>;
+		};
+		delete fixture.__fixtureDataRequests;
+		delete fixture.__fixtureStores;
+		const entry = pathToFileURL(join(root, 'build/server/entry.js'));
+		entry.searchParams.set('data-test', String(Date.now()));
+		const server = (await import(entry.href)) as {
+			handler: (request: Request) => Promise<Response>;
+		};
+		const response = await server.handler(new Request('http://example.test/'));
+		const html = await response.text();
+		expect(response.status).toBe(200);
+		expect(html).toContain('<li>Tides</li>');
+		// The seed follows the page's content, just before </body>.
+		const seedAt = html.indexOf('<script id="__octane_seed:data" type="application/json">');
+		expect(seedAt).toBeGreaterThan(html.indexOf('<li>Kelp</li>'));
+		expect(seedAt).toBeLessThan(html.lastIndexOf('</body>'));
+		expect(fixture.__fixtureDataRequests).toEqual(['notes']);
+		// One store for the request, retired once its response ended.
+		expect(fixture.__fixtureStores).toHaveLength(1);
+		expect(fixture.__fixtureStores![0]!.retired).toBe(true);
+
+		const instance = await createRsbuild({
+			cwd: root,
+			rsbuildConfig: {
+				plugins: [pluginOctane({ hmr: false })],
+				dev: { lazyCompilation: false },
+				mode: 'development',
+				server: { host: '127.0.0.1' },
+			} as any,
+		});
+		const started = await instance.startDevServer({ getPortSilently: true });
+		let page: import('playwright').Page | undefined;
+		try {
+			const browser = await getBrowser();
+			page = await browser.newPage();
+			const errors: string[] = [];
+			page.on('console', (message) => {
+				if (message.type() === 'error') errors.push(message.text());
+			});
+			page.on('pageerror', (error) => errors.push('pageerror: ' + String(error)));
+			await page.goto(`http://127.0.0.1:${started.port}/`, { waitUntil: 'load' });
+			// Interactive once hydrated.
+			await page.locator('[data-clicks]').click();
+			await page.locator('[data-clicks]', { hasText: 'clicks 1' }).waitFor({ timeout: 30_000 });
+			expect(await page.locator('[data-notes] li').allTextContents()).toEqual(['Tides', 'Kelp']);
+			// The browser's store started from the seed, so it asked for nothing.
+			expect(
+				await page.evaluate(
+					() => (globalThis as { __fixtureDataRequests?: string[] }).__fixtureDataRequests,
+				),
+			).toBeUndefined();
+			expect(errors).toEqual([]);
+		} finally {
+			await page?.close();
+			await started.server.close();
+		}
+	}, 180_000);
 
 	it('emits stable client-only chunks and hydrates one adopted generic region', async () => {
 		writeClientOnlyRendererApp(root);
