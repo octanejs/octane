@@ -216,7 +216,7 @@ Inside a retained React component, a rich-text callback such as `chunks => <stro
 
 ## Store hooks in linked workspace packages
 
-The codemod can migrate a named hook from a local `workspace:` dependency when it can read the TypeScript implementation, trace a React context read, and verify that the hook uses the same store code as a renderer-independent public entry. The public entry and hook names can vary. The supported runtime versions match the React Intl adapter above.
+The codemod can migrate a named hook from a local `workspace:` dependency when it can read the TypeScript implementation, trace a React context read, and verify that the hook uses the same store code as a renderer-independent public entry. The public entry and hook names can vary. The supported runtime versions match the React Intl adapter above. A top-level `const` can expose a second name for a handle already created by a verified shared factory. Consumers keep the original handle identity.
 
 Preview shows the native hook sources the codemod would add alongside the shared `octane-store-context.tsrx` and `octane-store-hooks.ts` helpers. The generated hooks call the original store, subscription, and snapshot functions. They retain React’s dependency lists and hook order. The application compiles these sources with its installed toolchain. When the workspace hook implementation changes, rerun the migration from its original React inputs in a clean checkout and review the new companions. A differing file at a generated path blocks the write.
 
