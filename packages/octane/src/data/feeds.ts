@@ -21,6 +21,7 @@ import {
 	entryKey,
 	internals,
 	rewrite,
+	seedCursorKey,
 	selections,
 	type DataStore,
 	type Entry,
@@ -121,7 +122,7 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 			restored = true;
 			// A previous session's cursor is older than the page's, so it replays everything this page missed.
 			if (source.persisted) cursor ??= await source.persisted.cursor(key);
-			cursor ??= source.seeded.get(key) ?? null;
+			if (params === undefined) cursor ??= source.seeded.get(seedCursorKey(feed.name)) ?? null;
 			if (signal.aborted) return;
 		}
 		let failures = 0;

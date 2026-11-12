@@ -353,6 +353,11 @@ export function entryKey(name: string, input: unknown): string {
 	return `${name}\nwire:${encoded}`;
 }
 
+/** @internal Keep the SSR seed format readable across client and server releases. Server feeds take no parameters. */
+export function seedCursorKey(feedName: string): string {
+	return feedName + '\nundefined';
+}
+
 /** @internal Copy-on-write replacement of the arrays and objects named in `replace`. */
 export function rewrite(value: unknown, replace: Map<unknown, unknown>): unknown {
 	if (replace.has(value)) return replace.get(value);
@@ -419,7 +424,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 							.then(
 								(reply) => {
 									if (reply.ok && typeof reply.value === 'string') {
-										cursors.push([entryKey(feed.name, undefined), reply.value]);
+										cursors.push([seedCursorKey(feed.name), reply.value]);
 									}
 								},
 								// Without a position the browser's feed starts from its connection.
