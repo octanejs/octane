@@ -1661,7 +1661,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			for (const entry of entries.values()) {
 				for (const name of names) {
 					if (!entry.names.has(name)) continue;
-					// A partial feed edit keeps the base's age, but it supersedes old write refreshes.
+					// A pending reply can introduce a row this event already removed from the server,
+					// even if the current read or view has never held that row.
 					// In-flight reads have already restarted with their own newer attempts.
 					if (!entry.inflight) entry.attempt = ++sequence;
 					all.add(entry);
