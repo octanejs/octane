@@ -920,6 +920,15 @@ describe('octane analyze Strong migration', () => {
 		expect(result.json().strongPreview.findings).toBe(1);
 	});
 
+	it('keeps the declaration keyword separate when fixing a compact state binding', async () => {
+		const { root } = app({ 'src/Cart.tsx': CART.replace('const [open]', 'const[open]') });
+		const result = await run(root, ['--strong-preview', '--fix']);
+		expect(result.json().fixed).toEqual({ findings: 2, files: ['src/Cart.tsx'] });
+		expect(readFileSync(path.join(root, 'src/Cart.tsx'), 'utf8')).toContain(
+			'const open = useInitialValue(false);',
+		);
+	});
+
 	it('falls back to the first error with an older compiler that cannot collect', async () => {
 		// An installed octane from before collectDiagnostics exposes only
 		// compile(). The real compile() stands in for it, so the fallback reports
