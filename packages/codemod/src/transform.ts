@@ -2316,7 +2316,7 @@ class ModuleTransform {
 						!item.isTypeOnly &&
 						/^use[A-Z0-9]/.test(name)
 					) {
-						const refs = this.localUses(item.name);
+						const refs = renderUses(this.localUses(item.name));
 						const native = refs.filter((ref) => nativeSetupHook(ref, this.localUses));
 						const call = native[0];
 						// Relative imports use the compiler's custom slot-keyed hook naming rule.

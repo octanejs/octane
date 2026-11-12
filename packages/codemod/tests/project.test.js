@@ -144,7 +144,8 @@ import { subscribe, read } from './attribute-store';
 export function useValue() { return useStore(subscribe, read, server); }
 function server() { return null; }`;
 		const consumer = `import { useValue as useAttribute } from './use-value';
-export function Pane() { const value = useAttribute(); return <p>{value === null ? 'server' : value ? 'on' : 'off'}</p>; }`;
+type Snapshot = ReturnType<typeof useAttribute>;
+export function Pane() { const value: Snapshot = useAttribute(); return <p>{value === null ? 'server' : value ? 'on' : 'off'}</p>; }`;
 		const root = project({
 			'package.json': '{"type":"module"}',
 			'tsconfig.json':
