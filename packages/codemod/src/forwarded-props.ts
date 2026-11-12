@@ -2,7 +2,7 @@ import ts from 'typescript';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import { localUses } from './local-uses.js';
 
-function contains(node: ts.Node, matches: (node: ts.Node) => boolean): boolean {
+export function contains(node: ts.Node, matches: (node: ts.Node) => boolean): boolean {
 	return (
 		matches(node) ||
 		ts.forEachChild(node, (child) => contains(child, matches) || undefined) === true

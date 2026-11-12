@@ -9,6 +9,7 @@ import {
 } from './forwarded-props.js';
 import { reactRenderer, staticReactProps } from './react-renderer.js';
 import { linkedRenderState } from './linked-state.js';
+import { nativeSetupHook } from './local-react-hook.js';
 import { localUses, scalar, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
@@ -1451,7 +1452,13 @@ class ModuleTransform {
 			return attr.name.text === 'aria-hidden' && literalJsxAttribute(attr);
 		});
 		if (!supported) return false;
-		return this.nativeSvgOutput(tag, uses, unproven);
+		this.svgRead ??= svgLocalReads(
+			this.checker,
+			uses,
+			(node) => this.typeOf(node),
+			(type) => ts.isTypeReferenceNode(type) && this.reactTypeName(type.typeName) === 'ReactNode',
+		);
+		return this.nativeOutput(this.svgRead(tag) ?? tag, uses, unproven);
 	}
 
 	private planLinkedState(owner: ts.FunctionDeclaration) {
@@ -1865,10 +1872,10 @@ class ModuleTransform {
 	private svgRead?: ReturnType<typeof svgLocalReads>;
 	private nativeSvgProps?: ReturnType<typeof forwardedProps>;
 	private provenSvgOwners?: Set<ts.Node>;
-	private nativeSvgOutput(
-		element: ts.JsxSelfClosingElement,
+	private nativeOutput(
+		value: ts.Node,
 		uses: ReturnType<typeof localUses>,
-		unproven: (tag: ts.Identifier, prop: string) => void,
+		unproven?: (tag: ts.Identifier, prop: string) => void,
 	): boolean {
 		const typeOf = (node: ts.Node) => this.typeOf(node);
 		const destination = {
@@ -1879,16 +1886,10 @@ class ModuleTransform {
 		this.nativeSvgProps ??= forwardedProps(this.sf, this.checker, destination, uses);
 		const slot = (tag: ts.Identifier, prop: string) => {
 			const known = this.nativeSvgProps!(this.checker.getSymbolAtLocation(tag), prop);
-			if (!known) unproven(tag, prop);
+			if (!known) unproven?.(tag, prop);
 			return known;
 		};
-		this.svgRead ??= svgLocalReads(
-			this.checker,
-			uses,
-			typeOf,
-			(type) => ts.isTypeReferenceNode(type) && this.reactTypeName(type.typeName) === 'ReactNode',
-		);
-		const first = nativeOutputOwner(this.svgRead(element) ?? element, slot, destination);
+		const first = nativeOutputOwner(value, slot, destination);
 		if (!first) return false;
 		const pending = [first];
 		const proven = (this.provenSvgOwners ??= new Set());
@@ -2965,6 +2966,29 @@ class ModuleTransform {
 				const dest =
 					hook?.from ?? (this.nativeIntl.has(item) ? this.options.reactIntlAdapter : undefined);
 				if (!dest) {
+					const name = (item.propertyName ?? item.name).text;
+					if (
+						this.options.localReactHook &&
+						!node.attributes &&
+						!clause.isTypeOnly &&
+						!item.isTypeOnly &&
+						/^use[A-Z0-9]/.test(name)
+					) {
+						const call = this.localUses(item.name).find((ref) =>
+							nativeSetupHook(ref, this.localUses, {
+								calleeName: (callee) => this.calleeName(callee),
+								nativeOutput: (element) => this.nativeOutput(element, this.localUses),
+							}),
+						);
+						const hook = call && this.options.localReactHook(module, name);
+						if (hook)
+							this.note(
+								RULE.bindings,
+								'error',
+								call,
+								`The unchanged ${module} export ${name} calls React's ${hook}. Provide a compiled Octane hook for native callers or keep this component under a React renderer.`,
+							);
+					}
 					kept.push(item);
 					continue;
 				}
