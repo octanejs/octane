@@ -13,6 +13,7 @@ import {
 	read,
 	receive,
 	webSocketListener,
+	write,
 	type FeedFrame,
 	type FeedRequest,
 	type Listener,
@@ -20,8 +21,10 @@ import {
 	type Transport,
 } from '../src/data/index.js';
 import {
+	addTodo,
 	createServer,
 	firstTodo,
+	setDone,
 	isTodo,
 	schema,
 	Todo,
@@ -109,6 +112,53 @@ afterEach(() => {
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('feeds', () => {
+	it.each([todos, todoPages])(
+		'keeps a rename from the feed when an earlier write returns $name',
+		async (read) => {
+			const server = createServer();
+			let release!: () => void;
+			const { store } = setup(async (request, signal) => {
+				const reply = await server.transport(request, signal);
+				if (request.kind === 'write') await new Promise<void>((resolve) => (release = resolve));
+				return reply;
+			});
+			const list = await observed(store.read(read, undefined));
+			const writing = store.write(setDone, { id: 'a', done: true });
+			await vi.waitFor(() => expect(release).toBeDefined());
+			server.rows[0].title = 'Atoll';
+			receive(store, [{ put: Todo, value: { ...server.rows[0] } }]);
+			expect(list()[0]!.title).toBe('Atoll');
+			release();
+			await writing;
+			await settle();
+			expect(list()[0]).toEqual(server.rows[0]);
+		},
+	);
+
+	it.each([todos, todoPages])(
+		'does not resurrect a row removed before the first reply containing it reaches $name',
+		async (read) => {
+			const server = createServer();
+			let release!: () => void;
+			const { store } = setup(async (request, signal) => {
+				const reply = await server.transport(request, signal);
+				if (request.kind === 'write') await new Promise<void>((resolve) => (release = resolve));
+				return reply;
+			});
+			const list = await observed(store.read(read, undefined));
+			const add = write({ name: addTodo.name, input: addTodo.input, invalidates: ['todo'] });
+			const writing = store.write(add, { title: 'New row' });
+			await vi.waitFor(() => expect(release).toBeDefined());
+			const removed = server.rows.pop()!;
+			receive(store, [{ remove: Todo, id: removed.id }]);
+			expect(list()).toEqual(server.rows);
+			release();
+			await writing;
+			await settle();
+			expect(list()).toEqual(server.rows);
+		},
+	);
+
 	it('shows a changed record in every read that holds it, with no request', async () => {
 		const { server, store, connections } = setup();
 		const list = await observed(store.read(todos, undefined));

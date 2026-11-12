@@ -335,6 +335,17 @@ function sameRow(a: unknown, b: unknown): boolean {
 	return keys.every((key) => Object.is((a as any)[key], (b as any)[key]));
 }
 
+/** Compare confirmed read outputs only when a bundled refresh and a newer full value raced. */
+function sameWireValue(a: unknown, b: unknown): boolean {
+	if (Object.is(a, b)) return true;
+	try {
+		return devalue.stringify(a) === devalue.stringify(b);
+	} catch {
+		// A custom transport can return objects the wire codec cannot represent.
+		return false;
+	}
+}
+
 /** A stable key for plain input: object keys sorted, so `{a,b}` and `{b,a}` share an entry. */
 function inputKey(value: unknown): string {
 	return JSON.stringify(value, (_, item) =>
@@ -998,8 +1009,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (persisted && !entry.hasBase && !entry.checkedStorage && entry.read.persist) {
 			return restore(entry);
 		}
-		const attempt = ++entry.attempt;
 		const startedSeq = ++sequence;
+		const attempt = (entry.attempt = startedSeq);
 		const abort = (entry.abort = new AbortController());
 		const { read } = entry;
 		clearHostTimeout(entry.keepTimer);
@@ -1037,7 +1048,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		entry.abort?.abort();
 		entry.abort = null;
 		entry.inflight = null;
-		return ++entry.attempt;
+		return (entry.attempt = ++sequence);
 	}
 
 	/** Discard any load in flight, since it may predate the change, and reload if observed. */
@@ -1164,7 +1175,12 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	}
 
 	/** A confirmed write refreshes the reads it returned and marks the rest it affects stale. */
-	function confirm(operation: Operation, reply?: DataReply & { ok: true }, output?: unknown): void {
+	function confirm(
+		operation: Operation,
+		reply?: DataReply & { ok: true },
+		output?: unknown,
+		dispatchedAt = sequence,
+	): void {
 		const { write } = operation;
 		if (write.effect?.kind === 'create' && write.serverId) {
 			if (output === undefined) {
@@ -1202,17 +1218,39 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				}
 			}
 			if (!entry) continue;
+			// Another request, invalidation or write reply overtook this write. The server
+			// gives no ordering between them, so reload rather than publishing an older value.
+			const overtaken = entry.attempt > dispatchedAt;
+			if (
+				overtaken &&
+				(entry.baseSeq <= dispatchedAt || entry.stale || entry.inflight || entry.span)
+			) {
+				reload.add(entry);
+				continue;
+			}
 			refreshed.add(entry);
-			// The refreshed value was read after the write, so it supersedes any load in flight.
-			const attempt = supersede(entry);
+			// The refreshed value supersedes any load that preceded this write.
+			const attempt = overtaken ? entry.attempt : supersede(entry);
 			const startedSeq = ++sequence;
-			const current = () => !retired && entry.attempt === attempt;
+			const current = () => {
+				if (retired || entries.get(entry.key) !== entry) return false;
+				if (entry.attempt === attempt) return true;
+				// A partial feed edit can supersede the refresh while its schema validates.
+				// The edit cannot account for the rest of the reply; a later full load can.
+				if (!entry.inflight && !entry.stale && entry.baseSeq < startedSeq) invalidateEntry(entry);
+				return false;
+			};
 			pending.push(
 				Promise.resolve()
 					.then(() => parse(entry.read.output, item.value))
 					.then(
 						(value) => () => {
 							if (!current()) return undefined;
+							if (overtaken) {
+								// The feed can echo this write before its reply arrives.
+								if (!sameWireValue(entry.base, value)) invalidateEntry(entry);
+								return undefined;
+							}
 							adopt(entry, value, startedSeq);
 							save(entry);
 							return entry;
@@ -1360,7 +1398,9 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			? persisted!.journal({ id, name: write.name, raw: operation.raw })
 			: null;
 
+		let dispatchedAt = 0;
 		const deliver = () => {
+			dispatchedAt = sequence;
 			const tags = writeTags(write);
 			const refresh: { name: string; input: unknown }[] = [];
 			for (const entry of entries.values()) {
@@ -1423,11 +1463,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					output = write.output ? await parse(write.output, reply.value) : reply.value;
 				} catch (error) {
 					// The server applied the write; only its reply is unreadable.
-					if (!retired) confirm(operation, reply);
+					if (!retired) confirm(operation, reply, undefined, dispatchedAt);
 					throw error;
 				}
 				if (retired) throw new DataRetiredError();
-				confirm(operation, reply, output);
+				confirm(operation, reply, output, dispatchedAt);
 				if (write.serverId || settlesLocally(write)) touchEntities();
 				return output;
 			},
@@ -1629,7 +1669,15 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			reloadAll(reload);
 			const all = new Set(changed);
 			for (const entry of entries.values()) {
-				for (const name of names) if (entry.names.has(name)) all.add(entry);
+				for (const name of names) {
+					if (!entry.names.has(name)) continue;
+					// A pending reply can introduce a row this event already removed from the server,
+					// even if the current read or view has never held that row.
+					// In-flight reads have already restarted with their own newer attempts.
+					if (!entry.inflight) entry.attempt = ++sequence;
+					all.add(entry);
+					break;
+				}
 			}
 			commit(all);
 		},
