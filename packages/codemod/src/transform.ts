@@ -254,19 +254,19 @@ function isJsx(node: ts.Node) {
 /** A deferred clsx call may test a binding only if its truth value stays fixed. */
 function svgClassToken(
 	expr: ts.Expression,
-	fixedGuard: (name: ts.Identifier) => boolean,
+	fixedToken: (name: ts.Identifier, truthTest: boolean) => boolean,
 	truthTest = false,
 ): boolean {
 	expr = skipWrappers(expr);
 	if (ts.isStringLiteralLike(expr)) return true;
-	if (ts.isIdentifier(expr)) return truthTest && fixedGuard(expr);
+	if (ts.isIdentifier(expr)) return fixedToken(expr, truthTest);
 	if (ts.isPrefixUnaryExpression(expr) && expr.operator === ts.SyntaxKind.ExclamationToken)
-		return svgClassToken(expr.operand, fixedGuard, true);
+		return svgClassToken(expr.operand, fixedToken, true);
 	if (ts.isConditionalExpression(expr))
 		return (
-			svgClassToken(expr.condition, fixedGuard, true) &&
-			svgClassToken(expr.whenTrue, fixedGuard, truthTest) &&
-			svgClassToken(expr.whenFalse, fixedGuard, truthTest)
+			svgClassToken(expr.condition, fixedToken, true) &&
+			svgClassToken(expr.whenTrue, fixedToken, truthTest) &&
+			svgClassToken(expr.whenFalse, fixedToken, truthTest)
 		);
 	if (ts.isBinaryExpression(expr)) {
 		const op = expr.operatorToken.kind;
@@ -274,9 +274,9 @@ function svgClassToken(
 			return (
 				svgClassToken(
 					expr.left,
-					fixedGuard,
+					fixedToken,
 					truthTest || op === ts.SyntaxKind.AmpersandAmpersandToken,
-				) && svgClassToken(expr.right, fixedGuard, truthTest)
+				) && svgClassToken(expr.right, fixedToken, truthTest)
 			);
 	}
 	return false;
@@ -1756,6 +1756,27 @@ class ModuleTransform {
 	}
 
 	private fixedSvgParameters?: Map<ts.Symbol, boolean>;
+	private svgClassString(name: ts.Identifier) {
+		const declaration = this.declarationOf(name);
+		if (declaration && ts.isVariableDeclaration(declaration))
+			return (
+				!!declaration.initializer && ts.isStringLiteralLike(skipWrappers(declaration.initializer))
+			);
+		if (
+			!declaration ||
+			!(ts.isParameter(declaration) || ts.isBindingElement(declaration)) ||
+			declaration.initializer
+		)
+			return false;
+		const parameter = ts.isParameter(declaration) ? declaration : declaration.parent.parent;
+		return (
+			ts.isParameter(parameter) &&
+			!!parameter.type &&
+			!parameter.initializer &&
+			textKind(this.typeOf(declaration.name)) === 1
+		);
+	}
+
 	private svgClassName(expr: ts.Expression) {
 		if (ts.isIdentifier(expr)) return true;
 		if (ts.isPropertyAccessExpression(expr)) return this.svgCssClass(expr);
@@ -1781,8 +1802,12 @@ class ModuleTransform {
 			(this.resolve('clsx') ?? 'clsx') === 'clsx' &&
 			this.options.installedClsx === true &&
 			(expr.arguments.every((arg) =>
-				svgClassToken(arg, (name) =>
-					fixedBinding(this.checker, name, expr, (this.fixedSvgParameters ??= new Map())),
+				svgClassToken(
+					arg,
+					(name, truthTest) =>
+						(truthTest || this.svgClassString(name)) &&
+						fixedBinding(this.checker, name, expr, (this.fixedSvgParameters ??= new Map())) &&
+						initializedBefore(this.checker, name, expr),
 				),
 			) ||
 				expr.arguments.every((arg) => {

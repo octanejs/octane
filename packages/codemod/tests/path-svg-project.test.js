@@ -277,7 +277,7 @@ it('preserves the authored SVG root on the server and the client, including subs
 		'className="status" data-testid="status-mark" data-caption="A &amp; B" data-empty=""',
 	);
 	const { root, file, icon } = fixture(withData);
-	const drawing = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="none" role="img" focusable="false">
+	const drawing = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" preserveAspectRatio="none" fill="none" role="img" focusable="false">
 		<rect x="1" y="2" width="8" height="7" rx="2" fill="var(--surface)"/>
 		<g transform="translate(0 -1) scale(1.5)" clip-path="url(#sample)"><g><path d="M0 0L6 4Z" fill="currentColor" fill-rule="evenodd"/></g></g>
 		<path d="M1 1L3 3" stroke="#fff" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="bevel" opacity=".3"/>
@@ -376,6 +376,19 @@ it('preserves the authored SVG root on the server and the client, including subs
 	}
 }, 30_000);
 
+it('renders the authored local pattern on the server and client', async () => {
+	const drawing = `<svg viewBox="0 0 12 12" preserveAspectRatio="none">
+  <rect width="12" height="12" fill="url(#tile)"/>
+  <defs><pattern id="tile" width="2" height="3" patternUnits="userSpaceOnUse"><path d="M0 0L2 3" stroke="currentColor" stroke-opacity="0.5"/></pattern></defs>
+ </svg>`;
+	await expectSvgRenderParity(
+		'export function Pane() { return <Mark className="pattern" />; }',
+		[{}],
+		1,
+		{ 'icons/mark.svg': drawing },
+	);
+});
+
 it('keeps distinct component types for separate SVG modules with identical source', async () => {
 	const { root, file, icon } = fixture(`
 		import First from './icons/mark.svg';
@@ -426,6 +439,7 @@ async function expectSvgRenderParity(view, states, count, projectFiles = {}) {
 		.readFileSync(path.join(root, 'src/icons/mark.svg'), 'utf8')
 		.replace(/(<svg [^>]+)>/, '$1 {...props}>')
 		.replaceAll('fill-rule=', 'fillRule=')
+		.replaceAll('stroke-opacity=', 'strokeOpacity=')
 		.replaceAll('stroke-width=', 'strokeWidth=');
 	fs.writeFileSync(
 		path.join(root, 'src/reference.tsx'),
@@ -692,6 +706,45 @@ it('preserves SVG classes selected by stable conditional and clsx guards on the 
 	);
 });
 
+it('preserves path transforms and fixed string classes across server and client rendering', async () => {
+	await expectSvgRenderParity(
+		`import {clsx as join} from 'clsx';
+		export function Pane({tone}: {tone: string}) {
+			return <button><Mark className={join('badge', tone)}/></button>;
+		}`,
+		[{ tone: 'quiet' }, { tone: '' }, { tone: 'bright warm' }],
+		1,
+		{
+			'icons/mark.svg': asset.replace(
+				'<path ',
+				'<path transform="translate(2 1) scale(1.5) matrix(1, 0, 0, .75, 3, -2)" ',
+			),
+		},
+	);
+});
+
+it('keeps the SVG diagnostic when a string token may be uninitialized', () => {
+	const result = transformModule(
+		`import Mark from './mark.svg';
+		import cx from 'clsx';
+		export function Pane({mode}) {
+			switch (mode) {
+				case 'init':
+					const tone = 'quiet';
+					break;
+				case 'show':
+					return <button><Mark className={cx('badge', tone)}/></button>;
+			}
+			return <span/>;
+		}`,
+		'pane.tsx',
+		{ installedClsx: true, pathSvgAdapter: () => './native-icon' },
+	);
+	expect(result.notes).toContainEqual(
+		expect.objectContaining({ rule: 'svg-issuer', severity: 'error' }),
+	);
+});
+
 it('renders a selected SVG from a block-scoped local on the server and across client updates', async () => {
 	await expectSvgRenderParity(
 		`import {useState} from 'react';
@@ -842,6 +895,11 @@ it.each([
 	['an arbitrary call', '', "read('icon', active && 'on')"],
 	['a nested effectful call', '', "cx('icon', read() && 'on')"],
 	['an opaque object argument', 'const value = {active};', "cx('icon', value)"],
+	[
+		'an object asserted as a string',
+		'const value = {active} as unknown as string;',
+		"cx('icon', value)",
+	],
 	['a JSX value argument', 'const value = <span/>;', "cx('icon', value)"],
 ])('retains the bare SVG for %s', async (_reason, setup, expression) => {
 	const { root, file } = fixture(`import Mark from './icons/mark.svg';
