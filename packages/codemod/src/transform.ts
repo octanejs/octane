@@ -902,6 +902,13 @@ class ModuleTransform {
 						this.localUses,
 					),
 				() => this.options.reactStoreComponent?.('react-intl') === true,
+				(call) =>
+					this.note(
+						RULE.bindings,
+						'error',
+						call,
+						'A React Intl formatter can schedule React DOM resources on the original request. Verify this formatMessage call runs without renderer-owned effects, or keep it in the original React render.',
+					),
 			);
 		}
 		let safeStoreUses: ReturnType<typeof storeHookUses> | undefined;
@@ -1363,6 +1370,13 @@ class ModuleTransform {
 				reason = `<${text}> needs ReactCompatInline to stay inside this paragraph. Install an Octane release that exports it or keep the paragraph in React.`;
 			if (reason === null) {
 				port.islands++;
+				if (binding.module === 'react-intl' && name === 'FormattedMessage')
+					this.note(
+						RULE.bindings,
+						'error',
+						element,
+						'A React Intl formatter can depend on ancestor contexts or schedule React DOM resources outside this generated island. Verify the provider and its formatters, or keep this message under its original React ancestors.',
+					);
 				this.islands.set(element, paragraph ? 'ReactCompatInline' : 'ReactCompat');
 			} else {
 				// Octane fails on a React component deep in its renderer, naming

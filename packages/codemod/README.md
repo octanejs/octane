@@ -220,6 +220,8 @@ Inside an authored `ReactCompat` boundary, a single original React component can
 
 Inside a retained React component, a rich-text callback such as `chunks => <strong>{chunks}</strong>` can keep producing a genuine React element. When the codemod creates a React island for `FormattedMessage`, an inline substitution such as `values={{ lineBreak: <br /> }}` also stays in React if the other props and substitutions cannot observe a change in evaluation timing. The codemod recognizes a single intrinsic tag with literal attributes and an optional literal key. Callbacks can use their parameter as the sole child. Spreads, refs, and event handlers retain a migration diagnostic.
 
+A native `formatMessage` call can return the expected string while losing resource hints scheduled by a provider-supplied formatter. An automatically generated `FormattedMessage` island can also lose access to other React ancestor contexts. The codemod retains the preview and reports a blocking diagnostic for these calls and islands. Review the actual provider and formatter before adopting them. A local `IntlProvider` can inherit configuration from its mutable class defaults. Explicitly authored React boundaries keep their existing contract.
+
 ## Store hooks in linked workspace packages
 
 The codemod can migrate a named hook from a local `workspace:` dependency when it can read the TypeScript implementation, trace a React context read, and verify that the hook uses the same store code as a renderer-independent public entry. The public entry and hook names can vary. The supported runtime versions match the React Intl adapter above. A top-level `const` can expose a second name for a handle already created by a verified shared factory. Consumers keep the original handle identity.

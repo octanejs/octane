@@ -11,6 +11,12 @@ let project;
 let dom;
 let client;
 let server;
+const ownershipError = expect.objectContaining({
+	rule: 'bindings',
+	severity: 'error',
+	message: expect.stringContaining('React Intl formatter'),
+});
+
 async function load(mode) {
 	const entry =
 		mode === 'server'
@@ -53,7 +59,7 @@ beforeAll(async () => {
 			unported: (name) => (name === 'react-intl' ? name : null),
 		},
 	);
-	expect(fields.notes.filter((note) => note.severity === 'error')).toEqual([]);
+	expect(fields.notes.filter((note) => note.severity === 'error')).toEqual([ownershipError]);
 	expect(fields.code).not.toMatch(/from ['"]react-intl['"]/);
 	await writeFile(path.join(project, 'fields.tsrx'), fields.code);
 	for (const [name, read] of [
@@ -107,7 +113,7 @@ beforeAll(async () => {
 			reactStoreComponent: (name) => name === 'react-intl',
 		},
 	);
-	expect(rich.notes.filter((n) => n.severity === 'error')).toEqual([]);
+	expect(rich.notes.filter((n) => n.severity === 'error')).toEqual([ownershipError]);
 	await writeFile(path.join(project, 'rich.tsrx'), rich.code);
 	const badge = path.join(project, 'badge.tsx'),
 		reader = path.join(project, 'reader.tsx');
@@ -134,7 +140,7 @@ beforeAll(async () => {
 		converted.files
 			.flatMap((f) => [...f.diagnostics, ...f.notes])
 			.filter((d) => d.severity === 'error'),
-	).toEqual([]);
+	).toEqual([ownershipError]);
 	[client, server] = await Promise.all([load('client'), load('server')]);
 });
 afterAll(async () => {
