@@ -3,6 +3,39 @@ import { contains, renderUses } from './forwarded-props.js';
 import { localUses } from './local-uses.js';
 import { skipWrappers } from './expression-wrappers.js';
 
+function reactImport(name: ts.Identifier, checker: ts.TypeChecker) {
+	const binding = checker.getSymbolAtLocation(name)?.declarations?.[0];
+	if (!binding || !ts.isImportSpecifier(binding) || binding.isTypeOnly) return;
+	const clause = binding.parent.parent;
+	const imp = clause.parent;
+	if (
+		!clause.isTypeOnly &&
+		ts.isImportDeclaration(imp) &&
+		!imp.attributes &&
+		ts.isStringLiteral(imp.moduleSpecifier) &&
+		imp.moduleSpecifier.text === 'react'
+	)
+		return (binding.propertyName ?? binding.name).text;
+}
+
+function nullRef(statement: ts.Statement, checker: ts.TypeChecker) {
+	if (!ts.isVariableStatement(statement)) return false;
+	const { flags, declarations } = statement.declarationList;
+	if (!(flags & ts.NodeFlags.Const) || flags & ts.NodeFlags.Using || declarations.length !== 1)
+		return false;
+	const { name, initializer } = declarations[0];
+	return (
+		ts.isIdentifier(name) &&
+		!!initializer &&
+		ts.isCallExpression(initializer) &&
+		!initializer.questionDotToken &&
+		initializer.arguments.length === 1 &&
+		initializer.arguments[0].kind === ts.SyntaxKind.NullKeyword &&
+		ts.isIdentifier(initializer.expression) &&
+		reactImport(initializer.expression, checker) === 'useRef'
+	);
+}
+
 function literalDeclaration(declaration: ts.VariableDeclaration) {
 	if (!ts.isIdentifier(declaration.name) || declaration.parent.flags & ts.NodeFlags.Using)
 		return false;
@@ -20,6 +53,7 @@ function literalDeclaration(declaration: ts.VariableDeclaration) {
 export function nativeSetupHook(
 	ref: ts.Identifier,
 	uses: ReturnType<typeof localUses>,
+	checker: ts.TypeChecker,
 	diagnostic?: {
 		calleeName(callee: ts.Expression): string | null;
 		nativeOutput(element: ts.JsxElement | ts.JsxSelfClosingElement): boolean;
@@ -40,7 +74,16 @@ export function nativeSetupHook(
 	if (!ts.isBlock(block)) return false;
 	const position = block.statements.indexOf(statement);
 	if (!diagnostic) {
-		if (position !== 0) return false;
+		if (position === 0) {
+			if (decl.parent.declarations[0] !== decl) return false;
+		} else if (
+			decl.parent.flags & ts.NodeFlags.Using ||
+			call.questionDotToken ||
+			call.arguments.length ||
+			decl.parent.declarations.length !== 1 ||
+			!block.statements.slice(0, position).every((prior) => nullRef(prior, checker))
+		)
+			return false;
 	} else {
 		const declarations = decl.parent.declarations;
 		if (
@@ -116,7 +159,8 @@ export function nativeSetupHook(
 		: ts.isJsxSelfClosingElement(value)
 			? value.tagName
 			: undefined;
-	return !!tag && ts.isIdentifier(tag) && /^[a-z]/.test(tag.text);
+	if (!tag || !ts.isIdentifier(tag) || !/^[a-z]/.test(tag.text)) return false;
+	return diagnostic ? 'diagnostic' : position === 0 ? 'first' : 'afterRefs';
 }
 
 /** Only a call in the first evaluated statement witnesses a hook in this export.
@@ -144,19 +188,7 @@ export function directReactHooks(sf: ts.SourceFile, checker: ts.TypeChecker) {
 				? first.expression
 				: undefined;
 		if (!value || !ts.isCallExpression(value) || !ts.isIdentifier(value.expression)) continue;
-		const binding = checker.getSymbolAtLocation(value.expression)?.declarations?.[0];
-		if (!binding || !ts.isImportSpecifier(binding) || binding.isTypeOnly) continue;
-		const clause = binding.parent.parent;
-		const imp = clause.parent;
-		if (
-			clause.isTypeOnly ||
-			!ts.isImportDeclaration(imp) ||
-			imp.attributes ||
-			!ts.isStringLiteral(imp.moduleSpecifier) ||
-			imp.moduleSpecifier.text !== 'react'
-		)
-			continue;
-		const hook = (binding.propertyName ?? binding.name).text;
+		const hook = reactImport(value.expression, checker);
 		if (hook !== 'useState' && hook !== 'useSyncExternalStore') continue;
 		// A local write can replace the exported function before the importer calls it.
 		if (
@@ -168,4 +200,227 @@ export function directReactHooks(sf: ts.SourceFile, checker: ts.TypeChecker) {
 		hooks.set(fn.name.text, hook);
 	}
 	return hooks;
+}
+
+function scalarLiteral(node: ts.Node) {
+	return (
+		ts.isStringLiteralLike(node) ||
+		ts.isNumericLiteral(node) ||
+		node.kind === ts.SyntaxKind.TrueKeyword ||
+		node.kind === ts.SyntaxKind.FalseKeyword ||
+		node.kind === ts.SyntaxKind.NullKeyword
+	);
+}
+
+function returned(fn: ts.FunctionDeclaration) {
+	const body = fn.body?.statements;
+	const stmt = body?.length === 1 ? body[0] : undefined;
+	return stmt && ts.isReturnStatement(stmt) ? stmt.expression : undefined;
+}
+
+function primitiveSnapshot(node: ts.Expression): boolean {
+	node = skipWrappers(node);
+	if (scalarLiteral(node)) return true;
+	if (ts.isConditionalExpression(node))
+		return primitiveSnapshot(node.whenTrue) && primitiveSnapshot(node.whenFalse);
+	return (
+		(ts.isPrefixUnaryExpression(node) && node.operator === ts.SyntaxKind.ExclamationToken) ||
+		(ts.isBinaryExpression(node) &&
+			[
+				ts.SyntaxKind.EqualsEqualsToken,
+				ts.SyntaxKind.ExclamationEqualsToken,
+				ts.SyntaxKind.EqualsEqualsEqualsToken,
+				ts.SyntaxKind.ExclamationEqualsEqualsToken,
+			].includes(node.operatorToken.kind))
+	);
+}
+
+/** An unchanged leaf can read DOM attributes and use an observer, without accessing a renderer. */
+function neutralAttributeStore(
+	sf: ts.SourceFile,
+	checker: ts.TypeChecker,
+	read: ts.FunctionDeclaration,
+) {
+	const ambient = (n: ts.Node, name: string) =>
+		ts.isIdentifier(n) && n.text === name && !checker.getSymbolAtLocation(n);
+	const element = (n: ts.Node) =>
+		ts.isPropertyAccessExpression(n) &&
+		ambient(n.expression, 'document') &&
+		(n.name.text === 'documentElement' || n.name.text === 'body');
+	const dataset = (n: ts.Node) =>
+		ts.isPropertyAccessExpression(n) && n.name.text === 'dataset' && element(n.expression);
+	const observer = (n: ts.Node) => {
+		if (!ts.isIdentifier(n)) return false;
+		const decl = checker.getSymbolAtLocation(n)?.valueDeclaration;
+		return (
+			decl &&
+			ts.isVariableDeclaration(decl) &&
+			ts.isVariableDeclarationList(decl.parent) &&
+			(decl.parent.flags & ts.NodeFlags.Const) !== 0 &&
+			decl.initializer &&
+			ts.isNewExpression(decl.initializer) &&
+			ambient(decl.initializer.expression, 'MutationObserver')
+		);
+	};
+	const observerMethod = (n: ts.Node) =>
+		ts.isPropertyAccessExpression(n) &&
+		(n.name.text === 'observe' || n.name.text === 'disconnect') &&
+		observer(n.expression);
+	const unsafe = (n: ts.Node): boolean => {
+		if (ts.isTypeNode(n)) return false;
+		if (
+			ts.isPropertyAccessExpression(n) &&
+			!element(n) &&
+			!dataset(n) &&
+			!observerMethod(n) &&
+			!(dataset(n.expression) && !Object.hasOwn(Object.prototype, n.name.text))
+		)
+			return true;
+		if (ts.isCallExpression(n) && !observerMethod(n.expression)) return true;
+		if (ts.isNewExpression(n) && !ambient(n.expression, 'MutationObserver')) return true;
+		if (
+			ts.isElementAccessExpression(n) ||
+			ts.isTaggedTemplateExpression(n) ||
+			ts.isDeleteExpression(n) ||
+			ts.isPostfixUnaryExpression(n) ||
+			(ts.isPrefixUnaryExpression(n) &&
+				(n.operator === ts.SyntaxKind.PlusPlusToken ||
+					n.operator === ts.SyntaxKind.MinusMinusToken)) ||
+			n.kind === ts.SyntaxKind.ThisKeyword ||
+			n.kind === ts.SyntaxKind.SuperKeyword ||
+			(ts.isBinaryExpression(n) &&
+				n.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+				n.operatorToken.kind <= ts.SyntaxKind.LastAssignment)
+		)
+			return true;
+		if (ts.isIdentifier(n)) {
+			const parent = n.parent;
+			const property =
+				(ts.isPropertyAccessExpression(parent) || ts.isPropertyAssignment(parent)) &&
+				parent.name === n;
+			if (
+				!property &&
+				!checker.getSymbolAtLocation(n) &&
+				!['document', 'MutationObserver', 'undefined'].includes(n.text)
+			)
+				return true;
+		}
+		return !!ts.forEachChild(n, unsafe);
+	};
+	return (
+		!ts.forEachChild(sf, unsafe) &&
+		!contains(
+			read,
+			(node) =>
+				ts.isCallExpression(node) ||
+				ts.isNewExpression(node) ||
+				(ts.isReturnStatement(node) && !!node.expression && !primitiveSnapshot(node.expression)),
+		)
+	);
+}
+
+/** Clone a stateless hook while leaving its DOM reader and subscription shared. */
+export function nativeExternalStore(
+	file: string,
+	source: string,
+	name: string,
+	loadLeaf: (specifier: string) => { sf: ts.SourceFile; checker: ts.TypeChecker } | undefined,
+) {
+	const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest);
+	if (sf.statements.length !== 4) return;
+	const imports = sf.statements.filter(ts.isImportDeclaration);
+	const functions = sf.statements.filter(ts.isFunctionDeclaration);
+	if (imports.length !== 2 || functions.length !== 2) return;
+	const named = (imp: ts.ImportDeclaration) => {
+		const clause = imp.importClause;
+		const bindings = clause?.namedBindings;
+		return !imp.attributes &&
+			clause &&
+			!clause.name &&
+			!clause.isTypeOnly &&
+			bindings &&
+			ts.isNamedImports(bindings) &&
+			bindings.elements.every((el) => !el.isTypeOnly)
+			? bindings.elements
+			: undefined;
+	};
+	const react = imports.find(
+		(imp) => ts.isStringLiteral(imp.moduleSpecifier) && imp.moduleSpecifier.text === 'react',
+	);
+	const store = imports.find((imp) => imp !== react);
+	if (
+		!react ||
+		!store ||
+		!ts.isStringLiteral(store.moduleSpecifier) ||
+		!store.moduleSpecifier.text.startsWith('./')
+	)
+		return;
+	const reactNames = named(react),
+		storeNames = named(store);
+	if (reactNames?.length !== 1 || storeNames?.length !== 2) return;
+	const hook = reactNames[0]!;
+	if ((hook.propertyName ?? hook.name).text !== 'useSyncExternalStore') return;
+	const wrapper = functions.find((fn) => fn.name?.text === name);
+	const server = functions.find((fn) => fn !== wrapper);
+	if (
+		!wrapper ||
+		wrapper.modifiers?.length !== 1 ||
+		wrapper.modifiers[0]!.kind !== ts.SyntaxKind.ExportKeyword ||
+		wrapper.parameters.length ||
+		wrapper.asteriskToken ||
+		!server?.name ||
+		server.modifiers ||
+		server.parameters.length ||
+		server.asteriskToken
+	)
+		return;
+	const snapshot = returned(server);
+	const call = returned(wrapper);
+	if (
+		!snapshot ||
+		!scalarLiteral(snapshot) ||
+		!call ||
+		!ts.isCallExpression(call) ||
+		call.questionDotToken ||
+		!ts.isIdentifier(call.expression) ||
+		call.expression.text !== hook.name.text ||
+		call.arguments.length !== 3 ||
+		!call.arguments.every(ts.isIdentifier) ||
+		call.arguments[2]!.getText(sf) !== server.name.text
+	)
+		return;
+	const imported = (node: ts.Expression) =>
+		storeNames.find((el) => el.name.text === (node as ts.Identifier).text);
+	const subscribe = imported(call.arguments[0]!);
+	const read = imported(call.arguments[1]!);
+	if (!subscribe || !read || subscribe === read) return;
+	const leaf = loadLeaf(store.moduleSpecifier.text);
+	if (!leaf) return;
+	const { sf: storeFile, checker } = leaf;
+	if (
+		!storeFile.statements.every(
+			(stmt) =>
+				ts.isFunctionDeclaration(stmt) &&
+				stmt.name &&
+				!stmt.asteriskToken &&
+				!['document', 'MutationObserver', 'undefined'].includes(stmt.name.text) &&
+				stmt.modifiers?.length === 1 &&
+				stmt.modifiers[0]!.kind === ts.SyntaxKind.ExportKeyword,
+		)
+	)
+		return;
+	const exported = (item: ts.ImportSpecifier) =>
+		storeFile.statements
+			.filter(ts.isFunctionDeclaration)
+			.find((fn) => fn.name?.text === (item.propertyName ?? item.name).text);
+	const subscribeFn = exported(subscribe),
+		readFn = exported(read);
+	if (!subscribeFn || !readFn || !neutralAttributeStore(storeFile, checker, readFn)) return;
+	const spec = react.moduleSpecifier;
+	return (
+		"// Native external-store wrapper generated by Octane codemod.\n'use no memo';\n" +
+		source.slice(0, spec.getStart(sf)) +
+		"'octane'" +
+		source.slice(spec.end)
+	);
 }

@@ -228,6 +228,166 @@ export function useLabel() { const later = () => useState('ready'); return 'read
 		}
 	});
 
+	it('shares a stateless external store with unchanged React callers', async () => {
+		const wrapper = `import { useSyncExternalStore as useStore } from 'react';
+import { subscribe, read } from './attribute-store';
+export function useValue() { return useStore(subscribe, read, server); }
+function server() { return null; }`;
+		const consumer = `import { useValue as useAttribute } from './use-value';
+type Snapshot = ReturnType<typeof useAttribute>;
+export function Pane() { const value: Snapshot = useAttribute(); return <p>{value === null ? 'server' : value ? 'on' : 'off'}</p>; }`;
+		const withRefs = `import { useRef as emptyRef } from 'react';\n${consumer.replace(
+			'const value:',
+			'const first=emptyRef(null); const second=emptyRef(null); const value:',
+		)}`;
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'tsconfig.json':
+				'{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler","strict":true}}',
+			'attribute-store.ts': `export function read() { return document.documentElement.dataset.label === 'on'; }
+export function subscribe(listener: () => void) {
+	const observer = new MutationObserver(listener);
+	observer.observe(document.documentElement, {attributes:true, attributeFilter:['data-label']});
+	return () => observer.disconnect();
+}`,
+			'other-ref.ts': "export { useRef } from 'react';",
+			'use-value.ts': wrapper,
+			'Pane.tsx': consumer,
+			'Other.tsx': withRefs.replace('function Pane', 'function Other'),
+			'Unchanged.tsx': consumer.replace('function Pane', 'function Unchanged'),
+			'Mixed.tsx': consumer + '\nexport function ReactValue() { return useAttribute(); }',
+		});
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const inputs = ['Pane.tsx', 'Other.tsx'].map((name) => path.join(root, name));
+		const expectBlocked = async (files, hook = 'useSyncExternalStore') => {
+			const preview = await runCodemod(files, { root, strong: true, write: false });
+			expect(preview.files.some((file) => file.file.endsWith('.octane.ts'))).toBe(false);
+			expect(preview.files[0].notes).toContainEqual(
+				expect.objectContaining({
+					severity: 'error',
+					message: expect.stringContaining(`calls React's ${hook}`),
+				}),
+			);
+		};
+		await expectBlocked([path.join(root, 'Mixed.tsx')]);
+		for (const source of [
+			withRefs.replace('emptyRef(null)', 'emptyRef(Math.random())'),
+			withRefs.replace('const first', 'let first'),
+			withRefs.replace('const first', 'await using first'),
+			withRefs.replace('const value:', 'using value:'),
+			withRefs.replace('const value:', 'const earlier = Math.random(), value:'),
+			withRefs.replace("from 'react'", "from './other-ref'"),
+		]) {
+			const file = path.join(root, 'Unproved.tsx');
+			fs.writeFileSync(file, source);
+			const preview = await runCodemod([file], { root, strong: true, write: false });
+			expect(preview.files[0].code).toContain("from './use-value'");
+			expect(preview.files[0].notes.filter((note) => note.rule === 'bindings')).toEqual([]);
+		}
+
+		// These hosts expose an unchanged React hook, but do not prove every call can share a native sidecar.
+		const diagnosticOnly = path.join(root, 'DiagnosticOnly.tsx');
+		for (const source of [
+			consumer.replace('function Pane()', 'const Pane = () =>'),
+			consumer + '\nexport function Sibling() { return <Pane/>; }',
+			consumer.replace('const value:', 'const before = 1; const value:'),
+		]) {
+			fs.writeFileSync(diagnosticOnly, source);
+			await expectBlocked([diagnosticOnly]);
+		}
+
+		const shadow = path.join(root, 'shadow');
+		const localReact = path.join(root, 'local-react');
+		fs.mkdirSync(path.join(shadow, 'node_modules'), { recursive: true });
+		fs.mkdirSync(localReact);
+		fs.writeFileSync(
+			path.join(localReact, 'package.json'),
+			'{"name":"react","version":"19.2.0","types":"./index.d.ts"}',
+		);
+		fs.writeFileSync(
+			path.join(localReact, 'index.d.ts'),
+			'export declare function useRef(value: null): { current: null };',
+		);
+		fs.symlinkSync(localReact, path.join(shadow, 'node_modules/react'), 'dir');
+		const shadowed = path.join(shadow, 'View.tsx');
+		fs.writeFileSync(shadowed, withRefs.replace('./use-value', '../use-value'));
+		const preview = await runCodemod([shadowed], { root, strong: true, write: false });
+		expect(preview.files[0].code).toContain("from '../use-value'");
+		expect(preview.files.some((file) => file.file.endsWith('.octane.ts'))).toBe(false);
+		for (const alias of ['readAttribute', 'use3Value', 'useContext', 'use']) {
+			const input = path.join(root, 'Alias.tsx');
+			fs.writeFileSync(input, consumer.replaceAll('useAttribute', alias));
+			await expectBlocked([input]);
+			fs.writeFileSync(input, withRefs.replaceAll('useAttribute', alias));
+			await expectBlocked([input]);
+		}
+		const leaf = path.join(root, 'attribute-store.ts');
+		const source = fs.readFileSync(leaf, 'utf8');
+		fs.writeFileSync(
+			leaf,
+			source.replace("document.documentElement.dataset.label === 'on'", 'document.documentElement'),
+		);
+		await expectBlocked([inputs[0]]);
+		await expectBlocked([inputs[1]]);
+		fs.writeFileSync(leaf, "import { Fragment } from 'react';\n" + source);
+		await expectBlocked([inputs[0]]);
+		fs.writeFileSync(leaf, source);
+		const occupied = path.join(root, 'use-value.octane.ts');
+		fs.writeFileSync(occupied, 'export const custom = true;');
+		await expectBlocked([inputs[0]]);
+		await expectBlocked([inputs[1]]);
+		expect(fs.readFileSync(occupied, 'utf8')).toBe('export const custom = true;');
+		fs.rmSync(occupied);
+		const hookFile = path.join(root, 'use-value.ts');
+		fs.writeFileSync(
+			hookFile,
+			"import { useState } from 'react'; export function useValue() { const [value] = useState(false); return value; }",
+		);
+		await expectBlocked([inputs[1]], 'useState');
+		fs.writeFileSync(hookFile, wrapper);
+
+		const migrated = await runCodemod(inputs, { root, strong: true });
+		for (const input of ['Pane.tsx', 'Other.tsx']) {
+			const file = migrated.files.find((result) => result.file === input);
+			expect(file?.strong).toBe(true);
+			expect(file.code).toContain("from './use-value.octane'");
+			expect([...file.notes, ...file.diagnostics].filter((n) => n.severity === 'error')).toEqual(
+				[],
+			);
+		}
+		expect(fs.readFileSync(path.join(root, 'use-value.ts'), 'utf8')).toBe(wrapper);
+		expect(fs.readFileSync(path.join(root, 'Unchanged.tsx'), 'utf8')).toBe(
+			consumer.replace('function Pane', 'function Unchanged'),
+		);
+		expect(migrated.files.filter((file) => file.file.endsWith('.octane.ts'))).toHaveLength(1);
+
+		fs.writeFileSync(
+			path.join(root, 'entry.ts'),
+			`import { Pane } from './Pane.tsrx';
+import { renderToStaticMarkup } from 'octane/server';
+export const render = () => renderToStaticMarkup(Pane, {}).html;`,
+		);
+		const { createServer } = await import('vite');
+		const { octane } = await import('octane/compiler/vite');
+		const server = await createServer({
+			root,
+			configFile: false,
+			logLevel: 'silent',
+			server: { middlewareMode: true, hmr: false },
+			plugins: [octane({ hmr: false })],
+		});
+		try {
+			const { render } = await server.ssrLoadModule('/entry.ts');
+			expect(render()).toBe('<p>server</p>');
+		} finally {
+			await server.close();
+		}
+	}, 30_000);
+
 	it('recognizes a local hook selected for an in-place rewrite through a symlink', async () => {
 		const root = project({
 			'Panel.tsx':
