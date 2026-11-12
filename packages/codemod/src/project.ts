@@ -343,6 +343,7 @@ export async function runCodemod(
 					/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(base, name)?.version ?? ''),
 				) &&
 				[file, adapter].every((source) => {
+					if (!bindingProject.original(source, 'react-intl')) return false;
 					const resolved = ts.resolveModuleName(
 						'react-intl',
 						source,
