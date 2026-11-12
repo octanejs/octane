@@ -273,6 +273,23 @@ it.each([
 		'a direct component call',
 		nativeRefInput.replace('<Owner report={report}/>', '{Owner({report})}'),
 	],
+	[
+		'a directly called named function expression',
+		nativeRefInput
+			.replace('function Owner({report}) {', 'const Owner = function Inner({report}) {')
+			.replace('}\nfunction Loader', '};\nfunction Loader')
+			.replace('<Owner report={report}/>', '{Owner({report})}'),
+	],
+	[
+		'an immediately invoked function expression',
+		`import {useState} from 'react';
+		export function App() {
+			return <main>{(function Inner() {
+				const [node, attach] = useState<HTMLDivElement | null>(null);
+				return <div ref={attach}/>;
+			})()}</main>;
+		}`,
+	],
 ])('keeps state when the ref has %s', (_case, source) => {
 	const migrated = migrate(source);
 	expect(migrated.rules['native-ref-state']).toBeUndefined();

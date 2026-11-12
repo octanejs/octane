@@ -3873,8 +3873,24 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		)
 			return null;
 
-		const binding = owner.name ?? (ts.isVariableDeclaration(owner.parent) && owner.parent.name);
-		if (binding && ts.isIdentifier(binding) && !this.localUses(binding).every(componentTagOrExport))
+		let binding = owner.name;
+		if (!ts.isFunctionDeclaration(owner)) {
+			const declaration = owner.parent;
+			if (
+				!ts.isVariableDeclaration(declaration) ||
+				declaration.initializer !== owner ||
+				!ts.isIdentifier(declaration.name) ||
+				!(ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const)
+			)
+				return null;
+			binding = declaration.name;
+		}
+		if (
+			(binding && !this.localUses(binding).every(componentTagOrExport)) ||
+			(owner.name &&
+				owner.name !== binding &&
+				!this.localUses(owner.name).every(componentTagOrExport))
+		)
 			return null;
 
 		const fresh = (base: string) => {
