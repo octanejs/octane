@@ -300,6 +300,8 @@ export function createPersistence(
 	let marksChanged = false;
 	/** Saved values' metadata, by hashed name. */
 	let metas = new Map<string, StoredMeta>();
+	/** Prepared cache writes survive a failed commit even if the source read is later evicted. */
+	const prepared = new Map<string, { meta: StoredMeta; value?: string }>();
 	/** Hashed names of keys seen this session, and the reverse. */
 	const names = new Map<string, Promise<string>>();
 	const owners = new Map<string, string>();
@@ -391,6 +393,7 @@ export function createPersistence(
 			if (!expired(meta, now) && total <= limit * 0.9) break;
 			total -= meta.size;
 			metas.delete(meta.key);
+			prepared.delete(meta.key);
 			removed.add(meta.key);
 		}
 	}
@@ -418,12 +421,12 @@ export function createPersistence(
 		const checkpoint = marksChanged ? { marks: [...marks], cursors: [...cursors] } : null;
 		marksChanged = false;
 		const settled = ended.size ? [...ended] : null;
-		const put: Array<{ meta: StoredMeta; value?: string }> = [];
 		for (const key of keys) {
 			const saving = collect(key);
 			if (saving === undefined) continue;
 			const name = await nameOf(key);
 			if (saving === null) {
+				prepared.delete(name);
 				if (metas.delete(name)) removed.add(name);
 				continue;
 			}
@@ -440,24 +443,23 @@ export function createPersistence(
 			};
 			metas.set(name, meta);
 			removed.delete(name);
-			put.push({ meta, value });
+			prepared.set(name, { meta, value });
 		}
 		for (const name of touched) {
 			const meta = metas.get(name);
-			if (meta) put.push({ meta: { ...meta, lastUsed: now } });
+			if (meta && !prepared.has(name)) prepared.set(name, { meta });
 		}
 		touched.clear();
 		purge(now);
 		const remove = [...removed];
 		removed.clear();
-		const kept = put.filter(({ meta }) => metas.has(meta.key));
+		const kept = [...prepared.values()];
 		if (!cleared && (kept.length > 0 || remove.length > 0)) {
 			try {
 				await storage.commit(partition, kept, remove);
+				prepared.clear();
 			} catch {
-				// Drop any old durable copies unless a later save can replace them.
-				// Keep the previous checkpoint until those updates or deletions commit.
-				for (const key of keys) dirty.add(key);
+				// Retry the encrypted values this checkpoint covers, without re-reading evicted entries.
 				for (const name of remove) removed.add(name);
 				if (checkpoint) marksChanged = true;
 				retryOnce(mayRetry);
@@ -494,6 +496,7 @@ export function createPersistence(
 	}
 
 	function forget(name: string): void {
+		prepared.delete(name);
 		if (metas.delete(name)) removed.add(name);
 		schedule();
 	}
@@ -519,7 +522,8 @@ export function createPersistence(
 				forget(name);
 				return undefined;
 			}
-			const text = await storage.get(partition, name).catch(() => undefined);
+			const text =
+				prepared.get(name)?.value ?? (await storage.get(partition, name).catch(() => undefined));
 			if (cleared || text === undefined) return undefined;
 			try {
 				const stored = devalue.parse(await cipher.open(text, name)) as Stored & { at: number };
@@ -602,6 +606,7 @@ export function createPersistence(
 				if (cleared) return;
 				const name = await nameOf(key);
 				metas.delete(name);
+				prepared.delete(name);
 				touched.delete(name);
 				removed.delete(name);
 				await storage.commit(partition, [], [name]);
@@ -633,6 +638,7 @@ export function createPersistence(
 			clearHostTimeout(retryTimer);
 			document?.removeEventListener('visibilitychange', hidden);
 			metas = new Map();
+			prepared.clear();
 			marks.clear();
 			cursors.clear();
 			dirty.clear();

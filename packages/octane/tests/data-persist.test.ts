@@ -1357,63 +1357,107 @@ describe('octane/data feeds across restarts', () => {
 		shown.stop();
 	});
 
-	it('resumes before a feed update whose value could not be saved', async () => {
-		const inner = memoryStorage();
-		let failValues = false;
-		let failed = false;
-		const storage: PersistentStorage = {
-			...inner,
-			commit(partition, put, remove) {
-				if (
-					failValues &&
-					put.some(({ meta, value }) => value !== undefined && meta.key !== partition)
-				) {
-					failed = true;
-					return Promise.reject(new Error('value store unavailable'));
-				}
-				return inner.commit(partition, put, remove);
-			},
-		};
-		const collection = read({
-			name: shelf.name,
-			output: shelf.output,
-			fresh: 60_000,
-		});
-		const replacements = feed({
-			name: 'first-book',
-			event: schema<Book>(isBook),
-			changes: (book) => ({ read: collection, input: undefined, value: [book] }),
-			covers: [],
-		});
-		const feedLog = history();
-		const remote = server(books());
-		const open = () =>
-			createDataStore({
-				transport: remote.transport,
-				persist: cache(storage, 'ada'),
-				listen: feedLog.listener,
+	it.each(['offline', 'evicted', 'reopened', 'superseded', 'forgotten'] as const)(
+		'recovers a failed feed value commit after the read is %s',
+		async (caseName) => {
+			const inner = memoryStorage();
+			let failValues = false;
+			let failed = false;
+			let resolveCommit!: () => void;
+			const release = new Promise<void>((resolve) => (resolveCommit = resolve));
+			let retried!: () => void;
+			const nextCheckpoint = new Promise<void>((resolve) => (retried = resolve));
+			const storage: PersistentStorage = {
+				...inner,
+				commit(partition, put, remove) {
+					if (
+						failValues &&
+						put.some(({ meta, value }) => value !== undefined && meta.key !== partition)
+					) {
+						failed = true;
+						return release.then(() => {
+							throw new Error('value store unavailable');
+						});
+					}
+					const committed = inner.commit(partition, put, remove);
+					if (failed && put.some(({ meta }) => meta.key === partition))
+						void committed.then(retried);
+					return committed;
+				},
+			};
+			const collection = read({
+				name: shelf.name,
+				output: shelf.output,
+				fresh: 60_000,
+				keep: 0,
 			});
-		const before = open();
-		const original = await value<Book[]>(before, collection);
-		const stop = listen(before, replacements).subscribe(() => {});
-		await vi.waitFor(() => expect(feedLog.cursors).toEqual([null]));
-		await saved();
+			const replacements = feed({
+				name: 'first-book',
+				event: schema<Book>(isBook),
+				changes: (book) => ({ read: collection, input: undefined, value: [book] }),
+				covers: [],
+			});
+			const feedLog = history();
+			const remote = server(books());
+			const open = () =>
+				createDataStore({
+					transport: remote.transport,
+					persist: cache(storage, 'ada'),
+					listen: feedLog.listener,
+				});
+			const before = open();
+			const original = await value<Book[]>(before, collection);
+			const stop = listen(before, replacements).subscribe(() => {});
+			await vi.waitFor(() => expect(feedLog.cursors).toEqual([null]));
+			await saved();
 
-		failValues = true;
-		const renamed = { ...books()[0]!, title: 'New title' };
-		feedLog.publish(renamed);
-		await vi.waitFor(() => expect(original.handle.getSnapshot().value![0]).toEqual(renamed));
-		await vi.waitFor(() => expect(failed).toBe(true));
-		stop();
-		await saved();
+			failValues = true;
+			const renamed = { ...books()[0]!, title: 'New title' };
+			feedLog.publish(renamed);
+			await vi.waitFor(() => expect(original.handle.getSnapshot().value![0]).toEqual(renamed));
+			await vi.waitFor(() => expect(failed).toBe(true));
+			let expected = renamed;
+			let cursor = '1';
+			if (caseName === 'superseded') {
+				expected = { ...renamed, title: 'Later title' };
+				feedLog.publish(expected);
+				await vi.waitFor(() => expect(original.handle.getSnapshot().value![0]).toEqual(expected));
+				cursor = '2';
+			}
+			stop();
+			if (caseName === 'offline') {
+				resolveCommit();
+				await saved();
+				const after = open();
+				const shown = await value<Book[]>(after, collection);
+				stops.push(listen(after, replacements).subscribe(() => {}));
+				await vi.waitFor(() => expect(feedLog.cursors).toEqual([null, '0']));
+				await vi.waitFor(() => expect(shown.handle.getSnapshot().value![0]).toEqual(renamed));
+				return;
+			}
 
-		failValues = false;
-		const after = open();
-		const shown = await value<Book[]>(after, collection);
-		stops.push(listen(after, replacements).subscribe(() => {}));
-		await vi.waitFor(() => expect(feedLog.cursors).toEqual([null, '0']));
-		await vi.waitFor(() => expect(shown.handle.getSnapshot().value![0]).toEqual(renamed));
-	});
+			if (caseName !== 'superseded') {
+				original.stop();
+				await vi.waitFor(() => expect(original.handle.getSnapshot().status).toBe('pending'));
+			}
+			if (caseName === 'reopened') {
+				const shown = await value<Book[]>(before, collection);
+				expect(shown.value[0]).toEqual(renamed);
+			}
+			const forgotten = caseName === 'forgotten' ? before.forget(collection, undefined) : undefined;
+			failValues = false;
+			resolveCommit();
+			await forgotten;
+			await nextCheckpoint;
+			const after = open();
+			stops.push(listen(after, replacements).subscribe(() => {}));
+			await vi.waitFor(() => expect(feedLog.cursors).toEqual([null, cursor]));
+			remote.log.length = 0;
+			const restored = await value<Book[]>(after, collection);
+			expect(restored.value[0]).toEqual(caseName === 'forgotten' ? books()[0] : expected);
+			expect(remote.log).toEqual(caseName === 'forgotten' ? ['read shelf'] : []);
+		},
+	);
 
 	it('restores stale a saved value that missed an event because it was not in memory', async () => {
 		const storage = memoryStorage();
