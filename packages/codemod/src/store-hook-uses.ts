@@ -1,4 +1,4 @@
-import { nativeOutputOwner } from './forwarded-props.js';
+import { nativeOutputOwner, renderUses } from './forwarded-props.js';
 import { componentTagOrExport, localUses, portableArguments, scalar } from './local-uses.js';
 import { skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
@@ -145,7 +145,7 @@ export function storeHookUses(
 	typeOf: (node: ts.Node) => ts.Type,
 ) {
 	// Direct eval can reference the hook or a local result by spelling alone.
-	if (file.text.includes('eval')) {
+	if (file.text.includes('eval') || file.text.includes('\\u')) {
 		const directEval = (n: ts.Node): boolean =>
 			(ts.isIdentifier(n) && n.text === 'eval') || !!ts.forEachChild(n, directEval);
 		if (directEval(file)) return () => false;
@@ -215,7 +215,7 @@ export function storeHookUses(
 		else if (ts.isVariableDeclaration(outer.parent) && ts.isIdentifier(outer.parent.name))
 			name = outer.parent.name;
 		else if (!ts.isExportAssignment(outer.parent)) return false;
-		return !name || uses(name).every(componentTagOrExport);
+		return !name || renderUses(uses(name)).every(componentTagOrExport);
 	}
 	const portable = portableArguments(checker, typeOf);
 	function argument(expr: ts.Expression, check: ResultCheck, allowShared = false) {

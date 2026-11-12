@@ -1,1 +1,1 @@
-export { composeHtmlStream } from '@octanejs/app-core/html';
+export { composeHtmlStream, endRoute, routeEnding } from '@octanejs/app-core/html';
