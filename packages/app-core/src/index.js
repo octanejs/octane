@@ -25,3 +25,4 @@ export {
 export { runServerRequest } from './server/signal-owners.js';
 export { createServerCallHost } from './server/server-calls.js';
 export { createRpcRegistry } from './server/rpc-registry.js';
+export { routeSeed } from './seeds.js';

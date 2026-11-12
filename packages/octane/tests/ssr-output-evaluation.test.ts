@@ -131,7 +131,7 @@ for (const dev of [true, false]) {
 			expect(log).toEqual(['yield:b', 'yield:a', 'key:b', 'visit:b', 'key:a', 'visit:a']);
 		});
 
-		it('keeps destructuring defaults and index values in key and body evaluation order', () => {
+		it('initializes each row once before evaluating its key and body with the same index', () => {
 			const log: string[] = [];
 			let fallback = 0;
 			const out = renderToString(server.DestructuredRows, {
@@ -150,18 +150,9 @@ for (const dev of [true, false]) {
 				},
 			});
 			expect(visibleHtml(out.html)).toBe(
-				'<ul><li data-id="a">default-2</li><li data-id="b">default-4</li></ul>',
+				'<ul><li data-id="a">default-1</li><li data-id="b">default-2</li></ul>',
 			);
-			expect(log).toEqual([
-				'fallback',
-				'key:a:0',
-				'fallback',
-				'visit:a:0',
-				'fallback',
-				'key:b:1',
-				'fallback',
-				'visit:b:1',
-			]);
+			expect(log).toEqual(['fallback', 'key:a:0', 'visit:a:0', 'fallback', 'key:b:1', 'visit:b:1']);
 		});
 
 		it('renders the empty arm without evaluating an item key or body', () => {

@@ -18,6 +18,11 @@ const rootAttributes = {
 	role: /^img$/,
 	focusable: /^(?:true|false)$/,
 };
+
+export function svgLiteralRootOverride(name: string, value: string) {
+	return (name === 'fill' || name === 'focusable') && rootAttributes[name].test(value);
+}
+
 const fillRule = /^(?:evenodd|nonzero)$/;
 const presentation = {
 	fill: paint,
@@ -72,6 +77,11 @@ function attributes(text: string, allowed: Record<string, RegExp>) {
 		values[name] = value;
 	}
 	return space.test(text.slice(end)) ? values : null;
+}
+
+// Hydration and React interop use reserved data attributes.
+export function svgDataAttribute(name: string): name is `data-${string}` {
+	return /^data-(?!oct(?:ane)?(?:-|$)|react-compat$)[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(name);
 }
 
 type StaticSvgNode = {
