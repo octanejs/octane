@@ -7,6 +7,7 @@ const IMPURE_UPDATER = 'OCTANE_STRONG_IMPURE_UPDATER';
 const SNAPSHOT_MUTATION = 'OCTANE_STRONG_SNAPSHOT_MUTATION';
 const RENDER_SNAPSHOT_MUTATION = 'OCTANE_STRONG_RENDER_SNAPSHOT_MUTATION';
 const STALE_STATE_UPDATE = 'OCTANE_STRONG_STALE_STATE_UPDATE';
+const READ_AFTER_SET = 'OCTANE_STRONG_READ_AFTER_SET';
 const READ_ONLY_STATE = 'OCTANE_STRONG_READ_ONLY_STATE';
 const WRITE_ONLY_STATE = 'OCTANE_STRONG_WRITE_ONLY_STATE';
 const UNCACHED_STORE_SNAPSHOT = 'OCTANE_STRONG_UNCACHED_STORE_SNAPSHOT';
@@ -301,7 +302,7 @@ export function useLog() {
 export function A({ step }) {
   const [n, setN] = useState(0);
   const [items, dispatch] = useReducer(reducer, []);
-  return <b onClick={() => { setN((p) => p + step); dispatch({ type: 'add', item: n }); }}>{items.length}</b>;
+  return <b onClick={() => { dispatch({ type: 'add', item: n }); setN((p) => p + step); }}>{items.length}</b>;
 }`),
 			'/src/App.tsrx',
 		);
@@ -838,6 +839,152 @@ export function useSave(save) {
 }`),
 			'/src/App.tsrx',
 		);
+	});
+});
+
+describe('Strong reads after a synchronous state update', () => {
+	/** Source offsets of READ_AFTER_SET hints; each is a hint and the module compiles. */
+	function hintsAt(body: string, filename = '/src/App.tsrx'): number[] {
+		const source = tsx(body, IMPORTS, true);
+		expect(() => compile(source, filename)).not.toThrow();
+		const { diagnostics } = collectDiagnostics(source, filename);
+		return diagnostics
+			.filter((diagnostic: { code: string }) => diagnostic.code === READ_AFTER_SET)
+			.map((diagnostic: { severity: string; start: { offset: number } }) => {
+				expect(diagnostic.severity).toBe('hint');
+				return diagnostic.start.offset - source.indexOf('export function');
+			});
+	}
+	const at = (body: string, needle: string) => body.indexOf(needle);
+
+	it.each([
+		[
+			'a condition after clearing a draft',
+			`export function A({ send }) { const [draft, setDraft] = useState(''); function submit() { setDraft(''); if (draft) send(draft); } return <button onClick={submit}>{draft as string}</button>; }`,
+			['draft) send', 'draft); }'],
+		],
+		[
+			'a log after an increment',
+			`export function A({ log }) { const [count, setCount] = useState(0); return <button onClick={() => { setCount(count + 1); log(count); }}>{count}</button>; }`,
+			'count); }',
+		],
+		[
+			'a second increment from the same snapshot',
+			`export function A() { const [count, setCount] = useState(0); return <button onClick={() => { setCount(count + 1); setCount(count + 1); }}>{count}</button>; }`,
+			'count + 1); }',
+		],
+		[
+			'a property of the state value',
+			`export function A({ log }) { const [items, setItems] = useState([]); return <button onClick={() => { setItems([]); log(items.length); }}>{items.length}</button>; }`,
+			'items.length); }',
+		],
+		[
+			'a nested block after the update',
+			`export function A({ log }) { const [open, setOpen] = useState(false); return <button onClick={() => { setOpen(true); if (log) { log(open); } }}>{String(open)}</button>; }`,
+			'open); }',
+		],
+		[
+			'a read in the same switch case',
+			`export function A({ log }) { const [count, setCount] = useState(0); return <button onClick={() => { switch (log) { case 1: setCount(0); log(count); break; } }}>{count}</button>; }`,
+			'count); break',
+		],
+		[
+			'reducer state after a dispatch',
+			`export function A({ log }) { const [s, dispatch] = useReducer((s, a) => s + a, 0); return <button onClick={() => { dispatch(1); log(s); }}>{s}</button>; }`,
+			's); }',
+		],
+		[
+			'a read after an await',
+			`export function A({ save }) { const [n, setN] = useState(0); return <button onClick={async () => { await save(); setN(0); save(n); }}>{n}</button>; }`,
+			'n); }',
+		],
+	])('hints at %s', (_name, body, needles) => {
+		const expected = (Array.isArray(needles) ? needles : [needles]).map((needle) =>
+			at(body, needle),
+		);
+		expect(hintsAt(body)).toEqual(expected);
+	});
+
+	it.each([
+		[
+			'the next value computed once',
+			`export function A({ log }) { const [count, setCount] = useState(0); return <button onClick={() => { const next = count + 1; setCount(next); log(next); }}>{count}</button>; }`,
+		],
+		[
+			'a read in the setter argument',
+			`export function A() { const [count, setCount] = useState(0); return <button onClick={() => setCount(count + 1)}>{count}</button>; }`,
+		],
+		[
+			'reads in updater functions',
+			`export function A() { const [count, setCount] = useState(0); return <button onClick={() => { setCount((c) => c + 1); setCount((c) => c + count); }}>{count}</button>; }`,
+		],
+		[
+			'the state getter',
+			`export function A({ log }) { const [count, setCount, getCount] = useState(0); return <button onClick={() => { setCount(1); log(getCount()); }}>{count}</button>; }`,
+		],
+		[
+			'a read before the update',
+			`export function A({ log }) { const [count, setCount] = useState(0); return <button onClick={() => { log(count); setCount(0); }}>{count}</button>; }`,
+		],
+		[
+			'a read in a sibling branch',
+			`export function A({ log }) { const [count, setCount] = useState(0); return <button onClick={() => { if (count) { setCount(0); } else { log(count); } }}>{count}</button>; }`,
+		],
+		[
+			'a read in a later switch case',
+			`export function A({ log }) { const [count, setCount] = useState(0); return <button onClick={() => { switch (log) { case 1: setCount(0); break; default: log(count); } }}>{count}</button>; }`,
+		],
+		[
+			'a read after a block that updated',
+			`export function A({ log }) { const [count, setCount] = useState(0); return <button onClick={() => { if (log) { setCount(0); } log(count); }}>{count}</button>; }`,
+		],
+		[
+			'a conditional update expression',
+			`export function A({ log }) { const [count, setCount] = useState(0); return <button onClick={() => { log && setCount(0); log(count); }}>{count}</button>; }`,
+		],
+		[
+			'a parameter that aliases the state',
+			`export function A({ log }) { const [q, setQ] = useState(''); const run = (next) => { setQ(next); log(next); }; return <button onClick={() => run(q)}>{q as string}</button>; }`,
+		],
+		[
+			'another state',
+			`export function A({ log }) { const [a, setA] = useState(0); const [b, setB] = useState(0); return <button onClick={() => { setA(1); log(b); }}>{a + b}</button>; }`,
+		],
+		[
+			'a nested function after the update',
+			`export function A({ later }) { const [n, setN] = useState(0); return <button onClick={() => { setN(1); later(() => n); }}>{n}</button>; }`,
+		],
+	])('does not hint at %s', (_name, body) => {
+		expect(hintsAt(body)).toEqual([]);
+	});
+
+	it('is silent outside Strong mode and preserves emitted code', () => {
+		const source = tsx(
+			`export function A({ log }) { const [count, setCount] = useState(0); return <button onClick={() => { setCount(count + 1); log(count); }}>{count}</button>; }`,
+		);
+		const codes = (options: object) =>
+			compile(source, '/src/App.tsrx', options as any).diagnostics.map(
+				(diagnostic: { code: string }) => diagnostic.code,
+			);
+		expect(codes({})).not.toContain(READ_AFTER_SET);
+		expect(codes({ strong: true })).toContain(READ_AFTER_SET);
+		for (const mode of ['client', 'server'] as const) {
+			expect(compile(source, '/src/App.tsrx', { mode, strong: true }).code).toBe(
+				compile(source, '/src/App.tsrx', { mode }).code,
+			);
+		}
+	});
+
+	it('names the compute-once replacement', () => {
+		const source = tsx(
+			`export function A({ log }) { const [count, setCount] = useState(0); return <button onClick={() => { setCount(count + 1); log(count); }}>{count}</button>; }`,
+			IMPORTS,
+			true,
+		);
+		const diagnostic = collectDiagnostics(source, '/src/App.tsrx').diagnostics.find(
+			(item: { code: string }) => item.code === READ_AFTER_SET,
+		);
+		expect(diagnostic?.message).toContain('const next = count + 1; setCount(next); log(next)');
 	});
 });
 

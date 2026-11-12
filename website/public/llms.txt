@@ -528,6 +528,7 @@ Adoption workflow for an existing app:
 Migration recipes, React idiom → Strong replacement:
 
 - Capture an initial render value: `const [value] = useState(() => initial);` → `const value = useInitialValue(() => initial);`
+- Use the value you just set: `setDraft(''); if (draft) send(draft);` → `const message = draft; setDraft(''); if (message) send(message);`
 - Create a value once: `if (ref.current === null) ref.current = new Store();` → `const ref = useLazyRef(() => new Store());`
 - Render from a DOM measurement: `useLayoutEffect(() => setWidth(el.current.offsetWidth));` → `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });`
 - Measure an element from a callback ref: `<span ref={(el) => { if (el) setWidth(el.offsetWidth); }}>` → `const width = useLayoutSnapshot(() => el.current?.offsetWidth ?? 0, { initial: 0 });`
@@ -563,6 +564,7 @@ State values, updaters, and subscriptions:
 - `OCTANE_STRONG_IMPURE_UPDATER`: Do the side effect or nondeterministic read in the event handler, effect, or Action, and pass its result in: `const now = Date.now(); setValue((current) => current + now)`.
 - `OCTANE_STRONG_SNAPSHOT_MUTATION`: Pass a new value, for example `setItems([...items, item])` or `setItems((current) => [...current, item])`. Keep mutable objects in `useRef`, or create one with `useLazyRef`.
 - `OCTANE_STRONG_STALE_STATE_UPDATE`: Use the updater form, `setValue((current) => current + 1)`, compute from the state a reducer receives, or read the latest value with the state getter (the third tuple member).
+- `OCTANE_STRONG_READ_AFTER_SET` (hint): Compute the next value once and use it for both: `const next = count + 1; setCount(next); log(next)`. When the old value is what you mean, name it first: `const previous = count; setCount(0); log(previous)`.
 - `OCTANE_STRONG_READ_ONLY_STATE`: Derive render values from their inputs. Use `useInitialValue(value)` for a deliberate initial render snapshot. Pass a factory to initialize lazily. Use `useRef(value)` or `useLazyRef(() => createValue())` for mutable values kept for events or effects.
 - `OCTANE_STRONG_WRITE_ONLY_STATE`: Subscribe with `useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)` and render its snapshot, or remove the unused state.
 - `OCTANE_STRONG_UNCACHED_STORE_SNAPSHOT`: Return a value the store keeps, such as its current state object, or read each field with its own `useSyncExternalStore` call.

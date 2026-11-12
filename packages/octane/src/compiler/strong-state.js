@@ -1,12 +1,14 @@
 // Strong state purity checks that share the Strong visitor's lexical bindings
 // and execution phases: pure updaters and reducers, immutable state values in
-// every phase, and deferred updates computed from a stale render snapshot.
+// every phase, deferred updates computed from a stale render snapshot, and
+// (as a hint) reads of a state after its own setter ran in the same function.
 // Like the other Strong policies, this never annotates the parser tree or
 // changes the code emitted for a valid module.
 
 export const STRONG_IMPURE_UPDATER = 'OCTANE_STRONG_IMPURE_UPDATER';
 export const STRONG_SNAPSHOT_MUTATION = 'OCTANE_STRONG_SNAPSHOT_MUTATION';
 export const STRONG_STALE_STATE_UPDATE = 'OCTANE_STRONG_STALE_STATE_UPDATE';
+export const STRONG_READ_AFTER_SET = 'OCTANE_STRONG_READ_AFTER_SET';
 
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
 const SKIP_KEYS = new Set([
@@ -97,12 +99,14 @@ export const SNAPSHOT_MUTATION_MESSAGE =
 	'Strong mode does not allow mutating a state value outside render. Passing the same object back to its setter does not re-render, and the change rewrites the snapshot that transitions and useOptimistic revert to. Pass a new value instead, for example setItems([...items, item]) or setItems((current) => [...current, item]). Keep mutable objects in useRef, or create one with useLazyRef.';
 const STALE_MESSAGE =
 	'Strong mode does not allow a deferred state update computed from the render snapshot of the same state. After an await, or in a timer or promise callback, other updates may already have changed it. Use the updater form, setValue((current) => current + 1), or read the latest value with the state getter (the third tuple member).';
+const READ_AFTER_SET_MESSAGE =
+	'This reads the render snapshot of a state its setter or dispatch already updated earlier in the same function, so it sees the old value, not the one just set. Compute the next value once and use it for both, for example: const next = count + 1; setCount(next); log(next). When the old value is meant, name it first: const previous = count.';
 const STALE_REDUCER_MESSAGE =
 	'Strong mode does not allow a deferred dispatch computed from the render snapshot of the same reducer state. After an await, or in a timer or promise callback, other actions may already have changed it. Compute the next state in the reducer from the state it receives, or read the latest value with the state getter (the third tuple member).';
 
 /**
  * @param {{
- *   report: (code: string, node: any, message: string) => void,
+ *   report: (code: string, node: any, message: string, suggestions?: any[], severity?: string) => void,
  *   resolve: (scope: any, name: string) => any,
  *   unwrap: (node: any) => any,
  *   createScope: (parent: any, kind: string, statements?: any[], params?: any[]) => any,
@@ -295,6 +299,34 @@ export function createStrongStatePolicy(api) {
 			const kind = snapshot.array === true ? 'array' : shapeKind(snapshot.shape);
 			if (kind === 'array') return ARRAY_MUTATORS.has(method) ? member : null;
 			return COLLECTION_MUTATORS.get(kind)?.has(method) ? member : null;
+		},
+
+		/**
+		 * A statement that is a direct setter or dispatch call updates its state
+		 * for the rest of the block, including nested blocks.
+		 */
+		recordUpdate(statement, scope) {
+			const call = statement.type === 'ExpressionStatement' ? unwrap(statement.expression) : null;
+			if (call?.type !== 'CallExpression') return;
+			const value = callableValue(call.callee, scope);
+			if (value?.kind === 'setter' && value.state) {
+				(scope.updatedStates ??= new Set()).add(value.state);
+			}
+		},
+
+		/**
+		 * Hint at a captured render snapshot read after its own update in the same
+		 * function. A parameter or local alias names a value the function chose.
+		 */
+		checkReadAfterUpdate(node, binding, scope) {
+			if (binding?.kind !== 'snapshot' || !binding.state) return;
+			let updated = false;
+			for (let current = scope; current; current = current.parent) {
+				if (current.bindings.has(node.name)) return;
+				updated ||= current.updatedStates?.has(binding.state) === true;
+				if (current.kind === 'function') break;
+			}
+			if (updated) report(STRONG_READ_AFTER_SET, node, READ_AFTER_SET_MESSAGE, [], 'hint');
 		},
 
 		/** Report a deferred setter or dispatch computed from its own render snapshot. */
