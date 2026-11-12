@@ -619,6 +619,56 @@ export function Host({rows}: { rows: Row[] }) {
 		}
 	});
 
+	it('renders retained ordered JSX maps in conditional directive arms', async () => {
+		const rows = "['a', 'b'].map(label => <li key={key(label)}>{read(label)}</li>)";
+		const branches = {
+			And: `show && ${rows}`,
+			Then: `show ? ${rows} : <li>empty</li>`,
+			Else: `show ? <li>empty</li> : ${rows}`,
+		};
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'tsconfig.json':
+				'{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler","strict":true}}',
+			'List.tsx': Object.entries(branches)
+				.map(([name, branch]) => {
+					return `export function ${name}({show, trace}: {show: boolean; trace: string[]}) {
+	function key(label: string) { trace.push('key:' + label); return label; }
+	function read(label: string) { trace.push('prop:' + label); return label + '!'; }
+	return <ul>{${branch}}</ul>;
+}`;
+				})
+				.join('\n'),
+		});
+		fs.symlinkSync(
+			path.join(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const [file] = (
+			await runCodemod([root], { write: false, strong: true, verify: true, projectTypes: true })
+		).files;
+		expect(file.diagnostics.filter(({ severity }) => severity === 'error')).toEqual([]);
+		const original = await bundleRuntime(root, 'server', "export * from './List.tsx'");
+		const migrated = loadCompiledFixtureSource(file.code, { id: file.output, mode: 'server' });
+
+		for (const name of Object.keys(branches)) {
+			for (const show of [true, false]) {
+				const trace = [];
+				const react = renderReact(reactElement(original[name], { show, trace }));
+				const nativeTrace = [];
+				const native = renderToStaticMarkup(migrated[name], { show, trace: nativeTrace }).html;
+				expect(new JSDOM(native).window.document.body.textContent).toBe(
+					new JSDOM(react).window.document.body.textContent,
+				);
+				expect(nativeTrace).toEqual(trace);
+				if (show === (name !== 'Else')) {
+					expect(trace).toEqual(['prop:a', 'key:a', 'prop:b', 'key:b']);
+				}
+			}
+		}
+	});
+
 	it('keeps visible or ambiguous JSX text and authored comments in keyed map rows', async () => {
 		const children = [
 			' {row.child()}',
