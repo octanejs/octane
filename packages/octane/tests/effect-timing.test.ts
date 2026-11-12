@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { drainPassiveEffects, flushSync } from '../src/index.js';
+import { installTestClock } from 'octane/testing';
 import { mount, nextPaint, type MountResult } from './_helpers';
 import {
 	PhaseOrder,
@@ -110,8 +111,7 @@ describe('effect timing', () => {
 	});
 
 	it('eventually runs passive effects when a background tab receives no animation frame', async () => {
-		vi.useFakeTimers();
-		vi.stubGlobal('requestAnimationFrame', () => 0);
+		const clock = installTestClock();
 		const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
 		let rendered: MountResult | undefined;
 		const log: string[] = [];
@@ -119,41 +119,41 @@ describe('effect timing', () => {
 			rendered = mount(PassiveDeferred, { tick: 0, log });
 			expect(log).toEqual(['layout']);
 
-			await vi.advanceTimersByTimeAsync(1_000);
+			// A hidden page draws no frame: the effect runs in the next task.
+			await clock.advance(0);
 
 			expect(log).toEqual(['layout', 'passive']);
 		} finally {
 			rendered?.unmount();
 			drainPassiveEffects();
 			visibility.mockRestore();
-			vi.unstubAllGlobals();
-			vi.useRealTimers();
+			clock.uninstall();
 		}
 	});
 
-	it('keeps visible-page passive effects deferred while waiting for the next paint', () => {
-		vi.useFakeTimers();
-		vi.stubGlobal('requestAnimationFrame', () => 0);
+	it('keeps visible-page passive effects deferred while waiting for the next paint', async () => {
+		const clock = installTestClock();
 		const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
 		let rendered: MountResult | undefined;
 		const log: string[] = [];
 		try {
 			rendered = mount(PassiveDeferred, { tick: 0, log });
-			vi.advanceTimersByTime(50);
-
+			// No zero-delay delivery: a visible page waits for its next frame.
+			await clock.advance(0);
 			expect(log).toEqual(['layout']);
+
+			await clock.frame();
+			expect(log).toEqual(['layout', 'passive']);
 		} finally {
 			rendered?.unmount();
 			drainPassiveEffects();
 			visibility.mockRestore();
-			vi.unstubAllGlobals();
-			vi.useRealTimers();
+			clock.uninstall();
 		}
 	});
 
 	it('delivers later passive updates after an inline drain cancels an earlier delivery', async () => {
-		vi.useFakeTimers();
-		vi.stubGlobal('requestAnimationFrame', () => 0);
+		const clock = installTestClock();
 		const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
 		let rendered: MountResult | undefined;
 		const log: string[] = [];
@@ -161,11 +161,11 @@ describe('effect timing', () => {
 			rendered = mount(CoalescedPassiveArtifact, { label: 'a', log });
 			drainPassiveEffects();
 			rendered.update(CoalescedPassiveArtifact, { label: 'b', log });
-			await vi.advanceTimersByTimeAsync(1_000);
+			await clock.advance(1_000);
 			expect(log).toEqual(['render:a', 'body:a', 'render:b', 'cleanup:a', 'body:b']);
 
 			rendered.update(CoalescedPassiveArtifact, { label: 'c', log });
-			await vi.advanceTimersByTimeAsync(1_000);
+			await clock.advance(1_000);
 			expect(log).toEqual([
 				'render:a',
 				'body:a',
@@ -178,20 +178,18 @@ describe('effect timing', () => {
 			]);
 			expect(rendered.container.querySelector('[data-label="c"]')).not.toBeNull();
 			rendered.unmount();
-			await vi.advanceTimersByTimeAsync(1_000);
+			await clock.advance(1_000);
 			expect(log.filter((entry) => entry === 'cleanup:c')).toEqual(['cleanup:c']);
 		} finally {
 			rendered?.unmount();
 			drainPassiveEffects();
 			visibility.mockRestore();
-			vi.unstubAllGlobals();
-			vi.useRealTimers();
+			clock.uninstall();
 		}
 	});
 
 	it('delivers passive work scheduled by an effect that synchronously updates another root', async () => {
-		vi.useFakeTimers();
-		vi.stubGlobal('requestAnimationFrame', () => 0);
+		const clock = installTestClock();
 		const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
 		let first: MountResult | undefined;
 		let second: MountResult | undefined;
@@ -206,7 +204,7 @@ describe('effect timing', () => {
 				onEffect: () =>
 					second!.update(CoalescedPassiveArtifact, { label: 'after', log: secondLog }),
 			});
-			await vi.advanceTimersByTimeAsync(1_000);
+			await clock.advance(1_000);
 			expect(firstLog).toEqual(['body:0']);
 			expect(secondLog).toEqual([
 				'render:before',
@@ -225,8 +223,7 @@ describe('effect timing', () => {
 			second?.unmount();
 			drainPassiveEffects();
 			visibility.mockRestore();
-			vi.unstubAllGlobals();
-			vi.useRealTimers();
+			clock.uninstall();
 		}
 	});
 

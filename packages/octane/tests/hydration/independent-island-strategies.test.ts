@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { compile } from 'octane/compiler';
+import { installTestClock } from 'octane/testing';
 import { bootstrapIndependentHydration } from '../../src/hydration/independent-island.js';
 import { independentHydrationStrategies } from '../../src/hydration/independent-strategies.js';
 import { renderToString } from '../../src/runtime.server.js';
@@ -115,6 +116,21 @@ describe('independent Hydrate automatic strategies', () => {
 			expect(view.loads).toHaveLength(1);
 		} finally {
 			view.cleanup();
+		}
+	});
+
+	it('activates idle() when the test clock next runs due work', async () => {
+		const clock = installTestClock();
+		const view = mount('idle({ timeout: 125 })');
+		try {
+			await settle();
+			expect(view.loads).toEqual([]);
+			await clock.advance(0);
+			await settle();
+			expect(view.loads).toHaveLength(1);
+		} finally {
+			view.cleanup();
+			clock.uninstall();
 		}
 	});
 
