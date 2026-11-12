@@ -54,7 +54,7 @@ const PLAIN = { template: false };
 const DESCRIPTOR = { template: false, descriptor: true };
 /** The local component that wraps an element no island can host and throws its `error`. */
 const NO_PORT = 'NoOctanePort';
-const syntheticSubmitMembers = {
+const syntheticEventMembers = {
 	nativeEvent: 'unknown',
 	persist: '() => void',
 	isDefaultPrevented: '() => boolean',
@@ -567,7 +567,7 @@ function isComponentName(name: string) {
 class ModuleTransform {
 	readonly source: string;
 	readonly filename: string;
-	private submitParameters?: Set<ts.ParameterDeclaration>;
+	private reactEventParameters?: Set<ts.ParameterDeclaration>;
 	readonly options: TransformOptions;
 	readonly target: 'tsrx' | 'tsx';
 	readonly strong: boolean;
@@ -905,13 +905,18 @@ class ModuleTransform {
 			this.reactRendererBodies.set(element, tag + ', ' + props);
 		}
 		let hasEval = false;
-		if (this.source.includes('SubmitEvent') || this.source.includes('\\u'))
-			this.submitParameters = this.indexSubmitParameters();
+		if (
+			this.source.includes('SubmitEvent') ||
+			this.source.includes('ReactEventHandler') ||
+			this.source.includes('\\u')
+		)
+			this.reactEventParameters = this.indexReactEventParameters();
 		const fields: ts.JsxOpeningLikeElement[] = [];
 		/** Values read as an element: cloned, inspected, or a `render` prop. */
 		const elements: ts.Expression[] = [];
 		const visit = (node: ts.Node) => {
-			if (ts.isParameter(node) && this.submitParameters?.has(node)) this.checkSubmitParameter(node);
+			if (ts.isParameter(node) && this.reactEventParameters?.has(node))
+				this.checkReactEventParameter(node);
 			if (ts.isIdentifier(node) && declaresName(node)) this.declared.add(node.text);
 			if (this.options.pathSvgAdapter && ts.isIdentifier(node) && node.text === 'eval')
 				hasEval = true;
@@ -2153,7 +2158,13 @@ class ModuleTransform {
 		if (ts.isImportDeclaration(node)) return this.rewriteImport(node);
 		if (ts.isExportDeclaration(node) && node.moduleSpecifier) return this.rewriteReexport(node);
 		if (ts.isCallExpression(node)) return this.rewriteCall(node);
-		if (ts.isPropertyAccessExpression(node)) return this.rewriteMember(node);
+		if (ts.isPropertyAccessExpression(node)) {
+			const text = this.rewriteMember(node);
+			if (text === null) this.checkProjectReactEventMember(node, node.name.text);
+			return text;
+		}
+		if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression))
+			this.checkProjectReactEventMember(node, node.argumentExpression.text);
 		if (ts.isQualifiedName(node)) return this.rewriteQualifiedType(node);
 		if (ts.isImportTypeNode(node)) return this.rewriteImportType(node);
 		if (ts.isTypeReferenceNode(node)) return this.rewriteTypeReference(node, node.typeName);
@@ -2452,13 +2463,17 @@ class ModuleTransform {
 					exports.elements[index + 1]?.getFullStart() ?? exports.end - 1,
 				);
 				const name = (item.propertyName ?? item.name).text;
-				if (name === 'SubmitEvent' || name === 'SubmitEventHandler') {
+				if (
+					name === 'SubmitEvent' ||
+					name === 'SubmitEventHandler' ||
+					name === 'ReactEventHandler'
+				) {
 					retained.push(text);
 					this.note(
 						RULE.unsupported,
 						'error',
 						item,
-						'Review the React submit event re-export and define an explicit native event type.',
+						'Review the React event re-export and define an explicit native event type.',
 					);
 				} else {
 					migrated.push(text);
@@ -2565,7 +2580,7 @@ class ModuleTransform {
 		const qualifier = node.qualifier;
 		const name = qualifier && ts.isIdentifier(qualifier) ? qualifier.text : null;
 		if (specifier.text === 'react' && !node.isTypeOf) {
-			const event = this.nativeSubmitType(node, name);
+			const event = this.nativeEventType(node, name);
 			if (event !== undefined) {
 				if (event !== null) this.count(RULE.import);
 				return event;
@@ -2874,7 +2889,7 @@ class ModuleTransform {
 		if (ts.isQualifiedName(name) && this.isGlobalNamespace(name.left, 'JSX'))
 			this.require('octane', 'JSX', true);
 		const imported = this.reactTypeName(name);
-		const event = this.nativeSubmitType(node, imported);
+		const event = this.nativeEventType(node, imported);
 		if (event) {
 			this.count(RULE.import);
 			return event;
@@ -3360,8 +3375,20 @@ class ModuleTransform {
 		return { fn: param.parent, param };
 	}
 
-	private nativeSubmitType(node: ts.NodeWithTypeArguments, name: string | null) {
-		if (name !== 'SubmitEvent' && name !== 'SubmitEventHandler') return undefined;
+	private nativeEventType(node: ts.NodeWithTypeArguments, name: string | null) {
+		const genericHandler = name === 'ReactEventHandler';
+		if (!genericHandler && name !== 'SubmitEvent' && name !== 'SubmitEventHandler')
+			return undefined;
+		const target = node.typeArguments?.[0];
+		const type = (name: string) =>
+			ts.isExternalModule(this.sf)
+				? this.require('octane', name, true)
+				: `import(${this.quote}octane${this.quote}).${name}`;
+		if (genericHandler) {
+			const native = type('NativeEvent');
+			const event = target ? `${native}<${this.emit(target, PLAIN)}>` : native;
+			return `${type('EventHandler')}<${event}>`;
+		}
 		const global = this.checker.resolveName(
 			'globalThis',
 			node,
@@ -3377,11 +3404,6 @@ class ModuleTransform {
 			);
 			return null;
 		}
-		const target = node.typeArguments?.[0];
-		const type = (name: string) =>
-			ts.isExternalModule(this.sf)
-				? this.require('octane', name, true)
-				: `import(${this.quote}octane${this.quote}).${name}`;
 		const host = target ? this.emit(target, PLAIN) : 'globalThis.Element';
 		const event = `${type('NativeEvent')}<${host}, globalThis.SubmitEvent>`;
 		return name === 'SubmitEventHandler' ? `${type('EventHandler')}<${event}>` : event;
@@ -3389,7 +3411,7 @@ class ModuleTransform {
 
 	/** Let the isolated checker propagate the original React types through
 	 * assertions and contextual signatures, without changing ordinary binding. */
-	private indexSubmitParameters() {
+	private indexReactEventParameters() {
 		const names = new Set<string>();
 		const edits: { start: number; end: number; handler: boolean }[] = [];
 		const original: ts.ParameterDeclaration[] = [];
@@ -3405,11 +3427,12 @@ class ModuleTransform {
 				return [node.typeArguments[0], node.typeArguments[1]];
 		};
 		const replace = (name: string | null, first: ts.Node, last = first) => {
-			if (name === 'SubmitEvent' || name === 'SubmitEventHandler')
+			const handler = name === 'SubmitEventHandler' || name === 'ReactEventHandler';
+			if (name === 'SubmitEvent' || handler)
 				edits.push({
 					start: first.getStart(this.sf),
 					end: last.end,
-					handler: name === 'SubmitEventHandler',
+					handler,
 				});
 		};
 		const collect = (node: ts.Node) => {
@@ -3433,7 +3456,7 @@ class ModuleTransform {
 		};
 		collect(this.sf);
 		if (!edits.length || (!original.length && !projections.length)) return undefined;
-		let markerName = '__octaneSubmit';
+		let markerName = '__octaneChecked';
 		while (
 			[markerName, markerName + 'Event', markerName + 'Handler'].some((name) => names.has(name))
 		)
@@ -3451,7 +3474,7 @@ class ModuleTransform {
 		}
 		pieces.push(this.source.slice(offset));
 		const analysis = pieces.join('');
-		const synthetic = Object.entries(syntheticSubmitMembers)
+		const synthetic = Object.entries(syntheticEventMembers)
 			.map(([name, type]) => `${name}: ${type};`)
 			.join(' ');
 		const { sf, checker } = bind(
@@ -3517,7 +3540,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		const syntheticKey = (type: ts.Type): boolean =>
 			type.isUnion()
 				? type.types.some(syntheticKey)
-				: type.isStringLiteral() && Object.hasOwn(syntheticSubmitMembers, type.value);
+				: type.isStringLiteral() && Object.hasOwn(syntheticEventMembers, type.value);
 		if (selections.length === projections.length) {
 			for (const [index, [object, key]] of selections.entries()) {
 				const source = projections[index];
@@ -3532,7 +3555,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 						RULE.unsupported,
 						'error',
 						source,
-						'This submit event type selects a member available only on React synthetic events. Review the native annotation.',
+						'This event type selects a member available only on React synthetic events. Review the native annotation.',
 					);
 			}
 		}
@@ -3558,16 +3581,9 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return result;
 	}
 
-	private checkSubmitParameter(param: ts.ParameterDeclaration) {
-		const report = (node: ts.Node) =>
-			this.note(
-				RULE.eventObject,
-				'error',
-				node,
-				'This React SubmitEvent use needs review. Octane passes a native SubmitEvent with a typed currentTarget.',
-			);
+	private checkReactEventParameter(param: ts.ParameterDeclaration) {
 		if (!ts.isIdentifier(param.name) || param.dotDotDotToken) {
-			report(param);
+			this.reportReactEventUse(param);
 			return;
 		}
 		for (const ref of renderUses(this.localUses(param.name))) {
@@ -3577,7 +3593,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				access.expression !== ref ||
 				ts.findAncestor(access, ts.isFunctionLike) !== param.parent
 			) {
-				report(ref);
+				this.reportReactEventUse(ref);
 				continue;
 			}
 			const member = access.name.text;
@@ -3598,14 +3614,60 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				)
 			)
 				continue;
-			report(access);
+			this.reportReactEventUse(access);
 		}
+	}
+
+	private checkProjectReactEventMember(
+		node: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+		name: string,
+	) {
+		if (!Object.hasOwn(syntheticEventMembers, name)) return;
+		const parameter = this.parameterOf(node.expression);
+		if (parameter && this.reactEventParameters?.has(parameter.param)) return;
+		// A contextual handler can acquire its synthetic event type in another module.
+		const event = this.projectType(node.expression)?.type.getNonNullableType();
+		if (event?.getSymbol()?.name !== 'SyntheticEvent') return;
+		if (
+			!event
+				.getProperty(name)
+				?.declarations?.some(
+					(member) =>
+						ts.isInterfaceDeclaration(member.parent) &&
+						member.parent.name.text === 'BaseSyntheticEvent' &&
+						/[/\\]node_modules[/\\]@types[/\\]react[/\\]/.test(member.getSourceFile().fileName),
+				)
+		)
+			return;
+		if (
+			ts.findAncestor(
+				node,
+				(parent) =>
+					(ts.isJsxElement(parent) || ts.isJsxSelfClosingElement(parent)) &&
+					(this.islands.has(parent) ||
+						this.reactRendererBodies.has(parent) ||
+						this.reactCompatTag(
+							ts.isJsxElement(parent) ? parent.openingElement.tagName : parent.tagName,
+						)),
+			)
+		)
+			return;
+		this.reportReactEventUse(node);
+	}
+
+	private reportReactEventUse(node: ts.Node) {
+		this.note(
+			RULE.eventObject,
+			'error',
+			node,
+			'This React event use needs review. Octane passes a native event with a typed currentTarget.',
+		);
 	}
 
 	isEventParameter(node: ts.Node) {
 		const found = this.parameterOf(node);
 		if (!found) return false;
-		if (this.submitParameters?.has(found.param)) return false;
+		if (this.reactEventParameters?.has(found.param)) return false;
 		const type = found.param.type;
 		if (type && ts.isTypeReferenceNode(type) && /Event$/.test(type.typeName.getText(this.sf))) {
 			return true;

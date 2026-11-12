@@ -518,6 +518,31 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		);
 	});
 
+	it('reports synthetic operations in contextually typed generic React event handlers', () => {
+		const { notes } = transformModule(
+			`import type { ReactEventHandler as LoadHandler } from 'react';
+			function Frame(props: { onLoad: LoadHandler<HTMLIFrameElement> }) {
+				return <iframe onLoad={props.onLoad} />;
+			}
+			export function App() {
+				return <Frame onLoad={(event) => event.isDefaultPrevented()} />;
+			}`,
+			'frame.tsx',
+		);
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'event-object', severity: 'error' }),
+		);
+	});
+
+	it('rewrites a generic React handler import type without changing script scope', () => {
+		const { code, notes } = transformModule(
+			"type Load = import('react').ReactEventHandler;",
+			'frame-types.ts',
+		);
+		expect(notes.filter((n) => n.severity === 'error')).toEqual([]);
+		expect(code).toBe("type Load = import('octane').EventHandler<import('octane').NativeEvent>;");
+	});
+
 	it.each(['React.SubmitEvent | null', '(React.SubmitEvent)'])(
 		'checks synthetic reads with a wrapped %s annotation',
 		(type) => {
@@ -603,14 +628,17 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 		},
 	);
 
-	it('retains a React submit event re-export for review', () => {
-		const source = "export type {SubmitEvent as Submit} from 'react';";
-		const { code, notes } = transformModule(source, 'form-types.ts');
-		expect(code).toBe(source);
-		expect(notes).toContainEqual(
-			expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
-		);
-	});
+	it.each(['SubmitEvent', 'ReactEventHandler'])(
+		'retains a React %s re-export for review',
+		(name) => {
+			const source = `export type {${name} as EventType} from 'react';`;
+			const { code, notes } = transformModule(source, 'form-types.ts');
+			expect(code).toBe(source);
+			expect(notes).toContainEqual(
+				expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+			);
+		},
+	);
 
 	it('migrates sibling exports and keeps comments on the React submit type re-export', () => {
 		const { code, notes } = transformModule(
@@ -676,7 +704,7 @@ export function Banner({ visible, count }: { visible?: boolean; count: number })
 	it('checks escaped React imports and avoids a decoded marker-name collision', () => {
 		const { notes } = transformModule(
 			String.raw`import type {Submit\u0045vent as Event} from 'react';
-			function submit<__octaneSubm\u0069tEvent>(e: Event | any) { e.isDefaultPrevented(); }`,
+			function submit<__octaneChec\u006bedEvent>(e: Event | any) { e.isDefaultPrevented(); }`,
 			'form.tsx',
 		);
 		expect(
