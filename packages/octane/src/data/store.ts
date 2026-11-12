@@ -194,7 +194,7 @@ interface SeedEntry {
 	/** Milliseconds since the value loaded, measured when the seed was written. */
 	readonly age: number;
 	readonly stale?: boolean;
-	readonly span?: Pick<Span, 'start' | 'first' | 'last'>;
+	readonly span?: Pick<Span, 'start' | 'first' | 'last'> | undefined;
 }
 
 /**
@@ -933,6 +933,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				const { offset } = wireInput(entry) as { offset: number };
 				if (start !== offset || (start === 0 && first !== null)) return;
 				const { of, compare } = entry.read.view;
+				// Seed adoption is synchronous. Async bounds use the ordinary validated load.
 				const lower = first === null ? null : parse(of.schema, first);
 				if (lower instanceof Promise) {
 					void lower.catch(() => {});
@@ -1596,8 +1597,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					input: entry.input,
 					age,
 					value: span ? confirmedRows(entry) : project(entry, true),
-					...(span && { span: { start: span.start, first: span.first, last: span.last } }),
-					...(entry.stale && { stale: true }),
+					span: span ? { start: span.start, first: span.first, last: span.last } : undefined,
+					stale: entry.stale,
 				});
 			}
 			// devalue escapes `<`, so the text cannot close the script element holding it.

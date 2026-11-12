@@ -869,8 +869,8 @@ code of their own:
 A data seed carries each read's age when the server finishes the render. The
 browser adds the time spent in its store before a read is first used. If the
 host knows how long a seed spent in transit or in an HTML cache, pass that
-duration in milliseconds as `seedAge` to `createDataStore`. The default is
-zero. Server and browser clocks can differ.
+duration in milliseconds as `seedAge` to `createDataStore`. For example, a host
+serving cached HTML can use its cache entry’s measured age. The default is zero. Server and browser clocks can differ.
 
 `@octanejs/vite-plugin` and `@octanejs/rsbuild-plugin` both do this.
 
