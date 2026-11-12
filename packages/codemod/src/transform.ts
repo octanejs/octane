@@ -940,13 +940,15 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						this.localUses,
 					),
 				() => this.options.reactStoreComponent?.('react-intl') === true,
-				(call) =>
-					this.note(
-						RULE.bindings,
-						'error',
-						call,
-						'A React Intl formatter can schedule React DOM resources on the original request. Verify this formatMessage call runs without renderer-owned effects, or keep it in the original React render.',
-					),
+				(call, method) => {
+					if (method === 'formatMessage' || this.options.automaticReactJsx)
+						this.note(
+							RULE.bindings,
+							'error',
+							call,
+							`A React Intl formatter can schedule React DOM resources on the original request. Verify this ${method} call runs without renderer-owned effects, or keep it in the original React render.`,
+						);
+				},
 			);
 		}
 		let safeStoreUses: ReturnType<typeof storeHookUses> | undefined;

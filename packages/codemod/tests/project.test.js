@@ -3407,6 +3407,73 @@ export function Greeting({ count }: { count: number }) {
 		return root;
 	}
 	it.each([false, true])(
+		'reports direct render-phase date, time and number formatters (projectTypes=%s)',
+		async (projectTypes) => {
+			const number = `import {useIntl} from 'react-intl';
+				export function View() { return <b>{useIntl().formatNumber(12)}</b>; }`;
+			const root = setup({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				'OtherFactory.tsx': '/** @jsxImportSource octane */\n' + number,
+				'nested/View.tsx': number,
+				'nested/tsconfig.json': JSON.stringify({
+					compilerOptions: { jsx: 'react-jsx', paths: { 'react-intl': ['./intl-service.ts'] } },
+				}),
+				'nested/intl-service.ts': `export const useIntl = () => ({formatNumber: String});`,
+				'Direct.tsx': `import {useIntl} from 'react-intl';
+					export function Direct() {
+						const intl = useIntl();
+						const date = intl.formatDate(0);
+						return <b title={intl.formatTime(0)}>{date}{intl.formatNumber(12)}</b>;
+					}`,
+				'Deferred.tsx': `import {useIntl} from 'react-intl';
+					export function Deferred() {
+						const intl = useIntl();
+						return <button onClick={() => { void intl.formatTime(0); }}>Later</button>;
+					}`,
+			});
+			const types = path.join(root, 'node_modules/@types');
+			fs.mkdirSync(types);
+			fs.symlinkSync(
+				path.join(REPO, 'packages/octane/node_modules/@types/react'),
+				path.join(types, 'react'),
+				'dir',
+			);
+			const { files } = await runCodemod(
+				['Direct.tsx', 'Deferred.tsx', 'OtherFactory.tsx', 'nested/View.tsx'].map((f) =>
+					path.join(root, f),
+				),
+				{
+					root,
+					strong: true,
+					verify: true,
+					write: false,
+					projectTypes,
+				},
+			);
+			const direct = files.find((f) => f.file === 'Direct.tsx');
+			const deferred = files.find((f) => f.file === 'Deferred.tsx');
+			expect(direct.notes.filter((n) => n.severity === 'error')).toEqual(
+				['formatDate', 'formatTime', 'formatNumber'].map((method) =>
+					expect.objectContaining({
+						rule: 'bindings',
+						message: expect.stringContaining(`this ${method} call`),
+					}),
+				),
+			);
+			expect(deferred.notes.filter((n) => n.severity === 'error')).toEqual([]);
+			for (const file of ['OtherFactory.tsx', 'nested/View.tsx']) {
+				const result = files.find((f) => f.file === file);
+				expect(result.notes).not.toContainEqual(
+					expect.objectContaining({ message: expect.stringContaining('this formatNumber call') }),
+				);
+			}
+			for (const selected of [direct, deferred])
+				expect(selected.code).toContain('octane-react-intl.tsrx');
+		},
+	);
+	it.each([false, true])(
 		'reports opaque formatter ownership in native calls and generated rich islands (projectTypes=%s)',
 		async (projectTypes) => {
 			const direct = `import {useIntl} from 'react-intl'; export function Text() {
