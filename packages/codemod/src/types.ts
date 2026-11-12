@@ -28,6 +28,8 @@ export interface TransformOptions {
 	resolveSpecifier?(specifier: string): string | null;
 	/** The issuer resolves the original installed React runtime and types. */
 	originalReact?: boolean;
+	/** A React DOM resource hint called by an imported plain TypeScript initializer. */
+	initializerResourceHint?(module: string, name: string): string | undefined;
 	/** A dispatcher hook directly called by an unchanged local TypeScript export. */
 	localReactHook?(
 		module: string,
