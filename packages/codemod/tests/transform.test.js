@@ -1481,8 +1481,9 @@ describe('strengthen', () => {
 		const result = strengthen(compiler, code, path.join(FIXTURES, 'raw.tsrx'));
 		expect(result.strong).toBe(false);
 		expect(result.code).not.toContain('use strong');
+		expect(result.fixed).toEqual(['OCTANE_STRONG_READ_ONLY_STATE']);
+		expect(result.code).toContain('const open = useInitialValue(false);');
 		expect(result.blockers.map((b) => `${b.severity} ${b.code}`)).toEqual([
-			'warning OCTANE_STRONG_READ_ONLY_STATE',
 			'warning OCTANE_STRONG_UNTRUSTED_HTML',
 		]);
 		expect(compileErrors(result.code, 'raw.tsrx')).toEqual([]);
