@@ -142,6 +142,27 @@ describe('feeds', () => {
 		expect(server.log.length).toBe(loads);
 	});
 
+	it('reloads a window lower in a view when a new record lands above it', async () => {
+		const { server, store, connections } = setup();
+		server.rows.splice(
+			0,
+			1,
+			...Array.from({ length: 30 }, (_, at) => ({
+				id: `r${at}`,
+				title: `r${String(at).padStart(2, '0')}`,
+				done: false,
+			})),
+		);
+		const page = await observed(store.read(todoPages, { offset: 24, limit: 2 }));
+		stops.push(listen(store, changes).subscribe(() => {}));
+		expect(page().map((todo) => todo.title)).toEqual(['r24', 'r25']);
+
+		const added = { id: 'n', title: 'a new first', done: false };
+		server.rows.push(added);
+		connections[0]!.send({ event: { kind: 'put', todo: added } });
+		await vi.waitFor(() => expect(page().map((todo) => todo.title)).toEqual(['r23', 'r24']));
+	});
+
 	it('reloads a read whose load in flight the server answered before a removal', async () => {
 		const server = createServer();
 		let hold: Promise<void> | null = null;

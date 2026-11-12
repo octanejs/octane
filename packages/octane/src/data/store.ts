@@ -155,7 +155,7 @@ export interface StoreInternals {
 	/** Aborts when the store retires. */
 	readonly retired: AbortSignal;
 	readonly entries: ReadonlyMap<string, Entry>;
-	/** Whether a view holds the record `id`, or would show `value`. */
+	/** Whether a view holds the record `id`, or would show `value` or move its rows for it. */
 	viewed(entity: Entity<any>, id: string, value?: unknown): boolean;
 	/** Take a record into the views, newer than every load already started; `null` removes it. */
 	record(entity: Entity<any>, id: string, value: unknown, reload: Set<Entry>): void;
@@ -1542,7 +1542,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		entries,
 		viewed: (entity, id, value) =>
 			!!records.get(entity.name)?.has(id) ||
-			(value !== undefined && [...viewEntries(entity.name)].some((entry) => inSpan(entry, value))),
+			(value !== undefined &&
+				[...viewEntries(entity.name)].some(
+					// A record above a lower window moves every row in it.
+					(entry) => inSpan(entry, value) || (entry.span!.start > 0 && above(entry, value)),
+				)),
 		record(entity, id, value, reload) {
 			if (value === null) deleteRecord(entity, id, reload);
 			else putRecord(entity, value, ++sequence, null, reload, true);

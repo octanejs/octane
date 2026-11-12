@@ -154,6 +154,8 @@ export function createShelfHandler(options: { latency?: number } = {}) {
 						cursor: String(position),
 					};
 				}
+				// A change made while the last frame was being read is already in the history.
+				if ((shelf.history.at(-1)?.position ?? 0) > seen) continue;
 				await new Promise<void>((resolve) => {
 					const wake = () => {
 						shelf.waiters.delete(wake);
