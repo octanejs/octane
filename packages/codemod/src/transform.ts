@@ -989,17 +989,28 @@ class ModuleTransform {
 				)
 					continue;
 				const refs = this.localUses(declaration.name);
+				const fixed =
+					refs.length === 1 && this.options.fixedColorSvgAdapter
+						? this.fixedSvgColor(refs[0])
+						: undefined;
 				const eligible = refs.map((ref) =>
-					this.nativePathSvgUse(ref, this.localUses, (tag, prop) =>
-						unknownSvgSlots.set(
-							ref,
-							` Cannot prove where <${tag.text}> renders its ${prop === 'children' ? 'children' : prop + ' prop'}.`,
-						),
+					this.nativePathSvgUse(
+						ref,
+						this.localUses,
+						(tag, prop) =>
+							unknownSvgSlots.set(
+								ref,
+								` Cannot prove where <${tag.text}> renders its ${prop === 'children' ? 'children' : prop + ' prop'}.`,
+							),
+						fixed?.attribute,
 					),
 				);
 				if (!eligible.length || eligible.includes(false)) continue;
-				const native = this.options.pathSvgAdapter(binding.module);
+				const native = fixed
+					? this.options.fixedColorSvgAdapter?.(binding.module, fixed.color)
+					: this.options.pathSvgAdapter(binding.module);
 				if (!native) continue;
+				if (fixed) this.removed.add(fixed.attribute);
 				this.pathSvgImports.set(declaration.parent, native);
 				for (const ref of refs) pathSvgTags.add(ref);
 			}
@@ -1190,14 +1201,57 @@ class ModuleTransform {
 		}
 	}
 
+	private fixedSvgColor(ref: ts.Identifier) {
+		const tag = ref.parent;
+		if (!ts.isJsxSelfClosingElement(tag) || tag.tagName !== ref) return;
+		const attribute = tag.attributes.properties.find(
+			(attr): attr is ts.JsxAttribute =>
+				ts.isJsxAttribute(attr) && ts.isIdentifier(attr.name) && attr.name.text === 'style',
+		);
+		const value = attribute?.initializer;
+		if (!attribute || !value || !ts.isJsxExpression(value) || /\/[/*]/.test(attribute.getText()))
+			return;
+		const object = value.expression;
+		if (!object || !ts.isObjectLiteralExpression(object) || object.properties.length !== 1) return;
+		const property = object.properties[0];
+		if (
+			!ts.isPropertyAssignment(property) ||
+			!ts.isIdentifier(property.name) ||
+			property.name.text !== 'color' ||
+			!ts.isStringLiteral(property.initializer)
+		)
+			return;
+		const match = /^var\((--[a-z][a-z0-9-]*)\)$/.exec(property.initializer.text);
+		if (!match) return;
+		// Keep the styled element in a direct return through intrinsic children.
+		let output: ts.Node = tag;
+		while (
+			ts.isJsxElement(output.parent) &&
+			ts.isIdentifier(output.parent.openingElement.tagName) &&
+			/^[a-z]/.test(output.parent.openingElement.tagName.text)
+		)
+			output = output.parent;
+		while (ts.isParenthesizedExpression(output.parent)) output = output.parent;
+		const ret = output.parent;
+		if (
+			ts.isReturnStatement(ret) &&
+			ts.isBlock(ret.parent) &&
+			ts.isFunctionDeclaration(ret.parent.parent) &&
+			ret.parent.statements.length === 1
+		)
+			return { attribute, color: match[1] };
+	}
+
 	nativePathSvgUse(
 		ref: ts.Identifier,
 		uses: ReturnType<typeof localUses>,
 		unproven: (tag: ts.Identifier, prop: string) => void,
+		fixedStyle?: ts.JsxAttribute,
 	) {
 		const tag = ref.parent;
 		if (!ts.isJsxSelfClosingElement(tag) || tag.tagName !== ref || tag.typeArguments) return false;
 		const supported = tag.attributes.properties.every((attr) => {
+			if (attr === fixedStyle) return true;
 			if (!ts.isJsxAttribute(attr) || !ts.isIdentifier(attr.name)) return false;
 			const value = attr.initializer;
 			if (attr.name.text === 'className')
