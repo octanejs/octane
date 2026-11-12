@@ -1601,6 +1601,71 @@ const invalid: Panel = { style: 'color:red' };`,
 		expect((await preview()).code).toBe(upgraded.code);
 	});
 
+	it('verifies both runtime conditions of the published inline React host', async () => {
+		const octane = 'node_modules/octane';
+		const manifest = JSON.parse(
+			fs.readFileSync(path.join(REPO, 'packages/octane/package.json'), 'utf8'),
+		);
+		const exports = manifest.publishConfig.exports;
+		const compilerUrl = pathToFileURL(
+			path.join(REPO, 'packages/octane/src/compiler/index.js'),
+		).href;
+		const files = {
+			'package.json': '{"type":"module"}',
+			'App.tsx':
+				"import { Badge } from 'react-badge-kit'; export function App() { return <p><Badge /></p>; }",
+			[octane + '/package.json']: JSON.stringify({
+				name: 'octane',
+				type: 'module',
+				version: manifest.version,
+				exports: Object.fromEntries(
+					['./compiler', './react', './react/server'].map((name) => [name, exports[name]]),
+				),
+			}),
+			[path.join(octane, exports['./compiler'].default)]:
+				`export { collectDiagnostics } from ${JSON.stringify(compilerUrl)};`,
+		};
+		for (const name of ['./react', './react/server']) {
+			const types = path.join(octane, exports[name].types);
+			files[types] = "export { ReactCompatInline } from './inline.js';";
+			files[path.join(path.dirname(types), 'inline.d.ts')] =
+				'export declare const ReactCompatInline: unknown;';
+			for (const condition of ['node', 'default'])
+				files[path.join(octane, exports[name][condition])] =
+					'const ReactCompatInline = null; export { ReactCompatInline };';
+		}
+		const root = project(files);
+		for (const name of ['react', 'react-dom'])
+			fs.symlinkSync(
+				fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+				path.join(root, 'node_modules', name),
+				'dir',
+			);
+		const preview = async () =>
+			(await runCodemod([path.join(root, 'App.tsx')], { root, write: false, strong: true }))
+				.files[0];
+		const result = await preview();
+		expect([...result.notes, ...result.diagnostics].filter((n) => n.severity === 'error')).toEqual(
+			[],
+		);
+		expect(result.code).toMatch(/<ReactCompatInline><Badge\s*\/>/);
+
+		const unavailable = expect.objectContaining({
+			severity: 'error',
+			message: expect.stringContaining('ReactCompatInline'),
+		});
+		for (const [name, condition] of [
+			['./react', 'default'],
+			['./react/server', 'node'],
+			['./react', 'types'],
+		]) {
+			const entry = path.join(root, octane, exports[name][condition]);
+			fs.writeFileSync(entry, 'export {};');
+			expect((await preview()).notes).toContainEqual(unavailable);
+			fs.writeFileSync(entry, files[path.relative(root, entry)]);
+		}
+	});
+
 	it('requires the same Octane compiler at the React island issuer', async () => {
 		const issuer = 'src/node_modules/octane';
 		const other = issuer + '/node_modules/octane';

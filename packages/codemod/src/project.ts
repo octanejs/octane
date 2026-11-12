@@ -245,28 +245,39 @@ export async function runCodemod(
 		const exports = record(installed.manifest.exports);
 		return ['react', 'react/server'].every((name) => {
 			const entry = exports['./' + name];
+			const conditions = record(entry);
+			const types = typeof entry === 'string' ? entry : conditions.types;
 			const target = originalModule(file, 'octane/' + name)?.resolvedFileName;
 			if (
-				typeof entry !== 'string' ||
+				typeof types !== 'string' ||
 				!target ||
-				fs.realpathSync(target) !== path.resolve(dir, entry)
+				fs.realpathSync(target) !== path.resolve(dir, types)
 			)
 				return false;
-			const source = ts.createSourceFile(
-				target,
-				fs.readFileSync(target, 'utf8'),
-				ts.ScriptTarget.Latest,
-			);
-			return source.statements.some(
-				(statement) =>
-					ts.isExportDeclaration(statement) &&
-					!statement.isTypeOnly &&
-					statement.exportClause &&
-					ts.isNamedExports(statement.exportClause) &&
-					statement.exportClause.elements.some(
-						(item) => !item.isTypeOnly && item.name.text === 'ReactCompatInline',
-					),
-			);
+			if (typeof entry !== 'string' && typeof conditions.default !== 'string') return false;
+			// Published packages resolve types separately from the Node and bundler code.
+			const entries = typeof entry === 'string' ? [entry] : Object.values(conditions);
+			return entries.every((value) => {
+				if (typeof value !== 'string' || !value.startsWith('./')) return false;
+				const file = path.resolve(dir, value);
+				if (!ts.sys.fileExists(file) || !fs.realpathSync(file).startsWith(dir + path.sep))
+					return false;
+				const source = ts.createSourceFile(
+					file,
+					fs.readFileSync(file, 'utf8'),
+					ts.ScriptTarget.Latest,
+				);
+				return source.statements.some(
+					(statement) =>
+						ts.isExportDeclaration(statement) &&
+						!statement.isTypeOnly &&
+						statement.exportClause &&
+						ts.isNamedExports(statement.exportClause) &&
+						statement.exportClause.elements.some(
+							(item) => !item.isTypeOnly && item.name.text === 'ReactCompatInline',
+						),
+				);
+			});
 		});
 	}
 	// One shared context per project, including separate file-by-file migrations.
