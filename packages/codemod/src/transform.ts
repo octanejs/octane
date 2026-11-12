@@ -38,6 +38,24 @@ type Import = {
 	typeOnly: boolean;
 	port: Unported | null;
 };
+const RADIX_SLOT_MEMBERS = new Map([
+	['Root', 'Slot'],
+	['Slot', 'Slot'],
+	['Slottable', 'Slottable'],
+]);
+
+function directMember(receiver: ts.Node) {
+	const parent = receiver.parent;
+	if (
+		ts.isPropertyAccessExpression(parent) &&
+		parent.expression === receiver &&
+		!parent.questionDotToken
+	)
+		return parent.name;
+	if (ts.isQualifiedName(parent) && parent.left === receiver) return parent.right;
+	return null;
+}
+
 type Severity = Note['severity'];
 type ModuleExports = TransformResult['exports'];
 
@@ -586,6 +604,8 @@ class ModuleTransform {
 	readonly indentUnit: string;
 	/** Every import, keyed by its declaration. */
 	readonly imports = new Map<ts.Node, Import>();
+	radixSlotMembers?: Map<ts.MemberName, { root?: string; name: string }>;
+	retainedRadixSlots?: Set<ts.Identifier>;
 	nativeIntl = new Set<ts.ImportSpecifier>();
 	hasReactBridge = false;
 	readonly pathSvgImports = new Map<ts.ImportDeclaration, string>();
@@ -796,6 +816,12 @@ class ModuleTransform {
 					port: null,
 				};
 				this.imports.set(declaration, entry);
+				if (
+					module === 'radix-ui' &&
+					(imported === 'Slot' || entry.namespace) &&
+					this.resolve(module) === '@octanejs/radix'
+				)
+					this.planRadixSlots(name, entry.namespace);
 				if (module === 'octane/react' || module === 'octane/react/server')
 					this.hasReactBridge = true;
 				if (
@@ -1075,6 +1101,91 @@ class ModuleTransform {
 		};
 		visit(this.sf);
 		return calls;
+	}
+
+	/** Only one authored element can move into an explicit children prop. */
+	singleElementChild(node: ts.JsxElement) {
+		const { openingElement, closingElement, children } = node;
+		if (
+			!openingElement.attributes.properties.every(
+				(attr) => ts.isJsxAttribute(attr) && attr.name.getText(this.sf) !== 'children',
+			) ||
+			closingElement.getText(this.sf) !== `</${openingElement.tagName.getText(this.sf)}>`
+		)
+			return null;
+		// Only line breaks and ASCII layout whitespace vanish in rendered JSX.
+		const content = children.filter(
+			(child) => !(ts.isJsxText(child) && /^[\t ]*[\r\n][\t\r\n ]*$/.test(child.text)),
+		);
+		const [child] = content;
+		return content.length === 1 && (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child))
+			? child
+			: null;
+	}
+
+	/** The consolidated React package exports Slot as a namespace, unlike the binding. */
+	planRadixSlots(binding: ts.Identifier, namespace: boolean) {
+		const members = new Map<ts.MemberName, string>();
+		for (const ref of this.localUses(binding)) {
+			const first = directMember(ref);
+			if (namespace && first && first.text !== 'Slot') continue;
+			const member = namespace && first ? directMember(first.parent) : first;
+			const name = member && RADIX_SLOT_MEMBERS.get(member.text);
+			const access = member?.parent;
+			const use = access?.parent;
+			let reason: string | undefined;
+			if (
+				!use ||
+				!(ts.isJsxOpeningElement(use) ||
+				ts.isJsxSelfClosingElement(use) ||
+				ts.isJsxClosingElement(use)
+					? use.tagName === access
+					: ts.isTypeQueryNode(use) && use.exprName === access)
+			) {
+				reason =
+					'Use Radix Slot.Root, Slot.Slot, or Slot.Slottable as a direct JSX tag or type query to migrate it.';
+			} else if (ts.isJsxOpeningElement(use) || ts.isJsxSelfClosingElement(use)) {
+				if (!this.radixSlotChildren(use))
+					reason = 'The codemod can only migrate Radix Slot with a single intrinsic element child.';
+			}
+			if (!member || !name || reason) {
+				(this.retainedRadixSlots ??= new Set()).add(binding);
+				this.note(
+					RULE.binding,
+					'error',
+					ref,
+					reason ?? 'The Octane binding has no equivalent Radix Slot member.',
+				);
+				return;
+			}
+			members.set(member, name);
+		}
+		for (const [member, name] of members)
+			(this.radixSlotMembers ??= new Map()).set(member, {
+				root: namespace ? binding.text : undefined,
+				name,
+			});
+	}
+
+	/** An intrinsic child cannot be a Slottable marker or an alias of one. */
+	radixSlotChildren(tag: ts.JsxOpeningLikeElement) {
+		const intrinsic = (child: ts.Node | null) => {
+			if (!child || (!ts.isJsxElement(child) && !ts.isJsxSelfClosingElement(child))) return false;
+			const name = ts.isJsxElement(child) ? child.openingElement.tagName : child.tagName;
+			return ts.isIdentifier(name) && /^[a-z]/.test(name.text);
+		};
+		if (ts.isJsxOpeningElement(tag)) return intrinsic(this.singleElementChild(tag.parent));
+		return tag.attributes.properties.every((attr) => {
+			if (!ts.isJsxAttribute(attr)) return false;
+			if (attr.name.getText(this.sf) !== 'children') return true;
+			const value = attr.initializer;
+			return (
+				!!value &&
+				ts.isJsxExpression(value) &&
+				!!value.expression &&
+				intrinsic(skipWrappers(value.expression))
+			);
+		});
 	}
 
 	/**
@@ -2293,6 +2404,8 @@ class ModuleTransform {
 		}
 		const clause = node.importClause;
 		const bindings = clause?.namedBindings;
+		if (bindings && ts.isNamespaceImport(bindings) && this.retainedRadixSlots?.has(bindings.name))
+			return null;
 		if (clause && bindings && ts.isNamedImports(bindings)) {
 			const moved = new Map<string, string[]>();
 			const kept: ts.ImportSpecifier[] = [];
@@ -2387,6 +2500,22 @@ class ModuleTransform {
 		for (const element of bindings.elements) {
 			const imported = (element.propertyName ?? element.name).text;
 			const local = element.name.text;
+			if (module === 'radix-ui' && imported === 'Slot' && next === '@octanejs/radix') {
+				if (!ts.isImportSpecifier(element)) {
+					this.note(
+						RULE.binding,
+						'error',
+						element,
+						'The Octane binding has no Radix Slot namespace to re-export.',
+					);
+					kept.push(element.getText(this.sf));
+				} else if (this.retainedRadixSlots?.has(element.name)) {
+					kept.push(element.getText(this.sf));
+				} else {
+					renamed = true;
+				}
+				continue;
+			}
 			const name = mapPackageExport(module, imported);
 			if (name === null) {
 				this.note(RULE.binding, 'error', element, missingExport(module, imported));
@@ -2425,6 +2554,13 @@ class ModuleTransform {
 	 * @param severity of a member the port lacks
 	 */
 	rewritePackageMember(namespace: ts.Node, member: ts.MemberName, severity: Severity) {
+		const slot = this.radixSlotMembers?.get(member);
+		if (slot) {
+			this.count(RULE.import);
+			return slot.root
+				? `${slot.root}.${slot.name}`
+				: this.require('@octanejs/radix', slot.name, ts.isQualifiedName(member.parent));
+		}
 		const entry = this.importOf(namespace);
 		if (!entry?.namespace) return null;
 		const name = mapPackageExport(entry.module, member.text);
@@ -2498,6 +2634,24 @@ class ModuleTransform {
 				`\`@octanejs/radix\` serves \`${specifier.text}\` as its \`${namespace}\` namespace; read it from \`import { ${namespace} } from '@octanejs/radix'\`.`,
 			);
 			return null;
+		}
+		if (specifier.text === 'radix-ui' && next === '@octanejs/radix') {
+			let qualifier = ts.isImportTypeNode(node) ? node.qualifier : undefined;
+			while (qualifier && ts.isQualifiedName(qualifier)) qualifier = qualifier.left;
+			if (
+				ts.isCallExpression(node) ||
+				(ts.isExportDeclaration(node) &&
+					(!node.exportClause || ts.isNamespaceExport(node.exportClause))) ||
+				(ts.isImportTypeNode(node) && (!qualifier || qualifier.text === 'Slot'))
+			) {
+				this.note(
+					RULE.binding,
+					'error',
+					node,
+					'The Octane binding has no equivalent Radix Slot namespace. Import specific components instead.',
+				);
+				return null;
+			}
 		}
 		this.count(RULE.import);
 		return this.replaceSpecifier(node, specifier, next);
@@ -3819,30 +3973,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		}
 		const name = this.calleeName(tag);
 		const opening = node.openingElement;
-		if (
-			ctx.template &&
-			this.options.elementChild &&
-			ts.isIdentifier(tag) &&
-			isComponentName(tag.text)
-		) {
+		const radixSlot = ts.isPropertyAccessExpression(tag) && this.radixSlotMembers?.has(tag.name);
+		if (ctx.template && (radixSlot || (ts.isIdentifier(tag) && isComponentName(tag.text)))) {
 			const binding =
 				declaration && ts.isFunctionDeclaration(declaration)
 					? declaration.getStart(this.sf)
 					: imported;
-			if (
-				binding !== null &&
-				this.options.elementChild(binding) &&
-				opening.attributes.properties.every(
-					(a) => ts.isJsxAttribute(a) && a.name.getText(this.sf) !== 'children',
-				) &&
-				node.closingElement.getText(this.sf) === '</' + tag.text + '>'
-			) {
-				// Only line breaks and ASCII layout whitespace vanish in rendered JSX.
-				const content = node.children.filter(
-					(c) => !(ts.isJsxText(c) && /^[\t ]*[\r\n][\t\r\n ]*$/.test(c.text)),
-				);
-				const [child] = content;
-				if (content.length === 1 && (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child))) {
+			if (radixSlot || (binding !== null && this.options.elementChild?.(binding))) {
+				const child = this.singleElementChild(node);
+				if (child) {
 					this.count(RULE.elementChildProp);
 					return (
 						this.span(opening, opening.getStart(this.sf), opening.end - 1, ctx) +
