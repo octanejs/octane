@@ -92,22 +92,29 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 		if (!store.retired) store.invalidate(feed.covers);
 	}
 
-	async function apply(frame: FeedFrame): Promise<void> {
+	async function apply(frame: FeedFrame, signal: AbortSignal): Promise<void> {
+		if (signal.aborted) return;
 		if (frame.gap) missed();
 		if ('event' in frame && !(frame.id !== undefined && seen.has(frame.id))) {
 			try {
-				const changes = feed.changes(await parse(feed.event, frame.event), params);
-				if (!store.retired) receive(store, Array.isArray(changes) ? changes : [changes as never]);
+				const event = await parse(feed.event, frame.event);
+				if (signal.aborted) return;
+				const changes = feed.changes(event, params);
+				// The connection signal also aborts synchronously when the store retires.
+				if (signal.aborted) return;
+				receive(store, Array.isArray(changes) ? changes : [changes as never]);
 			} catch {
+				if (signal.aborted) return;
 				// An event the store cannot read or apply is one it missed.
 				missed();
 			}
+			if (signal.aborted) return;
 			if (frame.id !== undefined) {
 				seen.add(frame.id);
 				if (seen.size > SEEN) seen.delete(seen.values().next().value!);
 			}
 		}
-		if (frame.cursor !== undefined && frame.cursor !== cursor) {
+		if (!signal.aborted && frame.cursor !== undefined && frame.cursor !== cursor) {
 			cursor = frame.cursor;
 			// Saved after the values this frame and the ones before it changed.
 			source.persisted?.keepCursor(key, cursor);
@@ -118,11 +125,10 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 		const connect = source.listen!;
 		const signal = AbortSignal.any([stop, source.retired]);
 		if (!restored) {
-			restored = true;
-			// A previous session's cursor is older than the page's, so it replays everything this page missed.
-			if (source.persisted) cursor ??= await source.persisted.cursor(key);
-			cursor ??= source.seeded.get(key) ?? null;
+			const saved = source.persisted ? await source.persisted.cursor(key) : null;
 			if (signal.aborted) return;
+			cursor ??= saved ?? source.seeded.get(key) ?? null;
+			restored = true;
 		}
 		let failures = 0;
 		while (!signal.aborted) {
@@ -138,7 +144,7 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 						wasLive = true;
 						set(LIVE);
 					}
-					await apply(frame);
+					await apply(frame, signal);
 				}
 			} catch (cause) {
 				error = cause;
