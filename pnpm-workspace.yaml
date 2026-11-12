@@ -685,8 +685,10 @@ patchedDependencies:
   # The same type-only import rule for the native parser: the compat facade's
   # scope check mirrors acorn-typescript's lexical import bindings, and the
   # compiler parses .tsrx with it first in Node. Not yet fixed upstream in
-  # tsrx-org/oxc (checked through @tsrx/oxc 0.23.0). Same scope and guard as the
-  # acorn-typescript patch; drop it when the adopted release reads importKind.
+  # tsrx-org/oxc (checked through @tsrx/oxc 0.23.0). Drop the scope hunks when
+  # the adopted release reads importKind and the parser-option hunks when it
+  # preserves import/export kinds for .ts/.mts/.cts. The published Node
+  # compiler bundles the patched JS facade and loads the native parser separately.
   '@tsrx/oxc@0.23.0': patches/@tsrx__oxc@0.23.0.patch
   # Verify Chromium request interception is live before a browser mock route is
   # added, and keep it on across files. The provider mocks through
