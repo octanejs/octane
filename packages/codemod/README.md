@@ -383,6 +383,8 @@ export function useCellValue(definition) {
 
 When an effect with dependencies such as `[controller]` reads `controller.value` or calls `controller.start()`, Strong migration can preserve the original object-identity dependency. For an unused dependency such as `revision` in `[controller, revision]`, the codemod can emit `void revision` inside the effect so a revision change still triggers cleanup and setup. It attempts these rewrites for immutable bindings and verifies the resulting dependencies with the project compiler. An imperative handle can use the same rewrite with a list of fixed bindings, keeping property reads inside its factory.
 
+Strong migration can preserve a typed `useState<Element | null>(null)` setter used only as one native host `ref` in an ordinary React JSX project. The generated component uses `useSyncExternalStore` to observe attachment and detachment. This also covers ref commits owned by an ancestor Suspense boundary.
+
 For a component that already receives an Octane writable signal, Strong migration can
 replace `useSyncExternalStore(notify => cell.subscribe(notify), () => cell.get(), () => cell.get())`
 with `cell.get()` in a module that already opts in to native signal tracking. The receiver must

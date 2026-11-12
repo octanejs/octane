@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { expect, it } from 'vitest';
-import { flushSync, hydrateRoot } from 'octane';
+import { act, createRoot, flushSync, hydrateRoot, setLayoutSnapshotTiming } from 'octane';
 import { renderToString } from 'octane/server';
 import * as signals from 'octane/signals';
 import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
@@ -17,7 +17,7 @@ export function Reading(props: { value: Cell<string> }) {
   return <p>{label}</p>;
 }`;
 
-function migrate(source, verify = true) {
+function migrate(source, verify = true, strong = true) {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'octane-signal-read-'));
 	try {
 		const file = path.join(root, 'Reading.tsx');
@@ -25,7 +25,7 @@ function migrate(source, verify = true) {
 		fs.writeFileSync(path.join(root, 'package.json'), '{"type":"module"}');
 		fs.writeFileSync(
 			path.join(root, 'tsconfig.json'),
-			'{"compilerOptions":{"strict":true,"moduleResolution":"bundler","module":"ESNext","jsx":"preserve"}}',
+			'{"compilerOptions":{"strict":true,"moduleResolution":"bundler","module":"ESNext","jsx":"react-jsx"}}',
 		);
 		fs.symlinkSync(
 			path.resolve(import.meta.dirname, '../node_modules'),
@@ -33,7 +33,9 @@ function migrate(source, verify = true) {
 			'dir',
 		);
 		const bin = path.resolve(import.meta.dirname, '../dist/bin.js');
-		const result = spawnSync(process.execPath, [bin, '--strong', '--print', '--json', file], {
+		const args = [bin, '--print', '--json', file];
+		if (strong) args.push('--strong');
+		const result = spawnSync(process.execPath, args, {
 			cwd: root,
 			encoding: 'utf8',
 		});
@@ -161,4 +163,118 @@ it.each([
 	const migrated = migrate("import 'octane/signals';\n" + source);
 	expect(migrated.rules['native-signal-read']).toBeUndefined();
 	expect(migrated.code).toContain('useSyncExternalStore');
+});
+
+const nativeRefInput = `import { Suspense, use, useLayoutEffect, useState } from 'react';
+function Reader({node, report}) {
+	useLayoutEffect(() => { report(node); }, [node, report]);
+	return <em data-ref={node ? "attached" : "detached"}/>;
+}
+function Owner({report}) {
+	const [node, attach] = useState<HTMLDivElement | null>(null);
+	return <div><div ref={attach} data-host=""/><Reader node={node} report={report}/></div>;
+}
+function Loader({register, pending}) {
+	const [blocked, setBlocked] = useState(false);
+	useLayoutEffect(() => { register(setBlocked); }, [register, setBlocked]);
+	if (blocked) use(pending);
+	return <i/>;
+}
+export function App({report, register, pending}) {
+	return <section><Suspense fallback={<p data-fallback="">Loading</p>}>
+		<div><Owner report={report}/><Loader register={register} pending={pending}/></div>
+	</Suspense></section>;
+}`;
+
+it('preserves native ref publication when an ancestor commits Suspense', async () => {
+	const migrated = migrate(nativeRefInput);
+	expect(migrated.strong).toBe(true);
+	expect(migrated.rules['native-ref-state']).toBe(1);
+	expect(migrated.notes).toEqual([]);
+	const server = loadCompiledFixtureSource(migrated.code, { id: 'App.tsrx', mode: 'server' });
+	const html = renderToString(server.App, {
+		pending: Promise.resolve('ready'),
+		report() {
+			throw new Error('The layout effect ran during SSR');
+		},
+		register() {
+			throw new Error('The layout effect ran during SSR');
+		},
+	}).html;
+	expect(html).toContain('data-ref="detached"');
+	const reference = migrate(nativeRefInput, true, false);
+	const compiled = (code) =>
+		loadCompiledFixtureSource(code, {
+			id: 'App.tsrx',
+			mode: 'client',
+		});
+	async function exercise(App) {
+		const host = document.createElement('div');
+		const root = createRoot(host);
+		const observed = [];
+		let suspend, resolve;
+		const pending = new Promise((done) => {
+			resolve = done;
+		});
+		try {
+			await act(() =>
+				root.render(App, {
+					pending,
+					register(fn) {
+						suspend = fn;
+					},
+					report(node) {
+						observed.push(node);
+					},
+				}),
+			);
+			const original = host.querySelector('[data-host]');
+			expect(original).toBeInstanceOf(HTMLDivElement);
+			expect(observed.at(-1)).toBe(original);
+			expect(host.querySelector('em').getAttribute('data-ref')).toBe('attached');
+			await act(() => suspend(true));
+			expect(host.querySelector('[data-fallback]')).toBeInstanceOf(HTMLParagraphElement);
+			observed.length = 0;
+			await act(async () => {
+				resolve('ready');
+				await pending;
+			});
+			expect(host.querySelector('[data-host]')).toBe(original);
+			expect(host.querySelector('[data-fallback]')).toBeNull();
+			expect(observed).toEqual([null, original]);
+		} finally {
+			await act(() => root.unmount());
+		}
+	}
+	try {
+		for (const timing of ['commit', 'frame']) {
+			setLayoutSnapshotTiming(timing);
+			await exercise(compiled(reference.code).App);
+			await exercise(compiled(migrated.code).App);
+		}
+	} finally {
+		setLayoutSnapshotTiming('commit');
+	}
+});
+
+it.each([
+	[
+		'another setter use',
+		nativeRefInput.replace('ref={attach}', 'ref={attach} onClick={() => attach(null)}'),
+	],
+	[
+		'a composite ref',
+		nativeRefInput.replace('<div ref={attach} data-host=""/>', '<Reader ref={attach}/>'),
+	],
+	['an opaque spread', nativeRefInput.replace('ref={attach}', 'ref={attach} {...unknownProps}')],
+	['a custom JSX factory', '/** @jsx custom */\n' + nativeRefInput],
+	['an async owner', nativeRefInput.replace('function Owner', 'async function Owner')],
+	[
+		'a direct component call',
+		nativeRefInput.replace('<Owner report={report}/>', '{Owner({report})}'),
+	],
+])('keeps state when the ref has %s', (_case, source) => {
+	const migrated = migrate(source);
+	expect(migrated.rules['native-ref-state']).toBeUndefined();
+	expect(migrated.code).toContain('useState<HTMLDivElement | null>(null)');
 });
