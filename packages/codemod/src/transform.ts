@@ -1,4 +1,4 @@
-import { svgDataAttribute } from './path-svg.js';
+import { svgDataAttribute, svgLiteralRootOverride } from './path-svg.js';
 import {
 	forwardedProps,
 	literalJsxAttribute,
@@ -9,10 +9,10 @@ import {
 } from './forwarded-props.js';
 import { reactRenderer, staticReactProps } from './react-renderer.js';
 import { nativeSetupHook } from './local-react-hook.js';
-import { localUses, walkLocalValues } from './local-uses.js';
+import { localUses, scalar, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
-import { effectReceivers, fixedBinding } from './effect-receivers.js';
+import { effectReceivers, fixedBinding, initializedBefore } from './effect-receivers.js';
 import { isBareSvgTag, storeHookUses } from './store-hook-uses.js';
 import { intlImports } from './react-intl.js';
 import {
@@ -595,6 +595,8 @@ class ModuleTransform {
 	readonly strong: boolean;
 	readonly effectAliases?: Map<ts.Expression, string>;
 	readonly effectSnapshots?: Map<ts.ExpressionStatement, string[]>;
+	private snapshotEdits?: Map<ts.Node, string>;
+	private snapshotCaptures?: Map<ts.ArrowFunction, string[]>;
 	/** React imports read as values, not only as types. */
 	readonly valueUses = new Set<string>();
 	hasSignalRuntime?: boolean;
@@ -927,6 +929,7 @@ class ModuleTransform {
 			this.reactRendererBodies.set(element, tag + ', ' + props);
 		}
 		let hasEval = false;
+		const snapshots: ts.VariableDeclaration[] = [];
 		if (
 			this.source.includes('SubmitEvent') ||
 			this.source.includes('ReactEventHandler') ||
@@ -940,7 +943,18 @@ class ModuleTransform {
 			if (ts.isParameter(node) && this.reactEventParameters?.has(node))
 				this.checkReactEventParameter(node);
 			if (ts.isIdentifier(node) && declaresName(node)) this.declared.add(node.text);
-			if (this.options.pathSvgAdapter && ts.isIdentifier(node) && node.text === 'eval')
+			if (
+				this.options.captureEffectSnapshots &&
+				ts.isVariableDeclaration(node) &&
+				ts.isArrayBindingPattern(node.name) &&
+				node.name.elements.length === 1
+			)
+				snapshots.push(node);
+			if (
+				(this.options.pathSvgAdapter || this.options.captureEffectSnapshots) &&
+				ts.isIdentifier(node) &&
+				node.text === 'eval'
+			)
 				hasEval = true;
 			if (ts.isIdentifier(node) && portLocals.has(node.text)) this.planUnported(node);
 			if (isJsx(node)) this.hasJsx = true;
@@ -960,6 +974,7 @@ class ModuleTransform {
 			ts.forEachChild(node, visit);
 		};
 		visit(this.sf);
+		if (!hasEval) for (const decl of snapshots) this.planEffectSnapshot(decl);
 		if (this.hasReactBridge) {
 			// A namespace used only for the native bridge needs no missing-port report.
 			for (const module of ['octane/react', 'octane/react/server']) {
@@ -1209,11 +1224,236 @@ class ModuleTransform {
 							!!value.expression &&
 							this.svgClassName(value.expression)))
 				);
-			if (svgDataAttribute(attr.name.text)) return !!value && ts.isStringLiteral(value);
+			if (
+				value &&
+				ts.isStringLiteral(value) &&
+				(svgDataAttribute(attr.name.text) || svgLiteralRootOverride(attr.name.text, value.text))
+			)
+				return true;
 			return attr.name.text === 'aria-hidden' && literalJsxAttribute(attr);
 		});
 		if (!supported) return false;
 		return this.nativeSvgOutput(tag, uses, unproven);
+	}
+
+	/** In a candidate module, locally constructed elements can leave only as this component's output. */
+	private elementsOnlyInReturn(owner: ts.FunctionDeclaration) {
+		const hooks = new Set(['useState', 'useEffect', 'useRef']);
+		const escapes = (node: ts.Node): boolean => {
+			if (isJsx(node)) {
+				if (!ts.isJsxSelfClosingElement(node)) return true;
+				let output: ts.Node = node;
+				while (
+					ts.isParenthesizedExpression(output.parent) ||
+					(ts.isConditionalExpression(output.parent) && output !== output.parent.condition)
+				)
+					output = output.parent;
+				if (
+					!ts.isReturnStatement(output.parent) ||
+					ts.findAncestor(output.parent, ts.isFunctionLike) !== owner
+				)
+					return true;
+			}
+			if (
+				ts.isCallExpression(node) &&
+				(node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+					(ts.isIdentifier(node.expression) && node.expression.text === 'require'))
+			)
+				return true;
+			if (
+				ts.isIdentifier(node) &&
+				this.apiLocals.has(node.text) &&
+				!this.inImport(node) &&
+				!inTypeNode(node)
+			) {
+				const api = this.importOf(node);
+				if (api && !api.typeOnly) {
+					const name =
+						api.namespace &&
+						ts.isPropertyAccessExpression(node.parent) &&
+						node.parent.expression === node
+							? node.parent.name.text
+							: api.imported;
+					if (api.module !== 'react' || !hooks.has(name)) return true;
+				}
+			}
+			return ts.forEachChild(node, (child) => escapes(child) || undefined) === true;
+		};
+		return !escapes(this.sf);
+	}
+
+	/** Standard library scalar observations can be captured at the same instant. */
+	private platformScalar(expr: ts.Expression): boolean {
+		const types = this.options.types;
+		const peer =
+			types?.sourceFile.text === this.source
+				? nodeSpanning(types.sourceFile, expr.getStart(), expr.end)
+				: expr;
+		if (!peer || peer.kind !== expr.kind) return false;
+		const check = peer === expr ? this.checker : types!.checker;
+		const member = ts.isCallExpression(peer) && !peer.arguments.length ? peer.expression : peer;
+		return (
+			ts.isPropertyAccessExpression(member) &&
+			ts.isIdentifier(member.expression) &&
+			[member.expression, member.name].every(
+				(id) => check.getSymbolAtLocation(id)?.valueDeclaration?.getSourceFile().hasNoDefaultLib,
+			) &&
+			scalar(check.getTypeAtLocation(peer))
+		);
+	}
+
+	/** Keep an immutable mount value in a ref when only sibling React effects observe it. */
+	private planEffectSnapshot(decl: ts.VariableDeclaration) {
+		const call = decl.initializer;
+		const element = ts.isArrayBindingPattern(decl.name) ? decl.name.elements[0] : undefined;
+		if (
+			!ts.isVariableDeclarationList(decl.parent) ||
+			!(decl.parent.flags & ts.NodeFlags.Const) ||
+			decl.type ||
+			!element ||
+			!ts.isBindingElement(element) ||
+			!ts.isIdentifier(element.name) ||
+			element.initializer ||
+			element.dotDotDotToken ||
+			!call ||
+			!ts.isCallExpression(call) ||
+			call.questionDotToken ||
+			call.arguments.length !== 1 ||
+			!ts.isArrowFunction(call.arguments[0]) ||
+			call.arguments[0].modifiers?.length
+		)
+			return;
+		const state = this.callee(call.expression);
+		if (
+			state?.module !== 'react' ||
+			state.name !== 'useState' ||
+			/\/[*/]/.test(decl.name.getText(this.sf)) ||
+			/\/[*/]/.test(call.expression.getText(this.sf))
+		)
+			return;
+
+		const name = element.name;
+		const owner = ts.findAncestor(decl, ts.isFunctionLike);
+		if (
+			!owner ||
+			!ts.isFunctionDeclaration(owner) ||
+			!owner.name ||
+			!ts.isSourceFile(owner.parent) ||
+			this.localUses(owner.name).some((ref) => !inTypeNode(ref))
+		)
+			return;
+		// Forward unchanged arguments, literals, and platform scalars in ordinary records.
+		// A callable or a local component result could have renderer-specific identity.
+		const data = (input: ts.Expression): boolean => {
+			const expr = skipWrappers(input);
+			if (ts.isObjectLiteralExpression(expr))
+				return expr.properties.every(
+					(field) =>
+						(ts.isPropertyAssignment(field) &&
+							(ts.isIdentifier(field.name) ||
+								ts.isStringLiteralLike(field.name) ||
+								ts.isNumericLiteral(field.name)) &&
+							field.name.text !== '__proto__' &&
+							data(field.initializer)) ||
+						(ts.isShorthandPropertyAssignment(field) &&
+							!field.objectAssignmentInitializer &&
+							data(field.name)),
+				);
+			if (ts.isIdentifier(expr)) {
+				const symbol = ts.isShorthandPropertyAssignment(expr.parent)
+					? this.checker.getShorthandAssignmentValueSymbol(expr.parent)
+					: this.checker.getSymbolAtLocation(expr);
+				const binding = symbol?.valueDeclaration;
+				if (
+					!binding ||
+					!(ts.isParameter(binding) || ts.isBindingElement(binding)) ||
+					!ts.isIdentifier(binding.name)
+				)
+					return false;
+				let param: ts.Node = binding;
+				while (ts.isBindingElement(param) && !param.initializer) param = param.parent.parent;
+				return (
+					ts.isParameter(param) &&
+					param.parent === owner &&
+					!param.initializer &&
+					fixedBinding(this.checker, binding.name, call)
+				);
+			}
+			if (ts.isBinaryExpression(expr) && expr.operatorToken.kind === ts.SyntaxKind.PlusToken)
+				return data(expr.left) && data(expr.right);
+			return (
+				ts.isStringLiteralLike(expr) ||
+				ts.isNumericLiteral(expr) ||
+				expr.kind === ts.SyntaxKind.NullKeyword ||
+				expr.kind === ts.SyntaxKind.TrueKeyword ||
+				expr.kind === ts.SyntaxKind.FalseKeyword ||
+				this.platformScalar(expr)
+			);
+		};
+		const body = call.arguments[0].body;
+		if (ts.isBlock(body) || !ts.isObjectLiteralExpression(skipWrappers(body)) || !data(body))
+			return;
+		const effectCallback = (call: ts.Node) => {
+			if (
+				!ts.isCallExpression(call) ||
+				call.questionDotToken ||
+				call.arguments.length !== 2 ||
+				!ts.isArrayLiteralExpression(call.arguments[1])
+			)
+				return;
+			const [callback] = call.arguments;
+			const hook = this.callee(call.expression);
+			if (
+				hook?.module !== 'react' ||
+				hook.name !== 'useEffect' ||
+				!ts.isArrowFunction(callback) ||
+				!ts.isBlock(callback.body) ||
+				callback.parameters.length ||
+				callback.modifiers?.length ||
+				ts.findAncestor(call, ts.isFunctionLike) !== owner
+			)
+				return;
+			// A capture must not displace a directive prologue.
+			const first = callback.body.statements[0];
+			if (first && ts.isExpressionStatement(first) && ts.isStringLiteral(first.expression)) return;
+			return callback;
+		};
+		const callbacks = new Set<ts.ArrowFunction>();
+		const deps: ts.Identifier[] = [];
+		for (const ref of this.localUses(name)) {
+			const list = ref.parent;
+			if (
+				ts.isArrayLiteralExpression(list) &&
+				ts.isCallExpression(list.parent) &&
+				list.parent.arguments[1] === list &&
+				effectCallback(list.parent)
+			) {
+				deps.push(ref);
+				continue;
+			}
+			const arrow = ts.findAncestor(
+				ref,
+				(n): n is ts.ArrowFunction =>
+					ts.isArrowFunction(n) && ref.pos >= n.body.pos && effectCallback(n.parent) === n,
+			);
+			if (!arrow) return;
+			callbacks.add(arrow);
+		}
+		if (!callbacks.size || !this.elementsOnlyInReturn(owner)) return;
+		let cell = name.text + 'Ref';
+		while (this.declared.has(cell) || this.readsGlobal(cell)) cell += '_';
+		this.declared.add(cell);
+		const edits = (this.snapshotEdits ??= new Map());
+		const joined = decl.name.getStart(this.sf) === decl.parent.getStart(this.sf) + 'const'.length;
+		edits.set(decl.name, joined ? ' ' + cell : cell);
+		edits.set(call, this.require('octane', 'useLazyRef', false));
+		for (const dep of deps) edits.set(dep, cell);
+		for (const cb of callbacks) {
+			const captures = (this.snapshotCaptures ??= new Map());
+			const prev = captures.get(cb) ?? [];
+			prev.push(`const ${name.text} = ${cell}.current;`);
+			captures.set(cb, prev);
+		}
 	}
 
 	private references?: ReturnType<typeof localUses>;
@@ -2002,7 +2242,7 @@ class ModuleTransform {
 	}
 
 	/**
-	 * Request an import from Octane and return the local name to use.
+	 * Request an import and return the local name to use.
 	 */
 	require(module: string, name: string, typeOnly: boolean) {
 		let names = this.added.get(module);
@@ -2125,31 +2365,40 @@ class ModuleTransform {
 	}
 
 	rewrite(node: ts.Node, ctx: Context): string | null {
+		const snapshot = this.snapshotEdits?.get(node);
+		if (snapshot)
+			return ts.isCallExpression(node)
+				? snapshot + this.span(node, node.expression.end, node.end, ctx)
+				: snapshot;
+		const stored = ts.isArrowFunction(node) ? this.snapshotCaptures?.get(node) : undefined;
 		const aliases = this.effectAliases;
-		if (aliases) {
-			if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) {
+		if (aliases || stored) {
+			if (aliases && (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node))) {
 				const alias = aliases.get(node);
 				if (alias) return alias;
 			}
 			if (ts.isArrowFunction(node)) {
 				const snapshots = ts.isBlock(node.body) ? this.effectSnapshots : undefined;
-				const captures = effectReceivers(
-					node,
-					this.checker,
-					(name) => {
-						const hook = this.callee(name);
-						return hook?.module === 'react' ? hook.name : null;
-					},
-					aliases,
-					snapshots &&
-						((statement, member, name) => {
-							if (aliases.has(member)) return;
-							const declarations = snapshots.get(statement) ?? [];
-							declarations.push(`const ${name} = ${this.emit(member, PLAIN)};`);
-							snapshots.set(statement, declarations);
-							aliases.set(member, name);
-						}),
-				);
+				const captures = aliases
+					? effectReceivers(
+							node,
+							this.checker,
+							(name) => {
+								const hook = this.callee(name);
+								return hook?.module === 'react' ? hook.name : null;
+							},
+							aliases,
+							snapshots &&
+								((statement, member, name) => {
+									if (aliases.has(member)) return;
+									const declarations = snapshots.get(statement) ?? [];
+									declarations.push(`const ${name} = ${this.emit(member, PLAIN)};`);
+									snapshots.set(statement, declarations);
+									aliases.set(member, name);
+								}),
+						)
+					: [];
+				if (stored) captures.unshift(...stored);
 				if (captures.length) {
 					const { body } = node;
 					const block = ts.isBlock(body);
@@ -2506,6 +2755,10 @@ class ModuleTransform {
 					exports.elements[index + 1]?.getFullStart() ?? exports.end - 1,
 				);
 				const name = (item.propertyName ?? item.name).text;
+				if (mapReactImport(module, name, node.isTypeOnly || item.isTypeOnly)?.module === module) {
+					retained.push(text);
+					continue;
+				}
 				if (
 					name === 'SubmitEvent' ||
 					name === 'SubmitEventHandler' ||
@@ -2622,6 +2875,13 @@ class ModuleTransform {
 		if (module === undefined) return this.rewriteSpecifier(node, specifier);
 		const qualifier = node.qualifier;
 		const name = qualifier && ts.isIdentifier(qualifier) ? qualifier.text : null;
+		if (
+			node.isTypeOf &&
+			name &&
+			mapReactImport(specifier.text, name, true)?.module === specifier.text
+		) {
+			return null;
+		}
 		if (specifier.text === 'react' && !node.isTypeOf) {
 			const event = this.nativeEventType(node, name);
 			if (event !== undefined) {
@@ -2908,6 +3168,14 @@ class ModuleTransform {
 				: !this.isGlobalNamespace(node.left, 'React')
 		) {
 			return null;
+		}
+		if (ts.isTypeQueryNode(node.parent)) {
+			const mapped = mapReactImport(namespace?.module ?? 'react', node.right.text, true);
+			if (mapped?.module === 'react') {
+				if (!namespace) return null;
+				this.count(RULE.import);
+				return this.require(mapped.module, mapped.name, true);
+			}
 		}
 		const name = mapQualifiedType(node.right.text);
 		if (!name) {
@@ -4344,7 +4612,42 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return this.directive(node);
 	}
 
+	/** The same unkeyed input keeps its live value when only its default changes. */
+	private conditionalInputDefault(node: ts.ConditionalExpression) {
+		const test = skipParens(node.condition);
+		if (!ts.isIdentifier(test)) return null;
+		const [yes, no] = [node.whenTrue, node.whenFalse].map((arm) => {
+			const element = skipParens(arm);
+			if (
+				!ts.isJsxSelfClosingElement(element) ||
+				!ts.isIdentifier(element.tagName) ||
+				element.tagName.text !== 'input' ||
+				element.typeArguments ||
+				element.attributes.properties.length !== 1
+			)
+				return null;
+			const [attribute] = element.attributes.properties;
+			if (!ts.isJsxAttribute(attribute) || attribute.name.getText(this.sf) !== 'defaultValue')
+				return null;
+			const value = attribute.initializer;
+			return value && ts.isStringLiteral(value) && !/[&\r\n]/.test(value.text) ? value.text : null;
+		});
+		if (
+			yes === null ||
+			no === null ||
+			!fixedBinding(this.checker, test, node) ||
+			!initializedBefore(this.checker, test, node) ||
+			this.lostComments(node.getStart(this.sf), node.end, '').length
+		)
+			return null;
+		this.count(RULE.if);
+		const condition = this.emit(test, PLAIN);
+		return `<input defaultValue={${condition} ? ${JSON.stringify(yes)} : ${JSON.stringify(no)}} />`;
+	}
+
 	ifDirective(node: ts.ConditionalExpression) {
+		const shared = this.conditionalInputDefault(node);
+		if (shared !== null) return shared;
 		let whenTrue = this.arm(node.whenTrue);
 		let whenFalse = this.arm(node.whenFalse);
 		// A ternary between two values is a value; one with an element on

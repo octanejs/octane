@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { act, createElement, useEffect } from 'react';
+import { act, createElement, useEffect, useState } from 'react';
 import { createRoot as reactRoot } from 'react-dom/client';
 import { createRoot } from 'octane';
 import { expect, it } from 'vitest';
@@ -284,3 +284,129 @@ it('respects local shadows, fresh alias names and comments', async () => {
 	expect(migrated.code).toContain('const currentReceiverValueValue = receiver;');
 	expect(migrated.code).toContain('/* keep */');
 });
+
+it('preserves a lazy mount value through effect updates and cleanup', async () => {
+	const source = `import { useState as state, useEffect as effect } from 'react';
+	export function Probe({ read, record, revision }) {
+		const[value] = state(() => ({ read, revision }));
+		effect(() => {
+			const valueRef = { value };
+			record('start', revision, valueRef.value, value.read());
+			return () => record('stop', revision, value, value.read());
+		}, [record, value, revision]);
+		return revision ? <p data-revision={String(revision)}/> : null;
+	}`;
+	const migrated = migrate(source);
+	expect(migrated.strong).toBe(true);
+	const native = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
+	function Reference({ read, record, revision }) {
+		const [value] = useState(() => ({ read, revision }));
+		useEffect(() => {
+			record('start', revision, value, value.read());
+			return () => record('stop', revision, value, value.read());
+		}, [record, value, revision]);
+		return createElement('p', null, String(revision));
+	}
+	async function exercise(react) {
+		const log = [];
+		const functions = new Set();
+		const record = (phase, revision, value, unbound) => {
+			functions.add(value);
+			log.push([phase, revision, unbound]);
+		};
+		const root = react
+			? reactRoot(document.createElement('div'))
+			: createRoot(document.createElement('div'));
+		try {
+			for (const revision of [1, 1, 2]) {
+				const props = {
+					read() {
+						return this.revision;
+					},
+					record,
+					revision,
+				};
+				if (react) await act(() => root.render(createElement(Reference, props)));
+				else {
+					root.render(native.Probe, props);
+					await flushEffects();
+				}
+			}
+		} finally {
+			if (react) await act(() => root.unmount());
+			else {
+				root.unmount();
+				await flushEffects();
+			}
+		}
+		return { log, values: functions.size };
+	}
+	const expected = await exercise(true);
+	expect(expected.values).toBe(1);
+	expect(expected.log[0]).toEqual(['start', 1, 1]);
+	expect(expected.log.at(-1)).toEqual(['stop', 2, 1]);
+	expect(await exercise(false)).toEqual(expected);
+});
+
+it.each([
+	['eager initializer', '{ seed }', ''],
+	['render read', '() => ({ seed })', 'observe(value);'],
+	['custom hook', '() => ({ seed })', 'useOther(() => observe(value), [value]);'],
+	[
+		'nested owner',
+		'() => ({ seed })',
+		'function useNested() { useEffect(() => { observe(value); }, [value]); }',
+	],
+	['dependency expression', '() => ({ seed })', 'useEffect(() => {}, [value.seed]);'],
+	['dynamic lookup', '() => ({ seed })', 'eval("value");'],
+	[
+		'nested element consumed by an opaque component',
+		'() => ({ seed })',
+		'return <Store><b/></Store>;',
+	],
+	['element in initializer', '() => ({ seed: <b/> })', ''],
+	[
+		'direct platform write',
+		'() => ({ seed: Date.now() })',
+		'Date.now = () => <b/> as unknown as number;',
+	],
+	[
+		'reflective platform write',
+		'() => ({ seed: Date.now() })',
+		'',
+		'',
+		"Object.defineProperty(Date, 'now', { value: () => <b/> });",
+	],
+	[
+		'element handed out inside the template',
+		'() => ({ seed })',
+		'return <p>{(seed.current = <b/>, null)}</p>;',
+	],
+	['local factory', '() => ({ seed: make() })', ''],
+	['async factory', 'async () => ({ seed })', ''],
+	['quoted prototype setter', '() => ({ "__proto__": seed })', ''],
+	['element in effect', '() => ({ seed })', '', 'observe(<b>{value.seed}</b>);'],
+	['helper in effect', '() => ({ seed })', '', 'observe(make());'],
+	[
+		'local JSX consumer',
+		'() => ({ seed })',
+		'',
+		'',
+		'export function Parent() { return <Probe seed={<b/>}/>; }',
+	],
+	['retained comment', '() => ({ seed })', '', '', '', '[/* keep */ value]'],
+])(
+	'keeps a read-only state diagnostic for %s',
+	(_case, initial, extra, effect = '', suffix = '', binding = '[value]') => {
+		const migrated = migrate(`import { useState, useEffect } from 'react';
+		${(initial + effect).includes('make()') ? 'function make() { return <b/>; }' : ''}
+		export function Probe({ seed, observe, useOther }) {
+			const ${binding} = useState(${initial});
+			useEffect(() => { observe(value); ${effect} }, [value, observe]);
+			${extra}
+			return <p/>;
+		}
+		${suffix}`);
+		expect(migrated.diagnostics.map((d) => d.code)).toContain('OCTANE_STRONG_READ_ONLY_STATE');
+	},
+);

@@ -21,6 +21,7 @@ import { act, mount } from './_helpers';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture';
 import {
 	List,
+	MappedKeyOnly,
 	MutableList,
 	ListWithEmpty,
 	ToggleableEmpty,
@@ -100,6 +101,35 @@ import { SnapshotMappedList } from './_fixtures/for-mapped.js';
 
 const labels = (r: ReturnType<typeof mount>) => r.findAll('li').map((li) => li.textContent);
 const stripComments = (html: string) => html.replace(/<!--[\s\S]*?-->/g, '');
+
+it('evaluates mapped JSX keys on the server even when row markup is static', () => {
+	const trace: string[] = [];
+	const rows = ['a', 'b', 'c'].map((id) => ({
+		get id() {
+			trace.push('key ' + id);
+			return {
+				[Symbol.toPrimitive](hint: string) {
+					trace.push('coerce ' + id + ' ' + hint);
+					if (id === 'a') {
+						delete rows[1];
+						rows.push({ id: 'later' });
+					}
+					return id;
+				},
+			} as unknown as string;
+		},
+	}));
+	const server = loadServerFixture<{ MappedKeyOnly: typeof MappedKeyOnly }>(
+		'packages/octane/tests/_fixtures/for.tsrx',
+	);
+	expect(
+		ServerRuntime.renderToStaticMarkup(server.MappedKeyOnly, {
+			rows,
+			__items: (row: { id: string }) => row.id,
+		}).html,
+	).toBe('<ul><li></li><li></li></ul>');
+	expect(trace).toEqual(['key a', 'coerce a default', 'key c', 'coerce c default']);
+});
 
 describe('manual keyed lists', () => {
 	it.each([
