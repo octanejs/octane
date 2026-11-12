@@ -1,4 +1,4 @@
-import { svgDataAttribute } from './path-svg.js';
+import { svgDataAttribute, svgLiteralRootOverride } from './path-svg.js';
 import {
 	forwardedProps,
 	literalJsxAttribute,
@@ -1225,7 +1225,12 @@ class ModuleTransform {
 							!!value.expression &&
 							this.svgClassName(value.expression)))
 				);
-			if (svgDataAttribute(attr.name.text)) return !!value && ts.isStringLiteral(value);
+			if (
+				value &&
+				ts.isStringLiteral(value) &&
+				(svgDataAttribute(attr.name.text) || svgLiteralRootOverride(attr.name.text, value.text))
+			)
+				return true;
 			return attr.name.text === 'aria-hidden' && literalJsxAttribute(attr);
 		});
 		if (!supported) return false;
@@ -2280,7 +2285,7 @@ class ModuleTransform {
 	}
 
 	/**
-	 * Request an import from Octane and return the local name to use.
+	 * Request an import and return the local name to use.
 	 */
 	require(module: string, name: string, typeOnly: boolean) {
 		let names = this.added.get(module);
@@ -2773,6 +2778,10 @@ class ModuleTransform {
 					exports.elements[index + 1]?.getFullStart() ?? exports.end - 1,
 				);
 				const name = (item.propertyName ?? item.name).text;
+				if (mapReactImport(module, name, node.isTypeOnly || item.isTypeOnly)?.module === module) {
+					retained.push(text);
+					continue;
+				}
 				if (
 					name === 'SubmitEvent' ||
 					name === 'SubmitEventHandler' ||
@@ -2889,6 +2898,13 @@ class ModuleTransform {
 		if (module === undefined) return this.rewriteSpecifier(node, specifier);
 		const qualifier = node.qualifier;
 		const name = qualifier && ts.isIdentifier(qualifier) ? qualifier.text : null;
+		if (
+			node.isTypeOf &&
+			name &&
+			mapReactImport(specifier.text, name, true)?.module === specifier.text
+		) {
+			return null;
+		}
 		if (specifier.text === 'react' && !node.isTypeOf) {
 			const event = this.nativeEventType(node, name);
 			if (event !== undefined) {
@@ -3175,6 +3191,14 @@ class ModuleTransform {
 				: !this.isGlobalNamespace(node.left, 'React')
 		) {
 			return null;
+		}
+		if (ts.isTypeQueryNode(node.parent)) {
+			const mapped = mapReactImport(namespace?.module ?? 'react', node.right.text, true);
+			if (mapped?.module === 'react') {
+				if (!namespace) return null;
+				this.count(RULE.import);
+				return this.require(mapped.module, mapped.name, true);
+			}
 		}
 		const name = mapQualifiedType(node.right.text);
 		if (!name) {
@@ -4611,7 +4635,42 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return this.directive(node);
 	}
 
+	/** The same unkeyed input keeps its live value when only its default changes. */
+	private conditionalInputDefault(node: ts.ConditionalExpression) {
+		const test = skipParens(node.condition);
+		if (!ts.isIdentifier(test)) return null;
+		const [yes, no] = [node.whenTrue, node.whenFalse].map((arm) => {
+			const element = skipParens(arm);
+			if (
+				!ts.isJsxSelfClosingElement(element) ||
+				!ts.isIdentifier(element.tagName) ||
+				element.tagName.text !== 'input' ||
+				element.typeArguments ||
+				element.attributes.properties.length !== 1
+			)
+				return null;
+			const [attribute] = element.attributes.properties;
+			if (!ts.isJsxAttribute(attribute) || attribute.name.getText(this.sf) !== 'defaultValue')
+				return null;
+			const value = attribute.initializer;
+			return value && ts.isStringLiteral(value) && !/[&\r\n]/.test(value.text) ? value.text : null;
+		});
+		if (
+			yes === null ||
+			no === null ||
+			!fixedBinding(this.checker, test, node) ||
+			!initializedBefore(this.checker, test, node) ||
+			this.lostComments(node.getStart(this.sf), node.end, '').length
+		)
+			return null;
+		this.count(RULE.if);
+		const condition = this.emit(test, PLAIN);
+		return `<input defaultValue={${condition} ? ${JSON.stringify(yes)} : ${JSON.stringify(no)}} />`;
+	}
+
 	ifDirective(node: ts.ConditionalExpression) {
+		const shared = this.conditionalInputDefault(node);
+		if (shared !== null) return shared;
 		let whenTrue = this.arm(node.whenTrue);
 		let whenFalse = this.arm(node.whenFalse);
 		// A ternary between two values is a value; one with an element on

@@ -228,8 +228,12 @@ it.each([
 	'data-oct-s="7"',
 	'data-octane="x"',
 	'data-react-compat="yes"',
+	'fill={value}',
+	'fill="url(#paint)"',
+	'focusable={false}',
+	'focusable="auto"',
 ])(
-	'keeps an SVG with an unsupported data attribute in its original renderer: %s',
+	'keeps an SVG with an unsupported root attribute in its original renderer: %s',
 	async (attribute) => {
 		const { root, file } = fixture(
 			`import Mark from './icons/mark.svg'; export function Pane({value}) { return <div><Mark ${attribute}/></div>; }`,
@@ -385,8 +389,9 @@ async function expectSvgRenderParity(view, states, count, projectFiles = {}) {
 		fs.writeFileSync(path.join(root, 'src', name), contents);
 	}
 	const classes = [];
-	const reference = asset
-		.replace('<svg ', '<svg {...props} ')
+	const reference = fs
+		.readFileSync(path.join(root, 'src/icons/mark.svg'), 'utf8')
+		.replace(/(<svg [^>]+)>/, '$1 {...props}>')
 		.replaceAll('fill-rule=', 'fillRule=')
 		.replaceAll('stroke-width=', 'strokeWidth=');
 	fs.writeFileSync(
@@ -448,6 +453,18 @@ async function expectSvgRenderParity(view, states, count, projectFiles = {}) {
 	}
 	return { root, classes };
 }
+
+it('preserves SVG root defaults and literal overrides on the server and client', async () => {
+	await expectSvgRenderParity(
+		`export function Pane({className}) { return <button>
+			<Mark className={className} fill="currentColor" focusable="false" />
+			<Mark />
+		</button>; }`,
+		[{ className: 'first' }, { className: 'next' }],
+		2,
+		{ 'icons/mark.svg': asset.replace('fill="none"', 'fill="none" focusable="true"') },
+	);
+});
 
 it('preserves scoped and composed CSS module classes on SVGs on the server and client', async () => {
 	const {
