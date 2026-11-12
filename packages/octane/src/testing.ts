@@ -18,13 +18,19 @@ class ClockTimer extends HostClockTimer {
 	}
 }
 
-/** A clock that owns Octane's timers, animation frames, host tasks and `now()`. */
+/**
+ * A clock that owns Octane's timers, animation frames, host tasks, `now()`
+ * and the dates its data cache stamps.
+ */
 export interface TestClock {
 	/** The clock's current time in milliseconds. */
 	now(): number;
+	/** The clock's `Date.now()`: the real date at install, moved as the clock moves. */
+	dateNow(): number;
 	/**
 	 * Move time forward by `ms`, running each timer, frame and host task that
 	 * falls due, in time order, with a full microtask checkpoint after each.
+	 * An idle callback is a task, due when it is requested.
 	 */
 	advance(ms: number): Promise<void>;
 	/** Advance to the next animation frame and run it and the tasks it posts. */
@@ -41,14 +47,18 @@ export interface TestClock {
 /**
  * Install a clock that owns the time Octane's runtime waits on: transitions
  * and deferred updates (host tasks), passive effects (frames and post-paint
- * tasks), Suspense reveal throttling, transition fallback timeouts and the
- * shared producer budget. Nothing moves until the test calls `advance`,
+ * tasks), Suspense reveal throttling, transition fallback timeouts, the
+ * shared producer budget, idle and streamed hydration, and `octane/data`
+ * freshness and retention. Nothing moves until the test calls `advance`,
  * `frame` or `settle`. `act()` still runs clock work that is already due, but
  * never moves time. The clock does not own the app's own `setTimeout` calls.
  */
 export function installTestClock(): TestClock {
 	if (HOST_CLOCK) throw new Error('installTestClock: a test clock is already installed.');
 	let time = typeof performance === 'object' ? performance.now() : Date.now();
+	const installedAt = time;
+	const dateAtInstall = Date.now();
+	const dateNow = () => dateAtInstall + (time - installedAt);
 	let seq = 0;
 	let queue: ClockTimer[] = [];
 
@@ -100,6 +110,7 @@ export function installTestClock(): TestClock {
 
 	const clock = {
 		now: () => time,
+		dateNow,
 		schedule(callback: () => void, delay: number, frame: boolean): HostClockTimer {
 			const due = frame ? (Math.floor(time / FRAME_MS) + 1) * FRAME_MS : time + Math.max(0, delay);
 			const timer = new ClockTimer(callback, due, seq++);
@@ -123,6 +134,7 @@ export function installTestClock(): TestClock {
 	};
 	return {
 		now: () => time,
+		dateNow,
 		advance,
 		frame: () => advance((Math.floor(time / FRAME_MS) + 1) * FRAME_MS - time),
 		settle: () => drain(Infinity),

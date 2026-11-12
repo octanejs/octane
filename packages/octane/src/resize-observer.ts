@@ -1,3 +1,5 @@
+import { HOST_CLOCK } from './host-task.js';
+
 let queuedCallbacks: Set<() => void> | null = null;
 let postTask: (() => void) | undefined;
 
@@ -26,6 +28,10 @@ function enqueue(callback: () => void): void {
 		return;
 	}
 	queuedCallbacks = new Set([callback]);
+	if (HOST_CLOCK) {
+		HOST_CLOCK.schedule(drainCallbacks, 0, false);
+		return;
+	}
 	if (postTask === undefined) {
 		if (typeof MessageChannel === 'undefined') {
 			postTask = () => {
