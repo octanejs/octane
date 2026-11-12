@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/image-crop",
-  "version": "0.0.25",
+  "version": "0.0.26",
   "description": "react-image-crop for Octane with matching crop interaction behavior.",
   "license": "ISC",
   "type": "module",
@@ -44,7 +44,7 @@
     "typecheck": "octane-tsc -p tsconfig.json -p tsconfig.tests.json"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.16.0"
+    "octane": "workspace:^0.17.0"
   },
   "devDependencies": {
     "octane": "workspace:*",
