@@ -9,6 +9,7 @@ import { compileTypesInspection } from 'octane/compiler/volar';
 import ts from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createScopedSignalRecipe, runCodemod } from '../dist/index.js';
+import { bundleRuntime, installDOM } from './bundle-runtime.js';
 
 const REPO = path.resolve(import.meta.dirname, '../../..');
 /** @type {string[]} */
@@ -485,7 +486,7 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		const root = project({
 			'package.json': '{}',
 			'Card.tsx': [
-				json ? '' : "import { createRef } from 'react'; export const ref = createRef();",
+				json ? '' : "import { findDOMNode } from 'react-dom'; export const find = findDOMNode;",
 				'export const Card = () => <p />;',
 				'// ' + 'x'.repeat(1024 * 1024) + ' end of input',
 			].join('\n'),
@@ -506,6 +507,61 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		} else {
 			expect(stdout).toMatch(/^✗ Card\.tsx → Card\.tsrx/);
 			expect(stdout.trimEnd().endsWith('1 error(s) (dry run)')).toBe(true);
+		}
+	});
+
+	it('uses the original ref allocator for refs mounted by a Strong component', async () => {
+		const root = project({
+			'View.tsx': `import * as React from 'react';
+import { createRef as allocate, type RefObject } from 'react';
+export const named = allocate<HTMLButtonElement>();
+export const qualified = React.createRef<HTMLButtonElement>();
+export function View(props: { target: RefObject<HTMLButtonElement | null> }) {
+	return <button ref={props.target}>Ready</button>;
+}`,
+		});
+		fs.symlinkSync(
+			path.resolve(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const [file] = (await runCodemod([root], { root, write: false, strong: true })).files;
+		expect(file).toMatchObject({ strong: true, notes: [], diagnostics: [] });
+		fs.writeFileSync(path.join(root, file.output), file.code);
+		const dom = installDOM();
+		try {
+			const { act, createRoot, reactRef, View, named, qualified } = await bundleRuntime(
+				root,
+				'client',
+				`export { act, createRoot } from 'octane';
+export { createRef as reactRef } from 'react';
+export * from './View.tsrx';`,
+			);
+			expect(named).not.toBe(qualified);
+			const original = reactRef();
+			for (const ref of [named, qualified]) {
+				expect(Object.getOwnPropertyDescriptor(ref, 'current')).toEqual(
+					Object.getOwnPropertyDescriptor(original, 'current'),
+				);
+				expect(Object.isSealed(ref)).toBe(Object.isSealed(original));
+			}
+			const container = dom.window.document.body;
+			const app = createRoot(container);
+			try {
+				await act(async () => app.render(View, { target: named }));
+				const button = container.querySelector('button');
+				expect(button?.textContent).toBe('Ready');
+				expect(named.current).toBe(button);
+				await act(async () => app.render(View, { target: qualified }));
+				expect(named.current).toBeNull();
+				expect(qualified.current).toBe(button);
+			} finally {
+				await act(async () => app.unmount());
+			}
+			expect(qualified.current).toBeNull();
+		} finally {
+			vi.unstubAllGlobals();
+			dom.window.close();
 		}
 	});
 
