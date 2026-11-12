@@ -374,7 +374,12 @@ async function bootstrapDocumentLifecycle() {}
  *   - `rootBoundary`: the config names a root pending or catch boundary.
  *   - `independentHydration` / `streamedSignals`: some compiled module has an
  *     independent island / streamed signal state, so its lazy runtime loads.
- *   - `voidRoot: true` hydrates without returned-value reconciliation. Only a
+ *   - `data: true`: the config names a `data` module. The entry waits for the
+ *     whole document, opens the page's store from the server's seed, and
+ *     renders the route inside `DataRoot`, as the server did. Off by default,
+ *     so an app without one never loads `octane/data`.
+ *   - `voidRoot: true` hydrates without returned-value reconciliation. A `data`
+ *     entry ignores it: its root is `DataRoot`, which no build proves void. Only a
  *     build that proved every page and layout it can render is a void `@{}`
  *     body, with no root boundary, may set it (see compiler/void-roots.js).
  *
@@ -393,6 +398,9 @@ async function bootstrapDocumentLifecycle() {}
  *   runtimeModuleId?: string,
  *   generatedBy?: string,
  *   rootBoundary?: boolean,
+ *   data?: boolean,
+ *   dataRootModuleId?: string,
+ *   seedsModuleId?: string,
  *   voidRoot?: boolean,
  *   independentHydration?: boolean,
  *   streamedSignals?: boolean,
@@ -403,15 +411,26 @@ export function create_client_entry_source(options = {}) {
 	const runtimeModuleId =
 		options.runtimeModuleId ?? fileURLToPath(new URL('./client-entry-runtime.js', import.meta.url));
 	const rootBoundary = options.rootBoundary !== false;
+	const data = options.data === true;
+	const dataImports = data
+		? `import { DataRoot } from ${JSON.stringify(
+				options.dataRootModuleId ??
+					fileURLToPath(new URL('../templates/data-root.tsrx', import.meta.url)),
+			)};
+import { readRouteSeed } from ${JSON.stringify(
+				options.seedsModuleId ?? fileURLToPath(new URL('./seeds.js', import.meta.url)),
+			)};`
+		: '';
 	const imports = [
-		options.voidRoot ? '__hydrateVoidRoot as hydrateRoot' : 'hydrateRoot',
+		options.voidRoot && !data ? '__hydrateVoidRoot as hydrateRoot' : 'hydrateRoot',
 		'initializeHydrationEventCapture',
 		...(rootBoundary ? ['Suspense', 'ErrorBoundary', 'createElement'] : []),
 	];
 	return (
 		client_entry_prelude(
 			options,
-			`import { ${imports.join(', ')} } from ${JSON.stringify(runtimeModuleId)};`,
+			`import { ${imports.join(', ')} } from ${JSON.stringify(runtimeModuleId)};` +
+				(dataImports === '' ? '' : '\n' + dataImports),
 		) +
 		`function getComponentExport(module, exportName) {
   // Explicit export name requires an exact match; do NOT fall back, so a
@@ -559,7 +578,26 @@ ${
     Content = withRootBoundary(Content, rootBoundary);
 `
 		: ''
-}
+}${
+			data
+				? `    if (data.data) {
+      // The store's seed follows the page's content, so wait for the whole document.
+      if (document.readyState === 'loading') {
+        await new Promise((ready) => document.addEventListener('DOMContentLoaded', ready, { once: true }));
+      }
+      const dataModule = await importModule(data.data);
+      if (incompatibleBuild) return;
+      if (documentLifecycle && !await documentLifecycle.whenActive()) return;
+      const store = dataModule.default(readRouteSeed('data'), null);
+      const routeContent = Content;
+      Content = (props, scope) => DataRoot({
+        store,
+        children: (_props, childScope) => routeContent(props, childScope),
+      }, scope);
+    }
+`
+				: ''
+		}
     if (incompatibleBuild) return;
     if (documentLifecycle && !await documentLifecycle.whenActive()) return;
     hydrateRoot(target, Content, undefined,

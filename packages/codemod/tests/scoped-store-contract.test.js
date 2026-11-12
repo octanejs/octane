@@ -340,7 +340,8 @@ it.each([
 
 it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
 	const source = `import {useSnapshot as useReading, valueOf} from 'observer';
-export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }`;
+export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }
+export type PaneParameters = Parameters<typeof Pane>;`;
 	const originalPane = { 'app/src/pane.tsx': source };
 	const { app, library } = project(originalPane);
 	const originalSources = Object.fromEntries(
@@ -370,10 +371,7 @@ export function Pane() { const value = useReading(); return <p>{valueOf(1)}{valu
 	const helperBytes = Object.fromEntries(
 		helpers.map((f) => [f.output, fs.readFileSync(path.join(app, f.output), 'utf8')]),
 	);
-	fs.writeFileSync(
-		path.join(app, 'src/second.tsx'),
-		source.replace('function Pane', 'function Other'),
-	);
+	fs.writeFileSync(path.join(app, 'src/second.tsx'), source.replaceAll('Pane', 'Other'));
 	// The normal directory entry now also sees the generated ordinary TypeScript files.
 	const second = await migrate(app, ['src'], true);
 	expect(second.files.find((f) => f.file === 'src/second.tsx')?.rules['store-hook']).toBe(1);

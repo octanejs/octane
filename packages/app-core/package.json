@@ -22,6 +22,7 @@
   "files": [
     "src",
     "types",
+    "templates",
     "README.md",
     "LICENSE"
   ],
@@ -72,6 +73,16 @@
       "types": "./types/node.d.ts",
       "import": "./src/server/node-http.js",
       "default": "./src/server/node-http.js"
+    },
+    "./seeds": {
+      "types": "./types/seeds.d.ts",
+      "import": "./src/seeds.js",
+      "default": "./src/seeds.js"
+    },
+    "./data-root": {
+      "types": "./types/data-root.d.ts",
+      "import": "./templates/data-root.tsrx",
+      "default": "./templates/data-root.tsrx"
     },
     "./server-functions": {
       "types": "./types/server-functions.d.ts",

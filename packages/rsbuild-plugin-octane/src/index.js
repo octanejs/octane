@@ -171,6 +171,7 @@ function configSignature(config, strongOverride) {
 		),
 		preHydrate: config.router.preHydrate,
 		rootBoundary: config.rootBoundary,
+		data: config.data,
 		server: config.server,
 		compiler: {
 			renderers: config.compiler.renderers.signature,
@@ -518,6 +519,9 @@ export function pluginOctane(inlineOptions = {}) {
 							staticEntries: entries,
 							clientBuildIdExpression: '__webpack_hash__',
 							generatedBy: PLUGIN_NAME,
+							data: Boolean(loaded.config.data),
+							dataRootModuleId: localRequire.resolve('@octanejs/app-core/data-root'),
+							seedsModuleId: localRequire.resolve('@octanejs/app-core/seeds'),
 						});
 					},
 				);
@@ -554,6 +558,8 @@ export function pluginOctane(inlineOptions = {}) {
 							octaneConfigPath: loaded.configPath,
 							configImportPath: loaded.configPath,
 							rootBoundary: loaded.config.rootBoundary,
+							data: loaded.config.data,
+							dataRootModuleId: localRequire.resolve('@octanejs/app-core/data-root'),
 							rpcModulePaths: serverModules.ids,
 							...(webWorkerServer ? { mode: 'webworker' } : null),
 							...(production && !webWorkerServer

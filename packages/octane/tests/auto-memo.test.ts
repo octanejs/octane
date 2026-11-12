@@ -4534,6 +4534,73 @@ describe('compiler-owned component-region memoization', () => {
 		root.unmount();
 	});
 
+	it.each(['tsx', 'tsrx'])(
+		'reports a later map callback error before rendering its first row in .%s',
+		(extension) => {
+			for (const row of [
+				'<Child key={index} value={read(index)} />',
+				'<div key={index} data-index={read(index)}><Child value={index} /></div>',
+				'<i key={index} title={badTitle} data-index={read(index)} />',
+			]) {
+				const { App } = loadCompiledFixtureSource(
+					`
+					function read(index) {
+						if (index === 1) throw new Error('second callback');
+						return index;
+					}
+					function Child({ value }) {
+						if (value === 0) throw new Error('first child');
+						return <i />;
+					}
+					const badTitle = {
+						toString() { throw new Error('first title'); },
+					};
+					export function App() {
+						return <section>{[0, 1].map(index => ${row})}</section>;
+					}
+					`,
+					{
+						id: `map-error-order.${extension}`,
+						mode: 'server',
+						compileOptions: { hmr: false, dev: false, strong: false },
+					},
+				);
+				expect(() => ServerRuntime.renderToString(App, {})).toThrow('second callback');
+			}
+		},
+	);
+
+	it('evaluates callbacks in array order when keyed rows reverse', () => {
+		const { App } = loadCompiledFixtureSource(
+			`export function App({ rows }) @{
+				<ul>{rows.map(row => <li key={row.id} data-marker={row.read()} />)}</ul>
+			}`,
+			{
+				id: 'map-callback-reorder.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false, strong: false },
+			},
+		);
+		let marker = '';
+		const rows = ['a', 'b'].map((id) => ({
+			get id() {
+				marker = id;
+				return id;
+			},
+			read: () => marker,
+		}));
+		const root = mount(App, { rows });
+		try {
+			const [first, second] = root.findAll('li');
+			expect(root.findAll('li').map((row) => row.getAttribute('data-marker'))).toEqual(['a', 'b']);
+			root.update(App, { rows: rows.toReversed() });
+			expect(root.findAll('li')).toEqual([second, first]);
+			expect(root.findAll('li').map((row) => row.getAttribute('data-marker'))).toEqual(['b', 'a']);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('preserves keyed component state and effects across native and custom map receivers', () => {
 		const compiled = compile(
 			`function Row(props) { return <li>{props.label}</li>; }

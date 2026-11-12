@@ -143,9 +143,13 @@ list, the filter and map callbacks may reuse a parameter name.
 
 ## What it reports
 
-Class components, `createRef`, `defaultProps`, and anything else without an
+Class components, `defaultProps`, and anything else without an
 automatic rewrite are listed under **Needs attention** with a file and line.
 The process exits with status 1 when any error remains.
+
+Named imports and re-exports, dotted namespace access, and direct type queries
+for React's `createRef` keep the original allocator. Octane can attach and
+clear the ref object it returns.
 
 If a migration target already exists or two sources share a target, write mode
 stops before editing the project. `--dry-run` and `--print` report the colliding
@@ -245,6 +249,8 @@ For example, `<Mark className="icon" aria-hidden data-testid="status-icon" />` c
 A directly returned SVG can use a fixed color such as `style={{ color: 'var(--icon-color)' }}`, including through intrinsic parents. This requires one JSX use of the import and a lowercase custom property with no fallback. The generated component keeps the fixed color on its SVG root.
 
 The SVG class can also come from a CSS Module. For example, after `import styles from './badge.module.css'`, both `className={styles.mark}` and `className={cx(styles.mark, styles.accent)}` keep the stylesheet's scoped and composed class names. A `clsx` call that reads the stylesheet must use only string literals and direct class reads. This requires the original and migrated modules to load the same CSS class map, with stable, side-effect-free string exports throughout the application. The codemod checks plain relative default imports and their uses in the current source file. Passing the imported map to another function or assigning to a property keeps the SVG diagnostic.
+
+Quoted `fill` and `focusable` props can override the corresponding SVG root attributes. For example, `<Mark fill="currentColor" focusable="false" />` uses the caller's paint and focusability. Omitting either prop preserves the value from the asset. The override must pass the same validation as the corresponding attribute in the SVG file.
 
 A component can also store an SVG with literal attributes directly in a local before rendering it. For example, `let icon = null; if (active) icon = <Mark />; return <span>{icon}</span>;` has a single render outlet. The local must be declared directly in the component body with `let` or `const`, and that body must end in a single return. Each additional write must be a standalone assignment, and the only runtime read must lead to a proven render destination in the same function. A captured local, a second read, or a recognized hook call in that function keeps the SVG diagnostic.
 
