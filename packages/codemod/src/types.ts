@@ -77,6 +77,8 @@ export interface TransformOptions {
 	pathSvgAdapter?(specifier: string): string | null;
 	/** With pathSvgAdapter, supplies a native SVG adapter with the requested fixed root color. */
 	fixedColorSvgAdapter?(specifier: string, color: string): string | null;
+	/** The project compiles this file with the original React automatic JSX runtime. */
+	automaticReactJsx?: boolean;
 	/** This file uses React's automatic JSX runtime and the component resolves to its original React package. */
 	reactStoreComponent?(specifier: string): boolean;
 }
