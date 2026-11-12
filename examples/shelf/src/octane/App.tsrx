@@ -1,8 +1,16 @@
 import { useState, useSyncExternalStore } from 'octane';
 import type { OctaneNode } from 'octane';
-import { DataProvider, useForm, useRead } from 'octane/data/octane';
+import { DataProvider, useFeed, useForm, useRead } from 'octane/data/octane';
 import type { Book } from '../shared/contracts.ts';
-import { addBook, books, finished, removeBook, setRead, stats } from '../shared/contracts.ts';
+import {
+	addBook,
+	books,
+	finished,
+	removeBook,
+	setRead,
+	shelfChanges,
+	stats,
+} from '../shared/contracts.ts';
 import {
 	ACCOUNTS,
 	checkSaved,
@@ -15,8 +23,18 @@ import {
 	type Session,
 } from '../shared/session.ts';
 
+const LIVE = { connecting: 'Connecting…', live: 'Live', offline: 'Reconnecting…' };
+
 function useExternal<T>(value: ExternalValue<T>): T {
 	return useSyncExternalStore(value.subscribe, value.get, value.get);
+}
+
+/** Listens to the shelf's changes, so another tab's edit shows here at once. */
+function Live() @{
+	const feed = useFeed(shelfChanges);
+	<p class="live" data-feed={feed.status}>
+		{LIVE[feed.status]}
+	</p>
 }
 
 /** Suspends, so a server render waits for the counts and the page arrives with them. */
@@ -162,6 +180,7 @@ function Network(props: { session: Session }) @{
 export function ShelfBody(props: { session: Session; children?: OctaneNode }) @{
 	const session = props.session;
 	<DataProvider store={session.store}>
+		<Live />
 		@try {
 			<Stats />
 		} @pending {

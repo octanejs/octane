@@ -1,12 +1,13 @@
 /** @jsxImportSource react */
 import { Suspense, useState, useSyncExternalStore, Component, type ReactNode } from 'react';
-import { DataProvider, useForm, useRead } from 'octane/data/react';
+import { DataProvider, useFeed, useForm, useRead } from 'octane/data/react';
 import {
 	addBook,
 	books,
 	finished,
 	removeBook,
 	setRead,
+	shelfChanges,
 	stats,
 	type Book,
 } from '../shared/contracts.ts';
@@ -24,6 +25,18 @@ import {
 
 function useExternal<T>(value: ExternalValue<T>): T {
 	return useSyncExternalStore(value.subscribe, value.get, value.get);
+}
+
+const LIVE = { connecting: 'Connecting…', live: 'Live', offline: 'Reconnecting…' };
+
+/** Listens to the shelf's changes, so another tab's edit shows here at once. */
+function Live() {
+	const feed = useFeed(shelfChanges);
+	return (
+		<p className="live" data-feed={feed.status}>
+			{LIVE[feed.status]}
+		</p>
+	);
 }
 
 /** Suspends, so a server render waits for the counts and the page arrives with them. */
@@ -193,6 +206,7 @@ class LoadError extends Component<{ children: ReactNode }, { error: Error | null
 function ShelfBody({ session }: { session: Session }) {
 	return (
 		<DataProvider store={session.store}>
+			<Live />
 			<Suspense fallback={<p className="stats">Counting…</p>}>
 				<Stats />
 			</Suspense>

@@ -1,8 +1,15 @@
 /** @jsxImportSource react */
 import { Suspense } from 'react';
 import type { DataStore } from 'octane/data';
-import { DataProvider, usePages, useRead, useReadState, useWrite } from 'octane/data/react';
-import { setDone, todoPages, todos } from '../_data-todos.js';
+import {
+	DataProvider,
+	useFeed,
+	usePages,
+	useRead,
+	useReadState,
+	useWrite,
+} from 'octane/data/react';
+import { setDone, todoChanges, todoPages, todos } from '../_data-todos.js';
 
 function ReactDoneCount() {
 	const { value } = useReadState(todos);
@@ -56,6 +63,26 @@ function ReactPageList() {
 				))}
 			</ul>
 			{pages.more ? <button onClick={() => void pages.loadMore()}>More</button> : null}
+		</section>
+	);
+}
+
+export function ReactFeed(props: { store: DataStore }) {
+	return (
+		<DataProvider store={props.store}>
+			<ReactFeedList />
+		</DataProvider>
+	);
+}
+
+function ReactFeedList() {
+	const feed = useFeed(todoChanges);
+	const list = useRead(todos);
+	return (
+		<section data-react-feed={feed.status}>
+			{list.map((todo) => (
+				<p key={todo.id}>{todo.title}</p>
+			))}
 		</section>
 	);
 }

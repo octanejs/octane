@@ -10,6 +10,9 @@ import {
 	parse,
 	type DataReply,
 	type DataRequest,
+	type Feed,
+	type FeedFrame,
+	type FeedRequest,
 	type Read,
 	type Transport,
 	type View,
@@ -60,6 +63,21 @@ export interface DataServer {
 	 */
 	serve(request: string, call: ServerCallContext): Promise<string>;
 	/**
+	 * Answer one feed connection sent through a `module server` function, as
+	 * `serverListener` encodes it. Each event is validated before it leaves.
+	 * A connection ends after 25 seconds, within a server call's limit, and
+	 * the store connects again from its cursor:
+	 *
+	 * ```tsrx
+	 * module server {
+	 *   export function events(request: string, call: ServerCallContext) {
+	 *     return handler.listen(request, call);
+	 *   }
+	 * }
+	 * ```
+	 */
+	listen(request: string, call: ServerCallContext): AsyncIterable<string>;
+	/**
 	 * Call before rendering a page. Signs the page's forms for the request's
 	 * account and, when the request is a form's native POST, runs its write.
 	 * Middleware passes its context as `caller`, so `context` sees its viewer.
@@ -86,7 +104,7 @@ export interface DataCall {
 }
 
 export interface DataHandler {
-	readonly contract: Read<any, any> | Write<any, any>;
+	readonly contract: Read<any, any> | Write<any, any> | Feed<any, any>;
 	readonly run: (input: any, call: any) => unknown;
 }
 
@@ -107,6 +125,18 @@ export interface Handle<C> {
 		contract: Read<I, O> | Write<I, O>,
 		run: (input: I, call: C & DataCall) => O | Promise<O>,
 	): DataHandler;
+	/**
+	 * A feed's handler yields its frames for one connection, from just after
+	 * `call.cursor` when the client has one, until `call.signal` aborts. When it
+	 * cannot resume from that cursor it yields `{ gap: true }` first.
+	 */
+	<P, E>(
+		contract: Feed<P, E>,
+		run: (
+			params: P,
+			call: C & DataCall & { readonly cursor: string | null },
+		) => AsyncIterable<{ event?: E; id?: string; cursor?: string; gap?: boolean }>,
+	): DataHandler;
 }
 
 const handle: Handle<any> = (contract: DataHandler['contract'], run: DataHandler['run']) => ({
@@ -122,6 +152,9 @@ function same(submitted: unknown, token: string): boolean {
 		difference |= submitted.charCodeAt(i) ^ token.charCodeAt(i);
 	return difference === 0;
 }
+
+/** How long one feed connection lasts, under a server call's 30 second limit. */
+const FEED_CONNECTION = 25_000;
 
 /** A write may ask for at most this many reads back; the rest reload on their own. */
 const MAX_REFRESH = 8;
@@ -238,6 +271,55 @@ export function createDataHandler<C extends object = {}>(
 			return new Response(null, { status: 500 });
 		}
 	};
+	/** One feed connection's frames, each event validated, until the connection's time is up. */
+	async function* frames(
+		payload: FeedRequest,
+		request: Request,
+		server: ServerCallContext,
+	): AsyncGenerator<FeedFrame> {
+		const handler = typeof payload.name === 'string' ? byName.get(payload.name) : undefined;
+		if (!handler || handler.contract.kind !== 'feed') throw new DataError('not_found');
+		const contract = handler.contract;
+		const params = contract.params ? await parse(contract.params, payload.params) : undefined;
+		const ended = new AbortController();
+		const signal = AbortSignal.any([server.signal, ended.signal]);
+		const call = {
+			...callFor(await contextFor(request, server), request, '', signal),
+			cursor: typeof payload.cursor === 'string' ? payload.cursor : null,
+		};
+		const iterator = (handler.run(params, call) as AsyncIterable<FeedFrame>)[
+			Symbol.asyncIterator
+		]();
+		const timeUp = new Promise<null>((resolve) => {
+			const timer = setTimeout(() => resolve(null), FEED_CONNECTION);
+			signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
+		});
+		try {
+			while (true) {
+				const next = await Promise.race([iterator.next(), timeUp]);
+				if (next === null || next.done) return;
+				const { event, id, cursor, gap } = next.value;
+				const position = typeof cursor === 'string' ? { cursor } : {};
+				if (!('event' in next.value)) {
+					yield gap === true ? { gap: true, ...position } : position;
+					continue;
+				}
+				if (gap === true) yield { gap: true };
+				let checked: { value: unknown } | null = null;
+				try {
+					checked = { value: await parse(contract.event, event) };
+				} catch {}
+				// An event that fails its contract never leaves; the client hears it missed one.
+				yield checked
+					? { event: checked.value, ...(typeof id === 'string' ? { id } : {}), ...position }
+					: { gap: true, ...position };
+			}
+		} finally {
+			ended.abort();
+			void Promise.resolve(iterator.return?.()).catch(() => {});
+		}
+	}
+
 	let signing: Promise<CryptoKey> | undefined;
 	/** An HMAC of the account, so a token is valid only for the account it was issued to. */
 	async function sign(grant: string): Promise<string> {
@@ -322,5 +404,10 @@ export function createDataHandler<C extends object = {}>(
 		// devalue on both sides, as over HTTP: a server call carries only plain data.
 		serve: async (request: string, call: ServerCallContext) =>
 			devalue.stringify(await answer(devalue.parse(request), call.request, call)),
+		async *listen(request: string, call: ServerCallContext) {
+			for await (const frame of frames(devalue.parse(request), call.request, call)) {
+				yield devalue.stringify(frame);
+			}
+		},
 	});
 }

@@ -5898,6 +5898,7 @@ const STRONG_LITE_HOOKS = new Set([
 	'useReducer',
 	'useRef',
 	'useLazyRef',
+	'useInitialValue',
 	'useEffect',
 	'useLayoutEffect',
 	'useInsertionEffect',
@@ -6359,6 +6360,7 @@ const SETUP_SYNC_FACTORY_HOOKS = new Set([
 	'useMemo',
 	'useState',
 	'useLazyRef',
+	'useInitialValue',
 	'useLinkedState',
 	'useReducer',
 	'useSyncExternalStore',
@@ -22562,6 +22564,7 @@ const NUMERIC_HOOK_SLOT_POSITION = {
 	useCallback: 2,
 	useRef: 1,
 	useLazyRef: 1,
+	useInitialValue: 1,
 	useEffectEvent: 1,
 	useImperativeHandle: 3,
 	useActionState: 3,
@@ -22581,7 +22584,7 @@ function appendHookSlotArgument(name, args, slot, numeric, origin, ctx) {
 	// Lazy refs reserve numeric slots for the compiler; their authored API only
 	// accepts manual Symbols. The runtime already supports this private ABI.
 	const typedSlot =
-		ctx.typescriptWeb && numeric && name === 'useLazyRef'
+		ctx.typescriptWeb && numeric && (name === 'useLazyRef' || name === 'useInitialValue')
 			? b.ts_as(expression, b.ts_keyword_type('any'))
 			: expression;
 	out.push({
