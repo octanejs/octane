@@ -531,6 +531,13 @@ describe('feed presets', () => {
 		expect(order).toEqual(['position', 'read']);
 	});
 
+	it('skips a queued position request when the render retires before dispatch', async () => {
+		const transport = vi.fn<Transport>();
+		const store = createDataStore({ transport, feeds: [todoChanges] });
+		await store.retire();
+		expect(transport).not.toHaveBeenCalled();
+	});
+
 	it("stops a server render's position request when its store retires", async () => {
 		let signal: AbortSignal | undefined;
 		const store = createDataStore({
