@@ -76,9 +76,9 @@ export function initializedBefore(checker: ts.TypeChecker, name: ts.Identifier, 
 }
 
 /**
- * An explicit [owner] observes object identity, even when the effect reads
- * owner.value or calls owner.method(). Read that same binding into the effect
- * and leave the property accesses where React executed them, including cleanup.
+ * An explicit [owner] observes object identity even when the callback reads
+ * owner.value or calls owner.method(). Read the binding inside the callback
+ * and leave property accesses where React executed them, including cleanup.
  */
 export function effectReceivers(
 	callback: ts.ArrowFunction,
@@ -90,6 +90,7 @@ export function effectReceivers(
 		member: ts.PropertyAccessExpression,
 		name: string,
 	) => void,
+	bridgeLayout?: (statement: ts.ExpressionStatement, name: string) => void,
 ): string[] {
 	const { body } = callback;
 	if (
@@ -101,21 +102,24 @@ export function effectReceivers(
 	)
 		return [];
 	const call = callback.parent;
+	if (!ts.isCallExpression(call)) return [];
+	const hook = reactHook(call.expression);
+	const imperative = hook === 'useImperativeHandle';
+	const callbackIndex = imperative ? 1 : 0;
 	if (
-		!ts.isCallExpression(call) ||
-		call.arguments.length !== 2 ||
-		call.arguments[0] !== callback ||
-		!['useEffect', 'useLayoutEffect', 'useInsertionEffect'].includes(
-			reactHook(call.expression) ?? '',
-		)
+		(!imperative && !['useEffect', 'useLayoutEffect', 'useInsertionEffect'].includes(hook ?? '')) ||
+		call.arguments.length !== callbackIndex + 2 ||
+		call.arguments[callbackIndex] !== callback ||
+		(imperative && ts.isSpreadElement(call.arguments[0]!))
 	)
 		return [];
-	const deps = call.arguments[1];
+	const deps = call.arguments[callbackIndex + 1]!;
 	if (!ts.isArrayLiteralExpression(deps)) return [];
 
 	const identifiers = deps.elements.filter(ts.isIdentifier);
 	const hasProperties = identifiers.length !== deps.elements.length;
-	if (hasProperties && !snapshot) return [];
+	// A property snapshot would run before the imperative handle evaluates its ref.
+	if (hasProperties && (imperative || !snapshot)) return [];
 
 	const names = new Set<string>();
 	const members = new Map<ts.Symbol, ts.Identifier[]>();
@@ -157,16 +161,21 @@ export function effectReceivers(
 		)
 			return [];
 		const parameters = new Map<ts.Symbol, boolean>();
+		const canBridgeLayout =
+			bridgeLayout &&
+			hook === 'useLayoutEffect' &&
+			!callback.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword);
+		let layoutEvent = false;
 		for (const property of properties) {
 			let root: ts.Expression = property;
 			while (ts.isPropertyAccessExpression(root) && ts.isIdentifier(root.name))
 				root = root.expression;
-			if (
-				!ts.isIdentifier(root) ||
-				names.has(root.text) ||
-				!fixedBinding(checker, root, call, parameters)
-			)
-				return [];
+			if (!ts.isIdentifier(root) || !fixedBinding(checker, root, call, parameters)) return [];
+			if (names.has(root.text)) {
+				const symbol = checker.getSymbolAtLocation(root);
+				if (!canBridgeLayout || !symbol || !members.has(symbol)) return [];
+				layoutEvent = true;
+			}
 		}
 		// Accessors observe the order and multiplicity of the original render-time reads.
 		for (const [index, property] of properties.entries()) {
@@ -176,6 +185,16 @@ export function effectReceivers(
 			names.add(name);
 			snapshot(statement, property, name);
 			declarations.push(`void ${name};`);
+		}
+		if (layoutEvent && bridgeLayout) {
+			// Run the latest committed setup at layout time, including after Activity reconnects.
+			let name = 'runLayoutEffect';
+			while (names.has(name) || checker.resolveName(name, call, ts.SymbolFlags.Value, false))
+				name += '_';
+			bridgeLayout(statement, name);
+			for (const { text } of identifiers) declarations.push(`void ${text};`);
+			declarations.push(`return ${name}();`);
+			return declarations;
 		}
 	}
 	// An otherwise unused dependency can intentionally restart the effect.

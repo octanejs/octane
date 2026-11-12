@@ -3,9 +3,9 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { act, createElement, useEffect, useState } from 'react';
+import { act, createElement, useEffect, useImperativeHandle, useState } from 'react';
 import { createRoot as reactRoot } from 'react-dom/client';
-import { createRoot } from 'octane';
+import { Activity, createElement as octaneElement, createRoot } from 'octane';
 import { expect, it } from 'vitest';
 import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
 import { flushEffects } from '../../octane/tests/_helpers.js';
@@ -185,6 +185,68 @@ it.each([
 	}
 });
 
+it('preserves property reads and the current layout setup when Activity reconnects', () => {
+	const migrated = migrate(`import { useEffectEvent, useLayoutEffect } from 'react';
+export function Probe({ receiver, revision, record }) {
+	useLayoutEffect(() => {
+		const value = receiver.value;
+		record('setup', receiver.name, value, revision);
+		return () => record('cleanup', receiver.name, value, revision);
+	}, [receiver.value, receiver.value]);
+	return <p>{String(revision)}</p>;
+}`);
+	expect(migrated.strong).toBe(true);
+	const { Probe } = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
+	const reads = [];
+	const effects = [];
+	const receiver = (name, value) => ({
+		name,
+		get value() {
+			reads.push(name);
+			return value;
+		},
+	});
+	const a = receiver('a', 1);
+	const b = receiver('b', 1);
+	const c = receiver('c', 2);
+	const record = (...entry) => effects.push(entry);
+	const host = document.createElement('div');
+	const root = createRoot(host);
+	const render = (mode, receiver, revision) => {
+		root.render(
+			octaneElement(Activity, {
+				mode,
+				children: octaneElement(Probe, {
+					receiver,
+					revision,
+					record,
+				}),
+			}),
+		);
+		flushEffects();
+	};
+	try {
+		render('visible', a, 1);
+		render('visible', b, 2);
+		render('hidden', b, 3);
+		render('visible', b, 4);
+		expect(host.textContent).toBe('4');
+		render('visible', c, 5);
+	} finally {
+		root.unmount();
+		flushEffects();
+	}
+	expect(reads).toEqual(['a', 'a', 'a', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'c', 'c', 'c']);
+	expect(effects).toEqual([
+		['setup', 'a', 1, 1],
+		['cleanup', 'a', 1, 1],
+		['setup', 'b', 1, 4],
+		['cleanup', 'b', 1, 4],
+		['setup', 'c', 2, 5],
+		['cleanup', 'c', 2, 5],
+	]);
+});
+
 it.each([
 	[
 		'mutable parameter',
@@ -285,6 +347,134 @@ it('respects local shadows, fresh alias names and comments', async () => {
 	expect(migrated.code).toContain('/* keep */');
 });
 
+const handleFactory = '() => ({ created: receiver.value, read: () => receiver.read() })';
+const imperativeSource = `import { useImperativeHandle } from 'react';
+export function Probe({ receiver, handleRef, revision }) {
+	useImperativeHandle(handleRef, ${handleFactory}, [receiver]);
+	return <p>{String(revision)}</p>;
+}`;
+
+it('preserves receiver identity, layout attachment and cleanup for an imperative handle', async () => {
+	const migrated = migrate(imperativeSource);
+	expect(migrated.strong).toBe(true);
+	const native = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
+
+	function Reference({ receiver, handleRef, revision }) {
+		useImperativeHandle(
+			handleRef,
+			() => ({ created: receiver.value, read: () => receiver.read() }),
+			[receiver],
+		);
+		return createElement('p', null, String(revision));
+	}
+
+	async function exercise(react) {
+		const log = [];
+		const host = document.createElement('div');
+		const receiver = (name) => ({
+			name,
+			count: 1,
+			get value() {
+				log.push(`create ${this.read()} at ${host.textContent}`);
+				return this.read();
+			},
+			read() {
+				return this.name + this.count;
+			},
+		});
+		const a = receiver('a');
+		const b = receiver('b');
+		let held;
+		const callbackRef = (value) => {
+			held = value;
+			log.push('attach ' + value?.created);
+			return () => {
+				held = null;
+				log.push('cleanup ' + value.created);
+			};
+		};
+		const objectRef = { current: null };
+		const root = react ? reactRoot(host) : createRoot(host);
+		const render = async (receiver, handleRef, revision) => {
+			const props = { receiver, handleRef, revision };
+			if (react) await act(() => root.render(createElement(Reference, props)));
+			else root.render(native.Probe, props);
+		};
+
+		try {
+			const unreadable = {
+				get value() {
+					throw new Error('A null ref must not read the handle');
+				},
+			};
+			await render(unreadable, null, 0);
+			await render(a, callbackRef, 1);
+			const first = held;
+			expect(first.created).toBe('a1');
+
+			a.count = 2;
+			await render(a, callbackRef, 2);
+			expect(held).toBe(first);
+			expect(held.read()).toBe('a2');
+
+			await render(a, objectRef, 3);
+			expect(held).toBeNull();
+			expect(objectRef.current.created).toBe('a2');
+			const second = objectRef.current;
+
+			b.count = 2;
+			await render(b, objectRef, 4);
+			expect(objectRef.current).not.toBe(second);
+			expect(objectRef.current.created).toBe('b2');
+		} finally {
+			if (react) await act(() => root.unmount());
+			else root.unmount();
+		}
+		expect(objectRef.current).toBeNull();
+		return log;
+	}
+
+	const before = globalThis.IS_REACT_ACT_ENVIRONMENT;
+	globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+	try {
+		const original = await exercise(true);
+		expect(original).toEqual([
+			'create a1 at 1',
+			'attach a1',
+			'cleanup a1',
+			'create a2 at 3',
+			'create b2 at 4',
+		]);
+		expect(await exercise(false)).toEqual(original);
+	} finally {
+		globalThis.IS_REACT_ACT_ENVIRONMENT = before;
+	}
+});
+
+it('keeps a getter dependency after the imperative handle ref expression', () => {
+	const migrated = migrate(
+		imperativeSource
+			.replace('{ receiver, handleRef, revision }', '{ receiver, handleRef, revision, trigger }')
+			.replace('useImperativeHandle(handleRef,', 'useImperativeHandle(handleRef(),')
+			.replace(handleFactory, '() => { return { created: receiver.value }; }')
+			.replace('[receiver]', '[receiver, trigger.value]'),
+	);
+	expect(migrated.strong).toBe(false);
+	expect(migrated.code).toMatch(
+		/useImperativeHandle\(handleRef\(\),[\s\S]*\[receiver, trigger\.value\]/,
+	);
+});
+
+it('retains explicit dependencies when an imperative handle reads another reactive value', () => {
+	const migrated = migrate(
+		imperativeSource.replace('created: receiver.value', 'created: receiver.value + revision'),
+	);
+	expect(migrated.strong).toBe(false);
+	expect(migrated.diagnostics.some((d) => d.code === 'OCTANE_STRONG_EXPLICIT_DEPENDENCIES')).toBe(
+		true,
+	);
+});
+
 it('preserves a lazy mount value through effect updates and cleanup', async () => {
 	const source = `import { useState as state, useEffect as effect } from 'react';
 	export function Probe({ read, record, revision }) {
@@ -296,8 +486,9 @@ it('preserves a lazy mount value through effect updates and cleanup', async () =
 		}, [record, value, revision]);
 		return revision ? <p data-revision={String(revision)}/> : null;
 	}`;
-	const migrated = migrate(source);
+	const migrated = migrate(`${source}\nconst useInitialValue = 0;`);
 	expect(migrated.strong).toBe(true);
+	expect(migrated.code).toContain('useLazyRef');
 	const native = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
 	function Reference({ read, record, revision }) {
 		const [value] = useState(() => ({ read, revision }));
@@ -396,9 +587,10 @@ it.each([
 	],
 	['retained comment', '() => ({ seed })', '', '', '', '[/* keep */ value]'],
 ])(
-	'keeps a read-only state diagnostic for %s',
+	'keeps a read-only state diagnostic for %s when useInitialValue is shadowed',
 	(_case, initial, extra, effect = '', suffix = '', binding = '[value]') => {
 		const migrated = migrate(`import { useState, useEffect } from 'react';
+		const useInitialValue = 0;
 		${(initial + effect).includes('make()') ? 'function make() { return <b/>; }' : ''}
 		export function Probe({ seed, observe, useOther }) {
 			const ${binding} = useState(${initial});

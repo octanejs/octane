@@ -335,25 +335,29 @@ function scalarMeasurement(value, initial) {
 
 // Adding a module binding must not capture an existing free reference, including
 // a JSX namespace or a TypeScript value query. The caller caches this module scan.
-export function snapshotImportEditor(ast, source) {
+export function hookImportEditor(ast, source, replacement, replaced) {
 	const imports = new Map();
 	const groups = [];
+	let replacementImported = false;
 	for (const declaration of ast.body) {
 		if (
 			declaration.type !== 'ImportDeclaration' ||
-			declaration.source.value !== 'octane' ||
+			(declaration.source.value !== 'octane' && declaration.source.value !== 'octane/server') ||
 			declaration.importKind === 'type'
 		)
 			continue;
 		const named = declaration.specifiers.filter((spec) => spec.type === 'ImportSpecifier');
-		if (!named.length) continue;
+		replacementImported ||= named.some(
+			(spec) =>
+				spec.importKind !== 'type' &&
+				spec.imported.name === replacement &&
+				spec.local.name === replacement,
+		);
+		if (!named.length || declaration.source.value !== 'octane') continue;
 		const group = { declaration, named };
 		groups.push(group);
 		for (const spec of named) {
-			if (
-				spec.importKind !== 'type' &&
-				['useState', 'useLayoutEffect'].includes(spec.imported.name)
-			) {
+			if (spec.importKind !== 'type' && replaced.includes(spec.imported.name)) {
 				imports.set(spec.local.name, { spec, sites: new Set(), offered: new Set() });
 			}
 		}
@@ -376,7 +380,7 @@ export function snapshotImportEditor(ast, source) {
 				)
 					dynamic = true;
 				if (node.type !== 'Identifier' && node.type !== 'JSXIdentifier') return;
-				if (node.name === 'useLayoutSnapshot') collision = true;
+				if (node.name === replacement) collision = true;
 				const binding = imports.get(node.name);
 				if (!binding) return;
 				// A local type export refers to the imported value as a type. Runtime
@@ -410,10 +414,17 @@ export function snapshotImportEditor(ast, source) {
 		);
 	}
 
-	return (state, effect, existing) => {
+	return (sites, existing, requireNamedImports = false) => {
 		const add = !existing;
 		if (dynamic || (add && (collision || !groups.length))) return false;
-		const calls = [state, effect].map((call) => imports.get(call.callee.name)).filter(Boolean);
+		const calls = sites
+			.map((call) => {
+				const binding = imports.get(call.callee.name);
+				return binding?.sites.has(call.callee.start) ? binding : undefined;
+			})
+			.filter(Boolean);
+		if (requireNamedImports && (calls.length !== sites.length || (!add && !replacementImported)))
+			return false;
 		// Leave the last consumer of a shared import for the next fix pass. The
 		// last edit can then remove that import, even when a batch applied all
 		// its siblings together. Each editor action must also work on its own.
@@ -435,14 +446,14 @@ export function snapshotImportEditor(ast, source) {
 			const kept = named.filter((spec) => !drop.has(spec));
 			const last = named[named.length - 1];
 			if (kept.length === named.length) {
-				if (append) edits.push({ start: last.end, end: last.end, text: ', useLayoutSnapshot' });
+				if (append) edits.push({ start: last.end, end: last.end, text: `, ${replacement}` });
 				continue;
 			}
 			// Preserve comments in import lists. A commented declaration can be
 			// separated by hand without guessing which specifier owns the comment.
 			if (/\/[/*]/.test(source.slice(declaration.start, declaration.end))) return false;
 			const names = kept.map((spec) => source.slice(spec.start, spec.end));
-			if (append) names.push('useLayoutSnapshot');
+			if (append) names.push(replacement);
 			if (names.length) {
 				edits.push({ start: named[0].start, end: last.end, text: names.join(', ') });
 			} else if (named.length === declaration.specifiers.length) {
@@ -451,8 +462,7 @@ export function snapshotImportEditor(ast, source) {
 				return false;
 			}
 		}
-		for (const call of [state, effect])
-			imports.get(call.callee.name)?.offered.add(call.callee.start);
+		for (const call of sites) imports.get(call.callee.name)?.offered.add(call.callee.start);
 		return edits;
 	};
 }

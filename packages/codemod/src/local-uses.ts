@@ -80,6 +80,7 @@ type LocalWrites = {
 		visit: VisitSource,
 	) => boolean | undefined;
 	members: (node: ts.Node, visit: VisitSource, frame?: CallContext, path?: Key[]) => boolean;
+	hasMemberWrite: (name: ts.Identifier) => boolean;
 };
 // A file can be queried once per island or store argument. Index its writes once
 // for the checker that owns its symbols, and release them with the source file.
@@ -96,10 +97,13 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 		ts.Symbol,
 		(AssignmentSource & { path: Key[]; frame?: CallContext; instance?: CallContext })[]
 	>();
-	const pending: (AssignmentSource & {
+	const mutationOnly = new Set<ts.Symbol>();
+	const pending: {
 		receiver: ts.Expression;
 		key: Key | null; // A shallow copy preserves the source's field names.
-	})[] = [];
+		source: ts.Expression | undefined;
+		selection: Selection[];
+	}[] = [];
 	const assigns = new Set<ts.CallExpression>();
 
 	function keyOf(node: ts.Expression): Key {
@@ -723,8 +727,7 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 				else bindings.set(symbol, [{ source, selection }]);
 			}
 		} else if (isMember(target)) {
-			if (source)
-				pending.push({ receiver: target.expression, key: memberKey(target), source, selection });
+			pending.push({ receiver: target.expression, key: memberKey(target), source, selection });
 		} else if (ts.isArrayLiteralExpression(target)) {
 			target.elements.forEach((entry, index) => {
 				if (ts.isSpreadElement(entry))
@@ -756,18 +759,34 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 		}
 	}
 
-	function recordAssign(node: ts.CallExpression) {
+	function recordObjectWrite(node: ts.CallExpression) {
 		const method = skipWrappers(node.expression);
 		const receiver = node.arguments[0];
 		if (!receiver || !isMember(method)) return;
 		const object = skipWrappers(method.expression);
+		if (!ts.isIdentifier(object) || (object.text !== 'Object' && object.text !== 'Reflect')) return;
+		const methodName = memberKey(method);
+		const symbol = localSymbol(checker, object);
+		const builtin = symbol?.valueDeclaration?.getSourceFile().hasNoDefaultLib;
 		if (
-			!ts.isIdentifier(object) ||
-			object.text !== 'Object' ||
-			memberKey(method) !== 'assign' ||
-			!localSymbol(checker, object)?.valueDeclaration?.getSourceFile().hasNoDefaultLib
-		)
+			(object.text === 'Object' &&
+				builtin &&
+				(methodName === 'defineProperty' ||
+					methodName === 'defineProperties' ||
+					methodName === 'setPrototypeOf')) ||
+			(object.text === 'Reflect' &&
+				(!symbol || builtin) &&
+				(methodName === 'set' ||
+					methodName === 'defineProperty' ||
+					methodName === 'deleteProperty' ||
+					methodName === 'setPrototypeOf'))
+		) {
+			pending.push({ receiver, key: null, source: undefined, selection: [] });
+			if (object.text === 'Reflect' && methodName === 'set' && node.arguments[3])
+				pending.push({ receiver: node.arguments[3], key: null, source: undefined, selection: [] });
 			return;
+		}
+		if (object.text !== 'Object' || methodName !== 'assign' || !builtin) return;
 		assigns.add(node);
 		function copy(source: ts.Expression) {
 			source = skipWrappers(source);
@@ -801,7 +820,7 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 		}
 		if (ts.isCallExpression(node)) {
 			possibleCalls.push(node);
-			recordAssign(node);
+			recordObjectWrite(node);
 		}
 		if (
 			ts.isBinaryExpression(node) &&
@@ -809,6 +828,14 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 			node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
 		) {
 			record(node.left, node.right, []);
+		} else if (ts.isDeleteExpression(node)) {
+			record(node.expression, undefined, []);
+		} else if (
+			(ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+			(node.operator === ts.SyntaxKind.PlusPlusToken ||
+				node.operator === ts.SyntaxKind.MinusMinusToken)
+		) {
+			record(node.operand, undefined, []);
 		} else if (ts.isForOfStatement(node) || ts.isForInStatement(node)) {
 			// for-in supplies string keys, but defaults in its binding pattern can still run.
 			if (!ts.isVariableDeclarationList(node.initializer))
@@ -840,6 +867,10 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 				[],
 				true,
 				(root, location, instance) => {
+					if (!source) {
+						mutationOnly.add(root);
+						return false;
+					}
 					const path = key === null ? location : [...location, key];
 					const values = members.get(root);
 					const entry = { path, source, selection, frame, instance };
@@ -867,9 +898,16 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 		arguments: argumentSources,
 		bindings,
 		members: memberSources,
+		hasMemberWrite: (name: ts.Identifier) =>
+			(members.size > 0 || mutationOnly.size > 0) &&
+			locations(name, [], false, (root) => members.has(root) || mutationOnly.has(root)),
 	};
 	writesByFile.set(file, { checker, writes });
 	return writes;
+}
+
+export function hasLocalMemberWrite(name: ts.Identifier, checker: ts.TypeChecker) {
+	return localWrites(name.getSourceFile(), checker).hasMemberWrite(name);
 }
 
 /** Inspect syntax and the declarations and assignments supplying its values in this module.
@@ -1065,6 +1103,14 @@ export function portableArguments(
 		}
 		return safe;
 	};
+}
+
+/** Whether this value is only named as a JSX component or a module export. */
+export function componentTagOrExport(ref: ts.Identifier) {
+	const p = ref.parent;
+	return ts.isJsxOpeningElement(p) || ts.isJsxClosingElement(p) || ts.isJsxSelfClosingElement(p)
+		? p.tagName === ref
+		: ts.isExportSpecifier(p) || ts.isExportAssignment(p);
 }
 
 export function localUses(file: ts.SourceFile, checker: ts.TypeChecker) {

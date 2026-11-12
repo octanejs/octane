@@ -1,7 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { JSDOM } from 'jsdom';
 import { collectDiagnostics } from 'octane/compiler';
+import * as ReactServerBridge from 'octane/react/server';
 import { renderToStaticMarkup } from 'octane/server';
+import { prerender } from 'octane/static';
+import { createElement as reactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
 import { loadCompiler, strengthen, transformModule } from '../dist/index.js';
@@ -45,6 +49,18 @@ function migrate(name) {
 }
 
 describe('transformModule', () => {
+	it('distinguishes a custom Array type from the default library', () => {
+		const source = `/// <reference no-default-lib="true"/>
+declare namespace Vendor {
+	interface Array<T> { map<U>(render: (value: T) => U): U[] }
+}
+export function List({ rows }: { rows: Vendor.Array<string> }) {
+	return <ul>{rows.map(label => <li key={label}>{label}</li>)}</ul>;
+}`;
+		const { code } = transformModule(source, 'list.tsx');
+		expect(code).toContain('rows.map(');
+	});
+
 	it('flags React SVG import conventions only where their components render in Octane', () => {
 		const source = `import { ReactCompat } from 'octane/react';
 import { ReactCompat as ServerCompat } from 'octane/react/server';
@@ -985,6 +1001,46 @@ export type Qualified = typeof R.createRef;`,
 		]);
 	});
 
+	it.each([
+		['named alias', "import { ReactCompatInline as Inline } from 'octane/react';", 'Inline'],
+		[
+			'server namespace',
+			"import * as Bridge from 'octane/react/server';",
+			'Bridge.ReactCompatInline',
+		],
+	])('keeps a %s inline React boundary inside its paragraph', async (_, imported, tag) => {
+		const source = `${imported}
+			import { Badge } from 'badge-kit';
+			export function View() {
+				return <p><${tag}><Badge /></${tag}></p>;
+			}`;
+		const result = transformModule(source, 'View.tsx', {
+			target: 'tsrx',
+			strong: true,
+			reactCompat: true,
+			unported: (module) => (module === 'badge-kit' ? module : null),
+		});
+		expect(result.notes.filter((note) => note.severity === 'error')).toEqual([]);
+		expect(result.rules['react-compat']).toBeUndefined();
+		const { View } = loadCompiledFixtureSource(result.code, {
+			id: 'View.tsrx',
+			mode: 'server',
+			runtimeModules: {
+				'octane/react/server': ReactServerBridge,
+				'badge-kit': { Badge: () => reactElement('b', null, 'badge') },
+			},
+		});
+		const { html } = await prerender(View, {});
+		const dom = new JSDOM(html);
+		try {
+			const { document } = dom.window;
+			expect(document.querySelector('p > span[data-react-compat] > b')?.textContent).toBe('badge');
+			expect(document.querySelectorAll('[data-react-compat]')).toHaveLength(1);
+		} finally {
+			dom.window.close();
+		}
+	});
+
 	it('passes a text field wrapper its rest props `onChange` as `onInput`', () => {
 		const migrate = (/** @type {string} */ body) =>
 			transformModule(
@@ -1437,8 +1493,9 @@ describe('strengthen', () => {
 		const result = strengthen(compiler, code, path.join(FIXTURES, 'raw.tsrx'));
 		expect(result.strong).toBe(false);
 		expect(result.code).not.toContain('use strong');
+		expect(result.fixed).toEqual(['OCTANE_STRONG_READ_ONLY_STATE']);
+		expect(result.code).toContain('const open = useInitialValue(false);');
 		expect(result.blockers.map((b) => `${b.severity} ${b.code}`)).toEqual([
-			'warning OCTANE_STRONG_READ_ONLY_STATE',
 			'warning OCTANE_STRONG_UNTRUSTED_HTML',
 		]);
 		expect(compileErrors(result.code, 'raw.tsrx')).toEqual([]);

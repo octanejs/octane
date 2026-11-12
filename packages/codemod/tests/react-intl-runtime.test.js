@@ -19,7 +19,7 @@ async function load(mode) {
 	return bundleRuntime(
 		project,
 		mode,
-		`export * from './page.tsrx'; export * from './rich.tsrx'; export * from './fields.tsrx'; export * from './locale.tsrx'; export * from './choices.tsrx'; export * from './reader.tsrx'; ${entry}
+		`export * from './page.tsrx'; export * from './rich.tsrx'; export * from './fields.tsrx'; export * from './OwnedLocale.tsrx'; export * from './OwnedMember.tsrx'; export * from './choices.tsrx'; export * from './reader.tsrx'; ${entry}
 				export { OctaneCompat } from 'octane/react${mode === 'server' ? '/server' : ''}';
 				export * as react from 'react'; export * as intl from 'react-intl';
 				export { renderToString } from 'react-dom/server';`,
@@ -56,20 +56,25 @@ beforeAll(async () => {
 	expect(fields.notes.filter((note) => note.severity === 'error')).toEqual([]);
 	expect(fields.code).not.toMatch(/from ['"]react-intl['"]/);
 	await writeFile(path.join(project, 'fields.tsrx'), fields.code);
-	const locale = transformModule(
-		`import {IntlProvider as Provider, useIntl} from 'react-intl';
-		function Language() { const { 'locale': lang } = useIntl(); return <p lang={lang}>{lang}</p>; }
-		export function OwnedLocale() { return <Provider locale="fr"><Language/></Provider>; }`,
-		'locale.tsx',
-		{
-			reactIntlAdapter: './react-intl.tsrx',
-			reactCompat: true,
-			reactStoreComponent: (name) => name === 'react-intl',
-			unported: (name) => (name === 'react-intl' ? name : null),
-		},
-	);
-	expect(locale.notes.filter((note) => note.severity === 'error')).toEqual([]);
-	await writeFile(path.join(project, 'locale.tsrx'), locale.code);
+	for (const [name, read] of [
+		['OwnedLocale', "{ 'locale': lang } = useIntl()"],
+		['OwnedMember', 'lang = useIntl().locale'],
+	]) {
+		const locale = transformModule(
+			`import {IntlProvider as Provider, useIntl} from 'react-intl';
+			function Language() { const ${read}; return <p lang={lang}>{lang}</p>; }
+			export function ${name}() { return <Provider locale="fr"><Language/></Provider>; }`,
+			name + '.tsx',
+			{
+				reactIntlAdapter: './react-intl.tsrx',
+				reactCompat: true,
+				reactStoreComponent: (name) => name === 'react-intl',
+				unported: (name) => (name === 'react-intl' ? name : null),
+			},
+		);
+		expect(locale.notes.filter((note) => note.severity === 'error')).toEqual([]);
+		await writeFile(path.join(project, name + '.tsrx'), locale.code);
+	}
 	const choices = transformModule(
 		`import { ReactCompat as Boundary } from 'octane/react';
 		import * as Bridge from 'octane/react';
@@ -182,16 +187,17 @@ it('uses the nearest native or React-owned formatter and respects an explicitly 
 });
 
 it('preserves a locale binding under the component’s own Intl provider during SSR', async () => {
-	const { intl, react, renderToString, prerender, OwnedLocale } = server;
+	const { intl, react, renderToString, prerender, OwnedLocale, OwnedMember } = server;
 	const h = react.createElement;
 	function Language() {
 		const { locale: lang } = intl.useIntl();
 		return h('p', { lang }, lang);
 	}
 	const original = h(intl.IntlProvider, { locale: 'fr' }, h(Language));
-	expect(paragraph((await prerender(OwnedLocale, {})).html)).toEqual(
-		paragraph(renderToString(original)),
-	);
+	const expected = paragraph(renderToString(original));
+	for (const component of [OwnedLocale, OwnedMember]) {
+		expect(paragraph((await prerender(component, {})).html)).toEqual(expected);
+	}
 });
 
 it('updates native text and formatter configuration, and preserves the formatter through child-only updates', () => {

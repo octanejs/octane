@@ -8,6 +8,7 @@ import {
 	svgLocalReads,
 } from './forwarded-props.js';
 import { reactRenderer, staticReactProps } from './react-renderer.js';
+import { linkedRenderState } from './linked-state.js';
 import { localUses, scalar, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
@@ -39,6 +40,24 @@ type Import = {
 	typeOnly: boolean;
 	port: Unported | null;
 };
+const RADIX_SLOT_MEMBERS = new Map([
+	['Root', 'Slot'],
+	['Slot', 'Slot'],
+	['Slottable', 'Slottable'],
+]);
+
+function directMember(receiver: ts.Node) {
+	const parent = receiver.parent;
+	if (
+		ts.isPropertyAccessExpression(parent) &&
+		parent.expression === receiver &&
+		!parent.questionDotToken
+	)
+		return parent.name;
+	if (ts.isQualifiedName(parent) && parent.left === receiver) return parent.right;
+	return null;
+}
+
 type Severity = Note['severity'];
 type ModuleExports = TransformResult['exports'];
 
@@ -160,6 +179,7 @@ export function bind(filename: string, source: string) {
 	return { sf, checker: program.getTypeChecker() };
 }
 
+const ES5_LIB_PATH = ts.getDefaultLibFilePath({}).replace(/[^/\\]+$/, 'lib.es5.d.ts');
 let es5: ts.SourceFile | undefined;
 
 /**
@@ -167,10 +187,9 @@ let es5: ts.SourceFile | undefined;
  * array and string members have types.
  */
 function esLib() {
-	const file = ts.getDefaultLibFilePath({}).replace(/[^/\\]+$/, 'lib.es5.d.ts');
 	es5 ??= ts.createSourceFile(
 		'lib.es5.d.ts',
-		ts.sys.readFile(file) as string,
+		ts.sys.readFile(ES5_LIB_PATH) as string,
 		ts.ScriptTarget.Latest,
 		true,
 	);
@@ -205,7 +224,10 @@ function scriptKind(filename: string) {
 }
 
 function nativeReactCompat(module: string, name: string) {
-	return name === 'ReactCompat' && (module === 'octane/react' || module === 'octane/react/server');
+	return (
+		(name === 'ReactCompat' || name === 'ReactCompatInline') &&
+		(module === 'octane/react' || module === 'octane/react/server')
+	);
 }
 
 function skipParens(node: ts.Expression): ts.Expression {
@@ -596,6 +618,8 @@ class ModuleTransform {
 	readonly effectSnapshots?: Map<ts.ExpressionStatement, string[]>;
 	private snapshotEdits?: Map<ts.Node, string>;
 	private snapshotCaptures?: Map<ts.ArrowFunction, string[]>;
+	private linkedStateEdits?: Map<ts.Statement, string>;
+	private linkedStateNames?: [string, string, string, string];
 	/** React imports read as values, not only as types. */
 	readonly valueUses = new Set<string>();
 	hasSignalRuntime?: boolean;
@@ -609,6 +633,8 @@ class ModuleTransform {
 	readonly indentUnit: string;
 	/** Every import, keyed by its declaration. */
 	readonly imports = new Map<ts.Node, Import>();
+	radixSlotMembers?: Map<ts.MemberName, { replacement?: string; name: string }>;
+	radixSlotImports?: Map<ts.Identifier, 'original' | 'native'>;
 	nativeIntl = new Set<ts.ImportSpecifier>();
 	hasReactBridge = false;
 	readonly pathSvgImports = new Map<ts.ImportDeclaration, string>();
@@ -642,7 +668,10 @@ class ModuleTransform {
 	/** Unported packages, by name. */
 	readonly unported = new Map<string, Unported>();
 	/** Elements to host in a `ReactCompat` island. */
-	readonly islands = new Set<ts.JsxElement | ts.JsxSelfClosingElement>();
+	readonly islands = new Map<
+		ts.JsxElement | ts.JsxSelfClosingElement,
+		'ReactCompat' | 'ReactCompatInline'
+	>();
 	readonly reactRendererBodies = new Map<ts.Node, string>();
 	readonly originalStoreTags = new Map<ts.ImportSpecifier, string>();
 	storeSourceNames?: Set<string>;
@@ -819,6 +848,12 @@ class ModuleTransform {
 					port: null,
 				};
 				this.imports.set(declaration, entry);
+				if (
+					module === 'radix-ui' &&
+					(imported === 'Slot' || entry.namespace) &&
+					this.resolve(module) === '@octanejs/radix'
+				)
+					this.planRadixSlots(name, entry.namespace);
 				if (module === 'octane/react' || module === 'octane/react/server')
 					this.hasReactBridge = true;
 				if (
@@ -950,7 +985,9 @@ class ModuleTransform {
 			)
 				snapshots.push(node);
 			if (
-				(this.options.pathSvgAdapter || this.options.captureEffectSnapshots) &&
+				(this.options.pathSvgAdapter ||
+					this.options.captureEffectSnapshots ||
+					this.options.linkRenderState) &&
 				ts.isIdentifier(node) &&
 				node.text === 'eval'
 			)
@@ -974,6 +1011,12 @@ class ModuleTransform {
 		};
 		visit(this.sf);
 		if (!hasEval) for (const decl of snapshots) this.planEffectSnapshot(decl);
+		if (!hasEval && this.options.linkRenderState && this.strong && this.target === 'tsrx') {
+			for (const statement of this.sf.statements) {
+				if (ts.isFunctionDeclaration(statement) && this.isComponent(statement))
+					this.planLinkedState(statement);
+			}
+		}
 		if (this.hasReactBridge) {
 			// A namespace used only for the native bridge needs no missing-port report.
 			for (const module of ['octane/react', 'octane/react/server']) {
@@ -1004,17 +1047,28 @@ class ModuleTransform {
 				)
 					continue;
 				const refs = this.localUses(declaration.name);
+				const fixed =
+					refs.length === 1 && this.options.fixedColorSvgAdapter
+						? this.fixedSvgColor(refs[0])
+						: undefined;
 				const eligible = refs.map((ref) =>
-					this.nativePathSvgUse(ref, this.localUses, (tag, prop) =>
-						unknownSvgSlots.set(
-							ref,
-							` Cannot prove where <${tag.text}> renders its ${prop === 'children' ? 'children' : prop + ' prop'}.`,
-						),
+					this.nativePathSvgUse(
+						ref,
+						this.localUses,
+						(tag, prop) =>
+							unknownSvgSlots.set(
+								ref,
+								` Cannot prove where <${tag.text}> renders its ${prop === 'children' ? 'children' : prop + ' prop'}.`,
+							),
+						fixed?.attribute,
 					),
 				);
 				if (!eligible.length || eligible.includes(false)) continue;
-				const native = this.options.pathSvgAdapter(binding.module);
+				const native = fixed
+					? this.options.fixedColorSvgAdapter?.(binding.module, fixed.color)
+					: this.options.pathSvgAdapter(binding.module);
 				if (!native) continue;
+				if (fixed) this.removed.add(fixed.attribute);
 				this.pathSvgImports.set(declaration.parent, native);
 				for (const ref of refs) pathSvgTags.add(ref);
 			}
@@ -1118,6 +1172,95 @@ class ModuleTransform {
 		return calls;
 	}
 
+	/** Only one authored element can move into an explicit children prop. */
+	singleElementChild(node: ts.JsxElement) {
+		const { openingElement, closingElement, children } = node;
+		if (
+			!openingElement.attributes.properties.every(
+				(attr) => ts.isJsxAttribute(attr) && attr.name.getText(this.sf) !== 'children',
+			) ||
+			closingElement.getText(this.sf) !== `</${openingElement.tagName.getText(this.sf)}>`
+		)
+			return null;
+		// Only line breaks and ASCII layout whitespace vanish in rendered JSX.
+		const content = children.filter(
+			(child) => !(ts.isJsxText(child) && /^[\t ]*[\r\n][\t\r\n ]*$/.test(child.text)),
+		);
+		const [child] = content;
+		return content.length === 1 && (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child))
+			? child
+			: null;
+	}
+
+	/** The consolidated React package exports Slot as a namespace, unlike the binding. */
+	planRadixSlots(binding: ts.Identifier, namespace: boolean) {
+		const members = new Map<ts.MemberName, string>();
+		for (const ref of this.localUses(binding)) {
+			const first = directMember(ref);
+			if (namespace && first && first.text !== 'Slot') continue;
+			const member = namespace && first ? directMember(first.parent) : first;
+			const name = member && RADIX_SLOT_MEMBERS.get(member.text);
+			const access = member?.parent;
+			const use = access?.parent;
+			let reason: string | undefined;
+			if (
+				!use ||
+				!(ts.isJsxOpeningElement(use) ||
+				ts.isJsxSelfClosingElement(use) ||
+				ts.isJsxClosingElement(use)
+					? use.tagName === access
+					: ts.isTypeQueryNode(use) && use.exprName === access)
+			) {
+				reason =
+					'Use Radix Slot.Root, Slot.Slot, or Slot.Slottable as a direct JSX tag or type query to migrate it.';
+			} else if (ts.isJsxOpeningElement(use) || ts.isJsxSelfClosingElement(use)) {
+				if (!this.radixSlotChildren(use))
+					reason = 'The codemod can only migrate Radix Slot with a single intrinsic element child.';
+			}
+			if (!member || !name || reason) {
+				(this.radixSlotImports ??= new Map()).set(binding, 'original');
+				this.note(
+					RULE.binding,
+					'error',
+					ref,
+					reason ?? 'The Octane binding has no equivalent Radix Slot member.',
+				);
+				return;
+			}
+			members.set(member, name);
+		}
+		for (const [member, name] of members) {
+			const replacement = namespace
+				? `${binding.text}.${name}`
+				: name === 'Slot'
+					? binding.text
+					: undefined;
+			if (!namespace && replacement) (this.radixSlotImports ??= new Map()).set(binding, 'native');
+			(this.radixSlotMembers ??= new Map()).set(member, { replacement, name });
+		}
+	}
+
+	/** An intrinsic child cannot be a Slottable marker or an alias of one. */
+	radixSlotChildren(tag: ts.JsxOpeningLikeElement) {
+		const intrinsic = (child: ts.Node | null) => {
+			if (!child || (!ts.isJsxElement(child) && !ts.isJsxSelfClosingElement(child))) return false;
+			const name = ts.isJsxElement(child) ? child.openingElement.tagName : child.tagName;
+			return ts.isIdentifier(name) && /^[a-z]/.test(name.text);
+		};
+		if (ts.isJsxOpeningElement(tag)) return intrinsic(this.singleElementChild(tag.parent));
+		return tag.attributes.properties.every((attr) => {
+			if (!ts.isJsxAttribute(attr)) return false;
+			if (attr.name.getText(this.sf) !== 'children') return true;
+			const value = attr.initializer;
+			return (
+				!!value &&
+				ts.isJsxExpression(value) &&
+				!!value.expression &&
+				intrinsic(skipWrappers(value.expression))
+			);
+		});
+	}
+
 	/**
 	 * The package with no Octane port that a specifier names, or null. It
 	 * still runs on React, which only the codemod's report and a comment say.
@@ -1131,6 +1274,34 @@ class ModuleTransform {
 			this.ports.set(module, port);
 		}
 		return port;
+	}
+
+	/** Find the paragraph receiving an island through transparent child syntax. */
+	private inParagraph(value: ts.Node) {
+		for (;;) {
+			const parent = value.parent;
+			if (ts.isJsxElement(parent)) {
+				const tag = parent.openingElement.tagName;
+				if (this.calleeName(tag) !== 'Fragment') {
+					if (!ts.isIdentifier(tag)) return false;
+					// The emitter removes an earlier run's fallback around the original element.
+					if (tag.text !== NO_PORT) return tag.text === 'p';
+				}
+			} else if (!(
+				ts.isJsxFragment(parent) ||
+				(ts.isJsxExpression(parent) && !parent.dotDotDotToken) ||
+				isWrapper(parent) ||
+				(ts.isConditionalExpression(parent) && parent.condition !== value) ||
+				(ts.isBinaryExpression(parent) &&
+					(parent.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+						parent.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken ||
+						(parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+							parent.right === value)))
+			)) {
+				return false;
+			}
+			value = parent;
+		}
 	}
 
 	/**
@@ -1181,14 +1352,17 @@ class ModuleTransform {
 				}
 				return;
 			}
-			const reason = !this.hostsInReact(element)
+			const paragraph = this.inParagraph(element);
+			let reason = !this.hostsInReact(element)
 				? `\`<${text}>\` takes children or props that Octane renders, which cannot cross into a React island.`
 				: this.options.reactCompat
 					? null
 					: `\`<${text}>\` can render in a \`ReactCompat\` island only with React and React DOM 19.2 or newer in the React 19 series.`;
+			if (reason === null && paragraph && !this.options.reactCompatInline)
+				reason = `<${text}> needs ReactCompatInline to stay inside this paragraph. Install an Octane release that exports it or keep the paragraph in React.`;
 			if (reason === null) {
 				port.islands++;
-				this.islands.add(element);
+				this.islands.set(element, paragraph ? 'ReactCompatInline' : 'ReactCompat');
 			} else {
 				// Octane fails on a React component deep in its renderer, naming
 				// neither it nor its package, so it throws this error there instead.
@@ -1205,16 +1379,61 @@ class ModuleTransform {
 		}
 	}
 
+	private fixedSvgColor(ref: ts.Identifier) {
+		const tag = ref.parent;
+		if (!ts.isJsxSelfClosingElement(tag) || tag.tagName !== ref) return;
+		const attribute = tag.attributes.properties.find(
+			(attr): attr is ts.JsxAttribute =>
+				ts.isJsxAttribute(attr) && ts.isIdentifier(attr.name) && attr.name.text === 'style',
+		);
+		const value = attribute?.initializer;
+		if (!attribute || !value || !ts.isJsxExpression(value) || /\/[/*]/.test(attribute.getText()))
+			return;
+		const object = value.expression;
+		if (!object || !ts.isObjectLiteralExpression(object) || object.properties.length !== 1) return;
+		const property = object.properties[0];
+		if (
+			!ts.isPropertyAssignment(property) ||
+			!ts.isIdentifier(property.name) ||
+			property.name.text !== 'color' ||
+			!ts.isStringLiteral(property.initializer)
+		)
+			return;
+		const match = /^var\((--[a-z][a-z0-9-]*)\)$/.exec(property.initializer.text);
+		if (!match) return;
+		// Keep the styled element in a direct return through intrinsic children.
+		let output: ts.Node = tag;
+		while (
+			ts.isJsxElement(output.parent) &&
+			ts.isIdentifier(output.parent.openingElement.tagName) &&
+			/^[a-z]/.test(output.parent.openingElement.tagName.text)
+		)
+			output = output.parent;
+		while (ts.isParenthesizedExpression(output.parent)) output = output.parent;
+		const ret = output.parent;
+		if (
+			ts.isReturnStatement(ret) &&
+			ts.isBlock(ret.parent) &&
+			ts.isFunctionDeclaration(ret.parent.parent) &&
+			ret.parent.statements.length === 1
+		)
+			return { attribute, color: match[1] };
+	}
+
 	nativePathSvgUse(
 		ref: ts.Identifier,
 		uses: ReturnType<typeof localUses>,
 		unproven: (tag: ts.Identifier, prop: string) => void,
+		fixedStyle?: ts.JsxAttribute,
 	) {
 		const tag = ref.parent;
 		if (!ts.isJsxSelfClosingElement(tag) || tag.tagName !== ref || tag.typeArguments) return false;
 		const supported = tag.attributes.properties.every((attr) => {
+			if (attr === fixedStyle) return true;
 			if (!ts.isJsxAttribute(attr) || !ts.isIdentifier(attr.name)) return false;
 			const value = attr.initializer;
+			if (attr.name.text === 'style')
+				return attributeOf(tag, 'style') === attr && this.svgInlineTransform(value);
 			if (attr.name.text === 'className')
 				return (
 					!!value &&
@@ -1233,6 +1452,50 @@ class ModuleTransform {
 		});
 		if (!supported) return false;
 		return this.nativeSvgOutput(tag, uses, unproven);
+	}
+
+	private planLinkedState(owner: ts.FunctionDeclaration) {
+		const plan = linkedRenderState(
+			owner,
+			this.checker,
+			(name) => this.localUses(name),
+			(expr) => {
+				const hook = this.callee(expr);
+				return hook?.module === 'react' && hook.name === 'useState';
+			},
+		);
+		if (!plan) return;
+		const fresh = (base: string) => {
+			let name = base;
+			while (this.declared.has(name) || this.readsGlobal(name)) name += '_';
+			this.declared.add(name);
+			return name;
+		};
+		const hook = this.require('octane', 'useLinkedState', false);
+		// These locals live in separate component scopes. Reserve names against the source once.
+		const [active, previous, seen, initialName] = (this.linkedStateNames ??= [
+			fresh('active'),
+			fresh('previous'),
+			fresh('seen'),
+			fresh('initial'),
+		]);
+		const initial = plan.eager ? initialName : active;
+		const indent = this.indentOf(plan.state),
+			line = '\n' + indent,
+			inner = line + this.indentUnit;
+		const flag = plan.flag.getText(this.sf);
+		const eager = plan.eager ? `const ${initial} = ${plan.eager.getText(this.sf)};${line}` : '';
+		const input = plan.eager ? `!!(${flag})` : flag;
+		const replay = plan.replay.map((read) => `void (${read.getText(this.sf)});`).join(' ');
+		// Re-read the original prelude before publication: a retrying getter can suspend.
+		const replacement =
+			eager +
+			`const [${plan.name}] = ${hook}(${input}, (${active}, ${previous}): boolean => {${inner}` +
+			`const ${seen} = (${previous}?.value ?? ${initial}) === true;${inner}` +
+			`if (${active} && !${seen}) { ${replay} }${inner}return ${seen} || ${active};${line}});`;
+		const edits = (this.linkedStateEdits ??= new Map());
+		edits.set(plan.state, replacement);
+		edits.set(plan.guard, DROP);
 	}
 
 	/** In a candidate module, locally constructed elements can leave only as this component's output. */
@@ -1517,6 +1780,17 @@ class ModuleTransform {
 	private svgClassName(expr: ts.Expression) {
 		if (ts.isIdentifier(expr)) return true;
 		if (ts.isPropertyAccessExpression(expr)) return this.svgCssClass(expr);
+		if (ts.isConditionalExpression(expr))
+			return (
+				ts.isStringLiteralLike(skipWrappers(expr.whenTrue)) &&
+				ts.isStringLiteralLike(skipWrappers(expr.whenFalse)) &&
+				svgClassToken(
+					expr,
+					(name) =>
+						fixedBinding(this.checker, name, expr, (this.fixedSvgParameters ??= new Map())) &&
+						initializedBefore(this.checker, name, expr),
+				)
+			);
 		if (!ts.isCallExpression(expr) || !ts.isIdentifier(expr.expression)) return false;
 		const declaration = this.declarationOf(expr.expression);
 		const binding = declaration && this.imports.get(declaration);
@@ -1544,6 +1818,48 @@ class ModuleTransform {
 					);
 				}))
 		);
+	}
+
+	private svgInlineTransform(value: ts.JsxAttributeValue | undefined) {
+		if (!value || !ts.isJsxExpression(value) || value.dotDotDotToken || !value.expression)
+			return false;
+		const object = skipWrappers(value.expression);
+		if (!ts.isObjectLiteralExpression(object) || object.properties.length !== 1) return false;
+		const [field] = object.properties;
+		if (
+			!ts.isPropertyAssignment(field) ||
+			!ts.isIdentifier(field.name) ||
+			field.name.text !== 'transform'
+		)
+			return false;
+		const text = skipWrappers(field.initializer);
+		// Keep exactly one declaration, with no renderer-specific priority handling.
+		if (ts.isStringLiteralLike(text)) return text.text.trim() !== '' && !/[!;]/.test(text.text);
+		if (!ts.isTemplateExpression(text) || /[!;]/.test(text.head.text)) return false;
+		const numeric = (node: ts.Expression) => {
+			node = skipWrappers(node);
+			return (
+				ts.isNumericLiteral(node) ||
+				(ts.isPrefixUnaryExpression(node) &&
+					(node.operator === ts.SyntaxKind.MinusToken ||
+						node.operator === ts.SyntaxKind.PlusToken) &&
+					ts.isNumericLiteral(skipWrappers(node.operand)))
+			);
+		};
+		return text.templateSpans.every(({ expression, literal }) => {
+			if (/[!;]/.test(literal.text)) return false;
+			const part = skipWrappers(expression);
+			if (numeric(part)) return true;
+			if (!ts.isConditionalExpression(part)) return false;
+			const test = skipWrappers(part.condition);
+			return (
+				ts.isIdentifier(test) &&
+				fixedBinding(this.checker, test, part, (this.fixedSvgParameters ??= new Map())) &&
+				initializedBefore(this.checker, test, part) &&
+				numeric(part.whenTrue) &&
+				numeric(part.whenFalse)
+			);
+		});
 	}
 
 	private svgRead?: ReturnType<typeof svgLocalReads>;
@@ -2389,6 +2705,10 @@ class ModuleTransform {
 	}
 
 	rewrite(node: ts.Node, ctx: Context): string | null {
+		if (this.linkedStateEdits && ts.isStatement(node)) {
+			const linked = this.linkedStateEdits.get(node);
+			if (linked) return linked;
+		}
 		const snapshot = this.snapshotEdits?.get(node);
 		if (snapshot)
 			return ts.isCallExpression(node)
@@ -2403,6 +2723,21 @@ class ModuleTransform {
 			}
 			if (ts.isArrowFunction(node)) {
 				const snapshots = ts.isBlock(node.body) ? this.effectSnapshots : undefined;
+				const importedEvent = snapshots && this.apiLocals.get('useEffectEvent');
+				const canBridgeLayout =
+					snapshots &&
+					(!importedEvent ||
+						this.checker
+							.resolveName(
+								'useEffectEvent',
+								node.parent,
+								ts.SymbolFlags.Value | ts.SymbolFlags.Alias,
+								false,
+							)
+							?.declarations?.some(
+								(declaration) => this.imports.get(declaration) === importedEvent,
+							));
+				let layoutEvent = false;
 				const captures = aliases
 					? effectReceivers(
 							node,
@@ -2420,6 +2755,14 @@ class ModuleTransform {
 									snapshots.set(statement, declarations);
 									aliases.set(member, name);
 								}),
+							canBridgeLayout
+								? (statement, name) => {
+										const event = this.require('octane', 'useEffectEvent', false);
+										const setup = this.span(node, node.getStart(this.sf), node.end, ctx);
+										snapshots.get(statement)!.push(`const ${name} = ${event}(${setup});`);
+										layoutEvent = true;
+									}
+								: undefined,
 						)
 					: [];
 				if (stored) captures.unshift(...stored);
@@ -2428,9 +2771,10 @@ class ModuleTransform {
 					const block = ts.isBlock(body);
 					const bodyStart = body.getStart(this.sf);
 					const start = block ? bodyStart : body.pos;
-					const head = this.span(node, node.getStart(this.sf), start, ctx);
 					const indent = this.indentOf(block ? body : node);
 					const line = '\n' + indent + this.indentUnit;
+					if (layoutEvent) return '() => {' + line + captures.join(line) + '\n' + indent + '}';
+					const head = this.span(node, node.getStart(this.sf), start, ctx);
 					let rest: string;
 					if (block) {
 						rest = this.span(body, start + 1, body.end, ctx);
@@ -2511,7 +2855,7 @@ class ModuleTransform {
 		if (ts.isJsxAttributes(node)) return this.rewriteAttributes(node, ctx);
 		if ((ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) && this.islands.has(node)) {
 			this.count(RULE.reactCompat);
-			const island = this.require('octane/react', 'ReactCompat', false);
+			const island = this.require('octane/react', this.islands.get(node)!, false);
 			const content = this.span(node, node.getStart(this.sf), node.end, PLAIN);
 			const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
 			const imported = this.importOf(ts.isPropertyAccessExpression(tag) ? tag.expression : tag);
@@ -2600,6 +2944,12 @@ class ModuleTransform {
 		}
 		const clause = node.importClause;
 		const bindings = clause?.namedBindings;
+		if (
+			bindings &&
+			ts.isNamespaceImport(bindings) &&
+			this.radixSlotImports?.get(bindings.name) === 'original'
+		)
+			return null;
 		if (clause && bindings && ts.isNamedImports(bindings)) {
 			const moved = new Map<string, string[]>();
 			const kept: ts.ImportSpecifier[] = [];
@@ -2694,6 +3044,27 @@ class ModuleTransform {
 		for (const element of bindings.elements) {
 			const imported = (element.propertyName ?? element.name).text;
 			const local = element.name.text;
+			if (module === 'radix-ui' && imported === 'Slot' && next === '@octanejs/radix') {
+				if (!ts.isImportSpecifier(element)) {
+					this.note(
+						RULE.binding,
+						'error',
+						element,
+						'The Octane binding has no Radix Slot namespace to re-export.',
+					);
+					kept.push(element.getText(this.sf));
+					continue;
+				}
+				const plan = this.radixSlotImports?.get(element.name);
+				if (plan === 'original') {
+					kept.push(element.getText(this.sf));
+				} else if (plan === 'native') {
+					values.push(element.getText(this.sf));
+				} else {
+					renamed = true;
+				}
+				continue;
+			}
 			const name = mapPackageExport(module, imported);
 			if (name === null) {
 				this.note(RULE.binding, 'error', element, missingExport(module, imported));
@@ -2732,6 +3103,14 @@ class ModuleTransform {
 	 * @param severity of a member the port lacks
 	 */
 	rewritePackageMember(namespace: ts.Node, member: ts.MemberName, severity: Severity) {
+		const slot = this.radixSlotMembers?.get(member);
+		if (slot) {
+			this.count(RULE.import);
+			return (
+				slot.replacement ??
+				this.require('@octanejs/radix', slot.name, ts.isQualifiedName(member.parent))
+			);
+		}
 		const entry = this.importOf(namespace);
 		if (!entry?.namespace) return null;
 		const name = mapPackageExport(entry.module, member.text);
@@ -2813,6 +3192,24 @@ class ModuleTransform {
 				`\`@octanejs/radix\` serves \`${specifier.text}\` as its \`${namespace}\` namespace; read it from \`import { ${namespace} } from '@octanejs/radix'\`.`,
 			);
 			return null;
+		}
+		if (specifier.text === 'radix-ui' && next === '@octanejs/radix') {
+			let qualifier = ts.isImportTypeNode(node) ? node.qualifier : undefined;
+			while (qualifier && ts.isQualifiedName(qualifier)) qualifier = qualifier.left;
+			if (
+				ts.isCallExpression(node) ||
+				(ts.isExportDeclaration(node) &&
+					(!node.exportClause || ts.isNamespaceExport(node.exportClause))) ||
+				(ts.isImportTypeNode(node) && (!qualifier || qualifier.text === 'Slot'))
+			) {
+				this.note(
+					RULE.binding,
+					'error',
+					node,
+					'The Octane binding has no equivalent Radix Slot namespace. Import specific components instead.',
+				);
+				return null;
+			}
 		}
 		this.count(RULE.import);
 		return this.replaceSpecifier(node, specifier, next);
@@ -3100,7 +3497,7 @@ class ModuleTransform {
 			tag.tagName === node;
 		if (isTag && this.hasReactBridge && this.reactCompatTag(tag.tagName)) {
 			// The project compiler recognizes named imports when transporting descriptor children.
-			return this.require(this.importOf(node.expression)!.module, 'ReactCompat', false);
+			return this.require(this.importOf(node.expression)!.module, node.name.text, false);
 		}
 		// So is `const P = C.Provider`; a member of the provider (`C.Provider.x`)
 		// or a write to it stays.
@@ -3432,8 +3829,59 @@ class ModuleTransform {
 	}
 
 	/**
+	 * A render-local function has a fresh identity each time the component runs.
+	 * Tracking that identity refreshes the handle on each render.
+	 */
+	freshHandleDependency(node: ts.CallExpression, name: string) {
+		const [ref, factory] = node.arguments;
+		const statement = node.parent;
+		if (
+			!this.strong ||
+			name !== 'useImperativeHandle' ||
+			node.questionDotToken ||
+			ts.isSpreadElement(ref) ||
+			!ts.isArrowFunction(factory) ||
+			factory.modifiers?.length ||
+			factory.parameters.length ||
+			ts.isBlock(factory.body) ||
+			!ts.isExpressionStatement(statement) ||
+			!ts.isBlock(statement.parent) ||
+			!isFunctionLike(statement.parent.parent)
+		)
+			return;
+		const object = skipParens(factory.body);
+		if (!ts.isObjectLiteralExpression(object) || object.properties.length !== 1) return;
+		const [field] = object.properties;
+		if (!ts.isShorthandPropertyAssignment(field) || field.objectAssignmentInitializer) return;
+		const method = this.declarationOf(field.name);
+		if (
+			!method ||
+			!ts.isFunctionDeclaration(method) ||
+			method.parent !== statement.parent ||
+			!method.body
+		)
+			return;
+		const binding = method.name;
+		if (
+			!binding ||
+			this.localUses(binding).some(
+				(use) =>
+					use !== field.name && !(ts.isCallExpression(use.parent) && use.parent.expression === use),
+			) ||
+			// TypeScript can bind a function and a same-named var to separate symbols.
+			reads(
+				statement.parent.parent,
+				(id) =>
+					id.text === 'eval' || (id !== binding && id.text === binding.text && declaresName(id)),
+			)
+		)
+			return;
+		return `[${field.name.getText(this.sf)}]`;
+	}
+
+	/**
 	 * React runs a hook with an omitted or undefined list on every render.
-	 * Octane spells that schedule with `null`, including in Strong migrations.
+	 * Octane spells that schedule with `null` or a fresh dependency.
 	 */
 	rewriteDependencies(node: ts.CallExpression, name: string) {
 		const depsIndex = DEPENDENCY_HOOKS[name];
@@ -3444,16 +3892,18 @@ class ModuleTransform {
 			this.count(RULE.deps);
 			return (
 				this.span(node, node.getStart(this.sf), deps.getStart(this.sf), PLAIN) +
-				'null' +
+				(this.freshHandleDependency(node, name) ?? 'null') +
 				this.source.slice(deps.end, node.end)
 			);
 		}
 		if (node.arguments.length !== depsIndex) return null;
 		this.count(RULE.deps);
 		const last = node.arguments[node.arguments.length - 1];
+		const deps = this.freshHandleDependency(node, name) ?? 'null';
 		return (
 			this.span(node, node.getStart(this.sf), last.end, PLAIN) +
-			', null' +
+			', ' +
+			deps +
 			this.source.slice(last.end, node.end)
 		);
 	}
@@ -4196,30 +4646,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		}
 		const name = this.calleeName(tag);
 		const opening = node.openingElement;
-		if (
-			ctx.template &&
-			this.options.elementChild &&
-			ts.isIdentifier(tag) &&
-			isComponentName(tag.text)
-		) {
+		const radixSlot = ts.isPropertyAccessExpression(tag) && this.radixSlotMembers?.has(tag.name);
+		if (ctx.template && (radixSlot || (ts.isIdentifier(tag) && isComponentName(tag.text)))) {
 			const binding =
 				declaration && ts.isFunctionDeclaration(declaration)
 					? declaration.getStart(this.sf)
 					: imported;
-			if (
-				binding !== null &&
-				this.options.elementChild(binding) &&
-				opening.attributes.properties.every(
-					(a) => ts.isJsxAttribute(a) && a.name.getText(this.sf) !== 'children',
-				) &&
-				node.closingElement.getText(this.sf) === '</' + tag.text + '>'
-			) {
-				// Only line breaks and ASCII layout whitespace vanish in rendered JSX.
-				const content = node.children.filter(
-					(c) => !(ts.isJsxText(c) && /^[\t ]*[\r\n][\t\r\n ]*$/.test(c.text)),
-				);
-				const [child] = content;
-				if (content.length === 1 && (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child))) {
+			if (radixSlot || (binding !== null && this.options.elementChild?.(binding))) {
+				const child = this.singleElementChild(node);
+				if (child) {
 					this.count(RULE.elementChildProp);
 					return (
 						this.span(opening, opening.getStart(this.sf), opening.end - 1, ctx) +
@@ -4733,6 +5168,27 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		} else output = fn.body;
 		const root = skipParens(output);
 		if (!isJsx(root) && !ts.isConditionalExpression(root)) return null;
+
+		// Custom maps and explicit array holes keep the original callback dispatch.
+		const receiver = skipWrappers(iterable);
+		const initializer = ts.isIdentifier(receiver) ? this.constValue(receiver) : null;
+		const array = initializer ? skipWrappers(initializer) : receiver;
+		if (ts.isArrayLiteralExpression(array) && array.elements.some(ts.isOmittedExpression))
+			return null;
+		const declarations = this.typeOf(iterable)
+			.getNonNullableType()
+			.getProperty('map')?.declarations;
+		if (
+			declarations?.some((declaration) => {
+				const file = declaration.getSourceFile();
+				return (
+					(file !== esLib() && file.fileName !== ES5_LIB_PATH) ||
+					!ts.isInterfaceDeclaration(declaration.parent) ||
+					!['Array', 'ReadonlyArray'].includes(declaration.parent.name.text)
+				);
+			})
+		)
+			return null;
 
 		const attribute = rowKey(root);
 		let key: ts.Expression | null = null;

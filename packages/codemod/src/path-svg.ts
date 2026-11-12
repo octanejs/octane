@@ -5,7 +5,7 @@ const extent = new RegExp('^(?!-)' + number + '(?:px|em|rem|%)?$');
 const separator = '(?: *, *| +)';
 const paint =
 	/^(?:[a-zA-Z]+|#[\da-fA-F]{3,4}|#[\da-fA-F]{6}(?:[\da-fA-F]{2})?|var\(--[A-Za-z_][A-Za-z0-9_-]*\))$/;
-const opacity = /^(?:0(?:\.\d+)?|1)$/;
+const opacity = /^(?:0|0?\.\d+|1)$/;
 const nextNumber = '(?:' + separator + number + ')';
 const operation =
 	'(?:(?:scale|translate)\\(' +
@@ -64,8 +64,9 @@ const rectAttributes = {
 const shapeAttributes = {
 	path: pathAttributes,
 	rect: rectAttributes,
-	g: { transform },
+	g: { transform, 'clip-path': /^url\(#[A-Za-z_][A-Za-z0-9_-]*\)$/ },
 	defs: {},
+	clipPath: { id: /^[A-Za-z_][A-Za-z0-9_-]*$/ },
 	pattern: {
 		id: /^[A-Za-z_][A-Za-z0-9_-]*$/,
 		width: tileSize,
@@ -81,10 +82,12 @@ function attributes(text: string, allowed: Record<string, RegExp>) {
 	let end = 0;
 	for (let match; (match = field.exec(text)); end = field.lastIndex) {
 		const name = match[1]!;
-		const value = (match[2] ?? match[3])!;
+		let value = (match[2] ?? match[3])!;
 		if (name in values || !Object.prototype.hasOwnProperty.call(allowed, name)) return null;
 		const rule = allowed[name]!;
 		if (!rule.test(value)) return null;
+		// SVGR emits a numeric literal for a leading-dot opacity.
+		if (rule === opacity && value.startsWith('.')) value = '0' + value;
 		// SVG component loaders can emit a numeric literal for unitless lengths.
 		if (rule === length || rule === extent || rule === opacity || rule === tileSize) {
 			const n = Number(value);
@@ -115,16 +118,18 @@ type StaticSvgNode = {
 	children: StaticSvgNode[];
 };
 
-/** Read authored geometry and validate a local paint reference without expanding XML. */
+/** Read authored geometry with a single local clip or paint definition. */
 export function parseStaticSvg(source: string) {
 	if (typeof source !== 'string') return null;
 	let root: Record<string, string> | null = null;
 	const children: StaticSvgNode[] = [];
 	const open: { tag: 'svg' | StaticSvgNode['tag']; children: StaticSvgNode[] }[] = [];
+	let clipId: string | undefined;
+	let reference: string | undefined;
 	let patternId: string | undefined;
 	let paintId: string | undefined;
 	const token =
-		/[ \t\r\n]*(?:<!--([\s\S]*?)-->|<\/(svg|g|defs|pattern)[ \t\r\n]*>|<(svg|g|rect|path|defs|pattern)([^<>]*?)(\/?)>)/gy;
+		/[ \t\r\n]*(?:<!--([\s\S]*?)-->|<\/(svg|g|defs|clipPath|pattern)[ \t\r\n]*>|<(svg|g|rect|path|defs|clipPath|pattern)([^<>]*?)(\/?)>)/gy;
 	let hasShape = false;
 	let end = 0;
 	for (let match; (match = token.exec(source)); end = token.lastIndex) {
@@ -135,20 +140,24 @@ export function parseStaticSvg(source: string) {
 				return null;
 		} else if (closing) {
 			if (!parent || closing !== parent.tag) return null;
-			if ((closing === 'defs' || closing === 'pattern') && parent.children.length !== 1)
+			if (
+				(closing === 'defs' || closing === 'clipPath' || closing === 'pattern') &&
+				parent.children.length !== 1
+			)
 				return null;
 			open.pop();
 		} else if (tag === 'svg') {
 			if (root || selfClosing) return null;
 			root = attributes(fields!, rootAttributes);
 			if (!root) return null;
-			open.push({ tag: 'svg', children });
+			open.push({ tag, children });
 		} else {
 			if (!parent) return null;
 			const name = tag as StaticSvgNode['tag'];
 			if (
 				(name === 'defs' && parent.tag !== 'svg') ||
-				(name === 'pattern') !== (parent.tag === 'defs') ||
+				(name === 'clipPath' || name === 'pattern') !== (parent.tag === 'defs') ||
+				(parent.tag === 'clipPath' && name !== 'rect') ||
 				(parent.tag === 'pattern' && name !== 'path')
 			)
 				return null;
@@ -161,9 +170,19 @@ export function parseStaticSvg(source: string) {
 				(tag === 'rect' && !(props.width && props.height))
 			)
 				return null;
+			if (name === 'clipPath') {
+				if (!props.id || clipId !== undefined || patternId !== undefined) return null;
+				clipId = props.id;
+			}
+			if (props['clip-path']) {
+				const id = props['clip-path'].slice(5, -1);
+				if (parent.tag !== 'svg' || (reference !== undefined && reference !== id)) return null;
+				reference = id;
+			}
 			if (name === 'pattern') {
 				if (
 					patternId !== undefined ||
+					clipId !== undefined ||
 					!(props.id && props.width && props.height && props.patternUnits)
 				)
 					return null;
@@ -177,10 +196,15 @@ export function parseStaticSvg(source: string) {
 			const node: StaticSvgNode = { tag: name, attributes: props, children: [] };
 			parent.children.push(node);
 			if (container) open.push(node);
-			else if (parent.tag !== 'pattern') hasShape = true;
+			else if (parent.tag !== 'clipPath' && parent.tag !== 'pattern') hasShape = true;
 		}
 	}
-	return root && hasShape && !open.length && patternId === paintId && space.test(source.slice(end))
+	return root &&
+		hasShape &&
+		!open.length &&
+		clipId === reference &&
+		patternId === paintId &&
+		space.test(source.slice(end))
 		? { root, children }
 		: null;
 }

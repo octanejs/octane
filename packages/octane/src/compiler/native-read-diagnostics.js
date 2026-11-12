@@ -37,6 +37,7 @@ const RENDER_CALLBACKS = new Map([
 	['useMemo', [0]],
 	['useState', [0]],
 	['useLazyRef', [0]],
+	['useInitialValue', [0]],
 	['useReducer', [2]],
 	['useLinkedState', [1]],
 	['useSyncExternalStore', [1, 2]],
