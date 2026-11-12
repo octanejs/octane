@@ -22,6 +22,7 @@ import {
 import {
 	createServer,
 	firstTodo,
+	setDone,
 	isTodo,
 	schema,
 	Todo,
@@ -109,6 +110,29 @@ afterEach(() => {
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('feeds', () => {
+	it.each([todos, todoPages])(
+		'keeps a rename from the feed when an earlier write returns $name',
+		async (read) => {
+			const server = createServer();
+			let release!: () => void;
+			const { store } = setup(async (request, signal) => {
+				const reply = await server.transport(request, signal);
+				if (request.kind === 'write') await new Promise<void>((resolve) => (release = resolve));
+				return reply;
+			});
+			const list = await observed(store.read(read, undefined));
+			const writing = store.write(setDone, { id: 'a', done: true });
+			await vi.waitFor(() => expect(release).toBeDefined());
+			server.rows[0].title = 'Atoll';
+			receive(store, [{ put: Todo, value: { ...server.rows[0] } }]);
+			expect(list()[0]!.title).toBe('Atoll');
+			release();
+			await writing;
+			await settle();
+			expect(list()[0]).toEqual(server.rows[0]);
+		},
+	);
+
 	it('shows a changed record in every read that holds it, with no request', async () => {
 		const { server, store, connections } = setup();
 		const list = await observed(store.read(todos, undefined));

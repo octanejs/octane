@@ -787,6 +787,36 @@ describe('octane/data server-assigned IDs and server transactions', () => {
 		expect(server.log).not.toContainEqual(expect.stringMatching(/^setDone/));
 	});
 
+	it('rechecks a shared read when concurrent writes deliver their refreshed values out of order', async () => {
+		const server = createServer();
+		const releases: Array<() => void> = [];
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				const reply = await server.transport(request, signal);
+				if (request.kind === 'write') await new Promise<void>((resolve) => releases.push(resolve));
+				return reply;
+			},
+		});
+		const list = store.read(todos, undefined);
+		await observe(list);
+
+		const first = store.write(addTodo, { title: 'First' });
+		await vi.waitFor(() => expect(releases).toHaveLength(1));
+		const second = store.write(addTodo, { title: 'Second' });
+		await vi.waitFor(() => expect(releases).toHaveLength(2));
+		releases[1]!();
+		await second;
+		const seen: string[][] = [];
+		const stop = list.subscribe(() => seen.push(list.getSnapshot().value!.map((row) => row.title)));
+		releases[0]!();
+		await first;
+		await settled();
+
+		expect(list.getSnapshot().value).toEqual(server.rows);
+		expect(seen.every((titles) => titles.includes('Second'))).toBe(true);
+		stop();
+	});
+
 	it('adopts every read a reply carries before notifying any reader', async () => {
 		const server = createServer();
 		const store = createDataStore({ transport: server.transport });
