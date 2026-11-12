@@ -123,7 +123,8 @@ export function webSocketListener(
 			const socket = new (options.WebSocket ?? WebSocket)(url, options.protocols);
 			socket.addEventListener('open', () => {
 				socket.send(encode(request));
-				push({});
+				// `accept` says the feed is open once it has read the request; another service may say nothing.
+				if (options.decode) push({});
 			});
 			socket.addEventListener('message', (message) => {
 				try {
@@ -134,9 +135,11 @@ export function webSocketListener(
 				}
 			});
 			socket.addEventListener('error', () => end(new Error('octane/data: the feed socket failed')));
+			// A browser calls any completed close handshake clean, a refusal (1008) or a failure (1011)
+			// included, so only a normal close ends the connection without an error.
 			socket.addEventListener('close', (event) =>
 				end(
-					event.wasClean
+					event.code === 1000
 						? undefined
 						: new Error(`octane/data: the feed socket closed (${event.code})`),
 				),

@@ -381,7 +381,8 @@ function sockets(server: DataServer, origin: string, viewer: string) {
 				open = false;
 				closed.push(code);
 				for (const listener of listeners.close) listener();
-				const event = Object.assign(new Event('close'), { code, wasClean: code === 1000 });
+				// As in a browser, a completed close handshake is clean whatever its code.
+				const event = Object.assign(new Event('close'), { code, wasClean: true });
 				queueMicrotask(() => this.dispatchEvent(event));
 			};
 			this.peer = {
@@ -400,8 +401,11 @@ function sockets(server: DataServer, origin: string, viewer: string) {
 				});
 			// The upgrade request, over HTTPS as the host receives it.
 			const request = new Request(String(url).replace(/^wss:/, 'https:'), { headers: { origin } });
-			server.accept(this.peer, request, { viewer });
-			queueMicrotask(() => open && this.dispatchEvent(new Event('open')));
+			// The handshake completes, and the page sees `open`, before the server reads the upgrade.
+			queueMicrotask(() => {
+				this.dispatchEvent(new Event('open'));
+				server.accept(this.peer, request, { viewer });
+			});
 		}
 		close: (code?: number) => void;
 		send: (data: string) => void;
@@ -466,6 +470,9 @@ describe('feed presets', () => {
 		await vi.waitFor(() => expect(handle.getSnapshot().status).toBe('offline'));
 		expect(closed[0]).toBe(1008);
 		expect(heard).toEqual([]);
+		// It waits before trying again rather than reconnecting at once.
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		expect(closed).toEqual([1008]);
 	});
 
 	it("listens through the page's own broker, one subscription per topic, live once subscribed", async () => {
