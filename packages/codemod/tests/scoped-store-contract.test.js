@@ -982,6 +982,7 @@ it('defers store factory inputs linked to React work during a read', async () =>
 		viaTsx: './tsx-handle',
 		viaJs: './js-handle',
 		viaSibling: './sibling-handle',
+		viaDirectory: './directory-handle',
 		plain: './handles',
 		pure: './pure',
 		explicitJs: './explicit-js-key',
@@ -1028,6 +1029,12 @@ it('defers store factory inputs linked to React work during a read', async () =>
 		'app/src/barrel.ts': "export {dependent as nested} from './dependent';",
 		'app/src/snapshot-key.ts':
 			"import {direct} from './handles'; export const snapshot = direct as string;",
+		'app/src/directory-handle.ts': `import {select} from 'observer/core';
+			import {readDirectory} from './directory';
+			export const viaDirectory = select(readDirectory);`,
+		'app/src/directory/package.json': JSON.stringify({ types: 'shape.d.ts', main: 'runtime.js' }),
+		'app/src/directory/shape.d.ts': 'export declare function readDirectory(): string;',
+		'app/src/directory/runtime.js': "export {readTsx as readDirectory} from '../resource';",
 		'app/src/resource.tsx': `import {preload as hint} from 'react-dom';
 			export function readTsx() {hint('/tsx-preview.png', {as: 'image'}); return 'ready';}`,
 		'app/src/script-resource.js': `import {preload} from 'react-dom';
@@ -1064,9 +1071,10 @@ it('defers store factory inputs linked to React work during a read', async () =>
 			import {Pane as ViaTsx} from './viaTsx';
 			import {Pane as ViaJs} from './viaJs';
 			import {Pane as ViaSibling} from './viaSibling';
+			import {Pane as ViaDirectory} from './viaDirectory';
 			export function Root() {
 				return <current.Provider value={{get: read}}>
-					<Direct/><Wrapped/><Mutated/><ViaTsx/><ViaJs/><ViaSibling/>
+					<Direct/><Wrapped/><Mutated/><ViaTsx/><ViaJs/><ViaSibling/><ViaDirectory/>
 				</current.Provider>;
 			}`,
 		...Object.fromEntries(
@@ -1084,12 +1092,14 @@ it('defers store factory inputs linked to React work during a read', async () =>
 	for (const resource of ['preview', 'tsx-preview', 'js-preview', 'choice-preview']) {
 		expect(html).toContain('<link rel="preload" href="/' + resource + '.png" as="image"/>');
 	}
-	expect(html.match(/<b>ready<\/b>/g)).toHaveLength(6);
+	expect(html.match(/<b>ready<\/b>/g)).toHaveLength(7);
 
 	const names = Object.keys(panes).map((name) => 'src/' + name + '.tsx');
+	const physicalApp = fs.realpathSync(app);
+	const options = { strong: true, verify: true, projectTypes: true, write: false };
 	const { files } = await runCodemod(
-		names.map((name) => path.join(app, name)),
-		{ root: app, strong: true, verify: true, projectTypes: true, write: false },
+		names.map((name) => path.join(physicalApp, name)),
+		{ ...options, root: physicalApp },
 	);
 	for (const name of names) {
 		const file = files.find((entry) => entry.file === name);
@@ -1105,6 +1115,16 @@ it('defers store factory inputs linked to React work during a read', async () =>
 			expect(errors, name).toContainEqual(expect.objectContaining({ rule: 'bindings' }));
 		}
 	}
+
+	const linkedApp = path.join(path.dirname(app), 'linked-app');
+	fs.symlinkSync(app, linkedApp, 'dir');
+	const linked = await runCodemod([path.join(linkedApp, 'src/viaDirectory.tsx')], {
+		...options,
+		root: linkedApp,
+	});
+	expect(linked.files.find((file) => file.file === 'src/viaDirectory.tsx').notes).toContainEqual(
+		expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+	);
 });
 
 it('requires an imported application handle to come from the original shared factory', async () => {

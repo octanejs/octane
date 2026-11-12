@@ -8,6 +8,8 @@ import {
 	svgLocalReads,
 } from './forwarded-props.js';
 import { reactRenderer, staticReactProps } from './react-renderer.js';
+import { linkedRenderState } from './linked-state.js';
+import { nativeSetupHook } from './local-react-hook.js';
 import { localUses, scalar, walkLocalValues } from './local-uses.js';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
@@ -178,6 +180,7 @@ export function bind(filename: string, source: string) {
 	return { sf, checker: program.getTypeChecker() };
 }
 
+const ES5_LIB_PATH = ts.getDefaultLibFilePath({}).replace(/[^/\\]+$/, 'lib.es5.d.ts');
 let es5: ts.SourceFile | undefined;
 
 /**
@@ -185,10 +188,9 @@ let es5: ts.SourceFile | undefined;
  * array and string members have types.
  */
 function esLib() {
-	const file = ts.getDefaultLibFilePath({}).replace(/[^/\\]+$/, 'lib.es5.d.ts');
 	es5 ??= ts.createSourceFile(
 		'lib.es5.d.ts',
-		ts.sys.readFile(file) as string,
+		ts.sys.readFile(ES5_LIB_PATH) as string,
 		ts.ScriptTarget.Latest,
 		true,
 	);
@@ -253,19 +255,19 @@ function isJsx(node: ts.Node) {
 /** A deferred clsx call may test a binding only if its truth value stays fixed. */
 function svgClassToken(
 	expr: ts.Expression,
-	fixedGuard: (name: ts.Identifier) => boolean,
+	fixedToken: (name: ts.Identifier, truthTest: boolean) => boolean,
 	truthTest = false,
 ): boolean {
 	expr = skipWrappers(expr);
 	if (ts.isStringLiteralLike(expr)) return true;
-	if (ts.isIdentifier(expr)) return truthTest && fixedGuard(expr);
+	if (ts.isIdentifier(expr)) return fixedToken(expr, truthTest);
 	if (ts.isPrefixUnaryExpression(expr) && expr.operator === ts.SyntaxKind.ExclamationToken)
-		return svgClassToken(expr.operand, fixedGuard, true);
+		return svgClassToken(expr.operand, fixedToken, true);
 	if (ts.isConditionalExpression(expr))
 		return (
-			svgClassToken(expr.condition, fixedGuard, true) &&
-			svgClassToken(expr.whenTrue, fixedGuard, truthTest) &&
-			svgClassToken(expr.whenFalse, fixedGuard, truthTest)
+			svgClassToken(expr.condition, fixedToken, true) &&
+			svgClassToken(expr.whenTrue, fixedToken, truthTest) &&
+			svgClassToken(expr.whenFalse, fixedToken, truthTest)
 		);
 	if (ts.isBinaryExpression(expr)) {
 		const op = expr.operatorToken.kind;
@@ -273,9 +275,9 @@ function svgClassToken(
 			return (
 				svgClassToken(
 					expr.left,
-					fixedGuard,
+					fixedToken,
 					truthTest || op === ts.SyntaxKind.AmpersandAmpersandToken,
-				) && svgClassToken(expr.right, fixedGuard, truthTest)
+				) && svgClassToken(expr.right, fixedToken, truthTest)
 			);
 	}
 	return false;
@@ -617,6 +619,8 @@ class ModuleTransform {
 	readonly effectSnapshots?: Map<ts.ExpressionStatement, string[]>;
 	private snapshotEdits?: Map<ts.Node, string>;
 	private snapshotCaptures?: Map<ts.ArrowFunction, string[]>;
+	private linkedStateEdits?: Map<ts.Statement, string>;
+	private linkedStateNames?: [string, string, string, string];
 	/** React imports read as values, not only as types. */
 	readonly valueUses = new Set<string>();
 	hasSignalRuntime?: boolean;
@@ -982,7 +986,9 @@ class ModuleTransform {
 			)
 				snapshots.push(node);
 			if (
-				(this.options.pathSvgAdapter || this.options.captureEffectSnapshots) &&
+				(this.options.pathSvgAdapter ||
+					this.options.captureEffectSnapshots ||
+					this.options.linkRenderState) &&
 				ts.isIdentifier(node) &&
 				node.text === 'eval'
 			)
@@ -1006,6 +1012,12 @@ class ModuleTransform {
 		};
 		visit(this.sf);
 		if (!hasEval) for (const decl of snapshots) this.planEffectSnapshot(decl);
+		if (!hasEval && this.options.linkRenderState && this.strong && this.target === 'tsrx') {
+			for (const statement of this.sf.statements) {
+				if (ts.isFunctionDeclaration(statement) && this.isComponent(statement))
+					this.planLinkedState(statement);
+			}
+		}
 		if (this.hasReactBridge) {
 			// A namespace used only for the native bridge needs no missing-port report.
 			for (const module of ['octane/react', 'octane/react/server']) {
@@ -1440,7 +1452,57 @@ class ModuleTransform {
 			return attr.name.text === 'aria-hidden' && literalJsxAttribute(attr);
 		});
 		if (!supported) return false;
-		return this.nativeSvgOutput(tag, uses, unproven);
+		this.svgRead ??= svgLocalReads(
+			this.checker,
+			uses,
+			(node) => this.typeOf(node),
+			(type) => ts.isTypeReferenceNode(type) && this.reactTypeName(type.typeName) === 'ReactNode',
+		);
+		return this.nativeOutput(this.svgRead(tag) ?? tag, uses, unproven);
+	}
+
+	private planLinkedState(owner: ts.FunctionDeclaration) {
+		const plan = linkedRenderState(
+			owner,
+			this.checker,
+			(name) => this.localUses(name),
+			(expr) => {
+				const hook = this.callee(expr);
+				return hook?.module === 'react' && hook.name === 'useState';
+			},
+		);
+		if (!plan) return;
+		const fresh = (base: string) => {
+			let name = base;
+			while (this.declared.has(name) || this.readsGlobal(name)) name += '_';
+			this.declared.add(name);
+			return name;
+		};
+		const hook = this.require('octane', 'useLinkedState', false);
+		// These locals live in separate component scopes. Reserve names against the source once.
+		const [active, previous, seen, initialName] = (this.linkedStateNames ??= [
+			fresh('active'),
+			fresh('previous'),
+			fresh('seen'),
+			fresh('initial'),
+		]);
+		const initial = plan.eager ? initialName : active;
+		const indent = this.indentOf(plan.state),
+			line = '\n' + indent,
+			inner = line + this.indentUnit;
+		const flag = plan.flag.getText(this.sf);
+		const eager = plan.eager ? `const ${initial} = ${plan.eager.getText(this.sf)};${line}` : '';
+		const input = plan.eager ? `!!(${flag})` : flag;
+		const replay = plan.replay.map((read) => `void (${read.getText(this.sf)});`).join(' ');
+		// Re-read the original prelude before publication: a retrying getter can suspend.
+		const replacement =
+			eager +
+			`const [${plan.name}] = ${hook}(${input}, (${active}, ${previous}): boolean => {${inner}` +
+			`const ${seen} = (${previous}?.value ?? ${initial}) === true;${inner}` +
+			`if (${active} && !${seen}) { ${replay} }${inner}return ${seen} || ${active};${line}});`;
+		const edits = (this.linkedStateEdits ??= new Map());
+		edits.set(plan.state, replacement);
+		edits.set(plan.guard, DROP);
 	}
 
 	/** In a candidate module, locally constructed elements can leave only as this component's output. */
@@ -1701,6 +1763,27 @@ class ModuleTransform {
 	}
 
 	private fixedSvgParameters?: Map<ts.Symbol, boolean>;
+	private svgClassString(name: ts.Identifier) {
+		const declaration = this.declarationOf(name);
+		if (declaration && ts.isVariableDeclaration(declaration))
+			return (
+				!!declaration.initializer && ts.isStringLiteralLike(skipWrappers(declaration.initializer))
+			);
+		if (
+			!declaration ||
+			!(ts.isParameter(declaration) || ts.isBindingElement(declaration)) ||
+			declaration.initializer
+		)
+			return false;
+		const parameter = ts.isParameter(declaration) ? declaration : declaration.parent.parent;
+		return (
+			ts.isParameter(parameter) &&
+			!!parameter.type &&
+			!parameter.initializer &&
+			textKind(this.typeOf(declaration.name)) === 1
+		);
+	}
+
 	private svgClassName(expr: ts.Expression) {
 		if (ts.isIdentifier(expr)) return true;
 		if (ts.isPropertyAccessExpression(expr)) return this.svgCssClass(expr);
@@ -1726,8 +1809,12 @@ class ModuleTransform {
 			(this.resolve('clsx') ?? 'clsx') === 'clsx' &&
 			this.options.installedClsx === true &&
 			(expr.arguments.every((arg) =>
-				svgClassToken(arg, (name) =>
-					fixedBinding(this.checker, name, expr, (this.fixedSvgParameters ??= new Map())),
+				svgClassToken(
+					arg,
+					(name, truthTest) =>
+						(truthTest || this.svgClassString(name)) &&
+						fixedBinding(this.checker, name, expr, (this.fixedSvgParameters ??= new Map())) &&
+						initializedBefore(this.checker, name, expr),
 				),
 			) ||
 				expr.arguments.every((arg) => {
@@ -1785,10 +1872,10 @@ class ModuleTransform {
 	private svgRead?: ReturnType<typeof svgLocalReads>;
 	private nativeSvgProps?: ReturnType<typeof forwardedProps>;
 	private provenSvgOwners?: Set<ts.Node>;
-	private nativeSvgOutput(
-		element: ts.JsxSelfClosingElement,
+	private nativeOutput(
+		value: ts.Node,
 		uses: ReturnType<typeof localUses>,
-		unproven: (tag: ts.Identifier, prop: string) => void,
+		unproven?: (tag: ts.Identifier, prop: string) => void,
 	): boolean {
 		const typeOf = (node: ts.Node) => this.typeOf(node);
 		const destination = {
@@ -1799,16 +1886,10 @@ class ModuleTransform {
 		this.nativeSvgProps ??= forwardedProps(this.sf, this.checker, destination, uses);
 		const slot = (tag: ts.Identifier, prop: string) => {
 			const known = this.nativeSvgProps!(this.checker.getSymbolAtLocation(tag), prop);
-			if (!known) unproven(tag, prop);
+			if (!known) unproven?.(tag, prop);
 			return known;
 		};
-		this.svgRead ??= svgLocalReads(
-			this.checker,
-			uses,
-			typeOf,
-			(type) => ts.isTypeReferenceNode(type) && this.reactTypeName(type.typeName) === 'ReactNode',
-		);
-		const first = nativeOutputOwner(this.svgRead(element) ?? element, slot, destination);
+		const first = nativeOutputOwner(value, slot, destination);
 		if (!first) return false;
 		const pending = [first];
 		const proven = (this.provenSvgOwners ??= new Set());
@@ -2625,6 +2706,10 @@ class ModuleTransform {
 	}
 
 	rewrite(node: ts.Node, ctx: Context): string | null {
+		if (this.linkedStateEdits && ts.isStatement(node)) {
+			const linked = this.linkedStateEdits.get(node);
+			if (linked) return linked;
+		}
 		const snapshot = this.snapshotEdits?.get(node);
 		if (snapshot)
 			return ts.isCallExpression(node)
@@ -2639,6 +2724,21 @@ class ModuleTransform {
 			}
 			if (ts.isArrowFunction(node)) {
 				const snapshots = ts.isBlock(node.body) ? this.effectSnapshots : undefined;
+				const importedEvent = snapshots && this.apiLocals.get('useEffectEvent');
+				const canBridgeLayout =
+					snapshots &&
+					(!importedEvent ||
+						this.checker
+							.resolveName(
+								'useEffectEvent',
+								node.parent,
+								ts.SymbolFlags.Value | ts.SymbolFlags.Alias,
+								false,
+							)
+							?.declarations?.some(
+								(declaration) => this.imports.get(declaration) === importedEvent,
+							));
+				let layoutEvent = false;
 				const captures = aliases
 					? effectReceivers(
 							node,
@@ -2656,6 +2756,16 @@ class ModuleTransform {
 									snapshots.set(statement, declarations);
 									aliases.set(member, name);
 								}),
+							canBridgeLayout
+								? (statement, name) => {
+										const event = this.require('octane', 'useEffectEvent', false);
+										const setup = this.span(node, node.getStart(this.sf), node.end, ctx);
+										snapshots.get(statement)!.push(`const ${name} = ${event}(${setup});`);
+										layoutEvent = true;
+									}
+								: undefined,
+							this.options.captureEffectHelpers ? this.localUses : undefined,
+							(arrow) => this.emit(arrow, PLAIN),
 						)
 					: [];
 				if (stored) captures.unshift(...stored);
@@ -2664,9 +2774,10 @@ class ModuleTransform {
 					const block = ts.isBlock(body);
 					const bodyStart = body.getStart(this.sf);
 					const start = block ? bodyStart : body.pos;
-					const head = this.span(node, node.getStart(this.sf), start, ctx);
 					const indent = this.indentOf(block ? body : node);
 					const line = '\n' + indent + this.indentUnit;
+					if (layoutEvent) return '() => {' + line + captures.join(line) + '\n' + indent + '}';
+					const head = this.span(node, node.getStart(this.sf), start, ctx);
 					let rest: string;
 					if (block) {
 						rest = this.span(body, start + 1, body.end, ctx);
@@ -2855,6 +2966,29 @@ class ModuleTransform {
 				const dest =
 					hook?.from ?? (this.nativeIntl.has(item) ? this.options.reactIntlAdapter : undefined);
 				if (!dest) {
+					const name = (item.propertyName ?? item.name).text;
+					if (
+						this.options.localReactHook &&
+						!node.attributes &&
+						!clause.isTypeOnly &&
+						!item.isTypeOnly &&
+						/^use[A-Z0-9]/.test(name)
+					) {
+						const call = this.localUses(item.name).find((ref) =>
+							nativeSetupHook(ref, this.localUses, {
+								calleeName: (callee) => this.calleeName(callee),
+								nativeOutput: (element) => this.nativeOutput(element, this.localUses),
+							}),
+						);
+						const hook = call && this.options.localReactHook(module, name);
+						if (hook)
+							this.note(
+								RULE.bindings,
+								'error',
+								call,
+								`The unchanged ${module} export ${name} calls React's ${hook}. Provide a compiled Octane hook for native callers or keep this component under a React renderer.`,
+							);
+					}
 					kept.push(item);
 					continue;
 				}
@@ -5060,6 +5194,27 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		} else output = fn.body;
 		const root = skipParens(output);
 		if (!isJsx(root) && !ts.isConditionalExpression(root)) return null;
+
+		// Custom maps and explicit array holes keep the original callback dispatch.
+		const receiver = skipWrappers(iterable);
+		const initializer = ts.isIdentifier(receiver) ? this.constValue(receiver) : null;
+		const array = initializer ? skipWrappers(initializer) : receiver;
+		if (ts.isArrayLiteralExpression(array) && array.elements.some(ts.isOmittedExpression))
+			return null;
+		const declarations = this.typeOf(iterable)
+			.getNonNullableType()
+			.getProperty('map')?.declarations;
+		if (
+			declarations?.some((declaration) => {
+				const file = declaration.getSourceFile();
+				return (
+					(file !== esLib() && file.fileName !== ES5_LIB_PATH) ||
+					!ts.isInterfaceDeclaration(declaration.parent) ||
+					!['Array', 'ReadonlyArray'].includes(declaration.parent.name.text)
+				);
+			})
+		)
+			return null;
 
 		const attribute = rowKey(root);
 		let key: ts.Expression | null = null;

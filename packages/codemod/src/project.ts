@@ -22,6 +22,7 @@ import { finding, loadCompiler, thrown } from './compiler.js';
 import { PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
 import { bind, projectTypeAt, textKind, transformModule } from './transform.js';
+import { directReactHooks } from './local-react-hook.js';
 import { forwardedProps } from './forwarded-props.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
@@ -230,6 +231,19 @@ export async function runCodemod(
 		).resolvedModule;
 		return target?.resolvedFileName === original?.resolvedFileName ? (target ?? null) : undefined;
 	}
+	function installedReact(file: string) {
+		const dir = path.dirname(file);
+		if (ts.findConfigFile(dir, ts.sys.fileExists) !== rootProject) return false;
+		const target = originalModule(file, 'react');
+		if (!target || !['react', '@types/react'].includes(target.packageId?.name ?? '')) return false;
+		// TypeScript can resolve @types/react even when the runtime is missing or linked locally.
+		const runtime = readInstalled(dir, 'react');
+		return (
+			runtime?.manifest.name === 'react' &&
+			fs.realpathSync(runtime.dir).split(path.sep).includes('node_modules') &&
+			fs.realpathSync(target.resolvedFileName).split(path.sep).includes('node_modules')
+		);
+	}
 	const inlineCompatDirs = new Map<string, boolean>();
 	function supportsInlineReactCompat(file: string) {
 		const issuer = path.dirname(file);
@@ -359,7 +373,7 @@ export async function runCodemod(
 				new URL('../templates/react-intl.tsrx', import.meta.url),
 				'utf8',
 			);
-			adapterState = inspectAdapter(adapter, adapterSource, PREVIOUS_INTL_SHA256);
+			adapterState = inspectAdapter(adapter, adapterSource, PREVIOUS_INTL_HASHES);
 			if (
 				adapterState.kind === 'conflict' ||
 				owners.has(ts.sys.useCaseSensitiveFileNames ? adapter : adapter.toLowerCase())
@@ -385,7 +399,7 @@ export async function runCodemod(
 		ADAPTER_OCTANE_VERSION.test(readInstalled(helperDir, 'octane')?.version ?? '')
 			? createScopedStorePlanner(helperDir, storeBridge, config ?? undefined)
 			: null;
-	const { inputFactory, helperFunction } = storeSources(root, config, (file, source) => {
+	const { inputFactory, helperFunction, localFile } = storeSources(root, config, (file, source) => {
 		if (
 			renames.has(file) ||
 			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject ||
@@ -407,6 +421,53 @@ export async function runCodemod(
 				resolveBinding(specifier, file, bindingProject, new Map(), []),
 		}).changed;
 	});
+	const localHooks = new Map<string, Map<string, string>>();
+	let selectedInPlace: Set<string> | undefined;
+	function localReactHook(from: string, module: string, name: string) {
+		if (
+			catalogName(module) !== null ||
+			resolveRename(from, module) ||
+			/[!%?#\\]/.test(module) ||
+			ts.findConfigFile(path.dirname(from), ts.sys.fileExists) !== rootProject
+		)
+			return;
+		const file = localFile(from, module);
+		if (
+			!file ||
+			known.has(file) ||
+			path.basename(file) === 'index.ts' ||
+			fs.existsSync(file.slice(0, -3) + '.tsrx') ||
+			(path.extname(module) && !module.endsWith('.ts')) ||
+			fs.realpathSync(file) !== path.join(fs.realpathSync(root), path.relative(root, file)) ||
+			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject
+		)
+			return;
+		let hooks = localHooks.get(file);
+		if (!hooks) {
+			const source = fs.readFileSync(file, 'utf8');
+			hooks = new Map();
+			if (
+				(/\b(?:useState|useSyncExternalStore)\b/.test(source) || source.includes('\\u')) &&
+				originalModule(file, 'react') &&
+				readInstalled(path.dirname(file), 'react')?.manifest.name === 'react'
+			) {
+				const existing = program?.getSourceFile(file);
+				const bound =
+					existing && program
+						? { sf: existing, checker: program.getTypeChecker() }
+						: bind(file, source);
+				hooks = directReactHooks(bound.sf, bound.checker);
+			}
+			localHooks.set(file, hooks);
+		}
+		const hook = hooks.get(name);
+		if (!hook || fs.statSync(file).nlink > 1) return;
+		// Writing an unrenamed selection through a symlink changes its physical target.
+		selectedInPlace ??= new Set(
+			[...known].filter((f) => !renames.has(f) && !conflicts.has(f)).map((f) => fs.realpathSync(f)),
+		);
+		if (!selectedInPlace.has(fs.realpathSync(file))) return hook;
+	}
 	const checkedHelpers = new Map<string, { code: string; state: AdapterState; error?: string }>();
 	const generatedHelpers = new Map<string, string>();
 	const svgHelpers = new Set<string>();
@@ -493,7 +554,7 @@ export async function runCodemod(
 		const state: AdapterState =
 			shadowed || ownerOf(output)
 				? { kind: 'conflict' }
-				: inspectAdapter(output, code, output === svgHelper ? PREVIOUS_SVG_SHA256 : undefined);
+				: inspectAdapter(output, code, output === svgHelper ? PREVIOUS_SVG_HASHES : undefined);
 		let error: string | undefined;
 		if (state.kind === 'conflict') {
 			error = 'The ' + kind + ' adapter path is occupied: ' + name;
@@ -630,14 +691,18 @@ export async function runCodemod(
 				? (specifier: string, color?: string) => pathSvgAdapter(file, specifier, svgErrors, color)
 				: undefined;
 		const transform = (
-			captureEffectReceivers: boolean | 'properties' = false,
 			notes = extra,
-			captureEffectSnapshots = false,
+			retry?: 'effectReceivers' | 'effectProperties' | 'effectSnapshots' | 'linkedState',
 		) =>
 			transformModule(source, file, {
-				captureEffectReceivers: !!captureEffectReceivers,
-				snapshotEffectProperties: captureEffectReceivers === 'properties',
-				captureEffectSnapshots,
+				captureEffectReceivers:
+					retry === 'effectReceivers' ||
+					retry === 'effectProperties' ||
+					retry === 'effectSnapshots',
+				snapshotEffectProperties: retry === 'effectProperties',
+				captureEffectHelpers: retry === 'effectProperties' && installedReact(file),
+				captureEffectSnapshots: retry === 'effectSnapshots',
+				linkRenderState: retry === 'linkedState' && installedReact(file),
 				target,
 				reactIntlAdapter: intl,
 				forwardedText: (module, name, prop, ordinaryCaller, through) =>
@@ -650,6 +715,9 @@ export async function runCodemod(
 						ordinaryCaller,
 					),
 				resolveStoreHook,
+				localReactHook: renames.has(file)
+					? (module, name) => localReactHook(file, module, name)
+					: undefined,
 				strong,
 				strictNullChecks: strictConfig !== null,
 				get types() {
@@ -707,7 +775,7 @@ export async function runCodemod(
 			});
 		if (intl && adapterError) {
 			// Public utilities such as defineMessages can stay on React Intl without a helper.
-			const needsAdapter = transform(false, []).rules['react-intl'];
+			const needsAdapter = transform([]).rules['react-intl'];
 			intl = undefined;
 			if (needsAdapter) {
 				const note: Note = {
@@ -772,9 +840,10 @@ export async function runCodemod(
 			if (strong && result.template) {
 				const strengthened = strengthen(compiler, code, output, {
 					force: options.forceStrong,
-					withEffectReceivers: () => transform(true, []).code,
-					withEffectProperties: () => transform('properties', []).code,
-					withEffectSnapshots: () => transform(true, [], true).code,
+					withEffectReceivers: () => transform([], 'effectReceivers').code,
+					withEffectProperties: () => transform([], 'effectProperties').code,
+					withEffectSnapshots: () => transform([], 'effectSnapshots').code,
+					withLinkedState: () => transform([], 'linkedState').code,
 				});
 				code = strengthened.code;
 				isStrong = strengthened.strong;
@@ -863,7 +932,7 @@ export async function runCodemod(
 				file: adapter,
 				source: adapterSource,
 				state: adapterState,
-				previous: PREVIOUS_INTL_SHA256,
+				previous: PREVIOUS_INTL_HASHES,
 				rule: 'react-intl',
 			});
 		if (svg)
@@ -871,7 +940,7 @@ export async function runCodemod(
 				file: svgHelper,
 				source: svg.code,
 				state: svg.state,
-				previous: PREVIOUS_SVG_SHA256,
+				previous: PREVIOUS_SVG_HASHES,
 				rule: 'svg-paths',
 			});
 		// Check both shared helpers before writing either. Recheck again at publication.
@@ -977,9 +1046,11 @@ type AdapterState =
 	{ kind: 'missing' | 'current' | 'conflict' } | { kind: 'previous'; mode: number; hash: string };
 
 // Hash only previously shipped helpers. A locally edited file belongs to the application.
-const PREVIOUS_INTL_SHA256 = ['07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98'];
+const PREVIOUS_INTL_HASHES = ['07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98'];
 
-const PREVIOUS_SVG_SHA256 = [
+const PREVIOUS_SVG_HASHES = [
+	'893474efdb9186489e6c0113d1dedaaf9b7d2a0443f8b5d04048680610696bdf',
+	'88de6c9053abe0f94934ebb7cd54cd681e4d2544b3facab0dbdf3d4c588649a5',
 	'62ef936e3ce64cfe809297e08e74538f0c409f0bde6a926ca7b88de93161a38d',
 	'a3d611226ba955f4f5601caa4c6987f0a5a943fab97362843d16f02c686c6944',
 	'058f232bcee5d0caf24d72ec8f9864152b7eb6a9e882614bff3209ff0d145d00',

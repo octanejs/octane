@@ -232,7 +232,14 @@ export function storeSources(
 		}
 		if (candidates.size || specifier.startsWith('.')) {
 			const runtime = runtimeFile(from, specifier);
-			if (runtime) candidates.add(runtime);
+			if (runtime) {
+				// Node resolves symlinks before returning the runtime path.
+				const file =
+					root !== project && inProject(runtime, project)
+						? path.join(root, path.relative(project, runtime))
+						: runtime;
+				candidates.add(file);
+			}
 		}
 		return [...candidates].filter(
 			(file) =>
@@ -409,5 +416,5 @@ export function storeSources(
 		}
 		return exported.has(name);
 	}
-	return { inputFactory, helperFunction };
+	return { inputFactory, helperFunction, localFile };
 }

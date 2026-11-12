@@ -9,9 +9,13 @@ export interface Note {
 export interface TransformOptions {
 	/** Try receiver captures for a Strong effect with an explicit object dependency. */
 	captureEffectReceivers?: boolean;
+	/** Retry empty effect dependency lists with their source-verified ref helpers. */
+	captureEffectHelpers?: boolean;
 	/** Also preserve eligible property triggers at the original effect statement. */
 	snapshotEffectProperties?: boolean;
 	captureEffectSnapshots?: boolean;
+	/** Retry a render-time state update with an equivalent linked boolean. */
+	linkRenderState?: boolean;
 	/** `tsrx` (default) rewrites component bodies as templates; `tsx` keeps JSX and only ports the React APIs. */
 	target?: 'tsx' | 'tsrx';
 	/** Emit Strong-mode source: add `"use strong"` and leave omitted dependency lists to the compiler. */
@@ -22,6 +26,8 @@ export interface TransformOptions {
 	types?: { sourceFile: ts.SourceFile; checker: ts.TypeChecker };
 	/** The new spelling of an import specifier (a renamed module, a binding package), or null to keep it. */
 	resolveSpecifier?(specifier: string): string | null;
+	/** A dispatcher hook directly called by an unchanged local TypeScript export. */
+	localReactHook?(module: string, name: string): string | undefined;
 	/** Resolve a source-backed workspace hook after verifying its implementation and its call sites. */
 	resolveStoreHook?(
 		module: string,

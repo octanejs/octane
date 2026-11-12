@@ -11,6 +11,7 @@ import * as ReactServerBridge from 'octane/react/server';
 import { prerender } from 'octane/static';
 import { createElement as reactElement } from 'react';
 import { compileTypesInspection } from 'octane/compiler/volar';
+import { renderToStaticMarkup } from 'octane/server';
 import ts from 'typescript';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
@@ -92,6 +93,166 @@ export function Redeclared({ ref, label }) {
 		},
 	);
 
+	it('reports a native setup call into a React hook left in an unselected local module', () => {
+		const helper = `import { useState as state } from 'react';
+export function useLabel() { const [label] = state('ready'); return label; }`;
+		const panel = `import { useLabel as read } from './use-label';
+export function Panel() { const label = read(); return <b>{label}</b>; }`;
+		const root = project({
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: {
+					strict: true,
+					jsx: 'react-jsx',
+					moduleResolution: 'bundler',
+					paths: { '@tanstack/react-query': ['./query-hook.ts'] },
+				},
+			}),
+			'use-label.ts': helper,
+			'Late.tsx': panel.replace('./use-label', './rewritten-at-runtime'),
+			'rewritten-at-runtime.ts': helper + String.raw`;ev\u0061l("useLabel=()=> 'ready'");`,
+			'query-hook.ts': helper.replace('useLabel', 'useQuery'),
+			'Catalog.tsx': panel
+				.replace('useLabel', 'useQuery')
+				.replace('./use-label', '@tanstack/react-query'),
+			'Arrow.tsx': panel.replace('function Panel()', 'const Panel = () =>'),
+			'Function.tsx': panel.replace('function Panel()', 'const Panel = function()'),
+			'Memo.tsx': `import { memo as wrap } from 'react';
+${panel.replace('function Panel()', 'const Panel = wrap(() =>')})`,
+			'Forward.tsx': `import * as React from 'react';
+${panel.replace('function Panel()', 'const Panel = React.forwardRef(function Inner(props, ref)')})`,
+			'Sibling.tsx': panel + '\nexport function App() { return <Panel/>; }',
+			'ReactOwned.tsx':
+				"import {ReactCompat} from 'octane/react';\n" +
+				panel +
+				'\nexport function App() { return <ReactCompat><Panel/></ReactCompat>; }',
+			'EscapedInner.tsx': panel
+				.replace('function Panel()', 'const Panel = function Inner()')
+				.replace('return <b>', 'publish(Inner); return <b>'),
+			'UnknownWrapper.tsx':
+				'const wrap = callback => callback;\n' +
+				panel.replace('function Panel()', 'const Panel = wrap(() =>') +
+				')',
+			'Panel.tsx': panel + '\nexport type View = typeof Panel;',
+			'AfterSetup.tsx': `import { useLabel as read } from './use-label';
+export function AfterSetup() {
+	const title = 'Label';
+	const label = read();
+	return <b title={title}>{label}</b>;
+}`,
+			'Skipped.tsx': panel.replace(
+				'const label = read();',
+				"const before = (() => { throw new Error('setup failed'); })(), label = read();",
+			),
+			'Disposal.tsx': panel.replace(
+				'const label = read();',
+				"using before = 'text' as unknown as Disposable; const label = read();",
+			),
+			'WithParam.tsx': panel
+				.replace('./use-label', './with-param')
+				.replace('read()', "read('ready')"),
+			'with-param.ts':
+				helper
+					.replace('useLabel()', 'useLabel(initial: string)')
+					.replace("state('ready')", 'state(initial)') + '\nexport type Reader = typeof useLabel;',
+			'Rebound.tsx': panel.replace('./use-label', './rebound-hook'),
+			'rebound-hook.ts': helper + "\nuseLabel = () => 'ready';",
+
+			'Pure.tsx': panel.replace('./use-label', './pure-hook'),
+			'pure-hook.ts': `import { useState as state } from 'react';
+export function useLabel(state = () => ['ready']) { const [label] = state(); return label; }`,
+			'Unused.tsx': `import { useLabel } from './use-label';
+export function Unused() { const later = () => useLabel(); return <b>ready</b>; }`,
+			'Deferred.tsx': panel.replace('./use-label', './defer'),
+			'defer.ts': `import { useState } from 'react';
+export function useLabel() { const later = () => useState('ready'); return 'ready'; }`,
+			'Changed.tsx': panel.replace('./use-label', './selected'),
+			'selected.ts': helper,
+			'External.tsx': panel.replace('./use-label', './use-external-store'),
+			'use-external-store.ts': `import {useSyncExternalStore} from 'react'; export function useLabel() {return useSyncExternalStore(() => () => {}, () => 'ready', () => 'ready');}`,
+			'Escape.tsx': panel + '\nexport const callback = Panel;',
+			'Shadowed.tsx': panel.replace('./use-label', './js-sibling'),
+			'js-sibling.ts': helper,
+			'AlreadyNative.tsx': panel.replace('./use-label', './native-sibling'),
+			'native-sibling.ts': helper,
+			'native-sibling.tsrx': "export function useLabel(){return 'ready'}",
+			'js-sibling.js': "export function useLabel() { return 'ready'; }",
+		});
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const selected = fs
+			.readdirSync(root)
+			.filter((name) => name.endsWith('.tsx') || name === 'selected.ts');
+		for (const projectTypes of [false, true]) {
+			const run = spawnSync(
+				process.execPath,
+				[
+					path.join(import.meta.dirname, '../dist/bin.js'),
+					'--strong',
+					'--print',
+					'--json',
+					...(projectTypes ? [] : ['--no-project-types']),
+					...selected,
+				],
+				{ cwd: root, encoding: 'utf8' },
+			);
+			expect(run.status).toBe(1);
+			const { files } = JSON.parse(run.stdout);
+			const errors = files.flatMap((f) =>
+				f.notes
+					.filter((n) => n.severity === 'error')
+					.map((n) => [f.file, n.rule, n.line, n.message]),
+			);
+			expect(errors).toEqual([
+				['AfterSetup.tsx', 'bindings', 4, expect.stringMatching(/useLabel.*React.*useState/)],
+				['Arrow.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
+				[
+					'External.tsx',
+					'bindings',
+					2,
+					expect.stringMatching(/useLabel.*React.*useSyncExternalStore/),
+				],
+				['Forward.tsx', 'bindings', 3, expect.stringMatching(/useLabel.*React.*useState/)],
+				['Function.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
+				['Memo.tsx', 'bindings', 3, expect.stringMatching(/useLabel.*React.*useState/)],
+				['Panel.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
+				['Sibling.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
+				['WithParam.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
+			]);
+			expect(files.find((f) => f.file === 'Catalog.tsx').code).toContain(
+				'@octanejs/tanstack-query',
+			);
+			expect(fs.readFileSync(path.join(root, 'use-label.ts'), 'utf8')).toBe(helper);
+		}
+	});
+
+	it('recognizes a local hook selected for an in-place rewrite through a symlink', async () => {
+		const root = project({
+			'Panel.tsx':
+				"import {useLabel} from './use-label'; export function Panel(){const label=useLabel(); return <b>{label}</b>}",
+			'use-label.ts':
+				"import {useState} from 'react'; export function useLabel(){const [label]=useState('ready'); return label}",
+		});
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const selected = path.join(root, 'alias.ts');
+		fs.symlinkSync('use-label.ts', selected);
+		const { files } = await runCodemod([path.join(root, 'Panel.tsx'), selected], {
+			root,
+			strong: true,
+			write: true,
+		});
+		expect(
+			files.find((f) => f.file === 'Panel.tsx').notes.filter((n) => n.severity === 'error'),
+		).toEqual([]);
+		expect(fs.readFileSync(path.join(root, 'use-label.ts'), 'utf8')).toMatch(/from ['"]octane['"]/);
+	});
+
 	it('preserves mapped children passed to an imported inspection component under Vite', async () => {
 		const root = project({
 			'package.json': '{"type":"module"}',
@@ -142,6 +303,66 @@ export const render = (rows: string[]) => renderToStaticMarkup(App, {rows}).html
 			await server.close();
 		}
 	}, 30_000);
+
+	it('keeps custom and sparse map calls in compatibility mode', async () => {
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'tsconfig.json':
+				'{"compilerOptions":{"strict":true,"jsx":"react-jsx","module":"esnext","moduleResolution":"bundler"}}',
+			'Rows.ts': 'export interface Rows { map<T>(render: (value: string) => T): T[] }',
+			'Custom.tsx': `import type { Rows } from './Rows';
+export function Custom({ rows }: { rows: Rows }) {
+	return <ul>{rows.map(label => <li key={label}>{label}</li>)}</ul>;
+}
+export function Cast({ rows }: { rows: unknown }) {
+	return <ul>{(rows as Rows).map(label => <li key={label}>{label}</li>)}</ul>;
+}
+export function Optional({ rows }: { rows: Rows | null }) {
+	return <ul>{rows?.map(label => <li key={label}>{label}</li>)}</ul>;
+}`,
+			'Sparse.tsx': `export function Sparse() {
+	const rows = ['first', , 'last'];
+	return <ul>{rows.map(label => <li key={label ?? 'hole'}>{label ?? 'hole'}</li>)}</ul>;
+}`,
+			'Native.tsx': `export function Native({ rows }: { rows: ReadonlyArray<string> }) {
+	return <ul>{rows.map(label => <li key={label}>{label}</li>)}</ul>;
+}`,
+		});
+		fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+		const { files } = await runCodemod([root], {
+			write: false,
+			strong: true,
+			projectTypes: true,
+			verify: true,
+		});
+		const custom = files.find((entry) => entry.output === 'Custom.tsrx');
+		const sparse = files.find((entry) => entry.output === 'Sparse.tsrx');
+		for (const file of [custom, sparse]) {
+			expect(file.strong).toBe(false);
+			expect(file.code).toContain('rows.map(');
+			expect(file.code).not.toContain('@for');
+			expect(file.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+		}
+		const native = files.find((entry) => entry.output === 'Native.tsrx');
+		expect(native.strong).toBe(true);
+		expect(native.code).toContain('@for');
+
+		const { Custom, Cast, Optional } = loadCompiledFixtureSource(custom.code, {
+			id: custom.output,
+			mode: 'server',
+		});
+		const rows = { map: (render) => [render('custom')] };
+		for (const render of [Custom, Cast, Optional])
+			expect(renderToStaticMarkup(render, { rows }).html).toContain('>custom</li>');
+		const { Sparse } = loadCompiledFixtureSource(sparse.code, {
+			id: sparse.output,
+			mode: 'server',
+		});
+		const html = renderToStaticMarkup(Sparse).html;
+		expect(html).toContain('>first</li>');
+		expect(html).toContain('>last</li>');
+		expect(html).not.toContain('hole');
+	});
 
 	it('warns for element-valued template children and preserves the caller contract', async () => {
 		const root = project({
