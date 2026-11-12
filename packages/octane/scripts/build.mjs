@@ -8,9 +8,9 @@
 //      consumer. build-runtime.mjs emits the bundler ESM tree, the `node`-condition
 //      ESM tree, and CommonJS.
 //   2. The compiler and its separately imported Node adapters are already plain
-//      `.js` — copy them and their hand-written declarations. Bundle only the
-//      Volar entry's third-party graph so published typechecks use the audited
-//      parser/printer versions; Octane's own compiler modules remain shared.
+//      `.js` — copy them and their hand-written declarations. Bundle the patched OXC facade
+//      for the Node parser and the audited parser/printer graph for Volar.
+//      Octane's own compiler modules remain shared.
 //   3. Type declarations (`tsc --emitDeclarationOnly`) alongside the JS.
 //
 // Entry points are GLOBBED from `src/`, not hand-listed — a hand-maintained list
@@ -18,6 +18,7 @@
 // dist shipped with unresolvable imports). verify-dist.mjs backstops the build:
 // every emitted module's relative imports must resolve, every publishConfig export
 // must exist, and every entry point must import cleanly in plain Node.
+import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
 import { cpSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -40,6 +41,27 @@ rmSync(dist, { recursive: true, force: true });
 await buildPublishedRuntime(pkgDir);
 
 cpSync(join(src, 'compiler'), join(dist, 'compiler'), { recursive: true });
+// pnpm workspace patches do not follow Octane into consumer installations.
+// Ship the patched facade while resolving the platform-specific parser on the host.
+const compilerDir = join(src, 'compiler');
+await build({
+	absWorkingDir: compilerDir,
+	entryPoints: ['parser.node.js'],
+	outfile: join(dist, 'compiler/parser.node.js'),
+	bundle: true,
+	format: 'esm',
+	platform: 'node',
+	target: 'esnext',
+	packages: 'external',
+	alias: {
+		'@tsrx/oxc/tsrx-core-compat': fileURLToPath(import.meta.resolve('@tsrx/oxc/tsrx-core-compat')),
+	},
+	external: ['./parser.browser.js', './parser-output.js', './parser-template-shape.js'],
+});
+const oxcDir = dirname(fileURLToPath(import.meta.resolve('@tsrx/oxc/package.json')));
+for (const notice of ['LICENSE', 'THIRD_PARTY_NOTICES.md']) {
+	cpSync(join(oxcDir, notice), join(dist, 'compiler', `oxc-${notice}`));
+}
 await bundleVolarCompiler({ packageDir: pkgDir, outdir: join(dist, 'compiler') });
 // Hand-written declarations for the plain-JS dom-tables module (tsc only emits
 // declarations for the .ts sources). The JSX runtime is likewise a type-only

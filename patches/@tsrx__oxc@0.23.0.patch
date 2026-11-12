@@ -1,8 +1,37 @@
 diff --git a/dist/tsrx-core-compat/facade.js b/dist/tsrx-core-compat/facade.js
-index a5469dfe856464892e7e8ffb9d7b1374b4cc9643..2ba93259e2108fc405b3af957fd9f15263fe4fbd 100644
+index a5469dfe856464892e7e8ffb9d7b1374b4cc9643..4cc524c878af2c91e4a020eacfb7bf7ff2017fb8 100644
 --- a/dist/tsrx-core-compat/facade.js
 +++ b/dist/tsrx-core-compat/facade.js
-@@ -1957,6 +1957,7 @@ const DECLARED_VAR = 2;
+@@ -73,13 +73,18 @@
+ 		showSemanticErrors: true
+ 	});
+ }
+-const TYPESCRIPT_PARSER_OPTIONS = ordinaryParserOptions("ts");
++const JAVASCRIPT_PARSER_OPTIONS = ordinaryParserOptions("ts");
++const TYPESCRIPT_PARSER_OPTIONS = Object.freeze({
++	...JAVASCRIPT_PARSER_OPTIONS,
++	astType: "ts"
++});
+ const TYPESCRIPT_REACT_PARSER_OPTIONS = Object.freeze({
+ 	...ordinaryParserOptions("tsx"),
+ 	astType: "ts"
+ });
+ const TYPESCRIPT_DEFINITION_PARSER_OPTIONS = ordinaryParserOptions("dts");
+ const PRESERVED_PARENS_PARSER_OPTIONS = new Map([
++	JAVASCRIPT_PARSER_OPTIONS,
+ 	TYPESCRIPT_PARSER_OPTIONS,
+ 	TYPESCRIPT_REACT_PARSER_OPTIONS,
+ 	TYPESCRIPT_DEFINITION_PARSER_OPTIONS
+@@ -102,7 +107,7 @@
+ 	if (pathname.endsWith(".object.ts")) return TYPESCRIPT_REACT_PARSER_OPTIONS;
+ 	if (pathname.endsWith(".ts") || pathname.endsWith(".mts") || pathname.endsWith(".cts")) return TYPESCRIPT_PARSER_OPTIONS;
+ 	if (pathname.endsWith(".jsx")) return TYPESCRIPT_REACT_PARSER_OPTIONS;
+-	if (pathname.endsWith(".js") || pathname.endsWith(".mjs") || pathname.endsWith(".cjs")) return TYPESCRIPT_PARSER_OPTIONS;
++	if (pathname.endsWith(".js") || pathname.endsWith(".mjs") || pathname.endsWith(".cjs")) return JAVASCRIPT_PARSER_OPTIONS;
+ 	return eagerTsrx ? EAGER_PARSER_OPTIONS : PARSER_OPTIONS;
+ }
+ const DYNAMIC_TAG_REFERENCE_MESSAGE = "A dynamic tag expression must be an identifier, a member access such as `props.as` or `registry[name]`, or a string literal. Compute anything else before the element: `const Tag = c ? Child : Fallback;`, then `<{Tag} />`.";
+@@ -1957,6 +1962,7 @@
  const DECLARED_TYPE = 4;
  const DECLARED_ENUM = 8;
  const DECLARED_EXPORT_ONLY = 16;
@@ -10,7 +39,7 @@ index a5469dfe856464892e7e8ffb9d7b1374b4cc9643..2ba93259e2108fc405b3af957fd9f152
  function scopeHas(scope, name, kind) {
  	return scope.names !== null && ((scope.names.get(name) ?? 0) & kind) !== 0;
  }
-@@ -2116,7 +2117,14 @@ function scopeDiagnostics(program, source) {
+@@ -2116,7 +2122,14 @@
  		scopeAdd(scope, name, kind);
  		if (scope.flags & SCOPE_TOP) undefinedExports.delete(name);
  	};
@@ -26,7 +55,7 @@ index a5469dfe856464892e7e8ffb9d7b1374b4cc9643..2ba93259e2108fc405b3af957fd9f152
  	const tasks = [];
  	const enterBlock = () => enter(0);
  	const enterVarScope = () => enter(SCOPE_VAR);
-@@ -2291,11 +2299,15 @@ function scopeDiagnostics(program, source) {
+@@ -2291,11 +2304,15 @@
  			case "ImportDeclaration":
  				for (const specifier of node.specifiers ?? []) {
  					const local = specifier?.local;

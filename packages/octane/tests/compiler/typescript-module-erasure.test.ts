@@ -96,6 +96,24 @@ function moduleRecord(code: string) {
 }
 
 describe('compile() erases TypeScript-only syntax from .ts modules', () => {
+	it.each(['ts', 'mts', 'cts'])(
+		'links .%s modules with type imports and import attributes',
+		(ext) => {
+			const code = compileWith(
+				'native',
+				`
+			import type { Model } from './types.mjs';
+			import { type Bar, baz } from './values.mjs';
+			export type Data = typeof import('./data.json', { with: { type: 'json' } });
+			export const value: Model & Bar = baz;
+		`,
+				`/src/data.${ext}`,
+				{ mode: 'client' },
+			);
+			expect(evaluate(code, `data-${ext}.mjs`, 'm.value')).toBe(3);
+		},
+	);
+
 	for (const parserName of PARSERS) {
 		for (const mode of MODES) {
 			it(`links and evaluates as plain JavaScript (${parserName} parser, ${mode})`, () => {
