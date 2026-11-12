@@ -427,6 +427,43 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		return key?.startsWith('g:') && !key.includes('.') ? key.slice(2) : null;
 	}
 
+	function browserGlobal(expression) {
+		const node = unwrap(expression);
+		return node?.type === 'Identifier' && GLOBAL_OBJECTS.has(node.name) && bindingOf(node) === null;
+	}
+
+	// Only the receiver is bound. Extra call arguments can be ignored or forwarded
+	// as data; they are not additional callbacks invoked by the scheduler.
+	function boundScheduler(callee, args, depth = 0) {
+		if (callee?.type === 'Identifier' && depth < 8) {
+			const binding = bindingOf(callee);
+			const init = stableInit(binding);
+			if (init == null || init.end > callee.start || !varInitialized(binding, callee)) return null;
+			return boundScheduler(init, args, depth + 1);
+		}
+		if (callee?.type !== 'CallExpression' || callee.optional || callee.arguments.length !== 1)
+			return null;
+		const method = unwrap(callee.callee);
+		if (
+			method?.type !== 'MemberExpression' ||
+			method.optional ||
+			memberName(method) !== 'bind' ||
+			!browserGlobal(callee.arguments[0])
+		)
+			return null;
+		const target = unwrap(method.object);
+		const name =
+			target.type === 'MemberExpression' && !target.optional && browserGlobal(target.object)
+				? memberName(target)
+				: target.type === 'Identifier' && bindingOf(target) === null
+					? target.name
+					: null;
+		if (args[0]?.type === 'SpreadElement') return null;
+		if (name === 'queueMicrotask' && args.length === 1) return name;
+		if (name === 'setTimeout' && args.length <= 2) return name;
+		return null;
+	}
+
 	function zeroDelay(expression) {
 		if (expression == null) return true;
 		const value = staticValue(expression);
@@ -1591,7 +1628,7 @@ export function createStrongEffectPolicy({ ast, analysis, callNames, report }) {
 		runsBeforePaint(node) {
 			if (callNames.get(node) === 'startTransition') return 'sync';
 			const callee = unwrap(node.callee);
-			const name = globalFunction(callee);
+			const name = globalFunction(callee) ?? boundScheduler(callee, node.arguments);
 			if (name === 'queueMicrotask') return 'yield';
 			if (name === 'setTimeout') {
 				const handler = unwrap(node.arguments?.[0]);
