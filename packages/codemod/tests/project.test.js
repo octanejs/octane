@@ -3133,6 +3133,11 @@ describe('scoped signal recipe', () => {
 });
 
 describe('React Intl project migration', () => {
+	const opaqueFormatter = expect.objectContaining({
+		rule: 'bindings',
+		severity: 'error',
+		message: expect.stringContaining('React Intl formatter'),
+	});
 	const localeCode = `import { useIntl as useLocale, FormattedMessage, type IntlShape, defineMessages } from 'react-intl';
 export function Greeting({ count }: { count: number }) {
 	const intl = useLocale();
@@ -3148,6 +3153,38 @@ export function Greeting({ count }: { count: number }) {
 		}
 		return root;
 	}
+	it.each([false, true])(
+		'reports opaque formatter ownership in native calls and generated rich islands (projectTypes=%s)',
+		async (projectTypes) => {
+			const direct = `import {useIntl} from 'react-intl'; export function Text() {
+				const intl=useIntl(); return <p title={intl.formatMessage({id:'label',defaultMessage:'Ready'})}/>;
+			}`;
+			const rich = `import {FormattedMessage as Message} from 'react-intl'; export function Rich(){
+				return <div><Message id="more" defaultMessage="Read <em>more</em>" values={{em: part => <em>{part}</em>}}/></div>;
+			}`;
+			const root = setup({
+				'Direct.tsx': direct,
+				'Rich.tsx': rich,
+				'Closed.tsx': `import './setup'; import {IntlProvider} from 'react-intl';
+					${direct.replace('export function Text', 'function Text')}
+					export function Page(){return <IntlProvider locale="en"><Text/></IntlProvider>;}`,
+				'setup.ts': `import {IntlProvider} from 'react-intl';
+					IntlProvider.defaultProps = {...IntlProvider.defaultProps, messages: {label:'patched'}};`,
+			});
+			const result = await runCodemod(
+				['Direct.tsx', 'Rich.tsx', 'Closed.tsx'].map((name) => path.join(root, name)),
+				{ root, write: false, strong: true, projectTypes },
+			);
+			for (const name of ['Direct.tsx', 'Rich.tsx', 'Closed.tsx']) {
+				const file = result.files.find((f) => f.file === name);
+				const isRich = file.file === 'Rich.tsx';
+				expect(file.notes.filter((d) => d.message.includes('React Intl formatter'))).toEqual([
+					opaqueFormatter,
+				]);
+				expect(file.code).toContain(isRich ? 'IntlBoundary' : 'intl.formatMessage(');
+			}
+		},
+	);
 	it('migrates a locale binding only below its own React Intl provider', async () => {
 		const enclosed = `import {IntlProvider as Provider, useIntl} from 'react-intl';
 			function Locale() { const { locale } = useIntl(); return <p lang={locale}/>; }
@@ -3246,7 +3283,9 @@ export function Greeting({ count }: { count: number }) {
 		});
 		const page = both.files.find((f) => f.file === 'src/Greeting.tsx');
 		expect(page.rules['react-intl']).toBe(1);
-		expect([...page.notes, ...page.diagnostics].filter((d) => d.severity === 'error')).toEqual([]);
+		expect([...page.notes, ...page.diagnostics].filter((d) => d.severity === 'error')).toEqual([
+			opaqueFormatter,
+		]);
 	});
 	it('follows a localized prop through one selected component into its returned input', async () => {
 		const pages = {
@@ -3333,10 +3372,15 @@ export function Greeting({ count }: { count: number }) {
 				{ root, write: false, strong: true, projectTypes: false },
 			);
 			const page = results.find((f) => f.file === 'src/Greeting.tsx');
-			expect(page.notes.some((n) => n.rule === 'bindings' && n.severity === 'error')).toBe(
-				!expected,
-			);
-			if (expected) expect(page.rules['react-intl']).toBe(1);
+			const errors = page.notes.filter((n) => n.rule === 'bindings' && n.severity === 'error');
+			if (expected) {
+				expect(errors).toEqual([opaqueFormatter]);
+				expect(page.rules['react-intl']).toBe(1);
+			} else {
+				expect(errors).toContainEqual(
+					expect.objectContaining({ message: expect.stringContaining('is a React hook') }),
+				);
+			}
 		}
 	});
 	it('defers a forwarded attribute when the caller resolves components in a nested project', async () => {
@@ -3395,7 +3439,9 @@ export function Greeting({ count }: { count: number }) {
 			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
 		);
 		expect(page.rules['react-intl']).toBe(1);
-		expect([...page.notes, ...page.diagnostics].filter((n) => n.severity === 'error')).toEqual([]);
+		expect([...page.notes, ...page.diagnostics].filter((n) => n.severity === 'error')).toEqual([
+			opaqueFormatter,
+		]);
 	});
 	it('keeps the formatter diagnostic when a wrapper may observe or render its raw value', async () => {
 		const wrappers = [
@@ -3469,9 +3515,9 @@ export function Locale() { return <IntlProvider locale="en"><b>test</b></IntlPro
 		});
 		const result = preview.files.find((f) => f.file === 'src/Greeting.tsx');
 		expect(result.strong).toBe(true);
-		expect([...result.notes, ...result.diagnostics].filter((d) => d.severity === 'error')).toEqual(
-			[],
-		);
+		expect([...result.notes, ...result.diagnostics].filter((d) => d.severity === 'error')).toEqual([
+			opaqueFormatter,
+		]);
 		expect(result.code).toContain(
 			"useIntl as useLocale, FormattedMessage } from './octane-react-intl.tsrx'",
 		);
