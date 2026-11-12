@@ -372,6 +372,26 @@ function nodeSpanning(sf: ts.SourceFile, start: number, end: number): ts.Node | 
 	}
 }
 
+function rowKeyLiteral(node: ts.Expression) {
+	node = skipWrappers(node);
+	if (ts.isPrefixUnaryExpression(node)) {
+		const operand = skipWrappers(node.operand);
+		if (node.operator === ts.SyntaxKind.PlusToken) return ts.isNumericLiteral(operand);
+		return (
+			node.operator === ts.SyntaxKind.MinusToken &&
+			(ts.isNumericLiteral(operand) || ts.isBigIntLiteral(operand))
+		);
+	}
+	return (
+		ts.isStringLiteralLike(node) ||
+		ts.isNumericLiteral(node) ||
+		ts.isBigIntLiteral(node) ||
+		node.kind === ts.SyntaxKind.TrueKeyword ||
+		node.kind === ts.SyntaxKind.FalseKeyword ||
+		node.kind === ts.SyntaxKind.NullKeyword
+	);
+}
+
 /**
  * The attribute an element sets by `name`.
  */
@@ -4339,6 +4359,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				);
 				return null;
 			}
+			if (setup.length && !this.rowKeyCanMove(key, item, iterable, setup)) {
+				this.note(
+					RULE.for,
+					'warning',
+					attribute,
+					'This row runs setup before reading its key, so the list stays a `.map()`.',
+				);
+				return null;
+			}
 			this.removed.add(attribute);
 			const opening = attribute.parent.parent;
 			if (
@@ -4432,6 +4461,41 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			return node.forEachChild(exitsWithValue);
 		};
 		return statements.some(exitsWithValue) ? null : exits;
+	}
+
+	/** An @for header evaluates its key before the row body runs. */
+	rowKeyCanMove(
+		key: ts.Expression,
+		item: ts.ParameterDeclaration,
+		iterable: ts.Expression,
+		setup: ts.Statement[],
+	) {
+		if (!ts.isIdentifier(item.name)) return false;
+		if (rowKeyLiteral(key)) return true;
+		key = skipWrappers(key);
+		const source = skipWrappers(iterable);
+		if (
+			ts.isIdentifier(key) &&
+			this.declarationOf(key) === item &&
+			ts.isArrayLiteralExpression(source) &&
+			source.elements.every(rowKeyLiteral) &&
+			fixedBinding(this.checker, key, key)
+		) {
+			return true;
+		}
+
+		// Even an accessor key can precede initialization that reads nothing.
+		return (
+			setup.every(
+				(statement) =>
+					ts.isVariableStatement(statement) &&
+					(statement.declarationList.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
+					statement.declarationList.declarations.every(
+						({ name, initializer }) =>
+							ts.isIdentifier(name) && initializer !== undefined && rowKeyLiteral(initializer),
+					),
+			) && !reads(key, (name) => name.text === 'eval' && !isPropertyName(name))
+		);
 	}
 
 	readsLocals(expression: ts.Node, statements: ts.Statement[]) {
