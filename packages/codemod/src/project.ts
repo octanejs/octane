@@ -230,6 +230,19 @@ export async function runCodemod(
 		).resolvedModule;
 		return target?.resolvedFileName === original?.resolvedFileName ? (target ?? null) : undefined;
 	}
+	function installedReact(file: string) {
+		const dir = path.dirname(file);
+		if (ts.findConfigFile(dir, ts.sys.fileExists) !== rootProject) return false;
+		const target = originalModule(file, 'react');
+		if (!target || !['react', '@types/react'].includes(target.packageId?.name ?? '')) return false;
+		// TypeScript can resolve @types/react even when the runtime is missing or linked locally.
+		const runtime = readInstalled(dir, 'react');
+		return (
+			runtime?.manifest.name === 'react' &&
+			fs.realpathSync(runtime.dir).split(path.sep).includes('node_modules') &&
+			fs.realpathSync(target.resolvedFileName).split(path.sep).includes('node_modules')
+		);
+	}
 	const inlineCompatDirs = new Map<string, boolean>();
 	function supportsInlineReactCompat(file: string) {
 		const issuer = path.dirname(file);
@@ -630,14 +643,17 @@ export async function runCodemod(
 				? (specifier: string, color?: string) => pathSvgAdapter(file, specifier, svgErrors, color)
 				: undefined;
 		const transform = (
-			captureEffectReceivers: boolean | 'properties' = false,
 			notes = extra,
-			captureEffectSnapshots = false,
+			retry?: 'effectReceivers' | 'effectProperties' | 'effectSnapshots' | 'linkedState',
 		) =>
 			transformModule(source, file, {
-				captureEffectReceivers: !!captureEffectReceivers,
-				snapshotEffectProperties: captureEffectReceivers === 'properties',
-				captureEffectSnapshots,
+				captureEffectReceivers:
+					retry === 'effectReceivers' ||
+					retry === 'effectProperties' ||
+					retry === 'effectSnapshots',
+				snapshotEffectProperties: retry === 'effectProperties',
+				captureEffectSnapshots: retry === 'effectSnapshots',
+				linkRenderState: retry === 'linkedState' && installedReact(file),
 				target,
 				reactIntlAdapter: intl,
 				forwardedText: (module, name, prop, ordinaryCaller, through) =>
@@ -707,7 +723,7 @@ export async function runCodemod(
 			});
 		if (intl && adapterError) {
 			// Public utilities such as defineMessages can stay on React Intl without a helper.
-			const needsAdapter = transform(false, []).rules['react-intl'];
+			const needsAdapter = transform([]).rules['react-intl'];
 			intl = undefined;
 			if (needsAdapter) {
 				const note: Note = {
@@ -772,9 +788,10 @@ export async function runCodemod(
 			if (strong && result.template) {
 				const strengthened = strengthen(compiler, code, output, {
 					force: options.forceStrong,
-					withEffectReceivers: () => transform(true, []).code,
-					withEffectProperties: () => transform('properties', []).code,
-					withEffectSnapshots: () => transform(true, [], true).code,
+					withEffectReceivers: () => transform([], 'effectReceivers').code,
+					withEffectProperties: () => transform([], 'effectProperties').code,
+					withEffectSnapshots: () => transform([], 'effectSnapshots').code,
+					withLinkedState: () => transform([], 'linkedState').code,
 				});
 				code = strengthened.code;
 				isStrong = strengthened.strong;
