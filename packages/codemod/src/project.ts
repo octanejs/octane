@@ -25,8 +25,10 @@ import { bind, projectTypeAt, textKind, transformModule } from './transform.js';
 import { forwardedProps } from './forwarded-props.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
-/** React packages and the Octane package that replaces each. */
+const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|17\.(?:0|[1-9]\d*))$/;
+/** React packages and the Octane entry point that replaces each. */
 const CATALOG = { ...DATA.reactPackages, ...PORTED_PACKAGES };
+const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies'];
 /** A package that, by its name, renders through React. */
 const REACT_PACKAGE = /^(?:react-|@[^/]+\/react(?:-|\/|$)|[^/]+\/react$)|-react(?:\/|$)/;
 
@@ -217,9 +219,8 @@ export async function runCodemod(
 			);
 		});
 	}
-	// Null identifies a resolved alias, while undefined means TypeScript found no source.
-	function originalModule(file: string, module: string, project = config) {
-		const bindings = { moduleResolution: ts.ModuleResolutionKind.Bundler, ...project };
+	function originalModule(file: string, module: string, options = config) {
+		const bindings = { moduleResolution: ts.ModuleResolutionKind.Bundler, ...options };
 		const target = ts.resolveModuleName(module, file, bindings, ts.sys).resolvedModule;
 		const original = ts.resolveModuleName(
 			module,
@@ -227,34 +228,20 @@ export async function runCodemod(
 			{ ...bindings, paths: undefined, baseUrl: undefined },
 			ts.sys,
 		).resolvedModule;
-		return target && target.resolvedFileName !== original?.resolvedFileName ? null : target;
+		return target?.resolvedFileName === original?.resolvedFileName ? (target ?? null) : undefined;
 	}
-	function projectSpecifier(
-		file: string,
-		specifier: string,
-		packages: Map<string, string>,
-		notes: Note[],
-	) {
-		const rename = resolveRename(file, specifier);
-		if (rename) return rename;
-		if (specifier === 'radix-ui') {
-			const bindings = tsconfigOptions(path.dirname(file));
-			if (
-				(bindings?.paths || bindings?.baseUrl) &&
-				originalModule(file, specifier, bindings) === null
-			) {
-				notes.push({
-					rule: 'bindings',
-					severity: 'error',
-					line: 1,
-					message:
-						'`radix-ui` resolves to a different module through a TypeScript alias. Review the local component before migrating this import.',
-				});
-				return null;
-			}
-		}
-		return resolveBinding(specifier, packages, notes);
-	}
+	const bindingProject = {
+		root,
+		original(file: string, module: string) {
+			const dir = path.dirname(file);
+			const options =
+				ts.findConfigFile(dir, ts.sys.fileExists) === rootProject ? config : tsconfigOptions(dir);
+			return (
+				(!options?.paths && !options?.baseUrl) ||
+				originalModule(file, module, options) !== undefined
+			);
+		},
+	};
 	// One shared context per project, including separate file-by-file migrations.
 	const sourceDir = path.join(root, 'src');
 	const adapter = path.join(
@@ -284,7 +271,7 @@ export async function runCodemod(
 				!!lib &&
 				lib.manifest.name === 'react-intl' &&
 				/^7\./.test(lib.version) &&
-				/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(octane) &&
+				ADAPTER_OCTANE_VERSION.test(octane) &&
 				['react', 'react-dom'].every((name) =>
 					/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(base, name)?.version ?? ''),
 				) &&
@@ -343,7 +330,7 @@ export async function runCodemod(
 		target === 'tsrx' &&
 		compiler &&
 		reactCompat &&
-		/^0\.16\.(?:[7-9]|[1-9]\d+)$/.test(readInstalled(helperDir, 'octane')?.version ?? '')
+		ADAPTER_OCTANE_VERSION.test(readInstalled(helperDir, 'octane')?.version ?? '')
 			? createScopedStorePlanner(helperDir, storeBridge, config ?? undefined)
 			: null;
 	const { inputFactory, helperFunction } = storeSources(root, config, (file, source) => {
@@ -363,7 +350,9 @@ export async function runCodemod(
 			get types() {
 				return typesOf(file);
 			},
-			resolveSpecifier: (specifier) => projectSpecifier(file, specifier, new Map(), []),
+			resolveSpecifier: (specifier) =>
+				resolveRename(file, specifier) ??
+				resolveBinding(specifier, file, bindingProject, new Map(), []),
 		}).changed;
 	});
 	const checkedHelpers = new Map<string, { code: string; state: AdapterState; error?: string }>();
@@ -580,10 +569,15 @@ export async function runCodemod(
 							.replace(/\.ts$/, '');
 						return { from: relative.startsWith('.') ? relative : './' + relative, name: plan.name };
 					};
-		const transform = (captureEffectReceivers: boolean | 'properties' = false, notes = extra) =>
+		const transform = (
+			captureEffectReceivers: boolean | 'properties' = false,
+			notes = extra,
+			captureEffectSnapshots = false,
+		) =>
 			transformModule(source, file, {
 				captureEffectReceivers: !!captureEffectReceivers,
 				snapshotEffectProperties: captureEffectReceivers === 'properties',
+				captureEffectSnapshots,
 				target,
 				reactIntlAdapter: intl,
 				forwardedText: (module, name, prop, ordinaryCaller, through) =>
@@ -601,7 +595,9 @@ export async function runCodemod(
 				get types() {
 					return (types ??= typesOf(file));
 				},
-				resolveSpecifier: (specifier) => projectSpecifier(file, specifier, packages, notes),
+				resolveSpecifier: (specifier) =>
+					resolveRename(file, specifier) ??
+					resolveBinding(specifier, file, bindingProject, packages, notes),
 				isContext,
 				elementChild: !elementExports.size
 					? undefined
@@ -714,6 +710,7 @@ export async function runCodemod(
 					force: options.forceStrong,
 					withEffectReceivers: () => transform(true, []).code,
 					withEffectProperties: () => transform('properties', []).code,
+					withEffectSnapshots: () => transform(true, [], true).code,
 				});
 				code = strengthened.code;
 				isStrong = strengthened.strong;
@@ -794,7 +791,7 @@ export async function runCodemod(
 			file: string;
 			source: string;
 			state: AdapterState;
-			previous: string;
+			previous: readonly string[];
 			rule: string;
 		}[] = [];
 		if (adapterState && adapterSource && intlConsumer)
@@ -913,21 +910,27 @@ export async function runCodemod(
 }
 
 type AdapterState =
-	{ kind: 'missing' | 'current' | 'conflict' } | { kind: 'previous'; mode: number };
+	{ kind: 'missing' | 'current' | 'conflict' } | { kind: 'previous'; mode: number; hash: string };
 
 // Hash only previously shipped helpers. A locally edited file belongs to the application.
-const PREVIOUS_INTL_SHA256 = '07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98';
+const PREVIOUS_INTL_SHA256 = ['07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98'];
 
-const PREVIOUS_SVG_SHA256 = '3becf859871f17914f6f0631e8db8058aa4932fd4a9817718b98eb247a902b24';
+const PREVIOUS_SVG_SHA256 = [
+	'a3d611226ba955f4f5601caa4c6987f0a5a943fab97362843d16f02c686c6944',
+	'3becf859871f17914f6f0631e8db8058aa4932fd4a9817718b98eb247a902b24',
+	'1dbf34eea75c07c21c8ab3814d54e58115e833aa140fc5f34b5f2cba91d018c3',
+];
 
-function inspectAdapter(file: string, source: string, previous?: string): AdapterState {
+function inspectAdapter(file: string, source: string, previous?: readonly string[]): AdapterState {
 	const stat = fs.lstatSync(file, { throwIfNoEntry: false });
 	if (!stat) return { kind: 'missing' };
 	if (!stat.isFile()) return { kind: 'conflict' };
 	const bytes = fs.readFileSync(file);
 	if (bytes.equals(Buffer.from(source))) return { kind: 'current' };
-	if (previous && createHash('sha256').update(bytes).digest('hex') === previous)
-		return { kind: 'previous', mode: stat.mode & 0o777 };
+	if (previous) {
+		const hash = createHash('sha256').update(bytes).digest('hex');
+		if (previous.includes(hash)) return { kind: 'previous', mode: stat.mode & 0o777, hash };
+	}
 	return { kind: 'conflict' };
 }
 
@@ -935,7 +938,10 @@ function canPublishAdapter(current: AdapterState, planned: AdapterState): boolea
 	return (
 		current.kind === 'current' ||
 		(current.kind === 'missing' && planned.kind === 'missing') ||
-		(current.kind === 'previous' && planned.kind === 'previous' && current.mode === planned.mode)
+		(current.kind === 'previous' &&
+			planned.kind === 'previous' &&
+			current.mode === planned.mode &&
+			current.hash === planned.hash)
 	);
 }
 
@@ -943,7 +949,7 @@ function publishAdapter(
 	file: string,
 	source: string,
 	planned: AdapterState,
-	previous: string,
+	previous: readonly string[],
 ): boolean {
 	const current = inspectAdapter(file, source, previous);
 	if (current.kind === 'current') return true;
@@ -966,7 +972,7 @@ function publishAdapter(
 		fs.chmodSync(next, current.mode);
 		const latest = inspectAdapter(file, source, previous);
 		if (latest.kind !== 'previous') return latest.kind === 'current';
-		if (latest.mode !== current.mode) return false;
+		if (!canPublishAdapter(latest, current)) return false;
 		fs.renameSync(next, file);
 		return true;
 	} finally {
@@ -1250,22 +1256,57 @@ function contextIndex(
  * The binding that replaces a React package import, recorded so the report
  * can list the dependency changes.
  */
-function resolveBinding(specifier: string, packages: Map<string, string>, notes: Note[]) {
+function resolveBinding(
+	specifier: string,
+	file: string,
+	project: { root: string; original: (file: string, module: string) => boolean },
+	packages: Map<string, string>,
+	notes: Note[],
+) {
+	if (specifier === 'radix-ui' && !project.original(file, specifier)) {
+		notes.push({
+			rule: 'bindings',
+			severity: 'error',
+			line: 1,
+			message:
+				'`radix-ui` resolves to a different module through a TypeScript alias. Review the local component before migrating this import.',
+		});
+		return null;
+	}
 	const name = catalogName(specifier);
 	if (name === null) return null;
-	const binding = CATALOG[name];
-	packages.set(name, binding);
+	const target = CATALOG[name];
+	const binding = packageName(target);
 	const entry = DATA.bindings.find((candidate) => candidate.name === binding);
+	const subpath = target.slice(binding.length) + specifier.slice(name.length);
+	const served = entry && entry.exports.some((key) => serves(key, `.${subpath}`));
+	if (target !== binding) {
+		const shadowed = [specifier, binding + subpath].find((name) => !project.original(file, name));
+		const message = shadowed
+			? `Resolve \`${shadowed}\` to its original package before migrating this import.`
+			: !served || !canUseBindingSubpath(file, project.root, binding, subpath, entry.version)
+				? `Install a version of \`${binding}\` that exports \`.${subpath}\` before migrating this import.`
+				: null;
+		if (message) {
+			notes.push({ rule: 'bindings', severity: 'error', line: 1, message });
+			return null;
+		}
+	}
+	packages.set(name, binding);
 	// An aggregate binding (`@octanejs/visx`, for `@visx/visx`) serves each
 	// package of its scope from a subpath: `@visx/hierarchy` is
 	// `@octanejs/visx/hierarchy`.
 	const upstream = entry?.upstream?.package;
 	const aggregate = upstream?.match(/^@([^/]+)\/\1$/);
-	if (aggregate && name !== upstream && name.startsWith(`@${aggregate[1]}/`)) {
+	if (
+		target === binding &&
+		aggregate &&
+		name !== upstream &&
+		name.startsWith(`@${aggregate[1]}/`)
+	) {
 		return `${binding}/${name.slice(aggregate[1].length + 2)}${specifier.slice(name.length)}`;
 	}
-	const subpath = specifier.slice(name.length);
-	if (subpath === '' || entry?.exports.some((key) => serves(key, `.${subpath}`))) {
+	if (subpath === '' || served) {
 		return binding + subpath;
 	}
 	// A binding outside the catalog has exports the codemod cannot see.
@@ -1285,6 +1326,49 @@ function resolveBinding(specifier: string, packages: Map<string, string>, notes:
 				},
 	);
 	return binding + subpath;
+}
+
+function canUseBindingSubpath(
+	file: string,
+	root: string,
+	binding: string,
+	subpath: string,
+	version: string,
+) {
+	const dir = path.dirname(file);
+	const installed = readInstalled(dir, binding);
+	if (installed) {
+		if (installed.manifest.name !== binding) return false;
+		const entry = record(installed.manifest.exports)[`.${subpath}`];
+		let target = entry;
+		if (isRecord(entry)) {
+			const conditions = Object.entries(entry);
+			if (conditions.some(([key]) => !['types', 'import', 'require', 'default'].includes(key)))
+				return false;
+			target = conditions.find(([key]) => key === 'import' || key === 'default')?.[1];
+		}
+		if (typeof target !== 'string' || !target.startsWith('./')) return false;
+		const resolved = path.resolve(installed.dir, target);
+		return (
+			resolved.startsWith(installed.dir + path.sep) &&
+			fs.statSync(resolved, { throwIfNoEntry: false })?.isFile()
+		);
+	}
+	// New dependencies use the catalog version. For a different declaration,
+	// require an installed export before rewriting its imports.
+	for (const project of new Set([root, findRoot(dir)])) {
+		const manifestFile = path.join(project, 'package.json');
+		if (!fs.existsSync(manifestFile)) continue;
+		const manifest = record(JSON.parse(fs.readFileSync(manifestFile, 'utf8')));
+		if (
+			DEPENDENCY_FIELDS.some((field) => {
+				const spec = record(manifest[field])[binding];
+				return spec !== undefined && spec !== version && spec !== `^${version}`;
+			})
+		)
+			return false;
+	}
+	return true;
 }
 
 /**
@@ -1360,16 +1444,15 @@ function addBindings(
 	const text = fs.readFileSync(file, 'utf8');
 	const manifest: unknown = JSON.parse(text);
 	if (packages.size === 0) return [];
-	const fields = ['dependencies', 'devDependencies', 'peerDependencies'];
 	if (
 		!isRecord(manifest) ||
-		fields.some((field) => manifest[field] !== undefined && !isRecord(manifest[field]))
+		DEPENDENCY_FIELDS.some((field) => manifest[field] !== undefined && !isRecord(manifest[field]))
 	) {
 		throw new Error('Cannot add bindings to malformed package.json dependency fields.');
 	}
 	const added: CodemodResult['dependencies'] = [];
 	for (const [from, to] of packages) {
-		if (fields.some((field) => record(manifest[field])[to] !== undefined)) continue;
+		if (DEPENDENCY_FIELDS.some((field) => record(manifest[field])[to] !== undefined)) continue;
 		const version = DATA.bindings.find((binding) => binding.name === to)?.version;
 		const range = version ? `^${version}` : 'latest';
 		const field = record(manifest.devDependencies)[packageName(from)]

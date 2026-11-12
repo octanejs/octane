@@ -72,6 +72,8 @@ export interface ServerManifest {
 	};
 	/** config `router.preHydrate`, serialized into #__octane_data for the client entry */
 	preHydrate?: string | null;
+	/** The config's `data` module, opened per request, and the root it renders routes inside. */
+	data?: RouteDataEntry | null;
 	/** Map of entry path → `module server` namespace for RPC support */
 	rpcModules?: Record<string, Record<string, Function>>;
 	/** Platform primitives (adapter's, or the generated entry's Node defaults) */
@@ -141,4 +143,19 @@ export function createRootBoundaryWrapper(
 	Content: Component,
 	boundary: { pending?: Component | null; catch?: Component | null },
 	runtime: { Suspense: Component; ErrorBoundary: Component; createElement: Function },
+): Component;
+
+export interface RouteDataEntry {
+	/** The module's project-root ID, serialized for the client entry. */
+	path: string;
+	open: import('@octanejs/app-core').RouteDataOpener;
+	/** `DataRoot` from `@octanejs/app-core/data-root`, compiled for the server. */
+	Root: Component<{ store: import('@octanejs/app-core').RouteDataStore; children?: unknown }>;
+}
+
+/** Render a route inside the config's `data` store, opened for this request and seeded once it has rendered. */
+export function provideRouteData(
+	context: import('@octanejs/app-core').Context,
+	data: RouteDataEntry | null | undefined,
+	Root: Component,
 ): Component;

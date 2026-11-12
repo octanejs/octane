@@ -23,6 +23,7 @@ import { queueRootDeletion, journalBag, journalObjectOnce } from './commit.js';
 import { getFirstChild, getNextSibling } from './templates.js';
 import { eventSlot, devEventListener } from './events.js';
 import { ROOT_RENDER_ROLLBACK, TRANSITION_JOURNAL } from './drivers.js';
+import { RENDERER_REGION_OWNER_COUNT, rendererRegionOwnerForBlock } from './context.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -450,6 +451,12 @@ export function injectStyle(id: string, css: string, nonce?: string): void {
 
 const _resourceHints = new Set<string>();
 
+function hostedResourceHints() {
+	return RENDERER_REGION_OWNER_COUNT
+		? rendererRegionOwnerForBlock(CURRENT_BLOCK)?.resourceHints
+		: undefined;
+}
+
 /** Known-hint check shared by insertHeadHint and cross-family suppression. */
 function hasHeadHint(key: string): boolean {
 	if (_resourceHints.has(key)) return true;
@@ -543,6 +550,8 @@ function applyHintAttrs(el: Element, opts: Record<string, unknown> | undefined):
 
 /** React DOM `preload(href, {as, …})` — `<link rel="preload">`. */
 export function preload(href: string, options: { as: string } & Record<string, unknown>): void {
+	const hints = hostedResourceHints();
+	if (hints) return hints.preload(href, options);
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preload', href, options);
 		if (warning !== null) console.error(warning);
@@ -615,6 +624,8 @@ export function preload(href: string, options: { as: string } & Record<string, u
  * its element when called, not at a commit.
  */
 export function preinit(href: string, options: { as: string } & Record<string, unknown>): void {
+	const hints = hostedResourceHints();
+	if (hints) return hints.preinit(href, options);
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preinit', href, options);
 		if (warning !== null) console.error(warning);
@@ -642,6 +653,8 @@ export function preinit(href: string, options: { as: string } & Record<string, u
 
 /** React DOM `preconnect(href, {crossOrigin?})` — `<link rel="preconnect">`. */
 export function preconnect(href: string, options?: { crossOrigin?: string }): void {
+	const hints = hostedResourceHints();
+	if (hints) return hints.preconnect(href, options);
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preconnect', href, options);
 		if (warning !== null) console.error(warning);
@@ -666,6 +679,12 @@ export function preconnect(href: string, options?: { crossOrigin?: string }): vo
 
 /** React DOM `prefetchDNS(href)` — `<link rel="dns-prefetch">`. */
 export function prefetchDNS(href: string): void {
+	const hints = hostedResourceHints();
+	if (hints) {
+		if (process.env.NODE_ENV !== 'production' && arguments.length > 1)
+			return Reflect.apply(hints.prefetchDNS, undefined, arguments);
+		return hints.prefetchDNS(href);
+	}
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('prefetchDNS', href, arguments[1], arguments.length > 1);
 		if (warning !== null) console.error(warning);
@@ -687,6 +706,8 @@ export function prefetchDNS(href: string): void {
  * options apply as attributes through the shared lenient pass-through.
  */
 export function preloadModule(href: string, options?: Record<string, unknown>): void {
+	const hints = hostedResourceHints();
+	if (hints) return hints.preloadModule(href, options);
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preloadModule', href, options);
 		if (warning !== null) console.error(warning);
@@ -718,6 +739,8 @@ export function preinitModule(
 	href: string,
 	options?: { as?: string } & Record<string, unknown>,
 ): void {
+	const hints = hostedResourceHints();
+	if (hints) return hints.preinitModule(href, options);
 	if (process.env.NODE_ENV !== 'production') {
 		const warning = resourceHintWarning('preinitModule', href, options);
 		if (warning !== null) console.error(warning);

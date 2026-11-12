@@ -231,6 +231,11 @@ export function resolveOctaneConfig(raw, options = {}) {
 
 	validate_root_boundary(raw.rootBoundary);
 
+	if (raw.data !== undefined && (typeof raw.data !== 'string' || !raw.data.startsWith('/'))) {
+		// Both the server and the browser import it, by its project-root ID.
+		throw new Error("[octane] data must be a project-root module ID (e.g. '/src/data.ts').");
+	}
+
 	if (raw.server?.trustProxy !== undefined && typeof raw.server.trustProxy !== 'boolean') {
 		throw new Error('[octane] server.trustProxy must be a boolean when provided.');
 	}
@@ -307,6 +312,7 @@ export function resolveOctaneConfig(raw, options = {}) {
 			preHydrate: raw.router?.preHydrate,
 		},
 		rootBoundary: raw.rootBoundary ?? {},
+		data: raw.data,
 		middlewares: raw.middlewares ?? [],
 		platform: {
 			env: raw.platform?.env ?? {},

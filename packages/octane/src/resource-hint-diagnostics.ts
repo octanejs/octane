@@ -3,6 +3,9 @@
 type ResourceHintName =
 	'prefetchDNS' | 'preconnect' | 'preload' | 'preloadModule' | 'preinit' | 'preinitModule';
 
+/** @internal An outer renderer owns the document resources of a hosted render. */
+export type ResourceHintHost = Pick<typeof import('./runtime/head.js'), ResourceHintName>;
+
 function describeHintValue(value: unknown): string {
 	if (value === null) return '`null`';
 	if (value === undefined) return '`undefined`';

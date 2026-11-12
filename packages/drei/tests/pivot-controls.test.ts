@@ -104,7 +104,8 @@ async function mountPair(props: Record<string, any>) {
 	octaneHost.append(octaneCanvas);
 	const reactControls = { enabled: true },
 		octaneControls = { enabled: true };
-	let reactState!: RootState, reactRef!: THREE.Group, octaneRef!: THREE.Group;
+	let reactState!: RootState, reactRef!: THREE.Group;
+	const octaneControlRef = { current: null as THREE.Group | null };
 	function Capture() {
 		reactState = useThree();
 		reactState.controls = reactControls as any;
@@ -146,7 +147,7 @@ async function mountPair(props: Record<string, any>) {
 	octaneRoot.render(PivotControlsScene, {
 		...props,
 		controls: octaneControls,
-		controlRef: (value: THREE.Group) => (octaneRef = value),
+		controlRef: octaneControlRef,
 	});
 	await act(async () => {
 		for (let i = 0; i < 8; i++) await Promise.resolve();
@@ -161,11 +162,12 @@ async function mountPair(props: Record<string, any>) {
 		reactState,
 		reactControls,
 		octaneControls,
+		octaneControlRef,
 		get reactRef() {
 			return reactRef;
 		},
 		get octaneRef() {
-			return octaneRef;
+			return octaneControlRef.current!;
 		},
 	};
 }
@@ -187,7 +189,7 @@ async function interactionPair(props: Record<string, any>) {
 	pair.octaneRoot.render(PivotControlsScene, {
 		...props,
 		controls: pair.octaneControls,
-		controlRef: () => {},
+		controlRef: pair.octaneControlRef,
 		onDragStart: octaneCalls.start,
 		onDrag: octaneCalls.drag,
 		onDragEnd: octaneCalls.end,
@@ -287,7 +289,7 @@ describe('PivotControls', () => {
 			disableScaling: true,
 			translationLimits: [[-0.5, 0.5], undefined, undefined],
 			controls: pair.octaneControls,
-			controlRef: () => {},
+			controlRef: pair.octaneControlRef,
 			onDragStart: octaneCalls.start,
 			onDrag: octaneCalls.drag,
 			onDragEnd: octaneCalls.end,
