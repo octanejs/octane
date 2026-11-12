@@ -159,6 +159,7 @@ export function bind(filename: string, source: string) {
 	return { sf, checker: program.getTypeChecker() };
 }
 
+const ES5_LIB_PATH = ts.getDefaultLibFilePath({}).replace(/[^/\\]+$/, 'lib.es5.d.ts');
 let es5: ts.SourceFile | undefined;
 
 /**
@@ -166,10 +167,9 @@ let es5: ts.SourceFile | undefined;
  * array and string members have types.
  */
 function esLib() {
-	const file = ts.getDefaultLibFilePath({}).replace(/[^/\\]+$/, 'lib.es5.d.ts');
 	es5 ??= ts.createSourceFile(
 		'lib.es5.d.ts',
-		ts.sys.readFile(file) as string,
+		ts.sys.readFile(ES5_LIB_PATH) as string,
 		ts.ScriptTarget.Latest,
 		true,
 	);
@@ -4321,6 +4321,27 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		} else output = fn.body;
 		const root = skipParens(output);
 		if (!isJsx(root) && !ts.isConditionalExpression(root)) return null;
+
+		// Custom maps and explicit array holes keep the original callback dispatch.
+		const receiver = skipWrappers(iterable);
+		const initializer = ts.isIdentifier(receiver) ? this.constValue(receiver) : null;
+		const array = initializer ? skipWrappers(initializer) : receiver;
+		if (ts.isArrayLiteralExpression(array) && array.elements.some(ts.isOmittedExpression))
+			return null;
+		const declarations = this.typeOf(iterable)
+			.getNonNullableType()
+			.getProperty('map')?.declarations;
+		if (
+			declarations?.some((declaration) => {
+				const file = declaration.getSourceFile();
+				return (
+					(file !== esLib() && file.fileName !== ES5_LIB_PATH) ||
+					!ts.isInterfaceDeclaration(declaration.parent) ||
+					!['Array', 'ReadonlyArray'].includes(declaration.parent.name.text)
+				);
+			})
+		)
+			return null;
 
 		const attribute = rowKey(root);
 		let key: ts.Expression | null = null;
