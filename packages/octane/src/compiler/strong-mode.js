@@ -6269,13 +6269,15 @@ export function analyzeStrongMode(ast, source, filename, options = {}) {
 		initialValueImports ??= hookImportEditor(ast, source, 'useInitialValue', ['useState']);
 		const imports = initialValueImports([call], existing, true);
 		if (imports === false) return [];
+		// The bracket can touch the declaration keyword, unlike the replacement identifier.
+		const bindingText = /[a-z]/.test(source.charAt(decl.id.start - 1)) ? ' ' + id.name : id.name;
 		return [
 			{
 				hook: 'useInitialValue',
 				message: 'Retain the initial render value.',
 				edits: [
 					...imports,
-					{ start: decl.id.start, end: decl.id.end, text: id.name },
+					{ start: decl.id.start, end: decl.id.end, text: bindingText },
 					{ start: call.callee.start, end: call.callee.end, text: 'useInitialValue' },
 				],
 			},

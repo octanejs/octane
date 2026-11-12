@@ -424,8 +424,9 @@ it('preserves a lazy mount value through effect updates and cleanup', async () =
 		}, [record, value, revision]);
 		return revision ? <p data-revision={String(revision)}/> : null;
 	}`;
-	const migrated = migrate(source);
+	const migrated = migrate(`${source}\nconst useInitialValue = 0;`);
 	expect(migrated.strong).toBe(true);
+	expect(migrated.code).toContain('useLazyRef');
 	const native = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'client' });
 	function Reference({ read, record, revision }) {
 		const [value] = useState(() => ({ read, revision }));
@@ -524,9 +525,10 @@ it.each([
 	],
 	['retained comment', '() => ({ seed })', '', '', '', '[/* keep */ value]'],
 ])(
-	'keeps a read-only state diagnostic for %s',
+	'keeps a read-only state diagnostic for %s when useInitialValue is shadowed',
 	(_case, initial, extra, effect = '', suffix = '', binding = '[value]') => {
 		const migrated = migrate(`import { useState, useEffect } from 'react';
+		const useInitialValue = 0;
 		${(initial + effect).includes('make()') ? 'function make() { return <b/>; }' : ''}
 		export function Probe({ seed, observe, useOther }) {
 			const ${binding} = useState(${initial});
