@@ -824,8 +824,9 @@ export const handler = createDataHandler(
 );
 ```
 
-Export one function that answers the store's requests, and give the store a
-`serverTransport` over it:
+Export one function that answers the store's requests, and open the store
+with a `serverTransport` over it. Make that opener the module's default export
+and name the module as the config's `data`:
 
 ```tsrx
 // src/data.tsrx
@@ -838,12 +839,34 @@ module server {
 	}
 }
 
-import { createDataStore, serverTransport } from 'octane/data';
+import type { Context } from '@octanejs/vite-plugin';
+import { createDataStore, serverTransport, type FormSeed } from 'octane/data';
 import { data } from 'server';
 
-export const openStore = (seed?: string | null) =>
-	createDataStore({ transport: serverTransport(data), seed });
+/** Where the forms middleware below keeps the page's form session. */
+export const FORMS = 'data.forms';
+
+export default function open(seed: string | null, context: Context | null) {
+	const form = (context?.state.get(FORMS) as { form: FormSeed } | undefined)?.form;
+	return createDataStore({ transport: serverTransport(data), seed, form });
+}
 ```
+
+With `data: '/src/data.tsrx'` in `octane.config.ts`, every render route runs
+inside the store it opens, so pages call `useRead` and `useWrite` with no store
+code of their own:
+
+- The server opens one store per request, after its middleware has run, with
+  `seed` `null` and the request's `context`. Its in-process `data` calls run
+  under that request.
+- Once the page has finished rendering, streamed boundaries included, the
+  store's `dehydrate()` output is written as a script just before `</body>`,
+  and the store is retired when the response ends.
+- The browser opens its store with that seed and `context` `null`, so
+  hydration loads nothing. It waits for the document to finish parsing first,
+  because the seed follows the page's content.
+
+`@octanejs/vite-plugin` and `@octanejs/rsbuild-plugin` both do this.
 
 `serverTransport` encodes each request with devalue, as `httpTransport` does,
 so the values a contract carries survive although a server call carries only
@@ -852,15 +875,14 @@ as unknown, exactly as for a lost HTTP reply.
 
 Native form submissions post to the page itself. Run them in the page's
 `before` middleware: an accepted one answers with the 303 back to the page.
-Keep the session in `Context.state`, so the page can pass its `form` to the
-store it renders with and that store's `dehydrate()` carries it to the browser:
+Keep the session in `Context.state`, where `open` above passes its `form` to the
+page's store, whose seed carries it to the browser:
 
 ```ts
 // octane.config.ts
 import { defineConfig, RenderRoute, type Middleware } from '@octanejs/vite-plugin';
 import { handler } from './src/data.server.ts';
-
-export const FORMS = 'data.forms';
+import { FORMS } from './src/data.tsrx';
 
 // After the middleware that authenticates `context.viewer`.
 const forms: Middleware = async (context, next) => {
@@ -874,12 +896,34 @@ const forms: Middleware = async (context, next) => {
 };
 
 export default defineConfig({
+	data: '/src/data.tsrx',
 	router: { routes: [new RenderRoute({ path: '/', entry: '/src/App.tsrx', before: [forms] })] },
 });
 ```
 
-The page renders its store's `dehydrate()` output into its own script, and the
-browser's store starts from it: route state is not serialized automatically.
+### Route seeds
+
+The `data` module is built on route seeds, which any other cache can use too.
+On the server, `routeSeed(context, name, produce)` from the integration's
+package hands the browser `produce()`'s text under `name`. `produce` runs once
+the page has finished rendering, and not at all when the render fails; its text
+is written as a JSON script just before `</body>`. In the browser,
+`readRouteSeed(name)` from `@octanejs/vite-plugin/seeds` (or
+`@octanejs/rsbuild-plugin/seeds`) returns that text, or `null` on a page
+rendered only there. Read it once the document has finished parsing.
+
+```ts
+// A middleware: seed the request's cache once the page has rendered.
+const cache: Middleware = (context, next) => {
+	const queries = createQueryCache();
+	context.state.set('queries', queries);
+	routeSeed(context, 'queries', () => JSON.stringify(queries.dehydrate()));
+	return next();
+};
+
+// In the browser:
+const queries = createQueryCache(JSON.parse(readRouteSeed('queries') ?? 'null'));
+```
 
 ### `module server` functions in a custom server
 

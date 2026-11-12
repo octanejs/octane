@@ -1,4 +1,5 @@
 export { composeHtmlStream } from './server/html-stream.js';
+export { endRoute, routeEnding } from './seeds.js';
 export { serializeRouteData } from './server/route-data.js';
 export {
 	HYDRATION_NONCE_PLACEHOLDER,
