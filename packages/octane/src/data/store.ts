@@ -84,6 +84,13 @@ export class DataUncertainError extends Error {
 	}
 }
 
+/** The prerequisite create was refused, so this queued edit never reached the transport. */
+class DependencyError extends DataError {
+	constructor() {
+		super('dependency');
+	}
+}
+
 /** The store belonged to a grant that has ended, such as a signed-out account. */
 export class DataRetiredError extends Error {
 	constructor() {
@@ -405,13 +412,15 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			? Promise.all(
 					options.feeds.map((feed) =>
 						Promise.resolve()
-							.then(() =>
-								transport(
+							.then(() => {
+								// Position probes bypass request(), which waits on these probes itself.
+								assertLive();
+								return transport(
 									{ kind: 'position', name: feed.name, input: undefined },
 									// A retired render, cancelled or failed, stops asking.
 									retiring.signal,
-								),
-							)
+								);
+							})
 							.then(
 								(reply) => {
 									if (reply.ok && typeof reply.value === 'string') {
@@ -931,6 +940,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		await undefined;
 		// Read after the feeds' positions, so no change falls between them and a value.
 		if (positions) await positions;
+		assertLive();
 		return transport(payload, signal);
 	}
 
@@ -1158,7 +1168,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const { write } = operation;
 		if (write.effect?.kind === 'create' && write.serverId) {
 			if (output === undefined) {
-				operation.gate?.reject(new DataError('dependency'));
+				operation.gate?.reject(new DependencyError());
 			} else {
 				assignId(operation, write.serverId(output));
 			}
@@ -1250,7 +1260,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			touchEntities();
 		} else {
 			remove(operation);
-			operation.gate?.reject(new DataError('dependency'));
+			operation.gate?.reject(new DependencyError());
 		}
 	}
 
@@ -1375,7 +1385,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const previous = queueKey === undefined ? undefined : queues.get(queueKey);
 		const sent = previous
 			? previous.then(dispatch, (error) => {
-					if (retired || error instanceof DataError) throw error;
+					if (retired || error instanceof DependencyError) throw error;
 					return dispatch();
 				})
 			: dispatch();
@@ -1405,7 +1415,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				if (retired) throw new DataRetiredError();
 				if (!reply.ok) {
 					remove(operation);
-					operation.gate?.reject(new DataError('dependency'));
+					operation.gate?.reject(new DependencyError());
 					throw new DataError(reply.code, reply.data, reply.issues);
 				}
 				let output: unknown;
@@ -1423,7 +1433,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			},
 			(error) => {
 				if (retired) throw new DataRetiredError();
-				if (error instanceof DataError) {
+				if (error instanceof DependencyError) {
 					// A create this write depended on was refused; it was never sent.
 					remove(operation);
 					operation.gate?.reject(error);
