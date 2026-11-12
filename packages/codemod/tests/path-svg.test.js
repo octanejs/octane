@@ -38,7 +38,7 @@ describe('static SVG assets', () => {
 			<!-- Original drawing <rect/> -->
 			<rect x="-1.5" y="0" width="12" height="2em" rx="2" ry="1" fill="var(--surface-color)"/>
 			<g transform="translate(0 -5.5) scale(4.4)"><g>${path}</g></g>
-			<path d="M1 1Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="bevel" opacity="0.3"/>
+			<path d="M1 1Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="bevel" opacity=".3"/>
 		</svg><!-- End of drawing -->`;
 		const leaf = (tag, attributes) => ({ tag, attributes, children: [] });
 		expect(parseStaticSvg(source)).toEqual({
@@ -97,7 +97,7 @@ describe('static SVG assets', () => {
 		['extra transform operations', `<svg><g transform="scale(1) rotate(2)">${path}</g></svg>`],
 		['extra transform arguments', `<svg><g transform="translate(1 2 3)">${path}</g></svg>`],
 		['noncanonical rectangle dimensions', '<svg><rect width="01" height="2"/></svg>'],
-		['noncanonical opacity', '<svg><path d="M1 1" opacity=".3"/></svg>'],
+		['noncanonical opacity', '<svg><path d="M1 1" opacity=".30"/></svg>'],
 		['out of range opacity', '<svg><path d="M1 1" opacity="2"/></svg>'],
 		['unknown line caps', '<svg><path d="M1 1" stroke-linecap="circle"/></svg>'],
 		['CSS variable fallbacks', '<svg><path d="M1 1" fill="var(--theme, red)"/></svg>'],
