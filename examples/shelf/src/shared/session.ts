@@ -8,6 +8,7 @@ import {
 	DataUncertainError,
 	createDataStore,
 	indexedDBStorage,
+	serverListener,
 	serverTransport,
 	type DataRequest,
 	type DataStore,
@@ -15,7 +16,7 @@ import {
 	type Transport,
 } from 'octane/data';
 import { addBook, receipt, removeBook, setRead } from './contracts.ts';
-import { data } from './data.tsrx';
+import { data, events } from './data.tsrx';
 
 export const ACCOUNTS = ['ada', 'grace'] as const;
 export type Account = (typeof ACCOUNTS)[number];
@@ -111,7 +112,14 @@ export function openSession(account: Account, namespace = '', seed?: string | nu
 		// A write still unsettled when the page closes is shown again on the next load, then settled by its receipt.
 		journal: { writes: [addBook, setRead, removeBook], receipt },
 	};
-	return sessionFor(account, createDataStore({ transport, seed, persist }), faults, network);
+	// Another tab's or device's change arrives as an event, so this page shows it without loading.
+	const listen = serverListener(events);
+	return sessionFor(
+		account,
+		createDataStore({ transport, seed, persist, listen }),
+		faults,
+		network,
+	);
 }
 
 /** A server render's session, around a store whose `data` calls run in process. */

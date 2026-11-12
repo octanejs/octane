@@ -17,7 +17,10 @@ import {
 	DataError,
 	DataUncertainError,
 	entity,
+	feed,
+	listen,
 	read,
+	serverListener,
 	serverTransport,
 	write,
 	type StandardSchema,
@@ -196,6 +199,78 @@ describe('octane/data over module server', () => {
 		expect((await handler.forms(post(), { viewer: 'grace' })).status).toBe(403);
 		expect((await handler.forms(post(), { viewer: 'ada' })).status).toBe(303);
 		expect(added).toEqual(['ada:Tides']);
+	});
+
+	it("streams a feed's validated events to the store, from the cursor it resumes at", async () => {
+		const renamed = feed({
+			name: 'notes.renamed',
+			params: accept<{ shelf: string }>((value) => typeof value?.shelf === 'string'),
+			event: accept<Note>(isNote),
+			changes: (note) => ({ put: Note, value: note }),
+			covers: ['note'],
+		});
+		const heard: Array<{ viewer: string; shelf: string; cursor: string | null }> = [];
+		let title = 'Tides';
+		const handler = createDataHandler(
+			{ context: (_request, call) => ({ viewer: String(call?.viewer) }) },
+			(handle) => [
+				handle(notes, () => [{ id: 'n1', title, at: AT }]),
+				handle(renamed, async function* (params, { viewer, cursor }) {
+					heard.push({ viewer, shelf: params.shelf, cursor });
+					title = 'Atoll';
+					yield { event: { id: 'n1', title, at: AT }, id: 'e1', cursor: 'c1' };
+					// Fails its contract, so it never leaves the server; the store reloads instead.
+					yield { event: { id: 'n1', title: 'Leak', at: 'not a date' } as never, cursor: 'c2' };
+				}),
+			],
+		);
+		const events = __registerServerFunction(
+			(request: string, call: ServerCallContext) => handler.listen(request, call),
+			1,
+			{ id: 'feedf00d', module: '/src/data.tsrx', export: 'events' },
+		);
+		const data = __registerServerFunction(
+			(request: string, call: ServerCallContext) => handler.serve(request, call),
+			1,
+			TARGET,
+		);
+		vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+			const request = new Request(new URL(String(input), location.href), init);
+			const target = String(input).includes('feedf00d') ? events : data;
+			const body = executeServerFunctionStream(target, await request.text(), {
+				request,
+				signal: request.signal,
+				viewer: 'ada',
+			});
+			return new Response(body, { headers: { 'Content-Type': 'application/x-octane-rpc+ndjson' } });
+		});
+		const call = (id: string) => (request: string, options?: { signal?: AbortSignal }) =>
+			__serverRpcStream(id, [request], options) as Promise<never>;
+		const store = createDataStore({
+			transport: serverTransport(call(TARGET.id)),
+			listen: serverListener(call('feedf00d')),
+		});
+		const list = store.read(notes, undefined);
+		const shown: string[] = [];
+		const stopList = list.subscribe(() => {
+			const value = list.getSnapshot().value;
+			if (value) shown.push(value[0]!.title);
+		});
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+
+		const stop = listen(store, renamed, { shelf: 'sea' }).subscribe(() => {});
+		await vi.waitFor(() => expect(list.getSnapshot().value![0]!.title).toBe('Atoll'));
+		expect(list.getSnapshot().value![0]!.at).toBeInstanceOf(Date);
+		// The source ended, so the store connected again from the last cursor.
+		await vi.waitFor(() => expect(heard.length).toBeGreaterThanOrEqual(2));
+		expect(heard.slice(0, 2)).toEqual([
+			{ viewer: 'ada', shelf: 'sea', cursor: null },
+			{ viewer: 'ada', shelf: 'sea', cursor: 'c2' },
+		]);
+		expect(shown).not.toContain('Leak');
+		stop();
+		stopList();
+		store.retire();
 	});
 
 	it('compiles a module server block that serves the store, and ships none of it to the browser', () => {
