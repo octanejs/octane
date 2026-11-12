@@ -8085,6 +8085,11 @@ export function useLazyRef<T>(factory: () => T, slot?: ServerHookSlot): { curren
 	return rec.ref as { current: T };
 }
 
+/** Capture a render value once for the lifetime of this hook. */
+export function useInitialValue<T>(factory: () => T, slot?: symbol): T {
+	return useLazyRef(factory, slot).current;
+}
+
 /** React's `useDebugValue` — devtools-only on the client, no-op everywhere. */
 export function useDebugValue(_value?: unknown, _format?: unknown, _slot?: ServerHookSlot): void;
 export function useDebugValue(_value?: unknown, _format?: unknown): void {}

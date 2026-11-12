@@ -214,8 +214,8 @@ export const STRONG_DIAGNOSTICS = [
 		detects:
 			'A declaration takes the value from a `useState` call and discards its setter, for example `const [value] = useState(initial)` or `const value = useState(initial)[0]`. This includes lazy initializers.',
 		replacement:
-			'Derive render values from their inputs. For values kept for events or effects, use `useRef(value)` or `useLazyRef(() => createValue())` for one-time initialization.',
-		primitives: ['useRef', 'useLazyRef'],
+			'Derive render values from their inputs. Use `useInitialValue(() => value)` for a deliberate initial render snapshot, or `useRef(value)` or `useLazyRef(() => createValue())` for mutable values kept for events or effects.',
+		primitives: ['useInitialValue', 'useRef', 'useLazyRef'],
 	},
 	{
 		code: 'OCTANE_STRONG_WRITE_ONLY_STATE',
@@ -515,6 +515,25 @@ export const STRONG_DIAGNOSTICS = [
 
 /** @type {readonly StrongRecipe[]} */
 export const STRONG_RECIPES = [
+	{
+		id: 'initial-value',
+		title: 'Capture an initial render value',
+		react: 'const [value] = useState(() => initial);',
+		strong: 'const value = useInitialValue(() => initial);',
+		codes: ['OCTANE_STRONG_READ_ONLY_STATE'],
+		before: `import { useState } from 'octane';
+export function Example({ initial }: { initial: string }) @{
+  const [value] = useState(() => initial);
+  <p>{value as string}</p>
+}`,
+		after: `"use strong";
+import { useInitialValue } from 'octane';
+export function Example({ initial }: { initial: string }) @{
+  const value = useInitialValue(() => initial);
+  <p>{value as string}</p>
+}`,
+		note: 'The factory captures the initial value for this mount. Use a derived value when it should follow later inputs.',
+	},
 	{
 		id: 'lazy-ref',
 		title: 'Create a value once',

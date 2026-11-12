@@ -1,6 +1,13 @@
-import { useLazyRef, useRef } from 'octane';
-import { useLazyRef as useServerLazyRef } from 'octane/server';
-import { useLazyRef as useUniversalLazyRef, useRef as useUniversalRef } from 'octane/universal';
+import { useInitialValue, useLazyRef, useRef } from 'octane';
+import {
+	useInitialValue as useServerInitialValue,
+	useLazyRef as useServerLazyRef,
+} from 'octane/server';
+import {
+	useInitialValue as useUniversalInitialValue,
+	useLazyRef as useUniversalLazyRef,
+	useRef as useUniversalRef,
+} from 'octane/universal';
 
 const value = useLazyRef(() => ({ count: 1 }));
 const count: number = value.current.count;
@@ -35,6 +42,14 @@ useServerLazyRef(() => 1, 5);
 // @ts-expect-error Server manual slots follow the public symbol slot contract.
 useServerLazyRef(() => 1, 'slot');
 
+const initialized: { count: number } = useInitialValue(() => ({ count: 1 }));
+const initializedFunction: () => number = useServerInitialValue(() => callback, slot);
+const initializedUndefined: undefined = useUniversalInitialValue(() => undefined);
+// @ts-expect-error Initial values require a factory.
+useInitialValue(123);
+// @ts-expect-error Numeric slots are compiler-owned.
+useInitialValue(() => 1, 5);
+
 const initialSymbol = Symbol('ref value');
 const ordinarySymbol: symbol = useRef(initialSymbol).current;
 
@@ -48,4 +63,7 @@ void [
 	explicitUniversal,
 	universalLazy,
 	serverManual,
+	initialized,
+	initializedFunction,
+	initializedUndefined,
 ];

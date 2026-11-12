@@ -1386,6 +1386,11 @@ export function useLazyRef<T>(factory: () => T, slot?: HookSlot): { current: T }
 	return ref;
 }
 
+/** Capture a render value once for the lifetime of this hook. */
+export function useInitialValue<T>(factory: () => T, slot?: symbol): T {
+	return useLazyRef(factory, slot).current;
+}
+
 /**
  * React's `useDebugValue(value, format?)` — a devtools-only label for custom
  * hooks. Octane has no devtools inspector, so it is a no-op; exported so custom
