@@ -375,6 +375,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	const { transport } = options;
 	const entries = new Map<string, Entry>();
 	const seeds = new Map<string, SeedEntry>();
+	let seedsStale = false;
 	/** Created records' operation IDs, by entity, mapped to the IDs their servers assigned. */
 	const assigned = new Map<string, string>();
 	const parsed = options.seed
@@ -434,7 +435,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	/** What persistent storage keeps for an entry: its confirmed value, never a pending edit. */
 	function saving(key: string) {
 		const entry = entries.get(key);
-		// An evicted dirty read can no longer replace its older durable copy.
+		// A direct read replacement may have no invalidation tags. After eviction its older
+		// copy has to be deleted before a cursor can advance past the missing replacement.
 		if (!entry) return null;
 		if (!entry.read.persist) return undefined;
 		if (!entry.hasBase) return null;
@@ -918,6 +920,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (value instanceof Promise) return;
 		const reload = new Set<Entry>();
 		adopt(entry, value, 0, seed.age, reload);
+		entry.stale ||= seedsStale;
 		save(entry);
 		// A seed is adopted while a render asks for its read.
 		if (reload.size > 0) queueMicrotask(() => !retired && reloadAll(reload));
@@ -1263,39 +1266,54 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	 */
 	async function recover(journal: NonNullable<PersistOptions['journal']>): Promise<void> {
 		const recovered: Operation[] = [];
-		for (const { id, name, raw } of await persisted!.recover()) {
+		const obsolete: string[] = [];
+		for (const { id, name, raw, order } of await persisted!.recover()) {
 			const write = journal.writes.find((item) => item.name === name);
-			if (!write) continue;
-			let input: unknown;
-			try {
-				input = await parse(write.input, raw);
-			} catch {
-				// A compatible build can still recover this operation by its original ID.
-				continue;
+			if (write) {
+				try {
+					const input = await parse(write.input, raw);
+					recovered.push(operationFor(id, write, input, raw, 'uncertain'));
+					continue;
+				} catch {
+					// A compatible build may still recover this operation during the grace period.
+				}
 			}
-			recovered.push(operationFor(id, write, input, raw, 'uncertain'));
+			if (hostDateNow() - order[0] >= 30 * 24 * 60 * 60 * 1000) obsolete.push(id);
 		}
-		if (retired || recovered.length === 0) return;
-		// They were submitted before anything this session submitted.
-		operations = [...recovered, ...operations];
-		touchEntities();
+		if (retired) return;
+		// Recovered writes were submitted before anything this session submitted.
+		if (recovered.length) {
+			operations = [...recovered, ...operations];
+			touchEntities();
+		}
+		async function receipt(id: string) {
+			const reply = await request(
+				{ kind: 'read', name: journal.receipt.name, input: { operationId: id } },
+				retiring.signal,
+			);
+			if (!reply.ok) throw new DataError(reply.code);
+			return parse(journal.receipt.output, reply.value);
+		}
 		for (const operation of recovered) {
-			void request(
-				{ kind: 'read', name: journal.receipt.name, input: { operationId: operation.id } },
-				new AbortController().signal,
-			)
-				.then((reply) => {
-					if (!reply.ok) throw new DataError(reply.code);
-					return parse(journal.receipt.output, reply.value);
-				})
-				.then(
-					({ applied, value }) => {
-						if (!retired && operation.status === 'uncertain') {
-							settleOperation(operation, applied, value);
-						}
-					},
-					() => {},
-				);
+			void receipt(operation.id).then(
+				({ applied, value }) => {
+					if (!retired && operation.status === 'uncertain')
+						settleOperation(operation, applied, value);
+				},
+				() => {},
+			);
+		}
+		// Obsolete writes have no usable effect metadata. Check one receipt at a time.
+		for (const id of obsolete) {
+			if (retired) return;
+			const outcome = await receipt(id).catch(() => undefined);
+			if (retired || !outcome || typeof outcome.applied !== 'boolean') continue;
+			if (outcome.applied) {
+				persisted!.invalidated([null]);
+				seedsStale = true;
+				for (const entry of entries.values()) invalidateEntry(entry);
+			}
+			persisted!.unjournal(id);
 		}
 	}
 

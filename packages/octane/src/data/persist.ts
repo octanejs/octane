@@ -29,7 +29,7 @@
  *   mounted component is showing are never purged.
  */
 import * as devalue from 'devalue';
-import { hostDateNow, postHostTask } from '../host-task.js';
+import { clearHostTimeout, hostDateNow, postHostTask, setHostTimeout } from '../host-task.js';
 import type { Read, Write } from './contracts.js';
 
 /** What the store keeps in memory about each saved value. */
@@ -102,6 +102,10 @@ export interface PersistOptions {
 	 * applied it; the store then keeps or rolls back the edit, and never
 	 * sends the write again. A create whose server assigns IDs needs `value`,
 	 * the created record, in an applied receipt.
+	 * Undeclared or incompatible writes get 30 days for a compatible build
+	 * to recover them. After that, a restart checks their receipts before
+	 * removing them. An applied write with unknown effects makes cached reads
+	 * stale. An unavailable receipt keeps the entry for a later restart.
 	 */
 	readonly journal?: {
 		readonly writes: ReadonlyArray<Write<any, any>>;
@@ -169,9 +173,9 @@ export interface Persistence {
 	/** Remove a write from the journal once its outcome is known. */
 	unjournal(id: string): void;
 	/** The writes a previous session left in the journal. */
-	recover(): Promise<Journaled[]>;
+	recover(): Promise<Array<Journaled & { order: [number, number] }>>;
 	/** Values saved before now that hold one of these tags are restored stale. */
-	invalidated(tags: readonly string[]): void;
+	invalidated(tags: readonly (string | null)[]): void;
 	/** The cursor a feed last saved, by its key; null when there is none. */
 	cursor(key: string): Promise<string | null>;
 	/** Save a feed's cursor, after every value already marked to save. */
@@ -288,7 +292,7 @@ export function createPersistence(
 	const ended = new Set<string>();
 	/** When each tag was last marked stale, kept in its own partition. */
 	let marksPartition = '';
-	const marks = new Map<string, number>();
+	const marks = new Map<string | null, number>();
 	/** A logical timestamp keeps later invalidations distinct within one clock tick. */
 	let markTime = 0;
 	/** Each feed's last cursor, kept with the marks so both commit together. */
@@ -306,6 +310,7 @@ export function createPersistence(
 	const touched = new Set<string>();
 	const removed = new Set<string>();
 	let scheduled = false;
+	let retryTimer: unknown;
 	let writing: Promise<void> = Promise.resolve();
 
 	const ready = (async () => {
@@ -360,12 +365,17 @@ export function createPersistence(
 		return version;
 	}
 
-	function schedule(): void {
+	function schedule(retry = false): void {
+		if (!retry && retryTimer !== undefined) {
+			clearHostTimeout(retryTimer);
+			retryTimer = undefined;
+		}
 		if (scheduled || cleared) return;
 		scheduled = true;
 		postHostTask(() => {
 			scheduled = false;
-			writing = writing.then(flush, flush);
+			const save = () => flush(!retry);
+			writing = writing.then(save, save);
 		});
 	}
 
@@ -385,7 +395,18 @@ export function createPersistence(
 		}
 	}
 
-	async function flush(): Promise<void> {
+	// Each externally scheduled save gets one delayed retry, including on an otherwise idle page.
+	function retryOnce(mayRetry: boolean): void {
+		if (!cleared && mayRetry) {
+			if (retryTimer !== undefined) clearHostTimeout(retryTimer);
+			retryTimer = setHostTimeout(() => {
+				retryTimer = undefined;
+				schedule(true);
+			}, 100);
+		}
+	}
+
+	async function flush(mayRetry: boolean): Promise<void> {
 		await ready;
 		if (cleared) return;
 		const now = hostDateNow();
@@ -439,6 +460,7 @@ export function createPersistence(
 				for (const key of keys) dirty.add(key);
 				for (const name of remove) removed.add(name);
 				if (checkpoint) marksChanged = true;
+				retryOnce(mayRetry);
 				return;
 			}
 		}
@@ -456,6 +478,7 @@ export function createPersistence(
 				await storage.commit(marksPartition, [{ meta, value }], []);
 			} catch {
 				marksChanged = true;
+				retryOnce(mayRetry);
 				return;
 			}
 		}
@@ -465,7 +488,7 @@ export function createPersistence(
 				await storage.commit(journalPartition, [], settled);
 				for (const name of settled) ended.delete(name);
 			} catch {
-				// The next save retries removal.
+				retryOnce(mayRetry);
 			}
 		}
 	}
@@ -478,7 +501,10 @@ export function createPersistence(
 	// A hidden page may never run another task: save what is waiting now.
 	const document = (globalThis as { document?: Document }).document;
 	const hidden = () => {
-		if (document!.visibilityState === 'hidden' && !cleared) writing = writing.then(flush, flush);
+		if (document!.visibilityState === 'hidden' && !cleared) {
+			const save = () => flush(true);
+			writing = writing.then(save, save);
+		}
 	};
 	document?.addEventListener('visibilitychange', hidden);
 
@@ -501,7 +527,9 @@ export function createPersistence(
 				metas.set(name, { ...meta, lastUsed: hostDateNow() });
 				touched.add(name);
 				schedule();
-				const marked = stored.tags.some((tag) => (marks.get(tag) ?? 0) > stored.at);
+				const marked =
+					(marks.get(null) ?? 0) > stored.at ||
+					stored.tags.some((tag) => (marks.get(tag) ?? 0) > stored.at);
 				return marked ? { ...stored, stale: true } : stored;
 			} catch {
 				forget(name);
@@ -561,8 +589,7 @@ export function createPersistence(
 					journaled.set(write.id, name);
 					writes.push(write);
 				} catch {
-					ended.add(name);
-					schedule();
+					// An unreadable journal value has no trustworthy operation ID or receipt.
 				}
 			}
 			return writes.sort((a, b) => a.order[0] - b.order[0] || a.order[1] - b.order[1]);
@@ -603,6 +630,7 @@ export function createPersistence(
 		},
 		clear() {
 			cleared = true;
+			clearHostTimeout(retryTimer);
 			document?.removeEventListener('visibilitychange', hidden);
 			metas = new Map();
 			marks.clear();

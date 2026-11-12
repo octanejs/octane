@@ -584,6 +584,38 @@ describe('octane/data persistent cache', () => {
 		expect(third.log).toEqual(['read shelf']);
 	});
 
+	it.each([true, false])(
+		'retries an idle cache save once after a storage failure (recovers: %s)',
+		async (recover) => {
+			const inner = memoryStorage();
+			let attempts = 0;
+			const storage: PersistentStorage = {
+				...inner,
+				commit(partition, put, remove) {
+					if (put.some(({ meta, value }) => value !== undefined && meta.key !== partition)) {
+						attempts++;
+						if (!recover || attempts === 1) return Promise.reject(new Error('unavailable'));
+					}
+					return inner.commit(partition, put, remove);
+				},
+			};
+			const first = server(books());
+			const before = createDataStore({
+				transport: first.transport,
+				persist: cache(storage, 'ada'),
+			});
+			await before.prefetch(shelf, undefined);
+			await vi.waitFor(() => expect(attempts).toBe(2));
+			// Give a mistakenly self-rearming retry time to run again.
+			await new Promise((resolve) => setTimeout(resolve, 250));
+			expect(attempts).toBe(2);
+			const remote = server(books());
+			const next = createDataStore({ transport: remote.transport, persist: cache(inner, 'ada') });
+			await next.prefetch(shelf, undefined);
+			expect(remote.log).toEqual(recover ? [] : ['read shelf']);
+		},
+	);
+
 	it('saves marks again after storage fails to save them', async () => {
 		const inner = memoryStorage();
 		let failMarks = false;
@@ -820,45 +852,96 @@ describe('octane/data durable writes', () => {
 		expect(again.remote.log).toEqual([]);
 	});
 
-	it.each(['storage read fails', 'write no longer declared', 'input schema changed'] as const)(
-		'preserves a journaled write for a later restart when %s',
-		async (reason) => {
-			const inner = memoryStorage();
-			let failRead = false;
-			const storage: PersistentStorage = {
-				...inner,
-				get(partition, key) {
-					if (failRead && partition !== key) {
-						failRead = false;
-						return Promise.reject(new Error('storage temporarily unavailable'));
-					}
-					return inner.get(partition, key);
-				},
-			};
+	it.each([
+		'storage read fails',
+		'storage returns unreadable data',
+		'write no longer declared',
+		'input schema changed',
+	] as const)('preserves a journaled write for a later restart when %s', async (reason) => {
+		const inner = memoryStorage();
+		let failRead = false;
+		const storage: PersistentStorage = {
+			...inner,
+			get(partition, key) {
+				if (failRead && partition !== key) {
+					failRead = false;
+					return reason === 'storage returns unreadable data'
+						? Promise.resolve('incomplete journal value')
+						: Promise.reject(new Error('storage temporarily unavailable'));
+				}
+				return inner.get(partition, key);
+			},
+		};
+		const first = server(books());
+		first.faults.lose = 'reply';
+		const before = createDataStore({ transport: first.transport, persist: durable(storage) });
+		await expect(before.write(setRead, { id: 'a', read: true })).rejects.toThrow(/unknown/);
+
+		const incompatible = write({ name: setRead.name, input: schema(() => false) });
+		const writes = {
+			'storage read fails': [setRead],
+			'storage returns unreadable data': [setRead],
+			'write no longer declared': [],
+			'input schema changed': [incompatible],
+		}[reason];
+		failRead = reason === 'storage read fails' || reason === 'storage returns unreadable data';
+		const intermediate = server(first.books, first.applied);
+		createDataStore({
+			transport: intermediate.transport,
+			persist: cache(storage, 'ada', { journal: { writes, receipt } }),
+		});
+		await saved();
+		expect(failRead).toBe(false);
+		expect(intermediate.log).toEqual([]);
+
+		const { remote } = restart(storage, first);
+		await vi.waitFor(() => expect(remote.log).toEqual(['read receipt']));
+		expect(first.applied.size).toBe(1);
+	});
+
+	it.each(['applied', 'refused', 'offline'] as const)(
+		'settles an obsolete journal entry by its original receipt (%s)',
+		async (outcome) => {
+			const storage = memoryStorage();
 			const first = server(books());
-			first.faults.lose = 'reply';
-			const before = createDataStore({ transport: first.transport, persist: durable(storage) });
-			await expect(before.write(setRead, { id: 'a', read: true })).rejects.toThrow(/unknown/);
-
-			const incompatible = write({ name: setRead.name, input: schema(() => false) });
-			const writes = {
-				'storage read fails': [setRead],
-				'write no longer declared': [],
-				'input schema changed': [incompatible],
-			}[reason];
-			failRead = reason === 'storage read fails';
-			const intermediate = server(first.books, first.applied);
-			createDataStore({
-				transport: intermediate.transport,
-				persist: cache(storage, 'ada', { journal: { writes, receipt } }),
+			const cachedShelf = read({
+				name: shelf.name,
+				output: shelf.output,
+				fresh: Infinity,
+				expire: Infinity,
 			});
+			const now = Date.now();
+			vi.spyOn(Date, 'now').mockReturnValue(now);
+			const before = createDataStore({ transport: first.transport, persist: durable(storage) });
+			await before.prefetch(cachedShelf, undefined);
 			await saved();
-			expect(failRead).toBe(false);
-			expect(intermediate.log).toEqual([]);
+			first.faults.lose = outcome === 'refused' ? 'request' : 'reply';
+			await expect(before.write(setRead, { id: 'a', read: true })).rejects.toThrow(/unknown/);
+			await saved();
 
-			const { remote } = restart(storage, first);
-			await vi.waitFor(() => expect(remote.log).toEqual(['read receipt']));
-			expect(first.applied.size).toBe(1);
+			vi.mocked(Date.now).mockReturnValue(now + 31 * 24 * 60 * 60 * 1000);
+			const intermediate = server(first.books, first.applied);
+			if (outcome === 'offline') intermediate.faults.lose = 'request';
+			let receipts = 0;
+			createDataStore({
+				transport(request) {
+					if (request.name === 'receipt') receipts++;
+					return intermediate.transport(request);
+				},
+				persist: cache(storage, 'ada', { journal: { writes: [], receipt } }),
+			});
+			await vi.waitFor(() => expect(receipts).toBe(1));
+			await saved();
+			const { store, remote } = restart(storage, first);
+			await saved();
+			if (outcome === 'offline') {
+				await vi.waitFor(() => expect(remote.log).toContain('read receipt'));
+			} else {
+				expect(remote.log).toEqual([]);
+				await value(store, cachedShelf);
+				await saved();
+				expect(remote.log).toEqual(outcome === 'applied' ? ['read shelf'] : []);
+			}
 		},
 	);
 
