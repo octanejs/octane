@@ -238,7 +238,9 @@ The codemod checks how each component uses the hook. Conditions, scalar output, 
 
 A verified hook result can also go to a named function exported directly from an unchanged local TypeScript module whose local runtime dependencies also remain unchanged. The call must run inside a React effect, its cleanup, or an inline click handler on an intrinsic element in the component’s rendered output. For example, `useEffect(() => { syncSettings(store, 'startup'); }, [store])` keeps the same function and store. The other arguments must be literal data or local constants initialized with literals, and the call must discard the result. Calls during render and callbacks passed to custom components need review.
 
-When the file uses the project’s React 19.2+ automatic JSX runtime, a service read with a verified handle can receive a self-closing component from an installed React package with literal props, for example `store.read(notices).show(<Message id="saved" />)`. The generated code creates the original React element, so the service can render it later under its React provider.
+The codemod preserves reads of provider-owned store members in proven post-render paths, such as inline effects and intrinsic click handlers. A verified handle establishes the input’s origin. The active provider supplies the store methods and getters.
+
+When the file uses the project’s React 19.2+ automatic JSX runtime, a deferred service read with a verified handle can receive a self-closing component from an installed React package with literal props, for example `store.read(notices).show(<Message id="saved" />)`. The generated code creates the original React element, so the service can render it later under its React provider.
 
 Dynamic JSX payloads, opaque store values rendered as children, and components passed to unknown renderers still require manual migration.
 
