@@ -5,6 +5,7 @@ import {
 	DataRetiredError,
 	DataUncertainError,
 	httpTransport,
+	receive,
 	read,
 	view,
 	write,
@@ -206,6 +207,38 @@ describe('octane/data store', () => {
 		expect(server.log).toEqual([]);
 	});
 
+	it('keeps a committed write with an invalid server output uncertain until its receipt is known', async () => {
+		const positive = schema<number>((value) => typeof value === 'number' && value > 0);
+		const mark = write({
+			name: setDone.name,
+			input: setDone.input,
+			patches: Todo,
+			output: positive,
+		});
+		const applied: string[] = [];
+		const handler = createDataHandler({}, (handle) => [
+			handle(todos, () => [{ id: 'a', title: 'Tides', done: applied.length > 0 }]),
+			handle(mark, (_input, call) => {
+				applied.push(call.operationId);
+				return 0;
+			}),
+		]);
+		const store = createDataStore({
+			transport: handler.transport(new Request('https://app.test/')),
+		});
+		const list = store.read(todos, undefined);
+		await observe(list);
+
+		const result = await store.write(mark, { id: 'a', done: true }).catch((error) => error);
+		expect(result).toBeInstanceOf(DataUncertainError);
+		expect(applied).toEqual([result.operationId]);
+		expect(list.getSnapshot().value![0].done).toBe(true);
+		store.settle(result.operationId, true);
+		await vi.waitFor(() => expect(list.getSnapshot().refreshing).toBe(false));
+		expect(list.getSnapshot().value![0].done).toBe(true);
+		expect(applied).toHaveLength(1);
+	});
+
 	it('keeps an uncertain edit without counting it twice, until its outcome is named', async () => {
 		const server = createServer();
 		let dropReply = true;
@@ -249,6 +282,25 @@ describe('octane/data store', () => {
 		expect(offlineList.getSnapshot().value).toHaveLength(1);
 		offline.settle(failed.operationId, false);
 		expect(offlineList.getSnapshot().value).toHaveLength(2);
+	});
+
+	it('can settle a write when its transport rejected with a DataError after committing', async () => {
+		const server = createServer();
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				const reply = await server.transport(request, signal);
+				if (request.kind === 'write') throw new DataError('unreadable');
+				return reply;
+			},
+		});
+		const list = store.read(todos, undefined);
+		await observe(list);
+		const error = await store.write(setDone, { id: 'a', done: true }).catch((reason) => reason);
+		if (!(error instanceof DataUncertainError)) throw new Error('expected an uncertain write');
+		expect(list.getSnapshot().value![0].done).toBe(true);
+		store.settle(error.operationId, true);
+		await vi.waitFor(() => expect(list.getSnapshot().refreshing).toBe(false));
+		expect(server.log.filter((line) => line.startsWith('setDone'))).toEqual(['setDone true']);
 	});
 
 	it('sends writes to one entity in the order they were submitted', async () => {
@@ -508,13 +560,25 @@ describe('octane/data store', () => {
 		expect(received).toEqual([42]);
 	});
 
+	it('retires queued writes before invoking their transport', async () => {
+		const server = createServer();
+		const store = createDataStore({ transport: server.transport });
+		const first = store.write(setDone, { id: 'a', done: true });
+		const second = store.write(setDone, { id: 'a', done: false });
+		store.retire();
+
+		await Promise.all(
+			[first, second].map((result) => expect(result).rejects.toBeInstanceOf(DataRetiredError)),
+		);
+		expect(server.log).toEqual([]);
+	});
+
 	it('refuses work for a retired account and ignores its late replies', async () => {
 		const server = createServer();
 		let release!: () => void;
-		const gate = new Promise<void>((resolve) => (release = resolve));
 		const store = createDataStore({
 			transport: async (request, signal) => {
-				await gate;
+				await new Promise<void>((resolve) => (release = resolve));
 				return server.transport(request, signal);
 			},
 		});
@@ -524,6 +588,8 @@ describe('octane/data store', () => {
 
 		// A callback that began under this account still holds this store.
 		const lateInvalidate = () => store.invalidate(['todo']);
+		// Let the read reach the transport before retiring its account.
+		await vi.waitFor(() => expect(release).toBeDefined());
 		store.retire();
 		release();
 		await settled();
@@ -588,6 +654,69 @@ describe('octane/data server render and hydration', () => {
 		const saved = client.write(setDone, { id: 'a', done: true });
 		expect(list.getSnapshot().value![0].done).toBe(true);
 		await saved;
+	});
+
+	it('refreshes a read invalidated before the server sent its seed', async () => {
+		const server = createServer();
+		const contract = { ...todos, tags: ['shelf'], fresh: 60_000 };
+		const rendering = createDataStore({ transport: server.transport });
+		await rendering.prefetch(contract, undefined);
+		rendering.invalidate(['shelf']);
+		const client = createDataStore({ transport: server.transport, seed: rendering.dehydrate() });
+		const list = client.read(contract, undefined);
+		expect(list.getSnapshot().stale).toBe(true);
+		const stop = list.subscribe(() => {});
+		await vi.waitFor(() => expect(server.log).toEqual(['list', 'list']));
+		stop();
+		await rendering.retire();
+		await client.retire();
+	});
+
+	it.each([-86_400_000, 86_400_000])(
+		'counts elapsed client time and supplied seed age with a client clock skew of %i ms',
+		async (skew) => {
+			vi.useFakeTimers();
+			try {
+				const server = createServer();
+				const contract = { ...todos, expire: 100, fresh: 100 };
+				const seed = await serverRender(server, contract);
+				vi.setSystemTime(Date.now() + skew);
+				const open = (seedAge?: number) =>
+					createDataStore({ transport: server.transport, seed, seedAge });
+				const immediately = open();
+				expect(immediately.read(contract, undefined).getSnapshot().status).toBe('ready');
+				const late = open();
+				const inTransit = open(75);
+				vi.advanceTimersByTime(30);
+				expect(inTransit.read(contract, undefined).getSnapshot().status).toBe('pending');
+				vi.advanceTimersByTime(70);
+				expect(late.read(contract, undefined).getSnapshot().status).toBe('pending');
+				await Promise.all([immediately.retire(), late.retire(), inTransit.retire()]);
+			} finally {
+				vi.useRealTimers();
+			}
+		},
+	);
+
+	it('falls back to a load when asynchronous seed validation rejects', async () => {
+		const server = createServer();
+		const seed = await serverRender(server);
+		const output = {
+			'~standard': {
+				...todos.output['~standard'],
+				async validate(value: unknown) {
+					if ((value as TodoItem[])[0]?.title === 'Tides') throw new Error('old value');
+					return { value: value as TodoItem[] };
+				},
+			},
+		};
+		server.rows[0]!.title = 'Atoll';
+		const contract = { ...todos, output };
+		const client = createDataStore({ transport: server.transport, seed });
+		await client.prefetch(contract, undefined);
+		expect(client.read(contract, undefined).getSnapshot().value?.[0]?.title).toBe('Atoll');
+		await settled();
+		await client.retire();
 	});
 
 	it('runs the same validation in process as over HTTP', async () => {
@@ -845,6 +974,97 @@ describe('octane/data server-assigned IDs and server transactions', () => {
 		expect(server.log).not.toContainEqual(expect.stringMatching(/^setDone/));
 	});
 
+	it('keeps a write to one round trip when its feed already supplied the same read', async () => {
+		const counts = read({
+			name: 'counts',
+			tags: ['todo'],
+			output: schema<{ done: number }>((v) => typeof v?.done === 'number'),
+		});
+		const requests: string[] = [];
+		const store = createDataStore({
+			transport: async (request) => {
+				requests.push(request.kind);
+				if (request.kind === 'read') return { ok: true, value: { done: 0 } };
+				receive(store, [{ read: counts, value: { done: 1 } }]);
+				return {
+					ok: true,
+					value: { id: 'a', title: 'Tides', done: true },
+					refreshed: [{ name: counts.name, input: undefined, value: { done: 1 } }],
+				};
+			},
+		});
+		const count = store.read(counts, undefined);
+		await observe(count);
+		await store.write(setDone, { id: 'a', done: true });
+		await settled();
+		expect(requests).toEqual(['read', 'write']);
+		expect(count.getSnapshot().value).toEqual({ done: 1 });
+	});
+
+	it('rechecks the whole read if a partial feed edit overtakes a validating write refresh', async () => {
+		let resume!: () => void;
+		let hold = false;
+		const listRead = read({
+			name: todos.name,
+			entities: (list: TodoItem[]) => Todo.from(list),
+			output: {
+				'~standard': {
+					version: 1,
+					vendor: 'test',
+					validate: async (value: unknown) => {
+						if (hold) {
+							hold = false;
+							await new Promise<void>((resolve) => (resume = resolve));
+						}
+						return { value: value as TodoItem[] };
+					},
+				},
+			},
+		});
+		const add = write({ name: addTodo.name, input: addTodo.input, invalidates: ['todo'] });
+		const server = createServer();
+		const store = createDataStore({ transport: server.transport });
+		const list = store.read(listRead, undefined);
+		await observe(list);
+		hold = true;
+		await store.write(add, { title: 'New book' });
+		await vi.waitFor(() => expect(resume).toBeDefined());
+		server.rows[0]!.title = 'Renamed';
+		receive(store, [{ put: Todo, value: { ...server.rows[0]! } }]);
+		resume();
+		await vi.waitFor(() => expect(list.getSnapshot().value).toEqual(server.rows));
+	});
+
+	it('rechecks a shared read when concurrent writes deliver their refreshed values out of order', async () => {
+		const server = createServer();
+		const releases: Array<() => void> = [];
+		const store = createDataStore({
+			transport: async (request, signal) => {
+				const reply = await server.transport(request, signal);
+				if (request.kind === 'write') await new Promise<void>((resolve) => releases.push(resolve));
+				return reply;
+			},
+		});
+		const list = store.read(todos, undefined);
+		await observe(list);
+
+		const first = store.write(addTodo, { title: 'First' });
+		await vi.waitFor(() => expect(releases).toHaveLength(1));
+		const second = store.write(addTodo, { title: 'Second' });
+		await vi.waitFor(() => expect(releases).toHaveLength(2));
+		releases[1]!();
+		await second;
+		const seen: string[][] = [];
+		const stop = list.subscribe(() => seen.push(list.getSnapshot().value!.map((row) => row.title)));
+		releases[0]!();
+		await first;
+		await settled();
+
+		expect(list.getSnapshot().value).toEqual(server.rows);
+		expect(seen.every((titles) => titles.includes('Second'))).toBe(true);
+		stop();
+	});
+
 	it('adopts every read a reply carries before notifying any reader', async () => {
 		const server = createServer();
 		const store = createDataStore({ transport: server.transport });
@@ -881,7 +1101,7 @@ describe('octane/data publish and forget', () => {
 				version: 1,
 				vendor: 'test',
 				validate: (value: any) =>
-					new Promise((resolve) =>
+					new Promise<{ value: TodoItem[] }>((resolve) =>
 						setTimeout(() => resolve({ value }), value[0].title === 'Older' ? 20 : 0),
 					),
 			},

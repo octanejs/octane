@@ -1,18 +1,26 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, beforeAll, expect, it } from 'vitest';
 import { act, drainPassiveEffects, flushSync, hydrateRoot } from 'octane';
 import { renderHydrationFixture } from '../../octane/tests/_hydration-ssr.js';
 import { HydratedVirtualList, observerLifecycle } from './_fixtures/hydration.tsrx';
+
+let html: string;
+
+// Rendering the server twin starts a cold Vite SSR server and compiles the
+// whole server runtime: about 0.5 s idle and 2-3 s on a loaded CI shard. That
+// is fixture setup, so it runs here rather than inside the test's budget.
+beforeAll(async () => {
+	({ html } = await renderHydrationFixture(
+		'tanstack-virtual',
+		'packages/tanstack-virtual/tests/_fixtures/hydration.tsrx',
+		'HydratedVirtualList',
+		{},
+	));
+});
 
 afterEach(() => document.body.replaceChildren());
 
 // @parity-case conformance:virtual-hydration
 it('adopts the initial virtual rows, updates their extent and disposes the observer', async () => {
-	const { html } = await renderHydrationFixture(
-		'tanstack-virtual',
-		'packages/tanstack-virtual/tests/_fixtures/hydration.tsrx',
-		'HydratedVirtualList',
-		{},
-	);
 	const container = document.createElement('div');
 	container.innerHTML = html;
 	document.body.append(container);

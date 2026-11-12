@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { installTestClock } from 'octane/testing';
 import { __serverRpc } from 'octane';
 import { __serverRpcPreload } from 'octane/internal/server-rpc';
 import * as devalue from 'devalue';
@@ -481,7 +482,7 @@ describe('streamed server-function results', () => {
 	);
 
 	it('includes stalled response headers in the invocation deadline', async () => {
-		vi.useFakeTimers();
+		const clock = installTestClock();
 		const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(
 			(_url, options) =>
 				new Promise((_, reject) => {
@@ -495,11 +496,13 @@ describe('streamed server-function results', () => {
 			void __serverRpc('deadbeef', [], {}, true, { timeoutMs: 10 }).catch((error) => {
 				outcome = error;
 			});
-			await vi.advanceTimersByTimeAsync(20);
+			await clock.advance(9);
+			expect(outcome).toBeUndefined();
+			await clock.advance(1);
 			expect(outcome).toMatchObject({ code: 'OCTANE_RPC_UNCERTAIN' });
 		} finally {
 			fetch.mockRestore();
-			vi.useRealTimers();
+			clock.uninstall();
 		}
 	});
 

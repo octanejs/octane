@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import { createRequire, isBuiltin } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
-import { skipWrappers } from './expression-wrappers.js';
-import { hasLocalMemberWrite } from './local-uses.js';
+import { isWrapper, skipWrappers } from './expression-wrappers.js';
+import { renderUses } from './forwarded-props.js';
+import { hasLocalMemberWrite, localUses } from './local-uses.js';
 import { bind } from './transform.js';
 import { hasRuntimeDependency } from './scoped-store-contract.js';
 
@@ -93,6 +94,30 @@ export function storeSources(
 		const locals = new Map<string, Input>();
 		const localFunctions = new Set<string>();
 		const { sf, checker } = bind(file, fs.readFileSync(file, 'utf8'));
+		let uses: ReturnType<typeof localUses> | undefined;
+		function handleEscapes(name: ts.Identifier) {
+			const refs = (uses ??= localUses(sf, checker));
+			const pending = [name];
+			while (pending.length) {
+				for (const ref of renderUses(refs(pending.pop()!))) {
+					let value: ts.Node = ref;
+					while (isWrapper(value.parent)) value = value.parent;
+					const parent = value.parent;
+					if (ts.isExportSpecifier(parent) || ts.isExportAssignment(parent)) continue;
+					if (
+						!ts.isVariableDeclaration(parent) ||
+						parent.initializer !== value ||
+						!ts.isIdentifier(parent.name) ||
+						!ts.isVariableDeclarationList(parent.parent) ||
+						(parent.parent.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+						!ts.isSourceFile(parent.parent.parent.parent)
+					)
+						return true;
+					pending.push(parent.name);
+				}
+			}
+			return false;
+		}
 		for (const s of sf.statements) {
 			if (ts.isFunctionDeclaration(s) && s.name && s.body) localFunctions.add(s.name.text);
 			if (
@@ -143,7 +168,9 @@ export function storeSources(
 							input = {
 								factory: callee.reexport,
 								direct: !callee.opaqueOnly && call === d.initializer && target === call.expression,
-								data: call.arguments.every((arg) => dataInput(arg, locals)),
+								// A local use can expose a literal-initialized handle to a callback.
+								data:
+									call.arguments.every((arg) => dataInput(arg, locals)) && !handleEscapes(d.name),
 							};
 					} else if (localFunctions.has(target.text)) input = { opaque: true };
 				} else if (inertLiteral(call)) input = { literal: true };

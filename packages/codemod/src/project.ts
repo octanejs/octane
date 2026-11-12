@@ -297,12 +297,15 @@ export async function runCodemod(
 			});
 		});
 	}
+	function bindingOptions(file: string) {
+		const dir = path.dirname(file);
+		return ts.findConfigFile(dir, ts.sys.fileExists) === rootProject
+			? config
+			: tsconfigOptions(dir);
+	}
 	const bindingProject = {
 		root,
-		original(file: string, module: string) {
-			const dir = path.dirname(file);
-			const options =
-				ts.findConfigFile(dir, ts.sys.fileExists) === rootProject ? config : tsconfigOptions(dir);
+		original(file: string, module: string, options = bindingOptions(file)) {
 			return (
 				(!options?.paths && !options?.baseUrl) ||
 				originalModule(file, module, options) !== undefined
@@ -343,7 +346,11 @@ export async function runCodemod(
 					/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(base, name)?.version ?? ''),
 				) &&
 				[file, adapter].every((source) => {
-					if (!bindingProject.original(source, 'react-intl')) return false;
+					const options = bindingOptions(source);
+					if (!bindingProject.original(source, 'react-intl', options)) return false;
+					const conditions = options?.customConditions;
+					if (conditions?.length && hasRuntimeExportCondition(lib.manifest.exports, conditions))
+						return false;
 					const resolved = ts.resolveModuleName(
 						'react-intl',
 						source,
@@ -1650,6 +1657,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function record(value: unknown): Record<string, unknown> {
 	return isRecord(value) ? value : {};
+}
+
+/** A shared declaration entry can hide an executable branch from TypeScript resolution. */
+function hasRuntimeExportCondition(exports: unknown, conditions: readonly string[]) {
+	const map = record(exports);
+	const root = Object.keys(map).some((key) => key.startsWith('.')) ? map['.'] : exports;
+	function walk(value: unknown, matched: boolean): boolean {
+		if (typeof value === 'string' || value === null) return matched;
+		if (Array.isArray(value)) return value.some((entry) => walk(entry, matched));
+		return Object.entries(record(value)).some(
+			([key, entry]) =>
+				key !== 'types' &&
+				!key.startsWith('types@') &&
+				walk(entry, matched || conditions.includes(key)),
+		);
+	}
+	return walk(root, false);
 }
 
 /**

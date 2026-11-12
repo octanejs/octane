@@ -50,7 +50,7 @@ import {
 	type PersistOptions,
 	type Stored,
 } from './persist.js';
-import { setHostTimeout, clearHostTimeout, hostDateNow } from '../host-task.js';
+import { setHostTimeout, clearHostTimeout, hostDateNow, hostNow } from '../host-task.js';
 
 export interface ReadSnapshot<T> {
 	readonly status: 'pending' | 'ready' | 'error';
@@ -81,6 +81,13 @@ export class DataUncertainError extends Error {
 		super('octane/data: the outcome of this write is unknown', { cause });
 		this.name = 'DataUncertainError';
 		this.operationId = operationId;
+	}
+}
+
+/** The prerequisite create was refused, so this queued edit never reached the transport. */
+class DependencyError extends DataError {
+	constructor() {
+		super('dependency');
 	}
 }
 
@@ -142,6 +149,8 @@ export interface DataStoreOptions {
 	readonly transport: Transport;
 	/** A server store's `dehydrate()` output. */
 	readonly seed?: string | null | undefined;
+	/** Elapsed milliseconds between writing the seed and opening this store, when known. */
+	readonly seedAge?: number | undefined;
 	/** On a server, the request's `forms(request).form`; `dehydrate()` carries it to the browser. */
 	readonly form?: FormSeed | undefined;
 	/**
@@ -189,8 +198,10 @@ interface SeedEntry {
 	readonly name: string;
 	readonly input: unknown;
 	readonly value: unknown;
-	/** Milliseconds since the server loaded the value; clocks are not compared. */
+	/** Milliseconds since the value loaded, measured when the seed was written. */
 	readonly age: number;
+	readonly stale?: boolean;
+	readonly span?: Pick<Span, 'start' | 'first' | 'last'> | undefined;
 }
 
 /**
@@ -328,6 +339,17 @@ function sameRow(a: unknown, b: unknown): boolean {
 	return keys.every((key) => Object.is((a as any)[key], (b as any)[key]));
 }
 
+/** Compare confirmed read outputs only when a bundled refresh and a newer full value raced. */
+function sameWireValue(a: unknown, b: unknown): boolean {
+	if (Object.is(a, b)) return true;
+	try {
+		return devalue.stringify(a) === devalue.stringify(b);
+	} catch {
+		// A custom transport can return objects the wire codec cannot represent.
+		return false;
+	}
+}
+
 /** Canonicalize object field order while retaining the types and references used on the wire. */
 const keyEncoding: NonNullable<Parameters<typeof devalue.stringify>[2]> = {
 	operations: {
@@ -393,6 +415,9 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				cursors?: Array<[string, string]>;
 			})
 		: null;
+	const seedAge = options.seedAge ?? 0;
+	if (!Number.isFinite(seedAge) || seedAge < 0) throw new RangeError('Invalid seed age');
+	const seedTime = parsed ? hostNow() : 0;
 	for (const seed of parsed?.reads ?? []) seeds.set(entryKey(seed.name, seed.input), seed);
 	const formSeed = options.form ?? parsed?.form ?? NO_FORM_SEED;
 	/** A refused submission's outcome goes to the first form that matches it, once. */
@@ -414,13 +439,15 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			? Promise.all(
 					options.feeds.map((feed) =>
 						Promise.resolve()
-							.then(() =>
-								transport(
+							.then(() => {
+								// Position probes bypass request(), which waits on these probes itself.
+								assertLive();
+								return transport(
 									{ kind: 'position', name: feed.name, input: undefined },
 									// A retired render, cancelled or failed, stops asking.
 									retiring.signal,
-								),
-							)
+								);
+							})
 							.then(
 								(reply) => {
 									if (reply.ok && typeof reply.value === 'string') {
@@ -657,7 +684,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	}
 
 	/** The confirmed value with every outstanding edit applied, in submission order. */
-	function project(entry: Entry): unknown {
+	function project(entry: Entry, confirmedOnly = false): unknown {
 		if (!entry.read.entities || (operations.length === 0 && records.size === 0)) return entry.base;
 		const replace = new Map<unknown, unknown>();
 		for (const { entity, source } of selections(entry.read, entry.base)) {
@@ -675,6 +702,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				}
 			}
 			for (const operation of operations) {
+				if (confirmedOnly && operation.status !== 'confirmed') continue;
 				const { effect } = operation.write;
 				if (effect?.entity.name !== entity.name || !shows(operation, entry)) continue;
 				const index = items.findIndex((item) => entity.id(item) === operation.entityId);
@@ -694,6 +722,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				replace.set(source, list ? items : items[0]);
 		}
 		if (replace.size === 0) return entry.base;
+		if (confirmedOnly) return rewrite(entry.base, replace);
 		// Unchanged parts keep the last value, so a reader is not told of a change that is not one.
 		const last = entry.projected;
 		if (last !== null && last.base === entry.base && last.parts.size === replace.size) {
@@ -840,14 +869,17 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		startedSeq: number,
 		age = 0,
 		reload?: Set<Entry>,
+		bounds?: Pick<Span, 'start' | 'first' | 'last'>,
 	): void {
 		if (isView(entry.read)) {
 			const rows = value as unknown[];
 			const { offset, limit } = wireInput(entry) as { offset: number; limit: number };
 			entry.span = {
-				start: offset,
-				first: offset > 0 ? (rows[0] ?? null) : null,
-				last: rows.length < limit ? null : rows[rows.length - 1],
+				...(bounds ?? {
+					start: offset,
+					first: offset > 0 ? (rows[0] ?? null) : null,
+					last: rows.length < limit ? null : rows[rows.length - 1],
+				}),
 				reloaded: false,
 				more: false,
 				rows: new Map(),
@@ -915,16 +947,43 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const seed = seeds.get(entry.key);
 		if (!seed) return;
 		seeds.delete(entry.key);
-		if (seed.age >= entry.read.expire) return;
+		const age = seed.age + seedAge + Math.max(0, hostNow() - seedTime);
+		if (!Number.isFinite(age) || age < 0 || age >= entry.read.expire) return;
 		let value: unknown;
+		let bounds: SeedEntry['span'];
 		try {
 			value = parse(entry.read.output, seed.value);
+			if (value instanceof Promise) {
+				void value.catch(() => {});
+				return;
+			}
+			if (seed.span !== undefined && isView(entry.read)) {
+				const { start, first, last } = seed.span;
+				const { offset } = wireInput(entry) as { offset: number };
+				if (start !== offset || (start === 0 && first !== null)) return;
+				const { of, compare } = entry.read.view;
+				// Seed adoption is synchronous. Async bounds use the ordinary validated load.
+				const lower = first === null ? null : parse(of.schema, first);
+				if (lower instanceof Promise) {
+					void lower.catch(() => {});
+					return;
+				}
+				const upper = last === null ? null : parse(of.schema, last);
+				if (upper instanceof Promise) {
+					void upper.catch(() => {});
+					return;
+				}
+				if (start > 0 && lower === null && (upper !== null || (value as unknown[]).length > 0))
+					return;
+				if (lower !== null && upper !== null && compare(lower, upper) > 0) return;
+				bounds = { start, first: lower, last: upper };
+			}
 		} catch {
 			return;
 		}
-		if (value instanceof Promise) return;
 		const reload = new Set<Entry>();
-		adopt(entry, value, 0, seed.age, reload);
+		adopt(entry, value, 0, age, reload, bounds);
+		entry.stale = seed.stale === true;
 		save(entry);
 		// A seed is adopted while a render asks for its read.
 		if (reload.size > 0) queueMicrotask(() => !retired && reloadAll(reload));
@@ -940,6 +999,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		await undefined;
 		// Read after the feeds' positions, so no change falls between them and a value.
 		if (positions) await positions;
+		assertLive();
 		return transport(payload, signal);
 	}
 
@@ -997,8 +1057,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (persisted && !entry.hasBase && !entry.checkedStorage && entry.read.persist) {
 			return restore(entry);
 		}
-		const attempt = ++entry.attempt;
 		const startedSeq = ++sequence;
+		const attempt = (entry.attempt = startedSeq);
 		const abort = (entry.abort = new AbortController());
 		const { read } = entry;
 		clearHostTimeout(entry.keepTimer);
@@ -1036,7 +1096,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		entry.abort?.abort();
 		entry.abort = null;
 		entry.inflight = null;
-		return ++entry.attempt;
+		return (entry.attempt = ++sequence);
 	}
 
 	/** Discard any load in flight, since it may predate the change, and reload if observed. */
@@ -1170,11 +1230,16 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	}
 
 	/** A confirmed write refreshes the reads it returned and marks the rest it affects stale. */
-	function confirm(operation: Operation, reply?: DataReply & { ok: true }, output?: unknown): void {
+	function confirm(
+		operation: Operation,
+		reply?: DataReply & { ok: true },
+		output?: unknown,
+		dispatchedAt = sequence,
+	): void {
 		const { write } = operation;
 		if (write.effect?.kind === 'create' && write.serverId) {
 			if (output === undefined) {
-				operation.gate?.reject(new DataError('dependency'));
+				operation.gate?.reject(new DependencyError());
 			} else {
 				assignId(operation, write.serverId(output));
 			}
@@ -1208,17 +1273,39 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				}
 			}
 			if (!entry) continue;
+			// Another request, invalidation or write reply overtook this write. The server
+			// gives no ordering between them, so reload rather than publishing an older value.
+			const overtaken = entry.attempt > dispatchedAt;
+			if (
+				overtaken &&
+				(entry.baseSeq <= dispatchedAt || entry.stale || entry.inflight || entry.span)
+			) {
+				reload.add(entry);
+				continue;
+			}
 			refreshed.add(entry);
-			// The refreshed value was read after the write, so it supersedes any load in flight.
-			const attempt = supersede(entry);
+			// The refreshed value supersedes any load that preceded this write.
+			const attempt = overtaken ? entry.attempt : supersede(entry);
 			const startedSeq = ++sequence;
-			const current = () => !retired && entry.attempt === attempt;
+			const current = () => {
+				if (retired || entries.get(entry.key) !== entry) return false;
+				if (entry.attempt === attempt) return true;
+				// A partial feed edit can supersede the refresh while its schema validates.
+				// The edit cannot account for the rest of the reply; a later full load can.
+				if (!entry.inflight && !entry.stale && entry.baseSeq < startedSeq) invalidateEntry(entry);
+				return false;
+			};
 			pending.push(
 				Promise.resolve()
 					.then(() => parse(entry.read.output, item.value))
 					.then(
 						(value) => () => {
 							if (!current()) return undefined;
+							if (overtaken) {
+								// The feed can echo this write before its reply arrives.
+								if (!sameWireValue(entry.base, value)) invalidateEntry(entry);
+								return undefined;
+							}
 							adopt(entry, value, startedSeq);
 							save(entry);
 							return entry;
@@ -1266,7 +1353,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			touchEntities();
 		} else {
 			remove(operation);
-			operation.gate?.reject(new DataError('dependency'));
+			operation.gate?.reject(new DependencyError());
 		}
 	}
 
@@ -1366,7 +1453,9 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			? persisted!.journal({ id, name: write.name, raw: operation.raw })
 			: null;
 
+		let dispatchedAt = 0;
 		const deliver = () => {
+			dispatchedAt = sequence;
 			const tags = writeTags(write);
 			const refresh: { name: string; input: unknown }[] = [];
 			for (const entry of entries.values()) {
@@ -1391,7 +1480,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const previous = queueKey === undefined ? undefined : queues.get(queueKey);
 		const sent = previous
 			? previous.then(dispatch, (error) => {
-					if (retired || error instanceof DataError) throw error;
+					if (retired || error instanceof DependencyError) throw error;
 					return dispatch();
 				})
 			: dispatch();
@@ -1421,7 +1510,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				if (retired) throw new DataRetiredError();
 				if (!reply.ok) {
 					remove(operation);
-					operation.gate?.reject(new DataError('dependency'));
+					operation.gate?.reject(new DependencyError());
 					throw new DataError(reply.code, reply.data, reply.issues);
 				}
 				let output: unknown;
@@ -1429,17 +1518,17 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					output = write.output ? await parse(write.output, reply.value) : reply.value;
 				} catch (error) {
 					// The server applied the write; only its reply is unreadable.
-					if (!retired) confirm(operation, reply);
+					if (!retired) confirm(operation, reply, undefined, dispatchedAt);
 					throw error;
 				}
 				if (retired) throw new DataRetiredError();
-				confirm(operation, reply, output);
+				confirm(operation, reply, output, dispatchedAt);
 				if (write.serverId || settlesLocally(write)) touchEntities();
 				return output;
 			},
 			(error) => {
 				if (retired) throw new DataRetiredError();
-				if (error instanceof DataError) {
+				if (error instanceof DependencyError) {
 					// A create this write depended on was refused; it was never sent.
 					remove(operation);
 					operation.gate?.reject(error);
@@ -1568,7 +1657,15 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			for (const entry of entries.values()) {
 				const age = now - entry.fetchedAt;
 				if (!entry.hasBase || age >= entry.read.expire) continue;
-				seed.push({ name: entry.read.name, input: entry.input, value: entry.base, age });
+				const { span } = entry;
+				seed.push({
+					name: entry.read.name,
+					input: entry.input,
+					age,
+					value: span ? confirmedRows(entry) : project(entry, true),
+					span: span ? { start: span.start, first: span.first, last: span.last } : undefined,
+					stale: entry.stale,
+				});
 			}
 			// devalue escapes `<`, so the text cannot close the script element holding it.
 			return devalue.stringify({ reads: seed, form: formSeed, cursors });
@@ -1635,7 +1732,15 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			reloadAll(reload);
 			const all = new Set(changed);
 			for (const entry of entries.values()) {
-				for (const name of names) if (entry.names.has(name)) all.add(entry);
+				for (const name of names) {
+					if (!entry.names.has(name)) continue;
+					// A pending reply can introduce a row this event already removed from the server,
+					// even if the current read or view has never held that row.
+					// In-flight reads have already restarted with their own newer attempts.
+					if (!entry.inflight) entry.attempt = ++sequence;
+					all.add(entry);
+					break;
+				}
 			}
 			commit(all);
 		},

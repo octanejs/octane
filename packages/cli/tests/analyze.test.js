@@ -929,6 +929,27 @@ describe('octane analyze Strong migration', () => {
 		);
 	});
 
+	it.each(['{ /* keep */ [field]: value = fallback, ...rest }', '[, value = fallback, ...rest]'])(
+		'preserves the nested state binding %s when applying its fix',
+		async (pattern) => {
+			const file = 'src/Initial.tsrx';
+			const source = `import { useState } from 'octane';
+export function Initial({ make, field, fallback }) @{
+  const[${pattern}] = useState(() => make());
+  <p>{String(value) as string}</p>
+}`;
+			const { root } = app({ [file]: source });
+			const result = await run(root, ['--strong-preview', '--fix']);
+			expect(result.json().fixed).toEqual({ findings: 1, files: [file] });
+			expect(result.json().findings).toEqual([]);
+			expect(readFileSync(path.join(root, file), 'utf8')).toBe(
+				source
+					.replaceAll('useState', 'useInitialValue')
+					.replace(`const[${pattern}]`, `const ${pattern}`),
+			);
+		},
+	);
+
 	it('falls back to the first error with an older compiler that cannot collect', async () => {
 		// An installed octane from before collectDiagnostics exposes only
 		// compile(). The real compile() stands in for it, so the fallback reports

@@ -523,7 +523,7 @@
         {
           "path": "packages/tanstack-virtual/tests/ssr-hydration.test.ts",
           "role": "test",
-          "sha256": "d3f08a70f03f340e8ec34eecc473acce2b643983abab8b47d0fa892869c06144",
+          "sha256": "b5fbbe0c05ddf65a91b559a2bb971432d00fcc22e04febcfee3bd4ae60175e25",
           "cases": [
             {
               "id": "conformance:virtual-hydration",

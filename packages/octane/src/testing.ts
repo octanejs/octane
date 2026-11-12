@@ -58,7 +58,8 @@ export function installTestClock(): TestClock {
 	let time = typeof performance === 'object' ? performance.now() : Date.now();
 	const installedAt = time;
 	const dateAtInstall = Date.now();
-	const dateNow = () => dateAtInstall + (time - installedAt);
+	// Whole milliseconds, as `Date.now()` is: callers treat dates as integers.
+	const dateNow = () => Math.floor(dateAtInstall + (time - installedAt));
 	let seq = 0;
 	let queue: ClockTimer[] = [];
 

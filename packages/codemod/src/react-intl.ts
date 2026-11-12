@@ -33,7 +33,7 @@ export function intlImports(
 	canPassToReact: (element: ts.JsxElement | ts.JsxSelfClosingElement) => boolean,
 	returnedReceiver: (tag: ts.JsxOpeningLikeElement) => boolean,
 	originalReact: () => boolean,
-	unknownFormatter: (call: ts.CallExpression) => void,
+	unknownFormatter: (call: ts.CallExpression, method: string) => void,
 ): Set<ts.ImportSpecifier> {
 	const candidates = file.statements.filter(ts.isImportDeclaration).flatMap((decl) => {
 		const named = decl.importClause?.namedBindings;
@@ -213,8 +213,11 @@ export function intlImports(
 			})
 		);
 	}
-	const nativeMessages = new Set<ts.CallExpression>();
-	function callsScalarMethod(receiver: ts.Expression): boolean {
+	const nativeFormatters = new Map<ts.CallExpression, string>();
+	function callsScalarMethod(
+		receiver: ts.Expression,
+		owner: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction,
+	): boolean {
 		const access = receiver.parent;
 		if (
 			!ts.isPropertyAccessExpression(access) ||
@@ -224,7 +227,25 @@ export function intlImports(
 			return false;
 		const call = access.parent;
 		if (!ts.isCallExpression(call) || call.expression !== access) return false;
-		if (scalarMethods.has(access.name.text)) return true;
+		if (scalarMethods.has(access.name.text)) {
+			// In the original React render, JSX attributes and children evaluate eagerly.
+			if (
+				/^(?:formatDate|formatTime|formatNumber)$/.test(access.name.text) &&
+				!owner.asteriskToken &&
+				!owner.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
+				ts.findAncestor(
+					call,
+					(node) =>
+						node === owner.body ||
+						ts.isFunctionLike(node) ||
+						ts.isClassLike(node) ||
+						ts.isInterfaceDeclaration(node) ||
+						ts.isTypeNode(node),
+				) === owner.body
+			)
+				nativeFormatters.set(call, access.name.text);
+			return true;
+		}
 		if (
 			access.name.text !== 'formatMessage' ||
 			call.arguments.length < 1 ||
@@ -246,7 +267,7 @@ export function intlImports(
 			return false;
 		const values = call.arguments[1];
 		if (values && !scalarValues(values)) return false;
-		nativeMessages.add(call);
+		nativeFormatters.set(call, access.name.text);
 		return true;
 	}
 	function localeView(
@@ -377,7 +398,7 @@ export function intlImports(
 			!isComponent(owner)
 		)
 			return false;
-		if (callsScalarMethod(call)) return true;
+		if (callsScalarMethod(call, owner)) return true;
 		const access = call.parent;
 		const directLocale =
 			ts.isPropertyAccessExpression(access) &&
@@ -394,7 +415,7 @@ export function intlImports(
 			return false;
 		let name: ts.Identifier;
 		if (ts.isIdentifier(decl.name)) {
-			if (!directLocale) return uses(decl.name).every(callsScalarMethod);
+			if (!directLocale) return uses(decl.name).every((ref) => callsScalarMethod(ref, owner));
 			name = decl.name;
 		} else {
 			if (directLocale || !ts.isObjectBindingPattern(decl.name) || decl.name.elements.length !== 1)
@@ -426,7 +447,7 @@ export function intlImports(
 		if (name === 'useIntl') {
 			// Direct eval can read the imported hook or its formatter through an untracked name.
 			if (hasEval(file)) continue;
-			nativeMessages.clear();
+			nativeFormatters.clear();
 			const proof =
 				locations.length === 1
 					? readsIntl(locations[0], true)
@@ -434,7 +455,7 @@ export function intlImports(
 			if (proof) {
 				selected.add(item);
 				if (proof !== true) selected.add(proof);
-				for (const call of nativeMessages) unknownFormatter(call);
+				for (const [call, method] of nativeFormatters) unknownFormatter(call, method);
 			}
 			continue;
 		}

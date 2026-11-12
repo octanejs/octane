@@ -126,6 +126,17 @@ describe('installTestClock', () => {
 		await vi.waitFor(() => expect(text('#n')).toBe('10'));
 	});
 
+	it('keeps dateNow() in whole milliseconds, as Date.now() is', async () => {
+		clock = installTestClock();
+		const start = clock.dateNow();
+		// frame() lands on a 16 ms boundary, a fractional step from the start.
+		await clock.frame();
+		await clock.advance(0.5);
+		expect(Number.isInteger(clock.dateNow())).toBe(true);
+		expect(clock.dateNow() - start).toBe(Math.floor(clock.dateNow() - start));
+		expect(clock.dateNow()).toBeGreaterThanOrEqual(start);
+	});
+
 	it('refuses a second clock', () => {
 		clock = installTestClock();
 		expect(() => installTestClock()).toThrow(/already installed/);
