@@ -706,6 +706,12 @@ class ModuleTransform {
 		this.indentUnit = /^\t/m.test(source) ? '\t' : '  ';
 	}
 
+	private get emitsTsrx() {
+		return (
+			this.template || (this.target === 'tsrx' && (this.hasJsx || /\.[jt]sx$/.test(this.filename)))
+		);
+	}
+
 	run(): TransformResult {
 		this.analyze();
 		let code = this.emit(this.sf, PLAIN, 0);
@@ -739,8 +745,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 }
 `;
 		}
-		const tsrx =
-			this.template || (this.target === 'tsrx' && (this.hasJsx || /\.[jt]sx$/.test(this.filename)));
+		const tsrx = this.emitsTsrx;
 		if (tsrx) code = code.replace(/^\/\*\*\s*@jsxImportSource\s+\S+\s*\*\/[ \t]*\r?\n/m, '');
 		// A JavaScript module was never type-checked; as TSRX it stays unchecked.
 		if (tsrx && /\.[cm]?jsx?$/.test(this.filename)) {
@@ -3808,6 +3813,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			);
 			return null;
 		}
+		if (name === 'useEffect' && callee.module === 'react' && node.arguments.length === 2)
+			this.checkEffectDependencyReads(node, node.arguments[1]);
 		if (name in DEPENDENCY_HOOKS) return this.rewriteDependencies(node, name);
 		return null;
 	}
@@ -4096,6 +4103,66 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		)
 			return;
 		return `[${field.name.getText(this.sf)}]`;
+	}
+
+	private ownDataDependency(
+		member: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+		hook: ts.CallExpression,
+	) {
+		const receiver = skipWrappers(member.expression);
+		const name = ts.isPropertyAccessExpression(member)
+			? member.name
+			: skipWrappers(member.argumentExpression);
+		if (
+			!ts.isStringLiteralLike(name) &&
+			!(ts.isPropertyAccessExpression(member) && ts.isIdentifier(name))
+		)
+			return false;
+		const key = name.text;
+		if (key === '__proto__' || !ts.isIdentifier(receiver)) return false;
+		const init = this.constValue(receiver);
+		const object = init && skipWrappers(init);
+		const owner = ts.findAncestor(hook, ts.isFunctionLike);
+		if (
+			!object ||
+			!ts.isObjectLiteralExpression(object) ||
+			!owner ||
+			!fixedBinding(this.checker, receiver, hook) ||
+			this.localUses(receiver).some((name) => !declaresName(name)) ||
+			reads(owner, (name) => name.text === 'eval')
+		)
+			return false;
+		// Spreads, computed names and accessors can redefine the property.
+		return (
+			object.properties.every(
+				(field) =>
+					(ts.isPropertyAssignment(field) && !ts.isComputedPropertyName(field.name)) ||
+					(ts.isShorthandPropertyAssignment(field) && !field.objectAssignmentInitializer),
+			) &&
+			object.properties.some(
+				({ name }) =>
+					name && (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) && name.text === key,
+			)
+		);
+	}
+
+	private checkEffectDependencyReads(node: ts.CallExpression, deps: ts.Expression) {
+		const list = skipWrappers(deps);
+		if (!this.emitsTsrx || !ts.isArrayLiteralExpression(list)) return;
+		const opaque = list.elements.find((expr) => {
+			const member = skipWrappers(expr);
+			return (
+				(ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member)) &&
+				!this.ownDataDependency(member, node)
+			);
+		});
+		if (opaque)
+			this.note(
+				RULE.deps,
+				'error',
+				opaque,
+				'This effect dependency reads a property during render and may run a getter owned by React. Keep the component in React or verify the getter before moving it to native SSR.',
+			);
 	}
 
 	/**
