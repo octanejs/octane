@@ -645,7 +645,10 @@ class ModuleTransform {
 	/** Unported packages, by name. */
 	readonly unported = new Map<string, Unported>();
 	/** Elements to host in a `ReactCompat` island. */
-	readonly islands = new Set<ts.JsxElement | ts.JsxSelfClosingElement>();
+	readonly islands = new Map<
+		ts.JsxElement | ts.JsxSelfClosingElement,
+		'ReactCompat' | 'ReactCompatInline'
+	>();
 	readonly reactRendererBodies = new Map<ts.Node, string>();
 	readonly originalStoreTags = new Map<ts.ImportSpecifier, string>();
 	storeSourceNames?: Set<string>;
@@ -1136,6 +1139,34 @@ class ModuleTransform {
 		return port;
 	}
 
+	/** Find the paragraph receiving an island through transparent child syntax. */
+	private inParagraph(value: ts.Node) {
+		for (;;) {
+			const parent = value.parent;
+			if (ts.isJsxElement(parent)) {
+				const tag = parent.openingElement.tagName;
+				if (this.calleeName(tag) !== 'Fragment') {
+					if (!ts.isIdentifier(tag)) return false;
+					// The emitter removes an earlier run's fallback around the original element.
+					if (tag.text !== NO_PORT) return tag.text === 'p';
+				}
+			} else if (!(
+				ts.isJsxFragment(parent) ||
+				(ts.isJsxExpression(parent) && !parent.dotDotDotToken) ||
+				isWrapper(parent) ||
+				(ts.isConditionalExpression(parent) && parent.condition !== value) ||
+				(ts.isBinaryExpression(parent) &&
+					(parent.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+						parent.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken ||
+						(parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+							parent.right === value)))
+			)) {
+				return false;
+			}
+			value = parent;
+		}
+	}
+
 	/**
 	 * A component from a package with no Octane port renders in React, inside
 	 * a `ReactCompat` island, when its element hands React nothing Octane
@@ -1184,14 +1215,17 @@ class ModuleTransform {
 				}
 				return;
 			}
-			const reason = !this.hostsInReact(element)
+			const paragraph = this.inParagraph(element);
+			let reason = !this.hostsInReact(element)
 				? `\`<${text}>\` takes children or props that Octane renders, which cannot cross into a React island.`
 				: this.options.reactCompat
 					? null
 					: `\`<${text}>\` can render in a \`ReactCompat\` island only with React and React DOM 19.2 or newer in the React 19 series.`;
+			if (reason === null && paragraph && !this.options.reactCompatInline)
+				reason = `<${text}> needs ReactCompatInline to stay inside this paragraph. Install an Octane release that exports it or keep the paragraph in React.`;
 			if (reason === null) {
 				port.islands++;
-				this.islands.add(element);
+				this.islands.set(element, paragraph ? 'ReactCompatInline' : 'ReactCompat');
 			} else {
 				// Octane fails on a React component deep in its renderer, naming
 				// neither it nor its package, so it throws this error there instead.
@@ -2489,7 +2523,7 @@ class ModuleTransform {
 		if (ts.isJsxAttributes(node)) return this.rewriteAttributes(node, ctx);
 		if ((ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) && this.islands.has(node)) {
 			this.count(RULE.reactCompat);
-			const island = this.require('octane/react', 'ReactCompat', false);
+			const island = this.require('octane/react', this.islands.get(node)!, false);
 			const content = this.span(node, node.getStart(this.sf), node.end, PLAIN);
 			const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
 			const imported = this.importOf(ts.isPropertyAccessExpression(tag) ? tag.expression : tag);
