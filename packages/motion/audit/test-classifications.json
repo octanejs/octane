@@ -101,6 +101,11 @@
       "reason": "Checks scroll-linked MotionValues."
     },
     {
+      "path": "packages/motion/tests/conformance/server-host.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks Octane Vite server rendering, hydration, and host style and ref ownership."
+    },
+    {
       "path": "packages/motion/tests/conformance/stagger.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks Octane variant orchestration timing."
