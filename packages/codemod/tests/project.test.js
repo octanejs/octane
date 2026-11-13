@@ -334,10 +334,25 @@ export function Redeclared({ ref, label }) {
 			const view = (name) => `import { useState } from 'react';
 import { ${name} as initialize } from './factory';
 export function View() { const [value] = useState(initialize); return <p>{value}</p>; }`;
+			const inline = (initializer) => `import { useState } from 'react';
+import { withHint as initialize } from './factory';
+export function View() {
+	const [state] = useState(${initializer});
+	return <p>{state.value}</p>;
+}`;
+
 			const root = project({
 				'View.tsx': view('withHint'),
+				'Inline.tsx': inline('() => ({ value: initialize() })'),
+				'Block.tsx': inline('function () { const value = initialize(); return { value }; }'),
 				'Ordinary.tsx': view('ordinary'),
 				'Deferred.tsx': view('deferred'),
+				'DeferredInline.tsx': inline("() => ({ value: 'ready', run: () => initialize() })"),
+				'Unreachable.tsx': inline("() => { return { value: 'ready' }; initialize(); }"),
+				'Shadowed.tsx': inline(
+					"() => { const initialize = () => 'ready'; return { value: initialize() }; }",
+				),
+				'Skipped.tsx': inline('() => ({ value: false && initialize() })'),
 				'CompiledHint.tsx': `import { preload as hint } from 'react-dom';
 import { useState } from 'react';
 import { ordinary } from './factory';
@@ -360,16 +375,27 @@ export function deferred() { return () => hint('/later.png', { as: 'image' }); }
 					files.map((file) => path.join(root, file)),
 					options,
 				);
-			const unselected = await run('View.tsx', 'Ordinary.tsx', 'Deferred.tsx');
-			const selected = await run('View.tsx', 'factory.ts', 'CompiledHint.tsx');
-			for (const report of [unselected, selected])
-				expect(report.files.find((file) => file.file === 'View.tsx').notes).toContainEqual(
-					expect.objectContaining({
-						severity: 'error',
-						message: expect.stringContaining('React DOM preload'),
-					}),
-				);
-			for (const name of ['Ordinary.tsx', 'Deferred.tsx'])
+			const affected = ['View.tsx', 'Inline.tsx', 'Block.tsx'];
+			const controls = [
+				'Ordinary.tsx',
+				'Deferred.tsx',
+				'DeferredInline.tsx',
+				'Unreachable.tsx',
+				'Shadowed.tsx',
+				'Skipped.tsx',
+			];
+			const unselected = await run(...affected, ...controls);
+			const selected = await run(...affected, 'factory.ts', 'CompiledHint.tsx');
+			for (const report of [unselected, selected]) {
+				for (const name of affected)
+					expect(report.files.find((file) => file.file === name).notes).toContainEqual(
+						expect.objectContaining({
+							severity: 'error',
+							message: expect.stringContaining('React DOM preload'),
+						}),
+					);
+			}
+			for (const name of controls)
 				expect(unselected.files.find((file) => file.file === name).notes).toEqual([]);
 
 			const compiled = selected.files.find((file) => file.file === 'CompiledHint.tsx');
