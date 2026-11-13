@@ -1,5 +1,11 @@
 import { nativeOutputOwner, renderUses } from './forwarded-props.js';
-import { componentTagOrExport, localUses, portableArguments, scalar } from './local-uses.js';
+import {
+	componentTagOrExport,
+	localUses,
+	portableArguments,
+	scalar,
+	valueReads,
+} from './local-uses.js';
 import { skipWrappers } from './expression-wrappers.js';
 import type { StoreInputCheck } from './store-inputs.js';
 import ts from 'typescript';
@@ -120,8 +126,26 @@ export function isBareSvgTag(
 		seen.add(symbol);
 		const d = symbol.declarations?.[0];
 		if (!d) return false;
-		if ((ts.isParameter(d) || ts.isBindingElement(d)) && ts.isIdentifier(d.name) && d.initializer)
-			return !(ts.isBindingElement(d) && suppliesBinding(d)) && fromSvg(d.initializer);
+		if (ts.isBindingElement(d) && ts.isIdentifier(d.name)) {
+			const selected = d.propertyName ?? d.name;
+			if (
+				!d.initializer &&
+				!d.dotDotDotToken &&
+				ts.isObjectBindingPattern(d.parent) &&
+				(ts.isIdentifier(selected) || ts.isStringLiteralLike(selected))
+			)
+				return valueReads(
+					value,
+					checker,
+					[],
+					(binding, selection) =>
+						!selection.length && !!binding.declarations?.some((item) => imports.has(item)),
+					() => false,
+				);
+			return !!d.initializer && !suppliesBinding(d) && fromSvg(d.initializer);
+		}
+		if (ts.isParameter(d) && ts.isIdentifier(d.name) && d.initializer)
+			return fromSvg(d.initializer);
 		if (
 			ts.isVariableDeclaration(d) &&
 			d.initializer &&

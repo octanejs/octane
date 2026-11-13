@@ -103,6 +103,22 @@ it('reports an ordinary bare SVG component whose issuer changes to .tsrx', () =>
 	expect(conflict.result.notes.map((n) => n.rule)).toEqual(['rename-conflict']);
 });
 
+it('reports a bare SVG selected from a local record without flagging a sibling', async () => {
+	const { root, file } = fixture(`import Mark from './icons/mark.svg';
+const Plain = () => <span />;
+export function Pane() {
+	const pair = { svg: Mark, plain: Plain };
+	const { svg: Selected, plain: Other } = pair;
+	return <button><Selected /><Other /></button>;
+}`);
+	const result = await runCodemod([file], { root, strong: true, svgPaths: true, write: false });
+	const pane = result.files.find((entry) => entry.file === 'src/pane.tsx');
+	expect(pane.notes.filter((note) => note.rule === 'svg-issuer')).toEqual([
+		expect.objectContaining({ line: 6, severity: 'error' }),
+	]);
+	expect(result.files.some((entry) => entry.output.endsWith('.svg.octane.ts'))).toBe(false);
+});
+
 it('previews and writes explicitly selected SVG assets without migrating their consumers', async () => {
 	const { root, file, icon } = fixture();
 	const twin = path.join(root, 'src/icons/twin.svg');
