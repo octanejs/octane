@@ -1362,6 +1362,12 @@ export function Host({rows}: { rows: Row[] }) {
 				'List.tsx': source(direct),
 				'Plus.tsx': source(direct.replace('(index as number)', '(index as number) + 1')),
 				'Typeof.tsx': source(direct.replace('(index as number)', 'typeof index')),
+				'Call.tsx': source(direct.replace('(index as number)', 'String(index)')),
+				'Product.tsx': source(direct.replace('(index as number)', '2 * (index as number)')),
+				'Unary.tsx': source(direct.replace('(index as number)', '-index')),
+				'Bitwise.tsx': source(direct.replace('(index as number)', '0 | index')),
+				'Optional.tsx': source(direct.replace('(index as number)', 'maybe?.(index)')),
+				'Earlier.tsx': source(direct.replace('(index as number)', 'fail() * index')),
 				'Computed.tsx': source(
 					'[{0:4},{1:5}].map(({[index]:label},index) => <li key={0}>{label}</li>)',
 				),
@@ -1382,7 +1388,18 @@ export function Host({rows}: { rows: Row[] }) {
 				inputs.map((file) => path.basename(file)),
 			);
 			for (const file of preview.files) {
-				if (['List.tsx', 'Plus.tsx', 'Typeof.tsx', 'Computed.tsx'].includes(file.file)) {
+				if (
+					[
+						'List.tsx',
+						'Plus.tsx',
+						'Typeof.tsx',
+						'Call.tsx',
+						'Product.tsx',
+						'Unary.tsx',
+						'Bitwise.tsx',
+						'Computed.tsx',
+					].includes(file.file)
+				) {
 					expect(file.notes).toEqual([note]);
 					expect(file.code).toContain('@for');
 				} else expect(file.notes).toEqual([]);
