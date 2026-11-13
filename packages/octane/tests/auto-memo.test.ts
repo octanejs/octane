@@ -4601,6 +4601,70 @@ describe('compiler-owned component-region memoization', () => {
 		}
 	});
 
+	it.each<[string, string, (string | ErrorConstructor)?]>([
+		['tsx', `key={index} value={'' + row}`],
+		['tsrx', `key={index} value={row + ''}`],
+		['tsrx', `key={'' + row} value={index}`],
+		['tsrx', `key={index} value={('' + '') + row}`],
+		['tsrx', `key={index} value={index === 0 ? 0 : 1n + 1}`, TypeError],
+	])(
+		'evaluates a later map callback addition before rendering the first row in .%s (%s)',
+		(extension, props, error = 'second callback') => {
+			const { App } = loadCompiledFixtureSource(
+				`function Child({ value }) {
+				if (value === 0 || value === '0') throw Error('first child');
+				return <li />;
+			}
+			export function App({ rows }) {
+				return <ul>{rows.map((row, index) => <Child ${props} />)}</ul>;
+			}`,
+				{
+					id: `map-addition.${extension}`,
+					mode: 'server',
+					compileOptions: { hmr: false, dev: false, strong: false },
+				},
+			);
+			const rows = [
+				{ [Symbol.toPrimitive]: () => 0 },
+				{
+					[Symbol.toPrimitive]() {
+						throw Error('second callback');
+					},
+				},
+			];
+			expect(() => ServerRuntime.renderToString(App, { rows })).toThrow(error);
+		},
+	);
+
+	it('coerces mapped JSX props in callback order when keyed rows reverse', () => {
+		const { App } = loadCompiledFixtureSource(
+			`export function App({ rows }) @{
+				<ul>{rows.map(row => <li key={row.id} data-marker={'' + row} />)}</ul>
+			}`,
+			{
+				id: 'map-concatenation-reorder.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false, dev: false, strong: false },
+			},
+		);
+		let sequence = 0;
+		const rows = ['a', 'b'].map((id) => ({
+			id,
+			[Symbol.toPrimitive]: () => ++sequence,
+		}));
+		const root = mount(App, { rows });
+		try {
+			const [first, second] = root.findAll('li');
+			expect(root.findAll('li').map((row) => row.getAttribute('data-marker'))).toEqual(['1', '2']);
+			sequence = 0;
+			root.update(App, { rows: rows.toReversed() });
+			expect(root.findAll('li')).toEqual([second, first]);
+			expect(root.findAll('li').map((row) => row.getAttribute('data-marker'))).toEqual(['1', '2']);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('preserves keyed component state and effects across native and custom map receivers', () => {
 		const compiled = compile(
 			`function Row(props) { return <li>{props.label}</li>; }
