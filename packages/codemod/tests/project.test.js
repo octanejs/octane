@@ -1345,6 +1345,64 @@ export function Host({rows}: { rows: Row[] }) {
 		},
 	);
 
+	it.each([false, true])(
+		'blocks earlier map bindings that read the later index (project types %s)',
+		async (projectTypes) => {
+			const direct =
+				'[{id:1},{id:2}].map(({id,label=(index as number)},index) => <li key={id}>{label}</li>)';
+			/** @param {string} list */
+			const source = (list) => `export const View = () => <ul>{${list}}</ul>;`;
+			const originals = {
+				'package.json': '{"name":"app","type":"module"}',
+				'tsconfig.json':
+					'{"compilerOptions":{"strict":true,"jsx":"react-jsx","moduleResolution":"bundler"}}',
+				'index.html': '<script type="module" src="./First.tsx"></script>',
+				'First.tsx': 'export const First = () => <p/>;',
+				'Caller.tsx': "import { View } from './List.tsx'; export const Caller = () => <View/>;",
+				'List.tsx': source(direct),
+				'Plus.tsx': source(direct.replace('(index as number)', '(index as number) + 1')),
+				'Typeof.tsx': source(direct.replace('(index as number)', 'typeof index')),
+				'Computed.tsx': source(
+					'[{0:4},{1:5}].map(({[index]:label},index) => <li key={0}>{label}</li>)',
+				),
+				'Literal.tsx': source(direct.replace('(index as number)', '7')),
+				'Deferred.tsx': source(
+					direct.replace('(index as number)', '() => index').replace('{label}', '{id}'),
+				),
+				'Dead.tsx': source(direct.replace('(index as number)', 'false ? index : 7')),
+			};
+			const root = project(originals);
+			const options = { root, verify: false, projectTypes };
+			const note = expect.objectContaining({ rule: 'map-parameter-tdz', severity: 'error' });
+			const inputs = Object.keys(originals)
+				.filter((file) => file.endsWith('.tsx'))
+				.map((file) => path.join(root, file));
+			const preview = await runCodemod(inputs, { ...options, write: false });
+			expect(preview.files.map(({ file }) => file)).toEqual(
+				inputs.map((file) => path.basename(file)),
+			);
+			for (const file of preview.files) {
+				if (['List.tsx', 'Plus.tsx', 'Typeof.tsx', 'Computed.tsx'].includes(file.file)) {
+					expect(file.notes).toEqual([note]);
+					expect(file.code).toContain('@for');
+				} else expect(file.notes).toEqual([]);
+			}
+			const result = await runCodemod(inputs, options);
+			expect(result.files).toEqual([
+				expect.objectContaining({
+					file: 'List.tsx',
+					output: 'List.tsx',
+					changed: false,
+					code: originals['List.tsx'],
+					notes: [note],
+				}),
+			]);
+			expect(fs.readdirSync(root).sort()).toEqual(Object.keys(originals).sort());
+			for (const [file, code] of Object.entries(originals))
+				expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
+		},
+	);
+
 	it('keeps visible or ambiguous JSX text and authored comments in keyed map rows', async () => {
 		const children = [
 			' {row.child()}',
