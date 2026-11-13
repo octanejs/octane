@@ -113,8 +113,13 @@ An empty frame says the connection is open.
 | `secret` | Signs form tokens. Required for `forms()`. |
 | `grant(context)` | The account a request acts for; a form signed for one account is refused for another. |
 
-`define(handle)` returns `handle(contract, run)` entries; names must be
-unique. `run(input, call)` receives validated input and `call`: the context
+`define(handle, defineHandler)` returns `handle(contract, run)` entries; names
+must be unique. `defineHandler(Module, { key: run })` takes a module namespace
+(`import * as Module from './x.data.ts'`) and returns one entry per read,
+view, write or feed it exports. Its type requires exactly one `run` per
+contract export, typed as `handle` types it; a missing or extra key is a type
+error, a missing one at runtime throws, and other exports are ignored.
+`Implementation<C, T>` is the type of `run` for contract `T`. `run(input, call)` receives validated input and `call`: the context
 plus `request`, `signal`, `operationId` and `read(contract, input)`. A view's
 `run` receives `{ ...params, offset, limit }`. A feed's `run` is an async
 iterable of frames and receives `call.cursor`. Throw `DataError(code, data?)`

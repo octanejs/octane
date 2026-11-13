@@ -882,7 +882,8 @@ submitted twice is applied once.
 
 `createDataHandler(options, define)` builds the server side. `define`
 receives `handle`, which pairs a contract with the function that serves it,
-and returns the list of handlers. Two handlers with the same name are an error.
+and [`defineHandler`](#define-handler), which serves a whole module's
+contracts, and returns the list of handlers. Two handlers with the same name are an error.
 
 ```ts
 import { DataError } from 'octane/data';
@@ -925,6 +926,38 @@ your `context` returned, plus:
 `context` also receives a second argument, `caller`, with the `viewer` your
 server middleware authenticated, when the request came through a server
 function or a framework middleware.
+
+<h3 id="define-handler">Serve a whole module</h3>
+
+`define` also receives `defineHandler`, which serves every contract a module
+exports from one object keyed by export name. Import the module as a
+namespace and give each contract its function:
+
+```ts
+import { createDataHandler } from 'octane/data/server';
+import * as Shelf from './contracts.ts';
+
+export const handler = createDataHandler({ context }, (_, defineHandler) =>
+	defineHandler(Shelf, {
+		books: (input, { shelf }) => shelf.slice(input.offset, input.offset + input.limit),
+		stats: (_, { shelf }) => ({ total: shelf.length }),
+		setRead: (input, { shelf }) => markRead(shelf, input.id, input.read),
+	}),
+);
+```
+
+Each function is typed as `handle` would type it for that contract, so
+`input`, `call` and the return value come from the contract and your
+`context`. The object needs exactly one function for each read, view, write
+and feed the module exports: a missing, misspelled or extra key fails to
+compile, so adding a contract to the module points you at the server code
+that must serve it. Other exports, such as an entity or a schema, need
+none. `defineHandler` returns the same handlers `handle` makes, so you can
+spread it next to them: `[...defineHandler(Shelf, { … }), handle(other, run)]`.
+
+To share one function between contracts, write a small factory and call it
+once per key, such as `books: windowOf(Shelf.books)`. The `Implementation<C,
+T>` type names the function that serves contract `T` under context `C`.
 
 <h3 id="module-server">Serve through a server function</h3>
 
@@ -1792,9 +1825,9 @@ flag.
 
 <h3 id="reference-server">octane/data/server</h3>
 
-| Export              | What it is for                                                                                                                                                       |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createDataHandler` | Serve contracts. Options: `context`, `allowedOrigins`, `secret`, `grant`. Returns a `fetch`-style handler with `transport`, `serve`, `listen`, `accept` and `forms`. |
+| Export              | What it is for                                                                                                                                                                                                                          |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createDataHandler` | Serve contracts. Options: `context`, `allowedOrigins`, `secret`, `grant`. `define` receives `handle` and [`defineHandler`](#define-handler). Returns a `fetch`-style handler with `transport`, `serve`, `listen`, `accept` and `forms`. |
 
 <h3 id="reference-bindings">octane/data/octane and octane/data/react</h3>
 
