@@ -2140,9 +2140,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 
 	/**
 	 * Whether a React component's element can be the root of a `ReactCompat`
-	 * island: React renders all of it, so its children are text and no prop
-	 * holds an element, as JSX here, through a value this module declares, or
-	 * by its type.
+	 * island: its children are text or a single primitive literal, and no prop
+	 * holds an element here, through a local value, or by its type.
 	 */
 	hostsInReact(element: ts.JsxElement | ts.JsxSelfClosingElement) {
 		// By type: a cast to `any` or `ReactNode` proves nothing.
@@ -2150,7 +2149,27 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			ts.isJsxText(child) ||
 			(ts.isJsxExpression(child) &&
 				(!child.expression || textKind(this.typeOf(child.expression)) !== 0));
-		if (ts.isJsxElement(element) && !element.children.every(text)) return false;
+		if (ts.isJsxElement(element) && !element.children.every(text)) {
+			// Mixed text and expression children can be normalized differently by JSX emitters.
+			const [child, extra] = withoutJsxIndentation(element.children).filter(
+				(node) => !ts.isJsxExpression(node) || node.expression,
+			);
+			if (
+				extra ||
+				!child ||
+				!ts.isJsxExpression(child) ||
+				!child.expression ||
+				child.dotDotDotToken
+			)
+				return false;
+			const kind = skipWrappers(child.expression).kind;
+			if (
+				kind !== ts.SyntaxKind.TrueKeyword &&
+				kind !== ts.SyntaxKind.FalseKeyword &&
+				kind !== ts.SyntaxKind.NullKeyword
+			)
+				return false;
+		}
 		const attributes = ts.isJsxElement(element)
 			? element.openingElement.attributes
 			: element.attributes;
