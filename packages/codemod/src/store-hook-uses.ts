@@ -1,5 +1,11 @@
 import { nativeOutputOwner, renderUses } from './forwarded-props.js';
-import { componentTagOrExport, localUses, portableArguments, scalar } from './local-uses.js';
+import {
+	componentTagOrExport,
+	localUses,
+	portableArguments,
+	scalar,
+	valueReads,
+} from './local-uses.js';
 import { skipWrappers } from './expression-wrappers.js';
 import type { StoreInputCheck } from './store-inputs.js';
 import ts from 'typescript';
@@ -203,9 +209,15 @@ export function storeHookUses(
 	}
 	function effectSetup(fn: ts.Node) {
 		if (effectCallback(fn)) return fn;
-		const parent = fn.parent;
-		if (!ts.isReturnStatement(parent) || parent.expression !== fn) return;
-		const setup = ts.findAncestor(parent, ts.isFunctionLike);
+		let cleanup = fn;
+		while (ts.isParenthesizedExpression(cleanup.parent)) cleanup = cleanup.parent;
+		const parent = cleanup.parent;
+		const setup =
+			ts.isArrowFunction(parent) && parent.body === cleanup
+				? parent
+				: ts.isReturnStatement(parent) && parent.expression === cleanup
+					? ts.findAncestor(parent, ts.isFunctionLike)
+					: undefined;
 		if (setup && effectCallback(setup)) return setup;
 	}
 	function effectBoundary(node: ts.Node) {
@@ -391,6 +403,20 @@ export function storeHookUses(
 			check.unchangedHelper(statement.moduleSpecifier.text, (item.propertyName ?? item.name).text)
 		);
 	}
+	function readsStoreDuringRender(value: ts.Expression, use: ts.Node, check: ResultCheck) {
+		return valueReads(
+			value,
+			checker,
+			[],
+			() => false,
+			(node) =>
+				ts.isCallExpression(node) &&
+				!node.questionDotToken &&
+				ts.isIdentifier(node.expression) &&
+				checker.getSymbolAtLocation(node.expression)?.declarations?.[0] === check.item &&
+				!runsAfterRender(use, node),
+		);
+	}
 	function bound(name: ts.BindingName, check: ResultCheck): boolean {
 		if (ts.isIdentifier(name)) return uses(name).every((use) => safe(use, check));
 		return name.elements.every((el) => ts.isOmittedExpression(el) || bound(el.name, check));
@@ -413,8 +439,11 @@ export function storeHookUses(
 			ts.isVariableDeclarationList(p.parent) &&
 			p.parent.flags & ts.NodeFlags.Const
 		) {
-			const hook = !ts.isIdentifier(p.name) && originalReceiver(value, check, true);
-			return !p.type && (!hook || runsAfterRender(p, hook)) && bound(p.name, check);
+			return (
+				!p.type &&
+				(ts.isIdentifier(p.name) || !readsStoreDuringRender(value, p, check)) &&
+				bound(p.name, check)
+			);
 		}
 		if (ts.isExpressionStatement(p) || ts.isVoidExpression(p) || ts.isTypeOfExpression(p))
 			return true;
@@ -444,9 +473,8 @@ export function storeHookUses(
 		if (ts.isPropertyAccessExpression(p) || ts.isElementAccessExpression(p)) {
 			if (p.expression !== value) return false;
 			// The provider owns the member. Even retrieving it can execute a getter.
-			const hook = originalReceiver(value, check, true);
 			return (
-				(!hook || runsAfterRender(p, hook)) &&
+				!readsStoreDuringRender(value, p, check) &&
 				(!ts.isElementAccessExpression(p) || argument(p.argumentExpression, check)) &&
 				safe(p, check)
 			);
