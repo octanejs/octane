@@ -8,7 +8,8 @@
 //   such as contracts → store → transport → server. A column may hold several
 //   boxes, which is how fan-in (many tabs, one owner) is drawn.
 // - `SequenceDiagram`: participants across the top and numbered messages
-//   between them, read top to bottom, for an exchange over time.
+//   between them, one row each so they read top to bottom, for an exchange
+//   over time.
 //
 // Both are figures with a caption, and every box and message is real text, so
 // a screen reader reads the diagram as its steps.
@@ -248,7 +249,7 @@ export function SequenceDiagram(props: {
 								: 'sequence-left';
 					<li
 						class={['sequence-step', direction]}
-						style={{ gridColumn: `${start} / ${end}` }}
+						style={{ gridColumn: `${start} / ${end}`, gridRow: String(index + 1) }}
 						aria-label={`${index + 1}. ${props.actors[step.from]} to ${props.actors[step.to]}: ${step.text}`}
 					>
 						<span>
