@@ -35,7 +35,9 @@ afterAll(async () => {
 
 describe('injectAgent', () => {
 	it('puts the agent module first in the head, ahead of the app', () => {
-		const html = injectAgent('<html><head><title>x</title><script type="module" src="/main.js"></script></head></html>');
+		const html = injectAgent(
+			'<html><head><title>x</title><script type="module" src="/main.js"></script></head></html>',
+		);
 		expect(html.indexOf('/@id/octane/agent')).toBeLessThan(html.indexOf('/main.js'));
 		expect(html.indexOf('/@id/octane/agent')).toBeGreaterThan(html.indexOf('<head>'));
 	});

@@ -29,7 +29,12 @@ async function loadPlaywright() {
  */
 export function injectAgent(html) {
 	const head = /<head(\s[^>]*)?>/i.exec(html);
-	if (head) return html.slice(0, head.index + head[0].length) + AGENT_SCRIPT + html.slice(head.index + head[0].length);
+	if (head)
+		return (
+			html.slice(0, head.index + head[0].length) +
+			AGENT_SCRIPT +
+			html.slice(head.index + head[0].length)
+		);
 	return AGENT_SCRIPT + html;
 }
 
@@ -37,7 +42,10 @@ export function injectAgent(html) {
 function locate(page, target) {
 	if (target.testId !== undefined) return page.getByTestId(target.testId);
 	if (target.role !== undefined)
-		return page.getByRole(target.role, target.name === undefined ? {} : { name: target.name, exact: true });
+		return page.getByRole(
+			target.role,
+			target.name === undefined ? {} : { name: target.name, exact: true },
+		);
 	if (target.text !== undefined) return page.getByText(target.text, { exact: true });
 	if (target.selector !== undefined) return page.locator(target.selector);
 	throw new Error('A target needs one of testId, role (with an optional name), text or selector.');

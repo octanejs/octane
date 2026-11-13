@@ -16,7 +16,9 @@ function App() @{
 	}, [count]);
 	<main>
 		<h1>{'Agent fixture'}</h1>
-		<button data-testid="add" onClick={() => setCount(count + 1)}>{'Add one'}</button>
+		<button data-testid="add" onClick={() => setCount(count + 1)}>
+			{'Add one'}
+		</button>
 		<p data-testid="count">{`count ${count}`}</p>
 		<p data-testid="seen">{`seen ${seen}`}</p>
 		<input aria-label="Name" value={name} onInput={(event) => setName(event.currentTarget.value)} />
