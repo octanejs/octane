@@ -389,6 +389,23 @@ store.read(extra);
 		expect(report(root)).toEqual(['books.data.ts:5:14 [OCTANE_DATA_CONTRACT_UNUSED]']);
 	});
 
+	it('recovers once a module with a syntax error is fixed', () => {
+		const root = project({ 'books.data.ts': `${contracts}export const broken = (;\n` });
+		const program = createDataProgram(root);
+		const page = `import { stats } from './books.data.ts';\nexport const s = remember(stats);\n`;
+		expect(program.check(join(root, 'books.data.ts'))).toEqual([]);
+		expect(program.report()).toEqual([]);
+		writeFileSync(join(root, 'books.data.ts'), contracts);
+		program.invalidate(join(root, 'books.data.ts'));
+		expect(program.check(join(root, 'page.ts'), page).map((d: Diagnostic) => d.code)).toEqual([
+			'OCTANE_DATA_CONTRACT_ESCAPE',
+		]);
+		// The fixed module's contracts are back: nothing uses them.
+		expect(program.report().map((d: Diagnostic) => d.code)).toContain(
+			'OCTANE_DATA_CONTRACT_UNUSED',
+		);
+	});
+
 	it('opts in when the application imports the manifest', () => {
 		const root = project({ 'books.data.ts': contracts });
 		const program = createDataProgram(root);

@@ -540,9 +540,16 @@ export function createDataProgram(root, files) {
 		return candidates.find((candidate) => read(candidate) !== null) ?? null;
 	};
 	const analyze = (file, source) => {
-		const cached = analyzed.get(file);
-		if (active.has(file)) return cached?.result ?? null;
+		if (active.has(file)) return analyzed.get(file)?.result ?? null;
 		active.add(file);
+		try {
+			return analyzeFresh(file, source);
+		} finally {
+			active.delete(file);
+		}
+	};
+	const analyzeFresh = (file, source) => {
+		const cached = analyzed.get(file);
 		if (cached?.source === source) {
 			// Refresh the contract modules it imports first, including ones that did
 			// not exist yet: a new or changed export list bumps the generation.
@@ -550,10 +557,7 @@ export function createDataProgram(root, files) {
 				const target = resolveDataModule(specifier, file);
 				if (target !== null) facts(target);
 			}
-			if (cached.generation === generation) {
-				active.delete(file);
-				return cached.result;
-			}
+			if (cached.generation === generation) return cached.result;
 		}
 		const specifiers = [];
 		const result = analyzeDataContracts(source, file, (specifier) => {
@@ -565,7 +569,6 @@ export function createDataProgram(root, files) {
 			facts(target);
 			return exportsOf.get(target) ?? null;
 		});
-		active.delete(file);
 		if (DATA_MODULE.test(file)) {
 			// A module that re-exports contracts has exports this module cannot list.
 			const exported =
@@ -588,10 +591,18 @@ export function createDataProgram(root, files) {
 		analyzed.set(file, { source, generation, specifiers, result });
 		return result;
 	};
-	/** A module's facts from disk, or null when it does not touch octane/data. */
+	/**
+	 * A module's facts from disk, or null when it does not touch octane/data or
+	 * does not parse: its own build reports the syntax error, not its importers.
+	 */
 	const facts = (file) => {
 		const source = read(file);
-		return source !== null && MENTIONS_DATA.test(source) ? analyze(file, source) : null;
+		if (source === null || !MENTIONS_DATA.test(source)) return null;
+		try {
+			return analyze(file, source);
+		} catch {
+			return null;
+		}
 	};
 	/** Every module's facts, keyed by file. */
 	const all = () => {
@@ -633,7 +644,13 @@ export function createDataProgram(root, files) {
 			)
 				return [];
 			source ??= read(file);
-			return source !== null && MENTIONS_DATA.test(source) ? analyze(file, source).diagnostics : [];
+			if (source === null || !MENTIONS_DATA.test(source)) return [];
+			try {
+				return analyze(file, source)?.diagnostics ?? [];
+			} catch {
+				// A syntax error is the compiler's to report.
+				return [];
+			}
 		},
 
 		/** Handler coverage, unused contracts, and names shared across modules. */
