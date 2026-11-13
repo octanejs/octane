@@ -558,6 +558,78 @@ export const scalar = bag.scalar;`,
 	}
 });
 
+it('follows wildcard re-exports of store arguments from a converted JSX producer', async () => {
+	const pane = (module, name = 'value', value = 'id') => `import { useSnapshot } from 'observer';
+import { ${name} as id } from './${module}';
+export function Pane() { return <p>{useSnapshot({ id: ${value} })}</p>; }`;
+	const rejected = {
+		wildcard: pane('cycle-b'),
+		typeShadow: pane('type-shadow'),
+		ambiguous: pane('ambiguous'),
+		namespace: pane('namespace', 'inner', 'id.value'),
+		nestedNamespace: pane('namespace-barrel', 'inner', 'id.value'),
+		namespaceDefault: pane('namespace-barrel', 'inner', 'id.default'),
+	};
+	const accepted = {
+		scalar: pane('cycle-b', 'scalar'),
+		explicit: pane('explicit'),
+		unchanged: pane('stable-barrel'),
+		typed: pane('type-star'),
+		namespaceScalar: pane('namespace-barrel', 'inner', 'id.scalar'),
+		defaultValue: `import { useSnapshot } from 'observer';
+import * as exports from './default-barrel';
+export function Pane() {
+	const id = (exports as unknown as { default: string }).default;
+	return <p>{useSnapshot({ id: id })}</p>;
+}`,
+	};
+	const { app } = project({
+		'observer/react-hooks.ts': `import {use} from 'react'; import {current} from './renderer';
+import {valueOf} from './state';
+export function useChannel(key: {id: string}) { return valueOf(use(current)) + ':' + key.id; }`,
+		'app/src/producer.tsx': `export const value = <b/> as unknown as string;
+export const scalar = 'safe';
+export default value;`,
+		'app/src/original.tsx': 'export const value = <i/> as unknown as string;',
+		'app/src/plain.ts': "export const value = 'safe';",
+		'app/src/cycle-a.ts': "export * from './cycle-b'; export * from './producer';",
+		'app/src/cycle-b.ts': "export * from './cycle-a';",
+		'app/src/type-shadow.ts': "export * from './producer'; export type value = string;",
+		'app/src/ambiguous.ts': "export * from './producer'; export * from './plain';",
+		'app/src/explicit.ts': "export * from './producer'; export { value } from './plain';",
+		'app/src/stable-barrel.ts': "export * from './original';",
+		'app/src/type-star.ts': "export type * from './producer'; export * from './plain';",
+		'app/src/namespace.ts': "export * as inner from './producer';",
+		'app/src/namespace-barrel.ts': "export * from './namespace';",
+		'app/src/default-barrel.ts': "export * from './producer';",
+		...Object.fromEntries(
+			Object.entries({ ...rejected, ...accepted }).map(([name, code]) => [
+				'app/src/' + name + '.tsx',
+				code,
+			]),
+		),
+	});
+	const result = await runCodemod(
+		['producer', ...Object.keys(rejected), ...Object.keys(accepted)].map((name) =>
+			path.join(app, 'src', name + '.tsx'),
+		),
+		{ root: app, strong: true, verify: true, projectTypes: true, write: false },
+	);
+	for (const name of Object.keys(rejected)) {
+		const file = result.files.find((entry) => entry.file === 'src/' + name + '.tsx');
+		expect(file.notes).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+	}
+	for (const name of Object.keys(accepted)) {
+		const file = result.files.find((entry) => entry.file === 'src/' + name + '.tsx');
+		expect(file.rules['store-hook']).toBe(1);
+		expect(
+			[...file.notes, ...file.diagnostics].filter((item) => item.severity === 'error'),
+		).toEqual([]);
+	}
+});
+
 it('preserves the active store and aliased handle through effects, Effect Events and clicks', async () => {
 	const { app } = project({
 		'observer/public-store.ts': "export { valueOf, key } from './state';",

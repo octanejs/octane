@@ -387,9 +387,47 @@ export function storeSources(
 
 	function readExport(file: string, name: string, selection: Selection): ExportValue {
 		const { sf, checker } = bindingFor(file);
-		const symbol = checker.getSymbolAtLocation(sf)?.exports?.get(ts.escapeLeadingUnderscores(name));
-		const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
-		if (!declaration) return emptyValue;
+		const exported = checker.getSymbolAtLocation(sf)?.exports;
+		const symbol = exported?.get(ts.escapeLeadingUnderscores(name));
+		const declaration =
+			symbol?.valueDeclaration ??
+			symbol?.declarations?.find(
+				(node) =>
+					(ts.isExportSpecifier(node) && !node.isTypeOnly && !node.parent.parent.isTypeOnly) ||
+					(ts.isNamespaceExport(node) && !node.parent.isTypeOnly) ||
+					(ts.isExportAssignment(node) && !node.isExportEquals),
+			);
+		// A runtime export shadows stars. Type declarations are erased and default never travels through a star.
+		if (!declaration || ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Ambient) {
+			if (name === 'default') return emptyValue;
+			const imports: ExportRead[] = [];
+			for (const star of exported?.get(ts.InternalSymbolName.ExportStar)?.declarations ?? []) {
+				if (
+					ts.isExportDeclaration(star) &&
+					!star.isTypeOnly &&
+					!star.attributes &&
+					star.moduleSpecifier &&
+					ts.isStringLiteral(star.moduleSpecifier)
+				)
+					imports.push({ from: file, module: star.moduleSpecifier.text, name, selection });
+			}
+			return { jsx: false, imports };
+		}
+		if (ts.isNamespaceExport(declaration)) {
+			const statement = declaration.parent;
+			const [member, ...rest] = selection;
+			return member !== undefined &&
+				!statement.attributes &&
+				statement.moduleSpecifier &&
+				ts.isStringLiteral(statement.moduleSpecifier)
+				? {
+						jsx: false,
+						imports: [
+							{ from: file, module: statement.moduleSpecifier.text, name: member, selection: rest },
+						],
+					}
+				: emptyValue;
+		}
 		let value: ts.Node;
 		if (ts.isExportSpecifier(declaration)) {
 			const statement = declaration.parent.parent;
