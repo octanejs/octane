@@ -344,7 +344,7 @@ export function storeSources(
 	function readExport(file: string, name: string, selection: Selection): ExportValue {
 		const { sf, checker } = bindingFor(file);
 		const symbol = checker.getSymbolAtLocation(sf)?.exports?.get(ts.escapeLeadingUnderscores(name));
-		const declaration = symbol?.declarations?.[0];
+		const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
 		if (!declaration) return emptyValue;
 		let value: ts.Node;
 		if (ts.isExportSpecifier(declaration)) {

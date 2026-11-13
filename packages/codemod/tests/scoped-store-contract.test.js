@@ -496,7 +496,8 @@ export function Pane() { return <p>{useSnapshot({ id: ${value} })}</p>; }`;
 import {valueOf} from './state';
 export function useChannel(key: {id: string}) { return valueOf(use(current)) + ':' + key.id; }`,
 		'app/src/producer.tsx': `const badge = <b/> as unknown as string;
-export const bag = { badge, scalar: 'safe' };
+export type bag = { badge: string; scalar: string };
+export const bag: bag = { badge, scalar: 'safe' };
 export const { badge: destructured } = bag;
 const readBadge = () => bag.badge;
 export const returned = readBadge();
