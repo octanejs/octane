@@ -21,7 +21,13 @@ import ts from 'typescript';
 import { finding, loadCompiler, thrown } from './compiler.js';
 import { PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
-import { bind, projectTypeAt, textKind, transformModule } from './transform.js';
+import {
+	bind,
+	MAP_PARAMETER_WRITE,
+	projectTypeAt,
+	textKind,
+	transformModule,
+} from './transform.js';
 import { directRendererCalls, nativeExternalStore } from './local-react-hook.js';
 import { forwardedProps } from './forwarded-props.js';
 import {
@@ -1018,6 +1024,13 @@ export async function runCodemod(
 			}
 		}
 		const result = transform();
+		const parameterWrite = result.notes.find((note) => note.rule === MAP_PARAMETER_WRITE);
+		if (write && parameterWrite)
+			return blockedWrite(
+				root,
+				unchangedFile(path.relative(root, file), source, parameterWrite),
+				compiler?.from,
+			);
 		for (const message of [...storeErrors, ...svgErrors]) {
 			const note: Note = {
 				rule: svgErrors.has(message) ? 'svg-paths' : 'store-hook',

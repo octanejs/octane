@@ -96,6 +96,8 @@ const syntheticEventMembers = {
 	isPropagationStopped: '() => boolean',
 };
 
+export const MAP_PARAMETER_WRITE = 'map-parameter-write';
+
 /** Rule names, as reported. */
 const RULE = {
 	binding: 'bindings',
@@ -5850,6 +5852,26 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			? this.ifDirective(root)
 			: this.relative(this.emit(root, TEMPLATE), root);
 		if (arm === null) return null;
+		const mutable = (name: ts.Identifier) =>
+			!fixedBinding(this.checker, name, name, undefined, (use) => !isPropertyName(use));
+		if (
+			isJsx(root) &&
+			!literal.elements.some(ts.isSpreadElement) &&
+			((index && ts.isIdentifier(index.name) && mutable(index.name)) ||
+				(!ts.isIdentifier(item.name) &&
+					reads(
+						item.name,
+						(name) =>
+							ts.isBindingElement(name.parent) && name.parent.name === name && mutable(name),
+					)))
+		) {
+			this.note(
+				MAP_PARAMETER_WRITE,
+				'error',
+				node,
+				'Cannot prove this map parameter stays unchanged in an @for row. Exclude the source from migration or keep the parameter unchanged.',
+			);
+		}
 		this.count(RULE.for);
 		let source = this.emit(callee.expression, PLAIN);
 		if (callee.questionDotToken) source = `${source} ?? []`;
