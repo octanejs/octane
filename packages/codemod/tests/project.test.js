@@ -1063,6 +1063,33 @@ export function App() {
 		}
 	});
 
+	it.each([
+		[6, true, []],
+		[7, false, ['OCTANE_STRONG_READ_ONLY_STATE']],
+	])(
+		'reports the final Strong result after repairing six of %i aliased hooks',
+		async (count, strong, codes) => {
+			const indexes = Array.from({ length: count }, (_, index) => index);
+			const imports = indexes.map((index) => `useState as useValue${index}`).join(', ');
+			const states = indexes.map((index) => `const [value${index}] = useValue${index}(${index});`);
+			const values = indexes.map((index) => `<span>{value${index}}</span>`).join('');
+			const root = project({
+				'Panel.tsx': `import { ${imports} } from 'react';
+export function Panel() {
+	${states.join('\n\t')}
+	return <div>${values}</div>;
+}`,
+			});
+			fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(root, 'node_modules'), 'dir');
+			const {
+				files: [file],
+			} = await runCodemod([root], { root, strong: true, verify: true });
+			expect(file.strong).toBe(strong);
+			expect(file.diagnostics.map(({ code }) => code)).toEqual(codes);
+			expect(file.code.includes('"use strong";')).toBe(strong);
+		},
+	);
+
 	it('keeps custom and sparse map calls in compatibility mode', async () => {
 		const root = project({
 			'package.json': '{"type":"module"}',
