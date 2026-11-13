@@ -414,7 +414,9 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'nativeCreateScopedElement',
 	],
 	'./static': ['prerender'],
-	'./testing': ['clampJsdomScrollTop'],
+	'./testing': ['clampJsdomScrollTop', 'installTestClock'],
+	// Side effect only: installs the test clock for the agent driver.
+	'./agent': [],
 	'./constants': [
 		'ATTRIBUTE_ALIASES',
 		'BLOCK_CLOSE',

@@ -4,7 +4,10 @@
   "license": "MIT",
   "type": "module",
   "sideEffects": [
+    "./src/agent.ts",
     "./src/compiler/register.js",
+    "./dist/agent.js",
+    "./dist/node/agent.js",
     "./dist/compiler/register.js"
   ],
   "engines": {
@@ -113,6 +116,7 @@
     "./internal/server-rpc": "./src/internal/server-rpc.ts",
     "./static": "./src/static/index.ts",
     "./testing": "./src/testing.ts",
+    "./agent": "./src/agent.ts",
     "./constants": "./src/constants.ts",
     "./profiling": "./src/profiling.ts",
     "./universal": "./src/universal.ts",
@@ -430,6 +434,11 @@
         "types": "./dist/testing.d.ts",
         "node": "./dist/node/testing.js",
         "default": "./dist/testing.js"
+      },
+      "./agent": {
+        "types": "./dist/agent.d.ts",
+        "node": "./dist/node/agent.js",
+        "default": "./dist/agent.js"
       },
       "./constants": {
         "types": "./dist/constants.d.ts",

@@ -40,7 +40,18 @@
     "@modelcontextprotocol/sdk": "^1.21.0",
     "zod": "^4.4.3"
   },
+  "peerDependencies": {
+    "playwright": ">=1.49.0"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "vite": "catalog:default",
     "vitest": "catalog:default"
   }
 }
