@@ -158,17 +158,31 @@ function selectedRecordField(
 	}
 }
 
-/** Bare SVG default imports can switch from a component to an asset URL for a .tsrx issuer. */
+/** A bare SVG's default export can switch from a component to an asset URL for a .tsrx issuer. */
 export function isBareSvgTag(
 	tag: ts.JsxTagNameExpression,
 	checker: ts.TypeChecker,
 	imports: Set<ts.Node>,
 	uses: ReturnType<typeof localUses>,
 ): boolean {
-	if (!ts.isIdentifier(tag) || /^[a-z]|-/.test(tag.text)) return false;
+	if (!ts.isPropertyAccessExpression(tag) && (!ts.isIdentifier(tag) || /^[a-z]|-/.test(tag.text)))
+		return false;
+	function isSvgNamespace(value: ts.Expression) {
+		value = skipWrappers(value);
+		const declaration = ts.isIdentifier(value) && localSymbol(checker, value)?.declarations?.[0];
+		return !!declaration && ts.isNamespaceImport(declaration) && imports.has(declaration);
+	}
 	const seen = new Set<ts.Symbol>();
 	function fromSvg(value: ts.Expression): boolean {
 		value = skipWrappers(value);
+		if (ts.isPropertyAccessExpression(value))
+			return value.name.text === 'default' && isSvgNamespace(value.expression);
+		if (ts.isElementAccessExpression(value)) {
+			const key = skipWrappers(value.argumentExpression);
+			return (
+				ts.isStringLiteralLike(key) && key.text === 'default' && isSvgNamespace(value.expression)
+			);
+		}
 		if (ts.isConditionalExpression(value)) {
 			const condition = literalCondition(value.condition);
 			if (condition !== undefined)
@@ -196,6 +210,21 @@ export function isBareSvgTag(
 		const d = symbol.declarations?.[0];
 		if (!d) return false;
 		if (ts.isBindingElement(d) && ts.isIdentifier(d.name)) {
+			const key = d.propertyName ?? d.name;
+			const pattern = d.parent;
+			const declaration = pattern.parent;
+			if (
+				!d.dotDotDotToken &&
+				(ts.isIdentifier(key) || ts.isStringLiteralLike(key)) &&
+				key.text === 'default' &&
+				ts.isObjectBindingPattern(pattern) &&
+				ts.isVariableDeclaration(declaration) &&
+				declaration.initializer &&
+				ts.isVariableDeclarationList(declaration.parent) &&
+				declaration.parent.flags & ts.NodeFlags.Const &&
+				isSvgNamespace(declaration.initializer)
+			)
+				return true;
 			if (d.initializer) return !suppliesBinding(d) && fromSvg(d.initializer);
 			const field = selectedRecordField(d, checker, uses);
 			return !!field && fromSvg(field);
@@ -209,7 +238,7 @@ export function isBareSvgTag(
 			d.parent.flags & ts.NodeFlags.Const
 		)
 			return fromSvg(d.initializer);
-		return imports.has(d);
+		return !ts.isNamespaceImport(d) && imports.has(d);
 	}
 	return fromSvg(tag);
 }
