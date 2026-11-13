@@ -416,7 +416,7 @@ async function dataWorker(keeper: Page, namespace: string) {
 			type: 'module',
 			name,
 		});
-	}, `octane-data:2:${namespace}:ada`);
+	}, `octane-data:3:${namespace}:ada`);
 	const cdp = await keeper.context().browser()!.newBrowserCDPSession();
 	let targetId = '';
 	await expect
@@ -528,5 +528,36 @@ test('signs every shared tab of an account out when another account signs in, ev
 		.getByRole('button', { name: 'ada' })
 		.click();
 	await expect(page.getByText('3 books · 0 read')).toBeVisible();
+	await other.close();
+});
+
+test('reconnects every shared tab to a new data worker after the worker crashes', async ({
+	page,
+	browser,
+}) => {
+	test.setTimeout(90_000);
+	const url = `/?ns=${Date.now()}-${++namespace}&owner=shared`;
+	const other = await page.context().newPage();
+	for (const tab of [page, other]) {
+		await tab.goto(url);
+		await expect(tab.getByText('3 books · 0 read')).toBeVisible();
+	}
+	const cdp = await browser.newBrowserCDPSession();
+	const workers = async () =>
+		(await cdp.send('Target.getTargets')).targetInfos.filter(
+			(target) => target.type === 'shared_worker',
+		);
+	const [crashed] = await workers();
+	await cdp.send('Target.closeTarget', { targetId: crashed!.targetId });
+
+	// Each tab notices the silence within three 5 s heartbeats, starts the worker again, and
+	// carries on with it.
+	await expect
+		.poll(async () => (await workers()).map((target) => target.targetId), { timeout: 40_000 })
+		.toEqual([expect.not.stringMatching(crashed!.targetId)]);
+	await page.waitForTimeout(20_000);
+	await book(page, 'Kindred').getByRole('checkbox').click();
+	await expect(status(page)).toHaveText('Saved', { timeout: 15_000 });
+	await expect(book(other, 'Kindred').getByRole('checkbox')).toBeChecked();
 	await other.close();
 });

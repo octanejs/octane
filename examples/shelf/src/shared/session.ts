@@ -17,10 +17,33 @@ import {
 	type FormState,
 	type Transport,
 } from 'octane/data';
-import { addBook, receipt, removeBook, setRead } from './contracts.ts';
+import {
+	addBook,
+	books,
+	finished,
+	receipt,
+	removeBook,
+	setRead,
+	shelfChanges,
+	stats,
+	unread,
+} from './contracts.ts';
 import { data, events } from './data.tsrx';
 
 export const ACCOUNTS = ['ada', 'grace'] as const;
+
+/** Every contract the pages use, so the data worker can tell this build from another deploy's. */
+const contracts = [
+	books,
+	finished,
+	unread,
+	stats,
+	receipt,
+	addBook,
+	setRead,
+	removeBook,
+	shelfChanges,
+];
 export type Account = (typeof ACCOUNTS)[number];
 
 /**
@@ -92,14 +115,6 @@ function describe(request: DataRequest): string {
 export function openSession(account: Account, namespace = '', seed?: string | null): Session {
 	document.cookie = `${ACCOUNT_COOKIE}=${encodeURIComponent(namespace + account)}; path=/; SameSite=Strict`;
 	const partition = namespace + account;
-	// With `?owner=shared`, the account's tabs share the data worker's owner, which makes their
-	// requests. It keeps nothing on the device yet, and the fault switches act on this tab's own store.
-	const port =
-		new URLSearchParams(location.search).get('owner') === 'shared' && sharedOwner(partition);
-	if (port) {
-		const store = createReplica(port, { seed, writes: [addBook, setRead, removeBook] });
-		return sessionFor(account, store, { dropNextReply: false, offline: false }, externalValue([]));
-	}
 	const call = serverTransport(data);
 	const faults: Faults = { dropNextReply: false, offline: false };
 	const network = externalValue<readonly NetworkEntry[]>([]);
@@ -124,12 +139,14 @@ export function openSession(account: Account, namespace = '', seed?: string | nu
 	};
 	// Another tab's or device's change arrives as an event, so this page shows it without loading.
 	const listen = serverListener(events);
-	return sessionFor(
-		account,
-		createDataStore({ transport, seed, persist, listen }),
-		faults,
-		network,
-	);
+	// With `?owner=shared`, the account's tabs share the data worker's owner, which makes their
+	// requests. A tab the owner cannot serve, such as one from another deploy, carries on with
+	// these same options as its own store; the fault switches and network log act only then.
+	const store =
+		new URLSearchParams(location.search).get('owner') === 'shared'
+			? createReplica(sharedOwner(partition), { transport, seed, persist, listen, contracts })
+			: createDataStore({ transport, seed, persist, listen });
+	return sessionFor(account, store, faults, network);
 }
 
 /** A server render's session, around a store whose `data` calls run in process. */
