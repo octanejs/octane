@@ -1682,34 +1682,45 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		}
 	});
 
-	it.skipIf(process.platform !== 'darwin')(
-		'reports a rename collision through a differently normalized symlink target',
-		async ({ skip }) => {
-			const parent = 'Cafe\u0301';
-			const source = 'export const Item = () => <i />;';
-			const root = project({ [parent + '/Item.tsx']: source });
-			const alternate = parent.normalize('NFC');
-			if (!fs.existsSync(path.join(root, alternate))) skip();
-			fs.symlinkSync(alternate, path.join(root, 'linked'), 'dir');
-			const paths = [parent + '/Item.tsx', 'linked/Item.tsx'];
-			for (const write of [false, true]) {
-				const { files } = await runCodemod(
-					paths.map((file) => path.join(root, file)),
-					{ root, write, verify: false },
-				);
-				expect(files.map(({ file }) => file)).toEqual(write ? paths.slice(1) : paths);
-				for (const file of files) {
-					expect(file).toMatchObject({
-						output: file.file,
-						changed: false,
-						notes: [expect.objectContaining({ rule: 'rename-conflict', severity: 'error' })],
-					});
-				}
-				expect(fs.readdirSync(path.join(root, parent))).toEqual(['Item.tsx']);
-				expect(fs.readFileSync(path.join(root, paths[0]), 'utf8')).toBe(source);
+	it('uses filesystem directory identity for differently normalized symlink targets', async () => {
+		const parent = 'Cafe\u0301';
+		const source = 'export const Item = () => <i />;';
+		const root = project({ [parent + '/Item.tsx']: source });
+		const alternate = parent.normalize('NFC');
+		const alternatePath = path.join(root, alternate);
+		const sameDirectory = fs.existsSync(alternatePath);
+		if (!sameDirectory) {
+			fs.mkdirSync(alternatePath);
+			fs.writeFileSync(path.join(alternatePath, 'Item.tsx'), source.replace('<i />', '<b />'));
+		}
+		fs.symlinkSync(alternate, path.join(root, 'linked'), 'dir');
+		const paths = [parent + '/Item.tsx', 'linked/Item.tsx'];
+		const inputs = paths.map((file) => path.join(root, file));
+		const preview = await runCodemod(inputs, { root, write: false, verify: false });
+		const result = await runCodemod(inputs, { root, write: true, verify: false });
+		if (sameDirectory) {
+			expect(preview.files.map(({ file }) => file)).toEqual(paths);
+			expect(result.files.map(({ file }) => file)).toEqual(paths.slice(1));
+			for (const file of [...preview.files, ...result.files]) {
+				expect(file).toMatchObject({
+					output: file.file,
+					changed: false,
+					notes: [expect.objectContaining({ rule: 'rename-conflict', severity: 'error' })],
+				});
 			}
-		},
-	);
+			expect(fs.readdirSync(path.join(root, parent))).toEqual(['Item.tsx']);
+			expect(fs.readFileSync(inputs[0], 'utf8')).toBe(source);
+		} else {
+			const outputs = paths.map((file) => file.replace(/\.tsx$/, '.tsrx'));
+			for (const { files } of [preview, result]) {
+				expect(files.map(({ output }) => output)).toEqual(outputs);
+				expect(files.flatMap(({ notes }) => notes)).toEqual([]);
+			}
+			expect(fs.readFileSync(path.join(root, outputs[0]), 'utf8')).toContain('<i />');
+			expect(fs.readFileSync(path.join(root, outputs[1]), 'utf8')).toContain('<b />');
+			expect(inputs.some((file) => fs.existsSync(file))).toBe(false);
+		}
+	});
 
 	it('renames separate file symlinks without removing their shared target', async () => {
 		const source = 'export const Item = () => <i />;';
