@@ -6201,7 +6201,7 @@ function autoMemoCallExecutesSetupHook(call, ctx) {
  * classified differently. Callers that need "no call executes here" for a reason
  * other than memo staleness (SSR item identity) omit it and keep every other call.
  *
- * Every caller admits a lexically unbound standard global from
+ * By default, the walk admits a lexically unbound standard global from
  * SETUP_PURE_GLOBAL_CALLEES, such as `String(row.id)`. It closes over nothing and
  * runs no user code beyond the argument coercion that template literals and `+`
  * already perform. Memo proofs accept the name through isConversionGlobal.
@@ -9219,8 +9219,12 @@ function isJsxReturningMapCall(node) {
 	return false;
 }
 
-// Addition can run an operand's coercion or throw when numeric types differ.
-function mapAdditionHasEffects(node) {
+// These expressions can run user coercion or throw before the mapped JSX exists.
+function mapCoercionHasEffects(node) {
+	if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') return true;
+	if (node.type === 'TemplateLiteral') {
+		return node.expressions.some((expression) => !isInvariantLiteral(unwrapTsExpr(expression)));
+	}
 	if (node.type !== 'BinaryExpression' || node.operator !== '+') return false;
 	const left = unwrapTsExpr(node.left);
 	const right = unwrapTsExpr(node.right);
@@ -9278,8 +9282,8 @@ function mapCallToForOf(expr, ctx) {
 	const body = arrow.body;
 	if (!body || (body.type !== 'JSXElement' && body.type !== 'Element')) return null;
 	// Fusion interleaves callbacks and row rendering. Preserve authored callback
-	// order when a call or implicit addition coercion can be observed.
-	if (containsRenderCall([body], null, mapAdditionHasEffects)) return null;
+	// order when a call or coercion can be observed.
+	if (containsRenderCall([body], null, mapCoercionHasEffects)) return null;
 	// Pull a `key={…}` attribute off the returned element → the for-of header key,
 	// and drop it from the element (it's not a DOM attribute). makeForCall then
 	// keys via the header, falling back to `item.id ?? item` when there's no key.

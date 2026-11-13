@@ -258,6 +258,11 @@ describe('playground AST preparation', () => {
 		expect(ranges.at(-1)).toEqual({ from: 0, to: 10 });
 		expect(node.dataset.astPinned).toBe('true');
 
+		preview.reveal(4, false, 'automatic');
+		expect(node.dataset.astPinned).toBe('true');
+		preview.reveal(4, false);
+		expect(node.dataset.astPinned).toBeUndefined();
+
 		preview.clear();
 		expect(ranges.at(-1)).toBeNull();
 		expect(node.dataset.astPinned).toBeUndefined();
