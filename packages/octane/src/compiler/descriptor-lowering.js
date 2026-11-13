@@ -15,6 +15,8 @@
  * The compiler's lowering passes and those proofs share these predicates.
  */
 
+import { createLexicalAnalysis } from './compile-universal.js';
+
 /**
  * Local names whose JSX children the compiler lowers to element descriptors:
  * `descriptorChildren(…)` module bindings, `ReactCompat` transport boundaries,
@@ -104,6 +106,13 @@ export function findDirectlyCalledNames(statements, names) {
 	return called;
 }
 
+function isRootImport(ast, callee) {
+	const lexical = createLexicalAnalysis(ast);
+	return (
+		lexical.resolveBinding(lexical.nodeScopes.get(callee), callee.name)?.scope === lexical.rootScope
+	);
+}
+
 /**
  * The template functions that lowerDirectlyCalledTemplateFunctions rewrites to
  * their returned-JSX form. Its comment in compile.js states the rules.
@@ -146,8 +155,8 @@ export function findDirectlyCalledTemplateFunctions(ast) {
 		if (isObjectPassThroughCallee(callee)) return true;
 		if (callee?.type !== 'Identifier') return false;
 		if (callee.name === 'createPortal') return true;
-		renderingCallees ??= collectOctaneImportLocals(ast.body, ['memo', 'createElement']);
-		return renderingCallees.has(callee.name);
+		renderingCallees ??= collectOctaneImportLocals(ast.body, ['memo', 'createElement'], true);
+		return renderingCallees.has(callee.name) && isRootImport(ast, callee);
 	};
 	const lowered = new Set();
 	const names = new Set([...candidates.values()].map(([name]) => name));
@@ -257,12 +266,13 @@ export function isObjectPassThroughCallee(callee) {
 }
 
 // Local names of the given `octane` named imports.
-export function collectOctaneImportLocals(moduleBody, importedNames) {
+export function collectOctaneImportLocals(moduleBody, importedNames, valuesOnly = false) {
 	const names = new Set();
 	for (const stmt of moduleBody) {
 		if (stmt.type !== 'ImportDeclaration' || stmt.source?.value !== 'octane') continue;
+		if (valuesOnly && stmt.importKind === 'type') continue;
 		for (const spec of stmt.specifiers || []) {
-			if (spec.type !== 'ImportSpecifier') continue;
+			if (spec.type !== 'ImportSpecifier' || (valuesOnly && spec.importKind === 'type')) continue;
 			const imported = spec.imported?.name ?? spec.imported?.value;
 			if (importedNames.includes(imported) && spec.local?.name) names.add(spec.local.name);
 		}
