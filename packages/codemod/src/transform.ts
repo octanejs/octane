@@ -4282,13 +4282,25 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	private checkHookDependencyReads(node: ts.CallExpression, deps: ts.Expression) {
 		const list = skipWrappers(deps);
 		if (!this.emitsTsrx || !ts.isArrayLiteralExpression(list)) return;
-		const opaque = list.elements.find((expr) => {
+		const read = (expr: ts.Expression): ts.Expression | undefined => {
 			const member = skipWrappers(expr);
-			return (
+			if (ts.isConditionalExpression(member)) {
+				const condition = skipWrappers(member.condition);
+				if (condition.kind === ts.SyntaxKind.TrueKeyword) return read(member.whenTrue);
+				if (condition.kind === ts.SyntaxKind.FalseKeyword) return read(member.whenFalse);
+				return read(condition) ?? read(member.whenTrue) ?? read(member.whenFalse);
+			}
+			if (
 				(ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member)) &&
 				!this.ownDataDependency(member, node)
-			);
-		});
+			)
+				return member;
+		};
+		let opaque: ts.Expression | undefined;
+		for (const entry of list.elements) {
+			opaque = read(entry);
+			if (opaque) break;
+		}
 		if (opaque)
 			this.note(
 				RULE.deps,

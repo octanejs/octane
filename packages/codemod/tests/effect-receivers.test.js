@@ -179,6 +179,35 @@ it('reports an opaque effect dependency whose getter registers a React SSR style
 	).toContainEqual(dependencyError);
 }, 20_000);
 
+it('reports a getter in a conditional dependency that can register a React SSR stylesheet', () => {
+	function Reference({ enabled, probe }) {
+		useLayoutEffect(() => {}, [enabled ? probe.value : 0]);
+		return createElement('b', null, 'ok');
+	}
+	const probe = {
+		get value() {
+			preinit('/conditional.css', { as: 'style' });
+			return 1;
+		},
+	};
+	expect(renderToStaticMarkup(createElement(Reference, { enabled: true, probe }))).toContain(
+		'<link rel="stylesheet" href="/conditional.css"',
+	);
+	expect(renderToStaticMarkup(createElement(Reference, { enabled: false, probe }))).toBe(
+		'<b>ok</b>',
+	);
+	const input = `import { useLayoutEffect } from 'react';
+		export function Probe({ enabled, probe }: { enabled: boolean; probe: { value: number } }) {
+			useLayoutEffect(() => {}, [enabled ? probe.value : 0]);
+			return <b>ok</b>;
+		}`;
+	for (const strong of [false, true]) {
+		expect(migrate(input, strong).notes).toContainEqual(dependencyError);
+	}
+	const unreachable = input.replace('enabled ? probe.value : 0', 'true ? 0 : probe.value');
+	expect(migrate(unreachable).notes).not.toContainEqual(dependencyError);
+}, 20_000);
+
 it.each([
 	['block', false],
 	['block', true],
