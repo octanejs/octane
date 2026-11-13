@@ -266,7 +266,7 @@ async function createCipher(source: PersistOptions['key']) {
 }
 
 /** The output schema's shape, where its validator describes one. */
-function shape(read: Read<any, any>): string {
+export function shape(read: Read<any, any>): string {
 	try {
 		return (
 			JSON.stringify(read.output['~standard'].jsonSchema?.output({ target: 'draft-2020-12' })) ?? ''

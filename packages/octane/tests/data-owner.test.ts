@@ -14,6 +14,7 @@ import {
 	serveDataOwner,
 	sharedOwner,
 	type DataOwner,
+	type DataReply,
 	type DataStore,
 	type FeedFrame,
 	type Listener,
@@ -36,7 +37,14 @@ afterEach(() => {
 	for (const close of closers.splice(0)) close();
 });
 
-const writes = [addTodo, setDone, removeTodo];
+/** Every contract the tabs use: a tab of a build with other contracts is refused. */
+const contracts = [todos, todoPages, addTodo, setDone, removeTodo, todoChanges];
+/** A tab falls back to its own transport only when it cannot share: here, that would be a bug. */
+const unshared: Transport = () => Promise.reject(new Error('this tab did not share its owner'));
+const unsharedListener: Listener = () => {
+	throw new Error('this tab did not share its owner');
+};
+const replicaOptions = { transport: unshared, listen: unsharedListener, contracts };
 
 /** An owner over `transport`, and `count` replicas connected to it by message channels. */
 function tabs(transport: Transport, count: number, feedListener?: Listener): DataStore[] {
@@ -44,7 +52,7 @@ function tabs(transport: Transport, count: number, feedListener?: Listener): Dat
 	return Array.from({ length: count }, () => {
 		const channel = new MessageChannel();
 		owner.connect(channel.port1);
-		const store = createReplica(channel.port2, { writes });
+		const store = createReplica(channel.port2, replicaOptions);
 		closers.push(() => {
 			void store.retire();
 			channel.port1.close();
@@ -247,7 +255,7 @@ describe('octane/data owner and replicas', () => {
  * the browser keeps one worker per name, each recording the origin's account in
  * IndexedDB. Returns a function that opens a tab's replica for an account.
  */
-function sharedWorkers(transport: Transport) {
+function sharedWorkers(transport: Transport, local: Transport = unshared) {
 	const owners = new Map<string, DataOwner>();
 	vi.stubGlobal(
 		'SharedWorker',
@@ -263,7 +271,8 @@ function sharedWorkers(transport: Transport) {
 			}
 		},
 	);
-	return (account: string) => createReplica(sharedOwner(account)!, { writes });
+	return (account: string) =>
+		createReplica(sharedOwner(account)!, { ...replicaOptions, transport: local });
 }
 
 async function accountStore<T>(
@@ -283,6 +292,181 @@ async function accountStore<T>(
 }
 const recordedAccount = () => accountStore('readonly', (store) => store.get(0));
 const recordAccount = (value: object) => accountStore('readwrite', (store) => store.put(value, 0));
+
+describe('octane/data owners across builds and crashes', () => {
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.unstubAllGlobals();
+	});
+
+	it('shares the owner only between builds with the same contracts; any other tab keeps its own store', async () => {
+		const server = createServer();
+		const owner = createDataOwner({
+			transport: async (request, signal) => {
+				await new Promise((resolve) => setTimeout(resolve, 30));
+				return server.transport(request, signal);
+			},
+		});
+		const own: string[] = [];
+		const tab = (port: MessagePort | null, list: typeof contracts) =>
+			createReplica(port, {
+				transport: (request, signal) => (own.push(request.name), server.transport(request, signal)),
+				contracts: list,
+			});
+		const connected = () => {
+			const channel = new MessageChannel();
+			owner.connect(channel.port1);
+			closers.push(() => (channel.port1.close(), channel.port2.close()));
+			return channel.port2;
+		};
+		// Another deploy, which no longer has `removeTodo`, and a browser without SharedWorker.
+		const stores = [
+			tab(connected(), contracts),
+			tab(connected(), contracts),
+			tab(
+				connected(),
+				contracts.filter((contract) => contract !== removeTodo),
+			),
+			tab(null, contracts),
+		];
+		for (const store of stores) closers.push(() => void store.retire());
+		await Promise.all(stores.map((store) => observed(store.read(todos, undefined))));
+		// The compatible pair shared one request; the others each loaded on their own.
+		expect(own).toEqual(['todos.list', 'todos.list']);
+		expect(server.log).toEqual(['list', 'list', 'list']);
+	});
+
+	it('reconnects to a new owner when the worker stops answering, without sending a write twice', async () => {
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+		const server = createServer();
+		const workers: Array<{ channel: MessageChannel; hang: boolean }> = [];
+		vi.stubGlobal(
+			'SharedWorker',
+			class {
+				port: MessagePort;
+				constructor() {
+					// Each construction after a crash starts a new worker, with a new owner.
+					const worker = { channel: new MessageChannel(), hang: false };
+					workers.push(worker);
+					createDataOwner({
+						transport: async (request, signal) => {
+							if (worker.hang) return new Promise<DataReply>(() => {});
+							return server.transport(request, signal);
+						},
+					}).connect(worker.channel.port1);
+					this.port = worker.channel.port2;
+					closers.push(() => (worker.channel.port1.close(), worker.channel.port2.close()));
+				}
+			},
+		);
+		const store = createReplica(sharedOwner('ada'), replicaOptions);
+		closers.push(() => void store.retire());
+		const list = store.read(todos, undefined);
+		await observed(list);
+
+		// The worker stops answering, with a reload and a write in flight.
+		workers[0]!.hang = true;
+		const reload = list.refresh();
+		const write = store.write(setDone, { id: 'a', done: true }).catch((error: unknown) => error);
+		await vi.waitFor(() => expect(done(() => list.getSnapshot().value!)).toBe(true));
+		workers[0]!.channel.port1.close();
+		await vi.advanceTimersByTimeAsync(20_000);
+
+		await vi.waitFor(() => expect(workers).toHaveLength(2));
+		await reload;
+		expect(list.getSnapshot().status).toBe('ready');
+		// The write may have reached the server before the crash, so it is uncertain, never resent.
+		expect(await write).toBeInstanceOf(DataUncertainError);
+		expect(writeCount(server.log)).toBe(0);
+	});
+
+	it('serves a tab again when it wakes after being dropped as silent, while its account is unchanged', async () => {
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+		const server = createServer();
+		const signals: AbortSignal[] = [];
+		const feedListener: Listener = (_request, signal) => ({
+			async *[Symbol.asyncIterator]() {
+				signals.push(signal);
+				yield {};
+				await new Promise((resolve) => signal.addEventListener('abort', resolve));
+			},
+		});
+		const owner = createDataOwner({ transport: server.transport, listen: feedListener });
+		const channel = new MessageChannel();
+		owner.connect(channel.port1);
+		closers.push(() => (channel.port1.close(), channel.port2.close()));
+		// A frozen tab runs nothing, its heartbeat included, until it resumes.
+		const store = createReplica(channel.port2, replicaOptions);
+		const list = store.read(todos, undefined);
+		await observed(list);
+		closers.push(listen(store, todoChanges).subscribe(() => {}));
+		await vi.waitFor(() => expect(signals).toHaveLength(1));
+
+		document.dispatchEvent(new Event('freeze'));
+		await vi.advanceTimersByTimeAsync(20_000);
+		await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true));
+		document.dispatchEvent(new Event('resume'));
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+		expect(store.retired).toBe(false);
+		// Its feed connects again through the owner.
+		await vi.advanceTimersByTimeAsync(5_000);
+		await vi.waitFor(() => expect(signals).toHaveLength(2));
+
+		// Silent again, it is dropped again.
+		document.dispatchEvent(new Event('freeze'));
+		await vi.advanceTimersByTimeAsync(20_000);
+		await vi.waitFor(() => expect(signals[1]!.aborted).toBe(true));
+		document.dispatchEvent(new Event('resume'));
+	});
+
+	it('keeps its owner while the browser throttles its timers, as long as each ping is answered', async () => {
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+		const server = createServer();
+		const owner = createDataOwner({ transport: server.transport });
+		const channel = new MessageChannel();
+		owner.connect(channel.port1);
+		closers.push(() => (channel.port1.close(), channel.port2.close()));
+		const store = createReplica(channel.port2, replicaOptions);
+		const list = store.read(todos, undefined);
+		await observed(list);
+		// A background tab's timers fire a minute apart; each ping is still answered.
+		for (let tick = 0; tick < 4; tick++) {
+			vi.setSystemTime(Date.now() + 60_000);
+			await vi.advanceTimersByTimeAsync(5_000);
+			await new Promise((resolve) => setImmediate(resolve));
+		}
+		// Still served by the owner: this tab's own transport would refuse.
+		await list.refresh();
+		expect(list.getSnapshot().status).toBe('ready');
+		expect(server.log).toEqual(['list', 'list']);
+	});
+
+	it('drops a tab that stops answering from the feeds it listened to', async () => {
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+		const server = createServer();
+		const signals: AbortSignal[] = [];
+		const feedListener: Listener = (_request, signal) => ({
+			async *[Symbol.asyncIterator]() {
+				signals.push(signal);
+				yield {};
+				await new Promise((resolve) => signal.addEventListener('abort', resolve));
+			},
+		});
+		const owner = createDataOwner({ transport: server.transport, listen: feedListener });
+		const channel = new MessageChannel();
+		owner.connect(channel.port1);
+		const store = createReplica(channel.port2, replicaOptions);
+		closers.push(() => (channel.port1.close(), channel.port2.close()));
+		const stop = listen(store, todoChanges).subscribe(() => {});
+		closers.push(stop);
+		await vi.waitFor(() => expect(listen(store, todoChanges).getSnapshot().status).toBe('live'));
+
+		// The tab's process ends without a word: its port goes quiet.
+		channel.port2.close();
+		await vi.advanceTimersByTimeAsync(20_000);
+		await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true));
+	});
+});
 
 describe('octane/data in a SharedWorker', () => {
 	beforeEach(() => {
@@ -307,7 +491,7 @@ describe('octane/data in a SharedWorker', () => {
 				}
 			},
 		);
-		const store = createReplica(sharedOwner('ada')!, { writes });
+		const store = createReplica(sharedOwner('ada')!, replicaOptions);
 		const list = await observed(store.read(todos, undefined));
 		expect(list()[0]!.title).toBe('Tides');
 		expect(server.log).toEqual(['list']);
@@ -365,20 +549,26 @@ describe('octane/data in a SharedWorker', () => {
 		expect(await recordedAccount()).toEqual({ account: 'grace', generation: 2 });
 	});
 
-	it('records the account again for the next tab when recording it failed', async () => {
+	it('keeps a tab working on its own store when the account cannot be recorded, and tries again for the next', async () => {
 		const server = createServer();
-		const open = sharedWorkers(server.transport);
+		const own: string[] = [];
+		const open = sharedWorkers(server.transport, (request, signal) => {
+			own.push(request.name);
+			return server.transport(request, signal);
+		});
 		const working = indexedDB;
 		vi.stubGlobal('indexedDB', {
 			open() {
 				throw new DOMException('storage is unavailable', 'UnknownError');
 			},
 		});
-		const failed = open('ada');
-		await vi.waitFor(() => expect(failed.retired).toBe(true));
+		const alone = open('ada');
+		await observed(alone.read(todos, undefined));
+		expect(own).toEqual(['todos.list']);
 		vi.stubGlobal('indexedDB', working);
 		const tab = open('ada');
 		await observed(tab.read(todos, undefined));
+		expect(own).toEqual(['todos.list']);
 		expect(await recordedAccount()).toEqual({ account: 'ada', generation: 1 });
 	});
 
@@ -410,15 +600,16 @@ describe('octane/data in a SharedWorker', () => {
 			const received: string[] = [];
 			channel.port1.onmessage = ({ data }) => received.push(data.t);
 			closers.push(() => (channel.port1.close(), channel.port2.close()));
-			const store = createReplica(channel.port2, { writes });
+			const store = createReplica(channel.port2, replicaOptions);
 			void store.retire();
 			await vi.advanceTimersByTimeAsync(0);
-			expect(received).toEqual(['retire']);
+			const retires = () => received.filter((type) => type === 'retire');
+			expect(retires()).toEqual(['retire']);
 			await vi.advanceTimersByTimeAsync(5_000);
-			expect(received).toEqual(['retire', 'retire']);
+			expect(retires()).toEqual(['retire', 'retire']);
 			channel.port1.postMessage({ t: 'retired' });
 			await vi.advanceTimersByTimeAsync(20_000);
-			expect(received).toEqual(['retire', 'retire']);
+			expect(retires()).toEqual(['retire', 'retire']);
 		} finally {
 			vi.useRealTimers();
 		}
@@ -440,7 +631,7 @@ describe('octane/data in a SharedWorker', () => {
 		try {
 			expect(sharedOwner('ada')).toBe(port);
 			expect(constructed).toEqual([
-				['/_octane/data-worker.js', { type: 'module', name: 'octane-data:2:ada' }],
+				['/_octane/data-worker.js', { type: 'module', name: 'octane-data:3:ada' }],
 			]);
 			vi.stubGlobal(
 				'SharedWorker',

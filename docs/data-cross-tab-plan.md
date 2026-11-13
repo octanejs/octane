@@ -195,12 +195,16 @@ connection code. Each PR reports bytes as usual.
    `serveDataOwner`, and the `dataWorker` option of the Vite and Rspack
    plugins.) Shelf opens two pages and asserts one network load and one shared
    rollback, in Chromium, under both bundlers.
-3. **Account fencing.** (This PR: owners record the origin's account and
+3. **Account fencing.** (Done in #2572: owners record the origin's account and
    generation in IndexedDB, announce it on a BroadcastChannel, and retire a
    replaced account's tabs; a sign-out never undoes a newer sign-in.) The
    durable generation, freeze and resume, and the timeout path. Browser tests freeze a page, switch accounts in another, and
    resume.
-4. **Handshake, fallback and crashes.** Contract identity, a mixed-build test
+4. **Handshake, fallback and crashes.** (This PR: `createReplica(owner, {
+   ...localOptions, contracts })` falls back to a local store when the owner is
+   `null`, refuses the build, cannot record the account, or is lost for good;
+   heartbeats both ways; a lost owner is reopened and asked again, writes in
+   flight become uncertain.) Contract identity, a mixed-build test
    (one compatible pair, one incompatible), worker termination and respawn,
    and journal recovery after a crash.
 5. **Single-writer cache.** The cache budget becomes per account, not per tab.

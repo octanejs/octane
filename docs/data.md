@@ -193,9 +193,12 @@ store once hydrated. Only the newest submission's outcome is shown.
 
 - `createDataOwner({ transport, listen? })` makes every request and holds every
   feed connection for its replicas; `connect(port)` serves one.
-- `createReplica(port, { writes, seed?, ... })` is a store without
-  `transport`, `listen` or `persist`. It renders, evaluates views and shows its
-  own edits in the same task. `writes` lists every write any replica may send.
+- `createReplica(owner, { ...storeOptions, contracts })` takes an ordinary
+  store's options plus `contracts`, every read, write and feed the app uses.
+  It renders, evaluates views and shows its own edits in the same task. It
+  carries on as a local store, with its own `transport`, `listen` and
+  `persist`, when `owner` is `null`, the owner refuses its build, cannot record
+  the account, or is lost and cannot be reopened.
 - The owner sends each write once. Other replicas show it from the moment it is
   sent and settle it the same way. Equal reads in flight are one request,
   except a replica's reload never joins a request that may predate it. One
@@ -219,9 +222,20 @@ store once hydrated. Only the newest submission's outcome is shown.
   its generation is still current, so it never undoes a newer sign-in.
 - A replica's reads show pending while its page is frozen. On `resume` it asks
   the owner, and shows them again only once the account is confirmed.
-- The owner protocol version (2) is part of the worker's name, so tabs on
+- A tab's `hello` carries its contract identity: each contract's kind, name,
+  `version` and output schema shape. The first build served sets the owner's;
+  a tab of another build is refused and carries on as a local store.
+- Tabs and owners check on each other every 5 seconds; three silent intervals
+  mean gone. A tab whose owner is gone fences its reads, reopens the worker,
+  asks the new owner every read the old one never answered, and rejects writes
+  that were in flight as uncertain, never resending them. An owner drops a
+  silent tab's feed subscriptions; its writes keep going.
+- While a replica is fenced, `prefetch` waits for the fence to lift, so a
+  suspended reader shows the confirmed value rather than none.
+- The owner protocol version (3) is part of the worker's name, so tabs on
   another protocol never share an owner.
-- The owner does not persist yet.
+- The owner does not persist yet; a replica given `persist` keeps its own
+  cache and journal, as a local store does.
 
 ## Errors
 
