@@ -6204,8 +6204,9 @@ function autoMemoCallExecutesSetupHook(call, ctx) {
  * SETUP_PURE_GLOBAL_CALLEES, such as `String(row.id)`. It closes over nothing and
  * runs no user code beyond the argument coercion that template literals and `+`
  * already perform. Memo proofs accept the name through isConversionGlobal.
+ * Callers that preserve evaluation order can pass an additional effect check.
  */
-function containsRenderCall(stmts, memoCtx = null) {
+function containsRenderCall(stmts, memoCtx = null, extraEffect = null) {
 	let found = false;
 	const seen = new WeakSet();
 	function walk(n) {
@@ -6225,6 +6226,10 @@ function containsRenderCall(stmts, memoCtx = null) {
 			t === 'FunctionDeclaration'
 		) {
 			return; // deferred — runs at event/invoke time, not during render
+		}
+		if (extraEffect?.(n)) {
+			found = true;
+			return;
 		}
 		if (
 			t === 'CallExpression' ||
@@ -9213,6 +9218,21 @@ function isJsxReturningMapCall(node) {
 	return false;
 }
 
+// Addition can run an operand's coercion or throw when numeric types differ.
+function mapAdditionHasEffects(node) {
+	if (node.type !== 'BinaryExpression' || node.operator !== '+') return false;
+	const left = unwrapTsExpr(node.left);
+	const right = unwrapTsExpr(node.right);
+	if (!isInvariantLiteral(left) || !isInvariantLiteral(right)) return true;
+	const leftType = typeof left.value;
+	const rightType = typeof right.value;
+	return (
+		leftType !== 'string' &&
+		rightType !== 'string' &&
+		(leftType === 'bigint') !== (rightType === 'bigint')
+	);
+}
+
 /**
  * Convert a `{xs.map((item[, index]) => <jsx key={K}>…)}` JSX child into a
  * guarded synthetic `@for` dispatched through the shared map slot so a genuine,
@@ -9256,9 +9276,9 @@ function mapCallToForOf(expr, ctx) {
 	// component). Block bodies and fragment roots keep the childSlot path.
 	const body = arrow.body;
 	if (!body || (body.type !== 'JSXElement' && body.type !== 'Element')) return null;
-	// A fused loop renders each row before invoking the next callback. Keep
-	// potentially observable calls in the authored map so they run in array order.
-	if (containsRenderCall([body])) return null;
+	// Fusion interleaves callbacks and row rendering. Preserve authored callback
+	// order when a call or implicit addition coercion can be observed.
+	if (containsRenderCall([body], null, mapAdditionHasEffects)) return null;
 	// Pull a `key={…}` attribute off the returned element → the for-of header key,
 	// and drop it from the element (it's not a DOM attribute). makeForCall then
 	// keys via the header, falling back to `item.id ?? item` when there's no key.
