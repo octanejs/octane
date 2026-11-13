@@ -98,6 +98,7 @@ const syntheticEventMembers = {
 
 export const MAP_PARAMETER_TDZ = 'map-parameter-tdz';
 export const MAP_PARAMETER_WRITE = 'map-parameter-write';
+export const CONTEXT_PROVIDER_GETTER = 'context-provider-getter';
 
 /** Rule names, as reported. */
 const RULE = {
@@ -3715,7 +3716,20 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			!(ts.isPropertyAccessExpression(tag) && tag.expression === node) &&
 			!(ts.isBinaryExpression(tag) && tag.left === node);
 		if (node.name.text === 'Provider' && (isTag || isValue) && this.isContext(node.expression)) {
-			if (!ts.isJsxClosingElement(tag)) this.count(RULE.provider);
+			if (!ts.isJsxClosingElement(tag)) {
+				if (
+					isTag &&
+					ts.isIdentifier(node.expression) &&
+					this.hasLocalProviderGetter(node.expression)
+				)
+					this.note(
+						CONTEXT_PROVIDER_GETTER,
+						'error',
+						node,
+						'Replacing this React context Provider read can skip an authored getter. Review the custom Provider before migrating it.',
+					);
+				this.count(RULE.provider);
+			}
 			return this.emit(node.expression, PLAIN);
 		}
 		const namespace = this.importOf(node.expression);
@@ -5295,6 +5309,56 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			return this.createsContext(node.whenTrue) && this.createsContext(node.whenFalse);
 		}
 		return ts.isCallExpression(node) && this.calleeName(node.expression) === 'createContext';
+	}
+
+	private hasLocalProviderGetter(context: ts.Identifier): boolean {
+		if (!this.source.includes('defineProperty') && !this.source.includes('\\u')) return false;
+		const initial = this.constValue(context);
+		const factory = initial && skipParens(initial);
+		if (
+			!factory ||
+			!ts.isCallExpression(factory) ||
+			this.reactHook(factory.expression) !== 'createContext'
+		)
+			return false;
+		return this.localUses(context).some((reference) => {
+			const call = reference.parent;
+			if (
+				!ts.isCallExpression(call) ||
+				call.arguments[0] !== reference ||
+				call.questionDotToken ||
+				!ts.isExpressionStatement(call.parent) ||
+				call.parent.parent !== this.sf ||
+				factory.end > call.pos ||
+				call.end > context.pos
+			)
+				return false;
+			const method = call.expression;
+			const [, key, descriptor] = call.arguments;
+			if (
+				!ts.isPropertyAccessExpression(method) ||
+				method.questionDotToken ||
+				method.name.text !== 'defineProperty' ||
+				!ts.isIdentifier(method.expression) ||
+				method.expression.text !== 'Object' ||
+				this.declarationOf(method.expression)?.getSourceFile().hasNoDefaultLib !== true ||
+				!key ||
+				!ts.isStringLiteralLike(key) ||
+				key.text !== 'Provider' ||
+				!descriptor ||
+				!ts.isObjectLiteralExpression(descriptor)
+			)
+				return false;
+			let getter = false;
+			for (const property of descriptor.properties) {
+				const name = property.name;
+				if (!name || (!ts.isIdentifier(name) && !ts.isStringLiteral(name))) return false;
+				if (name.text === 'configurable' || name.text === 'enumerable') continue;
+				if (name.text !== 'get' || getter || !ts.isMethodDeclaration(property)) return false;
+				getter = true;
+			}
+			return getter;
+		});
 	}
 
 	/**
