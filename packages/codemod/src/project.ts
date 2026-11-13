@@ -73,7 +73,8 @@ export async function runCodemod(
 		const dir = path.dirname(file);
 		let physical = outputDirectories.get(dir);
 		if (physical === undefined) {
-			physical = fs.realpathSync(dir);
+			// On macOS the native lookup also returns the stored Unicode spelling.
+			physical = process.platform === 'darwin' ? fs.realpathSync.native(dir) : fs.realpathSync(dir);
 			outputDirectories.set(dir, physical);
 		}
 		const output = path.join(physical, path.basename(file));

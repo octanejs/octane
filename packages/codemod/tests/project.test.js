@@ -1682,6 +1682,35 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		}
 	});
 
+	it.skipIf(process.platform !== 'darwin')(
+		'reports a rename collision through a differently normalized symlink target',
+		async ({ skip }) => {
+			const parent = 'Cafe\u0301';
+			const source = 'export const Item = () => <i />;';
+			const root = project({ [parent + '/Item.tsx']: source });
+			const alternate = parent.normalize('NFC');
+			if (!fs.existsSync(path.join(root, alternate))) skip();
+			fs.symlinkSync(alternate, path.join(root, 'linked'), 'dir');
+			const paths = [parent + '/Item.tsx', 'linked/Item.tsx'];
+			for (const write of [false, true]) {
+				const { files } = await runCodemod(
+					paths.map((file) => path.join(root, file)),
+					{ root, write, verify: false },
+				);
+				expect(files.map(({ file }) => file)).toEqual(write ? paths.slice(1) : paths);
+				for (const file of files) {
+					expect(file).toMatchObject({
+						output: file.file,
+						changed: false,
+						notes: [expect.objectContaining({ rule: 'rename-conflict', severity: 'error' })],
+					});
+				}
+				expect(fs.readdirSync(path.join(root, parent))).toEqual(['Item.tsx']);
+				expect(fs.readFileSync(path.join(root, paths[0]), 'utf8')).toBe(source);
+			}
+		},
+	);
+
 	it('renames separate file symlinks without removing their shared target', async () => {
 		const source = 'export const Item = () => <i />;';
 		const root = project({ 'Item.tsx': source });
