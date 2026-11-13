@@ -93,8 +93,14 @@ function propScope(file: ts.SourceFile, checker: ts.TypeChecker) {
 		});
 	function mark(symbol: ts.Symbol | undefined) {
 		const resolved = target(symbol);
-		if (resolved && (resolved.flags & ts.SymbolFlags.ValueModule || localDeclaration(resolved)))
-			opaque = true;
+		if (!resolved?.declarations?.length) {
+			// The checker also exposes erased re-exports when reading a namespace.
+			const declarations = symbol?.declarations;
+			if (!declarations?.length || !declarations.every(ts.isTypeOnlyImportOrExportDeclaration))
+				opaque = true;
+			return;
+		}
+		if (resolved.flags & ts.SymbolFlags.ValueModule || localDeclaration(resolved)) opaque = true;
 		const decl = resolved?.valueDeclaration;
 		const source = decl?.getSourceFile();
 		if (decl && source === file) imported.add(decl);

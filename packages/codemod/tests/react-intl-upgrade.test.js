@@ -70,15 +70,23 @@ it('uses shorthand project types for stable exported scalar props with external 
 		path.join(src, 'producer.tsx'),
 		"import type {Label} from './labels'; export const label = <b>rich</b> as unknown as Label;",
 	);
+	fs.writeFileSync(
+		path.join(src, 'erased-export.ts'),
+		"export type {Missing} from 'runtime-only-self'; export const heading = 'Ready';",
+	);
 	const view =
 		'<section><FormattedMessage id="hello" defaultMessage="Hello {label}" values={{label}} /></section>';
-	const throughShim = (specifier) =>
-		`import {Again} from '${specifier}'; export function Pane({label}: {label: Label}) { return ${view}; } export function Other(){return <Again label={rendererLabel}/>;}`;
+	const throughShim = (specifier, binding = '{Again}') =>
+		`import ${binding} from '${specifier}'; export function Pane({label}: {label: Label}) { return ${view}; } export function Other(){return <Again label={rendererLabel}/>;}`;
 	const cases = {
 		relativeDeclaration: throughShim('./relative-shim.js'),
 		packageDeclaration: throughShim('shorthand-props-fixture/self'),
 		declarationTypeOnly: `import {type Again} from './type-shim.js'; export type Same = typeof Again; export function Pane({label}: {label: Label}) { return ${view}; }`,
 		symlinkBarrel: throughShim('../linked/linked-shim'),
+		unresolvedNamed: throughShim('runtime-only-self'),
+		unresolvedDefault: throughShim('runtime-only-self', 'Again'),
+		unresolvedTypeOnly: `import type Default from 'runtime-only-self'; import {type Again} from 'runtime-only-self'; export type Same = [typeof Default, typeof Again]; export function Pane({label}: {label: Label}) { return ${view}; }`,
+		unresolvedTypeExport: `import * as content from './erased-export'; export function Pane({label}: {label: Label}) { return <>{content.heading}{${view}}</>; }`,
 		safe: `export function Pane({label}: {label: Label}) { return ${view}; }
 			export type Props = Parameters<typeof Pane>; export {Pane as Renamed};`,
 		siblingRenderable: `import type {ReactNode} from 'react'; export function Pane({label, sibling}: {label: Label, sibling?: ReactNode}) { return <>{sibling}{${view}}</>; }`,
@@ -147,6 +155,8 @@ it('uses shorthand project types for stable exported scalar props with external 
 			name === 'siblingRenderable' ||
 			name === 'typeAlias' ||
 			name === 'declarationTypeOnly' ||
+			name === 'unresolvedTypeOnly' ||
+			name === 'unresolvedTypeExport' ||
 			name === 'dynamicExternal'
 		) {
 			expect(file.strong).toBe(true);
