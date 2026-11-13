@@ -96,6 +96,7 @@ const syntheticEventMembers = {
 	isPropagationStopped: '() => boolean',
 };
 
+export const MAP_PARAMETER_TDZ = 'map-parameter-tdz';
 export const MAP_PARAMETER_WRITE = 'map-parameter-write';
 
 /** Rule names, as reported. */
@@ -5852,25 +5853,33 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			? this.ifDirective(root)
 			: this.relative(this.emit(root, TEMPLATE), root);
 		if (arm === null) return null;
-		const mutable = (name: ts.Identifier) =>
-			!fixedBinding(this.checker, name, name, undefined, (use) => !isPropertyName(use));
-		if (
-			isJsx(root) &&
-			!literal.elements.some(ts.isSpreadElement) &&
-			((index && ts.isIdentifier(index.name) && mutable(index.name)) ||
+		if (isJsx(root) && !literal.elements.some(ts.isSpreadElement)) {
+			if (index && this.patternReadsOrdinal(item.name, index)) {
+				this.note(
+					MAP_PARAMETER_TDZ,
+					'error',
+					node,
+					'An @for row initializes its index before this parameter pattern can read it. Review the original callback’s initialization order.',
+				);
+			}
+			const mutable = (name: ts.Identifier) =>
+				!fixedBinding(this.checker, name, name, undefined, (use) => !isPropertyName(use));
+			if (
+				(index && ts.isIdentifier(index.name) && mutable(index.name)) ||
 				(!ts.isIdentifier(item.name) &&
 					reads(
 						item.name,
 						(name) =>
 							ts.isBindingElement(name.parent) && name.parent.name === name && mutable(name),
-					)))
-		) {
-			this.note(
-				MAP_PARAMETER_WRITE,
-				'error',
-				node,
-				'Cannot prove this map parameter stays unchanged in an @for row. Exclude the source from migration or keep the parameter unchanged.',
-			);
+					))
+			) {
+				this.note(
+					MAP_PARAMETER_WRITE,
+					'error',
+					node,
+					'Cannot prove this map parameter stays unchanged in an @for row. Exclude the source from migration or keep the parameter unchanged.',
+				);
+			}
 		}
 		this.count(RULE.for);
 		let source = this.emit(callee.expression, PLAIN);
@@ -5893,6 +5902,33 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			setup[0],
 		);
 		return this.block(header, statements + '\n' + arm);
+	}
+
+	private patternReadsOrdinal(pattern: ts.BindingName, ordinal: ts.ParameterDeclaration): boolean {
+		const readsOrdinal = (expr: ts.Expression | undefined): boolean => {
+			if (!expr) return false;
+			const read = skipWrappers(expr);
+			if (ts.isIdentifier(read)) return this.declarationOf(read) === ordinal;
+			if (ts.isTypeOfExpression(read)) return readsOrdinal(read.expression);
+			return (
+				ts.isBinaryExpression(read) &&
+				read.operatorToken.kind === ts.SyntaxKind.PlusToken &&
+				((rowKeyLiteral(read.right) && readsOrdinal(read.left)) ||
+					(rowKeyLiteral(read.left) && readsOrdinal(read.right)))
+			);
+		};
+		return (
+			!ts.isIdentifier(pattern) &&
+			pattern.elements.some(
+				(element) =>
+					ts.isBindingElement(element) &&
+					(readsOrdinal(element.initializer) ||
+						(element.propertyName &&
+							ts.isComputedPropertyName(element.propertyName) &&
+							readsOrdinal(element.propertyName.expression)) ||
+						this.patternReadsOrdinal(element.name, ordinal)),
+			)
+		);
 	}
 
 	/**
