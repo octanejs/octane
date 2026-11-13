@@ -589,8 +589,13 @@ export function deferred() { return () => hint('/later.png', { as: 'image' }); }
 	it('reports a native setup call into a React hook left in an unselected local module', () => {
 		const helper = `import { useState as state } from 'react';
 export function useLabel() { const [label] = state('ready'); return label; }`;
+		const callback = `import { useCallback as retain } from 'react';
+export function useLabel(value: string) { const read = retain(() => value, [value]); return read(); }`;
 		const panel = `import { useLabel as read } from './use-label';
 export function Panel() { const label = read(); return <b>{label}</b>; }`;
+		const callbackPanel = panel
+			.replace('./use-label', './use-callback')
+			.replace('read()', "read('ready')");
 		const root = project({
 			'tsconfig.json': JSON.stringify({
 				compilerOptions: {
@@ -601,6 +606,17 @@ export function Panel() { const label = read(); return <b>{label}</b>; }`;
 				},
 			}),
 			'use-label.ts': helper,
+			'use-callback.ts': callback,
+			'Callback.tsx': callbackPanel,
+			'CallbackShadowed.tsx': callbackPanel.replace('./use-callback', './shadowed-callback'),
+			'shadowed-callback.ts': callback.replace(
+				'const read = retain',
+				'const retain = (fn) => fn; const read = retain',
+			),
+			'CallbackSkipped.tsx': callbackPanel.replace(
+				"const label = read('ready');",
+				"const before = (() => { throw new Error('setup failed'); })(); const label = read('ready');",
+			),
 			'Late.tsx': panel.replace('./use-label', './rewritten-at-runtime'),
 			'rewritten-at-runtime.ts': helper + String.raw`;ev\u0061l("useLabel=()=> 'ready'");`,
 			'query-hook.ts': helper.replace('useLabel', 'useQuery'),
@@ -701,6 +717,7 @@ export function useLabel() { const later = () => useState('ready'); return 'read
 			expect(errors).toEqual([
 				['AfterSetup.tsx', 'bindings', 4, expect.stringMatching(/useLabel.*React.*useState/)],
 				['Arrow.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
+				['Callback.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useCallback/)],
 				[
 					'External.tsx',
 					'bindings',
