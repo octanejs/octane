@@ -80,6 +80,31 @@ export async function runCodemod(
 		const output = path.join(physical, path.basename(file));
 		return ts.sys.useCaseSensitiveFileNames ? output : output.toLowerCase();
 	}
+	const normalizedOwners =
+		process.platform === 'darwin' && files.some((file) => /[^\x00-\x7F]/.test(path.basename(file)))
+			? new Map<string, string[]>()
+			: undefined;
+	function normalizedOwner(key: string, file: string) {
+		if (!normalizedOwners) return;
+		const group = path.join(path.dirname(key), path.basename(key).normalize('NFC'));
+		let candidates = normalizedOwners.get(group);
+		if (!candidates) normalizedOwners.set(group, (candidates = []));
+		// Use an ordinary existing entry to probe the other stem without following leaf links.
+		const regularFile = (name: string) => fs.lstatSync(name, { throwIfNoEntry: false })?.isFile();
+		const sameStem = (source: string, other: string) => {
+			const alternate = other.slice(0, -path.extname(other).length) + path.extname(source);
+			return (
+				regularFile(source) &&
+				regularFile(alternate) &&
+				fs.realpathSync.native(source) === fs.realpathSync.native(alternate)
+			);
+		};
+		const previous = candidates.filter(
+			(candidate) => sameStem(candidate, file) || sameStem(file, candidate),
+		);
+		if (previous.length === 0 || !previous.some(regularFile)) candidates.push(file);
+		return previous;
+	}
 	const conflicts: Map<string, FileResult> = new Map();
 	const conflictFor = (file: string, source: string, output: string, reason: string) =>
 		unchangedFile(path.relative(root, file), source, {
@@ -96,8 +121,10 @@ export async function runCodemod(
 		const output = file.replace(/\.(?:jsx?|tsx)$/, '.tsrx');
 		if (output === file) continue;
 		const key = outputKey(output);
-		const previous = owners.get(key);
-		if (!previous) owners.set(key, file);
+		const direct = owners.get(key);
+		const normalized = normalizedOwner(key, file);
+		const previous = direct ?? normalized?.[0];
+		if (!direct) owners.set(key, previous ?? file);
 		if (previous || fs.lstatSync(output, { throwIfNoEntry: false })) {
 			const reason = previous
 				? `is also the target of ${path.relative(root, previous)}`
@@ -105,18 +132,20 @@ export async function runCodemod(
 			const conflict = conflictFor(file, source, output, reason);
 			if (write) return blockedWrite(root, conflict);
 			conflicts.set(file, conflict);
-			const previousOutput = previous && renames.get(previous);
-			if (previous && previousOutput) {
-				conflicts.set(
-					previous,
-					conflictFor(
-						previous,
-						fs.readFileSync(previous, 'utf8'),
-						previousOutput,
-						`is also the target of ${path.relative(root, file)}`,
-					),
-				);
-				renames.delete(previous);
+			for (const owner of new Set([previous, ...(normalized ?? [])])) {
+				const ownerOutput = owner && renames.get(owner);
+				if (owner && ownerOutput) {
+					conflicts.set(
+						owner,
+						conflictFor(
+							owner,
+							fs.readFileSync(owner, 'utf8'),
+							ownerOutput,
+							`is also the target of ${path.relative(root, file)}`,
+						),
+					);
+					renames.delete(owner);
+				}
 			}
 			continue;
 		}
