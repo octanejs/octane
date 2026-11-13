@@ -1209,7 +1209,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				isBareSvgTag(field.tagName, this.checker, bareSvgImports, this.localUses)
 			) {
 				this.note(
-					this.nativeStoreHooks.size ? 'store-hook' : 'svg-issuer',
+					'svg-issuer',
 					'error',
 					field.tagName,
 					'This JSX tag can resolve to a bare SVG import. Loading the SVG from .tsrx can produce an asset URL. Import and render the SVG in a React-owned .tsx component hosted by ReactCompat, or configure a native SVG loader for .tsrx.' +
