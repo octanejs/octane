@@ -169,10 +169,16 @@ function hostedLeaf(output: ts.JsxElement | ts.JsxSelfClosingElement) {
 			component = skipWrappers(value.expression);
 		}
 	}
-	if (component) return ts.isJsxSelfClosingElement(output) ? component : undefined;
-	if (seen.has('props') || !ts.isJsxElement(output)) return;
-	const [child, extra] = withoutJsxIndentation(output.children);
-	if (!extra && child && ts.isJsxSelfClosingElement(child)) return child.tagName;
+	const children = ts.isJsxElement(output)
+		? withoutJsxIndentation(output.children).filter(
+				(child) => !ts.isJsxExpression(child) || child.expression,
+			)
+		: [];
+	if (component) return children.length === 0 ? component : undefined;
+	if (seen.has('props')) return;
+	const [child, extra] = children;
+	if (!extra && child && (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child)))
+		return openingTag(child).tagName;
 }
 
 /** Runtime imports that an explicit server host returns directly. */

@@ -177,6 +177,16 @@ describe('runCodemod', () => {
 		it.each([
 			['component', `${server}\n${child}\n${owner}`, leaf],
 			[
+				'paired component',
+				`${server}\n${child}\n${owner.replace(' />', '>\n{/* comment */}\n</Host>')}`,
+				leaf,
+			],
+			[
+				'paired element child',
+				`${server}\n${child}\nexport function App() { return <Host>\n{/* comment */}\n<Leaf></Leaf>\n</Host>; }`,
+				leaf,
+			],
+			[
 				'component with props',
 				`${server}\n${child}\nexport const App = () => <Host component={Leaf} props={{ label: 'name' }} />;`,
 				leaf,
