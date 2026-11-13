@@ -6317,13 +6317,13 @@ describe('compiler-owned component-region memoization', () => {
 		});
 		const root = mount(client.App, { items });
 		const row = root.find('.returned-provider-map-row');
-		expect(events).toEqual(['get:map', 'get:prototype', 'call:map']);
+		expect(events).toEqual(['get:map', 'call:map']);
 		expect(row.textContent).toBe('initial');
 
 		events.length = 0;
 		label = 'updated';
 		root.click('#returned-provider-map-update');
-		expect(events).toEqual(['get:map', 'get:prototype', 'call:map']);
+		expect(events).toEqual(['get:map', 'call:map']);
 		expect(root.find('.returned-provider-map-row')).toBe(row);
 		expect(row.textContent).toBe('updated');
 		root.unmount();

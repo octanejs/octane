@@ -369,9 +369,9 @@ export function mapSlot(receiver: any, method: any, callback?: (...args: any[]) 
 		return mapped;
 	}
 	if (
+		method !== NATIVE_ARRAY_MAP ||
 		!Array.isArray(receiver) ||
 		Object.getPrototypeOf(receiver) !== Array.prototype ||
-		method !== NATIVE_ARRAY_MAP ||
 		hasOwnProp.call(receiver, 'constructor') ||
 		Object.getOwnPropertyDescriptor(Array.prototype, 'constructor')?.value !== Array ||
 		Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get !== NATIVE_ARRAY_SPECIES_GETTER
