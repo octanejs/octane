@@ -867,6 +867,17 @@ export async function runCodemod(
 				localReactHook: renames.has(file)
 					? (module, name, nativeOnly) => localReactHook(file, module, name, nativeOnly)
 					: undefined,
+				localReactRootComponent: renames.has(file)
+					? (module, name) => {
+							const hook = localReactHook(file, module, name, false);
+							if (
+								typeof hook === 'string' &&
+								installedReact(file, 'react-dom') &&
+								originalModule(file, 'react-dom/client')
+							)
+								return hook;
+						}
+					: undefined,
 				strong,
 				strictNullChecks: strictConfig !== null,
 				get types() {
