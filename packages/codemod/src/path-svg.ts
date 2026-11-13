@@ -41,7 +41,7 @@ const userSpace = /^userSpaceOnUse$/;
 const bounds = { x: length, y: length, width: extent, height: extent };
 const blur = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
 const presentation = {
-	fill: paint,
+	fill: referencedPaint,
 	stroke: paint,
 	'stroke-width': length,
 	'stroke-linecap': /^(?:butt|round|square)$/,
@@ -50,7 +50,6 @@ const presentation = {
 };
 const pathAttributes = {
 	...presentation,
-	fill: referencedPaint,
 	transform,
 	d: /^[Mm] *[+\-.\d][MmLlHhVvCcSsQqTtAaZzEe0-9.,+\- ]+$/,
 	'fill-rule': fillRule,
@@ -60,7 +59,6 @@ const pathAttributes = {
 const rectAttributes = {
 	...presentation,
 	...bounds,
-	fill: referencedPaint,
 	rx: extent,
 	ry: extent,
 	transform,

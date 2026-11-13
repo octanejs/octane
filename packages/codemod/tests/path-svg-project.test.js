@@ -476,6 +476,7 @@ it('renders local gradients, a mask, and a filter in two instances', async () =>
 	const drawing = `<svg viewBox="0 0 16 16">
   <g mask="url(#cutout)" filter="url(#soften)">
     <rect width="16" height="16" fill="url(#paint)" transform="matrix(1 0 0 1 0 0)"/>
+    <circle cx="8" cy="8" r="4" fill="url(#paint)"/>
   </g>
   <mask id="cutout" maskUnits="userSpaceOnUse" x="0" y="0" width="16" height="16" style="mask-type:alpha">
     <path d="M0 0H16V16H0Z" fill="white"/>
