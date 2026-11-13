@@ -197,6 +197,29 @@ export interface StoreInternals {
 	record(entity: Entity<any>, id: string, value: unknown, reload: Set<Entry>): void;
 	/** Give a read a new confirmed value; `edited` keeps its load's age and sequence, for a value changed in part. */
 	rebase(entry: Entry, value: unknown, edited: boolean, reload: Set<Entry>): void;
+	/** The entry a reply for this wire key belongs to. */
+	wireEntry(key: string): Entry | undefined;
+	/** Show a write another tab sent, without sending it. */
+	follow(operation: Operation): void;
+	operation(id: string): Operation | undefined;
+	operationFor(
+		id: string,
+		write: Write<any, any>,
+		input: unknown,
+		raw: unknown,
+		status: Operation['status'],
+	): Operation;
+	/** Confirm a write another tab sent, with its reply and parsed output. */
+	confirm(
+		operation: Operation,
+		reply: (DataReply & { ok: true }) | undefined,
+		output: unknown,
+	): void;
+	/** Roll back a write another tab sent, which the server refused. */
+	remove(operation: Operation): void;
+	settleOperation(operation: Operation, confirmed: boolean, value: unknown): void;
+	/** Called after `settle` settles a write here, so other tabs can settle it too. */
+	onSettle(notify: (id: string, confirmed: boolean, value: unknown) => void): void;
 	/** Reload `reload`, then notify the readers of `changed` and of every read showing a record of `names`. */
 	finish(reload: Set<Entry>, changed: readonly Entry[], names: ReadonlySet<string>): void;
 }
@@ -273,7 +296,8 @@ export interface Entry {
 	projected: { base: unknown; parts: Map<unknown, unknown>; value: unknown } | null;
 }
 
-interface Operation {
+/** @internal */
+export interface Operation {
 	readonly id: string;
 	readonly write: Write<any, any>;
 	/** The validated input the optimistic edit uses. */
@@ -451,6 +475,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	let sequence = 0;
 	let retired = false;
 	const retiring = new AbortController();
+	/** A replica's way to tell other tabs a write was settled here. */
+	let settled: ((id: string, confirmed: boolean, value: unknown) => void) | null = null;
 	/** The feeds' positions a server render took before its first read, for its seed. */
 	const cursors: Array<[string, string]> = [];
 	const positions =
@@ -1300,15 +1326,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const refreshed = new Set<Entry>();
 		const pending: Promise<() => Entry | undefined>[] = [];
 		for (const item of reply?.refreshed ?? []) {
-			const key = entryKey(item.name, item.input);
-			let entry = entries.get(key);
-			// A view asked for its window with a margin, so the reply names that input.
-			for (const candidate of entry ? [] : entries.values()) {
-				if (candidate.span && entryKey(candidate.read.name, wireInput(candidate)) === key) {
-					entry = candidate;
-					break;
-				}
-			}
+			const entry = wireEntry(entryKey(item.name, item.input));
 			if (!entry) continue;
 			// Another request, invalidation or write reply overtook this write. The server
 			// gives no ordering between them, so reload rather than publishing an older value.
@@ -1375,6 +1393,18 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (!operation.write.effect) operations = operations.filter((item) => item !== operation);
 		collect();
 		persisted?.unjournal(operation.id);
+	}
+
+	/** The entry a reply for `key` belongs to: the read, or a view that asked for that window with its margin. */
+	function wireEntry(key: string): Entry | undefined {
+		const entry = entries.get(key);
+		if (entry) return entry;
+		for (const candidate of entries.values()) {
+			if (candidate.span && entryKey(candidate.read.name, wireInput(candidate)) === key) {
+				return candidate;
+			}
+		}
+		return undefined;
 	}
 
 	function remove(operation: Operation): void {
@@ -1651,7 +1681,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		settle(operationId, confirmed, value) {
 			assertLive();
 			const operation = operations.find((item) => item.id === operationId);
-			if (operation?.status === 'uncertain') settleOperation(operation, confirmed, value);
+			if (operation?.status !== 'uncertain') return;
+			settleOperation(operation, confirmed, value);
+			// Other tabs showing this write settle it too.
+			settled?.(operationId, confirmed, value);
 		},
 		publish(read, input, value) {
 			assertLive();
@@ -1791,6 +1824,25 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				idle(entry);
 			}
 			save(entry);
+		},
+		wireEntry,
+		follow(operation) {
+			operations.push(operation);
+			touchEntities();
+		},
+		operation: (id) => operations.find((item) => item.id === id),
+		operationFor,
+		confirm(operation, reply, output) {
+			confirm(operation, reply, output);
+			touchEntities();
+		},
+		remove(operation) {
+			remove(operation);
+			operation.gate?.reject(new DependencyError());
+		},
+		settleOperation,
+		onSettle(notify) {
+			settled = notify;
 		},
 		finish(reload, changed, names) {
 			reloadAll(reload);

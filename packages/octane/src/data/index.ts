@@ -9,6 +9,8 @@ export {
 	webSocketListener,
 } from './transport.js';
 export { listen, receive } from './feeds.js';
+export { createDataOwner, createReplica } from './owner.js';
+export type { DataOwner, OwnerPort } from './owner.js';
 export { pages } from './pages.js';
 export { autoBudget, indexedDBStorage, memoryStorage } from './persist.js';
 export type { DeviceHints, PersistentStorage, PersistOptions, StoredMeta } from './persist.js';
