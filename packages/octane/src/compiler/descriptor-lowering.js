@@ -108,30 +108,39 @@ export function findDirectlyCalledNames(statements, names) {
 
 // Both the template-argument proof and portal lowering need the original lexical owner.
 export function portalImportBinding(ast) {
-	const imported = ast.body.some((node) => {
+	let imported;
+	for (const node of ast.body) {
 		const source = node.source?.value;
-		return (
-			node.type === 'ImportDeclaration' &&
-			node.importKind !== 'type' &&
-			(source === 'octane' || source === 'octane/server') &&
-			node.specifiers.some(
-				(specifier) =>
-					specifier.type === 'ImportSpecifier' &&
-					specifier.importKind !== 'type' &&
-					specifier.local?.name === 'createPortal' &&
-					(specifier.imported?.name ?? specifier.imported?.value) === 'createPortal',
-			)
-		);
-	});
-	if (!imported) return null;
+		if (
+			node.type !== 'ImportDeclaration' ||
+			node.importKind === 'type' ||
+			(source !== 'octane' && source !== 'octane/server')
+		)
+			continue;
+		for (const specifier of node.specifiers) {
+			if (
+				specifier.type === 'ImportSpecifier' &&
+				specifier.importKind !== 'type' &&
+				specifier.local?.name === 'createPortal'
+			) {
+				const name = specifier.imported?.name ?? specifier.imported?.value;
+				if (
+					name === 'createPortal' ||
+					(source === 'octane' && (name === 'memo' || name === 'createElement'))
+				)
+					imported = name;
+			}
+		}
+	}
+	if (imported === undefined) return null;
 	let lexical;
 	return (callee) => {
-		if (callee?.type !== 'Identifier' || callee.name !== 'createPortal') return false;
+		if (callee?.type !== 'Identifier' || callee.name !== 'createPortal') return undefined;
 		lexical ??= createLexicalAnalysis(ast);
-		return (
-			lexical.resolveBinding(lexical.nodeScopes.get(callee), callee.name)?.scope ===
+		return lexical.resolveBinding(lexical.nodeScopes.get(callee), callee.name)?.scope ===
 			lexical.rootScope
-		);
+			? imported
+			: undefined;
 	};
 }
 
@@ -176,7 +185,7 @@ export function findDirectlyCalledTemplateFunctions(ast, portalBinding = portalI
 		const callee = unwrapTsExpr(call.callee);
 		if (isObjectPassThroughCallee(callee)) return true;
 		if (callee?.type !== 'Identifier') return false;
-		if (portalBinding?.(callee)) return true;
+		if (callee.name === 'createPortal') return portalBinding?.(callee) !== undefined;
 		renderingCallees ??= collectOctaneImportLocals(ast.body, ['memo', 'createElement']);
 		return renderingCallees.has(callee.name);
 	};

@@ -39806,8 +39806,8 @@ function lowerJsxReturnBranchComponents(ast) {
  * lowers the helper. The runtime itself renders the function arguments of
  * three calls, which keep that path: an imported Octane `createPortal` body,
  * and the component or render-function child given to Octane's `memo` or
- * `createElement`. So does a component given to an
- * `Object` static that only stores or returns it, as
+ * `createElement`. So does a component given to an `Object` static that only
+ * stores or returns it, as
  * `Object.assign(Button, { Item })` does: the component is rendered later, and
  * inside a module-level function only its template body can own a directive.
  *
@@ -39823,7 +39823,7 @@ function lowerDirectlyCalledTemplateFunctions(ast) {
 	const lower = (node) =>
 		mapAst(node, (n) => {
 			if (lowered.has(n)) return returnedJsxFunction(n, lower);
-			if (n.type === 'CallExpression' && portalBinding?.(n.callee))
+			if (n.type === 'CallExpression' && portalBinding?.(n.callee) === 'createPortal')
 				return { ...n, arguments: lower(n.arguments), _octanePortalCall: true };
 			return null;
 		});

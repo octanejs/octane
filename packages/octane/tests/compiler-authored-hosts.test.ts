@@ -221,16 +221,20 @@ describe('authored host JSX', () => {
 		},
 	);
 
-	it('calls a template callback passed to a local createPortal helper', () => {
-		const source = `function createPortal(render) { return render(); }
-			export function App() @{
+	it.each([
+		['function createPortal(render) { return render(); }', ''],
+		["import { memo as createPortal } from 'octane';", '{ createPortal }'],
+	])('calls a template callback through an ordinary createPortal binding: %s', (setup, params) => {
+		const source = `${setup}
+			export function App(${params}) @{
 				const value = createPortal(() => @{ <b>local</b> });
 				<main>{value}</main>
 			}`;
 		const { App: ServerApp } = fixture(source, true);
 		const { App } = fixture(source);
-		expect(renderToString(ServerApp).html).toContain('<b>local</b>');
-		const rendered = mount(App);
+		const props = { createPortal: (render: () => unknown) => render() };
+		expect(renderToString(ServerApp, props).html).toContain('<b>local</b>');
+		const rendered = mount(App, props);
 		try {
 			expect(rendered.find('b').textContent).toBe('local');
 		} finally {
