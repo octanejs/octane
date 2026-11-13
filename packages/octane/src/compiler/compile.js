@@ -9271,7 +9271,7 @@ function mapCallToForOf(expr, ctx) {
 		params.length > 2 ||
 		params[0].type === 'AssignmentPattern' ||
 		params[0].type === 'RestElement' ||
-		params.some(mapCallbackPatternCapturesLexicalReceiver) ||
+		mapCallbackPatternSomeExpression(params[0], mapPatternExpressionNeedsOriginalCallback) ||
 		mapCallbackCapturesLexicalReceiver(arrow.body)
 	) {
 		return null;
@@ -9390,28 +9390,33 @@ function isModuleConstTag(tag, ctx) {
 	return ctx.mapConstTags.has(tag.name);
 }
 
-function mapCallbackPatternCapturesLexicalReceiver(pattern) {
+function mapPatternExpressionNeedsOriginalCallback(expression) {
+	// Row helpers interleave parameter evaluation with rendering and may already
+	// have initialized the index when the callback would still be binding the item.
+	return !isInvariantLiteral(unwrapTsExpr(expression));
+}
+
+function mapCallbackPatternSomeExpression(pattern, matches) {
 	if (!pattern || typeof pattern !== 'object') return false;
 	switch (pattern.type) {
 		case 'AssignmentPattern':
-			return (
-				mapCallbackPatternCapturesLexicalReceiver(pattern.left) ||
-				mapCallbackCapturesLexicalReceiver(pattern.right)
-			);
+			return mapCallbackPatternSomeExpression(pattern.left, matches) || matches(pattern.right);
 		case 'ObjectPattern':
 			return (pattern.properties || []).some((property) => {
 				if (property.type === 'RestElement') {
-					return mapCallbackPatternCapturesLexicalReceiver(property.argument);
+					return mapCallbackPatternSomeExpression(property.argument, matches);
 				}
 				return (
-					(property.computed && mapCallbackCapturesLexicalReceiver(property.key)) ||
-					mapCallbackPatternCapturesLexicalReceiver(property.value || property.key)
+					(property.computed && matches(property.key)) ||
+					mapCallbackPatternSomeExpression(property.value || property.key, matches)
 				);
 			});
 		case 'ArrayPattern':
-			return (pattern.elements || []).some(mapCallbackPatternCapturesLexicalReceiver);
+			return (pattern.elements || []).some((item) =>
+				mapCallbackPatternSomeExpression(item, matches),
+			);
 		case 'RestElement':
-			return mapCallbackPatternCapturesLexicalReceiver(pattern.argument);
+			return mapCallbackPatternSomeExpression(pattern.argument, matches);
 		default:
 			return false;
 	}
@@ -38340,7 +38345,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	const inlineKey =
 		keyCapturesParent ||
 		(snapshot !== null &&
-			(mapCallbackPatternCapturesLexicalReceiver(leftDeclId) ||
+			(mapCallbackPatternSomeExpression(leftDeclId, mapCallbackCapturesLexicalReceiver) ||
 				mapCallbackCapturesLexicalReceiver(explicitKey))) ||
 		(node.nativeArrayMap !== undefined &&
 			mapCallbackHasEventClosure(node.nativeArrayMap.callback) &&
