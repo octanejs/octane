@@ -1188,7 +1188,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			// An explicit loader, query, or fragment doesn't use the bare SVG convention.
 			const bare = /^#?[^!?#]*\.svg$/i;
 			for (const [declaration, entry] of this.imports) {
-				if (entry.typeOnly || entry.imported !== 'default' || !bare.test(entry.module)) continue;
+				if (
+					entry.typeOnly ||
+					(entry.imported !== 'default' && !entry.namespace) ||
+					!bare.test(entry.module)
+				)
+					continue;
 				const statement = ts.findAncestor(declaration, ts.isImportDeclaration);
 				if (!statement?.attributes && bare.test(this.resolve(entry.module) ?? entry.module))
 					bareSvgImports.add(declaration);
