@@ -2016,6 +2016,29 @@ export function View() { return <b title={provide()}>Badge</b>; }`,
 		);
 	});
 
+	it('uses the importing tsconfig to identify a selected context alias', async () => {
+		const root = project({
+			'package.json': '{"name":"app"}',
+			'tsconfig.json': '{"compilerOptions":{"paths":{"@theme":["./other.ts"]}}}',
+			'other.ts': 'export const ThemeContext = {};',
+			'theme.ts':
+				"import { createContext } from 'react'; export const ThemeContext = createContext('light');",
+			'theme.js': "export const ThemeContext = { Provider() { return 'JS'; } };",
+			'nested/tsconfig.json':
+				'{"compilerOptions":{"paths":{"@theme":["../theme.ts"],"@js":["../theme.js"]}}}',
+			'nested/View.tsx': `import { ThemeContext } from '@theme';
+import { ThemeContext as JS } from '@js';
+export function View() { return <ThemeContext.Provider value="dark"><JS.Provider /></ThemeContext.Provider>; }`,
+		});
+		const result = await runCodemod(
+			['theme.ts', 'nested/View.tsx'].map((name) => path.join(root, name)),
+			{ root, write: false },
+		);
+		expect(result.files.find((file) => file.file === 'nested/View.tsx').code).toContain(
+			'<ThemeContext value="dark"><JS.Provider /></ThemeContext>',
+		);
+	});
+
 	it('rewrites `.Provider` only on values that are contexts', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',

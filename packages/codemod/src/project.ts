@@ -770,10 +770,7 @@ export async function runCodemod(
 			)
 				return null;
 			// Keep the package naming heuristic only for an alias of a known selected context.
-			return known.has(target.resolvedFileName) &&
-				contextsOf(target.resolvedFileName).has(name) &&
-				(renamed(file, specifier)?.file === target.resolvedFileName ||
-					localFile(file, specifier) === target.resolvedFileName)
+			return known.has(target.resolvedFileName) && contextsOf(target.resolvedFileName).has(name)
 				? null
 				: false;
 		};
