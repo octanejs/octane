@@ -55,6 +55,13 @@ export interface OctanePluginOptions {
 	renderers?: ExperimentalRendererConfigOptions;
 	/** @experimental Authenticate immutable CSS-module exports in production builds. */
 	cssModuleConstants?: OctaneVitePluginOptions['cssModuleConstants'];
+	/**
+	 * The app's data worker module, which calls `serveDataOwner` from
+	 * `octane/data`. Client builds emit it at `/_octane/data-worker.js`, and the
+	 * dev server serves it there, so every deploy's tabs share one owner through
+	 * `sharedOwner`. Resolved from the Vite project root.
+	 */
+	dataWorker?: OctaneVitePluginOptions['dataWorker'];
 }
 
 /** The Octane compiler plugin plus Vite app/metaframework integration. */
