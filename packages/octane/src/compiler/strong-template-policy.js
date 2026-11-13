@@ -136,11 +136,15 @@ export function createStrongTemplatePolicy({
 			value.type === 'JSXCodeBlock'
 		)
 			return true;
-		if (value.type === 'ConditionalExpression')
+		if (value.type === 'ConditionalExpression') {
+			const test = unwrap(value.test);
+			if (test?.type === 'Literal' && typeof test.value === 'boolean')
+				return expressionHasJSX(test.value ? value.consequent : value.alternate, aliasIsJSX);
 			return (
 				expressionHasJSX(value.consequent, aliasIsJSX) ||
 				expressionHasJSX(value.alternate, aliasIsJSX)
 			);
+		}
 		if (value.type === 'LogicalExpression')
 			return expressionHasJSX(value.left, aliasIsJSX) || expressionHasJSX(value.right, aliasIsJSX);
 		if (value.type === 'SequenceExpression')
