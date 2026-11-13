@@ -53,8 +53,10 @@ import {
 } from './form.js';
 import {
 	createPersistence,
+	persistedRead,
 	type Persistence,
 	type PersistOptions,
+	type Saving,
 	type Stored,
 } from './persist.js';
 import { setHostTimeout, clearHostTimeout, hostDateNow, hostNow } from '../host-task.js';
@@ -79,6 +81,15 @@ export interface ReadHandle<T> {
 	/** Observe the read. The first observer starts a load when the value is missing or stale. */
 	subscribe(notify: () => void): () => void;
 	refresh(): Promise<void>;
+}
+
+/**
+ * What a suspending reader of `handle` waits on: the load in flight, one
+ * promise for every caller as `use` requires, or the account's confirmation
+ * while the store is fenced.
+ */
+export function loading(store: DataStore, handle: ReadHandle<unknown>): Promise<void> {
+	return internals.get(store)!.loading(handle);
 }
 
 /** The write may have reached the server. Its edit stays visible until `settle`. */
@@ -108,6 +119,9 @@ export class DataRetiredError extends Error {
 
 export interface DataStore {
 	readonly retired: boolean;
+	/** A read with no input; a view with no parameters shows its default window. */
+	read<O>(read: Read<void, O>): ReadHandle<O>;
+	read<T>(view: View<void, T>): ReadHandle<T[]>;
 	read<I, O>(read: Read<I, O>, input: I): ReadHandle<O>;
 	prefetch<I, O>(read: Read<I, O>, input: I): Promise<void>;
 	write<I, O>(write: Write<I, O>, input: I): Promise<O>;
@@ -222,6 +236,8 @@ export interface StoreInternals {
 	onSettle(notify: (id: string, confirmed: boolean, value: unknown) => void): void;
 	/** Show every read as pending, or show them again. */
 	fence(on: boolean): void;
+	/** What a suspending reader of one of this store's handles waits on. */
+	loading(handle: ReadHandle<unknown>): Promise<void>;
 	/** Reload `reload`, then notify the readers of `changed` and of every read showing a record of `names`. */
 	finish(reload: Set<Entry>, changed: readonly Entry[], names: ReadonlySet<string>): void;
 }
@@ -439,6 +455,22 @@ export function rewrite(value: unknown, replace: Map<unknown, unknown>): unknown
 	return copy ?? value;
 }
 
+/** How a store saves: its own persistence, or one a replica forwards to its owner. */
+export type PersistenceFactory = (
+	collect: (key: string) => Saving | null | undefined,
+	inUse: (key: string) => boolean,
+) => Persistence;
+let injected: PersistenceFactory | null = null;
+/** Build a store, in `build`, whose `persist` goes through `factory`. */
+export function withPersistence<T>(factory: PersistenceFactory, build: () => T): T {
+	injected = factory;
+	try {
+		return build();
+	} finally {
+		injected = null;
+	}
+}
+
 /** @internal */
 export function selections(read: Read<any, any>, value: unknown) {
 	const selected = read.entities ? read.entities(value) : [];
@@ -511,7 +543,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			: null;
 	let retirement: Promise<void> | null = null;
 	const persisted = options.persist
-		? createPersistence(options.persist, saving, (key) => !!entries.get(key)?.subscribers.size)
+		? (injected ?? ((collect, inUse) => createPersistence(options.persist!, collect, inUse)))(
+				saving,
+				(key) => !!entries.get(key)?.subscribers.size,
+			)
 		: null;
 	const durable = new Set(options.persist?.journal?.writes);
 	if (options.persist?.journal) void recover(options.persist.journal);
@@ -532,7 +567,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			span: span && { start: span.start, first: span.first, last: span.last },
 			tags: [...entry.read.tags, ...entry.names],
 		};
-		return { stored, read: entry.read };
+		return { stored, read: persistedRead(entry.read) };
 	}
 
 	/** Save an entry once its confirmed value changes; a view's change is every view's of its entity. */
@@ -1078,7 +1113,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const attempt = entry.attempt;
 		const current = () => !retired && entry.attempt === attempt && !entry.hasBase;
 		const done = persisted!
-			.restore(entry.key, entry.read)
+			.restore(entry.key, persistedRead(entry.read))
 			.then(async (stored) => {
 				if (!stored || !current()) return;
 				const age = Math.max(0, hostDateNow() - stored.savedAt);
@@ -1262,6 +1297,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			projected: null,
 		};
 		entries.set(key, created);
+		handles.set(created.handle, created);
 		adoptSeed(created);
 		idle(created);
 		return created;
@@ -1626,20 +1662,24 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		);
 	}
 
+	/** Each handle's entry, so a reader holding only the handle can wait for its load. */
+	const handles = new WeakMap<ReadHandle<unknown>, Entry>();
+	function prefetch(read: Read<any, any>, input: unknown): Promise<void> {
+		if (retired) return NEVER;
+		// A suspended reader waits for the account to be confirmed, then shows what is held.
+		if (fenced) return fenced.lifted;
+		const entry = entryFor(read, input);
+		return entry.hasBase && !isStale(entry) ? Promise.resolve() : load(entry);
+	}
+
 	const store: DataStore = {
 		get retired() {
 			return retired;
 		},
-		read(read, input) {
+		read(read: Read<any, any>, input?: unknown) {
 			return retired ? RETIRED_HANDLE : entryFor(read, input).handle;
 		},
-		prefetch(read, input) {
-			if (retired) return NEVER;
-			// A suspended reader waits for the account to be confirmed, then shows what is held.
-			if (fenced) return fenced.lifted;
-			const entry = entryFor(read, input);
-			return entry.hasBase && !isStale(entry) ? Promise.resolve() : load(entry);
-		},
+		prefetch,
 		write(write, input) {
 			assertLive();
 			let parsed: unknown;
@@ -1854,6 +1894,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		settleOperation,
 		onSettle(notify) {
 			settled = notify;
+		},
+		loading(handle) {
+			const entry = handles.get(handle);
+			return entry ? prefetch(entry.read, entry.input) : NEVER;
 		},
 		fence(on) {
 			if (on === !!fenced) return;

@@ -200,14 +200,17 @@ connection code. Each PR reports bytes as usual.
    replaced account's tabs; a sign-out never undoes a newer sign-in.) The
    durable generation, freeze and resume, and the timeout path. Browser tests freeze a page, switch accounts in another, and
    resume.
-4. **Handshake, fallback and crashes.** (This PR: `createReplica(owner, {
+4. **Handshake, fallback and crashes.** (Done in #2583: `createReplica(owner, {
    ...localOptions, contracts })` falls back to a local store when the owner is
    `null`, refuses the build, cannot record the account, or is lost for good;
    heartbeats both ways; a lost owner is reopened and asked again, writes in
    flight become uncertain.) Contract identity, a mixed-build test
    (one compatible pair, one incompatible), worker termination and respawn,
    and journal recovery after a crash.
-5. **Single-writer cache.** The cache budget becomes per account, not per tab.
+5. **Single-writer cache.** (This PR, 5a: `serveDataOwner({ persist })`; a
+   replica forwards its persistence to the owner, and only the first tab
+   recovers the journal. 5b settles writes lost in a crash from the owner's
+   journal.) The cache budget becomes per account, not per tab.
    Receipt lookups are deduplicated across tabs. Then remove the per-tab
    persistence path from replicas.
 

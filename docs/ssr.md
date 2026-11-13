@@ -853,7 +853,7 @@ export default function open(seed: string | null, context: Context | null) {
 ```
 
 With `data: '/src/data.tsrx'` in `octane.config.ts`, every render route runs
-inside the store it opens, so pages call `useRead` and `useWrite` with no store
+inside the store it opens, so pages call `useDataStore`, `useRead` and `store.write` with no store
 code of their own:
 
 - The server opens one store per request, after its middleware has run, with
@@ -950,7 +950,7 @@ const store = createDataStore({
 });
 ```
 
-A component that calls `useFeed(bookChanges)` keeps the feed open while it is
+A component that calls `useFeed(listen(store, bookChanges))` keeps the feed open while it is
 mounted, and returns its status: `connecting`, `live`, or `offline` while it
 waits to try again. Every component listening with equal parameters shares one
 connection, which closes when the last one unmounts. Outside a component,

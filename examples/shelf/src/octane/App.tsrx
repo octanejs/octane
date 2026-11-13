@@ -1,6 +1,7 @@
+import { listen } from 'octane/data';
 import { useState, useSyncExternalStore } from 'octane';
 import type { OctaneNode } from 'octane';
-import { DataProvider, useFeed, useForm, useRead } from 'octane/data/octane';
+import { DataProvider, useDataStore, useFeed, useForm, useRead } from 'octane/data/octane';
 import type { Book } from '../shared/contracts.ts';
 import {
 	addBook,
@@ -31,7 +32,7 @@ function useExternal<T>(value: ExternalValue<T>): T {
 
 /** Listens to the shelf's changes, so another tab's edit shows here at once. */
 function Live() @{
-	const feed = useFeed(shelfChanges);
+	const feed = useFeed(listen(useDataStore(), shelfChanges));
 	<p class="live" data-feed={feed.status}>
 		{LIVE[feed.status]}
 	</p>
@@ -39,12 +40,12 @@ function Live() @{
 
 /** Suspends, so a server render waits for the counts and the page arrives with them. */
 function Stats() @{
-	const counts = useRead(stats);
+	const counts = useRead(useDataStore().read(stats));
 	<p class="stats" aria-live="polite">{`${counts.total} books · ${counts.read} read`}</p>
 }
 
 function BookList(props: { session: Session }) @{
-	const list = useRead(books);
+	const list = useRead(useDataStore().read(books));
 	const session = props.session;
 	@if (list.length === 0) {
 		<p class="empty">The shelf is empty.</p>
@@ -71,7 +72,7 @@ function BookList(props: { session: Session }) @{
 
 /** Marking a book read moves it here before the server replies. */
 function FinishedList() @{
-	const list = useRead(finished);
+	const list = useRead(useDataStore().read(finished));
 	<section class="finished" aria-label="Finished">
 		<h2>Finished</h2>
 		@if (list.length === 0) {

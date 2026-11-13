@@ -117,6 +117,13 @@
       "kind": "resilience",
       "spec": "e2e/shelf.spec.ts",
       "critical": true
+    },
+    {
+      "id": "shared-owner-cache",
+      "title": "Start a reloaded shared tab from the data worker's encrypted cache, without loading its lists",
+      "kind": "golden",
+      "spec": "e2e/shelf.spec.ts",
+      "critical": true
     }
   ],
   "faultScenarios": [

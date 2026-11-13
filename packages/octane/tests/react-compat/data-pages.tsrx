@@ -1,19 +1,20 @@
 import { ReactCompat } from 'octane/react';
 import type { DataStore } from 'octane/data';
-import { DataProvider, usePages } from 'octane/data/octane';
+import { pages } from 'octane/data';
+import { DataProvider, useDataStore, usePages } from 'octane/data/octane';
 import { todoPages } from '../_data-todos.js';
 import { ReactPages } from './data.react.js';
 
 function OctanePages() @{
-	const pages = usePages(todoPages);
+	const shown = usePages(pages(useDataStore(), todoPages));
 	<section data-octane-pages="">
 		<ul>
-			@for (const todo of pages.value ?? []; key todo.id) {
+			@for (const todo of shown.value ?? []; key todo.id) {
 				<li>{todo.title as string}</li>
 			}
 		</ul>
-		@if (pages.more) {
-			<button onClick={() => void pages.loadMore()}>{'More'}</button>
+		@if (shown.more) {
+			<button onClick={() => void shown.loadMore()}>{'More'}</button>
 		}
 	</section>
 }

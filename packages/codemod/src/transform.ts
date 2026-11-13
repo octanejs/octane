@@ -3872,10 +3872,15 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (
 			ts.isPropertyAccessExpression(node.expression) &&
 			node.expression.name.text === 'render' &&
-			node.arguments.length === 1 &&
-			this.isRoot(node.expression.expression)
+			node.arguments.length === 1
 		) {
-			return this.rewriteRootRender(node, node.arguments[0]);
+			const receiver = skipParens(node.expression.expression);
+			const root = ts.isIdentifier(receiver) ? this.constValue(receiver) : receiver;
+			if (root && ts.isCallExpression(root) && this.calleeName(root.expression) === 'createRoot') {
+				const rewritten = this.rewriteRootRender(node, node.arguments[0]);
+				if (rewritten !== null) this.checkLocalReactRoot(node, receiver, root);
+				return rewritten;
+			}
 		}
 		const callee = this.callee(node.expression);
 		// An Octane hook without a list already means "inferred".
@@ -4495,16 +4500,76 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			: `${this.require('octane', 'hydrateRoot', false)}(${containerText}, ${elementText})`;
 	}
 
-	/**
-	 * Whether `node` is a root `createRoot` made: the call itself, or a
-	 * `const` bound to it.
-	 */
-	isRoot(node: ts.Expression) {
-		node = skipParens(node);
-		const value = ts.isIdentifier(node) ? this.constValue(node) : node;
-		return (
-			!!value && ts.isCallExpression(value) && this.calleeName(value.expression) === 'createRoot'
-		);
+	/** Report renderer ownership only for the ordinary direct root rewrite. */
+	private checkLocalReactRoot(
+		call: ts.CallExpression,
+		receiver: ts.Expression,
+		root: ts.CallExpression,
+	) {
+		const local = this.options.localReactRootComponent;
+		const element = skipParens(call.arguments[0]);
+		if (!local || !ts.isJsxSelfClosingElement(element) || !ts.isIdentifier(element.tagName)) return;
+		const tag = element.tagName;
+		const leaf = this.importOf(tag);
+		const factoryName = ts.isPropertyAccessExpression(root.expression)
+			? root.expression.expression
+			: root.expression;
+		const rootImport = this.importOf(factoryName);
+		const factoryBinding = ts.isIdentifier(factoryName) && this.declarationOf(factoryName);
+		if (
+			!leaf ||
+			leaf.typeOnly ||
+			ts.findAncestor(this.declarationOf(tag)!, ts.isImportDeclaration)?.attributes ||
+			rootImport?.module !== 'react-dom/client' ||
+			rootImport.typeOnly ||
+			!factoryBinding ||
+			!(ts.isImportSpecifier(factoryBinding) || ts.isNamespaceImport(factoryBinding)) ||
+			ts.findAncestor(factoryBinding, ts.isImportDeclaration)?.attributes ||
+			ts.isOptionalChain(call) ||
+			ts.isOptionalChain(root) ||
+			!this.options.automaticReactJsx ||
+			((this.source.includes('eval') || this.source.includes('\\u')) && hasEval(this.sf))
+		)
+			return;
+		if (ts.isIdentifier(receiver)) {
+			const declaration = root.parent;
+			if (
+				!ts.isVariableDeclaration(declaration) ||
+				!ts.isIdentifier(declaration.name) ||
+				ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Export ||
+				(ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const
+			)
+				return;
+			const statement = declaration.parent.parent;
+			if (!ts.isVariableStatement(statement)) return;
+			const topLevel =
+				ts.isExpressionStatement(call.parent) &&
+				call.parent.parent === this.sf &&
+				statement.parent === this.sf &&
+				statement.end <= call.getStart(this.sf);
+			if (
+				(!topLevel && !initializedBefore(this.checker, receiver, call)) ||
+				renderUses(this.localUses(declaration.name)).some((ref) => {
+					const access = ref.parent;
+					return (
+						!ts.isPropertyAccessExpression(access) ||
+						access.expression !== ref ||
+						(access.name.text !== 'render' && access.name.text !== 'unmount') ||
+						!ts.isCallExpression(access.parent) ||
+						access.parent.expression !== access
+					);
+				})
+			)
+				return;
+		}
+		const hook = local(leaf.module, leaf.imported);
+		if (hook)
+			this.note(
+				RULE.rootRender,
+				'error',
+				tag,
+				`The migrated root renders ${tag.text}, but the unchanged ${leaf.module} export calls React's ${hook}. Migrate the component or keep this root under React DOM.`,
+			);
 	}
 
 	/**

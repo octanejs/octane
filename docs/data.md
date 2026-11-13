@@ -14,7 +14,7 @@ each invariant listed here.
 | --- | --- | --- |
 | `octane/data` | `read`, `write`, `view`, `entity`, `feed`, `DataError`; `createDataStore`, `DataUncertainError`, `DataRetiredError`; `httpTransport`, `serverTransport`, `serverListener`, `webSocketListener`, `pubSubListener`; `listen`, `receive`, `pages`; `indexedDBStorage`, `memoryStorage`, `autoBudget`; `createDataOwner`, `createReplica`, `sharedOwner`, `serveDataOwner` | Browser, server, workers. Imports no renderer and no compiler. |
 | `octane/data/server` | `createDataHandler` | Server only. |
-| `octane/data/octane` | `DataProvider`, `useDataStore`, `useRead`, `useReadState`, `usePages`, `useWrite`, `useForm`, `useFeed` | Octane components. The server compiler retargets it to `octane/data/octane/server`. |
+| `octane/data/octane` | `DataProvider`, `useDataStore`, `useRead`, `usePages`, `useForm`, `useFeed` | Octane components. The server compiler retargets it to `octane/data/octane/server`. |
 | `octane/data/react` | The same names, over React's hooks | React 19 components. Marked `'use client'`. |
 
 Both bindings read snapshots through `useSyncExternalStore`, so a store given to
@@ -234,8 +234,16 @@ store once hydrated. Only the newest submission's outcome is shown.
   suspended reader shows the confirmed value rather than none.
 - The owner protocol version (3) is part of the worker's name, so tabs on
   another protocol never share an owner.
-- The owner does not persist yet; a replica given `persist` keeps its own
-  cache and journal, as a local store does.
+- `createDataOwner({ persist: (account) => PersistOptions })`, which
+  `serveDataOwner` passes through, makes the owner the only writer of the
+  account's encrypted cache and write journal. A replica with `persist`
+  forwards every persistence call to it (restore, save, journal, stale marks,
+  feed cursors, clear), so tabs share one cache and one budget; only the first
+  tab to recover the journal after a restart gets its entries. Signing out, or
+  another account signing in, clears the cache. A replica uses its own
+  `persist` only once it is a local store.
+- A write in flight to an owner that crashes is uncertain until the app
+  settles it from its receipt.
 
 ## Errors
 

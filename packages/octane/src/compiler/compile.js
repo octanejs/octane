@@ -19718,6 +19718,11 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// (hoisted @for bodies, `__tsrx$N` sub-templates) carry no loc of their
 	// own — their scaffolding inherits the nearest located enclosing origin.
 	const shellOrigin = node.loc ? node : node.id?.loc ? node.id : prevFnOrigin;
+	const pendingOutputGuard =
+		ctx.mode !== 'server' &&
+		ctx._universalRuntimeUnit == null &&
+		!returnedOutput &&
+		setupCanScheduleSelfUpdate(statements, ctx);
 	let plan = null;
 	let returnedExpression = null;
 	if (returnedOutput && jsxNodes.length === 0) {
@@ -19751,6 +19756,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			options?.inlineBindingGuards === true,
 			options?.mappedItem === true,
 			options?.inheritedEnvNames ?? null,
+			pendingOutputGuard,
 		);
 	}
 	ctx.currentInvariantLocals = prevInvariantLocals;
@@ -19848,14 +19854,11 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// A self-update scheduled by setup discards this output. The owning Block
 	// replays setup before returning to its parent, so children initialize from
 	// the settled state and no template/resource work escapes the first pass.
+	// For a plain component root, its authored props still evaluate before
+	// the discarded return, without starting the child.
 	// Setup that only reads built-in hooks and pure globals cannot schedule an
 	// update; keep those bodies unchanged (see setupCanScheduleSelfUpdate).
-	if (
-		ctx.mode !== 'server' &&
-		ctx._universalRuntimeUnit == null &&
-		!returnedOutput &&
-		setupCanScheduleSelfUpdate(statements, ctx)
-	) {
+	if (pendingOutputGuard) {
 		bodyStatements.push(
 			inheritOriginLoc(
 				b.if(
@@ -19864,7 +19867,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 						b.member(b.member(b.id('__s'), 'block'), 'pending'),
 						b.unary('!', b.member(b.member(b.id('__s'), 'block'), 'crossRenderUpdate')),
 					),
-					{ ...b.return(null), _octanePendingOutputGuard: true },
+					{ ...b.return(plan?.discardedProps ?? null), _octanePendingOutputGuard: true },
 					null,
 				),
 				node,
@@ -29465,6 +29468,7 @@ function planJsx(
 	inlineBindingGuards = false,
 	mappedItem = false,
 	inheritedEnvNames = null,
+	pendingOutputGuard = false,
 ) {
 	// DEV ONLY: per-element source-location map for THIS body (path-key → [line, col]),
 	// populated at the top of emitElementHtml and read in the binding mount loop to emit
@@ -30577,6 +30581,7 @@ function planJsx(
 	// hydration. Sorting by source id restores DOM order. Positional children carry
 	// their own `<!>` anchor, so their relative call order is irrelevant — sorting is
 	// a harmless no-op for them.
+	let discardedProps;
 	const afterCalls = [];
 	const pushAfter = (id, line) => afterCalls.push({ id, line });
 	// Dense per-body slot indices. Slot 0 is this body's binding bag (`__s.slots[0]`);
@@ -31505,6 +31510,14 @@ function planJsx(
 			const helper = componentSlotHelper(cc);
 			const componentHelper = rtAlias(helper);
 			ctx.runtimeNeeded.add(helper);
+			if (
+				pendingOutputGuard &&
+				headNodes.length === 0 &&
+				!ctx.nativeReads &&
+				!ctx.presentationHydration
+			) {
+				discardedProps = discardedComponentProps(cc, ctx);
+			}
 			pushAfterStmt(cc.id, org, {
 				...b.stmt(
 					b.call(
@@ -31748,6 +31761,7 @@ function planJsx(
 		// bodies don't → no `let _b … if (undefined) … else {}` wrapper in the
 		// assembled body (the slot calls use __block.parentNode directly).
 		hasBag: !noTemplate,
+		discardedProps,
 		renderLocals,
 		mount: mountLines,
 		update: updateLines,
@@ -31941,6 +31955,58 @@ function componentSlotHelper(call) {
 		: call.functionComponent
 			? 'componentSlotFunction'
 			: 'componentSlot';
+}
+
+// A plain same-module component call has no output work before its props.
+// Read the tag first, then evaluate the authored values without building the
+// discarded props record or entering the child slot.
+function discardedComponentProps(call, ctx) {
+	const tag = call.origin.openingElement?.name ?? call.origin.id;
+	if (
+		call.inlineComponent ||
+		call.bindingSite ||
+		call.hydrationInput ||
+		call.keyExpr != null ||
+		!ctx.moduleFunctionDeclarations.has(tag?.name) ||
+		!isFunctionComponentTag(tag, ctx) ||
+		call.propsExpr.type !== 'ObjectExpression'
+	)
+		return;
+	const values = [];
+	let hasCall = false;
+	const runtimeOperand = (value) => {
+		let inner = unwrapTsExpr(value);
+		while (inner?.type === 'TSInstantiationExpression') inner = unwrapTsExpr(inner.expression);
+		return inner;
+	};
+	const plainValue = (value) => value?.type === 'Identifier' || isInvariantLiteral(value);
+	for (const prop of call.propsExpr.properties) {
+		if (
+			prop.type !== 'Property' ||
+			prop.kind !== 'init' ||
+			prop.computed ||
+			prop.key.type !== 'Literal' ||
+			prop.key.value === 'children' ||
+			prop.key.value === 'ref' ||
+			prop.key.value === '__proto__'
+		)
+			return;
+		const value = runtimeOperand(prop.value);
+		if (!plainValue(value)) {
+			const callee = runtimeOperand(value.callee);
+			if (
+				value.type !== 'CallExpression' ||
+				value.optional ||
+				callee?.type !== 'Identifier' ||
+				callee.name === 'eval' ||
+				!value.arguments.every((argument) => plainValue(runtimeOperand(argument)))
+			)
+				return;
+			hasCall = true;
+		}
+		values.push(prop.value);
+	}
+	if (hasCall) return b.unary('void', b.sequence([call.compNode, ...values]));
 }
 
 // Preserve each selected writer and its first seven arguments. Longer tails

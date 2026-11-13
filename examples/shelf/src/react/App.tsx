@@ -1,6 +1,7 @@
 /** @jsxImportSource react */
+import { listen } from 'octane/data';
 import { Suspense, useState, useSyncExternalStore, Component, type ReactNode } from 'react';
-import { DataProvider, useFeed, useForm, useRead } from 'octane/data/react';
+import { DataProvider, useDataStore, useFeed, useForm, useRead } from 'octane/data/react';
 import {
 	addBook,
 	books,
@@ -31,7 +32,7 @@ const LIVE = { connecting: 'Connecting…', live: 'Live', offline: 'Reconnecting
 
 /** Listens to the shelf's changes, so another tab's edit shows here at once. */
 function Live() {
-	const feed = useFeed(shelfChanges);
+	const feed = useFeed(listen(useDataStore(), shelfChanges));
 	return (
 		<p className="live" data-feed={feed.status}>
 			{LIVE[feed.status]}
@@ -41,7 +42,7 @@ function Live() {
 
 /** Suspends, so a server render waits for the counts and the page arrives with them. */
 function Stats() {
-	const counts = useRead(stats);
+	const counts = useRead(useDataStore().read(stats));
 	return (
 		<p className="stats" aria-live="polite">
 			{`${counts.total} books · ${counts.read} read`}
@@ -50,7 +51,7 @@ function Stats() {
 }
 
 function BookList({ session }: { session: Session }) {
-	const list = useRead(books);
+	const list = useRead(useDataStore().read(books));
 	if (list.length === 0) return <p className="empty">The shelf is empty.</p>;
 	return (
 		<ul className="books" aria-label="Books">
@@ -75,7 +76,7 @@ function BookList({ session }: { session: Session }) {
 
 /** Marking a book read moves it here before the server replies. */
 function FinishedList() {
-	const list = useRead(finished);
+	const list = useRead(useDataStore().read(finished));
 	return (
 		<section className="finished" aria-label="Finished">
 			<h2>Finished</h2>
