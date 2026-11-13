@@ -119,6 +119,38 @@ export function Pane() {
 	expect(result.files.some((entry) => entry.output.endsWith('.svg.octane.ts'))).toBe(false);
 });
 
+it('uses the final reachable own field of a confined SVG record', async () => {
+	const { root } = fixture();
+	const cases = {
+		last: ['const { v: Icon } = { v: Plain, v: Mark };', true],
+		replaced: ['const { v: Icon } = { v: Mark, v: Plain };', false],
+		dead: ['const { v: Icon } = { v: (() => null) ?? Mark };', false],
+		deadBranch: ['const { v: Icon } = { v: true ? Plain : Mark };', false],
+		liveBranch: ['const { v: Icon } = { v: false ? Plain : Mark };', true],
+		empty: ['const { v: Icon } = {};', false],
+		spread: ['const { v: Icon } = { v: Mark, ...other };', false],
+		accessor: ['const { v: Icon } = { v: Mark, get v() { return Plain } };', false],
+		computed: ["const { v: Icon } = { v: Mark, ['v']: Plain };", false],
+		mutable: ['const pair = { v: Plain }; const { v: Icon } = pair; pair.v = Mark;', false],
+	};
+	const targets = Object.keys(cases).map((name) => path.join(root, 'src', name + '.tsx'));
+	for (const [i, [body]] of Object.values(cases).entries()) {
+		fs.writeFileSync(
+			targets[i],
+			`import Mark from './icons/mark.svg'; const Plain = () => <b/>; declare const other: object;
+export function Pane() { ${body} return <Icon/>; }`,
+		);
+	}
+	const result = await runCodemod(targets, { root, strong: true, svgPaths: true, write: false });
+	for (const [name, [, warns]] of Object.entries(cases)) {
+		const pane = result.files.find((entry) => entry.file === 'src/' + name + '.tsx');
+		expect(
+			pane.notes.some((note) => note.rule === 'svg-issuer'),
+			name,
+		).toBe(warns);
+	}
+});
+
 it('previews and writes explicitly selected SVG assets without migrating their consumers', async () => {
 	const { root, file, icon } = fixture();
 	const twin = path.join(root, 'src/icons/twin.svg');
