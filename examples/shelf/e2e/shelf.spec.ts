@@ -416,7 +416,7 @@ async function dataWorker(keeper: Page, namespace: string) {
 			type: 'module',
 			name,
 		});
-	}, `octane-data:1:${namespace}:ada`);
+	}, `octane-data:2:${namespace}:ada`);
 	const cdp = await keeper.context().browser()!.newBrowserCDPSession();
 	let targetId = '';
 	await expect
@@ -496,4 +496,37 @@ test('tabs that share the data worker load each read once, and show the same pen
 	expect(worker.writes()).toHaveLength(1);
 	await other.close();
 	await keeper.close();
+});
+
+test('signs every shared tab of an account out when another account signs in, even one that was frozen', async ({
+	page,
+}) => {
+	const url = `/?ns=${Date.now()}-${++namespace}&owner=shared`;
+	const other = await page.context().newPage();
+	for (const tab of [page, other]) {
+		await tab.goto(url);
+		await expect(tab.getByText('3 books · 0 read')).toBeVisible();
+	}
+	const lifecycle = await page.context().newCDPSession(other);
+	await lifecycle.send('Page.setWebLifecycleState', { state: 'frozen' });
+
+	await page
+		.getByRole('navigation', { name: 'Account' })
+		.getByRole('button', { name: 'grace' })
+		.click();
+	await expect(page.getByText('2 books · 0 read')).toBeVisible();
+	await expect(book(page, 'The Dispossessed')).toBeVisible();
+
+	// The frozen tab resumes on the old account, and shows nothing of it.
+	await lifecycle.send('Page.setWebLifecycleState', { state: 'active' });
+	await expect(other.getByText('Loading the shelf…')).toBeVisible();
+	await expect(book(other, 'Kindred')).toHaveCount(0);
+
+	// Signing the first account in again works in a tab, and the second account's tabs are signed out.
+	await page
+		.getByRole('navigation', { name: 'Account' })
+		.getByRole('button', { name: 'ada' })
+		.click();
+	await expect(page.getByText('3 books · 0 read')).toBeVisible();
+	await other.close();
 });

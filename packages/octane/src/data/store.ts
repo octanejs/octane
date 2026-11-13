@@ -220,6 +220,8 @@ export interface StoreInternals {
 	settleOperation(operation: Operation, confirmed: boolean, value: unknown): void;
 	/** Called after `settle` settles a write here, so other tabs can settle it too. */
 	onSettle(notify: (id: string, confirmed: boolean, value: unknown) => void): void;
+	/** Show every read as pending, or show them again. */
+	fence(on: boolean): void;
 	/** Reload `reload`, then notify the readers of `changed` and of every read showing a record of `names`. */
 	finish(reload: Set<Entry>, changed: readonly Entry[], names: ReadonlySet<string>): void;
 }
@@ -474,6 +476,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	let operations: Operation[] = [];
 	let sequence = 0;
 	let retired = false;
+	/** Reads show nothing until the account is confirmed, as a retired store's do. */
+	let fenced = false;
 	const retiring = new AbortController();
 	/** A replica's way to tell other tabs a write was settled here. */
 	let settled: ((id: string, confirmed: boolean, value: unknown) => void) | null = null;
@@ -1210,7 +1214,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			subscribers: new Set(),
 			handle: {
 				getSnapshot() {
-					if (retired) return PENDING;
+					if (retired || fenced) return PENDING;
 					const current = entries.get(key) ?? created;
 					return (current.snapshot ??= buildSnapshot(current));
 				},
@@ -1848,6 +1852,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		settleOperation,
 		onSettle(notify) {
 			settled = notify;
+		},
+		fence(on) {
+			fenced = on;
+			for (const entry of entries.values()) for (const notify of [...entry.subscribers]) notify();
 		},
 		finish(reload, changed, names) {
 			reloadAll(reload);
