@@ -9,7 +9,7 @@ export {
 	webSocketListener,
 } from './transport.js';
 export { listen, receive } from './feeds.js';
-export { createDataOwner, createReplica } from './owner.js';
+export { createDataOwner, createReplica, serveDataOwner, sharedOwner } from './owner.js';
 export type { DataOwner, OwnerPort } from './owner.js';
 export { pages } from './pages.js';
 export { autoBudget, indexedDBStorage, memoryStorage } from './persist.js';

@@ -18,6 +18,7 @@ import * as nodeFs from 'node:fs';
 import * as nodePath from 'node:path';
 import * as nodeUrl from 'node:url';
 import { parseModule } from '@tsrx/core';
+import { DATA_WORKER_PATH } from '../data/worker-path.js';
 import {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
 	INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
@@ -831,6 +832,8 @@ export function octane(options = {}) {
 	}
 	let hmrEnabled = options.hmr;
 	let resolvedConfig;
+	/** The chunks the data worker loads, whose dynamic imports must not preload through `document`. */
+	const dataWorkerChunks = new Set();
 	let tsconfigPaths = false;
 	// Whether each installed source package, by root, depends on CommonJS.
 	const commonJsSourceRoots = new Map();
@@ -1176,7 +1179,31 @@ export function octane(options = {}) {
 					extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.tsrx'],
 				},
 				ssr: { noExternal: sourceDependencies },
+				// Vite's preload helper inserts <link> elements, and a worker has no document.
+				...(options.dataWorker && config.build?.modulePreload !== false
+					? {
+							build: {
+								modulePreload: {
+									resolveDependencies: (file, deps, context) =>
+										dataWorkerChunks.has(context.hostId)
+											? []
+											: (config.build?.modulePreload?.resolveDependencies?.(file, deps, context) ??
+												deps),
+								},
+							},
+						}
+					: null),
 			};
+		},
+		configureServer(server) {
+			if (!options.dataWorker) return;
+			const file = nodePath.resolve(projectRoot, options.dataWorker).replaceAll('\\', '/');
+			const source = `import ${JSON.stringify(`/@fs/${file.replace(/^\/+/, '')}`)};\n`;
+			server.middlewares.use((request, response, next) => {
+				if (request.url?.split('?')[0] !== DATA_WORKER_PATH) return next();
+				response.setHeader('content-type', 'text/javascript');
+				response.end(source);
+			});
 		},
 		configResolved(config) {
 			resolvedConfig = config;
@@ -1223,6 +1250,18 @@ export function octane(options = {}) {
 			}
 		},
 		buildStart() {
+			// The data worker keeps one path across deploys, so every tab shares one SharedWorker.
+			if (
+				options.dataWorker &&
+				resolvedConfig?.command === 'build' &&
+				emitClientReferenceManifest
+			) {
+				this.emitFile({
+					type: 'chunk',
+					id: nodePath.resolve(projectRoot, options.dataWorker),
+					fileName: DATA_WORKER_PATH.slice(1),
+				});
+			}
 			if (this.environment === undefined) {
 				cssModuleProofStates.clear();
 				proofWaitGraphs.clear();
@@ -1265,6 +1304,16 @@ export function octane(options = {}) {
 		},
 		generateBundle(_outputOptions, bundle) {
 			if (!emitClientReferenceManifest) return;
+			if (options.dataWorker) {
+				dataWorkerChunks.clear();
+				const add = (fileName) => {
+					const chunk = bundle[fileName];
+					if (chunk?.type !== 'chunk' || dataWorkerChunks.has(fileName)) return;
+					dataWorkerChunks.add(fileName);
+					chunk.imports.forEach(add);
+				};
+				add(DATA_WORKER_PATH.slice(1));
+			}
 			const clientReferences = clientReferenceManifest(this, bundle);
 			if (Object.keys(clientReferences.references).length > 0) {
 				this.emitFile({

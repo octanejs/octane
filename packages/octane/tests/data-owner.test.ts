@@ -9,6 +9,8 @@ import {
 	createReplica,
 	DataUncertainError,
 	listen,
+	serveDataOwner,
+	sharedOwner,
 	type DataStore,
 	type FeedFrame,
 	type Listener,
@@ -234,5 +236,56 @@ describe('octane/data owner and replicas', () => {
 		expect(connections[0]!.signal.aborted).toBe(false);
 		stopSecond();
 		await vi.waitFor(() => expect(connections[0]!.signal.aborted).toBe(true));
+	});
+});
+
+describe('octane/data in a SharedWorker', () => {
+	it('serves an owner to each tab that connects to the worker', async () => {
+		const server = createServer();
+		serveDataOwner({ transport: server.transport });
+		const channel = new MessageChannel();
+		globalThis.dispatchEvent(new MessageEvent('connect', { ports: [channel.port1] }));
+		const store = createReplica(channel.port2, { writes });
+		closers.push(() => {
+			void store.retire();
+			channel.port1.close();
+			channel.port2.close();
+		});
+		const list = await observed(store.read(todos, undefined));
+		expect(list()[0]!.title).toBe('Tides');
+		expect(server.log).toEqual(['list']);
+	});
+
+	it('connects a tab to the worker named for its protocol and partition, or reports that it cannot', () => {
+		expect(sharedOwner('ada')).toBeNull();
+		const constructed: unknown[] = [];
+		const port = new MessageChannel().port1;
+		vi.stubGlobal(
+			'SharedWorker',
+			class {
+				port = port;
+				constructor(...args: unknown[]) {
+					constructed.push(args);
+				}
+			},
+		);
+		try {
+			expect(sharedOwner('ada')).toBe(port);
+			expect(constructed).toEqual([
+				['/_octane/data-worker.js', { type: 'module', name: 'octane-data:1:ada' }],
+			]);
+			vi.stubGlobal(
+				'SharedWorker',
+				class {
+					constructor() {
+						throw new DOMException('blocked', 'SecurityError');
+					}
+				},
+			);
+			expect(sharedOwner('ada')).toBeNull();
+		} finally {
+			vi.unstubAllGlobals();
+			port.close();
+		}
 	});
 });

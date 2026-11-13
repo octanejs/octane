@@ -96,6 +96,13 @@
       "kind": "resilience",
       "spec": "e2e/shelf.spec.ts",
       "critical": true
+    },
+    {
+      "id": "shared-owner-across-tabs",
+      "title": "Share one data worker between two tabs: send each read once, and show one tab's uncertain edit and its rollback in both",
+      "kind": "golden",
+      "spec": "e2e/shelf.spec.ts",
+      "critical": true
     }
   ],
   "faultScenarios": [

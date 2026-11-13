@@ -57,6 +57,7 @@ const PLUGIN_OPTION_KEYS = new Set([
 	'transpile',
 	'cssModuleConstants',
 	'clientBuildMode',
+	'dataWorker',
 ]);
 const LAYER_SPECIALIZATION_KEYS = new Set(['runtime', 'renderers', 'universalRuntime']);
 
@@ -201,6 +202,7 @@ function normalizeOptions(value, plugin) {
 		throw new TypeError('@octanejs/rspack-plugin: `root` must be a path string.');
 	}
 	if (plugin) normalizeRuntimeRequest(options.runtime);
+	if (plugin) normalizeRuntimeRequest(options.dataWorker, 'dataWorker');
 	if (
 		plugin &&
 		options.clientBuildMode !== undefined &&
@@ -290,6 +292,7 @@ function normalizeOptions(value, plugin) {
 			: null),
 		...(plugin && options.transpile !== undefined ? { transpile: options.transpile } : null),
 		...(plugin && options.runtime !== undefined ? { runtime: options.runtime } : null),
+		...(plugin && options.dataWorker !== undefined ? { dataWorker: options.dataWorker } : null),
 		...(plugin && options.cssModuleConstants !== undefined
 			? { cssModuleConstants: options.cssModuleConstants }
 			: null),
