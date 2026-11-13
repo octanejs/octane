@@ -3733,6 +3733,27 @@ export function Greeting({ count }: { count: number }) {
 				expect(selected.code).toContain('octane-react-intl.tsrx');
 		},
 	);
+	it.each(['react-jsx', 'preserve'])(
+		'reports ownership for a declarative formatter moved into the native adapter (jsx=%s)',
+		async (jsx) => {
+			const input = `import { FormattedMessage as Message } from 'react-intl';
+				export function Text() { return <main><Message id="label" defaultMessage="Ready" /></main>; }`;
+			const root = setup({
+				'tsconfig.json': JSON.stringify({ compilerOptions: { jsx, moduleResolution: 'bundler' } }),
+				'src/Text.tsx': input,
+			});
+			const { files } = await runCodemod([path.join(root, 'src/Text.tsx')], {
+				root,
+				strong: true,
+				verify: true,
+				write: false,
+			});
+			const text = files.find((file) => file.file === 'src/Text.tsx');
+			expect(text.strong).toBe(true);
+			expect(text.code).toContain("from './octane-react-intl.tsrx'");
+			expect(text.notes.filter((note) => note.severity === 'error')).toEqual([opaqueFormatter]);
+		},
+	);
 	it.each([false, true])(
 		'reports opaque formatter ownership in native calls and generated rich islands (projectTypes=%s)',
 		async (projectTypes) => {
@@ -4205,6 +4226,7 @@ export function Locale() { return <IntlProvider locale="en"><b>test</b></IntlPro
 		const result = preview.files.find((f) => f.file === 'src/Greeting.tsx');
 		expect(result.strong).toBe(true);
 		expect([...result.notes, ...result.diagnostics].filter((d) => d.severity === 'error')).toEqual([
+			opaqueFormatter,
 			opaqueFormatter,
 		]);
 		expect(result.code).toContain(
