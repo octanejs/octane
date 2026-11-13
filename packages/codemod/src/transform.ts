@@ -1,6 +1,7 @@
 import { svgDataAttribute, svgLiteralRootOverride } from './path-svg.js';
 import {
 	forwardedProps,
+	hasEval,
 	literalJsxAttribute,
 	nativeOutputOwner,
 	returnedTextReceiver,
@@ -24,6 +25,7 @@ import {
 	effectReceivers,
 	fixedBinding,
 	initializedBefore,
+	stableExportedProp,
 } from './effect-receivers.js';
 import { isBareSvgTag, storeHookUses } from './store-hook-uses.js';
 import { intlImports } from './react-intl.js';
@@ -143,9 +145,29 @@ export function transformModule(
 
 export function projectTypeAt(node: ts.Node, types: TransformOptions['types']) {
 	if (types?.sourceFile.text !== node.getSourceFile().text) return null;
-	const same = nodeSpanning(types.sourceFile, node.getStart(), node.end);
-	if (same?.kind !== node.kind) return null;
-	return { type: types.checker.getTypeAtLocation(same), checker: types.checker };
+	const peer = nodeSpanning(types.sourceFile, node.getStart(), node.end);
+	// A shorthand and its identifier occupy the same span. Use the declared
+	// prop contract when the binding stays stable and local code cannot supply it.
+	if (
+		peer &&
+		ts.isShorthandPropertyAssignment(peer) &&
+		ts.isIdentifier(node) &&
+		ts.isShorthandPropertyAssignment(node.parent) &&
+		node.parent.name === node
+	) {
+		const { sourceFile, checker } = types;
+		const symbol = checker.getShorthandAssignmentValueSymbol(peer);
+		const type = checker.getTypeAtLocation(peer.name);
+		if (
+			!scalar(type) ||
+			!stableExportedProp(symbol, checker) ||
+			((sourceFile.text.includes('eval') || sourceFile.text.includes('\\u')) && hasEval(sourceFile))
+		)
+			return null;
+		return { type, checker };
+	}
+	if (peer?.kind !== node.kind) return null;
+	return { type: types.checker.getTypeAtLocation(peer), checker: types.checker };
 }
 
 /**

@@ -40,6 +40,137 @@ afterEach(() => {
 	if (root) fs.rmSync(root, { recursive: true, force: true });
 });
 
+it('uses shorthand project types for stable exported scalar props with external callers', async () => {
+	const { src } = project();
+	fs.writeFileSync(
+		path.join(root, 'package.json'),
+		JSON.stringify({
+			type: 'module',
+			name: 'shorthand-props-fixture',
+			exports: { './self': { types: './src/self-shim.d.ts', default: './src/self-shim.js' } },
+		}),
+	);
+	fs.writeFileSync(
+		path.join(root, 'tsconfig.json'),
+		JSON.stringify({
+			compilerOptions: {
+				strict: true,
+				module: 'ESNext',
+				moduleResolution: 'bundler',
+				target: 'ESNext',
+				jsx: 'react-jsx',
+			},
+		}),
+	);
+	fs.writeFileSync(
+		path.join(src, 'labels.ts'),
+		'export type Label = string & { readonly brand: unique symbol };',
+	);
+	fs.writeFileSync(
+		path.join(src, 'producer.tsx'),
+		"import type {Label} from './labels'; export const label = <b>rich</b> as unknown as Label;",
+	);
+	fs.writeFileSync(
+		path.join(src, 'erased-export.ts'),
+		"export type {Missing} from 'runtime-only-self'; export const heading = 'Ready';",
+	);
+	const view =
+		'<section><FormattedMessage id="hello" defaultMessage="Hello {label}" values={{label}} /></section>';
+	const throughShim = (specifier, binding = '{Again}') =>
+		`import ${binding} from '${specifier}'; export function Pane({label}: {label: Label}) { return ${view}; } export function Other(){return <Again label={rendererLabel}/>;}`;
+	const cases = {
+		relativeDeclaration: throughShim('./relative-shim.js'),
+		packageDeclaration: throughShim('shorthand-props-fixture/self'),
+		declarationTypeOnly: `import {type Again} from './type-shim.js'; export type Same = typeof Again; export function Pane({label}: {label: Label}) { return ${view}; }`,
+		symlinkBarrel: throughShim('../linked/linked-shim'),
+		unresolvedNamed: throughShim('runtime-only-self'),
+		unresolvedDefault: throughShim('runtime-only-self', 'Again'),
+		unresolvedTypeOnly: `import type Default from 'runtime-only-self'; import {type Again} from 'runtime-only-self'; export type Same = [typeof Default, typeof Again]; export function Pane({label}: {label: Label}) { return ${view}; }`,
+		unresolvedTypeExport: `import * as content from './erased-export'; export function Pane({label}: {label: Label}) { return <>{content.heading}{${view}}</>; }`,
+		safe: `export function Pane({label}: {label: Label}) { return ${view}; }
+			export type Props = Parameters<typeof Pane>; export {Pane as Renamed};`,
+		siblingRenderable: `import type {ReactNode} from 'react'; export function Pane({label, sibling}: {label: Label, sibling?: ReactNode}) { return <>{sibling}{${view}}</>; }`,
+		sibling: `export function Pane({label, sibling = rendererLabel}: {label: Label, sibling?: Label}) { return ${view}; }`,
+		siblingWrite: `export function Pane({sibling = (arguments[0].label = rendererLabel), label}: {label: Label, sibling?: Label}) { return ${view}; }`,
+		varRedeclaration: `export function Pane({label}: {label: Label}) { var label = rendererLabel; return ${view}; }`,
+		forInWrite: `export function Pane({label}: {label: Label}) { for (label in {saved: true}) break; return ${view}; }`,
+		localBarrel: `import {Renamed as Again} from './caller-barrel'; export function Pane({label}: {label: Label}) { return ${view}; } export function Other(){return <Again label={rendererLabel}/>;}`,
+		namespaceBarrel: `import * as Self from './namespace-barrel'; export function Pane({label}: {label: Label}) { return ${view}; } export function Other(){return <Self.Renamed label={rendererLabel}/>;}`,
+		nestedNamespace: `import * as Self from './outer-barrel'; export function Pane({label}: {label: Label}) { return ${view}; } export function Other(){return <Self.Inner.Renamed label={rendererLabel}/>;}`,
+		dynamicSelf: `export function Pane({label}: {label: Label}) { return ${view}; } export async function Other(){const {Pane: Again} = await import('./dynamicSelf'); return <Again label={rendererLabel}/>;}`,
+		dynamicBarrel: `export function Pane({label}: {label: Label}) { return ${view}; } export async function Other(){const {Renamed: Again} = await import('./dynamic-barrel'); return <Again label={rendererLabel}/>;}`,
+		typeAlias: `import type {Renamed as Again} from './type-barrel'; export type Same = typeof Again; export function Pane({label}: {label: Label}) { return ${view}; }`,
+		dynamicExternal: `export function load(){return import('./labels');} export function Pane({label}: {label: Label}) { return ${view}; }`,
+		imported: `const label = rendererLabel; export function Pane() { return ${view}; }`,
+		evalWrite: `export function Pane({label}: {label: Label}) { eval("label = rendererLabel"); return ${view}; }`,
+		reassigned: `export function Pane({label}: {label: Label}) { label = rendererLabel; return ${view}; }`,
+		parameterDefault: `export function Pane({label}: {label: Label} = {label: rendererLabel}) { return ${view}; }`,
+		bindingDefault: `export function Pane({label = rendererLabel}: {label?: Label}) { return ${view}; }`,
+		nestedDefault: `export function Pane({inner: {label} = {label: rendererLabel}}: {inner?: {label: Label}}) { return ${view}; }`,
+		localCall: `export function Render(label: Label) { return ${view}; } export function Pane() { return Render(rendererLabel); }`,
+		localJsx: `export function Child({label}: {label: Label}) { return ${view}; } export function Pane() { return <Child label={rendererLabel}/>; }`,
+	};
+	for (const [name, body] of Object.entries(cases)) {
+		fs.writeFileSync(
+			path.join(src, name + '.tsx'),
+			`import {FormattedMessage} from 'react-intl';
+			import type {Label} from './labels'; import {label as rendererLabel} from './producer';
+			${body}`,
+		);
+	}
+	for (const [name, owner] of [
+		['caller-barrel', 'localBarrel'],
+		['namespace-barrel', 'namespaceBarrel'],
+		['nested-barrel', 'nestedNamespace'],
+		['dynamic-barrel', 'dynamicBarrel'],
+		['type-barrel', 'typeAlias'],
+	]) {
+		fs.writeFileSync(path.join(src, name + '.ts'), `export {Pane as Renamed} from './${owner}';`);
+	}
+	fs.writeFileSync(path.join(src, 'outer-barrel.ts'), "export * as Inner from './nested-barrel';");
+	for (const [shim, owner] of [
+		['relative-shim', 'relativeDeclaration'],
+		['self-shim', 'packageDeclaration'],
+		['type-shim', 'declarationTypeOnly'],
+	]) {
+		fs.writeFileSync(path.join(src, shim + '.js'), `export {Pane as Again} from './${owner}';`);
+		fs.writeFileSync(
+			path.join(src, shim + '.d.ts'),
+			"import type {Label} from './labels'; export declare function Again(props: {label: Label}): import('react').ReactElement;",
+		);
+	}
+	fs.writeFileSync(
+		path.join(src, 'linked-shim.ts'),
+		"export {Pane as Again} from './symlinkBarrel';",
+	);
+	fs.symlinkSync(src, path.join(root, 'linked'), 'dir');
+	const files = [...Object.keys(cases), 'producer'].map((name) => path.join(src, name + '.tsx'));
+	const options = { root, strong: true, verify: true, write: false };
+	const result = await runCodemod(files, { ...options, projectTypes: true });
+	for (const name of Object.keys(cases)) {
+		const file = result.files.find((entry) => entry.file === 'src/' + name + '.tsx');
+		const errors = [...file.notes, ...file.diagnostics].filter((note) => note.severity === 'error');
+		if (
+			name === 'safe' ||
+			name === 'siblingRenderable' ||
+			name === 'typeAlias' ||
+			name === 'declarationTypeOnly' ||
+			name === 'unresolvedTypeOnly' ||
+			name === 'unresolvedTypeExport' ||
+			name === 'dynamicExternal'
+		) {
+			expect(file.strong).toBe(true);
+			expect(errors, name).toEqual([]);
+		} else {
+			expect(errors, name).toContainEqual(expect.objectContaining({ rule: 'bindings' }));
+		}
+	}
+	const local = await runCodemod([path.join(src, 'safe.tsx')], { ...options, projectTypes: false });
+	expect(local.files[0].notes).toContainEqual(
+		expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+	);
+});
+
 it('previews and atomically upgrades the released helper while sharing context with an existing consumer', async () => {
 	const { src, helper, input } = project();
 	fs.writeFileSync(helper, previous);
