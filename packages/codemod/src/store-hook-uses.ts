@@ -247,9 +247,19 @@ export function storeHookUses(
 		);
 	}
 	function runsAfterRender(use: ts.Node, hook: ts.CallExpression) {
-		const fn = ts.findAncestor(use, ts.isFunctionLike);
+		let owner = use.parent;
+		for (let child = use; owner && !ts.isFunctionLike(owner); child = owner, owner = owner.parent) {
+			// An instance initializer can run in another renderer if the class escapes.
+			if (
+				ts.isPropertyDeclaration(owner) &&
+				owner.initializer === child &&
+				!(ts.getCombinedModifierFlags(owner) & ts.ModifierFlags.Static)
+			)
+				return false;
+		}
 		return (
-			!!fn && (!!effectSetup(fn) || clickHandler(fn, hook) || effectEventCallback(fn, hook, use))
+			!!owner &&
+			(!!effectSetup(owner) || clickHandler(owner, hook) || effectEventCallback(owner, hook, use))
 		);
 	}
 
