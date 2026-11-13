@@ -8,7 +8,9 @@ import { IDBFactory } from 'fake-indexeddb';
 import 'fake-indexeddb/auto';
 import {
 	autoBudget,
+	createDataOwner,
 	createDataStore,
+	createReplica,
 	entity,
 	feed,
 	indexedDBStorage,
@@ -17,6 +19,7 @@ import {
 	read,
 	view,
 	write,
+	type DataOwner,
 	type DataReply,
 	type DataRequest,
 	type FeedFrame,
@@ -1743,4 +1746,102 @@ describe('octane/data feeds across restarts', () => {
 const stops: Array<() => void> = [];
 afterEach(() => {
 	for (const stop of stops.splice(0)) stop();
+});
+
+describe('octane/data persistence through a shared owner', () => {
+	const contracts = [shelf, count, unread, setRead, receipt];
+	const journal = { writes: [setRead], receipt };
+	const closing: Array<() => void> = [];
+	afterEach(() => {
+		for (const close of closing.splice(0)) close();
+	});
+
+	/** An owner that keeps the account's cache in `storage`. */
+	const ownerOver = (storage: PersistentStorage, remote: ReturnType<typeof server>) =>
+		createDataOwner({ transport: remote.transport, persist: () => cache(storage, 'ada') });
+
+	/** A tab of `owner`, whose own cache, used only on its own, is `tabStorage`. */
+	function tab(
+		owner: DataOwner,
+		tabStorage: PersistentStorage,
+		list = contracts,
+		transport: (request: DataRequest) => Promise<DataReply> = () =>
+			Promise.reject(new Error('this tab did not share its owner')),
+	) {
+		const channel = new MessageChannel();
+		owner.connect(channel.port1);
+		const store = createReplica(channel.port2, {
+			transport,
+			persist: cache(tabStorage, 'ada', { journal }),
+			contracts: list,
+		});
+		closing.push(() => (channel.port1.close(), channel.port2.close()));
+		return store;
+	}
+
+	it('saves one cache for every tab through the owner, which a tab after a restart starts from', async () => {
+		const storage = memoryStorage();
+		const tabStorage = memoryStorage();
+		const first = server(books());
+		const owner = ownerOver(storage, first);
+		const [one, two] = [tab(owner, tabStorage), tab(owner, tabStorage)];
+		await value(one, shelf);
+		await value(two, count);
+		await saved();
+		// Only the owner writes; neither tab keeps a cache of its own.
+		expect(listPartitions(storage).length).toBeGreaterThan(0);
+		expect(listPartitions(tabStorage)).toEqual([]);
+
+		const remote = server(first.books);
+		const restarted = tab(ownerOver(storage, remote), tabStorage);
+		expect((await value<Book[]>(restarted, shelf)).value).toHaveLength(3);
+		expect(remote.log).toEqual([]);
+	});
+
+	it('recovers the journal in one tab after a restart, looking each write up once', async () => {
+		const storage = memoryStorage();
+		const tabStorage = memoryStorage();
+		const first = server(books());
+		const before = tab(ownerOver(storage, first), tabStorage);
+		await value(before, shelf);
+		first.faults.lose = 'reply';
+		await expect(before.write(setRead, { id: 'a', read: true })).rejects.toThrow(/unknown/);
+		await saved();
+
+		const remote = server(first.books, first.applied);
+		const owner = ownerOver(storage, remote);
+		const [one, two] = [tab(owner, tabStorage), tab(owner, tabStorage)];
+		await value(one, shelf);
+		await value(two, shelf);
+		await vi.waitFor(() => expect(remote.log).toContain('read receipt'));
+		await saved();
+		expect(remote.log.filter((entry) => entry === 'read receipt')).toEqual(['read receipt']);
+		expect(listPartitions(tabStorage)).toEqual([]);
+	});
+
+	it('clears the account’s cache when a tab signs it out', async () => {
+		const storage = memoryStorage();
+		const first = server(books());
+		const store = tab(ownerOver(storage, first), memoryStorage());
+		await value(store, shelf);
+		await saved();
+		await store.retire();
+		await saved();
+		const left = await Promise.all(
+			listPartitions(storage).map((partition) => storage.index(partition)),
+		);
+		expect(left.flat()).toEqual([]);
+	});
+
+	it('keeps a cache of its own in a tab the owner refuses', async () => {
+		const storage = memoryStorage();
+		const tabStorage = memoryStorage();
+		const first = server(books());
+		const owner = ownerOver(storage, first);
+		await value(tab(owner, tabStorage), count);
+		const other = tab(owner, tabStorage, [shelf, count], first.transport);
+		await value(other, shelf);
+		await saved();
+		expect(listPartitions(tabStorage).length).toBeGreaterThan(0);
+	});
 });

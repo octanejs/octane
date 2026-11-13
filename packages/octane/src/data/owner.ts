@@ -40,7 +40,7 @@ import {
 	type DataReply,
 	type DataRequest,
 } from './contracts.js';
-import { clearHostTimeout, hostDateNow, setHostTimeout } from '../host-task.js';
+import { clearHostTimeout, hostDateNow, postHostTask, setHostTimeout } from '../host-task.js';
 import {
 	createDataStore,
 	DataRetiredError,
@@ -49,8 +49,18 @@ import {
 	type DataStore,
 	type DataStoreOptions,
 	type Entry,
+	type PersistenceFactory,
+	withPersistence,
 } from './store.js';
-import { done, request as settled, shape } from './persist.js';
+import {
+	createPersistence,
+	done,
+	request as settled,
+	shape,
+	type Persistence,
+	type PersistOptions,
+	type Saving,
+} from './persist.js';
 import { DATA_WORKER_PATH } from './worker-path.js';
 
 /** The part of a `MessagePort` the owner and its replicas use. */
@@ -72,6 +82,13 @@ type ToOwner =
 	| { readonly t: 'retire' }
 	/** Is the account still signed in? Asked by a tab resuming from being frozen. */
 	| { readonly t: 'ping' }
+	/** A call to the account's persistence, which the owner alone writes; `id` 0 wants no answer. */
+	| {
+			readonly t: 'persist';
+			readonly id: number;
+			readonly op: PersistOp;
+			readonly args: readonly unknown[];
+	  }
 	| {
 			readonly t: 'request';
 			readonly id: number;
@@ -96,6 +113,8 @@ type ToReplica =
 	| { readonly t: 'retired' }
 	/** This tab cannot share the owner: its build's contracts differ, or the account cannot be recorded. */
 	| { readonly t: 'refused' }
+	/** The answer to a call to the account's persistence. */
+	| { readonly t: 'persisted'; readonly id: number; readonly value: unknown }
 	| { readonly t: 'reply'; readonly id: number; readonly reply: DataReply }
 	| { readonly t: 'failed'; readonly id: number; readonly error: unknown }
 	| { readonly t: 'frame'; readonly id: number; readonly frame: FeedFrame }
@@ -133,6 +152,11 @@ export function createDataOwner(options: {
 	readonly listen?: Listener | undefined;
 	/** Serve only while this owner's account is the origin's, recorded in IndexedDB. */
 	readonly fence?: boolean | undefined;
+	/**
+	 * The signed-in account's encrypted cache and write journal. The owner is
+	 * their only writer, so every tab shares one budget and one journal.
+	 */
+	readonly persist?: ((account: string) => PersistOptions) | undefined;
 }): DataOwner {
 	const { transport, listen, fence } = options;
 	/** The replicas of the signed-in account. A replica of a retired one is never served again. */
@@ -202,8 +226,54 @@ export function createDataOwner(options: {
 		};
 	}
 
+	/** The account's persistence, opened on first use; what each tab last asked to save. */
+	let persistence: Persistence | null = null;
+	const saves = new Map<string, Saving | null>();
+	/** Keys some tab restored or saved this session, which purging leaves alone. */
+	const shown = new Set<string>();
+	/** Only the first tab to ask recovers the journal, so each write is looked up once. */
+	let recovering = false;
+	function persistenceFor(): Persistence | null {
+		if (!persistence && serving && options.persist) {
+			persistence = createPersistence(
+				options.persist(serving.account ?? ''),
+				(key) => {
+					if (!saves.has(key)) return undefined;
+					const saving = saves.get(key);
+					saves.delete(key);
+					return saving;
+				},
+				(key) => shown.has(key),
+			);
+		}
+		return persistence;
+	}
+	function persist(port: OwnerPort, { id, op, args }: Extract<ToOwner, { t: 'persist' }>): void {
+		const answer = (value: unknown) => {
+			if (id) post(port, { t: 'persisted', id, value });
+		};
+		const p = persistenceFor();
+		const key = args[0] as string;
+		if (!p) return answer(op === 'recover' ? [] : op === 'cursor' ? null : undefined);
+		if (op === 'save' || op === 'restore') shown.add(key);
+		if (op === 'save') return (saves.set(key, args[1] as Saving | null), p.mark(key));
+		if (op === 'recover') {
+			if (recovering) return answer([]);
+			recovering = true;
+		}
+		// Each operation is the persistence method of the same name.
+		const result = (p as any)[op](...args) as Promise<unknown> | undefined;
+		result?.then(answer, () => answer(op === 'recover' ? [] : op === 'cursor' ? null : undefined));
+	}
+
 	/** Every replica of the account hears it is retired, and nothing in flight reaches one. */
 	function retireAll(): void {
+		// Signing out, or another account signing in, leaves nothing of this one on the device.
+		void persistence?.clear().catch(() => {});
+		persistence = null;
+		saves.clear();
+		shown.clear();
+		recovering = false;
 		serving = null;
 		generation = 0;
 		for (const upstream of upstreams.values()) upstream.abort.abort();
@@ -411,6 +481,7 @@ export function createDataOwner(options: {
 				else if (message.t === 'unlisten') unsubscribe(port, message.id);
 				else if (message.t === 'retire') signOut();
 				else if (message.t === 'ping') port.postMessage({ t: 'live' } satisfies ToReplica);
+				else if (message.t === 'persist') persist(port, message);
 				else if (message.t !== 'hello') others(port, message);
 			};
 			port.addEventListener('message', ({ data }) => {
@@ -420,7 +491,11 @@ export function createDataOwner(options: {
 					identity ??= message.identity;
 					if (message.identity !== identity) joined = Promise.resolve(refuse(port));
 					else if (fence) joined = join(port, message.account!);
-					else if (serving) (replicas.add(port), watch(port));
+					else if (serving) {
+						replicas.add(port);
+						watch(port);
+						port.postMessage({ t: 'live' } satisfies ToReplica);
+					}
 				} else if (joined) joined = joined.then(() => handle(message));
 				else handle(message);
 			});
@@ -531,12 +606,75 @@ export function createReplica(
 			}
 		},
 	});
+	// The account's cache and journal belong to the owner: this tab forwards its persistence
+	// calls there, and keeps its own only once it is a local store.
+	let decide!: (shared: boolean) => void;
+	const served = new Promise<boolean>((resolve) => (decide = resolve));
+	const asked = new Map<
+		number,
+		{ readonly op: PersistOp; readonly args: readonly unknown[]; resolve(value: any): void }
+	>();
+	let own: Persistence | null = null;
+	let collect!: Parameters<PersistenceFactory>[0];
+	let inUse!: Parameters<PersistenceFactory>[1];
+	const ownPersistence = () => (own ??= createPersistence(local.persist!, collect, inUse));
+	const persistAsk = (op: PersistOp, args: readonly unknown[]): Promise<any> =>
+		served.then(() =>
+			port
+				? new Promise((resolve) => {
+						const id = ++next;
+						asked.set(id, { op, args, resolve });
+						send({ t: 'persist', id, op, args });
+					})
+				: (ownPersistence() as any)[op](...args),
+		);
+	const persistTell = (op: PersistOp, args: readonly unknown[]) =>
+		void served.then(() =>
+			port ? send({ t: 'persist', id: 0, op, args }) : (ownPersistence() as any)[op](...args),
+		);
+	const marked = new Set<string>();
+	/** Send what changed once per host task, as a local store saves once per task. */
+	const flush = () => {
+		const keys = [...marked];
+		marked.clear();
+		for (const key of keys) {
+			if (!port) {
+				ownPersistence().mark(key);
+				continue;
+			}
+			const saving = collect(key);
+			if (saving !== undefined) send({ t: 'persist', id: 0, op: 'save', args: [key, saving] });
+		}
+	};
+	const forwarded: PersistenceFactory = (collectSaving, keyInUse) => {
+		collect = collectSaving;
+		inUse = keyInUse;
+		return {
+			restore: (key, read) => persistAsk('restore', [key, read]),
+			mark(key) {
+				if (marked.size === 0) void served.then(() => postHostTask(flush));
+				marked.add(key);
+			},
+			discard: (key) => persistTell('discard', [key]),
+			journal: (write) => persistAsk('journal', [write]),
+			unjournal: (id) => persistTell('unjournal', [id]),
+			recover: () => persistAsk('recover', []),
+			invalidated: (tags) => persistTell('invalidated', [tags]),
+			cursor: (key) => persistAsk('cursor', [key]),
+			keepCursor: (key, cursor) => persistTell('keepCursor', [key, cursor]),
+			forget: (key) => persistAsk('forget', [key]),
+			clear: () => persistAsk('clear', []),
+		};
+	};
+
 	const listen = local.listen;
-	const store = createDataStore({
-		...local,
-		transport,
-		listen: listen && ((request, signal) => (port ? viaOwner : listen)(request, signal)),
-	});
+	const store = withPersistence(forwarded, () =>
+		createDataStore({
+			...local,
+			transport,
+			listen: listen && ((request, signal) => (port ? viaOwner : listen)(request, signal)),
+		}),
+	);
 	const inner = internals.get(store)!;
 	inner.onSettle((op, confirmed, value) => send({ t: 'settle', op, confirmed, value }));
 
@@ -570,6 +708,10 @@ export function createReplica(
 			else ask(item.request, item.fresh).then(item.resolve, item.reject);
 		}
 		for (const feed of feeds.values()) feed.end(new Error(LOST));
+		// Persistence calls are asked again of whatever serves this tab now.
+		const persisting = [...asked.values()];
+		asked.clear();
+		for (const call of persisting) void persistAsk(call.op, call.args).then(call.resolve);
 		// Another tab's write in flight may still settle; its tab settles it once it knows.
 		for (const op of followed) {
 			const operation = inner.operation(op);
@@ -580,6 +722,7 @@ export function createReplica(
 	/** Carry on as a local store: the owner refused this build, or is gone for good. */
 	function becomeLocal(refused: boolean) {
 		port = null;
+		decide(false);
 		clearHostTimeout(beat);
 		inner.fence(false);
 		abandon((request) => local.transport(request, new AbortController().signal), refused);
@@ -590,9 +733,12 @@ export function createReplica(
 		clearHostTimeout(asking);
 		clearHostTimeout(beat);
 		port = null;
+		decide(false);
 		void retireHere();
 		for (const pending of replies.values()) pending.reject(new DataRetiredError());
 		replies.clear();
+		for (const call of asked.values()) call.resolve(undefined);
+		asked.clear();
 		for (const feed of feeds.values()) feed.end();
 	}
 
@@ -722,7 +868,12 @@ export function createReplica(
 			const message = data as ToReplica;
 			switch (message.t) {
 				case 'live':
+					decide(true);
 					inner.fence(false);
+					break;
+				case 'persisted':
+					asked.get(message.id)?.resolve(message.value);
+					asked.delete(message.id);
 					break;
 				case 'retired':
 					retired();
@@ -786,6 +937,19 @@ export function createReplica(
  */
 const PROTOCOL = 3;
 const RETIRED: ToReplica = { t: 'retired' };
+/** The persistence calls a replica forwards, by method name; `save` carries what `mark` would collect. */
+type PersistOp =
+	| 'restore'
+	| 'save'
+	| 'discard'
+	| 'journal'
+	| 'unjournal'
+	| 'recover'
+	| 'invalidated'
+	| 'cursor'
+	| 'keepCursor'
+	| 'forget'
+	| 'clear';
 const REFUSED: ToReplica = { t: 'refused' };
 /** How often a tab and its owner check on each other; three silent intervals means gone. */
 const HEARTBEAT_MS = 5_000;

@@ -53,8 +53,10 @@ import {
 } from './form.js';
 import {
 	createPersistence,
+	persistedRead,
 	type Persistence,
 	type PersistOptions,
+	type Saving,
 	type Stored,
 } from './persist.js';
 import { setHostTimeout, clearHostTimeout, hostDateNow, hostNow } from '../host-task.js';
@@ -439,6 +441,22 @@ export function rewrite(value: unknown, replace: Map<unknown, unknown>): unknown
 	return copy ?? value;
 }
 
+/** How a store saves: its own persistence, or one a replica forwards to its owner. */
+export type PersistenceFactory = (
+	collect: (key: string) => Saving | null | undefined,
+	inUse: (key: string) => boolean,
+) => Persistence;
+let injected: PersistenceFactory | null = null;
+/** Build a store, in `build`, whose `persist` goes through `factory`. */
+export function withPersistence<T>(factory: PersistenceFactory, build: () => T): T {
+	injected = factory;
+	try {
+		return build();
+	} finally {
+		injected = null;
+	}
+}
+
 /** @internal */
 export function selections(read: Read<any, any>, value: unknown) {
 	const selected = read.entities ? read.entities(value) : [];
@@ -511,7 +529,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			: null;
 	let retirement: Promise<void> | null = null;
 	const persisted = options.persist
-		? createPersistence(options.persist, saving, (key) => !!entries.get(key)?.subscribers.size)
+		? (injected ?? ((collect, inUse) => createPersistence(options.persist!, collect, inUse)))(
+				saving,
+				(key) => !!entries.get(key)?.subscribers.size,
+			)
 		: null;
 	const durable = new Set(options.persist?.journal?.writes);
 	if (options.persist?.journal) void recover(options.persist.journal);
@@ -532,7 +553,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			span: span && { start: span.start, first: span.first, last: span.last },
 			tags: [...entry.read.tags, ...entry.names],
 		};
-		return { stored, read: entry.read };
+		return { stored, read: persistedRead(entry.read) };
 	}
 
 	/** Save an entry once its confirmed value changes; a view's change is every view's of its entity. */
@@ -1078,7 +1099,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		const attempt = entry.attempt;
 		const current = () => !retired && entry.attempt === attempt && !entry.hasBase;
 		const done = persisted!
-			.restore(entry.key, entry.read)
+			.restore(entry.key, persistedRead(entry.read))
 			.then(async (stored) => {
 				if (!stored || !current()) return;
 				const age = Math.max(0, hostDateNow() - stored.savedAt);

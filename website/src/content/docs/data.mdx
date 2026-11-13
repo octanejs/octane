@@ -1406,15 +1406,31 @@ the same rollbacks, and equal reads from several tabs are one request.
 It takes three steps.
 
 **1. Write the worker module.** It calls `serveDataOwner` with the transport
-and listener a tab would otherwise use:
+and listener a tab would otherwise use. If your app keeps an encrypted cache,
+give the worker that too, as a function of the signed-in account: the worker
+is the only one that writes the account's cache and write journal, so every
+tab shares one cache and one size limit.
 
 ```ts
 // worker.ts
-import { serveDataOwner, serverListener, serverTransport } from 'octane/data';
+import { indexedDBStorage, serveDataOwner, serverListener, serverTransport } from 'octane/data';
 import { data, events } from './data.tsrx';
+import { cacheKeyFor } from './cache-key.ts';
 
-serveDataOwner({ transport: serverTransport(data), listen: serverListener(events) });
+serveDataOwner({
+	transport: serverTransport(data),
+	listen: serverListener(events),
+	persist: (account) => ({
+		storage: indexedDBStorage(),
+		partition: account,
+		key: () => cacheKeyFor(account),
+	}),
+});
 ```
+
+The worker gets the cache key itself, here from a hypothetical `cacheKeyFor`
+helper that fetches the signed-in user's secret, so the key never has to be
+handed over from a page.
 
 **2. Tell the build about it.** The `dataWorker` option emits the module at a
 fixed path, `/_octane/data-worker.js`, which never changes between deploys,
@@ -1562,10 +1578,34 @@ tabs and the owner check on each other every five seconds:
 - **When a tab goes quiet,** the owner stops holding feed connections for it.
   Any write the tab sent keeps going.
 
+<h3 id="cross-tab-cache">One cache for every tab</h3>
+
+Give `serveDataOwner` a `persist` function, and the worker becomes the only
+place the account's encrypted cache and write journal are written. Each shared
+tab's store still asks for saved values and saves what changed, exactly as an
+ordinary store would, but it asks the worker:
+
+- **One cache, one size limit.** Values every tab loads are saved once, and the
+  cache's budget applies to the account as a whole, not to each tab.
+- **No tab overwrites another.** Only the worker writes, so a value one tab
+  saved is never replaced by an older copy from another.
+- **A reloaded tab starts from the cache.** It asks the worker for the values
+  it needs, and shows fresh ones without loading them.
+- **One journal, recovered once.** Durable writes are journaled by the worker.
+  After a restart, only the first tab to start recovers them, so each write's
+  receipt is looked up once.
+- **Signing out clears it.** When the account signs out, or another signs in,
+  the worker clears the account's cache.
+
+A tab only uses the `persist` options you gave `createReplica` when it carries
+on as an ordinary store. Point them at the same storage, partition and key,
+and such a tab reads the same cache.
+
 <h3 id="cross-tab-limits">Current limits</h3>
 
-The owner does not persist yet. A replica given `persist` keeps its own
-encrypted cache and write journal, as an ordinary store does, one per tab.
+A write that was on its way to the worker when the worker crashed becomes
+uncertain, and you settle it from its receipt, as with any lost reply. A later
+release settles it automatically from the worker's journal.
 
 <h2 id="bindings">Octane and React, one store</h2>
 

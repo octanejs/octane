@@ -561,3 +561,41 @@ test('reconnects every shared tab to a new data worker after the worker crashes'
 	await expect(book(other, 'Kindred').getByRole('checkbox')).toBeChecked();
 	await other.close();
 });
+
+test('starts a shared tab from the data worker’s cache after a reload, without loading', async ({
+	page,
+}) => {
+	const ns = `${Date.now()}-${++namespace}`;
+	const keeper = await page.context().newPage();
+	const worker = await dataWorker(keeper, ns);
+	await page.goto(`/mixed.html?ns=${ns}&owner=shared`);
+	await expect(page.getByText('3 books · 0 read')).toBeVisible();
+	await book(page, 'Kindred').getByRole('checkbox').click();
+	await expect(page.getByText('3 books · 1 read')).toBeVisible();
+	await expect(finishedList(page).getByRole('listitem')).toHaveText(['Kindred']);
+	// Saved through the worker, once its next task runs.
+	await page.waitForTimeout(200);
+
+	const before = worker.reads().length;
+	await page.reload();
+	await expect(book(page, 'Kindred').getByRole('checkbox')).toBeChecked();
+	await expect(finishedList(page).getByRole('listitem')).toHaveText(['Kindred']);
+	// The lists are fresh for 30 seconds: the worker's cache serves them.
+	const lists = worker
+		.reads()
+		.slice(before)
+		.filter((body) => body.includes('books.list') || body.includes('books.finished'));
+	expect(lists).toEqual([]);
+	const saved = await page.evaluate(
+		() =>
+			new Promise<string>((resolve) => {
+				const opening = indexedDB.open('shelf');
+				opening.onsuccess = () => {
+					const all = opening.result.transaction('value').objectStore('value').getAll();
+					all.onsuccess = () => resolve(JSON.stringify(all.result));
+				};
+			}),
+	);
+	expect(saved).not.toContain('Kindred');
+	await keeper.close();
+});
