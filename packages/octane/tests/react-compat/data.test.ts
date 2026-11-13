@@ -4,12 +4,18 @@
  * an Octane page and a React island show the same value, the same pending
  * edit and the same rollback, because the store owns them.
  */
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { act as octaneAct, drainPassiveEffects, flushSync } from 'octane';
-import { createDataStore, type FeedFrame, type Transport } from '../../src/data/index.js';
+import {
+	createDataOwner,
+	createDataStore,
+	createReplica,
+	type FeedFrame,
+	type Transport,
+} from '../../src/data/index.js';
 import { mount } from '../_helpers.js';
-import { createServer } from '../_data-todos.js';
+import { createServer, setDone } from '../_data-todos.js';
 import { DataPage } from './data.tsrx';
 import { PagesPage } from './data-pages.tsrx';
 import { FeedPage } from './data-feed.tsrx';
@@ -263,5 +269,53 @@ describe('useFeed', () => {
 
 		await run(() => mounted.unmount());
 		expect(connections[0]!.signal.aborted).toBe(true);
+	});
+});
+
+describe('replicas of one owner', () => {
+	it('shows an edit made in one tab in another tab, in Octane and in its React island', async () => {
+		const server = createServer();
+		let release!: () => void;
+		const owner = createDataOwner({
+			transport: async (request, signal) => {
+				if (request.kind === 'write') await new Promise<void>((resolve) => (release = resolve));
+				return server.transport(request, signal);
+			},
+		});
+		const pages = [false, true].map((island) => {
+			const channel = new MessageChannel();
+			owner.connect(channel.port1);
+			const store = createReplica(channel.port2, { writes: [setDone] });
+			dispose.push(() => {
+				void store.retire();
+				channel.port1.close();
+				channel.port2.close();
+			});
+			return { store, island };
+		});
+		const mounted: Array<ReturnType<typeof mount>> = [];
+		await run(() => {
+			for (const page of pages) {
+				const view = mount(DataPage, page);
+				mounted.push(view);
+				dispose.push(() => view.unmount());
+			}
+		});
+		await settle();
+		const [first, second] = mounted.map((view) => view.container);
+		expect(text(second!, '[data-octane-done]')).toBe('0');
+
+		await run(() => first!.querySelector<HTMLButtonElement>('[data-octane-toggle]')!.click());
+		await vi.waitFor(async () => {
+			await settle();
+			expect(text(second!, '[data-octane-done]')).toBe('1');
+			expect(text(second!, '[data-react-done]')).toBe('1');
+		});
+		release();
+		await vi.waitFor(async () => {
+			await settle();
+			expect(server.rows[0]!.done).toBe(true);
+			expect(text(second!, '[data-react-done]')).toBe('1');
+		});
 	});
 });
