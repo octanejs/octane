@@ -367,14 +367,16 @@ function sameWireValue(a: unknown, b: unknown): boolean {
 	}
 }
 
-/** A stable key for plain input: object keys sorted, so `{a,b}` and `{b,a}` share an entry. */
-function inputKey(value: unknown): string {
-	return JSON.stringify(value, (_, item) =>
-		item !== null && typeof item === 'object' && !Array.isArray(item)
-			? Object.fromEntries(Object.entries(item).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
-			: item,
-	);
-}
+/** Canonicalize object field order while retaining the types and references used on the wire. */
+const keyEncoding: NonNullable<Parameters<typeof devalue.stringify>[2]> = {
+	operations: {
+		shapeOf(value) {
+			const shape = devalue.defaultStringifyOperations.shapeOf(value);
+			if (shape.kind === 'plain' || shape.kind === 'null-proto') shape.keys.sort();
+			return shape;
+		},
+	},
+};
 
 /** `value` with its entity ID changed from `from` to `to`, copied; other values unchanged. */
 function renameId(entity: Entity<any>, value: unknown, from: string, to: string): unknown {
@@ -383,9 +385,16 @@ function renameId(entity: Entity<any>, value: unknown, from: string, to: string)
 		: value;
 }
 
-/** @internal Equal reads of equal inputs share one key. */
+/** @internal Reads and feed cursors use the same key format. A new cursor cannot cover old cached reads. */
 export function entryKey(name: string, input: unknown): string {
-	return `${name}\n${inputKey(input)}`;
+	const encoded =
+		input === undefined ? 'undefined' : devalue.stringify(input, undefined, keyEncoding);
+	return `${name}\nwire:${encoded}`;
+}
+
+/** @internal Keep the SSR seed format readable across client and server releases. Server feeds take no parameters. */
+export function seedCursorKey(feedName: string): string {
+	return feedName + '\nundefined';
 }
 
 /** @internal Copy-on-write replacement of the arrays and objects named in `replace`. */
@@ -415,6 +424,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	const entries = new Map<string, Entry>();
 	const seeds = new Map<string, SeedEntry>();
 	let staleSeedTags: Set<string> | undefined;
+	let seedsStale = false;
 	/** Created records' operation IDs, by entity, mapped to the IDs their servers assigned. */
 	const assigned = new Map<string, string>();
 	const parsed = options.seed
@@ -460,7 +470,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 							.then(
 								(reply) => {
 									if (reply.ok && typeof reply.value === 'string') {
-										cursors.push([entryKey(feed.name, undefined), reply.value]);
+										cursors.push([seedCursorKey(feed.name), reply.value]);
 									}
 								},
 								// Without a position the browser's feed starts from its connection.
@@ -479,7 +489,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	/** What persistent storage keeps for an entry: its confirmed value, never a pending edit. */
 	function saving(key: string) {
 		const entry = entries.get(key);
-		if (!entry?.read.persist) return undefined;
+		// A direct read replacement may have no invalidation tags. After eviction its older
+		// copy has to be deleted before a cursor can advance past the missing replacement.
+		if (!entry) return null;
+		if (!entry.read.persist) return undefined;
 		if (!entry.hasBase) return null;
 		const { span } = entry;
 		const stored: Stored = {
@@ -1003,7 +1016,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		}
 		const reload = new Set<Entry>();
 		adopt(entry, value, 0, age, reload, bounds);
-		entry.stale = seed.stale === true || (invalidated !== undefined && affects(entry, invalidated));
+		entry.stale =
+			seed.stale === true ||
+			seedsStale ||
+			(invalidated !== undefined && affects(entry, invalidated));
 		save(entry);
 		// A seed is adopted while a render asks for its read.
 		if (reload.size > 0) queueMicrotask(() => !retired && reloadAll(reload));
@@ -1167,11 +1183,17 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			key,
 			subscribers: new Set(),
 			handle: {
-				getSnapshot: () => (retired ? PENDING : (created.snapshot ??= buildSnapshot(created))),
+				getSnapshot() {
+					if (retired) return PENDING;
+					const current = entries.get(key) ?? created;
+					return (current.snapshot ??= buildSnapshot(current));
+				},
 				subscribe(notify) {
 					if (retired) return () => {};
 					// A handle outlives its entry's retention; observing it again restores the entry.
-					if (!entries.has(key)) entries.set(key, created);
+					const current = entries.get(key);
+					if (current && current !== created) return current.handle.subscribe(notify);
+					if (!current) entries.set(key, created);
 					clearHostTimeout(created.keepTimer);
 					created.keepTimer = undefined;
 					// Age reloads a value only for the first observer of a value already served.
@@ -1186,8 +1208,9 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				},
 				refresh() {
 					if (retired) return NEVER;
-					invalidateEntry(created);
-					return load(created);
+					const current = entryFor(read, input);
+					invalidateEntry(current);
+					return load(current);
 				},
 			},
 			base: undefined,
@@ -1378,40 +1401,54 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	 */
 	async function recover(journal: NonNullable<PersistOptions['journal']>): Promise<void> {
 		const recovered: Operation[] = [];
-		for (const { id, name, raw } of await persisted!.recover()) {
+		const obsolete: string[] = [];
+		for (const { id, name, raw, order } of await persisted!.recover()) {
 			const write = journal.writes.find((item) => item.name === name);
-			let input: unknown;
-			try {
-				if (!write) throw new Error('unknown write');
-				input = await parse(write.input, raw);
-			} catch {
-				// A write this build no longer declares, or whose input it no longer accepts.
-				persisted!.unjournal(id);
-				continue;
+			if (write) {
+				try {
+					const input = await parse(write.input, raw);
+					recovered.push(operationFor(id, write, input, raw, 'uncertain'));
+					continue;
+				} catch {
+					// A compatible build may still recover this operation during the grace period.
+				}
 			}
-			recovered.push(operationFor(id, write, input, raw, 'uncertain'));
+			if (hostDateNow() - order[0] >= 30 * 24 * 60 * 60 * 1000) obsolete.push(id);
 		}
-		if (retired || recovered.length === 0) return;
-		// They were submitted before anything this session submitted.
-		operations = [...recovered, ...operations];
-		touchEntities();
+		if (retired) return;
+		// Recovered writes were submitted before anything this session submitted.
+		if (recovered.length) {
+			operations = [...recovered, ...operations];
+			touchEntities();
+		}
+		async function receipt(id: string) {
+			const reply = await request(
+				{ kind: 'read', name: journal.receipt.name, input: { operationId: id } },
+				retiring.signal,
+			);
+			if (!reply.ok) throw new DataError(reply.code);
+			return parse(journal.receipt.output, reply.value);
+		}
 		for (const operation of recovered) {
-			void request(
-				{ kind: 'read', name: journal.receipt.name, input: { operationId: operation.id } },
-				new AbortController().signal,
-			)
-				.then((reply) => {
-					if (!reply.ok) throw new DataError(reply.code);
-					return parse(journal.receipt.output, reply.value);
-				})
-				.then(
-					({ applied, value }) => {
-						if (!retired && operation.status === 'uncertain') {
-							settleOperation(operation, applied, value);
-						}
-					},
-					() => {},
-				);
+			void receipt(operation.id).then(
+				({ applied, value }) => {
+					if (!retired && operation.status === 'uncertain')
+						settleOperation(operation, applied, value);
+				},
+				() => {},
+			);
+		}
+		// Obsolete writes have no usable effect metadata. Check one receipt at a time.
+		for (const id of obsolete) {
+			if (retired) return;
+			const outcome = await receipt(id).catch(() => undefined);
+			if (retired || !outcome || typeof outcome.applied !== 'boolean') continue;
+			if (outcome.applied) {
+				persisted!.invalidated([null]);
+				seedsStale = true;
+				for (const entry of entries.values()) invalidateEntry(entry);
+			}
+			persisted!.unjournal(id);
 		}
 	}
 

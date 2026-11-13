@@ -1,10 +1,10 @@
 import * as Effect from 'effect/Effect';
-import * as AsyncResult from 'effect/reactivity/AsyncResult';
 import * as Atom from 'effect/reactivity/Atom';
+import * as AtomRegistry from 'effect/reactivity/AtomRegistry';
 import { describe, expect, it } from 'vitest';
 import { RegistryContext, scheduleTask } from '../src/RegistryContext.tsrx';
 
-const nextTask = () => new Promise((resolve) => setTimeout(resolve, 0));
+const nextScheduledTask = () => new Promise<void>((resolve) => scheduleTask(resolve));
 
 // OCTANE DIVERGENCE[scheduler][ordinary:effect-atom-schedule-task-cancel]:
 // upstream queues these tasks on React's Scheduler at LowPriority. The port
@@ -18,7 +18,7 @@ describe('scheduleTask', () => {
 		scheduleTask(() => log.push('second'));
 		await Promise.resolve();
 		log.push('microtask');
-		await nextTask();
+		await nextScheduledTask();
 		expect(log).toEqual(['microtask', 'first', 'second']);
 	});
 
@@ -28,17 +28,17 @@ describe('scheduleTask', () => {
 		const cancel = scheduleTask(() => log.push('cancelled'));
 		scheduleTask(() => log.push('kept'));
 		cancel();
-		await nextTask();
+		await nextScheduledTask();
 		expect(log).toEqual(['kept']);
 	});
 
-	it('drives effects in the default RegistryContext registry', async () => {
+	it('drives effects in the default RegistryContext registry', async ({ signal }) => {
 		const registry = RegistryContext.defaultValue;
 		const atom = Atom.make(Effect.promise(() => Promise.resolve('loaded')));
 		const unmount = registry.mount(atom);
 		try {
-			await nextTask();
-			expect(AsyncResult.getOrElse(registry.get(atom), () => 'pending')).toBe('loaded');
+			const result = await Effect.runPromise(AtomRegistry.getResult(registry, atom), { signal });
+			expect(result).toBe('loaded');
 		} finally {
 			unmount();
 		}

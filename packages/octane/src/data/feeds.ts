@@ -21,6 +21,7 @@ import {
 	entryKey,
 	internals,
 	rewrite,
+	seedCursorKey,
 	selections,
 	type DataStore,
 	type Entry,
@@ -74,7 +75,7 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 	const observers = new Set<() => void>();
 	const seen = new Set<string>();
 	let snapshot = CONNECTING;
-	let cursor: string | null = source.seeded.get(key) ?? null;
+	let cursor = params === undefined ? (source.seeded.get(seedCursorKey(feed.name)) ?? null) : null;
 	/** Whether a connection has been live, so one that comes back without a cursor missed events. */
 	let wasLive = false;
 	/** Only a subscribed run reconciles page and disk after storage is ready. */

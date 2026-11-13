@@ -4,6 +4,7 @@
  * event to every read that holds its records, and reloads what it may have
  * missed.
  */
+import * as devalue from 'devalue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	createDataStore,
@@ -613,6 +614,8 @@ describe('feed presets', () => {
 		// The position is taken first, so no change can fall between it and the value.
 		expect(order).toEqual(['position', 'read']);
 		const seed = rendering.dehydrate();
+		// A browser from the previous release must be able to resume this page.
+		expect(new Map(devalue.parse(seed).cursors).get(todoChanges.name + '\nundefined')).toBe('0');
 		void rendering.retire();
 
 		// Renamed after the server read it, before the browser connects.
@@ -638,6 +641,20 @@ describe('feed presets', () => {
 		const store = createDataStore({ transport, feeds: [todoChanges] });
 		await store.retire();
 		expect(transport).not.toHaveBeenCalled();
+	});
+
+	it('resumes a feed from the cursor seeded by an older server', async () => {
+		const { listener, connections } = scripted();
+		const store = createDataStore({
+			listen: listener,
+			transport: createServer().transport,
+			seed: devalue.stringify({
+				reads: [],
+				cursors: [[todoChanges.name + '\nundefined', 'before-render']],
+			}),
+		});
+		stops.push(listen(store, todoChanges).subscribe(() => {}));
+		await vi.waitFor(() => expect(connections[0]?.request.cursor).toBe('before-render'));
 	});
 
 	it("stops a server render's position request when its store retires", async () => {

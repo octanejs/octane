@@ -24,6 +24,7 @@ import { strengthen } from './strong.js';
 import { bind, projectTypeAt, textKind, transformModule } from './transform.js';
 import { directRendererCalls, nativeExternalStore } from './local-react-hook.js';
 import { forwardedProps } from './forwarded-props.js';
+import { importsReactBridge, islandComponents, executableImports } from './react-island-sources.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
 const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|17\.(?:0|[1-9]\d*))$/;
@@ -979,18 +980,65 @@ export async function runCodemod(
 	// Configs and scripts name modules by path too, such as Vite's
 	// `server.warmup.clientFiles`, including those outside the migrated paths.
 	const byFile = new Map(results.map((result) => [path.join(root, result.file), result]));
-	for (const file of renames.size
-		? collect(root, (name) => SOURCE.test(name) || isTsrx(name))
-		: []) {
-		if (renames.has(file) || conflicts.has(file)) continue;
-		const result = byFile.get(file);
-		const paths = rewriteModulePaths(
-			result?.code ?? fs.readFileSync(file, 'utf8'),
+	// React executes imported island components with their original module dependencies.
+	const edited = new Set(results.filter((r) => r.changed).map((r) => path.join(root, r.file)));
+	const inspected = new Set<string>();
+	let physicalEdits: Map<string, FileResult[]> | undefined;
+	let islandConflict: FileResult | undefined;
+	function protectIslandModule(issuer: string, specifier: string, owner: string) {
+		const file = ts.resolveModuleName(
+			specifier,
+			issuer,
+			{ moduleResolution: ts.ModuleResolutionKind.Bundler, ...bindingOptions(issuer) },
+			ts.sys,
+		).resolvedModule?.resolvedFileName;
+		if (!file || /\.d\.[cm]?ts$/.test(file) || !SOURCE.test(file)) return;
+		const physical = fs.realpathSync(file);
+		if (inspected.has(physical)) return;
+		inspected.add(physical);
+		// A workspace import and an explicitly selected path may reach the same file through different links.
+		if (!physicalEdits) {
+			physicalEdits = new Map();
+			for (const selected of edited) {
+				const real = fs.realpathSync(selected);
+				const group = physicalEdits.get(real) ?? [];
+				group.push(byFile.get(selected)!);
+				physicalEdits.set(real, group);
+			}
+		}
+		for (const result of physicalEdits.get(physical) ?? []) {
+			const note: Note = {
+				rule: 'react-compat',
+				severity: 'error',
+				line: 1,
+				message: `Keep ${result.file} in React: the authored React island in ${path.relative(root, owner)} uses its original implementation. Exclude this module from the migration.`,
+			};
+			result.notes.push(note);
+			if (write && !islandConflict)
+				islandConflict = unchangedFile(result.file, fs.readFileSync(file, 'utf8'), note);
+		}
+		if (physical.split(path.sep).includes('node_modules')) return;
+		for (const module of executableImports(
 			file,
-			root,
-			renames,
-			resolveRename,
-		);
+			fs.readFileSync(file, 'utf8'),
+			!!bindingOptions(file)?.verbatimModuleSyntax,
+		))
+			protectIslandModule(file, module, owner);
+	}
+	for (const file of edited.size || renames.size
+		? new Set([...collect(root, (name) => SOURCE.test(name) || isTsrx(name)), ...files])
+		: []) {
+		const source = fs.readFileSync(file, 'utf8');
+		if (edited.size && importsReactBridge(source)) {
+			for (const module of await islandComponents(file, source, (spec) =>
+				bindingProject.original(file, spec),
+			))
+				protectIslandModule(file, module, file);
+		}
+		if (islandConflict) return blockedWrite(root, islandConflict, compiler?.from);
+		if (!renames.size || renames.has(file) || conflicts.has(file)) continue;
+		const result = byFile.get(file);
+		const paths = rewriteModulePaths(result?.code ?? source, file, root, renames, resolveRename);
 		if (!paths) continue;
 		const rules = { ...result?.rules, 'module-paths': paths.count };
 		if (result) Object.assign(result, { code: paths.code, changed: true, rules });
