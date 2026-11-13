@@ -1649,6 +1649,91 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		},
 	);
 
+	it('reports a rename collision through a symlinked directory before writing', async () => {
+		const original = {
+			'package.json': '{ "name": "app" }',
+			'index.html': '<script type="module" src="./First.tsx"></script>',
+			'First.tsx': 'export const First = () => <div />;',
+			'Item.tsx': 'export const Item = () => <i />;',
+		};
+		const root = project(original);
+		fs.symlinkSync('.', path.join(root, 'linked'), 'dir');
+		const paths = [root, path.join(root, 'linked/Item.tsx')];
+		for (const write of [false, true]) {
+			const { files } = await runCodemod(paths, { write });
+			expect(files.find(({ file }) => file === 'linked/Item.tsx')).toMatchObject({
+				output: 'linked/Item.tsx',
+				changed: false,
+				notes: [
+					expect.objectContaining({
+						rule: 'rename-conflict',
+						severity: 'error',
+						message: expect.stringMatching(/linked\/Item\.tsrx.*Item\.tsx/),
+					}),
+				],
+			});
+			expect(files.filter(({ changed }) => changed).map(({ output }) => output)).toEqual(
+				write ? [] : ['First.tsrx'],
+			);
+			if (!write) expect(files.find(({ file }) => file === 'Item.tsx').output).toBe('Item.tsx');
+			expect(fs.readdirSync(root).sort()).toEqual([...Object.keys(original), 'linked'].sort());
+			for (const [file, source] of Object.entries(original))
+				expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(source);
+		}
+	});
+
+	it('uses filesystem directory identity for differently normalized symlink targets', async () => {
+		const parent = 'Cafe\u0301';
+		const source = 'export const Item = () => <i />;';
+		const root = project({ [parent + '/Item.tsx']: source });
+		const alternate = parent.normalize('NFC');
+		const alternatePath = path.join(root, alternate);
+		const sameDirectory = fs.existsSync(alternatePath);
+		if (!sameDirectory) {
+			fs.mkdirSync(alternatePath);
+			fs.writeFileSync(path.join(alternatePath, 'Item.tsx'), source.replace('<i />', '<b />'));
+		}
+		fs.symlinkSync(alternate, path.join(root, 'linked'), 'dir');
+		const paths = [parent + '/Item.tsx', 'linked/Item.tsx'];
+		const inputs = paths.map((file) => path.join(root, file));
+		const preview = await runCodemod(inputs, { root, write: false, verify: false });
+		const result = await runCodemod(inputs, { root, write: true, verify: false });
+		if (sameDirectory) {
+			expect(preview.files.map(({ file }) => file)).toEqual(paths);
+			expect(result.files.map(({ file }) => file)).toEqual(paths.slice(1));
+			for (const file of [...preview.files, ...result.files]) {
+				expect(file).toMatchObject({
+					output: file.file,
+					changed: false,
+					notes: [expect.objectContaining({ rule: 'rename-conflict', severity: 'error' })],
+				});
+			}
+			expect(fs.readdirSync(path.join(root, parent))).toEqual(['Item.tsx']);
+			expect(fs.readFileSync(inputs[0], 'utf8')).toBe(source);
+		} else {
+			const outputs = paths.map((file) => file.replace(/\.tsx$/, '.tsrx'));
+			for (const { files } of [preview, result]) {
+				expect(files.map(({ output }) => output)).toEqual(outputs);
+				expect(files.flatMap(({ notes }) => notes)).toEqual([]);
+			}
+			expect(fs.readFileSync(path.join(root, outputs[0]), 'utf8')).toContain('<i />');
+			expect(fs.readFileSync(path.join(root, outputs[1]), 'utf8')).toContain('<b />');
+			expect(inputs.some((file) => fs.existsSync(file))).toBe(false);
+		}
+	});
+
+	it('renames separate file symlinks without removing their shared target', async () => {
+		const source = 'export const Item = () => <i />;';
+		const root = project({ 'Item.tsx': source });
+		const files = ['One.tsx', 'Two.tsx'].map((name) => path.join(root, name));
+		for (const file of files) fs.symlinkSync('Item.tsx', file);
+		const { files: results } = await runCodemod(files, { root });
+		expect(results.map(({ output }) => output)).toEqual(['One.tsrx', 'Two.tsrx']);
+		expect(results.flatMap(({ notes }) => notes)).toEqual([]);
+		expect(fs.readdirSync(root).sort()).toEqual(['Item.tsx', 'One.tsrx', 'Two.tsrx']);
+		expect(fs.readFileSync(path.join(root, 'Item.tsx'), 'utf8')).toBe(source);
+	});
+
 	it('reports mixed-project collisions alongside other Strong candidates in the CLI', () => {
 		const root = project({
 			'package.json': '{"name":"app"}',
@@ -4716,6 +4801,30 @@ export function Greeting({ data }) { const intl = useIntl(); consume(intl); retu
 			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(text);
 		expect(fs.existsSync(path.join(root, 'src/Greeting.tsrx'))).toBe(false);
 		expect(fs.existsSync(path.join(root, 'src/Other.tsrx'))).toBe(false);
+	});
+	it('reports a planned helper collision through a symlinked source directory', async () => {
+		const authored = 'export const Custom = () => <p />;';
+		const root = setup({ 'src/octane-react-intl.tsx': authored });
+		fs.symlinkSync('src', path.join(root, 'linked'), 'dir');
+		const paths = ['src/Greeting.tsx', 'linked/octane-react-intl.tsx'].map((file) =>
+			path.join(root, file),
+		);
+		const { files } = await runCodemod(paths, { root });
+		expect(files).toEqual([
+			expect.objectContaining({
+				file: 'src/Greeting.tsx',
+				changed: false,
+				notes: [
+					expect.objectContaining({
+						severity: 'error',
+						message: expect.stringContaining('src/octane-react-intl.tsrx is already in use'),
+					}),
+				],
+			}),
+		]);
+		expect(fs.readFileSync(paths[0], 'utf8')).toBe(localeCode);
+		expect(fs.readFileSync(paths[1], 'utf8')).toBe(authored);
+		expect(fs.existsSync(path.join(root, 'src/octane-react-intl.tsrx'))).toBe(false);
 	});
 	it('ignores an occupied helper path when only React Intl utilities are used', async () => {
 		const utility =

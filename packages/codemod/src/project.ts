@@ -66,6 +66,20 @@ export async function runCodemod(
 	const renames: Map<string, string> = new Map();
 	const exports: Map<string, TransformResult['exports']> = new Map();
 	const owners: Map<string, string> = new Map();
+	const outputDirectories = new Map<string, string>();
+	function outputKey(file: string) {
+		// A symlinked parent can name the same output. Keep the last path component
+		// lexical because the write owns that directory entry, not a symlink target.
+		const dir = path.dirname(file);
+		let physical = outputDirectories.get(dir);
+		if (physical === undefined) {
+			// On macOS the native lookup also returns the stored Unicode spelling.
+			physical = process.platform === 'darwin' ? fs.realpathSync.native(dir) : fs.realpathSync(dir);
+			outputDirectories.set(dir, physical);
+		}
+		const output = path.join(physical, path.basename(file));
+		return ts.sys.useCaseSensitiveFileNames ? output : output.toLowerCase();
+	}
 	const conflicts: Map<string, FileResult> = new Map();
 	const conflictFor = (file: string, source: string, output: string, reason: string) =>
 		unchangedFile(path.relative(root, file), source, {
@@ -81,7 +95,7 @@ export async function runCodemod(
 		if (!result.template) continue;
 		const output = file.replace(/\.(?:jsx?|tsx)$/, '.tsrx');
 		if (output === file) continue;
-		const key = ts.sys.useCaseSensitiveFileNames ? output : output.toLowerCase();
+		const key = outputKey(output);
 		const previous = owners.get(key);
 		if (!previous) owners.set(key, file);
 		if (previous || fs.lstatSync(output, { throwIfNoEntry: false })) {
@@ -436,10 +450,7 @@ export async function runCodemod(
 				'utf8',
 			);
 			adapterState = inspectAdapter(adapter, adapterSource, PREVIOUS_INTL_HASHES);
-			if (
-				adapterState.kind === 'conflict' ||
-				owners.has(ts.sys.useCaseSensitiveFileNames ? adapter : adapter.toLowerCase())
-			) {
+			if (adapterState.kind === 'conflict' || owners.has(outputKey(adapter))) {
 				adapterError = `Cannot generate the React Intl adapter because ${adapterName} is already in use.`;
 			} else if (
 				compiler &&
@@ -685,8 +696,7 @@ export async function runCodemod(
 				? cached.error
 				: 'Two generated adapters need different code at ' + path.relative(root, output);
 		const name = path.relative(root, output);
-		const ownerOf = (file: string) =>
-			owners.has(ts.sys.useCaseSensitiveFileNames ? file : file.toLowerCase());
+		const ownerOf = (file: string) => owners.has(outputKey(file));
 		// Bundlers can prefer a JavaScript or JSX sibling over our extensionless .ts import.
 		const shadowed =
 			output.endsWith('.ts') &&
