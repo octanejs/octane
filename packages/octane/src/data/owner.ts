@@ -19,6 +19,8 @@
  *   request that may predate the change it reloads for. The newest read
  *   started for a key replaces the value of each replica that holds it and is
  *   not loading it itself; an older one finishing later does not.
+ * - Each write's receipt is looked up once per owner, and every tab that asks
+ *   for it settles the write by that answer.
  * - One upstream connection serves every replica listening to a feed with
  *   the same parameters; it closes when the last one stops.
  * - With `fence`, the origin has one account at a time. Its record, the
@@ -95,6 +97,8 @@ type ToOwner =
 			readonly request: DataRequest;
 			/** A reload: it must not join a request already in flight. */
 			readonly fresh: boolean;
+			/** A write's receipt, which every tab asking for it shares. */
+			readonly receipt: boolean;
 	  }
 	| { readonly t: 'listen'; readonly id: number; readonly request: FeedRequest }
 	| { readonly t: 'unlisten'; readonly id: number }
@@ -168,6 +172,8 @@ export function createDataOwner(options: {
 	const asked = new WeakMap<Promise<DataReply>, Set<OwnerPort>>();
 	/** The newest read started for each wire key: only its value is told to the others. */
 	const newest = new Map<string, Promise<DataReply>>();
+	/** Receipts looked up, by wire key, so every tab settles a write by the same answer. */
+	const receipts = new Map<string, Promise<DataReply>>();
 
 	const others = (from: OwnerPort, message: ToReplica) => {
 		for (const port of replicas) if (port !== from) port.postMessage(message);
@@ -233,6 +239,8 @@ export function createDataOwner(options: {
 	const shown = new Set<string>();
 	/** Only the first tab to ask recovers the journal, so each write is looked up once. */
 	let recovering = false;
+	/** Writes journaled through this owner and not yet settled, which are no tab's to recover. */
+	const journaled = new Set<string>();
 	function persistenceFor(): Persistence | null {
 		if (!persistence && serving && options.persist) {
 			persistence = createPersistence(
@@ -257,13 +265,25 @@ export function createDataOwner(options: {
 		if (!p) return answer(nothing(op));
 		if (op === 'save' || op === 'restore') shown.add(key);
 		if (op === 'save') return (saves.set(key, args[1] as Saving | null), p.mark(key));
+		if (op === 'journal') journaled.add((args[0] as { id: string }).id);
+		if (op === 'unjournal') journaled.delete(key);
 		if (op === 'recover') {
 			if (recovering) return answer([]);
 			recovering = true;
 		}
 		// Each operation is the persistence method of the same name.
 		const result = (p as any)[op](...args) as Promise<unknown> | undefined;
-		result?.then(answer, () => answer(nothing(op)));
+		result?.then(
+			(value) =>
+				// A write in flight through this owner is its tab's to settle; only an earlier
+				// owner's, such as a crashed worker's, are left for the recovering tab.
+				answer(
+					op === 'recover'
+						? (value as { id: string }[]).filter(({ id }) => !journaled.has(id))
+						: value,
+				),
+			() => answer(nothing(op)),
+		);
 	}
 
 	/** Every replica of the account hears it is retired, and nothing in flight reaches one. */
@@ -273,6 +293,8 @@ export function createDataOwner(options: {
 		persistence = null;
 		saves.clear();
 		shown.clear();
+		journaled.clear();
+		receipts.clear();
 		recovering = false;
 		serving = null;
 		generation = 0;
@@ -349,7 +371,10 @@ export function createDataOwner(options: {
 		}
 	}
 
-	function request(from: OwnerPort, id: number, payload: DataRequest, fresh: boolean): void {
+	function request(
+		from: OwnerPort,
+		{ id, request: payload, fresh, receipt }: Extract<ToOwner, { t: 'request' }>,
+	): void {
 		const answer = (reply: DataReply) => post(from, { t: 'reply', id, reply });
 		const fail = (error: unknown) => post(from, { t: 'failed', id, error });
 		if (payload.kind === 'write') {
@@ -368,7 +393,7 @@ export function createDataOwner(options: {
 			return;
 		}
 		const key = `${payload.kind}\n${entryKey(payload.name, payload.input)}`;
-		let shared = fresh ? undefined : reading.get(key);
+		let shared = receipt ? receipts.get(key) : fresh ? undefined : reading.get(key);
 		if (!shared) {
 			const started = (shared = Promise.resolve().then(() =>
 				transport(payload, new AbortController().signal),
@@ -379,6 +404,15 @@ export function createDataOwner(options: {
 				if (reading.get(key) === started) reading.delete(key);
 				if (newest.get(key) === started) newest.delete(key);
 			};
+			if (receipt) {
+				receipts.set(key, started);
+				// An answer that is not an outcome is asked for again; the oldest outcomes are forgotten.
+				started.then(
+					(reply) => reply.ok || receipts.delete(key),
+					() => receipts.delete(key),
+				);
+				if (receipts.size > 256) receipts.delete(receipts.keys().next().value!);
+			}
 			if (payload.kind === 'read') {
 				started.then(
 					(reply) => {
@@ -476,7 +510,7 @@ export function createDataOwner(options: {
 					watch(port);
 				}
 				heard.set(port, hostDateNow());
-				if (message.t === 'request') request(port, message.id, message.request, message.fresh);
+				if (message.t === 'request') request(port, message);
 				else if (message.t === 'listen') subscribe(port, message.id, message.request);
 				else if (message.t === 'unlisten') unsubscribe(port, message.id);
 				else if (message.t === 'retire') signOut();
@@ -561,20 +595,26 @@ export function createReplica(
 	 */
 	const askedFor = new Set<string>();
 
+	const receiptName = local.persist?.journal?.receipt.name;
+	/** Ask the owner to make `request`. */
+	const ask = (request: DataRequest, fresh: boolean) =>
+		new Promise<DataReply>((resolve, reject) => {
+			const id = ++next;
+			replies.set(id, { request, fresh, resolve, reject });
+			const receipt = request.kind === 'read' && request.name === receiptName;
+			send({ t: 'request', id, request, fresh, receipt });
+		});
+
 	const transport: Transport = (request, signal) => {
 		if (!port) return local.transport(request, signal);
-		return new Promise((resolve, reject) => {
-			const id = ++next;
-			let fresh = false;
-			if (request.kind !== 'write') {
-				const key = `${request.kind}\n${entryKey(request.name, request.input)}`;
-				fresh = askedFor.delete(key);
-				askedFor.add(key);
-				if (askedFor.size > 512) askedFor.delete(askedFor.values().next().value!);
-			}
-			replies.set(id, { request, fresh, resolve, reject });
-			send({ t: 'request', id, request, fresh });
-		});
+		let fresh = false;
+		if (request.kind !== 'write') {
+			const key = `${request.kind}\n${entryKey(request.name, request.input)}`;
+			fresh = askedFor.delete(key);
+			askedFor.add(key);
+			if (askedFor.size > 512) askedFor.delete(askedFor.values().next().value!);
+		}
+		return ask(request, fresh);
 	};
 
 	const viaOwner: Listener = (request, signal) => ({
@@ -745,22 +785,16 @@ export function createReplica(
 	/**
 	 * The owner stopped answering: its worker may have crashed. Show nothing
 	 * until a new owner confirms the account, and ask it what the old one did
-	 * not answer.
+	 * not answer. Once it does, settle each write left uncertain by its receipt.
 	 */
+	let reconnecting = false;
 	function lost() {
 		const reopened = port && opened.get(port)?.reopen();
 		if (!reopened) return becomeLocal(false);
 		inner.fence(true);
+		reconnecting = true;
 		connect(reopened);
-		abandon(
-			(request, fresh) =>
-				new Promise((resolve, reject) => {
-					const id = ++next;
-					replies.set(id, { request, fresh, resolve, reject });
-					send({ t: 'request', id, request, fresh });
-				}),
-			false,
-		);
+		abandon(ask, false);
 	}
 
 	// Each side checks the other is still there. A tab whose last three pings went unanswered
@@ -870,6 +904,10 @@ export function createReplica(
 				case 'live':
 					decide(true);
 					inner.fence(false);
+					if (reconnecting) {
+						reconnecting = false;
+						inner.resettle();
+					}
 					break;
 				case 'persisted':
 					asked.get(message.id)?.resolve(message.value);

@@ -207,12 +207,14 @@ connection code. Each PR reports bytes as usual.
    flight become uncertain.) Contract identity, a mixed-build test
    (one compatible pair, one incompatible), worker termination and respawn,
    and journal recovery after a crash.
-5. **Single-writer cache.** (This PR, 5a: `serveDataOwner({ persist })`; a
-   replica forwards its persistence to the owner, and only the first tab
-   recovers the journal. 5b settles writes lost in a crash from the owner's
-   journal.) The cache budget becomes per account, not per tab.
-   Receipt lookups are deduplicated across tabs. Then remove the per-tab
-   persistence path from replicas.
+5. **Single-writer cache.** (Done. 5a, #2594: `serveDataOwner({ persist })`;
+   a replica forwards its persistence to the owner, which keeps one cache and
+   budget per account, and only the first tab recovers the journal; a tab
+   keeps its own persistence only as a local store. 5b: a tab that reconnects
+   after a crash settles each journaled write it shows as uncertain by its
+   receipt, which the owner looks up once for every tab; a later tab's
+   recovery leaves out writes still in flight; a new owner can remove a
+   write an earlier one journaled.)
 
 Each PR carries both bindings' tests and the RFC acceptance cases it closes.
 
