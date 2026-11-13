@@ -206,8 +206,22 @@ store once hydrated. Only the newest submission's outcome is shown.
   `OctaneRspackPlugin` emits it at `/_octane/data-worker.js`.
   `sharedOwner(name, url?)` returns that SharedWorker's port, named by protocol
   version and `name`, or `null` where SharedWorker is unavailable.
-- The owner does not persist yet, and account fencing across tabs is not yet
-  available.
+- `createDataOwner({ fence: true })`, which `serveDataOwner` always sets,
+  fences accounts. The origin has one account at a time, recorded in IndexedDB
+  (`octane-data-account`) with a generation that increases on every sign-in
+  and sign-out, durably before any replica hears of it, and announced on the
+  `octane-data:account` `BroadcastChannel`. `sharedOwner(account)` opens with a
+  `hello` naming the account. A different account signing in retires every
+  replica of the old one: values clear, pending requests reject with
+  `DataRetiredError`, feeds end, and nothing in flight reaches a replica.
+- `retire()` on a replica signs its account out in every tab and repeats the
+  request every 5 seconds until the owner confirms. A sign-out records only if
+  its generation is still current, so it never undoes a newer sign-in.
+- A replica's reads show pending while its page is frozen. On `resume` it asks
+  the owner, and shows them again only once the account is confirmed.
+- The owner protocol version (2) is part of the worker's name, so tabs on
+  another protocol never share an owner.
+- The owner does not persist yet.
 
 ## Errors
 

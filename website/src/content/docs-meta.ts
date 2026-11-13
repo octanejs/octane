@@ -342,7 +342,14 @@ export const docsMeta: DocMeta[] = [
 					'sharedOwner',
 					'serveDataOwner',
 					'dataWorker',
+					'account fencing',
+					'sign out',
 				],
+			},
+			{
+				id: 'account-fencing',
+				title: 'One account per browser, in every tab',
+				level: 3,
 			},
 			{
 				id: 'bindings',

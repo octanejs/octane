@@ -1367,6 +1367,8 @@ export async function switchAccount(): Promise<DataStore> {
 
 Give the new store to your `DataProvider` and key the subtree by account, so
 nothing from the old account carries over.
+When tabs share an owner, retiring one tab's store signs the account out in
+every tab; see [One account per browser](#account-fencing).
 
 <h2 id="cross-tab">Sharing across tabs</h2>
 
@@ -1444,8 +1446,10 @@ export default {
 With Rspack the worker is emitted as the `octane-data-worker` entry; leave
 that entry out of your pages' HTML.
 
-**3. Connect each tab.** `sharedOwner(name)` connects to the owner every tab
-with the same `name` uses; use the account's partition. It returns `null`
+**3. Connect each tab.** `sharedOwner(account)` connects to the owner every
+tab signed in as that account uses, and tells it which account this tab is
+signed in as. Pass the same account ID your server authenticates, such as the
+signed-in user's ID. It returns `null`
 where SharedWorker is missing or cannot start, so fall back to an ordinary
 store there:
 
@@ -1483,15 +1487,63 @@ listen })` returns an owner whose `connect(port)` serves a replica over any
 `MessagePort`, such as one end of a `MessageChannel`. That is useful in tests,
 and for sharing one owner between several roots in one page.
 
+<h3 id="account-fencing">One account per browser, in every tab</h3>
+
+A shared owner has to be careful about accounts. Picture two tabs open as Ada.
+In one, Ada signs out and Grace signs in. The other tab must not keep showing
+Ada's shelf, and nothing Ada's tab had in flight may arrive in Grace's. That
+is true even for a tab the browser froze in the background, which hears
+nothing until it wakes.
+
+So the data worker **fences** accounts. The origin has one signed-in account
+at a time. The worker records it in IndexedDB, with a **generation** number
+that goes up on every sign-in and sign-out, before any tab hears about it,
+and announces each change to the other workers on a `BroadcastChannel`.
+`serveDataOwner` turns this on for you, and you do not call anything extra:
+
+- **Signing in as another account signs the old one out everywhere.** When a
+  tab connects with `sharedOwner('grace')` while Ada is recorded, Grace is
+  recorded, and every tab of Ada's is retired: its values clear, its pending
+  requests reject with `DataRetiredError`, and its feeds close.
+- **Signing out reaches every tab.** Calling `store.retire()` on a replica
+  signs its account out in every tab, not just this one. The tab keeps asking
+  until the owner confirms, so a busy or restarting worker cannot lose a
+  sign-out.
+- **A late sign-out never undoes a newer sign-in.** A sign-out applies only if
+  the generation it was made under is still the recorded one.
+- **Frozen tabs wake up safe.** When the browser freezes a tab, its reads show
+  as pending. When it resumes, it asks its owner whether its account is still
+  signed in, and shows its values again only if it is. Otherwise it is
+  retired.
+
+In practice, switching accounts in a tab looks like it does without sharing:
+open the new account's store, and give it to your `DataProvider`. The old
+account's other tabs are retired for you.
+
+```ts
+import { createReplica, sharedOwner, type DataStore } from 'octane/data';
+import { addBook, removeBook, setRead } from './contracts.ts';
+
+const writes = [addBook, setRead, removeBook];
+
+export function switchAccount(current: DataStore, next: string): DataStore | null {
+	const port = sharedOwner(next);
+	if (!port) return null; // No SharedWorker: open an ordinary store instead.
+	// Recording `next` retires every tab of the old account, this one's store included.
+	const store = createReplica(port, { writes });
+	void current.retire();
+	return store;
+}
+```
+
+`createDataOwner` takes the same switch as `fence: true` when you host an
+owner yourself; without it, the owner serves every replica that connects.
+
 <h3 id="cross-tab-limits">Current limits</h3>
 
-Cross-tab sharing is the newest part of `octane/data`:
-
-- The owner does not persist yet. A replica has no `persist` option, so a page
-  that needs an encrypted cache or a write journal uses an ordinary store.
-- Account fencing is coming soon: signing out in one tab will reach every
-  tab, including tabs frozen in the background, with one account per origin.
-  Until then, retire each tab's store when its account changes.
+The owner does not persist yet. A replica has no `persist` option, so a page
+that needs an encrypted cache or a write journal uses an ordinary store, one
+per tab.
 
 <h2 id="bindings">Octane and React, one store</h2>
 
