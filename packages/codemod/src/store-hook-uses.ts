@@ -10,6 +10,7 @@ type ResultCheck = {
 	known: Map<ts.Expression, boolean>;
 	descriptors: (elements: ts.JsxSelfClosingElement[]) => boolean;
 	unchangedHelper?: (module: string, name: string) => boolean;
+	retainedArgument?: (module: string, name: string) => boolean;
 };
 
 function literal(value: ts.Expression) {
@@ -171,6 +172,15 @@ export function storeHookUses(
 			!call.questionDotToken &&
 			call.arguments[0] === fn &&
 			reactHook(call.expression, ['useEffect', 'useLayoutEffect'])
+		);
+	}
+	function sameEffectSetup(call: ts.CallExpression, hook: ts.CallExpression) {
+		const effect = ts.findAncestor(call, effectBoundary);
+		return (
+			!!effect &&
+			ts.isFunctionLike(effect) &&
+			effectCallback(effect) &&
+			ts.findAncestor(effect.parent, effectBoundary) === ts.findAncestor(hook, effectBoundary)
 		);
 	}
 	function clickHandler(value: ts.Node, hook: ts.CallExpression) {
@@ -461,6 +471,23 @@ export function storeHookUses(
 				)
 					return check.descriptors(p.arguments.filter(ts.isJsxSelfClosingElement));
 				const handle = p.arguments[0];
+				if (
+					check.retainedArgument &&
+					handle &&
+					!p.questionDotToken &&
+					ts.isPropertyAccessExpression(value) &&
+					!value.questionDotToken &&
+					(ts.isExpressionStatement(p.parent) || ts.isVoidExpression(p.parent))
+				) {
+					const receiver = originalReceiver(value.expression, check, true);
+					if (
+						receiver &&
+						sameEffectSetup(p, receiver) &&
+						p.arguments.slice(1).every((arg) => argument(arg, check)) &&
+						sharedHandle(handle, check.retainedArgument) === true
+					)
+						return true;
+				}
 				return (
 					ts.isPropertyAccessExpression(value) &&
 					!!originalReceiver(value.expression, check) &&
@@ -489,8 +516,16 @@ export function storeHookUses(
 		imported: StoreInputCheck,
 		descriptors: ResultCheck['descriptors'],
 		unchangedHelper?: ResultCheck['unchangedHelper'],
+		retainedArgument?: ResultCheck['retainedArgument'],
 	) => {
-		const check: ResultCheck = { item, imported, known: new Map(), descriptors, unchangedHelper };
+		const check: ResultCheck = {
+			item,
+			imported,
+			known: new Map(),
+			descriptors,
+			unchangedHelper,
+			retainedArgument,
+		};
 		const references = uses(item.name);
 		return (
 			references.length > 0 &&
