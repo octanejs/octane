@@ -84,6 +84,12 @@ export interface OctaneVitePluginOptions {
 	 * `sharedOwner`. Resolved from the Vite project root.
 	 */
 	dataWorker?: string;
+	/**
+	 * The `octane/data` contract check and the generated `octane/data/manifest`.
+	 * On once the app imports `octane/data/manifest`; `true` turns the check on
+	 * without it, and `false` turns both off.
+	 */
+	data?: boolean;
 	/** @experimental Declarative renderer selection for this compiler instance. */
 	renderers?: OctaneRendererConfigOptions;
 	/**

@@ -11,6 +11,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('octane/compiler/bundler', () => ({
 	createOctaneCompiler: mocks.createOctaneCompiler,
+	// No data program, as with `data: false`; tests/data-contracts.test.ts builds it for real.
+	createDataProgram: () => null,
+	DATA_MANIFEST_MODULE: 'octane/data/manifest',
+	formatDataDiagnostic: () => '',
 }));
 
 import { OctaneRspackPlugin, octaneRspack } from '../src/index.js';

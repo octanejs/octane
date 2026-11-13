@@ -1,7 +1,14 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
-import { analyzeDataContracts } from '../../src/compiler/data-contracts.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+	analyzeDataContracts,
+	createDataProgram,
+	formatDataDiagnostic,
+} from '../../src/compiler/data-contracts.js';
+
+type Diagnostic = { code: string; start: { line: number } };
 
 const FIXTURES = join(import.meta.dirname, '_fixtures/data-contracts');
 
@@ -233,5 +240,180 @@ for (const list of [books, finished]) cache.set(list.name, list);
 			'OCTANE_DATA_CONTRACT_ESCAPE:2',
 			'OCTANE_DATA_CONTRACT_ESCAPE:3',
 		]);
+	});
+});
+
+describe('data contract program', () => {
+	const roots: string[] = [];
+	afterEach(() => {
+		for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+	});
+	function project(files: Record<string, string>) {
+		const root = realpathSync(mkdtempSync(join(tmpdir(), 'octane-data-program-')));
+		roots.push(root);
+		for (const [name, source] of Object.entries(files)) writeFileSync(join(root, name), source);
+		return root;
+	}
+	const report = (root: string, files?: string[]) =>
+		createDataProgram(root, files)
+			.report()
+			.map((diagnostic) => formatDataDiagnostic(diagnostic, root).split('] ')[0] + ']');
+
+	it('counts only contract exports of a contract module as contracts', () => {
+		const root = project({
+			'books.data.ts': `${contracts}export const bookShape = z.object({ id: z.string() });\n`,
+		});
+		const page = `import * as books from './books.data.ts';
+import { bookShape, stats } from './books.data.ts';
+export const list = z.array(bookShape);
+export const parsed = parse(books.bookShape, input);
+export const read = () => store.read(stats);
+export const escaped = remember(books.stats);
+`;
+		expect(
+			createDataProgram(root)
+				.check(join(root, 'page.ts'), page)
+				.map((diagnostic: Diagnostic) => `${diagnostic.code}:${diagnostic.start.line}`),
+		).toEqual(['OCTANE_DATA_CONTRACT_ESCAPE:6']);
+		// Without the program, every import from the module counts.
+		expect(codes(page, join(root, 'page.ts'))).toEqual([
+			'OCTANE_DATA_CONTRACT_ESCAPE:3',
+			'OCTANE_DATA_CONTRACT_ESCAPE:4',
+			'OCTANE_DATA_CONTRACT_ESCAPE:6',
+		]);
+	});
+
+	it('reports unhandled, twice-handled, unused, and duplicate contracts', () => {
+		const root = project({
+			'books.data.ts': contracts,
+			'more.data.ts': `import { read } from 'octane/data';
+export const total = read({ name: 'books.stats' });
+`,
+			'server.ts': `import * as Books from './books.data.ts';
+import { addBook } from './books.data.ts';
+createDataHandler({}, (handle, defineHandler) => [
+	...defineHandler(Books, {}),
+	handle(addBook, run),
+]);
+`,
+			'page.ts': `import { setRead, stats } from './books.data.ts';
+import { total } from './more.data.ts';
+store.write(setRead, {});
+store.read(stats);
+store.read(total);
+`,
+			'ignored.ts': `store.read(nothing);
+`,
+		});
+		expect(report(root)).toEqual([
+			'books.data.ts:5:14 [OCTANE_DATA_CONTRACT_UNHANDLED]',
+			'more.data.ts:2:14 [OCTANE_DATA_CONTRACT_DECLARATION]',
+			'more.data.ts:2:14 [OCTANE_DATA_CONTRACT_UNHANDLED]',
+		]);
+		// An explicit file list replaces the scan: without the server, every used contract is unhandled.
+		expect(
+			report(
+				root,
+				['books.data.ts', 'page.ts'].map((file) => join(root, file)),
+			),
+		).toEqual([
+			'books.data.ts:4:14 [OCTANE_DATA_CONTRACT_UNHANDLED]',
+			'books.data.ts:5:14 [OCTANE_DATA_CONTRACT_UNUSED]',
+			'books.data.ts:6:14 [OCTANE_DATA_CONTRACT_UNHANDLED]',
+		]);
+	});
+
+	it('follows contract modules that import each other, and sees their edits', () => {
+		const root = project({
+			'a.data.ts': `import { entity } from 'octane/data';
+import { Other } from './b.data.ts';
+export const Thing = entity('thing', Other);
+`,
+			'b.data.ts': `import { entity } from 'octane/data';
+import { Thing } from './a.data.ts';
+export const Other = entity('other', Thing);
+`,
+			'page.ts': `import { stats } from './a.data.ts';\nexport const s = remember(stats);\n`,
+		});
+		const program = createDataProgram(root);
+		expect(program.report().map((diagnostic) => diagnostic.code)).toEqual([
+			'OCTANE_DATA_CONTRACT_UNUSED',
+			'OCTANE_DATA_CONTRACT_UNUSED',
+		]);
+		// `stats` is not an export of a.data.ts, so the page holds no contract.
+		expect(program.check(join(root, 'page.ts'))).toEqual([]);
+		writeFileSync(
+			join(root, 'a.data.ts'),
+			`import { read } from 'octane/data';\nexport const stats = read({ name: 'a.stats' });\n`,
+		);
+		program.invalidate(join(root, 'a.data.ts'));
+		expect(
+			program.check(join(root, 'page.ts')).map((diagnostic: Diagnostic) => diagnostic.code),
+		).toEqual(['OCTANE_DATA_CONTRACT_ESCAPE']);
+	});
+
+	it('narrows an import once its contract module appears', () => {
+		const root = project({
+			'page.ts': `import { bookShape } from './books.data.ts';\nexport const list = z.array(bookShape);\n`,
+		});
+		const program = createDataProgram(root);
+		// Unknown module: every import from it counts as a contract.
+		expect(program.check(join(root, 'page.ts')).map((d: Diagnostic) => d.code)).toEqual([
+			'OCTANE_DATA_CONTRACT_ESCAPE',
+		]);
+		writeFileSync(
+			join(root, 'books.data.ts'),
+			`${contracts}export const bookShape = z.object({ id: z.string() });\n`,
+		);
+		program.invalidate(join(root, 'books.data.ts'));
+		expect(program.check(join(root, 'page.ts'))).toEqual([]);
+	});
+
+	it('follows contracts a contract module re-exports', () => {
+		const root = project({
+			'books.data.ts': contracts,
+			'index.data.ts': `export * from './more.data.ts';\nexport { setRead, stats as total } from './books.data.ts';\n`,
+			'more.data.ts': `import { read } from 'octane/data';\nexport const extra = read({ name: 'more.extra' });\n`,
+			'server.ts': `import * as All from './index.data.ts';
+createDataHandler({}, (handle, defineHandler) => defineHandler(All, {}));
+`,
+			'page.ts': `import { extra, setRead, total } from './index.data.ts';
+store.write(setRead, {});
+store.read(total);
+store.read(extra);
+`,
+		});
+		// `defineHandler(All)` serves the re-exported contracts, under an alias and
+		// through `export *`, and the page's uses through the barrel count. Only
+		// `addBook`, which the barrel leaves out and nothing calls, is reported.
+		expect(report(root)).toEqual(['books.data.ts:5:14 [OCTANE_DATA_CONTRACT_UNUSED]']);
+	});
+
+	it('recovers once a module with a syntax error is fixed', () => {
+		const root = project({ 'books.data.ts': `${contracts}export const broken = (;\n` });
+		const program = createDataProgram(root);
+		const page = `import { stats } from './books.data.ts';\nexport const s = remember(stats);\n`;
+		expect(program.check(join(root, 'books.data.ts'))).toEqual([]);
+		expect(program.report()).toEqual([]);
+		// The manifest still watches it, so fixing it regenerates the manifest.
+		expect(program.manifest().files).toEqual([join(root, 'books.data.ts')]);
+		writeFileSync(join(root, 'books.data.ts'), contracts);
+		program.invalidate(join(root, 'books.data.ts'));
+		expect(program.check(join(root, 'page.ts'), page).map((d: Diagnostic) => d.code)).toEqual([
+			'OCTANE_DATA_CONTRACT_ESCAPE',
+		]);
+		// The fixed module's contracts are back: nothing uses them.
+		expect(program.report().map((d: Diagnostic) => d.code)).toContain(
+			'OCTANE_DATA_CONTRACT_UNUSED',
+		);
+	});
+
+	it('opts in when the application imports the manifest', () => {
+		const root = project({ 'books.data.ts': contracts });
+		const program = createDataProgram(root);
+		expect(program.importsManifest()).toBe(false);
+		writeFileSync(join(root, 'entry.ts'), `import { contracts } from 'octane/data/manifest';\n`);
+		program.invalidate(join(root, 'entry.ts'));
+		expect(program.importsManifest()).toBe(true);
 	});
 });

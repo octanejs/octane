@@ -452,7 +452,7 @@
       "code": "OCTANE_DATA_CONTRACT_DECLARATION",
       "section": "data",
       "severity": "error",
-      "detects": "A call to `entity`, `read`, `view`, `write`, or `feed` from `octane/data` is not the whole initializer of an exported module-level `const`, its `name` (or an entity's first argument) is not a string literal, its options object spreads another object, or two contracts in the module share a name. The build cannot list a contract it cannot read without running the module.",
+      "detects": "A call to `entity`, `read`, `view`, `write`, or `feed` from `octane/data` is not the whole initializer of an exported module-level `const`, its `name` (or an entity's first argument) is not a string literal, its options object spreads another object, or two contracts share a name, in one module or across the application's contract modules. The build cannot list a contract it cannot read without running the module.",
       "replacement": "Declare each contract as `export const setRead = write({ name: 'books.setRead', … })` in a `*.data.ts` module. Instead of building contracts in a function, declare one contract whose `input` carries the value.",
       "url": "https://octanejs.dev/docs/strong-mode#octane-data-contract-declaration"
     },
@@ -479,6 +479,22 @@
       "detects": "A contract binding is used somewhere other than a contract site, an inline array a site loops over, an import or export, a type, or the object of a property read: for example passed to an app helper, stored in a variable, array, or map, or passed as a prop. The build could no longer find every use of the contract.",
       "replacement": "Pass a callback that names the contract, such as `submit(session, (store) => store.write(setRead, input))`, or move code that must take any contract into a module outside the check.",
       "url": "https://octanejs.dev/docs/strong-mode#octane-data-contract-escape"
+    },
+    {
+      "code": "OCTANE_DATA_CONTRACT_UNHANDLED",
+      "section": "data",
+      "severity": "error",
+      "detects": "A read, view, write, or feed is used by the app, such as in `store.read` or `useForm`, but no `handle(…)` or `defineHandler(…)` in any `createDataHandler` serves it, or two of them do. The build checks the whole application, so a client build sees the server's handlers. Development builds report it as a warning.",
+      "replacement": "Serve each contract once: `handle(setRead, (input, call) => …)` inside `createDataHandler`, or `defineHandler(Books, { … })` for every contract `Books` exports.",
+      "url": "https://octanejs.dev/docs/strong-mode#octane-data-contract-unhandled"
+    },
+    {
+      "code": "OCTANE_DATA_CONTRACT_UNUSED",
+      "section": "data",
+      "severity": "hint",
+      "detects": "A contract nothing in the application uses: a read, view, write, or feed no module calls, though a handler may serve it, or an entity no contract names.",
+      "replacement": "Remove the contract and its handler, or use it from the app.",
+      "url": "https://octanejs.dev/docs/strong-mode#octane-data-contract-unused"
     }
   ],
   "recipes": [

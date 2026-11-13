@@ -58,6 +58,7 @@ const PLUGIN_OPTION_KEYS = new Set([
 	'cssModuleConstants',
 	'clientBuildMode',
 	'dataWorker',
+	'data',
 ]);
 const LAYER_SPECIALIZATION_KEYS = new Set(['runtime', 'renderers', 'universalRuntime']);
 
@@ -203,6 +204,9 @@ function normalizeOptions(value, plugin) {
 	}
 	if (plugin) normalizeRuntimeRequest(options.runtime);
 	if (plugin) normalizeRuntimeRequest(options.dataWorker, 'dataWorker');
+	if (plugin && options.data !== undefined && typeof options.data !== 'boolean') {
+		throw new TypeError('@octanejs/rspack-plugin: `data` must be a boolean when provided.');
+	}
 	if (
 		plugin &&
 		options.clientBuildMode !== undefined &&
@@ -293,6 +297,7 @@ function normalizeOptions(value, plugin) {
 		...(plugin && options.transpile !== undefined ? { transpile: options.transpile } : null),
 		...(plugin && options.runtime !== undefined ? { runtime: options.runtime } : null),
 		...(plugin && options.dataWorker !== undefined ? { dataWorker: options.dataWorker } : null),
+		...(plugin && options.data !== undefined ? { data: options.data } : null),
 		...(plugin && options.cssModuleConstants !== undefined
 			? { cssModuleConstants: options.cssModuleConstants }
 			: null),

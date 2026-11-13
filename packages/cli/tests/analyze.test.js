@@ -244,6 +244,53 @@ export function Hint({ value }) @{
 	});
 });
 
+describe('octane analyze octane/data contracts', () => {
+	const FIXTURE = path.join(OCTANE, 'tests/compiler/_fixtures/data-program/src');
+
+	/** @param {Record<string, string>} files */
+	function linked(files) {
+		const created = project(files);
+		mkdirSync(path.join(created.root, 'node_modules'));
+		symlinkSync(OCTANE, path.join(created.root, 'node_modules/octane'), 'dir');
+		return created;
+	}
+	const sources = Object.fromEntries(
+		['books.data.ts', 'extra.data.ts', 'page.ts', 'schema.ts', 'server.ts'].map((name) => [
+			`src/${name}`,
+			readFileSync(path.join(FIXTURE, name), 'utf8'),
+		]),
+	);
+
+	it('reports what the build reports once the app imports the manifest', async () => {
+		const { root } = linked({
+			...sources,
+			'src/entry.ts': readFileSync(path.join(FIXTURE, 'entry.ts'), 'utf8'),
+		});
+		const result = await runCli(['analyze', '--cwd', root, '--json']);
+		const found = result
+			.json()
+			.findings.map(
+				(/** @type {any} */ finding) =>
+					`${finding.file}:${finding.line} ${finding.severity} ${finding.code}`,
+			);
+		expect(found).toEqual([
+			'src/books.data.ts:12 error OCTANE_DATA_CONTRACT_UNHANDLED',
+			'src/books.data.ts:14 hint OCTANE_DATA_CONTRACT_UNUSED',
+			'src/books.data.ts:15 hint OCTANE_DATA_CONTRACT_UNUSED',
+			'src/extra.data.ts:4 error OCTANE_DATA_CONTRACT_UNHANDLED',
+			'src/extra.data.ts:5 error OCTANE_DATA_CONTRACT_DECLARATION',
+			'src/extra.data.ts:5 hint OCTANE_DATA_CONTRACT_UNUSED',
+		]);
+		expect(result.exitCode).toBe(3);
+	});
+
+	it('leaves an app that does not import the manifest alone', async () => {
+		const { root } = linked(sources);
+		const result = await runCli(['analyze', '--cwd', root, '--json']);
+		expect(result.json().findings).toEqual([]);
+	});
+});
+
 describe('octane analyze Strong coverage', () => {
 	const EFFECT_UPDATE =
 		"import { useState, useEffect } from 'octane';\n" +
