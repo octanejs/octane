@@ -60,7 +60,7 @@ export function strengthen(
 	const original = code;
 	const fixed: string[] = [];
 	let diagnostics: CompileDiagnostic[] = [];
-	for (let round = 0; round < MAX_ROUNDS; round++) {
+	for (let round = 0; round <= MAX_ROUNDS; round++) {
 		const result = compiler.collectDiagnostics(code, filename, { strong: true });
 		if (result.error != null) {
 			// A module that compatibility mode cannot compile either has no
@@ -69,6 +69,8 @@ export function strengthen(
 			return fallback(code, compat.error == null ? [thrown(result.error)] : [], fixed, force);
 		}
 		diagnostics = result.diagnostics;
+		// The last pass checks the final edit without attempting another repair.
+		if (round === MAX_ROUNDS) break;
 		const stateArguments = propStateArguments(code, filename, diagnostics);
 		const fixes = diagnostics.flatMap((diagnostic) => fixesFor(code, diagnostic, stateArguments));
 		if (fixes.length === 0) break;
