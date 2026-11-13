@@ -1186,7 +1186,10 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		}
 		for (const field of fields) {
 			if (pathSvgTags.has(field.tagName)) this.count('svg-paths');
-			else if (bareSvgImports.size && isBareSvgTag(field.tagName, this.checker, bareSvgImports)) {
+			else if (
+				bareSvgImports.size &&
+				isBareSvgTag(field.tagName, this.checker, bareSvgImports, this.localUses)
+			) {
 				this.note(
 					this.nativeStoreHooks.size ? 'store-hook' : 'svg-issuer',
 					'error',
