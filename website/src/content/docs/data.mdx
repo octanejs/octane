@@ -1651,11 +1651,19 @@ A tab only uses the `persist` options you gave `createReplica` when it carries
 on as an ordinary store. Point them at the same storage, partition and key,
 and such a tab reads the same cache.
 
-<h3 id="cross-tab-limits">Current limits</h3>
+<h3 id="cross-tab-crash-writes">Writes in flight when the worker crashes</h3>
 
-A write that was on its way to the worker when the worker crashed becomes
-uncertain, and you settle it from its receipt, as with any lost reply. A later
-release settles it automatically from the worker's journal.
+A write that was on its way when the worker crashed may or may not have
+reached your server, so it becomes uncertain, and its edit stays on screen.
+If the write is in your `journal`, you don't need to do anything else. Once
+a tab reconnects to the new worker, it asks your `receipt` read whether the
+server applied the write, then keeps the edit or rolls it back. The write is
+never sent again.
+
+Every tab showing that write does the same, but the worker asks your server
+only once and gives each tab the same answer, so all of them end up agreeing.
+A write that isn't in the journal stays uncertain until you settle it from
+its receipt yourself, as with any lost reply.
 
 <h2 id="bindings">Octane and React, one store</h2>
 

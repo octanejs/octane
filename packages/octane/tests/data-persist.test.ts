@@ -11,12 +11,14 @@ import {
 	createDataOwner,
 	createDataStore,
 	createReplica,
+	DataUncertainError,
 	entity,
 	feed,
 	indexedDBStorage,
 	listen,
 	memoryStorage as createMemoryStorage,
 	read,
+	sharedOwner,
 	view,
 	write,
 	type DataOwner,
@@ -1906,6 +1908,120 @@ describe('octane/data persistence through a shared owner', () => {
 		await vi.waitFor(() => expect(store.retired).toBe(true));
 		await saved();
 		expect(unhandled).not.toHaveBeenCalled();
+	});
+
+	/**
+	 * The account's data worker, over `storage`: the first tab to connect starts it, and
+	 * after `crash` the next tab to connect starts another, as the browser does.
+	 */
+	function crashingWorker(
+		storage: PersistentStorage,
+		transport: (request: DataRequest) => Promise<DataReply>,
+	) {
+		let worker: { owner: DataOwner; ports: MessagePort[] } | null = null;
+		vi.stubGlobal(
+			'SharedWorker',
+			class {
+				port: MessagePort;
+				constructor() {
+					worker ??= {
+						owner: createDataOwner({ transport, persist: () => cache(storage, 'ada') }),
+						ports: [],
+					};
+					const channel = new MessageChannel();
+					worker.owner.connect(channel.port1);
+					worker.ports.push(channel.port1);
+					this.port = channel.port2;
+					closing.push(() => (channel.port1.close(), channel.port2.close()));
+				}
+			},
+		);
+		return {
+			open() {
+				const store = createReplica(sharedOwner('ada')!, {
+					transport: () => Promise.reject(new Error('this tab did not share its owner')),
+					persist: cache(memoryStorage(), 'ada', { journal }),
+					contracts,
+				});
+				closing.push(() => void store.retire());
+				return store;
+			},
+			/** End the worker; each tab notices within three heartbeats, and starts another. */
+			async crash() {
+				for (const port of worker!.ports) port.close();
+				worker = null;
+				await vi.advanceTimersByTimeAsync(20_000);
+			},
+		};
+	}
+
+	it.each([
+		['never reached the server rolls back', 'request', false],
+		['the server applied is confirmed', 'reply', true],
+	] as const)(
+		'settles a write in flight when the worker crashed by its receipt, in every tab: one that %s',
+		async (_, lost, applied) => {
+			vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+			const storage = memoryStorage();
+			const remote = server(books());
+			let hung = false;
+			const worker = crashingWorker(storage, async (request) => {
+				if (request.kind !== 'write' || hung) return remote.transport(request);
+				// The worker crashes with the write in flight, before or after the server applies it.
+				if (lost === 'reply') await remote.transport(request);
+				hung = true;
+				return new Promise<DataReply>(() => {});
+			});
+			const [one, two] = [worker.open(), worker.open()];
+			const shown = [await value<Book[]>(one, shelf), await value<Book[]>(two, shelf)];
+			const readA = () => shown.map(({ handle }) => handle.getSnapshot().value![0]!.read);
+
+			const write = one.write(setRead, { id: 'a', read: true }).catch((error: unknown) => error);
+			await vi.waitFor(() => expect(hung).toBe(true));
+			expect(readA()).toEqual([true, true]);
+			await worker.crash();
+
+			expect(await write).toBeInstanceOf(DataUncertainError);
+			await vi.waitFor(() => expect(remote.log).toContain('read receipt'));
+			await vi.waitFor(() => expect(readA()).toEqual([applied, applied]));
+			// Both tabs settled by one lookup, and nothing was sent again.
+			expect(remote.log.filter((entry) => entry === 'read receipt')).toHaveLength(1);
+			expect(remote.log.filter((entry) => entry === 'write setRead')).toHaveLength(applied ? 1 : 0);
+
+			// Settled, it left the journal: a tab after the next restart has nothing to look up.
+			vi.useRealTimers();
+			await saved();
+			const after = server(remote.books, remote.applied);
+			const restarted = tab(ownerOver(storage, after), memoryStorage());
+			expect((await value<Book[]>(restarted, shelf)).value[0]!.read).toBe(applied);
+			await saved();
+			expect(after.log).not.toContain('read receipt');
+		},
+	);
+
+	it('leaves a write in flight to its tab when a tab opened after a crash recovers the journal', async () => {
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+		const remote = server(books());
+		let sent = false;
+		const worker = crashingWorker(memoryStorage(), (request) => {
+			sent ||= request.kind === 'write';
+			return remote.transport(request);
+		});
+		const one = worker.open();
+		const { handle } = await value<Book[]>(one, shelf);
+		await worker.crash();
+
+		// The new worker has not recovered the journal: the next tab to open does.
+		const release = remote.hold('write');
+		const write = one.write(setRead, { id: 'a', read: true });
+		// Journaled before it is sent.
+		await vi.waitFor(() => expect(sent).toBe(true));
+		const two = worker.open();
+		await value(two, shelf);
+		release();
+		await write;
+		expect(handle.getSnapshot().value![0]!.read).toBe(true);
+		expect(remote.log).not.toContain('read receipt');
 	});
 
 	it('keeps a cache of its own in a tab the owner refuses', async () => {
