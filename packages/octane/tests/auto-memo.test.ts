@@ -4607,19 +4607,23 @@ describe('compiler-owned component-region memoization', () => {
 		['tsrx', `key={'' + row} value={index}`],
 		['tsrx', `key={index} value={('' + '') + row}`],
 		['tsrx', `key={index} value={index === 0 ? 0 : 1n + 1}`, TypeError],
+		['tsx', 'key={index} value={String(row)}'],
+		['tsrx', 'key={index} value={`${row}`}'],
+		['tsrx', 'key={index} value={String?.(row)}'],
+		['tsrx', `key={index} value={index ? BigInt('invalid') : BigInt('1')}`, SyntaxError],
 	])(
-		'evaluates a later map callback addition before rendering the first row in .%s (%s)',
+		'evaluates a later map callback coercion before rendering the first row in .%s (%s)',
 		(extension, props, error = 'second callback') => {
 			const { App } = loadCompiledFixtureSource(
 				`function Child({ value }) {
-				if (value === 0 || value === '0') throw Error('first child');
+				if (value === 0 || value === '0' || value === 1n) throw Error('first child');
 				return <li />;
 			}
 			export function App({ rows }) {
 				return <ul>{rows.map((row, index) => <Child ${props} />)}</ul>;
 			}`,
 				{
-					id: `map-addition.${extension}`,
+					id: `map-coercion.${extension}`,
 					mode: 'server',
 					compileOptions: { hmr: false, dev: false, strong: false },
 				},
@@ -4636,34 +4640,43 @@ describe('compiler-owned component-region memoization', () => {
 		},
 	);
 
-	it('coerces mapped JSX props in callback order when keyed rows reverse', () => {
-		const { App } = loadCompiledFixtureSource(
-			`export function App({ rows }) @{
-				<ul>{rows.map(row => <li key={row.id} data-marker={'' + row} />)}</ul>
+	it.each([`'' + row`, 'String(row)', '`${row}`'])(
+		'coerces mapped JSX props in callback order when keyed rows reverse (%s)',
+		(expression) => {
+			const { App } = loadCompiledFixtureSource(
+				`export function App({ rows }) @{
+				<ul>{rows.map(row => <li key={row.id} data-marker={${expression}} />)}</ul>
 			}`,
-			{
-				id: 'map-concatenation-reorder.tsrx',
-				mode: 'client',
-				compileOptions: { hmr: false, dev: false, strong: false },
-			},
-		);
-		let sequence = 0;
-		const rows = ['a', 'b'].map((id) => ({
-			id,
-			[Symbol.toPrimitive]: () => ++sequence,
-		}));
-		const root = mount(App, { rows });
-		try {
-			const [first, second] = root.findAll('li');
-			expect(root.findAll('li').map((row) => row.getAttribute('data-marker'))).toEqual(['1', '2']);
-			sequence = 0;
-			root.update(App, { rows: rows.toReversed() });
-			expect(root.findAll('li')).toEqual([second, first]);
-			expect(root.findAll('li').map((row) => row.getAttribute('data-marker'))).toEqual(['1', '2']);
-		} finally {
-			root.unmount();
-		}
-	});
+				{
+					id: 'map-coercion-reorder.tsrx',
+					mode: 'client',
+					compileOptions: { hmr: false, dev: false, strong: false },
+				},
+			);
+			let sequence = 0;
+			const rows = ['a', 'b'].map((id) => ({
+				id,
+				[Symbol.toPrimitive]: () => ++sequence,
+			}));
+			const root = mount(App, { rows });
+			try {
+				const [first, second] = root.findAll('li');
+				expect(root.findAll('li').map((row) => row.getAttribute('data-marker'))).toEqual([
+					'1',
+					'2',
+				]);
+				sequence = 0;
+				root.update(App, { rows: rows.toReversed() });
+				expect(root.findAll('li')).toEqual([second, first]);
+				expect(root.findAll('li').map((row) => row.getAttribute('data-marker'))).toEqual([
+					'1',
+					'2',
+				]);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
 
 	it('preserves keyed component state and effects across native and custom map receivers', () => {
 		const compiled = compile(
@@ -8417,10 +8430,9 @@ describe('compiler-owned component-region memoization', () => {
 	});
 });
 
-// `String(value)` is the documented spelling of an intended text conversion. An
-// unshadowed conversion global must leave every component memo proof where the
-// bare value leaves it, so each source compiles to the same plan with or without
-// the call. A binding that shadows `String` is an ordinary callee again.
+// Unshadowed String(value) is eligible for component memoization like the bare
+// value. A shadowed String is an ordinary callee. Authored map callbacks have a
+// separate ordering requirement before a mapped component starts rendering.
 describe('autoMemo — conversion globals in component regions', () => {
 	const compileClient = (source: string, id: string) =>
 		compile(source, id, { hmr: false, autoMemo: true }).code;
@@ -8457,16 +8469,16 @@ describe('autoMemo — conversion globals in component regions', () => {
 			 }`,
 		],
 		[
-			'a mapped row under a provider',
+			'a mapped row component under a provider',
 			'mapped-provider.tsx',
 			`import { createContext, memo, useState } from 'octane';
 			 const Theme = createContext(null);
-			 function RowImpl(props) { return <span>{props.label}</span>; }
+			 function RowImpl(props) { return <span>{String(props.label) as string}</span>; }
 			 const Row = memo(RowImpl);
 			 function Rows(props) {
 				return (
 					<div id="rows">
-						{props.items.map((item) => <Row key={item.id} label={String(item.label)} />)}
+						{props.items.map((item) => <Row key={item.id} label={item.label} />)}
 					</div>
 				);
 			 }
