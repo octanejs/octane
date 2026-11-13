@@ -205,7 +205,9 @@ function fromBase64(text: string): Uint8Array<ArrayBuffer> {
 
 /** AES-GCM for values and HMAC for names, both derived from the session's key with HKDF. */
 async function createCipher(source: PersistOptions['key']) {
-	const secret = typeof source === 'function' ? await source() : source;
+	// Name the getter's type: under bun-types, `CryptoKey` survives a `typeof` function check.
+	const secret =
+		typeof source === 'function' ? await (source as () => CacheKey | Promise<CacheKey>)() : source;
 	const base =
 		secret instanceof CryptoKey
 			? secret
