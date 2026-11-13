@@ -193,6 +193,51 @@ describe('authored host JSX', () => {
 		}
 	});
 
+	it.each(['<main>{createPortal(null, "body")}</main>', '<>{createPortal(null, "body")}</>'])(
+		'calls a local function shadowing the Octane portal import in %s',
+		(body) => {
+			const source = `import { createPortal } from 'octane';
+			export function App({ createPortal }) @{ ${body} }
+			export function Portal({ target }) @{ <main>{createPortal(<b>portal</b>, target)}</main> }`;
+			const createPortal = vi.fn(() => 'local');
+			const props = { createPortal };
+			const { App: ServerApp } = fixture(source, true);
+			expect(renderToString(ServerApp, props).html).toContain('local');
+			expect(createPortal).toHaveBeenCalledExactlyOnceWith(null, 'body');
+			createPortal.mockClear();
+
+			const { App, Portal } = fixture(source);
+			const rendered = mount(App, props);
+			const target = document.createElement('div');
+			const portal = mount(Portal, { target });
+			try {
+				expect(rendered.container.textContent).toBe('local');
+				expect(createPortal).toHaveBeenCalledExactlyOnceWith(null, 'body');
+				expect(target.textContent).toBe('portal');
+			} finally {
+				portal.unmount();
+				rendered.unmount();
+			}
+		},
+	);
+
+	it('calls a template callback passed to a local createPortal helper', () => {
+		const source = `function createPortal(render) { return render(); }
+			export function App() @{
+				const value = createPortal(() => @{ <b>local</b> });
+				<main>{value}</main>
+			}`;
+		const { App: ServerApp } = fixture(source, true);
+		const { App } = fixture(source);
+		expect(renderToString(ServerApp).html).toContain('<b>local</b>');
+		const rendered = mount(App);
+		try {
+			expect(rendered.find('b').textContent).toBe('local');
+		} finally {
+			rendered.unmount();
+		}
+	});
+
 	it('renders style markup supplied through an ordinary host prop', () => {
 		const source = `export function App({css}) @{ <div><style dangerouslySetInnerHTML={{__html: css}}/><span>text</span></div> }`;
 		const { App } = fixture(source);

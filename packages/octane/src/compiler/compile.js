@@ -177,6 +177,7 @@ import {
 	collectOctaneImportLocals,
 	findDirectlyCalledNames,
 	findDirectlyCalledTemplateFunctions,
+	portalImportBinding,
 	soleRenderPropChild,
 } from './descriptor-lowering.js';
 
@@ -18292,13 +18293,7 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 			node,
 		);
 	}
-	if (
-		expr &&
-		expr.type === 'CallExpression' &&
-		expr.callee &&
-		expr.callee.type === 'Identifier' &&
-		expr.callee.name === 'createPortal'
-	) {
+	if (isCreatePortalCall(expr)) {
 		ctx.runtimeNeeded.add('ssrPortal');
 		return ssrCall('ssrPortal', [], node);
 	}
@@ -35909,13 +35904,7 @@ function emitElementHtml(
 }
 
 function isCreatePortalCall(node) {
-	return (
-		node &&
-		node.type === 'CallExpression' &&
-		node.callee &&
-		node.callee.type === 'Identifier' &&
-		node.callee.name === 'createPortal'
-	);
+	return node?.type === 'CallExpression' && node._octanePortalCall === true;
 }
 
 function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, cssHash) {
@@ -39811,9 +39800,9 @@ function lowerJsxReturnBranchComponents(ast) {
  * The runtime's own calls render the lowered value too, so this costs only the
  * template fast path. A call through a shadowing binding of the same name also
  * lowers the helper. The runtime itself renders the function arguments of
- * three calls, which keep that path: a `createPortal` body, matched by name as
- * the portal lowering matches it, and the component or render-function child
- * given to octane's `memo` or `createElement`. So does a component given to an
+ * three calls, which keep that path: an imported Octane `createPortal` body,
+ * and the component or render-function child given to Octane's `memo` or
+ * `createElement`. So does a component given to an
  * `Object` static that only stores or returns it, as
  * `Object.assign(Button, { Item })` does: the component is rendered later, and
  * inside a module-level function only its template body can own a directive.
@@ -39824,10 +39813,16 @@ function lowerJsxReturnBranchComponents(ast) {
  * JSX.
  */
 function lowerDirectlyCalledTemplateFunctions(ast) {
-	const lowered = findDirectlyCalledTemplateFunctions(ast);
-	if (lowered.size === 0) return ast;
+	const portalBinding = portalImportBinding(ast);
+	const lowered = findDirectlyCalledTemplateFunctions(ast, portalBinding);
+	if (lowered.size === 0 && portalBinding === null) return ast;
 	const lower = (node) =>
-		mapAst(node, (n) => (lowered.has(n) ? returnedJsxFunction(n, lower) : null));
+		mapAst(node, (n) => {
+			if (lowered.has(n)) return returnedJsxFunction(n, lower);
+			if (n.type === 'CallExpression' && portalBinding?.(n.callee))
+				return { ...n, arguments: lower(n.arguments), _octanePortalCall: true };
+			return null;
+		});
 	return lower(ast);
 }
 
