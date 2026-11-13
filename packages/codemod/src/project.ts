@@ -24,7 +24,13 @@ import { strengthen } from './strong.js';
 import { bind, projectTypeAt, textKind, transformModule } from './transform.js';
 import { directRendererCalls, nativeExternalStore } from './local-react-hook.js';
 import { forwardedProps } from './forwarded-props.js';
-import { importsReactBridge, islandComponents, executableImports } from './react-island-sources.js';
+import {
+	importsReactBridge,
+	islandComponents,
+	executableImports,
+	hostedServerComponents,
+	reverseIslandExports,
+} from './react-island-sources.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
 const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|17\.(?:0|[1-9]\d*))$/;
@@ -1041,6 +1047,32 @@ export async function runCodemod(
 	const inspected = new Set<string>();
 	let physicalEdits: Map<string, FileResult[]> | undefined;
 	let islandConflict: FileResult | undefined;
+	function originalOctaneBridge(file: string, specifier: string) {
+		const installed = readInstalled(path.dirname(file), 'octane');
+		const module = originalModule(file, specifier, bindingOptions(file));
+		return (
+			installed?.manifest.name === 'octane' &&
+			module?.packageId?.name === 'octane' &&
+			fs.realpathSync(module.resolvedFileName).startsWith(fs.realpathSync(installed.dir) + path.sep)
+		);
+	}
+	function originalReactJsxRuntime(file: string) {
+		const name = 'react/jsx-runtime';
+		const types = originalModule(file, name)?.packageId?.name;
+		if (types !== 'react' && types !== '@types/react') return false;
+		const installed = readInstalled(path.dirname(file), 'react');
+		try {
+			return (
+				installed?.manifest.name === 'react' &&
+				fs
+					.realpathSync(createRequire(file).resolve(name))
+					.startsWith(fs.realpathSync(installed.dir) + path.sep)
+			);
+		} catch {
+			return false;
+		}
+	}
+	const reverseIslands = new Map<string, ReadonlySet<string>>();
 	function protectIslandModule(issuer: string, specifier: string, owner: string) {
 		const file = ts.resolveModuleName(
 			specifier,
@@ -1097,20 +1129,54 @@ export async function runCodemod(
 		const paths = rewriteModulePaths(result?.code ?? source, file, root, renames, resolveRename);
 		if (!paths) continue;
 		const rules = { ...result?.rules, 'module-paths': paths.count };
+		const name = path.relative(root, file);
+		const host: FileResult = result ?? {
+			file: name,
+			output: name,
+			changed: true,
+			rules,
+			notes: [],
+			strong: null,
+			strongFixes: [],
+			diagnostics: [],
+			code: paths.code,
+		};
 		if (result) Object.assign(result, { code: paths.code, changed: true, rules });
-		else {
-			const name = path.relative(root, file);
-			results.push({
-				file: name,
-				output: name,
-				changed: true,
-				rules,
-				notes: [],
-				strong: null,
-				strongFixes: [],
-				diagnostics: [],
-				code: paths.code,
-			});
+		else results.push(host);
+		if (
+			!edited.has(file) &&
+			source.includes('octane/react/server') &&
+			automaticReactJsx(file) &&
+			originalOctaneBridge(file, 'octane/react/server') &&
+			originalReactJsxRuntime(file)
+		) {
+			for (const edge of hostedServerComponents(file, source)) {
+				const match = edge.module.startsWith('.') && renamed(file, edge.module);
+				if (!match) continue;
+				const leaf = byFile.get(match.file);
+				if (!leaf?.output.endsWith('.tsrx')) continue;
+				let names = reverseIslands.get(match.file);
+				if (!names) {
+					names = await reverseIslandExports(leaf.output, leaf.code, (module) =>
+						originalOctaneBridge(match.file, module),
+					);
+					reverseIslands.set(match.file, names);
+				}
+				if (!names.has(edge.name)) continue;
+				const note: Note = {
+					rule: 'react-compat',
+					severity: 'error',
+					line: edge.line,
+					message: `React SSR cannot render ${leaf.output} inside OctaneCompat because it returns a ReactCompat island.`,
+				};
+				if (write) return blockedWrite(root, unchangedFile(name, source, note), compiler?.from);
+				host.notes.push(note);
+				leaf.notes.push({
+					...note,
+					line: 1,
+					message: `${note.message} Server host: ${name}:${edge.line}.`,
+				});
+			}
 		}
 	}
 
