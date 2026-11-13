@@ -145,7 +145,7 @@ written directly: `setRead`, or a namespace member such as
 | --- | --- |
 | `store.read`, `store.prefetch`, `store.publish`, `store.forget` | first argument |
 | `store.write`, `store.form` | first argument |
-| `useWrite`, `useForm` (both bindings) | first argument |
+| `useForm` (both bindings) | first argument |
 | `pages(store, view)`, `listen(store, feed)` | second argument |
 | `handle(contract, run)` in `createDataHandler`, `call.read(read, input)` in a handler | first argument |
 | `view({ of })`, `write({ creates, patches, removes })` | that property |
@@ -155,6 +155,13 @@ The checker matches a site by the method or import name and the contract
 argument, never by the receiver. It does not need to prove that `session.store`
 is a `DataStore`: a contract binding in the first argument of a `.write(…)`
 call is a write site.
+
+A write is sent only by `store.write(contract, input)`, so the contract, its
+input and the send are one expression. There is no `useWrite`: it returned a
+bound function, which a component could pass to children or store, so the
+place a write is sent was no longer the place its contract was named. In a
+component, `useDataStore().write(setRead, input)` replaces it. `useForm`
+stays, because it subscribes to the form's state and renders the form.
 
 Rejected: a parameter, a variable assigned from a contract, a conditional
 (`flag ? addBook : setRead`), or a computed member (`contracts[name]`).
@@ -375,7 +382,7 @@ export const byShelf = (id: string) => read({ name: `shelf.${id}`, output });
 
 ## Decisions
 
-Agreed 2026-11-13: every recommendation.
+Agreed 2026-11-13: every recommendation, and dropping `useWrite`.
 
 1. **Sigil or shape.** Shape, with no sigil.
 2. **Contract modules.** The `*.data.ts` suffix. Rejected: a configured glob
@@ -389,6 +396,10 @@ Agreed 2026-11-13: every recommendation.
    hash; settle it in the manifest PR.
 5. **Escapes.** None per line at first; a module outside the check is the
    escape.
+6. **One way to write.** `useWrite` is removed from both bindings; a write is
+   always `store.write(contract, input)`, matching reads'
+   `useRead(store.read(contract, input))`. The removal lands with the one-way
+   read change on `feat/data-one-read`.
 
 Implementation is three steps: the per-module analysis and rules 1–4 with
 catalog entries; the whole-program pass and manifest in both plugins; shelf
