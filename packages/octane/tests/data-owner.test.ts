@@ -3,14 +3,17 @@
  * Every tab sees the same values, the same pending edits and the same
  * rollbacks, and the owner makes each request and holds each feed once.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { IDBFactory } from 'fake-indexeddb';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	createDataOwner,
 	createReplica,
+	DataRetiredError,
 	DataUncertainError,
 	listen,
 	serveDataOwner,
 	sharedOwner,
+	type DataOwner,
 	type DataStore,
 	type FeedFrame,
 	type Listener,
@@ -239,21 +242,169 @@ describe('octane/data owner and replicas', () => {
 	});
 });
 
+/**
+ * Fencing owners behind a stand-in SharedWorker: one owner per worker name, as
+ * the browser keeps one worker per name, each recording the origin's account in
+ * IndexedDB. Returns a function that opens a tab's replica for an account.
+ */
+function sharedWorkers(transport: Transport) {
+	const owners = new Map<string, DataOwner>();
+	vi.stubGlobal(
+		'SharedWorker',
+		class {
+			port: MessagePort;
+			constructor(_url: string, { name }: { name: string }) {
+				let owner = owners.get(name);
+				if (!owner) owners.set(name, (owner = createDataOwner({ transport, fence: true })));
+				const channel = new MessageChannel();
+				owner.connect(channel.port1);
+				this.port = channel.port2;
+				closers.push(() => (channel.port1.close(), channel.port2.close()));
+			}
+		},
+	);
+	return (account: string) => createReplica(sharedOwner(account)!, { writes });
+}
+
+async function accountStore<T>(
+	mode: IDBTransactionMode,
+	use: (store: IDBObjectStore) => IDBRequest<T>,
+) {
+	const opening = indexedDB.open('octane-data-account', 1);
+	const database = await new Promise<IDBDatabase>(
+		(resolve) => (opening.onsuccess = () => resolve(opening.result)),
+	);
+	const request = use(database.transaction('account', mode).objectStore('account'));
+	const value = await new Promise<T>(
+		(resolve) => (request.onsuccess = () => resolve(request.result)),
+	);
+	database.close();
+	return value;
+}
+const recordedAccount = () => accountStore('readonly', (store) => store.get(0));
+const recordAccount = (value: object) => accountStore('readwrite', (store) => store.put(value, 0));
+
 describe('octane/data in a SharedWorker', () => {
-	it('serves an owner to each tab that connects to the worker', async () => {
+	beforeEach(() => {
+		globalThis.indexedDB = new IDBFactory();
+	});
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('serves each tab that connects to the worker', async () => {
 		const server = createServer();
 		serveDataOwner({ transport: server.transport });
-		const channel = new MessageChannel();
-		globalThis.dispatchEvent(new MessageEvent('connect', { ports: [channel.port1] }));
-		const store = createReplica(channel.port2, { writes });
-		closers.push(() => {
-			void store.retire();
-			channel.port1.close();
-			channel.port2.close();
-		});
+		vi.stubGlobal(
+			'SharedWorker',
+			class {
+				port: MessagePort;
+				constructor() {
+					const channel = new MessageChannel();
+					globalThis.dispatchEvent(new MessageEvent('connect', { ports: [channel.port1] }));
+					this.port = channel.port2;
+					closers.push(() => (channel.port1.close(), channel.port2.close()));
+				}
+			},
+		);
+		const store = createReplica(sharedOwner('ada')!, { writes });
 		const list = await observed(store.read(todos, undefined));
 		expect(list()[0]!.title).toBe('Tides');
 		expect(server.log).toEqual(['list']);
+	});
+
+	it('retires every tab of an account once another account signs in', async () => {
+		const server = createServer();
+		let release!: () => void;
+		const open = sharedWorkers(async (request, signal) => {
+			if (request.kind === 'write') await new Promise<void>((resolve) => (release = resolve));
+			return server.transport(request, signal);
+		});
+		const [first, second] = [open('ada'), open('ada')];
+		const one = first.read(todos, undefined);
+		await observed(one);
+		await observed(second.read(todos, undefined));
+		const pending = first.write(setDone, { id: 'a', done: true }).catch((error: unknown) => error);
+		await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+
+		const other = open('grace');
+		await observed(other.read(todos, undefined));
+		await vi.waitFor(() => expect([first.retired, second.retired]).toEqual([true, true]));
+		expect(one.getSnapshot().status).toBe('pending');
+		// The write's reply, arriving after the sign-in, reaches no tab of the old account.
+		release();
+		expect(await pending).toBeInstanceOf(DataRetiredError);
+		expect(other.retired).toBe(false);
+		expect(await recordedAccount()).toEqual({ account: 'grace', generation: 2 });
+	});
+
+	it('signs the account out in every tab, and records it', async () => {
+		const server = createServer();
+		const open = sharedWorkers(server.transport);
+		const [first, second] = [open('ada'), open('ada')];
+		await observed(second.read(todos, undefined));
+		await first.retire();
+		await vi.waitFor(() => expect(second.retired).toBe(true));
+		expect(await recordedAccount()).toEqual({ account: null, generation: 2 });
+
+		// Signing in again starts a new generation, served by the same worker.
+		const again = open('ada');
+		await observed(again.read(todos, undefined));
+		expect(await recordedAccount()).toEqual({ account: 'ada', generation: 3 });
+	});
+
+	it('never lets a late sign-out undo a newer sign-in', async () => {
+		const server = createServer();
+		const open = sharedWorkers(server.transport);
+		const old = open('ada');
+		await observed(old.read(todos, undefined));
+		// Another account signed in, and its announcement has not reached this owner yet.
+		await recordAccount({ account: 'grace', generation: 2 });
+		await old.retire();
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(await recordedAccount()).toEqual({ account: 'grace', generation: 2 });
+	});
+
+	it('shows nothing in a tab resuming from being frozen until its account is confirmed', async () => {
+		const server = createServer();
+		const open = sharedWorkers(server.transport);
+		const tab = open('ada');
+		const list = tab.read(todos, undefined);
+		await observed(list);
+
+		document.dispatchEvent(new Event('freeze'));
+		expect(list.getSnapshot().status).toBe('pending');
+		document.dispatchEvent(new Event('resume'));
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+		// Confirmed, not reloaded.
+		expect(server.log).toEqual(['list']);
+
+		document.dispatchEvent(new Event('freeze'));
+		await observed(open('grace').read(todos, undefined));
+		document.dispatchEvent(new Event('resume'));
+		await vi.waitFor(() => expect(tab.retired).toBe(true));
+		expect(list.getSnapshot().status).toBe('pending');
+	});
+
+	it('asks the owner again until it confirms a sign-out', async () => {
+		vi.useFakeTimers();
+		try {
+			const channel = new MessageChannel();
+			const received: string[] = [];
+			channel.port1.onmessage = ({ data }) => received.push(data.t);
+			closers.push(() => (channel.port1.close(), channel.port2.close()));
+			const store = createReplica(channel.port2, { writes });
+			void store.retire();
+			await vi.advanceTimersByTimeAsync(0);
+			expect(received).toEqual(['retire']);
+			await vi.advanceTimersByTimeAsync(5_000);
+			expect(received).toEqual(['retire', 'retire']);
+			channel.port1.postMessage({ t: 'retired' });
+			await vi.advanceTimersByTimeAsync(20_000);
+			expect(received).toEqual(['retire', 'retire']);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('connects a tab to the worker named for its protocol and partition, or reports that it cannot', () => {
