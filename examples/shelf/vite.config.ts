@@ -58,7 +58,12 @@ function shelfServer(): Plugin {
 const page = (name: string) => `${root}${name}.html`;
 
 export default defineConfig({
-	plugins: [octane({ requireDirective: true }), react(), shelfServer()],
+	plugins: [
+		// The data worker: `/_octane/data-worker.js`, which pages opened with `?owner=shared` share.
+		octane({ requireDirective: true, dataWorker: 'src/shared/worker.ts' }),
+		react(),
+		shelfServer(),
+	],
 	optimizeDeps: { exclude: ['octane'] },
 	build: {
 		target: 'esnext',

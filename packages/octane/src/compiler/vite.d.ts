@@ -77,6 +77,13 @@ export interface OctaneVitePluginOptions {
 	 * @default false
 	 */
 	requireDirective?: boolean;
+	/**
+	 * The app's data worker module, which calls `serveDataOwner` from
+	 * `octane/data`. Client builds emit it at `/_octane/data-worker.js`, and the
+	 * dev server serves it there, so every deploy's tabs share one owner through
+	 * `sharedOwner`. Resolved from the Vite project root.
+	 */
+	dataWorker?: string;
 	/** @experimental Declarative renderer selection for this compiler instance. */
 	renderers?: OctaneRendererConfigOptions;
 	/**
