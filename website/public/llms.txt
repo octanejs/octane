@@ -673,6 +673,13 @@ Coverage:
 - `OCTANE_STRONG_COVERAGE_STALE`: Run `octane analyze --strong-baseline update`.
 - `OCTANE_STRONG_DEPENDENCY`: Make the package Strong and declare it with `"octane": { "strong": true }` or a list of its Strong paths in its package.json, or name the package (or `"octane/react"`) in `compiler.strongDependencies.allow`.
 
+Data contracts (the octane/data check, not Strong mode):
+
+- `OCTANE_DATA_CONTRACT_DECLARATION`: Declare each contract as `export const setRead = write({ name: 'books.setRead', … })` in a `*.data.ts` module. Instead of building contracts in a function, declare one contract whose `input` carries the value.
+- `OCTANE_DATA_CONTRACT_MODULE`: Move the contracts into a `*.data.ts` module, and move statements that run for effect, and server imports, into a module that imports the contracts.
+- `OCTANE_DATA_CONTRACT_ARGUMENT`: Name one contract binding at the site, such as `store.write(setRead, input)`, and pass the varying value in its input. A handler for several contracts may loop over an inline array of them: `[books, unread].map((list) => handle(list, …))`.
+- `OCTANE_DATA_CONTRACT_ESCAPE`: Pass a callback that names the contract, such as `submit(session, (store) => store.write(setRead, input))`, or move code that must take any contract into a module outside the check.
+
 Each code is documented at https://octanejs.dev/docs/strong-mode#<code-in-kebab-case>.
 
 <!-- strong-diagnostics:llms:end -->

@@ -8,10 +8,16 @@
 // keeps it exhaustive: every code the compiler or CLI can report has an entry,
 // and every recipe's `before` reports its codes while its `after` compiles.
 //
+// The `data` section is the octane/data contract check
+// (docs/data-contract-conventions.md). It is not part of Strong mode: it
+// applies to `.tsx` too and is reported by compiler/data-contracts.js. It
+// shares this catalog so its codes render into the same reference and
+// `octane explain` without a second generator.
+//
 // Text is Markdown. Recipe sources are complete `.tsrx` modules without the
 // `"use strong"` directive, which the test and the renderers add.
 
-/** @typedef {'effects' | 'state' | 'render' | 'templates' | 'dom' | 'coverage'} StrongSectionId */
+/** @typedef {'effects' | 'state' | 'render' | 'templates' | 'dom' | 'coverage' | 'data'} StrongSectionId */
 
 /**
  * @typedef {Object} StrongDiagnostic
@@ -43,6 +49,7 @@ export const STRONG_DIAGNOSTIC_SECTIONS = [
 	{ id: 'templates', title: 'Lists, templates, and compatibility APIs' },
 	{ id: 'dom', title: 'DOM ownership and trusted HTML' },
 	{ id: 'coverage', title: 'Coverage' },
+	{ id: 'data', title: 'Data contracts (the octane/data check, not Strong mode)' },
 ];
 
 /** @type {readonly StrongDiagnostic[]} */
@@ -519,6 +526,42 @@ export const STRONG_DIAGNOSTICS = [
 			"With `compiler.strongDependencies.require`, an application import reaches a module in another Octane package that compiles without Strong mode, directly, through re-exports, or behind that package's own Strong modules, or it reaches an `octane/react` (ReactCompat) boundary. The build fails at the import, and `octane analyze` reports the same error.",
 		replacement:
 			'Make the package Strong and declare it with `"octane": { "strong": true }` or a list of its Strong paths in its package.json, or name the package (or `"octane/react"`) in `compiler.strongDependencies.allow`.',
+	},
+	{
+		code: 'OCTANE_DATA_CONTRACT_DECLARATION',
+		section: 'data',
+		severity: 'error',
+		detects:
+			"A call to `entity`, `read`, `view`, `write`, or `feed` from `octane/data` is not the whole initializer of an exported module-level `const`, its `name` (or an entity's first argument) is not a string literal, its options object spreads another object, or two contracts in the module share a name. The build cannot list a contract it cannot read without running the module.",
+		replacement:
+			"Declare each contract as `export const setRead = write({ name: 'books.setRead', … })` in a `*.data.ts` module. Instead of building contracts in a function, declare one contract whose `input` carries the value.",
+	},
+	{
+		code: 'OCTANE_DATA_CONTRACT_MODULE',
+		section: 'data',
+		severity: 'error',
+		detects:
+			'A contract is declared in a module whose file name does not end in `.data.ts` or `.data.js`, or a contract module has a top-level statement other than an import, a type, or a `const` declaration or export, or imports `octane/server` or `octane/data/server`. The browser and the server both import a contract module, so it must stay inert.',
+		replacement:
+			'Move the contracts into a `*.data.ts` module, and move statements that run for effect, and server imports, into a module that imports the contracts.',
+	},
+	{
+		code: 'OCTANE_DATA_CONTRACT_ARGUMENT',
+		section: 'data',
+		severity: 'error',
+		detects:
+			"A contract site, such as `store.write`, `store.read`, `useForm`, `useWrite`, `handle`, `pages`, `listen`, `view({ of })`, or a feed change's `put`, receives a contract chosen at runtime: a conditional, a logical expression, or a computed member such as `contracts[name]`. Sites are matched by method, import, or property name, never by the receiver.",
+		replacement:
+			'Name one contract binding at the site, such as `store.write(setRead, input)`, and pass the varying value in its input. A handler for several contracts may loop over an inline array of them: `[books, unread].map((list) => handle(list, …))`.',
+	},
+	{
+		code: 'OCTANE_DATA_CONTRACT_ESCAPE',
+		section: 'data',
+		severity: 'error',
+		detects:
+			'A contract binding is used somewhere other than a contract site, an inline array a site loops over, an import or export, a type, or the object of a property read: for example passed to an app helper, stored in a variable, array, or map, or passed as a prop. The build could no longer find every use of the contract.',
+		replacement:
+			'Pass a callback that names the contract, such as `submit(session, (store) => store.write(setRead, input))`, or move code that must take any contract into a module outside the check.',
 	},
 ];
 

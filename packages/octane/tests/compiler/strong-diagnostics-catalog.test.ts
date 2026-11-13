@@ -10,15 +10,15 @@ import {
 
 const REPO = join(import.meta.dirname, '../../../..');
 
-// Every Strong code the compiler or CLI can report, read from the sources that
-// report them, so a new code cannot ship without a catalog entry.
+// Every Strong and data contract code the compiler or CLI can report, read from
+// the sources that report them, so a new code cannot ship without a catalog entry.
 function reportedCodes() {
 	const codes = new Set<string>();
 	for (const dir of ['packages/octane/src/compiler', 'packages/cli/src/commands/analyze']) {
 		for (const file of readdirSync(join(REPO, dir))) {
 			if (!file.endsWith('.js') || file === 'strong-diagnostics.js') continue;
 			const source = readFileSync(join(REPO, dir, file), 'utf8');
-			for (const [code] of source.matchAll(/OCTANE_STRONG_[A-Z0-9_]+/g)) {
+			for (const [code] of source.matchAll(/OCTANE_(?:STRONG|DATA_CONTRACT)_[A-Z0-9_]+/g)) {
 				// A prefix such as `OCTANE_STRONG_` used to build or test a code.
 				if (!code.endsWith('_')) codes.add(code);
 			}
