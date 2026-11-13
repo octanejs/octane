@@ -617,7 +617,7 @@ function contentOf(node: ts.JsxElement | ts.JsxFragment) {
 }
 
 /** JSX emitters agree on empty ASCII indentation; spaces on a single line are children. */
-function withoutJsxIndentation(children: readonly ts.JsxChild[]) {
+export function withoutJsxIndentation(children: readonly ts.JsxChild[]) {
 	return children.filter(
 		(child) => !(ts.isJsxText(child) && /^[\t ]*[\r\n][\t\r\n ]*$/.test(child.text)),
 	);
