@@ -540,7 +540,7 @@ export async function runCodemod(
 			const source = fs.readFileSync(file, 'utf8');
 			hooks = new Map();
 			if (
-				(/\b(?:useContext|useState|useSyncExternalStore)\b/.test(source) ||
+				(/\b(?:useCallback|useContext|useState|useSyncExternalStore)\b/.test(source) ||
 					source.includes('\\u')) &&
 				originalModule(file, 'react') &&
 				readInstalled(path.dirname(file), 'react')?.manifest.name === 'react'
@@ -554,7 +554,11 @@ export async function runCodemod(
 					bound.sf,
 					bound.checker,
 					'react',
-					(name) => name === 'useContext' || name === 'useState' || name === 'useSyncExternalStore',
+					(name) =>
+						name === 'useCallback' ||
+						name === 'useContext' ||
+						name === 'useState' ||
+						name === 'useSyncExternalStore',
 				);
 			}
 			localHooks.set(file, hooks);
@@ -866,6 +870,17 @@ export async function runCodemod(
 					: undefined,
 				localReactHook: renames.has(file)
 					? (module, name, nativeOnly) => localReactHook(file, module, name, nativeOnly)
+					: undefined,
+				localReactRootComponent: renames.has(file)
+					? (module, name) => {
+							const hook = localReactHook(file, module, name, false);
+							if (
+								typeof hook === 'string' &&
+								installedReact(file, 'react-dom') &&
+								originalModule(file, 'react-dom/client')
+							)
+								return hook;
+						}
 					: undefined,
 				strong,
 				strictNullChecks: strictConfig !== null,

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToString } from 'octane/server';
-import { flushSync, hydrateRoot } from '../src/index.js';
+import { createRoot, flushSync, hydrateRoot } from '../src/index.js';
 import { act, mount } from './_helpers.js';
 import { loadCompiledFixtureSource } from './_server-fixture.js';
 
@@ -14,6 +14,76 @@ function fixture(source: string, server = false) {
 }
 
 describe('authored host JSX', () => {
+	it.each([
+		'label(ready)',
+		'((label as (ready: boolean) => string)(ready as boolean) as string)',
+		'(label!(ready!) satisfies string)',
+		'(label<boolean> as typeof label)(ready)',
+	])('evaluates parent prop %s before discarding a render-phase update output', (value) => {
+		const source = `import { useState } from 'octane';
+			function Child({ value, log }) @{
+				log('child ' + value);
+				<b>{value as string}</b>
+			}
+			export function App({ label, log }) @{
+				const [ready, setReady] = useState(false);
+				if (!ready) setReady(true);
+				<Child value={${value}} log={log} />
+			}`;
+		const { App } = fixture(source);
+		const trace: string[] = [];
+		const props = {
+			label(ready: boolean) {
+				trace.push('parent ' + ready);
+				return ready ? 'ready' : 'discarded';
+			},
+			log(value: string) {
+				trace.push(value);
+			},
+		};
+		const rendered = mount(App, props);
+		try {
+			expect(rendered.find('b').textContent).toBe('ready');
+			expect(trace).toEqual(['parent false', 'parent true', 'child ready']);
+		} finally {
+			rendered.unmount();
+		}
+
+		const { App: ServerApp } = fixture(source, true);
+		const container = document.createElement('div');
+		trace.length = 0;
+		container.innerHTML = renderToString(ServerApp, props).html;
+		expect(trace).toEqual(['parent false', 'parent true', 'child ready']);
+		const original = container.querySelector('b');
+		const onRecoverableError = vi.fn();
+		const hydrated = hydrateRoot(container, App, props, { onRecoverableError });
+		try {
+			expect(container.querySelector('b')).toBe(original);
+			expect(container.textContent).toBe('ready');
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		} finally {
+			hydrated.unmount();
+		}
+
+		const failure = new Error('unready');
+		const root = createRoot(container);
+		trace.length = 0;
+		try {
+			expect(() =>
+				root.render(App, {
+					...props,
+					label(ready: boolean) {
+						if (!ready) throw failure;
+						return 'ready';
+					},
+				}),
+			).toThrow(failure);
+			expect(trace).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it.each(['direct', 'spread', 'descriptor'])(
 		'only suppresses hydration differences for literal true through %s props',
 		async (kind) => {
