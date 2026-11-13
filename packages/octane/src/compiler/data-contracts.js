@@ -38,7 +38,6 @@ const METHOD_SITES = new Map([
 ]);
 /** Function sites, by imported name (or local name for `createDataHandler`'s `handle`). */
 const FUNCTION_SITES = new Map([
-	['useWrite', 0],
 	['useForm', 0],
 	['handle', 0],
 	['pages', 1],

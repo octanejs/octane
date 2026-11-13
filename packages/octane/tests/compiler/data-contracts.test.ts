@@ -145,11 +145,11 @@ function helper() {}
 	it('reports a contract argument chosen at runtime', () => {
 		const source = `import * as books from './books.data.ts';
 import { addBook, setRead } from './books.data.ts';
-import { useWrite } from 'octane/data/react';
+import { useForm } from 'octane/data/react';
 export function edit(store, book, name) {
 	store.write(book.read ? addBook : setRead, { id: book.id });
 	store.write(books[name], {});
-	useWrite(setRead ?? addBook);
+	useForm(setRead ?? addBook);
 }
 `;
 		expect(codes(source, '/app/page.tsx')).toEqual([
