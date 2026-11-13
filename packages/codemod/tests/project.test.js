@@ -2416,6 +2416,7 @@ export * from './View.tsrx';`,
 		const descriptor = (/** @type {string} */ members) =>
 			`Object.defineProperty(Theme, 'Provider', { configurable: true, ${members} });`;
 		const getter = descriptor(get);
+		const wrapped = `((Object as ObjectConstructor).defineProperty!)((Theme!), ('Provider' as const), ({ ${get} } satisfies PropertyDescriptor));`;
 		const component = 'function Replacement({children}) { return <b>{children}</b>; }';
 		const tag =
 			'export const View = () => <Theme.Provider value="given"><span>child</span></Theme.Provider>;';
@@ -2428,6 +2429,13 @@ export * from './View.tsrx';`,
 		const sources = {
 			'Caller.tsx': "import { View } from './View.tsx'; export const Caller = () => <View />;",
 			'View.tsx': [context, component, getter, tag].join('\n'),
+			'Wrapped.tsx': [context, component, wrapped, tag].join('\n'),
+			'Optional.tsx': [
+				context,
+				component,
+				wrapped.replace('defineProperty!)(', 'defineProperty!)?.('),
+				tag,
+			].join('\n'),
 			...Object.fromEntries(
 				Object.entries(setters).map(([file, members]) => [
 					file,
@@ -2440,7 +2448,7 @@ export * from './View.tsrx';`,
 				context,
 				component,
 				'const Object = { defineProperty() {} };',
-				getter,
+				wrapped,
 				tag,
 			].join('\n'),
 			'Sibling.tsx': [context, component, getter.replace("'Provider'", "'other'"), tag].join('\n'),
@@ -2462,10 +2470,11 @@ export * from './View.tsrx';`,
 		const options = { root, verify: false };
 		const preview = await runCodemod(inputs, { ...options, write: false });
 		const byFile = new Map(preview.files.map((file) => [file.file, file]));
-		for (const file of ['View.tsx', ...Object.keys(setters)])
+		for (const file of ['View.tsx', 'Wrapped.tsx', ...Object.keys(setters)])
 			expect(byFile.get(file).notes).toEqual([note]);
 		for (const file of [
 			'Control.tsx',
+			'Optional.tsx',
 			'SetterOnly.tsx',
 			'Shadowed.tsx',
 			'Sibling.tsx',

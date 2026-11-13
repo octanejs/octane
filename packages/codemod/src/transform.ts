@@ -5322,10 +5322,13 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		)
 			return false;
 		return this.localUses(context).some((reference) => {
-			const call = reference.parent;
+			let target: ts.Expression = reference;
+			while (isWrapper(target.parent) && target.parent.expression === target)
+				target = target.parent;
+			const call = target.parent;
 			if (
 				!ts.isCallExpression(call) ||
-				call.arguments[0] !== reference ||
+				call.arguments[0] !== target ||
 				call.questionDotToken ||
 				!ts.isExpressionStatement(call.parent) ||
 				call.parent.parent !== this.sf ||
@@ -5333,15 +5336,19 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				call.end > context.pos
 			)
 				return false;
-			const method = call.expression;
-			const [, key, descriptor] = call.arguments;
+			const method = skipWrappers(call.expression);
+			const object = ts.isPropertyAccessExpression(method) && skipWrappers(method.expression);
+			const [, keyArgument, descriptorArgument] = call.arguments;
+			const key = keyArgument && skipWrappers(keyArgument);
+			const descriptor = descriptorArgument && skipWrappers(descriptorArgument);
 			if (
 				!ts.isPropertyAccessExpression(method) ||
 				method.questionDotToken ||
 				method.name.text !== 'defineProperty' ||
-				!ts.isIdentifier(method.expression) ||
-				method.expression.text !== 'Object' ||
-				this.declarationOf(method.expression)?.getSourceFile().hasNoDefaultLib !== true ||
+				!object ||
+				!ts.isIdentifier(object) ||
+				object.text !== 'Object' ||
+				this.declarationOf(object)?.getSourceFile().hasNoDefaultLib !== true ||
 				!key ||
 				!ts.isStringLiteralLike(key) ||
 				key.text !== 'Provider' ||
