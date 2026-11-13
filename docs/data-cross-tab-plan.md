@@ -191,12 +191,14 @@ connection code. Each PR reports bytes as usual.
    pair, with no SharedWorker yet: shared reads and requests, operations
    broadcast, the same rollback in two replicas, feed events fanned out.
    Tested in Node with `MessageChannel`.
-2. **SharedWorker host and build output.** (This PR: `sharedOwner`,
+2. **SharedWorker host and build output.** (Done in #2560: `sharedOwner`,
    `serveDataOwner`, and the `dataWorker` option of the Vite and Rspack
    plugins.) Shelf opens two pages and asserts one network load and one shared
    rollback, in Chromium, under both bundlers.
-3. **Account fencing.** The durable generation, freeze and resume, and the
-   timeout path. Browser tests freeze a page, switch accounts in another, and
+3. **Account fencing.** (This PR: owners record the origin's account and
+   generation in IndexedDB, announce it on a BroadcastChannel, and retire a
+   replaced account's tabs; a sign-out never undoes a newer sign-in.) The
+   durable generation, freeze and resume, and the timeout path. Browser tests freeze a page, switch accounts in another, and
    resume.
 4. **Handshake, fallback and crashes.** Contract identity, a mixed-build test
    (one compatible pair, one incompatible), worker termination and respawn,
