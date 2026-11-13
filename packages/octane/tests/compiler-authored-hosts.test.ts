@@ -14,7 +14,12 @@ function fixture(source: string, server = false) {
 }
 
 describe('authored host JSX', () => {
-	it('evaluates parent props before discarding a render-phase update output', () => {
+	it.each([
+		'label(ready)',
+		'((label as (ready: boolean) => string)(ready as boolean) as string)',
+		'(label!(ready!) satisfies string)',
+		'(label<boolean> as typeof label)(ready)',
+	])('evaluates parent prop %s before discarding a render-phase update output', (value) => {
 		const source = `import { useState } from 'octane';
 			function Child({ value, log }) @{
 				log('child ' + value);
@@ -23,7 +28,7 @@ describe('authored host JSX', () => {
 			export function App({ label, log }) @{
 				const [ready, setReady] = useState(false);
 				if (!ready) setReady(true);
-				<Child value={label(ready)} log={log} />
+				<Child value={${value}} log={log} />
 			}`;
 		const { App } = fixture(source);
 		const trace: string[] = [];

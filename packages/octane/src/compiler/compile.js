@@ -31974,7 +31974,12 @@ function discardedComponentProps(call, ctx) {
 		return;
 	const values = [];
 	let hasCall = false;
-	const plainValue = (value) => value.type === 'Identifier' || isInvariantLiteral(value);
+	const runtimeOperand = (value) => {
+		let inner = unwrapTsExpr(value);
+		while (inner?.type === 'TSInstantiationExpression') inner = unwrapTsExpr(inner.expression);
+		return inner;
+	};
+	const plainValue = (value) => value?.type === 'Identifier' || isInvariantLiteral(value);
 	for (const prop of call.propsExpr.properties) {
 		if (
 			prop.type !== 'Property' ||
@@ -31986,17 +31991,20 @@ function discardedComponentProps(call, ctx) {
 			prop.key.value === '__proto__'
 		)
 			return;
-		const value = prop.value;
+		const value = runtimeOperand(prop.value);
 		if (!plainValue(value)) {
+			const callee = runtimeOperand(value.callee);
 			if (
 				value.type !== 'CallExpression' ||
-				value.callee.type !== 'Identifier' ||
-				!value.arguments.every(plainValue)
+				value.optional ||
+				callee?.type !== 'Identifier' ||
+				callee.name === 'eval' ||
+				!value.arguments.every((argument) => plainValue(runtimeOperand(argument)))
 			)
 				return;
 			hasCall = true;
 		}
-		values.push(value);
+		values.push(prop.value);
 	}
 	if (hasCall) return b.unary('void', b.sequence([call.compNode, ...values]));
 }
