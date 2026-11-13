@@ -10,6 +10,7 @@ import { docsMeta } from '../../../website/src/content/docs-meta.ts';
 import ssrMd from '../../../docs/ssr.md?raw';
 import reactDifferencesMd from '../../../docs/differences-from-react.md?raw';
 import deferredHydrationMd from '../../../docs/deferred-hydration.md?raw';
+import dataMd from '../../../docs/data.md?raw';
 
 export interface McpDocSection {
 	id: string;
@@ -114,6 +115,17 @@ const repoDocs: McpDoc[] = [
 		url: 'https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md',
 		sections: markdownSections(deferredHydrationMd),
 		markdown: deferredHydrationMd,
+	},
+	{
+		slug: 'data-reference',
+		title: 'octane/data (full reference)',
+		description:
+			'The complete octane/data reference: entry points, contract options, store guarantees, the wire protocol, the handler, forms, feeds, persistence, and the cross-tab owner.',
+		group: 'Explore',
+		source: 'repo',
+		url: 'https://github.com/octanejs/octane/blob/main/docs/data.md',
+		sections: markdownSections(dataMd),
+		markdown: dataMd,
 	},
 	{
 		slug: 'ssr',
