@@ -237,7 +237,7 @@ store once hydrated. Only the newest submission's outcome is shown.
   silent tab's feed subscriptions; its writes keep going.
 - While a replica is fenced, `prefetch` waits for the fence to lift, so a
   suspended reader shows the confirmed value rather than none.
-- The owner protocol version (3) is part of the worker's name, so tabs on
+- The owner protocol version (4) is part of the worker's name, so tabs on
   another protocol never share an owner.
 - `createDataOwner({ persist: (account) => PersistOptions })`, which
   `serveDataOwner` passes through, makes the owner the only writer of the
@@ -247,8 +247,14 @@ store once hydrated. Only the newest submission's outcome is shown.
   tab to recover the journal after a restart gets its entries. Signing out, or
   another account signing in, clears the cache. A replica uses its own
   `persist` only once it is a local store.
-- A write in flight to an owner that crashes is uncertain until the app
-  settles it from its receipt.
+- A durable write in flight to an owner that crashes settles by itself: once
+  each tab reconnects, it looks up the receipt of every journaled write it
+  shows as uncertain and keeps or rolls back the edit. The owner looks each
+  receipt up once and gives every tab that asks the same answer, so tabs
+  settle a write the same way. A write that is not journaled stays uncertain
+  until the app settles it.
+- A tab that recovers the journal leaves out the writes still in flight
+  through the current owner: they belong to the tab that sent them.
 
 ## Errors
 

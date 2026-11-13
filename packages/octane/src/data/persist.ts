@@ -595,10 +595,11 @@ export function createPersistence(
 		},
 		unjournal(id) {
 			const name = journaled.get(id);
-			if (name === undefined) return;
 			journaled.delete(id);
-			ended.add(name);
-			schedule();
+			const end = (name: string) => (ended.add(name), schedule());
+			if (name !== undefined) end(name);
+			// Journaled by an earlier owner of the partition, such as a data worker that crashed.
+			else void ready.then(async () => cleared || end(await cipher.name(`write\n${id}`)));
 		},
 		async recover() {
 			await ready;
