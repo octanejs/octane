@@ -1963,22 +1963,72 @@ export * from './View.tsrx';`,
 		expect(second.files.filter((file) => file.changed)).toEqual([]);
 	});
 
-	it('preserves members of a direct object export in an unselected relative source', async () => {
+	it.each([
+		['data.ts', './data', "Provider() { return 'original'; }"],
+		['data.ts', './data', 'get Provider() { return Provider; }'],
+		['data.tsx', './data', 'Provider: () => "original"'],
+		['data.tsx', './data.tsx', 'Provider'],
+		['dir/index.tsx', './dir/index', 'Provider'],
+	])(
+		'preserves a direct object member from %s imported as %s (%s)',
+		async (file, specifier, field) => {
+			const root = project({
+				'package.json': '{"name":"app","type":"module"}',
+				'tsconfig.json': '{"compilerOptions":{"module":"esnext","moduleResolution":"bundler"}}',
+				[file]: `const Provider = () => 'original';
+			export const BadgeContext = {
+				${field},
+				Consumer() { return 'content'; },
+			};`,
+				'View.tsx': `import { BadgeContext as Badge } from '${specifier}';
+const provide = Badge.Provider;
+export function View() { return <b title={provide()}><Badge.Consumer>{(value) => value}</Badge.Consumer></b>; }`,
+			});
+			const result = await runCodemod([path.join(root, 'View.tsx')], { root, write: false });
+			const view = result.files.find((file) => file.file === 'View.tsx').code;
+			expect(view).toContain('const provide = Badge.Provider');
+			expect(view).toContain('<Badge.Consumer>');
+		},
+	);
+
+	it('uses an unselected TSX object only when the relative import identifies that source', async () => {
 		const root = project({
 			'package.json': '{"name":"app","type":"module"}',
 			'tsconfig.json': '{"compilerOptions":{"module":"esnext","moduleResolution":"bundler"}}',
-			'data.ts': `export const BadgeContext = {
-				Provider() { return 'original'; },
-				Consumer() { return 'content'; },
-			};`,
-			'View.tsx': `import { BadgeContext as Badge } from './data';
-const provide = Badge.Provider;
-export function View() { return <b title={provide()}><Badge.Consumer>{(value) => value}</Badge.Consumer></b>; }`,
+			'data.tsx': "export const BadgeContext = { Provider: () => 'original' };",
+			'data.jsx':
+				"import { createContext } from 'octane'; export const BadgeContext = createContext('fallback');",
+			'View.tsx': `import { BadgeContext as Explicit } from './data.tsx';
+import { BadgeContext as Ambiguous } from './data';
+export function View() {
+	return <><Explicit.Provider /><Ambiguous.Provider value="supplied" /></>;
+}`,
 		});
 		const result = await runCodemod([path.join(root, 'View.tsx')], { root, write: false });
 		const view = result.files.find((file) => file.file === 'View.tsx').code;
-		expect(view).toContain('const provide = Badge.Provider');
-		expect(view).toContain('<Badge.Consumer>');
+		expect(view).toContain('<Explicit.Provider />');
+		expect(view).toContain('<Ambiguous value="supplied" />');
+	});
+
+	it('preserves the provider rewrite when a bundler can load a file ahead of a directory index', async () => {
+		const root = project({
+			'package.json': '{"name":"app","type":"module"}',
+			'tsconfig.json': '{"compilerOptions":{"module":"esnext","moduleResolution":"bundler"}}',
+			'data/index.tsx': "export const BadgeContext = { Provider: () => 'object' };",
+			'data.mjs': "export { BadgeContext } from './owner.ts';",
+			'owner.ts':
+				"import { createContext } from 'react'; export const BadgeContext = createContext('default');",
+			'View.tsx': `import { BadgeContext } from './data';
+export function View() { return <BadgeContext.Provider value="supplied"><b /></BadgeContext.Provider>; }`,
+		});
+		const result = await runCodemod([path.join(root, 'View.tsx'), path.join(root, 'owner.ts')], {
+			root,
+			write: false,
+		});
+		expect(result.files.find((file) => file.file === 'owner.ts').code).toContain("from 'octane'");
+		expect(result.files.find((file) => file.file === 'View.tsx').code).toContain(
+			'<BadgeContext value="supplied"><b /></BadgeContext>',
+		);
 	});
 
 	it('preserves the context naming fallback across a CommonJS producer boundary', async () => {
