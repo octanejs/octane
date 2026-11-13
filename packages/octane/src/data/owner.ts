@@ -164,16 +164,24 @@ export function createDataOwner(options: {
 		heard.set(port, hostDateNow());
 		sweeping ??= setHostTimeout(sweep, HEARTBEAT_MS);
 	}
+	/**
+	 * Tabs dropped while silent, by the generation they were served under. A
+	 * frozen or throttled tab may speak again: under that generation it is
+	 * served again, and under any other it is told its account was retired.
+	 */
+	const dropped = new WeakMap<OwnerPort, number>();
 	function sweep(): void {
 		sweeping = undefined;
 		for (const [port, at] of heard) {
 			if (replicas.has(port) && hostDateNow() - at <= HEARTBEAT_MS * 3) continue;
 			heard.delete(port);
-			replicas.delete(port);
-			// Its writes keep going; only what it listened to stops.
+			if (replicas.delete(port)) dropped.set(port, generation);
+			// Its writes keep going; what it listened to stops, and connects again if it wakes.
 			for (const upstream of upstreams.values()) {
 				const id = upstream.members.get(port);
-				if (id !== undefined) unsubscribe(port, id);
+				if (id === undefined) continue;
+				unsubscribe(port, id);
+				port.postMessage({ t: 'end', id } satisfies ToReplica);
 			}
 		}
 		if (heard.size > 0) sweeping = setHostTimeout(sweep, HEARTBEAT_MS);
@@ -391,7 +399,11 @@ export function createDataOwner(options: {
 			const handle = (message: ToOwner) => {
 				if (refused.has(port)) return port.postMessage(REFUSED);
 				// A replica of a retired account is told so, whatever it asks.
-				if (!replicas.has(port)) return port.postMessage(RETIRED);
+				if (!replicas.has(port)) {
+					if (!serving || dropped.get(port) !== generation) return port.postMessage(RETIRED);
+					dropped.delete(port);
+					replicas.add(port);
+				}
 				heard.set(port, hostDateNow());
 				if (message.t === 'request') request(port, message.id, message.request, message.fresh);
 				else if (message.t === 'listen') subscribe(port, message.id, message.request);
@@ -604,14 +616,16 @@ export function createReplica(
 		);
 	}
 
-	// Each side checks the other is still there. A tab that hears nothing for a while has lost
-	// its owner; an owner that hears nothing from a tab drops it.
-	let heard = hostDateNow();
+	// Each side checks the other is still there. A tab whose last three pings went unanswered
+	// has lost its owner, however long the browser throttled its timers between them; an owner
+	// that hears nothing from a tab drops it.
+	let unanswered = 0;
 	let beat: unknown;
 	const heartbeat = () => {
 		if (!port || store.retired) return;
-		if (hostDateNow() - heard > HEARTBEAT_MS * 3) lost();
+		if (unanswered >= 3) lost();
 		if (!port) return;
+		unanswered++;
 		send({ t: 'ping' });
 		beat = setHostTimeout(heartbeat, HEARTBEAT_MS);
 	};
@@ -620,13 +634,22 @@ export function createReplica(
 	// until the owner says the account is still signed in.
 	if (typeof document !== 'undefined') {
 		const listening = { signal: inner.retired };
-		document.addEventListener('freeze', () => port && inner.fence(true), listening);
+		document.addEventListener(
+			'freeze',
+			() => {
+				if (!port) return;
+				inner.fence(true);
+				clearHostTimeout(beat);
+			},
+			listening,
+		);
 		document.addEventListener(
 			'resume',
 			() => {
-				// Time frozen is not time the owner was silent.
-				heard = hostDateNow();
-				send({ t: 'ping' });
+				if (!port) return;
+				clearHostTimeout(beat);
+				unanswered = 0;
+				heartbeat();
 			},
 			listening,
 		);
@@ -691,10 +714,10 @@ export function createReplica(
 	/** Use `next` as this tab's owner: introduce the tab, and hear only that owner from now on. */
 	function connect(next: OwnerPort) {
 		port = next;
-		heard = hostDateNow();
+		unanswered = 0;
 		next.addEventListener('message', ({ data }) => {
 			if (port !== next) return;
-			heard = hostDateNow();
+			unanswered = 0;
 			const message = data as ToReplica;
 			switch (message.t) {
 				case 'live':

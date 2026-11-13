@@ -380,6 +380,61 @@ describe('octane/data owners across builds and crashes', () => {
 		expect(writeCount(server.log)).toBe(0);
 	});
 
+	it('serves a tab again when it wakes after being dropped as silent, while its account is unchanged', async () => {
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+		const server = createServer();
+		const signals: AbortSignal[] = [];
+		const feedListener: Listener = (_request, signal) => ({
+			async *[Symbol.asyncIterator]() {
+				signals.push(signal);
+				yield {};
+				await new Promise((resolve) => signal.addEventListener('abort', resolve));
+			},
+		});
+		const owner = createDataOwner({ transport: server.transport, listen: feedListener });
+		const channel = new MessageChannel();
+		owner.connect(channel.port1);
+		closers.push(() => (channel.port1.close(), channel.port2.close()));
+		// A frozen tab runs nothing, its heartbeat included, until it resumes.
+		const store = createReplica(channel.port2, replicaOptions);
+		const list = store.read(todos, undefined);
+		await observed(list);
+		closers.push(listen(store, todoChanges).subscribe(() => {}));
+		await vi.waitFor(() => expect(signals).toHaveLength(1));
+
+		document.dispatchEvent(new Event('freeze'));
+		await vi.advanceTimersByTimeAsync(20_000);
+		await vi.waitFor(() => expect(signals[0]!.aborted).toBe(true));
+		document.dispatchEvent(new Event('resume'));
+		await vi.waitFor(() => expect(list.getSnapshot().status).toBe('ready'));
+		expect(store.retired).toBe(false);
+		// Its feed connects again through the owner.
+		await vi.advanceTimersByTimeAsync(5_000);
+		await vi.waitFor(() => expect(signals).toHaveLength(2));
+	});
+
+	it('keeps its owner while the browser throttles its timers, as long as each ping is answered', async () => {
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+		const server = createServer();
+		const owner = createDataOwner({ transport: server.transport });
+		const channel = new MessageChannel();
+		owner.connect(channel.port1);
+		closers.push(() => (channel.port1.close(), channel.port2.close()));
+		const store = createReplica(channel.port2, replicaOptions);
+		const list = store.read(todos, undefined);
+		await observed(list);
+		// A background tab's timers fire a minute apart; each ping is still answered.
+		for (let tick = 0; tick < 4; tick++) {
+			vi.setSystemTime(Date.now() + 60_000);
+			await vi.advanceTimersByTimeAsync(5_000);
+			await new Promise((resolve) => setImmediate(resolve));
+		}
+		// Still served by the owner: this tab's own transport would refuse.
+		await list.refresh();
+		expect(list.getSnapshot().status).toBe('ready');
+		expect(server.log).toEqual(['list', 'list']);
+	});
+
 	it('drops a tab that stops answering from the feeds it listened to', async () => {
 		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
 		const server = createServer();

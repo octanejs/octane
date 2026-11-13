@@ -1455,15 +1455,7 @@ app uses.
 
 ```ts
 import { createReplica, serverListener, serverTransport, sharedOwner } from 'octane/data';
-import {
-	addBook,
-	books,
-	finished,
-	removeBook,
-	setRead,
-	shelfChanges,
-	stats,
-} from './contracts.ts';
+import { addBook, books, finished, removeBook, setRead, shelfChanges, stats } from './contracts.ts';
 import { data, events } from './data.tsrx';
 
 const contracts = [books, finished, stats, addBook, setRead, removeBook, shelfChanges];
