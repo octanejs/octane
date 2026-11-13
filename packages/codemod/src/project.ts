@@ -747,9 +747,31 @@ export async function runCodemod(
 		let installedClsx: boolean | undefined;
 		let reactJsx: boolean | undefined;
 		const isContext = (specifier: string, name: string) => {
-			if (!specifier.startsWith('.')) return null;
-			const target = resolveModule(file, specifier, known);
-			return target ? contextsOf(target.file).has(name) : null;
+			if (specifier.startsWith('.')) {
+				const target = resolveModule(file, specifier, known);
+				return !!target && contextsOf(target.file).has(name);
+			}
+			const options = bindingOptions(file);
+			if (!options?.paths && !options?.baseUrl) return null;
+			const target = ts.resolveModuleName(
+				specifier,
+				file,
+				{ moduleResolution: ts.ModuleResolutionKind.Bundler, ...options },
+				ts.sys,
+			).resolvedModule;
+			if (
+				!target ||
+				target.isExternalLibraryImport ||
+				target.resolvedFileName.split(path.sep).includes('node_modules')
+			)
+				return null;
+			// Keep the package naming heuristic only for an alias of a known selected context.
+			return known.has(target.resolvedFileName) &&
+				contextsOf(target.resolvedFileName).has(name) &&
+				(renamed(file, specifier)?.file === target.resolvedFileName ||
+					localFile(file, specifier) === target.resolvedFileName)
+				? null
+				: false;
 		};
 		const matchesExport = (
 			index: Map<string, Set<string>>,

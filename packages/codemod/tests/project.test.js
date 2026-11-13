@@ -1857,6 +1857,59 @@ export * from './View.tsrx';`,
 		expect(second.files.filter((file) => file.changed)).toEqual([]);
 	});
 
+	it('preserves Provider members on original local exports without a known context', async () => {
+		const root = project({
+			'package.json': '{"name":"app"}',
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: {
+					paths: { '@app/*': ['./src/*'], '@pkg': ['./node_modules/ext/index.d.ts'] },
+				},
+			}),
+			'node_modules/ext/index.d.ts': 'export declare const PackageContext: unknown;',
+			'src/names.tsx': "export const BadgeContext = { Provider() { return 'original'; } };",
+			'src/owner.ts':
+				"import {createContext} from 'react'; export const ThemeContext = createContext('light');",
+			'src/barrel.ts': "export {ThemeContext as SharedContext} from './owner';",
+			'src/ui.tsx':
+				"import {createContext} from 'react'; export const LabelContext = createContext('caption');",
+			'src/local.ts': "export const OriginalContext = { get Provider() { return 'ready'; } };",
+			'src/Badge.tsx': `import { BadgeContext as Badge } from '@app/names';
+import { SharedContext } from '@app/barrel';
+import { LabelContext } from '@app/ui';
+import { OriginalContext } from './local';
+import { PackageContext } from '@pkg';
+const provide = Badge.Provider;
+const theme = SharedContext.Provider;
+const label = LabelContext.Provider;
+const original = OriginalContext.Provider;
+const external = PackageContext.Provider;
+export function View() { return <b title={provide()}>Badge</b>; }`,
+			'nested/tsconfig.json': '{"compilerOptions":{"paths":{"@sub":["../src/local.ts"]}}}',
+			'nested/Read.ts':
+				"import {OriginalContext} from '@sub'; export const selected = OriginalContext.Provider;",
+		});
+		const result = await runCodemod(
+			[
+				'src/Badge.tsx',
+				'src/names.tsx',
+				'src/owner.ts',
+				'src/barrel.ts',
+				'src/ui.tsx',
+				'nested/Read.ts',
+			].map((name) => path.join(root, name)),
+			{ root, write: false },
+		);
+		const badge = result.files.find((file) => file.file === 'src/Badge.tsx').code;
+		expect(badge).toContain('const provide = Badge.Provider');
+		expect(badge).toContain('const original = OriginalContext.Provider');
+		expect(badge).toContain('const theme = SharedContext;');
+		expect(badge).toContain('const label = LabelContext;');
+		expect(badge).toContain('const external = PackageContext;');
+		expect(result.files.find((file) => file.file === 'nested/Read.ts').code).toContain(
+			'OriginalContext.Provider',
+		);
+	});
+
 	it('rewrites `.Provider` only on values that are contexts', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',
