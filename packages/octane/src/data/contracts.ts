@@ -224,8 +224,8 @@ const isCount = (value: unknown, min: number, max: number) =>
  *
  * Read one window with `store.read(view, { offset, limit })`; its snapshot's
  * `more` says whether rows follow. Read a growing list a page at a time with
- * `pages(store, view)` or `usePages(view)`, which joins the pages loaded so far
- * and adds the next with `loadMore()`.
+ * `pages(store, view)`, which joins the pages loaded so far and adds the next
+ * with `loadMore()`; a component shows it with `usePages`.
  */
 export function view<T, P = void>(options: {
 	name: string;

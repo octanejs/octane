@@ -55,7 +55,7 @@ you will meet all of them in the first example.
 	label="One request: a component asks the store, the store asks the transport, and the server's handler answers."
 	columns={[
 		{ nodes: [{ title: 'Contracts', detail: 'read, write, view, feed' }], arrow: 'describe' },
-		{ nodes: [{ title: 'Components', detail: 'useRead, useWrite, useForm' }], arrow: 'binding' },
+		{ nodes: [{ title: 'Components', detail: 'useRead, useForm' }], arrow: 'binding' },
 		{ nodes: [{ title: 'Store', detail: 'cache, edits, rollback' }], arrow: 'request' },
 		{ nodes: [{ title: 'Transport', detail: 'serverTransport or httpTransport' }], arrow: 'wire' },
 		{ nodes: [{ title: 'Handler', detail: 'createDataHandler validates and runs' }] },
@@ -64,12 +64,12 @@ you will meet all of them in the first example.
 
 Each part lives in its own entry point, so a page only ships what it uses:
 
-| Entry point          | What it holds                                                                  | Where it runs      |
-| -------------------- | ------------------------------------------------------------------------------ | ------------------ |
-| `octane/data`        | Contracts, the store, transports, feeds, persistence, and cross-tab sharing    | Browser and server |
-| `octane/data/server` | `createDataHandler`, which serves contracts                                    | Server only        |
-| `octane/data/octane` | The Octane binding: `DataProvider`, `useRead`, `useWrite`, and the other hooks | Octane components  |
-| `octane/data/react`  | The React binding, with the same names and behavior                            | React components   |
+| Entry point          | What it holds                                                               | Where it runs      |
+| -------------------- | --------------------------------------------------------------------------- | ------------------ |
+| `octane/data`        | Contracts, the store, transports, feeds, persistence, and cross-tab sharing | Browser and server |
+| `octane/data/server` | `createDataHandler`, which serves contracts                                 | Server only        |
+| `octane/data/octane` | The Octane binding: `DataProvider`, `useRead`, and the other hooks          | Octane components  |
+| `octane/data/react`  | The React binding, with the same names and behavior                         | React components   |
 
 The Octane binding has a server version too. You never import it yourself:
 when Octane compiles a component for a server render, it points
@@ -178,16 +178,17 @@ empty.
 <h3 id="first-component">4. Show it in a component</h3>
 
 Put the store in a `DataProvider` near the top of your app. Any component
-below it can then call `useRead`.
+below it can then get the store with `useDataStore()`, ask it for a read with
+`store.read(books)`, and show that read with `useRead`.
 
 ```tsrx
 // App.tsrx
-import { DataProvider, useRead } from 'octane/data/octane';
+import { DataProvider, useDataStore, useRead } from 'octane/data/octane';
 import { books } from './contracts.ts';
 import { store } from './store.ts';
 
 function BookList() @{
-	const list = useRead(books);
+	const list = useRead(useDataStore().read(books));
 	<ul>
 		@for (const book of list; key book.id) {
 			<li>{book.title as string}</li>
@@ -210,6 +211,13 @@ export function App() @{
 }
 ```
 
+There is one way to read, wherever you are. `store.read(books)` returns a
+**handle** for that read: the same thing code outside a component uses to get
+a snapshot, subscribe, or refresh. Asking twice for the same read and input
+gives you the same handle, so calling it during every render is fine. A
+component passes the handle to `useRead`, which keeps the component in step
+with it for as long as it is mounted.
+
 `useRead` returns the value itself, not a loading state. While the first
 value is on its way, it **suspends**: the nearest `@pending` arm (or
 `<Suspense>` boundary) shows instead. If the first load fails, it throws to
@@ -223,12 +231,12 @@ JSX change:
 /** @jsxImportSource react */
 // App.tsx
 import { Suspense } from 'react';
-import { DataProvider, useRead } from 'octane/data/react';
+import { DataProvider, useDataStore, useRead } from 'octane/data/react';
 import { books } from './contracts.ts';
 import { store } from './store.ts';
 
 function BookList() {
-	const list = useRead(books);
+	const list = useRead(useDataStore().read(books));
 	if (list.length === 0) return <p>The shelf is empty.</p>;
 	return (
 		<ul>
@@ -258,7 +266,7 @@ else on this page builds on it.
 <h3 id="read-inputs">Reads with an input</h3>
 
 Most reads take an argument, such as an ID or a search term. Give the contract
-an `input` schema and pass the input as the hook's second argument:
+an `input` schema and pass the input to `store.read` as its second argument:
 
 ```ts
 import { read } from 'octane/data';
@@ -272,11 +280,11 @@ export const book = read({
 ```
 
 ```tsrx
-import { useRead } from 'octane/data/octane';
+import { useDataStore, useRead } from 'octane/data/octane';
 import { book } from './contracts.ts';
 
 export function BookTitle(props: { id: string }) @{
-	const value = useRead(book, { id: props.id });
+	const value = useRead(useDataStore().read(book, { id: props.id }));
 	<h1>{value.title as string}</h1>
 }
 ```
@@ -290,14 +298,15 @@ fine.
 <h3 id="read-without-suspending">Read without suspending</h3>
 
 Sometimes you would rather show a value and its status yourself than suspend.
-`useReadState` returns a **snapshot** instead of the value:
+Pass `{ suspend: false }`, and `useRead` returns the handle's **snapshot**
+instead of the value. It still keeps the component in step with the read:
 
 ```tsrx
-import { useReadState } from 'octane/data/octane';
+import { useDataStore, useRead } from 'octane/data/octane';
 import { books } from './contracts.ts';
 
 export function ShelfCount() @{
-	const snapshot = useReadState(books);
+	const snapshot = useRead(useDataStore().read(books), { suspend: false });
 	<p>
 		@if (snapshot.status === 'pending') {
 			<span>Counting…</span>
@@ -394,9 +403,10 @@ The store has a few more methods for plain code:
 
 <h2 id="writing">Writing data</h2>
 
-A **write** contract describes a change. You call it with `store.write`, or
-with the function `useWrite` returns, and get back a promise for the
-server's reply.
+A **write** contract describes a change. You call it with
+`store.write(contract, input)`, the same in a component as anywhere else, and
+get back a promise for the server's reply. In a component, get the store with
+`useDataStore()`.
 
 ```ts
 import { write } from 'octane/data';
@@ -487,12 +497,12 @@ Here is a checkbox that marks a book read. Notice there is no local state for
 "saving": the list shows the edit because the store does.
 
 ```tsrx
-import { useRead, useWrite } from 'octane/data/octane';
+import { useDataStore, useRead } from 'octane/data/octane';
 import { books, setRead } from './contracts.ts';
 
 export function BookList() @{
-	const list = useRead(books);
-	const save = useWrite(setRead);
+	const store = useDataStore();
+	const list = useRead(store.read(books));
 	<ul>
 		@for (const book of list; key book.id) {
 			<li>
@@ -500,7 +510,9 @@ export function BookList() @{
 					<input
 						type="checkbox"
 						checked={book.read}
-						onChange={() => void save({ id: book.id, read: !book.read }).catch(() => {})}
+						onChange={() =>
+							void store.write(setRead, { id: book.id, read: !book.read }).catch(() => {})
+						}
 					/>
 					{book.title as string}
 				</label>
@@ -519,12 +531,12 @@ And the same component in React:
 
 ```tsx
 /** @jsxImportSource react */
-import { useRead, useWrite } from 'octane/data/react';
+import { useDataStore, useRead } from 'octane/data/react';
 import { books, setRead } from './contracts.ts';
 
 export function BookList() {
-	const list = useRead(books);
-	const save = useWrite(setRead);
+	const store = useDataStore();
+	const list = useRead(store.read(books));
 	return (
 		<ul>
 			{list.map((book) => (
@@ -533,7 +545,9 @@ export function BookList() {
 						<input
 							type="checkbox"
 							checked={book.read}
-							onChange={() => void save({ id: book.id, read: !book.read }).catch(() => {})}
+							onChange={() =>
+								void store.write(setRead, { id: book.id, read: !book.read }).catch(() => {})
+							}
 						/>
 						{book.title}
 					</label>
@@ -708,22 +722,24 @@ In a real app this is a database query with the same `WHERE` and `ORDER BY`.
 The store loads a little more than the window it shows, so a row moving in
 from just below the fold appears without a request.
 
-A view is a read, so `useRead(unread)` shows its default window. To show a
-specific window, pass `{ offset, limit }`, plus any parameters the view
-declares with an `input` schema.
+A view is a read, so `useRead(store.read(unread))` shows its default window.
+To show a specific window, pass `{ offset, limit }` to `store.read`, plus any
+parameters the view declares with an `input` schema.
 
 <h3 id="pages">Load a page at a time</h3>
 
-For a list that grows as the user scrolls or presses "Show more", use
-`usePages`. It joins the pages loaded so far into one list. Like
-`useReadState`, it does not suspend.
+For a list that grows as the user scrolls or presses "Show more", ask for a
+**pages handle** with `pages(store, view, params?)`, and show it with
+`usePages`. It joins the pages loaded so far into one list, and it does not
+suspend.
 
 ```tsrx
-import { usePages } from 'octane/data/octane';
+import { pages } from 'octane/data';
+import { useDataStore, usePages } from 'octane/data/octane';
 import { unread } from './contracts.ts';
 
 export function UpNext() @{
-	const list = usePages(unread);
+	const list = usePages(pages(useDataStore(), unread));
 	<section>
 		<ul>
 			@for (const book of list.value ?? []; key book.id) {
@@ -1210,13 +1226,14 @@ as the component is mounted, and returns the connection's status:
 component listening to the same feed shares one connection.
 
 ```tsrx
-import { useFeed } from 'octane/data/octane';
+import { listen } from 'octane/data';
+import { useDataStore, useFeed } from 'octane/data/octane';
 import { shelfChanges } from './contracts.ts';
 
 const LABELS = { connecting: 'Connecting…', live: 'Live', offline: 'Reconnecting…' };
 
 export function LiveBadge() @{
-	const feed = useFeed(shelfChanges);
+	const feed = useFeed(listen(useDataStore(), shelfChanges));
 	<p data-feed={feed.status}>{LABELS[feed.status] as string}</p>
 }
 ```
@@ -1406,15 +1423,31 @@ the same rollbacks, and equal reads from several tabs are one request.
 It takes three steps.
 
 **1. Write the worker module.** It calls `serveDataOwner` with the transport
-and listener a tab would otherwise use:
+and listener a tab would otherwise use. If your app keeps an encrypted cache,
+give the worker that too, as a function of the signed-in account: the worker
+is the only one that writes the account's cache and write journal, so every
+tab shares one cache and one size limit.
 
 ```ts
 // worker.ts
-import { serveDataOwner, serverListener, serverTransport } from 'octane/data';
+import { indexedDBStorage, serveDataOwner, serverListener, serverTransport } from 'octane/data';
 import { data, events } from './data.tsrx';
+import { cacheKeyFor } from './cache-key.ts';
 
-serveDataOwner({ transport: serverTransport(data), listen: serverListener(events) });
+serveDataOwner({
+	transport: serverTransport(data),
+	listen: serverListener(events),
+	persist: (account) => ({
+		storage: indexedDBStorage(),
+		partition: account,
+		key: () => cacheKeyFor(account),
+	}),
+});
 ```
+
+The worker gets the cache key itself, here from a hypothetical `cacheKeyFor`
+helper that fetches the signed-in user's secret, so the key never has to be
+handed over from a page.
 
 **2. Tell the build about it.** The `dataWorker` option emits the module at a
 fixed path, `/_octane/data-worker.js`, which never changes between deploys,
@@ -1562,10 +1595,34 @@ tabs and the owner check on each other every five seconds:
 - **When a tab goes quiet,** the owner stops holding feed connections for it.
   Any write the tab sent keeps going.
 
+<h3 id="cross-tab-cache">One cache for every tab</h3>
+
+Give `serveDataOwner` a `persist` function, and the worker becomes the only
+place the account's encrypted cache and write journal are written. Each shared
+tab's store still asks for saved values and saves what changed, exactly as an
+ordinary store would, but it asks the worker:
+
+- **One cache, one size limit.** Values every tab loads are saved once, and the
+  cache's budget applies to the account as a whole, not to each tab.
+- **No tab overwrites another.** Only the worker writes, so a value one tab
+  saved is never replaced by an older copy from another.
+- **A reloaded tab starts from the cache.** It asks the worker for the values
+  it needs, and shows fresh ones without loading them.
+- **One journal, recovered once.** Durable writes are journaled by the worker.
+  After a restart, only the first tab to start recovers them, so each write's
+  receipt is looked up once.
+- **Signing out clears it.** When the account signs out, or another signs in,
+  the worker clears the account's cache.
+
+A tab only uses the `persist` options you gave `createReplica` when it carries
+on as an ordinary store. Point them at the same storage, partition and key,
+and such a tab reads the same cache.
+
 <h3 id="cross-tab-limits">Current limits</h3>
 
-The owner does not persist yet. A replica given `persist` keeps its own
-encrypted cache and write journal, as an ordinary store does, one per tab.
+A write that was on its way to the worker when the worker crashed becomes
+uncertain, and you settle it from its receipt, as with any lost reply. A later
+release settles it automatically from the worker's journal.
 
 <h2 id="bindings">Octane and React, one store</h2>
 
@@ -1595,16 +1652,14 @@ moment, and a rollback reaches both.
 Both bindings export the same names with the same behavior, so moving a
 component between renderers changes only the import:
 
-| Hook or component            | What it does                                                                          |
-| ---------------------------- | ------------------------------------------------------------------------------------- |
-| `DataProvider`               | Puts a store in context for the components below it: `<DataProvider store={store}>`.  |
-| `useDataStore()`             | Returns the store from context, for plain-code calls such as `store.invalidate`.      |
-| `useRead(read, input?)`      | Returns the value, suspending until the first one arrives.                            |
-| `useReadState(read, input?)` | Returns the snapshot, without suspending.                                             |
-| `usePages(view, params?)`    | Returns a view's pages so far as one list, with `more`, `loadingMore` and `loadMore`. |
-| `useWrite(write)`            | Returns a stable function that sends the write through the store.                     |
-| `useForm(write, key?)`       | Returns a native form for a write that declares `form` fields.                        |
-| `useFeed(feed, params?)`     | Listens to a feed while mounted, and returns its connection status.                   |
+| Hook or component                       | What it does                                                                                             |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `DataProvider`                          | Puts a store in context for the components below it: `<DataProvider store={store}>`.                     |
+| `useDataStore()`                        | Returns the store from context: `read` gives the handles below, `write` sends a write, and so on.        |
+| `useRead(store.read(read, input?))`     | Returns the value, suspending until the first one arrives; with `{ suspend: false }`, the live snapshot. |
+| `usePages(pages(store, view, params?))` | Returns a view's pages so far as one list, with `more`, `loadingMore` and `loadMore`.                    |
+| `useForm(write, key?)`                  | Returns a native form for a write that declares `form` fields.                                           |
+| `useFeed(listen(store, feed, params?))` | Listens to a feed while mounted, and returns its connection status.                                      |
 
 The only difference is the host renderer's rules. In Octane, hooks are keyed
 by where they are written, not by call order, so a `useRead` may sit behind a
@@ -1620,12 +1675,12 @@ Octane page. Pass the island the same store, and give it its own React
 /** @jsxImportSource react */
 // UpNext.tsx — a React component.
 import type { DataStore } from 'octane/data';
-import { DataProvider, useReadState, useWrite } from 'octane/data/react';
+import { DataProvider, useDataStore, useRead } from 'octane/data/react';
 import { setRead, unread } from './contracts.ts';
 
 function UpNextList() {
-	const list = useReadState(unread).value ?? [];
-	const save = useWrite(setRead);
+	const store = useDataStore();
+	const list = useRead(store.read(unread), { suspend: false }).value ?? [];
 	return (
 		<ul>
 			{list.map((book) => (
@@ -1633,7 +1688,7 @@ function UpNextList() {
 					{book.title}{' '}
 					<button
 						type="button"
-						onClick={() => void save({ id: book.id, read: true }).catch(() => {})}
+						onClick={() => void store.write(setRead, { id: book.id, read: true }).catch(() => {})}
 					>
 						Mark read
 					</button>
@@ -1743,13 +1798,11 @@ flag.
 
 <h3 id="reference-bindings">octane/data/octane and octane/data/react</h3>
 
-| Export         | What it is for                                        |
-| -------------- | ----------------------------------------------------- |
-| `DataProvider` | Provide a store to the components below it.           |
-| `useDataStore` | Read the store from context.                          |
-| `useRead`      | Read a value, suspending until the first one arrives. |
-| `useReadState` | Read a snapshot without suspending.                   |
-| `usePages`     | Read a view a page at a time.                         |
-| `useWrite`     | Get a stable function that sends a write.             |
-| `useForm`      | Render a native form for a write.                     |
-| `useFeed`      | Listen to a feed while mounted.                       |
+| Export         | What it is for                                                                                                 |
+| -------------- | -------------------------------------------------------------------------------------------------------------- |
+| `DataProvider` | Provide a store to the components below it.                                                                    |
+| `useDataStore` | Read the store from context.                                                                                   |
+| `useRead`      | Show a read handle's value, suspending until the first one arrives, or its snapshot with `{ suspend: false }`. |
+| `usePages`     | Show a pages handle: a view a page at a time.                                                                  |
+| `useForm`      | Render a native form for a write.                                                                              |
+| `useFeed`      | Listen to a feed handle while mounted.                                                                         |

@@ -204,9 +204,9 @@ describe('descriptorChildren component marker', () => {
 	});
 
 	it("imports the data binding's server twin in server output", () => {
-		const source = `import { useRead } from 'octane/data/octane';
+		const source = `import { useDataStore, useRead } from 'octane/data/octane';
 			import { books } from './books.ts';
-			export function List() @{ const list = useRead(books); <p>{String(list.length)}</p> }`;
+			export function List() @{ const list = useRead(useDataStore().read(books)); <p>{String(list.length)}</p> }`;
 		const sources = (code: string) =>
 			parseModule(code, 'compiled.js')
 				.body.filter((node: any) => node.type === 'ImportDeclaration')

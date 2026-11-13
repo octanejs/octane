@@ -158,12 +158,31 @@ export interface Stored {
 	readonly tags: readonly string[];
 }
 
+/**
+ * What persistence needs of a read: its `version` with its output schema's
+ * shape, which a saved value must match, and how long a value lives. A tab
+ * sharing an owner sends it in place of the read.
+ */
+export interface PersistedRead {
+	readonly version: string;
+	readonly expire: number;
+}
+const persistedReads = new WeakMap<Read<any, any>, PersistedRead>();
+export function persistedRead(read: Read<any, any>): PersistedRead {
+	let persisted = persistedReads.get(read);
+	if (!persisted) {
+		persisted = { version: `${read.version}\n${shape(read)}`, expire: read.expire };
+		persistedReads.set(read, persisted);
+	}
+	return persisted;
+}
+
 /** A value to save, and the read it belongs to. */
-export type Saving = { readonly stored: Stored; readonly read: Read<any, any> };
+export type Saving = { readonly stored: Stored; readonly read: PersistedRead };
 
 export interface Persistence {
 	/** The saved value for `key`, unless it was saved for another shape of `read`. */
-	restore(key: string, read: Read<any, any>): Promise<Stored | undefined>;
+	restore(key: string, read: PersistedRead): Promise<Stored | undefined>;
 	/** Save `key` in the next host task; `collect` reads its value then, and `null` deletes it. */
 	mark(key: string): void;
 	/** Drop a saved value that failed validation or expired. */
@@ -307,7 +326,7 @@ export function createPersistence(
 	/** Hashed names of keys seen this session, and the reverse. */
 	const names = new Map<string, Promise<string>>();
 	const owners = new Map<string, string>();
-	const versions = new WeakMap<Read<any, any>, Promise<string>>();
+	const versions = new Map<string, Promise<string>>();
 	let budget = Infinity;
 	let cleared = false;
 	const dirty = new Set<string>();
@@ -362,10 +381,9 @@ export function createPersistence(
 		return name;
 	}
 
-	function versionOf(read: Read<any, any>): Promise<string> {
-		let version = versions.get(read);
-		if (!version)
-			versions.set(read, (version = cipher.name(`version\n${read.version}\n${shape(read)}`)));
+	function versionOf(read: PersistedRead): Promise<string> {
+		let version = versions.get(read.version);
+		if (!version) versions.set(read.version, (version = cipher.name(`version\n${read.version}`)));
 		return version;
 	}
 

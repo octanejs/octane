@@ -1,12 +1,13 @@
 import { ReactCompat } from 'octane/react';
 import type { DataStore } from 'octane/data';
-import { DataProvider, useFeed, useRead } from 'octane/data/octane';
+import { listen } from 'octane/data';
+import { DataProvider, useDataStore, useFeed, useRead } from 'octane/data/octane';
 import { todoChanges, todos } from '../_data-todos.js';
 import { ReactFeed } from './data.react.js';
 
 function OctaneFeed() @{
-	const feed = useFeed(todoChanges);
-	const list = useRead(todos);
+	const feed = useFeed(listen(useDataStore(), todoChanges));
+	const list = useRead(useDataStore().read(todos));
 	<section data-octane-feed={feed.status}>
 		@for (const todo of list; key todo.id) {
 			<p>{todo.title as string}</p>
