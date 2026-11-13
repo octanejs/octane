@@ -1116,7 +1116,7 @@
         },
         {
           "id": "shared-owner-across-tabs",
-          "title": "Share one data worker between two tabs: send each read once, and show one tab's uncertain edit and its rollback in both",
+          "title": "Share one data worker between two tabs, on the mixed page and on the React page: send each read once, and show one tab's uncertain edit and its rollback in both",
           "kind": "golden",
           "spec": "e2e/shelf.spec.ts",
           "critical": true
@@ -1130,7 +1130,7 @@
         },
         {
           "id": "shared-owner-crash-recovery",
-          "title": "Reconnect every shared tab to a new data worker after the worker crashes, and keep saving",
+          "title": "Reconnect every shared tab to a new data worker after the worker crashes, settle the write it had in flight by its receipt, and keep saving",
           "kind": "resilience",
           "spec": "e2e/shelf.spec.ts",
           "critical": true

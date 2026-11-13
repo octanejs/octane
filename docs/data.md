@@ -255,6 +255,12 @@ store once hydrated. Only the newest submission's outcome is shown.
   until the app settles it.
 - A tab that recovers the journal leaves out the writes still in flight
   through the current owner: they belong to the tab that sent them.
+- A replica hydrates from its page's seed without waiting on the owner, then
+  offers each seeded read (not view) to the other tabs with its load time. A tab holding
+  an older value takes it; one holding a newer value offers its own back, so
+  every tab ends up showing the newest. Joining a feed connection that stands
+  at another position than the seed's cursor is a gap: the replica reloads
+  what the feed covers.
 
 ## Errors
 

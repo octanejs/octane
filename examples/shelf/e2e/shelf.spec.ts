@@ -465,46 +465,46 @@ async function dataWorker(keeper: Page, namespace: string) {
 	};
 }
 
-test('tabs that share the data worker load each read once, and show the same pending edit and rollback', async ({
-	page,
-}) => {
-	const ns = `${Date.now()}-${++namespace}`;
-	const url = `/mixed.html?ns=${ns}&owner=shared`;
-	const keeper = await page.context().newPage();
-	const worker = await dataWorker(keeper, ns);
+for (const { name, path } of [PAGES[2]!, PAGES[1]!])
+	test(`${name}: tabs that share the data worker load each read once, and show the same pending edit and rollback`, async ({
+		page,
+	}) => {
+		const ns = `${Date.now()}-${++namespace}`;
+		const url = `${path}?ns=${ns}&owner=shared`;
+		const keeper = await page.context().newPage();
+		const worker = await dataWorker(keeper, ns);
 
-	// Two tabs open at once, on a network slow enough that their reads overlap.
-	await worker.latency(2_000);
-	const other = await page.context().newPage();
-	await Promise.all([page.goto(url), other.goto(url)]);
-	for (const tab of [page, other]) {
-		await expect(tab.getByText('3 books · 0 read')).toBeVisible({ timeout: 15_000 });
-		await expect(tab.getByText('Live', { exact: true })).toBeVisible();
-	}
-	await worker.latency(0);
-	// Each read was sent once for both tabs, and both share one feed connection.
-	const reads = worker.reads();
-	expect(reads.length).toBeGreaterThan(0);
-	expect(new Set(reads).size).toBe(reads.length);
-	expect(worker.feeds()).toHaveLength(1);
+		// Two tabs open at once, on a network slow enough that their reads overlap.
+		await worker.latency(2_000);
+		const other = await page.context().newPage();
+		await Promise.all([page.goto(url), other.goto(url)]);
+		for (const tab of [page, other]) {
+			await expect(tab.getByText('3 books · 0 read')).toBeVisible({ timeout: 15_000 });
+			await expect(tab.getByText('Live', { exact: true })).toBeVisible();
+		}
+		await worker.latency(0);
+		// Each read was sent once for both tabs, if at all: a server-rendered page starts from its seed.
+		const reads = worker.reads();
+		expect(new Set(reads).size).toBe(reads.length);
+		expect(worker.feeds()).toHaveLength(1);
 
-	// An edit whose request fails shows in both tabs until one tab learns it never arrived.
-	await worker.block(true);
-	await book(page, 'Kindred').getByRole('checkbox').click();
-	await expect(status(page)).toHaveText(/The reply was lost/);
-	for (const tab of [page, other])
-		await expect(book(tab, 'Kindred').getByRole('checkbox')).toBeChecked();
-	await worker.block(false);
-	await status(page).getByRole('button', { name: 'Check saved result' }).click();
-	await expect(status(page)).toHaveText('The server never received that change');
-	for (const tab of [page, other]) {
-		await expect(book(tab, 'Kindred').getByRole('checkbox')).not.toBeChecked();
-		await expect(tab.getByText('3 books · 0 read')).toBeVisible();
-	}
-	expect(worker.writes()).toHaveLength(1);
-	await other.close();
-	await keeper.close();
-});
+		// An edit whose request fails shows in both tabs until one tab learns it never arrived.
+		await worker.block(true);
+		await book(page, 'Kindred').getByRole('checkbox').click();
+		await expect(status(page)).toHaveText(/The reply was lost/);
+		for (const tab of [page, other])
+			await expect(book(tab, 'Kindred').getByRole('checkbox')).toBeChecked();
+		await worker.block(false);
+		await status(page).getByRole('button', { name: 'Check saved result' }).click();
+		await expect(status(page)).toHaveText('The server never received that change');
+		for (const tab of [page, other]) {
+			await expect(book(tab, 'Kindred').getByRole('checkbox')).not.toBeChecked();
+			await expect(tab.getByText('3 books · 0 read')).toBeVisible();
+		}
+		expect(worker.writes()).toHaveLength(1);
+		await other.close();
+		await keeper.close();
+	});
 
 test('signs every shared tab of an account out when another account signs in, even one that was frozen', async ({
 	page,

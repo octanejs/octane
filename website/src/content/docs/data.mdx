@@ -1553,6 +1553,13 @@ tabs' edits as they happen. And the owner uses the whole list to check that
 every tab sharing it was built from the same contracts. A replica still
 hydrates from the page's seed, so hydration never waits for the worker.
 
+A page's seed can be newer than what your other tabs hold, or older, if the
+page came from a cache. So after hydrating, a tab offers its seeded values to
+the others, along with when they were loaded. Whichever value is newer wins,
+in every tab, without loading anything again. And if the page's live feed
+position differs from the one the worker is connected at, the tab may have
+missed events in between, so it reloads what that feed covers.
+
 You can also run an owner without a worker. `createDataOwner({ transport,
 listen })` returns an owner whose `connect(port)` serves a replica over any
 `MessagePort`, such as one end of a `MessageChannel`. That is useful in tests,

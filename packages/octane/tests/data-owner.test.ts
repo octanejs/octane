@@ -3,6 +3,7 @@
  * Every tab sees the same values, the same pending edits and the same
  * rollbacks, and the owner makes each request and holds each feed once.
  */
+import * as devalue from 'devalue';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -11,6 +12,7 @@ import {
 	DataRetiredError,
 	DataUncertainError,
 	listen,
+	read,
 	serveDataOwner,
 	sharedOwner,
 	type DataOwner,
@@ -27,6 +29,7 @@ import {
 	removeTodo,
 	setDone,
 	todoChanges,
+	Todo,
 	todoPages,
 	todos,
 	type TodoItem,
@@ -213,6 +216,75 @@ describe('octane/data owner and replicas', () => {
 		first!.settle(error.operationId, false);
 		expect(done(one)).toBe(false);
 		await vi.waitFor(() => expect(done(two)).toBe(false));
+	});
+
+	describe('a tab opened from a server render', () => {
+		/** The todo list, fresh for a minute, so a seeded or loaded value is shown without loading. */
+		const list = read({
+			name: todos.name,
+			output: todos.output,
+			entities: (todos) => Todo.from(todos),
+			fresh: 60_000,
+		});
+		const options = { ...replicaOptions, contracts: [...contracts, list] };
+		/** A page's seed: the server render's todo list, loaded `age` milliseconds before it. */
+		const seedOf = (title: string, age: number, cursor?: string) =>
+			devalue.stringify({
+				reads: [
+					{ name: list.name, input: undefined, age, value: [{ id: 'a', title, done: false }] },
+				],
+				cursors: cursor === undefined ? [] : [[todoChanges.name + '\nundefined', cursor]],
+			});
+		function connect(owner: DataOwner, seed?: string) {
+			const channel = new MessageChannel();
+			owner.connect(channel.port1);
+			const store = createReplica(channel.port2, { ...options, seed });
+			closers.push(() => {
+				void store.retire();
+				channel.port1.close();
+				channel.port2.close();
+			});
+			return store;
+		}
+
+		it.each([
+			['newer than', 'Lagoon', 0, ['Lagoon', 'Lagoon']],
+			['older than', 'Tides', 30_000, ['Atoll', 'Atoll']],
+		] as const)(
+			'shows in every tab the newer of its seed and what another tab loaded, without loading: a seed %s the load',
+			async (_, title, age, shown) => {
+				const server = createServer();
+				server.rows[0]!.title = 'Atoll';
+				const owner = createDataOwner({ transport: server.transport });
+				const one = await observed(connect(owner).read(list));
+				await new Promise((resolve) => setTimeout(resolve, 5));
+				const two = await observed(connect(owner, seedOf(title, age)).read(list));
+				await vi.waitFor(() => expect([one()[0]!.title, two()[0]!.title]).toEqual(shown));
+				expect(server.log).toEqual(['list']);
+			},
+		);
+
+		it('reloads what a feed covers when its seed stood elsewhere in the feed than the connection it joins', async () => {
+			const server = createServer();
+			const feedListener: Listener = () => ({
+				async *[Symbol.asyncIterator]() {
+					yield { cursor: 'after-render' };
+					await new Promise(() => {});
+				},
+			});
+			const owner = createDataOwner({ transport: server.transport, listen: feedListener });
+			const first = connect(owner);
+			await observed(first.read(list));
+			closers.push(listen(first, todoChanges).subscribe(() => {}));
+			await vi.waitFor(() => expect(listen(first, todoChanges).getSnapshot().status).toBe('live'));
+
+			// The server render read its position before the connection's latest event.
+			server.rows[0]!.title = 'Atoll';
+			const second = connect(owner, seedOf('Tides', 0, 'before-render'));
+			const two = await observed(second.read(list));
+			closers.push(listen(second, todoChanges).subscribe(() => {}));
+			await vi.waitFor(() => expect(two()[0]!.title).toBe('Atoll'));
+		});
 	});
 
 	it('holds one feed connection for every tab, and closes it when the last tab stops listening', async () => {

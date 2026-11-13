@@ -102,12 +102,28 @@ type ToOwner =
 	  }
 	| { readonly t: 'listen'; readonly id: number; readonly request: FeedRequest }
 	| { readonly t: 'unlisten'; readonly id: number }
+	/** A value this tab holds, loaded at `at`, for the others: a seed, or one newer than a seed offered. */
+	| Offer
 	| {
 			readonly t: 'settle';
 			readonly op: string;
 			readonly confirmed: boolean;
 			readonly value: unknown;
 	  };
+
+/**
+ * A value a replica holds, loaded at `at` (a wall-clock time every tab and the
+ * owner share): one a server render seeded, or one newer than a value offered.
+ * A replica holding an older value takes it; one holding a newer value offers
+ * its own back.
+ */
+interface Offer {
+	readonly t: 'offer';
+	readonly name: string;
+	readonly input: unknown;
+	readonly value: unknown;
+	readonly at: number;
+}
 
 /** What an owner sends a replica. */
 type ToReplica =
@@ -125,6 +141,8 @@ type ToReplica =
 	| { readonly t: 'end'; readonly id: number; readonly error?: unknown }
 	/** Another replica loaded a read. */
 	| { readonly t: 'value'; readonly name: string; readonly input: unknown; readonly value: unknown }
+	/** A value another replica holds, which the owner passes on as it came. */
+	| Offer
 	/** Another replica sent a write. */
 	| { readonly t: 'write'; readonly op: string; readonly name: string; readonly raw: unknown }
 	/** How a write another replica sent ended: its reply, or uncertain. */
@@ -451,11 +469,17 @@ export function createDataOwner(options: {
 		let upstream = upstreams.get(key);
 		if (upstream) {
 			upstream.members.set(from, id);
-			// A replica joining a live connection hears it is open, and where it stands.
+			// A replica joining a live connection hears it is open, and where it stands. One that
+			// stood elsewhere, such as a page whose server render read the feed's position, may
+			// have missed events in between.
+			const { cursor } = upstream;
 			from.postMessage({
 				t: 'frame',
 				id,
-				frame: upstream.cursor === null ? {} : { cursor: upstream.cursor },
+				frame:
+					cursor === null
+						? {}
+						: { cursor, gap: payload.cursor !== null && payload.cursor !== cursor },
 			} satisfies ToReplica);
 			return;
 		}
@@ -876,6 +900,34 @@ export function createReplica(
 		}
 	}
 
+	/** Offer the others what this tab holds for `entry`. */
+	const offer = (entry: Entry) => {
+		const held = inner.held(entry);
+		if (held) send({ t: 'offer', ...held });
+	};
+	inner.onSeed(offer);
+
+	/**
+	 * Take a value another replica holds, if it loaded later than the one held
+	 * here; offer this one back if it loaded later.
+	 */
+	async function offered({ name, input, value, at }: Offer) {
+		const entry = inner.wireEntry(entryKey(name, input));
+		if (!entry?.hasBase || entry.inflight || store.retired || at === entry.fetchedAt) return;
+		if (at < entry.fetchedAt) return offer(entry);
+		let parsed: unknown;
+		try {
+			parsed = await parse(entry.read.output, value);
+		} catch {
+			return;
+		}
+		if (store.retired || entry.inflight || inner.entries.get(entry.key) !== entry) return;
+		if (at <= entry.fetchedAt) return;
+		const reload = new Set<Entry>();
+		inner.rebase(entry, parsed, false, reload, Math.max(0, hostDateNow() - at));
+		inner.finish(reload, [entry], entry.names);
+	}
+
 	/** Take a value another replica loaded, for a read held here and not loading. */
 	async function value(name: string, input: unknown, raw: unknown) {
 		const entry: Entry | undefined = inner.wireEntry(entryKey(name, input));
@@ -935,6 +987,9 @@ export function createReplica(
 					break;
 				case 'value':
 					void value(message.name, message.input, message.value);
+					break;
+				case 'offer':
+					void offered(message);
 					break;
 				case 'write':
 					inOrder(() => follow(message.op, message.name, message.raw));
