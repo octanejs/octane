@@ -5350,10 +5350,23 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			)
 				return false;
 			let getter = false;
+			let setter = false;
 			for (const property of descriptor.properties) {
 				const name = property.name;
 				if (!name || (!ts.isIdentifier(name) && !ts.isStringLiteral(name))) return false;
 				if (name.text === 'configurable' || name.text === 'enumerable') continue;
+				if (name.text === 'set' && !setter) {
+					const value = ts.isPropertyAssignment(property)
+						? skipWrappers(property.initializer)
+						: null;
+					if (
+						!ts.isMethodDeclaration(property) &&
+						!(value && (ts.isArrowFunction(value) || ts.isFunctionExpression(value)))
+					)
+						return false;
+					setter = true;
+					continue;
+				}
 				if (name.text !== 'get' || getter || !ts.isMethodDeclaration(property)) return false;
 				getter = true;
 			}

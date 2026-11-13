@@ -2395,14 +2395,29 @@ export * from './View.tsrx';`,
 	it('blocks a local React context Provider getter before writing', async () => {
 		const context =
 			"import { createContext as makeContext } from 'react'; const Theme = makeContext('default');";
-		const getter =
-			"Object.defineProperty(Theme, 'Provider', { configurable: true, get() { return Replacement; } });";
+		const get = 'get() { return Replacement; }';
+		const descriptor = (/** @type {string} */ members) =>
+			`Object.defineProperty(Theme, 'Provider', { configurable: true, ${members} });`;
+		const getter = descriptor(get);
 		const component = 'function Replacement({children}) { return <b>{children}</b>; }';
 		const tag =
 			'export const View = () => <Theme.Provider value="given"><span>child</span></Theme.Provider>;';
+		const setters = {
+			'GetSet.tsx': get + ', set(value) {}',
+			'SetGet.tsx': "'set'(value) {}, " + get,
+			'SetterFunction.tsx': 'set: function (value) {}, ' + get,
+			'SetterArrow.tsx': get + ', set: (value) => {}',
+		};
 		const sources = {
 			'Caller.tsx': "import { View } from './View.tsx'; export const Caller = () => <View />;",
 			'View.tsx': [context, component, getter, tag].join('\n'),
+			...Object.fromEntries(
+				Object.entries(setters).map(([file, members]) => [
+					file,
+					[context, component, descriptor(members), tag].join('\n'),
+				]),
+			),
+			'SetterOnly.tsx': [context, descriptor('set(value) {}'), tag].join('\n'),
 			'Control.tsx': [context, tag].join('\n'),
 			'Shadowed.tsx': [
 				context,
@@ -2430,9 +2445,11 @@ export * from './View.tsrx';`,
 		const options = { root, verify: false };
 		const preview = await runCodemod(inputs, { ...options, write: false });
 		const byFile = new Map(preview.files.map((file) => [file.file, file]));
-		expect(byFile.get('View.tsx').notes).toEqual([note]);
+		for (const file of ['View.tsx', ...Object.keys(setters)])
+			expect(byFile.get(file).notes).toEqual([note]);
 		for (const file of [
 			'Control.tsx',
+			'SetterOnly.tsx',
 			'Shadowed.tsx',
 			'Sibling.tsx',
 			'Deferred.tsx',
