@@ -403,6 +403,7 @@ export function createDataOwner(options: {
 					if (!serving || dropped.get(port) !== generation) return port.postMessage(RETIRED);
 					dropped.delete(port);
 					replicas.add(port);
+					watch(port);
 				}
 				heard.set(port, hostDateNow());
 				if (message.t === 'request') request(port, message.id, message.request, message.fresh);

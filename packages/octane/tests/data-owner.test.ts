@@ -411,6 +411,12 @@ describe('octane/data owners across builds and crashes', () => {
 		// Its feed connects again through the owner.
 		await vi.advanceTimersByTimeAsync(5_000);
 		await vi.waitFor(() => expect(signals).toHaveLength(2));
+
+		// Silent again, it is dropped again.
+		document.dispatchEvent(new Event('freeze'));
+		await vi.advanceTimersByTimeAsync(20_000);
+		await vi.waitFor(() => expect(signals[1]!.aborted).toBe(true));
+		document.dispatchEvent(new Event('resume'));
 	});
 
 	it('keeps its owner while the browser throttles its timers, as long as each ping is answered', async () => {
