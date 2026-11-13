@@ -7,9 +7,11 @@ import {
 	DataError,
 	DataUncertainError,
 	createDataStore,
+	createReplica,
 	indexedDBStorage,
 	serverListener,
 	serverTransport,
+	sharedOwner,
 	type DataRequest,
 	type DataStore,
 	type FormState,
@@ -89,6 +91,15 @@ function describe(request: DataRequest): string {
  */
 export function openSession(account: Account, namespace = '', seed?: string | null): Session {
 	document.cookie = `${ACCOUNT_COOKIE}=${encodeURIComponent(namespace + account)}; path=/; SameSite=Strict`;
+	const partition = namespace + account;
+	// With `?owner=shared`, the account's tabs share the data worker's owner, which makes their
+	// requests. It keeps nothing on the device yet, and the fault switches act on this tab's own store.
+	const port =
+		new URLSearchParams(location.search).get('owner') === 'shared' && sharedOwner(partition);
+	if (port) {
+		const store = createReplica(port, { seed, writes: [addBook, setRead, removeBook] });
+		return sessionFor(account, store, { dropNextReply: false, offline: false }, externalValue([]));
+	}
 	const call = serverTransport(data);
 	const faults: Faults = { dropNextReply: false, offline: false };
 	const network = externalValue<readonly NetworkEntry[]>([]);
@@ -103,7 +114,6 @@ export function openSession(account: Account, namespace = '', seed?: string | nu
 		}
 		return reply;
 	};
-	const partition = namespace + account;
 	const persist = {
 		storage: indexedDBStorage({ name: 'shelf' }),
 		partition,

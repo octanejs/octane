@@ -403,3 +403,97 @@ test('a React island and its Octane page show the same edit and the same rollbac
 	await status(page).getByRole('button', { name: 'Check saved result' }).click();
 	await expect(island.getByText('The Left Hand of Darkness')).toBeVisible();
 });
+
+/**
+ * Drive the shelf's data worker for `namespace` through the DevTools protocol: a
+ * worker's requests never reach Playwright's routes. `keeper` starts the worker
+ * first, under the name `sharedOwner` gives it, so no request is missed.
+ */
+async function dataWorker(keeper: Page, namespace: string) {
+	await keeper.goto('/_octane/data-worker.js');
+	await keeper.evaluate((name) => {
+		(window as { worker?: SharedWorker }).worker = new SharedWorker('/_octane/data-worker.js', {
+			type: 'module',
+			name,
+		});
+	}, `octane-data:1:${namespace}:ada`);
+	const cdp = await keeper.context().browser()!.newBrowserCDPSession();
+	let targetId = '';
+	await expect
+		.poll(async () => {
+			const { targetInfos } = await cdp.send('Target.getTargets');
+			targetId = targetInfos.find((target) => target.type === 'shared_worker')?.targetId ?? '';
+			return targetId;
+		})
+		.not.toBe('');
+	const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: false });
+	let id = 0;
+	const send = (method: string, params: object = {}) =>
+		cdp.send('Target.sendMessageToTarget', {
+			sessionId,
+			message: JSON.stringify({ id: ++id, method, params }),
+		});
+	/** The data calls the worker has sent: store requests, and connections to the feed. */
+	const sent: string[] = [];
+	cdp.on('Target.receivedMessageFromTarget', ({ message }) => {
+		const { method, params } = JSON.parse(message);
+		if (method !== 'Network.requestWillBeSent' || !isData(new URL(params.request.url))) return;
+		sent.push(params.request.postData ?? '');
+	});
+	await send('Network.enable');
+	return {
+		reads: () => sent.filter((body) => body.includes('\\"kind\\"') && !body.includes('write')),
+		feeds: () => sent.filter((body) => body.includes('books.changes')),
+		writes: () => sent.filter((body) => body.includes('write')),
+		latency: (latency: number) =>
+			send('Network.emulateNetworkConditions', {
+				offline: false,
+				latency,
+				downloadThroughput: -1,
+				uploadThroughput: -1,
+			}),
+		block: (blocked: boolean) =>
+			send('Network.setBlockedURLs', { urls: blocked ? ['*_$_ripple_rpc_$_*'] : [] }),
+	};
+}
+
+test('tabs that share the data worker load each read once, and show the same pending edit and rollback', async ({
+	page,
+}) => {
+	const ns = `${Date.now()}-${++namespace}`;
+	const url = `/mixed.html?ns=${ns}&owner=shared`;
+	const keeper = await page.context().newPage();
+	const worker = await dataWorker(keeper, ns);
+
+	// Two tabs open at once, on a network slow enough that their reads overlap.
+	await worker.latency(2_000);
+	const other = await page.context().newPage();
+	await Promise.all([page.goto(url), other.goto(url)]);
+	for (const tab of [page, other]) {
+		await expect(tab.getByText('3 books · 0 read')).toBeVisible({ timeout: 15_000 });
+		await expect(tab.getByText('Live', { exact: true })).toBeVisible();
+	}
+	await worker.latency(0);
+	// Each read was sent once for both tabs, and both share one feed connection.
+	const reads = worker.reads();
+	expect(reads.length).toBeGreaterThan(0);
+	expect(new Set(reads).size).toBe(reads.length);
+	expect(worker.feeds()).toHaveLength(1);
+
+	// An edit whose request fails shows in both tabs until one tab learns it never arrived.
+	await worker.block(true);
+	await book(page, 'Kindred').getByRole('checkbox').click();
+	await expect(status(page)).toHaveText(/The reply was lost/);
+	for (const tab of [page, other])
+		await expect(book(tab, 'Kindred').getByRole('checkbox')).toBeChecked();
+	await worker.block(false);
+	await status(page).getByRole('button', { name: 'Check saved result' }).click();
+	await expect(status(page)).toHaveText('The server never received that change');
+	for (const tab of [page, other]) {
+		await expect(book(tab, 'Kindred').getByRole('checkbox')).not.toBeChecked();
+		await expect(tab.getByText('3 books · 0 read')).toBeVisible();
+	}
+	expect(worker.writes()).toHaveLength(1);
+	await other.close();
+	await keeper.close();
+});

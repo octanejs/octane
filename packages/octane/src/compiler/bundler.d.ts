@@ -281,6 +281,8 @@ export function findLeadingJsxImportSourcePragma(code: string): string | null;
 
 export const HYDRATE_QUERY_PARAM: 'octane-hydrate';
 export const INDEPENDENT_HYDRATION_MANIFEST_FILENAME: 'octane-independent-hydration.json';
+/** Where the build plugins emit an app's data worker; see `sharedOwner` in `octane/data`. */
+export { DATA_WORKER_PATH } from '../data/worker-path.js';
 
 /** Direct function exports whose authored body never returns a renderable value. */
 export function findVoidComponentExports(source: string | CompilerProgram, id: string): string[];

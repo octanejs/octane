@@ -30,7 +30,14 @@ const rules = [
 ];
 // Octane ships its TypeScript source, whose imports name the built `.js` files.
 const resolve = { extensionAlias: { '.js': ['.ts', '.js'] } };
-const octane = () => new OctaneRspackPlugin({ requireDirective: true, transpile: false });
+// The client build also emits the data worker at `/_octane/data-worker.js`, which pages opened
+// with `?owner=shared` share; the server build ignores it.
+const octane = () =>
+	new OctaneRspackPlugin({
+		requireDirective: true,
+		transpile: false,
+		dataWorker: './src/shared/worker.ts',
+	});
 
 /** A page's HTML, without the entry script Vite reads: Rspack adds its own bundle. */
 const page = (file, chunk) =>

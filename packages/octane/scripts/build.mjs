@@ -73,6 +73,7 @@ cpSync(join(src, 'html-tree-validation.d.ts'), join(dist, 'html-tree-validation.
 cpSync(join(src, 'jsx-runtime.d.ts'), join(dist, 'jsx-runtime.d.ts'));
 cpSync(join(src, 'jsx-runtime-strong.d.ts'), join(dist, 'jsx-runtime-strong.d.ts'));
 cpSync(join(src, 'strong.d.ts'), join(dist, 'strong.d.ts'));
+cpSync(join(src, 'data/worker-path.d.ts'), join(dist, 'data/worker-path.d.ts'));
 
 execFileSync(join(root, 'node_modules/.bin/tsc'), ['-p', join(pkgDir, 'tsconfig.build.json')], {
 	stdio: 'inherit',

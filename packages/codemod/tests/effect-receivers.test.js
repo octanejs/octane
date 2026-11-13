@@ -6,9 +6,13 @@ import path from 'node:path';
 import {
 	act,
 	createElement,
+	useCallback,
 	useEffect,
 	useEffectEvent,
 	useImperativeHandle,
+	useInsertionEffect,
+	useLayoutEffect,
+	useMemo,
 	useRef,
 	useState,
 } from 'react';
@@ -68,6 +72,51 @@ const dependencyError = expect.objectContaining({
 	severity: 'error',
 	message: expect.stringContaining('getter owned by React'),
 });
+
+it.each([
+	['useLayoutEffect', '() => {}', (value) => useLayoutEffect(() => {}, [value])],
+	['useInsertionEffect', '() => {}', (value) => useInsertionEffect(() => {}, [value])],
+	[
+		'useImperativeHandle',
+		'null, () => ({})',
+		(value) => useImperativeHandle(null, () => ({}), [value]),
+	],
+	['useMemo', '() => 1', (value) => useMemo(() => 1, [value])],
+	['useCallback', '() => {}', (value) => useCallback(() => {}, [value])],
+])(
+	'reports an opaque dependency evaluated during React SSR by %s',
+	(name, args, useDependency) => {
+		function Reference({ probe }) {
+			useDependency(probe.value);
+			return createElement('b', null, 'ok');
+		}
+		const html = renderToStaticMarkup(
+			createElement(Reference, {
+				probe: {
+					get value() {
+						preinit('/snapshot.css', { as: 'style' });
+						return 1;
+					},
+				},
+			}),
+		);
+		expect(html).toContain('<link rel="stylesheet" href="/snapshot.css"');
+		const input = `import { ${name} } from 'react';
+	export function Probe({ probe }: { probe: { value: number } }) {
+		${name}(${args}, [probe.value]);
+		return <b>ok</b>;
+	}`;
+		for (const strong of [false, true]) {
+			expect(migrate(input, strong).notes).toContainEqual(dependencyError);
+		}
+		const ownData = input.replace(
+			'({ probe }: { probe: { value: number } }) {',
+			'() { const probe = { value: 1 };',
+		);
+		expect(migrate(ownData).notes).not.toContainEqual(dependencyError);
+	},
+	20_000,
+);
 
 it('reports an opaque effect dependency whose getter registers a React SSR stylesheet', () => {
 	function Reference({ probe }) {

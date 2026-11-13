@@ -1,6 +1,7 @@
-import { nativeOutputOwner, renderUses } from './forwarded-props.js';
+import { hasEval, nativeOutputOwner, renderUses } from './forwarded-props.js';
 import {
 	componentTagOrExport,
+	localSymbol,
 	localUses,
 	portableArguments,
 	scalar,
@@ -61,6 +62,20 @@ function literalCondition(expr: ts.Expression) {
 		return 'truthy';
 }
 
+/** A later spread or unknown key may replace the selected own data property. */
+function finalOwnField(source: ts.ObjectLiteralExpression, key: string) {
+	if (key === '__proto__') return;
+	for (let i = source.properties.length - 1; i >= 0; i--) {
+		const field = source.properties[i];
+		if (!field.name || !(ts.isIdentifier(field.name) || ts.isStringLiteralLike(field.name))) return;
+		if (field.name.text !== key) continue;
+		if (ts.isPropertyAssignment(field)) return field.initializer;
+		if (ts.isShorthandPropertyAssignment(field) && !field.objectAssignmentInitializer)
+			return field.name;
+		return;
+	}
+}
+
 /** A final, defined own property in an inline object prevents its binding default from running. */
 function suppliesBinding(binding: ts.BindingElement) {
 	const pattern = binding.parent;
@@ -77,21 +92,70 @@ function suppliesBinding(binding: ts.BindingElement) {
 	const key = binding.propertyName ?? binding.name;
 	if (
 		!ts.isObjectLiteralExpression(source) ||
-		!(ts.isIdentifier(key) || ts.isStringLiteralLike(key)) ||
-		key.text === '__proto__'
+		!(ts.isIdentifier(key) || ts.isStringLiteralLike(key))
 	)
 		return false;
-	// A later spread or a key we cannot compare may overwrite the value.
-	for (let i = source.properties.length - 1; i >= 0; i--) {
-		const field = source.properties[i];
-		if (!field.name || !(ts.isIdentifier(field.name) || ts.isStringLiteralLike(field.name)))
-			return false;
-		if (field.name.text !== key.text) continue;
-		if (!ts.isPropertyAssignment(field)) return false;
-		const value = skipWrappers(field.initializer);
-		return literal(value) || literalCondition(value) === 'truthy';
+	const value = finalOwnField(source, key.text);
+	return !!value && (literal(value) || literalCondition(value) === 'truthy');
+}
+
+/** Only follow one ordinary const record which cannot be changed through another reader. */
+function selectedRecordField(
+	d: ts.BindingElement,
+	checker: ts.TypeChecker,
+	uses: ReturnType<typeof localUses>,
+) {
+	const pattern = d.parent;
+	const key = d.propertyName ?? d.name;
+	if (
+		d.dotDotDotToken ||
+		!ts.isObjectBindingPattern(pattern) ||
+		!(ts.isIdentifier(key) || ts.isStringLiteralLike(key))
+	)
+		return;
+	const decl = pattern.parent;
+	function constant(
+		node: ts.Node | undefined,
+	): node is ts.VariableDeclaration & { initializer: ts.Expression } {
+		return (
+			!!node &&
+			ts.isVariableDeclaration(node) &&
+			!!node.initializer &&
+			ts.isVariableDeclarationList(node.parent) &&
+			(node.parent.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const
+		);
 	}
-	return false;
+	if (!constant(decl)) return;
+	let record = skipWrappers(decl.initializer);
+	if (ts.isIdentifier(record)) {
+		const source = checker.getSymbolAtLocation(record)?.valueDeclaration;
+		if (
+			!constant(source) ||
+			!ts.isIdentifier(source.name) ||
+			source.end > decl.pos ||
+			!ts.isVariableStatement(source.parent.parent) ||
+			source.parent.parent.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ||
+			!renderUses(uses(source.name)).every((ref) => ref === record)
+		)
+			return;
+		record = skipWrappers(source.initializer);
+	}
+	if (!ts.isObjectLiteralExpression(record)) return;
+	const file = d.getSourceFile();
+	if ((file.text.includes('eval') || file.text.includes('\\u')) && hasEval(file)) return;
+	// A getter or default in an earlier binding could change the selected field.
+	for (const entry of pattern.elements) {
+		if (entry === d) return finalOwnField(record, key.text);
+		const earlier = entry.propertyName ?? entry.name;
+		if (
+			!ts.isIdentifier(entry.name) ||
+			entry.initializer ||
+			entry.dotDotDotToken ||
+			!(ts.isIdentifier(earlier) || ts.isStringLiteralLike(earlier)) ||
+			!finalOwnField(record, earlier.text)
+		)
+			return;
+	}
 }
 
 /** Bare SVG default imports can switch from a component to an asset URL for a .tsrx issuer. */
@@ -99,13 +163,18 @@ export function isBareSvgTag(
 	tag: ts.JsxTagNameExpression,
 	checker: ts.TypeChecker,
 	imports: Set<ts.Node>,
+	uses: ReturnType<typeof localUses>,
 ): boolean {
 	if (!ts.isIdentifier(tag) || /^[a-z]|-/.test(tag.text)) return false;
 	const seen = new Set<ts.Symbol>();
 	function fromSvg(value: ts.Expression): boolean {
 		value = skipWrappers(value);
-		if (ts.isConditionalExpression(value))
+		if (ts.isConditionalExpression(value)) {
+			const condition = literalCondition(value.condition);
+			if (condition !== undefined)
+				return fromSvg(condition === 'truthy' ? value.whenTrue : value.whenFalse);
 			return fromSvg(value.whenTrue) || fromSvg(value.whenFalse);
+		}
 		if (ts.isBinaryExpression(value)) {
 			const op = value.operatorToken.kind;
 			const left = literalCondition(value.left);
@@ -121,13 +190,18 @@ export function isBareSvgTag(
 				);
 		}
 		if (!ts.isIdentifier(value)) return false;
-		const symbol = checker.getSymbolAtLocation(value);
+		const symbol = localSymbol(checker, value);
 		if (!symbol || seen.has(symbol)) return false;
 		seen.add(symbol);
 		const d = symbol.declarations?.[0];
 		if (!d) return false;
-		if ((ts.isParameter(d) || ts.isBindingElement(d)) && ts.isIdentifier(d.name) && d.initializer)
-			return !(ts.isBindingElement(d) && suppliesBinding(d)) && fromSvg(d.initializer);
+		if (ts.isBindingElement(d) && ts.isIdentifier(d.name)) {
+			if (d.initializer) return !suppliesBinding(d) && fromSvg(d.initializer);
+			const field = selectedRecordField(d, checker, uses);
+			return !!field && fromSvg(field);
+		}
+		if (ts.isParameter(d) && ts.isIdentifier(d.name) && d.initializer)
+			return fromSvg(d.initializer);
 		if (
 			ts.isVariableDeclaration(d) &&
 			d.initializer &&
@@ -259,9 +333,19 @@ export function storeHookUses(
 		);
 	}
 	function runsAfterRender(use: ts.Node, hook: ts.CallExpression) {
-		const fn = ts.findAncestor(use, ts.isFunctionLike);
+		let owner = use.parent;
+		for (let child = use; owner && !ts.isFunctionLike(owner); child = owner, owner = owner.parent) {
+			// An instance initializer can run in another renderer if the class escapes.
+			if (
+				ts.isPropertyDeclaration(owner) &&
+				owner.initializer === child &&
+				!(ts.getCombinedModifierFlags(owner) & ts.ModifierFlags.Static)
+			)
+				return false;
+		}
 		return (
-			!!fn && (!!effectSetup(fn) || clickHandler(fn, hook) || effectEventCallback(fn, hook, use))
+			!!owner &&
+			(!!effectSetup(owner) || clickHandler(owner, hook) || effectEventCallback(owner, hook, use))
 		);
 	}
 
