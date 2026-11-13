@@ -160,6 +160,39 @@ directions, so a new skill cannot stay unreachable here. This tool reads the Rul
 hosts that discover skills natively and hosts that call this tool see the same
 thing.
 
+### Drive a running app: `octane_app_*`
+
+Nine tools drive one page of an Octane app's Vite development server in Chromium,
+with a clock the agent owns. `octane_app_open` injects `octane/agent` ahead of the
+app's scripts, so Octane's test clock (`installTestClock` from `octane/testing`)
+owns the runtime's time from boot. Between two operations nothing moves: timers,
+frames, transitions, Suspense reveals and effects wait until the agent moves time,
+so there are no sleeps and no timing flakes.
+
+| Tool | What it does |
+| --- | --- |
+| `octane_app_open` | Open a dev server URL and run its start-up work to idle. |
+| `octane_app_tree` | The page's accessibility tree, as ARIA YAML. |
+| `octane_app_state` | Mounted components and their `useState`/`useReducer` values. Needs `octane({ devtools: true })`. |
+| `octane_app_tap` | Click a target. |
+| `octane_app_type` | Fill a text field, optionally pressing Enter. |
+| `octane_app_clock` | `advance` by ms, go to the next `frame`, or `settle` everything the clock holds. |
+| `octane_app_screenshot` | A PNG of the page. |
+| `octane_app_logs` | Console messages and page errors since the last call. |
+| `octane_app_close` | Close the page and its browser. |
+
+A target is a `testId`, an ARIA `role` with an optional accessible `name`,
+exact `text`, or a CSS `selector`. After a tap or typing, the driver runs the work
+that input made due, as the browser would in that input's own task, but does not
+move the clock: an effect that waits for the next frame waits for
+`octane_app_clock`.
+
+The driver needs Playwright beside the server (`npm install -D playwright` and
+`npx playwright install chromium`); the other tools do not. The clock owns
+Octane's own scheduling, not the app's own `setTimeout` calls. A page the driver
+did not open never loads `octane/agent`, so a person using the same dev server
+sees real time.
+
 ## Tools (octane monorepo only)
 
 ### `octane_project_map`

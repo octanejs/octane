@@ -5553,6 +5553,17 @@ export default defineConfig({
 				},
 			},
 			{
+				// The agent driver against a real Vite dev server in Chromium.
+				testExecution: { group: 'heavy-browser', browsers: ['chromium'] },
+				test: {
+					name: 'octane-mcp-server-browser',
+					include: ['packages/octane-mcp-server/tests/browser/**/*.test.js'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+				},
+			},
+			{
 				test: {
 					name: 'cli',
 					include: ['packages/cli/tests/**/*.test.js'],
