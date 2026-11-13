@@ -1815,6 +1815,103 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		}
 	});
 
+	it.each([
+		['linked', 'src', 'Caller.ts', false],
+		['src', 'linked', 'Caller.ts', false],
+		['linked', 'src', 'index.html', false],
+		['src', 'linked', 'index.html', false],
+		['linked', 'src', 'Caller.ts', true],
+		['src', 'linked', 'Caller.ts', true],
+		['linked', 'src', 'index.html', true],
+		['src', 'linked', 'index.html', true],
+	])(
+		'checks a linked rename from %s to a caller in %s through %s (case variant %s)',
+		async (selected, used, issuer, caseVariant) => {
+			const script = (file) => `<script type="module" src="./${file}"></script>`;
+			/** @type {Record<string, string>} */
+			const original = {
+				'package.json': '{"name":"app","type":"module"}',
+				'tsconfig.json': '{"compilerOptions":{"module":"esnext","moduleResolution":"bundler"}}',
+				'index.html': script('First.tsx'),
+				'First.tsx':
+					"import { useState } from 'react'; export function First(){const [n]=useState(1); return <b>{n}</b>}",
+				'src/Part.tsx': 'export function Part(){return <i/>}',
+			};
+			const root = project(original);
+			fs.symlinkSync('src', path.join(root, 'linked'), 'dir');
+			const insensitive = fs.existsSync(path.join(root, 'src/part.tsx'));
+			const variant = caseVariant && (!insensitive || process.platform === 'darwin');
+			const distinct = variant && !insensitive;
+			const name = variant ? 'part' : 'Part';
+			// Select an authored case variant too, to exercise lookup of the stored leaf.
+			const selectedName = variant && insensitive && selected === 'linked' ? 'pArT' : 'Part';
+			/** @param {string} file @param {string} code */
+			const save = (file, code) => {
+				original[file] = code;
+				fs.writeFileSync(path.join(root, file), code);
+			};
+			if (distinct) save('src/part.tsx', 'export function Part(){return <aside/>}');
+			if (issuer === 'index.html')
+				save(issuer, original[issuer] + script(used + '/' + name + '.tsx'));
+			else save(issuer, `export { Part } from './${used}/${name}';`);
+			const source = selected + '/' + selectedName + '.tsx';
+			const output = source.replace(/\.tsx$/, '.tsrx');
+			const inputs = ['First.tsx', source].map((file) => path.join(root, file));
+			const options = { root, verify: false };
+			const note = expect.objectContaining({
+				rule: 'rename-conflict',
+				severity: 'error',
+				message: expect.stringContaining(issuer),
+			});
+			const preview = await runCodemod(inputs, { ...options, write: false });
+			if (distinct) {
+				const result = await runCodemod(inputs, options);
+				for (const report of [preview, result]) {
+					expect(report.files.map((file) => file.output)).toEqual(['First.tsrx', output]);
+					expect(report.files.flatMap((file) => file.notes)).toEqual([]);
+				}
+				expect(fs.existsSync(path.join(root, output))).toBe(true);
+				expect(fs.readFileSync(path.join(root, 'src/part.tsx'), 'utf8')).toBe(
+					original['src/part.tsx'],
+				);
+				const caller = fs.readFileSync(path.join(root, issuer), 'utf8');
+				expect(caller).toBe(original[issuer].replace('First.tsx', 'First.tsrx'));
+				return;
+			}
+			expect(preview.files).toEqual([
+				expect.objectContaining({ file: 'First.tsx', output: 'First.tsrx' }),
+				expect.objectContaining({ file: source, output, notes: [note] }),
+			]);
+			const result = await runCodemod(inputs, options);
+			expect(result.files).toEqual([
+				expect.objectContaining({
+					file: source,
+					output: source,
+					changed: false,
+					code: original['src/Part.tsx'],
+					notes: [note],
+				}),
+			]);
+			expect(fs.existsSync(path.join(root, 'First.tsrx'))).toBe(false);
+			expect(fs.existsSync(path.join(root, output))).toBe(false);
+			for (const [file, code] of Object.entries(original))
+				expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
+		},
+	);
+
+	it('preserves path-like display text in a selected module', async () => {
+		const text = './linked/Part.tsx';
+		const root = project({
+			'Label.tsx': `export function Label(){return <b>{'${text}'}</b>}`,
+			'src/Part.tsx': 'export function Part(){return <i/>}',
+		});
+		fs.symlinkSync('src', path.join(root, 'linked'), 'dir');
+		const { files } = await runCodemod([root], { verify: false });
+		expect(files.map(({ output }) => output)).toEqual(['Label.tsrx', 'src/Part.tsrx']);
+		expect(files.flatMap(({ notes }) => notes)).toEqual([]);
+		expect(fs.readFileSync(path.join(root, 'Label.tsrx'), 'utf8')).toContain(text);
+	});
+
 	it('uses filesystem directory identity for differently normalized symlink targets', async () => {
 		const parent = 'Cafe\u0301';
 		const source = 'export const Item = () => <i />;';

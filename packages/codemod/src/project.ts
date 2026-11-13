@@ -74,7 +74,7 @@ export async function runCodemod(
 	const exports: Map<string, TransformResult['exports']> = new Map();
 	const owners: Map<string, string> = new Map();
 	const outputDirectories = new Map<string, string>();
-	function outputKey(file: string) {
+	function entryKey(file: string) {
 		// A symlinked parent can name the same output. Keep the last path component
 		// lexical because the write owns that directory entry, not a symlink target.
 		const dir = path.dirname(file);
@@ -84,7 +84,10 @@ export async function runCodemod(
 			physical = process.platform === 'darwin' ? fs.realpathSync.native(dir) : fs.realpathSync(dir);
 			outputDirectories.set(dir, physical);
 		}
-		const output = path.join(physical, path.basename(file));
+		return path.join(physical, path.basename(file));
+	}
+	function outputKey(file: string) {
+		const output = entryKey(file);
 		return ts.sys.useCaseSensitiveFileNames ? output : output.toLowerCase();
 	}
 	const normalizedOwners =
@@ -176,6 +179,41 @@ export async function runCodemod(
 	}
 	const contextsOf = contextIndex(exports, known);
 	const renamed = renamedImports(root, config, renames);
+	const foldNames = process.platform === 'darwin';
+	const leafKey = (file: string) => {
+		const name = path.basename(file);
+		return foldNames ? name.toLowerCase() : name;
+	};
+	const sourceNames = new Set([...renames.keys()].map(leafKey));
+	const sourceEntries = new Map([...renames.keys()].map((file) => [entryKey(file), file]));
+	const foldedSources = new Map<string, string[]>();
+	if (foldNames) {
+		for (const [entry, source] of sourceEntries) {
+			const key = path.join(path.dirname(entry), leafKey(entry));
+			const group = foldedSources.get(key);
+			if (group) group.push(source);
+			else foldedSources.set(key, [source]);
+		}
+	}
+	function linkedRename(file: string) {
+		if (renames.has(path.normalize(file))) return;
+		const name = leafKey(file);
+		if (!sourceNames.has(name) || !fs.existsSync(file)) return;
+		const entry = entryKey(file);
+		const selected = sourceEntries.get(entry);
+		if (selected) return selected;
+		const folded = foldNames && foldedSources.get(path.join(path.dirname(entry), name));
+		if (!folded) return;
+		// APFS reports the stored spelling. A leaf symlink or hard link must
+		// remain a distinct entry even when it reaches the same file.
+		if (!fs.lstatSync(file, { throwIfNoEntry: false })?.isFile()) return;
+		const actual = fs.realpathSync.native(file);
+		return folded.find(
+			(source) =>
+				fs.lstatSync(source, { throwIfNoEntry: false })?.isFile() &&
+				fs.realpathSync.native(source) === actual,
+		);
+	}
 	const resolveRename = (from: string, specifier: string) =>
 		renamed(from, specifier)?.specifier ?? null;
 	const propChecks = new Map<string, ReturnType<typeof propsOf>>();
@@ -1156,6 +1194,13 @@ export async function runCodemod(
 		}
 	}
 	const reverseIslands = new Map<string, ReadonlySet<string>>();
+	const linkedConflicts = new Map<string, string>();
+	function checkLinkedRename(file: string, issuer: string) {
+		const selected = linkedRename(file);
+		if (selected && !linkedConflicts.has(selected)) linkedConflicts.set(selected, issuer);
+	}
+	const scanRename = (from: string, specifier: string) =>
+		renamed(from, specifier, (winner) => checkLinkedRename(winner, from))?.specifier ?? null;
 	function protectIslandModule(issuer: string, specifier: string, owner: string) {
 		const file = ts.resolveModuleName(
 			specifier,
@@ -1207,10 +1252,18 @@ export async function runCodemod(
 				protectIslandModule(file, module, file);
 		}
 		if (islandConflict) return blockedWrite(root, islandConflict, compiler?.from);
-		if (!renames.size || renames.has(file) || conflicts.has(file)) continue;
+		if (!renames.size || linkedRename(file) || conflicts.has(file)) continue;
 		const result = byFile.get(file);
-		const paths = rewriteModulePaths(result?.code ?? source, file, root, renames, resolveRename);
-		if (!paths) continue;
+		const selected = renames.has(file);
+		const paths = rewriteModulePaths(
+			selected ? source : (result?.code ?? source),
+			file,
+			root,
+			renames,
+			scanRename,
+			selected ? undefined : checkLinkedRename,
+		);
+		if (!paths || selected) continue;
 		const rules = { ...result?.rules, 'module-paths': paths.count };
 		const name = path.relative(root, file);
 		const host: FileResult = result ?? {
@@ -1263,6 +1316,24 @@ export async function runCodemod(
 		}
 	}
 
+	const pages = planEntryPages(
+		root,
+		paths.map((entry) => path.resolve(entry)),
+		renames,
+		checkLinkedRename,
+	);
+	for (const [file, issuer] of linkedConflicts) {
+		const conflict = conflictFor(
+			file,
+			fs.readFileSync(file, 'utf8'),
+			renames.get(file)!,
+			'would leave a reference in ' +
+				path.relative(root, issuer) +
+				' pointing to its original name',
+		);
+		if (write) return blockedWrite(root, conflict, compiler?.from);
+		byFile.get(file)?.notes.push(...conflict.notes);
+	}
 	const intlConsumer = results.find((file) => file.rules['react-intl']);
 	const svg = generatedHelpers.has(svgHelper) && checkedHelpers.get(svgHelper);
 	if (write) {
@@ -1355,12 +1426,8 @@ export async function runCodemod(
 			strongFixes: [],
 		});
 	}
-	const html = rewriteEntryPages(
-		root,
-		paths.map((entry) => path.resolve(entry)),
-		renames,
-		write,
-	);
+	if (write) for (const [page, next] of pages) fs.writeFileSync(page, next);
+	const html = [...pages.keys()].map((page) => path.relative(root, page));
 	const dependencies = addBindings(root, packages, write);
 	if (write) {
 		for (const result of results) {
@@ -1630,7 +1697,7 @@ function renamedImports(
 				: null;
 		return { start, end, directory };
 	});
-	return (from: string, specifier: string) => {
+	return (from: string, specifier: string, unmatched?: (file: string) => void) => {
 		const matches = specifier.startsWith('.')
 			? []
 			: aliases.filter(({ start, end }) =>
@@ -1641,7 +1708,10 @@ function renamedImports(
 		if (!renames.size || (!specifier.startsWith('.') && !matches.length)) return null;
 		const resolved = ts.resolveModuleName(specifier, from, options, ts.sys, cache).resolvedModule;
 		const target = resolved && renames.get(resolved.resolvedFileName);
-		if (!target) return null;
+		if (!target) {
+			if (resolved) unmatched?.(resolved.resolvedFileName);
+			return null;
+		}
 		// Only a single directory alias preserves the specifier's suffix.
 		// A fixed alias or fallback list may resolve elsewhere after a rename.
 		const alias = matches.length === 1 ? matches[0] : null;
@@ -2041,13 +2111,13 @@ function rendersWithReact(name: string, from: string) {
  * Point `<script src>` in HTML entry pages at renamed modules.
  * @param targets the paths being migrated
  */
-function rewriteEntryPages(
+function planEntryPages(
 	root: string,
 	targets: string[],
 	renames: Map<string, string>,
-	write: boolean,
+	unmatched: (file: string, issuer: string) => void,
 ) {
-	const updated: string[] = [];
+	const updated = new Map<string, string>();
 	for (const page of findHtml(root, targets)) {
 		const html = fs.readFileSync(page, 'utf8');
 		const next = html.replace(
@@ -2056,14 +2126,14 @@ function rewriteEntryPages(
 				// Vite serves `/` from the page's own directory, as it does `./`.
 				const file = path.join(path.dirname(page), src);
 				const renamed = renames.get(file);
-				if (!renamed) return match;
+				if (!renamed) {
+					unmatched(file, page);
+					return match;
+				}
 				return open + quote + src.replace(/\.[jt]sx?$/, '.tsrx') + quote;
 			},
 		);
-		if (next !== html) {
-			updated.push(path.relative(root, page));
-			if (write) fs.writeFileSync(page, next);
-		}
+		if (next !== html) updated.set(page, next);
 	}
 	return updated;
 }
@@ -2079,17 +2149,17 @@ function rewriteModulePaths(
 	root: string,
 	renames: Map<string, string>,
 	resolveRename: (from: string, specifier: string) => string | null,
+	unmatched?: (file: string, issuer: string) => void,
 ): { code: string; count: number } | null {
 	const edits: { start: number; end: number; text: string }[] = [];
 	function literal(value: string, start: number, end: number, moduleSource: boolean) {
 		if (!moduleSource) {
 			const ext = SOURCE.exec(value)?.[0];
-			if (
-				ext &&
-				code.slice(end - 1 - ext.length, end - 1) === ext &&
-				[path.dirname(file), root].some((dir) => renames.has(path.join(dir, value)))
-			) {
-				edits.push({ start: end - 1 - ext.length, end: end - 1, text: '.tsrx' });
+			if (ext && code.slice(end - 1 - ext.length, end - 1) === ext) {
+				const candidates = [path.dirname(file), root].map((dir) => path.join(dir, value));
+				if (candidates.some((candidate) => renames.has(candidate)))
+					edits.push({ start: end - 1 - ext.length, end: end - 1, text: '.tsrx' });
+				else for (const candidate of candidates) unmatched?.(candidate, file);
 			}
 			return;
 		}
