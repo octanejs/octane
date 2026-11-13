@@ -12,7 +12,7 @@ each invariant listed here.
 
 | Entry | Exports | Runs |
 | --- | --- | --- |
-| `octane/data` | `read`, `write`, `view`, `entity`, `feed`, `DataError`; `createDataStore`, `DataUncertainError`, `DataRetiredError`; `httpTransport`, `serverTransport`, `serverListener`, `webSocketListener`, `pubSubListener`; `listen`, `receive`, `pages`; `indexedDBStorage`, `memoryStorage`, `autoBudget`; `createDataOwner`, `createReplica`, `sharedOwner`, `serveDataOwner` | Browser, server, workers. Imports no renderer and no compiler. |
+| `octane/data` | `read`, `write`, `view`, `entity`, `feed`, `DataError`; `createDataStore`, `DataUncertainError`, `DataRetiredError`; `httpTransport`, `serverTransport`, `serverListener`, `webSocketListener`, `pubSubListener`; `listen`, `receive`, `pages`; `indexedDBStorage`, `memoryStorage`, `autoBudget`; `createDataOwner`, `createReplica`, `sharedOwner`, `serveDataOwner`, `contractIdentity` | Browser, server, workers. Imports no renderer and no compiler. |
 | `octane/data/server` | `createDataHandler` | Server only. |
 | `octane/data/octane` | `DataProvider`, `useDataStore`, `useRead`, `usePages`, `useForm`, `useFeed` | Octane components. The server compiler retargets it to `octane/data/octane/server`. |
 | `octane/data/react` | The same names, over React's hooks | React 19 components. Marked `'use client'`. |

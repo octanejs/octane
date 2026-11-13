@@ -1792,32 +1792,33 @@ reply, and in two tabs at once.
 
 <h3 id="reference-data">octane/data</h3>
 
-| Export               | What it is for                                                                                                               |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `read`               | Describe a read: `name`, `input`, `output`, `entities`, `tags`, `fresh`, `keep`, `expire`, `persist`, `version`.             |
-| `write`              | Describe a write: `creates`, `patches` or `removes` an entity, with `draft`, `serverId`, `record`, `form` and `invalidates`. |
-| `entity`             | Name a record type and its key, so every read holding a record shares its fields.                                            |
-| `view`               | Describe a list by a rule over an entity: `where`, `order`, `limit`, `max`.                                                  |
-| `feed`               | Describe server events and the `changes` each one makes, with the reads it `covers`.                                         |
-| `DataError`          | A definitive refusal, with `code`, `data` and `issues`.                                                                      |
-| `createDataStore`    | Create a store: `transport`, `seed`, `seedAge`, `form`, `persist`, `listen`, `feeds`.                                        |
-| `DataUncertainError` | A write whose outcome is unknown; settle it by `operationId`.                                                                |
-| `DataRetiredError`   | Thrown by a retired store.                                                                                                   |
-| `httpTransport`      | Send requests to a handler mounted at a URL.                                                                                 |
-| `serverTransport`    | Send requests through a `module server` function that calls `handler.serve`.                                                 |
-| `serverListener`     | Listen to feeds through a `module server` function that calls `handler.listen`.                                              |
-| `webSocketListener`  | Listen to feeds over a WebSocket served by `handler.accept`, or an existing socket service.                                  |
-| `pubSubListener`     | Listen to feeds through a message broker the page already uses.                                                              |
-| `listen`             | Listen to a feed from plain code; returns a handle with `getSnapshot` and `subscribe`.                                       |
-| `receive`            | Apply changes from your own subscription, as a feed event would.                                                             |
-| `pages`              | Read a view a page at a time from plain code.                                                                                |
-| `indexedDBStorage`   | Persistent storage in IndexedDB.                                                                                             |
-| `memoryStorage`      | Storage in memory, for tests and hosts without persistent storage.                                                           |
-| `autoBudget`         | A storage budget sized by the device's memory, data saver and quota.                                                         |
-| `createDataOwner`    | An owner that serves replicas over message ports.                                                                            |
-| `createReplica`      | A store whose requests and feeds go through an owner.                                                                        |
-| `sharedOwner`        | Connect to the account's owner in the app's data worker, or `null` without SharedWorker.                                     |
-| `serveDataOwner`     | Serve an owner to every tab that connects: what the data worker module calls.                                                |
+| Export               | What it is for                                                                                                                |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `read`               | Describe a read: `name`, `input`, `output`, `entities`, `tags`, `fresh`, `keep`, `expire`, `persist`, `version`.              |
+| `write`              | Describe a write: `creates`, `patches` or `removes` an entity, with `draft`, `serverId`, `record`, `form` and `invalidates`.  |
+| `entity`             | Name a record type and its key, so every read holding a record shares its fields.                                             |
+| `view`               | Describe a list by a rule over an entity: `where`, `order`, `limit`, `max`.                                                   |
+| `feed`               | Describe server events and the `changes` each one makes, with the reads it `covers`.                                          |
+| `DataError`          | A definitive refusal, with `code`, `data` and `issues`.                                                                       |
+| `createDataStore`    | Create a store: `transport`, `seed`, `seedAge`, `form`, `persist`, `listen`, `feeds`.                                         |
+| `DataUncertainError` | A write whose outcome is unknown; settle it by `operationId`.                                                                 |
+| `DataRetiredError`   | Thrown by a retired store.                                                                                                    |
+| `httpTransport`      | Send requests to a handler mounted at a URL.                                                                                  |
+| `serverTransport`    | Send requests through a `module server` function that calls `handler.serve`.                                                  |
+| `serverListener`     | Listen to feeds through a `module server` function that calls `handler.listen`.                                               |
+| `webSocketListener`  | Listen to feeds over a WebSocket served by `handler.accept`, or an existing socket service.                                   |
+| `pubSubListener`     | Listen to feeds through a message broker the page already uses.                                                               |
+| `listen`             | Listen to a feed from plain code; returns a handle with `getSnapshot` and `subscribe`.                                        |
+| `receive`            | Apply changes from your own subscription, as a feed event would.                                                              |
+| `pages`              | Read a view a page at a time from plain code.                                                                                 |
+| `indexedDBStorage`   | Persistent storage in IndexedDB.                                                                                              |
+| `memoryStorage`      | Storage in memory, for tests and hosts without persistent storage.                                                            |
+| `autoBudget`         | A storage budget sized by the device's memory, data saver and quota.                                                          |
+| `createDataOwner`    | An owner that serves replicas over message ports.                                                                             |
+| `createReplica`      | A store whose requests and feeds go through an owner.                                                                         |
+| `sharedOwner`        | Connect to the account's owner in the app's data worker, or `null` without SharedWorker.                                      |
+| `serveDataOwner`     | Serve an owner to every tab that connects: what the data worker module calls.                                                 |
+| `contractIdentity`   | What `createReplica` compares to tell whether two builds can share an owner; `octane/data/manifest` exports it as `identity`. |
 
 A store has these methods: `read`, `prefetch`, `write`, `form`, `invalidate`,
 `settle`, `publish`, `forget`, `retire` and `dehydrate`, plus the `retired`

@@ -63,6 +63,8 @@ const FUNCTIONS = new Set(['ArrowFunctionExpression', 'FunctionExpression']);
  * @typedef {{ offset: number, line: number, column: number }} DataPosition
  * @typedef {{ binding: string, kind: string, name: string | null, exported: boolean, start: DataPosition, end: DataPosition }} DataContractDeclaration
  * @typedef {{ binding: string, source: string | null, imported: string, site: string, start: DataPosition, end: DataPosition }} DataContractUse
+ * @typedef {{ source: string, names: Array<[imported: string, exported: string]> | null }} DataReexport
+ *   `export { a as b } from './x.data.ts'`, or `export * from` with null names
  */
 
 /**
@@ -73,7 +75,7 @@ const FUNCTIONS = new Set(['ArrowFunctionExpression', 'FunctionExpression']);
  * @param {string} source
  * @param {string} filename
  * @param {(specifier: string) => ReadonlySet<string> | null} [contractExports]
- * @returns {{ declarations: DataContractDeclaration[], uses: DataContractUse[], diagnostics: any[] }}
+ * @returns {{ declarations: DataContractDeclaration[], uses: DataContractUse[], reexports: DataReexport[], diagnostics: any[] }}
  */
 export function analyzeDataContracts(source, filename, contractExports) {
 	const ast = parseModule(source, filename);
@@ -95,7 +97,29 @@ export function analyzeDataContracts(source, filename, contractExports) {
 	const namespaces = new Map();
 	const exported = new Set();
 	const importedName = new Map();
+	/** @type {DataReexport[]} */
+	const reexports = [];
 	for (const statement of ast.body) {
+		if (
+			(statement.type === 'ExportAllDeclaration' ||
+				(statement.type === 'ExportNamedDeclaration' && statement.source != null)) &&
+			statement.exportKind !== 'type' &&
+			DATA_SPECIFIER.test(statement.source.value)
+		) {
+			const name = (node) => node.name ?? node.value;
+			reexports.push({
+				source: statement.source.value,
+				names:
+					statement.type === 'ExportAllDeclaration'
+						? statement.exported == null
+							? null
+							: []
+						: statement.specifiers.map((specifier) => [
+								name(specifier.local),
+								name(specifier.exported),
+							]),
+			});
+		}
 		if (statement.type === 'ImportDeclaration' && statement.importKind !== 'type') {
 			const from = statement.source.value;
 			for (const specifier of statement.specifiers) {
@@ -373,7 +397,7 @@ export function analyzeDataContracts(source, filename, contractExports) {
 	};
 	walk(ast, null, null, visit);
 	diagnostics.sort((a, b) => a.start.offset - b.start.offset);
-	return { declarations, uses, diagnostics };
+	return { declarations, uses, reexports, diagnostics };
 }
 
 /** Visits `node` and, unless `visit` returns false, its runtime children. */
@@ -483,7 +507,7 @@ export function createDataProgram(root, files) {
 	let listed = files ? [...files] : null;
 	/** file → { stamp, source }, where a missing file has a null source. */
 	const sources = new Map();
-	/** file → { source, generation, targets, result } */
+	/** file → { source, generation, specifiers, result } */
 	const analyzed = new Map();
 	// Bumped when a contract module's exports change, so importers are reanalyzed.
 	let generation = 0;
@@ -517,33 +541,51 @@ export function createDataProgram(root, files) {
 	};
 	const analyze = (file, source) => {
 		const cached = analyzed.get(file);
-		if (cached?.source === source) {
-			// Refresh the contract modules it imports first: a changed export list
-			// bumps the generation.
-			for (const target of cached.targets) facts(target);
-			if (cached.generation === generation) return cached.result;
-		}
-		const targets = new Set();
+		if (active.has(file)) return cached?.result ?? null;
 		active.add(file);
+		if (cached?.source === source) {
+			// Refresh the contract modules it imports first, including ones that did
+			// not exist yet: a new or changed export list bumps the generation.
+			for (const specifier of cached.specifiers) {
+				const target = resolveDataModule(specifier, file);
+				if (target !== null) facts(target);
+			}
+			if (cached.generation === generation) {
+				active.delete(file);
+				return cached.result;
+			}
+		}
+		const specifiers = [];
 		const result = analyzeDataContracts(source, file, (specifier) => {
+			specifiers.push(specifier);
 			const target = resolveDataModule(specifier, file);
+			// A cycle partner's exports are not known yet; its own analysis bumps
+			// the generation, so this module is analyzed again.
 			if (target === null || active.has(target)) return null;
-			targets.add(target);
 			facts(target);
 			return exportsOf.get(target) ?? null;
 		});
 		active.delete(file);
 		if (DATA_MODULE.test(file)) {
-			const exported = result.declarations
-				.filter((declaration) => declaration.exported)
-				.map((declaration) => declaration.binding);
+			// A module that re-exports contracts has exports this module cannot list.
+			const exported =
+				result.reexports.length > 0
+					? null
+					: new Set(
+							result.declarations
+								.filter((declaration) => declaration.exported)
+								.map((declaration) => declaration.binding),
+						);
 			const previous = exportsOf.get(file);
-			if (previous === undefined || [...previous].join() !== exported.join()) {
-				exportsOf.set(file, new Set(exported));
-				if (previous !== undefined) generation++;
+			if (
+				previous === undefined ||
+				String(previous && [...previous]) !== String(exported && [...exported])
+			) {
+				exportsOf.set(file, exported);
+				generation++;
 			}
 		}
-		analyzed.set(file, { source, generation, targets, result });
+		analyzed.set(file, { source, generation, specifiers, result });
 		return result;
 	};
 	/** A module's facts from disk, or null when it does not touch octane/data. */
@@ -598,6 +640,37 @@ export function createDataProgram(root, files) {
 		report() {
 			const modules = all();
 			const declared = declarationsOf(modules);
+			/** The declaring module's key for `name` exported by `file`, through re-exports. */
+			const canonical = (file, name, seen = new Set()) => {
+				const key = `${file}\0${name}`;
+				if (declared.has(key) || seen.has(file)) return declared.has(key) ? key : null;
+				seen.add(file);
+				for (const { source, names } of modules.get(file)?.reexports ?? []) {
+					const target = resolveDataModule(source, file);
+					const pair = names?.find(([, exported]) => exported === name);
+					const found =
+						target === null || (names !== null && pair === undefined)
+							? null
+							: canonical(target, pair?.[0] ?? name, seen);
+					if (found !== null) return found;
+				}
+				return null;
+			};
+			/** Every name `file` exports, through re-exports. */
+			const exportNames = (file, seen = new Set()) => {
+				if (seen.has(file)) return [];
+				seen.add(file);
+				const facts = modules.get(file);
+				const names = (facts?.declarations ?? [])
+					.filter((declaration) => declaration.exported)
+					.map((declaration) => declaration.binding);
+				for (const { source, names: pairs } of facts?.reexports ?? []) {
+					const target = resolveDataModule(source, file);
+					if (pairs !== null) names.push(...pairs.map(([, exported]) => exported));
+					else if (target !== null) names.push(...exportNames(target, seen));
+				}
+				return names;
+			};
 			const handled = new Map();
 			const calls = new Map();
 			const used = new Set();
@@ -606,13 +679,14 @@ export function createDataProgram(root, files) {
 					const target = use.source === null ? file : resolveDataModule(use.source, file);
 					if (target === null) continue;
 					if (use.imported === '*') {
-						for (const declaration of modules.get(target)?.declarations ?? []) {
-							const key = `${target}\0${declaration.binding}`;
-							if (SERVED.has(declaration.kind)) handled.set(key, (handled.get(key) ?? 0) + 1);
+						for (const name of new Set(exportNames(target))) {
+							const key = canonical(target, name);
+							if (key !== null && SERVED.has(declared.get(key).declaration.kind))
+								handled.set(key, (handled.get(key) ?? 0) + 1);
 						}
 						continue;
 					}
-					const key = `${target}\0${use.imported}`;
+					const key = canonical(target, use.imported) ?? `${target}\0${use.imported}`;
 					used.add(key);
 					if (HANDLER_SITES.has(use.site)) handled.set(key, (handled.get(key) ?? 0) + 1);
 					// A contract module's own sites, such as `view({ of })`, declare rather than call.

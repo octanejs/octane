@@ -352,6 +352,43 @@ export const Other = entity('other', Thing);
 		).toEqual(['OCTANE_DATA_CONTRACT_ESCAPE']);
 	});
 
+	it('narrows an import once its contract module appears', () => {
+		const root = project({
+			'page.ts': `import { bookShape } from './books.data.ts';\nexport const list = z.array(bookShape);\n`,
+		});
+		const program = createDataProgram(root);
+		// Unknown module: every import from it counts as a contract.
+		expect(program.check(join(root, 'page.ts')).map((d: Diagnostic) => d.code)).toEqual([
+			'OCTANE_DATA_CONTRACT_ESCAPE',
+		]);
+		writeFileSync(
+			join(root, 'books.data.ts'),
+			`${contracts}export const bookShape = z.object({ id: z.string() });\n`,
+		);
+		program.invalidate(join(root, 'books.data.ts'));
+		expect(program.check(join(root, 'page.ts'))).toEqual([]);
+	});
+
+	it('follows contracts a contract module re-exports', () => {
+		const root = project({
+			'books.data.ts': contracts,
+			'index.data.ts': `export * from './more.data.ts';\nexport { setRead, stats as total } from './books.data.ts';\n`,
+			'more.data.ts': `import { read } from 'octane/data';\nexport const extra = read({ name: 'more.extra' });\n`,
+			'server.ts': `import * as All from './index.data.ts';
+createDataHandler({}, (handle, defineHandler) => defineHandler(All, {}));
+`,
+			'page.ts': `import { extra, setRead, total } from './index.data.ts';
+store.write(setRead, {});
+store.read(total);
+store.read(extra);
+`,
+		});
+		// `defineHandler(All)` serves the re-exported contracts, under an alias and
+		// through `export *`, and the page's uses through the barrel count. Only
+		// `addBook`, which the barrel leaves out and nothing calls, is reported.
+		expect(report(root)).toEqual(['books.data.ts:5:14 [OCTANE_DATA_CONTRACT_UNUSED]']);
+	});
+
 	it('opts in when the application imports the manifest', () => {
 		const root = project({ 'books.data.ts': contracts });
 		const program = createDataProgram(root);
