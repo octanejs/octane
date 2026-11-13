@@ -1825,11 +1825,9 @@ flag.
 
 <h3 id="reference-server">octane/data/server</h3>
 
-| Export              | What it is for                                                                                                                                                                     |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createDataHandler` | Serve contracts. Options: `context`, `allowedOrigins`, `secret`, `grant`. Returns a `fetch`-style handler with `transport`, `serve`, `listen`, `accept` and `forms`.               |
-| `defineHandler`     | The second argument of `createDataHandler`'s `define`. `defineHandler(module, { key: run })` serves every contract a module namespace exports, one typed function per export name. |
-| `Implementation`    | The type of the function that serves a contract, for factories shared by several keys.                                                                                             |
+| Export              | What it is for                                                                                                                                                                                                                          |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createDataHandler` | Serve contracts. Options: `context`, `allowedOrigins`, `secret`, `grant`. `define` receives `handle` and [`defineHandler`](#define-handler). Returns a `fetch`-style handler with `transport`, `serve`, `listen`, `accept` and `forms`. |
 
 <h3 id="reference-bindings">octane/data/octane and octane/data/react</h3>
 
