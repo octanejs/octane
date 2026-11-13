@@ -576,3 +576,29 @@ describe('octane_strong_explain', () => {
 		}
 	});
 });
+
+describe('agent driver tools', () => {
+	it('lists the app operations and asks for an open app before using one', async () => {
+		const { client, close } = await connectUserServer();
+		try {
+			const { tools } = await client.listTools();
+			const names = tools.map((tool) => tool.name).filter((name) => name.startsWith('octane_app_'));
+			expect(names.sort()).toEqual([
+				'octane_app_clock',
+				'octane_app_close',
+				'octane_app_logs',
+				'octane_app_open',
+				'octane_app_screenshot',
+				'octane_app_state',
+				'octane_app_tap',
+				'octane_app_tree',
+				'octane_app_type',
+			]);
+			const result = await client.callTool({ name: 'octane_app_tree', arguments: {} });
+			expect(result.isError).toBe(true);
+			expect(result.content[0].text).toContain('octane_app_open');
+		} finally {
+			await close();
+		}
+	});
+});

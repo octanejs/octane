@@ -13,6 +13,7 @@ import {
 	KNOWN_BINDING_PACKAGE_DIRS,
 	UPSTREAM_ADAPTERS,
 } from './bridge.js';
+import { registerAgentTools } from './agent.js';
 import { explainStrong, STRONG_EXPLAIN_TOOL } from './strong.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -745,6 +746,7 @@ export function createServer(options = {}) {
 		{ instructions: instructionsFor(repoMode) },
 	);
 	registerUserTools(server, repoRoot, repoMode);
+	registerAgentTools(server, z);
 	if (repoMode) registerRepoTools(server, repoRoot);
 	return server;
 }
