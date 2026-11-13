@@ -5909,10 +5909,27 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (!expr) return false;
 			const read = skipWrappers(expr);
 			if (ts.isIdentifier(read)) return this.declarationOf(read) === ordinal;
-			if (ts.isTypeOfExpression(read)) return readsOrdinal(read.expression);
+			if (ts.isTypeOfExpression(read) || ts.isVoidExpression(read))
+				return readsOrdinal(read.expression);
+			if (ts.isPrefixUnaryExpression(read))
+				return (
+					read.operator !== ts.SyntaxKind.PlusPlusToken &&
+					read.operator !== ts.SyntaxKind.MinusMinusToken &&
+					readsOrdinal(read.operand)
+				);
+			// Optional calls can skip the argument. An earlier argument or a
+			// member getter can interrupt evaluation before the ordinal read.
+			if (ts.isCallExpression(read))
+				return (
+					!ts.isOptionalChain(read) &&
+					ts.isIdentifier(skipWrappers(read.expression)) &&
+					readsOrdinal(read.arguments[0])
+				);
+			if (!ts.isBinaryExpression(read)) return false;
+			const op = read.operatorToken.kind;
 			return (
-				ts.isBinaryExpression(read) &&
-				read.operatorToken.kind === ts.SyntaxKind.PlusToken &&
+				((op >= ts.SyntaxKind.PlusToken && op <= ts.SyntaxKind.PercentToken) ||
+					(op >= ts.SyntaxKind.LessThanLessThanToken && op <= ts.SyntaxKind.CaretToken)) &&
 				((rowKeyLiteral(read.right) && readsOrdinal(read.left)) ||
 					(rowKeyLiteral(read.left) && readsOrdinal(read.right)))
 			);
