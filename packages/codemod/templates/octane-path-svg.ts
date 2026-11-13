@@ -14,7 +14,8 @@ function reactClassName(value: unknown) {
 // Prepare static props once and create fresh elements for each mounted icon.
 function prepareShape(node: StaticSvgNode, key: number): () => OctaneNode {
 	const props = { ...node.attributes, key };
-	if (node.tag === 'path' || node.tag === 'rect') return () => createElement(node.tag, props);
+	if (node.tag === 'path' || node.tag === 'rect' || node.tag === 'circle')
+		return () => createElement(node.tag, props);
 	const children = node.children.map(prepareShape);
 	return () => createElement(node.tag, { ...props, children: children.map((render) => render()) });
 }
