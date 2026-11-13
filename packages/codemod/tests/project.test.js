@@ -1722,6 +1722,78 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		}
 	});
 
+	it('checks normalization-equivalent destination names using filesystem lookup', async () => {
+		const decomposed = 'Ite\u0301m';
+		const composed = decomposed.normalize('NFC');
+		const first = decomposed + '.tsx';
+		const source = 'export const A = () => <b />;';
+		const root = project({ [first]: source });
+		const existing = path.join(root, first);
+		const aliases = fs.existsSync(path.join(root, composed + '.tsx'));
+		const normalizationInsensitive = process.platform === 'darwin' && aliases;
+		// The native lookup rule is scoped to macOS. Use a separate name on other
+		// normalizing mounts so the ordinary successful-migration control still runs.
+		const other = aliases && !normalizationInsensitive ? 'Other' : composed;
+		const second = other + '.jsx';
+		const original = {
+			'package.json': '{ "name": "app" }',
+			'index.html': '<script type="module" src="./First.tsx"></script>',
+			'First.tsx': 'export const First = () => <div />;',
+			[first]: source,
+			[second]: 'export const B = () => <i />;',
+		};
+		for (const [name, content] of Object.entries(original))
+			fs.writeFileSync(path.join(root, name), content);
+		// A different directory entry can still have the same inode.
+		fs.linkSync(existing, path.join(root, 'Alias.tsx'));
+		const paths = ['First.tsx', first, second, 'Alias.tsx'].map((name) => path.join(root, name));
+		const options = { root, verify: false };
+		const preview = await runCodemod(paths, { ...options, write: false });
+		if (normalizationInsensitive) {
+			const conflicted = preview.files.filter(({ notes }) =>
+				notes.some(({ rule }) => rule === 'rename-conflict'),
+			);
+			expect(conflicted.map(({ file, output, changed }) => [file, output, changed])).toEqual([
+				[first, first, false],
+				[second, second, false],
+			]);
+			expect(preview.files.filter(({ changed }) => changed).map(({ output }) => output)).toEqual([
+				'First.tsrx',
+				'Alias.tsrx',
+			]);
+			const result = await runCodemod(paths, { ...options, write: true });
+			expect(result.files).toEqual([
+				expect.objectContaining({
+					file: second,
+					output: second,
+					changed: false,
+					notes: [expect.objectContaining({ rule: 'rename-conflict', severity: 'error' })],
+				}),
+			]);
+			for (const [file, source] of Object.entries(original))
+				expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(source);
+			expect(fs.readFileSync(path.join(root, 'Alias.tsx'), 'utf8')).toBe(original[first]);
+			expect(fs.readdirSync(root).sort()).toEqual([...Object.keys(original), 'Alias.tsx'].sort());
+		} else {
+			const outputs = ['First.tsrx', decomposed + '.tsrx', other + '.tsrx', 'Alias.tsrx'];
+			const result = await runCodemod(paths, { ...options, write: true });
+			for (const { files } of [preview, result]) {
+				expect(files.map(({ output }) => output)).toEqual(outputs);
+				expect(files.flatMap(({ notes }) => notes)).toEqual([]);
+			}
+			expect(fs.readFileSync(path.join(root, outputs[1]), 'utf8')).toContain('<b />');
+			expect(fs.readFileSync(path.join(root, outputs[2]), 'utf8')).toContain('<i />');
+			expect(fs.readFileSync(path.join(root, outputs[3]), 'utf8')).toContain('<b />');
+			expect(paths.some((file) => fs.existsSync(file))).toBe(false);
+			expect(fs.readFileSync(path.join(root, 'index.html'), 'utf8')).toBe(
+				original['index.html'].replace('./First.tsx', './First.tsrx'),
+			);
+			expect(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).toBe(
+				original['package.json'],
+			);
+		}
+	});
+
 	it('renames separate file symlinks without removing their shared target', async () => {
 		const source = 'export const Item = () => <i />;';
 		const root = project({ 'Item.tsx': source });
