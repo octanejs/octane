@@ -483,12 +483,8 @@ export async function runCodemod(
 				resolveBinding(specifier, file, bindingProject, new Map(), []),
 		}).changed;
 	}
-	const { inputFactory, changedJsxExport, helperFunction, localFile } = storeSources(
-		root,
-		config,
-		unchangedStoreInput,
-		(file) => renames.has(file),
-	);
+	const { inputFactory, changedJsxExport, helperFunction, localFile, exportsProviderObject } =
+		storeSources(root, config, unchangedStoreInput, (file) => renames.has(file));
 	const localHints = new Map<string, Map<string, string>>();
 	function initializerResourceHint(from: string, module: string, name: string) {
 		const file = localFile(from, module);
@@ -751,28 +747,23 @@ export async function runCodemod(
 		let installedClsx: boolean | undefined;
 		let reactJsx: boolean | undefined;
 		const isContext = (specifier: string, name: string) => {
-			if (specifier.startsWith('.')) {
-				const target = resolveModule(file, specifier, known);
-				return !!target && contextsOf(target.file).has(name);
-			}
-			const options = bindingOptions(file);
-			if (!options?.paths && !options?.baseUrl) return null;
-			const target = ts.resolveModuleName(
-				specifier,
-				file,
-				{ moduleResolution: ts.ModuleResolutionKind.Bundler, ...options },
-				ts.sys,
-			).resolvedModule;
+			if (!specifier.startsWith('.')) return null;
+			const target = resolveModule(file, specifier, known);
+			if (target) return contextsOf(target.file).has(name);
 			if (
-				!target ||
-				target.isExternalLibraryImport ||
-				target.resolvedFileName.split(path.sep).includes('node_modules')
+				!name.endsWith('Context') ||
+				config?.module !== ts.ModuleKind.ESNext ||
+				config.moduleSuffixes ||
+				config.rootDirs ||
+				ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject
 			)
 				return null;
-			// Keep the package naming heuristic only for an alias of a known selected context.
-			return known.has(target.resolvedFileName) && contextsOf(target.resolvedFileName).has(name)
-				? null
-				: false;
+			const source = localFile(file, specifier);
+			return source &&
+				ts.findConfigFile(path.dirname(source), ts.sys.fileExists) === rootProject &&
+				exportsProviderObject(source, name)
+				? false
+				: null;
 		};
 		const matchesExport = (
 			index: Map<string, Set<string>>,

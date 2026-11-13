@@ -5260,12 +5260,9 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			return this.emitChildren(node, ctx);
 		}
 		if (name === 'Suspense' && ctx.template) return this.rewriteSuspense(node);
-		if (
-			ts.isPropertyAccessExpression(tag) &&
-			tag.name.text === 'Consumer' &&
-			this.isContext(tag.expression)
-		)
-			return this.rewriteConsumer(node, ctx, tag);
+		if (ts.isPropertyAccessExpression(tag) && tag.name.text === 'Consumer') {
+			if (this.isContext(tag.expression)) return this.rewriteConsumer(node, ctx, tag);
+		}
 		return null;
 	}
 

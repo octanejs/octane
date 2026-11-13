@@ -2,4 +2,4 @@
 '@octanejs/codemod': patch
 ---
 
-Preserve context members on unselected relative imports and local TypeScript aliases whose exports are not known to be migrated contexts.
+Preserve `.Provider` and `.Consumer` on a relative import of a directly exported const object with a `Provider` method in ESNext TypeScript projects.

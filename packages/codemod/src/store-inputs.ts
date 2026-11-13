@@ -152,6 +152,26 @@ export function storeSources(
 		}
 		return binding;
 	}
+	function exportsProviderObject(file: string, name: string) {
+		const { sf, checker } = bindingFor(file);
+		const symbol = checker.getSymbolAtLocation(sf)?.exports?.get(ts.escapeLeadingUnderscores(name));
+		const declaration = symbol?.valueDeclaration;
+		if (
+			!declaration ||
+			!ts.isVariableDeclaration(declaration) ||
+			!declaration.initializer ||
+			(declaration.parent.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+			ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Ambient
+		)
+			return false;
+		const object = skipWrappers(declaration.initializer);
+		return (
+			ts.isObjectLiteralExpression(object) &&
+			object.properties.some(
+				(field) => ts.isMethodDeclaration(field) && field.name.getText(sf) === 'Provider',
+			)
+		);
+	}
 	function inputs(file: string) {
 		const saved = modules.get(file);
 		if (saved) return saved;
@@ -629,5 +649,5 @@ export function storeSources(
 		}
 		return exported.has(name);
 	}
-	return { inputFactory, changedJsxExport, helperFunction, localFile };
+	return { inputFactory, changedJsxExport, helperFunction, localFile, exportsProviderObject };
 }
