@@ -18299,7 +18299,16 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 	}
 	if (isCreatePortalCall(expr)) {
 		ctx.runtimeNeeded.add('ssrPortal');
-		return ssrCall('ssrPortal', [], node);
+		const marker = ssrCall('ssrPortal', [], node);
+		if (!hasExplicitPortalArgs(expr.arguments)) return marker;
+		const eager = [];
+		for (let i = 0; i < expr.arguments.length; i++) {
+			const arg = expr.arguments[i];
+			if (i === 1 && isServerDocumentBody(arg, ctx)) continue;
+			if (!isDeferredPortalOperand(arg, i === 0))
+				eager.push(rewriteJsxValues(rewriteHookCalls(arg, ctx, name), ctx));
+		}
+		return eager.length === 0 ? marker : inheritOriginLoc(b.sequence([...eager, marker]), node);
 	}
 	if (
 		node.returnedJsxValue !== true &&
@@ -31625,6 +31634,20 @@ function planJsx(
 			}
 			portalTrailing.push(bagFieldNode(bag, `_portalAnchor$${pc.id}`));
 		}
+		let body = pc.bodyExpr;
+		if (
+			hasExplicitPortalArgs(pc.origin.arguments) &&
+			!isDeferredPortalOperand(pc.origin.arguments[0], true) &&
+			!isInvariantLiteral(pc.targetExpr) &&
+			// Direct eval can observe a newly introduced lexical binding.
+			!(ctx.portalHasDirectEval ??=
+				(ctx.mapSource.includes('eval') || ctx.mapSource.includes('\\u')) &&
+				hasInlineMemoDirectEval(ctx.authoredModuleAst))
+		) {
+			const local = allocCompilerName(ctx, '__portalBody');
+			pushAfterStmt(pc.id, org, b.const(local, body));
+			body = b.id(local);
+		}
 		pushAfterStmt(
 			pc.id,
 			org,
@@ -31634,7 +31657,7 @@ function planJsx(
 					b.id('__s'),
 					b.literal(slotIndex),
 					pc.targetExpr,
-					pc.bodyExpr,
+					body,
 					pc.propsExpr,
 					hostNodeFor(`_portalHost$${pc.id}`),
 					...portalTrailing,
@@ -35977,6 +36000,42 @@ function isCreatePortalCall(node) {
 	return node?.type === 'CallExpression' && node._octanePortalCall === true;
 }
 
+function hasExplicitPortalArgs(args) {
+	return (
+		(args.length === 2 || args.length === 3) && !args.some((arg) => arg.type === 'SpreadElement')
+	);
+}
+
+function isServerDocumentBody(arg, ctx) {
+	const expression = unwrapTsExpr(arg);
+	const target =
+		expression?.type === 'ChainExpression' ? unwrapTsExpr(expression.expression) : expression;
+	if (target?.type !== 'MemberExpression' || target.computed || target.property.name !== 'body')
+		return false;
+	const receiver = unwrapTsExpr(target.object);
+	if (receiver?.type !== 'Identifier' || receiver.name !== 'document') return false;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const scope = lexical.nodeScopes.get(receiver);
+	return scope != null && lexical.resolveBinding(scope, 'document') == null;
+}
+
+function isInlinePortalBody(node) {
+	const type = node?.type;
+	return (
+		type === 'Element' || type === 'Fragment' || type === 'JSXElement' || type === 'JSXFragment'
+	);
+}
+
+function isDeferredPortalOperand(node, body) {
+	const inner = unwrapTsExpr(node);
+	if (isInvariantLiteral(inner) || isFunctionNode(inner)) return true;
+	// Only the raw JSX body is hoisted. Type-wrapped elements stay descriptors,
+	// whose construction can read a component binding or its default props.
+	return body
+		? isInlinePortalBody(node) || inner?.type === 'Tsrx' || inner?.type === 'Tsx'
+		: isJsxLike(inner) || inner?.type === 'Fragment';
+}
+
 function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, cssHash) {
 	const [bodyArg, targetArg, propsArg] = callNode.arguments;
 	// The body is typically a <tsrx>...</tsrx> block or an arrow-`@{}` — both
@@ -35986,8 +36045,7 @@ function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, css
 	// printed verbatim into the emitted portal() call (invalid output).
 	let bodyExpr;
 	let envNames = null;
-	const bt = bodyArg ? bodyArg.type : null;
-	if (bt === 'Element' || bt === 'Fragment' || bt === 'JSXElement' || bt === 'JSXFragment') {
+	if (isInlinePortalBody(bodyArg)) {
 		// Phase 2: hoisted portal body + env tuple (see hoistBodyHelper).
 		envNames = unionEnv(ctx, [{ stmts: [bodyArg], params: [] }]);
 		bodyExpr = inheritOriginLoc(
