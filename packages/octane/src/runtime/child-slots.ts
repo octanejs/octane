@@ -335,9 +335,9 @@ export function mapSlot(
 	if (arguments.length === 2) {
 		const receiver = scopeOrItems;
 		if (
+			slotOrMethod !== NATIVE_ARRAY_MAP ||
 			!Array.isArray(receiver) ||
 			Object.getPrototypeOf(receiver) !== Array.prototype ||
-			slotOrMethod !== NATIVE_ARRAY_MAP ||
 			hasOwnProp.call(receiver, 'constructor') ||
 			Object.getOwnPropertyDescriptor(Array.prototype, 'constructor')?.value !== Array ||
 			Object.getOwnPropertyDescriptor(Array, Symbol.species)?.get !== NATIVE_ARRAY_SPECIES_GETTER

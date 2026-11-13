@@ -90,6 +90,45 @@ describe('hydrateRoot — mapped-fallback keyed list', () => {
 		root.unmount();
 	});
 
+	it('calls a custom map without inspecting its receiver during SSR and hydration', () => {
+		const receivers: unknown[] = [];
+		const items = new Proxy(
+			Object.assign([...ITEMS], {
+				map(this: typeof ITEMS, callback: Parameters<(typeof ITEMS)['map']>[0]) {
+					receivers.push(this);
+					return Array.prototype.map.call([...this].reverse(), callback);
+				},
+			}),
+			{
+				getPrototypeOf() {
+					throw new Error('unexpected prototype read');
+				},
+			},
+		);
+		container.innerHTML = ServerRT.renderToString(server['MappedFallbackList'], { items }).html;
+		const served = [...container.querySelectorAll('li.fallback-row')];
+		expect(served.map((row) => row.textContent)).toEqual(['c', 'b', 'a']);
+
+		const errors: unknown[] = [];
+		const root = hydrateRoot(
+			container,
+			MappedFallbackList,
+			{ items },
+			{ onRecoverableError: (error) => errors.push(error) },
+		);
+		try {
+			flushSync(() => {});
+			const adopted = [...container.querySelectorAll('li.fallback-row')];
+			expect(adopted).toHaveLength(served.length);
+			for (const [index, row] of adopted.entries()) expect(row).toBe(served[index]);
+			expect(receivers.length).toBe(2);
+			for (const receiver of receivers) expect(receiver).toBe(items);
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('stays keyed across a post-hydration reorder on the fallback path', () => {
 		const { html } = ServerRT.renderToString(server.MappedFallbackList, { items: ITEMS });
 		container.innerHTML = html;
