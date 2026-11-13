@@ -221,6 +221,68 @@ describe('authored host JSX', () => {
 		},
 	);
 
+	it('evaluates direct portal arguments in source order on the client and server', () => {
+		const source = `import { createPortal } from 'octane';
+			export function App({ mark, target }) @{
+				<main>{createPortal(mark('body'), target(), mark('key'))}</main>
+			}`;
+		const calls: string[] = [];
+		const target = document.createElement('div');
+		const props = {
+			mark(value: string) {
+				calls.push(value);
+				return value;
+			},
+			target() {
+				calls.push('target');
+				return target;
+			},
+		};
+		const { App: ServerApp } = fixture(source, true);
+		expect(renderToString(ServerApp, props).html).toBe('<!--3--><main><!----></main>');
+		expect(calls).toEqual(['body', 'target', 'key']);
+		calls.length = 0;
+
+		const { App } = fixture(source);
+		const rendered = mount(App, props);
+		try {
+			expect(calls).toEqual(['body', 'target', 'key']);
+			expect(target.textContent).toBe('body');
+		} finally {
+			rendered.unmount();
+		}
+	});
+
+	it('does not read a portal target after its first argument throws', () => {
+		const source = `import { createPortal } from 'octane';
+			export function App({ body, target }) @{ <main>{createPortal(body(), target())}</main> }`;
+		const failure = new Error('body failed');
+		const props = {
+			body() {
+				throw failure;
+			},
+			target: vi.fn(() => document.createElement('div')),
+		};
+		const { App: ServerApp } = fixture(source, true);
+		expect(() => renderToString(ServerApp, props)).toThrow(failure);
+		expect(props.target).not.toHaveBeenCalled();
+	});
+
+	it('keeps the portal temporary outside authored direct eval', () => {
+		const source = `import { createPortal } from 'octane';
+			export function App({ target }) @{
+				<main>{createPortal(eval('typeof __portalBody'), target())}</main>
+			}`;
+		const { App } = fixture(source);
+		const target = document.createElement('div');
+		const rendered = mount(App, { target: () => target });
+		try {
+			expect(target.textContent).toBe('undefined');
+		} finally {
+			rendered.unmount();
+		}
+	});
+
 	it.each([
 		['function createPortal(render) { return render(); }', ''],
 		["import { memo as createPortal } from 'octane';", '{ createPortal }'],

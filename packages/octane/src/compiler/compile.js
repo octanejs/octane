@@ -18299,7 +18299,16 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 	}
 	if (isCreatePortalCall(expr)) {
 		ctx.runtimeNeeded.add('ssrPortal');
-		return ssrCall('ssrPortal', [], node);
+		const marker = ssrCall('ssrPortal', [], node);
+		if (!hasExplicitPortalArgs(expr.arguments)) return marker;
+		const eager = [];
+		for (let i = 0; i < expr.arguments.length; i++) {
+			const arg = expr.arguments[i];
+			if (i === 1 && isServerDocumentBody(arg, ctx)) continue;
+			if (!isDeferredPortalOperand(arg))
+				eager.push(rewriteJsxValues(rewriteHookCalls(arg, ctx, name), ctx));
+		}
+		return eager.length === 0 ? marker : inheritOriginLoc(b.sequence([...eager, marker]), node);
 	}
 	if (
 		node.returnedJsxValue !== true &&
@@ -31612,6 +31621,20 @@ function planJsx(
 			}
 			portalTrailing.push(bagFieldNode(bag, `_portalAnchor$${pc.id}`));
 		}
+		let body = pc.bodyExpr;
+		if (
+			hasExplicitPortalArgs(pc.origin.arguments) &&
+			!isDeferredPortalOperand(pc.origin.arguments[0]) &&
+			!isInvariantLiteral(pc.targetExpr) &&
+			// Direct eval can observe a newly introduced lexical binding.
+			!(ctx.portalHasDirectEval ??=
+				(ctx.mapSource.includes('eval') || ctx.mapSource.includes('\\u')) &&
+				hasInlineMemoDirectEval(ctx.authoredModuleAst))
+		) {
+			const local = allocCompilerName(ctx, '__portalBody');
+			pushAfterStmt(pc.id, org, b.const(local, body));
+			body = b.id(local);
+		}
 		pushAfterStmt(
 			pc.id,
 			org,
@@ -31621,7 +31644,7 @@ function planJsx(
 					b.id('__s'),
 					b.literal(slotIndex),
 					pc.targetExpr,
-					pc.bodyExpr,
+					body,
 					pc.propsExpr,
 					hostNodeFor(`_portalHost$${pc.id}`),
 					...portalTrailing,
@@ -35909,6 +35932,33 @@ function emitElementHtml(
 
 function isCreatePortalCall(node) {
 	return node?.type === 'CallExpression' && node._octanePortalCall === true;
+}
+
+function hasExplicitPortalArgs(args) {
+	return (
+		(args.length === 2 || args.length === 3) && !args.some((arg) => arg.type === 'SpreadElement')
+	);
+}
+
+function isServerDocumentBody(arg, ctx) {
+	const target = unwrapTsExpr(arg);
+	if (target?.type !== 'MemberExpression' || target.computed || target.property.name !== 'body')
+		return false;
+	const receiver = unwrapTsExpr(target.object);
+	if (receiver?.type !== 'Identifier' || receiver.name !== 'document') return false;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const scope = lexical.nodeScopes.get(receiver);
+	return scope != null && lexical.resolveBinding(scope, 'document') == null;
+}
+
+function isDeferredPortalOperand(node) {
+	const inner = unwrapTsExpr(node);
+	return (
+		isInvariantLiteral(inner) ||
+		isFunctionNode(inner) ||
+		isJsxLike(inner) ||
+		inner?.type === 'Fragment'
+	);
 }
 
 function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, cssHash) {
