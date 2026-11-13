@@ -6,6 +6,7 @@ import { loadServerFixture } from './_server-fixture.js';
 import {
 	ArrayRows,
 	IdentifierRows,
+	IndexRows,
 	LetHeaderRows,
 	ObjectRows,
 } from './_fixtures/map-destructured-param-write.tsrx';
@@ -44,6 +45,44 @@ function clickRow(container: Element, id: string): void {
 }
 
 describe('native .map() callback parameters stay writable', () => {
+	it('keeps the index writable after hydrating and reordering keyed rows', async () => {
+		const log: number[] = [];
+		const errors: unknown[] = [];
+		const on = (index: number) => log.push(index);
+		const { html } = await Server.renderToString(server.IndexRows, { xs: OBJECT_ROWS, on });
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const [alpha, beta] = container.querySelectorAll('li');
+		const root = hydrateRoot(
+			container,
+			IndexRows,
+			{ xs: OBJECT_ROWS, on },
+			{ onRecoverableError: (error: unknown) => errors.push(error) },
+		);
+		try {
+			flushSync(() => {});
+			expect(labels(container)).toEqual(['Alpha', 'Beta']);
+			expect(container.querySelector('[data-id="a"]')).toBe(alpha);
+			expect(container.querySelector('[data-id="b"]')).toBe(beta);
+			clickRow(container, 'a');
+			clickRow(container, 'a');
+
+			flushSync(() => root.render(IndexRows, { xs: [...OBJECT_ROWS].reverse(), on }));
+			expect(labels(container)).toEqual(['Beta', 'Alpha']);
+			expect(container.querySelector('[data-id="a"]')).toBe(alpha);
+			expect(container.querySelector('[data-id="b"]')).toBe(beta);
+			clickRow(container, 'a');
+			clickRow(container, 'a');
+			clickRow(container, 'b');
+			expect(log).toEqual([1, 2, 2, 3, 1]);
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+
 	it('uses one iterator snapshot for the mapped row key and output', () => {
 		let reads = 0;
 		const pair: [string, string] = ['a', 'label'];

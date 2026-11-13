@@ -52,6 +52,16 @@ export function IdentifierRows(props: Props) @{
 	</ul>
 }
 
+export function IndexRows(props: { xs: Row[]; on: (value: number) => void }) @{
+	<ul>
+		{props.xs.map((row, index) => (
+			<li key={row.id} data-id={row.id} onClick={() => props.on(++index)}>
+				{row.label as string}
+			</li>
+		))}
+	</ul>
+}
+
 export function LetHeaderRows(props: Props) @{
 	<ul>
 		@for (let { id, label } of props.xs; key id) {
