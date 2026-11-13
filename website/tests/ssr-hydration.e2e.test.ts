@@ -65,6 +65,7 @@ const ROUTES = [
 	'/docs/cli',
 	'/docs/core-apis',
 	'/docs/signals',
+	'/docs/data',
 	'/docs/tsrx-vs-tsx',
 	'/docs/differences-from-react',
 	'/docs/lynx',

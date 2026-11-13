@@ -276,6 +276,92 @@ export const docsMeta: DocMeta[] = [
 		],
 	},
 	{
+		slug: 'data',
+		title: 'Data',
+		description:
+			'Load, cache and save server data with octane/data: contracts, a shared store, optimistic writes, forms, SSR seeds, realtime feeds, offline persistence, and cross-tab sharing for Octane and React components.',
+		group: 'Learn Octane',
+		searchTerms: ['octane/data', 'server data', 'data layer', 'cache', 'optimistic updates'],
+		sections: [
+			{ id: 'the-pieces', title: 'How the pieces fit' },
+			{
+				id: 'first-read',
+				title: 'Your first read',
+				searchTerms: ['createDataStore', 'DataProvider', 'useRead', 'serverTransport'],
+			},
+			{
+				id: 'reading',
+				title: 'Reading data',
+				searchTerms: ['useReadState', 'prefetch', 'invalidate', 'fresh', 'keep', 'expire'],
+			},
+			{ id: 'read-handles', title: 'Read outside a component', level: 3 },
+			{
+				id: 'writing',
+				title: 'Writing data',
+				searchTerms: ['write', 'useWrite', 'entity', 'DataError', 'DataUncertainError', 'settle'],
+			},
+			{ id: 'optimistic', title: 'Optimistic edits and rollback', level: 3 },
+			{ id: 'uncertain', title: 'When the reply is lost', level: 3 },
+			{ id: 'views', title: 'Views and pagination', searchTerms: ['view', 'usePages', 'pages'] },
+			{ id: 'forms', title: 'Forms that work before JavaScript', searchTerms: ['useForm'] },
+			{
+				id: 'server',
+				title: 'Serve your contracts',
+				searchTerms: ['createDataHandler', 'handler.serve', 'httpTransport'],
+			},
+			{
+				id: 'ssr',
+				title: 'Server rendering and hydration',
+				searchTerms: ['dehydrate', 'seed', 'retire'],
+			},
+			{
+				id: 'feeds',
+				title: 'Realtime feeds',
+				searchTerms: [
+					'feed',
+					'useFeed',
+					'listen',
+					'receive',
+					'serverListener',
+					'webSocketListener',
+					'pubSubListener',
+				],
+			},
+			{
+				id: 'persistence',
+				title: 'Persistence and offline',
+				searchTerms: ['indexedDBStorage', 'memoryStorage', 'autoBudget', 'journal', 'receipt'],
+			},
+			{
+				id: 'cross-tab',
+				title: 'Sharing across tabs',
+				searchTerms: [
+					'SharedWorker',
+					'createDataOwner',
+					'createReplica',
+					'sharedOwner',
+					'serveDataOwner',
+					'dataWorker',
+					'account fencing',
+					'sign out',
+				],
+			},
+			{
+				id: 'account-fencing',
+				title: 'One account per browser, in every tab',
+				level: 3,
+			},
+			{
+				id: 'bindings',
+				title: 'Octane and React, one store',
+				searchTerms: ['octane/data/react', 'octane/data/octane', 'ReactCompat'],
+			},
+			{ id: 'errors', title: 'Errors', searchTerms: ['DataRetiredError'] },
+			{ id: 'example', title: 'A complete example' },
+			{ id: 'reference', title: 'API reference' },
+		],
+	},
+	{
 		slug: 'styling',
 		title: 'Styling',
 		description:

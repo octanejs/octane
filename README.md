@@ -237,6 +237,12 @@ Octane itself. Good places to start:
   `.tsrx` essentials.
 - [Signals](https://octanejs.dev/docs/signals): stable scoped state, derived values,
   async resources, and native component reads without extra compiler options.
+- [Data](https://octanejs.dev/docs/data): `octane/data`, the data layer for
+  server-owned data. Declare reads and writes once as contracts; one store caches
+  them, shows optimistic edits and rolls them back, hands server renders to
+  hydration, keeps values current with realtime feeds, persists them encrypted
+  for offline use, and shares one owner across tabs. Octane and React
+  components use the same store through matching hooks.
 - [Build tools](https://octanejs.dev/docs/build-tools): Vite, Rspack, or Rsbuild
   for SPA compilation and full-stack SSR.
 - [TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx): when to reach for
@@ -262,6 +268,8 @@ In this repository:
 - [TSRX basics](./docs/tsrx-basics.md): components, hooks, control flow, class
   composition, text input events, strong mode.
 - [Signals](./docs/signals.md): ownership, async queries, retained values, and hydration.
+- [Data](./docs/data.md): the `octane/data` reference: entry points, store
+  guarantees, the wire protocol, and the cross-tab owner.
 - [Server rendering](./docs/ssr.md) and
   [deferred hydration](./docs/deferred-hydration.md): the full references.
 - [Differences from React](./docs/differences-from-react.md): the divergence

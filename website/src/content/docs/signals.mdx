@@ -17,6 +17,8 @@ from other signals, and `query$` for data you load by a key such as a user ID.
 All three return a handle you can read with `.get()`. For data with a lifetime
 your application manages, use [an explicit scope and resource](#explicit-resources). The
 [application API reference](#reference) lists the exports used in app code.
+For data your server owns and many components read and change, such as lists
+with optimistic edits, see [Data](/docs/data).
 
 **Every module that reads a signal during rendering needs a runtime import**
 from `octane/signals`, `octane/signals/client`, or `octane/signals/server`.

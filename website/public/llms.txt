@@ -14,6 +14,7 @@ Key facts for answering questions about Octane:
 - `useLinkedState(source, calculate, options?)` keeps a value editable while its source stays the same, then resets or adjusts it immediately when the source changes. The calculation receives the new source and the previous `{ source, value }`, or `undefined` on the first render. No effect or render-time setter is needed.
 - [`useLayoutSnapshot`](https://octanejs.dev/docs/core-apis#use-layout-snapshot) renders from a committed DOM measurement before paint, using an initial value for SSR and hydration. It does not observe layout changes independently of component commits. [`useLazyRef(factory)`](https://octanejs.dev/docs/core-apis#use-lazy-ref) creates a ref's value once. In Strong mode, `useLayoutSnapshot` replaces setting state from a layout-effect measurement, and `useLazyRef` replaces React's `if (ref.current === null) ref.current = create()` idiom.
 - Signals are stable: `octane/signals` provides `signal$`, async-capable `derived$`, keyed `query$`, streams, and `optimistic$`/`action$`. Module declarations resolve to request-local server state or document-local browser state; explicit `createScope`/`createResource` remain available. `useSignal$` from `octane/signals/client` provides component-owned state. Native reads require a runtime signals import and the standard compiler, with no extra option. Use `$` names for handles/helpers exposing live reads; sampled values keep ordinary names.
+- `octane/data` is the data layer for server-owned data: contracts (`read`, `write`, `view`, `entity`, `feed`) describe operations and do no I/O; `createDataStore` caches reads, applies optimistic edits and rolls them back; `createDataHandler` from `octane/data/server` serves contracts; `octane/data/octane` and `octane/data/react` expose the same hooks (`DataProvider`, `useRead`, `useReadState`, `usePages`, `useWrite`, `useForm`, `useFeed`) over one store. See the Data section below and the [Data guide](https://octanejs.dev/docs/data).
 - Strong mode is opt-in: a leading `"use strong"` directive or `compiler: { strong: true }` asserts immutable snapshots and pure rendering, enabling `OCTANE_STRONG_*` compile errors and fully conditioned production memoization for user-authored render operations. In a Strong module the compiler owns memoization and dependencies: `useMemo` and `useCallback` are errors, and an explicit dependency array that differs from the inferred inputs is an error (an equivalent one is a hint). Render never reads or writes `ref.current`: use `useLazyRef` for create-once values and `useLayoutSnapshot` for DOM measurements. `useEffectEvent` and effects that synchronize external systems remain valid. See the Strong mode section below and the [Strong mode guide](https://octanejs.dev/docs/strong-mode).
 - Native, delegated DOM events (`onClick`, `onInput`, `onSubmit`) instead of a synthetic event layer — behavior matches the platform. There is no synthetic `onChange`: `onInput` is the per-edit handler for text inputs; native `change` fires when the browser commits an edit, usually on blur.
 - `OCTANE_NATIVE_TEXT_ONCHANGE` is a nonfatal authoring warning, not an event rewrite. The compiler reports direct `onChange`/`onChangeCapture` on a statically known text-entry `<input>` or `<textarea>` without a usable input handler; development runtime checks cover unresolved spreads/dynamic types/final props and report through `console.error` once per broken episode. Statically true `readOnly`/`disabled` controls are excluded. Use the phase-preserving `onInput`/`onInputCapture` fix for per-edit intent.
@@ -54,6 +55,7 @@ An uncontrolled field that intentionally saves only when the browser commits the
 
 - [Quick start](https://octanejs.dev/docs/quick-start): Scaffold a new app with `npm create octane my-app` (`--template spa` for a client-only app, `--template fullstack` for routing and SSR), or add Octane to an existing project, then mount a component and learn the `.tsrx` essentials (components, state/effects, conditional hooks, control flow, SSR/hydrate).
 - [Signals](https://octanejs.dev/docs/signals): Writable and async derived declarations, keyed queries, pending UI, streams, optimistic actions, transitions, request/document ownership, and streamed adoption before hydration.
+- [Data](https://octanejs.dev/docs/data): `octane/data` contracts, the store, transports, optimistic writes and rollback, views and pagination, native forms, `createDataHandler`, SSR seeds and hydration, realtime feeds, encrypted persistence and the write journal, cross-tab sharing through a SharedWorker owner, and the matching Octane and React bindings.
 - [Build tools](https://octanejs.dev/docs/build-tools): Configure the recommended Vite integration or the matching Rspack and Rsbuild plugins, including routing, SSR, hydration, production, and preview.
 - [CLI](https://octanejs.dev/docs/cli): The `octane` command line — `create` scaffolds a new app into an empty directory (this is what `npm create octane my-app` runs, so the two are the same command reached two ways); `doctor` diagnoses the misconfigurations that fail quietly (a duplicated runtime, a missing `jsxImportSource`, plain `tsc` over `.tsrx`, a wildcard `declare module '*.tsrx'`) and `--fix` repairs the mechanical ones; `analyze` compiles every `.tsrx` and Octane-owned `.tsx` module through the project's own octane and reports every compiler diagnostic, with `--strong-preview`, `--fix`, and `--strong-baseline` for Strong mode adoption; `init` wires Octane into an existing project; `add` installs a binding by the React package it ports; `explain` decodes a minified production error or prints a Strong diagnostic's entry; `mcp add` registers the MCP server with Claude Code, Codex, Cursor, or VS Code. Every command emits `--json` and uses fixed exit codes (`3` = doctor found problems).
 - [Profiling](https://octanejs.dev/docs/profiling): Enable `profile: true` with Vite, Rspack, or Rsbuild to inspect component render/DOM time, self time, render counts, causes, bails, scheduling delay, Chrome trace data, and engine work counters through `profiler.counters()`, `snapshot()`, and `diff()`.
@@ -498,6 +500,65 @@ The host supplies matching build/document identities and the initial response's 
 Native rendering supports DOM client/server. Deep stores, local derived/async hooks, cross-root atomic reveal, and native reads in non-DOM renderers remain outside the API. Declaration `derived$` supports async callbacks; explicit `scope.derived$` does not.
 
 `scope.inspect()` reports metadata without evaluating dormant computations or exposing values/callbacks. `createScope({ scopeKey, debug: { traceLimit: 256 } })` enables bounded tracing; profiling builds expose native reads in DevTools. Public errors include `ScopeDisposedError`, `SignalCycleError`, `SignalFrameError`, `SignalIdleError`, `SignalSerializationError`, `SignalStreamError`, `SignalWriteError`, and `ActionUncertainError`. The separate `@octanejs/alien-signals` binding keeps its existing API. See the [guide](https://octanejs.dev/docs/signals) and [full reference](https://github.com/octanejs/octane/blob/main/docs/signals.md).
+
+## Data
+
+`octane/data` loads, caches and saves data the server owns. It has five parts:
+
+- **Contracts** from `octane/data` describe operations and do no I/O, so client, server and tests import the same module. `read({ name, input?, output, entities?, tags?, fresh?, keep?, expire?, persist?, version? })`; `write({ name, input, output?, creates? | patches? | removes?, draft?, serverId?, record?, form?, invalidates? })`; `entity(name, schema, key = 'id')` with `Entity.from(value)` in a read's `entities`; `view({ name, of, where?, order, limit = 20, max = 500, input? })`, a list the store evaluates locally so an edit moves rows between views at once; `feed({ name, params?, event, changes, covers })`. Schemas are any Standard Schema validator (Zod, Valibot, ArkType). `fresh` defaults to 0, `keep` to 300000 ms, `expire` to Infinity.
+- **The store**: `createDataStore({ transport, seed?, seedAge?, form?, persist?, listen?, feeds? })`. Methods: `read(read, input)` returns a handle with `getSnapshot()`, `subscribe(notify)` and `refresh()`; `prefetch`, `write`, `form`, `invalidate(tags)`, `settle(operationId, confirmed, value?)`, `publish`, `forget`, `retire()` and `dehydrate()`. Snapshots carry `status` (`pending`/`ready`/`error`), `value`, `error`, `refreshing`, `stale` and `more`. Describing a read does no network work; subscribing, prefetching or refreshing loads it, and equal inputs share one entry and one request.
+- **Transports**: `serverTransport(fn)` through a `module server` function returning `handler.serve(request, call)`, or `httpTransport(url)` to a mounted handler. Resolving with a reply is definitive; rejecting means a write's outcome is unknown.
+- **The handler**: `createDataHandler({ context?, allowedOrigins?, secret?, grant? }, (handle) => [handle(contract, (input, call) => …)])` from `octane/data/server`. Inputs and outputs are validated. `call` adds `request`, `signal`, `operationId` and `read(contract, input)` to the context. The handler is a `(Request) => Promise<Response>` function with `transport(request)`, `serve`, `listen`, `accept(socket, request, caller?)` and `forms(request, caller?)`.
+- **Bindings**: `octane/data/octane` and `octane/data/react` export the same names and behavior. `useRead` suspends until the first value and throws a failed first load to the nearest `@catch`/error boundary; later reloads keep the value on screen. `useReadState` and `usePages` do not suspend. Octane's hooks are slot-keyed, so they may be conditional.
+
+```ts
+import { entity, read, write } from 'octane/data';
+import { z } from 'zod';
+
+const bookShape = z.object({ id: z.string(), title: z.string(), read: z.boolean() });
+export const Book = entity('book', bookShape);
+export const books = read({ name: 'books.list', output: z.array(bookShape), entities: (list) => Book.from(list) });
+export const setRead = write({
+  name: 'books.setRead',
+  input: bookShape.pick({ id: true, read: true }),
+  output: bookShape,
+  patches: Book,
+  record: (book) => book,
+});
+```
+
+```tsrx
+import { DataProvider, useRead, useWrite } from 'octane/data/octane';
+import type { DataStore } from 'octane/data';
+import { books, setRead } from './contracts.ts';
+
+function BookList() @{
+  const list = useRead(books);
+  const save = useWrite(setRead);
+  <ul>
+    @for (const book of list; key book.id) {
+      <li>
+        <input type="checkbox" checked={book.read} onChange={() => void save({ id: book.id, read: !book.read }).catch(() => {})} />
+        {book.title as string}
+      </li>
+    }
+  </ul>
+}
+
+export function App(props: { store: DataStore }) @{
+  <DataProvider store={props.store}>
+    @try { <BookList /> } @pending { <p>Loading…</p> }
+  </DataProvider>
+}
+```
+
+- **Optimistic writes**: a write with `creates`/`patches`/`removes` shows its edit in the same task on every read holding the record, sends once with an operation ID, and on refusal (`DataError` with `code`, `data`, `issues`) removes the edit everywhere. A lost reply rejects with `DataUncertainError` and keeps the edit until `store.settle(operationId, applied)` after a receipt lookup; nothing is resent. Writes to an unconfirmed create wait for it.
+- **Views**: the handler returns `limit` records from `offset`, filtered by `view.view.where` and sorted by `view.view.compare`. `usePages(view)` / `pages(store, view)` join pages with `more`, `loadingMore` and `loadMore()`.
+- **Forms**: a write with `form: { field: 'text' | 'secret' | 'number' | 'boolean' | 'checkbox' }` accepts native POSTs. `useForm(write, key?)` returns `attrs` (spread on `<form>`), `hidden(values?)`, `pending`, `values`, `issues`, `error` and `submit`. On the server, `await handler.forms(request)` before rendering returns `{ response, status, form }`; send `response` when set and pass `form` to the page store. Requires `secret`; `grant` binds forms to an account.
+- **SSR**: create a store per request with an in-process transport, render (Octane `prerender` from `octane/static`, or React's), take `store.dehydrate()`, then `store.retire()`. Put the seed in `<script type="application/json">` and pass it as `createDataStore({ transport, seed })` before hydrating; hydration loads nothing. Seeds keep their age. Passing `feeds: [...]` to the server store records feed positions in the seed so the browser's feed resumes from before the render.
+- **Feeds**: a feed handler is an async generator yielding `{ event, id?, cursor? }`, `{ gap: true }`, or `{ cursor }` (open) until `call.signal` aborts; it yields its position first when `call.cursor` is null. Changes are `{ put, value }`, `{ remove, id }`, `{ read, input?, value }` or `{ invalidates }`. Missed events mark `covers` stale. Connect with `listen: serverListener(fn)` (fn returns `handler.listen`; 25 s connections), `webSocketListener(url)` (served by `handler.accept`), or `pubSubListener(subscribe)`. `useFeed(feed)` listens while mounted and returns `connecting`/`live`/`offline`; `listen(store, feed)` does the same from plain code; `receive(store, changes)` applies an app's own subscription.
+- **Persistence**: `persist: { storage: indexedDBStorage() | memoryStorage(), partition, key, budget?, journal? }`. Values are encrypted with `key` (a random per-user secret of at least 128 bits or a `CryptoKey`), names are hashed, only confirmed values are saved, and the partition is trimmed to `budget` (`autoBudget(device)` or `'auto'`). `journal: { writes, receipt }` keeps listed writes across restarts and settles them by receipt without resending. `persist: false` on a read keeps it off disk; `version` discards old saves. `retire()` clears memory and the partition; later writes throw `DataRetiredError`.
+- **Cross-tab**: a data worker module calls `serveDataOwner({ transport, listen })`; build it with `dataWorker` on `octane()` from `octane/compiler/vite` or on `OctaneRspackPlugin`, emitted at `/_octane/data-worker.js`. Each tab calls `sharedOwner(partition)` and, when it returns a port, `createReplica(port, { seed, writes })`; otherwise an ordinary store. Replicas render and show edits locally; the owner makes every request and holds every feed connection, so tabs share values, pending edits and rollbacks. `createDataOwner` serves replicas over any `MessagePort`. `serveDataOwner` fences accounts: the origin has one signed-in account, recorded in IndexedDB with a generation and announced on a BroadcastChannel; `sharedOwner(account)` names the tab's account, another account signing in retires every tab of the old one (values cleared, pending requests reject with `DataRetiredError`), a replica's `retire()` signs the account out in every tab, a late sign-out never undoes a newer sign-in, and a frozen tab shows its reads as pending until its owner confirms the account on resume. Replicas do not persist yet.
 
 ## Strong mode
 

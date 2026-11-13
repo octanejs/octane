@@ -9,7 +9,8 @@ contracts and one server, built with Vite or with Rspack:
 | `/react.html` | React 19 (`.tsx`), server-rendered | `octane/data/react` |
 | `/mixed.html` | Octane, hosting a React island through `ReactCompat`, browser-rendered | both, sharing one store |
 
-The Octane and React pages differ only in their view code and binding import.
+The [Data guide](https://octanejs.dev/docs/data) walks through every piece used
+here. The Octane and React pages differ only in their view code and binding import.
 Everything else is shared:
 
 - [`src/shared/contracts.ts`](src/shared/contracts.ts) declares the reads and
