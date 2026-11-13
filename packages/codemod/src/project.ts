@@ -494,12 +494,8 @@ export async function runCodemod(
 				resolveBinding(specifier, file, bindingProject, new Map(), []),
 		}).changed;
 	}
-	const { inputFactory, changedJsxExport, helperFunction, localFile } = storeSources(
-		root,
-		config,
-		unchangedStoreInput,
-		(file) => renames.has(file),
-	);
+	const { inputFactory, changedJsxExport, helperFunction, localFile, exportsConstObject } =
+		storeSources(root, config, unchangedStoreInput, (file) => renames.has(file));
 	const localHints = new Map<string, Map<string, string>>();
 	function initializerResourceHint(from: string, module: string, name: string) {
 		const file = localFile(from, module);
@@ -763,7 +759,24 @@ export async function runCodemod(
 		const isContext = (specifier: string, name: string) => {
 			if (!specifier.startsWith('.')) return null;
 			const target = resolveModule(file, specifier, known);
-			return target ? contextsOf(target.file).has(name) : null;
+			if (target) return contextsOf(target.file).has(name);
+			if (
+				!name.endsWith('Context') ||
+				config?.module !== ts.ModuleKind.ESNext ||
+				config.moduleSuffixes ||
+				config.rootDirs ||
+				ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject
+			)
+				return null;
+			const source = localFile(file, specifier, true);
+			if (!source) return null;
+			const direct = path.resolve(path.dirname(file), specifier);
+			// A bundler can load a sibling file ahead of TypeScript's directory index.
+			return (source === direct || source === direct + path.extname(source)) &&
+				ts.findConfigFile(path.dirname(source), ts.sys.fileExists) === rootProject &&
+				exportsConstObject(source, name)
+				? false
+				: null;
 		};
 		const matchesExport = (
 			index: Map<string, Set<string>>,

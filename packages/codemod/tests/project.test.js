@@ -2048,6 +2048,115 @@ export * from './View.tsrx';`,
 		expect(second.files.filter((file) => file.changed)).toEqual([]);
 	});
 
+	it.each([
+		['data.ts', './data', "Provider() { return 'original'; }"],
+		['data.ts', './data', 'get Provider() { return Provider; }'],
+		['data.tsx', './data', 'Provider: () => "original"'],
+		['data.tsx', './data.tsx', 'Provider'],
+		['dir/index.tsx', './dir/index', 'Provider'],
+	])(
+		'preserves a direct object member from %s imported as %s (%s)',
+		async (file, specifier, field) => {
+			const root = project({
+				'package.json': '{"name":"app","type":"module"}',
+				'tsconfig.json': '{"compilerOptions":{"module":"esnext","moduleResolution":"bundler"}}',
+				[file]: `const Provider = () => 'original';
+			export const BadgeContext = {
+				${field},
+				Consumer() { return 'content'; },
+			};`,
+				'View.tsx': `import { BadgeContext as Badge } from '${specifier}';
+const provide = Badge.Provider;
+export function View() { return <b title={provide()}><Badge.Consumer>{(value) => value}</Badge.Consumer></b>; }`,
+			});
+			const result = await runCodemod([path.join(root, 'View.tsx')], { root, write: false });
+			const view = result.files.find((file) => file.file === 'View.tsx').code;
+			expect(view).toContain('const provide = Badge.Provider');
+			expect(view).toContain('<Badge.Consumer>');
+		},
+	);
+
+	it('uses an unselected TSX object only when the relative import identifies that source', async () => {
+		const root = project({
+			'package.json': '{"name":"app","type":"module"}',
+			'tsconfig.json': '{"compilerOptions":{"module":"esnext","moduleResolution":"bundler"}}',
+			'data.tsx': "export const BadgeContext = { Provider: () => 'original' };",
+			'data.jsx':
+				"import { createContext } from 'octane'; export const BadgeContext = createContext('fallback');",
+			'View.tsx': `import { BadgeContext as Explicit } from './data.tsx';
+import { BadgeContext as Ambiguous } from './data';
+export function View() {
+	return <><Explicit.Provider /><Ambiguous.Provider value="supplied" /></>;
+}`,
+		});
+		const result = await runCodemod([path.join(root, 'View.tsx')], { root, write: false });
+		const view = result.files.find((file) => file.file === 'View.tsx').code;
+		expect(view).toContain('<Explicit.Provider />');
+		expect(view).toContain('<Ambiguous value="supplied" />');
+	});
+
+	it('preserves the provider rewrite when a bundler can load a file ahead of a directory index', async () => {
+		const root = project({
+			'package.json': '{"name":"app","type":"module"}',
+			'tsconfig.json': '{"compilerOptions":{"module":"esnext","moduleResolution":"bundler"}}',
+			'data/index.tsx': "export const BadgeContext = { Provider: () => 'object' };",
+			'data.mjs': "export { BadgeContext } from './owner.ts';",
+			'owner.ts':
+				"import { createContext } from 'react'; export const BadgeContext = createContext('default');",
+			'View.tsx': `import { BadgeContext } from './data';
+export function View() { return <BadgeContext.Provider value="supplied"><b /></BadgeContext.Provider>; }`,
+		});
+		const result = await runCodemod([path.join(root, 'View.tsx'), path.join(root, 'owner.ts')], {
+			root,
+			write: false,
+		});
+		expect(result.files.find((file) => file.file === 'owner.ts').code).toContain("from 'octane'");
+		expect(result.files.find((file) => file.file === 'View.tsx').code).toContain(
+			'<BadgeContext value="supplied"><b /></BadgeContext>',
+		);
+	});
+
+	it('preserves the context naming fallback across a CommonJS producer boundary', async () => {
+		const root = project({
+			'package.json': '{"name":"app"}',
+			'tsconfig.json': '{"compilerOptions":{"module":"esnext","moduleResolution":"bundler"}}',
+			'source/tsconfig.json': '{"compilerOptions":{"module":"commonjs"}}',
+			'source/data.ts': `import { createContext } from 'octane';
+export const ThemeContext = { Provider() { return 'original'; } };
+exports.ThemeContext = createContext('default');`,
+			'View.tsx': `import { ThemeContext } from './source/data';
+export function View() { return <ThemeContext.Provider value="supplied"><b /></ThemeContext.Provider>; }`,
+		});
+		const result = await runCodemod([path.join(root, 'View.tsx')], { root, write: false });
+		expect(result.files.find((file) => file.file === 'View.tsx').code).toContain(
+			'<ThemeContext value="supplied"><b /></ThemeContext>',
+		);
+	});
+
+	it('keeps migrated providers reachable through unselected re-exports and directory links', async () => {
+		const root = project({
+			'package.json': '{"name":"app","type":"module"}',
+			'tsconfig.json': '{"compilerOptions":{"paths":{"@theme":["./link/theme.ts"]}}}',
+			'owner/theme.ts':
+				"import { createContext } from 'react'; export const ThemeContext = createContext('light');",
+			'selected.ts': "export { ThemeContext } from './owner/theme';",
+			'retained.ts': "export { ThemeContext } from './owner/theme';",
+			'View.tsx': `import { ThemeContext as Selected } from './selected';
+import { ThemeContext as Retained } from './retained';
+import { ThemeContext as Linked } from './link/theme';
+import { ThemeContext as Alias } from '@theme';
+export function View() { return <Selected.Provider value="a"><Retained.Provider value="b"><Linked.Provider value="c"><Alias.Provider value="d" /></Linked.Provider></Retained.Provider></Selected.Provider>; }`,
+		});
+		fs.symlinkSync(path.join(root, 'owner'), path.join(root, 'link'), 'dir');
+		const result = await runCodemod(
+			['owner/theme.ts', 'selected.ts', 'View.tsx'].map((file) => path.join(root, file)),
+			{ root, write: false },
+		);
+		expect(result.files.find((file) => file.file === 'View.tsx').code).toContain(
+			'<Selected value="a"><Retained value="b"><Linked value="c"><Alias value="d" /></Linked></Retained></Selected>',
+		);
+	});
+
 	it('rewrites `.Provider` only on values that are contexts', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',

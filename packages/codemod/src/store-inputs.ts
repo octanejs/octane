@@ -152,6 +152,20 @@ export function storeSources(
 		}
 		return binding;
 	}
+	function exportsConstObject(file: string, name: string) {
+		const { sf, checker } = bindingFor(file);
+		const symbol = checker.getSymbolAtLocation(sf)?.exports?.get(ts.escapeLeadingUnderscores(name));
+		const declaration = symbol?.valueDeclaration;
+		if (
+			!declaration ||
+			!ts.isVariableDeclaration(declaration) ||
+			!declaration.initializer ||
+			(declaration.parent.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+			ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Ambient
+		)
+			return false;
+		return ts.isObjectLiteralExpression(skipWrappers(declaration.initializer));
+	}
 	function inputs(file: string) {
 		const saved = modules.get(file);
 		if (saved) return saved;
@@ -289,18 +303,19 @@ export function storeSources(
 			return undefined;
 		}
 	}
-	function localFile(from: string, specifier: string) {
+	function localFile(from: string, specifier: string, allowTsx = false) {
 		const file = typedFile(from, specifier);
-		if (!file || !/(?<!\.d)\.ts$/.test(file) || !inProject(file, root)) return null;
+		if (!file || file.endsWith('.d.ts') || !inProject(file, root)) return null;
+		const extension = path.extname(file);
+		if (extension !== '.ts' && !(allowTsx && extension === '.tsx')) return null;
 		const physical = fs.realpathSync(file);
 		if (!inProject(physical, project)) return null;
 		// A JS sibling or directory can implement a different export even for a tsconfig alias.
-		if (!specifier.endsWith('.ts')) {
-			const stem = file.slice(0, -3);
+		if (!specifier.endsWith(extension)) {
+			const stem = file.slice(0, -extension.length);
 			if (
-				['.js', '.jsx', '.tsx', '.mjs', '.cjs', '.mts', '.cts', ''].some((ext) =>
-					fs.existsSync(stem + ext),
-				)
+				sourceExtensions.some((ext) => ext !== extension && fs.existsSync(stem + ext)) ||
+				fs.existsSync(stem)
 			)
 				return null;
 		}
@@ -629,5 +644,5 @@ export function storeSources(
 		}
 		return exported.has(name);
 	}
-	return { inputFactory, changedJsxExport, helperFunction, localFile };
+	return { inputFactory, changedJsxExport, helperFunction, localFile, exportsConstObject };
 }
