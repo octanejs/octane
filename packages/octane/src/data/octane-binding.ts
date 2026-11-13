@@ -18,11 +18,11 @@
  */
 import type * as Client from '../index.js';
 import type { OctaneNode } from '../index.js';
-import type { Feed, Read, View, Write } from './contracts.js';
-import { listen, type FeedSnapshot } from './feeds.js';
+import type { Write } from './contracts.js';
+import type { FeedHandle, FeedSnapshot } from './feeds.js';
 import { formViews, type FormView } from './form.js';
-import { pages, type PagesSnapshot } from './pages.js';
-import type { DataStore, ReadSnapshot } from './store.js';
+import type { PagesHandle, PagesSnapshot } from './pages.js';
+import { loading, type DataStore, type ReadHandle, type ReadSnapshot } from './store.js';
 
 type Runtime = Pick<
 	typeof Client,
@@ -32,39 +32,30 @@ type Runtime = Pick<
 export interface OctaneDataBinding {
 	DataProvider(props: { store: DataStore; children?: OctaneNode }): OctaneNode;
 	useDataStore(): DataStore;
-	/** Observe a read without suspending. The component mounts and unmounts the observation. */
-	useReadState: {
-		<O>(read: Read<void, O>): ReadSnapshot<O>;
-		<T>(read: View<void, T>): ReadSnapshot<T[]>;
-		<I, O>(read: Read<I, O>, input: I): ReadSnapshot<O>;
-	};
 	/**
-	 * Read a value, suspending under the nearest `@pending` or `<Suspense>` until
-	 * the first one arrives and throwing a failed first load to the nearest
-	 * `@catch` or error boundary. Later reloads keep the last value on screen.
+	 * Read a value from a handle, `store.read(read, input)`, while the component
+	 * is mounted. It suspends under the nearest `@pending` or `<Suspense>` until
+	 * the first value arrives, and throws a failed first load to the nearest
+	 * `@catch` or error boundary; later reloads keep the last value on screen.
+	 * With `{ suspend: false }` it returns the live snapshot instead.
 	 */
 	useRead: {
-		<O>(read: Read<void, O>): O;
-		<T>(read: View<void, T>): T[];
-		<I, O>(read: Read<I, O>, input: I): O;
+		<T>(handle: ReadHandle<T>): T;
+		<T>(handle: ReadHandle<T>, options: { readonly suspend: false }): ReadSnapshot<T>;
 	};
 	/**
-	 * A view read a page at a time, as one list. `more` says whether another page
-	 * has rows, and `loadMore` shows it. Like `useReadState`, it does not suspend.
+	 * Show a view a page at a time, from a handle, `pages(store, view, params)`.
+	 * `more` says whether another page has rows, and `loadMore` shows it. It
+	 * does not suspend.
 	 */
-	usePages: {
-		<T>(view: View<void, T>): PagesSnapshot<T>;
-		<P, T>(view: View<P, T>, params: P): PagesSnapshot<T>;
-	};
+	usePages<T>(handle: PagesHandle<T>): PagesSnapshot<T>;
 	/**
-	 * Listen to a feed while the component is mounted, so its events keep the
-	 * store's reads current. Components listening to equal arguments share one
-	 * connection. Returns the connection's status.
+	 * Listen to a feed, from a handle, `listen(store, feed, params)`, while the
+	 * component is mounted, so its events keep the store's reads current.
+	 * Components listening to equal arguments share one connection. Returns the
+	 * connection's status.
 	 */
-	useFeed: {
-		<E>(feed: Feed<void, E>): FeedSnapshot;
-		<P, E>(feed: Feed<P, E>, params: P): FeedSnapshot;
-	};
+	useFeed(handle: FeedHandle): FeedSnapshot;
 	/** A stable function that submits a write through the store. */
 	useWrite<I, O>(write: Write<I, O>): (input: I) => Promise<O>;
 	/**
@@ -89,35 +80,27 @@ export function createOctaneDataBinding(runtime: Runtime): OctaneDataBinding {
 		return store;
 	}
 
-	function useReadState(read: Read<any, any>, input?: unknown, slot?: symbol) {
-		const [value, hookSlot] = split(input, slot);
-		// Equal inputs resolve to one handle, so its methods are stable across renders.
-		const handle = useDataStore().read(read, value);
-		return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot, hookSlot);
-	}
-
-	function useRead(read: Read<any, any>, input?: unknown, slot?: symbol) {
-		const [value, hookSlot] = split(input, slot);
-		const store = useDataStore();
-		const snapshot = useReadState(read, value, hookSlot);
+	// Equal arguments resolve to one handle, so a handle's methods are stable across renders.
+	function useRead(handle: ReadHandle<any>, options?: unknown, slot?: symbol) {
+		const [given, hookSlot] = split(options, slot);
+		const snapshot = useSyncExternalStore(
+			handle.subscribe,
+			handle.getSnapshot,
+			handle.getSnapshot,
+			hookSlot,
+		);
+		if ((given as { suspend?: boolean } | undefined)?.suspend === false) return snapshot;
 		if (snapshot.status === 'error') throw snapshot.error;
-		// The load in flight is one promise for every caller, as `use` requires.
-		if (snapshot.status === 'pending') use(store.prefetch(read, value));
+		if (snapshot.status === 'pending') use(loading(useDataStore(), handle));
 		return snapshot.value;
 	}
 
-	function usePages(view: View<any, any>, params?: unknown, slot?: symbol) {
-		const [value, hookSlot] = split(params, slot);
-		// Equal arguments resolve to one handle, so its methods are stable across renders.
-		const handle = pages(useDataStore(), view, value);
-		return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot, hookSlot);
+	function usePages(handle: PagesHandle<any>, slot?: symbol) {
+		return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot, slot);
 	}
 
-	function useFeed(feed: Feed<any, any>, params?: unknown, slot?: symbol) {
-		const [value, hookSlot] = split(params, slot);
-		// Equal arguments resolve to one handle, so its methods are stable across renders.
-		const handle = listen(useDataStore(), feed, value);
-		return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot, hookSlot);
+	function useFeed(handle: FeedHandle, slot?: symbol) {
+		return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot, slot);
 	}
 
 	const formView = formViews(createElement as (type: string, props: object) => OctaneNode);
@@ -142,7 +125,6 @@ export function createOctaneDataBinding(runtime: Runtime): OctaneDataBinding {
 	return {
 		DataProvider: (props) => createElement(StoreContext, { value: props.store }, props.children),
 		useDataStore,
-		useReadState,
 		useRead,
 		usePages,
 		useFeed,

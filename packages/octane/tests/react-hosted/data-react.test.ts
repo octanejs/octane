@@ -8,7 +8,7 @@ import * as React from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { createDataStore, type DataStore } from '../../src/data/index.js';
-import { DataProvider, useForm, useRead, useReadState, useWrite } from '../../src/data/react.js';
+import { DataProvider, useDataStore, useForm, useRead, useWrite } from '../../src/data/react.js';
 import { createServer, setDone, todos } from '../_data-todos.js';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -16,12 +16,12 @@ const act: <T>(scope: () => T | Promise<T>) => Promise<T> = (React as any).act;
 const h = React.createElement;
 
 function Titles() {
-	const list = useRead(todos, undefined);
+	const list = useRead(useDataStore().read(todos, undefined));
 	return h('ul', null, ...list.map((todo) => h('li', { key: todo.id }, todo.title)));
 }
 
 function DoneCount() {
-	const { value } = useReadState(todos, undefined);
+	const { value } = useRead(useDataStore().read(todos, undefined), { suspend: false });
 	return h('output', null, value ? String(value.filter((todo) => todo.done).length) : '…');
 }
 

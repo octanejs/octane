@@ -292,7 +292,7 @@ export const docsMeta: DocMeta[] = [
 			{
 				id: 'reading',
 				title: 'Reading data',
-				searchTerms: ['useReadState', 'prefetch', 'invalidate', 'fresh', 'keep', 'expire'],
+				searchTerms: ['suspend', 'snapshot', 'prefetch', 'invalidate', 'fresh', 'keep', 'expire'],
 			},
 			{ id: 'read-handles', title: 'Read outside a component', level: 3 },
 			{

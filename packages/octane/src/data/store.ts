@@ -81,6 +81,15 @@ export interface ReadHandle<T> {
 	refresh(): Promise<void>;
 }
 
+/**
+ * What a suspending reader of `handle` waits on: the load in flight, one
+ * promise for every caller as `use` requires, or the account's confirmation
+ * while the store is fenced.
+ */
+export function loading(store: DataStore, handle: ReadHandle<unknown>): Promise<void> {
+	return internals.get(store)!.loading(handle);
+}
+
 /** The write may have reached the server. Its edit stays visible until `settle`. */
 export class DataUncertainError extends Error {
 	readonly operationId: string;
@@ -108,6 +117,9 @@ export class DataRetiredError extends Error {
 
 export interface DataStore {
 	readonly retired: boolean;
+	/** A read with no input; a view with no parameters shows its default window. */
+	read<O>(read: Read<void, O>): ReadHandle<O>;
+	read<T>(view: View<void, T>): ReadHandle<T[]>;
 	read<I, O>(read: Read<I, O>, input: I): ReadHandle<O>;
 	prefetch<I, O>(read: Read<I, O>, input: I): Promise<void>;
 	write<I, O>(write: Write<I, O>, input: I): Promise<O>;
@@ -222,6 +234,8 @@ export interface StoreInternals {
 	onSettle(notify: (id: string, confirmed: boolean, value: unknown) => void): void;
 	/** Show every read as pending, or show them again. */
 	fence(on: boolean): void;
+	/** What a suspending reader of one of this store's handles waits on. */
+	loading(handle: ReadHandle<unknown>): Promise<void>;
 	/** Reload `reload`, then notify the readers of `changed` and of every read showing a record of `names`. */
 	finish(reload: Set<Entry>, changed: readonly Entry[], names: ReadonlySet<string>): void;
 }
@@ -1262,6 +1276,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			projected: null,
 		};
 		entries.set(key, created);
+		handles.set(created.handle, created);
 		adoptSeed(created);
 		idle(created);
 		return created;
@@ -1626,20 +1641,24 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		);
 	}
 
+	/** Each handle's entry, so a reader holding only the handle can wait for its load. */
+	const handles = new WeakMap<ReadHandle<unknown>, Entry>();
+	function prefetch(read: Read<any, any>, input: unknown): Promise<void> {
+		if (retired) return NEVER;
+		// A suspended reader waits for the account to be confirmed, then shows what is held.
+		if (fenced) return fenced.lifted;
+		const entry = entryFor(read, input);
+		return entry.hasBase && !isStale(entry) ? Promise.resolve() : load(entry);
+	}
+
 	const store: DataStore = {
 		get retired() {
 			return retired;
 		},
-		read(read, input) {
+		read(read: Read<any, any>, input?: unknown) {
 			return retired ? RETIRED_HANDLE : entryFor(read, input).handle;
 		},
-		prefetch(read, input) {
-			if (retired) return NEVER;
-			// A suspended reader waits for the account to be confirmed, then shows what is held.
-			if (fenced) return fenced.lifted;
-			const entry = entryFor(read, input);
-			return entry.hasBase && !isStale(entry) ? Promise.resolve() : load(entry);
-		},
+		prefetch,
 		write(write, input) {
 			assertLive();
 			let parsed: unknown;
@@ -1854,6 +1873,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		settleOperation,
 		onSettle(notify) {
 			settled = notify;
+		},
+		loading(handle) {
+			const entry = handles.get(handle);
+			return entry ? prefetch(entry.read, entry.input) : NEVER;
 		},
 		fence(on) {
 			if (on === !!fenced) return;

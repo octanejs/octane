@@ -11,13 +11,5 @@ import { createOctaneDataBinding } from './octane-binding.js';
 // The server runtime mirrors the client's public signatures over its own scope types.
 const runtime = { createContext, createElement, use, useCallback, useSyncExternalStore };
 
-export const {
-	DataProvider,
-	useDataStore,
-	useFeed,
-	useForm,
-	usePages,
-	useRead,
-	useReadState,
-	useWrite,
-} = createOctaneDataBinding(runtime as unknown as Parameters<typeof createOctaneDataBinding>[0]);
+export const { DataProvider, useDataStore, useFeed, useForm, usePages, useRead, useWrite } =
+	createOctaneDataBinding(runtime as unknown as Parameters<typeof createOctaneDataBinding>[0]);

@@ -1,10 +1,10 @@
 /** @jsxImportSource react */
 import type { DataStore } from 'octane/data';
-import { DataProvider, useReadState, useWrite } from 'octane/data/react';
+import { DataProvider, useDataStore, useRead, useWrite } from 'octane/data/react';
 import { setRead, unread } from '../shared/contracts.ts';
 
 function Unread() {
-	const list = useReadState(unread).value ?? [];
+	const list = useRead(useDataStore().read(unread), { suspend: false }).value ?? [];
 	const save = useWrite(setRead);
 	return (
 		<section className="island" aria-label="React island">

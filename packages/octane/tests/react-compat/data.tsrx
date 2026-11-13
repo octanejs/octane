@@ -1,19 +1,19 @@
 import { ReactCompat } from 'octane/react';
 import type { DataStore } from 'octane/data';
 import { useTransition } from 'octane';
-import { DataProvider, useRead, useReadState, useWrite } from 'octane/data/octane';
+import { DataProvider, useDataStore, useRead, useWrite } from 'octane/data/octane';
 import { setDone, todos } from '../_data-todos.js';
 import { ReactTodoPanel } from './data.react.js';
 
 function OctaneDoneCount() @{
-	const state = useReadState(todos);
+	const state = useRead(useDataStore().read(todos), { suspend: false });
 	<output data-octane-done="">
 		{(state.value ? String(state.value.filter((todo) => todo.done).length) : '…') as string}
 	</output>
 }
 
 function OctaneTitles() @{
-	const list = useRead(todos);
+	const list = useRead(useDataStore().read(todos));
 	const save = useWrite(setDone);
 	<ul>
 		@for (const todo of list; key todo.id) {
@@ -32,7 +32,7 @@ function OctaneTitles() @{
 
 /** A write inside a transition: its edit shows at once, and the transition stays pending until it settles. */
 function TransitionToggle() @{
-	const list = useRead(todos);
+	const list = useRead(useDataStore().read(todos));
 	const save = useWrite(setDone);
 	const [pending, start] = useTransition();
 	const todo = list[0]!;

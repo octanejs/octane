@@ -950,7 +950,7 @@ const store = createDataStore({
 });
 ```
 
-A component that calls `useFeed(bookChanges)` keeps the feed open while it is
+A component that calls `useFeed(listen(store, bookChanges))` keeps the feed open while it is
 mounted, and returns its status: `connecting`, `live`, or `offline` while it
 waits to try again. Every component listening with equal parameters shares one
 connection, which closes when the last one unmounts. Outside a component,

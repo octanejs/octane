@@ -1,25 +1,26 @@
 /** @jsxImportSource react */
 import { Suspense } from 'react';
 import type { DataStore } from 'octane/data';
+import { listen, pages } from 'octane/data';
 import {
 	DataProvider,
+	useDataStore,
 	useFeed,
 	usePages,
 	useRead,
-	useReadState,
 	useWrite,
 } from 'octane/data/react';
 import { setDone, todoChanges, todoPages, todos } from '../_data-todos.js';
 
 function ReactDoneCount() {
-	const { value } = useReadState(todos);
+	const { value } = useRead(useDataStore().read(todos), { suspend: false });
 	return (
 		<output data-react-done="">{value ? value.filter((todo) => todo.done).length : '…'}</output>
 	);
 }
 
 function ReactToggle() {
-	const list = useRead(todos);
+	const list = useRead(useDataStore().read(todos));
 	const save = useWrite(setDone);
 	const todo = list[0]!;
 	return (
@@ -54,15 +55,15 @@ export function ReactPages(props: { store: DataStore }) {
 }
 
 function ReactPageList() {
-	const pages = usePages(todoPages);
+	const shown = usePages(pages(useDataStore(), todoPages));
 	return (
 		<section data-react-pages="">
 			<ul>
-				{pages.value?.map((todo) => (
+				{shown.value?.map((todo) => (
 					<li key={todo.id}>{todo.title}</li>
 				))}
 			</ul>
-			{pages.more ? <button onClick={() => void pages.loadMore()}>More</button> : null}
+			{shown.more ? <button onClick={() => void shown.loadMore()}>More</button> : null}
 		</section>
 	);
 }
@@ -76,8 +77,8 @@ export function ReactFeed(props: { store: DataStore }) {
 }
 
 function ReactFeedList() {
-	const feed = useFeed(todoChanges);
-	const list = useRead(todos);
+	const feed = useFeed(listen(useDataStore(), todoChanges));
+	const list = useRead(useDataStore().read(todos));
 	return (
 		<section data-react-feed={feed.status}>
 			{list.map((todo) => (
