@@ -631,7 +631,7 @@ describe('octane/data in a SharedWorker', () => {
 		try {
 			expect(sharedOwner('ada')).toBe(port);
 			expect(constructed).toEqual([
-				['/_octane/data-worker.js', { type: 'module', name: 'octane-data:3:ada' }],
+				['/_octane/data-worker.js', { type: 'module', name: 'octane-data:4:ada' }],
 			]);
 			vi.stubGlobal(
 				'SharedWorker',
