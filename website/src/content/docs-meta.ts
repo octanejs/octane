@@ -292,13 +292,20 @@ export const docsMeta: DocMeta[] = [
 			{
 				id: 'reading',
 				title: 'Reading data',
-				searchTerms: ['useReadState', 'prefetch', 'invalidate', 'fresh', 'keep', 'expire'],
+				searchTerms: ['suspend', 'snapshot', 'prefetch', 'invalidate', 'fresh', 'keep', 'expire'],
 			},
 			{ id: 'read-handles', title: 'Read outside a component', level: 3 },
 			{
 				id: 'writing',
 				title: 'Writing data',
-				searchTerms: ['write', 'useWrite', 'entity', 'DataError', 'DataUncertainError', 'settle'],
+				searchTerms: [
+					'write',
+					'store.write',
+					'entity',
+					'DataError',
+					'DataUncertainError',
+					'settle',
+				],
 			},
 			{ id: 'optimistic', title: 'Optimistic edits and rollback', level: 3 },
 			{ id: 'uncertain', title: 'When the reply is lost', level: 3 },

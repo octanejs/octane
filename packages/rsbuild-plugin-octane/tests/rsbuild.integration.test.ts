@@ -272,11 +272,11 @@ export default function open(seed: string | null): DataStore {
 		root,
 		'src/Notes.tsrx',
 		`import { useState } from 'octane';
-import { useRead } from 'octane/data/octane';
+import { useDataStore, useRead } from 'octane/data/octane';
 import { notes } from './data.ts';
 
 function List() @{
-	const list = useRead(notes);
+	const list = useRead(useDataStore().read(notes));
 	<ul data-notes="">
 		@for (const note of list; key note) {
 			<li>{note}</li>
