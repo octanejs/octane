@@ -9,6 +9,7 @@ import FrameworkIntegrations from './docs/framework-integrations.mdx';
 import Cli from './docs/cli.mdx';
 import CoreApis from './docs/core-apis.mdx';
 import Signals from './docs/signals.mdx';
+import Data from './docs/data.mdx';
 import Styling from './docs/styling.mdx';
 import TsrxVsTsx from './docs/tsrx-vs-tsx.mdx';
 import StrongMode from './docs/strong-mode.mdx';
@@ -35,6 +36,7 @@ const components: Record<string, DocEntry['component']> = {
 	cli: Cli,
 	'core-apis': CoreApis,
 	signals: Signals,
+	data: Data,
 	styling: Styling,
 	'tsrx-vs-tsx': TsrxVsTsx,
 	'strong-mode': StrongMode,

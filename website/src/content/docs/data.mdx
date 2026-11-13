@@ -1,0 +1,1733 @@
+---
+title: Data
+---
+
+import { FlowDiagram, SequenceDiagram } from '../../components/FlowDiagram.tsrx';
+
+<div className="doc-hero">
+	<p className="doc-eyebrow">Server data</p>
+	<h1>Data</h1>
+	<p className="doc-lede">
+		{
+			'octane/data loads, caches and saves the data your server owns. Declare each read and write once, and every component, page and tab that uses it shows the same values, the same pending edits and the same rollbacks.'
+		}
+	</p>
+</div>
+
+Most apps spend a surprising amount of code on server data. A list has to be
+loaded, shared with the other components that show it, kept after a component
+unmounts, reloaded when it is stale, and updated the moment the user edits
+it — then put back if the server refuses the edit. A server render has to hand
+its data to the browser so hydration does not load it again. And if the app
+is open in two tabs, each one should see the other's changes.
+
+`octane/data` does that work for you. You describe **what** your data is, and
+it decides **when** to load, cache, save, share and roll back. It has no
+renderer of its own, so the same store drives Octane components, React
+components, and plain code such as tests.
+
+[Signals](/docs/signals) are the tool for state your app owns, such as a draft
+or a selected tab, and for one-off async values. Reach for `octane/data` when
+the server owns the data and several parts of the app read and change it.
+
+<h2 id="the-pieces">How the pieces fit</h2>
+
+`octane/data` is built from five small parts. Each one has a single job, and
+you will meet all of them in the first example.
+
+- A **contract** describes one operation: a **read** (load something), a
+  **write** (change something), a **view** (a sorted list), or a **feed**
+  (a stream of server events). A contract is only a description. Importing one
+  does no network work, so the browser, the server and your tests can all
+  import the same file.
+- A **store** runs contracts in the browser. It caches each read's value,
+  shares one request between every component that asks for the same thing,
+  shows a write's edit straight away, and puts it back if the server refuses.
+- A **transport** carries the store's requests to the server. It is one
+  function, so you can send them over `fetch`, through a `module server`
+  function, or anywhere else.
+- A **handler** runs on the server. It pairs each contract with the function
+  that serves it, and validates every input before your code sees it.
+- A **binding** connects a store to your components: `octane/data/octane` for
+  Octane and `octane/data/react` for React. Both have the same hooks.
+
+<FlowDiagram
+	label="One request: a component asks the store, the store asks the transport, and the server's handler answers."
+	columns={[
+		{ nodes: [{ title: 'Contracts', detail: 'read, write, view, feed' }], arrow: 'describe' },
+		{ nodes: [{ title: 'Components', detail: 'useRead, useWrite, useForm' }], arrow: 'binding' },
+		{ nodes: [{ title: 'Store', detail: 'cache, edits, rollback' }], arrow: 'request' },
+		{ nodes: [{ title: 'Transport', detail: 'serverTransport or httpTransport' }], arrow: 'wire' },
+		{ nodes: [{ title: 'Handler', detail: 'createDataHandler validates and runs' }] },
+	]}
+/>
+
+Each part lives in its own entry point, so a page only ships what it uses:
+
+| Entry point          | What it holds                                                                  | Where it runs      |
+| -------------------- | ------------------------------------------------------------------------------ | ------------------ |
+| `octane/data`        | Contracts, the store, transports, feeds, persistence, and cross-tab sharing    | Browser and server |
+| `octane/data/server` | `createDataHandler`, which serves contracts                                    | Server only        |
+| `octane/data/octane` | The Octane binding: `DataProvider`, `useRead`, `useWrite`, and the other hooks | Octane components  |
+| `octane/data/react`  | The React binding, with the same names and behavior                            | React components   |
+
+The Octane binding has a server version too. You never import it yourself:
+when Octane compiles a component for a server render, it points
+`octane/data/octane` at the server version for you.
+
+<h2 id="first-read">Your first read</h2>
+
+Let's build a small reading list from the beginning: a list of books, loaded
+from the server and shown in a component. It takes four short files.
+
+<h3 id="first-contracts">1. Describe the data</h3>
+
+Contracts check data with a **schema**: a validator that says what shape a
+value must have. `octane/data` accepts any validator that implements
+[Standard Schema](https://standardschema.dev), the shared interface of Zod,
+Valibot, ArkType and others. These examples use Zod.
+
+```ts
+// contracts.ts — imported by the server and by the browser.
+import { read } from 'octane/data';
+import { z } from 'zod';
+
+export const Book = z.object({
+	id: z.string(),
+	title: z.string().trim().min(1, 'Enter a title'),
+	read: z.boolean(),
+});
+export type Book = z.infer<typeof Book>;
+
+export const books = read({
+	name: 'books.list',
+	output: z.array(Book),
+});
+```
+
+A read has a unique `name`, which is how the server finds its handler, and an
+`output` schema for the value it returns. It can also take an `input`, which
+you will see shortly.
+
+<h3 id="first-handler">2. Serve it</h3>
+
+On the server, `createDataHandler` pairs each contract with the function
+that answers it. The handler validates every input before your function runs
+and every output before it leaves, so your code never sees data that does not
+match its schema.
+
+```ts
+// server.ts — server code only.
+import { createDataHandler } from 'octane/data/server';
+import { books, type Book } from './contracts.ts';
+
+const shelf: Book[] = [
+	{ id: '1', title: 'Kindred', read: false },
+	{ id: '2', title: 'Piranesi', read: true },
+];
+
+export const handler = createDataHandler({}, (handle) => [handle(books, () => shelf)]);
+```
+
+The first argument holds options, such as how to recognize the signed-in
+user. The second lists your handlers. Options come first so the handlers below
+can be typed from them, as [Serve your contracts](#server) shows.
+
+The browser needs a way to reach `handler`. In an Octane app, the simplest
+way is a `module server` block: a function that runs on the server, which the
+browser calls as if it were local. The compiler replaces it in the browser
+with a small stub that sends the call to the server, with your app's origin
+checks and middleware.
+
+```tsrx
+// data.tsrx — the one door between the store and the handler.
+module server {
+	import type { ServerCallContext } from 'octane/server';
+	import { handler } from './server.ts';
+
+	export async function data(request: string, call: ServerCallContext) {
+		return handler.serve(request, call);
+	}
+}
+
+import { data } from 'server';
+
+export { data };
+```
+
+`handler.serve` answers one store request. If you would rather expose a plain
+HTTP endpoint, see [Serve over HTTP](#http-endpoint).
+
+<h3 id="first-store">3. Create a store</h3>
+
+A store needs a transport. `serverTransport(data)` sends each request through
+the `data` function above.
+
+```ts
+// store.ts
+import { createDataStore, serverTransport } from 'octane/data';
+import { data } from './data.tsrx';
+
+export const store = createDataStore({ transport: serverTransport(data) });
+```
+
+Create one store per signed-in account and keep it for as long as the account
+stays signed in. The store is where cached values live, so a new store starts
+empty.
+
+<h3 id="first-component">4. Show it in a component</h3>
+
+Put the store in a `DataProvider` near the top of your app. Any component
+below it can then call `useRead`.
+
+```tsrx
+// App.tsrx
+import { DataProvider, useRead } from 'octane/data/octane';
+import { books } from './contracts.ts';
+import { store } from './store.ts';
+
+function BookList() @{
+	const list = useRead(books);
+	<ul>
+		@for (const book of list; key book.id) {
+			<li>{book.title as string}</li>
+		} @empty {
+			<li>The shelf is empty.</li>
+		}
+	</ul>
+}
+
+export function App() @{
+	<DataProvider store={store}>
+		@try {
+			<BookList />
+		} @pending {
+			<p>Loading the shelf…</p>
+		} @catch (error) {
+			<p role="alert">{`Could not load the shelf: ${(error as Error).message}` as string}</p>
+		}
+	</DataProvider>
+}
+```
+
+`useRead` returns the value itself, not a loading state. While the first
+value is on its way, it **suspends**: the nearest `@pending` arm (or
+`<Suspense>` boundary) shows instead. If the first load fails, it throws to
+the nearest `@catch` (or error boundary). Once a value has arrived, later
+reloads keep it on screen, so the list never flickers back to "Loading".
+
+The same component in React looks like this. Only the binding import and the
+JSX change:
+
+```tsx
+/** @jsxImportSource react */
+// App.tsx
+import { Suspense } from 'react';
+import { DataProvider, useRead } from 'octane/data/react';
+import { books } from './contracts.ts';
+import { store } from './store.ts';
+
+function BookList() {
+	const list = useRead(books);
+	if (list.length === 0) return <p>The shelf is empty.</p>;
+	return (
+		<ul>
+			{list.map((book) => (
+				<li key={book.id}>{book.title}</li>
+			))}
+		</ul>
+	);
+}
+
+export function App() {
+	return (
+		<DataProvider store={store}>
+			<Suspense fallback={<p>Loading the shelf…</p>}>
+				<BookList />
+			</Suspense>
+		</DataProvider>
+	);
+}
+```
+
+That is the whole loop: a contract, a handler, a store, and a hook. Everything
+else on this page builds on it.
+
+<h2 id="reading">Reading data</h2>
+
+<h3 id="read-inputs">Reads with an input</h3>
+
+Most reads take an argument, such as an ID or a search term. Give the contract
+an `input` schema and pass the input as the hook's second argument:
+
+```ts
+import { read } from 'octane/data';
+import { z } from 'zod';
+
+export const book = read({
+	name: 'books.byId',
+	input: z.object({ id: z.string() }),
+	output: z.object({ id: z.string(), title: z.string(), read: z.boolean() }),
+});
+```
+
+```tsrx
+import { useRead } from 'octane/data/octane';
+import { book } from './contracts.ts';
+
+export function BookTitle(props: { id: string }) @{
+	const value = useRead(book, { id: props.id });
+	<h1>{value.title as string}</h1>
+}
+```
+
+The store identifies each cached value by the read's name and its input, so
+two components that ask for `book` with `{ id: '1' }` share one value and one
+request, while `{ id: '2' }` is a separate entry. Inputs are compared by
+value, not by object identity, so a fresh object literal on every render is
+fine.
+
+<h3 id="read-without-suspending">Read without suspending</h3>
+
+Sometimes you would rather show a value and its status yourself than suspend.
+`useReadState` returns a **snapshot** instead of the value:
+
+```tsrx
+import { useReadState } from 'octane/data/octane';
+import { books } from './contracts.ts';
+
+export function ShelfCount() @{
+	const snapshot = useReadState(books);
+	<p>
+		@if (snapshot.status === 'pending') {
+			<span>Counting…</span>
+		} @else if (snapshot.status === 'error') {
+			<span>Count unavailable</span>
+		} @else {
+			<span>{`${snapshot.value!.length} books${snapshot.refreshing ? ' (updating)' : ''}`}</span>
+		}
+	</p>
+}
+```
+
+A snapshot has these fields:
+
+| Field        | Meaning                                                                                           |
+| ------------ | ------------------------------------------------------------------------------------------------- |
+| `status`     | `'pending'` until the first value arrives, then `'ready'`, or `'error'` if the first load failed. |
+| `value`      | The newest value from the server, with any pending edits applied on top.                          |
+| `error`      | Why the load failed, when `status` is `'error'`.                                                  |
+| `refreshing` | A reload is in flight while the current value stays on screen.                                    |
+| `stale`      | The value is older than the read allows, or a write marked it stale; it reloads when observed.    |
+| `more`       | For a [view](#views), whether rows follow the ones shown.                                         |
+
+<h3 id="freshness">How long values last</h3>
+
+Three options on a contract say how long a value is good for. All three are in
+milliseconds.
+
+- `fresh` (default `0`): how long a value is served without asking the server
+  again. With the default, a component that mounts shows the cached value
+  straight away and reloads it in the background.
+- `keep` (default five minutes): how long a value is kept once no component is
+  showing it. After that it is dropped, and the next reader loads it again.
+- `expire` (default never): the age after which a value is never shown, even
+  while it reloads.
+
+```ts
+import { read } from 'octane/data';
+import { z } from 'zod';
+
+export const stats = read({
+	name: 'books.stats',
+	output: z.object({ total: z.number().int(), read: z.number().int() }),
+	fresh: 30_000, // Show it for 30 seconds without reloading.
+	keep: 600_000, // Keep it for 10 minutes after the last reader leaves.
+	tags: ['shelf'], // Writes that change the shelf mark it stale.
+});
+```
+
+`tags` group reads so a write can mark them stale together. You will see how in
+[Writing data](#writing).
+
+<h3 id="read-handles">Read outside a component</h3>
+
+Hooks are a thin layer over the store, and you can use the store directly in
+event handlers, route loaders, tests or any plain code. `store.read` returns a
+**read handle**. Asking for one does no network work; the handle loads only
+when something subscribes, prefetches or refreshes.
+
+```ts
+import { createDataStore, serverTransport } from 'octane/data';
+import { books } from './contracts.ts';
+import { data } from './data.tsrx';
+
+const store = createDataStore({ transport: serverTransport(data) });
+
+// Start a load early, such as when the pointer hovers a link.
+await store.prefetch(books, undefined);
+
+const handle = store.read(books, undefined);
+const stop = handle.subscribe(() => {
+	const snapshot = handle.getSnapshot();
+	if (snapshot.status === 'ready') console.log(`${snapshot.value!.length} books`);
+});
+
+await handle.refresh(); // Reload now, keeping the current value on screen.
+stop(); // The last subscriber leaving starts the `keep` timer.
+```
+
+- `getSnapshot()` returns the current snapshot. It is the same object until
+  something changes, so it can back `useSyncExternalStore` directly.
+- `subscribe(notify)` observes the read. The first subscriber starts a load if
+  the value is missing or stale. It returns a function that stops observing.
+- `refresh()` reloads now and resolves once the reload settles.
+
+The store has a few more methods for plain code:
+
+- `store.invalidate(tags)` marks every read with one of these tags (or holding
+  one of these entities) stale. Reads on screen reload.
+- `store.publish(read, input, value)` hands the store a value you got
+  elsewhere, as if a load had returned it.
+- `store.forget(read, input)` erases one cached value, in memory and in
+  [persistent storage](#persistence).
+
+<h2 id="writing">Writing data</h2>
+
+A **write** contract describes a change. You call it with `store.write`, or
+with the function `useWrite` returns, and get back a promise for the
+server's reply.
+
+```ts
+import { write } from 'octane/data';
+import { z } from 'zod';
+
+export const renameShelf = write({
+	name: 'shelf.rename',
+	input: z.object({ name: z.string().min(1) }),
+	output: z.object({ name: z.string() }),
+	invalidates: ['shelf'],
+});
+```
+
+After the server confirms the write, every read tagged `shelf` is marked
+stale, and the ones on screen reload. That is the simplest way to keep reads
+up to date: name what a write affects, and the store takes care of the rest.
+
+<h3 id="entities">Entities: one record, many reads</h3>
+
+Reloading is correct, but it is slow and it flickers. Usually the app already
+knows what the write will do: toggling a book's `read` flag changes that book,
+wherever it appears. An **entity** tells the store which values are records
+with an identity, so one edit can update every copy.
+
+```ts
+import { entity, read, write } from 'octane/data';
+import { z } from 'zod';
+
+const bookShape = z.object({ id: z.string(), title: z.string(), read: z.boolean() });
+
+/** Every read that holds a book shares its fields. */
+export const Book = entity('book', bookShape);
+
+export const books = read({
+	name: 'books.list',
+	output: z.array(bookShape),
+	// Tell the store where the books are in this read's value.
+	entities: (list) => Book.from(list),
+});
+
+export const setRead = write({
+	name: 'books.setRead',
+	input: bookShape.pick({ id: true, read: true }),
+	output: bookShape,
+	patches: Book, // The input is a partial book, keyed by its `id`.
+	record: (book) => book, // The reply is the saved book.
+});
+```
+
+`entity(name, schema, key?)` names a record type. Its ID lives in the `id`
+property unless you pass another `key`. A read that holds records says where
+they are with `entities`, using `Book.from(...)` on one record or an array.
+
+A write then says what it does to that entity:
+
+- `patches: Book` merges the write's input into the record with that ID.
+- `creates: Book` adds a new record. Its `draft(input, id)` option builds the
+  record to show before the server replies; by default the draft is the input
+  plus the new ID.
+- `removes: Book` removes the record with the input's ID from every read.
+
+`record` tells the store where the saved record is in the reply, so it can
+take the server's version without reloading anything.
+
+<h3 id="optimistic">Optimistic edits and rollback</h3>
+
+A write with an effect is **optimistic**: the store shows its edit in the
+same moment the user acts, before the request even leaves. If the server
+confirms, the store keeps the server's reply. If it refuses, the edit is
+removed from every read that showed it.
+
+<SequenceDiagram
+	label="An optimistic write: the edit shows at once, then the reply either confirms it or rolls it back."
+	actors={['Component', 'Store', 'Transport', 'Handler']}
+	steps={[
+		{ from: 0, to: 1, text: 'store.write(setRead, { id, read: true })' },
+		{ from: 1, to: 1, text: 'Apply the edit to every read holding the book; re-render now' },
+		{ from: 1, to: 2, text: 'Send the write, once, with an operation ID' },
+		{ from: 2, to: 3, text: 'Validate input, run the handler' },
+		{ from: 3, to: 1, text: 'Confirmed: reply with the saved book and refreshed reads' },
+		{ from: 1, to: 0, text: 'Show the server’s values; the promise resolves' },
+		{ from: 3, to: 1, text: 'Or refused: DataError with a code' },
+		{ from: 1, to: 0, text: 'Remove the edit everywhere; the promise rejects' },
+	]}
+/>
+
+Here is a checkbox that marks a book read. Notice there is no local state for
+"saving": the list shows the edit because the store does.
+
+```tsrx
+import { useRead, useWrite } from 'octane/data/octane';
+import { books, setRead } from './contracts.ts';
+
+export function BookList() @{
+	const list = useRead(books);
+	const save = useWrite(setRead);
+	<ul>
+		@for (const book of list; key book.id) {
+			<li>
+				<label>
+					<input
+						type="checkbox"
+						checked={book.read}
+						onChange={() => void save({ id: book.id, read: !book.read }).catch(() => {})}
+					/>
+					{book.title as string}
+				</label>
+			</li>
+		}
+	</ul>
+}
+```
+
+The checkbox uses `onChange`, which is right for a checkbox: the browser fires
+`change` the moment it is toggled. Octane's events are native, so for a text
+field you would use `onInput` for each keystroke (see
+[Differences from React](/docs/differences-from-react)).
+
+And the same component in React:
+
+```tsx
+/** @jsxImportSource react */
+import { useRead, useWrite } from 'octane/data/react';
+import { books, setRead } from './contracts.ts';
+
+export function BookList() {
+	const list = useRead(books);
+	const save = useWrite(setRead);
+	return (
+		<ul>
+			{list.map((book) => (
+				<li key={book.id}>
+					<label>
+						<input
+							type="checkbox"
+							checked={book.read}
+							onChange={() => void save({ id: book.id, read: !book.read }).catch(() => {})}
+						/>
+						{book.title}
+					</label>
+				</li>
+			))}
+		</ul>
+	);
+}
+```
+
+A few guarantees make optimistic edits safe to rely on:
+
+- **Edits replay cleanly.** Every edit is "set these fields", "insert this ID"
+  or "delete this ID". When a newer value arrives from the server while an
+  edit is still pending, the store re-applies the edit on top, and applying it
+  to a value that already includes it changes nothing.
+- **No half-applied replies.** Every value one reply carries is adopted before
+  any component re-renders, so no render sees part of a server transaction.
+- **Writes wait for their create.** If you create a book and then rename it
+  before the create is confirmed, the rename waits. If the create is refused,
+  the rename is refused too, without being sent.
+
+When the server picks the ID of a new record (an auto-increment key, say),
+add `serverId: (reply) => reply.id` to the create. Until the reply arrives the
+record shows under a temporary ID, and later writes to it are sent with the
+server's ID.
+
+<h3 id="refusals">When the server says no</h3>
+
+A handler refuses a write by throwing a `DataError` with a short code. The
+code, and any data you attach, reach the browser unchanged:
+
+```ts
+import { DataError } from 'octane/data';
+import { createDataHandler } from 'octane/data/server';
+import { addBook, type Book } from './contracts.ts';
+
+const shelf: Book[] = [];
+
+export const handler = createDataHandler({}, (handle) => [
+	handle(addBook, (input, { operationId }) => {
+		if (shelf.some((book) => book.title === input.title)) throw new DataError('duplicate');
+		const book = { id: operationId, title: input.title, read: false };
+		shelf.push(book);
+		return book;
+	}),
+]);
+```
+
+On the browser, the write's promise rejects with that `DataError`, and the
+edit is already gone from the screen. A schema failure is a `DataError` too,
+with the code `'invalid'` and the validator's messages in `issues`.
+
+```ts
+import { DataError } from 'octane/data';
+import { addBook } from './contracts.ts';
+import { store } from './store.ts';
+
+try {
+	await store.write(addBook, { title: 'Kindred' });
+} catch (error) {
+	if (error instanceof DataError && error.code === 'duplicate') {
+		console.log('That book is already on the shelf');
+	}
+}
+```
+
+<h3 id="uncertain">When the reply is lost</h3>
+
+Networks fail in an awkward place: after the server has applied a write but
+before its reply arrives. Retrying could apply the write twice; rolling back
+could hide a change that really happened. So the store does neither. The
+write's promise rejects with a `DataUncertainError`, and its edit **stays on
+screen** until you learn what happened.
+
+Every write carries an **operation ID**, which your handler receives as
+`call.operationId`. If the handler records the IDs it has applied, a
+**receipt** read can answer "did this write land?" and `store.settle` puts the
+store right:
+
+```ts
+import { DataUncertainError, read } from 'octane/data';
+import { z } from 'zod';
+import { setRead } from './contracts.ts';
+import { store } from './store.ts';
+
+export const receipt = read({
+	name: 'books.receipt',
+	input: z.object({ operationId: z.string() }),
+	output: z.object({ applied: z.boolean() }),
+});
+
+export async function markRead(id: string) {
+	try {
+		await store.write(setRead, { id, read: true });
+	} catch (error) {
+		if (!(error instanceof DataUncertainError)) throw error;
+		// Ask the server, then keep the edit or roll it back. Nothing is resent.
+		const handle = store.read(receipt, { operationId: error.operationId });
+		await handle.refresh();
+		const snapshot = handle.getSnapshot();
+		if (snapshot.status === 'ready') store.settle(error.operationId, snapshot.value!.applied);
+	}
+}
+```
+
+Recording operation IDs also makes your handler safe to call twice with the
+same write: check the set before applying. [Persistence](#journal) shows how
+the store can do this lookup for you, even after the page reloads.
+
+<h2 id="views">Views and pagination</h2>
+
+A plain read returns whatever the server sends. That works until an edit
+should move a row: marking a book read should move it out of "Unread" and
+into "Finished", in the right sorted position, right away. The server could
+send both lists again, but the browser already knows the rule.
+
+A **view** is a list defined by a rule over an entity: which records belong
+(`where`) and in what order (`order`). The store evaluates that rule itself,
+over every copy of the entity it holds, so an edit moves a record into, out of
+or across views in the same moment.
+
+```ts
+import { entity, view } from 'octane/data';
+import { z } from 'zod';
+
+const bookShape = z.object({ id: z.string(), title: z.string(), read: z.boolean() });
+export const Book = entity('book', bookShape);
+
+export const unread = view({
+	name: 'books.unread',
+	of: Book,
+	where: (book) => !book.read,
+	order: [['title', 'asc']],
+	limit: 50, // Rows shown when no window is asked for.
+});
+
+export const finished = view({
+	name: 'books.finished',
+	of: Book,
+	where: (book) => book.read,
+	order: [['title', 'asc']],
+	limit: 50,
+});
+```
+
+`order` lists sort keys, most significant first, and the entity's key breaks
+any remaining ties. `max` (default 500) caps how many rows one request may
+ask for.
+
+The server serves a **window** of the view: `limit` records starting at
+position `offset`, filtered by the same rule and sorted in exactly the same
+order. The contract carries the rule, so the handler can reuse it:
+
+```ts
+import { createDataHandler } from 'octane/data/server';
+import { unread, type Book } from './contracts.ts';
+
+const shelf: Book[] = [];
+
+export const handler = createDataHandler({}, (handle) => [
+	handle(unread, (input) =>
+		shelf
+			.filter((book) => unread.view.where(book, input))
+			.sort(unread.view.compare)
+			.slice(input.offset, input.offset + input.limit),
+	),
+]);
+```
+
+In a real app this is a database query with the same `WHERE` and `ORDER BY`.
+The store loads a little more than the window it shows, so a row moving in
+from just below the fold appears without a request.
+
+A view is a read, so `useRead(unread)` shows its default window. To show a
+specific window, pass `{ offset, limit }`, plus any parameters the view
+declares with an `input` schema.
+
+<h3 id="pages">Load a page at a time</h3>
+
+For a list that grows as the user scrolls or presses "Show more", use
+`usePages`. It joins the pages loaded so far into one list. Like
+`useReadState`, it does not suspend.
+
+```tsrx
+import { usePages } from 'octane/data/octane';
+import { unread } from './contracts.ts';
+
+export function UpNext() @{
+	const list = usePages(unread);
+	<section>
+		<ul>
+			@for (const book of list.value ?? []; key book.id) {
+				<li>{book.title as string}</li>
+			}
+		</ul>
+		@if (list.more) {
+			<button type="button" disabled={list.loadingMore} onClick={() => void list.loadMore()}>
+				Show more
+			</button>
+		}
+	</section>
+}
+```
+
+Each page is an ordinary window of the view, so pages share records with each
+other and with every other view, and an edit moves a row from one page to the
+next exactly as it moves rows within one. Outside a component,
+`pages(store, view, params?, size?)` returns the same list as a handle with
+`getSnapshot`, `subscribe`, `loadMore` and `refresh`.
+
+<h2 id="forms">Forms that work before JavaScript</h2>
+
+A form is the most natural way to send a write, and the browser already
+knows how to submit one: as a native `POST`, with no JavaScript at all.
+`octane/data` lets the same form work both ways. Before the page hydrates,
+or with JavaScript turned off, it posts to the server natively. Once
+hydrated, it submits through the store instead, with the write's optimistic
+edit.
+
+Give the write a `form` option that lists the fields a form submits and how
+to read each one:
+
+```ts
+import { entity, write } from 'octane/data';
+import { z } from 'zod';
+
+const bookShape = z.object({
+	id: z.string(),
+	title: z.string().trim().min(1, 'Enter a title'),
+	read: z.boolean(),
+});
+export const Book = entity('book', bookShape);
+
+export const addBook = write({
+	name: 'books.add',
+	input: bookShape.pick({ title: true }),
+	output: bookShape,
+	creates: Book,
+	record: (book) => book,
+	form: { title: 'text' },
+});
+```
+
+Each field is one of `'text'`, `'secret'` (text a refused form never sends
+back to the page, such as a password), `'number'`, `'boolean'` (exactly
+`"true"` or `"false"`, as a hidden field writes it), or `'checkbox'` (`true`
+when present, `false` when absent). Any field the write does not declare is
+refused.
+
+In a component, `useForm` returns everything the `<form>` needs:
+
+```tsrx
+import { useForm } from 'octane/data/octane';
+import { addBook } from './contracts.ts';
+
+export function AddBook() @{
+	const add = useForm(addBook);
+	const message = add.issues.title ?? (add.error ? 'Could not add that book' : '');
+	<form {...add.attrs}>
+		{add.hidden()}
+		<input name="title" aria-label="Book title" defaultValue={add.values.title ?? ''} />
+		<button type="submit" disabled={add.pending}>
+			Add
+		</button>
+		@if (message) {
+			<p role="alert">{message as string}</p>
+		}
+	</form>
+}
+```
+
+- `attrs` goes on the `<form>`: `method="post"`, and an `onSubmit` that takes
+  over once the page is hydrated.
+- `hidden(values?)` renders hidden inputs that name the write and the form,
+  plus any input values the user does not type, such as a row's ID.
+- `pending`, `values`, `issues` and `error` describe the latest submission.
+  After a refusal, `values` holds what was typed so the field can show it
+  again, and `issues` holds the first message for each field (one about the
+  whole input is under `''`).
+- `submit(eventOrFormData)` submits through the store yourself, if you need
+  to run code around it.
+
+For one form per row, pass a key: `useForm(removeBook, book.id)` gives each
+row its own pending state and messages.
+
+On the server, call `handler.forms` before rendering a page. When the request
+is a form's native `POST`, it runs the write. An accepted submission gets a
+`303` redirect back to the page. A refused one renders the page again, with
+the form's values and messages carried to the browser through the store's
+[seed](#ssr).
+
+```ts
+// server.ts
+import { createDataHandler } from 'octane/data/server';
+import { addBook } from './contracts.ts';
+import { addToShelf } from './db.ts';
+
+export const handler = createDataHandler(
+	{
+		context: (request) => ({ account: request.headers.get('x-account') ?? 'guest' }),
+		// Signs each page's forms. Keep it in server-only configuration.
+		secret: process.env.FORM_SECRET!,
+		// The account a request acts for: a form signed for one account is refused for another.
+		grant: (context) => context.account,
+	},
+	(handle) => [handle(addBook, (input, { account }) => addToShelf(account, input.title))],
+);
+```
+
+```ts
+// page.ts — the server route that renders a page and accepts its form posts.
+import { handler } from './server.ts';
+import { renderPage } from './render.ts';
+
+export async function page(request: Request): Promise<Response> {
+	const forms = await handler.forms(request);
+	if (forms.response) return forms.response; // An accepted POST: redirect back.
+	const html = await renderPage(request, forms.form);
+	return new Response(html, { status: forms.status, headers: { 'content-type': 'text/html' } });
+}
+```
+
+Pass `forms.form` to the page's store as `createDataStore({ transport, form })`,
+as the [server rendering](#ssr) section shows. Each page's forms are signed
+for its account, and each render's operation IDs are new, so a page that is
+submitted twice is applied once.
+
+<h2 id="server">Serve your contracts</h2>
+
+`createDataHandler(options, define)` builds the server side. `define`
+receives `handle`, which pairs a contract with the function that serves it,
+and returns the list of handlers. Two handlers with the same name are an error.
+
+```ts
+import { DataError } from 'octane/data';
+import { createDataHandler } from 'octane/data/server';
+import { books, setRead } from './contracts.ts';
+import { accountFrom, shelfFor } from './accounts.ts';
+
+export const handler = createDataHandler(
+	{
+		// Runs for every request: authenticate it and return what handlers need.
+		context: (request) => {
+			const account = accountFrom(request);
+			if (!account) throw new DataError('unauthorized');
+			return { account, shelf: shelfFor(account) };
+		},
+		// Other origins that may call this endpoint. The request's own is always allowed.
+		allowedOrigins: ['https://admin.example.com'],
+	},
+	(handle) => [
+		handle(books, (_, { shelf }) => shelf),
+		handle(setRead, (input, { shelf }) => {
+			const book = shelf.find((item) => item.id === input.id);
+			if (!book) throw new DataError('missing');
+			book.read = input.read;
+			return book;
+		}),
+	],
+);
+```
+
+Every handler receives the validated input and a `call` object. It holds what
+your `context` returned, plus:
+
+- `call.request`: the incoming `Request`.
+- `call.signal`: aborts if the client goes away.
+- `call.operationId`: the client's ID for a write (empty for a read).
+- `call.read(contract, input)`: run another read in process, under the same
+  context.
+
+`context` also receives a second argument, `caller`, with the `viewer` your
+server middleware authenticated, when the request came through a server
+function or a framework middleware.
+
+<h3 id="module-server">Serve through a server function</h3>
+
+The pattern from [your first read](#first-handler) is the recommended one in
+an Octane app. `handler.serve(request, call)` answers one store request sent
+through a `module server` function, and `serverTransport(fn)` sends it. The
+call runs under your app's origin checks and middleware, and during a server
+render the same call runs in process with no network hop at all.
+
+<h3 id="http-endpoint">Serve over HTTP</h3>
+
+The handler is also an ordinary `fetch`-style function, `(request: Request) =>
+Promise<Response>`, so you can mount it at a URL in any server that speaks
+`Request` and `Response`: Bun, Deno, Workers, Node through an adapter, or a
+framework route.
+
+```ts
+// A route in any Request/Response server.
+import { handler } from './server.ts';
+
+export function POST(request: Request): Promise<Response> {
+	return handler(request);
+}
+```
+
+Then point the browser's store at that URL with `httpTransport`:
+
+```ts
+import { createDataStore, httpTransport } from 'octane/data';
+
+export const store = createDataStore({
+	transport: httpTransport('/api/data', { headers: { 'x-app-version': '1' } }),
+});
+```
+
+Both transports encode requests with [devalue](https://github.com/Rich-Harris/devalue),
+so dates, maps and sets survive the trip. A response that is not a reply,
+such as a proxy's error page, counts as a lost reply, never as a refusal.
+
+You can also write your own transport. It is one function,
+`(request, signal) => Promise<DataReply>`. Resolving with a reply is
+definitive; rejecting means the outcome is unknown.
+
+<h2 id="ssr">Server rendering and hydration</h2>
+
+When a page is rendered on the server, its reads should be loaded there, and
+the browser should start with those values instead of loading them again.
+`octane/data` does this with a **seed**: a snapshot of the server store's
+values, written into the page as JSON.
+
+<FlowDiagram
+	label="A server render loads its reads, writes them into the page as a seed, and the browser's store starts from it."
+	columns={[
+		{
+			nodes: [{ title: 'Request store', detail: 'createDataStore, one per request' }],
+			arrow: 'render',
+		},
+		{ nodes: [{ title: 'HTML', detail: 'every useRead resolved' }], arrow: 'dehydrate()' },
+		{
+			nodes: [{ title: 'Seed', detail: '<script type="application/json">' }],
+			arrow: 'seed option',
+		},
+		{
+			nodes: [{ title: 'Browser store', detail: 'adopts values on first read' }],
+			arrow: 'hydrate',
+		},
+		{ nodes: [{ title: 'Hydrated page', detail: 'no requests' }] },
+	]}
+/>
+
+On the server, create a store for each request. Its transport calls the
+handler in process, under the request's account. Render, take the seed with
+`dehydrate()`, then `retire()` the store:
+
+```ts
+// render.ts — runs on the server for each page request.
+import { createDataStore, serverTransport } from 'octane/data';
+import { prerender } from 'octane/static';
+import { App } from './App.tsrx';
+import { data } from './data.tsrx';
+
+export async function renderPage(template: string): Promise<string> {
+	const store = createDataStore({ transport: serverTransport(data) });
+	try {
+		const { html, css } = await prerender(App, { store });
+		const seed = store.dehydrate();
+		return template
+			.replace('<!--app-html-->', () => css + html)
+			.replace(
+				'<!--app-seed-->',
+				() => `<script type="application/json" id="data-seed">${seed}</script>`,
+			);
+	} finally {
+		store.retire(); // A request's store ends with its request.
+	}
+}
+```
+
+`prerender` from `octane/static` waits for every suspended read, so the HTML
+arrives complete. `dehydrate()` returns text that is safe to place inside a
+`<script type="application/json">`; call it once the render is complete.
+If your server serves contracts over HTTP instead of a server function,
+`handler.transport(request)` gives the same in-process transport for a
+`Request`.
+
+In the browser, read the seed and pass it to the store before hydrating:
+
+```ts
+// main.ts — the browser entry.
+import { hydrateRoot } from 'octane';
+import { createDataStore, serverTransport } from 'octane/data';
+import { App } from './App.tsrx';
+import { data } from './data.tsrx';
+
+const seed = document.getElementById('data-seed')?.textContent ?? null;
+const store = createDataStore({ transport: serverTransport(data), seed });
+
+hydrateRoot(document.getElementById('root')!, App, { store });
+```
+
+The store adopts each seeded value the first time a component asks for it,
+so hydration finds the server's value without waiting or loading. A seeded
+value keeps its age: `fresh` and `expire` count from when the server loaded
+it, not from when the page opened. If you know how long the page sat in a
+cache, pass that as `seedAge` in milliseconds.
+
+React works the same way: render with `prerender` from `react-dom/static`,
+call `store.dehydrate()`, and pass the seed to the browser's store before
+`hydrateRoot` from `react-dom/client`. The seed format belongs to the store,
+not to the renderer, so an Octane page and a React page can share one server.
+
+<h2 id="feeds">Realtime feeds</h2>
+
+So far the browser only learns about a change when it asks. A **feed**
+delivers changes as they happen: another tab marks a book read, another user
+adds one, a background job finishes, and every page listening updates without
+loading anything.
+
+<FlowDiagram
+	label="A feed: the server's handler yields events, a listener carries them, and the store applies each one to every read that holds the records."
+	columns={[
+		{
+			nodes: [{ title: 'Your events', detail: 'database, queue, pub/sub' }],
+			arrow: 'yield frames',
+		},
+		{
+			nodes: [{ title: 'Feed handler', detail: 'validates each event; cursor, gap' }],
+			arrow: 'stream',
+		},
+		{
+			nodes: [
+				{ title: 'serverListener' },
+				{ title: 'webSocketListener' },
+				{ title: 'pubSubListener' },
+			],
+			arrow: 'listen',
+		},
+		{ nodes: [{ title: 'Store', detail: 'feed.changes → put, remove, read' }], arrow: 'notify' },
+		{ nodes: [{ title: 'Every read', detail: 'holding those records' }] },
+	]}
+/>
+
+<h3 id="feed-contract">Describe the events</h3>
+
+A feed contract has an `event` schema and a `changes` function that says what
+each event means to the store:
+
+```ts
+import { entity, feed, read } from 'octane/data';
+import { z } from 'zod';
+
+const bookShape = z.object({ id: z.string(), title: z.string(), read: z.boolean() });
+export const Book = entity('book', bookShape);
+
+const counts = z.object({ total: z.number().int(), read: z.number().int() });
+export const stats = read({ name: 'books.stats', output: counts, tags: ['shelf'] });
+
+const shelfEvent = z.discriminatedUnion('kind', [
+	z.object({ kind: z.literal('put'), book: bookShape, counts }),
+	z.object({ kind: z.literal('removed'), id: z.string(), counts }),
+]);
+export type ShelfEvent = z.infer<typeof shelfEvent>;
+
+export const shelfChanges = feed({
+	name: 'books.changes',
+	event: shelfEvent,
+	changes: (event) => [
+		event.kind === 'put' ? { put: Book, value: event.book } : { remove: Book, id: event.id },
+		{ read: stats, value: event.counts },
+	],
+	// If events may have been missed, these reads reload.
+	covers: ['book', 'shelf'],
+});
+```
+
+A change is one of four things:
+
+- `{ put: Entity, value }`: this record, as the server now holds it. Every
+  read and view holding it shows it, and views re-sort.
+- `{ remove: Entity, id }`: this record was deleted; it leaves every list.
+- `{ read: Read, input?, value }`: this read's whole new value, such as a
+  count.
+- `{ invalidates: [...] }`: reads with these tags reload, for a change the
+  event does not carry.
+
+`covers` names the tags and entities the feed keeps current. If the store may
+have missed events (the connection dropped, or the server reports a gap), it
+marks those reads stale and the ones on screen reload, so nothing stays wrong.
+
+<h3 id="feed-handler">Serve the events</h3>
+
+A feed's handler is an async generator. It yields **frames** for one
+connection until `call.signal` aborts:
+
+- `{ event, id?, cursor? }`: an event. `id` lets the store drop a duplicate,
+  and `cursor` is the position to resume from after it.
+- `{ gap: true }`: events were missed, such as a cursor too old to resume
+  from.
+- `{ cursor }` with no event: "the connection is open, and this is where it
+  starts."
+
+```ts
+import { createDataHandler } from 'octane/data/server';
+import { shelfChanges } from './contracts.ts';
+// Your app's change log: each change has a position and its event.
+import { changesAfter, latestPosition, nextChange } from './changes.ts';
+
+export const handler = createDataHandler({}, (handle) => [
+	handle(shelfChanges, async function* (_, { cursor, signal }) {
+		let seen = cursor === null ? latestPosition() : Number(cursor);
+		yield { cursor: String(seen) }; // Open, from here.
+		while (!signal.aborted) {
+			for (const { position, event } of changesAfter(seen)) {
+				seen = position;
+				yield { event, id: String(position), cursor: String(position) };
+			}
+			await nextChange(signal);
+		}
+	}),
+]);
+```
+
+When the client reconnects, `call.cursor` is the last cursor it saw, so the
+handler can resume right after it. Every event is validated against the
+feed's schema before it leaves the server.
+
+<h3 id="listeners">Connect the store</h3>
+
+The store's `listen` option says how feeds connect. There are three
+listeners, for three kinds of servers:
+
+- `serverListener(fn)` streams each connection through a `module server`
+  function that returns `handler.listen(request, call)`. A connection lasts up
+  to 25 seconds, within a server call's limit, and the store reconnects from
+  its cursor.
+- `webSocketListener(url)` opens a WebSocket per connection. On the server,
+  `handler.accept(socket, request, caller?)` serves it, with no time limit,
+  and refuses sockets from other origins.
+- `pubSubListener(subscribe)` uses a message broker the page already has.
+  A broker without history has no cursor, so after a dropped subscription
+  the store reloads what the feed covers.
+
+```tsrx
+// data.tsrx
+module server {
+	import type { ServerCallContext } from 'octane/server';
+	import { handler } from './server.ts';
+
+	export async function data(request: string, call: ServerCallContext) {
+		return handler.serve(request, call);
+	}
+
+	export function events(request: string, call: ServerCallContext) {
+		return handler.listen(request, call);
+	}
+}
+
+import { data, events } from 'server';
+
+export { data, events };
+```
+
+```ts
+// store.ts
+import { createDataStore, serverListener, serverTransport } from 'octane/data';
+import { data, events } from './data.tsrx';
+
+export const store = createDataStore({
+	transport: serverTransport(data),
+	listen: serverListener(events),
+});
+```
+
+<h3 id="use-feed">Listen while a component is mounted</h3>
+
+A feed connects only while something listens. `useFeed` listens for as long
+as the component is mounted, and returns the connection's status:
+`'connecting'`, `'live'`, or `'offline'` while it waits to retry. Every
+component listening to the same feed shares one connection.
+
+```tsrx
+import { useFeed } from 'octane/data/octane';
+import { shelfChanges } from './contracts.ts';
+
+const LABELS = { connecting: 'Connecting…', live: 'Live', offline: 'Reconnecting…' };
+
+export function LiveBadge() @{
+	const feed = useFeed(shelfChanges);
+	<p data-feed={feed.status}>{LABELS[feed.status] as string}</p>
+}
+```
+
+Outside components, `listen(store, feed, params?)` returns the same handle
+with `getSnapshot` and `subscribe`; subscribing connects, and the last
+unsubscribe disconnects. A failed connection retries with growing, jittered
+delays, up to 30 seconds apart.
+
+If your app already has its own subscription, `receive(store, changes)`
+applies a list of changes exactly as a feed event would. It does not
+validate them, so pass only values a schema has already checked.
+
+<h3 id="feed-ssr">Feeds and server rendering</h3>
+
+There is a gap between a server render and the browser's first feed
+connection. An event that happens in between would be lost. To close it, pass
+the page's feeds to the server's store:
+
+```ts
+import { createDataStore, serverTransport } from 'octane/data';
+import { shelfChanges } from './contracts.ts';
+import { data } from './data.tsrx';
+
+const store = createDataStore({
+	transport: serverTransport(data),
+	feeds: [shelfChanges],
+});
+```
+
+Before its first read, the server's store asks each feed for its current
+position, and the seed carries it. The browser's feed then resumes from just
+before the page's values loaded, so a change made during the render still
+arrives. For this, a feed handler yields its position first when
+`call.cursor` is `null`, as the example above does.
+
+<h2 id="persistence">Persistence and offline</h2>
+
+A reload normally starts with an empty store. With `persist`, the store saves
+confirmed values to the device, and on its next start shows them straight
+away, with their age, just like a seed: a fresh value needs no request, and a
+stale one shows while it reloads.
+
+```ts
+import { autoBudget, createDataStore, indexedDBStorage, serverTransport } from 'octane/data';
+import { data } from './data.tsrx';
+
+import { session } from './session.ts';
+
+export const store = createDataStore({
+	transport: serverTransport(data),
+	persist: {
+		storage: indexedDBStorage({ name: 'my-app' }),
+		// The account the store acts for; each account's values are kept apart.
+		partition: session.account,
+		// A random per-user secret from the signed-in session, never a password.
+		key: session.cacheKey,
+		// How much to keep, in characters of saved text. 'auto' sizes it by device.
+		budget: (device) => autoBudget(device),
+	},
+});
+```
+
+Saved data is private and tidy by design:
+
+- **Encrypted.** Every value is encrypted with `key`, and every name storage
+  sees is a keyed hash. People who share a browser can neither read nor list
+  each other's values. Take the key from the signed-in session, such as a
+  per-user secret your server issues at sign-in. It can be a string of at
+  least 128 random bits, bytes, or a non-exportable `CryptoKey`.
+- **Only confirmed values.** Nothing pending is saved, so a restart never
+  shows an edit the server refused.
+- **Within budget.** After each save, expired values go first, then the least
+  recently used, down to 90% of the budget. Values on screen are never purged.
+  `autoBudget` gives 1 MB on small devices, 2 MB up to 4 GB of memory, 5 MB
+  above, halved when the user asks to save data, and never more than 1% of
+  the storage quota.
+- **Versioned.** A value saved under a different output schema shape, or a
+  different `version` on its read, is discarded unread.
+
+Set `persist: false` on a read whose value should never touch the disk, such
+as one holding secrets. Change a read's `version` when a saved value would
+now mean something else.
+
+`indexedDBStorage` is the browser adapter. `memoryStorage()` keeps everything
+in memory, for tests and hosts without persistent storage. To persist
+anywhere else, such as OPFS or native storage, implement the
+`PersistentStorage` interface: four methods (`index`, `get`, `commit`,
+`clear`) that only ever see hashed names and encrypted text.
+
+<h3 id="journal">Writes that survive a reload</h3>
+
+What about a write the user made just before closing the tab, or while
+offline? Add a **journal**. Each listed write is saved before it is sent, and
+leaves the journal only once its outcome is known.
+
+```ts
+import { createDataStore, indexedDBStorage, read, serverTransport } from 'octane/data';
+import { z } from 'zod';
+import { addBook, removeBook, setRead } from './contracts.ts';
+import { data } from './data.tsrx';
+
+import { session } from './session.ts';
+
+export const receipt = read({
+	name: 'books.receipt',
+	input: z.object({ operationId: z.string() }),
+	output: z.object({ applied: z.boolean() }),
+});
+
+export const store = createDataStore({
+	transport: serverTransport(data),
+	persist: {
+		storage: indexedDBStorage(),
+		partition: session.account,
+		key: session.cacheKey,
+		journal: { writes: [addBook, setRead, removeBook], receipt },
+	},
+});
+```
+
+After a restart, the store finds the unfinished write, shows its edit again,
+and reads its **receipt** to learn whether the server applied it. It then
+keeps or rolls back the edit. It never sends the write twice. A create whose
+server assigns IDs needs the created record as `value` in an applied receipt.
+
+<h3 id="sign-out">Signing out</h3>
+
+When the account changes, call `store.retire()`. It clears every value in
+memory at once, deletes the account's saved values, and ignores any reply
+still on its way. Later writes throw `DataRetiredError`; later reads stay
+pending without loading, so a component that still holds the old store shows
+nothing rather than failing. Then create a new store for the new account.
+
+```ts
+import { createDataStore, serverTransport, type DataStore } from 'octane/data';
+import { data } from './data.tsrx';
+
+let store: DataStore = createDataStore({ transport: serverTransport(data) });
+
+export async function switchAccount(): Promise<DataStore> {
+	const old = store;
+	store = createDataStore({ transport: serverTransport(data) });
+	await old.retire(); // Resolves once its saved values are deleted.
+	return store;
+}
+```
+
+Give the new store to your `DataProvider` and key the subtree by account, so
+nothing from the old account carries over.
+When tabs share an owner, retiring one tab's store signs the account out in
+every tab; see [One account per browser](#account-fencing).
+
+<h2 id="cross-tab">Sharing across tabs</h2>
+
+Open an app in two tabs and, normally, each tab has its own store. They load
+the same reads twice, hold two feed connections, and only see each other's
+edits after a reload or a feed event.
+
+With a shared owner, the tabs of one account share a single **owner**,
+running in a [SharedWorker](https://developer.mozilla.org/en-US/docs/Web/API/SharedWorker).
+Each tab keeps a **replica**: an ordinary store that renders, evaluates views
+and shows its own edits instantly, exactly as before. The owner makes every
+request and holds every feed connection, and tells each replica what the
+others did. So every tab shows the same values, the same pending edits and
+the same rollbacks, and equal reads from several tabs are one request.
+
+<FlowDiagram
+	label="Tabs keep replicas; one SharedWorker owner per account makes every request and holds every feed connection."
+	columns={[
+		{
+			nodes: [
+				{ title: 'Tab 1', detail: 'replica store' },
+				{ title: 'Tab 2', detail: 'replica store' },
+				{ title: 'Tab 3', detail: 'replica store' },
+			],
+			arrow: 'message ports',
+		},
+		{
+			nodes: [{ title: 'Data worker', detail: 'serveDataOwner: one owner per account' }],
+			arrow: 'transport + listen',
+		},
+		{ nodes: [{ title: 'Server', detail: 'createDataHandler' }] },
+	]}
+/>
+
+It takes three steps.
+
+**1. Write the worker module.** It calls `serveDataOwner` with the transport
+and listener a tab would otherwise use:
+
+```ts
+// worker.ts
+import { serveDataOwner, serverListener, serverTransport } from 'octane/data';
+import { data, events } from './data.tsrx';
+
+serveDataOwner({ transport: serverTransport(data), listen: serverListener(events) });
+```
+
+**2. Tell the build about it.** The `dataWorker` option emits the module at a
+fixed path, `/_octane/data-worker.js`, which never changes between deploys,
+so every tab constructs the same worker. With Vite, pass it to the compiler
+plugin from `octane/compiler/vite`:
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { octane } from 'octane/compiler/vite';
+
+export default defineConfig({
+	plugins: [octane({ dataWorker: 'src/worker.ts' })],
+});
+```
+
+The development server serves the worker at the same path. With Rspack, the
+option is the same on `@octanejs/rspack-plugin`:
+
+```ts
+// rspack.config.mjs
+import { OctaneRspackPlugin } from '@octanejs/rspack-plugin';
+
+export default {
+	plugins: [new OctaneRspackPlugin({ dataWorker: './src/worker.ts' })],
+};
+```
+
+With Rspack the worker is emitted as the `octane-data-worker` entry; leave
+that entry out of your pages' HTML.
+
+**3. Connect each tab.** `sharedOwner(account)` connects to the owner every
+tab signed in as that account uses, and tells it which account this tab is
+signed in as. Pass the same account ID your server authenticates, such as the
+signed-in user's ID. It returns `null`
+where SharedWorker is missing or cannot start, so fall back to an ordinary
+store there:
+
+```ts
+import {
+	createDataStore,
+	createReplica,
+	serverListener,
+	serverTransport,
+	sharedOwner,
+} from 'octane/data';
+import { addBook, removeBook, setRead } from './contracts.ts';
+import { data, events } from './data.tsrx';
+
+export function openStore(account: string, seed: string | null) {
+	const port = sharedOwner(account);
+	if (port) {
+		// `writes` lists every write any tab may send, so this tab can show them.
+		return createReplica(port, { seed, writes: [addBook, setRead, removeBook] });
+	}
+	return createDataStore({
+		transport: serverTransport(data),
+		listen: serverListener(events),
+		seed,
+	});
+}
+```
+
+A replica takes the same options as `createDataStore`, except `transport`,
+`listen` and `persist`, which belong to the owner. It still hydrates from the
+page's seed.
+
+You can also run an owner without a worker. `createDataOwner({ transport,
+listen })` returns an owner whose `connect(port)` serves a replica over any
+`MessagePort`, such as one end of a `MessageChannel`. That is useful in tests,
+and for sharing one owner between several roots in one page.
+
+<h3 id="account-fencing">One account per browser, in every tab</h3>
+
+A shared owner has to be careful about accounts. Picture two tabs open as Ada.
+In one, Ada signs out and Grace signs in. The other tab must not keep showing
+Ada's shelf, and nothing Ada's tab had in flight may arrive in Grace's. That
+is true even for a tab the browser froze in the background, which hears
+nothing until it wakes.
+
+So the data worker **fences** accounts. The origin has one signed-in account
+at a time. The worker records it in IndexedDB, with a **generation** number
+that goes up on every sign-in and sign-out, before any tab hears about it,
+and announces each change to the other workers on a `BroadcastChannel`.
+`serveDataOwner` turns this on for you, and you do not call anything extra:
+
+- **Signing in as another account signs the old one out everywhere.** When a
+  tab connects with `sharedOwner('grace')` while Ada is recorded, Grace is
+  recorded, and every tab of Ada's is retired: its values clear, its pending
+  requests reject with `DataRetiredError`, and its feeds close.
+- **Signing out reaches every tab.** Calling `store.retire()` on a replica
+  signs its account out in every tab, not just this one. The tab keeps asking
+  until the owner confirms, so a busy or restarting worker cannot lose a
+  sign-out.
+- **A late sign-out never undoes a newer sign-in.** A sign-out applies only if
+  the generation it was made under is still the recorded one.
+- **Frozen tabs wake up safe.** When the browser freezes a tab, its reads show
+  as pending. When it resumes, it asks its owner whether its account is still
+  signed in, and shows its values again only if it is. Otherwise it is
+  retired.
+
+In practice, switching accounts in a tab looks like it does without sharing:
+open the new account's store, and give it to your `DataProvider`. The old
+account's other tabs are retired for you.
+
+```ts
+import { createReplica, sharedOwner, type DataStore } from 'octane/data';
+import { addBook, removeBook, setRead } from './contracts.ts';
+
+const writes = [addBook, setRead, removeBook];
+
+export function switchAccount(current: DataStore, next: string): DataStore | null {
+	const port = sharedOwner(next);
+	if (!port) return null; // No SharedWorker: open an ordinary store instead.
+	// Recording `next` retires every tab of the old account, this one's store included.
+	const store = createReplica(port, { writes });
+	void current.retire();
+	return store;
+}
+```
+
+`createDataOwner` takes the same switch as `fence: true` when you host an
+owner yourself; without it, the owner serves every replica that connects.
+
+<h3 id="cross-tab-limits">Current limits</h3>
+
+The owner does not persist yet. A replica has no `persist` option, so a page
+that needs an encrypted cache or a write journal uses an ordinary store, one
+per tab.
+
+<h2 id="bindings">Octane and React, one store</h2>
+
+The store owns every value, pending edit and rollback; a binding only
+subscribes to it. So an Octane component and a React component given the
+same store always agree: an edit made in one shows in the other in the same
+moment, and a rollback reaches both.
+
+<FlowDiagram
+	label="Both bindings read one store, so an Octane page and a React island show the same values and edits."
+	columns={[
+		{
+			nodes: [
+				{ title: 'Octane components', detail: '.tsrx' },
+				{ title: 'React components', detail: '.tsx' },
+			],
+			arrow: 'hooks',
+		},
+		{
+			nodes: [{ title: 'octane/data/octane' }, { title: 'octane/data/react' }],
+			arrow: 'useSyncExternalStore',
+		},
+		{ nodes: [{ title: 'One DataStore', detail: 'values, edits, rollbacks' }] },
+	]}
+/>
+
+Both bindings export the same names with the same behavior, so moving a
+component between renderers changes only the import:
+
+| Hook or component            | What it does                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------- |
+| `DataProvider`               | Puts a store in context for the components below it: `<DataProvider store={store}>`.  |
+| `useDataStore()`             | Returns the store from context, for plain-code calls such as `store.invalidate`.      |
+| `useRead(read, input?)`      | Returns the value, suspending until the first one arrives.                            |
+| `useReadState(read, input?)` | Returns the snapshot, without suspending.                                             |
+| `usePages(view, params?)`    | Returns a view's pages so far as one list, with `more`, `loadingMore` and `loadMore`. |
+| `useWrite(write)`            | Returns a stable function that sends the write through the store.                     |
+| `useForm(write, key?)`       | Returns a native form for a write that declares `form` fields.                        |
+| `useFeed(feed, params?)`     | Listens to a feed while mounted, and returns its connection status.                   |
+
+The only difference is the host renderer's rules. In Octane, hooks are keyed
+by where they are written, not by call order, so a `useRead` may sit behind a
+condition or after an early return. In React, the usual rules of hooks apply.
+
+<h3 id="react-island">An Octane page with a React island</h3>
+
+`ReactCompat` from `octane/react` hosts real React components inside an
+Octane page. Pass the island the same store, and give it its own React
+`DataProvider`:
+
+```tsx
+/** @jsxImportSource react */
+// UpNext.tsx — a React component.
+import type { DataStore } from 'octane/data';
+import { DataProvider, useReadState, useWrite } from 'octane/data/react';
+import { setRead, unread } from './contracts.ts';
+
+function UpNextList() {
+	const list = useReadState(unread).value ?? [];
+	const save = useWrite(setRead);
+	return (
+		<ul>
+			{list.map((book) => (
+				<li key={book.id}>
+					{book.title}{' '}
+					<button
+						type="button"
+						onClick={() => void save({ id: book.id, read: true }).catch(() => {})}
+					>
+						Mark read
+					</button>
+				</li>
+			))}
+		</ul>
+	);
+}
+
+export function UpNext(props: { store: DataStore }) {
+	return (
+		<DataProvider store={props.store}>
+			<UpNextList />
+		</DataProvider>
+	);
+}
+```
+
+```tsrx
+// Page.tsrx — the Octane page that hosts it.
+import type { DataStore } from 'octane/data';
+import { DataProvider } from 'octane/data/octane';
+import { ReactCompat } from 'octane/react';
+import { BookList } from './BookList.tsrx';
+import { UpNext } from './UpNext.tsx';
+
+export function Page(props: { store: DataStore }) @{
+	<DataProvider store={props.store}>
+		@try {
+			<BookList />
+		} @pending {
+			<p>Loading…</p>
+		}
+		<ReactCompat>
+			<UpNext store={props.store} />
+		</ReactCompat>
+	</DataProvider>
+}
+```
+
+Each renderer has its own context, so the island needs its own provider; the
+store is the same object. Marking a book read from the React island moves it
+in the Octane list in the same moment. The same works the other way round
+with `OctaneCompat`, which hosts Octane components inside a React app. See
+[React interop](/docs/react-compat).
+
+<h2 id="errors">Errors</h2>
+
+`octane/data` keeps three outcomes apart, because each needs a different
+response from your app:
+
+| Error                | What it means                                                                                                                    | What to do                                                        |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `DataError`          | A definitive refusal. The operation did not happen. `code` says why, `data` carries details, `issues` lists validation messages. | Show the reason. A write's edit has already been rolled back.     |
+| `DataUncertainError` | A write may have reached the server, but its reply was lost. Its edit stays on screen.                                           | Look up its receipt with `operationId`, then call `store.settle`. |
+| `DataRetiredError`   | The store was retired, such as after sign-out.                                                                                   | Use the new account's store.                                      |
+
+<h2 id="example">A complete example</h2>
+
+[Shelf](https://github.com/octanejs/octane/tree/main/examples/shelf) is a
+reading list built on `octane/data` that uses everything on this page. One
+set of contracts and one server render three pages: an Octane page, a React
+page, and an Octane page hosting a React island, built with Vite or Rspack.
+Try it with JavaScript turned off, with the network offline, with a lost
+reply, and in two tabs at once.
+
+<h2 id="reference">API reference</h2>
+
+<h3 id="reference-data">octane/data</h3>
+
+| Export               | What it is for                                                                                                               |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `read`               | Describe a read: `name`, `input`, `output`, `entities`, `tags`, `fresh`, `keep`, `expire`, `persist`, `version`.             |
+| `write`              | Describe a write: `creates`, `patches` or `removes` an entity, with `draft`, `serverId`, `record`, `form` and `invalidates`. |
+| `entity`             | Name a record type and its key, so every read holding a record shares its fields.                                            |
+| `view`               | Describe a list by a rule over an entity: `where`, `order`, `limit`, `max`.                                                  |
+| `feed`               | Describe server events and the `changes` each one makes, with the reads it `covers`.                                         |
+| `DataError`          | A definitive refusal, with `code`, `data` and `issues`.                                                                      |
+| `createDataStore`    | Create a store: `transport`, `seed`, `seedAge`, `form`, `persist`, `listen`, `feeds`.                                        |
+| `DataUncertainError` | A write whose outcome is unknown; settle it by `operationId`.                                                                |
+| `DataRetiredError`   | Thrown by a retired store.                                                                                                   |
+| `httpTransport`      | Send requests to a handler mounted at a URL.                                                                                 |
+| `serverTransport`    | Send requests through a `module server` function that calls `handler.serve`.                                                 |
+| `serverListener`     | Listen to feeds through a `module server` function that calls `handler.listen`.                                              |
+| `webSocketListener`  | Listen to feeds over a WebSocket served by `handler.accept`, or an existing socket service.                                  |
+| `pubSubListener`     | Listen to feeds through a message broker the page already uses.                                                              |
+| `listen`             | Listen to a feed from plain code; returns a handle with `getSnapshot` and `subscribe`.                                       |
+| `receive`            | Apply changes from your own subscription, as a feed event would.                                                             |
+| `pages`              | Read a view a page at a time from plain code.                                                                                |
+| `indexedDBStorage`   | Persistent storage in IndexedDB.                                                                                             |
+| `memoryStorage`      | Storage in memory, for tests and hosts without persistent storage.                                                           |
+| `autoBudget`         | A storage budget sized by the device's memory, data saver and quota.                                                         |
+| `createDataOwner`    | An owner that serves replicas over message ports.                                                                            |
+| `createReplica`      | A store whose requests and feeds go through an owner.                                                                        |
+| `sharedOwner`        | Connect to the account's owner in the app's data worker, or `null` without SharedWorker.                                     |
+| `serveDataOwner`     | Serve an owner to every tab that connects: what the data worker module calls.                                                |
+
+A store has these methods: `read`, `prefetch`, `write`, `form`, `invalidate`,
+`settle`, `publish`, `forget`, `retire` and `dehydrate`, plus the `retired`
+flag.
+
+<h3 id="reference-server">octane/data/server</h3>
+
+| Export              | What it is for                                                                                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createDataHandler` | Serve contracts. Options: `context`, `allowedOrigins`, `secret`, `grant`. Returns a `fetch`-style handler with `transport`, `serve`, `listen`, `accept` and `forms`. |
+
+<h3 id="reference-bindings">octane/data/octane and octane/data/react</h3>
+
+| Export         | What it is for                                        |
+| -------------- | ----------------------------------------------------- |
+| `DataProvider` | Provide a store to the components below it.           |
+| `useDataStore` | Read the store from context.                          |
+| `useRead`      | Read a value, suspending until the first one arrives. |
+| `useReadState` | Read a snapshot without suspending.                   |
+| `usePages`     | Read a view a page at a time.                         |
+| `useWrite`     | Get a stable function that sends a write.             |
+| `useForm`      | Render a native form for a write.                     |
+| `useFeed`      | Listen to a feed while mounted.                       |
