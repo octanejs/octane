@@ -3891,9 +3891,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			);
 			return null;
 		}
-		if (name === 'useEffect' && callee.module === 'react' && node.arguments.length === 2)
-			this.checkEffectDependencyReads(node, node.arguments[1]);
-		if (name in DEPENDENCY_HOOKS) return this.rewriteDependencies(node, name);
+		if (name in DEPENDENCY_HOOKS) {
+			const depsIndex = DEPENDENCY_HOOKS[name];
+			if (callee.module === 'react' && node.arguments.length === depsIndex + 1)
+				this.checkHookDependencyReads(node, node.arguments[depsIndex]);
+			return this.rewriteDependencies(node, name);
+		}
 		return null;
 	}
 
@@ -4224,7 +4227,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		);
 	}
 
-	private checkEffectDependencyReads(node: ts.CallExpression, deps: ts.Expression) {
+	private checkHookDependencyReads(node: ts.CallExpression, deps: ts.Expression) {
 		const list = skipWrappers(deps);
 		if (!this.emitsTsrx || !ts.isArrayLiteralExpression(list)) return;
 		const opaque = list.elements.find((expr) => {
@@ -4239,7 +4242,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				RULE.deps,
 				'error',
 				opaque,
-				'This effect dependency reads a property during render and may run a getter owned by React. Keep the component in React or verify the getter before moving it to native SSR.',
+				'This hook dependency reads a property during render and may run a getter owned by React. Keep the component in React or verify the getter before moving it to native SSR.',
 			);
 	}
 
