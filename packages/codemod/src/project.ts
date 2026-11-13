@@ -534,7 +534,8 @@ export async function runCodemod(
 			const source = fs.readFileSync(file, 'utf8');
 			hooks = new Map();
 			if (
-				(/\b(?:useState|useSyncExternalStore)\b/.test(source) || source.includes('\\u')) &&
+				(/\b(?:useContext|useState|useSyncExternalStore)\b/.test(source) ||
+					source.includes('\\u')) &&
 				originalModule(file, 'react') &&
 				readInstalled(path.dirname(file), 'react')?.manifest.name === 'react'
 			) {
@@ -547,7 +548,7 @@ export async function runCodemod(
 					bound.sf,
 					bound.checker,
 					'react',
-					(name) => name === 'useState' || name === 'useSyncExternalStore',
+					(name) => name === 'useContext' || name === 'useState' || name === 'useSyncExternalStore',
 				);
 			}
 			localHooks.set(file, hooks);

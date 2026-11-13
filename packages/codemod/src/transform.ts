@@ -3112,26 +3112,34 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 							sites.length > 0 &&
 							sites.every(Boolean) &&
 							(!sites.includes('afterRefs') || this.options.originalReact === true);
+						const setup = {
+							calleeName: (callee: ts.Expression) => this.calleeName(callee),
+							nativeOutput: (element: ts.JsxElement | ts.JsxSelfClosingElement) =>
+								this.nativeOutput(element, this.localUses),
+						};
 						const call =
 							refs[sites.indexOf('first')] ??
 							(nativeOnly
 								? refs[0]
-								: refs.find((ref) =>
-										nativeSetupHook(ref, this.localUses, this.checker, {
-											calleeName: (callee) => this.calleeName(callee),
-											nativeOutput: (element) => this.nativeOutput(element, this.localUses),
-										}),
-									));
+								: refs.find((ref) => nativeSetupHook(ref, this.localUses, this.checker, setup)));
+						const site =
+							call ??
+							refs.find((ref) =>
+								nativeSetupHook(ref, this.localUses, this.checker, {
+									...setup,
+									contextSetup: true,
+								}),
+							);
 						const local =
-							call && this.options.localReactHook(module, name, slotKeyed && nativeOnly);
-						if (local && typeof local !== 'string') {
+							site && this.options.localReactHook(module, name, !!call && slotKeyed && nativeOnly);
+						if (call && local && typeof local !== 'string') {
 							dest = local.from;
 							this.count('native-external-store');
-						} else if (local && call)
+						} else if (site && typeof local === 'string' && (call || local === 'useContext'))
 							this.note(
 								RULE.bindings,
 								'error',
-								call,
+								site,
 								`The unchanged ${module} export ${name} calls React's ${local}. Provide a compiled Octane hook for native callers or keep this component under a React renderer.`,
 							);
 					}
