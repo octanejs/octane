@@ -127,42 +127,70 @@ export interface DataHandler {
 }
 
 /**
- * Pair a contract with the function that serves it; `call` carries the
- * request's context. A view's handler receives its parameters and the window
- * to serve, and returns that window's records in the view's order.
+ * The function that serves contract `T`; `call` carries the request's
+ * context. A read or write's handler receives its parsed input and returns
+ * its output.
+ *
+ * A view's handler receives its parameters and the window to serve, and
+ * returns that window's records in the view's order.
+ *
+ * A feed's handler yields its frames for one connection, from just after
+ * `call.cursor` when the client has one, until `call.signal` aborts. When it
+ * cannot resume from that cursor it yields `{ gap: true }` first. A handler
+ * that resumes yields its position first when `call.cursor` is null: a
+ * server render reads it to start the page's feed from it.
  */
-export interface Handle<C> {
-	<P, T>(
-		contract: View<P, T>,
-		run: (
-			input: ([P] extends [void] ? {} : P) & { readonly offset: number; readonly limit: number },
-			call: C & DataCall,
-		) => T[] | Promise<T[]>,
-	): DataHandler;
-	<I, O>(
-		contract: Read<I, O> | Write<I, O>,
-		run: (input: I, call: C & DataCall) => O | Promise<O>,
-	): DataHandler;
-	/**
-	 * A feed's handler yields its frames for one connection, from just after
-	 * `call.cursor` when the client has one, until `call.signal` aborts. When it
-	 * cannot resume from that cursor it yields `{ gap: true }` first. A handler
-	 * that resumes yields its position first when `call.cursor` is null: a
-	 * server render reads it to start the page's feed from it.
-	 */
-	<P, E>(
-		contract: Feed<P, E>,
-		run: (
-			params: P,
-			call: C & DataCall & { readonly cursor: string | null },
-		) => AsyncIterable<{ event?: E; id?: string; cursor?: string; gap?: boolean }>,
-	): DataHandler;
-}
+export type Implementation<C, T> =
+	T extends View<infer P, infer R>
+		? (
+				input: ([P] extends [void] ? {} : P) & { readonly offset: number; readonly limit: number },
+				call: C & DataCall,
+			) => R[] | Promise<R[]>
+		: T extends Read<infer I, infer O> | Write<infer I, infer O>
+			? (input: I, call: C & DataCall) => O | Promise<O>
+			: T extends Feed<infer P, infer E>
+				? (
+						params: P,
+						call: C & DataCall & { readonly cursor: string | null },
+					) => AsyncIterable<{ event?: E; id?: string; cursor?: string; gap?: boolean }>
+				: never;
 
-const handle: Handle<any> = (contract: DataHandler['contract'], run: DataHandler['run']) => ({
-	contract,
-	run,
-});
+/** Pair a contract with the function that serves it. */
+export type Handle<C> = <T extends DataHandler['contract']>(
+	contract: T,
+	run: Implementation<C, T>,
+) => DataHandler;
+
+/** One implementation for each contract a module exports, under its export name. */
+export type Implementations<C, G> = {
+	[K in keyof G as G[K] extends DataHandler['contract'] ? K : never]: Implementation<C, G[K]>;
+};
+
+/**
+ * Serve every contract a module exports, given its namespace:
+ * `defineHandler(Books, { stats: (input, call) => …, addBook: … })`. The
+ * type requires exactly one implementation per contract, so adding one to
+ * the module fails to compile until it is served. Other exports are ignored.
+ */
+export type DefineHandler<C> = <G extends object>(
+	group: G,
+	implementations: NoInfer<Implementations<C, G>>,
+) => DataHandler[];
+
+const handle: Handle<any> = (contract, run) => ({ contract, run });
+
+const defineHandler: DefineHandler<any> = (group: any, implementations: any) => {
+	const handlers: DataHandler[] = [];
+	for (const key in group) {
+		const contract = group[key];
+		const kind = contract?.kind;
+		if (kind !== 'read' && kind !== 'write' && kind !== 'feed') continue;
+		const run = implementations[key];
+		if (typeof run !== 'function') throw new Error(`octane/data: no handler for "${key}"`);
+		handlers.push({ contract, run });
+	}
+	return handlers;
+};
 
 /** Compare a submitted token in time independent of where it differs. */
 function same(submitted: unknown, token: string): boolean {
@@ -188,7 +216,9 @@ function respond(status: number, reply: DataReply): Response {
 
 /**
  * Options come first so the context type they produce types every handler:
- * `createDataHandler({ context }, (handle) => [handle(books, (input, call) => …)])`.
+ * `createDataHandler({ context }, (handle) => [handle(books, (input, call) => …)])`,
+ * or a whole module's contracts at once with
+ * `(handle, defineHandler) => defineHandler(Books, { … })`.
  */
 export function createDataHandler<C extends object = {}>(
 	options: {
@@ -201,10 +231,10 @@ export function createDataHandler<C extends object = {}>(
 		/** The account a request acts for. A form signed for one account is refused for another. */
 		grant?: (context: C) => string;
 	},
-	define: (handle: Handle<C>) => readonly DataHandler[],
+	define: (handle: Handle<C>, defineHandler: DefineHandler<C>) => readonly DataHandler[],
 ): DataServer {
 	const byName = new Map<string, DataHandler>();
-	for (const handler of define(handle)) {
+	for (const handler of define(handle, defineHandler)) {
 		const { name } = handler.contract;
 		if (byName.has(name)) throw new Error(`octane/data: two handlers are named "${name}"`);
 		byName.set(name, handler);

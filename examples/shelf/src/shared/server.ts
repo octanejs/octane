@@ -5,23 +5,13 @@
  * write is applied once and its receipt can be read back.
  */
 import { DataError } from 'octane/data';
-import { createDataHandler, type DataCaller } from 'octane/data/server';
-import {
-	addBook,
-	books,
-	finished,
-	receipt,
-	removeBook,
-	setRead,
-	shelfChanges,
-	stats,
-	unread,
-	type Book,
-} from './contracts.ts';
+import { createDataHandler, type DataCaller, type Implementation } from 'octane/data/server';
+import * as Shelf from './contracts.ts';
 
+type Book = Shelf.Book;
 type ShelfEvent = { kind: 'put'; book: Book } | { kind: 'removed'; id: string };
 
-interface Shelf {
+interface Account {
 	books: Book[];
 	applied: Set<string>;
 	/** The latest changes, so a listener that reconnects resumes after the last one it saw. */
@@ -42,9 +32,9 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function createShelfHandler(options: { latency?: number } = {}) {
 	const latency = options.latency ?? 250;
-	const shelves = new Map<string, Shelf>();
+	const shelves = new Map<string, Account>();
 
-	function shelfFor(key: string): Shelf {
+	function shelfFor(key: string): Account {
 		let shelf = shelves.get(key);
 		if (!shelf) {
 			const account = key.slice(key.lastIndexOf(':') + 1);
@@ -61,7 +51,7 @@ export function createShelfHandler(options: { latency?: number } = {}) {
 	}
 
 	/** Apply a write once per operation ID, so a retried request changes nothing, and tell listeners. */
-	async function apply(shelf: Shelf, operationId: string, effect: () => ShelfEvent) {
+	async function apply(shelf: Account, operationId: string, effect: () => ShelfEvent) {
 		await delay(latency);
 		if (shelf.applied.has(operationId)) return;
 		const event = effect();
@@ -71,12 +61,12 @@ export function createShelfHandler(options: { latency?: number } = {}) {
 		for (const wake of [...shelf.waiters]) wake();
 	}
 
-	const countsOf = (shelf: Shelf) => ({
+	const countsOf = (shelf: Account) => ({
 		total: shelf.books.length,
 		read: shelf.books.filter((book) => book.read).length,
 	});
 
-	function find(shelf: Shelf, id: string): Book {
+	function find(shelf: Account, id: string): Book {
 		const book = shelf.books.find((item) => item.id === id);
 		if (!book) throw new DataError('missing');
 		return book;
@@ -93,81 +83,87 @@ export function createShelfHandler(options: { latency?: number } = {}) {
 		secret: 'shelf example secret',
 		grant: ({ account }: { account: string }) => account,
 	};
-	return createDataHandler({ context, ...forms }, (handle) => [
-		// A view's handler serves its rule's window, in exactly the view's order.
-		...[books, finished, unread].map((list) =>
-			handle(list, async (input, { shelf }) => {
-				await delay(latency / 2);
-				return shelf.books
-					.filter((book) => list.view.where(book, input))
-					.sort(list.view.compare)
-					.slice(input.offset, input.offset + input.limit)
-					.map((book) => ({ ...book }));
-			}),
-		),
-		handle(stats, (_, { shelf }) => countsOf(shelf)),
-		handle(addBook, async (input, { shelf, operationId }) => {
-			const title = input.title.toLowerCase();
-			if (shelf.books.some((book) => book.title.toLowerCase() === title)) {
-				throw new DataError('duplicate');
-			}
-			await apply(shelf, operationId, () => {
-				const book = { id: operationId, title: input.title, read: false };
-				shelf.books.push(book);
-				return { kind: 'put', book: { ...book } };
-			});
-			return { ...find(shelf, operationId) };
-		}),
-		handle(setRead, async (input, { shelf, operationId }) => {
-			await apply(shelf, operationId, () => {
-				const book = find(shelf, input.id);
-				book.read = input.read;
-				return { kind: 'put', book: { ...book } };
-			});
-			return { ...find(shelf, input.id) };
-		}),
-		handle(removeBook, (input, { shelf, operationId }) =>
-			apply(shelf, operationId, () => {
-				find(shelf, input.id);
-				shelf.books = shelf.books.filter((book) => book.id !== input.id);
-				return { kind: 'removed', id: input.id };
-			}),
-		),
-		handle(receipt, (input, { shelf }) => ({ applied: shelf.applied.has(input.operationId) })),
-		// Each change after the listener's cursor, then each new one, until the connection ends.
-		handle(shelfChanges, async function* (_, { shelf, cursor, signal }) {
-			let seen = cursor === null ? (shelf.history.at(-1)?.position ?? 0) : Number(cursor);
-			const oldest = shelf.history[0]?.position ?? seen + 1;
-			if (!(seen >= oldest - 1)) {
-				seen = shelf.history.at(-1)?.position ?? 0;
-				yield { gap: true, cursor: String(seen) };
-			} else {
-				yield { cursor: String(seen) };
-			}
-			while (!signal.aborted) {
-				for (const { position, event } of shelf.history) {
-					if (position <= seen) continue;
-					seen = position;
-					yield {
-						event: { ...event, counts: countsOf(shelf) },
-						id: String(position),
-						cursor: String(position),
-					};
+
+	/** A view's handler serves its rule's window, in exactly the view's order. */
+	const windowOf =
+		(list: typeof Shelf.books): Implementation<{ shelf: Account }, typeof list> =>
+		async (input, { shelf }) => {
+			await delay(latency / 2);
+			return shelf.books
+				.filter((book) => list.view.where(book, input))
+				.sort(list.view.compare)
+				.slice(input.offset, input.offset + input.limit)
+				.map((book) => ({ ...book }));
+		};
+
+	return createDataHandler({ context, ...forms }, (_, defineHandler) =>
+		defineHandler(Shelf, {
+			books: windowOf(Shelf.books),
+			finished: windowOf(Shelf.finished),
+			unread: windowOf(Shelf.unread),
+			stats: (_, { shelf }) => countsOf(shelf),
+			addBook: async (input, { shelf, operationId }) => {
+				const title = input.title.toLowerCase();
+				if (shelf.books.some((book) => book.title.toLowerCase() === title)) {
+					throw new DataError('duplicate');
 				}
-				// A change made while the last frame was being read is already in the history.
-				if ((shelf.history.at(-1)?.position ?? 0) > seen) continue;
-				await new Promise<void>((resolve) => {
-					const wake = () => {
-						shelf.waiters.delete(wake);
-						signal.removeEventListener('abort', wake);
-						resolve();
-					};
-					shelf.waiters.add(wake);
-					signal.addEventListener('abort', wake, { once: true });
+				await apply(shelf, operationId, () => {
+					const book = { id: operationId, title: input.title, read: false };
+					shelf.books.push(book);
+					return { kind: 'put', book: { ...book } };
 				});
-			}
+				return { ...find(shelf, operationId) };
+			},
+			setRead: async (input, { shelf, operationId }) => {
+				await apply(shelf, operationId, () => {
+					const book = find(shelf, input.id);
+					book.read = input.read;
+					return { kind: 'put', book: { ...book } };
+				});
+				return { ...find(shelf, input.id) };
+			},
+			removeBook: (input, { shelf, operationId }) =>
+				apply(shelf, operationId, () => {
+					find(shelf, input.id);
+					shelf.books = shelf.books.filter((book) => book.id !== input.id);
+					return { kind: 'removed', id: input.id };
+				}),
+			receipt: (input, { shelf }) => ({ applied: shelf.applied.has(input.operationId) }),
+			// Each change after the listener's cursor, then each new one, until the connection ends.
+			shelfChanges: async function* (_, { shelf, cursor, signal }) {
+				let seen = cursor === null ? (shelf.history.at(-1)?.position ?? 0) : Number(cursor);
+				const oldest = shelf.history[0]?.position ?? seen + 1;
+				if (!(seen >= oldest - 1)) {
+					seen = shelf.history.at(-1)?.position ?? 0;
+					yield { gap: true, cursor: String(seen) };
+				} else {
+					yield { cursor: String(seen) };
+				}
+				while (!signal.aborted) {
+					for (const { position, event } of shelf.history) {
+						if (position <= seen) continue;
+						seen = position;
+						yield {
+							event: { ...event, counts: countsOf(shelf) },
+							id: String(position),
+							cursor: String(position),
+						};
+					}
+					// A change made while the last frame was being read is already in the history.
+					if ((shelf.history.at(-1)?.position ?? 0) > seen) continue;
+					await new Promise<void>((resolve) => {
+						const wake = () => {
+							shelf.waiters.delete(wake);
+							signal.removeEventListener('abort', wake);
+							resolve();
+						};
+						shelf.waiters.add(wake);
+						signal.addEventListener('abort', wake, { once: true });
+					});
+				}
+			},
 		}),
-	]);
+	);
 }
 
 /** The server's one shelf handler, for `data` and for each page's forms. */
