@@ -41,6 +41,13 @@ describe('injectAgent', () => {
 		expect(html.indexOf('/@id/octane/agent')).toBeLessThan(html.indexOf('/main.js'));
 		expect(html.indexOf('/@id/octane/agent')).toBeGreaterThan(html.indexOf('<head>'));
 	});
+
+	it('serves the agent module under the base Vite gave its own client', () => {
+		const html = injectAgent(
+			'<html><head><script type="module" src="/app/@vite/client"></script></head></html>',
+		);
+		expect(html).toContain('src="/app/@id/octane/agent"');
+	});
 });
 
 describe('the agent driver', () => {

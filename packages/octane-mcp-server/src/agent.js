@@ -4,8 +4,6 @@
 // time from `octane/agent`, so between two operations nothing moves, and the
 // agent says when time passes (`clock`).
 
-const AGENT_MODULE = '/@id/octane/agent';
-const AGENT_SCRIPT = `<script type="module" src="${AGENT_MODULE}"></script>`;
 const LOG_LIMIT = 500;
 const BOOT_TIMEOUT_MS = 20_000;
 
@@ -28,6 +26,10 @@ async function loadPlaywright() {
  * time before any app module runs. Module scripts run in document order.
  */
 export function injectAgent(html) {
+	// Vite serves `@id/` under its `base`, and has already rewritten its own
+	// client script to carry it, so read the base from there.
+	const base = /src="([^"]*)@vite\/client"/.exec(html)?.[1] ?? '/';
+	const AGENT_SCRIPT = `<script type="module" src="${base}@id/octane/agent"></script>`;
 	const head = /<head(\s[^>]*)?>/i.exec(html);
 	if (head)
 		return (
@@ -88,7 +90,7 @@ export async function openApp({ url, width = 1280, height = 800, headless = true
 			});
 		} catch {
 			throw new Error(
-				`${url} did not load ${AGENT_MODULE}. The agent drives a Vite development server ` +
+				`${url} did not load octane/agent. The agent drives a Vite development server ` +
 					'of an app that depends on octane.',
 			);
 		}
