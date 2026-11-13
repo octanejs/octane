@@ -120,21 +120,40 @@ function* directExportReturns({ sf, checker }: ReturnType<typeof bind>) {
 	if (!module || hasEval(sf)) return;
 	const uses = localUses(sf, checker);
 	for (const symbol of checker.getExportsOfModule(module)) {
-		const decl = symbol.valueDeclaration;
-		if (!decl || !(ts.isFunctionDeclaration(decl) || ts.isVariableDeclaration(decl))) continue;
-		if (ts.isVariableDeclaration(decl) && !(ts.getCombinedNodeFlags(decl) & ts.NodeFlags.Const))
+		let decl = symbol.valueDeclaration ?? symbol.declarations?.[0];
+		if (!decl) continue;
+		let value: ts.Node = decl;
+		let defaultRef: ts.Identifier | undefined;
+		if (ts.isExportAssignment(decl)) {
+			if (decl.isExportEquals) continue;
+			value = skipWrappers(decl.expression);
+			if (ts.isIdentifier(value)) {
+				defaultRef = value;
+				decl = checker.getSymbolAtLocation(value)?.valueDeclaration;
+				if (!decl || (ts.isVariableDeclaration(decl) && decl.end > value.pos)) continue;
+				value = decl;
+			}
+		}
+		const name =
+			ts.isVariableDeclaration(value) || ts.isFunctionDeclaration(value) ? value.name : undefined;
+		if (
+			name &&
+			(!ts.isIdentifier(name) ||
+				!uses(name).every((ref) => ref === defaultRef || componentTagOrExport(ref)))
+		)
 			continue;
-		const name = decl.name;
-		if (name && (!ts.isIdentifier(name) || !uses(name).every(componentTagOrExport))) continue;
-		const output = returnedJsx(decl);
+		if (ts.isVariableDeclaration(value)) {
+			if (!(ts.getCombinedNodeFlags(value) & ts.NodeFlags.Const)) continue;
+			if (!value.initializer) continue;
+			value = skipWrappers(value.initializer);
+		}
+		const output = returnedJsx(value);
 		if (output) yield { name: symbol.name, output };
 	}
 }
 
-function returnedJsx(declaration: ts.Declaration) {
-	const fn = ts.isVariableDeclaration(declaration) ? declaration.initializer : declaration;
+function returnedJsx(fn: ts.Node) {
 	if (
-		!fn ||
 		!(ts.isFunctionDeclaration(fn) || ts.isFunctionExpression(fn) || ts.isArrowFunction(fn)) ||
 		fn.asteriskToken ||
 		fn.modifiers?.some((item) => item.kind === ts.SyntaxKind.AsyncKeyword)
@@ -184,8 +203,9 @@ function hostedLeaf(output: ts.JsxElement | ts.JsxSelfClosingElement) {
 /** Runtime imports that an explicit server host returns directly. */
 export function hostedServerComponents(file: string, source: string) {
 	if (
-		/@jsx(?:Runtime|Frag)?\b/.test(source) ||
-		[...source.matchAll(/@jsxImportSource\s+(\S+)/g)].some(([, name]) => name !== 'react')
+		/@jsx(?:Frag)?\b/i.test(source) ||
+		[...source.matchAll(/@jsxRuntime\s+(\S+)/gi)].some(([, mode]) => mode !== 'automatic') ||
+		[...source.matchAll(/@jsxImportSource\s+(\S+)/gi)].some(([, name]) => name !== 'react')
 	)
 		return [];
 	const bound = bind(file, source);

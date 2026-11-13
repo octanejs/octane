@@ -177,6 +177,29 @@ describe('runCodemod', () => {
 		it.each([
 			['component', `${server}\n${child}\n${owner}`, leaf],
 			[
+				'explicit automatic JSX',
+				`/** @jsxRuntime automatic */\n${server}\n${child}\n${owner}`,
+				leaf,
+			],
+			[
+				'default arrow host',
+				`${server}\n${child}\nexport default () => <Host component={Leaf} />;`,
+				leaf,
+			],
+			[
+				'default local leaf',
+				`${server}\nimport Leaf from './Leaf.tsx';\n${owner}`,
+				leaf.replace('export function Leaf', 'function Leaf') + '\nexport default (Leaf);',
+			],
+			[
+				'default arrow leaf',
+				`${server}\nimport Leaf from './Leaf.tsx';\n${owner}`,
+				leaf.replace(
+					'export function Leaf() { return <Reverse component={Child} />; }',
+					'export default () => <Reverse component={Child} />;',
+				),
+			],
+			[
 				'paired component',
 				`${server}\n${child}\n${owner.replace(' />', '>\n{/* comment */}\n</Host>')}`,
 				leaf,
@@ -225,6 +248,7 @@ describe('runCodemod', () => {
 		});
 
 		it.each([
+			['explicit classic JSX', `/** @jsxRuntime classic */\n${server}`, child, owner],
 			[
 				'mutable host export',
 				server,
