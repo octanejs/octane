@@ -1057,6 +1057,17 @@ export function walkLocalValues(
 /** Values that can cross a renderer boundary, optionally including a verified original store input. */
 type ImportedArgument = (module: string, name: string, selection?: Key[]) => boolean | 'reject';
 
+/** Follow the bindings that can supply a value or a selected part of it. */
+export function valueReads(
+	value: ts.Node,
+	checker: ts.TypeChecker,
+	selection: Key[],
+	binding: (symbol: ts.Symbol, selection: Key[]) => boolean,
+	leaf: (node: ts.Node) => boolean,
+) {
+	return localWrites(value.getSourceFile(), checker).values(value, selection, binding, leaf);
+}
+
 export function transportedValue(
 	value: ts.Node,
 	checker: ts.TypeChecker,
@@ -1064,8 +1075,9 @@ export function transportedValue(
 	imported: (module: string, name: string, selection: Key[]) => boolean,
 	jsx?: () => boolean,
 ) {
-	return localWrites(value.getSourceFile(), checker).values(
+	return valueReads(
 		value,
+		checker,
 		selection,
 		(symbol, path) => {
 			const item = symbol.declarations?.[0];

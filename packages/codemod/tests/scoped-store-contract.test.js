@@ -1753,6 +1753,79 @@ it('reports render-time reads of members supplied by the active scoped store pro
 	expect(click.notes.filter((note) => note.severity === 'error')).toEqual([]);
 });
 
+it('reports render-time provider member reads through scalar inputs and local aliases', async () => {
+	const pane = (body) => `import {useSnapshot} from 'observer'; import {useEffect} from 'react';
+		export function Pane({id}: {id: string}) { ${body} }`;
+	const views = {
+		Direct: 'const store = useSnapshot(id); return <b>{store.label}</b>;',
+		Destructure: 'const {label} = useSnapshot(id); return <b>{label}</b>;',
+		Literal: "const store = useSnapshot('fixed'); return <b>{store.label}</b>;",
+		Alias: 'const store = useSnapshot(id); const alias = store; return <b>{alias.label}</b>;',
+		Branch:
+			"const store = useSnapshot('fixed'); const alias = id ? store : {label: 'empty'}; return <b>{alias.label}</b>;",
+		Nullish:
+			"const store = useSnapshot('fixed'); const alias = store ?? {label: 'empty'}; return <b>{alias.label}</b>;",
+		ShortCircuit:
+			"const store = useSnapshot('fixed'); const alias = id && store; return <b>{alias && alias.label}</b>;",
+		Shorthand:
+			'const store = useSnapshot(id); const holder = {store}; return <b>{holder.store.label}</b>;',
+
+		Effect:
+			'const store = useSnapshot(id); useEffect(() => {void store.label;}, [store]); return <b>effect</b>;',
+		Cleanup:
+			'const store = useSnapshot(id); useEffect(() => (() => {void store.label;}), [store]); return <b>cleanup</b>;',
+		Identity: "const store = useSnapshot(id); return <b>{store ? 'exists' : 'missing'}</b>;",
+		Presence:
+			"const store = useSnapshot(id); const alias = store ? {label:'exists'} : {label:'missing'}; return <b>{alias.label}</b>;",
+	};
+	const { app } = project({
+		'observer/state.ts': `export function valueOf(owner: {label: string}, id: string) {
+			return id === '' ? {label: 'empty'} : owner;
+		}`,
+		'observer/renderer.ts':
+			"import {createContext} from 'react'; export const current = createContext({label: 'base'});",
+		'observer/react-hooks.ts': original
+			.replace('useChannel()', 'useChannel(id: string)')
+			.replace('valueOf(readContext(current))', 'valueOf(readContext(current), id)'),
+		...Object.fromEntries(
+			Object.entries(views).map(([name, body]) => [`app/src/${name}.tsx`, pane(body)]),
+		),
+	});
+	const { files } = await runCodemod(
+		Object.keys(views).map((name) => path.join(app, `src/${name}.tsx`)),
+		{
+			root: app,
+			strong: true,
+			verify: true,
+			projectTypes: true,
+			write: false,
+		},
+	);
+	for (const name of [
+		'Direct',
+		'Destructure',
+		'Literal',
+		'Alias',
+		'Branch',
+		'Nullish',
+		'ShortCircuit',
+		'Shorthand',
+	]) {
+		const view = files.find((file) => file.file === `src/${name}.tsx`);
+		expect(view.notes, name).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+	}
+	for (const name of ['Effect', 'Cleanup', 'Identity', 'Presence']) {
+		const view = files.find((file) => file.file === `src/${name}.tsx`);
+		expect(view.strong, name).toBe(true);
+		expect(
+			view.notes.filter((note) => note.severity === 'error'),
+			name,
+		).toEqual([]);
+	}
+});
+
 it('retains the bindings diagnostic for wrapped keys that can dispatch into React', async () => {
 	const pane = (name) => `import {useSnapshot} from 'observer'; import {${name}} from './handles';
 		export function Pane() {const store=useSnapshot();return <b>{String(store.get(${name}))}</b>;}`;
