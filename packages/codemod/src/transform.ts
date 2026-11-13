@@ -992,7 +992,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					const from = this.options.resolveStoreHook(
 						entry.module,
 						entry.imported,
-						(sharedInput, unchangedHelper) => {
+						(sharedInput, unchangedHelper, retainedArgument) => {
 							safeStoreUses ??= storeHookUses(
 								this.sf,
 								this.checker,
@@ -1010,6 +1010,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 									return true;
 								},
 								unchangedHelper,
+								retainedArgument,
 							);
 						},
 					);

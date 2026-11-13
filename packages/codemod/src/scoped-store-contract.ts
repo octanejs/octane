@@ -88,8 +88,14 @@ function manifest(file: string) {
 	}
 }
 /** Audit every executable target of a bare dependency, including browser and server conditions. */
-function runtimeTargets(spec: string, resolved: string, from: string): string[] {
+export function runtimeTargets(
+	spec: string,
+	resolved: string,
+	from: string,
+	unconditional = false,
+): string[] {
 	if (spec.startsWith('.')) {
+		if (unconditional) return [];
 		const executable = installed(spec, from);
 		return executable && executable !== resolved ? [resolved, executable] : [resolved];
 	}
@@ -104,6 +110,7 @@ function runtimeTargets(spec: string, resolved: string, from: string): string[] 
 		if (pkg?.name === name) {
 			if (pkg.browser) return [];
 			if (!pkg.exports) {
+				if (unconditional) return [];
 				if (subpath !== '.') return [resolved];
 				return [
 					...new Set([
@@ -133,6 +140,7 @@ function runtimeTargets(spec: string, resolved: string, from: string): string[] 
 				wildcard = subpath.slice(start.length, subpath.length - end.length);
 				branch = map[key];
 			}
+			if (unconditional && typeof branch !== 'string') return [];
 			const leaves = (v: unknown): string[] => {
 				if (typeof v === 'string')
 					return v.startsWith('./') ? [path.resolve(dir, v.replaceAll('*', wildcard))] : [];

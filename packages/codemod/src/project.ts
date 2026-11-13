@@ -1,6 +1,6 @@
-import { createScopedStorePlanner } from './scoped-store-contract.js';
+import { createScopedStorePlanner, runtimeTargets } from './scoped-store-contract.js';
 import { parseStaticSvg } from './path-svg.js';
-import { resourceHints, storeSources } from './store-inputs.js';
+import { resourceHints, retainedLiteralExports, storeSources } from './store-inputs.js';
 import type {
 	CodemodOptions,
 	CodemodResult,
@@ -245,6 +245,52 @@ export async function runCodemod(
 			fs.realpathSync(runtime.dir).split(path.sep).includes('node_modules') &&
 			fs.realpathSync(target.resolvedFileName).split(path.sep).includes('node_modules')
 		);
+	}
+	let physicalRoot: string | undefined;
+	const retainedStoreArguments = new Map<string, ReadonlySet<string> | null>();
+	const descriptorModules = new Map<string, ReadonlySet<string> | null>();
+	function retainedStoreArgument(file: string, source: string, name: string) {
+		const key = file + '\0' + source;
+		let retained = retainedStoreArguments.get(key);
+		if (retained === undefined) {
+			retained = retainsPackageTarget(file, source);
+			retainedStoreArguments.set(key, retained);
+		}
+		return retained?.has(name) ?? false;
+	}
+	function retainsPackageTarget(file: string, source: string) {
+		if (resolveRename(file, source) || catalogName(source) !== null || unportedName(source, file))
+			return null;
+		const target = originalModule(file, source);
+		if (!target?.isExternalLibraryImport || !installedReact(file)) return null;
+		try {
+			const runtime = createRequire(file).resolve(source);
+			if (!path.isAbsolute(runtime)) return null;
+			const real = fs.realpathSync(runtime);
+			if (known.has(real) || known.has(target.resolvedFileName)) return null;
+			const authored = path.relative((physicalRoot ??= fs.realpathSync(root)), real);
+			if (
+				!authored.startsWith('..' + path.sep) &&
+				!path.isAbsolute(authored) &&
+				!authored.split(path.sep).includes('node_modules')
+			)
+				return null;
+			const [entry] = runtimeTargets(source, real, file, true);
+			if (
+				fs.realpathSync(target.resolvedFileName) !== real ||
+				!entry ||
+				fs.realpathSync(entry) !== real
+			)
+				return null;
+			let descriptors = descriptorModules.get(real);
+			if (descriptors === undefined) {
+				descriptors = retainedLiteralExports(real);
+				descriptorModules.set(real, descriptors);
+			}
+			return descriptors;
+		} catch {
+			return null;
+		}
 	}
 	const inlineCompatDirs = new Map<string, boolean>();
 	function supportsInlineReactCompat(file: string) {
@@ -740,6 +786,7 @@ export async function runCodemod(
 										ts.findConfigFile(path.dirname(file), ts.sys.fileExists) === rootProject &&
 										!!originalModule(file, 'react')) &&
 									helperFunction(file, source, name),
+								(source, name) => retainedStoreArgument(file, source, name),
 							)
 						)
 							return null;
