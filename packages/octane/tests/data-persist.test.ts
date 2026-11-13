@@ -1833,6 +1833,44 @@ describe('octane/data persistence through a shared owner', () => {
 		expect(left.flat()).toEqual([]);
 	});
 
+	it('keeps a cache of its own in a tab with no owner', async () => {
+		const tabStorage = memoryStorage();
+		const first = server(books());
+		const store = createReplica(null, {
+			transport: first.transport,
+			persist: cache(tabStorage, 'ada', { journal }),
+			contracts,
+		});
+		closing.push(() => void store.retire());
+		await value(store, shelf);
+		await store.write(setRead, { id: 'a', read: true });
+		await saved();
+		expect(listPartitions(tabStorage).length).toBeGreaterThan(0);
+		expect(first.log).toContain('write setRead');
+	});
+
+	it('ends a journal recovery cleanly when the account signs out before the owner answers', async () => {
+		const channel = new MessageChannel();
+		closing.push(() => (channel.port1.close(), channel.port2.close()));
+		// An owner that accepts the tab, then never answers its persistence calls.
+		channel.port1.onmessage = ({ data }) => {
+			if (data.t === 'hello') channel.port1.postMessage({ t: 'live' });
+		};
+		const unhandled = vi.fn();
+		process.on('unhandledRejection', unhandled);
+		closing.push(() => process.off('unhandledRejection', unhandled));
+		const store = createReplica(channel.port2, {
+			transport: () => Promise.reject(new Error('this tab did not share its owner')),
+			persist: cache(memoryStorage(), 'ada', { journal }),
+			contracts,
+		});
+		await saved();
+		channel.port1.postMessage({ t: 'retired' });
+		await vi.waitFor(() => expect(store.retired).toBe(true));
+		await saved();
+		expect(unhandled).not.toHaveBeenCalled();
+	});
+
 	it('keeps a cache of its own in a tab the owner refuses', async () => {
 		const storage = memoryStorage();
 		const tabStorage = memoryStorage();

@@ -254,7 +254,7 @@ export function createDataOwner(options: {
 		};
 		const p = persistenceFor();
 		const key = args[0] as string;
-		if (!p) return answer(op === 'recover' ? [] : op === 'cursor' ? null : undefined);
+		if (!p) return answer(nothing(op));
 		if (op === 'save' || op === 'restore') shown.add(key);
 		if (op === 'save') return (saves.set(key, args[1] as Saving | null), p.mark(key));
 		if (op === 'recover') {
@@ -263,7 +263,7 @@ export function createDataOwner(options: {
 		}
 		// Each operation is the persistence method of the same name.
 		const result = (p as any)[op](...args) as Promise<unknown> | undefined;
-		result?.then(answer, () => answer(op === 'recover' ? [] : op === 'cursor' ? null : undefined));
+		result?.then(answer, () => answer(nothing(op)));
 	}
 
 	/** Every replica of the account hears it is retired, and nothing in flight reaches one. */
@@ -737,7 +737,7 @@ export function createReplica(
 		void retireHere();
 		for (const pending of replies.values()) pending.reject(new DataRetiredError());
 		replies.clear();
-		for (const call of asked.values()) call.resolve(undefined);
+		for (const call of asked.values()) call.resolve(nothing(call.op));
 		asked.clear();
 		for (const feed of feeds.values()) feed.end();
 	}
@@ -926,6 +926,9 @@ export function createReplica(
 	if (owner) {
 		connect(owner);
 		beat = setHostTimeout(heartbeat, HEARTBEAT_MS);
+	} else {
+		// No owner to share: this tab is a local store from the start.
+		decide(false);
 	}
 	return store;
 }
@@ -933,10 +936,13 @@ export function createReplica(
 /**
  * The owner protocol's version, in the worker's name, so a tab on another
  * protocol never shares it. 3: `hello` carries the build's contract identity,
- * and each side checks the other is still there.
+ * and each side checks the other is still there. 4: the owner keeps the
+ * account's cache and journal, which tabs reach through `persist`.
  */
-const PROTOCOL = 3;
+const PROTOCOL = 4;
 const RETIRED: ToReplica = { t: 'retired' };
+/** What a persistence call answers when there is nothing: no entries to recover, no cursor, no value. */
+const nothing = (op: PersistOp) => (op === 'recover' ? [] : op === 'cursor' ? null : undefined);
 /** The persistence calls a replica forwards, by method name; `save` carries what `mark` would collect. */
 type PersistOp =
 	| 'restore'
