@@ -1270,6 +1270,81 @@ export function Host({rows}: { rows: Row[] }) {
 		}
 	});
 
+	it.each([false, true])(
+		'blocks writable map rows before writing (project types %s)',
+		async (projectTypes) => {
+			const writable = '[1,2].map((item, i) => <li key={item}>{i++}</li>)';
+			const sources = {
+				'package.json': '{"name":"app","type":"module"}',
+				'tsconfig.json':
+					'{"compilerOptions":{"strict":true,"jsx":"react-jsx","moduleResolution":"bundler"}}',
+				'index.html': '<script type="module" src="./First.tsx"></script>',
+				'First.tsx':
+					"import { FormattedMessage } from 'react-intl'; export const First = () => <p><FormattedMessage id='x' defaultMessage='x' /></p>;",
+				'Caller.tsx': "import { List } from './List.tsx'; export const Caller = () => <List />;",
+				'List.tsx': `export const List = () => <ul>{${writable}}</ul>;`,
+				'Binding.tsx':
+					'export const Binding = () => <ul>{[{id:1},{id:2}].map(({id}) => <li key={0}>{id++}</li>)}</ul>;',
+				'Typed.tsx': `import type { Visible } from './type'; export const Typed = ({show}: {show: Visible}) => <ul>{show && (show && ${writable})}</ul>;`,
+				'Control.tsx':
+					'export const Control = () => <ul>{[1,2].map(item => <li key={0}>{item++}</li>)}</ul>;',
+				'Member.tsx':
+					'export const Member = () => <ul>{[{eval:1},{eval:2}].map((item,i) => <li key={0}>{item.eval}{i}</li>)}</ul>;',
+				'Eval.tsx':
+					"export const Eval = () => <ul>{[1,2].map((item,i) => <li key={0}>{eval('i++')}</li>)}</ul>;",
+				'type.ts': 'export type Visible = boolean;',
+			};
+			const root = project(sources);
+			fs.symlinkSync(
+				path.join(import.meta.dirname, '../node_modules'),
+				path.join(root, 'node_modules'),
+				'dir',
+			);
+			const selected = Object.keys(sources)
+				.filter((file) => file.endsWith('.tsx'))
+				.map((file) => path.join(root, file));
+			const opts = { root, projectTypes, verify: false };
+			const blocked = expect.objectContaining({ rule: 'map-parameter-write', severity: 'error' });
+			const preview = await runCodemod(selected, { ...opts, write: false });
+			const byFile = new Map(preview.files.map((file) => [file.file, file]));
+			for (const file of [
+				'List.tsx',
+				'Binding.tsx',
+				'Eval.tsx',
+				...(projectTypes ? ['Typed.tsx'] : []),
+			]) {
+				expect(byFile.get(file)).toMatchObject({
+					output: file.replace('.tsx', '.tsrx'),
+					code: expect.stringContaining('@for'),
+					notes: [blocked],
+				});
+			}
+			for (const file of ['Control.tsx', 'Member.tsx']) {
+				expect(byFile.get(file).notes).toEqual([]);
+				expect(byFile.get(file).code).toContain('@for');
+			}
+			if (!projectTypes) {
+				expect(byFile.get('Typed.tsx').notes).toEqual([]);
+				expect(byFile.get('Typed.tsx').code).toContain('.map(');
+			}
+			expect(byFile.get('Caller.tsx').code).toContain('./List.tsrx');
+			expect(preview.files.filter((file) => file.rules['react-intl-adapter'])).toHaveLength(1);
+			const result = await runCodemod(selected, opts);
+			expect(result.files).toEqual([
+				expect.objectContaining({
+					file: 'List.tsx',
+					output: 'List.tsx',
+					code: sources['List.tsx'],
+					changed: false,
+					notes: [blocked],
+				}),
+			]);
+			expect(fs.readdirSync(root).sort()).toEqual([...Object.keys(sources), 'node_modules'].sort());
+			for (const [file, code] of Object.entries(sources))
+				expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
+		},
+	);
+
 	it('keeps visible or ambiguous JSX text and authored comments in keyed map rows', async () => {
 		const children = [
 			' {row.child()}',

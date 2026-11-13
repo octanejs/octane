@@ -13,6 +13,7 @@ export function fixedBinding(
 	name: ts.Identifier,
 	read: ts.Expression,
 	parameters?: Map<ts.Symbol, boolean>,
+	mayEval?: (name: ts.Identifier) => boolean,
 ) {
 	const symbol = checker.getSymbolAtLocation(name);
 	if (symbol?.declarations?.length !== 1 || !symbol.valueDeclaration) return false;
@@ -33,7 +34,8 @@ export function fixedBinding(
 
 	let fixed = true;
 	visit(owner, (node) => {
-		if (ts.isIdentifier(node) && node.text === 'eval') fixed = false;
+		// Without a caller's syntax proof, any eval identifier can hide a write.
+		if (ts.isIdentifier(node) && node.text === 'eval' && (!mayEval || mayEval(node))) fixed = false;
 		let target: ts.Node | undefined;
 		if (
 			ts.isBinaryExpression(node) &&
