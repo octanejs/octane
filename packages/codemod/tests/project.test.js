@@ -788,6 +788,95 @@ export function useObserver(fit: () => void) {
 		expect(fs.readFileSync(path.join(root, 'use-observer.ts'), 'utf8')).toBe(hook);
 	});
 
+	it('reports an unchanged React hook component passed to a migrated React DOM root', async () => {
+		const app = (module = './leaf') => `import * as ReactDOM from 'react-dom/client';
+import { Leaf } from '${module}';
+export function mount(container: HTMLElement, label: string) {
+	const root = ReactDOM.createRoot(container);
+	root.render(<Leaf label={label} />);
+	return () => root.unmount();
+}
+export function Native() { return <b>native</b>; }`;
+		const leaf = `import { createElement, useState } from 'react';
+export function Leaf(props: { label: string }) {
+	const [label] = useState(props.label);
+	return createElement('i', null, label);
+}`;
+		const root = project({
+			'tsconfig.json':
+				'{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler","strict":true}}',
+			'leaf.ts': leaf,
+			'Namespace.tsx': app(),
+			'Named.tsx': app()
+				.replace('* as ReactDOM', '{ createRoot as createReactRoot }')
+				.replace('ReactDOM.createRoot', 'createReactRoot'),
+			'Inline.tsx': app().replace(
+				'const root = ReactDOM.createRoot(container);\n\troot.render(<Leaf label={label} />);\n\treturn () => root.unmount();',
+				'ReactDOM.createRoot(container).render(<Leaf label={label} />);',
+			),
+			'TopLevel.tsx': `import * as ReactDOM from 'react-dom/client';
+import { Leaf } from './leaf';
+const root = ReactDOM.createRoot(document.body);
+root.render(<Leaf label="label" />);`,
+			'ExportedRoot.tsx': `import * as ReactDOM from 'react-dom/client';
+import { Leaf } from './leaf';
+export const root = ReactDOM.createRoot(document.body);
+root.render(<Leaf label="label" />);`,
+			'DefaultObject.tsx': app()
+				.replace('* as ReactDOM', 'ReactDOM')
+				.replace(
+					'\nexport function mount',
+					'\nReactDOM.createRoot = () => ({ render() {}, unmount() {} });\nexport function mount',
+				),
+			'Assigned.tsx': app().replace(
+				'\n\troot.render(',
+				'\n\troot.render = () => {};\n\troot.render(',
+			),
+			'Escaped.tsx': app()
+				.replace('label: string) {', 'label: string, observe: (root: ReactDOM.Root) => void) {')
+				.replace('\n\troot.render(', '\n\tobserve(root);\n\troot.render('),
+			'Shadow.tsx': app().replace(
+				'label: string) {',
+				"label: string, ReactDOM: typeof import('react-dom/client')) {",
+			),
+			'UnselectedNative.tsx': app('./native.tsrx'),
+			'native.tsrx': 'export function Leaf({label}: { label: string }) @{ <i>{label}</i> }',
+			'Selected.tsx': app('./selected-leaf'),
+			'selected-leaf.ts': leaf,
+			'Renamed.tsx': app('./renamed-leaf'),
+			'renamed-leaf.tsx': leaf.replace("createElement('i', null, label)", '<i>{label}</i>'),
+		});
+		fs.symlinkSync(
+			path.join(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const selected = fs
+			.readdirSync(root)
+			.filter((f) => f.endsWith('.tsx') || f === 'selected-leaf.ts');
+		const { files } = await runCodemod(
+			selected.map((file) => path.join(root, file)),
+			{ root, strong: true, verify: true, projectTypes: true, write: false },
+		);
+		const blocked = files.flatMap((file) =>
+			file.notes
+				.filter((note) => note.rule === 'root-render' && note.severity === 'error')
+				.map((note) => [file.file, note.line, note.message]),
+		);
+		const message = expect.stringMatching(/Leaf.*React.*useState/);
+		expect(blocked).toEqual([
+			['Inline.tsx', 4, message],
+			['Named.tsx', 5, message],
+			['Namespace.tsx', 5, message],
+			['TopLevel.tsx', 4, message],
+		]);
+		const namespace = files.find((f) => f.file === 'Namespace.tsx');
+		expect(namespace.strong).toBe(true);
+		expect(namespace.diagnostics).toEqual([]);
+		expect(namespace.code).toContain('root.render(Leaf, { label: label })');
+		expect(files.find((f) => f.file === 'Renamed.tsx').code).toContain('./renamed-leaf.tsrx');
+	});
+
 	it('shares a stateless external store with unchanged React callers', async () => {
 		const wrapper = `import { useSyncExternalStore as useStore } from 'react';
 import { subscribe, read } from './attribute-store';
