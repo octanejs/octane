@@ -345,7 +345,7 @@ function isFunctionNode(n) {
 }
 
 // Strip TS value-preserving wrappers (`x as T`, `x!`, `<T>x`, `x satisfies T`).
-function unwrapTsExpr(n) {
+export function unwrapTsExpr(n) {
 	while (
 		n &&
 		(n.type === 'TSAsExpression' ||

@@ -89,6 +89,29 @@ for (const contract of [addBook, setRead]) session.store.form(contract);
 		]);
 	});
 
+	it('sees through type assertions and optional calls', () => {
+		const declaration = `import { write } from 'octane/data';
+export const tagged = write({ name: 'books.tagged', input }) satisfies Contract;
+`;
+		expect(codes(declaration, '/app/books.data.ts')).toEqual([]);
+		const source = `import { books, setRead, unread } from './books.data.ts';
+session.store.write!(setRead as Contract, {});
+session?.store.write?.(setRead, {});
+([books, unread] as const).map((list) => handle(list, run));
+for (const list of <const>[books, unread]) session.store.read(list);
+`;
+		const { diagnostics, uses } = analyzeDataContracts(source, '/app/page.ts');
+		expect(diagnostics).toEqual([]);
+		expect(uses.map((use) => `${use.binding}@${use.site}`)).toEqual([
+			'setRead@write',
+			'setRead@write',
+			'books@handle',
+			'unread@handle',
+			'books@read',
+			'unread@read',
+		]);
+	});
+
 	it('accepts type positions, property reads, and exports', () => {
 		const source = `import { setRead, type Book } from './books.data.ts';
 export type Input = typeof setRead extends { input: infer I } ? I : never;

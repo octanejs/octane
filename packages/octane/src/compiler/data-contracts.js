@@ -16,6 +16,7 @@ import {
 	isIdentifierReference,
 } from './compile-universal.js';
 import { parseModule } from '#octane/compiler-parser';
+import { unwrapTsExpr } from './descriptor-lowering.js';
 
 const DATA_CONTRACT_DECLARATION = 'OCTANE_DATA_CONTRACT_DECLARATION';
 const DATA_CONTRACT_MODULE = 'OCTANE_DATA_CONTRACT_MODULE';
@@ -45,7 +46,6 @@ const FUNCTION_SITES = new Map([
 ]);
 /** `view({ of })`, `write({ creates, patches, removes })`, and a FeedChange's `put`, `remove`, `read`. */
 const PROPERTY_SITES = new Set(['of', 'creates', 'patches', 'removes', 'put', 'remove', 'read']);
-const TS_WRAPPERS = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression']);
 
 /**
  * @typedef {{ offset: number, line: number, column: number }} DataPosition
@@ -119,10 +119,10 @@ export function analyzeDataContracts(source, filename) {
 		const declaration = isExport ? statement.declaration : statement;
 		if (declaration?.type !== 'VariableDeclaration') continue;
 		for (const declarator of declaration.declarations) {
-			const kind = factoryOf(declarator.init);
+			const call = unwrapTsExpr(declarator.init);
+			const kind = factoryOf(call);
 			if (kind === null || declarator.id.type !== 'Identifier') continue;
 			const binding = declarator.id.name;
-			const call = declarator.init;
 			declared.add(call);
 			contracts.set(binding, { source: null, imported: binding });
 			const name = contractName(kind, call);
@@ -187,7 +187,7 @@ export function analyzeDataContracts(source, filename) {
 	const aliases = new Map();
 	/** The contracts an expression names directly, or null. */
 	const contractsOf = (node) => {
-		while (TS_WRAPPERS.has(node?.type)) node = node.expression;
+		node = unwrapTsExpr(node);
 		if (node?.type === 'Identifier') {
 			const scope = resolved(node)?.scope;
 			if (scope === rootScope && contracts.has(node.name)) {
@@ -232,6 +232,7 @@ export function analyzeDataContracts(source, filename) {
 		return found;
 	};
 	const inlineContracts = (array) => {
+		array = unwrapTsExpr(array);
 		if (array?.type !== 'ArrayExpression' || array.elements.length === 0) return null;
 		const all = array.elements.map(contractsOf);
 		return all.every(Boolean) ? all.flat() : null;
@@ -277,7 +278,7 @@ export function analyzeDataContracts(source, filename) {
 					`This \`${kind}\` contract is built at runtime. Declare each contract as an exported module-level \`const\` with a literal name.`,
 				);
 			}
-			const callee = node.callee;
+			const callee = unwrapTsExpr(node.callee);
 			let index;
 			let name;
 			if (callee.type === 'MemberExpression' && !callee.computed) {
