@@ -1,7 +1,15 @@
-// The per-module half of the octane/data contract check
-// (docs/data-contract-conventions.md). It finds a module's contract
-// declarations and the sites that use them, and reports rules 1–4. The
-// whole-program pass (handler coverage, unused and duplicate names, the
+// The per-module half of the octane/data contract check. It finds a module's
+// contract declarations and the sites that use them, and reports four rules:
+//
+// 1. DECLARATION: a contract is an exported module-level `const` initialized
+//    by a direct factory call from `octane/data`, with a literal name.
+// 2. MODULE: contracts live only in `*.data.ts` / `*.data.js` modules, whose
+//    top level holds only imports, types, and `const` declarations and exports.
+// 3. ARGUMENT: a contract site names its contract binding directly.
+// 4. ESCAPE: a contract is otherwise used only in an import, export, type, or
+//    as the object of a property read.
+//
+// The whole-program pass (handler coverage, unused and duplicate names, the
 // generated manifest) consumes what it returns.
 //
 // A site is matched by its method, import, or property name and its contract

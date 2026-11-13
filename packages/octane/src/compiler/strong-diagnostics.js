@@ -8,11 +8,10 @@
 // keeps it exhaustive: every code the compiler or CLI can report has an entry,
 // and every recipe's `before` reports its codes while its `after` compiles.
 //
-// The `data` section is the octane/data contract check
-// (docs/data-contract-conventions.md). It is not part of Strong mode: it
-// applies to `.tsx` too and is reported by compiler/data-contracts.js. It
-// shares this catalog so its codes render into the same reference and
-// `octane explain` without a second generator.
+// The `data` section is the octane/data contract check. It is not part of
+// Strong mode: it applies to `.tsx` too and is reported by
+// compiler/data-contracts.js. It shares this catalog so its codes render into
+// the same reference and `octane explain` without a second generator.
 //
 // Text is Markdown. Recipe sources are complete `.tsrx` modules without the
 // `"use strong"` directive, which the test and the renderers add.
