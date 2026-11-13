@@ -271,14 +271,14 @@
         {
           "id": "ordinary:effect-atom-schedule-task-order",
           "path": "packages/effect-atom/tests/scheduleTask.test.ts",
-          "sha256": "4cb8488e6142312090566784f4b572a3523a92d795dba3cf67756a7565246c44",
+          "sha256": "42e54d806c4dfe57679355280aa026f620d68b18840a521ec5c036e1a43c1ddb",
           "testName": "runs each task in a later host task, in the order they were scheduled",
           "fullName": "scheduleTask runs each task in a later host task, in the order they were scheduled"
         },
         {
           "id": "ordinary:effect-atom-schedule-task-cancel",
           "path": "packages/effect-atom/tests/scheduleTask.test.ts",
-          "sha256": "4cb8488e6142312090566784f4b572a3523a92d795dba3cf67756a7565246c44",
+          "sha256": "42e54d806c4dfe57679355280aa026f620d68b18840a521ec5c036e1a43c1ddb",
           "testName": "skips a task cancelled before it runs",
           "fullName": "scheduleTask skips a task cancelled before it runs"
         }
