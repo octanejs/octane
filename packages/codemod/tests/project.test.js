@@ -130,6 +130,140 @@ describe('runCodemod', () => {
 		}
 	});
 
+	describe('React-hosted Octane SSR', () => {
+		const leaf = `/** @jsxImportSource octane */
+			import { ReactCompat as Reverse } from 'octane/react';
+			import { Child } from './Child.js';
+			export function Leaf() { return <Reverse component={Child} />; }
+			export const Native = () => <b>native</b>;`;
+		const server = "import { OctaneCompat as Host } from 'octane/react/server';";
+		const child = "import { Leaf } from './Leaf.tsx';";
+		const owner = 'export function App() { return <Host component={Leaf} />; }';
+		const app = (/** @type {string} */ host, source = leaf, paths = {}) => {
+			const files = {
+				'package.json': '{"name":"app","type":"module"}',
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: {
+						jsx: 'react-jsx',
+						module: 'ESNext',
+						moduleResolution: 'Bundler',
+						paths,
+					},
+				}),
+				'App.server.tsx': host,
+				'Leaf.tsx': source,
+				'Child.js':
+					"import {createElement} from 'react'; export const Child = () => createElement('b', null, 'React child');",
+				'Other.ts': 'export function OctaneCompat() { return null; }',
+				'index.html': '<script type="module" src="./Leaf.tsx"></script>',
+			};
+			const root = project(files);
+			const modules = path.join(root, 'node_modules');
+			fs.mkdirSync(modules);
+			for (const name of ['octane', 'react', 'react-dom'])
+				fs.symlinkSync(
+					fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+					path.join(modules, name),
+					'dir',
+				);
+			return { root, files, selected: [path.join(root, 'Leaf.tsx')] };
+		};
+		const error = expect.objectContaining({
+			rule: 'react-compat',
+			severity: 'error',
+			message: expect.stringContaining('React SSR cannot render Leaf.tsrx inside OctaneCompat'),
+		});
+
+		it.each([
+			['component', `${server}\n${child}\n${owner}`, leaf],
+			[
+				'component with props',
+				`${server}\n${child}\nexport const App = () => <Host component={Leaf} props={{ label: 'name' }} />;`,
+				leaf,
+			],
+			[
+				'child with default leaf',
+				`/** @jsxImportSource react */\n${server}\nimport Leaf from './Leaf.tsx';\nexport default function App() { return <Host>\n<Leaf label="name" />\n</Host>; }`,
+				leaf
+					.replace('export function Leaf', 'export default function Leaf')
+					.replace('ReactCompat as Reverse', 'ReactCompatInline as Reverse'),
+			],
+			[
+				'const leaf',
+				`${server}\n${child}\n${owner}`,
+				leaf.replace(
+					'export function Leaf() { return <Reverse component={Child} />; }',
+					'export const Leaf = () => <Reverse><Child /></Reverse>;',
+				),
+			],
+		])('reports a direct %s edge before writing', async (_, issuer, source) => {
+			const { root, files, selected } = app(issuer, source);
+			const preview = await runCodemod(selected, { root, strong: true, write: false });
+			const migrated = preview.files.find((f) => f.file === 'Leaf.tsx');
+			const host = preview.files.find((f) => f.file === 'App.server.tsx');
+			expect(migrated?.strong).toBe(true);
+			expect(migrated?.notes).toContainEqual(error);
+			expect(host?.notes).toContainEqual(error);
+			expect(host?.code).toContain("'./Leaf.tsrx'");
+			const refused = await runCodemod(selected, { root, strong: true });
+			expect(refused.files).toEqual([
+				expect.objectContaining({ file: 'App.server.tsx', changed: false, notes: [error] }),
+			]);
+			for (const [file, text] of Object.entries(files))
+				expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(text);
+			expect(fs.existsSync(path.join(root, 'Leaf.tsrx'))).toBe(false);
+		});
+
+		it.each([
+			[
+				'mutable host export',
+				server,
+				child,
+				'export let App = () => <Host component={Leaf} />; App = () => <b>standalone</b>;',
+			],
+			['reassigned host function', server, child, owner + ' App = () => <b>standalone</b>;'],
+			['direct eval rewriting the host', server, child, owner + ' eval("App = () => null");'],
+			['client host', server.replace('/server', ''), child, owner],
+			['standalone native consumer', '', child, 'export function App() { return <Leaf />; }'],
+			['shadowed server host', server, child, owner.replace('App()', 'App({ Host })')],
+			[
+				'overridden host prop',
+				server,
+				child,
+				owner.replace('component={Leaf}', 'component={Leaf} {...{ component: null }}'),
+			],
+			[
+				'duplicate component prop',
+				server,
+				child,
+				owner.replace('component={Leaf}', 'component={Leaf} component={null}'),
+			],
+			[
+				'dynamic native selection',
+				server,
+				child,
+				owner.replace('component={Leaf}', 'component={flag ? Leaf : null}'),
+			],
+			[
+				'visible child whitespace',
+				server,
+				child,
+				owner.replace('<Host component={Leaf} />', '<Host> <Leaf /> </Host>'),
+			],
+			['native JSX pragma', '/** @jsxImportSource octane */\n' + server, child, owner],
+			['different local export', server, child.replace('{ Leaf }', '{ Native as Leaf }'), owner],
+			['mapped JSX runtime', server, child, owner, { 'react/jsx-runtime': ['./Other.ts'] }],
+			['mapped server import', server, child, owner, { 'octane/react/server': ['./Other.ts'] }],
+		])(
+			'leaves a %s outside the direct SSR diagnostic',
+			async (_, hostImport, leafImport, component, paths) => {
+				const { root, selected } = app(`${hostImport}\n${leafImport}\n${component}`, leaf, paths);
+				const result = await runCodemod(selected, { root, strong: true, write: false });
+				for (const file of result.files) expect(file.notes).not.toContainEqual(error);
+			},
+		);
+	});
+
 	it.each([
 		[
 			'statically re-exported hook',
