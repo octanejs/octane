@@ -176,7 +176,9 @@ describe('compiler AST emit architecture', () => {
 			'TemplateElement',
 			'TemplatePart',
 			'Text',
+			// Bundler `emitFile` records, not AST.
 			'asset',
+			'chunk',
 			// Independent hydration capture codec descriptors are protocol records, not AST.
 			'json',
 		]);
