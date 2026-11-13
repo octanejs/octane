@@ -791,6 +791,54 @@ function descriptorProject(files) {
 	});
 }
 
+it('defers store reads in instance fields that can run after effect setup', async () => {
+	const cases = {
+		escaped: 'class Later { value = store.label; } publish(Later);',
+		anonymous: 'publish(class { value = store.label; });',
+		staticEscape: 'class Later { value = store.label; static { publish(Later); } }',
+		immediateStatic: 'class Now { static value = store.label; } void Now.value;',
+		immediateBlock: 'class Now { static { void store.label; } }',
+		computedName: 'class Now { [store.label] = 1; } publish(Now);',
+	};
+	const { app } = project({
+		'observer/state.ts': 'export function valueOf<T>(value: T) { return value; }',
+		'observer/renderer.ts':
+			"import {createContext} from 'react'; export const current = createContext({label: 'base'});",
+		'app/src/receiver.ts':
+			'export function publish(value: object) { Object.assign(globalThis, {published: value}); }',
+		...Object.fromEntries(
+			Object.entries(cases).map(([name, body]) => [
+				'app/src/' + name + '.tsx',
+				`import {useSnapshot} from 'observer'; import {useEffect} from 'react';
+import {publish} from './receiver';
+export function Pane() {
+	const store = useSnapshot();
+	useEffect(() => { ${body} }, [store]);
+	return <b>ready</b>;
+}`,
+			]),
+		),
+	});
+	const result = await runCodemod(
+		Object.keys(cases).map((name) => path.join(app, 'src', name + '.tsx')),
+		{ root: app, strong: true, verify: true, projectTypes: true, write: false },
+	);
+	for (const name of ['escaped', 'anonymous', 'staticEscape']) {
+		const file = result.files.find((entry) => entry.file === 'src/' + name + '.tsx');
+		expect(file.notes, name).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+	}
+	for (const name of ['immediateStatic', 'immediateBlock', 'computedName']) {
+		const file = result.files.find((entry) => entry.file === 'src/' + name + '.tsx');
+		expect(file.rules['store-hook'], name).toBe(1);
+		expect(
+			[...file.notes, ...file.diagnostics].filter((note) => note.severity === 'error'),
+			name,
+		).toEqual([]);
+	}
+});
+
 it('passes an installed data descriptor by identity to the active store during effect setup', async () => {
 	const { app } = descriptorProject({
 		'app/src/pane.tsx': descriptorPane(descriptorEffect, 'descriptors/report'),
