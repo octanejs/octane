@@ -1,3 +1,4 @@
+import type { StoreInputCheck } from './store-inputs.js';
 import type ts from 'typescript';
 
 export interface Note {
@@ -41,7 +42,7 @@ export interface TransformOptions {
 		module: string,
 		name: string,
 		safeUses: (
-			sharedInput: (module: string, name: string) => boolean | 'opaque',
+			sharedInput: StoreInputCheck,
 			unchangedHelper?: (module: string, name: string) => boolean,
 		) => boolean,
 	): { from: string; name: string } | null;
