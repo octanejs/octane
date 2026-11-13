@@ -511,37 +511,63 @@ describe('octane/data persistent cache', () => {
 			persist: cache(storage, 'ada', { budget: Infinity }),
 		});
 		// The shelf is saved first, so before this session it is the least recently used.
-		for (const contract of [shelf, count]) {
-			(await value(seed, contract)).stop();
-			await saved();
-		}
-		const [shelfSize, countSize] = (await storage.index(listPartitions(storage)[0]!)).map(
-			(meta) => meta.size,
-		);
+		(await value(seed, shelf)).stop();
+		const savedValues = () => {
+			const [partition] = listPartitions(storage);
+			return partition ? storage.index(partition) : Promise.resolve([]);
+		};
+		const savedShelf = await vi.waitFor(async () => {
+			const entries = await savedValues();
+			expect(entries).toHaveLength(1);
+			return entries[0]!;
+		});
+		// LRU uses millisecond timestamps. Give the count a strictly later timestamp.
+		await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(savedShelf.lastUsed));
+		(await value(seed, count)).stop();
+		const savedCount = await vi.waitFor(async () => {
+			const entries = await savedValues();
+			expect(entries).toHaveLength(2);
+			return entries.find((meta) => meta.key !== savedShelf.key)!;
+		});
 
 		// Room for the two saved values, with slack for sizes that vary by a few characters,
 		// and not for one more of the count's size.
-		const budget = Math.ceil((shelfSize! + countSize! + 40) / 0.9);
-		expect(shelfSize! + 2 * countSize!).toBeGreaterThan(budget);
+		const budget = Math.ceil((savedShelf.size + savedCount.size + 40) / 0.9);
+		expect(savedShelf.size + 2 * savedCount.size).toBeGreaterThan(budget);
+		const before = server(books());
+		const allowSerial = before.hold();
 		const store = createDataStore({
-			transport: server(books()).transport,
+			transport: before.transport,
 			persist: cache(storage, 'ada', { budget }),
 		});
-		(await value(store, shelf)).stop();
-		await saved();
+		try {
+			// The restored shelf must now be newer than the count.
+			await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(savedCount.lastUsed));
+			(await value(store, shelf)).stop();
+		} finally {
+			allowSerial();
+		}
 		(await value(store, serial)).stop();
-		await saved();
+		await vi.waitFor(async () => {
+			const keys = (await savedValues()).map((meta) => meta.key);
+			expect(keys).toHaveLength(2);
+			expect(keys).toContain(savedShelf.key);
+			expect(keys).not.toContain(savedCount.key);
+		});
 
 		// The count, unused this session, goes; the shelf, restored and shown, stays.
 		const remote = server(books());
 		remote.hold();
-		const after = createDataStore({ transport: remote.transport, persist: cache(storage, 'ada') });
+		const transport = vi.fn(remote.transport);
+		const after = createDataStore({ transport, persist: cache(storage, 'ada') });
 		const kept = after.read(shelf, undefined);
 		kept.subscribe(() => {});
 		const gone = after.read(count, undefined);
 		gone.subscribe(() => {});
-		await saved();
-		expect(kept.getSnapshot().status).toBe('ready');
+		await vi.waitFor(() => {
+			expect(kept.getSnapshot().status).toBe('ready');
+			expect(transport.mock.calls.map(([request]) => request.name)).toEqual(['count']);
+		});
 		expect(gone.getSnapshot().status).toBe('pending');
 	});
 
