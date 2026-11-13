@@ -687,6 +687,201 @@ it('preserves the active store and aliased handle through effects, Effect Events
 	}
 }, 30_000);
 
+const installedDescriptor = `export const Descriptor = { tag: 'report' };`;
+const descriptorCall = 'service.emit(Descriptor, { count: 3 });';
+const descriptorEffect = `useEffect(() => { ${descriptorCall} }, [service]);`;
+
+function descriptorPane(body, module = 'descriptors') {
+	return `import {useSnapshot} from 'observer';
+		import {Descriptor} from '${module}';
+		import {useEffect} from 'react';
+		export function Pane() {
+			const service = useSnapshot();
+			${body}
+			return <p>Ready</p>;
+		}`;
+}
+
+function descriptorProject(files) {
+	return project({
+		'observer/state.ts': 'export function valueOf<T>(x: T) { return x; }',
+		'observer/renderer.ts': `import {createContext} from 'react';
+			export const current = createContext({ emit(_descriptor: unknown, _payload: unknown) {} });`,
+		'node_modules/descriptors/package.json': JSON.stringify({
+			name: 'descriptors',
+			exports: { './*': './*.ts' },
+		}),
+		'node_modules/descriptors/report.ts': `import type {Metadata} from './metadata';
+			export enum Channel { Application = 'app' }
+			export const Descriptor = { tag: 'report' } satisfies Metadata;`,
+		'node_modules/descriptors/metadata.ts': 'export interface Metadata { tag: string }',
+		...files,
+	});
+}
+
+it('passes an installed data descriptor by identity to the active store during effect setup', async () => {
+	const { app } = descriptorProject({
+		'app/src/pane.tsx': descriptorPane(descriptorEffect, 'descriptors/report'),
+	});
+	const { files } = await runCodemod([path.join(app, 'src/pane.tsx')], {
+		root: app,
+		strong: true,
+		verify: true,
+		projectTypes: true,
+		write: true,
+	});
+	const pane = files.find((file) => file.file === 'src/pane.tsx');
+	expect(pane.strong).toBe(true);
+	expect([...pane.notes, ...pane.diagnostics].filter((item) => item.severity === 'error')).toEqual(
+		[],
+	);
+	fs.writeFileSync(
+		path.join(app, 'src/provider.tsrx'),
+		`import {NativeStoreProvider} from './octane-store-context.tsrx';
+		import {current} from '../../observer/renderer';
+		import {Pane} from './pane.tsrx';
+		export function Root({store}) @{ <NativeStoreProvider context={current} value={store}><Pane/></NativeStoreProvider> }`,
+	);
+	const entry = `export {Root} from './src/provider.tsrx';
+		export {Descriptor} from 'descriptors/report';`;
+	const dom = installDOM();
+	try {
+		const server = await bundleRuntime(
+			app,
+			'server',
+			entry + `export {renderToString} from 'octane/server';`,
+		);
+		const serverStore = { emit: vi.fn() };
+		expect(server.renderToString(server.Root, { store: serverStore }).html).toContain('Ready');
+		expect(serverStore.emit).not.toHaveBeenCalled();
+		const client = await bundleRuntime(
+			app,
+			'client',
+			entry + `export {act, createRoot} from 'octane';`,
+		);
+		const host = document.createElement('div');
+		const root = client.createRoot(host);
+		try {
+			for (const tag of ['report', 'replacement']) {
+				client.Descriptor.tag = tag;
+				const store = { emit: vi.fn((descriptor) => descriptor.tag) };
+				await client.act(async () => root.render(client.Root, { store }));
+				expect(host.textContent).toBe('Ready');
+				expect(store.emit).toHaveBeenCalledExactlyOnceWith(client.Descriptor, { count: 3 });
+				expect(store.emit.mock.calls[0][0]).toBe(client.Descriptor);
+				expect(store.emit.mock.contexts[0]).toBe(store);
+				expect(store.emit).toHaveReturnedWith(tag);
+			}
+		} finally {
+			await client.act(async () => root.unmount());
+		}
+	} finally {
+		dom.window.close();
+		vi.unstubAllGlobals();
+	}
+}, 30_000);
+
+it('defers imported JSX in descriptor call payloads and preserves the selected scalar field', async () => {
+	const pane = (value, imports) =>
+		`import {${imports}} from './descriptor-payload'; ${descriptorPane(
+			descriptorEffect.replace('count: 3', 'count: ' + value),
+			'descriptors/report',
+		)}`;
+	const cases = {
+		named: pane('badge', 'badge'),
+		projected: pane('payload.badge', 'payload'),
+		scalar: pane('payload.scalar', 'payload'),
+	};
+	const { app } = descriptorProject({
+		'app/src/descriptor-payload.tsx': `export const badge = <b/> as unknown as string;
+			export const payload = {badge, scalar: 'ready'};`,
+		...Object.fromEntries(
+			Object.entries(cases).map(([name, source]) => ['app/src/' + name + '.tsx', source]),
+		),
+	});
+	const { files } = await runCodemod(
+		['descriptor-payload', ...Object.keys(cases)].map((name) =>
+			path.join(app, 'src', name + '.tsx'),
+		),
+		{ root: app, strong: true, verify: true, projectTypes: true, write: false },
+	);
+	for (const name of ['named', 'projected']) {
+		const file = files.find((entry) => entry.file === 'src/' + name + '.tsx');
+		expect(file.rules['store-hook']).toBeUndefined();
+		expect(file.notes).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+	}
+	const scalar = files.find((entry) => entry.file === 'src/scalar.tsx');
+	expect(scalar.rules['store-hook']).toBe(1);
+	expect(
+		[...scalar.notes, ...scalar.diagnostics].filter((note) => note.severity === 'error'),
+	).toEqual([]);
+});
+
+it('defers descriptor calls with uncertain evaluation, object shape, or package identity', async () => {
+	const cases = {
+		render: descriptorPane(descriptorCall, 'descriptors/report'),
+		returnValue: descriptorPane(
+			'useEffect(() => service.emit(Descriptor, { count: 3 }), [service]);',
+			'descriptors/report',
+		),
+		classField: descriptorPane(
+			'useEffect(() => { class Later { value = service.emit(Descriptor, { count: 3 }); } queueMicrotask(() => new Later()); }, [service]);',
+			'descriptors/report',
+		),
+		jsx: descriptorPane(descriptorEffect.replace('count: 3', 'view: <b/>'), 'descriptors/report'),
+		getter: descriptorPane(descriptorEffect, 'descriptors/getter'),
+		dataAlias: descriptorPane(descriptorEffect, 'descriptors/alias'),
+		executableImport: descriptorPane(descriptorEffect, 'inline-type-descriptors'),
+		local: descriptorPane(descriptorEffect, './local-descriptor'),
+		conditional: descriptorPane(descriptorEffect, 'conditional-descriptors'),
+		legacy: descriptorPane(descriptorEffect, 'legacy-descriptors/metadata'),
+	};
+	const { app, root } = descriptorProject({
+		...Object.fromEntries(
+			Object.entries(cases).map(([name, source]) => [`app/src/${name}.tsx`, source]),
+		),
+		'app/src/local-descriptor.ts': installedDescriptor,
+		'node_modules/descriptors/getter.ts': `export const Descriptor = { get tag() { return 'report'; } };`,
+		'node_modules/descriptors/alias.ts': `const tag = 'report'; export const Descriptor = { tag: tag };`,
+		'node_modules/inline-type-descriptors/package.json': JSON.stringify({
+			name: 'inline-type-descriptors',
+			exports: './index.ts',
+		}),
+		'node_modules/inline-type-descriptors/index.ts': `import {type Metadata} from './metadata';
+			export const Descriptor = { tag: 'report' } satisfies Metadata;`,
+		'node_modules/inline-type-descriptors/metadata.ts':
+			'globalThis.descriptorMetadataLoaded = true; export interface Metadata { tag: string }',
+		'node_modules/conditional-descriptors/package.json': JSON.stringify({
+			name: 'conditional-descriptors',
+			exports: { import: './index.ts', require: './alias.ts' },
+		}),
+		'node_modules/conditional-descriptors/index.ts': installedDescriptor,
+		'node_modules/legacy-descriptors/package.json': JSON.stringify({ name: 'legacy-descriptors' }),
+		'node_modules/legacy-descriptors/metadata/package.json': JSON.stringify({
+			main: './server.ts',
+			module: './client.ts',
+		}),
+		'node_modules/legacy-descriptors/metadata/server.ts': installedDescriptor,
+		'node_modules/legacy-descriptors/metadata/client.ts': installedDescriptor.replace(
+			'report',
+			'browser',
+		),
+	});
+	fs.symlinkSync('index.ts', path.join(root, 'node_modules/conditional-descriptors/alias.ts'));
+	const { files } = await runCodemod(
+		Object.keys(cases).map((name) => path.join(app, `src/${name}.tsx`)),
+		{ root: app, strong: true, verify: true, projectTypes: true },
+	);
+	for (const name of Object.keys(cases)) {
+		const pane = files.find((file) => file.file === `src/${name}.tsx`);
+		expect(pane.notes, name).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+	}
+}, 30_000);
+
 it.each([
 	['render-time calls', { run: 'useEffect(() => update(), []); update();' }],
 	['click-time calls', { run: '', output: '<button onClick={() => update()}>Send</button>' }],

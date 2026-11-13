@@ -44,6 +44,7 @@ export interface TransformOptions {
 		safeUses: (
 			sharedInput: StoreInputCheck,
 			unchangedHelper?: (module: string, name: string) => boolean,
+			retainedArgument?: (module: string, name: string) => boolean,
 		) => boolean,
 	): { from: string; name: string } | null;
 	/** Relative path to the project-local React Intl adapter, when its installed peers support it. */

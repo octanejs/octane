@@ -51,10 +51,10 @@ function importsResourceHint(statement: ts.ImportDeclaration | ts.ExportDeclarat
 	);
 }
 
-function dataInput(expr: ts.Expression, locals: ReadonlyMap<string, Input>): boolean {
+function dataInput(expr: ts.Expression, locals?: ReadonlyMap<string, Input>): boolean {
 	const value = skipWrappers(expr);
 	if (ts.isIdentifier(value)) {
-		const input = locals.get(value.text);
+		const input = locals?.get(value.text);
 		return !!input && 'literal' in input;
 	}
 	if (ts.isArrayLiteralExpression(value))
@@ -86,6 +86,50 @@ function inertLiteral(value: ts.Expression) {
 		value.kind === ts.SyntaxKind.FalseKeyword ||
 		value.kind === ts.SyntaxKind.NullKeyword
 	);
+}
+
+/** Read const data exported by an original module without executable dependencies. */
+export function retainedLiteralExports(file: string) {
+	const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest);
+	const exported = new Set<string>();
+	for (const statement of source.statements) {
+		if (ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement)) continue;
+		if (
+			ts.isImportDeclaration(statement) &&
+			!statement.attributes &&
+			statement.importClause?.isTypeOnly
+		)
+			continue;
+		if (
+			ts.isEnumDeclaration(statement) &&
+			statement.members.every(
+				(member) =>
+					!ts.isComputedPropertyName(member.name) &&
+					member.initializer &&
+					inertLiteral(skipWrappers(member.initializer)),
+			)
+		)
+			continue;
+		if (
+			!ts.isVariableStatement(statement) ||
+			(statement.declarationList.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const
+		)
+			return null;
+		for (const declaration of statement.declarationList.declarations) {
+			if (
+				!ts.isIdentifier(declaration.name) ||
+				!declaration.initializer ||
+				!dataInput(declaration.initializer)
+			)
+				return null;
+			if (
+				ts.isObjectLiteralExpression(skipWrappers(declaration.initializer)) &&
+				statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+			)
+				exported.add(declaration.name.text);
+		}
+	}
+	return exported;
 }
 
 /** Resolve application source used by a workspace store consumer. */
