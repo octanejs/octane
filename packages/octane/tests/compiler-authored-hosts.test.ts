@@ -62,6 +62,27 @@ describe('authored host JSX', () => {
 		},
 	);
 
+	it.each([
+		['memo', 'memo'],
+		['createElement', 'make'],
+	])('calls a template callback when an ordinary binding shadows %s', (imported, name) => {
+		const source = `import { ${imported} as ${name} } from 'octane';
+			export function App() @{
+				const ${name} = (render) => render();
+				const value = ${name}(() => @{ <b>local</b> });
+				<main>{value}</main>
+			}`;
+		const { App: ServerApp } = fixture(source, true);
+		const { App } = fixture(source);
+		expect(renderToString(ServerApp).html).toContain('<b>local</b>');
+		const rendered = mount(App);
+		try {
+			expect(rendered.find('b').textContent).toBe('local');
+		} finally {
+			rendered.unmount();
+		}
+	});
+
 	it('limits hydration suppression to the authored element', async () => {
 		const source = `export function App({value}) @{ <section suppressHydrationWarning><p>{value as string}</p></section> }`;
 		const container = document.createElement('div');
