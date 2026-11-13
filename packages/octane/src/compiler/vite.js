@@ -22,13 +22,16 @@ import { DATA_WORKER_PATH } from '../data/worker-path.js';
 import {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
 	INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
+	DATA_MANIFEST_MODULE,
 	cleanModuleId,
 	createClientReferenceManifest,
+	createDataProgram,
 	createOctaneCompiler,
 	discoverOctaneSourceDependencies,
 	findDescriptorChildrenExports,
 	findDescriptorChildrenImports,
 	findVoidComponentImports,
+	formatDataDiagnostic,
 	packageReachesCommonJs,
 	resolveRendererForFile,
 } from './bundler.js';
@@ -45,6 +48,7 @@ const COMPILER_MEMO_EXPORTS_META = 'octane:compiler-memo-exports';
 const DESCRIPTOR_CHILDREN_EXPORTS_META = 'octane:descriptor-children-exports';
 const CLIENT_REFERENCE_META = 'octane:client-reference';
 const INDEPENDENT_WIDGETS_META = 'octane:independent-widgets';
+const DATA_MANIFEST_ID = '\0octane:data-manifest';
 const DESCRIPTOR_PREFLIGHT_AUTHORITY = Symbol('octane.descriptor-preflight');
 const NODE_MODULES_PATH = /(?:^|[\\/])node_modules(?:[\\/]|$)/;
 
@@ -802,6 +806,9 @@ export function octane(options = {}) {
 	if (options.strong !== undefined && typeof options.strong !== 'boolean') {
 		throw new TypeError('octane/compiler/vite: `strong` must be a boolean when provided.');
 	}
+	if (options.data !== undefined && typeof options.data !== 'boolean') {
+		throw new TypeError('octane/compiler/vite: `data` must be a boolean when provided.');
+	}
 	if (
 		options.textTypes !== undefined &&
 		(options.textTypes === null ||
@@ -994,6 +1001,25 @@ export function octane(options = {}) {
 	});
 	// An explicit override of Vite's per-module SSR auto-detection.
 	const forceSsr = options.ssr;
+	// The octane/data contract check. `data: false` turns it off; otherwise
+	// importing the generated manifest turns it on. A module can be transformed
+	// before the import is resolved, so the first module that mentions
+	// octane/data asks the program, once per watch generation, whether any
+	// source imports it. An app that never mentions octane/data never scans.
+	let dataProgram = options.data === false ? null : createDataProgram(projectRoot);
+	let manifestResolved = false;
+	let dataEnabled = null;
+	const dataOptedIn = () => dataProgram !== null && (options.data === true || manifestResolved);
+	const dataCheck = () => dataOptedIn() || (dataEnabled ??= dataProgram.importsManifest());
+	const dataMessage = (diagnostics) =>
+		diagnostics.map((diagnostic) => formatDataDiagnostic(diagnostic, projectRoot)).join('\n');
+	// Dev logs the whole-program report when it changes; a build fails on it.
+	let dataWarnings = '';
+	const warnDataProgram = () => {
+		const message = dataOptedIn() ? dataMessage(dataProgram.report()) : '';
+		if (message !== '' && message !== dataWarnings) logger?.warn(`octane/data:\n${message}`);
+		dataWarnings = message;
+	};
 
 	const resetCompiler = (root) => {
 		resetTextTypes();
@@ -1004,6 +1030,8 @@ export function octane(options = {}) {
 		cssModuleProofStates.clear();
 		proofWaitGraphs.clear();
 		projectRoot = nodePath.resolve(root);
+		if (dataProgram !== null) dataProgram = createDataProgram(projectRoot);
+		dataEnabled = null;
 		compiler = createOctaneCompiler({
 			_descriptorPreflightAuthority: DESCRIPTOR_PREFLIGHT_AUTHORITY,
 			root: projectRoot,
@@ -1196,6 +1224,18 @@ export function octane(options = {}) {
 			};
 		},
 		configureServer(server) {
+			if (dataProgram !== null) {
+				// A new or deleted contract module changes the manifest's imports.
+				const refresh = (file) => {
+					if (!dataProgram.invalidate(nodePath.resolve(file))) return;
+					for (const environment of Object.values(server.environments ?? {})) {
+						const module = environment.moduleGraph.getModuleById(DATA_MANIFEST_ID);
+						if (module) environment.reloadModule(module);
+					}
+				};
+				server.watcher.on('add', refresh);
+				server.watcher.on('unlink', refresh);
+			}
 			if (!options.dataWorker) return;
 			const file = nodePath.resolve(projectRoot, options.dataWorker).replaceAll('\\', '/');
 			const source = `import ${JSON.stringify(`/@fs/${file.replace(/^\/+/, '')}`)};\n`;
@@ -1272,6 +1312,24 @@ export function octane(options = {}) {
 		},
 		buildEnd(error) {
 			if (error) releaseTextTypeProject();
+			// The whole program is read from disk, so the client build reports it once.
+			if (
+				!error &&
+				resolvedConfig?.command === 'build' &&
+				forceSsr !== true &&
+				(this.environment
+					? this.environment.config.consumer === 'client'
+					: !resolvedConfig.build?.ssr) &&
+				dataOptedIn()
+			) {
+				const diagnostics = dataProgram.report();
+				const hints = diagnostics.filter((diagnostic) => diagnostic.severity === 'hint');
+				if (hints.length > 0) this.warn(dataMessage(hints));
+				if (hints.length < diagnostics.length)
+					this.error(
+						dataMessage(diagnostics.filter((diagnostic) => diagnostic.severity !== 'hint')),
+					);
+			}
 			if (this.environment === undefined) proofWaitGraphs.clear();
 			else proofWaitGraphs.delete(this.environment);
 			const keys = this.environment === undefined ? ['client', 'server'] : [this.environment];
@@ -1287,6 +1345,11 @@ export function octane(options = {}) {
 		},
 		watchChange(id) {
 			compiler.invalidate(id);
+			if (dataProgram !== null) {
+				dataProgram.invalidate(cleanModuleId(id));
+				dataEnabled = null;
+				if (resolvedConfig?.command === 'serve') warnDataProgram();
+			}
 			// A one-shot build can receive a watch event mid-build and must fail closed.
 			textTypeProject?.invalidate(cleanModuleId(id));
 			// Edited sources already miss by digest. A manifest edit can change the
@@ -1353,6 +1416,10 @@ export function octane(options = {}) {
 			}
 		},
 		async resolveId(source, importer, resolveOptions) {
+			if (source === DATA_MANIFEST_MODULE && dataProgram !== null) {
+				manifestResolved = true;
+				return DATA_MANIFEST_ID;
+			}
 			if (resolveOptions?.ssr) {
 				const runtimeRequest = compiler.resolveRuntimeRequest(source, 'server');
 				if (runtimeRequest !== null && runtimeRequest !== source) {
@@ -1412,7 +1479,21 @@ export function octane(options = {}) {
 				depsOptimizer.registerMissingImport(`${owner.name} > ${source}`, dependency),
 			);
 		},
+		load(id) {
+			if (id !== DATA_MANIFEST_ID) return null;
+			const { code, files } = dataProgram.manifest();
+			for (const file of files) this.addWatchFile(file);
+			if (resolvedConfig?.command === 'serve') warnDataProgram();
+			return code;
+		},
 		transform(code, id, transformOptions) {
+			if (dataProgram !== null && id[0] !== '\0') {
+				const diagnostics = dataProgram.check(cleanModuleId(id), code);
+				if (diagnostics.length > 0 && dataCheck()) {
+					const { start } = diagnostics[0];
+					this.error(dataMessage(diagnostics), { line: start.line, column: start.column });
+				}
+			}
 			const foldedCode = foldDevProfileGuards ? foldServedProfileGuards(this, code, id) : null;
 			if (foldedCode !== null) code = foldedCode;
 			// A module the compiler leaves alone still serves its folded code.

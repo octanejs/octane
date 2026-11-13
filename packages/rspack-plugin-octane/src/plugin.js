@@ -6,9 +6,12 @@ import { fileURLToPath } from 'node:url';
 import {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
 	DATA_WORKER_PATH,
+	DATA_MANIFEST_MODULE,
 	INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
 	createClientReferenceManifest,
+	createDataProgram,
 	createOctaneCompiler,
+	formatDataDiagnostic,
 } from 'octane/compiler/bundler';
 import { installCssModuleConstants } from './css-module-constants.js';
 import { createStreamedSignalHmrRuntimeModule } from './streamed-signals-hmr.js';
@@ -30,6 +33,7 @@ const PLUGIN_VERSION = createRequire(import.meta.url)('../package.json').version
 const loaderPath = fileURLToPath(new URL('./loader.js', import.meta.url));
 const finalizeLoaderPath = fileURLToPath(new URL('./finalize-loader.js', import.meta.url));
 const parallelLoaderPath = fileURLToPath(new URL('./parallel-loader.js', import.meta.url));
+const dataManifestPath = fileURLToPath(new URL('./data-manifest.js', import.meta.url));
 const DEFAULT_MAX_WORKERS = 4;
 const OCTANE_RULE = /\.(?:tsrx|tsx|ts|js)$/i;
 const TYPESCRIPT_RULE = /\.(?:tsrx|tsx|ts)$/i;
@@ -668,6 +672,19 @@ export class OctaneRspackPlugin {
 				use: [{ loader: 'builtin:swc-loader', options: { detectSyntax: 'auto' } }],
 			});
 		}
+		// The octane/data contract check. `data: false` turns it off; otherwise
+		// importing the generated manifest turns it on.
+		const dataProgram = this.options.data === false ? null : createDataProgram(root);
+		if (dataProgram !== null) {
+			compiler.options.module.rules.push(
+				{ resolve: { alias: { [`${DATA_MANIFEST_MODULE}$`]: dataManifestPath } } },
+				{
+					resource: dataManifestPath,
+					enforce: 'post',
+					use: [{ loader: dataManifestPath, options: { root } }],
+				},
+			);
+		}
 		const layerRuntimeAliases = [];
 		for (const [layer, specialization] of Object.entries(this.options.layerSpecializations ?? {})) {
 			if (specialization.runtime === undefined) continue;
@@ -705,11 +722,41 @@ export class OctaneRspackPlugin {
 		compiler.hooks.watchRun?.tap(PLUGIN_NAME, () => {
 			for (const current of discoveryCompilers) current.invalidate();
 			discovery = undefined;
+			for (const file of [...(compiler.modifiedFiles ?? []), ...(compiler.removedFiles ?? [])])
+				dataProgram?.invalidate(file);
 		});
 		compiler.hooks.thisCompilation?.tap(PLUGIN_NAME, (compilation) => {
 			const current = discover();
 			addDependencies(compilation.fileDependencies, current.dependencies);
 			addDependencies(compilation.missingDependencies, current.missingDependencies);
+			if (dataProgram !== null) {
+				compilation.hooks.finishModules.tap(PLUGIN_NAME, (modules) => {
+					// Opted in by `data: true` or by importing the manifest, which is in
+					// the graph by now.
+					if (
+						this.options.data !== true &&
+						![...modules].some((module) => module.resource === dataManifestPath)
+					)
+						return;
+					const report = (list, diagnostic) =>
+						list.push(new compiler.webpack.WebpackError(formatDataDiagnostic(diagnostic, root)));
+					for (const module of modules) {
+						if (typeof module.resource !== 'string') continue;
+						const file = module.resource.split('?')[0];
+						for (const diagnostic of dataProgram.check(file))
+							report(compilation.errors, diagnostic);
+					}
+					// The whole program is read from disk, so the client build reports it
+					// once. Dev reports it as warnings, which the overlay shows.
+					if (environment !== 'client') return;
+					for (const diagnostic of dataProgram.report()) {
+						report(
+							diagnostic.severity === 'hint' || dev ? compilation.warnings : compilation.errors,
+							diagnostic,
+						);
+					}
+				});
+			}
 			if (environment === 'client') {
 				const IndependentHydrationRuntimeModule = independentHydrationRuntimeModule(
 					compiler,

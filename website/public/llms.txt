@@ -679,6 +679,8 @@ Data contracts (the octane/data check, not Strong mode):
 - `OCTANE_DATA_CONTRACT_MODULE`: Move the contracts into a `*.data.ts` module, and move statements that run for effect, and server imports, into a module that imports the contracts.
 - `OCTANE_DATA_CONTRACT_ARGUMENT`: Name one contract binding at the site, such as `store.write(setRead, input)`, and pass the varying value in its input. A handler for several contracts may loop over an inline array of them: `[books, unread].map((list) => handle(list, …))`.
 - `OCTANE_DATA_CONTRACT_ESCAPE`: Pass a callback that names the contract, such as `submit(session, (store) => store.write(setRead, input))`, or move code that must take any contract into a module outside the check.
+- `OCTANE_DATA_CONTRACT_UNHANDLED`: Serve each contract once: `handle(setRead, (input, call) => …)` inside `createDataHandler`, or `defineHandler(Books, { … })` for every contract `Books` exports.
+- `OCTANE_DATA_CONTRACT_UNUSED` (hint): Remove the contract and its handler, or use it from the app.
 
 Each code is documented at https://octanejs.dev/docs/strong-mode#<code-in-kebab-case>.
 

@@ -23,6 +23,8 @@ import {
 	forEachRuntimeAstChild,
 	isIdentifierReference,
 } from './compile-universal.js';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { parseModule } from '#octane/compiler-parser';
 import { unwrapTsExpr } from './descriptor-lowering.js';
 
@@ -45,10 +47,11 @@ const METHOD_SITES = new Map([
 	['write', 0],
 	['form', 0],
 ]);
-/** Function sites, by imported name (or local name for `createDataHandler`'s `handle`). */
+/** Function sites, by imported name (or local name for `createDataHandler`'s `handle` and `defineHandler`). */
 const FUNCTION_SITES = new Map([
 	['useForm', 0],
 	['handle', 0],
+	['defineHandler', 0],
 	['pages', 1],
 	['listen', 1],
 ]);
@@ -60,14 +63,21 @@ const FUNCTIONS = new Set(['ArrowFunctionExpression', 'FunctionExpression']);
  * @typedef {{ offset: number, line: number, column: number }} DataPosition
  * @typedef {{ binding: string, kind: string, name: string | null, exported: boolean, start: DataPosition, end: DataPosition }} DataContractDeclaration
  * @typedef {{ binding: string, source: string | null, imported: string, site: string, start: DataPosition, end: DataPosition }} DataContractUse
+ * @typedef {{ source: string, names: Array<[imported: string, exported: string]> | null }} DataReexport
+ *   `export { a as b } from './x.data.ts'`, or `export * from` with null names
  */
 
 /**
+ * `contractExports` names the contracts a `*.data.ts` import specifier
+ * exports, or returns null when it cannot tell; then every import from it
+ * counts as a contract.
+ *
  * @param {string} source
  * @param {string} filename
- * @returns {{ declarations: DataContractDeclaration[], uses: DataContractUse[], diagnostics: any[] }}
+ * @param {(specifier: string) => ReadonlySet<string> | null} [contractExports]
+ * @returns {{ declarations: DataContractDeclaration[], uses: DataContractUse[], reexports: DataReexport[], diagnostics: any[] }}
  */
-export function analyzeDataContracts(source, filename) {
+export function analyzeDataContracts(source, filename, contractExports) {
 	const ast = parseModule(source, filename);
 	const lexical = createLexicalAnalysis(ast);
 	const { rootScope, nodeScopes, resolveBinding } = lexical;
@@ -87,7 +97,29 @@ export function analyzeDataContracts(source, filename) {
 	const namespaces = new Map();
 	const exported = new Set();
 	const importedName = new Map();
+	/** @type {DataReexport[]} */
+	const reexports = [];
 	for (const statement of ast.body) {
+		if (
+			(statement.type === 'ExportAllDeclaration' ||
+				(statement.type === 'ExportNamedDeclaration' && statement.source != null)) &&
+			statement.exportKind !== 'type' &&
+			DATA_SPECIFIER.test(statement.source.value)
+		) {
+			const name = (node) => node.name ?? node.value;
+			reexports.push({
+				source: statement.source.value,
+				names:
+					statement.type === 'ExportAllDeclaration'
+						? statement.exported == null
+							? null
+							: []
+						: statement.specifiers.map((specifier) => [
+								name(specifier.local),
+								name(specifier.exported),
+							]),
+			});
+		}
 		if (statement.type === 'ImportDeclaration' && statement.importKind !== 'type') {
 			const from = statement.source.value;
 			for (const specifier of statement.specifiers) {
@@ -100,8 +132,11 @@ export function analyzeDataContracts(source, filename) {
 				if (imported !== undefined) importedName.set(local, imported);
 				if (from === 'octane/data' && FACTORIES.has(imported)) factories.set(local, imported);
 				else if (DATA_SPECIFIER.test(from)) {
-					if (specifier.type === 'ImportNamespaceSpecifier') namespaces.set(local, from);
-					else contracts.set(local, { source: from, imported });
+					const known = contractExports?.(from) ?? null;
+					if (specifier.type === 'ImportNamespaceSpecifier')
+						namespaces.set(local, { source: from, known });
+					else if (known === null || known.has(imported))
+						contracts.set(local, { source: from, imported });
 				}
 			}
 		} else if (statement.type === 'ExportNamedDeclaration' && statement.source == null) {
@@ -194,6 +229,13 @@ export function analyzeDataContracts(source, filename) {
 	// Rules 3 and 4. A loop alias is the parameter of a `.map` or `for…of` over
 	// an inline array of contract references; it stands for exactly those.
 	const aliases = new Map();
+	/** A namespace import's member that is a known non-contract export, such as a shared schema. */
+	const isPlainMember = (node) =>
+		node.type === 'MemberExpression' &&
+		!node.computed &&
+		node.object.type === 'Identifier' &&
+		namespaces.get(node.object.name)?.known?.has(node.property.name) === false &&
+		resolved(node.object)?.scope === rootScope;
 	/** The contracts an expression names directly, or null. */
 	const contractsOf = (node) => {
 		node = unwrapTsExpr(node);
@@ -210,13 +252,14 @@ export function analyzeDataContracts(source, filename) {
 			!node.computed &&
 			node.object.type === 'Identifier' &&
 			namespaces.has(node.object.name) &&
+			!isPlainMember(node) &&
 			resolved(node.object)?.scope === rootScope
 		) {
 			const imported = node.property.name;
 			return [
 				{
 					binding: `${node.object.name}.${imported}`,
-					source: namespaces.get(node.object.name),
+					source: namespaces.get(node.object.name).source,
 					imported,
 				},
 			];
@@ -258,7 +301,15 @@ export function analyzeDataContracts(source, filename) {
 	};
 	/** Check one contract position; returns false so the walk skips it. */
 	const site = (node, name) => {
-		const targets = contractsOf(node);
+		node = unwrapTsExpr(node);
+		// `defineHandler(Books, { … })` serves every read, write, and feed `Books` exports.
+		const targets =
+			name === 'defineHandler' &&
+			node.type === 'Identifier' &&
+			namespaces.has(node.name) &&
+			resolved(node)?.scope === rootScope
+				? [{ binding: node.name, source: namespaces.get(node.name).source, imported: '*' }]
+				: contractsOf(node);
 		if (targets !== null) {
 			for (const target of targets) {
 				uses.push({
@@ -327,6 +378,7 @@ export function analyzeDataContracts(source, filename) {
 			}
 		}
 		const named = node.type === 'MemberExpression' ? contractsOf(node) : null;
+		if (named === null && isPlainMember(node)) return false;
 		if (node.type === 'MemberExpression' && named === null && contractsOf(node.object) !== null) {
 			// A property read off a contract, such as `books.view.compare`.
 			if (node.computed) walk(node.property, node, 'property', visit);
@@ -345,7 +397,7 @@ export function analyzeDataContracts(source, filename) {
 	};
 	walk(ast, null, null, visit);
 	diagnostics.sort((a, b) => a.start.offset - b.start.offset);
-	return { declarations, uses, diagnostics };
+	return { declarations, uses, reexports, diagnostics };
 }
 
 /** Visits `node` and, unless `visit` returns false, its runtime children. */
@@ -423,4 +475,379 @@ function diagnostic(code, filename, node, message) {
 		message,
 		suggestions: [],
 	};
+}
+
+// The whole-program half. It reads the project's sources from disk rather than
+// following one bundle graph, so a client build sees the server's handlers, and
+// the Vite and Rspack plugins and `octane analyze` reach the same verdict.
+
+const DATA_CONTRACT_UNHANDLED = 'OCTANE_DATA_CONTRACT_UNHANDLED';
+const DATA_CONTRACT_UNUSED = 'OCTANE_DATA_CONTRACT_UNUSED';
+
+export const DATA_MANIFEST_MODULE = 'octane/data/manifest';
+const SOURCE_FILE = /\.(?:tsrx|[cm]?[jt]sx?)$/;
+const IGNORED_DIRECTORIES = new Set(['node_modules', 'dist', 'build', 'out', 'coverage']);
+/** A source that names `octane/data` or imports a contract module. */
+const MENTIONS_DATA = /octane\/data|\.data(?:\.[cm]?[jt]s)?['"]/;
+/** Contracts a `createDataHandler` serves. */
+const SERVED = new Set(['read', 'view', 'write', 'feed']);
+const HANDLER_SITES = new Set(['handle', 'defineHandler']);
+const RESOLVE_EXTENSIONS = ['.ts', '.js', '.mts', '.mjs', '.cts', '.cjs'];
+
+/**
+ * The project's octane/data facts. Each source is read once per change of its
+ * modification time; `files` replaces the directory scan, as `octane analyze`
+ * already has one.
+ *
+ * @param {string} root
+ * @param {readonly string[]} [files]
+ */
+export function createDataProgram(root, files) {
+	/** @type {string[] | null} */
+	let listed = files ? [...files] : null;
+	/** file → { stamp, source }, where a missing file has a null source. */
+	const sources = new Map();
+	/** file → { source, generation, specifiers, result } */
+	const analyzed = new Map();
+	// Bumped when a contract module's exports change, so importers are reanalyzed.
+	let generation = 0;
+	const exportsOf = new Map();
+	// Modules being analyzed, so contract modules that import each other terminate.
+	const active = new Set();
+
+	const list = () => (listed ??= scan(root));
+	const read = (file) => {
+		let stamp = -1;
+		try {
+			const stat = statSync(file);
+			stamp = stat.mtimeMs + stat.size;
+		} catch {}
+		let entry = sources.get(file);
+		if (entry?.stamp !== stamp) {
+			entry = { stamp, source: stamp < 0 ? null : readFileSync(file, 'utf8') };
+			sources.set(file, entry);
+		}
+		return entry.source;
+	};
+	/** The contract module a relative `*.data` specifier names, or null. */
+	const resolveDataModule = (specifier, importer) => {
+		if (!DATA_SPECIFIER.test(specifier) || !(specifier[0] === '.' || isAbsolute(specifier)))
+			return null;
+		const base = resolve(dirname(importer), specifier);
+		const candidates = DATA_MODULE.test(base)
+			? [base, base.replace(/js$/, 'ts')]
+			: RESOLVE_EXTENSIONS.map((extension) => base + extension);
+		return candidates.find((candidate) => read(candidate) !== null) ?? null;
+	};
+	const analyze = (file, source) => {
+		if (active.has(file)) return analyzed.get(file)?.result ?? null;
+		active.add(file);
+		try {
+			return analyzeFresh(file, source);
+		} finally {
+			active.delete(file);
+		}
+	};
+	const analyzeFresh = (file, source) => {
+		const cached = analyzed.get(file);
+		if (cached?.source === source) {
+			// Refresh the contract modules it imports first, including ones that did
+			// not exist yet: a new or changed export list bumps the generation.
+			for (const specifier of cached.specifiers) {
+				const target = resolveDataModule(specifier, file);
+				if (target !== null) facts(target);
+			}
+			if (cached.generation === generation) return cached.result;
+		}
+		const specifiers = [];
+		const result = analyzeDataContracts(source, file, (specifier) => {
+			specifiers.push(specifier);
+			const target = resolveDataModule(specifier, file);
+			// A cycle partner's exports are not known yet; its own analysis bumps
+			// the generation, so this module is analyzed again.
+			if (target === null || active.has(target)) return null;
+			facts(target);
+			return exportsOf.get(target) ?? null;
+		});
+		if (DATA_MODULE.test(file)) {
+			// A module that re-exports contracts has exports this module cannot list.
+			const exported =
+				result.reexports.length > 0
+					? null
+					: new Set(
+							result.declarations
+								.filter((declaration) => declaration.exported)
+								.map((declaration) => declaration.binding),
+						);
+			const previous = exportsOf.get(file);
+			if (
+				previous === undefined ||
+				String(previous && [...previous]) !== String(exported && [...exported])
+			) {
+				exportsOf.set(file, exported);
+				generation++;
+			}
+		}
+		analyzed.set(file, { source, generation, specifiers, result });
+		return result;
+	};
+	/**
+	 * A module's facts from disk, or null when it does not touch octane/data or
+	 * does not parse: its own build reports the syntax error, not its importers.
+	 */
+	const facts = (file) => {
+		const source = read(file);
+		if (source === null || !MENTIONS_DATA.test(source)) return null;
+		try {
+			return analyze(file, source);
+		} catch {
+			return null;
+		}
+	};
+	/** Every module's facts, keyed by file. */
+	const all = () => {
+		const result = new Map();
+		for (const file of list()) {
+			const found = facts(file);
+			if (found !== null) result.set(file, found);
+		}
+		return result;
+	};
+	/** Each contract's declaration, by `file\0binding`, with its first name holder. */
+	const declarationsOf = (modules) => {
+		const declared = new Map();
+		for (const [file, { declarations }] of [...modules].sort(([a], [b]) => (a < b ? -1 : 1))) {
+			for (const declaration of declarations) {
+				if (declaration.exported && declaration.name !== null)
+					declared.set(`${file}\0${declaration.binding}`, { file, declaration });
+			}
+		}
+		return declared;
+	};
+
+	return {
+		/** Whether the application imports the generated manifest, which opts it in. */
+		importsManifest() {
+			for (const file of list()) if (read(file)?.includes(DATA_MANIFEST_MODULE)) return true;
+			return false;
+		},
+
+		/** One module's own diagnostics (rules 1–4), from `source` or the file on disk. */
+		check(file, source) {
+			if ((source !== undefined && !MENTIONS_DATA.test(source)) || !SOURCE_FILE.test(file))
+				return [];
+			const path = relative(root, file);
+			if (
+				path.startsWith('..') ||
+				isAbsolute(path) ||
+				path.split(/[\\/]/).some((part) => part[0] === '.' || IGNORED_DIRECTORIES.has(part))
+			)
+				return [];
+			source ??= read(file);
+			if (source === null || !MENTIONS_DATA.test(source)) return [];
+			try {
+				return analyze(file, source)?.diagnostics ?? [];
+			} catch {
+				// A syntax error is the compiler's to report.
+				return [];
+			}
+		},
+
+		/** Handler coverage, unused contracts, and names shared across modules. */
+		report() {
+			const modules = all();
+			const declared = declarationsOf(modules);
+			/** The declaring module's key for `name` exported by `file`, through re-exports. */
+			const canonical = (file, name, seen = new Set()) => {
+				const key = `${file}\0${name}`;
+				if (declared.has(key) || seen.has(file)) return declared.has(key) ? key : null;
+				seen.add(file);
+				for (const { source, names } of modules.get(file)?.reexports ?? []) {
+					const target = resolveDataModule(source, file);
+					const pair = names?.find(([, exported]) => exported === name);
+					const found =
+						target === null || (names !== null && pair === undefined)
+							? null
+							: canonical(target, pair?.[0] ?? name, seen);
+					if (found !== null) return found;
+				}
+				return null;
+			};
+			/** Every name `file` exports, through re-exports. */
+			const exportNames = (file, seen = new Set()) => {
+				if (seen.has(file)) return [];
+				seen.add(file);
+				const facts = modules.get(file);
+				const names = (facts?.declarations ?? [])
+					.filter((declaration) => declaration.exported)
+					.map((declaration) => declaration.binding);
+				for (const { source, names: pairs } of facts?.reexports ?? []) {
+					const target = resolveDataModule(source, file);
+					if (pairs !== null) names.push(...pairs.map(([, exported]) => exported));
+					else if (target !== null) names.push(...exportNames(target, seen));
+				}
+				return names;
+			};
+			const handled = new Map();
+			const calls = new Map();
+			const used = new Set();
+			for (const [file, { uses }] of modules) {
+				for (const use of uses) {
+					const target = use.source === null ? file : resolveDataModule(use.source, file);
+					if (target === null) continue;
+					if (use.imported === '*') {
+						for (const name of new Set(exportNames(target))) {
+							const key = canonical(target, name);
+							if (key !== null && SERVED.has(declared.get(key).declaration.kind))
+								handled.set(key, (handled.get(key) ?? 0) + 1);
+						}
+						continue;
+					}
+					const key = canonical(target, use.imported) ?? `${target}\0${use.imported}`;
+					used.add(key);
+					if (HANDLER_SITES.has(use.site)) handled.set(key, (handled.get(key) ?? 0) + 1);
+					// A contract module's own sites, such as `view({ of })`, declare rather than call.
+					else if (!DATA_MODULE.test(file) && !calls.has(key))
+						calls.set(key, `${relativeTo(root, file)}:${use.start.line}`);
+				}
+			}
+			const diagnostics = [];
+			const names = new Map();
+			for (const [key, { file, declaration }] of declared) {
+				const { binding, kind, name } = declaration;
+				const node = { start: declaration.start.offset, end: declaration.end.offset };
+				node.loc = { start: declaration.start, end: declaration.end };
+				const first = names.get(name);
+				if (first === undefined) names.set(name, { file, binding });
+				else if (first.file !== file) {
+					diagnostics.push(
+						diagnostic(
+							DATA_CONTRACT_DECLARATION,
+							file,
+							node,
+							`\`${binding}\` reuses the name ${JSON.stringify(name)} of \`${first.binding}\` in ${relativeTo(root, first.file)}. Give each contract its own name.`,
+						),
+					);
+				}
+				const count = handled.get(key) ?? 0;
+				const call = calls.get(key);
+				if (SERVED.has(kind) && (count > 1 || (count === 0 && call !== undefined))) {
+					diagnostics.push(
+						diagnostic(
+							DATA_CONTRACT_UNHANDLED,
+							file,
+							node,
+							count > 1
+								? `\`${binding}\` is handled ${count} times. Serve each contract from one \`handle(${binding}, …)\` or \`defineHandler\` entry.`
+								: `\`${binding}\` is used in ${call}, but no \`createDataHandler\` serves it. Add \`handle(${binding}, …)\`, or serve its module with \`defineHandler\`.`,
+						),
+					);
+				} else if (kind === 'entity' ? !used.has(key) : call === undefined) {
+					diagnostics.push({
+						...diagnostic(
+							DATA_CONTRACT_UNUSED,
+							file,
+							node,
+							count > 0
+								? `\`${binding}\` is served, but nothing in the app uses it. Remove it and its handler, or use it from the app.`
+								: `\`${binding}\` is declared but never used. Remove it, or use it from the app.`,
+						),
+						severity: 'hint',
+					});
+				}
+			}
+			return diagnostics;
+		},
+
+		/**
+		 * The source of `octane/data/manifest`, and the contract modules it
+		 * reads. `identity` is the shape `createReplica` compares at runtime,
+		 * not a hash of declaration text: a contract's output schema may come
+		 * from another module, and a formatting edit must not split owners.
+		 */
+		manifest() {
+			const files = list().filter((file) => DATA_MODULE.test(file));
+			const modules = new Map();
+			for (const file of files) {
+				const found = facts(file);
+				if (found !== null) modules.set(file, found);
+			}
+			const seen = new Set();
+			const entries = [];
+			for (const { file, declaration } of declarationsOf(modules).values()) {
+				if (!SERVED.has(declaration.kind) || seen.has(declaration.name)) continue;
+				seen.add(declaration.name);
+				entries.push({ file, declaration });
+			}
+			entries.sort((a, b) => (a.declaration.name < b.declaration.name ? -1 : 1));
+			const imports = new Map();
+			const locals = entries.map(({ file, declaration }, index) => {
+				if (!imports.has(file)) imports.set(file, []);
+				imports.get(file).push(`${declaration.binding} as c${index}`);
+				return `c${index}`;
+			});
+			const writes = locals.filter((_, index) => entries[index].declaration.kind === 'write');
+			const code =
+				`import { contractIdentity } from 'octane/data';\n` +
+				[...imports]
+					.map(
+						([file, names]) =>
+							`import { ${names.join(', ')} } from ${JSON.stringify(file.replaceAll('\\', '/'))};\n`,
+					)
+					.join('') +
+				`export const contracts = [${locals.join(', ')}];\n` +
+				`export const writes = [${writes.join(', ')}];\n` +
+				`export const identity = contractIdentity(contracts);\n`;
+			// Every contract module, including one that does not parse yet, so
+			// fixing it regenerates the manifest.
+			return { code, files };
+		},
+
+		/**
+		 * Forget a changed file, or with none, every file. A created or deleted
+		 * source rescans the project.
+		 * Returns whether it is a contract module, whose change the manifest sees.
+		 */
+		invalidate(file) {
+			sources.delete(file);
+			const listChanged =
+				file === undefined ||
+				listed?.includes(file) !== (SOURCE_FILE.test(file) && existsSync(file));
+			if (!files && listChanged) listed = null;
+			return file !== undefined && DATA_MODULE.test(file);
+		},
+	};
+}
+
+/** Project sources under `root`, outside dependencies, build output, and dot directories. */
+function scan(root) {
+	const found = [];
+	const queue = [root];
+	while (queue.length > 0) {
+		const directory = queue.pop();
+		let entries;
+		try {
+			entries = readdirSync(directory, { withFileTypes: true });
+		} catch {
+			continue;
+		}
+		for (const entry of entries) {
+			if (entry.name[0] === '.') continue;
+			const path = join(directory, entry.name);
+			if (entry.isDirectory()) {
+				if (!IGNORED_DIRECTORIES.has(entry.name)) queue.push(path);
+			} else if (SOURCE_FILE.test(entry.name) && !entry.name.endsWith('.d.ts')) found.push(path);
+		}
+	}
+	return found.sort();
+}
+
+function relativeTo(root, file) {
+	return relative(root, file).replaceAll('\\', '/');
+}
+
+/** One diagnostic as a build reports it: `file:line:column [CODE] message`. */
+export function formatDataDiagnostic(diagnostic, root) {
+	const { filename, start, code, message } = diagnostic;
+	return `${relativeTo(root, filename)}:${start.line}:${start.column + 1} [${code}] ${message}`;
 }
