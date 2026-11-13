@@ -15,6 +15,8 @@
  * The compiler's lowering passes and those proofs share these predicates.
  */
 
+import { createLexicalAnalysis } from './compile-universal.js';
+
 /**
  * Local names whose JSX children the compiler lowers to element descriptors:
  * `descriptorChildren(…)` module bindings, `ReactCompat` transport boundaries,
@@ -104,11 +106,49 @@ export function findDirectlyCalledNames(statements, names) {
 	return called;
 }
 
+// Both the template-argument proof and portal lowering need the original lexical owner.
+export function portalImportBinding(ast) {
+	let imported;
+	for (const node of ast.body) {
+		const source = node.source?.value;
+		if (
+			node.type !== 'ImportDeclaration' ||
+			node.importKind === 'type' ||
+			(source !== 'octane' && source !== 'octane/server')
+		)
+			continue;
+		for (const specifier of node.specifiers) {
+			if (
+				specifier.type === 'ImportSpecifier' &&
+				specifier.importKind !== 'type' &&
+				specifier.local?.name === 'createPortal'
+			) {
+				const name = specifier.imported?.name ?? specifier.imported?.value;
+				if (
+					name === 'createPortal' ||
+					(source === 'octane' && (name === 'memo' || name === 'createElement'))
+				)
+					imported = name;
+			}
+		}
+	}
+	if (imported === undefined) return null;
+	let lexical;
+	return (callee) => {
+		if (callee?.type !== 'Identifier' || callee.name !== 'createPortal') return undefined;
+		lexical ??= createLexicalAnalysis(ast);
+		return lexical.resolveBinding(lexical.nodeScopes.get(callee), callee.name)?.scope ===
+			lexical.rootScope
+			? imported
+			: undefined;
+	};
+}
+
 /**
  * The template functions that lowerDirectlyCalledTemplateFunctions rewrites to
  * their returned-JSX form. Its comment in compile.js states the rules.
  */
-export function findDirectlyCalledTemplateFunctions(ast) {
+export function findDirectlyCalledTemplateFunctions(ast, portalBinding = portalImportBinding(ast)) {
 	// Template function expressions, found anywhere.
 	const expressions = new Set();
 	// Nested template function node → [binding name, the function declaring it].
@@ -145,7 +185,7 @@ export function findDirectlyCalledTemplateFunctions(ast) {
 		const callee = unwrapTsExpr(call.callee);
 		if (isObjectPassThroughCallee(callee)) return true;
 		if (callee?.type !== 'Identifier') return false;
-		if (callee.name === 'createPortal') return true;
+		if (callee.name === 'createPortal') return portalBinding?.(callee) !== undefined;
 		renderingCallees ??= collectOctaneImportLocals(ast.body, ['memo', 'createElement']);
 		return renderingCallees.has(callee.name);
 	};
