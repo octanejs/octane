@@ -21,6 +21,7 @@ import {
 	entryKey,
 	internals,
 	rewrite,
+	seedCursorKey,
 	selections,
 	type DataStore,
 	type Entry,
@@ -127,7 +128,8 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 		if (!restored) {
 			const saved = source.persisted ? await source.persisted.cursor(key) : null;
 			if (signal.aborted) return;
-			cursor ??= saved ?? source.seeded.get(key) ?? null;
+			cursor ??= saved;
+			if (params === undefined) cursor ??= source.seeded.get(seedCursorKey(feed.name)) ?? null;
 			restored = true;
 		}
 		let failures = 0;
