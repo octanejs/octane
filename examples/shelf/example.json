@@ -110,6 +110,13 @@
       "kind": "resilience",
       "spec": "e2e/shelf.spec.ts",
       "critical": true
+    },
+    {
+      "id": "shared-owner-crash-recovery",
+      "title": "Reconnect every shared tab to a new data worker after the worker crashes, and keep saving",
+      "kind": "resilience",
+      "spec": "e2e/shelf.spec.ts",
+      "critical": true
     }
   ],
   "faultScenarios": [

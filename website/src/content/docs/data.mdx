@@ -1447,40 +1447,53 @@ With Rspack the worker is emitted as the `octane-data-worker` entry; leave
 that entry out of your pages' HTML.
 
 **3. Connect each tab.** `sharedOwner(account)` connects to the owner every
-tab signed in as that account uses, and tells it which account this tab is
-signed in as. Pass the same account ID your server authenticates, such as the
-signed-in user's ID. It returns `null`
-where SharedWorker is missing or cannot start, so fall back to an ordinary
-store there:
+tab signed in as that account uses. Pass the same account ID your server
+authenticates, such as the signed-in user's ID. Then give the result to
+`createReplica`, along with exactly the options you would give an ordinary
+store, plus one more: `contracts`, a list of every read, write and feed your
+app uses.
 
 ```ts
+import { createReplica, serverListener, serverTransport, sharedOwner } from 'octane/data';
 import {
-	createDataStore,
-	createReplica,
-	serverListener,
-	serverTransport,
-	sharedOwner,
-} from 'octane/data';
-import { addBook, removeBook, setRead } from './contracts.ts';
+	addBook,
+	books,
+	finished,
+	removeBook,
+	setRead,
+	shelfChanges,
+	stats,
+} from './contracts.ts';
 import { data, events } from './data.tsrx';
 
+const contracts = [books, finished, stats, addBook, setRead, removeBook, shelfChanges];
+
 export function openStore(account: string, seed: string | null) {
-	const port = sharedOwner(account);
-	if (port) {
-		// `writes` lists every write any tab may send, so this tab can show them.
-		return createReplica(port, { seed, writes: [addBook, setRead, removeBook] });
-	}
-	return createDataStore({
+	return createReplica(sharedOwner(account), {
 		transport: serverTransport(data),
 		listen: serverListener(events),
 		seed,
+		contracts,
 	});
 }
 ```
 
-A replica takes the same options as `createDataStore`, except `transport`,
-`listen` and `persist`, which belong to the owner. It still hydrates from the
-page's seed.
+Why the ordinary options? Because sharing is not always possible, and the tab
+should keep working when it isn't. The replica holds on to them, and quietly
+becomes an ordinary store, using that `transport` and `listen` itself, when:
+
+- `sharedOwner` returned `null`, because the browser has no SharedWorker or
+  would not start one;
+- the owner turns this tab away because it comes from a different deploy (more
+  on that below);
+- the owner cannot record the signed-in account, for example because
+  IndexedDB is unavailable in the worker;
+- the owner stopped answering and a new one could not be started.
+
+Why `contracts`? Two reasons. The replica uses the writes in it to show other
+tabs' edits as they happen. And the owner uses the whole list to check that
+every tab sharing it was built from the same contracts. A replica still
+hydrates from the page's seed, so hydration never waits for the worker.
 
 You can also run an owner without a worker. `createDataOwner({ transport,
 listen })` returns an owner whose `connect(port)` serves a replica over any
@@ -1521,16 +1534,12 @@ open the new account's store, and give it to your `DataProvider`. The old
 account's other tabs are retired for you.
 
 ```ts
-import { createReplica, sharedOwner, type DataStore } from 'octane/data';
-import { addBook, removeBook, setRead } from './contracts.ts';
+import { type DataStore } from 'octane/data';
+import { openStore } from './store.ts';
 
-const writes = [addBook, setRead, removeBook];
-
-export function switchAccount(current: DataStore, next: string): DataStore | null {
-	const port = sharedOwner(next);
-	if (!port) return null; // No SharedWorker: open an ordinary store instead.
+export function switchAccount(current: DataStore, next: string): DataStore {
 	// Recording `next` retires every tab of the old account, this one's store included.
-	const store = createReplica(port, { writes });
+	const store = openStore(next, null);
 	void current.retire();
 	return store;
 }
@@ -1539,11 +1548,32 @@ export function switchAccount(current: DataStore, next: string): DataStore | nul
 `createDataOwner` takes the same switch as `fence: true` when you host an
 owner yourself; without it, the owner serves every replica that connects.
 
+<h3 id="cross-tab-builds">Different deploys, and crashes</h3>
+
+A SharedWorker outlives any one page. If you deploy while a user has tabs
+open, a tab of the new build may connect to a worker that an old tab started.
+That is fine as long as both builds agree on the data, so the owner checks.
+The first tab to connect decides: its `contracts` (each contract's kind, name,
+`version`, and output schema shape) become the owner's. A tab whose contracts
+differ is turned away, and carries on as an ordinary store. Once every old tab
+closes, the old worker ends, and the next tab starts the new one.
+
+Workers can also crash, and tabs can disappear without saying goodbye. So the
+tabs and the owner check on each other every five seconds:
+
+- **When the owner goes quiet,** a tab hides its values (its reads show as
+  pending), starts the worker again, and introduces itself to the new owner.
+  Reads the old owner never answered are asked again. A write that was on its
+  way may already have reached the server, so it is never sent twice: it
+  becomes uncertain, and you settle it from its receipt as with any lost
+  reply.
+- **When a tab goes quiet,** the owner stops holding feed connections for it.
+  Any write the tab sent keeps going.
+
 <h3 id="cross-tab-limits">Current limits</h3>
 
-The owner does not persist yet. A replica has no `persist` option, so a page
-that needs an encrypted cache or a write journal uses an ordinary store, one
-per tab.
+The owner does not persist yet. A replica given `persist` keeps its own
+encrypted cache and write journal, as an ordinary store does, one per tab.
 
 <h2 id="bindings">Octane and React, one store</h2>
 
