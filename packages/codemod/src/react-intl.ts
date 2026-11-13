@@ -230,7 +230,6 @@ export function intlImports(
 		if (scalarMethods.has(access.name.text)) {
 			// In the original React render, JSX attributes and children evaluate eagerly.
 			if (
-				/^(?:formatDate|formatTime|formatNumber)$/.test(access.name.text) &&
 				!owner.asteriskToken &&
 				!owner.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
 				ts.findAncestor(

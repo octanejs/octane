@@ -3667,8 +3667,19 @@ export function Greeting({ count }: { count: number }) {
 		return root;
 	}
 	it.each([false, true])(
-		'reports direct render-phase date, time and number formatters (projectTypes=%s)',
+		'reports direct render-phase scalar formatters (projectTypes=%s)',
 		async (projectTypes) => {
+			const methods = {
+				formatDate: '0',
+				formatTime: '0',
+				formatDateTimeRange: '0, 1',
+				formatRelativeTime: `0, 'day'`,
+				formatNumber: '12',
+				formatPlural: '1',
+				formatDisplayName: `'US', { type: 'region' }`,
+			};
+			const calls = Object.entries(methods).map(([method, args]) => `intl.${method}(${args})`);
+			const [date, time, ...others] = calls;
 			const number = `import {useIntl} from 'react-intl';
 				export function View() { return <b>{useIntl().formatNumber(12)}</b>; }`;
 			const root = setup({
@@ -3684,13 +3695,13 @@ export function Greeting({ count }: { count: number }) {
 				'Direct.tsx': `import {useIntl} from 'react-intl';
 					export function Direct() {
 						const intl = useIntl();
-						const date = intl.formatDate(0);
-						return <b title={intl.formatTime(0)}>{date}{intl.formatNumber(12)}</b>;
+						const date = ${date};
+						return <b title={${time}}>{date}${others.map((call) => `{${call}}`).join('')}</b>;
 					}`,
 				'Deferred.tsx': `import {useIntl} from 'react-intl';
 					export function Deferred() {
 						const intl = useIntl();
-						return <button onClick={() => { void intl.formatTime(0); }}>Later</button>;
+						return <button onClick={() => { ${calls.map((call) => `${call};`).join(' ')} }}>Later</button>;
 					}`,
 			});
 			const types = path.join(root, 'node_modules/@types');
@@ -3715,7 +3726,7 @@ export function Greeting({ count }: { count: number }) {
 			const direct = files.find((f) => f.file === 'Direct.tsx');
 			const deferred = files.find((f) => f.file === 'Deferred.tsx');
 			expect(direct.notes.filter((n) => n.severity === 'error')).toEqual(
-				['formatDate', 'formatTime', 'formatNumber'].map((method) =>
+				Object.keys(methods).map((method) =>
 					expect.objectContaining({
 						rule: 'bindings',
 						message: expect.stringContaining(`this ${method} call`),
