@@ -4640,6 +4640,65 @@ describe('compiler-owned component-region memoization', () => {
 		},
 	);
 
+	describe.each(['client', 'server'] as const)('mapped parameter evaluation (%s)', (mode) => {
+		it.each<[string, string | ErrorConstructor]>([
+			['({ id, value = read() })', 'second default'],
+			['({ id, [field]: value })', 'second property'],
+			['({ id, value = index }, index)', ReferenceError],
+		])('preserves the error from %s', (parameters, expected) => {
+			const { App } = loadCompiledFixtureSource(
+				`function Child({ value }) {
+					if (value === 'first') throw new Error('first child');
+					return <li />;
+				}
+				export function App({ rows, read, field }) {
+					return <ul>{rows.map(${parameters} => <Child key={id} value={value} />)}</ul>;
+				}`,
+				{
+					id: 'map-parameter-evaluation.tsrx',
+					mode,
+					compileOptions: {
+						hmr: false,
+						dev: process.env['OCTANE_TEST_COMPILE_MODE'] !== 'prod',
+						strong: false,
+					},
+				},
+			);
+			let propertyReads = 0;
+			const props = {
+				rows:
+					typeof expected === 'string' ? [{ id: 'a', value: 'first' }, { id: 'b' }] : [{ id: 'a' }],
+				read() {
+					throw new Error('second default');
+				},
+				field: {
+					[Symbol.toPrimitive]() {
+						if (++propertyReads === 2) throw new Error('second property');
+						return 'value';
+					},
+				},
+			};
+			if (mode === 'server') {
+				expect(() => ServerRuntime.renderToString(App, props)).toThrow(expected);
+				return;
+			}
+			const errors: unknown[] = [];
+			const container = document.body.appendChild(document.createElement('div'));
+			const root = createRoot(container, { onUncaughtError: (error) => errors.push(error) });
+			try {
+				flushSync(() => root.render(App, props));
+				expect(errors).toEqual([
+					typeof expected === 'string'
+						? expect.objectContaining({ message: expected })
+						: expect.any(expected),
+				]);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		});
+	});
+
 	it.each([`'' + row`, 'String(row)', '`${row}`'])(
 		'coerces mapped JSX props in callback order when keyed rows reverse (%s)',
 		(expression) => {
@@ -5937,6 +5996,13 @@ describe('compiler-owned component-region memoization', () => {
 			rows: [{ id: 1, label: 'computed' }],
 			expected: (_prefix: string) => 'computed',
 		},
+		{
+			capture: 'nested normal-function receiver and arguments',
+			callback:
+				"({ id, label = (function () { return this.prefix + ':' + arguments[0]; }).call({ prefix: 'nested' }, 'own') }) => <li key={id}>{label}</li>",
+			rows: [{ id: 1 }],
+			expected: (_prefix: string) => 'nested:own',
+		},
 	])(
 		'preserves $capture in arrow map parameters on client and server',
 		({ capture, callback, rows, expected }) => {
@@ -5995,11 +6061,10 @@ describe('compiler-owned component-region memoization', () => {
 			expected: 'safe',
 		},
 		{
-			kind: 'nested normal-function receiver and arguments',
-			callback:
-				"({ id, label = (function () { return this.prefix + ':' + arguments[0]; }).call({ prefix: 'nested' }, 'own') }) => <li key={id}>{label}</li>",
+			kind: 'literal computed property and default',
+			callback: `({ id, ['label']: label = 'fallback' }) => <li key={id}>{label}</li>`,
 			rows: [{ id: 1 }],
-			expected: 'nested:own',
+			expected: 'fallback',
 		},
 	])('keeps $kind in arrow map parameters optimized', ({ kind, callback, rows, expected }) => {
 		const source = `

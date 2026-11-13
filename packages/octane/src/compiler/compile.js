@@ -9271,7 +9271,7 @@ function mapCallToForOf(expr, ctx) {
 		params.length > 2 ||
 		params[0].type === 'AssignmentPattern' ||
 		params[0].type === 'RestElement' ||
-		params.some(mapCallbackPatternCapturesLexicalReceiver) ||
+		mapCallbackPatternSomeExpression(params[0], mapPatternExpressionNeedsOriginalCallback) ||
 		mapCallbackCapturesLexicalReceiver(arrow.body)
 	) {
 		return null;
@@ -9284,6 +9284,11 @@ function mapCallToForOf(expr, ctx) {
 	// Fusion interleaves callbacks and row rendering. Preserve authored callback
 	// order when a call or coercion can be observed.
 	if (containsRenderCall([body], null, mapCoercionHasEffects)) return null;
+	// The row helper exposes a read-only position. A writable callback index
+	// needs its original binding, including when a handler captures it.
+	if (params[1] && collectReassignedBindings({ body: [b.stmt(arrow)] }).has(params[1])) {
+		return null;
+	}
 	// Pull a `key={…}` attribute off the returned element → the for-of header key,
 	// and drop it from the element (it's not a DOM attribute). makeForCall then
 	// keys via the header, falling back to `item.id ?? item` when there's no key.
@@ -9390,28 +9395,33 @@ function isModuleConstTag(tag, ctx) {
 	return ctx.mapConstTags.has(tag.name);
 }
 
-function mapCallbackPatternCapturesLexicalReceiver(pattern) {
+function mapPatternExpressionNeedsOriginalCallback(expression) {
+	// Row helpers interleave parameter evaluation with rendering and may already
+	// have initialized the index when the callback would still be binding the item.
+	return !isInvariantLiteral(unwrapTsExpr(expression));
+}
+
+function mapCallbackPatternSomeExpression(pattern, matches) {
 	if (!pattern || typeof pattern !== 'object') return false;
 	switch (pattern.type) {
 		case 'AssignmentPattern':
-			return (
-				mapCallbackPatternCapturesLexicalReceiver(pattern.left) ||
-				mapCallbackCapturesLexicalReceiver(pattern.right)
-			);
+			return mapCallbackPatternSomeExpression(pattern.left, matches) || matches(pattern.right);
 		case 'ObjectPattern':
 			return (pattern.properties || []).some((property) => {
 				if (property.type === 'RestElement') {
-					return mapCallbackPatternCapturesLexicalReceiver(property.argument);
+					return mapCallbackPatternSomeExpression(property.argument, matches);
 				}
 				return (
-					(property.computed && mapCallbackCapturesLexicalReceiver(property.key)) ||
-					mapCallbackPatternCapturesLexicalReceiver(property.value || property.key)
+					(property.computed && matches(property.key)) ||
+					mapCallbackPatternSomeExpression(property.value || property.key, matches)
 				);
 			});
 		case 'ArrayPattern':
-			return (pattern.elements || []).some(mapCallbackPatternCapturesLexicalReceiver);
+			return (pattern.elements || []).some((item) =>
+				mapCallbackPatternSomeExpression(item, matches),
+			);
 		case 'RestElement':
-			return mapCallbackPatternCapturesLexicalReceiver(pattern.argument);
+			return mapCallbackPatternSomeExpression(pattern.argument, matches);
 		default:
 			return false;
 	}
@@ -18299,7 +18309,16 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 	}
 	if (isCreatePortalCall(expr)) {
 		ctx.runtimeNeeded.add('ssrPortal');
-		return ssrCall('ssrPortal', [], node);
+		const marker = ssrCall('ssrPortal', [], node);
+		if (!hasExplicitPortalArgs(expr.arguments)) return marker;
+		const eager = [];
+		for (let i = 0; i < expr.arguments.length; i++) {
+			const arg = expr.arguments[i];
+			if (i === 1 && isServerDocumentBody(arg, ctx)) continue;
+			if (!isDeferredPortalOperand(arg, i === 0))
+				eager.push(rewriteJsxValues(rewriteHookCalls(arg, ctx, name), ctx));
+		}
+		return eager.length === 0 ? marker : inheritOriginLoc(b.sequence([...eager, marker]), node);
 	}
 	if (
 		node.returnedJsxValue !== true &&
@@ -31625,6 +31644,20 @@ function planJsx(
 			}
 			portalTrailing.push(bagFieldNode(bag, `_portalAnchor$${pc.id}`));
 		}
+		let body = pc.bodyExpr;
+		if (
+			hasExplicitPortalArgs(pc.origin.arguments) &&
+			!isDeferredPortalOperand(pc.origin.arguments[0], true) &&
+			!isInvariantLiteral(pc.targetExpr) &&
+			// Direct eval can observe a newly introduced lexical binding.
+			!(ctx.portalHasDirectEval ??=
+				(ctx.mapSource.includes('eval') || ctx.mapSource.includes('\\u')) &&
+				hasInlineMemoDirectEval(ctx.authoredModuleAst))
+		) {
+			const local = allocCompilerName(ctx, '__portalBody');
+			pushAfterStmt(pc.id, org, b.const(local, body));
+			body = b.id(local);
+		}
 		pushAfterStmt(
 			pc.id,
 			org,
@@ -31634,7 +31667,7 @@ function planJsx(
 					b.id('__s'),
 					b.literal(slotIndex),
 					pc.targetExpr,
-					pc.bodyExpr,
+					body,
 					pc.propsExpr,
 					hostNodeFor(`_portalHost$${pc.id}`),
 					...portalTrailing,
@@ -35977,6 +36010,42 @@ function isCreatePortalCall(node) {
 	return node?.type === 'CallExpression' && node._octanePortalCall === true;
 }
 
+function hasExplicitPortalArgs(args) {
+	return (
+		(args.length === 2 || args.length === 3) && !args.some((arg) => arg.type === 'SpreadElement')
+	);
+}
+
+function isServerDocumentBody(arg, ctx) {
+	const expression = unwrapTsExpr(arg);
+	const target =
+		expression?.type === 'ChainExpression' ? unwrapTsExpr(expression.expression) : expression;
+	if (target?.type !== 'MemberExpression' || target.computed || target.property.name !== 'body')
+		return false;
+	const receiver = unwrapTsExpr(target.object);
+	if (receiver?.type !== 'Identifier' || receiver.name !== 'document') return false;
+	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	const scope = lexical.nodeScopes.get(receiver);
+	return scope != null && lexical.resolveBinding(scope, 'document') == null;
+}
+
+function isInlinePortalBody(node) {
+	const type = node?.type;
+	return (
+		type === 'Element' || type === 'Fragment' || type === 'JSXElement' || type === 'JSXFragment'
+	);
+}
+
+function isDeferredPortalOperand(node, body) {
+	const inner = unwrapTsExpr(node);
+	if (isInvariantLiteral(inner) || isFunctionNode(inner)) return true;
+	// Only the raw JSX body is hoisted. Type-wrapped elements stay descriptors,
+	// whose construction can read a component binding or its default props.
+	return body
+		? isInlinePortalBody(node) || inner?.type === 'Tsrx' || inner?.type === 'Tsx'
+		: isJsxLike(inner) || inner?.type === 'Fragment';
+}
+
 function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, cssHash) {
 	const [bodyArg, targetArg, propsArg] = callNode.arguments;
 	// The body is typically a <tsrx>...</tsrx> block or an arrow-`@{}` — both
@@ -35986,8 +36055,7 @@ function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, css
 	// printed verbatim into the emitted portal() call (invalid output).
 	let bodyExpr;
 	let envNames = null;
-	const bt = bodyArg ? bodyArg.type : null;
-	if (bt === 'Element' || bt === 'Fragment' || bt === 'JSXElement' || bt === 'JSXFragment') {
+	if (isInlinePortalBody(bodyArg)) {
 		// Phase 2: hoisted portal body + env tuple (see hoistBodyHelper).
 		envNames = unionEnv(ctx, [{ stmts: [bodyArg], params: [] }]);
 		bodyExpr = inheritOriginLoc(
@@ -38340,7 +38408,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	const inlineKey =
 		keyCapturesParent ||
 		(snapshot !== null &&
-			(mapCallbackPatternCapturesLexicalReceiver(leftDeclId) ||
+			(mapCallbackPatternSomeExpression(leftDeclId, mapCallbackCapturesLexicalReceiver) ||
 				mapCallbackCapturesLexicalReceiver(explicitKey))) ||
 		(node.nativeArrayMap !== undefined &&
 			mapCallbackHasEventClosure(node.nativeArrayMap.callback) &&

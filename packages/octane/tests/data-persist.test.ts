@@ -622,31 +622,42 @@ describe('octane/data persistent cache', () => {
 
 	it('saves marks again after storage fails to save them', async () => {
 		const inner = memoryStorage();
+		const savedValues = new Set<string>();
 		let failMarks = false;
+		let rejectedMarks = false;
+		let savedMarks = false;
 		const storage: PersistentStorage = {
 			...inner,
-			commit(partition, put, remove) {
+			async commit(partition, put, remove) {
 				// The marks are the only value saved under their partition's own name.
-				if (failMarks && put[0]?.meta.key === partition) {
-					failMarks = false;
-					return Promise.reject(new Error('quota exceeded'));
+				const marks = put[0]?.meta.key === partition;
+				// Even an idle retry fails until the later read is saved.
+				if (failMarks && marks && savedValues.size < 2) {
+					rejectedMarks = true;
+					throw new Error('quota exceeded');
 				}
-				return inner.commit(partition, put, remove);
+				await inner.commit(partition, put, remove);
+				if (marks) {
+					if (failMarks) savedMarks = true;
+				} else {
+					for (const { meta, value } of put) {
+						if (value !== undefined) savedValues.add(meta.key);
+					}
+				}
 			},
 		};
 		const first = server(books());
 		const before = createDataStore({ transport: first.transport, persist: cache(storage, 'ada') });
 		(await value(before, shelf)).stop();
-		await saved();
+		await vi.waitFor(() => expect(savedValues.size).toBe(1));
 
 		failMarks = true;
 		const writer = createDataStore({ transport: first.transport, persist: cache(storage, 'ada') });
 		await writer.write(setRead, { id: 'a', read: true });
-		await saved();
-		expect(failMarks).toBe(false);
-		// Any later save writes the marks that failed.
+		await vi.waitFor(() => expect(rejectedMarks).toBe(true));
+		// Storage can save the marks once the later read is durable.
 		(await value(writer, count)).stop();
-		await saved();
+		await vi.waitFor(() => expect(savedMarks).toBe(true));
 
 		const remote = server(first.books);
 		const after = createDataStore({ transport: remote.transport, persist: cache(storage, 'ada') });
