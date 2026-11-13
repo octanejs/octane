@@ -561,6 +561,43 @@ it('preserves SVG root defaults and literal overrides on the server and client',
 	);
 });
 
+it('preserves circle geometry, order, and authored root data on the server and client', async () => {
+	await expectSvgRenderParity(
+		`export function Pane({className}) { return <button>
+			<Mark className={className} data-status="override" />
+			<Mark />
+		</button>; }`,
+		[{ className: 'first' }, { className: 'next' }],
+		2,
+		{
+			'icons/mark.svg': `<svg viewBox="0 0 20 20" data-status="authored" data-empty="">
+				<path d="M0 0H20" stroke="#fff"/>
+				<g transform="translate(1 2)"><circle cx="5.4" cy="5.4" r="3.5" stroke="currentColor" fill="none"/></g>
+				<rect width="6" height="4"/>
+				<circle r="2" stroke="#020304" stroke-width="0.25"/>
+			</svg>`,
+		},
+	);
+});
+
+it.each([
+	'<svg><circle r="-2"/></svg>',
+	'<svg><circle cx="1"/></svg>',
+	'<svg><circle r="2" r="3"/></svg>',
+	'<svg><circle r="2" fill="url(#paint)"/></svg>',
+	'<svg data-status="001"><path d="M0 0H1"/></svg>',
+	'<svg data-oct-s="reserved"><path d="M0 0H1"/></svg>',
+	'<svg data-status="one" data-status="two"><path d="M0 0H1"/></svg>',
+])('keeps unsupported circle geometry and root data for review: %s', async (drawing) => {
+	const { root, file, icon } = fixture();
+	fs.writeFileSync(icon, drawing);
+	const { files } = await runCodemod([file], { root, svgPaths: true, strong: true, write: false });
+	expect(files.find((entry) => entry.file === 'src/pane.tsx').notes).toContainEqual(
+		expect.objectContaining({ rule: 'svg-issuer', severity: 'error' }),
+	);
+	expect(files.some((entry) => entry.output.endsWith('.svg.octane.ts'))).toBe(false);
+});
+
 it('preserves scoped and composed CSS module classes on SVGs on the server and client', async () => {
 	const {
 		root,

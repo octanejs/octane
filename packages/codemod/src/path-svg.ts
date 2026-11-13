@@ -64,6 +64,7 @@ const rectAttributes = {
 const shapeAttributes = {
 	path: pathAttributes,
 	rect: rectAttributes,
+	circle: { ...presentation, cx: length, cy: length, r: extent },
 	g: { transform, 'clip-path': /^url\(#[A-Za-z_][A-Za-z0-9_-]*\)$/ },
 	defs: {},
 	clipPath: { id: /^[A-Za-z_][A-Za-z0-9_-]*$/ },
@@ -75,7 +76,7 @@ const shapeAttributes = {
 	},
 };
 
-function attributes(text: string, allowed: Record<string, RegExp>) {
+function attributes(text: string, allowed: Record<string, RegExp>, allowData = false) {
 	const values: Record<string, string> = {};
 	const field =
 		/[ \t\r\n]+([A-Za-z][A-Za-z-]*)[ \t\r\n]*=[ \t\r\n]*(?:"([^"&<>\t\r\n]*)"|'([^'&<>\t\r\n]*)')/gy;
@@ -83,9 +84,19 @@ function attributes(text: string, allowed: Record<string, RegExp>) {
 	for (let match; (match = field.exec(text)); end = field.lastIndex) {
 		const name = match[1]!;
 		let value = (match[2] ?? match[3])!;
-		if (name in values || !Object.prototype.hasOwnProperty.call(allowed, name)) return null;
-		const rule = allowed[name]!;
-		if (!rule.test(value)) return null;
+		if (name in values) return null;
+		const rule = Object.prototype.hasOwnProperty.call(allowed, name) ? allowed[name] : undefined;
+		// SVG JSX loaders can normalize numeric strings or escape punctuation differently.
+		if (
+			rule
+				? !rule.test(value)
+				: !(
+						allowData &&
+						svgDataAttribute(name) &&
+						/^(?:[a-z][a-z0-9_-]*(?: [a-z0-9_-]+)*)?$/.test(value)
+					)
+		)
+			return null;
 		// SVGR emits a numeric literal for a leading-dot opacity.
 		if (rule === opacity && value.startsWith('.')) value = '0' + value;
 		// SVG component loaders can emit a numeric literal for unitless lengths.
@@ -129,7 +140,7 @@ export function parseStaticSvg(source: string) {
 	let patternId: string | undefined;
 	let paintId: string | undefined;
 	const token =
-		/[ \t\r\n]*(?:<!--([\s\S]*?)-->|<\/(svg|g|defs|clipPath|pattern)[ \t\r\n]*>|<(svg|g|rect|path|defs|clipPath|pattern)([^<>]*?)(\/?)>)/gy;
+		/[ \t\r\n]*(?:<!--([\s\S]*?)-->|<\/(svg|g|defs|clipPath|pattern)[ \t\r\n]*>|<(svg|g|rect|circle|path|defs|clipPath|pattern)([^<>]*?)(\/?)>)/gy;
 	let hasShape = false;
 	let end = 0;
 	for (let match; (match = token.exec(source)); end = token.lastIndex) {
@@ -148,7 +159,7 @@ export function parseStaticSvg(source: string) {
 			open.pop();
 		} else if (tag === 'svg') {
 			if (root || selfClosing) return null;
-			root = attributes(fields!, rootAttributes);
+			root = attributes(fields!, rootAttributes, true);
 			if (!root) return null;
 			open.push({ tag, children });
 		} else {
@@ -161,13 +172,14 @@ export function parseStaticSvg(source: string) {
 				(parent.tag === 'pattern' && name !== 'path')
 			)
 				return null;
-			const container = name !== 'path' && name !== 'rect';
+			const container = name !== 'path' && name !== 'rect' && name !== 'circle';
 			if (container ? selfClosing || open.length > 32 : !selfClosing) return null;
 			const props = attributes(fields!, shapeAttributes[name]);
 			if (
 				!props ||
 				(tag === 'path' && !props.d) ||
-				(tag === 'rect' && !(props.width && props.height))
+				(tag === 'rect' && !(props.width && props.height)) ||
+				(tag === 'circle' && !props.r)
 			)
 				return null;
 			if (name === 'clipPath') {
