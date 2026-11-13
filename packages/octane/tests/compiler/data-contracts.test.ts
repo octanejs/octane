@@ -112,6 +112,26 @@ for (const list of <const>[books, unread]) session.store.read(list);
 		]);
 	});
 
+	it('walks functions in a site position instead of rejecting them', () => {
+		const source = `import { setRead, stats } from './books.data.ts';
+export const api = {
+	read() {
+		return store.read(stats);
+	},
+	put: () => store.write(setRead, {}),
+	remove: () => remember(setRead),
+};
+`;
+		const { diagnostics, uses } = analyzeDataContracts(source, '/app/page.ts');
+		expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+			'OCTANE_DATA_CONTRACT_ESCAPE',
+		]);
+		expect(uses.map((use) => `${use.binding}@${use.site}`)).toEqual([
+			'stats@read',
+			'setRead@write',
+		]);
+	});
+
 	it('accepts type positions, property reads, and exports', () => {
 		const source = `import { setRead, type Book } from './books.data.ts';
 export type Input = typeof setRead extends { input: infer I } ? I : never;

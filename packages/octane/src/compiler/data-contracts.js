@@ -54,6 +54,7 @@ const FUNCTION_SITES = new Map([
 ]);
 /** `view({ of })`, `write({ creates, patches, removes })`, and a FeedChange's `put`, `remove`, `read`. */
 const PROPERTY_SITES = new Set(['of', 'creates', 'patches', 'removes', 'put', 'remove', 'read']);
+const FUNCTIONS = new Set(['ArrowFunctionExpression', 'FunctionExpression']);
 
 /**
  * @typedef {{ offset: number, line: number, column: number }} DataPosition
@@ -230,10 +231,12 @@ export function analyzeDataContracts(source, filename) {
 		if (scope === rootScope) return contracts.has(node.name) || namespaces.has(node.name);
 		return aliases.get(scope)?.has(node.name) === true;
 	};
+	// Stops at functions: a callback or method in a site position is walked as
+	// ordinary code, so its own sites count and its escapes are still reported.
 	const mentionsContract = (node) => {
 		let found = false;
 		walk(node, null, null, (child, parent, key) => {
-			if (found) return false;
+			if (found || FUNCTIONS.has(child.type)) return false;
 			found = isContractIdentifier(child, parent, key);
 			return !found;
 		});
