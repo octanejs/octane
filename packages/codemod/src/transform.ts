@@ -1034,6 +1034,16 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			const tag = this.originalStoreTags.get(item) ?? item.name.text;
 			this.reactRendererBodies.set(element, tag + ', ' + props);
 		}
+		if (this.target === 'tsrx') {
+			for (const item of this.nativeIntl) {
+				if ((item.propertyName ?? item.name).text !== 'FormattedMessage') continue;
+				for (const ref of this.localUses(item.name)) {
+					const element = ref.parent;
+					if (ts.isJsxSelfClosingElement(element) && !this.reactRendererBodies.has(element))
+						this.reportIntlFormatterOwner(element, 'generated native adapter');
+				}
+			}
+		}
 		let hasEval = false;
 		const snapshots: ts.VariableDeclaration[] = [];
 		const helperCalls: ts.CallExpression[] | undefined =
@@ -1470,12 +1480,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					(name === 'FormattedMessage' ||
 						(this.options.reactIntlAdapter && INTL_FORMATTER.test(importedName)))
 				)
-					this.note(
-						RULE.bindings,
-						'error',
-						element,
-						'A React Intl formatter can depend on ancestor contexts or schedule React DOM resources outside this generated island. Verify the provider and its formatters, or keep the formatter under its original React ancestors.',
-					);
+					this.reportIntlFormatterOwner(element, 'generated island');
 				this.islands.set(element, paragraph ? 'ReactCompatInline' : 'ReactCompat');
 			} else {
 				// Octane fails on a React component deep in its renderer, naming
@@ -1491,6 +1496,18 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		) {
 			block(`\`${text}\` is a React context, which Octane cannot read.`);
 		}
+	}
+
+	private reportIntlFormatterOwner(
+		node: ts.Node,
+		boundary: 'generated island' | 'generated native adapter',
+	) {
+		this.note(
+			RULE.bindings,
+			'error',
+			node,
+			`A React Intl formatter can depend on ancestor contexts or schedule React DOM resources outside this ${boundary}. Verify the provider and its formatters, or keep the formatter under its original React ancestors.`,
+		);
 	}
 
 	private fixedSvgColor(ref: ts.Identifier) {
