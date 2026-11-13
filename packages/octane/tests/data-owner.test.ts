@@ -16,6 +16,7 @@ import {
 	type Transport,
 } from '../src/data/index.js';
 import {
+	addTodo,
 	createServer,
 	removeTodo,
 	setDone,
@@ -29,7 +30,7 @@ afterEach(() => {
 	for (const close of closers.splice(0)) close();
 });
 
-const writes = [setDone, removeTodo];
+const writes = [addTodo, setDone, removeTodo];
 
 /** An owner over `transport`, and `count` replicas connected to it by message channels. */
 function tabs(transport: Transport, count: number, feedListener?: Listener): DataStore[] {
@@ -75,6 +76,63 @@ describe('octane/data owner and replicas', () => {
 		expect(one()[0]!.title).toBe('Atoll');
 		await vi.waitFor(() => expect(two()[0]!.title).toBe('Atoll'));
 		expect(server.log).toEqual(['list', 'list']);
+	});
+
+	it('reloads a read with a new request even while an older one is in flight, and keeps the newer value', async () => {
+		const server = createServer();
+		const held: Array<() => void> = [];
+		let hold = false;
+		const [first, second] = tabs(async (request, signal) => {
+			// The server answers now, as of now; the reply reaches the tab when released.
+			const reply = await server.transport(request, signal);
+			if (hold) await new Promise<void>((resolve) => held.push(resolve));
+			return reply;
+		}, 2);
+		const one = await observed(first!.read(todos, undefined));
+		const two = await observed(second!.read(todos, undefined));
+
+		hold = true;
+		const older = first!.read(todos, undefined).refresh();
+		await vi.waitFor(() => expect(held).toHaveLength(1));
+		server.rows[0]!.title = 'Atoll';
+		// The second tab reloads after the change, so the first tab's request cannot answer it.
+		const newer = second!.read(todos, undefined).refresh();
+		await vi.waitFor(() => expect(held).toHaveLength(2));
+		held[1]!();
+		await newer;
+		expect(two()[0]!.title).toBe('Atoll');
+		held[0]!();
+		await older;
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		// The older reply, finishing last, does not take the second tab back.
+		expect(two()[0]!.title).toBe('Atoll');
+		expect(one()[0]!.title).toBe('Tides');
+	});
+
+	it('holds an edit to a record another tab is creating until the create is settled', async () => {
+		const server = createServer();
+		let release!: () => void;
+		const [first, second] = tabs(async (request, signal) => {
+			if (request.name === addTodo.name) {
+				await new Promise<void>((resolve) => (release = resolve));
+				return { ok: false, code: 'full' };
+			}
+			return server.transport(request, signal);
+		}, 2);
+		await observed(first!.read(todos, undefined));
+		const two = await observed(second!.read(todos, undefined));
+
+		const added = first!.write(addTodo, { title: 'Reef' }).catch((error) => error);
+		await vi.waitFor(() => expect(two()).toHaveLength(2));
+		const edited = second!.write(setDone, { id: two()[1]!.id, done: true }).catch((error) => error);
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(writeCount(server.log)).toBe(0);
+		release();
+		expect(((await added) as { code: string }).code).toBe('full');
+		await edited;
+		// The create was refused, so the edit to its record is never sent.
+		expect(writeCount(server.log)).toBe(0);
+		await vi.waitFor(() => expect(two()).toHaveLength(1));
 	});
 
 	it('shows a write from one tab in the other before its reply, and the same rollback when it is refused', async () => {

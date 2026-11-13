@@ -14,9 +14,11 @@
  *   replica shows it from the moment it is sent, and settles it as that
  *   replica does: confirmed with the same reply, refused, or uncertain until
  *   one of them settles it.
- * - Equal reads in flight at once are one request. A read another replica
- *   loaded replaces the value of a replica that holds it and is not loading
- *   it itself.
+ * - Equal reads in flight at once are one request, except that a replica
+ *   asking again for a read it asked for before, to reload it, never joins a
+ *   request that may predate the change it reloads for. The newest read
+ *   started for a key replaces the value of each replica that holds it and is
+ *   not loading it itself; an older one finishing later does not.
  * - One upstream connection serves every replica listening to a feed with
  *   the same parameters; it closes when the last one stops.
  */
@@ -48,7 +50,13 @@ export interface OwnerPort {
 
 /** What a replica sends its owner. */
 type ToOwner =
-	| { readonly t: 'request'; readonly id: number; readonly request: DataRequest }
+	| {
+			readonly t: 'request';
+			readonly id: number;
+			readonly request: DataRequest;
+			/** A reload: it must not join a request already in flight. */
+			readonly fresh: boolean;
+	  }
 	| { readonly t: 'listen'; readonly id: number; readonly request: FeedRequest }
 	| { readonly t: 'unlisten'; readonly id: number }
 	| {
@@ -103,12 +111,14 @@ export function createDataOwner(options: {
 	const upstreams = new Map<string, Upstream>();
 	/** The replicas that asked for each shared read; the rest are told its value. */
 	const asked = new WeakMap<Promise<DataReply>, Set<OwnerPort>>();
+	/** The newest read started for each wire key: only its value is told to the others. */
+	const newest = new Map<string, Promise<DataReply>>();
 
 	const others = (from: OwnerPort, message: ToReplica) => {
 		for (const port of replicas) if (port !== from) port.postMessage(message);
 	};
 
-	function request(from: OwnerPort, id: number, payload: DataRequest): void {
+	function request(from: OwnerPort, id: number, payload: DataRequest, fresh: boolean): void {
 		const answer = (reply: DataReply) =>
 			from.postMessage({ t: 'reply', id, reply } satisfies ToReplica);
 		const fail = (error: unknown) =>
@@ -129,16 +139,22 @@ export function createDataOwner(options: {
 			return;
 		}
 		const key = `${payload.kind}\n${entryKey(payload.name, payload.input)}`;
-		let shared = reading.get(key);
+		let shared = fresh ? undefined : reading.get(key);
 		if (!shared) {
-			shared = Promise.resolve().then(() => transport(payload, new AbortController().signal));
-			reading.set(key, shared);
-			const done = () => reading.delete(key);
-			shared.then(done, done);
+			const started = (shared = Promise.resolve().then(() =>
+				transport(payload, new AbortController().signal),
+			));
+			reading.set(key, started);
+			newest.set(key, started);
+			const done = () => {
+				if (reading.get(key) === started) reading.delete(key);
+				if (newest.get(key) === started) newest.delete(key);
+			};
 			if (payload.kind === 'read') {
-				shared.then(
+				started.then(
 					(reply) => {
-						if (!reply.ok) return;
+						// A newer read has replaced this one; its value is the one to share.
+						if (!reply.ok || newest.get(key) !== started) return;
 						// Every replica holding this read takes the value; the ones that asked already have it.
 						const value: ToReplica = {
 							t: 'value',
@@ -147,11 +163,12 @@ export function createDataOwner(options: {
 							value: reply.value,
 						};
 						for (const port of replicas)
-							if (!asked.get(shared!)?.has(port)) port.postMessage(value);
+							if (!asked.get(started)!.has(port)) port.postMessage(value);
 					},
 					() => {},
 				);
 			}
+			started.then(done, done);
 		}
 		let askers = asked.get(shared);
 		if (!askers) asked.set(shared, (askers = new Set()));
@@ -223,7 +240,7 @@ export function createDataOwner(options: {
 			replicas.add(port);
 			port.addEventListener('message', ({ data }) => {
 				const message = data as ToOwner;
-				if (message.t === 'request') request(port, message.id, message.request);
+				if (message.t === 'request') request(port, message.id, message.request, message.fresh);
 				else if (message.t === 'listen') subscribe(port, message.id, message.request);
 				else if (message.t === 'unlisten') unsubscribe(port, message.id);
 				else others(port, message);
@@ -252,12 +269,20 @@ export function createReplica(
 	>();
 	const feeds = new Map<number, { push(frame: FeedFrame): void; end(error?: unknown): void }>();
 	const send = (message: ToOwner) => port.postMessage(message);
+	/** The reads this replica has asked for: asking again is a reload. */
+	const askedFor = new WeakSet<Entry>();
 
 	const transport: Transport = (request) =>
 		new Promise((resolve, reject) => {
 			const id = ++next;
 			replies.set(id, { resolve, reject });
-			send({ t: 'request', id, request });
+			const entry =
+				request.kind === 'read'
+					? inner.wireEntry(entryKey(request.name, request.input))
+					: undefined;
+			const fresh = !!entry && askedFor.has(entry);
+			if (entry) askedFor.add(entry);
+			send({ t: 'request', id, request, fresh });
 		});
 
 	const listen: Listener = (request, signal) => ({

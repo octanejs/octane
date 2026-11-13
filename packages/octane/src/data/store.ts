@@ -1522,11 +1522,31 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		};
 	}
 
+	/** Hold a record's queue behind a write. A create holds it until its outcome is known, even if uncertain. */
+	function hold(operation: Operation, queueKey: string, sent: Promise<unknown>): void {
+		let held = sent;
+		if (operation.write.effect!.kind === 'create') {
+			let resolve!: () => void;
+			let reject!: (error: unknown) => void;
+			const promise = new Promise<void>((done, fail) => {
+				resolve = done;
+				reject = fail;
+			});
+			promise.catch(() => {});
+			operation.gate = { promise, resolve, reject };
+			held = promise;
+		}
+		queues.set(queueKey, held);
+		const release = () => {
+			if (queues.get(queueKey) === held) queues.delete(queueKey);
+		};
+		held.then(release, release);
+	}
+
 	function send(write: Write<any, any>, input: unknown, raw: unknown): Promise<any> {
 		const id = crypto.randomUUID();
 		const operation = operationFor(id, write, input, raw, 'pending');
 		const { effect } = write;
-		const creates = effect?.kind === 'create';
 		operations.push(operation);
 		if (effect) touchEntities();
 		// A durable write is in the journal before it can reach the server.
@@ -1565,26 +1585,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 					return dispatch();
 				})
 			: dispatch();
-		if (queueKey !== undefined) {
-			// A create holds its record's queue until its outcome is known, even if uncertain.
-			let held: Promise<unknown> = sent;
-			if (creates) {
-				let resolve!: () => void;
-				let reject!: (error: unknown) => void;
-				const promise = new Promise<void>((done, fail) => {
-					resolve = done;
-					reject = fail;
-				});
-				promise.catch(() => {});
-				operation.gate = { promise, resolve, reject };
-				held = promise;
-			}
-			queues.set(queueKey, held);
-			const release = () => {
-				if (queues.get(queueKey) === held) queues.delete(queueKey);
-			};
-			held.then(release, release);
-		}
+		if (queueKey !== undefined) hold(operation, queueKey, sent);
 
 		return sent.then(
 			async (reply) => {
@@ -1828,6 +1829,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		wireEntry,
 		follow(operation) {
 			operations.push(operation);
+			const { effect } = operation.write;
+			// Edits here to another tab's new record wait for its outcome, as they would there.
+			if (effect?.kind === 'create')
+				hold(operation, `${effect.entity.name}\n${operation.entityId}`, NEVER);
 			touchEntities();
 		},
 		operation: (id) => operations.find((item) => item.id === id),
