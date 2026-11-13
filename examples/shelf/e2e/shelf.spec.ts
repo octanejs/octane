@@ -442,6 +442,14 @@ async function dataWorker(keeper: Page, namespace: string) {
 	});
 	await send('Network.enable');
 	return {
+		/**
+		 * End the worker, as a crash does. Detached first: DevTools would hold the worker started
+		 * in its place, under the same name, until a debugger resumed it.
+		 */
+		async crash() {
+			await cdp.send('Target.detachFromTarget', { sessionId });
+			await cdp.send('Target.closeTarget', { targetId });
+		},
 		reads: () => sent.filter((body) => body.includes('\\"kind\\"') && !body.includes('write')),
 		feeds: () => sent.filter((body) => body.includes('books.changes')),
 		writes: () => sent.filter((body) => body.includes('write')),
@@ -531,34 +539,50 @@ test('signs every shared tab of an account out when another account signs in, ev
 	await other.close();
 });
 
-test('reconnects every shared tab to a new data worker after the worker crashes', async ({
+test('reconnects every shared tab to a new data worker after the worker crashes, and settles the write it had in flight', async ({
 	page,
 	browser,
 }) => {
 	test.setTimeout(90_000);
-	const url = `/?ns=${Date.now()}-${++namespace}&owner=shared`;
+	const ns = `${Date.now()}-${++namespace}`;
+	const url = `/?ns=${ns}&owner=shared`;
+	const keeper = await page.context().newPage();
+	const worker = await dataWorker(keeper, ns);
 	const other = await page.context().newPage();
 	for (const tab of [page, other]) {
 		await tab.goto(url);
 		await expect(tab.getByText('3 books · 0 read')).toBeVisible();
 	}
+	await keeper.close();
 	const cdp = await browser.newBrowserCDPSession();
 	const workers = async () =>
 		(await cdp.send('Target.getTargets')).targetInfos.filter(
 			(target) => target.type === 'shared_worker',
 		);
 	const [crashed] = await workers();
-	await cdp.send('Target.closeTarget', { targetId: crashed!.targetId });
 
-	// Each tab notices the silence within three 5 s heartbeats, starts the worker again, and
-	// carries on with it.
+	// The worker crashes while the reply to an edit is held on a slow network. Both tabs show the
+	// edit, uncertain, until its receipt says the server applied it.
+	await worker.latency(60_000);
+	await book(page, 'Kindred').getByRole('checkbox').click();
+	for (const tab of [page, other])
+		await expect(book(tab, 'Kindred').getByRole('checkbox')).toBeChecked();
+	await worker.crash();
+
+	// Each tab notices the silence within three 5 s heartbeats, starts the worker again, carries on
+	// with it, and confirms the edit by its receipt, without sending it again.
 	await expect
 		.poll(async () => (await workers()).map((target) => target.targetId), { timeout: 40_000 })
 		.toEqual([expect.not.stringMatching(crashed!.targetId)]);
-	await page.waitForTimeout(20_000);
+	for (const tab of [page, other]) {
+		await expect(tab.getByText('3 books · 1 read')).toBeVisible({ timeout: 30_000 });
+		await expect(book(tab, 'Kindred').getByRole('checkbox')).toBeChecked();
+	}
+	expect(worker.writes()).toHaveLength(1);
+
 	await book(page, 'Kindred').getByRole('checkbox').click();
 	await expect(status(page)).toHaveText('Saved', { timeout: 15_000 });
-	await expect(book(other, 'Kindred').getByRole('checkbox')).toBeChecked();
+	await expect(book(other, 'Kindred').getByRole('checkbox')).not.toBeChecked();
 	await other.close();
 });
 

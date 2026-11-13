@@ -232,6 +232,8 @@ export interface StoreInternals {
 	/** Roll back a write another tab sent, which the server refused. */
 	remove(operation: Operation): void;
 	settleOperation(operation: Operation, confirmed: boolean, value: unknown): void;
+	/** Settle each uncertain durable write by its receipt, as a restart does. */
+	resettle(): void;
 	/** Called after `settle` settles a write here, so other tabs can settle it too. */
 	onSettle(notify: (id: string, confirmed: boolean, value: unknown) => void): void;
 	/** Show every read as pending, or show them again. */
@@ -1432,7 +1434,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		reloadAll(reload);
 		if (!operation.write.effect) operations = operations.filter((item) => item !== operation);
 		collect();
-		persisted?.unjournal(operation.id);
+		if (durable.has(operation.write)) persisted!.unjournal(operation.id);
 	}
 
 	/** The entry a reply for `key` belongs to: the read, or a view that asked for that window with its margin. */
@@ -1450,7 +1452,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	function remove(operation: Operation): void {
 		operations = operations.filter((item) => item !== operation);
 		touchEntities();
-		persisted?.unjournal(operation.id);
+		if (durable.has(operation.write)) persisted!.unjournal(operation.id);
 	}
 
 	/** Name an uncertain write's outcome once a receipt has established it. */
@@ -1462,6 +1464,28 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			remove(operation);
 			operation.gate?.reject(new DependencyError());
 		}
+	}
+
+	/** Ask the server whether it applied the journaled write `id`. */
+	async function receipt(id: string) {
+		const { receipt } = options.persist!.journal!;
+		const reply = await request(
+			{ kind: 'read', name: receipt.name, input: { operationId: id } },
+			retiring.signal,
+		);
+		if (!reply.ok) throw new DataError(reply.code);
+		return parse(receipt.output, reply.value);
+	}
+
+	/** Settle an uncertain durable write by its receipt; one whose receipt cannot be read stays uncertain. */
+	function settleByReceipt(operation: Operation): void {
+		void receipt(operation.id).then(
+			({ applied, value }) => {
+				if (!retired && operation.status === 'uncertain')
+					settleOperation(operation, applied, value);
+			},
+			() => {},
+		);
 	}
 
 	/**
@@ -1491,23 +1515,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			operations = [...recovered, ...operations];
 			touchEntities();
 		}
-		async function receipt(id: string) {
-			const reply = await request(
-				{ kind: 'read', name: journal.receipt.name, input: { operationId: id } },
-				retiring.signal,
-			);
-			if (!reply.ok) throw new DataError(reply.code);
-			return parse(journal.receipt.output, reply.value);
-		}
-		for (const operation of recovered) {
-			void receipt(operation.id).then(
-				({ applied, value }) => {
-					if (!retired && operation.status === 'uncertain')
-						settleOperation(operation, applied, value);
-				},
-				() => {},
-			);
-		}
+		for (const operation of recovered) settleByReceipt(operation);
 		// Obsolete writes have no usable effect metadata. Check one receipt at a time.
 		for (const id of obsolete) {
 			if (retired) return;
@@ -1892,6 +1900,11 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			operation.gate?.reject(new DependencyError());
 		},
 		settleOperation,
+		resettle() {
+			for (const operation of operations)
+				if (operation.status === 'uncertain' && durable.has(operation.write))
+					settleByReceipt(operation);
+		},
 		onSettle(notify) {
 			settled = notify;
 		},
