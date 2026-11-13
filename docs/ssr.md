@@ -853,7 +853,7 @@ export default function open(seed: string | null, context: Context | null) {
 ```
 
 With `data: '/src/data.tsrx'` in `octane.config.ts`, every render route runs
-inside the store it opens, so pages call `useRead` and `useWrite` with no store
+inside the store it opens, so pages call `useDataStore`, `useRead` and `store.write` with no store
 code of their own:
 
 - The server opens one store per request, after its middleware has run, with

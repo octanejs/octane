@@ -5,7 +5,7 @@
  * component given the same store see the same values, pending edits and
  * rollbacks, because the store owns them and neither renderer does.
  */
-import { createContext, createElement, use, useCallback, useSyncExternalStore } from 'react';
+import { createContext, createElement, use, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import type { Write } from './contracts.js';
 import type { FeedHandle, FeedSnapshot } from './feeds.js';
@@ -66,12 +66,6 @@ export function usePages<T>(handle: PagesHandle<T>): PagesSnapshot<T> {
  */
 export function useFeed(handle: FeedHandle): FeedSnapshot {
 	return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot);
-}
-
-/** A stable function that submits a write through the store. */
-export function useWrite<I, O>(write: Write<I, O>): (input: I) => Promise<O> {
-	const store = useDataStore();
-	return useCallback((input: I) => store.write(write, input), [store, write]);
 }
 
 const formView = formViews<ReactNode>(createElement);

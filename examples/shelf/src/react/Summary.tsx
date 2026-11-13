@@ -1,11 +1,11 @@
 /** @jsxImportSource react */
 import type { DataStore } from 'octane/data';
-import { DataProvider, useDataStore, useRead, useWrite } from 'octane/data/react';
+import { DataProvider, useDataStore, useRead } from 'octane/data/react';
 import { setRead, unread } from '../shared/contracts.ts';
 
 function Unread() {
-	const list = useRead(useDataStore().read(unread), { suspend: false }).value ?? [];
-	const save = useWrite(setRead);
+	const store = useDataStore();
+	const list = useRead(store.read(unread), { suspend: false }).value ?? [];
 	return (
 		<section className="island" aria-label="React island">
 			<h2>Up next (React island)</h2>
@@ -19,7 +19,9 @@ function Unread() {
 							<button
 								type="button"
 								aria-label={`Mark ${book.title} read from React`}
-								onClick={() => void save({ id: book.id, read: true }).catch(() => {})}
+								onClick={() =>
+									void store.write(setRead, { id: book.id, read: true }).catch(() => {})
+								}
 							>
 								Mark read
 							</button>

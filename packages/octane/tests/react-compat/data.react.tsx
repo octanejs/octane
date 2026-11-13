@@ -2,14 +2,7 @@
 import { Suspense } from 'react';
 import type { DataStore } from 'octane/data';
 import { listen, pages } from 'octane/data';
-import {
-	DataProvider,
-	useDataStore,
-	useFeed,
-	usePages,
-	useRead,
-	useWrite,
-} from 'octane/data/react';
+import { DataProvider, useDataStore, useFeed, usePages, useRead } from 'octane/data/react';
 import { setDone, todoChanges, todoPages, todos } from '../_data-todos.js';
 
 function ReactDoneCount() {
@@ -20,13 +13,13 @@ function ReactDoneCount() {
 }
 
 function ReactToggle() {
-	const list = useRead(useDataStore().read(todos));
-	const save = useWrite(setDone);
+	const store = useDataStore();
+	const list = useRead(store.read(todos));
 	const todo = list[0]!;
 	return (
 		<button
 			data-react-toggle=""
-			onClick={() => void save({ id: todo.id, done: !todo.done }).catch(() => {})}
+			onClick={() => void store.write(setDone, { id: todo.id, done: !todo.done }).catch(() => {})}
 		>
 			{todo.done ? 'Mark active' : 'Complete'}
 		</button>

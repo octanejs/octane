@@ -26,7 +26,7 @@ import { loading, type DataStore, type ReadHandle, type ReadSnapshot } from './s
 
 type Runtime = Pick<
 	typeof Client,
-	'createContext' | 'createElement' | 'use' | 'useCallback' | 'useSyncExternalStore'
+	'createContext' | 'createElement' | 'use' | 'useSyncExternalStore'
 >;
 
 export interface OctaneDataBinding {
@@ -56,8 +56,6 @@ export interface OctaneDataBinding {
 	 * connection's status.
 	 */
 	useFeed(handle: FeedHandle): FeedSnapshot;
-	/** A stable function that submits a write through the store. */
-	useWrite<I, O>(write: Write<I, O>): (input: I) => Promise<O>;
 	/**
 	 * A native form for a write that declares `form` fields. `key` separates
 	 * instances, such as one per row, so each keeps its own state.
@@ -71,7 +69,7 @@ function split(input: unknown, slot: symbol | undefined): [unknown, symbol | und
 }
 
 export function createOctaneDataBinding(runtime: Runtime): OctaneDataBinding {
-	const { createContext, createElement, use, useCallback, useSyncExternalStore } = runtime;
+	const { createContext, createElement, use, useSyncExternalStore } = runtime;
 	const StoreContext = createContext<DataStore | null>(null);
 
 	function useDataStore(): DataStore {
@@ -117,18 +115,12 @@ export function createOctaneDataBinding(runtime: Runtime): OctaneDataBinding {
 		return formView(handle, state);
 	}
 
-	function useWrite(write: Write<any, any>, slot?: symbol) {
-		const store = useDataStore();
-		return useCallback((input: unknown) => store.write(write, input), [store, write], slot);
-	}
-
 	return {
 		DataProvider: (props) => createElement(StoreContext, { value: props.store }, props.children),
 		useDataStore,
 		useRead,
 		usePages,
 		useFeed,
-		useWrite,
 		useForm,
 	} as OctaneDataBinding;
 }

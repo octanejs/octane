@@ -14,7 +14,7 @@ Key facts for answering questions about Octane:
 - `useLinkedState(source, calculate, options?)` keeps a value editable while its source stays the same, then resets or adjusts it immediately when the source changes. The calculation receives the new source and the previous `{ source, value }`, or `undefined` on the first render. No effect or render-time setter is needed.
 - [`useLayoutSnapshot`](https://octanejs.dev/docs/core-apis#use-layout-snapshot) renders from a committed DOM measurement before paint, using an initial value for SSR and hydration. It does not observe layout changes independently of component commits. [`useLazyRef(factory)`](https://octanejs.dev/docs/core-apis#use-lazy-ref) creates a ref's value once. In Strong mode, `useLayoutSnapshot` replaces setting state from a layout-effect measurement, and `useLazyRef` replaces React's `if (ref.current === null) ref.current = create()` idiom.
 - Signals are stable: `octane/signals` provides `signal$`, async-capable `derived$`, keyed `query$`, streams, and `optimistic$`/`action$`. Module declarations resolve to request-local server state or document-local browser state; explicit `createScope`/`createResource` remain available. `useSignal$` from `octane/signals/client` provides component-owned state. Native reads require a runtime signals import and the standard compiler, with no extra option. Use `$` names for handles/helpers exposing live reads; sampled values keep ordinary names.
-- `octane/data` is the data layer for server-owned data: contracts (`read`, `write`, `view`, `entity`, `feed`) describe operations and do no I/O; `createDataStore` caches reads, applies optimistic edits and rolls them back; `createDataHandler` from `octane/data/server` serves contracts; `octane/data/octane` and `octane/data/react` expose the same hooks (`DataProvider`, `useRead`, `usePages`, `useWrite`, `useForm`, `useFeed`) over one store. See the Data section below and the [Data guide](https://octanejs.dev/docs/data).
+- `octane/data` is the data layer for server-owned data: contracts (`read`, `write`, `view`, `entity`, `feed`) describe operations and do no I/O; `createDataStore` caches reads, applies optimistic edits and rolls them back; `createDataHandler` from `octane/data/server` serves contracts; `octane/data/octane` and `octane/data/react` expose the same hooks (`DataProvider`, `useRead`, `usePages`, `useForm`, `useFeed`, with writes through `store.write`) over one store. See the Data section below and the [Data guide](https://octanejs.dev/docs/data).
 - Strong mode is opt-in: a leading `"use strong"` directive or `compiler: { strong: true }` asserts immutable snapshots and pure rendering, enabling `OCTANE_STRONG_*` compile errors and fully conditioned production memoization for user-authored render operations. In a Strong module the compiler owns memoization and dependencies: `useMemo` and `useCallback` are errors, and an explicit dependency array that differs from the inferred inputs is an error (an equivalent one is a hint). Render never reads or writes `ref.current`: use `useLazyRef` for create-once values and `useLayoutSnapshot` for DOM measurements. `useEffectEvent` and effects that synchronize external systems remain valid. See the Strong mode section below and the [Strong mode guide](https://octanejs.dev/docs/strong-mode).
 - Native, delegated DOM events (`onClick`, `onInput`, `onSubmit`) instead of a synthetic event layer — behavior matches the platform. There is no synthetic `onChange`: `onInput` is the per-edit handler for text inputs; native `change` fires when the browser commits an edit, usually on blur.
 - `OCTANE_NATIVE_TEXT_ONCHANGE` is a nonfatal authoring warning, not an event rewrite. The compiler reports direct `onChange`/`onChangeCapture` on a statically known text-entry `<input>` or `<textarea>` without a usable input handler; development runtime checks cover unresolved spreads/dynamic types/final props and report through `console.error` once per broken episode. Statically true `readOnly`/`disabled` controls are excluded. Use the phase-preserving `onInput`/`onInputCapture` fix for per-edit intent.
@@ -528,17 +528,17 @@ export const setRead = write({
 ```
 
 ```tsrx
-import { DataProvider, useDataStore, useRead, useWrite } from 'octane/data/octane';
+import { DataProvider, useDataStore, useRead } from 'octane/data/octane';
 import type { DataStore } from 'octane/data';
 import { books, setRead } from './contracts.ts';
 
 function BookList() @{
-  const list = useRead(useDataStore().read(books));
-  const save = useWrite(setRead);
+  const store = useDataStore();
+  const list = useRead(store.read(books));
   <ul>
     @for (const book of list; key book.id) {
       <li>
-        <input type="checkbox" checked={book.read} onChange={() => void save({ id: book.id, read: !book.read }).catch(() => {})} />
+        <input type="checkbox" checked={book.read} onChange={() => void store.write(setRead, { id: book.id, read: !book.read }).catch(() => {})} />
         {book.title as string}
       </li>
     }

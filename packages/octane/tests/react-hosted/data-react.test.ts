@@ -8,7 +8,7 @@ import * as React from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { createDataStore, type DataStore } from '../../src/data/index.js';
-import { DataProvider, useDataStore, useForm, useRead, useWrite } from '../../src/data/react.js';
+import { DataProvider, useDataStore, useForm, useRead } from '../../src/data/react.js';
 import { createServer, setDone, todos } from '../_data-todos.js';
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -27,7 +27,8 @@ function DoneCount() {
 
 let submit: (input: { id: string; done: boolean }) => Promise<unknown>;
 function Toggle() {
-	submit = useWrite(setDone);
+	const store = useDataStore();
+	submit = (input) => store.write(setDone, input);
 	return null;
 }
 
