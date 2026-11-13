@@ -18305,7 +18305,7 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 		for (let i = 0; i < expr.arguments.length; i++) {
 			const arg = expr.arguments[i];
 			if (i === 1 && isServerDocumentBody(arg, ctx)) continue;
-			if (!isDeferredPortalOperand(arg))
+			if (!isDeferredPortalOperand(arg, i === 0))
 				eager.push(rewriteJsxValues(rewriteHookCalls(arg, ctx, name), ctx));
 		}
 		return eager.length === 0 ? marker : inheritOriginLoc(b.sequence([...eager, marker]), node);
@@ -31624,7 +31624,7 @@ function planJsx(
 		let body = pc.bodyExpr;
 		if (
 			hasExplicitPortalArgs(pc.origin.arguments) &&
-			!isDeferredPortalOperand(pc.origin.arguments[0]) &&
+			!isDeferredPortalOperand(pc.origin.arguments[0], true) &&
 			!isInvariantLiteral(pc.targetExpr) &&
 			// Direct eval can observe a newly introduced lexical binding.
 			!(ctx.portalHasDirectEval ??=
@@ -35953,14 +35953,21 @@ function isServerDocumentBody(arg, ctx) {
 	return scope != null && lexical.resolveBinding(scope, 'document') == null;
 }
 
-function isDeferredPortalOperand(node) {
-	const inner = unwrapTsExpr(node);
+function isInlinePortalBody(node) {
+	const type = node?.type;
 	return (
-		isInvariantLiteral(inner) ||
-		isFunctionNode(inner) ||
-		isJsxLike(inner) ||
-		inner?.type === 'Fragment'
+		type === 'Element' || type === 'Fragment' || type === 'JSXElement' || type === 'JSXFragment'
 	);
+}
+
+function isDeferredPortalOperand(node, body) {
+	const inner = unwrapTsExpr(node);
+	if (isInvariantLiteral(inner) || isFunctionNode(inner)) return true;
+	// Only the raw JSX body is hoisted. Type-wrapped elements stay descriptors,
+	// whose construction can read a component binding or its default props.
+	return body
+		? isInlinePortalBody(node) || inner?.type === 'Tsrx' || inner?.type === 'Tsx'
+		: isJsxLike(inner) || inner?.type === 'Fragment';
 }
 
 function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, cssHash) {
@@ -35972,8 +35979,7 @@ function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, css
 	// printed verbatim into the emitted portal() call (invalid output).
 	let bodyExpr;
 	let envNames = null;
-	const bt = bodyArg ? bodyArg.type : null;
-	if (bt === 'Element' || bt === 'Fragment' || bt === 'JSXElement' || bt === 'JSXFragment') {
+	if (isInlinePortalBody(bodyArg)) {
 		// Phase 2: hoisted portal body + env tuple (see hoistBodyHelper).
 		envNames = unionEnv(ctx, [{ stmts: [bodyArg], params: [] }]);
 		bodyExpr = inheritOriginLoc(

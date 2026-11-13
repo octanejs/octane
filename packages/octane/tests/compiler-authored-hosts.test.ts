@@ -289,6 +289,47 @@ describe('authored host JSX', () => {
 		expect(props.target).not.toHaveBeenCalled();
 	});
 
+	it('evaluates a type-asserted JSX portal argument before its target', () => {
+		const source = `import { createPortal } from 'octane';
+			export function App({ Content, mark, target }) @{
+				<main>{createPortal((<Content /> as unknown), target(), mark('key'))}</main>
+			}`;
+		const body = `export function Content() @{ <b>body</b> }`;
+		const calls: string[] = [];
+		const destination = document.createElement('div');
+		function observedContent(content: object) {
+			return Object.defineProperty(content, 'defaultProps', {
+				get() {
+					calls.push('body');
+					return undefined;
+				},
+			});
+		}
+		const props = {
+			mark(value: string) {
+				calls.push(value);
+				return value;
+			},
+			target() {
+				calls.push('target');
+				return destination;
+			},
+		};
+		const { App: ServerApp } = fixture(source, true);
+		const Content = observedContent(fixture(body, true).Content);
+		expect(renderToString(ServerApp, { ...props, Content }).html).toContain('<main>');
+		expect(calls).toEqual(['body', 'target', 'key']);
+		calls.length = 0;
+		const { App } = fixture(source);
+		const view = mount(App, { ...props, Content: observedContent(fixture(body).Content) });
+		try {
+			expect(calls).toEqual(['body', 'target', 'key']);
+			expect(destination.querySelector('b')?.textContent).toBe('body');
+		} finally {
+			view.unmount();
+		}
+	});
+
 	it('renders a direct optional document body portal on the server without a DOM', () => {
 		const source = `import { createPortal } from 'octane';
 			export function App({ mark }) @{
