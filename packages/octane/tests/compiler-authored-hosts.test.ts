@@ -289,6 +289,39 @@ describe('authored host JSX', () => {
 		expect(props.target).not.toHaveBeenCalled();
 	});
 
+	it('renders a direct optional document body portal on the server without a DOM', () => {
+		const source = `import { createPortal } from 'octane';
+			export function App({ mark }) @{
+				<main>{createPortal(mark('body'), (document?.body as HTMLElement), mark('key'))}</main>
+			}`;
+		const { App } = fixture(source, true);
+		const mark = vi.fn((value: string) => value);
+		const browserDocument = Object.getOwnPropertyDescriptor(globalThis, 'document')!;
+		Reflect.deleteProperty(globalThis, 'document');
+		try {
+			expect(renderToString(App, { mark }).html).toContain('<main>');
+			expect(mark.mock.calls).toEqual([['body'], ['key']]);
+		} finally {
+			Object.defineProperty(globalThis, 'document', browserDocument);
+		}
+	});
+
+	it('evaluates a shadowed optional document target on the server', () => {
+		const source = `import { createPortal } from 'octane';
+			export function App({ document, mark }) @{
+				<main>{createPortal(mark('body'), document?.body, mark('key'))}</main>
+			}`;
+		const { App } = fixture(source, true);
+		const mark = vi.fn((value: string) => value);
+		const target = {
+			get body() {
+				return mark('target');
+			},
+		};
+		expect(renderToString(App, { document: target, mark }).html).toContain('<main>');
+		expect(mark.mock.calls).toEqual([['body'], ['target'], ['key']]);
+	});
+
 	it('keeps the portal temporary outside authored direct eval', () => {
 		const source = `import { createPortal } from 'octane';
 			export function App({ target }) @{

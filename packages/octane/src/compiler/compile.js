@@ -35941,7 +35941,9 @@ function hasExplicitPortalArgs(args) {
 }
 
 function isServerDocumentBody(arg, ctx) {
-	const target = unwrapTsExpr(arg);
+	const expression = unwrapTsExpr(arg);
+	const target =
+		expression?.type === 'ChainExpression' ? unwrapTsExpr(expression.expression) : expression;
 	if (target?.type !== 'MemberExpression' || target.computed || target.property.name !== 'body')
 		return false;
 	const receiver = unwrapTsExpr(target.object);
