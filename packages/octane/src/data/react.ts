@@ -5,13 +5,13 @@
  * component given the same store see the same values, pending edits and
  * rollbacks, because the store owns them and neither renderer does.
  */
-import { createContext, createElement, use, useCallback, useSyncExternalStore } from 'react';
+import { createContext, createElement, use, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
-import type { Feed, Read, View, Write } from './contracts.js';
-import { listen, type FeedSnapshot } from './feeds.js';
+import type { Write } from './contracts.js';
+import type { FeedHandle, FeedSnapshot } from './feeds.js';
 import { formViews, type FormView } from './form.js';
-import { pages, type PagesSnapshot } from './pages.js';
-import type { DataStore, ReadSnapshot } from './store.js';
+import type { PagesHandle, PagesSnapshot } from './pages.js';
+import { loading, type DataStore, type ReadHandle, type ReadSnapshot } from './store.js';
 
 const StoreContext = createContext<DataStore | null>(null);
 
@@ -25,63 +25,47 @@ export function useDataStore(): DataStore {
 	return store;
 }
 
-/** Observe a read without suspending. The component mounts and unmounts the observation. */
-export function useReadState<O>(read: Read<void, O>): ReadSnapshot<O>;
-/** A view with no parameters shows its default window when the input is omitted. */
-export function useReadState<T>(read: View<void, T>): ReadSnapshot<T[]>;
-export function useReadState<I, O>(read: Read<I, O>, input: I): ReadSnapshot<O>;
-export function useReadState<I, O>(read: Read<I, O>, input?: I): ReadSnapshot<O> {
-	// Equal inputs resolve to one handle, so its methods are stable across renders.
-	const handle = useDataStore().read(read, input as I);
-	return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot);
-}
-
 /**
- * Read a value, suspending under the nearest `<Suspense>` until the first one
- * arrives and throwing a failed first load to the nearest error boundary.
- * Later reloads keep the last value on screen.
+ * Read a value from a handle, `store.read(read, input)`, while the component
+ * is mounted. It suspends under the nearest `<Suspense>` until the first value
+ * arrives, and throws a failed first load to the nearest error boundary; later
+ * reloads keep the last value on screen. With `{ suspend: false }` it returns
+ * the live snapshot instead. Equal arguments resolve to one handle, so its
+ * methods are stable across renders.
  */
-export function useRead<O>(read: Read<void, O>): O;
-export function useRead<T>(read: View<void, T>): T[];
-export function useRead<I, O>(read: Read<I, O>, input: I): O;
-export function useRead<I, O>(read: Read<I, O>, input?: I): O {
-	const store = useDataStore();
-	const snapshot = useReadState(read, input as I);
+export function useRead<T>(handle: ReadHandle<T>): T;
+export function useRead<T>(
+	handle: ReadHandle<T>,
+	options: { readonly suspend: false },
+): ReadSnapshot<T>;
+export function useRead<T>(
+	handle: ReadHandle<T>,
+	options?: { readonly suspend: false },
+): T | ReadSnapshot<T> {
+	const snapshot = useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot);
+	if (options?.suspend === false) return snapshot;
 	if (snapshot.status === 'error') throw snapshot.error;
-	// The load in flight is one promise for every caller, as `use` requires.
-	if (snapshot.status === 'pending') use(store.prefetch(read, input as I));
-	return snapshot.value as O;
+	if (snapshot.status === 'pending') use(loading(useDataStore(), handle));
+	return snapshot.value as T;
 }
 
 /**
- * A view read a page at a time, as one list. `more` says whether another page
- * has rows, and `loadMore` shows it. Like `useReadState`, it does not suspend.
+ * Show a view a page at a time, from a handle, `pages(store, view, params)`.
+ * `more` says whether another page has rows, and `loadMore` shows it. It does
+ * not suspend.
  */
-export function usePages<T>(view: View<void, T>): PagesSnapshot<T>;
-export function usePages<P, T>(view: View<P, T>, params: P): PagesSnapshot<T>;
-export function usePages<P, T>(view: View<P, T>, params?: P): PagesSnapshot<T> {
-	// Equal arguments resolve to one handle, so its methods are stable across renders.
-	const handle = pages(useDataStore(), view, params as P);
+export function usePages<T>(handle: PagesHandle<T>): PagesSnapshot<T> {
 	return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot);
 }
 
 /**
- * Listen to a feed while the component is mounted, so its events keep the
- * store's reads current. Components listening to equal arguments share one
- * connection. Returns the connection's status.
+ * Listen to a feed, from a handle, `listen(store, feed, params)`, while the
+ * component is mounted, so its events keep the store's reads current.
+ * Components listening to equal arguments share one connection. Returns the
+ * connection's status.
  */
-export function useFeed<E>(feed: Feed<void, E>): FeedSnapshot;
-export function useFeed<P, E>(feed: Feed<P, E>, params: P): FeedSnapshot;
-export function useFeed<P, E>(feed: Feed<P, E>, params?: P): FeedSnapshot {
-	// Equal arguments resolve to one handle, so its methods are stable across renders.
-	const handle = listen(useDataStore(), feed, params as P);
+export function useFeed(handle: FeedHandle): FeedSnapshot {
 	return useSyncExternalStore(handle.subscribe, handle.getSnapshot, handle.getSnapshot);
-}
-
-/** A stable function that submits a write through the store. */
-export function useWrite<I, O>(write: Write<I, O>): (input: I) => Promise<O> {
-	const store = useDataStore();
-	return useCallback((input: I) => store.write(write, input), [store, write]);
 }
 
 const formView = formViews<ReactNode>(createElement);
