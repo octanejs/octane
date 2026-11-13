@@ -284,6 +284,40 @@ export const INDEPENDENT_HYDRATION_MANIFEST_FILENAME: 'octane-independent-hydrat
 /** Where the build plugins emit an app's data worker; see `sharedOwner` in `octane/data`. */
 export { DATA_WORKER_PATH } from '../data/worker-path.js';
 
+/** A diagnostic from the octane/data contract check. */
+export interface DataContractDiagnostic {
+	code: string;
+	severity: 'error' | 'hint';
+	filename: string;
+	start: { offset: number; line: number; column: number };
+	end: { offset: number; line: number; column: number };
+	message: string;
+	suggestions: [];
+}
+
+/** One diagnostic as a build reports it: `file:line:column [CODE] message`. */
+export function formatDataDiagnostic(diagnostic: DataContractDiagnostic, root: string): string;
+
+/** The specifier the build plugins generate from the project's `*.data.ts` modules. */
+export const DATA_MANIFEST_MODULE: 'octane/data/manifest';
+
+/**
+ * The project's octane/data facts, read from disk under `root`, or from
+ * `files` when given: per-module checks, the whole-program report, and the
+ * generated `octane/data/manifest`.
+ */
+export function createDataProgram(
+	root: string,
+	files?: readonly string[],
+): {
+	importsManifest(): boolean;
+	check(file: string, source?: string): DataContractDiagnostic[];
+	report(): DataContractDiagnostic[];
+	manifest(): { code: string; files: string[] };
+	/** Returns whether `file` is a contract module, whose change the manifest sees. */
+	invalidate(file?: string): boolean;
+};
+
 /** Direct function exports whose authored body never returns a renderable value. */
 export function findVoidComponentExports(source: string | CompilerProgram, id: string): string[];
 

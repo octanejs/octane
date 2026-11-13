@@ -486,7 +486,7 @@ async function hydrate_entry_features(context, config, entries, clientBuild, pro
  * it). An explicit `profile` (true or false) always takes precedence over
  * `devtools`.
  *
- * @param {{ hmr?: boolean, output?: 'js' | 'ts', profile?: boolean, devtools?: boolean, strong?: boolean, textTypes?: import('octane/compiler/vite').OctaneVitePluginOptions['textTypes'], knownAttributeSpreads?: import('octane/compiler/vite').OctaneVitePluginOptions['knownAttributeSpreads'], domBindingFixedProps?: import('octane/compiler/vite').OctaneVitePluginOptions['domBindingFixedProps'], opaqueSignalHandles?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions, cssModuleConstants?: import('octane/compiler/vite').OctaneVitePluginOptions['cssModuleConstants'], dataWorker?: string }} [inlineOptions]
+ * @param {{ hmr?: boolean, output?: 'js' | 'ts', profile?: boolean, devtools?: boolean, strong?: boolean, textTypes?: import('octane/compiler/vite').OctaneVitePluginOptions['textTypes'], knownAttributeSpreads?: import('octane/compiler/vite').OctaneVitePluginOptions['knownAttributeSpreads'], domBindingFixedProps?: import('octane/compiler/vite').OctaneVitePluginOptions['domBindingFixedProps'], opaqueSignalHandles?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions, cssModuleConstants?: import('octane/compiler/vite').OctaneVitePluginOptions['cssModuleConstants'], dataWorker?: string, data?: boolean }} [inlineOptions]
  * @returns {Plugin[]}
  */
 export function octane(inlineOptions = {}) {
@@ -1479,6 +1479,7 @@ export function octane(inlineOptions = {}) {
 	 *   renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions,
 	 *   cssModuleConstants?: import('octane/compiler/vite').OctaneVitePluginOptions['cssModuleConstants'],
 	 *   dataWorker?: string,
+	 *   data?: boolean,
 	 *   __onIndependentWidgets?: (id: string, environment: string, templates: any[], streamedSignals: boolean) => void,
 	 *   __clientBuildId?: () => string,
 	 * }}
@@ -1513,6 +1514,7 @@ export function octane(inlineOptions = {}) {
 		compilerOptions.cssModuleConstants = inlineOptions.cssModuleConstants;
 	}
 	if (inlineOptions.dataWorker !== undefined) compilerOptions.dataWorker = inlineOptions.dataWorker;
+	if (inlineOptions.data !== undefined) compilerOptions.data = inlineOptions.data;
 	const compilerPlugin = /** @type {Plugin} */ (octaneCompiler(compilerOptions));
 	const compilerConfigHook = compilerPlugin.config;
 	if (typeof compilerConfigHook === 'function') {

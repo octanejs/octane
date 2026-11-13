@@ -103,6 +103,7 @@
     "./data/react": "./src/data/react.ts",
     "./data/octane": "./src/data/octane.ts",
     "./data/octane/server": "./src/data/octane.server.ts",
+    "./data/manifest": "./src/data/manifest.ts",
     "./signals": "./src/signals/index.ts",
     "./signals/client": "./src/signals/client.ts",
     "./signals/server": "./src/signals/server.ts",
@@ -347,6 +348,11 @@
         "types": "./dist/data/react.d.ts",
         "node": "./dist/node/data/react.js",
         "default": "./dist/data/react.js"
+      },
+      "./data/manifest": {
+        "types": "./dist/data/manifest.d.ts",
+        "node": "./dist/node/data/manifest.js",
+        "default": "./dist/data/manifest.js"
       },
       "./signals": {
         "types": "./dist/signals/index.d.ts",

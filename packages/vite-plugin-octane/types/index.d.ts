@@ -62,6 +62,8 @@ export interface OctanePluginOptions {
 	 * `sharedOwner`. Resolved from the Vite project root.
 	 */
 	dataWorker?: OctaneVitePluginOptions['dataWorker'];
+	/** The `octane/data` contract check and generated `octane/data/manifest`. */
+	data?: OctaneVitePluginOptions['data'];
 }
 
 /** The Octane compiler plugin plus Vite app/metaframework integration. */

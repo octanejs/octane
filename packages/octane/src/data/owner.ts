@@ -510,9 +510,9 @@ type Contract = Read<any, any> | Write<any, any> | Feed<any, any>;
 /**
  * Whether two builds can share an owner: the name, kind, `version` and output
  * schema shape of each contract they use, as the persistent cache compares a
- * saved value with its read.
+ * saved value with its read. `octane/data/manifest` exports it as `identity`.
  */
-function contractIdentity(contracts: ReadonlyArray<Contract>): string {
+export function contractIdentity(contracts: ReadonlyArray<Contract>): string {
 	return contracts
 		.map((contract) =>
 			contract.kind === 'read'

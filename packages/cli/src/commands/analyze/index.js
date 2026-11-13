@@ -77,6 +77,23 @@ async function loadCompiler(root) {
 }
 
 /**
+ * The project's octane/data contract program, or null when the installed
+ * octane predates it.
+ *
+ * @param {string} root
+ * @param {string[]} files
+ */
+async function loadDataProgram(root, files) {
+	try {
+		const require = createRequire(path.join(root, 'noop.js'));
+		const bundler = await import(pathToFileURL(require.resolve('octane/compiler/bundler')).href);
+		return bundler.createDataProgram?.(root, files) ?? null;
+	} catch {
+		return null;
+	}
+}
+
+/**
  * Strong codes and the native text `onChange` error Strong promotes, keyed to
  * their documentation.
  *
@@ -375,7 +392,18 @@ export default defineCommand({
 			);
 		}
 
-		if (targets.length === 0 && !measureCoverage && !reportDependencies && !requireDependencies) {
+		// The octane/data contract check runs as the build runs it: once the app
+		// imports `octane/data/manifest`, over every module and the whole program.
+		let data = whole ? await loadDataProgram(project.root, project.sourceFiles) : null;
+		if (data?.importsManifest() !== true) data = null;
+
+		if (
+			targets.length === 0 &&
+			data === null &&
+			!measureCoverage &&
+			!reportDependencies &&
+			!requireDependencies
+		) {
 			ctx.ui.intro('octane analyze');
 			ctx.ui.outro('No Octane modules found.');
 			return { json: { ok: true, analyzed: 0, findings: [] } };
@@ -617,6 +645,18 @@ export default defineCommand({
 						suggestions: [],
 					});
 				}
+			}
+		}
+
+		if (data !== null) {
+			const diagnostics = [
+				...project.sourceFiles.flatMap((absolute) => data.check(absolute)),
+				...data.report(),
+			];
+			for (const diagnostic of diagnostics) {
+				findings.push(
+					findingOf(diagnostic, displayPath(project.root, ctx.cwd, diagnostic.filename)),
+				);
 			}
 		}
 

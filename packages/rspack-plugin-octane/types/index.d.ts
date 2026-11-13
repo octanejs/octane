@@ -185,6 +185,12 @@ export interface OctaneRspackPluginOptions extends OctaneRspackLoaderOptions {
 	 * from the compiler's context.
 	 */
 	dataWorker?: string;
+	/**
+	 * The `octane/data` contract check and the generated `octane/data/manifest`.
+	 * On once the app imports `octane/data/manifest`; `true` turns the check on
+	 * without it, and `false` turns both off.
+	 */
+	data?: boolean;
 	/** Build intent for SSR metadata; independent of optimization/HMR settings. */
 	clientBuildMode?: 'production' | 'development';
 	/**
