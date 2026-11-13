@@ -103,6 +103,13 @@
       "kind": "golden",
       "spec": "e2e/shelf.spec.ts",
       "critical": true
+    },
+    {
+      "id": "shared-owner-account-fencing",
+      "title": "Sign every shared tab of an account out when another account signs in, including a tab that was frozen",
+      "kind": "resilience",
+      "spec": "e2e/shelf.spec.ts",
+      "critical": true
     }
   ],
   "faultScenarios": [

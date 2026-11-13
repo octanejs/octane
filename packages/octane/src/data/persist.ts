@@ -692,13 +692,13 @@ export function memoryStorage(): PersistentStorage {
 	};
 }
 
-const request = <T>(target: IDBRequest<T>) =>
+export const request = <T>(target: IDBRequest<T>) =>
 	new Promise<T>((resolve, reject) => {
 		target.onsuccess = () => resolve(target.result);
 		target.onerror = () => reject(target.error);
 	});
 
-const done = (transaction: IDBTransaction) =>
+export const done = (transaction: IDBTransaction) =>
 	new Promise<void>((resolve, reject) => {
 		transaction.oncomplete = () => resolve();
 		transaction.onerror = transaction.onabort = () => reject(transaction.error);
