@@ -395,6 +395,8 @@ store.read(extra);
 		const page = `import { stats } from './books.data.ts';\nexport const s = remember(stats);\n`;
 		expect(program.check(join(root, 'books.data.ts'))).toEqual([]);
 		expect(program.report()).toEqual([]);
+		// The manifest still watches it, so fixing it regenerates the manifest.
+		expect(program.manifest().files).toEqual([join(root, 'books.data.ts')]);
 		writeFileSync(join(root, 'books.data.ts'), contracts);
 		program.invalidate(join(root, 'books.data.ts'));
 		expect(program.check(join(root, 'page.ts'), page).map((d: Diagnostic) => d.code)).toEqual([

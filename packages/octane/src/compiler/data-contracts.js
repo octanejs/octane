@@ -766,8 +766,9 @@ export function createDataProgram(root, files) {
 		 * from another module, and a formatting edit must not split owners.
 		 */
 		manifest() {
+			const files = list().filter((file) => DATA_MODULE.test(file));
 			const modules = new Map();
-			for (const file of list().filter((file) => DATA_MODULE.test(file))) {
+			for (const file of files) {
 				const found = facts(file);
 				if (found !== null) modules.set(file, found);
 			}
@@ -797,7 +798,9 @@ export function createDataProgram(root, files) {
 				`export const contracts = [${locals.join(', ')}];\n` +
 				`export const writes = [${writes.join(', ')}];\n` +
 				`export const identity = contractIdentity(contracts);\n`;
-			return { code, files: [...modules.keys()] };
+			// Every contract module, including one that does not parse yet, so
+			// fixing it regenerates the manifest.
+			return { code, files };
 		},
 
 		/**
