@@ -1,8 +1,8 @@
 # octane/data: a checked convention for contracts (design)
 
-Status: proposal, for review. Nothing here is implemented. It assumes reads go
-one way, `useRead(store.read(contract, input))`, with `useReadState` removed
-(branch `feat/data-one-read`).
+Status: agreed 2026-11-13 (all five recommendations); not implemented yet. It
+assumes reads go one way, `useRead(store.read(contract, input))`, with
+`useReadState` removed (branch `feat/data-one-read`).
 
 ## The problem
 
@@ -373,21 +373,23 @@ export const byShelf = (id: string) => read({ name: `shelf.${id}`, output });
 // Instead: one read with an input, `input: z.object({ id: z.string() })`.
 ```
 
-## Decisions to make
+## Decisions
 
-1. **Sigil or shape.** Recommended: shape, with no sigil.
-2. **Contract modules.** Recommended: the `*.data.ts` suffix. Alternatives: a
-   configured glob (more flexible, one more option), or any module, with the
-   manifest built from the import graph (no rename, but incomplete in dev).
-3. **Enforcement.** Recommended: Option B, a separate plugin check shared by
-   Vite and Rspack, with catalog entries and `octane analyze` support.
-   Alternative: Option A, Strong diagnostics, which leaves `.tsx` unchecked.
-4. **Manifest contents.** Recommended: `contracts`, `writes`, `identity`.
-   Open: whether `identity` hashes declaration source or keeps the runtime
-   shape hash.
-5. **Escapes.** Recommended: none per line at first; a module outside the
-   check is the escape.
+Agreed 2026-11-13: every recommendation.
 
-After the choices, implementation is three steps: the per-module analysis and
-rules 1–4 with catalog entries; the whole-program pass and manifest in both
-plugins; shelf and the data guide moved to the convention.
+1. **Sigil or shape.** Shape, with no sigil.
+2. **Contract modules.** The `*.data.ts` suffix. Rejected: a configured glob
+   (one more option), and any module with the manifest built from the import
+   graph (incomplete in dev).
+3. **Enforcement.** Option B, a separate plugin check shared by Vite and
+   Rspack, with catalog entries and `octane analyze` support. Rejected:
+   Option A, Strong diagnostics, which leaves `.tsx` unchecked.
+4. **Manifest contents.** `contracts`, `writes`, `identity`. Still open:
+   whether `identity` hashes declaration source or keeps the runtime shape
+   hash; settle it in the manifest PR.
+5. **Escapes.** None per line at first; a module outside the check is the
+   escape.
+
+Implementation is three steps: the per-module analysis and rules 1–4 with
+catalog entries; the whole-program pass and manifest in both plugins; shelf
+and the data guide moved to the convention.
