@@ -45,6 +45,10 @@ export function App() { const ref = useRef(0); return <p>{ref.current}</p>; }`;
 		['inline JSX', 'props.items.map(item => <li>{item.name as string}</li>)'],
 		['computed map', 'props.items["map"](item => <li />)'],
 		['conditional output', 'props.items.map(item => item.show ? <li /> : null)'],
+		[
+			'selected literal branch',
+			'props.items.map(item => true ? <li title={item.read()} /> : item)',
+		],
 		['block return', 'props.items.map(item => { return <li />; })'],
 		['fragment output', 'props.items.map(item => <><li /></>)'],
 	])('rejects .map returning %s', (_label, expression) => {
@@ -54,6 +58,17 @@ export function App() { const ref = useRef(0); return <p>{ref.current}</p>; }`;
 			expect(() => compile(strong(source), 'App.tsrx', { mode })).toThrow('OCTANE_STRONG_MAP_JSX');
 		}
 	});
+	it.each(['false ? <li title={item.read()} /> : item', '(true as boolean) ? item : <li />'])(
+		'allows a data mapper when its literal conditional cannot return JSX',
+		(expression) => {
+			const source = strong(`export function App(props) @{
+				const values = props.items.map(item => ${expression});
+				<p>{values.length as string}</p>
+			}`);
+			for (const mode of ['client', 'server'] as const)
+				expect(() => compile(source, 'App.tsrx', { mode })).not.toThrow();
+		},
+	);
 	it('resolves a named JSX mapper and its alias', () => {
 		const source = `export function App(props) @{
 			const renderItem = item => <li>{item.name as string}</li>;
