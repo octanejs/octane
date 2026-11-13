@@ -172,15 +172,40 @@ export async function runCodemod(
 	}
 	const contextsOf = contextIndex(exports, known);
 	const renamed = renamedImports(root, config, renames);
-	const sourceNames = new Set([...renames.keys()].map((file) => path.basename(file)));
+	const foldNames = process.platform === 'darwin';
+	const leafKey = (file: string) => {
+		const name = path.basename(file);
+		return foldNames ? name.toLowerCase() : name;
+	};
+	const sourceNames = new Set([...renames.keys()].map(leafKey));
 	const sourceEntries = new Map([...renames.keys()].map((file) => [entryKey(file), file]));
+	const foldedSources = new Map<string, string[]>();
+	if (foldNames) {
+		for (const [entry, source] of sourceEntries) {
+			const key = path.join(path.dirname(entry), leafKey(entry));
+			const group = foldedSources.get(key);
+			if (group) group.push(source);
+			else foldedSources.set(key, [source]);
+		}
+	}
 	function linkedRename(file: string) {
-		if (
-			!renames.has(path.normalize(file)) &&
-			sourceNames.has(path.basename(file)) &&
-			fs.existsSync(file)
-		)
-			return sourceEntries.get(entryKey(file));
+		if (renames.has(path.normalize(file))) return;
+		const name = leafKey(file);
+		if (!sourceNames.has(name) || !fs.existsSync(file)) return;
+		const entry = entryKey(file);
+		const selected = sourceEntries.get(entry);
+		if (selected) return selected;
+		const folded = foldNames && foldedSources.get(path.join(path.dirname(entry), name));
+		if (!folded) return;
+		// APFS reports the stored spelling. A leaf symlink or hard link must
+		// remain a distinct entry even when it reaches the same file.
+		if (!fs.lstatSync(file, { throwIfNoEntry: false })?.isFile()) return;
+		const actual = fs.realpathSync.native(file);
+		return folded.find(
+			(source) =>
+				fs.lstatSync(source, { throwIfNoEntry: false })?.isFile() &&
+				fs.realpathSync.native(source) === actual,
+		);
 	}
 	const resolveRename = (from: string, specifier: string) =>
 		renamed(from, specifier)?.specifier ?? null;
