@@ -472,6 +472,43 @@ it('renders the authored local pattern on the server and client', async () => {
 	);
 });
 
+it('renders local gradients, a mask, and a filter in two instances', async () => {
+	const drawing = `<svg viewBox="0 0 16 16">
+  <g mask="url(#cutout)" filter="url(#soften)">
+    <rect width="16" height="16" fill="url(#paint)" transform="matrix(1 0 0 1 0 0)"/>
+    <circle cx="8" cy="8" r="4" fill="url(#paint)"/>
+  </g>
+  <mask id="cutout" maskUnits="userSpaceOnUse" x="0" y="0" width="16" height="16" style="mask-type:alpha">
+    <path d="M0 0H16V16H0Z" fill="white"/>
+  </mask>
+  <defs>
+    <linearGradient id="paint" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="16" y2="16">
+      <stop offset="0" stop-color="currentColor"/>
+      <stop offset=".5" stop-color="#e70" stop-opacity=".5"/>
+    </linearGradient>
+    <filter id="soften" filterUnits="userSpaceOnUse" x="0" y="0" width="16" height="16" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="background"/>
+      <feBlend in="SourceGraphic" in2="background" mode="normal" result="combined"/>
+      <feGaussianBlur stdDeviation="1" result="soft"/>
+    </filter>
+  </defs>
+</svg>`;
+	const react = drawing
+		.replace('style="mask-type:alpha"', 'style={{maskType: "alpha"}}')
+		.replace('offset=".5"', 'offset={0.5}')
+		.replace('stop-opacity=".5"', 'stopOpacity={0.5}')
+		.replaceAll('stop-color=', 'stopColor=')
+		.replace('color-interpolation-filters=', 'colorInterpolationFilters=')
+		.replace('flood-opacity=', 'floodOpacity=');
+	await expectSvgRenderParity(
+		'export function Pane({active}) { return <button><Mark className={active ? "on" : "off"} /><Mark className="fixed" /></button>; }',
+		[{ active: false }, { active: true }],
+		2,
+		{ 'icons/mark.svg': drawing },
+		react,
+	);
+});
+
 it('keeps distinct component types for separate SVG modules with identical source', async () => {
 	const { root, file, icon } = fixture(`
 		import First from './icons/mark.svg';
@@ -512,14 +549,13 @@ it('keeps distinct component types for separate SVG modules with identical sourc
 	}
 });
 
-async function expectSvgRenderParity(view, states, count, projectFiles = {}) {
+async function expectSvgRenderParity(view, states, count, projectFiles = {}, referenceSvg) {
 	const { root, file } = fixture("import Mark from './icons/mark.svg';\n" + view);
 	for (const [name, contents] of Object.entries(projectFiles)) {
 		fs.writeFileSync(path.join(root, 'src', name), contents);
 	}
 	const classes = [];
-	const reference = fs
-		.readFileSync(path.join(root, 'src/icons/mark.svg'), 'utf8')
+	const reference = (referenceSvg ?? fs.readFileSync(path.join(root, 'src/icons/mark.svg'), 'utf8'))
 		.replace(/(<svg [^>]+)>/, '$1 {...props}>')
 		.replaceAll('fill-rule=', 'fillRule=')
 		.replaceAll('stroke-opacity=', 'strokeOpacity=')
