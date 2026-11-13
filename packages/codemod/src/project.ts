@@ -409,7 +409,7 @@ export async function runCodemod(
 		ADAPTER_OCTANE_VERSION.test(readInstalled(helperDir, 'octane')?.version ?? '')
 			? createScopedStorePlanner(helperDir, storeBridge, config ?? undefined)
 			: null;
-	const { inputFactory, helperFunction, localFile } = storeSources(root, config, (file, source) => {
+	function unchangedStoreInput(file: string, source: string) {
 		if (
 			renames.has(file) ||
 			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject ||
@@ -430,7 +430,13 @@ export async function runCodemod(
 				resolveRename(file, specifier) ??
 				resolveBinding(specifier, file, bindingProject, new Map(), []),
 		}).changed;
-	});
+	}
+	const { inputFactory, changedJsxExport, helperFunction, localFile } = storeSources(
+		root,
+		config,
+		unchangedStoreInput,
+		(file) => renames.has(file),
+	);
 	const localHints = new Map<string, Map<string, string>>();
 	function initializerResourceHint(from: string, module: string, name: string) {
 		const file = localFile(from, module);
@@ -719,7 +725,9 @@ export async function runCodemod(
 						if (
 							!plan ||
 							!safeUses(
-								(source, name) => {
+								(source, name, selection) => {
+									if (selection)
+										return changedJsxExport(file, source, name, selection) ? 'opaque' : false;
 									const input = inputFactory(file, source, name, plan.isSharedExport);
 									if (!input) return false;
 									if ('opaque' in input) return 'opaque';

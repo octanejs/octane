@@ -78,6 +78,12 @@ const MAX_CALL_CONTEXTS = 64;
 type LocalWrites = {
 	calls: ReturnType<typeof localCalls>;
 	bindings: Map<ts.Symbol, AssignmentSource[]>;
+	values: (
+		node: ts.Node,
+		selection: Key[],
+		imported: (symbol: ts.Symbol, selection: Key[]) => boolean,
+		leaf: (node: ts.Node) => boolean,
+	) => boolean;
 	bindingStep: (d: ts.BindingElement) => Selection;
 	selected: (source: ts.Expression, path: Key[]) => ts.Expression | null | undefined;
 	arguments: (
@@ -255,6 +261,7 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 		match: (root: ts.Symbol, path: Key[], instance?: CallContext) => boolean,
 		initial?: CallContext,
 		unbound?: (fn: ts.SignatureDeclaration) => void,
+		leaf?: (node: ts.Node) => boolean,
 	): boolean {
 		const states = new Map<
 			CallContext,
@@ -264,6 +271,7 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 		const joinedReturns = new Map<ts.CallExpression, Set<string>>();
 		let returnVisits = 0;
 		function trace(node: ts.Node, path: Key[], frame: CallContext): boolean {
+			if (leaf?.(node)) return true;
 			if (isWrapper(node)) return trace(node.expression, path, frame);
 			if (isMember(node)) {
 				return trace(node.expression, [memberKey(node), ...path], frame);
@@ -275,6 +283,8 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 				);
 			}
 			if (ts.isCallExpression(node)) {
+				// The value query can reach a local call even in a file without indexed member writes.
+				if (leaf && !calls.targets.has(node)) calls.scan(node);
 				const fn = calls.targets.get(node);
 				if (fn && !activeReturns.has(node)) {
 					const joined = frame === null || ++returnVisits > MAX_CALL_CONTEXTS;
@@ -294,6 +304,13 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 			}
 			if (ts.isConditionalExpression(node))
 				return trace(node.whenTrue, path, frame) || trace(node.whenFalse, path, frame);
+			if (
+				leaf &&
+				ts.isBinaryExpression(node) &&
+				(node.operatorToken.kind === ts.SyntaxKind.CommaToken ||
+					node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken)
+			)
+				return trace(node.right, path, frame);
 			if (isLogical(node)) return trace(node.left, path, frame) || trace(node.right, path, frame);
 			if ((path.length || !writing) && ts.isArrayLiteralExpression(node)) {
 				const [index, ...rest] = path;
@@ -691,8 +708,9 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 		visit: VisitSource,
 		frame?: CallContext,
 		selectionPath?: Key[],
+		leaf?: (node: ts.Node) => boolean,
 	): boolean {
-		if (!members.size || (!selectionPath && !consumingUse(node))) return false;
+		if (!members.size || (!selectionPath && !leaf && !consumingUse(node))) return false;
 
 		return locations(
 			node,
@@ -721,6 +739,8 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 						return visit(source, sourceFrame === undefined ? frame : sourceFrame, origin);
 					}),
 			frame,
+			undefined,
+			leaf,
 		);
 	}
 
@@ -898,12 +918,20 @@ function localWrites(file: ts.SourceFile, checker: ts.TypeChecker): LocalWrites 
 		if (sites?.length) for (const call of sites) index(calls.frame(call));
 		else index();
 	}
-	const writes = {
+	const writes: LocalWrites = {
 		calls,
 		selected,
 		bindingStep,
 		arguments: argumentSources,
 		bindings,
+		values: (node, selection, imported, leaf) => {
+			const trace = (value: ts.Node, frame: CallContext, path: Key[] = []) =>
+				locations(value, path, false, imported, frame, undefined, leaf);
+			return (
+				trace(node, undefined, selection) ||
+				memberSources(node, trace, undefined, selection.length ? selection : undefined, leaf)
+			);
+		},
 		members: memberSources,
 		hasMemberWrite: (name: ts.Identifier) =>
 			(members.size > 0 || mutationOnly.size > 0) &&
@@ -1027,7 +1055,48 @@ export function walkLocalValues(
 }
 
 /** Values that can cross a renderer boundary, optionally including a verified original store input. */
-type ImportedArgument = (module: string, name: string) => boolean | 'reject';
+type ImportedArgument = (module: string, name: string, selection?: Key[]) => boolean | 'reject';
+
+export function transportedValue(
+	value: ts.Node,
+	checker: ts.TypeChecker,
+	selection: Key[],
+	imported: (module: string, name: string, selection: Key[]) => boolean,
+	jsx?: () => boolean,
+) {
+	return localWrites(value.getSourceFile(), checker).values(
+		value,
+		selection,
+		(symbol, path) => {
+			const item = symbol.declarations?.[0];
+			if (!item) return false;
+			let clause: ts.ImportClause;
+			let name: string | undefined;
+			if (ts.isImportSpecifier(item) && !item.isTypeOnly) {
+				clause = item.parent.parent;
+				name = (item.propertyName ?? item.name).text;
+			} else if (ts.isImportClause(item) && item.name) {
+				clause = item;
+				name = 'default';
+			} else if (ts.isNamespaceImport(item) && path.length) {
+				clause = item.parent;
+				[name, ...path] = path;
+			} else return false;
+			const statement = clause.parent;
+			return (
+				name !== undefined &&
+				!clause.isTypeOnly &&
+				!statement.attributes &&
+				ts.isStringLiteral(statement.moduleSpecifier) &&
+				imported(statement.moduleSpecifier.text, name, path)
+			);
+		},
+		(node) =>
+			!!jsx &&
+			(ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node)) &&
+			jsx(),
+	);
+}
 
 export function portableArguments(
 	checker: ts.TypeChecker,
@@ -1099,6 +1168,16 @@ export function portableArguments(
 	const clean = new Map<ts.Expression, boolean>();
 	return (expr: ts.Expression, imported?: ImportedArgument) => {
 		if (!argument(expr, imported)) return false;
+		if (
+			imported &&
+			transportedValue(
+				expr,
+				checker,
+				[],
+				(module, name, selection) => imported(module, name, selection) === 'reject',
+			)
+		)
+			return false;
 		let safe = clean.get(expr);
 		if (safe === undefined) {
 			safe = !walkLocalValues(expr, checker, (n) =>

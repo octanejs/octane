@@ -4,11 +4,22 @@ import path from 'node:path';
 import ts from 'typescript';
 import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import { renderUses } from './forwarded-props.js';
-import { hasLocalMemberWrite, localUses } from './local-uses.js';
+import { hasLocalMemberWrite, localUses, transportedValue } from './local-uses.js';
 import { bind } from './transform.js';
 import { hasRuntimeDependency } from './scoped-store-contract.js';
 
+type Selection = (string | undefined)[];
+export type StoreInputCheck = (
+	module: string,
+	name: string,
+	selection?: Selection,
+) => boolean | 'opaque';
+
 type Factory = { module: string; name: string; from: string };
+type ExportRead = Factory & { selection: Selection };
+type ExportValue = { jsx: boolean; imports: ExportRead[] };
+const emptyValue: ExportValue = { jsx: false, imports: [] };
+const MAX_EXPORT_SELECTIONS = 64;
 type Opaque = { opaque: true };
 type Input =
 	| { factory: Factory; direct: boolean; data: boolean }
@@ -82,18 +93,28 @@ export function storeSources(
 	root: string,
 	config: ts.CompilerOptions | null,
 	unchanged: (file: string, source: string) => boolean,
+	changesRenderer: (file: string) => boolean = () => false,
 ) {
 	const options = { moduleResolution: ts.ModuleResolutionKind.Bundler, ...config };
 	const cache = ts.createModuleResolutionCache(root, (file) => file, options);
 	const modules = new Map<string, Map<string, Input>>();
 	const project = fs.realpathSync(root);
+	const bindings = new Map<string, ReturnType<typeof bind>>();
+	function bindingFor(file: string) {
+		let binding = bindings.get(file);
+		if (!binding) {
+			binding = bind(file, fs.readFileSync(file, 'utf8'));
+			bindings.set(file, binding);
+		}
+		return binding;
+	}
 	function inputs(file: string) {
 		const saved = modules.get(file);
 		if (saved) return saved;
 		const exported = new Map<string, Input>();
 		const locals = new Map<string, Input>();
 		const localFunctions = new Set<string>();
-		const { sf, checker } = bind(file, fs.readFileSync(file, 'utf8'));
+		const { sf, checker } = bindingFor(file);
 		let uses: ReturnType<typeof localUses> | undefined;
 		function handleEscapes(name: ts.Identifier) {
 			const refs = (uses ??= localUses(sf, checker));
@@ -320,6 +341,87 @@ export function storeSources(
 		return false;
 	}
 
+	function readExport(file: string, name: string, selection: Selection): ExportValue {
+		const { sf, checker } = bindingFor(file);
+		const symbol = checker.getSymbolAtLocation(sf)?.exports?.get(ts.escapeLeadingUnderscores(name));
+		const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
+		if (!declaration) return emptyValue;
+		let value: ts.Node;
+		if (ts.isExportSpecifier(declaration)) {
+			const statement = declaration.parent.parent;
+			if (declaration.isTypeOnly || statement.isTypeOnly || statement.attributes) return emptyValue;
+			const exported = declaration.propertyName ?? declaration.name;
+			if (statement.moduleSpecifier) {
+				if (!ts.isStringLiteral(statement.moduleSpecifier)) return emptyValue;
+				return {
+					jsx: false,
+					imports: [
+						{ from: file, module: statement.moduleSpecifier.text, name: exported.text, selection },
+					],
+				};
+			}
+			value = exported;
+		} else if (ts.isExportAssignment(declaration) && !declaration.isExportEquals) {
+			value = declaration.expression;
+		} else if (
+			(ts.isVariableDeclaration(declaration) || ts.isBindingElement(declaration)) &&
+			ts.isIdentifier(declaration.name)
+		) {
+			if (
+				ts.isVariableDeclaration(declaration) &&
+				declaration.initializer &&
+				ts.isVariableDeclarationList(declaration.parent) &&
+				declaration.parent.flags & ts.NodeFlags.Const &&
+				inertLiteral(skipWrappers(declaration.initializer))
+			)
+				return emptyValue;
+			value = declaration.name;
+		} else return emptyValue;
+		const imports: ExportRead[] = [];
+		const jsx = transportedValue(
+			value,
+			checker,
+			selection,
+			(module, name, selected) => {
+				imports.push({ from: file, module, name, selection: selected });
+				return false;
+			},
+			() => changesRenderer(file),
+		);
+		return { jsx, imports };
+	}
+
+	const queriedExports = new Map<string, Map<string, ExportValue>>();
+	function changedJsxExport(from: string, module: string, name: string, selection: Selection) {
+		const pending: ExportRead[] = [{ from, module, name, selection }];
+		const seen = new Set<string>();
+		while (pending.length) {
+			const { from, module, name, selection } = pending.pop()!;
+			for (const file of executableFiles(from, module)) {
+				const key = file + '\0' + name;
+				let paths = queriedExports.get(key);
+				if (!paths) queriedExports.set(key, (paths = new Map()));
+				const requested = JSON.stringify(selection);
+				const join =
+					selection.length > MAX_EXPORT_SELECTIONS ||
+					(!paths.has(requested) && paths.size >= MAX_EXPORT_SELECTIONS);
+				const path = join ? [] : selection;
+				const shape = join ? '[]' : requested;
+				const query = key + '\0' + shape;
+				if (seen.has(query)) continue;
+				seen.add(query);
+				let result = paths.get(shape);
+				if (!result) {
+					result = readExport(file, name, path);
+					paths.set(shape, result);
+				}
+				if (result.jsx) return true;
+				pending.push(...result.imports);
+			}
+		}
+		return false;
+	}
+
 	// Follow named re-exports to a direct factory or an opaque local initializer.
 	function inputFactory(
 		from: string,
@@ -445,5 +547,5 @@ export function storeSources(
 		}
 		return exported.has(name);
 	}
-	return { inputFactory, helperFunction, localFile };
+	return { inputFactory, changedJsxExport, helperFunction, localFile };
 }
