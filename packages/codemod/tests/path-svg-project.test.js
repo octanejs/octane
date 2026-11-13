@@ -119,6 +119,41 @@ export function Pane() {
 	expect(result.files.some((entry) => entry.output.endsWith('.svg.octane.ts'))).toBe(false);
 });
 
+it('reports bare SVG namespace defaults used as JSX tags', async () => {
+	const { root, file } = fixture(`import * as Art from './icons/mark.svg';
+import * as Explicit from './icons/mark.svg?react';
+import * as Queried from './icons/mark.svg?url';
+const Alias = Art.default;
+const Indexed = Art['default'];
+const { default: Selected } = Art;
+const Plain = () => <b />;
+let Replaced = Art.default;
+Replaced = Plain;
+const Cycle = Cycle;
+export function Pane() {
+	return <main>
+		<Art.default />
+		<Alias />
+		<Indexed />
+		<Selected />
+		<Art.other />
+		<Art />
+		<Explicit.default />
+		<Queried.default />
+		<Replaced />
+		<Cycle />
+	</main>;
+}
+export function Shadow({ Art }: { Art: { default: typeof Plain } }) { return <Art.default />; }`);
+	for (const svgPaths of [false, true]) {
+		const { files } = await runCodemod([file], { root, strong: true, svgPaths, write: false });
+		const pane = files.find((entry) => entry.file === 'src/pane.tsx');
+		expect(pane.notes.filter((note) => note.rule === 'svg-issuer')).toEqual(
+			[13, 14, 15, 16].map((line) => expect.objectContaining({ line, severity: 'error' })),
+		);
+	}
+});
+
 it('uses the final reachable own field of a confined SVG record', async () => {
 	const { root } = fixture();
 	const cases = {
