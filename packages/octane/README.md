@@ -33,6 +33,14 @@ Each module that consumes native signal reads needs its own runtime import from
 `octane/signals`, `octane/signals/client`, or `octane/signals/server`. No extra
 compiler option is needed.
 
+[`octane/data`](https://octanejs.dev/docs/data) is the data layer for
+server-owned data. Declare reads, writes, views and feeds as contracts, serve
+them with `createDataHandler` from `octane/data/server`, and read them through
+one store from Octane (`octane/data/octane`) or React (`octane/data/react`)
+components. The store shows optimistic edits and rolls them back, seeds
+hydration from a server render, applies realtime feeds, persists encrypted
+values for offline use, and can share one owner across tabs.
+
 ## Dynamically selected compiled views
 
 In a template, use `CompiledOutlet` when all dynamically selected components

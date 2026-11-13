@@ -29,6 +29,8 @@ describe('docs snapshot', () => {
 		expect(DOC_SLUGS).toContain('deferred-hydration-reference');
 		expect(DOC_SLUGS).toContain('ssr');
 		expect(DOC_SLUGS).toContain('differences-from-react-reference');
+		expect(DOC_SLUGS).toContain('data');
+		expect(DOC_SLUGS).toContain('data-reference');
 	});
 
 	it('serves substantial markdown with frontmatter stripped', () => {
