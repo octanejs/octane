@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
+	DATA_WORKER_PATH,
 	INDEPENDENT_HYDRATION_MANIFEST_FILENAME,
 	createClientReferenceManifest,
 	createOctaneCompiler,
@@ -549,6 +550,15 @@ export class OctaneRspackPlugin {
 			? realRoot(resolve(root, this.options.textTypes.tsconfig))
 			: undefined;
 		assertProfilingDefineAvailable(compiler, profile);
+		if (this.options.dataWorker && environment === 'client') {
+			// The data worker keeps one path across deploys, so every tab shares one SharedWorker.
+			new compiler.webpack.EntryPlugin(compilerRoot, this.options.dataWorker, {
+				name: 'octane-data-worker',
+				filename: DATA_WORKER_PATH.slice(1),
+				// A worker has no document to load chunks into, so its dynamic imports stay in the file.
+				asyncChunks: false,
+			}).apply(compiler);
+		}
 		saltPersistentCacheVersion(compiler, {
 			root,
 			environment,

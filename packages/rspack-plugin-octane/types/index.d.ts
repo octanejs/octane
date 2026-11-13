@@ -177,6 +177,14 @@ export interface OctaneRspackLoaderOptions {
 }
 
 export interface OctaneRspackPluginOptions extends OctaneRspackLoaderOptions {
+	/**
+	 * The app's data worker module, which calls `serveDataOwner` from
+	 * `octane/data`. Client builds emit it as the `octane-data-worker` entry at
+	 * `/_octane/data-worker.js`, so every deploy's tabs share one owner through
+	 * `sharedOwner`. Leave that entry out of the pages' HTML. A request resolved
+	 * from the compiler's context.
+	 */
+	dataWorker?: string;
 	/** Build intent for SSR metadata; independent of optimization/HMR settings. */
 	clientBuildMode?: 'production' | 'development';
 	/**

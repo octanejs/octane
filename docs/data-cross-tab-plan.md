@@ -160,21 +160,21 @@ page's.
 ## What this changes for apps
 
 ```ts
-// src/data.ts: the module both the page and the worker import.
-export const options = { transport: serverTransport(data), listen: serverListener(events),
-  persist: { storage: indexedDBStorage(), partition, key }, feeds: [bookChanges] };
+// src/data-worker.ts: named by the build plugins' `dataWorker` option, which
+// emit it at `/_octane/data-worker.js`.
+serveDataOwner({ transport: serverTransport(data), listen: serverListener(events) });
 
-// The page.
-export default (seed) => createDataStore({ ...options, seed, owner: sharedOwner() });
-
-// The worker entry, emitted at a stable path by the build plugins.
-serveDataOwner(options);
+// The page. `sharedOwner` is `null` where SharedWorker is missing or refused.
+const port = sharedOwner(partition);
+export const store = port
+  ? createReplica(port, { seed, writes: [addBook, setRead, removeBook] })
+  : createDataStore({ transport, listen, persist, seed });
 ```
 
-`owner: sharedOwner()` is the opt-in. Without it, nothing changes. Hooks,
-contracts and handlers are untouched. The config `data` module from
-`@octanejs/app-core` gains the worker entry, so apps using it opt in with one
-line.
+The worker and `sharedOwner` are the opt-in, and live in their own module, so
+an app without them ships none of the connection code. Hooks, contracts and
+handlers are untouched. The config `data` module from `@octanejs/app-core`
+gains the worker entry later, so apps using it opt in with one line.
 
 ## Bundle cost
 
@@ -186,15 +186,15 @@ connection code. Each PR reports bytes as usual.
 
 ## Delivery
 
-1. **Owner protocol, in process.** (This PR: `createDataOwner` and
-   `createReplica`.) The owner and replica over a `MessagePort`
+1. **Owner protocol, in process.** (Done: `createDataOwner` and
+   `createReplica`, #2559.) The owner and replica over a `MessagePort`
    pair, with no SharedWorker yet: shared reads and requests, operations
    broadcast, the same rollback in two replicas, feed events fanned out.
    Tested in Node with `MessageChannel`.
-2. **SharedWorker host and build output.** `sharedOwner()`, the worker entry,
-   and the stable path in the Vite and Rsbuild/Rspack plugins. Shelf opens two
-   pages and asserts one network load and one shared rollback, in Chromium,
-   under both bundlers.
+2. **SharedWorker host and build output.** (This PR: `sharedOwner`,
+   `serveDataOwner`, and the `dataWorker` option of the Vite and Rspack
+   plugins.) Shelf opens two pages and asserts one network load and one shared
+   rollback, in Chromium, under both bundlers.
 3. **Account fencing.** The durable generation, freeze and resume, and the
    timeout path. Browser tests freeze a page, switch accounts in another, and
    resume.

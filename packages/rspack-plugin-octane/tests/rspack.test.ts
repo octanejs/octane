@@ -322,6 +322,36 @@ new Worker(new URL('./worker.ts', import.meta.url));`,
 		}
 	});
 
+	it('emits the data worker at its stable path as one file, for client builds only', async () => {
+		write(root, 'src/page.js', 'globalThis.pageRan = true;\n');
+		write(root, 'src/lazy.js', 'export const value = "loaded in the worker";\n');
+		write(
+			root,
+			'src/worker.js',
+			"import('./lazy.js').then(({ value }) => self.postMessage(value));\n",
+		);
+		const build = (target: string, path: string) =>
+			compile({
+				context: root,
+				mode: 'production',
+				target,
+				entry: { page: './src/page.js' },
+				output: { path: join(root, path), filename: '[name].[contenthash:8].js' },
+				optimization: { minimize: false },
+				plugins: [new OctaneRspackPlugin({ parallel: false, dataWorker: './src/worker.js' })],
+			});
+		await build('web', 'dist-client');
+		await build('node', 'dist-server');
+
+		// A worker has no document to load a chunk into, so its dynamic import is in the file.
+		const messages: unknown[] = [];
+		runInNewContext(readFileSync(join(root, 'dist-client/_octane/data-worker.js'), 'utf8'), {
+			self: { postMessage: (message: unknown) => messages.push(message) },
+		});
+		await vi.waitFor(() => expect(messages).toEqual(['loaded in the worker']));
+		expect(existsSync(join(root, 'dist-server/_octane'))).toBe(false);
+	});
+
 	it('retains Lynx worklet feature installation through a production re-export', async () => {
 		const lynxPackage = join(repositoryRoot, 'packages/lynx');
 		const featureEntry = join(lynxPackage, 'src/core/main-thread-worklet-feature.ts');

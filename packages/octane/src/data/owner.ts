@@ -40,6 +40,7 @@ import {
 	type DataStoreOptions,
 	type Entry,
 } from './store.js';
+import { DATA_WORKER_PATH } from './worker-path.js';
 
 /** The part of a `MessagePort` the owner and its replicas use. */
 export interface OwnerPort {
@@ -413,4 +414,31 @@ export function createReplica(
 	});
 	port.start?.();
 	return store;
+}
+
+/** The owner protocol's version, in the worker's name, so a tab on another protocol never shares it. */
+const PROTOCOL = 1;
+
+/**
+ * Connect to the owner every tab sharing `name` uses, such as the account's
+ * partition, through the data worker the build plugins emit. Returns `null`
+ * where SharedWorker is missing or cannot start, so the tab opens its own
+ * store instead.
+ */
+export function sharedOwner(name: string, url: string | URL = DATA_WORKER_PATH): OwnerPort | null {
+	if (typeof SharedWorker !== 'function') return null;
+	try {
+		return new SharedWorker(url, { type: 'module', name: `octane-data:${PROTOCOL}:${name}` }).port;
+	} catch {
+		return null;
+	}
+}
+
+/** Serve an owner to every tab that connects: what the app's data worker module calls. */
+export function serveDataOwner(options: Parameters<typeof createDataOwner>[0]): DataOwner {
+	const owner = createDataOwner(options);
+	globalThis.addEventListener('connect', (event) =>
+		owner.connect((event as MessageEvent).ports[0]!),
+	);
+	return owner;
 }
