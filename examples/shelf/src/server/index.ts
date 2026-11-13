@@ -8,7 +8,7 @@
 import type { Middleware } from '@octanejs/app-core';
 import { createServerFunctions } from '@octanejs/app-core/server-functions';
 import { createDataStore, serverTransport } from 'octane/data';
-import { shelfChanges } from '../shared/contracts.ts';
+import { shelfChanges } from '../shared/contracts.data.ts';
 import * as dataModule from '../shared/data.tsrx';
 import { handler } from '../shared/server.ts';
 import { ACCOUNT_COOKIE, namespaceFrom, serverSession } from '../shared/session.ts';

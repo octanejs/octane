@@ -1,7 +1,7 @@
 /** @jsxImportSource react */
 import type { DataStore } from 'octane/data';
 import { DataProvider, useDataStore, useRead } from 'octane/data/react';
-import { setRead, unread } from '../shared/contracts.ts';
+import { setRead, unread } from '../shared/contracts.data.ts';
 
 function Unread() {
 	const store = useDataStore();

@@ -6,7 +6,7 @@
  */
 import { DataError } from 'octane/data';
 import { createDataHandler, type DataCaller, type Implementation } from 'octane/data/server';
-import * as Shelf from './contracts.ts';
+import * as Shelf from './contracts.data.ts';
 
 type Book = Shelf.Book;
 type ShelfEvent = { kind: 'put'; book: Book } | { kind: 'removed'; id: string };
@@ -86,21 +86,21 @@ export function createShelfHandler(options: { latency?: number } = {}) {
 
 	/** A view's handler serves its rule's window, in exactly the view's order. */
 	const windowOf =
-		(list: typeof Shelf.books): Implementation<{ shelf: Account }, typeof list> =>
+		(rule: typeof Shelf.books.view): Implementation<{ shelf: Account }, typeof Shelf.books> =>
 		async (input, { shelf }) => {
 			await delay(latency / 2);
 			return shelf.books
-				.filter((book) => list.view.where(book, input))
-				.sort(list.view.compare)
+				.filter((book) => rule.where(book, input))
+				.sort(rule.compare)
 				.slice(input.offset, input.offset + input.limit)
 				.map((book) => ({ ...book }));
 		};
 
 	return createDataHandler({ context, ...forms }, (_, defineHandler) =>
 		defineHandler(Shelf, {
-			books: windowOf(Shelf.books),
-			finished: windowOf(Shelf.finished),
-			unread: windowOf(Shelf.unread),
+			books: windowOf(Shelf.books.view),
+			finished: windowOf(Shelf.finished.view),
+			unread: windowOf(Shelf.unread.view),
 			stats: (_, { shelf }) => countsOf(shelf),
 			addBook: async (input, { shelf, operationId }) => {
 				const title = input.title.toLowerCase();

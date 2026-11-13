@@ -13,9 +13,12 @@ The [Data guide](https://octanejs.dev/docs/data) walks through every piece used
 here. The Octane and React pages differ only in their view code and binding import.
 Everything else is shared:
 
-- [`src/shared/contracts.ts`](src/shared/contracts.ts) declares the reads and
+- [`src/shared/contracts.data.ts`](src/shared/contracts.data.ts) declares the reads and
   writes with Zod schemas. Declaring them does no I/O, so the server and both
-  front ends import the same module.
+  front ends import the same module. Its `.data.ts` name opts it into the
+  build's contract check: Vite and Rspack fail the build if a contract the
+  pages use has no handler, and generate `octane/data/manifest`, whose
+  `contracts` and `writes` the session passes to the store.
 - [`src/shared/server.ts`](src/shared/server.ts) serves them with
   `createDataHandler`. Each write records its operation ID with its effect, so
   a lookup can say whether it landed.

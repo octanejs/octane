@@ -7481,7 +7481,7 @@
       },
       "OCTANE_DATA_CONTRACT_ARGUMENT": {
         "severity": "error",
-        "detects": "A contract site, such as `store.write`, `store.read`, `useForm`, `handle`, `pages`, `listen`, `view({ of })`, or a feed change's `put`, receives a contract chosen at runtime: a conditional, a logical expression, or a computed member such as `contracts[name]`. Sites are matched by method, import, or property name, never by the receiver.",
+        "detects": "A contract site, such as `store.write`, `store.read`, `useForm`, `handle`, `pages`, `listen`, `view({ of })`, a feed change's `put`, or the store options `feeds` and `journal.receipt`, receives a contract chosen at runtime: a conditional, a logical expression, or a computed member such as `contracts[name]`. Sites are matched by method, import, or property name, never by the receiver.",
         "replacement": "Name one contract binding at the site, such as `store.write(setRead, input)`, and pass the varying value in its input. A handler for several contracts may loop over an inline array of them: `[books, unread].map((list) => handle(list, …))`.",
         "url": "https://octanejs.dev/docs/strong-mode#octane-data-contract-argument"
       },
