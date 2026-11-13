@@ -3851,21 +3851,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		// An Octane hook without a list already means "inferred".
 		if (!callee || callee.module === 'octane') return null;
 		const name = callee.name;
-		if (name === 'useState' && callee.module === 'react' && this.options.initializerResourceHint) {
-			const [initializer] = node.arguments;
-			const value = initializer && skipWrappers(initializer);
-			const imported = value && ts.isIdentifier(value) && this.importOf(value);
-			if (imported && !imported.typeOnly && !imported.namespace) {
-				const hint = this.options.initializerResourceHint(imported.module, imported.imported);
-				if (hint)
-					this.note(
-						RULE.bindings,
-						'error',
-						initializer,
-						`The initializer \`${imported.imported}\` calls React DOM ${hint} from plain TypeScript. Move the resource hint into Octane-compiled code so the server renderer can collect it.`,
-					);
-			}
-		}
+		if (name === 'useState' && callee.module === 'react' && node.arguments[0])
+			this.checkInitializerResourceHints(node.arguments[0]);
 		if (name === 'useSyncExternalStore' && this.strong && this.target === 'tsrx')
 			return this.nativeSignalRead(node);
 		if (name === 'forwardRef') return this.rewriteForwardRef(node);
@@ -3901,6 +3888,68 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			return this.rewriteDependencies(node, name);
 		}
 		return null;
+	}
+
+	private checkInitializerResourceHints(initializer: ts.Expression) {
+		const resourceHint = this.options.initializerResourceHint;
+		if (!resourceHint) return;
+		const value = skipWrappers(initializer);
+		const check = (callee: ts.Expression, site: ts.Node) => {
+			callee = skipWrappers(callee);
+			if (!ts.isIdentifier(callee)) return;
+			const declaration = this.declarationOf(callee);
+			const imported = declaration && this.imports.get(declaration);
+			if (!imported || imported.typeOnly || imported.namespace) return;
+			if (site !== initializer && ts.findAncestor(declaration, ts.isImportDeclaration)?.attributes)
+				return;
+			const hint = resourceHint(imported.module, imported.imported);
+			if (hint)
+				this.note(
+					RULE.bindings,
+					'error',
+					site,
+					`The initializer calls \`${imported.imported}\`, which uses React DOM ${hint} from plain TypeScript. Move the resource hint into Octane-compiled code so the server renderer can collect it.`,
+				);
+		};
+		if (!ts.isArrowFunction(value) && !ts.isFunctionExpression(value)) {
+			if (ts.isIdentifier(value)) check(value, initializer);
+			return;
+		}
+		if (value.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword)) return;
+		if (ts.isFunctionExpression(value) && value.asteriskToken) return;
+		// Follow eager expressions only. A returned callback or a lazy operand may never run.
+		const visit = (node: ts.Node) => {
+			if (isFunctionLike(node) || ts.isClassLike(node) || ts.isTypeNode(node)) return;
+			if (ts.isConditionalExpression(node)) return visit(node.condition);
+			if (ts.isOptionalChain(node)) return visit(node.expression);
+			if (ts.isBinaryExpression(node)) {
+				const kind = node.operatorToken.kind;
+				if (
+					kind === ts.SyntaxKind.AmpersandAmpersandToken ||
+					kind === ts.SyntaxKind.BarBarToken ||
+					kind === ts.SyntaxKind.QuestionQuestionToken ||
+					kind === ts.SyntaxKind.AmpersandAmpersandEqualsToken ||
+					kind === ts.SyntaxKind.BarBarEqualsToken ||
+					kind === ts.SyntaxKind.QuestionQuestionEqualsToken
+				)
+					return visit(node.left);
+			}
+			if (ts.isCallExpression(node)) check(node.expression, node);
+			ts.forEachChild(node, visit);
+		};
+		if (!ts.isBlock(value.body)) return visit(value.body);
+		for (const statement of value.body.statements) {
+			if (ts.isReturnStatement(statement)) {
+				if (statement.expression) visit(statement.expression);
+				break;
+			}
+			if (ts.isExpressionStatement(statement)) visit(statement.expression);
+			else if (ts.isVariableStatement(statement)) {
+				for (const { initializer } of statement.declarationList.declarations) {
+					if (initializer) visit(initializer);
+				}
+			} else break;
+		}
 	}
 
 	/** Publish an exclusive native host ref through the existing external-store hook. */
