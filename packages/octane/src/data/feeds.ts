@@ -75,10 +75,10 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 	const observers = new Set<() => void>();
 	const seen = new Set<string>();
 	let snapshot = CONNECTING;
-	let cursor: string | null = null;
+	let cursor = params === undefined ? (source.seeded.get(seedCursorKey(feed.name)) ?? null) : null;
 	/** Whether a connection has been live, so one that comes back without a cursor missed events. */
 	let wasLive = false;
-	/** Whether the cursor a previous session saved has been read. */
+	/** Only a subscribed run reconciles page and disk after storage is ready. */
 	let restored = false;
 	/** Aborts the current run, when the last observer leaves. */
 	let running: AbortController | null = null;
@@ -125,12 +125,16 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
 	async function run(stop: AbortSignal): Promise<void> {
 		const connect = source.listen!;
 		const signal = AbortSignal.any([stop, source.retired]);
-		if (!restored) {
-			const saved = source.persisted ? await source.persisted.cursor(key) : null;
+		if (!restored && source.persisted) {
+			const saved = await source.persisted.cursor(key);
 			if (signal.aborted) return;
-			cursor ??= saved;
-			if (params === undefined) cursor ??= source.seeded.get(seedCursorKey(feed.name)) ?? null;
 			restored = true;
+			// Positions are opaque. Refresh covered values when cache and page disagree.
+			if (saved !== null && cursor !== null && saved !== cursor) {
+				missed();
+				source.persisted.keepCursor(key, cursor);
+			}
+			cursor ??= saved;
 		}
 		let failures = 0;
 		while (!signal.aborted) {
@@ -200,7 +204,8 @@ function createFeed<P, E>(store: DataStore, feed: Feed<P, E>, params: P, key: st
  */
 export function receive(store: DataStore, changes: readonly FeedChange[]): void {
 	if (store.retired) throw new DataRetiredError();
-	const { entries, persisted, viewed, record, rebase, finish } = internals.get(store)!;
+	const { entries, persisted, invalidateSeeds, discardSeed, viewed, record, rebase, finish } =
+		internals.get(store)!;
 	const reload = new Set<Entry>();
 	const changed: Entry[] = [];
 	const names = new Set<string>();
@@ -222,7 +227,10 @@ export function receive(store: DataStore, changes: readonly FeedChange[]): void 
 			if (entry) {
 				rebase(entry, change.value, false, reload);
 				changed.push(entry);
-			} else persisted?.discard(key);
+			} else {
+				discardSeed(key);
+				persisted?.discard(key);
+			}
 			continue;
 		}
 		const value = 'put' in change ? change.value : null;
@@ -238,7 +246,10 @@ export function receive(store: DataStore, changes: readonly FeedChange[]): void 
 	}
 	if (tags.length > 0) store.invalidate(tags);
 	// A saved value of these records that is not in memory, and so not saved again now, is restored stale.
-	if (names.size > 0) persisted?.invalidated([...names]);
+	if (names.size > 0) {
+		invalidateSeeds(names);
+		persisted?.invalidated([...names]);
+	}
 	finish(reload, changed, names);
 
 	/** Put or remove the record in a read the server ordered, which views do not cover. */

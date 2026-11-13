@@ -187,6 +187,9 @@ export interface StoreInternals {
 	readonly persisted: Persistence | null;
 	/** Each feed's position when the server render that seeded this store began. */
 	readonly seeded: ReadonlyMap<string, string>;
+	/** A feed changed an entity or replaced a particular read before its seed was adopted. */
+	invalidateSeeds(tags: Iterable<string>): void;
+	discardSeed(key: string): void;
 	readonly entries: ReadonlyMap<string, Entry>;
 	/** Whether a view holds the record `id`, or would show `value` or move its rows for it. */
 	viewed(entity: Entity<any>, id: string, value?: unknown): boolean;
@@ -420,6 +423,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	const { transport } = options;
 	const entries = new Map<string, Entry>();
 	const seeds = new Map<string, SeedEntry>();
+	let staleSeedTags: Set<string> | undefined;
 	let seedsStale = false;
 	/** Created records' operation IDs, by entity, mapped to the IDs their servers assigned. */
 	const assigned = new Map<string, string>();
@@ -957,6 +961,16 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		collect();
 	}
 
+	function invalidateSeeds(tags: Iterable<string>): void {
+		if (seeds.size === 0) return;
+		staleSeedTags ??= new Set();
+		for (const tag of tags) staleSeedTags.add(tag);
+	}
+
+	function discardSeed(key: string): void {
+		if (seeds.delete(key) && seeds.size === 0) staleSeedTags = undefined;
+	}
+
 	/**
 	 * Start an entry from the server's value. Hydration is synchronous, so a
 	 * validator that answers asynchronously, or rejects, leaves an ordinary load.
@@ -964,7 +978,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	function adoptSeed(entry: Entry): void {
 		const seed = seeds.get(entry.key);
 		if (!seed) return;
-		seeds.delete(entry.key);
+		const invalidated = staleSeedTags;
+		discardSeed(entry.key);
 		const age = seed.age + seedAge + Math.max(0, hostNow() - seedTime);
 		if (!Number.isFinite(age) || age < 0 || age >= entry.read.expire) return;
 		let value: unknown;
@@ -1001,7 +1016,10 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		}
 		const reload = new Set<Entry>();
 		adopt(entry, value, 0, age, reload, bounds);
-		entry.stale = seed.stale === true || seedsStale;
+		entry.stale =
+			seed.stale === true ||
+			seedsStale ||
+			(invalidated !== undefined && affects(entry, invalidated));
 		save(entry);
 		// A seed is adopted while a render asks for its read.
 		if (reload.size > 0) queueMicrotask(() => !retired && reloadAll(reload));
@@ -1130,8 +1148,9 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		}
 	}
 
-	function affects(entry: Entry, tags: readonly string[]): boolean {
-		return tags.some((tag) => entry.read.tags.includes(tag) || entry.names.has(tag));
+	function affects(entry: Entry, tags: Iterable<string>): boolean {
+		for (const tag of tags) if (entry.read.tags.includes(tag) || entry.names.has(tag)) return true;
+		return false;
 	}
 
 	function writeTags(write: Write<any, any>): readonly string[] {
@@ -1626,6 +1645,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		invalidate(tags) {
 			assertLive();
 			persisted?.invalidated(tags);
+			invalidateSeeds(tags);
 			for (const entry of entries.values()) if (affects(entry, tags)) invalidateEntry(entry);
 		},
 		settle(operationId, confirmed, value) {
@@ -1680,7 +1700,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		forget(read, input) {
 			assertLive();
 			const key = entryKey(read.name, input);
-			seeds.delete(key);
+			discardSeed(key);
 			const entry = entries.get(key);
 			if (entry) {
 				supersede(entry);
@@ -1727,6 +1747,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			records.clear();
 			views.clear();
 			seeds.clear();
+			staleSeedTags = undefined;
 			forms.clear();
 			for (const entry of entries.values()) {
 				entry.abort?.abort();
@@ -1744,6 +1765,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		retired: retiring.signal,
 		persisted,
 		seeded: new Map(parsed?.cursors),
+		invalidateSeeds,
+		discardSeed,
 		entries,
 		viewed: (entity, id, value) =>
 			!!records.get(entity.name)?.has(id) ||
