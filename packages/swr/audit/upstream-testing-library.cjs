@@ -19,6 +19,8 @@ const REMOTE_MUTATION_MULTIPLE_TEST =
 const LOCAL_MUTATION_VALIDATING_TEST =
 	'useSWR - local mutation should reset isValidating after mutate';
 const LOCAL_MUTATION_VALIDATING_TEXT = 'isValidating:true';
+const LATEST_RETRY_TEST =
+	'useSWR - config callbacks should trigger the onErrorRetry event with the latest version of the onErrorRetry callback';
 const BROADCAST_TESTS = new Set(['useSWR should broadcast data', 'useSWR should broadcast error']);
 const BROADCAST_RELEASE_TEXTS = new Set(['0 0 0', '1 1 1']);
 
@@ -27,7 +29,13 @@ let releaseLocalMutationInitialRequest = null;
 let supersedingMutationTimers = null;
 let broadcastPollingTimers = null;
 
+// findByText advances the retry clock. A delayed test continuation must not.
+beforeEach(() => {
+	if (expect.getState().currentTestName === LATEST_RETRY_TEST) jest.useFakeTimers();
+});
+
 afterEach(() => {
+	if (expect.getState().currentTestName === LATEST_RETRY_TEST) jest.useRealTimers();
 	broadcastPollingTimers?.restore();
 	broadcastPollingTimers = null;
 });
