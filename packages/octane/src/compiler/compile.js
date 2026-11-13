@@ -9284,6 +9284,11 @@ function mapCallToForOf(expr, ctx) {
 	// Fusion interleaves callbacks and row rendering. Preserve authored callback
 	// order when a call or coercion can be observed.
 	if (containsRenderCall([body], null, mapCoercionHasEffects)) return null;
+	// The row helper exposes a read-only position. A writable callback index
+	// needs its original binding, including when a handler captures it.
+	if (params[1] && collectReassignedBindings({ body: [b.stmt(arrow)] }).has(params[1])) {
+		return null;
+	}
 	// Pull a `key={…}` attribute off the returned element → the for-of header key,
 	// and drop it from the element (it's not a DOM attribute). makeForCall then
 	// keys via the header, falling back to `item.id ?? item` when there's no key.
