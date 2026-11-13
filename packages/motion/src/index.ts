@@ -840,12 +840,17 @@ export const domMax: MotionFeatureBundle = Object.freeze({
 export type MotionProxy = Record<string, MotionComponent>;
 
 function motionProxy(preloadedFeatures: boolean): MotionProxy {
+	const components = new Map<string, MotionComponent>();
 	return new Proxy(
 		{},
 		{
-			get(cache: Record<string, MotionComponent>, tag: string | symbol) {
+			get(_target, tag) {
 				if (typeof tag !== 'string') return undefined;
-				return cache[tag] ?? (cache[tag] = createMotionComponent(tag, preloadedFeatures));
+				const cached = components.get(tag);
+				if (cached !== undefined) return cached;
+				const component = createMotionComponent(tag, preloadedFeatures);
+				components.set(tag, component);
+				return component;
 			},
 		},
 	);
