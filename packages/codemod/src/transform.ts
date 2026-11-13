@@ -4531,8 +4531,71 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		return null;
 	}
 
+	private rewriteFreshHandle(statement: ts.ExpressionStatement, call: ts.CallExpression) {
+		const [ref, factory, argument] = call.arguments;
+		const deps = argument && skipParens(argument);
+		const body = statement.parent;
+		if (
+			!this.strong ||
+			this.target !== 'tsrx' ||
+			!ts.isIdentifier(call.expression) ||
+			this.reactHook(call.expression) !== 'useImperativeHandle' ||
+			call.questionDotToken ||
+			call.arguments.length < 2 ||
+			call.arguments.length > 3 ||
+			(deps && (!ts.isIdentifier(deps) || deps.text !== 'undefined' || this.declarationOf(deps))) ||
+			!ts.isIdentifier(ref) ||
+			!ts.isArrowFunction(factory) ||
+			factory.modifiers?.length ||
+			factory.typeParameters?.length ||
+			factory.parameters.length ||
+			!factory.type ||
+			ts.isBlock(factory.body) ||
+			!ts.isBlock(body) ||
+			!ts.isFunctionDeclaration(body.parent) ||
+			body.parent.parent !== this.sf ||
+			body.parent.asteriskToken ||
+			body.parent.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) ||
+			!this.isComponent(body.parent)
+		)
+			return null;
+		const value = skipParens(factory.body);
+		if (
+			!ts.isObjectLiteralExpression(value) ||
+			!value.properties.length ||
+			!value.properties.every(
+				(field) =>
+					ts.isPropertyAssignment(field) &&
+					(ts.isIdentifier(field.name) || ts.isStringLiteral(field.name)) &&
+					field.name.text !== '__proto__' &&
+					ts.isArrowFunction(field.initializer),
+			) ||
+			!fixedBinding(this.checker, ref, call) ||
+			!initializedBefore(this.checker, ref, call) ||
+			reads(body.parent, (id) => id.text === 'eval') ||
+			this.lostComments(statement.getFullStart(), call.end, '').length
+		)
+			return null;
+
+		// Strong tracks this reference. A const arrow could be auto-memoized.
+		let name = 'createHandle';
+		while (this.declared.has(name) || this.readsGlobal(name)) name += '_';
+		this.declared.add(name);
+		this.count(RULE.deps);
+		return (
+			`let ${name} = ${this.emit(factory, PLAIN)};\n${this.indentOf(statement)}` +
+			this.span(call, call.getStart(this.sf), factory.getStart(this.sf), PLAIN) +
+			`${name}, [${name}]` +
+			this.source.slice((argument ?? factory).end, statement.end)
+		);
+	}
+
 	rewriteStatement(node: ts.ExpressionStatement) {
 		const call = node.expression;
+		if (ts.isCallExpression(call)) {
+			const handle = this.rewriteFreshHandle(node, call);
+			if (handle !== null) return handle;
+		}
 		if (
 			ts.isCallExpression(call) &&
 			call.arguments.length === 0 &&

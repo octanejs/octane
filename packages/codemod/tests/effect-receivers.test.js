@@ -20,6 +20,8 @@ import { preinit } from 'react-dom';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createRoot as reactRoot } from 'react-dom/client';
 import { Activity, createElement as octaneElement, createRoot } from 'octane';
+import { createElement as serverElement } from 'octane/server';
+import { prerender } from 'octane/static';
 import { expect, it } from 'vitest';
 import { loadCompiledFixtureSource } from '../../octane/tests/_server-fixture.js';
 import { flushEffects } from '../../octane/tests/_helpers.js';
@@ -597,6 +599,164 @@ it('preserves receiver identity, layout attachment and cleanup for an imperative
 	} finally {
 		globalThis.IS_REACT_ACT_ENVIRONMENT = before;
 	}
+});
+
+const freshHandleSource = `import { useImperativeHandle, useState, type Ref } from 'react';
+type Handle = { open: () => void };
+type Props = { handleRef: Ref<Handle> };
+export function Probe({ handleRef }: Props) {
+	const [open, setOpen] = useState(false);
+	useImperativeHandle(handleRef, (): Handle => ({ open: (): void => setOpen(true) }));
+	return <button type="button" onClick={() => setOpen(!open)}>{String(open)}</button>;
+}
+export function Parent({ handleRef }: Props) {
+	const [tick, setTick] = useState(0);
+	return <section><button type="button" onClick={() => setTick(tick + 1)}>{String(tick)}</button><Probe handleRef={handleRef} /></section>;
+}`;
+
+it('refreshes an inline imperative handle on each committed render in Strong mode', async () => {
+	const migrated = migrate(freshHandleSource);
+	const explicitUndefined = migrate(
+		freshHandleSource.replace('setOpen(true) }));', 'setOpen(true) }), (undefined));'),
+	);
+	for (const file of [migrated, explicitUndefined]) {
+		expect(file.strong).toBe(true);
+		expect(file.diagnostics).toEqual([]);
+	}
+
+	function Probe({ handleRef }) {
+		const [open, setOpen] = useState(false);
+		useImperativeHandle(handleRef, () => ({ open: () => setOpen(true) }));
+		return createElement('button', { type: 'button', onClick: () => setOpen(!open) }, String(open));
+	}
+	function Parent({ handleRef }) {
+		const [tick, setTick] = useState(0);
+		return createElement(
+			'section',
+			null,
+			createElement('button', { type: 'button', onClick: () => setTick(tick + 1) }, String(tick)),
+			createElement(Probe, { handleRef }),
+		);
+	}
+	const server = loadCompiledFixtureSource(migrated.code, { id: 'Probe.tsrx', mode: 'server' });
+	const serverProps = () => {
+		const trace = [];
+		return {
+			trace,
+			get handleRef() {
+				trace.push('read ref');
+				return () => trace.push('attach');
+			},
+		};
+	};
+	const reactProps = serverProps();
+	const nativeProps = serverProps();
+	expect(renderToStaticMarkup(createElement(Parent, reactProps))).toContain('false</button>');
+	const { html } = await prerender(() => serverElement(server.Parent, nativeProps));
+	expect(html).toContain('false</button>');
+	expect(reactProps.trace).toEqual(['read ref']);
+	expect(nativeProps.trace).toEqual(reactProps.trace);
+
+	async function exercise(react, Component) {
+		const host = document.createElement('div');
+		const root = react ? reactRoot(host) : createRoot(host);
+		const trace = [];
+		let held;
+		const attached = new Set();
+		const ref = (name) => (value) => {
+			expect(attached.has(value)).toBe(false);
+			attached.add(value);
+			held = value;
+			trace.push([name, 'attach', host.querySelector('button:last-child').textContent]);
+			return () => {
+				held = undefined;
+				trace.push([name, 'cleanup']);
+			};
+		};
+		const first = ref('first');
+		const second = ref('second');
+		const props = { handleRef: first };
+		const commit = async (action) => {
+			if (react) await act(action);
+			else {
+				action();
+				await flushEffects();
+			}
+		};
+		const render = (props) =>
+			react ? root.render(createElement(Component, props)) : root.render(Component, props);
+		try {
+			await commit(() => render(props));
+			await commit(() => host.querySelector('button').click());
+			await commit(() => render(props));
+			await commit(() => held.open());
+			await commit(() => held.open());
+			await commit(() => render({ handleRef: second }));
+		} finally {
+			await commit(() => root.unmount());
+		}
+		expect(held).toBeUndefined();
+		return trace;
+	}
+
+	const before = globalThis.IS_REACT_ACT_ENVIRONMENT;
+	globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+	try {
+		const original = await exercise(true, Parent);
+		expect(original.filter((entry) => entry[1] === 'attach')).toEqual([
+			['first', 'attach', 'false'],
+			['first', 'attach', 'false'],
+			['first', 'attach', 'false'],
+			['first', 'attach', 'true'],
+			['second', 'attach', 'true'],
+		]);
+		for (const dev of [true, false]) {
+			const native = loadCompiledFixtureSource(migrated.code, {
+				id: 'Probe.tsrx',
+				mode: 'client',
+				compileOptions: { dev },
+			});
+			expect(await exercise(false, native.Parent)).toEqual(original);
+		}
+	} finally {
+		globalThis.IS_REACT_ACT_ENVIRONMENT = before;
+	}
+});
+
+it.each([
+	['contextual return type', (source) => source.replace('(): Handle =>', '() =>')],
+	['ref accessor', (source) => source.replace('Handle(handleRef,', 'Handle(handleRef(),')],
+	[
+		'late ref',
+		(source) =>
+			source
+				.replace('Handle(handleRef,', 'Handle(late,')
+				.replace('return <button', 'const late = handleRef; return <button'),
+	],
+	['direct eval', (source) => source.replace('const [open', 'eval(""); const [open')],
+	['spread', (source) => source.replace('({ open:', '({ ...{}, open:')],
+	['source comment', (source) => source.replace('(): Handle =>', '(): Handle /* keep */ =>')],
+])('retains the compatibility path for an inline handle with %s', (_, rewrite) => {
+	const migrated = migrate(rewrite(freshHandleSource));
+	expect(migrated.strong).toBe(false);
+	expect(migrated.diagnostics).toContainEqual(
+		expect.objectContaining({ code: 'OCTANE_STRONG_UNTRACKED_EFFECT' }),
+	);
+});
+
+it('keeps TypeScript narrowing in a deferred handle method', () => {
+	const source = `import { useImperativeHandle, type Ref } from 'react';
+type Handle = { read: () => string };
+export function Probe({ value, ref }: { value: string | number; ref: Ref<Handle> }) {
+	let label: string | number = value;
+	if (typeof label === 'number') label = String(label);
+	useImperativeHandle(ref, (): Handle => ({ read: () => label.toUpperCase() }));
+	return <span>ready</span>;
+}`;
+	const migrated = migrate(source);
+	expect(migrated.strong).toBe(true);
+	expect(migrated.diagnostics).toEqual([]);
+	expect(migrated.code).toContain('read: () => label.toUpperCase()');
 });
 
 it('keeps a getter dependency after the imperative handle ref expression', () => {
