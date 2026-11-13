@@ -280,10 +280,13 @@ export function createReplica(
 		new Promise((resolve, reject) => {
 			const id = ++next;
 			replies.set(id, { resolve, reject });
-			const key = `${request.kind}\n${entryKey(request.name, request.input)}`;
-			const fresh = askedFor.delete(key);
-			askedFor.add(key);
-			if (askedFor.size > 512) askedFor.delete(askedFor.values().next().value!);
+			let fresh = false;
+			if (request.kind !== 'write') {
+				const key = `${request.kind}\n${entryKey(request.name, request.input)}`;
+				fresh = askedFor.delete(key);
+				askedFor.add(key);
+				if (askedFor.size > 512) askedFor.delete(askedFor.values().next().value!);
+			}
 			send({ t: 'request', id, request, fresh });
 		});
 

@@ -80,11 +80,12 @@ describe('octane/data owner and replicas', () => {
 	});
 
 	it.each([
-		['read', todos],
-		['view', todoPages],
+		['read', todos, 0],
+		['view', todoPages, 0],
+		['read after many writes', todos, 600],
 	] as const)(
 		'reloads a %s with a new request even while an older one is in flight, and keeps the newer value',
-		async (_, read) => {
+		async (_, read, writes) => {
 			const server = createServer();
 			const held: Array<() => void> = [];
 			let hold = false;
@@ -96,6 +97,10 @@ describe('octane/data owner and replicas', () => {
 			}, 2);
 			const one = await observed(first!.read(read as typeof todos, undefined));
 			const two = await observed(second!.read(read as typeof todos, undefined));
+			// Writes do not push the read out of what the tab remembers asking for.
+			for (let index = 0; index < writes; index++) {
+				await second!.write(setDone, { id: `x${index}`, done: true }).catch(() => {});
+			}
 
 			hold = true;
 			const older = first!.read(read as typeof todos, undefined).refresh();
