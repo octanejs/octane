@@ -5853,7 +5853,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			? this.ifDirective(root)
 			: this.relative(this.emit(root, TEMPLATE), root);
 		if (arm === null) return null;
-		if (isJsx(root) && !literal.elements.some(ts.isSpreadElement)) {
+		if (!literal.elements.some(ts.isSpreadElement)) {
 			if (index && this.patternReadsOrdinal(item.name, index)) {
 				this.note(
 					MAP_PARAMETER_TDZ,
