@@ -21,6 +21,7 @@ import {
 	removeTodo,
 	setDone,
 	todoChanges,
+	todoPages,
 	todos,
 	type TodoItem,
 } from './_data-todos.js';
@@ -78,36 +79,42 @@ describe('octane/data owner and replicas', () => {
 		expect(server.log).toEqual(['list', 'list']);
 	});
 
-	it('reloads a read with a new request even while an older one is in flight, and keeps the newer value', async () => {
-		const server = createServer();
-		const held: Array<() => void> = [];
-		let hold = false;
-		const [first, second] = tabs(async (request, signal) => {
-			// The server answers now, as of now; the reply reaches the tab when released.
-			const reply = await server.transport(request, signal);
-			if (hold) await new Promise<void>((resolve) => held.push(resolve));
-			return reply;
-		}, 2);
-		const one = await observed(first!.read(todos, undefined));
-		const two = await observed(second!.read(todos, undefined));
+	it.each([
+		['read', todos],
+		['view', todoPages],
+	] as const)(
+		'reloads a %s with a new request even while an older one is in flight, and keeps the newer value',
+		async (_, read) => {
+			const server = createServer();
+			const held: Array<() => void> = [];
+			let hold = false;
+			const [first, second] = tabs(async (request, signal) => {
+				// The server answers now, as of now; the reply reaches the tab when released.
+				const reply = await server.transport(request, signal);
+				if (hold) await new Promise<void>((resolve) => held.push(resolve));
+				return reply;
+			}, 2);
+			const one = await observed(first!.read(read as typeof todos, undefined));
+			const two = await observed(second!.read(read as typeof todos, undefined));
 
-		hold = true;
-		const older = first!.read(todos, undefined).refresh();
-		await vi.waitFor(() => expect(held).toHaveLength(1));
-		server.rows[0]!.title = 'Atoll';
-		// The second tab reloads after the change, so the first tab's request cannot answer it.
-		const newer = second!.read(todos, undefined).refresh();
-		await vi.waitFor(() => expect(held).toHaveLength(2));
-		held[1]!();
-		await newer;
-		expect(two()[0]!.title).toBe('Atoll');
-		held[0]!();
-		await older;
-		await new Promise((resolve) => setTimeout(resolve, 20));
-		// The older reply, finishing last, does not take the second tab back.
-		expect(two()[0]!.title).toBe('Atoll');
-		expect(one()[0]!.title).toBe('Tides');
-	});
+			hold = true;
+			const older = first!.read(read as typeof todos, undefined).refresh();
+			await vi.waitFor(() => expect(held).toHaveLength(1));
+			server.rows[0]!.title = 'Atoll';
+			// The second tab reloads after the change, so the first tab's request cannot answer it.
+			const newer = second!.read(read as typeof todos, undefined).refresh();
+			await vi.waitFor(() => expect(held).toHaveLength(2));
+			held[1]!();
+			await newer;
+			expect(two()[0]!.title).toBe('Atoll');
+			held[0]!();
+			await older;
+			await new Promise((resolve) => setTimeout(resolve, 20));
+			// The older reply, finishing last, does not take the second tab back.
+			expect(two()[0]!.title).toBe('Atoll');
+			expect(one()[0]!.title).toBe('Tides');
+		},
+	);
 
 	it('holds an edit to a record another tab is creating until the create is settled', async () => {
 		const server = createServer();

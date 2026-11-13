@@ -269,19 +269,21 @@ export function createReplica(
 	>();
 	const feeds = new Map<number, { push(frame: FeedFrame): void; end(error?: unknown): void }>();
 	const send = (message: ToOwner) => port.postMessage(message);
-	/** The reads this replica has asked for: asking again is a reload. */
-	const askedFor = new WeakSet<Entry>();
+	/**
+	 * The reads this replica asked for most recently, by wire key: asking again
+	 * is a reload. Bounded, so a long session paging through views keeps only
+	 * the recent ones; a forgotten key's reload may share an in-flight request.
+	 */
+	const askedFor = new Set<string>();
 
 	const transport: Transport = (request) =>
 		new Promise((resolve, reject) => {
 			const id = ++next;
 			replies.set(id, { resolve, reject });
-			const entry =
-				request.kind === 'read'
-					? inner.wireEntry(entryKey(request.name, request.input))
-					: undefined;
-			const fresh = !!entry && askedFor.has(entry);
-			if (entry) askedFor.add(entry);
+			const key = `${request.kind}\n${entryKey(request.name, request.input)}`;
+			const fresh = askedFor.delete(key);
+			askedFor.add(key);
+			if (askedFor.size > 512) askedFor.delete(askedFor.values().next().value!);
 			send({ t: 'request', id, request, fresh });
 		});
 
