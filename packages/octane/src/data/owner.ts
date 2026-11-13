@@ -145,8 +145,8 @@ type ToReplica =
 			readonly name: string;
 			readonly input: unknown;
 			readonly value: unknown;
-			/** When the request that read it started. */
-			readonly at: number;
+			/** When the request that read it started; an owner from an older build leaves it out. */
+			readonly at?: number;
 	  }
 	/** A value another replica holds, which the owner passes on as it came. */
 	| Offer
@@ -949,17 +949,19 @@ export function createReplica(
 	 * Take a value another replica loaded, for a read held here and not loading,
 	 * unless what is held was read by a request that started later.
 	 */
-	async function value(name: string, input: unknown, raw: unknown, at: number) {
+	async function value(name: string, input: unknown, raw: unknown, at = hostDateNow()) {
 		const entry: Entry | undefined = inner.wireEntry(entryKey(name, input));
-		if (!entry || entry.inflight || store.retired || (entry.hasBase && at < entry.fetchedAt))
-			return;
+		const older = () => entry!.hasBase && at < entry!.fetchedAt;
+		if (!entry || entry.inflight || store.retired || older()) return;
 		let parsed: unknown;
 		try {
 			parsed = await parse(entry.read.output, raw);
 		} catch {
 			return;
 		}
-		if (store.retired || entry.inflight || inner.entries.get(entry.key) !== entry) return;
+		// Another value or offer may have landed while this one was validated.
+		if (store.retired || entry.inflight || inner.entries.get(entry.key) !== entry || older())
+			return;
 		const reload = new Set<Entry>();
 		inner.rebase(entry, parsed, false, reload, Math.max(0, hostDateNow() - at));
 		inner.finish(reload, [entry], entry.names);

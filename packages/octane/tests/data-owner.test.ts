@@ -21,6 +21,7 @@ import {
 	type FeedFrame,
 	type Listener,
 	type ReadHandle,
+	type StandardSchema,
 	type Transport,
 } from '../src/data/index.js';
 import {
@@ -293,6 +294,74 @@ describe('octane/data owner and replicas', () => {
 				await vi.waitFor(() => expect(two()[0]!.title).toBe('Atoll'));
 			},
 		);
+
+		/** A tab whose owner the test plays: it serves the tab, and answers each read with `answer()`. */
+		function playedOwner(
+			answer: () => unknown,
+			list2: Parameters<typeof createReplica>[1]['contracts'],
+			seed?: string,
+		) {
+			const channel = new MessageChannel();
+			channel.port1.onmessage = ({ data }) => {
+				if (data.t === 'hello') channel.port1.postMessage({ t: 'live' });
+				if (data.t === 'request')
+					channel.port1.postMessage({
+						t: 'reply',
+						id: data.id,
+						reply: { ok: true, value: answer() },
+					});
+			};
+			const store = createReplica(channel.port2, { ...options, contracts: list2, seed });
+			closers.push(() => {
+				void store.retire();
+				channel.port1.close();
+				channel.port2.close();
+			});
+			return { store, post: (message: object) => channel.port1.postMessage(message) };
+		}
+		const titled = (title: string) => [{ id: 'a', title, done: false }];
+
+		it("takes a value from an owner of an older build, which doesn't say when it was read", async () => {
+			const { store, post } = playedOwner(() => [], [...contracts, list], seedOf('Tides', 0));
+			const shown = await observed(store.read(list));
+			post({ t: 'value', name: list.name, input: undefined, value: titled('Atoll') });
+			await vi.waitFor(() => expect(shown()[0]!.title).toBe('Atoll'));
+			expect(store.read(list).getSnapshot().status).toBe('ready');
+		});
+
+		it('keeps the newer of two values whose validation overlaps', async () => {
+			// An output schema that answers a moment later, as an async validator does.
+			const output: StandardSchema<unknown, TodoItem[]> = {
+				'~standard': {
+					version: 1,
+					vendor: 'test',
+					validate: (value) =>
+						new Promise((resolve) => setTimeout(() => resolve({ value: value as TodoItem[] }), 10)),
+				},
+			};
+			const slow = read({ name: 'todos.slow', output });
+			const { store, post } = playedOwner(() => titled('Tides'), [...contracts, slow]);
+			const shown = await observed(store.read(slow));
+			const loaded = Date.now();
+			await new Promise((resolve) => setTimeout(resolve, 30));
+			// The newer offer is validated first; the older value lands after it.
+			post({
+				t: 'offer',
+				name: slow.name,
+				input: undefined,
+				value: titled('Lagoon'),
+				at: loaded + 15,
+			});
+			post({
+				t: 'value',
+				name: slow.name,
+				input: undefined,
+				value: titled('Atoll'),
+				at: loaded + 5,
+			});
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			expect(shown()[0]!.title).toBe('Lagoon');
+		});
 
 		/** The server's transport, holding each list reply, read when it was asked, until released. */
 		function held(server: ReturnType<typeof createServer>) {
