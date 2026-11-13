@@ -219,8 +219,8 @@ export interface StoreInternals {
 	 * has none, is stale or loading, or is a view, whose rows need their window's bounds.
 	 */
 	held(entry: Entry): { name: string; input: unknown; value: unknown; at: number } | null;
-	/** Called after a server render's seed gives a read its value. */
-	onSeed(notify: (entry: Entry) => void): void;
+	/** Called after a server render's seed gives a read its value, with the key a load of it is sent under. */
+	onSeed(notify: (entry: Entry, wireKey: string) => void): void;
 	/** The entry a reply for this wire key belongs to. */
 	wireEntry(key: string): Entry | undefined;
 	/** Show a write another tab sent, without sending it. */
@@ -1048,7 +1048,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		if (seeds.delete(key) && seeds.size === 0) staleSeedTags = undefined;
 	}
 
-	let seededHere: ((entry: Entry) => void) | undefined;
+	let seededHere: ((entry: Entry, wireKey: string) => void) | undefined;
 
 	/**
 	 * Start an entry from the server's value. Hydration is synchronous, so a
@@ -1100,7 +1100,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			seedsStale ||
 			(invalidated !== undefined && affects(entry, invalidated));
 		save(entry);
-		seededHere?.(entry);
+		seededHere?.(entry, entryKey(entry.read.name, wireInput(entry)));
 		// A seed is adopted while a render asks for its read.
 		if (reload.size > 0) queueMicrotask(() => !retired && reloadAll(reload));
 	}
@@ -1174,6 +1174,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			return restore(entry);
 		}
 		const startedSeq = ++sequence;
+		// A value is as old as the request that read it, so tabs compare loads by when they started.
+		const startedAt = hostDateNow();
 		const attempt = (entry.attempt = startedSeq);
 		const abort = (entry.abort = new AbortController());
 		const { read } = entry;
@@ -1188,7 +1190,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			.then(
 				(value) => {
 					if (!current()) return;
-					adopt(entry, value, startedSeq);
+					adopt(entry, value, startedSeq, hostDateNow() - startedAt);
 					save(entry);
 				},
 				(error) => {

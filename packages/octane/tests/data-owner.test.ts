@@ -264,7 +264,67 @@ describe('octane/data owner and replicas', () => {
 			},
 		);
 
-		it('reloads what a feed covers when its seed stood elsewhere in the feed than the connection it joins', async () => {
+		it.each([
+			['stands at another position', { cursor: 'after-render' }],
+			['has no position yet', {}],
+		] as const)(
+			'reloads what a feed covers when its seed stood elsewhere than the connection it joins, which %s',
+			async (_, frame) => {
+				const server = createServer();
+				const feedListener: Listener = () => ({
+					async *[Symbol.asyncIterator]() {
+						yield frame;
+						await new Promise(() => {});
+					},
+				});
+				const owner = createDataOwner({ transport: server.transport, listen: feedListener });
+				const first = connect(owner);
+				await observed(first.read(list));
+				closers.push(listen(first, todoChanges).subscribe(() => {}));
+				await vi.waitFor(() =>
+					expect(listen(first, todoChanges).getSnapshot().status).toBe('live'),
+				);
+
+				// The server render read its position before the connection's latest event.
+				server.rows[0]!.title = 'Atoll';
+				const second = connect(owner, seedOf('Tides', 0, 'before-render'));
+				const two = await observed(second.read(list));
+				closers.push(listen(second, todoChanges).subscribe(() => {}));
+				await vi.waitFor(() => expect(two()[0]!.title).toBe('Atoll'));
+			},
+		);
+
+		/** The server's transport, holding each list reply, read when it was asked, until released. */
+		function held(server: ReturnType<typeof createServer>) {
+			const waiting: Array<() => void> = [];
+			const transport: Transport = async (request, signal) => {
+				const reply = await server.transport(request, signal);
+				if (request.name === list.name) await new Promise<void>((go) => waiting.push(go));
+				return reply;
+			};
+			return { transport, release: () => waiting.splice(0).forEach((go) => go()) };
+		}
+
+		it('shows a newer seed in a tab that was loading, once its older load lands', async () => {
+			const server = createServer();
+			server.rows[0]!.title = 'Atoll';
+			const { transport, release } = held(server);
+			const owner = createDataOwner({ transport });
+			const first = connect(owner);
+			const reading = first.read(list);
+			closers.push(reading.subscribe(() => {}));
+			await vi.waitFor(() => expect(server.log).toEqual(['list']));
+			// The page was rendered after that load started, with a newer title.
+			await new Promise((resolve) => setTimeout(resolve, 5));
+			const two = await observed(connect(owner, seedOf('Lagoon', 0)).read(list));
+			// The offer reaches the first tab while its load is still held.
+			await new Promise((resolve) => setTimeout(resolve, 20));
+			release();
+			await vi.waitFor(() => expect(reading.getSnapshot().value?.[0]!.title).toBe('Lagoon'));
+			expect(two()[0]!.title).toBe('Lagoon');
+		});
+
+		it('reloads a seeded read after a feed gap without joining an older request in flight', async () => {
 			const server = createServer();
 			const feedListener: Listener = () => ({
 				async *[Symbol.asyncIterator]() {
@@ -272,18 +332,24 @@ describe('octane/data owner and replicas', () => {
 					await new Promise(() => {});
 				},
 			});
-			const owner = createDataOwner({ transport: server.transport, listen: feedListener });
+			const { transport, release } = held(server);
+			const owner = createDataOwner({ transport, listen: feedListener });
 			const first = connect(owner);
-			await observed(first.read(list));
+			const reading = first.read(list);
+			closers.push(reading.subscribe(() => {}));
+			await vi.waitFor(() => expect(server.log).toEqual(['list']));
 			closers.push(listen(first, todoChanges).subscribe(() => {}));
 			await vi.waitFor(() => expect(listen(first, todoChanges).getSnapshot().status).toBe('live'));
 
-			// The server render read its position before the connection's latest event.
+			// The first tab's load is still held when the title changes and a page renders.
 			server.rows[0]!.title = 'Atoll';
 			const second = connect(owner, seedOf('Tides', 0, 'before-render'));
-			const two = await observed(second.read(list));
+			const handle = second.read(list);
+			closers.push(handle.subscribe(() => {}));
 			closers.push(listen(second, todoChanges).subscribe(() => {}));
-			await vi.waitFor(() => expect(two()[0]!.title).toBe('Atoll'));
+			await vi.waitFor(() => expect(server.log).toEqual(['list', 'list']));
+			release();
+			await vi.waitFor(() => expect(handle.getSnapshot().value?.[0]!.title).toBe('Atoll'));
 		});
 	});
 
