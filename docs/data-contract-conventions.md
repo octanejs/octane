@@ -398,8 +398,8 @@ Agreed 2026-11-13: every recommendation, and dropping `useWrite`.
    escape.
 6. **One way to write.** `useWrite` is removed from both bindings; a write is
    always `store.write(contract, input)`, matching reads'
-   `useRead(store.read(contract, input))`. The removal lands with the one-way
-   read change on `feat/data-one-read`.
+   `useRead(store.read(contract, input))`. Removed with the one-way read change
+   in #2600.
 
 Implementation is three steps: the per-module analysis and rules 1–4 with
 catalog entries; the whole-program pass and manifest in both plugins; shelf
