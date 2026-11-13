@@ -59,7 +59,10 @@ beforeAll(async () => {
 			unported: (name) => (name === 'react-intl' ? name : null),
 		},
 	);
-	expect(fields.notes.filter((note) => note.severity === 'error')).toEqual([ownershipError]);
+	expect(fields.notes.filter((note) => note.severity === 'error')).toEqual([
+		ownershipError,
+		ownershipError,
+	]);
 	expect(fields.code).not.toMatch(/from ['"]react-intl['"]/);
 	await writeFile(path.join(project, 'fields.tsrx'), fields.code);
 	for (const [name, read] of [

@@ -18,6 +18,11 @@ const provider = `import {IntlProvider} from './octane-react-intl.tsrx';
 export function PreviouslyMigrated({children}) @{
 	<IntlProvider locale="en" messages={{greeting: 'Hello, {name}!'}}>{children}</IntlProvider>
 }`;
+const nativeOwnership = expect.objectContaining({
+	rule: 'bindings',
+	severity: 'error',
+	message: expect.stringContaining('generated native adapter'),
+});
 let root;
 function project() {
 	root = fs.mkdtempSync(path.join(os.tmpdir(), 'octane-intl-upgrade-'));
@@ -160,14 +165,23 @@ it('uses shorthand project types for stable exported scalar props with external 
 			name === 'dynamicExternal'
 		) {
 			expect(file.strong).toBe(true);
-			expect(errors, name).toEqual([]);
+			expect(errors, name).toEqual([nativeOwnership]);
 		} else {
-			expect(errors, name).toContainEqual(expect.objectContaining({ rule: 'bindings' }));
+			expect(errors, name).toContainEqual(
+				expect.objectContaining({
+					rule: 'bindings',
+					message: expect.not.stringContaining('generated native adapter'),
+				}),
+			);
 		}
 	}
 	const local = await runCodemod([path.join(src, 'safe.tsx')], { ...options, projectTypes: false });
 	expect(local.files[0].notes).toContainEqual(
-		expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		expect.objectContaining({
+			rule: 'bindings',
+			severity: 'error',
+			message: expect.not.stringContaining('generated native adapter'),
+		}),
 	);
 });
 
@@ -185,7 +199,9 @@ it('previews and atomically upgrades the released helper while sharing context w
 	});
 	expect(fs.readFileSync(helper, 'utf8')).toBe(previous);
 	const result = await runCodemod([input], { root, strong: true });
-	expect(result.files.flatMap((f) => f.notes).filter((n) => n.severity === 'error')).toEqual([]);
+	expect(result.files.flatMap((f) => f.notes).filter((n) => n.severity === 'error')).toEqual([
+		nativeOwnership,
+	]);
 	expect(fs.readFileSync(helper, 'utf8')).toBe(current);
 	expect(fs.readFileSync(previousInode, 'utf8')).toBe(previous);
 	expect(fs.statSync(helper).mode & 0o777).toBe(fs.statSync(previousInode).mode & 0o777);
@@ -245,7 +261,17 @@ it.each([
 		return mkdtemp(prefix, ...args);
 	});
 	const out = await runCodemod([input], { root });
-	expect(out.files.some((f) => f.notes.some((n) => n.severity === 'error'))).toBe(!accepted);
+	const errors = out.files.flatMap((f) => f.notes).filter((n) => n.severity === 'error');
+	expect(errors).toEqual(
+		accepted
+			? [nativeOwnership]
+			: [
+					expect.objectContaining({
+						rule: 'react-intl',
+						message: expect.stringContaining('changed during migration'),
+					}),
+				],
+	);
 	expect(fs.readFileSync(helper, 'utf8')).toBe(other);
 	expect(fs.existsSync(input)).toBe(!accepted);
 	expect(fs.existsSync(path.join(src, 'Greeting.tsrx'))).toBe(accepted);
@@ -262,7 +288,9 @@ it('adopts an identical concurrent creation without truncating its file', async 
 		return write(name, data, opts);
 	});
 	const out = await runCodemod([input], { root });
-	expect(out.files.flatMap((f) => f.notes).filter((n) => n.severity === 'error')).toEqual([]);
+	expect(out.files.flatMap((f) => f.notes).filter((n) => n.severity === 'error')).toEqual([
+		nativeOwnership,
+	]);
 	expect(fs.readFileSync(helper, 'utf8')).toBe(current);
 	expect(fs.existsSync(input)).toBe(false);
 });

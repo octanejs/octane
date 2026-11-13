@@ -1241,9 +1241,13 @@ it('delivers the original React element to a store service for rendering under i
 	const pane = result.files.find((file) => file.file === 'src/pane.tsx');
 	expect(pane.rules['store-hook']).toBe(1);
 	expect(pane.rules['react-intl']).toBe(1);
-	expect([...pane.notes, ...pane.diagnostics].filter((item) => item.severity === 'error')).toEqual(
-		[],
-	);
+	expect([...pane.notes, ...pane.diagnostics].filter((item) => item.severity === 'error')).toEqual([
+		expect.objectContaining({
+			rule: 'bindings',
+			line: 6,
+			message: expect.stringContaining('generated native adapter'),
+		}),
+	]);
 	fs.writeFileSync(
 		path.join(app, 'src/provider.tsrx'),
 		`
