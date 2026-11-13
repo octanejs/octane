@@ -2128,6 +2128,7 @@ it('keeps the receiver-specific bare SVG diagnostics when other slots in the sam
 	expect(pane.rules['svg-paths']).toBe(1);
 	const notes = pane.notes.filter((n) => n.severity === 'error' && n.message.includes('bare SVG'));
 	expect(notes).toHaveLength(2);
+	expect(notes.map((n) => n.rule)).toEqual(['svg-issuer', 'svg-issuer']);
 	expect(notes.map((n) => n.message)).toEqual([
 		expect.stringMatching(/<Button> renders its children/),
 		expect.stringMatching(/<Row> renders its icon prop/),

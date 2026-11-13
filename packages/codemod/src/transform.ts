@@ -1209,7 +1209,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				isBareSvgTag(field.tagName, this.checker, bareSvgImports, this.localUses)
 			) {
 				this.note(
-					this.nativeStoreHooks.size ? 'store-hook' : 'svg-issuer',
+					'svg-issuer',
 					'error',
 					field.tagName,
 					'This JSX tag can resolve to a bare SVG import. Loading the SVG from .tsrx can produce an asset URL. Import and render the SVG in a React-owned .tsx component hosted by ReactCompat, or configure a native SVG loader for .tsrx.' +
@@ -5853,7 +5853,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			? this.ifDirective(root)
 			: this.relative(this.emit(root, TEMPLATE), root);
 		if (arm === null) return null;
-		if (isJsx(root) && !literal.elements.some(ts.isSpreadElement)) {
+		if (!literal.elements.some(ts.isSpreadElement)) {
 			if (index && this.patternReadsOrdinal(item.name, index)) {
 				this.note(
 					MAP_PARAMETER_TDZ,

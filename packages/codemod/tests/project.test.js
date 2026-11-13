@@ -1403,6 +1403,48 @@ export function Host({rows}: { rows: Row[] }) {
 		},
 	);
 
+	it.each([
+		['write', '[1,2].map((item, index) => show ? <li>{index++}</li> : null)'],
+		['tdz', '[{id:1},{id:2}].map(({id,label=index}, index) => show ? <li>{label}</li> : null)'],
+	])('blocks conditional map rows with a parameter %s before writing', async (kind, list) => {
+		const view = (/** @type {string} */ rows) =>
+			`export const View = ({show}: {show: boolean}) => <ul>{${rows}}</ul>;`;
+		const sources = {
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			'Caller.tsx': "import { View } from './View.tsx'; export const Caller = () => <View show />;",
+			'View.tsx': view(list),
+			'Control.tsx': view('[1,2].map((item, index) => show ? <li>{index}</li> : null)'),
+		};
+		const root = project(sources);
+		const inputs = ['Caller.tsx', 'View.tsx', 'Control.tsx'].map((file) => path.join(root, file));
+		const blocked = expect.objectContaining({
+			rule: `map-parameter-${kind}`,
+			severity: 'error',
+		});
+		const preview = await runCodemod(inputs, { root, verify: false, write: false });
+		expect(preview.files.find((file) => file.file === 'View.tsx')).toMatchObject({
+			code: expect.stringContaining('@for'),
+			notes: [blocked],
+		});
+		expect(preview.files.find((file) => file.file === 'Control.tsx')).toMatchObject({
+			code: expect.stringContaining('@for'),
+			notes: [],
+		});
+		const result = await runCodemod(inputs, { root, verify: false });
+		expect(result.files).toEqual([
+			expect.objectContaining({
+				file: 'View.tsx',
+				output: 'View.tsx',
+				code: sources['View.tsx'],
+				changed: false,
+				notes: [blocked],
+			}),
+		]);
+		expect(fs.readdirSync(root).sort()).toEqual(Object.keys(sources).sort());
+		for (const [file, code] of Object.entries(sources))
+			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
+	});
+
 	it('keeps visible or ambiguous JSX text and authored comments in keyed map rows', async () => {
 		const children = [
 			' {row.child()}',
