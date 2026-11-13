@@ -30,15 +30,17 @@
  */
 import {
 	parse,
+	type Feed,
 	type FeedFrame,
 	type FeedRequest,
 	type Listener,
+	type Read,
 	type Transport,
 	type Write,
 	type DataReply,
 	type DataRequest,
 } from './contracts.js';
-import { clearHostTimeout, setHostTimeout } from '../host-task.js';
+import { clearHostTimeout, hostDateNow, setHostTimeout } from '../host-task.js';
 import {
 	createDataStore,
 	DataRetiredError,
@@ -48,7 +50,7 @@ import {
 	type DataStoreOptions,
 	type Entry,
 } from './store.js';
-import { done, request as settled } from './persist.js';
+import { done, request as settled, shape } from './persist.js';
 import { DATA_WORKER_PATH } from './worker-path.js';
 
 /** The part of a `MessagePort` the owner and its replicas use. */
@@ -60,8 +62,12 @@ export interface OwnerPort {
 
 /** What a replica sends its owner. */
 type ToOwner =
-	/** A tab's first message: the account it signs in as. */
-	| { readonly t: 'hello'; readonly account: string }
+	/**
+	 * A tab's first message: the account it signs in as, where the owner
+	 * fences by account, and its build's contracts, which must match the first
+	 * build the owner served.
+	 */
+	| { readonly t: 'hello'; readonly account: string | undefined; readonly identity: string }
 	/** Sign the account out, in every tab. */
 	| { readonly t: 'retire' }
 	/** Is the account still signed in? Asked by a tab resuming from being frozen. */
@@ -88,6 +94,8 @@ type ToReplica =
 	| { readonly t: 'live' }
 	/** The account was signed out, or another signed in: show nothing more. */
 	| { readonly t: 'retired' }
+	/** This tab cannot share the owner: its build's contracts differ, or the account cannot be recorded. */
+	| { readonly t: 'refused' }
 	| { readonly t: 'reply'; readonly id: number; readonly reply: DataReply }
 	| { readonly t: 'failed'; readonly id: number; readonly error: unknown }
 	| { readonly t: 'frame'; readonly id: number; readonly frame: FeedFrame }
@@ -145,6 +153,40 @@ export function createDataOwner(options: {
 		if (replicas.has(port)) port.postMessage(message);
 	};
 
+	/** The contracts of the first build served; a tab of another build is refused. */
+	let identity: string | undefined;
+	const refused = new WeakSet<OwnerPort>();
+	const refuse = (port: OwnerPort) => (refused.add(port), port.postMessage(REFUSED));
+	/** When each replica was last heard from; one silent too long has gone, and is dropped. */
+	const heard = new Map<OwnerPort, number>();
+	let sweeping: unknown;
+	function watch(port: OwnerPort): void {
+		heard.set(port, hostDateNow());
+		sweeping ??= setHostTimeout(sweep, HEARTBEAT_MS);
+	}
+	/**
+	 * Tabs dropped while silent, by the generation they were served under. A
+	 * frozen or throttled tab may speak again: under that generation it is
+	 * served again, and under any other it is told its account was retired.
+	 */
+	const dropped = new WeakMap<OwnerPort, number>();
+	function sweep(): void {
+		sweeping = undefined;
+		for (const [port, at] of heard) {
+			if (replicas.has(port) && hostDateNow() - at <= HEARTBEAT_MS * 3) continue;
+			heard.delete(port);
+			if (replicas.delete(port)) dropped.set(port, generation);
+			// Its writes keep going; what it listened to stops, and connects again if it wakes.
+			for (const upstream of upstreams.values()) {
+				const id = upstream.members.get(port);
+				if (id === undefined) continue;
+				unsubscribe(port, id);
+				port.postMessage({ t: 'end', id } satisfies ToReplica);
+			}
+		}
+		if (heard.size > 0) sweeping = setHostTimeout(sweep, HEARTBEAT_MS);
+	}
+
 	/** The account being served, once its generation is recorded; `null` once retired. */
 	let serving: { readonly account: string | null; readonly ready: Promise<number> } | null = fence
 		? null
@@ -188,12 +230,14 @@ export function createDataOwner(options: {
 				}
 				if (serving !== current) return port.postMessage(RETIRED);
 				replicas.add(port);
+				watch(port);
 				port.postMessage({ t: 'live' } satisfies ToReplica);
 			},
 			() => {
-				// The account could not be recorded: the next tab to connect tries again.
+				// The account could not be recorded: this tab keeps its own store, and the next tab
+				// to connect tries again.
 				if (serving === current) serving = null;
-				port.postMessage(RETIRED);
+				refuse(port);
 			},
 		);
 	}
@@ -350,12 +394,18 @@ export function createDataOwner(options: {
 
 	return {
 		connect(port) {
-			if (!fence && serving) replicas.add(port);
-			/** With `fence`, a replica is served once its account is recorded, in the order it asked. */
+			/** A replica is served once its build matches and its account is recorded, in the order it asked. */
 			let joined: Promise<void> | null = null;
 			const handle = (message: ToOwner) => {
+				if (refused.has(port)) return port.postMessage(REFUSED);
 				// A replica of a retired account is told so, whatever it asks.
-				if (!replicas.has(port)) return port.postMessage(RETIRED);
+				if (!replicas.has(port)) {
+					if (!serving || dropped.get(port) !== generation) return port.postMessage(RETIRED);
+					dropped.delete(port);
+					replicas.add(port);
+					watch(port);
+				}
+				heard.set(port, hostDateNow());
 				if (message.t === 'request') request(port, message.id, message.request, message.fresh);
 				else if (message.t === 'listen') subscribe(port, message.id, message.request);
 				else if (message.t === 'unlisten') unsubscribe(port, message.id);
@@ -365,8 +415,13 @@ export function createDataOwner(options: {
 			};
 			port.addEventListener('message', ({ data }) => {
 				const message = data as ToOwner;
-				if (fence && message.t === 'hello') joined = join(port, message.account);
-				else if (joined) joined = joined.then(() => handle(message));
+				if (message.t === 'hello') {
+					// The first build served decides which builds share this owner.
+					identity ??= message.identity;
+					if (message.identity !== identity) joined = Promise.resolve(refuse(port));
+					else if (fence) joined = join(port, message.account!);
+					else if (serving) (replicas.add(port), watch(port));
+				} else if (joined) joined = joined.then(() => handle(message));
 				else handle(message);
 			});
 			port.start?.();
@@ -374,25 +429,56 @@ export function createDataOwner(options: {
 	};
 }
 
+/** Any contract a replica's app uses: reads and views, writes, and feeds. */
+type Contract = Read<any, any> | Write<any, any> | Feed<any, any>;
+
 /**
- * A store for one tab, whose requests and feeds go through the owner on
- * `port`, and which shows what the owner's other replicas do. `writes` lists
- * the writes any replica may send, so this one can show them.
+ * Whether two builds can share an owner: the name, kind, `version` and output
+ * schema shape of each contract they use, as the persistent cache compares a
+ * saved value with its read.
+ */
+function contractIdentity(contracts: ReadonlyArray<Contract>): string {
+	return contracts
+		.map((contract) =>
+			contract.kind === 'read'
+				? `read ${contract.name} ${contract.version} ${shape(contract)}`
+				: `${contract.kind} ${contract.name}`,
+		)
+		.sort()
+		.join('\n');
+}
+
+/**
+ * A store for one tab that shares the owner on `owner`, and shows what the
+ * owner's other tabs do. It takes the options of a local store: where `owner`
+ * is `null`, the owner refuses this build (another deploy's contracts), or it
+ * is lost and cannot be reopened, the tab carries on as a local store with
+ * them. `contracts` lists every read, write and feed the app uses, so the
+ * owner can tell compatible builds apart and this tab can show the others'
+ * writes.
  */
 export function createReplica(
-	port: OwnerPort,
-	options: Omit<DataStoreOptions, 'transport' | 'listen' | 'persist'> & {
-		readonly writes: ReadonlyArray<Write<any, any>>;
-	},
+	owner: OwnerPort | null,
+	options: DataStoreOptions & { readonly contracts: ReadonlyArray<Contract> },
 ): DataStore {
-	const { writes, ...rest } = options;
+	const { contracts, ...local } = options;
+	/** The owner's port, or `null` once this tab is a local store. */
+	let port: OwnerPort | null = null;
 	let next = 0;
+	/** Requests the owner has not answered, so a new owner can be asked again. */
 	const replies = new Map<
 		number,
-		{ resolve(reply: DataReply): void; reject(error: unknown): void }
+		{
+			readonly request: DataRequest;
+			readonly fresh: boolean;
+			resolve(reply: DataReply): void;
+			reject(error: unknown): void;
+		}
 	>();
 	const feeds = new Map<number, { push(frame: FeedFrame): void; end(error?: unknown): void }>();
-	const send = (message: ToOwner) => port.postMessage(message);
+	/** Other tabs' writes this tab shows and has not seen settle. */
+	const followed = new Set<string>();
+	const send = (message: ToOwner) => port?.postMessage(message);
 	/**
 	 * The reads this replica asked for most recently, by wire key: asking again
 	 * is a reload. Bounded, so a long session paging through views keeps only
@@ -400,10 +486,10 @@ export function createReplica(
 	 */
 	const askedFor = new Set<string>();
 
-	const transport: Transport = (request) =>
-		new Promise((resolve, reject) => {
+	const transport: Transport = (request, signal) => {
+		if (!port) return local.transport(request, signal);
+		return new Promise((resolve, reject) => {
 			const id = ++next;
-			replies.set(id, { resolve, reject });
 			let fresh = false;
 			if (request.kind !== 'write') {
 				const key = `${request.kind}\n${entryKey(request.name, request.input)}`;
@@ -411,10 +497,12 @@ export function createReplica(
 				askedFor.add(key);
 				if (askedFor.size > 512) askedFor.delete(askedFor.values().next().value!);
 			}
+			replies.set(id, { request, fresh, resolve, reject });
 			send({ t: 'request', id, request, fresh });
 		});
+	};
 
-	const listen: Listener = (request, signal) => ({
+	const viaOwner: Listener = (request, signal) => ({
 		async *[Symbol.asyncIterator]() {
 			const id = ++next;
 			const queue: FeedFrame[] = [];
@@ -443,39 +531,134 @@ export function createReplica(
 			}
 		},
 	});
-
-	const store = createDataStore({ ...rest, transport, listen });
+	const listen = local.listen;
+	const store = createDataStore({
+		...local,
+		transport,
+		listen: listen && ((request, signal) => (port ? viaOwner : listen)(request, signal)),
+	});
 	const inner = internals.get(store)!;
 	inner.onSettle((op, confirmed, value) => send({ t: 'settle', op, confirmed, value }));
 
 	// Retiring signs the account out in every tab. Until the owner confirms it, ask again:
 	// a sign-out must not be lost to a busy or restarting owner.
 	const retireHere = store.retire;
-	let asking: ReturnType<typeof setHostTimeout> | undefined;
+	let asking: unknown;
 	const signOut = () => {
 		send({ t: 'retire' });
 		asking = setHostTimeout(signOut, SIGN_OUT_RETRY_MS);
 	};
 	store.retire = () => {
-		if (!store.retired) signOut();
+		if (port && !store.retired) signOut();
 		return retireHere();
 	};
-	/** The owner retired the account: nothing more is shown, and nothing pending will be answered. */
+
+	/**
+	 * Stop waiting on the owner's port: a write already sent to it may have
+	 * been made, so it is uncertain, never sent again; every other request is
+	 * asked again, of `ask`. Each feed connects again, through whatever serves
+	 * this tab now.
+	 */
+	function abandon(
+		ask: (request: DataRequest, fresh: boolean) => Promise<DataReply>,
+		refused: boolean,
+	) {
+		const pending = [...replies.values()];
+		replies.clear();
+		for (const item of pending) {
+			if (item.request.kind === 'write' && !refused) item.reject(new Error(LOST));
+			else ask(item.request, item.fresh).then(item.resolve, item.reject);
+		}
+		for (const feed of feeds.values()) feed.end(new Error(LOST));
+		// Another tab's write in flight may still settle; its tab settles it once it knows.
+		for (const op of followed) {
+			const operation = inner.operation(op);
+			if (operation?.status === 'pending') operation.status = 'uncertain';
+		}
+	}
+
+	/** Carry on as a local store: the owner refused this build, or is gone for good. */
+	function becomeLocal(refused: boolean) {
+		port = null;
+		clearHostTimeout(beat);
+		inner.fence(false);
+		abandon((request) => local.transport(request, new AbortController().signal), refused);
+	}
+
+	/** The account was signed out, or another signed in: nothing more is shown. */
 	function retired() {
 		clearHostTimeout(asking);
+		clearHostTimeout(beat);
+		port = null;
 		void retireHere();
 		for (const pending of replies.values()) pending.reject(new DataRetiredError());
 		replies.clear();
 		for (const feed of feeds.values()) feed.end();
 	}
+
+	/**
+	 * The owner stopped answering: its worker may have crashed. Show nothing
+	 * until a new owner confirms the account, and ask it what the old one did
+	 * not answer.
+	 */
+	function lost() {
+		const reopened = port && opened.get(port)?.reopen();
+		if (!reopened) return becomeLocal(false);
+		inner.fence(true);
+		connect(reopened);
+		abandon(
+			(request, fresh) =>
+				new Promise((resolve, reject) => {
+					const id = ++next;
+					replies.set(id, { request, fresh, resolve, reject });
+					send({ t: 'request', id, request, fresh });
+				}),
+			false,
+		);
+	}
+
+	// Each side checks the other is still there. A tab whose last three pings went unanswered
+	// has lost its owner, however long the browser throttled its timers between them; an owner
+	// that hears nothing from a tab drops it.
+	let unanswered = 0;
+	let beat: unknown;
+	const heartbeat = () => {
+		if (!port || store.retired) return;
+		if (unanswered >= 3) lost();
+		if (!port) return;
+		unanswered++;
+		send({ t: 'ping' });
+		beat = setHostTimeout(heartbeat, HEARTBEAT_MS);
+	};
+
 	// A tab frozen in the background may have missed a sign-out: it shows nothing it held
 	// until the owner says the account is still signed in.
 	if (typeof document !== 'undefined') {
 		const listening = { signal: inner.retired };
-		document.addEventListener('freeze', () => inner.fence(true), listening);
-		document.addEventListener('resume', () => send({ t: 'ping' }), listening);
+		document.addEventListener(
+			'freeze',
+			() => {
+				if (!port) return;
+				inner.fence(true);
+				clearHostTimeout(beat);
+			},
+			listening,
+		);
+		document.addEventListener(
+			'resume',
+			() => {
+				if (!port) return;
+				clearHostTimeout(beat);
+				unanswered = 0;
+				heartbeat();
+			},
+			listening,
+		);
 	}
-	const byName = new Map(writes.map((write) => [write.name, write]));
+	const byName = new Map<string, Write<any, any>>();
+	for (const contract of contracts)
+		if (contract.kind === 'write') byName.set(contract.name, contract);
+	const identity = contractIdentity(contracts);
 
 	/** Show another replica's write, once its input validates here. */
 	async function follow(op: string, name: string, raw: unknown) {
@@ -483,6 +666,7 @@ export function createReplica(
 		if (!write || store.retired) return;
 		const input = await parse(write.input, raw);
 		if (store.retired) return;
+		followed.add(op);
 		inner.follow(inner.operationFor(op, write, input, raw, 'pending'));
 	}
 	/** Followed writes in order, so an outcome never overtakes its write. */
@@ -493,6 +677,7 @@ export function createReplica(
 
 	/** Settle another replica's write the way it settled. */
 	async function outcome(op: string, reply: DataReply | null) {
+		followed.delete(op);
 		const operation = inner.operation(op);
 		if (!operation || store.retired) return;
 		if (reply === null) {
@@ -527,58 +712,86 @@ export function createReplica(
 		inner.finish(reload, [entry], entry.names);
 	}
 
-	port.addEventListener('message', ({ data }) => {
-		const message = data as ToReplica;
-		switch (message.t) {
-			case 'live':
-				inner.fence(false);
-				break;
-			case 'retired':
-				retired();
-				break;
-			case 'reply':
-			case 'failed': {
-				const pending = replies.get(message.id);
-				replies.delete(message.id);
-				if (message.t === 'reply') pending?.resolve(message.reply);
-				else pending?.reject(message.error);
-				break;
+	/** Use `next` as this tab's owner: introduce the tab, and hear only that owner from now on. */
+	function connect(next: OwnerPort) {
+		port = next;
+		unanswered = 0;
+		next.addEventListener('message', ({ data }) => {
+			if (port !== next) return;
+			unanswered = 0;
+			const message = data as ToReplica;
+			switch (message.t) {
+				case 'live':
+					inner.fence(false);
+					break;
+				case 'retired':
+					retired();
+					break;
+				case 'refused':
+					becomeLocal(true);
+					break;
+				case 'reply':
+				case 'failed': {
+					const pending = replies.get(message.id);
+					replies.delete(message.id);
+					if (message.t === 'reply') pending?.resolve(message.reply);
+					else pending?.reject(message.error);
+					break;
+				}
+				case 'frame':
+					feeds.get(message.id)?.push(message.frame);
+					break;
+				case 'end':
+					feeds.get(message.id)?.end(message.error);
+					break;
+				case 'value':
+					void value(message.name, message.input, message.value);
+					break;
+				case 'write':
+					inOrder(() => follow(message.op, message.name, message.raw));
+					break;
+				case 'outcome':
+					inOrder(() => outcome(message.op, message.reply));
+					break;
+				case 'settle':
+					inOrder(() => {
+						followed.delete(message.op);
+						const operation = inner.operation(message.op);
+						if (operation?.status === 'uncertain' && !store.retired) {
+							inner.settleOperation(operation, message.confirmed, message.value);
+						}
+					});
+					break;
 			}
-			case 'frame':
-				feeds.get(message.id)?.push(message.frame);
-				break;
-			case 'end':
-				feeds.get(message.id)?.end(message.error);
-				break;
-			case 'value':
-				void value(message.name, message.input, message.value);
-				break;
-			case 'write':
-				inOrder(() => follow(message.op, message.name, message.raw));
-				break;
-			case 'outcome':
-				inOrder(() => outcome(message.op, message.reply));
-				break;
-			case 'settle':
-				inOrder(() => {
-					const operation = inner.operation(message.op);
-					if (operation?.status === 'uncertain' && !store.retired) {
-						inner.settleOperation(operation, message.confirmed, message.value);
-					}
-				});
-				break;
-		}
-	});
-	port.start?.();
+		});
+		next.start?.();
+		next.postMessage({
+			t: 'hello',
+			account: opened.get(next)?.account,
+			identity,
+		} satisfies ToOwner);
+	}
+
+	if (owner) {
+		connect(owner);
+		beat = setHostTimeout(heartbeat, HEARTBEAT_MS);
+	}
 	return store;
 }
 
 /**
  * The owner protocol's version, in the worker's name, so a tab on another
- * protocol never shares it. 2: a tab opens with `hello`, naming its account.
+ * protocol never shares it. 3: `hello` carries the build's contract identity,
+ * and each side checks the other is still there.
  */
-const PROTOCOL = 2;
+const PROTOCOL = 3;
 const RETIRED: ToReplica = { t: 'retired' };
+const REFUSED: ToReplica = { t: 'refused' };
+/** How often a tab and its owner check on each other; three silent intervals means gone. */
+const HEARTBEAT_MS = 5_000;
+const LOST = 'octane/data: the connection to the shared owner was lost';
+/** What `sharedOwner` knows of each port it opened: the account, and how to open another. */
+const opened = new WeakMap<OwnerPort, { account: string; reopen(): OwnerPort | null }>();
 /** How long a tab waits for its owner to confirm a sign-out before asking again. */
 const SIGN_OUT_RETRY_MS = 5_000;
 /** Where fencing owners record the origin's account, and announce a new one. */
@@ -587,9 +800,9 @@ const ACCOUNT_CHANNEL = 'octane-data:account';
 
 /**
  * Connect to the owner every tab sharing `name` uses, such as the account's
- * partition, through the data worker the build plugins emit. Returns `null`
- * where SharedWorker is missing or cannot start, so the tab opens its own
- * store instead.
+ * partition, through the data worker the build plugins emit. Pass the port to
+ * `createReplica`. Returns `null` where SharedWorker is missing or cannot
+ * start, and `createReplica` then makes the tab a local store.
  */
 export function sharedOwner(name: string, url: string | URL = DATA_WORKER_PATH): OwnerPort | null {
 	if (typeof SharedWorker !== 'function') return null;
@@ -598,7 +811,7 @@ export function sharedOwner(name: string, url: string | URL = DATA_WORKER_PATH):
 			type: 'module',
 			name: `octane-data:${PROTOCOL}:${name}`,
 		});
-		port.postMessage({ t: 'hello', account: name } satisfies ToOwner);
+		opened.set(port, { account: name, reopen: () => sharedOwner(name, url) });
 		return port;
 	} catch {
 		return null;

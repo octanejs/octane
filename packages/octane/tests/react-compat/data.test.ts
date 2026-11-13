@@ -15,7 +15,7 @@ import {
 	type Transport,
 } from '../../src/data/index.js';
 import { mount } from '../_helpers.js';
-import { createServer, setDone } from '../_data-todos.js';
+import { createServer, setDone, todos } from '../_data-todos.js';
 import { DataPage } from './data.tsrx';
 import { PagesPage } from './data-pages.tsrx';
 import { FeedPage } from './data-feed.tsrx';
@@ -285,7 +285,10 @@ describe('replicas of one owner', () => {
 		const pages = [false, true].map((island) => {
 			const channel = new MessageChannel();
 			owner.connect(channel.port1);
-			const store = createReplica(channel.port2, { writes: [setDone] });
+			const store = createReplica(channel.port2, {
+				transport: () => Promise.reject(new Error('this tab did not share its owner')),
+				contracts: [todos, setDone],
+			});
 			dispose.push(() => {
 				void store.retire();
 				channel.port1.close();
@@ -317,5 +320,46 @@ describe('replicas of one owner', () => {
 			expect(server.rows[0]!.done).toBe(true);
 			expect(text(second!, '[data-react-done]')).toBe('1');
 		});
+	});
+
+	it('holds a frozen tab’s Octane page and React island until the owner confirms the account', async () => {
+		const server = createServer();
+		const owner = createDataOwner({ transport: server.transport });
+		const channel = new MessageChannel();
+		owner.connect(channel.port1);
+		const store = createReplica(channel.port2, {
+			transport: () => Promise.reject(new Error('this tab did not share its owner')),
+			contracts: [todos, setDone],
+		});
+		dispose.push(() => {
+			void store.retire();
+			channel.port1.close();
+			channel.port2.close();
+		});
+		let view!: ReturnType<typeof mount>;
+		await run(() => {
+			view = mount(DataPage, { store, island: true });
+			dispose.push(() => view.unmount());
+		});
+		await vi.waitFor(async () => {
+			await settle();
+			expect(text(view.container, '[data-react-done]')).toBe('0');
+		});
+		expect(view.container.querySelectorAll('[data-octane-toggle]')).toHaveLength(1);
+
+		await run(() => document.dispatchEvent(new Event('freeze')));
+		await settle();
+		// Reads show nothing new: a snapshot reader shows it is waiting, and a suspending reader
+		// waits for the account instead of rendering without a value.
+		expect(text(view.container, '[data-octane-done]')).toBe('…');
+		expect(view.container.querySelector('[data-octane-error]')).toBeNull();
+
+		await run(() => document.dispatchEvent(new Event('resume')));
+		await vi.waitFor(async () => {
+			await settle();
+			expect(view.container.querySelectorAll('[data-octane-toggle]')).toHaveLength(1);
+			expect(text(view.container, '[data-react-done]')).toBe('0');
+		});
+		expect(server.log).toEqual(['list']);
 	});
 });
