@@ -553,6 +553,73 @@ export function useLabel() { const later = () => useState('ready'); return 'read
 		}
 	});
 
+	it('reports an unchanged React context hook after ordinary component setup', async () => {
+		const view = (setup, read = 'useObserver(fit)') => `import { useRef } from 'react';
+import { useObserver } from './use-observer';
+export function View({ hidden = false }: { hidden?: boolean }) {
+	const node = useRef<HTMLElement | null>(null);
+	const fit = () => { if (node.current) node.current.dataset.fit = 'yes'; };
+	${setup}
+	const observe = ${read};
+	return <p ref={observe}>ready</p>;
+}`;
+		const hook = `import { createContext, useContext as readContext } from 'react';
+const Observer = createContext(false);
+export function useObserver(fit: () => void) {
+	const enabled = readContext(Observer);
+	return enabled ? fit : undefined;
+}`;
+		const root = project({
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+			}),
+			'use-observer.ts': hook,
+			'View.tsx': view('const width = 20;'),
+			'Early.tsx': view('if (hidden) return null;'),
+			'Disposal.tsx': view('using disposable = makeDisposable();'),
+			'Deferred.tsx': view('', '() => useObserver(fit)'),
+			'Getter.tsx': view(
+				'const reader = { get fit() { return fit; } };',
+				'useObserver(reader.fit)',
+			),
+			'Escaped.tsx': view('') + '\nexport const escaped = View;',
+			'Unknown.tsx':
+				view('') + '\nexport function Parent() { return <Unknown><View /></Unknown>; }',
+			'Selected.tsx': view('').replace('./use-observer', './selected'),
+			'selected.ts': hook,
+		});
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+		);
+		const paths = fs
+			.readdirSync(root)
+			.filter((name) => name.endsWith('.tsx') || name === 'selected.ts');
+		const { files } = await runCodemod(
+			paths.map((file) => path.join(root, file)),
+			{
+				root,
+				strong: true,
+				projectTypes: true,
+				verify: true,
+				write: false,
+			},
+		);
+		const blocked = files.flatMap((file) =>
+			file.notes
+				.filter(
+					(note) =>
+						note.rule === 'bindings' &&
+						note.severity === 'error' &&
+						note.message.includes("React's useContext"),
+				)
+				.map((note) => [file.file, note.line]),
+		);
+		expect(blocked).toEqual([['View.tsx', 7]]);
+		expect(files.find((file) => file.file === 'View.tsx').code).toContain('./use-observer');
+		expect(fs.readFileSync(path.join(root, 'use-observer.ts'), 'utf8')).toBe(hook);
+	});
+
 	it('shares a stateless external store with unchanged React callers', async () => {
 		const wrapper = `import { useSyncExternalStore as useStore } from 'react';
 import { subscribe, read } from './attribute-store';

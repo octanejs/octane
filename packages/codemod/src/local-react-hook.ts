@@ -1,6 +1,7 @@
 import ts from 'typescript';
 import { contains, renderUses } from './forwarded-props.js';
 import { localUses } from './local-uses.js';
+import { fixedBinding, initializedBefore } from './effect-receivers.js';
 import { skipWrappers } from './expression-wrappers.js';
 
 function rendererImport(name: ts.Identifier, checker: ts.TypeChecker, module = 'react') {
@@ -57,6 +58,7 @@ export function nativeSetupHook(
 	diagnostic?: {
 		calleeName(callee: ts.Expression): string | null;
 		nativeOutput(element: ts.JsxElement | ts.JsxSelfClosingElement): boolean;
+		contextSetup?: boolean;
 	},
 ) {
 	const call = ref.parent;
@@ -82,6 +84,28 @@ export function nativeSetupHook(
 			call.arguments.length ||
 			decl.parent.declarations.length !== 1 ||
 			!block.statements.slice(0, position).every((prior) => nullRef(prior, checker))
+		)
+			return false;
+	} else if (diagnostic.contextSetup) {
+		if (
+			call.questionDotToken ||
+			decl.parent.declarations.length !== 1 ||
+			(decl.parent.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+			!call.arguments.every(
+				(argument) =>
+					ts.isIdentifier(argument) &&
+					fixedBinding(checker, argument, call) &&
+					initializedBefore(checker, argument, call),
+			) ||
+			// Earlier ordinary setup must have returned normally to reach this call.
+			!block.statements
+				.slice(0, position)
+				.every(
+					(prior) =>
+						ts.isVariableStatement(prior) &&
+						(prior.declarationList.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
+						prior.declarationList.declarations.length === 1,
+				)
 		)
 			return false;
 	} else {
