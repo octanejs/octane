@@ -1237,7 +1237,7 @@ export function Playground() @{
 			};
 			controllerRef.current.revealAst = () => {
 				if (disposed || !activeAstEntry()) return;
-				astPreview.reveal(sourceView.state.selection.main.head, true);
+				astPreview.reveal(sourceView.state.selection.main.head, true, 'automatic');
 			};
 
 			// Loads `param`'s compiler and runtime, then swaps both in and

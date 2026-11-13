@@ -26,7 +26,7 @@ import {
 	MAX_PLAYGROUND_SOURCE_LENGTH,
 	PLAYGROUND_SOURCE_LIMIT_ERROR,
 } from '../src/lib/playground-hash.ts';
-import { PLAYGROUND_REACT_VERSION } from '../src/lib/playground-sandbox.ts';
+import { PLAYGROUND_REACT_VERSION, RUNTIME_MANIFEST_PATH } from '../src/lib/playground-sandbox.ts';
 import { LYNX_EXAMPLES } from '../src/content/lynx-examples.ts';
 import {
 	spawnServer as spawnServerIn,
@@ -2402,7 +2402,21 @@ describe(
 		it.concurrent(
 			'playground reveals and pins source AST ranges from the mobile controls',
 			async () => {
-				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground');
+				let releaseRuntime!: () => void;
+				const runtimeGate = new Promise<void>((resolve) => {
+					releaseRuntime = resolve;
+				});
+				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/playground', {
+					beforeNavigation: async (page) => {
+						await page.route(`**${RUNTIME_MANIFEST_PATH}`, async (route) => {
+							await runtimeGate;
+							await route.continue();
+						});
+					},
+				}).catch((error) => {
+					releaseRuntime();
+					throw error;
+				});
 				try {
 					await page.setViewportSize({ width: 390, height: 667 });
 					await page.waitForSelector('.pg-grid.ready', { timeout: PLAYWRIGHT_ACTION_TIMEOUT });
@@ -2427,6 +2441,13 @@ describe(
 						{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
 					);
 
+					// Main's compiler is already available; only the preview runtime is pending.
+					const loading = page.locator('#pg-octane-version-status', { hasText: 'Loading main' });
+					await loading.waitFor();
+					releaseRuntime();
+					await loading.waitFor({ state: 'hidden' });
+					await page.locator('.pg-ast-node[data-ast-pinned="true"]').waitFor();
+
 					await page.locator('.pg-mobile-toggle button', { hasText: 'Code' }).click();
 					await page.locator('.pg-panel[aria-label="Source editor"]').waitFor();
 					// CodeMirror may split one logical marked range across lines and
@@ -2444,6 +2465,7 @@ describe(
 					);
 					expect(errors).toEqual([]);
 				} finally {
+					releaseRuntime();
 					await page.close();
 				}
 			},

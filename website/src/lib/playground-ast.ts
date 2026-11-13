@@ -235,7 +235,7 @@ export function findDeepestAstNode(
 export interface AstPreviewController {
 	setAst(ast: unknown, filename: string, options?: { label?: string; notice?: string }): void;
 	setUnavailable(message: string, filename: string): void;
-	reveal(offset: number, scroll: boolean): void;
+	reveal(offset: number, scroll: boolean, kind?: 'automatic'): void;
 	clear(): void;
 	destroy(): void;
 }
@@ -461,7 +461,8 @@ export function createAstPreview(
 			options.onNodeRange(null, false);
 			renderAst();
 		},
-		reveal(offset, scroll) {
+		reveal(offset, scroll, kind) {
+			if (kind === 'automatic' && pinnedNode !== null) return;
 			const node = prepared ? findDeepestAstNode(prepared, offset) : null;
 			// Same target as the last pointer sample and nothing pinned to undo:
 			// the tree and the editor already show exactly this.
