@@ -18,6 +18,7 @@ const operation =
 const transform = new RegExp('^' + operation + '(?:' + separator + operation + ')*$');
 const transformNumbers = new RegExp(number, 'g');
 const localPaint = /^url\(#[A-Za-z_][A-Za-z0-9_-]*\)$/;
+const identifier = /^[A-Za-z_][A-Za-z0-9_-]*$/;
 const tileSize = /^[1-9]\d*$/;
 const rootAttributes = {
 	preserveAspectRatio: /^none$/,
@@ -35,6 +36,10 @@ export function svgLiteralRootOverride(name: string, value: string) {
 }
 
 const fillRule = /^(?:evenodd|nonzero)$/;
+const referencedPaint = new RegExp(paint.source + '|' + localPaint.source);
+const userSpace = /^userSpaceOnUse$/;
+const bounds = { x: length, y: length, width: extent, height: extent };
+const blur = /^(?:0|[1-9]\d*)(?:\.\d+)?$/;
 const presentation = {
 	fill: paint,
 	stroke: paint,
@@ -45,6 +50,7 @@ const presentation = {
 };
 const pathAttributes = {
 	...presentation,
+	fill: referencedPaint,
 	transform,
 	d: /^[Mm] *[+\-.\d][MmLlHhVvCcSsQqTtAaZzEe0-9.,+\- ]+$/,
 	'fill-rule': fillRule,
@@ -53,33 +59,50 @@ const pathAttributes = {
 };
 const rectAttributes = {
 	...presentation,
-	fill: new RegExp(paint.source + '|' + localPaint.source),
-	x: length,
-	y: length,
-	width: extent,
-	height: extent,
+	...bounds,
+	fill: referencedPaint,
 	rx: extent,
 	ry: extent,
+	transform,
 };
 const shapeAttributes = {
 	path: pathAttributes,
 	rect: rectAttributes,
 	circle: { ...presentation, cx: length, cy: length, r: extent },
-	g: { transform, 'clip-path': /^url\(#[A-Za-z_][A-Za-z0-9_-]*\)$/ },
+	g: { transform, 'clip-path': localPaint, mask: localPaint, filter: localPaint },
 	defs: {},
-	clipPath: { id: /^[A-Za-z_][A-Za-z0-9_-]*$/ },
+	clipPath: { id: identifier },
 	pattern: {
-		id: /^[A-Za-z_][A-Za-z0-9_-]*$/,
+		id: identifier,
 		width: tileSize,
 		height: tileSize,
-		patternUnits: /^userSpaceOnUse$/,
+		patternUnits: userSpace,
 	},
+	linearGradient: {
+		id: identifier,
+		gradientUnits: userSpace,
+		x1: length,
+		y1: length,
+		x2: length,
+		y2: length,
+	},
+	stop: { offset: opacity, 'stop-color': paint, 'stop-opacity': opacity },
+	mask: { id: identifier, ...bounds, maskUnits: userSpace, style: /^mask-type:alpha$/ },
+	filter: {
+		id: identifier,
+		...bounds,
+		filterUnits: userSpace,
+		'color-interpolation-filters': /^(?:sRGB|linearRGB)$/,
+	},
+	feFlood: { 'flood-opacity': opacity, result: identifier },
+	feBlend: { in: identifier, in2: identifier, mode: /^normal$/, result: identifier },
+	feGaussianBlur: { stdDeviation: blur, result: identifier },
 };
 
 function attributes(text: string, allowed: Record<string, RegExp>, allowData = false) {
 	const values: Record<string, string> = {};
 	const field =
-		/[ \t\r\n]+([A-Za-z][A-Za-z-]*)[ \t\r\n]*=[ \t\r\n]*(?:"([^"&<>\t\r\n]*)"|'([^'&<>\t\r\n]*)')/gy;
+		/[ \t\r\n]+([A-Za-z][A-Za-z0-9-]*)[ \t\r\n]*=[ \t\r\n]*(?:"([^"&<>\t\r\n]*)"|'([^'&<>\t\r\n]*)')/gy;
 	let end = 0;
 	for (let match; (match = field.exec(text)); end = field.lastIndex) {
 		const name = match[1]!;
@@ -100,11 +123,17 @@ function attributes(text: string, allowed: Record<string, RegExp>, allowData = f
 		// SVGR emits a numeric literal for a leading-dot opacity.
 		if (rule === opacity && value.startsWith('.')) value = '0' + value;
 		// SVG component loaders can emit a numeric literal for unitless lengths.
-		if (rule === length || rule === extent || rule === opacity || rule === tileSize) {
+		if (
+			rule === length ||
+			rule === extent ||
+			rule === opacity ||
+			rule === tileSize ||
+			rule === blur
+		) {
 			const n = Number(value);
 			if (
 				(!Number.isNaN(n) && String(n) !== value) ||
-				(rule === extent && !Number.isFinite(parseFloat(value)))
+				((rule === extent || rule === blur) && !Number.isFinite(parseFloat(value)))
 			)
 				return null;
 		}
@@ -129,18 +158,77 @@ type StaticSvgNode = {
 	children: StaticSvgNode[];
 };
 
-/** Read authored geometry with a single local clip or paint definition. */
+type SvgTag = StaticSvgNode['tag'];
+type SvgParent = 'svg' | SvgTag;
+const containerTags = new Set<SvgTag>([
+	'g',
+	'defs',
+	'clipPath',
+	'pattern',
+	'linearGradient',
+	'mask',
+	'filter',
+]);
+const definitionTags = new Set<SvgTag>(['clipPath', 'pattern', 'linearGradient', 'mask', 'filter']);
+const filterPrimitives = new Set<SvgTag>(['feFlood', 'feBlend', 'feGaussianBlur']);
+const geometryTags = new Set<SvgTag>(['path', 'rect', 'circle']);
+
+function allowedChild(parent: SvgParent, child: SvgTag) {
+	switch (parent) {
+		case 'defs':
+			return definitionTags.has(child) && child !== 'mask';
+		case 'linearGradient':
+			return child === 'stop';
+		case 'filter':
+			return filterPrimitives.has(child);
+		case 'clipPath':
+			return child === 'rect';
+		case 'pattern':
+			return child === 'path';
+		case 'mask':
+			return child === 'path' || child === 'rect';
+		default:
+			return (
+				geometryTags.has(child) ||
+				child === 'g' ||
+				(parent === 'svg' && (child === 'defs' || child === 'mask'))
+			);
+	}
+}
+
+function closedContainer(tag: SvgParent, children: readonly StaticSvgNode[]) {
+	if (tag === 'clipPath' || tag === 'pattern') return children.length === 1;
+	if (tag === 'linearGradient') return children.length >= 2;
+	if (tag !== 'filter') return (tag !== 'defs' && tag !== 'mask') || children.length > 0;
+	const inputs = new Set(['SourceGraphic', 'SourceAlpha']);
+	return (
+		children.length > 0 &&
+		children.every(({ tag, attributes }) => {
+			const { in: input, in2, result, stdDeviation } = attributes;
+			if (
+				(tag === 'feBlend' && !(input && in2 && inputs.has(input) && inputs.has(in2))) ||
+				(tag === 'feGaussianBlur' && stdDeviation === undefined) ||
+				!result ||
+				inputs.has(result)
+			)
+				return false;
+			inputs.add(result);
+			return true;
+		})
+	);
+}
+
+/** Read authored geometry with bounded local paint and effect definitions. */
 export function parseStaticSvg(source: string) {
 	if (typeof source !== 'string') return null;
 	let root: Record<string, string> | null = null;
 	const children: StaticSvgNode[] = [];
-	const open: { tag: 'svg' | StaticSvgNode['tag']; children: StaticSvgNode[] }[] = [];
-	let clipId: string | undefined;
-	let reference: string | undefined;
-	let patternId: string | undefined;
-	let paintId: string | undefined;
+	const open: { tag: SvgParent; children: StaticSvgNode[] }[] = [];
+	const definitions = new Map<string, SvgTag>();
+	const references: { id: string; target: SvgTag; rootRect?: boolean }[] = [];
+	let legacyDefinition = false;
 	const token =
-		/[ \t\r\n]*(?:<!--([\s\S]*?)-->|<\/(svg|g|defs|clipPath|pattern)[ \t\r\n]*>|<(svg|g|rect|circle|path|defs|clipPath|pattern)([^<>]*?)(\/?)>)/gy;
+		/[ \t\r\n]*(?:<!--([\s\S]*?)-->|<\/([A-Za-z][A-Za-z0-9]*)[ \t\r\n]*>|<([A-Za-z][A-Za-z0-9]*)([^<>]*?)(\/?)>)/gy;
 	let hasShape = false;
 	let end = 0;
 	for (let match; (match = token.exec(source)); end = token.lastIndex) {
@@ -150,11 +238,7 @@ export function parseStaticSvg(source: string) {
 			if (/--|-$|[^\t\r\n\u0020-\uD7FF\uE000-\uFFFD\u{10000}-\u{10FFFF}]/u.test(comment))
 				return null;
 		} else if (closing) {
-			if (!parent || closing !== parent.tag) return null;
-			if (
-				(closing === 'defs' || closing === 'clipPath' || closing === 'pattern') &&
-				parent.children.length !== 1
-			)
+			if (!parent || closing !== parent.tag || !closedContainer(parent.tag, parent.children))
 				return null;
 			open.pop();
 		} else if (tag === 'svg') {
@@ -163,59 +247,68 @@ export function parseStaticSvg(source: string) {
 			if (!root) return null;
 			open.push({ tag, children });
 		} else {
-			if (!parent) return null;
-			const name = tag as StaticSvgNode['tag'];
-			if (
-				(name === 'defs' && parent.tag !== 'svg') ||
-				(name === 'clipPath' || name === 'pattern') !== (parent.tag === 'defs') ||
-				(parent.tag === 'clipPath' && name !== 'rect') ||
-				(parent.tag === 'pattern' && name !== 'path')
-			)
+			if (!parent || !tag || !Object.prototype.hasOwnProperty.call(shapeAttributes, tag))
 				return null;
-			const container = name !== 'path' && name !== 'rect' && name !== 'circle';
+			const name = tag as SvgTag;
+			if (!allowedChild(parent.tag, name)) return null;
+			if (name === 'defs' && children.some((node) => node.tag === 'defs')) return null;
+			const container = containerTags.has(name);
 			if (container ? selfClosing || open.length > 32 : !selfClosing) return null;
 			const props = attributes(fields!, shapeAttributes[name]);
 			if (
 				!props ||
 				(tag === 'path' && !props.d) ||
 				(tag === 'rect' && !(props.width && props.height)) ||
-				(tag === 'circle' && !props.r)
+				(tag === 'circle' && !props.r) ||
+				(tag === 'stop' && !props['stop-color'])
 			)
 				return null;
-			if (name === 'clipPath') {
-				if (!props.id || clipId !== undefined || patternId !== undefined) return null;
-				clipId = props.id;
+			if (definitionTags.has(name)) {
+				if (!props.id || definitions.has(props.id)) return null;
+				legacyDefinition ||= name === 'clipPath' || name === 'pattern';
+				definitions.set(props.id, name);
 			}
 			if (props['clip-path']) {
-				const id = props['clip-path'].slice(5, -1);
-				if (parent.tag !== 'svg' || (reference !== undefined && reference !== id)) return null;
-				reference = id;
+				if (parent.tag !== 'svg') return null;
+				references.push({ id: props['clip-path'].slice(5, -1), target: 'clipPath' });
 			}
-			if (name === 'pattern') {
-				if (
-					patternId !== undefined ||
-					clipId !== undefined ||
-					!(props.id && props.width && props.height && props.patternUnits)
-				)
-					return null;
-				patternId = props.id;
+			if (name === 'pattern' && !(props.width && props.height && props.patternUnits)) return null;
+			if (
+				name === 'linearGradient' &&
+				!(props.gradientUnits && props.x1 && props.y1 && props.x2 && props.y2)
+			)
+				return null;
+			if (
+				(name === 'mask' && !(props.maskUnits && props.style && props.width && props.height)) ||
+				(name === 'filter' && !(props.filterUnits && props.width && props.height))
+			)
+				return null;
+			for (const target of ['mask', 'filter'] as const) {
+				if (props[target]) references.push({ id: props[target].slice(5, -1), target });
 			}
-			if (name === 'rect' && props.fill?.startsWith('url(')) {
-				const id = props.fill.slice(5, -1);
-				if (parent.tag !== 'svg' || (paintId !== undefined && paintId !== id)) return null;
-				paintId = id;
+			if (props.fill?.startsWith('url(')) {
+				if (parent.tag !== 'svg' && parent.tag !== 'g') return null;
+				references.push({
+					id: props.fill.slice(5, -1),
+					target: 'linearGradient',
+					rootRect: name === 'rect' && parent.tag === 'svg',
+				});
 			}
 			const node: StaticSvgNode = { tag: name, attributes: props, children: [] };
 			parent.children.push(node);
 			if (container) open.push(node);
-			else if (parent.tag !== 'clipPath' && parent.tag !== 'pattern') hasShape = true;
+			else if (parent.tag === 'svg' || parent.tag === 'g') hasShape = true;
 		}
 	}
 	return root &&
 		hasShape &&
 		!open.length &&
-		clipId === reference &&
-		patternId === paintId &&
+		(!legacyDefinition || definitions.size === 1) &&
+		new Set(references.map(({ id }) => id)).size === definitions.size &&
+		references.every(
+			({ id, target, rootRect }) =>
+				definitions.get(id) === target || (rootRect && definitions.get(id) === 'pattern'),
+		) &&
 		space.test(source.slice(end))
 		? { root, children }
 		: null;
