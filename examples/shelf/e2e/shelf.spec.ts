@@ -416,7 +416,7 @@ async function dataWorker(keeper: Page, namespace: string) {
 			type: 'module',
 			name,
 		});
-	}, `octane-data:1:${namespace}:ada`);
+	}, `octane-data:2:${namespace}:ada`);
 	const cdp = await keeper.context().browser()!.newBrowserCDPSession();
 	let targetId = '';
 	await expect

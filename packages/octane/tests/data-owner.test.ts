@@ -365,6 +365,23 @@ describe('octane/data in a SharedWorker', () => {
 		expect(await recordedAccount()).toEqual({ account: 'grace', generation: 2 });
 	});
 
+	it('records the account again for the next tab when recording it failed', async () => {
+		const server = createServer();
+		const open = sharedWorkers(server.transport);
+		const working = indexedDB;
+		vi.stubGlobal('indexedDB', {
+			open() {
+				throw new DOMException('storage is unavailable', 'UnknownError');
+			},
+		});
+		const failed = open('ada');
+		await vi.waitFor(() => expect(failed.retired).toBe(true));
+		vi.stubGlobal('indexedDB', working);
+		const tab = open('ada');
+		await observed(tab.read(todos, undefined));
+		expect(await recordedAccount()).toEqual({ account: 'ada', generation: 1 });
+	});
+
 	it('shows nothing in a tab resuming from being frozen until its account is confirmed', async () => {
 		const server = createServer();
 		const open = sharedWorkers(server.transport);
@@ -423,7 +440,7 @@ describe('octane/data in a SharedWorker', () => {
 		try {
 			expect(sharedOwner('ada')).toBe(port);
 			expect(constructed).toEqual([
-				['/_octane/data-worker.js', { type: 'module', name: 'octane-data:1:ada' }],
+				['/_octane/data-worker.js', { type: 'module', name: 'octane-data:2:ada' }],
 			]);
 			vi.stubGlobal(
 				'SharedWorker',

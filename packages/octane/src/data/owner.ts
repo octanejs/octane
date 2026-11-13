@@ -190,7 +190,11 @@ export function createDataOwner(options: {
 				replicas.add(port);
 				port.postMessage({ t: 'live' } satisfies ToReplica);
 			},
-			() => port.postMessage(RETIRED),
+			() => {
+				// The account could not be recorded: the next tab to connect tries again.
+				if (serving === current) serving = null;
+				port.postMessage(RETIRED);
+			},
 		);
 	}
 
@@ -569,8 +573,11 @@ export function createReplica(
 	return store;
 }
 
-/** The owner protocol's version, in the worker's name, so a tab on another protocol never shares it. */
-const PROTOCOL = 1;
+/**
+ * The owner protocol's version, in the worker's name, so a tab on another
+ * protocol never shares it. 2: a tab opens with `hello`, naming its account.
+ */
+const PROTOCOL = 2;
 const RETIRED: ToReplica = { t: 'retired' };
 /** How long a tab waits for its owner to confirm a sign-out before asking again. */
 const SIGN_OUT_RETRY_MS = 5_000;
