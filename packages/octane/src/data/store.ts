@@ -477,7 +477,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	let sequence = 0;
 	let retired = false;
 	/** Reads show nothing until the account is confirmed, as a retired store's do. */
-	let fenced = false;
+	let fenced: { readonly lifted: Promise<void>; lift(): void } | null = null;
 	const retiring = new AbortController();
 	/** A replica's way to tell other tabs a write was settled here. */
 	let settled: ((id: string, confirmed: boolean, value: unknown) => void) | null = null;
@@ -1635,6 +1635,8 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		},
 		prefetch(read, input) {
 			if (retired) return NEVER;
+			// A suspended reader waits for the account to be confirmed, then shows what is held.
+			if (fenced) return fenced.lifted;
 			const entry = entryFor(read, input);
 			return entry.hasBase && !isStale(entry) ? Promise.resolve() : load(entry);
 		},
@@ -1854,7 +1856,14 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 			settled = notify;
 		},
 		fence(on) {
-			fenced = on;
+			if (on === !!fenced) return;
+			if (on) {
+				let lift!: () => void;
+				fenced = { lifted: new Promise<void>((resolve) => (lift = resolve)), lift };
+			} else {
+				fenced!.lift();
+				fenced = null;
+			}
 			for (const entry of entries.values()) for (const notify of [...entry.subscribers]) notify();
 		},
 		finish(reload, changed, names) {
