@@ -40,7 +40,7 @@ import {
 	islandComponents,
 	executableImports,
 	hostedServerComponents,
-	intrinsicReactExports,
+	directReactExports,
 	migratedJsxFactories,
 	octaneRootComponents,
 	reactServerComponents,
@@ -1427,7 +1427,26 @@ export async function runCodemod(
 		}
 	}
 	const reverseIslands = new Map<string, ReadonlySet<string>>();
-	const intrinsicExports = new Map<string, ReturnType<typeof intrinsicReactExports>>();
+	const reactExports = new Map<string, ReturnType<typeof directReactExports>>();
+	const templateExports = new Map<string, Set<string>>();
+	function hasTemplateExport(file: FileResult, name: string) {
+		let names = templateExports.get(file.output);
+		if (!names) {
+			names = new Set();
+			const { program, errors } = parseSync(file.output, file.code);
+			if (program && !errors.length)
+				for (const statement of program.body) {
+					if (statement.type !== 'ExportNamedDeclaration') continue;
+					const fn = statement.declaration;
+					if (fn?.type !== 'FunctionDeclaration' || !fn.id) continue;
+					// The parser exposes TSRX code blocks through its ESTree body type.
+					const body: unknown = fn.body;
+					if (isRecord(body) && body.type === 'JSXCodeBlock') names.add(fn.id.name);
+				}
+			templateExports.set(file.output, names);
+		}
+		return names.has(name);
+	}
 	const jsxFactories = new Map<string, ReadonlySet<string>>();
 	const linkedConflicts = new Map<string, string>();
 	function checkLinkedRename(file: string, issuer: string) {
@@ -1652,12 +1671,22 @@ export async function runCodemod(
 					}
 					if (!names.has(edge.name)) continue;
 				} else {
-					let intrinsic = intrinsicExports.get(match.file);
-					if (!intrinsic) {
-						intrinsic = intrinsicReactExports(match.file, fs.readFileSync(match.file, 'utf8'));
-						intrinsicExports.set(match.file, intrinsic);
+					let originalExports = reactExports.get(match.file);
+					if (!originalExports) {
+						originalExports = directReactExports(match.file, fs.readFileSync(match.file, 'utf8'));
+						reactExports.set(match.file, originalExports);
 					}
-					if (!intrinsic.names.has(edge.name) || (edge.lazy && intrinsic.mayExportThen)) continue;
+					if (edge.lazy && originalExports.mayExportThen) continue;
+					if (!originalExports.intrinsics.has(edge.name)) {
+						if (
+							!explicit ||
+							edge.lazy ||
+							edge.renderer !== 'JSX' ||
+							!originalExports.wrappers.has(edge.name) ||
+							!hasTemplateExport(leaf, edge.name)
+						)
+							continue;
+					}
 				}
 				const note: Note = {
 					rule: 'react-compat',
