@@ -2337,9 +2337,14 @@ export function Leaf(props: { label: string }) {
 }`;
 		const root = project({
 			'tsconfig.json':
-				'{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler","strict":true}}',
+				'{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler","strict":true,"paths":{"@example/package/react":["./leaf.ts"]}}}',
 			'leaf.ts': leaf,
 			'Namespace.tsx': app(),
+			'Spread.tsx': app().replace('<Leaf label={label} />', '<Leaf {...{ label }} />'),
+			'SpreadIsland.tsx': app('@example/package/react').replace(
+				'<Leaf label={label} />',
+				'<Leaf {...{ label }} />',
+			),
 			'Named.tsx': app()
 				.replace('* as ReactDOM', '{ createRoot as createReactRoot }')
 				.replace('ReactDOM.createRoot', 'createReactRoot'),
@@ -2406,12 +2411,14 @@ root.render(<Leaf label="label" />);`,
 			['Inline.tsx', 4, message],
 			['Named.tsx', 5, message],
 			['Namespace.tsx', 5, message],
+			['Spread.tsx', 5, message],
 			['TopLevel.tsx', 4, message],
 		]);
 		const namespace = files.find((f) => f.file === 'Namespace.tsx');
 		expect(namespace.strong).toBe(true);
 		expect(namespace.diagnostics).toEqual([]);
 		expect(namespace.code).toContain('root.render(Leaf, { label: label })');
+		expect(files.find((f) => f.file === 'SpreadIsland.tsx').rules['react-compat']).toBe(1);
 		expect(files.find((f) => f.file === 'Renamed.tsx').code).toContain('./renamed-leaf.tsrx');
 	});
 

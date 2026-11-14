@@ -400,8 +400,8 @@ root.render(<App />);`;
 		const render = (/** @type {string} */ call) =>
 			transformModule(source(call), 'main.tsx').code.split('\n').at(-2);
 		expect(render('root.render(<App />)')).toBe('root.render(App);');
-		expect(render('root.render(<StrictMode><App size={2} {...rest} on /></StrictMode>)')).toBe(
-			'root.render(App, { size: 2, ...rest, on: true });',
+		expect(render('root.render(<StrictMode><App size={2} on /></StrictMode>)')).toBe(
+			'root.render(App, { size: 2, on: true });',
 		);
 		expect(render('root.render(createElement(App, { depth: 10 }))')).toBe(
 			'root.render(App, { depth: 10 });',
@@ -415,8 +415,23 @@ root.render(<App />);`;
 		// React's server renderers return the HTML; Octane's return `{ html, css }`.
 		expect(render('renderToString(createElement(App))')).toBe('renderToString(App).html;');
 		expect(render('renderToString(<div />)')).toBe('renderToString(<div />).html;');
-		// A key, a ref, or children keep the element.
+		// A spread can carry the same identity as an explicit key.
 		expect(render('root.render(<App key="a" />)')).toBe('root.render(<App key="a" />);');
+		expect(render('root.render(<App size={2} {...rest} on />)')).toBe(
+			'root.render(<App size={2} {...rest} on />);',
+		);
+		expect(render('hydrateRoot(document.body, <App {...rest} />)')).toBe(
+			'hydrateRoot(document.body, <App {...rest} />);',
+		);
+		expect(render('renderToString(<App {...rest} />)')).toBe(
+			'renderToString(<App {...rest} />).html;',
+		);
+		const spread = transformModule(
+			'import { flushSync } from "react-dom";\n' +
+				source('root.render(<App value={flushSync(() => {})} {...rest} />)'),
+			'main.tsx',
+		);
+		expect(spread.notes.filter((note) => note.rule === 'flush-sync')).toHaveLength(1);
 		expect(transformModule(source('root.render(<App />)'), 'main.tsx').code).not.toContain(
 			'StrictMode',
 		);

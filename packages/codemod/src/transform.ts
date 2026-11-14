@@ -4310,7 +4310,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			const root = ts.isIdentifier(receiver) ? this.constValue(receiver) : receiver;
 			if (root && ts.isCallExpression(root) && this.calleeName(root.expression) === 'createRoot') {
 				const rewritten = this.rewriteRootRender(node, node.arguments[0]);
-				if (rewritten !== null) this.checkLocalReactRoot(node, receiver, root);
+				this.checkLocalReactRoot(node, receiver, root, rewritten === null);
 				return rewritten;
 			}
 		}
@@ -5125,11 +5125,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			: `${this.require('octane', 'hydrateRoot', false)}(${containerText}, ${elementText})`;
 	}
 
-	/** Report renderer ownership only for the ordinary direct root rewrite. */
+	/** JSX kept for a prop spread still needs the direct-root ownership check. */
 	private checkLocalReactRoot(
 		call: ts.CallExpression,
 		receiver: ts.Expression,
 		root: ts.CallExpression,
+		retained: boolean,
 	) {
 		const local = this.options.localReactRootComponent;
 		const element = skipParens(call.arguments[0]);
@@ -5142,6 +5143,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const rootImport = this.importOf(factoryName);
 		const factoryBinding = ts.isIdentifier(factoryName) && this.declarationOf(factoryName);
 		if (
+			!isComponentName(tag.text) ||
+			(retained &&
+				(!element.attributes.properties.some(ts.isJsxSpreadAttribute) ||
+					this.islands.has(element) ||
+					this.reactRendererBodies.has(element) ||
+					this.unrenderable.has(element))) ||
 			!leaf ||
 			leaf.typeOnly ||
 			ts.findAncestor(this.declarationOf(tag)!, ts.isImportDeclaration)?.attributes ||
@@ -5233,12 +5240,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			const tag = node.tagName;
 			if (!ts.isIdentifier(tag) && !ts.isPropertyAccessExpression(tag)) return null;
 			if (!isComponentName(tag.getText(this.sf).split('.').pop() ?? '')) return null;
+			const attributes = node.attributes.properties;
+			// A spread can carry the root's key. The direct overload has no key.
+			if (!attributes.every(ts.isJsxAttribute)) return null;
 			const props: string[] = [];
-			for (const property of node.attributes.properties) {
-				if (ts.isJsxSpreadAttribute(property)) {
-					props.push(`...${this.emit(property.expression, PLAIN)}`);
-					continue;
-				}
+			for (const property of attributes) {
 				const name = property.name.getText(this.sf);
 				if (name === 'key' || name === 'ref') return null;
 				const key = /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name);
