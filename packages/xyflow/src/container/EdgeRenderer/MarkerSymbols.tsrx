@@ -2,8 +2,9 @@ import { useMemo } from 'octane';
 import { errorMessages, MarkerType, type EdgeMarker } from '@xyflow/system';
 
 import { useStoreApi } from '../../hooks/useStore';
+import type { AllowUndefined } from '../../types/allow-undefined-props';
 
-type SymbolProps = Omit<EdgeMarker, 'type'>;
+type SymbolProps = AllowUndefined<Omit<EdgeMarker, 'type'>, 'color' | 'strokeWidth'>;
 
 const ArrowSymbol = ({ color = 'none', strokeWidth = 1 }: SymbolProps) => {
 	const style = {
