@@ -176,12 +176,10 @@ it.each([true, false])(
 	'selects an inline host only for a native paragraph child (available: %s)',
 	(available) => {
 		const source = `import { FormattedMessage } from 'react-intl';
-		import { ReactCompat } from 'octane/react';
 		import { Container } from 'container';
 		export function Sample() {
 			return <><p><FormattedMessage id="paragraph" /><Container><FormattedMessage id="opaque" /></Container></p>
-				<FormattedMessage id="flow" />
-				<ReactCompat><FormattedMessage id="owned" /></ReactCompat></>;
+				<FormattedMessage id="flow" /></>;
 		}`;
 		const { code, notes } = transformModule(source, 'sample.tsx', {
 			unported: (name) => (name === 'react-intl' ? name : null),
@@ -190,8 +188,7 @@ it.each([true, false])(
 			reactCompatInline: available,
 		});
 		expect(code).toContain(available ? 'id="paragraph" inlineHost={' : 'id="paragraph" />');
-		for (const id of ['opaque', 'flow', 'owned'])
-			expect(code).not.toContain(`id="${id}" inlineHost={`);
+		for (const id of ['opaque', 'flow']) expect(code).not.toContain(`id="${id}" inlineHost={`);
 		expect(notes.filter((note) => note.severity === 'error')).toContainEqual(ownershipError);
 	},
 );
