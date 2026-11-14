@@ -2,4 +2,4 @@
 "@octanejs/codemod": patch
 ---
 
-Refuse to write a map conversion when moving the callback into a row can change its access to `this`, `arguments`, or `new.target`.
+Report JSX map callbacks whose `this`, `arguments`, or `new.target` reads can change when the codemod migrates their component or lowers the callback to a row.

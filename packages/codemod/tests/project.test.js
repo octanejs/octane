@@ -1687,6 +1687,45 @@ export function Host({rows}: { rows: Row[] }) {
 	});
 
 	it.each([
+		'[{}, {}].map((_, index) => <li key={String(index)}>{String(arguments.length)}</li>)',
+		'[{}, , {}].map((_) => <li key={0}>{String(arguments.length)}</li>)',
+		'[{}, {}].map((_, index, rows) => <li key={index}>{String(arguments.length)}</li>)',
+		'[{}].map((() => <li key={0}>{String(arguments.length)}</li>), undefined)',
+	])('blocks a retained JSX map from reading renderer arguments before writing', async (rows) => {
+		const original = `export function List() { return <ul>{${rows}}</ul>; }`;
+		const root = project({
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			'List.tsx': original,
+			'Control.tsx': `export function List() {
+	return <ul>{[{}, {}].map(function (_) {
+		return <li key={0}>{String(arguments.length)}</li>;
+	})}</ul>;
+}`,
+		});
+		fs.symlinkSync(
+			path.join(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+		);
+		const inputs = ['List.tsx', 'Control.tsx'].map((file) => path.join(root, file));
+		const note = expect.objectContaining({ rule: 'map-callback-scope', severity: 'error' });
+		const preview = await runCodemod(inputs, { root, write: false, verify: false });
+		expect(preview.files.find(({ file }) => file === 'List.tsx')).toMatchObject({
+			code: expect.stringContaining(rows),
+			notes: [note],
+		});
+		expect(preview.files.find(({ file }) => file === 'Control.tsx')).toMatchObject({
+			code: expect.stringContaining('.map(function'),
+			notes: [],
+		});
+		const result = await runCodemod(inputs, { root, verify: false });
+		expect(result.files).toEqual([
+			expect.objectContaining({ file: 'List.tsx', changed: false, notes: [note] }),
+		]);
+		expect(fs.readFileSync(inputs[0], 'utf8')).toBe(original);
+		expect(fs.existsSync(path.join(root, 'List.tsrx'))).toBe(false);
+	});
+
+	it.each([
 		['write', '[...[1]].map((item, index) => <li key={0}>{index++}</li>)'],
 		['tdz', '[...[{}]].map(({label=index}, index) => <li key={0}>{label}</li>)'],
 	])('blocks spread-array map rows with a parameter %s before writing', async (kind, rows) => {

@@ -5953,15 +5953,26 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 */
 	forDirective(node: ts.CallExpression) {
 		const callee = node.expression;
+		if (!ts.isPropertyAccessExpression(callee) || callee.name.text !== 'map') return null;
+		const fn = node.arguments[0];
+		if (!fn) return null;
+		const callback = skipWrappers(fn);
+		// Even a retained arrow can observe the enclosing renderer's invocation.
 		if (
-			!ts.isPropertyAccessExpression(callee) ||
-			callee.name.text !== 'map' ||
-			node.arguments.length !== 1
+			ts.isArrowFunction(callback) &&
+			(ts.isBlock(callback.body) ? returnsJsx(callback.body.statements) : hasJsx(callback.body)) &&
+			readsFunctionContext(callback, this.checker)
 		) {
+			this.note(
+				MAP_CALLBACK_SCOPE,
+				'error',
+				node,
+				'The migrated component can change this arrow callback’s access to this, arguments, or new.target. Review these reads before porting the map.',
+			);
 			return null;
 		}
-		const fn = node.arguments[0];
-		if (!(ts.isArrowFunction(fn) || ts.isFunctionExpression(fn))) return null;
+		if (node.arguments.length !== 1 || !(ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)))
+			return null;
 		if (fn.parameters.length === 0 || fn.parameters.length > 2) return null;
 		if (fn.parameters.some((p) => p.initializer || p.dotDotDotToken)) return null;
 		const [item, index] = fn.parameters;
@@ -6086,10 +6097,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			);
 			return null;
 		}
-		if (
-			fn.parameters.some((parameter) => readsFunctionContext(parameter, this.checker)) ||
-			(ts.isArrowFunction(fn) && readsFunctionContext(fn.body, this.checker))
-		) {
+		if (fn.parameters.some((parameter) => readsFunctionContext(parameter, this.checker))) {
 			this.note(
 				MAP_CALLBACK_SCOPE,
 				'error',
