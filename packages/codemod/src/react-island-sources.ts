@@ -52,7 +52,7 @@ function imported(checker: ts.TypeChecker, node: ts.Node) {
 		return { name, module: imp.moduleSpecifier.text };
 }
 
-/** Original imported components handed directly to an authored React island. */
+/** Original imported components handed to an authored React island. */
 export async function islandComponents(
 	file: string,
 	source: string,
@@ -83,8 +83,31 @@ export async function islandComponents(
 			: ts.isJsxSelfClosingElement(node)
 				? node.tagName
 				: node;
-		const entry = imported(checker, ref);
-		if (entry) components.add(entry.module);
+		if (ts.isIdentifier(ref) && ref !== node && /^[a-z]|-/.test(ref.text)) return;
+		let value = ref;
+		const seen = new Set<ts.VariableDeclaration>();
+		for (;;) {
+			const entry = imported(checker, value);
+			if (entry) {
+				components.add(entry.module);
+				return;
+			}
+			if (!ts.isIdentifier(value)) return;
+			const symbol = checker.getSymbolAtLocation(value);
+			const alias = symbol?.declarations?.length === 1 && symbol.valueDeclaration;
+			if (
+				!alias ||
+				!ts.isVariableDeclaration(alias) ||
+				!ts.isVariableDeclarationList(alias.parent) ||
+				(alias.parent.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+				!ts.isIdentifier(alias.name) ||
+				!alias.initializer ||
+				seen.has(alias)
+			)
+				return;
+			seen.add(alias);
+			value = skipWrappers(alias.initializer);
+		}
 	}
 	function visit(n: ts.Node) {
 		if (ts.isJsxSelfClosingElement(n) || ts.isJsxOpeningElement(n)) {
