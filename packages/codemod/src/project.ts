@@ -23,6 +23,7 @@ import { PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
 import {
 	bind,
+	CONTEXT_PROVIDER_GETTER,
 	MAP_PARAMETER_TDZ,
 	MAP_PARAMETER_WRITE,
 	projectTypeAt,
@@ -1063,13 +1064,16 @@ export async function runCodemod(
 			}
 		}
 		const result = transform();
-		const parameterError = result.notes.find(
-			(note) => note.rule === MAP_PARAMETER_WRITE || note.rule === MAP_PARAMETER_TDZ,
+		const blockedTransform = result.notes.find(
+			(note) =>
+				note.rule === MAP_PARAMETER_WRITE ||
+				note.rule === MAP_PARAMETER_TDZ ||
+				note.rule === CONTEXT_PROVIDER_GETTER,
 		);
-		if (write && parameterError)
+		if (write && blockedTransform)
 			return blockedWrite(
 				root,
-				unchangedFile(path.relative(root, file), source, parameterError),
+				unchangedFile(path.relative(root, file), source, blockedTransform),
 				compiler?.from,
 			);
 		for (const message of [...storeErrors, ...svgErrors]) {
