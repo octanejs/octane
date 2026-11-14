@@ -68,6 +68,13 @@ test('a moon task that runs bun test selects bun named test files', async () => 
 		...packageTree,
 	];
 	const inventory = await immutableTestInventory(tree, 'packages/widget', manifest, options);
+	await assert.rejects(
+		immutableTestInventory(tree, 'packages/widget', manifest, {
+			...options,
+			evidenceBudget: { remainingBytes: tree[0].size + tree[2].size - 1 },
+		}),
+		/Source evidence exceeds the total byte limit: packages\/widget\/test\/widget.test.ts/,
+	);
 	assert.deepEqual(
 		inventory.map(({ path, registrations }) => [path, registrations.length]),
 		[['packages/widget/test/widget.test.ts', 1]],
@@ -390,7 +397,7 @@ describe('resolved evidence', () => {
 		const source = {
 			name: 'react-widget',
 			version: '1.2.3',
-			repository: { owner: 'example', repo: 'widgets', subdirectory: 'packages/react-widget' },
+			repository: { owner: 'Example', repo: 'Widgets', subdirectory: 'packages/react-widget' },
 			commit: 'a'.repeat(40),
 			manifestLicense: 'MIT',
 			licenseFiles: [{ path: 'LICENSE', scope: 'root', content: MIT_TEXT }],
@@ -401,11 +408,19 @@ describe('resolved evidence', () => {
 				registry: published,
 				source: pinned,
 			});
-		assert.equal(assess().status, 'licensed');
-		assert.equal(
-			assess({ ...registry, repository: { ...registry.repository, subdirectory: 'other' } }).status,
-			'blocked',
-		);
+		const result = assess();
+		assert.equal(result.status, 'licensed');
+		assert.deepEqual(result.identity.repository, {
+			owner: 'example',
+			repo: 'widgets',
+			subdirectory: 'packages/react-widget',
+		});
+		const conflict = assess({
+			...registry,
+			repository: { ...registry.repository, subdirectory: 'other' },
+		});
+		assert.equal(conflict.status, 'blocked');
+		assert.equal(conflict.identity.repository.subdirectory, 'other');
 		assert.equal(assess(registry, { ...source, name: 'another-package' }).status, 'blocked');
 		assert.equal(assess(registry, { ...source, commit: 'b'.repeat(40) }).status, 'blocked');
 		assert.equal(
@@ -713,6 +728,16 @@ describe('resolved evidence', () => {
 		const sourceManifest = sourceManifestBytes.toString('base64');
 		const sourceLicense = sourceLicenseBytes.toString('base64');
 		const sourceTree = [
+			// Large tracked artifacts elsewhere in the monorepo are never read as
+			// package evidence. The mock deliberately has no responses for them.
+			...[0, 1, 2].map((index) => ({
+				path: `.yarn/cache/dependency-${index}.zip`,
+				mode: '100644',
+				type: 'blob',
+				size: 90 * 1024 * 1024,
+				sha: 'd'.repeat(40),
+				url: `https://api.github.com/repos/example/widgets/git/blobs/unrelated-${index}`,
+			})),
 			{
 				path: 'packages/react-widget/package.json',
 				type: 'blob',
