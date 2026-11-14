@@ -71,6 +71,7 @@ import {
 import type { InlineCaughtErrorReport } from './roots.js';
 import { journalObjectOnce } from './commit.js';
 import { hasControlledSyncs } from './forms.js';
+import { RENDERER_REGION_OWNER_COUNT } from './context.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -454,12 +455,15 @@ export function nativeEffectPublicationCurrent(entry: PendingEffect, slot: Effec
  * but before this drain: deactivateScope already fired their cleanups, and the
  * body must not run while hidden (it re-enqueues on reveal). See
  * inInactiveSubtree. INSERTION entries are exempt — they stay connected and
- * keep firing while hidden (deactivateScope spares them too).
+ * keep firing while hidden (deactivateScope spares them too). A React host
+ * deletion marks the root itself inactive before deferred disposal. Skip
+ * further insertion setups there so the running setup can return its cleanup.
  */
 export function drainRegisteredMutationEffects(): PendingEffect[] | null {
 	const ins = effectQueues[INSERTION];
 	const lay = effectQueues[LAYOUT];
 	if (ins.length === 0 && lay.length === 0) return null;
+	const hostedInsertions = ins.length > 0 && RENDERER_REGION_OWNER_COUNT;
 	const q =
 		ins.length === 0
 			? lay.splice(0)
@@ -479,9 +483,10 @@ export function drainRegisteredMutationEffects(): PendingEffect[] | null {
 			const e = q[k];
 			if (e.phase === INSERTION && !e.scope.block.disposed) fireEffectCleanup(e);
 		}
+		const root = hostedInsertions ? scope.block.idState.renderOwner?.current : null;
 		for (let k = i; k < end; k++) {
 			const e = q[k];
-			if (e.phase === INSERTION && !e.scope.block.disposed) runEffectBody(e);
+			if (e.phase === INSERTION && !scope.block.disposed && !root?.inactive) runEffectBody(e);
 		}
 		for (let k = i; k < end; k++) {
 			const e = q[k];

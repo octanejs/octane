@@ -4,6 +4,7 @@ import {
 	use,
 	useEffect,
 	useId,
+	useInsertionEffect,
 	useLayoutEffect,
 	useState,
 } from 'octane';
@@ -38,6 +39,23 @@ export function GreetingIsland(props) @{
 		<h2 class="greeting">{'Hello ' + props.name}</h2>
 		<Counter />
 	</section>
+}
+
+export function InsertionEffectIsland({ log }: { log: (message: string) => void }) @{
+	const [version, setVersion] = useState(0);
+	useInsertionEffect(() => {
+		log('first setup:' + version);
+		return () => {
+			log('first cleanup:' + version);
+		};
+	}, [version]);
+	useInsertionEffect(() => {
+		log('second setup:' + version);
+		return () => {
+			log('second cleanup:' + version);
+		};
+	}, [version]);
+	<button onClick={() => setVersion(1)}>{String(version)}</button>
 }
 
 export function ActivityIsland({ log }: { log: (message: string) => void }) @{
