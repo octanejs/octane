@@ -95,6 +95,43 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 			),
 			'Relative.tsx': entry('./Boundary'),
 			'Alias.tsx': entry('@/Boundary'),
+			'Ternary.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace('return <Frame><b>ready</b></Frame>;', 'return show ? <Frame /> : <b />;'),
+			'Guard.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (show) return <Frame />; return <b />;',
+				),
+			'LogicalArm.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean, enabled: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'return show ? <b /> : (enabled === true && <Frame />);',
+				),
+			'NestedHole.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return <Other>{true ? <Frame /> : null}</Other>;',
+			),
+			'MapArm.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return [true].map((show) => show ? <Frame /> : <b />);',
+			),
+			'DeadTernary.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return false ? <Frame /> : <b />;',
+			),
+			'DeadLogicalArm.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'return show ? <b /> : (false && <Frame />);',
+				),
+			'DeadGuards.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'if (false) return <Frame />; if (true) return <b />; if (true) return <Frame />; return <Frame />;',
+			),
 			'Strict.tsx':
 				"import { StrictMode as Strict } from 'react';\n" +
 				entry('./Boundary').replace(
@@ -165,8 +202,11 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				['Alias.tsx', includeClass ? 'error' : 'warning'],
 				['DefaultBaseView.tsx', includeClass ? 'error' : 'warning'],
 				['DefaultExportView.tsx', includeClass ? 'error' : 'warning'],
+				['Guard.tsx', includeClass ? 'error' : 'warning'],
+				['LogicalArm.tsx', includeClass ? 'error' : 'warning'],
 				['Relative.tsx', includeClass ? 'error' : 'warning'],
 				['Strict.tsx', includeClass ? 'error' : 'warning'],
+				['Ternary.tsx', includeClass ? 'error' : 'warning'],
 			]);
 		}
 	});
