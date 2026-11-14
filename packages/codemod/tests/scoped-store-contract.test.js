@@ -529,6 +529,75 @@ it('warns at existing standalone client roots when the migrated hook reads conte
 	}
 }, 30_000);
 
+it('warns when an existing Octane server renderer imports a migrated store consumer', async () => {
+	const server = `import { renderToString as render } from 'octane/server';
+		import * as SSR from 'octane/server';
+		import { Pane, Plain } from './pane.tsx';
+		export const standalone = () => render(Pane, { label: 'title' }).html;
+		export const staticMarkup = () => SSR.renderToStaticMarkup(Pane).html;
+		export const plain = () => render(Plain).html;
+		export function shadowed(render: (body: typeof Pane) => string) { return render(Pane); }`;
+	const { app } = project({
+		'app/src/pane.tsx': `import { useSnapshot } from 'observer';
+			export function Pane({ label = '' }: { label?: string } = {}) {
+				const value = useSnapshot();
+				return <b>{label + String(value)}</b>;
+			}
+			export function Plain() { return <b>plain</b>; }`,
+		'app/src/server.ts': server,
+		'app/src/nested.tsrx': `import { standalone } from './server';
+			export function Nested() @{
+				const html = standalone();
+				<p>{html as string}</p>
+			}`,
+		'app/src/unverified/server.ts': `import { renderToString } from 'octane/server';
+			import { Pane } from '../pane.tsx';
+			export const render = () => renderToString(Pane);`,
+		'app/src/unverified/node_modules/octane/package.json': JSON.stringify({
+			name: 'octane',
+			version: '0.17.0',
+			exports: { './server': { types: './index.d.ts', import: './runtime.mjs' } },
+		}),
+		'app/src/unverified/node_modules/octane/index.d.ts':
+			'export function renderToString(body: unknown): void;',
+		'app/src/unverified/node_modules/octane/runtime.mjs': 'export function renderToString() {}',
+	});
+	const leaf = path.join(app, 'src/pane.tsx');
+	const host = path.join(app, 'src/server.ts');
+	const options = { root: app, strong: true, verify: true };
+	const preview = await runCodemod([leaf], { ...options, write: false });
+	const notes = preview.files.find((file) => file.file === 'src/server.ts')?.notes;
+	expect(notes).toEqual(
+		[4, 5].map((line) => ({
+			rule: 'store-hook',
+			severity: 'warning',
+			line,
+			message: expect.stringMatching(/If this server call runs standalone.*NativeStoreProvider/),
+		})),
+	);
+	expect(preview.files.find((file) => file.file === 'src/unverified/server.ts')?.notes).toEqual([]);
+	expect(fs.readFileSync(host, 'utf8')).toBe(server);
+	const written = await runCodemod([leaf], { ...options, write: true });
+	expect(written.files.find((file) => file.file === 'src/server.ts')?.notes).toEqual(notes);
+	expect(fs.readFileSync(host, 'utf8')).toBe(server.replace('./pane.tsx', './pane.tsrx'));
+	const { standalone, staticMarkup, plain, hosted } = await bundleRuntime(
+		app,
+		'server',
+		`import { createElement as h } from 'react';
+		import { renderToString } from 'react-dom/server';
+		import { OctaneCompat } from 'octane/react/server';
+		import { current } from '../observer/renderer';
+		import { Nested } from './src/nested.tsrx';
+		export { standalone, staticMarkup, plain } from './src/server';
+		export const hosted = () => renderToString(h(current, { value: 42 },
+			h(OctaneCompat, { component: Nested }))); `,
+	);
+	expect(standalone).toThrow(/useContext|errors\/12/);
+	expect(staticMarkup).toThrow(/useContext|errors\/12/);
+	expect(plain()).toContain('<b>plain</b>');
+	expect(hosted()).toContain('title42');
+}, 30_000);
+
 it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
 	const source = `import {useSnapshot as useReading, valueOf} from 'observer';
 export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }
