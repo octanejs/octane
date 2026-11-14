@@ -2786,6 +2786,8 @@ export function View() { return <Selected.Provider value="a"><Retained.Provider 
 					paths: {
 						'@shade': ['./shade.ts'],
 						'@ordinary': ['./ordinary.ts'],
+						'@factory': ['./factory.ts'],
+						'@default': ['./default.ts'],
 						'@unselected': ['./unselected.ts'],
 						'@shadowed': ['./shadowed'],
 					},
@@ -2794,6 +2796,10 @@ export function View() { return <Selected.Provider value="a"><Retained.Provider 
 			'shade.ts':
 				"import { createContext } from 'react'; export const Shade = createContext('default');",
 			'ordinary.ts': "export const BadgeContext = { Provider: () => 'plain' };",
+			'factory.ts': `function make() { return { Provider: () => 'plain' }; }
+export const MadeContext = make();
+export const Plain = make();`,
+			'default.ts': "export default { Provider: () => 'plain' };",
 			'unselected.ts':
 				"import { createContext } from 'react'; export const Outside = createContext('default');",
 			'shadowed.ts':
@@ -2801,22 +2807,33 @@ export function View() { return <Selected.Provider value="a"><Retained.Provider 
 			'shadowed.js': "export const Shadowed = { Provider: () => 'plain' };",
 			'View.tsx': `import { Shade } from '@shade';
 import { BadgeContext } from '@ordinary';
+import { MadeContext, Plain } from '@factory';
+import DefaultContext from '@default';
 import { Outside } from '@unselected';
 import { Shadowed } from '@shadowed';
 export function View() {
-	return <Shade.Provider value="night"><Shade.Consumer>{(value) => <b>{value}</b>}</Shade.Consumer><BadgeContext.Provider /><Outside.Provider /><Shadowed.Provider /></Shade.Provider>;
+	return <Shade.Provider value="night">
+		<Shade.Consumer>{(value) => <b>{value}</b>}</Shade.Consumer>
+		<BadgeContext.Provider /><MadeContext.Provider /><DefaultContext.Provider />
+		<Plain.Provider /><Outside.Provider /><Shadowed.Provider />
+	</Shade.Provider>;
 }`,
 		});
-		const selection = ['shade.ts', 'ordinary.ts', 'shadowed.ts', 'View.tsx'].map((file) =>
-			path.join(root, file),
-		);
+		const selection = [
+			'shade.ts',
+			'ordinary.ts',
+			'factory.ts',
+			'default.ts',
+			'shadowed.ts',
+			'View.tsx',
+		].map((file) => path.join(root, file));
 		const before = selection.map((file) => fs.readFileSync(file, 'utf8'));
 		const options = { root, projectTypes: false, verify: false };
 		const { files } = await runCodemod(selection, { ...options, write: false });
 		const view = files.find(({ file }) => file === 'View.tsx');
 		const notes = view?.notes.filter(({ rule }) => rule === 'context-path-alias');
 		expect(notes).toEqual(
-			['Provider', 'Consumer', 'Provider'].map((member) =>
+			['Provider', 'Consumer', 'Provider', 'Provider', 'Provider'].map((member) =>
 				expect.objectContaining({
 					severity: 'error',
 					message: expect.stringContaining(`${member} member`),
@@ -2824,7 +2841,15 @@ export function View() {
 			),
 		);
 		expect(view?.code).toContain('<Shade.Consumer>');
-		for (const name of ['Shade', 'BadgeContext', 'Outside', 'Shadowed'])
+		for (const name of [
+			'Shade',
+			'BadgeContext',
+			'MadeContext',
+			'DefaultContext',
+			'Plain',
+			'Outside',
+			'Shadowed',
+		])
 			expect(view?.code).toContain(`<${name}.Provider`);
 		expect(files.find(({ file }) => file === 'shade.ts')?.code).toContain("from 'octane'");
 		const result = await runCodemod(selection, options);

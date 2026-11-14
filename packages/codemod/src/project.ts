@@ -845,7 +845,7 @@ export async function runCodemod(
 		const reactStoreComponents = new Map<string, boolean>();
 		let installedClsx: boolean | undefined;
 		let reactJsx: boolean | undefined;
-		const isContext: NonNullable<TransformOptions['isContext']> = (specifier, name) => {
+		const isContext: NonNullable<TransformOptions['isContext']> = (specifier, name, local) => {
 			if (!specifier.startsWith('.')) {
 				if (
 					!contextPaths.length ||
@@ -865,7 +865,7 @@ export async function runCodemod(
 					exports.has(source) &&
 					ts.findConfigFile(path.dirname(source), ts.sys.fileExists) === rootProject &&
 					(exports.get(source)?.contexts.includes(name) ||
-						(name.endsWith('Context') && exportsConstObject(source, name)))
+						(name === 'default' ? local : name).endsWith('Context'))
 					? 'review-alias'
 					: null;
 			}
