@@ -385,6 +385,14 @@ it('warns at a direct migrated server call that needs a standalone store provide
 			export const anonymousPane = renderToString(<AnonymousPane />);
 			export const parenthesized = renderToString((<Pane />));
 			export const wrappedCall = (renderToString(<Pane />));
+			export const literalProps = (renderToString((<Props label="root" />)));
+			export const plainProps = renderToString(<Plain label="root" />);
+			export const keyed = renderToString(<Props label="root" key="root" />);
+			export const withChildren = renderToString(<Props children="root" />);
+			export const withRef = renderToString(<Props ref={null} />);
+			export const spread = renderToString(<Props {...{ label: 'root' }} />);
+			const state = { get label(): string { throw new Error('getter'); } };
+			export const dynamic = renderToString(<Props label={state.label} />);
 			const identity = (value: unknown) => value;
 			export const nested = identity((<Plain data-render={() => renderToString(<Pane />)} />));`,
 		'app/src/hosted.tsx': `import { OctaneCompat } from 'octane/react/server';
@@ -440,8 +448,14 @@ it('warns at a direct migrated server call that needs a standalone store provide
 			line: 12,
 			message: expect.stringMatching(/migrated Pane.*NativeStoreProvider/),
 		}),
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 13,
+			message: expect.stringMatching(/migrated Props.*NativeStoreProvider/),
+		}),
 	]);
-	expect(fs.existsSync(path.join(app, 'src/root.tsrx'))).toBe(true);
+	const root = fs.readFileSync(path.join(app, 'src/root.tsrx'), 'utf8');
+	expect(root).toContain('renderToString(Props, { label: "root" }).html');
 	const hosted = fs.readFileSync(path.join(app, 'src/hosted.tsx'), 'utf8');
 	expect(hosted).toContain("from './pane.tsrx'");
 	expect(hosted).toContain('<OctaneCompat component={Pane} />');

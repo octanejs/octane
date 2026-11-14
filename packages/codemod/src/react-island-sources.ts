@@ -4,6 +4,7 @@ import { hasRuntimeDependency } from './scoped-store-contract.js';
 import { skipWrappers } from './expression-wrappers.js';
 import { hasEval, rendersElementChildren } from './forwarded-props.js';
 import { componentTagOrExport, localUses } from './local-uses.js';
+import { staticReactProps } from './react-renderer.js';
 import { bind, nativeReactCompat, skipParens, withoutJsxIndentation } from './transform.js';
 
 export function importsReactBridge(source: string) {
@@ -496,7 +497,16 @@ export function reactServerComponents(
 				if (
 					jsx &&
 					(!ts.isIdentifier(jsx.tagName) || /^[A-Z][\w$]*$/.test(jsx.tagName.text)) &&
-					jsx.attributes.properties.length === 0 &&
+					(jsx.attributes.properties.length === 0 ||
+						(topLevel &&
+							ts.isJsxSelfClosingElement(jsx) &&
+							staticReactProps(jsx) !== null &&
+							!jsx.attributes.properties.some(
+								(attr) =>
+									ts.isJsxAttribute(attr) &&
+									ts.isIdentifier(attr.name) &&
+									attr.name.text === 'children',
+							))) &&
 					ordinaryReactJsx(source) &&
 					original('react/jsx-runtime')
 				)
