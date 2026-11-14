@@ -75,6 +75,67 @@ const dependencyError = expect.objectContaining({
 	message: expect.stringContaining('getter owned by React'),
 });
 
+const ownedState = `import { useEffect, useState } from 'react';
+
+export function Probe({ onFailure }: { onFailure: () => void }) {
+  const [retry, setRetry] = useState(() => ({ attempt: 0, failed: false }));
+  useEffect(() => {
+    if (retry.failed) onFailure();
+  }, [retry.failed, onFailure]);
+
+  return (
+    <div>
+      <button onClick={() => { setRetry(previous => ({ ...previous, failed: true })); }}>Fail</button>
+      <button onClick={() => { setRetry({ attempt: 1, failed: true }); }}>Same failure</button>
+      <button onClick={() => { setRetry({ attempt: 2, failed: false }); }}>Reset</button>
+      <button aria-pressed={retry.failed} data-attempt={retry.attempt}>Current status</button>
+    </div>
+  );
+}`;
+
+it('accepts an own data dependency over closed state updates', () => {
+	const result = migrate(ownedState);
+	expect(result.strong).toBe(true);
+	expect(result.notes).not.toContainEqual(dependencyError);
+});
+
+it.each([
+	['setter escape', 'leak(setRetry);'],
+	['state escape', 'leak(retry);'],
+	['direct getter replacement', 'setRetry({attempt: 1, get failed() { return false; }});'],
+	['replacement without the property', 'setRetry({attempt: 1});'],
+	['unknown spread', 'setRetry({...unknown(), failed: true});'],
+	[
+		'updater parameter escape',
+		'setRetry(previous => (leak(previous), {...previous, failed: true}));',
+	],
+	['member called with the state as receiver', 'retry.attempt();'],
+	['member assignment through a pattern', '[retry.failed] = [false];'],
+	['prototype mutation', 'retry.__proto__ = altered;'],
+	['mutated namespace hook', 'React.useState = alternate;'],
+	['named hook exposed through React default', 'React.useState = alternate;'],
+	['mutable CommonJS React export', "require('react').useState = alternate;"],
+	['missing sibling property', 'setRetry({failed: false});'],
+])(
+	'keeps reviewing a state dependency with %s',
+	(kind, line) => {
+		let source = ownedState;
+		if (kind === 'mutated namespace hook')
+			source = source
+				.replace('import { useEffect, useState }', 'import React, { useEffect }')
+				.replace('useState(()', 'React.useState(()');
+		if (kind === 'named hook exposed through React default')
+			source = source.replace(
+				'import { useEffect, useState }',
+				'import React, { useEffect, useState }',
+			);
+		expect(
+			migrate(source.replace('  useEffect(', '  ' + line + '\n  useEffect(')).notes,
+		).toContainEqual(dependencyError);
+	},
+	20_000,
+);
+
 it.each([
 	['useLayoutEffect', '() => {}', (value) => useLayoutEffect(() => {}, [value])],
 	['useInsertionEffect', '() => {}', (value) => useInsertionEffect(() => {}, [value])],
