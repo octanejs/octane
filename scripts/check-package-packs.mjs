@@ -1461,6 +1461,10 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 		path.join(sourceDirectory, 'published-types.ts'),
 		renderPackedTsrxConsumerTypeProbe(),
 	);
+	cpSync(
+		path.join(REPO_ROOT, 'scripts/fixtures/packed-lottie-types.ts'),
+		path.join(sourceDirectory, 'published-lottie-types.ts'),
+	);
 	writeFileSync(
 		path.join(sourceDirectory, 'published-source-imports.ts'),
 		renderPackedTsrxSourceImports([...sourceConsumerSpecifiers.values()].flat()),
@@ -1566,7 +1570,10 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 		{
 			project: 'tsconfig.browser.json',
 			config: {
-				consumerSourceFiles: ['src/published-browser-source-imports.ts'],
+				consumerSourceFiles: [
+					'src/published-browser-source-imports.ts',
+					'src/published-lottie-types.ts',
+				],
 				nodeTypes: false,
 				// MDX's server provider belongs to the full Node lane above. Keep its
 				// client source checked here; an actual client import of server code

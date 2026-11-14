@@ -273,6 +273,11 @@
         "tags": ["motion", "timeline"]
       },
       {
+        "packageName": "@octanejs/lottie-react",
+        "title": "Lottie",
+        "tags": ["animation", "lottie"]
+      },
+      {
         "packageName": "@octanejs/motion",
         "title": "Motion",
         "tags": ["animation", "transitions"]

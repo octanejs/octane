@@ -1950,7 +1950,8 @@ function catalogName(specifier: string) {
 	const parts = specifier.split('/');
 	for (let length = parts.length; length > 0; length--) {
 		const candidate = parts.slice(0, length).join('/');
-		if (candidate in CATALOG) return candidate;
+		// Lottie's exported view still needs explicit renderer ownership at its callers.
+		if (candidate !== 'lottie-react' && candidate in CATALOG) return candidate;
 	}
 	return null;
 }

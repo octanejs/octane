@@ -1,0 +1,226 @@
+[
+  {
+    "id": "react-case-v1:e807dcdd6827f855c009",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/Lottie.test.tsx",
+    "testName": "<Lottie /> should check if 'lottieRef' can be undefined",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:2921de08e017c5e57c7b",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/Lottie.test.tsx",
+    "testName": "<Lottie /> should check 'lottieRef' properties",
+    "pristineResult": "failed",
+    "pristineFailure": "AssertionError: expected 14 to be 13 // Object.is equality"
+  },
+  {
+    "id": "react-case-v1:026714a6015b5f3489df",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/Lottie.test.tsx",
+    "testName": "<Lottie /> should pass HTML props to container <div>",
+    "pristineResult": "failed",
+    "pristineFailure": "TestingLibraryElementError: Unable to find a label with the text of: test"
+  },
+  {
+    "id": "react-case-v1:c8db48cf1c2b691f8b67",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/Lottie.test.tsx",
+    "testName": "<Lottie /> should not pass non-HTML props to container <div>",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:e99e1fbd6a68f38b06d2",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/Lottie.test.tsx",
+    "testName": "<Lottie /> should check if interactivity applied when passed as a prop",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:42fa0da35904427fbf4d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottie.test.tsx",
+    "testName": "useLottie(...) General should check the returned object",
+    "pristineResult": "failed",
+    "pristineFailure": "AssertionError: expected 15 to be 14 // Object.is equality"
+  },
+  {
+    "id": "react-case-v1:6d3bb8ad07ae212ef2d9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottie.test.tsx",
+    "testName": "useLottie(...) w/o animationInstanceRef should check the interaction methods",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:8e681ec9e139ac136256",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottie.test.tsx",
+    "testName": "useLottie(...) w/o animationInstanceRef shouldn't return error when adding event listener",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:5787b74f74133179c8ba",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottie.test.tsx",
+    "testName": "useLottie(...) w/ animationInstanceRef should check the interaction methods",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:3218d74f50590b5943ee",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottie.test.tsx",
+    "testName": "useLottie(...) w/ animationInstanceRef should destroy the previous animation instance",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:a8bc21afb545eaa86f93",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottie.test.tsx",
+    "testName": "useLottie(...) w/ animationInstanceRef should add event listener",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:cadd6db704b068ca4731",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottie.test.tsx",
+    "testName": "useLottie(...) w/ animationInstanceRef shouldn't add an undefined event listener type",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:e77b76f4db1dffd57007",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottie.test.tsx",
+    "testName": "useLottie(...) w/ animationInstanceRef shouldn't add event listener w/ the handler as 'undefined'",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:f3e9f84a2737164adc2d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useLottieInteractivity General mounts with a div wrapper around lottie element",
+    "pristineResult": "failed",
+    "pristineFailure": "TypeError: Cannot read properties of undefined (reading 'current')"
+  },
+  {
+    "id": "react-case-v1:0dd6f15f2122a4d83484",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity General does nothing if animationItem is not provided",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:c83cb40642cbea753998",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity General calls animationItem.stop() when mounts",
+    "pristineResult": "failed",
+    "pristineFailure": "AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times"
+  },
+  {
+    "id": "react-case-v1:c5f1ea9e18f150c45f29",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity scroll mode attaches and detaches eventListeners",
+    "pristineResult": "failed",
+    "pristineFailure": "AssertionError: expected \"addEventListener\" to be called 1 times, but got 0 times"
+  },
+  {
+    "id": "react-case-v1:c0c621fa6979e560a495",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity scroll mode do not process if action does not match",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:2edfb8d9eacb6795fa20",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity scroll mode handles `seek` type correctly",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:84c68c3fa9b68f3fb99a",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity scroll mode handles `loop` type correctly",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:3032782e15a88846c6d6",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity scroll mode handles `play` type correctly",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:e6ee3afc83435304560e",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity scroll mode handles `stop` type correctly",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:28e93b9c58dfd45254af",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity cursor mode attaches and detaches eventListeners",
+    "pristineResult": "failed",
+    "pristineFailure": "AssertionError: expected \"addEventListener\" to be called 2 times, but got 0 times"
+  },
+  {
+    "id": "react-case-v1:d1ca9dd213381e2ab6d9",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity cursor mode handles mouseout event correctly",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:b9f34b2cf2464eb1a3f1",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity cursor mode do not process lottie if action does not match",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:f8a1646b6af6a6b60057",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity cursor mode handles `seek` type correctly",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:85c35c2af552484f2d8d",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity cursor mode handles `loop` type correctly",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:aff057f9bafa149454fe",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity cursor mode handles `play` type correctly",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:60b7967ca15a2dafe738",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity cursor mode handles `stop` type correctly",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:70ec3398cdae53984154",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity helpers getContainerVisbility does correct calculations",
+    "pristineResult": "passed"
+  },
+  {
+    "id": "react-case-v1:500a0863bebfffbf8dcb",
+    "classification": "implemented",
+    "localEvidence": "tests/upstream/useLottieInteractivity.test.tsx",
+    "testName": "useInitInteractivity helpers getContainerCursorPosition does correct calculations",
+    "pristineResult": "passed"
+  }
+]

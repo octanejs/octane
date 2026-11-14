@@ -1,0 +1,55 @@
+{
+  "name": "@octanejs/lottie-react",
+  "version": "0.0.1",
+  "description": "Octane bindings for Lottie animations, ported from lottie-react 2.4.1.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/lottie-react"
+  },
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": [
+    "src",
+    "LICENSE",
+    "LICENSE.upstream",
+    "README.md",
+    "UPSTREAM.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project lottie-react --project lottie-react-pristine --project lottie-react-server --project lottie-react-browser",
+    "typecheck": "octane-tsc -p tsconfig.json",
+    "upstream:verify": "node ../../scripts/react-parity/verify-provenance.mjs --package-dir ."
+  },
+  "dependencies": {
+    "lottie-web": "5.13.0"
+  },
+  "peerDependencies": {
+    "octane": "workspace:^0.17.0"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/react": "16.3.2",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "lottie-react": "2.4.1",
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

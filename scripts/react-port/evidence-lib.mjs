@@ -742,25 +742,28 @@ function staticModuleSpecifiers(filePath) {
 		if (
 			is.isImportDeclaration(node) &&
 			node.moduleSpecifier &&
-			is.isStringLiteralLikeNode(node.moduleSpecifier) &&
-			node.importClause?.phaseModifier !== SyntaxKind.TypeKeyword
+			is.isStringLiteralLikeNode(node.moduleSpecifier)
 		) {
-			specifiers.push(node.moduleSpecifier.text);
+			specifiers.push({
+				specifier: node.moduleSpecifier.text,
+				typeOnly: node.importClause?.phaseModifier === SyntaxKind.TypeKeyword,
+			});
 		} else if (
 			is.isExportDeclaration(node) &&
 			node.moduleSpecifier &&
-			is.isStringLiteralLikeNode(node.moduleSpecifier) &&
-			!node.isTypeOnly
+			is.isStringLiteralLikeNode(node.moduleSpecifier)
 		) {
-			specifiers.push(node.moduleSpecifier.text);
+			specifiers.push({ specifier: node.moduleSpecifier.text, typeOnly: node.isTypeOnly });
 		} else if (
 			is.isImportEqualsDeclaration(node) &&
 			is.isExternalModuleReference(node.moduleReference) &&
 			node.moduleReference.expression &&
-			is.isStringLiteralLikeNode(node.moduleReference.expression) &&
-			!node.isTypeOnly
+			is.isStringLiteralLikeNode(node.moduleReference.expression)
 		) {
-			specifiers.push(node.moduleReference.expression.text);
+			specifiers.push({
+				specifier: node.moduleReference.expression.text,
+				typeOnly: node.isTypeOnly,
+			});
 		} else if (
 			is.isCallExpression(node) &&
 			node.arguments.length === 1 &&
@@ -768,7 +771,7 @@ function staticModuleSpecifiers(filePath) {
 			(node.expression.kind === SyntaxKind.ImportKeyword ||
 				(is.isIdentifier(node.expression) && node.expression.text === 'require'))
 		) {
-			specifiers.push(node.arguments[0].text);
+			specifiers.push({ specifier: node.arguments[0].text, typeOnly: false });
 		}
 		node.forEachChild(visit);
 	}
@@ -776,10 +779,13 @@ function staticModuleSpecifiers(filePath) {
 	return specifiers;
 }
 
-function resolveRelativeSource(fromFile, specifier) {
+function resolveRelativeSource(fromFile, specifier, typeOnly) {
 	const base = path.resolve(path.dirname(fromFile), specifier);
+	const sources = base.endsWith('.js')
+		? [base.slice(0, -3) + '.ts', base.slice(0, -3) + '.tsx']
+		: [];
 	const candidates = [
-		base,
+		...(typeOnly ? [...sources, base] : [base, ...sources]),
 		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => `${base}${extension}`),
 		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => path.join(base, `index${extension}`)),
 	];
@@ -800,34 +806,41 @@ export function inspectShippedSources(packageDirectory) {
 	]);
 	const queue = collectExportTargets(manifest.exports ?? manifest.main ?? manifest.module ?? [])
 		.filter((target) => typeof target === 'string' && !/\.d\.[cm]?ts$/.test(target))
-		.map((target) => path.resolve(resolvedPackageDirectory, target));
-	const reachableFiles = new Set();
+		.map((target) => ({ filePath: path.resolve(resolvedPackageDirectory, target), runtime: true }));
+	const reachableFiles = new Map();
 	while (queue.length > 0) {
-		const filePath = queue.shift();
+		const { filePath, runtime } = queue.shift();
 		if (!existsSync(filePath) || !statSync(filePath).isFile()) continue;
 		const resolvedFile = realpathSync(filePath);
 		const relativeFile = path.relative(resolvedPackageDirectory, resolvedFile);
 		if (
 			relativeFile === '..' ||
 			relativeFile.startsWith(`..${path.sep}`) ||
-			path.isAbsolute(relativeFile) ||
-			reachableFiles.has(resolvedFile)
+			path.isAbsolute(relativeFile)
 		) {
 			continue;
 		}
-		reachableFiles.add(resolvedFile);
-		for (const specifier of staticModuleSpecifiers(resolvedFile)) {
+		const previous = reachableFiles.get(resolvedFile);
+		if (previous === true || previous === runtime) continue;
+		reachableFiles.set(resolvedFile, runtime);
+		for (const { specifier, typeOnly } of staticModuleSpecifiers(resolvedFile)) {
+			// Type-only files ship and need hashes, but their imports do not execute.
+			const executes = runtime && !typeOnly;
 			if (specifier.startsWith('#') && manifest.imports?.[specifier] !== undefined) {
 				// Package imports resolve from the package root. Audit all export
 				// conditions, including browser stubs and server prehydration scripts.
 				for (const target of collectExportTargets(manifest.imports[specifier])) {
-					if (target.startsWith('./')) queue.push(path.resolve(resolvedPackageDirectory, target));
-					else runtimeDependencies.add(packageRoot(target));
+					if (target.startsWith('./')) {
+						queue.push({
+							filePath: path.resolve(resolvedPackageDirectory, target),
+							runtime: executes,
+						});
+					} else if (executes) runtimeDependencies.add(packageRoot(target));
 				}
 			} else if (specifier.startsWith('.') || specifier.startsWith('/')) {
-				const dependencyFile = resolveRelativeSource(resolvedFile, specifier);
-				if (dependencyFile) queue.push(dependencyFile);
-			} else {
+				const dependencyFile = resolveRelativeSource(resolvedFile, specifier, typeOnly);
+				if (dependencyFile) queue.push({ filePath: dependencyFile, runtime: executes });
+			} else if (executes) {
 				runtimeDependencies.add(packageRoot(specifier));
 			}
 		}
@@ -835,7 +848,7 @@ export function inspectShippedSources(packageDirectory) {
 
 	return {
 		runtimeDependencies: [...new Set([...runtimeDependencies].map(packageRoot))].sort(),
-		files: [...reachableFiles]
+		files: [...reachableFiles.keys()]
 			.map((file) => path.relative(resolvedPackageDirectory, file).split(path.sep).join('/'))
 			.sort(),
 	};

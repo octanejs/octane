@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "lottie-react-pristine",
+  "roots": ["packages/lottie-react/tests"],
+  "files": ["packages/lottie-react/tests/upstream-original.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:lottie-react:pristine-wrapper",
+      "file": "packages/lottie-react/tests/upstream-original.test.ts",
+      "fullName": "replays every pinned lottie-react registration with its recorded result"
+    }
+  ]
+}

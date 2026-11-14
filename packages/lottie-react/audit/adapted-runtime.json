@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "project": "lottie-react",
+  "roots": ["packages/lottie-react/tests/upstream"],
+  "files": [
+    "packages/lottie-react/tests/upstream/Lottie.test.tsx",
+    "packages/lottie-react/tests/upstream/useLottie.test.tsx",
+    "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx"
+  ],
+  "tests": [
+    {
+      "id": "runtime:lottie-react:e807dcdd6827f855c009",
+      "file": "packages/lottie-react/tests/upstream/Lottie.test.tsx",
+      "fullName": "<Lottie /> should check if 'lottieRef' can be undefined"
+    },
+    {
+      "id": "runtime:lottie-react:2921de08e017c5e57c7b",
+      "file": "packages/lottie-react/tests/upstream/Lottie.test.tsx",
+      "fullName": "<Lottie /> should check 'lottieRef' properties"
+    },
+    {
+      "id": "runtime:lottie-react:026714a6015b5f3489df",
+      "file": "packages/lottie-react/tests/upstream/Lottie.test.tsx",
+      "fullName": "<Lottie /> should pass HTML props to container <div>"
+    },
+    {
+      "id": "runtime:lottie-react:c8db48cf1c2b691f8b67",
+      "file": "packages/lottie-react/tests/upstream/Lottie.test.tsx",
+      "fullName": "<Lottie /> should not pass non-HTML props to container <div>"
+    },
+    {
+      "id": "runtime:lottie-react:e99e1fbd6a68f38b06d2",
+      "file": "packages/lottie-react/tests/upstream/Lottie.test.tsx",
+      "fullName": "<Lottie /> should check if interactivity applied when passed as a prop"
+    },
+    {
+      "id": "runtime:lottie-react:42fa0da35904427fbf4d",
+      "file": "packages/lottie-react/tests/upstream/useLottie.test.tsx",
+      "fullName": "useLottie(...) General should check the returned object"
+    },
+    {
+      "id": "runtime:lottie-react:6d3bb8ad07ae212ef2d9",
+      "file": "packages/lottie-react/tests/upstream/useLottie.test.tsx",
+      "fullName": "useLottie(...) w/o animationInstanceRef should check the interaction methods"
+    },
+    {
+      "id": "runtime:lottie-react:8e681ec9e139ac136256",
+      "file": "packages/lottie-react/tests/upstream/useLottie.test.tsx",
+      "fullName": "useLottie(...) w/o animationInstanceRef shouldn't return error when adding event listener"
+    },
+    {
+      "id": "runtime:lottie-react:5787b74f74133179c8ba",
+      "file": "packages/lottie-react/tests/upstream/useLottie.test.tsx",
+      "fullName": "useLottie(...) w/ animationInstanceRef should check the interaction methods"
+    },
+    {
+      "id": "runtime:lottie-react:3218d74f50590b5943ee",
+      "file": "packages/lottie-react/tests/upstream/useLottie.test.tsx",
+      "fullName": "useLottie(...) w/ animationInstanceRef should destroy the previous animation instance"
+    },
+    {
+      "id": "runtime:lottie-react:a8bc21afb545eaa86f93",
+      "file": "packages/lottie-react/tests/upstream/useLottie.test.tsx",
+      "fullName": "useLottie(...) w/ animationInstanceRef should add event listener"
+    },
+    {
+      "id": "runtime:lottie-react:cadd6db704b068ca4731",
+      "file": "packages/lottie-react/tests/upstream/useLottie.test.tsx",
+      "fullName": "useLottie(...) w/ animationInstanceRef shouldn't add an undefined event listener type"
+    },
+    {
+      "id": "runtime:lottie-react:e77b76f4db1dffd57007",
+      "file": "packages/lottie-react/tests/upstream/useLottie.test.tsx",
+      "fullName": "useLottie(...) w/ animationInstanceRef shouldn't add event listener w/ the handler as 'undefined'"
+    },
+    {
+      "id": "runtime:lottie-react:f3e9f84a2737164adc2d",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useLottieInteractivity General mounts with a div wrapper around lottie element"
+    },
+    {
+      "id": "runtime:lottie-react:0dd6f15f2122a4d83484",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity General does nothing if animationItem is not provided"
+    },
+    {
+      "id": "runtime:lottie-react:c83cb40642cbea753998",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity General calls animationItem.stop() when mounts"
+    },
+    {
+      "id": "runtime:lottie-react:c5f1ea9e18f150c45f29",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity scroll mode attaches and detaches eventListeners"
+    },
+    {
+      "id": "runtime:lottie-react:c0c621fa6979e560a495",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity scroll mode do not process if action does not match"
+    },
+    {
+      "id": "runtime:lottie-react:2edfb8d9eacb6795fa20",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity scroll mode handles `seek` type correctly"
+    },
+    {
+      "id": "runtime:lottie-react:84c68c3fa9b68f3fb99a",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity scroll mode handles `loop` type correctly"
+    },
+    {
+      "id": "runtime:lottie-react:3032782e15a88846c6d6",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity scroll mode handles `play` type correctly"
+    },
+    {
+      "id": "runtime:lottie-react:e6ee3afc83435304560e",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity scroll mode handles `stop` type correctly"
+    },
+    {
+      "id": "runtime:lottie-react:28e93b9c58dfd45254af",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity cursor mode attaches and detaches eventListeners"
+    },
+    {
+      "id": "runtime:lottie-react:d1ca9dd213381e2ab6d9",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity cursor mode handles mouseout event correctly"
+    },
+    {
+      "id": "runtime:lottie-react:b9f34b2cf2464eb1a3f1",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity cursor mode do not process lottie if action does not match"
+    },
+    {
+      "id": "runtime:lottie-react:f8a1646b6af6a6b60057",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity cursor mode handles `seek` type correctly"
+    },
+    {
+      "id": "runtime:lottie-react:85c35c2af552484f2d8d",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity cursor mode handles `loop` type correctly"
+    },
+    {
+      "id": "runtime:lottie-react:aff057f9bafa149454fe",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity cursor mode handles `play` type correctly"
+    },
+    {
+      "id": "runtime:lottie-react:60b7967ca15a2dafe738",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity cursor mode handles `stop` type correctly"
+    },
+    {
+      "id": "runtime:lottie-react:70ec3398cdae53984154",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity helpers getContainerVisbility does correct calculations"
+    },
+    {
+      "id": "runtime:lottie-react:500a0863bebfffbf8dcb",
+      "file": "packages/lottie-react/tests/upstream/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity helpers getContainerCursorPosition does correct calculations"
+    }
+  ]
+}

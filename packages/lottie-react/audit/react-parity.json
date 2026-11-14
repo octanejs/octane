@@ -1,0 +1,393 @@
+{
+  "$schema": "../../hook-form/audit/react-parity.schema.json",
+  "schemaVersion": 1,
+  "provenance": {
+    "repo": "https://github.com/Gamote/lottie-react.git",
+    "version": "2.4.1",
+    "commit": "bd794d226e14c714e7d740a1f7fa9dcf284d7235",
+    "sourceRoot": "src",
+    "testRoot": "src/__tests__",
+    "license": "MIT",
+    "integrity": "sha256:8c28c26157e5e69a6d93111005ad78044f9ae3492e9b20edd78ac4da288e513b",
+    "verification": "verified"
+  },
+  "upstreamSuites": {
+    "runtime": "present",
+    "types": "absent"
+  },
+  "materializedTests": "packages/lottie-react",
+  "adaptedRoots": {
+    "source": {
+      "roots": ["packages/lottie-react/src"],
+      "include": ["\\.(?:ts|tsrx)$"],
+      "exclude": []
+    },
+    "tests": {
+      "roots": ["packages/lottie-react/tests/upstream"],
+      "include": ["\\.test\\.tsx$"],
+      "exclude": []
+    }
+  },
+  "adaptedRuntimeSummary": {
+    "inventoryEntries": 31,
+    "uniqueIdentities": 31,
+    "duplicateEntriesWithinLanes": 0,
+    "identitiesSharedAcrossLanes": 0
+  },
+  "environments": {
+    "workspace-node": {
+      "node": ">=22",
+      "platform": "any",
+      "arch": "any",
+      "packageManager": "pnpm@12.9.1",
+      "lockfile": "pnpm-lock.yaml",
+      "lockfileSha256": "c46a277340353d7cd3d82da168a331ac7467144cf8e37ee150a6fe9f6a2d8d72"
+    }
+  },
+  "lanes": [
+    {
+      "id": "lottie-react-pristine-upstream",
+      "type": "pristine-upstream",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "lottie-react-pristine",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "Replays all 31 pinned source cases and verifies the original seven failures.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/lottie-react/audit/pristine-wrapper-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/lottie-react/audit/pristine-wrapper-runtime.json",
+          "role": "support",
+          "sha256": "c42610b8dfb3f7c5cc99bfd0ac5ac9d545f5cbc85c66f90f48738b414f63ffb2"
+        },
+        {
+          "path": "packages/lottie-react/tests/upstream-original.test.ts",
+          "role": "support",
+          "sha256": "8fd4bc376786c116cf28fac4e14672ae31ac4011bf42f33da4fef7494926a90e"
+        },
+        {
+          "path": "packages/lottie-react/audit/pristine-runtime.json",
+          "role": "support",
+          "sha256": "6787a2169914e21bfb0a6ca544dd728ab6c1528ab30fc8accaf58a6b603c5b12"
+        },
+        {
+          "path": "packages/lottie-react/audit/pristine-suite.json",
+          "role": "support",
+          "sha256": "c834ad572efdc3ec260cb20f5aa07d5a433f777f269d2d01d367c1e9f64dec75"
+        },
+        {
+          "path": "packages/lottie-react/tests/upstream-vitest.config.ts",
+          "role": "support",
+          "sha256": "bbd60aa4a3003b4d4753fe19875f5a23eb11a29c9b0f2c9d6cde0ffbe768114a"
+        },
+        {
+          "path": "packages/lottie-react/tests/_canvas-setup.ts",
+          "role": "support",
+          "sha256": "7903ce5d22b09743c96d5e5e0e45fd6ace395e23bae61f9b734e5a6bfca96701"
+        },
+        {
+          "path": "packages/lottie-react/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "45c4c1e8d6d727abdf23a6ef435c2c036f39d5c989951fe028d64bf32e2ffcde"
+        },
+        {
+          "path": "packages/lottie-react/LICENSE.upstream",
+          "role": "support",
+          "sha256": "299382b6cadfffca95080072ea867f7e7a5794bc05e1f49238c2de7cd164b458"
+        },
+        {
+          "path": "scripts/react-parity/lottie-react-pristine-runtime.mjs",
+          "role": "support",
+          "sha256": "4f0d7ef9aa9e5e1bc51890157137803d0c26c8fee2f944b8161e713c584211d5"
+        }
+      ]
+    },
+    {
+      "id": "lottie-react-adapted-upstream",
+      "type": "adapted-octane",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "lottie-react",
+      "evidenceOrigin": "upstream-suite",
+      "notes": "All 31 cases run against the Octane binding with their pinned test names.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/lottie-react/audit/adapted-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/lottie-react/audit/adapted-runtime.json",
+          "role": "support",
+          "sha256": "39f8b75928e387aa5c88ef531a429791ed795767900f166d3ed5302afc2e43c0"
+        },
+        {
+          "path": "packages/lottie-react/tests/_canvas-setup.ts",
+          "role": "support",
+          "sha256": "7903ce5d22b09743c96d5e5e0e45fd6ace395e23bae61f9b734e5a6bfca96701"
+        },
+        {
+          "path": "packages/lottie-react/audit/upstream.lock.json",
+          "role": "support",
+          "sha256": "45c4c1e8d6d727abdf23a6ef435c2c036f39d5c989951fe028d64bf32e2ffcde"
+        },
+        {
+          "path": "packages/lottie-react/audit/upstream-crosswalk.json",
+          "role": "support",
+          "sha256": "dc629bb208a1b1ed3d75460d3880d4f909e2ee608a40721bc6abed5b4206b8d9"
+        },
+        {
+          "path": "packages/lottie-react/audit/upstream-registrations.json",
+          "role": "support",
+          "sha256": "a21033f11db2564891b5f4e50bded324f6d378102973e9c1679a0b7df5356e87"
+        },
+        {
+          "path": "packages/lottie-react/audit/upstream-patches/tests/upstream/Lottie.test.tsx.patch",
+          "role": "support",
+          "sha256": "c6a997272c74d85d3f42b1ce00f8e43e129e9cccda0aafad6ffe1de6a226f9c8"
+        },
+        {
+          "path": "packages/lottie-react/audit/upstream-patches/tests/upstream/useLottie.test.tsx.patch",
+          "role": "support",
+          "sha256": "6880b5eb668ccb13e90650bd78debcd273fab949d2f25d4f36295abd82b57fae"
+        },
+        {
+          "path": "packages/lottie-react/audit/upstream-patches/tests/upstream/useLottieInteractivity.test.tsx.patch",
+          "role": "support",
+          "sha256": "8aa739d46acff1c60057a8633e04951a73a4a85c9105e05abcd15ef5106da1cd"
+        }
+      ]
+    },
+    {
+      "id": "lottie-react-ssr",
+      "type": "differential",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "lottie-react-server",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Server markup and inert animation lifecycle.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/lottie-react/audit/ssr-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/lottie-react/audit/ssr-runtime.json",
+          "role": "support",
+          "sha256": "30b18a493615bce9e9f5716a47566ce126561ec37385c4b940361411c1ed7811"
+        },
+        {
+          "path": "packages/lottie-react/tests/ssr/view.server.test.ts",
+          "role": "support",
+          "sha256": "1c7887dadbb3a39fabe50bf798e65754604cac15585e7c588000d8f280818d9e"
+        }
+      ]
+    },
+    {
+      "id": "lottie-react-browser",
+      "type": "browser",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "lottie-react-browser",
+      "notes": "Chromium compares the published React package and Octane mount, animation replacement, cleanup, and hydration.",
+      "execution": {
+        "kind": "vitest-full",
+        "inventory": "packages/lottie-react/audit/browser-runtime.json"
+      },
+      "files": [
+        {
+          "path": "packages/lottie-react/audit/browser-runtime.json",
+          "role": "support",
+          "sha256": "8c0fb372f06ca9e450e70c8cbd58b8653fc6154e6631c4d6110ef2d600428192"
+        },
+        {
+          "path": "packages/lottie-react/tests/browser/animation.browser.test.ts",
+          "role": "support",
+          "sha256": "83ff41656e83d3b774f714e7041bde9493e5787622ec6b09e132103d5961b11b"
+        },
+        {
+          "path": "packages/lottie-react/tests/browser/harness/index.html",
+          "role": "support",
+          "sha256": "08f7ee879ce1ce91e21642283e14a4f16fcee6a34337698d0051f025dcdd3487"
+        },
+        {
+          "path": "packages/lottie-react/tests/browser/harness/main.tsrx",
+          "role": "support",
+          "sha256": "368877d9360da5d4b09c20ac7106693288a737224f372aac30c111895d1fe1a6"
+        },
+        {
+          "path": "packages/lottie-react/tests/browser/harness/react-oracle.js",
+          "role": "support",
+          "sha256": "6d457d997d012d2b8c57c6ab5f72e4ae9ee78764cd8dc3958a917a243e894090"
+        },
+        {
+          "path": "packages/lottie-react/tests/browser/harness/server.ts",
+          "role": "support",
+          "sha256": "4cdbff3aedfcb766454cdf037b69edf1de63a29fad8ba2a3a825b9a679ea9eaa"
+        }
+      ]
+    },
+    {
+      "id": "lottie-react-pristine-types",
+      "type": "pristine-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "lottie-react-pristine-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Published declaration contract",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsc",
+        "project": "packages/lottie-react/tests/types/tsconfig.pristine.json"
+      },
+      "files": [
+        {
+          "path": "packages/lottie-react/tests/types/pristine.ts",
+          "role": "test",
+          "sha256": "574625f20f58291834acc0b86307bfd961f86941a42fd77d8abfa9fd8c8af97c",
+          "cases": [
+            {
+              "id": "types:lottie-react:pristine",
+              "testName": "Published declaration contract",
+              "fullName": "Published declaration contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/lottie-react/tests/types/tsconfig.pristine.json",
+          "role": "support",
+          "sha256": "7589c97e7002e5782a5a74b35eead186cf9c294ed04c9288adacc26e4f455345"
+        }
+      ]
+    },
+    {
+      "id": "lottie-react-adapted-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "lottie-react-adapted-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Octane declaration contract",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/lottie-react/tests/types/tsconfig.adapted.json"
+      },
+      "files": [
+        {
+          "path": "packages/lottie-react/tests/types/adapted.ts",
+          "role": "test",
+          "sha256": "752da3e3e8d114aec471dfc4d5ae70d6719d5729ce1a898075da12a6de829b0e",
+          "cases": [
+            {
+              "id": "types:lottie-react:adapted",
+              "testName": "Octane declaration contract",
+              "fullName": "Octane declaration contract"
+            }
+          ]
+        },
+        {
+          "path": "packages/lottie-react/tests/types/tsconfig.adapted.json",
+          "role": "support",
+          "sha256": "e0d70261ab33ac9f2d4707211e84c363025518dea75c70f868987d3f2f751458"
+        }
+      ]
+    },
+    {
+      "id": "lottie-react-public-types",
+      "type": "adapted-types",
+      "oracle": "required",
+      "environment": "workspace-node",
+      "project": "lottie-react-public-types",
+      "evidenceOrigin": "repo-authored",
+      "notes": "Public value and type exports",
+      "execution": {
+        "kind": "typescript",
+        "compiler": "tsrx-tsc",
+        "project": "packages/lottie-react/tests/types/tsconfig.json"
+      },
+      "files": [
+        {
+          "path": "packages/lottie-react/tests/types/public.ts",
+          "role": "test",
+          "sha256": "30c40af3043439bde704310f1c147f38e6f470a74c717f6ccb351508f10dfb36",
+          "cases": [
+            {
+              "id": "types:lottie-react:public",
+              "testName": "Public value and type exports",
+              "fullName": "Public value and type exports"
+            }
+          ]
+        },
+        {
+          "path": "packages/lottie-react/tests/types/tsconfig.json",
+          "role": "support",
+          "sha256": "29729593c31e70a1576a9795432ee79011549ed514dced6d7f58f0d99f6eb26e"
+        }
+      ]
+    }
+  ],
+  "divergences": [
+    {
+      "id": "lottie-241-ref",
+      "caseIds": [
+        "runtime:lottie-react:2921de08e017c5e57c7b",
+        "runtime:lottie-react:42fa0da35904427fbf4d"
+      ],
+      "upstreamResult": "The stale counts omit animationContainerRef.",
+      "octaneResult": "The public handle and hook expose animationContainerRef.",
+      "rationale": "The published package has 14 handle fields and 15 hook result fields.",
+      "classification": "stale-upstream-test",
+      "consumerImpact": "The binding follows the published 2.4.1 behavior.",
+      "migrationGuidance": "Use the published 2.4.1 API.",
+      "owner": "@octanejs/lottie-react",
+      "reviewCondition": "Recheck the fixtures when upgrading the upstream pin."
+    },
+    {
+      "id": "lottie-241-mock",
+      "caseIds": [
+        "runtime:lottie-react:026714a6015b5f3489df",
+        "runtime:lottie-react:e99e1fbd6a68f38b06d2"
+      ],
+      "upstreamResult": "The upstream whole-module automock hides the host container.",
+      "octaneResult": "The hook spy observes forwarding while the actual host renders.",
+      "rationale": "An observation-only spy keeps the element and callback contract observable.",
+      "classification": "stale-upstream-test",
+      "consumerImpact": "The binding follows the published 2.4.1 behavior.",
+      "migrationGuidance": "Use the published 2.4.1 API.",
+      "owner": "@octanejs/lottie-react",
+      "reviewCondition": "Recheck the fixtures when upgrading the upstream pin."
+    },
+    {
+      "id": "lottie-241-placeholder",
+      "caseIds": ["runtime:lottie-react:c8db48cf1c2b691f8b67"],
+      "upstreamResult": "The pinned placeholder makes no assertion.",
+      "octaneResult": "Animation-only options do not appear on the DOM host.",
+      "rationale": "The adapted case asserts the behavior stated by the upstream case name.",
+      "classification": "stale-upstream-test",
+      "consumerImpact": "The binding follows the published 2.4.1 behavior.",
+      "migrationGuidance": "Use the published 2.4.1 API.",
+      "owner": "@octanejs/lottie-react",
+      "reviewCondition": "Recheck the fixtures when upgrading the upstream pin."
+    },
+    {
+      "id": "lottie-241-interactivity",
+      "caseIds": [
+        "runtime:lottie-react:f3e9f84a2737164adc2d",
+        "runtime:lottie-react:c83cb40642cbea753998",
+        "runtime:lottie-react:c5f1ea9e18f150c45f29",
+        "runtime:lottie-react:28e93b9c58dfd45254af"
+      ],
+      "upstreamResult": "The stale suite expects an extra wrapper or listeners for empty actions.",
+      "octaneResult": "The hook returns the existing View. A matching action installs a listener and empty actions do not.",
+      "rationale": "The published implementation returns View and checks for a nonempty action list.",
+      "classification": "stale-upstream-test",
+      "consumerImpact": "The binding follows the published 2.4.1 behavior.",
+      "migrationGuidance": "Use the published 2.4.1 API.",
+      "owner": "@octanejs/lottie-react",
+      "reviewCondition": "Recheck the fixtures when upgrading the upstream pin."
+    }
+  ]
+}

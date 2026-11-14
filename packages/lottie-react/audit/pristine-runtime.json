@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/Lottie.test.tsx",
+      "fullName": "<Lottie /> should check 'lottieRef' properties",
+      "status": "failed",
+      "failure": "AssertionError: expected 14 to be 13 // Object.is equality"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/Lottie.test.tsx",
+      "fullName": "<Lottie /> should check if 'lottieRef' can be undefined",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/Lottie.test.tsx",
+      "fullName": "<Lottie /> should check if interactivity applied when passed as a prop",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/Lottie.test.tsx",
+      "fullName": "<Lottie /> should not pass non-HTML props to container <div>",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/Lottie.test.tsx",
+      "fullName": "<Lottie /> should pass HTML props to container <div>",
+      "status": "failed",
+      "failure": "TestingLibraryElementError: Unable to find a label with the text of: test"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottie.test.tsx",
+      "fullName": "useLottie(...) General should check the returned object",
+      "status": "failed",
+      "failure": "AssertionError: expected 15 to be 14 // Object.is equality"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottie.test.tsx",
+      "fullName": "useLottie(...) w/ animationInstanceRef should add event listener",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottie.test.tsx",
+      "fullName": "useLottie(...) w/ animationInstanceRef should check the interaction methods",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottie.test.tsx",
+      "fullName": "useLottie(...) w/ animationInstanceRef should destroy the previous animation instance",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottie.test.tsx",
+      "fullName": "useLottie(...) w/ animationInstanceRef shouldn't add an undefined event listener type",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottie.test.tsx",
+      "fullName": "useLottie(...) w/ animationInstanceRef shouldn't add event listener w/ the handler as 'undefined'",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottie.test.tsx",
+      "fullName": "useLottie(...) w/o animationInstanceRef should check the interaction methods",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottie.test.tsx",
+      "fullName": "useLottie(...) w/o animationInstanceRef shouldn't return error when adding event listener",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity General calls animationItem.stop() when mounts",
+      "status": "failed",
+      "failure": "AssertionError: expected \"vi.fn()\" to be called 1 times, but got 0 times"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity General does nothing if animationItem is not provided",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity cursor mode attaches and detaches eventListeners",
+      "status": "failed",
+      "failure": "AssertionError: expected \"addEventListener\" to be called 2 times, but got 0 times"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity cursor mode do not process lottie if action does not match",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity cursor mode handles `loop` type correctly",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity cursor mode handles `play` type correctly",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity cursor mode handles `seek` type correctly",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity cursor mode handles `stop` type correctly",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity cursor mode handles mouseout event correctly",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity helpers getContainerCursorPosition does correct calculations",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity helpers getContainerVisbility does correct calculations",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity scroll mode attaches and detaches eventListeners",
+      "status": "failed",
+      "failure": "AssertionError: expected \"addEventListener\" to be called 1 times, but got 0 times"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity scroll mode do not process if action does not match",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity scroll mode handles `loop` type correctly",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity scroll mode handles `play` type correctly",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity scroll mode handles `seek` type correctly",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useInitInteractivity scroll mode handles `stop` type correctly",
+      "status": "passed"
+    },
+    {
+      "file": "packages/lottie-react/upstream/src/__tests__/useLottieInteractivity.test.tsx",
+      "fullName": "useLottieInteractivity General mounts with a div wrapper around lottie element",
+      "status": "failed",
+      "failure": "TypeError: Cannot read properties of undefined (reading 'current')"
+    }
+  ]
+}

@@ -128,10 +128,13 @@ export function pinnedPublicEntries(packageDirectory, node) {
 		};
 		visit(source);
 	}
-	const publicExports = Object.entries(manifest.exports).filter(
-		([subpath, target]) =>
-			subpath !== './package.json' && typeof target === 'object' && target !== null,
-	);
+	const publicExports =
+		manifest.exports === undefined
+			? [['.', { types: manifest.types ?? manifest.typings }]]
+			: Object.entries(manifest.exports).filter(
+					([subpath, target]) =>
+						subpath !== './package.json' && typeof target === 'object' && target !== null,
+				);
 	// Let the checking compiler select versioned and nested export conditions,
 	// just as it does for the consumer. A fallback `types` may intentionally
 	// reject older compilers rather than describe the current public surface.
