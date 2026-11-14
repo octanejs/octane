@@ -25,6 +25,7 @@ import {
 	installCommitWork,
 	ROOT_RENDER_ROLLBACK,
 	TRANSITION_JOURNAL,
+	RENDERER_REGION_OWNER_COUNT,
 } from './drivers.js';
 import {
 	journalRootProperty,
@@ -42,6 +43,7 @@ import { ROOT_RENDER_TRANSACTION, WIP_CAPTURE } from './render.js';
 import { nodeAfterPortalRange } from './deopt.js';
 import { journalBag, REF_DETACH_SUPPRESSION } from './commit.js';
 import { getNextSibling } from './templates.js';
+import { rendererRegionOwnerForBlock } from './context.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
@@ -311,6 +313,24 @@ function attachArrayRefLeaf(ref: any, target: object, attachment: ArrayRefAttach
 	else attachment.cleanups.push(detach);
 }
 
+function attachHostedArrayRefLeaf(
+	ref: any,
+	target: object,
+	attachment: ArrayRefAttachment,
+	root: Block,
+): void {
+	if (ref == null || attachment.detached || root.inactive) return;
+	if (!Array.isArray(ref)) {
+		attachArrayRefLeaf(ref, target, attachment);
+		return;
+	}
+	for (let i = 0; !attachment.detached && !root.inactive && i < ref.length; i++) {
+		// A length or index getter can delete the React host before the leaf runs.
+		if (attachment.detached || root.inactive) return;
+		attachHostedArrayRefLeaf(ref[i], target, attachment, root);
+	}
+}
+
 export interface ActivityRefState {
 	connected: any;
 	hidden: boolean;
@@ -320,6 +340,7 @@ export function attachRef(
 	ref: any,
 	el: Element | FragmentInstance | null,
 	prevTarget?: Element | FragmentInstance | null,
+	block?: Block | null,
 ): void {
 	if (ref == null) return;
 	const target = el ?? prevTarget;
@@ -333,7 +354,7 @@ export function attachRef(
 			if (activity.connected === ref) activity.connected = null;
 		}
 	}
-	applyRefValue(ref, el, prevTarget);
+	applyRefValue(ref, el, prevTarget, block);
 }
 
 // A named function expression, as signalRetrySlot is: its array recursion alone
@@ -342,6 +363,7 @@ export const applyRefValue = function applyRefValue(
 	ref: any,
 	el: object | null,
 	prevTarget?: object | null,
+	block?: Block | null,
 ): void {
 	if (ref == null) return;
 	if (
@@ -385,7 +407,11 @@ export const applyRefValue = function applyRefValue(
 			const attachment = { cleanups: [], detached: false };
 			state.targets.set(el, attachment);
 			state.last = attachment;
-			attachArrayRefLeaf(ref, el, attachment);
+			// Only an array that begins while its host is active owns a prefix.
+			const root = RENDERER_REGION_OWNER_COUNT ? block?.idState.renderOwner?.current : undefined;
+			if (root != null && !root.inactive && rendererRegionOwnerForBlock(root) !== null)
+				attachHostedArrayRefLeaf(ref, el, attachment, root);
+			else attachArrayRefLeaf(ref, el, attachment);
 			return;
 		}
 		const attachment = prevTarget == null ? state?.last : state?.targets.get(prevTarget);

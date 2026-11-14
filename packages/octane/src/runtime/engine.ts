@@ -1816,13 +1816,13 @@ export type EffectEventCommitAction = () => InlineCaughtErrorReport | void;
 export const refAttachQueue: RefAttach[] = [];
 // A Fragment can re-point its ref during a render-phase replay before the mount
 // commit drains. Preserve that existing live-read contract with a shared callback
-// trampoline. The common drain remains branch-free, and Fragment instances do not
-// allocate a getter closure.
+// trampoline. The common drain does not need to identify Fragment instances, and
+// they do not allocate a getter closure.
 export function attachLiveFragmentRef(instance: FragmentInstance): void {
 	// Portal slots mount after the fragment binding but before commit. Publish all
 	// logically owned child handles before handing the instance to its callback.
 	instance._reapply();
-	attachRef(instance._currentRef, instance);
+	attachRef(instance._currentRef, instance, undefined, instance._ownerBlock);
 }
 
 /** @internal Preserve the owning renderer's scheduler without racing a staged commit. */
@@ -3927,7 +3927,7 @@ export function drainQueuedRefAttaches(): void {
 			if (NATIVE_READ_DRIVER) NATIVE_READ_DRIVER.forgetUnpublishedRef(r.el);
 			REF_CALLBACK_DEPTH++;
 			try {
-				attachRef(r.ref, r.el);
+				attachRef(r.ref, r.el, undefined, r.block);
 			} finally {
 				REF_CALLBACK_DEPTH--;
 			}
