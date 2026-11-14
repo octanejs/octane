@@ -50,6 +50,19 @@ function literalDeclaration(declaration: ts.VariableDeclaration) {
 	);
 }
 
+function safeSetupLiteral(node: ts.Expression, checker: ts.TypeChecker) {
+	if (scalarLiteral(node)) return true;
+	if (ts.isIdentifier(node) && node.text === 'undefined') {
+		const symbol = checker.getSymbolAtLocation(node);
+		return !!symbol && checker.isUndefinedSymbol(symbol);
+	}
+	return (
+		ts.isPrefixUnaryExpression(node) &&
+		(node.operator === ts.SyntaxKind.PlusToken || node.operator === ts.SyntaxKind.MinusToken) &&
+		ts.isNumericLiteral(skipWrappers(node.operand))
+	);
+}
+
 /** A state declaration before the retained hook, with no explicit lazy initializer. */
 function stateSetup(declaration: ts.VariableDeclaration, checker: ts.TypeChecker, owner: ts.Node) {
 	const { name, initializer } = declaration;
@@ -73,7 +86,7 @@ function stateSetup(declaration: ts.VariableDeclaration, checker: ts.TypeChecker
 	const input = initializer.arguments[0];
 	if (!input) return true;
 	const value = skipWrappers(input);
-	if (scalarLiteral(value)) return true;
+	if (safeSetupLiteral(value, checker)) return true;
 	let binding = ts.isIdentifier(value)
 		? checker.getSymbolAtLocation(value)?.valueDeclaration
 		: undefined;
@@ -238,7 +251,7 @@ export function nativeSetupHook(
 		call.arguments.every((input) => {
 			const arg = skipWrappers(input);
 			return (
-				scalarLiteral(arg) ||
+				safeSetupLiteral(arg, checker) ||
 				(ts.isIdentifier(arg) &&
 					fixedBinding(checker, arg, call) &&
 					initializedBefore(checker, arg, call))

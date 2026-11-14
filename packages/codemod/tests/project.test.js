@@ -828,6 +828,7 @@ export function Panel({ initial = false }: { initial?: boolean }) {
 					compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
 				}),
 				'use-label.ts': helper,
+				'throwing-value.ts': 'export const undefined = () => { throw new Error("unsafe"); };',
 				'Label.tsx':
 					'export function Label(props: { label: string }) { return <b>{props.label}</b>; }',
 				'Local.tsx': panel('', '<Label label={label} />'),
@@ -848,6 +849,20 @@ export function Panel({ initial = false }: { initial?: boolean }) {
 					) +
 					');',
 				'State.tsx': panel('const [open] = state(false);', '<b aria-expanded={open}>{label}</b>'),
+				'StateUndefined.tsx': panel('const [open] = state(undefined);', '<Label label={label} />'),
+				'StateSigned.tsx': panel('const [open] = state(-1);', '<Label label={label} />'),
+				'StateUnaryCall.tsx': panel('const [open] = state(-fail());', '<Label label={label} />'),
+				'UndefinedArgument.tsx': panel('', '<Label label={label} />').replace(
+					'useLabel()',
+					'useLabel(undefined)',
+				),
+				'SignedArgument.tsx': panel('', '<Label label={label} />').replace(
+					'useLabel()',
+					'useLabel(+1)',
+				),
+				'ShadowedUndefined.tsx':
+					'import { undefined } from "./throwing-value";\n' +
+					panel('', '<Label label={label} />').replace('useLabel()', 'useLabel(undefined)'),
 				'StateAndChild.tsx': panel(
 					'const [open] = state(initial);',
 					'<Label label={open ? "open" : label} />',
@@ -905,8 +920,12 @@ export function Panel({ initial = false }: { initial?: boolean }) {
 				'Local.tsx',
 				'Memo.tsx',
 				'SameDeclaration.tsx',
+				'SignedArgument.tsx',
 				'State.tsx',
 				'StateAndChild.tsx',
+				'StateSigned.tsx',
+				'StateUndefined.tsx',
+				'UndefinedArgument.tsx',
 			]);
 			expect(fs.existsSync(path.join(root, 'Local.tsx'))).toBe(true);
 			expect(fs.existsSync(path.join(root, 'Local.tsrx'))).toBe(false);
