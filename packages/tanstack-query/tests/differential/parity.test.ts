@@ -60,10 +60,15 @@ describe('differential: @octanejs/tanstack-query vs real @tanstack/react-query',
 			expect(d.octane.find('#d').textContent).toBe(
 				'data=undefined status=pending pending=true fetching=true success=false',
 			);
-			await d.step('settled (success)', () => query.resolve('fetched'));
-			expect(d.octane.find('#d').textContent).toBe(
-				'data=fetched status=success pending=false fetching=false success=true',
-			);
+			query.resolve('fetched');
+			const success = 'data=fetched status=success pending=false fetching=false success=true';
+			await expect
+				.poll(async () => {
+					await d.observe('drain query notifications', () => {});
+					return [d.octane.find('#d').textContent, d.react.find('#d').textContent];
+				})
+				.toEqual([success, success]);
+			await d.step('settled (success)', () => {});
 		} finally {
 			d.unmount();
 		}
