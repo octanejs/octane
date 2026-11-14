@@ -207,6 +207,7 @@ describe('type-only import bindings', () => {
 		"import type { Toc } from './types';\nexport function Toc({ headings }: { headings: Toc }) @{ <nav>{headings.length as string}</nav> }",
 		"import type { Contact } from '../data';\nexport default function Contact({ contact }: { contact: Contact }) { return <h1>{contact.name}</h1>; }",
 		"import { type Item, items } from './items';\nexport function Item({ item }: { item: Item }) @{ <li>{item.name as string}</li> }\nexport const count = items.length;",
+		"import type Theme from './theme';\nexport const Theme = 1;",
 		"import type * as Shapes from './shapes';\nexport const Shapes: Shapes.Registry = {};",
 		"export type { Theme };\nimport type { Theme } from './theme';",
 	];
@@ -240,6 +241,39 @@ describe('type-only import bindings', () => {
 		expect(() => parseModule(source, 'redeclared.tsrx')).toThrow(message);
 		expect(() => parseJavaScriptModule(source, 'redeclared.tsrx')).toThrow(message);
 		expect(compileToVolarMappings(source, 'redeclared.tsrx').errors).toMatchObject([{ message }]);
+	});
+
+	it.each([
+		"export type { Theme } from './theme';",
+		"export type * from './theme';",
+		"export type * as Theme from './theme';",
+	])('preserves independent lexical scopes after %s', (reexport) => {
+		const source = `${reexport}
+function first() { let label = 1; return label; }
+function second() { const label = 2; return label; }`;
+		expect(parseModule(source, 'scopes.ts').body).toHaveLength(3);
+		expect(parseJavaScriptModule(source, 'scopes.ts').body).toHaveLength(3);
+		expect(parseJavaScriptModule(source, 'scopes.tsrx').body).toHaveLength(3);
+		expect(compileToVolarMappings(source, 'scopes.tsrx').errors).toEqual([]);
+	});
+
+	it.each([
+		['function and lexical', 'function label() {} const label = 1;'],
+		['two lexical', 'let label = 1; const label = 2;'],
+	])('rejects %s bindings with the same name after a type re-export', (_, declarations) => {
+		const source = `export type { Theme } from './theme';
+function example() {
+	${declarations}
+}`;
+		expect(() => parseJavaScriptModule(source, 'scopes.tsrx')).toThrow(
+			/(?:label.*declared|[Rr]edeclare.*label)/,
+		);
+	});
+
+	it('keeps a type-only import-equals alias independent of a same-name value', () => {
+		const source = "import type Theme = require('./theme');\nexport const Theme = 1;";
+		expect(parseJavaScriptModule(source, 'alias.ts').body).toHaveLength(2);
+		expect(parseJavaScriptModule(source, 'alias.tsrx').body).toHaveLength(2);
 	});
 });
 
