@@ -2150,6 +2150,8 @@ export function View() {
 			].join('\n');
 			const view = (file, call = 'useLabel()') => `import { useLabel } from './${file}';
 export function View() { const label = ${call}; return <b>{label}</b>; }`;
+			const consumer = (call, file = 'owner') => `import * as producer from './${file}';
+export function View() { const label = ${call}; return <b>{label}</b>; }`;
 			const localNamespace = namespaceOwner.replace(
 				"import * as React from 'react';",
 				"const React = { useContext() { return 'local'; } };",
@@ -2171,6 +2173,18 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 				}),
 				'owner.ts': owner,
 				'View.tsx': view('owner'),
+				'ConsumerBracket.tsx': consumer("producer['useLabel']()", 'owner.js'),
+				'ConsumerDot.tsx': consumer('producer.useLabel()'),
+				'ConsumerRepeated.tsx': consumer('producer.useLabel()') + '\nexport { producer };',
+				'ConsumerDynamic.tsx': consumer("producer['use' + 'Label']()"),
+				'ConsumerOptionalMember.tsx': consumer('producer?.useLabel()'),
+				'ConsumerOptionalCall.tsx': consumer('producer.useLabel?.()'),
+				'ConsumerShadow.tsx': consumer('producer.useLabel()').replace(
+					'function View()',
+					'function View(producer: { useLabel(): string })',
+				),
+				'ConsumerPure.tsx': consumer('producer.useLabel()', 'pure'),
+				'pure.ts': "export function useLabel() { return 'local'; }",
 				'JsSpecifier.tsx': view('owner.js'),
 				'CompetingJsSpecifier.tsx': view('competing.js'),
 				'competing.ts': owner,
@@ -2263,6 +2277,19 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 					.map((note) => [file.file, note.line, note.severity, note.message]),
 			);
 			expect(findings).toEqual([
+				[
+					'ConsumerBracket.tsx',
+					2,
+					'warning',
+					expect.stringContaining('the import resolves to its TypeScript source'),
+				],
+				['ConsumerDot.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
+				[
+					'ConsumerRepeated.tsx',
+					2,
+					'warning',
+					expect.stringContaining('after its module initializes'),
+				],
 				['Cycle.tsx', 3, 'warning', expect.stringContaining('after its module initializes')],
 				[
 					'Direct.tsx',
