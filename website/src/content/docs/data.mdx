@@ -88,7 +88,7 @@ value must have. `octane/data` accepts any validator that implements
 Valibot, ArkType and others. These examples use Zod.
 
 ```ts
-// contracts.ts — imported by the server and by the browser.
+// contracts.data.ts — imported by the server and by the browser.
 import { read } from 'octane/data';
 import { z } from 'zod';
 
@@ -107,7 +107,8 @@ export const books = read({
 
 A read has a unique `name`, which is how the server finds its handler, and an
 `output` schema for the value it returns. It can also take an `input`, which
-you will see shortly.
+you will see shortly. The examples that declare contracts belong in this file.
+Its `.data.ts` name lets the build [check every contract](#contract-check).
 
 <h3 id="first-handler">2. Serve it</h3>
 
@@ -119,7 +120,7 @@ match its schema.
 ```ts
 // server.ts — server code only.
 import { createDataHandler } from 'octane/data/server';
-import { books, type Book } from './contracts.ts';
+import { books, type Book } from './contracts.data.ts';
 
 const shelf: Book[] = [
 	{ id: '1', title: 'Kindred', read: false },
@@ -184,7 +185,7 @@ below it can then get the store with `useDataStore()`, ask it for a read with
 ```tsrx
 // App.tsrx
 import { DataProvider, useDataStore, useRead } from 'octane/data/octane';
-import { books } from './contracts.ts';
+import { books } from './contracts.data.ts';
 import { store } from './store.ts';
 
 function BookList() @{
@@ -232,7 +233,7 @@ JSX change:
 // App.tsx
 import { Suspense } from 'react';
 import { DataProvider, useDataStore, useRead } from 'octane/data/react';
-import { books } from './contracts.ts';
+import { books } from './contracts.data.ts';
 import { store } from './store.ts';
 
 function BookList() {
@@ -281,7 +282,7 @@ export const book = read({
 
 ```tsrx
 import { useDataStore, useRead } from 'octane/data/octane';
-import { book } from './contracts.ts';
+import { book } from './contracts.data.ts';
 
 export function BookTitle(props: { id: string }) @{
 	const value = useRead(useDataStore().read(book, { id: props.id }));
@@ -303,7 +304,7 @@ instead of the value. It still keeps the component in step with the read:
 
 ```tsrx
 import { useDataStore, useRead } from 'octane/data/octane';
-import { books } from './contracts.ts';
+import { books } from './contracts.data.ts';
 
 export function ShelfCount() @{
 	const snapshot = useRead(useDataStore().read(books), { suspend: false });
@@ -368,7 +369,7 @@ when something subscribes, prefetches or refreshes.
 
 ```ts
 import { createDataStore, serverTransport } from 'octane/data';
-import { books } from './contracts.ts';
+import { books } from './contracts.data.ts';
 import { data } from './data.tsrx';
 
 const store = createDataStore({ transport: serverTransport(data) });
@@ -498,7 +499,7 @@ Here is a checkbox that marks a book read. Notice there is no local state for
 
 ```tsrx
 import { useDataStore, useRead } from 'octane/data/octane';
-import { books, setRead } from './contracts.ts';
+import { books, setRead } from './contracts.data.ts';
 
 export function BookList() @{
 	const store = useDataStore();
@@ -532,7 +533,7 @@ And the same component in React:
 ```tsx
 /** @jsxImportSource react */
 import { useDataStore, useRead } from 'octane/data/react';
-import { books, setRead } from './contracts.ts';
+import { books, setRead } from './contracts.data.ts';
 
 export function BookList() {
 	const store = useDataStore();
@@ -583,7 +584,7 @@ code, and any data you attach, reach the browser unchanged:
 ```ts
 import { DataError } from 'octane/data';
 import { createDataHandler } from 'octane/data/server';
-import { addBook, type Book } from './contracts.ts';
+import { addBook, type Book } from './contracts.data.ts';
 
 const shelf: Book[] = [];
 
@@ -603,7 +604,7 @@ with the code `'invalid'` and the validator's messages in `issues`.
 
 ```ts
 import { DataError } from 'octane/data';
-import { addBook } from './contracts.ts';
+import { addBook } from './contracts.data.ts';
 import { store } from './store.ts';
 
 try {
@@ -629,16 +630,18 @@ Every write carries an **operation ID**, which your handler receives as
 store right:
 
 ```ts
-import { DataUncertainError, read } from 'octane/data';
-import { z } from 'zod';
-import { setRead } from './contracts.ts';
-import { store } from './store.ts';
-
+// contracts.data.ts
 export const receipt = read({
 	name: 'books.receipt',
 	input: z.object({ operationId: z.string() }),
 	output: z.object({ applied: z.boolean() }),
 });
+```
+
+```ts
+import { DataUncertainError } from 'octane/data';
+import { receipt, setRead } from './contracts.data.ts';
+import { store } from './store.ts';
 
 export async function markRead(id: string) {
 	try {
@@ -704,7 +707,7 @@ order. The contract carries the rule, so the handler can reuse it:
 
 ```ts
 import { createDataHandler } from 'octane/data/server';
-import { unread, type Book } from './contracts.ts';
+import { unread, type Book } from './contracts.data.ts';
 
 const shelf: Book[] = [];
 
@@ -736,7 +739,7 @@ suspend.
 ```tsrx
 import { pages } from 'octane/data';
 import { useDataStore, usePages } from 'octane/data/octane';
-import { unread } from './contracts.ts';
+import { unread } from './contracts.data.ts';
 
 export function UpNext() @{
 	const list = usePages(pages(useDataStore(), unread));
@@ -804,7 +807,7 @@ In a component, `useForm` returns everything the `<form>` needs:
 
 ```tsrx
 import { useForm } from 'octane/data/octane';
-import { addBook } from './contracts.ts';
+import { addBook } from './contracts.data.ts';
 
 export function AddBook() @{
 	const add = useForm(addBook);
@@ -845,7 +848,7 @@ the form's values and messages carried to the browser through the store's
 ```ts
 // server.ts
 import { createDataHandler } from 'octane/data/server';
-import { addBook } from './contracts.ts';
+import { addBook } from './contracts.data.ts';
 import { addToShelf } from './db.ts';
 
 export const handler = createDataHandler(
@@ -888,7 +891,7 @@ contracts, and returns the list of handlers. Two handlers with the same name are
 ```ts
 import { DataError } from 'octane/data';
 import { createDataHandler } from 'octane/data/server';
-import { books, setRead } from './contracts.ts';
+import { books, setRead } from './contracts.data.ts';
 import { accountFrom, shelfFor } from './accounts.ts';
 
 export const handler = createDataHandler(
@@ -935,7 +938,7 @@ namespace and give each contract its function:
 
 ```ts
 import { createDataHandler } from 'octane/data/server';
-import * as Shelf from './contracts.ts';
+import * as Shelf from './contracts.data.ts';
 
 export const handler = createDataHandler({ context }, (_, defineHandler) =>
 	defineHandler(Shelf, {
@@ -956,7 +959,9 @@ none. `defineHandler` returns the same handlers `handle` makes, so you can
 spread it next to them: `[...defineHandler(Shelf, { … }), handle(other, run)]`.
 
 To share one function between contracts, write a small factory and call it
-once per key, such as `books: windowOf(Shelf.books)`. The `Implementation<C,
+once per key. Pass it what it needs from the contract, such as
+`books: windowOf(Shelf.books.view)`, rather than the contract itself, which the
+[contract check](#contract-check) cannot follow into a helper. The `Implementation<C,
 T>` type names the function that serves contract `T` under context `C`.
 
 <h3 id="module-server">Serve through a server function</h3>
@@ -1000,6 +1005,52 @@ such as a proxy's error page, counts as a lost reply, never as a refusal.
 You can also write your own transport. It is one function,
 `(request, signal) => Promise<DataReply>`. Resolving with a reply is
 definitive; rejecting means the outcome is unknown.
+
+<h2 id="contract-check">Let the build check your contracts</h2>
+
+Contracts are plain values, so nothing stops a page from using a write that
+no server handles until a user clicks the button. The Octane Vite and Rspack
+plugins can check every contract while they build, once you follow one
+convention: **declare contracts only in modules named `*.data.ts`** (or
+`*.data.js`), and import `octane/data/manifest` somewhere in the app.
+
+A contract module holds only imports, types, and exported `const`s. Each
+contract is an exported `const` with a literal `name`, such as
+`export const setRead = write({ name: 'books.setRead', … })`. Every other
+module names the contract directly where it uses it: `store.write(setRead, input)`,
+`useForm(addBook)`, `handle(books, …)`, `defineHandler(Shelf, { … })`, or a
+store option such as `feeds: [shelfChanges]`. A contract passed to a helper,
+stored in a variable, or chosen at runtime (`ok ? addBook : setRead`) is an
+error, because the build could no longer see where it goes. Pass the varying
+value in the contract's input instead.
+
+With that, every build reports:
+
+- a read, view, write or feed the app uses that no `createDataHandler`
+  serves, or that two handlers serve;
+- two contracts with the same name;
+- as a hint, a contract nothing uses.
+
+The client build reads the whole project, so it sees your server's handlers
+even though it never bundles them. A production build fails on an error; the
+dev server reports it as a warning. `octane analyze` runs the same check.
+Pass `data: true` to the plugin to check without importing the manifest, or
+`data: false` to turn both off. [Strong compiler checks](/docs/strong-mode#diagnostics-data)
+lists every diagnostic.
+
+<h3 id="contract-manifest">The generated manifest</h3>
+
+`octane/data/manifest` is written by the plugin from your `*.data.ts` modules.
+It exports:
+
+| Export      | What it is for                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------ |
+| `contracts` | Every read, view, write and feed, in name order: what `createReplica` needs.                     |
+| `writes`    | The writes among them, for a journal that keeps every write.                                     |
+| `identity`  | What `createReplica` compares to tell this build's contracts from another deploy's, as a string. |
+
+Adding or removing a contract module updates it while the dev server runs.
+Without the plugin, importing it throws.
 
 <h2 id="ssr">Server rendering and hydration</h2>
 
@@ -1181,7 +1232,7 @@ connection until `call.signal` aborts:
 
 ```ts
 import { createDataHandler } from 'octane/data/server';
-import { shelfChanges } from './contracts.ts';
+import { shelfChanges } from './contracts.data.ts';
 // Your app's change log: each change has a position and its event.
 import { changesAfter, latestPosition, nextChange } from './changes.ts';
 
@@ -1261,7 +1312,7 @@ component listening to the same feed shares one connection.
 ```tsrx
 import { listen } from 'octane/data';
 import { useDataStore, useFeed } from 'octane/data/octane';
-import { shelfChanges } from './contracts.ts';
+import { shelfChanges } from './contracts.data.ts';
 
 const LABELS = { connecting: 'Connecting…', live: 'Live', offline: 'Reconnecting…' };
 
@@ -1288,7 +1339,7 @@ the page's feeds to the server's store:
 
 ```ts
 import { createDataStore, serverTransport } from 'octane/data';
-import { shelfChanges } from './contracts.ts';
+import { shelfChanges } from './contracts.data.ts';
 import { data } from './data.tsrx';
 
 const store = createDataStore({
@@ -1364,18 +1415,11 @@ offline? Add a **journal**. Each listed write is saved before it is sent, and
 leaves the journal only once its outcome is known.
 
 ```ts
-import { createDataStore, indexedDBStorage, read, serverTransport } from 'octane/data';
-import { z } from 'zod';
-import { addBook, removeBook, setRead } from './contracts.ts';
+import { createDataStore, indexedDBStorage, serverTransport } from 'octane/data';
+import { addBook, receipt, removeBook, setRead } from './contracts.data.ts';
 import { data } from './data.tsrx';
 
 import { session } from './session.ts';
-
-export const receipt = read({
-	name: 'books.receipt',
-	input: z.object({ operationId: z.string() }),
-	output: z.object({ applied: z.boolean() }),
-});
 
 export const store = createDataStore({
 	transport: serverTransport(data),
@@ -1387,6 +1431,10 @@ export const store = createDataStore({
 	},
 });
 ```
+
+`receipt` is the read from [When the reply is lost](#uncertain). To journal
+every write the app declares, pass `writes` from the generated
+[`octane/data/manifest`](#contract-manifest) instead of a list.
 
 After a restart, the store finds the unfinished write, shows its edit again,
 and reads its **receipt** to learn whether the server applied it. It then
@@ -1516,15 +1564,13 @@ that entry out of your pages' HTML.
 tab signed in as that account uses. Pass the same account ID your server
 authenticates, such as the signed-in user's ID. Then give the result to
 `createReplica`, along with exactly the options you would give an ordinary
-store, plus one more: `contracts`, a list of every read, write and feed your
-app uses.
+store, plus one more: `contracts`, every read, write and feed your app uses. The
+build generates that list as [`octane/data/manifest`](#contract-manifest).
 
 ```ts
 import { createReplica, serverListener, serverTransport, sharedOwner } from 'octane/data';
-import { addBook, books, finished, removeBook, setRead, shelfChanges, stats } from './contracts.ts';
+import { contracts } from 'octane/data/manifest';
 import { data, events } from './data.tsrx';
-
-const contracts = [books, finished, stats, addBook, setRead, removeBook, shelfChanges];
 
 export function openStore(account: string, seed: string | null) {
 	return createReplica(sharedOwner(account), {
@@ -1724,7 +1770,7 @@ Octane page. Pass the island the same store, and give it its own React
 // UpNext.tsx — a React component.
 import type { DataStore } from 'octane/data';
 import { DataProvider, useDataStore, useRead } from 'octane/data/react';
-import { setRead, unread } from './contracts.ts';
+import { setRead, unread } from './contracts.data.ts';
 
 function UpNextList() {
 	const store = useDataStore();

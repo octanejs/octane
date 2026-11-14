@@ -57,7 +57,8 @@ const FUNCTION_SITES = new Map([
 ]);
 /**
  * `view({ of })`, `write({ creates, patches, removes })`, a FeedChange's `put`,
- * `remove`, `read`, and the store options `feeds` and `journal.receipt`.
+ * `remove`, `read`, and the store options `feeds`, `journal.writes`, and
+ * `journal.receipt`.
  */
 const PROPERTY_SITES = new Set([
 	'of',
@@ -68,6 +69,7 @@ const PROPERTY_SITES = new Set([
 	'remove',
 	'read',
 	'feeds',
+	'writes',
 	'receipt',
 ]);
 const FUNCTIONS = new Set(['ArrowFunctionExpression', 'FunctionExpression']);
