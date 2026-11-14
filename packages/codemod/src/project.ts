@@ -1552,7 +1552,7 @@ export async function runCodemod(
 			for (const edge of reactServerComponents(
 				file,
 				source,
-				(module) => module === 'react/jsx-runtime' && originalReactEntry(file, module),
+				(module) => originalReactEntry(file, module),
 				true,
 			)) {
 				const leaf = renamed(file, edge.module)?.file;
