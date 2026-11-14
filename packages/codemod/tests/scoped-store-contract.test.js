@@ -660,23 +660,30 @@ it('warns when an existing Octane server renderer imports a migrated store consu
 	expect(hosted()).toContain('title42');
 }, 30_000);
 
-it('warns about a retained wrapper whose linked export necessarily reaches React', async () => {
+it.each([
+	['direct', 'read(current)', false],
+	['nested', 'valueOf(read(current))', false],
+	['named alongside star', 'read(current)', true],
+])('warns about a retained wrapper through a %s linked hook', async (_case, read, named) => {
 	const view = (name) => `import { ${name} as read } from './helper';
 export function Pane() { const value = read(); return <p>{String(value)}</p>; }`;
 	const { app, library } = project({
-		'observer/entry.ts': "export * from './api'; export { valueOf } from './state';",
+		'observer/entry.ts': named
+			? "export * from './state'; export { useSnapshot, useMaybe } from './api';"
+			: "export * from './api'; export { valueOf } from './state';",
+		'observer/state.ts': `export function valueOf(x: number) { return x; }
+export function useSnapshot() { return 0; }`,
 		'observer/api/index.ts': "export { useChannel as useSnapshot, useMaybe } from './hooks';",
 		'observer/api/hooks.ts': `import { use as read } from 'react';
 import { current } from '../renderer';
 import { valueOf } from '../state';
 export function useChannel(value: number) {
 	const checked = valueOf(value);
-	if (checked) { const snapshot = read(current); return snapshot; }
-	return read(current);
+	if (checked) { const snapshot = ${read}; return snapshot; }
+	return ${read};
 }
 export function useMaybe(value: number) {
-	if (value) { return value; }
-	return read(current);
+	return valueOf(value ? read(current) : value);
 }`,
 		'app/src/helper.ts': `import { useSnapshot as reading, useMaybe as maybe, valueOf } from 'observer';
 export function useReading() { return reading(valueOf(1)); }

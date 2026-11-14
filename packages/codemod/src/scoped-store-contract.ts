@@ -660,7 +660,10 @@ function modulePlan(
 			)
 				return false;
 			const binding = namedRuntimeImport(call.expression, checker);
-			return binding?.module === 'react' && hooks.has(binding.name);
+			// The arguments of an ordinary call run before the call can return.
+			return (
+				(binding?.module === 'react' && hooks.has(binding.name)) || call.arguments.some(dispatch)
+			);
 		}
 		// Every entered branch must call React before it can return. Only simple setup
 		// statements and if arms without an else can continue to the next statement.
@@ -700,23 +703,22 @@ function modulePlan(
 		if (!exported || !identity(exported).declarations?.includes(fn)) return false;
 		if (fn.getSourceFile() === sf && fn.name?.text === name)
 			return fn.modifiers?.some((mod) => mod.kind === ts.SyntaxKind.ExportKeyword) === true;
-		const edges = sf.statements
+		const reexports = sf.statements
 			.filter(ts.isExportDeclaration)
-			.filter(
-				(edge) =>
-					!edge.isTypeOnly &&
-					edge.moduleSpecifier &&
-					!edge.attributes &&
-					(!edge.exportClause ||
-						(ts.isNamedExports(edge.exportClause) &&
-							edge.exportClause.elements.some(
-								(item) => !item.isTypeOnly && item.name.text === name,
-							))),
-			);
+			.filter((edge) => !edge.isTypeOnly);
+		const named = reexports.filter(
+			({ exportClause }) =>
+				exportClause &&
+				ts.isNamedExports(exportClause) &&
+				exportClause.elements.some((item) => !item.isTypeOnly && item.name.text === name),
+		);
+		// ESM resolves an explicit export before consulting any star exports.
+		const edges = named.length ? named : reexports.filter((edge) => !edge.exportClause);
 		// A barrel with multiple candidate exports does not prove which implementation runs.
 		if (edges.length !== 1) return false;
 		const edge = edges[0]!;
-		const specifier = request(edge.moduleSpecifier!);
+		if (edge.attributes || !edge.moduleSpecifier) return false;
+		const specifier = request(edge.moduleSpecifier);
 		if (!specifier?.startsWith('./')) return false;
 		const stem = path.resolve(path.dirname(sf.fileName), specifier);
 		if (fs.existsSync(path.join(stem, 'package.json'))) return false;
