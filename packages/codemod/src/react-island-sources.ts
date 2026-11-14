@@ -139,7 +139,7 @@ export async function islandComponents(
 	return [...components];
 }
 
-function* directExportReturns({ sf, checker }: ReturnType<typeof bind>) {
+function* directExportReturns({ sf, checker }: ReturnType<typeof bind>, allowSetup = false) {
 	const module = checker.getSymbolAtLocation(sf);
 	if (!module || hasEval(sf)) return;
 	const uses = localUses(sf, checker);
@@ -171,18 +171,18 @@ function* directExportReturns({ sf, checker }: ReturnType<typeof bind>) {
 			if (!value.initializer) continue;
 			value = skipWrappers(value.initializer);
 		}
-		const output = returnedJsx(value);
+		const output = returnedJsx(value, allowSetup);
 		if (output) yield { name: symbol.name, output, localName: name?.text, decl, symbol };
 	}
 }
 
-function returnedJsx(fn: ts.Node) {
-	const value = singleReturn(fn);
+function returnedJsx(fn: ts.Node, allowSetup: boolean) {
+	const value = singleReturn(fn, allowSetup);
 	const output = value && skipWrappers(value);
 	if (output && (ts.isJsxElement(output) || ts.isJsxSelfClosingElement(output))) return output;
 }
 
-function singleReturn(fn: ts.Node) {
+function singleReturn(fn: ts.Node, allowSetup = false) {
 	if (
 		!(ts.isFunctionDeclaration(fn) || ts.isFunctionExpression(fn) || ts.isArrowFunction(fn)) ||
 		fn.asteriskToken ||
@@ -190,9 +190,33 @@ function singleReturn(fn: ts.Node) {
 	)
 		return;
 	if (fn.body && ts.isBlock(fn.body)) {
-		const [statement, extra] = fn.body.statements;
-		if (!statement || extra || !ts.isReturnStatement(statement)) return;
-		return statement.expression;
+		const statements = fn.body.statements;
+		const last = statements.at(-1);
+		if (!last || !ts.isReturnStatement(last) || !last.expression) return;
+		if (statements.length === 1) return last.expression;
+		// The codemod moves this setup and its terminal JSX into one template body.
+		if (
+			!allowSetup ||
+			(ts.getCombinedModifierFlags(fn) & ts.ModifierFlags.Ambient) !== 0 ||
+			(ts.isVariableDeclaration(fn.parent) &&
+				(ts.getCombinedModifierFlags(fn.parent) & ts.ModifierFlags.Ambient) !== 0) ||
+			(!ts.isFunctionDeclaration(fn) &&
+				!ts.isVariableDeclaration(fn.parent) &&
+				!ts.isExportAssignment(fn.parent)) ||
+			!statements
+				.slice(0, -1)
+				.every(
+					(statement) =>
+						ts.isVariableStatement(statement) &&
+						!statement.modifiers?.some((item) => item.kind === ts.SyntaxKind.DeclareKeyword) &&
+						(statement.declarationList.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
+						statement.declarationList.declarations.every((decl) => decl.initializer !== undefined),
+				)
+		)
+			return;
+		const output = skipParens(last.expression);
+		if (ts.isJsxElement(output) || ts.isJsxSelfClosingElement(output)) return output;
+		return;
 	}
 	return fn.body;
 }
@@ -535,7 +559,7 @@ export function intrinsicReactExports(file: string, source: string) {
 		mayExportThen ||= sf.statements.some(
 			(stmt) => ts.isExportDeclaration(stmt) && !stmt.isTypeOnly && !stmt.exportClause,
 		);
-		for (const { name, output, localName } of directExportReturns(bound)) {
+		for (const { name, output, localName } of directExportReturns(bound, true)) {
 			const tag = openingTag(output).tagName;
 			if (
 				ts.isIdentifier(tag) &&
