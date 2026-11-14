@@ -3178,8 +3178,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 							(!sites.includes('afterRefs') || this.options.originalReact === true);
 						const setup = {
 							calleeName: (callee: ts.Expression) => this.calleeName(callee),
-							nativeOutput: (element: ts.JsxElement | ts.JsxSelfClosingElement) =>
-								this.nativeOutput(element, this.localUses),
+							nativeOutput: (element: ts.Node) => this.nativeOutput(element, this.localUses),
+							originalReact: () => this.options.originalReact === true,
 						};
 						const call =
 							refs[sites.indexOf('first')] ??

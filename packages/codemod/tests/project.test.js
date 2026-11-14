@@ -808,6 +808,84 @@ export function useLabel() { const later = () => useState('ready'); return 'read
 		}
 	});
 
+	it.each([false, true])(
+		'reports retained local hooks before native component output (projectTypes=%s)',
+		async (projectTypes) => {
+			const helper = `import { useState } from 'react';
+export function useLabel() { const [label] = useState('ready'); return label; }`;
+			const imports = `import { useState as state } from 'react';
+import { useLabel } from './use-label';
+import { Label as ImportedLabel } from './Label';`;
+			const panel = (prefix, output) => `${imports}
+function Label({ label }: { label: string }) { return <b>{label}</b>; }
+export function Panel({ initial = false }: { initial?: boolean }) {
+	${prefix}
+	const label = useLabel();
+	return ${output};
+}`;
+			const root = project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				'use-label.ts': helper,
+				'Label.tsx':
+					'export function Label(props: { label: string }) { return <b>{props.label}</b>; }',
+				'Local.tsx': panel('', '<Label label={label} />'),
+				'Imported.tsx': panel('', '<ImportedLabel label={label} />'),
+				'Fragment.tsx': panel('', '<><b>{label}</b></>'),
+				'State.tsx': panel('const [open] = state(false);', '<b aria-expanded={open}>{label}</b>'),
+				'StateAndChild.tsx': panel(
+					'const [open] = state(initial);',
+					'<Label label={open ? "open" : label} />',
+				),
+				'StateBindingDefault.tsx': panel(
+					'const [open = fail()] = state();',
+					'<Label label={label} />',
+				),
+				'ThrowingInitializer.tsx': panel(
+					"const [open] = state(() => { throw new Error('setup failed'); });",
+					'<Label label={label} />',
+				),
+				'ThrowingArgument.tsx': panel('', '<Label label={label} />').replace(
+					'useLabel()',
+					"useLabel((() => { throw new Error('argument failed'); })())",
+				),
+				'Declared.tsx': panel('', '<Label label={label} />').replace(
+					'const label = useLabel();',
+					'declare const label = useLabel();',
+				),
+				'ReactOwned.tsx':
+					"import { ReactCompat } from 'octane/react';\n" +
+					panel('', '<Label label={label} />') +
+					'\nexport function App() { return <ReactCompat><Panel/></ReactCompat>; }',
+			});
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules'),
+				path.join(root, 'node_modules'),
+				'dir',
+			);
+			const paths = fs.readdirSync(root).filter((name) => name.endsWith('.tsx'));
+			const options = { root, projectTypes, strong: true, verify: true };
+			const input = paths.map((name) => path.join(root, name));
+			const { files } = await runCodemod(input, { ...options, write: false });
+			expect(
+				files
+					.filter((file) =>
+						file.notes.some(
+							(note) =>
+								note.severity === 'error' &&
+								note.message.includes(
+									"The unchanged ./use-label export useLabel calls React's useState.",
+								),
+						),
+					)
+					.map((file) => file.file),
+			).toEqual(['Fragment.tsx', 'Imported.tsx', 'Local.tsx', 'State.tsx', 'StateAndChild.tsx']);
+			expect(fs.existsSync(path.join(root, 'Local.tsx'))).toBe(true);
+			expect(fs.existsSync(path.join(root, 'Local.tsrx'))).toBe(false);
+		},
+	);
+
 	it('reports an unchanged React context hook after ordinary component setup', async () => {
 		const view = (setup, read = 'useObserver(fit)') => `import { useRef } from 'react';
 import { useObserver } from './use-observer';
