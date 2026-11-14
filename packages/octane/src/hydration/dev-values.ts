@@ -6,6 +6,7 @@
 // includes it.
 import { domBindingClaims } from '../dom-binding-claims.js';
 import { HYDRATE_INPUT_ATTR, parserNormalizedMatch } from '../hydration-protocol.js';
+import { parsedInlineScriptContent } from '../shared-value-helpers.js';
 
 interface PassValues {
 	/** Each adopted element's class from its last writer, compared when the pass ends. */
@@ -113,15 +114,6 @@ export function unpatchedStyle(
 		differs(pass, el, 'style', server, client);
 }
 
-// SSR replaces only the `s` in case-insensitive opening/closing script tokens.
-// The comparison uses that serialized spelling after the script-data input
-// normalization applied to server markup.
-const INLINE_SCRIPT_TOKEN = /(<\/|<)(s)(cript)/gi;
-// Unlike ordinary HTML data, script data keeps character references such as
-// `&amp;` verbatim. Only the input-stream transformations that affect a parsed
-// script Text node apply: CRLF/CR become LF and NUL becomes U+FFFD.
-const SCRIPT_DATA_NORMALIZATION = /\r\n?|\u0000/g;
-
 /**
  * An adopted element keeps its server `dangerouslySetInnerHTML` content where
  * the client renders `next`. The client's HTML is parsed in the element's
@@ -134,13 +126,7 @@ export function unpatchedHTML(pass: object, el: Element, next: string): void {
 	let client: string;
 	if (el.localName === 'script') {
 		server = el.textContent ?? '';
-		client = String(next)
-			.replace(
-				INLINE_SCRIPT_TOKEN,
-				(_match, prefix: string, s: string, suffix: string) =>
-					`${prefix}${s === 's' ? '\\u0073' : '\\u0053'}${suffix}`,
-			)
-			.replace(SCRIPT_DATA_NORMALIZATION, (match) => (match === '\u0000' ? '\uFFFD' : '\n'));
+		client = parsedInlineScriptContent(String(next));
 	} else {
 		server = el.innerHTML;
 		const ns = el.namespaceURI;

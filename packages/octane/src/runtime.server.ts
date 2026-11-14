@@ -158,6 +158,7 @@ import {
 	childElementKey,
 	childrenIterator,
 	describeTextareaChild,
+	escapeInlineScriptContent,
 	escapeMappedElementKey,
 	resolveLazyDefaultProps as lazyResolvedProps,
 	textareaChildText,
@@ -2777,7 +2778,7 @@ function ssrHostElement(
 			// (`createElement('SCRIPT', …)` creates a real script in the browser too).
 			inner =
 				semanticTag === 'script'
-					? escapeEntireInlineScriptContent(raw)
+					? escapeInlineScriptContent(raw)
 					: semanticTag === 'style'
 						? escapeEntireInlineStyleContent(raw)
 						: raw;
@@ -2797,7 +2798,7 @@ function ssrHostElement(
 			if (rawText !== null) {
 				inner =
 					semanticTag === 'script'
-						? escapeEntireInlineScriptContent(rawText)
+						? escapeInlineScriptContent(rawText)
 						: escapeEntireInlineStyleContent(rawText);
 			} else {
 				// A de-opt host whose children contain COMPONENTS renders those children on the
@@ -4215,21 +4216,6 @@ function escapeEntireInlineStyleContent(value: string): string {
 	);
 }
 
-// React's whole-inline-script escape: replace only the `s` in each case-
-// insensitive `<script` / `</script` token. The resulting `\u0073` / `\u0053`
-// stays valid JavaScript while preventing the HTML parser from opening or closing
-// a script element early. Other `<`, `>`, `&`, U+2028 and U+2029 characters remain
-// untouched because they can be meaningful JavaScript syntax.
-const INLINE_SCRIPT_TOKEN = /(<\/|<)(s)(cript)/gi;
-
-function escapeEntireInlineScriptContent(value: string): string {
-	return value.replace(
-		INLINE_SCRIPT_TOKEN,
-		(_match, prefix: string, s: string, suffix: string) =>
-			`${prefix}${s === 's' ? '\\u0073' : '\\u0053'}${suffix}`,
-	);
-}
-
 /**
  * Resolve source-ordered `dangerouslySetInnerHTML` writers for a script and make
  * the resulting whole-script body safe to concatenate into an HTML response.
@@ -4242,7 +4228,7 @@ export function ssrScriptInnerHtml(
 	childrenSources: readonly (readonly [boolean, unknown])[] = [],
 ): string | undefined {
 	const html = ssrInnerHtml(sources, renderChildren, definitelyHasChildren, childrenSources);
-	return html === undefined ? undefined : escapeEntireInlineScriptContent(html);
+	return html === undefined ? undefined : escapeInlineScriptContent(html);
 }
 
 function finalPresentSource(
@@ -4268,6 +4254,21 @@ export function ssrChildrenSources(
 	const child = finalPresentSource(sources);
 	if (!child[0]) return renderFallback();
 	return textarea ? ssrTextareaText([child[1]]) : ssrChildText(child[1], scope);
+}
+
+/** Serialize a compiled HTML script's string children as script data. */
+export function ssrScriptChildrenSources(
+	sources: readonly (readonly [boolean, unknown])[],
+	renderFallback: () => string,
+	scope: SSRScope,
+	namespace: AttributeNamespace,
+): string {
+	const child = finalPresentSource(sources);
+	if (!child[0]) return renderFallback();
+	const value = child[1];
+	if (typeof value !== 'string' || resolveAttributeNamespace(namespace) !== 'html')
+		return ssrChildText(value, scope);
+	return probingDangerHtmlChild(value) ? '' : escapeInlineScriptContent(value);
 }
 
 /**

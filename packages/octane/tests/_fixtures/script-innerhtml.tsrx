@@ -29,6 +29,19 @@ export function ExecutableScript(props: ScriptSourceProps) @{
 	<script data-kind="executable" dangerouslySetInnerHTML={{ __html: props.source }} />
 }
 
+export function ScriptChildren(props: ScriptSourceProps) @{
+	<section>
+		<script data-kind="literal" children={"window.literal = '&<> &lt;';"} />
+		<script nonce="fixture-nonce" children={props.source} />
+	</section>
+}
+
+export function ForeignScriptChildren(props: ScriptSourceProps) @{
+	<svg>
+		<script children={props.source} />
+	</svg>
+}
+
 export function JsonScript(props: ScriptValueProps) @{
 	<script
 		type="application/json"
