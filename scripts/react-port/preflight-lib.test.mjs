@@ -479,7 +479,7 @@ describe('resolved evidence', () => {
 		const source = {
 			name: 'react-widget',
 			version: '1.2.3',
-			repository: { owner: 'example', repo: 'widgets', subdirectory: 'packages/react-widget' },
+			repository: { owner: 'Example', repo: 'Widgets', subdirectory: 'packages/react-widget' },
 			commit: 'a'.repeat(40),
 			manifestLicense: 'MIT',
 			licenseFiles: [{ path: 'LICENSE', scope: 'root', content: MIT_TEXT }],
@@ -490,11 +490,19 @@ describe('resolved evidence', () => {
 				registry: published,
 				source: pinned,
 			});
-		assert.equal(assess().status, 'licensed');
-		assert.equal(
-			assess({ ...registry, repository: { ...registry.repository, subdirectory: 'other' } }).status,
-			'blocked',
-		);
+		const result = assess();
+		assert.equal(result.status, 'licensed');
+		assert.deepEqual(result.identity.repository, {
+			owner: 'example',
+			repo: 'widgets',
+			subdirectory: 'packages/react-widget',
+		});
+		const conflict = assess({
+			...registry,
+			repository: { ...registry.repository, subdirectory: 'other' },
+		});
+		assert.equal(conflict.status, 'blocked');
+		assert.equal(conflict.identity.repository.subdirectory, 'other');
 		assert.equal(assess(registry, { ...source, name: 'another-package' }).status, 'blocked');
 		assert.equal(assess(registry, { ...source, commit: 'b'.repeat(40) }).status, 'blocked');
 		assert.equal(
