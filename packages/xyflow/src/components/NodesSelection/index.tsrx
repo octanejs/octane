@@ -15,7 +15,7 @@ import { arrowKeyDiffs } from '../NodeWrapper/utils.tsrx';
 import type { Node, ReactFlowState } from '../../types';
 
 export type NodesSelectionProps<NodeType> = {
-	onSelectionContextMenu?: (event: MouseEvent, nodes: NodeType[]) => void;
+	onSelectionContextMenu?: ((event: MouseEvent, nodes: NodeType[]) => void) | undefined;
 	noPanClassName?: string;
 	disableKeyboardA11y: boolean;
 };
