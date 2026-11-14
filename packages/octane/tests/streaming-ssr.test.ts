@@ -1207,39 +1207,29 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(onError).not.toHaveBeenCalled();
 	});
 
-	it('streams each boundary at its own resolve time, not the wave-set slowest', async () => {
-		// REAL timers on purpose (no vi.useFakeTimers): the assertion is about
-		// wall-clock chunk arrival. Margins are generous so CI jitter can't flip
-		// it — the early chunk must land in [EARLY, LATE - 50], i.e. long before
-		// the late boundary's data even resolves.
-		const EARLY = 20;
-		const LATE = 250;
-		const a = new Promise<string>((r) => setTimeout(() => r('alpha'), EARLY));
-		const b = new Promise<string>((r) => setTimeout(() => r('beta'), LATE));
-		const arrivals: { chunk: string; at: number }[] = [];
-		let end!: () => void;
-		const ended = new Promise<void>((res) => (end = res));
-		const t0 = performance.now();
-		const { pipe } = ServerRT.renderToPipeableStream(server.Siblings, { a, b });
-		pipe({
-			write: (chunk: string) => arrivals.push({ chunk, at: performance.now() - t0 }),
-			end: () => end(),
-		});
-		const [aId, bId] = protocolIds(arrivals[0].chunk);
-		await ended;
+	it('streams a resolved boundary while its sibling is still pending', async () => {
+		const a = deferred<string>();
+		const b = deferred<string>();
+		const { chunks, dest, ended } = collector();
+		const render = ServerRT.renderToPipeableStream(server.Siblings, { a: a.promise, b: b.promise });
+		render.pipe(dest);
+		try {
+			expect(chunks).toHaveLength(1);
+			const [aId, bId] = protocolIds(chunks[0]);
+			a.resolve('alpha');
+			await vi.waitFor(() => expect(chunks).toHaveLength(2));
+			expect(chunks[1]).toContain('data-oct-s="' + aId + '"');
+			expect(chunks[1]).toContain('alpha');
+			expect(chunks[1]).not.toContain('beta');
 
-		// Shell + one segment chunk PER boundary. The old settle-all round held
-		// alpha's segment until beta landed and shipped both in ONE chunk.
-		expect(arrivals).toHaveLength(3);
-		const [, first, second] = arrivals;
-		expect(first.chunk).toContain('data-oct-s="' + aId + '"');
-		expect(first.chunk).toContain('alpha');
-		expect(first.chunk).not.toContain('beta');
-		expect(second.chunk).toContain('data-oct-s="' + bId + '"');
-		expect(second.chunk).toContain('beta');
-		expect(first.at).toBeGreaterThanOrEqual(EARLY - 5); // not before its data
-		expect(first.at).toBeLessThan(LATE - 50); // on the wire while beta still pends
-		expect(second.at).toBeGreaterThanOrEqual(LATE - 5);
+			b.resolve('beta');
+			await ended;
+			expect(chunks).toHaveLength(3);
+			expect(chunks[2]).toContain('data-oct-s="' + bId + '"');
+			expect(chunks[2]).toContain('beta');
+		} finally {
+			render.abort(new Error('test completed'));
+		}
 	});
 
 	it.each(['pipeable', 'readable'] as const)(
