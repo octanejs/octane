@@ -22,7 +22,18 @@
  */
 import * as React from 'react';
 import type { ComponentBody, Scope } from '../src/index.js';
-import { OctaneCompat, type OctaneReactComponent } from '../src/react/index.js';
+import { OctaneCompat, OctaneCompatInline, type OctaneReactComponent } from 'octane/react';
+import {
+	OctaneCompat as OctaneCompatServer,
+	OctaneCompatInline as OctaneCompatInlineServer,
+} from 'octane/react/server';
+
+type Equal<A, B> =
+	(<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+declare function expectType<T extends true>(): void;
+
+expectType<Equal<typeof OctaneCompatInline, typeof OctaneCompat>>();
+expectType<Equal<typeof OctaneCompatInlineServer, typeof OctaneCompatServer>>();
 
 interface GreetingProps {
 	name: string;
@@ -90,6 +101,16 @@ export type ScopeStaysInternal = Scope;
 // parameter, so island prop mistakes are call-site type errors with zero
 // per-island declarations.
 export const componentForm = <OctaneCompat component={RawGreeting} props={{ name: 'x' }} />;
+export const inlineComponentForm = (
+	<OctaneCompatInlineServer component={RawGreeting} props={{ name: 'x' }} />
+);
+export const inlineChildrenForm = (
+	<OctaneCompatInline>
+		<Greeting name="x" />
+	</OctaneCompatInline>
+);
+// @ts-expect-error — wrong island prop type in the inline component form
+export const inlineWrong = <OctaneCompatInline component={RawGreeting} props={{ name: 42 }} />;
 // The tsrx-tsc view of a `.tsrx` export — `(props) => <octane element>` — is
 // equally accepted; the return type is deliberately unconstrained.
 declare const TsrxGreeting: (props: GreetingProps) => { $$typeOnly: true };

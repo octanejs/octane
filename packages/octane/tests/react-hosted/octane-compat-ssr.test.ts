@@ -21,9 +21,12 @@ import {
 import { renderToString as reactRenderToString, renderToPipeableStream } from 'react-dom/server';
 import { PassThrough } from 'node:stream';
 import { join } from 'node:path';
-import { OctaneCompat } from 'octane/react';
+import { OctaneCompat, OctaneCompatInline } from 'octane/react';
 import { act as octaneAct } from 'octane';
-import { OctaneCompat as OctaneCompatServer } from 'octane/react/server';
+import {
+	OctaneCompat as OctaneCompatServer,
+	OctaneCompatInline as OctaneCompatInlineServer,
+} from 'octane/react/server';
 import { renderToString as renderOctaneToString } from 'octane/server';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
 import { createLog } from '../_helpers.js';
@@ -33,6 +36,7 @@ import {
 	SsrAsync as ClientSsrAsync,
 	SsrGreeting as ClientSsrGreeting,
 	SsrIdIsland as ClientSsrIdIsland,
+	SsrInline as ClientSsrInline,
 	SsrLayout as ClientSsrLayout,
 	SsrLocallyGuarded as ClientSsrLocallyGuarded,
 	SsrStyled as ClientSsrStyled,
@@ -184,6 +188,55 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 		await reactAct(async () => (serverButton as HTMLElement).click());
 		expect(host.querySelector('.ssr-count')?.textContent).toBe('clicks:1');
 		await mounted.unmount();
+	});
+
+	it('hydrates an inline island inside a paragraph and preserves its DOM across updates', async () => {
+		const serverPage = h(
+			'p',
+			null,
+			'Status ',
+			h(OctaneCompatInlineServer, { component: server.SsrInline, props: { label: 'ready' } }),
+			' today',
+		);
+		const clientPage = (label: string, key: string) =>
+			h(
+				'p',
+				null,
+				'Status ',
+				h(OctaneCompatInline, { key }, h(ClientSsrInline, { label })),
+				' today',
+			);
+		const container = document.createElement('div');
+		container.innerHTML = reactRenderToString(serverPage);
+		const paragraph = container.querySelector('p')!;
+		const host = paragraph.querySelector('span[data-octane-compat]')!;
+		const leaf = host.querySelector('em');
+		expect(paragraph.textContent).toBe('Status ready today');
+		expect(host.style.display).toBe('contents');
+		expect(leaf?.textContent).toBe('ready');
+
+		document.body.appendChild(container);
+		const { hydrateRoot } = await import('react-dom/client');
+		const onRecoverableError = vi.fn();
+		let reactRoot!: ReturnType<typeof hydrateRoot>;
+		try {
+			await reactAct(async () => {
+				reactRoot = hydrateRoot(container, clientPage('ready', 'initial'), { onRecoverableError });
+			});
+			await reactAct(async () => reactRoot.render(clientPage('available', 'initial')));
+			expect(container.querySelector('p')).toBe(paragraph);
+			expect(paragraph.querySelector('[data-octane-compat]')).toBe(host);
+			expect(host.querySelector('em')).toBe(leaf);
+			expect(paragraph.textContent).toBe('Status available today');
+
+			await reactAct(async () => reactRoot.render(clientPage('ready', 'replacement')));
+			expect(paragraph.querySelector('[data-octane-compat]')).not.toBe(host);
+			expect(paragraph.textContent).toBe('Status ready today');
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		} finally {
+			if (reactRoot) await reactAct(async () => reactRoot.unmount());
+			container.remove();
+		}
 	});
 
 	it('server-renders the component/props form byte-identically to the children form and hydrates it', async () => {

@@ -200,7 +200,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 		'warmMemo',
 		'withSlot',
 	],
-	'./react': ['OctaneCompat', '__hostContextFiberWalks'],
+	'./react': ['OctaneCompat', 'OctaneCompatInline', '__hostContextFiberWalks'],
 	'./hydration': [
 		'condition',
 		'createStreamedRegionReceiver',
@@ -258,7 +258,7 @@ export const REQUIRED_PUBLIC_VALUE_EXPORTS = {
 	],
 	'./signals/client': ['useSignal$'],
 	'./signals/server': ['useSignal$'],
-	'./react/server': ['OctaneCompat'],
+	'./react/server': ['OctaneCompat', 'OctaneCompatInline'],
 	'./server': [
 		'Activity',
 		'Children',
