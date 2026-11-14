@@ -9,7 +9,14 @@ declare const process: { env: { NODE_ENV?: string } };
 import * as React from 'react';
 import type { ComponentBody } from '../index.js';
 
-export interface OctaneCompatProps {
+interface OctaneCompatHostPresentation {
+	/** React class name on the host element. */
+	hostClassName?: string;
+	/** React style on the host element, replacing the default `display: contents`. */
+	hostStyle?: React.CSSProperties;
+}
+
+export interface OctaneCompatProps extends OctaneCompatHostPresentation {
 	/** Exactly one compiled Octane component element. */
 	children: React.ReactElement;
 	component?: undefined;
@@ -50,7 +57,8 @@ export type OctaneCompatComponentProps<P> = {
 	/** The compiled Octane component to host — octane invokes it, never React. */
 	component: OctaneHostedComponent<P>;
 	children?: never;
-} & ({} extends P ? { props?: NoInfer<P> } : { props: NoInfer<P> });
+} & OctaneCompatHostPresentation &
+	({} extends P ? { props?: NoInfer<P> } : { props: NoInfer<P> });
 
 declare const OCTANE_RENDERED: unique symbol;
 
