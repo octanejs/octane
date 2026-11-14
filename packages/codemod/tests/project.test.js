@@ -3631,6 +3631,47 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		}
 	});
 
+	it('reports unsupported computed React namespace members through the CLI', () => {
+		const root = project({
+			'package.json': '{}',
+			'Profiler.tsx': `import * as React from 'react';
+export const Profile = React['Profiler'];
+export function View() { return <Profile id="test" onRender={() => {}}><b>Ready</b></Profile>; }`,
+			'Default.tsx': `import R from 'react';
+const Boundary = R[\`Profiler\`];
+export { Boundary as Profile };
+export function View() { return <Boundary id="test" onRender={() => {}}><b>Ready</b></Boundary>; }`,
+			'Controls.tsx': `import * as React from 'react';
+export const valid = React['isValidElement'];
+export const read = (key: keyof typeof React) => React[key];
+export function View(React: { Profiler: string }) {
+	return <b>{React['Profiler']}</b>;
+}`,
+		});
+		const { status, stdout } = spawnSync(
+			process.execPath,
+			[path.join(import.meta.dirname, '../dist/bin.js'), root, '--strong', '--print', '--json'],
+			{ encoding: 'utf8' },
+		);
+		expect(status).toBe(1);
+		const { files } = JSON.parse(stdout);
+		for (const name of ['Profiler.tsx', 'Default.tsx']) {
+			const file = files.find((item) => item.file === name);
+			expect(file?.notes).toContainEqual({
+				rule: 'unsupported-api',
+				severity: 'error',
+				line: 2,
+				message: 'Octane has no \`Profiler\`; use the Octane devtools profiler.',
+			});
+		}
+		const control = files.find((item) => item.file === 'Controls.tsx');
+		expect(control?.notes.filter((note) => note.rule === 'unsupported-api')).toEqual([]);
+		expect(control?.code).toContain("React['isValidElement']");
+		expect(control?.code).toContain('React[key]');
+		for (const name of ['Profiler', 'Default', 'Controls'])
+			expect(fs.existsSync(path.join(root, name + '.tsrx'))).toBe(false);
+	});
+
 	it('uses the original ref allocator for refs mounted by a Strong component', async () => {
 		const root = project({
 			'View.tsx': `import * as React from 'react';
