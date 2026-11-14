@@ -1,8 +1,76 @@
 diff --git a/index.js b/index.js
-index fe6763f19ad149d169986bbd4f0c8ff218106962..95c55dcc4b174d850f97654832ac6c558ce250a6 100644
+index fe6763f19ad149d169986bbd4f0c8ff218106962..a51bbc25d48b4482979bb849a2dfaf4f3b3a9a98 100644
 --- a/index.js
 +++ b/index.js
-@@ -5484,7 +5484,10 @@ function tsPlugin(options) {
+@@ -1592,6 +1592,7 @@
+          * default kind is undefined
+          * */
+         this.importOrExportOuterKind = void 0;
++        this.typeOnlyImportSpecifiers = false;
+         this.tsParseConstModifier = (node) => {
+           this.tsParseModifiers({
+             modified: node,
+@@ -3609,7 +3610,10 @@
+       tsParseImportEqualsDeclaration(node, isExport) {
+         node.isExport = isExport || false;
+         node.id = this.parseIdent();
+-        this.checkLValSimple(node.id, acornScope.BIND_LEXICAL);
++        this.checkLValSimple(
++          node.id,
++          node.importKind === "type" ? acornScope.BIND_FLAGS_TS_IMPORT : acornScope.BIND_LEXICAL
++        );
+         super.expect(tt.eq);
+         const moduleReference = this.tsParseModuleReference();
+         if (node.importKind === "type" && moduleReference.type !== "TSExternalModuleReference") {
+@@ -3795,24 +3799,30 @@
+         return super.parseExprOp(left, leftStartPos, leftStartLoc, minPrec, forInit);
+       }
+       parseImportSpecifiers() {
+-        let nodes = [], first = true;
+-        if (acornTypeScript.tokenIsIdentifier(this.type)) {
+-          nodes.push(this.parseImportDefaultSpecifier());
+-          if (!this.eat(tt.comma)) return nodes;
+-        }
+-        if (this.type === tt.star) {
+-          nodes.push(this.parseImportNamespaceSpecifier());
++        const previous = this.typeOnlyImportSpecifiers;
++        this.typeOnlyImportSpecifiers = this.importOrExportOuterKind === "type";
++        try {
++          let nodes = [], first = true;
++          if (acornTypeScript.tokenIsIdentifier(this.type)) {
++            nodes.push(this.parseImportDefaultSpecifier());
++            if (!this.eat(tt.comma)) return nodes;
++          }
++          if (this.type === tt.star) {
++            nodes.push(this.parseImportNamespaceSpecifier());
++            return nodes;
++          }
++          this.expect(tt.braceL);
++          while (!this.eat(tt.braceR)) {
++            if (!first) {
++              this.expect(tt.comma);
++              if (this.afterTrailingComma(tt.braceR)) break;
++            } else first = false;
++            nodes.push(this.parseImportSpecifier());
++          }
+           return nodes;
+-        }
+-        this.expect(tt.braceL);
+-        while (!this.eat(tt.braceR)) {
+-          if (!first) {
+-            this.expect(tt.comma);
+-            if (this.afterTrailingComma(tt.braceR)) break;
+-          } else first = false;
+-          nodes.push(this.parseImportSpecifier());
+-        }
+-        return nodes;
++        } finally {
++          this.typeOnlyImportSpecifiers = previous;
++        }
+       }
+       /**
+        * @param {Node} node this may be ImportDeclaration |
+@@ -5484,7 +5494,10 @@
            node[rightOfAsKey] = this.copyNode(node[leftOfAsKey]);
          }
          if (isImport) {
@@ -14,13 +82,13 @@ index fe6763f19ad149d169986bbd4f0c8ff218106962..95c55dcc4b174d850f97654832ac6c55
          }
        }
        raiseCommonCheck(pos, message, recoverable) {
-@@ -5583,11 +5586,19 @@ function tsPlugin(options) {
+@@ -5583,11 +5596,19 @@
          }
        }
        declareName(name, bindingType, pos) {
-+        // Every name `import type …` binds arrives here as lexical, including
-+        // acorn's own specifiers and the alias of `import type A = require()`.
-+        if (bindingType === acornScope.BIND_LEXICAL && this.importOrExportOuterKind === "type") {
++        // Acorn validates default, namespace and named specifiers as lexical
++        // bindings. Only reclassify while parsing an actual type import.
++        if (bindingType === acornScope.BIND_LEXICAL && this.typeOnlyImportSpecifiers) {
 +          bindingType = acornScope.BIND_FLAGS_TS_IMPORT;
 +        }
 +        // A type-only import binds no value, so only another type-only import of

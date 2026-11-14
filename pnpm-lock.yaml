@@ -1394,7 +1394,7 @@ overrides:
 packageExtensionsChecksum: sha256-XN5zp/IiFh7oL3uoVIj9kQwS10aRIZS77YifBp5DLNo=
 
 patchedDependencies:
-  '@sveltejs/acorn-typescript@1.0.13': fe96849d048ea45c6910b18b5d7344ab5b6fe50b3ece6f27144eb95578bcbff5
+  '@sveltejs/acorn-typescript@1.0.13': d0b06e4e1c663671981b2a666be1812ef129b83de2adc585bd72171bbc979387
   '@tsrx/core@0.5.5': e7415e93ecc2fc037320fad0b46b063c795c673477c6bbca2474d9c4eb377f96
   '@tsrx/oxc@0.23.0': eb1fdf3caf79bc632213653d782f46bee49af25c8b13a0c809353e0ae3ba1d94
   '@vitest/browser-playwright@4.1.10': 1957634122dfa6f4790b66e73a42343637af36d3fb182eb25e07fa261dbc27dd
@@ -47795,7 +47795,7 @@ snapshots:
       invariant: 2.2.4
       styleq: 0.2.1
 
-  '@sveltejs/acorn-typescript@1.0.13(patch_hash=fe96849d048ea45c6910b18b5d7344ab5b6fe50b3ece6f27144eb95578bcbff5)(acorn@8.18.0)':
+  '@sveltejs/acorn-typescript@1.0.13(patch_hash=d0b06e4e1c663671981b2a666be1812ef129b83de2adc585bd72171bbc979387)(acorn@8.18.0)':
     dependencies:
       acorn: 8.18.0
 
@@ -49514,7 +49514,7 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
       '@noble/hashes': 2.2.0
-      '@sveltejs/acorn-typescript': 1.0.13(patch_hash=fe96849d048ea45c6910b18b5d7344ab5b6fe50b3ece6f27144eb95578bcbff5)(acorn@8.18.0)
+      '@sveltejs/acorn-typescript': 1.0.13(patch_hash=d0b06e4e1c663671981b2a666be1812ef129b83de2adc585bd72171bbc979387)(acorn@8.18.0)
       '@tsrx/runtime': 0.2.0
       '@types/estree': 1.0.9
       '@types/estree-jsx': 1.0.5
@@ -49530,7 +49530,7 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
       '@noble/hashes': 2.2.0
-      '@sveltejs/acorn-typescript': 1.0.13(patch_hash=fe96849d048ea45c6910b18b5d7344ab5b6fe50b3ece6f27144eb95578bcbff5)(acorn@8.18.0)
+      '@sveltejs/acorn-typescript': 1.0.13(patch_hash=d0b06e4e1c663671981b2a666be1812ef129b83de2adc585bd72171bbc979387)(acorn@8.18.0)
       '@tsrx/runtime': 0.2.4
       '@types/estree': 1.0.9
       '@types/estree-jsx': 1.0.5
@@ -65800,7 +65800,7 @@ snapshots:
     dependencies:
       '@jridgewell/remapping': 2.3.5
       '@jridgewell/sourcemap-codec': 1.6.0
-      '@sveltejs/acorn-typescript': 1.0.13(patch_hash=fe96849d048ea45c6910b18b5d7344ab5b6fe50b3ece6f27144eb95578bcbff5)(acorn@8.18.0)
+      '@sveltejs/acorn-typescript': 1.0.13(patch_hash=d0b06e4e1c663671981b2a666be1812ef129b83de2adc585bd72171bbc979387)(acorn@8.18.0)
       '@types/estree': 1.0.9
       acorn: 8.18.0
       aria-query: 5.3.1
