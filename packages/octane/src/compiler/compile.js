@@ -21054,6 +21054,16 @@ const LOOP_TYPES = new Set([
 ]);
 const FN_TYPES = new Set(['FunctionExpression', 'FunctionDeclaration', 'ArrowFunctionExpression']);
 
+// Bare use() retains its historical unbound shorthand. A local binding
+// called use is not the runtime hook unless its import says so.
+function isBareUseCall(call) {
+	return (
+		call.callee.name === 'use' &&
+		(call._octaneUnboundCallee === true ||
+			(call._octaneImportedHook ?? call._octaneHookRuntimeImportedHook) === 'use')
+	);
+}
+
 // Is this statement a `const/let x = use(<arg>)` declaration (or a bare
 // `use(<arg>)` expression statement)? Returns the use CallExpression or null.
 function useCallOfStatement(stmt, ctx) {
@@ -21072,7 +21082,7 @@ function useCallOfStatement(stmt, ctx) {
 		call &&
 		call.type === 'CallExpression' &&
 		call.callee.type === 'Identifier' &&
-		(call.callee.name === 'use' || ctx?._parallelUseAliases?.has(call.callee.name)) &&
+		(isBareUseCall(call) || ctx?._parallelUseAliases?.has(call.callee.name)) &&
 		call.arguments.length >= 1
 	) {
 		return call;
@@ -21467,7 +21477,7 @@ function collectUseArgumentRoots(
 		if (
 			n.type === 'CallExpression' &&
 			n.callee?.type === 'Identifier' &&
-			(n.callee.name === 'use' ||
+			(isBareUseCall(n) ||
 				n._octaneImportedHook === 'use' ||
 				ctx?._parallelUseAliases?.has(n.callee.name) === true) &&
 			n.arguments?.length >= 1
@@ -23374,7 +23384,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					hookRuntimeImportedName !== undefined ||
 					n._octaneUnboundCallee === true);
 			const isCustom = !generated && !isBuiltin && /^use[A-Z]/.test(name) && name !== 'useContext';
-			const isServerUse = name === 'use' && ctx.mode === 'server';
+			const isServerUse =
+				ctx.mode === 'server' &&
+				(importedName === 'use' || hookRuntimeImportedName === 'use' || isBareUseCall(n));
 			if (isBuiltin || isCustom || isServerUse) {
 				if (isBuiltin) {
 					const inline = lowerLocalMemoExpression(n, name);
