@@ -4206,6 +4206,78 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 		);
 	});
 
+	it('reports when migrating a text change capture would reorder an input handler', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'tsconfig.json': '{ "compilerOptions": { "jsx": "react-jsx", "strict": true } }',
+			'Field.tsx': `export function Field({ record, rest }: { record: (label: string, value: string) => void; rest: { title?: string } }) {
+	const input = (event: { currentTarget: { value: string } }) => record('input', event.currentTarget.value);
+	const change = (event: { currentTarget: { value: string } }) => record('change', event.currentTarget.value);
+	return <div>
+		<input id="text" type="text" onInput={input} onChangeCapture={change} />
+		<textarea id="textarea" onInput={input} onChangeCapture={change} />
+		<input id="inverse" onInputCapture={input} onChange={change} />
+		<input id="same-phase" onInputCapture={input} onChangeCapture={change} />
+		<input id="checkable" type="checkbox" onInput={input} onChangeCapture={change} />
+		<input id="single" onChangeCapture={change} />
+		<input id="spread" onInput={input} onChangeCapture={change} {...rest} />
+		<input id="absent" onInput={void 0} onChangeCapture={change} />
+		<input id="global-undefined" onInput={undefined} onChangeCapture={change} />
+		<input id="absent-change" onInput={input} onChangeCapture={null} />
+		<input id="duplicate-input" onInput={input} onInput={void 0} onChangeCapture={change} />
+		<input id="duplicate-capture" onInput={input} onChangeCapture={change} onChangeCapture={void 0} />
+	</div>;
+}`,
+		});
+		const [file] = (await runCodemod([root], { root, strong: true, write: false })).files;
+		expect(file.strong).toBe(true);
+		const changeNotes = file.notes.filter((note) => note.rule === 'native-text-change');
+		expect(changeNotes.map(({ severity, message }) => [severity, message])).toEqual([
+			['warning', expect.stringContaining('callback order')],
+			['warning', expect.stringContaining('callback order')],
+			['warning', expect.stringContaining('fires on commit')],
+		]);
+		expect(file.code).toContain('id="text" type="text" onInput={input} onChangeCapture={change}');
+		expect(file.code).toContain('id="textarea" onInput={input} onChangeCapture={change}');
+		expect(file.code).toContain('id="inverse" onInputCapture={input} onInput={change}');
+		expect(file.code).toContain('id="same-phase" onInputCapture={input} onChangeCapture={change}');
+		expect(file.code).toContain(
+			'id="checkable" type="checkbox" onInput={input} onChangeCapture={change}',
+		);
+		expect(file.code).toContain('id="single" onInputCapture={change}');
+		expect(file.code).toContain('id="spread" onInput={input} onInputCapture={change} {...rest}');
+		expect(file.code).toContain('id="absent" onInput={void 0} onInputCapture={change}');
+		expect(file.code).toContain(
+			'id="global-undefined" onInput={undefined} onInputCapture={change}',
+		);
+		expect(file.code).toContain('id="absent-change" onInput={input} onInputCapture={null}');
+		expect(file.code).toContain(
+			'id="duplicate-input" onInput={input} onInput={void 0} onInputCapture={change}',
+		);
+		expect(file.code).toContain(
+			'id="duplicate-capture" onInput={input} onInputCapture={change} onInputCapture={void 0}',
+		);
+	});
+
+	it('warns when an input handler shadows the global undefined value', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'Field.tsx': `export function Field({ input }: { input: () => void }) {
+	const undefined = input;
+	return <input onInput={undefined} onChangeCapture={input} />;
+}`,
+		});
+		const [file] = (await runCodemod([root], { root, write: false })).files;
+		expect(file.notes).toContainEqual(
+			expect.objectContaining({
+				rule: 'native-text-change',
+				severity: 'warning',
+				message: expect.stringContaining('callback order'),
+			}),
+		);
+		expect(file.code).toContain('onInput={undefined} onChangeCapture={input}');
+	});
+
 	it('leaves a text field spread alone when its type has no `onChange`', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',

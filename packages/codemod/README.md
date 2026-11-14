@@ -66,6 +66,13 @@ keeps its React shape, but Octane's leaves the commit's `useEffect`s queued
 where React runs them before returning. React Three Fiber scenes need moving
 into `.three.tsrx` modules by hand.
 
+On a text input or textarea with no spreads, an explicit `onInput` and a
+single `onChangeCapture` can both run. The codemod retains those handlers and
+warns about callback order.
+React calls `onInput` before its synthetic change capture. Renaming the capture
+handler to `onInputCapture` would run it first. Review the event scheduling for
+the migrated control. The retained `onChangeCapture` runs on native change.
+
 When an exported native host component begins setup with a call to an unselected
 local TypeScript hook, the codemod reports a binding error if the original named
 export begins by calling a named React import of `useState` or
