@@ -3906,6 +3906,47 @@ export const views = [Motion, motion.div];`,
 		},
 	);
 
+	it('retains Motion context type references while migrating the corresponding value', async () => {
+		const blocked = [
+			"import type { MotionConfigContext as C } from 'motion/react'; export type T = C;",
+			"import { MotionConfigContext as C } from 'framer-motion'; export interface T extends C {}",
+			"import * as Motion from 'motion/react'; export type T = Motion.MotionConfigContext;",
+			"import * as Motion from 'motion/react'; export interface T extends Motion.MotionConfigContext {}",
+			"import * as Motion from 'motion/react'; import C = Motion.MotionConfigContext; export type T = C;",
+			"export type T = import('motion/react').MotionConfigContext;",
+			"export { MotionConfigContext as Context } from 'motion/react';",
+			"import { MotionConfigContext as C } from 'motion/react'; export { C };",
+			"import { MotionConfigContext as C } from 'motion/react'; export default C;",
+			"import * as Motion from 'motion/react'; export default Motion.MotionConfigContext;",
+		];
+		const allowed = [
+			"import type { MotionConfigContext as C } from 'motion/react'; export type T = typeof C;",
+			"import * as Motion from 'motion/react'; export type T = typeof Motion.MotionConfigContext;",
+			"export type T = typeof import('motion/react').MotionConfigContext;",
+			"import { MotionConfigContext as C } from 'motion/react'; export const Context = C;",
+		];
+		const root = project(
+			Object.fromEntries([...blocked, ...allowed].map((source, i) => [`context${i}.ts`, source])),
+		);
+		const result = await runCodemod([root], { write: false, verify: false });
+		for (const [i, source] of [...blocked, ...allowed].entries()) {
+			const file = result.files.find(({ file }) => file === `context${i}.ts`);
+			if (i < blocked.length) {
+				expect(file?.code).toBe(source);
+				expect(file?.notes).toEqual([
+					expect.objectContaining({
+						rule: 'bindings',
+						severity: 'error',
+						message: expect.stringContaining('MotionConfigContext'),
+					}),
+				]);
+			} else {
+				expect(file?.code).toContain('@octanejs/motion');
+				expect(file?.notes).toEqual([]);
+			}
+		}
+	});
+
 	it('reports exactly the Radix exports `@octanejs/radix` lacks', async () => {
 		const radix = path.join(REPO, 'packages/radix');
 		// The binding's own dev dependency on `radix-ui` installs every primitive package.
