@@ -1999,6 +1999,17 @@ export function Host({rows}: { rows: Row[] }) {
 				'ObjectValue.tsx': source(direct.replace('(index as number)', '({["label"]:index}).label')),
 				'ObjectShorthand.tsx': source(direct.replace('(index as number)', '({index}).index')),
 				'ObjectKey.tsx': source(direct.replace('(index as number)', '({[index]:0})[0]')),
+				'NestedLiteral.tsx': source(
+					direct.replace('(index as number)', '[{ ["label"]: [1, , {}] }, index][1]'),
+				),
+				'NestedReceiver.tsx': source(
+					direct.replace('(index as number)', '[{ label: [1] }][index]'),
+				),
+				'ArraySpreadRead.tsx': source(
+					direct.replace('(index as number)', '[...(index as any)].length'),
+				),
+				'ObjectSpreadRead.tsx': source(direct.replace('(index as number)', '({...[index]}).label')),
+				'CallSpreadRead.tsx': source(direct.replace('(index as number)', 'String(...[index])')),
 				'DeferredLiteral.tsx': source(
 					direct.replace(
 						'(index as number)',
@@ -2007,7 +2018,19 @@ export function Host({rows}: { rows: Row[] }) {
 				),
 				'ThrowingLiteral.tsx': source(direct.replace('(index as number)', '[fail(),index][1]')),
 				'ThrowingKey.tsx': source(direct.replace('(index as number)', '({[key()]:index}).label')),
+				'CoercionPrefix.tsx': source(
+					direct.replace('(index as number)', '[{[{} as any]:1},index][1]'),
+				),
+				'ComputedKeyCoercion.tsx': source(
+					direct.replace('(index as number)', '({[{} as any]:index}).label'),
+				),
 				'SpreadPrefix.tsx': source(direct.replace('(index as number)', '[...values,index][1]')),
+				'LiteralSpreadPrefix.tsx': source(
+					direct.replace('(index as number)', '[...[0], index][1]'),
+				),
+				'ObjectSpreadPrefix.tsx': source(
+					direct.replace('(index as number)', '({...values, label: index}).label'),
+				),
 				'ThrowingCallee.tsx': source(
 					direct.replace('label=(index as number)', 'label=convert([index]),convert'),
 				),
@@ -2053,6 +2076,11 @@ export function Host({rows}: { rows: Row[] }) {
 						'ObjectValue.tsx',
 						'ObjectShorthand.tsx',
 						'ObjectKey.tsx',
+						'NestedLiteral.tsx',
+						'NestedReceiver.tsx',
+						'ArraySpreadRead.tsx',
+						'ObjectSpreadRead.tsx',
+						'CallSpreadRead.tsx',
 						'OptionalIndex.tsx',
 						'Receiver.tsx',
 						'Computed.tsx',

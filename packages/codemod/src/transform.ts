@@ -6211,11 +6211,31 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	}
 
 	private patternReadsOrdinal(pattern: ts.BindingName, ordinal: ts.ParameterDeclaration): boolean {
+		const safePrefix = (expr: ts.Expression): boolean => {
+			const value = skipWrappers(expr);
+			if (rowKeyLiteral(value)) return true;
+			if (ts.isArrayLiteralExpression(value))
+				return value.elements.every(
+					(element) => ts.isOmittedExpression(element) || safePrefix(element),
+				);
+			return (
+				ts.isObjectLiteralExpression(value) &&
+				value.properties.every(
+					(property) =>
+						ts.isPropertyAssignment(property) &&
+						(!ts.isComputedPropertyName(property.name) ||
+							rowKeyLiteral(property.name.expression)) &&
+						safePrefix(property.initializer),
+				)
+			);
+		};
 		// Once a value can interrupt evaluation, a later read is no longer proven.
 		const readsInOrder = (expressions: readonly ts.Expression[]) => {
 			for (const expression of expressions) {
+				// The source is evaluated before iteration or property copying.
+				if (ts.isSpreadElement(expression)) return readsOrdinal(expression.expression);
 				if (readsOrdinal(expression)) return true;
-				if (!rowKeyLiteral(expression)) return false;
+				if (!safePrefix(expression)) return false;
 			}
 			return false;
 		};
@@ -6235,22 +6255,26 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (ts.isArrayLiteralExpression(read))
 				return readsInOrder(read.elements.filter((element) => !ts.isOmittedExpression(element)));
 			if (ts.isObjectLiteralExpression(read)) {
-				const values: ts.Expression[] = [];
 				for (const property of read.properties) {
-					if (ts.isSpreadAssignment(property)) break;
-					if (ts.isComputedPropertyName(property.name)) values.push(property.name.expression);
-					if (ts.isPropertyAssignment(property)) values.push(property.initializer);
-					if (ts.isShorthandPropertyAssignment(property)) values.push(property.name);
+					if (ts.isSpreadAssignment(property)) return readsOrdinal(property.expression);
+					if (ts.isComputedPropertyName(property.name)) {
+						const key = property.name.expression;
+						if (readsOrdinal(key)) return true;
+						if (!rowKeyLiteral(key)) return false;
+					}
+					if (ts.isShorthandPropertyAssignment(property)) return readsOrdinal(property.name);
+					if (ts.isPropertyAssignment(property)) {
+						if (readsOrdinal(property.initializer)) return true;
+						if (!safePrefix(property.initializer)) return false;
+					}
 				}
-				return readsInOrder(values);
+				return false;
 			}
 			if (ts.isElementAccessExpression(read)) {
 				if (readsOrdinal(read.expression)) return true;
 				const receiver = skipWrappers(read.expression);
 				return (
-					(rowKeyLiteral(receiver) ||
-						(ts.isArrayLiteralExpression(receiver) && receiver.elements.every(rowKeyLiteral)) ||
-						(ts.isObjectLiteralExpression(receiver) && !receiver.properties.length)) &&
+					safePrefix(receiver) &&
 					(!ts.isOptionalChain(read) || receiver.kind !== ts.SyntaxKind.NullKeyword) &&
 					readsOrdinal(read.argumentExpression)
 				);
