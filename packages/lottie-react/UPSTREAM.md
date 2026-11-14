@@ -11,7 +11,11 @@
 | Animation engine | `lottie-web@5.13.0` |
 | React oracle | `react@19.2.7`, `react-dom@19.2.7`, `@types/react@19.2.17`, `@types/react-dom@19.2.3` |
 
+## Source boundary
+
 The [pinned source](https://github.com/Gamote/lottie-react/tree/bd794d226e14c714e7d740a1f7fa9dcf284d7235) supplies the component, hooks, types, and upstream Jest tests. The lock records their Git blobs. The original npm tarball and a byte-exact copy of its `build/index.d.ts` live under `upstream-artifact/`. The npm declaration is authoritative for the released callback types. `LICENSE.upstream` preserves the upstream notice byte for byte, including its CC0 provision for sample code.
+
+The binding adapts the React view, hooks, and public types in `src/`. It uses the published animation engine directly.
 
 ## Published surface
 

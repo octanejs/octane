@@ -11,6 +11,7 @@ import {
 	EVIDENCE_MATRIX_SCHEMA_VERSION,
 	evaluateVerificationReadiness,
 	inspectBindingPackage,
+	inspectShippedSources,
 	migrateEvidenceMatrix,
 	recordEvidence,
 	validateUpstreamCrosswalk,
@@ -596,6 +597,30 @@ describe('package and closure completion', () => {
 		});
 
 		assert.equal(result.status, 'passed', result.issues.join('\n'));
+	});
+
+	test('hashes local type-only source without treating its imports as executable', async () => {
+		const root = await mkdtemp(path.join(tmpdir(), 'react-port-local-type-closure-'));
+		const entry = path.join(root, 'index.ts');
+		await writeFile(
+			path.join(root, 'package.json'),
+			JSON.stringify({ exports: { '.': './index.ts' } }),
+		);
+		await writeFile(
+			path.join(root, 'shape.ts'),
+			"import 'shape-runtime'; export type Shape = string;",
+		);
+		const exportedTypes = "export type { Shape } from './shape.js';\n";
+		await writeFile(entry, exportedTypes);
+		assert.deepEqual(inspectShippedSources(root), {
+			files: ['index.ts', 'shape.ts'],
+			runtimeDependencies: [],
+		});
+		await writeFile(entry, exportedTypes + "import './shape.js';\n");
+		assert.deepEqual(inspectShippedSources(root), {
+			files: ['index.ts', 'shape.ts'],
+			runtimeDependencies: ['shape-runtime'],
+		});
 	});
 
 	test('requires React-coupled dependency edges to use their planned binding', () => {
