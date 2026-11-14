@@ -19,6 +19,26 @@ function rendererImport(name: ts.Identifier, checker: ts.TypeChecker, module = '
 		return (binding.propertyName ?? binding.name).text;
 }
 
+function privateContextReader(callee: ts.Expression, checker: ts.TypeChecker) {
+	if (ts.isIdentifier(callee)) return rendererImport(callee, checker) === 'useContext';
+	if (
+		!ts.isPropertyAccessExpression(callee) ||
+		!ts.isIdentifier(callee.expression) ||
+		callee.name.text !== 'useContext'
+	)
+		return false;
+	const binding = checker.getSymbolAtLocation(callee.expression)?.declarations?.[0];
+	if (!binding || !ts.isNamespaceImport(binding)) return false;
+	const clause = binding.parent;
+	const imp = clause.parent;
+	return (
+		!clause.isTypeOnly &&
+		!imp.attributes &&
+		ts.isStringLiteral(imp.moduleSpecifier) &&
+		imp.moduleSpecifier.text === 'react'
+	);
+}
+
 function nullRef(statement: ts.Statement, checker: ts.TypeChecker) {
 	if (!ts.isVariableStatement(statement)) return false;
 	const { flags, declarations } = statement.declarationList;
@@ -294,7 +314,7 @@ function firstRendererCall(fn: ts.FunctionDeclaration) {
 			: ts.isReturnStatement(first) || ts.isExpressionStatement(first)
 				? first.expression
 				: undefined);
-	if (first && value && ts.isCallExpression(value) && ts.isIdentifier(value.expression))
+	if (first && value && ts.isCallExpression(value))
 		return { call: value, callee: value.expression, ambient: declaredVariable(first) };
 }
 
@@ -326,7 +346,7 @@ function privateContextCall(
 		read.ambient ||
 		ts.isOptionalChain(read.call) ||
 		read.call.arguments.length !== 1 ||
-		rendererImport(read.callee, checker) !== 'useContext'
+		!privateContextReader(read.callee, checker)
 	)
 		return false;
 	const context = read.call.arguments[0];
@@ -413,7 +433,8 @@ export function directRendererCalls(
 			(!first || first.ambient || ts.isOptionalChain(first.call) || first.call.arguments.length)
 		)
 			continue;
-		const name = first && rendererImport(first.callee, checker, module);
+		const name =
+			first && ts.isIdentifier(first.callee) && rendererImport(first.callee, checker, module);
 		const direct = name && accepts(name) ? name : undefined;
 		if (!direct && !(first && privateContextExports) && module !== 'react') continue;
 		// A local write can replace the exported function before the importer calls it.
@@ -427,6 +448,7 @@ export function directRendererCalls(
 		else if (
 			privateContextExports &&
 			first &&
+			ts.isIdentifier(first.callee) &&
 			!first.ambient &&
 			!fn.parameters.length &&
 			privateContextCall(sf, checker, uses, first.call, first.callee)
