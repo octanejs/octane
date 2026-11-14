@@ -33,6 +33,8 @@ export interface TransformOptions {
 	recordBindingRewrite?(from: string, to: string): void;
 	/** The issuer resolves the original installed React runtime and types. */
 	originalReact?: boolean;
+	/** The issuer resolves the original React DOM server entry that this call will migrate. */
+	originalReactServerEntry?(module: string): boolean;
 	/** A React DOM resource hint called by an imported plain TypeScript initializer. */
 	initializerResourceHint?(module: string, name: string): string | undefined;
 	/** Renderer work called by an unchanged local TypeScript export. */

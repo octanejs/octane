@@ -50,6 +50,95 @@ function typecheckProject(root) {
 }
 
 describe('runCodemod', () => {
+	it('warns on waiting for a migrated render stream before reading the body', async () => {
+		const imports = [
+			"import { renderToReadableStream as render } from 'react-dom/server';",
+			"const { renderToReadableStream: render } = await import('react-dom/server.browser');",
+		];
+		const sources = Object.fromEntries(
+			imports.map((entry, index) => [
+				`Stream${index}.tsx`,
+				`${index === 0 ? entry : ''}
+export async function clipboard() {
+	${index === 1 ? entry : ''}
+	const stream = await render(<main />);
+	await stream.allReady;
+	const sink = { html: '' };
+	sink.html = await new Response(stream).text();
+	return sink.html;
+}`,
+			]),
+		);
+		const source = sources['Stream0.tsx'];
+		const config = { jsx: 'react-jsx', moduleResolution: 'bundler' };
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'tsconfig.json': JSON.stringify({ compilerOptions: config }),
+			...sources,
+			'Concurrent.tsx': source
+				.replace('await stream.allReady;', '')
+				.replace(
+					'await new Response(stream).text()',
+					'(await Promise.all([new Response(stream).text(), stream.allReady]))[0]',
+				),
+			'Early.tsx': source.replace(
+				'await stream.allReady;',
+				'start(); await stream.allReady; function start() { void stream.getReader(); }',
+			),
+			'ShadowedRenderer.tsx': source.replace('clipboard()', 'clipboard(render)'),
+			'ShadowedResponse.tsx': source.replace('clipboard()', 'clipboard(Response)'),
+		});
+		fs.mkdirSync(path.join(root, 'node_modules'));
+		const require = createRequire(import.meta.url);
+		for (const name of ['react-dom', 'react', '@types/react-dom']) {
+			const target = path.join(root, 'node_modules', name);
+			fs.mkdirSync(path.dirname(target), { recursive: true });
+			fs.symlinkSync(path.dirname(require.resolve(name + '/package.json')), target, 'dir');
+		}
+		fs.symlinkSync(
+			path.join(REPO, 'packages/octane'),
+			path.join(root, 'node_modules/octane'),
+			'dir',
+		);
+		const { files } = await runCodemod(
+			['Stream0', 'Stream1', 'Concurrent', 'Early', 'ShadowedRenderer', 'ShadowedResponse'].map(
+				(name) => path.join(root, name + '.tsx'),
+			),
+			{ root, write: false, strong: true, verify: false },
+		);
+		for (const file of files) {
+			const notes = file.notes.filter((finding) => finding.rule === 'server-render');
+			if (!file.file.startsWith('Stream')) {
+				expect(notes).toEqual([]);
+				continue;
+			}
+			expect(notes).toEqual([
+				expect.objectContaining({
+					severity: 'warning',
+					line: 5,
+					message: expect.stringMatching(/before awaiting allReady/),
+				}),
+			]);
+			expect(file.code).toContain('octane/server');
+			expect(file.code).toContain('await stream.allReady');
+		}
+
+		fs.writeFileSync(path.join(root, 'custom.ts'), 'export const renderToReadableStream = null;');
+		for (const entry of ['react-dom/server', 'octane/server']) {
+			fs.writeFileSync(
+				path.join(root, 'tsconfig.json'),
+				JSON.stringify({ compilerOptions: { ...config, paths: { [entry]: ['./custom.ts'] } } }),
+			);
+			const redirected = await runCodemod([path.join(root, 'Stream0.tsx')], {
+				root,
+				write: false,
+				strong: true,
+				verify: false,
+			});
+			expect(redirected.files[0].notes).toEqual([]);
+		}
+	});
+
 	const reactLeaf =
 		"import {useState} from 'react'; export default function Leaf(){const [n]=useState(1);return <button>{n}</button>}";
 	const boundaryImports =
