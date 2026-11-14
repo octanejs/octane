@@ -213,7 +213,7 @@ export async function runCodemod(
 	const foldNames = process.platform === 'darwin';
 	const leafKey = (file: string) => {
 		const name = path.basename(file);
-		return foldNames ? name.toLowerCase() : name;
+		return foldNames ? name.normalize('NFC').toLowerCase() : name;
 	};
 	const sourceNames = new Set([...renames.keys()].map(leafKey));
 	const sourceEntries = new Map([...renames.keys()].map((file) => [entryKey(file), file]));
