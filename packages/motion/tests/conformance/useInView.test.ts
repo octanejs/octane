@@ -29,6 +29,12 @@ describe('useInView', () => {
 		}
 
 		vi.stubGlobal('IntersectionObserver', Observer);
+		const initialDescriptor = Object.getOwnPropertyDescriptor(Symbol.prototype, 'initial');
+		const readSlotAsOptions = vi.fn(() => true);
+		Object.defineProperty(Symbol.prototype, 'initial', {
+			configurable: true,
+			get: readSlotAsOptions,
+		});
 		try {
 			const options = { initial: true, amount: 0.5, margin: '0px 20%' } as const;
 			const r = mount(InViewPair, { options });
@@ -48,6 +54,7 @@ describe('useInView', () => {
 				};
 
 				expect(view()).toEqual(['false', 'true']);
+				expect(readSlotAsOptions).not.toHaveBeenCalled();
 				flushEffects();
 				expect(observerOf(right)?.options).toMatchObject({ threshold: 0.5, rootMargin: '0px 20%' });
 				intersect(right, true);
@@ -70,6 +77,8 @@ describe('useInView', () => {
 			}
 			expect(observers.every((observer) => observer.targets.size === 0)).toBe(true);
 		} finally {
+			if (initialDescriptor) Object.defineProperty(Symbol.prototype, 'initial', initialDescriptor);
+			else Reflect.deleteProperty(Symbol.prototype, 'initial');
 			vi.unstubAllGlobals();
 		}
 	});
