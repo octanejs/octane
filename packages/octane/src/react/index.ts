@@ -144,7 +144,7 @@ function hostedRootEnvelope(props: {
 }
 
 function reportHostedFault(error: unknown): void {
-	// Disposal is deferred past React's commit (see scheduleDisconnectCheck), so
+	// Disposal is deferred past React's commit, so
 	// a hosted cleanup fault cannot re-throw into React's commit-error path.
 	// Match React 19's own uncaught-error default.
 	if (typeof reportError === 'function') reportError(error);
@@ -192,7 +192,7 @@ class HostedIslandController {
 	private committed: TransportedChild | null = null;
 	private episode: PendingEpisode | null = null;
 	private disposers = new Set<() => void>();
-	/** Bumped by every attachment signal; cancels a pending deferred dispose check. */
+	/** A new insertion-effect setup cancels disposal queued by the previous setup. */
 	private lifecycleGeneration = 0;
 	private attemptSuspended = false;
 	private attemptErrored = false;
@@ -392,7 +392,11 @@ class HostedIslandController {
 
 	hostAttached(node: HTMLElement): void {
 		this.host = node;
-		this.lifecycleGeneration++;
+	}
+
+	hostDetached(): void {
+		// Hiding detaches the ref. Keep the host for pending retries and republish on reveal.
+		this.attached = false;
 	}
 
 	/**
@@ -404,7 +408,6 @@ class HostedIslandController {
 	 */
 	commit(child: TransportedChild, identifierPrefix: string, snapshot: ContextSnapshot): void {
 		if (this.disposed) return;
-		this.lifecycleGeneration++;
 		this.identifierPrefix = identifierPrefix;
 		const previous = this.committed;
 		// A child identity/key change replaces the island — and resets context
@@ -435,25 +438,19 @@ class HostedIslandController {
 		this.attachAndFlush();
 	}
 
-	// Keep the host so pending retries can still reach a connected, hidden island.
-	scheduleDisconnectCheck(): void {
+	/** Insertion effects stay registered while React hides or probes the island. */
+	startLifetime(): () => void {
 		const generation = ++this.lifecycleGeneration;
-		queueMicrotask(() => {
-			if (this.disposed || generation !== this.lifecycleGeneration) return;
-			if (this.host !== null && this.host.isConnected) {
-				// React deletion removes the host within its commit; a still-connected
-				// host after the commit's microtasks is a hide (hidden content keeps
-				// its DOM under display:none), not an unmount. Preserve the hosted
-				// root, DOM, and state; the reveal's layout effect reattaches.
-				this.attached = false;
-				return;
-			}
-			try {
-				this.dispose();
-			} catch (error) {
-				reportHostedFault(error);
-			}
-		});
+		return () => {
+			queueMicrotask(() => {
+				if (this.disposed || generation !== this.lifecycleGeneration) return;
+				try {
+					this.dispose();
+				} catch (error) {
+					reportHostedFault(error);
+				}
+			});
+		};
 	}
 
 	private dispose(): void {
@@ -594,14 +591,12 @@ export function OctaneCompat(
 
 	const [hostRef] = React.useState(() => (node: HTMLDivElement | null) => {
 		if (node !== null) controller.hostAttached(node);
-		else controller.scheduleDisconnectCheck();
+		else controller.hostDetached();
 	});
 	React.useLayoutEffect(() => {
 		controller.commit(child, identifierPrefix, snapshot);
 	});
-	// Activity hiding disconnects refs and passive effects before deletion.
-	// Insertion effects stay connected and can trigger deferred teardown on deletion.
-	React.useInsertionEffect(() => () => controller.scheduleDisconnectCheck(), [controller]);
+	React.useInsertionEffect(() => controller.startLifetime(), [controller]);
 
 	return React.createElement('div', {
 		'data-octane-compat': '',
