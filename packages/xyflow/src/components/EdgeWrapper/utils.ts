@@ -7,7 +7,7 @@ import {
 	SimpleBezierEdgeInternal,
 } from '../Edges';
 
-export const builtinEdgeTypes: EdgeTypes = {
+export const builtinEdgeTypes: EdgeTypes & { default: EdgeTypes[string] } = {
 	default: BezierEdgeInternal,
 	straight: StraightEdgeInternal,
 	step: StepEdgeInternal,
