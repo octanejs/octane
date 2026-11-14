@@ -261,6 +261,56 @@ export function discardSubtreeRefAttachesFrom(
 const refCleanups = new WeakMap<(el: any) => unknown, WeakMap<object, () => void>>();
 const refLastCleanupTarget = new WeakMap<(el: any) => unknown, object>();
 
+interface ArrayRefAttachment {
+	cleanups: (() => void)[];
+	detached: boolean;
+}
+
+interface ArrayRefState {
+	targets: WeakMap<object, ArrayRefAttachment>;
+	last: ArrayRefAttachment | undefined;
+}
+
+// One array can contain the same callback more than once. Record each
+// occurrence's teardown in the order it was attached.
+let arrayRefStates: WeakMap<readonly unknown[], ArrayRefState> | undefined;
+
+function attachArrayRefLeaf(ref: any, target: object, attachment: ArrayRefAttachment): void {
+	if (ref == null || attachment.detached) return;
+	if (Array.isArray(ref)) {
+		for (let i = 0; !attachment.detached && i < ref.length; i++)
+			attachArrayRefLeaf(ref[i], target, attachment);
+		return;
+	}
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__profileCount(ProfileCounter.REF_ATTACH);
+	let cleanup: unknown;
+	const detach = () => {
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__profileCount(ProfileCounter.REF_DETACH);
+		if (typeof cleanup === 'function') cleanup();
+		else if (typeof ref === 'function') ref(null);
+		else ref.current = null;
+	};
+	try {
+		if (typeof ref === 'function') cleanup = ref(target);
+		else ref.current = target;
+	} catch (error) {
+		if (attachment.detached) {
+			try {
+				detach();
+			} finally {
+				throw error;
+			}
+		}
+		attachment.cleanups.push(detach);
+		throw error;
+	}
+	// A callback may synchronously unmount its own root before returning.
+	if (attachment.detached) detach();
+	else attachment.cleanups.push(detach);
+}
+
 export interface ActivityRefState {
 	connected: any;
 	hidden: boolean;
@@ -326,23 +376,43 @@ export const applyRefValue = function applyRefValue(
 		return;
 	}
 	if (Array.isArray(ref)) {
+		let state = arrayRefStates?.get(ref);
 		if (el !== null) {
-			for (let i = 0; i < ref.length; i++) applyRefValue(ref[i], el, prevTarget);
+			if (state === undefined) {
+				state = { targets: new WeakMap(), last: undefined };
+				(arrayRefStates ??= new WeakMap()).set(ref, state);
+			}
+			const attachment = { cleanups: [], detached: false };
+			state.targets.set(el, attachment);
+			state.last = attachment;
+			attachArrayRefLeaf(ref, el, attachment);
 			return;
 		}
+		const attachment = prevTarget == null ? state?.last : state?.targets.get(prevTarget);
+		if (attachment?.detached) return;
+		if (attachment) attachment.detached = true;
 		// Release every owner after a cleanup failure, keeping update-depth errors fatal.
 		let error: unknown;
 		let failed = false;
-		for (let i = 0; i < ref.length; i++) {
-			try {
-				applyRefValue(ref[i], el, prevTarget);
-			} catch (caught) {
-				if (caught instanceof MaximumUpdateDepthError) throw caught;
-				if (!failed) {
-					error = caught;
-					failed = true;
+		const cleanups = attachment?.cleanups;
+		try {
+			for (let i = 0; i < (cleanups?.length ?? ref.length); i++) {
+				try {
+					if (cleanups) cleanups[i]();
+					else applyRefValue(ref[i], el, prevTarget);
+				} catch (caught) {
+					if (caught instanceof MaximumUpdateDepthError) throw caught;
+					if (!failed) {
+						error = caught;
+						failed = true;
+					}
 				}
 			}
+		} finally {
+			// Keep the closed receipt weakly associated with the target so a
+			// second explicit detach cannot release the leaves again.
+			if (cleanups) cleanups.length = 0;
+			if (attachment && state?.last === attachment) state.last = undefined;
 		}
 		if (failed) throw error;
 		return;

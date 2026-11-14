@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { attachRef } from '../src/index.js';
 import { mount } from './_helpers';
-import { IdentityRef } from './_fixtures/ref-identity.tsrx';
+import { ActivityIdentityRef, IdentityRef } from './_fixtures/ref-identity.tsrx';
 
 describe('callback ref identity change (React 19 detach-before-attach)', () => {
 	it('swapping the callback runs the old cleanup-return before attaching the new', () => {
@@ -105,5 +106,95 @@ describe('callback ref identity change (React 19 detach-before-attach)', () => {
 		root.unmount();
 		expect(firstObject.current).toBeNull();
 		expect(log.at(-1)).toBe('first:cleanup');
+	});
+
+	it('cleans up every occurrence of a callback in a nested array ref', () => {
+		const log: string[] = [];
+		let calls = 0;
+		const callback = (element: Element | null) => {
+			if (element === null) {
+				log.push('null');
+				return;
+			}
+			const call = ++calls;
+			log.push(`attach ${call}`);
+			if (call !== 2) return () => log.push(`cleanup ${call}`);
+		};
+		const root = mount(IdentityRef, { pick: [callback, [callback, callback]] });
+
+		root.update(IdentityRef, { pick: null });
+		expect(log).toEqual(['attach 1', 'attach 2', 'attach 3', 'cleanup 1', 'null', 'cleanup 3']);
+		root.unmount();
+		expect(log).toHaveLength(6);
+	});
+
+	it('reconnects each duplicate array ref occurrence after Activity reveals', () => {
+		const log: string[] = [];
+		let calls = 0;
+		const callback = (element: Element | null) => {
+			if (element === null) {
+				log.push('null');
+				return;
+			}
+			const call = ++calls;
+			log.push(`attach ${call}`);
+			return () => log.push(`cleanup ${call}`);
+		};
+		const pick = [callback, callback];
+		const root = mount(ActivityIdentityRef, { mode: 'visible', pick });
+		const host = root.find('#host');
+
+		root.update(ActivityIdentityRef, { mode: 'hidden', pick });
+		expect(log).toEqual(['attach 1', 'attach 2', 'cleanup 1', 'cleanup 2']);
+		root.update(ActivityIdentityRef, { mode: 'visible', pick });
+		expect(root.find('#host')).toBe(host);
+		root.unmount();
+		expect(log.slice(4)).toEqual(['attach 3', 'attach 4', 'cleanup 3', 'cleanup 4']);
+	});
+
+	it('cleans up the leaves originally attached even if the array changes', () => {
+		const log: string[] = [];
+		const refs = [() => () => log.push('original cleanup')];
+		const root = mount(IdentityRef, { pick: refs });
+		refs[0] = () => {
+			log.push('replacement called');
+			return () => {};
+		};
+		root.unmount();
+		expect(log).toEqual(['original cleanup']);
+	});
+
+	it('finishes the active array callback when it detaches its own ref', () => {
+		const log: string[] = [];
+		const element = document.createElement('div');
+		const refs = [
+			() => {
+				log.push('first attach');
+				attachRef(refs, null, element);
+				return () => log.push('first cleanup');
+			},
+			() => log.push('second called'),
+		];
+
+		attachRef(refs, element);
+		expect(log).toEqual(['first attach', 'first cleanup']);
+	});
+
+	it('uses the most recent array attachment for a targetless detach', () => {
+		const cleanups: Element[] = [];
+		const callback = (element: Element | null) => {
+			expect(element).not.toBeNull();
+			return () => cleanups.push(element!);
+		};
+		const refs = [callback, callback];
+		const a = document.createElement('div');
+		const b = document.createElement('div');
+		attachRef(refs, a);
+		attachRef(refs, b);
+
+		attachRef(refs, null);
+		expect(cleanups).toEqual([b, b]);
+		attachRef(refs, null, a);
+		expect(cleanups).toEqual([b, b, a, a]);
 	});
 });
