@@ -531,7 +531,8 @@ export function reactServerComponents(
 					!ts.isOptionalChain(value) &&
 					(value.arguments.length === 1 ||
 						(value.arguments.length === 2 &&
-							skipWrappers(value.arguments[1]).kind === ts.SyntaxKind.NullKeyword))
+							(selected ? value.arguments[1] : skipWrappers(value.arguments[1])).kind ===
+								ts.SyntaxKind.NullKeyword))
 				) {
 					const factory = imported(checker, value.expression);
 					if (factory?.module === 'react' && factory.name === 'createElement' && original('react'))
@@ -552,7 +553,12 @@ export function reactServerComponents(
 			const call = expression && skipParens(expression);
 			if (!call || !ts.isCallExpression(call)) return;
 			const argument = call.arguments[0] && skipParens(call.arguments[0]);
-			if (argument && ts.isJsxSelfClosingElement(argument) && ts.isIdentifier(argument.tagName))
+			if (!argument) return;
+			const target = ts.isCallExpression(argument) ? argument.arguments[0] : undefined;
+			if (
+				(ts.isJsxSelfClosingElement(argument) && ts.isIdentifier(argument.tagName)) ||
+				(target && ts.isIdentifier(target) && /^[A-Z]/.test(target.getText(sf)))
+			)
 				visit(call);
 		}
 		for (const statement of sf.statements) {

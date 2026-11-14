@@ -493,6 +493,48 @@ it('warns at a direct migrated server call that needs a standalone store provide
 	expect(renderHosted()).toContain('&lt;b&gt;42&lt;/b&gt;');
 });
 
+it('reports a migrated React factory root that needs its store context', async () => {
+	const { app } = project({
+		'app/src/pane.tsx': `import { useSnapshot } from 'observer';
+			export function Pane() { const value = useSnapshot(); return <b>{String(value)}</b>; }
+			export function Plain() { return <b>plain</b>; }`,
+		'app/src/root.tsx': `import { createElement as h } from 'react';
+			import * as React from 'react';
+			import { renderToStaticMarkup, renderToString } from 'react-dom/server';
+			import { Pane, Pane as lower, Plain } from './pane.tsx';
+			export function render() { return renderToString((h(Pane))); }
+			export function namespace() { return renderToStaticMarkup(React.createElement(Pane, null)); }
+			export const plain = renderToString(h(Plain));
+			export function lowerCase() { return renderToString(h(lower)); }
+			export function parenthesized() { return renderToString(h((Pane))); }
+			export function asserted() { return renderToString(h(Pane as typeof Pane)); }
+			export function escaped() { return renderToString(h(\\u0050ane)); }
+			export function wrappedNull() { return renderToString(h(Pane, (null))); }
+			export function shadowed(h: (value: unknown) => any) { return renderToString(h(Pane)); }`,
+	});
+	const paths = ['pane', 'root'].map((name) => path.join(app, 'src', name + '.tsx'));
+	const { files } = await runCodemod(paths, { root: app, strong: true, verify: true, write: true });
+	const result = files.find(({ file }) => file === 'src/root.tsx');
+	expect(result.notes.filter(({ rule }) => rule === 'store-hook')).toEqual(
+		[5, 6].map((line) =>
+			expect.objectContaining({
+				line,
+				severity: 'warning',
+				message: expect.stringMatching(/standalone.*migrated Pane.*NativeStoreProvider/),
+			}),
+		),
+	);
+
+	const { render, namespace, plain } = await bundleRuntime(
+		app,
+		'server',
+		"export { render, namespace, plain } from './src/root.tsrx';",
+	);
+	expect(render).toThrow(/useContext|errors\/12/);
+	expect(namespace).toThrow(/useContext|errors\/12/);
+	expect(plain).toContain('<b>plain</b>');
+});
+
 it('warns at existing standalone client roots when the migrated hook reads context', async () => {
 	const mount = `import { createRoot as mount } from 'octane';
 		import * as Octane from 'octane';
