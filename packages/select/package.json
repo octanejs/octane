@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/select",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "license": "MIT",
   "type": "module",
   "description": "React Select bindings for the Octane renderer.",
@@ -47,7 +47,7 @@
     "memoize-one": "6.0.0"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.17.0"
+    "octane": "workspace:^0.18.0"
   },
   "devDependencies": {
     "@babel/core": "7.19.6",

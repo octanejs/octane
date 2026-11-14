@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/dexie",
-  "version": "0.1.63",
+  "version": "0.1.64",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -41,7 +41,7 @@
   },
   "peerDependencies": {
     "dexie": "^4.4.4",
-    "octane": "workspace:^0.17.0"
+    "octane": "workspace:^0.18.0"
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",

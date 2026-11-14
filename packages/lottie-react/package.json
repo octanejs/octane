@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/lottie-react",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Octane bindings for Lottie animations, ported from lottie-react 2.4.1.",
   "license": "MIT",
   "type": "module",
@@ -37,7 +37,7 @@
     "lottie-web": "5.13.0"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.17.0"
+    "octane": "workspace:^0.18.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

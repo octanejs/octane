@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/next-themes",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -40,7 +40,7 @@
     "upstream:test": "node ../../scripts/react-parity/run-pristine.mjs next-themes"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.17.0"
+    "octane": "workspace:^0.18.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

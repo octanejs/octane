@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/hot-toast",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -45,7 +45,7 @@
     "goober": "2.1.19"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.17.0"
+    "octane": "workspace:^0.18.0"
   },
   "devDependencies": {
     "@babel/preset-env": "7.29.7",

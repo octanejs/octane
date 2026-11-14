@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-start",
-  "version": "0.2.16",
+  "version": "0.2.17",
   "description": "TanStack Start for Octane, including file-route generation, server functions, SSR streaming, hydration, and Vite or Rsbuild integration.",
   "license": "MIT",
   "type": "module",
@@ -153,7 +153,7 @@
   },
   "peerDependencies": {
     "@rsbuild/core": "^2.0.0",
-    "octane": "workspace:^0.17.0",
+    "octane": "workspace:^0.18.0",
     "vite": ">=7.0.0"
   },
   "peerDependenciesMeta": {

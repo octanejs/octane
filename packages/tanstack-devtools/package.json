@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-devtools",
-  "version": "0.0.64",
+  "version": "0.0.65",
   "license": "MIT",
   "type": "module",
   "octane": {
@@ -42,7 +42,7 @@
     "@tanstack/devtools": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.17.0"
+    "octane": "workspace:^0.18.0"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",

@@ -1,5 +1,157 @@
 # @octanejs/codemod
 
+## 0.2.1
+
+### Patch Changes
+
+- 4d23599: Refuse to migrate a local React context's Provider JSX when a direct module-level Object.defineProperty call defines its getter earlier in the same source file.
+- 32532ec: Report migrated React DOM roots that directly render an unchanged local component which still calls a React hook.
+- 898108e: Warn when an existing Octane server renderer directly renders a migrated component whose generated store hook needs the original provider during standalone rendering.
+- f3acd8e: Preserve the original React source when an authored ReactCompat island receives an imported component through a local constant.
+- b9e9c78: Preserve JSX map calls on runtime-supplied arrays and report the React element ownership that their methods can observe.
+- aad5480: Convert one-way render-state latches initialized directly from a typed boolean prop, preserving eager and retry prop reads.
+- cdab185: Report unresolved bare SVG tags as `svg-issuer` errors even when a store hook in the same file migrates.
+- 9988377: Report potentially renderer-owned getters read by conditional expressions in React hook dependency lists.
+- b9e26af: Report writable or prematurely initialized map callback parameters when an unkeyed conditional row becomes an `@for` directive. Refuse to write the affected migration.
+- e502c24: Report bare SVG imports selected by object destructuring when the imported component can reach a JSX tag.
+- e7dd31c: Report opaque property reads in effect dependency lists that can execute a React-owned getter during native SSR.
+- 2a97508: Report potentially renderer-owned getters in React layout effect, insertion effect, imperative handle, memo, and callback dependency lists.
+- 83d262f: Move ref-only helpers into an effect when all of their calls belong to that effect, preserving the original setup and cleanup behavior.
+- 1711879: Preserve an explicit effect restart trigger when an unrelated property has the same name.
+- 46785e6: Keep scoped-store migration diagnostics when a locally exposed handle can acquire a callback that schedules React DOM resources.
+- 32c189c: Retain renderer ownership diagnostics for render-time reads of scoped store results through scalar hook inputs and local value aliases.
+- 51ee741: Report React DOM resource hints called through local TypeScript helpers during inline state initialization.
+- 0336f7a: Report unknown renderer ownership for React Intl formatters in generated Intl islands, and honor nested TypeScript package aliases when selecting the Intl adapter.
+- 6736c8f: Report React Intl provider ownership when migrating a `FormattedMessage` to the generated native adapter.
+- 7b5848e: Report render-time React Intl date range, relative time, plural and display name calls whose provider may schedule React DOM resources during server rendering.
+- afba690: Report possible React-owned SSR effects from direct React Intl date, time, and number formatting during render.
+- 5d3f3e7: Preserve React JSX evaluation order when mapped row props or children are evaluated before an observable key. Report rows that need manual migration.
+- 2657380: Retain async and generator JSX map callbacks for review so a native loop cannot discard their promise or iterator results.
+- 052d8a7: Refuse map-to-`@for` writes when a parameter default reads the later index through an eagerly evaluated property access, receiver, or call argument.
+- aaf72b8: Flag more map destructuring expressions that may read the callback index before it is initialized. This protects against suppressing a `ReferenceError` when an eager arithmetic expression, unary expression, or first argument of a direct call becomes part of an `@for` loop.
+- 91510a9: Report a map callback's destructuring read of its later index when an `@for` conversion would change initialization order, and refuse to write the migration.
+- c62f457: Migrate typed React state setters used exclusively as one native host ref to a component-local external-store snapshot in Strong mode.
+- 494156c: Preserve eager prop reads and callable React state initializers when strengthening modules, and preserve parenthesized reducer initial values.
+- 5fcffd4: Allow a single literal boolean or null JSX child in a React compatibility island, preserving the value passed to the React component.
+- a340118: Report unchanged local React hooks called before a component returns conditional JSX.
+- f5f888d: Keep retained JSX map expressions renderable inside conditional directive arms.
+- 54b928d: Warn when a retained React server render directly imports a JSX component selected for migration.
+- a37c90a: Allow scoped-store hook migration when a local Effect Event uses the store and every call to that Effect Event comes directly from the same component's effects or their cleanups.
+- 1d1ea68: Defer scoped-store migrations when an imported argument carries JSX from a producer selected for renderer conversion.
+- 59ce57c: Keep a bindings diagnostic when a native render reads a member supplied by an opaque scoped store provider.
+- 06b23f4: Recover project types for shorthand scalar props from plain exported component parameters after checking for local writes and callers.
+- 6c422d9: Apply the map callback parameter checks to array literals with spreads. Block writes when converting these callbacks to `@for` would change a parameter assignment or when its binding pattern could read the index too early.
+- a3d6f36: Refuse to rename a source when an import or HTML entry page would keep pointing to its old name through another spelling of the same symlinked directory.
+- a4dc429: Report React DOM resource hints in imported TypeScript state initializers when native server rendering cannot collect them.
+- cfd7ebf: Migrate static SVG circles and plain data attributes authored on the SVG root when the component is proven to render in Octane.
+- 2e13507: Migrate supported static SVGs with local linear gradients, alpha masks, and simple filters when `--svg-paths` can prove native renderer ownership.
+- 6b71eec: Keep the scoped-store diagnostic when an instance field can read the store after its enclosing effect or event has finished.
+- 4c7b483: Follow wildcard re-exports when checking whether a scoped-store argument carries JSX from a module selected for conversion.
+- d4b6e6a: Report conflicting migration outputs reached through symlinked directories before writing any files.
+- 028f776: Warn when migrating a text input or textarea's `onChangeCapture` would move it ahead of an existing `onInput` handler.
+- 060db00: Report conflicting migration output names that differ only by Unicode normalization on macOS when a source file proves both names refer to the same directory entry.
+- 0e8d8ee: Warn when a migrated component calls an unchanged local hook that reads React context through a private helper after its module initializes.
+- 8ba0941: Warn when an admitted SVG asset declares xmlns and a React loader that forwards it can differ from Octane on a fresh mount.
+- a586fc3: Report writable map callback indexes and destructured bindings when conversion would make them read-only in an `@for` row. Refuse the migration before writing project files.
+- baceb39: Preserve `.Provider` and `.Consumer` on const object literals exported directly by unselected `.ts` and `.tsx` files when a relative import names the file or its extensionless path in an ESNext project.
+- f9e5005: Warn at a directly migrated top-level server render when its component may need `NativeStoreProvider` in standalone Octane.
+- 5bbb134: Report later map index reads in earlier parameter tests and in branches selected by literal conditions before converting to an Octane loop.
+- 84bd2a4: Report later map index reads in earlier parameter defaults that evaluate comma or strict equality operands before converting to an Octane loop.
+- 0970200: Keep simple inline `useImperativeHandle` factories in Strong mode when React refreshes the handle on every committed render.
+- 98de84e: Add `OctaneCompatInline` to host compiled Octane phrasing content inside React using a span on the client and server. The codemod preserves its authored React server ownership.
+- c091087: Report native React Intl `formatMessage` calls and generated `FormattedMessage` React islands that can lose React request resource hints or ancestor context. Keep the existing migration preview for review.
+- 439a50c: Retain React Motion `MotionConfigContext` type references and re-exports when migrating named imports. The Octane binding exports a different context value.
+- 016f22c: Report context member references through a TypeScript path alias when the selected local export needs review. Keep the member in previews and stop write mode before changing the project.
+- 922c9ee: Report a migration conflict before writing when a selected change would replace an authored React island's component or a statically imported local implementation dependency.
+- 9708f41: Report direct server-side `OctaneCompat` edges that would reach an emitted `ReactCompat` island, and stop write mode before changing those files.
+- f06f862: Report unchanged local wrappers that still call React Intl's `useIntl` before native component output.
+- aea2f15: Check React Motion imports and re-exports against the Octane Motion binding's catalog. Keep requests for missing exports or an unknown namespace on their original entry points and report a binding error.
+- 5aaa75f: Check named Motion imports against the project's installed Octane binding before rewriting them. Report an existing binding whose exports cannot be verified.
+- 8c2e32c: Report unchanged local hooks that call React's `useCallback` when a migrated component calls them during native render setup.
+- a93ff97: Report a JSX map parameter that reads the later index inside a template literal before lowering the map to `@for`.
+- d019be8: Warn when an existing standalone Octane client root directly renders a migrated store consumer that may read its original provider context.
+- e288b40: Report bare SVG imports that are rendered through a namespace's default export.
+- 988a2d0: Allow React to set the host class and style on `OctaneCompat` and
+  `OctaneCompatInline` with `hostClassName` and `hostStyle`. Both hosts use
+  `display: contents` by default.
+
+  Keep the codemod's React SSR ownership checks active when a host sets either
+  presentation prop.
+- 49ab3c2: Report JSX map callbacks whose `this`, `arguments`, or `new.target` reads can change when the codemod migrates their component or lowers the callback to a row.
+- e34aabd: Refuse to migrate a React module that directly returns an authored server `OctaneCompat` host.
+- fc0d598: Migrate deferred calls on verified scoped stores when the original package supplies a data descriptor. Preserve the descriptor import and identity, the method receiver, and the effect setup timing.
+- 96d8a87: Report retained private React context helpers that use a literal namespace member such as `React["useContext"]`.
+- 25bb730: Report native component setup that calls an unchanged local React hook with a literal parameter default.
+- 6099bf2: Report unselected local hooks that still call React when native component setup returns component JSX or follows ordinary state declarations.
+- b8a47e1: Warn when a retained private helper reads React context through a React namespace import.
+- cc274f3: Report retained React effect hooks reached during a migrated component's setup, including calls after ordinary const initializers.
+- 32ad2e1: Warn when an unchanged React component directly renders a JSX export selected for migration to Octane.
+- ca9fc73: Preserve React Intl imports when a configured TypeScript custom condition can select a runtime export for the package's root entry.
+- 7df9fb2: Verify the final Strong-mode repair before choosing the output mode and reporting remaining diagnostics.
+- 760f5f7: Report unchanged local hooks that call React's `useContext` when a migrated component calls them during native render setup.
+- 999d8e9: Report eager reads of a later map index inside array and object literals before converting the callback to a keyed loop.
+- 8fc40b3: Report a JSX map parameter that reads the later index in an immediately invoked synchronous arrow before lowering the map to `@for`.
+- Updated dependencies [7a917ac]
+- Updated dependencies [14af2dc]
+- Updated dependencies [9507c7b]
+- Updated dependencies [7a0fa8a]
+- Updated dependencies [45536c1]
+- Updated dependencies [cb13e64]
+- Updated dependencies [9a756ff]
+- Updated dependencies [35f0615]
+- Updated dependencies [cd695f2]
+- Updated dependencies [229c9fa]
+- Updated dependencies [c6641b6]
+- Updated dependencies [a5b9bef]
+- Updated dependencies [ff21aac]
+- Updated dependencies [30acf9b]
+- Updated dependencies [01a68e4]
+- Updated dependencies [c3bea0c]
+- Updated dependencies [bbbb499]
+- Updated dependencies [c493477]
+- Updated dependencies [33224c9]
+- Updated dependencies [dd23f96]
+- Updated dependencies [cbadc1e]
+- Updated dependencies [13f4a75]
+- Updated dependencies [e6024c4]
+- Updated dependencies [36a0ac5]
+- Updated dependencies [116bb8c]
+- Updated dependencies [98de84e]
+- Updated dependencies [d2a12e2]
+- Updated dependencies [0b487b9]
+- Updated dependencies [69b5971]
+- Updated dependencies [79e59b7]
+- Updated dependencies [08c8f21]
+- Updated dependencies [52963f5]
+- Updated dependencies [7d04546]
+- Updated dependencies [0c0ab0d]
+- Updated dependencies [e43ef86]
+- Updated dependencies [46e438c]
+- Updated dependencies [235acdb]
+- Updated dependencies [4ae0559]
+- Updated dependencies [a60018e]
+- Updated dependencies [998ad73]
+- Updated dependencies [42d6270]
+- Updated dependencies [aea2f15]
+- Updated dependencies [4abf364]
+- Updated dependencies [988a2d0]
+- Updated dependencies [7240091]
+- Updated dependencies [3158125]
+- Updated dependencies [6fe9c4e]
+- Updated dependencies [598df83]
+- Updated dependencies [173a573]
+- Updated dependencies [6921d3d]
+- Updated dependencies [09160df]
+- Updated dependencies [db22792]
+- Updated dependencies [aa67310]
+- Updated dependencies [84ae971]
+- Updated dependencies [f3e22ba]
+- Updated dependencies [b117586]
+- Updated dependencies [92ad772]
+- Updated dependencies [296e948]
+  - octane@0.18.0
+  - @octanejs/cli@0.3.5
+
 ## 0.2.0
 
 ### Minor Changes

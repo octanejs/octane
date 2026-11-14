@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/lexical",
-  "version": "0.2.13",
+  "version": "0.2.14",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -120,7 +120,7 @@
     "yjs": "catalog:default"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.17.0"
+    "octane": "workspace:^0.18.0"
   },
   "devDependencies": {
     "@lexical/react": "catalog:default",
