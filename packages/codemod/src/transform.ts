@@ -6131,6 +6131,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return whenFalse === '' ? then : then + ' ' + this.block('@else', whenFalse);
 	}
 
+	private reportOpaqueMap(node: ts.CallExpression) {
+		this.note(
+			RULE.for,
+			'error',
+			node,
+			'This receiver can override .map() and inspect the React elements its callback returns. Keep this list in React or verify its map behavior before porting it.',
+		);
+	}
+
 	/**
 	 * `items.map((item, i) => <Row key={item.id} />)` is
 	 * `@for (const item of items; index i; key item.id) { <Row /> }`.
@@ -6193,6 +6202,24 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		if (ts.isBlock(fn.body)) {
 			const statements = fn.body.statements;
 			const last = statements[statements.length - 1];
+			if (
+				last &&
+				ts.isSwitchStatement(last) &&
+				!literal &&
+				!rowKeyLiteral(last.expression) &&
+				!fn.asteriskToken &&
+				!fn.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
+				last.caseBlock.clauses.some((clause) =>
+					clause.statements.some(
+						(statement) =>
+							ts.isReturnStatement(statement) &&
+							statement.expression &&
+							isJsx(skipWrappers(statement.expression)),
+					),
+				)
+			) {
+				this.reportOpaqueMap(node);
+			}
 			if (!last || !ts.isReturnStatement(last) || !last.expression) return null;
 			setup = statements.slice(0, -1);
 			const exit = this.emptyArmExit(setup);
@@ -6230,14 +6257,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				return null;
 			}
 		}
-		if (!literal) {
-			this.note(
-				RULE.for,
-				'error',
-				node,
-				'This receiver can override .map() and inspect the React elements its callback returns. Keep this list in React or verify its map behavior before porting it.',
-			);
-		}
+		if (!literal) this.reportOpaqueMap(node);
 		if (attribute && key && !this.stableRowKey(key, item, iterable)) {
 			const open = attribute.parent.parent;
 			const children = ts.isJsxElement(root) ? root.children : [];

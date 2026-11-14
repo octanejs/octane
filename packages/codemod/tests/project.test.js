@@ -50,6 +50,75 @@ function typecheckProject(root) {
 }
 
 describe('runCodemod', () => {
+	it('reports opaque map methods that receive JSX from a callback switch', async () => {
+		const setup = `function makeRows() {
+	const rows = ['a', 'b'];
+	return Object.assign(rows, {
+		map(render: (value: string) => unknown) {
+			const first = render(rows[0]) as { $$typeof?: symbol };
+			return first.$$typeof === Symbol.for('react.transitional.element')
+				? [first]
+				: [render(rows[1]), first];
+		},
+	});
+}`;
+		const map = `makeRows().map(row => {
+		const label = row.toUpperCase();
+		switch (row) {
+			case 'a': return <b key={row}>{label}</b>;
+			default: return (<i key={row}>{label}</i>);
+		}
+	})`;
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'Native.tsx': `${setup}
+export function List() { return <main>{${map}}</main>; }`,
+			'Island.tsx': `import { ReactCompat } from 'octane/react';
+${setup}
+export function List() { return <ReactCompat><main>{${map}}</main></ReactCompat>; }`,
+			'Literal.tsx': `export function List() { return <main>{${map.replace('makeRows()', "['a', 'b']")}}</main>; }`,
+			'ConstantSwitch.tsx': `${setup}
+export function List() { return <main>{${map.replace('switch (row)', "switch ('text')").replace('default: return (<i key={row}>{label}</i>);', "default: return 'text';")}}</main>; }`,
+			'Callbacks.tsx': `${setup}
+export function List() { return <main>{makeRows().map(row => {
+	switch (row) {
+		case 'a': return () => <b>{row}</b>;
+		default: return undefined;
+	}
+})}</main>; }`,
+			'Values.tsx': `${setup}
+export function List() { return <main>{makeRows().map(row => {
+	switch (row) {
+		case 'a': return row;
+		default: return '';
+	}
+})}</main>; }`,
+		});
+		const { files } = await runCodemod([root], { root, write: false, verify: false });
+		expect(files.map((file) => file.file).sort()).toEqual([
+			'Callbacks.tsx',
+			'ConstantSwitch.tsx',
+			'Island.tsx',
+			'Literal.tsx',
+			'Native.tsx',
+			'Values.tsx',
+		]);
+		for (const file of files) {
+			const notes = file.notes.filter((note) => note.rule === 'template-for');
+			if (file.file === 'Native.tsx') {
+				expect(notes).toEqual([
+					expect.objectContaining({
+						severity: 'error',
+						message: expect.stringContaining('inspect the React elements'),
+					}),
+				]);
+				expect(file.code).toContain('makeRows().map(');
+			} else {
+				expect(notes).toEqual([]);
+			}
+		}
+	});
+
 	it('warns on waiting for a migrated render stream before reading the body', async () => {
 		const imports = [
 			"import { renderToReadableStream as render } from 'react-dom/server';",
