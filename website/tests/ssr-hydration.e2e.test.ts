@@ -2241,24 +2241,47 @@ describe(
 			'client-side navigation does not start resources owned by the outgoing route',
 			{ timeout: 30_000 },
 			async () => {
-				const outgoingLynxRequests: string[] = [];
-				let navigating = false;
+				const lynxRequests: { path: string; start: number }[] = [];
+				const navigationLabel = 'benchmarks-navigation';
+				let navigationStart: number | undefined;
 				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/', {
 					beforeNavigation: async (page) => {
 						await page.route(/\/assets\/benchmarks-[^/]+\.js$/, async (route) => {
 							await new Promise((resolve) => setTimeout(resolve, 500));
 							await route.continue();
 						});
-						page.on('request', (request) => {
-							const pathname = new URL(request.url()).pathname;
-							if (navigating && pathname.startsWith('/lynx-examples/')) {
-								outgoingLynxRequests.push(pathname);
-							}
+						// Record starts even if the router aborts the request on unmount.
+						const cdp = await page.context().newCDPSession(page);
+						cdp.on('Network.requestWillBeSent', ({ request, timestamp }) => {
+							const pathname = new URL(request.url).pathname;
+							if (pathname.startsWith('/lynx-examples/'))
+								lynxRequests.push({ path: pathname, start: timestamp });
 						});
+						// console.timeStamp supplies Chromium's monotonic clock, shared with network starts.
+						cdp.on('Performance.metrics', ({ title, metrics }) => {
+							if (title === navigationLabel)
+								navigationStart ??= metrics.find(({ name }) => name === 'Timestamp')?.value;
+						});
+						await cdp.send('Network.enable');
+						await cdp.send('Performance.enable');
 					},
 				});
 				try {
-					navigating = true;
+					await expect
+						.poll(() => page.getByRole('log').innerText(), { timeout: PLAYWRIGHT_ACTION_TIMEOUT })
+						.toContain('count is now 0');
+					const documentTimeOrigin = await page.evaluate((label) => {
+						const router = window.__TSR_ROUTER__;
+						if (!router) throw new Error('Homepage router is missing after hydration.');
+						// The Link commits its transition cue before it starts routing. Only
+						// requests after the router accepts the new route are outgoing work.
+						router.subscribe('onBeforeNavigate', ({ toLocation }) => {
+							if (toLocation.pathname === '/benchmarks') {
+								console.timeStamp(label);
+							}
+						});
+						return performance.timeOrigin;
+					}, navigationLabel);
 					await page.click('a.nav-link[href="/benchmarks"]');
 					await page.waitForFunction(() => location.pathname === '/benchmarks', null, {
 						timeout: PLAYWRIGHT_ACTION_TIMEOUT,
@@ -2270,7 +2293,13 @@ describe(
 							timeout: PLAYWRIGHT_ACTION_TIMEOUT,
 						},
 					);
-					expect(outgoingLynxRequests).toEqual([]);
+					expect(await page.evaluate(() => performance.timeOrigin)).toBe(documentTimeOrigin);
+					const startOfNavigation = navigationStart;
+					if (startOfNavigation === undefined)
+						throw new Error('Chromium did not report the Benchmarks navigation timestamp.');
+					expect(
+						lynxRequests.filter(({ start }) => start >= startOfNavigation).map(({ path }) => path),
+					).toEqual([]);
 					expect(errors).toEqual([]);
 				} finally {
 					await page.close();
