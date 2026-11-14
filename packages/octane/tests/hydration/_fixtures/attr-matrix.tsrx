@@ -62,6 +62,7 @@ export function FormAttrs(props) @{
 			{'go'}
 		</button>
 		<input class="f3" autoFocus={props.on} />
+		<input class="f4" formAction={props.on ? '/on' : ''} />
 	</form>
 }
 
