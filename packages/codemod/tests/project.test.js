@@ -1967,6 +1967,13 @@ export function Host({rows}: { rows: Row[] }) {
 				'Call.tsx': source(direct.replace('(index as number)', 'String(index)')),
 				'LaterArg.tsx': source(direct.replace('(index as number)', 'String(0, index)')),
 				'Callee.tsx': source(direct.replace('(index as number)', '(index as any)?.()')),
+				'ImmediateArrow.tsx': source(direct.replace('(index as number)', '(() => index)()')),
+				'ImmediateArrowShadow.tsx': source(
+					direct.replace('(index as number)', '((index = 7) => index)()'),
+				),
+				'ImmediateArrowThrowingArg.tsx': source(
+					direct.replace('(index as number)', '(() => index)(fail())'),
+				),
 				'Product.tsx': source(direct.replace('(index as number)', '2 * (index as number)')),
 				'Unary.tsx': source(direct.replace('(index as number)', '-index')),
 				'Bitwise.tsx': source(direct.replace('(index as number)', '0 | index')),
@@ -2075,6 +2082,7 @@ export function Host({rows}: { rows: Row[] }) {
 						'Call.tsx',
 						'LaterArg.tsx',
 						'Callee.tsx',
+						'ImmediateArrow.tsx',
 						'OptionalArrow.tsx',
 						'EarlierCallee.tsx',
 						'EarlierCalleeLaterArg.tsx',
@@ -2103,7 +2111,7 @@ export function Host({rows}: { rows: Row[] }) {
 					expect(file.code).toContain('@for');
 				} else expect(file.notes).toEqual([]);
 			}
-			for (const first of ['ArrayValue.tsx', 'Template.tsx']) {
+			for (const first of ['ArrayValue.tsx', 'Template.tsx', 'ImmediateArrow.tsx']) {
 				const result = await runCodemod(
 					[path.join(root, first), ...inputs.filter((file) => path.basename(file) !== first)],
 					options,
