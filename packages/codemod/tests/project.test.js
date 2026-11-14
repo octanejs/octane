@@ -1183,6 +1183,137 @@ export function useObserver(fit: () => void) {
 	});
 
 	it.each([true, false])(
+		'reports a retained React Intl hook before native output (projectTypes=%s)',
+		async (projectTypes) => {
+			const owner = `import { useIntl as readIntl } from 'react-intl';
+export function useLocale(enabled = true) {
+	const intl = readIntl();
+	return enabled ? intl.locale : 'en';
+}`;
+			const view = (file) => `import { useLocale } from './${file}';
+export function View() {
+	const locale = useLocale();
+	return <b>{locale}</b>;
+}`;
+			const root = project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				'owner.ts': owner,
+				'pure.ts': "export function useLocale() { return 'en'; }",
+				'selected.ts': owner,
+				'erased.ts': owner.replace('const intl =', 'declare const intl ='),
+				'shadowed.ts': owner.replace(
+					'export function useLocale(enabled = true)',
+					'export function useLocale(enabled = true, readIntl)',
+				),
+				'View.tsx': view('owner'),
+				'Pure.tsx': view('pure'),
+				'Selected.tsx': view('selected'),
+				'Erased.tsx': view('erased'),
+				'Shadowed.tsx': view('shadowed'),
+			});
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules'),
+				path.join(root, 'node_modules'),
+			);
+			const paths = [
+				'View.tsx',
+				'Pure.tsx',
+				'Selected.tsx',
+				'Erased.tsx',
+				'Shadowed.tsx',
+				'selected.ts',
+			];
+			const run = () =>
+				runCodemod(
+					paths.map((file) => path.join(root, file)),
+					{
+						root,
+						strong: true,
+						projectTypes,
+						verify: true,
+						write: false,
+					},
+				);
+			const findings = (files) =>
+				files.flatMap((file) =>
+					file.notes
+						.filter((note) => note.message.includes("calls React Intl's useIntl"))
+						.map((note) => [file.file, note.line, note.severity]),
+				);
+			const { files } = await run();
+			expect(findings(files)).toEqual([['View.tsx', 3, 'error']]);
+			expect(files.find((file) => file.file === 'View.tsx')?.code).toContain('./owner');
+
+			fs.writeFileSync(
+				path.join(root, 'replacement.ts'),
+				"export const useIntl = () => ({ locale: 'en' });",
+			);
+			fs.writeFileSync(
+				path.join(root, 'tsconfig.json'),
+				JSON.stringify({
+					compilerOptions: {
+						strict: true,
+						jsx: 'react-jsx',
+						moduleResolution: 'bundler',
+						paths: { 'react-intl': ['./replacement.ts'] },
+					},
+				}),
+			);
+			expect(findings((await run()).files)).toEqual([]);
+		},
+	);
+
+	it.each([
+		['src/components/useIntl', 'module.exports = () => ({ locale: "en" });'],
+		['lib/src/components/useIntl.mjs', 'export default () => ({ locale: "en" });'],
+		['src/components/useIntl.js', 'module.exports.default = () => ({ locale: "en" });'],
+		['node_modules/react/index.js', 'exports.useContext = () => ({ locale: "en" });'],
+	])(
+		'keeps the retained hook unclassified when %s changes the installed hook',
+		async (shadow, code) => {
+			const root = project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				'owner.ts':
+					"import { useIntl } from 'react-intl'; export function useLocale() { const intl = useIntl(); return intl.locale; }",
+				'View.tsx':
+					"import { useLocale } from './owner'; export function View() { const locale = useLocale(); return <b>{locale}</b>; }",
+			});
+			const installed = path.join(root, 'node_modules/react-intl');
+			fs.cpSync(
+				fs.realpathSync(path.join(REPO, 'packages/codemod/node_modules/react-intl')),
+				installed,
+				{
+					recursive: true,
+				},
+			);
+			for (const name of ['octane', 'react'])
+				fs.symlinkSync(
+					path.join(REPO, 'packages/codemod/node_modules', name),
+					path.join(root, 'node_modules', name),
+				);
+			const reportsRetainedHook = async () => {
+				const { files } = await runCodemod([path.join(root, 'View.tsx')], {
+					root,
+					strong: true,
+					projectTypes: true,
+					verify: true,
+					write: false,
+				});
+				return files[0]?.notes.some((note) => note.message.includes("calls React Intl's useIntl"));
+			};
+			expect(await reportsRetainedHook()).toBe(true);
+			const replacement = path.join(installed, shadow);
+			fs.mkdirSync(path.dirname(replacement), { recursive: true });
+			fs.writeFileSync(replacement, code);
+			expect(await reportsRetainedHook()).toBe(false);
+		},
+	);
+
+	it.each([true, false])(
 		'advises on a retained private context helper (projectTypes=%s)',
 		async (projectTypes) => {
 			const imports = "import { createContext, useContext as readContext } from 'react';";

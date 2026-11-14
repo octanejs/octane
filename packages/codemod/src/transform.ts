@@ -3221,7 +3221,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 								RULE.bindings,
 								'error',
 								site,
-								`The unchanged ${module} export ${name} calls React's ${local}. Provide a compiled Octane hook for native callers or keep this component under a React renderer.`,
+								`The unchanged ${module} export ${name} calls ${local === 'useIntl' ? "React Intl's" : "React's"} ${local}. Provide a compiled Octane hook for native callers or keep this component under a React renderer.`,
 							);
 						else if (local && typeof local !== 'string' && 'privateContext' in local) {
 							const advisorySite = refs.find((ref) =>
@@ -4743,7 +4743,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				RULE.rootRender,
 				'error',
 				tag,
-				`The migrated root renders ${tag.text}, but the unchanged ${leaf.module} export calls React's ${hook}. Migrate the component or keep this root under React DOM.`,
+				`The migrated root renders ${tag.text}, but the unchanged ${leaf.module} export calls ${hook === 'useIntl' ? "React Intl's" : "React's"} ${hook}. Migrate the component or keep this root under React DOM.`,
 			);
 	}
 
