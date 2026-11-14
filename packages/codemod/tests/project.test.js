@@ -581,6 +581,95 @@ ${shape === 'named and default export' ? 'export default Owner;' : ''}`,
 	);
 
 	it.each([
+		[
+			'a state tuple and direct React JSX',
+			'export function Leaf() { const [label] = useState("ready"); return <b>{label}</b>; }',
+			false,
+			true,
+		],
+		[
+			'a literal and lazy React JSX',
+			'export const Leaf = () => { const label = "ready"; return (<b>{label}</b>); };',
+			true,
+			true,
+		],
+		[
+			'an early return',
+			'export function Leaf({ skip }) { if (skip) return null; const label = "ready"; return <b>{label}</b>; }',
+			false,
+			false,
+		],
+		[
+			'a type wrapper',
+			'export function Leaf() { const label = "ready"; return <b>{label}</b> as React.ReactElement; }',
+			false,
+			false,
+		],
+		[
+			'an ambient export',
+			'export declare function Leaf() { const label = "ready"; return <b>{label}</b>; }',
+			false,
+			false,
+		],
+		[
+			'an ambient setup declaration',
+			'export function Leaf() { declare const label = "ready"; return <b>{label}</b>; }',
+			false,
+			false,
+		],
+		[
+			'an explicit disposal declaration',
+			'export function Leaf() { using value = resource(); return <b />; }',
+			false,
+			false,
+		],
+	])(
+		'reports retained React JSX for a migrated leaf with %s',
+		async (_shape, leaf, lazy, warns) => {
+			const ingress = lazy
+				? "import { lazy } from 'react'; const Leaf = lazy(() => import('./Leaf').then(m => ({ default: m.Leaf })));"
+				: "import { Leaf } from './Leaf';";
+			const root = project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { jsx: 'react-jsx', moduleResolution: 'Bundler' },
+				}),
+				'Leaf.tsx': "import { useState } from 'react';\n" + leaf,
+				'Owner.tsx': ingress + '\nexport function Owner() { return <Leaf />; }',
+			});
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules'),
+				path.join(root, 'node_modules'),
+				'dir',
+			);
+			const selected = [path.join(root, 'Leaf.tsx')];
+			const options = { root, strong: true, write: false };
+			const preview = await runCodemod(selected, options);
+			const migrated = preview.files.find((file) => file.file === 'Leaf.tsx');
+			const retained = preview.files.find((file) => file.file === 'Owner.tsx');
+			const affected = preview.files.filter((file) =>
+				file.notes.some(
+					(note) =>
+						note.rule === 'react-compat' &&
+						note.severity === 'warning' &&
+						note.message.includes('retained React JSX') &&
+						note.message.includes(lazy ? 'through React.lazy' : 'directly'),
+				),
+			);
+			expect(affected.map((file) => file.file)).toEqual(warns ? ['Leaf.tsx', 'Owner.tsx'] : []);
+			expect(migrated?.output).toBe('Leaf.tsrx');
+			expect(retained?.code).toContain("'./Leaf.tsrx'");
+			if (warns) {
+				const written = await runCodemod(selected, { ...options, write: true });
+				expect(written.files.map(({ file, notes }) => ({ file, notes }))).toEqual(
+					preview.files.map(({ file, notes }) => ({ file, notes })),
+				);
+				expect(fs.readFileSync(path.join(root, 'Leaf.tsrx'), 'utf8')).toBe(migrated?.code);
+				expect(fs.readFileSync(path.join(root, 'Owner.tsx'), 'utf8')).toBe(retained?.code);
+			}
+		},
+	);
+
+	it.each([
 		['direct named import', 'icon()', true],
 		['shadowed import', 'icon()', false],
 		['call with an argument', 'icon(1)', false],
