@@ -81,10 +81,12 @@ export default defineConfig({
 hook/context helper modules with `/** @jsxImportSource octane */`; mark React-owned JSX with
 `/** @jsxImportSource react */`. Do not alias React or React DOM to Octane.
 
-`requireDirective` applies to application files under the bundler root. Keep
-mixed application modules inside that root. Installed and linked packages retain
-their package ownership rules; a React library that does not declare Octane
-remains React-owned.
+`requireDirective` gates application files under the bundler root. Installed and
+linked packages use their manifest's default ownership. With this option
+enabled, a package's `.tsx` file with a leading `/** @jsxImportSource react */`
+stays with React's transform unless the application registers `react` as its
+renderer intrinsics. A React library that does not declare Octane remains
+React-owned.
 
 Use a named `ReactCompat` import (aliases are supported). The compiler transports
 its child as an inspectable element descriptor instead of executing the React
