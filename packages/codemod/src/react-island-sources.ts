@@ -242,14 +242,22 @@ export function retainedReactServerComponents(
 			) {
 				const value = skipWrappers(node.arguments[0]);
 				let ref: ts.Node | undefined;
+				const jsx =
+					ts.isJsxSelfClosingElement(value) ||
+					(ts.isJsxElement(value) &&
+						withoutJsxIndentation(value.children).every(
+							(child) => ts.isJsxExpression(child) && !child.expression,
+						))
+						? openingTag(value)
+						: undefined;
 				if (
-					ts.isJsxSelfClosingElement(value) &&
-					(!ts.isIdentifier(value.tagName) || /^[A-Z][\w$]*$/.test(value.tagName.text)) &&
-					value.attributes.properties.length === 0 &&
+					jsx &&
+					(!ts.isIdentifier(jsx.tagName) || /^[A-Z][\w$]*$/.test(jsx.tagName.text)) &&
+					jsx.attributes.properties.length === 0 &&
 					ordinaryReactJsx(source) &&
 					original('react/jsx-runtime')
 				)
-					ref = value.tagName;
+					ref = jsx.tagName;
 				if (
 					ts.isCallExpression(value) &&
 					!ts.isOptionalChain(value) &&

@@ -301,6 +301,9 @@ describe('runCodemod', () => {
 	describe('retained React server rendering', () => {
 		it.each([
 			['direct JSX', 'render(<Leaf />)', '', true],
+			['empty JSX pair', 'render(<Leaf></Leaf>)', '', true],
+			['comment-only JSX pair', 'render(<Leaf>{/* comment */}</Leaf>)', '', true],
+			['JSX pair with a child', 'render(<Leaf>child</Leaf>)', '', false],
 			['direct element', 'render(h(Leaf))', '', true],
 			['direct element with null props', 'render(h(Leaf, null))', '', true],
 			['shadowed renderer', '((render) => render(h(Leaf)))(other)', '', false],
