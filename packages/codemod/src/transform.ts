@@ -3481,17 +3481,22 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		return this.replaceSpecifier(node, specifier, next);
 	}
 
-	/** Check export names against the catalog without guessing at a whole namespace. */
+	/** Check known exports without guessing at a whole namespace. */
 	hasBindingExports(node: ts.Node, binding: string, available: ReadonlySet<string>) {
-		const check = (site: ts.Node, name?: string) => {
-			if (name !== undefined && available.has(name)) return true;
+		const hasDifferentType = (name: string | undefined) =>
+			binding === '@octanejs/motion' && name === 'MotionConfigContext';
+		const check = (site: ts.Node, name?: string, needsType = false) => {
+			const missingType = needsType && hasDifferentType(name);
+			if (name !== undefined && available.has(name) && !missingType) return true;
 			this.note(
 				RULE.binding,
 				'error',
 				site,
 				name === undefined
 					? `\`${binding}\` exposes a subset of the original module. Import specific supported exports before migrating this reference.`
-					: `\`${binding}\` has no \`${name}\` export.`,
+					: missingType
+						? `\`${binding}\` does not export the React Motion \`${name}\` type. Review the context fields before migrating this reference.`
+						: `\`${binding}\` has no \`${name}\` export.`,
 			);
 			return false;
 		};
@@ -3499,7 +3504,19 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			if (!elements.length) return check(node);
 			let supported = true;
 			for (const element of elements) {
-				if (!check(element, (element.propertyName ?? element.name).text)) supported = false;
+				const name = (element.propertyName ?? element.name).text;
+				// A re-export can expose both the type and the value to another module.
+				const typeUse =
+					hasDifferentType(name) &&
+					(ts.isExportSpecifier(element)
+						? element
+						: this.localUses(element.name).find(
+								(ref) =>
+									ts.isPartOfTypeNode(ref) ||
+									ts.isExportSpecifier(ref.parent) ||
+									ts.isExportAssignment(ref.parent),
+							));
+				if (!check(typeUse || element, name, !!typeUse)) supported = false;
 			}
 			return supported;
 		};
@@ -3515,9 +3532,17 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			return this.localUses(bindings.name).every((ref) => {
 				const parent = ref.parent;
 				if (ts.isPropertyAccessExpression(parent) && parent.expression === ref)
-					return check(parent.name, parent.name.text);
+					return check(
+						parent.name,
+						parent.name.text,
+						ts.isPartOfTypeNode(parent.name) || ts.isExportAssignment(parent.parent),
+					);
 				if (ts.isQualifiedName(parent) && parent.left === ref)
-					return check(parent.right, parent.right.text);
+					return check(
+						parent.right,
+						parent.right.text,
+						ts.isPartOfTypeNode(parent.right) || ts.isImportEqualsDeclaration(parent.parent),
+					);
 				if (
 					ts.isElementAccessExpression(parent) &&
 					parent.expression === ref &&
@@ -3532,7 +3557,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (ts.isImportTypeNode(node)) {
 			let name = node.qualifier;
 			while (name && ts.isQualifiedName(name)) name = name.left;
-			if (name) return check(name, name.text);
+			if (name) return check(name, name.text, !node.isTypeOf);
 		}
 		return check(node);
 	}
