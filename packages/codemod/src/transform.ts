@@ -3216,7 +3216,14 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						if (call && local && typeof local !== 'string' && 'from' in local) {
 							dest = local.from;
 							this.count('native-external-store');
-						} else if (site && typeof local === 'string' && (call || local === 'useContext'))
+						} else if (call && (local === 'useEffect' || local === 'useEffectEvent'))
+							this.note(
+								RULE.bindings,
+								'error',
+								call,
+								`If setup reaches React's ${local} in the unchanged ${module} export ${name}, the call requires a React renderer. Provide a compiled Octane hook for native callers or keep this component under a React renderer.`,
+							);
+						else if (site && typeof local === 'string' && (call || local === 'useContext'))
 							this.note(
 								RULE.bindings,
 								'error',
