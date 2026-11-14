@@ -540,10 +540,13 @@ provider value even when the change landed mid-episode
 publish is also needed (so a new value can stop the suspension itself) remains
 open question 16.
 
-Every relay/retry callback carries the controller generation and pending-episode
-token. A settlement from a superseded attempt or unmounted island must become a
-no-op. If the current root was disposed after an initial routed suspension, retry
-creates and rebinds a fresh hosted root before acknowledging readiness.
+Each retry checks the current pending episode and insertion-effect lifetime.
+Insertion cleanup closes the lifetime synchronously, before deferred disposal,
+so a queued settlement cannot restart a deleted island. A layout effect can
+delete the island during the retry itself, so check the lifetime again before
+draining passive effects. If the current root was disposed after an initial
+routed suspension, retry creates and rebinds a fresh hosted root before
+acknowledging readiness.
 
 The post-commit resolution rule comes from Ripple's former compat implementation:
 it resolved React's wakeable in a post-block-flush callback, after Ripple had
