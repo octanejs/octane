@@ -363,6 +363,7 @@ export {
 	CompiledOutlet,
 	compilerCacheContext,
 	compilerOpaqueTag,
+	armCompilerContext,
 	memo,
 	HMR,
 	hmr,
