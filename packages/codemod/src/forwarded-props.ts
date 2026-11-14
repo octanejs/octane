@@ -91,6 +91,16 @@ const nonElementHosts =
 	/^(?:textarea|title|script|style|option|noscript|iframe|noembed|noframes|xmp|plaintext|area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$/;
 const hookName = /^use(?:[A-Z0-9]|$)/;
 
+export function rendersElementChildren(element: ts.JsxOpeningLikeElement) {
+	return (
+		ts.isIdentifier(element.tagName) &&
+		!nonElementHosts.test(element.tagName.text) &&
+		!element.attributes.properties.some(
+			(attr) => ts.isJsxAttribute(attr) && attr.name.getText() === 'dangerouslySetInnerHTML',
+		)
+	);
+}
+
 // A scalar assertion can turn a child into a text binding. Require a member
 // that the compiler cannot classify as primitive text, even through aliases.
 function renderType(type: ts.Type) {
@@ -141,14 +151,7 @@ export function nativeOutputOwner(
 			)
 				return;
 			if (/^[a-z]/.test(tag.text)) {
-				if (
-					attr ||
-					nonElementHosts.test(tag.text) ||
-					element.attributes.properties.some(
-						(a) => ts.isJsxAttribute(a) && a.name.getText() === 'dangerouslySetInnerHTML',
-					)
-				)
-					return;
+				if (attr || !rendersElementChildren(element)) return;
 			} else {
 				const key = attr ? attr.name.getText() : 'children';
 				if (

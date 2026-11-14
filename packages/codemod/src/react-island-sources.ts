@@ -1,7 +1,8 @@
 import ts from 'typescript';
+import { parseSync } from '@tsrx/oxc/parser';
 import { hasRuntimeDependency } from './scoped-store-contract.js';
 import { skipWrappers } from './expression-wrappers.js';
-import { hasEval } from './forwarded-props.js';
+import { hasEval, rendersElementChildren } from './forwarded-props.js';
 import { componentTagOrExport, localUses } from './local-uses.js';
 import { bind, nativeReactCompat, withoutJsxIndentation } from './transform.js';
 
@@ -171,7 +172,7 @@ function* directExportReturns({ sf, checker }: ReturnType<typeof bind>) {
 			value = skipWrappers(value.initializer);
 		}
 		const output = returnedJsx(value);
-		if (output) yield { name: symbol.name, output, localName: name?.text };
+		if (output) yield { name: symbol.name, output, localName: name?.text, decl, symbol };
 	}
 }
 
@@ -258,23 +259,46 @@ export function hostedServerComponents(file: string, source: string) {
 	return edges;
 }
 
-/** A retained component that returns JSX for a directly imported component. */
+/** Imports rendered directly by a retained component. */
 export function retainedReactComponentReturns(file: string, source: string) {
 	if (!ordinaryReactJsx(source)) return [];
 	const bound = bind(file, source);
 	const { sf, checker } = bound;
-	const edges = [];
+	const edges: { name: string; module: string; factory?: true; line: number }[] = [];
 	const seen = new Set<ts.Node>();
-	for (const { output, localName } of directExportReturns(bound)) {
+	for (const { output, localName, decl } of directExportReturns(bound)) {
 		if (seen.has(output)) continue;
 		const tag = openingTag(output).tagName;
 		if (localName && !/^[A-Z]/.test(localName)) continue;
+		seen.add(output);
+		if (ts.isIdentifier(tag) && /^[a-z]/.test(tag.text)) {
+			if (
+				!ts.isJsxElement(output) ||
+				(ts.getCombinedModifierFlags(decl) & ts.ModifierFlags.Ambient) !== 0 ||
+				!rendersElementChildren(output.openingElement) ||
+				output.openingElement.attributes.properties.some(ts.isJsxSpreadAttribute)
+			)
+				continue;
+			for (const child of output.children) {
+				if (!ts.isJsxExpression(child) || !child.expression || child.dotDotDotToken) continue;
+				const call = skipWrappers(child.expression);
+				if (!ts.isCallExpression(call) || ts.isOptionalChain(call) || call.arguments.length)
+					continue;
+				const callee = skipWrappers(call.expression);
+				const leaf = ts.isIdentifier(callee) && imported(checker, callee);
+				if (leaf && /^\.{1,2}\/[^!%?#\\]*\.tsx$/.test(leaf.module))
+					edges.push({
+						...leaf,
+						factory: true,
+						line: sf.getLineAndCharacterOfPosition(call.getStart(sf)).line + 1,
+					});
+			}
+			continue;
+		}
 		if (ts.isIdentifier(tag) && !/^[A-Z]/.test(tag.text)) continue;
 		const leaf = imported(checker, tag);
-		if (leaf?.module.startsWith('.')) {
-			seen.add(output);
+		if (leaf?.module.startsWith('.'))
 			edges.push({ ...leaf, line: sf.getLineAndCharacterOfPosition(output.getStart(sf)).line + 1 });
-		}
 	}
 	return edges;
 }
@@ -422,6 +446,35 @@ export function intrinsicReactExports(file: string, source: string) {
 		}
 	}
 	return names;
+}
+
+/** Factories whose intrinsic JSX return survives as Octane JSX in the emitted file. */
+export function migratedJsxFactories(file: string, source: string, emitted: string) {
+	if (!ordinaryReactJsx(source)) return new Set<string>();
+	function factories(code: string) {
+		const names = new Set<string>();
+		for (const { name, output, decl, symbol } of directExportReturns(bind(file, code))) {
+			const tag = openingTag(output).tagName;
+			if (
+				ts.isFunctionDeclaration(decl) &&
+				symbol.declarations?.length === 1 &&
+				decl.name?.text === name &&
+				/^[a-z]/.test(name) &&
+				decl.parameters.length === 0 &&
+				(ts.getCombinedModifierFlags(decl) &
+					(ts.ModifierFlags.Export | ts.ModifierFlags.Ambient)) ===
+					ts.ModifierFlags.Export &&
+				ts.isIdentifier(tag) &&
+				/^[a-z]/.test(tag.text)
+			)
+				names.add(name);
+		}
+		return names;
+	}
+	const original = factories(source);
+	// TSX parsing proves the emitted return directly. Volar can hoist it out of the function.
+	if (!original.size || parseSync(file, emitted).errors.length) return new Set<string>();
+	return original.intersection(factories(emitted));
 }
 
 /** Inspect the emitted local export before assigning a reverse island to a server host. */

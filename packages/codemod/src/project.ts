@@ -40,6 +40,7 @@ import {
 	executableImports,
 	hostedServerComponents,
 	intrinsicReactExports,
+	migratedJsxFactories,
 	octaneRootComponents,
 	reactServerComponents,
 	retainedReactComponentReturns,
@@ -1404,6 +1405,7 @@ export async function runCodemod(
 	}
 	const reverseIslands = new Map<string, ReadonlySet<string>>();
 	const intrinsicExports = new Map<string, ReadonlySet<string>>();
+	const jsxFactories = new Map<string, ReadonlySet<string>>();
 	const linkedConflicts = new Map<string, string>();
 	function checkLinkedRename(file: string, issuer: string) {
 		const selected = linkedRename(file);
@@ -1592,12 +1594,14 @@ export async function runCodemod(
 			for (const edge of edges) {
 				const match = renamed(file, edge.module);
 				if (!match) continue;
+				const factory = 'factory' in edge && edge.factory;
 				const original = path.resolve(path.dirname(file), edge.module);
 				const explicit =
 					match.file === original && (edge.renderer !== 'JSX' || /\.[jt]sx$/.test(edge.module));
 				if (
 					!explicit &&
-					(edge.renderer !== 'JSX' ||
+					(factory ||
+						edge.renderer !== 'JSX' ||
 						!/^\.{1,2}\//.test(edge.module) ||
 						/[!%?#\\]/.test(edge.module) ||
 						config?.rootDirs ||
@@ -1609,18 +1613,23 @@ export async function runCodemod(
 					continue;
 				const leaf = byFile.get(match.file);
 				if (!leaf?.output.endsWith('.tsrx')) continue;
-				let names = intrinsicExports.get(match.file);
+				const exports = factory ? jsxFactories : intrinsicExports;
+				let names = exports.get(match.file);
 				if (!names) {
-					names = intrinsicReactExports(match.file, fs.readFileSync(match.file, 'utf8'));
-					intrinsicExports.set(match.file, names);
+					const source = fs.readFileSync(match.file, 'utf8');
+					names = factory
+						? migratedJsxFactories(match.file, source, leaf.code)
+						: intrinsicReactExports(match.file, source);
+					exports.set(match.file, names);
 				}
 				if (!names.has(edge.name)) continue;
 				const note: Note = {
 					rule: 'react-compat',
 					severity: 'warning',
 					line: edge.line,
-					message:
-						edge.renderer === 'JSX'
+					message: factory
+						? `The retained React JSX in ${name} uses ${leaf.file}'s ${edge.name} as a JSX child. With standard package resolution, migrate the caller too or keep this factory in React.`
+						: edge.renderer === 'JSX'
 							? `The retained React JSX in ${name} renders ${leaf.file} directly. With standard package resolution, migrate the caller too or keep this component in React.`
 							: `The retained React server render in ${name} imports ${leaf.file} directly. With standard package resolution, migrate the server entry too or keep this component in React.`,
 				};
