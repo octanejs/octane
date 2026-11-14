@@ -147,6 +147,20 @@ function* directExportReturns({ sf, checker }: ReturnType<typeof bind>, allowSet
 	for (const symbol of checker.getExportsOfModule(module)) {
 		let decl = symbol.valueDeclaration ?? symbol.declarations?.[0];
 		if (!decl) continue;
+		let splitExport = false;
+		if (ts.isExportSpecifier(decl)) {
+			if (
+				!allowSetup ||
+				decl.isTypeOnly ||
+				decl.parent.parent.isTypeOnly ||
+				decl.parent.parent.moduleSpecifier
+			)
+				continue;
+			const local = checker.getExportSpecifierLocalTargetSymbol(decl)?.valueDeclaration;
+			if (!local || !ts.isFunctionDeclaration(local)) continue;
+			splitExport = true;
+			decl = local;
+		}
 		let value: ts.Node = decl;
 		let defaultRef: ts.Identifier | undefined;
 		if (ts.isExportAssignment(decl)) {
@@ -173,7 +187,8 @@ function* directExportReturns({ sf, checker }: ReturnType<typeof bind>, allowSet
 			value = skipWrappers(value.initializer);
 		}
 		const output = returnedJsx(value, allowSetup);
-		if (output) yield { name: symbol.name, output, localName: name?.text, decl, symbol };
+		if (output)
+			yield { name: symbol.name, output, localName: name?.text, decl, symbol, splitExport };
 	}
 }
 
@@ -558,9 +573,10 @@ export function reactServerComponents(
 	return edges;
 }
 
-/** Local exports whose original body returns an intrinsic React element. */
-export function intrinsicReactExports(file: string, source: string) {
-	const names = new Set<string>();
+/** Local exports whose original body returns React JSX directly. */
+export function directReactExports(file: string, source: string) {
+	const intrinsics = new Set<string>();
+	const wrappers = new Set<string>();
 	let mayExportThen = false;
 	if (ordinaryReactJsx(source)) {
 		const bound = bind(file, source);
@@ -580,17 +596,26 @@ export function intrinsicReactExports(file: string, source: string) {
 		mayExportThen ||= sf.statements.some(
 			(stmt) => ts.isExportDeclaration(stmt) && !stmt.isTypeOnly && !stmt.exportClause,
 		);
-		for (const { name, output, localName } of directExportReturns(bound, true)) {
+		for (const { name, output, localName, decl, splitExport } of directExportReturns(bound, true)) {
 			const tag = openingTag(output).tagName;
 			if (
+				!splitExport &&
 				ts.isIdentifier(tag) &&
 				/^[a-z]/.test(tag.text) &&
 				(!localName || /^[A-Z]/.test(localName))
 			)
-				names.add(name);
+				intrinsics.add(name);
+			else if (
+				ts.isFunctionDeclaration(decl) &&
+				localName === name &&
+				/^[A-Z]/.test(name) &&
+				ts.isIdentifier(tag) &&
+				/^[A-Z]/.test(tag.text)
+			)
+				wrappers.add(name);
 		}
 	}
-	return { names, mayExportThen };
+	return { intrinsics, wrappers, mayExportThen };
 }
 
 /** Factories whose intrinsic JSX return survives as Octane JSX in the emitted file. */
