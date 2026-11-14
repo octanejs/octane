@@ -110,6 +110,12 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					'return <Frame><b>ready</b></Frame>;',
 					'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
 				),
+			'RetainedCompound.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean, enabled: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } if (!enabled) return <b />; return <Frame />;',
+				),
 			'RetainedDead.tsx': entry('./Boundary').replace(
 				'return <Frame><b>ready</b></Frame>;',
 				'if (true) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
@@ -237,6 +243,7 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				['LogicalArm.tsx', includeClass ? 'error' : 'warning'],
 				['Relative.tsx', includeClass ? 'error' : 'warning'],
 				['Retained.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedCompound.tsx', includeClass ? 'error' : 'warning'],
 				['Strict.tsx', includeClass ? 'error' : 'warning'],
 				['Ternary.tsx', includeClass ? 'error' : 'warning'],
 			]);

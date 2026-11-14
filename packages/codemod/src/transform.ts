@@ -7126,12 +7126,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		const last = statements[statements.length - 1];
 		if (!last || !ts.isReturnStatement(last) || !last.expression) return null;
 		const guard = statements.findIndex((s, i) => i < statements.length - 1 && guardReturn(s));
-		if (guard !== -1) return this.rewriteGuards(node, body, guard);
+		if (guard !== -1) {
+			const output = this.rewriteGuards(node, body, guard);
+			if (output !== null) return output;
+		}
 		const inner = skipParens(last.expression);
 		// A template body has one output; any other early `return <A />` would
 		// render through runtime descriptors, so the plain function stays.
 		const setupStatements = statements.slice(0, -1);
-		if (returnsJsx(setupStatements)) {
+		if (guard !== -1 || returnsJsx(setupStatements)) {
 			if (
 				this.options.localReactClass &&
 				(ts.isJsxElement(inner) || ts.isJsxSelfClosingElement(inner)) &&
