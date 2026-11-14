@@ -493,6 +493,81 @@ it('warns at a direct migrated server call that needs a standalone store provide
 	expect(renderHosted()).toContain('&lt;b&gt;42&lt;/b&gt;');
 });
 
+it('reports a migrated React factory root that needs its store context', async () => {
+	const { app } = project({
+		'app/src/pane.tsx': `import { useSnapshot } from 'observer';
+			export function Pane() { const value = useSnapshot(); return <b>{String(value)}</b>; }
+			export function Plain() { return <b>plain</b>; }`,
+		'app/src/root.tsx': `import { createElement as h } from 'react';
+			import * as React from 'react';
+			import { renderToStaticMarkup, renderToString } from 'react-dom/server';
+			import { Pane, Pane as lower, Plain } from './pane.tsx';
+			import * as Views from './pane.tsx';
+			const fail = () => { throw new Error('props failed'); };
+			export function render() { return renderToString((h(Pane))); }
+			export function namespace() { return renderToStaticMarkup(React.createElement(Pane, null)); }
+			export const plain = renderToString(h(Plain));
+			export function lowerCase() { return renderToString(h(lower)); }
+			export function parenthesized() { return renderToString(h((Pane))); }
+			export function asserted() { return renderToString(h(Pane as typeof Pane)); }
+			export function escaped() { return renderToString(h(\\u0050ane)); }
+			export function wrappedNull() { return renderToString(h(Pane, (null))); }
+			export function emptyProps() { return renderToString(h(Pane, undefined)); }
+			export function literalProps() { return renderToStaticMarkup(h(Pane, { label: 'root' })); }
+			export function throwingProps() { return renderToString(React.createElement(Pane, fail())); }
+			export function spreadProps(...props: [null]) { return renderToString(h(Pane, ...props)); }
+			export function withChild() { return renderToString(h(Pane, null, 'child')); }
+			export function shadowed(h: (value: unknown) => any) { return renderToString(h(Pane)); }
+			export function namespaceTarget() { return renderToString(h(Views.Pane, null)); }
+			export function escapedMember() { return renderToString(h(Views.\\u0050ane)); }
+			export function wrapMember() { return renderToString(h((Views.Pane))); }
+			export function shadowedTarget(Views: { Pane: typeof Plain }) { return renderToString(h(Views.Pane)); }
+			export function namespaceJsx() { return renderToString(<Views.Pane />); }`,
+	});
+	const paths = ['pane', 'root'].map((name) => path.join(app, 'src', name + '.tsx'));
+	const { files } = await runCodemod(paths, { root: app, strong: true, verify: true, write: true });
+	const result = files.find(({ file }) => file === 'src/root.tsx');
+	expect(result.notes.filter(({ rule }) => rule === 'store-hook')).toEqual(
+		[7, 8, 14, 15, 16, 17, 18, 21, 25].map((line) =>
+			expect.objectContaining({
+				line,
+				severity: 'warning',
+				message: expect.stringMatching(/standalone.*migrated Pane.*NativeStoreProvider/),
+			}),
+		),
+	);
+
+	const {
+		render,
+		namespace,
+		wrappedNull,
+		emptyProps,
+		literalProps,
+		throwingProps,
+		spreadProps,
+		namespaceTarget,
+		namespaceJsx,
+		plain,
+	} = await bundleRuntime(
+		app,
+		'server',
+		"export { render, namespace, wrappedNull, emptyProps, literalProps, throwingProps, spreadProps, namespaceTarget, namespaceJsx, plain } from './src/root.tsrx';",
+	);
+	for (const root of [
+		render,
+		namespace,
+		wrappedNull,
+		emptyProps,
+		literalProps,
+		namespaceTarget,
+		namespaceJsx,
+	])
+		expect(root).toThrow(/useContext|errors\/12/);
+	expect(() => spreadProps(null)).toThrow(/useContext|errors\/12/);
+	expect(throwingProps).toThrow('props failed');
+	expect(plain).toContain('<b>plain</b>');
+});
+
 it('warns at existing standalone client roots when the migrated hook reads context', async () => {
 	const mount = `import { createRoot as mount } from 'octane';
 		import * as Octane from 'octane';
