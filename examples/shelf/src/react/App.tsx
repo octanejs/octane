@@ -11,7 +11,7 @@ import {
 	shelfChanges,
 	stats,
 	type Book,
-} from '../shared/contracts.ts';
+} from '../shared/contracts.data.ts';
 import {
 	ACCOUNTS,
 	checkSaved,

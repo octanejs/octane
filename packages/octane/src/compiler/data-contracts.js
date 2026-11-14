@@ -55,8 +55,21 @@ const FUNCTION_SITES = new Map([
 	['pages', 1],
 	['listen', 1],
 ]);
-/** `view({ of })`, `write({ creates, patches, removes })`, and a FeedChange's `put`, `remove`, `read`. */
-const PROPERTY_SITES = new Set(['of', 'creates', 'patches', 'removes', 'put', 'remove', 'read']);
+/**
+ * `view({ of })`, `write({ creates, patches, removes })`, a FeedChange's `put`,
+ * `remove`, `read`, and the store options `feeds` and `journal.receipt`.
+ */
+const PROPERTY_SITES = new Set([
+	'of',
+	'creates',
+	'patches',
+	'removes',
+	'put',
+	'remove',
+	'read',
+	'feeds',
+	'receipt',
+]);
 const FUNCTIONS = new Set(['ArrowFunctionExpression', 'FunctionExpression']);
 
 /**
@@ -309,7 +322,7 @@ export function analyzeDataContracts(source, filename, contractExports) {
 			namespaces.has(node.name) &&
 			resolved(node)?.scope === rootScope
 				? [{ binding: node.name, source: namespaces.get(node.name).source, imported: '*' }]
-				: contractsOf(node);
+				: (contractsOf(node) ?? inlineContracts(node));
 		if (targets !== null) {
 			for (const target of targets) {
 				uses.push({

@@ -1057,7 +1057,7 @@ A contract is declared in a module whose file name does not end in `.data.ts` or
 	<code>OCTANE_DATA_CONTRACT_ARGUMENT</code>
 </h4>
 
-A contract site, such as `store.write`, `store.read`, `useForm`, `handle`, `pages`, `listen`, `view({ of })`, or a feed change's `put`, receives a contract chosen at runtime: a conditional, a logical expression, or a computed member such as `contracts[name]`. Sites are matched by method, import, or property name, never by the receiver.
+A contract site, such as `store.write`, `store.read`, `useForm`, `handle`, `pages`, `listen`, `view({ of })`, a feed change's `put`, or the store options `feeds` and `journal.receipt`, receives a contract chosen at runtime: a conditional, a logical expression, or a computed member such as `contracts[name]`. Sites are matched by method, import, or property name, never by the receiver.
 
 **Replacement.** Name one contract binding at the site, such as `store.write(setRead, input)`, and pass the varying value in its input. A handler for several contracts may loop over an inline array of them: `[books, unread].map((list) => handle(list, …))`.
 

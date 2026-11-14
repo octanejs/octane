@@ -1,5 +1,5 @@
 /**
- * A copy of examples/shelf/src/shared/contracts.ts under the contract module
+ * A copy of examples/shelf/src/shared/contracts.data.ts under the contract module
  * name the data check requires. It must pass the check unchanged.
  */
 import { z } from 'zod';

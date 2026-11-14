@@ -2,7 +2,7 @@ import { listen } from 'octane/data';
 import { useState, useSyncExternalStore } from 'octane';
 import type { OctaneNode } from 'octane';
 import { DataProvider, useDataStore, useFeed, useForm, useRead } from 'octane/data/octane';
-import type { Book } from '../shared/contracts.ts';
+import type { Book } from '../shared/contracts.data.ts';
 import {
 	addBook,
 	books,
@@ -11,7 +11,7 @@ import {
 	setRead,
 	shelfChanges,
 	stats,
-} from '../shared/contracts.ts';
+} from '../shared/contracts.data.ts';
 import {
 	ACCOUNTS,
 	checkSaved,

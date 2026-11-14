@@ -139,6 +139,19 @@ export const api = {
 		]);
 	});
 
+	it('counts the store options that name contracts, including an inline array', () => {
+		const source = `import { receipt, shelfChanges, stats } from './books.data.ts';
+createDataStore({ feeds: [shelfChanges, stats], persist: { journal: { writes, receipt } } });
+`;
+		const { diagnostics, uses } = analyzeDataContracts(source, '/app/page.ts');
+		expect(diagnostics).toEqual([]);
+		expect(uses.map((use) => `${use.binding}@${use.site}`)).toEqual([
+			'shelfChanges@feeds',
+			'stats@feeds',
+			'receipt@receipt',
+		]);
+	});
+
 	it('accepts type positions, property reads, and exports', () => {
 		const source = `import { setRead, type Book } from './books.data.ts';
 export type Input = typeof setRead extends { input: infer I } ? I : never;
