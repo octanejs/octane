@@ -298,6 +298,73 @@ describe('runCodemod', () => {
 		);
 	});
 
+	it.each([
+		['plain return', 'Leaf', '<Leaf />', '', true],
+		['named import', '{ Leaf }', '<Leaf />', '', true],
+		['React JSX pragma', 'Leaf', '<Leaf />', '/** @jsxImportSource react */', true],
+		['native JSX', 'Leaf', '<Leaf />', '/** @jsxImportSource octane */', false],
+		['mapped JSX runtime', 'Leaf', '<Leaf />', '', false],
+		['lowercase tag', 'leaf', '<leaf />', '', false],
+		['type-only import', 'type Leaf', '<Leaf />', '', false],
+		['shadowed binding', 'Leaf', '<Leaf />', '', false],
+		['explicit bridge', 'Leaf', '<OctaneCompat component={Leaf} />', '', false],
+	])(
+		'advises on a retained JSX issuer with a %s',
+		async (shape, binding, output, pragma, warns) => {
+			const root = project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: {
+						jsx: 'react-jsx',
+						moduleResolution: 'Bundler',
+						...(shape === 'mapped JSX runtime'
+							? { paths: { 'react/jsx-runtime': ['./other.ts'] } }
+							: {}),
+					},
+				}),
+				'other.ts': 'export const jsx = () => null;',
+				'Leaf.tsx':
+					'export function Leaf() { return <button>Original</button>; }\nexport default Leaf;',
+				'Owner.tsx': `${pragma}
+import { OctaneCompat } from 'octane/react';
+import ${binding} from './Leaf.tsx';
+export function Owner(${shape === 'shadowed binding' ? '{ Leaf }' : ''}) { return ${output}; }`,
+			});
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules'),
+				path.join(root, 'node_modules'),
+				'dir',
+			);
+			const selected = [path.join(root, 'Leaf.tsx')];
+			const preview = await runCodemod(selected, {
+				root,
+				strong: true,
+				verify: true,
+				write: false,
+			});
+			const affected = preview.files
+				.filter((file) =>
+					file.notes.some(
+						(note) => note.severity === 'warning' && note.message.includes('retained React JSX'),
+					),
+				)
+				.map((file) => file.file);
+			expect(affected).toEqual(warns ? ['Leaf.tsx', 'Owner.tsx'] : []);
+			if (shape === 'plain return') {
+				const result = await runCodemod(selected, { root, strong: true, verify: true });
+				expect(result.files.find((file) => file.file === 'Owner.tsx')?.notes).toEqual(
+					expect.arrayContaining([
+						expect.objectContaining({
+							severity: 'warning',
+							message: expect.stringContaining('retained React JSX'),
+						}),
+					]),
+				);
+				expect(fs.readFileSync(path.join(root, 'Owner.tsx'), 'utf8')).toContain('./Leaf.tsrx');
+				expect(fs.existsSync(path.join(root, 'Leaf.tsrx'))).toBe(true);
+			}
+		},
+	);
+
 	describe('retained React server rendering', () => {
 		it.each([
 			['direct JSX', 'render(<Leaf />)', '', true],
