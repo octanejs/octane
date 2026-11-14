@@ -3,6 +3,7 @@
  * We distinguish between values we can update directly with `useDirectStoreUpdater` (like `snapGrid`)
  * and values that have a dedicated setter function in the store (like `setNodes`).
  */
+import type { AllowUndefined } from '../../types/allow-undefined-props';
 import { useEffect, useRef } from 'octane';
 import { shallow } from '@octanejs/zustand/shallow';
 import {
@@ -79,8 +80,8 @@ const reactFlowFieldsToTrack = [
 ] as const;
 
 type ReactFlowFieldsToTrack = (typeof reactFlowFieldsToTrack)[number];
-type StoreUpdaterProps<NodeType extends Node = Node, EdgeType extends Edge = Edge> = Pick<
-	ReactFlowProps<NodeType, EdgeType>,
+type StoreUpdaterProps<NodeType extends Node = Node, EdgeType extends Edge = Edge> = AllowUndefined<
+	Pick<ReactFlowProps<NodeType, EdgeType>, ReactFlowFieldsToTrack>,
 	ReactFlowFieldsToTrack
 > & {
 	rfId: string;
