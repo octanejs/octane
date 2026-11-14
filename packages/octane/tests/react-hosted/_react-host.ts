@@ -480,10 +480,10 @@ export interface ReactHostMount {
 
 export async function mountReactHost(
 	element: React.ReactNode,
-	options?: { onUncaughtError?: (error: unknown) => void },
+	options?: { onUncaughtError?: (error: unknown) => void; detached?: boolean },
 ): Promise<ReactHostMount> {
 	const container = document.createElement('div');
-	document.body.appendChild(container);
+	if (!options?.detached) document.body.appendChild(container);
 	const reactRoot = createReactRoot(
 		container,
 		options?.onUncaughtError ? ({ onUncaughtError: options.onUncaughtError } as any) : undefined,

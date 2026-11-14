@@ -321,33 +321,19 @@ Lifecycle rules:
    render must not mutate a running Octane tree.
 6. Preserve the Octane root when React temporarily hides a suspended primary tree
    and tears down layout effects.
-7. Dispose on a real unmount. React StrictMode's development setup/cleanup probe
-   requires idempotent setup and a cancelable deferred final-dispose check rather
-   than blindly destroying the root in every layout cleanup. The same deferred
-   check is the hide/probe/unmount discriminator: React's deletion removes the
-   host from the document within the same commit, while StrictMode probes and
-   Suspense hiding leave it connected (hidden content keeps its DOM under
-   `display: none`). A post-commit connectivity check on the host — canceled by
-   a new attachment generation — separates all three without a private signal.
-   **Phase 0 proved this against React 19.2 with one hard constraint on the
-   check's TRIGGER**: hiding Suspense content destroys layout effects AND
-   detaches refs, but leaves passive effects connected. Deleting an
-   already-hidden tree still fires passive cleanup after the ref detaches.
-   The Phase 0 spike scheduled the check from both signals
-   (`tests/react-hosted/lifecycle-discriminator.test.ts`).
-   The public wrapper uses insertion-effect cleanup alongside ref detach.
-   React Activity disconnects passive effects when it hides a subtree.
-   Insertion effects stay connected through both kinds of hide and the
-   StrictMode probe, so their cleanup triggers the check on actual deletion.
-   The external DOM-removal reconciliation also holds. If the host is removed
-   externally, React gives no signal. A later commit republishes into the
-   detached host without faulting, and Octane's safe-cleanup guarantee covers
-   the eventual teardown.
+7. Dispose on a real unmount. React insertion effects stay registered through
+   Suspense and Activity hides and the StrictMode development probe. Their
+   cleanup schedules disposal after the React commit. A new insertion-effect
+   setup cancels the pending disposal. Ref detach preserves the root and host
+   for retries, and the reveal's layout effect republishes the island.
+   These signals also work in React containers outside the document.
+   The Phase 0 spike instead used a connectivity check after ref detach and
+   passive cleanup (`tests/react-hosted/lifecycle-discriminator.test.ts`).
 8. Keep the bridge active until Octane teardown finishes. During actual React
    deletion, an Octane cleanup error cannot be surfaced by scheduling state on the
    deleting controller; `routeError()` should decline it so the throw re-enters
    the disposal frame synchronously. **Phase 0 refinement:** because rule 7's
-   discriminator defers disposal past React's commit, that frame is a
+   cleanup defers disposal past React's commit, that frame is a
    post-commit microtask, NOT React's commit-error path — the fault can no
    longer reach React's own error handling. The decline behavior is proven
    (the fault is not swallowed and the dead wrapper is never scheduled), but a
