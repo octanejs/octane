@@ -6845,7 +6845,16 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			}
 			if (!ts.isBinaryExpression(read)) return false;
 			const op = read.operatorToken.kind;
-			if (eagerBinary(op)) return readsInOrder([read.left, read.right]);
+			if (
+				eagerBinary(op) ||
+				op === ts.SyntaxKind.LessThanToken ||
+				op === ts.SyntaxKind.LessThanEqualsToken ||
+				op === ts.SyntaxKind.GreaterThanToken ||
+				op === ts.SyntaxKind.GreaterThanEqualsToken
+			) {
+				// Relational comparison coerces its operands only after both reads.
+				return readsInOrder([read.left, read.right]);
+			}
 			if (
 				op === ts.SyntaxKind.AmpersandAmpersandToken ||
 				op === ts.SyntaxKind.BarBarToken ||
