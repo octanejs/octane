@@ -403,6 +403,17 @@ compile error, because every iteration would share one call-site slot. Loop with
 the keyed `@for` directive, where each item gets its own hook state, or extract a
 child component.
 
+When you rename an imported custom hook in a fully compiled `.tsrx` or Octane-owned
+`.tsx` module, keep the local name in the `useX` form:
+
+```ts
+import { useReading as useValue } from './reading';
+```
+
+With an ordinary alias like `readValue`, repeated calls can share state and
+context reads can stay stale. Keep the hook name until the compiler can follow
+these aliases. [Track the compiler fix](https://github.com/octanejs/octane/issues/2756).
+
 ## Control flow
 
 Rendered control flow uses directive-prefixed blocks: `@if`, `@for`, `@switch`,
