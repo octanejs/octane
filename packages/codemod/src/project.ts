@@ -47,6 +47,14 @@ import {
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
 const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|17\.(?:0|[1-9]\d*))$/;
+// React Intl 7.1.14. Both entry points re-export a hook that calls React.useContext.
+const INTL_HOOK_FILES = {
+	'index.js': '8f5854dadcd055f066234e13a344bd0b102aea2d50ddfd2f0cf12e9f48116059',
+	'lib/index.js': '208130dc122cbb84cbc0d4cce54fd7f458954f45d2cd5dc505d7263686ca6093',
+	'src/components/useIntl.js': '7f26c3c5aebaf874aa2ee7f56952358530c246382f7ca9e729a3ee33d196d6c8',
+	'lib/src/components/useIntl.js':
+		'36bb0433939586c08e79a211372987b4173c73552f75d2ae66b6250bdf1f3b8c',
+};
 /** React packages and the Octane entry point that replaces each. */
 const CATALOG = { ...DATA.reactPackages, ...PORTED_PACKAGES };
 const MOTION_BINDING = '@octanejs/motion';
@@ -647,6 +655,69 @@ export async function runCodemod(
 		string,
 		{ direct: Map<string, string>; privateContexts: Set<string> }
 	>();
+	const intlHookPackages = new Map<string, boolean>();
+	function originalIntlHook(file: string) {
+		const types = originalModule(file, 'react-intl');
+		if (types?.packageId?.name !== 'react-intl') return false;
+		const installed = readInstalled(path.dirname(file), 'react-intl');
+		if (
+			installed?.manifest.name !== 'react-intl' ||
+			installed.version !== '7.1.14' ||
+			installed.manifest.browser ||
+			installed.manifest.exports ||
+			installed.manifest.main !== 'index.js' ||
+			installed.manifest.module !== 'lib/index.js'
+		)
+			return false;
+		try {
+			const dir = fs.realpathSync(installed.dir);
+			const entry = path.join(dir, 'index.js');
+			const issuer = createRequire(file);
+			if (
+				!dir.split(path.sep).includes('node_modules') ||
+				fs.realpathSync(types.resolvedFileName) !== path.join(dir, 'index.d.ts') ||
+				issuer.resolve('react-intl') !== entry ||
+				readInstalled(path.dirname(file), 'react')?.manifest.name !== 'react'
+			)
+				return false;
+			const react = issuer.resolve('react');
+			if (
+				!['src', 'lib/src'].every(
+					(prefix) =>
+						createRequire(path.join(dir, prefix, 'components/useIntl.js')).resolve('react') ===
+						react,
+				)
+			)
+				return false;
+			let verified = intlHookPackages.get(dir);
+			if (verified === undefined) {
+				// An extra executable can shadow an extensionless import before its verified .js.
+				verified =
+					['src', 'lib/src'].every((prefix) =>
+						['', '.mjs', '.mts', '.ts', '.jsx', '.tsx'].every(
+							(ext) =>
+								!fs.lstatSync(path.join(dir, prefix, 'components/useIntl' + ext), {
+									throwIfNoEntry: false,
+								}),
+						),
+					) &&
+					Object.entries(INTL_HOOK_FILES).every(([name, hash]) => {
+						const executable = path.join(dir, name);
+						const stat = fs.lstatSync(executable, { throwIfNoEntry: false });
+						return (
+							stat?.isFile() &&
+							stat.size < 16_384 &&
+							fs.realpathSync(executable) === executable &&
+							createHash('sha256').update(fs.readFileSync(executable)).digest('hex') === hash
+						);
+					});
+				intlHookPackages.set(dir, verified);
+			}
+			return verified;
+		} catch {
+			return false;
+		}
+	}
 	let selectedInPlace: Set<string> | undefined;
 	function localReactHook(from: string, module: string, name: string, nativeOnly: boolean) {
 		if (
@@ -671,28 +742,38 @@ export async function runCodemod(
 		if (!hooks) {
 			const source = fs.readFileSync(file, 'utf8');
 			hooks = { direct: new Map(), privateContexts: new Set() };
-			if (
-				(/\b(?:useCallback|useContext|useState|useSyncExternalStore)\b/.test(source) ||
-					source.includes('\\u')) &&
+			const escaped = source.includes('\\u');
+			const react =
+				(/\b(?:useCallback|useContext|useState|useSyncExternalStore)\b/.test(source) || escaped) &&
 				originalModule(file, 'react') &&
-				readInstalled(path.dirname(file), 'react')?.manifest.name === 'react'
-			) {
+				readInstalled(path.dirname(file), 'react')?.manifest.name === 'react';
+			const intl = (source.includes('useIntl') || escaped) && originalIntlHook(file);
+			if (react || intl) {
 				const existing = program?.getSourceFile(file);
 				const bound =
 					existing && program
 						? { sf: existing, checker: program.getTypeChecker() }
 						: bind(file, source);
-				hooks.direct = directRendererCalls(
-					bound.sf,
-					bound.checker,
-					'react',
-					(name) =>
-						name === 'useCallback' ||
-						name === 'useContext' ||
-						name === 'useState' ||
-						name === 'useSyncExternalStore',
-					hooks.privateContexts,
-				);
+				if (react)
+					hooks.direct = directRendererCalls(
+						bound.sf,
+						bound.checker,
+						'react',
+						(name) =>
+							name === 'useCallback' ||
+							name === 'useContext' ||
+							name === 'useState' ||
+							name === 'useSyncExternalStore',
+						hooks.privateContexts,
+					);
+				if (intl)
+					for (const [name, hook] of directRendererCalls(
+						bound.sf,
+						bound.checker,
+						'react-intl',
+						(name) => name === 'useIntl',
+					))
+						hooks.direct.set(name, hook);
 			}
 			localHooks.set(file, hooks);
 		}
