@@ -68,6 +68,7 @@ import {
 	ROOT_RENDER_ROLLBACK,
 	TRANSITION_JOURNAL,
 	TRANSITION_JOURNAL_BAGS,
+	RENDERER_REGION_OWNER_COUNT,
 } from './drivers.js';
 import {
 	handOverSignalRetryScope,
@@ -116,7 +117,6 @@ import {
 	stagedRevealGroup,
 } from './transitions.js';
 import {
-	RENDERER_REGION_OWNER_COUNT,
 	rendererRegionOwnerForBlock,
 	rendererRegionTryHandler,
 	rendererRegionSuspenseHandler,
