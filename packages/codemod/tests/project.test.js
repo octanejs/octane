@@ -1541,6 +1541,21 @@ export function View() {
 			].join('\n');
 			const view = (file, call = 'useLabel()') => `import { useLabel } from './${file}';
 export function View() { const label = ${call}; return <b>{label}</b>; }`;
+			const localNamespace = namespaceOwner.replace(
+				"import * as React from 'react';",
+				"const React = { useContext() { return 'local'; } };",
+			);
+			const namespaceMembers = {
+				NamespaceBracket: "React['useContext'](Theme)",
+				NamespaceTemplate: 'React[`useContext`](Theme)',
+				NamespaceUnicode: "React['use\\u0043ontext'](Theme)",
+				NamespaceHex: "React['use\\x43ontext'](Theme)",
+				NamespaceIdentityEscape: "React['use\\Context'](Theme)",
+				NamespaceLineContinuation: "React['use\\\nContext'](Theme)",
+				NamespaceBracketOptional: "React?.['useContext'](Theme)",
+				NamespaceBracketOptionalCall: "React['useContext']?.(Theme)",
+				NamespaceBracketDynamic: "React['use' + 'Context'](Theme)",
+			};
 			const files = {
 				'tsconfig.json': JSON.stringify({
 					compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
@@ -1549,6 +1564,15 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 				'View.tsx': view('owner'),
 				'hook-namespace.ts': namespaceOwner,
 				'Namespace.tsx': view('hook-namespace'),
+				...Object.fromEntries(
+					Object.entries(namespaceMembers).flatMap(([name, member]) => {
+						const file = `hook-${name}`;
+						return [
+							[`${file}.ts`, namespaceOwner.replace('React.useContext(Theme)', member)],
+							[`${name}.tsx`, view(file)],
+						];
+					}),
+				),
 				'hook-namespace-type.ts': namespaceOwner.replace(
 					'import * as React',
 					'import type * as React',
@@ -1559,11 +1583,13 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 					'React?.useContext(',
 				),
 				'NamespaceOptional.tsx': view('hook-namespace-optional'),
-				'hook-namespace-fake.ts': namespaceOwner.replace(
-					"import * as React from 'react';",
-					"const React = { useContext() { return 'local'; } };",
-				),
+				'hook-namespace-fake.ts': localNamespace,
 				'NamespaceFake.tsx': view('hook-namespace-fake'),
+				'hook-namespace-bracket-shadow.ts': localNamespace.replace(
+					'React.useContext(Theme)',
+					"React['useContext'](Theme)",
+				),
+				'NamespaceBracketShadow.tsx': view('hook-namespace-bracket-shadow'),
 				'Cycle.tsx': "import './early';\n" + view('owner'),
 				'early.ts': "import { View } from './Cycle'; View();",
 				'Optional.tsx': view('owner', 'useLabel?.()'),
@@ -1632,6 +1658,37 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 					expect.stringContaining("export useLabel calls React's useContext"),
 				],
 				['Namespace.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
+				[
+					'NamespaceBracket.tsx',
+					2,
+					'warning',
+					expect.stringContaining('after its module initializes'),
+				],
+				['NamespaceHex.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
+				[
+					'NamespaceIdentityEscape.tsx',
+					2,
+					'warning',
+					expect.stringContaining('after its module initializes'),
+				],
+				[
+					'NamespaceLineContinuation.tsx',
+					2,
+					'warning',
+					expect.stringContaining('after its module initializes'),
+				],
+				[
+					'NamespaceTemplate.tsx',
+					2,
+					'warning',
+					expect.stringContaining('after its module initializes'),
+				],
+				[
+					'NamespaceUnicode.tsx',
+					2,
+					'warning',
+					expect.stringContaining('after its module initializes'),
+				],
 				['View.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
 			]);
 			for (const name of ['Cycle.tsx', 'View.tsx']) {
