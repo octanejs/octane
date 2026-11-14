@@ -83,6 +83,7 @@ import {
 	promoteMemoAncestry,
 	type DirectContextReads,
 	CONTEXT_DEPENDENCIES,
+	SHARED_BODY_SCOPE,
 } from './context.js';
 import { CURSOR, type HydrationCapability } from './hydration.js';
 import {
@@ -2103,6 +2104,17 @@ export function compilerCacheContext(
 	}
 	if (CONTEXT_DEPENDENCIES && restamp) CONTEXT_DEPENDENCIES.restampSlot(slot);
 	return current;
+}
+
+/**
+ * Arm a full component before its imported hooks run. A direct body call or
+ * a helper sharing another component's hook scope does not own this block.
+ * @internal
+ */
+export function armCompilerContext(scope: Scope): void {
+	const block = CURRENT_BLOCK;
+	if (block !== null && scope === block && scope !== SHARED_BODY_SCOPE && !block.memoInChain)
+		promoteMemoAncestry(block);
 }
 
 /**
