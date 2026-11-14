@@ -223,6 +223,11 @@ describe('runCodemod', () => {
 			['named', server, owner],
 			['inline', server.replace('OctaneCompat', 'OctaneCompatInline'), owner],
 			[
+				'styled inline',
+				server.replace('OctaneCompat', 'OctaneCompatInline'),
+				owner.replace(' />', ' hostClassName="status" hostStyle={{ display: \'inline\' }} />'),
+			],
+			[
 				'namespace',
 				"import * as Bridge from 'octane/react/server';",
 				owner.replace('<Host', '<Bridge.OctaneCompat'),
@@ -338,6 +343,11 @@ describe('runCodemod', () => {
 				leaf,
 			],
 			[
+				'styled inline element child',
+				`${server.replace('OctaneCompat', 'OctaneCompatInline')}\n${child}\nexport const App = () => <Host hostClassName="status" hostStyle={{ display: 'inline' }}><Leaf /></Host>;`,
+				leaf,
+			],
+			[
 				'child with default leaf',
 				`/** @jsxImportSource react */\n${server}\nimport Leaf from './Leaf.tsx';\nexport default function App() { return <Host>\n<Leaf label="name" />\n</Host>; }`,
 				leaf
@@ -394,6 +404,12 @@ describe('runCodemod', () => {
 				server,
 				child,
 				owner.replace('component={Leaf}', 'component={Leaf} component={null}'),
+			],
+			[
+				'duplicate host style prop',
+				server,
+				child,
+				owner.replace(' />', " hostStyle={{}} hostStyle={{ display: 'inline' }} />"),
 			],
 			[
 				'dynamic native selection',

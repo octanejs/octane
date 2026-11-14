@@ -239,6 +239,62 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 		}
 	});
 
+	it('preserves the inline host and its content when the React owner changes its presentation', async () => {
+		const presentation = { hostClassName: 'status', hostStyle: { display: 'inline' } };
+		const serverPage = h(
+			'p',
+			null,
+			h(OctaneCompatInlineServer, {
+				...presentation,
+				component: server.SsrInline,
+				props: { label: 'ready' },
+			}),
+		);
+		const clientPage = (label: string, hostClassName: string, hostStyle?: React.CSSProperties) =>
+			h(
+				'p',
+				null,
+				h(OctaneCompatInline, { hostClassName, hostStyle }, h(ClientSsrInline, { label })),
+			);
+		const container = document.createElement('div');
+		container.innerHTML = reactRenderToString(serverPage);
+		const host = container.querySelector('p > span')!;
+		const leaf = host.querySelector('em')!;
+		const text = leaf.firstChild;
+		expect(host.className).toBe('status');
+		expect(host.style.display).toBe('inline');
+		expect(leaf.textContent).toBe('ready');
+
+		document.body.appendChild(container);
+		const { hydrateRoot } = await import('react-dom/client');
+		const onRecoverableError = vi.fn();
+		let reactRoot!: ReturnType<typeof hydrateRoot>;
+		try {
+			await reactAct(async () => {
+				reactRoot = hydrateRoot(
+					container,
+					clientPage('ready', presentation.hostClassName, presentation.hostStyle),
+					{ onRecoverableError },
+				);
+			});
+			await reactAct(async () =>
+				reactRoot.render(clientPage('ready', 'status-busy', { display: 'inline-block' })),
+			);
+			expect(host.className).toBe('status-busy');
+			expect(host.style.display).toBe('inline-block');
+			await reactAct(async () => reactRoot.render(clientPage('busy', 'status-busy')));
+			expect(container.querySelector('p > span')).toBe(host);
+			expect(host.style.display).toBe('contents');
+			expect(host.querySelector('em')).toBe(leaf);
+			expect(leaf.firstChild).toBe(text);
+			expect(leaf.textContent).toBe('busy');
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		} finally {
+			if (reactRoot) await reactAct(async () => reactRoot.unmount());
+			container.remove();
+		}
+	});
+
 	it('server-renders the component/props form byte-identically to the children form and hydrates it', async () => {
 		// Both authoring forms resolve to the SAME island transport, so their
 		// server markup must be byte-equal at the same tree position.

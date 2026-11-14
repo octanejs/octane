@@ -322,10 +322,13 @@ hydration recovery.
   restrictions on nested controls in buttons. Keep these hosts out of table
   rows, selects, SVG trees, and other parents that disallow their host tags.
   The island's renderer alone reconciles and writes its interior.
-- Each host is styled `display: contents` so it adds no layout box. The
+- Each host defaults to `display: contents` so it adds no layout box. The
   island's own root element is the parent's flex or grid item. Selectors still
   see the host, so a child combinator such as `.row > .title` does not reach the
-  island's root. Wrap the island in your own element when you want a box.
+  island's root. For `OctaneCompat` and `OctaneCompatInline`, use
+  `hostClassName` and `hostStyle` to style the host. A supplied `hostStyle`
+  replaces the default style. Use `hostStyle={{}}` to leave display to CSS
+  and the element's default.
 - React Server Components, Flight, and React's server `cache()` do not cross
   these boundaries.
 - Nested React→`OctaneCompat`→`ReactCompat` **server rendering** is unsupported.
