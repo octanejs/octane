@@ -621,6 +621,11 @@ describe('package and closure completion', () => {
 			files: ['index.ts', 'shape.ts'],
 			runtimeDependencies: ['shape-runtime'],
 		});
+		await writeFile(path.join(root, 'shape.js'), "import 'js-runtime';");
+		assert.deepEqual(inspectShippedSources(root), {
+			files: ['index.ts', 'shape.js', 'shape.ts'],
+			runtimeDependencies: ['js-runtime'],
+		});
 	});
 
 	test('requires React-coupled dependency edges to use their planned binding', () => {

@@ -779,11 +779,13 @@ function staticModuleSpecifiers(filePath) {
 	return specifiers;
 }
 
-function resolveRelativeSource(fromFile, specifier) {
+function resolveRelativeSource(fromFile, specifier, typeOnly) {
 	const base = path.resolve(path.dirname(fromFile), specifier);
+	const sources = base.endsWith('.js')
+		? [base.slice(0, -3) + '.ts', base.slice(0, -3) + '.tsx']
+		: [];
 	const candidates = [
-		base,
-		...(base.endsWith('.js') ? [base.slice(0, -3) + '.ts', base.slice(0, -3) + '.tsx'] : []),
+		...(typeOnly ? [...sources, base] : [base, ...sources]),
 		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => `${base}${extension}`),
 		...SHIPPED_SOURCE_EXTENSIONS.map((extension) => path.join(base, `index${extension}`)),
 	];
@@ -836,7 +838,7 @@ export function inspectShippedSources(packageDirectory) {
 					} else if (executes) runtimeDependencies.add(packageRoot(target));
 				}
 			} else if (specifier.startsWith('.') || specifier.startsWith('/')) {
-				const dependencyFile = resolveRelativeSource(resolvedFile, specifier);
+				const dependencyFile = resolveRelativeSource(resolvedFile, specifier, typeOnly);
 				if (dependencyFile) queue.push({ filePath: dependencyFile, runtime: executes });
 			} else if (executes) {
 				runtimeDependencies.add(packageRoot(specifier));
