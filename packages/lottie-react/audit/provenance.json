@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "LICENSE.upstream",
+      "sha256": "299382b6cadfffca95080072ea867f7e7a5794bc05e1f49238c2de7cd164b458"
+    },
+    {
+      "path": "upstream-artifact/lottie-react-2.4.1.tgz",
+      "sha256": "8c28c26157e5e69a6d93111005ad78044f9ae3492e9b20edd78ac4da288e513b"
+    },
+    {
+      "path": "upstream-artifact/index.d.ts",
+      "sha256": "d114d7f758e0ae8f0a2070004c89cc92810580fab416a470a78bbcf34f315357"
+    }
+  ],
+  "packageIdentity": {
+    "path": "upstream/package.json",
+    "name": "lottie-react",
+    "version": "2.4.1",
+    "license": "MIT"
+  },
+  "filesEqual": [{ "path": "LICENSE.upstream", "equalsPath": "upstream/LICENSE" }],
+  "unpublishedDirs": ["audit", "scripts", "tests", "upstream", "upstream-artifact"]
+}

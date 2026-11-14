@@ -1,0 +1,47 @@
+{
+  "runtimeDependencies": ["lottie-web", "octane"],
+  "adaptedSources": [
+    {
+      "packageName": "lottie-react",
+      "paths": [
+        "src/components/Lottie.tsrx",
+        "src/hooks/useLottie.tsrx",
+        "src/hooks/useLottieInteractivity.tsrx",
+        "src/index.ts",
+        "src/types.ts"
+      ]
+    }
+  ],
+  "sourceLedger": [
+    {
+      "path": "src/components/Lottie.tsrx",
+      "sha256": "4971b15b2e1dfe5390cd630730cf6e261edcd3537144b2b9dca2069c880176ee",
+      "origin": "adapted",
+      "packageName": "lottie-react"
+    },
+    {
+      "path": "src/hooks/useLottie.tsrx",
+      "sha256": "3829bd05fb150bf60846b19fc81accb240e0c97a95d17dacd736a4efd3097890",
+      "origin": "adapted",
+      "packageName": "lottie-react"
+    },
+    {
+      "path": "src/hooks/useLottieInteractivity.tsrx",
+      "sha256": "943dafa6a83dec5734805389be03a2d9ace686c202ecc28a8880d0aaffedf1a4",
+      "origin": "adapted",
+      "packageName": "lottie-react"
+    },
+    {
+      "path": "src/index.ts",
+      "sha256": "3e79e98183d8075d33e99cc7d364584939062d50c95c45bc1cf66f9327a83183",
+      "origin": "adapted",
+      "packageName": "lottie-react"
+    },
+    {
+      "path": "src/types.ts",
+      "sha256": "84af1a704ea17b7bdb343aca11b416ebf1be363cb19eb20f6ac838fdf20f3422",
+      "origin": "adapted",
+      "packageName": "lottie-react"
+    }
+  ]
+}

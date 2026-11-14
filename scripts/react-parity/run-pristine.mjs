@@ -16,6 +16,7 @@ export const runners = new Map([
 	['floating-ui', { module: './floating-ui-pristine-runtime.mjs', label: '@floating-ui/react' }],
 	['livestore', { module: './livestore-pristine-runtime.mjs', label: 'LiveStore' }],
 	['jotai', { module: './jotai-pristine-runtime.mjs', label: 'Jotai' }],
+	['lottie-react', { module: './lottie-react-pristine-runtime.mjs', label: 'lottie-react' }],
 	['next-themes', { module: './next-themes-pristine-runtime.mjs', label: 'next-themes' }],
 	['effect-atom', { module: './effect-atom-pristine-runtime.mjs', label: '@effect/atom-react' }],
 	['pierre-trees', { module: './pierre-trees-pristine-runtime.mjs', label: '@pierre/trees/react' }],

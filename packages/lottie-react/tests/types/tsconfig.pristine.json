@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsxImportSource": "react",
+    "types": ["react"]
+  },
+  "include": ["./pristine.ts"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-pristine",
+    "publicMode": "pinned",
+    "upstreamRegistrations": []
+  }
+}

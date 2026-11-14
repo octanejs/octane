@@ -936,6 +936,17 @@
       "exports": ["./experimental"]
     },
     {
+      "name": "@octanejs/lottie-react",
+      "version": "0.0.1",
+      "category": "Animation",
+      "upstream": { "package": "lottie-react", "version": "2.4.1" },
+      "surface": "The published Lottie component, useLottie and useLottieInteractivity hooks, LottiePlayer, and all twelve type exports.",
+      "divergences": ["Views, container props, DOM handlers, and refs use Octane types."],
+      "ssr": "Server rendering emits the animation container. The client initializes and disposes of the animation.",
+      "verified": "2026-11-14",
+      "exports": []
+    },
+    {
       "name": "@octanejs/lucide",
       "version": "0.1.63",
       "category": "Icons",
@@ -5296,6 +5307,7 @@
     "ink": "@octanejs/ink",
     "input-otp": "@octanejs/input-otp",
     "jotai": "@octanejs/jotai",
+    "lottie-react": "@octanejs/lottie-react",
     "lucide-react": "@octanejs/lucide",
     "mobx-react": "@octanejs/mobx",
     "mobx-react-lite": "@octanejs/mobx",

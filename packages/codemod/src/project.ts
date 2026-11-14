@@ -24,6 +24,7 @@ import { strengthen } from './strong.js';
 import {
 	bind,
 	CONTEXT_PROVIDER_GETTER,
+	LOTTIE_IMPORT,
 	MAP_PARAMETER_TDZ,
 	MAP_PARAMETER_WRITE,
 	projectTypeAt,
@@ -1068,12 +1069,15 @@ export async function runCodemod(
 			(note) =>
 				note.rule === MAP_PARAMETER_WRITE ||
 				note.rule === MAP_PARAMETER_TDZ ||
-				note.rule === CONTEXT_PROVIDER_GETTER,
+				note.rule === CONTEXT_PROVIDER_GETTER ||
+				note.rule === LOTTIE_IMPORT,
 		);
-		if (write && blockedTransform)
+		const blockedBinding = extra.find((note) => note.rule === LOTTIE_IMPORT);
+		const blocker = blockedTransform ?? blockedBinding;
+		if (write && blocker)
 			return blockedWrite(
 				root,
-				unchangedFile(path.relative(root, file), source, blockedTransform),
+				unchangedFile(path.relative(root, file), source, blocker),
 				compiler?.from,
 			);
 		for (const message of [...storeErrors, ...svgErrors]) {
@@ -1823,6 +1827,40 @@ function resolveBinding(
 	packages: Map<string, string>,
 	notes: Note[],
 ) {
+	if (specifier === 'lottie-react' || specifier.startsWith('lottie-react/')) {
+		if (specifier !== 'lottie-react') {
+			notes.push({
+				rule: LOTTIE_IMPORT,
+				severity: 'error',
+				line: 1,
+				message: `The Lottie binding only supports the package root. Review \`${specifier}\` before migrating this import.`,
+			});
+			return null;
+		}
+		const installed = readInstalled(path.dirname(file), specifier);
+		const target = CATALOG[specifier];
+		const entry = DATA.bindings.find((binding) => binding.name === target);
+		const version = entry?.upstream?.version;
+		const installedBinding = target && readInstalled(path.dirname(file), target);
+		if (
+			!target ||
+			!version ||
+			installed?.manifest.name !== specifier ||
+			installed.version !== version ||
+			(installedBinding
+				? installedBinding.manifest.name !== target || installedBinding.version !== entry.version
+				: !declaresCatalogVersion(path.dirname(file), project.root, target, entry.version)) ||
+			![specifier, target].every((name) => project.original(file, name))
+		) {
+			notes.push({
+				rule: LOTTIE_IMPORT,
+				severity: 'error',
+				line: 1,
+				message: `Resolve \`lottie-react\` ${version ?? 'and its binding'} to the original installed package before migrating this import.`,
+			});
+			return null;
+		}
+	}
 	if (specifier === 'radix-ui' && !project.original(file, specifier)) {
 		notes.push({
 			rule: 'bindings',
@@ -1916,6 +1954,10 @@ function canUseBindingSubpath(
 	}
 	// New dependencies use the catalog version. For a different declaration,
 	// require an installed export before rewriting its imports.
+	return declaresCatalogVersion(dir, root, binding, version);
+}
+
+function declaresCatalogVersion(dir: string, root: string, binding: string, version: string) {
 	for (const project of new Set([root, findRoot(dir)])) {
 		const manifestFile = path.join(project, 'package.json');
 		if (!fs.existsSync(manifestFile)) continue;

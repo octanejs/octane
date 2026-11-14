@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "project": "lottie-react-server",
+  "roots": ["packages/lottie-react/tests/ssr"],
+  "files": ["packages/lottie-react/tests/ssr/view.server.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:lottie-react:ssr",
+      "file": "packages/lottie-react/tests/ssr/view.server.test.ts",
+      "fullName": "renders the animation container on the server without starting a player"
+    }
+  ]
+}

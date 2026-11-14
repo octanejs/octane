@@ -1,0 +1,23 @@
+diff --git a/tests/upstream/useLottie.test.tsx b/tests/upstream/useLottie.test.tsx
+--- a/tests/upstream/useLottie.test.tsx
++++ b/tests/upstream/useLottie.test.tsx
+@@ -54,7 +54,9 @@ describe("useLottie(...)", () => {
+     test("should check the returned object", async () => {
+       const { result } = initUseLottie();
+ 
+-      expect(Object.keys(result.current).length).toBe(14);
++      // OCTANE DIVERGENCE[lottie-241-ref]: the pinned implementation also exposes its container ref.
++      expect(Object.keys(result.current).length).toBe(15);
++      expect(result.current.animationContainerRef.current).toBeNull();
+ 
+       expect(result.current.View).toBeDefined();
+       expect(result.current.play).toBeDefined();
+@@ -69,7 +71,7 @@ describe("useLottie(...)", () => {
+       expect(result.current.getDuration).toBeDefined();
+       expect(result.current.destroy).toBeDefined();
+       expect(result.current.animationLoaded).toBeDefined();
+-      expect(result.current.animationItem || true).toBeDefined();
++      expect(result.current.animationItem).toBeUndefined();
+     });
+   });
+ 

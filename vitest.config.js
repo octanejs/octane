@@ -675,6 +675,45 @@ export default defineConfig({
 			{
 				testExecution: { group: 'react-parity' },
 				test: {
+					name: 'lottie-react',
+					include: ['packages/lottie-react/tests/upstream/**/*.test.tsx'],
+					environment: 'jsdom',
+					globals: true,
+					setupFiles: ['packages/lottie-react/tests/_canvas-setup.ts'],
+				},
+				plugins: [octane()],
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'lottie-react-pristine',
+					include: ['packages/lottie-react/tests/upstream-original.test.ts'],
+					environment: 'node',
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'lottie-react-server',
+					include: ['packages/lottie-react/tests/ssr/*.test.ts'],
+					environment: 'node',
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: { alias: [OCTANE_SERVER_SOURCE_ALIAS] },
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
+					name: 'lottie-react-browser',
+					include: ['packages/lottie-react/tests/browser/*.test.ts'],
+					environment: 'node',
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				testExecution: { group: 'react-parity' },
+				test: {
 					name: 'next-themes-pristine',
 					include: ['packages/next-themes/tests/upstream-original.test.ts'],
 					environment: 'node',

@@ -1,0 +1,49 @@
+diff --git a/tests/upstream/Lottie.test.tsx b/tests/upstream/Lottie.test.tsx
+--- a/tests/upstream/Lottie.test.tsx
++++ b/tests/upstream/Lottie.test.tsx
+@@ -9,7 +9,8 @@ import Lottie from "../../src/components/Lottie.tsrx";
+ import { LottieRef, PartialLottieComponentProps } from "../../src/types";
+ import useLottieInteractivity from "../../src/hooks/useLottieInteractivity.tsrx";
+ 
+-vi.mock("../../src/hooks/useLottieInteractivity.tsrx");
++// OCTANE DIVERGENCE[lottie-241-mock]: observe the hook without hiding the rendered container.
++vi.mock("../../src/hooks/useLottieInteractivity.tsrx", { spy: true });
+ 
+ function renderLottie(props?: PartialLottieComponentProps) {
+   const defaultProps = {
+@@ -30,7 +31,9 @@ describe("<Lottie />", () => {
+ 
+     renderLottie({ lottieRef });
+ 
+-    expect(Object.keys(lottieRef.current || {}).length).toBe(13);
++    // OCTANE DIVERGENCE[lottie-241-ref]: the pinned implementation also exposes its container ref.
++    expect(Object.keys(lottieRef.current || {}).length).toBe(14);
++    expect(lottieRef.current?.animationContainerRef.current).toBeInstanceOf(HTMLDivElement);
+ 
+     expect(lottieRef.current?.play).toBeDefined();
+     expect(lottieRef.current?.stop).toBeDefined();
+@@ -53,12 +56,20 @@ describe("<Lottie />", () => {
+   });
+ 
+   test("should not pass non-HTML props to container <div>", () => {
+-    // TODO
++    // OCTANE DIVERGENCE[lottie-241-placeholder]: exercise the upstream placeholder's DOM contract.
++    const { container } = renderLottie({ lottieRef: { current: null } });
++    const host = container.querySelector("div")!;
++    expect(host.hasAttribute("animationdata")).toBe(false);
++    expect(host.hasAttribute("lottieref")).toBe(false);
+   });
+ 
+   test("should check if interactivity applied when passed as a prop", async () => {
+-    (useLottieInteractivity as vi.Mock).mockReturnValue(<div />);
+-    renderLottie({ interactivity: { actions: [], mode: "scroll" } });
+-    expect(useLottieInteractivity).toHaveBeenCalled();
++    const actions: NonNullable<PartialLottieComponentProps["interactivity"]>["actions"] = [
++      { type: "stop", visibility: [0, 1], frames: [0] },
++    ];
++    renderLottie({ interactivity: { actions, mode: "scroll" } });
++    const options = vi.mocked(useLottieInteractivity).mock.lastCall?.[0];
++    expect(options?.actions).toBe(actions);
++    expect(options?.mode).toBe("scroll");
+   });
+ });

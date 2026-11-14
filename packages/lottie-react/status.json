@@ -1,0 +1,14 @@
+{
+  "upstream": { "package": "lottie-react", "version": "2.4.1" },
+  "provenance": {
+    "source": "https://github.com/Gamote/lottie-react/tree/bd794d226e14c714e7d740a1f7fa9dcf284d7235",
+    "license": "MIT",
+    "commit": "bd794d226e14c714e7d740a1f7fa9dcf284d7235",
+    "verification": "verified"
+  },
+  "surface": "The published Lottie component, useLottie and useLottieInteractivity hooks, LottiePlayer, and all twelve type exports.",
+  "divergences": ["Views, container props, DOM handlers, and refs use Octane types."],
+  "ssr": "Server rendering emits the animation container. The client initializes and disposes of the animation.",
+  "docs": ["packages/lottie-react/README.md", "packages/lottie-react/UPSTREAM.md"],
+  "verified": "2026-11-14"
+}

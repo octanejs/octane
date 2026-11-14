@@ -1,0 +1,148 @@
+{
+	"schemaVersion": 1,
+	"identity": {
+		"packageName": "lottie-react",
+		"version": "2.4.1",
+		"repository": {
+			"owner": "Gamote",
+			"repo": "lottie-react",
+			"subdirectory": null
+		},
+		"commit": "bd794d226e14c714e7d740a1f7fa9dcf284d7235",
+		"integrity": "sha512-LQrH7jlkigIIv++wIyrOYFLHSKQpEY4zehPicL9bQsrt1rnoKRYCYgpCUe5maqylNtacy58/sQDZTkwMcTRxZw=="
+	},
+	"license": {
+		"spdx": "MIT",
+		"evidence": [
+			{
+				"path": "LICENSE",
+				"sha256": "299382b6cadfffca95080072ea867f7e7a5794bc05e1f49238c2de7cd164b458"
+			}
+		],
+		"notices": []
+	},
+	"scopes": [
+		"LICENSE",
+		"package.json",
+		"src"
+	],
+	"adaptedMappings": [
+		{
+			"fromRoot": "src/__tests__",
+			"toRoot": "tests/upstream"
+		}
+	],
+	"adaptedRewrites": [
+		{
+			"find": "@testing-library/react-hooks",
+			"replace": "@octanejs/testing-library"
+		},
+		{
+			"find": "@testing-library/react",
+			"replace": "@octanejs/testing-library"
+		},
+		{
+			"find": "from \"react-dom/test-utils\"",
+			"replace": "from \"octane\""
+		},
+		{
+			"find": "import React from \"react\";",
+			"replace": "/** @jsxImportSource octane */"
+		},
+		{
+			"find": "import React, { CSSProperties } from \"react\";",
+			"replace": "/** @jsxImportSource octane */\nimport type { CSSProperties } from \"octane\";"
+		},
+		{
+			"find": "\"../components/Lottie\"",
+			"replace": "\"../../src/components/Lottie.tsrx\""
+		},
+		{
+			"find": "\"../hooks/useLottie\"",
+			"replace": "\"../../src/hooks/useLottie.tsrx\""
+		},
+		{
+			"find": "\"../hooks/useLottieInteractivity\"",
+			"replace": "\"../../src/hooks/useLottieInteractivity.tsrx\""
+		},
+		{
+			"find": "\"../hooks/useLottieInteractivity.tsx\"",
+			"replace": "\"../../src/hooks/useLottieInteractivity.tsrx\""
+		},
+		{
+			"find": "\"../types\"",
+			"replace": "\"../../src/types\""
+		},
+		{
+			"find": "jest.",
+			"replace": "vi."
+		},
+		{
+			"find": "toBeCalled",
+			"replace": "toHaveBeenCalled"
+		}
+	],
+	"files": [
+		{
+			"path": "LICENSE",
+			"gitBlob": "68d7ed11317c7c78ac172fd51ecab26617e3276e",
+			"size": 1786
+		},
+		{
+			"path": "package.json",
+			"gitBlob": "84fc7f8af1fda98c5dcec41654ad77d413280b5c",
+			"size": 3387
+		},
+		{
+			"path": "src/__tests__/assets/groovyWalk.json",
+			"gitBlob": "6370c01274d5ee6276665c823014f40bf48f96b2",
+			"size": 187047
+		},
+		{
+			"path": "src/__tests__/Lottie.test.tsx",
+			"gitBlob": "7157b45c0e4369dcceab3af476bdc5b2c4e57f40",
+			"size": 2282
+		},
+		{
+			"path": "src/__tests__/useLottie.test.tsx",
+			"gitBlob": "e4297d44eead174d0295476b516b80abcf1d7544",
+			"size": 6260
+		},
+		{
+			"path": "src/__tests__/useLottieInteractivity.test.tsx",
+			"gitBlob": "9f69b31221d8f566d57a2f9f609f15f667e47cbc",
+			"size": 16248
+		},
+		{
+			"path": "src/components/Lottie.ts",
+			"gitBlob": "853339f60fb56a0bf11f4a422ceb01193964bfd3",
+			"size": 1658
+		},
+		{
+			"path": "src/globals.d.ts",
+			"gitBlob": "feb78cb7df8109e2c73aaa6cd6ce3501147f8099",
+			"size": 130
+		},
+		{
+			"path": "src/hooks/useLottie.tsx",
+			"gitBlob": "117da783f715ae14fccf87426b3039274bdb8188",
+			"size": 8116
+		},
+		{
+			"path": "src/hooks/useLottieInteractivity.tsx",
+			"gitBlob": "b2cf3addc3b68c317b3971a13bd9e4781e211a16",
+			"size": 7970
+		},
+		{
+			"path": "src/index.tsx",
+			"gitBlob": "1e812168f1d866b9418422e237fa85a38841c453",
+			"size": 303
+		},
+		{
+			"path": "src/types.ts",
+			"gitBlob": "2e8edc76c5a587333fe23b1953fc3635cbc4729c",
+			"size": 2743
+		}
+	],
+	"fingerprint": "feb49cfa392614ddbaecf996de4a5aa2b0150f84829735cd5bd0fd17f39d5324"
+}
