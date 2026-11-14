@@ -19,7 +19,7 @@ import {
 	scalar,
 	walkLocalValues,
 } from './local-uses.js';
-import { isWrapper, skipWrappers } from './expression-wrappers.js';
+import { isWrapper, literalCondition, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
 import {
 	effectHelpers,
@@ -6256,6 +6256,18 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				)
 			);
 		};
+		// A predictable truth value alone does not prove the expression completes.
+		const completingLiteralCondition = (expression: ts.Expression) => {
+			const value = skipWrappers(expression);
+			if (ts.isVoidExpression(value))
+				return rowKeyLiteral(value.expression) ? 'nullish' : undefined;
+			if (!safePrefix(value)) return undefined;
+			// For the allowed unary + and -, the operand has the same truthiness.
+			const literal = ts.isPrefixUnaryExpression(value) ? skipWrappers(value.operand) : value;
+			if (ts.isBigIntLiteral(literal))
+				return /^(?:0[xXoObB])?0+n$/.test(literal.text) ? 'falsy' : 'truthy';
+			return literalCondition(literal);
+		};
 		// Once a value can interrupt evaluation, a later read is no longer proven.
 		const readsInOrder = (expressions: readonly ts.Expression[]) => {
 			for (const expression of expressions) {
@@ -6281,9 +6293,11 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (ts.isPropertyAccessExpression(read)) return readsOrdinal(read.expression);
 			if (ts.isConditionalExpression(read)) {
 				if (readsOrdinal(read.condition)) return true;
-				const test = skipWrappers(read.condition).kind;
-				if (test === ts.SyntaxKind.TrueKeyword) return readsOrdinal(read.whenTrue);
-				return test === ts.SyntaxKind.FalseKeyword && readsOrdinal(read.whenFalse);
+				const condition = completingLiteralCondition(read.condition);
+				return (
+					condition !== undefined &&
+					readsOrdinal(condition === 'truthy' ? read.whenTrue : read.whenFalse)
+				);
 			}
 			if (ts.isTemplateExpression(read)) {
 				for (const { expression } of read.templateSpans) {
@@ -6358,14 +6372,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				op === ts.SyntaxKind.QuestionQuestionToken
 			) {
 				if (readsOrdinal(read.left)) return true;
-				const left = skipWrappers(read.left).kind;
-				const rightWhen =
+				const condition = completingLiteralCondition(read.left);
+				if (condition === undefined) return false;
+				const reachesRight =
 					op === ts.SyntaxKind.AmpersandAmpersandToken
-						? ts.SyntaxKind.TrueKeyword
+						? condition === 'truthy'
 						: op === ts.SyntaxKind.BarBarToken
-							? ts.SyntaxKind.FalseKeyword
-							: ts.SyntaxKind.NullKeyword;
-				return left === rightWhen && readsOrdinal(read.right);
+							? condition !== 'truthy'
+							: condition === 'nullish';
+				return reachesRight && readsOrdinal(read.right);
 			}
 			return (
 				((op >= ts.SyntaxKind.PlusToken && op <= ts.SyntaxKind.PercentToken) ||
