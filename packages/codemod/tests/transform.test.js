@@ -893,6 +893,56 @@ export type Qualified = typeof R.createRef;`,
 		).toContain('export const P = descriptorChildren(({ children, ref }');
 	});
 
+	it.each([
+		['object ref', 'check(image.current)', '<Image ref={image} />', true],
+		[
+			'forwarded callback',
+			'{ check(String(!!image.current)); }',
+			'<Image {...props} ref={node => { ref?.(node); image.current = node; }} />',
+			true,
+		],
+		['native node', 'check(image.current)', '<img ref={image} />', false],
+		[
+			'explicit boundary',
+			'check(image.current)',
+			'<ReactCompat><Image ref={image} /></ReactCompat>',
+			false,
+		],
+		['later spread', 'check(image.current)', '<Image ref={image} {...props} />', false],
+		['cleanup only', '() => check(image.current)', '<Image ref={image} />', false],
+		['deferred read', 'later(() => check(image.current))', '<Image ref={image} />', false],
+		['write only', '{ image.current = null; }', '<Image ref={image} />', false],
+		['other ref', 'check(other.current)', '<Image ref={image} />', false],
+		['passive effect', 'check(image.current)', '<Image ref={image} />', false],
+		['unreachable layout effect', 'check(image.current)', '<Image ref={image} />', false],
+		[
+			'changed callback argument',
+			'check(image.current)',
+			'<Image ref={node => { node = null; image.current = node; }} />',
+			false,
+		],
+	])('checks the original layout effect timing for %s', (label, effect, jsx, issue) => {
+		const model = `
+			import { useRef, useLayoutEffect, useEffect } from 'react';
+			import { ReactCompat } from 'octane/react';
+			import { Image } from 'retained-image';
+			export function Preview({ref, ...props}) {
+				const image = useRef(null), other = useRef(null);
+				${label === 'unreachable layout effect' ? 'if (false) ' : ''}${label === 'passive effect' ? 'useEffect' : 'useLayoutEffect'}(() => ${effect}, []);
+				return ${jsx};
+			}
+		`;
+		const result = transformModule(model, 'preview.tsx', {
+			unported: (source) => (source === 'retained-image' ? source : null),
+			reactCompat: true,
+		});
+		const notes = result.notes.filter((note) => note.rule === 'react-island-layout-ref');
+		if (issue) {
+			expect(result.unported).toEqual([{ name: 'retained-image', islands: 1, blocked: 0 }]);
+			expect(notes).toEqual([expect.objectContaining({ severity: 'error' })]);
+		} else expect(notes).toEqual([]);
+	});
+
 	it('hosts a leaf component of a package with no Octane port in a `ReactCompat` island', () => {
 		const migrate = (
 			/** @type {string} */ source,

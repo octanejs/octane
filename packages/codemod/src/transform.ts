@@ -1539,6 +1539,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						(this.options.reactIntlAdapter && INTL_FORMATTER.test(importedName)))
 				)
 					this.reportIntlFormatterOwner(element, 'generated island');
+				this.checkIslandLayoutRef(parent);
 				this.islands.set(element, paragraph ? 'ReactCompatInline' : 'ReactCompat');
 			} else {
 				// Octane fails on a React component deep in its renderer, naming
@@ -1554,6 +1555,104 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		) {
 			block(`\`${text}\` is a React context, which Octane cannot read.`);
 		}
+	}
+
+	/** A layout setup can depend on the child ref from the original shared commit. */
+	private checkIslandLayoutRef(tag: ts.JsxOpeningLikeElement) {
+		const attr = tag.attributes.properties.findLast(
+			(p) => ts.isJsxSpreadAttribute(p) || (ts.isIdentifier(p.name) && p.name.text === 'ref'),
+		);
+		const value = attr && ts.isJsxAttribute(attr) && attr.initializer;
+		if (!attr || !value || !ts.isJsxExpression(value) || !value.expression) return;
+		const element = ts.isJsxOpeningElement(tag) ? tag.parent : tag;
+		const owner = ts.findAncestor(element, isFunctionLike);
+		const ref = skipWrappers(value.expression);
+		let name = ts.isIdentifier(ref) ? ref : undefined;
+		if (
+			ts.isArrowFunction(ref) &&
+			!ref.modifiers?.length &&
+			ref.parameters.length === 1 &&
+			!ref.parameters[0].initializer &&
+			!ref.parameters[0].dotDotDotToken
+		) {
+			const body = ref.body;
+			const assign = (value: ts.Expression) => {
+				const write = skipWrappers(value);
+				if (!ts.isBinaryExpression(write) || write.operatorToken.kind !== ts.SyntaxKind.EqualsToken)
+					return;
+				const { left, right } = write;
+				if (
+					ts.isPropertyAccessExpression(left) &&
+					left.name.text === 'current' &&
+					ts.isIdentifier(left.expression) &&
+					ts.isIdentifier(right) &&
+					this.declarationOf(right) === ref.parameters[0] &&
+					fixedBinding(this.checker, right, write)
+				)
+					return left.expression;
+			};
+			if (ts.isBlock(body)) {
+				for (const step of body.statements) {
+					if (!ts.isExpressionStatement(step)) break;
+					if ((name = assign(step.expression))) break;
+				}
+			} else name = assign(body);
+		}
+		const init = name && this.constValue(name);
+		if (
+			!owner ||
+			!name ||
+			!init ||
+			!ts.isCallExpression(init) ||
+			init.questionDotToken ||
+			init.arguments.length !== 1 ||
+			init.arguments[0].kind !== ts.SyntaxKind.NullKeyword ||
+			this.reactHook(init.expression) !== 'useRef' ||
+			!fixedBinding(this.checker, name, element) ||
+			!initializedBefore(this.checker, name, element)
+		)
+			return;
+		const layoutRead = (ref: ts.Identifier) => {
+			if (directMember(ref)?.text !== 'current') return false;
+			const setup = ts.findAncestor(ref, ts.isFunctionLike);
+			if (!setup || !ts.isArrowFunction(setup) || setup.modifiers?.length) return false;
+			const call = setup.parent;
+			if (
+				!ts.isCallExpression(call) ||
+				call.arguments[0] !== setup ||
+				call.questionDotToken ||
+				this.reactHook(call.expression) !== 'useLayoutEffect' ||
+				!ts.isExpressionStatement(call.parent) ||
+				call.parent.parent !== owner.body
+			)
+				return false;
+			let value: ts.Node = ref.parent;
+			while (
+				isWrapper(value.parent) ||
+				ts.isPropertyAccessExpression(value.parent) ||
+				ts.isTemplateSpan(value.parent) ||
+				ts.isTemplateExpression(value.parent) ||
+				(ts.isPrefixUnaryExpression(value.parent) &&
+					value.parent.operator === ts.SyntaxKind.ExclamationToken) ||
+				(ts.isCallExpression(value.parent) && !ts.isOptionalChain(value.parent))
+			)
+				value = value.parent;
+			const step = value.parent;
+			return (
+				value === setup.body ||
+				(ts.isExpressionStatement(step) &&
+					step.parent === setup.body &&
+					ts.isBlock(setup.body) &&
+					setup.body.statements[0] === step)
+			);
+		};
+		if (this.localUses(name).some(layoutRead))
+			this.note(
+				'react-island-layout-ref',
+				'error',
+				attr,
+				'This layout effect can run before the generated ReactCompat island sets its child ref. Keep both in React or move the layout work to the ref callback.',
+			);
 	}
 
 	private reportIntlFormatterOwner(
