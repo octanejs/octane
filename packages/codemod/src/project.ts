@@ -748,6 +748,7 @@ export async function runCodemod(
 				(/\b(?:useCallback|useContext|useEffect|useEffectEvent|useState|useSyncExternalStore)\b/.test(
 					source,
 				) ||
+					(source.includes('\\') && source.includes('createContext')) ||
 					escaped) &&
 				originalModule(file, 'react') &&
 				readInstalled(path.dirname(file), 'react')?.manifest.name === 'react';

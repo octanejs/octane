@@ -21,12 +21,13 @@ function rendererImport(name: ts.Identifier, checker: ts.TypeChecker, module = '
 
 function privateContextReader(callee: ts.Expression, checker: ts.TypeChecker) {
 	if (ts.isIdentifier(callee)) return rendererImport(callee, checker) === 'useContext';
-	if (
-		!ts.isPropertyAccessExpression(callee) ||
-		!ts.isIdentifier(callee.expression) ||
-		callee.name.text !== 'useContext'
-	)
-		return false;
+	if (!ts.isPropertyAccessExpression(callee) && !ts.isElementAccessExpression(callee)) return false;
+	const member = ts.isPropertyAccessExpression(callee)
+		? callee.name.text
+		: ts.isStringLiteralLike(callee.argumentExpression)
+			? callee.argumentExpression.text
+			: undefined;
+	if (member !== 'useContext' || !ts.isIdentifier(callee.expression)) return false;
 	const binding = checker.getSymbolAtLocation(callee.expression)?.declarations?.[0];
 	if (!binding || !ts.isNamespaceImport(binding)) return false;
 	const clause = binding.parent;
