@@ -47,6 +47,12 @@ Pass `hostClassName` and `hostStyle` to style either host from React. A supplied
 `hostStyle={{ display: 'inline' }}` gives an inline host its own layout box,
 and `hostStyle={{}}` leaves its display to CSS and the element's default.
 
+When React's `Activity` hides an `OctaneCompat` island, the island keeps its
+last published React context values until reveal. An insertion effect inside
+the hidden island can therefore leave a stylesheet for visible siblings on
+its previous value. On reveal the host publishes the latest committed context
+before ancestor React layout effects run.
+
 Resource hints such as `preload` and `preinit` issued during an
 `OctaneCompat` render use the React host's document resource handling.
 Place declarative document metadata such as `<title>` and `<meta>` in the
