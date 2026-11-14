@@ -24,7 +24,7 @@ import { strengthen } from './strong.js';
 import {
 	bind,
 	CONTEXT_PROVIDER_GETTER,
-	MAP_PARAMETER_RECEIVER,
+	MAP_CALLBACK_SCOPE,
 	MAP_PARAMETER_TDZ,
 	MAP_PARAMETER_WRITE,
 	projectTypeAt,
@@ -1081,7 +1081,7 @@ export async function runCodemod(
 			(note) =>
 				note.rule === MAP_PARAMETER_WRITE ||
 				note.rule === MAP_PARAMETER_TDZ ||
-				note.rule === MAP_PARAMETER_RECEIVER ||
+				note.rule === MAP_CALLBACK_SCOPE ||
 				note.rule === CONTEXT_PROVIDER_GETTER,
 		);
 		if (write && blockedTransform)
