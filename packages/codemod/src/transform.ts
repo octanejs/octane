@@ -6211,6 +6211,14 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	}
 
 	private patternReadsOrdinal(pattern: ts.BindingName, ordinal: ts.ParameterDeclaration): boolean {
+		// Once a value can interrupt evaluation, a later read is no longer proven.
+		const readsInOrder = (expressions: readonly ts.Expression[]) => {
+			for (const expression of expressions) {
+				if (readsOrdinal(expression)) return true;
+				if (!rowKeyLiteral(expression)) return false;
+			}
+			return false;
+		};
 		const readsOrdinal = (expr: ts.Expression | undefined): boolean => {
 			if (!expr) return false;
 			const read = skipWrappers(expr);
@@ -6224,6 +6232,18 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					readsOrdinal(read.operand)
 				);
 			if (ts.isPropertyAccessExpression(read)) return readsOrdinal(read.expression);
+			if (ts.isArrayLiteralExpression(read))
+				return readsInOrder(read.elements.filter((element) => !ts.isOmittedExpression(element)));
+			if (ts.isObjectLiteralExpression(read)) {
+				const values: ts.Expression[] = [];
+				for (const property of read.properties) {
+					if (ts.isSpreadAssignment(property)) break;
+					if (ts.isComputedPropertyName(property.name)) values.push(property.name.expression);
+					if (ts.isPropertyAssignment(property)) values.push(property.initializer);
+					if (ts.isShorthandPropertyAssignment(property)) values.push(property.name);
+				}
+				return readsInOrder(values);
+			}
 			if (ts.isElementAccessExpression(read)) {
 				if (readsOrdinal(read.expression)) return true;
 				const receiver = skipWrappers(read.expression);
@@ -6242,7 +6262,6 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				const callee = skipWrappers(read.expression);
 				if (!ts.isArrowFunction(callee) && (ts.isOptionalChain(read) || !ts.isIdentifier(callee)))
 					return false;
-				if (readsOrdinal(read.arguments[0])) return true;
 				// A binding in the current parameter list may still be uninitialized.
 				const declaration = ts.isIdentifier(callee) && this.declarationOf(callee);
 				if (
@@ -6251,15 +6270,9 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					ts.findAncestor(declaration, ts.isParameter)?.parent === ordinal.parent
 				) {
 					const element = ts.findAncestor(read, ts.isBindingElement);
-					if (!element || declaration.parent !== element.parent || declaration.end > element.pos)
-						return false;
+					if (!element || declaration.end > element.pos) return false;
 				}
-				for (let i = 1; i < read.arguments.length; i++) {
-					if (!rowKeyLiteral(read.arguments[i - 1])) return false;
-					const argument = read.arguments[i];
-					if (readsOrdinal(argument)) return true;
-				}
-				return false;
+				return readsInOrder(read.arguments);
 			}
 			if (!ts.isBinaryExpression(read)) return false;
 			const op = read.operatorToken.kind;
