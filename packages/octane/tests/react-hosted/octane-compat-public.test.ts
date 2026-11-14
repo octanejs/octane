@@ -14,9 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { OctaneCompat } from 'octane/react';
 import { flushSync as octaneFlushSync } from '../../src/index.js';
-import { createLog } from '../_helpers.js';
+import { createLog, flushEffects } from '../_helpers.js';
 import { h, mountReactHost, reactAct, SpikeErrorBoundary } from './_react-host.js';
 import {
+	ActivityIsland,
 	BadgeIsland,
 	CleanupThrowIsland,
 	GreetingIsland,
@@ -670,6 +671,41 @@ describe('octane/react — StrictMode, hide/reveal, and teardown discrimination 
 
 		await mounted.unmount();
 		expect(log.drain()).toEqual(['island-cleanup:hidden-del']);
+	});
+
+	it('preserves an Activity island on reveal and cleans it up on hidden deletion', async () => {
+		const log = createLog();
+		const island = h(OctaneCompat<{ log: (message: string) => void }>, {
+			component: ActivityIsland,
+			props: { log: log.push },
+		});
+		const tree = (mode: 'visible' | 'hidden') => h(React.Activity, { mode, children: island });
+		const mounted = await mountReactHost(tree('visible'));
+		try {
+			flushEffects();
+			expect(log.drain()).toEqual(['layout setup', 'passive setup']);
+			const host = mounted.host();
+			const button = host.querySelector('.count') as HTMLButtonElement;
+			await reactAct(async () => button.click());
+
+			await mounted.render(tree('hidden'));
+			expect(host.isConnected).toBe(true);
+			expect(host.style.display).toBe('none');
+			expect(log.drain()).toEqual([]);
+
+			await mounted.render(tree('visible'));
+			expect(host.style.display).toBe('contents');
+			expect(mounted.host().querySelector('.count')).toBe(button);
+			expect(button.textContent).toBe('count:1');
+
+			await mounted.render(tree('hidden'));
+			expect(host.style.display).toBe('none');
+			expect(log.drain()).toEqual([]);
+		} finally {
+			await mounted.unmount();
+		}
+		expect(mounted.container.querySelector('.count')).toBeNull();
+		expect(log.drain()).toEqual(['layout cleanup', 'passive cleanup']);
 	});
 
 	it('routes a hosted cleanup fault through reportError without scheduling the dead wrapper', async () => {

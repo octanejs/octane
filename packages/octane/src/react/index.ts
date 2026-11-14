@@ -396,29 +396,6 @@ class HostedIslandController {
 	}
 
 	/**
-	 * Host-ref detach: schedule the deferred hide/probe/unmount discriminator.
-	 * `host` is deliberately kept — a hidden island's ref detaches too, and a
-	 * pending-episode retry must still reach the (connected, display:none) host.
-	 */
-	hostDetached(): void {
-		this.scheduleDisconnectCheck();
-	}
-
-	passiveAlive(): void {
-		this.lifecycleGeneration++;
-	}
-
-	/**
-	 * Passive-effect cleanup is the deletion signal that still fires for HIDDEN
-	 * trees: React 19 hide destroys layout effects and detaches refs but leaves
-	 * passive effects connected, so deleting an already-hidden island fires only
-	 * this cleanup (Phase 0 signal matrix, §5 rule 7).
-	 */
-	passiveDetached(): void {
-		this.scheduleDisconnectCheck();
-	}
-
-	/**
 	 * Layout-commit publish (§5 rule 4): synchronously finish the hosted Octane
 	 * commit before the wrapper's layout effect returns, so outer React layout
 	 * effects observe current island DOM. Bails when the parent re-render
@@ -458,7 +435,8 @@ class HostedIslandController {
 		this.attachAndFlush();
 	}
 
-	private scheduleDisconnectCheck(): void {
+	// Keep the host so pending retries can still reach a connected, hidden island.
+	scheduleDisconnectCheck(): void {
 		const generation = ++this.lifecycleGeneration;
 		queueMicrotask(() => {
 			if (this.disposed || generation !== this.lifecycleGeneration) return;
@@ -616,15 +594,14 @@ export function OctaneCompat(
 
 	const [hostRef] = React.useState(() => (node: HTMLDivElement | null) => {
 		if (node !== null) controller.hostAttached(node);
-		else controller.hostDetached();
+		else controller.scheduleDisconnectCheck();
 	});
 	React.useLayoutEffect(() => {
 		controller.commit(child, identifierPrefix, snapshot);
 	});
-	React.useEffect(() => {
-		controller.passiveAlive();
-		return () => controller.passiveDetached();
-	}, [controller]);
+	// Activity hiding disconnects refs and passive effects before deletion.
+	// Insertion effects stay connected and can trigger deferred teardown on deletion.
+	React.useInsertionEffect(() => () => controller.scheduleDisconnectCheck(), [controller]);
 
 	return React.createElement('div', {
 		'data-octane-compat': '',

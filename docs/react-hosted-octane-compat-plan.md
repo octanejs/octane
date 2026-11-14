@@ -331,17 +331,18 @@ Lifecycle rules:
    a new attachment generation — separates all three without a private signal.
    **Phase 0 proved this against React 19.2 with one hard constraint on the
    check's TRIGGER**: hiding Suspense content destroys layout effects AND
-   detaches refs, but leaves PASSIVE effects connected; deleting an
-   already-hidden tree then fires only the passive cleanup. The check must
-   therefore be scheduled from BOTH the host ref detach (prompt visible
-   deletion + hide detection) and the wrapper's passive cleanup
-   (deletion-while-hidden) — a layout-cleanup-only or ref-only trigger leaks
-   the hosted root when React deletes a hidden island
-   (`tests/react-hosted/lifecycle-discriminator.test.ts`). The external
-   DOM-removal reconciliation also holds: with the host externally removed,
-   React gives no signal, a later commit republishes into the detached host
-   without faulting, and Octane's safe-cleanup guarantee covers the eventual
-   teardown.
+   detaches refs, but leaves passive effects connected. Deleting an
+   already-hidden tree still fires passive cleanup after the ref detaches.
+   The Phase 0 spike scheduled the check from both signals
+   (`tests/react-hosted/lifecycle-discriminator.test.ts`).
+   The public wrapper uses insertion-effect cleanup alongside ref detach.
+   React Activity disconnects passive effects when it hides a subtree.
+   Insertion effects stay connected through both kinds of hide and the
+   StrictMode probe, so their cleanup triggers the check on actual deletion.
+   The external DOM-removal reconciliation also holds. If the host is removed
+   externally, React gives no signal. A later commit republishes into the
+   detached host without faulting, and Octane's safe-cleanup guarantee covers
+   the eventual teardown.
 8. Keep the bridge active until Octane teardown finishes. During actual React
    deletion, an Octane cleanup error cannot be surfaced by scheduling state on the
    deleting controller; `routeError()` should decline it so the throw re-enters
