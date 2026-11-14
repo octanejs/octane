@@ -95,76 +95,83 @@ function sessionFor(key: object): HostedServerSession {
 	return session;
 }
 
-export function OctaneCompat<P>(props: OctaneCompatComponentProps<P>): React.ReactNode;
-export function OctaneCompat(props: OctaneCompatProps): React.ReactNode;
-export function OctaneCompat(
-	props: OctaneCompatProps | OctaneCompatComponentProps<unknown>,
-): React.ReactNode {
-	const child = resolveHostedIsland(props);
-	// The island-stable identifier prefix; the client wrapper derives the same
-	// value at the same tree position, so Octane ids hydrate byte-identically.
-	const identifierPrefix = React.useId();
-	const session = sessionFor(props);
+function createOctaneCompat(host: 'div' | 'span') {
+	function OctaneCompat<P>(props: OctaneCompatComponentProps<P>): React.ReactNode;
+	function OctaneCompat(props: OctaneCompatProps): React.ReactNode;
+	function OctaneCompat(
+		props: OctaneCompatProps | OctaneCompatComponentProps<unknown>,
+	): React.ReactNode {
+		const child = resolveHostedIsland(props);
+		// The island-stable identifier prefix; the client wrapper derives the same
+		// value at the same tree position, so Octane ids hydrate byte-identically.
+		const identifierPrefix = React.useId();
+		const session = sessionFor(props);
 
-	// Replay committed strata IN ORDER: identity-stable and status-stamped, so
-	// settled ones unwrap synchronously and use()-call positions stay aligned
-	// across Fizz replays (§9.1 — order determinism is hard correctness).
-	for (const stratum of session.strata) React.use(stratum as PromiseLike<void>);
+		// Replay committed strata IN ORDER: identity-stable and status-stamped, so
+		// settled ones unwrap synchronously and use()-call positions stay aligned
+		// across Fizz replays (§9.1 — order determinism is hard correctness).
+		for (const stratum of session.strata) React.use(stratum as PromiseLike<void>);
 
-	const attempt = renderHostedAttempt(
-		session,
-		hostedServerEnvelope as never,
-		{ body: child.type, bodyProps: child.props, bodyKey: child.key },
-		{
-			identifierPrefix,
-			// §6.4: the hosted context reader IS React's — nearest provider,
-			// defaults, and Fizz semantics come along for free.
-			readForeignContext: (context) => React.use(context as React.Context<unknown>),
-		},
-	);
-	if (attempt.status === 'suspended') {
-		// Delegate the wait to Fizz; the replay re-enters with the session.
-		React.use(attempt.stratum as Promise<void>);
-	}
-	if (attempt.status !== 'complete') {
-		// Unreachable: use(pending) throws. Narrow for TypeScript.
-		throw new Error('octane/react/server: hosted attempt did not complete.');
-	}
-	if (attempt.head.length > 0) {
-		// §9.2 v1 policy: hoisted head output cannot land under a body host.
-		throw new Error(
-			'<OctaneCompat> islands cannot hoist <title>/<meta>/<link> to the document head ' +
-				'during React SSR yet; render head resources from the React tree instead.',
+		const attempt = renderHostedAttempt(
+			session,
+			hostedServerEnvelope as never,
+			{ body: child.type, bodyProps: child.props, bodyKey: child.key },
+			{
+				identifierPrefix,
+				// §6.4: the hosted context reader IS React's — nearest provider,
+				// defaults, and Fizz semantics come along for free.
+				readForeignContext: (context) => React.use(context as React.Context<unknown>),
+			},
 		);
-	}
+		if (attempt.status === 'suspended') {
+			// Delegate the wait to Fizz; the replay re-enters with the session.
+			React.use(attempt.stratum as Promise<void>);
+		}
+		if (attempt.status !== 'complete') {
+			// Unreachable: use(pending) throws. Narrow for TypeScript.
+			throw new Error('octane/react/server: hosted attempt did not complete.');
+		}
+		if (attempt.head.length > 0) {
+			// §9.2 v1 policy: hoisted head output cannot land under a body host.
+			throw new Error(
+				'<OctaneCompat> islands cannot hoist <title>/<meta>/<link> to the document head ' +
+					'during React SSR yet; render head resources from the React tree instead.',
+			);
+		}
 
-	const children: React.ReactNode[] = [];
-	for (const [hash, sheet] of attempt.cssEntries) {
-		// React 19 style resources: Fizz hoists and dedupes by href across
-		// islands. React serializes the href as `data-href="octane-<hash>"`
-		// (and drops any other attribute), which octane hydration's style
-		// detection recognizes — no re-injection client-side.
+		const children: React.ReactNode[] = [];
+		for (const [hash, sheet] of attempt.cssEntries) {
+			// React 19 style resources: Fizz hoists and dedupes by href across
+			// islands. React serializes the href as `data-href="octane-<hash>"`
+			// (and drops any other attribute), which octane hydration's style
+			// detection recognizes — no re-injection client-side.
+			children.push(
+				React.createElement(
+					'style',
+					{
+						key: `css-${hash}`,
+						href: `octane-${hash}`,
+						precedence: 'octane',
+						nonce: sheet.nonce,
+					},
+					sheet.css,
+				),
+			);
+		}
 		children.push(
-			React.createElement(
-				'style',
-				{
-					key: `css-${hash}`,
-					href: `octane-${hash}`,
-					precedence: 'octane',
-					nonce: sheet.nonce,
-				},
-				sheet.css,
-			),
+			React.createElement(host, {
+				key: 'host',
+				'data-octane-compat': '',
+				style: OCTANE_COMPAT_HOST_STYLE,
+				suppressHydrationWarning: true,
+				dangerouslySetInnerHTML: { __html: attempt.html },
+			}),
 		);
+		return React.createElement(React.Fragment, null, ...children);
 	}
-	children.push(
-		React.createElement('div', {
-			key: 'host',
-			'data-octane-compat': '',
-			style: OCTANE_COMPAT_HOST_STYLE,
-			suppressHydrationWarning: true,
-			dangerouslySetInnerHTML: { __html: attempt.html },
-		}),
-	);
-	return React.createElement(React.Fragment, null, ...children);
+	return OctaneCompat;
 }
+
+export const OctaneCompat = /* @__PURE__ */ createOctaneCompat('div');
+/** Host phrasing Octane content inside a span with display: contents. */
+export const OctaneCompatInline = /* @__PURE__ */ createOctaneCompat('span');

@@ -36,7 +36,11 @@ Octane components inside React 19. See the
 for choosing a boundary and setting up a mixed application. Both boundaries
 have server implementations in `octane/react/server`. Like the `ReactCompat`
 host below, the `div[data-octane-compat]` host is styled `display: contents`,
-so the island's own root element is the parent's flex or grid item.
+so the island's own root element is the parent's flex or grid item. Use
+`OctaneCompatInline` from the same entries for a `span[data-octane-compat]`
+host. It takes the same props. Use phrasing content inside the span and
+respect the surrounding HTML, including a button's restriction on nested
+controls.
 
 Resource hints such as `preload` and `preinit` issued during an
 `OctaneCompat` render use the React host's document resource handling.

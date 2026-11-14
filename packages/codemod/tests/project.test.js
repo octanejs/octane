@@ -221,6 +221,7 @@ describe('runCodemod', () => {
 			'/** @jsxImportSource octane */\nexport function Leaf() { return <b>native</b>; }';
 		it.each([
 			['named', server, owner],
+			['inline', server.replace('OctaneCompat', 'OctaneCompatInline'), owner],
 			[
 				'namespace',
 				"import * as Bridge from 'octane/react/server';",
@@ -293,6 +294,11 @@ describe('runCodemod', () => {
 
 		it.each([
 			['component', `${server}\n${child}\n${owner}`, leaf],
+			[
+				'inline element child',
+				`${server.replace('OctaneCompat', 'OctaneCompatInline')}\n${child}\nexport function App() { return <Host><Leaf /></Host>; }`,
+				leaf,
+			],
 			[
 				'explicit automatic JSX',
 				`/** @jsxRuntime automatic */\n${server}\n${child}\n${owner}`,
