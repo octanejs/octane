@@ -1794,7 +1794,7 @@ root.render(<Leaf label="label" />);`,
 import { subscribe, read } from './attribute-store';
 export function useValue() { return useStore(subscribe, read, server); }
 function server() { return null; }`;
-		const consumer = `import { useValue as useAttribute } from './use-value';
+		const consumer = `import { useValue as useAttribute } from './.store/use-value';
 type Snapshot = ReturnType<typeof useAttribute>;
 export function Pane() { const value: Snapshot = useAttribute(); return <p>{value === null ? 'server' : value ? 'on' : 'off'}</p>; }`;
 		const withRefs = `import { useRef as emptyRef } from 'react';\n${consumer.replace(
@@ -1805,14 +1805,14 @@ export function Pane() { const value: Snapshot = useAttribute(); return <p>{valu
 			'package.json': '{"type":"module"}',
 			'tsconfig.json':
 				'{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler","strict":true}}',
-			'attribute-store.ts': `export function read() { return document.documentElement.dataset.label === 'on'; }
+			'.store/attribute-store.ts': `export function read() { return document.documentElement.dataset.label === 'on'; }
 export function subscribe(listener: () => void) {
 	const observer = new MutationObserver(listener);
 	observer.observe(document.documentElement, {attributes:true, attributeFilter:['data-label']});
 	return () => observer.disconnect();
 }`,
 			'other-ref.ts': "export { useRef } from 'react';",
-			'use-value.ts': wrapper,
+			'.store/use-value.ts': wrapper,
 			'Pane.tsx': consumer,
 			'Other.tsx': withRefs.replace('function Pane', 'function Other'),
 			'Unchanged.tsx': consumer.replace('function Pane', 'function Unchanged'),
@@ -1826,7 +1826,7 @@ export function subscribe(listener: () => void) {
 		const inputs = ['Pane.tsx', 'Other.tsx'].map((name) => path.join(root, name));
 		const expectBlocked = async (files, hook = 'useSyncExternalStore') => {
 			const preview = await runCodemod(files, { root, strong: true, write: false });
-			expect(preview.files.some((file) => file.file.endsWith('.octane.ts'))).toBe(false);
+			expect(preview.files.some((file) => file.file.endsWith('.octane.tsrx'))).toBe(false);
 			expect(preview.files[0].notes).toContainEqual(
 				expect.objectContaining({
 					severity: 'error',
@@ -1846,7 +1846,7 @@ export function subscribe(listener: () => void) {
 			const file = path.join(root, 'Unproved.tsx');
 			fs.writeFileSync(file, source);
 			const preview = await runCodemod([file], { root, strong: true, write: false });
-			expect(preview.files[0].code).toContain("from './use-value'");
+			expect(preview.files[0].code).toContain("from './.store/use-value'");
 			expect(preview.files[0].notes.filter((note) => note.rule === 'bindings')).toEqual([]);
 		}
 
@@ -1875,10 +1875,10 @@ export function subscribe(listener: () => void) {
 		);
 		fs.symlinkSync(localReact, path.join(shadow, 'node_modules/react'), 'dir');
 		const shadowed = path.join(shadow, 'View.tsx');
-		fs.writeFileSync(shadowed, withRefs.replace('./use-value', '../use-value'));
+		fs.writeFileSync(shadowed, withRefs.replace('./.store/use-value', '../.store/use-value'));
 		const preview = await runCodemod([shadowed], { root, strong: true, write: false });
-		expect(preview.files[0].code).toContain("from '../use-value'");
-		expect(preview.files.some((file) => file.file.endsWith('.octane.ts'))).toBe(false);
+		expect(preview.files[0].code).toContain("from '../.store/use-value'");
+		expect(preview.files.some((file) => file.file.endsWith('.octane.tsrx'))).toBe(false);
 		for (const alias of ['readAttribute', 'use3Value', 'useContext', 'use']) {
 			const input = path.join(root, 'Alias.tsx');
 			fs.writeFileSync(input, consumer.replaceAll('useAttribute', alias));
@@ -1886,7 +1886,7 @@ export function subscribe(listener: () => void) {
 			fs.writeFileSync(input, withRefs.replaceAll('useAttribute', alias));
 			await expectBlocked([input]);
 		}
-		const leaf = path.join(root, 'attribute-store.ts');
+		const leaf = path.join(root, '.store/attribute-store.ts');
 		const source = fs.readFileSync(leaf, 'utf8');
 		fs.writeFileSync(
 			leaf,
@@ -1897,13 +1897,13 @@ export function subscribe(listener: () => void) {
 		fs.writeFileSync(leaf, "import { Fragment } from 'react';\n" + source);
 		await expectBlocked([inputs[0]]);
 		fs.writeFileSync(leaf, source);
-		const occupied = path.join(root, 'use-value.octane.ts');
+		const occupied = path.join(root, '.store/use-value.octane.tsrx');
 		fs.writeFileSync(occupied, 'export const custom = true;');
 		await expectBlocked([inputs[0]]);
 		await expectBlocked([inputs[1]]);
 		expect(fs.readFileSync(occupied, 'utf8')).toBe('export const custom = true;');
 		fs.rmSync(occupied);
-		const hookFile = path.join(root, 'use-value.ts');
+		const hookFile = path.join(root, '.store/use-value.ts');
 		fs.writeFileSync(
 			hookFile,
 			"import { useState } from 'react'; export function useValue() { const [value] = useState(false); return value; }",
@@ -1911,27 +1911,39 @@ export function subscribe(listener: () => void) {
 		await expectBlocked([inputs[1]], 'useState');
 		fs.writeFileSync(hookFile, wrapper);
 
+		const legacyPath = path.join(root, '.store/use-value.octane.ts');
+		const legacy = wrapper.replace("from 'react'", "from 'octane'");
+		fs.writeFileSync(legacyPath, legacy);
 		const migrated = await runCodemod(inputs, { root, strong: true });
 		for (const input of ['Pane.tsx', 'Other.tsx']) {
 			const file = migrated.files.find((result) => result.file === input);
 			expect(file?.strong).toBe(true);
-			expect(file.code).toContain("from './use-value.octane'");
+			expect(file.code).toContain("from './.store/use-value.octane.tsrx'");
 			expect([...file.notes, ...file.diagnostics].filter((n) => n.severity === 'error')).toEqual(
 				[],
 			);
 		}
-		expect(fs.readFileSync(path.join(root, 'use-value.ts'), 'utf8')).toBe(wrapper);
+		expect(fs.readFileSync(hookFile, 'utf8')).toBe(wrapper);
 		expect(fs.readFileSync(path.join(root, 'Unchanged.tsx'), 'utf8')).toBe(
 			consumer.replace('function Pane', 'function Unchanged'),
 		);
-		expect(migrated.files.filter((file) => file.file.endsWith('.octane.ts'))).toHaveLength(1);
+		expect(fs.readFileSync(legacyPath, 'utf8')).toBe(legacy);
+		expect(migrated.files.filter((file) => file.file.endsWith('.octane.tsrx'))).toHaveLength(1);
+		const reused = await runCodemod([path.join(root, 'Unchanged.tsx')], {
+			root,
+			strong: true,
+			write: false,
+		});
+		expect(reused.files[0].code).toContain("from './.store/use-value.octane.tsrx'");
+		expect(reused.files.some((file) => file.file.endsWith('.octane.tsrx'))).toBe(false);
 
-		fs.writeFileSync(
-			path.join(root, 'entry.ts'),
-			`import { Pane } from './Pane.tsrx';
+		const entry = `import { Pane } from './Pane.tsrx';
 import { renderToStaticMarkup } from 'octane/server';
-export const render = () => renderToStaticMarkup(Pane, {}).html;`,
-		);
+export const render = () => renderToStaticMarkup(Pane, {}).html;`;
+		const bundled = await bundleRuntime(root, 'server', entry);
+		expect(bundled.render()).toBe('<p>server</p>');
+
+		fs.writeFileSync(path.join(root, 'entry.ts'), entry);
 		const { createServer } = await import('vite');
 		const { octane } = await import('octane/compiler/vite');
 		const server = await createServer({
@@ -1939,7 +1951,7 @@ export const render = () => renderToStaticMarkup(Pane, {}).html;`,
 			configFile: false,
 			logLevel: 'silent',
 			server: { middlewareMode: true, hmr: false },
-			plugins: [octane({ hmr: false })],
+			plugins: [octane({ hmr: false, requireDirective: true })],
 		});
 		try {
 			const { render } = await server.ssrLoadModule('/entry.ts');
