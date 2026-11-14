@@ -1,5 +1,23 @@
 /** Pure element-value operations shared without coupling renderer runtime graphs. */
 
+// Script data keeps HTML character references literally. Only opening and
+// closing script tokens need escaping before a whole body enters HTML.
+const INLINE_SCRIPT_TOKEN = /(<\/|<)(s)(cript)/gi;
+
+export function escapeInlineScriptContent(value: string): string {
+	return value.replace(
+		INLINE_SCRIPT_TOKEN,
+		(_match, prefix: string, s: string, suffix: string) =>
+			`${prefix}${s === 's' ? '\\u0073' : '\\u0053'}${suffix}`,
+	);
+}
+
+export function parsedInlineScriptContent(value: string): string {
+	return escapeInlineScriptContent(value).replace(/\r\n?|\u0000/g, (match) =>
+		match === '\u0000' ? '\uFFFD' : '\n',
+	);
+}
+
 /** Apply component defaults to a newly allocated public element props object. */
 export function applyElementDefaultProps(type: any, props: any): void {
 	const defaults = type?.defaultProps;

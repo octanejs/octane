@@ -120,6 +120,53 @@ describe('<script> content contract', () => {
 		}
 	});
 
+	it('preserves script children in buffered and streamed HTML and adopts the parsed script nodes', async () => {
+		const props = { source: EXECUTABLE_SOURCE };
+		const buffered = ServerRuntime.renderToString(server['ScriptChildren'], props);
+		const streamed = await collectPipeableStream(server['ScriptChildren'], props);
+		expect(streamed.errors).toEqual([]);
+		for (const html of [buffered.html, streamed.html]) {
+			const container = document.createElement('div');
+			container.innerHTML = html;
+			const [literal, dynamic] = container.querySelectorAll('script');
+			expect(literal.textContent).toBe("window.literal = '&<> &lt;';");
+			expect(dynamic.nonce).toBe('fixture-nonce');
+			expect(container.querySelectorAll('script')).toHaveLength(2);
+			expect(container.querySelector('[data-pwn]')).toBeNull();
+
+			const isolatedWindow: { __octaneScriptValue?: unknown } = {};
+			new Function('window', dynamic.textContent ?? '')(isolatedWindow);
+			expect(isolatedWindow.__octaneScriptValue).toEqual(BREAKOUT_VALUE);
+
+			document.body.appendChild(container);
+			const onRecoverableError = vi.fn();
+			const root = hydrateRoot(container, client.ScriptChildren, props, { onRecoverableError });
+			try {
+				flushSync(() => {});
+				await Promise.resolve();
+				expect(container.querySelector('[data-kind="literal"]')).toBe(literal);
+				expect(container.querySelector('[nonce]')).toBe(dynamic);
+				expect(onRecoverableError).not.toHaveBeenCalled();
+
+				const source = 'window.updated = "<&>";';
+				flushSync(() => root.render(client.ScriptChildren, { source }));
+				expect(container.querySelector('[nonce]')).toBe(dynamic);
+				expect(dynamic.textContent).toBe(source);
+			} finally {
+				root.unmount();
+				container.remove();
+			}
+		}
+	});
+
+	it('keeps ordinary text serialization for an SVG script children prop', () => {
+		const source = '<sample>&lt;</sample>';
+		const { html } = ServerRuntime.renderToString(server['ForeignScriptChildren'], { source });
+		const script = parseFragment(html).querySelector('script');
+		expect(script?.namespaceURI).toBe('http://www.w3.org/2000/svg');
+		expect(script?.textContent).toBe(source);
+	});
+
 	it('hydrates the server-safe script spelling by adoption and applies later updates', () => {
 		const { html } = ServerRuntime.renderToString(server.SpeculationRules, {
 			value: BREAKOUT_VALUE,
