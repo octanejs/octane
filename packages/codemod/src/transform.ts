@@ -100,6 +100,7 @@ const syntheticEventMembers = {
 export const MAP_PARAMETER_TDZ = 'map-parameter-tdz';
 export const MAP_PARAMETER_WRITE = 'map-parameter-write';
 export const MAP_CALLBACK_SCOPE = 'map-callback-scope';
+export const CONTEXT_ALIAS = 'context-path-alias';
 export const CONTEXT_PROVIDER_GETTER = 'context-provider-getter';
 
 /** Rule names, as reported. */
@@ -3444,6 +3445,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (!ts.isStringLiteral(specifier)) return null;
 		const next = this.resolve(specifier.text);
 		if (next === null || next === specifier.text) return null;
+		const available = this.options.bindingExports?.(specifier.text, next);
+		if (available && !this.hasBindingExports(node, next, available)) return null;
 		const namespace = radixNamespace(specifier.text);
 		if (namespace !== null) {
 			// A re-export, `import()`, or type of the package would be the whole binding.
@@ -3473,8 +3476,65 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				return null;
 			}
 		}
+		if (available) this.options.recordBindingRewrite?.(specifier.text, next);
 		this.count(RULE.import);
 		return this.replaceSpecifier(node, specifier, next);
+	}
+
+	/** Check export names against the catalog without guessing at a whole namespace. */
+	hasBindingExports(node: ts.Node, binding: string, available: ReadonlySet<string>) {
+		const check = (site: ts.Node, name?: string) => {
+			if (name !== undefined && available.has(name)) return true;
+			this.note(
+				RULE.binding,
+				'error',
+				site,
+				name === undefined
+					? `\`${binding}\` exposes a subset of the original module. Import specific supported exports before migrating this reference.`
+					: `\`${binding}\` has no \`${name}\` export.`,
+			);
+			return false;
+		};
+		const checkNamed = (elements: readonly (ts.ImportSpecifier | ts.ExportSpecifier)[]) => {
+			if (!elements.length) return check(node);
+			let supported = true;
+			for (const element of elements) {
+				if (!check(element, (element.propertyName ?? element.name).text)) supported = false;
+			}
+			return supported;
+		};
+		if (ts.isImportDeclaration(node)) {
+			const clause = node.importClause;
+			if (!clause) return check(node);
+			if (clause.name) return check(clause.name, 'default');
+			const bindings = clause.namedBindings;
+			if (!bindings) return check(node);
+			if (ts.isNamedImports(bindings)) return checkNamed(bindings.elements);
+			if ((this.source.includes('eval') || this.source.includes('\\u')) && hasEval(this.sf))
+				return check(bindings);
+			return this.localUses(bindings.name).every((ref) => {
+				const parent = ref.parent;
+				if (ts.isPropertyAccessExpression(parent) && parent.expression === ref)
+					return check(parent.name, parent.name.text);
+				if (ts.isQualifiedName(parent) && parent.left === ref)
+					return check(parent.right, parent.right.text);
+				if (
+					ts.isElementAccessExpression(parent) &&
+					parent.expression === ref &&
+					ts.isStringLiteralLike(parent.argumentExpression)
+				)
+					return check(parent.argumentExpression, parent.argumentExpression.text);
+				return check(ref);
+			});
+		}
+		if (ts.isExportDeclaration(node) && node.exportClause && ts.isNamedExports(node.exportClause))
+			return checkNamed(node.exportClause.elements);
+		if (ts.isImportTypeNode(node)) {
+			let name = node.qualifier;
+			while (name && ts.isQualifiedName(name)) name = name.left;
+			if (name) return check(name, name.text);
+		}
+		return check(node);
 	}
 
 	/**
@@ -3767,7 +3827,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			!isTag &&
 			!(ts.isPropertyAccessExpression(tag) && tag.expression === node) &&
 			!(ts.isBinaryExpression(tag) && tag.left === node);
-		if (node.name.text === 'Provider' && (isTag || isValue) && this.isContext(node.expression)) {
+		if (
+			node.name.text === 'Provider' &&
+			(isTag || isValue) &&
+			this.isContext(node.expression, node)
+		) {
 			if (!ts.isJsxClosingElement(tag)) {
 				if (
 					isTag &&
@@ -5368,7 +5432,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		}
 		if (name === 'Suspense' && ctx.template) return this.rewriteSuspense(node);
 		if (ts.isPropertyAccessExpression(tag) && tag.name.text === 'Consumer') {
-			if (this.isContext(tag.expression)) return this.rewriteConsumer(node, ctx, tag);
+			if (this.isContext(tag.expression, tag)) return this.rewriteConsumer(node, ctx, tag);
 		}
 		return null;
 	}
@@ -5378,16 +5442,25 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 * `createContext` call here, or an export the project knows is one. Only
 	 * a package's export, which the codemod cannot see, is judged by its name.
 	 */
-	isContext(node: ts.Expression) {
+	isContext(node: ts.Expression, member?: ts.PropertyAccessExpression) {
 		if (!ts.isIdentifier(node)) return false;
 		const declaration = this.declarationOf(node);
 		if (declaration && ts.isVariableDeclaration(declaration)) {
 			return !!declaration.initializer && this.createsContext(declaration.initializer);
 		}
 		const entry = declaration ? this.imports.get(declaration) : null;
-		if (!entry || entry.namespace) return false;
+		if (!entry || entry.namespace || entry.typeOnly) return false;
 		const name = entry.imported === 'default' ? entry.local : entry.imported;
-		return this.options.isContext?.(entry.module, entry.imported) ?? /Context$/.test(name);
+		const context = this.options.isContext?.(entry.module, entry.imported, entry.local);
+		if (context !== 'review-alias') return context ?? /Context$/.test(name);
+		if (member && !ts.isJsxClosingElement(member.parent))
+			this.note(
+				CONTEXT_ALIAS,
+				'error',
+				member,
+				`TypeScript resolves \`${entry.module}\` to a selected local export. Verify the runtime alias and its ${member.name.text} member before migrating it.`,
+			);
+		return false;
 	}
 
 	/**
@@ -6039,33 +6112,30 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			? this.ifDirective(root)
 			: this.relative(this.emit(root, TEMPLATE), root);
 		if (arm === null) return null;
-		if (!literal.elements.some(ts.isSpreadElement)) {
-			if (index && this.patternReadsOrdinal(item.name, index)) {
-				this.note(
-					MAP_PARAMETER_TDZ,
-					'error',
-					node,
-					'An @for row initializes its index before this parameter pattern can read it. Review the original callback’s initialization order.',
-				);
-			}
-			const mutable = (name: ts.Identifier) =>
-				!fixedBinding(this.checker, name, name, undefined, (use) => !isPropertyName(use));
-			if (
-				(index && ts.isIdentifier(index.name) && mutable(index.name)) ||
-				(!ts.isIdentifier(item.name) &&
-					reads(
-						item.name,
-						(name) =>
-							ts.isBindingElement(name.parent) && name.parent.name === name && mutable(name),
-					))
-			) {
-				this.note(
-					MAP_PARAMETER_WRITE,
-					'error',
-					node,
-					'Cannot prove this map parameter stays unchanged in an @for row. Exclude the source from migration or keep the parameter unchanged.',
-				);
-			}
+		if (index && this.patternReadsOrdinal(item.name, index)) {
+			this.note(
+				MAP_PARAMETER_TDZ,
+				'error',
+				node,
+				'An @for row initializes its index before this parameter pattern can read it. Review the original callback’s initialization order.',
+			);
+		}
+		const mutable = (name: ts.Identifier) =>
+			!fixedBinding(this.checker, name, name, undefined, (use) => !isPropertyName(use));
+		if (
+			(index && ts.isIdentifier(index.name) && mutable(index.name)) ||
+			(!ts.isIdentifier(item.name) &&
+				reads(
+					item.name,
+					(name) => ts.isBindingElement(name.parent) && name.parent.name === name && mutable(name),
+				))
+		) {
+			this.note(
+				MAP_PARAMETER_WRITE,
+				'error',
+				node,
+				'Cannot prove this map parameter stays unchanged in an @for row. Exclude the source from migration or keep the parameter unchanged.',
+			);
 		}
 		this.count(RULE.for);
 		let source = this.emit(callee.expression, PLAIN);

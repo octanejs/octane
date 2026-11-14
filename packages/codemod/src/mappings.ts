@@ -260,11 +260,17 @@ const TANSTACK_ADAPTERS: Record<string, Record<string, string>> = {
 export const PORTED_PACKAGES = {
 	'@floating-ui/react-dom': '@octanejs/floating-ui/react-dom',
 	'@tanstack/react-start': '@octanejs/tanstack-start',
+	'motion/react': '@octanejs/motion',
 	...Object.fromEntries(
 		Object.keys(TANSTACK_ADAPTERS).map((name) => [name, name.replace('/react-', '/octane-')]),
 	),
 	...Object.fromEntries([...RADIX_PACKAGES.keys()].map((name) => [name, '@octanejs/radix'])),
 } as Record<string, string>;
+
+/** The React entry points that the bounded Motion binding serves from its root. */
+export function isReactMotion(module: string) {
+	return module === 'framer-motion' || module === 'motion/react';
+}
 
 /**
  * The `@octanejs/radix` namespace a Radix package's imports become, or null.

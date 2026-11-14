@@ -13,6 +13,7 @@ interface Binding {
 export declare const DATA: {
 	bindings: Binding[];
 	reactPackages: Record<string, string>;
+	motionExports: string[];
 	errorCodes: Record<string, { message: string; runtime: string[]; status: string }>;
 	strongDiagnostics: {
 		diagnostics: Record<

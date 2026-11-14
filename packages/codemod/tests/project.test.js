@@ -1686,6 +1686,45 @@ export function Host({rows}: { rows: Row[] }) {
 			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(source);
 	});
 
+	it.each([
+		['write', '[...[1]].map((item, index) => <li key={0}>{index++}</li>)'],
+		['tdz', '[...[{}]].map(({label=index}, index) => <li key={0}>{label}</li>)'],
+	])('blocks spread-array map rows with a parameter %s before writing', async (kind, rows) => {
+		const sources = {
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			'Caller.tsx': "import { View } from './View.tsx'; export const Caller = () => <View />;",
+			'View.tsx': `export const View = () => <ul>{${rows}}</ul>;`,
+			'Controls.tsx': `export const Dense = () => <ul>{[1].map((item, index) => <li key={0}>{index}</li>)}</ul>;
+export const Spread = () => <ul>{[...[1]].map((item, index) => <li key={0}>{index}</li>)}</ul>;`,
+		};
+		const root = project(sources);
+		const inputs = ['Caller.tsx', 'View.tsx', 'Controls.tsx'].map((file) => path.join(root, file));
+		const options = { root, verify: false, strong: true };
+		const blocked = expect.objectContaining({ rule: `map-parameter-${kind}`, severity: 'error' });
+		const preview = await runCodemod(inputs, { ...options, write: false });
+		expect(preview.files.find((file) => file.file === 'View.tsx')).toMatchObject({
+			code: expect.stringContaining('@for'),
+			notes: [blocked],
+		});
+		const controls = preview.files.find((file) => file.file === 'Controls.tsx');
+		expect(controls.notes).toEqual([]);
+		expect(controls.rules['template-for']).toBe(2);
+
+		const result = await runCodemod(inputs, options);
+		expect(result.files).toEqual([
+			expect.objectContaining({
+				file: 'View.tsx',
+				output: 'View.tsx',
+				code: sources['View.tsx'],
+				changed: false,
+				notes: [blocked],
+			}),
+		]);
+		expect(fs.readdirSync(root).sort()).toEqual(Object.keys(sources).sort());
+		for (const [file, code] of Object.entries(sources))
+			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
+	});
+
 	it('keeps visible or ambiguous JSX text and authored comments in keyed map rows', async () => {
 		const children = [
 			' {row.child()}',
@@ -2836,6 +2875,90 @@ export function View() { return <Selected.Provider value="a"><Retained.Provider 
 		);
 	});
 
+	it('reports selected context member reads through TypeScript path aliases before writing', async () => {
+		const root = project({
+			'package.json': '{"name":"app","type":"module"}',
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: {
+					module: 'esnext',
+					moduleResolution: 'bundler',
+					paths: {
+						'@shade': ['./shade.ts'],
+						'@ordinary': ['./ordinary.ts'],
+						'@factory': ['./factory.ts'],
+						'@default': ['./default.ts'],
+						'@unselected': ['./unselected.ts'],
+						'@shadowed': ['./shadowed'],
+					},
+				},
+			}),
+			'shade.ts':
+				"import { createContext } from 'react'; export const Shade = createContext('default');",
+			'ordinary.ts': "export const BadgeContext = { Provider: () => 'plain' };",
+			'factory.ts': `function make() { return { Provider: () => 'plain' }; }
+export const MadeContext = make();
+export const Plain = make();`,
+			'default.ts': "export default { Provider: () => 'plain' };",
+			'unselected.ts':
+				"import { createContext } from 'react'; export const Outside = createContext('default');",
+			'shadowed.ts':
+				"import { createContext } from 'react'; export const Shadowed = createContext('default');",
+			'shadowed.js': "export const Shadowed = { Provider: () => 'plain' };",
+			'View.tsx': `import { Shade } from '@shade';
+import { BadgeContext } from '@ordinary';
+import { MadeContext, Plain } from '@factory';
+import DefaultContext from '@default';
+import { Outside } from '@unselected';
+import { Shadowed } from '@shadowed';
+export function View() {
+	return <Shade.Provider value="night">
+		<Shade.Consumer>{(value) => <b>{value}</b>}</Shade.Consumer>
+		<BadgeContext.Provider /><MadeContext.Provider /><DefaultContext.Provider />
+		<Plain.Provider /><Outside.Provider /><Shadowed.Provider />
+	</Shade.Provider>;
+}`,
+		});
+		const selection = [
+			'shade.ts',
+			'ordinary.ts',
+			'factory.ts',
+			'default.ts',
+			'shadowed.ts',
+			'View.tsx',
+		].map((file) => path.join(root, file));
+		const before = selection.map((file) => fs.readFileSync(file, 'utf8'));
+		const options = { root, projectTypes: false, verify: false };
+		const { files } = await runCodemod(selection, { ...options, write: false });
+		const view = files.find(({ file }) => file === 'View.tsx');
+		const notes = view?.notes.filter(({ rule }) => rule === 'context-path-alias');
+		expect(notes).toEqual(
+			['Provider', 'Consumer', 'Provider', 'Provider', 'Provider'].map((member) =>
+				expect.objectContaining({
+					severity: 'error',
+					message: expect.stringContaining(`${member} member`),
+				}),
+			),
+		);
+		expect(view?.code).toContain('<Shade.Consumer>');
+		for (const name of [
+			'Shade',
+			'BadgeContext',
+			'MadeContext',
+			'DefaultContext',
+			'Plain',
+			'Outside',
+			'Shadowed',
+		])
+			expect(view?.code).toContain(`<${name}.Provider`);
+		expect(files.find(({ file }) => file === 'shade.ts')?.code).toContain("from 'octane'");
+		const result = await runCodemod(selection, options);
+		expect(result.files).toEqual([
+			expect.objectContaining({ file: 'View.tsx', changed: false, notes: [notes[0]] }),
+		]);
+		expect(selection.map((file) => fs.readFileSync(file, 'utf8'))).toEqual(before);
+		expect(fs.existsSync(path.join(root, 'View.tsrx'))).toBe(false);
+	});
+
 	it('rewrites `.Provider` only on values that are contexts', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',
@@ -3641,6 +3764,62 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 				]),
 			);
 		}
+	});
+
+	it('migrates only proven export references from the React Motion entry points', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'supported.ts': `import { motion, inView } from 'framer-motion';
+import * as Motion from 'motion/react';
+export const supported = [motion.div, inView, Motion['motion'].span];
+export type Transition = import('motion/react').Transition;`,
+			'unsupported.tsx': `import { AnimatePresence, useIsPresent as usePresent } from 'framer-motion';
+import * as Motion from 'motion/react';
+export { type HTMLMotionProps as Props } from 'framer-motion';
+export function App() { return <AnimatePresence><Motion.Reorder.Group>{usePresent()}</Motion.Reorder.Group></AnimatePresence>; }`,
+			'whole.ts': `export * from 'framer-motion';
+import * as Motion from 'framer-motion';
+export const lookup = (name: string) => Motion[name];
+export const load = () => import('motion/react');`,
+			'default.ts': `import Motion, { motion } from 'framer-motion';
+export const views = [Motion, motion.div];`,
+		});
+		const { files } = await runCodemod([root], { verify: false, write: false });
+		const supported = files.find(({ file }) => file === 'supported.ts');
+		expect(supported?.notes).toEqual([]);
+		expect(supported?.code).not.toMatch(/['"](?:framer-motion|motion\/react)['"]/);
+		expect(supported?.code.match(/@octanejs\/motion/g)).toHaveLength(3);
+		const unsupported = files.find(({ file }) => file === 'unsupported.tsx');
+		expect(unsupported?.code).not.toContain('@octanejs/motion');
+		for (const name of ['useIsPresent', 'Reorder', 'HTMLMotionProps']) {
+			expect(unsupported?.notes).toContainEqual(
+				expect.objectContaining({
+					rule: 'bindings',
+					severity: 'error',
+					message: expect.stringContaining(name),
+				}),
+			);
+		}
+		const whole = files.find(({ file }) => file === 'whole.ts');
+		expect(whole?.code).not.toContain('@octanejs/motion');
+		expect(whole?.notes.filter(({ severity }) => severity === 'error')).toHaveLength(3);
+		const withDefault = files.find(({ file }) => file === 'default.ts');
+		expect(withDefault?.code).not.toContain('@octanejs/motion');
+		expect(withDefault?.notes).toContainEqual(
+			expect.objectContaining({ severity: 'error', message: expect.stringContaining('default') }),
+		);
+		const manifest = path.join(root, 'package.json');
+		const before = fs.readFileSync(manifest, 'utf8');
+		const retained = await runCodemod([path.join(root, 'unsupported.tsx')], { verify: false });
+		expect(retained.packages).toEqual([]);
+		expect(retained.dependencies).toEqual([]);
+		expect(fs.readFileSync(manifest, 'utf8')).toBe(before);
+		const migrated = await runCodemod([path.join(root, 'supported.ts')], { verify: false });
+		expect(migrated.packages.map(({ from }) => from)).toEqual(['framer-motion', 'motion/react']);
+		expect(migrated.dependencies.map(({ name }) => name)).toEqual(['@octanejs/motion']);
+		expect(JSON.parse(fs.readFileSync(manifest, 'utf8')).dependencies['@octanejs/motion']).toBe(
+			`^${catalogVersion('@octanejs/motion')}`,
+		);
 	});
 
 	it('reports exactly the Radix exports `@octanejs/radix` lacks', async () => {
