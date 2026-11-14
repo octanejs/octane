@@ -306,17 +306,19 @@ function declaredVariable(statement: ts.Statement) {
 	);
 }
 
-function firstRendererCall(fn: ts.FunctionDeclaration) {
-	const first = fn.body?.statements[0];
-	const value =
-		first &&
-		(ts.isVariableStatement(first)
-			? first.declarationList.declarations[0]?.initializer
-			: ts.isReturnStatement(first) || ts.isExpressionStatement(first)
-				? first.expression
-				: undefined);
-	if (first && value && ts.isCallExpression(value))
-		return { call: value, callee: value.expression, ambient: declaredVariable(first) };
+function firstRendererCall(body: ts.Block | ts.Expression | undefined) {
+	if (!body) return;
+	const first = ts.isBlock(body) ? body.statements[0] : undefined;
+	const value = ts.isBlock(body)
+		? first &&
+			(ts.isVariableStatement(first)
+				? first.declarationList.declarations[0]?.initializer
+				: ts.isReturnStatement(first) || ts.isExpressionStatement(first)
+					? first.expression
+					: undefined)
+		: skipWrappers(body);
+	if (value && ts.isCallExpression(value))
+		return { call: value, callee: value.expression, ambient: !!first && declaredVariable(first) };
 }
 
 function privateContextCall(
@@ -341,7 +343,7 @@ function privateContextCall(
 		)
 	)
 		return false;
-	const read = firstRendererCall(helper);
+	const read = firstRendererCall(helper.body);
 	if (
 		!read ||
 		read.ambient ||
@@ -412,14 +414,9 @@ export function directRendererCalls(
 	const calls = new Map<string, string>();
 	if (contains(sf, (n) => ts.isIdentifier(n) && n.text === 'eval')) return calls;
 	const uses = localUses(sf, checker);
-	for (const fn of sf.statements) {
+	const record = (binding: ts.Identifier, fn: ts.FunctionDeclaration | ts.ArrowFunction) => {
 		if (
-			!ts.isFunctionDeclaration(fn) ||
-			!fn.name ||
 			!fn.body ||
-			fn.asteriskToken ||
-			fn.modifiers?.length !== 1 ||
-			fn.modifiers[0].kind !== ts.SyntaxKind.ExportKeyword ||
 			fn.parameters.some(
 				(p) =>
 					!ts.isIdentifier(p.name) ||
@@ -427,25 +424,27 @@ export function directRendererCalls(
 						(module === 'react-dom' || !scalarLiteral(skipWrappers(p.initializer)))),
 			)
 		)
-			continue;
-		const first = firstRendererCall(fn);
+			return;
+		const first = firstRendererCall(fn.body);
+		const arrow = ts.isArrowFunction(fn);
 		if (
-			module === 'react-intl' &&
-			(!first || first.ambient || ts.isOptionalChain(first.call) || first.call.arguments.length)
+			(arrow && (!first || first.ambient || ts.isOptionalChain(first.call))) ||
+			(module === 'react-intl' &&
+				(!first || first.ambient || ts.isOptionalChain(first.call) || first.call.arguments.length))
 		)
-			continue;
+			return;
 		const name =
 			first && ts.isIdentifier(first.callee) && rendererImport(first.callee, checker, module);
 		const direct = name && accepts(name) ? name : undefined;
-		if (!direct && !(first && privateContextExports) && module !== 'react') continue;
-		// A local write can replace the exported function before the importer calls it.
+		if (!direct && (arrow || (!(first && privateContextExports) && module !== 'react'))) return;
+		// The export must keep the same callable binding until the consumer calls it.
 		if (
-			renderUses(uses(fn.name)).some(
+			renderUses(uses(binding)).some(
 				(ref) => !ts.isCallExpression(ref.parent) || ref.parent.expression !== ref,
 			)
 		)
-			continue;
-		if (direct) calls.set(fn.name.text, direct);
+			return;
+		if (direct) calls.set(binding.text, direct);
 		else if (
 			privateContextExports &&
 			first &&
@@ -454,10 +453,30 @@ export function directRendererCalls(
 			!fn.parameters.length &&
 			privateContextCall(sf, checker, uses, first.call, first.callee)
 		)
-			privateContextExports.add(fn.name.text);
-		else if (module === 'react') {
+			privateContextExports.add(binding.text);
+		else if (module === 'react' && ts.isBlock(fn.body)) {
 			const effect = setupEffect(fn.body, checker);
-			if (effect) calls.set(fn.name.text, effect);
+			if (effect) calls.set(binding.text, effect);
+		}
+	};
+	for (const statement of sf.statements) {
+		if (
+			(!ts.isFunctionDeclaration(statement) && !ts.isVariableStatement(statement)) ||
+			statement.modifiers?.length !== 1 ||
+			statement.modifiers[0].kind !== ts.SyntaxKind.ExportKeyword
+		)
+			continue;
+		if (ts.isFunctionDeclaration(statement)) {
+			if (statement.name && !statement.asteriskToken) record(statement.name, statement);
+		} else if (
+			module === 'react' &&
+			(statement.declarationList.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const
+		) {
+			for (const { name, initializer } of statement.declarationList.declarations) {
+				const arrow = initializer && skipWrappers(initializer);
+				if (ts.isIdentifier(name) && arrow && ts.isArrowFunction(arrow) && !arrow.modifiers?.length)
+					record(name, arrow);
+			}
 		}
 	}
 	return calls;
