@@ -317,6 +317,12 @@ export const docsMeta: DocMeta[] = [
 				searchTerms: ['createDataHandler', 'handler.serve', 'httpTransport'],
 			},
 			{
+				id: 'contract-check',
+				title: 'Let the build check your contracts',
+				searchTerms: ['*.data.ts', 'octane/data/manifest', 'OCTANE_DATA_CONTRACT'],
+			},
+			{ id: 'contract-manifest', title: 'The generated manifest', level: 3 },
+			{
 				id: 'ssr',
 				title: 'Server rendering and hydration',
 				searchTerms: ['dehydrate', 'seed', 'retire'],
