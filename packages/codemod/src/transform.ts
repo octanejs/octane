@@ -6211,9 +6211,17 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	}
 
 	private patternReadsOrdinal(pattern: ts.BindingName, ordinal: ts.ParameterDeclaration): boolean {
+		const eagerBinary = (op: ts.SyntaxKind) =>
+			op === ts.SyntaxKind.CommaToken ||
+			op === ts.SyntaxKind.EqualsEqualsEqualsToken ||
+			op === ts.SyntaxKind.ExclamationEqualsEqualsToken;
 		const safePrefix = (expr: ts.Expression): boolean => {
 			const value = skipWrappers(expr);
 			if (rowKeyLiteral(value)) return true;
+			if (ts.isBinaryExpression(value))
+				return (
+					eagerBinary(value.operatorToken.kind) && safePrefix(value.left) && safePrefix(value.right)
+				);
 			if (ts.isArrayLiteralExpression(value))
 				return value.elements.every(
 					(element) => ts.isOmittedExpression(element) || safePrefix(element),
@@ -6287,9 +6295,11 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (ts.isElementAccessExpression(read)) {
 				if (readsOrdinal(read.expression)) return true;
 				const receiver = skipWrappers(read.expression);
+				// A safe comma expression can still produce null.
 				return (
 					safePrefix(receiver) &&
-					(!ts.isOptionalChain(read) || receiver.kind !== ts.SyntaxKind.NullKeyword) &&
+					(!ts.isOptionalChain(read) ||
+						(receiver.kind !== ts.SyntaxKind.NullKeyword && !ts.isBinaryExpression(receiver))) &&
 					readsOrdinal(read.argumentExpression)
 				);
 			}
@@ -6322,6 +6332,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			}
 			if (!ts.isBinaryExpression(read)) return false;
 			const op = read.operatorToken.kind;
+			if (eagerBinary(op)) return readsInOrder([read.left, read.right]);
 			if (
 				op === ts.SyntaxKind.AmpersandAmpersandToken ||
 				op === ts.SyntaxKind.BarBarToken ||
