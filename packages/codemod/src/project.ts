@@ -23,6 +23,7 @@ import { PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
 import {
 	bind,
+	CONTEXT_ALIAS,
 	CONTEXT_PROVIDER_GETTER,
 	MAP_PARAMETER_TDZ,
 	MAP_PARAMETER_WRITE,
@@ -181,6 +182,7 @@ export async function runCodemod(
 		if (sourceFile) return { sourceFile, checker: program.getTypeChecker() };
 	}
 	const contextsOf = contextIndex(exports, known);
+	const contextPaths = Object.keys(config?.paths ?? {}).map((pattern) => pattern.split('*'));
 	const renamed = renamedImports(root, config, renames);
 	const foldNames = process.platform === 'darwin';
 	const leafKey = (file: string) => {
@@ -843,8 +845,30 @@ export async function runCodemod(
 		const reactStoreComponents = new Map<string, boolean>();
 		let installedClsx: boolean | undefined;
 		let reactJsx: boolean | undefined;
-		const isContext = (specifier: string, name: string) => {
-			if (!specifier.startsWith('.')) return null;
+		const isContext: NonNullable<TransformOptions['isContext']> = (specifier, name) => {
+			if (!specifier.startsWith('.')) {
+				if (
+					!contextPaths.length ||
+					config?.module !== ts.ModuleKind.ESNext ||
+					config.moduleSuffixes ||
+					config.rootDirs ||
+					ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject ||
+					!contextPaths.some(([start, end]) =>
+						end === undefined
+							? specifier === start
+							: specifier.startsWith(start) && specifier.endsWith(end),
+					)
+				)
+					return null;
+				const source = localFile(file, specifier, true);
+				return source &&
+					exports.has(source) &&
+					ts.findConfigFile(path.dirname(source), ts.sys.fileExists) === rootProject &&
+					(exports.get(source)?.contexts.includes(name) ||
+						(name.endsWith('Context') && exportsConstObject(source, name)))
+					? 'review-alias'
+					: null;
+			}
 			const target = resolveModule(file, specifier, known);
 			if (target) return contextsOf(target.file).has(name);
 			if (
@@ -1080,6 +1104,7 @@ export async function runCodemod(
 			(note) =>
 				note.rule === MAP_PARAMETER_WRITE ||
 				note.rule === MAP_PARAMETER_TDZ ||
+				note.rule === CONTEXT_ALIAS ||
 				note.rule === CONTEXT_PROVIDER_GETTER,
 		);
 		if (write && blockedTransform)
