@@ -47,9 +47,9 @@ const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
 const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|17\.(?:0|[1-9]\d*))$/;
 /** React packages and the Octane entry point that replaces each. */
 const CATALOG = { ...DATA.reactPackages, ...PORTED_PACKAGES };
+const MOTION_BINDING = '@octanejs/motion';
+const MOTION_VERSION = DATA.bindings.find(({ name }) => name === MOTION_BINDING)!.version;
 const MOTION_EXPORTS = new Set(DATA.motionExports);
-const bindingExports: NonNullable<TransformOptions['bindingExports']> = (from, to) =>
-	to === '@octanejs/motion' && isReactMotion(from) ? MOTION_EXPORTS : undefined;
 const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies'];
 /** A package that, by its name, renders through React. */
 const REACT_PACKAGE = /^(?:react-|@[^/]+\/react(?:-|\/|$)|[^/]+\/react$)|-react(?:\/|$)/;
@@ -452,8 +452,45 @@ export async function runCodemod(
 			? config
 			: tsconfigOptions(dir);
 	}
+	const installedMotionExports = new Map<string, ReadonlySet<string> | null>();
+	const motionExportsByIssuer = new Map<string, ReadonlySet<string> | null>();
+	function motionExports(file: string): ReadonlySet<string> | null {
+		const dir = path.dirname(file);
+		const known = motionExportsByIssuer.get(dir);
+		if (known !== undefined) return known;
+		const installed = readInstalled(dir, MOTION_BINDING);
+		const declarations = bindingDeclarations(root, dir, MOTION_BINDING);
+		let actual: ReadonlySet<string> | null = null;
+		if (
+			installed &&
+			!declarations.some(
+				(spec) =>
+					typeof spec === 'string' &&
+					/^\d+\.\d+\.\d+(?:-[\da-z.-]+)?(?:\+[\da-z.-]+)?$/i.test(spec) &&
+					spec !== installed.version,
+			)
+		) {
+			const physical = fs.realpathSync(installed.dir);
+			const cached = installedMotionExports.get(physical);
+			actual = cached === undefined ? readMotionExports(installed.manifest, physical) : cached;
+			installedMotionExports.set(physical, actual);
+		} else if (
+			!installed &&
+			declarations.every((spec) => catalogBindingVersion(spec, MOTION_VERSION))
+		) {
+			actual = MOTION_EXPORTS;
+		}
+		motionExportsByIssuer.set(dir, actual);
+		return actual;
+	}
+	function bindingExports(file: string, from: string, to: string) {
+		return to === MOTION_BINDING && isReactMotion(from)
+			? (motionExports(file) ?? undefined)
+			: undefined;
+	}
 	const bindingProject = {
 		root,
+		motionExports,
 		original(file: string, module: string, options = bindingOptions(file)) {
 			return (
 				(!options?.paths && !options?.baseUrl) ||
@@ -574,7 +611,7 @@ export async function runCodemod(
 			resolveSpecifier: (specifier) =>
 				resolveRename(file, specifier) ??
 				resolveBinding(specifier, file, bindingProject, new Map(), []),
-			bindingExports,
+			bindingExports: (from, to) => bindingExports(file, from, to),
 		}).changed;
 	}
 	const { inputFactory, changedJsxExport, helperFunction, localFile, exportsConstObject } =
@@ -1028,7 +1065,7 @@ export async function runCodemod(
 				resolveSpecifier: (specifier) =>
 					resolveRename(file, specifier) ??
 					resolveBinding(specifier, file, bindingProject, packages, notes),
-				bindingExports,
+				bindingExports: (from, to) => bindingExports(file, from, to),
 				recordBindingRewrite: (from, to) => packages.set(from, to),
 				isContext,
 				elementChild: !elementExports.size
@@ -1913,7 +1950,11 @@ function contextIndex(
 function resolveBinding(
 	specifier: string,
 	file: string,
-	project: { root: string; original: (file: string, module: string) => boolean },
+	project: {
+		root: string;
+		original: (file: string, module: string) => boolean;
+		motionExports: (file: string) => ReadonlySet<string> | null;
+	},
 	packages: Map<string, string>,
 	notes: Note[],
 ) {
@@ -1934,21 +1975,27 @@ function resolveBinding(
 	const entry = DATA.bindings.find((candidate) => candidate.name === binding);
 	const subpath = target.slice(binding.length) + specifier.slice(name.length);
 	const served = entry && entry.exports.some((key) => serves(key, `.${subpath}`));
-	if (target !== binding || isReactMotion(specifier)) {
+	const reactMotion = isReactMotion(specifier);
+	if (target !== binding || reactMotion) {
 		const shadowed = [specifier, binding + subpath].find((name) => !project.original(file, name));
-		const message = shadowed
-			? `Resolve \`${shadowed}\` to its original package before migrating this import.`
-			: subpath &&
-				  (!served || !canUseBindingSubpath(file, project.root, binding, subpath, entry.version))
-				? `Install a version of \`${binding}\` that exports \`.${subpath}\` before migrating this import.`
-				: null;
+		let message: string | undefined;
+		if (shadowed) {
+			message = `Resolve \`${shadowed}\` to its original package before migrating this import.`;
+		} else if (reactMotion && project.motionExports(file) === null) {
+			message = `Could not check the exports of \`${MOTION_BINDING}\`. Install the intended binding version and rerun the codemod.`;
+		} else if (
+			subpath &&
+			(!served || !canUseBindingSubpath(file, project.root, binding, subpath, entry.version))
+		) {
+			message = `Install a version of \`${binding}\` that exports \`.${subpath}\` before migrating this import.`;
+		}
 		if (message) {
 			notes.push({ rule: 'bindings', severity: 'error', line: 1, message });
 			return null;
 		}
 	}
 	// Partial bindings are recorded only after their export check accepts a rewrite.
-	if (!isReactMotion(specifier)) packages.set(name, binding);
+	if (!reactMotion) packages.set(name, binding);
 	// An aggregate binding (`@octanejs/visx`, for `@visx/visx`) serves each
 	// package of its scope from a subpath: `@visx/hierarchy` is
 	// `@octanejs/visx/hierarchy`.
@@ -1984,6 +2031,51 @@ function resolveBinding(
 	return binding + subpath;
 }
 
+/** Read the published binding's authored ESM root without loading it. */
+function readMotionExports(manifest: unknown, dir: string): ReadonlySet<string> | null {
+	const pkg = record(manifest);
+	const target = record(pkg.exports)['.'];
+	if (
+		pkg.name !== MOTION_BINDING ||
+		pkg.type !== 'module' ||
+		typeof target !== 'string' ||
+		!target.startsWith('./') ||
+		!target.endsWith('.ts') ||
+		target.endsWith('.d.ts')
+	)
+		return null;
+	const entry = path.resolve(dir, target);
+	if (
+		!entry.startsWith(dir + path.sep) ||
+		!ts.sys.fileExists(entry) ||
+		!fs.realpathSync(entry).startsWith(dir + path.sep)
+	)
+		return null;
+	const program = ts.createProgram([entry], {
+		module: ts.ModuleKind.ESNext,
+		moduleResolution: ts.ModuleResolutionKind.Bundler,
+		target: ts.ScriptTarget.ESNext,
+		skipLibCheck: true,
+		types: [],
+	});
+	const source = program.getSourceFile(entry);
+	if (!source) return null;
+	const checker = program.getTypeChecker();
+	const module = checker.getSymbolAtLocation(source);
+	if (!module) return null;
+	return new Set(
+		checker
+			.getExportsOfModule(module)
+			.filter(
+				(symbol) =>
+					MOTION_EXPORTS.has(symbol.name) &&
+					(!(symbol.flags & ts.SymbolFlags.Alias) ||
+						checker.getAliasedSymbol(symbol).declarations?.length),
+			)
+			.map(({ name }) => name),
+	);
+}
+
 function canUseBindingSubpath(
 	file: string,
 	root: string,
@@ -2010,21 +2102,28 @@ function canUseBindingSubpath(
 			fs.statSync(resolved, { throwIfNoEntry: false })?.isFile()
 		);
 	}
-	// New dependencies use the catalog version. For a different declaration,
-	// require an installed export before rewriting its imports.
+	// New dependencies use the catalog version. Other pins need an installed export proof.
+	return bindingDeclarations(root, dir, binding).every((spec) =>
+		catalogBindingVersion(spec, version),
+	);
+}
+
+function bindingDeclarations(root: string, dir: string, binding: string): unknown[] {
+	const versions: unknown[] = [];
 	for (const project of new Set([root, findRoot(dir)])) {
 		const manifestFile = path.join(project, 'package.json');
 		if (!fs.existsSync(manifestFile)) continue;
 		const manifest = record(JSON.parse(fs.readFileSync(manifestFile, 'utf8')));
-		if (
-			DEPENDENCY_FIELDS.some((field) => {
-				const spec = record(manifest[field])[binding];
-				return spec !== undefined && spec !== version && spec !== `^${version}`;
-			})
-		)
-			return false;
+		for (const field of DEPENDENCY_FIELDS) {
+			const spec = record(manifest[field])[binding];
+			if (spec !== undefined) versions.push(spec);
+		}
 	}
-	return true;
+	return versions;
+}
+
+function catalogBindingVersion(spec: unknown, version: string) {
+	return spec === version || spec === `^${version}`;
 }
 
 /**
