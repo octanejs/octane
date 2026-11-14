@@ -1350,6 +1350,108 @@ function loadImportedLiteApp(mode: 'client' | 'server' = 'client') {
 }
 
 describe('imported component regions', () => {
+	it.each([false, true])(
+		'refreshes a Strong leaf that reads its provider through an imported hook (hydrate: %s)',
+		(hydrate) => {
+			const hookSource = `import { createContext, useContext } from 'octane';
+			 export const ReadingContext = createContext('default');
+			 export function useReading() { return useContext(ReadingContext); }`;
+			const appSource = `'use strong';
+			 import { ReadingContext, useReading as useValue } from './context.tsrx';
+			 function Leaf() @{
+				const Leaf = '!';
+				const value = useValue();
+				<output>{value + Leaf}</output>
+			 }
+			 export function App({ outer, inner, rows }) @{
+				<ReadingContext value={outer}>
+					<Leaf />
+					<ReadingContext value={inner}>
+						@for (const row of rows; key row) { <Leaf /> }
+					</ReadingContext>
+					<Leaf />
+				</ReadingContext>
+			 }`;
+			const load = (mode: 'client' | 'server') =>
+				loadImportedModule(
+					appSource,
+					'imported-context-hook-parent.tsrx',
+					{ './context.tsrx': loadImportedModule(hookSource, 'context.tsrx', undefined, {}, mode) },
+					{},
+					mode,
+				)['App'];
+			const host = document.body.appendChild(document.createElement('main'));
+			const props = { outer: 'outer', inner: 'first', rows: [1, 2] };
+			const App = load('client');
+			if (hydrate) host.innerHTML = ServerRuntime.renderToString(load('server'), props).html;
+			const serverNodes = Array.from(host.querySelectorAll('output'));
+			const onRecoverableError = vi.fn();
+			const root = hydrate
+				? hydrateRoot(host, App, props, { onRecoverableError })
+				: createRoot(host);
+			try {
+				flushSync(() => {
+					if (!hydrate) root.render(App, props);
+				});
+				const nodes = Array.from(host.querySelectorAll('output'));
+				expect(nodes.map((node) => node.textContent)).toEqual([
+					'outer!',
+					'first!',
+					'first!',
+					'outer!',
+				]);
+				if (hydrate) nodes.forEach((node, index) => expect(node).toBe(serverNodes[index]));
+				flushSync(() => root.render(App, { ...props, inner: 'next' }));
+				expect(nodes.map((node) => node.textContent)).toEqual([
+					'outer!',
+					'next!',
+					'next!',
+					'outer!',
+				]);
+				host.querySelectorAll('output').forEach((node, index) => expect(node).toBe(nodes[index]));
+				expect(onRecoverableError).not.toHaveBeenCalled();
+			} finally {
+				root.unmount();
+				host.remove();
+			}
+		},
+	);
+
+	it('keeps an imported pure hook-shaped projection stable across equal inputs', () => {
+		const projections = loadImportedModule(
+			`export function useFormat(text) { return { text }; }`,
+			'projections.tsrx',
+		);
+		const { App } = loadImportedModule(
+			`'use strong';
+			 import { useFormat } from './projections.tsrx';
+			 function Leaf({ label, onRead }) @{
+				const result = useFormat(label);
+				<button onClick={() => onRead(result)}>{result.text as string}</button>
+			 }
+			 export function App({ label, tick, onRead }) @{
+				<section data-tick={tick}><Leaf label={label} onRead={onRead} /></section>
+			 }`,
+			'imported-pure-projection-parent.tsrx',
+			{ './projections.tsrx': projections },
+		);
+		const seen: { text: string }[] = [];
+		const onRead = (value: { text: string }) => seen.push(value);
+		const root = mount(App, { label: 'first', tick: 0, onRead });
+		try {
+			root.click('button');
+			root.update(App, { label: 'first', tick: 1, onRead });
+			root.click('button');
+			expect(seen).toEqual([{ text: 'first' }, { text: 'first' }]);
+			expect(seen[1]).toBe(seen[0]);
+			root.update(App, { label: 'next', tick: 2, onRead });
+			root.click('button');
+			expect(seen[2]?.text).toBe('next');
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it('admits imported regions only for exports that publish a proof', () => {
 		const card = `import { useState } from 'octane';
 			 import { Leaf } from './leaf';
