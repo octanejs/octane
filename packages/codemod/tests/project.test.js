@@ -3625,6 +3625,18 @@ export const views = [Motion, motion.div];`,
 		expect(withDefault?.notes).toContainEqual(
 			expect.objectContaining({ severity: 'error', message: expect.stringContaining('default') }),
 		);
+		const manifest = path.join(root, 'package.json');
+		const before = fs.readFileSync(manifest, 'utf8');
+		const retained = await runCodemod([path.join(root, 'unsupported.tsx')], { verify: false });
+		expect(retained.packages).toEqual([]);
+		expect(retained.dependencies).toEqual([]);
+		expect(fs.readFileSync(manifest, 'utf8')).toBe(before);
+		const migrated = await runCodemod([path.join(root, 'supported.ts')], { verify: false });
+		expect(migrated.packages.map(({ from }) => from)).toEqual(['framer-motion', 'motion/react']);
+		expect(migrated.dependencies.map(({ name }) => name)).toEqual(['@octanejs/motion']);
+		expect(JSON.parse(fs.readFileSync(manifest, 'utf8')).dependencies['@octanejs/motion']).toBe(
+			`^${catalogVersion('@octanejs/motion')}`,
+		);
 	});
 
 	it('reports exactly the Radix exports `@octanejs/radix` lacks', async () => {

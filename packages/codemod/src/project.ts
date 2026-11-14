@@ -1005,6 +1005,7 @@ export async function runCodemod(
 					resolveRename(file, specifier) ??
 					resolveBinding(specifier, file, bindingProject, packages, notes),
 				bindingExports,
+				recordBindingRewrite: (from, to) => packages.set(from, to),
 				isContext,
 				elementChild: !elementExports.size
 					? undefined
@@ -1921,7 +1922,8 @@ function resolveBinding(
 			return null;
 		}
 	}
-	packages.set(name, binding);
+	// Partial bindings are recorded only after their export check accepts a rewrite.
+	if (!isReactMotion(specifier)) packages.set(name, binding);
 	// An aggregate binding (`@octanejs/visx`, for `@visx/visx`) serves each
 	// package of its scope from a subpath: `@visx/hierarchy` is
 	// `@octanejs/visx/hierarchy`.

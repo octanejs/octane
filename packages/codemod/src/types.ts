@@ -29,6 +29,8 @@ export interface TransformOptions {
 	resolveSpecifier?(specifier: string): string | null;
 	/** The catalog export names for a partial binding, when known. */
 	bindingExports?(from: string, to: string): ReadonlySet<string> | undefined;
+	/** Record a successful rewrite that was checked against a partial binding's catalog. */
+	recordBindingRewrite?(from: string, to: string): void;
 	/** The issuer resolves the original installed React runtime and types. */
 	originalReact?: boolean;
 	/** A React DOM resource hint called by an imported plain TypeScript initializer. */

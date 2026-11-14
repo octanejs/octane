@@ -3457,6 +3457,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				return null;
 			}
 		}
+		if (available) this.options.recordBindingRewrite?.(specifier.text, next);
 		this.count(RULE.import);
 		return this.replaceSpecifier(node, specifier, next);
 	}
