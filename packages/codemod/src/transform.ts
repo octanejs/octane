@@ -6207,14 +6207,44 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					read.operator !== ts.SyntaxKind.MinusMinusToken &&
 					readsOrdinal(read.operand)
 				);
-			// Optional calls can skip the argument. An earlier argument or a
-			// member getter can interrupt evaluation before the ordinal read.
-			if (ts.isCallExpression(read))
+			if (ts.isPropertyAccessExpression(read)) return readsOrdinal(read.expression);
+			if (ts.isElementAccessExpression(read)) {
+				if (readsOrdinal(read.expression)) return true;
+				const receiver = skipWrappers(read.expression);
 				return (
-					!ts.isOptionalChain(read) &&
-					ts.isIdentifier(skipWrappers(read.expression)) &&
-					readsOrdinal(read.arguments[0])
+					(rowKeyLiteral(receiver) ||
+						(ts.isArrayLiteralExpression(receiver) && receiver.elements.every(rowKeyLiteral)) ||
+						(ts.isObjectLiteralExpression(receiver) && !receiver.properties.length)) &&
+					(!ts.isOptionalChain(read) || receiver.kind !== ts.SyntaxKind.NullKeyword) &&
+					readsOrdinal(read.argumentExpression)
 				);
+			}
+			if (ts.isCallExpression(read)) {
+				if (readsOrdinal(read.expression)) return true;
+				// Optional calls can skip their arguments, and earlier arguments or a
+				// member getter can interrupt evaluation before the ordinal read.
+				const callee = skipWrappers(read.expression);
+				if (!ts.isArrowFunction(callee) && (ts.isOptionalChain(read) || !ts.isIdentifier(callee)))
+					return false;
+				if (readsOrdinal(read.arguments[0])) return true;
+				// A binding in the current parameter list may still be uninitialized.
+				const declaration = ts.isIdentifier(callee) && this.declarationOf(callee);
+				if (
+					declaration &&
+					(ts.isParameter(declaration) || ts.isBindingElement(declaration)) &&
+					ts.findAncestor(declaration, ts.isParameter)?.parent === ordinal.parent
+				) {
+					const element = ts.findAncestor(read, ts.isBindingElement);
+					if (!element || declaration.parent !== element.parent || declaration.end > element.pos)
+						return false;
+				}
+				for (let i = 1; i < read.arguments.length; i++) {
+					if (!rowKeyLiteral(read.arguments[i - 1])) return false;
+					const argument = read.arguments[i];
+					if (readsOrdinal(argument)) return true;
+				}
+				return false;
+			}
 			if (!ts.isBinaryExpression(read)) return false;
 			const op = read.operatorToken.kind;
 			return (

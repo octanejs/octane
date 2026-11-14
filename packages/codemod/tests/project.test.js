@@ -1834,11 +1834,32 @@ export function Host({rows}: { rows: Row[] }) {
 				'Plus.tsx': source(direct.replace('(index as number)', '(index as number) + 1')),
 				'Typeof.tsx': source(direct.replace('(index as number)', 'typeof index')),
 				'Call.tsx': source(direct.replace('(index as number)', 'String(index)')),
+				'LaterArg.tsx': source(direct.replace('(index as number)', 'String(0, index)')),
+				'Callee.tsx': source(direct.replace('(index as number)', '(index as any)?.()')),
 				'Product.tsx': source(direct.replace('(index as number)', '2 * (index as number)')),
 				'Unary.tsx': source(direct.replace('(index as number)', '-index')),
 				'Bitwise.tsx': source(direct.replace('(index as number)', '0 | index')),
 				'Optional.tsx': source(direct.replace('(index as number)', 'maybe?.(index)')),
+				'OptionalArrow.tsx': source(direct.replace('(index as number)', '(() => 1)?.(index)')),
+				'Nullish.tsx': source(direct.replace('(index as number)', '(null as any)?.[index]')),
+				'Getter.tsx': source(direct.replace('(index as number)', 'owner.values[index]')),
 				'Earlier.tsx': source(direct.replace('(index as number)', 'fail() * index')),
+				'EarlierArg.tsx': source(direct.replace('(index as number)', 'String(fail(), index)')),
+				'LaterCallee.tsx': source(
+					direct.replace('label=(index as number)', 'label=convert(0, index),convert'),
+				),
+				'EarlierCallee.tsx': source(
+					direct.replace('label=(index as number)', 'convert=()=>1,label=convert(index)'),
+				),
+				'EarlierCalleeLaterArg.tsx': source(
+					direct.replace('label=(index as number)', 'convert=()=>1,label=convert(0,index)'),
+				),
+				'NestedCallee.tsx': source(
+					direct.replace('label=(index as number)', 'label=7,nested:{convert}=convert(0,index)'),
+				),
+				'LiteralIndex.tsx': source(direct.replace('(index as number)', '[0][index]')),
+				'OptionalIndex.tsx': source(direct.replace('(index as number)', '[0]?.[index]')),
+				'Receiver.tsx': source(direct.replace('(index as number)', '(index as any)?.label')),
 				'Computed.tsx': source(
 					'[{0:4},{1:5}].map(({[index]:label},index) => <li key={0}>{label}</li>)',
 				),
@@ -1865,9 +1886,17 @@ export function Host({rows}: { rows: Row[] }) {
 						'Plus.tsx',
 						'Typeof.tsx',
 						'Call.tsx',
+						'LaterArg.tsx',
+						'Callee.tsx',
+						'OptionalArrow.tsx',
+						'EarlierCallee.tsx',
+						'EarlierCalleeLaterArg.tsx',
 						'Product.tsx',
 						'Unary.tsx',
 						'Bitwise.tsx',
+						'LiteralIndex.tsx',
+						'OptionalIndex.tsx',
+						'Receiver.tsx',
 						'Computed.tsx',
 					].includes(file.file)
 				) {
@@ -1875,13 +1904,19 @@ export function Host({rows}: { rows: Row[] }) {
 					expect(file.code).toContain('@for');
 				} else expect(file.notes).toEqual([]);
 			}
-			const result = await runCodemod(inputs, options);
+			const result = await runCodemod(
+				[
+					path.join(root, 'LiteralIndex.tsx'),
+					...inputs.filter((file) => path.basename(file) !== 'LiteralIndex.tsx'),
+				],
+				options,
+			);
 			expect(result.files).toEqual([
 				expect.objectContaining({
-					file: 'List.tsx',
-					output: 'List.tsx',
+					file: 'LiteralIndex.tsx',
+					output: 'LiteralIndex.tsx',
 					changed: false,
-					code: originals['List.tsx'],
+					code: originals['LiteralIndex.tsx'],
 					notes: [note],
 				}),
 			]);
