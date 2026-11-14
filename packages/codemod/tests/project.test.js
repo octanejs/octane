@@ -1370,6 +1370,13 @@ export function View() {
 			const helper = 'function readTheme() { const label = readContext(Theme); return label; }';
 			const hook = 'export function useLabel() { return readTheme(); }';
 			const owner = [imports, context, helper, hook].join('\n');
+			const namespaceOwner = [
+				"import * as React from 'react';",
+				"import { createContext } from 'react';",
+				context,
+				helper.replace('readContext', 'React.useContext'),
+				hook,
+			].join('\n');
 			const view = (file, call = 'useLabel()') => `import { useLabel } from './${file}';
 export function View() { const label = ${call}; return <b>{label}</b>; }`;
 			const files = {
@@ -1378,6 +1385,23 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 				}),
 				'owner.ts': owner,
 				'View.tsx': view('owner'),
+				'hook-namespace.ts': namespaceOwner,
+				'Namespace.tsx': view('hook-namespace'),
+				'hook-namespace-type.ts': namespaceOwner.replace(
+					'import * as React',
+					'import type * as React',
+				),
+				'NamespaceType.tsx': view('hook-namespace-type'),
+				'hook-namespace-optional.ts': namespaceOwner.replace(
+					'React.useContext(',
+					'React?.useContext(',
+				),
+				'NamespaceOptional.tsx': view('hook-namespace-optional'),
+				'hook-namespace-fake.ts': namespaceOwner.replace(
+					"import * as React from 'react';",
+					"const React = { useContext() { return 'local'; } };",
+				),
+				'NamespaceFake.tsx': view('hook-namespace-fake'),
 				'Cycle.tsx': "import './early';\n" + view('owner'),
 				'early.ts': "import { View } from './Cycle'; View();",
 				'Optional.tsx': view('owner', 'useLabel?.()'),
@@ -1445,6 +1469,7 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 					'error',
 					expect.stringContaining("export useLabel calls React's useContext"),
 				],
+				['Namespace.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
 				['View.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
 			]);
 			for (const name of ['Cycle.tsx', 'View.tsx']) {
