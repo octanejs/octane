@@ -1,5 +1,6 @@
 import {
 	bindRendererRegionOwner,
+	Fragment,
 	memo,
 	use,
 	useEffect,
@@ -7,6 +8,7 @@ import {
 	useInsertionEffect,
 	useLayoutEffect,
 	useState,
+	type FragmentInstance,
 } from 'octane';
 import { MirrorLocale, MirrorTheme } from './mirror-context.js';
 
@@ -56,6 +58,35 @@ export function InsertionEffectIsland({ log }: { log: (message: string) => void 
 		};
 	}, [version]);
 	<button onClick={() => setVersion(1)}>{String(version)}</button>
+}
+
+type HostedArrayRef<T> =
+	| ((target: T | null) => void | (() => void))
+	| { current: T | null }
+	| readonly HostedArrayRef<T>[];
+
+export function ArrayRefIsland(
+	props:
+		| {
+				fragment: false;
+				refs: readonly [HostedArrayRef<HTMLSpanElement>, HostedArrayRef<HTMLSpanElement>];
+		  }
+		| {
+				fragment: true;
+				refs: readonly [HostedArrayRef<FragmentInstance>, HostedArrayRef<FragmentInstance>];
+		  },
+) @{
+	const [version, setVersion] = useState<0 | 1>(0);
+	<section>
+		<button onClick={() => setVersion(1)}>{'update'}</button>
+		@if (props.fragment) {
+			<Fragment ref={props.refs[version]}>
+				<span>{String(version)}</span>
+			</Fragment>
+		} @else {
+			<span ref={props.refs[version]}>{String(version)}</span>
+		}
+	</section>
 }
 
 export function ActivityIsland({ log }: { log: (message: string) => void }) @{
