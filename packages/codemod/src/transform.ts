@@ -28,7 +28,6 @@ import {
 	stableExportedProp,
 } from './effect-receivers.js';
 import { isBareSvgTag, storeHookUses } from './store-hook-uses.js';
-import { dataInput } from './store-inputs.js';
 import { intlImports } from './react-intl.js';
 import {
 	DEPENDENCY_HOOKS,
@@ -100,7 +99,6 @@ const syntheticEventMembers = {
 export const MAP_PARAMETER_TDZ = 'map-parameter-tdz';
 export const MAP_PARAMETER_WRITE = 'map-parameter-write';
 export const CONTEXT_PROVIDER_GETTER = 'context-provider-getter';
-export const LOTTIE_IMPORT = 'lottie-import';
 
 /** Rule names, as reported. */
 const RULE = {
@@ -949,7 +947,6 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				}
 			}
 		}
-
 		// Resolve component wrappers through their imports before claiming native Intl hooks.
 		if (this.options.reactIntlAdapter && this.source.includes('react-intl')) {
 			this.nativeIntl = intlImports(
@@ -3096,93 +3093,6 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 
 	// ---------------------------------------------------------------- imports
 
-	private lottieViewReturn(id: ts.Identifier) {
-		const call = id.parent;
-		if (
-			!ts.isCallExpression(call) ||
-			call.expression !== id ||
-			call.questionDotToken ||
-			call.arguments.length !== 1
-		)
-			return false;
-		const options = skipWrappers(call.arguments[0]);
-		// The binding consumes these literal options before passing props to the DOM.
-		if (
-			!ts.isObjectLiteralExpression(options) ||
-			!options.properties.every(
-				(field) =>
-					ts.isPropertyAssignment(field) &&
-					(ts.isIdentifier(field.name) || ts.isStringLiteral(field.name)) &&
-					((field.name.text === 'animationData' && dataInput(field.initializer)) ||
-						((field.name.text === 'loop' || field.name.text === 'autoplay') &&
-							(field.initializer.kind === ts.SyntaxKind.TrueKeyword ||
-								field.initializer.kind === ts.SyntaxKind.FalseKeyword))),
-			)
-		)
-			return false;
-		const view = call.parent;
-		if (
-			!ts.isPropertyAccessExpression(view) ||
-			view.expression !== call ||
-			view.questionDotToken ||
-			view.name.text !== 'View'
-		)
-			return false;
-		const use = view.parent;
-		const owner = ts.isReturnStatement(use)
-			? ts.findAncestor(use, ts.isFunctionLike)
-			: ts.isArrowFunction(use) && use.body === view
-				? use
-				: undefined;
-		return (
-			!!owner &&
-			(ts.isFunctionDeclaration(owner) || ts.isArrowFunction(owner)) &&
-			!owner.asteriskToken &&
-			!owner.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword) &&
-			this.isComponent(owner)
-		);
-	}
-
-	private checkLottieImports() {
-		for (const statement of this.sf.statements) {
-			if (
-				!(ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) ||
-				!statement.moduleSpecifier ||
-				!ts.isStringLiteral(statement.moduleSpecifier) ||
-				statement.moduleSpecifier.text !== 'lottie-react'
-			)
-				continue;
-			const clause = ts.isImportDeclaration(statement) ? statement.importClause : undefined;
-			if (clause?.isTypeOnly || (ts.isExportDeclaration(statement) && statement.isTypeOnly))
-				continue;
-			const named = clause?.namedBindings;
-			if (
-				this.target === 'tsrx' &&
-				clause &&
-				!clause.name &&
-				named &&
-				ts.isNamedImports(named) &&
-				!hasEval(this.sf) &&
-				named.elements.every(
-					(item) =>
-						item.isTypeOnly ||
-						(item.name.text === 'useLottie' &&
-							(!item.propertyName || item.propertyName.text === 'useLottie') &&
-							renderUses(this.localUses(item.name)).every((id) => this.lottieViewReturn(id))),
-				)
-			)
-				continue;
-			this.resolved.set('lottie-react', null);
-			this.note(
-				LOTTIE_IMPORT,
-				'error',
-				statement,
-				'Automatic Lottie migration requires explicit animation options and a named useLottie call whose View is returned directly by a component.',
-			);
-			break;
-		}
-	}
-
 	rewriteImport(node: ts.ImportDeclaration) {
 		const native = this.pathSvgImports.get(node);
 		if (native) {
@@ -3499,19 +3409,6 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 
 	rewriteSpecifier(node: ts.Node, specifier: ts.Expression) {
 		if (!ts.isStringLiteral(specifier)) return null;
-		if (
-			specifier.text === 'lottie-react' &&
-			ts.isCallExpression(node) &&
-			this.options.resolveSpecifier
-		) {
-			this.note(
-				LOTTIE_IMPORT,
-				'error',
-				node,
-				'Review the consumers of this dynamic Lottie import before migrating it.',
-			);
-			return null;
-		}
 		const next = this.resolve(specifier.text);
 		if (next === null || next === specifier.text) return null;
 		const namespace = radixNamespace(specifier.text);
@@ -3552,10 +3449,6 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	 */
 	resolve(specifier: string) {
 		let next = this.resolved.get(specifier);
-		if (next === undefined && specifier === 'lottie-react' && this.options.resolveSpecifier) {
-			this.checkLottieImports();
-			next = this.resolved.get(specifier);
-		}
 		if (next === undefined) {
 			next = this.options.resolveSpecifier?.(specifier) ?? null;
 			this.resolved.set(specifier, next);

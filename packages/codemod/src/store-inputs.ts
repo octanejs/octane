@@ -51,7 +51,7 @@ function importsResourceHint(statement: ts.ImportDeclaration | ts.ExportDeclarat
 	);
 }
 
-export function dataInput(expr: ts.Expression, locals?: ReadonlyMap<string, Input>): boolean {
+function dataInput(expr: ts.Expression, locals?: ReadonlyMap<string, Input>): boolean {
 	const value = skipWrappers(expr);
 	if (ts.isIdentifier(value)) {
 		const input = locals?.get(value.text);

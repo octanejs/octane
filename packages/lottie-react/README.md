@@ -29,7 +29,7 @@ export function LoadingAnimation() {
 
 Pass an object ref as `lottieRef` to control playback through methods such as `play`, `pause`, and `goToAndStop`. Use `useLottie` when you need the rendered `View` and the playback methods in the same component. Pass the hook result as `lottieObj` to `useLottieInteractivity` to attach scroll or cursor actions.
 
-The codemod can migrate an installed `lottie-react@2.4.1` hook call that returns `.View` directly from a component and supplies explicit literal animation options. Callers that pass a props object or inspect the returned element require a renderer ownership review.
+When migrating from `lottie-react`, update the import after confirming that Octane renders the component and owns the returned `View`.
 
 Animation callbacks such as `onComplete` and `onEnterFrame` receive Lottie player events. Container props and event handlers use Octane's native DOM types. Server rendering emits the container and initializes playback on the client.
 
