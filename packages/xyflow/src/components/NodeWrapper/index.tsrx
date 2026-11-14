@@ -1,3 +1,4 @@
+import type { AllowUndefined } from '../../types/allow-undefined-props';
 import { memo } from 'octane';
 import type { KeyboardEvent, MouseEvent } from '../../react-shim.js';
 import cc from 'classcat';
@@ -41,7 +42,18 @@ function NodeWrapper<NodeType extends Node>({
 	nodeTypes,
 	nodeClickDistance,
 	onError,
-}: NodeWrapperProps<NodeType>) {
+}: AllowUndefined<
+	NodeWrapperProps<NodeType>,
+	| 'onClick'
+	| 'onDoubleClick'
+	| 'onContextMenu'
+	| 'onMouseEnter'
+	| 'onMouseMove'
+	| 'onMouseLeave'
+	| 'nodeTypes'
+	| 'nodeExtent'
+	| 'onError'
+>) {
 	const { node, internals, isParent } = useStore((s) => {
 		const node = s.nodeLookup.get(id)! as InternalNode<NodeType>;
 		const isParent = s.parentLookup.has(id);
