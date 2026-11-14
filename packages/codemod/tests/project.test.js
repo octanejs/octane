@@ -6323,6 +6323,45 @@ export const views = [Motion, motion.div];`,
 		);
 	});
 
+	it('migrates literal input type expressions with the same event semantics as quoted types', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'Field.tsx': `export function Field({ change }: { change: () => void }) {
+				return <div>
+					<input id="text" type={'text'} onChange={change} />
+					<input id="search" type={(\`search\` as const)} onChangeCapture={change} />
+				</div>;
+			}`,
+		});
+		const [file] = (await runCodemod([root], { strong: true, verify: true, write: false })).files;
+		expect(file.strong).toBe(true);
+		expect(file.notes.filter((note) => note.rule === 'native-text-change')).toEqual([]);
+		expect(file.code).toMatch(/id="text"[^>]*\bonInput=\{change\}/);
+		expect(file.code).toMatch(/id="search"[^>]*\bonInputCapture=\{change\}/);
+	});
+
+	it('keeps text change handlers when other attributes make a literal expression unsafe to migrate', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'Field.tsx': `export function Field({ change, props }: { change: () => void; props: { type: string; onInput?: () => void } }) {
+				return <div>
+					<input id="spread" type={'text'} {...props} onChange={change} />
+					<input id="earlier-spread" {...props} type={'text'} onChange={change} />
+					<input id="duplicate" type={'text'} type={'radio'} onChange={change} />
+					<input id="checkable" type={'checkbox'} onChange={change} />
+					<input id="unknown" type={'unknown'} onChange={change} />
+				</div>;
+			}`,
+		});
+		const [file] = (await runCodemod([root], { write: false })).files;
+		expect(file.code).toMatch(/id="spread"[^>]*\bonChange=\{change\}/);
+		expect(file.code).toMatch(/id="earlier-spread"[^>]*\bonChange=\{change\}/);
+		expect(file.code).toMatch(/id="duplicate"[^>]*\bonChange=\{change\}/);
+		expect(file.code).toMatch(/id="checkable"[^>]*\bonChange=\{change\}/);
+		expect(file.code).toMatch(/id="unknown"[^>]*\bonChange=\{change\}/);
+		expect(file.notes.filter((note) => note.rule === 'native-text-change')).toHaveLength(5);
+	});
+
 	it('reports when migrating a text change capture would reorder an input handler', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',
