@@ -1612,10 +1612,7 @@ export async function runCodemod(
 						['', '.json', '.tsrx'].some((ext) => fs.existsSync(original + ext)))
 				)
 					continue;
-				if (
-					!automaticReactJsx(match.file) ||
-					!originalReactEntry(match.file, 'react/jsx-runtime')
-				)
+				if (!automaticReactJsx(match.file) || !originalReactEntry(match.file, 'react/jsx-runtime'))
 					continue;
 				const leaf = byFile.get(match.file);
 				if (!leaf?.output.endsWith('.tsrx')) continue;
