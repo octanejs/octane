@@ -4785,6 +4785,67 @@ export * from './View.tsrx';`,
 			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(source);
 	});
 
+	it('blocks a top-level alias read of a React context Provider getter before writing', async () => {
+		const context =
+			"import { createContext } from 'react'; const Theme = createContext('default');";
+		const getter = "Object.defineProperty(Theme, 'Provider', { get() { return Replacement; } });";
+		const replacement = 'function Replacement() { return "custom"; }';
+		const alias = 'const Provide = Theme.Provider;';
+		const render = 'export function View() { return <Provide value="given" />; }';
+		const source = [context, replacement, getter, 'export ' + alias].join('\n');
+		const caller = "import { Provide } from './provider.ts'; " + render;
+		const sources = {
+			'provider.ts': source,
+			'View.tsx': caller,
+			'Wrapped.tsx': [
+				context,
+				replacement,
+				getter,
+				'const Provide = ((Theme.Provider as typeof Theme.Provider)! satisfies typeof Theme.Provider);',
+				render,
+			].join('\n'),
+			'Asserted.ts': [context, replacement, getter, 'const Provide = <any>Theme.Provider;'].join(
+				'\n',
+			),
+			'Late.tsx': [context, replacement, alias, getter, render].join('\n'),
+			'WrappedLate.tsx': [
+				context,
+				replacement,
+				'const Provide = (Theme.Provider!);',
+				getter,
+				render,
+			].join('\n'),
+			'Hoisted.tsx': [
+				context,
+				replacement,
+				'const Provide = read();',
+				getter,
+				'function read() { return Theme.Provider; }',
+				render,
+			].join('\n'),
+		};
+		const root = project(sources);
+		const note = expect.objectContaining({ rule: 'context-provider-getter', severity: 'error' });
+		const inputs = Object.keys(sources).map((file) => path.join(root, file));
+		const options = { root, verify: false };
+		const preview = await runCodemod(inputs, { ...options, write: false });
+		expect(preview.files.map(({ file, notes }) => [file, notes])).toEqual([
+			['provider.ts', [note]],
+			['View.tsx', []],
+			['Wrapped.tsx', [note]],
+			['Asserted.ts', [note]],
+			['Late.tsx', []],
+			['WrappedLate.tsx', []],
+			['Hoisted.tsx', []],
+		]);
+		expect((await runCodemod(inputs, options)).files).toEqual([
+			expect.objectContaining({ file: 'provider.ts', changed: false, code: source, notes: [note] }),
+		]);
+		expect(fs.readdirSync(root).sort()).toEqual(Object.keys(sources).sort());
+		expect(fs.readFileSync(inputs[0], 'utf8')).toBe(source);
+		expect(fs.readFileSync(inputs[1], 'utf8')).toBe(caller);
+	});
+
 	it.each([
 		['es2015', 'data.ts', './data', "Provider() { return 'original'; }"],
 		['es2020', 'data.ts', './data', 'get Provider() { return Provider; }'],
