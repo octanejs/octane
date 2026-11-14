@@ -621,6 +621,55 @@ class HostedIslandController {
 	}
 }
 
+function createOctaneCompat(host: 'div' | 'span') {
+	function OctaneCompat<P>(props: OctaneCompatComponentProps<P>): React.ReactNode;
+	function OctaneCompat(props: OctaneCompatProps): React.ReactNode;
+	function OctaneCompat(
+		props: OctaneCompatProps | OctaneCompatComponentProps<unknown>,
+	): React.ReactNode {
+		const [controller] = React.useState(() => new HostedIslandController());
+		// One stable invalidation per wrapper — a plain state bump (§5).
+		const [, bump] = React.useReducer((count: number) => count + 1, 0);
+		controller.notify = bump;
+
+		// Render-local transport: an aborted concurrent React render must never
+		// mutate the running Octane tree, so the island transport and context
+		// snapshot are captured here and published only from the committed layout
+		// effect below (§5 rules 4–5).
+		const child = resolveHostedIsland(props);
+		// Context reads replay during EVERY wrapper render — including one about
+		// to throw the relay/error — so React records the dependencies (§7 step 3).
+		const snapshot = controller.readReactSnapshots();
+		// SSR-stable island identifier prefix (§5 rule 2); Phase 4 pairs this with
+		// the hosted server renderer for hydration parity.
+		const identifierPrefix = React.useId();
+
+		if (controller.status === 2) throw controller.payload;
+		if (controller.status === 1) React.use(controller.payload as Promise<void>);
+
+		const [hostRef] = React.useState(() => (node: HTMLElement | null) => {
+			if (node !== null) controller.hostAttached(node);
+			else controller.hostDetached();
+		});
+		React.useLayoutEffect(() => {
+			controller.commit(child, identifierPrefix, snapshot);
+		});
+		React.useInsertionEffect(() => controller.startLifetime(), [controller]);
+
+		return React.createElement(host, {
+			'data-octane-compat': '',
+			style: OCTANE_COMPAT_HOST_STYLE,
+			ref: hostRef,
+			// §9.3 opaque-host contract: the server writes real island HTML; the
+			// client ALWAYS supplies this stable frozen sentinel so React neither
+			// diffs nor clears the Octane-owned descendants — on any render, forever.
+			suppressHydrationWarning: true,
+			dangerouslySetInnerHTML: OPAQUE_HOST_SENTINEL,
+		});
+	}
+	return OctaneCompat;
+}
+
 /**
  * Host exactly one compiled Octane component inside a React tree, in either
  * authoring form:
@@ -638,51 +687,9 @@ class HostedIslandController {
  * boundaries, error boundaries, and event ancestors are the integration
  * surface; there is nothing to register.
  */
-export function OctaneCompat<P>(props: OctaneCompatComponentProps<P>): React.ReactNode;
-export function OctaneCompat(props: OctaneCompatProps): React.ReactNode;
-export function OctaneCompat(
-	props: OctaneCompatProps | OctaneCompatComponentProps<unknown>,
-): React.ReactNode {
-	const [controller] = React.useState(() => new HostedIslandController());
-	// One stable invalidation per wrapper — a plain state bump (§5).
-	const [, bump] = React.useReducer((count: number) => count + 1, 0);
-	controller.notify = bump;
-
-	// Render-local transport: an aborted concurrent React render must never
-	// mutate the running Octane tree, so the island transport and context
-	// snapshot are captured here and published only from the committed layout
-	// effect below (§5 rules 4–5).
-	const child = resolveHostedIsland(props);
-	// Context reads replay during EVERY wrapper render — including one about
-	// to throw the relay/error — so React records the dependencies (§7 step 3).
-	const snapshot = controller.readReactSnapshots();
-	// SSR-stable island identifier prefix (§5 rule 2); Phase 4 pairs this with
-	// the hosted server renderer for hydration parity.
-	const identifierPrefix = React.useId();
-
-	if (controller.status === 2) throw controller.payload;
-	if (controller.status === 1) React.use(controller.payload as Promise<void>);
-
-	const [hostRef] = React.useState(() => (node: HTMLDivElement | null) => {
-		if (node !== null) controller.hostAttached(node);
-		else controller.hostDetached();
-	});
-	React.useLayoutEffect(() => {
-		controller.commit(child, identifierPrefix, snapshot);
-	});
-	React.useInsertionEffect(() => controller.startLifetime(), [controller]);
-
-	return React.createElement('div', {
-		'data-octane-compat': '',
-		style: OCTANE_COMPAT_HOST_STYLE,
-		ref: hostRef,
-		// §9.3 opaque-host contract: the server writes real island HTML; the
-		// client ALWAYS supplies this stable frozen sentinel so React neither
-		// diffs nor clears the Octane-owned descendants — on any render, forever.
-		suppressHydrationWarning: true,
-		dangerouslySetInnerHTML: OPAQUE_HOST_SENTINEL,
-	});
-}
+export const OctaneCompat = /* @__PURE__ */ createOctaneCompat('div');
+/** Host phrasing Octane content inside a span with display: contents. */
+export const OctaneCompatInline = /* @__PURE__ */ createOctaneCompat('span');
 
 /** Server island markup present? (Anything beyond the client's own sentinel.) */
 function hasServerIslandMarkup(host: HTMLElement): boolean {
