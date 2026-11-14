@@ -98,6 +98,7 @@ const syntheticEventMembers = {
 
 export const MAP_PARAMETER_TDZ = 'map-parameter-tdz';
 export const MAP_PARAMETER_WRITE = 'map-parameter-write';
+export const CONTEXT_ALIAS = 'context-path-alias';
 export const CONTEXT_PROVIDER_GETTER = 'context-provider-getter';
 
 /** Rule names, as reported. */
@@ -3808,7 +3809,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			!isTag &&
 			!(ts.isPropertyAccessExpression(tag) && tag.expression === node) &&
 			!(ts.isBinaryExpression(tag) && tag.left === node);
-		if (node.name.text === 'Provider' && (isTag || isValue) && this.isContext(node.expression)) {
+		if (
+			node.name.text === 'Provider' &&
+			(isTag || isValue) &&
+			this.isContext(node.expression, node)
+		) {
 			if (!ts.isJsxClosingElement(tag)) {
 				if (
 					isTag &&
@@ -5409,7 +5414,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		}
 		if (name === 'Suspense' && ctx.template) return this.rewriteSuspense(node);
 		if (ts.isPropertyAccessExpression(tag) && tag.name.text === 'Consumer') {
-			if (this.isContext(tag.expression)) return this.rewriteConsumer(node, ctx, tag);
+			if (this.isContext(tag.expression, tag)) return this.rewriteConsumer(node, ctx, tag);
 		}
 		return null;
 	}
@@ -5419,16 +5424,25 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 * `createContext` call here, or an export the project knows is one. Only
 	 * a package's export, which the codemod cannot see, is judged by its name.
 	 */
-	isContext(node: ts.Expression) {
+	isContext(node: ts.Expression, member?: ts.PropertyAccessExpression) {
 		if (!ts.isIdentifier(node)) return false;
 		const declaration = this.declarationOf(node);
 		if (declaration && ts.isVariableDeclaration(declaration)) {
 			return !!declaration.initializer && this.createsContext(declaration.initializer);
 		}
 		const entry = declaration ? this.imports.get(declaration) : null;
-		if (!entry || entry.namespace) return false;
+		if (!entry || entry.namespace || entry.typeOnly) return false;
 		const name = entry.imported === 'default' ? entry.local : entry.imported;
-		return this.options.isContext?.(entry.module, entry.imported) ?? /Context$/.test(name);
+		const context = this.options.isContext?.(entry.module, entry.imported, entry.local);
+		if (context !== 'review-alias') return context ?? /Context$/.test(name);
+		if (member && !ts.isJsxClosingElement(member.parent))
+			this.note(
+				CONTEXT_ALIAS,
+				'error',
+				member,
+				`TypeScript resolves \`${entry.module}\` to a selected local export. Verify the runtime alias and its ${member.name.text} member before migrating it.`,
+			);
+		return false;
 	}
 
 	/**
