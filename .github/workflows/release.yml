@@ -53,6 +53,10 @@ jobs:
           import { getReleasePlan } from '@changesets/get-release-plan';
           const plan = await getReleasePlan(process.cwd());
           console.log(`has_releases=${plan.releases.some((release) => release.type !== 'none')}`);
+          const bumpsOctane = plan.releases.some(
+            ({ name, type }) => name === 'octane' && (type === 'minor' || type === 'major'),
+          );
+          console.log(`bumps_octane_release_line=${bumpsOctane}`);
           NODE
 
       # Prove the repository-owned release plan before making the GitHub API
@@ -60,9 +64,19 @@ jobs:
       # remains a hard workflow failure during an API outage.
       - name: Validate generated release plan
         if: steps.release_plan.outputs.has_releases == 'true'
+        env:
+          BUMPS_OCTANE_RELEASE_LINE: ${{ steps.release_plan.outputs.bumps_octane_release_line }}
         run: |
           pnpm changeset:version
           git diff --check
+          # Version-only release PRs skip the full suite. Both adapters gate
+          # support by Octane release line, so check the newly generated line.
+          if [ "$BUMPS_OCTANE_RELEASE_LINE" = true ]; then
+            pnpm exec vitest run --project codemod \
+              packages/codemod/tests/react-intl-runtime.test.js \
+              packages/codemod/tests/scoped-store-contract.test.js \
+              -t 'keeps forwarded accessibility labels|preserves the active store and aliased handle'
+          fi
 
       - name: Restore checkout after release validation
         run: |
