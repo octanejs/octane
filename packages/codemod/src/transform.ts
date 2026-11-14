@@ -3894,6 +3894,100 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		);
 	}
 
+	private retainedReactFactory(ref: ts.Identifier) {
+		const call = ref.parent;
+		if (
+			!ts.isCallExpression(call) ||
+			call.expression !== ref ||
+			ts.isOptionalChain(call) ||
+			call.typeArguments?.length
+		)
+			return false;
+		const [tag, props, ...children] = call.arguments;
+		if (
+			!tag ||
+			!ts.isStringLiteral(tag) ||
+			props?.kind !== ts.SyntaxKind.NullKeyword ||
+			!children.every(ts.isStringLiteral)
+		)
+			return false;
+		let value: ts.Expression = call;
+		while (ts.isParenthesizedExpression(value.parent)) value = value.parent;
+		const direct = value.parent;
+		const block =
+			ts.isReturnStatement(direct) &&
+			ts.isBlock(direct.parent) &&
+			direct.parent.statements.length === 1
+				? direct.parent
+				: null;
+		const callback = block ? block.parent : direct;
+		if (
+			!ts.isArrowFunction(callback) ||
+			callback.body !== (block ?? value) ||
+			callback.parameters.length ||
+			callback.type ||
+			callback.typeParameters?.length ||
+			callback.modifiers?.length
+		)
+			return false;
+		const property = callback.parent;
+		if (
+			!ts.isPropertyAssignment(property) ||
+			property.initializer !== callback ||
+			!ts.isIdentifier(property.name) ||
+			property.name.text === '__proto__' ||
+			property.parent.properties.length !== 1
+		)
+			return false;
+		const expression = property.parent.parent;
+		const attribute = expression.parent;
+		if (
+			!ts.isJsxExpression(expression) ||
+			expression.dotDotDotToken ||
+			!ts.isJsxAttribute(attribute) ||
+			attribute.initializer !== expression ||
+			!ts.isIdentifier(attribute.name) ||
+			attribute.name.text !== 'props'
+		)
+			return false;
+		const island = attribute.parent.parent;
+		if (!ts.isJsxSelfClosingElement(island) || island.attributes.properties.length !== 2)
+			return false;
+		const component = island.attributes.properties.find((item) => item !== attribute);
+		if (
+			!component ||
+			!ts.isJsxAttribute(component) ||
+			!ts.isIdentifier(component.name) ||
+			component.name.text !== 'component' ||
+			!component.initializer ||
+			!ts.isJsxExpression(component.initializer) ||
+			!component.initializer.expression
+		)
+			return false;
+		const named = (id: ts.Node) => {
+			if (!ts.isIdentifier(id)) return;
+			const decl = this.declarationOf(id);
+			const entry = decl && this.imports.get(decl);
+			if (
+				decl &&
+				ts.isImportSpecifier(decl) &&
+				entry &&
+				!entry.typeOnly &&
+				!decl.parent.parent.parent.attributes
+			)
+				return entry;
+		};
+		const bridge = named(island.tagName);
+		const owner = named(component.initializer.expression);
+		return (
+			!!bridge &&
+			!!owner &&
+			nativeReactCompat(bridge.module, bridge.imported) &&
+			this.options.retainedReactBridgeComponent?.(bridge.module, owner.module, owner.imported) ===
+				true
+		);
+	}
+
 	/**
 	 * Fill each React import placeholder. The first one carries every Octane
 	 * import the module needs, the module's own specifiers first; the others
@@ -3931,6 +4025,23 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				if (!this.used.has(local)) continue;
 				const imported = (element.propertyName ?? element.name).text;
 				const typeOnly = clause.isTypeOnly || element.isTypeOnly;
+				if (
+					module === 'react' &&
+					imported === 'createElement' &&
+					!typeOnly &&
+					!node.attributes &&
+					this.target === 'tsrx' &&
+					this.hasReactBridge &&
+					this.options.retainedReactBridgeComponent &&
+					this.options.originalReact &&
+					!hasEval(this.sf)
+				) {
+					const refs = this.localUses(element.name).filter((ref) => !inTypeNode(ref));
+					if (refs.length && refs.every((ref) => this.retainedReactFactory(ref))) {
+						add(module, imported, local, false);
+						continue;
+					}
+				}
 				const mapped = mapReactImport(module, imported, typeOnly);
 				if (mapped) {
 					// A name read only in types imports as a type, which bundlers elide.

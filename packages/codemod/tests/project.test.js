@@ -1412,6 +1412,87 @@ export function deferred() { return () => hint('/later.png', { as: 'image' }); }
 		},
 	);
 
+	it('preserves a React factory returned directly by callbacks for an authored island', async () => {
+		const config = {
+			compilerOptions: {
+				strict: true,
+				jsx: 'react-jsx',
+				moduleResolution: 'bundler',
+				noEmit: true,
+				allowImportingTsExtensions: true,
+			},
+			files: ['View.tsrx'],
+		};
+		const source = `import { createElement } from 'react';
+import { ReactCompat as Island } from 'octane/react';
+import { Legacy } from './Legacy.tsx';
+export function View() {
+	return <main><Island component={Legacy} props={{
+		getIcon: () => { return (createElement('b', null, 'ready')); },
+	}} /></main>;
+}`;
+		const root = project({
+			'tsconfig.json': JSON.stringify(config),
+			'View.tsx': source,
+			'Alias.tsx': source
+				.replaceAll('createElement', 'make')
+				.replace('{ make }', '{ createElement as make }'),
+			'Mixed.tsx': source + "\nexport const native = () => createElement('i', null, 'elsewhere');",
+			'Spread.tsx': source.replace('props={{', 'props={{ ...extra,'),
+			'Typed.tsx': source
+				.replace('{ createElement }', '{ createElement, type ReactNode }')
+				.replace('getIcon: () =>', 'getIcon: (): ReactNode =>'),
+			'Legacy.tsx': `/** @jsxImportSource react */
+import type { ReactNode } from 'react';
+export function Legacy({ getIcon }: { getIcon(): ReactNode }) { return <nav>{getIcon()}</nav>; }`,
+		});
+		const modules = path.join(root, 'node_modules');
+		fs.mkdirSync(path.join(modules, '@types'), { recursive: true });
+		for (const name of ['octane', 'react', 'react-dom'])
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules', name),
+				path.join(modules, name),
+				'dir',
+			);
+		fs.symlinkSync(
+			path.join(REPO, 'packages/octane/node_modules/@types/react'),
+			path.join(modules, '@types/react'),
+			'dir',
+		);
+		fs.symlinkSync(path.join(REPO, 'node_modules/@tsrx'), path.join(modules, '@tsrx'), 'dir');
+		const result = await runCodemod(
+			['View', 'Alias', 'Mixed', 'Spread', 'Typed'].map((name) => path.join(root, name + '.tsx')),
+			{ root, write: false, strong: true, verify: true },
+		);
+		for (const name of ['View', 'Alias']) {
+			const file = result.files.find((item) => item.file === name + '.tsx');
+			expect(file.strong).toBe(true);
+			expect(file.code).toMatch(/import \{ createElement(?: as make)? \} from 'react'/);
+		}
+		for (const name of ['Mixed', 'Spread', 'Typed']) {
+			const file = result.files.find((item) => item.file === name + '.tsx');
+			expect(file.code).toMatch(/import \{ createElement(?:, type ReactNode)? \} from 'octane'/);
+		}
+		const view = result.files.find((item) => item.file === 'View.tsx');
+		fs.writeFileSync(path.join(root, view.output), view.code);
+		const checked = spawnSync(
+			process.execPath,
+			[path.join(REPO, 'scripts/octane-tsc/bin.mjs'), '-p', 'tsconfig.json'],
+			{ cwd: root, encoding: 'utf8' },
+		);
+		expect(checked.status, checked.stdout + checked.stderr).toBe(0);
+		const { render } = await bundleRuntime(
+			root,
+			'server',
+			`
+import { View } from './View.tsrx';
+import { renderToReadableStream } from 'octane/server';
+export const render = async () => new Response(await renderToReadableStream(View)).text();
+`,
+		);
+		expect(await render()).toContain('<nav><b>ready</b></nav>');
+	});
+
 	it('reports a native setup call into a React hook left in an unselected local module', () => {
 		const helper = `import { useState as state } from 'react';
 export function useLabel() { const [label] = state('ready'); return label; }`;

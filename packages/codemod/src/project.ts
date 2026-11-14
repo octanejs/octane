@@ -1135,6 +1135,35 @@ export async function runCodemod(
 				get originalReact() {
 					return installedReact(file);
 				},
+				retainedReactBridgeComponent: (bridge, module, name) => {
+					if (
+						!reactCompat ||
+						!module.startsWith('.') ||
+						!module.endsWith('.tsx') ||
+						bindingOptions(file)?.rootDirs?.length ||
+						bindingOptions(file)?.moduleSuffixes?.some(Boolean) ||
+						resolveRename(file, module) ||
+						!originalOctaneBridge(file, bridge) ||
+						!originalReactEntry(file, 'react', bindingOptions(file))
+					)
+						return false;
+					const owner = localFile(file, module, true);
+					if (
+						!owner?.endsWith('.tsx') ||
+						owner !== path.resolve(path.dirname(file), module) ||
+						fs.realpathSync(owner) !== entryKey(owner) ||
+						fs.statSync(owner).nlink !== 1 ||
+						known.has(owner) ||
+						!automaticReactJsx(owner) ||
+						!originalReactEntry(owner, 'react/jsx-runtime')
+					)
+						return false;
+					const source = fs.readFileSync(owner, 'utf8');
+					return (
+						/^\s*\/\*\*\s*@jsxImportSource\s+react\s*\*\//.test(source) &&
+						directReactExports(owner, source).intrinsics.has(name)
+					);
+				},
 				originalReactServerEntry: (module) =>
 					originalReactEntry(file, module, bindingOptions(file)) &&
 					originalOctaneBridge(file, 'octane/server'),
