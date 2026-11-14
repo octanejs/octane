@@ -14,7 +14,10 @@
         "src/internal.ts",
         "src/isRestoring.ts",
         "src/mutationOptions.ts",
+        "src/queries-types.ts",
         "src/queryOptions.ts",
+        "src/suspense-queries-types.ts",
+        "src/types.ts",
         "src/useBaseQuery.ts",
         "src/useInfiniteQuery.ts",
         "src/useIsFetching.ts",
@@ -90,10 +93,28 @@
       "sha256": "454a6437b2e517a64928fcf60c97dcea03018ff944e9d6fa426c949110944da3"
     },
     {
+      "path": "src/queries-types.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "1289f70ed0bb2758c1b915956ac06c64290a48cc08e6561a12bb3a7bd25a3cf8"
+    },
+    {
       "path": "src/queryOptions.ts",
       "origin": "adapted",
       "packageName": "@tanstack/react-query",
       "sha256": "abe022a8b5cd24f36b85346c78156e988d65ecaf1f4dc9be020a8b66f16baeee"
+    },
+    {
+      "path": "src/suspense-queries-types.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "889577f29c6db2302e31d3809f698a3062a91de2713051f0d3c41d2b034f9aa0"
+    },
+    {
+      "path": "src/types.ts",
+      "origin": "adapted",
+      "packageName": "@tanstack/react-query",
+      "sha256": "c2e7aa85dccb99d55f9b4777c62c957d7b5819ed5f6705853113289826d60b6d"
     },
     {
       "path": "src/useBaseQuery.ts",

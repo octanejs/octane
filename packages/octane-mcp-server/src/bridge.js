@@ -41,6 +41,7 @@ export const KNOWN_BINDINGS = {
 	'react-waypoint': '@octanejs/waypoint',
 	'react-window': '@octanejs/window',
 	'framer-motion': '@octanejs/motion',
+	'lottie-react': '@octanejs/lottie-react',
 	motion: '@octanejs/motion',
 	'@react-spring/web': '@octanejs/spring',
 	'@react-spring/parallax': '@octanejs/spring',

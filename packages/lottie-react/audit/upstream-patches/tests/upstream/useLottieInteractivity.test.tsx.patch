@@ -1,0 +1,79 @@
+diff --git a/tests/upstream/useLottieInteractivity.test.tsx b/tests/upstream/useLottieInteractivity.test.tsx
+--- a/tests/upstream/useLottieInteractivity.test.tsx
++++ b/tests/upstream/useLottieInteractivity.test.tsx
+@@ -28,6 +28,7 @@ describe("useLottieInteractivity", () => {
+       const hook = renderUseLottieInteractivity({
+         lottieObj: {
+           View: <span />,
++          animationContainerRef: { current: null },
+         } as any,
+         mode: "scroll",
+         actions: [],
+@@ -35,16 +36,15 @@ describe("useLottieInteractivity", () => {
+ 
+       const result = render(hook.result.current);
+ 
+-      expect(result.container.innerHTML).toEqual("<div><span></span></div>");
++      // OCTANE DIVERGENCE[lottie-241-interactivity]: the pinned implementation reuses View's existing container.
++      expect(result.container.innerHTML).toEqual("<span></span>");
+     });
+   });
+ });
+ 
+ describe("useInitInteractivity", () => {
+-  const result = render(<div role="test" />);
+-
+   const wrapperRef = {
+-    current: result.getByRole("test"),
++    current: document.createElement("div"),
+   };
+   wrapperRef.current.getBoundingClientRect = vi.fn();
+ 
+@@ -97,7 +97,8 @@ describe("useInitInteractivity", () => {
+         wrapperRef: wrapperRef as any,
+         animationItem: animationItem as any,
+         mode: "scroll",
+-        actions: [],
++        // OCTANE DIVERGENCE[lottie-241-interactivity]: empty actions no longer start interactivity.
++        actions: [{ visibility: [0, 1], frames: [0], type: "stop" }],
+       });
+ 
+       expect(stopSpy).toHaveBeenCalledTimes(1);
+@@ -106,7 +107,7 @@ describe("useInitInteractivity", () => {
+ 
+   describe("scroll mode", () => {
+     beforeAll(() => {
+-      window = Object.assign(window, { innerHeight: 1 });
++      Object.assign(window, { innerHeight: 1 });
+       (wrapperRef.current.getBoundingClientRect as vi.Mock<
+         any,
+         any
+@@ -131,7 +132,8 @@ describe("useInitInteractivity", () => {
+         wrapperRef: wrapperRef as any,
+         animationItem: animationItem as any,
+         mode: "scroll",
+-        actions: [],
++        // OCTANE DIVERGENCE[lottie-241-interactivity]: empty actions no longer start interactivity.
++        actions: [{ visibility: [0, 1], frames: [0], type: "stop" }],
+       });
+ 
+       expect(AddLSpy).toHaveBeenCalledTimes(1);
+@@ -309,7 +311,8 @@ describe("useInitInteractivity", () => {
+         wrapperRef: wrapperRef as any,
+         animationItem: animationItem as any,
+         mode: "cursor",
+-        actions: [],
++        // OCTANE DIVERGENCE[lottie-241-interactivity]: empty actions no longer start interactivity.
++        actions: [{ position: { x: [0, 1], y: [0, 1] }, frames: [0], type: "stop" }],
+       });
+ 
+       expect(wrapperAddLSpy).toHaveBeenCalledTimes(2);
+@@ -510,7 +513,7 @@ describe("useInitInteractivity", () => {
+         top: values.top,
+         height: values.height,
+       });
+-      window = Object.assign(window, { innerHeight: values.innerHeight });
++      Object.assign(window, { innerHeight: values.innerHeight });
+ 
+       const result = getContainerVisibility(wrapper as any);
+ 

@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "jsxImportSource": "octane"
+  },
+  "include": ["./adapted.ts"],
+  "reactPortEvidence": {
+    "gate": "upstream-types-adapted",
+    "publicMode": "pinned",
+    "upstreamRegistrations": []
+  }
+}

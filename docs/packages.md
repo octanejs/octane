@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**132 publishable package(s), including 117 framework binding(s) and 3 framework integration(s).**
+**133 publishable package(s), including 118 framework binding(s) and 3 framework integration(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 
@@ -65,6 +65,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22.22.2`.
 | `@octanejs/legendapp-list` | [`packages/legendapp-list`](../packages/legendapp-list) | framework binding | `0.0.2` | 2 |
 | `@octanejs/lexical` | [`packages/lexical`](../packages/lexical) | framework binding | `0.2.13` | 50 |
 | `@octanejs/livestore` | [`packages/livestore`](../packages/livestore) | framework binding | `0.0.39` | 2 |
+| `@octanejs/lottie-react` | [`packages/lottie-react`](../packages/lottie-react) | framework binding | `0.0.1` | 1 |
 | `@octanejs/lucide` | [`packages/lucide`](../packages/lucide) | framework binding | `0.1.63` | 4 |
 | `@octanejs/mantine-hooks` | [`packages/mantine-hooks`](../packages/mantine-hooks) | framework binding | `0.1.49` | 1 |
 | `@octanejs/markdown` | [`packages/markdown`](../packages/markdown) | framework binding | `0.0.34` | 1 |

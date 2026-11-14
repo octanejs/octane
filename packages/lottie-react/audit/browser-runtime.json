@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "project": "lottie-react-browser",
+  "roots": ["packages/lottie-react/tests/browser"],
+  "files": ["packages/lottie-react/tests/browser/animation.browser.test.ts"],
+  "tests": [
+    {
+      "id": "runtime:lottie-react:browser-false",
+      "file": "packages/lottie-react/tests/browser/animation.browser.test.ts",
+      "fullName": "matches real animation playback and teardown (hydrate=false)"
+    },
+    {
+      "id": "runtime:lottie-react:browser-true",
+      "file": "packages/lottie-react/tests/browser/animation.browser.test.ts",
+      "fullName": "matches real animation playback and teardown (hydrate=true)"
+    }
+  ]
+}

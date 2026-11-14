@@ -226,6 +226,7 @@
         "src/floating-ui-react/middleware/arrow.ts",
         "src/floating-ui-react/middleware/positioning.ts",
         "src/floating-ui-react/safePolygon.ts",
+        "src/floating-ui-react/types.ts",
         "src/floating-ui-react/utils.ts",
         "src/floating-ui-react/utils/composite.ts",
         "src/floating-ui-react/utils/constants.ts",
@@ -344,6 +345,7 @@
         "src/menu/trigger/MenuTrigger.tsrx",
         "src/menu/utils/findRootOwnerId.ts",
         "src/menu/utils/stateAttributesMapping.ts",
+        "src/menu/utils/types.ts",
         "src/menu/viewport/MenuViewport.tsrx",
         "src/menubar/Menubar.tsrx",
         "src/menubar/MenubarContext.ts",
@@ -401,6 +403,7 @@
         "src/number-field/utils/getViewportRect.ts",
         "src/number-field/utils/parse.ts",
         "src/number-field/utils/stateAttributesMapping.ts",
+        "src/number-field/utils/types.ts",
         "src/number-field/utils/validate.ts",
         "src/otp-field/index.parts.ts",
         "src/otp-field/index.ts",
@@ -1956,6 +1959,12 @@
       "packageName": "@base-ui/react"
     },
     {
+      "path": "src/floating-ui-react/types.ts",
+      "origin": "adapted",
+      "sha256": "2c0527fe3273268109954737b16bde05eadfa60339180528497bdfdef757ee5f",
+      "packageName": "@base-ui/react"
+    },
+    {
       "path": "src/floating-ui-react/utils.ts",
       "origin": "adapted",
       "sha256": "9e46e6faa5dfb04b8be61311426c25cf3f69351bbd2e27fd3af523b99ba5a20d",
@@ -2664,6 +2673,12 @@
       "packageName": "@base-ui/react"
     },
     {
+      "path": "src/menu/utils/types.ts",
+      "origin": "adapted",
+      "sha256": "36b21ab946f2aa3beed4fb1d42e5a5b9282b304731d88781fa3192c00c4e7a98",
+      "packageName": "@base-ui/react"
+    },
+    {
       "path": "src/menu/viewport/MenuViewport.tsrx",
       "origin": "adapted",
       "sha256": "e7b923d3ebf5209a0b7a8025a4a2d05e6747caea50b85739f4bf95d66e2958fd",
@@ -3003,6 +3018,12 @@
       "path": "src/number-field/utils/stateAttributesMapping.ts",
       "origin": "adapted",
       "sha256": "89d84d862304e320d94802caf5dc2daab163bff52761f39dd3141d77853a4218",
+      "packageName": "@base-ui/react"
+    },
+    {
+      "path": "src/number-field/utils/types.ts",
+      "origin": "adapted",
+      "sha256": "9d929681c8e86c7185d6179e556406a16feb2ae6a85222c8d74578585933f398",
       "packageName": "@base-ui/react"
     },
     {

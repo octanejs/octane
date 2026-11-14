@@ -5197,12 +5197,35 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				out += 'class' + this.emitInitializer(attribute);
 			} else if ((name === 'onChange' || name === 'onChangeCapture') && this.isTextEntry(element)) {
 				const input = name === 'onChange' ? 'onInput' : 'onInputCapture';
-				if (attributeOf(element, input)) {
+				const existing = attributeOf(element, input);
+				const changesOrder =
+					!spread &&
+					name === 'onChangeCapture' &&
+					(tag === 'input' || tag === 'textarea') &&
+					!attributes.some(
+						(peer) =>
+							peer !== attribute &&
+							ts.isJsxAttribute(peer) &&
+							ts.isIdentifier(peer.name) &&
+							peer.name.text === name,
+					) &&
+					this.mayHaveJsxHandler(attribute) &&
+					this.mayHaveJsxHandler(
+						attributes.findLast(
+							(peer): peer is ts.JsxAttribute =>
+								ts.isJsxAttribute(peer) &&
+								ts.isIdentifier(peer.name) &&
+								peer.name.text === 'onInput',
+						),
+					);
+				if (existing || changesOrder) {
 					this.note(
 						RULE.nativeChange,
 						'warning',
 						attribute,
-						`\`${name}\` beside \`${input}\` now fires on commit (blur), not per edit.`,
+						existing
+							? `\`${name}\` beside \`${input}\` now fires on commit (blur), not per edit.`
+							: 'Renaming `onChangeCapture` beside `onInput` can change callback order. Review the event scheduling. The retained `onChangeCapture` runs on native change.',
 					);
 					out += this.emit(attribute, PLAIN);
 				} else {
@@ -5214,6 +5237,21 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			}
 		}
 		return out + this.source.slice(cursor, node.end);
+	}
+
+	private mayHaveJsxHandler(attribute: ts.JsxAttribute | undefined) {
+		const initializer = attribute?.initializer;
+		if (!initializer || !ts.isJsxExpression(initializer) || !initializer.expression) return false;
+		const value = skipWrappers(initializer.expression);
+		if (ts.isExternalModule(this.sf) && ts.isIdentifier(value) && value.text === 'undefined') {
+			const symbol = this.checker.getSymbolAtLocation(value);
+			if (symbol && this.checker.isUndefinedSymbol(symbol)) return false;
+		}
+		return (
+			value.kind !== ts.SyntaxKind.NullKeyword &&
+			value.kind !== ts.SyntaxKind.FalseKeyword &&
+			!ts.isVoidExpression(value)
+		);
 	}
 
 	emitInitializer(attribute: ts.JsxAttribute) {

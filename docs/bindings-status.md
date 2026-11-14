@@ -3,7 +3,7 @@
 <!-- GENERATED FILE — do not edit. Edit packages/<name>/status.json and
      regenerate with `pnpm bindings:status`. -->
 
-The central status table for the 117 `@octanejs/*` framework bindings.
+The central status table for the 118 `@octanejs/*` framework bindings.
 Each row is sourced from that package's `packages/<name>/status.json` — the
 machine-readable status block maintained next to the code it describes — merged
 with the version in its `package.json`. CI runs `pnpm bindings:status:check`,
@@ -64,6 +64,7 @@ supported surface and known test coverage described for that package.
 | [`@octanejs/legendapp-list`](#octanejslegendapp-list) | `@legendapp/list@3.3.5` | The complete @legendapp/list/react entry: LegendList with every prop (data or children, renderItem, keyExtractor, getItemType, recycleItems, estimated and fixed item sizes, drawDistance, columns, sticky headers, snapping, initial scroll, maintainScrollAtEnd, maintainVisibleContentPosition, anchoredEndSpace, alwaysRender, viewability, header, footer and empty components, useWindowScroll, renderScrollComponent), the imperative ref handle, the nine per-row hooks, internal, and all 36 exported types. 1,348 upstream registrations run unchanged against React and the 1,255 core ones also against this package's source; 12 Chromium scenarios and 6 server renders match @legendapp/list/react step for step. | Row elements are sorted into item order by rendering the slots in that order, not by moving the DOM nodes, because Octane tracks each component's nodes. The DOM order is the same; after such a reorder, effects in different rows run in DOM order rather than upstream's container order; LegendList takes `ref` as a prop; upstream's forwardRef handle is unchanged | Supported and tested: octane/server renders the same scroll container, header, footer, empty state and snap anchors as @legendapp/list/react on react-dom/server. Rows render after the client measures the list, as upstream. Hydration is not covered. | 2026-10-30 |
 | [`@octanejs/lexical`](#octanejslexical) | `@lexical/react@0.51.0` | The 49 `@lexical/react` entry points represented by this port cover composer + contexts, the editable surface, plain/rich text, the plugin/menu set with its `*Utils` and `LexicalMenuOption` entries, and the `useLexical*` hooks including the `@lexical/a11y`-backed accessibility hooks. The 0.51.0 React extension subsystem, collaboration plugin, and tree view remain excluded as itemized in UPSTREAM.md. | Positioning uses `@octanejs/floating-ui` (the Octane port of `@floating-ui/react`) in place of `@floating-ui/react`; The class-based `LexicalErrorBoundary` becomes an Octane error boundary; `forwardRef` becomes ref-as-prop | No dedicated SSR/hydration tests. | 2026-09-28 |
 | [`@octanejs/livestore`](#octanejslivestore) | `@livestore/react@0.4.0` | Ports the complete stable renderer surface (registry provider/access, Suspense store loading and augmentation, reactive queries, client documents, and sync status) plus the exported experimental LiveList over LiveStore's unchanged 0.4.0 framework-neutral packages. | ReactApi and withReactApi retain their historical upstream names but attach Octane hooks; The public query error label identifies octane; LiveStore framework-toolkit 0.4.0 still records its internal refresh-reason renderer tag as react; React Strict Mode double invocation is not emulated | Supported at the binding boundary: server rendering reads existing synchronous state without running passive subscriptions or browser-only store work; client Suspense and hydration are covered separately. | 2026-08-02 |
+| [`@octanejs/lottie-react`](#octanejslottie-react) | `lottie-react@2.4.1` | The published Lottie component, useLottie and useLottieInteractivity hooks, LottiePlayer, and all twelve type exports. | Views, container props, DOM handlers, and refs use Octane types | Server rendering emits the animation container. The client initializes and disposes of the animation. | 2026-11-14 |
 | [`@octanejs/lucide`](#octanejslucide) | `lucide-react@1.24.0` | Complete against the published `lucide-react@1.24.0` runtime surface: every canonical icon and alias, the `icons` namespace, `Icon`, `createLucideIcon`, `LucideProvider`, `useLucideContext`, `DynamicIcon`, `iconNames`, `dynamicIconImports`, and per-icon subpath imports. | Icon refs are normal Octane `ref` props rather than React `forwardRef` components; Event callbacks receive native DOM events rather than React synthetic events | Supported and tested: icons and provider defaults render through `octane/server`, and client hydration adopts the server-rendered SVG element. | 2026-08-02 |
 | [`@octanejs/mantine-hooks`](#octanejsmantine-hooks) | `@mantine/hooks@9.5.0` | Complete @mantine/hooks 9.5.0 runtime export surface: state, timing, storage, viewport, input, focus, pointer, observer, hotkey, scrolling, collapse, drag, splitter, mask, and utility hooks. | Hooks use Octane's compiler-injected hook slots and runtime lifecycle instead of React's dispatcher; DOM subscriptions receive native browser events; React is retained only as a source-compatibility type vocabulary for refs, events, actions, and CSS properties; it is not loaded at runtime | Dedicated Node-mode coverage verifies deterministic state-hook output and guarded media-query initial values without a browser. DOM-only effects remain inert during server rendering. | 2026-08-02 |
 | [`@octanejs/markdown`](#octanejsmarkdown) | `react-markdown@10.1.0` | Complete react-markdown 10.1.0 root runtime and public type surface: Markdown, MarkdownAsync, MarkdownHooks, defaultUrlTransform, and all six exported type families. | Rendered elements, component mappings, hooks, and public renderable types target Octane instead of React; React 19 may emit automatic image preload hints during server rendering; Octane preserves the Markdown image output without that renderer-specific hint; React's synchronous renderer throws when MarkdownAsync suspends; Octane's MarkdownAsync returns an awaitable ElementDescriptor | Synchronous and awaited asynchronous Markdown are deterministic and browser-global-free; hydration adoption and updates are covered for default output, plugins, filtering, URLs, and component mappings. MarkdownHooks preserves its fallback and resolves on the client. | 2026-08-02 |
@@ -926,6 +927,22 @@ SSR / hydration: Supported at the binding boundary: server rendering reads exist
 Scope/evidence last checked: 2026-08-02.
 
 See also: [`docs/livestore-port.md`](livestore-port.md), [`packages/livestore/UPSTREAM.md`](../packages/livestore/UPSTREAM.md)
+
+## @octanejs/lottie-react
+
+[`packages/lottie-react`](../packages/lottie-react) `0.0.1` — ports `lottie-react@2.4.1`. Status data: [`packages/lottie-react/status.json`](../packages/lottie-react/status.json).
+
+The published Lottie component, useLottie and useLottieInteractivity hooks, LottiePlayer, and all twelve type exports.
+
+Known divergences:
+
+- Views, container props, DOM handlers, and refs use Octane types.
+
+SSR / hydration: Server rendering emits the animation container. The client initializes and disposes of the animation.
+
+Scope/evidence last checked: 2026-11-14.
+
+See also: [`packages/lottie-react/README.md`](../packages/lottie-react/README.md), [`packages/lottie-react/UPSTREAM.md`](../packages/lottie-react/UPSTREAM.md)
 
 ## @octanejs/lucide
 

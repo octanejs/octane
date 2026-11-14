@@ -195,6 +195,7 @@ function pinnedFixture(
 	run,
 	{
 		adjacent = false,
+		legacyTypes,
 		opaque = false,
 		versioned = false,
 		opaqueMember = false,
@@ -211,18 +212,22 @@ function pinnedFixture(
 		const published = JSON.stringify({
 			name: packageName,
 			version: '1.0.0',
-			exports: {
-				'.': adjacent
-					? { import: './index.mjs' }
-					: versioned
-						? {
-								'types@>=5.5': './index.d.mts',
-								types: './unsupported.d.mts',
-								default: './index.mjs',
-							}
-						: { import: { types: './index.d.mts', default: './index.mjs' } },
-				'./package.json': './package.json',
-			},
+			...(legacyTypes
+				? { main: './index.mjs', [legacyTypes]: './index.d.mts' }
+				: {
+						exports: {
+							'.': adjacent
+								? { import: './index.mjs' }
+								: versioned
+									? {
+											'types@>=5.5': './index.d.mts',
+											types: './unsupported.d.mts',
+											default: './index.mjs',
+										}
+									: { import: { types: './index.d.mts', default: './index.mjs' } },
+							'./package.json': './package.json',
+						},
+					}),
 		});
 		const member = opaqueMember ? 'metadata: unknown; ' : '';
 		const declaration = opaque
@@ -283,6 +288,21 @@ test('uses published declarations only after source, tarball, and installed byte
 		);
 		assert.deepEqual([...entries.internalMembers], [`${directory}/src/index.ts#Widget.hidden`]);
 	}));
+
+for (const legacyTypes of ['types', 'typings']) {
+	test('authenticates a legacy root declared with ' + legacyTypes, () =>
+		pinnedFixture(
+			({ directory, node }) => {
+				const entries = pinnedPublicEntries(directory, node);
+				assert.deepEqual(
+					[...entries],
+					[['@octanejs/widget', path.join(directory, 'node_modules/mit-widget/index.d.mts')]],
+				);
+			},
+			{ legacyTypes },
+		),
+	);
+}
 
 test('selects the published type condition supported by the checking compiler', () =>
 	pinnedFixture(
