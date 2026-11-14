@@ -472,7 +472,7 @@
         {
           "path": "packages/tanstack-query/tests/differential/parity.test.ts",
           "role": "test",
-          "sha256": "289ac9ee32cce4e671e5443fba85872946bd15dfaca0c1e2a4b7792a5f2c89d5",
+          "sha256": "0b59825b24a78b8bb458c44e80a0fc4f227631781e3adcfc7897a57368926178",
           "cases": [
             {
               "id": "differential:tanstack-query-cached",
@@ -519,7 +519,7 @@
         {
           "path": "packages/tanstack-query/tests/_fixtures/async-diff.tsrx",
           "role": "support",
-          "sha256": "755a9ef013929acf4d96c1102d6ab23e18461132c868cb47ca148fe650f7ae45"
+          "sha256": "502af5c961ca995668eb13e18e531046930084e5394fceeb789e1fccf39f5aa5"
         },
         {
           "path": "packages/tanstack-query/tests/_fixtures/sequential-suspense-diff.tsrx",
