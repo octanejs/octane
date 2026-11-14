@@ -47,7 +47,7 @@ import {
 } from './react-island-sources.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
-const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|17\.(?:0|[1-9]\d*))$/;
+const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|1[78]\.(?:0|[1-9]\d*))$/;
 // React Intl 7.1.14. Both entry points re-export a hook that calls React.useContext.
 const INTL_HOOK_FILES = {
 	'index.js': '8f5854dadcd055f066234e13a344bd0b102aea2d50ddfd2f0cf12e9f48116059',
