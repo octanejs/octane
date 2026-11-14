@@ -256,6 +256,40 @@ Inside a retained React component, a rich-text callback such as `chunks => <stro
 
 A native `formatMessage` call or a generated native `FormattedMessage` can return the expected string while losing resource hints scheduled by a provider-supplied formatter. A generated formatter can also lose access to other React ancestor contexts. The codemod retains the preview and reports a blocking diagnostic for these calls and islands. Review the actual provider and formatter before adopting them. A local `IntlProvider` can inherit configuration from its mutable class defaults. Explicitly authored React boundaries keep their existing contract.
 
+### Keep formatting in React while migrating a child
+
+With a retained React `IntlProvider`, keep `useIntl` and `formatMessage` in the React component that already owns the call. Pass the resulting string as a prop to an Octane child. This preserves the nearest provider and keeps its formatter callbacks in React's render.
+
+```tsx
+/** @jsxImportSource react */
+import { OctaneCompatInline } from 'octane/react';
+import { useIntl } from 'react-intl';
+import { Label } from './Label.tsrx';
+
+export function ReactLabel({ name }: { name: string }) {
+  const intl = useIntl();
+  const label = intl.formatMessage(
+    { id: 'welcome', defaultMessage: 'Welcome, {name}' },
+    { name },
+  );
+  return typeof label === 'string' ? (
+    <OctaneCompatInline component={Label} props={{ label }} />
+  ) : (
+    <strong>{label}</strong>
+  );
+}
+```
+
+```tsrx
+"use strong";
+
+export function Label({ label }: { label: string }) @{
+  <strong>{label as string}</strong>
+}
+```
+
+The `typeof` check keeps a rich-text result in React. `OctaneCompatInline` adds a span host for the inline Octane child. Compile the React and Octane files with the [mixed-app setup](../../docs/react-compat.md#compiler-ownership), and use `octane/react/server` in the server build. Select the prop-only child when running the codemod. The wrapper stays in React and its import follows the child's new extension.
+
 ### Extracting FormatJS messages
 
 `formatjs extract` expects ordinary TypeScript and JSX. After converting files to `.tsrx`, use `compileToVolarMappings` from `octane/compiler` to project those files to temporary TSX for extraction. Pass retained files and projected files to the same FormatJS invocation so it can check message IDs across both.
