@@ -6315,6 +6315,11 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			op === ts.SyntaxKind.CommaToken ||
 			op === ts.SyntaxKind.EqualsEqualsEqualsToken ||
 			op === ts.SyntaxKind.ExclamationEqualsEqualsToken;
+		const safeObjectSpread = (expression: ts.Expression) => {
+			const source = skipWrappers(expression);
+			// A fresh record proven below has only own data properties to copy.
+			return ts.isObjectLiteralExpression(source) && safePrefix(source);
+		};
 		const safePrefix = (expr: ts.Expression): boolean => {
 			const value = skipWrappers(expr);
 			if (rowKeyLiteral(value)) return true;
@@ -6328,12 +6333,13 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				);
 			return (
 				ts.isObjectLiteralExpression(value) &&
-				value.properties.every(
-					(property) =>
-						ts.isPropertyAssignment(property) &&
-						(!ts.isComputedPropertyName(property.name) ||
-							rowKeyLiteral(property.name.expression)) &&
-						safePrefix(property.initializer),
+				value.properties.every((property) =>
+					ts.isSpreadAssignment(property)
+						? safeObjectSpread(property.expression)
+						: ts.isPropertyAssignment(property) &&
+							(!ts.isComputedPropertyName(property.name) ||
+								rowKeyLiteral(property.name.expression)) &&
+							safePrefix(property.initializer),
 				)
 			);
 		};
@@ -6402,7 +6408,11 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				return readsInOrder(read.elements.filter((element) => !ts.isOmittedExpression(element)));
 			if (ts.isObjectLiteralExpression(read)) {
 				for (const property of read.properties) {
-					if (ts.isSpreadAssignment(property)) return readsOrdinal(property.expression);
+					if (ts.isSpreadAssignment(property)) {
+						if (readsOrdinal(property.expression)) return true;
+						if (!safeObjectSpread(property.expression)) return false;
+						continue;
+					}
 					if (ts.isComputedPropertyName(property.name)) {
 						const key = property.name.expression;
 						if (readsOrdinal(key)) return true;
