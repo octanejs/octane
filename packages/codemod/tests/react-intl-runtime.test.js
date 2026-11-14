@@ -20,12 +20,12 @@ const ownershipError = expect.objectContaining({
 async function load(mode) {
 	const entry =
 		mode === 'server'
-			? "export { prerender } from 'octane/static';"
-			: "export { createRoot, flushSync } from 'octane'; export { createRoot as reactRoot } from 'react-dom/client';";
+			? "export { prerender } from 'octane/static'; export { renderToReadableStream } from 'octane/server';"
+			: "export { createRoot, flushSync, hydrateRoot } from 'octane'; export { createRoot as reactRoot } from 'react-dom/client';";
 	return bundleRuntime(
 		project,
 		mode,
-		`export * from './page.tsrx'; export * from './rich.tsrx'; export * from './fields.tsrx'; export * from './OwnedLocale.tsrx'; export * from './OwnedMember.tsrx'; export * from './choices.tsrx'; export * from './reader.tsrx'; ${entry}
+		`export * from './page.tsrx'; export * from './rich.tsrx'; export * from './fields.tsrx'; export * from './OwnedLocale.tsrx'; export * from './OwnedMember.tsrx'; export * from './choices.tsrx'; export * from './reader.tsrx'; export * from './paragraph.tsrx'; ${entry}
 				export { OctaneCompat } from 'octane/react${mode === 'server' ? '/server' : ''}';
 				export * as react from 'react'; export * as intl from 'react-intl';
 				export { renderToString } from 'react-dom/server';`,
@@ -65,6 +65,17 @@ beforeAll(async () => {
 	]);
 	expect(fields.code).not.toMatch(/from ['"]react-intl['"]/);
 	await writeFile(path.join(project, 'fields.tsrx'), fields.code);
+	const paragraph = transformModule(
+		`import { FormattedMessage } from 'react-intl';
+		import { RawIntlProvider } from './react-intl.tsrx';
+		export function Paragraph({value, show}: {value: import('react-intl').IntlShape; show: boolean}) {
+			return <RawIntlProvider value={value}><p>Before {show && <><FormattedMessage id="label" /></>} after</p></RawIntlProvider>;
+		}`,
+		'paragraph.tsx',
+		{ reactIntlAdapter: './react-intl.tsrx', reactCompat: true, reactCompatInline: true },
+	);
+	expect(paragraph.notes.filter((note) => note.severity === 'error')).toEqual([ownershipError]);
+	await writeFile(path.join(project, 'paragraph.tsrx'), paragraph.code);
 	for (const [name, read] of [
 		['OwnedLocale', "{ 'locale': lang } = useIntl()"],
 		['OwnedMember', 'lang = useIntl().locale'],
@@ -160,6 +171,80 @@ function paragraph(html) {
 	const p = template.content.querySelector('p');
 	return [p.lang, p.textContent, p.childElementCount];
 }
+
+it.each([true, false])(
+	'selects an inline host only for a native paragraph child (available: %s)',
+	(available) => {
+		const source = `import { FormattedMessage } from 'react-intl';
+		import { Container } from 'container';
+		export function Sample() {
+			return <><p><FormattedMessage id="paragraph" /><Container><FormattedMessage id="opaque" /></Container></p>
+				<FormattedMessage id="flow" /></>;
+		}`;
+		const { code, notes } = transformModule(source, 'sample.tsx', {
+			unported: (name) => (name === 'react-intl' ? name : null),
+			reactIntlAdapter: './react-intl.tsrx',
+			reactCompat: true,
+			reactCompatInline: available,
+		});
+		expect(code).toContain(available ? 'id="paragraph" inlineHost={' : 'id="paragraph" />');
+		for (const id of ['opaque', 'flow']) expect(code).not.toContain(`id="${id}" inlineHost={`);
+		expect(notes.filter((note) => note.severity === 'error')).toContainEqual(ownershipError);
+	},
+);
+
+it.each([
+	[
+		'rich tags',
+		'<b>Hello</b>',
+		{ defaultRichTextElements: { b: (text) => server.react.createElement('em', null, text) } },
+		'em',
+	],
+	[
+		'a custom text component',
+		'Hello',
+		{
+			textComponent: ({ children }) => server.react.createElement('span', { id: 'text' }, children),
+		},
+		'#text',
+	],
+	['plain text', 'Hello', {}, null],
+])('adopts paragraph messages with %s', async (_, label, formatter, richSelector) => {
+	const options = {
+		locale: 'en',
+		messages: { label },
+		...formatter,
+	};
+	const stream = await server.renderToReadableStream(server.Paragraph, {
+		value: server.intl.createIntl(options),
+		show: true,
+	});
+	const host = document.createElement('div');
+	host.innerHTML = await new Response(stream).text();
+	const original = host.querySelector('p');
+	expect(original.textContent).toBe('Before Hello after');
+	if (richSelector) expect(original.querySelector(richSelector).textContent).toBe('Hello');
+	else expect(original.children).toHaveLength(0);
+	const errors = [];
+	let root;
+	try {
+		await client.react.act(() => {
+			client.flushSync(() => {
+				root = client.hydrateRoot(
+					host,
+					client.Paragraph,
+					{ value: client.intl.createIntl(options), show: true },
+					{ onRecoverableError: (error) => errors.push(error) },
+				);
+			});
+		});
+		expect(errors).toEqual([]);
+		expect(host.querySelector('p')).toBe(original);
+		expect(original.textContent).toBe('Before Hello after');
+	} finally {
+		await client.react.act(() => root?.unmount());
+	}
+});
 
 it('uses the nearest native or React-owned formatter and respects an explicitly empty native provider', async () => {
 	const { intl, react, renderToString, OctaneCompat, Message, Local, prerender } = server;
