@@ -3362,6 +3362,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	private checkRetainedNamespaceHooks(module: string, binding: ts.Identifier) {
 		const retainedHook = this.options.localReactHook;
 		if (!retainedHook) return;
+		let reported: Set<string> | undefined;
 		for (const ref of renderUses(this.localUses(binding))) {
 			const member = ref.parent;
 			if (!ts.isPropertyAccessExpression(member) && !ts.isElementAccessExpression(member)) continue;
@@ -3369,7 +3370,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			const name = ts.isPropertyAccessExpression(member)
 				? member.name.text
 				: ts.isStringLiteralLike(member.argumentExpression) && member.argumentExpression.text;
-			if (!name || !/^use[A-Z0-9]/.test(name)) continue;
+			if (!name || !/^use[A-Z0-9]/.test(name) || reported?.has(name)) continue;
 			if (
 				!nativeSetupHook(member, this.localUses, this.checker, {
 					...this.retainedHookSetup(),
@@ -3380,7 +3381,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			const local = retainedHook(module, name, false);
 			if (local && typeof local !== 'string' && 'privateContext' in local) {
 				this.warnRetainedPrivateContext(module, name, member);
-				return;
+				(reported ??= new Set()).add(name);
 			}
 		}
 	}

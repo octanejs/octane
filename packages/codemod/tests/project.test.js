@@ -2140,7 +2140,13 @@ export function View() {
 			const context = "const Theme = createContext('unset');";
 			const helper = 'function readTheme() { const label = readContext(Theme); return label; }';
 			const hook = 'export function useLabel() { return readTheme(); }';
-			const owner = [imports, context, helper, hook].join('\n');
+			const owner = [
+				imports,
+				context,
+				helper,
+				hook,
+				'export function useOtherLabel() { return readTheme(); }',
+			].join('\n');
 			const namespaceOwner = [
 				"import * as React from 'react';",
 				"import { createContext } from 'react';",
@@ -2176,6 +2182,13 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 				'ConsumerBracket.tsx': consumer("producer['useLabel']()", 'owner.js'),
 				'ConsumerDot.tsx': consumer('producer.useLabel()'),
 				'ConsumerRepeated.tsx': consumer('producer.useLabel()') + '\nexport { producer };',
+				'ConsumerMultiple.tsx': `import * as producer from './owner';
+export function View() {
+	const label = producer.useLabel();
+	const other = producer['useOtherLabel']();
+	const again = producer['useLabel']();
+	return <b>{label}{other}{again}</b>;
+}`,
 				'ConsumerDynamic.tsx': consumer("producer['use' + 'Label']()"),
 				'ConsumerOptionalMember.tsx': consumer('producer?.useLabel()'),
 				'ConsumerOptionalCall.tsx': consumer('producer.useLabel?.()'),
@@ -2284,6 +2297,8 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 					expect.stringContaining('the import resolves to its TypeScript source'),
 				],
 				['ConsumerDot.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
+				['ConsumerMultiple.tsx', 3, 'warning', expect.stringContaining('export useLabel')],
+				['ConsumerMultiple.tsx', 4, 'warning', expect.stringContaining('export useOtherLabel')],
 				[
 					'ConsumerRepeated.tsx',
 					2,
