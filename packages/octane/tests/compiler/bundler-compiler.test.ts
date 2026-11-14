@@ -2914,7 +2914,7 @@ describe('requireDirective ownership gate', () => {
 		expect(directed?.kind).toBe('slots');
 	});
 
-	it('keeps manifest-declared packages exempt from the ownership gate', () => {
+	it('uses the manifest to route unmarked Octane package sources', () => {
 		const root = mkdtempSync(join(tmpdir(), 'octane-ownership-manifest-'));
 		try {
 			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
@@ -2943,6 +2943,92 @@ describe('requireDirective ownership gate', () => {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
+
+	it.each(['workspace', 'installed'])(
+		'preserves explicit React JSX in a %s Octane package',
+		(layout) => {
+			const directory = mkdtempSync(join(tmpdir(), 'octane-ownership-mixed-package-'));
+			try {
+				const root = join(directory, 'app');
+				const packageRoot =
+					layout === 'workspace' ? join(directory, 'kit') : join(root, 'node_modules/kit');
+				mkdirSync(packageRoot, { recursive: true });
+				writeFileSync(
+					join(packageRoot, 'package.json'),
+					JSON.stringify({ name: 'kit', peerDependencies: { octane: '*' } }),
+				);
+				const source =
+					'/** @jsxImportSource react */\n' +
+					"import styles from './Host.module.css';\n" +
+					'export function Host() { return <p className={styles.host}>React</p>; }\n';
+				const reactFile = join(packageRoot, 'Host.tsx');
+				writeFileSync(reactFile, source);
+				const compiler = createOctaneCompiler({ root, requireDirective: true });
+				expect(compiler.modulePackage(source, reactFile).compiled).toBe(false);
+				expect(compiler.findCssModuleImportRequests(source, reactFile)).toEqual([]);
+				for (const environment of ['client', 'server'] as const) {
+					expect(compiler.transform(source, reactFile, { environment })?.kind ?? 'none').toBe(
+						'none',
+					);
+					expect(
+						compiler.transform(REACT_TSX, join(packageRoot, 'Unmarked.tsx'), { environment })?.kind,
+					).toBe('compile');
+					expect(
+						compiler.transform(COMPONENT, join(packageRoot, 'Island.tsrx'), { environment })?.kind,
+					).toBe('compile');
+				}
+
+				const legacy = createOctaneCompiler({ root });
+				expect(legacy.transform(source, reactFile)?.kind).toBe('compile');
+				expect(legacy.findCssModuleImportRequests(source, reactFile)).toContain(
+					'./Host.module.css',
+				);
+				const clientOnly = createOctaneCompiler({
+					root,
+					requireDirective: true,
+					renderers: {
+						registry: { object: { module: '/src/object-renderer.js', server: 'client-only' } },
+						rules: [{ include: '**/*.tsx', renderer: 'object' }],
+					},
+				});
+				expect(clientOnly.clientReferenceForFile(reactFile)).toBeNull();
+				expect(
+					clientOnly.transform(source, reactFile, { environment: 'server' })?.kind ?? 'none',
+				).toBe('none');
+				const nativeFile = join(packageRoot, 'Unmarked.tsx');
+				writeFileSync(nativeFile, REACT_TSX);
+				const reference = clientOnly.clientReferenceForFile(nativeFile);
+				expect(reference).toMatchObject({ renderer: 'object' });
+				expect(
+					clientOnly.transform(REACT_TSX, nativeFile, { environment: 'server' }),
+				).toMatchObject({
+					kind: 'client-only-stub',
+					clientReference: reference,
+				});
+
+				const configured = createOctaneCompiler({
+					root,
+					requireDirective: true,
+					renderers: {
+						registry: {
+							object: {
+								module: '/src/object-renderer.js',
+								server: 'client-only',
+								intrinsics: 'react',
+							},
+						},
+						rules: [{ include: '**/Host.tsx', renderer: 'object' }],
+					},
+				});
+				expect(configured.clientReferenceForFile(reactFile)).toMatchObject({ renderer: 'object' });
+				expect(configured.transform(source, reactFile, { environment: 'server' })?.kind).toBe(
+					'client-only-stub',
+				);
+			} finally {
+				rmSync(directory, { recursive: true, force: true });
+			}
+		},
+	);
 
 	it('lets exclude route .tsrx paths to another tsrx compiler', () => {
 		// tsrx syntax can target other renderers (@tsrx/react); a project
@@ -3035,6 +3121,29 @@ describe('requireDirective and client-only classification', () => {
 			expect(compiler.clientReferenceForFile(hostUtilFile)).toBeNull();
 			expect(compiler.transform(hostUtil, hostUtilFile, { environment: 'server' })).toBeNull();
 			expect(compiler.transform(hostUtil, hostUtilFile, { environment: 'client' })).toBeNull();
+
+			const foreignRoot = join(root, 'node_modules/react-kit/src/scenes');
+			mkdirSync(foreignRoot, { recursive: true });
+			const foreignFile = join(foreignRoot, 'ReactScene.tsx');
+			const foreignScene = '/** @jsxImportSource react */\n' + reactScene;
+			writeFileSync(foreignFile, foreignScene);
+			const includesForeignPackage = createOctaneCompiler({
+				root,
+				requireDirective: true,
+				renderers: {
+					registry: { object: { module: '/src/object-renderer.js', server: 'client-only' } },
+					rules: [{ include: '**/src/scenes/**', renderer: 'object' }],
+				},
+			});
+			for (const classify of [
+				() => includesForeignPackage.clientReferenceForFile(foreignFile),
+				() =>
+					includesForeignPackage.transform(foreignScene, foreignFile, { environment: 'server' }),
+			]) {
+				expect(classify).toThrow(
+					expect.objectContaining({ code: 'OCTANE_CLIENT_ONLY_SOURCE_UNSUPPORTED' }),
+				);
+			}
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

@@ -946,7 +946,8 @@ class OctaneBundlerCompiler {
 		// compilation for `.tsx`, hook slotting for plain `.ts`/`.js`. A leading
 		// pragma naming a foreign source (`react`, …) does NOT claim the file. Unmarked project
 		// modules pass through to the host toolchain. Installed/linked
-		// packages keep their manifest `usesOctane` decision. The pragma
+		// packages keep their manifest `usesOctane` decision unless a .tsx
+		// file explicitly names React as a foreign JSX source. The pragma
 		// always ships unchanged — it is meaningful to TypeScript and
 		// downstream tools (in a JSX-less `.ts`/`.js` module TypeScript
 		// ignores it, so there it acts purely as the ownership marker).
@@ -1323,6 +1324,16 @@ class OctaneBundlerCompiler {
 		return pragmaModule !== null && this.pragmaOwnedModules.has(pragmaModule);
 	}
 
+	_isReactJsxSource(code, file) {
+		return (
+			this.requireDirective &&
+			file.endsWith('.tsx') &&
+			!this.pragmaOwnedModules.has('react') &&
+			!this._isProjectOwnedSource(file) &&
+			findLeadingJsxImportSourcePragma(code) === 'react'
+		);
+	}
+
 	/**
 	 * The requireDirective ownership gate for one project-owned module.
 	 * A project `.tsrx` is Octane's by extension — in an Octane pipeline
@@ -1335,7 +1346,8 @@ class OctaneBundlerCompiler {
 	 * Two carve-outs: installed and linked packages are exempt (their
 	 * manifest `usesOctane` rule — a declared `octane` dependency, or
 	 * `octane.source` for a package outside `node_modules` — is already the
-	 * explicit per-package decision), and `exclude` path fragments are never
+	 * explicit per-package decision). An explicit React .tsx is checked
+	 * separately, and `exclude` path fragments are never
 	 * Octane's — tsrx
 	 * syntax can target other renderers (e.g. `@tsrx/react`), so a project
 	 * routing part of its `.tsrx` through a different tsrx compiler lists
@@ -1598,7 +1610,8 @@ class OctaneBundlerCompiler {
 	_preflightScope(code, id) {
 		const file = cleanModuleId(id);
 		const collected = { dependencies: new Set(), missingDependencies: new Set() };
-		if (this._isFullCompileSource(file, collected)) return 'compile';
+		if (this._isFullCompileSource(file, collected) && !this._isReactJsxSource(code, file))
+			return 'compile';
 		return isPlainHelperSource(file) && this._mayHookSlot(code, file, collected) ? 'slots' : 'none';
 	}
 
@@ -1679,7 +1692,8 @@ class OctaneBundlerCompiler {
 		if (Object.keys(this.renderers.boundaries).length > 0) return [];
 		const file = cleanModuleId(id);
 		const collected = { dependencies: new Set(), missingDependencies: new Set() };
-		if (!this._isFullCompileSource(file, collected)) return [];
+		if (!this._isFullCompileSource(file, collected) || this._isReactJsxSource(code, file))
+			return [];
 		const filename = this._canonicalModuleId(file);
 		const pragmaOwned =
 			this.requireDirective &&
@@ -1700,17 +1714,24 @@ class OctaneBundlerCompiler {
 	/**
 	 * requireDirective ownership for code-less classification: a project
 	 * `.tsrx` is Octane's by extension; any other project module needs its
-	 * leading @jsxImportSource pragma read from disk. The transform (which
-	 * receives real code) remains the authoritative gate; an unreadable file
-	 * is conservatively not Octane's, so importers can never hold a client
-	 * reference for a module whose own transform passes through to the host
-	 * toolchain.
+	 * leading @jsxImportSource pragma read from disk. An eligible package
+	 * `.tsx` can explicitly choose React. Preserve the manifest decision
+	 * for virtual external files, while a project module needs a positive
+	 * Octane claim to expose a client reference.
 	 */
-	_ownershipForFile(file) {
+	_ownershipForFile(file, collected) {
 		if (!this.requireDirective) return true;
-		if (!this._isProjectOwnedSource(file)) return true;
-		if (this.exclude.some((path) => file.includes(path))) return false;
+		const projectOwned = this._isProjectOwnedSource(file);
+		if (projectOwned && this.exclude.some((path) => file.includes(path))) return false;
 		if (file.endsWith('.tsrx')) return true;
+		if (
+			!projectOwned &&
+			(!file.endsWith('.tsx') ||
+				this.pragmaOwnedModules.has('react') ||
+				!this._isFullCompileSource(file, collected))
+		) {
+			return true;
+		}
 		let code;
 		try {
 			code = nodeFs.readFileSync(
@@ -1718,9 +1739,11 @@ class OctaneBundlerCompiler {
 				'utf8',
 			);
 		} catch {
-			return false;
+			// Unreadable project files need a positive Octane claim. Preserve
+			// the existing manifest classification for external virtual files.
+			return !projectOwned;
 		}
-		return this._pragmaClaimsOwnership(code);
+		return projectOwned ? this._pragmaClaimsOwnership(code) : !this._isReactJsxSource(code, file);
 	}
 
 	/** Classify a bundler-resolved module without loading or evaluating it. */
@@ -1732,8 +1755,8 @@ class OctaneBundlerCompiler {
 		// requireDirective gate an unmarked project module belongs to the
 		// host toolchain: no client reference, matching its pass-through
 		// transform (server-graph identity must not split from output).
-		if (renderer.server === 'client-only' && !this._ownershipForFile(file)) return null;
 		const collected = { dependencies: new Set(), missingDependencies: new Set() };
+		if (renderer.server === 'client-only' && !this._ownershipForFile(file, collected)) return null;
 		this._assertClientOnlySourceSupported(file, filename, renderer, collected);
 		return renderer.server === 'client-only' ? createClientReference(renderer.id, filename) : null;
 	}
@@ -1833,9 +1856,10 @@ class OctaneBundlerCompiler {
 			this._isProjectOwnedSource(file) &&
 			this._pragmaClaimsOwnership(code);
 		const octaneMarked = file.endsWith('.tsrx') || pragmaOwned;
+		const eligible = this._isFullCompileSource(file, collected);
+		const reactOwned = eligible && this._isReactJsxSource(code, file);
 		const fullCompile =
-			this._isFullCompileSource(file, collected) &&
-			this._passesOwnershipGate(file, filename, pragmaOwned);
+			eligible && !reactOwned && this._passesOwnershipGate(file, filename, pragmaOwned);
 		if ((bindingRequest !== null || islandRequest !== null) && !fullCompile) {
 			throw new Error('Octane DOM binding queries require a compiler-owned .tsrx/.tsx view.');
 		}
@@ -1845,9 +1869,10 @@ class OctaneBundlerCompiler {
 		// mixed repo — it passes through here, and clientReferenceForFile
 		// returns no reference for it, so classification and transform agree.
 		const hostOwned =
-			this.requireDirective &&
-			this._isProjectOwnedSource(file) &&
-			(!octaneMarked || this.exclude.some((path) => file.includes(path)));
+			reactOwned ||
+			(this.requireDirective &&
+				this._isProjectOwnedSource(file) &&
+				(!octaneMarked || this.exclude.some((path) => file.includes(path))));
 		if (!hostOwned) this._assertClientOnlySourceSupported(file, filename, renderer, collected);
 		if (
 			plainHelperSource &&
