@@ -1417,10 +1417,15 @@ not `O(islands × global event types)`.
     claimed by React (`tests/react-hosted/child-validation.test.ts`); nested
     React-authored children remain rejected.
 13. Exact Offscreen hide/reveal behavior for Octane effects, refs, events, and
-    measurements. *Phase 0 evidence:* the hosted root, DOM, state, and events
-    survive hide/reveal untouched, but Octane's own effects/refs are NOT
-    disconnected while hidden — whether an explicit disconnect/reconnect
-    (Activity reuse) is required is still open.
+    measurements. *Answered for Activity (#2692):* the hosted root renders the
+    island inside Octane's own `<Activity>`. React runs the wrapper's passive
+    cleanup on an Activity hide but not on a Suspense hide; a microtask check
+    that the StrictMode probe's layout re-setup cancels and deletion's insertion
+    cleanup retires then hides the hosted Activity. Its layout and passive
+    effects, refs, and `useSyncExternalStore` subscriptions disconnect while
+    state and DOM survive, and the reveal's layout commit reconnects them. A
+    Suspense hide still leaves the island's layout effects and refs connected,
+    where React disconnects them and keeps passive effects; that half is open.
 14. Translation or rejection policy for Octane head resources in hosted SSR,
     including CSP.
 15. ~~Whether React retains a newly discovered context dependency in an

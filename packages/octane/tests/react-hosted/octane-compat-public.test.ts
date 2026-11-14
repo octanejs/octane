@@ -34,6 +34,7 @@ import {
 	SuspendingIsland,
 	ThrowingIsland,
 	UseIdIsland,
+	VisibilityProbeIsland,
 } from './_fixtures/islands.tsrx';
 
 function deferred<T>() {
@@ -1057,7 +1058,7 @@ describe('octane/react — StrictMode, hide/reveal, and teardown discrimination 
 	});
 
 	it.each(['connected', 'detached'] as const)(
-		'preserves an Activity island on reveal and cleans it up on hidden deletion in a %s root',
+		'disconnects an Activity island while hidden, preserves it on reveal, and deletes it hidden in a %s root',
 		async (placement) => {
 			const log = createLog();
 			const island = h(OctaneCompat<{ log: (message: string) => void }>, {
@@ -1077,23 +1078,87 @@ describe('octane/react — StrictMode, hide/reveal, and teardown discrimination 
 				expect(host.isConnected).toBe(placement === 'connected');
 				expect(mounted.container.contains(host)).toBe(true);
 				expect(host.style.display).toBe('none');
-				expect(log.drain()).toEqual([]);
+				// React parity: hiding disconnects the island's effects.
+				expect(log.drain()).toEqual(['layout cleanup', 'passive cleanup']);
 
 				await mounted.render(tree('visible'));
+				flushEffects();
 				expect(host.style.display).toBe('contents');
 				expect(mounted.host().querySelector('.count')).toBe(button);
 				expect(button.textContent).toBe('count:1');
+				expect(log.drain()).toEqual(['layout setup', 'passive setup']);
 
 				await mounted.render(tree('hidden'));
 				expect(host.style.display).toBe('none');
-				expect(log.drain()).toEqual([]);
+				expect(log.drain()).toEqual(['layout cleanup', 'passive cleanup']);
 			} finally {
 				await mounted.unmount();
 			}
 			expect(mounted.container.querySelector('.count')).toBeNull();
-			expect(log.drain()).toEqual(['layout cleanup', 'passive cleanup']);
+			// Deleting the hidden island runs no cleanup twice.
+			expect(log.drain()).toEqual([]);
 		},
 	);
+
+	it('disconnects store subscriptions, effects, and refs while React Activity hides the island (#2692)', async () => {
+		const log = createLog();
+		const listeners = new Set<() => void>();
+		let value = 0;
+		const props = {
+			log: log.push,
+			read: () => value,
+			subscribe(listener: () => void) {
+				listeners.add(listener);
+				log.push('subscribe');
+				return () => {
+					listeners.delete(listener);
+					log.push('unsubscribe');
+				};
+			},
+			outputRef(_node: HTMLOutputElement) {
+				log.push('ref attach');
+				return () => log.push('ref cleanup');
+			},
+		};
+		const tree = (mode: 'visible' | 'hidden') =>
+			h(React.Activity, {
+				mode,
+				children: h(OctaneCompat<typeof props>, { component: VisibilityProbeIsland, props }),
+			});
+		const mounted = await mountReactHost(tree('visible'));
+		try {
+			flushEffects();
+			const host = mounted.host();
+			const output = host.querySelector('output')!;
+			expect(output.textContent).toBe('0');
+			expect(log.drain()).toEqual(['ref attach', 'layout setup', 'subscribe', 'passive setup']);
+
+			await mounted.render(tree('hidden'));
+			expect(host.style.display).toBe('none');
+			expect(log.drain().sort()).toEqual(
+				['layout cleanup', 'passive cleanup', 'ref cleanup', 'unsubscribe'].sort(),
+			);
+
+			// Hidden: no subscription, so a store update reaches nothing.
+			value++;
+			expect(listeners.size).toBe(0);
+			expect(output.textContent).toBe('0');
+
+			await mounted.render(tree('visible'));
+			flushEffects();
+			expect(host.style.display).toBe('contents');
+			expect(host.querySelector('output')).toBe(output);
+			expect(output.textContent).toBe('1');
+			expect(log.drain().sort()).toEqual(
+				['layout setup', 'passive setup', 'ref attach', 'subscribe'].sort(),
+			);
+		} finally {
+			await mounted.unmount();
+		}
+		expect(log.drain().sort()).toEqual(
+			['layout cleanup', 'passive cleanup', 'ref cleanup', 'unsubscribe'].sort(),
+		);
+	});
 
 	it('routes a hosted cleanup fault through reportError without scheduling the dead wrapper', async () => {
 		// jsdom does not implement reportError; stub the global the module

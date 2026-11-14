@@ -61,6 +61,7 @@ import { attachLiveFragmentRef } from '../runtime/engine.js';
 import { discardSubtreeRefAttachesFrom, type FragmentInstance } from '../runtime/refs.js';
 import type { RefAttach } from '../runtime/types.js';
 import {
+	Activity,
 	bindRendererRegionOwner,
 	createContext as createOctaneContext,
 	createElement as createOctaneElement,
@@ -183,6 +184,7 @@ function hostedRootEnvelope(props: {
 	body: ComponentBody;
 	bodyProps: unknown;
 	bodyKey: string | null;
+	mode: 'visible' | 'hidden';
 }): unknown {
 	bindRendererRegionOwner(props);
 	// The transported key rides the octane element so a key change replaces the
@@ -191,7 +193,12 @@ function hostedRootEnvelope(props: {
 		props.bodyKey === null
 			? props.bodyProps
 			: { ...(props.bodyProps as object), key: props.bodyKey };
-	return createOctaneElement(props.body, config as never);
+	// Octane's own Activity carries a React Activity hide into the island: it
+	// disconnects effects, refs, and store subscriptions while keeping state and DOM.
+	return createOctaneElement(Activity, {
+		mode: props.mode,
+		children: createOctaneElement(props.body, config as never),
+	});
 }
 
 function reportHostedFault(error: unknown): void {
@@ -255,6 +262,10 @@ class HostedIslandController {
 	private hydrating = false;
 	/** A §6.3 handshake unwound the last attempt; the next commit retries the root. */
 	private pendingContextRetry = false;
+	/** React Activity hid the wrapper; the hosted Activity is hidden until the next commit. */
+	private hidden = false;
+	/** A passive disconnect awaits its microtask check; any commit cancels it. */
+	private hideRequested = false;
 
 	// ── RendererRegionOwnerBridge ──────────────────────────────────────────
 
@@ -477,7 +488,11 @@ class HostedIslandController {
 		const contextsChanged = this.publishSnapshots(snapshot);
 		const needsContextRetry = this.pendingContextRetry;
 		this.pendingContextRetry = false;
+		// A layout commit means the wrapper is visible: cancel a pending hide and reveal.
+		const revealing = this.hidden;
+		this.hidden = this.hideRequested = false;
 		if (
+			!revealing &&
 			!contextsChanged &&
 			!needsContextRetry &&
 			this.attached &&
@@ -494,6 +509,28 @@ class HostedIslandController {
 		this.committed = child;
 		this.attached = true;
 		this.attachAndFlush();
+	}
+
+	/**
+	 * Wrapper passive cleanup. React runs it on an Activity hide, a StrictMode
+	 * probe, and deletion, but not on a Suspense hide, which keeps passive
+	 * effects connected. The microtask runs after the probe's layout re-setup
+	 * (which cancels it) and after deletion's insertion cleanup (which retires
+	 * the root), so only an Activity hide reaches the hosted Activity.
+	 */
+	passiveDisconnected(): void {
+		if (this.hidden || this.root === null || this.lifecycleGeneration < 0) return;
+		this.hideRequested = true;
+		queueMicrotask(() => {
+			if (!this.hideRequested || this.disposed || this.lifecycleGeneration < 0) return;
+			this.hideRequested = false;
+			this.hidden = true;
+			try {
+				this.attachAndFlush();
+			} catch (error) {
+				reportHostedFault(error);
+			}
+		});
 	}
 
 	/** Insertion effects stay registered while React hides or probes the island. */
@@ -549,6 +586,7 @@ class HostedIslandController {
 			body: committed.type,
 			bodyProps: committed.props,
 			bodyKey: committed.key,
+			mode: this.hidden ? 'hidden' : 'visible',
 		};
 		Object.defineProperty(props, RENDERER_REGION_OWNER, {
 			value: this,
@@ -654,6 +692,7 @@ function createOctaneCompat(host: 'div' | 'span') {
 		React.useLayoutEffect(() => {
 			controller.commit(child, identifierPrefix, snapshot);
 		});
+		React.useEffect(() => () => controller.passiveDisconnected(), [controller]);
 		React.useInsertionEffect(() => controller.startLifetime(), [controller]);
 
 		return React.createElement(host, {
