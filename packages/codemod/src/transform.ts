@@ -6778,7 +6778,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	}
 
 	private patternReadsOrdinal(pattern: ts.BindingName, ordinal: ts.ParameterDeclaration): boolean {
-		const eagerBinary = (op: ts.SyntaxKind) =>
+		const nonCoercingBinary = (op: ts.SyntaxKind) =>
 			op === ts.SyntaxKind.CommaToken ||
 			op === ts.SyntaxKind.EqualsEqualsEqualsToken ||
 			op === ts.SyntaxKind.ExclamationEqualsEqualsToken;
@@ -6793,7 +6793,9 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (ts.isVoidExpression(value)) return safePrefix(value.expression);
 			if (ts.isBinaryExpression(value))
 				return (
-					eagerBinary(value.operatorToken.kind) && safePrefix(value.left) && safePrefix(value.right)
+					nonCoercingBinary(value.operatorToken.kind) &&
+					safePrefix(value.left) &&
+					safePrefix(value.right)
 				);
 			if (ts.isArrayLiteralExpression(value))
 				return value.elements.every(
@@ -6933,7 +6935,6 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			}
 			if (!ts.isBinaryExpression(read)) return false;
 			const op = read.operatorToken.kind;
-			if (eagerBinary(op)) return readsInOrder([read.left, read.right]);
 			if (
 				op === ts.SyntaxKind.AmpersandAmpersandToken ||
 				op === ts.SyntaxKind.BarBarToken ||
@@ -6950,11 +6951,11 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 							: condition === 'nullish';
 				return reachesRight && readsOrdinal(read.right);
 			}
+			// Ordinary non-assignment operators read operands before coercion.
+			// A private brand operand is not a proven prefix, so the scan stops there.
 			return (
-				((op >= ts.SyntaxKind.PlusToken && op <= ts.SyntaxKind.PercentToken) ||
-					(op >= ts.SyntaxKind.LessThanLessThanToken && op <= ts.SyntaxKind.CaretToken)) &&
-				((rowKeyLiteral(read.right) && readsOrdinal(read.left)) ||
-					(rowKeyLiteral(read.left) && readsOrdinal(read.right)))
+				(op < ts.SyntaxKind.FirstAssignment || op > ts.SyntaxKind.LastAssignment) &&
+				readsInOrder([read.left, read.right])
 			);
 		};
 		return (
