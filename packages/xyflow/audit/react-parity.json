@@ -97,7 +97,7 @@
         {
           "path": "packages/xyflow/typetests/pristine/types.test-d.ts",
           "role": "test",
-          "sha256": "75cccd659ae636f2dabbe6eb9e5958b957b28a2fa598c6b642f1d23b64c39ba5",
+          "sha256": "758ddbf3ed1805e4a10c6aae76f0d75ac90542a8c8ae15975d332091d9f1e4b6",
           "cases": [
             {
               "id": "types:pristine",
@@ -114,7 +114,7 @@
         {
           "path": "packages/xyflow/typetests/assertions.md",
           "role": "support",
-          "sha256": "48c5c609584dc67b8c37ec610d719917bb9ec97b84b916355d1ff9f5ae64e247"
+          "sha256": "e76afd4b8944c3510d2f50737aea9250baf39a3e9cb2014c65e8f9eea09d03e6"
         }
       ]
     },
@@ -136,7 +136,7 @@
         {
           "path": "packages/xyflow/typetests/adapted/types.test-d.ts",
           "role": "test",
-          "sha256": "df2b46f9f932bfb33521db1ccfa33d6ea6b1cf0f8a1560dfbb9ba214f80924e7",
+          "sha256": "31429bbabd1ea8106bd4d3b6e32cc6c1e7ee88406174a6a004386778522d4cc2",
           "cases": [
             {
               "id": "types:adapted",
@@ -153,7 +153,7 @@
         {
           "path": "packages/xyflow/typetests/assertions.md",
           "role": "support",
-          "sha256": "48c5c609584dc67b8c37ec610d719917bb9ec97b84b916355d1ff9f5ae64e247"
+          "sha256": "e76afd4b8944c3510d2f50737aea9250baf39a3e9cb2014c65e8f9eea09d03e6"
         }
       ]
     },
