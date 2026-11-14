@@ -2104,9 +2104,32 @@ export function Host({rows}: { rows: Row[] }) {
 				'Deferred.tsx': source(
 					direct.replace('(index as number)', '() => index').replace('{label}', '{id}'),
 				),
+				'TestReadsIndex.tsx': source(direct.replace('(index as number)', 'index ? 7 : 8')),
+				'TrueArm.tsx': source(direct.replace('(index as number)', '(true as boolean) ? index : 7')),
+				'FalseArm.tsx': source(direct.replace('(index as number)', 'false ? 7 : index')),
+				'LogicalLeft.tsx': source(direct.replace('(index as number)', 'index && 7')),
+				'AndRight.tsx': source(direct.replace('(index as number)', 'true && index')),
+				'OrRight.tsx': source(direct.replace('(index as number)', 'false || index')),
+				'NullishRight.tsx': source(direct.replace('(index as number)', 'null ?? index')),
 				'Dead.tsx': source(direct.replace('(index as number)', 'false ? index : 7')),
+				'DeadTrueArm.tsx': source(direct.replace('(index as number)', 'true ? 7 : index')),
+				'DeadAnd.tsx': source(direct.replace('(index as number)', 'false && index')),
+				'DeadOr.tsx': source(direct.replace('(index as number)', 'true || index')),
+				'DeadNullish.tsx': source(direct.replace('(index as number)', 'false ?? index')),
+				'UnknownBranch.tsx': source(direct.replace('(index as number)', 'choose ? index : 7')),
+				'ThrowingBranch.tsx': source(direct.replace('(index as number)', 'fail() && index')),
+				'RetainedBranch.tsx': source(
+					direct
+						.replace('(index as number)', 'true ? index : 7')
+						.replace('key={id}>{label}', 'key={keyOf(id)}>{String(label)}'),
+				),
 			};
 			const root = project(originals);
+			fs.symlinkSync(
+				path.join(import.meta.dirname, '../node_modules'),
+				path.join(root, 'node_modules'),
+				'dir',
+			);
 			const options = { root, verify: false, projectTypes };
 			const note = expect.objectContaining({ rule: 'map-parameter-tdz', severity: 'error' });
 			const inputs = Object.keys(originals)
@@ -2148,13 +2171,29 @@ export function Host({rows}: { rows: Row[] }) {
 						'OptionalIndex.tsx',
 						'Receiver.tsx',
 						'Computed.tsx',
+						'TestReadsIndex.tsx',
+						'TrueArm.tsx',
+						'FalseArm.tsx',
+						'LogicalLeft.tsx',
+						'AndRight.tsx',
+						'OrRight.tsx',
+						'NullishRight.tsx',
 					].includes(file.file)
 				) {
-					expect(file.notes).toEqual([note]);
+					expect(file.notes, file.file).toEqual([note]);
 					expect(file.code).toContain('@for');
-				} else expect(file.notes).toEqual([]);
+				} else expect(file.notes, file.file).toEqual([]);
 			}
-			for (const first of ['ArrayValue.tsx', 'Template.tsx', 'ImmediateArrow.tsx']) {
+			expect(preview.files.find(({ file }) => file === 'RetainedBranch.tsx')?.code).toContain(
+				'.map(({id,label=true ? index : 7},index)',
+			);
+			for (const first of [
+				'ArrayValue.tsx',
+				'Template.tsx',
+				'ImmediateArrow.tsx',
+				'TrueArm.tsx',
+				'NullishRight.tsx',
+			]) {
 				const result = await runCodemod(
 					[path.join(root, first), ...inputs.filter((file) => path.basename(file) !== first)],
 					options,
@@ -2168,7 +2207,9 @@ export function Host({rows}: { rows: Row[] }) {
 						notes: [note],
 					}),
 				]);
-				expect(fs.readdirSync(root).sort()).toEqual(Object.keys(originals).sort());
+				expect(fs.readdirSync(root).sort()).toEqual(
+					[...Object.keys(originals), 'node_modules'].sort(),
+				);
 				for (const [file, code] of Object.entries(originals))
 					expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
 			}

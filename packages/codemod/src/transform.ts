@@ -6252,6 +6252,12 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					readsOrdinal(read.operand)
 				);
 			if (ts.isPropertyAccessExpression(read)) return readsOrdinal(read.expression);
+			if (ts.isConditionalExpression(read)) {
+				if (readsOrdinal(read.condition)) return true;
+				const test = skipWrappers(read.condition).kind;
+				if (test === ts.SyntaxKind.TrueKeyword) return readsOrdinal(read.whenTrue);
+				return test === ts.SyntaxKind.FalseKeyword && readsOrdinal(read.whenFalse);
+			}
 			if (ts.isTemplateExpression(read)) {
 				for (const { expression } of read.templateSpans) {
 					if (readsOrdinal(expression)) return true;
@@ -6316,6 +6322,21 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			}
 			if (!ts.isBinaryExpression(read)) return false;
 			const op = read.operatorToken.kind;
+			if (
+				op === ts.SyntaxKind.AmpersandAmpersandToken ||
+				op === ts.SyntaxKind.BarBarToken ||
+				op === ts.SyntaxKind.QuestionQuestionToken
+			) {
+				if (readsOrdinal(read.left)) return true;
+				const left = skipWrappers(read.left).kind;
+				const rightWhen =
+					op === ts.SyntaxKind.AmpersandAmpersandToken
+						? ts.SyntaxKind.TrueKeyword
+						: op === ts.SyntaxKind.BarBarToken
+							? ts.SyntaxKind.FalseKeyword
+							: ts.SyntaxKind.NullKeyword;
+				return left === rightWhen && readsOrdinal(read.right);
+			}
 			return (
 				((op >= ts.SyntaxKind.PlusToken && op <= ts.SyntaxKind.PercentToken) ||
 					(op >= ts.SyntaxKind.LessThanLessThanToken && op <= ts.SyntaxKind.CaretToken)) &&
