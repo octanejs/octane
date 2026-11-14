@@ -2712,11 +2712,12 @@ export function mountFastHostItems<T>(
 			: listNext(state, parentBlock, ROOT_RENDER_TRANSACTION.ops.length);
 	const rows = next === null ? null : listRoots(next, state.end);
 	const anchor = rows === null ? state.end : (DETACHED_ROOT ?? newDetachedRoot());
+	const normalizeKey = mapped && ((flags || 0) & 256) === 0;
 	try {
 		for (let index = 0; index < items.length; index++) {
 			const item = items[index];
 			const sourceKey = getKey(item, index);
-			const key = mapped ? 'k' + String(sourceKey) : sourceKey;
+			const key = normalizeKey ? 'k' + String(sourceKey) : sourceKey;
 			const block = createBlock(
 				'control-flow',
 				parentBlock,

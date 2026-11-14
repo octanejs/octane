@@ -2534,7 +2534,9 @@ export function renderPreparedChildList(
 	}
 	const { items, keys } = preparedList;
 	const keySource = compiledMapKey || keys!;
-	const normalizeKey = !!compiledMapKey;
+	const fastFlags = compiledMapFlags || 0;
+	// Compiled positional keys share the fallback's numeric array indices.
+	const normalizeKey = !!compiledMapKey && (fastFlags & 256) === 0;
 	const wasMappedNative = state.forSlot.mappedNative === true;
 	const body =
 		compiledMapBody || (mappedFallback === true ? mappedDeoptItemBody : (deoptItemBody as any));
@@ -2588,7 +2590,6 @@ export function renderPreparedChildList(
 	// re-deriving it by identity in mountItem (see ForSlot.plainDeopt).
 	const plainDeopt = compiledMapBody === undefined && mappedFallback !== true;
 	state.forSlot.plainDeopt = ELEMENT_DESCRIPTORS && plainDeopt ? updateDeoptComponent : null;
-	const fastFlags = compiledMapFlags || 0;
 	const ssrMarkerless = compiledMapBody !== undefined && (fastFlags & 16) !== 0;
 	let pure = (fastFlags & 1) !== 0;
 	let lite = false;

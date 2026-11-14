@@ -9290,8 +9290,8 @@ function mapCallToForOf(expr, ctx) {
 		return null;
 	}
 	// Pull a `key={…}` attribute off the returned element → the for-of header key,
-	// and drop it from the element (it's not a DOM attribute). makeForCall then
-	// keys via the header, falling back to `item.id ?? item` when there's no key.
+	// and drop it from the element (it's not a DOM attribute). An unkeyed
+	// callback produces positional rows, just as it does in the descriptor path.
 	const nameOf = (a) => a?.name?.name || a?.name;
 	const attributes = body.openingElement?.attributes || body.attributes || [];
 	const keyIndex = attributes.findIndex((attr) => nameOf(attr) === 'key');
@@ -9371,6 +9371,7 @@ function mapCallToForOf(expr, ctx) {
 			directReceiver,
 			callback: arrow,
 			keyReadsTag,
+			positionalKeys: keyAttr === undefined,
 		},
 	});
 	return inheritOriginLoc(forNode, expr);
@@ -17888,8 +17889,8 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 			b.call(keyName, row, ...(node.index ? [b.id('__i')] : [])),
 			explicitKey,
 		);
-	} else if (node.index) {
-		itemKey = inheritOriginLoc(b.id('__i'), node.index);
+	} else if (node.index || mapCall?.positionalKeys) {
+		itemKey = inheritOriginLoc(b.id('__i'), node.index ?? node);
 	}
 	const markerlessItem = isSsrMarkerlessForItem(node, itemBody);
 	const mappedRow = mapCall?.callback.body;
@@ -17927,7 +17928,7 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 					b.literal(!sharedItemRange && !bindingSite),
 					...(signalSite !== null
 						? [b.literal(false), b.literal(signalSite)]
-						: mapCall === null
+						: mapCall === null || mapCall.positionalKeys
 							? []
 							: [b.literal(true)]),
 				],
@@ -30742,7 +30743,8 @@ function planJsx(
 		//        bit 5 = conditional item bodies require their active scope,
 		//        bit 6 = dev: a mapped list without keys,
 		//        bit 7 = a sole component row whose template inserts its one root,
-		//        bits 8+ = the zero-based keyedForBlock selection dependency index.
+		//        bit 8 on mapSlot calls = positional keys (no authored key),
+		//        bits 8+ on keyedForBlock calls = the selection dependency index.
 		// keyedForBlock itself identifies a selection, including dependency zero;
 		// ordinary forBlock reuses bit 5 without an argument or tuple allocation.
 		const flags =
@@ -30754,6 +30756,7 @@ function planJsx(
 			(fc.requiresScope ? 32 : 0) |
 			(ctx.dev && fc.missingMapKey ? 64 : 0) |
 			(fc.detachRoot ? 128 : 0) |
+			(fc.positionalMapKeys ? 256 : 0) |
 			(fc.keyedSelectionIndex >= 0 ? fc.keyedSelectionIndex << 8 : 0);
 		// Arg layout: forBlock(__s, slot, host, items, keyFn, body, flags?, deps?,
 		// emptyBody?, anchor?, ownEnd?, selectionBody?). The final argument is
@@ -38382,14 +38385,11 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		if (node.index) params.push(b.id(node.index.name, node.index));
 		keyFn = inheritOriginLoc(b.arrow(params, explicitKey), explicitKey);
 	}
-	if (!keyFn && node.index) {
-		// Index identifier — caller iterates with index, key by index.
+	if (!keyFn && (node.index || node.nativeArrayMap?.positionalKeys)) {
+		const index = node.index ?? b.id(allocCompilerName(ctx, '__mapIndex'));
 		keyFn = inheritOriginLoc(
-			b.arrow(
-				[b.id(itemName, leftDeclId), b.id(node.index.name, node.index)],
-				b.id(node.index.name, node.index),
-			),
-			node.index,
+			b.arrow([b.id(itemName, leftDeclId), b.id(index.name, index)], b.id(index.name, index)),
+			node.index ?? node,
 		);
 	}
 	if (!keyFn) {
@@ -38954,6 +38954,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					])
 			: node.right, // the fold replaces this with a `props.hN` member read
 		missingMapKey: mapCall !== null && node.key == null,
+		positionalMapKeys: mapCall?.positionalKeys === true,
 		mapMethodExpr: mapCall
 			? mapCall.methodName === null
 				? b.member(b.id(mapCall.receiverName), 'map')
