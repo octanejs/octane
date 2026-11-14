@@ -171,6 +171,58 @@ describe('static SVG assets', () => {
 		}
 	});
 
+	const gradient =
+		'<linearGradient id="paint" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="8" y2="8"><stop stop-color="red"/><stop offset=".75" stop-color="currentColor"/></linearGradient>';
+	const filter =
+		'<filter id="soft" filterUnits="userSpaceOnUse" width="8" height="8"><feFlood result="clear"/><feBlend in="SourceGraphic" in2="clear" result="merged"/><feGaussianBlur stdDeviation="1" result="blurred"/></filter>';
+	const mask =
+		'<mask id="cut" maskUnits="userSpaceOnUse" width="8" height="8" style="mask-type:alpha"><path d="M0 0H8V8Z" fill="white"/></mask>';
+	const effects = `<svg><g mask="url(#cut)"><g filter="url(#soft)"><path d="M0 0H8V8Z" fill="url(#paint)"/></g></g>${mask}<defs>${gradient}${filter}</defs></svg>`;
+
+	it('preserves ordered local definitions, optional stop offsets, and filter inputs', () => {
+		const svg = parseStaticSvg(effects);
+		expect(svg?.children.map(({ tag }) => tag)).toEqual(['g', 'mask', 'defs']);
+		const definitions = svg?.children[2]?.children;
+		expect(definitions?.map(({ tag }) => tag)).toEqual(['linearGradient', 'filter']);
+		expect(definitions?.[0]?.children.map(({ attributes }) => attributes.offset)).toEqual([
+			undefined,
+			'0.75',
+		]);
+		expect(definitions?.[1]?.children.map(({ tag }) => tag)).toEqual([
+			'feFlood',
+			'feBlend',
+			'feGaussianBlur',
+		]);
+	});
+
+	it.each([
+		['an external gradient', effects.replace('url(#paint)', 'url(icons.svg#paint)')],
+		['a wrong target type', effects.replace('url(#soft)', 'url(#paint)')],
+		['duplicate definition IDs', effects.replace('id="soft"', 'id="paint"')],
+		['an unused mask', effects.replace(' mask="url(#cut)"', '')],
+		['a filter forward reference', effects.replace('in2="clear"', 'in2="blurred"')],
+		['an unsupported filter input', effects.replace('in2="clear"', 'in2="BackgroundImage"')],
+		['duplicate filter results', effects.replace('result="merged"', 'result="clear"')],
+		[
+			'an overflowing filter blur',
+			effects.replace('stdDeviation="1"', `stdDeviation="${'9'.repeat(310)}"`),
+		],
+		[
+			'an arbitrary mask declaration',
+			effects.replace('mask-type:alpha', 'mask-type:alpha;opacity:0'),
+		],
+		[
+			'a namespaced stop',
+			effects.replace('<stop stop-color=', '<stop xmlns="urn:other" stop-color='),
+		],
+		[
+			'a filter outside definitions',
+			effects.replace(filter, '').replace('</svg>', filter + '</svg>'),
+		],
+	])('declines %s in local effects', (_, source) => {
+		expect(parseStaticSvg(source)).toBeNull();
+	});
+
 	it('retains an authored unitful root length as a string', () => {
 		expect(parseStaticSvg(`<svg width="1e999px">${path}</svg>`)?.root.width).toBe('1e999px');
 	});

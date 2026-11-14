@@ -122,9 +122,14 @@ it('should replace last char if another one is pressed', async () => {
 	expect(await input().inputValue()).toBe('123457');
 });
 it('should move slot selection with arrow keys when input is full', async () => {
+	await page.goto('about:blank');
+	await page.clock.install();
+	await goto('/base');
 	await input().pressSequentially('123456');
 	expect(await input().inputValue()).toBe('123456');
 	await expectMirrorSelection(5, 6);
+	// Finish the value change's 0, 10 and 50 ms selection syncs before the next key.
+	await page.clock.runFor(50);
 	await pressAndExpectSelection('ArrowLeft', 4, 5);
 	await pressAndExpectSelection('ArrowLeft', 3, 4);
 	await pressAndExpectSelection('ArrowRight', 4, 5);

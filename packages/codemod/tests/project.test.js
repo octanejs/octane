@@ -1362,6 +1362,12 @@ export function Host({rows}: { rows: Row[] }) {
 				'List.tsx': source(direct),
 				'Plus.tsx': source(direct.replace('(index as number)', '(index as number) + 1')),
 				'Typeof.tsx': source(direct.replace('(index as number)', 'typeof index')),
+				'Call.tsx': source(direct.replace('(index as number)', 'String(index)')),
+				'Product.tsx': source(direct.replace('(index as number)', '2 * (index as number)')),
+				'Unary.tsx': source(direct.replace('(index as number)', '-index')),
+				'Bitwise.tsx': source(direct.replace('(index as number)', '0 | index')),
+				'Optional.tsx': source(direct.replace('(index as number)', 'maybe?.(index)')),
+				'Earlier.tsx': source(direct.replace('(index as number)', 'fail() * index')),
 				'Computed.tsx': source(
 					'[{0:4},{1:5}].map(({[index]:label},index) => <li key={0}>{label}</li>)',
 				),
@@ -1382,7 +1388,18 @@ export function Host({rows}: { rows: Row[] }) {
 				inputs.map((file) => path.basename(file)),
 			);
 			for (const file of preview.files) {
-				if (['List.tsx', 'Plus.tsx', 'Typeof.tsx', 'Computed.tsx'].includes(file.file)) {
+				if (
+					[
+						'List.tsx',
+						'Plus.tsx',
+						'Typeof.tsx',
+						'Call.tsx',
+						'Product.tsx',
+						'Unary.tsx',
+						'Bitwise.tsx',
+						'Computed.tsx',
+					].includes(file.file)
+				) {
 					expect(file.notes).toEqual([note]);
 					expect(file.code).toContain('@for');
 				} else expect(file.notes).toEqual([]);
@@ -2390,6 +2407,100 @@ export * from './View.tsrx';`,
 		]);
 		const second = await runCodemod([root]);
 		expect(second.files.filter((file) => file.changed)).toEqual([]);
+	});
+
+	it('blocks a local React context Provider getter before writing', async () => {
+		const context =
+			"import { createContext as makeContext } from 'react'; const Theme = makeContext('default');";
+		const get = 'get() { return Replacement; }';
+		const descriptor = (/** @type {string} */ members) =>
+			`Object.defineProperty(Theme, 'Provider', { configurable: true, ${members} });`;
+		const getter = descriptor(get);
+		const wrapped = `((Object as ObjectConstructor).defineProperty!)((Theme!), ('Provider' as const), ({ ${get} } satisfies PropertyDescriptor));`;
+		const component = 'function Replacement({children}) { return <b>{children}</b>; }';
+		const tag =
+			'export const View = () => <Theme.Provider value="given"><span>child</span></Theme.Provider>;';
+		const setters = {
+			'GetSet.tsx': get + ', set(value) {}',
+			'SetGet.tsx': "'set'(value) {}, " + get,
+			'SetterFunction.tsx': 'set: function (value) {}, ' + get,
+			'SetterArrow.tsx': get + ', set: (value) => {}',
+		};
+		const sources = {
+			'Caller.tsx': "import { View } from './View.tsx'; export const Caller = () => <View />;",
+			'View.tsx': [context, component, getter, tag].join('\n'),
+			'Wrapped.tsx': [context, component, wrapped, tag].join('\n'),
+			'Optional.tsx': [
+				context,
+				component,
+				wrapped.replace('defineProperty!)(', 'defineProperty!)?.('),
+				tag,
+			].join('\n'),
+			...Object.fromEntries(
+				Object.entries(setters).map(([file, members]) => [
+					file,
+					[context, component, descriptor(members), tag].join('\n'),
+				]),
+			),
+			'SetterOnly.tsx': [context, descriptor('set(value) {}'), tag].join('\n'),
+			'Control.tsx': [context, tag].join('\n'),
+			'Shadowed.tsx': [
+				context,
+				component,
+				'const Object = { defineProperty() {} };',
+				wrapped,
+				tag,
+			].join('\n'),
+			'Sibling.tsx': [context, component, getter.replace("'Provider'", "'other'"), tag].join('\n'),
+			'Deferred.tsx': [context, component, `function install() { ${getter} }`, tag].join('\n'),
+			'Dead.tsx': [context, component, `if (false) ${getter}`, tag].join('\n'),
+			'EarlierTag.tsx': [
+				context,
+				component,
+				'export const view = <Theme.Provider value="given"><span>child</span></Theme.Provider>;',
+				getter,
+			].join('\n'),
+			'Ordinary.tsx': [component, 'const Theme = { Provider: Replacement };', getter, tag].join(
+				'\n',
+			),
+		};
+		const root = project(sources);
+		const inputs = Object.keys(sources).map((file) => path.join(root, file));
+		const note = expect.objectContaining({ rule: 'context-provider-getter', severity: 'error' });
+		const options = { root, verify: false };
+		const preview = await runCodemod(inputs, { ...options, write: false });
+		const byFile = new Map(preview.files.map((file) => [file.file, file]));
+		for (const file of ['View.tsx', 'Wrapped.tsx', ...Object.keys(setters)])
+			expect(byFile.get(file).notes).toEqual([note]);
+		for (const file of [
+			'Control.tsx',
+			'Optional.tsx',
+			'SetterOnly.tsx',
+			'Shadowed.tsx',
+			'Sibling.tsx',
+			'Deferred.tsx',
+			'Dead.tsx',
+			'EarlierTag.tsx',
+		]) {
+			expect(byFile.get(file).notes).toEqual([]);
+			expect(byFile.get(file).code).toContain('<Theme value="given">');
+		}
+		expect(byFile.get('Ordinary.tsx').notes).toEqual([]);
+		expect(byFile.get('Ordinary.tsx').code).toContain('<Theme.Provider value="given">');
+
+		const result = await runCodemod(inputs, options);
+		expect(result.files).toEqual([
+			expect.objectContaining({
+				file: 'View.tsx',
+				output: 'View.tsx',
+				changed: false,
+				code: sources['View.tsx'],
+				notes: [note],
+			}),
+		]);
+		expect(fs.readdirSync(root).sort()).toEqual(Object.keys(sources).sort());
+		for (const [file, source] of Object.entries(sources))
+			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(source);
 	});
 
 	it.each([

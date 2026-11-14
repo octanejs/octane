@@ -4641,11 +4641,37 @@ describe('compiler-owned component-region memoization', () => {
 	);
 
 	describe.each(['client', 'server'] as const)('mapped parameter evaluation (%s)', (mode) => {
-		it.each<[string, string | ErrorConstructor]>([
+		it.each<[string, string | ErrorConstructor, unknown[]?]>([
 			['({ id, value = read() })', 'second default'],
 			['({ id, [field]: value })', 'second property'],
 			['({ id, value = index }, index)', ReferenceError],
-		])('preserves the error from %s', (parameters, expected) => {
+			[
+				'([id, value])',
+				'second iterator',
+				[
+					['a', 'first'],
+					{
+						[Symbol.iterator]() {
+							throw new Error('second iterator');
+						},
+					},
+				],
+			],
+			[
+				'({ entry: [id, value] })',
+				'second iterator',
+				[
+					{ entry: ['a', 'first'] },
+					{
+						entry: {
+							[Symbol.iterator]() {
+								throw new Error('second iterator');
+							},
+						},
+					},
+				],
+			],
+		])('preserves the error from %s', (parameters, expected, rows) => {
 			const { App } = loadCompiledFixtureSource(
 				`function Child({ value }) {
 					if (value === 'first') throw new Error('first child');
@@ -4667,7 +4693,10 @@ describe('compiler-owned component-region memoization', () => {
 			let propertyReads = 0;
 			const props = {
 				rows:
-					typeof expected === 'string' ? [{ id: 'a', value: 'first' }, { id: 'b' }] : [{ id: 'a' }],
+					rows ??
+					(typeof expected === 'string'
+						? [{ id: 'a', value: 'first' }, { id: 'b' }]
+						: [{ id: 'a' }]),
 				read() {
 					throw new Error('second default');
 				},
@@ -6055,12 +6084,6 @@ describe('compiler-owned component-region memoization', () => {
 			expected: 'safe',
 		},
 		{
-			kind: 'safe array destructuring',
-			callback: '([id, label]) => <li key={id}>{label}</li>',
-			rows: [[1, 'safe']],
-			expected: 'safe',
-		},
-		{
 			kind: 'literal computed property and default',
 			callback: `({ id, ['label']: label = 'fallback' }) => <li key={id}>{label}</li>`,
 			rows: [{ id: 1 }],
@@ -6085,6 +6108,60 @@ describe('compiler-owned component-region memoization', () => {
 		]);
 		root.unmount();
 		expect(compile(source, id, { hmr: false, dev: false }).code).toContain('mapSlot');
+	});
+
+	it('hydrates mapped tuples and keeps their keyed rows during reorder', () => {
+		const source = `
+			export function App({ rows }) {
+				return <ul>{rows.map(([id, label], index) => <li key={id}><input defaultValue={label} />{index}</li>)}</ul>;
+			}
+		`;
+		const id = 'map-tuple-hydration.tsx';
+		const compileOptions = { hmr: false, dev: process.env['OCTANE_TEST_COMPILE_MODE'] !== 'prod' };
+		const client = loadCompiledFixtureSource<{ App: (props: { rows: string[][] }) => void }>(
+			source,
+			{ id, mode: 'client', compileOptions },
+		);
+		const server = loadCompiledFixtureSource<{ App: (props: { rows: string[][] }) => string }>(
+			source,
+			{ id, mode: 'server', compileOptions },
+		);
+		const rows = [
+			['a', 'first'],
+			['b', 'second'],
+		];
+		const errors: unknown[] = [];
+		const container = document.body.appendChild(document.createElement('div'));
+		container.innerHTML = ServerRuntime.renderToString(server.App, { rows }).html;
+		const original = Array.from(container.querySelectorAll('li'));
+		expect(original.map((row) => row.textContent)).toEqual(['0', '1']);
+		const edited = original[0]!.querySelector('input')!;
+		edited.value = 'edited';
+		const root = hydrateRoot(
+			container,
+			client.App,
+			{ rows },
+			{
+				onRecoverableError: (error) => errors.push(error),
+			},
+		);
+		try {
+			flushSync(() => {});
+			const adopted = container.querySelectorAll('li');
+			expect(adopted).toHaveLength(original.length);
+			original.forEach((row, index) => expect(adopted[index]).toBe(row));
+			flushSync(() => root.render(client.App, { rows: rows.toReversed() }));
+			const reordered = container.querySelectorAll('li');
+			expect(reordered).toHaveLength(original.length);
+			original.toReversed().forEach((row, index) => expect(reordered[index]).toBe(row));
+			expect(original.map((row) => row.textContent)).toEqual(['1', '0']);
+			expect(container.querySelectorAll('input')[1]).toBe(edited);
+			expect(edited.value).toBe('edited');
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
 	});
 
 	it('reads native-array indexed getters exactly once in callback order on every render', () => {

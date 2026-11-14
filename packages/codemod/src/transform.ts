@@ -98,6 +98,7 @@ const syntheticEventMembers = {
 
 export const MAP_PARAMETER_TDZ = 'map-parameter-tdz';
 export const MAP_PARAMETER_WRITE = 'map-parameter-write';
+export const CONTEXT_PROVIDER_GETTER = 'context-provider-getter';
 
 /** Rule names, as reported. */
 const RULE = {
@@ -2140,9 +2141,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 
 	/**
 	 * Whether a React component's element can be the root of a `ReactCompat`
-	 * island: React renders all of it, so its children are text and no prop
-	 * holds an element, as JSX here, through a value this module declares, or
-	 * by its type.
+	 * island: its children are text or a single primitive literal, and no prop
+	 * holds an element here, through a local value, or by its type.
 	 */
 	hostsInReact(element: ts.JsxElement | ts.JsxSelfClosingElement) {
 		// By type: a cast to `any` or `ReactNode` proves nothing.
@@ -2150,7 +2150,27 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			ts.isJsxText(child) ||
 			(ts.isJsxExpression(child) &&
 				(!child.expression || textKind(this.typeOf(child.expression)) !== 0));
-		if (ts.isJsxElement(element) && !element.children.every(text)) return false;
+		if (ts.isJsxElement(element) && !element.children.every(text)) {
+			// Mixed text and expression children can be normalized differently by JSX emitters.
+			const [child, extra] = withoutJsxIndentation(element.children).filter(
+				(node) => !ts.isJsxExpression(node) || node.expression,
+			);
+			if (
+				extra ||
+				!child ||
+				!ts.isJsxExpression(child) ||
+				!child.expression ||
+				child.dotDotDotToken
+			)
+				return false;
+			const kind = skipWrappers(child.expression).kind;
+			if (
+				kind !== ts.SyntaxKind.TrueKeyword &&
+				kind !== ts.SyntaxKind.FalseKeyword &&
+				kind !== ts.SyntaxKind.NullKeyword
+			)
+				return false;
+		}
 		const attributes = ts.isJsxElement(element)
 			? element.openingElement.attributes
 			: element.attributes;
@@ -3715,7 +3735,20 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			!(ts.isPropertyAccessExpression(tag) && tag.expression === node) &&
 			!(ts.isBinaryExpression(tag) && tag.left === node);
 		if (node.name.text === 'Provider' && (isTag || isValue) && this.isContext(node.expression)) {
-			if (!ts.isJsxClosingElement(tag)) this.count(RULE.provider);
+			if (!ts.isJsxClosingElement(tag)) {
+				if (
+					isTag &&
+					ts.isIdentifier(node.expression) &&
+					this.hasLocalProviderGetter(node.expression)
+				)
+					this.note(
+						CONTEXT_PROVIDER_GETTER,
+						'error',
+						node,
+						'Replacing this React context Provider read can skip an authored getter. Review the custom Provider before migrating it.',
+					);
+				this.count(RULE.provider);
+			}
 			return this.emit(node.expression, PLAIN);
 		}
 		const namespace = this.importOf(node.expression);
@@ -5297,6 +5330,76 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return ts.isCallExpression(node) && this.calleeName(node.expression) === 'createContext';
 	}
 
+	private hasLocalProviderGetter(context: ts.Identifier): boolean {
+		if (!this.source.includes('defineProperty') && !this.source.includes('\\u')) return false;
+		const initial = this.constValue(context);
+		const factory = initial && skipParens(initial);
+		if (
+			!factory ||
+			!ts.isCallExpression(factory) ||
+			this.reactHook(factory.expression) !== 'createContext'
+		)
+			return false;
+		return this.localUses(context).some((reference) => {
+			let target: ts.Expression = reference;
+			while (isWrapper(target.parent) && target.parent.expression === target)
+				target = target.parent;
+			const call = target.parent;
+			if (
+				!ts.isCallExpression(call) ||
+				call.arguments[0] !== target ||
+				call.questionDotToken ||
+				!ts.isExpressionStatement(call.parent) ||
+				call.parent.parent !== this.sf ||
+				factory.end > call.pos ||
+				call.end > context.pos
+			)
+				return false;
+			const method = skipWrappers(call.expression);
+			const object = ts.isPropertyAccessExpression(method) && skipWrappers(method.expression);
+			const [, keyArgument, descriptorArgument] = call.arguments;
+			const key = keyArgument && skipWrappers(keyArgument);
+			const descriptor = descriptorArgument && skipWrappers(descriptorArgument);
+			if (
+				!ts.isPropertyAccessExpression(method) ||
+				method.questionDotToken ||
+				method.name.text !== 'defineProperty' ||
+				!object ||
+				!ts.isIdentifier(object) ||
+				object.text !== 'Object' ||
+				this.declarationOf(object)?.getSourceFile().hasNoDefaultLib !== true ||
+				!key ||
+				!ts.isStringLiteralLike(key) ||
+				key.text !== 'Provider' ||
+				!descriptor ||
+				!ts.isObjectLiteralExpression(descriptor)
+			)
+				return false;
+			let getter = false;
+			let setter = false;
+			for (const property of descriptor.properties) {
+				const name = property.name;
+				if (!name || (!ts.isIdentifier(name) && !ts.isStringLiteral(name))) return false;
+				if (name.text === 'configurable' || name.text === 'enumerable') continue;
+				if (name.text === 'set' && !setter) {
+					const value = ts.isPropertyAssignment(property)
+						? skipWrappers(property.initializer)
+						: null;
+					if (
+						!ts.isMethodDeclaration(property) &&
+						!(value && (ts.isArrowFunction(value) || ts.isFunctionExpression(value)))
+					)
+						return false;
+					setter = true;
+					continue;
+				}
+				if (name.text !== 'get' || getter || !ts.isMethodDeclaration(property)) return false;
+				getter = true;
+			}
+			return getter;
+		});
+	}
+
 	/**
 	 * `typeof children === 'function'` also holds for a compiled children
 	 * block, which renders through Octane rather than being called, so the
@@ -5909,10 +6012,27 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (!expr) return false;
 			const read = skipWrappers(expr);
 			if (ts.isIdentifier(read)) return this.declarationOf(read) === ordinal;
-			if (ts.isTypeOfExpression(read)) return readsOrdinal(read.expression);
+			if (ts.isTypeOfExpression(read) || ts.isVoidExpression(read))
+				return readsOrdinal(read.expression);
+			if (ts.isPrefixUnaryExpression(read))
+				return (
+					read.operator !== ts.SyntaxKind.PlusPlusToken &&
+					read.operator !== ts.SyntaxKind.MinusMinusToken &&
+					readsOrdinal(read.operand)
+				);
+			// Optional calls can skip the argument. An earlier argument or a
+			// member getter can interrupt evaluation before the ordinal read.
+			if (ts.isCallExpression(read))
+				return (
+					!ts.isOptionalChain(read) &&
+					ts.isIdentifier(skipWrappers(read.expression)) &&
+					readsOrdinal(read.arguments[0])
+				);
+			if (!ts.isBinaryExpression(read)) return false;
+			const op = read.operatorToken.kind;
 			return (
-				ts.isBinaryExpression(read) &&
-				read.operatorToken.kind === ts.SyntaxKind.PlusToken &&
+				((op >= ts.SyntaxKind.PlusToken && op <= ts.SyntaxKind.PercentToken) ||
+					(op >= ts.SyntaxKind.LessThanLessThanToken && op <= ts.SyntaxKind.CaretToken)) &&
 				((rowKeyLiteral(read.right) && readsOrdinal(read.left)) ||
 					(rowKeyLiteral(read.left) && readsOrdinal(read.right)))
 			);

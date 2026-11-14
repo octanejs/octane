@@ -23,6 +23,7 @@ import { PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
 import {
 	bind,
+	CONTEXT_PROVIDER_GETTER,
 	MAP_PARAMETER_TDZ,
 	MAP_PARAMETER_WRITE,
 	projectTypeAt,
@@ -1063,13 +1064,16 @@ export async function runCodemod(
 			}
 		}
 		const result = transform();
-		const parameterError = result.notes.find(
-			(note) => note.rule === MAP_PARAMETER_WRITE || note.rule === MAP_PARAMETER_TDZ,
+		const blockedTransform = result.notes.find(
+			(note) =>
+				note.rule === MAP_PARAMETER_WRITE ||
+				note.rule === MAP_PARAMETER_TDZ ||
+				note.rule === CONTEXT_PROVIDER_GETTER,
 		);
-		if (write && parameterError)
+		if (write && blockedTransform)
 			return blockedWrite(
 				root,
-				unchangedFile(path.relative(root, file), source, parameterError),
+				unchangedFile(path.relative(root, file), source, blockedTransform),
 				compiler?.from,
 			);
 		for (const message of [...storeErrors, ...svgErrors]) {
@@ -1462,6 +1466,7 @@ type AdapterState =
 const PREVIOUS_INTL_HASHES = ['07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98'];
 
 const PREVIOUS_SVG_HASHES = [
+	'90bc12d849bbed4f1932e9e7ab5b939242237a4b8876d4c0f01e093a7d5b8c80',
 	'9068d68b34a68b8dd4199764d16c174f1cf9cbf79172396b1f8960ddf5217916',
 	'893474efdb9186489e6c0113d1dedaaf9b7d2a0443f8b5d04048680610696bdf',
 	'88de6c9053abe0f94934ebb7cd54cd681e4d2544b3facab0dbdf3d4c588649a5',

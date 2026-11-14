@@ -102,12 +102,28 @@ type ToOwner =
 	  }
 	| { readonly t: 'listen'; readonly id: number; readonly request: FeedRequest }
 	| { readonly t: 'unlisten'; readonly id: number }
+	/** A value this tab holds, loaded at `at`, for the others: a seed, or one newer than a seed offered. */
+	| Offer
 	| {
 			readonly t: 'settle';
 			readonly op: string;
 			readonly confirmed: boolean;
 			readonly value: unknown;
 	  };
+
+/**
+ * A value a replica holds, loaded at `at` (a wall-clock time every tab and the
+ * owner share): one a server render seeded, or one newer than a value offered.
+ * A replica holding an older value takes it; one holding a newer value offers
+ * its own back.
+ */
+interface Offer {
+	readonly t: 'offer';
+	readonly name: string;
+	readonly input: unknown;
+	readonly value: unknown;
+	readonly at: number;
+}
 
 /** What an owner sends a replica. */
 type ToReplica =
@@ -124,7 +140,16 @@ type ToReplica =
 	| { readonly t: 'frame'; readonly id: number; readonly frame: FeedFrame }
 	| { readonly t: 'end'; readonly id: number; readonly error?: unknown }
 	/** Another replica loaded a read. */
-	| { readonly t: 'value'; readonly name: string; readonly input: unknown; readonly value: unknown }
+	| {
+			readonly t: 'value';
+			readonly name: string;
+			readonly input: unknown;
+			readonly value: unknown;
+			/** When the request that read it started; an owner from an older build leaves it out. */
+			readonly at?: number;
+	  }
+	/** A value another replica holds, which the owner passes on as it came. */
+	| Offer
 	/** Another replica sent a write. */
 	| { readonly t: 'write'; readonly op: string; readonly name: string; readonly raw: unknown }
 	/** How a write another replica sent ended: its reply, or uncertain. */
@@ -395,6 +420,7 @@ export function createDataOwner(options: {
 		const key = `${payload.kind}\n${entryKey(payload.name, payload.input)}`;
 		let shared = receipt ? receipts.get(key) : fresh ? undefined : reading.get(key);
 		if (!shared) {
+			const at = hostDateNow();
 			const started = (shared = Promise.resolve().then(() =>
 				transport(payload, new AbortController().signal),
 			));
@@ -424,6 +450,7 @@ export function createDataOwner(options: {
 							name: payload.name,
 							input: payload.input,
 							value: reply.value,
+							at,
 						};
 						for (const port of replicas) if (!asked.get(started)!.has(port)) post(port, value);
 					},
@@ -451,11 +478,15 @@ export function createDataOwner(options: {
 		let upstream = upstreams.get(key);
 		if (upstream) {
 			upstream.members.set(from, id);
-			// A replica joining a live connection hears it is open, and where it stands.
+			// A replica joining a live connection hears it is open, and where it stands. One that
+			// stood elsewhere, such as a page whose server render read the feed's position, may
+			// have missed events in between.
+			const { cursor } = upstream;
+			const gap = payload.cursor !== null && payload.cursor !== cursor;
 			from.postMessage({
 				t: 'frame',
 				id,
-				frame: upstream.cursor === null ? {} : { cursor: upstream.cursor },
+				frame: cursor === null ? { gap } : { cursor, gap },
 			} satisfies ToReplica);
 			return;
 		}
@@ -876,19 +907,63 @@ export function createReplica(
 		}
 	}
 
-	/** Take a value another replica loaded, for a read held here and not loading. */
-	async function value(name: string, input: unknown, raw: unknown) {
+	/** Offer the others what this tab holds for `entry`. */
+	const offer = (entry: Entry) => {
+		const held = inner.held(entry);
+		if (held) send({ t: 'offer', ...held });
+	};
+	inner.onSeed((entry, wireKey) => {
+		// A reload of a seeded read must not join a request that may predate what it reloads for.
+		askedFor.add(`read\n${wireKey}`);
+		offer(entry);
+	});
+
+	/**
+	 * Take a value another replica holds, if it loaded later than the one held
+	 * here; offer this one back if it loaded later.
+	 */
+	async function offered({ name, input, value, at }: Offer) {
+		const key = entryKey(name, input);
+		let entry = inner.wireEntry(key);
+		// A load under way may finish older than the offer: judge the offer once it lands.
+		if (entry?.inflight) {
+			await entry.inflight;
+			entry = inner.wireEntry(key);
+		}
+		if (!entry?.hasBase || entry.inflight || store.retired || at === entry.fetchedAt) return;
+		if (at < entry.fetchedAt) return offer(entry);
+		let parsed: unknown;
+		try {
+			parsed = await parse(entry.read.output, value);
+		} catch {
+			return;
+		}
+		if (store.retired || entry.inflight || inner.entries.get(entry.key) !== entry) return;
+		if (at <= entry.fetchedAt) return;
+		const reload = new Set<Entry>();
+		inner.rebase(entry, parsed, false, reload, Math.max(0, hostDateNow() - at));
+		inner.finish(reload, [entry], entry.names);
+	}
+
+	/**
+	 * Take a value another replica loaded, for a read held here and not loading,
+	 * unless what is held was read by a request that started later.
+	 */
+	async function value(name: string, input: unknown, raw: unknown, at = hostDateNow()) {
 		const entry: Entry | undefined = inner.wireEntry(entryKey(name, input));
-		if (!entry || entry.inflight || store.retired) return;
+		const older = () => entry!.hasBase && at < entry!.fetchedAt;
+		if (!entry || entry.inflight || store.retired || older()) return;
 		let parsed: unknown;
 		try {
 			parsed = await parse(entry.read.output, raw);
 		} catch {
 			return;
 		}
-		if (store.retired || entry.inflight || inner.entries.get(entry.key) !== entry) return;
+		// Another value or offer may have landed while this one was validated.
+		if (store.retired || entry.inflight || inner.entries.get(entry.key) !== entry || older())
+			return;
 		const reload = new Set<Entry>();
-		inner.rebase(entry, parsed, false, reload);
+		inner.rebase(entry, parsed, false, reload, Math.max(0, hostDateNow() - at));
 		inner.finish(reload, [entry], entry.names);
 	}
 
@@ -934,7 +1009,10 @@ export function createReplica(
 					feeds.get(message.id)?.end(message.error);
 					break;
 				case 'value':
-					void value(message.name, message.input, message.value);
+					void value(message.name, message.input, message.value, message.at);
+					break;
+				case 'offer':
+					void offered(message);
 					break;
 				case 'write':
 					inOrder(() => follow(message.op, message.name, message.raw));
