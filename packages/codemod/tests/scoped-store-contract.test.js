@@ -382,7 +382,11 @@ it('warns at a direct migrated server call that needs a standalone store provide
 			export const props = renderToString(<Props />);
 			export const destructured = renderToString(<Destructured />);
 			export const defaultPane = renderToString(<DefaultPane />);
-			export const anonymousPane = renderToString(<AnonymousPane />);`,
+			export const anonymousPane = renderToString(<AnonymousPane />);
+			export const parenthesized = renderToString((<Pane />));
+			export const wrappedCall = (renderToString(<Pane />));
+			const identity = (value: unknown) => value;
+			export const nested = identity((<Plain data-render={() => renderToString(<Pane />)} />));`,
 		'app/src/hosted.tsx': `import { OctaneCompat } from 'octane/react/server';
 			import { Pane } from './pane.tsx';
 			export function Hosted() { return <OctaneCompat component={Pane} />; }`,
@@ -425,6 +429,16 @@ it('warns at a direct migrated server call that needs a standalone store provide
 			file: 'src/root.tsx',
 			line: 10,
 			message: expect.stringMatching(/migrated default export.*NativeStoreProvider/),
+		}),
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 11,
+			message: expect.stringMatching(/migrated Pane.*NativeStoreProvider/),
+		}),
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 12,
+			message: expect.stringMatching(/migrated Pane.*NativeStoreProvider/),
 		}),
 	]);
 	expect(fs.existsSync(path.join(app, 'src/root.tsrx'))).toBe(true);

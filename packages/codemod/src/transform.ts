@@ -273,7 +273,7 @@ export function nativeReactCompat(module: string, name: string) {
 	);
 }
 
-function skipParens(node: ts.Expression): ts.Expression {
+export function skipParens(node: ts.Expression): ts.Expression {
 	while (ts.isParenthesizedExpression(node)) node = node.expression;
 	return node;
 }
