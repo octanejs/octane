@@ -746,6 +746,7 @@ class ModuleTransform {
 		ts.JsxElement | ts.JsxSelfClosingElement,
 		'ReactCompat' | 'ReactCompatInline'
 	>();
+	readonly inlineIntlMessages = new Set<ts.JsxSelfClosingElement>();
 	readonly reactRendererBodies = new Map<ts.Node, string>();
 	readonly originalStoreTags = new Map<ts.ImportSpecifier, string>();
 	storeSourceNames?: Set<string>;
@@ -1101,8 +1102,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					)
 						continue;
 					if (name === 'IntlProvider') this.checkIntlProviderResources(element);
-					else if (ts.isJsxSelfClosingElement(element))
+					else if (ts.isJsxSelfClosingElement(element)) {
 						this.reportIntlFormatterOwner(element, 'generated native adapter');
+						if (this.inParagraph(element) && this.options.reactCompatInline)
+							this.inlineIntlMessages.add(element);
+					}
 				}
 			}
 		}
@@ -5858,6 +5862,8 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				out += this.emit(attribute, PLAIN);
 			}
 		}
+		if (ts.isJsxSelfClosingElement(element) && this.inlineIntlMessages.has(element))
+			out += ` inlineHost={${this.require('octane/react', 'ReactCompatInline', false)}}`;
 		return out + this.source.slice(cursor, node.end);
 	}
 
