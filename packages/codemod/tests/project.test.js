@@ -4281,17 +4281,19 @@ export * from './View.tsrx';`,
 	});
 
 	it.each([
-		['data.ts', './data', "Provider() { return 'original'; }"],
-		['data.ts', './data', 'get Provider() { return Provider; }'],
-		['data.tsx', './data', 'Provider: () => "original"'],
-		['data.tsx', './data.tsx', 'Provider'],
-		['dir/index.tsx', './dir/index', 'Provider'],
+		['es2015', 'data.ts', './data', "Provider() { return 'original'; }"],
+		['es2020', 'data.ts', './data', 'get Provider() { return Provider; }'],
+		['es2022', 'data.tsx', './data', 'Provider: () => "original"'],
+		['esnext', 'data.tsx', './data.tsx', 'Provider'],
+		['esnext', 'dir/index.tsx', './dir/index', 'Provider'],
 	])(
-		'preserves a direct object member from %s imported as %s (%s)',
-		async (file, specifier, field) => {
+		'preserves a direct object member in %s from %s imported as %s (%s)',
+		async (module, file, specifier, field) => {
 			const root = project({
 				'package.json': '{"name":"app","type":"module"}',
-				'tsconfig.json': '{"compilerOptions":{"module":"esnext","moduleResolution":"bundler"}}',
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { module, moduleResolution: 'bundler' },
+				}),
 				[file]: `const Provider = () => 'original';
 			export const BadgeContext = {
 				${field},
@@ -4389,36 +4391,38 @@ export function View() { return <Selected.Provider value="a"><Retained.Provider 
 		);
 	});
 
-	it('reports selected context member reads through TypeScript path aliases before writing', async () => {
-		const root = project({
-			'package.json': '{"name":"app","type":"module"}',
-			'tsconfig.json': JSON.stringify({
-				compilerOptions: {
-					module: 'esnext',
-					moduleResolution: 'bundler',
-					paths: {
-						'@shade': ['./shade.ts'],
-						'@ordinary': ['./ordinary.ts'],
-						'@factory': ['./factory.ts'],
-						'@default': ['./default.ts'],
-						'@unselected': ['./unselected.ts'],
-						'@shadowed': ['./shadowed'],
+	it.each(['esnext', 'es2022'])(
+		'reports selected context member reads through TypeScript path aliases before writing (%s)',
+		async (module) => {
+			const root = project({
+				'package.json': '{"name":"app","type":"module"}',
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: {
+						module,
+						moduleResolution: 'bundler',
+						paths: {
+							'@shade': ['./shade.ts'],
+							'@ordinary': ['./ordinary.ts'],
+							'@factory': ['./factory.ts'],
+							'@default': ['./default.ts'],
+							'@unselected': ['./unselected.ts'],
+							'@shadowed': ['./shadowed'],
+						},
 					},
-				},
-			}),
-			'shade.ts':
-				"import { createContext } from 'react'; export const Shade = createContext('default');",
-			'ordinary.ts': "export const BadgeContext = { Provider: () => 'plain' };",
-			'factory.ts': `function make() { return { Provider: () => 'plain' }; }
+				}),
+				'shade.ts':
+					"import { createContext } from 'react'; export const Shade = createContext('default');",
+				'ordinary.ts': "export const BadgeContext = { Provider: () => 'plain' };",
+				'factory.ts': `function make() { return { Provider: () => 'plain' }; }
 export const MadeContext = make();
 export const Plain = make();`,
-			'default.ts': "export default { Provider: () => 'plain' };",
-			'unselected.ts':
-				"import { createContext } from 'react'; export const Outside = createContext('default');",
-			'shadowed.ts':
-				"import { createContext } from 'react'; export const Shadowed = createContext('default');",
-			'shadowed.js': "export const Shadowed = { Provider: () => 'plain' };",
-			'View.tsx': `import { Shade } from '@shade';
+				'default.ts': "export default { Provider: () => 'plain' };",
+				'unselected.ts':
+					"import { createContext } from 'react'; export const Outside = createContext('default');",
+				'shadowed.ts':
+					"import { createContext } from 'react'; export const Shadowed = createContext('default');",
+				'shadowed.js': "export const Shadowed = { Provider: () => 'plain' };",
+				'View.tsx': `import { Shade } from '@shade';
 import { BadgeContext } from '@ordinary';
 import { MadeContext, Plain } from '@factory';
 import DefaultContext from '@default';
@@ -4431,47 +4435,48 @@ export function View() {
 		<Plain.Provider /><Outside.Provider /><Shadowed.Provider />
 	</Shade.Provider>;
 }`,
-		});
-		const selection = [
-			'shade.ts',
-			'ordinary.ts',
-			'factory.ts',
-			'default.ts',
-			'shadowed.ts',
-			'View.tsx',
-		].map((file) => path.join(root, file));
-		const before = selection.map((file) => fs.readFileSync(file, 'utf8'));
-		const options = { root, projectTypes: false, verify: false };
-		const { files } = await runCodemod(selection, { ...options, write: false });
-		const view = files.find(({ file }) => file === 'View.tsx');
-		const notes = view?.notes.filter(({ rule }) => rule === 'context-path-alias');
-		expect(notes).toEqual(
-			['Provider', 'Consumer', 'Provider', 'Provider', 'Provider'].map((member) =>
-				expect.objectContaining({
-					severity: 'error',
-					message: expect.stringContaining(`${member} member`),
-				}),
-			),
-		);
-		expect(view?.code).toContain('<Shade.Consumer>');
-		for (const name of [
-			'Shade',
-			'BadgeContext',
-			'MadeContext',
-			'DefaultContext',
-			'Plain',
-			'Outside',
-			'Shadowed',
-		])
-			expect(view?.code).toContain(`<${name}.Provider`);
-		expect(files.find(({ file }) => file === 'shade.ts')?.code).toContain("from 'octane'");
-		const result = await runCodemod(selection, options);
-		expect(result.files).toEqual([
-			expect.objectContaining({ file: 'View.tsx', changed: false, notes: [notes[0]] }),
-		]);
-		expect(selection.map((file) => fs.readFileSync(file, 'utf8'))).toEqual(before);
-		expect(fs.existsSync(path.join(root, 'View.tsrx'))).toBe(false);
-	});
+			});
+			const selection = [
+				'shade.ts',
+				'ordinary.ts',
+				'factory.ts',
+				'default.ts',
+				'shadowed.ts',
+				'View.tsx',
+			].map((file) => path.join(root, file));
+			const before = selection.map((file) => fs.readFileSync(file, 'utf8'));
+			const options = { root, projectTypes: false, verify: false };
+			const { files } = await runCodemod(selection, { ...options, write: false });
+			const view = files.find(({ file }) => file === 'View.tsx');
+			const notes = view?.notes.filter(({ rule }) => rule === 'context-path-alias');
+			expect(notes).toEqual(
+				['Provider', 'Consumer', 'Provider', 'Provider', 'Provider'].map((member) =>
+					expect.objectContaining({
+						severity: 'error',
+						message: expect.stringContaining(`${member} member`),
+					}),
+				),
+			);
+			expect(view?.code).toContain('<Shade.Consumer>');
+			for (const name of [
+				'Shade',
+				'BadgeContext',
+				'MadeContext',
+				'DefaultContext',
+				'Plain',
+				'Outside',
+				'Shadowed',
+			])
+				expect(view?.code).toContain(`<${name}.Provider`);
+			expect(files.find(({ file }) => file === 'shade.ts')?.code).toContain("from 'octane'");
+			const result = await runCodemod(selection, options);
+			expect(result.files).toEqual([
+				expect.objectContaining({ file: 'View.tsx', changed: false, notes: [notes[0]] }),
+			]);
+			expect(selection.map((file) => fs.readFileSync(file, 'utf8'))).toEqual(before);
+			expect(fs.existsSync(path.join(root, 'View.tsrx'))).toBe(false);
+		},
+	);
 
 	it('rewrites `.Provider` only on values that are contexts', async () => {
 		const root = project({

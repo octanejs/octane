@@ -198,6 +198,14 @@ export async function runCodemod(
 	}
 	const contextsOf = contextIndex(exports, known);
 	const contextPaths = Object.keys(config?.paths ?? {}).map((pattern) => pattern.split('*'));
+	const moduleKind = config?.module;
+	const esmContextProject =
+		(moduleKind === ts.ModuleKind.ES2015 ||
+			moduleKind === ts.ModuleKind.ES2020 ||
+			moduleKind === ts.ModuleKind.ES2022 ||
+			moduleKind === ts.ModuleKind.ESNext) &&
+		!config?.moduleSuffixes &&
+		!config?.rootDirs;
 	const renamed = renamedImports(root, config, renames);
 	const foldNames = process.platform === 'darwin';
 	const leafKey = (file: string) => {
@@ -976,9 +984,7 @@ export async function runCodemod(
 			if (!specifier.startsWith('.')) {
 				if (
 					!contextPaths.length ||
-					config?.module !== ts.ModuleKind.ESNext ||
-					config.moduleSuffixes ||
-					config.rootDirs ||
+					!esmContextProject ||
 					ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject ||
 					!contextPaths.some(([start, end]) =>
 						end === undefined
@@ -1000,9 +1006,7 @@ export async function runCodemod(
 			if (target) return contextsOf(target.file).has(name);
 			if (
 				!name.endsWith('Context') ||
-				config?.module !== ts.ModuleKind.ESNext ||
-				config.moduleSuffixes ||
-				config.rootDirs ||
+				!esmContextProject ||
 				ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject
 			)
 				return null;
