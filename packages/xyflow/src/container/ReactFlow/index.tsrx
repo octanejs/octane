@@ -354,4 +354,9 @@ function ReactFlow<NodeType extends Node = Node, EdgeType extends Edge = Edge>(
  *}
  *```
  */
-export default fixedForwardRef<HTMLDivElement, ReactFlowProps>(ReactFlow);
+export default fixedForwardRef<HTMLDivElement, ReactFlowProps>(ReactFlow) as {
+	<NodeType extends Node = Node, EdgeType extends Edge = Edge>(
+		props: ReactFlowProps<NodeType, EdgeType> & { ref?: ForwardedRef<HTMLDivElement> },
+	): ReturnType<typeof ReactFlow>;
+	displayName?: string;
+};
