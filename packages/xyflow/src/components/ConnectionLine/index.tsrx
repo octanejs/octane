@@ -16,9 +16,9 @@ import { useConnection } from '../../hooks/useConnection';
 
 type ConnectionLineWrapperProps<NodeType extends Node = Node> = {
 	type: ConnectionLineType;
-	component?: ConnectionLineComponent<NodeType>;
-	containerStyle?: CSSProperties;
-	style?: CSSProperties;
+	component?: ConnectionLineComponent<NodeType> | undefined;
+	containerStyle?: CSSProperties | undefined;
+	style?: CSSProperties | undefined;
 };
 
 const selector = (s: ReactFlowState) => ({
@@ -58,8 +58,8 @@ export function ConnectionLineWrapper<NodeType extends Node = Node>({
 
 type ConnectionLineProps<NodeType extends Node = Node> = {
 	type: ConnectionLineType;
-	style?: CSSProperties;
-	CustomComponent?: ConnectionLineComponent<NodeType>;
+	style?: CSSProperties | undefined;
+	CustomComponent?: ConnectionLineComponent<NodeType> | undefined;
 	isValid: boolean | null;
 };
 
