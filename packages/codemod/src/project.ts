@@ -745,7 +745,10 @@ export async function runCodemod(
 			hooks = { direct: new Map(), privateContexts: new Set() };
 			const escaped = source.includes('\\u');
 			const react =
-				(/\b(?:useCallback|useContext|useState|useSyncExternalStore)\b/.test(source) || escaped) &&
+				(/\b(?:useCallback|useContext|useEffect|useEffectEvent|useState|useSyncExternalStore)\b/.test(
+					source,
+				) ||
+					escaped) &&
 				originalModule(file, 'react') &&
 				readInstalled(path.dirname(file), 'react')?.manifest.name === 'react';
 			const intl = (source.includes('useIntl') || escaped) && originalIntlHook(file);
@@ -1136,6 +1139,8 @@ export async function runCodemod(
 							const hook = localReactHook(file, module, name, false);
 							if (
 								typeof hook === 'string' &&
+								hook !== 'useEffect' &&
+								hook !== 'useEffectEvent' &&
 								installedReact(file, 'react-dom') &&
 								originalModule(file, 'react-dom/client')
 							)

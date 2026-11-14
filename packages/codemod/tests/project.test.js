@@ -1158,6 +1158,130 @@ export function Panel({ initial = false }: { initial?: boolean }) {
 		},
 	);
 
+	it.each([true, false])(
+		'reports direct retained React effect hooks in native setup (projectTypes=%s)',
+		async (projectTypes) => {
+			const view = (name) => `import { ${name} } from './use-connection';
+export function View({ onReady }: { onReady: () => void }) {
+	const label = ${name}(onReady);
+	return <p>{label}</p>;
+}`;
+			const owner = `import { useEffect as effect, useEffectEvent, useState } from 'react';
+const connections = { getCurrent() { return { connect(callback) { callback(); } }; } };
+function fail(): never { throw new Error('setup aborted'); }
+
+export function useConnection(onReady: () => void) {
+	const connection = connections.getCurrent();
+	const onConnected = useEffectEvent(onReady);
+	effect(() => connection.connect(onConnected), [connection]);
+	return 'connected';
+}
+export function useFirst() {
+	effect(() => {}, []);
+	return 'first';
+}
+export function useThrowing() {
+	const unused = fail();
+	effect(() => {}, []);
+	return 'throwing';
+}
+export function useStateFirst() {
+	const [label] = useState('state');
+	effect(() => {}, []);
+	return label;
+}
+export function useDeferred(onReady: () => void) {
+	const unused = () => useEffectEvent(onReady);
+	return 'deferred';
+}
+export function useShadowed() {
+	const effect = () => 'shadowed';
+	const label = effect();
+	return label;
+}
+export function useBranch(onReady: () => void) {
+	if (!onReady) return 'skipped';
+	effect(onReady, []);
+	return 'branch';
+}
+export function useErased(onReady: () => void) {
+	declare const onConnected = useEffectEvent(onReady);
+	return 'erased';
+}
+export function useDefaultTDZ(onReady = next, next = false) {
+	effect(() => {}, []);
+	return 'default';
+}
+export function useReassigned(onReady: () => void) {
+	let callback = useEffectEvent;
+	callback = () => onReady;
+	const next = callback(onReady);
+	return 'reassigned';
+}
+export function useLaterInitializer(onReady: () => void) {
+	const next = useEffectEvent(callback);
+	const callback = onReady;
+	return 'later initializer';
+}`;
+			const root = project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				'use-connection.ts': owner,
+				'Connection.tsx': view('useConnection'),
+				'First.tsx': view('useFirst'),
+				'Throwing.tsx': view('useThrowing'),
+				'StateFirst.tsx': view('useStateFirst'),
+				'Deferred.tsx': view('useDeferred'),
+				'Shadowed.tsx': view('useShadowed'),
+				'Branch.tsx': view('useBranch'),
+				'Erased.tsx': view('useErased'),
+				'DefaultTDZ.tsx': view('useDefaultTDZ'),
+				'Reassigned.tsx': view('useReassigned'),
+				'LaterInitializer.tsx': view('useLaterInitializer'),
+				'ReactOwned.tsx':
+					"import { ReactCompat } from 'octane/react';\n" +
+					view('useConnection') +
+					'\nexport function App() { return <ReactCompat><View onReady={() => {}} /></ReactCompat>; }',
+			});
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules'),
+				path.join(root, 'node_modules'),
+			);
+			const { files } = await runCodemod(
+				fs
+					.readdirSync(root)
+					.filter((file) => file.endsWith('.tsx'))
+					.map((file) => path.join(root, file)),
+				{ root, strong: true, projectTypes, verify: true, write: false },
+			);
+			const findings = files.flatMap((file) =>
+				file.notes
+					.filter(
+						(note) =>
+							note.rule === 'bindings' &&
+							note.severity === 'error' &&
+							note.message.includes("React's use"),
+					)
+					.map((note) => [file.file, /React's (use\w+)/.exec(note.message)?.[1]]),
+			);
+			expect(findings).toEqual([
+				['Connection.tsx', 'useEffectEvent'],
+				['First.tsx', 'useEffect'],
+				['LaterInitializer.tsx', 'useEffectEvent'],
+				['StateFirst.tsx', 'useState'],
+				['Throwing.tsx', 'useEffect'],
+			]);
+			expect(files.find((file) => file.file === 'Throwing.tsx').notes[0].message).toContain(
+				"If setup reaches React's useEffect",
+			);
+			expect(files.find((file) => file.file === 'Connection.tsx').code).toContain(
+				'./use-connection',
+			);
+			expect(fs.readFileSync(path.join(root, 'use-connection.ts'), 'utf8')).toBe(owner);
+		},
+	);
+
 	it('reports an unchanged React context hook after ordinary component setup', async () => {
 		const view = (setup, read = 'useObserver(fit)') => `import { useRef } from 'react';
 import { useObserver } from './use-observer';

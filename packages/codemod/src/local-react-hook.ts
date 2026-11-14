@@ -350,7 +350,37 @@ function privateContextCall(
 	);
 }
 
-/** Only a call in the first evaluated statement witnesses renderer work in this export. */
+/** A direct effect hook after straight-line const setup, if that setup completes. */
+function setupEffect(body: ts.Block, checker: ts.TypeChecker) {
+	for (const statement of body.statements) {
+		const declaration =
+			ts.isVariableStatement(statement) &&
+			(statement.declarationList.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
+			!declaredVariable(statement) &&
+			statement.declarationList.declarations.length === 1
+				? statement.declarationList.declarations[0]
+				: undefined;
+		const simple = declaration && ts.isIdentifier(declaration.name);
+		const expression = simple
+			? declaration.initializer
+			: ts.isExpressionStatement(statement)
+				? statement.expression
+				: undefined;
+		if (!expression) return;
+		const call = skipWrappers(expression);
+		if (
+			ts.isCallExpression(call) &&
+			!ts.isOptionalChain(call) &&
+			ts.isIdentifier(call.expression)
+		) {
+			const name = rendererImport(call.expression, checker);
+			if (name === 'useEffect' || name === 'useEffectEvent') return name;
+		}
+		if (!simple) return;
+	}
+}
+
+/** Find renderer calls at the start of an unchanged export's setup. */
 export function directRendererCalls(
 	sf: ts.SourceFile,
 	checker: ts.TypeChecker,
@@ -378,15 +408,14 @@ export function directRendererCalls(
 		)
 			continue;
 		const first = firstRendererCall(fn);
-		if (!first) continue;
 		if (
 			module === 'react-intl' &&
-			(first.ambient || ts.isOptionalChain(first.call) || first.call.arguments.length)
+			(!first || first.ambient || ts.isOptionalChain(first.call) || first.call.arguments.length)
 		)
 			continue;
-		const name = rendererImport(first.callee, checker, module);
+		const name = first && rendererImport(first.callee, checker, module);
 		const direct = name && accepts(name) ? name : undefined;
-		if (!direct && !privateContextExports) continue;
+		if (!direct && !(first && privateContextExports) && module !== 'react') continue;
 		// A local write can replace the exported function before the importer calls it.
 		if (
 			renderUses(uses(fn.name)).some(
@@ -397,11 +426,16 @@ export function directRendererCalls(
 		if (direct) calls.set(fn.name.text, direct);
 		else if (
 			privateContextExports &&
+			first &&
 			!first.ambient &&
 			!fn.parameters.length &&
 			privateContextCall(sf, checker, uses, first.call, first.callee)
 		)
 			privateContextExports.add(fn.name.text);
+		else if (module === 'react') {
+			const effect = setupEffect(fn.body, checker);
+			if (effect) calls.set(fn.name.text, effect);
+		}
 	}
 	return calls;
 }
