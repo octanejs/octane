@@ -833,10 +833,28 @@ export function Panel({ initial = false }: { initial?: boolean }) {
 				'Local.tsx': panel('', '<Label label={label} />'),
 				'Imported.tsx': panel('', '<ImportedLabel label={label} />'),
 				'Fragment.tsx': panel('', '<><b>{label}</b></>'),
+				'Memo.tsx':
+					"import { memo } from 'react';\n" +
+					panel('', '<Label label={label} />').replace(
+						'function Panel(',
+						'const Panel = memo(function Inner(',
+					) +
+					');',
+				'Forward.tsx':
+					"import { forwardRef } from 'react';\n" +
+					panel('const [open] = state(false);', '<b aria-expanded={open}>{label}</b>').replace(
+						'function Panel(',
+						'const Panel = forwardRef(function Inner(',
+					) +
+					');',
 				'State.tsx': panel('const [open] = state(false);', '<b aria-expanded={open}>{label}</b>'),
 				'StateAndChild.tsx': panel(
 					'const [open] = state(initial);',
 					'<Label label={open ? "open" : label} />',
+				),
+				'SameDeclaration.tsx': panel('', '<Label label={open ? "open" : label} />').replace(
+					'const label = useLabel();',
+					'const [open] = state(false), label = useLabel();',
 				),
 				'StateBindingDefault.tsx': panel(
 					'const [open = fail()] = state();',
@@ -880,7 +898,16 @@ export function Panel({ initial = false }: { initial?: boolean }) {
 						),
 					)
 					.map((file) => file.file),
-			).toEqual(['Fragment.tsx', 'Imported.tsx', 'Local.tsx', 'State.tsx', 'StateAndChild.tsx']);
+			).toEqual([
+				'Forward.tsx',
+				'Fragment.tsx',
+				'Imported.tsx',
+				'Local.tsx',
+				'Memo.tsx',
+				'SameDeclaration.tsx',
+				'State.tsx',
+				'StateAndChild.tsx',
+			]);
 			expect(fs.existsSync(path.join(root, 'Local.tsx'))).toBe(true);
 			expect(fs.existsSync(path.join(root, 'Local.tsrx'))).toBe(false);
 		},

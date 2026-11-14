@@ -88,7 +88,7 @@ export function nativeSetupHook(
 	checker: ts.TypeChecker,
 	diagnostic?: {
 		calleeName(callee: ts.Expression): string | null;
-		nativeOutput(element: ts.Node): boolean;
+		nativeOutput(element: ts.JsxElement | ts.JsxSelfClosingElement): boolean;
 		originalReact(): boolean;
 		contextSetup?: boolean;
 		privateContext?: boolean;
@@ -144,20 +144,23 @@ export function nativeSetupHook(
 		)
 			return false;
 	} else {
+		const setupDeclaration = (declaration: ts.VariableDeclaration) => {
+			if (literalDeclaration(declaration)) return true;
+			if (!stateSetup(declaration, checker, block.parent) || !diagnostic.originalReact())
+				return false;
+			afterState = true;
+			return true;
+		};
 		const declarations = decl.parent.declarations;
 		if (
-			!block.statements.slice(0, position).every(
-				(prior) =>
-					ts.isVariableStatement(prior) &&
-					prior.declarationList.declarations.every((declaration) => {
-						if (literalDeclaration(declaration)) return true;
-						if (!stateSetup(declaration, checker, block.parent) || !diagnostic.originalReact())
-							return false;
-						afterState = true;
-						return true;
-					}),
-			) ||
-			!declarations.slice(0, declarations.indexOf(decl)).every(literalDeclaration)
+			!block.statements
+				.slice(0, position)
+				.every(
+					(prior) =>
+						ts.isVariableStatement(prior) &&
+						prior.declarationList.declarations.every(setupDeclaration),
+				) ||
+			!declarations.slice(0, declarations.indexOf(decl)).every(setupDeclaration)
 		)
 			return false;
 	}
@@ -240,8 +243,7 @@ export function nativeSetupHook(
 					fixedBinding(checker, arg, call) &&
 					initializedBefore(checker, arg, call))
 			);
-		}) &&
-		diagnostic.nativeOutput(value)
+		})
 	)
 		return 'diagnostic';
 	return false;
