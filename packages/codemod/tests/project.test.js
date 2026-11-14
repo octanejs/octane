@@ -1438,6 +1438,15 @@ export function View() {
 				.replaceAll('createElement', 'make')
 				.replace('{ make }', '{ createElement as make }'),
 			'Mixed.tsx': source + "\nexport const native = () => createElement('i', null, 'elsewhere');",
+			'RuntimeFactory.tsx': source.replace(
+				'export function View()',
+				"import { jsx } from 'react/jsx-runtime';\n" +
+					"import * as React from 'react';\n" +
+					"const OctaneCreateElement = 'ready';\n" +
+					"export const native = () => jsx('i', { children: OctaneCreateElement });\n" +
+					"export const nativeNamespace = () => React.createElement('em', null, OctaneCreateElement);\n" +
+					'export function View()',
+			),
 			'Spread.tsx': source.replace('props={{', 'props={{ ...extra,'),
 			'Typed.tsx': source
 				.replace('{ createElement }', '{ createElement, type ReactNode }')
@@ -1461,7 +1470,9 @@ export function Legacy({ getIcon }: { getIcon(): ReactNode }) { return <nav>{get
 		);
 		fs.symlinkSync(path.join(REPO, 'node_modules/@tsrx'), path.join(modules, '@tsrx'), 'dir');
 		const result = await runCodemod(
-			['View', 'Alias', 'Mixed', 'Spread', 'Typed'].map((name) => path.join(root, name + '.tsx')),
+			['View', 'Alias', 'Mixed', 'RuntimeFactory', 'Spread', 'Typed'].map((name) =>
+				path.join(root, name + '.tsx'),
+			),
 			{ root, write: false, strong: true, verify: true },
 		);
 		for (const name of ['View', 'Alias']) {
@@ -1473,24 +1484,36 @@ export function Legacy({ getIcon }: { getIcon(): ReactNode }) { return <nav>{get
 			const file = result.files.find((item) => item.file === name + '.tsx');
 			expect(file.code).toMatch(/import \{ createElement(?:, type ReactNode)? \} from 'octane'/);
 		}
+		const runtimeFactory = result.files.find((item) => item.file === 'RuntimeFactory.tsx');
+		expect(runtimeFactory.code).toContain("import { createElement } from 'react'");
+		expect(runtimeFactory.code).toContain(
+			"import { createElement as OctaneCreateElement_ } from 'octane'",
+		);
+		expect(runtimeFactory.code).toContain('return OctaneCreateElement_(');
 		const view = result.files.find((item) => item.file === 'View.tsx');
 		fs.writeFileSync(path.join(root, view.output), view.code);
+		fs.writeFileSync(path.join(root, 'RuntimeFactory.tsrx'), runtimeFactory.code);
 		const checked = spawnSync(
 			process.execPath,
 			[path.join(REPO, 'scripts/octane-tsc/bin.mjs'), '-p', 'tsconfig.json'],
 			{ cwd: root, encoding: 'utf8' },
 		);
 		expect(checked.status, checked.stdout + checked.stderr).toBe(0);
-		const { render } = await bundleRuntime(
+		const { render, renderNative } = await bundleRuntime(
 			root,
 			'server',
 			`
 import { View } from './View.tsrx';
-import { renderToReadableStream } from 'octane/server';
-export const render = async () => new Response(await renderToReadableStream(View)).text();
+import { View as RuntimeView, native, nativeNamespace } from './RuntimeFactory.tsrx';
+import { renderToReadableStream, renderToStaticMarkup } from 'octane/server';
+export const render = async (runtime = false) =>
+	new Response(await renderToReadableStream(runtime ? RuntimeView : View)).text();
+export const renderNative = () => [native(), nativeNamespace()].map((node) => renderToStaticMarkup(node).html);
 `,
 		);
 		expect(await render()).toContain('<nav><b>ready</b></nav>');
+		expect(await render(true)).toContain('<nav><b>ready</b></nav>');
+		expect(renderNative()).toEqual(['<i>ready</i>', '<em>ready</em>']);
 	});
 
 	it('reports a native setup call into a React hook left in an unselected local module', () => {

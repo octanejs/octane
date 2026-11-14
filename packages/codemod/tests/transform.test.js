@@ -49,6 +49,14 @@ function migrate(name) {
 }
 
 describe('transformModule', () => {
+	it('binds React imports in an absolute Windows source path', () => {
+		const source = `import { createElement as make } from 'react';
+export const label = make('b', null, 'ready');`;
+		const { code } = transformModule(source, 'C:\\project\\label.tsx');
+		expect(code).toContain("import { createElement as make } from 'octane';");
+		expect(code).toContain("export const label = make('b', null, 'ready');");
+	});
+
 	it('distinguishes a custom Array type from the default library', () => {
 		const source = `/// <reference no-default-lib="true"/>
 declare namespace Vendor {

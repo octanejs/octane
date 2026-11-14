@@ -187,6 +187,8 @@ export function projectTypeAt(node: ts.Node, types: TransformOptions['types']) {
  * members.
  */
 export function bind(filename: string, source: string) {
+	// The program asks its host for slash-delimited paths even on Windows.
+	filename = filename.replaceAll('\\', '/');
 	const lib = esLib();
 	const sf = ts.createSourceFile(
 		filename,
@@ -2976,9 +2978,20 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		}
 		// A React import of the same name becomes this import.
 		const prior = this.apiLocals.get(name);
+		const originalFactory =
+			module === 'octane' &&
+			name === 'createElement' &&
+			prior?.module === 'react' &&
+			[...this.imports].some(
+				([declaration, entry]) =>
+					entry === prior &&
+					ts.isImportSpecifier(declaration) &&
+					this.retainedReactFactoryImport(declaration),
+			);
 		const collides =
 			(this.declared.has(name) || this.readsGlobal(name)) &&
-			!(prior && mapReactImport(prior.module, prior.imported, prior.typeOnly)?.name === name);
+			(originalFactory ||
+				!(prior && mapReactImport(prior.module, prior.imported, prior.typeOnly)?.name === name));
 		let local = collides ? `Octane${name[0].toUpperCase()}${name.slice(1)}` : name;
 		while (collides && (this.declared.has(local) || this.readsGlobal(local))) local += '_';
 		names.set(name, { local, typeOnly });
@@ -3992,6 +4005,24 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		);
 	}
 
+	private retainedReactFactoryImport(element: ts.ImportSpecifier) {
+		const binding = this.imports.get(element);
+		if (
+			binding?.module !== 'react' ||
+			binding.imported !== 'createElement' ||
+			binding.typeOnly ||
+			element.parent.parent.parent.attributes ||
+			this.target !== 'tsrx' ||
+			!this.hasReactBridge ||
+			!this.options.retainedReactBridgeComponent ||
+			!this.options.originalReact ||
+			hasEval(this.sf)
+		)
+			return false;
+		const refs = this.localUses(element.name).filter((ref) => !inTypeNode(ref));
+		return refs.length > 0 && refs.every((ref) => this.retainedReactFactory(ref));
+	}
+
 	/**
 	 * Fill each React import placeholder. The first one carries every Octane
 	 * import the module needs, the module's own specifiers first; the others
@@ -4013,6 +4044,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const kept = new Map<string, string[]>();
 		/** Locals of React's `jsx` factories, which a JSX runtime consumer calls. */
 		const factories: string[] = [];
+		let retainsCreateElement = false;
 		for (const node of this.importSlots) {
 			const module = (node.moduleSpecifier as ts.StringLiteral).text;
 			const clause = node.importClause;
@@ -4029,22 +4061,10 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				if (!this.used.has(local)) continue;
 				const imported = (element.propertyName ?? element.name).text;
 				const typeOnly = clause.isTypeOnly || element.isTypeOnly;
-				if (
-					module === 'react' &&
-					imported === 'createElement' &&
-					!typeOnly &&
-					!node.attributes &&
-					this.target === 'tsrx' &&
-					this.hasReactBridge &&
-					this.options.retainedReactBridgeComponent &&
-					this.options.originalReact &&
-					!hasEval(this.sf)
-				) {
-					const refs = this.localUses(element.name).filter((ref) => !inTypeNode(ref));
-					if (refs.length && refs.every((ref) => this.retainedReactFactory(ref))) {
-						add(module, imported, local, false);
-						continue;
-					}
+				if (imported === 'createElement' && this.retainedReactFactoryImport(element)) {
+					add(module, imported, local, false);
+					retainsCreateElement ||= local === 'createElement';
+					continue;
 				}
 				const mapped = mapReactImport(module, imported, typeOnly);
 				if (mapped) {
@@ -4069,6 +4089,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				kept.set(module, [...(kept.get(module) ?? []), spec]);
 			}
 		}
+		const jsxFactory =
+			retainsCreateElement && factories.length > 0
+				? this.require('octane', 'createElement', false)
+				: 'createElement';
+		if (jsxFactory !== 'createElement')
+			imports.get('octane')?.delete('createElement createElement');
 		for (const [module, names] of this.added) {
 			for (const [name, { local, typeOnly }] of names) add(module, name, local, typeOnly);
 		}
@@ -4095,12 +4121,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			// React's runtime takes the key apart from the props; Octane's
 			// `createElement` reads it from them.
 			const params = this.isTypeScript()
-				? 'type: Parameters<typeof createElement>[0], props: Record<string, unknown>, key?: string | number'
+				? `type: Parameters<typeof ${jsxFactory}>[0], props: Record<string, unknown>, key?: string | number`
 				: 'type, props, key';
 			const [first, ...rest] = factories;
 			lines.push(
 				`function ${first}(${params}) {`,
-				`${this.indentUnit}return createElement(type, key === undefined ? props : { ...props, key });`,
+				`${this.indentUnit}return ${jsxFactory}(type, key === undefined ? props : { ...props, key });`,
 				'}',
 				...rest.map((local) => `const ${local} = ${first};`),
 			);
