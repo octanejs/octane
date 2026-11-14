@@ -121,6 +121,11 @@
       "reason": "Checks scoped animation cleanup."
     },
     {
+      "path": "packages/motion/tests/conformance/useInView.test.ts",
+      "disposition": "octane-only-framework-contract",
+      "reason": "Checks observer options, independent refs, one-time entry, and cleanup in the Octane hook."
+    },
+    {
       "path": "packages/motion/tests/conformance/useMotionValueEvent.test.ts",
       "disposition": "octane-only-framework-contract",
       "reason": "Checks subscription timing and cleanup."
