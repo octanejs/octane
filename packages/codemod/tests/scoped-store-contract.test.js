@@ -687,13 +687,21 @@ export function useMaybe(value: number) {
 }`,
 		'app/src/helper.ts': `import { useSnapshot as reading, useMaybe as maybe, valueOf } from 'observer';
 export function useReading() { return reading(valueOf(1)); }
+export function useAsserted() { return ((reading(valueOf(1))! as number) satisfies number); }
+export function useProperty() { return (reading(valueOf(1)) as unknown[]).length; }
+export function useOptionalCall() { return (reading?.(1) as number); }
 export function useOptional() { return maybe(1); }`,
+		'app/src/asserted.tsx': view('useAsserted'),
 		'app/src/pane.tsx': view('useReading'),
+		'app/src/property.tsx': view('useProperty'),
+		'app/src/optional-call.tsx': view('useOptionalCall'),
 		'app/src/optional.tsx': view('useOptional'),
 	});
 	const run = (projectTypes) =>
 		runCodemod(
-			['pane', 'optional'].map((name) => path.join(app, 'src', name + '.tsx')),
+			['asserted', 'pane', 'property', 'optional-call', 'optional'].map((name) =>
+				path.join(app, 'src', name + '.tsx'),
+			),
 			{
 				root: app,
 				strong: true,
@@ -710,7 +718,10 @@ export function useOptional() { return maybe(1); }`,
 		);
 	for (const projectTypes of [true, false]) {
 		const result = await run(projectTypes);
-		expect(warnings(result)).toEqual([['src/pane.tsx', 'warning']]);
+		expect(warnings(result)).toEqual([
+			['src/asserted.tsx', 'warning'],
+			['src/pane.tsx', 'warning'],
+		]);
 		expect(result.files.find((file) => file.file === 'src/pane.tsx')).toMatchObject({
 			strong: true,
 			code: expect.stringContaining("from './helper'"),

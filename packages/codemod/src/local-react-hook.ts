@@ -429,20 +429,11 @@ export function directRendererCalls(
 			)
 		)
 			return;
-		const first = firstRendererCall(fn.body);
 		const arrow = ts.isArrowFunction(fn);
 		const forward = typeof module === 'function';
 		// A retained wrapper forwards directly and has a stable exported binding.
-		if (
-			forward &&
-			(arrow ||
-				!ts.isBlock(fn.body) ||
-				fn.body.statements.length !== 1 ||
-				!ts.isReturnStatement(fn.body.statements[0]!) ||
-				!first ||
-				ts.isOptionalChain(first.call))
-		)
-			return;
+		const first = firstRendererCall(forward ? (arrow ? undefined : returned(fn)) : fn.body);
+		if (forward && (!first || ts.isOptionalChain(first.call))) return;
 		if (
 			(arrow && (!first || first.ambient || ts.isOptionalChain(first.call))) ||
 			(module === 'react-intl' &&
