@@ -808,7 +808,8 @@ Keep the handlers in a server-only module, so middleware can use them too:
 ```ts
 // src/data.server.ts
 import { createDataHandler } from 'octane/data/server';
-import { books, addBook } from './contracts.ts';
+// Exports the `books` read and the `addBook` write.
+import * as Books from './books.data.ts';
 
 export const handler = createDataHandler(
 	{
@@ -817,12 +818,18 @@ export const handler = createDataHandler(
 		secret: process.env.FORM_SECRET,
 		grant: ({ viewer }) => String(viewer),
 	},
-	(handle) => [
-		handle(books, (input, { viewer }) => listBooks(viewer, input)),
-		handle(addBook, (input, { viewer, operationId }) => saveBook(viewer, input, operationId)),
-	],
+	// One function per contract the module exports; a missing or extra key is a type error.
+	(_, defineHandler) =>
+		defineHandler(Books, {
+			books: (input, { viewer }) => listBooks(viewer, input),
+			addBook: (input, { viewer, operationId }) => saveBook(viewer, input, operationId),
+		}),
 );
 ```
+
+Contracts live in `*.data.ts` modules, so the build can check that every
+contract the pages use has a handler; see the
+[Data guide](https://octanejs.dev/docs/data).
 
 Export one function that answers the store's requests, and open the store
 with a `serverTransport` over it. Make that opener the module's default export
