@@ -1,6 +1,6 @@
 'use strong';
 
-import { createContext, useContext, useMemo, type OctaneNode } from 'octane';
+import { createContext, memo, useContext, useMemo, type OctaneNode } from 'octane';
 import { ReactCompat } from 'octane/react';
 import type { ChildrenBlock } from 'octane/tsrx-boundary';
 import {
@@ -93,7 +93,7 @@ function ReactContent({ content }: { content: ReactNode }) {
 	return content;
 }
 
-export function FormattedMessage({
+function NativeFormattedMessage({
 	id,
 	defaultMessage,
 	description,
@@ -114,3 +114,23 @@ export function FormattedMessage({
 		<ReactCompat component={ReactContent} props={{ content }} contexts={intlContexts} />
 	</Locale>
 }
+
+function equalOwnValues<T extends object>(before: T | undefined, after: T | undefined): boolean {
+	if (before === after) return true;
+	if (!before || !after) return false;
+	const keys = Object.keys(before) as (keyof T)[];
+	if (keys.length !== Object.keys(after).length) return false;
+	for (const key of keys) {
+		if (before[key] !== after[key] || !Object.hasOwn(after, key)) return false;
+	}
+	return true;
+}
+
+function equalMessages(previous: Readonly<MessageProps>, next: Readonly<MessageProps>): boolean {
+	const { values, ...message } = previous;
+	const { values: nextValues, ...nextMessage } = next;
+	// React Intl compares its values separately with strict equality (including ±0 and NaN).
+	return equalOwnValues(nextValues, values) && equalOwnValues(message, nextMessage);
+}
+
+export const FormattedMessage = memo(NativeFormattedMessage, equalMessages);
