@@ -4,7 +4,7 @@ import { hasRuntimeDependency } from './scoped-store-contract.js';
 import { skipWrappers } from './expression-wrappers.js';
 import { hasEval, rendersElementChildren } from './forwarded-props.js';
 import { componentTagOrExport, localUses } from './local-uses.js';
-import { bind, nativeReactCompat, withoutJsxIndentation } from './transform.js';
+import { bind, nativeReactCompat, skipParens, withoutJsxIndentation } from './transform.js';
 
 export function importsReactBridge(source: string) {
 	return (
@@ -414,15 +414,15 @@ export function reactServerComponents(
 					});
 			}
 		}
-		ts.forEachChild(node, visit);
+		if (!topLevel) ts.forEachChild(node, visit);
 	}
 	if (topLevel) {
 		for (const statement of sf.statements) {
 			if (!ts.isVariableStatement(statement)) continue;
 			for (const declaration of statement.declarationList.declarations) {
-				const call = declaration.initializer;
+				const call = declaration.initializer && skipParens(declaration.initializer);
 				if (!call || !ts.isCallExpression(call)) continue;
-				const [argument] = call.arguments;
+				const argument = call.arguments[0] && skipParens(call.arguments[0]);
 				if (argument && ts.isJsxSelfClosingElement(argument) && ts.isIdentifier(argument.tagName))
 					visit(call);
 			}
