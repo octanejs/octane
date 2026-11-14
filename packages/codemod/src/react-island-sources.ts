@@ -147,6 +147,20 @@ function* directExportReturns({ sf, checker }: ReturnType<typeof bind>, allowSet
 	for (const symbol of checker.getExportsOfModule(module)) {
 		let decl = symbol.valueDeclaration ?? symbol.declarations?.[0];
 		if (!decl) continue;
+		let splitExport = false;
+		if (ts.isExportSpecifier(decl)) {
+			if (
+				!allowSetup ||
+				decl.isTypeOnly ||
+				decl.parent.parent.isTypeOnly ||
+				decl.parent.parent.moduleSpecifier
+			)
+				continue;
+			const local = checker.getExportSpecifierLocalTargetSymbol(decl)?.valueDeclaration;
+			if (!local || !ts.isFunctionDeclaration(local)) continue;
+			splitExport = true;
+			decl = local;
+		}
 		let value: ts.Node = decl;
 		let defaultRef: ts.Identifier | undefined;
 		if (ts.isExportAssignment(decl)) {
@@ -173,7 +187,8 @@ function* directExportReturns({ sf, checker }: ReturnType<typeof bind>, allowSet
 			value = skipWrappers(value.initializer);
 		}
 		const output = returnedJsx(value, allowSetup);
-		if (output) yield { name: symbol.name, output, localName: name?.text, decl, symbol };
+		if (output)
+			yield { name: symbol.name, output, localName: name?.text, decl, symbol, splitExport };
 	}
 }
 
@@ -581,9 +596,10 @@ export function directReactExports(file: string, source: string) {
 		mayExportThen ||= sf.statements.some(
 			(stmt) => ts.isExportDeclaration(stmt) && !stmt.isTypeOnly && !stmt.exportClause,
 		);
-		for (const { name, output, localName, decl } of directExportReturns(bound, true)) {
+		for (const { name, output, localName, decl, splitExport } of directExportReturns(bound, true)) {
 			const tag = openingTag(output).tagName;
 			if (
+				!splitExport &&
 				ts.isIdentifier(tag) &&
 				/^[a-z]/.test(tag.text) &&
 				(!localName || /^[A-Z]/.test(localName))

@@ -844,11 +844,19 @@ ${shape === 'named and default export' ? 'export default Owner;' : ''}`,
 			'Badge.tsx': 'export function Badge() { return <b>Ready</b>; }',
 			'View.tsx': `import { Badge } from './Badge.tsx';
 export function View() { return <Badge />; }
+function Split() { return <Badge />; }
+export { Split };
+function TypeOnly() { return <Badge />; }
+export type { TypeOnly };
 export function Label() { return 'ready'; }
 export function Replaced() { return <Badge />; }
 Replaced = function () { return 'ready'; };`,
 			'Owner.tsx': `import { View } from './View.tsx';
 export function Owner() { return <View />; }`,
+			'SplitOwner.tsx': `import { Split } from './View.tsx';
+export function SplitOwner() { return <Split />; }`,
+			'TypeOnlyOwner.tsx': `import { TypeOnly } from './View.tsx';
+export function TypeOnlyOwner() { return <TypeOnly />; }`,
 			'ScalarOwner.tsx': `import { Label } from './View.tsx';
 export function ScalarOwner() { return <Label />; }`,
 			'ReplacedOwner.tsx': `import { Replaced } from './View.tsx';
@@ -871,7 +879,9 @@ export function ReplacedOwner() { return <Replaced />; }`,
 		);
 		expect(affected).toEqual([
 			['View.tsx', 'warning', 1],
+			['View.tsx', 'warning', 1],
 			['Owner.tsx', 'warning', 2],
+			['SplitOwner.tsx', 'warning', 2],
 		]);
 		expect(preview.files.find((file) => file.file === 'ScalarOwner.tsx')?.code).toContain(
 			"from './View.tsrx'",

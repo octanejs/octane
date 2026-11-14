@@ -1434,15 +1434,16 @@ export async function runCodemod(
 		if (!names) {
 			names = new Set();
 			const { program, errors } = parseSync(file.output, file.code);
-			if (program && !errors.length)
+			if (program && !errors.length) {
 				for (const statement of program.body) {
-					if (statement.type !== 'ExportNamedDeclaration') continue;
-					const fn = statement.declaration;
+					const fn =
+						statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
 					if (fn?.type !== 'FunctionDeclaration' || !fn.id) continue;
 					// The parser exposes TSRX code blocks through its ESTree body type.
 					const body: unknown = fn.body;
 					if (isRecord(body) && body.type === 'JSXCodeBlock') names.add(fn.id.name);
 				}
+			}
 			templateExports.set(file.output, names);
 		}
 		return names.has(name);
