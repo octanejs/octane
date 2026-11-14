@@ -13,7 +13,7 @@ export const arrowKeyDiffs: Record<string, XYPosition> = {
 	ArrowRight: { x: 1, y: 0 },
 };
 
-export const builtinNodeTypes: NodeTypes = {
+export const builtinNodeTypes: NodeTypes & { default: NodeTypes[string] } = {
 	input: InputNode,
 	default: DefaultNode,
 	output: OutputNode,
