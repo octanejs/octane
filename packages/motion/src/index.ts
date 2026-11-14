@@ -1148,6 +1148,7 @@ export { useTransform } from './useTransform';
 export { useSpring } from './useSpring';
 export { useMotionValueEvent } from './useMotionValueEvent';
 export { useReducedMotion } from './useReducedMotion';
+export { useInView, type UseInViewOptions } from './useInView';
 export {
 	LayoutGroupContext,
 	LazyMotionContext,
