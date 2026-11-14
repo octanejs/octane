@@ -4,7 +4,7 @@ import { localUses } from './local-uses.js';
 import { fixedBinding, initializedBefore } from './effect-receivers.js';
 import { skipWrappers } from './expression-wrappers.js';
 
-function rendererImport(name: ts.Identifier, checker: ts.TypeChecker, module = 'react') {
+export function namedRuntimeImport(name: ts.Identifier, checker: ts.TypeChecker) {
 	const binding = checker.getSymbolAtLocation(name)?.declarations?.[0];
 	if (!binding || !ts.isImportSpecifier(binding) || binding.isTypeOnly) return;
 	const clause = binding.parent.parent;
@@ -13,10 +13,14 @@ function rendererImport(name: ts.Identifier, checker: ts.TypeChecker, module = '
 		!clause.isTypeOnly &&
 		ts.isImportDeclaration(imp) &&
 		!imp.attributes &&
-		ts.isStringLiteral(imp.moduleSpecifier) &&
-		imp.moduleSpecifier.text === module
+		ts.isStringLiteral(imp.moduleSpecifier)
 	)
-		return (binding.propertyName ?? binding.name).text;
+		return { module: imp.moduleSpecifier.text, name: (binding.propertyName ?? binding.name).text };
+}
+
+function rendererImport(name: ts.Identifier, checker: ts.TypeChecker, module = 'react') {
+	const imported = namedRuntimeImport(name, checker);
+	if (imported?.module === module) return imported.name;
 }
 
 function privateContextReader(callee: ts.Expression, checker: ts.TypeChecker) {
@@ -407,8 +411,8 @@ function setupEffect(body: ts.Block, checker: ts.TypeChecker) {
 export function directRendererCalls(
 	sf: ts.SourceFile,
 	checker: ts.TypeChecker,
-	module: 'react' | 'react-dom' | 'react-intl',
-	accepts: (name: string) => boolean,
+	module: 'react' | 'react-dom' | 'react-intl' | ((specifier: string, name: string) => boolean),
+	accepts?: (name: string) => boolean,
 	privateContextExports?: Set<string>,
 ) {
 	const calls = new Map<string, string>();
@@ -427,23 +431,43 @@ export function directRendererCalls(
 			return;
 		const first = firstRendererCall(fn.body);
 		const arrow = ts.isArrowFunction(fn);
+		const forward = typeof module === 'function';
+		// A retained wrapper forwards directly and has a stable exported binding.
+		if (
+			forward &&
+			(arrow ||
+				!ts.isBlock(fn.body) ||
+				fn.body.statements.length !== 1 ||
+				!ts.isReturnStatement(fn.body.statements[0]!) ||
+				!first ||
+				ts.isOptionalChain(first.call))
+		)
+			return;
 		if (
 			(arrow && (!first || first.ambient || ts.isOptionalChain(first.call))) ||
 			(module === 'react-intl' &&
 				(!first || first.ambient || ts.isOptionalChain(first.call) || first.call.arguments.length))
 		)
 			return;
-		const name =
-			first && ts.isIdentifier(first.callee) && rendererImport(first.callee, checker, module);
-		const direct = name && accepts(name) ? name : undefined;
-		if (!direct && (arrow || (!(first && privateContextExports) && module !== 'react'))) return;
-		// The export must keep the same callable binding until the consumer calls it.
+		// Check escapes before asking the workspace planner to inspect a foreign package.
 		if (
 			renderUses(uses(binding)).some(
 				(ref) => !ts.isCallExpression(ref.parent) || ref.parent.expression !== ref,
 			)
 		)
 			return;
+		const imported =
+			first && ts.isIdentifier(first.callee)
+				? namedRuntimeImport(first.callee, checker)
+				: undefined;
+		const direct =
+			imported &&
+			(forward
+				? module(imported.module, imported.name)
+				: imported.module === module && accepts?.(imported.name))
+				? imported.name
+				: undefined;
+		if (!direct && (arrow || (!(first && privateContextExports) && module !== 'react'))) return;
 		if (direct) calls.set(binding.text, direct);
 		else if (
 			privateContextExports &&

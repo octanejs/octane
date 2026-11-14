@@ -3,12 +3,16 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
+import { skipWrappers } from './expression-wrappers.js';
+import { namedRuntimeImport } from './local-react-hook.js';
 
 export interface ScopedStoreHookPlan {
 	/** The authored native module and the actual export behind any re-export. */
 	entry: string;
 	name: string;
 	files: ReadonlyMap<string, string>;
+	/** Every normal return from the verified original export reaches a React hook. */
+	requiresReact(): boolean;
 	/** Checks a store factory against its original, renderer-independent declaration. */
 	isSharedExport(module: string, imported: string, from: string): boolean;
 }
@@ -640,6 +644,118 @@ function modulePlan(
 		return !!body && readsContext(body, seen, files);
 	}
 
+	function reachesReact(fn: ts.FunctionDeclaration) {
+		if (
+			!fn.body ||
+			fn.parameters.some((param) => !ts.isIdentifier(param.name) || param.initializer) ||
+			installed('react', fn.getSourceFile().fileName) !== installed('react', entry)
+		)
+			return false;
+		function dispatch(expression: ts.Expression) {
+			const call = skipWrappers(expression);
+			if (
+				!ts.isCallExpression(call) ||
+				ts.isOptionalChain(call) ||
+				!ts.isIdentifier(call.expression)
+			)
+				return false;
+			const binding = namedRuntimeImport(call.expression, checker);
+			return binding?.module === 'react' && hooks.has(binding.name);
+		}
+		// Every entered branch must call React before it can return. Only simple setup
+		// statements and if arms without an else can continue to the next statement.
+		function setup(body: ts.Block): boolean {
+			for (const statement of body.statements) {
+				if (ts.isReturnStatement(statement) || ts.isExpressionStatement(statement))
+					return !!statement.expression && dispatch(statement.expression);
+				if (
+					ts.isIfStatement(statement) &&
+					!statement.elseStatement &&
+					ts.isBlock(statement.thenStatement) &&
+					setup(statement.thenStatement)
+				)
+					continue;
+				if (
+					!ts.isVariableStatement(statement) ||
+					(statement.declarationList.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+					statement.declarationList.declarations.length !== 1
+				)
+					return false;
+				const { initializer } = statement.declarationList.declarations[0]!;
+				if (initializer && dispatch(initializer)) return true;
+			}
+			return false;
+		}
+		return setup(fn.body);
+	}
+
+	function originalExportPath(
+		sf: ts.SourceFile,
+		name: string,
+		fn: ts.FunctionDeclaration,
+		depth = 0,
+	): boolean {
+		if (depth === 5) return false;
+		const exported = exports(sf).find((item) => item.name === name);
+		if (!exported || !identity(exported).declarations?.includes(fn)) return false;
+		if (fn.getSourceFile() === sf && fn.name?.text === name)
+			return fn.modifiers?.some((mod) => mod.kind === ts.SyntaxKind.ExportKeyword) === true;
+		const edges = sf.statements
+			.filter(ts.isExportDeclaration)
+			.filter(
+				(edge) =>
+					!edge.isTypeOnly &&
+					edge.moduleSpecifier &&
+					!edge.attributes &&
+					(!edge.exportClause ||
+						(ts.isNamedExports(edge.exportClause) &&
+							edge.exportClause.elements.some(
+								(item) => !item.isTypeOnly && item.name.text === name,
+							))),
+			);
+		// A barrel with multiple candidate exports does not prove which implementation runs.
+		if (edges.length !== 1) return false;
+		const edge = edges[0]!;
+		const specifier = request(edge.moduleSpecifier!);
+		if (!specifier?.startsWith('./')) return false;
+		const stem = path.resolve(path.dirname(sf.fileName), specifier);
+		if (fs.existsSync(path.join(stem, 'package.json'))) return false;
+		const next = target(specifier, sf.fileName);
+		if (!next || !owned(next) || fs.realpathSync(next) !== next || !sourceFile.test(next))
+			return false;
+		const executable = installed(specifier, sf.fileName);
+		if (executable && executable !== next) return false;
+		const candidates = new Set([stem]);
+		for (const prefix of [stem, path.join(stem, 'index')])
+			for (const suffix of ['', ...(options.moduleSuffixes ?? [])])
+				for (const extension of [
+					'.ts',
+					'.tsx',
+					'.tsrx',
+					'.js',
+					'.jsx',
+					'.mjs',
+					'.mts',
+					'.cjs',
+					'.cts',
+					'.json',
+				])
+					candidates.add(prefix + suffix + extension);
+		if (
+			[...candidates].some(
+				(file) => file !== next && fs.statSync(file, { throwIfNoEntry: false })?.isFile(),
+			)
+		)
+			return false;
+		const child = program.getSourceFile(next);
+		if (!child) return false;
+		const binding =
+			edge.exportClause && ts.isNamedExports(edge.exportClause)
+				? edge.exportClause.elements.find((item) => !item.isTypeOnly && item.name.text === name)
+				: undefined;
+		return originalExportPath(child, binding?.propertyName?.text ?? name, fn, depth + 1);
+	}
+
 	const sharedExports = new Map<string, boolean>();
 	function isSharedExport(module: string, imported: string, from: string): boolean {
 		if (!module || module.startsWith('.') || path.isAbsolute(module)) return false;
@@ -708,7 +824,13 @@ function modulePlan(
 						'',
 					].join('\n');
 					files.set(entry, nativeDirective + code);
-					plan = { entry, name: fn.name.text, files, isSharedExport };
+					plan = {
+						entry,
+						name: fn.name.text,
+						files,
+						isSharedExport,
+						requiresReact: () => originalExportPath(root, requested, fn) && reachesReact(fn),
+					};
 				}
 			}
 			result.set(requested, plan);

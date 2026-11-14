@@ -42,7 +42,7 @@ export interface TransformOptions {
 		module: string,
 		name: string,
 		nativeOnly: boolean,
-	): string | { from: string } | { privateContext: true } | undefined;
+	): string | { from: string } | { privateContext: true } | { retainedStore: true } | undefined;
 	/** A dispatcher hook directly called by an unchanged component at a migrated React DOM root. */
 	localReactRootComponent?(module: string, name: string): string | undefined;
 	/** Resolve a source-backed workspace hook after verifying its implementation and its call sites. */

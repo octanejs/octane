@@ -3452,7 +3452,13 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 									advisorySite,
 									`If native setup reaches the unchanged ${module} export ${name} after its module initializes${resolution}, its private helper calls React's useContext. Provide a compiled Octane hook or keep the component under React.`,
 								);
-						}
+						} else if (site && local && typeof local !== 'string' && 'retainedStore' in local)
+							this.note(
+								RULE.bindings,
+								'warning',
+								site,
+								`If native setup reaches the unchanged ${module} export ${name} through the original workspace entry, its store hook calls React. Provide a compiled Octane hook or keep the component under React.`,
+							);
 					}
 					if (!dest) {
 						kept.push(item);

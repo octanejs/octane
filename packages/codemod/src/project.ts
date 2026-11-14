@@ -663,7 +663,11 @@ export async function runCodemod(
 
 	const localHooks = new Map<
 		string,
-		{ direct: Map<string, string>; privateContexts: Set<string> }
+		{
+			direct: Map<string, string>;
+			privateContexts: Set<string>;
+			retainedStores?: Map<string, string>;
+		}
 	>();
 	const intlHookPackages = new Map<string, boolean>();
 	function originalIntlHook(file: string) {
@@ -765,12 +769,21 @@ export async function runCodemod(
 				originalModule(file, 'react') &&
 				readInstalled(path.dirname(file), 'react')?.manifest.name === 'react';
 			const intl = (source.includes('useIntl') || escaped) && originalIntlHook(file);
-			if (react || intl) {
+			const store = planStoreHook && /\buse[A-Z]|\\u/.test(source);
+			if (react || intl || store) {
 				const existing = program?.getSourceFile(file);
 				const bound =
 					existing && program
 						? { sf: existing, checker: program.getTypeChecker() }
 						: bind(file, source);
+				if (planStoreHook && store)
+					hooks.retainedStores = directRendererCalls(
+						bound.sf,
+						bound.checker,
+						(specifier, exported) =>
+							!!unportedName(specifier, file) &&
+							planStoreHook(specifier, exported, file)?.requiresReact() === true,
+					);
 				if (react)
 					hooks.direct = directRendererCalls(
 						bound.sf,
@@ -796,13 +809,22 @@ export async function runCodemod(
 		}
 		// Keep TS substitution advisory. A loader may select a different executable.
 		const hook = jsSpecifier ? undefined : hooks.direct.get(name);
-		if ((!hook && !hooks.privateContexts.has(name)) || fs.statSync(file).nlink > 1) return;
+		const retainedStore =
+			!jsSpecifier && hooks.retainedStores?.has(name) && automaticReactJsx(from);
+		if (
+			(!hook && !retainedStore && !hooks.privateContexts.has(name)) ||
+			fs.statSync(file).nlink > 1
+		)
+			return;
 		// Writing an unrenamed selection through a symlink changes its physical target.
 		selectedInPlace ??= new Set(
 			[...known].filter((f) => !renames.has(f) && !conflicts.has(f)).map((f) => fs.realpathSync(f)),
 		);
 		if (selectedInPlace.has(fs.realpathSync(file))) return;
-		if (!hook) return { privateContext: true } as const;
+		if (!hook)
+			return retainedStore
+				? ({ retainedStore: true } as const)
+				: ({ privateContext: true } as const);
 		if (
 			nativeOnly &&
 			compiler &&

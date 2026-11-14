@@ -660,6 +660,59 @@ it('warns when an existing Octane server renderer imports a migrated store consu
 	expect(hosted()).toContain('title42');
 }, 30_000);
 
+it('warns about a retained wrapper whose linked export necessarily reaches React', async () => {
+	const view = (name) => `import { ${name} as read } from './helper';
+export function Pane() { const value = read(); return <p>{String(value)}</p>; }`;
+	const { app, library } = project({
+		'observer/entry.ts': "export * from './api'; export { valueOf } from './state';",
+		'observer/api/index.ts': "export { useChannel as useSnapshot, useMaybe } from './hooks';",
+		'observer/api/hooks.ts': `import { use as read } from 'react';
+import { current } from '../renderer';
+import { valueOf } from '../state';
+export function useChannel(value: number) {
+	const checked = valueOf(value);
+	if (checked) { const snapshot = read(current); return snapshot; }
+	return read(current);
+}
+export function useMaybe(value: number) {
+	if (value) { return value; }
+	return read(current);
+}`,
+		'app/src/helper.ts': `import { useSnapshot as reading, useMaybe as maybe, valueOf } from 'observer';
+export function useReading() { return reading(valueOf(1)); }
+export function useOptional() { return maybe(1); }`,
+		'app/src/pane.tsx': view('useReading'),
+		'app/src/optional.tsx': view('useOptional'),
+	});
+	const run = (projectTypes) =>
+		runCodemod(
+			['pane', 'optional'].map((name) => path.join(app, 'src', name + '.tsx')),
+			{
+				root: app,
+				strong: true,
+				verify: true,
+				write: false,
+				projectTypes,
+			},
+		);
+	const warnings = ({ files }) =>
+		files.flatMap((file) =>
+			file.notes
+				.filter((note) => note.message.includes('through the original workspace entry'))
+				.map((note) => [file.file, note.severity]),
+		);
+	for (const projectTypes of [true, false]) {
+		const result = await run(projectTypes);
+		expect(warnings(result)).toEqual([['src/pane.tsx', 'warning']]);
+		expect(result.files.find((file) => file.file === 'src/pane.tsx')).toMatchObject({
+			strong: true,
+			code: expect.stringContaining("from './helper'"),
+		});
+	}
+	fs.writeFileSync(path.join(library, 'api.js'), 'export function useSnapshot() { return 1; }');
+	expect(warnings(await run(true))).toEqual([]);
+});
+
 it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
 	const source = `import {useSnapshot as useReading, valueOf} from 'observer';
 export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }
