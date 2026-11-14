@@ -1566,52 +1566,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (!attr || !value || !ts.isJsxExpression(value) || !value.expression) return;
 		const element = ts.isJsxOpeningElement(tag) ? tag.parent : tag;
 		const owner = ts.findAncestor(element, isFunctionLike);
-		const ref = skipWrappers(value.expression);
-		let name = ts.isIdentifier(ref) ? ref : undefined;
-		if (
-			ts.isArrowFunction(ref) &&
-			!ref.modifiers?.length &&
-			ref.parameters.length === 1 &&
-			!ref.parameters[0].initializer &&
-			!ref.parameters[0].dotDotDotToken
-		) {
-			const body = ref.body;
-			const assign = (value: ts.Expression) => {
-				const write = skipWrappers(value);
-				if (!ts.isBinaryExpression(write) || write.operatorToken.kind !== ts.SyntaxKind.EqualsToken)
-					return;
-				const { left, right } = write;
-				if (
-					ts.isPropertyAccessExpression(left) &&
-					left.name.text === 'current' &&
-					ts.isIdentifier(left.expression) &&
-					ts.isIdentifier(right) &&
-					this.declarationOf(right) === ref.parameters[0] &&
-					fixedBinding(this.checker, right, write)
-				)
-					return left.expression;
-			};
-			if (ts.isBlock(body)) {
-				for (const step of body.statements) {
-					if (!ts.isExpressionStatement(step)) break;
-					if ((name = assign(step.expression))) break;
-				}
-			} else name = assign(body);
-		}
-		const init = name && this.constValue(name);
-		if (
-			!owner ||
-			!name ||
-			!init ||
-			!ts.isCallExpression(init) ||
-			init.questionDotToken ||
-			init.arguments.length !== 1 ||
-			init.arguments[0].kind !== ts.SyntaxKind.NullKeyword ||
-			this.reactHook(init.expression) !== 'useRef' ||
-			!fixedBinding(this.checker, name, element) ||
-			!initializedBefore(this.checker, name, element)
-		)
-			return;
+		if (!owner) return;
 		const layoutRead = (ref: ts.Identifier) => {
 			if (directMember(ref)?.text !== 'current') return false;
 			const setup = ts.findAncestor(ref, ts.isFunctionLike);
@@ -1647,7 +1602,57 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					setup.body.statements[0] === step)
 			);
 		};
-		if (this.localUses(name).some(layoutRead))
+		const readsInLayout = (name: ts.Identifier) => {
+			const init = this.constValue(name);
+			if (
+				!init ||
+				!ts.isCallExpression(init) ||
+				init.questionDotToken ||
+				init.arguments.length !== 1 ||
+				init.arguments[0].kind !== ts.SyntaxKind.NullKeyword ||
+				this.reactHook(init.expression) !== 'useRef' ||
+				!fixedBinding(this.checker, name, element) ||
+				!initializedBefore(this.checker, name, element)
+			)
+				return false;
+			return this.localUses(name).some(layoutRead);
+		};
+		const ref = skipWrappers(value.expression);
+		let late = ts.isIdentifier(ref) && readsInLayout(ref);
+		if (
+			ts.isArrowFunction(ref) &&
+			!ref.modifiers?.length &&
+			ref.parameters.length === 1 &&
+			!ref.parameters[0].initializer &&
+			!ref.parameters[0].dotDotDotToken
+		) {
+			const body = ref.body;
+			const assign = (value: ts.Expression) => {
+				const write = skipWrappers(value);
+				if (!ts.isBinaryExpression(write) || write.operatorToken.kind !== ts.SyntaxKind.EqualsToken)
+					return false;
+				const left = skipWrappers(write.left);
+				const right = skipWrappers(write.right);
+				if (
+					ts.isPropertyAccessExpression(left) &&
+					left.name.text === 'current' &&
+					ts.isIdentifier(left.expression) &&
+					ts.isIdentifier(right) &&
+					this.declarationOf(right) === ref.parameters[0] &&
+					fixedBinding(this.checker, right, write)
+				)
+					return readsInLayout(left.expression);
+				return false;
+			};
+			if (ts.isBlock(body)) {
+				for (const step of body.statements) {
+					if (!ts.isExpressionStatement(step)) break;
+					if ((late = assign(step.expression))) break;
+				}
+			} else late = assign(body);
+		}
+
+		if (late)
 			this.note(
 				'react-island-layout-ref',
 				'error',
