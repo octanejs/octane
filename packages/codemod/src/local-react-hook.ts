@@ -383,7 +383,7 @@ function setupEffect(body: ts.Block, checker: ts.TypeChecker) {
 		const simple = declaration && ts.isIdentifier(declaration.name);
 		const expression = simple
 			? declaration.initializer
-			: ts.isExpressionStatement(statement)
+			: ts.isExpressionStatement(statement) || ts.isReturnStatement(statement)
 				? statement.expression
 				: undefined;
 		if (!expression) return;

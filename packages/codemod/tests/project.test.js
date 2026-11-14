@@ -1180,6 +1180,22 @@ export function useFirst() {
 	effect(() => {}, []);
 	return 'first';
 }
+export function useReturnedEffect(onReady: () => void) {
+	return effect(onReady, []);
+}
+export function useReturnedEvent(onReady: () => void) {
+	const connection = connections.getCurrent();
+	return (useEffectEvent(() => connection.connect(onReady)));
+}
+export function useReturnedValue(onReady: () => void) {
+	const connection = connections.getCurrent();
+	return connection;
+	effect(onReady, []);
+}
+export function useBareReturn(onReady: () => void) {
+	return;
+	effect(onReady, []);
+}
 export function useThrowing() {
 	const unused = fail();
 	effect(() => {}, []);
@@ -1230,6 +1246,10 @@ export function useLaterInitializer(onReady: () => void) {
 				'use-connection.ts': owner,
 				'Connection.tsx': view('useConnection'),
 				'First.tsx': view('useFirst'),
+				'ReturnedEffect.tsx': view('useReturnedEffect'),
+				'ReturnedEvent.tsx': view('useReturnedEvent'),
+				'ReturnedValue.tsx': view('useReturnedValue'),
+				'BareReturn.tsx': view('useBareReturn'),
 				'Throwing.tsx': view('useThrowing'),
 				'StateFirst.tsx': view('useStateFirst'),
 				'Deferred.tsx': view('useDeferred'),
@@ -1269,6 +1289,8 @@ export function useLaterInitializer(onReady: () => void) {
 				['Connection.tsx', 'useEffectEvent'],
 				['First.tsx', 'useEffect'],
 				['LaterInitializer.tsx', 'useEffectEvent'],
+				['ReturnedEffect.tsx', 'useEffect'],
+				['ReturnedEvent.tsx', 'useEffectEvent'],
 				['StateFirst.tsx', 'useState'],
 				['Throwing.tsx', 'useEffect'],
 			]);
