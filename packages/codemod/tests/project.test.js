@@ -3583,6 +3583,62 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 		}
 	});
 
+	it('migrates only proven export references from the React Motion entry points', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'supported.ts': `import { motion, inView } from 'framer-motion';
+import * as Motion from 'motion/react';
+export const supported = [motion.div, inView, Motion['motion'].span];
+export type Transition = import('motion/react').Transition;`,
+			'unsupported.tsx': `import { AnimatePresence, useIsPresent as usePresent } from 'framer-motion';
+import * as Motion from 'motion/react';
+export { type HTMLMotionProps as Props } from 'framer-motion';
+export function App() { return <AnimatePresence><Motion.Reorder.Group>{usePresent()}</Motion.Reorder.Group></AnimatePresence>; }`,
+			'whole.ts': `export * from 'framer-motion';
+import * as Motion from 'framer-motion';
+export const lookup = (name: string) => Motion[name];
+export const load = () => import('motion/react');`,
+			'default.ts': `import Motion, { motion } from 'framer-motion';
+export const views = [Motion, motion.div];`,
+		});
+		const { files } = await runCodemod([root], { verify: false, write: false });
+		const supported = files.find(({ file }) => file === 'supported.ts');
+		expect(supported?.notes).toEqual([]);
+		expect(supported?.code).not.toMatch(/['"](?:framer-motion|motion\/react)['"]/);
+		expect(supported?.code.match(/@octanejs\/motion/g)).toHaveLength(3);
+		const unsupported = files.find(({ file }) => file === 'unsupported.tsx');
+		expect(unsupported?.code).not.toContain('@octanejs/motion');
+		for (const name of ['useIsPresent', 'Reorder', 'HTMLMotionProps']) {
+			expect(unsupported?.notes).toContainEqual(
+				expect.objectContaining({
+					rule: 'bindings',
+					severity: 'error',
+					message: expect.stringContaining(name),
+				}),
+			);
+		}
+		const whole = files.find(({ file }) => file === 'whole.ts');
+		expect(whole?.code).not.toContain('@octanejs/motion');
+		expect(whole?.notes.filter(({ severity }) => severity === 'error')).toHaveLength(3);
+		const withDefault = files.find(({ file }) => file === 'default.ts');
+		expect(withDefault?.code).not.toContain('@octanejs/motion');
+		expect(withDefault?.notes).toContainEqual(
+			expect.objectContaining({ severity: 'error', message: expect.stringContaining('default') }),
+		);
+		const manifest = path.join(root, 'package.json');
+		const before = fs.readFileSync(manifest, 'utf8');
+		const retained = await runCodemod([path.join(root, 'unsupported.tsx')], { verify: false });
+		expect(retained.packages).toEqual([]);
+		expect(retained.dependencies).toEqual([]);
+		expect(fs.readFileSync(manifest, 'utf8')).toBe(before);
+		const migrated = await runCodemod([path.join(root, 'supported.ts')], { verify: false });
+		expect(migrated.packages.map(({ from }) => from)).toEqual(['framer-motion', 'motion/react']);
+		expect(migrated.dependencies.map(({ name }) => name)).toEqual(['@octanejs/motion']);
+		expect(JSON.parse(fs.readFileSync(manifest, 'utf8')).dependencies['@octanejs/motion']).toBe(
+			`^${catalogVersion('@octanejs/motion')}`,
+		);
+	});
+
 	it('reports exactly the Radix exports `@octanejs/radix` lacks', async () => {
 		const radix = path.join(REPO, 'packages/radix');
 		// The binding's own dev dependency on `radix-ui` installs every primitive package.

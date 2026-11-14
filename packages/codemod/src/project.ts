@@ -19,7 +19,7 @@ import { DATA } from '@octanejs/cli/data';
 import { parseSync } from '@tsrx/oxc/parser';
 import ts from 'typescript';
 import { finding, loadCompiler, thrown } from './compiler.js';
-import { PORTED_PACKAGES } from './mappings.js';
+import { isReactMotion, PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
 import {
 	bind,
@@ -46,6 +46,9 @@ const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
 const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|17\.(?:0|[1-9]\d*))$/;
 /** React packages and the Octane entry point that replaces each. */
 const CATALOG = { ...DATA.reactPackages, ...PORTED_PACKAGES };
+const MOTION_EXPORTS = new Set(DATA.motionExports);
+const bindingExports: NonNullable<TransformOptions['bindingExports']> = (from, to) =>
+	to === '@octanejs/motion' && isReactMotion(from) ? MOTION_EXPORTS : undefined;
 const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies'];
 /** A package that, by its name, renders through React. */
 const REACT_PACKAGE = /^(?:react-|@[^/]+\/react(?:-|\/|$)|[^/]+\/react$)|-react(?:\/|$)/;
@@ -569,6 +572,7 @@ export async function runCodemod(
 			resolveSpecifier: (specifier) =>
 				resolveRename(file, specifier) ??
 				resolveBinding(specifier, file, bindingProject, new Map(), []),
+			bindingExports,
 		}).changed;
 	}
 	const { inputFactory, changedJsxExport, helperFunction, localFile, exportsConstObject } =
@@ -1000,6 +1004,8 @@ export async function runCodemod(
 				resolveSpecifier: (specifier) =>
 					resolveRename(file, specifier) ??
 					resolveBinding(specifier, file, bindingProject, packages, notes),
+				bindingExports,
+				recordBindingRewrite: (from, to) => packages.set(from, to),
 				isContext,
 				elementChild: !elementExports.size
 					? undefined
@@ -1903,11 +1909,12 @@ function resolveBinding(
 	const entry = DATA.bindings.find((candidate) => candidate.name === binding);
 	const subpath = target.slice(binding.length) + specifier.slice(name.length);
 	const served = entry && entry.exports.some((key) => serves(key, `.${subpath}`));
-	if (target !== binding) {
+	if (target !== binding || isReactMotion(specifier)) {
 		const shadowed = [specifier, binding + subpath].find((name) => !project.original(file, name));
 		const message = shadowed
 			? `Resolve \`${shadowed}\` to its original package before migrating this import.`
-			: !served || !canUseBindingSubpath(file, project.root, binding, subpath, entry.version)
+			: subpath &&
+				  (!served || !canUseBindingSubpath(file, project.root, binding, subpath, entry.version))
 				? `Install a version of \`${binding}\` that exports \`.${subpath}\` before migrating this import.`
 				: null;
 		if (message) {
@@ -1915,7 +1922,8 @@ function resolveBinding(
 			return null;
 		}
 	}
-	packages.set(name, binding);
+	// Partial bindings are recorded only after their export check accepts a rewrite.
+	if (!isReactMotion(specifier)) packages.set(name, binding);
 	// An aggregate binding (`@octanejs/visx`, for `@visx/visx`) serves each
 	// package of its scope from a subpath: `@visx/hierarchy` is
 	// `@octanejs/visx/hierarchy`.
@@ -2013,6 +2021,7 @@ function catalogName(specifier: string) {
 	const parts = specifier.split('/');
 	for (let length = parts.length; length > 0; length--) {
 		const candidate = parts.slice(0, length).join('/');
+		if (candidate === 'motion/react' && candidate !== specifier) continue;
 		// Lottie's exported view still needs explicit renderer ownership at its callers.
 		if (candidate !== 'lottie-react' && candidate in CATALOG) return candidate;
 	}
