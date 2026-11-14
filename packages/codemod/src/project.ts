@@ -25,6 +25,7 @@ import {
 	bind,
 	CONTEXT_ALIAS,
 	CONTEXT_PROVIDER_GETTER,
+	ELEMENT_CHILD_ALIAS,
 	MAP_CALLBACK_SCOPE,
 	MAP_PARAMETER_TDZ,
 	MAP_PARAMETER_WRITE,
@@ -284,7 +285,7 @@ export async function runCodemod(
 		return inspect(destination, name, prop, ordinaryCaller, depth);
 	}
 
-	// resolveRename returns only an on-disk source that actually won import resolution.
+	// Index the exports of selected source modules by their planned output.
 	const elementExports = new Map<string, Set<string>>();
 	const descriptorExports = new Map<string, Set<string>>();
 	for (const [from, to] of renames) {
@@ -1169,10 +1170,20 @@ export async function runCodemod(
 				isContext,
 				elementChild: !elementExports.size
 					? undefined
-					: (binding) =>
-							typeof binding === 'number'
-								? (exports.get(file)?.elementChildren?.some((x) => x.start === binding) ?? false)
-								: matchesExport(elementExports, binding),
+					: (binding) => {
+							if (typeof binding === 'number')
+								return (
+									exports.get(file)?.elementChildren?.some((x) => x.start === binding) ?? false
+								);
+							if (binding.module.startsWith('.')) return matchesExport(elementExports, binding);
+							if (ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject)
+								return false;
+							const match = renamed(file, binding.module);
+							const output = match && renames.get(match.file);
+							return output && elementExports.get(output)?.has(binding.imported)
+								? 'review-alias'
+								: false;
+						},
 				descriptorChild: descriptorExports.size
 					? (binding) => matchesExport(descriptorExports, binding)
 					: undefined,
@@ -1250,7 +1261,8 @@ export async function runCodemod(
 				note.rule === MAP_PARAMETER_TDZ ||
 				note.rule === MAP_CALLBACK_SCOPE ||
 				note.rule === CONTEXT_ALIAS ||
-				note.rule === CONTEXT_PROVIDER_GETTER,
+				note.rule === CONTEXT_PROVIDER_GETTER ||
+				note.rule === ELEMENT_CHILD_ALIAS,
 		);
 		if (write && blockedTransform)
 			return blockedWrite(

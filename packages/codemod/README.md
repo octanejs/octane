@@ -108,6 +108,9 @@ selected React function component declares an element-only `children` prop,
 `<Frame><Badge /></Frame>` as `<Frame children={<Badge />} />`. This works for
 a top-level function in the same file or a direct relative import from another
 selected input. The `element-child-prop` count records the calls converted.
+The `element-child-path-alias` error blocks writes for a single nested element
+when TypeScript resolves a path alias to a selected element-only component.
+Verify the runtime target before passing the element with `children={...}`.
 
 The `element-children` note flags recognized React or JSX element annotations
 for review at other callers. Spreads, comments, meaningful whitespace, multiple

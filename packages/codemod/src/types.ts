@@ -65,8 +65,8 @@ export interface TransformOptions {
 		ordinaryCaller?: boolean,
 		through?: boolean,
 	): boolean;
-	/** Whether the selected component at this local declaration offset, or this imported name, accepts one explicit element. */
-	elementChild?(binding: number | { module: string; imported: string }): boolean;
+	/** Whether this selected component accepts one explicit element, with separate review for path aliases. */
+	elementChild?(binding: number | { module: string; imported: string }): boolean | 'review-alias';
 	/** Whether a selected, directly imported component inspects its child descriptors. */
 	descriptorChild?(binding: { module: string; imported: string }): boolean;
 	/** Whether an imported name is a context, with separate review for selected alias targets. */

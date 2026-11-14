@@ -3662,6 +3662,105 @@ export function Cases(p: {}) {return <main><Box {...p}><i /></Box><Box> <b /> </
 		);
 	});
 
+	it.each([false, true])(
+		'reports a nested element-only child through a selected path alias (Strong: %s)',
+		async (strong) => {
+			const caller = `import { Frame as Box } from '@/Frame';
+export function View() { return <Box><i /></Box> }`;
+			const originals = {
+				'package.json': '{"type":"module"}',
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: {
+						strict: true,
+						jsx: 'react-jsx',
+						moduleResolution: 'bundler',
+						paths: { '@/*': ['./src/*'], '@frame': ['./src/Frame.tsx'] },
+					},
+				}),
+				'src/Frame.tsx': `import type { ReactElement, ReactNode } from 'react';
+export function Frame({ children }: { children: ReactElement }) { return <section>{children}</section> }
+export function Broad({ children }: { children: ReactNode }) { return <section>{children}</section> }`,
+				'Alias.tsx': caller,
+				'FixedAlias.tsx': caller.replace('@/Frame', '@frame'),
+				'nested/Separate.tsx': caller,
+				'nested/tsconfig.json':
+					'{"extends":"../tsconfig.json","compilerOptions":{"paths":{"@/*":["./*"]}}}',
+				'nested/Frame.tsx': `import type { ReactNode } from 'react';
+export function Frame({ children }: { children: ReactNode }) { return <section>{children}</section> }`,
+				'Explicit.tsx': caller.replace('<Box><i /></Box>', '<Box children={<i />} />'),
+				'Broad.tsx': caller.replace('Frame as', 'Broad as'),
+				'Unsupported.tsx': `import { Frame as Box } from '@/Frame';
+export function View(props: {}) { return <main><Box {...props}><i /></Box><Box>{/* keep */}<i /></Box></main> }`,
+				'Relative.tsx': caller.replace('@/Frame', './src/Frame'),
+			};
+			const root = project(originals);
+			const cli = path.join(import.meta.dirname, '../dist/bin.js');
+			const files = [
+				'Relative.tsx',
+				...Object.keys(originals).filter(
+					(file) => file.endsWith('.tsx') && file !== 'Relative.tsx',
+				),
+			];
+			const mode = strong ? ['--strong'] : [];
+			const run = (selected, ...flags) =>
+				spawnSync(process.execPath, [cli, ...selected, ...mode, '--json', ...flags], {
+					cwd: root,
+					encoding: 'utf8',
+				});
+			const report = run(files, '--print');
+			expect(report.status).toBe(1);
+			const preview = new Map(JSON.parse(report.stdout).files.map((file) => [file.file, file]));
+			const note = expect.objectContaining({
+				rule: 'element-child-path-alias',
+				line: 2,
+				severity: 'error',
+				message: expect.stringMatching(/@\/Frame.*runtime.*children/),
+			});
+			expect(preview.get('Alias.tsx').notes).toEqual([note]);
+			expect(preview.get('FixedAlias.tsx').notes).toEqual([
+				expect.objectContaining({
+					rule: 'element-child-path-alias',
+					severity: 'error',
+					message: expect.stringContaining('@frame'),
+				}),
+			]);
+			for (const name of ['Alias.tsx', 'FixedAlias.tsx']) {
+				expect(preview.get(name).rules['element-child-prop']).toBeUndefined();
+				expect(preview.get(name).code).toContain('<Box><i /></Box>');
+			}
+			expect(preview.get('Alias.tsx').code).toContain('@/Frame.tsrx');
+			expect(preview.get('Relative.tsx').rules['element-child-prop']).toBe(1);
+			expect(preview.get('Explicit.tsx').notes).toEqual([]);
+			expect(preview.get('Broad.tsx').notes).toEqual([]);
+			expect(preview.get('nested/Separate.tsx').notes).toEqual([]);
+			expect(preview.get('Unsupported.tsx').notes).toEqual([]);
+			expect(run(['Alias.tsx'], '--print').status).toBe(0);
+
+			const write = run(files);
+			expect(write.status).toBe(1);
+			expect(JSON.parse(write.stdout).files).toEqual([
+				expect.objectContaining({ file: 'Alias.tsx', changed: false, notes: [note] }),
+			]);
+			expect(fs.readdirSync(root).sort()).toEqual(
+				[
+					...files.filter((file) => !file.includes('/')),
+					'nested',
+					'package.json',
+					'src',
+					'tsconfig.json',
+				].sort(),
+			);
+			expect(fs.readdirSync(path.join(root, 'src'))).toEqual(['Frame.tsx']);
+			expect(fs.readdirSync(path.join(root, 'nested')).sort()).toEqual([
+				'Frame.tsx',
+				'Separate.tsx',
+				'tsconfig.json',
+			]);
+			for (const [file, code] of Object.entries(originals))
+				expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
+		},
+	);
+
 	it('warns only for narrow, unmarked children on a TSRX component', async () => {
 		const root = project({
 			'foreign.ts': 'export interface ReactElement { label: string }',
