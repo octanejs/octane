@@ -174,6 +174,80 @@ describe('runCodemod', () => {
 			message: expect.stringContaining('React SSR cannot render Leaf.tsrx inside OctaneCompat'),
 		});
 
+		const native =
+			'/** @jsxImportSource octane */\nexport function Leaf() { return <b>native</b>; }';
+		it.each([
+			['named', server, owner],
+			[
+				'namespace',
+				"import * as Bridge from 'octane/react/server';",
+				owner.replace('<Host', '<Bridge.OctaneCompat'),
+			],
+			['explicit React JSX', '/** @jsxImportSource react */ ' + server, owner],
+			['escaped import', server.replace('/server', '/\\u0073erver'), owner],
+			['underscore alias', server.replace('as Host', 'as _Host'), owner.replace('<Host', '<_Host')],
+		])('keeps a selected authored %s server host in React', async (_, hostImport, component) => {
+			const { root, files, selected } = app(`${hostImport}\n${child}\n${component}`, native);
+			selected.push(path.join(root, 'App.server.tsx'));
+			const ownership = expect.objectContaining({
+				rule: 'react-compat',
+				severity: 'error',
+				line: 3,
+				message: expect.stringContaining('Keep the authored OctaneCompat host in React'),
+			});
+			for (const write of [false, true]) {
+				const result = await runCodemod(selected, { root, strong: true, write });
+				expect(result.files.find((f) => f.file === 'App.server.tsx')?.notes).toContainEqual(
+					ownership,
+				);
+				for (const [file, text] of Object.entries(files))
+					expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(text);
+				for (const file of ['Leaf.tsrx', 'App.server.tsrx'])
+					expect(fs.existsSync(path.join(root, file))).toBe(false);
+			}
+		});
+
+		it.each([
+			['retained authored host', `${server}\n${child}\n${owner}`, {}, false],
+			[
+				'intrinsic with a lowercase import alias',
+				`${server.replace('as Host', 'as host')}\n${child}\n${owner.replace('<Host', '<host')}`,
+				{},
+				true,
+			],
+			[
+				'local alias using the server specifier',
+				`${server}\n${child}\n${owner}`,
+				{ 'octane/react/server': ['./Other.ts'] },
+				true,
+			],
+			[
+				'native ReactCompat',
+				`/** @jsxImportSource octane */
+				import { ReactCompat } from 'octane/react/server';
+				import { Child } from './Child.js';
+				export function App() { return <ReactCompat component={Child} />; }`,
+				{},
+				true,
+			],
+		])('preserves existing migration behavior for a %s', async (_, source, paths, selectHost) => {
+			const { root, selected } = app(source, native, paths);
+			if (selectHost) selected.push(path.join(root, 'App.server.tsx'));
+			const result = await runCodemod(selected, { root, strong: true, write: true });
+			expect(result.files.flatMap((f) => f.notes)).not.toContainEqual(
+				expect.objectContaining({
+					rule: 'react-compat',
+					message: expect.stringContaining('Keep the authored OctaneCompat host in React'),
+				}),
+			);
+			expect(fs.existsSync(path.join(root, 'Leaf.tsrx'))).toBe(true);
+			expect(fs.existsSync(path.join(root, 'App.server.tsrx'))).toBe(selectHost);
+			if (!selectHost)
+				expect(fs.readFileSync(path.join(root, 'App.server.tsx'), 'utf8')).toBe(
+					source.replace('./Leaf.tsx', './Leaf.tsrx'),
+				);
+		});
+
 		it.each([
 			['component', `${server}\n${child}\n${owner}`, leaf],
 			[
@@ -903,6 +977,25 @@ export function Panel({ initial = false }: { initial?: boolean }) {
 				'Local.tsx': panel('', '<Label label={label} />'),
 				'Imported.tsx': panel('', '<ImportedLabel label={label} />'),
 				'Fragment.tsx': panel('', '<><b>{label}</b></>'),
+				'Conditional.tsx': panel('', '(initial ? (<Label label={label} />) : <b>{label}</b>)'),
+				'ConditionalEmpty.tsx': panel('', 'initial ? null : <>{label}</>'),
+				'ConditionalFalse.tsx': panel('', 'initial ? <b>{label}</b> : false'),
+				'ConditionalAsserted.tsx': panel('', '(initial ? <b>{label}</b> : null) as any'),
+				'ConditionalNonNull.tsx': panel('', '(initial ? <b>{label}</b> : null)!'),
+				'ConditionalSatisfies.tsx': panel('', '(initial ? <b>{label}</b> : null) satisfies any'),
+				'ConditionalWrappedArm.tsx': panel(
+					'',
+					'initial ? (<b>{label}</b> as any) : (null as null)',
+				),
+				'ConditionalDeferred.tsx': panel('', 'initial ? () => <b>{label}</b> : null'),
+				'ConditionalTest.tsx': panel('', '(<b>{label}</b>) ? null : false'),
+				'ConditionalValue.tsx': panel('', 'initial ? <b>{label}</b> : label'),
+				'ConditionalReactOwned.tsx':
+					"import { ReactCompat } from 'octane/react';\n" +
+					panel('', 'initial ? <b>{label}</b> : null') +
+					'\nexport function App() { return <ReactCompat><Panel/></ReactCompat>; }',
+				'ConditionalEscape.tsx':
+					panel('', 'initial ? <b>{label}</b> : null') + '\nexport const panels = [Panel];',
 				'Memo.tsx':
 					"import { memo } from 'react';\n" +
 					panel('', '<Label label={label} />').replace(
@@ -983,6 +1076,13 @@ export function Panel({ initial = false }: { initial?: boolean }) {
 					)
 					.map((file) => file.file),
 			).toEqual([
+				'Conditional.tsx',
+				'ConditionalAsserted.tsx',
+				'ConditionalEmpty.tsx',
+				'ConditionalFalse.tsx',
+				'ConditionalNonNull.tsx',
+				'ConditionalSatisfies.tsx',
+				'ConditionalWrappedArm.tsx',
 				'Forward.tsx',
 				'Fragment.tsx',
 				'Imported.tsx',

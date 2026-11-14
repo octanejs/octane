@@ -215,7 +215,9 @@ export function hostedServerComponents(file: string, source: string) {
 	const { sf, checker } = bound;
 	const edges = [];
 	for (const { output } of directExportReturns(bound)) {
-		const host = imported(checker, openingTag(output).tagName);
+		const tag = openingTag(output).tagName;
+		if (ts.isIdentifier(tag) && (/^[a-z]/.test(tag.text) || tag.text.includes('-'))) continue;
+		const host = imported(checker, tag);
 		if (host?.module !== 'octane/react/server' || host.name !== 'OctaneCompat') continue;
 		const ref = hostedLeaf(output);
 		const leaf = ref && imported(checker, ref);
