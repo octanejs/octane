@@ -3,7 +3,7 @@ import { parseSync } from '@tsrx/oxc/parser';
 import { hasRuntimeDependency } from './scoped-store-contract.js';
 import { skipWrappers } from './expression-wrappers.js';
 import { hasEval, rendersElementChildren } from './forwarded-props.js';
-import { componentTagOrExport, localUses } from './local-uses.js';
+import { componentTagOrExport, inTypeNode, localUses } from './local-uses.js';
 import { staticReactProps } from './react-renderer.js';
 import { bind, nativeReactCompat, skipParens, withoutJsxIndentation } from './transform.js';
 
@@ -34,13 +34,13 @@ async function bindIsland(file: string, source: string) {
 	return bind(file.endsWith('.tsrx') ? file + '.tsx' : file, code);
 }
 
-function imported(checker: ts.TypeChecker, node: ts.Node) {
+function imported(checker: ts.TypeChecker, node: ts.Node, defaultMember = false) {
 	const ref = ts.isPropertyAccessExpression(node) ? node.expression : node;
 	if (!ts.isIdentifier(ref)) return;
 	const decl = checker.getSymbolAtLocation(ref)?.declarations?.[0];
 	if (!decl) return;
 	const name = ts.isPropertyAccessExpression(node)
-		? ts.isNamespaceImport(decl) && node.name.text
+		? (ts.isNamespaceImport(decl) || (defaultMember && ts.isImportClause(decl))) && node.name.text
 		: ts.isImportSpecifier(decl) && !decl.isTypeOnly
 			? (decl.propertyName ?? decl.name).text
 			: ts.isImportClause(decl) && 'default';
@@ -52,6 +52,21 @@ function imported(checker: ts.TypeChecker, node: ts.Node) {
 		ts.isStringLiteral(imp.moduleSpecifier)
 	)
 		return { name, module: imp.moduleSpecifier.text };
+}
+
+function closedDefaultReactReceiver(receiver: ts.Identifier, uses: ReturnType<typeof localUses>) {
+	return uses(receiver).every((ref) => {
+		if (ts.isImportClause(ref.parent) || inTypeNode(ref)) return true;
+		const member = ref.parent;
+		if (!ts.isPropertyAccessExpression(member) || member.expression !== ref) return false;
+		const parent = member.parent;
+		return (
+			ts.isExpressionWithTypeArguments(parent) ||
+			(ts.isCallExpression(parent) &&
+				parent.expression === member &&
+				member.name.text !== 'default')
+		);
+	});
 }
 
 /** Direct React class exports, including an alias in a local export list. */
@@ -67,6 +82,12 @@ export function reactClassExports(file: string, source: string) {
 			const exp = decl.parent.parent;
 			if (decl.isTypeOnly || exp.isTypeOnly || exp.moduleSpecifier) continue;
 			decl = checker.getExportSpecifierLocalTargetSymbol(decl)?.valueDeclaration;
+		} else if (decl && ts.isExportAssignment(decl)) {
+			const value = decl.expression;
+			if (decl.isExportEquals || !ts.isIdentifier(value)) continue;
+			const local = checker.getSymbolAtLocation(value)?.valueDeclaration;
+			if (!local || local.parent !== sf || local.end > decl.getStart(sf)) continue;
+			decl = local;
 		}
 		if (
 			!decl ||
@@ -78,7 +99,13 @@ export function reactClassExports(file: string, source: string) {
 		const base = decl.heritageClauses?.find(
 			(clause) => clause.token === ts.SyntaxKind.ExtendsKeyword,
 		)?.types[0]?.expression;
-		const entry = base && imported(checker, base);
+		if (!base) continue;
+		let entry = imported(checker, base);
+		if (!entry && ts.isPropertyAccessExpression(base) && ts.isIdentifier(base.expression)) {
+			const candidate = imported(checker, base, true);
+			if (candidate?.module === 'react' && closedDefaultReactReceiver(base.expression, uses))
+				entry = candidate;
+		}
 		if (entry?.module !== 'react' || (entry.name !== 'Component' && entry.name !== 'PureComponent'))
 			continue;
 		if (!decl.name || uses(decl.name).every(componentTagOrExport)) names.add(symbol.name);

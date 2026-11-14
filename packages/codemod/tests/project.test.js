@@ -67,6 +67,25 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				},
 			}),
 			'Boundary.tsx': boundary,
+			'DefaultBase.tsx': boundary
+				.replace(
+					"import { Component as Base, type ReactNode } from 'react';",
+					"import React, { type ReactNode } from 'react';",
+				)
+				.replace('extends Base', 'extends React.PureComponent'),
+			'DefaultExport.tsx': boundary.replace(
+				'export { Frame as Boundary };',
+				'export default Frame;',
+			),
+			'MutatedBase.tsx': boundary
+				.replace(
+					"import { Component as Base, type ReactNode } from 'react';",
+					"import React, { type ReactNode } from 'react';\nReact.PureComponent = class Fake {};",
+				)
+				.replace('extends Base', 'extends React.PureComponent'),
+			'DefaultEarly.tsx': boundary
+				.replace('class Frame', 'export default Frame;\nclass Frame')
+				.replace('export { Frame as Boundary };', ''),
 			'Ambiguous.tsx': boundary,
 			'Ambiguous.js': 'export function Boundary() { return null; }',
 			'Pure.tsx': 'export function Boundary() { return <b>ready</b>; }',
@@ -91,6 +110,10 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 			'AmbiguousView.tsx': entry('./Ambiguous'),
 			'PureView.tsx': entry('./Pure'),
 			'DecoratedView.tsx': entry('./Decorated'),
+			'DefaultBaseView.tsx': entry('./DefaultBase'),
+			'DefaultExportView.tsx': entry('./DefaultExport').replace('{ Boundary as Frame }', 'Frame'),
+			'DefaultEarlyView.tsx': entry('./DefaultEarly').replace('{ Boundary as Frame }', 'Frame'),
+			'MutatedBaseView.tsx': entry('./MutatedBase'),
 			'Shadow.tsx': entry('./Boundary').replace('App()', 'App(Frame: () => unknown)'),
 			'Hosted.tsx':
 				"import { ReactCompat } from 'octane/react';\n" +
@@ -112,7 +135,8 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 			const inputs = Object.keys(sources).filter(
 				(file) =>
 					file.endsWith('.tsx') &&
-					(includeClass || (file !== 'Boundary.tsx' && file !== 'Hosted.tsx')),
+					(includeClass ||
+						!['Boundary.tsx', 'DefaultBase.tsx', 'DefaultExport.tsx', 'Hosted.tsx'].includes(file)),
 			);
 			const { files } = await runCodemod(
 				inputs.map((file) => path.join(root, file)),
@@ -139,6 +163,8 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					.sort(),
 			).toEqual([
 				['Alias.tsx', includeClass ? 'error' : 'warning'],
+				['DefaultBaseView.tsx', includeClass ? 'error' : 'warning'],
+				['DefaultExportView.tsx', includeClass ? 'error' : 'warning'],
 				['Relative.tsx', includeClass ? 'error' : 'warning'],
 				['Strict.tsx', includeClass ? 'error' : 'warning'],
 			]);
