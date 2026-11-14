@@ -323,7 +323,12 @@ export function assessResolvedEvidence({ input, registry, source }) {
 	const identity = {
 		packageName: registry.name,
 		version: registry.version,
-		repository: registry.repository,
+		repository:
+			blockers.length === 0 &&
+			registry.repository?.subdirectory == null &&
+			source.repository?.subdirectory != null
+				? { ...registry.repository, subdirectory: source.repository.subdirectory }
+				: registry.repository,
 		commit: source.commit,
 		integrity: registry.integrity,
 	};
