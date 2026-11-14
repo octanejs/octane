@@ -77,12 +77,38 @@ describe('octane/data store', () => {
 			new Date('2020-01-01'),
 			1n,
 			{ a: 1, b: 2 },
+			// Primitives and flat objects that print alike but are different inputs.
+			1,
+			'1',
+			0,
+			-0,
+			true,
+			'true',
+			'null',
+			Object.assign(Object.create(null), { a: 1, b: 2 }),
+			{ a: 'b","c":1' },
+			{ a: 'b', c: 1 },
+			{ 'a,b': 1 },
+			{ a: { b: 1 } },
 		];
 		for (const input of inputs) await store.prefetch(query, input);
 		expect(inputs.map((input) => store.read(query, input).getSnapshot().value)).toEqual(
 			inputs.map((_, i) => i + 1),
 		);
 		expect(store.read(query, { b: 2, a: 1 })).toBe(store.read(query, { a: 1, b: 2 }));
+		expect(store.read(query, { a: 'b', c: 1 })).toBe(store.read(query, { c: 1, a: 'b' }));
+		await store.retire();
+	});
+
+	it('keeps a value whose retention is longer than a timer can wait', async () => {
+		const server = createServer();
+		const kept = read({ ...todos, keep: Infinity, fresh: Infinity } as any) as typeof todos;
+		const store = createDataStore({ transport: server.transport });
+		await store.prefetch(kept, undefined);
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		await store.prefetch(kept, undefined);
+		expect(store.read(kept).getSnapshot().status).toBe('ready');
+		expect(server.log).toEqual(['list']);
 		await store.retire();
 	});
 
