@@ -75,7 +75,7 @@ export function NodesSelection<NodeType extends Node>({
 			event.preventDefault();
 
 			moveSelectedNodes({
-				direction: arrowKeyDiffs[event.key],
+				direction: arrowKeyDiffs[event.key]!,
 				factor: event.shiftKey ? 4 : 1,
 			});
 		}
