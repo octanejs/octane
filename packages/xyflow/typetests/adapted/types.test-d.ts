@@ -45,7 +45,6 @@ const flowProps: ReactFlowProps<Node<{ label: string }>, Edge> = {
 	minZoom: 0.25,
 };
 void flowProps;
-void ReactFlow;
 // @ts-expect-error unknown props are rejected
 const badFlowProps: ReactFlowProps = { notAFlowProp: true };
 void badFlowProps;
@@ -67,8 +66,30 @@ const onConnect: OnConnect = (connection) => {
 };
 void onConnect;
 
-// 6. addEdge preserves the caller's edge subtype.
 type WeightedEdge = Edge<{ weight: number }>;
+
+// ReactFlow infers both subtypes from its props and also accepts explicit types.
+const weightedEdge: WeightedEdge = { ...edge, data: { weight: 1 } };
+ReactFlow({
+	nodes: [node],
+	edges: [weightedEdge],
+	onNodeClick: (_, clickedNode) => clickedNode.data.label.toUpperCase(),
+	onEdgeClick: (_, clickedEdge) => clickedEdge.data?.weight.toFixed(1),
+	onInit: (instance) => {
+		instance.getNode(node.id)?.data.label.toUpperCase();
+		instance.getEdge(weightedEdge.id)?.data?.weight.toFixed(1);
+	},
+	ref: (element) => {
+		const container: HTMLDivElement | null = element;
+		void container;
+	},
+});
+ReactFlow<typeof node, WeightedEdge>({
+	// @ts-expect-error explicit node type requires a string label
+	nodes: [{ ...node, data: { label: 1 } }],
+});
+
+// 6. addEdge preserves the caller's edge subtype.
 declare const connection: Connection;
 declare const weightedEdges: WeightedEdge[];
 const nextEdges: WeightedEdge[] = addEdge<WeightedEdge>(connection, weightedEdges);
