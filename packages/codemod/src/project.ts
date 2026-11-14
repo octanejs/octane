@@ -26,6 +26,7 @@ import {
 	CONTEXT_ALIAS,
 	CONTEXT_PROVIDER_GETTER,
 	ELEMENT_CHILD_ALIAS,
+	INTL_PROVIDER_DEFAULTS,
 	MAP_CALLBACK_SCOPE,
 	MAP_PARAMETER_TDZ,
 	MAP_PARAMETER_WRITE,
@@ -1262,6 +1263,7 @@ export async function runCodemod(
 				note.rule === MAP_CALLBACK_SCOPE ||
 				note.rule === CONTEXT_ALIAS ||
 				note.rule === CONTEXT_PROVIDER_GETTER ||
+				note.rule === INTL_PROVIDER_DEFAULTS ||
 				note.rule === ELEMENT_CHILD_ALIAS,
 		);
 		if (write && blockedTransform)
