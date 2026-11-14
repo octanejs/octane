@@ -31,7 +31,7 @@ the same task as the event that caused it.
 
 | Contract | Options | Notes |
 | --- | --- | --- |
-| `read` | `name`, `input?`, `output`, `entities?`, `tags?`, `fresh = 0`, `keep = 300000`, `expire = Infinity`, `persist = true`, `version = ''` | Times are milliseconds. `entities(output)` returns `Entity.from(...)` selections. |
+| `read` | `name`, `input?`, `output`, `entities?`, `tags?`, `fresh = 0`, `keep = 300000`, `expire = Infinity`, `persist = true`, `version = ''` | Times are milliseconds; a `keep` of 2³¹ ms or more (such as `Infinity`) keeps the value for the session. `entities(output)` returns `Entity.from(...)` selections. |
 | `write` | `name`, `input`, `output?`, one of `creates`/`patches`/`removes`, `draft?`, `serverId?`, `record?`, `form?`, `invalidates?` | `draft(input, id)` defaults to the input plus the new ID. `record(output)` locates the saved record so views take it without reloading. |
 | `entity` | `name`, `schema`, `key = 'id'` | `id(value)` is `String(value[key])`. |
 | `view` | `name`, `of`, `order`, `where?`, `input?`, `limit = 20`, `max = 500`, plus the read options | A read whose input is `{ ...params, offset, limit }` and whose value is that window's rows. `view.view.where` and `view.view.compare` are exposed for handlers. |
@@ -217,8 +217,8 @@ store once hydrated. Only the newest submission's outcome is shown.
   upstream connection serves every replica listening to a feed with the same
   parameters.
 - `serveDataOwner(options)` is the data worker module's entry. The `dataWorker`
-  option of `octane()` from `octane/compiler/vite` and of
-  `OctaneRspackPlugin` emits it at `/_octane/data-worker.js`.
+  option of `octane()` from `octane/compiler/vite` or `@octanejs/vite-plugin`,
+  and of `OctaneRspackPlugin`, emits it at `/_octane/data-worker.js`.
   `sharedOwner(name, url?)` returns that SharedWorker's port, named by protocol
   version and `name`, or `null` where SharedWorker is unavailable.
 - `createDataOwner({ fence: true })`, which `serveDataOwner` always sets,
