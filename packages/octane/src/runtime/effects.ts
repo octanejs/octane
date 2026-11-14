@@ -51,6 +51,7 @@ import {
 	schedulePassiveFlush,
 	NATIVE_READ_DRIVER,
 	TRANSITION_ROOT_DRIVER,
+	RENDERER_REGION_OWNER_COUNT,
 } from './drivers.js';
 import {
 	storeSyncQueue,
@@ -71,7 +72,6 @@ import {
 import type { InlineCaughtErrorReport } from './roots.js';
 import { journalObjectOnce } from './commit.js';
 import { hasControlledSyncs } from './forms.js';
-import { RENDERER_REGION_OWNER_COUNT } from './context.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
