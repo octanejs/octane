@@ -589,8 +589,7 @@ export async function runCodemod(
 				adapterError = 'The project compiler cannot compile the React Intl adapter.';
 			}
 		}
-		const specifier = path.relative(dir, adapter).split(path.sep).join('/');
-		return specifier.startsWith('.') ? specifier : './' + specifier;
+		return relativeImport(file, adapter);
 	};
 	const helperDir = path.dirname(adapter);
 	const storeBridge = path.join(helperDir, 'octane-store-context.tsrx');
@@ -819,14 +818,11 @@ export async function runCodemod(
 					return;
 				return bind(leaf, fs.readFileSync(leaf, 'utf8'));
 			});
-			const output = file.slice(0, -3) + '.octane.ts';
-			if (
-				code &&
-				!compile(compiler, code, output, true).some((finding) => finding.severity === 'error') &&
-				!checkHelper(output, code)
-			) {
+			// The hook needs the same client and server compiler as its caller.
+			const output = file.slice(0, -3) + '.octane.tsrx';
+			if (code && !checkHelper(output, code)) {
 				generatedHelpers.set(output, code);
-				return { from: relativeTsImport(from, output) };
+				return { from: relativeImport(from, output) };
 			}
 		}
 		return hook;
@@ -2010,8 +2006,12 @@ function resolveModule(
 }
 
 function relativeTsImport(from: string, to: string) {
-	const specifier = path.relative(path.dirname(from), to).split(path.sep).join('/').slice(0, -3);
-	return specifier.startsWith('.') ? specifier : './' + specifier;
+	return relativeImport(from, to.slice(0, -3));
+}
+
+function relativeImport(from: string, to: string) {
+	const specifier = path.relative(path.dirname(from), to).split(path.sep).join('/');
+	return specifier.startsWith('../') ? specifier : './' + specifier;
 }
 
 /** Only relative assets and unambiguous directory aliases have a local file to inspect. */
