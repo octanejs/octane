@@ -315,13 +315,16 @@ hydration recovery.
 
 <h2 id="not-supported">Limits</h2>
 
-- Both hosts introduce a **div**: `div[data-octane-compat]` or
-  `div[data-react-compat]`. Place them where a div is valid, not directly inside a
-  table row, select, SVG tree, or another restricted content model. Do not let
-  another renderer reconcile or directly write the island's interior.
-- Each host div is styled `display: contents`, so it adds no layout box: the
+- `OctaneCompat` and `ReactCompat` use a **div** host.
+  `OctaneCompatInline` and `ReactCompatInline` use a **span** host with the
+  same props. Choose an inline host for phrasing content inside a paragraph.
+  The island's output must also be valid inside its ancestors, including
+  restrictions on nested controls in buttons. Keep these hosts out of table
+  rows, selects, SVG trees, and other parents that disallow their host tags.
+  The island's renderer alone reconciles and writes its interior.
+- Each host is styled `display: contents` so it adds no layout box. The
   island's own root element is the parent's flex or grid item. Selectors still
-  see the div, so a child combinator such as `.row > .title` does not reach the
+  see the host, so a child combinator such as `.row > .title` does not reach the
   island's root. Wrap the island in your own element when you want a box.
 - React Server Components, Flight, and React's server `cache()` do not cross
   these boundaries.

@@ -16,6 +16,10 @@ export function SsrGreeting(props) @{
 	</section>
 }
 
+export function SsrInline({ label }: { label: string }) @{
+	<em>{label}</em>
+}
+
 export function SsrIdIsland() @{
 	const id = useId();
 	<p class="ssr-id" data-oid={id}>
