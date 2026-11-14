@@ -2843,6 +2843,14 @@ export function Host({rows}: { rows: Row[] }) {
 					'{"compilerOptions":{"strict":true,"jsx":"react-jsx","moduleResolution":"bundler"}}',
 			};
 			const cases = [
+				['({...{}}, index)', true],
+				['{ ...({ ...{ value: 1 } } as object) } ? index : 7', true],
+				['void {...{ value: 1 }} ?? index', true],
+				['({ ...{}, value: index }).value', true],
+				['{...{}} || index', false],
+				['({...{ get value() { return fail(); } }}, index)', false],
+				['({...{ [fail()]: 0 }}, index)', false],
+				['({ ...fail(), value: index }).value', false],
 				['[...[]] && index', true],
 				['[0, ...([1] as number[])] ? index : 7', true],
 				['[...[]] || index', false],
