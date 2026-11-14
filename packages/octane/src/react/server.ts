@@ -37,7 +37,7 @@ export type {
 
 import * as React from 'react';
 import { reactResourceHints } from './resource-hints.js';
-import { createElement as createOctaneServerElement } from '../server/index.js';
+import { Activity, createElement as createOctaneServerElement } from '../server/index.js';
 import {
 	createHostedServerSession,
 	renderHostedAttempt,
@@ -73,7 +73,13 @@ function hostedServerEnvelope(props: {
 		props.bodyKey === null
 			? props.bodyProps
 			: { ...(props.bodyProps as object), key: props.bodyKey };
-	return createOctaneServerElement(props.body as never, config as never);
+	return createOctaneServerElement(
+		Activity as never,
+		{
+			mode: 'visible',
+			children: createOctaneServerElement(props.body as never, config as never),
+		} as never,
+	);
 }
 
 /**
