@@ -225,6 +225,27 @@ export function hostedServerComponents(file: string, source: string) {
 	return edges;
 }
 
+/** A retained component that returns JSX for a directly imported component. */
+export function retainedReactComponentReturns(file: string, source: string) {
+	if (!ordinaryReactJsx(source)) return [];
+	const bound = bind(file, source);
+	const { sf, checker } = bound;
+	const edges = [];
+	const seen = new Set<ts.Node>();
+	for (const { output, localName } of directExportReturns(bound)) {
+		if (seen.has(output)) continue;
+		const tag = openingTag(output).tagName;
+		if (localName && !/^[A-Z]/.test(localName)) continue;
+		if (ts.isIdentifier(tag) && !/^[A-Z]/.test(tag.text)) continue;
+		const leaf = imported(checker, tag);
+		if (leaf?.module.startsWith('.') && /\.[jt]sx$/.test(leaf.module)) {
+			seen.add(output);
+			edges.push({ ...leaf, line: sf.getLineAndCharacterOfPosition(output.getStart(sf)).line + 1 });
+		}
+	}
+	return edges;
+}
+
 /** React server calls that render directly imported components. */
 export function reactServerComponents(
 	file: string,
