@@ -91,7 +91,7 @@
         {
           "path": "packages/lottie-react/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "cee13bce41f26b79de67a5843f3e53d6067e80bea851da3247fb7beb5d70c1bc"
+          "sha256": "45c4c1e8d6d727abdf23a6ef435c2c036f39d5c989951fe028d64bf32e2ffcde"
         },
         {
           "path": "packages/lottie-react/LICENSE.upstream",
@@ -131,7 +131,7 @@
         {
           "path": "packages/lottie-react/audit/upstream.lock.json",
           "role": "support",
-          "sha256": "cee13bce41f26b79de67a5843f3e53d6067e80bea851da3247fb7beb5d70c1bc"
+          "sha256": "45c4c1e8d6d727abdf23a6ef435c2c036f39d5c989951fe028d64bf32e2ffcde"
         },
         {
           "path": "packages/lottie-react/audit/upstream-crosswalk.json",
