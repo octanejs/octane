@@ -40,6 +40,22 @@ export function GreetingIsland(props) @{
 	</section>
 }
 
+export function ActivityIsland({ log }: { log: (message: string) => void }) @{
+	useLayoutEffect(() => {
+		log('layout setup');
+		return () => {
+			log('layout cleanup');
+		};
+	});
+	useEffect(() => {
+		log('passive setup');
+		return () => {
+			log('passive cleanup');
+		};
+	});
+	<Counter />
+}
+
 export function BadgeIsland(props) @{
 	<p class="badge">{'badge:' + props.label}</p>
 }
