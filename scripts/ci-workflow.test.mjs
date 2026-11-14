@@ -363,6 +363,43 @@ describe('CI workflow aggregation', () => {
 		);
 	});
 
+	test('smokes both codemod adapters against the generated Octane release before restoring it', () => {
+		const plan = releaseWorkflow.indexOf('      - name: Check for pending releases\n');
+		const start = releaseWorkflow.indexOf('      - name: Validate generated release plan\n');
+		const restore = releaseWorkflow.indexOf(
+			'      - name: Restore checkout after release validation\n',
+		);
+		const reconcile = releaseWorkflow.indexOf(
+			'      - name: Create or update release pull request\n',
+		);
+		assert.ok(plan >= 0 && plan < start && start < restore && restore < reconcile);
+		assert.match(
+			releaseWorkflow.slice(plan, start),
+			/plan\.releases\.some\(\s*\(\{ name, type \}\) => name === 'octane' && \(type === 'minor' \|\| type === 'major'\),\s*\)/,
+		);
+		const validation = releaseWorkflow.slice(start, restore);
+		assert.match(validation, /if: steps\.release_plan\.outputs\.has_releases == 'true'/);
+		assert.match(
+			validation,
+			/BUMPS_OCTANE_RELEASE_LINE: \$\{\{ steps\.release_plan\.outputs\.bumps_octane_release_line \}\}/,
+		);
+		assert.match(
+			validation,
+			/pnpm changeset:version[\s\S]*?if \[ "\$BUMPS_OCTANE_RELEASE_LINE" = true \]; then\n\s+pnpm exec vitest run --project codemod[\s\S]*?react-intl-runtime\.test\.js[\s\S]*?scoped-store-contract\.test\.js[\s\S]*?\n\s+fi/,
+		);
+		assert.doesNotMatch(validation, /continue-on-error:/);
+		const titles = validation.match(/-t '([^']+)'/)?.[1].split('|');
+		const fixtures = ['react-intl-runtime', 'scoped-store-contract'];
+		assert.equal(titles?.length, fixtures.length);
+		for (const [index, fixture] of fixtures.entries()) {
+			const source = readFileSync(
+				path.join(REPO, `packages/codemod/tests/${fixture}.test.js`),
+				'utf8',
+			);
+			assert.ok(source.includes(`it('${titles[index]}`), `missing release smoke in ${fixture}`);
+		}
+	});
+
 	test('records release checks from the fresh branch ref when pull request metadata is stale', async () => {
 		const currentMain = 'current-main';
 		const staleMain = 'stale-main';
