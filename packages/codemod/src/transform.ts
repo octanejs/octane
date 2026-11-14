@@ -6082,33 +6082,30 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			? this.ifDirective(root)
 			: this.relative(this.emit(root, TEMPLATE), root);
 		if (arm === null) return null;
-		if (!literal.elements.some(ts.isSpreadElement)) {
-			if (index && this.patternReadsOrdinal(item.name, index)) {
-				this.note(
-					MAP_PARAMETER_TDZ,
-					'error',
-					node,
-					'An @for row initializes its index before this parameter pattern can read it. Review the original callback’s initialization order.',
-				);
-			}
-			const mutable = (name: ts.Identifier) =>
-				!fixedBinding(this.checker, name, name, undefined, (use) => !isPropertyName(use));
-			if (
-				(index && ts.isIdentifier(index.name) && mutable(index.name)) ||
-				(!ts.isIdentifier(item.name) &&
-					reads(
-						item.name,
-						(name) =>
-							ts.isBindingElement(name.parent) && name.parent.name === name && mutable(name),
-					))
-			) {
-				this.note(
-					MAP_PARAMETER_WRITE,
-					'error',
-					node,
-					'Cannot prove this map parameter stays unchanged in an @for row. Exclude the source from migration or keep the parameter unchanged.',
-				);
-			}
+		if (index && this.patternReadsOrdinal(item.name, index)) {
+			this.note(
+				MAP_PARAMETER_TDZ,
+				'error',
+				node,
+				'An @for row initializes its index before this parameter pattern can read it. Review the original callback’s initialization order.',
+			);
+		}
+		const mutable = (name: ts.Identifier) =>
+			!fixedBinding(this.checker, name, name, undefined, (use) => !isPropertyName(use));
+		if (
+			(index && ts.isIdentifier(index.name) && mutable(index.name)) ||
+			(!ts.isIdentifier(item.name) &&
+				reads(
+					item.name,
+					(name) => ts.isBindingElement(name.parent) && name.parent.name === name && mutable(name),
+				))
+		) {
+			this.note(
+				MAP_PARAMETER_WRITE,
+				'error',
+				node,
+				'Cannot prove this map parameter stays unchanged in an @for row. Exclude the source from migration or keep the parameter unchanged.',
+			);
 		}
 		this.count(RULE.for);
 		let source = this.emit(callee.expression, PLAIN);
