@@ -254,6 +254,43 @@ Inside a retained React component, a rich-text callback such as `chunks => <stro
 
 A native `formatMessage` call or a generated native `FormattedMessage` can return the expected string while losing resource hints scheduled by a provider-supplied formatter. A generated formatter can also lose access to other React ancestor contexts. The codemod retains the preview and reports a blocking diagnostic for these calls and islands. Review the actual provider and formatter before adopting them. A local `IntlProvider` can inherit configuration from its mutable class defaults. Explicitly authored React boundaries keep their existing contract.
 
+### Extracting FormatJS messages
+
+`formatjs extract` expects ordinary TypeScript and JSX. After converting files to `.tsrx`, use `compileToVolarMappings` from `octane/compiler` to project those files to temporary TSX for extraction. Pass retained files and projected files to the same FormatJS invocation so it can check message IDs across both.
+
+Save the script below as `extract-formatjs.mjs` in a project with Octane and the FormatJS CLI installed.
+
+```js
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { compileToVolarMappings } from 'octane/compiler';
+
+const directory = mkdtempSync(join(tmpdir(), 'octane-formatjs-'));
+try {
+	const files = process.argv.slice(2).map((file, index) => {
+		if (!file.endsWith('.tsrx')) return file;
+		const { code, errors } = compileToVolarMappings(readFileSync(file, 'utf8'), file);
+		if (errors.length) throw new Error(`Cannot project ${file} for message extraction`);
+		const projection = join(directory, `${index}.tsx`);
+		writeFileSync(projection, code);
+		return projection;
+	});
+	execFileSync('formatjs', ['extract', '--throws', '--out-file', 'messages.json', ...files], {
+		stdio: 'inherit',
+	});
+} finally {
+	rmSync(directory, { recursive: true, force: true });
+}
+```
+
+```sh
+pnpm exec node extract-formatjs.mjs src/retained.tsx src/migrated.tsrx
+```
+
+Use the same FormatJS options you used before migration. Aliased message components may need `--additional-component-names` with your extractor version. This example writes a catalog without source locations. With `--extract-source-location`, FormatJS reports the temporary TSX paths and offsets for projected files. If your workflow needs authored locations, keep message definitions in ordinary TypeScript or use the codemod's `--target tsx` option.
+
 ## Store hooks in linked workspace packages
 
 The codemod can migrate a named hook from a local `workspace:` dependency when it can read the TypeScript implementation, trace a React context read, and verify that the hook uses the same store code as a renderer-independent public entry. The public entry and hook names can vary. The supported runtime versions match the React Intl adapter above. A top-level `const` can expose a second name for a handle already created by a verified shared factory. Consumers keep the original handle identity.
