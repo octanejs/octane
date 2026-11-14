@@ -4181,6 +4181,51 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		},
 	);
 
+	it.each(['Caller.ts', 'index.html'])(
+		'reports a Unicode-alternate module spelling in %s before writing',
+		async (issuer) => {
+			const file = 'Caf\u00e9.tsx';
+			const alternate = file.normalize('NFD');
+			const source = 'export function Cafe(){return <b />;}';
+			const root = project({
+				[file]: source,
+				'First.tsx': 'export function First(){return <i />;}',
+			});
+			const alternatePath = path.join(root, alternate);
+			const sameFile = fs.existsSync(alternatePath);
+			const unrelated = 'export function Cafe(){return <aside />;}';
+			if (!sameFile) fs.writeFileSync(alternatePath, unrelated);
+			const caller =
+				issuer === 'index.html'
+					? `<script type="module" src="./${alternate}"></script>`
+					: `export { Cafe } from './${alternate}';`;
+			fs.writeFileSync(path.join(root, issuer), caller);
+			const inputs = ['First.tsx', file].map((name) => path.join(root, name));
+			const options = { root, verify: false };
+			const preview = await runCodemod(inputs, { ...options, write: false });
+			const written = await runCodemod(inputs, { ...options, write: true });
+			const output = file.replace(/\.tsx$/, '.tsrx');
+			if (!sameFile) {
+				expect(written.files.map(({ output }) => output)).toEqual(['First.tsrx', output]);
+				expect(fs.readFileSync(alternatePath, 'utf8')).toBe(unrelated);
+			} else {
+				const conflict = expect.objectContaining({
+					rule: 'rename-conflict',
+					severity: 'error',
+					message: expect.stringContaining(issuer),
+				});
+				expect(preview.files.find((row) => row.file === file)?.notes).toEqual([conflict]);
+				expect(written.files).toEqual([
+					expect.objectContaining({ file, output: file, changed: false, notes: [conflict] }),
+				]);
+				expect(fs.readFileSync(inputs[1], 'utf8')).toBe(source);
+				expect(fs.existsSync(path.join(root, 'First.tsrx'))).toBe(false);
+				expect(fs.existsSync(path.join(root, output))).toBe(false);
+			}
+			expect(fs.readFileSync(path.join(root, issuer), 'utf8')).toBe(caller);
+		},
+	);
+
 	it('preserves path-like display text in a selected module', async () => {
 		const text = './linked/Part.tsx';
 		const root = project({
