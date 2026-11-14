@@ -30,6 +30,8 @@ import {
 	reportUncaughtError,
 	ROOT_RENDER_ROLLBACK,
 	TRANSITION_JOURNAL,
+	RENDERER_REGION_OWNER_COUNT,
+	updateRendererRegionOwnerCount,
 } from './drivers.js';
 import {
 	beginNativeReadScope,
@@ -92,11 +94,6 @@ export let CONTEXT_DEPENDENCIES: {
 } | null = null;
 export let CONTEXT_CHILD: typeof useContextInternal | null = null;
 const RENDERER_REGION_DOM_OWNERS = new WeakMap<Block, RendererRegionOwnerBridge>();
-// Live region-owner roots (WeakMap exposes no size). Ordinary apps never bind
-// one, so every bridge lookup's caller first tests this count by truthiness:
-// one integer test per read, and a bundle without bindRendererRegionOwner
-// never assigns it and omits the lookups.
-export let RENDERER_REGION_OWNER_COUNT = 0;
 const RENDERER_REGION_DOM_BINDINGS = new WeakMap<
 	Block,
 	{
@@ -630,14 +627,14 @@ function bindRendererRegionOwnerImpl(props: unknown): void {
 	root.$$ctxCache = null;
 	root.$$ctxCacheOwner = null;
 	if (previous === undefined) {
-		RENDERER_REGION_OWNER_COUNT++;
+		updateRendererRegionOwnerCount(1);
 		(root.cleanups ??= []).push(() => {
 			const current = RENDERER_REGION_DOM_BINDINGS.get(root);
 			if (current === undefined) return;
 			current.release();
 			RENDERER_REGION_DOM_BINDINGS.delete(root);
 			RENDERER_REGION_DOM_OWNERS.delete(root);
-			RENDERER_REGION_OWNER_COUNT--;
+			updateRendererRegionOwnerCount(-1);
 		});
 	}
 }

@@ -12,6 +12,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
+import { flushSync as reactFlushSync } from 'react-dom';
 import { OctaneCompat } from 'octane/react';
 import { flushSync as octaneFlushSync } from '../../src/index.js';
 import { act as octaneAct, createLog, flushEffects } from '../_helpers.js';
@@ -21,6 +22,7 @@ import {
 	BadgeIsland,
 	CleanupThrowIsland,
 	GreetingIsland,
+	InsertionEffectIsland,
 	LocallyGuardedIsland,
 	NotifyIsland,
 	RefIsland,
@@ -626,6 +628,44 @@ describe('octane/react — suspension and error escape to React boundaries', () 
 				expect(log.drain()).toEqual(
 					mode === 'layout' ? ['rendered:settled', 'layout:settled'] : [],
 				);
+			} finally {
+				await mounted.unmount();
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'skips pending insertion setups after a hosted update deletes its host (detached %s)',
+		async (detached) => {
+			const log = createLog();
+			let removeHost!: () => void;
+			const mounted = await mountReactHost(
+				h(OctaneCompat<Parameters<typeof InsertionEffectIsland>[0]>, {
+					component: InsertionEffectIsland,
+					props: {
+						log: (message) => {
+							log.push(message);
+							if (message === 'first setup:1') removeHost();
+						},
+					},
+				}),
+				{ detached },
+			);
+			removeHost = () => {
+				reactFlushSync(() => mounted.reactRoot.unmount());
+				log.push('host children:' + mounted.container.childNodes.length);
+			};
+			try {
+				expect(log.drain()).toEqual(['first setup:0', 'second setup:0']);
+				const button = mounted.host().querySelector('button')!;
+				await reactAct(() => octaneAct(() => button.click()));
+				expect(log.drain()).toEqual([
+					'first cleanup:0',
+					'second cleanup:0',
+					'first setup:1',
+					'host children:0',
+					'first cleanup:1',
+				]);
 			} finally {
 				await mounted.unmount();
 			}
