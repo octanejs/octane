@@ -187,6 +187,8 @@ export function projectTypeAt(node: ts.Node, types: TransformOptions['types']) {
  * members.
  */
 export function bind(filename: string, source: string) {
+	// The program asks its host for slash-delimited paths even on Windows.
+	filename = filename.replaceAll('\\', '/');
 	const lib = esLib();
 	const sf = ts.createSourceFile(
 		filename,
@@ -3379,9 +3381,6 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			return false;
 		const owner = this.importOf(use.expression);
 		if (!owner || owner.namespace || owner.typeOnly) return false;
-		const file = resolveRegistry(owner.module);
-		if (!file) return false;
-
 		const [name, object, trailing] = use.arguments;
 		if (
 			!name ||
@@ -3431,6 +3430,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 
 		const types = this.options.types;
 		if (!types || types.sourceFile.text !== this.source) return false;
+		const file = resolveRegistry(owner.module);
+		if (!file) return false;
 		const { sourceFile, checker } = types;
 		const peer = nodeSpanning(sourceFile, call.getStart(this.sf), call.end);
 		const callee = nodeSpanning(sourceFile, use.expression.getStart(this.sf), use.expression.end);
@@ -3449,7 +3450,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			!decl ||
 			!ts.isFunctionDeclaration(decl) ||
 			!decl.body ||
-			decl.getSourceFile().fileName !== file ||
+			decl.getSourceFile() !== file ||
 			!(ts.getCombinedModifierFlags(decl) & ts.ModifierFlags.Export)
 		)
 			return false;

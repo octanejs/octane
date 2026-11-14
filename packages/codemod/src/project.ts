@@ -1141,7 +1141,7 @@ export async function runCodemod(
 								const request = path.resolve(path.dirname(file), specifier);
 								if (registry !== request && registry !== request + path.extname(registry)) return;
 								if (ts.findConfigFile(path.dirname(registry), ts.sys.fileExists) === rootProject)
-									return registry;
+									return program?.getSourceFile(registry);
 							}
 						: undefined,
 				get originalReact() {
