@@ -100,19 +100,22 @@ export function SuspendingEffectIsland({
 	rendered,
 	layout,
 	passive,
+	afterPassive,
 }: {
 	resource: PromiseLike<string>;
 	rendered: (value: string) => void;
 	layout: (value: string) => void;
-	passive: (value: string) => void;
+	passive: (value: string) => void | (() => void);
+	afterPassive?: (value: string) => void;
 }) @{
 	const value = use(resource);
 	rendered(value);
 	useLayoutEffect(() => {
 		layout(value);
 	}, [value]);
+	useEffect(() => passive(value), [value]);
 	useEffect(() => {
-		passive(value);
+		afterPassive?.(value);
 	}, [value]);
 	<p class="resolved">{value as string}</p>
 }

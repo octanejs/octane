@@ -631,6 +631,46 @@ describe('octane/react — suspension and error escape to React boundaries', () 
 			}
 		},
 	);
+
+	it('cleans up the effect that deletes its host and skips the next effect', async () => {
+		const resource = deferred<string>();
+		const log = createLog();
+		let unmount!: () => void;
+		const mounted = await mountReactHost(
+			h(
+				React.Suspense,
+				{ fallback: h('p', { className: 'react-fallback' }, 'react pending') },
+				h(OctaneCompat<Parameters<typeof SuspendingEffectIsland>[0]>, {
+					component: SuspendingEffectIsland,
+					props: {
+						resource: resource.promise,
+						rendered: () => {},
+						layout: () => {},
+						passive: () => {
+							log.push('passive setup');
+							unmount();
+							return () => {
+								log.push('passive cleanup');
+							};
+						},
+						afterPassive: () => log.push('next passive setup'),
+					},
+				}),
+			),
+		);
+		unmount = () => mounted.reactRoot.unmount();
+		try {
+			expect(mounted.container.querySelector('.react-fallback')).not.toBeNull();
+			await reactAct(async () => {
+				resource.resolve('settled');
+				await resource.promise;
+			});
+			expect(mounted.container.childNodes).toHaveLength(0);
+			expect(log.drain()).toEqual(['passive setup', 'passive cleanup']);
+		} finally {
+			await mounted.unmount();
+		}
+	});
 });
 
 describe('octane/react — StrictMode, hide/reveal, and teardown discrimination (§5 rule 7)', () => {
