@@ -26,6 +26,7 @@ import {
 	RefIsland,
 	RenderLogIsland,
 	PendingFaultIsland,
+	SuspendingEffectIsland,
 	SuspendingIsland,
 	ThrowingIsland,
 	UseIdIsland,
@@ -583,6 +584,53 @@ describe('octane/react — suspension and error escape to React boundaries', () 
 		expect(document.querySelector('[data-octane-compat]')).toBeNull();
 		expect(document.querySelector('.resolved')).toBeNull();
 	});
+
+	it.each(['initial', 'update', 'layout'] as const)(
+		'stops retrying when React deletes a pending island (%s)',
+		async (mode) => {
+			const resource = deferred<string>();
+			const log = createLog();
+			let unmount!: () => void;
+			const rendered = (value: string) => log.push('rendered:' + value);
+			const layout = (value: string) => {
+				log.push('layout:' + value);
+				if (mode === 'layout' && value === 'settled') unmount();
+			};
+			const passive = (value: string) => log.push('passive:' + value);
+			const tree = (pending: PromiseLike<string>) =>
+				h(
+					React.Suspense,
+					{ fallback: h('p', { className: 'react-fallback' }, 'react pending') },
+					h(OctaneCompat<Parameters<typeof SuspendingEffectIsland>[0]>, {
+						component: SuspendingEffectIsland,
+						props: { resource: pending, rendered, layout, passive },
+					}),
+				);
+			const mounted = await mountReactHost(
+				tree(mode === 'update' ? Promise.resolve('first') : resource.promise),
+			);
+			unmount = () => mounted.reactRoot.unmount();
+			try {
+				if (mode === 'update') {
+					expect(mounted.host().querySelector('.resolved')?.textContent).toBe('first');
+					await mounted.render(tree(resource.promise));
+				}
+				expect(mounted.container.querySelector('.react-fallback')).not.toBeNull();
+				log.clear();
+				await reactAct(async () => {
+					resource.resolve('settled');
+					if (mode !== 'layout') unmount();
+					await resource.promise;
+				});
+				expect(mounted.container.childNodes).toHaveLength(0);
+				expect(log.drain()).toEqual(
+					mode === 'layout' ? ['rendered:settled', 'layout:settled'] : [],
+				);
+			} finally {
+				await mounted.unmount();
+			}
+		},
+	);
 });
 
 describe('octane/react — StrictMode, hide/reveal, and teardown discrimination (§5 rule 7)', () => {

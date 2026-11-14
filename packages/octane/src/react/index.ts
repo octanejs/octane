@@ -192,7 +192,7 @@ class HostedIslandController {
 	private committed: TransportedChild | null = null;
 	private episode: PendingEpisode | null = null;
 	private disposers = new Set<() => void>();
-	/** A new insertion-effect setup cancels disposal queued by the previous setup. */
+	/** Positive while mounted. Cleanup negates the generation before deferring disposal. */
 	private lifecycleGeneration = 0;
 	private attemptSuspended = false;
 	private attemptErrored = false;
@@ -440,10 +440,13 @@ class HostedIslandController {
 
 	/** Insertion effects stay registered while React hides or probes the island. */
 	startLifetime(): () => void {
-		const generation = ++this.lifecycleGeneration;
+		const generation = Math.abs(this.lifecycleGeneration) + 1;
+		this.lifecycleGeneration = generation;
 		return () => {
+			if (generation !== this.lifecycleGeneration) return;
+			this.lifecycleGeneration = -generation;
 			queueMicrotask(() => {
-				if (this.disposed || generation !== this.lifecycleGeneration) return;
+				if (this.disposed || this.lifecycleGeneration !== -generation) return;
 				try {
 					this.dispose();
 				} catch (error) {
@@ -530,14 +533,15 @@ class HostedIslandController {
 		// A settlement from a superseded episode or an unmounted island is a
 		// no-op. routeError supersedes the episode when a fault is staged, so a
 		// stale settlement can never clobber an error with a "ready" status.
-		if (this.disposed || this.episode !== episode) return;
+		if (this.lifecycleGeneration < 0 || this.episode !== episode) return;
 		// Retry Octane FIRST; React learns about readiness only after the hosted
 		// tree has committed (§7 — the Ripple lesson).
 		const result = this.attachAndFlush();
 		// Re-suspended: the same episode remains pending. Errored: routeError
 		// already superseded the episode, staged status 2, and resolved the relay
 		// so the wrapper wakes and throws into the nearest React error boundary.
-		if (result.suspended || result.errored) return;
+		// A layout effect in the retry can synchronously delete the React host.
+		if (this.lifecycleGeneration < 0 || result.suspended || result.errored) return;
 		this.episode = null;
 		this.status = 0;
 		this.payload = null;

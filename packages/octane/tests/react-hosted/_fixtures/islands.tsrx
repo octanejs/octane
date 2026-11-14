@@ -95,6 +95,28 @@ export function SuspendingIsland(props) @{
 	<p class="resolved">{('value:' + value) as string}</p>
 }
 
+export function SuspendingEffectIsland({
+	resource,
+	rendered,
+	layout,
+	passive,
+}: {
+	resource: PromiseLike<string>;
+	rendered: (value: string) => void;
+	layout: (value: string) => void;
+	passive: (value: string) => void;
+}) @{
+	const value = use(resource);
+	rendered(value);
+	useLayoutEffect(() => {
+		layout(value);
+	}, [value]);
+	useEffect(() => {
+		passive(value);
+	}, [value]);
+	<p class="resolved">{value as string}</p>
+}
+
 /**
  * Suspends on props.resource once committed, and can be told to fault from an
  * island-internal update: `props.arm` receives a trigger that schedules an
