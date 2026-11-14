@@ -509,14 +509,17 @@ function returnsJsx(statements: readonly ts.Statement[]) {
 	return statements.some(visit);
 }
 
-/** A JSX return in this statement or its plain lexical blocks. */
-function directlyReturnsJsx(statement: ts.Statement): boolean {
-	if (ts.isBlock(statement)) return statement.statements.some(directlyReturnsJsx);
-	return (
-		ts.isReturnStatement(statement) &&
-		!!statement.expression &&
-		isJsx(skipWrappers(statement.expression))
-	);
+/** Follow a clause's straight-line statements and plain lexical blocks to an exit. */
+function clauseReturnsJsx(statements: readonly ts.Statement[]): boolean | undefined {
+	for (const statement of statements) {
+		if (ts.isReturnStatement(statement))
+			return !!statement.expression && isJsx(skipWrappers(statement.expression));
+		if (ts.isBreakStatement(statement) || ts.isThrowStatement(statement)) return false;
+		if (ts.isBlock(statement)) {
+			const returns = clauseReturnsJsx(statement.statements);
+			if (returns !== undefined) return returns;
+		}
+	}
 }
 
 /** Document tags a router shell renders through `@octanejs/tanstack-router`. */
@@ -6219,7 +6222,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				!rowKeyLiteral(last.expression) &&
 				!fn.asteriskToken &&
 				!fn.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
-				last.caseBlock.clauses.some((clause) => clause.statements.some(directlyReturnsJsx))
+				last.caseBlock.clauses.some((clause) => clauseReturnsJsx(clause.statements) === true)
 			) {
 				this.reportOpaqueMap(node);
 			}

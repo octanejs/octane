@@ -75,6 +75,13 @@ describe('runCodemod', () => {
 export function List() { return <main>{${map}}</main>; }`,
 			'Braced.tsx': `${setup}
 export function List() { return <main>{${map.replace("case 'a': return <b key={row}>{label}</b>;", "case 'a': { const bold = label; return <b key={row}>{bold}</b>; }").replace('default: return (<i key={row}>{label}</i>);', 'default: { return (<i key={row}>{label}</i>); }')}}</main>; }`,
+			'Unreachable.tsx': `${setup}
+export function List() { return <main>{makeRows().map(row => {
+	switch (row) {
+		case 'a': { return row; return <b>{row}</b>; }
+		default: { break; return <i>{row}</i>; }
+	}
+})}</main>; }`,
 			'Island.tsx': `import { ReactCompat } from 'octane/react';
 ${setup}
 export function List() { return <ReactCompat><main>{${map}}</main></ReactCompat>; }`,
@@ -104,6 +111,7 @@ export function List() { return <main>{makeRows().map(row => {
 			'Island.tsx',
 			'Literal.tsx',
 			'Native.tsx',
+			'Unreachable.tsx',
 			'Values.tsx',
 		]);
 		for (const file of files) {
