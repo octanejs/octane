@@ -341,6 +341,96 @@ it.each([
 	expect(helpers.sort()).toEqual(supported ? expectedHelpers : []);
 });
 
+it('warns at a direct migrated server call that needs a standalone store provider', async () => {
+	const rootImport = `import { renderToString } from 'react-dom/server';
+			import DefaultPane, { Pane, Plain, Conditional, Props, Destructured } from './pane.tsx';
+			import AnonymousPane from './anonymous.tsx';`;
+	const { app } = project({
+		'app/src/pane.tsx': `import { useSnapshot } from 'observer';
+			export function Pane() { const value = useSnapshot(); return <b>{String(value)}</b>; }
+			export function Plain() { return <b>plain</b>; }
+			export function Props(props: { label?: string }) {
+				const value = useSnapshot();
+				return <b>{props.label ?? String(value)}</b>;
+			}
+			export function Destructured({ label = 'label' }: { label?: string }) {
+				const value = useSnapshot();
+				return <b>{label}{String(value)}</b>;
+			}
+			export default function DefaultPane() {
+				const value = useSnapshot();
+				return <b>{String(value)}</b>;
+			}
+			export function Conditional() {
+				if (typeof window === 'undefined') return <b>server</b>;
+				const value = useSnapshot();
+				return <b>{String(value)}</b>;
+			}`,
+		'app/src/anonymous.tsx': `import { useSnapshot } from 'observer';
+			export default function () {
+				const value = useSnapshot();
+				return <b>{String(value)}</b>;
+			}`,
+		'app/src/root.tsx':
+			rootImport +
+			`
+			export const html = renderToString(<Pane />);
+			export const plain = renderToString(<Plain />);
+			export const conditional = renderToString(<Conditional />);
+			export const props = renderToString(<Props />);
+			export const destructured = renderToString(<Destructured />);
+			export const defaultPane = renderToString(<DefaultPane />);
+			export const anonymousPane = renderToString(<AnonymousPane />);`,
+		'app/src/hosted.tsx': `import { OctaneCompat } from 'octane/react/server';
+			import { Pane } from './pane.tsx';
+			export function Hosted() { return <OctaneCompat component={Pane} />; }`,
+		'app/src/deferred.tsx':
+			rootImport +
+			`
+			export function render() { return renderToString(<Pane />); }`,
+	});
+	const result = await runCodemod(
+		['root', 'pane', 'anonymous', 'deferred'].map((name) => path.join(app, 'src', name + '.tsx')),
+		{ root: app, strong: true, verify: true, write: true },
+	);
+	const findings = result.files.flatMap((file) =>
+		file.notes
+			.filter((note) => note.rule === 'store-hook' && note.severity === 'warning')
+			.map((note) => ({ file: file.file, ...note })),
+	);
+	expect(findings).toEqual([
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 4,
+			message: expect.stringMatching(/standalone.*NativeStoreProvider/i),
+		}),
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 7,
+			message: expect.stringMatching(/migrated Props.*NativeStoreProvider/),
+		}),
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 8,
+			message: expect.stringMatching(/migrated Destructured.*NativeStoreProvider/),
+		}),
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 9,
+			message: expect.stringMatching(/migrated default export.*NativeStoreProvider/),
+		}),
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 10,
+			message: expect.stringMatching(/migrated default export.*NativeStoreProvider/),
+		}),
+	]);
+	expect(fs.existsSync(path.join(app, 'src/root.tsrx'))).toBe(true);
+	const hosted = fs.readFileSync(path.join(app, 'src/hosted.tsx'), 'utf8');
+	expect(hosted).toContain("from './pane.tsrx'");
+	expect(hosted).toContain('<OctaneCompat component={Pane} />');
+});
+
 it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
 	const source = `import {useSnapshot as useReading, valueOf} from 'observer';
 export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }

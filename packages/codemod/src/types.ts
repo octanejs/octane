@@ -110,6 +110,7 @@ export interface TransformResult {
 	exports: {
 		elementChildren?: { start: number; exported?: string }[];
 		descriptorChildren?: string[];
+		storeHookComponents?: string[];
 		contexts: string[];
 		reexports: { specifier: string; names: [string, string][] | null }[];
 	};

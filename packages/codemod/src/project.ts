@@ -40,8 +40,8 @@ import {
 	executableImports,
 	hostedServerComponents,
 	intrinsicReactExports,
+	reactServerComponents,
 	retainedReactComponentReturns,
-	retainedReactServerComponents,
 	reverseIslandExports,
 } from './react-island-sources.js';
 
@@ -855,6 +855,7 @@ export async function runCodemod(
 		return error;
 	}
 	const results: FileResult[] = [];
+	const storeHookComponents = new Map<string, string[]>();
 	if (options.svgPaths && target === 'tsrx') {
 		// Explicit SVG inputs prepare a native component even if a caller's renderer is unknown.
 		// Directory scans still generate components only for verified JSX uses.
@@ -1145,6 +1146,8 @@ export async function runCodemod(
 			}
 		}
 		const result = transform();
+		if (result.exports.storeHookComponents)
+			storeHookComponents.set(file, result.exports.storeHookComponents);
 		const blockedTransform = result.notes.find(
 			(note) =>
 				note.rule === MAP_PARAMETER_WRITE ||
@@ -1371,6 +1374,36 @@ export async function runCodemod(
 				result.notes.push(note);
 			}
 		}
+		if (
+			selected &&
+			storeHookComponents.size &&
+			result?.rules['server-render'] &&
+			result.rules['root-render'] &&
+			automaticReactJsx(file) &&
+			originalReactEntry(file, 'react-dom/server') &&
+			originalOctaneBridge(file, 'octane/server')
+		) {
+			for (const edge of reactServerComponents(
+				file,
+				source,
+				(module) => module === 'react/jsx-runtime' && originalReactEntry(file, module),
+				true,
+			)) {
+				const leaf = renamed(file, edge.module)?.file;
+				if (
+					!leaf ||
+					leaf !== path.resolve(path.dirname(file), edge.module) ||
+					!storeHookComponents.get(leaf)?.includes(edge.name)
+				)
+					continue;
+				result.notes.push({
+					rule: 'store-hook',
+					severity: 'warning',
+					line: edge.line,
+					message: `If this server call runs standalone and reaches the migrated ${edge.name === 'default' ? 'default export' : edge.name}'s store hook, it may need NativeStoreProvider with its original store context and value.`,
+				});
+			}
+		}
 		const paths = rewriteModulePaths(
 			selected ? source : (result?.code ?? source),
 			file,
@@ -1411,7 +1444,7 @@ export async function runCodemod(
 				for (const edge of retainedReactComponentReturns(file, source))
 					edges.push({ ...edge, renderer: 'JSX' });
 			if (retainedServer && originalReactEntry(file, 'react-dom/server'))
-				for (const edge of retainedReactServerComponents(file, source, (module) =>
+				for (const edge of reactServerComponents(file, source, (module) =>
 					module === 'react'
 						? installedReact(file)
 						: automaticReactJsx(file) && originalReactEntry(file, module),

@@ -117,6 +117,8 @@ export function nativeSetupHook(
 		contextSetup?: boolean;
 		privateContext?: boolean;
 	},
+	// Store-root diagnostics can prove an anonymous declaration's default export.
+	allowAnonymousDefault = false,
 ) {
 	const call = ref.parent;
 	if (!ts.isCallExpression(call) || call.expression !== ref) return false;
@@ -224,21 +226,24 @@ export function nativeSetupHook(
 		name = holder.name;
 	}
 	if (
-		!name ||
-		!/^[A-Z]/.test(name.text) ||
+		(name
+			? !/^[A-Z]/.test(name.text)
+			: !allowAnonymousDefault ||
+				!owner.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)) ||
 		!ts.isSourceFile(owner.parent) ||
 		!owner.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ||
-		renderUses(uses(name)).some((ref) => {
-			const tag = ref.parent;
-			return !(
-				diagnostic &&
-				(ts.isJsxOpeningElement(tag) ||
-					ts.isJsxClosingElement(tag) ||
-					ts.isJsxSelfClosingElement(tag)) &&
-				tag.tagName === ref &&
-				diagnostic.nativeOutput(ts.isJsxSelfClosingElement(tag) ? tag : tag.parent)
-			);
-		})
+		(name &&
+			renderUses(uses(name)).some((ref) => {
+				const tag = ref.parent;
+				return !(
+					diagnostic &&
+					(ts.isJsxOpeningElement(tag) ||
+						ts.isJsxClosingElement(tag) ||
+						ts.isJsxSelfClosingElement(tag)) &&
+					tag.tagName === ref &&
+					diagnostic.nativeOutput(ts.isJsxSelfClosingElement(tag) ? tag : tag.parent)
+				);
+			}))
 	)
 		return false;
 	const last = block.statements.at(-1);
