@@ -5243,6 +5243,10 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		const initializer = attribute?.initializer;
 		if (!initializer || !ts.isJsxExpression(initializer) || !initializer.expression) return false;
 		const value = skipWrappers(initializer.expression);
+		if (ts.isExternalModule(this.sf) && ts.isIdentifier(value) && value.text === 'undefined') {
+			const symbol = this.checker.getSymbolAtLocation(value);
+			if (symbol && this.checker.isUndefinedSymbol(symbol)) return false;
+		}
 		return (
 			value.kind !== ts.SyntaxKind.NullKeyword &&
 			value.kind !== ts.SyntaxKind.FalseKeyword &&

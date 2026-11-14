@@ -4199,6 +4199,7 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 		<input id="single" onChangeCapture={change} />
 		<input id="spread" onInput={input} onChangeCapture={change} {...rest} />
 		<input id="absent" onInput={void 0} onChangeCapture={change} />
+		<input id="global-undefined" onInput={undefined} onChangeCapture={change} />
 		<input id="absent-change" onInput={input} onChangeCapture={null} />
 		<input id="duplicate-input" onInput={input} onInput={void 0} onChangeCapture={change} />
 		<input id="duplicate-capture" onInput={input} onChangeCapture={change} onChangeCapture={void 0} />
@@ -4223,6 +4224,9 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 		expect(file.code).toContain('id="single" onInputCapture={change}');
 		expect(file.code).toContain('id="spread" onInput={input} onInputCapture={change} {...rest}');
 		expect(file.code).toContain('id="absent" onInput={void 0} onInputCapture={change}');
+		expect(file.code).toContain(
+			'id="global-undefined" onInput={undefined} onInputCapture={change}',
+		);
 		expect(file.code).toContain('id="absent-change" onInput={input} onInputCapture={null}');
 		expect(file.code).toContain(
 			'id="duplicate-input" onInput={input} onInput={void 0} onInputCapture={change}',
@@ -4230,6 +4234,25 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 		expect(file.code).toContain(
 			'id="duplicate-capture" onInput={input} onInputCapture={change} onInputCapture={void 0}',
 		);
+	});
+
+	it('warns when an input handler shadows the global undefined value', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'Field.tsx': `export function Field({ input }: { input: () => void }) {
+	const undefined = input;
+	return <input onInput={undefined} onChangeCapture={input} />;
+}`,
+		});
+		const [file] = (await runCodemod([root], { root, write: false })).files;
+		expect(file.notes).toContainEqual(
+			expect.objectContaining({
+				rule: 'native-text-change',
+				severity: 'warning',
+				message: expect.stringContaining('callback order'),
+			}),
+		);
+		expect(file.code).toContain('onInput={undefined} onChangeCapture={input}');
 	});
 
 	it('leaves a text field spread alone when its type has no `onChange`', async () => {
