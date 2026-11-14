@@ -225,11 +225,12 @@ export function hostedServerComponents(file: string, source: string) {
 	return edges;
 }
 
-/** A retained React server call that renders a directly imported component. */
-export function retainedReactServerComponents(
+/** React server calls that render directly imported components. */
+export function reactServerComponents(
 	file: string,
 	source: string,
 	original: (module: 'react' | 'react/jsx-runtime') => boolean,
+	topLevel = false,
 ) {
 	const { sf, checker } = bind(file, source);
 	const edges: { module: string; name: string; line: number }[] = [];
@@ -279,7 +280,18 @@ export function retainedReactServerComponents(
 		}
 		ts.forEachChild(node, visit);
 	}
-	visit(sf);
+	if (topLevel) {
+		for (const statement of sf.statements) {
+			if (!ts.isVariableStatement(statement)) continue;
+			for (const declaration of statement.declarationList.declarations) {
+				const call = declaration.initializer;
+				if (!call || !ts.isCallExpression(call)) continue;
+				const [argument] = call.arguments;
+				if (argument && ts.isJsxSelfClosingElement(argument) && ts.isIdentifier(argument.tagName))
+					visit(call);
+			}
+		}
+	} else visit(sf);
 	return edges;
 }
 

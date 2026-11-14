@@ -879,10 +879,28 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 		}
 
+		const storeHookComponents = new Set<string>();
+		for (const item of this.nativeStoreHooks.keys()) {
+			for (const ref of this.localUses(item.name)) {
+				const call = ref.parent;
+				if (!ts.isCallExpression(call) || call.arguments.length || ts.isOptionalChain(call))
+					continue;
+				if (nativeSetupHook(ref, this.localUses, this.checker) !== 'first') continue;
+				const component = ts.findAncestor(ref, ts.isFunctionDeclaration);
+				if (
+					component?.name &&
+					!component.parameters.length &&
+					!component.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)
+				)
+					storeHookComponents.add(component.name.text);
+			}
+		}
+
 		return {
 			contexts: [...exported],
 			reexports,
 			...(descriptorChildren.length ? { descriptorChildren } : {}),
+			...(storeHookComponents.size ? { storeHookComponents: [...storeHookComponents] } : {}),
 			...(this.elementChildren.length ? { elementChildren: this.elementChildren } : {}),
 		};
 	}

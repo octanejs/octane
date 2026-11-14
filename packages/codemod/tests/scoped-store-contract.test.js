@@ -341,6 +341,51 @@ it.each([
 	expect(helpers.sort()).toEqual(supported ? expectedHelpers : []);
 });
 
+it('warns at a direct migrated server call that needs a standalone store provider', async () => {
+	const rootImport = `import { renderToString } from 'react-dom/server';
+		import { Pane, Plain, Conditional } from './pane.tsx';`;
+	const { app } = project({
+		'app/src/pane.tsx': `import { useSnapshot } from 'observer';
+			export function Pane() { const value = useSnapshot(); return <b>{String(value)}</b>; }
+			export function Plain() { return <b>plain</b>; }
+			export function Conditional() {
+				if (typeof window === 'undefined') return <b>server</b>;
+				const value = useSnapshot();
+				return <b>{String(value)}</b>;
+			}`,
+		'app/src/root.tsx':
+			rootImport +
+			`
+			export const html = renderToString(<Pane />);
+			export const plain = renderToString(<Plain />);
+			export const conditional = renderToString(<Conditional />);`,
+		'app/src/hosted.tsx': `import { OctaneCompat } from 'octane/react/server';
+			import { Pane } from './pane.tsx';
+			export function Hosted() { return <OctaneCompat component={Pane} />; }`,
+		'app/src/deferred.tsx':
+			rootImport +
+			`
+			export function render() { return renderToString(<Pane />); }`,
+	});
+	const result = await runCodemod(
+		['root', 'pane', 'deferred', 'hosted'].map((name) => path.join(app, 'src', name + '.tsx')),
+		{ root: app, strong: true, verify: true, write: true },
+	);
+	const findings = result.files.flatMap((file) =>
+		file.notes
+			.filter((note) => note.rule === 'store-hook' && note.severity === 'warning')
+			.map((note) => ({ file: file.file, ...note })),
+	);
+	expect(findings).toEqual([
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 3,
+			message: expect.stringMatching(/standalone.*NativeStoreProvider/i),
+		}),
+	]);
+	expect(fs.existsSync(path.join(app, 'src/root.tsrx'))).toBe(true);
+});
+
 it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
 	const source = `import {useSnapshot as useReading, valueOf} from 'observer';
 export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }
