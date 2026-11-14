@@ -87,12 +87,12 @@ function hostedServerEnvelope(props: {
 const SESSIONS = new WeakMap<object, HostedServerSession>();
 
 function sessionFor(key: object): HostedServerSession {
-	let session = SESSIONS.get(key);
-	if (session === undefined) {
-		session = createHostedServerSession(reactResourceHints);
-		SESSIONS.set(key, session);
+	let cachedSession = SESSIONS.get(key);
+	if (cachedSession === undefined) {
+		cachedSession = createHostedServerSession(reactResourceHints);
+		SESSIONS.set(key, cachedSession);
 	}
-	return session;
+	return cachedSession;
 }
 
 function createOctaneCompat(host: 'div' | 'span') {
