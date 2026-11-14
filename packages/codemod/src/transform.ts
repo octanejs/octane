@@ -104,6 +104,7 @@ export const MAP_CALLBACK_SCOPE = 'map-callback-scope';
 export const CONTEXT_ALIAS = 'context-path-alias';
 export const CONTEXT_PROVIDER_GETTER = 'context-provider-getter';
 export const ELEMENT_CHILD_ALIAS = 'element-child-path-alias';
+export const INTL_PROVIDER_DEFAULTS = 'intl-provider-defaults';
 
 /** Rule names, as reported. */
 const RULE = {
@@ -5705,17 +5706,44 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 
 	checkDefaultProps(node: ts.BinaryExpression) {
 		if (
-			node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-			ts.isPropertyAccessExpression(node.left) &&
-			node.left.name.text === 'defaultProps'
+			node.operatorToken.kind !== ts.SyntaxKind.EqualsToken ||
+			!ts.isPropertyAccessExpression(node.left)
+		)
+			return;
+		const member = node.left.name.text === 'defaultProps' ? node.left : node.left.expression;
+		if (
+			ts.isExpressionStatement(node.parent) &&
+			node.parent.parent === this.sf &&
+			ts.isPropertyAccessExpression(member) &&
+			member.name.text === 'defaultProps' &&
+			ts.isIdentifier(member.expression) &&
+			[...this.nativeIntl].some((item) => (item.propertyName ?? item.name).text === 'IntlProvider')
 		) {
-			this.note(
-				RULE.defaultProps,
-				'warning',
-				node,
-				'Function components ignore `defaultProps`; move the defaults into the props destructuring.',
-			);
+			const declaration = this.declarationOf(member.expression);
+			const imported = declaration && this.imports.get(declaration);
+			if (
+				declaration &&
+				imported?.module === 'react-intl' &&
+				imported.imported === 'IntlProvider' &&
+				!imported.typeOnly &&
+				!ts.findAncestor(declaration, ts.isImportDeclaration)?.attributes
+			) {
+				this.note(
+					INTL_PROVIDER_DEFAULTS,
+					'error',
+					node,
+					'The generated IntlProvider cannot share the React class defaults assigned here. Keep the provider and its consumers in the original React render.',
+				);
+				return;
+			}
 		}
+		if (node.left.name.text !== 'defaultProps') return;
+		this.note(
+			RULE.defaultProps,
+			'warning',
+			node,
+			'Function components ignore `defaultProps`; move the defaults into the props destructuring.',
+		);
 	}
 
 	// ---------------------------------------------------------------- JSX

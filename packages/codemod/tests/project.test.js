@@ -7239,6 +7239,63 @@ export function Greeting({ count }: { count: number }) {
 		}
 		return root;
 	}
+	it('blocks a provider migration that would split aliases of mutated React Intl defaults', async () => {
+		const provider = `import { IntlProvider as Original } from 'react-intl';
+import { IntlProvider as Provider, useIntl } from 'react-intl';
+function Language() { const { locale } = useIntl(); return <p lang={locale}>{locale}</p>; }
+export function View() { return <Provider locale=""><Language /></Provider>; }`;
+		const assignment =
+			"Original.defaultProps = { ...Original.defaultProps, defaultLocale: 'fr', onError() {} };";
+		const sources = {
+			'src/View.tsx': provider + '\n' + assignment,
+			'src/Field.tsx': provider + "\nOriginal.defaultProps.defaultLocale = 'fr';",
+			'src/Read.tsx': provider + '\nconsole.log(Original.defaultProps);',
+			'src/Shadow.tsx':
+				provider.replace(
+					"import { IntlProvider as Original } from 'react-intl';",
+					'const Original = { defaultProps: {} };',
+				) +
+				'\n' +
+				assignment,
+			'src/Deferred.tsx': provider + `\nexport function setup() { ${assignment} }`,
+			'src/Single.tsx':
+				provider
+					.replace('return <Provider', 'return <Original')
+					.replace('</Provider>', '</Original>') +
+				'\n' +
+				assignment,
+		};
+		const root = setup({
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+			}),
+			...sources,
+		});
+		const options = { root, strong: true };
+		const files = Object.keys(sources).map((file) => path.join(root, file));
+		const diagnostic = 'intl-provider-defaults';
+		const preview = await runCodemod(files, { ...options, write: false });
+		expect(
+			preview.files
+				.filter((file) =>
+					file.notes.some((note) => note.rule === diagnostic && note.severity === 'error'),
+				)
+				.map((file) => file.file)
+				.sort(),
+		).toEqual(['src/Field.tsx', 'src/View.tsx']);
+		expect(preview.files.find((file) => file.file === 'src/View.tsx').code).toContain(
+			'octane-react-intl.tsrx',
+		);
+		const result = await runCodemod(files, { ...options, write: true });
+		expect(result.files).toHaveLength(1);
+		expect(result.files[0].notes).toContainEqual(expect.objectContaining({ rule: diagnostic }));
+		for (const [file, source] of Object.entries(sources)) {
+			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(source);
+			expect(fs.existsSync(path.join(root, file.replace(/\.tsx$/, '.tsrx')))).toBe(false);
+		}
+		expect(fs.existsSync(path.join(root, 'src/octane-react-intl.tsrx'))).toBe(false);
+	});
+
 	it.each([false, true])(
 		'reports direct render-phase scalar formatters (projectTypes=%s)',
 		async (projectTypes) => {
