@@ -27,6 +27,7 @@ import type {
 	RootRenderOwner,
 	RootRenderTransaction,
 	RefAttach,
+	UncommittedRefAttaches,
 	SuspenseRefEntry,
 	OffscreenCapture,
 } from './types.js';
@@ -203,6 +204,18 @@ export let withRefDetachSuppression: typeof withRegisteredRefDetachSuppression =
 export let TRANSITION_TASK_DRIVER: TransitionTaskDriver | null = null;
 export let TRANSITION_ROOT_DRIVER: TransitionRootDriver | null = null;
 export let SCHEDULED_VISIBILITY_DRIVER: ScheduledVisibilityDriver | null = null;
+
+interface HostedRefDriver {
+	readonly skipped: RefAttach[] | null;
+	iterate(queue: RefAttach[]): IterableIterator<RefAttach>;
+	discardSubtree(root: Block, uncommitted: UncommittedRefAttaches): void;
+	finishRetirement(roots: readonly Block[]): void;
+}
+export let HOSTED_REF_DRIVER: HostedRefDriver | null = null;
+
+export function installHostedRefDriver(driver: HostedRefDriver): void {
+	HOSTED_REF_DRIVER ??= driver;
+}
 
 // The root render journal. A root render updates its scopes' records in place
 // while its DOM writes wait for the commit (#2043), so only a feature that can

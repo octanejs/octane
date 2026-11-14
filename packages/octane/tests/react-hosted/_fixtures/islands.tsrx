@@ -3,6 +3,7 @@ import {
 	Fragment,
 	memo,
 	use,
+	useCallback,
 	useEffect,
 	useId,
 	useInsertionEffect,
@@ -58,6 +59,79 @@ export function InsertionEffectIsland({ log }: { log: (message: string) => void 
 		};
 	}, [version]);
 	<button onClick={() => setVersion(1)}>{String(version)}</button>
+}
+
+type QueuedRefMode = 'remove' | 'suspend' | 'abort';
+
+type QueuedRefProps = {
+	record(message: string): void;
+	register(setVersion: (version: number) => void): void;
+	mode?: QueuedRefMode;
+	pending?: Promise<void>;
+};
+
+export function QueuedRefIsland({ record, register, mode, pending }: QueuedRefProps) @{
+	const [version, setVersion] = useState(0);
+	useLayoutEffect(() => {
+		register(setVersion);
+	}, [register]);
+	const first = useCallback(
+		(node: HTMLButtonElement | null) => {
+			record('first ' + (node ? 'attach:' : 'null:') + version);
+			if (node) return () => record('first cleanup:' + version);
+		},
+		[version],
+	);
+	const refVersion = Math.min(version, 1);
+	const second = useCallback(
+		(node: HTMLButtonElement | null) => {
+			record('second ' + (node ? 'attach:' : 'null:') + refVersion);
+			if (node) return () => record('second cleanup:' + refVersion);
+		},
+		[refVersion],
+	);
+	@try {
+		<section>
+			<QueuedRefButton callback={first} />
+			@if (mode === undefined) {
+				<QueuedRefButton callback={second} />
+			} @else if (mode === 'remove') {
+				@if (version < 2) {
+					<button ref={second}>{'second'}</button>
+				}
+			} @else {
+				<>
+					@try {
+						if (version === 2) use(pending!);
+						<button ref={second}>{'second'}</button>
+					} @pending {
+						<QueuedRefPending record={record} />
+					}
+					<QueuedRefGate fail={mode === 'abort' && version === 2} />
+				</>
+			}
+		</section>
+	} @catch {
+		<p>{'caught'}</p>
+	}
+}
+
+function QueuedRefButton({
+	callback,
+}: {
+	callback(node: HTMLButtonElement | null): void | (() => void);
+}) @{
+	<button ref={callback}>{'button'}</button>
+}
+
+function QueuedRefPending({ record }: { record(message: string): void }) @{
+	record('render pending');
+	<p>{'pending'}</p>
+}
+
+function QueuedRefGate({ fail }: { fail: boolean }) @{
+	if (fail) throw Error('discard pending');
+	<i>{'gate'}</i>
 }
 
 type HostedArrayRef<T> =

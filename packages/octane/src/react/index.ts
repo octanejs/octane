@@ -56,6 +56,10 @@ export type {
 
 import * as React from 'react';
 import { hasOwnProp } from '../has-own.js';
+import { installHostedRefDriver } from '../runtime/drivers.js';
+import { attachLiveFragmentRef } from '../runtime/engine.js';
+import { discardSubtreeRefAttachesFrom, type FragmentInstance } from '../runtime/refs.js';
+import type { RefAttach } from '../runtime/types.js';
 import {
 	bindRendererRegionOwner,
 	createContext as createOctaneContext,
@@ -121,6 +125,53 @@ interface ContextSnapshot {
 }
 
 const EMPTY_SNAPSHOT: ContextSnapshot = { entries: [], values: [] };
+
+function refRoot(block: Block | null): Block | null {
+	while (block !== null && block.parentBlock !== null) block = block.parentBlock;
+	return block;
+}
+
+let skippedRefs: RefAttach[] | null = null;
+
+function retainSkippedRef(entry: RefAttach): boolean {
+	const root = refRoot(entry.block);
+	// Native visibility only marks child blocks. A retired root keeps this
+	// marker after its bridge registration is released.
+	if (root?.kind !== 'root' || !root.inactive) return false;
+	// Resolve a Fragment mount's live ref now, before a later render changes it.
+	const ref =
+		entry.ref === attachLiveFragmentRef ? (entry.el as FragmentInstance)._currentRef : entry.ref;
+	if (ref != null) (skippedRefs ??= []).push(ref === entry.ref ? entry : { ...entry, ref });
+	return true;
+}
+
+const hostedRefDriver: Parameters<typeof installHostedRefDriver>[0] = {
+	get skipped() {
+		return skippedRefs?.length ? skippedRefs : null;
+	},
+	*iterate(queue) {
+		let i = 0;
+		try {
+			while (i < queue.length) {
+				const entry = queue[i++];
+				if (!retainSkippedRef(entry)) yield entry;
+			}
+		} finally {
+			// Closing the iterator after a fatal callback still records the retired tail.
+			for (; i < queue.length; i++) retainSkippedRef(queue[i]);
+		}
+	},
+	discardSubtree(root, uncommitted) {
+		if (skippedRefs !== null) discardSubtreeRefAttachesFrom(skippedRefs, root, uncommitted);
+	},
+	finishRetirement(roots) {
+		if (skippedRefs === null || skippedRefs.length === 0) return;
+		skippedRefs = skippedRefs.filter((entry) => {
+			const root = refRoot(entry.block);
+			return root === null || !roots.includes(root);
+		});
+	},
+};
 
 /**
  * Private hosted-root envelope. A plain function is a valid Octane component
@@ -192,6 +243,8 @@ class HostedIslandController {
 	private committed: TransportedChild | null = null;
 	private episode: PendingEpisode | null = null;
 	private disposers = new Map<() => void, Block>();
+	/** Exact roots marked during the current insertion cleanup, including late registrations. */
+	private retiringRoots: Block[] | null = null;
 	/** Positive while mounted. Cleanup negates the generation before deferring disposal. */
 	private lifecycleGeneration = 0;
 	private attemptSuspended = false;
@@ -328,8 +381,12 @@ class HostedIslandController {
 	}
 
 	registerDispose(dispose: () => void, root: Block): () => void {
+		installHostedRefDriver(hostedRefDriver);
 		this.disposers.set(dispose, root);
-		if (this.lifecycleGeneration < 0) root.inactive = true;
+		if (this.retiringRoots !== null) {
+			root.inactive = true;
+			this.retiringRoots.push(root);
+		}
 		this.rootLive = true;
 		return () => {
 			this.disposers.delete(dispose);
@@ -446,19 +503,24 @@ class HostedIslandController {
 		this.lifecycleGeneration = generation;
 		if (previous < 0) {
 			for (const root of this.disposers.values()) root.inactive = false;
+			this.retiringRoots = null;
 		}
 		return () => {
 			if (generation !== this.lifecycleGeneration) return;
 			this.lifecycleGeneration = -generation;
 			// The current Octane effect may still return a cleanup. Skip pending setups
 			// for this host immediately, then dispose after that callback finishes.
-			for (const root of this.disposers.values()) root.inactive = true;
+			const roots = (this.retiringRoots = [...this.disposers.values()]);
+			for (const root of roots) root.inactive = true;
 			queueMicrotask(() => {
 				if (this.disposed || this.lifecycleGeneration !== -generation) return;
 				try {
 					this.dispose();
 				} catch (error) {
 					reportHostedFault(error);
+				} finally {
+					this.retiringRoots = null;
+					hostedRefDriver.finishRetirement(roots);
 				}
 			});
 		};
