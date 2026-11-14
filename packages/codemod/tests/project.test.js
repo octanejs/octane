@@ -441,6 +441,60 @@ describe('runCodemod', () => {
 		['plain return', 'Leaf', '<Leaf />', '', true],
 		['named and default export', 'Leaf', '<Leaf />', '', true],
 		['named import', '{ Leaf }', '<Leaf />', '', true],
+		['extensionless return', '{ Leaf as Child }', '<Child />', '', true, './Leaf'],
+		['dotted stem', '{ Leaf }', '<Leaf />', '', true, './Leaf.light', {}, 'Leaf.light.tsx'],
+		['directory index', '{ Leaf }', '<Leaf />', '', true, './Leaf', {}, 'Leaf/index.tsx'],
+		[
+			'directory index with a package entry',
+			'{ Leaf }',
+			'<Leaf />',
+			'',
+			false,
+			'./Leaf',
+			{ 'Leaf/package.json': '{"browser":"./Other.js"}' },
+			'Leaf/index.tsx',
+		],
+		[
+			'directory index with a JSON sibling',
+			'{ Leaf }',
+			'<Leaf />',
+			'',
+			false,
+			'./Leaf',
+			{ 'Leaf.json': '{}' },
+			'Leaf/index.tsx',
+		],
+		[
+			'directory index with an extensionless file',
+			'{ Leaf }',
+			'<Leaf />',
+			'',
+			false,
+			'./Leaf',
+			{ 'Leaf/index': 'export function Leaf() { return null; }' },
+			'Leaf/index.tsx',
+		],
+		['extensionless shadowed binding', '{ Leaf }', '<Leaf />', '', false, './Leaf'],
+		['extensionless path alias', '{ Leaf }', '<Leaf />', '', false, '@/Leaf'],
+		['extensionless module suffixes', '{ Leaf }', '<Leaf />', '', false, './Leaf'],
+		[
+			'extensionless JavaScript sibling',
+			'{ Leaf }',
+			'<Leaf />',
+			'',
+			false,
+			'./Leaf',
+			{ 'Leaf.js': 'export function Leaf() { return null; }' },
+		],
+		[
+			'extensionless directory fallback',
+			'{ Leaf }',
+			'<Leaf />',
+			'',
+			false,
+			'./Leaf',
+			{ 'Leaf/index.tsx': 'export function Leaf() { return null; }' },
+		],
 		['React JSX pragma', 'Leaf', '<Leaf />', '/** @jsxImportSource react */', true],
 		['native JSX', 'Leaf', '<Leaf />', '/** @jsxImportSource octane */', false],
 		['mapped JSX runtime', 'Leaf', '<Leaf />', '', false],
@@ -449,8 +503,17 @@ describe('runCodemod', () => {
 		['shadowed binding', 'Leaf', '<Leaf />', '', false],
 		['explicit bridge', 'Leaf', '<OctaneCompat component={Leaf} />', '', false],
 	])(
-		'advises on a retained JSX issuer with a %s',
-		async (shape, binding, output, pragma, warns) => {
+		'advises on a retained JSX issuer (%s)',
+		async (
+			shape,
+			binding,
+			output,
+			pragma,
+			warns,
+			specifier = './Leaf.tsx',
+			siblings = {},
+			leaf = 'Leaf.tsx',
+		) => {
 			const root = project({
 				'tsconfig.json': JSON.stringify({
 					compilerOptions: {
@@ -459,23 +522,28 @@ describe('runCodemod', () => {
 						...(shape === 'mapped JSX runtime'
 							? { paths: { 'react/jsx-runtime': ['./other.ts'] } }
 							: {}),
+						...(shape === 'extensionless path alias' ? { paths: { '@/*': ['./*'] } } : {}),
+						...(shape === 'extensionless module suffixes'
+							? { moduleSuffixes: ['.native', ''] }
+							: {}),
 					},
 				}),
 				'other.ts': 'export const jsx = () => null;',
-				'Leaf.tsx':
+				[leaf]:
 					'export function Leaf() { return <button>Original</button>; }\nexport default Leaf;',
 				'Owner.tsx': `${pragma}
 import { OctaneCompat } from 'octane/react';
-import ${binding} from './Leaf.tsx';
-export function Owner(${shape === 'shadowed binding' ? '{ Leaf }' : ''}) { return ${output}; }
+import ${binding} from '${specifier}';
+export function Owner(${shape.endsWith('shadowed binding') ? '{ Leaf }' : ''}) { return ${output}; }
 ${shape === 'named and default export' ? 'export default Owner;' : ''}`,
+				...siblings,
 			});
 			fs.symlinkSync(
 				path.join(REPO, 'packages/codemod/node_modules'),
 				path.join(root, 'node_modules'),
 				'dir',
 			);
-			const selected = [path.join(root, 'Leaf.tsx')];
+			const selected = [path.join(root, leaf)];
 			const preview = await runCodemod(selected, {
 				root,
 				strong: true,
@@ -489,8 +557,14 @@ ${shape === 'named and default export' ? 'export default Owner;' : ''}`,
 					)
 					.map(() => file.file),
 			);
-			expect(affected).toEqual(warns ? ['Leaf.tsx', 'Owner.tsx'] : []);
-			if (shape === 'plain return') {
+			expect(affected).toEqual(warns ? [leaf, 'Owner.tsx'] : []);
+			if (shape.startsWith('extensionless') || leaf !== 'Leaf.tsx')
+				expect(preview.files.find((file) => file.file === 'Owner.tsx')?.code).toContain(
+					shape === 'extensionless path alias'
+						? "'@/Leaf.tsrx'"
+						: `'./${leaf.replace(/\.tsx$/, '.tsrx')}'`,
+				);
+			if (shape === 'plain return' || shape === 'extensionless return') {
 				const result = await runCodemod(selected, { root, strong: true, verify: true });
 				expect(result.files.find((file) => file.file === 'Owner.tsx')?.notes).toEqual(
 					expect.arrayContaining([
