@@ -509,6 +509,19 @@ function returnsJsx(statements: readonly ts.Statement[]) {
 	return statements.some(visit);
 }
 
+/** Follow a clause's straight-line statements and plain lexical blocks to an exit. */
+function clauseReturnsJsx(statements: readonly ts.Statement[]): boolean | undefined {
+	for (const statement of statements) {
+		if (ts.isReturnStatement(statement))
+			return !!statement.expression && isJsx(skipWrappers(statement.expression));
+		if (ts.isBreakStatement(statement) || ts.isThrowStatement(statement)) return false;
+		if (ts.isBlock(statement)) {
+			const returns = clauseReturnsJsx(statement.statements);
+			if (returns !== undefined) return returns;
+		}
+	}
+}
+
 /** Document tags a router shell renders through `@octanejs/tanstack-router`. */
 const DOCUMENT_TAGS: Record<string, string> = {
 	html: 'Html',
@@ -6131,6 +6144,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return whenFalse === '' ? then : then + ' ' + this.block('@else', whenFalse);
 	}
 
+	private reportOpaqueMap(node: ts.CallExpression) {
+		this.note(
+			RULE.for,
+			'error',
+			node,
+			'This receiver can override .map() and inspect the React elements its callback returns. Keep this list in React or verify its map behavior before porting it.',
+		);
+	}
+
 	/**
 	 * `items.map((item, i) => <Row key={item.id} />)` is
 	 * `@for (const item of items; index i; key item.id) { <Row /> }`.
@@ -6193,6 +6215,17 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		if (ts.isBlock(fn.body)) {
 			const statements = fn.body.statements;
 			const last = statements[statements.length - 1];
+			if (
+				last &&
+				ts.isSwitchStatement(last) &&
+				!literal &&
+				!rowKeyLiteral(last.expression) &&
+				!fn.asteriskToken &&
+				!fn.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
+				last.caseBlock.clauses.some((clause) => clauseReturnsJsx(clause.statements) === true)
+			) {
+				this.reportOpaqueMap(node);
+			}
 			if (!last || !ts.isReturnStatement(last) || !last.expression) return null;
 			setup = statements.slice(0, -1);
 			const exit = this.emptyArmExit(setup);
@@ -6230,14 +6263,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				return null;
 			}
 		}
-		if (!literal) {
-			this.note(
-				RULE.for,
-				'error',
-				node,
-				'This receiver can override .map() and inspect the React elements its callback returns. Keep this list in React or verify its map behavior before porting it.',
-			);
-		}
+		if (!literal) this.reportOpaqueMap(node);
 		if (attribute && key && !this.stableRowKey(key, item, iterable)) {
 			const open = attribute.parent.parent;
 			const children = ts.isJsxElement(root) ? root.children : [];
