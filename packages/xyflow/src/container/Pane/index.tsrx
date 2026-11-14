@@ -276,7 +276,11 @@ export function Pane({
 		if (!autoPanOnSelection || !containerBounds.current) {
 			return;
 		}
-		const [x, y] = calcAutoPan(position.current, containerBounds.current, autoPanSpeed);
+		// @xyflow/system always returns the x/y pair but declares it as number[].
+		const [x, y] = calcAutoPan(position.current, containerBounds.current, autoPanSpeed) as [
+			number,
+			number,
+		];
 
 		panBy({ x, y }).then((panned) => {
 			if (!selectionInProgress.current || !panned) {
