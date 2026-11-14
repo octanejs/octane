@@ -69,17 +69,17 @@
         {
           "path": "packages/input-otp/audit/pristine-runtime-crosswalk.json",
           "role": "support",
-          "sha256": "fb1073b5e138bbeb15d48331b6c6d7c4f21452749e4db2d5166b039dabf2ed0f"
+          "sha256": "ebbea7a868bbe0ed11ee16273bb26f4587d0311b9a1fc5ea37e4b7662777ac01"
         },
         {
           "path": "packages/input-otp/audit/pristine-adaptation-ledger.json",
           "role": "support",
-          "sha256": "7bf59feb3860ef6a035a98e238eb287a09c47551c0d3efa409557642440e22fc"
+          "sha256": "b9f312f914dd1bfd05a8d4be2a8d626740d17717d8f5303306ccf68a759fc711"
         },
         {
           "path": "packages/input-otp/tests/pristine/upstream.browser.test.ts",
           "role": "support",
-          "sha256": "e7fdfc659200c780071b325792a13a26b3a6e3bc9e81c6df195334d56145cf08"
+          "sha256": "0ec8c6d61e522ba8e6ecba9ec06428dae893391cb2a60598f17c0f012888fade"
         },
         {
           "path": "packages/input-otp/upstream/apps/playground/src/tests/base.delete-word.spec.ts",
