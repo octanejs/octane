@@ -4601,6 +4601,70 @@ describe('compiler-owned component-region memoization', () => {
 		}
 	});
 
+	it.each(['host', 'component'])('uses positions for keyless mapped %s rows', async (kind) => {
+		const element = kind === 'host' ? '<li data-value={row.value} />' : '<Row value={row.value} />';
+		const source = `
+			function Row({ value }) @{ <li data-value={value} /> }
+			export function App({ rows }) @{ <ul>{rows.map(row => ${element})}</ul> }
+		`;
+		const load = (mode: 'client' | 'server') =>
+			loadCompiledFixtureSource(source, {
+				id: 'map-positional-rows.tsrx',
+				mode,
+				compileOptions: { hmr: false, dev: false, strong: false },
+			}).App;
+		const client = load('client');
+		const readId = vi.fn(() => {
+			throw Error('The map callback never reads id');
+		});
+		const rows = Array.from({ length: 32 }, (_, index) => ({
+			value: String(index),
+			get id() {
+				return readId();
+			},
+		}));
+		const reverse = rows.toReversed();
+		const custom = {
+			map<T>(callback: (row: (typeof rows)[number]) => T) {
+				return reverse.map((row) => callback(row));
+			},
+		};
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(load('server'), { rows: reverse }).html;
+		const nodes = () => [...container.querySelectorAll('li')];
+		const values = (elements: Element[]) => elements.map((row) => row.getAttribute('data-value'));
+		const serverNodes = nodes();
+		const onRecoverableError = vi.fn();
+		const hydrated = hydrateRoot(container, client, { rows: custom }, { onRecoverableError });
+		try {
+			expect(nodes()).toEqual(serverNodes);
+			flushSync(() => hydrated.render(client, { rows }));
+			expect(nodes()).toEqual(serverNodes);
+			expect(values(nodes())).toEqual(rows.map((item) => item.value));
+			await Promise.resolve();
+			expect(onRecoverableError).not.toHaveBeenCalled();
+		} finally {
+			hydrated.unmount();
+		}
+
+		const root = mount(client, { rows: [] });
+		try {
+			root.update(client, { rows });
+			const initial = root.findAll('li');
+			expect(initial).toHaveLength(rows.length);
+			for (const receiver of [reverse, custom, rows]) {
+				root.update(client, { rows: receiver });
+				const current = root.findAll('li');
+				expect(current).toEqual(initial);
+				const expected = receiver === rows ? rows : reverse;
+				expect(values(current)).toEqual(expected.map((item) => item.value));
+			}
+			expect(readId).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+		}
+	});
+
 	it.each<[string, string, (string | ErrorConstructor)?]>([
 		['tsx', `key={index} value={'' + row}`],
 		['tsrx', `key={index} value={row + ''}`],
