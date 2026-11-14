@@ -341,6 +341,8 @@ milliseconds.
   straight away and reloads it in the background.
 - `keep` (default five minutes): how long a value is kept once no component is
   showing it. After that it is dropped, and the next reader loads it again.
+  A `keep` too long for a timer (2³¹ ms, about 25 days, or more, such as
+  `Infinity`) keeps the value for the session.
 - `expire` (default never): the age after which a value is never shown, even
   while it reloads.
 
@@ -1613,7 +1615,8 @@ handed over from a page.
 **2. Tell the build about it.** The `dataWorker` option emits the module at a
 fixed path, `/_octane/data-worker.js`, which never changes between deploys,
 so every tab constructs the same worker. With Vite, pass it to the compiler
-plugin from `octane/compiler/vite`:
+plugin from `octane/compiler/vite` (`octane()` from `@octanejs/vite-plugin`
+accepts it too):
 
 ```ts
 // vite.config.ts
