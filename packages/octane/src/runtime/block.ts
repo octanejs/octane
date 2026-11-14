@@ -56,6 +56,7 @@ import {
 	installCommitWork,
 	ROOT_RENDER_ROLLBACK,
 	TRANSITION_JOURNAL,
+	RENDERER_REGION_OWNER_COUNT,
 } from './drivers.js';
 import { signalDocumentEnabled } from '../signals/document-owner.js';
 import { explicitSignalOwners } from '../signals/owner-context.js';
@@ -83,7 +84,6 @@ import { PASSIVE, passiveScheduled, blockIsAncestorOf, pendingPassiveUnmounts } 
 import type { TrackedThenable, WarmEntry } from './use.js';
 import type { HookUpdate } from './transitions.js';
 import {
-	RENDERER_REGION_OWNER_COUNT,
 	type Context,
 	type DEFAULT_CTX,
 	rendererRegionTryHandler,

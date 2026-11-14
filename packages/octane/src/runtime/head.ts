@@ -22,8 +22,12 @@ import { createElement } from './elements.js';
 import { queueRootDeletion, journalBag, journalObjectOnce } from './commit.js';
 import { getFirstChild, getNextSibling } from './templates.js';
 import { eventSlot, devEventListener } from './events.js';
-import { ROOT_RENDER_ROLLBACK, TRANSITION_JOURNAL } from './drivers.js';
-import { RENDERER_REGION_OWNER_COUNT, rendererRegionOwnerForBlock } from './context.js';
+import {
+	RENDERER_REGION_OWNER_COUNT,
+	ROOT_RENDER_ROLLBACK,
+	TRANSITION_JOURNAL,
+} from './drivers.js';
+import { rendererRegionOwnerForBlock } from './context.js';
 
 // The consumer's bundler substitutes the whole Node environment expression below,
 // so the source guard must stay written out literally. Declared module-locally — never
