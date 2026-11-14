@@ -889,7 +889,6 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				const component = ts.findAncestor(ref, ts.isFunctionDeclaration);
 				if (
 					component?.name &&
-					!component.parameters.length &&
 					!component.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)
 				)
 					storeHookComponents.add(component.name.text);
