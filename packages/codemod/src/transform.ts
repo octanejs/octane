@@ -355,16 +355,14 @@ function readsCssToken(ref: ts.Identifier) {
 }
 
 /**
- * What a module's import of a package with no Octane port leaves to do.
+ * Describe a package import that the codemod keeps on React.
  */
 function portComment({ name, islands, blocked }: Unported) {
-	const missing = `No Octane port of \`${name}\` exists`;
-	if (blocked > 0) {
-		return `${missing}, and this module needs one: Octane cannot call its hooks, read its contexts, or pass Octane content to its components.`;
-	}
+	const retained = `Retained React import of \`${name}\``;
+	if (blocked > 0) return `${retained}. Review the uses that need a React renderer.`;
 	return islands > 0
-		? `${missing}, so its components render in React through ReactCompat.`
-		: `${missing}; React stays a dependency for it.`;
+		? `${retained}. Its components render in React through ReactCompat.`
+		: `${retained}. Keep React as a dependency.`;
 }
 
 /**
@@ -926,7 +924,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		// Added imports quote their module as the module's own imports do.
 		const first = this.sf.statements.find(ts.isImportDeclaration);
 		this.quote = first ? first.moduleSpecifier.getText(this.sf)[0] : "'";
-		/** Locals imported from a package with no Octane port. */
+		/** Locals whose package imports stay on React. */
 		const portLocals = new Set<string>();
 		const reactSvgImports = new Set<Import>();
 		for (const statement of this.sf.statements) {
@@ -942,7 +940,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						RULE.bindings,
 						'warning',
 						statement,
-						`\`${port.name}\` has no Octane port: import its components from it where they render, so they can render in a \`ReactCompat\` island.`,
+						`\`${port.name}\` stays on React. Import its components directly where they render so they can render in a \`ReactCompat\` island.`,
 					);
 				}
 			}
@@ -1436,8 +1434,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	}
 
 	/**
-	 * The package with no Octane port that a specifier names, or null. It
-	 * still runs on React, which only the codemod's report and a comment say.
+	 * The package that the codemod keeps on React for this specifier, or null.
 	 */
 	portOf(module: string) {
 		let port = this.ports.get(module);
@@ -1479,7 +1476,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	}
 
 	/**
-	 * A component from a package with no Octane port renders in React, inside
+	 * A component from a retained React import renders in React, inside
 	 * a `ReactCompat` island, when its element hands React nothing Octane
 	 * renders. Its hooks and contexts cannot run in an Octane component, so
 	 * they are reported.
@@ -1504,7 +1501,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const parent = member.parent;
 		const block = (message: string) => {
 			port.blocked++;
-			const error = `${message} \`${port.name}\` has no Octane port.`;
+			const error = `${message} \`${port.name}\` stays on React.`;
 			this.note(RULE.bindings, 'error', member, error);
 			return error;
 		};
@@ -1554,12 +1551,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 		} else if (ts.isCallExpression(parent) && parent.expression === member) {
 			if (/^use[A-Z0-9]/.test(name))
-				block(`\`${text}\` is a React hook, which Octane cannot call.`);
+				block(`\`${text}\` is a React hook. Keep this hook call under a React renderer.`);
 		} else if (
 			ts.isCallExpression(parent) &&
 			/^(?:use|useContext)$/.test(this.calleeName(parent.expression) ?? '')
 		) {
-			block(`\`${text}\` is a React context, which Octane cannot read.`);
+			block(`\`${text}\` is a React context. Keep this context read under a React renderer.`);
 		}
 	}
 
@@ -3505,7 +3502,9 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			!port ||
 			ts
 				.getLeadingCommentRanges(this.source, node.pos)
-				?.some((range) => this.source.slice(range.pos, range.end).includes('No Octane port of'))
+				?.some(({ pos, end }) =>
+					/(?:No Octane port|Retained React import) of/.test(this.source.slice(pos, end)),
+				)
 		)
 			return text;
 		return `// ${portComment(port)}\n${text ?? node.getText(this.sf)}`;
@@ -4051,7 +4050,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		// the Strong fallback can find its own directive line again. The
 		// comment on an unported package's import stays with it.
 		const prologue =
-			/^(?:#![^\n]*\n)?(?:[ \t]*(?:\/\/(?! No Octane port of)[^\n]*|\/\*[\s\S]*?\*\/[ \t]*|(['"])use [a-z ]+\1;?[^\n]*)?\r?\n)*/.exec(
+			/^(?:#![^\n]*\n)?(?:[ \t]*(?:\/\/(?! (?:No Octane port|Retained React import) of)[^\n]*|\/\*[\s\S]*?\*\/[ \t]*|(['"])use [a-z ]+\1;?[^\n]*)?\r?\n)*/.exec(
 				code,
 			);
 		return prologue ? prologue[0].length : 0;

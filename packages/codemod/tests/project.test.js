@@ -5519,9 +5519,25 @@ export function Animation() { return useLottie({ animationData: {}, autoplay: fa
 		});
 		expect(result.files[0]?.code).toContain("from 'lottie-react'");
 		expect(result.files[0]?.notes).toContainEqual(
-			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+			expect.objectContaining({
+				rule: 'bindings',
+				severity: 'error',
+				message: expect.stringContaining('Keep this hook call under a React renderer'),
+			}),
 		);
+		expect(result.files[0]?.code).toContain('Retained React import of `lottie-react`');
 		expect(result.dependencies).toEqual([]);
+		expect(result.missing).toEqual([{ name, modules: 1, islands: 0, blocked: 1 }]);
+
+		const preview = spawnSync(
+			process.execPath,
+			[path.join(REPO, 'packages/codemod/dist/bin.js'), 'Animation.tsx', '--strong', '--print'],
+			{ cwd: root, encoding: 'utf8' },
+		);
+		expect(preview.status).toBe(1);
+		expect(preview.stdout).toContain('Retained React imports');
+		expect(preview.stdout).toContain('1 use(s) need review');
+		expect(preview.stdout).not.toContain('no Octane port');
 	});
 
 	it('maps @effect/atom-react to its binding', async () => {
@@ -5546,7 +5562,7 @@ export function Animation() { return useLottie({ animationData: {}, autoplay: fa
 		);
 		for (const file of [provider, query]) {
 			expect(file?.code).not.toContain("'@effect/atom-react'");
-			expect(file?.code).not.toContain('No Octane port');
+			expect(file?.code).not.toContain('Retained React import');
 			expect(file?.diagnostics).toEqual([]);
 		}
 		expect(result.packages).toEqual([{ from: '@effect/atom-react', to: '@octanejs/effect-atom' }]);
@@ -5576,7 +5592,7 @@ export function Animation() { return useLottie({ animationData: {}, autoplay: fa
 		for (const file of [diffTree, browser]) {
 			expect(file?.code).toContain("from '@pierre/trees';");
 			expect(file?.code).not.toContain("'@pierre/trees/react'");
-			expect(file?.code).not.toContain('No Octane port');
+			expect(file?.code).not.toContain('Retained React import');
 			expect(file?.notes.filter((note) => note.rule === 'bindings')).toEqual([]);
 		}
 		expect(result.packages).toEqual([
@@ -6261,7 +6277,7 @@ export const views = [Motion, motion.div];`,
 			{ name: 'morphicons/react', modules: 1, islands: 0, blocked: 1 },
 		]);
 		expect(file.notes.map((note) => note.message)).toEqual([
-			'`<BaseMorphIcon>` takes children or props that Octane renders, which cannot cross into a React island. `morphicons/react` has no Octane port.',
+			'`<BaseMorphIcon>` takes children or props that Octane renders, which cannot cross into a React island. `morphicons/react` stays on React.',
 		]);
 		// It throws that error where it would render, not as its module loads:
 		// T3's Clerk shell imports `<ClerkProvider>` but renders it only with a key.
