@@ -203,7 +203,11 @@ function hostedLeaf(output: ts.JsxElement | ts.JsxSelfClosingElement) {
 	for (const attr of attrs) {
 		if (!ts.isJsxAttribute(attr) || !ts.isIdentifier(attr.name)) return;
 		const name = attr.name.text;
-		if (seen.has(name) || !['component', 'props', 'key'].includes(name)) return;
+		if (
+			seen.has(name) ||
+			!['component', 'props', 'key', 'hostClassName', 'hostStyle'].includes(name)
+		)
+			return;
 		seen.add(name);
 		if (name === 'component') {
 			const value = attr.initializer;
