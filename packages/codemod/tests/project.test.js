@@ -1970,6 +1970,17 @@ export function Host({rows}: { rows: Row[] }) {
 				'Product.tsx': source(direct.replace('(index as number)', '2 * (index as number)')),
 				'Unary.tsx': source(direct.replace('(index as number)', '-index')),
 				'Bitwise.tsx': source(direct.replace('(index as number)', '0 | index')),
+				'Template.tsx': source(direct.replace('(index as number)', '`row ${index}`')),
+				'TemplateLiteralPrefix.tsx': source(
+					direct.replace('(index as number)', '`row ${"prefix"} ${null} ${7n} ${index}`'),
+				),
+				'TemplateCoercionPrefix.tsx': source(
+					direct.replace('(index as number)', '`row ${{ __proto__: null }} ${index}`'),
+				),
+				'TemplateThrowingPrefix.tsx': source(
+					direct.replace('(index as number)', '`row ${fail()} ${index}`'),
+				),
+				'TemplateDeferred.tsx': source(direct.replace('(index as number)', '`row ${() => index}`')),
 				'Optional.tsx': source(direct.replace('(index as number)', 'maybe?.(index)')),
 				'OptionalArrow.tsx': source(direct.replace('(index as number)', '(() => 1)?.(index)')),
 				'Nullish.tsx': source(direct.replace('(index as number)', '(null as any)?.[index]')),
@@ -2071,6 +2082,8 @@ export function Host({rows}: { rows: Row[] }) {
 						'Product.tsx',
 						'Unary.tsx',
 						'Bitwise.tsx',
+						'Template.tsx',
+						'TemplateLiteralPrefix.tsx',
 						'LiteralIndex.tsx',
 						'ArrayValue.tsx',
 						'ObjectValue.tsx',
@@ -2090,25 +2103,24 @@ export function Host({rows}: { rows: Row[] }) {
 					expect(file.code).toContain('@for');
 				} else expect(file.notes).toEqual([]);
 			}
-			const result = await runCodemod(
-				[
-					path.join(root, 'ArrayValue.tsx'),
-					...inputs.filter((file) => path.basename(file) !== 'ArrayValue.tsx'),
-				],
-				options,
-			);
-			expect(result.files).toEqual([
-				expect.objectContaining({
-					file: 'ArrayValue.tsx',
-					output: 'ArrayValue.tsx',
-					changed: false,
-					code: originals['ArrayValue.tsx'],
-					notes: [note],
-				}),
-			]);
-			expect(fs.readdirSync(root).sort()).toEqual(Object.keys(originals).sort());
-			for (const [file, code] of Object.entries(originals))
-				expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
+			for (const first of ['ArrayValue.tsx', 'Template.tsx']) {
+				const result = await runCodemod(
+					[path.join(root, first), ...inputs.filter((file) => path.basename(file) !== first)],
+					options,
+				);
+				expect(result.files).toEqual([
+					expect.objectContaining({
+						file: first,
+						output: first,
+						changed: false,
+						code: originals[first],
+						notes: [note],
+					}),
+				]);
+				expect(fs.readdirSync(root).sort()).toEqual(Object.keys(originals).sort());
+				for (const [file, code] of Object.entries(originals))
+					expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
+			}
 		},
 	);
 
