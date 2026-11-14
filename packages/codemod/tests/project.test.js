@@ -65,6 +65,34 @@ describe('runCodemod', () => {
 			['Owner.tsx', 'Native.tsx', 'Leaf.tsx'],
 		],
 		['unselected issuer', 'Owner.tsx', islandOwner, ['Leaf.tsx']],
+		[
+			'module component alias',
+			'Owner.tsx',
+			boundaryImports +
+				'const Selected = Leaf; export function Owner(){return <Island component={Selected}/>}',
+			['Leaf.tsx'],
+		],
+		[
+			'later component alias chain',
+			'Owner.tsx',
+			boundaryImports +
+				'export function Owner(){return <Island component={Selected}/>} const View = Leaf; const Selected = View;',
+			['Leaf.tsx'],
+		],
+		[
+			'local component alias',
+			'Owner.tsx',
+			boundaryImports +
+				'export function Owner(){const Selected = Leaf; return <Island><Selected/></Island>}',
+			['Leaf.tsx'],
+		],
+		[
+			'component alias in a native issuer',
+			'Owner.tsrx',
+			boundaryImports +
+				'const Selected = Leaf; export function Owner()@{<Island component={Selected}/>}',
+			['Leaf.tsx'],
+		],
 		...[
 			['short-circuit child', '<Island>{shown && <Leaf/>}</Island>'],
 			['short-circuit component', '<Island component={shown && Leaf}/>'],
@@ -130,6 +158,21 @@ describe('runCodemod', () => {
 		}
 	});
 
+	it('migrates an import shadowed by the component passed to a React island', async () => {
+		const root = project({
+			'Owner.tsx':
+				boundaryImports +
+				'const Selected = Leaf; export function Owner(){const Selected = () => null; return <Island component={Selected}/>}',
+			'Leaf.tsx': reactLeaf,
+		});
+		const leaf = path.join(root, 'Leaf.tsx');
+		const result = await runCodemod([leaf], { root, write: true });
+		expect(result.files.flatMap((file) => file.notes)).not.toContainEqual(
+			expect.objectContaining({ rule: 'react-compat', severity: 'error' }),
+		);
+		expect(fs.existsSync(path.join(root, 'Leaf.tsrx'))).toBe(true);
+	});
+
 	describe('React-hosted Octane SSR', () => {
 		const leaf = `/** @jsxImportSource octane */
 			import { ReactCompat as Reverse } from 'octane/react';
@@ -172,6 +215,80 @@ describe('runCodemod', () => {
 			rule: 'react-compat',
 			severity: 'error',
 			message: expect.stringContaining('React SSR cannot render Leaf.tsrx inside OctaneCompat'),
+		});
+
+		const native =
+			'/** @jsxImportSource octane */\nexport function Leaf() { return <b>native</b>; }';
+		it.each([
+			['named', server, owner],
+			[
+				'namespace',
+				"import * as Bridge from 'octane/react/server';",
+				owner.replace('<Host', '<Bridge.OctaneCompat'),
+			],
+			['explicit React JSX', '/** @jsxImportSource react */ ' + server, owner],
+			['escaped import', server.replace('/server', '/\\u0073erver'), owner],
+			['underscore alias', server.replace('as Host', 'as _Host'), owner.replace('<Host', '<_Host')],
+		])('keeps a selected authored %s server host in React', async (_, hostImport, component) => {
+			const { root, files, selected } = app(`${hostImport}\n${child}\n${component}`, native);
+			selected.push(path.join(root, 'App.server.tsx'));
+			const ownership = expect.objectContaining({
+				rule: 'react-compat',
+				severity: 'error',
+				line: 3,
+				message: expect.stringContaining('Keep the authored OctaneCompat host in React'),
+			});
+			for (const write of [false, true]) {
+				const result = await runCodemod(selected, { root, strong: true, write });
+				expect(result.files.find((f) => f.file === 'App.server.tsx')?.notes).toContainEqual(
+					ownership,
+				);
+				for (const [file, text] of Object.entries(files))
+					expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(text);
+				for (const file of ['Leaf.tsrx', 'App.server.tsrx'])
+					expect(fs.existsSync(path.join(root, file))).toBe(false);
+			}
+		});
+
+		it.each([
+			['retained authored host', `${server}\n${child}\n${owner}`, {}, false],
+			[
+				'intrinsic with a lowercase import alias',
+				`${server.replace('as Host', 'as host')}\n${child}\n${owner.replace('<Host', '<host')}`,
+				{},
+				true,
+			],
+			[
+				'local alias using the server specifier',
+				`${server}\n${child}\n${owner}`,
+				{ 'octane/react/server': ['./Other.ts'] },
+				true,
+			],
+			[
+				'native ReactCompat',
+				`/** @jsxImportSource octane */
+				import { ReactCompat } from 'octane/react/server';
+				import { Child } from './Child.js';
+				export function App() { return <ReactCompat component={Child} />; }`,
+				{},
+				true,
+			],
+		])('preserves existing migration behavior for a %s', async (_, source, paths, selectHost) => {
+			const { root, selected } = app(source, native, paths);
+			if (selectHost) selected.push(path.join(root, 'App.server.tsx'));
+			const result = await runCodemod(selected, { root, strong: true, write: true });
+			expect(result.files.flatMap((f) => f.notes)).not.toContainEqual(
+				expect.objectContaining({
+					rule: 'react-compat',
+					message: expect.stringContaining('Keep the authored OctaneCompat host in React'),
+				}),
+			);
+			expect(fs.existsSync(path.join(root, 'Leaf.tsrx'))).toBe(true);
+			expect(fs.existsSync(path.join(root, 'App.server.tsrx'))).toBe(selectHost);
+			if (!selectHost)
+				expect(fs.readFileSync(path.join(root, 'App.server.tsx'), 'utf8')).toBe(
+					source.replace('./Leaf.tsx', './Leaf.tsrx'),
+				);
 		});
 
 		it.each([
@@ -296,6 +413,145 @@ describe('runCodemod', () => {
 				for (const file of result.files) expect(file.notes).not.toContainEqual(error);
 			},
 		);
+	});
+
+	it.each([
+		['plain return', 'Leaf', '<Leaf />', '', true],
+		['named and default export', 'Leaf', '<Leaf />', '', true],
+		['named import', '{ Leaf }', '<Leaf />', '', true],
+		['React JSX pragma', 'Leaf', '<Leaf />', '/** @jsxImportSource react */', true],
+		['native JSX', 'Leaf', '<Leaf />', '/** @jsxImportSource octane */', false],
+		['mapped JSX runtime', 'Leaf', '<Leaf />', '', false],
+		['lowercase tag', 'leaf', '<leaf />', '', false],
+		['type-only import', 'type Leaf', '<Leaf />', '', false],
+		['shadowed binding', 'Leaf', '<Leaf />', '', false],
+		['explicit bridge', 'Leaf', '<OctaneCompat component={Leaf} />', '', false],
+	])(
+		'advises on a retained JSX issuer with a %s',
+		async (shape, binding, output, pragma, warns) => {
+			const root = project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: {
+						jsx: 'react-jsx',
+						moduleResolution: 'Bundler',
+						...(shape === 'mapped JSX runtime'
+							? { paths: { 'react/jsx-runtime': ['./other.ts'] } }
+							: {}),
+					},
+				}),
+				'other.ts': 'export const jsx = () => null;',
+				'Leaf.tsx':
+					'export function Leaf() { return <button>Original</button>; }\nexport default Leaf;',
+				'Owner.tsx': `${pragma}
+import { OctaneCompat } from 'octane/react';
+import ${binding} from './Leaf.tsx';
+export function Owner(${shape === 'shadowed binding' ? '{ Leaf }' : ''}) { return ${output}; }
+${shape === 'named and default export' ? 'export default Owner;' : ''}`,
+			});
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules'),
+				path.join(root, 'node_modules'),
+				'dir',
+			);
+			const selected = [path.join(root, 'Leaf.tsx')];
+			const preview = await runCodemod(selected, {
+				root,
+				strong: true,
+				verify: true,
+				write: false,
+			});
+			const affected = preview.files.flatMap((file) =>
+				file.notes
+					.filter(
+						(note) => note.severity === 'warning' && note.message.includes('retained React JSX'),
+					)
+					.map(() => file.file),
+			);
+			expect(affected).toEqual(warns ? ['Leaf.tsx', 'Owner.tsx'] : []);
+			if (shape === 'plain return') {
+				const result = await runCodemod(selected, { root, strong: true, verify: true });
+				expect(result.files.find((file) => file.file === 'Owner.tsx')?.notes).toEqual(
+					expect.arrayContaining([
+						expect.objectContaining({
+							severity: 'warning',
+							message: expect.stringContaining('retained React JSX'),
+						}),
+					]),
+				);
+				expect(fs.readFileSync(path.join(root, 'Owner.tsx'), 'utf8')).toContain('./Leaf.tsrx');
+				expect(fs.existsSync(path.join(root, 'Leaf.tsrx'))).toBe(true);
+			}
+		},
+	);
+
+	describe('retained React server rendering', () => {
+		it.each([
+			['direct JSX', 'render(<Leaf />)', '', true],
+			['empty JSX pair', 'render(<Leaf></Leaf>)', '', true],
+			['comment-only JSX pair', 'render(<Leaf>{/* comment */}</Leaf>)', '', true],
+			['JSX pair with a child', 'render(<Leaf>child</Leaf>)', '', false],
+			['direct element', 'render(h(Leaf))', '', true],
+			['direct element with null props', 'render(h(Leaf, null))', '', true],
+			['shadowed renderer', '((render) => render(h(Leaf)))(other)', '', false],
+			['shadowed factory', '((h) => render(h(Leaf)))(other)', '', false],
+			['local server alias', 'render(<Leaf />)', 'react-dom/server', false],
+			['local JSX alias', 'render(<Leaf />)', 'react/jsx-runtime', false],
+			['Octane JSX pragma', 'render(<Leaf />)', 'pragma', false],
+			['intrinsic tag with a lowercase import', 'render(<leaf />)', '', false],
+			['separate physical JSX issuer', 'render(<Leaf />)', 'jsx sibling', false],
+			['unsupported element children', 'render(h(Leaf, null, load()))', '', false],
+		])('reports the %s in a retained issuer', async (_, call, alias, warns) => {
+			const files = {
+				'package.json': '{"name":"app","type":"module"}',
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: {
+						jsx: 'react-jsx',
+						moduleResolution: 'Bundler',
+						...(alias.startsWith('react') ? { paths: { [alias]: ['./other.ts'] } } : {}),
+					},
+				}),
+				'other.ts': 'export function renderToStaticMarkup() { return null; }',
+				'Owner.tsx': `${alias === 'pragma' ? '/** @jsxImportSource octane */\n' : ''}
+					import { renderToStaticMarkup as render } from 'react-dom/server';
+					import { createElement as h } from 'react';
+					import ${call.includes('<leaf') ? 'leaf' : 'Leaf'} from './Leaf.${alias === 'jsx sibling' ? 'jsx' : 'tsx'}';
+					export function page() { return ${call}; }`,
+				'Leaf.tsx': 'export default function Leaf() { return <button>Original</button>; }',
+				'index.html': '<script type="module" src="./Leaf.tsx"></script>',
+			};
+			if (alias === 'jsx sibling') files['Leaf.jsx'] = "export default () => 'retained';";
+			const root = project(files);
+			fs.mkdirSync(path.join(root, 'node_modules'));
+			for (const name of ['octane', 'react', 'react-dom'])
+				fs.symlinkSync(
+					fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+					path.join(root, 'node_modules', name),
+					'dir',
+				);
+			fs.mkdirSync(path.join(root, 'node_modules/@types'));
+			for (const name of ['react', 'react-dom']) {
+				const source = createRequire(path.join(REPO, 'packages/octane/package.json')).resolve(
+					`@types/${name}/package.json`,
+				);
+				fs.symlinkSync(path.dirname(source), path.join(root, 'node_modules/@types', name), 'dir');
+			}
+			const selected = [path.join(root, 'Leaf.tsx')];
+			const options = { root, strong: true, verify: true };
+			const warning = expect.objectContaining({
+				rule: 'react-compat',
+				severity: 'warning',
+				message: expect.stringContaining('retained React server render'),
+			});
+			const preview = await runCodemod(selected, { ...options, write: false });
+			for (const name of ['Leaf.tsx', 'Owner.tsx']) {
+				const notes = preview.files.find((file) => file.file === name)?.notes;
+				if (warns) expect(notes).toContainEqual(warning);
+				else expect(notes).not.toContainEqual(warning);
+			}
+			for (const [name, source] of Object.entries(files))
+				expect(fs.readFileSync(path.join(root, name), 'utf8')).toBe(source);
+			expect(fs.existsSync(path.join(root, 'Leaf.tsrx'))).toBe(false);
+		});
 	});
 
 	it.each([
@@ -591,6 +847,9 @@ export function deferred() { return () => hint('/later.png', { as: 'image' }); }
 export function useLabel() { const [label] = state('ready'); return label; }`;
 		const callback = `import { useCallback as retain } from 'react';
 export function useLabel(value: string) { const read = retain(() => value, [value]); return read(); }`;
+		const context = `import { createContext, useContext } from 'react';
+const Label = createContext('ready');
+export function useLabel(enabled = true) { const label = useContext(Label); return enabled ? label : ''; }`;
 		const panel = `import { useLabel as read } from './use-label';
 export function Panel() { const label = read(); return <b>{label}</b>; }`;
 		const callbackPanel = panel
@@ -606,6 +865,16 @@ export function Panel() { const label = read(); return <b>{label}</b>; }`;
 				},
 			}),
 			'use-label.ts': helper,
+			'LiteralDefault.tsx': panel.replace('./use-label', './literal-default'),
+			'literal-default.ts': context,
+			'ThrowingDefault.tsx': panel.replace('./use-label', './throwing-default'),
+			'throwing-default.ts': context.replace('= true', "= (() => { throw Error('default'); })()"),
+			'Destructured.tsx': panel.replace('./use-label', './destructured'),
+			'destructured.ts': context.replace('enabled = true', '{ enabled }: { enabled: boolean }'),
+			'PureDefault.tsx': panel.replace('./use-label', './pure-default'),
+			'pure-default.ts':
+				context.replace(', useContext', '') +
+				"\nfunction useContext(_label: unknown) { return 'ready'; }",
 			'use-callback.ts': callback,
 			'Callback.tsx': callbackPanel,
 			'CallbackShadowed.tsx': callbackPanel.replace('./use-callback', './shadowed-callback'),
@@ -726,6 +995,7 @@ export function useLabel() { const later = () => useState('ready'); return 'read
 				],
 				['Forward.tsx', 'bindings', 3, expect.stringMatching(/useLabel.*React.*useState/)],
 				['Function.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
+				['LiteralDefault.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useContext/)],
 				['Memo.tsx', 'bindings', 3, expect.stringMatching(/useLabel.*React.*useState/)],
 				['Panel.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
 				['Sibling.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
@@ -737,6 +1007,156 @@ export function useLabel() { const later = () => useState('ready'); return 'read
 			expect(fs.readFileSync(path.join(root, 'use-label.ts'), 'utf8')).toBe(helper);
 		}
 	});
+
+	it.each([false, true])(
+		'reports retained local hooks before native component output (projectTypes=%s)',
+		async (projectTypes) => {
+			const helper = `import { useState } from 'react';
+export function useLabel() { const [label] = useState('ready'); return label; }`;
+			const imports = `import { useState as state } from 'react';
+import { useLabel } from './use-label';
+import { Label as ImportedLabel } from './Label';`;
+			const panel = (prefix, output) => `${imports}
+function Label({ label }: { label: string }) { return <b>{label}</b>; }
+export function Panel({ initial = false }: { initial?: boolean }) {
+	${prefix}
+	const label = useLabel();
+	return ${output};
+}`;
+			const root = project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				'use-label.ts': helper,
+				'throwing-value.ts': 'export const undefined = () => { throw new Error("unsafe"); };',
+				'Label.tsx':
+					'export function Label(props: { label: string }) { return <b>{props.label}</b>; }',
+				'Local.tsx': panel('', '<Label label={label} />'),
+				'Imported.tsx': panel('', '<ImportedLabel label={label} />'),
+				'Fragment.tsx': panel('', '<><b>{label}</b></>'),
+				'Conditional.tsx': panel('', '(initial ? (<Label label={label} />) : <b>{label}</b>)'),
+				'ConditionalEmpty.tsx': panel('', 'initial ? null : <>{label}</>'),
+				'ConditionalFalse.tsx': panel('', 'initial ? <b>{label}</b> : false'),
+				'ConditionalAsserted.tsx': panel('', '(initial ? <b>{label}</b> : null) as any'),
+				'ConditionalNonNull.tsx': panel('', '(initial ? <b>{label}</b> : null)!'),
+				'ConditionalSatisfies.tsx': panel('', '(initial ? <b>{label}</b> : null) satisfies any'),
+				'ConditionalWrappedArm.tsx': panel(
+					'',
+					'initial ? (<b>{label}</b> as any) : (null as null)',
+				),
+				'ConditionalDeferred.tsx': panel('', 'initial ? () => <b>{label}</b> : null'),
+				'ConditionalTest.tsx': panel('', '(<b>{label}</b>) ? null : false'),
+				'ConditionalValue.tsx': panel('', 'initial ? <b>{label}</b> : label'),
+				'ConditionalReactOwned.tsx':
+					"import { ReactCompat } from 'octane/react';\n" +
+					panel('', 'initial ? <b>{label}</b> : null') +
+					'\nexport function App() { return <ReactCompat><Panel/></ReactCompat>; }',
+				'ConditionalEscape.tsx':
+					panel('', 'initial ? <b>{label}</b> : null') + '\nexport const panels = [Panel];',
+				'Memo.tsx':
+					"import { memo } from 'react';\n" +
+					panel('', '<Label label={label} />').replace(
+						'function Panel(',
+						'const Panel = memo(function Inner(',
+					) +
+					');',
+				'Forward.tsx':
+					"import { forwardRef } from 'react';\n" +
+					panel('const [open] = state(false);', '<b aria-expanded={open}>{label}</b>').replace(
+						'function Panel(',
+						'const Panel = forwardRef(function Inner(',
+					) +
+					');',
+				'State.tsx': panel('const [open] = state(false);', '<b aria-expanded={open}>{label}</b>'),
+				'StateUndefined.tsx': panel('const [open] = state(undefined);', '<Label label={label} />'),
+				'StateSigned.tsx': panel('const [open] = state(-1);', '<Label label={label} />'),
+				'StateUnaryCall.tsx': panel('const [open] = state(-fail());', '<Label label={label} />'),
+				'UndefinedArgument.tsx': panel('', '<Label label={label} />').replace(
+					'useLabel()',
+					'useLabel(undefined)',
+				),
+				'SignedArgument.tsx': panel('', '<Label label={label} />').replace(
+					'useLabel()',
+					'useLabel(+1)',
+				),
+				'ShadowedUndefined.tsx':
+					'import { undefined } from "./throwing-value";\n' +
+					panel('', '<Label label={label} />').replace('useLabel()', 'useLabel(undefined)'),
+				'StateAndChild.tsx': panel(
+					'const [open] = state(initial);',
+					'<Label label={open ? "open" : label} />',
+				),
+				'SameDeclaration.tsx': panel('', '<Label label={open ? "open" : label} />').replace(
+					'const label = useLabel();',
+					'const [open] = state(false), label = useLabel();',
+				),
+				'StateBindingDefault.tsx': panel(
+					'const [open = fail()] = state();',
+					'<Label label={label} />',
+				),
+				'ThrowingInitializer.tsx': panel(
+					"const [open] = state(() => { throw new Error('setup failed'); });",
+					'<Label label={label} />',
+				),
+				'ThrowingArgument.tsx': panel('', '<Label label={label} />').replace(
+					'useLabel()',
+					"useLabel((() => { throw new Error('argument failed'); })())",
+				),
+				'Declared.tsx': panel('', '<Label label={label} />').replace(
+					'const label = useLabel();',
+					'declare const label = useLabel();',
+				),
+				'ReactOwned.tsx':
+					"import { ReactCompat } from 'octane/react';\n" +
+					panel('', '<Label label={label} />') +
+					'\nexport function App() { return <ReactCompat><Panel/></ReactCompat>; }',
+			});
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules'),
+				path.join(root, 'node_modules'),
+				'dir',
+			);
+			const paths = fs.readdirSync(root).filter((name) => name.endsWith('.tsx'));
+			const options = { root, projectTypes, strong: true, verify: true };
+			const input = paths.map((name) => path.join(root, name));
+			const { files } = await runCodemod(input, { ...options, write: false });
+			expect(
+				files
+					.filter((file) =>
+						file.notes.some(
+							(note) =>
+								note.severity === 'error' &&
+								note.message.includes(
+									"The unchanged ./use-label export useLabel calls React's useState.",
+								),
+						),
+					)
+					.map((file) => file.file),
+			).toEqual([
+				'Conditional.tsx',
+				'ConditionalAsserted.tsx',
+				'ConditionalEmpty.tsx',
+				'ConditionalFalse.tsx',
+				'ConditionalNonNull.tsx',
+				'ConditionalSatisfies.tsx',
+				'ConditionalWrappedArm.tsx',
+				'Forward.tsx',
+				'Fragment.tsx',
+				'Imported.tsx',
+				'Local.tsx',
+				'Memo.tsx',
+				'SameDeclaration.tsx',
+				'SignedArgument.tsx',
+				'State.tsx',
+				'StateAndChild.tsx',
+				'StateSigned.tsx',
+				'StateUndefined.tsx',
+				'UndefinedArgument.tsx',
+			]);
+			expect(fs.existsSync(path.join(root, 'Local.tsx'))).toBe(true);
+			expect(fs.existsSync(path.join(root, 'Local.tsrx'))).toBe(false);
+		},
+	);
 
 	it('reports an unchanged React context hook after ordinary component setup', async () => {
 		const view = (setup, read = 'useObserver(fit)') => `import { useRef } from 'react';
@@ -804,6 +1224,231 @@ export function useObserver(fit: () => void) {
 		expect(files.find((file) => file.file === 'View.tsx').code).toContain('./use-observer');
 		expect(fs.readFileSync(path.join(root, 'use-observer.ts'), 'utf8')).toBe(hook);
 	});
+
+	it.each([true, false])(
+		'reports a retained React Intl hook before native output (projectTypes=%s)',
+		async (projectTypes) => {
+			const owner = `import { useIntl as readIntl } from 'react-intl';
+export function useLocale(enabled = true) {
+	const intl = readIntl();
+	return enabled ? intl.locale : 'en';
+}`;
+			const view = (file) => `import { useLocale } from './${file}';
+export function View() {
+	const locale = useLocale();
+	return <b>{locale}</b>;
+}`;
+			const root = project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				'owner.ts': owner,
+				'pure.ts': "export function useLocale() { return 'en'; }",
+				'selected.ts': owner,
+				'erased.ts': owner.replace('const intl =', 'declare const intl ='),
+				'shadowed.ts': owner.replace(
+					'export function useLocale(enabled = true)',
+					'export function useLocale(enabled = true, readIntl)',
+				),
+				'View.tsx': view('owner'),
+				'Pure.tsx': view('pure'),
+				'Selected.tsx': view('selected'),
+				'Erased.tsx': view('erased'),
+				'Shadowed.tsx': view('shadowed'),
+			});
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules'),
+				path.join(root, 'node_modules'),
+			);
+			const paths = [
+				'View.tsx',
+				'Pure.tsx',
+				'Selected.tsx',
+				'Erased.tsx',
+				'Shadowed.tsx',
+				'selected.ts',
+			];
+			const run = () =>
+				runCodemod(
+					paths.map((file) => path.join(root, file)),
+					{
+						root,
+						strong: true,
+						projectTypes,
+						verify: true,
+						write: false,
+					},
+				);
+			const findings = (files) =>
+				files.flatMap((file) =>
+					file.notes
+						.filter((note) => note.message.includes("calls React Intl's useIntl"))
+						.map((note) => [file.file, note.line, note.severity]),
+				);
+			const { files } = await run();
+			expect(findings(files)).toEqual([['View.tsx', 3, 'error']]);
+			expect(files.find((file) => file.file === 'View.tsx')?.code).toContain('./owner');
+
+			fs.writeFileSync(
+				path.join(root, 'replacement.ts'),
+				"export const useIntl = () => ({ locale: 'en' });",
+			);
+			fs.writeFileSync(
+				path.join(root, 'tsconfig.json'),
+				JSON.stringify({
+					compilerOptions: {
+						strict: true,
+						jsx: 'react-jsx',
+						moduleResolution: 'bundler',
+						paths: { 'react-intl': ['./replacement.ts'] },
+					},
+				}),
+			);
+			expect(findings((await run()).files)).toEqual([]);
+		},
+	);
+
+	it.each([
+		['src/components/useIntl', 'module.exports = () => ({ locale: "en" });'],
+		['lib/src/components/useIntl.mjs', 'export default () => ({ locale: "en" });'],
+		['src/components/useIntl.js', 'module.exports.default = () => ({ locale: "en" });'],
+		['node_modules/react/index.js', 'exports.useContext = () => ({ locale: "en" });'],
+	])(
+		'keeps the retained hook unclassified when %s changes the installed hook',
+		async (shadow, code) => {
+			const root = project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				'owner.ts':
+					"import { useIntl } from 'react-intl'; export function useLocale() { const intl = useIntl(); return intl.locale; }",
+				'View.tsx':
+					"import { useLocale } from './owner'; export function View() { const locale = useLocale(); return <b>{locale}</b>; }",
+			});
+			const installed = path.join(root, 'node_modules/react-intl');
+			fs.cpSync(
+				fs.realpathSync(path.join(REPO, 'packages/codemod/node_modules/react-intl')),
+				installed,
+				{
+					recursive: true,
+				},
+			);
+			for (const name of ['octane', 'react'])
+				fs.symlinkSync(
+					path.join(REPO, 'packages/codemod/node_modules', name),
+					path.join(root, 'node_modules', name),
+				);
+			const reportsRetainedHook = async () => {
+				const { files } = await runCodemod([path.join(root, 'View.tsx')], {
+					root,
+					strong: true,
+					projectTypes: true,
+					verify: true,
+					write: false,
+				});
+				return files[0]?.notes.some((note) => note.message.includes("calls React Intl's useIntl"));
+			};
+			expect(await reportsRetainedHook()).toBe(true);
+			const replacement = path.join(installed, shadow);
+			fs.mkdirSync(path.dirname(replacement), { recursive: true });
+			fs.writeFileSync(replacement, code);
+			expect(await reportsRetainedHook()).toBe(false);
+		},
+	);
+
+	it.each([true, false])(
+		'advises on a retained private context helper (projectTypes=%s)',
+		async (projectTypes) => {
+			const imports = "import { createContext, useContext as readContext } from 'react';";
+			const context = "const Theme = createContext('unset');";
+			const helper = 'function readTheme() { const label = readContext(Theme); return label; }';
+			const hook = 'export function useLabel() { return readTheme(); }';
+			const owner = [imports, context, helper, hook].join('\n');
+			const view = (file, call = 'useLabel()') => `import { useLabel } from './${file}';
+export function View() { const label = ${call}; return <b>{label}</b>; }`;
+			const files = {
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				'owner.ts': owner,
+				'View.tsx': view('owner'),
+				'Cycle.tsx': "import './early';\n" + view('owner'),
+				'early.ts': "import { View } from './Cycle'; View();",
+				'Optional.tsx': view('owner', 'useLabel?.()'),
+				'Argument.tsx': view('owner', 'useLabel(fail())'),
+				'Deferred.tsx': view('owner', '() => useLabel()'),
+				'ErasedCaller.tsx': view('owner').replace('const label', 'declare const label'),
+				'ReactOwned.tsx':
+					"import { ReactCompat } from 'octane/react';\n" +
+					view('owner') +
+					'\nexport function Parent() { return <ReactCompat><View /></ReactCompat>; }',
+				'hook-default.ts': owner.replace('readTheme()', 'readTheme(value = fail())'),
+				'Default.tsx': view('hook-default'),
+				'hook-changed.ts': owner + '\nreadTheme = () => "different";',
+				'Changed.tsx': view('hook-changed'),
+				'hook-ambient.ts': owner.replace(context, 'declare const Theme: any;'),
+				'Ambient.tsx': view('hook-ambient'),
+				'hook-erased-read.ts': owner.replace(
+					'const label = readContext',
+					'declare const label = readContext',
+				),
+				'ErasedRead.tsx': view('hook-erased-read'),
+				'hook-erased-helper.ts': owner.replace(
+					'return readTheme();',
+					"declare const label = readTheme(); return 'ok';",
+				),
+				'ErasedHelper.tsx': view('hook-erased-helper'),
+				'hook-exported.ts': owner + '\nexport { readTheme };',
+				'Exported.tsx': view('hook-exported'),
+				'hook-direct.ts': owner.replace(
+					hook,
+					'export function useLabel() { return readContext(Theme); }',
+				),
+				'Direct.tsx': view('hook-direct'),
+				'hook-selected.ts': owner,
+				'Selected.tsx': view('hook-selected'),
+			};
+			const root = project(files);
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules'),
+				path.join(root, 'node_modules'),
+			);
+			const inputs = Object.keys(files)
+				.filter((file) => file.endsWith('.tsx') || file === 'hook-selected.ts')
+				.sort();
+			const result = await runCodemod(
+				inputs.map((file) => path.join(root, file)),
+				{
+					root,
+					strong: true,
+					projectTypes,
+					verify: true,
+					write: false,
+				},
+			);
+			const findings = result.files.flatMap((file) =>
+				file.notes
+					.filter((note) => note.rule === 'bindings' && note.message.includes("React's useContext"))
+					.map((note) => [file.file, note.line, note.severity, note.message]),
+			);
+			expect(findings).toEqual([
+				['Cycle.tsx', 3, 'warning', expect.stringContaining('after its module initializes')],
+				[
+					'Direct.tsx',
+					2,
+					'error',
+					expect.stringContaining("export useLabel calls React's useContext"),
+				],
+				['View.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
+			]);
+			for (const name of ['Cycle.tsx', 'View.tsx']) {
+				const resultFile = result.files.find((file) => file.file === name);
+				expect(resultFile.strong).toBe(true);
+				expect(resultFile.code).toContain("from './owner'");
+			}
+			expect(fs.readFileSync(path.join(root, 'owner.ts'), 'utf8')).toBe(owner);
+		},
+	);
 
 	it('reports an unchanged React hook component passed to a migrated React DOM root', async () => {
 		const app = (module = './leaf') => `import * as ReactDOM from 'react-dom/client';
@@ -1363,11 +2008,95 @@ export function Host({rows}: { rows: Row[] }) {
 				'Plus.tsx': source(direct.replace('(index as number)', '(index as number) + 1')),
 				'Typeof.tsx': source(direct.replace('(index as number)', 'typeof index')),
 				'Call.tsx': source(direct.replace('(index as number)', 'String(index)')),
+				'LaterArg.tsx': source(direct.replace('(index as number)', 'String(0, index)')),
+				'Callee.tsx': source(direct.replace('(index as number)', '(index as any)?.()')),
+				'ImmediateArrow.tsx': source(direct.replace('(index as number)', '(() => index)()')),
+				'ImmediateArrowShadow.tsx': source(
+					direct.replace('(index as number)', '((index = 7) => index)()'),
+				),
+				'ImmediateArrowThrowingArg.tsx': source(
+					direct.replace('(index as number)', '(() => index)(fail())'),
+				),
 				'Product.tsx': source(direct.replace('(index as number)', '2 * (index as number)')),
 				'Unary.tsx': source(direct.replace('(index as number)', '-index')),
 				'Bitwise.tsx': source(direct.replace('(index as number)', '0 | index')),
+				'Template.tsx': source(direct.replace('(index as number)', '`row ${index}`')),
+				'TemplateLiteralPrefix.tsx': source(
+					direct.replace('(index as number)', '`row ${"prefix"} ${null} ${7n} ${index}`'),
+				),
+				'TemplateCoercionPrefix.tsx': source(
+					direct.replace('(index as number)', '`row ${{ __proto__: null }} ${index}`'),
+				),
+				'TemplateThrowingPrefix.tsx': source(
+					direct.replace('(index as number)', '`row ${fail()} ${index}`'),
+				),
+				'TemplateDeferred.tsx': source(direct.replace('(index as number)', '`row ${() => index}`')),
 				'Optional.tsx': source(direct.replace('(index as number)', 'maybe?.(index)')),
+				'OptionalArrow.tsx': source(direct.replace('(index as number)', '(() => 1)?.(index)')),
+				'Nullish.tsx': source(direct.replace('(index as number)', '(null as any)?.[index]')),
+				'Getter.tsx': source(direct.replace('(index as number)', 'owner.values[index]')),
 				'Earlier.tsx': source(direct.replace('(index as number)', 'fail() * index')),
+				'EarlierArg.tsx': source(direct.replace('(index as number)', 'String(fail(), index)')),
+				'LaterCallee.tsx': source(
+					direct.replace('label=(index as number)', 'label=convert(0, index),convert'),
+				),
+				'EarlierCallee.tsx': source(
+					direct.replace('label=(index as number)', 'convert=()=>1,label=convert(index)'),
+				),
+				'EarlierCalleeLaterArg.tsx': source(
+					direct.replace('label=(index as number)', 'convert=()=>1,label=convert(0,index)'),
+				),
+				'EarlierNestedCallee.tsx': source(
+					direct.replace(
+						'label=(index as number)',
+						'nested:{convert=()=>1}={},label=convert(index)',
+					),
+				),
+				'NestedCallee.tsx': source(
+					direct.replace('label=(index as number)', 'label=7,nested:{convert}=convert(0,index)'),
+				),
+				'LiteralIndex.tsx': source(direct.replace('(index as number)', '[0][index]')),
+				'ArrayValue.tsx': source(direct.replace('(index as number)', '[0, , index][2]')),
+				'ObjectValue.tsx': source(direct.replace('(index as number)', '({["label"]:index}).label')),
+				'ObjectShorthand.tsx': source(direct.replace('(index as number)', '({index}).index')),
+				'ObjectKey.tsx': source(direct.replace('(index as number)', '({[index]:0})[0]')),
+				'NestedLiteral.tsx': source(
+					direct.replace('(index as number)', '[{ ["label"]: [1, , {}] }, index][1]'),
+				),
+				'NestedReceiver.tsx': source(
+					direct.replace('(index as number)', '[{ label: [1] }][index]'),
+				),
+				'ArraySpreadRead.tsx': source(
+					direct.replace('(index as number)', '[...(index as any)].length'),
+				),
+				'ObjectSpreadRead.tsx': source(direct.replace('(index as number)', '({...[index]}).label')),
+				'CallSpreadRead.tsx': source(direct.replace('(index as number)', 'String(...[index])')),
+				'DeferredLiteral.tsx': source(
+					direct.replace(
+						'(index as number)',
+						'({ get hidden() { return index; }, label: 7 }).label',
+					),
+				),
+				'ThrowingLiteral.tsx': source(direct.replace('(index as number)', '[fail(),index][1]')),
+				'ThrowingKey.tsx': source(direct.replace('(index as number)', '({[key()]:index}).label')),
+				'CoercionPrefix.tsx': source(
+					direct.replace('(index as number)', '[{[{} as any]:1},index][1]'),
+				),
+				'ComputedKeyCoercion.tsx': source(
+					direct.replace('(index as number)', '({[{} as any]:index}).label'),
+				),
+				'SpreadPrefix.tsx': source(direct.replace('(index as number)', '[...values,index][1]')),
+				'LiteralSpreadPrefix.tsx': source(
+					direct.replace('(index as number)', '[...[0], index][1]'),
+				),
+				'ObjectSpreadPrefix.tsx': source(
+					direct.replace('(index as number)', '({...values, label: index}).label'),
+				),
+				'ThrowingCallee.tsx': source(
+					direct.replace('label=(index as number)', 'label=convert([index]),convert'),
+				),
+				'OptionalIndex.tsx': source(direct.replace('(index as number)', '[0]?.[index]')),
+				'Receiver.tsx': source(direct.replace('(index as number)', '(index as any)?.label')),
 				'Computed.tsx': source(
 					'[{0:4},{1:5}].map(({[index]:label},index) => <li key={0}>{label}</li>)',
 				),
@@ -1375,9 +2104,32 @@ export function Host({rows}: { rows: Row[] }) {
 				'Deferred.tsx': source(
 					direct.replace('(index as number)', '() => index').replace('{label}', '{id}'),
 				),
+				'TestReadsIndex.tsx': source(direct.replace('(index as number)', 'index ? 7 : 8')),
+				'TrueArm.tsx': source(direct.replace('(index as number)', '(true as boolean) ? index : 7')),
+				'FalseArm.tsx': source(direct.replace('(index as number)', 'false ? 7 : index')),
+				'LogicalLeft.tsx': source(direct.replace('(index as number)', 'index && 7')),
+				'AndRight.tsx': source(direct.replace('(index as number)', 'true && index')),
+				'OrRight.tsx': source(direct.replace('(index as number)', 'false || index')),
+				'NullishRight.tsx': source(direct.replace('(index as number)', 'null ?? index')),
 				'Dead.tsx': source(direct.replace('(index as number)', 'false ? index : 7')),
+				'DeadTrueArm.tsx': source(direct.replace('(index as number)', 'true ? 7 : index')),
+				'DeadAnd.tsx': source(direct.replace('(index as number)', 'false && index')),
+				'DeadOr.tsx': source(direct.replace('(index as number)', 'true || index')),
+				'DeadNullish.tsx': source(direct.replace('(index as number)', 'false ?? index')),
+				'UnknownBranch.tsx': source(direct.replace('(index as number)', 'choose ? index : 7')),
+				'ThrowingBranch.tsx': source(direct.replace('(index as number)', 'fail() && index')),
+				'RetainedBranch.tsx': source(
+					direct
+						.replace('(index as number)', 'true ? index : 7')
+						.replace('key={id}>{label}', 'key={keyOf(id)}>{String(label)}'),
+				),
 			};
 			const root = project(originals);
+			fs.symlinkSync(
+				path.join(import.meta.dirname, '../node_modules'),
+				path.join(root, 'node_modules'),
+				'dir',
+			);
 			const options = { root, verify: false, projectTypes };
 			const note = expect.objectContaining({ rule: 'map-parameter-tdz', severity: 'error' });
 			const inputs = Object.keys(originals)
@@ -1394,29 +2146,73 @@ export function Host({rows}: { rows: Row[] }) {
 						'Plus.tsx',
 						'Typeof.tsx',
 						'Call.tsx',
+						'LaterArg.tsx',
+						'Callee.tsx',
+						'ImmediateArrow.tsx',
+						'OptionalArrow.tsx',
+						'EarlierCallee.tsx',
+						'EarlierCalleeLaterArg.tsx',
+						'EarlierNestedCallee.tsx',
 						'Product.tsx',
 						'Unary.tsx',
 						'Bitwise.tsx',
+						'Template.tsx',
+						'TemplateLiteralPrefix.tsx',
+						'LiteralIndex.tsx',
+						'ArrayValue.tsx',
+						'ObjectValue.tsx',
+						'ObjectShorthand.tsx',
+						'ObjectKey.tsx',
+						'NestedLiteral.tsx',
+						'NestedReceiver.tsx',
+						'ArraySpreadRead.tsx',
+						'ObjectSpreadRead.tsx',
+						'CallSpreadRead.tsx',
+						'OptionalIndex.tsx',
+						'Receiver.tsx',
 						'Computed.tsx',
+						'TestReadsIndex.tsx',
+						'TrueArm.tsx',
+						'FalseArm.tsx',
+						'LogicalLeft.tsx',
+						'AndRight.tsx',
+						'OrRight.tsx',
+						'NullishRight.tsx',
 					].includes(file.file)
 				) {
-					expect(file.notes).toEqual([note]);
+					expect(file.notes, file.file).toEqual([note]);
 					expect(file.code).toContain('@for');
-				} else expect(file.notes).toEqual([]);
+				} else expect(file.notes, file.file).toEqual([]);
 			}
-			const result = await runCodemod(inputs, options);
-			expect(result.files).toEqual([
-				expect.objectContaining({
-					file: 'List.tsx',
-					output: 'List.tsx',
-					changed: false,
-					code: originals['List.tsx'],
-					notes: [note],
-				}),
-			]);
-			expect(fs.readdirSync(root).sort()).toEqual(Object.keys(originals).sort());
-			for (const [file, code] of Object.entries(originals))
-				expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
+			expect(preview.files.find(({ file }) => file === 'RetainedBranch.tsx')?.code).toContain(
+				'.map(({id,label=true ? index : 7},index)',
+			);
+			for (const first of [
+				'ArrayValue.tsx',
+				'Template.tsx',
+				'ImmediateArrow.tsx',
+				'TrueArm.tsx',
+				'NullishRight.tsx',
+			]) {
+				const result = await runCodemod(
+					[path.join(root, first), ...inputs.filter((file) => path.basename(file) !== first)],
+					options,
+				);
+				expect(result.files).toEqual([
+					expect.objectContaining({
+						file: first,
+						output: first,
+						changed: false,
+						code: originals[first],
+						notes: [note],
+					}),
+				]);
+				expect(fs.readdirSync(root).sort()).toEqual(
+					[...Object.keys(originals), 'node_modules'].sort(),
+				);
+				for (const [file, code] of Object.entries(originals))
+					expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
+			}
 		},
 	);
 
@@ -1448,6 +2244,144 @@ export function Host({rows}: { rows: Row[] }) {
 			notes: [],
 		});
 		const result = await runCodemod(inputs, { root, verify: false });
+		expect(result.files).toEqual([
+			expect.objectContaining({
+				file: 'View.tsx',
+				output: 'View.tsx',
+				code: sources['View.tsx'],
+				changed: false,
+				notes: [blocked],
+			}),
+		]);
+		expect(fs.readdirSync(root).sort()).toEqual(Object.keys(sources).sort());
+		for (const [file, code] of Object.entries(sources))
+			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
+	});
+
+	it.each([
+		['arguments[1]', 'function'],
+		['({ arguments }).arguments[1]', 'function'],
+		['Object.keys({ [arguments[1]]() {} })[0]', 'function'],
+		['this', 'function'],
+		['new.target === undefined', 'function'],
+		['(() => new.target)()', 'function'],
+		['arguments[0].label', 'arrow'],
+		['this?.label', 'arrow'],
+		['new.target === undefined', 'arrow'],
+		['arguments[0].label', 'arrow', 'body'],
+	])('blocks the map callback scope read %s (%s) before writing', async (value, kind, location) => {
+		const callback = kind === 'function' ? 'function ' : '';
+		const arrow = kind === 'arrow' ? ' => ' : ' ';
+		const parameter = location === 'body' ? 'label' : `label = ${value}`;
+		const rendered = location === 'body' ? value : 'label';
+		const originals = {
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			'Caller.tsx': "import { List } from './List.tsx'; export const Caller = () => <List />;",
+			'List.tsx': `export function List(props) {
+	return <ul>{[{}, {}].map(${callback}({ ${parameter} }, index)${arrow}{
+		return <li key="row">{String(${rendered})}</li>;
+	})}</ul>;
+}`,
+			'Control.tsx': `export function Control() {
+	return <ul>{[{ arguments: 'row' }].map(function ({
+		arguments: label = (function () { return new.target; })(),
+	}, index) {
+		return <li key={index}>{label}</li>;
+	})}</ul>;
+}`,
+		};
+		const root = project(originals);
+		const inputs = ['Caller.tsx', 'List.tsx', 'Control.tsx'].map((file) => path.join(root, file));
+		const options = { root, verify: false };
+		const note = expect.objectContaining({
+			rule: 'map-callback-scope',
+			severity: 'error',
+			message: expect.stringContaining(value.includes('new.target') ? 'new.target' : 'arguments'),
+		});
+		const preview = await runCodemod(inputs, { ...options, write: false });
+		const retained = preview.files.find(({ file }) => file === 'List.tsx');
+		expect(retained).toMatchObject({
+			code: expect.stringContaining(`.map(${callback}`),
+			notes: [note],
+		});
+		expect(retained?.code).toContain('key="row"');
+		expect(preview.files.find(({ file }) => file === 'Control.tsx')).toMatchObject({
+			code: expect.stringContaining('@for'),
+			notes: [],
+		});
+		const result = await runCodemod(inputs, options);
+		expect(result.files).toEqual([
+			expect.objectContaining({ file: 'List.tsx', changed: false, notes: [note] }),
+		]);
+		expect(fs.readdirSync(root).sort()).toEqual(Object.keys(originals).sort());
+		for (const [file, source] of Object.entries(originals))
+			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(source);
+	});
+
+	it.each([
+		'[{}, {}].map((_, index) => <li key={String(index)}>{String(arguments.length)}</li>)',
+		'[{}, , {}].map((_) => <li key={0}>{String(arguments.length)}</li>)',
+		'[{}, {}].map((_, index, rows) => <li key={index}>{String(arguments.length)}</li>)',
+		'[{}].map((() => <li key={0}>{String(arguments.length)}</li>), undefined)',
+	])('blocks a retained JSX map from reading renderer arguments before writing', async (rows) => {
+		const original = `export function List() { return <ul>{${rows}}</ul>; }`;
+		const root = project({
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			'List.tsx': original,
+			'Control.tsx': `export function List() {
+	return <ul>{[{}, {}].map(function (_) {
+		return <li key={0}>{String(arguments.length)}</li>;
+	})}</ul>;
+}`,
+		});
+		fs.symlinkSync(
+			path.join(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+		);
+		const inputs = ['List.tsx', 'Control.tsx'].map((file) => path.join(root, file));
+		const note = expect.objectContaining({ rule: 'map-callback-scope', severity: 'error' });
+		const preview = await runCodemod(inputs, { root, write: false, verify: false });
+		expect(preview.files.find(({ file }) => file === 'List.tsx')).toMatchObject({
+			code: expect.stringContaining(rows),
+			notes: [note],
+		});
+		expect(preview.files.find(({ file }) => file === 'Control.tsx')).toMatchObject({
+			code: expect.stringContaining('.map(function'),
+			notes: [],
+		});
+		const result = await runCodemod(inputs, { root, verify: false });
+		expect(result.files).toEqual([
+			expect.objectContaining({ file: 'List.tsx', changed: false, notes: [note] }),
+		]);
+		expect(fs.readFileSync(inputs[0], 'utf8')).toBe(original);
+		expect(fs.existsSync(path.join(root, 'List.tsrx'))).toBe(false);
+	});
+
+	it.each([
+		['write', '[...[1]].map((item, index) => <li key={0}>{index++}</li>)'],
+		['tdz', '[...[{}]].map(({label=index}, index) => <li key={0}>{label}</li>)'],
+	])('blocks spread-array map rows with a parameter %s before writing', async (kind, rows) => {
+		const sources = {
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			'Caller.tsx': "import { View } from './View.tsx'; export const Caller = () => <View />;",
+			'View.tsx': `export const View = () => <ul>{${rows}}</ul>;`,
+			'Controls.tsx': `export const Dense = () => <ul>{[1].map((item, index) => <li key={0}>{index}</li>)}</ul>;
+export const Spread = () => <ul>{[...[1]].map((item, index) => <li key={0}>{index}</li>)}</ul>;`,
+		};
+		const root = project(sources);
+		const inputs = ['Caller.tsx', 'View.tsx', 'Controls.tsx'].map((file) => path.join(root, file));
+		const options = { root, verify: false, strong: true };
+		const blocked = expect.objectContaining({ rule: `map-parameter-${kind}`, severity: 'error' });
+		const preview = await runCodemod(inputs, { ...options, write: false });
+		expect(preview.files.find((file) => file.file === 'View.tsx')).toMatchObject({
+			code: expect.stringContaining('@for'),
+			notes: [blocked],
+		});
+		const controls = preview.files.find((file) => file.file === 'Controls.tsx');
+		expect(controls.notes).toEqual([]);
+		expect(controls.rules['template-for']).toBe(2);
+
+		const result = await runCodemod(inputs, options);
 		expect(result.files).toEqual([
 			expect.objectContaining({
 				file: 'View.tsx',
@@ -2612,6 +3546,90 @@ export function View() { return <Selected.Provider value="a"><Retained.Provider 
 		);
 	});
 
+	it('reports selected context member reads through TypeScript path aliases before writing', async () => {
+		const root = project({
+			'package.json': '{"name":"app","type":"module"}',
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: {
+					module: 'esnext',
+					moduleResolution: 'bundler',
+					paths: {
+						'@shade': ['./shade.ts'],
+						'@ordinary': ['./ordinary.ts'],
+						'@factory': ['./factory.ts'],
+						'@default': ['./default.ts'],
+						'@unselected': ['./unselected.ts'],
+						'@shadowed': ['./shadowed'],
+					},
+				},
+			}),
+			'shade.ts':
+				"import { createContext } from 'react'; export const Shade = createContext('default');",
+			'ordinary.ts': "export const BadgeContext = { Provider: () => 'plain' };",
+			'factory.ts': `function make() { return { Provider: () => 'plain' }; }
+export const MadeContext = make();
+export const Plain = make();`,
+			'default.ts': "export default { Provider: () => 'plain' };",
+			'unselected.ts':
+				"import { createContext } from 'react'; export const Outside = createContext('default');",
+			'shadowed.ts':
+				"import { createContext } from 'react'; export const Shadowed = createContext('default');",
+			'shadowed.js': "export const Shadowed = { Provider: () => 'plain' };",
+			'View.tsx': `import { Shade } from '@shade';
+import { BadgeContext } from '@ordinary';
+import { MadeContext, Plain } from '@factory';
+import DefaultContext from '@default';
+import { Outside } from '@unselected';
+import { Shadowed } from '@shadowed';
+export function View() {
+	return <Shade.Provider value="night">
+		<Shade.Consumer>{(value) => <b>{value}</b>}</Shade.Consumer>
+		<BadgeContext.Provider /><MadeContext.Provider /><DefaultContext.Provider />
+		<Plain.Provider /><Outside.Provider /><Shadowed.Provider />
+	</Shade.Provider>;
+}`,
+		});
+		const selection = [
+			'shade.ts',
+			'ordinary.ts',
+			'factory.ts',
+			'default.ts',
+			'shadowed.ts',
+			'View.tsx',
+		].map((file) => path.join(root, file));
+		const before = selection.map((file) => fs.readFileSync(file, 'utf8'));
+		const options = { root, projectTypes: false, verify: false };
+		const { files } = await runCodemod(selection, { ...options, write: false });
+		const view = files.find(({ file }) => file === 'View.tsx');
+		const notes = view?.notes.filter(({ rule }) => rule === 'context-path-alias');
+		expect(notes).toEqual(
+			['Provider', 'Consumer', 'Provider', 'Provider', 'Provider'].map((member) =>
+				expect.objectContaining({
+					severity: 'error',
+					message: expect.stringContaining(`${member} member`),
+				}),
+			),
+		);
+		expect(view?.code).toContain('<Shade.Consumer>');
+		for (const name of [
+			'Shade',
+			'BadgeContext',
+			'MadeContext',
+			'DefaultContext',
+			'Plain',
+			'Outside',
+			'Shadowed',
+		])
+			expect(view?.code).toContain(`<${name}.Provider`);
+		expect(files.find(({ file }) => file === 'shade.ts')?.code).toContain("from 'octane'");
+		const result = await runCodemod(selection, options);
+		expect(result.files).toEqual([
+			expect.objectContaining({ file: 'View.tsx', changed: false, notes: [notes[0]] }),
+		]);
+		expect(selection.map((file) => fs.readFileSync(file, 'utf8'))).toEqual(before);
+		expect(fs.existsSync(path.join(root, 'View.tsrx'))).toBe(false);
+	});
+
 	it('rewrites `.Provider` only on values that are contexts', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',
@@ -3416,6 +4434,148 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 					}),
 				]),
 			);
+		}
+	});
+
+	it('migrates only proven export references from the React Motion entry points', async () => {
+		const root = project({
+			'package.json': '{ "name": "app" }',
+			'supported.ts': `import { motion, inView } from 'framer-motion';
+import * as Motion from 'motion/react';
+export const supported = [motion.div, inView, Motion['motion'].span];
+export type Transition = import('motion/react').Transition;`,
+			'unsupported.tsx': `import { AnimatePresence, useIsPresent as usePresent } from 'framer-motion';
+import * as Motion from 'motion/react';
+export { type HTMLMotionProps as Props } from 'framer-motion';
+export function App() { return <AnimatePresence><Motion.Reorder.Group>{usePresent()}</Motion.Reorder.Group></AnimatePresence>; }`,
+			'whole.ts': `export * from 'framer-motion';
+import * as Motion from 'framer-motion';
+export const lookup = (name: string) => Motion[name];
+export const load = () => import('motion/react');`,
+			'default.ts': `import Motion, { motion } from 'framer-motion';
+export const views = [Motion, motion.div];`,
+		});
+		const { files } = await runCodemod([root], { verify: false, write: false });
+		const supported = files.find(({ file }) => file === 'supported.ts');
+		expect(supported?.notes).toEqual([]);
+		expect(supported?.code).not.toMatch(/['"](?:framer-motion|motion\/react)['"]/);
+		expect(supported?.code.match(/@octanejs\/motion/g)).toHaveLength(3);
+		const unsupported = files.find(({ file }) => file === 'unsupported.tsx');
+		expect(unsupported?.code).not.toContain('@octanejs/motion');
+		for (const name of ['useIsPresent', 'Reorder', 'HTMLMotionProps']) {
+			expect(unsupported?.notes).toContainEqual(
+				expect.objectContaining({
+					rule: 'bindings',
+					severity: 'error',
+					message: expect.stringContaining(name),
+				}),
+			);
+		}
+		const whole = files.find(({ file }) => file === 'whole.ts');
+		expect(whole?.code).not.toContain('@octanejs/motion');
+		expect(whole?.notes.filter(({ severity }) => severity === 'error')).toHaveLength(3);
+		const withDefault = files.find(({ file }) => file === 'default.ts');
+		expect(withDefault?.code).not.toContain('@octanejs/motion');
+		expect(withDefault?.notes).toContainEqual(
+			expect.objectContaining({ severity: 'error', message: expect.stringContaining('default') }),
+		);
+		const manifest = path.join(root, 'package.json');
+		const before = fs.readFileSync(manifest, 'utf8');
+		const retained = await runCodemod([path.join(root, 'unsupported.tsx')], { verify: false });
+		expect(retained.packages).toEqual([]);
+		expect(retained.dependencies).toEqual([]);
+		expect(fs.readFileSync(manifest, 'utf8')).toBe(before);
+		const migrated = await runCodemod([path.join(root, 'supported.ts')], { verify: false });
+		expect(migrated.packages.map(({ from }) => from)).toEqual(['framer-motion', 'motion/react']);
+		expect(migrated.dependencies.map(({ name }) => name)).toEqual(['@octanejs/motion']);
+		expect(JSON.parse(fs.readFileSync(manifest, 'utf8')).dependencies['@octanejs/motion']).toBe(
+			`^${catalogVersion('@octanejs/motion')}`,
+		);
+	});
+
+	it.each([
+		['matching installed release', '0.1.15', './index.ts'],
+		['missing install', undefined, undefined],
+		['stale install', '0.1.67', './index.ts'],
+		['conditional root', '0.1.15', { types: './index.ts', default: './index.js' }],
+	])(
+		'checks Motion exports before rewriting imports with a %s',
+		async (scenario, installed, exportsRoot) => {
+			const binding = '@octanejs/motion';
+			const manifest = JSON.stringify({ dependencies: { [binding]: '0.1.15' } });
+			const root = project({
+				'package.json': manifest,
+				'available.ts': "export { inView } from 'framer-motion';",
+				'unavailable.ts': "export { LayoutGroup } from 'motion/react';",
+				...(installed && {
+					[`node_modules/${binding}/package.json`]: JSON.stringify({
+						name: binding,
+						type: 'module',
+						version: installed,
+						exports: { '.': exportsRoot },
+					}),
+					[`node_modules/${binding}/index.ts`]: "export * from './engine.js';",
+					[`node_modules/${binding}/engine.ts`]: 'export const inView = () => {};',
+				}),
+			});
+			const inputs = ['available.ts', 'unavailable.ts'].map((file) => path.join(root, file));
+			const result = await runCodemod(inputs, { root, verify: false });
+			const available = result.files.find(({ file }) => file === 'available.ts');
+			const unavailable = result.files.find(({ file }) => file === 'unavailable.ts');
+			const canCheck = scenario === 'matching installed release';
+			expect(available?.code).toContain(canCheck ? binding : 'framer-motion');
+			expect(available?.notes).toHaveLength(canCheck ? 0 : 1);
+			expect(unavailable?.code).toContain('motion/react');
+			expect(unavailable?.notes).toEqual([
+				expect.objectContaining({
+					rule: 'bindings',
+					severity: 'error',
+					message: expect.stringContaining(canCheck ? 'LayoutGroup' : binding),
+				}),
+			]);
+			expect(result.dependencies).toEqual([]);
+			expect(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).toBe(manifest);
+		},
+	);
+
+	it('retains Motion context type references while migrating the corresponding value', async () => {
+		const blocked = [
+			"import type { MotionConfigContext as C } from 'motion/react'; export type T = C;",
+			"import { MotionConfigContext as C } from 'framer-motion'; export interface T extends C {}",
+			"import * as Motion from 'motion/react'; export type T = Motion.MotionConfigContext;",
+			"import * as Motion from 'motion/react'; export interface T extends Motion.MotionConfigContext {}",
+			"import * as Motion from 'motion/react'; import C = Motion.MotionConfigContext; export type T = C;",
+			"export type T = import('motion/react').MotionConfigContext;",
+			"export { MotionConfigContext as Context } from 'motion/react';",
+			"import { MotionConfigContext as C } from 'motion/react'; export { C };",
+			"import { MotionConfigContext as C } from 'motion/react'; export default C;",
+			"import * as Motion from 'motion/react'; export default Motion.MotionConfigContext;",
+		];
+		const allowed = [
+			"import type { MotionConfigContext as C } from 'motion/react'; export type T = typeof C;",
+			"import * as Motion from 'motion/react'; export type T = typeof Motion.MotionConfigContext;",
+			"export type T = typeof import('motion/react').MotionConfigContext;",
+			"import { MotionConfigContext as C } from 'motion/react'; export const Context = C;",
+		];
+		const root = project(
+			Object.fromEntries([...blocked, ...allowed].map((source, i) => [`context${i}.ts`, source])),
+		);
+		const result = await runCodemod([root], { write: false, verify: false });
+		for (const [i, source] of [...blocked, ...allowed].entries()) {
+			const file = result.files.find(({ file }) => file === `context${i}.ts`);
+			if (i < blocked.length) {
+				expect(file?.code).toBe(source);
+				expect(file?.notes).toEqual([
+					expect.objectContaining({
+						rule: 'bindings',
+						severity: 'error',
+						message: expect.stringContaining('MotionConfigContext'),
+					}),
+				]);
+			} else {
+				expect(file?.code).toContain('@octanejs/motion');
+				expect(file?.notes).toEqual([]);
+			}
 		}
 	});
 

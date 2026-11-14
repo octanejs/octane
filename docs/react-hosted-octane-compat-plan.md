@@ -253,7 +253,7 @@ interface RendererRegionOwnerBridge {
 	readContext<T>(context: Context<T>): T;
 	routeError(error: unknown): boolean;
 	routeSuspense(thenable: PromiseLike<unknown>): boolean;
-	registerDispose(dispose: () => void): () => void;
+	registerDispose(dispose: () => void, root: Block): () => void;
 }
 ```
 
@@ -321,32 +321,22 @@ Lifecycle rules:
    render must not mutate a running Octane tree.
 6. Preserve the Octane root when React temporarily hides a suspended primary tree
    and tears down layout effects.
-7. Dispose on a real unmount. React StrictMode's development setup/cleanup probe
-   requires idempotent setup and a cancelable deferred final-dispose check rather
-   than blindly destroying the root in every layout cleanup. The same deferred
-   check is the hide/probe/unmount discriminator: React's deletion removes the
-   host from the document within the same commit, while StrictMode probes and
-   Suspense hiding leave it connected (hidden content keeps its DOM under
-   `display: none`). A post-commit connectivity check on the host — canceled by
-   a new attachment generation — separates all three without a private signal.
-   **Phase 0 proved this against React 19.2 with one hard constraint on the
-   check's TRIGGER**: hiding Suspense content destroys layout effects AND
-   detaches refs, but leaves PASSIVE effects connected; deleting an
-   already-hidden tree then fires only the passive cleanup. The check must
-   therefore be scheduled from BOTH the host ref detach (prompt visible
-   deletion + hide detection) and the wrapper's passive cleanup
-   (deletion-while-hidden) — a layout-cleanup-only or ref-only trigger leaks
-   the hosted root when React deletes a hidden island
-   (`tests/react-hosted/lifecycle-discriminator.test.ts`). The external
-   DOM-removal reconciliation also holds: with the host externally removed,
-   React gives no signal, a later commit republishes into the detached host
-   without faulting, and Octane's safe-cleanup guarantee covers the eventual
-   teardown.
+7. Dispose on a real unmount. React insertion effects stay registered through
+   Suspense and Activity hides and the StrictMode development probe. Their
+   cleanup schedules disposal after the React commit. A new insertion-effect
+   setup cancels the pending disposal. Ref detach preserves the root and host
+   for retries, and the reveal's layout effect republishes the island.
+   These signals also work in React containers outside the document.
+   Insertion cleanup marks the registered roots inactive immediately so an
+   in-progress passive drain skips their remaining effects. Deferred teardown
+   can still run the cleanup returned by the effect that deleted its host.
+   The Phase 0 spike instead used a connectivity check after ref detach and
+   passive cleanup (`tests/react-hosted/lifecycle-discriminator.test.ts`).
 8. Keep the bridge active until Octane teardown finishes. During actual React
    deletion, an Octane cleanup error cannot be surfaced by scheduling state on the
    deleting controller; `routeError()` should decline it so the throw re-enters
    the disposal frame synchronously. **Phase 0 refinement:** because rule 7's
-   discriminator defers disposal past React's commit, that frame is a
+   cleanup defers disposal past React's commit, that frame is a
    post-commit microtask, NOT React's commit-error path — the fault can no
    longer reach React's own error handling. The decline behavior is proven
    (the fault is not swallowed and the dead wrapper is never scheduled), but a
@@ -553,10 +543,13 @@ provider value even when the change landed mid-episode
 publish is also needed (so a new value can stop the suspension itself) remains
 open question 16.
 
-Every relay/retry callback carries the controller generation and pending-episode
-token. A settlement from a superseded attempt or unmounted island must become a
-no-op. If the current root was disposed after an initial routed suspension, retry
-creates and rebinds a fresh hosted root before acknowledging readiness.
+Each retry checks the current pending episode and insertion-effect lifetime.
+Insertion cleanup closes the lifetime synchronously, before deferred disposal,
+so a queued settlement cannot restart a deleted island. A layout effect can
+delete the island during the retry itself, so check the lifetime again before
+draining passive effects. If the current root was disposed after an initial
+routed suspension, retry creates and rebinds a fresh hosted root before
+acknowledging readiness.
 
 The post-commit resolution rule comes from Ripple's former compat implementation:
 it resolved React's wakeable in a post-block-flush callback, after Ripple had

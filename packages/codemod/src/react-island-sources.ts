@@ -52,7 +52,7 @@ function imported(checker: ts.TypeChecker, node: ts.Node) {
 		return { name, module: imp.moduleSpecifier.text };
 }
 
-/** Original imported components handed directly to an authored React island. */
+/** Original imported components handed to an authored React island. */
 export async function islandComponents(
 	file: string,
 	source: string,
@@ -83,8 +83,31 @@ export async function islandComponents(
 			: ts.isJsxSelfClosingElement(node)
 				? node.tagName
 				: node;
-		const entry = imported(checker, ref);
-		if (entry) components.add(entry.module);
+		if (ts.isIdentifier(ref) && ref !== node && /^[a-z]|-/.test(ref.text)) return;
+		let value = ref;
+		const seen = new Set<ts.VariableDeclaration>();
+		for (;;) {
+			const entry = imported(checker, value);
+			if (entry) {
+				components.add(entry.module);
+				return;
+			}
+			if (!ts.isIdentifier(value)) return;
+			const symbol = checker.getSymbolAtLocation(value);
+			const alias = symbol?.declarations?.length === 1 && symbol.valueDeclaration;
+			if (
+				!alias ||
+				!ts.isVariableDeclaration(alias) ||
+				!ts.isVariableDeclarationList(alias.parent) ||
+				(alias.parent.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+				!ts.isIdentifier(alias.name) ||
+				!alias.initializer ||
+				seen.has(alias)
+			)
+				return;
+			seen.add(alias);
+			value = skipWrappers(alias.initializer);
+		}
 	}
 	function visit(n: ts.Node) {
 		if (ts.isJsxSelfClosingElement(n) || ts.isJsxOpeningElement(n)) {
@@ -148,7 +171,7 @@ function* directExportReturns({ sf, checker }: ReturnType<typeof bind>) {
 			value = skipWrappers(value.initializer);
 		}
 		const output = returnedJsx(value);
-		if (output) yield { name: symbol.name, output };
+		if (output) yield { name: symbol.name, output, localName: name?.text };
 	}
 }
 
@@ -200,19 +223,24 @@ function hostedLeaf(output: ts.JsxElement | ts.JsxSelfClosingElement) {
 		return openingTag(child).tagName;
 }
 
-/** Runtime imports that an explicit server host returns directly. */
-export function hostedServerComponents(file: string, source: string) {
-	if (
+function ordinaryReactJsx(source: string) {
+	return !(
 		/@jsx(?:Frag)?\b/i.test(source) ||
 		[...source.matchAll(/@jsxRuntime\s+(\S+)/gi)].some(([, mode]) => mode !== 'automatic') ||
 		[...source.matchAll(/@jsxImportSource\s+(\S+)/gi)].some(([, name]) => name !== 'react')
-	)
-		return [];
+	);
+}
+
+/** Runtime imports that an explicit server host returns directly. */
+export function hostedServerComponents(file: string, source: string) {
+	if (!ordinaryReactJsx(source)) return [];
 	const bound = bind(file, source);
 	const { sf, checker } = bound;
 	const edges = [];
 	for (const { output } of directExportReturns(bound)) {
-		const host = imported(checker, openingTag(output).tagName);
+		const tag = openingTag(output).tagName;
+		if (ts.isIdentifier(tag) && (/^[a-z]/.test(tag.text) || tag.text.includes('-'))) continue;
+		const host = imported(checker, tag);
 		if (host?.module !== 'octane/react/server' || host.name !== 'OctaneCompat') continue;
 		const ref = hostedLeaf(output);
 		const leaf = ref && imported(checker, ref);
@@ -220,6 +248,172 @@ export function hostedServerComponents(file: string, source: string) {
 			edges.push({ ...leaf, line: sf.getLineAndCharacterOfPosition(output.getStart(sf)).line + 1 });
 	}
 	return edges;
+}
+
+/** A retained component that returns JSX for a directly imported component. */
+export function retainedReactComponentReturns(file: string, source: string) {
+	if (!ordinaryReactJsx(source)) return [];
+	const bound = bind(file, source);
+	const { sf, checker } = bound;
+	const edges = [];
+	const seen = new Set<ts.Node>();
+	for (const { output, localName } of directExportReturns(bound)) {
+		if (seen.has(output)) continue;
+		const tag = openingTag(output).tagName;
+		if (localName && !/^[A-Z]/.test(localName)) continue;
+		if (ts.isIdentifier(tag) && !/^[A-Z]/.test(tag.text)) continue;
+		const leaf = imported(checker, tag);
+		if (leaf?.module.startsWith('.') && /\.[jt]sx$/.test(leaf.module)) {
+			seen.add(output);
+			edges.push({ ...leaf, line: sf.getLineAndCharacterOfPosition(output.getStart(sf)).line + 1 });
+		}
+	}
+	return edges;
+}
+
+/** Existing Octane roots that render a directly imported component body. */
+export function octaneRootComponents(file: string, source: string) {
+	const { sf, checker } = bind(file, source);
+	const edges: {
+		runtime: 'octane' | 'octane/server';
+		module: string;
+		name: string;
+		line: number;
+	}[] = [];
+	function clientComponent(call: ts.CallExpression, callee: ts.Expression, hydrate: boolean) {
+		if (hydrate && call.arguments.length <= 4) return call.arguments[1];
+		if (
+			!ts.isPropertyAccessExpression(callee) ||
+			ts.isOptionalChain(callee) ||
+			callee.name.text !== 'render' ||
+			call.arguments.length > 2
+		)
+			return;
+		const root = skipWrappers(callee.expression);
+		if (
+			ts.isCallExpression(root) &&
+			!ts.isOptionalChain(root) &&
+			root.arguments.length >= 1 &&
+			root.arguments.length <= 2 &&
+			!root.arguments.some(ts.isSpreadElement)
+		) {
+			const factory = imported(checker, skipWrappers(root.expression));
+			if (factory?.module === 'octane' && factory.name === 'createRoot') return call.arguments[0];
+		}
+	}
+	function visit(node: ts.Node) {
+		if (
+			ts.isCallExpression(node) &&
+			!ts.isOptionalChain(node) &&
+			!node.arguments.some(ts.isSpreadElement)
+		) {
+			const callee = skipWrappers(node.expression);
+			const entry = imported(checker, callee);
+			const server = entry?.module === 'octane/server';
+			const value = server
+				? node.arguments.length <= 3 &&
+					(entry.name === 'renderToString' || entry.name === 'renderToStaticMarkup') &&
+					node.arguments[0]
+				: clientComponent(node, callee, entry?.module === 'octane' && entry.name === 'hydrateRoot');
+			const leaf = value ? imported(checker, skipWrappers(value)) : undefined;
+			if (leaf?.module.startsWith('.') && /\.[jt]sx$/.test(leaf.module))
+				edges.push({
+					...leaf,
+					runtime: server ? 'octane/server' : 'octane',
+					line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
+				});
+		}
+		ts.forEachChild(node, visit);
+	}
+	visit(sf);
+	return edges;
+}
+
+/** React server calls that render directly imported components. */
+export function reactServerComponents(
+	file: string,
+	source: string,
+	original: (module: 'react' | 'react/jsx-runtime') => boolean,
+	topLevel = false,
+) {
+	const { sf, checker } = bind(file, source);
+	const edges: { module: string; name: string; line: number }[] = [];
+	function visit(node: ts.Node) {
+		if (ts.isCallExpression(node) && !ts.isOptionalChain(node) && node.arguments.length === 1) {
+			const callee = imported(checker, node.expression);
+			if (
+				callee?.module === 'react-dom/server' &&
+				(callee.name === 'renderToString' || callee.name === 'renderToStaticMarkup')
+			) {
+				const value = skipWrappers(node.arguments[0]);
+				let ref: ts.Node | undefined;
+				const jsx =
+					ts.isJsxSelfClosingElement(value) ||
+					(ts.isJsxElement(value) &&
+						withoutJsxIndentation(value.children).every(
+							(child) => ts.isJsxExpression(child) && !child.expression,
+						))
+						? openingTag(value)
+						: undefined;
+				if (
+					jsx &&
+					(!ts.isIdentifier(jsx.tagName) || /^[A-Z][\w$]*$/.test(jsx.tagName.text)) &&
+					jsx.attributes.properties.length === 0 &&
+					ordinaryReactJsx(source) &&
+					original('react/jsx-runtime')
+				)
+					ref = jsx.tagName;
+				if (
+					ts.isCallExpression(value) &&
+					!ts.isOptionalChain(value) &&
+					(value.arguments.length === 1 ||
+						(value.arguments.length === 2 &&
+							skipWrappers(value.arguments[1]).kind === ts.SyntaxKind.NullKeyword))
+				) {
+					const factory = imported(checker, value.expression);
+					if (factory?.module === 'react' && factory.name === 'createElement' && original('react'))
+						ref = skipWrappers(value.arguments[0]);
+				}
+				const leaf = ref && imported(checker, ref);
+				if (leaf?.module.startsWith('.') && /\.[jt]sx$/.test(leaf.module))
+					edges.push({
+						...leaf,
+						line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
+					});
+			}
+		}
+		ts.forEachChild(node, visit);
+	}
+	if (topLevel) {
+		for (const statement of sf.statements) {
+			if (!ts.isVariableStatement(statement)) continue;
+			for (const declaration of statement.declarationList.declarations) {
+				const call = declaration.initializer;
+				if (!call || !ts.isCallExpression(call)) continue;
+				const [argument] = call.arguments;
+				if (argument && ts.isJsxSelfClosingElement(argument) && ts.isIdentifier(argument.tagName))
+					visit(call);
+			}
+		}
+	} else visit(sf);
+	return edges;
+}
+
+/** Local exports whose original body returns an intrinsic React element. */
+export function intrinsicReactExports(file: string, source: string) {
+	const names = new Set<string>();
+	if (ordinaryReactJsx(source)) {
+		for (const { name, output, localName } of directExportReturns(bind(file, source))) {
+			const tag = openingTag(output).tagName;
+			if (
+				ts.isIdentifier(tag) &&
+				/^[a-z]/.test(tag.text) &&
+				(!localName || /^[A-Z]/.test(localName))
+			)
+				names.add(name);
+		}
+	}
+	return names;
 }
 
 /** Inspect the emitted local export before assigning a reverse island to a server host. */

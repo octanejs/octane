@@ -50,7 +50,62 @@ function literalDeclaration(declaration: ts.VariableDeclaration) {
 	);
 }
 
-/** A direct initialization in an ordinary component returning a native host. */
+function safeSetupLiteral(node: ts.Expression, checker: ts.TypeChecker) {
+	if (scalarLiteral(node)) return true;
+	if (ts.isIdentifier(node) && node.text === 'undefined') {
+		const symbol = checker.getSymbolAtLocation(node);
+		return !!symbol && checker.isUndefinedSymbol(symbol);
+	}
+	return (
+		ts.isPrefixUnaryExpression(node) &&
+		(node.operator === ts.SyntaxKind.PlusToken || node.operator === ts.SyntaxKind.MinusToken) &&
+		ts.isNumericLiteral(skipWrappers(node.operand))
+	);
+}
+
+/** A state declaration before the retained hook, with no explicit lazy initializer. */
+function stateSetup(declaration: ts.VariableDeclaration, checker: ts.TypeChecker, owner: ts.Node) {
+	const { name, initializer } = declaration;
+	if (
+		(declaration.parent.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+		declaredVariable(declaration.parent.parent) ||
+		!ts.isArrayBindingPattern(name) ||
+		!name.elements.every(
+			(element) =>
+				ts.isOmittedExpression(element) ||
+				(!element.dotDotDotToken && !element.initializer && ts.isIdentifier(element.name)),
+		) ||
+		!initializer ||
+		!ts.isCallExpression(initializer) ||
+		ts.isOptionalChain(initializer) ||
+		!ts.isIdentifier(initializer.expression) ||
+		rendererImport(initializer.expression, checker) !== 'useState' ||
+		initializer.arguments.length > 1
+	)
+		return false;
+	const input = initializer.arguments[0];
+	if (!input) return true;
+	const value = skipWrappers(input);
+	if (safeSetupLiteral(value, checker)) return true;
+	let binding = ts.isIdentifier(value)
+		? checker.getSymbolAtLocation(value)?.valueDeclaration
+		: undefined;
+	while (binding && ts.isBindingElement(binding)) binding = binding.parent.parent;
+	return !!binding && ts.isParameter(binding) && binding.parent === owner;
+}
+
+function conditionalOutput(value: ts.Expression) {
+	if (!ts.isConditionalExpression(value)) return false;
+	const yes = skipWrappers(value.whenTrue);
+	const no = skipWrappers(value.whenFalse);
+	const jsx = (node: ts.Expression) =>
+		ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
+	const empty = (node: ts.Expression) =>
+		node.kind === ts.SyntaxKind.NullKeyword || node.kind === ts.SyntaxKind.FalseKeyword;
+	return (jsx(yes) && (jsx(no) || empty(no))) || (empty(yes) && jsx(no));
+}
+
+/** A direct initialization in an ordinary component with native output. */
 export function nativeSetupHook(
 	ref: ts.Identifier,
 	uses: ReturnType<typeof localUses>,
@@ -58,8 +113,12 @@ export function nativeSetupHook(
 	diagnostic?: {
 		calleeName(callee: ts.Expression): string | null;
 		nativeOutput(element: ts.JsxElement | ts.JsxSelfClosingElement): boolean;
+		originalReact(): boolean;
 		contextSetup?: boolean;
+		privateContext?: boolean;
 	},
+	// Store-root diagnostics can prove an anonymous declaration's default export.
+	allowAnonymousDefault = false,
 ) {
 	const call = ref.parent;
 	if (!ts.isCallExpression(call) || call.expression !== ref) return false;
@@ -73,8 +132,9 @@ export function nativeSetupHook(
 		return false;
 	const statement = decl.parent.parent;
 	const block = statement.parent;
-	if (!ts.isBlock(block)) return false;
+	if (!ts.isBlock(block) || declaredVariable(statement)) return false;
 	const position = block.statements.indexOf(statement);
+	let afterState = false;
 	if (!diagnostic) {
 		if (position === 0) {
 			if (decl.parent.declarations[0] !== decl) return false;
@@ -86,9 +146,10 @@ export function nativeSetupHook(
 			!block.statements.slice(0, position).every((prior) => nullRef(prior, checker))
 		)
 			return false;
-	} else if (diagnostic.contextSetup) {
+	} else if (diagnostic.contextSetup || diagnostic.privateContext) {
 		if (
 			call.questionDotToken ||
+			(diagnostic.privateContext && call.arguments.length !== 0) ||
 			decl.parent.declarations.length !== 1 ||
 			(decl.parent.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
 			!call.arguments.every(
@@ -109,6 +170,13 @@ export function nativeSetupHook(
 		)
 			return false;
 	} else {
+		const setupDeclaration = (declaration: ts.VariableDeclaration) => {
+			if (literalDeclaration(declaration)) return true;
+			if (!stateSetup(declaration, checker, block.parent) || !diagnostic.originalReact())
+				return false;
+			afterState = true;
+			return true;
+		};
 		const declarations = decl.parent.declarations;
 		if (
 			!block.statements
@@ -116,9 +184,9 @@ export function nativeSetupHook(
 				.every(
 					(prior) =>
 						ts.isVariableStatement(prior) &&
-						prior.declarationList.declarations.every(literalDeclaration),
+						prior.declarationList.declarations.every(setupDeclaration),
 				) ||
-			!declarations.slice(0, declarations.indexOf(decl)).every(literalDeclaration)
+			!declarations.slice(0, declarations.indexOf(decl)).every(setupDeclaration)
 		)
 			return false;
 	}
@@ -158,21 +226,24 @@ export function nativeSetupHook(
 		name = holder.name;
 	}
 	if (
-		!name ||
-		!/^[A-Z]/.test(name.text) ||
+		(name
+			? !/^[A-Z]/.test(name.text)
+			: !allowAnonymousDefault ||
+				!owner.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)) ||
 		!ts.isSourceFile(owner.parent) ||
 		!owner.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ||
-		renderUses(uses(name)).some((ref) => {
-			const tag = ref.parent;
-			return !(
-				diagnostic &&
-				(ts.isJsxOpeningElement(tag) ||
-					ts.isJsxClosingElement(tag) ||
-					ts.isJsxSelfClosingElement(tag)) &&
-				tag.tagName === ref &&
-				diagnostic.nativeOutput(ts.isJsxSelfClosingElement(tag) ? tag : tag.parent)
-			);
-		})
+		(name &&
+			renderUses(uses(name)).some((ref) => {
+				const tag = ref.parent;
+				return !(
+					diagnostic &&
+					(ts.isJsxOpeningElement(tag) ||
+						ts.isJsxClosingElement(tag) ||
+						ts.isJsxSelfClosingElement(tag)) &&
+					tag.tagName === ref &&
+					diagnostic.nativeOutput(ts.isJsxSelfClosingElement(tag) ? tag : tag.parent)
+				);
+			}))
 	)
 		return false;
 	const last = block.statements.at(-1);
@@ -183,16 +254,109 @@ export function nativeSetupHook(
 		: ts.isJsxSelfClosingElement(value)
 			? value.tagName
 			: undefined;
-	if (!tag || !ts.isIdentifier(tag) || !/^[a-z]/.test(tag.text)) return false;
-	return diagnostic ? 'diagnostic' : position === 0 ? 'first' : 'afterRefs';
+	const intrinsic = tag && ts.isIdentifier(tag) && /^[a-z]/.test(tag.text);
+	if (intrinsic && !afterState)
+		return diagnostic ? 'diagnostic' : position === 0 ? 'first' : 'afterRefs';
+	// The retained hook runs in setup, before the returned child has a renderer.
+	if (
+		diagnostic &&
+		!diagnostic.privateContext &&
+		(tag || ts.isJsxFragment(value) || conditionalOutput(value)) &&
+		!ts.isOptionalChain(call) &&
+		!(decl.parent.flags & ts.NodeFlags.Using) &&
+		call.arguments.every((input) => {
+			const arg = skipWrappers(input);
+			return (
+				safeSetupLiteral(arg, checker) ||
+				(ts.isIdentifier(arg) &&
+					fixedBinding(checker, arg, call) &&
+					initializedBefore(checker, arg, call))
+			);
+		})
+	)
+		return 'diagnostic';
+	return false;
+}
+
+function declaredVariable(statement: ts.Statement) {
+	return (
+		ts.isVariableStatement(statement) &&
+		!!statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.DeclareKeyword)
+	);
+}
+
+function firstRendererCall(fn: ts.FunctionDeclaration) {
+	const first = fn.body?.statements[0];
+	const value =
+		first &&
+		(ts.isVariableStatement(first)
+			? first.declarationList.declarations[0]?.initializer
+			: ts.isReturnStatement(first) || ts.isExpressionStatement(first)
+				? first.expression
+				: undefined);
+	if (first && value && ts.isCallExpression(value) && ts.isIdentifier(value.expression))
+		return { call: value, callee: value.expression, ambient: declaredVariable(first) };
+}
+
+function privateContextCall(
+	sf: ts.SourceFile,
+	checker: ts.TypeChecker,
+	uses: ReturnType<typeof localUses>,
+	outer: ts.CallExpression,
+	callee: ts.Identifier,
+) {
+	if (ts.isOptionalChain(outer) || outer.arguments.length) return false;
+	const helper = checker.getSymbolAtLocation(callee)?.valueDeclaration;
+	if (
+		!helper ||
+		!ts.isFunctionDeclaration(helper) ||
+		!helper.name ||
+		helper.parent !== sf ||
+		helper.modifiers?.length ||
+		helper.asteriskToken ||
+		helper.parameters.length ||
+		renderUses(uses(helper.name)).some(
+			(ref) => !ts.isCallExpression(ref.parent) || ref.parent.expression !== ref,
+		)
+	)
+		return false;
+	const read = firstRendererCall(helper);
+	if (
+		!read ||
+		read.ambient ||
+		ts.isOptionalChain(read.call) ||
+		read.call.arguments.length !== 1 ||
+		rendererImport(read.callee, checker) !== 'useContext'
+	)
+		return false;
+	const context = read.call.arguments[0];
+	const decl = ts.isIdentifier(context) && checker.getSymbolAtLocation(context)?.valueDeclaration;
+	if (!decl || !ts.isVariableDeclaration(decl)) return false;
+	const list = decl.parent;
+	const init = decl.initializer;
+	return (
+		ts.isVariableDeclarationList(list) &&
+		(list.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
+		ts.isVariableStatement(list.parent) &&
+		list.parent.parent === sf &&
+		!declaredVariable(list.parent) &&
+		!!init &&
+		ts.isCallExpression(init) &&
+		!ts.isOptionalChain(init) &&
+		ts.isIdentifier(init.expression) &&
+		rendererImport(init.expression, checker) === 'createContext' &&
+		init.arguments.length === 1 &&
+		scalarLiteral(init.arguments[0])
+	);
 }
 
 /** Only a call in the first evaluated statement witnesses renderer work in this export. */
 export function directRendererCalls(
 	sf: ts.SourceFile,
 	checker: ts.TypeChecker,
-	module: 'react' | 'react-dom',
+	module: 'react' | 'react-dom' | 'react-intl',
 	accepts: (name: string) => boolean,
+	privateContextExports?: Set<string>,
 ) {
 	const calls = new Map<string, string>();
 	if (contains(sf, (n) => ts.isIdentifier(n) && n.text === 'eval')) return calls;
@@ -205,19 +369,24 @@ export function directRendererCalls(
 			fn.asteriskToken ||
 			fn.modifiers?.length !== 1 ||
 			fn.modifiers[0].kind !== ts.SyntaxKind.ExportKeyword ||
-			fn.parameters.some((p) => !ts.isIdentifier(p.name) || p.initializer)
+			fn.parameters.some(
+				(p) =>
+					!ts.isIdentifier(p.name) ||
+					(p.initializer &&
+						(module === 'react-dom' || !scalarLiteral(skipWrappers(p.initializer)))),
+			)
 		)
 			continue;
-		const first = fn.body.statements[0];
+		const first = firstRendererCall(fn);
 		if (!first) continue;
-		const value = ts.isVariableStatement(first)
-			? first.declarationList.declarations[0]?.initializer
-			: ts.isReturnStatement(first) || ts.isExpressionStatement(first)
-				? first.expression
-				: undefined;
-		if (!value || !ts.isCallExpression(value) || !ts.isIdentifier(value.expression)) continue;
-		const name = rendererImport(value.expression, checker, module);
-		if (!name || !accepts(name)) continue;
+		if (
+			module === 'react-intl' &&
+			(first.ambient || ts.isOptionalChain(first.call) || first.call.arguments.length)
+		)
+			continue;
+		const name = rendererImport(first.callee, checker, module);
+		const direct = name && accepts(name) ? name : undefined;
+		if (!direct && !privateContextExports) continue;
 		// A local write can replace the exported function before the importer calls it.
 		if (
 			renderUses(uses(fn.name)).some(
@@ -225,7 +394,14 @@ export function directRendererCalls(
 			)
 		)
 			continue;
-		calls.set(fn.name.text, name);
+		if (direct) calls.set(fn.name.text, direct);
+		else if (
+			privateContextExports &&
+			!first.ambient &&
+			!fn.parameters.length &&
+			privateContextCall(sf, checker, uses, first.call, first.callee)
+		)
+			privateContextExports.add(fn.name.text);
 	}
 	return calls;
 }

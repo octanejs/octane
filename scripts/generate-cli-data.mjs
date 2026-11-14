@@ -13,6 +13,7 @@ import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format, resolveConfig } from 'prettier';
+import ts from 'typescript';
 import { KNOWN_BINDINGS } from '../packages/octane-mcp-server/src/bridge.js';
 import {
 	STRONG_DIAGNOSTICS,
@@ -77,6 +78,33 @@ function buildErrorCodes() {
 	);
 }
 
+function buildMotionExports() {
+	const dir = path.join(REPO, 'packages/motion');
+	const entry = path.resolve(dir, readJson(path.join(dir, 'package.json')).exports['.']);
+	const program = ts.createProgram([entry], {
+		module: ts.ModuleKind.ESNext,
+		moduleResolution: ts.ModuleResolutionKind.Bundler,
+		target: ts.ScriptTarget.ESNext,
+		skipLibCheck: true,
+		types: [],
+	});
+	const source = program.getSourceFile(entry);
+	const checker = program.getTypeChecker();
+	for (const statement of source.statements) {
+		if (
+			ts.isExportDeclaration(statement) &&
+			statement.moduleSpecifier &&
+			!checker.getSymbolAtLocation(statement.moduleSpecifier)
+		) {
+			throw new Error(`Cannot resolve Motion re-export ${statement.moduleSpecifier.getText()}`);
+		}
+	}
+	return checker
+		.getExportsOfModule(checker.getSymbolAtLocation(source))
+		.map((symbol) => symbol.name)
+		.sort();
+}
+
 function buildStrongDiagnostics() {
 	return {
 		diagnostics: Object.fromEntries(
@@ -105,6 +133,7 @@ const data = {
 	reactPackages: Object.fromEntries(
 		Object.entries(KNOWN_BINDINGS).sort(([a], [b]) => a.localeCompare(b)),
 	),
+	motionExports: buildMotionExports(),
 	errorCodes: buildErrorCodes(),
 	strongDiagnostics: buildStrongDiagnostics(),
 };

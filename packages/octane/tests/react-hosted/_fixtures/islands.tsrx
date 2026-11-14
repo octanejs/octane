@@ -4,6 +4,7 @@ import {
 	use,
 	useEffect,
 	useId,
+	useInsertionEffect,
 	useLayoutEffect,
 	useState,
 } from 'octane';
@@ -38,6 +39,39 @@ export function GreetingIsland(props) @{
 		<h2 class="greeting">{'Hello ' + props.name}</h2>
 		<Counter />
 	</section>
+}
+
+export function InsertionEffectIsland({ log }: { log: (message: string) => void }) @{
+	const [version, setVersion] = useState(0);
+	useInsertionEffect(() => {
+		log('first setup:' + version);
+		return () => {
+			log('first cleanup:' + version);
+		};
+	}, [version]);
+	useInsertionEffect(() => {
+		log('second setup:' + version);
+		return () => {
+			log('second cleanup:' + version);
+		};
+	}, [version]);
+	<button onClick={() => setVersion(1)}>{String(version)}</button>
+}
+
+export function ActivityIsland({ log }: { log: (message: string) => void }) @{
+	useLayoutEffect(() => {
+		log('layout setup');
+		return () => {
+			log('layout cleanup');
+		};
+	});
+	useEffect(() => {
+		log('passive setup');
+		return () => {
+			log('passive cleanup');
+		};
+	});
+	<Counter />
 }
 
 export function BadgeIsland(props) @{
@@ -77,6 +111,31 @@ export function TwoContextIsland() @{
 export function SuspendingIsland(props) @{
 	const value = use(props.resource);
 	<p class="resolved">{('value:' + value) as string}</p>
+}
+
+export function SuspendingEffectIsland({
+	resource,
+	rendered,
+	layout,
+	passive,
+	afterPassive,
+}: {
+	resource: PromiseLike<string>;
+	rendered: (value: string) => void;
+	layout: (value: string) => void;
+	passive: (value: string) => void | (() => void);
+	afterPassive?: (value: string) => void;
+}) @{
+	const value = use(resource);
+	rendered(value);
+	useLayoutEffect(() => {
+		layout(value);
+	}, [value]);
+	useEffect(() => passive(value), [value]);
+	useEffect(() => {
+		afterPassive?.(value);
+	}, [value]);
+	<p class="resolved">{value as string}</p>
 }
 
 /**

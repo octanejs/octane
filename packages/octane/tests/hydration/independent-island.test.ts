@@ -1255,7 +1255,7 @@ export function Answer() @{
 				resolveClient(data);
 				if (data === 'client' && !bindings) {
 					await vi.waitFor(() => expect(host.querySelector('[data-first]')).not.toBe(first));
-					await settle();
+					await vi.waitFor(() => expect(hasPendingWork()).toBe(false));
 					expect(host.querySelector('p')!.textContent).toBe('client');
 					expect(first.isConnected).toBe(false);
 					expect(events).toEqual([]);

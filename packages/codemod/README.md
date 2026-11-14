@@ -79,6 +79,11 @@ export begins by calling a named React import of `useState` or
 `useSyncExternalStore`. Give native callers a compiled Octane hook and retain the
 original for React callers.
 
+The codemod also warns when native setup calls an unchanged local hook that
+forwards to a private helper with a direct React `useContext` read. The warning
+describes what happens after the helper module initializes. Earlier imports in
+a cycle can enter a component while that module's context is still uninitialized.
+
 Every module with JSX becomes `.tsrx`, entries and helpers without a component
 included, so Strong mode can reach all of them; one that was JavaScript gains
 `// @ts-nocheck`, so it stays as unchecked as it was. Every import of a renamed
@@ -87,6 +92,13 @@ So is each string elsewhere in the project that is exactly a renamed module's
 path, from its own file or from the project root, such as Vite's
 `server.warmup.clientFiles: ['./src/main.tsx']`: the `module-paths` rule.
 Globs and paths without an extension stay as they are.
+
+A retained React server entry can still render a component selected for migration.
+The codemod warns when `renderToString(<Leaf />)` or
+`renderToStaticMarkup(createElement(Leaf))` directly uses a relative JSX import
+whose local component returns an intrinsic element. Migrate the server entry
+with that component or keep the component in React. Review custom bundler
+resolution, indirect calls, and dynamic imports.
 
 ### Element-only children
 
@@ -283,7 +295,7 @@ A component can also store an SVG with literal attributes directly in a local be
 
 The codemod follows an icon through local components and directly imported components selected in the same migration. For example, with `function Button({ children }) { return <button>{children}</button>; }`, it can follow `<Button><Mark /></Button>` to the native button. The same check applies to a named prop such as `icon`. A receiver can also test an explicitly named prop for presence and render it, for example `icon ? <span>{icon}</span> : null` or `<span>{preferred ?? icon}</span>`. Each use must reach native output or only test presence in the receiving function. At least one use must render the value. Presence checks on JSX children and on slots forwarded through another receiver need review because an empty JSX child can be a truthy render function. The caller’s surrounding JSX must also reach an exported native component. A type query such as `ComponentProps<typeof Button>` can still refer to the component after migration. A query on the imported SVG itself keeps its original component type and import. The check defers recognizable hook calls and props compiled as text. When an icon reaches an unverified renderer, you can prepare its native module separately with `octane-codemod --svg-paths src/icons/mark.svg`. This writes the native component beside the asset and leaves callers available for review. Confirm the receiving component renders Octane elements before switching its import to `./mark.svg.octane`.
 
-The generated SVG uses the native SVG namespace. In a client mount, Octane places an explicit `xmlns` attribute in the XMLNS namespace; React sets that attribute without a namespace. Applications that inspect the namespace of the attribute itself should keep their existing rendering path.
+The generated SVG uses the native SVG namespace. On a fresh client mount, Octane places an explicit `xmlns` attribute in the XMLNS namespace. If the original React loader forwards it as a prop, React sets it without a namespace. The codemod warns once per admitted asset with this attribute. Applications that inspect the attribute namespace should keep their existing rendering path.
 
 An inline style can set a single `transform` declaration. The value can be a string literal or a template with numeric literals selected by a fixed, initialized binding, such as `style={{ transform: \`rotate(\${open ? 0 : -90}deg)\` }}`. Octane preserves the declaration across updates and can add a trailing semicolon to the server-rendered style attribute.
 

@@ -141,13 +141,13 @@ export const api = {
 
 	it('counts the store options that name contracts, including an inline array', () => {
 		const source = `import { receipt, shelfChanges, stats } from './books.data.ts';
-createDataStore({ feeds: [shelfChanges, stats], persist: { journal: { writes, receipt } } });
+createDataStore({ feeds: [shelfChanges], persist: { journal: { writes: [stats], receipt } } });
 `;
 		const { diagnostics, uses } = analyzeDataContracts(source, '/app/page.ts');
 		expect(diagnostics).toEqual([]);
 		expect(uses.map((use) => `${use.binding}@${use.site}`)).toEqual([
 			'shelfChanges@feeds',
-			'stats@feeds',
+			'stats@writes',
 			'receipt@receipt',
 		]);
 	});

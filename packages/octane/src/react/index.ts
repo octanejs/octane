@@ -86,7 +86,7 @@ export type {
 	OctaneReactComponent,
 	OctaneRenderedNode,
 } from './shared.js';
-import { drainPassiveEffects } from '../runtime.js';
+import { drainPassiveEffects, type Block } from '../runtime.js';
 import { readNearestProviderValue } from './fiber-adapter.js';
 import { reactResourceHints } from './resource-hints.js';
 
@@ -144,7 +144,7 @@ function hostedRootEnvelope(props: {
 }
 
 function reportHostedFault(error: unknown): void {
-	// Disposal is deferred past React's commit (see scheduleDisconnectCheck), so
+	// Disposal is deferred past React's commit, so
 	// a hosted cleanup fault cannot re-throw into React's commit-error path.
 	// Match React 19's own uncaught-error default.
 	if (typeof reportError === 'function') reportError(error);
@@ -191,8 +191,8 @@ class HostedIslandController {
 	private identifierPrefix = '';
 	private committed: TransportedChild | null = null;
 	private episode: PendingEpisode | null = null;
-	private disposers = new Set<() => void>();
-	/** Bumped by every attachment signal; cancels a pending deferred dispose check. */
+	private disposers = new Map<() => void, Block>();
+	/** Positive while mounted. Cleanup negates the generation before deferring disposal. */
 	private lifecycleGeneration = 0;
 	private attemptSuspended = false;
 	private attemptErrored = false;
@@ -327,8 +327,9 @@ class HostedIslandController {
 		return true;
 	}
 
-	registerDispose(dispose: () => void): () => void {
-		this.disposers.add(dispose);
+	registerDispose(dispose: () => void, root: Block): () => void {
+		this.disposers.set(dispose, root);
+		if (this.lifecycleGeneration < 0) root.inactive = true;
 		this.rootLive = true;
 		return () => {
 			this.disposers.delete(dispose);
@@ -392,30 +393,11 @@ class HostedIslandController {
 
 	hostAttached(node: HTMLElement): void {
 		this.host = node;
-		this.lifecycleGeneration++;
 	}
 
-	/**
-	 * Host-ref detach: schedule the deferred hide/probe/unmount discriminator.
-	 * `host` is deliberately kept — a hidden island's ref detaches too, and a
-	 * pending-episode retry must still reach the (connected, display:none) host.
-	 */
 	hostDetached(): void {
-		this.scheduleDisconnectCheck();
-	}
-
-	passiveAlive(): void {
-		this.lifecycleGeneration++;
-	}
-
-	/**
-	 * Passive-effect cleanup is the deletion signal that still fires for HIDDEN
-	 * trees: React 19 hide destroys layout effects and detaches refs but leaves
-	 * passive effects connected, so deleting an already-hidden island fires only
-	 * this cleanup (Phase 0 signal matrix, §5 rule 7).
-	 */
-	passiveDetached(): void {
-		this.scheduleDisconnectCheck();
+		// Hiding detaches the ref. Keep the host for pending retries and republish on reveal.
+		this.attached = false;
 	}
 
 	/**
@@ -427,7 +409,6 @@ class HostedIslandController {
 	 */
 	commit(child: TransportedChild, identifierPrefix: string, snapshot: ContextSnapshot): void {
 		if (this.disposed) return;
-		this.lifecycleGeneration++;
 		this.identifierPrefix = identifierPrefix;
 		const previous = this.committed;
 		// A child identity/key change replaces the island — and resets context
@@ -458,24 +439,29 @@ class HostedIslandController {
 		this.attachAndFlush();
 	}
 
-	private scheduleDisconnectCheck(): void {
-		const generation = ++this.lifecycleGeneration;
-		queueMicrotask(() => {
-			if (this.disposed || generation !== this.lifecycleGeneration) return;
-			if (this.host !== null && this.host.isConnected) {
-				// React deletion removes the host within its commit; a still-connected
-				// host after the commit's microtasks is a hide (hidden content keeps
-				// its DOM under display:none), not an unmount. Preserve the hosted
-				// root, DOM, and state; the reveal's layout effect reattaches.
-				this.attached = false;
-				return;
-			}
-			try {
-				this.dispose();
-			} catch (error) {
-				reportHostedFault(error);
-			}
-		});
+	/** Insertion effects stay registered while React hides or probes the island. */
+	startLifetime(): () => void {
+		const previous = this.lifecycleGeneration;
+		const generation = Math.abs(previous) + 1;
+		this.lifecycleGeneration = generation;
+		if (previous < 0) {
+			for (const root of this.disposers.values()) root.inactive = false;
+		}
+		return () => {
+			if (generation !== this.lifecycleGeneration) return;
+			this.lifecycleGeneration = -generation;
+			// The current Octane effect may still return a cleanup. Skip pending setups
+			// for this host immediately, then dispose after that callback finishes.
+			for (const root of this.disposers.values()) root.inactive = true;
+			queueMicrotask(() => {
+				if (this.disposed || this.lifecycleGeneration !== -generation) return;
+				try {
+					this.dispose();
+				} catch (error) {
+					reportHostedFault(error);
+				}
+			});
+		};
 	}
 
 	private dispose(): void {
@@ -485,7 +471,7 @@ class HostedIslandController {
 		// runtime's teardown routing still consults it.
 		this.disposed = true;
 		try {
-			const disposers = [...this.disposers];
+			const disposers = [...this.disposers.keys()];
 			this.disposers.clear();
 			for (const dispose of disposers) dispose();
 		} finally {
@@ -555,14 +541,15 @@ class HostedIslandController {
 		// A settlement from a superseded episode or an unmounted island is a
 		// no-op. routeError supersedes the episode when a fault is staged, so a
 		// stale settlement can never clobber an error with a "ready" status.
-		if (this.disposed || this.episode !== episode) return;
+		if (this.lifecycleGeneration < 0 || this.episode !== episode) return;
 		// Retry Octane FIRST; React learns about readiness only after the hosted
 		// tree has committed (§7 — the Ripple lesson).
 		const result = this.attachAndFlush();
 		// Re-suspended: the same episode remains pending. Errored: routeError
 		// already superseded the episode, staged status 2, and resolved the relay
 		// so the wrapper wakes and throws into the nearest React error boundary.
-		if (result.suspended || result.errored) return;
+		// A layout effect in the retry can synchronously delete the React host.
+		if (this.lifecycleGeneration < 0 || result.suspended || result.errored) return;
 		this.episode = null;
 		this.status = 0;
 		this.payload = null;
@@ -621,10 +608,7 @@ export function OctaneCompat(
 	React.useLayoutEffect(() => {
 		controller.commit(child, identifierPrefix, snapshot);
 	});
-	React.useEffect(() => {
-		controller.passiveAlive();
-		return () => controller.passiveDetached();
-	}, [controller]);
+	React.useInsertionEffect(() => controller.startLifetime(), [controller]);
 
 	return React.createElement('div', {
 		'data-octane-compat': '',

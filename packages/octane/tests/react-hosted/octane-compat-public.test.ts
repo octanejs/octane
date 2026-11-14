@@ -12,19 +12,23 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
+import { flushSync as reactFlushSync } from 'react-dom';
 import { OctaneCompat } from 'octane/react';
 import { flushSync as octaneFlushSync } from '../../src/index.js';
-import { createLog } from '../_helpers.js';
+import { act as octaneAct, createLog, flushEffects } from '../_helpers.js';
 import { h, mountReactHost, reactAct, SpikeErrorBoundary } from './_react-host.js';
 import {
+	ActivityIsland,
 	BadgeIsland,
 	CleanupThrowIsland,
 	GreetingIsland,
+	InsertionEffectIsland,
 	LocallyGuardedIsland,
 	NotifyIsland,
 	RefIsland,
 	RenderLogIsland,
 	PendingFaultIsland,
+	SuspendingEffectIsland,
 	SuspendingIsland,
 	ThrowingIsland,
 	UseIdIsland,
@@ -582,6 +586,131 @@ describe('octane/react — suspension and error escape to React boundaries', () 
 		expect(document.querySelector('[data-octane-compat]')).toBeNull();
 		expect(document.querySelector('.resolved')).toBeNull();
 	});
+
+	it.each(['initial', 'update', 'layout'] as const)(
+		'stops retrying when React deletes a pending island (%s)',
+		async (mode) => {
+			const resource = deferred<string>();
+			const log = createLog();
+			let unmount!: () => void;
+			const rendered = (value: string) => log.push('rendered:' + value);
+			const layout = (value: string) => {
+				log.push('layout:' + value);
+				if (mode === 'layout' && value === 'settled') unmount();
+			};
+			const passive = (value: string) => log.push('passive:' + value);
+			const tree = (pending: PromiseLike<string>) =>
+				h(
+					React.Suspense,
+					{ fallback: h('p', { className: 'react-fallback' }, 'react pending') },
+					h(OctaneCompat<Parameters<typeof SuspendingEffectIsland>[0]>, {
+						component: SuspendingEffectIsland,
+						props: { resource: pending, rendered, layout, passive },
+					}),
+				);
+			const mounted = await mountReactHost(
+				tree(mode === 'update' ? Promise.resolve('first') : resource.promise),
+			);
+			unmount = () => mounted.reactRoot.unmount();
+			try {
+				if (mode === 'update') {
+					expect(mounted.host().querySelector('.resolved')?.textContent).toBe('first');
+					await mounted.render(tree(resource.promise));
+				}
+				expect(mounted.container.querySelector('.react-fallback')).not.toBeNull();
+				log.clear();
+				await reactAct(async () => {
+					resource.resolve('settled');
+					if (mode !== 'layout') unmount();
+					await resource.promise;
+				});
+				expect(mounted.container.childNodes).toHaveLength(0);
+				expect(log.drain()).toEqual(
+					mode === 'layout' ? ['rendered:settled', 'layout:settled'] : [],
+				);
+			} finally {
+				await mounted.unmount();
+			}
+		},
+	);
+
+	it.each([false, true])(
+		'skips pending insertion setups after a hosted update deletes its host (detached %s)',
+		async (detached) => {
+			const log = createLog();
+			let removeHost!: () => void;
+			const mounted = await mountReactHost(
+				h(OctaneCompat<Parameters<typeof InsertionEffectIsland>[0]>, {
+					component: InsertionEffectIsland,
+					props: {
+						log: (message) => {
+							log.push(message);
+							if (message === 'first setup:1') removeHost();
+						},
+					},
+				}),
+				{ detached },
+			);
+			removeHost = () => {
+				reactFlushSync(() => mounted.reactRoot.unmount());
+				log.push('host children:' + mounted.container.childNodes.length);
+			};
+			try {
+				expect(log.drain()).toEqual(['first setup:0', 'second setup:0']);
+				const button = mounted.host().querySelector('button')!;
+				await reactAct(() => octaneAct(() => button.click()));
+				expect(log.drain()).toEqual([
+					'first cleanup:0',
+					'second cleanup:0',
+					'first setup:1',
+					'host children:0',
+					'first cleanup:1',
+				]);
+			} finally {
+				await mounted.unmount();
+			}
+		},
+	);
+
+	it('cleans up the effect that deletes its host and skips the next effect', async () => {
+		const resource = deferred<string>();
+		const log = createLog();
+		let unmount!: () => void;
+		const mounted = await mountReactHost(
+			h(
+				React.Suspense,
+				{ fallback: h('p', { className: 'react-fallback' }, 'react pending') },
+				h(OctaneCompat<Parameters<typeof SuspendingEffectIsland>[0]>, {
+					component: SuspendingEffectIsland,
+					props: {
+						resource: resource.promise,
+						rendered: () => {},
+						layout: () => {},
+						passive: () => {
+							log.push('passive setup');
+							unmount();
+							return () => {
+								log.push('passive cleanup');
+							};
+						},
+						afterPassive: () => log.push('next passive setup'),
+					},
+				}),
+			),
+		);
+		unmount = () => mounted.reactRoot.unmount();
+		try {
+			expect(mounted.container.querySelector('.react-fallback')).not.toBeNull();
+			await reactAct(async () => {
+				resource.resolve('settled');
+				await resource.promise;
+			});
+			expect(mounted.container.childNodes).toHaveLength(0);
+			expect(log.drain()).toEqual(['passive setup', 'passive cleanup']);
+		} finally {
+			await mounted.unmount();
+		}
+	});
 });
 
 describe('octane/react — StrictMode, hide/reveal, and teardown discrimination (§5 rule 7)', () => {
@@ -671,6 +800,45 @@ describe('octane/react — StrictMode, hide/reveal, and teardown discrimination 
 		await mounted.unmount();
 		expect(log.drain()).toEqual(['island-cleanup:hidden-del']);
 	});
+
+	it.each(['connected', 'detached'] as const)(
+		'preserves an Activity island on reveal and cleans it up on hidden deletion in a %s root',
+		async (placement) => {
+			const log = createLog();
+			const island = h(OctaneCompat<{ log: (message: string) => void }>, {
+				component: ActivityIsland,
+				props: { log: log.push },
+			});
+			const tree = (mode: 'visible' | 'hidden') => h(React.Activity, { mode, children: island });
+			const mounted = await mountReactHost(tree('visible'), { detached: placement === 'detached' });
+			try {
+				flushEffects();
+				expect(log.drain()).toEqual(['layout setup', 'passive setup']);
+				const host = mounted.host();
+				const button = host.querySelector('.count') as HTMLButtonElement;
+				await octaneAct(async () => button.click());
+
+				await mounted.render(tree('hidden'));
+				expect(host.isConnected).toBe(placement === 'connected');
+				expect(mounted.container.contains(host)).toBe(true);
+				expect(host.style.display).toBe('none');
+				expect(log.drain()).toEqual([]);
+
+				await mounted.render(tree('visible'));
+				expect(host.style.display).toBe('contents');
+				expect(mounted.host().querySelector('.count')).toBe(button);
+				expect(button.textContent).toBe('count:1');
+
+				await mounted.render(tree('hidden'));
+				expect(host.style.display).toBe('none');
+				expect(log.drain()).toEqual([]);
+			} finally {
+				await mounted.unmount();
+			}
+			expect(mounted.container.querySelector('.count')).toBeNull();
+			expect(log.drain()).toEqual(['layout cleanup', 'passive cleanup']);
+		},
+	);
 
 	it('routes a hosted cleanup fault through reportError without scheduling the dead wrapper', async () => {
 		// jsdom does not implement reportError; stub the global the module

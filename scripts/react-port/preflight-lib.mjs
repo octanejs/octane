@@ -323,7 +323,12 @@ export function assessResolvedEvidence({ input, registry, source }) {
 	const identity = {
 		packageName: registry.name,
 		version: registry.version,
-		repository: registry.repository,
+		repository:
+			blockers.length === 0 &&
+			registry.repository?.subdirectory == null &&
+			source.repository?.subdirectory != null
+				? { ...registry.repository, subdirectory: source.repository.subdirectory }
+				: registry.repository,
 		commit: source.commit,
 		integrity: registry.integrity,
 	};
@@ -1002,8 +1007,8 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 			profile.version !== manifest.version ||
 			profile.commit !== options.sourceCommit
 		)
-			throw new Error('Test helper profile does not match the immutable package identity');
-		for (const helper of profile.helpers) {
+			throw new Error('Test inventory profile does not match the immutable package identity');
+		for (const helper of profile.helpers ?? []) {
 			const sourceCases = [];
 			for (const module of helper.modules) {
 				const entry = tree.find(
@@ -1098,6 +1103,25 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 						path.posix.basename(entry.path).startsWith(`${name}.`),
 					),
 			) ?? ((await declaresMoonBunTestTask(tree, scopePrefix, options)) ? 'bun' : undefined));
+	const jestDiscovery = profile?.jestDiscovery;
+	const pendingJestPaths = new Set(jestDiscovery?.testPaths);
+	if (jestDiscovery) {
+		if (
+			runner !== 'jest' ||
+			!pendingJestPaths.size ||
+			pendingJestPaths.size !== jestDiscovery.testPaths.length ||
+			!jestDiscovery.witnesses.length
+		)
+			throw new Error('Invalid Jest discovery profile');
+		for (const { path, gitBlob } of jestDiscovery.witnesses) {
+			if (
+				!tree.some(
+					(entry) => entry.path === path && entry.sha === gitBlob && isGitHubRegularBlob(entry),
+				)
+			)
+				throw new Error(`Jest discovery profile source mismatch: ${path}`);
+		}
+	}
 	const candidateEntries = tree.flatMap((entry) => {
 		if (!isGitHubRegularBlob(entry) || !entry.path.startsWith(scopePrefix)) return [];
 		if (configurationEntryPaths.has(entry.path)) return [];
@@ -1105,10 +1129,11 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		if (!TEST_SOURCE_PATTERN.test(relativePath) || /(?:^|\/)node_modules\//i.test(relativePath)) {
 			return [];
 		}
-		// Vitest's default discovery selects named test/spec files, not every
-		// module beneath a test/ support directory. Explicit include patterns
-		// still admit nonstandard names, and compile-only specs remain inventoried.
-		const conventional = conventionalTestPath(relativePath, { runner });
+		// A verified Jest list replaces its default discovery. Explicit and
+		// compile-only test selection still apply.
+		const conventional = jestDiscovery
+			? pendingJestPaths.delete(relativePath) || isUpstreamTypeTestPath(relativePath)
+			: conventionalTestPath(relativePath, { runner });
 		const directTest =
 			conventional || referencedByTestConfiguration(relativePath, configuredTestPatterns);
 		const inlineSource = referencedByTestConfiguration(
@@ -1117,6 +1142,10 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		);
 		return directTest || inlineSource ? [{ directTest, entry, inlineSource, relativePath }] : [];
 	});
+	if (pendingJestPaths.size)
+		throw new Error(
+			`Jest discovery profile test missing from source: ${pendingJestPaths.values().next().value}`,
+		);
 	if (candidateEntries.length > MAX_UPSTREAM_TEST_FILES) {
 		throw new Error('Immutable upstream test inventory exceeds the file limit');
 	}
@@ -1450,8 +1479,16 @@ export function githubHeaders(options) {
 }
 
 async function fetchGitHubBlob(entry, options) {
+	if (!Number.isSafeInteger(entry.size) || entry.size < 0)
+		throw new Error(`Invalid source evidence size: ${entry.path}`);
 	if (entry.size > REMOTE_LIMITS.licenseBytes)
 		throw new Error(`Source evidence file is too large: ${entry.path}`);
+	const budget = options.evidenceBudget;
+	if (budget) {
+		if (entry.size > budget.remainingBytes)
+			throw new Error(`Source evidence exceeds the total byte limit: ${entry.path}`);
+		budget.remainingBytes -= entry.size;
+	}
 	let bytes;
 	if (options.sourceCheckout) {
 		if (!/^[0-9a-f]{40}$/i.test(entry.sha ?? ''))
@@ -1542,7 +1579,14 @@ async function resolveGitHubSource(repository, ref, options) {
 			type: entry.type === 'tree' ? 'directory' : 'file',
 			size: entry.size ?? 0,
 		}));
-	validateArchiveEntries(sourceEntries, { maxFiles: 50_000 });
+	// The tree is metadata. Apply the aggregate byte limit to evidence we read,
+	// while retaining path, entry and per-file limits on the tree itself.
+	validateArchiveEntries(sourceEntries, { maxFiles: 50_000, maxTotalBytes: Infinity });
+	const evidenceOptions = {
+		...options,
+		sourceCommit: commit,
+		evidenceBudget: { remainingBytes: DEFAULT_ARCHIVE_LIMITS.maxTotalBytes },
+	};
 
 	const manifestPath = repository.subdirectory
 		? `${repository.subdirectory}/package.json`
@@ -1551,7 +1595,7 @@ async function resolveGitHubSource(repository, ref, options) {
 		(entry) => entry.path === manifestPath && isGitHubRegularBlob(entry),
 	);
 	if (!manifestEntry) throw new Error(`Immutable source has no ${manifestPath}`);
-	const manifestBytes = await fetchGitHubBlob(manifestEntry, options);
+	const manifestBytes = await fetchGitHubBlob(manifestEntry, evidenceOptions);
 	const manifest = parseJsonFile(manifestBytes, 'Immutable source manifest');
 	if (manifest.repository) {
 		const sourceManifestRepository = normalizeRepository(manifest.repository);
@@ -1581,7 +1625,7 @@ async function resolveGitHubSource(repository, ref, options) {
 	const licenseFiles = [];
 	const noticeFiles = [];
 	for (const entry of candidates.sort((left, right) => left.path.localeCompare(right.path))) {
-		const bytes = await fetchGitHubBlob(entry, options);
+		const bytes = await fetchGitHubBlob(entry, evidenceOptions);
 		const file = {
 			path: entry.path,
 			scope:
@@ -1596,7 +1640,7 @@ async function resolveGitHubSource(repository, ref, options) {
 		treeResponse.tree,
 		repository.subdirectory,
 		manifest,
-		{ ...options, sourceCommit: commit },
+		evidenceOptions,
 	);
 
 	return {

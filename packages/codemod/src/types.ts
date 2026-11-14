@@ -27,16 +27,20 @@ export interface TransformOptions {
 	types?: { sourceFile: ts.SourceFile; checker: ts.TypeChecker };
 	/** The new spelling of an import specifier (a renamed module, a binding package), or null to keep it. */
 	resolveSpecifier?(specifier: string): string | null;
+	/** The catalog export names for a partial binding, when known. */
+	bindingExports?(from: string, to: string): ReadonlySet<string> | undefined;
+	/** Record a successful rewrite that was checked against a partial binding's catalog. */
+	recordBindingRewrite?(from: string, to: string): void;
 	/** The issuer resolves the original installed React runtime and types. */
 	originalReact?: boolean;
 	/** A React DOM resource hint called by an imported plain TypeScript initializer. */
 	initializerResourceHint?(module: string, name: string): string | undefined;
-	/** A dispatcher hook directly called by an unchanged local TypeScript export. */
+	/** Renderer work called by an unchanged local TypeScript export. */
 	localReactHook?(
 		module: string,
 		name: string,
 		nativeOnly: boolean,
-	): string | { from: string } | undefined;
+	): string | { from: string } | { privateContext: true } | undefined;
 	/** A dispatcher hook directly called by an unchanged component at a migrated React DOM root. */
 	localReactRootComponent?(module: string, name: string): string | undefined;
 	/** Resolve a source-backed workspace hook after verifying its implementation and its call sites. */
@@ -63,8 +67,8 @@ export interface TransformOptions {
 	elementChild?(binding: number | { module: string; imported: string }): boolean;
 	/** Whether a selected, directly imported component inspects its child descriptors. */
 	descriptorChild?(binding: { module: string; imported: string }): boolean;
-	/** Whether an imported name is a context, or null when it cannot be known. */
-	isContext?(specifier: string, name: string): boolean | null;
+	/** Whether an imported name is a context, with separate review for selected alias targets. */
+	isContext?(specifier: string, name: string, local: string): boolean | 'review-alias' | null;
 	/** The React package an import specifier names when that package has no Octane port, or null. */
 	unported?(specifier: string): string | null;
 	/** The project has React and React DOM 19.2 or newer in the React 19 series, so `ReactCompat` can host an unported package's components. */
@@ -106,6 +110,7 @@ export interface TransformResult {
 	exports: {
 		elementChildren?: { start: number; exported?: string }[];
 		descriptorChildren?: string[];
+		storeHookComponents?: string[];
 		contexts: string[];
 		reexports: { specifier: string; names: [string, string][] | null }[];
 	};

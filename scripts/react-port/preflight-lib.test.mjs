@@ -68,9 +68,98 @@ test('a moon task that runs bun test selects bun named test files', async () => 
 		...packageTree,
 	];
 	const inventory = await immutableTestInventory(tree, 'packages/widget', manifest, options);
+	await assert.rejects(
+		immutableTestInventory(tree, 'packages/widget', manifest, {
+			...options,
+			evidenceBudget: { remainingBytes: tree[0].size + tree[2].size - 1 },
+		}),
+		/Source evidence exceeds the total byte limit: packages\/widget\/test\/widget.test.ts/,
+	);
 	assert.deepEqual(
 		inventory.map(({ path, registrations }) => [path, registrations.length]),
 		[['packages/widget/test/widget.test.ts', 1]],
+	);
+});
+
+test('pinned Jest discovery replaces defaults while retaining independent test selection', async () => {
+	const profile = JSON.parse(
+		readFileSync(new URL('./profiles/framer-motion-12.42.2.json', import.meta.url), 'utf8'),
+	);
+	const scope = 'packages/framer-motion';
+	const manifest = {
+		name: profile.package,
+		version: profile.version,
+		scripts: { test: 'jest', 'test:other': 'test quality/other.ts' },
+		vitest: { includeSource: ['src/inline.ts'] },
+	};
+	const blobs = new Map();
+	const entry = (relativePath, text) => {
+		const bytes = Buffer.from(text);
+		const sha = gitBlobSha(bytes);
+		const url = `https://api.github.com/repos/motiondivision/motion/git/blobs/${sha}`;
+		blobs.set(url, bytes);
+		return {
+			path: `${scope}/${relativePath}`,
+			type: 'blob',
+			mode: '100644',
+			sha,
+			size: bytes.length,
+			url,
+		};
+	};
+	const fetchImpl = async (url) => {
+		const bytes = blobs.get(String(url));
+		assert.ok(bytes);
+		return Response.json({
+			encoding: 'base64',
+			content: bytes.toString('base64'),
+			size: bytes.length,
+		});
+	};
+	const options = { fetchImpl, sourceCommit: profile.commit };
+	const [firstPath] = profile.jestDiscovery.testPaths;
+	const witnesses = profile.jestDiscovery.witnesses.map(({ path, gitBlob: sha }) => ({
+		path,
+		sha,
+		type: 'blob',
+		mode: '100644',
+	}));
+	const tests = profile.jestDiscovery.testPaths.map((file) =>
+		entry(file, "test('renders', () => {});"),
+	);
+	const independent = [
+		entry('quality/other.ts', "test('explicit', () => {});"),
+		entry('type-tests/usage.test-d.ts', 'const value: string = "ok";'),
+		entry('src/inline.ts', "if (import.meta.vitest) { test('inline', () => {}); }"),
+	];
+	const helper = entry(
+		'src/animation/animators/__tests__/utils.ts',
+		'export const utility = true;',
+	);
+	const tree = [...witnesses, ...tests, ...independent, helper];
+	const inventory = await immutableTestInventory(tree, scope, manifest, options);
+	assert.deepEqual(
+		inventory.map(({ path }) => path).sort(),
+		[...tests, ...independent].map(({ path }) => path).sort(),
+	);
+	await assert.rejects(
+		immutableTestInventory(tree.slice(1), scope, manifest, options),
+		/Jest discovery profile source mismatch/,
+	);
+	const firstFile = `${scope}/${firstPath}`;
+	const remainder = tree.filter(({ path }) => path !== firstFile);
+	await assert.rejects(
+		immutableTestInventory(remainder, scope, manifest, options),
+		/Jest discovery profile test missing from source/,
+	);
+	await assert.rejects(
+		immutableTestInventory(
+			[...remainder, entry(firstPath, 'export const value = true;')],
+			scope,
+			manifest,
+			options,
+		),
+		/has no countable registrations/,
 	);
 });
 
@@ -390,7 +479,7 @@ describe('resolved evidence', () => {
 		const source = {
 			name: 'react-widget',
 			version: '1.2.3',
-			repository: { owner: 'example', repo: 'widgets', subdirectory: 'packages/react-widget' },
+			repository: { owner: 'Example', repo: 'Widgets', subdirectory: 'packages/react-widget' },
 			commit: 'a'.repeat(40),
 			manifestLicense: 'MIT',
 			licenseFiles: [{ path: 'LICENSE', scope: 'root', content: MIT_TEXT }],
@@ -401,11 +490,19 @@ describe('resolved evidence', () => {
 				registry: published,
 				source: pinned,
 			});
-		assert.equal(assess().status, 'licensed');
-		assert.equal(
-			assess({ ...registry, repository: { ...registry.repository, subdirectory: 'other' } }).status,
-			'blocked',
-		);
+		const result = assess();
+		assert.equal(result.status, 'licensed');
+		assert.deepEqual(result.identity.repository, {
+			owner: 'example',
+			repo: 'widgets',
+			subdirectory: 'packages/react-widget',
+		});
+		const conflict = assess({
+			...registry,
+			repository: { ...registry.repository, subdirectory: 'other' },
+		});
+		assert.equal(conflict.status, 'blocked');
+		assert.equal(conflict.identity.repository.subdirectory, 'other');
 		assert.equal(assess(registry, { ...source, name: 'another-package' }).status, 'blocked');
 		assert.equal(assess(registry, { ...source, commit: 'b'.repeat(40) }).status, 'blocked');
 		assert.equal(
@@ -713,6 +810,16 @@ describe('resolved evidence', () => {
 		const sourceManifest = sourceManifestBytes.toString('base64');
 		const sourceLicense = sourceLicenseBytes.toString('base64');
 		const sourceTree = [
+			// Large tracked artifacts elsewhere in the monorepo are never read as
+			// package evidence. The mock deliberately has no responses for them.
+			...[0, 1, 2].map((index) => ({
+				path: `.yarn/cache/dependency-${index}.zip`,
+				mode: '100644',
+				type: 'blob',
+				size: 90 * 1024 * 1024,
+				sha: 'd'.repeat(40),
+				url: `https://api.github.com/repos/example/widgets/git/blobs/unrelated-${index}`,
+			})),
 			{
 				path: 'packages/react-widget/package.json',
 				type: 'blob',

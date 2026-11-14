@@ -19,11 +19,13 @@ import { DATA } from '@octanejs/cli/data';
 import { parseSync } from '@tsrx/oxc/parser';
 import ts from 'typescript';
 import { finding, loadCompiler, thrown } from './compiler.js';
-import { PORTED_PACKAGES } from './mappings.js';
+import { isReactMotion, PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
 import {
 	bind,
+	CONTEXT_ALIAS,
 	CONTEXT_PROVIDER_GETTER,
+	MAP_CALLBACK_SCOPE,
 	MAP_PARAMETER_TDZ,
 	MAP_PARAMETER_WRITE,
 	projectTypeAt,
@@ -37,13 +39,28 @@ import {
 	islandComponents,
 	executableImports,
 	hostedServerComponents,
+	intrinsicReactExports,
+	octaneRootComponents,
+	reactServerComponents,
+	retainedReactComponentReturns,
 	reverseIslandExports,
 } from './react-island-sources.js';
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
 const ADAPTER_OCTANE_VERSION = /^0\.(?:16\.(?:[7-9]|[1-9]\d+)|17\.(?:0|[1-9]\d*))$/;
+// React Intl 7.1.14. Both entry points re-export a hook that calls React.useContext.
+const INTL_HOOK_FILES = {
+	'index.js': '8f5854dadcd055f066234e13a344bd0b102aea2d50ddfd2f0cf12e9f48116059',
+	'lib/index.js': '208130dc122cbb84cbc0d4cce54fd7f458954f45d2cd5dc505d7263686ca6093',
+	'src/components/useIntl.js': '7f26c3c5aebaf874aa2ee7f56952358530c246382f7ca9e729a3ee33d196d6c8',
+	'lib/src/components/useIntl.js':
+		'36bb0433939586c08e79a211372987b4173c73552f75d2ae66b6250bdf1f3b8c',
+};
 /** React packages and the Octane entry point that replaces each. */
 const CATALOG = { ...DATA.reactPackages, ...PORTED_PACKAGES };
+const MOTION_BINDING = '@octanejs/motion';
+const MOTION_VERSION = DATA.bindings.find(({ name }) => name === MOTION_BINDING)!.version;
+const MOTION_EXPORTS = new Set(DATA.motionExports);
 const DEPENDENCY_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies'];
 /** A package that, by its name, renders through React. */
 const REACT_PACKAGE = /^(?:react-|@[^/]+\/react(?:-|\/|$)|[^/]+\/react$)|-react(?:\/|$)/;
@@ -179,6 +196,7 @@ export async function runCodemod(
 		if (sourceFile) return { sourceFile, checker: program.getTypeChecker() };
 	}
 	const contextsOf = contextIndex(exports, known);
+	const contextPaths = Object.keys(config?.paths ?? {}).map((pattern) => pattern.split('*'));
 	const renamed = renamedImports(root, config, renames);
 	const foldNames = process.platform === 'darwin';
 	const leafKey = (file: string) => {
@@ -445,8 +463,45 @@ export async function runCodemod(
 			? config
 			: tsconfigOptions(dir);
 	}
+	const installedMotionExports = new Map<string, ReadonlySet<string> | null>();
+	const motionExportsByIssuer = new Map<string, ReadonlySet<string> | null>();
+	function motionExports(file: string): ReadonlySet<string> | null {
+		const dir = path.dirname(file);
+		const known = motionExportsByIssuer.get(dir);
+		if (known !== undefined) return known;
+		const installed = readInstalled(dir, MOTION_BINDING);
+		const declarations = bindingDeclarations(root, dir, MOTION_BINDING);
+		let actual: ReadonlySet<string> | null = null;
+		if (
+			installed &&
+			!declarations.some(
+				(spec) =>
+					typeof spec === 'string' &&
+					/^\d+\.\d+\.\d+(?:-[\da-z.-]+)?(?:\+[\da-z.-]+)?$/i.test(spec) &&
+					spec !== installed.version,
+			)
+		) {
+			const physical = fs.realpathSync(installed.dir);
+			const cached = installedMotionExports.get(physical);
+			actual = cached === undefined ? readMotionExports(installed.manifest, physical) : cached;
+			installedMotionExports.set(physical, actual);
+		} else if (
+			!installed &&
+			declarations.every((spec) => catalogBindingVersion(spec, MOTION_VERSION))
+		) {
+			actual = MOTION_EXPORTS;
+		}
+		motionExportsByIssuer.set(dir, actual);
+		return actual;
+	}
+	function bindingExports(file: string, from: string, to: string) {
+		return to === MOTION_BINDING && isReactMotion(from)
+			? (motionExports(file) ?? undefined)
+			: undefined;
+	}
 	const bindingProject = {
 		root,
+		motionExports,
 		original(file: string, module: string, options = bindingOptions(file)) {
 			return (
 				(!options?.paths && !options?.baseUrl) ||
@@ -567,6 +622,7 @@ export async function runCodemod(
 			resolveSpecifier: (specifier) =>
 				resolveRename(file, specifier) ??
 				resolveBinding(specifier, file, bindingProject, new Map(), []),
+			bindingExports: (from, to) => bindingExports(file, from, to),
 		}).changed;
 	}
 	const { inputFactory, changedJsxExport, helperFunction, localFile, exportsConstObject } =
@@ -596,7 +652,73 @@ export async function runCodemod(
 		return calls.get(name);
 	}
 
-	const localHooks = new Map<string, Map<string, string>>();
+	const localHooks = new Map<
+		string,
+		{ direct: Map<string, string>; privateContexts: Set<string> }
+	>();
+	const intlHookPackages = new Map<string, boolean>();
+	function originalIntlHook(file: string) {
+		const types = originalModule(file, 'react-intl');
+		if (types?.packageId?.name !== 'react-intl') return false;
+		const installed = readInstalled(path.dirname(file), 'react-intl');
+		if (
+			installed?.manifest.name !== 'react-intl' ||
+			installed.version !== '7.1.14' ||
+			installed.manifest.browser ||
+			installed.manifest.exports ||
+			installed.manifest.main !== 'index.js' ||
+			installed.manifest.module !== 'lib/index.js'
+		)
+			return false;
+		try {
+			const dir = fs.realpathSync(installed.dir);
+			const entry = path.join(dir, 'index.js');
+			const issuer = createRequire(file);
+			if (
+				!dir.split(path.sep).includes('node_modules') ||
+				fs.realpathSync(types.resolvedFileName) !== path.join(dir, 'index.d.ts') ||
+				issuer.resolve('react-intl') !== entry ||
+				readInstalled(path.dirname(file), 'react')?.manifest.name !== 'react'
+			)
+				return false;
+			const react = issuer.resolve('react');
+			if (
+				!['src', 'lib/src'].every(
+					(prefix) =>
+						createRequire(path.join(dir, prefix, 'components/useIntl.js')).resolve('react') ===
+						react,
+				)
+			)
+				return false;
+			let verified = intlHookPackages.get(dir);
+			if (verified === undefined) {
+				// An extra executable can shadow an extensionless import before its verified .js.
+				verified =
+					['src', 'lib/src'].every((prefix) =>
+						['', '.mjs', '.mts', '.ts', '.jsx', '.tsx'].every(
+							(ext) =>
+								!fs.lstatSync(path.join(dir, prefix, 'components/useIntl' + ext), {
+									throwIfNoEntry: false,
+								}),
+						),
+					) &&
+					Object.entries(INTL_HOOK_FILES).every(([name, hash]) => {
+						const executable = path.join(dir, name);
+						const stat = fs.lstatSync(executable, { throwIfNoEntry: false });
+						return (
+							stat?.isFile() &&
+							stat.size < 16_384 &&
+							fs.realpathSync(executable) === executable &&
+							createHash('sha256').update(fs.readFileSync(executable)).digest('hex') === hash
+						);
+					});
+				intlHookPackages.set(dir, verified);
+			}
+			return verified;
+		} catch {
+			return false;
+		}
+	}
 	let selectedInPlace: Set<string> | undefined;
 	function localReactHook(from: string, module: string, name: string, nativeOnly: boolean) {
 		if (
@@ -620,38 +742,50 @@ export async function runCodemod(
 		let hooks = localHooks.get(file);
 		if (!hooks) {
 			const source = fs.readFileSync(file, 'utf8');
-			hooks = new Map();
-			if (
-				(/\b(?:useCallback|useContext|useState|useSyncExternalStore)\b/.test(source) ||
-					source.includes('\\u')) &&
+			hooks = { direct: new Map(), privateContexts: new Set() };
+			const escaped = source.includes('\\u');
+			const react =
+				(/\b(?:useCallback|useContext|useState|useSyncExternalStore)\b/.test(source) || escaped) &&
 				originalModule(file, 'react') &&
-				readInstalled(path.dirname(file), 'react')?.manifest.name === 'react'
-			) {
+				readInstalled(path.dirname(file), 'react')?.manifest.name === 'react';
+			const intl = (source.includes('useIntl') || escaped) && originalIntlHook(file);
+			if (react || intl) {
 				const existing = program?.getSourceFile(file);
 				const bound =
 					existing && program
 						? { sf: existing, checker: program.getTypeChecker() }
 						: bind(file, source);
-				hooks = directRendererCalls(
-					bound.sf,
-					bound.checker,
-					'react',
-					(name) =>
-						name === 'useCallback' ||
-						name === 'useContext' ||
-						name === 'useState' ||
-						name === 'useSyncExternalStore',
-				);
+				if (react)
+					hooks.direct = directRendererCalls(
+						bound.sf,
+						bound.checker,
+						'react',
+						(name) =>
+							name === 'useCallback' ||
+							name === 'useContext' ||
+							name === 'useState' ||
+							name === 'useSyncExternalStore',
+						hooks.privateContexts,
+					);
+				if (intl)
+					for (const [name, hook] of directRendererCalls(
+						bound.sf,
+						bound.checker,
+						'react-intl',
+						(name) => name === 'useIntl',
+					))
+						hooks.direct.set(name, hook);
 			}
 			localHooks.set(file, hooks);
 		}
-		const hook = hooks.get(name);
-		if (!hook || fs.statSync(file).nlink > 1) return;
+		const hook = hooks.direct.get(name);
+		if ((!hook && !hooks.privateContexts.has(name)) || fs.statSync(file).nlink > 1) return;
 		// Writing an unrenamed selection through a symlink changes its physical target.
 		selectedInPlace ??= new Set(
 			[...known].filter((f) => !renames.has(f) && !conflicts.has(f)).map((f) => fs.realpathSync(f)),
 		);
 		if (selectedInPlace.has(fs.realpathSync(file))) return;
+		if (!hook) return { privateContext: true } as const;
 		if (
 			nativeOnly &&
 			compiler &&
@@ -697,7 +831,9 @@ export async function runCodemod(
 	const generatedHelpers = new Map<string, string>();
 	const svgHelpers = new Set<string>();
 	const svgHelper = path.join(helperDir, 'octane-path-svg.ts');
-	const svgAssets = new Map<string, boolean>();
+	// Null marks unsupported geometry. A parsed asset records whether its root declares xmlns.
+	const svgAssets = new Map<string, boolean | null>();
+	const svgNamespaceWarnings = new Set<string>();
 	let svgHelperCode: string | undefined;
 	function nativeSvgModule(asset: string, errors: Set<string>, color?: string): string | null {
 		if (
@@ -706,16 +842,18 @@ export async function runCodemod(
 			/[!%?#]/.test(path.relative(root, asset))
 		)
 			return null;
-		if (!svgAssets.has(asset)) {
+		let hasXmlns = svgAssets.get(asset);
+		if (hasXmlns === undefined) {
 			const stat = fs.lstatSync(asset, { throwIfNoEntry: false });
-			svgAssets.set(
-				asset,
-				!!stat?.isFile() &&
-					fs.realpathSync(asset) === path.join(fs.realpathSync(root), path.relative(root, asset)) &&
-					!!parseStaticSvg(fs.readFileSync(asset, 'utf8')),
-			);
+			const svg =
+				stat?.isFile() &&
+				fs.realpathSync(asset) === path.join(fs.realpathSync(root), path.relative(root, asset))
+					? parseStaticSvg(fs.readFileSync(asset, 'utf8'))
+					: null;
+			hasXmlns = svg ? Object.hasOwn(svg.root, 'xmlns') : null;
+			svgAssets.set(asset, hasXmlns);
 		}
-		if (!svgAssets.get(asset)) return null;
+		if (hasXmlns === null) return null;
 		svgHelperCode ??=
 			fs.readFileSync(new URL('../templates/octane-path-svg.ts', import.meta.url), 'utf8') +
 			'\n' +
@@ -745,6 +883,7 @@ export async function runCodemod(
 		generatedHelpers.set(sidecar, code);
 		svgHelpers.add(svgHelper);
 		svgHelpers.add(sidecar);
+		if (hasXmlns) svgNamespaceWarnings.add(asset);
 		return sidecar;
 	}
 	function pathSvgAdapter(file: string, specifier: string, errors: Set<string>, color?: string) {
@@ -798,6 +937,7 @@ export async function runCodemod(
 		return error;
 	}
 	const results: FileResult[] = [];
+	const storeHookComponents = new Map<string, string[]>();
 	if (options.svgPaths && target === 'tsrx') {
 		// Explicit SVG inputs prepare a native component even if a caller's renderer is unknown.
 		// Directory scans still generate components only for verified JSX uses.
@@ -831,8 +971,30 @@ export async function runCodemod(
 		const reactStoreComponents = new Map<string, boolean>();
 		let installedClsx: boolean | undefined;
 		let reactJsx: boolean | undefined;
-		const isContext = (specifier: string, name: string) => {
-			if (!specifier.startsWith('.')) return null;
+		const isContext: NonNullable<TransformOptions['isContext']> = (specifier, name, local) => {
+			if (!specifier.startsWith('.')) {
+				if (
+					!contextPaths.length ||
+					config?.module !== ts.ModuleKind.ESNext ||
+					config.moduleSuffixes ||
+					config.rootDirs ||
+					ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject ||
+					!contextPaths.some(([start, end]) =>
+						end === undefined
+							? specifier === start
+							: specifier.startsWith(start) && specifier.endsWith(end),
+					)
+				)
+					return null;
+				const source = localFile(file, specifier, true);
+				return source &&
+					exports.has(source) &&
+					ts.findConfigFile(path.dirname(source), ts.sys.fileExists) === rootProject &&
+					(exports.get(source)?.contexts.includes(name) ||
+						(name === 'default' ? local : name).endsWith('Context'))
+					? 'review-alias'
+					: null;
+			}
 			const target = resolveModule(file, specifier, known);
 			if (target) return contextsOf(target.file).has(name);
 			if (
@@ -988,6 +1150,8 @@ export async function runCodemod(
 				resolveSpecifier: (specifier) =>
 					resolveRename(file, specifier) ??
 					resolveBinding(specifier, file, bindingProject, packages, notes),
+				bindingExports: (from, to) => bindingExports(file, from, to),
+				recordBindingRewrite: (from, to) => packages.set(from, to),
 				isContext,
 				elementChild: !elementExports.size
 					? undefined
@@ -1064,10 +1228,14 @@ export async function runCodemod(
 			}
 		}
 		const result = transform();
+		if (result.exports.storeHookComponents)
+			storeHookComponents.set(file, result.exports.storeHookComponents);
 		const blockedTransform = result.notes.find(
 			(note) =>
 				note.rule === MAP_PARAMETER_WRITE ||
 				note.rule === MAP_PARAMETER_TDZ ||
+				note.rule === MAP_CALLBACK_SCOPE ||
+				note.rule === CONTEXT_ALIAS ||
 				note.rule === CONTEXT_PROVIDER_GETTER,
 		);
 		if (write && blockedTransform)
@@ -1181,14 +1349,49 @@ export async function runCodemod(
 			fs.realpathSync(module.resolvedFileName).startsWith(fs.realpathSync(installed.dir) + path.sep)
 		);
 	}
-	function originalReactJsxRuntime(file: string) {
-		const name = 'react/jsx-runtime';
+	function originalOctaneRuntime(file: string, specifier: 'octane' | 'octane/server') {
+		const installed = readInstalled(path.dirname(file), 'octane');
+		const module = originalModule(file, specifier);
+		const adapterRuntime = readInstalled(helperDir, 'octane');
+		if (
+			installed?.manifest.name !== 'octane' ||
+			module?.packageId?.name !== 'octane' ||
+			!adapterRuntime
+		)
+			return false;
+		try {
+			const source = fs.realpathSync(module.resolvedFileName);
+			const directory = fs.realpathSync(installed.dir) + path.sep;
+			if (fs.realpathSync(adapterRuntime.dir) + path.sep !== directory) return false;
+			const targets = runtimeTargets(specifier, source, file);
+			return (
+				source.startsWith(directory) &&
+				targets.length > 0 &&
+				targets.every((target) => fs.realpathSync(target).startsWith(directory))
+			);
+		} catch {
+			return false;
+		}
+	}
+	function storeRootNote({ name, line }: { name: string; line: number }, server: boolean): Note {
+		const component = name === 'default' ? 'default export' : name;
+		return {
+			rule: 'store-hook',
+			severity: 'warning',
+			line,
+			message: server
+				? `If this server call runs standalone and reaches the migrated ${component}'s store hook, it may need NativeStoreProvider with its original store context and value.`
+				: `If the migrated ${component}'s store hook reads context, this standalone Octane root needs NativeStoreProvider with its original store context and value.`,
+		};
+	}
+	function originalReactEntry(file: string, name: 'react/jsx-runtime' | 'react-dom/server') {
+		const packageRoot = name === 'react/jsx-runtime' ? 'react' : 'react-dom';
 		const types = originalModule(file, name)?.packageId?.name;
-		if (types !== 'react' && types !== '@types/react') return false;
-		const installed = readInstalled(path.dirname(file), 'react');
+		if (types !== packageRoot && types !== `@types/${packageRoot}`) return false;
+		const installed = readInstalled(path.dirname(file), packageRoot);
 		try {
 			return (
-				installed?.manifest.name === 'react' &&
+				installed?.manifest.name === packageRoot &&
 				fs
 					.realpathSync(createRequire(file).resolve(name))
 					.startsWith(fs.realpathSync(installed.dir) + path.sep)
@@ -1198,6 +1401,7 @@ export async function runCodemod(
 		}
 	}
 	const reverseIslands = new Map<string, ReadonlySet<string>>();
+	const intrinsicExports = new Map<string, ReadonlySet<string>>();
 	const linkedConflicts = new Map<string, string>();
 	function checkLinkedRename(file: string, issuer: string) {
 		const selected = linkedRename(file);
@@ -1259,6 +1463,59 @@ export async function runCodemod(
 		if (!renames.size || linkedRename(file) || conflicts.has(file)) continue;
 		const result = byFile.get(file);
 		const selected = renames.has(file);
+		const specifier = 'octane/react/server';
+		const originalServerHost = () =>
+			automaticReactJsx(file) &&
+			originalOctaneBridge(file, specifier) &&
+			originalReactEntry(file, 'react/jsx-runtime');
+		const hasServerImport = source.includes(specifier);
+		if (
+			selected &&
+			result &&
+			(hasServerImport ||
+				(source.includes('\\') &&
+					ts.preProcessFile(source).importedFiles.some((entry) => entry.fileName === specifier))) &&
+			originalServerHost()
+		) {
+			const [edge] = hostedServerComponents(file, source);
+			if (edge) {
+				const note: Note = {
+					rule: 'react-compat',
+					severity: 'error',
+					line: edge.line,
+					message:
+						'Keep the authored OctaneCompat host in React. Exclude this module from the migration.',
+				};
+				if (write)
+					return blockedWrite(root, unchangedFile(result.file, source, note), compiler?.from);
+				result.notes.push(note);
+			}
+		}
+		if (
+			selected &&
+			storeHookComponents.size &&
+			result?.rules['server-render'] &&
+			result.rules['root-render'] &&
+			automaticReactJsx(file) &&
+			originalReactEntry(file, 'react-dom/server') &&
+			originalOctaneBridge(file, 'octane/server')
+		) {
+			for (const edge of reactServerComponents(
+				file,
+				source,
+				(module) => module === 'react/jsx-runtime' && originalReactEntry(file, module),
+				true,
+			)) {
+				const leaf = renamed(file, edge.module)?.file;
+				if (
+					!leaf ||
+					leaf !== path.resolve(path.dirname(file), edge.module) ||
+					!storeHookComponents.get(leaf)?.includes(edge.name)
+				)
+					continue;
+				result.notes.push(storeRootNote(edge, true));
+			}
+		}
 		const paths = rewriteModulePaths(
 			selected ? source : (result?.code ?? source),
 			file,
@@ -1267,7 +1524,35 @@ export async function runCodemod(
 			scanRename,
 			selected ? undefined : checkLinkedRename,
 		);
-		if (!paths || selected) continue;
+		if (!paths) continue;
+		const storeNotes: Note[] = result?.notes ?? [];
+		if (
+			storeHookComponents.size &&
+			SOURCE.test(file) &&
+			((source.includes('octane') &&
+				(source.includes('createRoot') ||
+					source.includes('hydrateRoot') ||
+					(source.includes('octane/server') &&
+						(source.includes('renderToString') || source.includes('renderToStaticMarkup'))))) ||
+				source.includes('\\')) &&
+			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) === rootProject
+		) {
+			const originalRuntimes = new Map<'octane' | 'octane/server', boolean>();
+			for (const edge of octaneRootComponents(file, source)) {
+				const leaf = renamed(file, edge.module)?.file;
+				if (
+					!leaf ||
+					leaf !== path.resolve(path.dirname(file), edge.module) ||
+					!storeHookComponents.get(leaf)?.includes(edge.name)
+				)
+					continue;
+				if (!originalRuntimes.has(edge.runtime))
+					originalRuntimes.set(edge.runtime, originalOctaneRuntime(file, edge.runtime));
+				if (originalRuntimes.get(edge.runtime))
+					storeNotes.push(storeRootNote(edge, edge.runtime === 'octane/server'));
+			}
+		}
+		if (selected) continue;
 		const rules = { ...result?.rules, 'module-paths': paths.count };
 		const name = path.relative(root, file);
 		const host: FileResult = result ?? {
@@ -1275,7 +1560,7 @@ export async function runCodemod(
 			output: name,
 			changed: true,
 			rules,
-			notes: [],
+			notes: storeNotes,
 			strong: null,
 			strongFixes: [],
 			diagnostics: [],
@@ -1283,13 +1568,59 @@ export async function runCodemod(
 		};
 		if (result) Object.assign(result, { code: paths.code, changed: true, rules });
 		else results.push(host);
+		const retainedJsx =
+			!known.has(file) &&
+			/\.[jt]sx$/.test(file) &&
+			(source.includes('.tsx') || source.includes('.jsx') || source.includes('\\'));
+		const retainedServer =
+			!isTsrx(file) && (source.includes('react-dom/server') || source.includes('\\'));
 		if (
 			!edited.has(file) &&
-			source.includes('octane/react/server') &&
-			automaticReactJsx(file) &&
-			originalOctaneBridge(file, 'octane/react/server') &&
-			originalReactJsxRuntime(file)
+			(retainedJsx || retainedServer) &&
+			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) === rootProject
 		) {
+			const edges = [];
+			if (retainedJsx && automaticReactJsx(file) && originalReactEntry(file, 'react/jsx-runtime'))
+				for (const edge of retainedReactComponentReturns(file, source))
+					edges.push({ ...edge, renderer: 'JSX' });
+			if (retainedServer && originalReactEntry(file, 'react-dom/server'))
+				for (const edge of reactServerComponents(file, source, (module) =>
+					module === 'react'
+						? installedReact(file)
+						: automaticReactJsx(file) && originalReactEntry(file, module),
+				))
+					edges.push({ ...edge, renderer: 'server render' });
+			for (const edge of edges) {
+				const match = renamed(file, edge.module);
+				if (
+					!match ||
+					match.file !== path.resolve(path.dirname(file), edge.module) ||
+					!automaticReactJsx(match.file) ||
+					!originalReactEntry(match.file, 'react/jsx-runtime')
+				)
+					continue;
+				const leaf = byFile.get(match.file);
+				if (!leaf?.output.endsWith('.tsrx')) continue;
+				let names = intrinsicExports.get(match.file);
+				if (!names) {
+					names = intrinsicReactExports(match.file, fs.readFileSync(match.file, 'utf8'));
+					intrinsicExports.set(match.file, names);
+				}
+				if (!names.has(edge.name)) continue;
+				const note: Note = {
+					rule: 'react-compat',
+					severity: 'warning',
+					line: edge.line,
+					message:
+						edge.renderer === 'JSX'
+							? `The retained React JSX in ${name} renders ${leaf.file} directly. With standard package resolution, migrate the caller too or keep this component in React.`
+							: `The retained React server render in ${name} imports ${leaf.file} directly. With standard package resolution, migrate the server entry too or keep this component in React.`,
+				};
+				host.notes.push(note);
+				leaf.notes.push({ ...note, line: 1 });
+			}
+		}
+		if (!edited.has(file) && hasServerImport && originalServerHost()) {
 			for (const edge of hostedServerComponents(file, source)) {
 				const match = edge.module.startsWith('.') && renamed(file, edge.module);
 				if (!match) continue;
@@ -1430,6 +1761,16 @@ export async function runCodemod(
 			strongFixes: [],
 		});
 	}
+	for (const asset of svgNamespaceWarnings)
+		results.push(
+			unchangedFile(path.relative(root, asset), '', {
+				rule: 'svg-paths',
+				severity: 'warning',
+				line: 1,
+				message:
+					'If the React SVG loader forwards the authored xmlns prop, a fresh Octane mount places it in the XMLNS namespace while React uses the null namespace. Review code that reads the attribute namespace.',
+			}),
+		);
 	if (write) for (const [page, next] of pages) fs.writeFileSync(page, next);
 	const html = [...pages.keys()].map((page) => path.relative(root, page));
 	const dependencies = addBindings(root, packages, write);
@@ -1712,9 +2053,11 @@ function renamedImports(
 				);
 		if (!renames.size || (!specifier.startsWith('.') && !matches.length)) return null;
 		const resolved = ts.resolveModuleName(specifier, from, options, ts.sys, cache).resolvedModule;
-		const target = resolved && renames.get(resolved.resolvedFileName);
+		// TypeScript returns slash-delimited names, including on Windows.
+		const file = resolved && path.normalize(resolved.resolvedFileName);
+		const target = file && renames.get(file);
 		if (!target) {
-			if (resolved) unmatched?.(resolved.resolvedFileName);
+			if (file) unmatched?.(file);
 			return null;
 		}
 		// Only a single directory alias preserves the specifier's suffix.
@@ -1722,13 +2065,13 @@ function renamedImports(
 		const alias = matches.length === 1 ? matches[0] : null;
 		if (alias?.directory && target.startsWith(alias.directory)) {
 			return {
-				file: resolved.resolvedFileName,
+				file,
 				specifier: alias.start + target.slice(alias.directory.length).split(path.sep).join('/'),
 			};
 		}
 		const relative = path.relative(path.dirname(from), target).split(path.sep).join('/');
 		return {
-			file: resolved.resolvedFileName,
+			file,
 			specifier: relative.startsWith('../') ? relative : './' + relative,
 		};
 	};
@@ -1819,7 +2162,11 @@ function contextIndex(
 function resolveBinding(
 	specifier: string,
 	file: string,
-	project: { root: string; original: (file: string, module: string) => boolean },
+	project: {
+		root: string;
+		original: (file: string, module: string) => boolean;
+		motionExports: (file: string) => ReadonlySet<string> | null;
+	},
 	packages: Map<string, string>,
 	notes: Note[],
 ) {
@@ -1840,19 +2187,27 @@ function resolveBinding(
 	const entry = DATA.bindings.find((candidate) => candidate.name === binding);
 	const subpath = target.slice(binding.length) + specifier.slice(name.length);
 	const served = entry && entry.exports.some((key) => serves(key, `.${subpath}`));
-	if (target !== binding) {
+	const reactMotion = isReactMotion(specifier);
+	if (target !== binding || reactMotion) {
 		const shadowed = [specifier, binding + subpath].find((name) => !project.original(file, name));
-		const message = shadowed
-			? `Resolve \`${shadowed}\` to its original package before migrating this import.`
-			: !served || !canUseBindingSubpath(file, project.root, binding, subpath, entry.version)
-				? `Install a version of \`${binding}\` that exports \`.${subpath}\` before migrating this import.`
-				: null;
+		let message: string | undefined;
+		if (shadowed) {
+			message = `Resolve \`${shadowed}\` to its original package before migrating this import.`;
+		} else if (reactMotion && project.motionExports(file) === null) {
+			message = `Could not check the exports of \`${MOTION_BINDING}\`. Install the intended binding version and rerun the codemod.`;
+		} else if (
+			subpath &&
+			(!served || !canUseBindingSubpath(file, project.root, binding, subpath, entry.version))
+		) {
+			message = `Install a version of \`${binding}\` that exports \`.${subpath}\` before migrating this import.`;
+		}
 		if (message) {
 			notes.push({ rule: 'bindings', severity: 'error', line: 1, message });
 			return null;
 		}
 	}
-	packages.set(name, binding);
+	// Partial bindings are recorded only after their export check accepts a rewrite.
+	if (!reactMotion) packages.set(name, binding);
 	// An aggregate binding (`@octanejs/visx`, for `@visx/visx`) serves each
 	// package of its scope from a subpath: `@visx/hierarchy` is
 	// `@octanejs/visx/hierarchy`.
@@ -1888,6 +2243,51 @@ function resolveBinding(
 	return binding + subpath;
 }
 
+/** Read the published binding's authored ESM root without loading it. */
+function readMotionExports(manifest: unknown, dir: string): ReadonlySet<string> | null {
+	const pkg = record(manifest);
+	const target = record(pkg.exports)['.'];
+	if (
+		pkg.name !== MOTION_BINDING ||
+		pkg.type !== 'module' ||
+		typeof target !== 'string' ||
+		!target.startsWith('./') ||
+		!target.endsWith('.ts') ||
+		target.endsWith('.d.ts')
+	)
+		return null;
+	const entry = path.resolve(dir, target);
+	if (
+		!entry.startsWith(dir + path.sep) ||
+		!ts.sys.fileExists(entry) ||
+		!fs.realpathSync(entry).startsWith(dir + path.sep)
+	)
+		return null;
+	const program = ts.createProgram([entry], {
+		module: ts.ModuleKind.ESNext,
+		moduleResolution: ts.ModuleResolutionKind.Bundler,
+		target: ts.ScriptTarget.ESNext,
+		skipLibCheck: true,
+		types: [],
+	});
+	const source = program.getSourceFile(entry);
+	if (!source) return null;
+	const checker = program.getTypeChecker();
+	const module = checker.getSymbolAtLocation(source);
+	if (!module) return null;
+	return new Set(
+		checker
+			.getExportsOfModule(module)
+			.filter(
+				(symbol) =>
+					MOTION_EXPORTS.has(symbol.name) &&
+					(!(symbol.flags & ts.SymbolFlags.Alias) ||
+						checker.getAliasedSymbol(symbol).declarations?.length),
+			)
+			.map(({ name }) => name),
+	);
+}
+
 function canUseBindingSubpath(
 	file: string,
 	root: string,
@@ -1914,21 +2314,28 @@ function canUseBindingSubpath(
 			fs.statSync(resolved, { throwIfNoEntry: false })?.isFile()
 		);
 	}
-	// New dependencies use the catalog version. For a different declaration,
-	// require an installed export before rewriting its imports.
+	// New dependencies use the catalog version. Other pins need an installed export proof.
+	return bindingDeclarations(root, dir, binding).every((spec) =>
+		catalogBindingVersion(spec, version),
+	);
+}
+
+function bindingDeclarations(root: string, dir: string, binding: string): unknown[] {
+	const versions: unknown[] = [];
 	for (const project of new Set([root, findRoot(dir)])) {
 		const manifestFile = path.join(project, 'package.json');
 		if (!fs.existsSync(manifestFile)) continue;
 		const manifest = record(JSON.parse(fs.readFileSync(manifestFile, 'utf8')));
-		if (
-			DEPENDENCY_FIELDS.some((field) => {
-				const spec = record(manifest[field])[binding];
-				return spec !== undefined && spec !== version && spec !== `^${version}`;
-			})
-		)
-			return false;
+		for (const field of DEPENDENCY_FIELDS) {
+			const spec = record(manifest[field])[binding];
+			if (spec !== undefined) versions.push(spec);
+		}
 	}
-	return true;
+	return versions;
+}
+
+function catalogBindingVersion(spec: unknown, version: string) {
+	return spec === version || spec === `^${version}`;
 }
 
 /**
@@ -1950,6 +2357,7 @@ function catalogName(specifier: string) {
 	const parts = specifier.split('/');
 	for (let length = parts.length; length > 0; length--) {
 		const candidate = parts.slice(0, length).join('/');
+		if (candidate === 'motion/react' && candidate !== specifier) continue;
 		// Lottie's exported view still needs explicit renderer ownership at its callers.
 		if (candidate !== 'lottie-react' && candidate in CATALOG) return candidate;
 	}

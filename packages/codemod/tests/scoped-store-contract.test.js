@@ -341,6 +341,263 @@ it.each([
 	expect(helpers.sort()).toEqual(supported ? expectedHelpers : []);
 });
 
+it('warns at a direct migrated server call that needs a standalone store provider', async () => {
+	const rootImport = `import { renderToString } from 'react-dom/server';
+			import DefaultPane, { Pane, Plain, Conditional, Props, Destructured } from './pane.tsx';
+			import AnonymousPane from './anonymous.tsx';`;
+	const { app } = project({
+		'app/src/pane.tsx': `import { useSnapshot } from 'observer';
+			export function Pane() { const value = useSnapshot(); return <b>{String(value)}</b>; }
+			export function Plain() { return <b>plain</b>; }
+			export function Props(props: { label?: string }) {
+				const value = useSnapshot();
+				return <b>{props.label ?? String(value)}</b>;
+			}
+			export function Destructured({ label = 'label' }: { label?: string }) {
+				const value = useSnapshot();
+				return <b>{label}{String(value)}</b>;
+			}
+			export default function DefaultPane() {
+				const value = useSnapshot();
+				return <b>{String(value)}</b>;
+			}
+			export function Conditional() {
+				if (typeof window === 'undefined') return <b>server</b>;
+				const value = useSnapshot();
+				return <b>{String(value)}</b>;
+			}`,
+		'app/src/anonymous.tsx': `import { useSnapshot } from 'observer';
+			export default function () {
+				const value = useSnapshot();
+				return <b>{String(value)}</b>;
+			}`,
+		'app/src/root.tsx':
+			rootImport +
+			`
+			export const html = renderToString(<Pane />);
+			export const plain = renderToString(<Plain />);
+			export const conditional = renderToString(<Conditional />);
+			export const props = renderToString(<Props />);
+			export const destructured = renderToString(<Destructured />);
+			export const defaultPane = renderToString(<DefaultPane />);
+			export const anonymousPane = renderToString(<AnonymousPane />);`,
+		'app/src/hosted.tsx': `import { OctaneCompat } from 'octane/react/server';
+			import { Pane } from './pane.tsx';
+			export function Hosted() { return <OctaneCompat component={Pane} />; }`,
+		'app/src/deferred.tsx':
+			rootImport +
+			`
+			export function render() { return renderToString(<Pane />); }`,
+	});
+	const result = await runCodemod(
+		['root', 'pane', 'anonymous', 'deferred'].map((name) => path.join(app, 'src', name + '.tsx')),
+		{ root: app, strong: true, verify: true, write: true },
+	);
+	const findings = result.files.flatMap((file) =>
+		file.notes
+			.filter((note) => note.rule === 'store-hook' && note.severity === 'warning')
+			.map((note) => ({ file: file.file, ...note })),
+	);
+	expect(findings).toEqual([
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 4,
+			message: expect.stringMatching(/standalone.*NativeStoreProvider/i),
+		}),
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 7,
+			message: expect.stringMatching(/migrated Props.*NativeStoreProvider/),
+		}),
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 8,
+			message: expect.stringMatching(/migrated Destructured.*NativeStoreProvider/),
+		}),
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 9,
+			message: expect.stringMatching(/migrated default export.*NativeStoreProvider/),
+		}),
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 10,
+			message: expect.stringMatching(/migrated default export.*NativeStoreProvider/),
+		}),
+	]);
+	expect(fs.existsSync(path.join(app, 'src/root.tsrx'))).toBe(true);
+	const hosted = fs.readFileSync(path.join(app, 'src/hosted.tsx'), 'utf8');
+	expect(hosted).toContain("from './pane.tsrx'");
+	expect(hosted).toContain('<OctaneCompat component={Pane} />');
+});
+
+it('warns at existing standalone client roots when the migrated hook reads context', async () => {
+	const mount = `import { createRoot as mount } from 'octane';
+		import * as Octane from 'octane';
+		import { Pane, Plain } from './pane.tsx';
+		import { Pane as Other } from './other/pane.tsx';
+		export const errors: unknown[] = [];
+		const options = { onUncaughtError: (error: unknown) => errors.push(error), onRecoverableError: (error: unknown) => errors.push(error) };
+		export const render = (host: HTMLElement) => mount(host, options).render(Pane);
+		export const hydrate = (host: HTMLElement) => Octane.hydrateRoot(host, Pane, undefined, options);
+		export function deferred(host: HTMLElement, replacement: ReturnType<typeof mount>) {
+			mount(host).render(Plain);
+			mount(host).render(Other);
+			const unused = mount(host);
+			let root = mount(host);
+			root = replacement;
+			root.render(Pane);
+			const fake = (target: HTMLElement, body: typeof Pane) => body;
+			const hydrateRoot = fake;
+			hydrateRoot(host, Pane);
+		}`;
+	const { app } = project({
+		'observer/react-hooks.ts': original.replace(
+			'return valueOf(readContext(current));',
+			'if (valueOf(0) === 0) return 42; return valueOf(readContext(current));',
+		),
+		'app/src/pane.tsx': `import { useSnapshot } from 'observer';
+			export function Pane() { const value = useSnapshot(); return <b>{String(value)}</b>; }
+			export function Plain() { return <b>plain</b>; }`,
+		'app/src/other/pane.tsx': 'export function Pane() { return <b>other</b>; }',
+		'app/src/client.ts': mount,
+		'app/src/unverified/client.ts': `import { hydrateRoot } from 'octane';
+			import { Pane } from '../pane.tsx';
+			export const hydrate = (host: HTMLElement) => hydrateRoot(host, Pane);`,
+		'app/src/unverified/node_modules/octane/package.json': JSON.stringify({
+			name: 'octane',
+			version: '0.17.0',
+			exports: { '.': { types: './index.d.ts', import: './runtime.mjs' } },
+		}),
+		'app/src/unverified/node_modules/octane/index.d.ts':
+			'export function hydrateRoot(host: HTMLElement, body: unknown): void;',
+		'app/src/unverified/node_modules/octane/runtime.mjs': 'export function hydrateRoot() {}',
+	});
+	const leaf = path.join(app, 'src/pane.tsx');
+	const host = path.join(app, 'src/client.ts');
+	const options = { root: app, strong: true, verify: true };
+	const { files } = await runCodemod([leaf], { ...options, write: false });
+	const client = files.find((file) => file.file === 'src/client.ts');
+	expect(files.find((file) => file.file === 'src/unverified/client.ts')?.notes).toEqual([]);
+	expect(client.notes).toEqual(
+		[7, 8].map((line) => ({
+			rule: 'store-hook',
+			severity: 'warning',
+			line,
+			message: expect.stringMatching(
+				/If the migrated Pane's store hook reads context.*NativeStoreProvider/,
+			),
+		})),
+	);
+	expect(fs.readFileSync(host, 'utf8')).toBe(mount);
+	expect(fs.existsSync(path.join(app, 'src/pane.tsrx'))).toBe(false);
+	const written = await runCodemod([leaf], { ...options, write: true });
+	expect(written.files.find((file) => file.file === 'src/client.ts')?.notes).toEqual(client.notes);
+	expect(fs.readFileSync(host, 'utf8')).toBe(mount.replace('./pane.tsx', './pane.tsrx'));
+	const pane = written.files.find((file) => file.file === 'src/pane.tsx');
+	expect(pane.rules['store-hook']).toBe(1);
+	expect([...pane.notes, ...pane.diagnostics].filter((note) => note.severity === 'error')).toEqual(
+		[],
+	);
+
+	const dom = installDOM();
+	try {
+		const { renderToString, Pane } = await bundleRuntime(
+			app,
+			'server',
+			"export { renderToString } from 'octane/server'; export { Pane } from './src/pane.tsrx';",
+		);
+		const { hydrate, errors } = await bundleRuntime(
+			app,
+			'client',
+			"export { hydrate, errors } from './src/client';",
+		);
+		const hydrated = document.createElement('div');
+		hydrated.innerHTML = renderToString(Pane).html;
+		const before = hydrated.firstElementChild;
+		const root = hydrate(hydrated);
+		try {
+			expect(hydrated.textContent).toBe('42');
+			expect(hydrated.firstElementChild).toBe(before);
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	} finally {
+		dom.window.close();
+		vi.unstubAllGlobals();
+	}
+}, 30_000);
+
+it('warns when an existing Octane server renderer imports a migrated store consumer', async () => {
+	const server = `import { renderToString as render } from 'octane/server';
+		import * as SSR from 'octane/server';
+		import { Pane, Plain } from './pane.tsx';
+		export const standalone = () => render(Pane, { label: 'title' }).html;
+		export const staticMarkup = () => SSR.renderToStaticMarkup(Pane).html;
+		export const plain = () => render(Plain).html;
+		export function shadowed(render: (body: typeof Pane) => string) { return render(Pane); }`;
+	const { app } = project({
+		'app/src/pane.tsx': `import { useSnapshot } from 'observer';
+			export function Pane({ label = '' }: { label?: string } = {}) {
+				const value = useSnapshot();
+				return <b>{label + String(value)}</b>;
+			}
+			export function Plain() { return <b>plain</b>; }`,
+		'app/src/server.ts': server,
+		'app/src/nested.tsrx': `import { standalone } from './server';
+			export function Nested() @{
+				const html = standalone();
+				<p>{html as string}</p>
+			}`,
+		'app/src/unverified/server.ts': `import { renderToString } from 'octane/server';
+			import { Pane } from '../pane.tsx';
+			export const render = () => renderToString(Pane);`,
+		'app/src/unverified/node_modules/octane/package.json': JSON.stringify({
+			name: 'octane',
+			version: '0.17.0',
+			exports: { './server': { types: './index.d.ts', import: './runtime.mjs' } },
+		}),
+		'app/src/unverified/node_modules/octane/index.d.ts':
+			'export function renderToString(body: unknown): void;',
+		'app/src/unverified/node_modules/octane/runtime.mjs': 'export function renderToString() {}',
+	});
+	const leaf = path.join(app, 'src/pane.tsx');
+	const host = path.join(app, 'src/server.ts');
+	const options = { root: app, strong: true, verify: true };
+	const preview = await runCodemod([leaf], { ...options, write: false });
+	const notes = preview.files.find((file) => file.file === 'src/server.ts')?.notes;
+	expect(notes).toEqual(
+		[4, 5].map((line) => ({
+			rule: 'store-hook',
+			severity: 'warning',
+			line,
+			message: expect.stringMatching(/If this server call runs standalone.*NativeStoreProvider/),
+		})),
+	);
+	expect(preview.files.find((file) => file.file === 'src/unverified/server.ts')?.notes).toEqual([]);
+	expect(fs.readFileSync(host, 'utf8')).toBe(server);
+	const written = await runCodemod([leaf], { ...options, write: true });
+	expect(written.files.find((file) => file.file === 'src/server.ts')?.notes).toEqual(notes);
+	expect(fs.readFileSync(host, 'utf8')).toBe(server.replace('./pane.tsx', './pane.tsrx'));
+	const { standalone, staticMarkup, plain, hosted } = await bundleRuntime(
+		app,
+		'server',
+		`import { createElement as h } from 'react';
+		import { renderToString } from 'react-dom/server';
+		import { OctaneCompat } from 'octane/react/server';
+		import { current } from '../observer/renderer';
+		import { Nested } from './src/nested.tsrx';
+		export { standalone, staticMarkup, plain } from './src/server';
+		export const hosted = () => renderToString(h(current, { value: 42 },
+			h(OctaneCompat, { component: Nested }))); `,
+	);
+	expect(standalone).toThrow(/useContext|errors\/12/);
+	expect(staticMarkup).toThrow(/useContext|errors\/12/);
+	expect(plain()).toContain('<b>plain</b>');
+	expect(hosted()).toContain('title42');
+}, 30_000);
+
 it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
 	const source = `import {useSnapshot as useReading, valueOf} from 'observer';
 export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }

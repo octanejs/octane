@@ -190,7 +190,7 @@ it('previews and writes explicitly selected SVG assets without migrating their c
 	const { root, file, icon } = fixture();
 	const twin = path.join(root, 'src/icons/twin.svg');
 	const unselected = path.join(root, 'src/icons/unused.svg');
-	fs.copyFileSync(icon, twin);
+	fs.writeFileSync(twin, asset.replace(' xmlns="http://www.w3.org/2000/svg"', ''));
 	fs.copyFileSync(icon, unselected);
 	const outputs = [
 		'src/icons/mark.svg.octane.ts',
@@ -204,24 +204,60 @@ it('previews and writes explicitly selected SVG assets without migrating their c
 		{ cwd: root, encoding: 'utf8' },
 	);
 	expect(preview.status, preview.stderr).toBe(0);
+	const parsed = JSON.parse(preview.stdout);
+	const notice = expect.objectContaining({
+		rule: 'svg-paths',
+		severity: 'warning',
+		message: expect.stringContaining('XMLNS namespace'),
+	});
+	const warnings = (result) =>
+		result.files.flatMap((entry) =>
+			entry.notes
+				.filter((note) => note.rule === 'svg-paths' && note.severity === 'warning')
+				.map((note) => [entry.file, note]),
+		);
+	expect(warnings(parsed)).toEqual([['src/icons/mark.svg', notice]]);
 	expect(
-		JSON.parse(preview.stdout)
-			.files.filter((f) => f.changed)
+		parsed.files
+			.filter((f) => f.changed)
 			.map((f) => f.output)
 			.sort(),
 	).toEqual(outputs);
 	expect(outputs.some((name) => fs.existsSync(path.join(root, name)))).toBe(false);
 
 	const options = { root, svgPaths: true, write: true };
-	await runCodemod([icon, twin], options);
+	expect(warnings(await runCodemod([icon, twin], options))).toEqual([
+		['src/icons/mark.svg', notice],
+	]);
 	const written = outputs.map((name) => fs.readFileSync(path.join(root, name), 'utf8'));
-	expect((await runCodemod([icon, twin], options)).files.some((f) => f.changed)).toBe(false);
+	const repeat = await runCodemod([icon, twin], options);
+	expect(repeat.files.some((f) => f.changed)).toBe(false);
+	expect(warnings(repeat)).toEqual([['src/icons/mark.svg', notice]]);
 	expect(outputs.map((name) => fs.readFileSync(path.join(root, name), 'utf8'))).toEqual(written);
 	expect(fs.readFileSync(file, 'utf8')).toBe(pane);
-	for (const source of [icon, twin, unselected])
-		expect(fs.readFileSync(source, 'utf8')).toBe(asset);
+	for (const source of [icon, unselected]) expect(fs.readFileSync(source, 'utf8')).toBe(asset);
+	expect(fs.readFileSync(twin, 'utf8')).not.toContain('xmlns=');
 	expect(fs.existsSync(unselected + '.octane.ts')).toBe(false);
 	expect(fs.existsSync(path.join(root, 'src/pane.tsrx'))).toBe(false);
+});
+
+it('reports the authored SVG namespace once for a shared admitted asset', async () => {
+	const { root, file, icon } = fixture();
+	const sibling = path.join(root, 'src/second.tsx');
+	fs.writeFileSync(sibling, pane);
+	const options = { root, svgPaths: true, strong: true, write: false };
+	const result = await runCodemod([file, sibling, icon], options);
+	expect(
+		result.files.filter((entry) => entry.rules['svg-paths']).map((entry) => entry.file),
+	).toEqual(['src/pane.tsx', 'src/second.tsx']);
+	expect(
+		result.files.flatMap((entry) =>
+			entry.notes
+				.filter((note) => note.rule === 'svg-paths' && note.severity === 'warning')
+				.map(() => entry.file),
+		),
+	).toEqual(['src/icons/mark.svg']);
+	expect(fs.existsSync(icon + '.octane.ts')).toBe(false);
 });
 
 it.each(['unsupported SVG', 'existing sidecar', 'existing shared helper'])(

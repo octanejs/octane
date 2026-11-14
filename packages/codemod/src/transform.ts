@@ -14,6 +14,7 @@ import { nativeSetupHook } from './local-react-hook.js';
 import {
 	componentTagOrExport,
 	inTypeNode,
+	localSymbol,
 	localUses,
 	scalar,
 	walkLocalValues,
@@ -98,6 +99,8 @@ const syntheticEventMembers = {
 
 export const MAP_PARAMETER_TDZ = 'map-parameter-tdz';
 export const MAP_PARAMETER_WRITE = 'map-parameter-write';
+export const MAP_CALLBACK_SCOPE = 'map-callback-scope';
+export const CONTEXT_ALIAS = 'context-path-alias';
 export const CONTEXT_PROVIDER_GETTER = 'context-provider-getter';
 
 /** Rule names, as reported. */
@@ -602,13 +605,29 @@ function reads(node: ts.Node, test: (name: ts.Identifier) => boolean): boolean {
 }
 
 /**
- * Whether a `function` body reads its own `this` or `arguments`.
+ * Whether moved code reads function context, including through a nested arrow.
  */
-function usesOwnThis(node: ts.Node): boolean {
-	if (node.kind === ts.SyntaxKind.ThisKeyword) return true;
-	if (ts.isIdentifier(node) && node.text === 'arguments') return true;
-	if (isFunctionLike(node) && !ts.isArrowFunction(node)) return false;
-	return ts.forEachChild(node, (child) => usesOwnThis(child) || undefined) === true;
+function readsFunctionContext(node: ts.Node, checker: ts.TypeChecker): boolean {
+	if (
+		node.kind === ts.SyntaxKind.ThisKeyword ||
+		(ts.isMetaProperty(node) && node.keywordToken === ts.SyntaxKind.NewKeyword)
+	)
+		return true;
+	if (ts.isIdentifier(node) && node.text === 'arguments') {
+		const symbol = localSymbol(checker, node);
+		return !!symbol && checker.isArgumentsSymbol(symbol);
+	}
+	if (isFunctionLike(node) && !ts.isArrowFunction(node)) {
+		const name = node.name;
+		// A computed method name runs before entering the method's own scope.
+		return (
+			!!name && ts.isComputedPropertyName(name) && readsFunctionContext(name.expression, checker)
+		);
+	}
+	if (ts.isTypeNode(node) && ts.isPartOfTypeNode(node)) return false;
+	return (
+		ts.forEachChild(node, (child) => readsFunctionContext(child, checker) || undefined) === true
+	);
 }
 
 /**
@@ -860,10 +879,26 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 		}
 
+		const storeHookComponents = new Set<string>();
+		for (const item of this.nativeStoreHooks.keys()) {
+			for (const ref of this.localUses(item.name)) {
+				const call = ref.parent;
+				if (!ts.isCallExpression(call) || call.arguments.length || ts.isOptionalChain(call))
+					continue;
+				if (nativeSetupHook(ref, this.localUses, this.checker, undefined, true) !== 'first')
+					continue;
+				const component = ts.findAncestor(ref, ts.isFunctionDeclaration);
+				if (component?.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword))
+					storeHookComponents.add('default');
+				else if (component?.name) storeHookComponents.add(component.name.text);
+			}
+		}
+
 		return {
 			contexts: [...exported],
 			reexports,
 			...(descriptorChildren.length ? { descriptorChildren } : {}),
+			...(storeHookComponents.size ? { storeHookComponents: [...storeHookComponents] } : {}),
 			...(this.elementChildren.length ? { elementChildren: this.elementChildren } : {}),
 		};
 	}
@@ -3161,6 +3196,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 							calleeName: (callee: ts.Expression) => this.calleeName(callee),
 							nativeOutput: (element: ts.JsxElement | ts.JsxSelfClosingElement) =>
 								this.nativeOutput(element, this.localUses),
+							originalReact: () => this.options.originalReact === true,
 						};
 						const call =
 							refs[sites.indexOf('first')] ??
@@ -3177,7 +3213,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 							);
 						const local =
 							site && this.options.localReactHook(module, name, !!call && slotKeyed && nativeOnly);
-						if (call && local && typeof local !== 'string') {
+						if (call && local && typeof local !== 'string' && 'from' in local) {
 							dest = local.from;
 							this.count('native-external-store');
 						} else if (site && typeof local === 'string' && (call || local === 'useContext'))
@@ -3185,8 +3221,23 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 								RULE.bindings,
 								'error',
 								site,
-								`The unchanged ${module} export ${name} calls React's ${local}. Provide a compiled Octane hook for native callers or keep this component under a React renderer.`,
+								`The unchanged ${module} export ${name} calls ${local === 'useIntl' ? "React Intl's" : "React's"} ${local}. Provide a compiled Octane hook for native callers or keep this component under a React renderer.`,
 							);
+						else if (local && typeof local !== 'string' && 'privateContext' in local) {
+							const advisorySite = refs.find((ref) =>
+								nativeSetupHook(ref, this.localUses, this.checker, {
+									...setup,
+									privateContext: true,
+								}),
+							);
+							if (advisorySite)
+								this.note(
+									RULE.bindings,
+									'warning',
+									advisorySite,
+									`If native setup reaches the unchanged ${module} export ${name} after its module initializes, its private helper calls React's useContext. Provide a compiled Octane hook or keep the component under React.`,
+								);
+						}
 					}
 					if (!dest) {
 						kept.push(item);
@@ -3411,6 +3462,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (!ts.isStringLiteral(specifier)) return null;
 		const next = this.resolve(specifier.text);
 		if (next === null || next === specifier.text) return null;
+		const available = this.options.bindingExports?.(specifier.text, next);
+		if (available && !this.hasBindingExports(node, next, available)) return null;
 		const namespace = radixNamespace(specifier.text);
 		if (namespace !== null) {
 			// A re-export, `import()`, or type of the package would be the whole binding.
@@ -3440,8 +3493,90 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				return null;
 			}
 		}
+		if (available) this.options.recordBindingRewrite?.(specifier.text, next);
 		this.count(RULE.import);
 		return this.replaceSpecifier(node, specifier, next);
+	}
+
+	/** Check known exports without guessing at a whole namespace. */
+	hasBindingExports(node: ts.Node, binding: string, available: ReadonlySet<string>) {
+		const hasDifferentType = (name: string | undefined) =>
+			binding === '@octanejs/motion' && name === 'MotionConfigContext';
+		const check = (site: ts.Node, name?: string, needsType = false) => {
+			const missingType = needsType && hasDifferentType(name);
+			if (name !== undefined && available.has(name) && !missingType) return true;
+			this.note(
+				RULE.binding,
+				'error',
+				site,
+				name === undefined
+					? `\`${binding}\` exposes a subset of the original module. Import specific supported exports before migrating this reference.`
+					: missingType
+						? `\`${binding}\` does not export the React Motion \`${name}\` type. Review the context fields before migrating this reference.`
+						: `\`${binding}\` has no \`${name}\` export.`,
+			);
+			return false;
+		};
+		const checkNamed = (elements: readonly (ts.ImportSpecifier | ts.ExportSpecifier)[]) => {
+			if (!elements.length) return check(node);
+			let supported = true;
+			for (const element of elements) {
+				const name = (element.propertyName ?? element.name).text;
+				// A re-export can expose both the type and the value to another module.
+				const typeUse =
+					hasDifferentType(name) &&
+					(ts.isExportSpecifier(element)
+						? element
+						: this.localUses(element.name).find(
+								(ref) =>
+									ts.isPartOfTypeNode(ref) ||
+									ts.isExportSpecifier(ref.parent) ||
+									ts.isExportAssignment(ref.parent),
+							));
+				if (!check(typeUse || element, name, !!typeUse)) supported = false;
+			}
+			return supported;
+		};
+		if (ts.isImportDeclaration(node)) {
+			const clause = node.importClause;
+			if (!clause) return check(node);
+			if (clause.name) return check(clause.name, 'default');
+			const bindings = clause.namedBindings;
+			if (!bindings) return check(node);
+			if (ts.isNamedImports(bindings)) return checkNamed(bindings.elements);
+			if ((this.source.includes('eval') || this.source.includes('\\u')) && hasEval(this.sf))
+				return check(bindings);
+			return this.localUses(bindings.name).every((ref) => {
+				const parent = ref.parent;
+				if (ts.isPropertyAccessExpression(parent) && parent.expression === ref)
+					return check(
+						parent.name,
+						parent.name.text,
+						ts.isPartOfTypeNode(parent.name) || ts.isExportAssignment(parent.parent),
+					);
+				if (ts.isQualifiedName(parent) && parent.left === ref)
+					return check(
+						parent.right,
+						parent.right.text,
+						ts.isPartOfTypeNode(parent.right) || ts.isImportEqualsDeclaration(parent.parent),
+					);
+				if (
+					ts.isElementAccessExpression(parent) &&
+					parent.expression === ref &&
+					ts.isStringLiteralLike(parent.argumentExpression)
+				)
+					return check(parent.argumentExpression, parent.argumentExpression.text);
+				return check(ref);
+			});
+		}
+		if (ts.isExportDeclaration(node) && node.exportClause && ts.isNamedExports(node.exportClause))
+			return checkNamed(node.exportClause.elements);
+		if (ts.isImportTypeNode(node)) {
+			let name = node.qualifier;
+			while (name && ts.isQualifiedName(name)) name = name.left;
+			if (name) return check(name, name.text, !node.isTypeOf);
+		}
+		return check(node);
 	}
 
 	/**
@@ -3734,7 +3869,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			!isTag &&
 			!(ts.isPropertyAccessExpression(tag) && tag.expression === node) &&
 			!(ts.isBinaryExpression(tag) && tag.left === node);
-		if (node.name.text === 'Provider' && (isTag || isValue) && this.isContext(node.expression)) {
+		if (
+			node.name.text === 'Provider' &&
+			(isTag || isValue) &&
+			this.isContext(node.expression, node)
+		) {
 			if (!ts.isJsxClosingElement(tag)) {
 				if (
 					isTag &&
@@ -4604,7 +4743,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				RULE.rootRender,
 				'error',
 				tag,
-				`The migrated root renders ${tag.text}, but the unchanged ${leaf.module} export calls React's ${hook}. Migrate the component or keep this root under React DOM.`,
+				`The migrated root renders ${tag.text}, but the unchanged ${leaf.module} export calls ${hook === 'useIntl' ? "React Intl's" : "React's"} ${hook}. Migrate the component or keep this root under React DOM.`,
 			);
 	}
 
@@ -5335,7 +5474,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		}
 		if (name === 'Suspense' && ctx.template) return this.rewriteSuspense(node);
 		if (ts.isPropertyAccessExpression(tag) && tag.name.text === 'Consumer') {
-			if (this.isContext(tag.expression)) return this.rewriteConsumer(node, ctx, tag);
+			if (this.isContext(tag.expression, tag)) return this.rewriteConsumer(node, ctx, tag);
 		}
 		return null;
 	}
@@ -5345,16 +5484,25 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 * `createContext` call here, or an export the project knows is one. Only
 	 * a package's export, which the codemod cannot see, is judged by its name.
 	 */
-	isContext(node: ts.Expression) {
+	isContext(node: ts.Expression, member?: ts.PropertyAccessExpression) {
 		if (!ts.isIdentifier(node)) return false;
 		const declaration = this.declarationOf(node);
 		if (declaration && ts.isVariableDeclaration(declaration)) {
 			return !!declaration.initializer && this.createsContext(declaration.initializer);
 		}
 		const entry = declaration ? this.imports.get(declaration) : null;
-		if (!entry || entry.namespace) return false;
+		if (!entry || entry.namespace || entry.typeOnly) return false;
 		const name = entry.imported === 'default' ? entry.local : entry.imported;
-		return this.options.isContext?.(entry.module, entry.imported) ?? /Context$/.test(name);
+		const context = this.options.isContext?.(entry.module, entry.imported, entry.local);
+		if (context !== 'review-alias') return context ?? /Context$/.test(name);
+		if (member && !ts.isJsxClosingElement(member.parent))
+			this.note(
+				CONTEXT_ALIAS,
+				'error',
+				member,
+				`TypeScript resolves \`${entry.module}\` to a selected local export. Verify the runtime alias and its ${member.name.text} member before migrating it.`,
+			);
+		return false;
 	}
 
 	/**
@@ -5847,15 +5995,26 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 */
 	forDirective(node: ts.CallExpression) {
 		const callee = node.expression;
+		if (!ts.isPropertyAccessExpression(callee) || callee.name.text !== 'map') return null;
+		const fn = node.arguments[0];
+		if (!fn) return null;
+		const callback = skipWrappers(fn);
+		// Even a retained arrow can observe the enclosing renderer's invocation.
 		if (
-			!ts.isPropertyAccessExpression(callee) ||
-			callee.name.text !== 'map' ||
-			node.arguments.length !== 1
+			ts.isArrowFunction(callback) &&
+			(ts.isBlock(callback.body) ? returnsJsx(callback.body.statements) : hasJsx(callback.body)) &&
+			readsFunctionContext(callback, this.checker)
 		) {
+			this.note(
+				MAP_CALLBACK_SCOPE,
+				'error',
+				node,
+				'The migrated component can change this arrow callback’s access to this, arguments, or new.target. Review these reads before porting the map.',
+			);
 			return null;
 		}
-		const fn = node.arguments[0];
-		if (!(ts.isArrowFunction(fn) || ts.isFunctionExpression(fn))) return null;
+		if (node.arguments.length !== 1 || !(ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)))
+			return null;
 		if (fn.parameters.length === 0 || fn.parameters.length > 2) return null;
 		if (fn.parameters.some((p) => p.initializer || p.dotDotDotToken)) return null;
 		const [item, index] = fn.parameters;
@@ -5880,8 +6039,8 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			)
 				return null;
 		}
-		// A `function` row sees its own `this` and `arguments`; an arm does not.
-		if (ts.isFunctionExpression(fn) && usesOwnThis(fn.body)) return null;
+		// Retaining an ordinary callback keeps its own function context.
+		if (ts.isFunctionExpression(fn) && readsFunctionContext(fn.body, this.checker)) return null;
 		// A row that writes an outer variable (`n++`) needs every row to run in
 		// order; an `@for` row can be skipped.
 		if (this.writesOuter(fn)) return null;
@@ -5980,6 +6139,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			);
 			return null;
 		}
+		if (fn.parameters.some((parameter) => readsFunctionContext(parameter, this.checker))) {
+			this.note(
+				MAP_CALLBACK_SCOPE,
+				'error',
+				node,
+				'An @for row cannot preserve this callback’s access to this, arguments, or new.target. Keep the original map callback until these reads are migrated explicitly.',
+			);
+			return null;
+		}
 		if (attribute) {
 			this.removed.add(attribute);
 			const opening = attribute.parent.parent;
@@ -5994,33 +6162,30 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			? this.ifDirective(root)
 			: this.relative(this.emit(root, TEMPLATE), root);
 		if (arm === null) return null;
-		if (!literal.elements.some(ts.isSpreadElement)) {
-			if (index && this.patternReadsOrdinal(item.name, index)) {
-				this.note(
-					MAP_PARAMETER_TDZ,
-					'error',
-					node,
-					'An @for row initializes its index before this parameter pattern can read it. Review the original callback’s initialization order.',
-				);
-			}
-			const mutable = (name: ts.Identifier) =>
-				!fixedBinding(this.checker, name, name, undefined, (use) => !isPropertyName(use));
-			if (
-				(index && ts.isIdentifier(index.name) && mutable(index.name)) ||
-				(!ts.isIdentifier(item.name) &&
-					reads(
-						item.name,
-						(name) =>
-							ts.isBindingElement(name.parent) && name.parent.name === name && mutable(name),
-					))
-			) {
-				this.note(
-					MAP_PARAMETER_WRITE,
-					'error',
-					node,
-					'Cannot prove this map parameter stays unchanged in an @for row. Exclude the source from migration or keep the parameter unchanged.',
-				);
-			}
+		if (index && this.patternReadsOrdinal(item.name, index)) {
+			this.note(
+				MAP_PARAMETER_TDZ,
+				'error',
+				node,
+				'An @for row initializes its index before this parameter pattern can read it. Review the original callback’s initialization order.',
+			);
+		}
+		const mutable = (name: ts.Identifier) =>
+			!fixedBinding(this.checker, name, name, undefined, (use) => !isPropertyName(use));
+		if (
+			(index && ts.isIdentifier(index.name) && mutable(index.name)) ||
+			(!ts.isIdentifier(item.name) &&
+				reads(
+					item.name,
+					(name) => ts.isBindingElement(name.parent) && name.parent.name === name && mutable(name),
+				))
+		) {
+			this.note(
+				MAP_PARAMETER_WRITE,
+				'error',
+				node,
+				'Cannot prove this map parameter stays unchanged in an @for row. Exclude the source from migration or keep the parameter unchanged.',
+			);
 		}
 		this.count(RULE.for);
 		let source = this.emit(callee.expression, PLAIN);
@@ -6046,6 +6211,34 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	}
 
 	private patternReadsOrdinal(pattern: ts.BindingName, ordinal: ts.ParameterDeclaration): boolean {
+		const safePrefix = (expr: ts.Expression): boolean => {
+			const value = skipWrappers(expr);
+			if (rowKeyLiteral(value)) return true;
+			if (ts.isArrayLiteralExpression(value))
+				return value.elements.every(
+					(element) => ts.isOmittedExpression(element) || safePrefix(element),
+				);
+			return (
+				ts.isObjectLiteralExpression(value) &&
+				value.properties.every(
+					(property) =>
+						ts.isPropertyAssignment(property) &&
+						(!ts.isComputedPropertyName(property.name) ||
+							rowKeyLiteral(property.name.expression)) &&
+						safePrefix(property.initializer),
+				)
+			);
+		};
+		// Once a value can interrupt evaluation, a later read is no longer proven.
+		const readsInOrder = (expressions: readonly ts.Expression[]) => {
+			for (const expression of expressions) {
+				// The source is evaluated before iteration or property copying.
+				if (ts.isSpreadElement(expression)) return readsOrdinal(expression.expression);
+				if (readsOrdinal(expression)) return true;
+				if (!safePrefix(expression)) return false;
+			}
+			return false;
+		};
 		const readsOrdinal = (expr: ts.Expression | undefined): boolean => {
 			if (!expr) return false;
 			const read = skipWrappers(expr);
@@ -6058,16 +6251,92 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					read.operator !== ts.SyntaxKind.MinusMinusToken &&
 					readsOrdinal(read.operand)
 				);
-			// Optional calls can skip the argument. An earlier argument or a
-			// member getter can interrupt evaluation before the ordinal read.
-			if (ts.isCallExpression(read))
+			if (ts.isPropertyAccessExpression(read)) return readsOrdinal(read.expression);
+			if (ts.isConditionalExpression(read)) {
+				if (readsOrdinal(read.condition)) return true;
+				const test = skipWrappers(read.condition).kind;
+				if (test === ts.SyntaxKind.TrueKeyword) return readsOrdinal(read.whenTrue);
+				return test === ts.SyntaxKind.FalseKeyword && readsOrdinal(read.whenFalse);
+			}
+			if (ts.isTemplateExpression(read)) {
+				for (const { expression } of read.templateSpans) {
+					if (readsOrdinal(expression)) return true;
+					// Each interpolation is coerced to text before the next one runs.
+					if (!rowKeyLiteral(expression)) return false;
+				}
+				return false;
+			}
+			if (ts.isArrayLiteralExpression(read))
+				return readsInOrder(read.elements.filter((element) => !ts.isOmittedExpression(element)));
+			if (ts.isObjectLiteralExpression(read)) {
+				for (const property of read.properties) {
+					if (ts.isSpreadAssignment(property)) return readsOrdinal(property.expression);
+					if (ts.isComputedPropertyName(property.name)) {
+						const key = property.name.expression;
+						if (readsOrdinal(key)) return true;
+						if (!rowKeyLiteral(key)) return false;
+					}
+					if (ts.isShorthandPropertyAssignment(property)) return readsOrdinal(property.name);
+					if (ts.isPropertyAssignment(property)) {
+						if (readsOrdinal(property.initializer)) return true;
+						if (!safePrefix(property.initializer)) return false;
+					}
+				}
+				return false;
+			}
+			if (ts.isElementAccessExpression(read)) {
+				if (readsOrdinal(read.expression)) return true;
+				const receiver = skipWrappers(read.expression);
 				return (
-					!ts.isOptionalChain(read) &&
-					ts.isIdentifier(skipWrappers(read.expression)) &&
-					readsOrdinal(read.arguments[0])
+					safePrefix(receiver) &&
+					(!ts.isOptionalChain(read) || receiver.kind !== ts.SyntaxKind.NullKeyword) &&
+					readsOrdinal(read.argumentExpression)
 				);
+			}
+			if (ts.isCallExpression(read)) {
+				if (readsOrdinal(read.expression)) return true;
+				const callee = skipWrappers(read.expression);
+				if (
+					ts.isArrowFunction(callee) &&
+					!callee.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
+					callee.parameters.length === 0 &&
+					read.arguments.length === 0 &&
+					!ts.isBlock(callee.body)
+				)
+					return readsOrdinal(callee.body);
+				// Optional calls can skip their arguments, and earlier arguments or a
+				// member getter can interrupt evaluation before the ordinal read.
+				if (!ts.isArrowFunction(callee) && (ts.isOptionalChain(read) || !ts.isIdentifier(callee)))
+					return false;
+				// A binding in the current parameter list may still be uninitialized.
+				const declaration = ts.isIdentifier(callee) && this.declarationOf(callee);
+				if (
+					declaration &&
+					(ts.isParameter(declaration) || ts.isBindingElement(declaration)) &&
+					ts.findAncestor(declaration, ts.isParameter)?.parent === ordinal.parent
+				) {
+					const element = ts.findAncestor(read, ts.isBindingElement);
+					if (!element || declaration.end > element.pos) return false;
+				}
+				return readsInOrder(read.arguments);
+			}
 			if (!ts.isBinaryExpression(read)) return false;
 			const op = read.operatorToken.kind;
+			if (
+				op === ts.SyntaxKind.AmpersandAmpersandToken ||
+				op === ts.SyntaxKind.BarBarToken ||
+				op === ts.SyntaxKind.QuestionQuestionToken
+			) {
+				if (readsOrdinal(read.left)) return true;
+				const left = skipWrappers(read.left).kind;
+				const rightWhen =
+					op === ts.SyntaxKind.AmpersandAmpersandToken
+						? ts.SyntaxKind.TrueKeyword
+						: op === ts.SyntaxKind.BarBarToken
+							? ts.SyntaxKind.FalseKeyword
+							: ts.SyntaxKind.NullKeyword;
+				return left === rightWhen && readsOrdinal(read.right);
+			}
 			return (
 				((op >= ts.SyntaxKind.PlusToken && op <= ts.SyntaxKind.PercentToken) ||
 					(op >= ts.SyntaxKind.LessThanLessThanToken && op <= ts.SyntaxKind.CaretToken)) &&

@@ -164,6 +164,15 @@ declare const process: { env: { NODE_ENV?: string } };
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
+// Live region-owner roots (WeakMap exposes no size). Ordinary apps never bind
+// one, so every bridge lookup's caller first tests this count by truthiness:
+// one integer test per read, and a bundle without bindRendererRegionOwner
+// never assigns it and omits the lookups.
+export let RENDERER_REGION_OWNER_COUNT = 0;
+export function updateRendererRegionOwnerCount(delta: 1 | -1): void {
+	RENDERER_REGION_OWNER_COUNT += delta;
+}
+
 // Every producer of commit-phase callbacks installs this before its first
 // entry: effect slots, external-store checks, Effect Events, commit actions
 // (Activity and Suspense hides, linked state, signal control adoption), ref
