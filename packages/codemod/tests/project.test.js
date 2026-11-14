@@ -1626,6 +1626,45 @@ export function Host({rows}: { rows: Row[] }) {
 			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
 	});
 
+	it.each([
+		['write', '[...[1]].map((item, index) => <li key={0}>{index++}</li>)'],
+		['tdz', '[...[{}]].map(({label=index}, index) => <li key={0}>{label}</li>)'],
+	])('blocks spread-array map rows with a parameter %s before writing', async (kind, rows) => {
+		const sources = {
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			'Caller.tsx': "import { View } from './View.tsx'; export const Caller = () => <View />;",
+			'View.tsx': `export const View = () => <ul>{${rows}}</ul>;`,
+			'Controls.tsx': `export const Dense = () => <ul>{[1].map((item, index) => <li key={0}>{index}</li>)}</ul>;
+export const Spread = () => <ul>{[...[1]].map((item, index) => <li key={0}>{index}</li>)}</ul>;`,
+		};
+		const root = project(sources);
+		const inputs = ['Caller.tsx', 'View.tsx', 'Controls.tsx'].map((file) => path.join(root, file));
+		const options = { root, verify: false, strong: true };
+		const blocked = expect.objectContaining({ rule: `map-parameter-${kind}`, severity: 'error' });
+		const preview = await runCodemod(inputs, { ...options, write: false });
+		expect(preview.files.find((file) => file.file === 'View.tsx')).toMatchObject({
+			code: expect.stringContaining('@for'),
+			notes: [blocked],
+		});
+		const controls = preview.files.find((file) => file.file === 'Controls.tsx');
+		expect(controls.notes).toEqual([]);
+		expect(controls.rules['template-for']).toBe(2);
+
+		const result = await runCodemod(inputs, options);
+		expect(result.files).toEqual([
+			expect.objectContaining({
+				file: 'View.tsx',
+				output: 'View.tsx',
+				code: sources['View.tsx'],
+				changed: false,
+				notes: [blocked],
+			}),
+		]);
+		expect(fs.readdirSync(root).sort()).toEqual(Object.keys(sources).sort());
+		for (const [file, code] of Object.entries(sources))
+			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
+	});
+
 	it('keeps visible or ambiguous JSX text and authored comments in keyed map rows', async () => {
 		const children = [
 			' {row.child()}',
