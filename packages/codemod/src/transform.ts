@@ -6211,6 +6211,34 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	}
 
 	private patternReadsOrdinal(pattern: ts.BindingName, ordinal: ts.ParameterDeclaration): boolean {
+		const safePrefix = (expr: ts.Expression): boolean => {
+			const value = skipWrappers(expr);
+			if (rowKeyLiteral(value)) return true;
+			if (ts.isArrayLiteralExpression(value))
+				return value.elements.every(
+					(element) => ts.isOmittedExpression(element) || safePrefix(element),
+				);
+			return (
+				ts.isObjectLiteralExpression(value) &&
+				value.properties.every(
+					(property) =>
+						ts.isPropertyAssignment(property) &&
+						(!ts.isComputedPropertyName(property.name) ||
+							rowKeyLiteral(property.name.expression)) &&
+						safePrefix(property.initializer),
+				)
+			);
+		};
+		// Once a value can interrupt evaluation, a later read is no longer proven.
+		const readsInOrder = (expressions: readonly ts.Expression[]) => {
+			for (const expression of expressions) {
+				// The source is evaluated before iteration or property copying.
+				if (ts.isSpreadElement(expression)) return readsOrdinal(expression.expression);
+				if (readsOrdinal(expression)) return true;
+				if (!safePrefix(expression)) return false;
+			}
+			return false;
+		};
 		const readsOrdinal = (expr: ts.Expression | undefined): boolean => {
 			if (!expr) return false;
 			const read = skipWrappers(expr);
@@ -6224,13 +6252,29 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					readsOrdinal(read.operand)
 				);
 			if (ts.isPropertyAccessExpression(read)) return readsOrdinal(read.expression);
+			if (ts.isArrayLiteralExpression(read))
+				return readsInOrder(read.elements.filter((element) => !ts.isOmittedExpression(element)));
+			if (ts.isObjectLiteralExpression(read)) {
+				for (const property of read.properties) {
+					if (ts.isSpreadAssignment(property)) return readsOrdinal(property.expression);
+					if (ts.isComputedPropertyName(property.name)) {
+						const key = property.name.expression;
+						if (readsOrdinal(key)) return true;
+						if (!rowKeyLiteral(key)) return false;
+					}
+					if (ts.isShorthandPropertyAssignment(property)) return readsOrdinal(property.name);
+					if (ts.isPropertyAssignment(property)) {
+						if (readsOrdinal(property.initializer)) return true;
+						if (!safePrefix(property.initializer)) return false;
+					}
+				}
+				return false;
+			}
 			if (ts.isElementAccessExpression(read)) {
 				if (readsOrdinal(read.expression)) return true;
 				const receiver = skipWrappers(read.expression);
 				return (
-					(rowKeyLiteral(receiver) ||
-						(ts.isArrayLiteralExpression(receiver) && receiver.elements.every(rowKeyLiteral)) ||
-						(ts.isObjectLiteralExpression(receiver) && !receiver.properties.length)) &&
+					safePrefix(receiver) &&
 					(!ts.isOptionalChain(read) || receiver.kind !== ts.SyntaxKind.NullKeyword) &&
 					readsOrdinal(read.argumentExpression)
 				);
@@ -6242,7 +6286,6 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				const callee = skipWrappers(read.expression);
 				if (!ts.isArrowFunction(callee) && (ts.isOptionalChain(read) || !ts.isIdentifier(callee)))
 					return false;
-				if (readsOrdinal(read.arguments[0])) return true;
 				// A binding in the current parameter list may still be uninitialized.
 				const declaration = ts.isIdentifier(callee) && this.declarationOf(callee);
 				if (
@@ -6251,15 +6294,9 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					ts.findAncestor(declaration, ts.isParameter)?.parent === ordinal.parent
 				) {
 					const element = ts.findAncestor(read, ts.isBindingElement);
-					if (!element || declaration.parent !== element.parent || declaration.end > element.pos)
-						return false;
+					if (!element || declaration.end > element.pos) return false;
 				}
-				for (let i = 1; i < read.arguments.length; i++) {
-					if (!rowKeyLiteral(read.arguments[i - 1])) return false;
-					const argument = read.arguments[i];
-					if (readsOrdinal(argument)) return true;
-				}
-				return false;
+				return readsInOrder(read.arguments);
 			}
 			if (!ts.isBinaryExpression(read)) return false;
 			const op = read.operatorToken.kind;
