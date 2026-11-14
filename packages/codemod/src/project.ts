@@ -1845,7 +1845,10 @@ type AdapterState =
 	{ kind: 'missing' | 'current' | 'conflict' } | { kind: 'previous'; mode: number; hash: string };
 
 // Hash only previously shipped helpers. A locally edited file belongs to the application.
-const PREVIOUS_INTL_HASHES = ['07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98'];
+const PREVIOUS_INTL_HASHES = [
+	'07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98',
+	'9cd8a44e85984cab413e73e63999156ac8508518c109cf53c26449c54a973043',
+];
 
 const PREVIOUS_SVG_HASHES = [
 	'90bc12d849bbed4f1932e9e7ab5b939242237a4b8876d4c0f01e093a7d5b8c80',
