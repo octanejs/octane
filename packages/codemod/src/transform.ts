@@ -14,6 +14,7 @@ import { nativeSetupHook } from './local-react-hook.js';
 import {
 	componentTagOrExport,
 	inTypeNode,
+	localSymbol,
 	localUses,
 	scalar,
 	walkLocalValues,
@@ -98,6 +99,7 @@ const syntheticEventMembers = {
 
 export const MAP_PARAMETER_TDZ = 'map-parameter-tdz';
 export const MAP_PARAMETER_WRITE = 'map-parameter-write';
+export const MAP_PARAMETER_RECEIVER = 'map-parameter-receiver';
 export const CONTEXT_PROVIDER_GETTER = 'context-provider-getter';
 
 /** Rule names, as reported. */
@@ -602,13 +604,21 @@ function reads(node: ts.Node, test: (name: ts.Identifier) => boolean): boolean {
 }
 
 /**
- * Whether a `function` body reads its own `this` or `arguments`.
+ * Whether code moved out of an ordinary function reads its `this` or `arguments`.
  */
-function usesOwnThis(node: ts.Node): boolean {
+function usesOwnThis(node: ts.Node, checker: ts.TypeChecker): boolean {
 	if (node.kind === ts.SyntaxKind.ThisKeyword) return true;
-	if (ts.isIdentifier(node) && node.text === 'arguments') return true;
-	if (isFunctionLike(node) && !ts.isArrowFunction(node)) return false;
-	return ts.forEachChild(node, (child) => usesOwnThis(child) || undefined) === true;
+	if (ts.isIdentifier(node) && node.text === 'arguments') {
+		const symbol = localSymbol(checker, node);
+		return !!symbol && checker.isArgumentsSymbol(symbol);
+	}
+	if (isFunctionLike(node) && !ts.isArrowFunction(node)) {
+		const name = node.name;
+		// A computed method name runs before entering the method's own scope.
+		return !!name && ts.isComputedPropertyName(name) && usesOwnThis(name.expression, checker);
+	}
+	if (ts.isTypeNode(node) && ts.isPartOfTypeNode(node)) return false;
+	return ts.forEachChild(node, (child) => usesOwnThis(child, checker) || undefined) === true;
 }
 
 /**
@@ -5896,7 +5906,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				return null;
 		}
 		// A `function` row sees its own `this` and `arguments`; an arm does not.
-		if (ts.isFunctionExpression(fn) && usesOwnThis(fn.body)) return null;
+		if (ts.isFunctionExpression(fn) && usesOwnThis(fn.body, this.checker)) return null;
 		// A row that writes an outer variable (`n++`) needs every row to run in
 		// order; an `@for` row can be skipped.
 		if (this.writesOuter(fn)) return null;
@@ -5992,6 +6002,18 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				'error',
 				node,
 				'An @for row would discard this callback’s promise or iterator. Review the retained .map() call for suspension or iteration.',
+			);
+			return null;
+		}
+		if (
+			ts.isFunctionExpression(fn) &&
+			fn.parameters.some((parameter) => usesOwnThis(parameter, this.checker))
+		) {
+			this.note(
+				MAP_PARAMETER_RECEIVER,
+				'error',
+				node,
+				'An @for row cannot preserve this parameter’s callback-owned this or arguments. Keep the original map callback until its parameter is migrated explicitly.',
 			);
 			return null;
 		}

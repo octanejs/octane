@@ -1626,6 +1626,54 @@ export function Host({rows}: { rows: Row[] }) {
 			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
 	});
 
+	it.each([
+		'arguments[1]',
+		'({ arguments }).arguments[1]',
+		'Object.keys({ [arguments[1]]() {} })[0]',
+		'this',
+	])('blocks a map parameter with a callback-scoped default %s before writing', async (value) => {
+		const originals = {
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			'Caller.tsx': "import { List } from './List.tsx'; export const Caller = () => <List />;",
+			'List.tsx': `export function List() {
+	return <ul>{[{}, {}].map(function ({ label = ${value} }, index) {
+		return <li key="row">{String(label)}</li>;
+	})}</ul>;
+}`,
+			'Control.tsx': `export function Control() {
+	return <ul>{[{ arguments: 'row' }].map(function ({ arguments: label }, index) {
+		return <li key={index}>{label}</li>;
+	})}</ul>;
+}`,
+		};
+		const root = project(originals);
+		const inputs = ['Caller.tsx', 'List.tsx', 'Control.tsx'].map((file) => path.join(root, file));
+		const options = { root, verify: false };
+		const note = expect.objectContaining({
+			rule: 'map-parameter-receiver',
+			severity: 'error',
+			message: expect.stringContaining('arguments'),
+		});
+		const preview = await runCodemod(inputs, { ...options, write: false });
+		const retained = preview.files.find(({ file }) => file === 'List.tsx');
+		expect(retained).toMatchObject({
+			code: expect.stringContaining('.map(function'),
+			notes: [note],
+		});
+		expect(retained?.code).toContain('key="row"');
+		expect(preview.files.find(({ file }) => file === 'Control.tsx')).toMatchObject({
+			code: expect.stringContaining('@for'),
+			notes: [],
+		});
+		const result = await runCodemod(inputs, options);
+		expect(result.files).toEqual([
+			expect.objectContaining({ file: 'List.tsx', changed: false, notes: [note] }),
+		]);
+		expect(fs.readdirSync(root).sort()).toEqual(Object.keys(originals).sort());
+		for (const [file, source] of Object.entries(originals))
+			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(source);
+	});
+
 	it('keeps visible or ambiguous JSX text and authored comments in keyed map rows', async () => {
 		const children = [
 			' {row.child()}',
