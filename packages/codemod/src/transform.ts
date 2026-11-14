@@ -1634,7 +1634,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				ts.isTemplateExpression(value.parent) ||
 				(ts.isPrefixUnaryExpression(value.parent) &&
 					value.parent.operator === ts.SyntaxKind.ExclamationToken) ||
-				(ts.isCallExpression(value.parent) && !ts.isOptionalChain(value.parent))
+				(ts.isCallExpression(value.parent) &&
+					(value.parent.expression === value || !ts.isOptionalChain(value.parent)))
 			)
 				value = value.parent;
 			const step = value.parent;
