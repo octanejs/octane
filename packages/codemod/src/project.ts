@@ -596,7 +596,10 @@ export async function runCodemod(
 		return calls.get(name);
 	}
 
-	const localHooks = new Map<string, Map<string, string>>();
+	const localHooks = new Map<
+		string,
+		{ direct: Map<string, string>; privateContexts: Set<string> }
+	>();
 	let selectedInPlace: Set<string> | undefined;
 	function localReactHook(from: string, module: string, name: string, nativeOnly: boolean) {
 		if (
@@ -620,7 +623,7 @@ export async function runCodemod(
 		let hooks = localHooks.get(file);
 		if (!hooks) {
 			const source = fs.readFileSync(file, 'utf8');
-			hooks = new Map();
+			hooks = { direct: new Map(), privateContexts: new Set() };
 			if (
 				(/\b(?:useCallback|useContext|useState|useSyncExternalStore)\b/.test(source) ||
 					source.includes('\\u')) &&
@@ -632,7 +635,7 @@ export async function runCodemod(
 					existing && program
 						? { sf: existing, checker: program.getTypeChecker() }
 						: bind(file, source);
-				hooks = directRendererCalls(
+				hooks.direct = directRendererCalls(
 					bound.sf,
 					bound.checker,
 					'react',
@@ -641,17 +644,19 @@ export async function runCodemod(
 						name === 'useContext' ||
 						name === 'useState' ||
 						name === 'useSyncExternalStore',
+					hooks.privateContexts,
 				);
 			}
 			localHooks.set(file, hooks);
 		}
-		const hook = hooks.get(name);
-		if (!hook || fs.statSync(file).nlink > 1) return;
+		const hook = hooks.direct.get(name);
+		if ((!hook && !hooks.privateContexts.has(name)) || fs.statSync(file).nlink > 1) return;
 		// Writing an unrenamed selection through a symlink changes its physical target.
 		selectedInPlace ??= new Set(
 			[...known].filter((f) => !renames.has(f) && !conflicts.has(f)).map((f) => fs.realpathSync(f)),
 		);
 		if (selectedInPlace.has(fs.realpathSync(file))) return;
+		if (!hook) return { privateContext: true } as const;
 		if (
 			nativeOnly &&
 			compiler &&

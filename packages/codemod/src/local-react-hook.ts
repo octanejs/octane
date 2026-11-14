@@ -59,6 +59,7 @@ export function nativeSetupHook(
 		calleeName(callee: ts.Expression): string | null;
 		nativeOutput(element: ts.JsxElement | ts.JsxSelfClosingElement): boolean;
 		contextSetup?: boolean;
+		privateContext?: boolean;
 	},
 ) {
 	const call = ref.parent;
@@ -86,9 +87,10 @@ export function nativeSetupHook(
 			!block.statements.slice(0, position).every((prior) => nullRef(prior, checker))
 		)
 			return false;
-	} else if (diagnostic.contextSetup) {
+	} else if (diagnostic.contextSetup || diagnostic.privateContext) {
 		if (
 			call.questionDotToken ||
+			(diagnostic.privateContext && (call.arguments.length !== 0 || declaredVariable(statement))) ||
 			decl.parent.declarations.length !== 1 ||
 			(decl.parent.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
 			!call.arguments.every(
@@ -187,12 +189,85 @@ export function nativeSetupHook(
 	return diagnostic ? 'diagnostic' : position === 0 ? 'first' : 'afterRefs';
 }
 
+function declaredVariable(statement: ts.Statement) {
+	return (
+		ts.isVariableStatement(statement) &&
+		!!statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.DeclareKeyword)
+	);
+}
+
+function firstRendererCall(fn: ts.FunctionDeclaration) {
+	const first = fn.body?.statements[0];
+	const value =
+		first &&
+		(ts.isVariableStatement(first)
+			? first.declarationList.declarations[0]?.initializer
+			: ts.isReturnStatement(first) || ts.isExpressionStatement(first)
+				? first.expression
+				: undefined);
+	if (first && value && ts.isCallExpression(value) && ts.isIdentifier(value.expression))
+		return { call: value, callee: value.expression, ambient: declaredVariable(first) };
+}
+
+function privateContextCall(
+	sf: ts.SourceFile,
+	checker: ts.TypeChecker,
+	uses: ReturnType<typeof localUses>,
+	outer: ts.CallExpression,
+	callee: ts.Identifier,
+) {
+	if (ts.isOptionalChain(outer) || outer.arguments.length) return false;
+	const helper = checker.getSymbolAtLocation(callee)?.valueDeclaration;
+	if (
+		!helper ||
+		!ts.isFunctionDeclaration(helper) ||
+		!helper.name ||
+		helper.parent !== sf ||
+		helper.modifiers?.length ||
+		helper.asteriskToken ||
+		helper.parameters.length ||
+		renderUses(uses(helper.name)).some(
+			(ref) => !ts.isCallExpression(ref.parent) || ref.parent.expression !== ref,
+		)
+	)
+		return false;
+	const read = firstRendererCall(helper);
+	if (
+		!read ||
+		read.ambient ||
+		ts.isOptionalChain(read.call) ||
+		read.call.arguments.length !== 1 ||
+		rendererImport(read.callee, checker) !== 'useContext'
+	)
+		return false;
+	const context = read.call.arguments[0];
+	const decl = ts.isIdentifier(context) && checker.getSymbolAtLocation(context)?.valueDeclaration;
+	if (!decl || !ts.isVariableDeclaration(decl)) return false;
+	const list = decl.parent;
+	const init = decl.initializer;
+	return (
+		ts.isVariableDeclarationList(list) &&
+		(list.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
+		ts.isVariableStatement(list.parent) &&
+		list.parent.parent === sf &&
+		!declaredVariable(list.parent) &&
+		!!init &&
+		ts.isCallExpression(init) &&
+		!ts.isOptionalChain(init) &&
+		ts.isIdentifier(init.expression) &&
+		rendererImport(init.expression, checker) === 'createContext' &&
+		init.arguments.length === 1 &&
+		scalarLiteral(init.arguments[0])
+	);
+}
+
 /** Only a call in the first evaluated statement witnesses renderer work in this export. */
 export function directRendererCalls(
 	sf: ts.SourceFile,
 	checker: ts.TypeChecker,
 	module: 'react' | 'react-dom',
 	accepts: (name: string) => boolean,
+	privateContextExports?: Set<string>,
 ) {
 	const calls = new Map<string, string>();
 	if (contains(sf, (n) => ts.isIdentifier(n) && n.text === 'eval')) return calls;
@@ -208,16 +283,11 @@ export function directRendererCalls(
 			fn.parameters.some((p) => !ts.isIdentifier(p.name) || p.initializer)
 		)
 			continue;
-		const first = fn.body.statements[0];
+		const first = firstRendererCall(fn);
 		if (!first) continue;
-		const value = ts.isVariableStatement(first)
-			? first.declarationList.declarations[0]?.initializer
-			: ts.isReturnStatement(first) || ts.isExpressionStatement(first)
-				? first.expression
-				: undefined;
-		if (!value || !ts.isCallExpression(value) || !ts.isIdentifier(value.expression)) continue;
-		const name = rendererImport(value.expression, checker, module);
-		if (!name || !accepts(name)) continue;
+		const name = rendererImport(first.callee, checker, module);
+		const direct = name && accepts(name) ? name : undefined;
+		if (!direct && !privateContextExports) continue;
 		// A local write can replace the exported function before the importer calls it.
 		if (
 			renderUses(uses(fn.name)).some(
@@ -225,7 +295,14 @@ export function directRendererCalls(
 			)
 		)
 			continue;
-		calls.set(fn.name.text, name);
+		if (direct) calls.set(fn.name.text, direct);
+		else if (
+			privateContextExports &&
+			!first.ambient &&
+			!fn.parameters.length &&
+			privateContextCall(sf, checker, uses, first.call, first.callee)
+		)
+			privateContextExports.add(fn.name.text);
 	}
 	return calls;
 }
