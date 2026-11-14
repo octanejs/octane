@@ -148,7 +148,7 @@ function* directExportReturns({ sf, checker }: ReturnType<typeof bind>) {
 			value = skipWrappers(value.initializer);
 		}
 		const output = returnedJsx(value);
-		if (output) yield { name: symbol.name, output };
+		if (output) yield { name: symbol.name, output, localName: name?.text };
 	}
 }
 
@@ -200,14 +200,17 @@ function hostedLeaf(output: ts.JsxElement | ts.JsxSelfClosingElement) {
 		return openingTag(child).tagName;
 }
 
-/** Runtime imports that an explicit server host returns directly. */
-export function hostedServerComponents(file: string, source: string) {
-	if (
+function ordinaryReactJsx(source: string) {
+	return !(
 		/@jsx(?:Frag)?\b/i.test(source) ||
 		[...source.matchAll(/@jsxRuntime\s+(\S+)/gi)].some(([, mode]) => mode !== 'automatic') ||
 		[...source.matchAll(/@jsxImportSource\s+(\S+)/gi)].some(([, name]) => name !== 'react')
-	)
-		return [];
+	);
+}
+
+/** Runtime imports that an explicit server host returns directly. */
+export function hostedServerComponents(file: string, source: string) {
+	if (!ordinaryReactJsx(source)) return [];
 	const bound = bind(file, source);
 	const { sf, checker } = bound;
 	const edges = [];
@@ -220,6 +223,73 @@ export function hostedServerComponents(file: string, source: string) {
 			edges.push({ ...leaf, line: sf.getLineAndCharacterOfPosition(output.getStart(sf)).line + 1 });
 	}
 	return edges;
+}
+
+/** A retained React server call that renders a directly imported component. */
+export function retainedReactServerComponents(
+	file: string,
+	source: string,
+	original: (module: 'react' | 'react/jsx-runtime') => boolean,
+) {
+	const { sf, checker } = bind(file, source);
+	const edges: { module: string; name: string; line: number }[] = [];
+	function visit(node: ts.Node) {
+		if (ts.isCallExpression(node) && !ts.isOptionalChain(node) && node.arguments.length === 1) {
+			const callee = imported(checker, node.expression);
+			if (
+				callee?.module === 'react-dom/server' &&
+				(callee.name === 'renderToString' || callee.name === 'renderToStaticMarkup')
+			) {
+				const value = skipWrappers(node.arguments[0]);
+				let ref: ts.Node | undefined;
+				if (
+					ts.isJsxSelfClosingElement(value) &&
+					(!ts.isIdentifier(value.tagName) || /^[A-Z][\w$]*$/.test(value.tagName.text)) &&
+					value.attributes.properties.length === 0 &&
+					ordinaryReactJsx(source) &&
+					original('react/jsx-runtime')
+				)
+					ref = value.tagName;
+				if (
+					ts.isCallExpression(value) &&
+					!ts.isOptionalChain(value) &&
+					(value.arguments.length === 1 ||
+						(value.arguments.length === 2 &&
+							skipWrappers(value.arguments[1]).kind === ts.SyntaxKind.NullKeyword))
+				) {
+					const factory = imported(checker, value.expression);
+					if (factory?.module === 'react' && factory.name === 'createElement' && original('react'))
+						ref = skipWrappers(value.arguments[0]);
+				}
+				const leaf = ref && imported(checker, ref);
+				if (leaf?.module.startsWith('.') && /\.[jt]sx$/.test(leaf.module))
+					edges.push({
+						...leaf,
+						line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
+					});
+			}
+		}
+		ts.forEachChild(node, visit);
+	}
+	visit(sf);
+	return edges;
+}
+
+/** Local exports whose original body returns an intrinsic React element. */
+export function intrinsicReactExports(file: string, source: string) {
+	const names = new Set<string>();
+	if (ordinaryReactJsx(source)) {
+		for (const { name, output, localName } of directExportReturns(bind(file, source))) {
+			const tag = openingTag(output).tagName;
+			if (
+				ts.isIdentifier(tag) &&
+				/^[a-z]/.test(tag.text) &&
+				(!localName || /^[A-Z]/.test(localName))
+			)
+				names.add(name);
+		}
+	}
+	return names;
 }
 
 /** Inspect the emitted local export before assigning a reverse island to a server host. */

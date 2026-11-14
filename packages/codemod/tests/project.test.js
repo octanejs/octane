@@ -298,6 +298,73 @@ describe('runCodemod', () => {
 		);
 	});
 
+	describe('retained React server rendering', () => {
+		it.each([
+			['direct JSX', 'render(<Leaf />)', '', true],
+			['direct element', 'render(h(Leaf))', '', true],
+			['direct element with null props', 'render(h(Leaf, null))', '', true],
+			['shadowed renderer', '((render) => render(h(Leaf)))(other)', '', false],
+			['shadowed factory', '((h) => render(h(Leaf)))(other)', '', false],
+			['local server alias', 'render(<Leaf />)', 'react-dom/server', false],
+			['local JSX alias', 'render(<Leaf />)', 'react/jsx-runtime', false],
+			['Octane JSX pragma', 'render(<Leaf />)', 'pragma', false],
+			['intrinsic tag with a lowercase import', 'render(<leaf />)', '', false],
+			['separate physical JSX issuer', 'render(<Leaf />)', 'jsx sibling', false],
+			['unsupported element children', 'render(h(Leaf, null, load()))', '', false],
+		])('reports the %s in a retained issuer', async (_, call, alias, warns) => {
+			const files = {
+				'package.json': '{"name":"app","type":"module"}',
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: {
+						jsx: 'react-jsx',
+						moduleResolution: 'Bundler',
+						...(alias.startsWith('react') ? { paths: { [alias]: ['./other.ts'] } } : {}),
+					},
+				}),
+				'other.ts': 'export function renderToStaticMarkup() { return null; }',
+				'Owner.tsx': `${alias === 'pragma' ? '/** @jsxImportSource octane */\n' : ''}
+					import { renderToStaticMarkup as render } from 'react-dom/server';
+					import { createElement as h } from 'react';
+					import ${call.includes('<leaf') ? 'leaf' : 'Leaf'} from './Leaf.${alias === 'jsx sibling' ? 'jsx' : 'tsx'}';
+					export function page() { return ${call}; }`,
+				'Leaf.tsx': 'export default function Leaf() { return <button>Original</button>; }',
+				'index.html': '<script type="module" src="./Leaf.tsx"></script>',
+			};
+			if (alias === 'jsx sibling') files['Leaf.jsx'] = "export default () => 'retained';";
+			const root = project(files);
+			fs.mkdirSync(path.join(root, 'node_modules'));
+			for (const name of ['octane', 'react', 'react-dom'])
+				fs.symlinkSync(
+					fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+					path.join(root, 'node_modules', name),
+					'dir',
+				);
+			fs.mkdirSync(path.join(root, 'node_modules/@types'));
+			for (const name of ['react', 'react-dom']) {
+				const source = createRequire(path.join(REPO, 'packages/octane/package.json')).resolve(
+					`@types/${name}/package.json`,
+				);
+				fs.symlinkSync(path.dirname(source), path.join(root, 'node_modules/@types', name), 'dir');
+			}
+			const selected = [path.join(root, 'Leaf.tsx')];
+			const options = { root, strong: true, verify: true };
+			const warning = expect.objectContaining({
+				rule: 'react-compat',
+				severity: 'warning',
+				message: expect.stringContaining('retained React server render'),
+			});
+			const preview = await runCodemod(selected, { ...options, write: false });
+			for (const name of ['Leaf.tsx', 'Owner.tsx']) {
+				const notes = preview.files.find((file) => file.file === name)?.notes;
+				if (warns) expect(notes).toContainEqual(warning);
+				else expect(notes).not.toContainEqual(warning);
+			}
+			for (const [name, source] of Object.entries(files))
+				expect(fs.readFileSync(path.join(root, name), 'utf8')).toBe(source);
+			expect(fs.existsSync(path.join(root, 'Leaf.tsrx'))).toBe(false);
+		});
+	});
+
 	it.each([
 		[
 			'statically re-exported hook',

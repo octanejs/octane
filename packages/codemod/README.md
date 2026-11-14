@@ -81,6 +81,13 @@ path, from its own file or from the project root, such as Vite's
 `server.warmup.clientFiles: ['./src/main.tsx']`: the `module-paths` rule.
 Globs and paths without an extension stay as they are.
 
+A retained React server entry can still render a component selected for migration.
+The codemod warns when `renderToString(<Leaf />)` or
+`renderToStaticMarkup(createElement(Leaf))` directly uses a relative JSX import
+whose local component returns an intrinsic element. Migrate the server entry
+with that component or keep the component in React. Review custom bundler
+resolution, indirect calls, and dynamic imports.
+
 ### Element-only children
 
 A nested component call in a DOM template supplies a render block. When a
