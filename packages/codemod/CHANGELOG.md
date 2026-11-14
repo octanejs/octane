@@ -1,5 +1,42 @@
 # @octanejs/codemod
 
+## 0.2.2
+
+### Patch Changes
+
+- 2926f1c: Migrate direct literal-bracket React namespace hook calls and preserve React's `createRef` allocator for the same syntax. Report computed hook accesses that need a manual migration.
+- 1d0902e: Generate new native external-store helpers as `.tsrx` files so builds that compile only TSRX apply the correct hook slots and runtime imports.
+- 206d5b3: Report unsupported React namespace APIs when an application accesses them through a literal computed property.
+- 64228dd: Report nested element-only children on path-alias calls and stop writes until the component’s runtime import target is verified.
+- 95f1958: Report when an automatically inserted React island can attach a ref after the parent layout effect reads it.
+- 96be027: Block JSX map conversions when a safe `void` expression is followed by a read of the uninitialized callback index in a parameter default.
+- 4c35afc: Enable the React Intl and scoped-store migration adapters when the project uses Octane 0.18.
+- 814c800: Accept hook dependencies that read a proven own data field on a component-owned state record.
+- 33e4655: Warn when a parenthesized server render reaches a migrated store hook that may need its original provider.
+- bcbdeb6: Preserve React Intl’s message comparison in the generated adapter. Equal substitutions keep the previous output, and context updates still refresh the catalog.
+- 596d0a3: Warn when a retained React JSX caller has an unambiguous extensionless import that the codemod redirects to an Octane component.
+- d29040c: Include directly exported constant arrow functions in the retained React hook diagnostic.
+- fd98195: Warn when a retained React JSX child calls a migrated factory that now returns an Octane renderable.
+- da6efe8: Warn when the codemod redirects a retained React lazy component's literal import to TSRX.
+- 731b0ec: Warn when a retained React caller renders a migrated component whose intrinsic JSX return follows straight-line const setup.
+- a2b09d2: Report potentially React-owned property reads in reachable operands of `&&`, `||`, and `??` in hook dependency arrays.
+- 653d363: Report when an opaque `.map()` receiver can inspect renderer-specific JSX elements returned directly by a callback’s final `switch`.
+- f562e27: Migrate text input change handlers when the input type is written as a JSX string expression, such as `type={'text'}`, and the attributes allow the same rewrite as a quoted type.
+- b2e1f51: Warn when a migrated server function directly renders a scoped-store consumer that may need its original provider during standalone rendering.
+- b10318f: Preserve proven ordinary context-like members and report ambiguous selected context aliases in ES2015, ES2020 and ES2022 TypeScript projects.
+- bdde6b1: Block a JSX map conversion when a literal array spread or a completing void expression can lead a parameter default to read the callback index before initialization.
+- f3fc6e3: Block JSX map conversions when copying a fresh object literal leads a parameter default to read the callback index before initialization.
+- 7476d36: Detect early JSX map index reads reached through literal conditions in short-circuit expressions and ternaries, including signed numbers, bigint literals, simple `void` expressions, and arrays and objects with safe literal contents.
+- 5b8da66: Warn when a relative `.js` import resolves to an unchanged TypeScript hook that reads React context through a private helper.
+- dd9d755: Warn when migrated code awaits a React DOM server stream's `allReady` before reading the body. Octane may need the reader to pull deferred content before that promise settles.
+- 7d342f0: Warn about migrated standalone server render calls that pass literal props to a component with a generated scoped-store hook.
+- Updated dependencies [f35440d]
+- Updated dependencies [b1d701b]
+- Updated dependencies [489470f]
+- Updated dependencies [15c0987]
+- Updated dependencies [ff666bb]
+  - octane@0.18.1
+
 ## 0.2.1
 
 ### Patch Changes

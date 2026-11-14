@@ -1,5 +1,15 @@
 # octane
 
+## 0.18.1
+
+### Patch Changes
+
+- f35440d: `OctaneCompat` islands now disconnect under a React `<Activity mode="hidden">` the way React components do: layout and passive effects clean up, refs detach, and `useSyncExternalStore` subscriptions unsubscribe while state and DOM are kept, and the reveal reconnects them against the latest store value.
+- b1d701b: Keep JSX map rows without an authored key at their array positions across rendering and hydration, without reading an implicit `id` from each item.
+- 489470f: Preserve React JSX in installed and linked Octane packages when a .tsx file declares React as its JSX source and the build uses `requireDirective`. Native .tsrx exports in the same package still compile with Octane.
+- 15c0987: Preserve string children as script text when server-rendering HTML scripts and adopt the same script nodes during hydration.
+- ff666bb: Refresh Strong components when a context read through an imported custom hook changes, even when the component's props have stayed equal.
+
 ## 0.18.0
 
 ### Minor Changes
