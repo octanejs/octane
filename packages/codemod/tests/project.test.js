@@ -3139,6 +3139,55 @@ export function Host({rows}: { rows: Row[] }) {
 	);
 
 	it.each([false, true])(
+		'blocks map defaults with an eager operand that reads the uninitialized index (project types %s)',
+		async (projectTypes) => {
+			const cases = [
+				['index < 1', true],
+				['0 <= index', true],
+				['index > fail()', true],
+				['0 >= index', true],
+				['index == 0', true],
+				['0 != index', true],
+				['index in {0: true}', true],
+				['0 in (index as unknown as object)', true],
+				['(index as unknown as object) instanceof Number', true],
+				['index + fail()', true],
+				['([] as unknown as number) * index', true],
+				['fail() < index', false],
+				['fail() != index', false],
+				['fail() in {value: index}', false],
+				['fail() instanceof (index as unknown as typeof Number)', false],
+				['(holder = index)', false],
+				['(holder &&= index)', false],
+				['({ valueOf() { return fail(); } } < 0, index)', false],
+				['0 < 1', false],
+			];
+			const source = (expression) => `let holder = 0; function fail() { throw Error('step'); }
+				export const List = () =>
+					<ul>{[{id:1},{id:2}].map(({id,label=${expression}},index) => <li key={id}>{label}</li>)}</ul>;`;
+			const originals = Object.fromEntries(
+				cases.map(([expression], i) => [`List${i}.tsx`, source(expression)]),
+			);
+			const root = project(originals);
+			const inputs = Object.keys(originals).map((file) => path.join(root, file));
+			const options = { root, verify: false, projectTypes };
+			const note = expect.objectContaining({ rule: 'map-parameter-tdz', severity: 'error' });
+			const preview = await runCodemod(inputs, { ...options, write: false });
+			for (const [i, [, blocked]] of cases.entries()) {
+				const file = preview.files.find(({ file }) => file === `List${i}.tsx`);
+				expect(file.code).toContain('@for');
+				expect(file.notes).toEqual(blocked ? [note] : []);
+			}
+			const written = await runCodemod(inputs, options);
+			expect(written.files).toEqual([
+				expect.objectContaining({ file: 'List0.tsx', changed: false, notes: [note] }),
+			]);
+			for (const [file, code] of Object.entries(originals))
+				expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
+		},
+	);
+
+	it.each([false, true])(
 		'blocks map index reads reached through a literal branch condition (project types %s)',
 		async (projectTypes) => {
 			const sources = {
