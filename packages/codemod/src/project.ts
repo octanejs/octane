@@ -40,6 +40,7 @@ import {
 	executableImports,
 	hostedServerComponents,
 	intrinsicReactExports,
+	migratedJsxFactories,
 	octaneRootComponents,
 	reactServerComponents,
 	retainedReactComponentReturns,
@@ -1407,6 +1408,7 @@ export async function runCodemod(
 	}
 	const reverseIslands = new Map<string, ReadonlySet<string>>();
 	const intrinsicExports = new Map<string, ReturnType<typeof intrinsicReactExports>>();
+	const jsxFactories = new Map<string, ReadonlySet<string>>();
 	const linkedConflicts = new Map<string, string>();
 	function checkLinkedRename(file: string, issuer: string) {
 		const selected = linkedRename(file);
@@ -1598,12 +1600,14 @@ export async function runCodemod(
 			for (const edge of edges) {
 				const match = renamed(file, edge.module);
 				if (!match) continue;
+				const factory = 'factory' in edge && edge.factory;
 				const original = path.resolve(path.dirname(file), edge.module);
 				const explicit =
 					match.file === original && (edge.renderer !== 'JSX' || /\.[jt]sx$/.test(edge.module));
 				if (
 					!explicit &&
-					(edge.renderer !== 'JSX' ||
+					(factory ||
+						edge.renderer !== 'JSX' ||
 						!/^\.{1,2}\//.test(edge.module) ||
 						/[!%?#\\]/.test(edge.module) ||
 						config?.rootDirs ||
@@ -1616,18 +1620,32 @@ export async function runCodemod(
 				if (edge.lazy && !(installedLazy ??= originalReactEntry(file, 'react'))) continue;
 				const leaf = byFile.get(match.file);
 				if (!leaf?.output.endsWith('.tsrx')) continue;
-				let intrinsic = intrinsicExports.get(match.file);
-				if (!intrinsic) {
-					intrinsic = intrinsicReactExports(match.file, fs.readFileSync(match.file, 'utf8'));
-					intrinsicExports.set(match.file, intrinsic);
+				if (factory) {
+					let names = jsxFactories.get(match.file);
+					if (!names) {
+						names = migratedJsxFactories(
+							match.file,
+							fs.readFileSync(match.file, 'utf8'),
+							leaf.code,
+						);
+						jsxFactories.set(match.file, names);
+					}
+					if (!names.has(edge.name)) continue;
+				} else {
+					let intrinsic = intrinsicExports.get(match.file);
+					if (!intrinsic) {
+						intrinsic = intrinsicReactExports(match.file, fs.readFileSync(match.file, 'utf8'));
+						intrinsicExports.set(match.file, intrinsic);
+					}
+					if (!intrinsic.names.has(edge.name) || (edge.lazy && intrinsic.mayExportThen)) continue;
 				}
-				if (!intrinsic.names.has(edge.name) || (edge.lazy && intrinsic.mayExportThen)) continue;
 				const note: Note = {
 					rule: 'react-compat',
 					severity: 'warning',
 					line: edge.line,
-					message:
-						edge.renderer === 'JSX'
+					message: factory
+						? `The retained React JSX in ${name} uses ${leaf.file}'s ${edge.name} as a JSX child. With standard package resolution, migrate the caller too or keep this factory in React.`
+						: edge.renderer === 'JSX'
 							? `The retained React JSX in ${name} renders ${leaf.file} ${edge.lazy ? 'through React.lazy' : 'directly'}. With standard package resolution, migrate the caller too or keep this component in React.`
 							: `The retained React server render in ${name} imports ${leaf.file} directly. With standard package resolution, migrate the server entry too or keep this component in React.`,
 				};

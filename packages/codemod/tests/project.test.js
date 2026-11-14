@@ -581,6 +581,72 @@ ${shape === 'named and default export' ? 'export default Owner;' : ''}`,
 	);
 
 	it.each([
+		['direct named import', 'icon()', true],
+		['shadowed import', 'icon()', false],
+		['call with an argument', 'icon(1)', false],
+		['optional call', 'icon?.()', false],
+		['attribute value', '', false],
+		['raw-text host', 'icon()', false],
+		['spread props', 'icon()', false],
+		['ambient caller', 'icon()', false],
+		['Octane JSX issuer', 'icon()', false],
+		['explicit React factory', 'icon()', false],
+		['mutable export', 'icon()', false],
+		['mixed dialect module', 'icon()', false],
+		['loader fragment', 'icon()', false],
+	])('advises on a retained React factory child (%s)', async (shape, call, warns) => {
+		const leaf =
+			shape === 'explicit React factory'
+				? `import { createRequire } from 'node:module';
+const { jsx } = createRequire(import.meta.url)('react/jsx-runtime');
+export function getIcon() { return jsx('b', { children: 'ready' }); }`
+				: 'export function getIcon() { return <b>ready</b>; }' +
+					(shape === 'mutable export' ? ' getIcon = () => null;' : '') +
+					(shape === 'mixed dialect module' ? ' export function View() { return <i />; }' : '');
+		const file = shape === 'loader fragment' ? 'Leaf#raw.tsx' : 'Leaf.tsx';
+		const pragma = shape === 'Octane JSX issuer' ? '/** @jsxImportSource octane */\n' : '';
+		const params = shape === 'shadowed import' ? '{ icon }' : '';
+		const view = call
+			? shape === 'raw-text host'
+				? `<script>{${call}}</script>`
+				: `<main${shape === 'spread props' ? ' {...props}' : ''}>{${call}}</main>`
+			: '<main title={icon()} />';
+		const root = project({
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"Bundler"}}',
+			[file]: leaf,
+			'Owner.tsx': `${pragma}import { getIcon as icon } from './${file}';
+export ${shape === 'ambient caller' ? 'declare ' : ''}function Owner(${params}) { return ${view}; }`,
+		});
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const selected = [path.join(root, file)];
+		const options = { root, strong: true, verify: true };
+		const check = ({ files }) => {
+			const affected = files.filter((entry) =>
+				entry.notes.some(
+					(note) =>
+						note.rule === 'react-compat' &&
+						note.severity === 'warning' &&
+						note.message.includes('getIcon as a JSX child'),
+				),
+			);
+			expect(affected.map((entry) => entry.file)).toEqual(warns ? [file, 'Owner.tsx'] : []);
+			expect(files.find((entry) => entry.file === file)).toMatchObject({
+				strong: true,
+				output: file.replace(/\.tsx$/, '.tsrx'),
+			});
+		};
+		check(await runCodemod(selected, { ...options, write: false }));
+		if (warns) {
+			check(await runCodemod(selected, options));
+			expect(fs.readFileSync(path.join(root, 'Owner.tsx'), 'utf8')).toContain('./Leaf.tsrx');
+		}
+	});
+
+	it.each([
 		['default export', "import { lazy } from 'react';", "() => import('./Leaf')", true],
 		[
 			'named export',
