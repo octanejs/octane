@@ -103,6 +103,7 @@ export const MAP_PARAMETER_WRITE = 'map-parameter-write';
 export const MAP_CALLBACK_SCOPE = 'map-callback-scope';
 export const CONTEXT_ALIAS = 'context-path-alias';
 export const CONTEXT_PROVIDER_GETTER = 'context-provider-getter';
+export const ELEMENT_CHILD_ALIAS = 'element-child-path-alias';
 
 /** Rule names, as reported. */
 const RULE = {
@@ -5888,14 +5889,13 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		// in React; `@if` or `@for` there would hand it a fragment instead.
 		const declaration = ts.isIdentifier(tag) ? this.declarationOf(tag) : null;
 		const entry = this.importOf(tag);
-		const imported =
-			entry && !entry.namespace && !entry.typeOnly && entry.module.startsWith('.') ? entry : null;
+		const imported = entry && !entry.namespace && !entry.typeOnly ? entry : null;
 		if (
 			(declaration &&
 				(ts.isVariableDeclaration(declaration) || ts.isFunctionDeclaration(declaration)) &&
 				this.descriptorComponents.has(declaration)) ||
 			(this.hasReactBridge && this.reactCompatTag(tag)) ||
-			(imported && this.options.descriptorChild?.(imported))
+			(imported?.module.startsWith('.') && this.options.descriptorChild?.(imported))
 		) {
 			return this.span(node, node.getStart(this.sf), node.end, DESCRIPTOR);
 		}
@@ -5907,18 +5907,31 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				declaration && ts.isFunctionDeclaration(declaration)
 					? declaration.getStart(this.sf)
 					: imported;
-			if (radixSlot || (binding !== null && this.options.elementChild?.(binding))) {
-				const child = this.singleElementChild(node);
-				if (child) {
-					this.count(RULE.elementChildProp);
-					return (
-						this.span(opening, opening.getStart(this.sf), opening.end - 1, ctx) +
-						' children={' +
-						this.emit(child, PLAIN) +
-						'} />'
-					);
-				}
+			const alias = imported && !imported.module.startsWith('.') ? imported : null;
+			const plan = radixSlot || (binding !== null && this.options.elementChild?.(binding));
+			const child = plan && this.singleElementChild(node);
+			if (child && plan === true && !alias) {
+				this.count(RULE.elementChildProp);
+				return (
+					this.span(opening, opening.getStart(this.sf), opening.end - 1, ctx) +
+					' children={' +
+					this.emit(child, PLAIN) +
+					'} />'
+				);
 			}
+			if (
+				child &&
+				plan === 'review-alias' &&
+				alias &&
+				declaration &&
+				!ts.findAncestor(declaration, ts.isImportDeclaration)?.attributes
+			)
+				this.note(
+					ELEMENT_CHILD_ALIAS,
+					'error',
+					opening,
+					`TypeScript resolves \`${alias.module}\` to a selected component with an element-only slot. Verify the runtime alias before passing the element with \`children={...}\`.`,
+				);
 		}
 		if (name === 'StrictMode') {
 			// Octane's StrictMode is a pass-through wrapper.
