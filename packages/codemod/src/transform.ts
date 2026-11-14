@@ -1090,10 +1090,18 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		}
 		if (this.target === 'tsrx') {
 			for (const item of this.nativeIntl) {
-				if ((item.propertyName ?? item.name).text !== 'FormattedMessage') continue;
+				const name = (item.propertyName ?? item.name).text;
+				if (name !== 'FormattedMessage' && name !== 'IntlProvider') continue;
 				for (const ref of this.localUses(item.name)) {
 					const element = ref.parent;
-					if (ts.isJsxSelfClosingElement(element) && !this.reactRendererBodies.has(element))
+					if (
+						(!ts.isJsxOpeningElement(element) && !ts.isJsxSelfClosingElement(element)) ||
+						element.tagName !== ref ||
+						this.reactRendererBodies.has(element)
+					)
+						continue;
+					if (name === 'IntlProvider') this.checkIntlProviderResources(element);
+					else if (ts.isJsxSelfClosingElement(element))
 						this.reportIntlFormatterOwner(element, 'generated native adapter');
 				}
 			}
@@ -4342,6 +4350,44 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			return this.rewriteDependencies(node, name);
 		}
 		return null;
+	}
+
+	private checkIntlProviderResources(tag: ts.JsxOpeningLikeElement) {
+		const resourceHint = this.options.initializerResourceHint;
+		if (!resourceHint) return;
+		// Provider admission already excludes spreads. JSX takes the last duplicate prop.
+		const attribute = (name: string) =>
+			tag.attributes.properties.findLast(
+				(attr): attr is ts.JsxAttribute =>
+					ts.isJsxAttribute(attr) && ts.isIdentifier(attr.name) && attr.name.text === name,
+			);
+		const locale = attribute('locale')?.initializer;
+		const expression = locale && ts.isJsxExpression(locale) ? locale.expression : locale;
+		const value = expression && skipWrappers(expression);
+		if (!value || !ts.isStringLiteralLike(value) || value.text !== '') return;
+		const callback = attribute('onError');
+		const handler = callback?.initializer;
+		if (!callback || !handler || !ts.isJsxExpression(handler) || !handler.expression) return;
+		const callee = skipWrappers(handler.expression);
+		if (!ts.isIdentifier(callee)) return;
+		const declaration = this.declarationOf(callee);
+		const imported = declaration && this.imports.get(declaration);
+		if (
+			!declaration ||
+			!imported ||
+			imported.typeOnly ||
+			imported.namespace ||
+			ts.findAncestor(declaration, ts.isImportDeclaration)?.attributes
+		)
+			return;
+		const hint = resourceHint(imported.module, imported.imported, true);
+		if (hint)
+			this.note(
+				RULE.bindings,
+				'error',
+				callback,
+				`IntlProvider can call \`${imported.imported}\` for an empty locale. The retained callback uses React DOM ${hint} outside the original React server request. Move it into Octane-compiled code or retain the React provider.`,
+			);
 	}
 
 	private checkInitializerResourceHints(initializer: ts.Expression) {

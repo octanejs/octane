@@ -636,8 +636,21 @@ export async function runCodemod(
 	}
 	const { inputFactory, changedJsxExport, helperFunction, localFile, exportsConstObject } =
 		storeSources(root, config, unchangedStoreInput, (file) => renames.has(file));
+	let selectedInPlace: Set<string> | undefined;
+	function writesSelectedInput(file: string) {
+		// An in-place write through a symlink changes its physical target.
+		selectedInPlace ??= new Set(
+			[...known].filter((f) => !renames.has(f) && !conflicts.has(f)).map((f) => fs.realpathSync(f)),
+		);
+		return selectedInPlace.has(fs.realpathSync(file));
+	}
 	const localHints = new Map<string, Map<string, string>>();
-	function initializerResourceHint(from: string, module: string, name: string) {
+	function initializerResourceHint(
+		from: string,
+		module: string,
+		name: string,
+		retainedOnly = false,
+	) {
 		const file = localFile(from, module);
 		if (
 			!file ||
@@ -658,7 +671,9 @@ export async function runCodemod(
 			}
 			localHints.set(file, calls);
 		}
-		return calls.get(name);
+		const hint = calls.get(name);
+		if (hint && (!retainedOnly || (fs.statSync(file).nlink === 1 && !writesSelectedInput(file))))
+			return hint;
 	}
 
 	const localHooks = new Map<
@@ -728,7 +743,6 @@ export async function runCodemod(
 			return false;
 		}
 	}
-	let selectedInPlace: Set<string> | undefined;
 	function localReactHook(from: string, module: string, name: string, nativeOnly: boolean) {
 		if (
 			catalogName(module) !== null ||
@@ -797,11 +811,7 @@ export async function runCodemod(
 		// Keep TS substitution advisory. A loader may select a different executable.
 		const hook = jsSpecifier ? undefined : hooks.direct.get(name);
 		if ((!hook && !hooks.privateContexts.has(name)) || fs.statSync(file).nlink > 1) return;
-		// Writing an unrenamed selection through a symlink changes its physical target.
-		selectedInPlace ??= new Set(
-			[...known].filter((f) => !renames.has(f) && !conflicts.has(f)).map((f) => fs.realpathSync(f)),
-		);
-		if (selectedInPlace.has(fs.realpathSync(file))) return;
+		if (writesSelectedInput(file)) return;
 		if (!hook) return { privateContext: true } as const;
 		if (
 			nativeOnly &&
@@ -1139,7 +1149,8 @@ export async function runCodemod(
 					originalReactEntry(file, module, bindingOptions(file)) &&
 					originalOctaneBridge(file, 'octane/server'),
 				initializerResourceHint: renames.has(file)
-					? (module, name) => initializerResourceHint(file, module, name)
+					? (module, name, retainedOnly) =>
+							initializerResourceHint(file, module, name, retainedOnly)
 					: undefined,
 				localReactHook: renames.has(file)
 					? (module, name, nativeOnly) => localReactHook(file, module, name, nativeOnly)
