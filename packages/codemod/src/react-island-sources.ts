@@ -69,6 +69,59 @@ function closedDefaultReactReceiver(receiver: ts.Identifier, uses: ReturnType<ty
 	});
 }
 
+/** A direct assignment of inert metadata does not change the exported constructor. */
+function classMetadataAssignment(ref: ts.Identifier, decl: ts.ClassDeclaration) {
+	const access = ref.parent;
+	if (!ts.isPropertyAccessExpression(access) || access.expression !== ref) return false;
+	const name = access.name.text;
+	if (name !== 'displayName' && name !== 'defaultProps') return false;
+	const assignment = access.parent;
+	if (
+		!ts.isBinaryExpression(assignment) ||
+		assignment.left !== access ||
+		assignment.operatorToken.kind !== ts.SyntaxKind.EqualsToken ||
+		!ts.isExpressionStatement(assignment.parent) ||
+		assignment.parent.parent !== decl.parent ||
+		assignment.getStart() < decl.end ||
+		decl.members.some(
+			(member) =>
+				ts.isClassStaticBlockDeclaration(member) ||
+				(member.name && ts.isComputedPropertyName(member.name)) ||
+				(ts.canHaveDecorators(member) && ts.getDecorators(member)?.length) ||
+				(ts.getCombinedModifierFlags(member) & ts.ModifierFlags.Static &&
+					(ts.isPropertyDeclaration(member) ||
+						ts.isSetAccessorDeclaration(member) ||
+						ts.isGetAccessorDeclaration(member))),
+		)
+	)
+		return false;
+	const value = skipWrappers(assignment.right);
+	if (name === 'displayName') return ts.isStringLiteralLike(value);
+	return (
+		ts.isObjectLiteralExpression(value) &&
+		value.properties.every((field) => {
+			if (
+				!ts.isPropertyAssignment(field) ||
+				!(
+					ts.isIdentifier(field.name) ||
+					ts.isStringLiteral(field.name) ||
+					ts.isNumericLiteral(field.name)
+				) ||
+				field.name.text === '__proto__'
+			)
+				return false;
+			const value = skipWrappers(field.initializer);
+			return (
+				ts.isStringLiteralLike(value) ||
+				ts.isNumericLiteral(value) ||
+				value.kind === ts.SyntaxKind.TrueKeyword ||
+				value.kind === ts.SyntaxKind.FalseKeyword ||
+				value.kind === ts.SyntaxKind.NullKeyword
+			);
+		})
+	);
+}
+
 /** Direct React class exports, including an alias in a local export list. */
 export function reactClassExports(file: string, source: string) {
 	const { sf, checker } = bind(file, source);
@@ -108,7 +161,13 @@ export function reactClassExports(file: string, source: string) {
 		}
 		if (entry?.module !== 'react' || (entry.name !== 'Component' && entry.name !== 'PureComponent'))
 			continue;
-		if (!decl.name || uses(decl.name).every(componentTagOrExport)) names.add(symbol.name);
+		if (
+			!decl.name ||
+			uses(decl.name).every(
+				(ref) => componentTagOrExport(ref) || classMetadataAssignment(ref, decl),
+			)
+		)
+			names.add(symbol.name);
 	}
 	return names;
 }

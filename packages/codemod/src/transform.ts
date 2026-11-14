@@ -7261,7 +7261,6 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			callee &&
 			callee.module === 'react' &&
 			callee.name === 'StrictMode' &&
-			!node.openingElement.attributes.properties.length &&
 			!this.islands.has(node) &&
 			!this.unrenderable.has(node) &&
 			!this.reactRendererBodies.has(node)

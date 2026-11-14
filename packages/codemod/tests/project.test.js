@@ -77,6 +77,15 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				'export { Frame as Boundary };',
 				'export default Frame;',
 			),
+			'Metadata.tsx':
+				boundary +
+				'\nFrame.displayName = "Boundary"; Frame.defaultProps = { fallback: "error", attempts: 1, retry: true };',
+			'MetadataSetter.tsx': boundary
+				.replace('render() {', 'static set displayName(value: string) {}\n\trender() {')
+				.concat('\nFrame.displayName = "Boundary";'),
+			'MetadataEffect.tsx': boundary + '\nFrame.displayName = register();',
+			'MetadataGetter.tsx':
+				boundary + '\nFrame.defaultProps = { get fallback() { return "error"; } };',
 			'MutatedBase.tsx': boundary
 				.replace(
 					"import { Component as Base, type ReactNode } from 'react';",
@@ -138,6 +147,12 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					'<Frame><b>ready</b></Frame>',
 					'<Strict><span /><Frame><b>ready</b></Frame></Strict>',
 				),
+			'KeyedStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Strict key="first"><Frame><b>ready</b></Frame></Strict>',
+				),
 			'NestedStrict.tsx':
 				"import { StrictMode as Strict } from 'react';\n" +
 				entry('./Boundary').replace(
@@ -149,6 +164,10 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 			'DecoratedView.tsx': entry('./Decorated'),
 			'DefaultBaseView.tsx': entry('./DefaultBase'),
 			'DefaultExportView.tsx': entry('./DefaultExport').replace('{ Boundary as Frame }', 'Frame'),
+			'MetadataView.tsx': entry('./Metadata'),
+			'MetadataSetterView.tsx': entry('./MetadataSetter'),
+			'MetadataEffectView.tsx': entry('./MetadataEffect'),
+			'MetadataGetterView.tsx': entry('./MetadataGetter'),
 			'DefaultEarlyView.tsx': entry('./DefaultEarly').replace('{ Boundary as Frame }', 'Frame'),
 			'MutatedBaseView.tsx': entry('./MutatedBase'),
 			'Shadow.tsx': entry('./Boundary').replace('App()', 'App(Frame: () => unknown)'),
@@ -173,7 +192,13 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				(file) =>
 					file.endsWith('.tsx') &&
 					(includeClass ||
-						!['Boundary.tsx', 'DefaultBase.tsx', 'DefaultExport.tsx', 'Hosted.tsx'].includes(file)),
+						![
+							'Boundary.tsx',
+							'DefaultBase.tsx',
+							'DefaultExport.tsx',
+							'Hosted.tsx',
+							'Metadata.tsx',
+						].includes(file)),
 			);
 			const { files } = await runCodemod(
 				inputs.map((file) => path.join(root, file)),
@@ -203,7 +228,9 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				['DefaultBaseView.tsx', includeClass ? 'error' : 'warning'],
 				['DefaultExportView.tsx', includeClass ? 'error' : 'warning'],
 				['Guard.tsx', includeClass ? 'error' : 'warning'],
+				['KeyedStrict.tsx', includeClass ? 'error' : 'warning'],
 				['LogicalArm.tsx', includeClass ? 'error' : 'warning'],
+				['MetadataView.tsx', includeClass ? 'error' : 'warning'],
 				['Relative.tsx', includeClass ? 'error' : 'warning'],
 				['Strict.tsx', includeClass ? 'error' : 'warning'],
 				['Ternary.tsx', includeClass ? 'error' : 'warning'],
