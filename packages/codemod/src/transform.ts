@@ -8,7 +8,7 @@ import {
 	renderUses,
 	svgLocalReads,
 } from './forwarded-props.js';
-import { reactRenderer, staticReactProps } from './react-renderer.js';
+import { reactRenderer, staticReactProps, unreadServerStream } from './react-renderer.js';
 import { linkedRenderState } from './linked-state.js';
 import { nativeSetupHook } from './local-react-hook.js';
 import {
@@ -3067,6 +3067,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (ts.isImportDeclaration(node)) return this.rewriteImport(node);
 		if (ts.isExportDeclaration(node) && node.moduleSpecifier) return this.rewriteReexport(node);
 		if (ts.isCallExpression(node)) return this.rewriteCall(node);
+		if (ts.isAwaitExpression(node) && ts.isPropertyAccessExpression(node.expression))
+			this.checkServerStream(node);
 		if (ts.isPropertyAccessExpression(node)) {
 			const text = this.rewriteMember(node);
 			if (text === null) this.checkProjectReactEventMember(node, node.name.text);
@@ -3944,6 +3946,26 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	}
 
 	// ---------------------------------------------------------------- APIs
+
+	private checkServerStream(wait: ts.AwaitExpression) {
+		const originalServer = this.options.originalReactServerEntry;
+		if (
+			originalServer &&
+			unreadServerStream(
+				wait,
+				(id) => this.declarationOf(id),
+				(id) => this.localUses(id),
+				originalServer,
+			) &&
+			!hasEval(this.sf)
+		)
+			this.note(
+				RULE.serverRender,
+				'warning',
+				wait,
+				"Octane's renderToReadableStream can wait for a reader when it writes deferred output. Start reading before awaiting allReady, or use prerender for fully resolved HTML.",
+			);
+	}
 
 	rewriteMember(node: ts.PropertyAccessExpression) {
 		// `<Ctx.Provider value>` is `<Ctx value>` in Octane, as in React 19.

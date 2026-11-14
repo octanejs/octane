@@ -1134,6 +1134,9 @@ export async function runCodemod(
 				get originalReact() {
 					return installedReact(file);
 				},
+				originalReactServerEntry: (module) =>
+					originalReactEntry(file, module, bindingOptions(file)) &&
+					originalOctaneBridge(file, 'octane/server'),
 				initializerResourceHint: renames.has(file)
 					? (module, name) => initializerResourceHint(file, module, name)
 					: undefined,
@@ -1395,12 +1398,9 @@ export async function runCodemod(
 				: `If the migrated ${component}'s store hook reads context, this standalone Octane root needs NativeStoreProvider with its original store context and value.`,
 		};
 	}
-	function originalReactEntry(
-		file: string,
-		name: 'react' | 'react/jsx-runtime' | 'react-dom/server',
-	) {
-		const packageRoot = name === 'react-dom/server' ? 'react-dom' : 'react';
-		const types = originalModule(file, name)?.packageId?.name;
+	function originalReactEntry(file: string, name: string, options = config) {
+		const packageRoot = packageName(name);
+		const types = originalModule(file, name, options)?.packageId?.name;
 		if (types !== packageRoot && types !== `@types/${packageRoot}`) return false;
 		const installed = readInstalled(path.dirname(file), packageRoot);
 		try {
