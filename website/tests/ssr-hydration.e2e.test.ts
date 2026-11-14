@@ -2241,24 +2241,38 @@ describe(
 			'client-side navigation does not start resources owned by the outgoing route',
 			{ timeout: 30_000 },
 			async () => {
-				const outgoingLynxRequests: string[] = [];
-				let navigating = false;
+				const lynxRequests: { path: string; start: number }[] = [];
 				const { page, errors } = await loadRoute(PREVIEW_ORIGIN, '/', {
 					beforeNavigation: async (page) => {
 						await page.route(/\/assets\/benchmarks-[^/]+\.js$/, async (route) => {
 							await new Promise((resolve) => setTimeout(resolve, 500));
 							await route.continue();
 						});
-						page.on('request', (request) => {
-							const pathname = new URL(request.url()).pathname;
-							if (navigating && pathname.startsWith('/lynx-examples/')) {
-								outgoingLynxRequests.push(pathname);
-							}
+						// Record starts even if the router aborts the request on unmount.
+						const cdp = await page.context().newCDPSession(page);
+						cdp.on('Network.requestWillBeSent', ({ request, wallTime }) => {
+							const pathname = new URL(request.url).pathname;
+							if (pathname.startsWith('/lynx-examples/'))
+								lynxRequests.push({ path: pathname, start: wallTime * 1000 });
 						});
+						await cdp.send('Network.enable');
 					},
 				});
 				try {
-					navigating = true;
+					await expect
+						.poll(() => page.getByRole('log').innerText(), { timeout: PLAYWRIGHT_ACTION_TIMEOUT })
+						.toContain('count is now 0');
+					await page.evaluate(() => {
+						const router = window.__TSR_ROUTER__;
+						if (!router) throw new Error('Homepage router is missing after hydration.');
+						// The Link commits its transition cue before it starts routing. Only
+						// requests after the router accepts the new route are outgoing work.
+						router.subscribe('onBeforeNavigate', ({ toLocation }) => {
+							if (toLocation.pathname === '/benchmarks') {
+								performance.mark('benchmarks-navigation');
+							}
+						});
+					});
 					await page.click('a.nav-link[href="/benchmarks"]');
 					await page.waitForFunction(() => location.pathname === '/benchmarks', null, {
 						timeout: PLAYWRIGHT_ACTION_TIMEOUT,
@@ -2270,7 +2284,15 @@ describe(
 							timeout: PLAYWRIGHT_ACTION_TIMEOUT,
 						},
 					);
-					expect(outgoingLynxRequests).toEqual([]);
+					const navigationStart = await page.evaluate(() => {
+						const navigation = performance.getEntriesByName('benchmarks-navigation', 'mark')[0];
+						return navigation && performance.timeOrigin + navigation.startTime;
+					});
+					if (navigationStart === undefined)
+						throw new Error('Benchmarks did not navigate within the hydrated document.');
+					expect(
+						lynxRequests.filter(({ start }) => start >= navigationStart).map(({ path }) => path),
+					).toEqual([]);
 					expect(errors).toEqual([]);
 				} finally {
 					await page.close();
