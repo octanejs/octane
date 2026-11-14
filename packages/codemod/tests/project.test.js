@@ -104,6 +104,37 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					'return <Frame><b>ready</b></Frame>;',
 					'if (show) return <Frame />; return <b />;',
 				),
+			'Retained.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+				),
+			'RetainedDead.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'if (true) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+			),
+			'RetainedUnconditional.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return <i>off</i>; return <Frame />;',
+			),
+			'RetainedFactory.tsx': entry('./Boundary')
+				.replace(
+					'export function App()',
+					'declare function makeView(frame: typeof Frame): unknown;\nexport function App(show: boolean)',
+				)
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return makeView(Frame);',
+				),
+			'RetainedCustom.tsx':
+				'/** @jsx custom */\ndeclare function custom(type: unknown, props: unknown): unknown;\n' +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+					),
 			'LogicalArm.tsx': entry('./Boundary')
 				.replace('App()', 'App(show: boolean, enabled: boolean)')
 				.replace(
@@ -205,6 +236,7 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				['Guard.tsx', includeClass ? 'error' : 'warning'],
 				['LogicalArm.tsx', includeClass ? 'error' : 'warning'],
 				['Relative.tsx', includeClass ? 'error' : 'warning'],
+				['Retained.tsx', includeClass ? 'error' : 'warning'],
 				['Strict.tsx', includeClass ? 'error' : 'warning'],
 				['Ternary.tsx', includeClass ? 'error' : 'warning'],
 			]);

@@ -7127,10 +7127,28 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		if (!last || !ts.isReturnStatement(last) || !last.expression) return null;
 		const guard = statements.findIndex((s, i) => i < statements.length - 1 && guardReturn(s));
 		if (guard !== -1) return this.rewriteGuards(node, body, guard);
+		const inner = skipParens(last.expression);
 		// A template body has one output; any other early `return <A />` would
 		// render through runtime descriptors, so the plain function stays.
-		if (returnsJsx(statements.slice(0, -1))) return null;
-		const inner = skipParens(last.expression);
+		const setupStatements = statements.slice(0, -1);
+		if (returnsJsx(setupStatements)) {
+			if (
+				this.options.localReactClass &&
+				(ts.isJsxElement(inner) || ts.isJsxSelfClosingElement(inner)) &&
+				ts.isFunctionDeclaration(node) &&
+				node.parent === this.sf &&
+				setupStatements.every(
+					(statement) =>
+						ts.isVariableStatement(statement) ||
+						(ts.isIfStatement(statement) &&
+							!statement.elseStatement &&
+							literalCondition(statement.expression) !== 'truthy'),
+				) &&
+				this.options.automaticReactJsx
+			)
+				this.checkReactClassRoot(inner);
+			return null;
+		}
 		let output = this.output(inner);
 		if (output === null) return null;
 		const head = this.head(node, body.getStart(this.sf));
@@ -7296,8 +7314,8 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			severity,
 			tag,
 			severity === 'error'
-				? `The migration resolves \`${entry.module}\` to the imported React class \`${tag.text}\`, which this native template renders. Keep this render in React or replace the class with an Octane function component.`
-				: `If this native template renders the imported React class \`${tag.text}\` resolved from \`${entry.module}\`, the call will fail. Verify the runtime import, keep the render in React, or replace the class with an Octane function component.`,
+				? `The migration resolves \`${entry.module}\` to the imported React class \`${tag.text}\`. The call fails if Octane renders this output. Keep this render in React or replace the class with an Octane function component.`
+				: `If Octane renders the imported React class \`${tag.text}\` resolved from \`${entry.module}\`, the call will fail. Verify the runtime import, keep the render in React, or replace the class with an Octane function component.`,
 		);
 	}
 
