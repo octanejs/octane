@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/dnd-kit-utilities",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -38,7 +38,7 @@
     "typecheck": "octane-tsc -p tsconfig.json"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.17.0"
+    "octane": "workspace:^0.18.0"
   },
   "devDependencies": {
     "@dnd-kit/utilities": "catalog:default",

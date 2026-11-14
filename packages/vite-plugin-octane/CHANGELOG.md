@@ -1,5 +1,71 @@
 # @octanejs/vite-plugin
 
+## 0.6.1
+
+### Patch Changes
+
+- 9507c7b: Add the whole-program `octane/data` contract check and the generated `octane/data/manifest`. Once an app imports `octane/data/manifest` (or sets `data: true` on the Vite or Rspack plugin), the build checks each module's contracts and reports contracts no `createDataHandler` serves, contracts served twice, names shared across `*.data.ts` modules, and unused contracts. The manifest exports `contracts`, `writes`, and `identity`. `octane analyze` runs the same checks, and `contractIdentity` is exported from `octane/data`.
+- 4ef6951: Forward the `dataWorker` option to the compiler plugin, so apps on `@octanejs/vite-plugin` emit their `octane/data` worker at `/_octane/data-worker.js`.
+- Updated dependencies [7a917ac]
+- Updated dependencies [14af2dc]
+- Updated dependencies [9507c7b]
+- Updated dependencies [7a0fa8a]
+- Updated dependencies [45536c1]
+- Updated dependencies [cb13e64]
+- Updated dependencies [9a756ff]
+- Updated dependencies [35f0615]
+- Updated dependencies [cd695f2]
+- Updated dependencies [229c9fa]
+- Updated dependencies [c6641b6]
+- Updated dependencies [a5b9bef]
+- Updated dependencies [ff21aac]
+- Updated dependencies [30acf9b]
+- Updated dependencies [01a68e4]
+- Updated dependencies [c3bea0c]
+- Updated dependencies [bbbb499]
+- Updated dependencies [c493477]
+- Updated dependencies [33224c9]
+- Updated dependencies [dd23f96]
+- Updated dependencies [cbadc1e]
+- Updated dependencies [13f4a75]
+- Updated dependencies [e6024c4]
+- Updated dependencies [36a0ac5]
+- Updated dependencies [116bb8c]
+- Updated dependencies [98de84e]
+- Updated dependencies [d2a12e2]
+- Updated dependencies [0b487b9]
+- Updated dependencies [69b5971]
+- Updated dependencies [79e59b7]
+- Updated dependencies [08c8f21]
+- Updated dependencies [52963f5]
+- Updated dependencies [7d04546]
+- Updated dependencies [0c0ab0d]
+- Updated dependencies [e43ef86]
+- Updated dependencies [46e438c]
+- Updated dependencies [235acdb]
+- Updated dependencies [4ae0559]
+- Updated dependencies [a60018e]
+- Updated dependencies [998ad73]
+- Updated dependencies [42d6270]
+- Updated dependencies [4abf364]
+- Updated dependencies [988a2d0]
+- Updated dependencies [7240091]
+- Updated dependencies [3158125]
+- Updated dependencies [6fe9c4e]
+- Updated dependencies [598df83]
+- Updated dependencies [173a573]
+- Updated dependencies [6921d3d]
+- Updated dependencies [09160df]
+- Updated dependencies [db22792]
+- Updated dependencies [aa67310]
+- Updated dependencies [84ae971]
+- Updated dependencies [f3e22ba]
+- Updated dependencies [b117586]
+- Updated dependencies [92ad772]
+- Updated dependencies [296e948]
+  - octane@0.18.0
+  - @octanejs/app-core@0.3.1
+
 ## 0.6.0
 
 ### Minor Changes

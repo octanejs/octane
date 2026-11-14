@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/pierre-diffs",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -44,7 +44,7 @@
     "@pierre/diffs": "1.6.1"
   },
   "peerDependencies": {
-    "octane": "workspace:^0.17.0"
+    "octane": "workspace:^0.18.0"
   },
   "devDependencies": {
     "@pierre/highlights": "0.2.0",

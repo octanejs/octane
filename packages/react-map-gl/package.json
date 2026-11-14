@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/react-map-gl",
-  "version": "0.0.40",
+  "version": "0.0.41",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -39,7 +39,7 @@
   },
   "peerDependencies": {
     "mapbox-gl": ">=3.5.0",
-    "octane": "workspace:^0.17.0"
+    "octane": "workspace:^0.18.0"
   },
   "peerDependenciesMeta": {
     "mapbox-gl": {

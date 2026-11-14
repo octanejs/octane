@@ -1,5 +1,12 @@
 # @octanejs/cli
 
+## 0.3.5
+
+### Patch Changes
+
+- 9507c7b: Add the whole-program `octane/data` contract check and the generated `octane/data/manifest`. Once an app imports `octane/data/manifest` (or sets `data: true` on the Vite or Rspack plugin), the build checks each module's contracts and reports contracts no `createDataHandler` serves, contracts served twice, names shared across `*.data.ts` modules, and unused contracts. The manifest exports `contracts`, `writes`, and `identity`. `octane analyze` runs the same checks, and `contractIdentity` is exported from `octane/data`.
+- aea2f15: Check React Motion imports and re-exports against the Octane Motion binding's catalog. Keep requests for missing exports or an unknown namespace on their original entry points and report a binding error.
+
 ## 0.3.4
 
 ### Patch Changes
