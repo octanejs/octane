@@ -1979,6 +1979,12 @@ describe('octane/data persistence through a shared owner', () => {
 			const write = one.write(setRead, { id: 'a', read: true }).catch((error: unknown) => error);
 			await vi.waitFor(() => expect(hung).toBe(true));
 			expect(readA()).toEqual([true, true]);
+			const persisted = createPersistence(
+				cache(storage, 'ada'),
+				() => undefined,
+				() => false,
+			);
+			expect(await persisted.recover()).toHaveLength(1);
 			await worker.crash();
 
 			expect(await write).toBeInstanceOf(DataUncertainError);
@@ -1988,9 +1994,9 @@ describe('octane/data persistence through a shared owner', () => {
 			expect(remote.log.filter((entry) => entry === 'read receipt')).toHaveLength(1);
 			expect(remote.log.filter((entry) => entry === 'write setRead')).toHaveLength(applied ? 1 : 0);
 
-			// Settled, it left the journal: a tab after the next restart has nothing to look up.
+			// Wait for the journal removal to reach durable storage before restarting again.
 			vi.useRealTimers();
-			await saved();
+			await vi.waitFor(async () => expect(await persisted.recover()).toEqual([]));
 			const after = server(remote.books, remote.applied);
 			const restarted = tab(ownerOver(storage, after), memoryStorage());
 			expect((await value<Book[]>(restarted, shelf)).value[0]!.read).toBe(applied);
