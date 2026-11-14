@@ -6233,8 +6233,11 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					declaration &&
 					(ts.isParameter(declaration) || ts.isBindingElement(declaration)) &&
 					ts.findAncestor(declaration, ts.isParameter)?.parent === ordinal.parent
-				)
-					return false;
+				) {
+					const element = ts.findAncestor(read, ts.isBindingElement);
+					if (!element || declaration.parent !== element.parent || declaration.end > element.pos)
+						return false;
+				}
 				for (let i = 1; i < read.arguments.length; i++) {
 					if (!rowKeyLiteral(read.arguments[i - 1])) return false;
 					const argument = read.arguments[i];

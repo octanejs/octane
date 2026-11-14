@@ -1837,6 +1837,12 @@ export function Host({rows}: { rows: Row[] }) {
 				'EarlierCallee.tsx': source(
 					direct.replace('label=(index as number)', 'convert=()=>1,label=convert(index)'),
 				),
+				'EarlierCalleeLaterArg.tsx': source(
+					direct.replace('label=(index as number)', 'convert=()=>1,label=convert(0,index)'),
+				),
+				'NestedCallee.tsx': source(
+					direct.replace('label=(index as number)', 'label=7,nested:{convert}=convert(0,index)'),
+				),
 				'LiteralIndex.tsx': source(direct.replace('(index as number)', '[0][index]')),
 				'OptionalIndex.tsx': source(direct.replace('(index as number)', '[0]?.[index]')),
 				'Receiver.tsx': source(direct.replace('(index as number)', '(index as any)?.label')),
@@ -1870,6 +1876,7 @@ export function Host({rows}: { rows: Row[] }) {
 						'Callee.tsx',
 						'OptionalArrow.tsx',
 						'EarlierCallee.tsx',
+						'EarlierCalleeLaterArg.tsx',
 						'Product.tsx',
 						'Unary.tsx',
 						'Bitwise.tsx',
