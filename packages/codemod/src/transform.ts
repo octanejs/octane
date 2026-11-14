@@ -37,6 +37,7 @@ import {
 	TEXT_FIELD_COMPONENTS,
 	TEXT_INPUT_TYPES,
 	UNSUPPORTED_VALUES,
+	isComputedReactCall,
 	mapPackageExport,
 	mapQualifiedType,
 	mapReactImport,
@@ -2766,7 +2767,63 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			if (!entry?.namespace || !isApiModule(entry.module)) return null;
 			return { name: node.name.text, module: entry.module };
 		}
+		if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) {
+			const name = node.argumentExpression.text;
+			if (this.canMigrateComputedReactCall(node, name)) return { name, module: 'react' };
+		}
 		return null;
+	}
+
+	private canMigrateComputedReactCall(node: ts.ElementAccessExpression, name: string) {
+		const parent = node.parent;
+		if (
+			!isComputedReactCall(name) ||
+			!ts.isCallExpression(parent) ||
+			parent.expression !== node ||
+			ts.isOptionalChain(parent) ||
+			!ts.isIdentifier(node.expression)
+		)
+			return false;
+		const declaration = this.declarationOf(node.expression);
+		if (
+			!declaration ||
+			!ts.isNamespaceImport(declaration) ||
+			this.imports.get(declaration)?.module !== 'react' ||
+			declaration.parent.isTypeOnly ||
+			declaration.parent.parent.attributes ||
+			this.lostComments(node.getStart(this.sf), node.end, '').length
+		)
+			return false;
+		return this.closedReactNamespace(declaration);
+	}
+
+	private reactNamespaceCalls?: boolean;
+	private closedReactNamespace(declaration: ts.NamespaceImport) {
+		// Bundlers can expose the mutable CommonJS object through a default import
+		// or the namespace's default member. Require the namespace to stay local.
+		return (this.reactNamespaceCalls ??=
+			[...this.imports].every(
+				([binding, item]) =>
+					item.module !== 'react' ||
+					item.typeOnly ||
+					binding === declaration ||
+					(!item.namespace && item.imported !== 'default'),
+			) &&
+			!(/eval|\\u/.test(this.source) && hasEval(this.sf)) &&
+			this.localUses(declaration.name).every((ref) => {
+				if (inTypeNode(ref)) return true;
+				const member = ref.parent;
+				return (
+					(ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member)) &&
+					member.expression === ref &&
+					ts.isCallExpression(member.parent) &&
+					member.parent.expression === member &&
+					(ts.isPropertyAccessExpression(member)
+						? member.name.text !== 'default'
+						: ts.isStringLiteralLike(member.argumentExpression) &&
+							member.argumentExpression.text !== 'default')
+				);
+			}));
 	}
 
 	line(node: ts.Node) {
@@ -3015,7 +3072,23 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		}
 		if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) {
 			const name = node.argumentExpression.text;
-			this.checkReactNamespaceMember(node, name);
+			const mapped = this.checkReactNamespaceMember(node, name);
+			if (
+				mapped &&
+				this.importOf(node.expression)?.module === 'react' &&
+				isComputedReactCall(name)
+			) {
+				if (this.canMigrateComputedReactCall(node, name)) {
+					this.count(RULE.import);
+					return this.require(mapped.module, mapped.name, false);
+				}
+				this.note(
+					RULE.unsupported,
+					'error',
+					node,
+					`Computed React \`${name}\` migration requires a direct call on a local React namespace import. Review the receiver and the call before migrating it.`,
+				);
+			}
 			this.checkProjectReactEventMember(node, name);
 		}
 		if (ts.isQualifiedName(node)) return this.rewriteQualifiedType(node);

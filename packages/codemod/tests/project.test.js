@@ -3927,6 +3927,89 @@ export function View(React: { Profiler: string }) {
 			expect(fs.existsSync(path.join(root, name + '.tsrx'))).toBe(false);
 	});
 
+	it('mounts and updates a Strong component using literal bracket calls on a React namespace', async () => {
+		const root = project({
+			'label.ts': `let label = 'before';
+export const readLabel = () => label;
+export const updateLabel = () => { label = 'after'; };`,
+			'Counter.tsx': `import * as React from 'react';
+import { readLabel, updateLabel } from './label';
+export const target = React['createRef']<HTMLButtonElement>();
+export function Counter() {
+	const [count, setCount] = React[\`useState\`](0);
+	const text = React['useMemo'](() => readLabel());
+	return <button ref={target} onClick={() => { updateLabel(); setCount(count + 1); }}>{String(count) + ':' + text}</button>;
+}`,
+		});
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+		);
+		const [file] = (
+			await runCodemod([path.join(root, 'Counter.tsx')], { root, write: false, strong: true })
+		).files;
+		expect(file).toMatchObject({ strong: true, notes: [], diagnostics: [] });
+		fs.writeFileSync(path.join(root, file.output), file.code);
+		const dom = installDOM();
+		try {
+			const { act, createRoot, Counter, target, reactRef } = await bundleRuntime(
+				root,
+				'client',
+				`export { act, createRoot } from 'octane';
+export { createRef as reactRef } from 'react';
+export * from './Counter.tsrx';`,
+			);
+			expect(Object.isSealed(target)).toBe(Object.isSealed(reactRef()));
+			const container = dom.window.document.body;
+			const app = createRoot(container);
+			try {
+				await act(async () => app.render(Counter));
+				const button = container.querySelector('button');
+				expect(button?.textContent).toBe('0:before');
+				expect(target.current).toBe(button);
+				await act(async () => button.click());
+				expect(button.textContent).toBe('1:after');
+			} finally {
+				await act(async () => app.unmount());
+			}
+			expect(target.current).toBeNull();
+		} finally {
+			vi.unstubAllGlobals();
+			dom.window.close();
+		}
+	});
+
+	it.each([
+		['optional call', "import * as R from 'react';", "R['useState']?.(0)"],
+		['hook alias', "import * as R from 'react';", "R['useState']"],
+		['member write', "import * as R from 'react';", "R['useState'] = () => [3]"],
+		['namespace escape', "import * as R from 'react'; mutate(R);", "R['useState'](0)"],
+		['default member', "import * as R from 'react'; mutate(R.default);", "R['useState'](0)"],
+		['default import', "import R from 'react';", "R['useState'](0)"],
+		[
+			'combined namespace and default import',
+			"import React, * as R from 'react'; mutate(React);",
+			"R['useState'](0)",
+		],
+		['commented access', "import * as R from 'react';", "R[/* why */ 'useState'](0)"],
+	])(
+		'reports a computed React %s that requires manual migration',
+		async (_, prefix, expression) => {
+			const root = project({
+				'View.tsx': `${prefix}\nexport const value = ${expression};\nexport function View() { return <b />; }`,
+			});
+			const [file] = (await runCodemod([root], { root, write: false, strong: true })).files;
+			expect(file.notes).toContainEqual({
+				rule: 'unsupported-api',
+				severity: 'error',
+				line: 2,
+				message:
+					'Computed React `useState` migration requires a direct call on a local React namespace import. Review the receiver and the call before migrating it.',
+			});
+			expect(file.code).toContain(expression);
+		},
+	);
+
 	it('uses the original ref allocator for refs mounted by a Strong component', async () => {
 		const root = project({
 			'View.tsx': `import * as React from 'react';

@@ -362,6 +362,17 @@ export function mapReactImport(
 	return null;
 }
 
+/** Computed calls can use React hook exports and the original ref allocator. */
+export function isComputedReactCall(name: string) {
+	return (
+		name === 'createRef' ||
+		(name.startsWith('use') &&
+			name !== 'useFormState' &&
+			name !== 'useFormStatus' &&
+			OCTANE_VALUES.has(name))
+	);
+}
+
 /** The Octane name for `React.<name>` in a type position. */
 export function mapQualifiedType(name: string): string | null {
 	if (name in QUALIFIED_TYPE_PREFERENCES) return QUALIFIED_TYPE_PREFERENCES[name];
