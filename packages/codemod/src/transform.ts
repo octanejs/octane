@@ -14,6 +14,7 @@ import { nativeSetupHook } from './local-react-hook.js';
 import {
 	componentTagOrExport,
 	inTypeNode,
+	localSymbol,
 	localUses,
 	scalar,
 	walkLocalValues,
@@ -98,6 +99,7 @@ const syntheticEventMembers = {
 
 export const MAP_PARAMETER_TDZ = 'map-parameter-tdz';
 export const MAP_PARAMETER_WRITE = 'map-parameter-write';
+export const MAP_CALLBACK_SCOPE = 'map-callback-scope';
 export const CONTEXT_ALIAS = 'context-path-alias';
 export const CONTEXT_PROVIDER_GETTER = 'context-provider-getter';
 
@@ -603,13 +605,29 @@ function reads(node: ts.Node, test: (name: ts.Identifier) => boolean): boolean {
 }
 
 /**
- * Whether a `function` body reads its own `this` or `arguments`.
+ * Whether moved code reads function context, including through a nested arrow.
  */
-function usesOwnThis(node: ts.Node): boolean {
-	if (node.kind === ts.SyntaxKind.ThisKeyword) return true;
-	if (ts.isIdentifier(node) && node.text === 'arguments') return true;
-	if (isFunctionLike(node) && !ts.isArrowFunction(node)) return false;
-	return ts.forEachChild(node, (child) => usesOwnThis(child) || undefined) === true;
+function readsFunctionContext(node: ts.Node, checker: ts.TypeChecker): boolean {
+	if (
+		node.kind === ts.SyntaxKind.ThisKeyword ||
+		(ts.isMetaProperty(node) && node.keywordToken === ts.SyntaxKind.NewKeyword)
+	)
+		return true;
+	if (ts.isIdentifier(node) && node.text === 'arguments') {
+		const symbol = localSymbol(checker, node);
+		return !!symbol && checker.isArgumentsSymbol(symbol);
+	}
+	if (isFunctionLike(node) && !ts.isArrowFunction(node)) {
+		const name = node.name;
+		// A computed method name runs before entering the method's own scope.
+		return (
+			!!name && ts.isComputedPropertyName(name) && readsFunctionContext(name.expression, checker)
+		);
+	}
+	if (ts.isTypeNode(node) && ts.isPartOfTypeNode(node)) return false;
+	return (
+		ts.forEachChild(node, (child) => readsFunctionContext(child, checker) || undefined) === true
+	);
 }
 
 /**
@@ -5935,15 +5953,26 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 */
 	forDirective(node: ts.CallExpression) {
 		const callee = node.expression;
+		if (!ts.isPropertyAccessExpression(callee) || callee.name.text !== 'map') return null;
+		const fn = node.arguments[0];
+		if (!fn) return null;
+		const callback = skipWrappers(fn);
+		// Even a retained arrow can observe the enclosing renderer's invocation.
 		if (
-			!ts.isPropertyAccessExpression(callee) ||
-			callee.name.text !== 'map' ||
-			node.arguments.length !== 1
+			ts.isArrowFunction(callback) &&
+			(ts.isBlock(callback.body) ? returnsJsx(callback.body.statements) : hasJsx(callback.body)) &&
+			readsFunctionContext(callback, this.checker)
 		) {
+			this.note(
+				MAP_CALLBACK_SCOPE,
+				'error',
+				node,
+				'The migrated component can change this arrow callback’s access to this, arguments, or new.target. Review these reads before porting the map.',
+			);
 			return null;
 		}
-		const fn = node.arguments[0];
-		if (!(ts.isArrowFunction(fn) || ts.isFunctionExpression(fn))) return null;
+		if (node.arguments.length !== 1 || !(ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)))
+			return null;
 		if (fn.parameters.length === 0 || fn.parameters.length > 2) return null;
 		if (fn.parameters.some((p) => p.initializer || p.dotDotDotToken)) return null;
 		const [item, index] = fn.parameters;
@@ -5968,8 +5997,8 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			)
 				return null;
 		}
-		// A `function` row sees its own `this` and `arguments`; an arm does not.
-		if (ts.isFunctionExpression(fn) && usesOwnThis(fn.body)) return null;
+		// Retaining an ordinary callback keeps its own function context.
+		if (ts.isFunctionExpression(fn) && readsFunctionContext(fn.body, this.checker)) return null;
 		// A row that writes an outer variable (`n++`) needs every row to run in
 		// order; an `@for` row can be skipped.
 		if (this.writesOuter(fn)) return null;
@@ -6065,6 +6094,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				'error',
 				node,
 				'An @for row would discard this callback’s promise or iterator. Review the retained .map() call for suspension or iteration.',
+			);
+			return null;
+		}
+		if (fn.parameters.some((parameter) => readsFunctionContext(parameter, this.checker))) {
+			this.note(
+				MAP_CALLBACK_SCOPE,
+				'error',
+				node,
+				'An @for row cannot preserve this callback’s access to this, arguments, or new.target. Keep the original map callback until these reads are migrated explicitly.',
 			);
 			return null;
 		}

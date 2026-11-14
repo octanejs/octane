@@ -1627,6 +1627,105 @@ export function Host({rows}: { rows: Row[] }) {
 	});
 
 	it.each([
+		['arguments[1]', 'function'],
+		['({ arguments }).arguments[1]', 'function'],
+		['Object.keys({ [arguments[1]]() {} })[0]', 'function'],
+		['this', 'function'],
+		['new.target === undefined', 'function'],
+		['(() => new.target)()', 'function'],
+		['arguments[0].label', 'arrow'],
+		['this?.label', 'arrow'],
+		['new.target === undefined', 'arrow'],
+		['arguments[0].label', 'arrow', 'body'],
+	])('blocks the map callback scope read %s (%s) before writing', async (value, kind, location) => {
+		const callback = kind === 'function' ? 'function ' : '';
+		const arrow = kind === 'arrow' ? ' => ' : ' ';
+		const parameter = location === 'body' ? 'label' : `label = ${value}`;
+		const rendered = location === 'body' ? value : 'label';
+		const originals = {
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			'Caller.tsx': "import { List } from './List.tsx'; export const Caller = () => <List />;",
+			'List.tsx': `export function List(props) {
+	return <ul>{[{}, {}].map(${callback}({ ${parameter} }, index)${arrow}{
+		return <li key="row">{String(${rendered})}</li>;
+	})}</ul>;
+}`,
+			'Control.tsx': `export function Control() {
+	return <ul>{[{ arguments: 'row' }].map(function ({
+		arguments: label = (function () { return new.target; })(),
+	}, index) {
+		return <li key={index}>{label}</li>;
+	})}</ul>;
+}`,
+		};
+		const root = project(originals);
+		const inputs = ['Caller.tsx', 'List.tsx', 'Control.tsx'].map((file) => path.join(root, file));
+		const options = { root, verify: false };
+		const note = expect.objectContaining({
+			rule: 'map-callback-scope',
+			severity: 'error',
+			message: expect.stringContaining(value.includes('new.target') ? 'new.target' : 'arguments'),
+		});
+		const preview = await runCodemod(inputs, { ...options, write: false });
+		const retained = preview.files.find(({ file }) => file === 'List.tsx');
+		expect(retained).toMatchObject({
+			code: expect.stringContaining(`.map(${callback}`),
+			notes: [note],
+		});
+		expect(retained?.code).toContain('key="row"');
+		expect(preview.files.find(({ file }) => file === 'Control.tsx')).toMatchObject({
+			code: expect.stringContaining('@for'),
+			notes: [],
+		});
+		const result = await runCodemod(inputs, options);
+		expect(result.files).toEqual([
+			expect.objectContaining({ file: 'List.tsx', changed: false, notes: [note] }),
+		]);
+		expect(fs.readdirSync(root).sort()).toEqual(Object.keys(originals).sort());
+		for (const [file, source] of Object.entries(originals))
+			expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(source);
+	});
+
+	it.each([
+		'[{}, {}].map((_, index) => <li key={String(index)}>{String(arguments.length)}</li>)',
+		'[{}, , {}].map((_) => <li key={0}>{String(arguments.length)}</li>)',
+		'[{}, {}].map((_, index, rows) => <li key={index}>{String(arguments.length)}</li>)',
+		'[{}].map((() => <li key={0}>{String(arguments.length)}</li>), undefined)',
+	])('blocks a retained JSX map from reading renderer arguments before writing', async (rows) => {
+		const original = `export function List() { return <ul>{${rows}}</ul>; }`;
+		const root = project({
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			'List.tsx': original,
+			'Control.tsx': `export function List() {
+	return <ul>{[{}, {}].map(function (_) {
+		return <li key={0}>{String(arguments.length)}</li>;
+	})}</ul>;
+}`,
+		});
+		fs.symlinkSync(
+			path.join(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+		);
+		const inputs = ['List.tsx', 'Control.tsx'].map((file) => path.join(root, file));
+		const note = expect.objectContaining({ rule: 'map-callback-scope', severity: 'error' });
+		const preview = await runCodemod(inputs, { root, write: false, verify: false });
+		expect(preview.files.find(({ file }) => file === 'List.tsx')).toMatchObject({
+			code: expect.stringContaining(rows),
+			notes: [note],
+		});
+		expect(preview.files.find(({ file }) => file === 'Control.tsx')).toMatchObject({
+			code: expect.stringContaining('.map(function'),
+			notes: [],
+		});
+		const result = await runCodemod(inputs, { root, verify: false });
+		expect(result.files).toEqual([
+			expect.objectContaining({ file: 'List.tsx', changed: false, notes: [note] }),
+		]);
+		expect(fs.readFileSync(inputs[0], 'utf8')).toBe(original);
+		expect(fs.existsSync(path.join(root, 'List.tsrx'))).toBe(false);
+	});
+
+	it.each([
 		['write', '[...[1]].map((item, index) => <li key={0}>{index++}</li>)'],
 		['tdz', '[...[{}]].map(({label=index}, index) => <li key={0}>{label}</li>)'],
 	])('blocks spread-array map rows with a parameter %s before writing', async (kind, rows) => {

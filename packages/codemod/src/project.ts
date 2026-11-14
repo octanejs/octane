@@ -25,6 +25,7 @@ import {
 	bind,
 	CONTEXT_ALIAS,
 	CONTEXT_PROVIDER_GETTER,
+	MAP_CALLBACK_SCOPE,
 	MAP_PARAMETER_TDZ,
 	MAP_PARAMETER_WRITE,
 	projectTypeAt,
@@ -1147,6 +1148,7 @@ export async function runCodemod(
 			(note) =>
 				note.rule === MAP_PARAMETER_WRITE ||
 				note.rule === MAP_PARAMETER_TDZ ||
+				note.rule === MAP_CALLBACK_SCOPE ||
 				note.rule === CONTEXT_ALIAS ||
 				note.rule === CONTEXT_PROVIDER_GETTER,
 		);
