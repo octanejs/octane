@@ -253,7 +253,7 @@ interface RendererRegionOwnerBridge {
 	readContext<T>(context: Context<T>): T;
 	routeError(error: unknown): boolean;
 	routeSuspense(thenable: PromiseLike<unknown>): boolean;
-	registerDispose(dispose: () => void): () => void;
+	registerDispose(dispose: () => void, root: Block): () => void;
 }
 ```
 
@@ -327,6 +327,9 @@ Lifecycle rules:
    setup cancels the pending disposal. Ref detach preserves the root and host
    for retries, and the reveal's layout effect republishes the island.
    These signals also work in React containers outside the document.
+   Insertion cleanup marks the registered roots inactive immediately so an
+   in-progress passive drain skips their remaining effects. Deferred teardown
+   can still run the cleanup returned by the effect that deleted its host.
    The Phase 0 spike instead used a connectivity check after ref detach and
    passive cleanup (`tests/react-hosted/lifecycle-discriminator.test.ts`).
 8. Keep the bridge active until Octane teardown finishes. During actual React
