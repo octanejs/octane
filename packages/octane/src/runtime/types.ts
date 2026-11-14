@@ -66,7 +66,7 @@ export interface RendererRegionOwnerBridge {
 	readContext<T>(context: Context<T>): T;
 	routeError(error: unknown): boolean;
 	routeSuspense(thenable: PromiseLike<unknown>): boolean;
-	registerDispose(dispose: () => void): () => void;
+	registerDispose(dispose: () => void, root: Block): () => void;
 	/**
 	 * Resolve a foreign (host-renderer) context object to a root-local Octane
 	 * mirror context. `use()`/`useContext()` consult this on their cold

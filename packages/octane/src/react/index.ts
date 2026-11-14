@@ -86,7 +86,7 @@ export type {
 	OctaneReactComponent,
 	OctaneRenderedNode,
 } from './shared.js';
-import { drainPassiveEffects } from '../runtime.js';
+import { drainPassiveEffects, type Block } from '../runtime.js';
 import { readNearestProviderValue } from './fiber-adapter.js';
 import { reactResourceHints } from './resource-hints.js';
 
@@ -191,7 +191,7 @@ class HostedIslandController {
 	private identifierPrefix = '';
 	private committed: TransportedChild | null = null;
 	private episode: PendingEpisode | null = null;
-	private disposers = new Set<() => void>();
+	private disposers = new Map<() => void, Block>();
 	/** Positive while mounted. Cleanup negates the generation before deferring disposal. */
 	private lifecycleGeneration = 0;
 	private attemptSuspended = false;
@@ -327,8 +327,9 @@ class HostedIslandController {
 		return true;
 	}
 
-	registerDispose(dispose: () => void): () => void {
-		this.disposers.add(dispose);
+	registerDispose(dispose: () => void, root: Block): () => void {
+		this.disposers.set(dispose, root);
+		if (this.lifecycleGeneration < 0) root.inactive = true;
 		this.rootLive = true;
 		return () => {
 			this.disposers.delete(dispose);
@@ -440,11 +441,18 @@ class HostedIslandController {
 
 	/** Insertion effects stay registered while React hides or probes the island. */
 	startLifetime(): () => void {
-		const generation = Math.abs(this.lifecycleGeneration) + 1;
+		const previous = this.lifecycleGeneration;
+		const generation = Math.abs(previous) + 1;
 		this.lifecycleGeneration = generation;
+		if (previous < 0) {
+			for (const root of this.disposers.values()) root.inactive = false;
+		}
 		return () => {
 			if (generation !== this.lifecycleGeneration) return;
 			this.lifecycleGeneration = -generation;
+			// The current Octane effect may still return a cleanup. Skip pending setups
+			// for this host immediately, then dispose after that callback finishes.
+			for (const root of this.disposers.values()) root.inactive = true;
 			queueMicrotask(() => {
 				if (this.disposed || this.lifecycleGeneration !== -generation) return;
 				try {
@@ -463,7 +471,7 @@ class HostedIslandController {
 		// runtime's teardown routing still consults it.
 		this.disposed = true;
 		try {
-			const disposers = [...this.disposers];
+			const disposers = [...this.disposers.keys()];
 			this.disposers.clear();
 			for (const dispose of disposers) dispose();
 		} finally {

@@ -622,7 +622,7 @@ function bindRendererRegionOwnerImpl(props: unknown): void {
 	// successive descriptor bridges share one committed lifecycle cell. The
 	// lookup is lazy so a disposer registered after a hydration pass is honored.
 	const dispose = () => DOM_ROOT_DISPOSERS.get(root)?.();
-	const release = bridge.registerDispose(dispose);
+	const release = bridge.registerDispose(dispose, root);
 	previous?.release();
 	const binding = { bridge, release };
 	RENDERER_REGION_DOM_BINDINGS.set(root, binding);
