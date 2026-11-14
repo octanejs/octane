@@ -34,6 +34,7 @@ import { h, mountReactHost, reactAct } from './_react-host.js';
 import { __setHostFiberAdapterEnabled } from '../../src/react/fiber-adapter.js';
 import {
 	SsrAsync as ClientSsrAsync,
+	SsrExternalStore as ClientSsrExternalStore,
 	SsrGreeting as ClientSsrGreeting,
 	SsrIdIsland as ClientSsrIdIsland,
 	SsrInline as ClientSsrInline,
@@ -41,6 +42,7 @@ import {
 	SsrLocallyGuarded as ClientSsrLocallyGuarded,
 	SsrStyled as ClientSsrStyled,
 	SsrThemed as ClientSsrThemed,
+	type ExternalStore,
 } from './_fixtures/ssr-islands.tsrx';
 
 afterEach(() => __setHostFiberAdapterEnabled(true));
@@ -188,6 +190,79 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 		await reactAct(async () => (serverButton as HTMLElement).click());
 		expect(host.querySelector('.ssr-count')?.textContent).toBe('clicks:1');
 		await mounted.unmount();
+	});
+
+	it('hydrates and subscribes to the nearest React-provided external store', async () => {
+		function createStore(serverValue: string, liveValue: string) {
+			const listeners = new Set<() => void>();
+			return {
+				listeners,
+				getServerSnapshot: vi.fn(() => serverValue),
+				getSnapshot: vi.fn(() => liveValue),
+				subscribe: vi.fn((notify: () => void) => {
+					listeners.add(notify);
+					return () => {
+						listeners.delete(notify);
+					};
+				}),
+				publish(value: string) {
+					liveValue = value;
+					for (const notify of listeners) notify();
+				},
+			};
+		}
+
+		const outer = createStore('outer server', 'outer live');
+		const inner = createStore('inner server', 'inner live');
+		const context = React.createContext<ExternalStore | null>(null);
+		const page = (island: React.ReactElement, store = inner) =>
+			h(context.Provider, { value: outer }, h(context.Provider, { value: store }, island));
+		const props = { context };
+		const container = document.createElement('div');
+		container.innerHTML = reactRenderToString(
+			page(h(OctaneCompatServer<typeof props>, { component: server['SsrExternalStore'], props })),
+		);
+		const output = container.querySelector('output');
+		expect(output?.textContent).toBe('inner server');
+		expect(inner.getServerSnapshot).toHaveBeenCalled();
+		expect(inner.getSnapshot).not.toHaveBeenCalled();
+		expect(inner.subscribe).not.toHaveBeenCalled();
+		inner.getServerSnapshot.mockClear();
+
+		const { hydrateRoot } = await import('react-dom/client');
+		const onRecoverableError = vi.fn();
+		const clientIsland = h(OctaneCompat<typeof props>, {
+			component: ClientSsrExternalStore,
+			props,
+		});
+		document.body.appendChild(container);
+		let reactRoot!: ReturnType<typeof hydrateRoot>;
+		try {
+			await octaneAct(() =>
+				reactAct(async () => {
+					reactRoot = hydrateRoot(container, page(clientIsland), { onRecoverableError });
+				}),
+			);
+			expect(onRecoverableError).not.toHaveBeenCalled();
+			expect(container.querySelector('output')).toBe(output);
+			expect(inner.getServerSnapshot).toHaveBeenCalled();
+			expect(output?.textContent).toBe('inner live');
+			expect(inner.listeners.size).toBe(1);
+			expect(outer.subscribe).not.toHaveBeenCalled();
+
+			await octaneAct(() => inner.publish('inner updated'));
+			expect(output?.textContent).toBe('inner updated');
+
+			await octaneAct(() => reactAct(async () => reactRoot.render(page(clientIsland, outer))));
+			expect(container.querySelector('output')).toBe(output);
+			expect(output?.textContent).toBe('outer live');
+			expect(inner.listeners.size).toBe(0);
+			expect(outer.listeners.size).toBe(1);
+		} finally {
+			if (reactRoot) await reactAct(async () => reactRoot.unmount());
+			container.remove();
+		}
+		expect(outer.listeners.size).toBe(0);
 	});
 
 	it('hydrates an inline island inside a paragraph and preserves its DOM across updates', async () => {
