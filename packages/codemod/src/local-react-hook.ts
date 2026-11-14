@@ -354,7 +354,7 @@ function privateContextCall(
 export function directRendererCalls(
 	sf: ts.SourceFile,
 	checker: ts.TypeChecker,
-	module: 'react' | 'react-dom',
+	module: 'react' | 'react-dom' | 'react-intl',
 	accepts: (name: string) => boolean,
 	privateContextExports?: Set<string>,
 ) {
@@ -372,12 +372,18 @@ export function directRendererCalls(
 			fn.parameters.some(
 				(p) =>
 					!ts.isIdentifier(p.name) ||
-					(p.initializer && (module !== 'react' || !scalarLiteral(skipWrappers(p.initializer)))),
+					(p.initializer &&
+						(module === 'react-dom' || !scalarLiteral(skipWrappers(p.initializer)))),
 			)
 		)
 			continue;
 		const first = firstRendererCall(fn);
 		if (!first) continue;
+		if (
+			module === 'react-intl' &&
+			(first.ambient || ts.isOptionalChain(first.call) || first.call.arguments.length)
+		)
+			continue;
 		const name = rendererImport(first.callee, checker, module);
 		const direct = name && accepts(name) ? name : undefined;
 		if (!direct && !privateContextExports) continue;
