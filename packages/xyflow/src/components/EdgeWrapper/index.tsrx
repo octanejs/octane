@@ -1,3 +1,4 @@
+import type { AllowUndefined } from '../../types/allow-undefined-props';
 import { useState, useMemo, useRef, useCallback, memo } from 'octane';
 import type { KeyboardEvent, MouseEvent as ReactMouseEvent } from '../../react-shim.js';
 import type { Octane } from 'octane/jsx-runtime';
@@ -37,7 +38,21 @@ function EdgeWrapper<EdgeType extends Edge = Edge>({
 	noPanClassName,
 	onError,
 	disableKeyboardA11y,
-}: EdgeWrapperProps<EdgeType>): Octane.JSX.Element | null {
+}: AllowUndefined<
+	EdgeWrapperProps<EdgeType>,
+	| 'onClick'
+	| 'onDoubleClick'
+	| 'onContextMenu'
+	| 'onMouseEnter'
+	| 'onMouseMove'
+	| 'onMouseLeave'
+	| 'onReconnect'
+	| 'onReconnectStart'
+	| 'onReconnectEnd'
+	| 'reconnectRadius'
+	| 'edgeTypes'
+	| 'onError'
+>): Octane.JSX.Element | null {
 	let edge = useStore((s) => s.edgeLookup.get(id)!) as EdgeType;
 	const defaultEdgeOptions = useStore((s) => s.defaultEdgeOptions);
 	edge = defaultEdgeOptions ? { ...defaultEdgeOptions, ...edge } : edge;
