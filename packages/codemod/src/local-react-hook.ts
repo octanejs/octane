@@ -364,7 +364,11 @@ export function directRendererCalls(
 			fn.asteriskToken ||
 			fn.modifiers?.length !== 1 ||
 			fn.modifiers[0].kind !== ts.SyntaxKind.ExportKeyword ||
-			fn.parameters.some((p) => !ts.isIdentifier(p.name) || p.initializer)
+			fn.parameters.some(
+				(p) =>
+					!ts.isIdentifier(p.name) ||
+					(p.initializer && (module !== 'react' || !scalarLiteral(skipWrappers(p.initializer)))),
+			)
 		)
 			continue;
 		const first = firstRendererCall(fn);
