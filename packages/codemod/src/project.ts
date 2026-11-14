@@ -1343,6 +1343,34 @@ export async function runCodemod(
 		if (!renames.size || linkedRename(file) || conflicts.has(file)) continue;
 		const result = byFile.get(file);
 		const selected = renames.has(file);
+		const specifier = 'octane/react/server';
+		const originalServerHost = () =>
+			automaticReactJsx(file) &&
+			originalOctaneBridge(file, specifier) &&
+			originalReactEntry(file, 'react/jsx-runtime');
+		const hasServerImport = source.includes(specifier);
+		if (
+			selected &&
+			result &&
+			(hasServerImport ||
+				(source.includes('\\') &&
+					ts.preProcessFile(source).importedFiles.some((entry) => entry.fileName === specifier))) &&
+			originalServerHost()
+		) {
+			const [edge] = hostedServerComponents(file, source);
+			if (edge) {
+				const note: Note = {
+					rule: 'react-compat',
+					severity: 'error',
+					line: edge.line,
+					message:
+						'Keep the authored OctaneCompat host in React. Exclude this module from the migration.',
+				};
+				if (write)
+					return blockedWrite(root, unchangedFile(result.file, source, note), compiler?.from);
+				result.notes.push(note);
+			}
+		}
 		const paths = rewriteModulePaths(
 			selected ? source : (result?.code ?? source),
 			file,
@@ -1419,13 +1447,7 @@ export async function runCodemod(
 				leaf.notes.push({ ...note, line: 1 });
 			}
 		}
-		if (
-			!edited.has(file) &&
-			source.includes('octane/react/server') &&
-			automaticReactJsx(file) &&
-			originalOctaneBridge(file, 'octane/react/server') &&
-			originalReactEntry(file, 'react/jsx-runtime')
-		) {
+		if (!edited.has(file) && hasServerImport && originalServerHost()) {
 			for (const edge of hostedServerComponents(file, source)) {
 				const match = edge.module.startsWith('.') && renamed(file, edge.module);
 				if (!match) continue;
