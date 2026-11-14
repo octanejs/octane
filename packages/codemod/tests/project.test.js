@@ -1529,6 +1529,67 @@ export function useLabel() { const later = () => useState('ready'); return 'read
 	});
 
 	it.each([false, true])(
+		'reports direct retained React arrow hooks (projectTypes=%s)',
+		async (projectTypes) => {
+			const context =
+				"import {createContext, useContext} from 'react'; const Context = createContext('value'); ";
+			const samples = {
+				Block:
+					context +
+					'export const useLabel = (): string => { const label = useContext(Context); return label; };',
+				Concise: context + 'export const useLabel = () => useContext(Context);',
+				Declared: context + 'export function useLabel() { return useContext(Context); }',
+				Deferred: context + 'export const useLabel = () => () => useContext(Context);',
+				Mutable: context + 'export let useLabel = () => useContext(Context);',
+				Async: context + 'export const useLabel = async () => useContext(Context);',
+				Optional: context + 'export const useLabel = () => useContext?.(Context);',
+				Shadowed: context + 'export const useLabel = (useContext = 0) => useContext(Context);',
+			};
+			const files = {
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+			};
+			for (const [name, helper] of Object.entries(samples)) {
+				files['reader-' + name + '.ts'] = helper;
+				files[name + '.tsx'] =
+					`import {useLabel} from './reader-${name}'; export function Panel() { const label = useLabel(); return <output>{label}</output>; }`;
+			}
+			const root = project(files);
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules'),
+				path.join(root, 'node_modules'),
+				'dir',
+			);
+			const inputs = Object.keys(samples).map((name) => path.join(root, name + '.tsx'));
+			const result = await runCodemod(inputs, {
+				root,
+				projectTypes,
+				strong: true,
+				verify: true,
+				write: false,
+			});
+			const diagnosed = result.files.filter((item) =>
+				item.notes.some(
+					(note) =>
+						note.rule === 'bindings' &&
+						note.severity === 'error' &&
+						note.message.includes("calls React's useContext"),
+				),
+			);
+			expect(diagnosed.map((item) => item.file)).toEqual([
+				'Block.tsx',
+				'Concise.tsx',
+				'Declared.tsx',
+			]);
+			for (const item of diagnosed) {
+				expect(item.strong).toBe(true);
+				expect(item.code).toContain("from './reader-");
+			}
+		},
+	);
+
+	it.each([false, true])(
 		'reports retained local hooks before native component output (projectTypes=%s)',
 		async (projectTypes) => {
 			const helper = `import { useState } from 'react';
@@ -2261,6 +2322,10 @@ root.render(<Leaf label="label" />);`,
 				'label: string) {',
 				"label: string, ReactDOM: typeof import('react-dom/client')) {",
 			),
+			'Arrow.tsx': app('./arrow-leaf'),
+			'arrow-leaf.ts': leaf
+				.replace('export function Leaf(', 'export const Leaf = (')
+				.replace(') {', ') => {'),
 			'UnselectedNative.tsx': app('./native.tsrx'),
 			'native.tsrx': 'export function Leaf({label}: { label: string }) @{ <i>{label}</i> }',
 			'Selected.tsx': app('./selected-leaf'),
@@ -2287,6 +2352,7 @@ root.render(<Leaf label="label" />);`,
 		);
 		const message = expect.stringMatching(/Leaf.*React.*useState/);
 		expect(blocked).toEqual([
+			['Arrow.tsx', 5, message],
 			['Inline.tsx', 4, message],
 			['Named.tsx', 5, message],
 			['Namespace.tsx', 5, message],
