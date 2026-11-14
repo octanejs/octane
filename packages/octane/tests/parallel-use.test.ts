@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { prerender } from 'octane/static';
+import { renderToString } from 'octane/server';
 import { flushSync, hydrateRoot } from '../src/index';
 import { mount, act, flushEffects } from './_helpers';
 import { loadCompiledFixtureSource } from './_server-fixture';
@@ -31,6 +32,83 @@ import {
 } from './_fixtures/parallel-use.tsrx';
 
 // Runtime behavior of the compiler's unconditional parallel-use pipeline.
+
+describe('ordinary functions named use', () => {
+	const compileOptions = { hmr: false, dev: false };
+
+	it.each(['client', 'server'] as const)(
+		'preserves call order and arguments for an imported alias in %s',
+		(mode) => {
+			const calls: string[] = [];
+			const { App } = loadCompiledFixtureSource(
+				`
+				import { format as use } from './formatter';
+				export function App({ read }) @{
+					const first = use(read('a'));
+					const second = use(read('b'));
+					<output>{(first + ',' + second) as string}</output>
+				}
+				`,
+				{
+					id: 'ordinary-use-import.tsrx',
+					mode,
+					compileOptions,
+					runtimeModules: {
+						'./formatter': {
+							format(...args: string[]) {
+								calls.push('call:' + args.join(':'));
+								return args[0].toUpperCase();
+							},
+						},
+					},
+				},
+			);
+			const props = {
+				read(label: string) {
+					calls.push('arg:' + label);
+					return label;
+				},
+			};
+			if (mode === 'server') {
+				expect(renderToString(App, props).html).toContain('<output>A,B</output>');
+			} else {
+				const root = mount(App, props);
+				try {
+					expect(root.find('output').textContent).toBe('A,B');
+				} finally {
+					root.unmount();
+				}
+			}
+			expect(calls).toEqual(['arg:a', 'call:a', 'arg:b', 'call:b']);
+		},
+	);
+
+	it.each([
+		["import { createContext, use } from 'octane';", 'use'],
+		["import { createContext, use as read } from 'octane';", 'read'],
+		["import { createContext } from 'octane';", 'use'],
+	])('preserves the builtin and a local call in SSR (%s)', (imports, call) => {
+		const { App } = loadCompiledFixtureSource(
+			`
+			${imports}
+			const Context = createContext('current');
+			function Local({ use }) @{
+				<output>{use('local') as string}</output>
+			}
+			export function App({ format }) @{
+				const current = ${call}(Context);
+				<section><p>{current as string}</p><Local use={format} /></section>
+			}
+			`,
+			{ id: 'builtin-use-provenance.tsrx', mode: 'server', compileOptions },
+		);
+		const { html } = renderToString(App, {
+			format: (...args: unknown[]) => args.map(String).join(':'),
+		});
+		expect(html).toContain('<p>current</p>');
+		expect(html).toContain('<output>local</output>');
+	});
+});
 
 interface Deferred<T> {
 	promise: Promise<T>;
