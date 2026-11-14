@@ -1600,12 +1600,9 @@ export async function runCodemod(
 					(edge.renderer !== 'JSX' ||
 						!/^\.{1,2}\//.test(edge.module) ||
 						/[!%?#\\]/.test(edge.module) ||
-						path.extname(edge.module) ||
 						config?.rootDirs ||
 						config?.moduleSuffixes?.some(Boolean) ||
-						!(match.file === original + '.tsx' || match.file === original + '.jsx') ||
-						hasModuleSibling(match.file) ||
-						['', '.json', '.tsrx'].some((ext) => fs.existsSync(original + ext)))
+						!unambiguousJsxPath(match.file, original))
 				)
 					continue;
 				if (!automaticReactJsx(match.file) || !originalReactEntry(match.file, 'react/jsx-runtime'))
@@ -2103,6 +2100,22 @@ function hasModuleSibling(file: string) {
 				(ext) => base + ext !== file && fs.existsSync(base + ext),
 			),
 		) || fs.existsSync(path.join(path.basename(stem) === 'index' ? dir : stem, 'package.json'))
+	);
+}
+
+/** Accept only a direct JSX file or directory index without a competing entry. */
+function unambiguousJsxPath(file: string, original: string) {
+	if (!/\.[jt]sx$/.test(file)) return false;
+	const stem = file.slice(0, -4);
+	const index = stem === path.join(original, 'index');
+	if (stem !== original && !index) return false;
+	const exists = (name: string) => fs.lstatSync(name, { throwIfNoEntry: false });
+	if (index ? !exists(original)?.isDirectory() : exists(original)) return false;
+	return (
+		!hasModuleSibling(file) &&
+		!exists(original + '.json') &&
+		!exists(original + '.tsrx') &&
+		(!index || (!exists(stem) && !exists(stem + '.json') && !exists(stem + '.tsrx')))
 	);
 }
 
