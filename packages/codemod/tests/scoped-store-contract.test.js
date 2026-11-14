@@ -401,7 +401,17 @@ it('warns at a direct migrated server call that needs a standalone store provide
 		'app/src/deferred.tsx':
 			rootImport +
 			`
-			export function render() { return renderToString(<Pane />); }`,
+			export function render() { return (renderToString((<Pane />))); }
+			export function renderPlain() { return renderToString(<Plain />); }
+			export function renderKeyed() { return renderToString(<Pane key="deferred" />); }
+			export function shadowed(renderToString: (value: unknown) => string) {
+				return renderToString(<Pane />);
+			}`,
+		'app/src/nested.tsrx': `import { render } from './deferred.tsx';
+			export function Nested() @{
+				const html = render();
+				<p>{html as string}</p>
+			}`,
 	});
 	const result = await runCodemod(
 		['root', 'pane', 'anonymous', 'deferred'].map((name) => path.join(app, 'src', name + '.tsx')),
@@ -453,12 +463,34 @@ it('warns at a direct migrated server call that needs a standalone store provide
 			line: 13,
 			message: expect.stringMatching(/migrated Props.*NativeStoreProvider/),
 		}),
+		expect.objectContaining({
+			file: 'src/deferred.tsx',
+			line: 4,
+			message: expect.stringMatching(
+				/If this server call runs standalone.*migrated Pane.*NativeStoreProvider/,
+			),
+		}),
 	]);
 	const root = fs.readFileSync(path.join(app, 'src/root.tsrx'), 'utf8');
 	expect(root).toContain('renderToString(Props, { label: "root" }).html');
 	const hosted = fs.readFileSync(path.join(app, 'src/hosted.tsx'), 'utf8');
 	expect(hosted).toContain("from './pane.tsrx'");
 	expect(hosted).toContain('<OctaneCompat component={Pane} />');
+	const { render, renderPlain, renderHosted } = await bundleRuntime(
+		app,
+		'server',
+		`import { createElement as h } from 'react';
+		import { renderToString } from 'react-dom/server';
+		import { OctaneCompat } from 'octane/react/server';
+		import { current } from '../observer/renderer';
+		import { Nested } from './src/nested.tsrx';
+		export { render, renderPlain } from './src/deferred.tsrx';
+		export const renderHosted = () => renderToString(h(current, { value: 42 },
+			h(OctaneCompat, { component: Nested })));`,
+	);
+	expect(render).toThrow(/useContext|errors\/12/);
+	expect(renderPlain()).toContain('<b>plain</b>');
+	expect(renderHosted()).toContain('&lt;b&gt;42&lt;/b&gt;');
 });
 
 it('warns at existing standalone client roots when the migrated hook reads context', async () => {

@@ -473,7 +473,7 @@ export function reactServerComponents(
 	file: string,
 	source: string,
 	original: (module: 'react' | 'react/jsx-runtime') => boolean,
-	topLevel = false,
+	selected = false,
 ) {
 	const { sf, checker } = bind(file, source);
 	const edges: { module: string; name: string; line: number }[] = [];
@@ -498,7 +498,7 @@ export function reactServerComponents(
 					jsx &&
 					(!ts.isIdentifier(jsx.tagName) || /^[A-Z][\w$]*$/.test(jsx.tagName.text)) &&
 					(jsx.attributes.properties.length === 0 ||
-						(topLevel &&
+						(selected &&
 							ts.isJsxSelfClosingElement(jsx) &&
 							staticReactProps(jsx) !== null &&
 							!jsx.attributes.properties.some(
@@ -530,17 +530,28 @@ export function reactServerComponents(
 					});
 			}
 		}
-		if (!topLevel) ts.forEachChild(node, visit);
+		if (!selected) ts.forEachChild(node, visit);
 	}
-	if (topLevel) {
+	if (selected) {
+		function visitDirectRoot(expression: ts.Expression | undefined) {
+			const call = expression && skipParens(expression);
+			if (!call || !ts.isCallExpression(call)) return;
+			const argument = call.arguments[0] && skipParens(call.arguments[0]);
+			if (argument && ts.isJsxSelfClosingElement(argument) && ts.isIdentifier(argument.tagName))
+				visit(call);
+		}
 		for (const statement of sf.statements) {
-			if (!ts.isVariableStatement(statement)) continue;
-			for (const declaration of statement.declarationList.declarations) {
-				const call = declaration.initializer && skipParens(declaration.initializer);
-				if (!call || !ts.isCallExpression(call)) continue;
-				const argument = call.arguments[0] && skipParens(call.arguments[0]);
-				if (argument && ts.isJsxSelfClosingElement(argument) && ts.isIdentifier(argument.tagName))
-					visit(call);
+			if (ts.isVariableStatement(statement)) {
+				for (const declaration of statement.declarationList.declarations)
+					visitDirectRoot(declaration.initializer);
+			} else if (
+				ts.isFunctionDeclaration(statement) &&
+				statement.body &&
+				!statement.asteriskToken &&
+				!statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword)
+			) {
+				for (const bodyStatement of statement.body.statements)
+					if (ts.isReturnStatement(bodyStatement)) visitDirectRoot(bodyStatement.expression);
 			}
 		}
 	} else visit(sf);
