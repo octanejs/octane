@@ -27,6 +27,8 @@ export interface TransformOptions {
 	types?: { sourceFile: ts.SourceFile; checker: ts.TypeChecker };
 	/** The new spelling of an import specifier (a renamed module, a binding package), or null to keep it. */
 	resolveSpecifier?(specifier: string): string | null;
+	/** The catalog export names for a partial binding, when known. */
+	bindingExports?(from: string, to: string): ReadonlySet<string> | undefined;
 	/** The issuer resolves the original installed React runtime and types. */
 	originalReact?: boolean;
 	/** A React DOM resource hint called by an imported plain TypeScript initializer. */

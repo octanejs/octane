@@ -3426,6 +3426,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (!ts.isStringLiteral(specifier)) return null;
 		const next = this.resolve(specifier.text);
 		if (next === null || next === specifier.text) return null;
+		const available = this.options.bindingExports?.(specifier.text, next);
+		if (available && !this.hasBindingExports(node, next, available)) return null;
 		const namespace = radixNamespace(specifier.text);
 		if (namespace !== null) {
 			// A re-export, `import()`, or type of the package would be the whole binding.
@@ -3457,6 +3459,62 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		}
 		this.count(RULE.import);
 		return this.replaceSpecifier(node, specifier, next);
+	}
+
+	/** Check export names against the catalog without guessing at a whole namespace. */
+	hasBindingExports(node: ts.Node, binding: string, available: ReadonlySet<string>) {
+		const check = (site: ts.Node, name?: string) => {
+			if (name !== undefined && available.has(name)) return true;
+			this.note(
+				RULE.binding,
+				'error',
+				site,
+				name === undefined
+					? `\`${binding}\` exposes a subset of the original module. Import specific supported exports before migrating this reference.`
+					: `\`${binding}\` has no \`${name}\` export.`,
+			);
+			return false;
+		};
+		const checkNamed = (elements: readonly (ts.ImportSpecifier | ts.ExportSpecifier)[]) => {
+			if (!elements.length) return check(node);
+			let supported = true;
+			for (const element of elements) {
+				if (!check(element, (element.propertyName ?? element.name).text)) supported = false;
+			}
+			return supported;
+		};
+		if (ts.isImportDeclaration(node)) {
+			const clause = node.importClause;
+			if (!clause) return check(node);
+			if (clause.name) return check(clause.name, 'default');
+			const bindings = clause.namedBindings;
+			if (!bindings) return check(node);
+			if (ts.isNamedImports(bindings)) return checkNamed(bindings.elements);
+			if ((this.source.includes('eval') || this.source.includes('\\u')) && hasEval(this.sf))
+				return check(bindings);
+			return this.localUses(bindings.name).every((ref) => {
+				const parent = ref.parent;
+				if (ts.isPropertyAccessExpression(parent) && parent.expression === ref)
+					return check(parent.name, parent.name.text);
+				if (ts.isQualifiedName(parent) && parent.left === ref)
+					return check(parent.right, parent.right.text);
+				if (
+					ts.isElementAccessExpression(parent) &&
+					parent.expression === ref &&
+					ts.isStringLiteralLike(parent.argumentExpression)
+				)
+					return check(parent.argumentExpression, parent.argumentExpression.text);
+				return check(ref);
+			});
+		}
+		if (ts.isExportDeclaration(node) && node.exportClause && ts.isNamedExports(node.exportClause))
+			return checkNamed(node.exportClause.elements);
+		if (ts.isImportTypeNode(node)) {
+			let name = node.qualifier;
+			while (name && ts.isQualifiedName(name)) name = name.left;
+			if (name) return check(name, name.text);
+		}
+		return check(node);
 	}
 
 	/**
