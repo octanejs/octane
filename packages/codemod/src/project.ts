@@ -704,7 +704,9 @@ export async function runCodemod(
 	const generatedHelpers = new Map<string, string>();
 	const svgHelpers = new Set<string>();
 	const svgHelper = path.join(helperDir, 'octane-path-svg.ts');
-	const svgAssets = new Map<string, boolean>();
+	// Null marks unsupported geometry. A parsed asset records whether its root declares xmlns.
+	const svgAssets = new Map<string, boolean | null>();
+	const svgNamespaceWarnings = new Set<string>();
 	let svgHelperCode: string | undefined;
 	function nativeSvgModule(asset: string, errors: Set<string>, color?: string): string | null {
 		if (
@@ -713,16 +715,18 @@ export async function runCodemod(
 			/[!%?#]/.test(path.relative(root, asset))
 		)
 			return null;
-		if (!svgAssets.has(asset)) {
+		let hasXmlns = svgAssets.get(asset);
+		if (hasXmlns === undefined) {
 			const stat = fs.lstatSync(asset, { throwIfNoEntry: false });
-			svgAssets.set(
-				asset,
-				!!stat?.isFile() &&
-					fs.realpathSync(asset) === path.join(fs.realpathSync(root), path.relative(root, asset)) &&
-					!!parseStaticSvg(fs.readFileSync(asset, 'utf8')),
-			);
+			const svg =
+				stat?.isFile() &&
+				fs.realpathSync(asset) === path.join(fs.realpathSync(root), path.relative(root, asset))
+					? parseStaticSvg(fs.readFileSync(asset, 'utf8'))
+					: null;
+			hasXmlns = svg ? Object.hasOwn(svg.root, 'xmlns') : null;
+			svgAssets.set(asset, hasXmlns);
 		}
-		if (!svgAssets.get(asset)) return null;
+		if (hasXmlns === null) return null;
 		svgHelperCode ??=
 			fs.readFileSync(new URL('../templates/octane-path-svg.ts', import.meta.url), 'utf8') +
 			'\n' +
@@ -752,6 +756,7 @@ export async function runCodemod(
 		generatedHelpers.set(sidecar, code);
 		svgHelpers.add(svgHelper);
 		svgHelpers.add(sidecar);
+		if (hasXmlns) svgNamespaceWarnings.add(asset);
 		return sidecar;
 	}
 	function pathSvgAdapter(file: string, specifier: string, errors: Set<string>, color?: string) {
@@ -1476,6 +1481,16 @@ export async function runCodemod(
 			strongFixes: [],
 		});
 	}
+	for (const asset of svgNamespaceWarnings)
+		results.push(
+			unchangedFile(path.relative(root, asset), '', {
+				rule: 'svg-paths',
+				severity: 'warning',
+				line: 1,
+				message:
+					'If the React SVG loader forwards the authored xmlns prop, a fresh Octane mount places it in the XMLNS namespace while React uses the null namespace. Review code that reads the attribute namespace.',
+			}),
+		);
 	if (write) for (const [page, next] of pages) fs.writeFileSync(page, next);
 	const html = [...pages.keys()].map((page) => path.relative(root, page));
 	const dependencies = addBindings(root, packages, write);
