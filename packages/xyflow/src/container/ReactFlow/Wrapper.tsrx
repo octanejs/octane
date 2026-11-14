@@ -22,18 +22,18 @@ export function Wrapper({
 	zIndexMode,
 }: {
 	children: OctaneNode;
-	nodes?: Node[];
-	edges?: Edge[];
+	nodes?: Node[] | undefined;
+	edges?: Edge[] | undefined;
 	defaultNodes?: Node[];
 	defaultEdges?: Edge[];
-	width?: number;
-	height?: number;
-	fitView?: boolean;
-	fitViewOptions?: FitViewOptions;
+	width?: number | undefined;
+	height?: number | undefined;
+	fitView?: boolean | undefined;
+	fitViewOptions?: FitViewOptions | undefined;
 	minZoom?: number;
 	maxZoom?: number;
 	nodeOrigin?: NodeOrigin;
-	nodeExtent?: CoordinateExtent;
+	nodeExtent?: CoordinateExtent | undefined;
 	zIndexMode?: ZIndexMode;
 }) {
 	const isWrapped = useContext(StoreContext);
