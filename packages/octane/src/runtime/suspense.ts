@@ -69,6 +69,7 @@ import {
 	TRANSITION_JOURNAL,
 	TRANSITION_JOURNAL_BAGS,
 	RENDERER_REGION_OWNER_COUNT,
+	HOSTED_REF_DRIVER,
 } from './drivers.js';
 import {
 	handOverSignalRetryScope,
@@ -2511,6 +2512,9 @@ function deactivateSuspensePrimary(
 	)
 		return;
 	if (state.detachedRefs === null) {
+		// Claim skipped hosted refs only when this hide commits. A speculative
+		// fallback can roll back and leave teardown responsible for those refs.
+		if (HOSTED_REF_DRIVER) HOSTED_REF_DRIVER.discardSubtree(persistent, uncommittedRefs);
 		state.detachedRefs = [];
 		// Nested hidden primaries already own their detach. Current visible arms
 		// and the canceled-attach index prevent double detaches or phantom refs.
