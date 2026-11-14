@@ -6337,11 +6337,21 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				)
 			);
 		};
-		// A predictable truth value alone does not prove the expression completes.
-		const completingLiteralCondition = (expression: ts.Expression) => {
+		const branchCondition = (expression: ts.Expression) => {
 			const value = skipWrappers(expression);
-			if (ts.isVoidExpression(value))
-				return rowKeyLiteral(value.expression) ? 'nullish' : undefined;
+			if (ts.isVoidExpression(value)) return safePrefix(value.expression) ? 'nullish' : undefined;
+			// A fresh array with literal spreads is truthy if its iterators finish.
+			// Branch detection can use that result even when iteration can throw.
+			if (
+				ts.isArrayLiteralExpression(value) &&
+				value.elements.every((element) => {
+					if (!ts.isSpreadElement(element))
+						return ts.isOmittedExpression(element) || safePrefix(element);
+					const source = skipWrappers(element.expression);
+					return ts.isArrayLiteralExpression(source) && safePrefix(source);
+				})
+			)
+				return 'truthy';
 			if (!safePrefix(value)) return undefined;
 			// For the allowed unary + and -, the operand has the same truthiness.
 			const literal = ts.isPrefixUnaryExpression(value) ? skipWrappers(value.operand) : value;
@@ -6374,7 +6384,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (ts.isPropertyAccessExpression(read)) return readsOrdinal(read.expression);
 			if (ts.isConditionalExpression(read)) {
 				if (readsOrdinal(read.condition)) return true;
-				const condition = completingLiteralCondition(read.condition);
+				const condition = branchCondition(read.condition);
 				return (
 					condition !== undefined &&
 					readsOrdinal(condition === 'truthy' ? read.whenTrue : read.whenFalse)
@@ -6453,7 +6463,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				op === ts.SyntaxKind.QuestionQuestionToken
 			) {
 				if (readsOrdinal(read.left)) return true;
-				const condition = completingLiteralCondition(read.left);
+				const condition = branchCondition(read.left);
 				if (condition === undefined) return false;
 				const reachesRight =
 					op === ts.SyntaxKind.AmpersandAmpersandToken
