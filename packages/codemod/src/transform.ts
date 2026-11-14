@@ -6252,6 +6252,14 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					readsOrdinal(read.operand)
 				);
 			if (ts.isPropertyAccessExpression(read)) return readsOrdinal(read.expression);
+			if (ts.isTemplateExpression(read)) {
+				for (const { expression } of read.templateSpans) {
+					if (readsOrdinal(expression)) return true;
+					// Each interpolation is coerced to text before the next one runs.
+					if (!rowKeyLiteral(expression)) return false;
+				}
+				return false;
+			}
 			if (ts.isArrayLiteralExpression(read))
 				return readsInOrder(read.elements.filter((element) => !ts.isOmittedExpression(element)));
 			if (ts.isObjectLiteralExpression(read)) {
