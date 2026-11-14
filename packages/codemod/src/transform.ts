@@ -6689,6 +6689,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		const safePrefix = (expr: ts.Expression): boolean => {
 			const value = skipWrappers(expr);
 			if (rowKeyLiteral(value)) return true;
+			if (ts.isVoidExpression(value)) return safePrefix(value.expression);
 			if (ts.isBinaryExpression(value))
 				return (
 					eagerBinary(value.operatorToken.kind) && safePrefix(value.left) && safePrefix(value.right)
@@ -6711,7 +6712,6 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		};
 		const branchCondition = (expression: ts.Expression) => {
 			const value = skipWrappers(expression);
-			if (ts.isVoidExpression(value)) return safePrefix(value.expression) ? 'nullish' : undefined;
 			// A fresh array with literal spreads is truthy if its iterators finish.
 			// Branch detection can use that result even when iteration can throw.
 			if (
@@ -6795,11 +6795,11 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (ts.isElementAccessExpression(read)) {
 				if (readsOrdinal(read.expression)) return true;
 				const receiver = skipWrappers(read.expression);
-				// A safe comma expression can still produce null.
+				// A safe prefix can still produce a nullish receiver.
 				return (
 					safePrefix(receiver) &&
 					(!ts.isOptionalChain(read) ||
-						(receiver.kind !== ts.SyntaxKind.NullKeyword && !ts.isBinaryExpression(receiver))) &&
+						(!ts.isBinaryExpression(receiver) && literalCondition(receiver) !== 'nullish')) &&
 					readsOrdinal(read.argumentExpression)
 				);
 			}
