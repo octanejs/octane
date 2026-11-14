@@ -3,10 +3,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { runCodemod } from '../dist/index.js';
-import { bundleRuntime } from './bundle-runtime.js';
+import { bundleRuntime, installDOM } from './bundle-runtime.js';
 
 const previous = fs.readFileSync(
 	new URL('./fixtures/react-intl/previous-helper.tsrx', import.meta.url),
+	'utf8',
+);
+const previousValues = fs.readFileSync(
+	new URL('./fixtures/react-intl/previous-values-helper.tsrx', import.meta.url),
 	'utf8',
 );
 const current = fs.readFileSync(new URL('../templates/react-intl.tsrx', import.meta.url), 'utf8');
@@ -185,43 +189,144 @@ it('uses shorthand project types for stable exported scalar props with external 
 	);
 });
 
-it('previews and atomically upgrades the released helper while sharing context with an existing consumer', async () => {
-	const { src, helper, input } = project();
-	fs.writeFileSync(helper, previous);
-	fs.chmodSync(helper, 0o640);
-	const previousInode = path.join(root, 'original-helper');
-	fs.linkSync(helper, previousInode);
-	const preview = await runCodemod([input], { root, strong: true, write: false });
-	expect(preview.files.find((f) => f.rules['react-intl-adapter'])).toMatchObject({
-		changed: true,
-		output: 'src/octane-react-intl.tsrx',
-		code: current,
-	});
-	expect(fs.readFileSync(helper, 'utf8')).toBe(previous);
-	const result = await runCodemod([input], { root, strong: true });
-	expect(result.files.flatMap((f) => f.notes).filter((n) => n.severity === 'error')).toEqual([
-		nativeOwnership,
-	]);
-	expect(fs.readFileSync(helper, 'utf8')).toBe(current);
-	expect(fs.readFileSync(previousInode, 'utf8')).toBe(previous);
-	expect(fs.statSync(helper).mode & 0o777).toBe(fs.statSync(previousInode).mode & 0o777);
-	expect(fs.readFileSync(path.join(src, 'PreviouslyMigrated.tsrx'), 'utf8')).toBe(provider);
-	expect((await runCodemod([src], { root, strong: true })).files.filter((f) => f.changed)).toEqual(
-		[],
-	);
+it.each([
+	['original', previous],
+	['with values', previousValues],
+])(
+	'upgrades the released helper %s while sharing context with an existing consumer',
+	async (_, previous) => {
+		const { src, helper, input } = project();
+		fs.writeFileSync(helper, previous);
+		fs.chmodSync(helper, 0o640);
+		const previousInode = path.join(root, 'original-helper');
+		fs.linkSync(helper, previousInode);
+		const preview = await runCodemod([input], { root, strong: true, write: false });
+		expect(preview.files.find((f) => f.rules['react-intl-adapter'])).toMatchObject({
+			changed: true,
+			output: 'src/octane-react-intl.tsrx',
+			code: current,
+		});
+		expect(fs.readFileSync(helper, 'utf8')).toBe(previous);
+		const result = await runCodemod([input], { root, strong: true });
+		expect(result.files.flatMap((f) => f.notes).filter((n) => n.severity === 'error')).toEqual([
+			nativeOwnership,
+		]);
+		expect(fs.readFileSync(helper, 'utf8')).toBe(current);
+		expect(fs.readFileSync(previousInode, 'utf8')).toBe(previous);
+		expect(fs.statSync(helper).mode & 0o777).toBe(fs.statSync(previousInode).mode & 0o777);
+		expect(fs.readFileSync(path.join(src, 'PreviouslyMigrated.tsrx'), 'utf8')).toBe(provider);
+		expect(
+			(await runCodemod([src], { root, strong: true })).files.filter((f) => f.changed),
+		).toEqual([]);
 
-	const server = await bundleRuntime(
-		root,
-		'server',
-		`export {PreviouslyMigrated} from './src/PreviouslyMigrated.tsrx';
+		const server = await bundleRuntime(
+			root,
+			'server',
+			`export {PreviouslyMigrated} from './src/PreviouslyMigrated.tsrx';
 		export {Greeting} from './src/Greeting.tsrx';
 		export {createElement as h} from 'octane/server'; export {prerender} from 'octane/static';`,
-		['react-intl'],
+			['react-intl'],
+		);
+		const rendered = await server.prerender(() =>
+			server.h(server.PreviouslyMigrated, { children: server.h(server.Greeting, { name: 'Ada' }) }),
+		);
+		expect(rendered.html).toContain('Hello, Ada!');
+	},
+);
+
+it('preserves React Intl message comparison and refreshes the catalog and keyed messages', async () => {
+	const { src, helper } = project();
+	fs.writeFileSync(helper, current);
+	fs.writeFileSync(
+		path.join(src, 'View.tsrx'),
+		`
+		import { FormattedMessage } from './octane-react-intl.tsrx';
+		export function View({ count, revision, messageKey }) @{
+			<section data-revision={revision}><FormattedMessage key={messageKey} id="estimate" values={{count}} /></section>
+		}
+	`,
 	);
-	const rendered = await server.prerender(() =>
-		server.h(server.PreviouslyMigrated, { children: server.h(server.Greeting, { name: 'Ada' }) }),
-	);
-	expect(rendered.html).toContain('Hello, Ada!');
+	const dom = installDOM();
+	try {
+		const {
+			act,
+			h,
+			createRoot,
+			OctaneCompat,
+			View,
+			createIntl,
+			RawIntlProvider,
+			FormattedMessage,
+		} = await bundleRuntime(
+			root,
+			'client',
+			`
+				export { act, createElement as h } from 'react';
+				export { createRoot } from 'react-dom/client';
+				export { OctaneCompat } from 'octane/react';
+				export { createIntl, RawIntlProvider, FormattedMessage } from 'react-intl';
+				export { View } from './src/View.tsrx';
+			`,
+			['react-intl'],
+		);
+		async function snapshots(hosted) {
+			const errors = [];
+			const missing = createIntl({
+				locale: 'en',
+				defaultLocale: 'de',
+				messages: {},
+				onError: (e) => errors.push(e.code),
+			});
+			const catalog = (suffix) =>
+				createIntl({ locale: 'en', messages: { estimate: '{count, number} ' + suffix } });
+			const before = catalog('old'),
+				after = catalog('new');
+			const frames = [
+				[1, missing],
+				[1, missing],
+				[1, missing, 'new'],
+				[2, missing, 'new'],
+				[0, before],
+				[-0, before],
+				[NaN, before],
+				[NaN, before],
+				[NaN, after],
+				[0, after],
+				[-0, after],
+			];
+			const container = dom.window.document.body;
+			const app = createRoot(container);
+			const result = [];
+			try {
+				for (const [i, [count, value, messageKey]] of frames.entries()) {
+					const revision = i + 1;
+					const child = hosted
+						? h(OctaneCompat, { component: View, props: { count, revision, messageKey } })
+						: h(
+								'section',
+								{ 'data-revision': revision },
+								h(FormattedMessage, { id: 'estimate', key: messageKey, values: { count } }),
+							);
+					await act(() => app.render(h(RawIntlProvider, { value }, child)));
+					const section = container.querySelector('section');
+					expect(section.dataset.revision).toBe(String(revision));
+					result.push({ text: section.textContent, errors: errors.slice() });
+				}
+			} finally {
+				await act(() => app.unmount());
+			}
+			return result;
+		}
+		const react = await snapshots(false);
+		expect(react[0].errors).toEqual(['MISSING_TRANSLATION']);
+		expect(react[2].errors).toEqual(['MISSING_TRANSLATION', 'MISSING_TRANSLATION']);
+		expect(react[5].text).toBe('0 old');
+		expect(react[8].text).toBe('NaN new');
+		expect(await snapshots(true)).toEqual(react);
+	} finally {
+		vi.unstubAllGlobals();
+		dom.window.close();
+	}
 });
 
 it.each(['edited', 'symlink'])(
