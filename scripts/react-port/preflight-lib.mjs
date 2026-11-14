@@ -1002,8 +1002,8 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 			profile.version !== manifest.version ||
 			profile.commit !== options.sourceCommit
 		)
-			throw new Error('Test helper profile does not match the immutable package identity');
-		for (const helper of profile.helpers) {
+			throw new Error('Test inventory profile does not match the immutable package identity');
+		for (const helper of profile.helpers ?? []) {
 			const sourceCases = [];
 			for (const module of helper.modules) {
 				const entry = tree.find(
@@ -1098,6 +1098,25 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 						path.posix.basename(entry.path).startsWith(`${name}.`),
 					),
 			) ?? ((await declaresMoonBunTestTask(tree, scopePrefix, options)) ? 'bun' : undefined));
+	const jestDiscovery = profile?.jestDiscovery;
+	const pendingJestPaths = new Set(jestDiscovery?.testPaths);
+	if (jestDiscovery) {
+		if (
+			runner !== 'jest' ||
+			!pendingJestPaths.size ||
+			pendingJestPaths.size !== jestDiscovery.testPaths.length ||
+			!jestDiscovery.witnesses.length
+		)
+			throw new Error('Invalid Jest discovery profile');
+		for (const { path, gitBlob } of jestDiscovery.witnesses) {
+			if (
+				!tree.some(
+					(entry) => entry.path === path && entry.sha === gitBlob && isGitHubRegularBlob(entry),
+				)
+			)
+				throw new Error(`Jest discovery profile source mismatch: ${path}`);
+		}
+	}
 	const candidateEntries = tree.flatMap((entry) => {
 		if (!isGitHubRegularBlob(entry) || !entry.path.startsWith(scopePrefix)) return [];
 		if (configurationEntryPaths.has(entry.path)) return [];
@@ -1105,10 +1124,11 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		if (!TEST_SOURCE_PATTERN.test(relativePath) || /(?:^|\/)node_modules\//i.test(relativePath)) {
 			return [];
 		}
-		// Vitest's default discovery selects named test/spec files, not every
-		// module beneath a test/ support directory. Explicit include patterns
-		// still admit nonstandard names, and compile-only specs remain inventoried.
-		const conventional = conventionalTestPath(relativePath, { runner });
+		// A verified Jest list replaces its default discovery. Explicit and
+		// compile-only test selection still apply.
+		const conventional = jestDiscovery
+			? pendingJestPaths.delete(relativePath) || isUpstreamTypeTestPath(relativePath)
+			: conventionalTestPath(relativePath, { runner });
 		const directTest =
 			conventional || referencedByTestConfiguration(relativePath, configuredTestPatterns);
 		const inlineSource = referencedByTestConfiguration(
@@ -1117,6 +1137,10 @@ export async function immutableTestInventory(tree, subdirectory, manifest, optio
 		);
 		return directTest || inlineSource ? [{ directTest, entry, inlineSource, relativePath }] : [];
 	});
+	if (pendingJestPaths.size)
+		throw new Error(
+			`Jest discovery profile test missing from source: ${pendingJestPaths.values().next().value}`,
+		);
 	if (candidateEntries.length > MAX_UPSTREAM_TEST_FILES) {
 		throw new Error('Immutable upstream test inventory exceeds the file limit');
 	}

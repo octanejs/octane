@@ -81,6 +81,88 @@ test('a moon task that runs bun test selects bun named test files', async () => 
 	);
 });
 
+test('pinned Jest discovery replaces defaults while retaining independent test selection', async () => {
+	const profile = JSON.parse(
+		readFileSync(new URL('./profiles/framer-motion-12.42.2.json', import.meta.url), 'utf8'),
+	);
+	const scope = 'packages/framer-motion';
+	const manifest = {
+		name: profile.package,
+		version: profile.version,
+		scripts: { test: 'jest', 'test:other': 'test quality/other.ts' },
+		vitest: { includeSource: ['src/inline.ts'] },
+	};
+	const blobs = new Map();
+	const entry = (relativePath, text) => {
+		const bytes = Buffer.from(text);
+		const sha = gitBlobSha(bytes);
+		const url = `https://api.github.com/repos/motiondivision/motion/git/blobs/${sha}`;
+		blobs.set(url, bytes);
+		return {
+			path: `${scope}/${relativePath}`,
+			type: 'blob',
+			mode: '100644',
+			sha,
+			size: bytes.length,
+			url,
+		};
+	};
+	const fetchImpl = async (url) => {
+		const bytes = blobs.get(String(url));
+		assert.ok(bytes);
+		return Response.json({
+			encoding: 'base64',
+			content: bytes.toString('base64'),
+			size: bytes.length,
+		});
+	};
+	const options = { fetchImpl, sourceCommit: profile.commit };
+	const [firstPath] = profile.jestDiscovery.testPaths;
+	const witnesses = profile.jestDiscovery.witnesses.map(({ path, gitBlob: sha }) => ({
+		path,
+		sha,
+		type: 'blob',
+		mode: '100644',
+	}));
+	const tests = profile.jestDiscovery.testPaths.map((file) =>
+		entry(file, "test('renders', () => {});"),
+	);
+	const independent = [
+		entry('quality/other.ts', "test('explicit', () => {});"),
+		entry('type-tests/usage.test-d.ts', 'const value: string = "ok";'),
+		entry('src/inline.ts', "if (import.meta.vitest) { test('inline', () => {}); }"),
+	];
+	const helper = entry(
+		'src/animation/animators/__tests__/utils.ts',
+		'export const utility = true;',
+	);
+	const tree = [...witnesses, ...tests, ...independent, helper];
+	const inventory = await immutableTestInventory(tree, scope, manifest, options);
+	assert.deepEqual(
+		inventory.map(({ path }) => path).sort(),
+		[...tests, ...independent].map(({ path }) => path).sort(),
+	);
+	await assert.rejects(
+		immutableTestInventory(tree.slice(1), scope, manifest, options),
+		/Jest discovery profile source mismatch/,
+	);
+	const firstFile = `${scope}/${firstPath}`;
+	const remainder = tree.filter(({ path }) => path !== firstFile);
+	await assert.rejects(
+		immutableTestInventory(remainder, scope, manifest, options),
+		/Jest discovery profile test missing from source/,
+	);
+	await assert.rejects(
+		immutableTestInventory(
+			[...remainder, entry(firstPath, 'export const value = true;')],
+			scope,
+			manifest,
+			options,
+		),
+		/has no countable registrations/,
+	);
+});
+
 const MIT_TEXT = `MIT License
 
 Copyright (c) 2026 Example Authors
