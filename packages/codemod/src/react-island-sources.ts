@@ -531,7 +531,7 @@ export function reactServerComponents(
 					!ts.isOptionalChain(value) &&
 					(value.arguments.length === 1 ||
 						(value.arguments.length === 2 &&
-							skipWrappers(value.arguments[1]).kind === ts.SyntaxKind.NullKeyword))
+							(selected || skipWrappers(value.arguments[1]).kind === ts.SyntaxKind.NullKeyword)))
 				) {
 					const factory = imported(checker, value.expression);
 					if (factory?.module === 'react' && factory.name === 'createElement' && original('react'))
@@ -552,7 +552,19 @@ export function reactServerComponents(
 			const call = expression && skipParens(expression);
 			if (!call || !ts.isCallExpression(call)) return;
 			const argument = call.arguments[0] && skipParens(call.arguments[0]);
-			if (argument && ts.isJsxSelfClosingElement(argument) && ts.isIdentifier(argument.tagName))
+			if (!argument) return;
+			if (ts.isJsxSelfClosingElement(argument) && ts.isIdentifier(argument.tagName)) {
+				visit(call);
+				return;
+			}
+			const target = ts.isJsxSelfClosingElement(argument)
+				? argument.tagName
+				: ts.isCallExpression(argument) && argument.arguments[0];
+			if (
+				target &&
+				(ts.isIdentifier(target) || ts.isPropertyAccessExpression(target)) &&
+				/^[A-Z]/.test(target.getText(sf).split('.').pop() ?? '')
+			)
 				visit(call);
 		}
 		for (const statement of sf.statements) {
