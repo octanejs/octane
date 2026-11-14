@@ -1,4 +1,13 @@
-import { use, useId, useLayoutEffect, useRef, useState } from 'octane';
+import {
+	use,
+	useContext,
+	useId,
+	useLayoutEffect,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from 'octane';
+import type { Context } from 'react';
 
 /**
  * Phase 4 islands, compiled BOTH ways: the client project imports this module
@@ -31,6 +40,23 @@ export function SsrIdIsland() @{
 export function SsrThemed(props) @{
 	const theme = use(props.themeContext);
 	<p class="ssr-theme">{('theme:' + theme) as string}</p>
+}
+
+export interface ExternalStore {
+	subscribe(notify: () => void): () => void;
+	getSnapshot(): string;
+	getServerSnapshot(): string;
+}
+
+function useStoreValue(context: Context<ExternalStore | null>): string {
+	const store = useContext(context);
+	if (store === null) throw new Error('Missing store provider');
+	return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot);
+}
+
+export function SsrExternalStore({ context }: { context: Context<ExternalStore | null> }) @{
+	const value = useStoreValue(context);
+	<output>{value}</output>
 }
 
 export function SsrAsync(props) @{
