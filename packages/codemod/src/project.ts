@@ -1387,8 +1387,11 @@ export async function runCodemod(
 				: `If the migrated ${component}'s store hook reads context, this standalone Octane root needs NativeStoreProvider with its original store context and value.`,
 		};
 	}
-	function originalReactEntry(file: string, name: 'react/jsx-runtime' | 'react-dom/server') {
-		const packageRoot = name === 'react/jsx-runtime' ? 'react' : 'react-dom';
+	function originalReactEntry(
+		file: string,
+		name: 'react' | 'react/jsx-runtime' | 'react-dom/server',
+	) {
+		const packageRoot = name === 'react-dom/server' ? 'react-dom' : 'react';
 		const types = originalModule(file, name)?.packageId?.name;
 		if (types !== packageRoot && types !== `@types/${packageRoot}`) return false;
 		const installed = readInstalled(path.dirname(file), packageRoot);
@@ -1404,7 +1407,7 @@ export async function runCodemod(
 		}
 	}
 	const reverseIslands = new Map<string, ReadonlySet<string>>();
-	const intrinsicExports = new Map<string, ReadonlySet<string>>();
+	const intrinsicExports = new Map<string, ReturnType<typeof intrinsicReactExports>>();
 	const jsxFactories = new Map<string, ReadonlySet<string>>();
 	const linkedConflicts = new Map<string, string>();
 	function checkLinkedRename(file: string, issuer: string) {
@@ -1580,7 +1583,9 @@ export async function runCodemod(
 			(retainedJsx || retainedServer) &&
 			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) === rootProject
 		) {
-			const edges = [];
+			const edges: (ReturnType<typeof retainedReactComponentReturns>[number] & {
+				renderer: 'JSX' | 'server render';
+			})[] = [];
 			if (retainedJsx && automaticReactJsx(file) && originalReactEntry(file, 'react/jsx-runtime'))
 				for (const edge of retainedReactComponentReturns(file, source))
 					edges.push({ ...edge, renderer: 'JSX' });
@@ -1591,6 +1596,7 @@ export async function runCodemod(
 						: automaticReactJsx(file) && originalReactEntry(file, module),
 				))
 					edges.push({ ...edge, renderer: 'server render' });
+			let installedLazy: boolean | undefined;
 			for (const edge of edges) {
 				const match = renamed(file, edge.module);
 				if (!match) continue;
@@ -1611,18 +1617,28 @@ export async function runCodemod(
 					continue;
 				if (!automaticReactJsx(match.file) || !originalReactEntry(match.file, 'react/jsx-runtime'))
 					continue;
+				if (edge.lazy && !(installedLazy ??= originalReactEntry(file, 'react'))) continue;
 				const leaf = byFile.get(match.file);
 				if (!leaf?.output.endsWith('.tsrx')) continue;
-				const exports = factory ? jsxFactories : intrinsicExports;
-				let names = exports.get(match.file);
-				if (!names) {
-					const source = fs.readFileSync(match.file, 'utf8');
-					names = factory
-						? migratedJsxFactories(match.file, source, leaf.code)
-						: intrinsicReactExports(match.file, source);
-					exports.set(match.file, names);
+				if (factory) {
+					let names = jsxFactories.get(match.file);
+					if (!names) {
+						names = migratedJsxFactories(
+							match.file,
+							fs.readFileSync(match.file, 'utf8'),
+							leaf.code,
+						);
+						jsxFactories.set(match.file, names);
+					}
+					if (!names.has(edge.name)) continue;
+				} else {
+					let intrinsic = intrinsicExports.get(match.file);
+					if (!intrinsic) {
+						intrinsic = intrinsicReactExports(match.file, fs.readFileSync(match.file, 'utf8'));
+						intrinsicExports.set(match.file, intrinsic);
+					}
+					if (!intrinsic.names.has(edge.name) || (edge.lazy && intrinsic.mayExportThen)) continue;
 				}
-				if (!names.has(edge.name)) continue;
 				const note: Note = {
 					rule: 'react-compat',
 					severity: 'warning',
@@ -1630,7 +1646,7 @@ export async function runCodemod(
 					message: factory
 						? `The retained React JSX in ${name} uses ${leaf.file}'s ${edge.name} as a JSX child. With standard package resolution, migrate the caller too or keep this factory in React.`
 						: edge.renderer === 'JSX'
-							? `The retained React JSX in ${name} renders ${leaf.file} directly. With standard package resolution, migrate the caller too or keep this component in React.`
+							? `The retained React JSX in ${name} renders ${leaf.file} ${edge.lazy ? 'through React.lazy' : 'directly'}. With standard package resolution, migrate the caller too or keep this component in React.`
 							: `The retained React server render in ${name} imports ${leaf.file} directly. With standard package resolution, migrate the server entry too or keep this component in React.`,
 				};
 				host.notes.push(note);

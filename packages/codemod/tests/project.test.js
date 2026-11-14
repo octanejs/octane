@@ -646,6 +646,106 @@ export ${shape === 'ambient caller' ? 'declare ' : ''}function Owner(${params}) 
 		}
 	});
 
+	it.each([
+		['default export', "import { lazy } from 'react';", "() => import('./Leaf')", true],
+		[
+			'named export',
+			"import { lazy as load } from 'react';",
+			"() => import('./Leaf').then((mod) => ({ default: mod.Leaf }))",
+			true,
+		],
+		[
+			'namespace and wrapped loader',
+			"import * as React from 'react';",
+			"(() => (import('./Leaf.tsx')))",
+			true,
+		],
+		['different factory', "import { lazy } from './other';", "() => import('./Leaf')", false],
+		['shadowed React', 'const React = { lazy };', "() => import('./Leaf')", false],
+		['mapped React', "import { lazy } from 'react';", "() => import('./Leaf')", false],
+		[
+			'conditional loader',
+			"import { lazy } from 'react';",
+			"() => flag ? import('./Leaf') : import('./OtherLeaf')",
+			false,
+		],
+		['dynamic loader', "import { lazy } from 'react';", '() => import(specifier)', false],
+		['query loader', "import { lazy } from 'react';", "() => import('./Leaf.tsx?raw')", false],
+		[
+			'arbitrary export mapping',
+			"import { lazy } from 'react';",
+			"() => import('./Leaf').then((mod) => ({ default: select(mod.Leaf) }))",
+			false,
+		],
+		[
+			'bare named export',
+			"import { lazy } from 'react';",
+			"() => import('./Leaf').then((mod) => mod.Leaf)",
+			false,
+		],
+		['mutable lazy tag', "import { lazy } from 'react';", "() => import('./Leaf')", false],
+		['ambient lazy tag', "import { lazy } from 'react';", "() => import('./Leaf')", false],
+		['shadowed lazy tag', "import { lazy } from 'react';", "() => import('./Leaf')", false],
+		['thenable module', "import { lazy } from 'react';", "() => import('./Leaf')", false],
+		['type-only then export', "import { lazy } from 'react';", "() => import('./Leaf')", true],
+		['wildcard export', "import { lazy } from 'react';", "() => import('./Leaf')", false],
+	])('advises on a retained React lazy issuer (%s)', async (shape, react, loader, warns) => {
+		const factory = react.includes('React')
+			? 'React.lazy'
+			: react.includes('as load')
+				? 'load'
+				: 'lazy';
+		const declaration =
+			shape === 'mutable lazy tag'
+				? 'let'
+				: shape === 'ambient lazy tag'
+					? 'declare const'
+					: 'const';
+		const ownerParams = shape === 'shadowed lazy tag' ? '{ LazyLeaf }' : '';
+		const leaf = shape === 'query loader' ? 'Leaf?raw.tsx' : 'Leaf.tsx';
+		if (shape === 'query loader' && process.platform === 'win32') return;
+		const root = project({
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: {
+					jsx: 'react-jsx',
+					moduleResolution: 'Bundler',
+					...(shape === 'mapped React' ? { paths: { react: ['./other.ts'] } } : {}),
+				},
+			}),
+			'other.ts': 'export const lazy = (load) => load;',
+			'OtherLeaf.tsx': 'export default function OtherLeaf() { return <i>Other</i>; }',
+			[leaf]: `export function Leaf() { return <b>Original</b>; }
+export default Leaf;
+${shape === 'thenable module' ? 'export function then(resolve) { resolve({ default: () => null }); }' : ''}
+${shape === 'type-only then export' ? 'export type then = string;' : ''}
+${shape === 'wildcard export' ? "export * from './other';" : ''}`,
+			'Owner.tsx': `${react}
+import './${leaf}';
+${declaration} LazyLeaf = ${factory}(${loader});
+export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
+		});
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const preview = await runCodemod([path.join(root, leaf)], {
+			root,
+			strong: true,
+			verify: true,
+			write: false,
+		});
+		const owner = preview.files.find((file) => file.file === 'Owner.tsx');
+		expect(owner?.code).toContain(`import './${leaf.replace('.tsx', '.tsrx')}';`);
+		const affected = preview.files.filter((file) =>
+			file.notes.some(
+				(note) => note.severity === 'warning' && note.message.includes('retained React JSX'),
+			),
+		);
+		expect(affected.map((file) => file.file)).toEqual(warns ? [leaf, 'Owner.tsx'] : []);
+		if (warns) expect(owner.code).toContain("import('./Leaf.tsrx')");
+	});
+
 	describe('retained React server rendering', () => {
 		it.each([
 			['direct JSX', 'render(<Leaf />)', '', true],

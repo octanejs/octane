@@ -177,20 +177,24 @@ function* directExportReturns({ sf, checker }: ReturnType<typeof bind>) {
 }
 
 function returnedJsx(fn: ts.Node) {
+	const value = singleReturn(fn);
+	const output = value && skipWrappers(value);
+	if (output && (ts.isJsxElement(output) || ts.isJsxSelfClosingElement(output))) return output;
+}
+
+function singleReturn(fn: ts.Node) {
 	if (
 		!(ts.isFunctionDeclaration(fn) || ts.isFunctionExpression(fn) || ts.isArrowFunction(fn)) ||
 		fn.asteriskToken ||
 		fn.modifiers?.some((item) => item.kind === ts.SyntaxKind.AsyncKeyword)
 	)
 		return;
-	let value: ts.Expression | undefined;
 	if (fn.body && ts.isBlock(fn.body)) {
 		const [statement, extra] = fn.body.statements;
 		if (!statement || extra || !ts.isReturnStatement(statement)) return;
-		value = statement.expression;
-	} else value = fn.body;
-	const output = value && skipWrappers(value);
-	if (output && (ts.isJsxElement(output) || ts.isJsxSelfClosingElement(output))) return output;
+		return statement.expression;
+	}
+	return fn.body;
 }
 
 function openingTag(element: ts.JsxElement | ts.JsxSelfClosingElement) {
@@ -259,13 +263,90 @@ export function hostedServerComponents(file: string, source: string) {
 	return edges;
 }
 
+function literalImport(expr: ts.Expression) {
+	const call = skipWrappers(expr);
+	if (!ts.isCallExpression(call) || call.expression.kind !== ts.SyntaxKind.ImportKeyword) return;
+	const [specifier, extra] = call.arguments;
+	if (
+		specifier &&
+		!extra &&
+		ts.isStringLiteralLike(specifier) &&
+		/^\.{1,2}\//.test(specifier.text) &&
+		!/[!%?#\\]/.test(specifier.text)
+	)
+		return specifier.text;
+}
+
+function lazyComponentImport(checker: ts.TypeChecker, tag: ts.JsxTagNameExpression) {
+	if (!ts.isIdentifier(tag)) return;
+	const symbol = checker.getSymbolAtLocation(tag);
+	const decl = symbol?.valueDeclaration;
+	if (
+		symbol?.declarations?.length !== 1 ||
+		!decl ||
+		!ts.isVariableDeclaration(decl) ||
+		ts.getCombinedModifierFlags(decl) & ts.ModifierFlags.Ambient ||
+		!decl.initializer ||
+		!ts.isVariableDeclarationList(decl.parent) ||
+		(decl.parent.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+		!ts.isVariableStatement(decl.parent.parent) ||
+		!ts.isSourceFile(decl.parent.parent.parent)
+	)
+		return;
+	const call = skipWrappers(decl.initializer);
+	if (!ts.isCallExpression(call) || ts.isOptionalChain(call) || call.arguments.length !== 1) return;
+	const callee = skipWrappers(call.expression);
+	if (ts.isOptionalChain(callee)) return;
+	const factory = imported(checker, callee);
+	if (factory?.module !== 'react' || factory.name !== 'lazy') return;
+	const loader = skipWrappers(call.arguments[0]!);
+	if (!ts.isArrowFunction(loader) || loader.parameters.length) return;
+	const result = singleReturn(loader);
+	if (!result) return;
+	const direct = literalImport(result);
+	if (direct) return { module: direct, name: 'default', lazy: true };
+	const map = skipWrappers(result);
+	if (
+		!ts.isCallExpression(map) ||
+		ts.isOptionalChain(map) ||
+		map.arguments.length !== 1 ||
+		!ts.isPropertyAccessExpression(map.expression) ||
+		map.expression.name.text !== 'then'
+	)
+		return;
+	const module = literalImport(map.expression.expression);
+	if (!module) return;
+	const mapper = skipWrappers(map.arguments[0]!);
+	if (!ts.isArrowFunction(mapper) || mapper.parameters.length !== 1) return;
+	const parameter = mapper.parameters[0]!;
+	if (!ts.isIdentifier(parameter.name) || parameter.initializer || parameter.dotDotDotToken) return;
+	const mapped = singleReturn(mapper);
+	const object = mapped && skipWrappers(mapped);
+	if (!object || !ts.isObjectLiteralExpression(object) || object.properties.length !== 1) return;
+	const field = object.properties[0]!;
+	if (
+		!ts.isPropertyAssignment(field) ||
+		!ts.isIdentifier(field.name) ||
+		field.name.text !== 'default'
+	)
+		return;
+	const value = skipWrappers(field.initializer);
+	if (
+		ts.isPropertyAccessExpression(value) &&
+		!ts.isOptionalChain(value) &&
+		checker.getSymbolAtLocation(value.expression) === checker.getSymbolAtLocation(parameter.name)
+	)
+		return { module, name: value.name.text, lazy: true };
+}
+
 /** Imports rendered directly by a retained component. */
 export function retainedReactComponentReturns(file: string, source: string) {
 	if (!ordinaryReactJsx(source)) return [];
 	const bound = bind(file, source);
 	const { sf, checker } = bound;
-	const edges: { name: string; module: string; factory?: true; line: number }[] = [];
+	const edges: { name: string; module: string; factory?: true; lazy?: true; line: number }[] = [];
 	const seen = new Set<ts.Node>();
+	const mayBeLazy = source.includes('import') && (source.includes('lazy') || source.includes('\\'));
 	for (const { output, localName, decl } of directExportReturns(bound)) {
 		if (seen.has(output)) continue;
 		const tag = openingTag(output).tagName;
@@ -296,7 +377,8 @@ export function retainedReactComponentReturns(file: string, source: string) {
 			continue;
 		}
 		if (ts.isIdentifier(tag) && !/^[A-Z]/.test(tag.text)) continue;
-		const leaf = imported(checker, tag);
+		const leaf =
+			imported(checker, tag) ?? (mayBeLazy ? lazyComponentImport(checker, tag) : undefined);
 		if (leaf?.module.startsWith('.'))
 			edges.push({ ...leaf, line: sf.getLineAndCharacterOfPosition(output.getStart(sf)).line + 1 });
 	}
@@ -434,8 +516,26 @@ export function reactServerComponents(
 /** Local exports whose original body returns an intrinsic React element. */
 export function intrinsicReactExports(file: string, source: string) {
 	const names = new Set<string>();
+	let mayExportThen = false;
 	if (ordinaryReactJsx(source)) {
-		for (const { name, output, localName } of directExportReturns(bind(file, source))) {
+		const bound = bind(file, source);
+		const { sf, checker } = bound;
+		const module = checker.getSymbolAtLocation(sf);
+		const then =
+			module && checker.getExportsOfModule(module).find((symbol) => symbol.name === 'then');
+		// import() assimilates a callable namespace then. This local checker cannot resolve wildcard re-exports.
+		mayExportThen =
+			!!then &&
+			(!!(then.flags & ts.SymbolFlags.Value) ||
+				!!then.declarations?.some(
+					(decl) =>
+						(ts.isExportSpecifier(decl) && !decl.isTypeOnly && !decl.parent.parent.isTypeOnly) ||
+						(ts.isImportEqualsDeclaration(decl) && !decl.isTypeOnly),
+				));
+		mayExportThen ||= sf.statements.some(
+			(stmt) => ts.isExportDeclaration(stmt) && !stmt.isTypeOnly && !stmt.exportClause,
+		);
+		for (const { name, output, localName } of directExportReturns(bound)) {
 			const tag = openingTag(output).tagName;
 			if (
 				ts.isIdentifier(tag) &&
@@ -445,7 +545,7 @@ export function intrinsicReactExports(file: string, source: string) {
 				names.add(name);
 		}
 	}
-	return names;
+	return { names, mayExportThen };
 }
 
 /** Factories whose intrinsic JSX return survives as Octane JSX in the emitted file. */
