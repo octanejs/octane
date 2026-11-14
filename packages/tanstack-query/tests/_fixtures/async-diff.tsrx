@@ -1,19 +1,16 @@
 import { useState } from 'octane';
 import { QueryClient, QueryClientProvider, useQuery, useMutation } from '@octanejs/tanstack-query';
 
-// Async differential fixtures — each side (octane / react) resolves its OWN
-// timers independently, so the rig compares: mount (pending on both) → settle
-// (success on both), byte-for-byte. A fresh client per MOUNT (useState
-// initializer) keeps repeated tests in one file independent.
+// A fresh client per mount keeps the two renderer caches and repeated tests independent.
 
 function delayed<T>(value: T, ms: number): Promise<T> {
 	return new Promise((res) => setTimeout(() => res(value), ms));
 }
 
-function AsyncReader() @{
+function AsyncReader({ queryFn }: { queryFn: () => Promise<string> }) @{
 	const q = useQuery({
 		queryKey: ['a'],
-		queryFn: () => delayed('fetched', 10),
+		queryFn,
 		retry: false,
 	});
 	<div id="d">
@@ -32,12 +29,12 @@ function AsyncReader() @{
 	</div>
 }
 
-export function AsyncApp() @{
+export function AsyncApp({ queryFn }: { queryFn: () => Promise<string> }) @{
 	const [client] = useState(
 		() => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
 	);
 	<QueryClientProvider client={client}>
-		<AsyncReader />
+		<AsyncReader queryFn={queryFn} />
 	</QueryClientProvider>
 }
 
