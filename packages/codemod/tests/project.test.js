@@ -3139,18 +3139,30 @@ export function Host({rows}: { rows: Row[] }) {
 	);
 
 	it.each([false, true])(
-		'blocks map defaults that compare the uninitialized index (project types %s)',
+		'blocks map defaults with an eager operand that reads the uninitialized index (project types %s)',
 		async (projectTypes) => {
 			const cases = [
 				['index < 1', true],
 				['0 <= index', true],
 				['index > fail()', true],
 				['0 >= index', true],
+				['index == 0', true],
+				['0 != index', true],
+				['index in {0: true}', true],
+				['0 in (index as unknown as object)', true],
+				['(index as unknown as object) instanceof Number', true],
+				['index + fail()', true],
+				['([] as unknown as number) * index', true],
 				['fail() < index', false],
+				['fail() != index', false],
+				['fail() in {value: index}', false],
+				['fail() instanceof (index as unknown as typeof Number)', false],
+				['(holder = index)', false],
+				['(holder &&= index)', false],
 				['({ valueOf() { return fail(); } } < 0, index)', false],
 				['0 < 1', false],
 			];
-			const source = (expression) => `function fail() { throw Error('step'); }
+			const source = (expression) => `let holder = 0; function fail() { throw Error('step'); }
 				export const List = () =>
 					<ul>{[{id:1},{id:2}].map(({id,label=${expression}},index) => <li key={id}>{label}</li>)}</ul>;`;
 			const originals = Object.fromEntries(
