@@ -271,6 +271,45 @@ it('reports a getter in a conditional dependency that can register a React SSR s
 	expect(migrate(unreachable).notes).not.toContainEqual(dependencyError);
 }, 20_000);
 
+it('reports getters evaluated by unary dependency expressions', () => {
+	function Reference({ probe }) {
+		useMemo(() => 1, [typeof probe.value]);
+		return createElement('b', null, 'ok');
+	}
+	const probe = {
+		get value() {
+			preinit('/unary.css', { as: 'style' });
+			return 1;
+		},
+	};
+	expect(renderToStaticMarkup(createElement(Reference, { probe }))).toContain(
+		'<link rel="stylesheet" href="/unary.css"',
+	);
+	const input = (dependency) => `import { useMemo } from 'react';
+		export function Probe({ probe }: { probe: { value: number } }) {
+			useMemo(() => 1, [${dependency}]);
+			return <b>ok</b>;
+		}`;
+	for (const strong of [false, true]) {
+		for (const dependency of [
+			'typeof probe.value',
+			'void probe.value',
+			'!probe.value',
+			'+probe.value',
+			'-probe.value',
+			'~probe.value',
+		]) {
+			expect(migrate(input(dependency), strong).notes, dependency).toContainEqual(dependencyError);
+		}
+	}
+	expect(migrate(input('!(false && probe.value)')).notes).not.toContainEqual(dependencyError);
+	const ownData = input('!probe.value').replace(
+		'({ probe }: { probe: { value: number } }) {',
+		'() { const probe = { value: 1 };',
+	);
+	expect(migrate(ownData).notes).not.toContainEqual(dependencyError);
+}, 20_000);
+
 it('reports a getter in a short-circuit dependency that can register a React SSR stylesheet', () => {
 	function Reference({ enabled, probe }) {
 		useLayoutEffect(() => {}, [enabled && probe.value]);

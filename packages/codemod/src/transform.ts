@@ -4925,6 +4925,14 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (!this.emitsTsrx || !ts.isArrayLiteralExpression(list)) return;
 		const read = (expr: ts.Expression): ts.Expression | undefined => {
 			const member = skipWrappers(expr);
+			if (ts.isTypeOfExpression(member) || ts.isVoidExpression(member))
+				return read(member.expression);
+			if (
+				ts.isPrefixUnaryExpression(member) &&
+				member.operator !== ts.SyntaxKind.PlusPlusToken &&
+				member.operator !== ts.SyntaxKind.MinusMinusToken
+			)
+				return read(member.operand);
 			if (ts.isConditionalExpression(member)) {
 				const condition = skipWrappers(member.condition);
 				if (condition.kind === ts.SyntaxKind.TrueKeyword) return read(member.whenTrue);
