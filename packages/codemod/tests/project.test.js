@@ -65,6 +65,34 @@ describe('runCodemod', () => {
 			['Owner.tsx', 'Native.tsx', 'Leaf.tsx'],
 		],
 		['unselected issuer', 'Owner.tsx', islandOwner, ['Leaf.tsx']],
+		[
+			'module component alias',
+			'Owner.tsx',
+			boundaryImports +
+				'const Selected = Leaf; export function Owner(){return <Island component={Selected}/>}',
+			['Leaf.tsx'],
+		],
+		[
+			'later component alias chain',
+			'Owner.tsx',
+			boundaryImports +
+				'export function Owner(){return <Island component={Selected}/>} const View = Leaf; const Selected = View;',
+			['Leaf.tsx'],
+		],
+		[
+			'local component alias',
+			'Owner.tsx',
+			boundaryImports +
+				'export function Owner(){const Selected = Leaf; return <Island><Selected/></Island>}',
+			['Leaf.tsx'],
+		],
+		[
+			'component alias in a native issuer',
+			'Owner.tsrx',
+			boundaryImports +
+				'const Selected = Leaf; export function Owner()@{<Island component={Selected}/>}',
+			['Leaf.tsx'],
+		],
 		...[
 			['short-circuit child', '<Island>{shown && <Leaf/>}</Island>'],
 			['short-circuit component', '<Island component={shown && Leaf}/>'],
@@ -128,6 +156,21 @@ describe('runCodemod', () => {
 				expect(fs.readFileSync(path.join(root, f), 'utf8')).toBe(original);
 			expect(fs.existsSync(path.join(root, 'Leaf.tsrx'))).toBe(false);
 		}
+	});
+
+	it('migrates an import shadowed by the component passed to a React island', async () => {
+		const root = project({
+			'Owner.tsx':
+				boundaryImports +
+				'const Selected = Leaf; export function Owner(){const Selected = () => null; return <Island component={Selected}/>}',
+			'Leaf.tsx': reactLeaf,
+		});
+		const leaf = path.join(root, 'Leaf.tsx');
+		const result = await runCodemod([leaf], { root, write: true });
+		expect(result.files.flatMap((file) => file.notes)).not.toContainEqual(
+			expect.objectContaining({ rule: 'react-compat', severity: 'error' }),
+		);
+		expect(fs.existsSync(path.join(root, 'Leaf.tsrx'))).toBe(true);
 	});
 
 	describe('React-hosted Octane SSR', () => {
