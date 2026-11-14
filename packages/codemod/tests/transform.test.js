@@ -414,12 +414,34 @@ root.render(<App />);`;
 		);
 		// React's server renderers return the HTML; Octane's return `{ html, css }`.
 		expect(render('renderToString(createElement(App))')).toBe('renderToString(App).html;');
+		expect(render('renderToString(createElement(App, undefined))')).toBe(
+			'renderToString(App).html;',
+		);
 		expect(render('renderToString(<div />)')).toBe('renderToString(<div />).html;');
 		// A key, a ref, or children keep the element.
 		expect(render('root.render(<App key="a" />)')).toBe('root.render(<App key="a" />);');
 		expect(transformModule(source('root.render(<App />)'), 'main.tsx').code).not.toContain(
 			'StrictMode',
 		);
+	});
+
+	it('keeps factory props when undefined resolves to a local binding', () => {
+		const { code, rules } = transformModule(
+			`import { createElement as h } from 'react';
+import { createRoot, hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
+import { App } from './App';
+export function render(undefined: { depth?: number }) {
+	createRoot(document.body).render(h(App, undefined));
+	hydrateRoot(document.body, h(App, (undefined)));
+	return renderToString((h(App, undefined)));
+}`,
+			'main.tsx',
+		);
+		expect(code).toContain('createRoot(document.body).render(h(App, undefined));');
+		expect(code).toContain('hydrateRoot(document.body, h(App, (undefined)));');
+		expect(code).toContain('return renderToString((h(App, undefined))).html;');
+		expect(rules['root-render']).toBeUndefined();
 	});
 
 	it('lowers `&&` to `@if` through a `const` that holds a comparison', () => {
