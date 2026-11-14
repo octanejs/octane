@@ -271,6 +271,50 @@ it('reports a getter in a conditional dependency that can register a React SSR s
 	expect(migrate(unreachable).notes).not.toContainEqual(dependencyError);
 }, 20_000);
 
+it('reports a getter in a short-circuit dependency that can register a React SSR stylesheet', () => {
+	function Reference({ enabled, probe }) {
+		useLayoutEffect(() => {}, [enabled && probe.value]);
+		return createElement('b', null, 'ok');
+	}
+	const probe = {
+		get value() {
+			preinit('/short-circuit.css', { as: 'style' });
+			return 1;
+		},
+	};
+	expect(renderToStaticMarkup(createElement(Reference, { enabled: true, probe }))).toContain(
+		'<link rel="stylesheet" href="/short-circuit.css"',
+	);
+	expect(renderToStaticMarkup(createElement(Reference, { enabled: false, probe }))).toBe(
+		'<b>ok</b>',
+	);
+
+	const input = (dep) => `import { useLayoutEffect } from 'react';
+		export function Probe({ enabled, probe }: { enabled: boolean; probe: { value: number } }) {
+			useLayoutEffect(() => {}, [${dep}]);
+			return <b>ok</b>;
+		}`;
+	for (const strong of [false, true]) {
+		for (const dep of [
+			'enabled && probe.value',
+			'enabled || probe.value',
+			'enabled ?? probe.value',
+			'null ?? (enabled && probe.value)',
+			'probe.value && false',
+		]) {
+			expect(migrate(input(dep), strong).notes, dep).toContainEqual(dependencyError);
+		}
+		for (const dep of [
+			'false && probe.value',
+			'true || probe.value',
+			'false ?? probe.value',
+			'"" ?? probe.value',
+		]) {
+			expect(migrate(input(dep), strong).notes, dep).not.toContainEqual(dependencyError);
+		}
+	}
+}, 20_000);
+
 it.each([
 	['block', false],
 	['block', true],
