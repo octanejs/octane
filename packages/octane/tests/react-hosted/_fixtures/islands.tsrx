@@ -9,6 +9,7 @@ import {
 	useInsertionEffect,
 	useLayoutEffect,
 	useState,
+	useSyncExternalStore,
 	type FragmentInstance,
 } from 'octane';
 import { MirrorLocale, MirrorTheme } from './mirror-context.js';
@@ -177,6 +178,30 @@ export function ActivityIsland({ log }: { log: (message: string) => void }) @{
 		};
 	});
 	<Counter />
+}
+
+/** Store, layout, passive, and host-ref probe for React visibility parity (#2692). */
+export function VisibilityProbeIsland({
+	subscribe,
+	read,
+	log,
+	outputRef,
+}: {
+	subscribe: (listener: () => void) => () => void;
+	read: () => number;
+	log: (message: string) => void;
+	outputRef: (node: HTMLOutputElement) => () => void;
+}) @{
+	const value = useSyncExternalStore(subscribe, read);
+	useLayoutEffect(() => {
+		log('layout setup');
+		return () => log('layout cleanup');
+	}, []);
+	useEffect(() => {
+		log('passive setup');
+		return () => log('passive cleanup');
+	}, []);
+	<output ref={outputRef}>{String(value)}</output>
 }
 
 export function BadgeIsland(props) @{
