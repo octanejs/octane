@@ -149,13 +149,13 @@ partition closed, exactly as the persistent cache does today.
 ### 6. Hydration and the seed
 
 The replica hydrates from the page's seed synchronously, as now, so hydration
-never waits on the worker. After hydration it subscribes its reads through the
-owner. The owner answers with what it holds. A value newer than the seed's,
-compared by load time (the tab and the worker share one clock), replaces it as
-an ordinary update. A seed value newer than the owner's is offered to the owner,
-which adopts it the way `publish` does. The seed's feed positions go to the
-owner, which resumes each feed from the older of its saved cursor and the
-page's.
+never waits on the worker. The owner holds no values of its own, so the tabs
+compare theirs: each read (not view) a seed gives a replica is offered to the other tabs
+with its load time (the tabs and the worker share one wall clock). A tab
+holding an older value takes it as an ordinary update; a tab holding a newer
+one offers its own back, which the seeded tab takes. A replica that joins a
+feed connection standing at another position than its page's seed hears it as
+a gap, and reloads what the feed covers. (Done in PR 6.)
 
 ## What this changes for apps
 
@@ -215,6 +215,10 @@ connection code. Each PR reports bytes as usual.
    receipt, which the owner looks up once for every tab; a later tab's
    recovery leaves out writes still in flight; a new owner can remove a
    write an earlier one journaled.)
+6. **Hydration and the seed.** (PR 6: a seeded tab offers its values to the
+   others, and the newer value wins in every tab; joining a feed at another
+   position than the seed's reloads what it covers. The shared-tab browser
+   test also runs on the React page.)
 
 Each PR carries both bindings' tests and the RFC acceptance cases it closes.
 
