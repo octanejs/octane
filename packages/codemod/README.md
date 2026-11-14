@@ -248,11 +248,47 @@ For a literal message descriptor with optional scalar substitutions, the codemod
 
 Self-closing `FormattedMessage` elements can render text directly, including ICU substitutions such as `values={{ count }}` when the named values are scalar and evaluating them keeps JSX in its original renderer. Custom text wrappers and provider-defined rich content use the installed React component. Supported React display islands receive the nearest real Intl context. A React-hosted Octane component reads the original provider. A standalone Octane root uses the generated `IntlProvider` or `RawIntlProvider`. The codemod moves providers with a closed subtree of native elements and scalar children. Providers surrounding other components need a review of which renderer owns their descendants. React islands retain the [ReactCompat rendering limits](../../docs/react-compat.md).
 
+For a message directly inside a paragraph, the codemod uses `ReactCompatInline` for the fallback when the installed Octane package exports it on the client and server. Verify that any provider-supplied rich text or custom wrapper produces phrasing content allowed inside a paragraph.
+
 Inside an authored `ReactCompat` boundary, a single original React component can be selected by a ternary that supplies different props on either branch. A namespaced bridge becomes a named import so the compiler can transport that child. Lists, optional children, and JSX-valued props require a React component to own their rendering.
 
 Inside a retained React component, a rich-text callback such as `chunks => <strong>{chunks}</strong>` can keep producing a genuine React element. When the codemod creates a React island for `FormattedMessage`, an inline substitution such as `values={{ lineBreak: <br /> }}` also stays in React if the other props and substitutions cannot observe a change in evaluation timing. The codemod recognizes a single intrinsic tag with literal attributes and an optional literal key. Callbacks can use their parameter as the sole child. Spreads, refs, and event handlers retain a migration diagnostic.
 
 A native `formatMessage` call or a generated native `FormattedMessage` can return the expected string while losing resource hints scheduled by a provider-supplied formatter. A generated formatter can also lose access to other React ancestor contexts. The codemod retains the preview and reports a blocking diagnostic for these calls and islands. Review the actual provider and formatter before adopting them. A local `IntlProvider` can inherit configuration from its mutable class defaults. Explicitly authored React boundaries keep their existing contract.
+
+### Keep formatting in React while migrating a child
+
+With a retained React `IntlProvider`, keep `useIntl` and `formatMessage` in the React component that already owns the call. Pass the resulting string as a prop to an Octane child. This preserves the nearest provider and keeps its formatter callbacks in React's render.
+
+```tsx
+/** @jsxImportSource react */
+import { OctaneCompatInline } from 'octane/react';
+import { useIntl } from 'react-intl';
+import { Label } from './Label.tsrx';
+
+export function ReactLabel({ name }: { name: string }) {
+  const intl = useIntl();
+  const label = intl.formatMessage(
+    { id: 'welcome', defaultMessage: 'Welcome, {name}' },
+    { name },
+  );
+  return typeof label === 'string' ? (
+    <OctaneCompatInline component={Label} props={{ label }} />
+  ) : (
+    <strong>{label}</strong>
+  );
+}
+```
+
+```tsrx
+"use strong";
+
+export function Label({ label }: { label: string }) @{
+  <strong>{label as string}</strong>
+}
+```
+
+The `typeof` check keeps a rich-text result in React. `OctaneCompatInline` adds a span host for the inline Octane child. Compile the React and Octane files with the [mixed-app setup](../../docs/react-compat.md#compiler-ownership), and use `octane/react/server` in the server build. Select the prop-only child when running the codemod. The wrapper stays in React and its import follows the child's new extension.
 
 ### Extracting FormatJS messages
 
