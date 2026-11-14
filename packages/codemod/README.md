@@ -79,6 +79,11 @@ export begins by calling a named React import of `useState` or
 `useSyncExternalStore`. Give native callers a compiled Octane hook and retain the
 original for React callers.
 
+The codemod also warns when native setup calls an unchanged local hook that
+forwards to a private helper with a direct React `useContext` read. The warning
+describes what happens after the helper module initializes. Earlier imports in
+a cycle can enter a component while that module's context is still uninitialized.
+
 Every module with JSX becomes `.tsrx`, entries and helpers without a component
 included, so Strong mode can reach all of them; one that was JavaScript gains
 `// @ts-nocheck`, so it stays as unchecked as it was. Every import of a renamed

@@ -3177,7 +3177,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 							);
 						const local =
 							site && this.options.localReactHook(module, name, !!call && slotKeyed && nativeOnly);
-						if (call && local && typeof local !== 'string') {
+						if (call && local && typeof local !== 'string' && 'from' in local) {
 							dest = local.from;
 							this.count('native-external-store');
 						} else if (site && typeof local === 'string' && (call || local === 'useContext'))
@@ -3187,6 +3187,21 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 								site,
 								`The unchanged ${module} export ${name} calls React's ${local}. Provide a compiled Octane hook for native callers or keep this component under a React renderer.`,
 							);
+						else if (local && typeof local !== 'string' && 'privateContext' in local) {
+							const advisorySite = refs.find((ref) =>
+								nativeSetupHook(ref, this.localUses, this.checker, {
+									...setup,
+									privateContext: true,
+								}),
+							);
+							if (advisorySite)
+								this.note(
+									RULE.bindings,
+									'warning',
+									advisorySite,
+									`If native setup reaches the unchanged ${module} export ${name} after its module initializes, its private helper calls React's useContext. Provide a compiled Octane hook or keep the component under React.`,
+								);
+						}
 					}
 					if (!dest) {
 						kept.push(item);

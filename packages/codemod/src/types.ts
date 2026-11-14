@@ -31,12 +31,12 @@ export interface TransformOptions {
 	originalReact?: boolean;
 	/** A React DOM resource hint called by an imported plain TypeScript initializer. */
 	initializerResourceHint?(module: string, name: string): string | undefined;
-	/** A dispatcher hook directly called by an unchanged local TypeScript export. */
+	/** Renderer work called by an unchanged local TypeScript export. */
 	localReactHook?(
 		module: string,
 		name: string,
 		nativeOnly: boolean,
-	): string | { from: string } | undefined;
+	): string | { from: string } | { privateContext: true } | undefined;
 	/** A dispatcher hook directly called by an unchanged component at a migrated React DOM root. */
 	localReactRootComponent?(module: string, name: string): string | undefined;
 	/** Resolve a source-backed workspace hook after verifying its implementation and its call sites. */

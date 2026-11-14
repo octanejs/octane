@@ -875,6 +875,100 @@ export function useObserver(fit: () => void) {
 		expect(fs.readFileSync(path.join(root, 'use-observer.ts'), 'utf8')).toBe(hook);
 	});
 
+	it.each([true, false])(
+		'advises on a retained private context helper (projectTypes=%s)',
+		async (projectTypes) => {
+			const imports = "import { createContext, useContext as readContext } from 'react';";
+			const context = "const Theme = createContext('unset');";
+			const helper = 'function readTheme() { const label = readContext(Theme); return label; }';
+			const hook = 'export function useLabel() { return readTheme(); }';
+			const owner = [imports, context, helper, hook].join('\n');
+			const view = (file, call = 'useLabel()') => `import { useLabel } from './${file}';
+export function View() { const label = ${call}; return <b>{label}</b>; }`;
+			const files = {
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				'owner.ts': owner,
+				'View.tsx': view('owner'),
+				'Cycle.tsx': "import './early';\n" + view('owner'),
+				'early.ts': "import { View } from './Cycle'; View();",
+				'Optional.tsx': view('owner', 'useLabel?.()'),
+				'Argument.tsx': view('owner', 'useLabel(fail())'),
+				'Deferred.tsx': view('owner', '() => useLabel()'),
+				'ErasedCaller.tsx': view('owner').replace('const label', 'declare const label'),
+				'ReactOwned.tsx':
+					"import { ReactCompat } from 'octane/react';\n" +
+					view('owner') +
+					'\nexport function Parent() { return <ReactCompat><View /></ReactCompat>; }',
+				'hook-default.ts': owner.replace('readTheme()', 'readTheme(value = fail())'),
+				'Default.tsx': view('hook-default'),
+				'hook-changed.ts': owner + '\nreadTheme = () => "different";',
+				'Changed.tsx': view('hook-changed'),
+				'hook-ambient.ts': owner.replace(context, 'declare const Theme: any;'),
+				'Ambient.tsx': view('hook-ambient'),
+				'hook-erased-read.ts': owner.replace(
+					'const label = readContext',
+					'declare const label = readContext',
+				),
+				'ErasedRead.tsx': view('hook-erased-read'),
+				'hook-erased-helper.ts': owner.replace(
+					'return readTheme();',
+					"declare const label = readTheme(); return 'ok';",
+				),
+				'ErasedHelper.tsx': view('hook-erased-helper'),
+				'hook-exported.ts': owner + '\nexport { readTheme };',
+				'Exported.tsx': view('hook-exported'),
+				'hook-direct.ts': owner.replace(
+					hook,
+					'export function useLabel() { return readContext(Theme); }',
+				),
+				'Direct.tsx': view('hook-direct'),
+				'hook-selected.ts': owner,
+				'Selected.tsx': view('hook-selected'),
+			};
+			const root = project(files);
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules'),
+				path.join(root, 'node_modules'),
+			);
+			const inputs = Object.keys(files)
+				.filter((file) => file.endsWith('.tsx') || file === 'hook-selected.ts')
+				.sort();
+			const result = await runCodemod(
+				inputs.map((file) => path.join(root, file)),
+				{
+					root,
+					strong: true,
+					projectTypes,
+					verify: true,
+					write: false,
+				},
+			);
+			const findings = result.files.flatMap((file) =>
+				file.notes
+					.filter((note) => note.rule === 'bindings' && note.message.includes("React's useContext"))
+					.map((note) => [file.file, note.line, note.severity, note.message]),
+			);
+			expect(findings).toEqual([
+				['Cycle.tsx', 3, 'warning', expect.stringContaining('after its module initializes')],
+				[
+					'Direct.tsx',
+					2,
+					'error',
+					expect.stringContaining("export useLabel calls React's useContext"),
+				],
+				['View.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
+			]);
+			for (const name of ['Cycle.tsx', 'View.tsx']) {
+				const resultFile = result.files.find((file) => file.file === name);
+				expect(resultFile.strong).toBe(true);
+				expect(resultFile.code).toContain("from './owner'");
+			}
+			expect(fs.readFileSync(path.join(root, 'owner.ts'), 'utf8')).toBe(owner);
+		},
+	);
+
 	it('reports an unchanged React hook component passed to a migrated React DOM root', async () => {
 		const app = (module = './leaf') => `import * as ReactDOM from 'react-dom/client';
 import { Leaf } from '${module}';
