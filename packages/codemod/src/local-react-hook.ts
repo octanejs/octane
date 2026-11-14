@@ -50,7 +50,51 @@ function literalDeclaration(declaration: ts.VariableDeclaration) {
 	);
 }
 
-/** A direct initialization in an ordinary component returning a native host. */
+function safeSetupLiteral(node: ts.Expression, checker: ts.TypeChecker) {
+	if (scalarLiteral(node)) return true;
+	if (ts.isIdentifier(node) && node.text === 'undefined') {
+		const symbol = checker.getSymbolAtLocation(node);
+		return !!symbol && checker.isUndefinedSymbol(symbol);
+	}
+	return (
+		ts.isPrefixUnaryExpression(node) &&
+		(node.operator === ts.SyntaxKind.PlusToken || node.operator === ts.SyntaxKind.MinusToken) &&
+		ts.isNumericLiteral(skipWrappers(node.operand))
+	);
+}
+
+/** A state declaration before the retained hook, with no explicit lazy initializer. */
+function stateSetup(declaration: ts.VariableDeclaration, checker: ts.TypeChecker, owner: ts.Node) {
+	const { name, initializer } = declaration;
+	if (
+		(declaration.parent.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+		declaredVariable(declaration.parent.parent) ||
+		!ts.isArrayBindingPattern(name) ||
+		!name.elements.every(
+			(element) =>
+				ts.isOmittedExpression(element) ||
+				(!element.dotDotDotToken && !element.initializer && ts.isIdentifier(element.name)),
+		) ||
+		!initializer ||
+		!ts.isCallExpression(initializer) ||
+		ts.isOptionalChain(initializer) ||
+		!ts.isIdentifier(initializer.expression) ||
+		rendererImport(initializer.expression, checker) !== 'useState' ||
+		initializer.arguments.length > 1
+	)
+		return false;
+	const input = initializer.arguments[0];
+	if (!input) return true;
+	const value = skipWrappers(input);
+	if (safeSetupLiteral(value, checker)) return true;
+	let binding = ts.isIdentifier(value)
+		? checker.getSymbolAtLocation(value)?.valueDeclaration
+		: undefined;
+	while (binding && ts.isBindingElement(binding)) binding = binding.parent.parent;
+	return !!binding && ts.isParameter(binding) && binding.parent === owner;
+}
+
+/** A direct initialization in an ordinary component with native output. */
 export function nativeSetupHook(
 	ref: ts.Identifier,
 	uses: ReturnType<typeof localUses>,
@@ -58,6 +102,7 @@ export function nativeSetupHook(
 	diagnostic?: {
 		calleeName(callee: ts.Expression): string | null;
 		nativeOutput(element: ts.JsxElement | ts.JsxSelfClosingElement): boolean;
+		originalReact(): boolean;
 		contextSetup?: boolean;
 		privateContext?: boolean;
 	},
@@ -74,8 +119,9 @@ export function nativeSetupHook(
 		return false;
 	const statement = decl.parent.parent;
 	const block = statement.parent;
-	if (!ts.isBlock(block)) return false;
+	if (!ts.isBlock(block) || declaredVariable(statement)) return false;
 	const position = block.statements.indexOf(statement);
+	let afterState = false;
 	if (!diagnostic) {
 		if (position === 0) {
 			if (decl.parent.declarations[0] !== decl) return false;
@@ -90,7 +136,7 @@ export function nativeSetupHook(
 	} else if (diagnostic.contextSetup || diagnostic.privateContext) {
 		if (
 			call.questionDotToken ||
-			(diagnostic.privateContext && (call.arguments.length !== 0 || declaredVariable(statement))) ||
+			(diagnostic.privateContext && call.arguments.length !== 0) ||
 			decl.parent.declarations.length !== 1 ||
 			(decl.parent.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
 			!call.arguments.every(
@@ -111,6 +157,13 @@ export function nativeSetupHook(
 		)
 			return false;
 	} else {
+		const setupDeclaration = (declaration: ts.VariableDeclaration) => {
+			if (literalDeclaration(declaration)) return true;
+			if (!stateSetup(declaration, checker, block.parent) || !diagnostic.originalReact())
+				return false;
+			afterState = true;
+			return true;
+		};
 		const declarations = decl.parent.declarations;
 		if (
 			!block.statements
@@ -118,9 +171,9 @@ export function nativeSetupHook(
 				.every(
 					(prior) =>
 						ts.isVariableStatement(prior) &&
-						prior.declarationList.declarations.every(literalDeclaration),
+						prior.declarationList.declarations.every(setupDeclaration),
 				) ||
-			!declarations.slice(0, declarations.indexOf(decl)).every(literalDeclaration)
+			!declarations.slice(0, declarations.indexOf(decl)).every(setupDeclaration)
 		)
 			return false;
 	}
@@ -185,8 +238,28 @@ export function nativeSetupHook(
 		: ts.isJsxSelfClosingElement(value)
 			? value.tagName
 			: undefined;
-	if (!tag || !ts.isIdentifier(tag) || !/^[a-z]/.test(tag.text)) return false;
-	return diagnostic ? 'diagnostic' : position === 0 ? 'first' : 'afterRefs';
+	const intrinsic = tag && ts.isIdentifier(tag) && /^[a-z]/.test(tag.text);
+	if (intrinsic && !afterState)
+		return diagnostic ? 'diagnostic' : position === 0 ? 'first' : 'afterRefs';
+	// The retained hook runs in setup, before the returned child has a renderer.
+	if (
+		diagnostic &&
+		!diagnostic.privateContext &&
+		(tag || ts.isJsxFragment(value)) &&
+		!ts.isOptionalChain(call) &&
+		!(decl.parent.flags & ts.NodeFlags.Using) &&
+		call.arguments.every((input) => {
+			const arg = skipWrappers(input);
+			return (
+				safeSetupLiteral(arg, checker) ||
+				(ts.isIdentifier(arg) &&
+					fixedBinding(checker, arg, call) &&
+					initializedBefore(checker, arg, call))
+			);
+		})
+	)
+		return 'diagnostic';
+	return false;
 }
 
 function declaredVariable(statement: ts.Statement) {

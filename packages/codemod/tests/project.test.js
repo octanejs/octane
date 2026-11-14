@@ -808,6 +808,130 @@ export function useLabel() { const later = () => useState('ready'); return 'read
 		}
 	});
 
+	it.each([false, true])(
+		'reports retained local hooks before native component output (projectTypes=%s)',
+		async (projectTypes) => {
+			const helper = `import { useState } from 'react';
+export function useLabel() { const [label] = useState('ready'); return label; }`;
+			const imports = `import { useState as state } from 'react';
+import { useLabel } from './use-label';
+import { Label as ImportedLabel } from './Label';`;
+			const panel = (prefix, output) => `${imports}
+function Label({ label }: { label: string }) { return <b>{label}</b>; }
+export function Panel({ initial = false }: { initial?: boolean }) {
+	${prefix}
+	const label = useLabel();
+	return ${output};
+}`;
+			const root = project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				'use-label.ts': helper,
+				'throwing-value.ts': 'export const undefined = () => { throw new Error("unsafe"); };',
+				'Label.tsx':
+					'export function Label(props: { label: string }) { return <b>{props.label}</b>; }',
+				'Local.tsx': panel('', '<Label label={label} />'),
+				'Imported.tsx': panel('', '<ImportedLabel label={label} />'),
+				'Fragment.tsx': panel('', '<><b>{label}</b></>'),
+				'Memo.tsx':
+					"import { memo } from 'react';\n" +
+					panel('', '<Label label={label} />').replace(
+						'function Panel(',
+						'const Panel = memo(function Inner(',
+					) +
+					');',
+				'Forward.tsx':
+					"import { forwardRef } from 'react';\n" +
+					panel('const [open] = state(false);', '<b aria-expanded={open}>{label}</b>').replace(
+						'function Panel(',
+						'const Panel = forwardRef(function Inner(',
+					) +
+					');',
+				'State.tsx': panel('const [open] = state(false);', '<b aria-expanded={open}>{label}</b>'),
+				'StateUndefined.tsx': panel('const [open] = state(undefined);', '<Label label={label} />'),
+				'StateSigned.tsx': panel('const [open] = state(-1);', '<Label label={label} />'),
+				'StateUnaryCall.tsx': panel('const [open] = state(-fail());', '<Label label={label} />'),
+				'UndefinedArgument.tsx': panel('', '<Label label={label} />').replace(
+					'useLabel()',
+					'useLabel(undefined)',
+				),
+				'SignedArgument.tsx': panel('', '<Label label={label} />').replace(
+					'useLabel()',
+					'useLabel(+1)',
+				),
+				'ShadowedUndefined.tsx':
+					'import { undefined } from "./throwing-value";\n' +
+					panel('', '<Label label={label} />').replace('useLabel()', 'useLabel(undefined)'),
+				'StateAndChild.tsx': panel(
+					'const [open] = state(initial);',
+					'<Label label={open ? "open" : label} />',
+				),
+				'SameDeclaration.tsx': panel('', '<Label label={open ? "open" : label} />').replace(
+					'const label = useLabel();',
+					'const [open] = state(false), label = useLabel();',
+				),
+				'StateBindingDefault.tsx': panel(
+					'const [open = fail()] = state();',
+					'<Label label={label} />',
+				),
+				'ThrowingInitializer.tsx': panel(
+					"const [open] = state(() => { throw new Error('setup failed'); });",
+					'<Label label={label} />',
+				),
+				'ThrowingArgument.tsx': panel('', '<Label label={label} />').replace(
+					'useLabel()',
+					"useLabel((() => { throw new Error('argument failed'); })())",
+				),
+				'Declared.tsx': panel('', '<Label label={label} />').replace(
+					'const label = useLabel();',
+					'declare const label = useLabel();',
+				),
+				'ReactOwned.tsx':
+					"import { ReactCompat } from 'octane/react';\n" +
+					panel('', '<Label label={label} />') +
+					'\nexport function App() { return <ReactCompat><Panel/></ReactCompat>; }',
+			});
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules'),
+				path.join(root, 'node_modules'),
+				'dir',
+			);
+			const paths = fs.readdirSync(root).filter((name) => name.endsWith('.tsx'));
+			const options = { root, projectTypes, strong: true, verify: true };
+			const input = paths.map((name) => path.join(root, name));
+			const { files } = await runCodemod(input, { ...options, write: false });
+			expect(
+				files
+					.filter((file) =>
+						file.notes.some(
+							(note) =>
+								note.severity === 'error' &&
+								note.message.includes(
+									"The unchanged ./use-label export useLabel calls React's useState.",
+								),
+						),
+					)
+					.map((file) => file.file),
+			).toEqual([
+				'Forward.tsx',
+				'Fragment.tsx',
+				'Imported.tsx',
+				'Local.tsx',
+				'Memo.tsx',
+				'SameDeclaration.tsx',
+				'SignedArgument.tsx',
+				'State.tsx',
+				'StateAndChild.tsx',
+				'StateSigned.tsx',
+				'StateUndefined.tsx',
+				'UndefinedArgument.tsx',
+			]);
+			expect(fs.existsSync(path.join(root, 'Local.tsx'))).toBe(true);
+			expect(fs.existsSync(path.join(root, 'Local.tsrx'))).toBe(false);
+		},
+	);
+
 	it('reports an unchanged React context hook after ordinary component setup', async () => {
 		const view = (setup, read = 'useObserver(fit)') => `import { useRef } from 'react';
 import { useObserver } from './use-observer';
