@@ -15,10 +15,11 @@ import * as React from 'react';
 import { flushSync as reactFlushSync } from 'react-dom';
 import { OctaneCompat } from 'octane/react';
 import { flushSync as octaneFlushSync } from '../../src/index.js';
-import { act as octaneAct, createLog, flushEffects } from '../_helpers.js';
+import { act as octaneAct, createLog, flushEffects, mount } from '../_helpers.js';
 import { h, mountReactHost, reactAct, SpikeErrorBoundary } from './_react-host.js';
 import {
 	ActivityIsland,
+	ArrayRefIsland,
 	BadgeIsland,
 	CleanupThrowIsland,
 	GreetingIsland,
@@ -671,6 +672,149 @@ describe('octane/react — suspension and error escape to React boundaries', () 
 			}
 		},
 	);
+
+	it.each([
+		{ fragment: false, detached: false, retireIn: 'callback' },
+		{ fragment: true, detached: true, retireIn: 'callback' },
+		{ fragment: false, detached: true, retireIn: 'index getter' },
+		{ fragment: true, detached: false, retireIn: 'length getter' },
+	])(
+		'stops an array ref when its React host is deleted by a $retireIn ($fragment, $detached)',
+		async ({ fragment, detached, retireIn }) => {
+			type Props = Parameters<typeof ArrayRefIsland>[0];
+			type Callback = (target: unknown) => void | (() => void);
+			const log = createLog();
+			let removeHost!: () => void;
+			let calls = 0;
+			const old: Callback = (target) => {
+				log.push(target ? 'old attach' : 'old null');
+				if (target) return () => log.push('old cleanup');
+			};
+			const repeat: Callback = (target) => {
+				if (!target) {
+					log.push('repeat null');
+					return;
+				}
+				const call = ++calls;
+				log.push('repeat attach:' + call);
+				return () => log.push('repeat cleanup:' + call);
+			};
+			const retire: Callback = (target) => {
+				log.push(target ? 'retire attach' : 'retire null');
+				if (target) {
+					removeHost();
+					return () => log.push('retire cleanup');
+				}
+			};
+			const tail = {
+				get current(): null {
+					return null;
+				},
+				set current(target: unknown) {
+					log.push(target ? 'tail attach' : 'tail null');
+				},
+			};
+			const nested = [repeat, retire, repeat];
+			if (retireIn === 'index getter') {
+				Object.defineProperty(nested, 1, {
+					get() {
+						log.push('index read');
+						removeHost();
+						return retire;
+					},
+				});
+			}
+			const next = [
+				repeat,
+				retireIn === 'length getter'
+					? new Proxy(nested, {
+							get(target, key, receiver) {
+								if (key === 'length') {
+									log.push('length read');
+									removeHost();
+								} else {
+									log.push('index read');
+								}
+								return Reflect.get(target, key, receiver);
+							},
+						})
+					: nested,
+				tail,
+			];
+			const mounted = await mountReactHost(
+				h(OctaneCompat<Props>, {
+					component: ArrayRefIsland,
+					props: fragment
+						? { fragment: true, refs: [[old, old], next] }
+						: { fragment: false, refs: [[old, old], next] },
+				}),
+				{ detached },
+			);
+			removeHost = () => {
+				reactFlushSync(() => mounted.reactRoot.unmount());
+				log.push('host children:' + mounted.container.childNodes.length);
+			};
+			try {
+				expect(log.drain()).toEqual(['old attach', 'old attach']);
+				const button = mounted.host().querySelector('button')!;
+				await reactAct(() => octaneAct(() => button.click()));
+				expect(log.drain()).toEqual([
+					'old cleanup',
+					'old cleanup',
+					'repeat attach:1',
+					...(retireIn === 'length getter'
+						? ['length read']
+						: ['repeat attach:2', retireIn === 'index getter' ? 'index read' : 'retire attach']),
+					'host children:0',
+					'repeat cleanup:1',
+					...(retireIn === 'length getter' ? [] : ['repeat cleanup:2']),
+					...(retireIn === 'callback' ? ['retire cleanup'] : []),
+				]);
+			} finally {
+				await mounted.unmount();
+			}
+		},
+	);
+
+	it('finishes an independent native array ref when a callback deletes a React island', async () => {
+		const mounted = await mountReactHost(
+			h(OctaneCompat<Parameters<typeof BadgeIsland>[0]>, {
+				component: BadgeIsland,
+				props: { label: 'hosted' },
+			}),
+		);
+		const log = createLog();
+		const native = mount(ArrayRefIsland, {
+			fragment: false,
+			refs: [
+				[],
+				[
+					(target) => {
+						if (!target) return;
+						log.push('first attach');
+						reactFlushSync(() => mounted.reactRoot.unmount());
+						log.push('host children:' + mounted.container.childNodes.length);
+						return () => log.push('first cleanup');
+					},
+					(target) => {
+						if (!target) return;
+						log.push('second attach');
+						return () => log.push('second cleanup');
+					},
+				],
+			],
+		});
+		try {
+			await reactAct(() => octaneAct(() => native.click('button')));
+			expect(log.drain()).toEqual(['first attach', 'host children:0', 'second attach']);
+			expect(native.find('span').textContent).toBe('1');
+			native.unmount();
+			expect(log.drain()).toEqual(['first cleanup', 'second cleanup']);
+		} finally {
+			native.unmount();
+			await mounted.unmount();
+		}
+	});
 
 	it('cleans up the effect that deletes its host and skips the next effect', async () => {
 		const resource = deferred<string>();
