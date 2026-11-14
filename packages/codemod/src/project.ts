@@ -1570,10 +1570,7 @@ export async function runCodemod(
 		};
 		if (result) Object.assign(result, { code: paths.code, changed: true, rules });
 		else results.push(host);
-		const retainedJsx =
-			!known.has(file) &&
-			/\.[jt]sx$/.test(file) &&
-			(source.includes('.tsx') || source.includes('.jsx') || source.includes('\\'));
+		const retainedJsx = !known.has(file) && /\.[jt]sx$/.test(file) && source.includes('<');
 		const retainedServer =
 			!isTsrx(file) && (source.includes('react-dom/server') || source.includes('\\'));
 		if (
@@ -1594,12 +1591,21 @@ export async function runCodemod(
 					edges.push({ ...edge, renderer: 'server render' });
 			for (const edge of edges) {
 				const match = renamed(file, edge.module);
+				if (!match) continue;
+				const original = path.resolve(path.dirname(file), edge.module);
+				const explicit =
+					match.file === original && (edge.renderer !== 'JSX' || /\.[jt]sx$/.test(edge.module));
 				if (
-					!match ||
-					match.file !== path.resolve(path.dirname(file), edge.module) ||
-					!automaticReactJsx(match.file) ||
-					!originalReactEntry(match.file, 'react/jsx-runtime')
+					!explicit &&
+					(edge.renderer !== 'JSX' ||
+						!/^\.{1,2}\//.test(edge.module) ||
+						/[!%?#\\]/.test(edge.module) ||
+						config?.rootDirs ||
+						config?.moduleSuffixes?.some(Boolean) ||
+						!unambiguousJsxPath(match.file, original))
 				)
+					continue;
+				if (!automaticReactJsx(match.file) || !originalReactEntry(match.file, 'react/jsx-runtime'))
 					continue;
 				const leaf = byFile.get(match.file);
 				if (!leaf?.output.endsWith('.tsrx')) continue;
@@ -2083,8 +2089,37 @@ function renamedImports(
 	};
 }
 
-/** Read the selected implementation only when a localized prop needs it. TS may prefer a
- * .tsx source even when the runtime can load a separate .js sibling or directory entry. */
+/** TS can prefer a source file over a separate JS sibling or directory entry. */
+function hasModuleSibling(file: string) {
+	const stem = file.slice(0, -path.extname(file).length);
+	const dir = path.dirname(stem);
+	const stems = path.basename(stem) === 'index' ? [stem, dir] : [stem, path.join(stem, 'index')];
+	return (
+		stems.some((base) =>
+			['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts'].some(
+				(ext) => base + ext !== file && fs.existsSync(base + ext),
+			),
+		) || fs.existsSync(path.join(path.basename(stem) === 'index' ? dir : stem, 'package.json'))
+	);
+}
+
+/** Accept only a direct JSX file or directory index without a competing entry. */
+function unambiguousJsxPath(file: string, original: string) {
+	if (!/\.[jt]sx$/.test(file)) return false;
+	const stem = file.slice(0, -4);
+	const index = stem === path.join(original, 'index');
+	if (stem !== original && !index) return false;
+	const exists = (name: string) => fs.lstatSync(name, { throwIfNoEntry: false });
+	if (index ? !exists(original)?.isDirectory() : exists(original)) return false;
+	return (
+		!hasModuleSibling(file) &&
+		!exists(original + '.json') &&
+		!exists(original + '.tsrx') &&
+		(!index || (!exists(stem) && !exists(stem + '.json') && !exists(stem + '.tsrx')))
+	);
+}
+
+/** Read the selected implementation only when a localized prop needs it. */
 type PropDestination = 'text' | 'render' | 'forwarded-text' | 'host-text';
 function propsOf(
 	file: string,
@@ -2098,18 +2133,7 @@ function propsOf(
 	ordinaryCaller?: boolean,
 	depth?: number,
 ) => boolean {
-	const stem = file.slice(0, -path.extname(file).length);
-	const dir = path.dirname(stem);
-	const stems = path.basename(stem) === 'index' ? [stem, dir] : [stem, path.join(stem, 'index')];
-	if (
-		stems.some((base) =>
-			['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts'].some(
-				(ext) => base + ext !== file && fs.existsSync(base + ext),
-			),
-		) ||
-		fs.existsSync(path.join(path.basename(stem) === 'index' ? dir : stem, 'package.json'))
-	)
-		return () => false;
+	if (hasModuleSibling(file)) return () => false;
 	const { sf, checker } = bind(file, fs.readFileSync(file, 'utf8'));
 	const module = checker.getSymbolAtLocation(sf);
 	const names = module && new Map(checker.getExportsOfModule(module).map((s) => [s.name, s]));

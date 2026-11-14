@@ -271,7 +271,7 @@ export function retainedReactComponentReturns(file: string, source: string) {
 		if (localName && !/^[A-Z]/.test(localName)) continue;
 		if (ts.isIdentifier(tag) && !/^[A-Z]/.test(tag.text)) continue;
 		const leaf = imported(checker, tag);
-		if (leaf?.module.startsWith('.') && /\.[jt]sx$/.test(leaf.module)) {
+		if (leaf?.module.startsWith('.')) {
 			seen.add(output);
 			edges.push({ ...leaf, line: sf.getLineAndCharacterOfPosition(output.getStart(sf)).line + 1 });
 		}
