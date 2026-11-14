@@ -79,7 +79,7 @@ import {
 } from './render.js';
 import { noteRecoverableHydrationError, isDocumentSingleton } from './roots.js';
 import { isAdoptionControl } from './hydration-presentation.js';
-import { HTML_NS, isHostElementOfType, setCustomElementListener } from './host-props.js';
+import { isHostElementOfType, setCustomElementListener } from './host-props.js';
 import { parsedInlineScriptContent } from '../shared-value-helpers.js';
 import { isElementDescriptor, isHostDescriptor } from './elements.js';
 import { siteLoc, componentSourceLoc } from './diagnostics.js';
@@ -123,7 +123,7 @@ function matchesParsedText(host: Node | null, server: string | null, client: str
 		parserNormalizedMatch(server, client) ||
 		(host !== null &&
 			(host as Element).localName === 'script' &&
-			(host as Element).namespaceURI === HTML_NS &&
+			(host as Element).namespaceURI === 'http://www.w3.org/1999/xhtml' &&
 			server === parsedInlineScriptContent(client))
 	);
 }
