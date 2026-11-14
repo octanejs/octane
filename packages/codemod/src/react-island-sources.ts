@@ -248,17 +248,17 @@ export function retainedReactComponentReturns(file: string, source: string) {
 	return edges;
 }
 
-/** Existing Octane client roots that render a directly imported component body. */
-export function octaneClientComponents(file: string, source: string) {
+/** Existing Octane roots that render a directly imported component body. */
+export function octaneRootComponents(file: string, source: string) {
 	const { sf, checker } = bind(file, source);
-	const edges: { module: string; name: string; line: number }[] = [];
-	function factory(node: ts.CallExpression) {
-		const callee = imported(checker, skipWrappers(node.expression));
-		if (callee?.module === 'octane') return callee.name;
-	}
-	function component(call: ts.CallExpression) {
-		const callee = skipWrappers(call.expression);
-		if (factory(call) === 'hydrateRoot' && call.arguments.length <= 4) return call.arguments[1];
+	const edges: {
+		runtime: 'octane' | 'octane/server';
+		module: string;
+		name: string;
+		line: number;
+	}[] = [];
+	function clientComponent(call: ts.CallExpression, callee: ts.Expression, hydrate: boolean) {
+		if (hydrate && call.arguments.length <= 4) return call.arguments[1];
 		if (
 			!ts.isPropertyAccessExpression(callee) ||
 			ts.isOptionalChain(callee) ||
@@ -272,10 +272,11 @@ export function octaneClientComponents(file: string, source: string) {
 			!ts.isOptionalChain(root) &&
 			root.arguments.length >= 1 &&
 			root.arguments.length <= 2 &&
-			!root.arguments.some(ts.isSpreadElement) &&
-			factory(root) === 'createRoot'
-		)
-			return call.arguments[0];
+			!root.arguments.some(ts.isSpreadElement)
+		) {
+			const factory = imported(checker, skipWrappers(root.expression));
+			if (factory?.module === 'octane' && factory.name === 'createRoot') return call.arguments[0];
+		}
 	}
 	function visit(node: ts.Node) {
 		if (
@@ -283,11 +284,19 @@ export function octaneClientComponents(file: string, source: string) {
 			!ts.isOptionalChain(node) &&
 			!node.arguments.some(ts.isSpreadElement)
 		) {
-			const value = component(node);
-			const leaf = value && imported(checker, skipWrappers(value));
+			const callee = skipWrappers(node.expression);
+			const entry = imported(checker, callee);
+			const server = entry?.module === 'octane/server';
+			const value = server
+				? node.arguments.length <= 3 &&
+					(entry.name === 'renderToString' || entry.name === 'renderToStaticMarkup') &&
+					node.arguments[0]
+				: clientComponent(node, callee, entry?.module === 'octane' && entry.name === 'hydrateRoot');
+			const leaf = value ? imported(checker, skipWrappers(value)) : undefined;
 			if (leaf?.module.startsWith('.') && /\.[jt]sx$/.test(leaf.module))
 				edges.push({
 					...leaf,
+					runtime: server ? 'octane/server' : 'octane',
 					line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
 				});
 		}
