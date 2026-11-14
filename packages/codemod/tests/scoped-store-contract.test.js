@@ -296,7 +296,9 @@ function project(overrides) {
 
 it.each([
 	['0.17.0', true],
-	['0.18.0', false],
+	['0.18.0', true],
+	['0.18.1', true],
+	['0.19.0', false],
 ])('gates the generated adapters on installed Octane %s', async (version, supported) => {
 	const { app, root } = project({
 		'app/src/pane.tsx': `import {useSnapshot} from 'observer';
