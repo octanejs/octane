@@ -68,6 +68,13 @@ test('a moon task that runs bun test selects bun named test files', async () => 
 		...packageTree,
 	];
 	const inventory = await immutableTestInventory(tree, 'packages/widget', manifest, options);
+	await assert.rejects(
+		immutableTestInventory(tree, 'packages/widget', manifest, {
+			...options,
+			evidenceBudget: { remainingBytes: tree[0].size + tree[2].size - 1 },
+		}),
+		/Source evidence exceeds the total byte limit: packages\/widget\/test\/widget.test.ts/,
+	);
 	assert.deepEqual(
 		inventory.map(({ path, registrations }) => [path, registrations.length]),
 		[['packages/widget/test/widget.test.ts', 1]],
@@ -713,6 +720,16 @@ describe('resolved evidence', () => {
 		const sourceManifest = sourceManifestBytes.toString('base64');
 		const sourceLicense = sourceLicenseBytes.toString('base64');
 		const sourceTree = [
+			// Large tracked artifacts elsewhere in the monorepo are never read as
+			// package evidence. The mock deliberately has no responses for them.
+			...[0, 1, 2].map((index) => ({
+				path: `.yarn/cache/dependency-${index}.zip`,
+				mode: '100644',
+				type: 'blob',
+				size: 90 * 1024 * 1024,
+				sha: 'd'.repeat(40),
+				url: `https://api.github.com/repos/example/widgets/git/blobs/unrelated-${index}`,
+			})),
 			{
 				path: 'packages/react-widget/package.json',
 				type: 'blob',
