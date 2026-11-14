@@ -300,6 +300,7 @@ describe('runCodemod', () => {
 
 	it.each([
 		['plain return', 'Leaf', '<Leaf />', '', true],
+		['named and default export', 'Leaf', '<Leaf />', '', true],
 		['named import', '{ Leaf }', '<Leaf />', '', true],
 		['React JSX pragma', 'Leaf', '<Leaf />', '/** @jsxImportSource react */', true],
 		['native JSX', 'Leaf', '<Leaf />', '/** @jsxImportSource octane */', false],
@@ -327,7 +328,8 @@ describe('runCodemod', () => {
 				'Owner.tsx': `${pragma}
 import { OctaneCompat } from 'octane/react';
 import ${binding} from './Leaf.tsx';
-export function Owner(${shape === 'shadowed binding' ? '{ Leaf }' : ''}) { return ${output}; }`,
+export function Owner(${shape === 'shadowed binding' ? '{ Leaf }' : ''}) { return ${output}; }
+${shape === 'named and default export' ? 'export default Owner;' : ''}`,
 			});
 			fs.symlinkSync(
 				path.join(REPO, 'packages/codemod/node_modules'),
@@ -341,13 +343,13 @@ export function Owner(${shape === 'shadowed binding' ? '{ Leaf }' : ''}) { retur
 				verify: true,
 				write: false,
 			});
-			const affected = preview.files
-				.filter((file) =>
-					file.notes.some(
+			const affected = preview.files.flatMap((file) =>
+				file.notes
+					.filter(
 						(note) => note.severity === 'warning' && note.message.includes('retained React JSX'),
-					),
-				)
-				.map((file) => file.file);
+					)
+					.map(() => file.file),
+			);
 			expect(affected).toEqual(warns ? ['Leaf.tsx', 'Owner.tsx'] : []);
 			if (shape === 'plain return') {
 				const result = await runCodemod(selected, { root, strong: true, verify: true });

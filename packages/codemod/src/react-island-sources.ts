@@ -231,13 +231,17 @@ export function retainedReactComponentReturns(file: string, source: string) {
 	const bound = bind(file, source);
 	const { sf, checker } = bound;
 	const edges = [];
+	const seen = new Set<ts.Node>();
 	for (const { output, localName } of directExportReturns(bound)) {
+		if (seen.has(output)) continue;
 		const tag = openingTag(output).tagName;
 		if (localName && !/^[A-Z]/.test(localName)) continue;
 		if (ts.isIdentifier(tag) && !/^[A-Z]/.test(tag.text)) continue;
 		const leaf = imported(checker, tag);
-		if (leaf?.module.startsWith('.') && /\.[jt]sx$/.test(leaf.module))
+		if (leaf?.module.startsWith('.') && /\.[jt]sx$/.test(leaf.module)) {
+			seen.add(output);
 			edges.push({ ...leaf, line: sf.getLineAndCharacterOfPosition(output.getStart(sf)).line + 1 });
+		}
 	}
 	return edges;
 }
