@@ -4918,6 +4918,25 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				if (condition.kind === ts.SyntaxKind.FalseKeyword) return read(member.whenFalse);
 				return read(condition) ?? read(member.whenTrue) ?? read(member.whenFalse);
 			}
+			if (ts.isBinaryExpression(member)) {
+				const op = member.operatorToken.kind;
+				if (
+					op === ts.SyntaxKind.AmpersandAmpersandToken ||
+					op === ts.SyntaxKind.BarBarToken ||
+					op === ts.SyntaxKind.QuestionQuestionToken
+				) {
+					const left = read(member.left);
+					if (left) return left;
+					const condition = literalCondition(member.left);
+					if (
+						condition === undefined ||
+						(op === ts.SyntaxKind.AmpersandAmpersandToken && condition === 'truthy') ||
+						(op === ts.SyntaxKind.BarBarToken && condition !== 'truthy') ||
+						(op === ts.SyntaxKind.QuestionQuestionToken && condition === 'nullish')
+					)
+						return read(member.right);
+				}
+			}
 			if (
 				(ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member)) &&
 				!this.ownDataDependency(member, node, list)
