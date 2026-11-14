@@ -8,7 +8,7 @@
  * that sequential suspense queries keep the boundary on its fallback until every
  * query has data.
  */
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { resolve } from 'node:path';
 import {
 	mountDifferential,
@@ -53,12 +53,25 @@ describe('differential: @octanejs/tanstack-query vs real @tanstack/react-query',
 
 	// @parity-case differential:tanstack-query-async
 	it('AsyncApp: pending → success renders byte-identical at both steps', async () => {
-		const d = await mountDifferential(ASYNC, 'AsyncApp', undefined, CACHE);
-		await d.step('mount (pending)', () => {});
-		await d.step('settled (success)', async () => {
-			await settle();
-		});
-		d.unmount();
+		const query = Promise.withResolvers<string>();
+		const d = await mountDifferential(ASYNC, 'AsyncApp', { queryFn: () => query.promise }, CACHE);
+		try {
+			await d.step('mount (pending)', () => {});
+			expect(d.octane.find('#d').textContent).toBe(
+				'data=undefined status=pending pending=true fetching=true success=false',
+			);
+			query.resolve('fetched');
+			const success = 'data=fetched status=success pending=false fetching=false success=true';
+			await expect
+				.poll(async () => {
+					await d.observe('drain query notifications', () => {});
+					return [d.octane.find('#d').textContent, d.react.find('#d').textContent];
+				})
+				.toEqual([success, success]);
+			await d.step('settled (success)', () => {});
+		} finally {
+			d.unmount();
+		}
 	});
 
 	// @parity-case differential:tanstack-query-mutation
