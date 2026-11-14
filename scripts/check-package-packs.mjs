@@ -1426,6 +1426,9 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 	mkdirSync(sourceDirectory, { recursive: true });
 	const strictBrowserDirectory = path.join(consumerDirectory, 'strict-browser');
 	mkdirSync(strictBrowserDirectory, { recursive: true });
+	const indexedFlowPackages = ['@octanejs/xyflow'];
+	const indexedFlowProject = 'tsconfig.xyflow-indexed.json';
+	const indexedFlowFixture = 'strict-indexed-flow.tsrx';
 	const {
 		browserSourceConsumerSpecifiers,
 		externalDependencies,
@@ -1602,22 +1605,33 @@ function validatePackedTsrxConsumer(tempRoot, archives, packedFiles, packedManif
 	) {
 		throw new Error('packed TSRX consumer projects drifted from PACKED_TSRX_CONSUMER_PROJECTS');
 	}
-	for (const { project, config, sourcePackages } of projects) {
+	if (contentMapper) {
 		writeFileSync(
-			path.join(consumerDirectory, project),
-			`${JSON.stringify(
-				createPackedTsrxConsumerConfig({
-					...config,
-					contentMapper,
-					sourcePackageDirectories: resolvePackedTsrxSourceDirectories(
-						consumerDirectory,
-						sourcePackages,
-					),
-				}),
-				null,
-				2,
-			)}\n`,
+			path.join(consumerDirectory, indexedFlowFixture),
+			"import { ReactFlow } from '@octanejs/xyflow';\nexport const Flow = () => <ReactFlow />;\n",
 		);
+		projects.push({
+			project: indexedFlowProject,
+			config: {
+				consumerSourceFiles: [indexedFlowFixture],
+				ecmaVersion: 'esnext',
+				nodeTypes: false,
+			},
+			consumerTsrxFiles: [indexedFlowFixture],
+			sourcePackages: indexedFlowPackages,
+		});
+	}
+	for (const { project, config, sourcePackages } of projects) {
+		const tsconfig = createPackedTsrxConsumerConfig({
+			...config,
+			contentMapper,
+			sourcePackageDirectories: resolvePackedTsrxSourceDirectories(
+				consumerDirectory,
+				sourcePackages,
+			),
+		});
+		if (project === indexedFlowProject) tsconfig.compilerOptions.noUncheckedIndexedAccess = true;
+		writeFileSync(path.join(consumerDirectory, project), `${JSON.stringify(tsconfig, null, 2)}\n`);
 	}
 	writeFileSync(
 		path.join(consumerDirectory, PACKED_TSRX_LANE_SENTINEL_PROJECT),
