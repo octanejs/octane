@@ -226,6 +226,7 @@ export {
 	ssrInnerHtml,
 	ssrScriptInnerHtml,
 	ssrChildrenSources,
+	ssrScriptChildrenSources,
 	ssrSpreadContent,
 	ssrVoidContent,
 	// Controlled form serialization (value/checked attrs, textarea content,

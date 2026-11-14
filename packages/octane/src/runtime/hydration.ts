@@ -80,6 +80,7 @@ import {
 import { noteRecoverableHydrationError, isDocumentSingleton } from './roots.js';
 import { isAdoptionControl } from './hydration-presentation.js';
 import { isHostElementOfType, setCustomElementListener } from './host-props.js';
+import { parsedInlineScriptContent } from '../shared-value-helpers.js';
 import { isElementDescriptor, isHostDescriptor } from './elements.js';
 import { siteLoc, componentSourceLoc } from './diagnostics.js';
 import { nodeAfter, atCommit, discardMarker, placeHydratedText, applyOutgoing } from './commit.js';
@@ -116,6 +117,16 @@ declare const process: { env: { NODE_ENV?: string } };
 // shallow semantics) keeps a differing server text and silences the attribute
 // warning. It never keeps a structural difference.
 // ---------------------------------------------------------------------------
+
+function matchesParsedText(host: Node | null, server: string | null, client: string): boolean {
+	return (
+		parserNormalizedMatch(server, client) ||
+		(host !== null &&
+			(host as Element).localName === 'script' &&
+			(host as Element).namespaceURI === 'http://www.w3.org/1999/xhtml' &&
+			server === parsedInlineScriptContent(client))
+	);
+}
 
 /**
  * Has the owning element opted out of hydration-mismatch handling? The compiler stamps a
@@ -1343,7 +1354,7 @@ export class HydrationCapability {
 		text: string,
 		loc: string | undefined,
 	): boolean {
-		const equal = server === text || parserNormalizedMatch(server, text);
+		const equal = server === text || matchesParsedText(host, server, text);
 		if (!equal) {
 			if (host !== null && host.nodeType === 1 && (host as Element).localName === 'textarea')
 				return false;
@@ -2226,7 +2237,7 @@ export function settleTexts(h: HydrationCapability): void {
 	if (texts !== null) {
 		h.pendingTexts = null;
 		for (const [node, { server, loc, text }] of texts) {
-			if (text !== server && !parserNormalizedMatch(server, text))
+			if (text !== server && !matchesParsedText(node.parentNode, server, text))
 				h.fail(
 					loc || (node.parentNode as any)?.__oct_loc,
 					() => `text ${JSON.stringify(text)}`,

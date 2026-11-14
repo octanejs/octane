@@ -17007,17 +17007,21 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// sole child. A nested JSX child (including `{null}`) is the transform's final
 	// writer and therefore leaves these earlier attribute sources inactive.
 	if (effectiveChildrenPropSources.length > 0) {
-		ctx.runtimeNeeded.add('ssrChildrenSources');
+		const script = tag === 'script' && (selfNs === 'html' || selfNs === 'opaque');
+		const childrenHelper = script ? 'ssrScriptChildrenSources' : 'ssrChildrenSources';
+		ctx.runtimeNeeded.add(childrenHelper);
 		childrenExpr = ssrCall(
-			'ssrChildrenSources',
+			childrenHelper,
 			[
 				b.array(effectiveChildrenPropSources),
 				ssrThunk(childrenExpr, node),
 				b.id('__s'),
 				// A textarea's children prop is text too (see textareaTextParts).
-				...(tag === 'textarea' && (selfNs === 'html' || selfNs === 'opaque')
-					? [b.literal(true, 'true')]
-					: []),
+				...(script
+					? [b.literal(selfNs)]
+					: tag === 'textarea' && (selfNs === 'html' || selfNs === 'opaque')
+						? [b.literal(true, 'true')]
+						: []),
 			],
 			node,
 		);
