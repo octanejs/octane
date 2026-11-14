@@ -5307,6 +5307,7 @@
     "ink": "@octanejs/ink",
     "input-otp": "@octanejs/input-otp",
     "jotai": "@octanejs/jotai",
+    "lottie-react": "@octanejs/lottie-react",
     "lucide-react": "@octanejs/lucide",
     "mobx-react": "@octanejs/mobx",
     "mobx-react-lite": "@octanejs/mobx",

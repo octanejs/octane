@@ -3112,6 +3112,29 @@ export function Position() {
 		expect(theme?.diagnostics).toEqual([]);
 	});
 
+	it('keeps the React Lottie hook despite its binding catalog entry', async () => {
+		const name = 'lottie-react';
+		const root = project({
+			'package.json': '{"name":"app","dependencies":{"lottie-react":"2.4.1"}}',
+			'node_modules/lottie-react/package.json':
+				'{"name":"lottie-react","version":"2.4.1","peerDependencies":{"react":"*"}}',
+			'Animation.tsx': `import { useLottie } from '${name}';
+export function Animation() { return useLottie({ animationData: {}, autoplay: false }).View; }`,
+		});
+		expect(DATA.reactPackages[name]).toBe('@octanejs/lottie-react');
+		const result = await runCodemod([path.join(root, 'Animation.tsx')], {
+			root,
+			write: false,
+			strong: true,
+			verify: true,
+		});
+		expect(result.files[0]?.code).toContain("from 'lottie-react'");
+		expect(result.files[0]?.notes).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+		expect(result.dependencies).toEqual([]);
+	});
+
 	it('maps @effect/atom-react to its binding', async () => {
 		// T3 Code's shapes: a registry provider built with createElement, and a
 		// query hook that reads the registry and refreshes atoms.
