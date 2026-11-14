@@ -502,6 +502,7 @@ it('reports a migrated React factory root that needs its store context', async (
 			import * as React from 'react';
 			import { renderToStaticMarkup, renderToString } from 'react-dom/server';
 			import { Pane, Pane as lower, Plain } from './pane.tsx';
+			import * as Views from './pane.tsx';
 			const fail = () => { throw new Error('props failed'); };
 			export function render() { return renderToString((h(Pane))); }
 			export function namespace() { return renderToStaticMarkup(React.createElement(Pane, null)); }
@@ -516,13 +517,18 @@ it('reports a migrated React factory root that needs its store context', async (
 			export function throwingProps() { return renderToString(React.createElement(Pane, fail())); }
 			export function spreadProps(...props: [null]) { return renderToString(h(Pane, ...props)); }
 			export function withChild() { return renderToString(h(Pane, null, 'child')); }
-			export function shadowed(h: (value: unknown) => any) { return renderToString(h(Pane)); }`,
+			export function shadowed(h: (value: unknown) => any) { return renderToString(h(Pane)); }
+			export function namespaceTarget() { return renderToString(h(Views.Pane, null)); }
+			export function escapedMember() { return renderToString(h(Views.\\u0050ane)); }
+			export function wrapMember() { return renderToString(h((Views.Pane))); }
+			export function shadowedTarget(Views: { Pane: typeof Plain }) { return renderToString(h(Views.Pane)); }
+			export function namespaceJsx() { return renderToString(<Views.Pane />); }`,
 	});
 	const paths = ['pane', 'root'].map((name) => path.join(app, 'src', name + '.tsx'));
 	const { files } = await runCodemod(paths, { root: app, strong: true, verify: true, write: true });
 	const result = files.find(({ file }) => file === 'src/root.tsx');
 	expect(result.notes.filter(({ rule }) => rule === 'store-hook')).toEqual(
-		[6, 7, 13, 14, 15, 16, 17].map((line) =>
+		[7, 8, 14, 15, 16, 17, 18, 21, 25].map((line) =>
 			expect.objectContaining({
 				line,
 				severity: 'warning',
@@ -539,13 +545,23 @@ it('reports a migrated React factory root that needs its store context', async (
 		literalProps,
 		throwingProps,
 		spreadProps,
+		namespaceTarget,
+		namespaceJsx,
 		plain,
 	} = await bundleRuntime(
 		app,
 		'server',
-		"export { render, namespace, wrappedNull, emptyProps, literalProps, throwingProps, spreadProps, plain } from './src/root.tsrx';",
+		"export { render, namespace, wrappedNull, emptyProps, literalProps, throwingProps, spreadProps, namespaceTarget, namespaceJsx, plain } from './src/root.tsrx';",
 	);
-	for (const root of [render, namespace, wrappedNull, emptyProps, literalProps])
+	for (const root of [
+		render,
+		namespace,
+		wrappedNull,
+		emptyProps,
+		literalProps,
+		namespaceTarget,
+		namespaceJsx,
+	])
 		expect(root).toThrow(/useContext|errors\/12/);
 	expect(() => spreadProps(null)).toThrow(/useContext|errors\/12/);
 	expect(throwingProps).toThrow('props failed');

@@ -553,10 +553,17 @@ export function reactServerComponents(
 			if (!call || !ts.isCallExpression(call)) return;
 			const argument = call.arguments[0] && skipParens(call.arguments[0]);
 			if (!argument) return;
-			const target = ts.isCallExpression(argument) ? argument.arguments[0] : undefined;
+			if (ts.isJsxSelfClosingElement(argument) && ts.isIdentifier(argument.tagName)) {
+				visit(call);
+				return;
+			}
+			const target = ts.isJsxSelfClosingElement(argument)
+				? argument.tagName
+				: ts.isCallExpression(argument) && argument.arguments[0];
 			if (
-				(ts.isJsxSelfClosingElement(argument) && ts.isIdentifier(argument.tagName)) ||
-				(target && ts.isIdentifier(target) && /^[A-Z]/.test(target.getText(sf)))
+				target &&
+				(ts.isIdentifier(target) || ts.isPropertyAccessExpression(target)) &&
+				/^[A-Z]/.test(target.getText(sf).split('.').pop() ?? '')
 			)
 				visit(call);
 		}
