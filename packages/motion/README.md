@@ -54,6 +54,8 @@ function List(props) @{
 - `MotionConfig` — global `transition` / `reducedMotion` defaults via context.
 - `useReducedMotion()` — a live `prefers-reduced-motion` subscription; operating-system
   setting changes update mounted consumers.
+- `useInView(ref, options?)` — viewport visibility for an element ref, with
+  `root`, `margin`, `amount`, `once`, and `initial` options.
 - `LayoutGroup` — namespaces `layoutId` values so independent shared-layout surfaces
   do not cross-animate.
 - `LazyMotion` + `domAnimation` / `domMax` + `m` — feature-gated hosts. The

@@ -5651,9 +5651,10 @@ export function App() { return <Slot.Root><button>Press</button></Slot.Root>; }`
 	it('migrates only proven export references from the React Motion entry points', async () => {
 		const root = project({
 			'package.json': '{ "name": "app" }',
-			'supported.ts': `import { motion, inView } from 'framer-motion';
+			'supported.ts': `import { motion, inView, useInView, type UseInViewOptions } from 'framer-motion';
 import * as Motion from 'motion/react';
-export const supported = [motion.div, inView, Motion['motion'].span];
+export const supported = [motion.div, inView, useInView, Motion['motion'].span];
+export type ViewOptions = UseInViewOptions;
 export type Transition = import('motion/react').Transition;`,
 			'unsupported.tsx': `import { AnimatePresence, useIsPresent as usePresent } from 'framer-motion';
 import * as Motion from 'motion/react';
@@ -5717,7 +5718,7 @@ export const views = [Motion, motion.div];`,
 			const root = project({
 				'package.json': manifest,
 				'available.ts': "export { inView } from 'framer-motion';",
-				'unavailable.ts': "export { LayoutGroup } from 'motion/react';",
+				'unavailable.ts': "export { useInView } from 'motion/react';",
 				...(installed && {
 					[`node_modules/${binding}/package.json`]: JSON.stringify({
 						name: binding,
@@ -5741,7 +5742,7 @@ export const views = [Motion, motion.div];`,
 				expect.objectContaining({
 					rule: 'bindings',
 					severity: 'error',
-					message: expect.stringContaining(canCheck ? 'LayoutGroup' : binding),
+					message: expect.stringContaining(canCheck ? 'useInView' : binding),
 				}),
 			]);
 			expect(result.dependencies).toEqual([]);
