@@ -54,6 +54,38 @@ function imported(checker: ts.TypeChecker, node: ts.Node) {
 		return { name, module: imp.moduleSpecifier.text };
 }
 
+/** Direct React class exports, including an alias in a local export list. */
+export function reactClassExports(file: string, source: string) {
+	const { sf, checker } = bind(file, source);
+	const names = new Set<string>();
+	const module = checker.getSymbolAtLocation(sf);
+	if (!module || hasEval(sf)) return names;
+	const uses = localUses(sf, checker);
+	for (const symbol of checker.getExportsOfModule(module)) {
+		let decl = symbol.valueDeclaration ?? symbol.declarations?.[0];
+		if (decl && ts.isExportSpecifier(decl)) {
+			const exp = decl.parent.parent;
+			if (decl.isTypeOnly || exp.isTypeOnly || exp.moduleSpecifier) continue;
+			decl = checker.getExportSpecifierLocalTargetSymbol(decl)?.valueDeclaration;
+		}
+		if (
+			!decl ||
+			!ts.isClassDeclaration(decl) ||
+			ts.getCombinedModifierFlags(decl) & ts.ModifierFlags.Ambient ||
+			ts.getDecorators(decl)?.length
+		)
+			continue;
+		const base = decl.heritageClauses?.find(
+			(clause) => clause.token === ts.SyntaxKind.ExtendsKeyword,
+		)?.types[0]?.expression;
+		const entry = base && imported(checker, base);
+		if (entry?.module !== 'react' || (entry.name !== 'Component' && entry.name !== 'PureComponent'))
+			continue;
+		if (!decl.name || uses(decl.name).every(componentTagOrExport)) names.add(symbol.name);
+	}
+	return names;
+}
+
 /** Original imported components handed to an authored React island. */
 export async function islandComponents(
 	file: string,

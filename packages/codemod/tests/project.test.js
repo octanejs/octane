@@ -50,6 +50,101 @@ function typecheckProject(root) {
 }
 
 describe('runCodemod', () => {
+	it('reports a direct native template root that imports a React class', async () => {
+		const boundary = `import { Component as Base, type ReactNode } from 'react';
+class Frame extends Base<{ children: ReactNode }> {
+	render() { return this.props.children; }
+}
+export { Frame as Boundary };`;
+		const entry = (module) => `import { Boundary as Frame } from '${module}';
+export function App() { return <Frame><b>ready</b></Frame>; }`;
+		const sources = {
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: {
+					jsx: 'react-jsx',
+					moduleResolution: 'bundler',
+					paths: { '@/*': ['./*'] },
+				},
+			}),
+			'Boundary.tsx': boundary,
+			'Ambiguous.tsx': boundary,
+			'Ambiguous.js': 'export function Boundary() { return null; }',
+			'Pure.tsx': 'export function Boundary() { return <b>ready</b>; }',
+			'Decorated.tsx': boundary.replace(
+				'class Frame',
+				'function replace() { return function Native() { return null; }; }\n@replace\nclass Frame',
+			),
+			'Relative.tsx': entry('./Boundary'),
+			'Alias.tsx': entry('@/Boundary'),
+			'Strict.tsx':
+				"import { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Strict><span /><Frame><b>ready</b></Frame></Strict>',
+				),
+			'NestedStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Other><Strict><Frame /></Strict></Other>',
+				),
+			'AmbiguousView.tsx': entry('./Ambiguous'),
+			'PureView.tsx': entry('./Pure'),
+			'DecoratedView.tsx': entry('./Decorated'),
+			'Shadow.tsx': entry('./Boundary').replace('App()', 'App(Frame: () => unknown)'),
+			'Hosted.tsx':
+				"import { ReactCompat } from 'octane/react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<ReactCompat><Frame /></ReactCompat>',
+				),
+			'Passed.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return <Other render={() => <Frame><b>ready</b></Frame>} />;',
+			),
+		};
+		const root = project(sources);
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+		);
+		for (const includeClass of [true, false]) {
+			const inputs = Object.keys(sources).filter(
+				(file) =>
+					file.endsWith('.tsx') &&
+					(includeClass || (file !== 'Boundary.tsx' && file !== 'Hosted.tsx')),
+			);
+			const { files } = await runCodemod(
+				inputs.map((file) => path.join(root, file)),
+				{
+					root,
+					strong: true,
+					verify: true,
+					projectTypes: false,
+					write: false,
+				},
+			);
+			const callers = files.filter((file) =>
+				file.notes.some(
+					(note) =>
+						note.rule === 'class-component' && note.message.includes('imported React class'),
+				),
+			);
+			expect(
+				callers
+					.map(({ file, notes }) => [
+						file,
+						notes.find((note) => note.rule === 'class-component').severity,
+					])
+					.sort(),
+			).toEqual([
+				['Alias.tsx', includeClass ? 'error' : 'warning'],
+				['Relative.tsx', includeClass ? 'error' : 'warning'],
+				['Strict.tsx', includeClass ? 'error' : 'warning'],
+			]);
+		}
+	});
+
 	it('reports opaque map methods that receive JSX from a callback switch', async () => {
 		const setup = `function makeRows() {
 	const rows = ['a', 'b'];

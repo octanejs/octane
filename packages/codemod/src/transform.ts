@@ -7215,12 +7215,60 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 * and indentation `node` had, or null when it is not a single renderable.
 	 */
 	output(node: ts.Expression) {
-		if (isJsx(node)) return this.emit(node, TEMPLATE);
+		if (isJsx(node)) {
+			if (this.options.localReactClass) {
+				const callee = ts.isJsxElement(node) && this.callee(node.openingElement.tagName);
+				if (
+					ts.isJsxElement(node) &&
+					callee &&
+					callee.module === 'react' &&
+					callee.name === 'StrictMode' &&
+					!node.openingElement.attributes.properties.length &&
+					!this.islands.has(node) &&
+					!this.unrenderable.has(node) &&
+					!this.reactRendererBodies.has(node)
+				) {
+					for (const child of node.children)
+						if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child))
+							this.checkReactClassRoot(child);
+				} else if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
+					this.checkReactClassRoot(node);
+				}
+			}
+			return this.emit(node, TEMPLATE);
+		}
 		if (ts.isConditionalExpression(node) || ts.isCallExpression(node)) {
 			const directive = this.directive(node);
 			return directive === null ? null : this.absolute(directive, node);
 		}
 		return null;
+	}
+
+	private checkReactClassRoot(node: ts.JsxElement | ts.JsxSelfClosingElement) {
+		const check = this.options.localReactClass;
+		if (
+			!check ||
+			this.islands.has(node) ||
+			this.unrenderable.has(node) ||
+			this.reactRendererBodies.has(node)
+		)
+			return;
+		const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
+		if (!ts.isIdentifier(tag) || !isComponentName(tag.text)) return;
+		const entry = this.importOf(tag);
+		if (!entry || entry.namespace || entry.typeOnly) return;
+		const declaration = ts.findAncestor(this.declarationOf(tag)!, ts.isImportDeclaration);
+		if (!declaration || declaration.attributes) return;
+		const severity = check(entry.module, entry.imported);
+		if (!severity) return;
+		this.note(
+			RULE.classComponent,
+			severity,
+			tag,
+			severity === 'error'
+				? `The migration resolves \`${entry.module}\` to the imported React class \`${tag.text}\`, which this native template renders. Keep this render in React or replace the class with an Octane function component.`
+				: `If this native template renders the imported React class \`${tag.text}\` resolved from \`${entry.module}\`, the call will fail. Verify the runtime import, keep the render in React, or replace the class with an Octane function component.`,
+		);
 	}
 
 	startsLine(node: ts.Node) {
