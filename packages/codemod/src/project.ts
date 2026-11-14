@@ -40,6 +40,7 @@ import {
 	executableImports,
 	hostedServerComponents,
 	intrinsicReactExports,
+	octaneClientComponents,
 	reactServerComponents,
 	retainedReactComponentReturns,
 	reverseIslandExports,
@@ -1348,6 +1349,30 @@ export async function runCodemod(
 			fs.realpathSync(module.resolvedFileName).startsWith(fs.realpathSync(installed.dir) + path.sep)
 		);
 	}
+	function originalOctaneClient(file: string) {
+		const installed = readInstalled(path.dirname(file), 'octane');
+		const module = originalModule(file, 'octane');
+		const adapterRuntime = readInstalled(helperDir, 'octane');
+		if (
+			installed?.manifest.name !== 'octane' ||
+			module?.packageId?.name !== 'octane' ||
+			!adapterRuntime
+		)
+			return false;
+		try {
+			const source = fs.realpathSync(module.resolvedFileName);
+			const directory = fs.realpathSync(installed.dir) + path.sep;
+			if (fs.realpathSync(adapterRuntime.dir) + path.sep !== directory) return false;
+			const targets = runtimeTargets('octane', source, file);
+			return (
+				source.startsWith(directory) &&
+				targets.length > 0 &&
+				targets.every((target) => fs.realpathSync(target).startsWith(directory))
+			);
+		} catch {
+			return false;
+		}
+	}
 	function originalReactEntry(file: string, name: 'react/jsx-runtime' | 'react-dom/server') {
 		const packageRoot = name === 'react/jsx-runtime' ? 'react' : 'react-dom';
 		const types = originalModule(file, name)?.packageId?.name;
@@ -1493,7 +1518,36 @@ export async function runCodemod(
 			scanRename,
 			selected ? undefined : checkLinkedRename,
 		);
-		if (!paths || selected) continue;
+		if (!paths) continue;
+		const clientStoreNotes: Note[] = result?.notes ?? [];
+		if (
+			storeHookComponents.size &&
+			SOURCE.test(file) &&
+			((source.includes('octane') &&
+				(source.includes('createRoot') || source.includes('hydrateRoot'))) ||
+				source.includes('\\')) &&
+			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) === rootProject
+		) {
+			const edges = octaneClientComponents(file, source);
+			if (edges.length && originalOctaneClient(file)) {
+				for (const edge of edges) {
+					const leaf = renamed(file, edge.module)?.file;
+					if (
+						!leaf ||
+						leaf !== path.resolve(path.dirname(file), edge.module) ||
+						!storeHookComponents.get(leaf)?.includes(edge.name)
+					)
+						continue;
+					clientStoreNotes.push({
+						rule: 'store-hook',
+						severity: 'warning',
+						line: edge.line,
+						message: `If the migrated ${edge.name === 'default' ? 'default export' : edge.name}'s store hook reads context, this standalone Octane root needs NativeStoreProvider with its original store context and value.`,
+					});
+				}
+			}
+		}
+		if (selected) continue;
 		const rules = { ...result?.rules, 'module-paths': paths.count };
 		const name = path.relative(root, file);
 		const host: FileResult = result ?? {
@@ -1501,7 +1555,7 @@ export async function runCodemod(
 			output: name,
 			changed: true,
 			rules,
-			notes: [],
+			notes: clientStoreNotes,
 			strong: null,
 			strongFixes: [],
 			diagnostics: [],

@@ -431,6 +431,104 @@ it('warns at a direct migrated server call that needs a standalone store provide
 	expect(hosted).toContain('<OctaneCompat component={Pane} />');
 });
 
+it('warns at existing standalone client roots when the migrated hook reads context', async () => {
+	const mount = `import { createRoot as mount } from 'octane';
+		import * as Octane from 'octane';
+		import { Pane, Plain } from './pane.tsx';
+		import { Pane as Other } from './other/pane.tsx';
+		export const errors: unknown[] = [];
+		const options = { onUncaughtError: (error: unknown) => errors.push(error), onRecoverableError: (error: unknown) => errors.push(error) };
+		export const render = (host: HTMLElement) => mount(host, options).render(Pane);
+		export const hydrate = (host: HTMLElement) => Octane.hydrateRoot(host, Pane, undefined, options);
+		export function deferred(host: HTMLElement, replacement: ReturnType<typeof mount>) {
+			mount(host).render(Plain);
+			mount(host).render(Other);
+			const unused = mount(host);
+			let root = mount(host);
+			root = replacement;
+			root.render(Pane);
+			const fake = (target: HTMLElement, body: typeof Pane) => body;
+			const hydrateRoot = fake;
+			hydrateRoot(host, Pane);
+		}`;
+	const { app } = project({
+		'observer/react-hooks.ts': original.replace(
+			'return valueOf(readContext(current));',
+			'if (valueOf(0) === 0) return 42; return valueOf(readContext(current));',
+		),
+		'app/src/pane.tsx': `import { useSnapshot } from 'observer';
+			export function Pane() { const value = useSnapshot(); return <b>{String(value)}</b>; }
+			export function Plain() { return <b>plain</b>; }`,
+		'app/src/other/pane.tsx': 'export function Pane() { return <b>other</b>; }',
+		'app/src/client.ts': mount,
+		'app/src/unverified/client.ts': `import { hydrateRoot } from 'octane';
+			import { Pane } from '../pane.tsx';
+			export const hydrate = (host: HTMLElement) => hydrateRoot(host, Pane);`,
+		'app/src/unverified/node_modules/octane/package.json': JSON.stringify({
+			name: 'octane',
+			version: '0.17.0',
+			exports: { '.': { types: './index.d.ts', import: './runtime.mjs' } },
+		}),
+		'app/src/unverified/node_modules/octane/index.d.ts':
+			'export function hydrateRoot(host: HTMLElement, body: unknown): void;',
+		'app/src/unverified/node_modules/octane/runtime.mjs': 'export function hydrateRoot() {}',
+	});
+	const leaf = path.join(app, 'src/pane.tsx');
+	const host = path.join(app, 'src/client.ts');
+	const options = { root: app, strong: true, verify: true };
+	const { files } = await runCodemod([leaf], { ...options, write: false });
+	const client = files.find((file) => file.file === 'src/client.ts');
+	expect(files.find((file) => file.file === 'src/unverified/client.ts')?.notes).toEqual([]);
+	expect(client.notes).toEqual(
+		[7, 8].map((line) => ({
+			rule: 'store-hook',
+			severity: 'warning',
+			line,
+			message: expect.stringMatching(
+				/If the migrated Pane's store hook reads context.*NativeStoreProvider/,
+			),
+		})),
+	);
+	expect(fs.readFileSync(host, 'utf8')).toBe(mount);
+	expect(fs.existsSync(path.join(app, 'src/pane.tsrx'))).toBe(false);
+	const written = await runCodemod([leaf], { ...options, write: true });
+	expect(written.files.find((file) => file.file === 'src/client.ts')?.notes).toEqual(client.notes);
+	expect(fs.readFileSync(host, 'utf8')).toBe(mount.replace('./pane.tsx', './pane.tsrx'));
+	const pane = written.files.find((file) => file.file === 'src/pane.tsx');
+	expect(pane.rules['store-hook']).toBe(1);
+	expect([...pane.notes, ...pane.diagnostics].filter((note) => note.severity === 'error')).toEqual(
+		[],
+	);
+
+	const dom = installDOM();
+	try {
+		const { renderToString, Pane } = await bundleRuntime(
+			app,
+			'server',
+			"export { renderToString } from 'octane/server'; export { Pane } from './src/pane.tsrx';",
+		);
+		const { hydrate, errors } = await bundleRuntime(
+			app,
+			'client',
+			"export { hydrate, errors } from './src/client';",
+		);
+		const hydrated = document.createElement('div');
+		hydrated.innerHTML = renderToString(Pane).html;
+		const before = hydrated.firstElementChild;
+		const root = hydrate(hydrated);
+		try {
+			expect(hydrated.textContent).toBe('42');
+			expect(hydrated.firstElementChild).toBe(before);
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+		}
+	} finally {
+		dom.window.close();
+		vi.unstubAllGlobals();
+	}
+}, 30_000);
+
 it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
 	const source = `import {useSnapshot as useReading, valueOf} from 'observer';
 export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }
