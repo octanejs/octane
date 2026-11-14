@@ -446,6 +446,36 @@ export function entryKey(name: string, input: unknown): string {
 	return `${name}\nwire:${encoded}`;
 }
 
+/**
+ * A key for `input` that is cheap to make and, like `entryKey`, equal only for
+ * equal inputs: for a missing input, a primitive, or a plain object of
+ * primitives, with its keys sorted as `entryKey` sorts them. `null` for anything else, which only
+ * `entryKey` encodes. -0 and non-finite numbers are left out, since they
+ * print as other values.
+ */
+function lookupKey(input: unknown): string | null {
+	if (input === undefined) return '';
+	if (input === null || typeof input !== 'object') return lookupValue(input);
+	// `entryKey` encodes a null-prototype object apart from a plain one; it alone handles them.
+	if (Object.getPrototypeOf(input) !== Object.prototype) return null;
+	const keys = Object.keys(input).sort();
+	let key = '{';
+	for (const name of keys) {
+		const value = lookupValue((input as Record<string, unknown>)[name]);
+		if (value === null) return null;
+		key += `${JSON.stringify(name)}:${value},`;
+	}
+	return key;
+}
+
+function lookupValue(value: unknown): string | null {
+	if (typeof value === 'string') return JSON.stringify(value);
+	if (typeof value === 'boolean' || value === null) return String(value);
+	if (typeof value === 'number' && Number.isFinite(value) && !Object.is(value, -0))
+		return String(value);
+	return null;
+}
+
 /** @internal Keep the SSR seed format readable across client and server releases. Server feeds take no parameters. */
 export function seedCursorKey(feedName: string): string {
 	return feedName + '\nundefined';
@@ -938,12 +968,17 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 	function idle(entry: Entry): void {
 		// A load in flight is demand: retention starts when it lands.
 		if (entry.subscribers.size > 0 || entry.inflight || entry.keepTimer !== undefined) return;
+		// A timer that long would fire at once: a value kept that long is kept for the session.
+		if (entry.read.keep >= 2 ** 31) return;
 		entry.keepTimer = setHostTimeout(() => {
 			entry.keepTimer = undefined;
 			// A handle outlives its entry; an evicted one must not show what it once held.
 			const view = isView(entry.read) ? entry.read.view.of.name : undefined;
 			forget(entry);
 			entries.delete(entry.key);
+			const lookup = lookupKey(entry.input);
+			if (lookup !== null && lookups.get(entry.read)?.get(lookup) === entry)
+				lookups.get(entry.read)!.delete(lookup);
 			if (view !== undefined) collectRecords(view);
 			collect();
 		}, entry.read.keep);
@@ -1255,10 +1290,27 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 		);
 	}
 
+	/**
+	 * Each read's entries by `lookupKey` of their input, so a render asking for
+	 * a read again finds it without encoding the input. An entry leaves when it
+	 * is evicted.
+	 */
+	const lookups = new Map<Read<any, any>, Map<string, Entry>>();
 	function entryFor(read: Read<any, any>, input: unknown): Entry {
+		const lookup = lookupKey(input);
+		let byInput = lookup === null ? undefined : lookups.get(read);
+		const found = byInput?.get(lookup!);
+		if (found && entries.get(found.key) === found) return found;
 		const key = entryKey(read.name, input);
-		let entry = entries.get(key);
-		if (entry) return entry;
+		const entry = entries.get(key) ?? createEntry(read, input, key);
+		if (lookup !== null) {
+			if (!byInput) lookups.set(read, (byInput = new Map()));
+			byInput.set(lookup, entry);
+		}
+		return entry;
+	}
+
+	function createEntry(read: Read<any, any>, input: unknown, key: string): Entry {
 		const created: Entry = {
 			read,
 			input,
@@ -1860,6 +1912,7 @@ export function createDataStore(options: DataStoreOptions): DataStore {
 				for (const notify of [...entry.subscribers]) notify();
 			}
 			entries.clear();
+			lookups.clear();
 			return retirement;
 		},
 	};
