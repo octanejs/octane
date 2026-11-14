@@ -19,7 +19,7 @@ import {
 	scalar,
 	walkLocalValues,
 } from './local-uses.js';
-import { isWrapper, skipParens, skipWrappers } from './expression-wrappers.js';
+import { isWrapper, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
 import {
 	effectHelpers,
@@ -271,6 +271,11 @@ export function nativeReactCompat(module: string, name: string) {
 		(name === 'ReactCompat' || name === 'ReactCompatInline') &&
 		(module === 'octane/react' || module === 'octane/react/server')
 	);
+}
+
+function skipParens(node: ts.Expression): ts.Expression {
+	while (ts.isParenthesizedExpression(node)) node = node.expression;
+	return node;
 }
 
 /**

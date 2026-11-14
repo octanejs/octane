@@ -2,7 +2,7 @@ import ts from 'typescript';
 import { contains, renderUses } from './forwarded-props.js';
 import { localUses } from './local-uses.js';
 import { fixedBinding, initializedBefore } from './effect-receivers.js';
-import { skipParens, skipWrappers } from './expression-wrappers.js';
+import { skipWrappers } from './expression-wrappers.js';
 
 function rendererImport(name: ts.Identifier, checker: ts.TypeChecker, module = 'react') {
 	const binding = checker.getSymbolAtLocation(name)?.declarations?.[0];
@@ -94,11 +94,10 @@ function stateSetup(declaration: ts.VariableDeclaration, checker: ts.TypeChecker
 	return !!binding && ts.isParameter(binding) && binding.parent === owner;
 }
 
-function conditionalOutput(expression: ts.Expression) {
-	const value = skipParens(expression);
+function conditionalOutput(value: ts.Expression) {
 	if (!ts.isConditionalExpression(value)) return false;
-	const yes = skipParens(value.whenTrue);
-	const no = skipParens(value.whenFalse);
+	const yes = skipWrappers(value.whenTrue);
+	const no = skipWrappers(value.whenFalse);
 	const jsx = (node: ts.Expression) =>
 		ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
 	const empty = (node: ts.Expression) =>
@@ -257,7 +256,7 @@ export function nativeSetupHook(
 	if (
 		diagnostic &&
 		!diagnostic.privateContext &&
-		(tag || ts.isJsxFragment(value) || conditionalOutput(last.expression)) &&
+		(tag || ts.isJsxFragment(value) || conditionalOutput(value)) &&
 		!ts.isOptionalChain(call) &&
 		!(decl.parent.flags & ts.NodeFlags.Using) &&
 		call.arguments.every((input) => {
