@@ -834,6 +834,18 @@ export function Panel({ initial = false }: { initial?: boolean }) {
 				'Local.tsx': panel('', '<Label label={label} />'),
 				'Imported.tsx': panel('', '<ImportedLabel label={label} />'),
 				'Fragment.tsx': panel('', '<><b>{label}</b></>'),
+				'Conditional.tsx': panel('', '(initial ? (<Label label={label} />) : <b>{label}</b>)'),
+				'ConditionalEmpty.tsx': panel('', 'initial ? null : <>{label}</>'),
+				'ConditionalFalse.tsx': panel('', 'initial ? <b>{label}</b> : false'),
+				'ConditionalDeferred.tsx': panel('', 'initial ? () => <b>{label}</b> : null'),
+				'ConditionalTest.tsx': panel('', '(<b>{label}</b>) ? null : false'),
+				'ConditionalValue.tsx': panel('', 'initial ? <b>{label}</b> : label'),
+				'ConditionalReactOwned.tsx':
+					"import { ReactCompat } from 'octane/react';\n" +
+					panel('', 'initial ? <b>{label}</b> : null') +
+					'\nexport function App() { return <ReactCompat><Panel/></ReactCompat>; }',
+				'ConditionalEscape.tsx':
+					panel('', 'initial ? <b>{label}</b> : null') + '\nexport const panels = [Panel];',
 				'Memo.tsx':
 					"import { memo } from 'react';\n" +
 					panel('', '<Label label={label} />').replace(
@@ -914,6 +926,9 @@ export function Panel({ initial = false }: { initial?: boolean }) {
 					)
 					.map((file) => file.file),
 			).toEqual([
+				'Conditional.tsx',
+				'ConditionalEmpty.tsx',
+				'ConditionalFalse.tsx',
 				'Forward.tsx',
 				'Fragment.tsx',
 				'Imported.tsx',

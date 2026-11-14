@@ -1,5 +1,10 @@
 import ts from 'typescript';
 
+export function skipParens(node: ts.Expression): ts.Expression {
+	while (ts.isParenthesizedExpression(node)) node = node.expression;
+	return node;
+}
+
 /**
  * Whether `node` wraps an expression only for grouping or the type checker.
  */

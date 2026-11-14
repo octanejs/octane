@@ -2,7 +2,7 @@ import ts from 'typescript';
 import { contains, renderUses } from './forwarded-props.js';
 import { localUses } from './local-uses.js';
 import { fixedBinding, initializedBefore } from './effect-receivers.js';
-import { skipWrappers } from './expression-wrappers.js';
+import { skipParens, skipWrappers } from './expression-wrappers.js';
 
 function rendererImport(name: ts.Identifier, checker: ts.TypeChecker, module = 'react') {
 	const binding = checker.getSymbolAtLocation(name)?.declarations?.[0];
@@ -92,6 +92,18 @@ function stateSetup(declaration: ts.VariableDeclaration, checker: ts.TypeChecker
 		: undefined;
 	while (binding && ts.isBindingElement(binding)) binding = binding.parent.parent;
 	return !!binding && ts.isParameter(binding) && binding.parent === owner;
+}
+
+function conditionalOutput(expression: ts.Expression) {
+	const value = skipParens(expression);
+	if (!ts.isConditionalExpression(value)) return false;
+	const yes = skipParens(value.whenTrue);
+	const no = skipParens(value.whenFalse);
+	const jsx = (node: ts.Expression) =>
+		ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
+	const empty = (node: ts.Expression) =>
+		node.kind === ts.SyntaxKind.NullKeyword || node.kind === ts.SyntaxKind.FalseKeyword;
+	return (jsx(yes) && (jsx(no) || empty(no))) || (empty(yes) && jsx(no));
 }
 
 /** A direct initialization in an ordinary component with native output. */
@@ -245,7 +257,7 @@ export function nativeSetupHook(
 	if (
 		diagnostic &&
 		!diagnostic.privateContext &&
-		(tag || ts.isJsxFragment(value)) &&
+		(tag || ts.isJsxFragment(value) || conditionalOutput(last.expression)) &&
 		!ts.isOptionalChain(call) &&
 		!(decl.parent.flags & ts.NodeFlags.Using) &&
 		call.arguments.every((input) => {
