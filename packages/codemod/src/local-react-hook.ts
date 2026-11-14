@@ -94,6 +94,17 @@ function stateSetup(declaration: ts.VariableDeclaration, checker: ts.TypeChecker
 	return !!binding && ts.isParameter(binding) && binding.parent === owner;
 }
 
+function conditionalOutput(value: ts.Expression) {
+	if (!ts.isConditionalExpression(value)) return false;
+	const yes = skipWrappers(value.whenTrue);
+	const no = skipWrappers(value.whenFalse);
+	const jsx = (node: ts.Expression) =>
+		ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
+	const empty = (node: ts.Expression) =>
+		node.kind === ts.SyntaxKind.NullKeyword || node.kind === ts.SyntaxKind.FalseKeyword;
+	return (jsx(yes) && (jsx(no) || empty(no))) || (empty(yes) && jsx(no));
+}
+
 /** A direct initialization in an ordinary component with native output. */
 export function nativeSetupHook(
 	ref: ts.Identifier,
@@ -245,7 +256,7 @@ export function nativeSetupHook(
 	if (
 		diagnostic &&
 		!diagnostic.privateContext &&
-		(tag || ts.isJsxFragment(value)) &&
+		(tag || ts.isJsxFragment(value) || conditionalOutput(value)) &&
 		!ts.isOptionalChain(call) &&
 		!(decl.parent.flags & ts.NodeFlags.Using) &&
 		call.arguments.every((input) => {
