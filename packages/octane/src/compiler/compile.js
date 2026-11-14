@@ -35223,10 +35223,14 @@ function emitElementHtml(
 			// `<button formAction={fn}>` is routed to setFormAction, which intercepts
 			// submit and calls the function with FormData (string values fall back to
 			// the native attribute at runtime). Static string actions were already
-			// inlined into the HTML above via the literal path.
+			// inlined into the HTML above via the literal path. A value that is a
+			// primitive by syntax can never be a function, so production writes it as
+			// the native URL attribute and the module names no submit interception.
+			const primitive = !ctx.dev && isPrimitiveValueExpression(inner);
 			bindings.push({
 				id: bindings.length,
-				kind: 'formAction',
+				kind: primitive ? 'attr' : 'formAction',
+				attributeHelper: primitive ? 'setURLAttribute' : undefined,
 				name: tag === 'form' ? 'action' : 'formaction',
 				expr,
 				path,
