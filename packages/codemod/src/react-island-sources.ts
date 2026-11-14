@@ -248,6 +248,55 @@ export function retainedReactComponentReturns(file: string, source: string) {
 	return edges;
 }
 
+/** Existing Octane client roots that render a directly imported component body. */
+export function octaneClientComponents(file: string, source: string) {
+	const { sf, checker } = bind(file, source);
+	const edges: { module: string; name: string; line: number }[] = [];
+	function factory(node: ts.CallExpression) {
+		const callee = imported(checker, skipWrappers(node.expression));
+		if (callee?.module === 'octane') return callee.name;
+	}
+	function component(call: ts.CallExpression) {
+		const callee = skipWrappers(call.expression);
+		if (factory(call) === 'hydrateRoot' && call.arguments.length <= 4) return call.arguments[1];
+		if (
+			!ts.isPropertyAccessExpression(callee) ||
+			ts.isOptionalChain(callee) ||
+			callee.name.text !== 'render' ||
+			call.arguments.length > 2
+		)
+			return;
+		const root = skipWrappers(callee.expression);
+		if (
+			ts.isCallExpression(root) &&
+			!ts.isOptionalChain(root) &&
+			root.arguments.length >= 1 &&
+			root.arguments.length <= 2 &&
+			!root.arguments.some(ts.isSpreadElement) &&
+			factory(root) === 'createRoot'
+		)
+			return call.arguments[0];
+	}
+	function visit(node: ts.Node) {
+		if (
+			ts.isCallExpression(node) &&
+			!ts.isOptionalChain(node) &&
+			!node.arguments.some(ts.isSpreadElement)
+		) {
+			const value = component(node);
+			const leaf = value && imported(checker, skipWrappers(value));
+			if (leaf?.module.startsWith('.') && /\.[jt]sx$/.test(leaf.module))
+				edges.push({
+					...leaf,
+					line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
+				});
+		}
+		ts.forEachChild(node, visit);
+	}
+	visit(sf);
+	return edges;
+}
+
 /** React server calls that render directly imported components. */
 export function reactServerComponents(
 	file: string,
