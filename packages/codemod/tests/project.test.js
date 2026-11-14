@@ -3762,6 +3762,51 @@ export const views = [Motion, motion.div];`,
 		);
 	});
 
+	it.each([
+		['matching installed release', '0.1.15', './index.ts'],
+		['missing install', undefined, undefined],
+		['stale install', '0.1.67', './index.ts'],
+		['conditional root', '0.1.15', { types: './index.ts', default: './index.js' }],
+	])(
+		'checks Motion exports before rewriting imports with a %s',
+		async (scenario, installed, exportsRoot) => {
+			const binding = '@octanejs/motion';
+			const manifest = JSON.stringify({ dependencies: { [binding]: '0.1.15' } });
+			const root = project({
+				'package.json': manifest,
+				'available.ts': "export { inView } from 'framer-motion';",
+				'unavailable.ts': "export { LayoutGroup } from 'motion/react';",
+				...(installed && {
+					[`node_modules/${binding}/package.json`]: JSON.stringify({
+						name: binding,
+						type: 'module',
+						version: installed,
+						exports: { '.': exportsRoot },
+					}),
+					[`node_modules/${binding}/index.ts`]: "export * from './engine.js';",
+					[`node_modules/${binding}/engine.ts`]: 'export const inView = () => {};',
+				}),
+			});
+			const inputs = ['available.ts', 'unavailable.ts'].map((file) => path.join(root, file));
+			const result = await runCodemod(inputs, { root, verify: false });
+			const available = result.files.find(({ file }) => file === 'available.ts');
+			const unavailable = result.files.find(({ file }) => file === 'unavailable.ts');
+			const canCheck = scenario === 'matching installed release';
+			expect(available?.code).toContain(canCheck ? binding : 'framer-motion');
+			expect(available?.notes).toHaveLength(canCheck ? 0 : 1);
+			expect(unavailable?.code).toContain('motion/react');
+			expect(unavailable?.notes).toEqual([
+				expect.objectContaining({
+					rule: 'bindings',
+					severity: 'error',
+					message: expect.stringContaining(canCheck ? 'LayoutGroup' : binding),
+				}),
+			]);
+			expect(result.dependencies).toEqual([]);
+			expect(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).toBe(manifest);
+		},
+	);
+
 	it('reports exactly the Radix exports `@octanejs/radix` lacks', async () => {
 		const radix = path.join(REPO, 'packages/radix');
 		// The binding's own dev dependency on `radix-ui` installs every primitive package.
