@@ -4586,9 +4586,182 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		return `[${field.name.getText(this.sf)}]`;
 	}
 
+	/** Prove the state record is never exposed and every update owns the dependency field. */
+	private ownStateDependency(
+		receiver: ts.Identifier,
+		key: string,
+		hook: ts.CallExpression,
+		dependencies: ts.ArrayLiteralExpression,
+	) {
+		const state = this.declarationOf(receiver);
+		if (
+			!state ||
+			!ts.isBindingElement(state) ||
+			!ts.isIdentifier(state.name) ||
+			state.initializer ||
+			state.dotDotDotToken
+		)
+			return false;
+		const tuple = state.parent;
+		if (
+			!ts.isArrayBindingPattern(tuple) ||
+			tuple.elements.length !== 2 ||
+			tuple.elements[0] !== state
+		)
+			return false;
+		const setter = tuple.elements[1];
+		const declaration = tuple.parent;
+		if (
+			!ts.isBindingElement(setter) ||
+			!ts.isIdentifier(setter.name) ||
+			setter.initializer ||
+			setter.dotDotDotToken ||
+			!ts.isVariableDeclaration(declaration) ||
+			!declaration.initializer ||
+			!fixedBinding(this.checker, receiver, hook) ||
+			!initializedBefore(this.checker, receiver, hook) ||
+			(/eval|\\u/.test(this.source) && hasEval(this.sf))
+		)
+			return false;
+		const init = skipWrappers(declaration.initializer);
+		if (
+			!ts.isCallExpression(init) ||
+			init.questionDotToken ||
+			init.arguments.length !== 1 ||
+			!ts.isIdentifier(init.expression) ||
+			this.reactHook(init.expression) !== 'useState' ||
+			this.options.originalReact === false ||
+			[...this.imports.values()].some(
+				(item) =>
+					item.module === 'react' &&
+					!item.typeOnly &&
+					(item.namespace || item.imported === 'default'),
+			)
+		)
+			return false;
+
+		// A CommonJS import or dynamic import can expose React's mutable export object.
+		const staticReactImports = this.sf.statements.filter(
+			(statement) =>
+				ts.isImportDeclaration(statement) &&
+				ts.isStringLiteral(statement.moduleSpecifier) &&
+				statement.moduleSpecifier.text === 'react',
+		).length;
+		const reactLoads = ts.preProcessFile(this.source, true, true).importedFiles;
+		if (reactLoads.filter((entry) => entry.fileName === 'react').length !== staticReactImports)
+			return false;
+
+		const simpleName = (name: ts.Node) =>
+			ts.isIdentifier(name) || ts.isStringLiteral(name) ? name.text : undefined;
+
+		const required = new Set([key]);
+		const addField = (name: string | undefined) => {
+			if (name === undefined || name === '__proto__') return false;
+			required.add(name);
+			return true;
+		};
+		const closed = renderUses(this.localUses(state.name)).every((use) => {
+			const parent = use.parent;
+			if (
+				ts.isVariableDeclaration(parent) &&
+				parent.initializer === use &&
+				ts.isObjectBindingPattern(parent.name)
+			) {
+				return parent.name.elements.every((binding) => {
+					const name = simpleName(binding.propertyName ?? binding.name);
+					return (
+						!binding.initializer &&
+						!binding.dotDotDotToken &&
+						ts.isIdentifier(binding.name) &&
+						addField(name)
+					);
+				});
+			}
+			if (
+				!ts.isPropertyAccessExpression(parent) ||
+				parent.expression !== use ||
+				!addField(parent.name.text)
+			)
+				return false;
+			let value: ts.Expression = parent;
+			while (isWrapper(value.parent)) value = value.parent;
+			const outer = value.parent;
+			return (
+				(ts.isPrefixUnaryExpression(outer) && outer.operator === ts.SyntaxKind.ExclamationToken) ||
+				(ts.isBinaryExpression(outer) &&
+					(outer.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken ||
+						outer.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken)) ||
+				(ts.isIfStatement(outer) && outer.expression === value) ||
+				(ts.isJsxExpression(outer) && ts.isJsxAttribute(outer.parent)) ||
+				outer === dependencies
+			);
+		});
+		if (!closed) return false;
+
+		const ownsFields = (expression: ts.Expression, prior?: ts.Identifier) => {
+			const record = skipWrappers(expression);
+			if (!ts.isObjectLiteralExpression(record)) return false;
+			let firstField = 0;
+			if (prior) {
+				const [spread] = record.properties;
+				const uses = this.localUses(prior);
+				if (
+					!spread ||
+					!ts.isSpreadAssignment(spread) ||
+					uses.length !== 1 ||
+					uses[0] !== spread.expression
+				)
+					return false;
+				firstField = 1;
+			}
+			const missing = new Set(prior ? [] : required);
+			for (const field of record.properties.slice(firstField)) {
+				if (!ts.isPropertyAssignment(field)) return false;
+				const name = simpleName(field.name);
+				if (name === undefined || name === '__proto__') return false;
+				missing.delete(name);
+			}
+			return missing.size === 0;
+		};
+		const initializer = skipWrappers(init.arguments[0]);
+		const birth = ts.isArrowFunction(initializer) ? initializer.body : initializer;
+		if (
+			(ts.isArrowFunction(initializer) &&
+				(initializer.modifiers?.length || initializer.parameters.length)) ||
+			ts.isBlock(birth) ||
+			!ownsFields(birth)
+		)
+			return false;
+
+		return this.localUses(setter.name).every((use) => {
+			const call = use.parent;
+			if (
+				!ts.isCallExpression(call) ||
+				call.expression !== use ||
+				call.questionDotToken ||
+				!ts.isExpressionStatement(call.parent) ||
+				call.arguments.length !== 1
+			)
+				return false;
+			const next = skipWrappers(call.arguments[0]);
+			if (!ts.isArrowFunction(next)) return ownsFields(next);
+			const [prior] = next.parameters;
+			return (
+				!next.modifiers?.length &&
+				next.parameters.length === 1 &&
+				ts.isIdentifier(prior.name) &&
+				!prior.initializer &&
+				!prior.dotDotDotToken &&
+				!ts.isBlock(next.body) &&
+				ownsFields(next.body, prior.name)
+			);
+		});
+	}
+
 	private ownDataDependency(
 		member: ts.PropertyAccessExpression | ts.ElementAccessExpression,
 		hook: ts.CallExpression,
+		dependencies: ts.ArrayLiteralExpression,
 	) {
 		const receiver = skipWrappers(member.expression);
 		const name = ts.isPropertyAccessExpression(member)
@@ -4601,6 +4774,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			return false;
 		const key = name.text;
 		if (key === '__proto__' || !ts.isIdentifier(receiver)) return false;
+		if (this.ownStateDependency(receiver, key, hook, dependencies)) return true;
 		const init = this.constValue(receiver);
 		const object = init && skipWrappers(init);
 		const owner = ts.findAncestor(hook, ts.isFunctionLike);
@@ -4640,7 +4814,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 			if (
 				(ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member)) &&
-				!this.ownDataDependency(member, node)
+				!this.ownDataDependency(member, node, list)
 			)
 				return member;
 		};
