@@ -4120,8 +4120,16 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			this.isContext(node.expression, node)
 		) {
 			if (!ts.isJsxClosingElement(tag)) {
+				let value: ts.Expression = node;
+				while (isWrapper(value.parent) && value.parent.expression === value) value = value.parent;
+				const declaration = value.parent;
+				const topLevelInitializer =
+					ts.isVariableDeclaration(declaration) &&
+					declaration.initializer === value &&
+					ts.isVariableStatement(declaration.parent.parent) &&
+					declaration.parent.parent.parent === this.sf;
 				if (
-					isTag &&
+					(isTag || topLevelInitializer) &&
 					ts.isIdentifier(node.expression) &&
 					this.hasLocalProviderGetter(node.expression)
 				)
