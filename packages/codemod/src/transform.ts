@@ -5538,6 +5538,23 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		if (!type) return true;
 		const value = type.initializer;
 		if (value && ts.isStringLiteral(value)) return TEXT_INPUT_TYPES.has(value.text);
+		if (tag === 'input' && value && ts.isJsxExpression(value) && value.expression) {
+			const expression = skipWrappers(value.expression);
+			// A spread can also supply the input handler that a rename would overwrite.
+			if (
+				ts.isStringLiteralLike(expression) &&
+				TEXT_INPUT_TYPES.has(expression.text) &&
+				!element.attributes.properties.some(
+					(attribute) =>
+						ts.isJsxSpreadAttribute(attribute) ||
+						(attribute !== type &&
+							ts.isIdentifier(attribute.name) &&
+							attribute.name.text === 'type'),
+				)
+			) {
+				return true;
+			}
+		}
 		this.note(
 			RULE.nativeChange,
 			'warning',
