@@ -442,6 +442,38 @@ describe('runCodemod', () => {
 		['named and default export', 'Leaf', '<Leaf />', '', true],
 		['named import', '{ Leaf }', '<Leaf />', '', true],
 		['extensionless return', '{ Leaf as Child }', '<Child />', '', true, './Leaf'],
+		['dotted stem', '{ Leaf }', '<Leaf />', '', true, './Leaf.light', {}, 'Leaf.light.tsx'],
+		['directory index', '{ Leaf }', '<Leaf />', '', true, './Leaf', {}, 'Leaf/index.tsx'],
+		[
+			'directory index with a package entry',
+			'{ Leaf }',
+			'<Leaf />',
+			'',
+			false,
+			'./Leaf',
+			{ 'Leaf/package.json': '{"browser":"./Other.js"}' },
+			'Leaf/index.tsx',
+		],
+		[
+			'directory index with a JSON sibling',
+			'{ Leaf }',
+			'<Leaf />',
+			'',
+			false,
+			'./Leaf',
+			{ 'Leaf.json': '{}' },
+			'Leaf/index.tsx',
+		],
+		[
+			'directory index with an extensionless file',
+			'{ Leaf }',
+			'<Leaf />',
+			'',
+			false,
+			'./Leaf',
+			{ 'Leaf/index': 'export function Leaf() { return null; }' },
+			'Leaf/index.tsx',
+		],
 		['extensionless shadowed binding', '{ Leaf }', '<Leaf />', '', false, './Leaf'],
 		['extensionless path alias', '{ Leaf }', '<Leaf />', '', false, '@/Leaf'],
 		['extensionless module suffixes', '{ Leaf }', '<Leaf />', '', false, './Leaf'],
@@ -472,7 +504,16 @@ describe('runCodemod', () => {
 		['explicit bridge', 'Leaf', '<OctaneCompat component={Leaf} />', '', false],
 	])(
 		'advises on a retained JSX issuer (%s)',
-		async (shape, binding, output, pragma, warns, specifier = './Leaf.tsx', siblings = {}) => {
+		async (
+			shape,
+			binding,
+			output,
+			pragma,
+			warns,
+			specifier = './Leaf.tsx',
+			siblings = {},
+			leaf = 'Leaf.tsx',
+		) => {
 			const root = project({
 				'tsconfig.json': JSON.stringify({
 					compilerOptions: {
@@ -488,7 +529,7 @@ describe('runCodemod', () => {
 					},
 				}),
 				'other.ts': 'export const jsx = () => null;',
-				'Leaf.tsx':
+				[leaf]:
 					'export function Leaf() { return <button>Original</button>; }\nexport default Leaf;',
 				'Owner.tsx': `${pragma}
 import { OctaneCompat } from 'octane/react';
@@ -502,7 +543,7 @@ ${shape === 'named and default export' ? 'export default Owner;' : ''}`,
 				path.join(root, 'node_modules'),
 				'dir',
 			);
-			const selected = [path.join(root, 'Leaf.tsx')];
+			const selected = [path.join(root, leaf)];
 			const preview = await runCodemod(selected, {
 				root,
 				strong: true,
@@ -516,10 +557,12 @@ ${shape === 'named and default export' ? 'export default Owner;' : ''}`,
 					)
 					.map(() => file.file),
 			);
-			expect(affected).toEqual(warns ? ['Leaf.tsx', 'Owner.tsx'] : []);
-			if (shape.startsWith('extensionless'))
+			expect(affected).toEqual(warns ? [leaf, 'Owner.tsx'] : []);
+			if (shape.startsWith('extensionless') || leaf !== 'Leaf.tsx')
 				expect(preview.files.find((file) => file.file === 'Owner.tsx')?.code).toContain(
-					`'${specifier}.tsrx'`,
+					shape === 'extensionless path alias'
+						? "'@/Leaf.tsrx'"
+						: `'./${leaf.replace(/\.tsx$/, '.tsrx')}'`,
 				);
 			if (shape === 'plain return' || shape === 'extensionless return') {
 				const result = await runCodemod(selected, { root, strong: true, verify: true });
