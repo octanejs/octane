@@ -37,7 +37,7 @@ import {
 	TEXT_FIELD_COMPONENTS,
 	TEXT_INPUT_TYPES,
 	UNSUPPORTED_VALUES,
-	isComputedReactCall,
+	isComputedReactHookOrRef,
 	mapPackageExport,
 	mapQualifiedType,
 	mapReactImport,
@@ -2777,7 +2777,9 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	private canMigrateComputedReactCall(node: ts.ElementAccessExpression, name: string) {
 		const parent = node.parent;
 		if (
-			!isComputedReactCall(name) ||
+			!isComputedReactHookOrRef(name) ||
+			name === 'useFormState' ||
+			name === 'useFormStatus' ||
 			!ts.isCallExpression(parent) ||
 			parent.expression !== node ||
 			ts.isOptionalChain(parent) ||
@@ -3073,10 +3075,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) {
 			const name = node.argumentExpression.text;
 			const mapped = this.checkReactNamespaceMember(node, name);
+			const module = mapped && this.importOf(node.expression)?.module;
+			const formHook = name === 'useFormState' || name === 'useFormStatus';
 			if (
 				mapped &&
-				this.importOf(node.expression)?.module === 'react' &&
-				isComputedReactCall(name)
+				(module === 'react' || (module === 'react-dom' && formHook)) &&
+				isComputedReactHookOrRef(name)
 			) {
 				if (this.canMigrateComputedReactCall(node, name)) {
 					this.count(RULE.import);
@@ -3086,7 +3090,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					RULE.unsupported,
 					'error',
 					node,
-					`Computed React \`${name}\` migration requires a direct call on a local React namespace import. Review the receiver and the call before migrating it.`,
+					formHook && module === 'react'
+						? `React DOM exports \`${name}\`. Check this computed React namespace access before migrating it.`
+						: formHook
+							? `Import React DOM's \`${name}\` by name before migrating this computed access.`
+							: `Computed React \`${name}\` migration requires a direct call on a local React namespace import. Review the receiver and the call before migrating it.`,
 				);
 			}
 			this.checkProjectReactEventMember(node, name);

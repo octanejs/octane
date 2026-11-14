@@ -4010,6 +4010,28 @@ export * from './Counter.tsrx';`,
 		},
 	);
 
+	it.each(['useFormState', 'useFormStatus'])(
+		'reports computed %s from both React packages',
+		async (hook) => {
+			const view = (module) =>
+				`import * as R from '${module}';\nexport function View() { const value = R['${hook}'](); return <b>{String(value)}</b>; }`;
+			const root = project({ 'React.tsx': view('react'), 'Dom.tsx': view('react-dom') });
+			const { files } = await runCodemod([root], { root, write: false, strong: true });
+			for (const file of files) {
+				expect(file.notes).toContainEqual({
+					rule: 'unsupported-api',
+					severity: 'error',
+					line: 2,
+					message:
+						file.file === 'React.tsx'
+							? `React DOM exports \`${hook}\`. Check this computed React namespace access before migrating it.`
+							: `Import React DOM's \`${hook}\` by name before migrating this computed access.`,
+				});
+				expect(file.code).toContain(`R['${hook}']()`);
+			}
+		},
+	);
+
 	it('uses the original ref allocator for refs mounted by a Strong component', async () => {
 		const root = project({
 			'View.tsx': `import * as React from 'react';
