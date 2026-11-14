@@ -804,6 +804,9 @@ export function deferred() { return () => hint('/later.png', { as: 'image' }); }
 export function useLabel() { const [label] = state('ready'); return label; }`;
 		const callback = `import { useCallback as retain } from 'react';
 export function useLabel(value: string) { const read = retain(() => value, [value]); return read(); }`;
+		const context = `import { createContext, useContext } from 'react';
+const Label = createContext('ready');
+export function useLabel(enabled = true) { const label = useContext(Label); return enabled ? label : ''; }`;
 		const panel = `import { useLabel as read } from './use-label';
 export function Panel() { const label = read(); return <b>{label}</b>; }`;
 		const callbackPanel = panel
@@ -819,6 +822,16 @@ export function Panel() { const label = read(); return <b>{label}</b>; }`;
 				},
 			}),
 			'use-label.ts': helper,
+			'LiteralDefault.tsx': panel.replace('./use-label', './literal-default'),
+			'literal-default.ts': context,
+			'ThrowingDefault.tsx': panel.replace('./use-label', './throwing-default'),
+			'throwing-default.ts': context.replace('= true', "= (() => { throw Error('default'); })()"),
+			'Destructured.tsx': panel.replace('./use-label', './destructured'),
+			'destructured.ts': context.replace('enabled = true', '{ enabled }: { enabled: boolean }'),
+			'PureDefault.tsx': panel.replace('./use-label', './pure-default'),
+			'pure-default.ts':
+				context.replace(', useContext', '') +
+				"\nfunction useContext(_label: unknown) { return 'ready'; }",
 			'use-callback.ts': callback,
 			'Callback.tsx': callbackPanel,
 			'CallbackShadowed.tsx': callbackPanel.replace('./use-callback', './shadowed-callback'),
@@ -939,6 +952,7 @@ export function useLabel() { const later = () => useState('ready'); return 'read
 				],
 				['Forward.tsx', 'bindings', 3, expect.stringMatching(/useLabel.*React.*useState/)],
 				['Function.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
+				['LiteralDefault.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useContext/)],
 				['Memo.tsx', 'bindings', 3, expect.stringMatching(/useLabel.*React.*useState/)],
 				['Panel.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
 				['Sibling.tsx', 'bindings', 2, expect.stringMatching(/useLabel.*React.*useState/)],
