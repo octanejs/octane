@@ -343,7 +343,8 @@ it.each([
 
 it('warns at a direct migrated server call that needs a standalone store provider', async () => {
 	const rootImport = `import { renderToString } from 'react-dom/server';
-			import { Pane, Plain, Conditional, Props, Destructured } from './pane.tsx';`;
+			import DefaultPane, { Pane, Plain, Conditional, Props, Destructured } from './pane.tsx';
+			import AnonymousPane from './anonymous.tsx';`;
 	const { app } = project({
 		'app/src/pane.tsx': `import { useSnapshot } from 'observer';
 			export function Pane() { const value = useSnapshot(); return <b>{String(value)}</b>; }
@@ -356,8 +357,17 @@ it('warns at a direct migrated server call that needs a standalone store provide
 				const value = useSnapshot();
 				return <b>{label}{String(value)}</b>;
 			}
+			export default function DefaultPane() {
+				const value = useSnapshot();
+				return <b>{String(value)}</b>;
+			}
 			export function Conditional() {
 				if (typeof window === 'undefined') return <b>server</b>;
+				const value = useSnapshot();
+				return <b>{String(value)}</b>;
+			}`,
+		'app/src/anonymous.tsx': `import { useSnapshot } from 'observer';
+			export default function () {
 				const value = useSnapshot();
 				return <b>{String(value)}</b>;
 			}`,
@@ -368,7 +378,9 @@ it('warns at a direct migrated server call that needs a standalone store provide
 			export const plain = renderToString(<Plain />);
 			export const conditional = renderToString(<Conditional />);
 			export const props = renderToString(<Props />);
-			export const destructured = renderToString(<Destructured />);`,
+			export const destructured = renderToString(<Destructured />);
+			export const defaultPane = renderToString(<DefaultPane />);
+			export const anonymousPane = renderToString(<AnonymousPane />);`,
 		'app/src/hosted.tsx': `import { OctaneCompat } from 'octane/react/server';
 			import { Pane } from './pane.tsx';
 			export function Hosted() { return <OctaneCompat component={Pane} />; }`,
@@ -378,7 +390,7 @@ it('warns at a direct migrated server call that needs a standalone store provide
 			export function render() { return renderToString(<Pane />); }`,
 	});
 	const result = await runCodemod(
-		['root', 'pane', 'deferred'].map((name) => path.join(app, 'src', name + '.tsx')),
+		['root', 'pane', 'anonymous', 'deferred'].map((name) => path.join(app, 'src', name + '.tsx')),
 		{ root: app, strong: true, verify: true, write: true },
 	);
 	const findings = result.files.flatMap((file) =>
@@ -389,18 +401,28 @@ it('warns at a direct migrated server call that needs a standalone store provide
 	expect(findings).toEqual([
 		expect.objectContaining({
 			file: 'src/root.tsx',
-			line: 3,
+			line: 4,
 			message: expect.stringMatching(/standalone.*NativeStoreProvider/i),
 		}),
 		expect.objectContaining({
 			file: 'src/root.tsx',
-			line: 6,
+			line: 7,
 			message: expect.stringMatching(/migrated Props.*NativeStoreProvider/),
 		}),
 		expect.objectContaining({
 			file: 'src/root.tsx',
-			line: 7,
+			line: 8,
 			message: expect.stringMatching(/migrated Destructured.*NativeStoreProvider/),
+		}),
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 9,
+			message: expect.stringMatching(/migrated default export.*NativeStoreProvider/),
+		}),
+		expect.objectContaining({
+			file: 'src/root.tsx',
+			line: 10,
+			message: expect.stringMatching(/migrated default export.*NativeStoreProvider/),
 		}),
 	]);
 	expect(fs.existsSync(path.join(app, 'src/root.tsrx'))).toBe(true);

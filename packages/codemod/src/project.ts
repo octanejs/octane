@@ -1400,7 +1400,7 @@ export async function runCodemod(
 					rule: 'store-hook',
 					severity: 'warning',
 					line: edge.line,
-					message: `If this server call runs standalone and reaches the migrated ${edge.name}'s store hook, it may need NativeStoreProvider with its original store context and value.`,
+					message: `If this server call runs standalone and reaches the migrated ${edge.name === 'default' ? 'default export' : edge.name}'s store hook, it may need NativeStoreProvider with its original store context and value.`,
 				});
 			}
 		}

@@ -885,13 +885,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				const call = ref.parent;
 				if (!ts.isCallExpression(call) || call.arguments.length || ts.isOptionalChain(call))
 					continue;
-				if (nativeSetupHook(ref, this.localUses, this.checker) !== 'first') continue;
+				if (nativeSetupHook(ref, this.localUses, this.checker, undefined, true) !== 'first')
+					continue;
 				const component = ts.findAncestor(ref, ts.isFunctionDeclaration);
-				if (
-					component?.name &&
-					!component.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword)
-				)
-					storeHookComponents.add(component.name.text);
+				if (component?.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword))
+					storeHookComponents.add('default');
+				else if (component?.name) storeHookComponents.add(component.name.text);
 			}
 		}
 
