@@ -37,6 +37,8 @@ import {
 	islandComponents,
 	executableImports,
 	hostedServerComponents,
+	intrinsicReactExports,
+	retainedReactServerComponents,
 	reverseIslandExports,
 } from './react-island-sources.js';
 
@@ -1181,14 +1183,14 @@ export async function runCodemod(
 			fs.realpathSync(module.resolvedFileName).startsWith(fs.realpathSync(installed.dir) + path.sep)
 		);
 	}
-	function originalReactJsxRuntime(file: string) {
-		const name = 'react/jsx-runtime';
+	function originalReactEntry(file: string, name: 'react/jsx-runtime' | 'react-dom/server') {
+		const packageRoot = name === 'react/jsx-runtime' ? 'react' : 'react-dom';
 		const types = originalModule(file, name)?.packageId?.name;
-		if (types !== 'react' && types !== '@types/react') return false;
-		const installed = readInstalled(path.dirname(file), 'react');
+		if (types !== packageRoot && types !== `@types/${packageRoot}`) return false;
+		const installed = readInstalled(path.dirname(file), packageRoot);
 		try {
 			return (
-				installed?.manifest.name === 'react' &&
+				installed?.manifest.name === packageRoot &&
 				fs
 					.realpathSync(createRequire(file).resolve(name))
 					.startsWith(fs.realpathSync(installed.dir) + path.sep)
@@ -1198,6 +1200,7 @@ export async function runCodemod(
 		}
 	}
 	const reverseIslands = new Map<string, ReadonlySet<string>>();
+	const intrinsicExports = new Map<string, ReadonlySet<string>>();
 	const linkedConflicts = new Map<string, string>();
 	function checkLinkedRename(file: string, issuer: string) {
 		const selected = linkedRename(file);
@@ -1285,10 +1288,48 @@ export async function runCodemod(
 		else results.push(host);
 		if (
 			!edited.has(file) &&
+			!isTsrx(file) &&
+			(source.includes('react-dom/server') || source.includes('\\')) &&
+			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) === rootProject &&
+			originalReactEntry(file, 'react-dom/server')
+		) {
+			for (const edge of retainedReactServerComponents(file, source, (module) =>
+				module === 'react'
+					? installedReact(file)
+					: automaticReactJsx(file) && originalReactEntry(file, module),
+			)) {
+				const match = renamed(file, edge.module);
+				if (
+					!match ||
+					match.file !== path.resolve(path.dirname(file), edge.module) ||
+					!automaticReactJsx(match.file) ||
+					!originalReactEntry(match.file, 'react/jsx-runtime')
+				)
+					continue;
+				const leaf = byFile.get(match.file);
+				if (!leaf?.output.endsWith('.tsrx')) continue;
+				let names = intrinsicExports.get(match.file);
+				if (!names) {
+					names = intrinsicReactExports(match.file, fs.readFileSync(match.file, 'utf8'));
+					intrinsicExports.set(match.file, names);
+				}
+				if (!names.has(edge.name)) continue;
+				const note: Note = {
+					rule: 'react-compat',
+					severity: 'warning',
+					line: edge.line,
+					message: `The retained React server render in ${name} imports ${leaf.file} directly. With standard package resolution, migrate the server entry too or keep this component in React.`,
+				};
+				host.notes.push(note);
+				leaf.notes.push({ ...note, line: 1 });
+			}
+		}
+		if (
+			!edited.has(file) &&
 			source.includes('octane/react/server') &&
 			automaticReactJsx(file) &&
 			originalOctaneBridge(file, 'octane/react/server') &&
-			originalReactJsxRuntime(file)
+			originalReactEntry(file, 'react/jsx-runtime')
 		) {
 			for (const edge of hostedServerComponents(file, source)) {
 				const match = edge.module.startsWith('.') && renamed(file, edge.module);
@@ -1712,9 +1753,11 @@ function renamedImports(
 				);
 		if (!renames.size || (!specifier.startsWith('.') && !matches.length)) return null;
 		const resolved = ts.resolveModuleName(specifier, from, options, ts.sys, cache).resolvedModule;
-		const target = resolved && renames.get(resolved.resolvedFileName);
+		// TypeScript returns slash-delimited names, including on Windows.
+		const file = resolved && path.normalize(resolved.resolvedFileName);
+		const target = file && renames.get(file);
 		if (!target) {
-			if (resolved) unmatched?.(resolved.resolvedFileName);
+			if (file) unmatched?.(file);
 			return null;
 		}
 		// Only a single directory alias preserves the specifier's suffix.
@@ -1722,13 +1765,13 @@ function renamedImports(
 		const alias = matches.length === 1 ? matches[0] : null;
 		if (alias?.directory && target.startsWith(alias.directory)) {
 			return {
-				file: resolved.resolvedFileName,
+				file,
 				specifier: alias.start + target.slice(alias.directory.length).split(path.sep).join('/'),
 			};
 		}
 		const relative = path.relative(path.dirname(from), target).split(path.sep).join('/');
 		return {
-			file: resolved.resolvedFileName,
+			file,
 			specifier: relative.startsWith('../') ? relative : './' + relative,
 		};
 	};
