@@ -11,7 +11,7 @@ import { useStore, useStoreApi } from '../../hooks/useStore';
 import type { ReactFlowState, OnSelectionChangeFunc, Node, Edge } from '../../types';
 
 type SelectionListenerProps<NodeType extends Node = Node, EdgeType extends Edge = Edge> = {
-	onSelectionChange?: OnSelectionChangeFunc<NodeType, EdgeType>;
+	onSelectionChange?: OnSelectionChangeFunc<NodeType, EdgeType> | undefined;
 };
 
 const selector = (s: ReactFlowState) => {

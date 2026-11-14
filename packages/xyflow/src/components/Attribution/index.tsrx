@@ -6,8 +6,8 @@ import { Panel } from '../Panel/index.tsrx';
 declare const process: { env: { NODE_ENV?: string } };
 
 type AttributionProps = {
-	proOptions?: ProOptions;
-	position?: PanelPosition;
+	proOptions?: ProOptions | undefined;
+	position?: PanelPosition | undefined;
 };
 
 const link = `https://reactflow.dev${
