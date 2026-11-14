@@ -40,6 +40,7 @@ import {
 	executableImports,
 	hostedServerComponents,
 	intrinsicReactExports,
+	retainedReactComponentReturns,
 	retainedReactServerComponents,
 	reverseIslandExports,
 } from './react-island-sources.js';
@@ -1366,18 +1367,29 @@ export async function runCodemod(
 		};
 		if (result) Object.assign(result, { code: paths.code, changed: true, rules });
 		else results.push(host);
+		const retainedJsx =
+			!known.has(file) &&
+			/\.[jt]sx$/.test(file) &&
+			(source.includes('.tsx') || source.includes('.jsx') || source.includes('\\'));
+		const retainedServer =
+			!isTsrx(file) && (source.includes('react-dom/server') || source.includes('\\'));
 		if (
 			!edited.has(file) &&
-			!isTsrx(file) &&
-			(source.includes('react-dom/server') || source.includes('\\')) &&
-			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) === rootProject &&
-			originalReactEntry(file, 'react-dom/server')
+			(retainedJsx || retainedServer) &&
+			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) === rootProject
 		) {
-			for (const edge of retainedReactServerComponents(file, source, (module) =>
-				module === 'react'
-					? installedReact(file)
-					: automaticReactJsx(file) && originalReactEntry(file, module),
-			)) {
+			const edges = [];
+			if (retainedJsx && automaticReactJsx(file) && originalReactEntry(file, 'react/jsx-runtime'))
+				for (const edge of retainedReactComponentReturns(file, source))
+					edges.push({ ...edge, renderer: 'JSX' });
+			if (retainedServer && originalReactEntry(file, 'react-dom/server'))
+				for (const edge of retainedReactServerComponents(file, source, (module) =>
+					module === 'react'
+						? installedReact(file)
+						: automaticReactJsx(file) && originalReactEntry(file, module),
+				))
+					edges.push({ ...edge, renderer: 'server render' });
+			for (const edge of edges) {
 				const match = renamed(file, edge.module);
 				if (
 					!match ||
@@ -1398,7 +1410,10 @@ export async function runCodemod(
 					rule: 'react-compat',
 					severity: 'warning',
 					line: edge.line,
-					message: `The retained React server render in ${name} imports ${leaf.file} directly. With standard package resolution, migrate the server entry too or keep this component in React.`,
+					message:
+						edge.renderer === 'JSX'
+							? `The retained React JSX in ${name} renders ${leaf.file} directly. With standard package resolution, migrate the caller too or keep this component in React.`
+							: `The retained React server render in ${name} imports ${leaf.file} directly. With standard package resolution, migrate the server entry too or keep this component in React.`,
 				};
 				host.notes.push(note);
 				leaf.notes.push({ ...note, line: 1 });
