@@ -87,19 +87,16 @@ export function IntlProvider({
 }
 
 type MessageProps = MessageDescriptor &
-	Pick<ComponentProps<typeof ReactMessage>, 'values' | 'ignoreTag'>;
+	Pick<ComponentProps<typeof ReactMessage>, 'values' | 'ignoreTag'> & {
+		inlineHost?: typeof ReactCompat;
+	};
 
 function ReactContent({ content }: { content: ReactNode }) {
 	return content;
 }
 
-function NativeFormattedMessage({
-	id,
-	defaultMessage,
-	description,
-	values,
-	ignoreTag,
-}: MessageProps) @{
+function NativeFormattedMessage(props: MessageProps) @{
+	const { id, defaultMessage, description, values, ignoreTag } = props;
 	const intl = useIntl();
 	const descriptor = { id, defaultMessage, description };
 	const { textComponent, formatMessage } = intl;
@@ -110,8 +107,11 @@ function NativeFormattedMessage({
 		? reactElement(ReactMessage, { ...descriptor, values, ignoreTag })
 		: formatMessage(descriptor, values, { ignoreTag });
 	if (typeof content === 'string') return content;
+	const Island = Object.hasOwn(props, 'inlineHost')
+		? (props.inlineHost ?? ReactCompat)
+		: ReactCompat;
 	<Locale value={intl}>
-		<ReactCompat component={ReactContent} props={{ content }} contexts={intlContexts} />
+		<Island component={ReactContent} props={{ content }} contexts={intlContexts} />
 	</Locale>
 }
 
