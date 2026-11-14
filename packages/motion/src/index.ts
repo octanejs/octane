@@ -19,6 +19,7 @@ import {
 	createElement,
 	useContext,
 	useEffect,
+	useInsertionEffect,
 	useLayoutEffect,
 	useMemo,
 	useState,
@@ -61,6 +62,7 @@ const GESTURE = Symbol.for('octane-motion:gesture');
 const EXIT = Symbol.for('octane-motion:exit');
 const LAYOUT = Symbol.for('octane-motion:layout');
 const DRAG = Symbol.for('octane-motion:drag');
+const DRAG_LISTENER = Symbol.for('octane-motion:drag-listener');
 const INVIEW = Symbol.for('octane-motion:inview');
 const MV = Symbol.for('octane-motion:motionvalues');
 const LAYOUT_ID = Symbol.for('octane-motion:layoutid');
@@ -99,6 +101,8 @@ const MOTION_PROPS = new Set([
 	'variants',
 	'drag',
 	'dragConstraints',
+	'dragControls',
+	'dragListener',
 	'dragElastic',
 	'dragMomentum',
 	'onDrag',
@@ -342,6 +346,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					),
 					layout: null,
 					layoutActive: false,
+					dragListener: undefined,
 				}) as any,
 			REFS,
 		);
@@ -641,6 +646,20 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 			INVIEW,
 		);
 
+		// Publish the listener setting only when this render commits. A live host
+		// can receive a pointer event while a descendant's render is still pending.
+		if ((dragEnabled && props.drag) || latest.dragListener !== undefined) {
+			const { dragListener = true } = props;
+			const listen = Boolean(dragListener);
+			useInsertionEffect(
+				() => {
+					latest.dragListener = listen;
+				},
+				[listen],
+				DRAG_LISTENER,
+			);
+		}
+
 		// `drag`: pointer-drag the element, updating its transform. Supports axis lock
 		// (`drag="x"`/`"y"`) and `dragConstraints` (a box of left/right/top/bottom px).
 		useLayoutEffect(
@@ -655,6 +674,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 				latest.dragX ??= 0;
 				latest.dragY ??= 0;
 				const onDown = (e: any) => {
+					if (!latest.dragListener) return;
 					active = true;
 					startX = e.clientX;
 					startY = e.clientY;
