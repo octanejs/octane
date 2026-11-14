@@ -6289,9 +6289,17 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			}
 			if (ts.isCallExpression(read)) {
 				if (readsOrdinal(read.expression)) return true;
+				const callee = skipWrappers(read.expression);
+				if (
+					ts.isArrowFunction(callee) &&
+					!callee.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
+					callee.parameters.length === 0 &&
+					read.arguments.length === 0 &&
+					!ts.isBlock(callee.body)
+				)
+					return readsOrdinal(callee.body);
 				// Optional calls can skip their arguments, and earlier arguments or a
 				// member getter can interrupt evaluation before the ordinal read.
-				const callee = skipWrappers(read.expression);
 				if (!ts.isArrowFunction(callee) && (ts.isOptionalChain(read) || !ts.isIdentifier(callee)))
 					return false;
 				// A binding in the current parameter list may still be uninitialized.
