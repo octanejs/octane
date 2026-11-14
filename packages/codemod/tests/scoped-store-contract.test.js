@@ -368,7 +368,7 @@ it('warns at a direct migrated server call that needs a standalone store provide
 			export function render() { return renderToString(<Pane />); }`,
 	});
 	const result = await runCodemod(
-		['root', 'pane', 'deferred', 'hosted'].map((name) => path.join(app, 'src', name + '.tsx')),
+		['root', 'pane', 'deferred'].map((name) => path.join(app, 'src', name + '.tsx')),
 		{ root: app, strong: true, verify: true, write: true },
 	);
 	const findings = result.files.flatMap((file) =>
@@ -384,6 +384,9 @@ it('warns at a direct migrated server call that needs a standalone store provide
 		}),
 	]);
 	expect(fs.existsSync(path.join(app, 'src/root.tsrx'))).toBe(true);
+	const hosted = fs.readFileSync(path.join(app, 'src/hosted.tsx'), 'utf8');
+	expect(hosted).toContain("from './pane.tsrx'");
+	expect(hosted).toContain('<OctaneCompat component={Pane} />');
 });
 
 it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
