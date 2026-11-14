@@ -737,12 +737,15 @@ export async function runCodemod(
 		)
 			return;
 		const file = localFile(from, module);
+		const jsSpecifier =
+			module.endsWith('.js') && (module.startsWith('./') || module.startsWith('../'));
 		if (
 			!file ||
+			(jsSpecifier && path.resolve(path.dirname(from), module.slice(0, -3) + '.ts') !== file) ||
 			known.has(file) ||
 			path.basename(file) === 'index.ts' ||
 			fs.existsSync(file.slice(0, -3) + '.tsrx') ||
-			(path.extname(module) && !module.endsWith('.ts')) ||
+			(path.extname(module) && !module.endsWith('.ts') && !jsSpecifier) ||
 			fs.realpathSync(file) !== path.join(fs.realpathSync(root), path.relative(root, file)) ||
 			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) !== rootProject
 		)
@@ -790,7 +793,8 @@ export async function runCodemod(
 			}
 			localHooks.set(file, hooks);
 		}
-		const hook = hooks.direct.get(name);
+		// Keep TS substitution advisory. A loader may select a different executable.
+		const hook = jsSpecifier ? undefined : hooks.direct.get(name);
 		if ((!hook && !hooks.privateContexts.has(name)) || fs.statSync(file).nlink > 1) return;
 		// Writing an unrenamed selection through a symlink changes its physical target.
 		selectedInPlace ??= new Set(

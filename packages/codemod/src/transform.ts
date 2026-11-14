@@ -3321,12 +3321,15 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 									privateContext: true,
 								}),
 							);
+							const resolution = module.endsWith('.js')
+								? ' and the import resolves to its TypeScript source'
+								: '';
 							if (advisorySite)
 								this.note(
 									RULE.bindings,
 									'warning',
 									advisorySite,
-									`If native setup reaches the unchanged ${module} export ${name} after its module initializes, its private helper calls React's useContext. Provide a compiled Octane hook or keep the component under React.`,
+									`If native setup reaches the unchanged ${module} export ${name} after its module initializes${resolution}, its private helper calls React's useContext. Provide a compiled Octane hook or keep the component under React.`,
 								);
 						}
 					}
