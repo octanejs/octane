@@ -3013,8 +3013,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			if (text === null) this.checkProjectReactEventMember(node, node.name.text);
 			return text;
 		}
-		if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression))
-			this.checkProjectReactEventMember(node, node.argumentExpression.text);
+		if (ts.isElementAccessExpression(node) && ts.isStringLiteralLike(node.argumentExpression)) {
+			const name = node.argumentExpression.text;
+			this.checkReactNamespaceMember(node, name);
+			this.checkProjectReactEventMember(node, name);
+		}
 		if (ts.isQualifiedName(node)) return this.rewriteQualifiedType(node);
 		if (ts.isImportTypeNode(node)) return this.rewriteImportType(node);
 		if (ts.isTypeReferenceNode(node)) return this.rewriteTypeReference(node, node.typeName);
@@ -3897,22 +3900,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 			return this.emit(node.expression, PLAIN);
 		}
-		const namespace = this.importOf(node.expression);
-		if (namespace?.namespace && namespace.module in REACT_MODULES) {
-			const name = node.name.text;
-			const mapped = mapReactImport(namespace.module, name, false);
-			if (!mapped) {
-				this.used.add(namespace.local);
-				this.note(
-					RULE.unsupported,
-					'error',
-					node,
-					UNSUPPORTED_VALUES[name] ?? `\`${node.getText(this.sf)}\` has no Octane equivalent.`,
-				);
-				return null;
-			}
+		const reactMember = this.checkReactNamespaceMember(node, node.name.text);
+		if (reactMember !== undefined) {
+			if (!reactMember) return null;
 			this.count(RULE.import);
-			return this.require(mapped.module, mapped.name, false);
+			return this.require(reactMember.module, reactMember.name, false);
 		}
 		const member = this.rewritePackageMember(node.expression, node.name, 'error');
 		if (member !== null) return member;
@@ -3926,6 +3918,26 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			return this.emit(node.expression, PLAIN) + '.currentTarget';
 		}
 		return null;
+	}
+
+	private checkReactNamespaceMember(
+		node: ts.PropertyAccessExpression | ts.ElementAccessExpression,
+		name: string,
+	) {
+		const namespace = this.importOf(node.expression);
+		if (!namespace?.namespace || !(namespace.module in REACT_MODULES)) return;
+		const mapped = mapReactImport(namespace.module, name, false);
+		if (!mapped) {
+			this.used.add(namespace.local);
+			this.note(
+				RULE.unsupported,
+				'error',
+				node,
+				UNSUPPORTED_VALUES[name] ?? `\`${node.getText(this.sf)}\` has no Octane equivalent.`,
+			);
+			return null;
+		}
+		return mapped;
 	}
 
 	/**
