@@ -73,6 +73,8 @@ describe('runCodemod', () => {
 			'package.json': '{"type":"module"}',
 			'Native.tsx': `${setup}
 export function List() { return <main>{${map}}</main>; }`,
+			'Braced.tsx': `${setup}
+export function List() { return <main>{${map.replace("case 'a': return <b key={row}>{label}</b>;", "case 'a': { const bold = label; return <b key={row}>{bold}</b>; }").replace('default: return (<i key={row}>{label}</i>);', 'default: { return (<i key={row}>{label}</i>); }')}}</main>; }`,
 			'Island.tsx': `import { ReactCompat } from 'octane/react';
 ${setup}
 export function List() { return <ReactCompat><main>{${map}}</main></ReactCompat>; }`,
@@ -82,7 +84,7 @@ export function List() { return <main>{${map.replace('switch (row)', "switch ('t
 			'Callbacks.tsx': `${setup}
 export function List() { return <main>{makeRows().map(row => {
 	switch (row) {
-		case 'a': return () => <b>{row}</b>;
+		case 'a': { return () => <b>{row}</b>; }
 		default: return undefined;
 	}
 })}</main>; }`,
@@ -96,6 +98,7 @@ export function List() { return <main>{makeRows().map(row => {
 		});
 		const { files } = await runCodemod([root], { root, write: false, verify: false });
 		expect(files.map((file) => file.file).sort()).toEqual([
+			'Braced.tsx',
 			'Callbacks.tsx',
 			'ConstantSwitch.tsx',
 			'Island.tsx',
@@ -105,7 +108,7 @@ export function List() { return <main>{makeRows().map(row => {
 		]);
 		for (const file of files) {
 			const notes = file.notes.filter((note) => note.rule === 'template-for');
-			if (file.file === 'Native.tsx') {
+			if (file.file === 'Native.tsx' || file.file === 'Braced.tsx') {
 				expect(notes).toEqual([
 					expect.objectContaining({
 						severity: 'error',

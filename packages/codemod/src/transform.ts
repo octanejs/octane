@@ -509,6 +509,16 @@ function returnsJsx(statements: readonly ts.Statement[]) {
 	return statements.some(visit);
 }
 
+/** A JSX return in this statement or its plain lexical blocks. */
+function directlyReturnsJsx(statement: ts.Statement): boolean {
+	if (ts.isBlock(statement)) return statement.statements.some(directlyReturnsJsx);
+	return (
+		ts.isReturnStatement(statement) &&
+		!!statement.expression &&
+		isJsx(skipWrappers(statement.expression))
+	);
+}
+
 /** Document tags a router shell renders through `@octanejs/tanstack-router`. */
 const DOCUMENT_TAGS: Record<string, string> = {
 	html: 'Html',
@@ -6209,14 +6219,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				!rowKeyLiteral(last.expression) &&
 				!fn.asteriskToken &&
 				!fn.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
-				last.caseBlock.clauses.some((clause) =>
-					clause.statements.some(
-						(statement) =>
-							ts.isReturnStatement(statement) &&
-							statement.expression &&
-							isJsx(skipWrappers(statement.expression)),
-					),
-				)
+				last.caseBlock.clauses.some((clause) => clause.statements.some(directlyReturnsJsx))
 			) {
 				this.reportOpaqueMap(node);
 			}
