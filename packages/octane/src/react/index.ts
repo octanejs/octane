@@ -658,7 +658,8 @@ function createOctaneCompat(host: 'div' | 'span') {
 
 		return React.createElement(host, {
 			'data-octane-compat': '',
-			style: OCTANE_COMPAT_HOST_STYLE,
+			className: props.hostClassName,
+			style: props.hostStyle ?? OCTANE_COMPAT_HOST_STYLE,
 			ref: hostRef,
 			// §9.3 opaque-host contract: the server writes real island HTML; the
 			// client ALWAYS supplies this stable frozen sentinel so React neither
@@ -688,7 +689,7 @@ function createOctaneCompat(host: 'div' | 'span') {
  * surface; there is nothing to register.
  */
 export const OctaneCompat = /* @__PURE__ */ createOctaneCompat('div');
-/** Host phrasing Octane content inside a span with display: contents. */
+/** Host phrasing Octane content inside a span. */
 export const OctaneCompatInline = /* @__PURE__ */ createOctaneCompat('span');
 
 /** Server island markup present? (Anything beyond the client's own sentinel.) */

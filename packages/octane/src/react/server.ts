@@ -162,7 +162,8 @@ function createOctaneCompat(host: 'div' | 'span') {
 			React.createElement(host, {
 				key: 'host',
 				'data-octane-compat': '',
-				style: OCTANE_COMPAT_HOST_STYLE,
+				className: props.hostClassName,
+				style: props.hostStyle ?? OCTANE_COMPAT_HOST_STYLE,
 				suppressHydrationWarning: true,
 				dangerouslySetInnerHTML: { __html: attempt.html },
 			}),
@@ -173,5 +174,5 @@ function createOctaneCompat(host: 'div' | 'span') {
 }
 
 export const OctaneCompat = /* @__PURE__ */ createOctaneCompat('div');
-/** Host phrasing Octane content inside a span with display: contents. */
+/** Host phrasing Octane content inside a span. */
 export const OctaneCompatInline = /* @__PURE__ */ createOctaneCompat('span');

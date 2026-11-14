@@ -42,6 +42,11 @@ host. It takes the same props. Use phrasing content inside the span and
 respect the surrounding HTML, including a button's restriction on nested
 controls.
 
+Pass `hostClassName` and `hostStyle` to style either host from React. A supplied
+`hostStyle` replaces the default `display: contents`. For example,
+`hostStyle={{ display: 'inline' }}` gives an inline host its own layout box,
+and `hostStyle={{}}` leaves its display to CSS and the element's default.
+
 Resource hints such as `preload` and `preinit` issued during an
 `OctaneCompat` render use the React host's document resource handling.
 Place declarative document metadata such as `<title>` and `<meta>` in the

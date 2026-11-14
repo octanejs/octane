@@ -102,15 +102,24 @@ export type ScopeStaysInternal = Scope;
 // per-island declarations.
 export const componentForm = <OctaneCompat component={RawGreeting} props={{ name: 'x' }} />;
 export const inlineComponentForm = (
-	<OctaneCompatInlineServer component={RawGreeting} props={{ name: 'x' }} />
+	<OctaneCompatInlineServer
+		component={RawGreeting}
+		props={{ name: 'x' }}
+		hostClassName="status"
+		hostStyle={{ display: 'inline' }}
+	/>
 );
 export const inlineChildrenForm = (
-	<OctaneCompatInline>
+	<OctaneCompatInline hostClassName="status" hostStyle={{ display: 'inline' }}>
 		<Greeting name="x" />
 	</OctaneCompatInline>
 );
 // @ts-expect-error — wrong island prop type in the inline component form
 export const inlineWrong = <OctaneCompatInline component={RawGreeting} props={{ name: 42 }} />;
+export const invalidHostStyle = (
+	// @ts-expect-error — the host style takes React style properties
+	<OctaneCompatInline component={RawGreeting} props={{ name: 'x' }} hostStyle="display:inline" />
+);
 // The tsrx-tsc view of a `.tsrx` export — `(props) => <octane element>` — is
 // equally accepted; the return type is deliberately unconstrained.
 declare const TsrxGreeting: (props: GreetingProps) => { $$typeOnly: true };
