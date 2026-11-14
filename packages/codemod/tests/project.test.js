@@ -1891,6 +1891,10 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 				}),
 				'owner.ts': owner,
 				'View.tsx': view('owner'),
+				'JsSpecifier.tsx': view('owner.js'),
+				'CompetingJsSpecifier.tsx': view('competing.js'),
+				'competing.ts': owner,
+				'competing.js': "export function useLabel() { return 'other'; }",
 				'hook-namespace.ts': namespaceOwner,
 				'Namespace.tsx': view('hook-namespace'),
 				...Object.fromEntries(
@@ -1986,6 +1990,12 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 					'error',
 					expect.stringContaining("export useLabel calls React's useContext"),
 				],
+				[
+					'JsSpecifier.tsx',
+					2,
+					'warning',
+					expect.stringContaining('the import resolves to its TypeScript source'),
+				],
 				['Namespace.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
 				[
 					'NamespaceBracket.tsx',
@@ -2020,10 +2030,12 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 				],
 				['View.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
 			]);
-			for (const name of ['Cycle.tsx', 'View.tsx']) {
+			for (const name of ['Cycle.tsx', 'JsSpecifier.tsx', 'View.tsx']) {
 				const resultFile = result.files.find((file) => file.file === name);
 				expect(resultFile.strong).toBe(true);
-				expect(resultFile.code).toContain("from './owner'");
+				expect(resultFile.code).toContain(
+					name === 'JsSpecifier.tsx' ? "from './owner.js'" : "from './owner'",
+				);
 			}
 			expect(fs.readFileSync(path.join(root, 'owner.ts'), 'utf8')).toBe(owner);
 		},
