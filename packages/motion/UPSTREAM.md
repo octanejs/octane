@@ -33,6 +33,7 @@ The binding reuses Motion's framework-neutral animation engine and ports a bound
 | `MotionConfig` | `MotionConfig` | Ported default transition context | `conformance/config.test.ts` |
 | `useMotionValue`, `useMotionValueEvent` | same | Ported | curated upstream useMotionValue lane + conformance |
 | `useAnimate`, `useScroll`, `useTransform`, `useSpring` | same | Ported bounded forms | corresponding conformance suites |
+| `useInView` | same | Octane state and effect slots over Motion's `inView` | `conformance/useInView.test.ts` |
 | framework-neutral exports from `motion` | root re-exports | Reused unchanged | package dependency and typecheck |
 | Remaining React components and hooks | not exported | Explicit gaps | `status.json` notes |
 
