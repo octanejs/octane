@@ -1753,9 +1753,11 @@ function renamedImports(
 				);
 		if (!renames.size || (!specifier.startsWith('.') && !matches.length)) return null;
 		const resolved = ts.resolveModuleName(specifier, from, options, ts.sys, cache).resolvedModule;
-		const target = resolved && renames.get(resolved.resolvedFileName);
+		// TypeScript returns slash-delimited names, including on Windows.
+		const file = resolved && path.normalize(resolved.resolvedFileName);
+		const target = file && renames.get(file);
 		if (!target) {
-			if (resolved) unmatched?.(resolved.resolvedFileName);
+			if (file) unmatched?.(file);
 			return null;
 		}
 		// Only a single directory alias preserves the specifier's suffix.
@@ -1763,13 +1765,13 @@ function renamedImports(
 		const alias = matches.length === 1 ? matches[0] : null;
 		if (alias?.directory && target.startsWith(alias.directory)) {
 			return {
-				file: resolved.resolvedFileName,
+				file,
 				specifier: alias.start + target.slice(alias.directory.length).split(path.sep).join('/'),
 			};
 		}
 		const relative = path.relative(path.dirname(from), target).split(path.sep).join('/');
 		return {
-			file: resolved.resolvedFileName,
+			file,
 			specifier: relative.startsWith('../') ? relative : './' + relative,
 		};
 	};
