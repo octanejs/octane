@@ -29,6 +29,7 @@ import {
 	RefIsland,
 	RenderLogIsland,
 	PendingFaultIsland,
+	QueuedRefIsland,
 	SuspendingEffectIsland,
 	SuspendingIsland,
 	ThrowingIsland,
@@ -668,6 +669,116 @@ describe('octane/react — suspension and error escape to React boundaries', () 
 					'first cleanup:1',
 				]);
 			} finally {
+				await mounted.unmount();
+			}
+		},
+	);
+
+	it.each([
+		{ detached: false, throws: false },
+		{ detached: true, throws: false },
+		{ detached: false, throws: true },
+	])(
+		'skips a later ref after its React host is deleted ($detached, $throws)',
+		async ({ detached, throws }) => {
+			const log = createLog();
+			let update!: (version: number) => void;
+			const mounted = await mountReactHost(
+				h(OctaneCompat<Parameters<typeof QueuedRefIsland>[0]>, {
+					component: QueuedRefIsland,
+					props: {
+						register: (setVersion) => {
+							update = setVersion;
+						},
+						record: (message) => {
+							log.push(message);
+							if (message === 'first attach:1') {
+								reactFlushSync(() => mounted.reactRoot.unmount());
+								log.push('host children:' + mounted.container.childNodes.length);
+								if (throws) throw Error('first ref failed');
+							}
+						},
+					},
+				}),
+				{ detached },
+			);
+			try {
+				expect(log.drain().sort()).toEqual(['first attach:0', 'second attach:0']);
+				await reactAct(() => octaneAct(() => update(1)));
+				expect(log.drain()).toEqual([
+					'first cleanup:0',
+					'second cleanup:0',
+					'first attach:1',
+					'host children:0',
+					throws ? 'first null:1' : 'first cleanup:1',
+				]);
+			} finally {
+				await mounted.unmount();
+			}
+		},
+	);
+
+	it.each(['remove', 'suspend', 'abort'] as const)(
+		'skips unpublished hosted refs while an independent native root stays live (%s)',
+		async (mode) => {
+			const log = createLog();
+			let updateNative!: (version: number) => void;
+			let updateHosted!: (version: number) => void;
+			const native = mount(QueuedRefIsland, {
+				register: (setVersion) => {
+					updateNative = setVersion;
+				},
+				record: (message) => {
+					log.push('native ' + message);
+					if (message === 'first attach:1') {
+						updateHosted(2);
+						reactFlushSync(() => mounted.reactRoot.unmount());
+						log.push('host children:' + mounted.container.childNodes.length);
+					}
+				},
+			});
+			const mounted = await mountReactHost(
+				h(OctaneCompat<Parameters<typeof QueuedRefIsland>[0]>, {
+					component: QueuedRefIsland,
+					props: {
+						mode,
+						pending: deferred<void>().promise,
+						register: (setVersion) => {
+							updateHosted = setVersion;
+						},
+						record: (message) => log.push('hosted ' + message),
+					},
+				}),
+			);
+			try {
+				expect(log.drain().sort()).toEqual([
+					'hosted first attach:0',
+					'hosted second attach:0',
+					'native first attach:0',
+					'native second attach:0',
+				]);
+				await reactAct(() =>
+					octaneAct(() =>
+						octaneFlushSync(() => {
+							updateNative(1);
+							updateHosted(1);
+						}),
+					),
+				);
+				expect(log.drain()).toEqual([
+					'native first cleanup:0',
+					'native second cleanup:0',
+					'hosted first cleanup:0',
+					'hosted second cleanup:0',
+					'native first attach:1',
+					'host children:0',
+					'native second attach:1',
+					...(mode === 'remove' ? [] : ['hosted render pending']),
+				]);
+				native.unmount();
+				expect(log.drain().sort()).toEqual(['native first cleanup:1', 'native second cleanup:1']);
+			} finally {
+				native.unmount();
 				await mounted.unmount();
 			}
 		},

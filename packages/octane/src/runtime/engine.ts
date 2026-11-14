@@ -112,6 +112,8 @@ import {
 	TRANSITION_TASK_DRIVER,
 	TRANSITION_ROOT_DRIVER,
 	SCHEDULED_VISIBILITY_DRIVER,
+	HOSTED_REF_DRIVER,
+	RENDERER_REGION_OWNER_COUNT,
 	activityRefState,
 	drainEffectEventUpdates,
 	drainMutationEffects,
@@ -3821,7 +3823,7 @@ const DETACHES_BY_TARGET = /* @__PURE__ */ new Map<unknown, number | number[]>()
  * queued detach. An Activity reveal queues that attach too, for an instance
  * whose committed ref may still be connected; that one pairs with nothing.
  */
-function dropUncommittedRefPairs(detaches: any[]): void {
+function dropUncommittedRefPairs(detaches: any[], skipped: RefAttach[] | null): void {
 	const byTarget = DETACHES_BY_TARGET;
 	for (let i = 0; i < detaches.length; i += 4) {
 		const queued = byTarget.get(detaches[i + 1]);
@@ -3829,9 +3831,18 @@ function dropUncommittedRefPairs(detaches: any[]): void {
 		else if (typeof queued === 'number') byTarget.set(detaches[i + 1], [queued, i]);
 		else queued.push(i);
 	}
+	// Earlier skipped attaches own the first matching detaches. The current
+	// attach queue may contain a later occurrence of the same pair.
+	if (skipped !== null) pairRefAttaches(detaches, skipped);
+	pairRefAttaches(detaches, refAttachQueue);
+	byTarget.clear();
+}
+
+function pairRefAttaches(detaches: any[], attaches: RefAttach[]): void {
+	const byTarget = DETACHES_BY_TARGET;
 	let write = 0;
-	for (let read = 0; read < refAttachQueue.length; read++) {
-		const entry = refAttachQueue[read];
+	for (let read = 0; read < attaches.length; read++) {
+		const entry = attaches[read];
 		const queued = byTarget.get(entry.el);
 		if (queued !== undefined) {
 			const live =
@@ -3852,16 +3863,16 @@ function dropUncommittedRefPairs(detaches: any[]): void {
 				}
 			}
 		}
-		refAttachQueue[write++] = entry;
+		attaches[write++] = entry;
 	}
-	refAttachQueue.length = write;
-	byTarget.clear();
+	attaches.length = write;
 }
 
 export function drainQueuedRefDetaches(): void {
 	if (refDetachQueue.length === 0) return;
 	const q = refDetachQueue.splice(0);
-	if (refAttachQueue.length !== 0) dropUncommittedRefPairs(q);
+	const skipped = HOSTED_REF_DRIVER ? HOSTED_REF_DRIVER.skipped : null;
+	if (refAttachQueue.length !== 0 || skipped !== null) dropUncommittedRefPairs(q, skipped);
 	for (let i = 0; i < q.length; i += 4) {
 		try {
 			REF_CALLBACK_DEPTH++;
@@ -3903,7 +3914,9 @@ export function drainQueuedRefAttaches(): void {
 		}
 		postOrderHostRefs(q);
 	}
-	for (const r of q) {
+	const pending =
+		HOSTED_REF_DRIVER && RENDERER_REGION_OWNER_COUNT ? HOSTED_REF_DRIVER.iterate(q) : q;
+	for (const r of pending) {
 		// Skip attaches whose owning subtree was unmounted earlier in THIS flush
 		// (e.g. a try boundary caught a mount-time throw and ran unmountBlock +
 		// the ref-detach cleanup). Without this guard the deferred attach would
