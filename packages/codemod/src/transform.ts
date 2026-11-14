@@ -6323,6 +6323,12 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (!ts.isBinaryExpression(read)) return false;
 			const op = read.operatorToken.kind;
 			if (
+				op === ts.SyntaxKind.CommaToken ||
+				op === ts.SyntaxKind.EqualsEqualsEqualsToken ||
+				op === ts.SyntaxKind.ExclamationEqualsEqualsToken
+			)
+				return readsInOrder([read.left, read.right]);
+			if (
 				op === ts.SyntaxKind.AmpersandAmpersandToken ||
 				op === ts.SyntaxKind.BarBarToken ||
 				op === ts.SyntaxKind.QuestionQuestionToken

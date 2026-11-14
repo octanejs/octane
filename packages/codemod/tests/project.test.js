@@ -2097,6 +2097,12 @@ export function Host({rows}: { rows: Row[] }) {
 				),
 				'OptionalIndex.tsx': source(direct.replace('(index as number)', '[0]?.[index]')),
 				'Receiver.tsx': source(direct.replace('(index as number)', '(index as any)?.label')),
+				'CommaLeft.tsx': source(direct.replace('(index as number)', '(index, 7)')),
+				'CommaRight.tsx': source(direct.replace('(index as number)', '(0, index)')),
+				'CommaThrowing.tsx': source(direct.replace('(index as number)', '(fail(), index)')),
+				'StrictEqual.tsx': source(direct.replace('(index as number)', '(index === 0 ? 7 : 8)')),
+				'StrictUnequal.tsx': source(direct.replace('(index as number)', '(0 !== index ? 7 : 8)')),
+				'StrictThrowing.tsx': source(direct.replace('(index as number)', 'fail() === index')),
 				'Computed.tsx': source(
 					'[{0:4},{1:5}].map(({[index]:label},index) => <li key={0}>{label}</li>)',
 				),
@@ -2171,6 +2177,10 @@ export function Host({rows}: { rows: Row[] }) {
 						'OptionalIndex.tsx',
 						'Receiver.tsx',
 						'Computed.tsx',
+						'CommaLeft.tsx',
+						'CommaRight.tsx',
+						'StrictEqual.tsx',
+						'StrictUnequal.tsx',
 						'TestReadsIndex.tsx',
 						'TrueArm.tsx',
 						'FalseArm.tsx',
@@ -2193,6 +2203,7 @@ export function Host({rows}: { rows: Row[] }) {
 				'ImmediateArrow.tsx',
 				'TrueArm.tsx',
 				'NullishRight.tsx',
+				'CommaRight.tsx',
 			]) {
 				const result = await runCodemod(
 					[path.join(root, first), ...inputs.filter((file) => path.basename(file) !== first)],
