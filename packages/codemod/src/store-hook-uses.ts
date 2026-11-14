@@ -7,7 +7,7 @@ import {
 	scalar,
 	valueReads,
 } from './local-uses.js';
-import { skipWrappers } from './expression-wrappers.js';
+import { literalCondition, skipWrappers } from './expression-wrappers.js';
 import type { StoreInputCheck } from './store-inputs.js';
 import ts from 'typescript';
 
@@ -42,24 +42,6 @@ function literalOptions(value: ts.Expression): boolean {
 				literalOptions(p.initializer),
 		);
 	return literal(value);
-}
-
-/** The short-circuit behavior of a literal operand, independent of project types. */
-function literalCondition(expr: ts.Expression) {
-	const value = skipWrappers(expr);
-	if (value.kind === ts.SyntaxKind.NullKeyword || ts.isVoidExpression(value)) return 'nullish';
-	if (ts.isStringLiteralLike(value)) return value.text.length ? 'truthy' : 'falsy';
-	if (ts.isNumericLiteral(value)) return Number(value.text) ? 'truthy' : 'falsy';
-	if (value.kind === ts.SyntaxKind.FalseKeyword) return 'falsy';
-	if (
-		value.kind === ts.SyntaxKind.TrueKeyword ||
-		ts.isArrowFunction(value) ||
-		ts.isFunctionExpression(value) ||
-		ts.isClassExpression(value) ||
-		ts.isArrayLiteralExpression(value) ||
-		ts.isObjectLiteralExpression(value)
-	)
-		return 'truthy';
 }
 
 /** A later spread or unknown key may replace the selected own data property. */

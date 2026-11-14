@@ -2834,6 +2834,77 @@ export function Host({rows}: { rows: Row[] }) {
 		},
 	);
 
+	it.each([false, true])(
+		'blocks map index reads reached through a literal branch condition (project types %s)',
+		async (projectTypes) => {
+			const sources = {
+				'package.json': '{"type":"module"}',
+				'tsconfig.json':
+					'{"compilerOptions":{"strict":true,"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			};
+			const cases = [
+				['1 && index', true],
+				['0 || index', true],
+				['"row" && index', true],
+				['null || index', true],
+				['void 0 ?? index', true],
+				['0 && index', false],
+				['"row" || index', false],
+				['0 ?? index', false],
+				['void fail() ?? index', false],
+				['[fail()] && index', false],
+				['-1 && index', true],
+				['+0 || index', true],
+				['1n && index', true],
+				['-0x000n || index', true],
+				['null ? 7 : index', true],
+				['1 ? index : 7', true],
+				['+0n || index', false],
+				['-0n && index', false],
+				['0n ?? index', false],
+				['"" ? index : 7', false],
+				['void fail() ? 7 : index', false],
+				['[0] && index', true],
+				['{a: 1} ? index : 7', true],
+				['{["a"]: [0, , {}]} && index', true],
+				['{a: 1} || index', false],
+				['[0] ?? index', false],
+				['{[fail()]: 0} && index', false],
+				['({ get a() { return fail() } }).a && index', false],
+				['[...fail()] && index', false],
+				['{...fail()} && index', false],
+			];
+			const files = cases.map(([operand], i) => {
+				const file = `View${i}.tsx`;
+				sources[file] = `function fail(): never { throw Error('left operand') }
+export function View() {
+	return <ul>{[{id:1},{id:2}].map(({id,label=${operand}},index) => <li key={id}>{label}</li>)}</ul>;
+}`;
+				return file;
+			});
+			const root = project(sources);
+			const paths = files.map((file) => path.join(root, file));
+			const options = { root, verify: false, projectTypes };
+			const note = expect.objectContaining({ rule: 'map-parameter-tdz', severity: 'error' });
+			const preview = await runCodemod(paths, { ...options, write: false });
+			expect(preview.files.map(({ notes }) => notes)).toEqual(
+				cases.map(([, blocks]) => (blocks ? [note] : [])),
+			);
+			const result = await runCodemod(paths, options);
+			expect(result.files).toEqual([
+				expect.objectContaining({
+					file: files[0],
+					output: files[0],
+					changed: false,
+					notes: [note],
+				}),
+			]);
+			expect(fs.readdirSync(root).sort()).toEqual(Object.keys(sources).sort());
+			for (const [file, code] of Object.entries(sources))
+				expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(code);
+		},
+	);
+
 	it.each([
 		['write', '[1,2].map((item, index) => show ? <li>{index++}</li> : null)'],
 		['tdz', '[{id:1},{id:2}].map(({id,label=index}, index) => show ? <li>{label}</li> : null)'],
