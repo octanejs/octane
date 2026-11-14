@@ -10,10 +10,21 @@ import { animate, hover, press, inView } from 'motion';
 import {
 	buildHTMLStyles,
 	buildSVGAttrs,
+	camelCaseAttributes,
+	camelToDash,
+	cancelFrame,
+	frame as motionFrame,
+	getValueAsType,
+	isSVGElement,
+	isSVGTag,
 	isVariantLabel,
+	numberValueTypes,
 	resolveMotionValue,
 	scrapeHTMLMotionValuesFromProps,
 	scrapeSVGMotionValuesFromProps,
+	SVGVisualElement,
+	visualElementStore,
+	type MotionValue,
 } from 'motion-dom';
 import {
 	createElement,
@@ -65,6 +76,7 @@ const DRAG = Symbol.for('octane-motion:drag');
 const DRAG_LISTENER = Symbol.for('octane-motion:drag-listener');
 const INVIEW = Symbol.for('octane-motion:inview');
 const MV = Symbol.for('octane-motion:motionvalues');
+const SVG_MV = Symbol.for('octane-motion:svg-motionvalues');
 const LAYOUT_ID = Symbol.for('octane-motion:layoutid');
 const LAYOUT_CLEANUP = Symbol.for('octane-motion:layout-cleanup');
 const STAGGER_ORCH = Symbol.for('octane-motion:stagger-orch');
@@ -129,20 +141,102 @@ function retained(values: Record<string, any>, original: Record<string, any>, cu
 	return next;
 }
 
+interface SVGAttributeValue {
+	key: string;
+	attribute: string;
+	value: MotionValue<unknown>;
+	sample: unknown;
+}
+
+function svgAttributeValue(key: string, sample: unknown): unknown {
+	return key === 'x' || key === 'y' || key === 'scale'
+		? sample
+		: getValueAsType(sample, numberValueTypes[key]);
+}
+
+function bindSVGAttributes(node: SVGElement, attributes: SVGAttributeValue[]): () => void {
+	let active = true;
+	const cleanups = attributes.map(({ key, attribute, value, sample }) => {
+		function write() {
+			if (!active) return;
+			const visual = visualElementStore.get(node);
+			if (visual instanceof SVGVisualElement) {
+				// An imperative Motion animation can keep rendering attributes after its
+				// target changes. Observe its projected keys after the render step.
+				for (const key in visual.renderState.attrs) {
+					if (attribute === motionAttributeName(key)) return;
+				}
+			}
+			const next = svgAttributeValue(key, value.get());
+			// The direct lane handles scalar samples. This also keeps object
+			// coercion from reentering commit during an asynchronous attribute write.
+			if (!active) return;
+			if (
+				typeof next === 'string' ||
+				typeof next === 'number' ||
+				typeof next === 'bigint' ||
+				(typeof next === 'boolean' && /^(?:aria|data)-/.test(attribute))
+			)
+				node.setAttribute(attribute, String(next));
+			else node.removeAttribute(attribute);
+		}
+		const onChange = () => {
+			if (active) motionFrame.postRender(write, false, true);
+		};
+		const unsubscribe = value.on('change', onChange);
+		if (!Object.is(value.get(), sample)) onChange();
+		return () => {
+			unsubscribe();
+			cancelFrame(write);
+		};
+	});
+	return () => {
+		active = false;
+		for (const cleanup of cleanups) cleanup();
+	};
+}
+
+const svgScalarAttribute =
+	/^(?:[xy][12]?|d[xy]?|r[xy]?|c[xy]|f[rxy]|width|height|points|offset|scale|fill|fill-opacity|fill-rule|stroke|stroke-(?:width|opacity|dasharray|dashoffset|linecap|linejoin|miterlimit)|opacity|color|stop-color|stop-opacity|(?:data|aria)-[a-z][a-z0-9-]*)$/;
+
+function motionAttributeName(key: string) {
+	return camelCaseAttributes.has(key) ? key : camelToDash(key);
+}
+
+// Only attributes whose current sample projects directly to one host field.
+function isMotionSVGAttribute(attribute: string, root: boolean): boolean {
+	return root ? attribute === 'viewBox' : svgScalarAttribute.test(attribute);
+}
+
 function readDomProps(
 	props: any,
 	svg: boolean,
+	svgRoot: boolean,
 	out: Record<string, any>,
-	frame: ReturnType<typeof firstFrame>,
+	latest: any,
 ) {
+	const frame: ReturnType<typeof firstFrame> = latest.frame;
 	const originalAttrs = frame?.attrs;
 	const motionAttrs = frame?.motionAttrs;
 	let attrs = originalAttrs;
+	let subscriptions: SVGAttributeValue[] | undefined;
 	for (const key in props) {
 		if (!MOTION_PROPS.has(key)) {
 			const value = props[key];
 			const motion = svg && isMotionValue(value);
 			out[key] = motion ? resolveMotionValue(value) : value;
+			if (motion || subscriptions?.length) {
+				const attribute = motionAttributeName(key);
+				if (subscriptions) {
+					for (let i = 0; i < subscriptions.length; i++) {
+						if (subscriptions[i].attribute !== attribute) continue;
+						subscriptions.splice(i, 1);
+						break;
+					}
+				}
+				if (motion && isMotionSVGAttribute(attribute, svgRoot))
+					(subscriptions ??= []).push({ key, attribute, value, sample: out[key] });
+			}
 			// An authored static value takes over even if it equals the MotionValue's sample.
 			if (!motion && value != null && motionAttrs?.has(key) && attrs && Object.hasOwn(attrs, key)) {
 				if (attrs === originalAttrs) attrs = { ...attrs };
@@ -159,7 +253,22 @@ function readDomProps(
 		}
 		out.style = style;
 	}
-	return attrs;
+	if (frame && attrs) {
+		attrs = retained(attrs, frame.originalAttrs, out);
+		const style = retained(frame.style, frame.originalStyle, props.style);
+		Object.assign(out, attrs);
+		out.style = Object.assign(out.style ?? {}, style);
+		if (attrs !== frame.attrs || style !== frame.style) {
+			useLayoutEffect(
+				() => {
+					latest.frame = { ...frame, attrs, style };
+				},
+				[attrs, style],
+				FRAME,
+			);
+		}
+	}
+	return subscriptions;
 }
 
 // Cheap structural key so a layout effect re-runs only when the target actually
@@ -284,6 +393,7 @@ export type MotionComponent = (props: any, scope: any) => OctaneElement;
 
 function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionComponent {
 	const svg = !tag.includes('-') && (svgHost.test(tag) || /[A-Z]/.test(tag));
+	const svgRoot = svg && isSVGTag(tag);
 	return function MotionComponent(props: any) {
 		const config = useContext(MotionConfigContext);
 		const layoutGroup = useContext(LayoutGroupContext);
@@ -347,6 +457,7 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 					layout: null,
 					layoutActive: false,
 					dragListener: undefined,
+					svgAttrs: undefined,
 				}) as any,
 			REFS,
 		);
@@ -801,23 +912,32 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 		);
 		useLayoutEffect(() => () => latest.layout?.stop(), [], LAYOUT_CLEANUP);
 
-		const frame = latest.frame;
 		const host: Record<string, any> = {};
-		const retainedAttrs = readDomProps(props, svg, host, frame);
-		if (frame && retainedAttrs) {
-			const attrs = retained(retainedAttrs, frame.originalAttrs, host);
-			const style = retained(frame.style, frame.originalStyle, props.style);
-			Object.assign(host, attrs);
-			host.style = Object.assign(host.style ?? {}, style);
-			if (attrs !== frame.attrs || style !== frame.style) {
-				useLayoutEffect(
-					() => {
-						latest.frame = { ...frame, attrs, style };
-					},
-					[attrs, style],
-					FRAME,
-				);
-			}
+		const subscriptions = readDomProps(props, svg, svgRoot, host, latest);
+		if (subscriptions?.length) {
+			for (const { key } of subscriptions) host[key] = svgAttributeValue(key, host[key]);
+			const previous: SVGAttributeValue[] | undefined = latest.svgAttrs;
+			const stable =
+				previous?.length === subscriptions.length &&
+				subscriptions.every(
+					({ key, value }, i) => previous[i].key === key && previous[i].value === value,
+				)
+					? previous
+					: subscriptions;
+			useLayoutEffect(
+				() => {
+					const node: unknown = latest.host.current;
+					if (!isSVGElement(node)) return;
+					latest.svgAttrs = stable;
+					const cleanup = bindSVGAttributes(node, subscriptions);
+					return () => {
+						latest.svgAttrs = undefined;
+						cleanup();
+					};
+				},
+				[stable],
+				SVG_MV,
+			);
 		}
 		host.ref = ref;
 		const children = props.children;

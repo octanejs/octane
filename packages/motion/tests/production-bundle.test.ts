@@ -84,6 +84,128 @@ globalThis.animationCompleted = new Promise((resolve) => {
 		expect(unusedBindings).toEqual([]);
 	});
 
+	it('tracks SVG attribute MotionValues alongside CSS transforms and stops retired writes', async () => {
+		const result = await build({
+			stdin: {
+				contents: `
+import { createElement as h, createRoot, flushSync } from 'octane';
+import { motion, motionValue } from '@octanejs/motion';
+import { frame } from 'motion-dom';
+
+const root = createRoot(document.getElementById('root'));
+const cx = motionValue(5);
+const x = motionValue(3);
+const cssX = motionValue(2);
+const strokeWidth = motionValue(2);
+const viewBox = motionValue('0 0 20 20');
+const hidden = motionValue(false);
+const replacement = motionValue(21);
+const render = (center, extras = true) => flushSync(() =>
+	root.render(h(motion.svg, { viewBox }, h(motion.circle, {
+		...(center === undefined ? {} : { cx: center }),
+		cy: 8,
+		...(extras ? { x, strokeWidth, 'aria-hidden': hidden, style: { x: cssX } } : {}),
+		animate: { opacity: 0.5 },
+		transition: { duration: 0 },
+	}))),
+);
+const afterRender = () => new Promise(resolve => frame.postRender(() => resolve()));
+
+render(cx);
+const svg = document.querySelector('svg');
+const circle = svg.querySelector('circle');
+const center = () => circle.getAttribute('cx');
+
+globalThis.svgMotionValues = (async () => {
+	const initial = [center(), circle.getAttribute('x'), svg.getAttribute('viewBox'), circle.getAttribute('aria-hidden')];
+	cx.set('25%');
+	x.set(11);
+	cssX.set(8);
+	strokeWidth.set(5);
+	hidden.set(true);
+	viewBox.set('0 0 40 40');
+	await afterRender();
+	const updated = [
+		center(),
+		circle.getAttribute('x'),
+		circle.style.transform,
+		circle.getAttribute('stroke-width'),
+		svg.getAttribute('viewBox'),
+		circle.getAttribute('opacity'),
+		circle.getAttribute('aria-hidden'),
+	];
+
+	cx.set(19);
+	render(replacement);
+	await afterRender();
+	const replaced = center();
+	replacement.set(22);
+	await afterRender();
+	const rebound = center();
+
+	render(replacement, false);
+	frame.postRender(() => render(22, false));
+	replacement.set(23);
+	await afterRender();
+	replacement.set(24);
+	await afterRender();
+	const staticTakeover = center();
+
+	render(replacement, false);
+	frame.postRender(() => render(undefined, false));
+	replacement.set(25);
+	await afterRender();
+	replacement.set(26);
+	await afterRender();
+	const removed = center();
+	const reused = circle === svg.querySelector('circle');
+
+	render(cx);
+	frame.postRender(() => root.unmount());
+	cx.set(27);
+	await afterRender();
+	return { initial, updated, replaced, rebound, staticTakeover, removed, reused, detached: center() };
+})();
+`,
+				resolveDir: packageDirectory,
+				sourcefile: 'public-motion-svg-consumer.ts',
+			},
+			bundle: true,
+			define: {
+				__OCTANE_PROFILE_ENABLED__: 'false',
+				'process.env.NODE_ENV': JSON.stringify('production'),
+			},
+			format: 'iife',
+			logLevel: 'silent',
+			minify: true,
+			platform: 'browser',
+			write: false,
+		});
+		const browser = new JSDOM('<!doctype html><div id="root"></div>', {
+			runScripts: 'dangerously',
+			pretendToBeVisual: true,
+		});
+
+		try {
+			browser.window.eval(result.outputFiles[0].text);
+			expect(
+				await (browser.window as typeof browser.window & { svgMotionValues: Promise<unknown> })
+					.svgMotionValues,
+			).toEqual({
+				initial: ['5', '3', '0 0 20 20', 'false'],
+				updated: ['25%', '11', 'translateX(8px)', '5', '0 0 40 40', '0.5', 'true'],
+				replaced: '21',
+				rebound: '22',
+				staticTakeover: '22',
+				removed: null,
+				reused: true,
+				detached: '19',
+			});
+		} finally {
+			browser.window.close();
+		}
+	});
+
 	it('enforces strict LazyMotion in a development browser bundle without a process global', async () => {
 		const result = await build({
 			stdin: {
