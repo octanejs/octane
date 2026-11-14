@@ -502,6 +502,7 @@ it('reports a migrated React factory root that needs its store context', async (
 			import * as React from 'react';
 			import { renderToStaticMarkup, renderToString } from 'react-dom/server';
 			import { Pane, Pane as lower, Plain } from './pane.tsx';
+			const fail = () => { throw new Error('props failed'); };
 			export function render() { return renderToString((h(Pane))); }
 			export function namespace() { return renderToStaticMarkup(React.createElement(Pane, null)); }
 			export const plain = renderToString(h(Plain));
@@ -510,13 +511,18 @@ it('reports a migrated React factory root that needs its store context', async (
 			export function asserted() { return renderToString(h(Pane as typeof Pane)); }
 			export function escaped() { return renderToString(h(\\u0050ane)); }
 			export function wrappedNull() { return renderToString(h(Pane, (null))); }
+			export function emptyProps() { return renderToString(h(Pane, undefined)); }
+			export function literalProps() { return renderToStaticMarkup(h(Pane, { label: 'root' })); }
+			export function throwingProps() { return renderToString(React.createElement(Pane, fail())); }
+			export function spreadProps(...props: [null]) { return renderToString(h(Pane, ...props)); }
+			export function withChild() { return renderToString(h(Pane, null, 'child')); }
 			export function shadowed(h: (value: unknown) => any) { return renderToString(h(Pane)); }`,
 	});
 	const paths = ['pane', 'root'].map((name) => path.join(app, 'src', name + '.tsx'));
 	const { files } = await runCodemod(paths, { root: app, strong: true, verify: true, write: true });
 	const result = files.find(({ file }) => file === 'src/root.tsx');
 	expect(result.notes.filter(({ rule }) => rule === 'store-hook')).toEqual(
-		[5, 6].map((line) =>
+		[6, 7, 13, 14, 15, 16, 17].map((line) =>
 			expect.objectContaining({
 				line,
 				severity: 'warning',
@@ -525,13 +531,24 @@ it('reports a migrated React factory root that needs its store context', async (
 		),
 	);
 
-	const { render, namespace, plain } = await bundleRuntime(
+	const {
+		render,
+		namespace,
+		wrappedNull,
+		emptyProps,
+		literalProps,
+		throwingProps,
+		spreadProps,
+		plain,
+	} = await bundleRuntime(
 		app,
 		'server',
-		"export { render, namespace, plain } from './src/root.tsrx';",
+		"export { render, namespace, wrappedNull, emptyProps, literalProps, throwingProps, spreadProps, plain } from './src/root.tsrx';",
 	);
-	expect(render).toThrow(/useContext|errors\/12/);
-	expect(namespace).toThrow(/useContext|errors\/12/);
+	for (const root of [render, namespace, wrappedNull, emptyProps, literalProps])
+		expect(root).toThrow(/useContext|errors\/12/);
+	expect(() => spreadProps(null)).toThrow(/useContext|errors\/12/);
+	expect(throwingProps).toThrow('props failed');
 	expect(plain).toContain('<b>plain</b>');
 });
 

@@ -531,8 +531,7 @@ export function reactServerComponents(
 					!ts.isOptionalChain(value) &&
 					(value.arguments.length === 1 ||
 						(value.arguments.length === 2 &&
-							(selected ? value.arguments[1] : skipWrappers(value.arguments[1])).kind ===
-								ts.SyntaxKind.NullKeyword))
+							(selected || skipWrappers(value.arguments[1]).kind === ts.SyntaxKind.NullKeyword)))
 				) {
 					const factory = imported(checker, value.expression);
 					if (factory?.module === 'react' && factory.name === 'createElement' && original('react'))
