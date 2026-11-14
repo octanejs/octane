@@ -3,6 +3,7 @@
  * Every tab sees the same values, the same pending edits and the same
  * rollbacks, and the owner makes each request and holds each feed once.
  */
+import * as devalue from 'devalue';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -11,6 +12,7 @@ import {
 	DataRetiredError,
 	DataUncertainError,
 	listen,
+	read,
 	serveDataOwner,
 	sharedOwner,
 	type DataOwner,
@@ -19,6 +21,7 @@ import {
 	type FeedFrame,
 	type Listener,
 	type ReadHandle,
+	type StandardSchema,
 	type Transport,
 } from '../src/data/index.js';
 import {
@@ -27,6 +30,7 @@ import {
 	removeTodo,
 	setDone,
 	todoChanges,
+	Todo,
 	todoPages,
 	todos,
 	type TodoItem,
@@ -213,6 +217,209 @@ describe('octane/data owner and replicas', () => {
 		first!.settle(error.operationId, false);
 		expect(done(one)).toBe(false);
 		await vi.waitFor(() => expect(done(two)).toBe(false));
+	});
+
+	describe('a tab opened from a server render', () => {
+		/** The todo list, fresh for a minute, so a seeded or loaded value is shown without loading. */
+		const list = read({
+			name: todos.name,
+			output: todos.output,
+			entities: (todos) => Todo.from(todos),
+			fresh: 60_000,
+		});
+		const options = { ...replicaOptions, contracts: [...contracts, list] };
+		/** A page's seed: the server render's todo list, loaded `age` milliseconds before it. */
+		const seedOf = (title: string, age: number, cursor?: string) =>
+			devalue.stringify({
+				reads: [
+					{ name: list.name, input: undefined, age, value: [{ id: 'a', title, done: false }] },
+				],
+				cursors: cursor === undefined ? [] : [[todoChanges.name + '\nundefined', cursor]],
+			});
+		function connect(owner: DataOwner, seed?: string) {
+			const channel = new MessageChannel();
+			owner.connect(channel.port1);
+			const store = createReplica(channel.port2, { ...options, seed });
+			closers.push(() => {
+				void store.retire();
+				channel.port1.close();
+				channel.port2.close();
+			});
+			return store;
+		}
+
+		it.each([
+			['newer than', 'Lagoon', 0, ['Lagoon', 'Lagoon']],
+			['older than', 'Tides', 30_000, ['Atoll', 'Atoll']],
+		] as const)(
+			'shows in every tab the newer of its seed and what another tab loaded, without loading: a seed %s the load',
+			async (_, title, age, shown) => {
+				const server = createServer();
+				server.rows[0]!.title = 'Atoll';
+				const owner = createDataOwner({ transport: server.transport });
+				const one = await observed(connect(owner).read(list));
+				await new Promise((resolve) => setTimeout(resolve, 5));
+				const two = await observed(connect(owner, seedOf(title, age)).read(list));
+				await vi.waitFor(() => expect([one()[0]!.title, two()[0]!.title]).toEqual(shown));
+				expect(server.log).toEqual(['list']);
+			},
+		);
+
+		it.each([
+			['stands at another position', { cursor: 'after-render' }],
+			['has no position yet', {}],
+		] as const)(
+			'reloads what a feed covers when its seed stood elsewhere than the connection it joins, which %s',
+			async (_, frame) => {
+				const server = createServer();
+				const feedListener: Listener = () => ({
+					async *[Symbol.asyncIterator]() {
+						yield frame;
+						await new Promise(() => {});
+					},
+				});
+				const owner = createDataOwner({ transport: server.transport, listen: feedListener });
+				const first = connect(owner);
+				await observed(first.read(list));
+				closers.push(listen(first, todoChanges).subscribe(() => {}));
+				await vi.waitFor(() =>
+					expect(listen(first, todoChanges).getSnapshot().status).toBe('live'),
+				);
+
+				// The server render read its position before the connection's latest event.
+				server.rows[0]!.title = 'Atoll';
+				const second = connect(owner, seedOf('Tides', 0, 'before-render'));
+				const two = await observed(second.read(list));
+				closers.push(listen(second, todoChanges).subscribe(() => {}));
+				await vi.waitFor(() => expect(two()[0]!.title).toBe('Atoll'));
+			},
+		);
+
+		/** A tab whose owner the test plays: it serves the tab, and answers each read with `answer()`. */
+		function playedOwner(
+			answer: () => unknown,
+			list2: Parameters<typeof createReplica>[1]['contracts'],
+			seed?: string,
+		) {
+			const channel = new MessageChannel();
+			channel.port1.onmessage = ({ data }) => {
+				if (data.t === 'hello') channel.port1.postMessage({ t: 'live' });
+				if (data.t === 'request')
+					channel.port1.postMessage({
+						t: 'reply',
+						id: data.id,
+						reply: { ok: true, value: answer() },
+					});
+			};
+			const store = createReplica(channel.port2, { ...options, contracts: list2, seed });
+			closers.push(() => {
+				void store.retire();
+				channel.port1.close();
+				channel.port2.close();
+			});
+			return { store, post: (message: object) => channel.port1.postMessage(message) };
+		}
+		const titled = (title: string) => [{ id: 'a', title, done: false }];
+
+		it("takes a value from an owner of an older build, which doesn't say when it was read", async () => {
+			const { store, post } = playedOwner(() => [], [...contracts, list], seedOf('Tides', 0));
+			const shown = await observed(store.read(list));
+			post({ t: 'value', name: list.name, input: undefined, value: titled('Atoll') });
+			await vi.waitFor(() => expect(shown()[0]!.title).toBe('Atoll'));
+			expect(store.read(list).getSnapshot().status).toBe('ready');
+		});
+
+		it('keeps the newer of two values whose validation overlaps', async () => {
+			// An output schema that answers a moment later, as an async validator does.
+			const output: StandardSchema<unknown, TodoItem[]> = {
+				'~standard': {
+					version: 1,
+					vendor: 'test',
+					validate: (value) =>
+						new Promise((resolve) => setTimeout(() => resolve({ value: value as TodoItem[] }), 10)),
+				},
+			};
+			const slow = read({ name: 'todos.slow', output });
+			const { store, post } = playedOwner(() => titled('Tides'), [...contracts, slow]);
+			const shown = await observed(store.read(slow));
+			const loaded = Date.now();
+			await new Promise((resolve) => setTimeout(resolve, 30));
+			// The newer offer is validated first; the older value lands after it.
+			post({
+				t: 'offer',
+				name: slow.name,
+				input: undefined,
+				value: titled('Lagoon'),
+				at: loaded + 15,
+			});
+			post({
+				t: 'value',
+				name: slow.name,
+				input: undefined,
+				value: titled('Atoll'),
+				at: loaded + 5,
+			});
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			expect(shown()[0]!.title).toBe('Lagoon');
+		});
+
+		/** The server's transport, holding each list reply, read when it was asked, until released. */
+		function held(server: ReturnType<typeof createServer>) {
+			const waiting: Array<() => void> = [];
+			const transport: Transport = async (request, signal) => {
+				const reply = await server.transport(request, signal);
+				if (request.name === list.name) await new Promise<void>((go) => waiting.push(go));
+				return reply;
+			};
+			return { transport, release: () => waiting.splice(0).forEach((go) => go()) };
+		}
+
+		it('shows a newer seed in a tab that was loading, once its older load lands', async () => {
+			const server = createServer();
+			server.rows[0]!.title = 'Atoll';
+			const { transport, release } = held(server);
+			const owner = createDataOwner({ transport });
+			const first = connect(owner);
+			const reading = first.read(list);
+			closers.push(reading.subscribe(() => {}));
+			await vi.waitFor(() => expect(server.log).toEqual(['list']));
+			// The page was rendered after that load started, with a newer title.
+			await new Promise((resolve) => setTimeout(resolve, 5));
+			const two = await observed(connect(owner, seedOf('Lagoon', 0)).read(list));
+			// The offer reaches the first tab while its load is still held.
+			await new Promise((resolve) => setTimeout(resolve, 20));
+			release();
+			await vi.waitFor(() => expect(reading.getSnapshot().value?.[0]!.title).toBe('Lagoon'));
+			expect(two()[0]!.title).toBe('Lagoon');
+		});
+
+		it('reloads a seeded read after a feed gap without joining an older request in flight', async () => {
+			const server = createServer();
+			const feedListener: Listener = () => ({
+				async *[Symbol.asyncIterator]() {
+					yield { cursor: 'after-render' };
+					await new Promise(() => {});
+				},
+			});
+			const { transport, release } = held(server);
+			const owner = createDataOwner({ transport, listen: feedListener });
+			const first = connect(owner);
+			const reading = first.read(list);
+			closers.push(reading.subscribe(() => {}));
+			await vi.waitFor(() => expect(server.log).toEqual(['list']));
+			closers.push(listen(first, todoChanges).subscribe(() => {}));
+			await vi.waitFor(() => expect(listen(first, todoChanges).getSnapshot().status).toBe('live'));
+
+			// The first tab's load is still held when the title changes and a page renders.
+			server.rows[0]!.title = 'Atoll';
+			const second = connect(owner, seedOf('Tides', 0, 'before-render'));
+			const handle = second.read(list);
+			closers.push(handle.subscribe(() => {}));
+			closers.push(listen(second, todoChanges).subscribe(() => {}));
+			await vi.waitFor(() => expect(server.log).toEqual(['list', 'list']));
+			release();
+			await vi.waitFor(() => expect(handle.getSnapshot().value?.[0]!.title).toBe('Atoll'));
+		});
 	});
 
 	it('holds one feed connection for every tab, and closes it when the last tab stops listening', async () => {

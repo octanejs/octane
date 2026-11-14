@@ -9271,7 +9271,7 @@ function mapCallToForOf(expr, ctx) {
 		params.length > 2 ||
 		params[0].type === 'AssignmentPattern' ||
 		params[0].type === 'RestElement' ||
-		mapCallbackPatternSomeExpression(params[0], mapPatternExpressionNeedsOriginalCallback) ||
+		mapCallbackPatternSome(params[0], mapPatternExpressionNeedsOriginalCallback, true) ||
 		mapCallbackCapturesLexicalReceiver(arrow.body)
 	) {
 		return null;
@@ -9401,27 +9401,33 @@ function mapPatternExpressionNeedsOriginalCallback(expression) {
 	return !isInvariantLiteral(unwrapTsExpr(expression));
 }
 
-function mapCallbackPatternSomeExpression(pattern, matches) {
+function mapCallbackPatternSome(pattern, matches, preserveIterator = false) {
 	if (!pattern || typeof pattern !== 'object') return false;
 	switch (pattern.type) {
 		case 'AssignmentPattern':
-			return mapCallbackPatternSomeExpression(pattern.left, matches) || matches(pattern.right);
+			return (
+				mapCallbackPatternSome(pattern.left, matches, preserveIterator) || matches(pattern.right)
+			);
 		case 'ObjectPattern':
 			return (pattern.properties || []).some((property) => {
 				if (property.type === 'RestElement') {
-					return mapCallbackPatternSomeExpression(property.argument, matches);
+					return mapCallbackPatternSome(property.argument, matches, preserveIterator);
 				}
 				return (
 					(property.computed && matches(property.key)) ||
-					mapCallbackPatternSomeExpression(property.value || property.key, matches)
+					mapCallbackPatternSome(property.value || property.key, matches, preserveIterator)
 				);
 			});
 		case 'ArrayPattern':
-			return (pattern.elements || []).some((item) =>
-				mapCallbackPatternSomeExpression(item, matches),
+			// Binding a row may run its iterator before any JSX child renders.
+			return (
+				preserveIterator ||
+				(pattern.elements || []).some((item) =>
+					mapCallbackPatternSome(item, matches, preserveIterator),
+				)
 			);
 		case 'RestElement':
-			return mapCallbackPatternSomeExpression(pattern.argument, matches);
+			return mapCallbackPatternSome(pattern.argument, matches, preserveIterator);
 		default:
 			return false;
 	}
@@ -38408,7 +38414,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	const inlineKey =
 		keyCapturesParent ||
 		(snapshot !== null &&
-			(mapCallbackPatternSomeExpression(leftDeclId, mapCallbackCapturesLexicalReceiver) ||
+			(mapCallbackPatternSome(leftDeclId, mapCallbackCapturesLexicalReceiver) ||
 				mapCallbackCapturesLexicalReceiver(explicitKey))) ||
 		(node.nativeArrayMap !== undefined &&
 			mapCallbackHasEventClosure(node.nativeArrayMap.callback) &&
