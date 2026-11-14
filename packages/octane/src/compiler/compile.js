@@ -1712,6 +1712,7 @@ const HOOK_MEMO_RUNTIME_HELPERS = new Set([
 	'compilerMemoRegion',
 	'compilerMemoWitness',
 	'compilerOpaqueTag',
+	'armCompilerContext',
 	'markCompilerMemo',
 	'hookMemoCreate',
 	'hookMemoEqual',
@@ -5747,11 +5748,15 @@ function collectImportedComponentReferences(root, importedNames) {
 	return components;
 }
 
-function containsAutoMemoContextRead(root, ctx) {
-	let found = false;
+const MEMO_CONTEXT_READ = 1;
+const MEMO_IMPORTED_HOOK = 2;
+
+function autoMemoContextReads(root, ctx, includeImportedHooks = false) {
+	let found = 0;
+	const all = includeImportedHooks ? MEMO_CONTEXT_READ | MEMO_IMPORTED_HOOK : MEMO_CONTEXT_READ;
 	const seen = new WeakSet();
 	function walk(node) {
-		if (found || !node || typeof node !== 'object') return;
+		if (found === all || !node || typeof node !== 'object') return;
 		if (Array.isArray(node)) {
 			for (const child of node) walk(child);
 			return;
@@ -5767,6 +5772,10 @@ function containsAutoMemoContextRead(root, ctx) {
 			return;
 		}
 		if (node.type === 'CallExpression' && node.callee?.type === 'Identifier') {
+			// Full TSRX slots a named custom hook when the local name also
+			// follows the hook convention. Its imported body may read context.
+			if (includeImportedHooks && node._octaneCustomHookCall && /^use[A-Z]/.test(node.callee.name))
+				found |= MEMO_IMPORTED_HOOK;
 			const name =
 				node._octaneImportedHook ??
 				node._octaneHookRuntimeImportedHook ??
@@ -5777,10 +5786,8 @@ function containsAutoMemoContextRead(root, ctx) {
 				(name === undefined &&
 					node._octaneUnboundCallee === true &&
 					(node.callee.name === 'useContext' || node.callee.name === 'use'))
-			) {
-				found = true;
-				return;
-			}
+			)
+				found |= MEMO_CONTEXT_READ;
 		}
 		for (const key in node) {
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
@@ -13522,9 +13529,13 @@ function compileInternal(
 		info.autoMemoCaptures = autoMemoSafe ? autoMemoCaptures.sort() : [];
 		info.autoMemoComponentDeps = autoMemoSafe ? autoMemoComponentDeps.sort() : [];
 		info.autoMemoImportedComponents = autoMemoSafe ? [...autoMemoImportedComponents].sort() : [];
+		const contextReads = autoMemoSafe
+			? autoMemoContextReads(root, ctx, ctx.strongMemo === true && info.voidOutput)
+			: 0;
+		info.autoMemoImportedHook = (contextReads & MEMO_IMPORTED_HOOK) !== 0;
 		info.autoMemoMayReadContext =
 			autoMemoSafe &&
-			(containsAutoMemoContextRead(root, ctx) ||
+			(contextReads !== 0 ||
 				[...autoMemoImportedComponents].some((name) => !isProvenLiteImport(ctx, name)) ||
 				[...free].some((name) => ctx.defaultMemoBindings.has(name)) ||
 				rendersOpaqueChild(root, locals, ctx));
@@ -13535,7 +13546,7 @@ function compileInternal(
 		// Strong render purity also admits the builtins in STRONG_LITE_HOOKS: their
 		// cells live in the lite Scope, and an update re-renders the nearest real
 		// Block, which re-runs this body without an observable difference.
-		let eligible = info.voidOutput;
+		let eligible = info.voidOutput && !info.autoMemoImportedHook;
 		let liteHooks = false;
 		for (const n of free) {
 			if (
@@ -18812,6 +18823,7 @@ function compileComponent(node, ctx, options) {
 				autoCallback: true,
 				localHookSlots: true,
 				returnedOutput,
+				trackContext: ctx.componentInfo.get(name)?.autoMemoImportedHook === true,
 			}),
 			node,
 			ctx,
@@ -19880,7 +19892,17 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	if (mapTemps.length > 0) {
 		bodyStatements.push(...mapTemps.map((temp) => inheritOriginLoc(b.let(temp), node)));
 	}
-	bodyStatements.push(...rewrittenStatements);
+	if (options?.trackContext) {
+		const { end } = moduleDirectives(rewrittenStatements);
+		bodyStatements.push(
+			...rewrittenStatements.slice(0, end),
+			inheritOriginLoc(
+				b.stmt(b.call(requireRuntimeForContext(ctx, 'armCompilerContext'), b.id('__s'))),
+				node,
+			),
+			...rewrittenStatements.slice(end),
+		);
+	} else bodyStatements.push(...rewrittenStatements);
 	// A self-update scheduled by setup discards this output. The owning Block
 	// replays setup before returning to its parent, so children initialize from
 	// the settled state and no template/resource work escapes the first pass.
@@ -38630,7 +38652,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		const witnesses = collectImportedComponentReferences(regionAst, ctx.importedNames);
 		let listMayReadContext =
 			witnesses.size > 0 ||
-			containsAutoMemoContextRead(regionAst, ctx) ||
+			autoMemoContextReads(regionAst, ctx) ||
 			rendersOpaqueChild(regionAst, [...ctx.currentComponentLocals, ...bodyScope], ctx);
 		if (listSafe) {
 			for (const name of regionFree) {
@@ -38712,7 +38734,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			node.nativeArrayMap === undefined &&
 			autoMemoDeps !== null &&
 			autoMemoDeps.every((name) => seenDeps.has(name) || ctx.importedNames.has(name)) &&
-			!containsAutoMemoContextRead(bodyAst, ctx) &&
+			!autoMemoContextReads(bodyAst, ctx) &&
 			hasOnlyHostConditionalItemBodies(subStmts);
 		if (structuredHostDepEligible) {
 			// The whole-list cache already witnesses imported projections. A row
