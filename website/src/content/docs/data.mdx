@@ -1014,15 +1014,56 @@ plugins can check every contract while they build, once you follow one
 convention: **declare contracts only in modules named `*.data.ts`** (or
 `*.data.js`), and import `octane/data/manifest` somewhere in the app.
 
-A contract module holds only imports, types, and exported `const`s. Each
-contract is an exported `const` with a literal `name`, such as
-`export const setRead = write({ name: 'books.setRead', … })`. Every other
-module names the contract directly where it uses it: `store.write(setRead, input)`,
-`useForm(addBook)`, `handle(books, …)`, `defineHandler(Shelf, { … })`, or a
-store option such as `feeds: [shelfChanges]`. A contract passed to a helper,
-stored in a variable, or chosen at runtime (`ok ? addBook : setRead`) is an
-error, because the build could no longer see where it goes. Pass the varying
-value in the contract's input instead.
+The convention has four rules, and each one breaks the build with its own
+error code:
+
+1. **A contract is an exported `const` with a literal name.** The build reads
+   the declaration, not the value it computes.
+
+   ```ts
+   // books.data.ts
+   export const setRead = write({ name: 'books.setRead', input: SetRead }); // ✓
+
+   export const shelfBooks = (shelf: string) => read({ name: `books.${shelf}`, input: Shelf }); // ✗ built at runtime
+   ```
+
+2. **A contract module holds only imports, types, and `const`s.** The browser
+   and the server both import it, so it runs no code of its own and imports
+   nothing server-only. A `console.log('loaded')` at the top of `books.data.ts`
+   is an error.
+
+3. **Every use names its contract directly.** That is the first argument of
+   `store.read`, `prefetch`, `publish`, `forget`, `write` or `form`; `useForm`,
+   `handle` and `defineHandler`; the second of `pages` and `listen`; or one of
+   the properties `of`, `creates`, `patches`, `removes`, `put`, `remove`,
+   `read`, `feeds`, `writes` and `receipt`.
+
+   ```ts
+   store.write(done ? setRead : setUnread, input); // ✗ chosen at runtime
+   store.write(Shelf[name], input); // ✗ chosen by key, from import * as Shelf
+   store.write(Shelf.setRead, input); // ✓
+   ```
+
+   Pass the varying value in the contract's input instead.
+
+4. **A contract goes nowhere else.** Passing one to your own function, or
+   keeping it in a variable or a list the build does not know, hides where it
+   goes. Pass a callback that uses the contract instead:
+
+   ```ts
+   submit(session, setRead, input); // ✗ `submit` receives a contract
+   submit(session, (store) => store.write(setRead, input)); // ✓
+   ```
+
+To repeat the same work for several contracts, loop over an inline list of
+them with `.map` or `for…of`. The loop variable stands for exactly those
+contracts, so it may appear at a contract site or in a property read, and
+nowhere else:
+
+```ts
+export const handlers = [books, unread].map((list) => handle(list, serveList));
+for (const list of [books, unread]) store.prefetch(list);
+```
 
 With that, every build reports:
 
@@ -1051,6 +1092,45 @@ It exports:
 
 Adding or removing a contract module updates it while the dev server runs.
 Without the plugin, importing it throws.
+
+It replaces the lists you would otherwise keep by hand. The
+[shelf example](#example)'s session used to list its contracts for
+a [shared owner](#cross-tab) and its writes for the [journal](#journal):
+
+```ts
+// Before: every new contract had to be added here too.
+const contracts = [
+	books,
+	finished,
+	unread,
+	stats,
+	receipt,
+	addBook,
+	setRead,
+	removeBook,
+	shelfChanges,
+];
+const persist = {
+	storage,
+	partition,
+	key,
+	journal: { writes: [addBook, setRead, removeBook], receipt },
+};
+createReplica(sharedOwner(partition), { transport, persist, contracts });
+```
+
+Under the check, that `contracts` list is a rule 4 error: `createReplica`'s
+`contracts` option is not a contract site, so the build could not see what the
+list holds. The manifest is the whole list, and it stays complete:
+
+```ts
+// After
+import { contracts, writes } from 'octane/data/manifest';
+import { receipt } from './contracts.data.ts';
+
+const persist = { storage, partition, key, journal: { writes, receipt } };
+createReplica(sharedOwner(partition), { transport, persist, contracts });
+```
 
 <h2 id="ssr">Server rendering and hydration</h2>
 
