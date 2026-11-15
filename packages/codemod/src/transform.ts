@@ -507,7 +507,7 @@ function nodeSpanning(sf: ts.SourceFile, start: number, end: number): ts.Node | 
 	}
 }
 
-function rowKeyLiteral(node: ts.Expression) {
+function isPrimitiveLiteral(node: ts.Expression) {
 	node = skipWrappers(node);
 	if (ts.isPrefixUnaryExpression(node)) {
 		const operand = skipWrappers(node.operand);
@@ -3418,10 +3418,22 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 
 	private retainedRegistryFactoryImport(react: ts.ImportDeclaration) {
 		const resolveRegistry = this.options.retainedRegistry;
-		const statements = this.sf.statements;
+		if (!resolveRegistry) return false;
+		// Check the registration shape without the inert exported constants.
+		const statements = this.sf.statements.filter((statement) => {
+			if (
+				!ts.isVariableStatement(statement) ||
+				statement.modifiers?.length !== 1 ||
+				statement.modifiers[0].kind !== ts.SyntaxKind.ExportKeyword ||
+				(statement.declarationList.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+				statement.declarationList.declarations.length !== 1
+			)
+				return true;
+			const { name, initializer, type } = statement.declarationList.declarations[0];
+			return !ts.isIdentifier(name) || !!type || !initializer || !isPrimitiveLiteral(initializer);
+		});
 		const bindings = react.importClause?.namedBindings;
 		if (
-			!resolveRegistry ||
 			statements.length !== 3 ||
 			!statements.slice(0, 2).every(ts.isImportDeclaration) ||
 			react.attributes ||
@@ -7378,7 +7390,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				last &&
 				ts.isSwitchStatement(last) &&
 				!literal &&
-				!rowKeyLiteral(last.expression) &&
+				!isPrimitiveLiteral(last.expression) &&
 				!fn.asteriskToken &&
 				!fn.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
 				last.caseBlock.clauses.some((clause) => clauseReturnsJsx(clause.statements) === true)
@@ -7432,7 +7444,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				if (!value.expression) return false;
 				const expression = skipWrappers(value.expression);
 				return !(
-					rowKeyLiteral(expression) ||
+					isPrimitiveLiteral(expression) ||
 					(ts.isIdentifier(expression) &&
 						fixedBinding(this.checker, expression, expression) &&
 						initializedBefore(this.checker, expression, expression))
@@ -7555,7 +7567,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		};
 		const safePrefix = (expr: ts.Expression): boolean => {
 			const value = skipWrappers(expr);
-			if (rowKeyLiteral(value)) return true;
+			if (isPrimitiveLiteral(value)) return true;
 			if (ts.isVoidExpression(value)) return safePrefix(value.expression);
 			if (ts.isBinaryExpression(value))
 				return (
@@ -7574,7 +7586,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 						? safeObjectSpread(property.expression)
 						: ts.isPropertyAssignment(property) &&
 							(!ts.isComputedPropertyName(property.name) ||
-								rowKeyLiteral(property.name.expression)) &&
+								isPrimitiveLiteral(property.name.expression)) &&
 							safePrefix(property.initializer),
 				)
 			);
@@ -7635,7 +7647,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				for (const { expression } of read.templateSpans) {
 					if (readsOrdinal(expression)) return true;
 					// Each interpolation is coerced to text before the next one runs.
-					if (!rowKeyLiteral(expression)) return false;
+					if (!isPrimitiveLiteral(expression)) return false;
 				}
 				return false;
 			}
@@ -7651,7 +7663,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					if (ts.isComputedPropertyName(property.name)) {
 						const key = property.name.expression;
 						if (readsOrdinal(key)) return true;
-						if (!rowKeyLiteral(key)) return false;
+						if (!isPrimitiveLiteral(key)) return false;
 					}
 					if (ts.isShorthandPropertyAssignment(property)) return readsOrdinal(property.name);
 					if (ts.isPropertyAssignment(property)) {
@@ -7881,14 +7893,14 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	}
 
 	private stableRowKey(key: ts.Expression, item: ts.ParameterDeclaration, iterable: ts.Expression) {
-		if (rowKeyLiteral(key)) return true;
+		if (isPrimitiveLiteral(key)) return true;
 		key = skipWrappers(key);
 		const source = skipWrappers(iterable);
 		return (
 			ts.isIdentifier(key) &&
 			this.declarationOf(key) === item &&
 			ts.isArrayLiteralExpression(source) &&
-			source.elements.every(rowKeyLiteral) &&
+			source.elements.every(isPrimitiveLiteral) &&
 			fixedBinding(this.checker, key, key)
 		);
 	}
@@ -7911,7 +7923,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					(statement.declarationList.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
 					statement.declarationList.declarations.every(
 						({ name, initializer }) =>
-							ts.isIdentifier(name) && initializer !== undefined && rowKeyLiteral(initializer),
+							ts.isIdentifier(name) && initializer !== undefined && isPrimitiveLiteral(initializer),
 					),
 			) && !reads(key, (name) => name.text === 'eval' && !isPropertyName(name))
 		);
