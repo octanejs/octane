@@ -199,8 +199,8 @@ The codemod warns when JSX renders an SVG imported with `?react` or the named
 `.svg` imports, check those tags too. A loader that emits Octane components
 can keep its existing imports.
 
-A React package with no Octane binding still runs on React, so React stays a
-dependency, and a comment above each import of it says so. When the project
+If the codemod keeps an import on React, the generated comment identifies the
+retained import. Keep React as a dependency. When the project
 has React and React DOM 19.2 or newer in the React 19 series, a component of that package renders in
 its own React root through `ReactCompat` if its element gives React nothing
 Octane renders: text children and props without elements. The package's hooks
@@ -210,9 +210,9 @@ in a local `NoOctanePort`, which throws the reported error where the component
 would render, so the page names the package instead of failing deep in
 Octane's renderer. Once you have checked that nothing Octane renders reaches
 it, such as a spread of props whose `children` no caller passes, swap the
-wrapper for `ReactCompat`. **No Octane port** lists each such
-package with the modules that import it, the elements hosted in islands, and
-the uses that need a port.
+wrapper for `ReactCompat`. **Retained React imports** lists each such package
+with the modules that import it, the elements hosted in islands, and the uses
+that need review.
 
 A patch the project applies to a React package the codemod replaces, through
 `patchedDependencies` (pnpm, Bun) or `patches/` (patch-package), patches the
@@ -248,11 +248,84 @@ For a literal message descriptor with optional scalar substitutions, the codemod
 
 Self-closing `FormattedMessage` elements can render text directly, including ICU substitutions such as `values={{ count }}` when the named values are scalar and evaluating them keeps JSX in its original renderer. Custom text wrappers and provider-defined rich content use the installed React component. Supported React display islands receive the nearest real Intl context. A React-hosted Octane component reads the original provider. A standalone Octane root uses the generated `IntlProvider` or `RawIntlProvider`. The codemod moves providers with a closed subtree of native elements and scalar children. Providers surrounding other components need a review of which renderer owns their descendants. React islands retain the [ReactCompat rendering limits](../../docs/react-compat.md).
 
+For a message directly inside a paragraph, the codemod uses `ReactCompatInline` for the fallback when the installed Octane package exports it on the client and server. Verify that any provider-supplied rich text or custom wrapper produces phrasing content allowed inside a paragraph.
+
 Inside an authored `ReactCompat` boundary, a single original React component can be selected by a ternary that supplies different props on either branch. A namespaced bridge becomes a named import so the compiler can transport that child. Lists, optional children, and JSX-valued props require a React component to own their rendering.
 
 Inside a retained React component, a rich-text callback such as `chunks => <strong>{chunks}</strong>` can keep producing a genuine React element. When the codemod creates a React island for `FormattedMessage`, an inline substitution such as `values={{ lineBreak: <br /> }}` also stays in React if the other props and substitutions cannot observe a change in evaluation timing. The codemod recognizes a single intrinsic tag with literal attributes and an optional literal key. Callbacks can use their parameter as the sole child. Spreads, refs, and event handlers retain a migration diagnostic.
 
 A native `formatMessage` call or a generated native `FormattedMessage` can return the expected string while losing resource hints scheduled by a provider-supplied formatter. A generated formatter can also lose access to other React ancestor contexts. The codemod retains the preview and reports a blocking diagnostic for these calls and islands. Review the actual provider and formatter before adopting them. A local `IntlProvider` can inherit configuration from its mutable class defaults. Explicitly authored React boundaries keep their existing contract.
+
+### Keep formatting in React while migrating a child
+
+With a retained React `IntlProvider`, keep `useIntl` and `formatMessage` in the React component that already owns the call. Pass the resulting string as a prop to an Octane child. This preserves the nearest provider and keeps its formatter callbacks in React's render.
+
+```tsx
+/** @jsxImportSource react */
+import { OctaneCompatInline } from 'octane/react';
+import { useIntl } from 'react-intl';
+import { Label } from './Label.tsrx';
+
+export function ReactLabel({ name }: { name: string }) {
+  const intl = useIntl();
+  const label = intl.formatMessage(
+    { id: 'welcome', defaultMessage: 'Welcome, {name}' },
+    { name },
+  );
+  return typeof label === 'string' ? (
+    <OctaneCompatInline component={Label} props={{ label }} />
+  ) : (
+    <strong>{label}</strong>
+  );
+}
+```
+
+```tsrx
+"use strong";
+
+export function Label({ label }: { label: string }) @{
+  <strong>{label as string}</strong>
+}
+```
+
+The `typeof` check keeps a rich-text result in React. `OctaneCompatInline` adds a span host for the inline Octane child. Compile the React and Octane files with the [mixed-app setup](../../docs/react-compat.md#compiler-ownership), and use `octane/react/server` in the server build. Select the prop-only child when running the codemod. The wrapper stays in React and its import follows the child's new extension.
+
+### Extracting FormatJS messages
+
+`formatjs extract` expects ordinary TypeScript and JSX. After converting files to `.tsrx`, use `compileToVolarMappings` from `octane/compiler` to project those files to temporary TSX for extraction. Pass retained files and projected files to the same FormatJS invocation so it can check message IDs across both.
+
+Save the script below as `extract-formatjs.mjs` in a project with Octane and the FormatJS CLI installed.
+
+```js
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { compileToVolarMappings } from 'octane/compiler';
+
+const directory = mkdtempSync(join(tmpdir(), 'octane-formatjs-'));
+try {
+	const files = process.argv.slice(2).map((file, index) => {
+		if (!file.endsWith('.tsrx')) return file;
+		const { code, errors } = compileToVolarMappings(readFileSync(file, 'utf8'), file);
+		if (errors.length) throw new Error(`Cannot project ${file} for message extraction`);
+		const projection = join(directory, `${index}.tsx`);
+		writeFileSync(projection, code);
+		return projection;
+	});
+	execFileSync('formatjs', ['extract', '--throws', '--out-file', 'messages.json', ...files], {
+		stdio: 'inherit',
+	});
+} finally {
+	rmSync(directory, { recursive: true, force: true });
+}
+```
+
+```sh
+pnpm exec node extract-formatjs.mjs src/retained.tsx src/migrated.tsrx
+```
+
+Use the same FormatJS options you used before migration. Aliased message components may need `--additional-component-names` with your extractor version. This example writes a catalog without source locations. With `--extract-source-location`, FormatJS reports the temporary TSX paths and offsets for projected files. If your workflow needs authored locations, keep message definitions in ordinary TypeScript or use the codemod's `--target tsx` option.
 
 ## Store hooks in linked workspace packages
 

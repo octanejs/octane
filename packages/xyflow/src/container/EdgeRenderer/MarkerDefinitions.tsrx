@@ -3,6 +3,7 @@ import { type MarkerProps, createMarkerIds } from '@xyflow/system';
 
 import { useStore } from '../../hooks/useStore';
 import { useMarkerSymbol } from './MarkerSymbols.tsrx';
+import type { AllowUndefined } from '../../types/allow-undefined-props';
 
 type MarkerDefinitionsProps = {
 	defaultColor: string | null;
@@ -18,7 +19,10 @@ const Marker = ({
 	markerUnits = 'strokeWidth',
 	strokeWidth,
 	orient = 'auto-start-reverse',
-}: MarkerProps) => {
+}: AllowUndefined<
+	MarkerProps,
+	'color' | 'width' | 'height' | 'markerUnits' | 'strokeWidth' | 'orient'
+>) => {
 	const Symbol = useMarkerSymbol(type);
 
 	if (!Symbol) {

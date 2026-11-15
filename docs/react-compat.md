@@ -47,10 +47,39 @@ Pass `hostClassName` and `hostStyle` to style either host from React. A supplied
 `hostStyle={{ display: 'inline' }}` gives an inline host its own layout box,
 and `hostStyle={{}}` leaves its display to CSS and the element's default.
 
+Use `hostRole` and `hostAriaLabel` to set a role and accessible name on either
+React-owned host. For example, a named icon can use `hostRole="img"`,
+`hostAriaLabel="Status"`, and `hostStyle={{ display: 'inline-block' }}` to give
+the host its own layout box.
+
+When React's `Activity` hides an `OctaneCompat` island, the island keeps its
+last published React context values until reveal. An insertion effect inside
+the hidden island can therefore leave a stylesheet for visible siblings on
+its previous value. On reveal the host publishes the latest committed context
+before ancestor React layout effects run.
+
 Resource hints such as `preload` and `preinit` issued during an
 `OctaneCompat` render use the React host's document resource handling.
 Place declarative document metadata such as `<title>` and `<meta>` in the
 React tree.
+
+In the browser, either host can borrow the `signalOwner` of a native Octane
+root. Pass the same owner to each island that should share its compiled
+module-level signals.
+
+```tsx
+const root = createRoot(container, { signalOwner: documentScope });
+
+<OctaneCompat clientSignalOwner={documentScope} component={Panel} props={panelProps} />
+```
+
+The host captures the owner for its React key. Change the host's outer key
+to use a different owner. The caller owns disposal, so removing one island
+leaves the other borrowers active. For React SSR, configure the original
+request owner through `installSignalOwnerEnvironment` and supply
+`clientSignalOwner` only from the browser entry. Use the same scope key for
+the browser owner and its server counterpart. Existing hydration sidecars
+carry historical reads before the borrowed owner supplies live values.
 
 ## Storybook with Octane components
 
@@ -81,10 +110,12 @@ export default defineConfig({
 hook/context helper modules with `/** @jsxImportSource octane */`; mark React-owned JSX with
 `/** @jsxImportSource react */`. Do not alias React or React DOM to Octane.
 
-`requireDirective` applies to application files under the bundler root. Keep
-mixed application modules inside that root. Installed and linked packages retain
-their package ownership rules; a React library that does not declare Octane
-remains React-owned.
+`requireDirective` gates application files under the bundler root. Installed and
+linked packages use their manifest's default ownership. With this option
+enabled, a package's `.tsx` file with a leading `/** @jsxImportSource react */`
+stays with React's transform unless the application registers `react` as its
+renderer intrinsics. A React library that does not declare Octane remains
+React-owned.
 
 Use a named `ReactCompat` import (aliases are supported). The compiler transports
 its child as an inspectable element descriptor instead of executing the React
@@ -178,6 +209,40 @@ scoped to each island; neither renderer's context internals are changed. Keep
 the ordered source/target identities stable for the boundary's lifetime, or
 change the boundary key. Duplicate target contexts are rejected. React providers
 inside the island keep their usual precedence.
+
+## Request-scoped signals in Node.js
+
+A Node.js server using React's `renderToPipeableStream` can give compiled module-level signals a request-local owner. Install a carrier once in the server entry. Enter the caller's scope when starting each render so React's asynchronous work can read that request's signals.
+
+```ts
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { renderToPipeableStream } from 'react-dom/server';
+import {
+  installSignalOwnerEnvironment,
+  runWithSignalOwner,
+  type SignalOwner,
+  type SignalOwnerIdentity,
+} from 'octane/signals/server';
+
+const owners = new AsyncLocalStorage<SignalOwnerIdentity>();
+installSignalOwnerEnvironment({
+  current: () => owners.getStore() ?? null,
+  run: (owner, render) => owners.run(owner, render),
+  capture: (owner) => (render) => owners.run(owner, render),
+});
+
+export function renderRequest(
+  owner: SignalOwner,
+  tree: Parameters<typeof renderToPipeableStream>[0],
+  options?: Parameters<typeof renderToPipeableStream>[1],
+) {
+  return runWithSignalOwner(owner, () => renderToPipeableStream(tree, options));
+}
+```
+
+The HTTP handler owns the scope. For a scope dedicated to one response, dispose it when the response finishes, and abort the React stream and dispose the scope if the client disconnects first. A recoverable React render error can leave other work pending.
+
+The carrier applies to Node server rendering. To [borrow an owner in the browser](https://octanejs.dev/docs/react-compat#borrow-a-client-signal-owner), pass `clientSignalOwner` from the browser entry with the same scope key as the request owner. The existing island sidecars supply historical reads during hydration. After hydration, the islands read live values from the browser owner.
 
 ## Server rendering and hydration
 

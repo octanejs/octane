@@ -1,3 +1,4 @@
+import type { AllowUndefined } from '../../types/allow-undefined-props';
 import { useEffect, useRef, type OctaneNode } from 'octane';
 import type {
 	EventHandler,
@@ -25,28 +26,26 @@ import { useStore, useStoreApi } from '../../hooks/useStore';
 import { getSelectionChanges } from '../../utils';
 import type { ReactFlowProps, ReactFlowState } from '../../types';
 
+type PaneForwardedProps =
+	| 'selectionMode'
+	| 'panOnDrag'
+	| 'autoPanOnSelection'
+	| 'onSelectionStart'
+	| 'onSelectionEnd'
+	| 'onPaneClick'
+	| 'onPaneContextMenu'
+	| 'onPaneScroll'
+	| 'onPaneMouseEnter'
+	| 'onPaneMouseMove'
+	| 'onPaneMouseLeave'
+	| 'selectionOnDrag';
+
 type PaneProps = {
 	isSelecting: boolean;
 	selectionKeyPressed: boolean;
 	children: OctaneNode;
 	paneClickDistance: number;
-} & Partial<
-	Pick<
-		ReactFlowProps,
-		| 'selectionMode'
-		| 'panOnDrag'
-		| 'autoPanOnSelection'
-		| 'onSelectionStart'
-		| 'onSelectionEnd'
-		| 'onPaneClick'
-		| 'onPaneContextMenu'
-		| 'onPaneScroll'
-		| 'onPaneMouseEnter'
-		| 'onPaneMouseMove'
-		| 'onPaneMouseLeave'
-		| 'selectionOnDrag'
-	>
->;
+} & AllowUndefined<Partial<Pick<ReactFlowProps, PaneForwardedProps>>, PaneForwardedProps>;
 
 const wrapHandler = <EventType extends Event>(
 	handler: EventHandler<EventType> | undefined,
@@ -276,7 +275,11 @@ export function Pane({
 		if (!autoPanOnSelection || !containerBounds.current) {
 			return;
 		}
-		const [x, y] = calcAutoPan(position.current, containerBounds.current, autoPanSpeed);
+		// @xyflow/system always returns the x/y pair but declares it as number[].
+		const [x, y] = calcAutoPan(position.current, containerBounds.current, autoPanSpeed) as [
+			number,
+			number,
+		];
 
 		panBy({ x, y }).then((panned) => {
 			if (!selectionInProgress.current || !panned) {

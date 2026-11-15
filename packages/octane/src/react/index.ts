@@ -72,6 +72,7 @@ import {
 	type ComponentBody,
 	type Context as OctaneContext,
 	type Root as OctaneRoot,
+	type RootOptions,
 } from '../index.js';
 import {
 	OCTANE_COMPAT_HOST_STYLE,
@@ -79,21 +80,27 @@ import {
 	OPAQUE_HOST_SENTINEL_COMMENT,
 	REACT_CONTEXT_TAG,
 	resolveHostedIsland,
-	type OctaneCompatComponentProps,
-	type OctaneCompatProps,
+	type OctaneCompatComponentProps as HostedComponentProps,
+	type OctaneCompatProps as HostedElementProps,
 	type TransportedChild,
 } from './shared.js';
 
-export type {
-	OctaneCompatComponentProps,
-	OctaneCompatProps,
-	OctaneHostedComponent,
-	OctaneReactComponent,
-	OctaneRenderedNode,
-} from './shared.js';
+export type { OctaneHostedComponent, OctaneReactComponent, OctaneRenderedNode } from './shared.js';
 import { drainPassiveEffects, type Block } from '../runtime.js';
 import { readNearestProviderValue } from './fiber-adapter.js';
 import { reactResourceHints } from './resource-hints.js';
+
+interface ClientSignalOwnerOption {
+	/**
+	 * Borrow a signal owner for the browser root. Change the host's React key
+	 * to select a different owner. The caller disposes the owner.
+	 */
+	clientSignalOwner?: RootOptions['signalOwner'];
+}
+
+export interface OctaneCompatProps extends HostedElementProps, ClientSignalOwnerOption {}
+
+export type OctaneCompatComponentProps<P> = HostedComponentProps<P> & ClientSignalOwnerOption;
 
 // Structural bench/test hook (§13): provider walks happen only at discovery.
 export { __hostContextFiberWalks } from './fiber-adapter.js';
@@ -266,6 +273,8 @@ class HostedIslandController {
 	private hidden = false;
 	/** A passive disconnect awaits its microtask check; any commit cancels it. */
 	private hideRequested = false;
+
+	constructor(private clientSignalOwner: RootOptions['signalOwner']) {}
 
 	// ── RendererRegionOwnerBridge ──────────────────────────────────────────
 
@@ -575,10 +584,18 @@ class HostedIslandController {
 			for (const dispose of disposers) dispose();
 		} finally {
 			this.active = false;
+			this.root = null;
+			this.clientSignalOwner = undefined;
 		}
 	}
 
 	// ── hosted root mechanics ──────────────────────────────────────────────
+
+	private rootOptions(): RootOptions {
+		const options: RootOptions = { identifierPrefix: this.identifierPrefix };
+		if (this.clientSignalOwner !== undefined) options.signalOwner = this.clientSignalOwner;
+		return options;
+	}
 
 	private envelopeProps(): Record<string, unknown> {
 		const committed = this.committed!;
@@ -617,7 +634,7 @@ class HostedIslandController {
 						host,
 						hostedRootEnvelope as unknown as ComponentBody,
 						this.envelopeProps(),
-						{ identifierPrefix: this.identifierPrefix },
+						this.rootOptions(),
 					);
 				});
 			} finally {
@@ -628,7 +645,7 @@ class HostedIslandController {
 		if (this.root === null || !this.rootLive) {
 			// First attach, or the runtime unmounted the previous root after an
 			// initial routed failure — a React retry binds a fresh root (§5 rule 9).
-			this.root = createOctaneRoot(this.host, { identifierPrefix: this.identifierPrefix });
+			this.root = createOctaneRoot(this.host, this.rootOptions());
 		}
 		const root = this.root;
 		octaneFlushSync(() =>
@@ -665,7 +682,7 @@ function createOctaneCompat(host: 'div' | 'span') {
 	function OctaneCompat(
 		props: OctaneCompatProps | OctaneCompatComponentProps<unknown>,
 	): React.ReactNode {
-		const [controller] = React.useState(() => new HostedIslandController());
+		const [controller] = React.useState(() => new HostedIslandController(props.clientSignalOwner));
 		// One stable invalidation per wrapper — a plain state bump (§5).
 		const [, bump] = React.useReducer((count: number) => count + 1, 0);
 		controller.notify = bump;
@@ -699,6 +716,8 @@ function createOctaneCompat(host: 'div' | 'span') {
 			'data-octane-compat': '',
 			className: props.hostClassName,
 			style: props.hostStyle ?? OCTANE_COMPAT_HOST_STYLE,
+			role: props.hostRole,
+			'aria-label': props.hostAriaLabel,
 			ref: hostRef,
 			// §9.3 opaque-host contract: the server writes real island HTML; the
 			// client ALWAYS supplies this stable frozen sentinel so React neither

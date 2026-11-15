@@ -6,6 +6,7 @@ import {
 	createElement,
 	type OctaneNode,
 	use,
+	useContext,
 	useState,
 } from 'octane';
 
@@ -40,6 +41,242 @@ export function AtToggle(props) @{
 			<span class="off">off</span>
 		}
 	</div>
+}
+
+function CapturedAction({ label }: { label: string }) @{
+	const [count, setCount] = useState(0);
+	<button onClick={() => setCount(count + 1)}>{label + ':' + count}</button>
+}
+
+function BranchAction(_props: { label: string }) @{
+	<i>module</i>
+}
+
+export function FunctionScopedBranch({ label }: { label: string }) @{
+	if (label) {
+		var BranchAction = CapturedAction;
+	}
+	<main>
+		@if (label) {
+			<BranchAction label={label} />
+		}
+	</main>
+}
+
+export function InlineParentBranch({ label }: { label: string }) @{
+	let branchLabel = '';
+	<main>
+		@if (label) {
+			branchLabel = label;
+			if (branchLabel) {
+				var BranchAction = CapturedAction;
+			}
+			@if (branchLabel) {
+				<BranchAction label={branchLabel} />
+			}
+		}
+	</main>
+}
+
+export function ConditionalInsideKeyedRows({ show }: { show: boolean }) @{
+	if (show) {
+		var RowAction = CapturedAction;
+	}
+
+	<main>
+		@for (const label of ['first', 'second']; key label) {
+			@if (show) {
+				<RowAction label={label} />
+			} @else {
+				<b>{label as string}</b>
+			}
+		}
+	</main>
+}
+
+export function SwitchScopedBranch({ label }: { label: string }) @{
+	if (label) {
+		var BranchAction = CapturedAction;
+	}
+
+	<main>
+		@switch (label) {
+			@case 'ready': {
+				@if (label) {
+					<BranchAction label={label} />
+				}
+			}
+			@default: {
+				@if (label) {
+					<BranchAction label={label} />
+				} @else {
+					<b>empty</b>
+				}
+			}
+		}
+	</main>
+}
+
+export function TryScopedBranch({ label }: { label: string }) @{
+	if (label) {
+		var BranchAction = CapturedAction;
+	}
+
+	<main>
+		@try {
+			@if (label === 'fail') {
+				<FailedBranch />
+			} @else {
+				@if (label) {
+					<BranchAction label={label} />
+				} @else {
+					<b>empty</b>
+				}
+			}
+		} @catch (error) {
+			<b>{(error as Error).message as string}</b>
+		}
+	</main>
+}
+
+export function PendingScopedBranch({
+	promise,
+	useLatest,
+}: {
+	promise: Promise<string>;
+	useLatest: boolean;
+}) @{
+	if (promise) {
+		var WakeAction = useLatest ? CapturedAction : BranchAction;
+	}
+
+	<main>
+		@try {
+			const label = use(promise);
+			@if (label) {
+				<WakeAction label={label} />
+			}
+		} @pending {
+			<b>waiting</b>
+		} @catch (error) {
+			<b>{(error as Error).message as string}</b>
+		}
+	</main>
+}
+
+function FailedBranch(): never {
+	throw new Error('branch failed');
+}
+
+function RowChoice({ label }: { label: string }) @{
+	<b>{label as string}</b>
+}
+
+function FirstChoice({ label }: { label: string }) @{
+	<i>{label as string}</i>
+}
+
+function SecondChoice({ label }: { label: string }) @{
+	<strong>{label as string}</strong>
+}
+
+export function FunctionScopedConditionalKeyedRows({
+	first,
+	rows,
+}: {
+	first: boolean;
+	rows: string[];
+}) @{
+	if (rows.length > 0) {
+		var RowChoice = first ? FirstChoice : SecondChoice;
+	}
+
+	<ol>
+		@for (const label of rows; key label) {
+			@if (label.length > 0) {
+				<li>
+					<RowChoice label={label} />
+				</li>
+			}
+		}
+	</ol>
+}
+
+export function FunctionScopedConditionalRowsWithEmpty({
+	first,
+	rows,
+}: {
+	first: boolean;
+	rows: string[];
+}) @{
+	if (typeof first === 'boolean') {
+		var RowChoice = first ? FirstChoice : SecondChoice;
+	}
+	<ol>
+		@for (const label of rows; key label) {
+			@if (label.length > 0) {
+				<li>
+					<RowChoice label={label} />
+				</li>
+			}
+		} @empty {
+			@if (first) {
+				<RowChoice label="empty" />
+			} @else {
+				const RowChoice = FirstChoice;
+				<RowChoice label="fallback" />
+			}
+		}
+	</ol>
+}
+
+const rowPrefix = 'module:';
+const rowKey: ((row: number) => number) | undefined = undefined;
+
+export function FunctionScopedKeyedRows(props: { rows: number[]; label: string; offset: number }) @{
+	if (props.label) {
+		var rowPrefix = props.label + ':';
+		var rowKey = (row: number) => props.offset + row;
+	}
+	<ul>
+		@for (const row of props.rows; key rowKey!(row)) {
+			<li>{String(row) + rowPrefix}</li>
+		} @empty {
+			<li>{rowPrefix as string}</li>
+		}
+	</ul>
+}
+
+const RowContext = createContext('default');
+
+function ScopedRowLabel() @{
+	<b>{useContext(RowContext) as string}</b>
+}
+
+const scopedRowLabel = createElement(ScopedRowLabel);
+const rowContent = 'module:';
+
+export function OpaqueFunctionScopedKeyedRows(props: {
+	rows: { name: string }[];
+	label: string;
+	rich?: boolean;
+}) @{
+	if (props.label) {
+		var rowContent: OctaneNode = props.rich ? scopedRowLabel : props.label;
+		var item = props.label;
+	}
+	<RowContext value={props.label}>
+		<ul>
+			@for (const item of props.rows; key item.name) {
+				<li>
+					{rowContent}
+					{item.name}
+				</li>
+			} @empty {
+				<li>{item}</li>
+			}
+		</ul>
+	</RowContext>
 }
 
 // Product-style return fragment: the toolbar is a fixed sibling while a

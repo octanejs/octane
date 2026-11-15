@@ -788,6 +788,7 @@ const SUITES = [
 		runs: [
 			{ script: 'bundle.mjs', args: () => [] },
 			{ label: 'effect-cleanup', script: 'effect-cleanup.mjs', args: () => [] },
+			{ label: 'boundary-rows', script: 'boundary-rows.mjs', args: () => [] },
 		],
 	},
 	{

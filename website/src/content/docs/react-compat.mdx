@@ -109,6 +109,25 @@ plugin. Missing, incorrect, or unknown props are errors at the child call site;
 no cast or ambient `.tsrx` shim is needed. Octane element values are still not
 ordinary React renderables outside this component transport.
 
+<h3 id="borrow-a-client-signal-owner">Borrow a browser signal owner</h3>
+
+In the browser, pass `clientSignalOwner` to `OctaneCompat` or
+`OctaneCompatInline` to share the same compiled module-level signals across
+islands and native Octane roots. The owner stays fixed for the host's React
+key. Change the outer key to select a different owner. The caller manages
+disposal.
+
+```tsx
+const root = createRoot(container, { signalOwner: documentScope });
+
+<OctaneCompat clientSignalOwner={documentScope} component={Panel} props={panelProps} />;
+```
+
+For React SSR, select the request owner through `installSignalOwnerEnvironment`.
+Pass `clientSignalOwner` only from the browser entry and use a browser owner
+with the same scope key as its server counterpart. Existing hydration sidecars
+carry each island's historical reads before it begins reading live values.
+
 <h2 id="render-react-in-octane">Render React in Octane</h2>
 
 Keep the React component in a React-owned module. Its hooks and JSX use the real
@@ -181,6 +200,11 @@ Here `ThemeContext` comes from React's `createContext`. The host resolves the
 nearest committed React provider and updates the island when it changes. With no
 provider, the island receives the React context's default. No mapping is needed
 in this direction.
+
+When React's `Activity` hides the island, the host publishes new React context
+values on reveal, before ancestor React layout effects run. Until reveal, an
+insertion effect inside the island can leave shared styles on their previous
+context value.
 
 <h3 id="octane-context-in-react">Octane context in a React island</h3>
 
@@ -292,6 +316,8 @@ and delegates unresolved suspension to React's server renderer. Fizz can stream
 the surrounding fallback and retry the island. Scoped island CSS becomes React
 19 style resources, hoisted and deduplicated across islands. The client Octane
 root hydrates the island's HTML; React leaves its descendants opaque.
+In a Node.js server, a [request-local signal owner](https://github.com/octanejs/octane/blob/main/docs/react-compat.md#request-scoped-signals-in-nodejs)
+can carry module-level signal values through React's streaming render.
 
 **React inside Octane:** use Octane's asynchronous or streaming server renderer.
 `ReactCompat` buffers the complete React HTML for each island. An enclosing
@@ -329,6 +355,10 @@ hydration recovery.
   `hostClassName` and `hostStyle` to style the host. A supplied `hostStyle`
   replaces the default style. Use `hostStyle={{}}` to leave display to CSS
   and the element's default.
+- Use `hostRole` and `hostAriaLabel` to give either React-owned Octane host a
+  role and accessible name. A named icon can use `hostRole="img"`,
+  `hostAriaLabel="Status"`, and `hostStyle={{ display: 'inline-block' }}` for
+  a host with its own layout box.
 - React Server Components, Flight, and React's server `cache()` do not cross
   these boundaries.
 - Nested React→`OctaneCompat`→`ReactCompat` **server rendering** is unsupported.

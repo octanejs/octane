@@ -1,10 +1,24 @@
 import { resolve } from 'node:path';
 import { renderToString } from 'octane/server';
 import { describe, it, expect } from 'vitest';
-import { hydrateRoot } from '../src/index.js';
+import { flushSync, hydrateRoot, useState } from '../src/index.js';
 import { mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture';
-import { Maybe, Multi, Toggleable, NoBraces, MutableCapture } from './_fixtures/early-return.tsrx';
+import {
+	Maybe,
+	Multi,
+	Toggleable,
+	NoBraces,
+	MutableCapture,
+	cell,
+	AliasedState,
+	ManualStateAlias,
+	ShadowedStateAlias,
+	NestedAliasedState,
+	NestedAliasedExpressions,
+	DirectAliasedState,
+	ScopedDirectAliasedState,
+} from './_fixtures/early-return.tsrx';
 import { App as HelperApp } from './_fixtures/return-from-helper.tsrx';
 
 describe('early returns', () => {
@@ -70,6 +84,126 @@ describe('early returns', () => {
 		} finally {
 			root?.unmount();
 			host.remove();
+		}
+	});
+
+	it('keeps aliased state independent across hydration and an early return', () => {
+		const server = loadServerFixture(resolve(__dirname, '_fixtures/early-return.tsrx'));
+		const props = { hide: false };
+		const host = document.createElement('div');
+		host.innerHTML = renderToString(server['AliasedState'], props).html;
+		document.body.append(host);
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			const button = host.querySelector('button')!;
+			expect(button.textContent).toBe('1:10');
+			const hydrated = hydrateRoot(host, AliasedState, props);
+			root = hydrated;
+			expect(host.querySelector('button')).toBe(button);
+			flushSync(() => button.click());
+			expect(button.textContent).toBe('2:10');
+
+			flushSync(() => hydrated.render(AliasedState, { hide: true }));
+			expect(host.querySelector('button')).toBeNull();
+			flushSync(() => hydrated.render(AliasedState, props));
+			expect(host.querySelector('button')?.textContent).toBe('2:10');
+		} finally {
+			root?.unmount();
+			host.remove();
+		}
+	});
+
+	it.each([
+		['NestedAliasedState', NestedAliasedState, true],
+		['NestedAliasedExpressions', NestedAliasedExpressions, false],
+	] as const)('hydrates and updates the state in %s', (name, App, hasGuard) => {
+		const server = loadServerFixture(resolve(__dirname, '_fixtures/early-return.tsrx'));
+		const props = { hide: false };
+		const host = document.createElement('div');
+		host.innerHTML = renderToString(server[name], props).html;
+		document.body.append(host);
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			const [first, second] = host.querySelectorAll('button');
+			expect([first.textContent, second.textContent]).toEqual(['1', '10']);
+			const hydrated = hydrateRoot(host, App, props);
+			root = hydrated;
+			const buttons = host.querySelectorAll('button');
+			expect(buttons[0]).toBe(first);
+			expect(buttons[1]).toBe(second);
+			flushSync(() => first.click());
+			expect([first.textContent, second.textContent]).toEqual(['2', '10']);
+			flushSync(() => second.click());
+			expect([first.textContent, second.textContent]).toEqual(['2', '11']);
+			if (hasGuard) {
+				flushSync(() => hydrated.render(App, { hide: true }));
+				expect(host.querySelector('button')).toBeNull();
+				flushSync(() => hydrated.render(App, props));
+				expect(Array.from(host.querySelectorAll('button'), (button) => button.textContent)).toEqual(
+					['1', '10'],
+				);
+			}
+		} finally {
+			root?.unmount();
+			host.remove();
+		}
+	});
+
+	it('keeps directly called state in its caller through hydration and an early return', () => {
+		const server = loadServerFixture(resolve(__dirname, '_fixtures/early-return.tsrx'));
+		const props = { hide: false };
+		const host = document.createElement('div');
+		host.innerHTML = renderToString(server['DirectAliasedState'], props).html;
+		document.body.append(host);
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			const [first, repeat, rendered] = host.querySelectorAll('button');
+			const hydrated = hydrateRoot(host, DirectAliasedState, props);
+			root = hydrated;
+			const after = host.querySelectorAll('button');
+			expect(after[0]).toBe(first);
+			expect(after[1]).toBe(repeat);
+			expect(after[2]).toBe(rendered);
+			const text = () => [...host.querySelectorAll('button')].map((node) => node.textContent);
+			expect(text()).toEqual(['1:10', '1:10', '1:10']);
+			flushSync(() => first.click());
+			expect(text()).toEqual(['2:10', '2:10', '1:10']);
+			flushSync(() => rendered.click());
+			expect(text()).toEqual(['2:10', '2:10', '2:10']);
+			flushSync(() => hydrated.render(DirectAliasedState, { hide: true }));
+			expect(text()).toEqual([]);
+			flushSync(() => hydrated.render(DirectAliasedState, props));
+			expect(text()).toEqual(['2:10', '2:10', '2:10']);
+		} finally {
+			root?.unmount();
+			host.remove();
+		}
+	});
+
+	it('keeps state independent for direct nested calls with explicit caller slots', () => {
+		const root = mount(ScopedDirectAliasedState);
+		try {
+			const [first, second] = root.findAll('button');
+			expect([first.textContent, second.textContent]).toEqual(['1', '10']);
+			flushSync(() => first.click());
+			expect([first.textContent, second.textContent]).toEqual(['2', '10']);
+			flushSync(() => second.click());
+			expect([first.textContent, second.textContent]).toEqual(['2', '11']);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('preserves the public alias identity and unrelated call sites', () => {
+		expect(cell).toBe(useState);
+		const manual = mount(ManualStateAlias);
+		const shadowed = mount(ShadowedStateAlias);
+		try {
+			expect(manual.find('output').textContent).toBe('undefined:1:1');
+			expect(shadowed.find('output').textContent).toBe('1:1');
+		} finally {
+			manual.unmount();
+			shadowed.unmount();
 		}
 	});
 

@@ -72,8 +72,9 @@ export interface OctaneVitePluginOptions {
 	 * by extension; a project `.tsx` compiles — and a plain project
 	 * `.ts`/`.js` gets octane hook slotting — only with a leading
 	 * `@jsxImportSource octane` pragma comment (a registered renderer's
-	 * intrinsics module also counts). Installed Octane packages retain
-	 * manifest-based ownership.
+	 * intrinsics module also counts). Installed and linked packages use
+	 * manifest-based ownership, with an explicit `@jsxImportSource react`
+	 * pragma leaving `.tsx` to React unless that JSX source is registered.
 	 * @default false
 	 */
 	requireDirective?: boolean;

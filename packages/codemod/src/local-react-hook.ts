@@ -4,7 +4,7 @@ import { localUses } from './local-uses.js';
 import { fixedBinding, initializedBefore } from './effect-receivers.js';
 import { skipWrappers } from './expression-wrappers.js';
 
-function rendererImport(name: ts.Identifier, checker: ts.TypeChecker, module = 'react') {
+export function namedRuntimeImport(name: ts.Identifier, checker: ts.TypeChecker) {
 	const binding = checker.getSymbolAtLocation(name)?.declarations?.[0];
 	if (!binding || !ts.isImportSpecifier(binding) || binding.isTypeOnly) return;
 	const clause = binding.parent.parent;
@@ -13,10 +13,14 @@ function rendererImport(name: ts.Identifier, checker: ts.TypeChecker, module = '
 		!clause.isTypeOnly &&
 		ts.isImportDeclaration(imp) &&
 		!imp.attributes &&
-		ts.isStringLiteral(imp.moduleSpecifier) &&
-		imp.moduleSpecifier.text === module
+		ts.isStringLiteral(imp.moduleSpecifier)
 	)
-		return (binding.propertyName ?? binding.name).text;
+		return { module: imp.moduleSpecifier.text, name: (binding.propertyName ?? binding.name).text };
+}
+
+function rendererImport(name: ts.Identifier, checker: ts.TypeChecker, module = 'react') {
+	const imported = namedRuntimeImport(name, checker);
+	if (imported?.module === module) return imported.name;
 }
 
 function privateContextReader(callee: ts.Expression, checker: ts.TypeChecker) {
@@ -71,7 +75,7 @@ function literalDeclaration(declaration: ts.VariableDeclaration) {
 	);
 }
 
-function safeSetupLiteral(node: ts.Expression, checker: ts.TypeChecker) {
+export function safeSetupLiteral(node: ts.Expression, checker: ts.TypeChecker) {
 	if (scalarLiteral(node)) return true;
 	if (ts.isIdentifier(node) && node.text === 'undefined') {
 		const symbol = checker.getSymbolAtLocation(node);
@@ -128,7 +132,7 @@ function conditionalOutput(value: ts.Expression) {
 
 /** A direct initialization in an ordinary component with native output. */
 export function nativeSetupHook(
-	ref: ts.Identifier,
+	ref: ts.Expression,
 	uses: ReturnType<typeof localUses>,
 	checker: ts.TypeChecker,
 	diagnostic?: {
@@ -329,16 +333,36 @@ function privateContextCall(
 	callee: ts.Identifier,
 ) {
 	if (ts.isOptionalChain(outer) || outer.arguments.length) return false;
-	const helper = checker.getSymbolAtLocation(callee)?.valueDeclaration;
+	const binding = checker.getSymbolAtLocation(callee)?.valueDeclaration;
+	if (!binding || (!ts.isFunctionDeclaration(binding) && !ts.isVariableDeclaration(binding)))
+		return false;
+	const name = binding.name;
+	if (!name || !ts.isIdentifier(name)) return false;
+
+	let helper: ts.FunctionDeclaration | ts.ArrowFunction | undefined;
+	if (ts.isFunctionDeclaration(binding)) {
+		if (binding.parent === sf) helper = binding;
+	} else {
+		const list = binding.parent;
+		const statement = list.parent;
+		if (
+			ts.isVariableDeclarationList(list) &&
+			(list.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
+			ts.isVariableStatement(statement) &&
+			statement.parent === sf &&
+			!statement.modifiers?.length &&
+			binding.initializer
+		) {
+			const initializer = skipWrappers(binding.initializer);
+			if (ts.isArrowFunction(initializer) && !ts.isBlock(initializer.body)) helper = initializer;
+		}
+	}
 	if (
 		!helper ||
-		!ts.isFunctionDeclaration(helper) ||
-		!helper.name ||
-		helper.parent !== sf ||
 		helper.modifiers?.length ||
 		helper.asteriskToken ||
 		helper.parameters.length ||
-		renderUses(uses(helper.name)).some(
+		renderUses(uses(name)).some(
 			(ref) => !ts.isCallExpression(ref.parent) || ref.parent.expression !== ref,
 		)
 	)
@@ -407,8 +431,8 @@ function setupEffect(body: ts.Block, checker: ts.TypeChecker) {
 export function directRendererCalls(
 	sf: ts.SourceFile,
 	checker: ts.TypeChecker,
-	module: 'react' | 'react-dom' | 'react-intl',
-	accepts: (name: string) => boolean,
+	module: 'react' | 'react-dom' | 'react-intl' | ((specifier: string, name: string) => boolean),
+	accepts?: (name: string) => boolean,
 	privateContextExports?: Set<string>,
 ) {
 	const calls = new Map<string, string>();
@@ -425,25 +449,36 @@ export function directRendererCalls(
 			)
 		)
 			return;
-		const first = firstRendererCall(fn.body);
 		const arrow = ts.isArrowFunction(fn);
+		const forward = typeof module === 'function';
+		// A retained wrapper forwards directly and has a stable exported binding.
+		const first = firstRendererCall(forward ? (arrow ? undefined : returned(fn)) : fn.body);
+		if (forward && (!first || ts.isOptionalChain(first.call))) return;
 		if (
 			(arrow && (!first || first.ambient || ts.isOptionalChain(first.call))) ||
 			(module === 'react-intl' &&
 				(!first || first.ambient || ts.isOptionalChain(first.call) || first.call.arguments.length))
 		)
 			return;
-		const name =
-			first && ts.isIdentifier(first.callee) && rendererImport(first.callee, checker, module);
-		const direct = name && accepts(name) ? name : undefined;
-		if (!direct && (arrow || (!(first && privateContextExports) && module !== 'react'))) return;
-		// The export must keep the same callable binding until the consumer calls it.
+		// Check escapes before asking the workspace planner to inspect a foreign package.
 		if (
 			renderUses(uses(binding)).some(
 				(ref) => !ts.isCallExpression(ref.parent) || ref.parent.expression !== ref,
 			)
 		)
 			return;
+		const imported =
+			first && ts.isIdentifier(first.callee)
+				? namedRuntimeImport(first.callee, checker)
+				: undefined;
+		const direct =
+			imported &&
+			(forward
+				? module(imported.module, imported.name)
+				: imported.module === module && accepts?.(imported.name))
+				? imported.name
+				: undefined;
+		if (!direct && (arrow || (!(first && privateContextExports) && module !== 'react'))) return;
 		if (direct) calls.set(binding.text, direct);
 		else if (
 			privateContextExports &&

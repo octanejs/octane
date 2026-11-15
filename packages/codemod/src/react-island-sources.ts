@@ -3,7 +3,12 @@ import { parseSync } from '@tsrx/oxc/parser';
 import { hasRuntimeDependency } from './scoped-store-contract.js';
 import { skipWrappers } from './expression-wrappers.js';
 import { hasEval, rendersElementChildren } from './forwarded-props.js';
-import { componentTagOrExport, localUses } from './local-uses.js';
+import {
+	componentTagOrExport,
+	inTypeNode,
+	localUses,
+	unchangedContextProviderUse,
+} from './local-uses.js';
 import { staticReactProps } from './react-renderer.js';
 import { bind, nativeReactCompat, skipParens, withoutJsxIndentation } from './transform.js';
 
@@ -34,13 +39,13 @@ async function bindIsland(file: string, source: string) {
 	return bind(file.endsWith('.tsrx') ? file + '.tsx' : file, code);
 }
 
-function imported(checker: ts.TypeChecker, node: ts.Node) {
+function imported(checker: ts.TypeChecker, node: ts.Node, defaultMember = false) {
 	const ref = ts.isPropertyAccessExpression(node) ? node.expression : node;
 	if (!ts.isIdentifier(ref)) return;
 	const decl = checker.getSymbolAtLocation(ref)?.declarations?.[0];
 	if (!decl) return;
 	const name = ts.isPropertyAccessExpression(node)
-		? ts.isNamespaceImport(decl) && node.name.text
+		? (ts.isNamespaceImport(decl) || (defaultMember && ts.isImportClause(decl))) && node.name.text
 		: ts.isImportSpecifier(decl) && !decl.isTypeOnly
 			? (decl.propertyName ?? decl.name).text
 			: ts.isImportClause(decl) && 'default';
@@ -52,6 +57,228 @@ function imported(checker: ts.TypeChecker, node: ts.Node) {
 		ts.isStringLiteral(imp.moduleSpecifier)
 	)
 		return { name, module: imp.moduleSpecifier.text };
+}
+
+function closedReactReceiver(receiver: ts.Identifier, uses: ReturnType<typeof localUses>) {
+	return uses(receiver).every((ref) => {
+		if (ts.isImportClause(ref.parent) || ts.isNamespaceImport(ref.parent) || inTypeNode(ref))
+			return true;
+		const member = ref.parent;
+		if (!ts.isPropertyAccessExpression(member) || member.expression !== ref) return false;
+		const parent = member.parent;
+		return (
+			ts.isExpressionWithTypeArguments(parent) ||
+			((ts.isJsxOpeningElement(parent) ||
+				ts.isJsxClosingElement(parent) ||
+				ts.isJsxSelfClosingElement(parent)) &&
+				parent.tagName === member &&
+				(member.name.text === 'Fragment' ||
+					member.name.text === 'Suspense' ||
+					member.name.text === 'StrictMode')) ||
+			(ts.isCallExpression(parent) &&
+				parent.expression === member &&
+				member.name.text !== 'default')
+		);
+	});
+}
+
+function soleReactReceiver(checker: ts.TypeChecker, receiver: ts.Identifier) {
+	const declaration = checker.getSymbolAtLocation(receiver)?.declarations?.[0];
+	return (
+		declaration &&
+		(ts.isNamespaceImport(declaration)
+			? !declaration.parent.name
+			: ts.isImportClause(declaration) && !declaration.namedBindings)
+	);
+}
+
+/** A direct assignment of inert metadata does not change the exported constructor. */
+function classMetadataAssignment(ref: ts.Identifier, decl: ts.ClassDeclaration) {
+	const access = ref.parent;
+	if (!ts.isPropertyAccessExpression(access) || access.expression !== ref) return false;
+	const name = access.name.text;
+	if (name !== 'displayName' && name !== 'defaultProps') return false;
+	const assignment = access.parent;
+	if (
+		!ts.isBinaryExpression(assignment) ||
+		assignment.left !== access ||
+		assignment.operatorToken.kind !== ts.SyntaxKind.EqualsToken ||
+		!ts.isExpressionStatement(assignment.parent) ||
+		assignment.parent.parent !== decl.parent ||
+		assignment.getStart() < decl.end ||
+		decl.members.some(
+			(member) =>
+				ts.isClassStaticBlockDeclaration(member) ||
+				(member.name && ts.isComputedPropertyName(member.name)) ||
+				(ts.canHaveDecorators(member) && ts.getDecorators(member)?.length) ||
+				(ts.getCombinedModifierFlags(member) & ts.ModifierFlags.Static &&
+					(ts.isPropertyDeclaration(member) ||
+						ts.isSetAccessorDeclaration(member) ||
+						ts.isGetAccessorDeclaration(member))),
+		)
+	)
+		return false;
+	const value = skipWrappers(assignment.right);
+	if (name === 'displayName') return ts.isStringLiteralLike(value);
+	return (
+		ts.isObjectLiteralExpression(value) &&
+		value.properties.every((field) => {
+			if (
+				!ts.isPropertyAssignment(field) ||
+				!(
+					ts.isIdentifier(field.name) ||
+					ts.isStringLiteral(field.name) ||
+					ts.isNumericLiteral(field.name)
+				) ||
+				field.name.text === '__proto__'
+			)
+				return false;
+			const value = skipWrappers(field.initializer);
+			return (
+				ts.isStringLiteralLike(value) ||
+				ts.isNumericLiteral(value) ||
+				value.kind === ts.SyntaxKind.TrueKeyword ||
+				value.kind === ts.SyntaxKind.FalseKeyword ||
+				value.kind === ts.SyntaxKind.NullKeyword
+			);
+		})
+	);
+}
+
+function localValueExport(symbol: ts.Symbol, checker: ts.TypeChecker) {
+	const declaration = symbol.valueDeclaration ?? symbol.declarations?.[0];
+	if (!declaration || !ts.isExportSpecifier(declaration)) return declaration;
+	const exported = declaration.parent.parent;
+	if (declaration.isTypeOnly || exported.isTypeOnly || exported.moduleSpecifier) return;
+	return checker.getExportSpecifierLocalTargetSymbol(declaration)?.valueDeclaration;
+}
+
+/** Direct React class exports, including an alias in a local export list. */
+export function reactClassExports(file: string, source: string) {
+	const { sf, checker } = bind(file, source);
+	const names = new Set<string>();
+	const module = checker.getSymbolAtLocation(sf);
+	if (!module || hasEval(sf)) return names;
+	const uses = localUses(sf, checker);
+	let decorators: boolean | undefined;
+	const hasDecorator = (node: ts.Node): boolean =>
+		ts.isDecorator(node) ||
+		(ts.forEachChild(node, (child) => hasDecorator(child) || undefined) ?? false);
+	const erasedClassUse = (ref: ts.Identifier) =>
+		inTypeNode(ref) &&
+		(ts.isTypeQueryNode(ref.parent) || !(decorators ??= source.includes('@') && hasDecorator(sf)));
+	for (const symbol of checker.getExportsOfModule(module)) {
+		let decl = localValueExport(symbol, checker);
+		if (decl && ts.isExportAssignment(decl)) {
+			const value = decl.expression;
+			if (decl.isExportEquals || !ts.isIdentifier(value)) continue;
+			const local = checker.getSymbolAtLocation(value)?.valueDeclaration;
+			if (!local || local.parent !== sf || local.end > decl.getStart(sf)) continue;
+			decl = local;
+		}
+		if (
+			!decl ||
+			!ts.isClassDeclaration(decl) ||
+			ts.getCombinedModifierFlags(decl) & ts.ModifierFlags.Ambient ||
+			ts.getDecorators(decl)?.length
+		)
+			continue;
+		const base = decl.heritageClauses?.find(
+			(clause) => clause.token === ts.SyntaxKind.ExtendsKeyword,
+		)?.types[0]?.expression;
+		if (!base) continue;
+		let entry = imported(checker, base);
+		if (!entry && ts.isPropertyAccessExpression(base) && ts.isIdentifier(base.expression)) {
+			const candidate = imported(checker, base, true);
+			if (candidate?.module === 'react' && closedReactReceiver(base.expression, uses))
+				entry = candidate;
+		}
+		if (entry?.module !== 'react' || (entry.name !== 'Component' && entry.name !== 'PureComponent'))
+			continue;
+		if (
+			!decl.name ||
+			uses(decl.name).every(
+				(ref) =>
+					erasedClassUse(ref) || componentTagOrExport(ref) || classMetadataAssignment(ref, decl),
+			)
+		)
+			names.add(symbol.name);
+	}
+	return names;
+}
+
+function hasSingleReactImport(sf: ts.SourceFile, source: string) {
+	const erased = new Set<number>();
+	for (const statement of sf.statements) {
+		if (
+			(ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) &&
+			statement.moduleSpecifier &&
+			!hasRuntimeDependency(statement, true)
+		)
+			erased.add(statement.moduleSpecifier.getStart(sf));
+	}
+	// Keep dynamic imports and require calls in the scan. Only declaration-level
+	// type imports and exports are erased even with verbatim module syntax.
+	return (
+		ts
+			.preProcessFile(source, true, true)
+			.importedFiles.filter(({ fileName, pos }) => fileName === 'react' && !erased.has(pos))
+			.length === 1
+	);
+}
+
+/** Direct module-level const exports initialized by the real React context factory. */
+export function retainedReactContextExports(file: string, source: string) {
+	const { sf, checker } = bind(file, source);
+	const module = checker.getSymbolAtLocation(sf);
+	const names = new Map<string, boolean>();
+	if (!module) return names;
+	let uses: ReturnType<typeof localUses> | undefined;
+	let singleReactImport: boolean | undefined;
+	let dynamicScope: boolean | undefined;
+	const readContext = (callee: ts.Expression) => {
+		const hook = ts.isIdentifier(callee) && imported(checker, callee);
+		return !!hook && hook.module === 'react' && hook.name === 'useContext';
+	};
+	for (const symbol of checker.getExportsOfModule(module)) {
+		const declaration = localValueExport(symbol, checker);
+		if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer)
+			continue;
+		const list = declaration.parent;
+		if (
+			(list.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+			!ts.isVariableStatement(list.parent) ||
+			list.parent.parent !== sf ||
+			ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Ambient
+		)
+			continue;
+		const init = skipWrappers(declaration.initializer);
+		if (!ts.isCallExpression(init) || ts.isOptionalChain(init)) continue;
+		const factory = init.expression;
+		const entry = imported(checker, factory, true);
+		if (entry?.module !== 'react' || entry.name !== 'createContext') continue;
+		if (ts.isPropertyAccessExpression(factory)) {
+			// With interop the default and namespace can share the same mutable React object.
+			singleReactImport ??= !(dynamicScope ??= hasEval(sf)) && hasSingleReactImport(sf, source);
+			if (
+				!singleReactImport ||
+				!ts.isIdentifier(factory.expression) ||
+				!soleReactReceiver(checker, factory.expression) ||
+				!closedReactReceiver(factory.expression, (uses ??= localUses(sf, checker)))
+			)
+				continue;
+		}
+		// The context itself stays a React value even if its Provider member is reassigned.
+		// For a retained member read, require the producer to keep that object local.
+		const unchangedProvider =
+			ts.isIdentifier(declaration.name) &&
+			!(dynamicScope ??= hasEval(sf)) &&
+			(uses ??= localUses(sf, checker))(declaration.name).every((ref) =>
+				unchangedContextProviderUse(ref, readContext),
+			);
+		names.set(symbol.name, unchangedProvider);
+	}
+	return names;
 }
 
 /** Original imported components handed to an authored React island. */
@@ -147,6 +374,20 @@ function* directExportReturns({ sf, checker }: ReturnType<typeof bind>, allowSet
 	for (const symbol of checker.getExportsOfModule(module)) {
 		let decl = symbol.valueDeclaration ?? symbol.declarations?.[0];
 		if (!decl) continue;
+		let splitExport = false;
+		if (ts.isExportSpecifier(decl)) {
+			if (
+				!allowSetup ||
+				decl.isTypeOnly ||
+				decl.parent.parent.isTypeOnly ||
+				decl.parent.parent.moduleSpecifier
+			)
+				continue;
+			const local = checker.getExportSpecifierLocalTargetSymbol(decl)?.valueDeclaration;
+			if (!local || !ts.isFunctionDeclaration(local)) continue;
+			splitExport = true;
+			decl = local;
+		}
 		let value: ts.Node = decl;
 		let defaultRef: ts.Identifier | undefined;
 		if (ts.isExportAssignment(decl)) {
@@ -173,7 +414,8 @@ function* directExportReturns({ sf, checker }: ReturnType<typeof bind>, allowSet
 			value = skipWrappers(value.initializer);
 		}
 		const output = returnedJsx(value, allowSetup);
-		if (output) yield { name: symbol.name, output, localName: name?.text, decl, symbol };
+		if (output)
+			yield { name: symbol.name, output, localName: name?.text, decl, symbol, splitExport };
 	}
 }
 
@@ -235,7 +477,15 @@ function hostedLeaf(output: ts.JsxElement | ts.JsxSelfClosingElement) {
 		const name = attr.name.text;
 		if (
 			seen.has(name) ||
-			!['component', 'props', 'key', 'hostClassName', 'hostStyle'].includes(name)
+			![
+				'component',
+				'props',
+				'key',
+				'hostClassName',
+				'hostStyle',
+				'hostRole',
+				'hostAriaLabel',
+			].includes(name)
 		)
 			return;
 		seen.add(name);
@@ -516,7 +766,7 @@ export function reactServerComponents(
 					!ts.isOptionalChain(value) &&
 					(value.arguments.length === 1 ||
 						(value.arguments.length === 2 &&
-							skipWrappers(value.arguments[1]).kind === ts.SyntaxKind.NullKeyword))
+							(selected || skipWrappers(value.arguments[1]).kind === ts.SyntaxKind.NullKeyword)))
 				) {
 					const factory = imported(checker, value.expression);
 					if (factory?.module === 'react' && factory.name === 'createElement' && original('react'))
@@ -537,13 +787,47 @@ export function reactServerComponents(
 			const call = expression && skipParens(expression);
 			if (!call || !ts.isCallExpression(call)) return;
 			const argument = call.arguments[0] && skipParens(call.arguments[0]);
-			if (argument && ts.isJsxSelfClosingElement(argument) && ts.isIdentifier(argument.tagName))
+			if (!argument) return;
+			if (ts.isJsxSelfClosingElement(argument) && ts.isIdentifier(argument.tagName)) {
+				visit(call);
+				return;
+			}
+			const target = ts.isJsxSelfClosingElement(argument)
+				? argument.tagName
+				: ts.isCallExpression(argument) && argument.arguments[0];
+			if (
+				target &&
+				(ts.isIdentifier(target) || ts.isPropertyAccessExpression(target)) &&
+				/^[A-Z]/.test(target.getText(sf).split('.').pop() ?? '')
+			)
 				visit(call);
 		}
-		for (const statement of sf.statements) {
+		function visitEntryStatement(statement: ts.Statement) {
 			if (ts.isVariableStatement(statement)) {
 				for (const declaration of statement.declarationList.declarations)
 					visitDirectRoot(declaration.initializer);
+			} else if (
+				ts.isExpressionStatement(statement) ||
+				(ts.isExportAssignment(statement) && !statement.isExportEquals)
+			) {
+				visitDirectRoot(statement.expression);
+			}
+		}
+		for (const statement of sf.statements) {
+			if (ts.isIfStatement(statement)) {
+				const condition = skipParens(statement.expression);
+				if (
+					ts.isPropertyAccessExpression(condition) &&
+					!ts.isOptionalChain(condition) &&
+					condition.name.text === 'main' &&
+					ts.isMetaProperty(condition.expression) &&
+					condition.expression.keywordToken === ts.SyntaxKind.ImportKeyword &&
+					condition.expression.name.text === 'meta'
+				) {
+					const body = statement.thenStatement;
+					if (ts.isBlock(body)) body.statements.forEach(visitEntryStatement);
+					else visitEntryStatement(body);
+				}
 			} else if (
 				ts.isFunctionDeclaration(statement) &&
 				statement.body &&
@@ -552,15 +836,16 @@ export function reactServerComponents(
 			) {
 				for (const bodyStatement of statement.body.statements)
 					if (ts.isReturnStatement(bodyStatement)) visitDirectRoot(bodyStatement.expression);
-			}
+			} else visitEntryStatement(statement);
 		}
 	} else visit(sf);
 	return edges;
 }
 
-/** Local exports whose original body returns an intrinsic React element. */
-export function intrinsicReactExports(file: string, source: string) {
-	const names = new Set<string>();
+/** Local exports whose original body returns React JSX directly. */
+export function directReactExports(file: string, source: string) {
+	const intrinsics = new Set<string>();
+	const wrappers = new Set<string>();
 	let mayExportThen = false;
 	if (ordinaryReactJsx(source)) {
 		const bound = bind(file, source);
@@ -580,17 +865,26 @@ export function intrinsicReactExports(file: string, source: string) {
 		mayExportThen ||= sf.statements.some(
 			(stmt) => ts.isExportDeclaration(stmt) && !stmt.isTypeOnly && !stmt.exportClause,
 		);
-		for (const { name, output, localName } of directExportReturns(bound, true)) {
+		for (const { name, output, localName, decl, splitExport } of directExportReturns(bound, true)) {
 			const tag = openingTag(output).tagName;
 			if (
+				!splitExport &&
 				ts.isIdentifier(tag) &&
 				/^[a-z]/.test(tag.text) &&
 				(!localName || /^[A-Z]/.test(localName))
 			)
-				names.add(name);
+				intrinsics.add(name);
+			else if (
+				ts.isFunctionDeclaration(decl) &&
+				localName === name &&
+				/^[A-Z]/.test(name) &&
+				ts.isIdentifier(tag) &&
+				/^[A-Z]/.test(tag.text)
+			)
+				wrappers.add(name);
 		}
 	}
-	return { names, mayExportThen };
+	return { intrinsics, wrappers, mayExportThen };
 }
 
 /** Factories whose intrinsic JSX return survives as Octane JSX in the emitted file. */

@@ -62,6 +62,8 @@ export interface OctaneCompilerOptions extends Pick<
 	/**
 	 * Mixed-toolchain ownership gate: a project `.tsx`, `.ts`, or `.js` module is
 	 * Octane's only with a leading `@jsxImportSource octane` pragma.
+	 * An installed or linked package's `.tsx` file can explicitly name React
+	 * as its foreign JSX source with a leading `@jsxImportSource react` pragma.
 	 * @default false
 	 */
 	requireDirective?: boolean;

@@ -28,10 +28,12 @@ import {
 	OctaneCompatInline as OctaneCompatInlineServer,
 } from 'octane/react/server';
 import { renderToString as renderOctaneToString } from 'octane/server';
+import * as signals from 'octane/signals';
 import { loadCompiledFixtureSource, loadServerFixture } from '../_server-fixture.js';
 import { createLog } from '../_helpers.js';
 import { h, mountReactHost, reactAct } from './_react-host.js';
 import { __setHostFiberAdapterEnabled } from '../../src/react/fiber-adapter.js';
+import * as signalClient from './_fixtures/hosted-signal-owner.tsrx';
 import {
 	SsrAsync as ClientSsrAsync,
 	SsrExternalStore as ClientSsrExternalStore,
@@ -158,6 +160,143 @@ async function hydratePage(
 }
 
 describe('octane/react/server — buffered SSR + client hydration (§9.3)', () => {
+	it('adopts historical signal values before following the client owner for each host lifetime', async () => {
+		const signalServer = loadServerFixture<typeof signalClient>(
+			'packages/octane/tests/react-hosted/_fixtures/hosted-signal-owner.tsrx',
+			{ runtimeModules: { 'octane/signals': signals } },
+		);
+		const { createScope, runWithSignalOwner } = signals;
+		const options = { scopeKey: 'react-hosted:test-document' };
+		const request = createScope(options);
+		const page = (
+			left: React.ReactElement,
+			right: React.ReactElement,
+			other: React.ReactElement,
+			mode: 'visible' | 'hidden' = 'visible',
+		) => h('section', null, h(React.Activity, { mode }, left), h('p', null, right), other);
+		const serverProps = (id: string) => ({
+			component: signalServer.SignalReader,
+			props: { id },
+		});
+		const container = document.createElement('div');
+		try {
+			container.innerHTML = runWithSignalOwner(request, () => {
+				signalServer.label$.set('request');
+				return reactRenderToString(
+					page(
+						h(OctaneCompatServer<signalClient.SignalReaderProps>, serverProps('left')),
+						h(OctaneCompatInlineServer<signalClient.SignalReaderProps>, serverProps('right')),
+						h(OctaneCompatServer<signalClient.SignalReaderProps>, serverProps('other')),
+					),
+				);
+			});
+		} finally {
+			request.dispose();
+		}
+		const output = (id: string) => container.querySelector('#' + id);
+		const left = output('left');
+		const right = output('right');
+		const other = output('other');
+		expect([left?.textContent, right?.textContent, other?.textContent]).toEqual([
+			'request',
+			'request',
+			'request',
+		]);
+		const { hydrateRoot } = await import('react-dom/client');
+		const shared = createScope(options);
+		const separate = createScope(options);
+		const layout: string[] = [];
+		const props = (id: string): signalClient.SignalReaderProps => ({
+			id,
+			onLayout: (value) => layout.push(id + ':' + value),
+		});
+		const clientPage = (owner = shared, key = 'first', mode: 'visible' | 'hidden' = 'visible') =>
+			page(
+				h(
+					OctaneCompat,
+					{ key, clientSignalOwner: owner },
+					h(signalClient.SignalReader, props('left')),
+				),
+				h(OctaneCompatInline<signalClient.SignalReaderProps>, {
+					clientSignalOwner: shared,
+					component: signalClient.SignalReader,
+					props: props('right'),
+				}),
+				h(OctaneCompat<signalClient.SignalReaderProps>, {
+					clientSignalOwner: separate,
+					component: signalClient.SignalReader,
+					props: props('other'),
+				}),
+				mode,
+			);
+		const write = (owner: signals.Scope, text: string) =>
+			runWithSignalOwner(owner, () => signalClient.label$.set(text));
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		const onRecoverableError = vi.fn();
+		document.body.appendChild(container);
+		try {
+			write(shared, 'shared');
+			write(separate, 'separate');
+			await octaneAct(() =>
+				reactAct(() => {
+					root = hydrateRoot(container, clientPage(), { onRecoverableError });
+				}),
+			);
+			expect(layout.slice().sort()).toEqual(['left:request', 'other:request', 'right:request']);
+			expect(output('left')).toBe(left);
+			expect(output('right')).toBe(right);
+			expect(output('other')).toBe(other);
+			expect([left?.textContent, right?.textContent, other?.textContent]).toEqual([
+				'shared',
+				'shared',
+				'separate',
+			]);
+			await octaneAct(() => reactAct(() => root!.render(clientPage(shared, 'first', 'hidden'))));
+			await octaneAct(() => write(shared, 'shared while hidden'));
+			expect(right?.textContent).toBe('shared while hidden');
+			expect(other?.textContent).toBe('separate');
+
+			await octaneAct(() => reactAct(() => root!.render(clientPage(separate))));
+			expect(output('left')).toBe(left);
+			expect(left?.textContent).toBe('shared while hidden');
+
+			await octaneAct(() => reactAct(() => root!.render(clientPage(separate, 'second'))));
+			expect(output('left')).not.toBe(left);
+			expect(output('left')?.textContent).toBe('separate');
+			await octaneAct(() => write(shared, 'shared survivor'));
+			expect(output('left')?.textContent).toBe('separate');
+			expect(right?.textContent).toBe('shared survivor');
+			expect(onRecoverableError).not.toHaveBeenCalled();
+
+			await octaneAct(() => reactAct(() => root!.unmount()));
+			root = undefined;
+			for (const owner of [shared, separate]) {
+				expect(owner.inspect().adoptionLeases).toBe(0);
+				expect(owner.inspect().nodes.every((node) => node.subscribers === 0)).toBe(true);
+				expect(owner.retired).toBe(false);
+			}
+		} finally {
+			try {
+				if (root) await octaneAct(() => reactAct(() => root!.unmount()));
+			} finally {
+				shared.dispose();
+				separate.dispose();
+				container.remove();
+			}
+		}
+	});
+
+	it.each([OctaneCompatServer, OctaneCompatInlineServer])(
+		'rejects the client-only signal owner in the server host',
+		(Host) => {
+			// A shared source import can be redirected to the server entry by the bundler.
+			const props = { component: server.SsrGreeting, clientSignalOwner: { scopeKey: 'browser' } };
+			expect(() => reactRenderToString(h(Host<unknown>, props))).toThrow(
+				'clientSignalOwner is only supported by octane/react in the browser.',
+			);
+		},
+	);
+
 	it('server-renders an island and hydrates it with adopted node identity, state, and events', async () => {
 		const serverPage = h(
 			'main',
@@ -314,8 +453,13 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 		}
 	});
 
-	it('preserves the inline host and its content when the React owner changes its presentation', async () => {
-		const presentation = { hostClassName: 'status', hostStyle: { display: 'inline' } };
+	it('preserves the inline host and its content when React changes its layout or accessible name', async () => {
+		const presentation = {
+			hostClassName: 'status',
+			hostStyle: { display: 'inline' },
+			hostRole: 'img' as React.AriaRole,
+			hostAriaLabel: 'Ready status',
+		};
 		const serverPage = h(
 			'p',
 			null,
@@ -325,12 +469,8 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 				props: { label: 'ready' },
 			}),
 		);
-		const clientPage = (label: string, hostClassName: string, hostStyle?: React.CSSProperties) =>
-			h(
-				'p',
-				null,
-				h(OctaneCompatInline, { hostClassName, hostStyle }, h(ClientSsrInline, { label })),
-			);
+		const clientPage = (label: string, props: Partial<typeof presentation>) =>
+			h('p', null, h(OctaneCompatInline, props, h(ClientSsrInline, { label })));
 		const container = document.createElement('div');
 		container.innerHTML = reactRenderToString(serverPage);
 		const host = container.querySelector('p > span')!;
@@ -338,6 +478,8 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 		const text = leaf.firstChild;
 		expect(host.className).toBe('status');
 		expect(host.style.display).toBe('inline');
+		expect(host.getAttribute('role')).toBe('img');
+		expect(host.getAttribute('aria-label')).toBe('Ready status');
 		expect(leaf.textContent).toBe('ready');
 
 		document.body.appendChild(container);
@@ -346,20 +488,31 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 		let reactRoot!: ReturnType<typeof hydrateRoot>;
 		try {
 			await reactAct(async () => {
-				reactRoot = hydrateRoot(
-					container,
-					clientPage('ready', presentation.hostClassName, presentation.hostStyle),
-					{ onRecoverableError },
-				);
+				reactRoot = hydrateRoot(container, clientPage('ready', presentation), {
+					onRecoverableError,
+				});
 			});
 			await reactAct(async () =>
-				reactRoot.render(clientPage('ready', 'status-busy', { display: 'inline-block' })),
+				reactRoot.render(
+					clientPage('ready', {
+						hostClassName: 'status-busy',
+						hostStyle: { display: 'inline-block' },
+						hostRole: 'status',
+						hostAriaLabel: 'Busy status',
+					}),
+				),
 			);
 			expect(host.className).toBe('status-busy');
 			expect(host.style.display).toBe('inline-block');
-			await reactAct(async () => reactRoot.render(clientPage('busy', 'status-busy')));
+			expect(host.getAttribute('role')).toBe('status');
+			expect(host.getAttribute('aria-label')).toBe('Busy status');
+			await reactAct(async () =>
+				reactRoot.render(clientPage('busy', { hostClassName: 'status-busy' })),
+			);
 			expect(container.querySelector('p > span')).toBe(host);
 			expect(host.style.display).toBe('contents');
+			expect(host.hasAttribute('role')).toBe(false);
+			expect(host.hasAttribute('aria-label')).toBe(false);
 			expect(host.querySelector('em')).toBe(leaf);
 			expect(leaf.firstChild).toBe(text);
 			expect(leaf.textContent).toBe('busy');

@@ -40,7 +40,7 @@
       "arch": "any",
       "packageManager": "pnpm@12.9.1",
       "lockfile": "pnpm-lock.yaml",
-      "lockfileSha256": "949a228c30d3b5aff48660fd0b29ba3bf4594c12e6afa5a63c603d44a3aede92"
+      "lockfileSha256": "63cebe365b927c0eeeff7639fad38adbb4ff8f929ac6a2c43f63a8eb4f4cf582"
     }
   },
   "lanes": [
@@ -155,7 +155,7 @@
         {
           "path": "scripts/react-parity/pristine-suite-lib.mjs",
           "role": "support",
-          "sha256": "d34ffc2dca00e6eef7dcaf5bc002024cc511f32dd20c681547555af520438bbb"
+          "sha256": "b4fff98f4fc16bf930a8ec85478e8ac6520df6a89949be6459c1ec2341bff588"
         }
       ]
     },

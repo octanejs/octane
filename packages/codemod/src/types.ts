@@ -31,20 +31,32 @@ export interface TransformOptions {
 	bindingExports?(from: string, to: string): ReadonlySet<string> | undefined;
 	/** Record a successful rewrite that was checked against a partial binding's catalog. */
 	recordBindingRewrite?(from: string, to: string): void;
+	/** Resolve a direct relative import of an unselected source in a single-file run. */
+	retainedRegistry?(specifier: string): ts.SourceFile | undefined;
 	/** The issuer resolves the original installed React runtime and types. */
 	originalReact?: boolean;
+	/** The authored React bridge and its direct component import still resolve to React. */
+	retainedReactBridgeComponent?(bridge: string, module: string, name: string): boolean;
 	/** The issuer resolves the original React DOM server entry that this call will migrate. */
 	originalReactServerEntry?(module: string): boolean;
-	/** A React DOM resource hint called by an imported plain TypeScript initializer. */
-	initializerResourceHint?(module: string, name: string): string | undefined;
+	/** A React DOM resource hint called by an imported plain TypeScript function. */
+	initializerResourceHint?(
+		module: string,
+		name: string,
+		retainedOnly?: boolean,
+	): string | undefined;
 	/** Renderer work called by an unchanged local TypeScript export. */
 	localReactHook?(
 		module: string,
 		name: string,
 		nativeOnly: boolean,
-	): string | { from: string } | { privateContext: true } | undefined;
+	): string | { from: string } | { privateContext: true } | { retainedStore: true } | undefined;
 	/** A dispatcher hook directly called by an unchanged component at a migrated React DOM root. */
 	localReactRootComponent?(module: string, name: string): string | undefined;
+	/** A directly imported context declaration that remains in React. */
+	localReactContext?(module: string, name: string, member: boolean): boolean;
+	/** Severity for a direct render of a local React class component. */
+	localReactClass?(module: string, name: string): 'error' | 'warning' | undefined;
 	/** Resolve a source-backed workspace hook after verifying its implementation and its call sites. */
 	resolveStoreHook?(
 		module: string,
@@ -71,7 +83,7 @@ export interface TransformOptions {
 	descriptorChild?(binding: { module: string; imported: string }): boolean;
 	/** Whether an imported name is a context, with separate review for selected alias targets. */
 	isContext?(specifier: string, name: string, local: string): boolean | 'review-alias' | null;
-	/** The React package an import specifier names when that package has no Octane port, or null. */
+	/** The React package an import specifier names when the codemod keeps it on React, or null. */
 	unported?(specifier: string): string | null;
 	/** The project has React and React DOM 19.2 or newer in the React 19 series, so `ReactCompat` can host an unported package's components. */
 	reactCompat?: boolean;
@@ -92,12 +104,12 @@ export interface TransformOptions {
 	/** This file uses React's automatic JSX runtime and the component resolves to its original React package. */
 	reactStoreComponent?(specifier: string): boolean;
 }
-/** A React package with no Octane port, and how migrated code uses it. */
+/** A retained React package import and how migrated code uses it. */
 export interface Unported {
 	name: string;
 	/** Elements now rendered in a `ReactCompat` island. */
 	islands: number;
-	/** Uses that only a port can support. */
+	/** Uses that need review before migrating to an Octane renderer. */
 	blocked: number;
 }
 export interface TransformResult {
@@ -171,7 +183,7 @@ export interface CodemodResult {
 	dependencies: { name: string; range: string }[];
 	/** Patches of replaced React packages, which do not reach their bindings. */
 	patched: { name: string; patch: string }[];
-	/** React packages the code imports that have no Octane port, and how it uses them. */
+	/** React package imports the codemod keeps on React, and how the code uses them. */
 	missing: (Unported & { modules: number })[];
 	/** Entry pages whose script reference was updated. */
 	html: string[];

@@ -17,6 +17,7 @@ import path from 'node:path';
 import { findRoot, readInstalled, scanSourceFiles } from '@octanejs/cli';
 import { DATA } from '@octanejs/cli/data';
 import { parseSync } from '@tsrx/oxc/parser';
+import type { DefaultTreeAdapterMap } from 'parse5';
 import ts from 'typescript';
 import { finding, loadCompiler, thrown } from './compiler.js';
 import { isReactMotion, PORTED_PACKAGES } from './mappings.js';
@@ -26,6 +27,7 @@ import {
 	CONTEXT_ALIAS,
 	CONTEXT_PROVIDER_GETTER,
 	ELEMENT_CHILD_ALIAS,
+	INTL_PROVIDER_DEFAULTS,
 	MAP_CALLBACK_SCOPE,
 	MAP_PARAMETER_TDZ,
 	MAP_PARAMETER_WRITE,
@@ -40,11 +42,13 @@ import {
 	islandComponents,
 	executableImports,
 	hostedServerComponents,
-	intrinsicReactExports,
+	directReactExports,
 	migratedJsxFactories,
 	octaneRootComponents,
+	reactClassExports,
 	reactServerComponents,
 	retainedReactComponentReturns,
+	retainedReactContextExports,
 	reverseIslandExports,
 } from './react-island-sources.js';
 
@@ -90,6 +94,7 @@ export async function runCodemod(
 	);
 	const known = new Set(paths.flatMap((entry) => collect(path.resolve(entry))));
 	const files = [...known];
+	let selectedRealpaths: Set<string> | undefined;
 	const renames: Map<string, string> = new Map();
 	const exports: Map<string, TransformResult['exports']> = new Map();
 	const owners: Map<string, string> = new Map();
@@ -211,7 +216,7 @@ export async function runCodemod(
 	const foldNames = process.platform === 'darwin';
 	const leafKey = (file: string) => {
 		const name = path.basename(file);
-		return foldNames ? name.toLowerCase() : name;
+		return foldNames ? name.normalize('NFC').toLowerCase() : name;
 	};
 	const sourceNames = new Set([...renames.keys()].map(leafKey));
 	const sourceEntries = new Map([...renames.keys()].map((file) => [entryKey(file), file]));
@@ -302,7 +307,7 @@ export async function runCodemod(
 	const compiler = verify || strong ? await loadCompiler(root) : null;
 	const packages: Map<string, string> = new Map();
 	const missing: Map<string, CodemodResult['missing'][number]> = new Map();
-	// `ReactCompat` hosts a component from a package with no port in a React
+	// `ReactCompat` hosts a component from a retained package import in a React
 	// root, from 19.2 within the React 19 series it supports.
 	const reactCompat = ['react', 'react-dom'].every((name) =>
 		/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(root, name)?.version ?? ''),
@@ -636,8 +641,71 @@ export async function runCodemod(
 	}
 	const { inputFactory, changedJsxExport, helperFunction, localFile, exportsConstObject } =
 		storeSources(root, config, unchangedStoreInput, (file) => renames.has(file));
+	let selectedInPlace: Set<string> | undefined;
+	function writesSelectedInput(file: string) {
+		// An in-place write through a symlink changes its physical target.
+		selectedInPlace ??= new Set(
+			[...known].filter((f) => !renames.has(f) && !conflicts.has(f)).map((f) => fs.realpathSync(f)),
+		);
+		return selectedInPlace.has(fs.realpathSync(file));
+	}
+	const noClasses = new Set<string>();
+	const localClasses = new Map<string, ReadonlySet<string>>();
+	function localReactClass(from: string, module: string, name: string) {
+		if (/[!%?#\\]/.test(module)) return;
+		const file = localFile(from, module, true);
+		if (!file || !file.endsWith('.tsx') || conflicts.has(file)) return;
+		let classes = localClasses.get(file);
+		if (classes === undefined) {
+			const source = fs.readFileSync(file, 'utf8');
+			classes =
+				/\bclass\b/.test(source) && installedReact(file)
+					? reactClassExports(file, source)
+					: noClasses;
+			localClasses.set(file, classes);
+		}
+		if (
+			classes.has(name) &&
+			ts.findConfigFile(path.dirname(from), ts.sys.fileExists) === rootProject
+		)
+			return renamed(from, module)?.file === file ? 'error' : 'warning';
+	}
+	const retainedContexts = new Map<string, ReadonlyMap<string, boolean>>();
+	function localReactContext(from: string, module: string, name: string, member: boolean) {
+		if (/[!%?#\\]/.test(module) || catalogName(module) !== null || resolveRename(from, module))
+			return false;
+		const file = localFile(from, module, true);
+		if (!file || known.has(file)) return false;
+		let contexts = retainedContexts.get(file);
+		if (contexts === undefined) {
+			const source = fs.readFileSync(file, 'utf8');
+			contexts = new Map();
+			if (source.includes('createContext') || source.includes('\\')) {
+				const stat = fs.lstatSync(file);
+				if (
+					stat.isFile() &&
+					stat.nlink === 1 &&
+					fs.realpathSync(file) ===
+						path.join((physicalRoot ??= fs.realpathSync(root)), path.relative(root, file)) &&
+					!writesSelectedInput(file) &&
+					installedReact(file)
+				)
+					contexts = retainedReactContextExports(file, source);
+			}
+			retainedContexts.set(file, contexts);
+		}
+		return (
+			(member ? contexts.get(name) === true : contexts.has(name)) &&
+			ts.findConfigFile(path.dirname(from), ts.sys.fileExists) === rootProject
+		);
+	}
 	const localHints = new Map<string, Map<string, string>>();
-	function initializerResourceHint(from: string, module: string, name: string) {
+	function initializerResourceHint(
+		from: string,
+		module: string,
+		name: string,
+		retainedOnly = false,
+	) {
 		const file = localFile(from, module);
 		if (
 			!file ||
@@ -658,12 +726,18 @@ export async function runCodemod(
 			}
 			localHints.set(file, calls);
 		}
-		return calls.get(name);
+		const hint = calls.get(name);
+		if (hint && (!retainedOnly || (fs.statSync(file).nlink === 1 && !writesSelectedInput(file))))
+			return hint;
 	}
 
 	const localHooks = new Map<
 		string,
-		{ direct: Map<string, string>; privateContexts: Set<string> }
+		{
+			direct: Map<string, string>;
+			privateContexts: Set<string>;
+			retainedStores?: Map<string, string>;
+		}
 	>();
 	const intlHookPackages = new Map<string, boolean>();
 	function originalIntlHook(file: string) {
@@ -728,7 +802,6 @@ export async function runCodemod(
 			return false;
 		}
 	}
-	let selectedInPlace: Set<string> | undefined;
 	function localReactHook(from: string, module: string, name: string, nativeOnly: boolean) {
 		if (
 			catalogName(module) !== null ||
@@ -765,12 +838,21 @@ export async function runCodemod(
 				originalModule(file, 'react') &&
 				readInstalled(path.dirname(file), 'react')?.manifest.name === 'react';
 			const intl = (source.includes('useIntl') || escaped) && originalIntlHook(file);
-			if (react || intl) {
+			const store = planStoreHook && /\buse[A-Z]|\\u/.test(source);
+			if (react || intl || store) {
 				const existing = program?.getSourceFile(file);
 				const bound =
 					existing && program
 						? { sf: existing, checker: program.getTypeChecker() }
 						: bind(file, source);
+				if (planStoreHook && store)
+					hooks.retainedStores = directRendererCalls(
+						bound.sf,
+						bound.checker,
+						(specifier, exported) =>
+							!!unportedName(specifier, file) &&
+							planStoreHook(specifier, exported, file)?.requiresReact() === true,
+					);
 				if (react)
 					hooks.direct = directRendererCalls(
 						bound.sf,
@@ -796,13 +878,18 @@ export async function runCodemod(
 		}
 		// Keep TS substitution advisory. A loader may select a different executable.
 		const hook = jsSpecifier ? undefined : hooks.direct.get(name);
-		if ((!hook && !hooks.privateContexts.has(name)) || fs.statSync(file).nlink > 1) return;
-		// Writing an unrenamed selection through a symlink changes its physical target.
-		selectedInPlace ??= new Set(
-			[...known].filter((f) => !renames.has(f) && !conflicts.has(f)).map((f) => fs.realpathSync(f)),
-		);
-		if (selectedInPlace.has(fs.realpathSync(file))) return;
-		if (!hook) return { privateContext: true } as const;
+		const retainedStore =
+			!jsSpecifier && hooks.retainedStores?.has(name) && automaticReactJsx(from);
+		if (
+			(!hook && !retainedStore && !hooks.privateContexts.has(name)) ||
+			fs.statSync(file).nlink > 1
+		)
+			return;
+		if (writesSelectedInput(file)) return;
+		if (!hook)
+			return retainedStore
+				? ({ retainedStore: true } as const)
+				: ({ privateContext: true } as const);
 		if (
 			nativeOnly &&
 			compiler &&
@@ -1048,7 +1135,7 @@ export async function runCodemod(
 				? undefined
 				: (module, name, safeUses) => {
 						if (!unportedName(module, file)) return null;
-						const plan = planStoreHook(module, name, file);
+						const plan = planStoreHook(module, name, file)?.plan;
 						if (
 							!plan ||
 							!safeUses(
@@ -1132,17 +1219,69 @@ export async function runCodemod(
 						ordinaryCaller,
 					),
 				resolveStoreHook,
+				retainedRegistry:
+					files.length === 1 && file.endsWith('.ts') && esmContextProject
+						? (specifier) => {
+								if (!specifier.startsWith('./') && !specifier.startsWith('../')) return;
+								const registry = localFile(file, specifier, true);
+								if (!registry || known.has(registry)) return;
+								const request = path.resolve(path.dirname(file), specifier);
+								if (registry !== request && registry !== request + path.extname(registry)) return;
+								if (ts.findConfigFile(path.dirname(registry), ts.sys.fileExists) === rootProject)
+									return program?.getSourceFile(registry);
+							}
+						: undefined,
 				get originalReact() {
 					return installedReact(file);
+				},
+				retainedReactBridgeComponent: (bridge, module, name) => {
+					if (
+						!reactCompat ||
+						!module.startsWith('.') ||
+						!module.endsWith('.tsx') ||
+						bindingOptions(file)?.rootDirs?.length ||
+						bindingOptions(file)?.moduleSuffixes?.some(Boolean) ||
+						resolveRename(file, module) ||
+						!originalOctaneBridge(file, bridge) ||
+						!originalReactEntry(file, 'react', bindingOptions(file))
+					)
+						return false;
+					const owner = localFile(file, module, true);
+					if (!owner?.endsWith('.tsx') || owner !== path.resolve(path.dirname(file), module))
+						return false;
+					const stat = fs.lstatSync(owner, { throwIfNoEntry: false });
+					if (
+						!stat?.isFile() ||
+						stat.nlink !== 1 ||
+						known.has(owner) ||
+						!automaticReactJsx(owner) ||
+						!originalReactEntry(owner, 'react/jsx-runtime')
+					)
+						return false;
+					// An alternate spelling or parent symlink can reach a selected source.
+					selectedRealpaths ??= new Set(files.map((file) => fs.realpathSync.native(file)));
+					if (selectedRealpaths.has(fs.realpathSync.native(owner))) return false;
+					const source = fs.readFileSync(owner, 'utf8');
+					return (
+						/^\s*\/\*\*\s*@jsxImportSource\s+react\s*\*\//.test(source) &&
+						directReactExports(owner, source).intrinsics.has(name)
+					);
 				},
 				originalReactServerEntry: (module) =>
 					originalReactEntry(file, module, bindingOptions(file)) &&
 					originalOctaneBridge(file, 'octane/server'),
 				initializerResourceHint: renames.has(file)
-					? (module, name) => initializerResourceHint(file, module, name)
+					? (module, name, retainedOnly) =>
+							initializerResourceHint(file, module, name, retainedOnly)
 					: undefined,
 				localReactHook: renames.has(file)
 					? (module, name, nativeOnly) => localReactHook(file, module, name, nativeOnly)
+					: undefined,
+				localReactClass: renames.has(file)
+					? (module, name) => localReactClass(file, module, name)
+					: undefined,
+				localReactContext: renames.has(file)
+					? (module, name, member) => localReactContext(file, module, name, member)
 					: undefined,
 				localReactRootComponent: renames.has(file)
 					? (module, name) => {
@@ -1262,6 +1401,7 @@ export async function runCodemod(
 				note.rule === MAP_CALLBACK_SCOPE ||
 				note.rule === CONTEXT_ALIAS ||
 				note.rule === CONTEXT_PROVIDER_GETTER ||
+				note.rule === INTL_PROVIDER_DEFAULTS ||
 				note.rule === ELEMENT_CHILD_ALIAS,
 		);
 		if (write && blockedTransform)
@@ -1427,7 +1567,27 @@ export async function runCodemod(
 		}
 	}
 	const reverseIslands = new Map<string, ReadonlySet<string>>();
-	const intrinsicExports = new Map<string, ReturnType<typeof intrinsicReactExports>>();
+	const reactExports = new Map<string, ReturnType<typeof directReactExports>>();
+	const templateExports = new Map<string, Set<string>>();
+	function hasTemplateExport(file: FileResult, name: string) {
+		let names = templateExports.get(file.output);
+		if (!names) {
+			names = new Set();
+			const { program, errors } = parseSync(file.output, file.code);
+			if (program && !errors.length) {
+				for (const statement of program.body) {
+					const fn =
+						statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+					if (fn?.type !== 'FunctionDeclaration' || !fn.id) continue;
+					// The parser exposes TSRX code blocks through its ESTree body type.
+					const body: unknown = fn.body;
+					if (isRecord(body) && body.type === 'JSXCodeBlock') names.add(fn.id.name);
+				}
+			}
+			templateExports.set(file.output, names);
+		}
+		return names.has(name);
+	}
 	const jsxFactories = new Map<string, ReadonlySet<string>>();
 	const linkedConflicts = new Map<string, string>();
 	function checkLinkedRename(file: string, issuer: string) {
@@ -1530,7 +1690,7 @@ export async function runCodemod(
 			for (const edge of reactServerComponents(
 				file,
 				source,
-				(module) => module === 'react/jsx-runtime' && originalReactEntry(file, module),
+				(module) => originalReactEntry(file, module),
 				true,
 			)) {
 				const leaf = renamed(file, edge.module)?.file;
@@ -1652,12 +1812,22 @@ export async function runCodemod(
 					}
 					if (!names.has(edge.name)) continue;
 				} else {
-					let intrinsic = intrinsicExports.get(match.file);
-					if (!intrinsic) {
-						intrinsic = intrinsicReactExports(match.file, fs.readFileSync(match.file, 'utf8'));
-						intrinsicExports.set(match.file, intrinsic);
+					let originalExports = reactExports.get(match.file);
+					if (!originalExports) {
+						originalExports = directReactExports(match.file, fs.readFileSync(match.file, 'utf8'));
+						reactExports.set(match.file, originalExports);
 					}
-					if (!intrinsic.names.has(edge.name) || (edge.lazy && intrinsic.mayExportThen)) continue;
+					if (edge.lazy && originalExports.mayExportThen) continue;
+					if (!originalExports.intrinsics.has(edge.name)) {
+						if (
+							!explicit ||
+							edge.lazy ||
+							edge.renderer !== 'JSX' ||
+							!originalExports.wrappers.has(edge.name) ||
+							!hasTemplateExport(leaf, edge.name)
+						)
+							continue;
+					}
 				}
 				const note: Note = {
 					rule: 'react-compat',
@@ -1704,7 +1874,7 @@ export async function runCodemod(
 		}
 	}
 
-	const pages = planEntryPages(
+	const pages = await planEntryPages(
 		root,
 		paths.map((entry) => path.resolve(entry)),
 		renames,
@@ -1860,6 +2030,7 @@ type AdapterState =
 const PREVIOUS_INTL_HASHES = [
 	'07ec8e00847ebc6f0bd5ffeb14bc064aa23df42d1d3db5102344c739f54dca98',
 	'9cd8a44e85984cab413e73e63999156ac8508518c109cf53c26449c54a973043',
+	'b2c10462518bfabfd9aecc774696c8a594b456b4752b6e753cd6311f889fba0e',
 ];
 
 const PREVIOUS_SVG_HASHES = [
@@ -2443,8 +2614,7 @@ function catalogName(specifier: string) {
 }
 
 /**
- * The React package a specifier names when Octane has no binding for it, or
- * null.
+ * The React package a specifier names when the codemod keeps it on React, or null.
  * @param from the importing module
  */
 function unportedName(specifier: string, from: string) {
@@ -2603,29 +2773,85 @@ function rendersWithReact(name: string, from: string) {
  * Point `<script src>` in HTML entry pages at renamed modules.
  * @param targets the paths being migrated
  */
-function planEntryPages(
+async function planEntryPages(
 	root: string,
 	targets: string[],
 	renames: Map<string, string>,
 	unmatched: (file: string, issuer: string) => void,
 ) {
 	const updated = new Map<string, string>();
-	for (const page of findHtml(root, targets)) {
-		const html = fs.readFileSync(page, 'utf8');
-		const next = html.replace(
-			/(<script\b[^>]*\bsrc=)(["'])([^"']+)\2/g,
-			(match, open: string, quote: string, src: string) => {
-				// Vite serves `/` from the page's own directory, as it does `./`.
-				const file = path.join(path.dirname(page), src);
-				const renamed = renames.get(file);
-				if (!renamed) {
-					unmatched(file, page);
-					return match;
-				}
-				return open + quote + src.replace(/\.[jt]sx?$/, '.tsrx') + quote;
-			},
-		);
-		if (next !== html) updated.set(page, next);
+	const pages = renames.size ? findHtml(root, targets) : [];
+	if (!pages.length) return updated;
+	const {
+		parse,
+		html: { NS },
+	} = await import('parse5');
+	function elements(source: string, scriptingEnabled: boolean) {
+		const nodes: DefaultTreeAdapterMap['node'][] = [
+			parse(source, { sourceCodeLocationInfo: !scriptingEnabled, scriptingEnabled }),
+		];
+		const result: DefaultTreeAdapterMap['element'][] = [];
+		for (const node of nodes) {
+			if ('childNodes' in node) for (const child of node.childNodes) nodes.push(child);
+			if (!scriptingEnabled && 'content' in node) nodes.push(node.content);
+			if ('attrs' in node) result.push(node);
+		}
+		return result;
+	}
+	for (const page of pages) {
+		const source = fs.readFileSync(page, 'utf8');
+		let hasBase: boolean | undefined;
+		const edits: { start: number; end: number }[] = [];
+		// Vite loads scripts in templates and noscript.
+		for (const script of elements(source, false)) {
+			if (script.tagName !== 'script') continue;
+			const src = script.sourceCodeLocation?.attrs?.src;
+			if (!src) continue;
+			const raw = source.slice(src.startOffset, src.endOffset);
+			const quoted = /^src\s*=\s*(["'])([\s\S]*)\1$/i.exec(raw);
+			if (!quoted) continue;
+			const value = quoted[2];
+			const pathname = value.split(/[?#]/, 1)[0];
+			const extension = /\.[jt]sx?$/.exec(pathname);
+			if (!extension) continue;
+			if (pathname !== value) {
+				const parsedPath = script.attrs
+					.find(({ name, prefix }) => !prefix && name === 'src')
+					?.value.split(/[?#]/, 1)[0];
+				if (
+					!script.attrs.some(
+						({ name, prefix, value }) => !prefix && name === 'type' && value === 'module',
+					) ||
+					script.attrs.some(({ name, prefix }) => !prefix && name === 'vite-ignore') ||
+					!/^\.{1,2}\//.test(pathname) ||
+					/[\u0000-\u0020%\\]/.test(pathname) ||
+					parsedPath !== pathname
+				)
+					continue;
+				// Only an active document base changes resolution in the browser.
+				hasBase ??=
+					/<base\b/i.test(source) &&
+					elements(source, true).some(
+						(node) =>
+							node.namespaceURI === NS.HTML &&
+							node.tagName === 'base' &&
+							node.attrs.some(({ name }) => name === 'href'),
+					);
+				if (hasBase) continue;
+			}
+			const file = path.join(path.dirname(page), pathname);
+			if (!renames.has(file)) {
+				unmatched(file, page);
+				continue;
+			}
+			const end = src.endOffset - 1 - (value.length - pathname.length);
+			edits.push({ start: end - extension[0].length, end });
+		}
+		let next = source;
+		for (const { start, end } of edits.sort((a, b) => b.start - a.start)) {
+			next = next.slice(0, start) + '.tsrx' + next.slice(end);
+		}
+		if (next !== source) updated.set(page, next);
 	}
 	return updated;
 }

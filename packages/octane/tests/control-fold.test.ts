@@ -1,12 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { compile } from 'octane/compiler';
 import * as ServerRT from 'octane/server';
-import { mount } from './_helpers';
+import { act, mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture.js';
 import { FragmentInstance, hydrateRoot, flushSync } from '../src/index.js';
 import {
 	RetToggle,
 	AtToggle,
+	FunctionScopedBranch,
+	InlineParentBranch,
+	ConditionalInsideKeyedRows,
+	SwitchScopedBranch,
+	TryScopedBranch,
+	PendingScopedBranch,
+	FunctionScopedConditionalKeyedRows,
+	FunctionScopedConditionalRowsWithEmpty,
 	ReturnedMailbox,
 	ReturnedDashboard,
 	ReturnedProviderMailbox,
@@ -29,6 +37,8 @@ import {
 	ClonedValueTemplateSlot,
 	ValueTemplateSvg,
 	ValueTemplateMatrix,
+	FunctionScopedKeyedRows,
+	OpaqueFunctionScopedKeyedRows,
 } from './_fixtures/control-fold.tsrx';
 import {
 	DirectReturnedFragmentRefMailbox,
@@ -112,6 +122,220 @@ describe('folded @if hydrates against the @{} oracle markup', () => {
 		root.unmount();
 		container.remove();
 	});
+});
+
+describe('function-scoped bindings across directive branches', () => {
+	it.each([
+		['FunctionScopedBranch', FunctionScopedBranch],
+		['InlineParentBranch', InlineParentBranch],
+		['SwitchScopedBranch', SwitchScopedBranch],
+		['TryScopedBranch', TryScopedBranch],
+	] as const)('renders and hydrates the local component in %s', (name, App) => {
+		const props = { label: 'ready' };
+		const view = mount(App, props);
+		try {
+			expect(view.find('button').textContent).toBe('ready:0');
+			view.update(App, { label: 'updated' });
+			expect(view.find('button').textContent).toBe('updated:0');
+		} finally {
+			view.unmount();
+		}
+
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = ServerRT.renderToString(serverModule()[name], props).html;
+		const button = container.querySelector('button');
+		expect(button?.textContent).toBe('ready:0');
+		const errors: unknown[] = [];
+		const root = hydrateRoot(container, App, props, {
+			onRecoverableError: (error) => errors.push(error),
+		});
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('button')).toBe(button);
+			flushSync(() => button!.click());
+			expect(button?.textContent).toBe('ready:1');
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+	it('keeps the empty default and handles an authored exception in the nested branches', () => {
+		const switched = mount(SwitchScopedBranch, { label: '' });
+		const tried = mount(TryScopedBranch, { label: '' });
+		try {
+			expect(switched.find('b').textContent).toBe('empty');
+			expect(tried.find('b').textContent).toBe('empty');
+			tried.update(TryScopedBranch, { label: 'fail' });
+			expect(tried.find('b').textContent).toBe('branch failed');
+		} finally {
+			switched.unmount();
+			tried.unmount();
+		}
+	});
+	it('uses the current captured component when a pending branch resumes', async () => {
+		const { promise, resolve } = Promise.withResolvers<string>();
+		const view = mount(PendingScopedBranch, { promise, useLatest: false });
+		try {
+			expect(view.find('b').textContent).toBe('waiting');
+			view.update(PendingScopedBranch, { promise, useLatest: true });
+			expect(view.find('b').textContent).toBe('waiting');
+			await act(() => resolve('ready'));
+			expect(view.find('button').textContent).toBe('ready:0');
+			expect(view.findAll('b')).toHaveLength(0);
+		} finally {
+			view.unmount();
+		}
+	});
+	it('keeps an untaken capture out of the keyed row fallback', () => {
+		const props = { show: false };
+		const view = mount(ConditionalInsideKeyedRows, props);
+		try {
+			expect(view.findAll('b').map((node) => node.textContent)).toEqual(['first', 'second']);
+		} finally {
+			view.unmount();
+		}
+	});
+});
+
+it.each([
+	['FunctionScopedConditionalKeyedRows', FunctionScopedConditionalKeyedRows],
+	['FunctionScopedConditionalRowsWithEmpty', FunctionScopedConditionalRowsWithEmpty],
+] as const)(
+	'updates locally captured components inside a keyed row conditional in %s',
+	(name, App) => {
+		const rows = ['first', 'second'];
+		const props = { first: true, rows };
+		const view = mount(App, props);
+		try {
+			expect(view.findAll('li > i').map((node) => node.textContent)).toEqual(rows);
+		} finally {
+			view.unmount();
+		}
+
+		const container = document.createElement('div');
+		container.innerHTML = ServerRT.renderToString(serverModule()[name], props).html;
+		document.body.appendChild(container);
+		const serverRows = [...container.querySelectorAll('li')];
+		const serverChildren = [...container.querySelectorAll('li > i')];
+		expect(serverChildren.map((node) => node.textContent)).toEqual(rows);
+		const errors: unknown[] = [];
+		const root = hydrateRoot(container, App, props, {
+			onRecoverableError: (error) => errors.push(error),
+		});
+		try {
+			flushSync(() => {});
+			expect(container.querySelectorAll('li > i')[0]).toBe(serverChildren[0]);
+			expect(container.querySelectorAll('li > i')[1]).toBe(serverChildren[1]);
+			flushSync(() => root.render(App, { first: false, rows }));
+			expect(container.querySelectorAll('li')[0]).toBe(serverRows[0]);
+			expect(container.querySelectorAll('li')[1]).toBe(serverRows[1]);
+			expect(
+				[...container.querySelectorAll('li > strong')].map((node) => node.textContent),
+			).toEqual(rows);
+			const reversed = [...rows].reverse();
+			const reorderedProps = { first: false, rows: reversed };
+			flushSync(() => root.render(App, reorderedProps));
+			expect(container.querySelectorAll('li')[0]).toBe(serverRows[1]);
+			expect(container.querySelectorAll('li')[1]).toBe(serverRows[0]);
+			if (name === 'FunctionScopedConditionalRowsWithEmpty') {
+				flushSync(() => root.render(App, { first: true, rows: [] }));
+				expect(container.querySelector('ol > i')?.textContent).toBe('empty');
+				flushSync(() => root.render(App, { first: false, rows: [] }));
+				expect(container.querySelector('ol > i')?.textContent).toBe('fallback');
+			}
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	},
+);
+
+it('preserves block-declared var reads in keyed rows, keys and the empty arm', () => {
+	const props = { rows: [1, 2], label: 'A', offset: 0 };
+	const container = document.createElement('div');
+	document.body.appendChild(container);
+	const { html } = ServerRT.renderToString(serverModule().FunctionScopedKeyedRows, props);
+	const cold = mount(FunctionScopedKeyedRows, props);
+	try {
+		expect(cold.findAll('li').map((row) => row.textContent)).toEqual(['1A:', '2A:']);
+	} finally {
+		cold.unmount();
+	}
+	container.innerHTML = html;
+	const serverRows = [...container.querySelectorAll('li')];
+	expect(serverRows.map((row) => row.textContent)).toEqual(['1A:', '2A:']);
+	const errors: unknown[] = [];
+	const root = hydrateRoot(container, FunctionScopedKeyedRows, props, {
+		onRecoverableError: (error) => errors.push(error),
+	});
+	try {
+		flushSync(() => {});
+		expect(container.querySelector('li')).toBe(serverRows[0]);
+		const updated = { ...props, label: 'B' };
+		flushSync(() => root.render(FunctionScopedKeyedRows, updated));
+		expect(serverRows.map((row) => row.textContent)).toEqual(['1B:', '2B:']);
+		const reversed = { ...updated, rows: [2, 1] };
+		flushSync(() => root.render(FunctionScopedKeyedRows, reversed));
+		expect(container.querySelector('li')).toBe(serverRows[1]);
+		flushSync(() => root.render(FunctionScopedKeyedRows, { ...reversed, offset: 10 }));
+		expect(serverRows.every((row) => !row.isConnected)).toBe(true);
+		expect([...container.querySelectorAll('li')].map((row) => row.textContent)).toEqual([
+			'2B:',
+			'1B:',
+		]);
+		flushSync(() => root.render(FunctionScopedKeyedRows, { ...reversed, rows: [] }));
+		expect(container.querySelector('li')?.textContent).toBe('B:');
+		expect(errors).toEqual([]);
+	} finally {
+		root.unmount();
+		container.remove();
+	}
+});
+
+it('preserves function-scoped values in renderable keyed rows and the empty arm', () => {
+	const props = { rows: [{ name: 'a' }, { name: 'b' }], label: 'A:' };
+	const cold = mount(OpaqueFunctionScopedKeyedRows, props);
+	try {
+		expect(cold.findAll('li').map((row) => row.textContent)).toEqual(['A:a', 'A:b']);
+	} finally {
+		cold.unmount();
+	}
+
+	const { html } = ServerRT.renderToString(serverModule().OpaqueFunctionScopedKeyedRows, props);
+	const container = document.createElement('div');
+	container.innerHTML = html;
+	document.body.appendChild(container);
+	const serverRows = [...container.querySelectorAll('li')];
+	expect(serverRows.map((row) => row.textContent)).toEqual(['A:a', 'A:b']);
+	const errors: unknown[] = [];
+	const root = hydrateRoot(container, OpaqueFunctionScopedKeyedRows, props, {
+		onRecoverableError: (error) => errors.push(error),
+	});
+	try {
+		flushSync(() => {});
+		expect(container.querySelectorAll('li')[0]).toBe(serverRows[0]);
+		expect(container.querySelectorAll('li')[1]).toBe(serverRows[1]);
+		for (const label of ['B:', 'C:']) {
+			flushSync(() => root.render(OpaqueFunctionScopedKeyedRows, { ...props, label, rich: true }));
+			expect(serverRows.map((row) => row.textContent)).toEqual([label + 'a', label + 'b']);
+			expect(container.querySelectorAll('li')[0]).toBe(serverRows[0]);
+			expect(container.querySelectorAll('li')[1]).toBe(serverRows[1]);
+		}
+		const rows: typeof props.rows = [];
+		flushSync(() => root.render(OpaqueFunctionScopedKeyedRows, { rows, label: 'D:' }));
+		const empty = container.querySelector('li');
+		expect(empty?.textContent).toBe('D:');
+		flushSync(() => root.render(OpaqueFunctionScopedKeyedRows, { rows, label: 'E:' }));
+		expect(container.querySelector('li')).toBe(empty);
+		expect(empty?.textContent).toBe('E:');
+		expect(errors).toEqual([]);
+	} finally {
+		root.unmount();
+		container.remove();
+	}
 });
 
 describe('template directives in a returned fragment', () => {

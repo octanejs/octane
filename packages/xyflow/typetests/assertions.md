@@ -10,7 +10,7 @@ The only permitted source difference is the import root:
 
 1. `Node` requires an id, numeric position, and data payload.
 2. `Edge` requires string source and target ids.
-3. `ReactFlowProps` accepts typed nodes, edges, and viewport options while rejecting unknown props.
+3. `ReactFlowProps` accepts typed nodes, edges, and viewport options while rejecting unknown props. The `ReactFlow` component infers node and edge types for callbacks and accepts explicit type arguments and a container ref.
 4. `HandleProps` requires a handle type and position.
 5. `OnConnect` receives the public `Connection` shape.
 6. `addEdge` preserves the caller's edge subtype.

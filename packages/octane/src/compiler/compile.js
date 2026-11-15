@@ -62,6 +62,7 @@ import {
 	applyHookDependencies,
 	collectReassignedBindings,
 	followsOptionalLink,
+	forEachHoistedVarPattern,
 	isInvariantLiteral,
 	methodDepFlags,
 } from './hook-deps.js';
@@ -177,6 +178,7 @@ import {
 	collectOctaneImportLocals,
 	findDirectlyCalledNames,
 	findDirectlyCalledTemplateFunctions,
+	isLowerableTemplateFunction,
 	portalImportBinding,
 	soleRenderPropChild,
 } from './descriptor-lowering.js';
@@ -1963,6 +1965,7 @@ function addUserImportSpecifiers(ctx, node) {
 function collectOctaneImportBindings(astBody) {
 	const locals = new Map();
 	const namespaces = new Set();
+	let fragmentImportSources = null;
 	// Local names bound by VALUE imports from any module OTHER than 'octane'. A
 	// library may export a hook whose name collides with a base hook (`useId`
 	// from a React-parity binding) — such a call site is that library's CUSTOM
@@ -1983,12 +1986,19 @@ function collectOctaneImportBindings(astBody) {
 		for (const sp of node.specifiers || []) {
 			if (sp.type === 'ImportSpecifier' && sp.local?.name && sp.imported?.name) {
 				locals.set(sp.local.name, sp.imported.name);
+				if (
+					sp.imported.name === 'Fragment' &&
+					sp.importKind !== 'type' &&
+					node.importKind !== 'type'
+				)
+					(fragmentImportSources ??= new Set()).add(node.source);
 			} else if (sp.type === 'ImportNamespaceSpecifier' && sp.local?.name) {
 				namespaces.add(sp.local.name);
+				if (node.importKind !== 'type') (fragmentImportSources ??= new Set()).add(node.source);
 			}
 		}
 	}
-	return { locals, namespaces, foreignLocals };
+	return { locals, namespaces, foreignLocals, fragmentImportSources };
 }
 
 export function collectNestedBindingNames(root) {
@@ -2258,21 +2268,23 @@ function inheritSoleCompRoot(bodyNodes, ctx) {
 // Collect the LOCAL names bound to the octane boundary builtins (see
 // inheritSoleCompRoot) from a module's import declarations. Aliased imports
 // (`import { Suspense as S }`) are matched by their local binding.
-function collectOctaneBoundaryNames(astBody, onlySuspense = false) {
+const SUSPENSE_IMPORTS = new Set(['Suspense']);
+const VIEW_TRANSITION_IMPORTS = new Set(['ViewTransition', 'unstable_ViewTransition']);
+
+function collectOctaneBoundaryNames(astBody, only = null) {
 	const names = new Set();
 	for (const node of astBody) {
 		if (node.type !== 'ImportDeclaration' || node.source.value !== 'octane') continue;
 		for (const sp of node.specifiers || []) {
 			const imported = sp.imported?.name;
-			if (onlySuspense && imported !== 'Suspense') continue;
+			if (only !== null && !only.has(imported)) continue;
 			if (
 				(imported === 'Suspense' ||
 					imported === 'ErrorBoundary' ||
 					imported === 'Activity' ||
 					imported === 'unstable_Activity' ||
 					imported === 'Hydrate' ||
-					imported === 'ViewTransition' ||
-					imported === 'unstable_ViewTransition') &&
+					VIEW_TRANSITION_IMPORTS.has(imported)) &&
 				sp.local?.name
 			) {
 				names.add(sp.local.name);
@@ -3048,6 +3060,18 @@ function collectBindings(pattern, out) {
 		collectBindings(pattern.left, out);
 		return;
 	}
+}
+
+// Track hoisted JavaScript vars only for template branch captures.
+function renderedHoistedVars(ctx, statements) {
+	if (!ctx.mayHaveHoistedVars) return null;
+	let names = ctx.currentHoistedVars;
+	forEachHoistedVarPattern(statements, (pattern, declaration) => {
+		if (declaration.declare === true) return;
+		if (names === ctx.currentHoistedVars) names = new Set(names);
+		collectBindings(pattern, names);
+	});
+	return names;
 }
 
 /**
@@ -4199,6 +4223,14 @@ function replaceUnwrappedExpression(expression, replacement) {
 	};
 }
 
+function isRenderWrite(node) {
+	return (
+		node.type === 'AssignmentExpression' ||
+		node.type === 'UpdateExpression' ||
+		(node.type === 'UnaryExpression' && node.operator === 'delete')
+	);
+}
+
 // Does the render tree assign, update, or delete anything while it renders?
 // Function values run later and are skipped.
 function renderTreeWrites(nodes) {
@@ -4216,11 +4248,7 @@ function renderTreeWrites(nodes) {
 		if (seen.has(node)) return;
 		seen.add(node);
 		if (FN_TYPES.has(node.type)) return;
-		if (
-			node.type === 'AssignmentExpression' ||
-			node.type === 'UpdateExpression' ||
-			(node.type === 'UnaryExpression' && node.operator === 'delete')
-		) {
+		if (isRenderWrite(node)) {
 			found = true;
 			return;
 		}
@@ -5537,13 +5565,13 @@ function containsComponentCallOrControlFlow(stmts) {
 }
 
 /**
- * A host-only conditional can share its containing row's immutable
- * item/dependency proof, including through a narrowly proven nested keyed list.
- * Entering either construct still needs the row's active scope. Lists without a
- * conditional, components, opaque list expressions, and every other
- * control-flow boundary remain on their existing path.
+ * A host-only conditional, a narrowly proven nested keyed list, or an imported
+ * ViewTransition around host content can share its containing row's immutable
+ * item/dependency proof. Entering any of them still needs the row's active
+ * scope. Rows with none of them, other components, opaque list expressions, and
+ * every other control-flow boundary remain on their existing path.
  */
-function hasOnlyHostConditionalItemBodies(stmts) {
+function hasOnlyHostConditionalItemBodies(stmts, viewTransitionNames) {
 	let hasConditional = false;
 	let disallowed = false;
 	const seen = new WeakSet();
@@ -5572,10 +5600,15 @@ function hasOnlyHostConditionalItemBodies(stmts) {
 			return;
 		}
 		if ((type === 'Element' || type === 'JSXElement') && isComponentTag(node)) {
-			disallowed = true;
-			return;
-		}
-		if (type === 'IfStatement' || type === 'JSXIfExpression') {
+			// A ViewTransition boundary reads no context and renders its children as
+			// given, so around host content it is as transparent as a conditional and
+			// likewise needs the row's own scope when the row does render.
+			if (!viewTransitionNames.has((node.openingElement?.name || node.id)?.name)) {
+				disallowed = true;
+				return;
+			}
+			hasConditional = true;
+		} else if (type === 'IfStatement' || type === 'JSXIfExpression') {
 			hasConditional = true;
 		} else if (type === 'JSXForExpression') {
 			const declaration = node.left;
@@ -7551,7 +7584,11 @@ function collectPrivateUnescapedComponents(body, ctx) {
 function collectPrivateRenderedComponents(body, ctx, candidates, acceptSite) {
 	if (candidates.size === 0) return candidates;
 
-	const allowed = collectRenderedComponentReferences(ctx, candidates, acceptSite);
+	const allowed = collectRenderedComponentReferences(
+		ctx.componentInfo.values(),
+		candidates,
+		acceptSite,
+	);
 	// An array deliberately does not introduce a synthetic module Block scope:
 	// sibling function references must remain free for the escape proof.
 	const escaped = collectFreeIdentifiers(body, [], allowed);
@@ -7568,7 +7605,7 @@ function collectPrivateRenderedComponents(body, ctx, candidates, acceptSite) {
 	return candidates;
 }
 
-function collectRenderedComponentReferences(ctx, candidates, acceptSite) {
+function collectRenderedComponentReferences(componentInfo, candidates, acceptSite) {
 	const allowed = new Set();
 	const visitOutput = (node, returnedOwner = null) => {
 		if (node == null) return;
@@ -7578,7 +7615,7 @@ function collectRenderedComponentReferences(ctx, candidates, acceptSite) {
 			if (!isComponentTag(node)) visitOutput(node.children, returnedOwner);
 			else {
 				const name = tagBindingName(node);
-				if (candidates.has(name) && acceptSite(node, name, returnedOwner))
+				if ((candidates === null || candidates.has(name)) && acceptSite(node, name, returnedOwner))
 					allowed.add(node.openingElement?.name ?? node.id);
 			}
 		} else if (node.type === 'JSXFragment' || node.type === 'Fragment') {
@@ -7602,7 +7639,7 @@ function collectRenderedComponentReferences(ctx, candidates, acceptSite) {
 			visitOutput(node.pending, returnedOwner);
 		}
 	};
-	for (const info of ctx.componentInfo.values()) {
+	for (const info of componentInfo) {
 		if (info.node.body?.type === 'JSXCodeBlock') visitOutput(info.node.body);
 		if (!info.returnJsx) continue;
 		for (const statement of info.node.body.body || []) {
@@ -8195,17 +8232,21 @@ function hydrationPropsPlans(ctx) {
 	}
 	if (candidates.size === 0) return plans;
 	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
-	collectRenderedComponentReferences(ctx, candidates, (node, name, returnedOwner) => {
-		if (returnedOwner !== null || node.children?.length) return false;
-		const plan = plans.get(name);
-		const attrs = node.attributes || node.openingElement?.attributes || [];
-		if (!warmCallsiteOwnsRequiredProps(plan.required, attrs)) return false;
-		const tag = node.openingElement?.name ?? node.id;
-		if (lexical.resolveBinding(lexical.nodeScopes.get(tag), name)?.scope !== lexical.rootScope)
-			return false;
-		plan.sites.add(tag);
-		return true;
-	});
+	collectRenderedComponentReferences(
+		ctx.componentInfo.values(),
+		candidates,
+		(node, name, returnedOwner) => {
+			if (returnedOwner !== null || node.children?.length) return false;
+			const plan = plans.get(name);
+			const attrs = node.attributes || node.openingElement?.attributes || [];
+			if (!warmCallsiteOwnsRequiredProps(plan.required, attrs)) return false;
+			const tag = node.openingElement?.name ?? node.id;
+			if (lexical.resolveBinding(lexical.nodeScopes.get(tag), name)?.scope !== lexical.rootScope)
+				return false;
+			plan.sites.add(tag);
+			return true;
+		},
+	);
 	// A private plan needs an admitted local callsite. HMR can also rebind the
 	// exported wrapper after definition-site initialization.
 	// Keep the existing same-module proof there; do not issue a cross-module
@@ -8713,7 +8754,7 @@ function collectAutoMemoLocalHazards(stmts, importedNames) {
 	return hazards;
 }
 
-function containsAutoMemoUnsafeStructure(stmts, ctx = null) {
+function containsAutoMemoUnsafeStructure(stmts, ctx = null, viewTransitionNames = null) {
 	let found = false;
 	const seen = new WeakSet();
 	// Spread bags on HOST elements, marked admissible by the owning element's
@@ -8857,11 +8898,12 @@ function containsAutoMemoUnsafeStructure(stmts, ctx = null) {
 			}
 			const name = tag?.name;
 			if (
-				name === 'Suspense' ||
-				name === 'ErrorBoundary' ||
-				name === 'ViewTransition' ||
-				name === 'Activity' ||
-				name === 'unstable_Activity'
+				!viewTransitionNames?.has(name) &&
+				(name === 'Suspense' ||
+					name === 'ErrorBoundary' ||
+					name === 'ViewTransition' ||
+					name === 'Activity' ||
+					name === 'unstable_Activity')
 			) {
 				found = true;
 				return;
@@ -9226,8 +9268,9 @@ function isJsxReturningMapCall(node) {
 	return false;
 }
 
-// These expressions can run user coercion or throw before the mapped JSX exists.
-function mapCoercionHasEffects(node) {
+// These expressions can write, run user coercion or throw before the mapped JSX exists.
+function mapCallbackHasEffects(node) {
+	if (isRenderWrite(node)) return true;
 	if (node.type === 'CallExpression' || node.type === 'OptionalCallExpression') return true;
 	if (node.type === 'TemplateLiteral') {
 		return node.expressions.some((expression) => !isInvariantLiteral(unwrapTsExpr(expression)));
@@ -9289,8 +9332,8 @@ function mapCallToForOf(expr, ctx) {
 	const body = arrow.body;
 	if (!body || (body.type !== 'JSXElement' && body.type !== 'Element')) return null;
 	// Fusion interleaves callbacks and row rendering. Preserve authored callback
-	// order when a call or coercion can be observed.
-	if (containsRenderCall([body], null, mapCoercionHasEffects)) return null;
+	// order when a write, call or coercion can be observed.
+	if (containsRenderCall([body], null, mapCallbackHasEffects)) return null;
 	// The row helper exposes a read-only position. A writable callback index
 	// needs its original binding, including when a handler captures it.
 	if (params[1] && collectReassignedBindings({ body: [b.stmt(arrow)] }).has(params[1])) {
@@ -9744,7 +9787,9 @@ function singleRootComponentArmName(node, locals, ctx) {
  * consulted).
  */
 function collectSingleRootIfDeps(render, locals, ctx) {
-	const roots = normalizeChildren(render ? [render] : []).filter((n) => n.type !== 'HeadHoist');
+	const roots = normalizeChildrenForShape(render ? [render] : [], ctx).filter(
+		(n) => n.type !== 'HeadHoist',
+	);
 	if (roots.length !== 1 || (!isIfDirective(roots[0]) && !isSwitchDirective(roots[0]))) {
 		return null;
 	}
@@ -12592,6 +12637,7 @@ function compileInternal(
 			serverBoundaryPreparation?.ast ?? analyzedAst,
 			hasStringChildProofs,
 			strongModeEnabled,
+			serverBoundaryPreparation === null,
 		);
 		return compiled;
 	}
@@ -12779,12 +12825,23 @@ function compileInternal(
 	// JavaScript return value. Lower it in every compiler mode so SSR, hydration,
 	// and HMR share one DOM-range shape. HMR still emits the generic component
 	// call ABI, and invalidates normally if an edit introduces a value return.
-	ast = lowerNullishComponentExits(ast);
+	const typescriptWeb = options?.output === 'ts' && options?.__valdiAbiGuard === undefined;
+	const canLowerLocalTemplates =
+		rendererBoundaryPreparation === null && canLowerLocalDomTemplates(filename, options);
+	const localStateAliases = canLowerLocalTemplates ? findLocalStateAliases(ast) : undefined;
+	ast = markLocalStateAliases(ast, localStateAliases);
+	ast = lowerNullishComponentExits(
+		ast,
+		typescriptWeb,
+		canLowerLocalTemplates,
+		localStateAliases,
+		parsedAst,
+	);
 	// Same contract for React-style conditional JSX returns: branch-selected
 	// output compiles as template control flow instead of de-opt descriptors.
 	ast = lowerJsxReturnBranchComponents(ast);
 	// A nested `@{ … }` function that code calls directly returns JSX instead.
-	ast = lowerDirectlyCalledTemplateFunctions(ast);
+	ast = lowerDirectlyCalledTemplateFunctions(ast, localStateAliases);
 	// Omitted dependency lists are compiler-owned: infer reactive captures
 	// before any component splitting/hoisting so every lexical binding is still
 	// visible to the shared TSRX/TSX analysis. Explicit arrays and `null` pass
@@ -13030,9 +13087,11 @@ function compileInternal(
 		// Source-map inputs, read by printNodeWithMap to ask esrap for real
 		// per-token mappings against the original .tsrx.
 		mapSource: source,
+		mayHaveHoistedVars: source.includes('var'),
+		currentHoistedVars: null,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
 		output: options?.output,
-		typescriptWeb: options?.output === 'ts' && options?.__valdiAbiGuard === undefined,
+		typescriptWeb,
 		// Coarse origin for module scaffolding with no authored source position
 		// (imports, delegate/style/template consts, hook-slot consts, HMR/stamp
 		// tails): the module's first located statement. Every node handed to the
@@ -13053,6 +13112,7 @@ function compileInternal(
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
+		ctx.fragmentImportSources = imports.fragmentImportSources;
 		ctx.foreignImportLocals = imports.foreignLocals;
 		ctx.provenContextBindings = collectProvenContextBindings(ast);
 		ctx.activityModuleAst = ast;
@@ -13223,7 +13283,8 @@ function compileInternal(
 	ctx._moduleBoundNames = collectModuleBoundNames(ast);
 	// M3 inherit-range exclusion set (see inheritSoleCompRoot).
 	ctx._octaneBoundaryNames = collectOctaneBoundaryNames(ast.body);
-	ctx._octaneSuspenseNames = collectOctaneBoundaryNames(ast.body, true);
+	ctx._octaneSuspenseNames = collectOctaneBoundaryNames(ast.body, SUSPENSE_IMPORTS);
+	ctx._octaneViewTransitionNames = collectOctaneBoundaryNames(ast.body, VIEW_TRANSITION_IMPORTS);
 	const productionEffects = !ctx.hmr && !ctx.dev && !ctx.profile;
 	const exportedComponents = ast.body.filter(
 		(statement) =>
@@ -13660,8 +13721,9 @@ function compileInternal(
 		// declined borrow would probe for a child pair the server never emitted.
 		// Reject lite for such callees.
 		if (eligible && compNode.body && compNode.body.type === 'JSXCodeBlock') {
-			const bodyNodes = normalizeChildren(
+			const bodyNodes = normalizeChildrenForShape(
 				compNode.body.render ? [compNode.body.render] : [],
+				ctx,
 			).filter((n) => n.type !== 'HeadHoist');
 			if (inheritSoleCompRoot(bodyNodes, ctx)) eligible = false;
 		}
@@ -14430,6 +14492,7 @@ function compileInternal(
 	}
 
 	// Built after every lowering and HMR wiring so all generated imports exist.
+	moduleBody = attachLocalStateGetterDeclarations(moduleBody, ctx);
 	const runtimeImportNodes = buildRuntimeImportNodes(ctx, 'octane', moduleOrigin);
 	const profileRuntimeImportNodes = buildProfileRuntimeImportNodes(ctx, moduleOrigin);
 
@@ -14540,6 +14603,7 @@ function compileServer(
 	analyzedAst = null,
 	hasStringChildProofs = false,
 	strongModeEnabled = false,
+	canLowerUnsplitTemplates = false,
 ) {
 	const parsedAst = analyzedAst ?? adoptParserAst(parseModule(source, filename));
 	const nativeChangeAnalysis =
@@ -14568,9 +14632,19 @@ function compileServer(
 	ast = splitDirectlyCalledComponents(ast);
 	// Mirror the client transform so SSR emits the same control-flow ranges
 	// hydration expects in both development and production.
-	ast = lowerNullishComponentExits(ast);
+	const canLowerLocalTemplates =
+		canLowerUnsplitTemplates && canLowerLocalDomTemplates(filename, options);
+	const localStateAliases = canLowerLocalTemplates ? findLocalStateAliases(ast) : undefined;
+	ast = markLocalStateAliases(ast, localStateAliases);
+	ast = lowerNullishComponentExits(
+		ast,
+		options?.output === 'ts',
+		canLowerLocalTemplates,
+		localStateAliases,
+		parsedAst,
+	);
 	ast = lowerJsxReturnBranchComponents(ast);
-	ast = lowerDirectlyCalledTemplateFunctions(ast);
+	ast = lowerDirectlyCalledTemplateFunctions(ast, localStateAliases);
 	// Mirror the client transform exactly. Effects are server no-ops, but
 	// useMemo/useCallback execute during SSR and must receive the same inferred
 	// dependency shape as hydration's client compile.
@@ -14656,6 +14730,7 @@ function compileServer(
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
+		ctx.fragmentImportSources = imports.fragmentImportSources;
 		ctx.foreignImportLocals = imports.foreignLocals;
 		ctx.provenContextBindings = collectProvenContextBindings(ast);
 		ctx.activityModuleAst = ast;
@@ -14663,7 +14738,7 @@ function compileServer(
 	// M3 inherit-range exclusion set — must match the client compile's
 	// (see inheritSoleCompRoot; both modes read the same import declarations).
 	ctx._octaneBoundaryNames = collectOctaneBoundaryNames(ast.body);
-	ctx._octaneSuspenseNames = collectOctaneBoundaryNames(ast.body, true);
+	ctx._octaneSuspenseNames = collectOctaneBoundaryNames(ast.body, SUSPENSE_IMPORTS);
 
 	// Style maps are module values and can be referenced by a component declared
 	// before the map itself. Lower every top-level map before compiling any
@@ -14806,7 +14881,7 @@ function compileServer(
 			...nativeActivation,
 			...signalActivation,
 			...helperNodes,
-			...bodyNodes,
+			...attachLocalStateGetterDeclarations(bodyNodes, ctx),
 		],
 		metadata: { path: [] },
 		start: ast.start,
@@ -19433,6 +19508,8 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			} else statements.push(child);
 		}
 	}
+	const previousHoistedVars = ctx.currentHoistedVars;
+	ctx.currentHoistedVars = renderedHoistedVars(ctx, statements);
 	const hookMemoOpaqueOwner =
 		ctx.inlineHookMemo && hasInlineMemoOpaqueDirective({ body: b.block(statements) });
 	ctx.currentHookMemoOwnerSafe =
@@ -19994,7 +20071,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		bodyStatements.push(
 			inheritOriginLoc(
 				b.if(
-					b.binary('===', b.id('_b'), b.id('undefined')),
+					b.binary('===', b.id('_b'), undefinedNode()),
 					b.block(plan.mount),
 					plan.update.length > 0 ? b.block(plan.update) : null,
 				),
@@ -20048,6 +20125,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx.currentHookMemoOwnerSafe = prevHookMemoOwnerSafe;
 	ctx.currentMapTemps = prevMapTemps;
 	ctx.currentComponentLocals = previousComponentLocals;
+	ctx.currentHoistedVars = previousHoistedVars;
 	// ONE FunctionDeclaration node — the caller prints it (once, with the full
 	// esrap map for top-level components) or embeds it in an enclosing body.
 	const presentationBody = preparePresentationHydration(
@@ -21054,6 +21132,16 @@ const LOOP_TYPES = new Set([
 ]);
 const FN_TYPES = new Set(['FunctionExpression', 'FunctionDeclaration', 'ArrowFunctionExpression']);
 
+// Bare use() retains its historical unbound shorthand. A local binding
+// called use is not the runtime hook unless its import says so.
+function isBareUseCall(call) {
+	return (
+		call.callee.name === 'use' &&
+		(call._octaneUnboundCallee === true ||
+			(call._octaneImportedHook ?? call._octaneHookRuntimeImportedHook) === 'use')
+	);
+}
+
 // Is this statement a `const/let x = use(<arg>)` declaration (or a bare
 // `use(<arg>)` expression statement)? Returns the use CallExpression or null.
 function useCallOfStatement(stmt, ctx) {
@@ -21072,7 +21160,7 @@ function useCallOfStatement(stmt, ctx) {
 		call &&
 		call.type === 'CallExpression' &&
 		call.callee.type === 'Identifier' &&
-		(call.callee.name === 'use' || ctx?._parallelUseAliases?.has(call.callee.name)) &&
+		(isBareUseCall(call) || ctx?._parallelUseAliases?.has(call.callee.name)) &&
 		call.arguments.length >= 1
 	) {
 		return call;
@@ -21467,7 +21555,7 @@ function collectUseArgumentRoots(
 		if (
 			n.type === 'CallExpression' &&
 			n.callee?.type === 'Identifier' &&
-			(n.callee.name === 'use' ||
+			(isBareUseCall(n) ||
 				n._octaneImportedHook === 'use' ||
 				ctx?._parallelUseAliases?.has(n.callee.name) === true) &&
 			n.arguments?.length >= 1
@@ -22661,14 +22749,40 @@ const NUMERIC_HOOK_SLOT_POSITION = {
 	useSignal$: 1,
 };
 
-function appendHookSlotArgument(name, args, slot, numeric, origin, ctx) {
-	const out = [...args];
+function withTrailingHookSlot(call, name, slot, numeric, ctx) {
+	const out = [...call.arguments];
+	if (
+		name === 'useState' &&
+		out.length === 0 &&
+		call._octaneHookRuntimeImportedHook === undefined &&
+		ctx._universalRuntimeUnit == null &&
+		!ctx.runtimeImportRoutes?.some((route) => route.imported?.has(name))
+	) {
+		// Omitting the initializer uses the public T | undefined overload.
+		// The generated trailing slot requires the initialized overload.
+		out.push(ssrVoid(call));
+		const types = call.typeArguments;
+		if (ctx.typescriptWeb && types?.params.length === 1) {
+			const [type] = types.params;
+			const optionalType = {
+				type: 'TSUnionType',
+				types: [
+					{ type: 'TSParenthesizedType', typeAnnotation: type },
+					b.ts_keyword_type('undefined'),
+				],
+			};
+			call.typeArguments = inheritOriginLoc(
+				b.ts_type_parameter_instantiation([optionalType]),
+				types,
+			);
+		}
+	}
 	const position =
 		numeric || INITIAL_VALUE_HOOKS.has(name) ? NUMERIC_HOOK_SLOT_POSITION[name] : undefined;
 	if (position !== undefined) {
-		while (out.length < position) out.push(b.id('undefined', origin));
+		while (out.length < position) out.push(b.id('undefined', call));
 	}
-	const expression = typeof slot === 'string' ? b.id(slot, origin) : slot;
+	const expression = typeof slot === 'string' ? b.id(slot, call) : slot;
 	// Lazy refs reserve numeric slots for the compiler; their authored API only
 	// accepts manual Symbols. The runtime already supports this private ABI.
 	const typedSlot =
@@ -22676,10 +22790,11 @@ function appendHookSlotArgument(name, args, slot, numeric, origin, ctx) {
 			? b.ts_as(expression, b.ts_keyword_type('any'))
 			: expression;
 	out.push({
-		...inheritOriginLoc(typedSlot, origin),
+		...inheritOriginLoc(typedSlot, call),
 		_octaneCompilerSlot: true,
 	});
-	return out;
+	call.arguments = out;
+	return call;
 }
 
 function wrapHookCallWithSlot(call, ctx, slot, callee, args) {
@@ -22692,6 +22807,36 @@ function wrapHookCallWithSlot(call, ctx, slot, callee, args) {
 		typeArguments: null,
 		arguments: [typeof slot === 'string' ? b.id(slot) : slot, fn, ...args],
 	};
+}
+
+function localStateGetterReference(node, ctx, helper) {
+	const byAlias = (ctx.localStateGetterReferences ??= new Map());
+	const alias = node.callee.name;
+	let entry = byAlias.get(alias);
+	if (entry === undefined) {
+		const imported = allocCompilerName(ctx, rtAlias(helper));
+		ctx.userRuntimeNames.add(`${helper} as ${imported}`);
+		entry = { ref: allocCompilerName(ctx, '_$' + alias + 'WithGetter'), imported };
+		byAlias.set(alias, entry);
+	}
+	return b.id(entry.ref);
+}
+
+function attachLocalStateGetterDeclarations(body, ctx) {
+	const references = ctx.localStateGetterReferences;
+	if (references === undefined) return body;
+	return body.flatMap((statement) => {
+		const node = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+		if (node?.type !== 'VariableDeclaration' || node.kind !== 'const') return [statement];
+		// The alias is a single declarator. Initializing its private getter
+		// immediately afterward preserves the authored alias's TDZ and export.
+		const declaration = node.declarations[0];
+		const entry =
+			declaration?.id.type === 'Identifier' ? references.get(declaration.id.name) : undefined;
+		return entry === undefined
+			? [statement]
+			: [statement, inheritOriginLoc(b.const(entry.ref, b.id(entry.imported)), declaration)];
+	});
 }
 
 function arrayPatternObservesStateGetter(pattern) {
@@ -23374,7 +23519,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					hookRuntimeImportedName !== undefined ||
 					n._octaneUnboundCallee === true);
 			const isCustom = !generated && !isBuiltin && /^use[A-Z]/.test(name) && name !== 'useContext';
-			const isServerUse = name === 'use' && ctx.mode === 'server';
+			const isServerUse =
+				ctx.mode === 'server' &&
+				(importedName === 'use' || hookRuntimeImportedName === 'use' || isBareUseCall(n));
 			if (isBuiltin || isCustom || isServerUse) {
 				if (isBuiltin) {
 					const inline = lowerLocalMemoExpression(n, name);
@@ -23405,7 +23552,8 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					else if (hookRuntimeImportedName === undefined) {
 						ctx.userRuntimeNames.add(localName === name ? name : `${name} as ${localName}`);
 					}
-					if (getterHelper !== null) requireRuntimeForContext(ctx, getterHelper);
+					if (getterHelper !== null && n._octaneLocalStateAlias !== true)
+						requireRuntimeForContext(ctx, getterHelper);
 					if (nativeMemo) requireRuntimeForContext(ctx, 'nativePuMemo');
 				}
 				if (isServerUse)
@@ -23452,7 +23600,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				const callee = nativeMemo
 					? b.id(runtimeAliasForContext(ctx, 'nativePuMemo'))
 					: getterHelper !== null
-						? b.id(runtimeAliasForContext(ctx, getterHelper))
+						? n._octaneLocalStateAlias === true
+							? localStateGetterReference(n, ctx, getterHelper)
+							: b.id(runtimeAliasForContext(ctx, getterHelper))
 						: n.callee._octaneGenerated
 							? b.id(runtimeAliasForContext(ctx, name))
 							: n.callee;
@@ -23463,23 +23613,23 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				if (isCustom || (hasSpread && SPREAD_PATH_SLOT_HOOKS.has(name)))
 					return wrapHookCallWithSlot(n, ctx, slot, callee, args);
 
-				const hookArgs = explicitMemoSlot
-					? args
-					: appendHookSlotArgument(name, args, slot, numericSlot, n, ctx);
+				const call = {
+					...n,
+					...(memoRoute ? { _octaneInlineMemoHook: memoCandidate } : null),
+					callee,
+					arguments: args,
+				};
+				if (explicitMemoSlot) return call;
+				withTrailingHookSlot(call, name, slot, numericSlot, ctx);
 				if (isServerUse && n._octaneHydrationSite !== undefined) {
-					hookArgs.push(
+					call.arguments.push(
 						inheritOriginLoc(
 							b.literal(n._octaneHydrationSite, JSON.stringify(n._octaneHydrationSite)),
 							n,
 						),
 					);
 				}
-				return {
-					...n,
-					...(memoRoute ? { _octaneInlineMemoHook: memoCandidate } : null),
-					callee,
-					arguments: hookArgs,
-				};
+				return call;
 			}
 		}
 		// Namespace-imported Octane hooks keep their member call intact while
@@ -23551,14 +23701,13 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 						: n.callee;
 				if (SPREAD_PATH_SLOT_HOOKS.has(name) && args.some((arg) => arg.type === 'SpreadElement'))
 					return wrapHookCallWithSlot(n, ctx, slot, callee, args);
-				return {
+				const call = {
 					...n,
 					...(memoRoute ? { _octaneInlineMemoHook: memoCandidate } : null),
 					callee,
-					arguments: explicitMemoSlot
-						? args
-						: appendHookSlotArgument(name, args, slot, numericSlot, n, ctx),
+					arguments: args,
 				};
+				return explicitMemoSlot ? call : withTrailingHookSlot(call, name, slot, numericSlot, ctx);
 			}
 		}
 		// METHOD-style custom hooks — `route.useLoaderData()`, `api.useSearch()`
@@ -23658,6 +23807,8 @@ function compileReturnJsxFunction(node, ctx, options) {
 	// otherwise JSX `.map()` always misses the existing PURE and autoMemo paths.
 	const prevValueDirectiveLowering = ctx._valueDirectiveLowering;
 	const prevLocals = ctx.currentComponentLocals;
+	const previousHoistedVars = ctx.currentHoistedVars;
+	ctx.currentHoistedVars = renderedHoistedVars(ctx, node.body.body);
 	const prevAutoMemoCallsitesSafe = ctx.currentAutoMemoCallsitesSafe;
 	const prevAutoMemoLocalHazards = ctx.currentAutoMemoLocalHazards;
 	const prevAutoCalculatedRenderableRefs = ctx.currentAutoCalculatedRenderableRefs;
@@ -23810,6 +23961,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 	} finally {
 		ctx._valueDirectiveLowering = prevValueDirectiveLowering;
 		ctx.currentComponentLocals = prevLocals;
+		ctx.currentHoistedVars = previousHoistedVars;
 		ctx.currentAutoMemoCallsitesSafe = prevAutoMemoCallsitesSafe;
 		ctx.currentAutoMemoLocalHazards = prevAutoMemoLocalHazards;
 		ctx.currentAutoCalculatedRenderableRefs = prevAutoCalculatedRenderableRefs;
@@ -25584,6 +25736,7 @@ function rewriteTsrxBlocks(
 	parentNs = 'html',
 	cssHash = null,
 	leaveCallbackReads = false,
+	directRenderChild = false,
 ) {
 	return rewrite(node, null);
 
@@ -25620,9 +25773,14 @@ function rewriteTsrxBlocks(
 			);
 			fakeBody.generator = n.generator;
 			if (n.returnType !== undefined) fakeBody.returnType = n.returnType;
+			// A direct child slot consumes the return value, just as ssrChild does.
+			const options =
+				directRenderChild && n === node && n.async !== true && hasOnlyLowerableNullishExits(n)
+					? { returnedOutput: true }
+					: null;
 			inlinedSubs.push(
 				withNestedTemplateScope(fakeBody, ctx, () =>
-					compileFunctionBody(fakeBody, ctx, helperName, parentNs, cssHash),
+					compileFunctionBody(fakeBody, ctx, helperName, parentNs, cssHash, options),
 				),
 			);
 			return inheritOriginLoc(b.id(helperName), n);
@@ -28062,6 +28220,12 @@ function isDescriptorBuiltElement(node, inSvg, ctx) {
 	return hasJsxAttribute(node, 'key') || (!inSvg && requiresImperativeHostTree(node, ctx));
 }
 
+// Output-shape analysis needs the emitting Fragment binding proof, while other
+// lowerings (map, Activity, and imperative hosts) remain disabled.
+function normalizeChildrenForShape(nodes, ctx, inSvg = false) {
+	return normalizeChildren(nodes, inSvg, null, false, true, null, ctx);
+}
+
 /**
  * Normalize a list of JSX child nodes into the shapes the emitters consume:
  *   - Indentation-only JSXText / JSX comments (`{…}` empty containers) → dropped
@@ -28091,6 +28255,8 @@ function normalizeChildren(
 	ctx = null,
 	inNoscript = false,
 	allowImperative = true,
+	bindingFragment = null,
+	fragmentCtx = ctx,
 ) {
 	const out = [];
 	if (!nodes) return out;
@@ -28164,7 +28330,10 @@ function normalizeChildren(
 			// has no notion of marker pairs. A keyed Fragment is a reconciliation
 			// boundary instead, so it takes the descriptor branch below; the
 			// lexical-nesting walk (no imperative lowering) still sees through it.
-			if (isFragmentLongForm(n, ctx) && !(allowImperative && hasJsxAttribute(n, 'key'))) {
+			if (
+				isFragmentLongForm(n, fragmentCtx, bindingFragment) &&
+				!(allowImperative && hasJsxAttribute(n, 'key'))
+			) {
 				const attributes = n.openingElement.attributes || [];
 				const refAttr = attributes.find(
 					(a) =>
@@ -28183,11 +28352,19 @@ function normalizeChildren(
 							refVal && refVal.type === 'JSXExpressionContainer' ? refVal.expression : refVal;
 					}
 					out.push({ type: 'FragmentStart', refExpr });
-					out.push(...normalizeChildren(n.children || [], inSvg, ctx, inNoscript));
-					out.push({ type: 'FragmentEnd' });
-				} else {
-					out.push(...normalizeChildren(n.children || [], inSvg, ctx, inNoscript));
 				}
+				out.push(
+					...normalizeChildren(
+						n.children || [],
+						inSvg,
+						ctx,
+						inNoscript,
+						true,
+						bindingFragment,
+						fragmentCtx,
+					),
+				);
+				if (refAttr || hasSpread) out.push({ type: 'FragmentEnd' });
 				continue;
 			}
 			// The mode-only builtin keeps its direct boundary lowering. Richer
@@ -28284,7 +28461,17 @@ function normalizeChildren(
 			}
 			out.push(element);
 		} else if (n.type === 'Tsx' || n.type === 'Tsrx' || n.type === 'JSXFragment') {
-			out.push(...normalizeChildren(n.children || [], inSvg, ctx, inNoscript));
+			out.push(
+				...normalizeChildren(
+					n.children || [],
+					inSvg,
+					ctx,
+					inNoscript,
+					true,
+					bindingFragment,
+					fragmentCtx,
+				),
+			);
 		} else if (n.type === 'JSXStyleElement') {
 			if (hasJsxAttribute(n, 'dangerouslySetInnerHTML') || hasJsxAttribute(n, 'children')) {
 				out.push(
@@ -28294,6 +28481,8 @@ function normalizeChildren(
 						ctx,
 						inNoscript,
 						allowImperative,
+						bindingFragment,
+						fragmentCtx,
 					),
 				);
 				continue;
@@ -28314,7 +28503,17 @@ function normalizeChildren(
 			// still template output, not setup JavaScript. Unwrap it before lowering
 			// so both client and server compilation route it through their construct
 			// emitters rather than asking esrap to print a TSRX-only expression.
-			out.push(...normalizeChildren([n.expression], inSvg, ctx, inNoscript));
+			out.push(
+				...normalizeChildren(
+					[n.expression],
+					inSvg,
+					ctx,
+					inNoscript,
+					true,
+					bindingFragment,
+					fragmentCtx,
+				),
+			);
 		} else if (n.type === 'JSXIfExpression') {
 			// `@if (cond) { ... } @else { ... }` — lower to the old IfStatement
 			// shape so the existing makeIfCall path picks it up. `consequent` and
@@ -28381,7 +28580,17 @@ function normalizeChildren(
 			if (body.length === 0 && render === null) continue;
 			if (body.length === 0 && render !== null) {
 				// Recurse — render is a single JSX node, treat as a sibling child.
-				out.push(...normalizeChildren([render], inSvg, ctx, inNoscript));
+				out.push(
+					...normalizeChildren(
+						[render],
+						inSvg,
+						ctx,
+						inNoscript,
+						true,
+						bindingFragment,
+						fragmentCtx,
+					),
+				);
 			} else {
 				out.push(
 					inheritOriginLoc(
@@ -30368,8 +30577,10 @@ function planJsx(
 		// value equals, so its first write still runs for null/undefined. For a
 		// mixed-style scalar, the same identity lets its setter distinguish a fresh
 		// mount from a preserved suspended retry.
-		const constArgNode = (expr) =>
-			expr === 'null' ? b.literal(null) : expr === 'unset' ? b.id('__s') : b.id(expr);
+		const constArgNode = (expr) => {
+			if (expr === 'undefined') return undefinedNode();
+			return expr === 'null' ? b.literal(null) : expr === 'unset' ? b.id('__s') : b.id(expr);
+		};
 		const bagFieldValue = (f) =>
 			f.hostVar !== null
 				? b.id(f.hostVar)
@@ -31999,7 +32210,7 @@ function tsrxExprNode(node, ctx, componentName, inlinedSubs, parentNs = 'html', 
 // Placeholder nodes for positional runtime-call arguments. Fresh per call —
 // origin stamping writes into loc-less nodes, so sharing one instance would
 // cross-stamp origins between statements.
-const undefinedNode = () => b.id('undefined');
+const undefinedNode = () => b.unary('void', b.literal(0));
 const nullNode = () => b.literal(null);
 
 // Optional positional arguments of a runtime writer whose parameters default to
@@ -34551,7 +34762,8 @@ function emitElementHtml(
 	let directChildrenClientBinding = null;
 	let hostCommitClientBinding = null;
 	const hasNestedJsxChildren =
-		hasAuthoredStaticScriptBody || normalizeChildren(sourceChildren, childNs === 'svg').length > 0;
+		hasAuthoredStaticScriptBody ||
+		normalizeChildrenForShape(sourceChildren, ctx, childNs === 'svg').length > 0;
 	// Strict whole-element proofs for the two lean controlled-form helpers. A
 	// spread or duplicate/conflicting writer makes source-order ownership
 	// ambiguous, so those elements keep the generic helpers. Select is excluded:
@@ -34858,7 +35070,7 @@ function emitElementHtml(
 					? b.literal(true, 'true', attr)
 					: tsrxExprNode(obj, ctx, componentName, inlinedSubs);
 			const noChildren =
-				sourceChildren.length === 0 || normalizeChildren(sourceChildren).length === 0;
+				sourceChildren.length === 0 || normalizeChildrenForShape(sourceChildren, ctx).length === 0;
 			if (noChildren && !isAfterSpread) {
 				bindings.push({
 					id: bindings.length,
@@ -36126,15 +36338,28 @@ function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, css
 // component-body locals minted AFTER collectComponentLocals ran, so they are
 // matched by name shape. Keep the helper inline when it needs a writable
 // capture or has no component context.
-function helperCaptures(ctx, stmts, params, checkWrites = false) {
-	if (!ctx.currentComponentLocals) return null;
+function helperCaptures(
+	ctx,
+	stmts,
+	params,
+	checkWrites = false,
+	branchVars = false,
+	locals = ctx.currentComponentLocals,
+) {
+	if (!locals) return null;
 	const freeWrites = checkWrites ? new Set() : null;
 	const scope = new Set();
 	for (const p of params || []) collectBindings(p, scope);
+	if (branchVars && ctx.mayHaveHoistedVars) {
+		forEachHoistedVarPattern(stmts, (pattern, declaration) => {
+			if (declaration.declare !== true) collectBindings(pattern, scope);
+		});
+	}
 	const free = collectFreeIdentifiers(b.block(stmts), scope, null, freeWrites);
 	const env = [];
 	for (const n of free) {
-		if (!ctx.currentComponentLocals.has(n) && !/^__pu\$\d+$/.test(n)) continue;
+		if (!locals.has(n) && !(branchVars && ctx.currentHoistedVars?.has(n)) && !/^__pu\$\d+$/.test(n))
+			continue;
 		// An inline helper keeps the writable binding shared with other closures.
 		if (freeWrites?.has(n)) return null;
 		env.push(n);
@@ -36148,11 +36373,11 @@ function helperCaptures(ctx, stmts, params, checkWrites = false) {
 // every helper reads from the same layout — so the emitted array is the
 // sorted UNION of each body's captures. If any arm requires inline placement,
 // all helpers in the construct stay inline.
-function unionEnv(ctx, bodies) {
+function unionEnv(ctx, bodies, branchVars = false, locals = ctx.currentComponentLocals) {
 	let all = null;
 	for (const b of bodies) {
 		if (!b) continue;
-		const c = helperCaptures(ctx, b.stmts, b.params, true);
+		const c = helperCaptures(ctx, b.stmts, b.params, true, branchVars, locals);
 		if (c === null) return null;
 		if (all === null) all = new Set();
 		for (const n of c) all.add(n);
@@ -36188,9 +36413,27 @@ function hoistBodyHelper(
 	keyedSelection = null,
 	inlineBindingGuards = false,
 	mappedItem = false,
+	locals = ctx.currentComponentLocals,
 ) {
 	const helperName = `${prefix}$${ctx.nextHelperId++}`;
-	const ownEnvNames = envNames === null ? null : helperCaptures(ctx, stmts, params);
+	const ownEnvNames =
+		envNames === null
+			? null
+			: helperCaptures(
+					ctx,
+					stmts,
+					params,
+					false,
+					ctx.mayHaveHoistedVars &&
+						(prefix === '__then' ||
+							prefix === '__else' ||
+							prefix === '__try' ||
+							prefix === '__pending' ||
+							prefix === '__catch' ||
+							prefix === '__case' ||
+							prefix === '__default'),
+					locals,
+				);
 	const ownEnv = new Set(ownEnvNames || []);
 	let bodyStmts = stmts;
 	if (envNames && envNames.length > 0) {
@@ -36278,6 +36521,9 @@ function hoistBodyHelper(
 	// this helper's params, env bindings, and body-level locals. (A nested
 	// helper's env values are emitted as plain identifiers at its call site.)
 	const prevLocals = ctx.currentComponentLocals;
+	// The module helper has access to the values in its emitted environment.
+	const previousHoistedVars = ctx.currentHoistedVars;
+	ctx.currentHoistedVars = null;
 	const prevInvariantLocals = ctx.currentInvariantLocals;
 	const prevEventInvariantLocals = ctx.currentEventInvariantLocals;
 	const extended = new Set(prevLocals);
@@ -36294,6 +36540,7 @@ function hoistBodyHelper(
 		helperFn = compileFunctionBody(fake, ctx, helperName, parentNs, cssHash, helperOptions);
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
+		ctx.currentHoistedVars = previousHoistedVars;
 		ctx.currentInvariantLocals = prevInvariantLocals;
 		ctx.currentEventInvariantLocals = prevEventInvariantLocals;
 	}
@@ -36435,10 +36682,11 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 			: [node.alternate]
 		: null;
 	// Phase 2: one shared env tuple for both branches (see unionEnv).
-	const envNames = unionEnv(ctx, [
-		thenStmts && { stmts: thenStmts, params: [] },
-		elseStmts && { stmts: elseStmts, params: [] },
-	]);
+	const envNames = unionEnv(
+		ctx,
+		[thenStmts && { stmts: thenStmts, params: [] }, elseStmts && { stmts: elseStmts, params: [] }],
+		true,
+	);
 	const thenHelperName = thenStmts
 		? hoistBodyHelper(
 				ctx,
@@ -36527,14 +36775,16 @@ function isActivityName(value) {
 	return value === 'Activity' || value === 'unstable_Activity';
 }
 
-// The component-local set does not include a module callback's parameters or
-// names declared inside nested JavaScript blocks. Resolve those rare builtin
-// candidates against the authored AST's actual scopes. Only modules containing
-// an Activity candidate allocate this analysis; normalized tags retain their
-// original name node, and synthesized names use the conservative fallback.
+// Component-local sets can miss callback parameters and nested declarations.
+// Resolve tag candidates against the authored AST's scopes. Normalized tags
+// retain their original name node; synthesized names may have no source scope.
 function activityReferenceBinding(name, node, ctx) {
 	if (!ctx?.activityModuleAst) return undefined;
 	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	return templateReferenceBinding(name, node, lexical);
+}
+
+function templateReferenceBinding(name, node, lexical) {
 	const scope =
 		lexical.nodeScopes.get(name) ??
 		lexical.nodeScopes.get(node.openingElement) ??
@@ -36636,17 +36886,34 @@ function isCheckedCompiledBoundary(node, ctx) {
 // named-import alias, or the Fragment member of an Octane namespace import.
 // Resolve aliases against their import bindings so a foreign or locally
 // shadowed component retains its ordinary component semantics.
-function isFragmentLongForm(node, ctx = null) {
+function resolvesModuleFragmentImport(name, node, ctx) {
+	const binding = activityReferenceBinding(name, node, ctx);
+	// TypeScript output retains erased imports in the import-name table.
+	return (
+		binding == null ||
+		(binding.scope === ctx.activityLexical.rootScope &&
+			ctx.fragmentImportSources?.has(binding.importSource) === true)
+	);
+}
+
+function isFragmentLongForm(node, ctx = null, bindingFragment = null) {
 	const name = node.openingElement?.name || node.id;
 	if (!name) return false;
 	if (name.type === 'Identifier' || name.type === 'JSXIdentifier') {
 		const local = name.name;
 		if (ctx?.currentComponentLocals?.has(local)) return false;
 		const imported = ctx?.octaneImportLocals?.get(local);
-		if (imported !== undefined) return imported === 'Fragment';
+		if (imported !== undefined)
+			return imported === 'Fragment' && resolvesModuleFragmentImport(name, node, ctx);
 		if (ctx?.foreignImportLocals?.has(local)) return false;
-		if (ctx?.componentInfo?.has(local)) return false;
-		return local === 'Fragment';
+		if (local !== 'Fragment' || ctx?.componentInfo?.has(local)) return false;
+		const binding = bindingFragment
+			? templateReferenceBinding(name, node, bindingFragment.lexical)
+			: activityReferenceBinding(name, node, ctx);
+		const lexical = bindingFragment?.lexical ?? ctx?.activityLexical;
+		if (bindingFragment?.imported && binding?.scope === lexical.rootScope) return true;
+		if (binding !== undefined) return binding === null;
+		return !lexical?.isBound(lexical.rootScope, local);
 	}
 	if (name.type !== 'MemberExpression' && name.type !== 'JSXMemberExpression') return false;
 	const object = name.object;
@@ -36657,7 +36924,8 @@ function isFragmentLongForm(node, ctx = null) {
 		(property?.type === 'Identifier' || property?.type === 'JSXIdentifier') &&
 		property.name === 'Fragment' &&
 		ctx?.octaneImportNamespaces?.has(object.name) === true &&
-		!ctx.currentComponentLocals?.has(object.name)
+		!ctx.currentComponentLocals?.has(object.name) &&
+		resolvesModuleFragmentImport(object, node, ctx)
 	);
 }
 
@@ -36715,13 +36983,17 @@ function makeChildCall(expr, ctx, componentName, inlinedSubs, cssHash, parentNs 
 		origin: expr,
 		isChild: true,
 		signalSite: directSignalSite(ctx, expr, 'binding'),
-		valueExpr: tsrxExprNode(
+		valueExpr: rewriteTsrxBlocks(
 			resolveStyleExpr(rewriteChildHoleValue(expr, ctx), cssHash),
 			ctx,
 			componentName,
 			inlinedSubs,
 			parentNs,
 			cssHash,
+			false,
+			ctx._universalRuntimeUnit == null &&
+				expr?.type === 'ArrowFunctionExpression' &&
+				expr.body?.type === 'JSXCodeBlock',
 		),
 	};
 	if (
@@ -37373,7 +37645,13 @@ function makeCompCall(
 		voidComponent = true;
 	} else if (ctx.componentInfo && compName !== null) {
 		const callSiteOk = !hasSpreadProp && !hasChildrenProp;
-		const calleeInfo = ctx.componentInfo.get(compName);
+		let calleeInfo = ctx.componentInfo.get(compName);
+		if (calleeInfo !== undefined) {
+			const tag = node.openingElement?.name ?? node.id;
+			const binding = activityReferenceBinding(tag, node, ctx);
+			if (binding !== undefined && binding?.scope !== ctx.activityLexical.rootScope)
+				calleeInfo = undefined;
+		}
 		let memoCallee = calleeInfo;
 		if (calleeInfo) {
 			// A direct shared renderer keeps the authored call's memo decision and
@@ -37897,7 +38175,7 @@ function makeTryCall(
 	const pendingStmts = bodies[1]?.stmts;
 	const catchBodyStmts = bodies[2]?.stmts;
 	const catchParams = bodies[2]?.params;
-	const envNames = unionEnv(ctx, bodies);
+	const envNames = unionEnv(ctx, bodies, ctx.mayHaveHoistedVars);
 	const hydrationInputsEqual =
 		pendingStmts && hoistHydrationInputsEqual(ctx, bodies, envNames, node, componentName);
 	if (hydrationInputsEqual?.optional) {
@@ -38057,6 +38335,7 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 	const envNames = unionEnv(
 		ctx,
 		(node.cases || []).map((c) => ({ stmts: c.consequent || [], params: [] })),
+		ctx.mayHaveHoistedVars,
 	);
 	// switchBlock's lite mask: bit 0 for a hookless default, bit i + 1 for case i.
 	// Its root mask marks the arms that render one template host the same way.
@@ -38432,6 +38711,29 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		);
 	}
 
+	// Feed the same locals to key placement, row caches and captured helpers.
+	let rowLocals = ctx.currentComponentLocals;
+	let hoistedRowVars = null;
+	const hasNestedComp = rowLocals != null && containsComponentCallOrControlFlow(subStmts);
+	const hasConditionalRoot =
+		ctx.currentHoistedVars != null && subStmts.length === 1 && isIfDirective(subStmts[0]);
+	if (
+		rowLocals != null &&
+		ctx.currentHoistedVars != null &&
+		node.nativeArrayMap === undefined &&
+		subStmts.length === 1 &&
+		(hasConditionalRoot ||
+			(isPlainHostRoot(subStmts[0]) &&
+				!hasNestedComp &&
+				(emptyStmts === null ||
+					(emptyStmts.length === 1 &&
+						isPlainHostRoot(emptyStmts[0]) &&
+						!containsComponentCallOrControlFlow(emptyStmts)))))
+	) {
+		hoistedRowVars = ctx.currentHoistedVars;
+		rowLocals = new Set([...rowLocals, ...hoistedRowVars]);
+	}
+
 	// Key fn is hoisted (it doesn't typically capture parent state). Synthetic
 	// loop nodes (legacy internal callers) may carry no position — fall back to
 	// the key arrow's own origin, then the module origin.
@@ -38439,7 +38741,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	const keyOrigin = node.loc ? node : keyFn.loc ? keyFn : ctx._moduleOrigin;
 	const keyBody = keyFn.body;
 	const keyCapturesParent = [...collectFreeIdentifiers(keyFn, new Set())].some((name) =>
-		ctx.currentComponentLocals?.has(name),
+		rowLocals?.has(name),
 	);
 	const inlineKey =
 		keyCapturesParent ||
@@ -38485,6 +38787,37 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			]
 		: [];
 
+	const hasPerItemEventClosure =
+		node.nativeArrayMap !== undefined && mapCallbackHasEventClosure(node.nativeArrayMap.callback);
+	// Phase 2: ONE env tuple shared by the item + @empty helpers — it IS the
+	// forBlock `deps` array (deps was already the captured-locals snapshot for
+	// dep-pure promotion; the runtime additionally stamps it as `block.extra`
+	// on every item/empty block). The union may widen deps with @empty-only
+	// captures — a conservative, correct deps for promotion purposes.
+	const itemAllStmts = [...indexInjection, ...destructureInjection, ...subStmts];
+	// The synthetic item param maps to the authored for-of binding.
+	const itemParams = [b.id(itemName, leftDeclId)];
+	let envNames = unionEnv(
+		ctx,
+		[{ stmts: itemAllStmts, params: itemParams }, emptyStmts && { stmts: emptyStmts, params: [] }],
+		false,
+		rowLocals,
+	);
+	if (hasPerItemEventClosure && envNames !== null && envNames.length > 1) {
+		// The helper and its packed tuple share this internal ordering. Grouping
+		// event-row captures in the same order improves the compressed fragment.
+		envNames = [envNames[1], envNames[0], ...envNames.slice(2)];
+	}
+	// An opaque hole can still read a function-scoped binding. Its helper must
+	// capture that binding, but the row remains on the ordinary refresh paths.
+	const opaqueVarCapture =
+		hoistedRowVars !== null &&
+		(envNames === null ||
+			envNames.some((name) => hoistedRowVars.has(name) && !ctx.currentComponentLocals.has(name))) &&
+		(hasConditionalRoot ||
+			rendersOpaqueChild(subStmts, [], ctx) ||
+			(emptyStmts !== null && rendersOpaqueChild(emptyStmts, [], ctx)));
+
 	// ─── Body analysis: PURE vs DEP-PURE vs normal.
 	//
 	// - PURE: body closes over nothing parent-reactive, no hooks, no comps,
@@ -38507,9 +38840,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	let autoMemoDeps = null;
 	let autoMemoWitnesses = [];
 	let autoMemoContextAware = false;
-	const hasPerItemEventClosure =
-		node.nativeArrayMap !== undefined && mapCallbackHasEventClosure(node.nativeArrayMap.callback);
-	if (ctx.currentComponentLocals) {
+	if (rowLocals && !opaqueVarCapture) {
 		const bodyScope = new Set([itemName]);
 		if (node.index) bodyScope.add(node.index.name);
 		// A destructured header runs in the item helper's synthesized prologue, so
@@ -38519,6 +38850,13 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			destructureInjection.length > 0 ? [...destructureInjection, ...subStmts] : subStmts;
 		const bodyAst = b.block(analyzedStmts);
 		const free = collectFreeIdentifiers(bodyAst, bodyScope);
+		// Only a tag that still resolves to the import: a component or row local of the
+		// same name is an arbitrary component.
+		const viewTransitionNames = new Set(
+			[...ctx._octaneViewTransitionNames].filter(
+				(name) => free.has(name) && !ctx.currentComponentLocals.has(name),
+			),
+		);
 		let hasParentClosure = false;
 		let hasHook = false;
 		// PURE and DEP-PURE skip a survivor on item identity (plus the deps
@@ -38532,7 +38870,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			if (HOOK_NAMES.has(name) || name === 'use' || name === 'useContext') {
 				hasHook = true;
 			}
-			if (ctx.currentComponentLocals.has(name)) {
+			if (rowLocals.has(name)) {
 				hasParentClosure = true;
 				if (!seenDeps.has(name)) {
 					seenDeps.add(name);
@@ -38555,7 +38893,6 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			const renderFree = collectFreeIdentifiers(bodyAst, bodyScope, ignored);
 			hasAmbientRead = ambientCandidates.some((name) => renderFree.has(name));
 		}
-		const hasNestedComp = containsComponentCallOrControlFlow(subStmts);
 		// Compatibility mode keeps method calls live: an unchanged receiver can
 		// hide mutable state (`header.column.getIsSorted()` flips while `header`
 		// stays the same object). Strong production modules assert pure rendering
@@ -38577,7 +38914,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			].sort();
 			if (
 				itemMemoWitnesses.length > 0 ||
-				rendersOpaqueChild(bodyAst, [...ctx.currentComponentLocals, ...bodyScope], ctx)
+				rendersOpaqueChild(bodyAst, [...rowLocals, ...bodyScope], ctx)
 			)
 				itemMemoContextAware = true;
 			for (const name of free) {
@@ -38585,7 +38922,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 					itemMemo = false;
 					break;
 				}
-				if (ctx.currentComponentLocals.has(name)) continue;
+				if (rowLocals.has(name)) continue;
 				if (ctx.importedNames.has(name)) {
 					if (!seenDeps.has(name)) {
 						seenDeps.add(name);
@@ -38635,7 +38972,14 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// mutations, effects, portals, and opaque module/global reads fail closed.
 		const regionStmts = emptyStmts ? [...subStmts, ...emptyStmts] : subStmts;
 		const regionAst = b.block(regionStmts);
-		const regionFree = collectFreeIdentifiers(regionAst, bodyScope);
+		// The row and @empty have distinct lexical scopes.
+		const regionFree = collectFreeIdentifiers(
+			emptyStmts === null ? regionAst : b.block(subStmts),
+			bodyScope,
+		);
+		if (emptyStmts !== null) {
+			for (const name of collectFreeIdentifiers(b.block(emptyStmts), [])) regionFree.add(name);
+		}
 		for (const name of collectFreeIdentifiers(keyBody, bodyScope)) regionFree.add(name);
 		let listSafe =
 			ctx.autoMemo === true &&
@@ -38644,7 +38988,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			!hasHook &&
 			!containsRenderCall(regionStmts, ctx) &&
 			!containsRenderCall([keyBody], ctx) &&
-			!containsAutoMemoUnsafeStructure(regionStmts, ctx) &&
+			!containsAutoMemoUnsafeStructure(regionStmts, ctx, viewTransitionNames) &&
 			!containsAutoMemoUnsafeStructure([keyBody], ctx) &&
 			!containsImportedMemberRead(keyBody, ctx.importedNames) &&
 			!containsImportedMemberRead(regionAst, ctx.importedNames);
@@ -38653,14 +38997,17 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		let listMayReadContext =
 			witnesses.size > 0 ||
 			autoMemoContextReads(regionAst, ctx) ||
-			rendersOpaqueChild(regionAst, [...ctx.currentComponentLocals, ...bodyScope], ctx);
+			rendersOpaqueChild(regionAst, [...rowLocals, ...bodyScope], ctx);
 		if (listSafe) {
 			for (const name of regionFree) {
-				if (ctx._octaneBoundaryNames.has(name) || ctx.importNamespaceNames.has(name)) {
+				if (
+					(ctx._octaneBoundaryNames.has(name) && !viewTransitionNames.has(name)) ||
+					ctx.importNamespaceNames.has(name)
+				) {
 					listSafe = false;
 					break;
 				}
-				if (ctx.currentComponentLocals.has(name)) {
+				if (rowLocals.has(name)) {
 					listDeps.add(name);
 					continue;
 				}
@@ -38706,18 +39053,19 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// survivor shortcut has no compiler-cache epoch cell to consult).
 		if (itemMemoContextAware && autoMemoDeps === null) itemMemo = false;
 		// A body whose only nested structure is host-only conditional content —
-		// an @if over host output, including a narrowly proven nested keyed @for —
-		// renders nothing opaque of its own, so with no parent captures it is a
-		// pure function of the item: an unchanged item identity leaves nothing
-		// inside the conditional able to move. Two extra gates keep the
-		// identity-only skip honest: a render-time hazard like an assignment in
-		// the @if test fails containsAutoMemoUnsafeStructure, and a live imported
-		// member read (`@if (mod.flag)`) can mutate while the import's identity —
-		// the only thing the skip compares — stays fixed.
+		// an @if over host output, including a narrowly proven nested keyed @for,
+		// or a named ViewTransition import around that host output — renders
+		// nothing opaque of its own, so with no parent captures it is a pure
+		// function of the item: an unchanged item identity leaves nothing inside
+		// able to move. Two extra gates keep the identity-only skip honest: a
+		// render-time hazard like an assignment in the @if test fails
+		// containsAutoMemoUnsafeStructure, and a live imported member read
+		// (`@if (mod.flag)`) can mutate while the import's identity — the only
+		// thing the skip compares — stays fixed.
 		const hostConditionalPure =
 			hasNestedComp &&
-			hasOnlyHostConditionalItemBodies(subStmts) &&
-			!containsAutoMemoUnsafeStructure(subStmts, ctx) &&
+			hasOnlyHostConditionalItemBodies(subStmts, viewTransitionNames) &&
+			!containsAutoMemoUnsafeStructure(subStmts, ctx, viewTransitionNames) &&
 			!containsImportedMemberRead(bodyAst, ctx.importedNames);
 		const hostPure =
 			!hasParentClosure &&
@@ -38735,7 +39083,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			autoMemoDeps !== null &&
 			autoMemoDeps.every((name) => seenDeps.has(name) || ctx.importedNames.has(name)) &&
 			!autoMemoContextReads(bodyAst, ctx) &&
-			hasOnlyHostConditionalItemBodies(subStmts);
+			hasOnlyHostConditionalItemBodies(subStmts, viewTransitionNames);
 		if (structuredHostDepEligible) {
 			// The whole-list cache already witnesses imported projections. A row
 			// survivor now makes the same decision independently, so its existing
@@ -38765,23 +39113,6 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		depNames.sort();
 	}
 
-	// Phase 2: ONE env tuple shared by the item + @empty helpers — it IS the
-	// forBlock `deps` array (deps was already the captured-locals snapshot for
-	// dep-pure promotion; the runtime additionally stamps it as `block.extra`
-	// on every item/empty block). The union may widen deps with @empty-only
-	// captures — a conservative, correct deps for promotion purposes.
-	const itemAllStmts = [...indexInjection, ...destructureInjection, ...subStmts];
-	// The synthetic item param maps to the authored for-of binding.
-	const itemParams = [b.id(itemName, leftDeclId)];
-	let envNames = unionEnv(ctx, [
-		{ stmts: itemAllStmts, params: itemParams },
-		emptyStmts && { stmts: emptyStmts, params: [] },
-	]);
-	if (hasPerItemEventClosure && envNames !== null && envNames.length > 1) {
-		// The helper and its packed tuple share this internal ordering. Grouping
-		// event-row captures in the same order improves the compressed fragment.
-		envNames = [envNames[1], envNames[0], ...envNames.slice(2)];
-	}
 	// The helper reads only component-local captures (`envNames`) from the
 	// tuple prefix. Compiler memoization may additionally need live imported
 	// bindings as dependency witnesses; append them without disturbing that ABI.
@@ -38818,6 +39149,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			cssHash,
 			envNames,
 			node.emptyKeyword ?? null,
+			null,
+			false,
+			false,
+			rowLocals,
 		);
 	}
 	// Single-root detection: when the body emits exactly one Element root and
@@ -38890,6 +39225,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	const ssrMarkerless = isSsrMarkerlessForItem(node, subStmts);
 	const hostRootTag = subStmts[0]?.id?.name ?? subStmts[0]?.openingElement?.name?.name;
 	const hostMountSafe =
+		!opaqueVarCapture &&
 		ctx.autoMemo === true &&
 		ctx._universalRuntimeUnit == null &&
 		(parentNs === 'html' || (parentNs === 'opaque' && HTML_ONLY_TAGS.has(hostRootTag))) &&
@@ -38899,7 +39235,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		subStmts.length === 1 &&
 		singleRoot &&
 		ssrMarkerless &&
-		!containsComponentCallOrControlFlow(subStmts) &&
+		!(rowLocals == null ? containsComponentCallOrControlFlow(subStmts) : hasNestedComp) &&
 		!containsRenderCall(subStmts) &&
 		!containsAutoMemoUnsafeStructure(subStmts) &&
 		isHostMountSafeTree(subStmts[0]);
@@ -38952,6 +39288,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		keyedSelection,
 		hostMountSafe,
 		node.nativeArrayMap != null,
+		rowLocals,
 	);
 
 	const mapCall = node.nativeArrayMap || null;
@@ -39292,8 +39629,18 @@ function retainTailHookState(body, first, ctx) {
 		names.length === 0
 			? []
 			: [inheritOriginLoc(b.const(b.array_pattern(names.map((n) => b.id(n))), b.id(tail)), origin)];
+	// A retained capture is an opaque compiler-created environment.
+	const inactive = b.literal(false, 'false');
 	return [
-		inheritOriginLoc(b.let(b.id(tail), b.literal(false, 'false')), origin),
+		inheritOriginLoc(
+			b.let(
+				b.id(tail),
+				ctx.typescriptWeb && names.length > 0
+					? b.ts_as(inactive, b.ts_keyword_type('any'))
+					: inactive,
+			),
+			origin,
+		),
 		...lowered,
 		inheritOriginLoc(b.if(b.id(tail), b.block([...unpack, ...output]), null), origin),
 	];
@@ -39429,6 +39776,154 @@ function sourceError(code, ctx, node, message) {
 	return codedError(code, message + at);
 }
 
+function canLowerLocalDomTemplates(filename, options) {
+	return (
+		cleanCompileFilename(filename).endsWith('.tsrx') &&
+		domSignalTarget(options) &&
+		options?.universalRuntime === undefined &&
+		options?.__rendererBoundariesLowered !== true &&
+		options?.__valdiAbiGuard === undefined
+	);
+}
+
+// A same-module const may read the exact imported Octane state function as a
+// value. Mark direct component setup before the early-exit pass moves slots.
+function findLocalStateAliases(ast) {
+	let imports;
+	for (const node of ast.body) {
+		if (
+			node.type !== 'ImportDeclaration' ||
+			node.source.value !== 'octane' ||
+			node.importKind === 'type' ||
+			node.phase != null ||
+			node.attributes?.length ||
+			node.assertions?.length
+		)
+			continue;
+		for (const specifier of node.specifiers) {
+			if (
+				specifier.type === 'ImportSpecifier' &&
+				specifier.importKind !== 'type' &&
+				(specifier.imported.name ?? specifier.imported.value) === 'useState'
+			)
+				(imports ??= new Set()).add(specifier.local.name);
+		}
+	}
+	if (imports === undefined) return undefined;
+	let aliases;
+	for (const statement of ast.body) {
+		const node = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+		if (
+			node?.type !== 'VariableDeclaration' ||
+			node.kind !== 'const' ||
+			node.declare === true ||
+			node.declarations.length !== 1
+		)
+			continue;
+		const { id, init } = node.declarations[0];
+		if (
+			id?.type === 'Identifier' &&
+			id.typeAnnotation == null &&
+			init?.type === 'Identifier' &&
+			imports.has(init.name)
+		)
+			(aliases ??= new Set()).add(id.name);
+	}
+	return aliases;
+}
+
+function localStateSetupMarker(ast, aliases) {
+	let lexical;
+	const mark = (node) => {
+		if (
+			node.type !== 'CallExpression' ||
+			node._octaneLocalStateAlias === true ||
+			node.optional === true ||
+			node.callee.type !== 'Identifier' ||
+			!aliases.has(node.callee.name) ||
+			node.arguments.length !== 1
+		)
+			return node;
+		// A lone Symbol is also the runtime's authored manual-slot ABI.
+		const initial = unwrapTsExpr(node.arguments[0]);
+		if (!isInvariantLiteral(initial) && !isFunctionNode(initial)) return node;
+		lexical ??= createLexicalAnalysis(ast);
+		const scope = lexical.nodeScopes.get(node);
+		if (
+			scope === undefined ||
+			lexical.resolveBinding(scope, node.callee.name)?.scope !== lexical.rootScope
+		)
+			return node;
+		return {
+			...node,
+			_octaneHookRuntimeImportedHook: 'useState',
+			_octaneLocalStateAlias: true,
+		};
+	};
+	return (body) => {
+		const setup = mapNodes(body.body, (node) => {
+			if (node.type !== 'VariableDeclaration') return node;
+			const declarations = mapNodes(node.declarations, (declaration) => {
+				const init = declaration.init && mark(declaration.init);
+				return init === declaration.init ? declaration : { ...declaration, init };
+			});
+			return declarations === node.declarations ? node : { ...node, declarations };
+		});
+		return setup === body.body ? body : { ...body, body: setup };
+	};
+}
+
+function markLocalStateAliases(ast, aliases) {
+	if (aliases === undefined) return ast;
+	const markSetup = localStateSetupMarker(ast, aliases);
+	const bodyNodes = mapNodes(ast.body, (statement) => {
+		const component = moduleStatementDeclaration(statement);
+		if (!isComponentFunction(component)) return statement;
+		const body = markSetup(component.body);
+		if (body === component.body) return statement;
+		const next = { ...component, body };
+		return statement === component ? next : { ...statement, declaration: next };
+	});
+	return bodyNodes === ast.body ? ast : { ...ast, body: bodyNodes };
+}
+
+// A memo wrapper can be called directly or pass its .type along. Keep
+// authored JS exits unless the private binding is only rendered by templates.
+function privateMemoTagUses(ast) {
+	const statements = ast.body;
+	const privateTags = new Set();
+	if (hasInlineMemoDirectEval(statements)) return privateTags;
+	const componentInfo = [];
+	for (const statement of statements) {
+		const node = moduleStatementDeclaration(statement);
+		if (isVoidJsxCodeBlockFunction(node)) componentInfo.push({ node });
+	}
+	let lexical;
+	const allowed = collectRenderedComponentReferences(componentInfo, null, (node, name) => {
+		if (name === null) return false;
+		const tag = node.openingElement?.name ?? node.id;
+		lexical ??= createLexicalAnalysis(ast);
+		if (lexical.resolveBinding(lexical.nodeScopes.get(tag), name)?.scope !== lexical.rootScope)
+			return false;
+		privateTags.add(name);
+		return true;
+	});
+	const escaped = collectFreeIdentifiers(statements, [], allowed);
+	const exported = collectExportedLocals(statements);
+	for (const name of privateTags) {
+		if (escaped.has(name) || exported.has(name)) privateTags.delete(name);
+	}
+	return privateTags;
+}
+
+// Only syntax that does not constrain the memo wrapper or callback's return type.
+function unwrapPrivateMemoExpression(node) {
+	while (node?.type === 'ParenthesizedExpression' || node?.type === 'TSNonNullExpression') {
+		node = node.expression;
+	}
+	return node;
+}
+
 /**
  * Turn compiler-proven shorthand guards into ordinary template control flow:
  *
@@ -39440,20 +39935,67 @@ function sourceError(code, ctx, node, message) {
  * generic return-value ABI. HMR continues to invoke every component through
  * its generic slot and invalidates if a later edit introduces a value return.
  */
-function lowerNullishComponentExits(ast) {
+function lowerNullishComponentExits(
+	ast,
+	typescriptWeb,
+	canLowerLocalTemplates,
+	localStateAliases,
+	parsedAst,
+) {
 	const statements = ast.body || [];
 	let out = null;
 	// Compiler-name allocation for retainTailHookState, before the compile
 	// context exists. That context later collects these names from the AST.
 	let names = null;
+	let memoLocals;
+	let privateTags;
+	let markMemoSetup;
+	let typeReferences;
 	for (let i = 0; i < statements.length; i++) {
 		const statement = statements[i];
+		const node = moduleStatementDeclaration(statement);
+		const memoItem =
+			canLowerLocalTemplates &&
+			statement === node &&
+			node?.type === 'VariableDeclaration' &&
+			node.kind === 'const' &&
+			node.declarations.length === 1 &&
+			node.declarations[0].id.type === 'Identifier'
+				? node.declarations[0]
+				: null;
+		const call = unwrapPrivateMemoExpression(memoItem?.init);
+		const callee =
+			call?.type === 'CallExpression' ? unwrapPrivateMemoExpression(call.callee) : null;
+		const argument = callee?.type === 'Identifier' ? call.arguments[0] : null;
+		const callback = unwrapPrivateMemoExpression(argument);
+		// A memo body can also render in a shared scope that ignores return values.
+		const memoBody =
+			(callback?.type === 'FunctionExpression' || callback?.type === 'ArrowFunctionExpression') &&
+			!callback.async &&
+			!callback.generator &&
+			call.optional !== true &&
+			callback.body?.type === 'JSXCodeBlock' &&
+			(memoLocals ??= collectOctaneImportLocals(statements, ['memo'], true)).has(callee.name) &&
+			hasOnlyLowerableNullishExits(callback) &&
+			(privateTags ??= privateMemoTagUses(ast)).has(memoItem.id.name) &&
+			memoItem.id.typeAnnotation == null &&
+			callback.returnType == null &&
+			call.typeArguments == null &&
+			!(typeReferences ??= collectTypeReferenceNames(parsedAst, new Set())).has(memoItem.id.name) &&
+			(callback.id == null ||
+				(!typeReferences.has(callback.id.name) &&
+					!collectFreeIdentifiers([callback.body, ...callback.params], []).has(callback.id.name)))
+				? callback
+				: null;
+		const component = memoBody ?? node;
 		let replacement = statement;
-		const isExport =
-			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration';
-		const node = isExport ? statement.declaration : statement;
-		if (hasOnlyLowerableNullishExits(node)) {
-			const body = node.body;
+		if (memoBody !== null || hasOnlyLowerableNullishExits(component)) {
+			// A proven alias is recognized only in direct setup. Mark it before
+			// lifting the guarded tail into template control flow.
+			const body =
+				memoBody !== null && localStateAliases !== undefined
+					? (markMemoSetup ??= localStateSetupMarker(ast, localStateAliases))(component.body)
+					: component.body;
 			const sequence = [...(body.body || []), ...(body.render ? [body.render] : [])];
 			const tail = hookedTailStart(sequence);
 			const rewritten =
@@ -39462,15 +40004,33 @@ function lowerNullishComponentExits(ast) {
 					: retainTailHookState(
 							sequence,
 							tail,
-							(names ??= { usedCompilerNames: collectIdentifierNames(ast) }),
+							(names ??= { usedCompilerNames: collectIdentifierNames(ast), typescriptWeb }),
 						);
 			const renderIndex = rewritten.findIndex(isJsxNode);
 			if (renderIndex !== -1 && !rewritten.slice(renderIndex + 1).some(isJsxNode)) {
-				const loweredNode = {
-					...node,
+				const lowered = {
+					...component,
 					body: { ...body, body: rewritten.slice(0, renderIndex), render: rewritten[renderIndex] },
 				};
-				replacement = isExport ? { ...statement, declaration: loweredNode } : loweredNode;
+				const declaration =
+					memoBody === null
+						? lowered
+						: {
+								...node,
+								declarations: [
+									{
+										...memoItem,
+										init: replaceTsInner(memoItem.init, call, {
+											...call,
+											arguments: [
+												replaceTsInner(call.arguments[0], memoBody, lowered),
+												...call.arguments.slice(1),
+											],
+										}),
+									},
+								],
+							};
+				replacement = statement === node ? declaration : { ...statement, declaration };
 			}
 		}
 		if (out === null && replacement !== statement) out = statements.slice(0, i);
@@ -39508,7 +40068,7 @@ function lowerNullishComponentExits(ast) {
 // The lowering runs in every compiler mode (client, server, HMR) so SSR and
 // hydration share one DOM-range shape — same contract as
 // lowerNullishComponentExits above. The bundler mirrors the decision through
-// hasLowerableJsxReturnBranches for cross-module void-output classification.
+// createJsxReturnBranchClassifier for cross-module void-output classification.
 
 const JSX_RETURN_OUTPUT_TYPES = new Set(['JSXElement', 'JSXFragment', 'Element', 'Fragment']);
 
@@ -39572,6 +40132,7 @@ function containsHookCall(node, slotKeyed = false) {
 		)
 			return false;
 		if (value.type === 'CallExpression') {
+			if (value._octaneLocalStateAlias === true) return true;
 			const callee = value.callee;
 			if (callee?.type === 'Identifier' && isHookName(callee.name)) return true;
 			if (
@@ -39591,13 +40152,14 @@ function containsHookCall(node, slotKeyed = false) {
 	return walk(node);
 }
 
-function isNullishReturnArg(argument) {
+function isNullishReturnArg(argument, moduleAnalysis) {
 	if (argument == null) return true;
 	const a = unwrapReturnParens(argument);
-	return (
-		(a.type === 'Literal' && a.value === null) ||
-		(a.type === 'Identifier' && a.name === 'undefined')
-	);
+	if (a.type === 'Literal') return a.value === null;
+	if (a.type !== 'Identifier' || a.name !== 'undefined') return false;
+	const lexical = createLexicalAnalysis(moduleAnalysis.ast);
+	const scope = lexical.nodeScopes.get(a);
+	return scope !== undefined && !lexical.isBound(scope, a.name);
 }
 
 /** Component-level ReturnStatement anywhere under `node`, nested fns excluded. */
@@ -39633,7 +40195,7 @@ function containsComponentReturn(node) {
 // React), a dynamic/member tag, or JSX containing a hook call — poisons the
 // candidate.
 function lowerReturnArgToOutput(argument, origin, state) {
-	if (isNullishReturnArg(argument)) return null;
+	if (isNullishReturnArg(argument, state.moduleAnalysis)) return null;
 	const a = unwrapReturnParens(argument);
 	if (a.type === 'JSXFragment' || a.type === 'Fragment') {
 		state.failed = true;
@@ -39849,27 +40411,23 @@ function collectDisqualifyingComponentUses(moduleBody) {
 
 // One short-lived analysis record belongs to one module pass. Its expensive
 // facts initialize only after a candidate reaches the gate that needs them.
-function createJsxReturnBranchModuleAnalysis() {
-	return { moduleBindings: null, disqualifyingComponentUses: null };
+function createJsxReturnBranchModuleAnalysis(ast) {
+	return { ast, moduleBindings: null, disqualifyingComponentUses: null };
 }
 
 function moduleBindingsForJsxReturnBranches(moduleBody, moduleAnalysis) {
-	if (moduleAnalysis === null) return collectModuleLevelBindings(moduleBody);
 	return (moduleAnalysis.moduleBindings ??= collectModuleLevelBindings(moduleBody));
 }
 
 function moduleOnlyRendersComponent(moduleBody, name, moduleAnalysis) {
-	const disqualifyingUses =
-		moduleAnalysis === null
-			? collectDisqualifyingComponentUses(moduleBody)
-			: (moduleAnalysis.disqualifyingComponentUses ??=
-					collectDisqualifyingComponentUses(moduleBody));
-	return !disqualifyingUses.has(name);
+	const uses = (moduleAnalysis.disqualifyingComponentUses ??=
+		collectDisqualifyingComponentUses(moduleBody));
+	return !uses.has(name);
 }
 
 // Rebuild one candidate function as a JSXCodeBlock (setup + render), or return
 // null when it must keep the generic value ABI.
-function lowerJsxReturnBranchesOf(node, moduleBody, moduleAnalysis = null) {
+function lowerJsxReturnBranchesOf(node, moduleBody, moduleAnalysis) {
 	if (
 		node == null ||
 		(node.type !== 'FunctionDeclaration' && node.type !== 'FunctionExpression') ||
@@ -39883,7 +40441,14 @@ function lowerJsxReturnBranchesOf(node, moduleBody, moduleAnalysis = null) {
 	if (!/^[A-Z]/.test(node.id.name)) return null;
 	// A component's returned-JSX twin exists only for direct calls.
 	if (node._octaneDirectCallTwin === true) return null;
-	const state = { failed: false, totalReturns: 0, branchReturn: false, jsxReturns: 0, roots: [] };
+	const state = {
+		moduleAnalysis,
+		failed: false,
+		totalReturns: 0,
+		branchReturn: false,
+		jsxReturns: 0,
+		roots: [],
+	};
 	const result = armifyComponentReturnList(node.body.body || [], state, false);
 	if (result === null || state.failed) return null;
 	// A single trailing `return <jsx>` stays on the established value paths —
@@ -39924,20 +40489,16 @@ function lowerJsxReturnBranchesOf(node, moduleBody, moduleAnalysis = null) {
 	};
 }
 
-/** Bundler mirror of the compile-time lowering decision (no transform). */
-export function hasLowerableJsxReturnBranches(node, moduleBody) {
-	return lowerJsxReturnBranchesOf(node, moduleBody) !== null;
-}
-
 /** Bundler classifier that shares one lazy analysis across a module. */
-export function createJsxReturnBranchClassifier(moduleBody) {
-	const moduleAnalysis = createJsxReturnBranchModuleAnalysis();
+export function createJsxReturnBranchClassifier(ast) {
+	const moduleAnalysis = createJsxReturnBranchModuleAnalysis(ast);
+	const moduleBody = ast.body || [];
 	return (node) => lowerJsxReturnBranchesOf(node, moduleBody, moduleAnalysis) !== null;
 }
 
 function lowerJsxReturnBranchComponents(ast) {
 	const statements = ast.body || [];
-	const moduleAnalysis = createJsxReturnBranchModuleAnalysis();
+	const moduleAnalysis = createJsxReturnBranchModuleAnalysis(ast);
 	let out = null;
 	for (let i = 0; i < statements.length; i++) {
 		const statement = statements[i];
@@ -39987,15 +40548,38 @@ function lowerJsxReturnBranchComponents(ast) {
  * because their returned-JSX forms return a promise or an iterator instead of
  * JSX.
  */
-function lowerDirectlyCalledTemplateFunctions(ast) {
+function lowerDirectlyCalledTemplateFunctions(ast, localStateAliases) {
 	const portalBinding = portalImportBinding(ast);
 	const lowered = findDirectlyCalledTemplateFunctions(ast, portalBinding);
-	if (lowered.size === 0 && portalBinding === null) return ast;
-	const lower = (node) =>
+	if (lowered.size === 0 && portalBinding === null && localStateAliases === undefined) return ast;
+	const markSetup =
+		localStateAliases === undefined ? null : localStateSetupMarker(ast, localStateAliases);
+	const moduleStatements =
+		markSetup === null ? null : new Set(ast.body.map(moduleStatementDeclaration));
+	const lower = (node, markNested = markSetup !== null) =>
 		mapAst(node, (n) => {
-			if (lowered.has(n)) return returnedJsxFunction(n, lower);
+			if (lowered.has(n)) {
+				const body = markSetup === null ? n.body : markSetup(n.body);
+				return returnedJsxFunction(body === n.body ? n : { ...n, body }, (node) =>
+					lower(node, markNested),
+				);
+			}
+			if (markNested && n._octaneDirectCallTwin === true) {
+				const body = markSetup(n.body);
+				return lower(body === n.body ? n : { ...n, body }, false);
+			}
+			// The remaining nested templates keep renderer-owned slots.
+			if (
+				markNested &&
+				isFunctionNode(n) &&
+				isLowerableTemplateFunction(n) &&
+				!moduleStatements.has(n)
+			) {
+				const body = markSetup(n.body);
+				if (body !== n.body) return lower({ ...n, body }, markNested);
+			}
 			if (n.type === 'CallExpression' && portalBinding?.(n.callee) === 'createPortal')
-				return { ...n, arguments: lower(n.arguments), _octanePortalCall: true };
+				return { ...n, arguments: lower(n.arguments, markNested), _octanePortalCall: true };
 			return null;
 		});
 	return lower(ast);
@@ -40311,6 +40895,23 @@ function typescriptCommentOptions(source) {
 	};
 }
 
+function printImportType(node, context) {
+	// OXC uses source; the JavaScript parser and esrap 2.3 use argument.
+	if (node.loc) context.location(node.loc.start.line, node.loc.start.column);
+	context.write('import(');
+	context.visit(node.source ?? node.argument);
+	if (node.options) {
+		context.write(', ');
+		context.visit(node.options);
+	}
+	context.write(')');
+	if (node.qualifier) {
+		context.write('.');
+		context.visit(node.qualifier);
+	}
+	if (node.typeArguments) context.visit(node.typeArguments);
+}
+
 /**
  * Perform the compiler's ONE generated-program print and return esrap's real
  * per-token mappings (decoded, not VLQ-encoded) plus the exact printable AST
@@ -40338,7 +40939,9 @@ function printNodeWithMap(node, ctx) {
 	if (assertPrintedLocs()) assertNodeLocs(printable);
 	const commentOptions =
 		ctx.output === 'ts' ? typescriptCommentOptions(ctx.mapSource) : esrapCommentOptions;
-	const { code, map } = esrapPrint(printable, withDeferredImports(esrapTsx(commentOptions)), {
+	const visitors = withDeferredImports(esrapTsx(commentOptions));
+	if (ctx.output === 'ts') visitors.TSImportType = printImportType;
+	const { code, map } = esrapPrint(printable, visitors, {
 		// esrap indents every continuation of a block comment. TS consumers need
 		// authored annotation bytes, including indentation inside nested comments.
 		indent: ctx.output === 'ts' ? '' : undefined,

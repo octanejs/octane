@@ -107,6 +107,10 @@ function createOctaneCompat(host: 'div' | 'span') {
 	function OctaneCompat(
 		props: OctaneCompatProps | OctaneCompatComponentProps<unknown>,
 	): React.ReactNode {
+		if ('clientSignalOwner' in props && props.clientSignalOwner !== undefined)
+			throw new TypeError(
+				'clientSignalOwner is only supported by octane/react in the browser. Use installSignalOwnerEnvironment to provide a request owner on the server.',
+			);
 		const child = resolveHostedIsland(props);
 		// The island-stable identifier prefix; the client wrapper derives the same
 		// value at the same tree position, so Octane ids hydrate byte-identically.
@@ -170,6 +174,8 @@ function createOctaneCompat(host: 'div' | 'span') {
 				'data-octane-compat': '',
 				className: props.hostClassName,
 				style: props.hostStyle ?? OCTANE_COMPAT_HOST_STYLE,
+				role: props.hostRole,
+				'aria-label': props.hostAriaLabel,
 				suppressHydrationWarning: true,
 				dangerouslySetInnerHTML: { __html: attempt.html },
 			}),

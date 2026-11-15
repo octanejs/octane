@@ -85,6 +85,28 @@ function typecheck(
 	}
 }
 
+it('preserves an inferred private memo callback return type observed by TypeScript', () => {
+	const source = `import { memo } from 'octane';
+
+const Counter = memo(function CounterImpl({ shown }: { shown: boolean }) @{
+	if (!shown) return null;
+	<button>visible</button>
+});
+
+export type CounterResult = ReturnType<typeof Counter.type>;
+export const hidden: CounterResult = null;
+
+export function App({ shown }: { shown: boolean }) @{
+	<main><Counter shown={shown} /></main>
+}`;
+	const result = compile(source, '/src/memo-return-contract.tsrx', {
+		mode: 'client',
+		output: 'ts',
+	});
+	expect(result.diagnostics).toEqual([]);
+	expect(typecheck({ 'memo-return-contract.ts': result.code })).toEqual([]);
+});
+
 it('typechecks generated traversal when the host exposes an opaque Node', () => {
 	const result = compile(
 		`export function Scene(props: { label: string }) @{
@@ -192,6 +214,85 @@ const Specialized = Generic<{ label: string; count: number }>;`;
 for (const parserName of ['native', 'javascript']) {
 	for (const mode of ['client', 'server'] as const) {
 		describe(`web TypeScript output with the ${parserName} parser in ${mode} mode`, () => {
+			it('keeps the existing Fragment lowering for type-only Octane imports', () => {
+				parser.javascript = parserName === 'javascript';
+				const cases = [
+					["import type { Fragment } from 'octane';", 'Fragment'],
+					["import { type Fragment } from 'octane';", 'Fragment'],
+					["import type { Fragment as Group } from 'octane';", 'Group'],
+					["import type * as Native from 'octane';", 'Native.Fragment'],
+				];
+				const files: Record<string, string> = {};
+				for (const [index, [declaration, tag]] of cases.entries()) {
+					const result = compile(
+						`${declaration} export function App() @{
+							<main><${tag}><p>fragment child</p></${tag}></main>
+						}`,
+						`/src/type-fragment-${index}.tsrx`,
+						{ mode, hmr: false, output: 'ts' },
+					);
+					expect(result.diagnostics).toEqual([]);
+					files[`type-fragment-${index}.ts`] = result.code;
+				}
+				expect(typecheck(files)).toEqual([]);
+			});
+
+			it('preserves a local value beside erased Fragment import metadata', () => {
+				parser.javascript = parserName === 'javascript';
+				const result = compile(
+					`import type { Fragment } from 'octane';
+					function Fragment() @{ <strong>local view</strong> }
+					export function App() @{ <main><Fragment><p>ignored child</p></Fragment></main> }`,
+					'/src/local-fragment.tsrx',
+					{ mode, hmr: false, output: 'ts' },
+				);
+				const emitted = ts.transpileModule(result.code, {
+					compilerOptions: { module: ts.ModuleKind.ESNext },
+				}).outputText;
+				expect(emitted).toContain('Fragment,');
+			});
+
+			it('preserves inline import types and their resolution mode', () => {
+				parser.javascript = parserName === 'javascript';
+				const source = `export type Entry = import('./peer').Entry<string>;
+					export type Factory = typeof import('./peer').make<number>;
+					export type Required = import('dual', { with: { 'resolution-mode': 'require' } }).Flavor;
+					export type Imported = import('dual', { with: { 'resolution-mode': 'import' } }).Flavor;
+					export function App({ entry }: { entry: Entry }) @{ <p>{entry.label as string}</p> }`;
+				const result = compile(source, '/src/entry.tsrx', { mode, hmr: false, output: 'ts' });
+				expect(result.lang).toBe('ts');
+				expect(result.diagnostics).toEqual([]);
+				expect(result.map.sourcesContent).toEqual([source]);
+				const output = ts.createSourceFile('entry.ts', result.code, ts.ScriptTarget.Latest, true);
+				const importModes = output.statements.flatMap((statement) => {
+					if (!ts.isTypeAliasDeclaration(statement) || !ts.isImportTypeNode(statement.type))
+						return [];
+					return (
+						statement.type.attributes?.elements.map(({ value }) => value.getText(output)) ?? []
+					);
+				});
+				expect(importModes.map((value) => value.slice(1, -1))).toEqual(['require', 'import']);
+				expect(
+					typecheck({
+						'entry.ts': result.code,
+						'peer.ts':
+							'export type Entry<T> = { label: T }; export function make<T>(value: T) { return value; }',
+						'dual.d.ts': "declare module 'dual' { export type Flavor = string; }",
+						'consumer.ts': `import type { Entry, Factory } from './entry';
+							const entry: Entry = { label: 'ready' };
+							const make: Factory = (value) => value + 1;
+							// @ts-expect-error The imported entry retained its string argument.
+							const invalid: Entry = { label: 42 };
+							// @ts-expect-error The type query retained its number argument.
+							make(entry.label);`,
+					}),
+				).toEqual([]);
+				const runtime = compile(source, '/src/entry.tsrx', { mode, hmr: false });
+				expect(runtime.diagnostics).toEqual([]);
+				expect(runtime.code).not.toContain('./peer');
+				expect(runtime.code).not.toContain('dual');
+			});
+
 			it('keeps generic class members in their enclosing type scope', () => {
 				parser.javascript = parserName === 'javascript';
 				const result = compile(
@@ -215,6 +316,55 @@ for (const parserName of ['native', 'javascript']) {
 					}),
 				).toEqual([]);
 			});
+
+			if (mode === 'server') {
+				it('typechecks nullable memo output in ordinary server components', () => {
+					parser.javascript = parserName === 'javascript';
+					const result = compile(
+						`import { memo } from 'octane';
+							type Props = { shown: boolean };
+							const Panel = memo(function Panel({ shown }: Props) @{
+								if (!shown) return null;
+								<output>ready</output>
+							});
+							const Marker = memo(function Marker({ shown }: Props) @{
+								if (!shown) return null;
+								<circle r="12" />
+							});
+							export type PanelResult = ReturnType<typeof Panel.type>;
+							export type MarkerResult = ReturnType<typeof Marker.type>;
+							export function App(props: Props) @{
+								<main>
+									<Panel shown={props.shown} />
+									<Panel key="spread" {...props} />
+									<svg><Marker shown={props.shown} /></svg>
+								</main>
+							}`,
+						'/src/nullable-memo.tsrx',
+						{ mode, strong: true, hmr: false, output: 'ts' },
+					);
+					expect(result.diagnostics).toEqual([]);
+					expect(
+						typecheck({
+							'nullable-memo.ts': result.code,
+							'compiled-only.ts': `import { ssrComponent, ssrHtml } from 'octane/server';
+								import type { SSRScope } from 'octane/internal/server';
+								import type { PanelResult } from './nullable-memo';
+								declare const scope: SSRScope;
+								declare const checked: true | undefined;
+								const hidden: PanelResult = null;
+								const nullable = (_props: { shown: boolean }, _scope: SSRScope): string | null => hidden;
+								const compiled = () => ssrHtml('ready');
+								ssrComponent(scope, nullable, { shown: false }, false, undefined, undefined, undefined, undefined, undefined);
+								ssrComponent(scope, compiled, {}, false, undefined, undefined, undefined, undefined, checked);
+								// @ts-expect-error The compiled-only path does not accept null.
+								ssrComponent(scope, nullable, { shown: false }, false, undefined, undefined, undefined, undefined, true);
+								// @ts-expect-error A flag that may be true still needs compiled output.
+								ssrComponent(scope, nullable, { shown: false }, false, undefined, undefined, undefined, undefined, checked);`,
+						}),
+					).toEqual([]);
+				});
+			}
 
 			it('preserves authored component props and generic declarations for TypeScript consumers', () => {
 				parser.javascript = parserName === 'javascript';
@@ -289,6 +439,44 @@ for (const parserName of ['native', 'javascript']) {
 						'consumer.ts': `import { App } from './callbacks'; App();`,
 					}),
 				).toEqual([]);
+			});
+
+			it('typechecks a state value captured by output after an early return', () => {
+				parser.javascript = parserName === 'javascript';
+				vi.stubEnv('OCTANE_COMPILE_FROZEN_AST', '1');
+				vi.stubEnv('OCTANE_COMPILE_ASSERT_LOC', '1');
+				const source = `import { useState } from 'octane';
+					export function App({ hide }: { hide: boolean }) @{
+						if (hide) return null;
+						const [count] = useState(1);
+						<output>{count as number}</output>
+					}`;
+				const { code } = compile(source, '/src/App.tsrx', { mode, output: 'ts' });
+				expect(typecheck({ 'app.ts': code })).toEqual([]);
+			});
+
+			it('preserves the no-initializer overload for typed state and its updater', () => {
+				parser.javascript = parserName === 'javascript';
+				const source = `import { useState } from 'octane';
+					import * as Octane from 'octane';
+					export function App<T>() @{
+						const [direct] = useState<number>();
+						const [state, setState, read] = Octane.useState<string>();
+						const [fn] = useState<(value: number) => number>();
+						const [Ctor] = useState<new () => { value: string }>();
+						const [conditional] = useState<T extends string ? 'yes' : 'no'>();
+						const result: number | undefined = fn?.(1);
+						const created: string | undefined = Ctor === undefined ? undefined : new Ctor().value;
+						const variant: 'yes' | 'no' | undefined = conditional;
+						const own: number | undefined = direct;
+						const getState: () => string | undefined = read;
+						const update = () => setState(previous => previous === undefined ? 'next' : undefined);
+						<button onClick={update}>
+							{[own, state, getState(), result, created, variant].map(String).join(':')}
+						</button>
+					}`;
+				const result = compile(source, '/src/App.tsrx', { mode, output: 'ts' });
+				expect(typecheck({ 'app.ts': result.code })).toEqual([]);
 			});
 
 			it('emits valid typed hook and control-flow code with scoped type aliases', () => {

@@ -15,7 +15,7 @@ import { arrowKeyDiffs } from '../NodeWrapper/utils.tsrx';
 import type { Node, ReactFlowState } from '../../types';
 
 export type NodesSelectionProps<NodeType> = {
-	onSelectionContextMenu?: (event: MouseEvent, nodes: NodeType[]) => void;
+	onSelectionContextMenu?: ((event: MouseEvent, nodes: NodeType[]) => void) | undefined;
 	noPanClassName?: string;
 	disableKeyboardA11y: boolean;
 };
@@ -75,7 +75,7 @@ export function NodesSelection<NodeType extends Node>({
 			event.preventDefault();
 
 			moveSelectedNodes({
-				direction: arrowKeyDiffs[event.key],
+				direction: arrowKeyDiffs[event.key]!,
 				factor: event.shiftKey ? 4 : 1,
 			});
 		}

@@ -2969,6 +2969,101 @@ describe('Strong hookful lite edges', () => {
 	});
 });
 
+it.each([
+	['item', 'const label of rows; key label', 'label as string'],
+	['index', 'const row of rows; index label; key row', 'String(label)'],
+	['row setup', 'const row of rows; key row', 'row as string', "const label = 'row';"],
+])(
+	'updates @empty when the enclosing value shares the %s name',
+	(_name, header, text, setup = '') => {
+		const source = `
+			export function App(props) @{
+				const rows = props.rows;
+				const label = props.label;
+				<ul>
+					@for (${header}) { ${setup} <li>{${text}}</li> }
+					@empty { <li>{label as string}</li> }
+				</ul>
+			}`;
+		const load = (mode: 'client' | 'server') =>
+			loadCompiledFixtureSource(source, {
+				id: 'list-empty-shadow.tsrx',
+				mode,
+				compileOptions: { hmr: false, dev: false },
+			});
+		const props = { rows: [], label: 'initial' };
+		const { App } = load('client');
+		const container = document.createElement('div');
+		container.innerHTML = ServerRuntime.renderToString(load('server').App, props).html;
+		document.body.appendChild(container);
+		const empty = container.querySelector('li');
+		expect(empty?.textContent).toBe('initial');
+		const errors: unknown[] = [];
+		const root = hydrateRoot(container, App, props, {
+			onRecoverableError: (error) => errors.push(error),
+		});
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('li')).toBe(empty);
+			flushSync(() => root.render(App, { ...props, label: 'updated' }));
+			expect(container.querySelector('li')).toBe(empty);
+			expect(empty?.textContent).toBe('updated');
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	},
+);
+
+it('updates a tag whose local binding shadows a module component', () => {
+	const source = `
+		function Choice() @{ <b>module</b> }
+		function First() @{ <i>first</i> }
+		function Second() @{ <strong>second</strong> }
+		export function App({ first }) @{
+			const Choice = first ? First : Second;
+			<main><Choice /></main>
+		}
+		export function ModuleChoice() @{ <main><Choice /></main> }
+	`;
+	const load = (mode: 'client' | 'server') =>
+		loadCompiledFixtureSource(source, {
+			id: 'shadowed-component-slot.tsrx',
+			mode,
+			compileOptions: { dev: false, hmr: false },
+		});
+	const { App, ModuleChoice } = load('client');
+	const props = { first: true };
+	const host = document.createElement('div');
+	host.innerHTML = ServerRuntime.renderToString(load('server').App, props).html;
+	document.body.appendChild(host);
+	const adopted = host.querySelector('i');
+	expect(adopted?.textContent).toBe('first');
+	const errors: unknown[] = [];
+	const root = hydrateRoot(host, App, props, {
+		onRecoverableError: (error) => errors.push(error),
+	});
+	try {
+		flushSync(() => {});
+		expect(host.querySelector('i')).toBe(adopted);
+		flushSync(() => root.render(App, { first: false }));
+		expect(host.querySelector('i')).toBeNull();
+		expect(host.querySelector('strong')?.textContent).toBe('second');
+		expect(errors).toEqual([]);
+	} finally {
+		root.unmount();
+		host.remove();
+	}
+
+	const module = mount(ModuleChoice);
+	try {
+		expect(module.find('b').textContent).toBe('module');
+	} finally {
+		module.unmount();
+	}
+});
+
 describe('compiler-owned component-region memoization', () => {
 	it('keeps alternate Provider children distinct while retaining live form state', () => {
 		const client = loadCompiledFixtureSource(
@@ -7640,6 +7735,58 @@ describe('compiler-owned component-region memoization', () => {
 		expect(root.find('#derived-scoped-row')).toBe(row);
 		expect(row.textContent).toBe('updated');
 		root.unmount();
+	});
+
+	it.each([
+		['deletes a later index', 'delete rows[1]', ['a', 'c']],
+		['assigns a shorter length', 'rows.length = 1', ['a']],
+		['decrements the length', 'rows.length--', ['a', 'b']],
+	])('keeps native map order when the JSX callback %s', (_, write, expected) => {
+		const source = `
+			export function App({ rows }) @{
+				<main>{rows.map(row => <i data-label={(${write}, row.label)}>{row.label as string}</i>)}</main>
+			}
+		`;
+		const id = 'map-callback-write.tsrx';
+		const compileOptions = { hmr: false, dev: false };
+		type Props = { rows: { label: string }[] };
+		const client = loadCompiledFixtureSource<{ App: (props: Props) => void }>(source, {
+			id,
+			mode: 'client',
+			compileOptions,
+		});
+		const server = loadCompiledFixtureSource<{ App: (props: Props) => string }>(source, {
+			id,
+			mode: 'server',
+			compileOptions,
+		});
+		const props = (): Props => ({ rows: ['a', 'b', 'c'].map((label) => ({ label })) });
+		const mounted = mount(client.App, props());
+		try {
+			expect(mounted.findAll('i').map((row) => row.textContent)).toEqual(expected);
+		} finally {
+			mounted.unmount();
+		}
+
+		const { html } = ServerRuntime.renderToString(server.App, props());
+		const container = document.body.appendChild(document.createElement('div'));
+		container.innerHTML = html;
+		const original = Array.from(container.querySelectorAll('i'));
+		const errors: unknown[] = [];
+		const hydrated = hydrateRoot(container, client.App, props(), {
+			onRecoverableError: (error) => errors.push(error),
+		});
+		try {
+			expect(original.map((row) => row.textContent)).toEqual(expected);
+			flushSync(() => {});
+			const adopted = container.querySelectorAll('i');
+			expect(adopted).toHaveLength(original.length);
+			original.forEach((row, index) => expect(adopted[index]).toBe(row));
+			expect(errors).toEqual([]);
+		} finally {
+			hydrated.unmount();
+			container.remove();
+		}
 	});
 
 	it('reads inherited sparse-array getters once without skipping their callback index', () => {

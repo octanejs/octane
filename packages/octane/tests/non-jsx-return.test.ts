@@ -8,6 +8,9 @@ import { mount, act } from './_helpers';
 import { createElement, hydrateRoot, flushSync } from '../src/index.js';
 import {
 	App,
+	EscapedGuardedMemoApp,
+	GuardedAliasedMemoApp,
+	GuardedMemoApp,
 	Mixed,
 	MixedFragment,
 	MixedInline,
@@ -23,6 +26,7 @@ import {
 	ReturnedOutputWithSibling,
 	UndefinedBranch,
 	type OptionalReturnProps,
+	GuardedInlineChild,
 } from './_fixtures/non-jsx-return.tsrx';
 import {
 	OptionalTransition as TSXOptionalTransition,
@@ -46,6 +50,34 @@ function serverModule(fixture = FIXTURE): Record<string, any> {
 		compileOptions: { mode: 'server' },
 	});
 }
+
+it('preserves a directly rendered inline template across an early null return', () => {
+	const props = { shown: true };
+	const container = document.createElement('div');
+	container.innerHTML = ServerRT.renderToString(serverModule()['GuardedInlineChild'], props).html;
+	document.body.appendChild(container);
+	const button = container.querySelector('button')!;
+	expect(button.textContent).toBe('1');
+	const errors: unknown[] = [];
+	const root = hydrateRoot(container, GuardedInlineChild, props, {
+		onRecoverableError: (error) => errors.push(error),
+	});
+	try {
+		flushSync(() => {});
+		flushSync(() => root.render(GuardedInlineChild, props));
+		expect(container.querySelector('button')).toBe(button);
+		flushSync(() => button.click());
+		expect(button.textContent).toBe('2');
+		flushSync(() => root.render(GuardedInlineChild, { shown: false }));
+		expect(container.querySelector('button')).toBeNull();
+		flushSync(() => root.render(GuardedInlineChild, props));
+		expect(container.querySelector('button')?.textContent).toBe('2');
+		expect(errors).toEqual([]);
+	} finally {
+		root.unmount();
+		container.remove();
+	}
+});
 
 // A function used as a component (`<Foo/>`) may return a non-JSX value — a
 // primitive coerced to text, via an early return or the trailing return. The
@@ -152,6 +184,39 @@ describe('generic component return reconciliation', () => {
 		expect(r.findAll('.mixed-inline')).toHaveLength(1);
 		expect(r.find('.mixed-inline').textContent).toBe('againdetail');
 		r.unmount();
+	});
+
+	it('preserves a null return when the memoized component is called directly', () => {
+		const r = mount(EscapedGuardedMemoApp);
+		try {
+			expect(r.find('span').textContent).toBe('null');
+			expect(r.find('output').textContent).toBe('shown');
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it.each([
+		['GuardedMemoApp', GuardedMemoApp],
+		['GuardedAliasedMemoApp', GuardedAliasedMemoApp],
+	] as const)('keeps %s across an early null return', (_name, CounterApp) => {
+		const r = mount(CounterApp, { shown: false });
+		try {
+			expect(r.container.querySelector('button')).toBeNull();
+			r.update(CounterApp, { shown: true });
+			const button = r.find('button');
+			expect(button.textContent).toBe('1');
+			r.click('button');
+			expect(button.textContent).toBe('2');
+			r.update(CounterApp, { shown: true });
+			expect(r.find('button')).toBe(button);
+			r.update(CounterApp, { shown: false });
+			expect(r.container.querySelector('button')).toBeNull();
+			r.update(CounterApp, { shown: true });
+			expect(r.find('button').textContent).toBe('2');
+		} finally {
+			r.unmount();
+		}
 	});
 
 	it('holds an early returned value while its trailing template suspends in a transition', async () => {
@@ -692,6 +757,32 @@ describe('non-JSX return on the server (props-first ABI)', () => {
 		expect(container.querySelector('.mixed-inline')?.textContent).toBe('again');
 		root.unmount();
 		container.remove();
+	});
+
+	it.each([
+		['GuardedMemoApp', GuardedMemoApp],
+		['GuardedAliasedMemoApp', GuardedAliasedMemoApp],
+	] as const)('adopts %s before switching to an early null return', async (name, App) => {
+		const server = serverModule();
+		const { html } = await ServerRT.renderToString(server[name], { shown: true });
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const button = container.querySelector('button');
+		const root = hydrateRoot(container, App, { shown: true });
+		try {
+			flushSync(() => {});
+			expect(button?.textContent).toBe('1');
+			expect(container.querySelector('button')).toBe(button);
+			flushSync(() => button?.click());
+			flushSync(() => root.render(App, { shown: false }));
+			expect(container.querySelector('button')).toBeNull();
+			flushSync(() => root.render(App, { shown: true }));
+			expect(container.querySelector('button')?.textContent).toBe('2');
+		} finally {
+			root.unmount();
+			container.remove();
+		}
 	});
 
 	it('renders and hydrates a `@{}` body that has no output node', async () => {

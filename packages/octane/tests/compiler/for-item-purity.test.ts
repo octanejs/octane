@@ -126,6 +126,89 @@ describe('@for item-body purity with host-only conditional content', () => {
 		expect(flags[0]! & PURE).toBe(0);
 	});
 
+	// A named ViewTransition import renders its children as given and reads no
+	// context, so a host row wrapped in one is the same pure function of the item
+	// as a host-only @if. The import may be aliased; a parent capture still needs
+	// the dependency path, and a component child stays opaque.
+	it.each([
+		['ViewTransition', "import { ViewTransition } from 'octane';", 'ViewTransition'],
+		['an alias', "import { ViewTransition as VT } from 'octane';", 'VT'],
+		['unstable_ViewTransition', "import { unstable_ViewTransition as VT } from 'octane';", 'VT'],
+	])('admits a capture-free host row wrapped in %s', (_name, prelude, tag) => {
+		const flags = compileList(`<${tag}><li>{item.label as string}</li></${tag}>`, prelude);
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & PURE).toBe(PURE);
+		expect(flags[0]! & DEP_ELIGIBLE).toBe(0);
+		expect(flags[0]! & INDEX_INDEPENDENT).toBe(INDEX_INDEPENDENT);
+	});
+
+	it('keeps the depEligible path when a ViewTransition row captures a parent local', () => {
+		const flags = appListFlags(
+			compile(
+				`
+				import { ViewTransition } from 'octane';
+				export function App(props) @{
+					const tone = props.tone;
+					<ul>@for (const item of props.items; key item.id) {
+						<ViewTransition><li data-tone={tone}>{item.label as string}</li></ViewTransition>
+					}</ul>
+				}
+			`,
+				'App.tsrx',
+				{ hmr: false, dev: false },
+			).code,
+		);
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & PURE).toBe(0);
+		expect(flags[0]! & DEP_ELIGIBLE).toBe(DEP_ELIGIBLE);
+	});
+
+	it('declines a ViewTransition row that renders a component', () => {
+		const flags = compileList(
+			'<ViewTransition><Row label={item.label} /></ViewTransition>',
+			"import { ViewTransition } from 'octane';\n" +
+				'function Row(props) @{ <li>{props.label as string}</li> }',
+		);
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & (PURE | DEP_ELIGIBLE)).toBe(0);
+	});
+
+	// A local binding that shadows the import is an arbitrary component.
+	it.each([
+		['a row local', '', 'const ViewTransition = item.Comp;'],
+		['a component local', 'const ViewTransition = props.Comp;', ''],
+		['a destructured prop', 'const { ViewTransition } = props;', ''],
+	])('declines %s that shadows the ViewTransition import', (_name, setup, rowSetup) => {
+		const flags = appListFlags(
+			compile(
+				`
+				import { ViewTransition } from 'octane';
+				export function App(props) @{
+					${setup}
+					<ul>@for (const item of props.items; key item.id) {
+						${rowSetup}
+						<ViewTransition><li>{item.label as string}</li></ViewTransition>
+					}</ul>
+				}
+			`,
+				'App.tsrx',
+				{ hmr: false, dev: false },
+			).code,
+		);
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & PURE).toBe(0);
+		expect(flags[0]! & DEP_ELIGIBLE).toBe(0);
+	});
+
+	it('declines a local component named ViewTransition', () => {
+		const flags = compileList(
+			'<ViewTransition label={item.label} />',
+			'function ViewTransition(props) @{ <li>{props.label as string}</li> }',
+		);
+		expect(flags).toHaveLength(1);
+		expect(flags[0]! & PURE).toBe(0);
+	});
+
 	it('declines a body that captures a parent local, keeping the depEligible path', () => {
 		const flags = appListFlags(
 			compile(
