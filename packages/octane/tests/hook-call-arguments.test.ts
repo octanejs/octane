@@ -37,6 +37,37 @@ function source(dialect: 'ts' | 'tsrx') {
 }
 
 describe('authored hook argument lists', () => {
+	it('initializes omitted state independently of a local undefined binding', () => {
+		const code = `import { useState } from 'octane';
+			function useOptional(value: number) {
+				const undefined = value;
+				const [state, update, getState] = useState<number>();
+				return { state, update, getState, shadow: undefined };
+			}
+
+			export function App({ value }: { value: number }) @{
+				const { state, update, getState, shadow } = useOptional(value);
+				<button onClick={() => update(2)}>
+					{String(state) + ':' + String(getState()) + ':' + String(shadow)}
+				</button>
+			}`;
+		const id = 'omitted-state-initializer.tsrx';
+		const props = { value: 99 };
+		const server = loadCompiledFixtureSource(code, { id, mode: 'server' });
+		expect(Server.renderToString(server.App, props).html).toContain(
+			'<button>undefined:undefined:99</button>',
+		);
+		const client = loadCompiledFixtureSource(code, { id, mode: 'client' });
+		const view = mount(client.App, props);
+		try {
+			expect(view.find('button').textContent).toBe('undefined:undefined:99');
+			view.click('button');
+			expect(view.find('button').textContent).toBe('2:2:99');
+		} finally {
+			view.unmount();
+		}
+	});
+
 	it.each([false, true])(
 		'keeps omitted plain-module initial values independent of a local undefined (inline=%s)',
 		(inlineHookMemo) => {
