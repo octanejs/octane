@@ -575,7 +575,8 @@ function createMotionComponent(tag: string, preloadedFeatures: boolean): MotionC
 						if (delay > 0) t = { ...(t || {}), delay: (t?.delay || 0) + delay };
 					}
 					const controls = animateTarget(node, resolvedAnimate, t, latest.shouldReduceMotion);
-					if (props.onAnimationComplete) whenDone(controls, () => props.onAnimationComplete());
+					if (props.onAnimationComplete)
+						whenDone(controls, () => props.onAnimationComplete(animateLabel));
 					return () => controls.stop();
 				}
 			},
