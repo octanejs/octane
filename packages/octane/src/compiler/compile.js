@@ -36580,11 +36580,9 @@ function isActivityName(value) {
 	return value === 'Activity' || value === 'unstable_Activity';
 }
 
-// The component-local set does not include a module callback's parameters or
-// names declared inside nested JavaScript blocks. Resolve those rare builtin
-// candidates against the authored AST's actual scopes. Only modules containing
-// an Activity candidate allocate this analysis; normalized tags retain their
-// original name node, and synthesized names use the conservative fallback.
+// Component-local sets can miss callback parameters and nested declarations.
+// Resolve tag candidates against the authored AST's scopes. Normalized tags
+// retain their original name node; synthesized names may have no source scope.
 function activityReferenceBinding(name, node, ctx) {
 	if (!ctx?.activityModuleAst) return undefined;
 	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
@@ -37426,7 +37424,13 @@ function makeCompCall(
 		voidComponent = true;
 	} else if (ctx.componentInfo && compName !== null) {
 		const callSiteOk = !hasSpreadProp && !hasChildrenProp;
-		const calleeInfo = ctx.componentInfo.get(compName);
+		let calleeInfo = ctx.componentInfo.get(compName);
+		if (calleeInfo !== undefined) {
+			const tag = node.openingElement?.name ?? node.id;
+			const binding = activityReferenceBinding(tag, node, ctx);
+			if (binding !== undefined && binding?.scope !== ctx.activityLexical.rootScope)
+				calleeInfo = undefined;
+		}
 		let memoCallee = calleeInfo;
 		if (calleeInfo) {
 			// A direct shared renderer keeps the authored call's memo decision and
