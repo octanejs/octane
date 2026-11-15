@@ -136,9 +136,9 @@ export type ReactFlowStore<NodeType extends Node = Node, EdgeType extends Edge =
 	onError?: OnError;
 
 	// event handlers
-	onViewportChangeStart?: OnViewportChange;
-	onViewportChange?: OnViewportChange;
-	onViewportChangeEnd?: OnViewportChange;
+	onViewportChangeStart?: OnViewportChange | undefined;
+	onViewportChange?: OnViewportChange | undefined;
+	onViewportChangeEnd?: OnViewportChange | undefined;
 	onBeforeDelete?: OnBeforeDelete<NodeType, EdgeType>;
 
 	onSelectionChangeHandlers: OnSelectionChangeFunc<NodeType, EdgeType>[];
@@ -149,7 +149,7 @@ export type ReactFlowStore<NodeType extends Node = Node, EdgeType extends Edge =
 	autoPanSpeed: number;
 	connectionRadius: number;
 
-	isValidConnection?: IsValidConnection<EdgeType>;
+	isValidConnection?: IsValidConnection<EdgeType> | undefined;
 
 	lib: string;
 	debug: boolean;
