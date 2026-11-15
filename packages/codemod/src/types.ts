@@ -39,8 +39,12 @@ export interface TransformOptions {
 	retainedReactBridgeComponent?(bridge: string, module: string, name: string): boolean;
 	/** The issuer resolves the original React DOM server entry that this call will migrate. */
 	originalReactServerEntry?(module: string): boolean;
-	/** A React DOM resource hint called by an imported plain TypeScript initializer. */
-	initializerResourceHint?(module: string, name: string): string | undefined;
+	/** A React DOM resource hint called by an imported plain TypeScript function. */
+	initializerResourceHint?(
+		module: string,
+		name: string,
+		retainedOnly?: boolean,
+	): string | undefined;
 	/** Renderer work called by an unchanged local TypeScript export. */
 	localReactHook?(
 		module: string,
