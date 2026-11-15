@@ -190,6 +190,35 @@ describe('hydrateRoot — STRUCTURAL mismatch with no boundary renders the root 
 		}
 	});
 
+	it.each(['let', 'var'])(
+		'reports the original location after reassigning a %s fragment root in dev',
+		async (kind) => {
+			const file = 'reassigned-fragment-root.tsrx';
+			const source = `function Leaf() @{ <div class="leaf">A</div> }
+${kind} View = () => @{ <><Leaf /><input type="text" /></> }, captured = View;
+Object.freeze(captured);
+View = null;
+export { captured };`;
+			const { captured } = loadCompiledFixtureSource(source, {
+				id: file,
+				mode: 'client',
+				compileOptions: { dev: true },
+			});
+			const { recovered, root } = await hydrateOver(
+				'<!--3--><section id="stale">server</section>',
+				captured,
+				{},
+			);
+			try {
+				expect(markup(container)).toBe('<div class="leaf">A</div><input type="text">');
+				expect(recovered.map((error) => error.message)).toEqual([expect.stringMatching(MISMATCH)]);
+				expect(warns()).toEqual([expect.stringMatching(structuralWarning(file))]);
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
 	it('@switch case swap (different tags): server <em>, client <strong> → the root renders on the client', async () => {
 		const srv = serverModule(STRUCTURAL, 'structural.tsrx');
 		const cli = devClientModule(STRUCTURAL, 'structural.tsrx');

@@ -11310,6 +11310,17 @@ function devLoc(ctx, node) {
 	return l ? [l.line, l.column | 0] : undefined;
 }
 
+function componentLocationStamp(target, value, origin) {
+	return inheritOriginLoc(
+		b.try(
+			b.block([b.stmt(b.assignment('=', b.member(b.id(target), '__oct_loc'), value))]),
+			// A frozen component object can reject the stamp.
+			b.catch_clause(null, null, b.block([])),
+		),
+		origin,
+	);
+}
+
 /** Embed anonymous-default root LOC without changing its ESM identity semantics. */
 function stampAnonymousDefaultFunctionLoc(node, ctx) {
 	if (!ctx.dev || node?.type !== 'ExportDefaultDeclaration') return node;
@@ -14395,15 +14406,6 @@ function compileInternal(
 	const stampNodes = [];
 	if (ctx.componentInfo) {
 		let referencedPrivateComponents;
-		const locStamp = (target, value) =>
-			inheritOriginLoc(
-				b.try(
-					b.block([b.stmt(b.assignment('=', b.member(b.id(target), '__oct_loc'), value))]),
-					// Empty catch — a frozen component object rejects the stamp.
-					b.catch_clause(null, null, b.block([])),
-				),
-				moduleOrigin,
-			);
 		for (const [name, info] of ctx.componentInfo) {
 			if (info.singleRoot === true && info.singleRootInitialized !== true) {
 				// Do not retain an unused wrapper solely to stamp cross-module metadata.
@@ -14429,15 +14431,22 @@ function compileInternal(
 			}
 		}
 		for (const entry of ctx.devFunctionLocs) {
-			stampNodes.push(locStamp(entry.name, b.literal(entry.loc, JSON.stringify(entry.loc))));
+			stampNodes.push(
+				componentLocationStamp(
+					entry.name,
+					b.literal(entry.loc, JSON.stringify(entry.loc)),
+					moduleOrigin,
+				),
+			);
 		}
 		for (const entry of ctx.devFunctionLocAliases) {
 			stampNodes.push(
-				locStamp(
+				componentLocationStamp(
 					entry.name,
 					entry.source === undefined
 						? b.literal(entry.loc, JSON.stringify(entry.loc))
 						: b.member(b.id(entry.source), '__oct_loc'),
+					moduleOrigin,
 				),
 			);
 		}
@@ -19179,6 +19188,11 @@ function compileComponent(node, ctx, options) {
 		const nodes = [isExported ? inheritOriginLoc(b.export(declNode), node) : declNode];
 		// These stamps belong to the freshly initialized value. A later write
 		// may replace the exported binding before module-tail metadata runs.
+		const loc = devLoc(ctx, node);
+		if (loc !== undefined)
+			nodes.push(
+				componentLocationStamp(name, b.literal(`${ctx.mapSourceName}:${loc[0]}:${loc[1]}`), node),
+			);
 		if (pendingWarm)
 			nodes.push(
 				inheritOriginLoc(
