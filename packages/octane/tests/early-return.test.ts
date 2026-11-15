@@ -1,10 +1,20 @@
 import { resolve } from 'node:path';
 import { renderToString } from 'octane/server';
 import { describe, it, expect } from 'vitest';
-import { hydrateRoot } from '../src/index.js';
+import { flushSync, hydrateRoot, useState } from '../src/index.js';
 import { mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture';
-import { Maybe, Multi, Toggleable, NoBraces, MutableCapture } from './_fixtures/early-return.tsrx';
+import {
+	Maybe,
+	Multi,
+	Toggleable,
+	NoBraces,
+	MutableCapture,
+	cell,
+	AliasedState,
+	ManualStateAlias,
+	ShadowedStateAlias,
+} from './_fixtures/early-return.tsrx';
 import { App as HelperApp } from './_fixtures/return-from-helper.tsrx';
 
 describe('early returns', () => {
@@ -70,6 +80,45 @@ describe('early returns', () => {
 		} finally {
 			root?.unmount();
 			host.remove();
+		}
+	});
+
+	it('keeps aliased state independent across hydration and an early return', () => {
+		const server = loadServerFixture(resolve(__dirname, '_fixtures/early-return.tsrx'));
+		const props = { hide: false };
+		const host = document.createElement('div');
+		host.innerHTML = renderToString(server['AliasedState'], props).html;
+		document.body.append(host);
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			const button = host.querySelector('button')!;
+			expect(button.textContent).toBe('1:10');
+			const hydrated = hydrateRoot(host, AliasedState, props);
+			root = hydrated;
+			expect(host.querySelector('button')).toBe(button);
+			flushSync(() => button.click());
+			expect(button.textContent).toBe('2:10');
+
+			flushSync(() => hydrated.render(AliasedState, { hide: true }));
+			expect(host.querySelector('button')).toBeNull();
+			flushSync(() => hydrated.render(AliasedState, props));
+			expect(host.querySelector('button')?.textContent).toBe('2:10');
+		} finally {
+			root?.unmount();
+			host.remove();
+		}
+	});
+
+	it('preserves the public alias identity and unrelated call sites', () => {
+		expect(cell).toBe(useState);
+		const manual = mount(ManualStateAlias);
+		const shadowed = mount(ShadowedStateAlias);
+		try {
+			expect(manual.find('output').textContent).toBe('undefined:1:1');
+			expect(shadowed.find('output').textContent).toBe('1:1');
+		} finally {
+			manual.unmount();
+			shadowed.unmount();
 		}
 	});
 

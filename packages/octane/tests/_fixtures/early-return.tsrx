@@ -1,4 +1,4 @@
-import { useState, type OctaneNode } from 'octane';
+import { useState, withSlot, type OctaneNode } from 'octane';
 
 // Simple early-return: render nothing when condition holds.
 // Old syntax: `if (props.hide) return;` before the JSX.
@@ -59,4 +59,30 @@ export function MutableCapture({ off }: { off: boolean }) {
 			{read()}
 		</span>
 	);
+}
+
+export const cell = useState;
+
+export function AliasedState({ hide }: { hide: boolean }) @{
+	if (hide) return null;
+	const [value, setValue, getValue] = cell(1);
+	const [other] = cell(10);
+	<button onClick={() => setValue(getValue() + 1)}>{value + ':' + other}</button>
+}
+
+export function ManualStateAlias() @{
+	const slot = Symbol.for('early-return:manual-state');
+	const [value] = cell(slot);
+	const path = Symbol.for('early-return:manual-path');
+	const first = withSlot(path, () => cell(1)[0]);
+	const second = withSlot(path, () => cell(10)[0]);
+	<output>{typeof value + ':' + first + ':' + second}</output>
+}
+
+export function ShadowedStateAlias() @{
+	function cell(value: number, _slot?: unknown) {
+		return [value, arguments.length];
+	}
+	const [value, count] = cell(1);
+	<output>{value + ':' + count}</output>
 }
