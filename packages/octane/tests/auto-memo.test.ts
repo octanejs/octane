@@ -2969,6 +2969,54 @@ describe('Strong hookful lite edges', () => {
 	});
 });
 
+it('updates a tag whose local binding shadows a module component', () => {
+	const source = `
+		function Choice() @{ <b>module</b> }
+		function First() @{ <i>first</i> }
+		function Second() @{ <strong>second</strong> }
+		export function App({ first }) @{
+			const Choice = first ? First : Second;
+			<main><Choice /></main>
+		}
+		export function ModuleChoice() @{ <main><Choice /></main> }
+	`;
+	const load = (mode: 'client' | 'server') =>
+		loadCompiledFixtureSource(source, {
+			id: 'shadowed-component-slot.tsrx',
+			mode,
+			compileOptions: { dev: false, hmr: false },
+		});
+	const { App, ModuleChoice } = load('client');
+	const props = { first: true };
+	const host = document.createElement('div');
+	host.innerHTML = ServerRuntime.renderToString(load('server').App, props).html;
+	document.body.appendChild(host);
+	const adopted = host.querySelector('i');
+	expect(adopted?.textContent).toBe('first');
+	const errors: unknown[] = [];
+	const root = hydrateRoot(host, App, props, {
+		onRecoverableError: (error) => errors.push(error),
+	});
+	try {
+		flushSync(() => {});
+		expect(host.querySelector('i')).toBe(adopted);
+		flushSync(() => root.render(App, { first: false }));
+		expect(host.querySelector('i')).toBeNull();
+		expect(host.querySelector('strong')?.textContent).toBe('second');
+		expect(errors).toEqual([]);
+	} finally {
+		root.unmount();
+		host.remove();
+	}
+
+	const module = mount(ModuleChoice);
+	try {
+		expect(module.find('b').textContent).toBe('module');
+	} finally {
+		module.unmount();
+	}
+});
+
 describe('compiler-owned component-region memoization', () => {
 	it('keeps alternate Provider children distinct while retaining live form state', () => {
 		const client = loadCompiledFixtureSource(
