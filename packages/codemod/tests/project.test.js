@@ -4025,6 +4025,56 @@ export function View() {
 		},
 	);
 
+	it('reports an unchanged JSX component directly rendered by a native template', async () => {
+		const leaf = `import { useId } from 'react';
+export function Leaf(props: { label: string }) { return <Surface {...props} />; }
+function Surface({ label }: { label: string }) {
+	const id = useId();
+	return <button id={id}>{label}</button>;
+}`;
+		const app = (module = './leaf') => `import { Leaf } from '${module}';
+export function App() { return <main><Leaf label="Ready" /></main>; }`;
+		const root = project({
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			'leaf.tsx': leaf,
+			'ambiguous.tsx': leaf,
+			'ambiguous.tsrx': 'export function Leaf() @{ <button>Native</button> }',
+			'native.tsx': '/** @jsxImportSource octane */\n' + leaf.replace("'react'", "'octane'"),
+			'App.tsx': app(),
+			'Explicit.tsx': app('./leaf.tsx'),
+			'Native.tsx': app('./native'),
+			'Ambiguous.tsx': app('./ambiguous'),
+			'Host.tsx': `import { ReactCompat } from 'octane/react';
+import { Leaf } from './leaf';
+export function App() { return <ReactCompat component={Leaf} props={{label: 'Ready'}} />; }`,
+		});
+		fs.symlinkSync(
+			path.join(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const inputs = ['App.tsx', 'Explicit.tsx', 'Native.tsx', 'Host.tsx', 'Ambiguous.tsx'].map(
+			(file) => path.join(root, file),
+		);
+		for (const projectTypes of [true, false]) {
+			const options = { root, strong: true, write: false, projectTypes };
+			const result = await runCodemod(inputs, options);
+			const matches = result.files.flatMap((file) =>
+				file.notes
+					.filter((note) => note.rule === 'retained-react-component')
+					.map((note) => [file.file, note.severity, note.line]),
+			);
+			expect(matches.sort()).toEqual([
+				['App.tsx', 'warning', 2],
+				['Explicit.tsx', 'warning', 2],
+			]);
+			const selected = await runCodemod([...inputs, path.join(root, 'leaf.tsx')], options);
+			expect(selected.files.flatMap((file) => file.notes)).not.toContainEqual(
+				expect.objectContaining({ rule: 'retained-react-component' }),
+			);
+		}
+	});
+
 	it('reports an unchanged React hook component passed to a migrated React DOM root', async () => {
 		const app = (module = './leaf') => `import * as ReactDOM from 'react-dom/client';
 import { Leaf } from '${module}';

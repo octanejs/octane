@@ -314,6 +314,15 @@ export async function runCodemod(
 		/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(root, name)?.version ?? ''),
 	);
 	const rootProject = ts.findConfigFile(root, ts.sys.fileExists);
+	const reactExports = new Map<string, ReturnType<typeof directReactExports>>();
+	function originalReactExports(file: string) {
+		let exports = reactExports.get(file);
+		if (!exports) {
+			exports = directReactExports(file, fs.readFileSync(file, 'utf8'));
+			reactExports.set(file, exports);
+		}
+		return exports;
+	}
 	function automaticReactJsx(file: string) {
 		// A nested project can compile the same file with another JSX factory.
 		return (
@@ -642,6 +651,36 @@ export async function runCodemod(
 	}
 	const { inputFactory, changedJsxExport, helperFunction, localFile, exportsConstObject } =
 		storeSources(root, config, unchangedStoreInput, (file) => renames.has(file));
+	function localReactTemplateComponent(from: string, module: string, name: string) {
+		if (
+			!/^\.{1,2}\//.test(module) ||
+			/[!%?#\\]/.test(module) ||
+			name === 'default' ||
+			!automaticReactJsx(from) ||
+			config?.rootDirs?.length ||
+			config?.moduleSuffixes?.some(Boolean)
+		)
+			return false;
+		const file = localFile(from, module, true);
+		const requested = path.resolve(path.dirname(from), module);
+		if (
+			!file?.endsWith('.tsx') ||
+			(file !== requested &&
+				(file !== requested + '.tsx' || !unambiguousJsxPath(file, requested))) ||
+			known.has(file) ||
+			!automaticReactJsx(file)
+		)
+			return false;
+		const stat = fs.lstatSync(file, { throwIfNoEntry: false });
+		if (!stat?.isFile() || stat.nlink !== 1) return false;
+		selectedRealpaths ??= new Set(files.map((input) => fs.realpathSync.native(input)));
+		if (selectedRealpaths.has(fs.realpathSync.native(file))) return false;
+		const exported = originalReactExports(file);
+		return (
+			(exported.intrinsics.has(name) || exported.wrappers.has(name)) &&
+			originalReactEntry(file, 'react/jsx-runtime')
+		);
+	}
 	let selectedInPlace: Set<string> | undefined;
 	function writesSelectedInput(file: string) {
 		// An in-place write through a symlink changes its physical target.
@@ -1278,6 +1317,9 @@ export async function runCodemod(
 				localReactHook: renames.has(file)
 					? (module, name, nativeOnly) => localReactHook(file, module, name, nativeOnly)
 					: undefined,
+				localReactTemplateComponent: renames.has(file)
+					? (module, name) => localReactTemplateComponent(file, module, name)
+					: undefined,
 				localReactClass: renames.has(file)
 					? (module, name) => localReactClass(file, module, name)
 					: undefined,
@@ -1569,7 +1611,6 @@ export async function runCodemod(
 		}
 	}
 	const reverseIslands = new Map<string, ReadonlySet<string>>();
-	const reactExports = new Map<string, ReturnType<typeof directReactExports>>();
 	const templateExports = new Map<string, Set<string>>();
 	function hasTemplateExport(file: FileResult, name: string) {
 		let names = templateExports.get(file.output);
@@ -1921,11 +1962,7 @@ export async function runCodemod(
 					}
 					if (!names.has(edge.name)) continue;
 				} else {
-					let originalExports = reactExports.get(match.file);
-					if (!originalExports) {
-						originalExports = directReactExports(match.file, fs.readFileSync(match.file, 'utf8'));
-						reactExports.set(match.file, originalExports);
-					}
+					const originalExports = originalReactExports(match.file);
 					if (edge.lazy && originalExports.mayExportThen) continue;
 					if (!originalExports.intrinsics.has(exportName)) {
 						if (

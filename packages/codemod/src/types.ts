@@ -53,6 +53,8 @@ export interface TransformOptions {
 	): string | { from: string } | { privateContext: true } | { retainedStore: true } | undefined;
 	/** A dispatcher hook directly called by an unchanged component at a migrated React DOM root. */
 	localReactRootComponent?(module: string, name: string): string | undefined;
+	/** Whether a retained local export returns JSX under the project's React JSX settings. */
+	localReactTemplateComponent?(module: string, name: string): boolean;
 	/** A directly imported context declaration that remains in React. */
 	localReactContext?(module: string, name: string, member: boolean): boolean;
 	/** Severity for a direct render of a local React class component. */
