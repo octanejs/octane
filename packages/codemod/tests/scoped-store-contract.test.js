@@ -493,6 +493,67 @@ it('warns at a direct migrated server call that needs a standalone store provide
 	expect(renderHosted()).toContain('&lt;b&gt;42&lt;/b&gt;');
 });
 
+it.each([true, false])(
+	'warns at migrated module-entry renders (project types: %s)',
+	async (projectTypes) => {
+		const imports = `import { renderToString } from 'react-dom/server';
+import { Pane } from './pane.tsx';
+`;
+		const { app } = project({
+			'app/src/pane.tsx': `import { useSnapshot } from 'observer';
+export function Pane() { const value = useSnapshot(); return <b>{String(value)}</b>; }`,
+			'app/src/entry.tsx':
+				imports +
+				`renderToString(<Pane />);
+export default renderToString(<Pane />);
+if ((import.meta.main)) {
+	const { length } = renderToString(<Pane />);
+	console.log(length);
+} else {
+	renderToString(<Pane />);
+}
+if (import.meta.main) renderToString(<Pane />);
+`,
+			'app/src/controls.tsx':
+				imports +
+				`if (false) renderToString(<Pane />);
+if (globalThis.useNative) renderToString(<Pane />);
+if (import.meta.main) {
+	const renderToString = (value: unknown) => value;
+	renderToString(<Pane />);
+}
+if (import.meta.main) renderToString(<Pane />, { identifierPrefix: 'prefix' });
+if (import.meta.main) renderToString(<b><Pane /></b>);
+export const renderLater = () => renderToString(<Pane />);
+`,
+			'app/src/commonjs.tsx': imports + 'export = renderToString(<Pane />);',
+		});
+		const paths = ['entry', 'controls', 'commonjs', 'pane'].map((name) =>
+			path.join(app, 'src', name + '.tsx'),
+		);
+		const { files } = await runCodemod(paths, {
+			root: app,
+			strong: true,
+			verify: true,
+			write: false,
+			projectTypes,
+		});
+		expect(
+			files.flatMap(({ file, notes }) =>
+				notes
+					.filter(({ rule, severity }) => rule === 'store-hook' && severity === 'warning')
+					.map(({ line, message }) => ({ file, line, message })),
+			),
+		).toEqual(
+			[3, 4, 6, 11].map((line) => ({
+				file: 'src/entry.tsx',
+				line,
+				message: expect.stringMatching(/standalone.*migrated Pane.*NativeStoreProvider/),
+			})),
+		);
+	},
+);
+
 it('reports a migrated React factory root that needs its store context', async () => {
 	const { app } = project({
 		'app/src/pane.tsx': `import { useSnapshot } from 'observer';
