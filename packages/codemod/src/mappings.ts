@@ -374,8 +374,15 @@ export function hasOctaneValue(name: string) {
 }
 
 /** The Octane name for `React.<name>` in a type position. */
-export function mapQualifiedType(name: string, module: string, typeOf: boolean): string | null {
+export function mapQualifiedType(
+	name: string,
+	module: string,
+	typeOf: boolean,
+	typeArgumentCount: number,
+): string | null {
 	if (name === 'Touch' && (module !== 'react' || typeOf)) return null;
+	// OctaneElement only accepts props. The migration alias preserves an explicit element type.
+	if (name === 'ReactElement' && typeArgumentCount > 1) return name;
 	if (name in QUALIFIED_TYPE_PREFERENCES) return QUALIFIED_TYPE_PREFERENCES[name];
 	if (OCTANE_TYPES.has(name)) return name;
 	return RENAMED_TYPES[name] ?? null;
