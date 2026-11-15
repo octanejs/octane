@@ -174,6 +174,8 @@ function createOctaneCompat(host: 'div' | 'span') {
 				'data-octane-compat': '',
 				className: props.hostClassName,
 				style: props.hostStyle ?? OCTANE_COMPAT_HOST_STYLE,
+				role: props.hostRole,
+				'aria-label': props.hostAriaLabel,
 				suppressHydrationWarning: true,
 				dangerouslySetInnerHTML: { __html: attempt.html },
 			}),

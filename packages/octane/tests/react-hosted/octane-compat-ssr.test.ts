@@ -453,8 +453,13 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 		}
 	});
 
-	it('preserves the inline host and its content when the React owner changes its presentation', async () => {
-		const presentation = { hostClassName: 'status', hostStyle: { display: 'inline' } };
+	it('preserves the inline host and its content when React changes its layout or accessible name', async () => {
+		const presentation = {
+			hostClassName: 'status',
+			hostStyle: { display: 'inline' },
+			hostRole: 'img' as React.AriaRole,
+			hostAriaLabel: 'Ready status',
+		};
 		const serverPage = h(
 			'p',
 			null,
@@ -464,12 +469,8 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 				props: { label: 'ready' },
 			}),
 		);
-		const clientPage = (label: string, hostClassName: string, hostStyle?: React.CSSProperties) =>
-			h(
-				'p',
-				null,
-				h(OctaneCompatInline, { hostClassName, hostStyle }, h(ClientSsrInline, { label })),
-			);
+		const clientPage = (label: string, props: Partial<typeof presentation>) =>
+			h('p', null, h(OctaneCompatInline, props, h(ClientSsrInline, { label })));
 		const container = document.createElement('div');
 		container.innerHTML = reactRenderToString(serverPage);
 		const host = container.querySelector('p > span')!;
@@ -477,6 +478,8 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 		const text = leaf.firstChild;
 		expect(host.className).toBe('status');
 		expect(host.style.display).toBe('inline');
+		expect(host.getAttribute('role')).toBe('img');
+		expect(host.getAttribute('aria-label')).toBe('Ready status');
 		expect(leaf.textContent).toBe('ready');
 
 		document.body.appendChild(container);
@@ -485,20 +488,31 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 		let reactRoot!: ReturnType<typeof hydrateRoot>;
 		try {
 			await reactAct(async () => {
-				reactRoot = hydrateRoot(
-					container,
-					clientPage('ready', presentation.hostClassName, presentation.hostStyle),
-					{ onRecoverableError },
-				);
+				reactRoot = hydrateRoot(container, clientPage('ready', presentation), {
+					onRecoverableError,
+				});
 			});
 			await reactAct(async () =>
-				reactRoot.render(clientPage('ready', 'status-busy', { display: 'inline-block' })),
+				reactRoot.render(
+					clientPage('ready', {
+						hostClassName: 'status-busy',
+						hostStyle: { display: 'inline-block' },
+						hostRole: 'status',
+						hostAriaLabel: 'Busy status',
+					}),
+				),
 			);
 			expect(host.className).toBe('status-busy');
 			expect(host.style.display).toBe('inline-block');
-			await reactAct(async () => reactRoot.render(clientPage('busy', 'status-busy')));
+			expect(host.getAttribute('role')).toBe('status');
+			expect(host.getAttribute('aria-label')).toBe('Busy status');
+			await reactAct(async () =>
+				reactRoot.render(clientPage('busy', { hostClassName: 'status-busy' })),
+			);
 			expect(container.querySelector('p > span')).toBe(host);
 			expect(host.style.display).toBe('contents');
+			expect(host.hasAttribute('role')).toBe(false);
+			expect(host.hasAttribute('aria-label')).toBe(false);
 			expect(host.querySelector('em')).toBe(leaf);
 			expect(leaf.firstChild).toBe(text);
 			expect(leaf.textContent).toBe('busy');
