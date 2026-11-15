@@ -496,6 +496,62 @@ export function render(undefined: { depth?: number }) {
 		).toContain('<html lang="en">');
 	});
 
+	it.each(['react-router', 'react-router-dom'])(
+		'keeps the app-owned loader context type on %s',
+		(module) => {
+			const source = `import type { AppLoadContext as Context } from '${module}';
+import { type AppLoadContext, Link } from '${module}';
+import type * as RouterTypes from '${module}';
+export type { AppLoadContext as ContextExport, RouteObject } from '${module}';
+type Inline = import('${module}').AppLoadContext;
+type Qualified = RouterTypes.AppLoadContext;
+export function Page({context}: {context: AppLoadContext | Context | Inline}) {
+	return <Link to="/" />;
+}`;
+			const { code, notes } = transformModule(source, 'route.tsx', {
+				resolveSpecifier: (name) => (name === module ? '@octanejs/remix-router' : null),
+			});
+			expect(code).toContain(`import type { AppLoadContext as Context } from '${module}';`);
+			expect(code).toContain(`import type { AppLoadContext } from '${module}';`);
+			expect(code).toContain("import { Link } from '@octanejs/remix-router';");
+			expect(code).toContain(`export type { AppLoadContext as ContextExport } from '${module}';`);
+			expect(code).toContain("export type { RouteObject } from '@octanejs/remix-router';");
+			expect(code).toContain(`type Inline = import('${module}').AppLoadContext;`);
+			expect(code).toContain(`import type * as RouterTypes from '${module}';`);
+			expect(code).toContain('type Qualified = RouterTypes.AppLoadContext;');
+			expect(notes).toEqual([]);
+		},
+	);
+
+	it('retains the loader context augmentation and attributed import on React Router', () => {
+		const imports =
+			"import type { AppLoadContext, RouteObject } from 'react-router' with { 'resolution-mode': 'require' };";
+		const source = `${imports}
+declare module 'react-router' { interface AppLoadContext { userId: string } }
+export type Query = typeof import('react-router').redirect;`;
+		const { code, notes } = transformModule(source, 'route.tsx', {
+			resolveSpecifier: (name) => (name === 'react-router' ? '@octanejs/remix-router' : null),
+		});
+		expect(code).toContain(imports);
+		expect(code).toContain(
+			"declare module 'react-router' { interface AppLoadContext { userId: string } }",
+		);
+		expect(code).toContain("export type Query = typeof import('@octanejs/remix-router').redirect;");
+		expect(notes).toEqual([]);
+	});
+
+	it('checks runtime exports when splitting a loader context type import', () => {
+		const source = "import { type AppLoadContext, Link, missing } from 'react-router';";
+		const output = transformModule(source, 'route.tsx', {
+			resolveSpecifier: () => '@octanejs/remix-router',
+			bindingExports: () => new Set(['Link']),
+		});
+		expect(output.code.trim()).toBe(source);
+		expect(output.notes).toMatchObject([
+			{ rule: 'bindings', severity: 'error', message: expect.stringContaining('missing') },
+		]);
+	});
+
 	it('ports providers of a context made on either branch, and providers read as values', () => {
 		const source =
 			"import { createContext } from 'react';\nconst C = DEV ? createContext(1) : createContext(2);\nexport const P = C.Provider;\nexport function A() {\n\treturn <C.Provider value={1}><i /></C.Provider>;\n}\n";
