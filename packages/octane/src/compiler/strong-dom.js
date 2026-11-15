@@ -47,7 +47,7 @@ const CHILD_METHODS = new Set([
 	'replaceChild',
 	'replaceChildren',
 ]);
-// Raw markup bypasses the TrustedHTML boundary whether or not there are children.
+// Raw markup is checked separately from mutations of template-owned children.
 const RAW_HTML_PROPERTIES = new Set(['innerHTML', 'outerHTML']);
 const RAW_HTML_METHODS = new Set(['insertAdjacentHTML', 'setHTMLUnsafe']);
 const CLASS_LIST_MUTATORS = new Set(['add', 'remove', 'replace', 'toggle']);
@@ -756,7 +756,23 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 					visitPattern(node.left);
 				} else {
 					const write = recordWrite(node.left, node.left, null);
-					if (node.operator === '=') assigned = unwrap(node.left);
+					if (node.operator === '=') {
+						assigned = unwrap(node.left);
+						const right = node.right;
+						if (
+							write?.kind === 'html' &&
+							write.spelling[0] === 'innerHTML' &&
+							node.left.type === 'MemberExpression' &&
+							!node.left.computed &&
+							node.left.start === node.start &&
+							right.type === 'Literal' &&
+							right.value === '' &&
+							right.raw?.length === 2 &&
+							right.end === node.end
+						) {
+							write.emptyHtml = true;
+						}
+					}
 					visitWriteTarget(node.left);
 					visit(node.right);
 					soil(write);
@@ -1004,6 +1020,28 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 		return element.boundary === ref.boundary ? element : null;
 	}
 
+	function isEmptyWidgetHost(element) {
+		const { node, boundary, tag } = element;
+		const { selfClosing, attributes } = node.openingElement;
+		if (tag !== 'div' || boundary?.body?.render !== node || !selfClosing) return false;
+		let ref = false;
+		for (const attribute of attributes) {
+			if (attribute.type !== 'JSXAttribute') return false;
+			const name = attributeName(attribute);
+			if (
+				name === 'children' ||
+				name === 'dangerouslySetInnerHTML' ||
+				name?.toLowerCase() === 'innerhtml' ||
+				name?.toLowerCase() === 'is'
+			)
+				return false;
+			if (name !== 'ref') continue;
+			if (ref || attribute.value?.expression?.type !== 'Identifier') return false;
+			ref = true;
+		}
+		return ref;
+	}
+
 	for (const write of writes) {
 		const element = provenElement(write.source);
 		if (element === null) continue;
@@ -1011,6 +1049,8 @@ export function analyzeStrongDOM(ast, source, filename, options = {}) {
 		const tag = `the <${element.tag}>`;
 		switch (write.kind) {
 			case 'html':
+				// Leave the browser's setter and Trusted Types policy in charge of the clear.
+				if (write.emptyHtml && write.source.ref && isEmptyWidgetHost(element)) break;
 				report(
 					STRONG_RAW_HTML_WRITE,
 					write.node,

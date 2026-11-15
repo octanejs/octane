@@ -19,10 +19,13 @@ const MODES = ['development', 'production'] as const;
 type Mode = (typeof MODES)[number];
 type Disposition = 'enforce' | 'report';
 const VIOLATION_LOG = /requires 'Trusted(HTML|Script|ScriptURL)' assignment/;
-const PAGES = ['/', '/stream', '/hydrate', '/deferred'];
+const PAGES = ['/', '/stream', '/hydrate', '/deferred', '/widget'];
 
 const fixture = loadServerFixture<typeof App>(
 	resolve('packages/octane/tests/browser/trusted-types/app.tsrx'),
+);
+const widget = loadServerFixture(
+	resolve('packages/octane/tests/browser/trusted-types/widget.tsrx'),
 );
 const bundles = new Map<Mode, string>();
 let browser: Browser;
@@ -90,7 +93,8 @@ function serve(): Promise<Server> {
 			url.searchParams.get('csp') === 'report'
 				? 'content-security-policy-report-only'
 				: 'content-security-policy';
-		res.writeHead(200, { 'content-type': 'text/html', [header]: CSP });
+		const policy = url.pathname === '/widget' && url.searchParams.has('defaultPolicy');
+		res.writeHead(200, { 'content-type': 'text/html', [header]: policy ? CSP + ' default' : CSP });
 		res.write(
 			'<!doctype html><html><head><script>window.__violations=[];' +
 				'document.addEventListener("securitypolicyviolation",function(e){' +
@@ -122,6 +126,9 @@ function serve(): Promise<Server> {
 				rows.resolve('streamed row');
 				shapes.resolve('streamed shape');
 			};
+		} else if (url.pathname === '/widget') {
+			const { html } = ServerRuntime.renderToString(widget.Widget, {});
+			res.end(`<div id="root">${html}</div>${client}</body></html>`);
 		} else {
 			const body = url.pathname === '/deferred' ? fixture.DeferredPage : fixture.HydratedPage;
 			const { html } = ServerRuntime.renderToString(body, { html: fixture.PAGE_HTML });
@@ -144,7 +151,12 @@ function stream(res: ServerResponse, rendered: { pipe(dest: any): unknown }) {
 }
 
 /** Opens `path`, failing the test on any page error or console error. */
-async function open(path: string, mode: Mode, disposition: Disposition = 'enforce') {
+async function open(
+	path: string,
+	mode: Mode,
+	disposition: Disposition = 'enforce',
+	defaultPolicy = false,
+) {
 	const page = await browser.newPage();
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
@@ -154,7 +166,10 @@ async function open(path: string, mode: Mode, disposition: Disposition = 'enforc
 			errors.push(message.text());
 	});
 	// `/stream` holds its response open, so its load event waits for the release.
-	await page.goto(`${origin}${path}?mode=${mode}&csp=${disposition}`, { waitUntil: 'commit' });
+	const policy = defaultPolicy ? '&defaultPolicy' : '';
+	await page.goto(`${origin}${path}?mode=${mode}&csp=${disposition}${policy}`, {
+		waitUntil: 'commit',
+	});
 	await page.waitForFunction(() => Boolean((window as any).__trustedTypes));
 	return { page, errors };
 }
@@ -274,6 +289,33 @@ describe.sequential('Trusted Types under an enforced CSP', () => {
 			await page.close();
 		}
 	});
+
+	it.each(MODES)(
+		'%s preserves the browser policy on an empty widget HTML assignment',
+		async (mode) => {
+			for (const defaultPolicy of [false, true]) {
+				const { page, errors } = await open('/widget', mode, 'enforce', defaultPolicy);
+				try {
+					if (!defaultPolicy)
+						await page.waitForFunction(() => (window as any).__violations.length === 1);
+					const state = await page.evaluate(() => ({
+						...(window as any).__trustedTypes,
+						violations: (window as any).__violations.length,
+					}));
+					expect(state).toEqual({
+						adopted: true,
+						rejected: !defaultPolicy,
+						inputs: defaultPolicy ? [''] : [],
+						text: defaultPolicy ? 'default policy' : '',
+						violations: defaultPolicy ? 0 : 1,
+					});
+					expect(errors).toEqual([]);
+				} finally {
+					await page.close();
+				}
+			}
+		},
+	);
 
 	it.each(MODES)('%s hydrates server HTML with hydrateRoot', (mode) =>
 		hydrateCase(mode, 'enforce'),
