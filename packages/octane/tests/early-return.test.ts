@@ -16,6 +16,8 @@ import {
 	ShadowedStateAlias,
 	NestedAliasedState,
 	NestedAliasedExpressions,
+	DirectAliasedState,
+	ScopedDirectAliasedState,
 } from './_fixtures/early-return.tsrx';
 import { App as HelperApp } from './_fixtures/return-from-helper.tsrx';
 
@@ -144,6 +146,51 @@ describe('early returns', () => {
 		} finally {
 			root?.unmount();
 			host.remove();
+		}
+	});
+
+	it('keeps directly called state in its caller through hydration and an early return', () => {
+		const server = loadServerFixture(resolve(__dirname, '_fixtures/early-return.tsrx'));
+		const props = { hide: false };
+		const host = document.createElement('div');
+		host.innerHTML = renderToString(server['DirectAliasedState'], props).html;
+		document.body.append(host);
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			const [first, repeat, rendered] = host.querySelectorAll('button');
+			const hydrated = hydrateRoot(host, DirectAliasedState, props);
+			root = hydrated;
+			const after = host.querySelectorAll('button');
+			expect(after[0]).toBe(first);
+			expect(after[1]).toBe(repeat);
+			expect(after[2]).toBe(rendered);
+			const text = () => [...host.querySelectorAll('button')].map((node) => node.textContent);
+			expect(text()).toEqual(['1:10', '1:10', '1:10']);
+			flushSync(() => first.click());
+			expect(text()).toEqual(['2:10', '2:10', '1:10']);
+			flushSync(() => rendered.click());
+			expect(text()).toEqual(['2:10', '2:10', '2:10']);
+			flushSync(() => hydrated.render(DirectAliasedState, { hide: true }));
+			expect(text()).toEqual([]);
+			flushSync(() => hydrated.render(DirectAliasedState, props));
+			expect(text()).toEqual(['2:10', '2:10', '2:10']);
+		} finally {
+			root?.unmount();
+			host.remove();
+		}
+	});
+
+	it('keeps state independent for direct nested calls with explicit caller slots', () => {
+		const root = mount(ScopedDirectAliasedState);
+		try {
+			const [first, second] = root.findAll('button');
+			expect([first.textContent, second.textContent]).toEqual(['1', '10']);
+			flushSync(() => first.click());
+			expect([first.textContent, second.textContent]).toEqual(['2', '10']);
+			flushSync(() => second.click());
+			expect([first.textContent, second.textContent]).toEqual(['2', '11']);
+		} finally {
+			root.unmount();
 		}
 	});
 

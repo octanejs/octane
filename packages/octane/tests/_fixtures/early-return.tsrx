@@ -120,3 +120,33 @@ export function NestedAliasedExpressions() @{
 		<StaticMemoized />
 	</main>
 }
+
+function DirectAliasCard({ hide }: { hide: boolean }) @{
+	if (hide) return null;
+	const [value, setValue, getValue] = cell<number>(1);
+	const [other] = cell(10);
+	<button onClick={() => setValue(getValue() + 1)}>{value + ':' + other}</button>
+}
+
+export function DirectAliasedState({ hide }: { hide: boolean }) @{
+	const first = DirectAliasCard({ hide });
+	const repeat = DirectAliasCard({ hide });
+	<main>
+		{first}
+		{repeat}
+		<DirectAliasCard hide={hide} />
+	</main>
+}
+
+export function ScopedDirectAliasedState() @{
+	function renderCounter<T extends number>(initial: T) @{
+		const [value, setValue, getValue] = cell<number>(() => initial);
+		<button onClick={() => setValue(getValue() + 1)}>{value as number}</button>
+	}
+	const first = withSlot(Symbol.for('direct-state:first'), () => renderCounter(1));
+	const second = withSlot(Symbol.for('direct-state:second'), () => renderCounter(10));
+	<main>
+		{first}
+		{second}
+	</main>
+}

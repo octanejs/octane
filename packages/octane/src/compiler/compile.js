@@ -40216,9 +40216,17 @@ function lowerDirectlyCalledTemplateFunctions(ast, localStateAliases) {
 		markSetup === null ? null : new Set(ast.body.map(moduleStatementDeclaration));
 	const lower = (node, markNested = markSetup !== null) =>
 		mapAst(node, (n) => {
-			if (lowered.has(n)) return returnedJsxFunction(n, (node) => lower(node, markNested));
-			if (markNested && n._octaneDirectCallTwin === true) return lower(n, false);
-			// Only template bodies that survive the returned-JSX ABI selection own slots.
+			if (lowered.has(n)) {
+				const body = markSetup === null ? n.body : markSetup(n.body);
+				return returnedJsxFunction(body === n.body ? n : { ...n, body }, (node) =>
+					lower(node, markNested),
+				);
+			}
+			if (markNested && n._octaneDirectCallTwin === true) {
+				const body = markSetup(n.body);
+				return lower(body === n.body ? n : { ...n, body }, false);
+			}
+			// The remaining nested templates keep renderer-owned slots.
 			if (
 				markNested &&
 				isFunctionNode(n) &&
