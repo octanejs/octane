@@ -602,6 +602,85 @@ export type Qualified = typeof R.createRef;`,
 		},
 	);
 
+	it.each(["import R from 'react';", "import type R from 'react';"])(
+		'keeps direct and nested Touch value queries on default React imports',
+		(declaration) => {
+			const { code, notes } = transformModule(
+				`${declaration} export type Point = R.Touch;
+				 export type Queries = [typeof R.Touch, typeof R.Touch.token];`,
+				'points.ts',
+			);
+			expect(code).toMatch(/import type \{ Touch(?: as \w+)? \} from 'octane'/);
+			expect(code).toContain("[typeof import('react').Touch, typeof import('react').Touch.token]");
+			expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(2);
+		},
+	);
+
+	it.each([
+		'export type Result = typeof Point.token;',
+		'export type { Point as PublicPoint };',
+		'export type Result = Point;',
+	])('preserves the resolution mode of a named React Touch import', (usage) => {
+		const declaration = `import type { Touch as Point } from 'react' with { 'resolution-mode': 'require' };`;
+		const { code } = transformModule(`${declaration}\n${usage}`, 'points.ts');
+		expect(code).toContain(declaration);
+		expect(code).toContain(usage);
+	});
+
+	it('checks each alias in an attributed React Touch import', () => {
+		const source = `import type { Touch as Point, Touch as Original } from 'react' with { 'resolution-mode': 'require' };
+			export type Result = [Point, typeof Original.token];`;
+		const { code, notes } = transformModule(source, 'points.ts');
+		expect(code).toBe(source);
+		expect(notes.filter((note) => note.rule === 'unsupported-api')).toEqual([
+			expect.objectContaining({ severity: 'error' }),
+		]);
+	});
+
+	it('keeps qualified references to an explicitly imported React Touch namespace', () => {
+		const declaration = "import type { Touch as Point } from 'react';";
+		const { code, notes } = transformModule(
+			`${declaration} export type Metadata = Point.Metadata;`,
+			'points.ts',
+		);
+		expect(code).toMatch(/import (?:type \{ |\{ type )Touch as Point \} from 'react'/);
+		expect(code).toContain('type Metadata = Point.Metadata;');
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+		);
+	});
+
+	it('preserves the source of React DOM Touch type references', () => {
+		const { code, notes } = transformModule(
+			`import type * as RD from 'react-dom';
+			 export type Points = [RD.Touch, RD.Touch.Metadata, typeof RD.Touch.token,
+			   import('react-dom').Touch, import('react-dom').Touch.Metadata];`,
+			'points.ts',
+		);
+		expect(code.match(/import\('react-dom'\)\.Touch/g)).toHaveLength(5);
+		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(5);
+	});
+
+	it('keeps nested React Touch types on their original namespace', () => {
+		const { code, notes } = transformModule(
+			`import type * as R from 'react';
+			 export type Metadata = [R.Touch.Metadata, import('react').Touch.Metadata];`,
+			'points.ts',
+		);
+		expect(code).toContain("[import('react').Touch.Metadata, import('react').Touch.Metadata]");
+		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(2);
+	});
+
+	it('preserves the selected React module facet for qualified Touch types', () => {
+		const source = `import type R from 'react' with { 'resolution-mode': 'require' };
+			export type Points = [R.Touch, import('react', { with: { 'resolution-mode': 'require' } }).Touch];`;
+		const { code, notes } = transformModule(source, 'points.ts');
+		expect(
+			code.match(/import\('react', \{ with: \{ 'resolution-mode': 'require' \} \}\)\.Touch/g),
+		).toHaveLength(2);
+		expect(notes).toEqual([]);
+	});
+
 	it('keeps qualified Touch value queries on React', () => {
 		const source = `import type * as R from 'react';
 declare module 'react' { const Touch: { token: { nested: 'real' } }; }

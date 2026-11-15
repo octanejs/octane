@@ -84,6 +84,10 @@ function isValueTypeQuery(name: ts.EntityName) {
 	return ts.isTypeQueryNode(name.parent) && name.parent.exprName === name;
 }
 
+function needsTouchValueOrNamespace(ref: ts.Identifier) {
+	return isValueTypeQuery(ref) || (ts.isQualifiedName(ref.parent) && ref.parent.left === ref);
+}
+
 type Severity = Note['severity'];
 type ModuleExports = TransformResult['exports'];
 
@@ -3623,6 +3627,34 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		}
 		if (module in REACT_MODULES) {
 			if (module === 'react' && this.retainedRegistryFactoryImport(node)) return null;
+			const clause = node.importClause;
+			const bindings = clause?.namedBindings;
+			if (
+				module === 'react' &&
+				node.attributes &&
+				clause &&
+				bindings &&
+				ts.isNamedImports(bindings)
+			) {
+				const touch = bindings.elements.filter(
+					(element) =>
+						(clause.isTypeOnly || element.isTypeOnly) &&
+						(element.propertyName ?? element.name).text === 'Touch',
+				);
+				if (touch.length > 0) {
+					// Preserve the authored resolution condition and its React export.
+					for (const element of touch) {
+						if (this.localUses(element.name).some(needsTouchValueOrNamespace))
+							this.note(
+								RULE.unsupported,
+								'error',
+								element,
+								"`Touch` from 'react' has no Octane equivalent for this use.",
+							);
+					}
+					return null;
+				}
+			}
 			this.importSlots.push(node);
 			return `\u0000IMPORT${this.importSlots.length - 1}\u0000`;
 		}
@@ -4120,16 +4152,17 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (module === undefined) return this.rewriteSpecifier(node, specifier);
 		const qualifier = node.qualifier;
 		if (
-			specifier.text === 'react' &&
-			node.isTypeOf &&
 			qualifier &&
-			firstQualifiedName(qualifier).text === 'Touch'
+			firstQualifiedName(qualifier).text === 'Touch' &&
+			(specifier.text === 'react-dom' ||
+				(specifier.text === 'react' &&
+					(node.attributes || node.isTypeOf || ts.isQualifiedName(qualifier))))
 		) {
-			this.note(
-				RULE.unsupported,
-				'warning',
+			this.reportRetainedTouchType(
+				specifier.text,
 				node,
-				'Octane has no Touch value for this type query.',
+				node.isTypeOf,
+				ts.isQualifiedName(qualifier),
 			);
 			return null;
 		}
@@ -4328,7 +4361,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				const imported = (element.propertyName ?? element.name).text;
 				let typeOnly = clause.isTypeOnly || element.isTypeOnly;
 				let typeReferences = false;
-				let touchValueQuery = false;
+				let unsupportedTouchUse = false;
 				if (module === 'react' && imported === 'Touch' && !node.attributes && this.isTypeScript()) {
 					// A type query still needs a value export, which Touch does not have.
 					const references = this.localUses(element.name);
@@ -4337,7 +4370,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						references.every(
 							(ref) => ts.isPartOfTypeNode(ref) || ts.isTypeOnlyExportDeclaration(ref.parent),
 						);
-					touchValueQuery = references.some(isValueTypeQuery);
+					unsupportedTouchUse = references.some(needsTouchValueOrNamespace);
 					typeOnly ||= typeReferences;
 				}
 				if (!this.used.has(local) && !typeReferences) continue;
@@ -4346,7 +4379,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					retainsCreateElement ||= local === 'createElement';
 					continue;
 				}
-				const mapped = touchValueQuery ? null : mapReactImport(module, imported, typeOnly);
+				const mapped = unsupportedTouchUse ? null : mapReactImport(module, imported, typeOnly);
 				if (mapped) {
 					// A name read only in types imports as a type, which bundlers elide.
 					add(mapped.module, mapped.name, local, typeOnly || !this.valueUses.has(local));
@@ -4619,6 +4652,18 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			: this.isGlobalNamespace(node, 'React');
 	}
 
+	private reportRetainedTouchType(module: string, node: ts.Node, query: boolean, nested: boolean) {
+		const message =
+			module === 'react-dom'
+				? "`Touch` from 'react-dom' stays on React DOM. Octane only maps the type from 'react'."
+				: query
+					? 'Octane has no Touch value for this type query.'
+					: nested
+						? 'Octane has no Touch namespace for this type reference.'
+						: null;
+		if (message) this.note(RULE.unsupported, 'warning', node, message);
+	}
+
 	rewriteQualifiedType(node: ts.QualifiedName) {
 		const member = this.rewritePackageMember(node.left, node.right, 'warning');
 		if (member !== null) return member;
@@ -4631,27 +4676,34 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			return null;
 		}
 		if (
-			namespace?.module === 'react' &&
 			ts.isIdentifier(node.left) &&
 			node.right.text === 'Touch' &&
-			isValueTypeQuery(node)
+			(namespace?.module === 'react-dom' || namespace?.module === 'react')
 		) {
 			const declaration = this.declarationOf(node.left);
-			if (declaration && ts.isNamespaceImport(declaration)) {
-				const attributes = declaration.parent.parent.attributes;
-				const options = attributes
-					? `, { ${attributes.getText(this.sf).replace(/^(?:with|assert)\b/, 'with:')} }`
-					: '';
-				this.note(
-					RULE.unsupported,
-					'warning',
-					node,
-					'Octane has no Touch value for this type query.',
-				);
-				return (
-					`import(${this.quote}react${this.quote}${options})` +
-					this.source.slice(node.left.end, node.end)
-				);
+			const clause =
+				declaration && (ts.isNamespaceImport(declaration) ? declaration.parent : declaration);
+			if (clause && ts.isImportClause(clause)) {
+				let access = node;
+				while (ts.isQualifiedName(access.parent) && access.parent.left === access)
+					access = access.parent;
+				const query = isValueTypeQuery(access);
+				const nested = access !== node;
+				const attributes = clause.parent.attributes;
+				if (
+					query ||
+					(ts.isTypeReferenceNode(access.parent) &&
+						(namespace.module === 'react-dom' || nested || attributes))
+				) {
+					const options = attributes
+						? `, { ${attributes.getText(this.sf).replace(/^(?:with|assert)\b/, 'with:')} }`
+						: '';
+					this.reportRetainedTouchType(namespace.module, node, query, nested);
+					return (
+						`import(${this.quote}${namespace.module}${this.quote}${options})` +
+						this.source.slice(node.left.end, node.end)
+					);
+				}
 			}
 		}
 		if (ts.isTypeQueryNode(node.parent)) {
