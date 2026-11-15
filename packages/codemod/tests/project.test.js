@@ -50,6 +50,314 @@ function typecheckProject(root) {
 }
 
 describe('runCodemod', () => {
+	it.each(['./context.ts', '@/context'])(
+		'reports a native root that would render a retained React context from %s',
+		async (specifier) => {
+			const context =
+				"import { createContext as factory } from 'react'; export const State = factory<string | null>(null);";
+			const root = fs.realpathSync(
+				project({
+					'tsconfig.json': JSON.stringify({
+						compilerOptions: {
+							strict: true,
+							jsx: 'react-jsx',
+							moduleResolution: 'bundler',
+							paths: { '@/*': ['./*'] },
+						},
+					}),
+					'context.ts': context,
+					'native.ts': context.replace("from 'react'", "from 'octane'"),
+					'View.tsx': `import { State as Provider } from '${specifier}';
+					export function View() { return <Provider value="ready"><b>hello</b></Provider>; }`,
+					'Native.tsx':
+						"import { State as Provider } from './native.ts'; export function Native() { return <Provider value='ready'><b>hello</b></Provider>; }",
+					'Shadow.tsx': `import { State as Provider } from '${specifier}';
+					export function Shadow(Provider: typeof import('react').Fragment) { return <Provider><b>hello</b></Provider>; }`,
+				}),
+			);
+			fs.symlinkSync(
+				path.resolve(import.meta.dirname, '../node_modules'),
+				path.join(root, 'node_modules'),
+				'dir',
+			);
+			const run = (/** @type {string[]} */ files) =>
+				runCodemod(
+					files.map((file) => path.join(root, file)),
+					{
+						root,
+						strong: true,
+						verify: true,
+						write: false,
+					},
+				);
+			const includesAdvisory = (/** @type {import('../dist/types.js').FileResult} */ file) =>
+				file.notes.find((note) => note.rule === 'retained-react-context');
+			const report = await run(['View.tsx', 'Native.tsx', 'Shadow.tsx']);
+			const consumer = report.files.find((file) => file.file === 'View.tsx');
+			expect(consumer?.strong).toBe(true);
+			expect(consumer?.code).toContain('<Provider');
+			expect(consumer && includesAdvisory(consumer)).toMatchObject({ severity: 'warning' });
+			for (const file of report.files.filter((file) => file !== consumer))
+				expect(includesAdvisory(file)).toBeUndefined();
+			const together = await run(['View.tsx', 'context.ts']);
+			expect(together.files.every((file) => includesAdvisory(file) === undefined)).toBe(true);
+		},
+	);
+
+	it.each([
+		['Context.tsx', 'StateContext'],
+		['Context.ts', 'StateContext.Provider'],
+		['Context.tsx', 'StateContext.Provider'],
+		['Context.tsx', 'stateContext.Provider'],
+	])('reports a retained React provider from %s rendered as %s', async (producer, tag) => {
+		const local = tag.split('.')[0];
+		const binding = local === 'StateContext' ? local : `StateContext as ${local}`;
+		const root = fs.realpathSync(
+			project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				[producer]: `import { createContext } from 'react'; export const StateContext = createContext('initial');`,
+				'View.tsx': `import { ${binding} } from './${producer}'; export function View() { return <${tag} value="next"><b>ready</b></${tag}>; }`,
+				'Shadow.tsx': `import { ${binding} } from './${producer}'; export function Shadow(${local}) { return <${local}.Provider value="next"><b>ready</b></${local}.Provider>; }`,
+				'Intrinsic.tsx': `import { StateContext as stateContext } from './${producer}'; export function View() { return <stateContext data-ready="yes" />; }`,
+			}),
+		);
+		fs.symlinkSync(
+			path.resolve(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const report = await runCodemod(
+			['View.tsx', 'Shadow.tsx', 'Intrinsic.tsx'].map((file) => path.join(root, file)),
+			{
+				root,
+				strong: true,
+				verify: true,
+				projectTypes: false,
+				write: false,
+			},
+		);
+		const view = report.files.find((file) => file.file === 'View.tsx');
+		const shadow = report.files.find((file) => file.file === 'Shadow.tsx');
+		expect(view?.strong).toBe(true);
+		expect(view?.notes).toContainEqual(
+			expect.objectContaining({ rule: 'retained-react-context', severity: 'warning' }),
+		);
+		expect(shadow?.notes.some((note) => note.rule === 'retained-react-context')).toBe(false);
+		const intrinsic = report.files.find((file) => file.file === 'Intrinsic.tsx');
+		expect(intrinsic?.notes.some((note) => note.rule === 'retained-react-context')).toBe(false);
+	});
+
+	it('reports retained React factories read from closed namespace and default imports', async () => {
+		const owners = {
+			Default: "import React from 'react'; export const State = React.createContext(null);",
+			Namespace: "import * as R from 'react'; export const State = R.createContext(null);",
+			LocalAlias:
+				"import { createContext } from 'react'; const Local = createContext(null); export { Local as State };",
+			ExportTypeOnly:
+				"import { createContext } from 'react'; const Local = createContext(null); export type { Local as State };",
+			NamespaceTypeImport:
+				"import * as R from 'react'; import type { ReactNode } from 'react'; export const State = R.createContext<ReactNode>(null);",
+			DefaultTypeExport:
+				"import R from 'react'; export type { ReactNode } from 'react'; export const State = R.createContext(null);",
+			SeparateInlineType:
+				"import R from 'react'; import { type ReactNode } from 'react'; export const State = R.createContext<ReactNode>(null);",
+			DynamicImport:
+				"import R from 'react'; const other = import('react'); export const State = R.createContext(null);",
+			RequireImport:
+				"import R from 'react'; const other = require('react'); export const State = R.createContext(null);",
+			Patched:
+				"import React from 'react'; React.createContext = () => function Replacement() { return null; }; export const State = React.createContext(null);",
+			Alternate:
+				"import * as R from 'react'; import { default as Other } from 'react'; Other.createContext = () => function Replacement() { return null; }; export const State = R.createContext(null);",
+			Combined:
+				"import Other, * as R from 'react'; Other.createContext = () => function Replacement() { return null; }; export const State = R.createContext(null);",
+			Escaped:
+				"import * as R from 'react'; Object.assign(R.default, { createContext: () => null }); export const State = R.createContext(null);",
+		};
+		const files = Object.entries(owners).flatMap(([name, source]) => [
+			[`owner${name}.ts`, source],
+			[
+				`${name}.tsx`,
+				`import { State } from './owner${name}.ts'; export function View() { return <State value={null}><b>ready</b></State>; }`,
+			],
+		]);
+		const root = fs.realpathSync(
+			project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				...Object.fromEntries(files),
+			}),
+		);
+		fs.symlinkSync(
+			path.resolve(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const report = await runCodemod(
+			Object.keys(owners).map((name) => path.join(root, `${name}.tsx`)),
+			{
+				root,
+				strong: true,
+				verify: true,
+				projectTypes: false,
+				write: false,
+			},
+		);
+		expect(
+			report.files
+				.filter((file) => file.notes.some((note) => note.rule === 'retained-react-context'))
+				.map((file) => file.file),
+		).toEqual([
+			'Default.tsx',
+			'Namespace.tsx',
+			'LocalAlias.tsx',
+			'NamespaceTypeImport.tsx',
+			'DefaultTypeExport.tsx',
+		]);
+	});
+
+	it('reports retained React providers in reachable native template arms and rows', async () => {
+		const provider = '<State value={null}><b>ready</b></State>';
+		const cases = {
+			Ternary: [`return shown ? ${provider} : <i />;`, 1],
+			AndArm: [`return shown ? (Boolean(shown) && ${provider}) : <i />;`, 1],
+			Guard: [`if (shown) return ${provider}; return <i />;`, 1],
+			BothArms: [`if (shown) return ${provider}; return ${provider};`, 2],
+			Map: ['return [1, 2].map(n => <State key={n} value={null} />);', 1],
+			MapConditional: [`return [1, 2].map(n => shown ? ${provider} : null);`, 1],
+			Fragment: [`return <>${provider}</>;`, 1],
+			Host: [`return <main>${provider}</main>;`, 1],
+			HostAnd: [`return <main>{Boolean(shown) && ${provider}}</main>;`, 1],
+			HostMap: [
+				`return <main>{[1, 2].map(n => <section key={n}>{Boolean(shown) && ${provider}}</section>)}</main>;`,
+				1,
+			],
+			RowAnd: [
+				`return [1, 2].map(n => <section key={n}>{Boolean(shown) && ${provider}}</section>);`,
+				1,
+			],
+			FragmentDead: [`return <>{false && ${provider}}</>;`, 0],
+			PlainMember: ['return <State.Provider value={null}><b>ready</b></State.Provider>;', 1],
+			ReplacedHere: ['State.Provider = () => null; return <State.Provider value={null}/>;', 0],
+			ReplacedOwner: ['return <State.Provider value={null}/>;', 0],
+			ReplacedGetter: ['return <State.Provider value={null}/>;', 0],
+			ChildOverride: [
+				`return <main dangerouslySetInnerHTML={{__html: 'raw'}}>${provider}</main>;`,
+				0,
+			],
+			Dead: [`return false ? ${provider} : <i />;`, 0],
+			DeadAnd: [`return shown ? (false && ${provider}) : <i />;`, 0],
+			TerminalGuard: [`if (true) return <i />; return ${provider};`, 0],
+			EmptyMap: ['return ([] as number[]).map(n => <State key={n} value={null} />);', 0],
+			DeadMapConditional: [`return [1, 2].map(n => false ? ${provider} : <i />);`, 0],
+			OutsideTemplate: [`return shown && ${provider};`, 0],
+			ForeignChildren: [
+				`function Discard() { return null; } return <Discard>{${provider}}</Discard>;`,
+				0,
+			],
+			ReactBoundary: [`return <ReactCompat component={() => ${provider}} />;`, 0],
+		};
+		const root = fs.realpathSync(
+			project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				'owner.ts':
+					"import { createContext } from 'react'; export const State = createContext(null);",
+				'replaced.ts':
+					"import { createContext } from 'react'; const Local = createContext(null); Local.Provider = () => null; export {Local as State};",
+				'getter.ts':
+					"import { createContext } from 'react'; export const State = createContext(null); Object.defineProperty(State, 'Provider', { get() { return () => null; } });",
+				...Object.fromEntries(
+					Object.entries(cases).map(([name, [body]]) => [
+						`${name}.tsx`,
+						`import { State } from './${name === 'ReplacedOwner' ? 'replaced' : name === 'ReplacedGetter' ? 'getter' : 'owner'}.ts';
+						${name === 'ReactBoundary' ? "import { ReactCompat } from 'octane/react';" : ''}
+						export function View({ shown }: { shown: boolean }) { ${body} }`,
+					]),
+				),
+			}),
+		);
+		fs.symlinkSync(
+			path.resolve(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const report = await runCodemod(
+			Object.keys(cases).map((name) => path.join(root, `${name}.tsx`)),
+			{ root, strong: true, verify: true, projectTypes: false, write: false },
+		);
+		for (const file of report.files) {
+			const name = file.file.slice(0, -4);
+			const notes = file.notes.filter((note) => note.rule === 'retained-react-context');
+			expect(notes, file.file).toHaveLength(cases[name][1]);
+			if (notes.length) {
+				expect(file.strong, file.file).toBe(true);
+				expect(
+					notes.every(({ severity }) => severity === 'warning'),
+					file.file,
+				).toBe(true);
+			}
+		}
+	});
+
+	it('recognizes unchanged React provider members alongside ordinary context reads', async () => {
+		const react = "import { createContext, useContext as read } from 'react';";
+		const provider = 'return <State.Provider value={null}><b>ready</b></State.Provider>;';
+		const use = "import { useContext as read } from 'react';";
+		const root = project({
+			'owner.tsx': `${react}
+				export const State = createContext(null);
+				export function readState() { return read(State); }
+				export function Shell() { return <State.Provider value={null}><i /></State.Provider>; }
+				export const name = State.displayName;`,
+			'Consumer.tsx': `import { State } from './owner.tsx';
+				${use}
+				export function View() { const state = read(State); const label = State.displayName; ${provider} }`,
+			'ConsumerMember.tsx': `import { State } from './owner.tsx';
+				export function Read() { return <State.Consumer>{() => null}</State.Consumer>; }
+				export function View() { ${provider} }`,
+			'Unknown.tsx': `import { State } from './owner.tsx';
+				declare function read(value: unknown): unknown;
+				export function View() { const state = read(State); ${provider} }`,
+			'Assignment.tsx': `import { State } from './owner.tsx';
+				export function View() { State.Provider = () => null; ${provider} }`,
+			'Shadowed.tsx': `import { State } from './owner.tsx';
+				${use}
+				export function View(read: (value: typeof State) => unknown) { const state = read(State); ${provider} }`,
+		});
+		fs.symlinkSync(
+			path.resolve(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const names = [
+			'Consumer.tsx',
+			'ConsumerMember.tsx',
+			'Unknown.tsx',
+			'Assignment.tsx',
+			'Shadowed.tsx',
+		];
+		const report = await runCodemod(
+			names.map((file) => path.join(root, file)),
+			{
+				root,
+				strong: true,
+				verify: true,
+				projectTypes: false,
+				write: false,
+			},
+		);
+		expect(
+			report.files
+				.filter((row) => row.notes.some((note) => note.rule === 'retained-react-context'))
+				.map((row) => row.file),
+		).toEqual(['Consumer.tsx', 'ConsumerMember.tsx']);
+	});
+
 	it('reports a direct native template root that imports a React class', async () => {
 		const boundary = `import { Component as Base, type ReactNode } from 'react';
 class Frame extends Base<{ children: ReactNode }> {
