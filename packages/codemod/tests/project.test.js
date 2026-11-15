@@ -4494,6 +4494,7 @@ export function Leaf(props: { label: string }) {
 				'{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler","strict":true,"paths":{"@example/package/react":["./leaf.ts"]}}}',
 			'leaf.ts': leaf,
 			'Namespace.tsx': app(),
+			'Quoted.tsx': app().replace('<Leaf label={label} />', '<Leaf label="A &amp; B" />'),
 			'Spread.tsx': app().replace('<Leaf label={label} />', '<Leaf {...{ label }} />'),
 			'SpreadIsland.tsx': app('@example/package/react').replace(
 				'<Leaf label={label} />',
@@ -4565,6 +4566,7 @@ root.render(<Leaf label="label" />);`,
 			['Inline.tsx', 4, message],
 			['Named.tsx', 5, message],
 			['Namespace.tsx', 5, message],
+			['Quoted.tsx', 5, message],
 			['Spread.tsx', 5, message],
 			['TopLevel.tsx', 4, message],
 		]);

@@ -448,6 +448,22 @@ root.render(<App />);`;
 		);
 	});
 
+	it.each([
+		['entity references', 'A &amp; B &amp;lt;', '<b>A &amp; B &amp;lt;</b>'],
+		['literal backslashes', String.raw`A\tB`, String.raw`<b>A\tB</b>`],
+		['line breaks', 'A\n  B', '<b>A\n  B</b>'],
+	])('preserves %s in quoted props passed to a server root', (_, name, expected) => {
+		const source = `import { renderToStaticMarkup } from 'react-dom/server';
+function App({ name }: { name: string }) { return <b>{name}</b>; }
+export function render() { return renderToStaticMarkup(<App name="${name}" />); }`;
+		const { code } = transformModule(source, 'root.tsx', {
+			strong: true,
+			strictNullChecks: true,
+		});
+		const { render } = loadCompiledFixtureSource(code, { id: 'root.tsrx', mode: 'server' });
+		expect(render()).toBe(expected);
+	});
+
 	it('keeps factory props when undefined resolves to a local binding', () => {
 		const { code, rules } = transformModule(
 			`import { createElement as h } from 'react';
