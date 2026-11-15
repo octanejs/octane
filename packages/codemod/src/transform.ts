@@ -3492,6 +3492,15 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		);
 	}
 
+	private warnRetainedStore(module: string, name: string, site: ts.Expression) {
+		this.note(
+			RULE.bindings,
+			'warning',
+			site,
+			`If native setup reaches the unchanged ${module} export ${name} through the original workspace entry, its store hook calls React. Provide a compiled Octane hook or keep the component under React.`,
+		);
+	}
+
 	private checkRetainedNamespaceHooks(module: string, binding: ts.Identifier) {
 		const retainedHook = this.options.localReactHook;
 		if (!retainedHook) return;
@@ -3499,23 +3508,36 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		for (const ref of renderUses(this.localUses(binding))) {
 			const member = ref.parent;
 			if (!ts.isPropertyAccessExpression(member) && !ts.isElementAccessExpression(member)) continue;
-			if (member.expression !== ref || ts.isOptionalChain(member)) continue;
+			const call = member.parent;
+			if (
+				member.expression !== ref ||
+				ts.isOptionalChain(member) ||
+				!ts.isCallExpression(call) ||
+				call.expression !== member ||
+				ts.isOptionalChain(call)
+			)
+				continue;
 			const name = ts.isPropertyAccessExpression(member)
 				? member.name.text
 				: ts.isStringLiteralLike(member.argumentExpression) && member.argumentExpression.text;
 			if (!name || !/^use[A-Z0-9]/.test(name) || reported?.has(name)) continue;
+			const setup = this.retainedHookSetup();
 			if (
-				!nativeSetupHook(member, this.localUses, this.checker, {
-					...this.retainedHookSetup(),
-					privateContext: true,
-				})
+				!nativeSetupHook(member, this.localUses, this.checker) &&
+				!nativeSetupHook(member, this.localUses, this.checker, setup) &&
+				!nativeSetupHook(member, this.localUses, this.checker, { ...setup, contextSetup: true })
 			)
 				continue;
 			const local = retainedHook(module, name, false);
-			if (local && typeof local !== 'string' && 'privateContext' in local) {
+			if (!local || typeof local === 'string') continue;
+			if ('retainedStore' in local) this.warnRetainedStore(module, name, member);
+			else if (
+				'privateContext' in local &&
+				nativeSetupHook(member, this.localUses, this.checker, { ...setup, privateContext: true })
+			)
 				this.warnRetainedPrivateContext(module, name, member);
-				(reported ??= new Set()).add(name);
-			}
+			else continue;
+			(reported ??= new Set()).add(name);
 		}
 	}
 
@@ -3624,7 +3646,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 								}),
 							);
 							if (advisorySite) this.warnRetainedPrivateContext(module, name, advisorySite);
-						}
+						} else if (site && local && typeof local !== 'string' && 'retainedStore' in local)
+							this.warnRetainedStore(module, name, site);
 					}
 					if (!dest) {
 						kept.push(item);
