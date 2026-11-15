@@ -7923,7 +7923,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 
 	private checkReactClassOutput(
 		node: ts.Expression,
-		conditional = false,
+		conditional: boolean | 'map' = false,
 		retained = false,
 		descriptorValue = false,
 	) {
@@ -7967,12 +7967,10 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				return;
 			}
 			if (ts.isCallExpression(node)) {
-				if (
-					!conditional &&
-					ts.isPropertyAccessExpression(node.expression) &&
-					node.expression.name.text === 'map'
-				)
-					(this.classOutputMaps ??= new WeakSet()).add(node);
+				const callee = node.expression;
+				if (!ts.isPropertyAccessExpression(callee) || callee.name.text !== 'map') return;
+				if (descriptorValue) this.checkDescriptorMapClassOutput(node, callee.expression);
+				else if (!conditional) (this.classOutputMaps ??= new WeakSet()).add(node);
 				return;
 			}
 		}
@@ -8012,7 +8010,12 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					if (ts.isJsxExpression(fallback) && fallback.expression) {
 						const expression = skipParens(fallback.expression);
 						if (isJsx(expression))
-							this.checkReactClassOutput(expression, true, false, descriptorValue);
+							this.checkReactClassOutput(
+								expression,
+								conditional === 'map' ? 'map' : true,
+								false,
+								descriptorValue,
+							);
 					}
 				}
 			} else if (callee.name !== 'StrictMode') {
@@ -8022,9 +8025,37 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		this.checkReactClassChildren(node, conditional, retained, descriptorValue);
 	}
 
+	private checkDescriptorMapClassOutput(call: ts.CallExpression, receiver: ts.Expression) {
+		const array = skipWrappers(receiver);
+		const [argument] = call.arguments;
+		if (
+			!ts.isArrayLiteralExpression(array) ||
+			!array.elements.some(
+				(element) => !ts.isSpreadElement(element) && !ts.isOmittedExpression(element),
+			) ||
+			call.arguments.length !== 1
+		)
+			return;
+		const fn = skipWrappers(argument);
+		if (
+			(!ts.isArrowFunction(fn) && !ts.isFunctionExpression(fn)) ||
+			fn.modifiers?.length ||
+			fn.asteriskToken
+		)
+			return;
+		const body = fn.body;
+		const output = ts.isBlock(body)
+			? body.statements.length === 1 && ts.isReturnStatement(body.statements[0])
+				? body.statements[0].expression
+				: undefined
+			: body;
+		// The retained map can be overridden and discard its callback's result.
+		if (output) this.checkReactClassOutput(output, 'map', false, true);
+	}
+
 	private checkReactClassChildren(
 		node: ts.JsxElement | ts.JsxFragment,
-		conditional: boolean,
+		conditional: boolean | 'map',
 		retained: boolean,
 		descriptorValue: boolean,
 	) {
@@ -8037,7 +8068,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 
 	private checkReactClassRoot(
 		node: ts.JsxElement | ts.JsxSelfClosingElement,
-		conditional: boolean,
+		conditional: boolean | 'map',
 		retained: boolean,
 	) {
 		const check = this.options.localReactClass;
@@ -8048,8 +8079,9 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		if (!entry || entry.namespace || entry.typeOnly) return;
 		const declaration = ts.findAncestor(this.declarationOf(tag)!, ts.isImportDeclaration);
 		if (!declaration || declaration.attributes) return;
-		const severity = check(entry.module, entry.imported);
-		if (!severity) return;
+		const proof = check(entry.module, entry.imported);
+		if (!proof) return;
+		const severity = conditional === 'map' ? 'warning' : proof;
 		this.note(
 			RULE.classComponent,
 			severity,
