@@ -48,6 +48,7 @@ import {
 	reactClassExports,
 	reactServerComponents,
 	retainedReactComponentReturns,
+	retainedReactContextExports,
 	reverseIslandExports,
 } from './react-island-sources.js';
 
@@ -669,6 +670,35 @@ export async function runCodemod(
 		)
 			return renamed(from, module)?.file === file ? 'error' : 'warning';
 	}
+	const retainedContexts = new Map<string, ReadonlyMap<string, boolean>>();
+	function localReactContext(from: string, module: string, name: string, member: boolean) {
+		if (/[!%?#\\]/.test(module) || catalogName(module) !== null || resolveRename(from, module))
+			return false;
+		const file = localFile(from, module, true);
+		if (!file || known.has(file)) return false;
+		let contexts = retainedContexts.get(file);
+		if (contexts === undefined) {
+			const source = fs.readFileSync(file, 'utf8');
+			contexts = new Map();
+			if (source.includes('createContext') || source.includes('\\')) {
+				const stat = fs.lstatSync(file);
+				if (
+					stat.isFile() &&
+					stat.nlink === 1 &&
+					fs.realpathSync(file) ===
+						path.join((physicalRoot ??= fs.realpathSync(root)), path.relative(root, file)) &&
+					!writesSelectedInput(file) &&
+					installedReact(file)
+				)
+					contexts = retainedReactContextExports(file, source);
+			}
+			retainedContexts.set(file, contexts);
+		}
+		return (
+			(member ? contexts.get(name) === true : contexts.has(name)) &&
+			ts.findConfigFile(path.dirname(from), ts.sys.fileExists) === rootProject
+		);
+	}
 	const localHints = new Map<string, Map<string, string>>();
 	function initializerResourceHint(
 		from: string,
@@ -1249,6 +1279,9 @@ export async function runCodemod(
 					: undefined,
 				localReactClass: renames.has(file)
 					? (module, name) => localReactClass(file, module, name)
+					: undefined,
+				localReactContext: renames.has(file)
+					? (module, name, member) => localReactContext(file, module, name, member)
 					: undefined,
 				localReactRootComponent: renames.has(file)
 					? (module, name) => {
