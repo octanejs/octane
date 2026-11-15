@@ -6708,8 +6708,8 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		}
 		if (
 			(classOutput || this.classOutputMaps?.has(node)) &&
-			!skipsRow &&
-			literal.elements.some((element) => !ts.isSpreadElement(element))
+			literal.elements.some((element) => !ts.isSpreadElement(element)) &&
+			(!skipsRow || this.classOutputMapRow(item, literal, setup))
 		)
 			this.checkReactClassOutput(root);
 		const arm = ts.isConditionalExpression(root)
@@ -7000,6 +7000,42 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			return node.forEachChild(exitsWithValue);
 		};
 		return statements.some(exitsWithValue) ? null : exits;
+	}
+
+	/** A literal row remains after a single numeric equality guard skips its match. */
+	private classOutputMapRow(
+		item: ts.ParameterDeclaration,
+		literal: ts.ArrayLiteralExpression,
+		setup: ts.Statement[],
+	) {
+		const [guard] = setup;
+		if (setup.length !== 1 || !ts.isIfStatement(guard) || guard.elseStatement) return false;
+		const branch = guard.thenStatement;
+		const exit =
+			ts.isBlock(branch) && branch.statements.length === 1 ? branch.statements[0] : branch;
+		const test = skipParens(guard.expression);
+		if (
+			!ts.isReturnStatement(exit) ||
+			!ts.isBinaryExpression(test) ||
+			test.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken
+		)
+			return false;
+		const left = skipWrappers(test.left);
+		const right = skipWrappers(test.right);
+		const compared =
+			ts.isIdentifier(left) && this.declarationOf(left) === item
+				? right
+				: ts.isIdentifier(right) && this.declarationOf(right) === item
+					? left
+					: null;
+		return (
+			compared !== null &&
+			ts.isNumericLiteral(compared) &&
+			literal.elements.some((element) => {
+				const value = skipWrappers(element);
+				return ts.isNumericLiteral(value) && Number(value.text) !== Number(compared.text);
+			})
+		);
 	}
 
 	// The automatic JSX runtime receives props (including children) before its
@@ -7297,18 +7333,38 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 
 	private checkReactClassOutput(value: ts.Expression) {
 		if (!this.options.localReactClass) return;
-		const node = skipParens(value);
+		let node = value;
+		while (isWrapper(node)) {
+			// Explicit string assertions render text even when the value is a descriptor.
+			if (
+				(ts.isAsExpression(node) ||
+					ts.isSatisfiesExpression(node) ||
+					ts.isTypeAssertionExpression(node)) &&
+				node.type.kind === ts.SyntaxKind.StringKeyword
+			)
+				return;
+			node = node.expression;
+		}
 		if (ts.isConditionalExpression(node)) {
 			const condition = literalCondition(node.condition);
 			if (condition === undefined || condition === 'truthy')
 				this.checkReactClassOutput(node.whenTrue);
 			if (condition !== 'truthy') this.checkReactClassOutput(node.whenFalse);
-		} else if (
-			ts.isBinaryExpression(node) &&
-			node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
-		) {
-			const condition = literalCondition(node.left);
-			if (condition === undefined || condition === 'truthy') this.checkReactClassOutput(node.right);
+		} else if (ts.isBinaryExpression(node)) {
+			const operator = node.operatorToken.kind;
+			const condition = isJsx(skipWrappers(node.left)) ? 'truthy' : literalCondition(node.left);
+			if (operator === ts.SyntaxKind.AmpersandAmpersandToken) {
+				if (condition === undefined || condition === 'truthy')
+					this.checkReactClassOutput(node.right);
+			} else if (
+				operator === ts.SyntaxKind.BarBarToken ||
+				operator === ts.SyntaxKind.QuestionQuestionToken
+			) {
+				const usesFallback =
+					operator === ts.SyntaxKind.BarBarToken ? condition !== 'truthy' : condition === 'nullish';
+				if (!usesFallback) this.checkReactClassOutput(node.left);
+				if (usesFallback || condition === undefined) this.checkReactClassOutput(node.right);
+			}
 		} else if (ts.isCallExpression(node)) {
 			if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'map')
 				(this.classOutputMaps ??= new WeakSet()).add(node);

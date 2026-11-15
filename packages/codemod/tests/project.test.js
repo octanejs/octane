@@ -328,6 +328,20 @@ export function App({ enabled }: { enabled: boolean }) { return ${jsx}; }`;
 			'MemberFragment.tsx': '<main><React.Fragment>{enabled && <Frame />}</React.Fragment></main>',
 			'MapChild.tsx': '<main>{[1].map((row) => <Frame key={row} />)}</main>',
 			'MapRoot.tsx': '[1].map((row) => <Frame key={row} />)',
+			'MapContinues.tsx':
+				'<main>{[1, 2].map((row) => { if (row === 1) return null; return <Frame />; })}</main>',
+			'MapSkipsAll.tsx':
+				'<main>{[1].map((row) => { if (row === 1) return null; return <Frame />; })}</main>',
+			'MapUnconditionalExit.tsx':
+				'<main>{[1].map((_row) => { return null; return <Frame />; })}</main>',
+			'AssertedHole.tsx': '<main>{((<Frame /> as unknown) satisfies unknown)!}</main>',
+			'StringAssertion.tsx': '<main>{((<Frame /> as unknown as string) satisfies unknown)!}</main>',
+			'StringSatisfies.tsx': '<main>{((<Frame /> as unknown) satisfies string)!}</main>',
+			'FallbackOr.tsx': '<main>{enabled || <Frame />}</main>',
+			'FallbackNullish.tsx': '<main>{(enabled ? null : 0) ?? <Frame />}</main>',
+			'FallbackLeft.tsx': '<main>{(<Frame /> as unknown) ?? <i />}</main>',
+			'DeadFallback.tsx': '<main>{true || <Frame />}{false ?? <Frame />}</main>',
+			'DeadFallbackAfterJsx.tsx': '<main>{<i /> || <Frame />}{<i /> ?? <Frame />}</main>',
 			'DeadHole.tsx': '<div>{false && <Frame />}{true ? null : <Frame />}</div>',
 			'UnusedMap.tsx': '<main>{[].map((row) => <Frame key={row} />)}</main>',
 			'SpreadMap.tsx': '<main>{[...[]].map((row) => <Frame key={row} />)}</main>',
@@ -378,12 +392,17 @@ export function App() { const Group = Holder; return <div><Group><Frame /></Grou
 					)
 					.sort(),
 			).toEqual([
+				['AssertedHole.tsx', includeClass ? 'error' : 'warning'],
 				['ClassName.tsx', includeClass ? 'error' : 'warning'],
 				['Composed.tsx', includeClass ? 'error' : 'warning'],
 				['ConditionalHole.tsx', includeClass ? 'error' : 'warning'],
 				['DirectHole.tsx', includeClass ? 'error' : 'warning'],
+				['FallbackLeft.tsx', includeClass ? 'error' : 'warning'],
+				['FallbackNullish.tsx', includeClass ? 'error' : 'warning'],
+				['FallbackOr.tsx', includeClass ? 'error' : 'warning'],
 				['LogicalHole.tsx', includeClass ? 'error' : 'warning'],
 				['MapChild.tsx', includeClass ? 'error' : 'warning'],
+				['MapContinues.tsx', includeClass ? 'error' : 'warning'],
 				['MapRoot.tsx', includeClass ? 'error' : 'warning'],
 				['MemberFragment.tsx', includeClass ? 'error' : 'warning'],
 				['NamedFragment.tsx', includeClass ? 'error' : 'warning'],
