@@ -37,7 +37,7 @@ import {
 	transformModule,
 } from './transform.js';
 import { directRendererCalls, nativeExternalStore } from './local-react-hook.js';
-import { forwardedProps } from './forwarded-props.js';
+import { contains, forwardedProps } from './forwarded-props.js';
 import {
 	importsReactBridge,
 	islandComponents,
@@ -1719,11 +1719,11 @@ export async function runCodemod(
 			);
 		}
 	}
-	const scanRename = (from: string, specifier: string) =>
+	const scanRename = (from: string, specifier: string, commonJs?: () => boolean) =>
 		renamed(
 			from,
 			specifier,
-			(winner) => checkLinkedRename(winner, from),
+			commonJs ? undefined : (winner) => checkLinkedRename(winner, from),
 			(file) => {
 				if (!renameConflicts.has(file)) {
 					renameConflicts.set(
@@ -1734,6 +1734,7 @@ export async function runCodemod(
 					);
 				}
 			},
+			commonJs,
 		)?.specifier ?? null;
 	function protectIslandModule(issuer: string, specifier: string, owner: string) {
 		const file = ts.resolveModuleName(
@@ -2441,6 +2442,7 @@ function renamedImports(
 		specifier: string,
 		unmatched?: (file: string) => void,
 		separateRuntime?: (file: string) => void,
+		commonJs?: () => boolean,
 	) => {
 		const matches = specifier.startsWith('.')
 			? []
@@ -2450,7 +2452,15 @@ function renamedImports(
 						: specifier.startsWith(start) && specifier.endsWith(end),
 				);
 		if (!renames.size || (!specifier.startsWith('.') && !matches.length)) return null;
-		const resolved = ts.resolveModuleName(specifier, from, options, ts.sys, cache).resolvedModule;
+		const resolved = ts.resolveModuleName(
+			specifier,
+			from,
+			options,
+			ts.sys,
+			cache,
+			undefined,
+			commonJs ? ts.ModuleKind.CommonJS : undefined,
+		).resolvedModule;
 		// TypeScript returns slash-delimited names, including on Windows.
 		const file = resolved && path.normalize(resolved.resolvedFileName);
 		const runtime = /^\.{1,2}\/.*\.jsx?$/.test(specifier)
@@ -2458,7 +2468,11 @@ function renamedImports(
 			: null;
 		if (file && runtime && file !== runtime) {
 			const selectedRuntime = renames.has(runtime) ? runtime : linkedRename(runtime);
-			if (selectedRuntime && selectedRuntime !== file && runtimeImport(from, specifier)) {
+			if (
+				selectedRuntime &&
+				selectedRuntime !== file &&
+				(commonJs?.() ?? runtimeImport(from, specifier))
+			) {
 				separateRuntime?.(selectedRuntime);
 				return null;
 			}
@@ -2472,7 +2486,7 @@ function renamedImports(
 			runtime &&
 			file.endsWith('.tsx') &&
 			ts.sys.fileExists(runtime) &&
-			runtimeImport(from, specifier)
+			(commonJs?.() ?? runtimeImport(from, specifier))
 		) {
 			// Preserve the runtime path and the TypeScript source it uses for types.
 			separateRuntime?.(file);
@@ -3043,6 +3057,84 @@ async function planEntryPages(
 	return updated;
 }
 
+/** A strict identity test observes the loader's main module without exposing it. */
+function comparesMainModule(node: ts.Node) {
+	const test = node.parent;
+	if (
+		!ts.isBinaryExpression(test) ||
+		(test.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken &&
+			test.operatorToken.kind !== ts.SyntaxKind.ExclamationEqualsEqualsToken)
+	)
+		return false;
+	const [main, module] = ts.isIdentifier(test.left)
+		? [test.right, test.left]
+		: [test.left, test.right];
+	return (
+		ts.isIdentifier(module) &&
+		module.text === 'module' &&
+		ts.isPropertyAccessExpression(main) &&
+		main.name.text === 'main' &&
+		ts.isIdentifier(main.expression) &&
+		main.expression.text === 'require'
+	);
+}
+
+function observesRequire(member: ts.PropertyAccessExpression) {
+	const use = member.parent;
+	if (member.name.text === 'main') return comparesMainModule(member);
+	if (member.name.text === 'resolve') return ts.isCallExpression(use) && use.expression === member;
+	if (member.name.text !== 'cache') return false;
+	// Cache entries are mutable Module objects. A presence test or deleting the
+	// map entry does not expose an object that can replace the wrapper's loader.
+	const entry = ts.isElementAccessExpression(use) && use.expression === member ? use : member;
+	const parent = entry.parent;
+	return (
+		(ts.isPrefixUnaryExpression(parent) && parent.operator === ts.SyntaxKind.ExclamationToken) ||
+		(ts.isIfStatement(parent) && parent.expression === entry) ||
+		(entry !== member && ts.isDeleteExpression(parent))
+	);
+}
+
+/** Positions of calls to the CommonJS wrapper's own `require`. */
+function commonJsRequires(file: string, code: string) {
+	const calls = new Set<number>();
+	const format = ts.getImpliedNodeFormatForFile(file, undefined, ts.sys, {
+		moduleResolution: ts.ModuleResolutionKind.NodeNext,
+	});
+	if (format !== ts.ModuleKind.CommonJS) return calls;
+	const { sf, checker } = bind(file, code);
+	const opaque = contains(sf, (node) => {
+		if (ts.isWithStatement(node)) return true;
+		if (!ts.isIdentifier(node)) return false;
+		const parent = node.parent;
+		if (ts.isPropertyAccessExpression(parent) && parent.name === node) return false;
+		// Dynamic scope and the wrapper's arguments can change the loader.
+		if (node.text === 'eval' || node.text === 'arguments') return true;
+		// Node's wrapper delegates to module.require. Allow ordinary exports assignments.
+		if (
+			node.text === 'module' &&
+			!comparesMainModule(node) &&
+			!(
+				ts.isPropertyAccessExpression(parent) &&
+				parent.expression === node &&
+				parent.name.text === 'exports'
+			)
+		)
+			return true;
+		if (
+			node.text !== 'require' ||
+			checker.resolveName(node.text, node, ts.SymbolFlags.Value, false)?.declarations?.length
+		)
+			return false;
+		if (ts.isPropertyAccessExpression(parent)) return !observesRequire(parent);
+		if (!ts.isCallExpression(parent) || parent.expression !== node) return true;
+		calls.add(node.end);
+		return false;
+	});
+	if (opaque) calls.clear();
+	return calls;
+}
+
 /**
  * Follow imports outside the migrated paths as well as exact path strings
  * in scripts and configs. Parse TSRX importers with their own grammar so
@@ -3053,7 +3145,7 @@ function rewriteModulePaths(
 	file: string,
 	root: string,
 	renames: Map<string, string>,
-	resolveRename: (from: string, specifier: string) => string | null,
+	resolveRename: (from: string, specifier: string, commonJs?: () => boolean) => string | null,
 	unmatched?: (file: string, issuer: string) => void,
 ): { code: string; count: number } | null {
 	const edits: { start: number; end: number; text: string }[] = [];
@@ -3108,9 +3200,31 @@ function rewriteModulePaths(
 		if (program) visit(program);
 	} else {
 		const sf = ts.createSourceFile(file, code, ts.ScriptTarget.Latest, true);
+		const mayRequire = file.endsWith('.js') && !ts.isExternalModule(sf);
+		let requires: Set<number> | undefined;
 		const visit = (node: ts.Node) => {
 			if (ts.isStringLiteralLike(node)) {
 				const p = node.parent;
+				if (
+					mayRequire &&
+					ts.isCallExpression(p) &&
+					p.arguments[0] === node &&
+					p.arguments.length === 1 &&
+					!p.questionDotToken &&
+					ts.isIdentifier(p.expression) &&
+					p.expression.text === 'require' &&
+					/^\.{1,2}\/.*\.js$/.test(node.text)
+				) {
+					const callee = p.expression;
+					let preservesRequire = false;
+					resolveRename(file, node.text, () => {
+						requires ??= commonJsRequires(file, code);
+						preservesRequire = requires.has(callee.end);
+						return preservesRequire;
+					});
+					// A split blocks the rename and keeps this call intact in preview.
+					if (preservesRequire) return;
+				}
 				const moduleSource =
 					((ts.isImportDeclaration(p) || ts.isExportDeclaration(p)) &&
 						p.moduleSpecifier === node) ||
