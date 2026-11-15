@@ -14,6 +14,10 @@ interface OctaneCompatHostPresentation {
 	hostClassName?: string;
 	/** React style on the host element, replacing the default `display: contents`. */
 	hostStyle?: React.CSSProperties;
+	/** Accessibility role on the React-owned host element. */
+	hostRole?: React.HTMLAttributes<HTMLElement>['role'];
+	/** Accessible name on the React-owned host element. */
+	hostAriaLabel?: React.AriaAttributes['aria-label'];
 }
 
 export interface OctaneCompatProps extends OctaneCompatHostPresentation {
