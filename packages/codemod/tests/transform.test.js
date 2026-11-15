@@ -793,6 +793,35 @@ export type Qualified = typeof R.createRef;`,
 		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(2);
 	});
 
+	it.each([
+		'interface Metadata extends Point.Original {}',
+		'class Metadata implements Point.Original { valid = true as const; }',
+	])('keeps the original React Touch type used in a heritage clause', (heritage) => {
+		const declaration = "import type { Touch as Point } from 'react';";
+		const { code, notes } = transformModule(`${declaration} export ${heritage}`, 'points.ts');
+		expect(code).toContain(declaration);
+		expect(code).toContain(heritage);
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+		);
+	});
+
+	it.each([
+		"import type * as R from 'react';",
+		"import type R from 'react';",
+		"import type * as R from 'react' with { 'resolution-mode': 'require' };",
+	])('keeps React Touch namespace heritage and still migrates generic arguments', (declaration) => {
+		const { code, notes } = transformModule(
+			`${declaration} export interface Metadata extends R.Touch.Original<R.ReactNode> {}`,
+			'points.ts',
+		);
+		expect(code).toContain(declaration);
+		expect(code).toContain('extends R.Touch.Original<OctaneNode>');
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'warning' }),
+		);
+	});
+
 	it('keeps nested React Touch types on their original namespace', () => {
 		const { code, notes } = transformModule(
 			`import type * as R from 'react';
@@ -1889,7 +1918,7 @@ declare module 'react' {
 			'types.ts',
 		);
 		expect(notes).toEqual([
-			expect.objectContaining({ rule: 'unsupported-api', severity: 'error', line: 2 }),
+			expect.objectContaining({ rule: 'react-type-projection', severity: 'error', line: 2 }),
 		]);
 		expect(code).toContain("export type Value = import('octane').OctaneNode;");
 	});
@@ -1904,10 +1933,90 @@ declare module 'react' {
 			'types.ts',
 		);
 		expect(notes).toEqual([
-			expect.objectContaining({ rule: 'unsupported-api', severity: 'error', line: 2 }),
+			expect.objectContaining({ rule: 'react-type-projection', severity: 'error', line: 2 }),
 		]);
 		expect(code).toContain('Props = R.ConsumerProps<OctaneNode>');
 		expect(code).toContain('Node = OctaneNode');
+	});
+
+	it('does not map a React value query using type-only exports', () => {
+		const { code, notes } = transformModule(
+			`import type * as R from 'react';
+			declare module 'react' { const ReactNode: { token: string }; }
+			export type Inline = typeof import('react').ReactNode;
+			export type Qualified = typeof R.ReactNode.token;`,
+			'types.ts',
+		);
+		expect(notes.filter(({ rule }) => rule === 'react-type-projection')).toEqual([
+			expect.objectContaining({ severity: 'error', line: 3 }),
+			expect.objectContaining({ severity: 'error', line: 4 }),
+		]);
+		expect(code).toContain("export type Inline = typeof import('octane').ReactNode;");
+	});
+
+	it('preserves value queries for the React allocator and leaves other owners alone', () => {
+		const { code, notes } = transformModule(
+			`import type * as R from 'react';
+			import type { createRef } from 'react';
+			export type Allocator = typeof createRef;
+			export type InlineAllocator = typeof import('react').createRef;
+			export type Memo = typeof R.memo;
+			export type InlineMemo = typeof import('react').memo;
+			export function read(createRef: 42, R: { Profiler: string }) {
+				const value: typeof createRef = createRef;
+				const other: typeof R.Profiler = R.Profiler;
+				return [value, other];
+			}`,
+			'types.ts',
+		);
+		expect(notes.some(({ rule }) => rule === 'react-type-projection')).toBe(false);
+		expect(code).toContain("export type InlineAllocator = typeof import('react').createRef;");
+		expect(code).toContain("export type InlineMemo = typeof import('octane').memo;");
+		expect(code).toContain('const other: typeof R.Profiler = R.Profiler;');
+	});
+
+	it('preserves nested value queries for an original React export', () => {
+		const source = `import type * as R from 'react';
+			import type Original from 'react' with { 'resolution-mode': 'require' };
+			export type Inline = typeof import('react').createRef.length;
+			export type Qualified = typeof R.createRef.length;
+			export type StaticDeep = typeof R.createRef.prototype.more;
+			export type Attributed = typeof Original /* keep */ .createRef.prototype.more;`;
+		const { code, notes } = transformModule(source, 'types.ts');
+		expect(notes).toEqual([]);
+		expect(code).toContain("Inline = typeof import('react').createRef.length;");
+		expect(code).toContain("import type * as R from 'react';");
+		expect(code).toContain('Qualified = typeof R.createRef.length;');
+		expect(code).toContain('StaticDeep = typeof R.createRef.prototype.more;');
+		expect(code).toContain(
+			"import type Original from 'react' with { 'resolution-mode': 'require' };",
+		);
+		expect(code).toContain('Attributed = typeof Original /* keep */ .createRef.prototype.more;');
+	});
+
+	it('keeps the owner of a nested ref query when a named allocator is shadowed', () => {
+		const { code, notes } = transformModule(
+			`import React,{ createRef, useState }from 'react';
+			 export type Allocator = typeof createRef;
+			 export function useCounter() {
+			   const createRef = true;
+			   type RefLength = typeof React.createRef.length;
+			   return [useState(0), createRef, null as unknown as RefLength];
+			 }`,
+			'types.ts',
+		);
+		expect(notes).toEqual([]);
+		expect(code).toContain("import React from 'react';");
+		expect(code).toContain("import { useState } from 'octane';");
+		expect(code).toContain('type RefLength = typeof React.createRef.length;');
+	});
+
+	it('preserves combined default and namespace owners for nested retained queries', () => {
+		const source = `import React, * as R from 'react';
+			export type Queries = [typeof React.createRef.prototype.more, typeof R.createRef.prototype.more];`;
+		const { code, notes } = transformModule(source, 'types.ts');
+		expect(code).toBe(source);
+		expect(notes).toEqual([]);
 	});
 
 	it('reports explicit React type re-exports when Octane lacks the authored spelling', () => {
@@ -1919,17 +2028,17 @@ declare module 'react' {
 		);
 		expect(notes).toEqual([
 			expect.objectContaining({
-				rule: 'unsupported-api',
+				rule: 'react-type-projection',
 				severity: 'error',
 				message: expect.stringContaining('ConsumerProps'),
 			}),
 			expect.objectContaining({
-				rule: 'unsupported-api',
+				rule: 'react-type-projection',
 				severity: 'error',
 				message: expect.stringContaining('SyntheticEvent'),
 			}),
 			expect.objectContaining({
-				rule: 'unsupported-api',
+				rule: 'react-type-projection',
 				severity: 'error',
 				message: expect.stringContaining('TouchList'),
 			}),

@@ -209,6 +209,7 @@ export {
 	ssrText,
 	ssrTextPre,
 	ssrTextSlot,
+	ssrRootTextMarker,
 	ssrNestingText,
 	ssrChild,
 	ssrChildText,

@@ -38,6 +38,7 @@ import {
 	TEXT_FIELD_COMPONENTS,
 	TEXT_INPUT_TYPES,
 	UNSUPPORTED_VALUES,
+	hasOctaneValue,
 	isComputedReactHookOrRef,
 	mapPackageExport,
 	mapQualifiedType,
@@ -85,8 +86,21 @@ function isValueTypeQuery(name: ts.EntityName) {
 	return ts.isTypeQueryNode(name.parent) && name.parent.exprName === name;
 }
 
+/** The lexical root of an interface base or class implements type. */
+function typeHeritageRoot(node: ts.ExpressionWithTypeArguments) {
+	if (!ts.isPartOfTypeNode(node)) return;
+	let root = node.expression;
+	while (ts.isPropertyAccessExpression(root) && !root.questionDotToken) root = root.expression;
+	if (ts.isIdentifier(root) && root !== node.expression) return root;
+}
+
 function needsTouchValueOrNamespace(ref: ts.Identifier) {
-	return isValueTypeQuery(ref) || (ts.isQualifiedName(ref.parent) && ref.parent.left === ref);
+	if (isValueTypeQuery(ref) || (ts.isQualifiedName(ref.parent) && ref.parent.left === ref))
+		return true;
+	let access: ts.Node = ref;
+	while (ts.isPropertyAccessExpression(access.parent) && access.parent.expression === access)
+		access = access.parent;
+	return ts.isExpressionWithTypeArguments(access.parent) && typeHeritageRoot(access.parent) === ref;
 }
 
 type Severity = Note['severity'];
@@ -120,6 +134,7 @@ export const CONTEXT_ALIAS = 'context-path-alias';
 export const CONTEXT_PROVIDER_GETTER = 'context-provider-getter';
 export const ELEMENT_CHILD_ALIAS = 'element-child-path-alias';
 export const INTL_PROVIDER_DEFAULTS = 'intl-provider-defaults';
+export const REACT_TYPE_PROJECTION = 'react-type-projection';
 
 /** Rule names, as reported. */
 const RULE = {
@@ -505,7 +520,7 @@ function nodeSpanning(sf: ts.SourceFile, start: number, end: number): ts.Node | 
 	}
 }
 
-function rowKeyLiteral(node: ts.Expression) {
+function isPrimitiveLiteral(node: ts.Expression) {
 	node = skipWrappers(node);
 	if (ts.isPrefixUnaryExpression(node)) {
 		const operand = skipWrappers(node.operand);
@@ -3416,10 +3431,22 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 
 	private retainedRegistryFactoryImport(react: ts.ImportDeclaration) {
 		const resolveRegistry = this.options.retainedRegistry;
-		const statements = this.sf.statements;
+		if (!resolveRegistry) return false;
+		// Check the registration shape without the inert exported constants.
+		const statements = this.sf.statements.filter((statement) => {
+			if (
+				!ts.isVariableStatement(statement) ||
+				statement.modifiers?.length !== 1 ||
+				statement.modifiers[0].kind !== ts.SyntaxKind.ExportKeyword ||
+				(statement.declarationList.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+				statement.declarationList.declarations.length !== 1
+			)
+				return true;
+			const { name, initializer, type } = statement.declarationList.declarations[0];
+			return !ts.isIdentifier(name) || !!type || !initializer || !isPrimitiveLiteral(initializer);
+		});
 		const bindings = react.importClause?.namedBindings;
 		if (
-			!resolveRegistry ||
 			statements.length !== 3 ||
 			!statements.slice(0, 2).every(ts.isImportDeclaration) ||
 			react.attributes ||
@@ -3958,7 +3985,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						mapped?.name !== name &&
 						mapReactImport(module, name, false)?.name !== name
 					)
-						this.note(RULE.unsupported, 'error', item, `Octane has no export \`${name}\`.`);
+						this.note(REACT_TYPE_PROJECTION, 'error', item, `Octane has no export \`${name}\`.`);
 					migrated.push(text);
 				}
 			}
@@ -4179,12 +4206,21 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			return null;
 		}
 		const name = qualifier && ts.isIdentifier(qualifier) ? qualifier.text : null;
-		if (
-			node.isTypeOf &&
-			name &&
-			mapReactImport(specifier.text, name, true)?.module === specifier.text
-		) {
-			return null;
+		let missingValue = false;
+		if (specifier.text === 'react' && node.isTypeOf && qualifier) {
+			let value = qualifier;
+			while (ts.isQualifiedName(value)) value = value.left;
+			const retained = mapReactImport('react', value.text, true)?.module === 'react';
+			if (retained) return null;
+			if (!hasOctaneValue(value.text)) {
+				missingValue = true;
+				this.note(
+					REACT_TYPE_PROJECTION,
+					'error',
+					value,
+					`Octane has no value export \`${value.text}\`.`,
+				);
+			}
 		}
 		if (specifier.text === 'react' && !node.isTypeOf) {
 			const event = this.nativeEventType(node, name);
@@ -4194,11 +4230,13 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 		}
 		this.count(RULE.import);
-		const renamed = name === null ? null : mapQualifiedType(name, specifier.text, node.isTypeOf);
-		if (name !== null && renamed === null) {
+		const renamed =
+			name === null || missingValue ? null : mapQualifiedType(name, specifier.text, node.isTypeOf);
+		if (name !== null && renamed === null && !missingValue) {
+			const unresolvedProjection = specifier.text === 'react' && !node.isTypeOf;
 			this.note(
-				RULE.unsupported,
-				specifier.text === 'react' && !node.isTypeOf ? 'error' : 'warning',
+				unresolvedProjection ? REACT_TYPE_PROJECTION : RULE.unsupported,
+				unresolvedProjection ? 'error' : 'warning',
 				node,
 				`Octane has no type \`${name}\`.`,
 			);
@@ -4737,12 +4775,29 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				}
 			}
 		}
-		if (ts.isTypeQueryNode(node.parent)) {
-			const mapped = mapReactImport(namespace?.module ?? 'react', node.right.text, true);
+		let queried: ts.QualifiedName = node;
+		if (namespace?.module === 'react') {
+			while (ts.isQualifiedName(queried.parent) && queried.parent.left === queried)
+				queried = queried.parent;
+		}
+		if (ts.isTypeQueryNode(queried.parent) && queried.parent.exprName === queried) {
+			const name = node.right.text;
+			const mapped = mapReactImport(namespace?.module ?? 'react', name, true);
 			if (mapped?.module === 'react') {
 				if (!namespace) return null;
+				const declaration = ts.isIdentifier(node.left) ? this.declarationOf(node.left) : null;
+				const clause =
+					declaration && (ts.isNamespaceImport(declaration) ? declaration.parent : declaration);
+				if (clause && ts.isImportClause(clause) && (queried !== node || clause.parent.attributes)) {
+					this.retainedTypeNamespaces.add(clause);
+					return node.getText(this.sf);
+				}
 				this.count(RULE.import);
 				return this.require(mapped.module, mapped.name, true);
+			}
+			if (namespace?.module === 'react' && !hasOctaneValue(name)) {
+				this.note(REACT_TYPE_PROJECTION, 'error', node, `Octane has no value export \`${name}\`.`);
+				return null;
 			}
 		}
 		const name = mapQualifiedType(
@@ -4752,9 +4807,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		);
 		if (!name) {
 			if (namespace) this.used.add(namespace.local);
+			const unresolvedProjection =
+				namespace?.module === 'react' && ts.isTypeReferenceNode(node.parent);
 			this.note(
-				RULE.unsupported,
-				namespace?.module === 'react' && ts.isTypeReferenceNode(node.parent) ? 'error' : 'warning',
+				unresolvedProjection ? REACT_TYPE_PROJECTION : RULE.unsupported,
+				unresolvedProjection ? 'error' : 'warning',
 				node,
 				`Octane has no type \`${node.getText(this.sf)}\`.`,
 			);
@@ -4768,6 +4825,27 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		node: ts.TypeReferenceNode | ts.ExpressionWithTypeArguments,
 		name: ts.EntityName | ts.Expression,
 	) {
+		if (ts.isExpressionWithTypeArguments(node)) {
+			const root = typeHeritageRoot(node);
+			const entry = root && this.importOf(root);
+			const member = root && directMember(root);
+			if (root && entry && member && (entry.module === 'react' || entry.module === 'react-dom')) {
+				if (entry.namespace && member.text === 'Touch' && member.parent !== name) {
+					const decl = this.declarationOf(root);
+					const clause = decl && (ts.isNamespaceImport(decl) ? decl.parent : decl);
+					if (clause && ts.isImportClause(clause)) {
+						this.reportRetainedTouchType(entry.module, member, false, true);
+						this.retainedTypeNamespaces.add(clause);
+						return name.getText(this.sf) + this.span(node, name.end, node.end, PLAIN);
+					}
+				}
+				if (entry.module === 'react' && entry.imported === 'Touch') {
+					this.used.add(entry.local);
+					return name.getText(this.sf) + this.span(node, name.end, node.end, PLAIN);
+				}
+			}
+		}
+
 		// Type heritage parses a qualified name as a property access expression.
 		if (
 			ts.isExpressionWithTypeArguments(node) &&
@@ -7346,7 +7424,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				last &&
 				ts.isSwitchStatement(last) &&
 				!literal &&
-				!rowKeyLiteral(last.expression) &&
+				!isPrimitiveLiteral(last.expression) &&
 				!fn.asteriskToken &&
 				!fn.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
 				last.caseBlock.clauses.some((clause) => clauseReturnsJsx(clause.statements) === true)
@@ -7400,7 +7478,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				if (!value.expression) return false;
 				const expression = skipWrappers(value.expression);
 				return !(
-					rowKeyLiteral(expression) ||
+					isPrimitiveLiteral(expression) ||
 					(ts.isIdentifier(expression) &&
 						fixedBinding(this.checker, expression, expression) &&
 						initializedBefore(this.checker, expression, expression))
@@ -7523,7 +7601,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		};
 		const safePrefix = (expr: ts.Expression): boolean => {
 			const value = skipWrappers(expr);
-			if (rowKeyLiteral(value)) return true;
+			if (isPrimitiveLiteral(value)) return true;
 			if (ts.isVoidExpression(value)) return safePrefix(value.expression);
 			if (ts.isBinaryExpression(value))
 				return (
@@ -7542,7 +7620,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 						? safeObjectSpread(property.expression)
 						: ts.isPropertyAssignment(property) &&
 							(!ts.isComputedPropertyName(property.name) ||
-								rowKeyLiteral(property.name.expression)) &&
+								isPrimitiveLiteral(property.name.expression)) &&
 							safePrefix(property.initializer),
 				)
 			);
@@ -7603,7 +7681,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				for (const { expression } of read.templateSpans) {
 					if (readsOrdinal(expression)) return true;
 					// Each interpolation is coerced to text before the next one runs.
-					if (!rowKeyLiteral(expression)) return false;
+					if (!isPrimitiveLiteral(expression)) return false;
 				}
 				return false;
 			}
@@ -7619,7 +7697,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					if (ts.isComputedPropertyName(property.name)) {
 						const key = property.name.expression;
 						if (readsOrdinal(key)) return true;
-						if (!rowKeyLiteral(key)) return false;
+						if (!isPrimitiveLiteral(key)) return false;
 					}
 					if (ts.isShorthandPropertyAssignment(property)) return readsOrdinal(property.name);
 					if (ts.isPropertyAssignment(property)) {
@@ -7647,10 +7725,13 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					ts.isArrowFunction(callee) &&
 					!callee.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
 					callee.parameters.length === 0 &&
-					read.arguments.length === 0 &&
-					!ts.isBlock(callee.body)
-				)
-					return readsOrdinal(callee.body);
+					read.arguments.length === 0
+				) {
+					if (!ts.isBlock(callee.body)) return readsOrdinal(callee.body);
+					if (callee.body.statements.length !== 1) return false;
+					const [statement] = callee.body.statements;
+					return ts.isReturnStatement(statement) && readsOrdinal(statement.expression);
+				}
 				// Optional calls can skip their arguments, and earlier arguments or a
 				// member getter can interrupt evaluation before the ordinal read.
 				if (!ts.isArrowFunction(callee) && (ts.isOptionalChain(read) || !ts.isIdentifier(callee)))
@@ -7849,14 +7930,14 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	}
 
 	private stableRowKey(key: ts.Expression, item: ts.ParameterDeclaration, iterable: ts.Expression) {
-		if (rowKeyLiteral(key)) return true;
+		if (isPrimitiveLiteral(key)) return true;
 		key = skipWrappers(key);
 		const source = skipWrappers(iterable);
 		return (
 			ts.isIdentifier(key) &&
 			this.declarationOf(key) === item &&
 			ts.isArrayLiteralExpression(source) &&
-			source.elements.every(rowKeyLiteral) &&
+			source.elements.every(isPrimitiveLiteral) &&
 			fixedBinding(this.checker, key, key)
 		);
 	}
@@ -7879,7 +7960,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					(statement.declarationList.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
 					statement.declarationList.declarations.every(
 						({ name, initializer }) =>
-							ts.isIdentifier(name) && initializer !== undefined && rowKeyLiteral(initializer),
+							ts.isIdentifier(name) && initializer !== undefined && isPrimitiveLiteral(initializer),
 					),
 			) && !reads(key, (name) => name.text === 'eval' && !isPropertyName(name))
 		);

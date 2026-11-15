@@ -15814,10 +15814,11 @@ function ssrEmitNodes(
 	// and leave the client's hydration walk a node short (React has the same
 	// problem and the same cure: a `<!-- -->` comment between adjacent texts).
 	// Emit the separator between two text-producing siblings whenever at least
-	// one side is a DYNAMIC hole; static/static pairs stay markerless (the
-	// client bakes those folded into the template, so the merged node adopts
-	// cleanly). Empty static literals serialize nothing and are transparent to
-	// adjacency. The client counterpart is the hole-aware `sibling()` walk in
+	// one side is a dynamic hole. Static host children fold into one node. A
+	// compiled body's literal roots each have their own slot, so emit hydration
+	// markers to separate adjacent literals and occupy empty ones. Empty literals
+	// stay transparent to the adjacency test so existing dynamic separators are
+	// preserved. The client counterpart is the hole-aware `sibling()` walk in
 	// runtime.ts, which treats separators as protocol nodes. Keep the comment
 	// payload in sync with HYDRATION_TEXT_SEP (constants.ts).
 	//
@@ -15828,11 +15829,20 @@ function ssrEmitNodes(
 	// that one `<!>`, and an empty range leaves nothing to claim. Only a host
 	// element's sole child needs no stand-in: the client mounts it with htext,
 	// which hydrates an empty host as ''.
-	const textSlots = nodes.length > 1 || ctx._ssrHostChildPos !== true;
+	const hostChildren = ctx._ssrHostChildPos === true;
+	const textSlots = nodes.length > 1 || !hostChildren;
 	let prevText = null; // 'static' | 'dyn' | null — last emitted part's text kind
 	for (const n of nodes) {
 		const kind = textAdjacencyKind(n, ctx);
-		if (kind === 'empty') continue; // serializes nothing — skip, adjacency-transparent
+		// A root literal occupies its own client text slot. Inside host elements,
+		// the client instead folds static runs and drops empty literal children.
+		if (kind === 'empty') {
+			if (!hostChildren) {
+				ctx.runtimeNeeded.add('ssrRootTextMarker');
+				parts.push(ssrCall('ssrRootTextMarker', [b.literal(false)], n));
+			}
+			continue;
+		}
 		const nlGuard = nlGuardFirst && parts.length === 0;
 		let p = ssrEmitNode(n, ctx, name, inlinedSubs, parentNs, cssHash, componentNs, nlGuard);
 		if (p && kind === 'dyn' && textSlots) {
@@ -15840,8 +15850,13 @@ function ssrEmitNodes(
 			p = ssrCall('ssrTextSlot', [p], n);
 		}
 		if (p) {
-			if (kind !== 'other' && prevText !== null && (kind === 'dyn' || prevText === 'dyn')) {
-				parts.push('<!-- -->');
+			if (kind !== 'other' && prevText !== null) {
+				if (kind === 'dyn' || prevText === 'dyn') {
+					parts.push('<!-- -->');
+				} else if (!hostChildren) {
+					ctx.runtimeNeeded.add('ssrRootTextMarker');
+					parts.push(ssrCall('ssrRootTextMarker', [b.literal(true)], n));
+				}
 			}
 			parts.push(p);
 			prevText = kind === 'other' ? null : kind;
@@ -35435,10 +35450,14 @@ function emitElementHtml(
 			// `<button formAction={fn}>` is routed to setFormAction, which intercepts
 			// submit and calls the function with FormData (string values fall back to
 			// the native attribute at runtime). Static string actions were already
-			// inlined into the HTML above via the literal path.
+			// inlined into the HTML above via the literal path. A value that is a
+			// primitive by syntax can never be a function, so production writes it as
+			// the native URL attribute and the module names no submit interception.
+			const primitive = !ctx.dev && isPrimitiveValueExpression(inner);
 			bindings.push({
 				id: bindings.length,
-				kind: 'formAction',
+				kind: primitive ? 'attr' : 'formAction',
+				attributeHelper: primitive ? 'setURLAttribute' : undefined,
 				name: tag === 'form' ? 'action' : 'formaction',
 				expr,
 				path,

@@ -10,10 +10,10 @@ type UseDragParams = {
 	nodeRef: RefObject<HTMLDivElement>;
 	disabled?: boolean;
 	noDragClassName?: string;
-	handleSelector?: string;
+	handleSelector?: string | undefined;
 	nodeId?: string;
 	isSelectable?: boolean;
-	nodeClickDistance?: number;
+	nodeClickDistance?: number | undefined;
 };
 
 /**

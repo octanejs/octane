@@ -1,9 +1,11 @@
 import { shallow } from '@octanejs/zustand/shallow';
 import { resolveHookSlot, withoutSlot } from './slot';
-import { ConnectionState, pointToRendererPoint } from '@xyflow/system';
+import { pointToRendererPoint } from '@xyflow/system';
 
 import { useStore } from './useStore';
-import type { InternalNode, Node, ReactFlowStore } from '../types';
+import type { Node, ReactFlowStore } from '../types';
+
+type ConnectionFor<NodeType extends Node = Node> = ReactFlowStore<NodeType>['connection'];
 
 function storeSelector(s: ReactFlowStore) {
 	return s.connection.inProgress
@@ -11,15 +13,12 @@ function storeSelector(s: ReactFlowStore) {
 		: { ...s.connection };
 }
 
-function getSelector<
-	NodeType extends Node = Node,
-	SelectorReturn = ConnectionState<InternalNode<NodeType>>,
->(
-	connectionSelector?: (connection: ConnectionState<InternalNode<NodeType>>) => SelectorReturn,
-): (s: ReactFlowStore) => SelectorReturn | ConnectionState<InternalNode> {
+function getSelector<NodeType extends Node = Node, SelectorReturn = ConnectionFor<NodeType>>(
+	connectionSelector?: (connection: ConnectionFor<NodeType>) => SelectorReturn,
+): (s: ReactFlowStore) => SelectorReturn | ConnectionFor {
 	if (connectionSelector) {
 		const combinedSelector = (s: ReactFlowStore) => {
-			const connection = storeSelector(s) as ConnectionState<InternalNode<NodeType>>;
+			const connection = storeSelector(s) as ConnectionFor<NodeType>;
 			return connectionSelector(connection);
 		};
 		return combinedSelector;
@@ -58,17 +57,16 @@ function getSelector<
  */
 export function useConnection<
 	NodeType extends Node = Node,
-	SelectorReturn = ConnectionState<InternalNode<NodeType>>,
+	SelectorReturn = ConnectionFor<NodeType>,
 >(
-	connectionSelector?: (connection: ConnectionState<InternalNode<NodeType>>) => SelectorReturn,
+	connectionSelector?: (connection: ConnectionFor<NodeType>) => SelectorReturn,
 	...rest: [slot?: symbol]
 ): SelectorReturn;
 export function useConnection<
 	NodeType extends Node = Node,
-	SelectorReturn = ConnectionState<InternalNode<NodeType>>,
+	SelectorReturn = ConnectionFor<NodeType>,
 >(
-	connectionSelectorArg?:
-		((connection: ConnectionState<InternalNode<NodeType>>) => SelectorReturn) | symbol,
+	connectionSelectorArg?: ((connection: ConnectionFor<NodeType>) => SelectorReturn) | symbol,
 	...rest: [slot?: symbol]
 ): SelectorReturn {
 	const slot =

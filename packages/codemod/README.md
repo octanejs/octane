@@ -194,6 +194,9 @@ stops before editing the project. `--dry-run` and `--print` report the colliding
 sources and preview the rest. Imports of colliding sources keep their existing
 paths, so check those dependencies before adopting the preview.
 
+An unresolved React type projection also stops before edits. Use `--print`
+to inspect the proposed changes, then resolve the React type before migrating.
+
 The codemod warns when JSX renders an SVG imported with `?react` or the named
 `ReactComponent` export. If your loader returns React components for bare
 `.svg` imports, check those tags too. A loader that emits Octane components

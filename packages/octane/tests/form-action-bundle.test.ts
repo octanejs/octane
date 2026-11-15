@@ -151,6 +151,67 @@ describe('production form-action reachability', () => {
 			}
 		});
 	});
+
+	it('keeps submit interception out when every action is a primitive by syntax', async () => {
+		const text = await bundleApp(
+			`export function App(props: { eager: boolean }) @{
+				<form action={props.eager ? '/eager' : '/'}>
+					<button formAction={props.eager ? 'javascript:save()' : null}>go</button>
+				</form>
+			}`,
+			"export { flushSync } from 'octane';",
+		);
+		expect(text).not.toMatch(/function handleFormSubmit\(/);
+		expect(text).not.toMatch(/function startTransition\(/);
+
+		await withDom(async (window) => {
+			const { App, createRoot, flushSync } = await load(text);
+			const container = window.document.createElement('div');
+			window.document.body.append(container);
+			const root = createRoot(container);
+			try {
+				root.render(App, { eager: false });
+				const form = container.querySelector('form')!;
+				const button = form.querySelector('button')!;
+				expect(form.getAttribute('action')).toBe('/');
+				expect(button.hasAttribute('formaction')).toBe(false);
+				flushSync(() => root.render(App, { eager: true }));
+				expect(form.getAttribute('action')).toBe('/eager');
+				expect(button.getAttribute('formaction')).toMatch(/^javascript:throw /);
+				expect(submit(window, form)).toBe(false);
+				flushSync(() => root.render(App, { eager: false }));
+				expect(form.getAttribute('action')).toBe('/');
+				expect(button.hasAttribute('formaction')).toBe(false);
+			} finally {
+				root.unmount();
+			}
+		});
+	});
+
+	// A type assertion is the author's claim, not a proof: the value still decides.
+	it('retains submit interception for an action only asserted to be a string', async () => {
+		const text = await bundleApp(
+			`export function App(props: { action: unknown }) @{ <form action={props.action as string}><button>go</button></form> }`,
+		);
+		expect(text).toMatch(/function handleFormSubmit\(/);
+
+		await withDom(async (window) => {
+			const { App, createRoot } = await load(text);
+			const calls: number[] = [];
+			const container = window.document.createElement('div');
+			window.document.body.append(container);
+			const root = createRoot(container);
+			try {
+				root.render(App, { action: () => calls.push(1) });
+				const form = container.querySelector('form')!;
+				expect(submit(window, form)).toBe(true);
+				expect(calls).toEqual([1]);
+				expect(form.hasAttribute('action')).toBe(false);
+			} finally {
+				root.unmount();
+			}
+		});
+	});
 });
 
 describe('production controlled-event reachability', () => {

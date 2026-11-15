@@ -1128,11 +1128,25 @@ export function List() { return <main>{makeRows().map(row => {
 		}
 	});
 
-	it('keeps a typed callback factory for a retained React registry', async () => {
-		const registration = `import { createElement as createIcon } from 'react';
+	it.each([
+		['a single registration', '', ''],
+		[
+			'unrelated primitive exports',
+			"export const label = 'Registry';\n",
+			'\nexport const version = 1;',
+		],
+		[
+			'wrapped and signed primitive exports',
+			"export const label = ('Registry' as const);\nexport const status = ('ready' satisfies string);\n",
+			'\nexport const version = -(1 as const);\nexport const revision = -2n;\nexport const empty = null!;',
+		],
+	])(
+		'keeps a typed callback factory for a retained React registry with %s',
+		async (_case, before, after) => {
+			const registration = `import { createElement as createIcon } from 'react';
 import { register } from './registry';
-export const tab = register('notes', { getIcon: () => createIcon('b', { className: 'icon' }, 'Notes') });`;
-		const registry = `/** @jsxImportSource react */
+${before}export const tab = register('notes', { getIcon: () => createIcon('b', { className: 'icon' }, 'Notes') });${after}`;
+			const registry = `/** @jsxImportSource react */
 import React, { type ReactNode } from 'react';
 type Entry = { getIcon(): ReactNode };
 const registrations = new Map<string, Entry>();
@@ -1144,81 +1158,92 @@ export function Registry() {
 	return <nav>{registrations.get('notes')!.getIcon()}</nav>;
 }
 export const getIcon = () => registrations.get('notes')!.getIcon();`;
-		const root = project({
-			'package.json': '{"type":"module"}',
-			'tsconfig.json':
-				'{"compilerOptions":{"target":"es2022","module":"esnext","moduleResolution":"bundler","jsx":"react-jsx","strict":true}}',
-			'register.ts': registration,
-			'registry.tsx': registry,
-			'entry.tsx': `import './register';
+			const root = project({
+				'package.json': '{"type":"module"}',
+				'tsconfig.json':
+					'{"compilerOptions":{"target":"es2022","module":"esnext","moduleResolution":"bundler","jsx":"react-jsx","strict":true}}',
+				'register.ts': registration,
+				'registry.tsx': registry,
+				'entry.tsx': `import './register';
 export { Registry, getIcon } from './registry';`,
-			'Reader.tsx':
-				"import { tab } from './register'; export function Reader() { return <aside>{tab.getIcon()}</aside>; }",
-		});
-		const modules = path.join(root, 'node_modules');
-		fs.mkdirSync(path.join(modules, '@types'), { recursive: true });
-		for (const name of ['react', 'react-dom']) {
-			fs.symlinkSync(
-				fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
-				path.join(modules, name),
-				'dir',
-			);
-			fs.symlinkSync(
-				path.join(REPO, 'packages/octane/node_modules/@types', name),
-				path.join(modules, '@types', name),
-				'dir',
-			);
-		}
-		const input = path.join(root, 'register.ts');
-		const options = { root, strong: true, verify: true };
-		const preview = await runCodemod([input], { ...options, write: false });
-		expect(preview.files).toEqual([
-			expect.objectContaining({
-				file: 'register.ts',
-				output: 'register.ts',
-				changed: false,
-				code: registration,
-				notes: [],
-				diagnostics: [],
-			}),
-		]);
-		await runCodemod([input], { ...options, write: true });
-		expect(fs.readFileSync(input, 'utf8')).toBe(registration);
-		const { Registry, getIcon } = await bundleRuntime(root, 'server', "export * from './entry';");
-		expect(isValidElement(getIcon())).toBe(true);
-		expect(renderReact(reactElement(Registry))).toBe('<nav><b class="icon">Notes</b></nav>');
+				'Reader.tsx':
+					"import { tab } from './register'; export function Reader() { return <aside>{tab.getIcon()}</aside>; }",
+			});
+			const modules = path.join(root, 'node_modules');
+			fs.mkdirSync(path.join(modules, '@types'), { recursive: true });
+			for (const name of ['react', 'react-dom']) {
+				fs.symlinkSync(
+					fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+					path.join(modules, name),
+					'dir',
+				);
+				fs.symlinkSync(
+					path.join(REPO, 'packages/octane/node_modules/@types', name),
+					path.join(modules, '@types', name),
+					'dir',
+				);
+			}
+			const input = path.join(root, 'register.ts');
+			const options = { root, strong: true, verify: true };
+			const preview = await runCodemod([input], { ...options, write: false });
+			expect(preview.files).toEqual([
+				expect.objectContaining({
+					file: 'register.ts',
+					output: 'register.ts',
+					changed: false,
+					code: registration,
+					notes: [],
+					diagnostics: [],
+				}),
+			]);
+			await runCodemod([input], { ...options, write: true });
+			expect(fs.readFileSync(input, 'utf8')).toBe(registration);
+			const { Registry, getIcon } = await bundleRuntime(root, 'server', "export * from './entry';");
+			expect(isValidElement(getIcon())).toBe(true);
+			expect(renderReact(reactElement(Registry))).toBe('<nav><b class="icon">Notes</b></nav>');
 
-		const batch = await runCodemod([input, path.join(root, 'Reader.tsx')], {
-			...options,
-			write: false,
-		});
-		expect(batch.files.find(({ file }) => file === 'register.ts').code).toContain("from 'octane'");
-		const unchecked = await runCodemod([input], { ...options, write: false, projectTypes: false });
-		expect(unchecked.files[0].code).toContain("from 'octane'");
+			const batch = await runCodemod([input, path.join(root, 'Reader.tsx')], {
+				...options,
+				write: false,
+			});
+			expect(batch.files.find(({ file }) => file === 'register.ts').code).toContain(
+				"from 'octane'",
+			);
+			const unchecked = await runCodemod([input], {
+				...options,
+				write: false,
+				projectTypes: false,
+			});
+			expect(unchecked.files[0].code).toContain("from 'octane'");
 
-		const mixed =
-			registration.replaceAll('createIcon', 'createElement') +
-			`
+			fs.writeFileSync(input, registration + "\nexport const other = createIcon('i', null);");
+			const extraFactory = await runCodemod([input], { ...options, write: false });
+			expect(extraFactory.files[0].code).toContain("from 'octane'");
+
+			const mixed =
+				registration.replaceAll('createIcon', 'createElement') +
+				`
 import * as React from 'react';
 export const other = React.createElement('i', null);`;
-		fs.writeFileSync(input, mixed);
-		const mixedPreview = await runCodemod([input], { ...options, write: false });
-		expect(mixedPreview.files[0].code).toContain("import { createElement } from 'octane';");
-		expect(mixedPreview.files[0].code).not.toContain("from 'react'");
-		fs.writeFileSync(input, registration);
+			fs.writeFileSync(input, mixed);
+			const mixedPreview = await runCodemod([input], { ...options, write: false });
+			expect(mixedPreview.files[0].code).toContain("import { createElement } from 'octane';");
+			expect(mixedPreview.files[0].code).not.toContain("from 'react'");
+			fs.writeFileSync(input, registration);
 
-		fs.writeFileSync(
-			path.join(root, 'registry.tsx'),
-			registry.replace(
-				'export function register(name: string, entry: Entry) {',
-				`export function register(name: string, entry: Entry): Entry;
+			fs.writeFileSync(
+				path.join(root, 'registry.tsx'),
+				registry.replace(
+					'export function register(name: string, entry: Entry) {',
+					`export function register(name: string, entry: Entry): Entry;
 export function register(name: string, entry: unknown): unknown;
 export function register(name: string, entry: any) {`,
-			),
-		);
-		const overloaded = await runCodemod([input], { ...options, write: false });
-		expect(overloaded.files[0].code).toContain("from 'octane'");
-	});
+				),
+			);
+			const overloaded = await runCodemod([input], { ...options, write: false });
+			expect(overloaded.files[0].code).toContain("from 'octane'");
+		},
+	);
 
 	it('warns on waiting for a migrated render stream before reading the body', async () => {
 		const imports = [
@@ -4539,6 +4564,12 @@ export function Host({rows}: { rows: Row[] }) {
 		'blocks map defaults with an eager operand that reads the uninitialized index (project types %s)',
 		async (projectTypes) => {
 			const cases = [
+				['(() => { return (index as number); })()', true],
+				['(() => { return () => index; })()', false],
+				['((index = 7) => { return index; })()', false],
+				['(async () => { return index; })()', false],
+				['(() => { try { return index; } catch { return 7; } })()', false],
+				['(() => { return index; })(fail())', false],
 				['index < 1', true],
 				['0 <= index', true],
 				['index > fail()', true],
@@ -6158,6 +6189,82 @@ export * from './View.tsrx';`,
 		]);
 		const second = await runCodemod([root]);
 		expect(second.files.filter((file) => file.changed)).toEqual([]);
+	});
+
+	it.each([
+		[
+			'namespace',
+			"import type * as React from 'react'; export type Props = React.ConsumerProps<React.ReactNode>;",
+		],
+		['inline', "export type Props = import('react').ConsumerProps<string>;"],
+		['re-export', "export type { ReactNode, ConsumerProps } from 'react';"],
+		[
+			'value query on a namespace',
+			"import type * as React from 'react'; export type Props = React.ComponentProps<typeof React.Profiler>;",
+		],
+		['inline value query', "export type Factory = typeof import('react').Profiler;"],
+		[
+			'qualified value query on a namespace',
+			"import * as React from 'react'; export type Length = typeof React.Profiler.length; export const value = React.memo;",
+		],
+		[
+			'inline qualified value query',
+			"export type Length = typeof import('react').Profiler.length;",
+		],
+	])(
+		'previews and blocks an unresolved React type projection before writing (%s)',
+		(_kind, projection) => {
+			const sources = {
+				'package.json': '{"name":"app","type":"module"}',
+				'App.tsx': projection + '\nexport function App() { return <div />; }',
+				'Entry.ts': "export { App } from './App.tsx';",
+				'First.tsx': 'export const First = () => <b />;',
+			};
+			const root = project(sources);
+			const binary = path.join(import.meta.dirname, '../dist/bin.js');
+			const run = (/** @type {string[]} */ options) =>
+				spawnSync(
+					process.execPath,
+					[binary, 'First.tsx', 'App.tsx', '--no-project-types', '--json', ...options],
+					{ cwd: root, encoding: 'utf8' },
+				);
+			const preview = run(['--print']);
+			expect(preview.status).toBe(1);
+			const candidate = JSON.parse(preview.stdout).files.find(
+				(/** @type {import('../dist/types.js').FileResult} */ file) => file.file === 'App.tsx',
+			);
+			expect(candidate.output).toBe('App.tsrx');
+			expect(candidate.code).toMatch(/(?:from |import\()['"]octane['"]/);
+			expect(candidate.notes).toEqual([
+				expect.objectContaining({ rule: 'react-type-projection', severity: 'error' }),
+			]);
+			for (const target of [[], ['--target', 'tsx']]) {
+				const stopped = run(target);
+				expect(stopped.status).toBe(1);
+				expect(JSON.parse(stopped.stdout).files).toEqual([
+					expect.objectContaining({
+						file: 'App.tsx',
+						output: 'App.tsx',
+						changed: false,
+						notes: [expect.objectContaining({ rule: 'react-type-projection', severity: 'error' })],
+					}),
+				]);
+				expect(fs.readdirSync(root).sort()).toEqual(Object.keys(sources).sort());
+				for (const [file, text] of Object.entries(sources))
+					expect(fs.readFileSync(path.join(root, file), 'utf8')).toBe(text);
+			}
+		},
+	);
+
+	it('still writes an ordinary partial migration with an unsupported API', async () => {
+		const source =
+			"import { Profiler } from 'react'; export const App = () => <Profiler id='a' onRender={() => {}}><div /></Profiler>;";
+		const root = project({ 'App.tsx': source });
+		const result = await runCodemod([path.join(root, 'App.tsx')], { root, verify: false });
+		expect(result.files[0].notes).toContainEqual(
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+		);
+		expect(fs.readFileSync(path.join(root, 'App.tsrx'), 'utf8')).toContain('<Profiler');
 	});
 
 	it('blocks a local React context Provider getter before writing', async () => {
