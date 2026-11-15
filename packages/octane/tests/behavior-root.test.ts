@@ -372,6 +372,87 @@ describe('behavior-only roots', () => {
 	let roots: Array<ReturnType<typeof attachBehaviorRoot>>;
 	let hydratedRoot: ReturnType<typeof hydrateRoot> | undefined;
 
+	it.each([false, true])(
+		'uses the local Fragment view for binding mount and adoption (dev=%s)',
+		(dev) => {
+			const fixture = authoredPresentation(
+				'App',
+				{ label: 'First' },
+				dev,
+				`
+function Fragment(props) @{ <span>{props.label as string}</span> }
+export function App(props) @{
+  'use dom bindings';
+  <main><Fragment label={props.label}><b>unused child</b></Fragment></main>
+}`,
+			);
+			const mounted = document.createElement('div');
+			const mount = fixture.mount({ parent: mounted }, fixture.state);
+			try {
+				expect(mounted.querySelector('span')?.textContent).toBe('First');
+				expect(mounted.querySelector('b')).toBeNull();
+				container.innerHTML = fixture.html;
+				const serverRoot = container.querySelector('main')!;
+				const serverLabel = serverRoot.querySelector('span')!;
+				expect(serverLabel.textContent).toBe('First');
+				const adopted = fixture.attach(serverRoot, fixture.state);
+				try {
+					fixture.publish({ label: 'Second' });
+					mount.refresh();
+					adopted.refresh();
+					expect(mounted.querySelector('span')?.textContent).toBe('Second');
+					expect(serverRoot.querySelector('span')).toBe(serverLabel);
+					expect(serverLabel.textContent).toBe('Second');
+				} finally {
+					adopted.dispose();
+				}
+			} finally {
+				mount.dispose();
+			}
+		},
+	);
+
+	it('rejects a nested Fragment binding that shadows a module view during extraction', () => {
+		expect(() =>
+			authoredPresentation(
+				'App',
+				{},
+				false,
+				`
+function Fragment() @{ <i>module view</i> }
+export function App() @{
+  'use dom bindings';
+  <main>
+    @if (true) {
+      const Fragment = () => null;
+      <Fragment><b>unused child</b></Fragment>
+    }
+  </main>
+}`,
+			),
+		).toThrow(/binding child components must be module-level binding views/);
+	});
+
+	it('renders the children of an imported Octane Fragment in a binding view', () => {
+		const fixture = authoredPresentation(
+			'App',
+			{ label: 'Grouped' },
+			false,
+			`
+import { Fragment } from 'octane';
+export function App(props) @{
+  'use dom bindings';
+  <main><Fragment><span>{props.label as string}</span></Fragment></main>
+}`,
+		);
+		const binding = fixture.mount({ parent: container }, fixture.state);
+		try {
+			expect(container.querySelector('span')?.textContent).toBe('Grouped');
+		} finally {
+			binding.dispose();
+		}
+	});
+
 	function attach(
 		target: Element = container,
 		options?: Parameters<typeof attachBehaviorRoot>[1],
