@@ -109,6 +109,25 @@ plugin. Missing, incorrect, or unknown props are errors at the child call site;
 no cast or ambient `.tsrx` shim is needed. Octane element values are still not
 ordinary React renderables outside this component transport.
 
+<h3 id="borrow-a-client-signal-owner">Borrow a browser signal owner</h3>
+
+In the browser, pass `clientSignalOwner` to `OctaneCompat` or
+`OctaneCompatInline` to share the same compiled module-level signals across
+islands and native Octane roots. The owner stays fixed for the host's React
+key. Change the outer key to select a different owner. The caller manages
+disposal.
+
+```tsx
+const root = createRoot(container, { signalOwner: documentScope });
+
+<OctaneCompat clientSignalOwner={documentScope} component={Panel} props={panelProps} />;
+```
+
+For React SSR, select the request owner through `installSignalOwnerEnvironment`.
+Pass `clientSignalOwner` only from the browser entry and use a browser owner
+with the same scope key as its server counterpart. Existing hydration sidecars
+carry each island's historical reads before it begins reading live values.
+
 <h2 id="render-react-in-octane">Render React in Octane</h2>
 
 Keep the React component in a React-owned module. Its hooks and JSX use the real

@@ -22,10 +22,12 @@
  */
 import * as React from 'react';
 import type { ComponentBody, Scope } from '../src/index.js';
+import type { SignalOwner } from 'octane/signals';
 import { OctaneCompat, OctaneCompatInline, type OctaneReactComponent } from 'octane/react';
 import {
 	OctaneCompat as OctaneCompatServer,
 	OctaneCompatInline as OctaneCompatInlineServer,
+	type OctaneCompatComponentProps as ServerComponentProps,
 } from 'octane/react/server';
 
 type Equal<A, B> =
@@ -114,6 +116,30 @@ export const inlineChildrenForm = (
 		<Greeting name="x" />
 	</OctaneCompatInline>
 );
+declare const browserOwner: SignalOwner;
+declare const browserOwnerOrUndefined: SignalOwner | undefined;
+export const explicitOwnerChild = (
+	<OctaneCompat clientSignalOwner={browserOwner}>
+		<Greeting name="x" />
+	</OctaneCompat>
+);
+export const explicitOwnerInline = (
+	<OctaneCompatInline
+		component={RawGreeting}
+		props={{ name: 'x' }}
+		clientSignalOwner={browserOwnerOrUndefined}
+	/>
+);
+export const invalidOwner = (
+	// @ts-expect-error — the browser option takes a signal owner
+	<OctaneCompat component={RawGreeting} props={{ name: 'x' }} clientSignalOwner="browser" />
+);
+export const serverOwner: ServerComponentProps<GreetingProps> = {
+	component: RawGreeting,
+	props: { name: 'x' },
+	// @ts-expect-error — the server receives its request owner from the environment
+	clientSignalOwner: browserOwner,
+};
 // @ts-expect-error — wrong island prop type in the inline component form
 export const inlineWrong = <OctaneCompatInline component={RawGreeting} props={{ name: 42 }} />;
 export const invalidHostStyle = (

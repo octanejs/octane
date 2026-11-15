@@ -58,6 +58,24 @@ Resource hints such as `preload` and `preinit` issued during an
 Place declarative document metadata such as `<title>` and `<meta>` in the
 React tree.
 
+In the browser, either host can borrow the `signalOwner` of a native Octane
+root. Pass the same owner to each island that should share its compiled
+module-level signals.
+
+```tsx
+const root = createRoot(container, { signalOwner: documentScope });
+
+<OctaneCompat clientSignalOwner={documentScope} component={Panel} props={panelProps} />
+```
+
+The host captures the owner for its React key. Change the host's outer key
+to use a different owner. The caller owns disposal, so removing one island
+leaves the other borrowers active. For React SSR, configure the original
+request owner through `installSignalOwnerEnvironment` and supply
+`clientSignalOwner` only from the browser entry. Use the same scope key for
+the browser owner and its server counterpart. Existing hydration sidecars
+carry historical reads before the borrowed owner supplies live values.
+
 ## Storybook with Octane components
 
 The [Storybook example](../examples/storybook/README.md) uses `OctaneCompat` in
