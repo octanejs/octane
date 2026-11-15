@@ -30,6 +30,7 @@ const subSlot = createSubSlot({ tagPrefix: ':wsel:' });
 
 interface SelectionCell<TState, StateSlice> {
 	snapshot: TState;
+	serverApi: ReadonlyStoreApi<TState> | null;
 	read: ReadSnapshot<TState>;
 	selector: (state: TState) => StateSlice;
 	equalityFn: ((previous: StateSlice, next: StateSlice) => boolean) | undefined;
@@ -66,26 +67,39 @@ export function useStoreWithEqualityFn<TState, StateSlice>(
 			: undefined;
 
 	const cache = useRef<SelectionCell<TState, StateSlice> | null>(null, subSlot(slot, 'sel'));
-	const select = (read: ReadSnapshot<TState>): StateSlice => {
+	const select = (read: ReadSnapshot<TState>, fromServer: boolean): StateSlice => {
 		const state = Reflect.apply(read, api, EMPTY_ARGS) as TState;
 		const c = cache.current;
 		if (c === null) {
 			const value = selector(state);
-			cache.current = { snapshot: state, read, selector, equalityFn, value };
+			cache.current = {
+				snapshot: state,
+				serverApi: fromServer ? api : null,
+				read,
+				selector,
+				equalityFn,
+				value,
+			};
 			return value;
 		}
 		if (
 			Object.is(c.snapshot, state) &&
-			c.read === read &&
+			(c.read === read || (!fromServer && c.serverApi === api)) &&
 			c.selector === selector &&
 			c.equalityFn === equalityFn
 		) {
+			// Hydration can switch readers while keeping the same selection.
+			if (fromServer || c.serverApi !== null) {
+				c.serverApi = fromServer ? api : null;
+				c.read = read;
+			}
 			return c.value;
 		}
 
 		const next = selector(state);
 		const same = equalityFn ? equalityFn(c.value, next) : Object.is(c.value, next);
 		c.snapshot = state;
+		c.serverApi = fromServer ? api : null;
 		c.read = read;
 		c.selector = selector;
 		c.equalityFn = equalityFn;
@@ -95,8 +109,8 @@ export function useStoreWithEqualityFn<TState, StateSlice>(
 
 	return useSyncExternalStore(
 		api.subscribe,
-		() => select(api.getState),
-		() => select(api.getInitialState),
+		() => select(api.getState, false),
+		() => select(api.getInitialState, true),
 		slot,
 	);
 }
