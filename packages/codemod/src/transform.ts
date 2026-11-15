@@ -4690,25 +4690,27 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (
 			ts.isIdentifier(node.left) &&
 			node.right.text === 'Touch' &&
-			(namespace?.module === 'react-dom' || namespace?.module === 'react')
+			(!namespace || namespace.module === 'react-dom' || namespace.module === 'react')
 		) {
 			const declaration = this.declarationOf(node.left);
+			if (!namespace && declaration) return null;
 			const clause =
 				declaration && (ts.isNamespaceImport(declaration) ? declaration.parent : declaration);
-			if (clause && ts.isImportClause(clause)) {
+			const importClause = clause && ts.isImportClause(clause) ? clause : null;
+			if (!namespace || importClause) {
 				let access = node;
 				while (ts.isQualifiedName(access.parent) && access.parent.left === access)
 					access = access.parent;
 				const query = isValueTypeQuery(access);
 				const nested = access !== node;
-				const attributes = clause.parent.attributes;
+				const attributes = importClause?.parent.attributes;
 				if (
 					query ||
 					(ts.isTypeReferenceNode(access.parent) &&
-						(namespace.module === 'react-dom' || nested || attributes))
+						(namespace?.module === 'react-dom' || nested || attributes))
 				) {
-					this.reportRetainedTouchType(namespace.module, node, query, nested);
-					this.retainedTypeNamespaces.add(clause);
+					this.reportRetainedTouchType(namespace?.module ?? 'react', node, query, nested);
+					if (importClause) this.retainedTypeNamespaces.add(importClause);
 					return node.getText(this.sf);
 				}
 			}

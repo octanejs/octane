@@ -683,6 +683,24 @@ export type Qualified = typeof R.createRef;`,
 		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(5);
 	});
 
+	it('keeps global React Touch property queries and nested types intact', () => {
+		const { code, notes } = transformModule(
+			`export type Nested = React.Touch.Metadata;
+			 export type Query = typeof React.Touch.loose.more;
+			 export type Portable = React.Touch;
+			 export namespace Scope {
+			   const React = { Touch: { loose: { more: 'local' } } };
+			   export type Shadow = typeof React.Touch.loose.more;
+			 }`,
+			'points.ts',
+		);
+		expect(code).toContain('Nested = React.Touch.Metadata;');
+		expect(code).toContain('Query = typeof React.Touch.loose.more;');
+		expect(code).toContain('Shadow = typeof React.Touch.loose.more;');
+		expect(code).toContain('Portable = Touch;');
+		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(2);
+	});
+
 	it('keeps nested React Touch types on their original namespace', () => {
 		const { code, notes } = transformModule(
 			`import type * as R from 'react';
