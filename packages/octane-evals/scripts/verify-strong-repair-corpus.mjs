@@ -132,12 +132,16 @@ function gradeSlot(entries) {
 			{
 				cwd: repositoryRoot,
 				env: { ...process.env, OCTANE_EVAL_SANDBOX: '1', OCTANE_EVAL_SUBMISSION_ROOT: aliasRoot },
-				stdio: 'ignore',
+				stdio: ['ignore', 'ignore', 'pipe'],
 			},
 		);
+		let stderr = '';
+		child.stderr.setEncoding('utf8').on('data', (chunk) => {
+			stderr = (stderr + chunk).slice(-8192);
+		});
 		runningSlots.set(child, entries);
 		child.on('error', reject);
-		child.on('close', (_code, signal) => {
+		child.on('close', (code, signal) => {
 			runningSlots.delete(child);
 			try {
 				if (signal !== null) throw new Error(`Negative grading terminated by ${signal}.`);
@@ -147,7 +151,16 @@ function gradeSlot(entries) {
 				);
 				resolvePromise(entries.map((entry) => ({ ...entry, result: byTask.get(entry.taskId) })));
 			} catch (error) {
-				reject(error);
+				if (error.code === 'ENOENT') {
+					const tasks = entries.map(({ taskId, name }) => `${taskId}/${name}`).join(', ');
+					const details = stderr.trim();
+					reject(
+						new Error(
+							`Strong repair grader exited ${code} without a report for ${tasks}.${details ? '\n' + details : ''}`,
+							{ cause: error },
+						),
+					);
+				} else reject(error);
 			} finally {
 				rmSync(aliasRoot, { recursive: true, force: true });
 			}
