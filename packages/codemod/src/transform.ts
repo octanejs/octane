@@ -188,6 +188,8 @@ export function projectTypeAt(node: ts.Node, types: TransformOptions['types']) {
  * members.
  */
 export function bind(filename: string, source: string) {
+	// The program asks its host for slash-delimited paths even on Windows.
+	filename = filename.replaceAll('\\', '/');
 	const lib = esLib();
 	const sf = ts.createSourceFile(
 		filename,
@@ -3336,6 +3338,129 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		return null;
 	}
 
+	private retainedRegistryFactoryImport(react: ts.ImportDeclaration) {
+		const resolveRegistry = this.options.retainedRegistry;
+		const statements = this.sf.statements;
+		const bindings = react.importClause?.namedBindings;
+		if (
+			!resolveRegistry ||
+			statements.length !== 3 ||
+			!statements.slice(0, 2).every(ts.isImportDeclaration) ||
+			react.attributes ||
+			react.importClause?.name ||
+			!bindings ||
+			!ts.isNamedImports(bindings) ||
+			bindings.elements.length !== 1 ||
+			!this.options.originalReact
+		)
+			return false;
+
+		const binding = this.importOf(bindings.elements[0].name);
+		if (!binding || binding.typeOnly || binding.imported !== 'createElement') return false;
+
+		// Only a registration module can keep the descriptor without also moving
+		// a consumer of it in the same file.
+		const declaration = statements[2];
+		if (
+			!ts.isVariableStatement(declaration) ||
+			!(declaration.declarationList.flags & ts.NodeFlags.Const)
+		)
+			return false;
+		const [entry, extra] = declaration.declarationList.declarations;
+		const use = entry?.initializer;
+		if (
+			extra ||
+			!entry ||
+			!ts.isIdentifier(entry.name) ||
+			entry.type ||
+			!use ||
+			!ts.isCallExpression(use) ||
+			use.questionDotToken ||
+			use.typeArguments ||
+			!ts.isIdentifier(use.expression)
+		)
+			return false;
+		const owner = this.importOf(use.expression);
+		if (!owner || owner.namespace || owner.typeOnly) return false;
+		const [name, object, trailing] = use.arguments;
+		if (
+			!name ||
+			!ts.isStringLiteral(name) ||
+			!object ||
+			!ts.isObjectLiteralExpression(object) ||
+			trailing ||
+			object.properties.length !== 1
+		)
+			return false;
+		const [property] = object.properties;
+		if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(property.name)) return false;
+		const arrow = property.initializer;
+		if (
+			!ts.isArrowFunction(arrow) ||
+			arrow.type ||
+			arrow.modifiers ||
+			arrow.typeParameters ||
+			arrow.parameters.length ||
+			ts.isBlock(arrow.body)
+		)
+			return false;
+		const call = skipParens(arrow.body);
+		if (
+			!ts.isCallExpression(call) ||
+			call.questionDotToken ||
+			call.typeArguments ||
+			this.importOf(call.expression) !== binding
+		)
+			return false;
+		const [tag, props, ...children] = call.arguments;
+		if (
+			!tag ||
+			!ts.isStringLiteral(tag) ||
+			(props &&
+				props.kind !== ts.SyntaxKind.NullKeyword &&
+				(!ts.isObjectLiteralExpression(props) ||
+					!props.properties.every(
+						(item) =>
+							ts.isPropertyAssignment(item) &&
+							ts.isIdentifier(item.name) &&
+							ts.isStringLiteral(item.initializer),
+					))) ||
+			!children.every(ts.isStringLiteral)
+		)
+			return false;
+
+		const types = this.options.types;
+		if (!types || types.sourceFile.text !== this.source) return false;
+		const file = resolveRegistry(owner.module);
+		if (!file) return false;
+		const { sourceFile, checker } = types;
+		const peer = nodeSpanning(sourceFile, call.getStart(this.sf), call.end);
+		const callee = nodeSpanning(sourceFile, use.expression.getStart(this.sf), use.expression.end);
+		const specifier = nodeSpanning(
+			sourceFile,
+			react.moduleSpecifier.getStart(this.sf),
+			react.moduleSpecifier.end,
+		);
+		if (!peer || !ts.isCallExpression(peer) || !callee || !specifier) return false;
+		const signatures = checker.getTypeAtLocation(callee).getCallSignatures();
+		const signature = signatures[0];
+		const decl = signature?.declaration;
+		if (
+			signatures.length !== 1 ||
+			signature.typeParameters?.length ||
+			!decl ||
+			!ts.isFunctionDeclaration(decl) ||
+			!decl.body ||
+			decl.getSourceFile() !== file ||
+			!(ts.getCombinedModifierFlags(decl) & ts.ModifierFlags.Export)
+		)
+			return false;
+		const module = checker.getSymbolAtLocation(specifier);
+		const reactNode =
+			module && checker.getExportsOfModule(module).find((symbol) => symbol.name === 'ReactNode');
+		return !!reactNode && checker.getContextualType(peer)?.aliasSymbol === reactNode;
+	}
+
 	// ---------------------------------------------------------------- imports
 
 	rewriteImport(node: ts.ImportDeclaration) {
@@ -3359,6 +3484,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			);
 		}
 		if (module in REACT_MODULES) {
+			if (module === 'react' && this.retainedRegistryFactoryImport(node)) return null;
 			this.importSlots.push(node);
 			return `\u0000IMPORT${this.importSlots.length - 1}\u0000`;
 		}
