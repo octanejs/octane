@@ -173,6 +173,10 @@ export default {
 };
 ```
 
+For an SSR build, the class plugin resolves `octane/react` to the selected
+Octane package's server implementation. Use `octane/react/server` explicitly
+when a server externalizes the compatibility entry or uses the loader alone.
+
 With the loader-only form, configure `.tsrx` resolution, TypeScript stripping,
 and exact `octane$` / `octane/profiling$` aliases to the app's Octane package
 yourself. The profiling alias keeps compiler metadata and runtime recording on
