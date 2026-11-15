@@ -1,6 +1,7 @@
 import { useState } from 'octane';
 import { createStore } from '@octanejs/zustand/vanilla';
 import type { StoreApi } from '@octanejs/zustand/vanilla';
+import { shallow } from '@octanejs/zustand/shallow';
 import { useStoreWithEqualityFn } from '@octanejs/zustand/traditional';
 
 export type SelectionState = { first: number; second: number };
@@ -24,6 +25,26 @@ export function SelectionReader(props: {
 	<output id="selection" data-generation={String(props.generation ?? 0)}>
 		{String(selection.value) as string}
 	</output>
+}
+
+type EndpointState = { active: boolean; x: number };
+
+function selectEndpoint(state: EndpointState) {
+	return state.active ? { to: { x: state.x } } : { to: null };
+}
+
+export function EndpointReader() @{
+	const [api] = useState(() => createStore<EndpointState>(() => ({ active: false, x: 1 })));
+	const { to } = useStoreWithEqualityFn(api, selectEndpoint, shallow);
+	<section>
+		<button
+			id="advance-endpoint"
+			onClick={() => api.setState(({ x }) => ({ active: true, x: x + 1 }))}
+		>
+			Update
+		</button>
+		<output id="endpoint">{(to ? String(to.x) : 'idle') as string}</output>
+	</section>
 }
 
 type ErrorState = { value: string | number };

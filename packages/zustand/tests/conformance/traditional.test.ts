@@ -5,13 +5,23 @@
  * multi-base-hook wrapper (useRef + useMemo + useSyncExternalStore + useEffect)
  * driven by a single forwarded slot + derived sub-slots.
  */
+import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeEach } from 'vitest';
+import { flushSync, hydrateRoot } from 'octane';
+import { renderToString } from 'octane/server';
+import * as Vanilla from '@octanejs/zustand/vanilla';
+import * as Shallow from '@octanejs/zustand/shallow';
+import {
+	loadPlainHookFixtureSource,
+	loadServerFixture,
+} from '../../../octane/tests/_server-fixture.js';
 import { createWithEqualityFn, useStoreWithEqualityFn } from '@octanejs/zustand/traditional';
 import { createStore } from '@octanejs/zustand/vanilla';
 import { shallow } from '@octanejs/zustand/shallow';
 import { mount, nextPaint } from '../_helpers';
 import { useEq, EqDefault, EqPerCall } from '../_fixtures/traditional.tsrx';
 import {
+	EndpointReader,
 	SelectionReader,
 	TraditionalErrors,
 	equalSelection,
@@ -60,6 +70,74 @@ describe('per-call equality function', () => {
 });
 
 describe('traditional selection updates', () => {
+	it('reuses the nested selection across hydration when both snapshots are the same', async () => {
+		const binding = 'packages/zustand/src/traditional.ts';
+		const serverBinding = loadPlainHookFixtureSource(readFileSync(binding, 'utf8'), {
+			id: binding,
+			mode: 'server',
+			inlineHookMemo: false,
+			runtimeModules: { 'zustand/vanilla': Vanilla },
+		});
+		const server = loadServerFixture(
+			'packages/zustand/tests/_fixtures/traditional-contracts.tsrx',
+			{
+				runtimeModules: {
+					'@octanejs/zustand/vanilla': Vanilla,
+					'@octanejs/zustand/shallow': Shallow,
+					'@octanejs/zustand/traditional': serverBinding,
+				},
+			},
+		);
+		let selections = 0;
+		const selector = (state: SelectionState) => {
+			selections++;
+			return { value: state.first, details: { second: state.second } };
+		};
+		const api = createStore<SelectionState>(() => ({ first: 1, second: 10 }));
+		const initial = api.getInitialState();
+		const getState = api.getState;
+		api.getState = () => getState();
+		expect(api.getState()).toBe(initial);
+		expect(api.getState).not.toBe(api.getInitialState);
+		const props = { api, selector, equalityFn: shallow };
+		const container = document.createElement('div');
+		container.innerHTML = renderToString(server.SelectionReader, props).html;
+		document.body.append(container);
+		const output = container.querySelector('output');
+		const afterServer = selections;
+		const root = hydrateRoot(container, SelectionReader, props);
+		try {
+			await nextPaint();
+			flushSync(() => {});
+			expect(container.querySelector('output')).toBe(output);
+			expect(output?.textContent).toBe('1');
+			expect(selections - afterServer).toBe(1);
+
+			api.setState({ first: 2 });
+			await nextPaint();
+			expect(output?.textContent).toBe('2');
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+
+	it('keeps a nested selected value stable while the store snapshot is current', async () => {
+		const r = mount(EndpointReader);
+		try {
+			await nextPaint();
+			expect(r.find('#endpoint').textContent).toBe('idle');
+			r.click('#advance-endpoint');
+			await nextPaint();
+			expect(r.find('#endpoint').textContent).toBe('2');
+			r.click('#advance-endpoint');
+			await nextPaint();
+			expect(r.find('#endpoint').textContent).toBe('3');
+		} finally {
+			r.unmount();
+		}
+	});
+
 	it('keeps an unchanged selection current across parent renders and later writes', async () => {
 		const api = createStore<SelectionState>(() => ({ first: 1, second: 10 }));
 		const props = { api, selector: selectFirst, equalityFn: equalSelection, generation: 0 };

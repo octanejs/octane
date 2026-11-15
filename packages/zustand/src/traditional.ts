@@ -21,14 +21,20 @@ import type { StateCreator, StoreApi } from 'zustand/vanilla';
 
 type ExtractState<S> = S extends { getState: () => infer T } ? T : never;
 type ReadonlyStoreApi<T> = Pick<StoreApi<T>, 'getState' | 'getInitialState' | 'subscribe'>;
+type ReadSnapshot<T> = () => T;
 
 const identity = <T>(arg: T): T => arg;
+const EMPTY_ARGS: [] = [];
 
 const subSlot = createSubSlot({ tagPrefix: ':wsel:' });
 
-interface SelectionCell<U> {
-	hasValue: boolean;
-	value: U | undefined;
+interface SelectionCell<TState, StateSlice> {
+	snapshot: TState;
+	serverApi: ReadonlyStoreApi<TState> | null;
+	read: ReadSnapshot<TState>;
+	selector: (state: TState) => StateSlice;
+	equalityFn: ((previous: StateSlice, next: StateSlice) => boolean) | undefined;
+	value: StateSlice;
 }
 
 export function useStoreWithEqualityFn<S extends ReadonlyStoreApi<unknown>>(
@@ -60,28 +66,51 @@ export function useStoreWithEqualityFn<TState, StateSlice>(
 			? (userArgs[1] as (a: StateSlice, b: StateSlice) => boolean)
 			: undefined;
 
-	const cache = useRef<SelectionCell<StateSlice>>(
-		{ hasValue: false, value: undefined },
-		subSlot(slot, 'sel'),
-	);
-	// Returns the cached reference while the selection is "equal" → octane's
-	// useSyncExternalStore sees an Object.is-equal snapshot and bails out.
-	const select = (state: TState): StateSlice => {
-		const next = selector(state);
+	const cache = useRef<SelectionCell<TState, StateSlice> | null>(null, subSlot(slot, 'sel'));
+	const select = (read: ReadSnapshot<TState>, fromServer: boolean): StateSlice => {
+		const state = Reflect.apply(read, api, EMPTY_ARGS) as TState;
 		const c = cache.current;
-		if (c.hasValue) {
-			const prev = c.value as StateSlice;
-			if (equalityFn ? equalityFn(prev, next) : Object.is(prev, next)) return prev;
+		if (c === null) {
+			const value = selector(state);
+			cache.current = {
+				snapshot: state,
+				serverApi: fromServer ? api : null,
+				read,
+				selector,
+				equalityFn,
+				value,
+			};
+			return value;
 		}
-		c.hasValue = true;
-		c.value = next;
-		return next;
+		if (
+			Object.is(c.snapshot, state) &&
+			(c.read === read || (!fromServer && c.serverApi === api)) &&
+			c.selector === selector &&
+			c.equalityFn === equalityFn
+		) {
+			// Hydration can switch readers while keeping the same selection.
+			if (fromServer || c.serverApi !== null) {
+				c.serverApi = fromServer ? api : null;
+				c.read = read;
+			}
+			return c.value;
+		}
+
+		const next = selector(state);
+		const same = equalityFn ? equalityFn(c.value, next) : Object.is(c.value, next);
+		c.snapshot = state;
+		c.serverApi = fromServer ? api : null;
+		c.read = read;
+		c.selector = selector;
+		c.equalityFn = equalityFn;
+		if (!same) c.value = next;
+		return c.value;
 	};
 
 	return useSyncExternalStore(
 		api.subscribe,
-		() => select(api.getState()),
-		() => select(api.getInitialState()),
+		() => select(api.getState, false),
+		() => select(api.getInitialState, true),
 		slot,
 	);
 }
