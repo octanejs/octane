@@ -20016,7 +20016,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		bodyStatements.push(
 			inheritOriginLoc(
 				b.if(
-					b.binary('===', b.id('_b'), b.id('undefined')),
+					b.binary('===', b.id('_b'), undefinedNode()),
 					b.block(plan.mount),
 					plan.update.length > 0 ? b.block(plan.update) : null,
 				),
@@ -30406,8 +30406,10 @@ function planJsx(
 		// value equals, so its first write still runs for null/undefined. For a
 		// mixed-style scalar, the same identity lets its setter distinguish a fresh
 		// mount from a preserved suspended retry.
-		const constArgNode = (expr) =>
-			expr === 'null' ? b.literal(null) : expr === 'unset' ? b.id('__s') : b.id(expr);
+		const constArgNode = (expr) => {
+			if (expr === 'undefined') return undefinedNode();
+			return expr === 'null' ? b.literal(null) : expr === 'unset' ? b.id('__s') : b.id(expr);
+		};
 		const bagFieldValue = (f) =>
 			f.hostVar !== null
 				? b.id(f.hostVar)
@@ -32037,7 +32039,7 @@ function tsrxExprNode(node, ctx, componentName, inlinedSubs, parentNs = 'html', 
 // Placeholder nodes for positional runtime-call arguments. Fresh per call —
 // origin stamping writes into loc-less nodes, so sharing one instance would
 // cross-stamp origins between statements.
-const undefinedNode = () => b.id('undefined');
+const undefinedNode = () => b.unary('void', b.literal(0));
 const nullNode = () => b.literal(null);
 
 // Optional positional arguments of a runtime writer whose parameters default to
