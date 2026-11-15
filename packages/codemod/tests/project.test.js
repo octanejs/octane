@@ -51,6 +51,75 @@ function typecheckProject(root) {
 
 describe('runCodemod', () => {
 	it.each([
+		['Widget.js', './Widget.js', 'Widget.tsx'],
+		['Widget.jsx', './Widget.jsx', 'Widget.tsx'],
+		['Widget.js', './Widget.js', 'Widget.d.ts'],
+		['real/Widget.js', './linked/Widget.js', 'real/Widget.tsx'],
+	])(
+		'preserves selected %s when %s has separate types',
+		async (runtimeFile, specifier, typesFile) => {
+			const runtime = 'export function Widget() { return <b>runtime</b>; }';
+			const typed = typesFile.endsWith('.d.ts')
+				? "export declare function Widget(): 'types';"
+				: 'export function Widget() { return <b>types</b>; }';
+			const consumer = `export { Widget } from '${specifier}';`;
+			const root = project({
+				'package.json': '{"type":"module"}',
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { jsx: 'react-jsx', moduleResolution: 'bundler', module: 'ESNext' },
+				}),
+				[typesFile]: typed,
+				[runtimeFile]: runtime,
+				'Consumer.ts': consumer,
+				'Other.tsx': 'export function Other() { return <i />; }',
+				'index.html': '<script type="module" src="./Other.tsx"></script>',
+			});
+			if (runtimeFile.startsWith('real/')) fs.symlinkSync('real', path.join(root, 'linked'), 'dir');
+			const inputs = [runtimeFile, 'Other.tsx'].map((file) => path.join(root, file));
+			const note = expect.objectContaining({
+				rule: 'rename-conflict',
+				severity: 'error',
+				message: expect.stringContaining(specifier),
+			});
+			const options = { root, strong: true, verify: false };
+			const preview = await runCodemod(inputs, { ...options, write: false });
+			expect(preview.files.find((row) => row.file === runtimeFile)?.notes).toContainEqual(note);
+			const written = await runCodemod(inputs, { ...options, write: true });
+			expect(written.files.find((row) => row.file === runtimeFile)?.notes).toContainEqual(note);
+			expect(fs.readFileSync(path.join(root, runtimeFile), 'utf8')).toBe(runtime);
+			expect(fs.readFileSync(path.join(root, typesFile), 'utf8')).toBe(typed);
+			expect(fs.readFileSync(path.join(root, 'Consumer.ts'), 'utf8')).toBe(consumer);
+			expect(fs.readFileSync(path.join(root, 'index.html'), 'utf8')).toContain('./Other.tsx');
+			expect(fs.existsSync(path.join(root, runtimeFile.replace(/\.jsx?$/, '.tsrx')))).toBe(false);
+			expect(fs.existsSync(path.join(root, 'Other.tsrx'))).toBe(false);
+		},
+	);
+
+	it('still migrates a runtime sibling reached only by an erased type import', async () => {
+		const consumer = "import type { Settings } from './Widget.js'; export type Local = Settings;";
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: { jsx: 'react-jsx', moduleResolution: 'bundler', module: 'ESNext' },
+			}),
+			'Widget.tsx': 'export type Settings = { label: string };',
+			'Widget.js': 'export function Widget() { return <b>runtime</b>; }',
+			'Consumer.ts': consumer,
+		});
+		const result = await runCodemod([path.join(root, 'Widget.js')], {
+			root,
+			write: true,
+			strong: true,
+			verify: false,
+		});
+		expect(
+			result.files.flatMap((row) => row.notes).some((note) => note.rule === 'rename-conflict'),
+		).toBe(false);
+		expect(fs.readFileSync(path.join(root, 'Consumer.ts'), 'utf8')).toBe(consumer);
+		expect(fs.existsSync(path.join(root, 'Widget.tsrx'))).toBe(true);
+	});
+
+	it.each([
 		[
 			'retained value import',
 			'Consumer.ts',

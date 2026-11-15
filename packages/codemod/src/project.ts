@@ -213,7 +213,7 @@ export async function runCodemod(
 			moduleKind === ts.ModuleKind.ESNext) &&
 		!config?.moduleSuffixes &&
 		!config?.rootDirs;
-	const renamed = renamedImports(root, config, renames, bindingOptions);
+	const renamed = renamedImports(root, config, renames, bindingOptions, linkedRename);
 	const foldNames = process.platform === 'darwin';
 	const leafKey = (file: string) => {
 		const name = path.basename(file);
@@ -1687,7 +1687,9 @@ export async function runCodemod(
 				if (!renameConflicts.has(file)) {
 					renameConflicts.set(
 						file,
-						`supplies types for ${JSON.stringify(specifier)} in ${path.relative(root, from)}, where that JavaScript path exists on disk`,
+						file.endsWith('.tsx')
+							? `supplies types for ${JSON.stringify(specifier)} in ${path.relative(root, from)}, where that JavaScript path exists on disk`
+							: `is the JavaScript path for ${JSON.stringify(specifier)} in ${path.relative(root, from)}, where TypeScript resolves to a different file`,
 					);
 				}
 			},
@@ -2363,6 +2365,7 @@ function renamedImports(
 	config: ts.CompilerOptions | null,
 	renames: Map<string, string>,
 	issuerOptions: (file: string) => ts.CompilerOptions | null,
+	linkedRename: (file: string) => string | undefined,
 ) {
 	const options = {
 		moduleResolution: ts.ModuleResolutionKind.Bundler,
@@ -2381,6 +2384,21 @@ function renamedImports(
 		return { start, end, directory };
 	});
 	const runtimeImports = new Map<string, ReadonlySet<string>>();
+	function runtimeImport(from: string, specifier: string) {
+		if (/\.d\.[cm]?ts$/.test(from)) return false;
+		let imports = runtimeImports.get(from);
+		if (!imports && !isTsrx(from)) {
+			imports = new Set(
+				executableImports(
+					from,
+					fs.readFileSync(from, 'utf8'),
+					!!issuerOptions(from)?.verbatimModuleSyntax,
+				),
+			);
+			runtimeImports.set(from, imports);
+		}
+		return !imports || imports.has(specifier);
+	}
 	return (
 		from: string,
 		specifier: string,
@@ -2398,31 +2416,30 @@ function renamedImports(
 		const resolved = ts.resolveModuleName(specifier, from, options, ts.sys, cache).resolvedModule;
 		// TypeScript returns slash-delimited names, including on Windows.
 		const file = resolved && path.normalize(resolved.resolvedFileName);
+		const runtime = /^\.{1,2}\/.*\.jsx?$/.test(specifier)
+			? path.resolve(path.dirname(from), specifier)
+			: null;
+		if (file && runtime && file !== runtime) {
+			const selectedRuntime = renames.has(runtime) ? runtime : linkedRename(runtime);
+			if (selectedRuntime && selectedRuntime !== file && runtimeImport(from, specifier)) {
+				separateRuntime?.(selectedRuntime);
+				return null;
+			}
+		}
 		const target = file && renames.get(file);
 		if (!target) {
 			if (file) unmatched?.(file);
 			return null;
 		}
-		if (file.endsWith('.tsx') && /^\.{1,2}\/.*\.jsx?$/.test(specifier)) {
-			const runtime = path.resolve(path.dirname(from), specifier);
-			if (ts.sys.fileExists(runtime) && !/\.d\.[cm]?ts$/.test(from)) {
-				let imports = runtimeImports.get(from);
-				if (!imports && !isTsrx(from)) {
-					imports = new Set(
-						executableImports(
-							from,
-							fs.readFileSync(from, 'utf8'),
-							!!issuerOptions(from)?.verbatimModuleSyntax,
-						),
-					);
-					runtimeImports.set(from, imports);
-				}
-				// Preserve the runtime path and the TypeScript source it uses for types.
-				if (!imports || imports.has(specifier)) {
-					separateRuntime?.(file);
-					return null;
-				}
-			}
+		if (
+			runtime &&
+			file.endsWith('.tsx') &&
+			ts.sys.fileExists(runtime) &&
+			runtimeImport(from, specifier)
+		) {
+			// Preserve the runtime path and the TypeScript source it uses for types.
+			separateRuntime?.(file);
+			return null;
 		}
 		// Only a single directory alias preserves the specifier's suffix.
 		// A fixed alias or fallback list may resolve elsewhere after a rename.
