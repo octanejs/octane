@@ -40871,6 +40871,23 @@ function typescriptCommentOptions(source) {
 	};
 }
 
+function printImportType(node, context) {
+	// OXC uses source; the JavaScript parser and esrap 2.3 use argument.
+	if (node.loc) context.location(node.loc.start.line, node.loc.start.column);
+	context.write('import(');
+	context.visit(node.source ?? node.argument);
+	if (node.options) {
+		context.write(', ');
+		context.visit(node.options);
+	}
+	context.write(')');
+	if (node.qualifier) {
+		context.write('.');
+		context.visit(node.qualifier);
+	}
+	if (node.typeArguments) context.visit(node.typeArguments);
+}
+
 /**
  * Perform the compiler's ONE generated-program print and return esrap's real
  * per-token mappings (decoded, not VLQ-encoded) plus the exact printable AST
@@ -40898,7 +40915,9 @@ function printNodeWithMap(node, ctx) {
 	if (assertPrintedLocs()) assertNodeLocs(printable);
 	const commentOptions =
 		ctx.output === 'ts' ? typescriptCommentOptions(ctx.mapSource) : esrapCommentOptions;
-	const { code, map } = esrapPrint(printable, withDeferredImports(esrapTsx(commentOptions)), {
+	const visitors = withDeferredImports(esrapTsx(commentOptions));
+	if (ctx.output === 'ts') visitors.TSImportType = printImportType;
+	const { code, map } = esrapPrint(printable, visitors, {
 		// esrap indents every continuation of a block comment. TS consumers need
 		// authored annotation bytes, including indentation inside nested comments.
 		indent: ctx.output === 'ts' ? '' : undefined,
