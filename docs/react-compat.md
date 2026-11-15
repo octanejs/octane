@@ -47,6 +47,11 @@ Pass `hostClassName` and `hostStyle` to style either host from React. A supplied
 `hostStyle={{ display: 'inline' }}` gives an inline host its own layout box,
 and `hostStyle={{}}` leaves its display to CSS and the element's default.
 
+Use `hostRole` and `hostAriaLabel` to set a role and accessible name on either
+React-owned host. For example, a named icon can use `hostRole="img"`,
+`hostAriaLabel="Status"`, and `hostStyle={{ display: 'inline-block' }}` to give
+the host its own layout box.
+
 When React's `Activity` hides an `OctaneCompat` island, the island keeps its
 last published React context values until reveal. An insertion effect inside
 the hidden island can therefore leave a stylesheet for visible siblings on
