@@ -404,7 +404,7 @@ interface SsrElementContext {
 	location?: string | undefined;
 }
 
-type ServerComponent = (props: any, scope: SSRScope, extra?: any) => string;
+type ServerComponent<Output = string> = (props: any, scope: SSRScope, extra?: any) => Output;
 
 /**
  * What the public render entries accept. In a split client/server build the
@@ -5602,9 +5602,10 @@ function retainRendererJobListKeys(frame: Frame, keys: ServerSignalListKeys): vo
  * parent's own range bounds it; the client borrows that range). Applies to
  * both the component branch (frame wrap) and the string-tag branch (ssrBlock).
  */
-export function ssrComponent(
+export function ssrComponent<CompiledOnly extends true | undefined = undefined>(
 	parent: SSRScope,
-	comp: ServerComponent | string | typeof Activity,
+	// Only ordinary component frames normalize arbitrary renderable values.
+	comp: ServerComponent<true extends CompiledOnly ? string : unknown> | string | typeof Activity,
 	props: any,
 	// true (M3): the sole root of its parent's `@{}` body. 2: the root of a
 	// component's returned value, which its component's range bounds when it
@@ -5614,7 +5615,7 @@ export function ssrComponent(
 	identityScoped?: boolean | 'key',
 	invocationSite?: string,
 	bindingMarker?: string,
-	compiledOnly?: true,
+	compiledOnly?: CompiledOnly,
 ): string {
 	if (inDiscardedPass()) return '';
 	// A runtime-resolved Activity is a symbol, not a callable component. Keep its
@@ -5787,7 +5788,7 @@ let NEXT_COMPONENT_NAMESPACE: 'html' | 'svg' | 'mathml' | null = null;
 /** Compiler ABI for a component call whose output is parsed in foreign content. */
 export function ssrComponentNS(
 	parent: SSRScope,
-	comp: ServerComponent | string | typeof Activity,
+	comp: ServerComponent<unknown> | string | typeof Activity,
 	props: any,
 	namespace: 'html' | 'svg' | 'mathml',
 	inherit?: boolean | 2,
@@ -5816,7 +5817,7 @@ export function ssrComponentNS(
 /** Server counterpart of componentSlotFromConfig's ordered config boundary. */
 export function ssrComponentFromConfig(
 	parent: SSRScope,
-	comp: ServerComponent | string | typeof Fragment | typeof Activity,
+	comp: ServerComponent<unknown> | string | typeof Fragment | typeof Activity,
 	config: any,
 	invocationSite: string,
 	namespace: 'html' | 'svg' | 'mathml' | null = null,
