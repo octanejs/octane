@@ -1123,7 +1123,9 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				this.options.resolveStoreHook &&
 				ts.isImportSpecifier(declaration) &&
 				/^use[A-Z0-9]/.test(entry.imported) &&
-				/^use[A-Z0-9]/.test(entry.local)
+				// The compiler only assigns custom hook slots to these local names.
+				/^use[A-Z]/.test(entry.local) &&
+				entry.local !== 'useContext'
 			) {
 				const statement = declaration.parent.parent.parent;
 				if (!statement.attributes && !/\/\*|\/\//.test(statement.getText(this.sf))) {

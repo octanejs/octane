@@ -923,7 +923,11 @@ export function Pane() { const value = hooks.useReading?.(); return <p>{String(v
 		}
 		if (forwarding) {
 			expect(plan()?.name).toBe(
-				localExport || forwarding.startsWith('(') ? undefined : 'useChannel',
+				forwarding.startsWith('(')
+					? undefined
+					: localExport?.includes(' as ')
+						? 'useSnapshot'
+						: 'useChannel',
 			);
 		}
 		fs.writeFileSync(path.join(library, 'api.js'), 'export function useSnapshot() { return 1; }');
@@ -1402,6 +1406,119 @@ it('preserves the active store and aliased handle through effects, Effect Events
 		vi.unstubAllGlobals();
 	}
 }, 30_000);
+
+it('uses both proved scoped-store exports when their private and public names collide', async () => {
+	const { app, plan } = project({
+		'observer/entry.ts':
+			"export * from './public-store'; export { usePublic as useSnapshot, useChannel as useAlternate, useDuplicate } from './react-hooks';",
+		'observer/react-hooks.ts': `import { use } from 'react'; import { current } from './renderer'; import { valueOf } from './state';
+			function useChannel() { return valueOf(use(current)); }
+			function useOther() { return valueOf(use(current)) + 10; }
+			export { type useChannel as useGhost, useChannel as usePublic, useChannel as useDuplicate, useOther as useChannel, useOther as bindStoreHook, useOther as "useQuoted-NAME" };`,
+		'app/src/pane.tsx': `import { useSnapshot } from 'observer'; export function Pane() { return <b>{String(useSnapshot())}</b>; }`,
+		'app/src/other.tsx': `import { useAlternate, useDuplicate } from 'observer'; export function Other() { const first = useAlternate(); const second = useDuplicate(); return <i>{String(first)} {String(second)}</i>; }`,
+	});
+	const snapshot = plan();
+	const alternate = plan('useAlternate');
+	expect(snapshot.name).toBe('usePublic');
+	expect(alternate.name).toBe('useChannel');
+	expect(plan('useDuplicate').name).toBe('useDuplicate');
+	expect(alternate.files).toEqual(snapshot.files);
+	expect(snapshot.files.get(snapshot.entry)).not.toContain('useGhost');
+	expect(snapshot.files.get(snapshot.entry)).not.toContain('export const bindStoreHook');
+	const result = await runCodemod(
+		['pane', 'other'].map((f) => path.join(app, 'src', f + '.tsx')),
+		{ root: app, strong: true, projectTypes: true, verify: true, write: true },
+	);
+	const consumers = result.files.filter(
+		({ file }) => file === 'src/other.tsx' || file === 'src/pane.tsx',
+	);
+	expect(consumers.map(({ strong, rules }) => [strong, rules['store-hook']])).toEqual([
+		[true, 1],
+		[true, 1],
+	]);
+	for (const row of consumers)
+		expect([...row.notes, ...row.diagnostics].filter((item) => item.severity === 'error')).toEqual(
+			[],
+		);
+	fs.writeFileSync(
+		path.join(app, 'src/provider.tsrx'),
+		`import { NativeStoreProvider } from './octane-store-context.tsrx';
+		import { current } from '../../observer/renderer';
+		import { Pane } from './pane.tsrx'; import { Other } from './other.tsrx';
+		export function Root({ value }) @{ <NativeStoreProvider context={current} value={value}><Pane/><Other/></NativeStoreProvider> }`,
+	);
+	const { Root, renderToString } = await bundleRuntime(
+		app,
+		'server',
+		"export { Root } from './src/provider.tsrx'; export { renderToString } from 'octane/server';",
+	);
+	const dom = installDOM();
+	try {
+		const target = document.createElement('template');
+		for (const value of [3, 8, 3]) {
+			target.innerHTML = renderToString(Root, { value }).html;
+			expect(target.content.querySelector('b').textContent).toBe(String(value));
+			expect(target.content.querySelector('i').textContent).toBe(`${value + 10} ${value}`);
+		}
+	} finally {
+		dom.window.close();
+		vi.unstubAllGlobals();
+	}
+}, 30_000);
+
+it('defers an ambiguous star barrel above a local scoped-store export', () => {
+	const { plan, planner, app } = fixture({
+		'observer/entry.ts':
+			"export * from './public-store'; export * from './react-hooks'; export * from './collision';",
+		'observer/react-hooks.ts':
+			original.replace('export function', 'function') + ' export { useChannel as useSnapshot };',
+		'observer/collision.ts': 'export function useSnapshot() { return 99; }',
+	});
+	expect(plan()).toBeNull();
+	expect(planner('observer', 'useSnapshot', path.join(app, 'src/pane.tsx'))?.requiresReact()).toBe(
+		false,
+	);
+});
+
+it('still recognizes a retained hook exported under an empty string name', () => {
+	const { plan, planner, app } = fixture({
+		'observer/entry.ts': `export * from './public-store'; export { "" as useSnapshot } from './react-hooks';`,
+		'observer/react-hooks.ts':
+			original.replace('export function', 'function') + ' export { useChannel as "" };',
+	});
+	expect(plan()).toBeNull();
+	expect(planner('observer', 'useSnapshot', path.join(app, 'src/pane.tsx'))?.requiresReact()).toBe(
+		true,
+	);
+});
+
+it.each(['use1', 'useContext'])(
+	'keeps a scoped-store hook on React when the local name %s cannot receive a native slot',
+	async (local) => {
+		const { app } = project({
+			'observer/react-hooks.ts': `import { use, useRef } from 'react'; import { current } from './renderer'; import { valueOf } from './state';
+			function useChannel(initial: string) { const ref = useRef(initial); return String(valueOf(use(current))) + ref.current; }
+			export { useChannel };`,
+			'app/src/pane.tsx': `import { useSnapshot as ${local} } from 'observer';
+			export function Pane() { const first = ${local}('A'); const second = ${local}('B'); return <b>{first}|{second}</b>; }`,
+		});
+		const input = path.join(app, 'src/pane.tsx');
+		const result = await runCodemod([input], {
+			root: app,
+			strong: true,
+			projectTypes: true,
+			verify: true,
+			write: false,
+		});
+		const pane = result.files.find(({ file }) => file === 'src/pane.tsx');
+		expect(pane.notes).toContainEqual(
+			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+		);
+		expect(pane.rules['store-hook']).toBeUndefined();
+		expect(pane.code).toContain("from 'observer'");
+	},
+);
 
 const installedDescriptor = `export const Descriptor = { tag: 'report' };`;
 const descriptorCall = 'service.emit(Descriptor, { count: 3 });';
