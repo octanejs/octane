@@ -22721,14 +22721,40 @@ const NUMERIC_HOOK_SLOT_POSITION = {
 	useSignal$: 1,
 };
 
-function appendHookSlotArgument(name, args, slot, numeric, origin, ctx) {
-	const out = [...args];
+function withTrailingHookSlot(call, name, slot, numeric, ctx) {
+	const out = [...call.arguments];
+	if (
+		name === 'useState' &&
+		out.length === 0 &&
+		call._octaneHookRuntimeImportedHook === undefined &&
+		ctx._universalRuntimeUnit == null &&
+		!ctx.runtimeImportRoutes?.some((route) => route.imported?.has(name))
+	) {
+		// Omitting the initializer uses the public T | undefined overload.
+		// The generated trailing slot requires the initialized overload.
+		out.push(ssrVoid(call));
+		const types = call.typeArguments;
+		if (ctx.typescriptWeb && types?.params.length === 1) {
+			const [type] = types.params;
+			const optionalType = {
+				type: 'TSUnionType',
+				types: [
+					{ type: 'TSParenthesizedType', typeAnnotation: type },
+					b.ts_keyword_type('undefined'),
+				],
+			};
+			call.typeArguments = inheritOriginLoc(
+				b.ts_type_parameter_instantiation([optionalType]),
+				types,
+			);
+		}
+	}
 	const position =
 		numeric || INITIAL_VALUE_HOOKS.has(name) ? NUMERIC_HOOK_SLOT_POSITION[name] : undefined;
 	if (position !== undefined) {
-		while (out.length < position) out.push(b.id('undefined', origin));
+		while (out.length < position) out.push(b.id('undefined', call));
 	}
-	const expression = typeof slot === 'string' ? b.id(slot, origin) : slot;
+	const expression = typeof slot === 'string' ? b.id(slot, call) : slot;
 	// Lazy refs reserve numeric slots for the compiler; their authored API only
 	// accepts manual Symbols. The runtime already supports this private ABI.
 	const typedSlot =
@@ -22736,10 +22762,11 @@ function appendHookSlotArgument(name, args, slot, numeric, origin, ctx) {
 			? b.ts_as(expression, b.ts_keyword_type('any'))
 			: expression;
 	out.push({
-		...inheritOriginLoc(typedSlot, origin),
+		...inheritOriginLoc(typedSlot, call),
 		_octaneCompilerSlot: true,
 	});
-	return out;
+	call.arguments = out;
+	return call;
 }
 
 function wrapHookCallWithSlot(call, ctx, slot, callee, args) {
@@ -23558,23 +23585,23 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				if (isCustom || (hasSpread && SPREAD_PATH_SLOT_HOOKS.has(name)))
 					return wrapHookCallWithSlot(n, ctx, slot, callee, args);
 
-				const hookArgs = explicitMemoSlot
-					? args
-					: appendHookSlotArgument(name, args, slot, numericSlot, n, ctx);
+				const call = {
+					...n,
+					...(memoRoute ? { _octaneInlineMemoHook: memoCandidate } : null),
+					callee,
+					arguments: args,
+				};
+				if (explicitMemoSlot) return call;
+				withTrailingHookSlot(call, name, slot, numericSlot, ctx);
 				if (isServerUse && n._octaneHydrationSite !== undefined) {
-					hookArgs.push(
+					call.arguments.push(
 						inheritOriginLoc(
 							b.literal(n._octaneHydrationSite, JSON.stringify(n._octaneHydrationSite)),
 							n,
 						),
 					);
 				}
-				return {
-					...n,
-					...(memoRoute ? { _octaneInlineMemoHook: memoCandidate } : null),
-					callee,
-					arguments: hookArgs,
-				};
+				return call;
 			}
 		}
 		// Namespace-imported Octane hooks keep their member call intact while
@@ -23646,14 +23673,13 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 						: n.callee;
 				if (SPREAD_PATH_SLOT_HOOKS.has(name) && args.some((arg) => arg.type === 'SpreadElement'))
 					return wrapHookCallWithSlot(n, ctx, slot, callee, args);
-				return {
+				const call = {
 					...n,
 					...(memoRoute ? { _octaneInlineMemoHook: memoCandidate } : null),
 					callee,
-					arguments: explicitMemoSlot
-						? args
-						: appendHookSlotArgument(name, args, slot, numericSlot, n, ctx),
+					arguments: args,
 				};
+				return explicitMemoSlot ? call : withTrailingHookSlot(call, name, slot, numericSlot, ctx);
 			}
 		}
 		// METHOD-style custom hooks — `route.useLoaderData()`, `api.useSearch()`

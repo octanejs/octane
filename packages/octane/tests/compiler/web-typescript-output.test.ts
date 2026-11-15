@@ -433,6 +433,30 @@ for (const parserName of ['native', 'javascript']) {
 				expect(typecheck({ 'app.ts': code })).toEqual([]);
 			});
 
+			it('preserves the no-initializer overload for typed state and its updater', () => {
+				parser.javascript = parserName === 'javascript';
+				const source = `import { useState } from 'octane';
+					import * as Octane from 'octane';
+					export function App<T>() @{
+						const [direct] = useState<number>();
+						const [state, setState, read] = Octane.useState<string>();
+						const [fn] = useState<(value: number) => number>();
+						const [Ctor] = useState<new () => { value: string }>();
+						const [conditional] = useState<T extends string ? 'yes' : 'no'>();
+						const result: number | undefined = fn?.(1);
+						const created: string | undefined = Ctor === undefined ? undefined : new Ctor().value;
+						const variant: 'yes' | 'no' | undefined = conditional;
+						const own: number | undefined = direct;
+						const getState: () => string | undefined = read;
+						const update = () => setState(previous => previous === undefined ? 'next' : undefined);
+						<button onClick={update}>
+							{[own, state, getState(), result, created, variant].map(String).join(':')}
+						</button>
+					}`;
+				const result = compile(source, '/src/App.tsrx', { mode, output: 'ts' });
+				expect(typecheck({ 'app.ts': result.code })).toEqual([]);
+			});
+
 			it('emits valid typed hook and control-flow code with scoped type aliases', () => {
 				parser.javascript = parserName === 'javascript';
 				vi.stubEnv('OCTANE_COMPILE_FROZEN_AST', '1');
