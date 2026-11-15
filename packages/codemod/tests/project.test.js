@@ -239,14 +239,21 @@ export function markup() { return render(<Glyph prefix="first" />); }`,
 			'web/routes.ts': `import { route as add, index, layout, prefix as group } from '@react-router/dev/routes';
 const prefix = (_path: string, _routes: unknown[]) => [];
 const indirect = [index('indirect.tsx')];
+const layoutFile = 'bound-layout.tsx';
+const routeFile = 'bound-route.tsx';
+const prefixPath = 'bound-prefix';
 export default [
 	add('page', 'page.tsx'),
 	layout('frame.tsx', [
 		index('index.tsx'),
 		...group('docs', [...group('api', [add('reference', 'reference.tsx')])]),
 	]),
+	layout(layoutFile, { id: 'bound' }, [index('layout-child.tsx')]),
+	add('parent', routeFile, [index('route-child.tsx')]),
+	...group(prefixPath, [index('prefix-child.tsx')]),
 	...prefix('unused', [index('unused.tsx')]),
 	...group('indirect', indirect),
+	...group(...['spread'], [index('unused.tsx')]),
 	add('data', 'data.tsx'),
 	add('nil', 'nil.tsx'),
 ];
@@ -255,6 +262,11 @@ function unused(add: (pattern: string, file: string) => unknown) { return add('f
 			'web/frame.tsx': 'export default function Frame() { return <main>frame</main>; }',
 			'web/index.tsx': 'export default function Index() { return <main>index</main>; }',
 			'web/reference.tsx': 'export default function Reference() { return <main>API</main>; }',
+			'web/bound-layout.tsx': 'export default function BoundLayout() { return <main />; }',
+			'web/bound-route.tsx': 'export default function BoundRoute() { return <main />; }',
+			'web/layout-child.tsx': 'export default function LayoutChild() { return <main />; }',
+			'web/route-child.tsx': 'export default function RouteChild() { return <main />; }',
+			'web/prefix-child.tsx': 'export default function PrefixChild() { return <main />; }',
 			'web/indirect.tsx': 'export default function Indirect() { return <main>indirect</main>; }',
 			'web/data.tsx':
 				'export function loader() { return new Response("data"); } export function Local() { return <main />; }',
@@ -277,9 +289,21 @@ function unused(add: (pattern: string, file: string) => unknown) { return add('f
 			path.join(router, 'routes.js'),
 			'exports.route = exports.index = exports.layout = exports.prefix = () => ({});',
 		);
-		const inputs = ['page', 'frame', 'index', 'reference', 'indirect', 'data', 'nil', 'unused'].map(
-			(name) => path.join(root, `web/${name}.tsx`),
-		);
+		const inputs = [
+			'page',
+			'frame',
+			'index',
+			'reference',
+			'bound-layout',
+			'bound-route',
+			'layout-child',
+			'route-child',
+			'prefix-child',
+			'indirect',
+			'data',
+			'nil',
+			'unused',
+		].map((name) => path.join(root, `web/${name}.tsx`));
 		const result = await runCodemod(inputs, { root, write: false });
 		const warned = result.files
 			.filter((file) =>
@@ -292,8 +316,11 @@ function unused(add: (pattern: string, file: string) => unknown) { return add('f
 		expect(warned).toEqual([
 			'web/frame.tsx',
 			'web/index.tsx',
+			'web/layout-child.tsx',
 			'web/page.tsx',
+			'web/prefix-child.tsx',
 			'web/reference.tsx',
+			'web/route-child.tsx',
 			'web/routes.ts',
 		]);
 		const registry = result.files.find((file) => file.file === 'web/routes.ts');

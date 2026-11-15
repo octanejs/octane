@@ -2541,9 +2541,8 @@ function registeredReactRoutes(file: string, source: string) {
 					continue;
 				const helper = namedRuntimeImport(group.expression, checker);
 				if (helper?.module !== '@react-router/dev/routes' || helper.name !== 'prefix') continue;
-				const prefix = skipWrappers(group.arguments[0]);
 				const children = skipWrappers(group.arguments[1]);
-				if (ts.isStringLiteralLike(prefix) && ts.isArrayLiteralExpression(children))
+				if (!ts.isSpreadElement(group.arguments[0]) && ts.isArrayLiteralExpression(children))
 					visit(children);
 			}
 			return;
@@ -2558,20 +2557,25 @@ function registeredReactRoutes(file: string, source: string) {
 		if (callee?.module !== '@react-router/dev/routes') return;
 		const position =
 			callee.name === 'route' ? 1 : callee.name === 'index' || callee.name === 'layout' ? 0 : -1;
-		if (position === 1 && value.arguments[0] && ts.isSpreadElement(value.arguments[0])) return;
+		if (position < 0) return;
 		const raw = value.arguments[position];
-		const literal = raw && skipWrappers(raw);
 		if (
-			!literal ||
-			!ts.isStringLiteralLike(literal) ||
-			path.isAbsolute(literal.text) ||
-			/[!%?#\\]/.test(literal.text)
+			(position === 1 && value.arguments[0] && ts.isSpreadElement(value.arguments[0])) ||
+			(raw && ts.isSpreadElement(raw))
 		)
 			return;
-		paths.push({
-			target: path.resolve(dir, literal.text),
-			line: sf.getLineAndCharacterOfPosition(literal.getStart(sf)).line + 1,
-		});
+		const literal = raw && skipWrappers(raw);
+		if (
+			literal &&
+			ts.isStringLiteralLike(literal) &&
+			!path.isAbsolute(literal.text) &&
+			!/[!%?#\\]/.test(literal.text)
+		) {
+			paths.push({
+				target: path.resolve(dir, literal.text),
+				line: sf.getLineAndCharacterOfPosition(literal.getStart(sf)).line + 1,
+			});
+		}
 		if (callee.name === 'index') return;
 		const options = value.arguments[position + 1];
 		if (!options) return;
