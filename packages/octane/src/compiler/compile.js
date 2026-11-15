@@ -28103,6 +28103,7 @@ function normalizeChildren(
 	ctx = null,
 	inNoscript = false,
 	allowImperative = true,
+	bindingFragment = null,
 ) {
 	const out = [];
 	if (!nodes) return out;
@@ -28176,7 +28177,10 @@ function normalizeChildren(
 			// has no notion of marker pairs. A keyed Fragment is a reconciliation
 			// boundary instead, so it takes the descriptor branch below; the
 			// lexical-nesting walk (no imperative lowering) still sees through it.
-			if (isFragmentLongForm(n, ctx) && !(allowImperative && hasJsxAttribute(n, 'key'))) {
+			if (
+				isFragmentLongForm(n, ctx, bindingFragment) &&
+				!(allowImperative && hasJsxAttribute(n, 'key'))
+			) {
 				const attributes = n.openingElement.attributes || [];
 				const refAttr = attributes.find(
 					(a) =>
@@ -28195,11 +28199,11 @@ function normalizeChildren(
 							refVal && refVal.type === 'JSXExpressionContainer' ? refVal.expression : refVal;
 					}
 					out.push({ type: 'FragmentStart', refExpr });
-					out.push(...normalizeChildren(n.children || [], inSvg, ctx, inNoscript));
-					out.push({ type: 'FragmentEnd' });
-				} else {
-					out.push(...normalizeChildren(n.children || [], inSvg, ctx, inNoscript));
 				}
+				out.push(
+					...normalizeChildren(n.children || [], inSvg, ctx, inNoscript, true, bindingFragment),
+				);
+				if (refAttr || hasSpread) out.push({ type: 'FragmentEnd' });
 				continue;
 			}
 			// The mode-only builtin keeps its direct boundary lowering. Richer
@@ -28296,7 +28300,9 @@ function normalizeChildren(
 			}
 			out.push(element);
 		} else if (n.type === 'Tsx' || n.type === 'Tsrx' || n.type === 'JSXFragment') {
-			out.push(...normalizeChildren(n.children || [], inSvg, ctx, inNoscript));
+			out.push(
+				...normalizeChildren(n.children || [], inSvg, ctx, inNoscript, true, bindingFragment),
+			);
 		} else if (n.type === 'JSXStyleElement') {
 			if (hasJsxAttribute(n, 'dangerouslySetInnerHTML') || hasJsxAttribute(n, 'children')) {
 				out.push(
@@ -28306,6 +28312,7 @@ function normalizeChildren(
 						ctx,
 						inNoscript,
 						allowImperative,
+						bindingFragment,
 					),
 				);
 				continue;
@@ -28326,7 +28333,7 @@ function normalizeChildren(
 			// still template output, not setup JavaScript. Unwrap it before lowering
 			// so both client and server compilation route it through their construct
 			// emitters rather than asking esrap to print a TSRX-only expression.
-			out.push(...normalizeChildren([n.expression], inSvg, ctx, inNoscript));
+			out.push(...normalizeChildren([n.expression], inSvg, ctx, inNoscript, true, bindingFragment));
 		} else if (n.type === 'JSXIfExpression') {
 			// `@if (cond) { ... } @else { ... }` — lower to the old IfStatement
 			// shape so the existing makeIfCall path picks it up. `consequent` and
@@ -28393,7 +28400,7 @@ function normalizeChildren(
 			if (body.length === 0 && render === null) continue;
 			if (body.length === 0 && render !== null) {
 				// Recurse — render is a single JSX node, treat as a sibling child.
-				out.push(...normalizeChildren([render], inSvg, ctx, inNoscript));
+				out.push(...normalizeChildren([render], inSvg, ctx, inNoscript, true, bindingFragment));
 			} else {
 				out.push(
 					inheritOriginLoc(
@@ -36543,6 +36550,10 @@ function isActivityName(value) {
 function activityReferenceBinding(name, node, ctx) {
 	if (!ctx?.activityModuleAst) return undefined;
 	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
+	return templateReferenceBinding(name, node, lexical);
+}
+
+function templateReferenceBinding(name, node, lexical) {
 	const scope =
 		lexical.nodeScopes.get(name) ??
 		lexical.nodeScopes.get(node.openingElement) ??
@@ -36644,7 +36655,7 @@ function isCheckedCompiledBoundary(node, ctx) {
 // named-import alias, or the Fragment member of an Octane namespace import.
 // Resolve aliases against their import bindings so a foreign or locally
 // shadowed component retains its ordinary component semantics.
-function isFragmentLongForm(node, ctx = null) {
+function isFragmentLongForm(node, ctx = null, bindingFragment = null) {
 	const name = node.openingElement?.name || node.id;
 	if (!name) return false;
 	if (name.type === 'Identifier' || name.type === 'JSXIdentifier') {
@@ -36653,8 +36664,14 @@ function isFragmentLongForm(node, ctx = null) {
 		const imported = ctx?.octaneImportLocals?.get(local);
 		if (imported !== undefined) return imported === 'Fragment';
 		if (ctx?.foreignImportLocals?.has(local)) return false;
-		if (ctx?.componentInfo?.has(local)) return false;
-		return local === 'Fragment';
+		if (local !== 'Fragment' || ctx?.componentInfo?.has(local)) return false;
+		const binding = bindingFragment
+			? templateReferenceBinding(name, node, bindingFragment.lexical)
+			: activityReferenceBinding(name, node, ctx);
+		const lexical = bindingFragment?.lexical ?? ctx?.activityLexical;
+		if (bindingFragment?.imported && binding?.scope === lexical.rootScope) return true;
+		if (binding !== undefined) return binding === null;
+		return !lexical?.isBound(lexical.rootScope, local);
 	}
 	if (name.type !== 'MemberExpression' && name.type !== 'JSXMemberExpression') return false;
 	const object = name.object;
