@@ -252,6 +252,47 @@ for (const parserName of ['native', 'javascript']) {
 				expect(emitted).toContain('Fragment,');
 			});
 
+			it('preserves inline import types and their resolution mode', () => {
+				parser.javascript = parserName === 'javascript';
+				const source = `export type Entry = import('./peer').Entry<string>;
+					export type Factory = typeof import('./peer').make<number>;
+					export type Required = import('dual', { with: { 'resolution-mode': 'require' } }).Flavor;
+					export type Imported = import('dual', { with: { 'resolution-mode': 'import' } }).Flavor;
+					export function App({ entry }: { entry: Entry }) @{ <p>{entry.label as string}</p> }`;
+				const result = compile(source, '/src/entry.tsrx', { mode, hmr: false, output: 'ts' });
+				expect(result.lang).toBe('ts');
+				expect(result.diagnostics).toEqual([]);
+				expect(result.map.sourcesContent).toEqual([source]);
+				const output = ts.createSourceFile('entry.ts', result.code, ts.ScriptTarget.Latest, true);
+				const importModes = output.statements.flatMap((statement) => {
+					if (!ts.isTypeAliasDeclaration(statement) || !ts.isImportTypeNode(statement.type))
+						return [];
+					return (
+						statement.type.attributes?.elements.map(({ value }) => value.getText(output)) ?? []
+					);
+				});
+				expect(importModes.map((value) => value.slice(1, -1))).toEqual(['require', 'import']);
+				expect(
+					typecheck({
+						'entry.ts': result.code,
+						'peer.ts':
+							'export type Entry<T> = { label: T }; export function make<T>(value: T) { return value; }',
+						'dual.d.ts': "declare module 'dual' { export type Flavor = string; }",
+						'consumer.ts': `import type { Entry, Factory } from './entry';
+							const entry: Entry = { label: 'ready' };
+							const make: Factory = (value) => value + 1;
+							// @ts-expect-error The imported entry retained its string argument.
+							const invalid: Entry = { label: 42 };
+							// @ts-expect-error The type query retained its number argument.
+							make(entry.label);`,
+					}),
+				).toEqual([]);
+				const runtime = compile(source, '/src/entry.tsrx', { mode, hmr: false });
+				expect(runtime.diagnostics).toEqual([]);
+				expect(runtime.code).not.toContain('./peer');
+				expect(runtime.code).not.toContain('dual');
+			});
+
 			it('keeps generic class members in their enclosing type scope', () => {
 				parser.javascript = parserName === 'javascript';
 				const result = compile(
