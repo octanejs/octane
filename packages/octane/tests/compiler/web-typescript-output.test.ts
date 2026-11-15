@@ -192,6 +192,44 @@ const Specialized = Generic<{ label: string; count: number }>;`;
 for (const parserName of ['native', 'javascript']) {
 	for (const mode of ['client', 'server'] as const) {
 		describe(`web TypeScript output with the ${parserName} parser in ${mode} mode`, () => {
+			it('keeps the existing Fragment lowering for type-only Octane imports', () => {
+				parser.javascript = parserName === 'javascript';
+				const cases = [
+					["import type { Fragment } from 'octane';", 'Fragment'],
+					["import { type Fragment } from 'octane';", 'Fragment'],
+					["import type { Fragment as Group } from 'octane';", 'Group'],
+					["import type * as Native from 'octane';", 'Native.Fragment'],
+				];
+				const files: Record<string, string> = {};
+				for (const [index, [declaration, tag]] of cases.entries()) {
+					const result = compile(
+						`${declaration} export function App() @{
+							<main><${tag}><p>fragment child</p></${tag}></main>
+						}`,
+						`/src/type-fragment-${index}.tsrx`,
+						{ mode, hmr: false, output: 'ts' },
+					);
+					expect(result.diagnostics).toEqual([]);
+					files[`type-fragment-${index}.ts`] = result.code;
+				}
+				expect(typecheck(files)).toEqual([]);
+			});
+
+			it('preserves a local value beside erased Fragment import metadata', () => {
+				parser.javascript = parserName === 'javascript';
+				const result = compile(
+					`import type { Fragment } from 'octane';
+					function Fragment() @{ <strong>local view</strong> }
+					export function App() @{ <main><Fragment><p>ignored child</p></Fragment></main> }`,
+					'/src/local-fragment.tsrx',
+					{ mode, hmr: false, output: 'ts' },
+				);
+				const emitted = ts.transpileModule(result.code, {
+					compilerOptions: { module: ts.ModuleKind.ESNext },
+				}).outputText;
+				expect(emitted).toContain('Fragment,');
+			});
+
 			it('keeps generic class members in their enclosing type scope', () => {
 				parser.javascript = parserName === 'javascript';
 				const result = compile(
