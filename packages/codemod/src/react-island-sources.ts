@@ -3,7 +3,7 @@ import { parseSync } from '@tsrx/oxc/parser';
 import { hasRuntimeDependency } from './scoped-store-contract.js';
 import { skipWrappers } from './expression-wrappers.js';
 import { hasEval, rendersElementChildren } from './forwarded-props.js';
-import { componentTagOrExport, localUses } from './local-uses.js';
+import { componentTagOrExport, inTypeNode, localUses } from './local-uses.js';
 import { staticReactProps } from './react-renderer.js';
 import { bind, nativeReactCompat, skipParens, withoutJsxIndentation } from './transform.js';
 
@@ -34,13 +34,13 @@ async function bindIsland(file: string, source: string) {
 	return bind(file.endsWith('.tsrx') ? file + '.tsx' : file, code);
 }
 
-function imported(checker: ts.TypeChecker, node: ts.Node) {
+function imported(checker: ts.TypeChecker, node: ts.Node, defaultMember = false) {
 	const ref = ts.isPropertyAccessExpression(node) ? node.expression : node;
 	if (!ts.isIdentifier(ref)) return;
 	const decl = checker.getSymbolAtLocation(ref)?.declarations?.[0];
 	if (!decl) return;
 	const name = ts.isPropertyAccessExpression(node)
-		? ts.isNamespaceImport(decl) && node.name.text
+		? (ts.isNamespaceImport(decl) || (defaultMember && ts.isImportClause(decl))) && node.name.text
 		: ts.isImportSpecifier(decl) && !decl.isTypeOnly
 			? (decl.propertyName ?? decl.name).text
 			: ts.isImportClause(decl) && 'default';
@@ -52,6 +52,139 @@ function imported(checker: ts.TypeChecker, node: ts.Node) {
 		ts.isStringLiteral(imp.moduleSpecifier)
 	)
 		return { name, module: imp.moduleSpecifier.text };
+}
+
+function closedDefaultReactReceiver(receiver: ts.Identifier, uses: ReturnType<typeof localUses>) {
+	return uses(receiver).every((ref) => {
+		if (ts.isImportClause(ref.parent) || inTypeNode(ref)) return true;
+		const member = ref.parent;
+		if (!ts.isPropertyAccessExpression(member) || member.expression !== ref) return false;
+		const parent = member.parent;
+		return (
+			ts.isExpressionWithTypeArguments(parent) ||
+			((ts.isJsxOpeningElement(parent) ||
+				ts.isJsxClosingElement(parent) ||
+				ts.isJsxSelfClosingElement(parent)) &&
+				parent.tagName === member &&
+				(member.name.text === 'Fragment' ||
+					member.name.text === 'Suspense' ||
+					member.name.text === 'StrictMode')) ||
+			(ts.isCallExpression(parent) &&
+				parent.expression === member &&
+				member.name.text !== 'default')
+		);
+	});
+}
+
+/** A direct assignment of inert metadata does not change the exported constructor. */
+function classMetadataAssignment(ref: ts.Identifier, decl: ts.ClassDeclaration) {
+	const access = ref.parent;
+	if (!ts.isPropertyAccessExpression(access) || access.expression !== ref) return false;
+	const name = access.name.text;
+	if (name !== 'displayName' && name !== 'defaultProps') return false;
+	const assignment = access.parent;
+	if (
+		!ts.isBinaryExpression(assignment) ||
+		assignment.left !== access ||
+		assignment.operatorToken.kind !== ts.SyntaxKind.EqualsToken ||
+		!ts.isExpressionStatement(assignment.parent) ||
+		assignment.parent.parent !== decl.parent ||
+		assignment.getStart() < decl.end ||
+		decl.members.some(
+			(member) =>
+				ts.isClassStaticBlockDeclaration(member) ||
+				(member.name && ts.isComputedPropertyName(member.name)) ||
+				(ts.canHaveDecorators(member) && ts.getDecorators(member)?.length) ||
+				(ts.getCombinedModifierFlags(member) & ts.ModifierFlags.Static &&
+					(ts.isPropertyDeclaration(member) ||
+						ts.isSetAccessorDeclaration(member) ||
+						ts.isGetAccessorDeclaration(member))),
+		)
+	)
+		return false;
+	const value = skipWrappers(assignment.right);
+	if (name === 'displayName') return ts.isStringLiteralLike(value);
+	return (
+		ts.isObjectLiteralExpression(value) &&
+		value.properties.every((field) => {
+			if (
+				!ts.isPropertyAssignment(field) ||
+				!(
+					ts.isIdentifier(field.name) ||
+					ts.isStringLiteral(field.name) ||
+					ts.isNumericLiteral(field.name)
+				) ||
+				field.name.text === '__proto__'
+			)
+				return false;
+			const value = skipWrappers(field.initializer);
+			return (
+				ts.isStringLiteralLike(value) ||
+				ts.isNumericLiteral(value) ||
+				value.kind === ts.SyntaxKind.TrueKeyword ||
+				value.kind === ts.SyntaxKind.FalseKeyword ||
+				value.kind === ts.SyntaxKind.NullKeyword
+			);
+		})
+	);
+}
+
+/** Direct React class exports, including an alias in a local export list. */
+export function reactClassExports(file: string, source: string) {
+	const { sf, checker } = bind(file, source);
+	const names = new Set<string>();
+	const module = checker.getSymbolAtLocation(sf);
+	if (!module || hasEval(sf)) return names;
+	const uses = localUses(sf, checker);
+	let decorators: boolean | undefined;
+	const hasDecorator = (node: ts.Node): boolean =>
+		ts.isDecorator(node) ||
+		(ts.forEachChild(node, (child) => hasDecorator(child) || undefined) ?? false);
+	const erasedClassUse = (ref: ts.Identifier) =>
+		inTypeNode(ref) &&
+		(ts.isTypeQueryNode(ref.parent) || !(decorators ??= source.includes('@') && hasDecorator(sf)));
+	for (const symbol of checker.getExportsOfModule(module)) {
+		let decl = symbol.valueDeclaration ?? symbol.declarations?.[0];
+		if (decl && ts.isExportSpecifier(decl)) {
+			const exp = decl.parent.parent;
+			if (decl.isTypeOnly || exp.isTypeOnly || exp.moduleSpecifier) continue;
+			decl = checker.getExportSpecifierLocalTargetSymbol(decl)?.valueDeclaration;
+		} else if (decl && ts.isExportAssignment(decl)) {
+			const value = decl.expression;
+			if (decl.isExportEquals || !ts.isIdentifier(value)) continue;
+			const local = checker.getSymbolAtLocation(value)?.valueDeclaration;
+			if (!local || local.parent !== sf || local.end > decl.getStart(sf)) continue;
+			decl = local;
+		}
+		if (
+			!decl ||
+			!ts.isClassDeclaration(decl) ||
+			ts.getCombinedModifierFlags(decl) & ts.ModifierFlags.Ambient ||
+			ts.getDecorators(decl)?.length
+		)
+			continue;
+		const base = decl.heritageClauses?.find(
+			(clause) => clause.token === ts.SyntaxKind.ExtendsKeyword,
+		)?.types[0]?.expression;
+		if (!base) continue;
+		let entry = imported(checker, base);
+		if (!entry && ts.isPropertyAccessExpression(base) && ts.isIdentifier(base.expression)) {
+			const candidate = imported(checker, base, true);
+			if (candidate?.module === 'react' && closedDefaultReactReceiver(base.expression, uses))
+				entry = candidate;
+		}
+		if (entry?.module !== 'react' || (entry.name !== 'Component' && entry.name !== 'PureComponent'))
+			continue;
+		if (
+			!decl.name ||
+			uses(decl.name).every(
+				(ref) =>
+					erasedClassUse(ref) || componentTagOrExport(ref) || classMetadataAssignment(ref, decl),
+			)
+		)
+			names.add(symbol.name);
+	}
+	return names;
 }
 
 /** Original imported components handed to an authored React island. */
