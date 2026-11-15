@@ -38804,7 +38804,14 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// mutations, effects, portals, and opaque module/global reads fail closed.
 		const regionStmts = emptyStmts ? [...subStmts, ...emptyStmts] : subStmts;
 		const regionAst = b.block(regionStmts);
-		const regionFree = collectFreeIdentifiers(regionAst, bodyScope);
+		// The row and @empty have distinct lexical scopes.
+		const regionFree = collectFreeIdentifiers(
+			emptyStmts === null ? regionAst : b.block(subStmts),
+			bodyScope,
+		);
+		if (emptyStmts !== null) {
+			for (const name of collectFreeIdentifiers(b.block(emptyStmts), [])) regionFree.add(name);
+		}
 		for (const name of collectFreeIdentifiers(keyBody, bodyScope)) regionFree.add(name);
 		let listSafe =
 			ctx.autoMemo === true &&
