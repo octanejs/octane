@@ -518,6 +518,12 @@ return ${jsx};
 			'ArrayHole.tsx': '<main>{[[<Frame key="frame" />]]}</main>',
 			'ArrayLogicalLeft.tsx': '<main>{[<Frame key="frame" />] || [<b key="b" />]}</main>',
 			'ArrayItemStringAssertion.tsx': '<main>{[<Frame key="frame" /> as unknown as string]}</main>',
+			'ArrayNestedStringAssertion.tsx': `<main>{[
+				enabled ? (<Frame key="frame" /> as unknown as string) : null,
+				enabled && (<Frame key="f" /> as unknown as string),
+				true || (<Frame key="dead" /> as unknown as string),
+				<aside key="host">{<Frame /> as unknown as string}</aside>,
+			]}</main>`,
 			'ArrayStringAssertion.tsx': '<main>{[<Frame key="frame" />] as unknown as string}</main>',
 			'ArrayLogicalRight.tsx': '<main>{[<b key="b" />] || [<Frame key="frame" />]}</main>',
 			'ArrayOpaque.tsx': '<main><Holder>{[<Frame key="frame" />]}</Holder></main>',
@@ -590,6 +596,12 @@ export class Frame extends Component { render() { return <b>ready</b>; } }`,
 			'NativeFallbackHtml.tsx': view(
 				'<Suspense fallback={<main><Frame /></main>}><b /></Suspense>',
 			),
+			'NativeFallbackHoles.tsx': view(
+				`<Suspense fallback={<aside>
+					{(<Frame />)}
+					<>{enabled && <Frame />}{<Frame /> as unknown as string}</>
+				</aside>}><Pending /></Suspense>`,
+			),
 			'NativeFallbackMap.tsx': view(
 				'<Suspense fallback={<>{[1].map(n => <Frame key={n} />)}</>}><b /></Suspense>',
 			),
@@ -631,6 +643,7 @@ export function App() { const Group = Holder; return <div><Group><Frame /></Grou
 				'RootFragmentProps.tsx',
 				'RetainedFragmentProps.tsx',
 				'NativeFallbackHtml.tsx',
+				'NativeFallbackHoles.tsx',
 				'NativeFallbackMap.tsx',
 				'NativeFallbackClass.tsx',
 				'NestedSuspense.tsx',
@@ -660,6 +673,9 @@ export function App() { const Group = Holder; return <div><Group><Frame /></Grou
 				['ArrayHole.tsx', includeClass ? 'error' : 'warning'],
 				['ArrayItemStringAssertion.tsx', includeClass ? 'error' : 'warning'],
 				['ArrayLogicalLeft.tsx', includeClass ? 'error' : 'warning'],
+				['ArrayNestedStringAssertion.tsx', includeClass ? 'error' : 'warning'],
+				['ArrayNestedStringAssertion.tsx', includeClass ? 'error' : 'warning'],
+				['ArrayNestedStringAssertion.tsx', includeClass ? 'error' : 'warning'],
 				['AssertedHole.tsx', includeClass ? 'error' : 'warning'],
 				['ClassName.tsx', includeClass ? 'error' : 'warning'],
 				['Composed.tsx', includeClass ? 'error' : 'warning'],
@@ -684,6 +700,8 @@ export function App() { const Group = Holder; return <div><Group><Frame /></Grou
 				['MemberFragment.tsx', includeClass ? 'error' : 'warning'],
 				['NamedFragment.tsx', includeClass ? 'error' : 'warning'],
 				['NativeFallbackClass.tsx', includeClass ? 'error' : 'warning'],
+				['NativeFallbackHoles.tsx', includeClass ? 'error' : 'warning'],
+				['NativeFallbackHoles.tsx', includeClass ? 'error' : 'warning'],
 				['NativeFallbackHtml.tsx', includeClass ? 'error' : 'warning'],
 				['NativeFragment.tsx', includeClass ? 'error' : 'warning'],
 				['NestedSuspense.tsx', includeClass ? 'error' : 'warning'],
@@ -694,7 +712,7 @@ export function App() { const Group = Holder; return <div><Group><Frame /></Grou
 			if (includeClass)
 				expect(
 					files
-						.find((file) => file.file === 'NativeFallbackHtml.tsx')
+						.find((file) => file.file === 'NativeFallbackHoles.tsx')
 						.notes.find((note) => note.rule === 'class-component').message,
 				).toContain('this native template can render');
 		}

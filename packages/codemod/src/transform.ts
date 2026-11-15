@@ -7908,12 +7908,18 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return TRUTHY | FALSY | NULLISH;
 	}
 
-	private checkReactClassOutput(node: ts.Expression, conditional = false, retained = false) {
+	private checkReactClassOutput(
+		node: ts.Expression,
+		conditional = false,
+		retained = false,
+		descriptorValue = false,
+	) {
 		if (!this.options.localReactClass) return;
-		if (!retained && !conditional) {
+		if (!retained) {
 			while (isWrapper(node)) {
-				// A string assertion selects text even when the value is a descriptor.
+				// String assertions select text in template holes. Descriptor values erase them.
 				if (
+					!descriptorValue &&
 					(ts.isAsExpression(node) ||
 						ts.isSatisfiesExpression(node) ||
 						ts.isTypeAssertionExpression(node)) &&
@@ -7925,8 +7931,9 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (ts.isConditionalExpression(node)) {
 				const condition = literalCondition(node.condition);
 				if (condition === undefined || condition === 'truthy')
-					this.checkReactClassOutput(node.whenTrue, conditional);
-				if (condition !== 'truthy') this.checkReactClassOutput(node.whenFalse, conditional);
+					this.checkReactClassOutput(node.whenTrue, conditional, false, descriptorValue);
+				if (condition !== 'truthy')
+					this.checkReactClassOutput(node.whenFalse, conditional, false, descriptorValue);
 				return;
 			}
 			if (ts.isBinaryExpression(node)) {
@@ -7936,16 +7943,22 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				const left = this.logicalResult(node.left);
 				// The left result of && is falsy and cannot render JSX.
 				if (operator !== ts.SyntaxKind.AmpersandAmpersandToken && left & ~rightCases)
-					this.checkReactClassOutput(node.left, conditional);
-				if (left & rightCases) this.checkReactClassOutput(node.right, conditional);
+					this.checkReactClassOutput(node.left, conditional, false, descriptorValue);
+				if (left & rightCases)
+					this.checkReactClassOutput(node.right, conditional, false, descriptorValue);
 				return;
 			}
 			if (ts.isArrayLiteralExpression(node)) {
-				for (const element of node.elements) this.checkReactClassOutput(skipWrappers(element));
+				for (const element of node.elements)
+					this.checkReactClassOutput(element, conditional, false, true);
 				return;
 			}
 			if (ts.isCallExpression(node)) {
-				if (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'map')
+				if (
+					!conditional &&
+					ts.isPropertyAccessExpression(node.expression) &&
+					node.expression.name.text === 'map'
+				)
 					(this.classOutputMaps ??= new WeakSet()).add(node);
 				return;
 			}
@@ -7961,7 +7974,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (ts.isJsxSelfClosingElement(node))
 				return this.checkReactClassRoot(node, conditional, retained);
 			if (!retained && rendersOrdinaryHtmlChildren(node.openingElement)) {
-				this.checkReactClassChildren(node, conditional, false);
+				this.checkReactClassChildren(node, conditional, false, descriptorValue);
 				return;
 			}
 			const tag = node.openingElement.tagName;
@@ -7985,31 +7998,27 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					if (!fallback) return this.checkReactClassRoot(node, conditional, retained);
 					if (ts.isJsxExpression(fallback) && fallback.expression) {
 						const expression = skipParens(fallback.expression);
-						if (isJsx(expression)) this.checkReactClassOutput(expression, true);
+						if (isJsx(expression))
+							this.checkReactClassOutput(expression, true, false, descriptorValue);
 					}
 				}
 			} else if (callee.name !== 'StrictMode') {
 				return this.checkReactClassRoot(node, conditional, retained);
 			}
 		}
-		this.checkReactClassChildren(node, conditional, retained);
+		this.checkReactClassChildren(node, conditional, retained, descriptorValue);
 	}
 
 	private checkReactClassChildren(
 		node: ts.JsxElement | ts.JsxFragment,
 		conditional: boolean,
 		retained: boolean,
+		descriptorValue: boolean,
 	) {
 		for (const child of node.children) {
-			if (isJsx(child)) this.checkReactClassOutput(child, conditional, retained);
-			else if (
-				!retained &&
-				!conditional &&
-				ts.isJsxExpression(child) &&
-				child.expression &&
-				!child.dotDotDotToken
-			)
-				this.checkReactClassOutput(child.expression);
+			if (isJsx(child)) this.checkReactClassOutput(child, conditional, retained, descriptorValue);
+			else if (!retained && ts.isJsxExpression(child) && child.expression && !child.dotDotDotToken)
+				this.checkReactClassOutput(child.expression, conditional, false, descriptorValue);
 		}
 	}
 
