@@ -2463,7 +2463,7 @@ function reactRouterEntries(root: string): [string, string] | undefined {
 	if (rootEntry && routesEntry) return [rootEntry, routesEntry];
 }
 
-/** Direct registrations in the framework's exported routes array and its literal child arrays. */
+/** Direct registrations in the framework's exported routes array and its literal child groups. */
 function registeredReactRoutes(file: string, source: string) {
 	const { sf, checker } = bind(file, source);
 	const paths: { target: string; line: number }[] = [];
@@ -2473,7 +2473,26 @@ function registeredReactRoutes(file: string, source: string) {
 	function visit(node: ts.Expression) {
 		const value = skipWrappers(node);
 		if (ts.isArrayLiteralExpression(value)) {
-			for (const element of value.elements) visit(element);
+			for (const element of value.elements) {
+				if (!ts.isSpreadElement(element)) {
+					visit(element);
+					continue;
+				}
+				const group = skipWrappers(element.expression);
+				if (
+					!ts.isCallExpression(group) ||
+					ts.isOptionalChain(group) ||
+					!ts.isIdentifier(group.expression) ||
+					group.arguments.length !== 2
+				)
+					continue;
+				const helper = namedRuntimeImport(group.expression, checker);
+				if (helper?.module !== '@react-router/dev/routes' || helper.name !== 'prefix') continue;
+				const prefix = skipWrappers(group.arguments[0]);
+				const children = skipWrappers(group.arguments[1]);
+				if (ts.isStringLiteralLike(prefix) && ts.isArrayLiteralExpression(children))
+					visit(children);
+			}
 			return;
 		}
 		if (

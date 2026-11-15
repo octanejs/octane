@@ -236,12 +236,26 @@ export function markup() { return render(<Glyph prefix="first" />); }`,
 				'{"compilerOptions":{"module":"ESNext","moduleResolution":"bundler","jsx":"react-jsx"}}',
 			'react-router.config.ts': 'export default { appDirectory: "web", ssr: true };',
 			'web/root.tsx': 'export default function Root() { return <main />; }',
-			'web/routes.ts': `import { route as add, index, layout } from '@react-router/dev/routes';
-export default [add('page', 'page.tsx'), layout('frame.tsx', [index('index.tsx')]), add('data', 'data.tsx'), add('nil', 'nil.tsx')];
+			'web/routes.ts': `import { route as add, index, layout, prefix as group } from '@react-router/dev/routes';
+const prefix = (_path: string, _routes: unknown[]) => [];
+const indirect = [index('indirect.tsx')];
+export default [
+	add('page', 'page.tsx'),
+	layout('frame.tsx', [
+		index('index.tsx'),
+		...group('docs', [...group('api', [add('reference', 'reference.tsx')])]),
+	]),
+	...prefix('unused', [index('unused.tsx')]),
+	...group('indirect', indirect),
+	add('data', 'data.tsx'),
+	add('nil', 'nil.tsx'),
+];
 function unused(add: (pattern: string, file: string) => unknown) { return add('fake', 'unused.tsx'); }`,
 			'web/page.tsx': 'export default function Page() { return <main>page</main>; }',
 			'web/frame.tsx': 'export default function Frame() { return <main>frame</main>; }',
 			'web/index.tsx': 'export default function Index() { return <main>index</main>; }',
+			'web/reference.tsx': 'export default function Reference() { return <main>API</main>; }',
+			'web/indirect.tsx': 'export default function Indirect() { return <main>indirect</main>; }',
 			'web/data.tsx':
 				'export function loader() { return new Response("data"); } export function Local() { return <main />; }',
 			'web/nil.tsx':
@@ -261,10 +275,10 @@ function unused(add: (pattern: string, file: string) => unknown) { return add('f
 		);
 		fs.writeFileSync(
 			path.join(router, 'routes.js'),
-			'exports.route = exports.index = exports.layout = () => ({});',
+			'exports.route = exports.index = exports.layout = exports.prefix = () => ({});',
 		);
-		const inputs = ['page', 'frame', 'index', 'data', 'nil', 'unused'].map((name) =>
-			path.join(root, `web/${name}.tsx`),
+		const inputs = ['page', 'frame', 'index', 'reference', 'indirect', 'data', 'nil', 'unused'].map(
+			(name) => path.join(root, `web/${name}.tsx`),
 		);
 		const result = await runCodemod(inputs, { root, write: false });
 		const warned = result.files
@@ -275,9 +289,16 @@ function unused(add: (pattern: string, file: string) => unknown) { return add('f
 			)
 			.map((file) => file.file)
 			.sort();
-		expect(warned).toEqual(['web/frame.tsx', 'web/index.tsx', 'web/page.tsx', 'web/routes.ts']);
+		expect(warned).toEqual([
+			'web/frame.tsx',
+			'web/index.tsx',
+			'web/page.tsx',
+			'web/reference.tsx',
+			'web/routes.ts',
+		]);
 		const registry = result.files.find((file) => file.file === 'web/routes.ts');
 		expect(registry.code).toContain("add('page', 'page.tsrx')");
+		expect(registry.code).toContain("add('reference', 'reference.tsrx')");
 	});
 
 	it('uses the default React Router directory when config omits it', async () => {
