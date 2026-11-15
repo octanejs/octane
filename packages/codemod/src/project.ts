@@ -42,7 +42,7 @@ import {
 	importsReactBridge,
 	islandComponents,
 	executableImports,
-	hostedServerComponents,
+	hostedComponents,
 	directReactExports,
 	migratedJsxFactories,
 	octaneRootComponents,
@@ -1652,22 +1652,18 @@ export async function runCodemod(
 		if (!renames.size || linkedRename(file) || conflicts.has(file)) continue;
 		const result = byFile.get(file);
 		const selected = renames.has(file);
-		const specifier = 'octane/react/server';
-		const originalServerHost = () =>
+		const serverBridge = 'octane/react/server';
+		const originalHost = (bridge: 'octane/react' | 'octane/react/server') =>
 			automaticReactJsx(file) &&
-			originalOctaneBridge(file, specifier) &&
+			originalOctaneBridge(file, bridge) &&
 			originalReactEntry(file, 'react/jsx-runtime');
-		const hasServerImport = source.includes(specifier);
-		if (
-			selected &&
-			result &&
-			(hasServerImport ||
-				(source.includes('\\') &&
-					ts.preProcessFile(source).importedFiles.some((entry) => entry.fileName === specifier))) &&
-			originalServerHost()
-		) {
-			const [edge] = hostedServerComponents(file, source);
-			if (edge) {
+		const hasServerImport = source.includes(serverBridge);
+		if (selected && result && (source.includes('octane/react') || source.includes('\\'))) {
+			const imports = ts.preProcessFile(source).importedFiles;
+			for (const bridge of [serverBridge, 'octane/react'] as const) {
+				if (!imports.some(({ fileName }) => fileName === bridge) || !originalHost(bridge)) continue;
+				const [edge] = hostedComponents(file, source, bridge);
+				if (!edge) continue;
 				const note: Note = {
 					rule: 'react-compat',
 					severity: 'error',
@@ -1678,6 +1674,7 @@ export async function runCodemod(
 				if (write)
 					return blockedWrite(root, unchangedFile(result.file, source, note), compiler?.from);
 				result.notes.push(note);
+				break;
 			}
 		}
 		if (
@@ -1845,8 +1842,8 @@ export async function runCodemod(
 				leaf.notes.push({ ...note, line: 1 });
 			}
 		}
-		if (!edited.has(file) && hasServerImport && originalServerHost()) {
-			for (const edge of hostedServerComponents(file, source)) {
+		if (!edited.has(file) && hasServerImport && originalHost(serverBridge)) {
+			for (const edge of hostedComponents(file, source, serverBridge)) {
 				const match = edge.module.startsWith('.') && renamed(file, edge.module);
 				if (!match) continue;
 				const leaf = byFile.get(match.file);

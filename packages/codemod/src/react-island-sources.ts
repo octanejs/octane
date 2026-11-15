@@ -515,8 +515,12 @@ function ordinaryReactJsx(source: string) {
 	);
 }
 
-/** Runtime imports that an explicit server host returns directly. */
-export function hostedServerComponents(file: string, source: string) {
+/** Runtime imports that an explicit React host returns directly. */
+export function hostedComponents(
+	file: string,
+	source: string,
+	bridge: 'octane/react' | 'octane/react/server',
+) {
 	if (!ordinaryReactJsx(source)) return [];
 	const bound = bind(file, source);
 	const { sf, checker } = bound;
@@ -526,7 +530,7 @@ export function hostedServerComponents(file: string, source: string) {
 		if (ts.isIdentifier(tag) && (/^[a-z]/.test(tag.text) || tag.text.includes('-'))) continue;
 		const host = imported(checker, tag);
 		if (
-			host?.module !== 'octane/react/server' ||
+			host?.module !== bridge ||
 			(host.name !== 'OctaneCompat' && host.name !== 'OctaneCompatInline')
 		)
 			continue;
