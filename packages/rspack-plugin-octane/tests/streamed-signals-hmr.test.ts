@@ -75,20 +75,21 @@ exports.update = function() { return module.hot.check(true); };
 				},
 			],
 		})!;
-		let completed: (error?: Error | null) => void;
-		const nextBuild = () =>
+		// Exercise native hot application with one explicit rebuild for the authored edit.
+		const build = (file?: string) =>
 			new Promise<void>((resolve, reject) => {
-				completed = (error) => (error ? reject(error) : resolve());
+				compiler.run(
+					(error, stats) => {
+						if (error) reject(error);
+						else if (stats?.hasErrors())
+							reject(new Error(stats.toString({ all: false, errors: true })));
+						else resolve();
+					},
+					{ modifiedFiles: file ? new Set([file]) : undefined },
+				);
 			});
-		const firstBuild = nextBuild();
-		const watching = compiler.watch({ aggregateTimeout: 0, poll: 20 }, (error, stats) => {
-			completed(
-				error ??
-					(stats?.hasErrors() ? new Error(stats.toString({ all: false, errors: true })) : null),
-			);
-		});
 		try {
-			await firstBuild;
+			await build();
 			(globalThis as any).__octaneNativeHmrEffects = [];
 			let reloads = 0;
 			(globalThis as any).location = {
@@ -101,12 +102,12 @@ exports.update = function() { return module.hot.check(true); };
 				deferred ? 'ordinary1' : 'first',
 			]);
 			enabled ||= feature === 'added' || feature === 'added-deferred';
-			const changedBuild = nextBuild();
+			const changedFile = join(root, deferred ? 'ordinary.cjs' : 'feature.cjs');
 			writeFileSync(
-				join(root, deferred ? 'ordinary.cjs' : 'feature.cjs'),
+				changedFile,
 				`globalThis.__octaneNativeHmrEffects.push("${deferred ? 'ordinary2' : 'second'}");`,
 			);
-			await changedBuild;
+			await build(changedFile);
 			if (deferred) {
 				await entry.update();
 				expect(reloads).toBe(0);
@@ -126,7 +127,6 @@ exports.update = function() { return module.hot.check(true); };
 				expect((globalThis as any).__octaneNativeHmrEffects).toEqual(['first']);
 			}
 		} finally {
-			await new Promise<void>((resolve) => watching.close(resolve));
 			await new Promise<void>((resolve, reject) =>
 				compiler.close((error) => (error ? reject(error) : resolve())),
 			);
