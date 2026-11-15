@@ -6,6 +6,7 @@ import {
 	createElement,
 	type OctaneNode,
 	use,
+	useContext,
 	useState,
 } from 'octane';
 
@@ -165,6 +166,55 @@ export function PendingScopedBranch({
 
 function FailedBranch(): never {
 	throw new Error('branch failed');
+}
+
+const rowPrefix = 'module:';
+const rowKey: ((row: number) => number) | undefined = undefined;
+
+export function FunctionScopedKeyedRows(props: { rows: number[]; label: string; offset: number }) @{
+	if (props.label) {
+		var rowPrefix = props.label + ':';
+		var rowKey = (row: number) => props.offset + row;
+	}
+	<ul>
+		@for (const row of props.rows; key rowKey!(row)) {
+			<li>{String(row) + rowPrefix}</li>
+		} @empty {
+			<li>{rowPrefix as string}</li>
+		}
+	</ul>
+}
+
+const RowContext = createContext('default');
+
+function ScopedRowLabel() @{
+	<b>{useContext(RowContext) as string}</b>
+}
+
+const scopedRowLabel = createElement(ScopedRowLabel);
+const rowContent = 'module:';
+
+export function OpaqueFunctionScopedKeyedRows(props: {
+	rows: { name: string }[];
+	label: string;
+	rich?: boolean;
+}) @{
+	if (props.label) {
+		var rowContent: OctaneNode = props.rich ? scopedRowLabel : props.label;
+		var item = props.label;
+	}
+	<RowContext value={props.label}>
+		<ul>
+			@for (const item of props.rows; key item.name) {
+				<li>
+					{rowContent}
+					{item.name}
+				</li>
+			} @empty {
+				<li>{item}</li>
+			}
+		</ul>
+	</RowContext>
 }
 
 // Product-style return fragment: the toolbar is a fixed sibling while a
