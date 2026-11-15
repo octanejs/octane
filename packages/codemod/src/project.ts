@@ -1799,7 +1799,7 @@ export async function runCodemod(
 			const imports = ts.preProcessFile(source).importedFiles;
 			for (const bridge of [serverBridge, 'octane/react'] as const) {
 				if (!imports.some(({ fileName }) => fileName === bridge) || !originalHost(bridge)) continue;
-				const [edge] = hostedComponents(file, source, bridge);
+				const [edge] = hostedComponents(file, source, bridge, true);
 				if (!edge) continue;
 				const note: Note = {
 					rule: 'react-compat',

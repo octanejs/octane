@@ -1,7 +1,7 @@
 import ts from 'typescript';
 import { parseSync } from '@tsrx/oxc/parser';
 import { hasRuntimeDependency } from './scoped-store-contract.js';
-import { skipWrappers } from './expression-wrappers.js';
+import { literalCondition, skipWrappers } from './expression-wrappers.js';
 import { hasEval, rendersElementChildren } from './forwarded-props.js';
 import {
 	componentTagOrExport,
@@ -367,7 +367,9 @@ export async function islandComponents(
 	return [...components];
 }
 
-function* directExportReturns({ sf, checker }: ReturnType<typeof bind>, allowSetup = false) {
+type Setup = boolean | ((statement: ts.Statement) => boolean);
+
+function* exportReturns({ sf, checker }: ReturnType<typeof bind>, allowSetup: Setup = false) {
 	const module = checker.getSymbolAtLocation(sf);
 	if (!module || hasEval(sf)) return;
 	const uses = localUses(sf, checker);
@@ -413,19 +415,27 @@ function* directExportReturns({ sf, checker }: ReturnType<typeof bind>, allowSet
 			if (!value.initializer) continue;
 			value = skipWrappers(value.initializer);
 		}
-		const output = returnedJsx(value, allowSetup);
-		if (output)
-			yield { name: symbol.name, output, localName: name?.text, decl, symbol, splitExport };
+		const returned = singleReturn(value, allowSetup);
+		if (returned)
+			yield {
+				name: symbol.name,
+				output: skipWrappers(returned),
+				localName: name?.text,
+				decl,
+				symbol,
+				splitExport,
+			};
 	}
 }
 
-function returnedJsx(fn: ts.Node, allowSetup: boolean) {
-	const value = singleReturn(fn, allowSetup);
-	const output = value && skipWrappers(value);
-	if (output && (ts.isJsxElement(output) || ts.isJsxSelfClosingElement(output))) return output;
+function* directExportReturns(bound: ReturnType<typeof bind>, allowSetup = false) {
+	for (const entry of exportReturns(bound, allowSetup)) {
+		const { output } = entry;
+		if (ts.isJsxElement(output) || ts.isJsxSelfClosingElement(output)) yield { ...entry, output };
+	}
 }
 
-function singleReturn(fn: ts.Node, allowSetup = false) {
+function singleReturn(fn: ts.Node, allowSetup: Setup = false) {
 	if (
 		!(ts.isFunctionDeclaration(fn) || ts.isFunctionExpression(fn) || ts.isArrowFunction(fn)) ||
 		fn.asteriskToken ||
@@ -450,18 +460,48 @@ function singleReturn(fn: ts.Node, allowSetup = false) {
 				.slice(0, -1)
 				.every(
 					(statement) =>
-						ts.isVariableStatement(statement) &&
-						!statement.modifiers?.some((item) => item.kind === ts.SyntaxKind.DeclareKeyword) &&
-						(statement.declarationList.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
-						statement.declarationList.declarations.every((decl) => decl.initializer !== undefined),
+						(typeof allowSetup === 'function' && allowSetup(statement)) ||
+						(ts.isVariableStatement(statement) &&
+							!statement.modifiers?.some((item) => item.kind === ts.SyntaxKind.DeclareKeyword) &&
+							(statement.declarationList.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
+							statement.declarationList.declarations.every(
+								(decl) => decl.initializer !== undefined,
+							)),
 				)
 		)
 			return;
+		if (typeof allowSetup === 'function') return last.expression;
 		const output = skipParens(last.expression);
 		if (ts.isJsxElement(output) || ts.isJsxSelfClosingElement(output)) return output;
 		return;
 	}
 	return fn.body;
+}
+
+function conditionalFallback(statement: ts.Statement, checker: ts.TypeChecker) {
+	if (!ts.isIfStatement(statement) || statement.elseStatement) return false;
+	const test = skipWrappers(statement.expression);
+	const negated =
+		ts.isPrefixUnaryExpression(test) && test.operator === ts.SyntaxKind.ExclamationToken;
+	const identifier = negated ? skipWrappers(test.operand) : test;
+	if (!ts.isIdentifier(identifier)) return false;
+	const declaration = checker.getSymbolAtLocation(identifier)?.valueDeclaration;
+	if (
+		declaration &&
+		ts.isVariableDeclaration(declaration) &&
+		ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const &&
+		declaration.initializer
+	) {
+		const value = literalCondition(declaration.initializer);
+		if (value !== undefined && negated !== (value === 'truthy')) return false;
+	}
+	const branch = statement.thenStatement;
+	return (
+		ts.isReturnStatement(branch) ||
+		(ts.isBlock(branch) &&
+			branch.statements.length === 1 &&
+			ts.isReturnStatement(branch.statements[0]!))
+	);
 }
 
 function openingTag(element: ts.JsxElement | ts.JsxSelfClosingElement) {
@@ -520,25 +560,40 @@ export function hostedComponents(
 	file: string,
 	source: string,
 	bridge: 'octane/react' | 'octane/react/server',
+	selected = false,
 ) {
 	if (!ordinaryReactJsx(source)) return [];
 	const bound = bind(file, source);
 	const { sf, checker } = bound;
-	const edges = [];
-	for (const { output } of directExportReturns(bound)) {
-		const tag = openingTag(output).tagName;
-		if (ts.isIdentifier(tag) && (/^[a-z]/.test(tag.text) || tag.text.includes('-'))) continue;
+	const edges: { name: string; module: string; line: number }[] = [];
+	function visit(output: ts.Node) {
+		if (selected && ts.isJsxFragment(output)) {
+			output.children.forEach(visit);
+			return;
+		}
+		if (!ts.isJsxElement(output) && !ts.isJsxSelfClosingElement(output)) return;
+		const opening = openingTag(output);
+		const tag = opening.tagName;
+		if (ts.isIdentifier(tag) && (/^[a-z]/.test(tag.text) || tag.text.includes('-'))) {
+			// Intrinsic children reach the returned output; custom slots can capture JSX.
+			if (selected && ts.isJsxElement(output) && rendersElementChildren(opening))
+				output.children.forEach(visit);
+			return;
+		}
 		const host = imported(checker, tag);
 		if (
 			host?.module !== bridge ||
 			(host.name !== 'OctaneCompat' && host.name !== 'OctaneCompatInline')
 		)
-			continue;
+			return;
 		const ref = hostedLeaf(output);
 		const leaf = ref && imported(checker, ref);
 		if (leaf)
 			edges.push({ ...leaf, line: sf.getLineAndCharacterOfPosition(output.getStart(sf)).line + 1 });
 	}
+	const allowSetup =
+		selected && ((statement: ts.Statement) => conditionalFallback(statement, checker));
+	for (const { output } of exportReturns(bound, allowSetup)) visit(output);
 	return edges;
 }
 
