@@ -1618,12 +1618,27 @@ export async function runCodemod(
 			names = new Set();
 			const { program, errors } = parseSync(file.output, file.code);
 			if (program && !errors.length) {
+				let defaultLocal: string | undefined;
 				for (const statement of program.body) {
 					const defaultExport = statement.type === 'ExportDefaultDeclaration';
-					const fn =
+					let fn =
 						defaultExport || statement.type === 'ExportNamedDeclaration'
 							? statement.declaration
 							: statement;
+					if (defaultExport) {
+						while (fn?.type === 'ParenthesizedExpression') fn = fn.expression;
+						if (fn?.type === 'Identifier') defaultLocal = fn.name;
+					} else if (statement.type === 'ExportNamedDeclaration' && !statement.source) {
+						for (const specifier of statement.specifiers) {
+							if (
+								(specifier.exported.type === 'Identifier'
+									? specifier.exported.name === 'default'
+									: specifier.exported.value === 'default') &&
+								specifier.local.type === 'Identifier'
+							)
+								defaultLocal = specifier.local.name;
+						}
+					}
 					if (fn?.type !== 'FunctionDeclaration') continue;
 					// The parser exposes TSRX code blocks through its ESTree body type.
 					const body: unknown = fn.body;
@@ -1632,6 +1647,7 @@ export async function runCodemod(
 						else if (fn.id) names.add(fn.id.name);
 					}
 				}
+				if (defaultLocal !== undefined && names.has(defaultLocal)) names.add('default');
 			}
 			templateExports.set(file.output, names);
 		}

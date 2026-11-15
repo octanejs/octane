@@ -968,7 +968,7 @@ export function directReactExports(file: string, source: string) {
 			else if (
 				ts.isFunctionDeclaration(decl) &&
 				(name === 'default'
-					? !splitExport && (!localName || /^[A-Z]/.test(localName))
+					? !localName || /^[A-Z]/.test(localName)
 					: localName === name && /^[A-Z]/.test(name)) &&
 				ts.isIdentifier(tag) &&
 				/^[A-Z]/.test(tag.text)
