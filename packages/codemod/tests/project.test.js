@@ -10405,6 +10405,61 @@ export function View() { return <Provider locale=""><Language /></Provider>; }`;
 				expect(selected.code).toContain('octane-react-intl.tsrx');
 		},
 	);
+	it.each([false, true])(
+		'reports React Intl formatters in eager hook callbacks (projectTypes=%s)',
+		async (projectTypes) => {
+			const root = setup({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { jsx: 'react-jsx', moduleResolution: 'bundler' },
+				}),
+				'Calculators.tsx': `import {useMemo as calculate, useState} from 'react';
+					import {useIntl} from 'react-intl';
+					export function Calculators() {
+						const intl = useIntl();
+						const label = calculate(((value = intl.formatNumber(12)) => value), []);
+						const [date] = useState(() => intl.formatDate(0));
+						return <b title={label}>{String(date)}</b>;
+					}`,
+				'Callbacks.tsx': `import {useCallback, useMemo, useEffect, useReducer} from 'react';
+					import {useIntl} from 'react-intl';
+					export function Callbacks() {
+						const intl = useIntl();
+						const later = useCallback(() => intl.formatNumber(12), []);
+						const name = useMemo(() => () => intl.formatDate(0), []);
+						const [, dispatch] = useReducer(() => intl.formatTime(0), 'ready');
+						useEffect(() => { intl.formatNumber(12); }, []);
+						return <button onClick={() => { later(); name(); dispatch(); }}>Later</button>;
+					}`,
+				'Shadowed.tsx': `import {useMemo as calculate} from 'react';
+					import {useIntl} from 'react-intl';
+					export function Shadowed({calculate}: {calculate: (read: () => string, deps: []) => string}) {
+						const intl = useIntl();
+						const label = calculate(() => intl.formatNumber(12), []);
+						return <b title={label}>Label</b>;
+					}`,
+			});
+			const { files } = await runCodemod(
+				['Calculators.tsx', 'Callbacks.tsx', 'Shadowed.tsx'].map((file) => path.join(root, file)),
+				{ root, strong: true, verify: true, write: false, projectTypes },
+			);
+			for (const [file, methods] of [
+				['Calculators.tsx', ['formatNumber', 'formatDate']],
+				['Callbacks.tsx', []],
+				['Shadowed.tsx', []],
+			]) {
+				const result = files.find((item) => item.file === file);
+				const errors = result.notes.filter((note) => note.severity === 'error');
+				expect(errors, file).toEqual(
+					methods.map((method) =>
+						expect.objectContaining({
+							rule: 'bindings',
+							message: expect.stringContaining(`this ${method} call`),
+						}),
+					),
+				);
+			}
+		},
+	);
 	it.each(['react-jsx', 'preserve'])(
 		'reports ownership for a declarative formatter moved into the native adapter (jsx=%s)',
 		async (jsx) => {

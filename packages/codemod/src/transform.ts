@@ -1120,6 +1120,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						this.localUses,
 					),
 				() => this.options.reactStoreComponent?.('react-intl') === true,
+				(callee) => {
+					const hook = this.directImportedValue(skipWrappers(callee))?.entry;
+					return hook?.module === 'react' && this.options.originalReact === true
+						? hook.imported
+						: null;
+				},
 				(call, method) => {
 					if (method === 'formatMessage' || this.options.automaticReactJsx)
 						this.note(
