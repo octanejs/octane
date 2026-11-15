@@ -2,7 +2,8 @@ import ts from 'typescript';
 import { parseSync } from '@tsrx/oxc/parser';
 import { hasRuntimeDependency } from './scoped-store-contract.js';
 import { literalCondition, skipWrappers } from './expression-wrappers.js';
-import { hasEval, rendersElementChildren } from './forwarded-props.js';
+import { atInitializedModuleHandle, initializedBefore } from './effect-receivers.js';
+import { hasEval, rendersElementChildren, rootHandleEscapes } from './forwarded-props.js';
 import {
 	componentTagOrExport,
 	inTypeNode,
@@ -760,6 +761,7 @@ export function octaneRootComponents(file: string, source: string) {
 		name: string;
 		line: number;
 	}[] = [];
+	let uses: ReturnType<typeof localUses> | undefined;
 	function clientComponent(call: ts.CallExpression, callee: ts.Expression, hydrate: boolean) {
 		if (hydrate && call.arguments.length <= 4) return call.arguments[1];
 		if (
@@ -769,17 +771,43 @@ export function octaneRootComponents(file: string, source: string) {
 			call.arguments.length > 2
 		)
 			return;
-		const root = skipWrappers(callee.expression);
-		if (
-			ts.isCallExpression(root) &&
-			!ts.isOptionalChain(root) &&
-			root.arguments.length >= 1 &&
-			root.arguments.length <= 2 &&
-			!root.arguments.some(ts.isSpreadElement)
-		) {
-			const factory = imported(checker, skipWrappers(root.expression));
-			if (factory?.module === 'octane' && factory.name === 'createRoot') return call.arguments[0];
+		const receiver = skipWrappers(callee.expression);
+		let root = receiver;
+		let handle: ts.Identifier | undefined;
+		if (ts.isIdentifier(receiver)) {
+			const declaration = checker.getSymbolAtLocation(receiver)?.valueDeclaration;
+			if (
+				!declaration ||
+				!ts.isVariableDeclaration(declaration) ||
+				!ts.isIdentifier(declaration.name) ||
+				!declaration.initializer ||
+				!(declaration.parent.flags & ts.NodeFlags.Const) ||
+				ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Export ||
+				(!atInitializedModuleHandle(declaration, call) &&
+					!initializedBefore(checker, receiver, call))
+			)
+				return;
+			handle = declaration.name;
+			root = skipWrappers(declaration.initializer);
 		}
+		if (
+			!ts.isCallExpression(root) ||
+			ts.isOptionalChain(root) ||
+			root.arguments.length < 1 ||
+			root.arguments.length > 2 ||
+			root.arguments.some(ts.isSpreadElement)
+		)
+			return;
+		const factory = imported(checker, skipWrappers(root.expression));
+		if (factory?.module !== 'octane' || factory.name !== 'createRoot') return;
+		if (handle) {
+			if ((source.includes('eval') || source.includes('\\u')) && hasEval(sf)) return;
+			const rootScope = (node: ts.Node) => ts.isFunctionLike(node) || ts.isClassLike(node);
+			const owner = ts.findAncestor(handle, rootScope);
+			const refs = (uses ??= localUses(sf, checker))(handle);
+			if (rootHandleEscapes(refs, (ref) => ts.findAncestor(ref, rootScope) === owner)) return;
+		}
+		return call.arguments[0];
 	}
 	function visit(node: ts.Node) {
 		if (

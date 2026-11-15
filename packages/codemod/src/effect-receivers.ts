@@ -79,6 +79,22 @@ export function initializedBefore(checker: ts.TypeChecker, name: ts.Identifier, 
 	);
 }
 
+/** A top-level call can use a previously initialized handle in the same module. */
+export function atInitializedModuleHandle(
+	declaration: ts.VariableDeclaration,
+	call: ts.CallExpression,
+) {
+	const statement = declaration.parent.parent;
+	const file = call.getSourceFile();
+	return (
+		ts.isVariableStatement(statement) &&
+		statement.parent === file &&
+		ts.isExpressionStatement(call.parent) &&
+		call.parent.parent === file &&
+		statement.end <= call.getStart(file)
+	);
+}
+
 const propScopes = new WeakMap<ts.SourceFile, ReturnType<typeof propScope>>();
 
 function propScope(file: ts.SourceFile, checker: ts.TypeChecker) {
