@@ -18,7 +18,8 @@
  *   asking again for a read it asked for before, to reload it, never joins a
  *   request that may predate the change it reloads for. The newest read
  *   started for a key replaces the value of each replica that holds it and is
- *   not loading it itself; an older one finishing later does not.
+ *   not loading it itself; an older one finishing later does not, and its value
+ *   is never saved over the newer one's.
  * - Each write's receipt is looked up once per owner, and every tab that asks
  *   for it settles the write by that answer.
  * - One upstream connection serves every replica listening to a feed with
@@ -48,6 +49,7 @@ import {
 	DataRetiredError,
 	entryKey,
 	internals,
+	requestTimes,
 	type DataStore,
 	type DataStoreOptions,
 	type Entry,
@@ -135,7 +137,13 @@ type ToReplica =
 	| { readonly t: 'refused' }
 	/** The answer to a call to the account's persistence. */
 	| { readonly t: 'persisted'; readonly id: number; readonly value: unknown }
-	| { readonly t: 'reply'; readonly id: number; readonly reply: DataReply }
+	| {
+			readonly t: 'reply';
+			readonly id: number;
+			readonly reply: DataReply;
+			/** When a read's request started; a write's reply and an owner from an older build leave it out. */
+			readonly at?: number;
+	  }
 	| { readonly t: 'failed'; readonly id: number; readonly error: unknown }
 	| { readonly t: 'frame'; readonly id: number; readonly frame: FeedFrame }
 	| { readonly t: 'end'; readonly id: number; readonly error?: unknown }
@@ -193,8 +201,13 @@ export function createDataOwner(options: {
 	/** Reads in flight, by wire key, so equal reads share one request. */
 	const reading = new Map<string, Promise<DataReply>>();
 	const upstreams = new Map<string, Upstream>();
-	/** The replicas that asked for each shared read; the rest are told its value. */
-	const asked = new WeakMap<Promise<DataReply>, Set<OwnerPort>>();
+	/** When each shared read started, and the replicas that asked for it; the rest are told its value. */
+	const asked = new WeakMap<
+		Promise<DataReply>,
+		{ readonly at: number; readonly ports: Set<OwnerPort> }
+	>();
+	/** When the last read started: each starts later than every read before it, so they have an order. */
+	let lastStart = 0;
 	/** The newest read started for each wire key: only its value is told to the others. */
 	const newest = new Map<string, Promise<DataReply>>();
 	/** Receipts looked up, by wire key, so every tab settles a write by the same answer. */
@@ -260,6 +273,8 @@ export function createDataOwner(options: {
 	/** The account's persistence, opened on first use; what each tab last asked to save. */
 	let persistence: Persistence | null = null;
 	const saves = new Map<string, Saving | null>();
+	/** When the newest request whose value was saved for each key started. */
+	const newestSaved = new Map<string, number>();
 	/** Keys some tab restored or saved this session, which purging leaves alone. */
 	const shown = new Set<string>();
 	/** Only the first tab to ask recovers the journal, so each write is looked up once. */
@@ -289,7 +304,16 @@ export function createDataOwner(options: {
 		const key = args[0] as string;
 		if (!p) return answer(nothing(op));
 		if (op === 'save' || op === 'restore') shown.add(key);
-		if (op === 'save') return (saves.set(key, args[1] as Saving | null), p.mark(key));
+		if (op === 'save') {
+			const saving = args[1] as Saving | null;
+			const at = saving?.requestedAt;
+			if (at !== undefined) {
+				// A reply to an older request can land after a newer one's value was saved.
+				if (at < (newestSaved.get(key) ?? 0)) return;
+				newestSaved.set(key, at);
+			}
+			return (saves.set(key, saving), p.mark(key));
+		}
 		if (op === 'journal') journaled.add((args[0] as { id: string }).id);
 		if (op === 'unjournal') journaled.delete(key);
 		if (op === 'recover') {
@@ -317,6 +341,7 @@ export function createDataOwner(options: {
 		void persistence?.clear().catch(() => {});
 		persistence = null;
 		saves.clear();
+		newestSaved.clear();
 		shown.clear();
 		journaled.clear();
 		receipts.clear();
@@ -420,10 +445,11 @@ export function createDataOwner(options: {
 		const key = `${payload.kind}\n${entryKey(payload.name, payload.input)}`;
 		let shared = receipt ? receipts.get(key) : fresh ? undefined : reading.get(key);
 		if (!shared) {
-			const at = hostDateNow();
+			const at = (lastStart = Math.max(lastStart + 1, hostDateNow()));
 			const started = (shared = Promise.resolve().then(() =>
 				transport(payload, new AbortController().signal),
 			));
+			asked.set(started, { at, ports: new Set() });
 			reading.set(key, started);
 			newest.set(key, started);
 			const done = () => {
@@ -452,17 +478,17 @@ export function createDataOwner(options: {
 							value: reply.value,
 							at,
 						};
-						for (const port of replicas) if (!asked.get(started)!.has(port)) post(port, value);
+						for (const port of replicas)
+							if (!asked.get(started)!.ports.has(port)) post(port, value);
 					},
 					() => {},
 				);
 			}
 			started.then(done, done);
 		}
-		let askers = asked.get(shared);
-		if (!askers) asked.set(shared, (askers = new Set()));
-		askers.add(from);
-		shared.then(answer, fail);
+		const { at, ports } = asked.get(shared)!;
+		ports.add(from);
+		shared.then((reply) => post(from, { t: 'reply', id, reply, at }), fail);
 	}
 
 	function subscribe(from: OwnerPort, id: number, payload: FeedRequest): void {
@@ -949,7 +975,8 @@ export function createReplica(
 	 * Take a value another replica loaded, for a read held here and not loading,
 	 * unless what is held was read by a request that started later.
 	 */
-	async function value(name: string, input: unknown, raw: unknown, at = hostDateNow()) {
+	async function value(name: string, input: unknown, raw: unknown, requestedAt?: number) {
+		const at = requestedAt ?? hostDateNow();
 		const entry: Entry | undefined = inner.wireEntry(entryKey(name, input));
 		const older = () => entry!.hasBase && at < entry!.fetchedAt;
 		if (!entry || entry.inflight || store.retired || older()) return;
@@ -963,7 +990,7 @@ export function createReplica(
 		if (store.retired || entry.inflight || inner.entries.get(entry.key) !== entry || older())
 			return;
 		const reload = new Set<Entry>();
-		inner.rebase(entry, parsed, false, reload, Math.max(0, hostDateNow() - at));
+		inner.rebase(entry, parsed, false, reload, Math.max(0, hostDateNow() - at), requestedAt);
 		inner.finish(reload, [entry], entry.names);
 	}
 
@@ -998,8 +1025,10 @@ export function createReplica(
 				case 'failed': {
 					const pending = replies.get(message.id);
 					replies.delete(message.id);
-					if (message.t === 'reply') pending?.resolve(message.reply);
-					else pending?.reject(message.error);
+					if (message.t === 'reply') {
+						if (message.at !== undefined) requestTimes.set(message.reply, message.at);
+						pending?.resolve(message.reply);
+					} else pending?.reject(message.error);
 					break;
 				}
 				case 'frame':

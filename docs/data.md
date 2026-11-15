@@ -254,6 +254,9 @@ store once hydrated. Only the newest submission's outcome is shown.
   tab to recover the journal after a restart gets its entries. Signing out, or
   another account signing in, clears the cache. A replica uses its own
   `persist` only once it is a local store.
+- The cache keeps a read's value from the newest request the owner made for
+  it. A reply to an older request that lands later shows in the tab that asked
+  for it, and is not saved over the newer value.
 - A durable write in flight to an owner that crashes settles by itself: once
   each tab reconnects, it looks up the receipt of every journaled write it
   shows as uncertain and keeps or rolls back the edit. The owner looks each
