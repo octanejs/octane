@@ -5740,6 +5740,15 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			if (!type || children.length > 0) return null;
 			if (!(ts.isIdentifier(type) || ts.isPropertyAccessExpression(type))) return null;
 			if (!isComponentName(type.getText(this.sf).split('.').pop() ?? '')) return null;
+			const config = props && skipWrappers(props);
+			// A bound `undefined` can carry props that still need the factory's config handling.
+			if (
+				config &&
+				ts.isIdentifier(config) &&
+				config.text === 'undefined' &&
+				this.declarationOf(config)
+			)
+				return null;
 			const text = this.emit(type, PLAIN);
 			return !props || isNullish(props) ? text : `${text}, ${this.emit(props, PLAIN)}`;
 		}
