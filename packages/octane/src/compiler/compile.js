@@ -12797,7 +12797,8 @@ function compileInternal(
 	// JavaScript return value. Lower it in every compiler mode so SSR, hydration,
 	// and HMR share one DOM-range shape. HMR still emits the generic component
 	// call ABI, and invalidates normally if an edit introduces a value return.
-	ast = lowerNullishComponentExits(ast);
+	const typescriptWeb = options?.output === 'ts' && options?.__valdiAbiGuard === undefined;
+	ast = lowerNullishComponentExits(ast, typescriptWeb);
 	// Same contract for React-style conditional JSX returns: branch-selected
 	// output compiles as template control flow instead of de-opt descriptors.
 	ast = lowerJsxReturnBranchComponents(ast);
@@ -13052,7 +13053,7 @@ function compileInternal(
 		currentHoistedVars: null,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
 		output: options?.output,
-		typescriptWeb: options?.output === 'ts' && options?.__valdiAbiGuard === undefined,
+		typescriptWeb,
 		// Coarse origin for module scaffolding with no authored source position
 		// (imports, delegate/style/template consts, hook-slot consts, HMR/stamp
 		// tails): the module's first located statement. Every node handed to the
@@ -14588,7 +14589,7 @@ function compileServer(
 	ast = splitDirectlyCalledComponents(ast);
 	// Mirror the client transform so SSR emits the same control-flow ranges
 	// hydration expects in both development and production.
-	ast = lowerNullishComponentExits(ast);
+	ast = lowerNullishComponentExits(ast, options?.output === 'ts');
 	ast = lowerJsxReturnBranchComponents(ast);
 	ast = lowerDirectlyCalledTemplateFunctions(ast);
 	// Mirror the client transform exactly. Effects are server no-ops, but
@@ -39381,8 +39382,18 @@ function retainTailHookState(body, first, ctx) {
 		names.length === 0
 			? []
 			: [inheritOriginLoc(b.const(b.array_pattern(names.map((n) => b.id(n))), b.id(tail)), origin)];
+	// A retained capture is an opaque compiler-created environment.
+	const inactive = b.literal(false, 'false');
 	return [
-		inheritOriginLoc(b.let(b.id(tail), b.literal(false, 'false')), origin),
+		inheritOriginLoc(
+			b.let(
+				b.id(tail),
+				ctx.typescriptWeb && names.length > 0
+					? b.ts_as(inactive, b.ts_keyword_type('any'))
+					: inactive,
+			),
+			origin,
+		),
 		...lowered,
 		inheritOriginLoc(b.if(b.id(tail), b.block([...unpack, ...output]), null), origin),
 	];
@@ -39529,7 +39540,7 @@ function sourceError(code, ctx, node, message) {
  * generic return-value ABI. HMR continues to invoke every component through
  * its generic slot and invalidates if a later edit introduces a value return.
  */
-function lowerNullishComponentExits(ast) {
+function lowerNullishComponentExits(ast, typescriptWeb) {
 	const statements = ast.body || [];
 	let out = null;
 	// Compiler-name allocation for retainTailHookState, before the compile
@@ -39551,7 +39562,7 @@ function lowerNullishComponentExits(ast) {
 					: retainTailHookState(
 							sequence,
 							tail,
-							(names ??= { usedCompilerNames: collectIdentifierNames(ast) }),
+							(names ??= { usedCompilerNames: collectIdentifierNames(ast), typescriptWeb }),
 						);
 			const renderIndex = rewritten.findIndex(isJsxNode);
 			if (renderIndex !== -1 && !rewritten.slice(renderIndex + 1).some(isJsxNode)) {
