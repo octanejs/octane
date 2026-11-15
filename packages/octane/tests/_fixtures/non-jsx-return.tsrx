@@ -292,3 +292,13 @@ export function MixedTransitionApp(props) @{
 		</div>
 	</div>
 }
+
+export function GuardedInlineChild({ shown }: { shown: boolean }) @{
+	<main>
+		{() => @{
+			if (!shown) return null;
+			const [count, setCount, getCount] = useState(1);
+			<button onClick={() => setCount(getCount() + 1)}>{count as number}</button>
+		}}
+	</main>
+}
