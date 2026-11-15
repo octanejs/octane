@@ -42,6 +42,57 @@ export function AtToggle(props) @{
 	</div>
 }
 
+function CapturedAction({ label }: { label: string }) @{
+	const [count, setCount] = useState(0);
+	<button onClick={() => setCount(count + 1)}>{label + ':' + count}</button>
+}
+
+function BranchAction(_props: { label: string }) @{
+	<i>module</i>
+}
+
+export function FunctionScopedBranch({ label }: { label: string }) @{
+	if (label) {
+		var BranchAction = CapturedAction;
+	}
+	<main>
+		@if (label) {
+			<BranchAction label={label} />
+		}
+	</main>
+}
+
+export function InlineParentBranch({ label }: { label: string }) @{
+	let branchLabel = '';
+	<main>
+		@if (label) {
+			branchLabel = label;
+			if (branchLabel) {
+				var BranchAction = CapturedAction;
+			}
+			@if (branchLabel) {
+				<BranchAction label={branchLabel} />
+			}
+		}
+	</main>
+}
+
+export function ConditionalInsideKeyedRows({ show }: { show: boolean }) @{
+	if (show) {
+		var RowAction = CapturedAction;
+	}
+
+	<main>
+		@for (const label of ['first', 'second']; key label) {
+			@if (show) {
+				<RowAction label={label} />
+			} @else {
+				<b>{label as string}</b>
+			}
+		}
+	</main>
+}
+
 // Product-style return fragment: the toolbar is a fixed sibling while a
 // top-level @if selects a mailbox view, whose drafts arm owns a keyed @for.
 // Directives need template Block scopes even though the outer component uses

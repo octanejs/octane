@@ -7,6 +7,9 @@ import { FragmentInstance, hydrateRoot, flushSync } from '../src/index.js';
 import {
 	RetToggle,
 	AtToggle,
+	FunctionScopedBranch,
+	InlineParentBranch,
+	ConditionalInsideKeyedRows,
 	ReturnedMailbox,
 	ReturnedDashboard,
 	ReturnedProviderMailbox,
@@ -111,6 +114,52 @@ describe('folded @if hydrates against the @{} oracle markup', () => {
 		expect(btn.textContent).toBe('on:1'); // handler is live on the adopted node
 		root.unmount();
 		container.remove();
+	});
+});
+
+describe('function-scoped bindings across @if branches', () => {
+	it.each([
+		['FunctionScopedBranch', FunctionScopedBranch],
+		['InlineParentBranch', InlineParentBranch],
+	] as const)('renders and hydrates the local component in %s', (name, App) => {
+		const props = { label: 'ready' };
+		const view = mount(App, props);
+		try {
+			expect(view.find('button').textContent).toBe('ready:0');
+			view.update(App, { label: 'updated' });
+			expect(view.find('button').textContent).toBe('updated:0');
+		} finally {
+			view.unmount();
+		}
+
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = ServerRT.renderToString(serverModule()[name], props).html;
+		const button = container.querySelector('button');
+		expect(button?.textContent).toBe('ready:0');
+		const errors: unknown[] = [];
+		const root = hydrateRoot(container, App, props, {
+			onRecoverableError: (error) => errors.push(error),
+		});
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('button')).toBe(button);
+			flushSync(() => button!.click());
+			expect(button?.textContent).toBe('ready:1');
+			expect(errors).toEqual([]);
+		} finally {
+			root.unmount();
+			container.remove();
+		}
+	});
+	it('keeps an untaken capture out of the keyed row fallback', () => {
+		const props = { show: false };
+		const view = mount(ConditionalInsideKeyedRows, props);
+		try {
+			expect(view.findAll('b').map((node) => node.textContent)).toEqual(['first', 'second']);
+		} finally {
+			view.unmount();
+		}
 	});
 });
 
