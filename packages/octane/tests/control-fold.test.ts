@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { compile } from 'octane/compiler';
 import * as ServerRT from 'octane/server';
-import { mount } from './_helpers';
+import { act, mount } from './_helpers';
 import { loadServerFixture } from './_server-fixture.js';
 import { FragmentInstance, hydrateRoot, flushSync } from '../src/index.js';
 import {
@@ -10,6 +10,9 @@ import {
 	FunctionScopedBranch,
 	InlineParentBranch,
 	ConditionalInsideKeyedRows,
+	SwitchScopedBranch,
+	TryScopedBranch,
+	PendingScopedBranch,
 	FunctionScopedConditionalKeyedRows,
 	ReturnedMailbox,
 	ReturnedDashboard,
@@ -120,10 +123,12 @@ describe('folded @if hydrates against the @{} oracle markup', () => {
 	});
 });
 
-describe('function-scoped bindings across @if branches', () => {
+describe('function-scoped bindings across directive branches', () => {
 	it.each([
 		['FunctionScopedBranch', FunctionScopedBranch],
 		['InlineParentBranch', InlineParentBranch],
+		['SwitchScopedBranch', SwitchScopedBranch],
+		['TryScopedBranch', TryScopedBranch],
 	] as const)('renders and hydrates the local component in %s', (name, App) => {
 		const props = { label: 'ready' };
 		const view = mount(App, props);
@@ -153,6 +158,33 @@ describe('function-scoped bindings across @if branches', () => {
 		} finally {
 			root.unmount();
 			container.remove();
+		}
+	});
+	it('keeps the empty default and handles an authored exception in the nested branches', () => {
+		const switched = mount(SwitchScopedBranch, { label: '' });
+		const tried = mount(TryScopedBranch, { label: '' });
+		try {
+			expect(switched.find('b').textContent).toBe('empty');
+			expect(tried.find('b').textContent).toBe('empty');
+			tried.update(TryScopedBranch, { label: 'fail' });
+			expect(tried.find('b').textContent).toBe('branch failed');
+		} finally {
+			switched.unmount();
+			tried.unmount();
+		}
+	});
+	it('uses the current captured component when a pending branch resumes', async () => {
+		const { promise, resolve } = Promise.withResolvers<string>();
+		const view = mount(PendingScopedBranch, { promise, useLatest: false });
+		try {
+			expect(view.find('b').textContent).toBe('waiting');
+			view.update(PendingScopedBranch, { promise, useLatest: true });
+			expect(view.find('b').textContent).toBe('waiting');
+			await act(() => resolve('ready'));
+			expect(view.find('button').textContent).toBe('ready:0');
+			expect(view.findAll('b')).toHaveLength(0);
+		} finally {
+			view.unmount();
 		}
 	});
 	it('keeps an untaken capture out of the keyed row fallback', () => {
