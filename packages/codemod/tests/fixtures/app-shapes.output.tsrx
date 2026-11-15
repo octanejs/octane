@@ -8,7 +8,7 @@ type ReactDOMProps<Props> = {
   [K in keyof Props]: K extends 'className' ? string | undefined
     : K extends 'style' ? import("octane").CSSProperties | undefined : Props[K];
 };
-// No Octane port of `@example/react-toast` exists, so its components render in React through ReactCompat.
+// Retained React import of `@example/react-toast`. Its components render in React through ReactCompat.
 import { Toaster, toast } from "@example/react-toast";
 
 // Shapes from migrating Memos and T3 Code: shadcn-style fields whose rest
