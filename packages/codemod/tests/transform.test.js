@@ -793,6 +793,35 @@ export type Qualified = typeof R.createRef;`,
 		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(2);
 	});
 
+	it.each([
+		'interface Metadata extends Point.Original {}',
+		'class Metadata implements Point.Original { valid = true as const; }',
+	])('keeps the original React Touch type used in a heritage clause', (heritage) => {
+		const declaration = "import type { Touch as Point } from 'react';";
+		const { code, notes } = transformModule(`${declaration} export ${heritage}`, 'points.ts');
+		expect(code).toContain(declaration);
+		expect(code).toContain(heritage);
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+		);
+	});
+
+	it.each([
+		"import type * as R from 'react';",
+		"import type R from 'react';",
+		"import type * as R from 'react' with { 'resolution-mode': 'require' };",
+	])('keeps React Touch namespace heritage and still migrates generic arguments', (declaration) => {
+		const { code, notes } = transformModule(
+			`${declaration} export interface Metadata extends R.Touch.Original<R.ReactNode> {}`,
+			'points.ts',
+		);
+		expect(code).toContain(declaration);
+		expect(code).toContain('extends R.Touch.Original<OctaneNode>');
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'warning' }),
+		);
+	});
+
 	it('keeps nested React Touch types on their original namespace', () => {
 		const { code, notes } = transformModule(
 			`import type * as R from 'react';
