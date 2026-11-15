@@ -1625,11 +1625,13 @@ export async function runCodemod(
 		if (leaf) return { file: leaf, name, indirect: false };
 		const barrel = localFile(from, specifier);
 		const original = path.resolve(path.dirname(from), specifier);
+		const substituted = specifier.endsWith('.js')
+			? original.slice(0, -3) + '.ts'
+			: original + '.ts';
 		if (
 			!barrel ||
-			!(barrel === original || (barrel === original + '.ts' && !hasModuleSibling(barrel))) ||
+			!(barrel === original || (barrel === substituted && !hasModuleSibling(barrel))) ||
 			!isPlainFile(barrel) ||
-			known.has(barrel) ||
 			ts.findConfigFile(path.dirname(barrel), ts.sys.fileExists) !== rootProject
 		)
 			return;

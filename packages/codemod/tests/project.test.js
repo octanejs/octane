@@ -1905,6 +1905,35 @@ ${shape === 'named and default export' ? 'export default Owner;' : ''}`,
 			true,
 		],
 		[
+			'JavaScript spelling of a named re-export',
+			'./Route.js',
+			{ 'Route.ts': "export { Leaf as Widget } from './Leaf';" },
+			true,
+		],
+		[
+			'a selected named re-export',
+			'./Route',
+			{ 'Route.ts': "export { Leaf as Widget } from './Leaf';" },
+			true,
+			true,
+		],
+		[
+			'a physical JavaScript barrel',
+			'./Route.js',
+			{
+				'Route.ts': "export { Leaf as Widget } from './Leaf';",
+				'Route.js': 'export const Widget = () => null;',
+			},
+			false,
+		],
+		[
+			'a selected type-only barrel',
+			'./Route',
+			{ 'Route.ts': "export type { Leaf as Widget } from './Leaf';" },
+			false,
+			true,
+		],
+		[
 			'type-only re-export',
 			'./Route',
 			{ 'Route.ts': "export type { Leaf as Widget } from './Leaf';" },
@@ -1925,7 +1954,7 @@ ${shape === 'named and default export' ? 'export default Owner;' : ''}`,
 			},
 			false,
 		],
-	])('reports retained JSX through %s', async (_shape, specifier, extra, warns) => {
+	])('reports retained JSX through %s', async (_shape, specifier, extra, warns, selectedBarrel) => {
 		const name = specifier === './Leaf.js' ? 'Leaf as Widget' : 'Widget';
 		const owner = `import { ${name} } from '${specifier}';\nexport function View() { return <Widget />; }`;
 		const root = fs.realpathSync(
@@ -1944,7 +1973,9 @@ ${shape === 'named and default export' ? 'export default Owner;' : ''}`,
 			path.join(root, 'node_modules'),
 			'dir',
 		);
-		const selected = [path.join(root, 'Leaf.tsx')];
+		const selected = (selectedBarrel ? ['Leaf.tsx', 'Route.ts'] : ['Leaf.tsx']).map((file) =>
+			path.join(root, file),
+		);
 		const options = { root, write: false, strong: true, verify: true };
 		const preview = await runCodemod(selected, options);
 		const affected = (report) =>
@@ -1966,6 +1997,7 @@ ${shape === 'named and default export' ? 'export default Owner;' : ''}`,
 			const written = await runCodemod(selected, { ...options, write: true });
 			expect(affected(written)).toEqual(affected(preview));
 			expect(fs.readFileSync(path.join(root, 'View.tsx'), 'utf8')).toBe(owner);
+			expect(fs.readFileSync(path.join(root, 'Route.ts'), 'utf8')).toContain('./Leaf.tsrx');
 		}
 	});
 
