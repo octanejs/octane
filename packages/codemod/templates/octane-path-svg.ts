@@ -24,6 +24,10 @@ export function pathSvg(source: string, fixedStyle?: string) {
 	if (!geometry) throw new Error('Expected a raw SVG containing only supported static geometry.');
 	const root = fixedStyle === undefined ? geometry.root : { ...geometry.root, style: fixedStyle };
 	const children = geometry.children.map(prepareShape);
+	if (geometry.title !== undefined) {
+		const props = { key: -1, children: geometry.title };
+		children.unshift(() => createElement('title', props));
+	}
 	return function PathSvg(props: {
 		className?: unknown;
 		'aria-hidden'?: string | boolean;
