@@ -3880,7 +3880,9 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					exports.elements[index + 1]?.getFullStart() ?? exports.end - 1,
 				);
 				const name = (item.propertyName ?? item.name).text;
-				if (mapReactImport(module, name, node.isTypeOnly || item.isTypeOnly)?.module === module) {
+				const typeOnly = node.isTypeOnly || item.isTypeOnly;
+				const mapped = mapReactImport(module, name, typeOnly);
+				if (mapped?.module === module) {
 					retained.push(text);
 					continue;
 				}
@@ -3897,6 +3899,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						'Review the React event re-export and define an explicit native event type.',
 					);
 				} else {
+					if (
+						typeOnly &&
+						mapped?.name !== name &&
+						mapReactImport(module, name, false)?.name !== name
+					)
+						this.note(RULE.unsupported, 'error', item, `Octane has no export \`${name}\`.`);
 					migrated.push(text);
 				}
 			}
@@ -4119,7 +4127,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		this.count(RULE.import);
 		const renamed = name === null ? null : mapQualifiedType(name);
 		if (name !== null && renamed === null) {
-			this.note(RULE.unsupported, 'warning', node, `Octane has no type \`${name}\`.`);
+			this.note(
+				RULE.unsupported,
+				specifier.text === 'react' && !node.isTypeOf ? 'error' : 'warning',
+				node,
+				`Octane has no type \`${name}\`.`,
+			);
 		}
 		const quote = this.source[specifier.getStart(this.sf)];
 		const head =
@@ -4593,7 +4606,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			if (namespace) this.used.add(namespace.local);
 			this.note(
 				RULE.unsupported,
-				'warning',
+				namespace?.module === 'react' && ts.isTypeReferenceNode(node.parent) ? 'error' : 'warning',
 				node,
 				`Octane has no type \`${node.getText(this.sf)}\`.`,
 			);
