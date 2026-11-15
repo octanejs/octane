@@ -75,7 +75,7 @@ function literalDeclaration(declaration: ts.VariableDeclaration) {
 	);
 }
 
-function safeSetupLiteral(node: ts.Expression, checker: ts.TypeChecker) {
+export function safeSetupLiteral(node: ts.Expression, checker: ts.TypeChecker) {
 	if (scalarLiteral(node)) return true;
 	if (ts.isIdentifier(node) && node.text === 'undefined') {
 		const symbol = checker.getSymbolAtLocation(node);

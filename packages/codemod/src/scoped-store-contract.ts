@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
 import { skipWrappers } from './expression-wrappers.js';
-import { namedRuntimeImport } from './local-react-hook.js';
+import { namedRuntimeImport, safeSetupLiteral } from './local-react-hook.js';
 
 export interface ScopedStoreHookPlan {
 	/** The authored native module and the actual export behind any re-export. */
@@ -651,7 +651,15 @@ function modulePlan(
 		if (
 			!fn.body ||
 			seen.has(fn) ||
-			fn.parameters.some((param) => !ts.isIdentifier(param.name) || param.initializer) ||
+			fn.parameters.some((param) => {
+				if (!ts.isIdentifier(param.name)) return true;
+				if (!param.initializer) return false;
+				const value = skipWrappers(param.initializer);
+				return (
+					!safeSetupLiteral(value, checker) &&
+					!(ts.isObjectLiteralExpression(value) && value.properties.length === 0)
+				);
+			}) ||
 			installed('react', fn.getSourceFile().fileName) !== installed('react', entry)
 		)
 			return false;

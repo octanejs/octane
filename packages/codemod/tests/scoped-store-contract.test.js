@@ -836,6 +836,45 @@ export function useOptional() { return maybe(1); }`,
 	},
 );
 
+it.each([
+	['an empty record', '{}', true],
+	['a scalar', '0', true],
+	['a property read', 'settings.options', false],
+	['a renderer hook used as a default', 'read(current)', false],
+])('checks a retained store hook with %s default', async (_case, initializer, expected) => {
+	const { app } = project({
+		'observer/entry.ts':
+			"export { valueOf } from './state'; export { useChannel as useSnapshot } from './react-hooks';",
+		'observer/react-hooks.ts': `import { use as read } from 'react';
+import { current } from './renderer';
+import { valueOf } from './state';
+${initializer === 'settings.options' ? "import { settings } from './settings';" : ''}
+export function useChannel(_value: number, options = ${initializer}) {
+	${initializer === 'read(current)' ? 'return options;' : 'return valueOf(read(current));'}
+}`,
+		'observer/settings.ts':
+			"export const settings = { get options() { throw Error('default ran'); } };",
+		'app/src/helper.ts': `import { useSnapshot } from 'observer';
+export function useReading() { return useSnapshot(1); }`,
+		'app/src/pane.tsx': `import { useReading } from './helper';
+export function Pane() { const value = useReading(); return <p>{String(value)}</p>; }`,
+	});
+	for (const projectTypes of [true, false]) {
+		const { files } = await runCodemod([path.join(app, 'src/pane.tsx')], {
+			root: app,
+			strong: true,
+			verify: true,
+			write: false,
+			projectTypes,
+		});
+		const pane = files.find((file) => file.file === 'src/pane.tsx');
+		expect(pane.code).toContain("from './helper'");
+		expect(
+			pane.notes.some((note) => note.message.includes('through the original workspace entry')),
+		).toBe(expected);
+	}
+});
+
 it('previews, writes and reuses hook helpers without changing a linked dependency', async () => {
 	const source = `import {useSnapshot as useReading, valueOf} from 'observer';
 export function Pane() { const value = useReading(); return <p>{valueOf(1)}{value}</p>; }
