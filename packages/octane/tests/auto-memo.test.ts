@@ -137,7 +137,7 @@ function trailingVersion(text: string | null): number {
 }
 
 function expectCompilerRegion(code: string): void {
-	expect(code).toMatch(/__s\.slots\[\d+\] === undefined \|\| __memoCache/);
+	expect(code).toMatch(/__s\.slots\[\d+\] === void 0 \|\| __memoCache/);
 	// Dependencies are snapshotted into temporaries once per render; the guard
 	// compares and publishes those exact values.
 	expect(code).toMatch(/const __memoDep[\w$]* = \(?[^;]+\)?;/);
@@ -3065,6 +3065,90 @@ it('updates a tag whose local binding shadows a module component', () => {
 });
 
 describe('compiler-owned component-region memoization', () => {
+	it.each([
+		['module', 'const undefined = 123;', '{ value }', ''],
+		['parameter', '', '{ value, supplied: undefined }', ''],
+		['setup', '', '{ value }', 'const undefined = 123;'],
+	])(
+		'renders an optimized child with a shadowed undefined in %s scope',
+		(_name, module, params, setup) => {
+			const source = `
+			${module}
+			function Leaf({ value }) @{ <b>{value as string}</b> }
+			export function App(${params}) @{
+				${setup}
+				<div><Leaf value={value} /><i>{String(undefined)}</i></div>
+			}
+		`;
+			const options = {
+				id: 'memo-region-shadowed-undefined.tsrx',
+				compileOptions: { strong: true },
+			};
+			const { App } = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+			const { App: ServerApp } = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+			const renderProps = { value: 'first', supplied: 123 };
+			const mounted = mount(App, renderProps);
+			try {
+				expect(mounted.find('b').textContent).toBe('first');
+				expect(mounted.find('i').textContent).toBe('123');
+				mounted.update(App, { value: 'second', supplied: 456 });
+				expect(mounted.find('b').textContent).toBe('second');
+				expect(mounted.find('i').textContent).toBe(_name === 'parameter' ? '456' : '123');
+			} finally {
+				mounted.unmount();
+			}
+			const container = document.createElement('div');
+			container.innerHTML = ServerRuntime.renderToString(ServerApp, renderProps).html;
+			const leaf = container.querySelector('b');
+			expect(leaf?.textContent).toBe('first');
+			const root = hydrateRoot(container, App, renderProps);
+			try {
+				expect(container.querySelector('b')).toBe(leaf);
+				flushSync(() => root.render(App, { value: 'second', supplied: 456 }));
+				expect(container.querySelector('b')?.textContent).toBe('second');
+			} finally {
+				root.unmount();
+			}
+		},
+	);
+
+	it('keeps an imported memo comparator when an authored binding holds the same callback', () => {
+		const compare = vi.fn(() => false);
+		const { Row } = loadCompiledFixtureSource(
+			`import { memo } from 'octane';
+			import { compare } from './compare';
+			function Plain({ label }) @{ <li>{label as string}</li> }
+			export const Row = memo(Plain, compare);`,
+			{ id: 'memo-witness-row.tsrx', mode: 'client', runtimeModules: { './compare': { compare } } },
+		);
+		const { App } = loadCompiledFixtureSource(
+			`import { Row } from './row';
+			export function App({ items, tick, undefined }) @{
+				<ul data-tick={tick}>@for (const item of items; key item.id) {
+					<Row id={item.id} label={item.label} />
+				}</ul>
+			}`,
+			{
+				id: 'memo-witness-parent.tsrx',
+				mode: 'client',
+				compileOptions: { strong: true },
+				runtimeModules: { './row': { Row } },
+			},
+		);
+		const item = { id: 'first', label: 'first' };
+		const mounted = mount(App, { items: [item], tick: 0, undefined: compare });
+		try {
+			const row = mounted.find('li');
+			compare.mockClear();
+			mounted.update(App, { items: [item], tick: 1, undefined: compare });
+			expect(compare).toHaveBeenCalledOnce();
+			expect(mounted.find('li')).toBe(row);
+			expect(row.textContent).toBe('first');
+		} finally {
+			mounted.unmount();
+		}
+	});
+
 	it('keeps alternate Provider children distinct while retaining live form state', () => {
 		const client = loadCompiledFixtureSource(
 			`import { useMemo } from 'octane';
