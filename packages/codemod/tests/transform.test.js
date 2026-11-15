@@ -1561,6 +1561,68 @@ export type Qualified = typeof R.createRef;`,
 		expect(code).toContain("Component = import('octane').FC<{ id: string }>;");
 	});
 
+	it('reports an unmapped inline React type as an error', () => {
+		const { code, notes } = transformModule(
+			`import type * as R from 'react';
+			export type Props = import('react').ConsumerProps<R.ReactNode>;
+			export type Value = import('react').ReactNode;`,
+			'types.ts',
+		);
+		expect(notes).toEqual([
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'error', line: 2 }),
+		]);
+		expect(code).toContain("export type Value = import('octane').OctaneNode;");
+	});
+
+	it('reports an unmapped direct type on an imported React namespace', () => {
+		const { code, notes } = transformModule(
+			`import type * as R from 'react';
+			export type Props = R.ConsumerProps<R.ReactNode>;
+			export type Node = R.ReactNode;
+			export type Intrinsics = R.JSX.IntrinsicElements;
+			export type Allocator = typeof R.createRef;`,
+			'types.ts',
+		);
+		expect(notes).toEqual([
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'error', line: 2 }),
+		]);
+		expect(code).toContain('Props = R.ConsumerProps<OctaneNode>');
+		expect(code).toContain('Node = OctaneNode');
+	});
+
+	it('reports explicit React type re-exports when Octane lacks the authored spelling', () => {
+		const { code, notes } = transformModule(
+			`export type { ConsumerProps as Props, SyntheticEvent, ReactNode, useState } from 'react';
+			export { type TouchList as Points, type useEffect as Effect, useCallback } from 'react';
+			export type { createRef as Allocator } from 'react';`,
+			'types.ts',
+		);
+		expect(notes).toEqual([
+			expect.objectContaining({
+				rule: 'unsupported-api',
+				severity: 'error',
+				message: expect.stringContaining('ConsumerProps'),
+			}),
+			expect.objectContaining({
+				rule: 'unsupported-api',
+				severity: 'error',
+				message: expect.stringContaining('SyntheticEvent'),
+			}),
+			expect.objectContaining({
+				rule: 'unsupported-api',
+				severity: 'error',
+				message: expect.stringContaining('TouchList'),
+			}),
+		]);
+		expect(code).toContain(
+			"export type { ConsumerProps as Props, SyntheticEvent, ReactNode, useState } from 'octane';",
+		);
+		expect(code).toContain(
+			"export { type TouchList as Points, type useEffect as Effect, useCallback } from 'octane';",
+		);
+		expect(code).toContain("export type { createRef as Allocator } from 'react';");
+	});
+
 	it('rewrites inside a remapped `import()` type', () => {
 		const source = "export type Boxed = import('./box').Box<import('react').ReactNode>;\n";
 		const { code } = transformModule(source, 'types.ts', {
