@@ -3459,11 +3459,11 @@ function vtFlush(
 		const finalize = (): void => {
 			if (!interrupted) {
 				let blocksByOwner: Map<VTOwner, Block[]> | undefined;
-				if (participants.length > 1) {
+				if (participants.length > 1 || unrelated !== null) {
 					blocksByOwner = new Map();
 					for (const group of participants) blocksByOwner.set(group.owner, []);
 					for (const block of VT_REGISTRY) {
-						if (block.disposed) continue;
+						if (block.disposed || unrelated?.has(block)) continue; // never captured before the update, so finalize would read it as entering
 						const owner = vtScopeForBlock(block);
 						if (owner !== null) blocksByOwner.get(owner)?.push(block);
 					}
