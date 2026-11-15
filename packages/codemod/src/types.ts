@@ -99,6 +99,8 @@ export interface TransformOptions {
 	cssModuleFile?(specifier: string): string | undefined;
 	/** The generated native SVG helper, if the project verified this raw asset. */
 	pathSvgAdapter?(specifier: string): string | null;
+	/** Whether a native server SVG entry resolves to the adapter's installed Octane. */
+	originalSvgServer?: boolean;
 	/** With pathSvgAdapter, supplies a native SVG adapter with the requested fixed root color. */
 	fixedColorSvgAdapter?(specifier: string, color: string): string | null;
 	/** The project compiles this file with the original React automatic JSX runtime. */
