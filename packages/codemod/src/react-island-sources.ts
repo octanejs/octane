@@ -935,8 +935,9 @@ export function directReactExports(file: string, source: string) {
 				intrinsics.add(name);
 			else if (
 				ts.isFunctionDeclaration(decl) &&
-				localName === name &&
-				/^[A-Z]/.test(name) &&
+				(name === 'default'
+					? !splitExport && (!localName || /^[A-Z]/.test(localName))
+					: localName === name && /^[A-Z]/.test(name)) &&
 				ts.isIdentifier(tag) &&
 				/^[A-Z]/.test(tag.text)
 			)

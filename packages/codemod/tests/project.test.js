@@ -4252,12 +4252,16 @@ export function App() { return <main><Leaf label="Ready" /></main>; }`;
 			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
 			'leaf.tsx': leaf,
 			'default-leaf.tsx': `export default function Leaf({ label }: { label: string }) { return <button>{label}</button>; }`,
+			'default-wrapper.tsx': leaf.replace('export function Leaf', 'export default function Leaf'),
+			'anonymous-wrapper.tsx': leaf.replace('export function Leaf', 'export default function'),
 			'ambiguous.tsx': leaf,
 			'ambiguous.tsrx': 'export function Leaf() @{ <button>Native</button> }',
 			'native.tsx': '/** @jsxImportSource octane */\n' + leaf.replace("'react'", "'octane'"),
 			'App.tsx': app(),
 			'Explicit.tsx': app('./leaf.tsx'),
 			'Default.tsx': app('./default-leaf').replace('import { Leaf }', 'import Leaf'),
+			'DefaultWrapper.tsx': app('./default-wrapper').replace('import { Leaf }', 'import Leaf'),
+			'AnonymousWrapper.tsx': app('./anonymous-wrapper').replace('import { Leaf }', 'import Leaf'),
 			'Native.tsx': app('./native'),
 			'Ambiguous.tsx': app('./ambiguous'),
 			'Host.tsx': `import { ReactCompat } from 'octane/react';
@@ -4270,8 +4274,10 @@ export function App() { return <ReactCompat component={Leaf} props={{label: 'Rea
 			'dir',
 		);
 		const inputs = [
+			'AnonymousWrapper.tsx',
 			'App.tsx',
 			'Default.tsx',
+			'DefaultWrapper.tsx',
 			'Explicit.tsx',
 			'Native.tsx',
 			'Host.tsx',
@@ -4286,12 +4292,19 @@ export function App() { return <ReactCompat component={Leaf} props={{label: 'Rea
 					.map((note) => [file.file, note.severity, note.line]),
 			);
 			expect(matches.sort()).toEqual([
+				['AnonymousWrapper.tsx', 'warning', 2],
 				['App.tsx', 'warning', 2],
 				['Default.tsx', 'warning', 2],
+				['DefaultWrapper.tsx', 'warning', 2],
 				['Explicit.tsx', 'warning', 2],
 			]);
 			const selected = await runCodemod(
-				[...inputs, path.join(root, 'leaf.tsx'), path.join(root, 'default-leaf.tsx')],
+				[
+					...inputs,
+					...['leaf.tsx', 'default-leaf.tsx', 'default-wrapper.tsx', 'anonymous-wrapper.tsx'].map(
+						(file) => path.join(root, file),
+					),
+				],
 				options,
 			);
 			expect(selected.files.flatMap((file) => file.notes)).not.toContainEqual(
