@@ -630,6 +630,58 @@ export type Qualified = typeof R.createRef;`,
 		expect(code).toContain('export type Deep = typeof React.Touch.loose.more;');
 	});
 
+	it('keeps the authored erasure of an unsupported named Touch query', () => {
+		const source = `import type { Touch as Point } from 'react';
+			export type Query = typeof Point.token;`;
+		const { code, notes } = transformModule(source, 'points.ts');
+		expect(code).toBe(source);
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+		);
+	});
+
+	it('keeps the portable Touch alias distinct from a retained value query', () => {
+		const { code } = transformModule(
+			`import type { Touch } from 'react';
+			 export type Query = typeof Touch.token;
+			 export type Point = React.Touch;`,
+			'points.ts',
+		);
+		expect(code).toContain("import type { Touch } from 'react';");
+		expect(code).toContain("import type { Touch as OctaneTouch } from 'octane';");
+		expect(code).toContain('export type Point = OctaneTouch;');
+	});
+
+	it('preserves a retained React attribute declaration with named siblings', () => {
+		const source = `import React, { type ReactNode as Node } from 'react' with { layer: 'original' };
+			export type Query = typeof React.Touch.token;
+			export type Value = Node;`;
+		const { code, notes } = transformModule(source, 'points.mts');
+		expect(code).toBe(source);
+		expect(notes).toContainEqual(
+			expect.objectContaining({ rule: 'unsupported-api', severity: 'warning' }),
+		);
+	});
+
+	it('keeps an attributed type-only default alias with its named siblings', () => {
+		const source = `import type { default as R, ReactNode as Node } from 'react' with { 'resolution-mode': 'require' };
+			export type Query = typeof R.Touch.token;
+			export type Value = Node;`;
+		expect(transformModule(source, 'points.mts').code).toBe(source);
+	});
+
+	it('reserves names from an attributed React import kept for a Touch query', () => {
+		const { code } = transformModule(
+			`export function useBoth() { return [useState(0), React.useState(1)]; }
+			 import React, { useState } from 'react' with { layer: 'original' };
+			 export type Query = typeof React.Touch.token;`,
+			'points.mts',
+		);
+		expect(code).toContain("import React, { useState } from 'react' with { layer: 'original' };");
+		expect(code).toContain("import { useState as OctaneUseState } from 'octane';");
+		expect(code).toContain('return [useState(0), OctaneUseState(1)];');
+	});
+
 	it('preserves combined default and namespace owners for Touch queries', () => {
 		const source = `import React, * as R from 'react';
 			export type Queries = [typeof React.Touch.loose.more, typeof R.Touch.loose.more];`;

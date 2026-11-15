@@ -3042,19 +3042,21 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		// A React import of the same name becomes this import.
 		const prior = this.apiLocals.get(name);
 		const originalFactory =
-			module === 'octane' &&
-			name === 'createElement' &&
-			prior?.module === 'react' &&
-			[...this.imports].some(
-				([declaration, entry]) =>
+			module === 'octane' && name === 'createElement' && prior?.module === 'react';
+		const canReuse =
+			prior &&
+			mapReactImport(prior.module, prior.imported, prior.typeOnly)?.name === name &&
+			![...this.imports].some(
+				([decl, entry]) =>
 					entry === prior &&
-					ts.isImportSpecifier(declaration) &&
-					this.retainedReactFactoryImport(declaration),
+					ts.isImportSpecifier(decl) &&
+					(decl.parent.parent.parent.attributes ||
+						(entry.module === 'react' &&
+							entry.imported === 'Touch' &&
+							this.localUses(decl.name).some(needsTouchValueOrNamespace)) ||
+						(originalFactory && this.retainedReactFactoryImport(decl))),
 			);
-		const collides =
-			(this.declared.has(name) || this.readsGlobal(name)) &&
-			(originalFactory ||
-				!(prior && mapReactImport(prior.module, prior.imported, prior.typeOnly)?.name === name));
+		const collides = (this.declared.has(name) || this.readsGlobal(name)) && !canReuse;
 		let local = collides ? `Octane${name[0].toUpperCase()}${name.slice(1)}` : name;
 		while (collides && (this.declared.has(local) || this.readsGlobal(local))) local += '_';
 		names.set(name, { local, typeOnly });
@@ -3642,6 +3644,13 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						(clause.isTypeOnly || element.isTypeOnly) &&
 						(element.propertyName ?? element.name).text === 'Touch',
 				);
+				// An erased default import may also be written inside a named import list.
+				const defaultTouch = bindings.elements.some(
+					(element) =>
+						(clause.isTypeOnly || element.isTypeOnly) &&
+						element.propertyName?.text === 'default' &&
+						this.localUses(element.name).some((ref) => directMember(ref)?.text === 'Touch'),
+				);
 				if (touch.length > 0) {
 					// Preserve the authored resolution condition and its React export.
 					for (const element of touch) {
@@ -3655,6 +3664,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					}
 					return null;
 				}
+				if (defaultTouch) return null;
 			}
 			this.importSlots.push(node);
 			return `\u0000IMPORT${this.importSlots.length - 1}\u0000`;
@@ -4357,6 +4367,10 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				(bindings && ts.isNamespaceImport(bindings) ? bindings.name.text : null);
 			// Members the rewrite could not map keep the namespace alive.
 			if (namespace && this.retainedTypeNamespaces.has(clause)) {
+				if (node.attributes) {
+					typeNamespaces.push(node.getText(this.sf));
+					continue;
+				}
 				// A static type query can follow a value chain that an import() type cannot.
 				typeNamespaces.push(
 					clause.name && bindings && ts.isNamedImports(bindings)
@@ -4383,7 +4397,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 							(ref) => ts.isPartOfTypeNode(ref) || ts.isTypeOnlyExportDeclaration(ref.parent),
 						);
 					unsupportedTouchUse = references.some(needsTouchValueOrNamespace);
-					typeOnly ||= typeReferences;
+					if (!unsupportedTouchUse) typeOnly ||= typeReferences;
 				}
 				if (!this.used.has(local) && !typeReferences) continue;
 				if (imported === 'createElement' && this.retainedReactFactoryImport(element)) {
@@ -4409,6 +4423,13 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					UNSUPPORTED_VALUES[imported] ??
 						`\`${imported}\` from '${module}' has no Octane equivalent.`,
 				);
+				if (unsupportedTouchUse && clause.isTypeOnly) {
+					const binding = imported === local ? local : `${imported} as ${local}`;
+					typeNamespaces.push(
+						`import type { ${binding} } from ${this.quote}${module}${this.quote};`,
+					);
+					continue;
+				}
 				const spec =
 					(typeOnly ? 'type ' : '') + (imported === local ? local : `${imported} as ${local}`);
 				kept.set(module, [...(kept.get(module) ?? []), spec]);
