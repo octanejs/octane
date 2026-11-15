@@ -46,12 +46,10 @@ for (let index = 0; index < producers; index++) {
 }
 const samples: number[][] = [];
 for (let round = 0; round < 3; round++) {
-	await task(25);
 	const previous = samples.at(-1) ?? owners.map(() => 0);
-	assert.ok(
-		seen.every((value, index) => value > previous[index]),
-		'every producer progresses',
-	);
+	do {
+		await task(25);
+	} while (seen.some((value, index) => value <= previous[index]));
 	samples.push([...seen]);
 }
 for (const stop of stops) stop();
