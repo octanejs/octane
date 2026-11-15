@@ -152,6 +152,7 @@ export const ELEMENT_CHILD_ALIAS = 'element-child-path-alias';
 export const INTL_PROVIDER_DEFAULTS = 'intl-provider-defaults';
 export const REACT_TYPE_PROJECTION = 'react-type-projection';
 export const BUFFERED_SSR_OPTIONS = 'buffered-ssr-options';
+export const BUFFERED_SSR_REACT_COMPONENT = 'buffered-ssr-react-component';
 
 /** Rule names, as reported. */
 const RULE = {
@@ -3062,20 +3063,24 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					(!item.namespace && item.imported !== 'default'),
 			) &&
 			!(/eval|\\u/.test(this.source) && hasEval(this.sf)) &&
-			this.localUses(declaration.name).every((ref) => {
-				if (inTypeNode(ref)) return true;
-				const member = ref.parent;
-				return (
-					(ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member)) &&
-					member.expression === ref &&
-					ts.isCallExpression(member.parent) &&
-					member.parent.expression === member &&
-					(ts.isPropertyAccessExpression(member)
-						? member.name.text !== 'default'
-						: ts.isStringLiteralLike(member.argumentExpression) &&
-							member.argumentExpression.text !== 'default')
-				);
-			}));
+			this.namespaceMemberCalls(declaration));
+	}
+
+	private namespaceMemberCalls(declaration: ts.NamespaceImport) {
+		return this.localUses(declaration.name).every((ref) => {
+			if (inTypeNode(ref)) return true;
+			const member = ref.parent;
+			return (
+				(ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member)) &&
+				member.expression === ref &&
+				ts.isCallExpression(member.parent) &&
+				member.parent.expression === member &&
+				(ts.isPropertyAccessExpression(member)
+					? member.name.text !== 'default'
+					: ts.isStringLiteralLike(member.argumentExpression) &&
+						member.argumentExpression.text !== 'default')
+			);
+		});
 	}
 
 	line(node: ts.Node) {
@@ -5097,6 +5102,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				return null;
 			}
 			if (node.arguments.length !== 1) return null;
+			this.checkBufferedReactComponent(node, node.arguments[0], callee.module);
 			// React returns the HTML; Octane returns `{ html, css }`.
 			this.count(RULE.serverRender);
 			return (
@@ -6001,6 +6007,108 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		return name === 'render'
 			? `${this.require('octane', 'createRoot', false)}(${containerText}).render(${elementText})`
 			: `${this.require('octane', 'hydrateRoot', false)}(${containerText}, ${elementText})`;
+	}
+
+	/** Report a retained React hook when the server render receives its JSX descriptor. */
+	private checkBufferedReactComponent(
+		call: ts.CallExpression,
+		argument: ts.Expression,
+		module: string,
+	) {
+		const check = this.options.localReactHook;
+		if (!check || ts.isOptionalChain(call)) return;
+		const callee = call.expression;
+		const receiver = ts.isPropertyAccessExpression(callee) ? callee.expression : callee;
+		if (!ts.isIdentifier(receiver)) return;
+		const binding = this.importOf(receiver);
+		const declaration = this.declarationOf(receiver);
+		if (
+			!binding ||
+			binding.typeOnly ||
+			!declaration ||
+			!(ts.isImportSpecifier(declaration) || ts.isNamespaceImport(declaration)) ||
+			ts.findAncestor(declaration, ts.isImportDeclaration)?.attributes ||
+			!this.options.automaticReactJsx ||
+			!this.options.originalReactServerEntry?.(module) ||
+			((this.source.includes('eval') || this.source.includes('\\')) && hasEval(this.sf))
+		)
+			return;
+		// Another import of the module can expose its mutable CommonJS exports.
+		if (
+			[...this.imports].some(
+				([decl, entry]) =>
+					REACT_MODULES[entry.module] === 'octane/server' &&
+					!entry.typeOnly &&
+					(ts.isNamespaceImport(decl)
+						? !this.namespaceMemberCalls(decl)
+						: entry.namespace || entry.imported === 'default'),
+			)
+		)
+			return;
+		const retained = (expression: ts.Expression) => {
+			const value = skipParens(expression);
+			if (!ts.isJsxSelfClosingElement(value) || this.retainedReactOutput(value)) return;
+			const imported = this.directImportedValue(value.tagName);
+			if (!imported || !isComponentName(imported.tag.text)) return;
+			const hook = check(imported.entry.module, imported.entry.imported, false);
+			if (typeof hook === 'string') return { tag: imported.tag.text, hook };
+		};
+		const value = skipParens(argument);
+		let component = retained(value);
+		if (ts.isIdentifier(value)) {
+			const local = this.declarationOf(value);
+			if (
+				!local ||
+				!ts.isVariableDeclaration(local) ||
+				!ts.isIdentifier(local.name) ||
+				!local.initializer ||
+				!initializedBefore(this.checker, value, call) ||
+				ts.findAncestor(local, ts.isFunctionLike) !== ts.findAncestor(call, ts.isFunctionLike)
+			)
+				return;
+			component = retained(local.initializer);
+			if (!component || !this.closedBufferedValue(local, value, call, (expr) => !!retained(expr)))
+				return;
+		}
+		if (component)
+			this.note(
+				BUFFERED_SSR_REACT_COMPONENT,
+				'error',
+				call,
+				`The migrated server renderer can render ${component.tag}, which stays on React and calls ${component.hook}. Migrate the component with this file or keep the render in React.`,
+			);
+	}
+
+	/** The descriptor can only go to this renderer or be replaced by another proven descriptor. */
+	private closedBufferedValue(
+		local: ts.VariableDeclaration,
+		value: ts.Identifier,
+		call: ts.CallExpression,
+		retained: (expression: ts.Expression) => boolean,
+	) {
+		const block = local.parent.parent.parent;
+		const kind = ts.getCombinedNodeFlags(local) & ts.NodeFlags.BlockScoped;
+		const canAssign =
+			kind === ts.NodeFlags.Let &&
+			ts.isReturnStatement(call.parent) &&
+			call.parent.parent === block;
+		if (!canAssign && kind !== ts.NodeFlags.Const) return false;
+		return renderUses(this.localUses(value)).every((ref) => {
+			if (ref === local.name) return true;
+			const write = ref.parent;
+			const statement = write.parent;
+			return (
+				canAssign &&
+				ts.isBinaryExpression(write) &&
+				write.left === ref &&
+				write.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+				ts.isExpressionStatement(statement) &&
+				statement.end <= call.pos &&
+				(statement.parent === block ||
+					(ts.isIfStatement(statement.parent) && statement.parent.parent === block)) &&
+				retained(write.right)
+			);
+		});
 	}
 
 	/** JSX retained for a prop spread or quoted reference still uses the migrated root. */

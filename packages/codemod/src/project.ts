@@ -26,6 +26,7 @@ import { strengthen } from './strong.js';
 import {
 	bind,
 	BUFFERED_SSR_OPTIONS,
+	BUFFERED_SSR_REACT_COMPONENT,
 	CONTEXT_ALIAS,
 	CONTEXT_PROVIDER_GETTER,
 	ELEMENT_CHILD_ALIAS,
@@ -1460,6 +1461,7 @@ export async function runCodemod(
 		const blockedTransform = result.notes.find(
 			(note) =>
 				note.rule === BUFFERED_SSR_OPTIONS ||
+				note.rule === BUFFERED_SSR_REACT_COMPONENT ||
 				note.rule === MAP_PARAMETER_WRITE ||
 				note.rule === MAP_PARAMETER_TDZ ||
 				note.rule === MAP_CALLBACK_SCOPE ||
