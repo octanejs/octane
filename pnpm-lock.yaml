@@ -5741,6 +5741,9 @@ importers:
       octane:
         specifier: workspace:*
         version: link:../octane
+      parse5:
+        specifier: 8.0.1
+        version: 8.0.1
       picocolors:
         specifier: catalog:default
         version: 1.1.1
