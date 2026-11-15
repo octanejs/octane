@@ -369,7 +369,7 @@ export async function islandComponents(
 
 type Setup = boolean | ((statement: ts.Statement) => boolean);
 
-function* directExportReturns({ sf, checker }: ReturnType<typeof bind>, allowSetup: Setup = false) {
+function* exportReturns({ sf, checker }: ReturnType<typeof bind>, allowSetup: Setup = false) {
 	const module = checker.getSymbolAtLocation(sf);
 	if (!module || hasEval(sf)) return;
 	const uses = localUses(sf, checker);
@@ -415,16 +415,24 @@ function* directExportReturns({ sf, checker }: ReturnType<typeof bind>, allowSet
 			if (!value.initializer) continue;
 			value = skipWrappers(value.initializer);
 		}
-		const output = returnedJsx(value, allowSetup);
-		if (output)
-			yield { name: symbol.name, output, localName: name?.text, decl, symbol, splitExport };
+		const returned = singleReturn(value, allowSetup);
+		if (returned)
+			yield {
+				name: symbol.name,
+				output: skipWrappers(returned),
+				localName: name?.text,
+				decl,
+				symbol,
+				splitExport,
+			};
 	}
 }
 
-function returnedJsx(fn: ts.Node, allowSetup: Setup) {
-	const value = singleReturn(fn, allowSetup);
-	const output = value && skipWrappers(value);
-	if (output && (ts.isJsxElement(output) || ts.isJsxSelfClosingElement(output))) return output;
+function* directExportReturns(bound: ReturnType<typeof bind>, allowSetup = false) {
+	for (const entry of exportReturns(bound, allowSetup)) {
+		const { output } = entry;
+		if (ts.isJsxElement(output) || ts.isJsxSelfClosingElement(output)) yield { ...entry, output };
+	}
 }
 
 function singleReturn(fn: ts.Node, allowSetup: Setup = false) {
@@ -462,6 +470,7 @@ function singleReturn(fn: ts.Node, allowSetup: Setup = false) {
 				)
 		)
 			return;
+		if (typeof allowSetup === 'function') return last.expression;
 		const output = skipParens(last.expression);
 		if (ts.isJsxElement(output) || ts.isJsxSelfClosingElement(output)) return output;
 		return;
@@ -584,7 +593,7 @@ export function hostedComponents(
 	}
 	const allowSetup =
 		selected && ((statement: ts.Statement) => conditionalFallback(statement, checker));
-	for (const { output } of directExportReturns(bound, allowSetup)) visit(output);
+	for (const { output } of exportReturns(bound, allowSetup)) visit(output);
 	return edges;
 }
 

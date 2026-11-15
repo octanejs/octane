@@ -1727,6 +1727,21 @@ export async function clipboard() {
 				'export const App = () => <div><><i /><Host component={Leaf} /></></div>;',
 			],
 			[
+				'a host in a root fragment',
+				server,
+				'export const App = () => <><i /><Host component={Leaf} /></>;',
+			],
+			[
+				'an asserted host after setup',
+				server,
+				'export function App() { const props = {}; return <Host component={Leaf} props={props} /> as any; }',
+			],
+			[
+				'a root fragment with a satisfies assertion after setup',
+				server,
+				'export function App() { const props = {}; return <><i /><Host component={Leaf} props={props} /></> satisfies any; }',
+			],
+			[
 				'a host returned by a default export',
 				server,
 				'const App = () => <div><Host component={Leaf} /></div>; export default App;',
