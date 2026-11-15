@@ -2,7 +2,6 @@ import * as Octane from 'octane';
 import { flushUniversalAct, flushUniversalSync, type UniversalSyncFlusher } from 'octane/universal';
 
 export type Act = typeof import('octane').act;
-type FlushSync = typeof import('octane').flushSync;
 const NO_ACT_ERROR = Symbol('octane.opentui.no-act-error');
 
 function isThenable<T>(value: T | Promise<T>): value is Promise<T> {
@@ -61,14 +60,14 @@ function runClientAct<T>(callback: () => T | Promise<T>, clientAct: Act): Promis
 	})();
 }
 
-export const flushSync: FlushSync = (callback) => {
-	const clientFlushSync = Reflect.get(Octane, 'flushSync') as FlushSync | undefined;
+export const flushSync: UniversalSyncFlusher = (callback) => {
+	const clientFlushSync = Reflect.get(Octane, 'flushSync') as UniversalSyncFlusher | undefined;
 	return flushUniversalSync(callback, clientFlushSync);
 };
 
 export const act: Act = (callback) => {
 	const clientAct = Reflect.get(Octane, 'act') as Act | undefined;
-	const clientFlushSync = Reflect.get(Octane, 'flushSync') as FlushSync | undefined;
+	const clientFlushSync = Reflect.get(Octane, 'flushSync') as UniversalSyncFlusher | undefined;
 	if (typeof clientAct === 'function') return runClientAct(callback, clientAct);
 	try {
 		return Promise.resolve(runActCallback(callback, clientFlushSync));

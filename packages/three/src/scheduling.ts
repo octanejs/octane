@@ -7,7 +7,6 @@ import {
 } from 'octane/universal';
 
 export type Act = typeof import('octane').act;
-type FlushSync = typeof import('octane').flushSync;
 const NO_ACT_ERROR = Symbol('octane.three.no-act-error');
 
 function isThenable<T>(value: T | Promise<T>): value is Promise<T> {
@@ -70,7 +69,7 @@ function runClientAct<T>(callback: () => T | Promise<T>, clientAct: Act): Promis
 }
 
 /** Flushes both the DOM scheduler and mounted universal Three roots. */
-export const flushSync: FlushSync = (callback) => {
+export const flushSync: UniversalSyncFlusher = (callback) => {
 	return flushUniversalSync(callback, getUniversalHostFlusher());
 };
 
