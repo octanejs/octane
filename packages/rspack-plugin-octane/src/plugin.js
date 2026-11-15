@@ -96,7 +96,7 @@ function mergeRuntimeAliases(aliases, additions) {
 	};
 }
 
-function addRuntimeAliases(compiler, request, root, explicitRuntime) {
+function addRuntimeAliases(compiler, request, root, explicitRuntime, environment) {
 	const resolveOptions = compiler.options.resolve;
 	// The factory is created before Rspack applies mode/target defaults. Merge
 	// the finalized ESM options (including `...`) before resolving; require
@@ -122,6 +122,20 @@ function addRuntimeAliases(compiler, request, root, explicitRuntime) {
 			aliases[`${subpath}$`] ??
 			aliases[subpath] ??
 			resolveRuntimeModule(packageResolver, subpath, packageRoot);
+	}
+	if (environment === 'server') {
+		const serverRequest = 'octane/react/server';
+		const aliasedServer =
+			Object.hasOwn(aliases, 'octane/react/server$') || Object.hasOwn(aliases, serverRequest);
+		const serverReact = aliasedServer
+			? serverRequest
+			: resolveRuntimeModule(packageResolver, serverRequest, packageRoot);
+		if (aliasedServer || serverReact !== serverRequest) {
+			if (!aliasedServer) additions['octane/react/server$'] = serverReact;
+			// Keep the second request visible to Rspack's issuer-layer aliases.
+			if (!Object.hasOwn(aliases, 'octane/react$') && !Object.hasOwn(aliases, 'octane/react'))
+				additions['octane/react$'] = serverRequest;
+		}
 	}
 	const runtime = explicitRuntime
 		? override
@@ -701,6 +715,7 @@ export class OctaneRspackPlugin {
 				runtimeRequest,
 				root,
 				this.options.runtime !== undefined,
+				environment,
 			);
 			for (const [alias, request] of layerRuntimeAliases) {
 				alias.octane$ = resolveRuntimeModule(resolver, request, root);
