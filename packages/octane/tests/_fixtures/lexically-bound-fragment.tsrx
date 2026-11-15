@@ -1,6 +1,7 @@
 'use strong';
 
-import { useState, type OctaneNode } from 'octane';
+import { Fragment as Group, useState, type OctaneNode } from 'octane';
+import * as Native from 'octane';
 
 function Fragment(props: { children?: OctaneNode; label: string }) @{
 	const [count, setCount] = useState(0);
@@ -17,5 +18,31 @@ export function LocalFragment(props: { label: string }) @{
 		<Fragment label={props.label}>
 			<IgnoredChild />
 		</Fragment>
+	</main>
+}
+
+export function ShadowedFragmentImports(props: { label: string }) @{
+	if (true) {
+		var Group = Fragment;
+		var Native = { Fragment };
+	}
+	<main>
+		<Group label={props.label}>
+			<IgnoredChild />
+		</Group>
+		<Native.Fragment label={props.label}>
+			<IgnoredChild />
+		</Native.Fragment>
+	</main>
+}
+
+export function GenuineFragmentImports() @{
+	<main>
+		<Group>
+			<p>named fragment</p>
+		</Group>
+		<Native.Fragment>
+			<p>namespace fragment</p>
+		</Native.Fragment>
 	</main>
 }

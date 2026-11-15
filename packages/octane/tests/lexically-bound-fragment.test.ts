@@ -1,7 +1,11 @@
 import { expect, it } from 'vitest';
 import { renderToString } from 'octane/server';
 import { flushSync, hydrateRoot } from '../src/index.js';
-import { LocalFragment } from './_fixtures/lexically-bound-fragment.tsrx';
+import {
+	GenuineFragmentImports,
+	LocalFragment,
+	ShadowedFragmentImports,
+} from './_fixtures/lexically-bound-fragment.tsrx';
 import { mount } from './_helpers.js';
 import { loadServerFixture } from './_server-fixture.js';
 
@@ -40,5 +44,44 @@ it('server-renders a local Fragment component that hydrates and retains its stat
 	} finally {
 		root.unmount();
 		container.remove();
+	}
+});
+
+it('hydrates fragment imports shadowed by declarations inside a setup branch', () => {
+	const props = { label: 'Count' };
+	const server = loadServerFixture<{ ShadowedFragmentImports: typeof ShadowedFragmentImports }>(
+		'packages/octane/tests/_fixtures/lexically-bound-fragment.tsrx',
+	);
+	const { html } = renderToString(server.ShadowedFragmentImports, props);
+	const container = document.createElement('div');
+	container.innerHTML = html;
+	const buttons = Array.from(container.querySelectorAll('button'));
+	expect(buttons.map((button) => button.textContent)).toEqual(['Count: 0', 'Count: 0']);
+
+	document.body.append(container);
+	const recoverable: unknown[] = [];
+	const root = hydrateRoot(container, ShadowedFragmentImports, props, {
+		onRecoverableError: (error) => recoverable.push(error),
+	});
+	try {
+		flushSync(() => buttons[0]!.click());
+		expect(Array.from(container.querySelectorAll('button'))).toEqual(buttons);
+		expect(buttons.map((button) => button.textContent)).toEqual(['Count: 1', 'Count: 0']);
+		expect(recoverable).toEqual([]);
+	} finally {
+		root.unmount();
+		container.remove();
+	}
+});
+
+it('renders the children of genuine named and namespace fragments', () => {
+	const view = mount(GenuineFragmentImports);
+	try {
+		expect(Array.from(view.container.querySelectorAll('p'), (node) => node.textContent)).toEqual([
+			'named fragment',
+			'namespace fragment',
+		]);
+	} finally {
+		view.unmount();
 	}
 });

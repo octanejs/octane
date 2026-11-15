@@ -36545,8 +36545,8 @@ function isActivityName(value) {
 // The component-local set does not include a module callback's parameters or
 // names declared inside nested JavaScript blocks. Resolve those rare builtin
 // candidates against the authored AST's actual scopes. Only modules containing
-// an Activity candidate allocate this analysis; normalized tags retain their
-// original name node, and synthesized names use the conservative fallback.
+// a relevant builtin candidate allocate this analysis. Normalized tags retain
+// their original name node, and synthesized names use the conservative fallback.
 function activityReferenceBinding(name, node, ctx) {
 	if (!ctx?.activityModuleAst) return undefined;
 	const lexical = (ctx.activityLexical ??= createLexicalAnalysis(ctx.activityModuleAst));
@@ -36655,6 +36655,11 @@ function isCheckedCompiledBoundary(node, ctx) {
 // named-import alias, or the Fragment member of an Octane namespace import.
 // Resolve aliases against their import bindings so a foreign or locally
 // shadowed component retains its ordinary component semantics.
+function resolvesModuleFragmentImport(name, node, ctx) {
+	const binding = activityReferenceBinding(name, node, ctx);
+	return binding === undefined || binding?.scope === ctx.activityLexical.rootScope;
+}
+
 function isFragmentLongForm(node, ctx = null, bindingFragment = null) {
 	const name = node.openingElement?.name || node.id;
 	if (!name) return false;
@@ -36662,7 +36667,8 @@ function isFragmentLongForm(node, ctx = null, bindingFragment = null) {
 		const local = name.name;
 		if (ctx?.currentComponentLocals?.has(local)) return false;
 		const imported = ctx?.octaneImportLocals?.get(local);
-		if (imported !== undefined) return imported === 'Fragment';
+		if (imported !== undefined)
+			return imported === 'Fragment' && resolvesModuleFragmentImport(name, node, ctx);
 		if (ctx?.foreignImportLocals?.has(local)) return false;
 		if (local !== 'Fragment' || ctx?.componentInfo?.has(local)) return false;
 		const binding = bindingFragment
@@ -36682,7 +36688,8 @@ function isFragmentLongForm(node, ctx = null, bindingFragment = null) {
 		(property?.type === 'Identifier' || property?.type === 'JSXIdentifier') &&
 		property.name === 'Fragment' &&
 		ctx?.octaneImportNamespaces?.has(object.name) === true &&
-		!ctx.currentComponentLocals?.has(object.name)
+		!ctx.currentComponentLocals?.has(object.name) &&
+		resolvesModuleFragmentImport(object, node, ctx)
 	);
 }
 
