@@ -7318,17 +7318,16 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		if (!this.options.localReactClass) return;
 		const callee = ts.isJsxElement(node) && this.callee(node.openingElement.tagName);
 		if (
-			ts.isJsxElement(node) &&
-			callee &&
-			callee.module === 'react' &&
-			callee.name === 'StrictMode' &&
-			!this.islands.has(node) &&
-			!this.unrenderable.has(node) &&
-			!this.reactRendererBodies.has(node)
+			ts.isJsxFragment(node) ||
+			(ts.isJsxElement(node) &&
+				callee &&
+				callee.module === 'react' &&
+				callee.name === 'StrictMode' &&
+				!this.islands.has(node) &&
+				!this.unrenderable.has(node) &&
+				!this.reactRendererBodies.has(node))
 		) {
-			for (const child of node.children)
-				if (ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child))
-					this.checkReactClassOutput(child);
+			for (const child of node.children) if (isJsx(child)) this.checkReactClassOutput(child);
 		} else if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
 			this.checkReactClassRoot(node);
 		}

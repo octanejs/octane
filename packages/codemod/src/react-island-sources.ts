@@ -136,6 +136,13 @@ export function reactClassExports(file: string, source: string) {
 	const module = checker.getSymbolAtLocation(sf);
 	if (!module || hasEval(sf)) return names;
 	const uses = localUses(sf, checker);
+	let decorators: boolean | undefined;
+	const hasDecorator = (node: ts.Node): boolean =>
+		ts.isDecorator(node) ||
+		(ts.forEachChild(node, (child) => hasDecorator(child) || undefined) ?? false);
+	const erasedClassUse = (ref: ts.Identifier) =>
+		inTypeNode(ref) &&
+		(ts.isTypeQueryNode(ref.parent) || !(decorators ??= source.includes('@') && hasDecorator(sf)));
 	for (const symbol of checker.getExportsOfModule(module)) {
 		let decl = symbol.valueDeclaration ?? symbol.declarations?.[0];
 		if (decl && ts.isExportSpecifier(decl)) {
@@ -171,7 +178,8 @@ export function reactClassExports(file: string, source: string) {
 		if (
 			!decl.name ||
 			uses(decl.name).every(
-				(ref) => componentTagOrExport(ref) || classMetadataAssignment(ref, decl),
+				(ref) =>
+					erasedClassUse(ref) || componentTagOrExport(ref) || classMetadataAssignment(ref, decl),
 			)
 		)
 			names.add(symbol.name);

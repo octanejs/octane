@@ -103,6 +103,10 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 			'MetadataEffect.tsx': boundary + '\nFrame.displayName = register();',
 			'MetadataGetter.tsx':
 				boundary + '\nFrame.defaultProps = { get fallback() { return "error"; } };',
+			'TypeUses.tsx':
+				boundary + '\nexport type Instance = Frame;\nexport type Factory = typeof Frame;',
+			'RuntimeBase.tsx': boundary + '\nexport class Other extends Frame {}',
+			'DecoratorMetadata.tsx': boundary + '\nclass Other { @capture field!: Frame; }',
 			'MutatedBase.tsx': boundary
 				.replace(
 					"import { Component as Base, type ReactNode } from 'react';",
@@ -170,6 +174,16 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					'<Frame><b>ready</b></Frame>',
 					'<Strict key="first"><Frame><b>ready</b></Frame></Strict>',
 				),
+			'FragmentRoot.tsx': entry('./Boundary').replace(
+				'<Frame><b>ready</b></Frame>',
+				'<><b>before</b><Frame /></>',
+			),
+			'FragmentStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<><Strict key="stable"><><Frame /></></Strict></>',
+				),
 			'NestedRootStrict.tsx':
 				"import React, { StrictMode as Strict } from 'react';\n" +
 				entry('./Boundary').replace(
@@ -199,6 +213,9 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 			'MetadataSetterView.tsx': entry('./MetadataSetter'),
 			'MetadataEffectView.tsx': entry('./MetadataEffect'),
 			'MetadataGetterView.tsx': entry('./MetadataGetter'),
+			'TypeUsesView.tsx': entry('./TypeUses'),
+			'RuntimeBaseView.tsx': entry('./RuntimeBase'),
+			'DecoratorMetadataView.tsx': entry('./DecoratorMetadata'),
 			'DefaultEarlyView.tsx': entry('./DefaultEarly').replace('{ Boundary as Frame }', 'Frame'),
 			'MutatedBaseView.tsx': entry('./MutatedBase'),
 			'Shadow.tsx': entry('./Boundary').replace('App()', 'App(Frame: () => unknown)'),
@@ -230,6 +247,7 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 							'DefaultExport.tsx',
 							'Hosted.tsx',
 							'Metadata.tsx',
+							'TypeUses.tsx',
 						].includes(file)),
 			);
 			const { files } = await runCodemod(
@@ -260,6 +278,8 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				['DefaultBaseTagsView.tsx', includeClass ? 'error' : 'warning'],
 				['DefaultBaseView.tsx', includeClass ? 'error' : 'warning'],
 				['DefaultExportView.tsx', includeClass ? 'error' : 'warning'],
+				['FragmentRoot.tsx', includeClass ? 'error' : 'warning'],
+				['FragmentStrict.tsx', includeClass ? 'error' : 'warning'],
 				['Guard.tsx', includeClass ? 'error' : 'warning'],
 				['KeyedStrict.tsx', includeClass ? 'error' : 'warning'],
 				['LogicalArm.tsx', includeClass ? 'error' : 'warning'],
@@ -268,6 +288,7 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				['Relative.tsx', includeClass ? 'error' : 'warning'],
 				['Strict.tsx', includeClass ? 'error' : 'warning'],
 				['Ternary.tsx', includeClass ? 'error' : 'warning'],
+				['TypeUsesView.tsx', includeClass ? 'error' : 'warning'],
 			]);
 		}
 	});
