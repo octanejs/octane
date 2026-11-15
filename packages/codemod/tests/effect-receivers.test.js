@@ -119,6 +119,11 @@ it('accepts unary reads from a closed state record when coercion cannot call use
 	]) {
 		expect(migrate(source).notes).toContainEqual(dependencyError);
 	}
+	const signed = number
+		.replace('attempt: 0', 'attempt: -1')
+		.replace('attempt: 1', 'attempt: +2')
+		.replace('...previous, failed: true', '...previous, attempt: -(3 as number), failed: true');
+	expect(migrate(signed).notes).not.toContainEqual(dependencyError);
 }, 20_000);
 
 it('reports numeric coercion of own data from a local object when it can call user code', () => {
@@ -144,6 +149,12 @@ it('reports numeric coercion of own data from a local object when it can call us
 		'1',
 	);
 	expect(migrate(localNumber).notes).not.toContainEqual(dependencyError);
+	expect(migrate(localNumber.replace('value: 1', 'value: -1')).notes).not.toContainEqual(
+		dependencyError,
+	);
+	expect(migrate(localNumber.replace('value: 1', 'value: +1n')).notes).toContainEqual(
+		dependencyError,
+	);
 	const duplicate = input("+probe['1']").replace('value: { valueOf()', '"1": 1, 0x1: { valueOf()');
 	expect(migrate(duplicate).notes).toContainEqual(dependencyError);
 }, 20_000);

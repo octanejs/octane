@@ -297,6 +297,16 @@ function isJsx(node: ts.Node) {
 	return ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node);
 }
 
+function isNumericConstant(node: ts.Expression) {
+	node = skipWrappers(node);
+	return (
+		ts.isNumericLiteral(node) ||
+		(ts.isPrefixUnaryExpression(node) &&
+			(node.operator === ts.SyntaxKind.MinusToken || node.operator === ts.SyntaxKind.PlusToken) &&
+			ts.isNumericLiteral(skipWrappers(node.operand)))
+	);
+}
+
 /** A deferred clsx call may test a binding only if its truth value stays fixed. */
 function svgClassToken(
 	expr: ts.Expression,
@@ -2143,28 +2153,18 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		// Keep exactly one declaration, with no renderer-specific priority handling.
 		if (ts.isStringLiteralLike(text)) return text.text.trim() !== '' && !/[!;]/.test(text.text);
 		if (!ts.isTemplateExpression(text) || /[!;]/.test(text.head.text)) return false;
-		const numeric = (node: ts.Expression) => {
-			node = skipWrappers(node);
-			return (
-				ts.isNumericLiteral(node) ||
-				(ts.isPrefixUnaryExpression(node) &&
-					(node.operator === ts.SyntaxKind.MinusToken ||
-						node.operator === ts.SyntaxKind.PlusToken) &&
-					ts.isNumericLiteral(skipWrappers(node.operand)))
-			);
-		};
 		return text.templateSpans.every(({ expression, literal }) => {
 			if (/[!;]/.test(literal.text)) return false;
 			const part = skipWrappers(expression);
-			if (numeric(part)) return true;
+			if (isNumericConstant(part)) return true;
 			if (!ts.isConditionalExpression(part)) return false;
 			const test = skipWrappers(part.condition);
 			return (
 				ts.isIdentifier(test) &&
 				fixedBinding(this.checker, test, part, (this.fixedSvgParameters ??= new Map())) &&
 				initializedBefore(this.checker, test, part) &&
-				numeric(part.whenTrue) &&
-				numeric(part.whenFalse)
+				isNumericConstant(part.whenTrue) &&
+				isNumericConstant(part.whenFalse)
 			);
 		});
 	}
@@ -4854,8 +4854,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				if (!ts.isPropertyAssignment(field)) return false;
 				const name = simpleName(field.name);
 				if (name === undefined || name === '__proto__') return false;
-				if (numeric.has(name) && !ts.isNumericLiteral(skipWrappers(field.initializer)))
-					return false;
+				if (numeric.has(name) && !isNumericConstant(field.initializer)) return false;
 				missing.delete(name);
 			}
 			return missing.size === 0;
@@ -4943,7 +4942,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			owns = true;
 			if (
 				coercesNumber &&
-				!(ts.isPropertyAssignment(field) && ts.isNumericLiteral(skipWrappers(field.initializer)))
+				!(ts.isPropertyAssignment(field) && isNumericConstant(field.initializer))
 			)
 				return false;
 		}
