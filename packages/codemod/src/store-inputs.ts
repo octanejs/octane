@@ -287,8 +287,10 @@ export function storeSources(
 		return exported;
 	}
 	function typedFile(from: string, specifier: string) {
-		return ts.resolveModuleName(specifier, from, options, ts.sys, cache).resolvedModule
+		const file = ts.resolveModuleName(specifier, from, options, ts.sys, cache).resolvedModule
 			?.resolvedFileName;
+		// TypeScript uses slash-delimited paths even on Windows.
+		return file && path.normalize(file);
 	}
 	function inProject(file: string, directory: string) {
 		return (
