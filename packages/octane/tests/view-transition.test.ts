@@ -30,6 +30,7 @@ import {
 	NestedSiblingsApp,
 	StagedTemplateApp,
 	BoundaryRowsApp,
+	CaptureFreeBoundaryRows,
 } from './_fixtures/view-transition-features.tsrx';
 
 function evalServer(source: string, filename: string): Record<string, any> {
@@ -324,6 +325,39 @@ describe('ViewTransition features', () => {
 		expect(typeof inst.old.animate).toBe('function');
 
 		(document as never as Record<string, any>)['startViewTransition'] = origSVT;
+	});
+
+	it('skips ViewTransition rows that close over nothing but the item', async () => {
+		const counted = (id: string, label: string) => {
+			let reads = 0;
+			return {
+				id,
+				get label() {
+					reads += 1;
+					return label + ':' + reads;
+				},
+			};
+		};
+		const kept = [counted('r0', 'a'), counted('r2', 'c')];
+		await act(() => {
+			root.render(CaptureFreeBoundaryRows, {
+				rows: [kept[0]!, counted('r1', 'b'), kept[1]!],
+			});
+		});
+		const hosts = [...container.querySelectorAll('li')];
+		expect(hosts.map((li) => li.textContent)).toEqual(['a:1', 'b:1', 'c:1']);
+
+		// A fresh array keeps the two survivor objects and replaces the middle row.
+		// The survivors' labels must stay at their first read.
+		await act(() => {
+			root.render(CaptureFreeBoundaryRows, {
+				rows: [kept[0]!, counted('r1', 'b2'), kept[1]!],
+			});
+		});
+		const rows = [...container.querySelectorAll('li')];
+		expect(rows.map((li) => li.textContent)).toEqual(['a:1', 'b2:1', 'c:1']);
+		expect(rows[0]).toBe(hosts[0]);
+		expect(rows[2]).toBe(hosts[2]);
 	});
 
 	it('animates exactly the list rows whose boundary content changed', async () => {

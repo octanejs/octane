@@ -38729,18 +38729,20 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// survivor shortcut has no compiler-cache epoch cell to consult).
 		if (itemMemoContextAware && autoMemoDeps === null) itemMemo = false;
 		// A body whose only nested structure is host-only conditional content —
-		// an @if over host output, including a narrowly proven nested keyed @for —
-		// renders nothing opaque of its own, so with no parent captures it is a
-		// pure function of the item: an unchanged item identity leaves nothing
-		// inside the conditional able to move. Two extra gates keep the
-		// identity-only skip honest: a render-time hazard like an assignment in
-		// the @if test fails containsAutoMemoUnsafeStructure, and a live imported
-		// member read (`@if (mod.flag)`) can mutate while the import's identity —
-		// the only thing the skip compares — stays fixed.
+		// an @if over host output, including a narrowly proven nested keyed @for,
+		// or a named ViewTransition import around that host output — renders
+		// nothing opaque of its own, so with no parent captures it is a pure
+		// function of the item: an unchanged item identity leaves nothing inside
+		// able to move. Two extra gates keep the identity-only skip honest: a
+		// render-time hazard like an assignment in the @if test fails
+		// containsAutoMemoUnsafeStructure. That walk takes the ViewTransition name
+		// set, so the imported boundary is not itself the hazard. A live imported
+		// member read (`@if (mod.flag)`) can still mutate while the import's
+		// identity — the only thing the skip compares — stays fixed.
 		const hostConditionalPure =
 			hasNestedComp &&
 			hasOnlyHostConditionalItemBodies(subStmts, ctx._octaneViewTransitionNames) &&
-			!containsAutoMemoUnsafeStructure(subStmts, ctx) &&
+			!containsAutoMemoUnsafeStructure(subStmts, ctx, ctx._octaneViewTransitionNames) &&
 			!containsImportedMemberRead(bodyAst, ctx.importedNames);
 		const hostPure =
 			!hasParentClosure &&

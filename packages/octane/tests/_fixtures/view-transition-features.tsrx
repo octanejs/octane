@@ -35,6 +35,20 @@ export function NestedSiblingsApp(props) @{
 	</ViewTransition>
 }
 
+// The same list with no parent capture. An unchanged item is the whole witness,
+// so a fresh array of the same row objects must not re-read survivor labels.
+export function CaptureFreeBoundaryRows(props: {
+	rows: Array<{ id: string; readonly label: string }>;
+}) @{
+	<ul>
+		@for (const row of props.rows; key row.id) {
+			<ViewTransition>
+				<li id={row.id}>{row.label as string}</li>
+			</ViewTransition>
+		}
+	</ul>
+}
+
 // A keyed list whose rows each own a boundary: the ordinary animated-list shape.
 export function BoundaryRowsApp(props) @{
 	const tone = props.tone;
