@@ -69,6 +69,39 @@ describe('authored hook argument lists', () => {
 	});
 
 	it.each([false, true])(
+		'keeps omitted plain-module initial values independent of a local undefined (inline=%s)',
+		(inlineHookMemo) => {
+			const code = `import { createElement, useState, useMemo } from 'octane';
+				import * as Octane from 'octane';
+				function useOptional(value: number) {
+					const undefined = value;
+					const [state, , read] = useState<number>();
+					const ref = Octane.useRef<number>();
+					const text = useMemo(() => String(value), [value]);
+					return [state, read(), ref.current, undefined, text].map(String).join(':');
+				}
+
+				export function App({ value }: { value: number }) {
+					return createElement('output', null, useOptional(value));
+				}`;
+			const id = 'omitted-plain-initializers.ts';
+			const expected = 'undefined:undefined:undefined:99:99';
+			const props = { value: 99 };
+			const server = loadPlainHookFixtureSource(code, { id, mode: 'server', inlineHookMemo });
+			expect(Server.renderToString(server.App, props).html).toContain(
+				`<output>${expected}</output>`,
+			);
+			const client = loadPlainHookFixtureSource(code, { id, mode: 'client', inlineHookMemo });
+			const view = mount(client.App, props);
+			try {
+				expect(view.find('output').textContent).toBe(expected);
+			} finally {
+				view.unmount();
+			}
+		},
+	);
+
+	it.each([false, true])(
 		'preserves manually supplied spread slots (inline=%s)',
 		(inlineHookMemo) => {
 			const code = slotHooks(
