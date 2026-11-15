@@ -461,19 +461,38 @@ describe('octane/data persistent cache', () => {
 	});
 
 	it('stays within its budget, purging the least recently used values first', async () => {
-		/** Load the shelf and keep it mounted, then load and unmount `unread`, then `count`. */
+		/** Keep the shelf mounted and compare two unobserved values on the final write. */
 		async function fill(budget: number) {
 			const storage = memoryStorage();
 			const store = createDataStore({
 				transport: server(books()).transport,
 				persist: cache(storage, 'ada', { budget }),
 			});
-			const mounted = await value(store, shelf);
-			await saved();
-			for (const contract of [unread, count]) {
-				(await value(store, contract)).stop();
-				await saved();
+			const keys = new Set<string>();
+			// Wait for each new saved key before loading the next value. The budgeted
+			// fill can replace an entry without increasing the index size.
+			async function nextSaved() {
+				const entry = await vi.waitFor(async () => {
+					const [partition] = listPartitions(storage);
+					const entries = partition ? await storage.index(partition) : [];
+					const saved = entries.find(({ key }) => !keys.has(key));
+					expect(saved).toBeDefined();
+					return saved!;
+				});
+				keys.add(entry.key);
+				return entry.lastUsed;
 			}
+			const mounted = await value(store, shelf);
+			const shelfLastUsed = await nextSaved();
+			await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(shelfLastUsed));
+			// The shelf and view can already exceed the budget while saving the view.
+			const view = await value(store, unread);
+			const viewLastUsed = await nextSaved();
+			view.stop();
+			await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(viewLastUsed));
+			// Load count without a subscriber so both it and the view can be evicted.
+			await store.prefetch(count, undefined);
+			await nextSaved();
 			mounted.stop();
 			return storage;
 		}
@@ -491,18 +510,21 @@ describe('octane/data persistent cache', () => {
 		// The mounted shelf is the oldest, but only `unread`, the least recently used of the rest, went.
 		const remote = server(books());
 		remote.hold();
-		const after = createDataStore({ transport: remote.transport, persist: cache(storage, 'ada') });
+		const transport = vi.fn(remote.transport);
+		const after = createDataStore({ transport, persist: cache(storage, 'ada') });
 		const handles = [shelf, count, unread].map((contract) => {
 			const handle = after.read(contract as any, undefined);
 			handle.subscribe(() => {});
 			return handle;
 		});
-		await saved();
-		expect(handles.map((handle) => handle.getSnapshot().status)).toEqual([
-			'ready',
-			'ready',
-			'pending',
-		]);
+		await vi.waitFor(() => {
+			expect(handles.map((handle) => handle.getSnapshot().status)).toEqual([
+				'ready',
+				'ready',
+				'pending',
+			]);
+			expect(transport.mock.calls.some(([request]) => request.name === 'unread')).toBe(true);
+		});
 	});
 
 	it('counts a value restored this session as recently used', async () => {
