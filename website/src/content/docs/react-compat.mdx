@@ -316,6 +316,8 @@ and delegates unresolved suspension to React's server renderer. Fizz can stream
 the surrounding fallback and retry the island. Scoped island CSS becomes React
 19 style resources, hoisted and deduplicated across islands. The client Octane
 root hydrates the island's HTML; React leaves its descendants opaque.
+In a Node.js server, a [request-local signal owner](https://github.com/octanejs/octane/blob/main/docs/react-compat.md#request-scoped-signals-in-nodejs)
+can carry module-level signal values through React's streaming render.
 
 **React inside Octane:** use Octane's asynchronous or streaming server renderer.
 `ReactCompat` buffers the complete React HTML for each island. An enclosing
