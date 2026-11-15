@@ -73,6 +73,8 @@ function installRuntime(
 			'./internal/client': './esm/internal-client.mjs',
 			'./internal/server': './esm/internal-server.mjs',
 			'./profiling': './esm/profiling.mjs',
+			'./react': './esm/react-client.mjs',
+			'./react/server': './esm/react-server.mjs',
 			'./universal': './esm/universal.mjs',
 			'./compiler': './esm/compiler.mjs',
 		},
@@ -104,6 +106,13 @@ function installRuntime(
 		}
 	}
 	write(directory, 'esm/profiling.mjs', "export { identity } from './client.mjs';\n");
+	for (const environment of ['client', 'server'] as const) {
+		write(
+			directory,
+			`esm/react-${environment}.mjs`,
+			`export const bridge = { origin: ${JSON.stringify(`${origin}:${environment}`)} };\n`,
+		);
+	}
 	for (const subpath of ['universal', 'compiler']) {
 		write(
 			directory,
@@ -306,6 +315,82 @@ describe('Rspack runtime package resolution', () => {
 			expectSharedRuntime(output.linked, output.application, 'selected', environment);
 		},
 	);
+
+	it.each(['web', 'node'] as const)('resolves the React bridge for %s', async (target) => {
+		installRuntime(join(root, 'node_modules/octane'), 'application');
+		write(
+			root,
+			'entry.mjs',
+			`export { bridge } from 'octane/react';
+			 export { bridge as explicitServer } from 'octane/react/server';`,
+		);
+		const output = load<{ bridge: Identity; explicitServer: Identity }>(
+			await build({}, { target }),
+		);
+		expect(output.bridge.origin).toBe(`application:${target === 'node' ? 'server' : 'client'}`);
+		expect(output.explicitServer.origin).toBe('application:server');
+		if (target === 'node') expect(output.bridge).toBe(output.explicitServer);
+	});
+
+	it('preserves the existing precedence of React bridge aliases in a server build', async () => {
+		installRuntime(join(root, 'node_modules/octane'), 'application');
+		const general = write(root, 'general.mjs', "export const bridge = { origin: 'general' };");
+		const exact = write(root, 'exact.mjs', "export const bridge = { origin: 'exact' };");
+		write(root, 'entry.mjs', "export { bridge } from 'octane/react';");
+		const resolve = {
+			alias: { 'octane/react': general },
+			byDependency: { esm: { alias: { 'octane/react$': exact } } },
+		};
+		const output = load<{ bridge: Identity }>(await build({}, { target: 'node', resolve }));
+		expect(output.bridge.origin).toBe('general');
+	});
+
+	it('shares the server bridge from an explicitly selected Octane package', async () => {
+		installRuntime(join(root, 'node_modules/octane'), 'ordinary');
+		const selected = installRuntime(join(sandbox, 'selected-octane'), 'selected');
+		write(
+			root,
+			'entry.mjs',
+			`export { bridge } from 'octane/react';
+			 export { bridge as explicitServer } from 'octane/react/server';`,
+		);
+		const output = load<{ bridge: Identity; explicitServer: Identity }>(
+			await build(
+				{},
+				{
+					target: 'node',
+					resolve: { alias: { octane$: join(selected, 'esm/client.mjs') } },
+				},
+			),
+		);
+		expect(output.bridge.origin).toBe('selected:server');
+		expect(output.bridge).toBe(output.explicitServer);
+	});
+
+	it('honors an issuer-layer alias for the server React bridge', async () => {
+		installRuntime(join(root, 'node_modules/octane'), 'application');
+		const layerBridge = write(
+			root,
+			'layer-bridge.mjs',
+			"export const bridge = { origin: 'layer' };",
+		);
+		write(root, 'entry.mjs', "export { bridge } from 'octane/react';");
+		const output = load<{ bridge: Identity }>(
+			await build(
+				{},
+				{
+					target: 'node',
+					entry: { main: { import: './entry.mjs', layer: 'host' } },
+					module: {
+						rules: [
+							{ issuerLayer: 'host', resolve: { alias: { 'octane/react/server$': layerBridge } } },
+						],
+					},
+				},
+			),
+		);
+		expect(output.bridge.origin).toBe('layer');
+	});
 
 	it('preserves exact helper overrides and unrelated subpaths beside a broad package alias', async () => {
 		installRuntime(join(root, 'node_modules/octane'), 'ordinary');
