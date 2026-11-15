@@ -500,6 +500,10 @@ function rowKeyLiteral(node: ts.Expression) {
 			(ts.isNumericLiteral(operand) || ts.isBigIntLiteral(operand))
 		);
 	}
+	return isPrimitiveLiteral(node);
+}
+
+function isPrimitiveLiteral(node: ts.Expression) {
 	return (
 		ts.isStringLiteralLike(node) ||
 		ts.isNumericLiteral(node) ||
@@ -3398,10 +3402,22 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 
 	private retainedRegistryFactoryImport(react: ts.ImportDeclaration) {
 		const resolveRegistry = this.options.retainedRegistry;
-		const statements = this.sf.statements;
+		if (!resolveRegistry) return false;
+		// Check the registration shape without the inert exported constants.
+		const statements = this.sf.statements.filter((statement) => {
+			if (
+				!ts.isVariableStatement(statement) ||
+				statement.modifiers?.length !== 1 ||
+				statement.modifiers[0].kind !== ts.SyntaxKind.ExportKeyword ||
+				(statement.declarationList.flags & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const ||
+				statement.declarationList.declarations.length !== 1
+			)
+				return true;
+			const { name, initializer, type } = statement.declarationList.declarations[0];
+			return !ts.isIdentifier(name) || !!type || !initializer || !isPrimitiveLiteral(initializer);
+		});
 		const bindings = react.importClause?.namedBindings;
 		if (
-			!resolveRegistry ||
 			statements.length !== 3 ||
 			!statements.slice(0, 2).every(ts.isImportDeclaration) ||
 			react.attributes ||
