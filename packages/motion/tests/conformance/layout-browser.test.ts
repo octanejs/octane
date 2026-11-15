@@ -48,6 +48,7 @@ for (const mode of ['development', 'production']) {
 					__OCTANE_PROFILE_ENABLED__: 'false',
 				},
 				alias: {
+					'octane/internal/client': resolve(root, 'packages/octane/src/internal/client.ts'),
 					octane: resolve(root, 'packages/octane/src/index.ts'),
 					'@octanejs/motion': resolve(root, 'packages/motion/src/index.ts'),
 				},
@@ -194,6 +195,33 @@ for (const mode of ['development', 'production']) {
 			});
 			expect(state.identity).toBe(true);
 			expectGeometry(state.rows, state.boxes);
+		});
+
+		it('keeps an exit-enabled row hidden until its Activity becomes visible again', async () => {
+			await open();
+			const result = await page.evaluate(() => {
+				const api = window.layoutCases;
+				api.mount({ cached: true, count: 1, exit: true });
+				const original = api.nodes()[0];
+				const initial = api.snapshot();
+				api.update({ mode: 'hidden' });
+				const hidden = api.nodes();
+				const retained = hidden.length === 1 && hidden[0] === original;
+				const hiddenWidth = original.getBoundingClientRect().width;
+				api.update({ mode: 'visible' });
+				const revealed = api.nodes();
+				return {
+					retained,
+					hiddenWidth,
+					revealed: revealed.length === 1 && revealed[0] === original,
+					initial,
+					final: api.snapshot(),
+				};
+			});
+			expect(result.retained).toBe(true);
+			expect(result.hiddenWidth).toBe(0);
+			expect(result.revealed).toBe(true);
+			expectGeometry(result.final, result.initial);
 		});
 
 		it('keeps nested synchronous commits from publishing superseded sibling effects', async () => {
