@@ -288,6 +288,10 @@ React-local transitions retain React's normal behavior, but an Octane transition
 does not wait for the separate React root or roll back committed Octane siblings.
 Neither compatibility host provides an atomic transaction across both renderers.
 
+When React removes an `OctaneCompat` host, it takes the host out of the DOM
+during the commit. Octane disposes the hosted root afterward, so its ref and
+effect cleanups can run after the surrounding React unmount call returns.
+
 While a React island has escaped as pending, new parent props and context
 snapshots are published on reveal. To cancel or replace that pending island,
 delete `ReactCompat` or change its outer key.
