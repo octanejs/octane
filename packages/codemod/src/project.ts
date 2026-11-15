@@ -1591,6 +1591,83 @@ export async function runCodemod(
 		return names.has(name);
 	}
 	const jsxFactories = new Map<string, ReadonlySet<string>>();
+	const renamedJsx = [...renames.keys()].some((file) => file.endsWith('.tsx'));
+	const namedReexports = new Map<string, Map<string, { module: string; name: string }>>();
+	function retainedJsxTarget(from: string, specifier: string, name: string) {
+		if (
+			!/^\.{1,2}\//.test(specifier) ||
+			/[!%?#\\]/.test(specifier) ||
+			config?.rootDirs ||
+			config?.moduleSuffixes?.some(Boolean)
+		)
+			return;
+		const isPlainFile = (file: string) => {
+			const stat = fs.lstatSync(file, { throwIfNoEntry: false });
+			return (
+				!!stat?.isFile() &&
+				stat.nlink === 1 &&
+				fs.realpathSync(file) ===
+					path.join((physicalRoot ??= fs.realpathSync(root)), path.relative(root, file))
+			);
+		};
+		const direct = (issuer: string, spec: string) => {
+			if (!/^\.{1,2}\//.test(spec) || /[!%?#\\]/.test(spec)) return;
+			const original = path.resolve(path.dirname(issuer), spec);
+			const resolved = renamed(issuer, spec);
+			if (!resolved?.file.endsWith('.tsx') || !isPlainFile(resolved.file)) return;
+			if (resolved.file === original && spec.endsWith('.tsx')) return resolved.file;
+			if (spec.endsWith('.js') && resolved.file === original.slice(0, -3) + '.tsx') {
+				if (!fs.lstatSync(original, { throwIfNoEntry: false }) && !hasModuleSibling(resolved.file))
+					return resolved.file;
+			} else if (unambiguousJsxPath(resolved.file, original)) return resolved.file;
+		};
+		const leaf = direct(from, specifier);
+		if (leaf) return { file: leaf, name, indirect: false };
+		const barrel = localFile(from, specifier);
+		const original = path.resolve(path.dirname(from), specifier);
+		const substituted = specifier.endsWith('.js')
+			? original.slice(0, -3) + '.ts'
+			: original + '.ts';
+		if (
+			!barrel ||
+			!(barrel === original || (barrel === substituted && !hasModuleSibling(barrel))) ||
+			!isPlainFile(barrel) ||
+			ts.findConfigFile(path.dirname(barrel), ts.sys.fileExists) !== rootProject
+		)
+			return;
+		let exports = namedReexports.get(barrel);
+		if (!exports) {
+			exports = new Map();
+			const { statements } = ts.createSourceFile(
+				barrel,
+				fs.readFileSync(barrel, 'utf8'),
+				ts.ScriptTarget.Latest,
+			);
+			for (const statement of statements) {
+				if (
+					!ts.isExportDeclaration(statement) ||
+					statement.isTypeOnly ||
+					statement.attributes ||
+					!statement.moduleSpecifier ||
+					!ts.isStringLiteral(statement.moduleSpecifier) ||
+					!statement.exportClause ||
+					!ts.isNamedExports(statement.exportClause)
+				)
+					continue;
+				for (const binding of statement.exportClause.elements) {
+					if (!binding.isTypeOnly)
+						exports.set(binding.name.text, {
+							module: statement.moduleSpecifier.text,
+							name: (binding.propertyName ?? binding.name).text,
+						});
+				}
+			}
+			namedReexports.set(barrel, exports);
+		}
+		const exported = exports.get(name);
+		const target = exported && direct(barrel, exported.module);
+		if (target) return { file: target, name: exported.name, indirect: true };
+	}
 	const renameConflicts = new Map<string, string>();
 	function checkLinkedRename(file: string, issuer: string) {
 		const selected = linkedRename(file);
@@ -1727,9 +1804,12 @@ export async function runCodemod(
 			scanRename,
 			selected ? undefined : checkLinkedRename,
 		);
-		if (!paths) continue;
+		const retainedJsx =
+			(paths || renamedJsx) && !known.has(file) && /\.[jt]sx$/.test(file) && source.includes('<');
+		if (!paths && !retainedJsx) continue;
 		const storeNotes: Note[] = result?.notes ?? [];
 		if (
+			paths &&
 			storeHookComponents.size &&
 			SOURCE.test(file) &&
 			((source.includes('octane') &&
@@ -1756,24 +1836,25 @@ export async function runCodemod(
 			}
 		}
 		if (selected) continue;
-		const rules = { ...result?.rules, 'module-paths': paths.count };
+		const rules = paths ? { ...result?.rules, 'module-paths': paths.count } : {};
 		const name = path.relative(root, file);
 		const host: FileResult = result ?? {
 			file: name,
 			output: name,
-			changed: true,
+			changed: !!paths,
 			rules,
 			notes: storeNotes,
 			strong: null,
 			strongFixes: [],
 			diagnostics: [],
-			code: paths.code,
+			code: paths?.code ?? source,
 		};
-		if (result) Object.assign(result, { code: paths.code, changed: true, rules });
-		else results.push(host);
-		const retainedJsx = !known.has(file) && /\.[jt]sx$/.test(file) && source.includes('<');
+		if (paths) {
+			if (result) Object.assign(result, { code: paths.code, changed: true, rules });
+			else results.push(host);
+		}
 		const retainedServer =
-			!isTsrx(file) && (source.includes('react-dom/server') || source.includes('\\'));
+			paths && !isTsrx(file) && (source.includes('react-dom/server') || source.includes('\\'));
 		if (
 			!edited.has(file) &&
 			(retainedJsx || retainedServer) &&
@@ -1794,14 +1875,24 @@ export async function runCodemod(
 					edges.push({ ...edge, renderer: 'server render' });
 			let installedLazy: boolean | undefined;
 			for (const edge of edges) {
-				const match = renamed(file, edge.module);
-				if (!match) continue;
 				const factory = 'factory' in edge && edge.factory;
 				const original = path.resolve(path.dirname(file), edge.module);
+				const direct = renamed(file, edge.module);
+				const proven =
+					edge.renderer === 'JSX' &&
+					!factory &&
+					!edge.lazy &&
+					(!direct || /\.js$/.test(edge.module))
+						? retainedJsxTarget(file, edge.module, edge.name)
+						: undefined;
+				const match = proven ?? direct;
+				if (!match) continue;
+				const exportName = proven?.name ?? edge.name;
 				const explicit =
 					match.file === original && (edge.renderer !== 'JSX' || /\.[jt]sx$/.test(edge.module));
 				if (
 					!explicit &&
+					!proven &&
 					(factory ||
 						edge.renderer !== 'JSX' ||
 						!/^\.{1,2}\//.test(edge.module) ||
@@ -1834,7 +1925,7 @@ export async function runCodemod(
 						reactExports.set(match.file, originalExports);
 					}
 					if (edge.lazy && originalExports.mayExportThen) continue;
-					if (!originalExports.intrinsics.has(edge.name)) {
+					if (!originalExports.intrinsics.has(exportName)) {
 						if (
 							!explicit ||
 							edge.lazy ||
@@ -1852,12 +1943,16 @@ export async function runCodemod(
 					message: factory
 						? `The retained React JSX in ${name} uses ${leaf.file}'s ${edge.name} as a JSX child. With standard package resolution, migrate the caller too or keep this factory in React.`
 						: edge.renderer === 'JSX'
-							? `The retained React JSX in ${name} renders ${leaf.file} ${edge.lazy ? 'through React.lazy' : 'directly'}. With standard package resolution, migrate the caller too or keep this component in React.`
+							? `The retained React JSX in ${name} renders ${leaf.file} ${edge.lazy ? 'through React.lazy' : proven?.indirect ? 'through a re-export' : 'directly'}. With standard package resolution, migrate the caller too or keep this component in React.`
 							: `The retained React server render in ${name} imports ${leaf.file} directly. With standard package resolution, migrate the server entry too or keep this component in React.`,
 				};
 				host.notes.push(note);
 				leaf.notes.push({ ...note, line: 1 });
 			}
+		}
+		if (!paths) {
+			if (host.notes.length && !result) results.push(host);
+			continue;
 		}
 		if (!edited.has(file) && hasServerImport && originalHost(serverBridge)) {
 			for (const edge of hostedComponents(file, source, serverBridge)) {
