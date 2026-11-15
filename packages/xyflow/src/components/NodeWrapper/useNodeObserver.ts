@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'octane';
 
-import type { InternalNode } from '../../types';
+import type { InternalNode, Node } from '../../types';
 import { useStoreApi } from '../../hooks/useStore';
 import { resolveHookSlot, subSlot } from '../../hooks/slot';
 
@@ -10,14 +10,14 @@ import { resolveHookSlot, subSlot } from '../../hooks/slot';
  * @internal
  * @returns nodeRef - reference to the node element
  */
-export function useNodeObserver(
+export function useNodeObserver<NodeType extends Node>(
 	{
 		node,
 		nodeType,
 		hasDimensions,
 		resizeObserver,
 	}: {
-		node: InternalNode;
+		node: InternalNode<NodeType>;
 		nodeType: string;
 		hasDimensions: boolean;
 		resizeObserver: ResizeObserver | null;
