@@ -4239,6 +4239,80 @@ export function View() {
 		},
 	);
 
+	it('reports an unchanged JSX component directly rendered by a native template', async () => {
+		const leaf = `import { useId } from 'react';
+export function Leaf(props: { label: string }) { return <Surface {...props} />; }
+function Surface({ label }: { label: string }) {
+	const id = useId();
+	return <button id={id}>{label}</button>;
+}`;
+		const app = (module = './leaf') => `import { Leaf } from '${module}';
+export function App() { return <main><Leaf label="Ready" /></main>; }`;
+		const root = project({
+			'tsconfig.json': '{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler"}}',
+			'leaf.tsx': leaf,
+			'default-leaf.tsx': `export default function Leaf({ label }: { label: string }) { return <button>{label}</button>; }`,
+			'default-wrapper.tsx': leaf.replace('export function Leaf', 'export default function Leaf'),
+			'anonymous-wrapper.tsx': leaf.replace('export function Leaf', 'export default function'),
+			'ambiguous.tsx': leaf,
+			'ambiguous.tsrx': 'export function Leaf() @{ <button>Native</button> }',
+			'native.tsx': '/** @jsxImportSource octane */\n' + leaf.replace("'react'", "'octane'"),
+			'App.tsx': app(),
+			'Explicit.tsx': app('./leaf.tsx'),
+			'Default.tsx': app('./default-leaf').replace('import { Leaf }', 'import Leaf'),
+			'DefaultWrapper.tsx': app('./default-wrapper').replace('import { Leaf }', 'import Leaf'),
+			'AnonymousWrapper.tsx': app('./anonymous-wrapper').replace('import { Leaf }', 'import Leaf'),
+			'Native.tsx': app('./native'),
+			'Ambiguous.tsx': app('./ambiguous'),
+			'Host.tsx': `import { ReactCompat } from 'octane/react';
+import { Leaf } from './leaf';
+export function App() { return <ReactCompat component={Leaf} props={{label: 'Ready'}} />; }`,
+		});
+		fs.symlinkSync(
+			path.join(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const inputs = [
+			'AnonymousWrapper.tsx',
+			'App.tsx',
+			'Default.tsx',
+			'DefaultWrapper.tsx',
+			'Explicit.tsx',
+			'Native.tsx',
+			'Host.tsx',
+			'Ambiguous.tsx',
+		].map((file) => path.join(root, file));
+		for (const projectTypes of [true, false]) {
+			const options = { root, strong: true, write: false, projectTypes };
+			const result = await runCodemod(inputs, options);
+			const matches = result.files.flatMap((file) =>
+				file.notes
+					.filter((note) => note.rule === 'retained-react-component')
+					.map((note) => [file.file, note.severity, note.line]),
+			);
+			expect(matches.sort()).toEqual([
+				['AnonymousWrapper.tsx', 'warning', 2],
+				['App.tsx', 'warning', 2],
+				['Default.tsx', 'warning', 2],
+				['DefaultWrapper.tsx', 'warning', 2],
+				['Explicit.tsx', 'warning', 2],
+			]);
+			const selected = await runCodemod(
+				[
+					...inputs,
+					...['leaf.tsx', 'default-leaf.tsx', 'default-wrapper.tsx', 'anonymous-wrapper.tsx'].map(
+						(file) => path.join(root, file),
+					),
+				],
+				options,
+			);
+			expect(selected.files.flatMap((file) => file.notes)).not.toContainEqual(
+				expect.objectContaining({ rule: 'retained-react-component' }),
+			);
+		}
+	});
+
 	it('reports an unchanged React hook component passed to a migrated React DOM root', async () => {
 		const app = (module = './leaf') => `import * as ReactDOM from 'react-dom/client';
 import { Leaf } from '${module}';

@@ -8249,7 +8249,10 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		if (!isJsx(node)) return;
 		if (!ts.isJsxFragment(node)) {
 			if (this.retainedReactOutput(node)) return;
-			if (!retained && !descriptorValue) this.checkRetainedReactContext(node);
+			if (!retained && !descriptorValue) {
+				this.checkRetainedReactContext(node);
+				this.checkRetainedReactTemplateComponent(node);
+			}
 			if (ts.isJsxSelfClosingElement(node))
 				return this.checkReactClassRoot(node, conditional, retained);
 			if (!retained && rendersOrdinaryHtmlChildren(node.openingElement)) {
@@ -8346,6 +8349,21 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		if (!entry || entry.namespace || entry.typeOnly) return;
 		const declaration = ts.findAncestor(this.declarationOf(tag)!, ts.isImportDeclaration);
 		if (declaration && !declaration.attributes) return { tag, entry };
+	}
+
+	private checkRetainedReactTemplateComponent(node: ts.JsxElement | ts.JsxSelfClosingElement) {
+		const check = this.options.localReactTemplateComponent;
+		if (!check) return;
+		const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
+		if (!ts.isIdentifier(tag) || !isComponentName(tag.text)) return;
+		const binding = this.directImportedValue(tag);
+		if (!binding || !check(binding.entry.module, binding.entry.imported)) return;
+		this.note(
+			'retained-react-component',
+			'warning',
+			tag,
+			`This native template can render ${tag.text} from the unchanged ${binding.entry.module} module. Its JSX returns a React element under the project's React JSX settings. Migrate the component too or keep its render under React.`,
+		);
 	}
 
 	private checkRetainedReactContext(node: ts.JsxElement | ts.JsxSelfClosingElement) {
