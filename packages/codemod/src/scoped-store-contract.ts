@@ -617,6 +617,13 @@ function modulePlan(
 		files.set(out, code.slice(0, start) + nativeDirective + code.slice(start));
 		return true;
 	}
+	function forwardedCall(fn: ts.FunctionDeclaration) {
+		if (fn.body?.statements.length !== 1) return;
+		const [only] = fn.body.statements;
+		const call = ts.isReturnStatement(only) ? only.expression : undefined;
+		if (call && ts.isCallExpression(call) && ts.isIdentifier(call.expression)) return call;
+	}
+
 	function readsContext(
 		fn: ts.FunctionDeclaration,
 		seen: Set<ts.Symbol>,
@@ -628,25 +635,22 @@ function modulePlan(
 		if (contextReaders.has(symbol)) return true;
 		seen.add(symbol);
 		// A thin exported forwarding hook may share another hook's contextual read.
-		const [only] = fn.body.statements;
-		if (
-			fn.body.statements.length !== 1 ||
-			!ts.isReturnStatement(only) ||
-			!only.expression ||
-			!ts.isCallExpression(only.expression) ||
-			!ts.isIdentifier(only.expression.expression)
-		)
-			return false;
-		const called = referenced(checker, only.expression.expression);
+		const forward = forwardedCall(fn);
+		if (!forward) return false;
+		const called = referenced(checker, forward.expression);
 		const body = called?.declarations?.find(
 			(d): d is ts.FunctionDeclaration => ts.isFunctionDeclaration(d) && !!d.body,
 		);
 		return !!body && readsContext(body, seen, files);
 	}
 
-	function reachesReact(fn: ts.FunctionDeclaration) {
+	function reachesReact(
+		fn: ts.FunctionDeclaration,
+		seen = new Set<ts.FunctionDeclaration>(),
+	): boolean {
 		if (
 			!fn.body ||
+			seen.has(fn) ||
 			fn.parameters.some((param) => !ts.isIdentifier(param.name) || param.initializer) ||
 			installed('react', fn.getSourceFile().fileName) !== installed('react', entry)
 		)
@@ -689,7 +693,21 @@ function modulePlan(
 			}
 			return false;
 		}
-		return setup(fn.body);
+		if (setup(fn.body)) return true;
+		const call = forwardedCall(fn);
+		if (!call || ts.isOptionalChain(call)) return false;
+		// The module audit already rules out reassignment and async or generator
+		// helpers. An imported alias alone does not identify the runtime module.
+		const target = checker
+			.getSymbolAtLocation(call.expression)
+			?.declarations?.find(
+				(declaration): declaration is ts.FunctionDeclaration =>
+					ts.isFunctionDeclaration(declaration) &&
+					!!declaration.body &&
+					declaration.parent === fn.parent,
+			);
+		seen.add(fn);
+		return !!target && reachesReact(target, seen);
 	}
 
 	function originalExportPath(

@@ -738,11 +738,12 @@ it('warns when an existing Octane server renderer imports a migrated store consu
 it.each([
 	['direct', 'read(current)', false],
 	['nested', 'valueOf(read(current))', false],
+	['local forwarding', 'read(current)', false, false, true],
 	['named alongside star', 'read(current)', true],
 	['parent-relative barrel', 'read(current)', false, true],
 ])(
 	'warns about a retained wrapper through a %s linked hook',
-	async (_case, read, named, parent) => {
+	async (_case, read, named, parent, forwarding) => {
 		const view = (name) => `import { ${name} as read } from './helper';
 export function Pane() { const value = read(); return <p>{String(value)}</p>; }`;
 		const { app, library } = project({
@@ -758,10 +759,17 @@ export function useSnapshot() { return 0; }`,
 				`import { use as read } from 'react';
 import { current } from '../renderer';
 import { valueOf } from '../state';
-export function useChannel(value: number) {
+${forwarding ? 'function useInner(value: number): number;' : ''}
+${forwarding ? 'function useInner' : 'export function useChannel'}(value: number) {
 	const checked = valueOf(value);
 	if (checked) { const snapshot = ${read}; return snapshot; }
 	return ${read};
+}
+${
+	forwarding
+		? `function useForward(value: number) { return useInner(value); }
+export function useChannel(value: number) { return useForward(value); }`
+		: ''
 }
 export function useMaybe(value: number) {
 	return valueOf(value ? read(current) : value);
