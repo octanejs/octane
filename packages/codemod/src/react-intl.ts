@@ -21,7 +21,10 @@ const scalarMethods = new Set([
 ]);
 const descriptor = new Set(['id', 'description', 'defaultMessage', 'ignoreTag']);
 
-function isImmediatelyCalled(node: ts.Node): boolean {
+function isEagerFunction(
+	node: ts.Node,
+	reactHook: (callee: ts.Expression) => string | null,
+): boolean {
 	if (
 		!(ts.isArrowFunction(node) || ts.isFunctionExpression(node)) ||
 		node.asteriskToken ||
@@ -31,7 +34,14 @@ function isImmediatelyCalled(node: ts.Node): boolean {
 	let expression: ts.Expression = node;
 	while (isWrapper(expression.parent)) expression = expression.parent;
 	const call = expression.parent;
-	return ts.isCallExpression(call) && call.expression === expression;
+	if (!ts.isCallExpression(call)) return false;
+	if (call.expression === expression) return true;
+	if (call.arguments[0] !== expression || ts.isOptionalChain(call)) return false;
+	const hook = reactHook(call.expression);
+	return (
+		(hook === 'useState' && call.arguments.length === 1) ||
+		(hook === 'useMemo' && call.arguments.length === 2 && !ts.isSpreadElement(call.arguments[1]))
+	);
 }
 
 /** Select whole named imports that the shared adapter can replace without changing renderer-owned values. */
@@ -47,6 +57,7 @@ export function intlImports(
 	canPassToReact: (element: ts.JsxElement | ts.JsxSelfClosingElement) => boolean,
 	returnedReceiver: (tag: ts.JsxOpeningLikeElement) => boolean,
 	originalReact: () => boolean,
+	reactHook: (callee: ts.Expression) => string | null,
 	unknownFormatter: (call: ts.CallExpression, method: string) => void,
 ): Set<ts.ImportSpecifier> {
 	const candidates = file.statements.filter(ts.isImportDeclaration).flatMap((decl) => {
@@ -242,7 +253,7 @@ export function intlImports(
 		const call = access.parent;
 		if (!ts.isCallExpression(call) || call.expression !== access) return false;
 		if (scalarMethods.has(access.name.text)) {
-			// React also evaluates directly invoked synchronous functions during render.
+			// React runs inline calls, memo calculators and lazy state initializers during render.
 			if (
 				!owner.asteriskToken &&
 				!owner.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
@@ -250,7 +261,7 @@ export function intlImports(
 					call,
 					(node) =>
 						node === owner.body ||
-						(ts.isFunctionLike(node) && !isImmediatelyCalled(node)) ||
+						(ts.isFunctionLike(node) && !isEagerFunction(node, reactHook)) ||
 						ts.isClassLike(node) ||
 						ts.isInterfaceDeclaration(node) ||
 						ts.isTypeNode(node),
