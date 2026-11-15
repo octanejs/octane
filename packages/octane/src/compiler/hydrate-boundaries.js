@@ -2512,10 +2512,11 @@ export function prepareHydrateBoundaries(
 				splitModuleCaptures.set(ast, { moduleBody: analysis.ast.body, bindings });
 		}
 	}
-	const templateTags = new Set(
+	// Each tag maps to whether its boundary is independent, which selects the entry.
+	const templateTags = new Map(
 		analysis.boundaries
 			.filter(isCompiledSplitHydrateBoundary)
-			.map((boundary) => boundary.node.openingElement.name),
+			.map((boundary) => [boundary.node.openingElement.name, boundary.independent]),
 	);
 	if (templateTags.size > 0) compiledSplitHydrateTags.set(ast, templateTags);
 	certifySplitContexts(ast, contexts, captureBindings);

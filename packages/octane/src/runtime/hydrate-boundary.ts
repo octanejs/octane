@@ -1470,3 +1470,12 @@ export const Hydrate: ComponentBody<HydrateProps> = /* @__PURE__ */ rollbackEntr
 export const __HydrateCompiled: ComponentBody<HydrateProps> = /* @__PURE__ */ rollbackEntry(
 	/* @__PURE__ */ initializeHydrateComponent(compiledHydrateBoundaryBody),
 );
+
+/**
+ * Compiler-proven independent island. Its own root renders the children and the
+ * hosting render never does, so this entry names no content body and with it no
+ * Suspense implementation.
+ */
+export const __HydrateIndependent: ComponentBody<HydrateProps> = /* @__PURE__ */ rollbackEntry(
+	/* @__PURE__ */ initializeHydrateComponent(() => EMPTY_HYDRATE_PENDING),
+);

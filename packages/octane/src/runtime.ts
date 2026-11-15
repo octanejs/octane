@@ -237,6 +237,7 @@ export type { PortalDescriptor } from './runtime/portals.js';
 export {
 	Hydrate,
 	__HydrateCompiled,
+	__HydrateIndependent,
 	__PermanentStaticHydrate,
 } from './runtime/hydrate-boundary.js';
 export {
