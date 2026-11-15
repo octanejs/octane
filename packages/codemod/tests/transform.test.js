@@ -602,6 +602,41 @@ export type Qualified = typeof R.createRef;`,
 		},
 	);
 
+	it('keeps qualified Touch value queries on React', () => {
+		const source = `import type * as R from 'react';
+declare module 'react' { const Touch: { token: { nested: 'real' } }; }
+export type Point = R.Touch;
+export type Direct = typeof R.Touch;
+export type Nested = typeof R /* keep */ .Touch.token;
+export type Deep = typeof R.Touch.token.nested;
+export namespace Local {
+	export const R = { Touch: { token: 'shadow' } };
+	export type Shadow = typeof R.Touch.token;
+}`;
+		const { code, notes } = transformModule(source, 'points.ts');
+		expect(code).toContain("import type { Touch as OctaneTouch } from 'octane';");
+		expect(code).toContain("typeof import('react').Touch;");
+		expect(code).toContain("typeof import('react') /* keep */ .Touch.token;");
+		expect(code).toContain("typeof import('react').Touch.token.nested;");
+		expect(code).toContain('export type Shadow = typeof R.Touch.token;');
+		expect(notes.filter((note) => note.rule === 'unsupported-api')).toHaveLength(4);
+		expect(transformModule(code, 'points.ts').code).toBe(code);
+	});
+
+	it('preserves a Touch value query with no other module marker', () => {
+		const source = `import type * as R from 'react' with /* condition */ { 'resolution-mode': 'require' };
+declare module 'react' {
+	const Touch: { token: 'original' };
+	export type Result = typeof R.Touch.token;
+}`;
+		const { code } = transformModule(source, 'points.ts');
+		expect(code).toMatch(/^export \{\};/);
+		expect(code).toContain(
+			"typeof import('react', { with: /* condition */ { 'resolution-mode': 'require' } }).Touch.token",
+		);
+		expect(transformModule(code, 'points.ts').code).toBe(code);
+	});
+
 	it('keeps Touch references outside the React type export unmapped', () => {
 		const { notes } = transformModule(
 			`import * as R from 'react';

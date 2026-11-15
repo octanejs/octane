@@ -74,6 +74,16 @@ function directMember(receiver: ts.Node) {
 	return null;
 }
 
+function firstQualifiedName(name: ts.EntityName): ts.Identifier {
+	while (ts.isQualifiedName(name)) name = name.left;
+	return name;
+}
+
+function isValueTypeQuery(name: ts.EntityName) {
+	while (ts.isQualifiedName(name.parent) && name.parent.left === name) name = name.parent;
+	return ts.isTypeQueryNode(name.parent) && name.parent.exprName === name;
+}
+
 type Severity = Note['severity'];
 type ModuleExports = TransformResult['exports'];
 
@@ -4109,6 +4119,20 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const module = REACT_MODULES[specifier.text];
 		if (module === undefined) return this.rewriteSpecifier(node, specifier);
 		const qualifier = node.qualifier;
+		if (
+			specifier.text === 'react' &&
+			node.isTypeOf &&
+			qualifier &&
+			firstQualifiedName(qualifier).text === 'Touch'
+		) {
+			this.note(
+				RULE.unsupported,
+				'warning',
+				node,
+				'Octane has no Touch value for this type query.',
+			);
+			return null;
+		}
 		const name = qualifier && ts.isIdentifier(qualifier) ? qualifier.text : null;
 		if (
 			node.isTypeOf &&
@@ -4313,12 +4337,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						references.every(
 							(ref) => ts.isPartOfTypeNode(ref) || ts.isTypeOnlyExportDeclaration(ref.parent),
 						);
-					touchValueQuery = references.some((ref) => {
-						let value: ts.EntityName = ref;
-						while (ts.isQualifiedName(value.parent) && value.parent.left === value)
-							value = value.parent;
-						return ts.isTypeQueryNode(value.parent) && value.parent.exprName === value;
-					});
+					touchValueQuery = references.some(isValueTypeQuery);
 					typeOnly ||= typeReferences;
 				}
 				if (!this.used.has(local) && !typeReferences) continue;
@@ -4610,6 +4629,30 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				: !this.isGlobalNamespace(node.left, 'React')
 		) {
 			return null;
+		}
+		if (
+			namespace?.module === 'react' &&
+			ts.isIdentifier(node.left) &&
+			node.right.text === 'Touch' &&
+			isValueTypeQuery(node)
+		) {
+			const declaration = this.declarationOf(node.left);
+			if (declaration && ts.isNamespaceImport(declaration)) {
+				const attributes = declaration.parent.parent.attributes;
+				const options = attributes
+					? `, { ${attributes.getText(this.sf).replace(/^(?:with|assert)\b/, 'with:')} }`
+					: '';
+				this.note(
+					RULE.unsupported,
+					'warning',
+					node,
+					'Octane has no Touch value for this type query.',
+				);
+				return (
+					`import(${this.quote}react${this.quote}${options})` +
+					this.source.slice(node.left.end, node.end)
+				);
+			}
 		}
 		if (ts.isTypeQueryNode(node.parent)) {
 			const mapped = mapReactImport(namespace?.module ?? 'react', node.right.text, true);
