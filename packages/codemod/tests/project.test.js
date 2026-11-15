@@ -73,10 +73,40 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					"import React, { type ReactNode } from 'react';",
 				)
 				.replace('extends Base', 'extends React.PureComponent'),
+			'DefaultBaseTags.tsx': boundary
+				.replace(
+					"import { Component as Base, type ReactNode } from 'react';",
+					"import React, { type ReactNode } from 'react';",
+				)
+				.replace('extends Base', 'extends React.Component')
+				.replace(
+					'return this.props.children;',
+					'return <React.Fragment><React.StrictMode><React.Suspense fallback={<i />}><React.Fragment />{this.props.children}</React.Suspense></React.StrictMode></React.Fragment>;',
+				),
+			'DefaultBaseNamespaceEscape.tsx': boundary
+				.replace(
+					"import { Component as Base, type ReactNode } from 'react';",
+					"import React, { type ReactNode } from 'react';",
+				)
+				.replace('extends Base', 'extends React.Component')
+				.replace('class Frame', 'replaceReact(React);\nclass Frame'),
 			'DefaultExport.tsx': boundary.replace(
 				'export { Frame as Boundary };',
 				'export default Frame;',
 			),
+			'Metadata.tsx':
+				boundary +
+				'\nFrame.displayName = "Boundary"; Frame.defaultProps = { fallback: "error", attempts: 1, retry: true };',
+			'MetadataSetter.tsx': boundary
+				.replace('render() {', 'static set displayName(value: string) {}\n\trender() {')
+				.concat('\nFrame.displayName = "Boundary";'),
+			'MetadataEffect.tsx': boundary + '\nFrame.displayName = register();',
+			'MetadataGetter.tsx':
+				boundary + '\nFrame.defaultProps = { get fallback() { return "error"; } };',
+			'TypeUses.tsx':
+				boundary + '\nexport type Instance = Frame;\nexport type Factory = typeof Frame;',
+			'RuntimeBase.tsx': boundary + '\nexport class Other extends Frame {}',
+			'DecoratorMetadata.tsx': boundary + '\nclass Other { @capture field!: Frame; }',
 			'MutatedBase.tsx': boundary
 				.replace(
 					"import { Component as Base, type ReactNode } from 'react';",
@@ -95,27 +125,6 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 			),
 			'Relative.tsx': entry('./Boundary'),
 			'Alias.tsx': entry('@/Boundary'),
-			'FragmentRoot.tsx': entry('./Boundary').replace(
-				'<Frame><b>ready</b></Frame>',
-				'<><b>before</b><Frame /></>',
-			),
-			'FragmentArm.tsx': entry('./Boundary')
-				.replace('App()', 'App(show: boolean)')
-				.replace('<Frame><b>ready</b></Frame>', 'show ? <><Frame /></> : <b />'),
-			'FragmentChild.tsx': entry('./Boundary').replace(
-				'<Frame><b>ready</b></Frame>',
-				'<Other><><Frame /></></Other>',
-			),
-			'FragmentStrict.tsx':
-				"import { StrictMode as Strict } from 'react';\n" +
-				entry('./Boundary').replace(
-					'<Frame><b>ready</b></Frame>',
-					'<><Strict key="stable"><><Frame /></></Strict></>',
-				),
-			'NestedFragment.tsx': entry('./Boundary').replace(
-				'<Frame><b>ready</b></Frame>',
-				'<><><Frame /></></>',
-			),
 			'Ternary.tsx': entry('./Boundary')
 				.replace('App()', 'App(show: boolean)')
 				.replace('return <Frame><b>ready</b></Frame>;', 'return show ? <Frame /> : <b />;'),
@@ -143,6 +152,13 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					'return <Frame><b>ready</b></Frame>;',
 					'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
 				),
+			'RetainedArrowMetadata.tsx':
+				entry('./Boundary')
+					.replace('export function App()', 'export const App = (show: boolean) =>')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+					) + '; export type View = typeof App; App.displayName = "App";',
 			'RetainedDefaultArrow.tsx': entry('./Boundary')
 				.replace('export function App()', 'export default (show: boolean) =>')
 				.replace(
@@ -169,6 +185,18 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				'export function App() { return <Frame><b>ready</b></Frame>; }',
 				'const Build = (show: boolean) => { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; }; export function App() { Build(true); return <b />; }',
 			),
+			'RetainedImperativeDeclaration.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'function Build(show: boolean) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; } export function App() { Build(true); return <b />; }',
+			),
+			'RetainedLocalComponent.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'function Build({ show }: { show: boolean }) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; } export function App() { return <Build show={true} />; }',
+			),
+			'RetainedSplitExport.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'function Build(show: boolean) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; } export { Build as App }; Build(true);',
+			),
 			'RetainedDead.tsx': entry('./Boundary').replace(
 				'return <Frame><b>ready</b></Frame>;',
 				'if (true) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
@@ -193,6 +221,28 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					.replace(
 						'return <Frame><b>ready</b></Frame>;',
 						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+					),
+			'RetainedFragment.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <><b /><Frame /></>;',
+				),
+			'RetainedNamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Group key="stable"><Frame /></Group>;',
+					),
+			'RetainedSuspense.tsx':
+				"import { Suspense } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Suspense fallback={<Frame />}><b /></Suspense>;',
 					),
 			'LogicalArm.tsx': entry('./Boundary')
 				.replace('App()', 'App(show: boolean, enabled: boolean)')
@@ -228,6 +278,102 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					'<Frame><b>ready</b></Frame>',
 					'<Strict><span /><Frame><b>ready</b></Frame></Strict>',
 				),
+			'KeyedStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Strict key="first"><Frame><b>ready</b></Frame></Strict>',
+				),
+			'NativeStrict.tsx':
+				"import { StrictMode as Strict } from 'octane';\n" +
+				entry('./Boundary').replace('<Frame><b>ready</b></Frame>', '<Strict><Frame /></Strict>'),
+			'NamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Group key="stable"><Frame /></Group>',
+				),
+			'QualifiedFragment.tsx':
+				"import React from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<React.Fragment><Frame /></React.Fragment>',
+				),
+			'NativeFragment.tsx':
+				"import * as Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Fragment ref={null}><Frame /></Native.Fragment>',
+				),
+			'ShadowedNamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(Group: typeof Other)')
+					.replace('<Frame><b>ready</b></Frame>', '<Group><Frame /></Group>'),
+			'HostedNamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\nimport { ReactCompat } from 'octane/react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<ReactCompat><Group><Frame /></Group></ReactCompat>',
+				),
+			'TypeOnlyFragmentNamespace.tsx':
+				"import type * as Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Fragment><Frame /></Native.Fragment>',
+				),
+			'DefaultOctaneFragmentNamespace.tsx':
+				"import Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Fragment><Frame /></Native.Fragment>',
+				),
+			'SuspenseChild.tsx':
+				"import { Suspense } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Suspense fallback={<i />}><Frame /></Suspense>',
+				),
+			'NativeSuspenseFallback.tsx':
+				"import * as Native from 'octane';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Native.Suspense fallback={(<><Frame /></>)}><Other /></Native.Suspense>',
+				),
+			'UnevaluatedSuspenseFallback.tsx':
+				"import { Suspense } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Suspense fallback={Boolean(<Frame />)}><Other /></Suspense>',
+				),
+			'HostedSuspense.tsx':
+				"import { Suspense } from 'react';\nimport { ReactCompat } from 'octane/react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<ReactCompat><Suspense fallback={<Frame />}><Frame /></Suspense></ReactCompat>',
+				),
+			'FragmentRoot.tsx': entry('./Boundary').replace(
+				'<Frame><b>ready</b></Frame>',
+				'<><b>before</b><Frame /></>',
+			),
+			'FragmentStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<><Strict key="stable"><><Frame /></></Strict></>',
+				),
+			'NestedRootStrict.tsx':
+				"import React, { StrictMode as Strict } from 'react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Strict><React.StrictMode key="inner"><Frame /></React.StrictMode></Strict>',
+				),
+			'NestedHostedStrict.tsx':
+				"import { StrictMode as Strict } from 'react';\nimport { ReactCompat } from 'octane/react';\n" +
+				entry('./Boundary').replace(
+					'<Frame><b>ready</b></Frame>',
+					'<Strict><ReactCompat><Strict><Frame /></Strict></ReactCompat></Strict>',
+				),
 			'NestedStrict.tsx':
 				"import { StrictMode as Strict } from 'react';\n" +
 				entry('./Boundary').replace(
@@ -238,7 +384,16 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 			'PureView.tsx': entry('./Pure'),
 			'DecoratedView.tsx': entry('./Decorated'),
 			'DefaultBaseView.tsx': entry('./DefaultBase'),
+			'DefaultBaseTagsView.tsx': entry('./DefaultBaseTags'),
+			'DefaultBaseNamespaceEscapeView.tsx': entry('./DefaultBaseNamespaceEscape'),
 			'DefaultExportView.tsx': entry('./DefaultExport').replace('{ Boundary as Frame }', 'Frame'),
+			'MetadataView.tsx': entry('./Metadata'),
+			'MetadataSetterView.tsx': entry('./MetadataSetter'),
+			'MetadataEffectView.tsx': entry('./MetadataEffect'),
+			'MetadataGetterView.tsx': entry('./MetadataGetter'),
+			'TypeUsesView.tsx': entry('./TypeUses'),
+			'RuntimeBaseView.tsx': entry('./RuntimeBase'),
+			'DecoratorMetadataView.tsx': entry('./DecoratorMetadata'),
 			'DefaultEarlyView.tsx': entry('./DefaultEarly').replace('{ Boundary as Frame }', 'Frame'),
 			'MutatedBaseView.tsx': entry('./MutatedBase'),
 			'Shadow.tsx': entry('./Boundary').replace('App()', 'App(Frame: () => unknown)'),
@@ -263,7 +418,15 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				(file) =>
 					file.endsWith('.tsx') &&
 					(includeClass ||
-						!['Boundary.tsx', 'DefaultBase.tsx', 'DefaultExport.tsx', 'Hosted.tsx'].includes(file)),
+						![
+							'Boundary.tsx',
+							'DefaultBase.tsx',
+							'DefaultBaseTags.tsx',
+							'DefaultExport.tsx',
+							'Hosted.tsx',
+							'Metadata.tsx',
+							'TypeUses.tsx',
+						].includes(file)),
 			);
 			const { files } = await runCodemod(
 				inputs.map((file) => path.join(root, file)),
@@ -290,33 +453,60 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					.sort(),
 			).toEqual([
 				['Alias.tsx', includeClass ? 'error' : 'warning'],
+				['DefaultBaseTagsView.tsx', includeClass ? 'error' : 'warning'],
 				['DefaultBaseView.tsx', includeClass ? 'error' : 'warning'],
 				['DefaultExportView.tsx', includeClass ? 'error' : 'warning'],
-				['FragmentArm.tsx', includeClass ? 'error' : 'warning'],
 				['FragmentRoot.tsx', includeClass ? 'error' : 'warning'],
 				['FragmentStrict.tsx', includeClass ? 'error' : 'warning'],
 				['Guard.tsx', includeClass ? 'error' : 'warning'],
+				['KeyedStrict.tsx', includeClass ? 'error' : 'warning'],
 				['LogicalArm.tsx', includeClass ? 'error' : 'warning'],
 				['MapArm.tsx', includeClass ? 'error' : 'warning'],
-				['NestedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['MetadataView.tsx', includeClass ? 'error' : 'warning'],
+				['NamedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['NativeFragment.tsx', includeClass ? 'error' : 'warning'],
+				['NativeStrict.tsx', includeClass ? 'error' : 'warning'],
+				['NativeSuspenseFallback.tsx', includeClass ? 'error' : 'warning'],
+				['NestedRootStrict.tsx', includeClass ? 'error' : 'warning'],
+				['QualifiedFragment.tsx', includeClass ? 'error' : 'warning'],
 				['Relative.tsx', includeClass ? 'error' : 'warning'],
 				['Retained.tsx', includeClass ? 'error' : 'warning'],
 				['RetainedArrow.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedArrowMetadata.tsx', includeClass ? 'error' : 'warning'],
 				['RetainedCompound.tsx', includeClass ? 'error' : 'warning'],
 				['RetainedDefaultArrow.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedLocalComponent.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedNamedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedSplitExport.tsx', includeClass ? 'error' : 'warning'],
 				['RetainedStrict.tsx', includeClass ? 'error' : 'warning'],
 				['Strict.tsx', includeClass ? 'error' : 'warning'],
+				['SuspenseChild.tsx', includeClass ? 'error' : 'warning'],
 				['Ternary.tsx', includeClass ? 'error' : 'warning'],
+				['TypeUsesView.tsx', includeClass ? 'error' : 'warning'],
 			]);
+			for (const { file, notes, code } of callers) {
+				if (!file.startsWith('Retained')) continue;
+				expect(notes.find((note) => note.rule === 'class-component').message).toMatch(
+					/if octane renders/i,
+				);
+				expect(code).toContain('return <i>');
+			}
 		}
 	});
 
 	it('reports imported React classes in ordinary native HTML children', async () => {
-		const view = (jsx) => `import React, { Fragment as Group, StrictMode } from 'react';
+		const view = (
+			jsx,
+			retained = false,
+		) => `import React, { Fragment as Group, StrictMode, Suspense } from 'react';
 import { Frame } from './Frame';
 import { ReactCompat } from 'octane/react';
 function Holder() { return <b>ignored</b>; }
-export function App({ enabled }: { enabled: boolean }) { return ${jsx}; }`;
+export function App({ enabled }: { enabled: boolean }) {
+${retained ? 'if (!enabled) { const text = "off"; return <i>{text}</i>; }' : ''}
+return ${jsx};
+}`;
 		const cases = {
 			'ClassName.tsx': '<article className={enabled ? "on" : "off"}><Frame /></article>',
 			'Composed.tsx':
@@ -343,12 +533,18 @@ export function App({ enabled }: { enabled: boolean }) { return ${jsx}; }`;
 			'FallbackLeft.tsx': '<main>{(<Frame /> as unknown) ?? <i />}</main>',
 			'DeadFallback.tsx': '<main>{true || <Frame />}{false ?? <Frame />}</main>',
 			'DeadFallbackAfterJsx.tsx': '<main>{<i /> || <Frame />}{<i /> ?? <Frame />}</main>',
+			'DeadLogicalChains.tsx':
+				'<main>{enabled || <i /> || <Frame />}{(enabled ?? <i />) ?? <Frame />}{(enabled && false) && <Frame />}</main>',
+			'DeadMixedLogicalChains.tsx':
+				'<main>{(enabled || false) ?? <Frame />}{((enabled ?? <i />) as unknown) ?? <Frame />}</main>',
+			'LiveLogicalChainOutputs.tsx':
+				'<main>{(enabled && <Frame />) || <i />}{(enabled ?? null) ?? <Frame />}{(enabled && true) && <Frame />}</main>',
 			'DeadHole.tsx': '<div>{false && <Frame />}{true ? null : <Frame />}</div>',
 			'UnusedMap.tsx': '<main>{[].map((row) => <Frame key={row} />)}</main>',
 			'SpreadMap.tsx': '<main>{[...[]].map((row) => <Frame key={row} />)}</main>',
 			'OpaqueMap.tsx': '<main>{Array.from({ length: 1 }).map((row) => <Frame key={row} />)}</main>',
 			'OpaqueCall.tsx': '<div>{Boolean(<Frame />)}</div>',
-			'FragmentProps.tsx': '<Group {...{}}><Frame /></Group>',
+			'FragmentProps.tsx': '<main><Group {...{}}><Frame /></Group></main>',
 			'Attribute.tsx': '<article title={String(<Frame />)}>text</article>',
 			'Custom.tsx': '<main><Holder><Frame /></Holder></main>',
 			'Foreign.tsx': '<main><svg><g><Frame /></g></svg></main>',
@@ -363,6 +559,17 @@ export function App({ enabled }: { enabled: boolean }) { return ${jsx}; }`;
 			'tsconfig.json': '{ "compilerOptions": { "jsx": "react-jsx" } }',
 			'Frame.tsx': `import { Component } from 'react';
 export class Frame extends Component { render() { return <b>ready</b>; } }`,
+			'RetainedHtmlChild.tsx': view('<main><Frame /></main>', true),
+			'RootFragmentProps.tsx': view('<Group {...{}}><Frame /></Group>'),
+			'RetainedFragmentProps.tsx': view('<Group {...{}}><Frame /></Group>', true),
+			'NativeFallbackHtml.tsx': view(
+				'<Suspense fallback={<main><Frame /></main>}><b /></Suspense>',
+			),
+			'NativeFallbackMap.tsx': view(
+				'<Suspense fallback={<>{[1].map(n => <Frame key={n} />)}</>}><b /></Suspense>',
+			),
+			'NativeFallbackClass.tsx': view('<Suspense fallback={<Frame />}><b /></Suspense>'),
+			'NestedSuspense.tsx': view('<main><Suspense fallback={<Frame />}><b /></Suspense></main>'),
 			'ShadowedFragment.tsx': `import { Fragment as Group } from 'react';
 import { Frame } from './Frame';
 function Holder() { return <b>ignored</b>; }
@@ -375,7 +582,17 @@ export function App() { const Group = Holder; return <div><Group><Frame /></Grou
 		);
 
 		for (const includeClass of [true, false]) {
-			const inputs = [...Object.keys(cases), 'ShadowedFragment.tsx'];
+			const inputs = [
+				...Object.keys(cases),
+				'ShadowedFragment.tsx',
+				'RetainedHtmlChild.tsx',
+				'RootFragmentProps.tsx',
+				'RetainedFragmentProps.tsx',
+				'NativeFallbackHtml.tsx',
+				'NativeFallbackMap.tsx',
+				'NativeFallbackClass.tsx',
+				'NestedSuspense.tsx',
+			];
 			if (includeClass) inputs.push('Frame.tsx');
 			const { files } = await runCodemod(
 				inputs.map((file) => path.join(root, file)),
@@ -402,13 +619,26 @@ export function App() { const Group = Holder; return <div><Group><Frame /></Grou
 				['FallbackNullish.tsx', includeClass ? 'error' : 'warning'],
 				['FallbackOr.tsx', includeClass ? 'error' : 'warning'],
 				['FallbackOrChain.tsx', includeClass ? 'error' : 'warning'],
+				...Array.from({ length: 3 }, () => [
+					'LiveLogicalChainOutputs.tsx',
+					includeClass ? 'error' : 'warning',
+				]),
 				['LogicalHole.tsx', includeClass ? 'error' : 'warning'],
 				['MapChild.tsx', includeClass ? 'error' : 'warning'],
 				['MapContinues.tsx', includeClass ? 'error' : 'warning'],
 				['MapRoot.tsx', includeClass ? 'error' : 'warning'],
 				['MemberFragment.tsx', includeClass ? 'error' : 'warning'],
 				['NamedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['NativeFallbackClass.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedFragmentProps.tsx', includeClass ? 'error' : 'warning'],
+				['RootFragmentProps.tsx', includeClass ? 'error' : 'warning'],
 			]);
+			if (includeClass)
+				expect(
+					files
+						.find((file) => file.file === 'NativeFallbackClass.tsx')
+						.notes.find((note) => note.rule === 'class-component').message,
+				).toContain('this native template can render');
 		}
 	});
 
@@ -490,6 +720,98 @@ export function List() { return <main>{makeRows().map(row => {
 				expect(notes).toEqual([]);
 			}
 		}
+	});
+
+	it('keeps a typed callback factory for a retained React registry', async () => {
+		const registration = `import { createElement as createIcon } from 'react';
+import { register } from './registry';
+export const tab = register('notes', { getIcon: () => createIcon('b', { className: 'icon' }, 'Notes') });`;
+		const registry = `/** @jsxImportSource react */
+import React, { type ReactNode } from 'react';
+type Entry = { getIcon(): ReactNode };
+const registrations = new Map<string, Entry>();
+export function register(name: string, entry: Entry) {
+	registrations.set(name, entry);
+	return entry;
+}
+export function Registry() {
+	return <nav>{registrations.get('notes')!.getIcon()}</nav>;
+}
+export const getIcon = () => registrations.get('notes')!.getIcon();`;
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'tsconfig.json':
+				'{"compilerOptions":{"target":"es2022","module":"esnext","moduleResolution":"bundler","jsx":"react-jsx","strict":true}}',
+			'register.ts': registration,
+			'registry.tsx': registry,
+			'entry.tsx': `import './register';
+export { Registry, getIcon } from './registry';`,
+			'Reader.tsx':
+				"import { tab } from './register'; export function Reader() { return <aside>{tab.getIcon()}</aside>; }",
+		});
+		const modules = path.join(root, 'node_modules');
+		fs.mkdirSync(path.join(modules, '@types'), { recursive: true });
+		for (const name of ['react', 'react-dom']) {
+			fs.symlinkSync(
+				fs.realpathSync(path.join(import.meta.dirname, '../node_modules', name)),
+				path.join(modules, name),
+				'dir',
+			);
+			fs.symlinkSync(
+				path.join(REPO, 'packages/octane/node_modules/@types', name),
+				path.join(modules, '@types', name),
+				'dir',
+			);
+		}
+		const input = path.join(root, 'register.ts');
+		const options = { root, strong: true, verify: true };
+		const preview = await runCodemod([input], { ...options, write: false });
+		expect(preview.files).toEqual([
+			expect.objectContaining({
+				file: 'register.ts',
+				output: 'register.ts',
+				changed: false,
+				code: registration,
+				notes: [],
+				diagnostics: [],
+			}),
+		]);
+		await runCodemod([input], { ...options, write: true });
+		expect(fs.readFileSync(input, 'utf8')).toBe(registration);
+		const { Registry, getIcon } = await bundleRuntime(root, 'server', "export * from './entry';");
+		expect(isValidElement(getIcon())).toBe(true);
+		expect(renderReact(reactElement(Registry))).toBe('<nav><b class="icon">Notes</b></nav>');
+
+		const batch = await runCodemod([input, path.join(root, 'Reader.tsx')], {
+			...options,
+			write: false,
+		});
+		expect(batch.files.find(({ file }) => file === 'register.ts').code).toContain("from 'octane'");
+		const unchecked = await runCodemod([input], { ...options, write: false, projectTypes: false });
+		expect(unchecked.files[0].code).toContain("from 'octane'");
+
+		const mixed =
+			registration.replaceAll('createIcon', 'createElement') +
+			`
+import * as React from 'react';
+export const other = React.createElement('i', null);`;
+		fs.writeFileSync(input, mixed);
+		const mixedPreview = await runCodemod([input], { ...options, write: false });
+		expect(mixedPreview.files[0].code).toContain("import { createElement } from 'octane';");
+		expect(mixedPreview.files[0].code).not.toContain("from 'react'");
+		fs.writeFileSync(input, registration);
+
+		fs.writeFileSync(
+			path.join(root, 'registry.tsx'),
+			registry.replace(
+				'export function register(name: string, entry: Entry) {',
+				`export function register(name: string, entry: Entry): Entry;
+export function register(name: string, entry: unknown): unknown;
+export function register(name: string, entry: any) {`,
+			),
+		);
+		const overloaded = await runCodemod([input], { ...options, write: false });
+		expect(overloaded.files[0].code).toContain("from 'octane'");
 	});
 
 	it('warns on waiting for a migrated render stream before reading the body', async () => {
@@ -756,7 +1078,10 @@ export async function clipboard() {
 			[
 				'styled inline',
 				server.replace('OctaneCompat', 'OctaneCompatInline'),
-				owner.replace(' />', ' hostClassName="status" hostStyle={{ display: \'inline\' }} />'),
+				owner.replace(
+					' />',
+					' hostClassName="status" hostStyle={{ display: \'inline\' }} hostRole="img" hostAriaLabel="Status" />',
+				),
 			],
 			[
 				'namespace',
@@ -875,7 +1200,7 @@ export async function clipboard() {
 			],
 			[
 				'styled inline element child',
-				`${server.replace('OctaneCompat', 'OctaneCompatInline')}\n${child}\nexport const App = () => <Host hostClassName="status" hostStyle={{ display: 'inline' }}><Leaf /></Host>;`,
+				`${server.replace('OctaneCompat', 'OctaneCompatInline')}\n${child}\nexport const App = () => <Host hostClassName="status" hostStyle={{ display: 'inline' }} hostRole="img" hostAriaLabel="Status"><Leaf /></Host>;`,
 				leaf,
 			],
 			[
@@ -1774,6 +2099,136 @@ export function deferred() { return () => hint('/later.png', { as: 'image' }); }
 		},
 	);
 
+	it('preserves a React factory returned directly by callbacks for an authored island', async () => {
+		const config = {
+			compilerOptions: {
+				strict: true,
+				jsx: 'react-jsx',
+				moduleResolution: 'bundler',
+				noEmit: true,
+				allowImportingTsExtensions: true,
+			},
+			files: ['View.tsrx'],
+		};
+		const source = `import { createElement } from 'react';
+import { ReactCompat as Island } from 'octane/react';
+import { Legacy } from './Legacy.tsx';
+export function View() {
+	return <main><Island component={Legacy} props={{
+		getIcon: () => { return (createElement('b', null, 'ready')); },
+	}} /></main>;
+}`;
+		const legacy = `/** @jsxImportSource react */
+import type { ReactNode } from 'react';
+export function Legacy({ getIcon }: { getIcon(): ReactNode }) { return <nav>{getIcon()}</nav>; }`;
+		const directory = 'Caf\u00e9';
+		const alternate = directory.normalize('NFD');
+		const root = project({
+			'tsconfig.json': JSON.stringify(config),
+			'View.tsx': source,
+			'Alias.tsx': source
+				.replaceAll('createElement', 'make')
+				.replace('{ make }', '{ createElement as make }'),
+			'Mixed.tsx': source + "\nexport const native = () => createElement('i', null, 'elsewhere');",
+			'RuntimeFactory.tsx': source.replace(
+				'export function View()',
+				"import { jsx } from 'react/jsx-runtime';\n" +
+					"import * as React from 'react';\n" +
+					"const OctaneCreateElement = 'ready';\n" +
+					"export const native = () => jsx('i', { children: OctaneCreateElement });\n" +
+					"export const nativeNamespace = () => React.createElement('em', null, OctaneCreateElement);\n" +
+					'export function View()',
+			),
+			'Spread.tsx': source.replace('props={{', 'props={{ ...extra,'),
+			'Typed.tsx': source
+				.replace('{ createElement }', '{ createElement, type ReactNode }')
+				.replace('getIcon: () =>', 'getIcon: (): ReactNode =>'),
+			'Legacy.tsx': legacy,
+			[`${directory}/Legacy.tsx`]: legacy,
+			'LinkedLeaf.tsx': source.replace('./Legacy.tsx', './LegacyLink.tsx'),
+			'LinkedParent.tsx': source.replace('./Legacy.tsx', './owner-link/Legacy.tsx'),
+		});
+		fs.symlinkSync('Legacy.tsx', path.join(root, 'LegacyLink.tsx'));
+		fs.symlinkSync(directory, path.join(root, 'owner-link'), 'dir');
+		const spelling = fs.existsSync(path.join(root, alternate)) ? alternate : directory;
+		fs.writeFileSync(
+			path.join(root, 'UnicodeOwner.tsx'),
+			source.replace('./Legacy.tsx', `./${spelling}/Legacy.tsx`),
+		);
+		const modules = path.join(root, 'node_modules');
+		fs.mkdirSync(path.join(modules, '@types'), { recursive: true });
+		for (const name of ['octane', 'react', 'react-dom'])
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules', name),
+				path.join(modules, name),
+				'dir',
+			);
+		fs.symlinkSync(
+			path.join(REPO, 'packages/octane/node_modules/@types/react'),
+			path.join(modules, '@types/react'),
+			'dir',
+		);
+		fs.symlinkSync(path.join(REPO, 'node_modules/@tsrx'), path.join(modules, '@tsrx'), 'dir');
+		const kept = ['View', 'Alias', 'UnicodeOwner', 'LinkedParent'];
+		const rewritten = ['Mixed', 'Spread', 'Typed', 'LinkedLeaf'];
+		const options = { root, write: false, strong: true, verify: true };
+		const result = await runCodemod(
+			[...kept, ...rewritten, 'RuntimeFactory'].map((name) => path.join(root, name + '.tsx')),
+			options,
+		);
+		for (const name of kept) {
+			const file = result.files.find((item) => item.file === name + '.tsx');
+			expect(file.strong).toBe(true);
+			expect(file.code).toMatch(/import \{ createElement(?: as make)? \} from 'react'/);
+		}
+		for (const name of rewritten) {
+			const file = result.files.find((item) => item.file === name + '.tsx');
+			expect(file.code).toMatch(/import \{ createElement(?:, type ReactNode)? \} from 'octane'/);
+		}
+		const runtimeFactory = result.files.find((item) => item.file === 'RuntimeFactory.tsx');
+		expect(runtimeFactory.code).toContain("import { createElement } from 'react'");
+		expect(runtimeFactory.code).toContain(
+			"import { createElement as OctaneCreateElement_ } from 'octane'",
+		);
+		expect(runtimeFactory.code).toContain('return OctaneCreateElement_(');
+		const view = result.files.find((item) => item.file === 'View.tsx');
+		const unicode = result.files.find((item) => item.file === 'UnicodeOwner.tsx');
+		fs.writeFileSync(path.join(root, view.output), view.code);
+		fs.writeFileSync(path.join(root, unicode.output), unicode.code);
+		fs.writeFileSync(path.join(root, 'RuntimeFactory.tsrx'), runtimeFactory.code);
+		const checked = spawnSync(
+			process.execPath,
+			[path.join(REPO, 'scripts/octane-tsc/bin.mjs'), '-p', 'tsconfig.json'],
+			{ cwd: root, encoding: 'utf8' },
+		);
+		expect(checked.status, checked.stdout + checked.stderr).toBe(0);
+		const { render, renderNative, renderUnicode } = await bundleRuntime(
+			root,
+			'server',
+			`
+import { View } from './View.tsrx';
+import { View as UnicodeView } from './UnicodeOwner.tsrx';
+import { View as RuntimeView, native, nativeNamespace } from './RuntimeFactory.tsrx';
+import { renderToReadableStream, renderToStaticMarkup } from 'octane/server';
+export const render = async (runtime = false) =>
+	new Response(await renderToReadableStream(runtime ? RuntimeView : View)).text();
+export const renderUnicode = async () => new Response(await renderToReadableStream(UnicodeView)).text();
+export const renderNative = () => [native(), nativeNamespace()].map((node) => renderToStaticMarkup(node).html);
+`,
+		);
+		expect(await render()).toContain('<nav><b>ready</b></nav>');
+		expect(await render(true)).toContain('<nav><b>ready</b></nav>');
+		expect(await renderUnicode()).toContain('<nav><b>ready</b></nav>');
+		expect(renderNative()).toEqual(['<i>ready</i>', '<em>ready</em>']);
+		const selected = await runCodemod(
+			[path.join(root, 'LinkedParent.tsx'), path.join(root, directory, 'Legacy.tsx')],
+			options,
+		);
+		expect(selected.files.find((item) => item.file === 'LinkedParent.tsx')?.code).toContain(
+			"import { createElement } from 'octane'",
+		);
+	});
+
 	it('reports a native setup call into a React hook left in an unselected local module', () => {
 		const helper = `import { useState as state } from 'react';
 export function useLabel() { const [label] = state('ready'); return label; }`;
@@ -2502,7 +2957,13 @@ export function View() {
 			const context = "const Theme = createContext('unset');";
 			const helper = 'function readTheme() { const label = readContext(Theme); return label; }';
 			const hook = 'export function useLabel() { return readTheme(); }';
-			const owner = [imports, context, helper, hook].join('\n');
+			const owner = [
+				imports,
+				context,
+				helper,
+				hook,
+				'export function useOtherLabel() { return readTheme(); }',
+			].join('\n');
 			const namespaceOwner = [
 				"import * as React from 'react';",
 				"import { createContext } from 'react';",
@@ -2511,6 +2972,8 @@ export function View() {
 				hook,
 			].join('\n');
 			const view = (file, call = 'useLabel()') => `import { useLabel } from './${file}';
+export function View() { const label = ${call}; return <b>{label}</b>; }`;
+			const consumer = (call, file = 'owner') => `import * as producer from './${file}';
 export function View() { const label = ${call}; return <b>{label}</b>; }`;
 			const localNamespace = namespaceOwner.replace(
 				"import * as React from 'react';",
@@ -2533,6 +2996,25 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 				}),
 				'owner.ts': owner,
 				'View.tsx': view('owner'),
+				'ConsumerBracket.tsx': consumer("producer['useLabel']()", 'owner.js'),
+				'ConsumerDot.tsx': consumer('producer.useLabel()'),
+				'ConsumerRepeated.tsx': consumer('producer.useLabel()') + '\nexport { producer };',
+				'ConsumerMultiple.tsx': `import * as producer from './owner';
+export function View() {
+	const label = producer.useLabel();
+	const other = producer['useOtherLabel']();
+	const again = producer['useLabel']();
+	return <b>{label}{other}{again}</b>;
+}`,
+				'ConsumerDynamic.tsx': consumer("producer['use' + 'Label']()"),
+				'ConsumerOptionalMember.tsx': consumer('producer?.useLabel()'),
+				'ConsumerOptionalCall.tsx': consumer('producer.useLabel?.()'),
+				'ConsumerShadow.tsx': consumer('producer.useLabel()').replace(
+					'function View()',
+					'function View(producer: { useLabel(): string })',
+				),
+				'ConsumerPure.tsx': consumer('producer.useLabel()', 'pure'),
+				'pure.ts': "export function useLabel() { return 'local'; }",
 				'JsSpecifier.tsx': view('owner.js'),
 				'CompetingJsSpecifier.tsx': view('competing.js'),
 				'competing.ts': owner,
@@ -2625,6 +3107,21 @@ export function View() { const label = ${call}; return <b>{label}</b>; }`;
 					.map((note) => [file.file, note.line, note.severity, note.message]),
 			);
 			expect(findings).toEqual([
+				[
+					'ConsumerBracket.tsx',
+					2,
+					'warning',
+					expect.stringContaining('the import resolves to its TypeScript source'),
+				],
+				['ConsumerDot.tsx', 2, 'warning', expect.stringContaining('after its module initializes')],
+				['ConsumerMultiple.tsx', 3, 'warning', expect.stringContaining('export useLabel')],
+				['ConsumerMultiple.tsx', 4, 'warning', expect.stringContaining('export useOtherLabel')],
+				[
+					'ConsumerRepeated.tsx',
+					2,
+					'warning',
+					expect.stringContaining('after its module initializes'),
+				],
 				['Cycle.tsx', 3, 'warning', expect.stringContaining('after its module initializes')],
 				[
 					'Direct.tsx',
@@ -4626,6 +5123,72 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		]);
 	});
 
+	it('renames relative HTML module paths without rewriting their URL suffix or other text', async () => {
+		const src = "./Page.tsx?mode=warm&amp;label=it's#section";
+		const script = `<script data-src="${src}" TYPE="module" SRC = "${src}"></script>`;
+		const html = [
+			`<!-- ${script} -->`,
+			`<script>const example = ${JSON.stringify(script.replace('</script>', ''))};</script>`,
+			`<script type="module" vite-ignore src="${src}"></script>`,
+			`<svg><script xlink:type="module" src="${src}"></script></svg>`,
+			`<script type="module" src="//cdn.example/Page.tsx?mode=warm"></script>`,
+			script,
+		].join('\n');
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'index.html': html,
+			'src/nested.html': '<script type="module" src=\'../Page.tsx#section\'></script>',
+			'public/redirect.html':
+				'<base href="./elsewhere/"><script type="module" src="../Page.tsx?mode=warm"></script>',
+			'Page.tsx': 'export const Page = () => <h1 />;',
+		});
+
+		const result = await runCodemod([path.join(root, 'Page.tsx')], { verify: false });
+
+		const read = (/** @type {string} */ name) => fs.readFileSync(path.join(root, name), 'utf8');
+		expect(result.html.sort()).toEqual(['index.html', 'src/nested.html']);
+		expect(read('index.html')).toBe(
+			html.slice(0, -script.length) +
+				script.replace(`SRC = "${src}`, 'SRC = "' + src.replace('.tsx', '.tsrx')),
+		);
+		expect(read('src/nested.html')).toBe(
+			'<script type="module" src=\'../Page.tsrx#section\'></script>',
+		);
+		expect(read('public/redirect.html')).toBe(
+			'<base href="./elsewhere/"><script type="module" src="../Page.tsx?mode=warm"></script>',
+		);
+		expect(fs.existsSync(path.join(root, 'Page.tsrx'))).toBe(true);
+		expect(fs.existsSync(path.join(root, 'Page.tsx'))).toBe(false);
+	});
+
+	it('follows nested Vite entry scripts without treating inactive bases as document bases', async () => {
+		const html = [
+			'<html><head><noscript><base href="/elsewhere/"></noscript></head><body>',
+			'<template><template><base href="/elsewhere/"><script type="module" src="./Page.tsx"></script></template></template>',
+			'<noscript><base href="/elsewhere/"><script type="module" src="./Page.tsx#other"></script></noscript>',
+			'<svg><script type="module" src="./Page.tsx"></script></svg>',
+			'<script type="module" src="./Page.tsx?mode=warm"></script>',
+			'</body></html>',
+		].join('\n');
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'index.html': html,
+			'public/redirect.html':
+				'<base href="/elsewhere/"><script type="module" src="../Page.tsx"></script>',
+			'Page.tsx': 'export const Page = () => <h1 />;',
+		});
+
+		const result = await runCodemod([path.join(root, 'Page.tsx')], { verify: false });
+
+		expect(result.html.sort()).toEqual(['index.html', 'public/redirect.html']);
+		expect(fs.readFileSync(path.join(root, 'index.html'), 'utf8')).toBe(
+			html.replaceAll('./Page.tsx', './Page.tsrx'),
+		);
+		expect(fs.readFileSync(path.join(root, 'public/redirect.html'), 'utf8')).toContain(
+			'src="../Page.tsrx"',
+		);
+	});
+
 	it('renames template modules and rewrites every import of them', async () => {
 		const root = project({
 			'package.json':
@@ -5239,6 +5802,76 @@ export function View() { return <b title={provide()}><Badge.Consumer>{(value) =>
 			expect(view).toContain('<Badge.Consumer>');
 		},
 	);
+
+	it('blocks an eager capture of a locally replaced React context provider before writing', async () => {
+		const context =
+			"import { createContext } from 'react'; const Theme = createContext('default');";
+		const replacement =
+			'function Replacement({ value }: { value: string }) { return "replacement:" + value; }';
+		const assignment = 'Object.assign(Theme, { Provider: Replacement });';
+		const capture = 'export const Provider = Theme.Provider;';
+		const source = [context, replacement, assignment, capture].join('\n');
+		const view = `import { Provider } from './provider';
+export function View() { return <b><Provider value="supplied"><i>supplied</i></Provider></b>; }`;
+		const sources = {
+			'provider.ts': source,
+			'View.tsx': view,
+			'Inline.ts': source.replace('Provider: Replacement', 'Provider: () => "inline"'),
+			'Late.ts': [context, replacement, capture, assignment].join('\n'),
+			'Shadowed.ts': source.replace(assignment, 'const Object = { assign() {} }; ' + assignment),
+			'Self.ts': source.replace('Provider: Replacement', 'Provider: Theme'),
+			'Sibling.ts': source.replace('Provider: Replacement', 'Other: Replacement'),
+			'Optional.ts': source.replace('Object.assign(', 'Object.assign?.('),
+			'Patched.ts': source.replace(assignment, 'Object.assign = () => Theme; ' + assignment),
+			'Eval.ts': source.replace(assignment, "eval('Object.assign = () => Theme'); " + assignment),
+			'PatchedInFunction.ts':
+				source.replace(assignment, 'patch(); ' + assignment) +
+				'\nfunction patch() { Object.assign = () => Theme; }',
+			'ContextPatchedInFunction.ts':
+				source.replace(assignment, 'patch(); ' + assignment) +
+				"\nfunction patch() { Reflect.defineProperty(Theme, 'Provider', { get: () => Theme, set() {} }); }",
+			'Restored.ts': source.replace(
+				capture,
+				'Object.assign(Theme, { Provider: Theme }); ' + capture,
+			),
+			'RestoredInDeclaration.ts': source.replace(
+				capture,
+				'export const reset = (Theme.Provider = Theme), Provider = Theme.Provider;',
+			),
+			'Reassigned.ts': source.replace(assignment, 'Replacement = Theme as never; ' + assignment),
+		};
+		const root = project({ 'package.json': '{"type":"module"}', ...sources });
+		const options = { root, strong: true, verify: true };
+		const note = expect.objectContaining({
+			rule: 'context-provider-getter',
+			severity: 'error',
+			line: 4,
+			message: expect.stringContaining('authored Provider replacement'),
+		});
+		const preview = await runCodemod(
+			Object.keys(sources).map((file) => path.join(root, file)),
+			{ ...options, write: false },
+		);
+		const diagnosed = preview.files.filter((row) =>
+			row.notes.some(
+				(note) =>
+					note.rule === 'context-provider-getter' &&
+					note.message.includes('authored Provider replacement'),
+			),
+		);
+		expect(diagnosed.map((row) => row.file).sort()).toEqual(['Inline.ts', 'provider.ts']);
+		for (const row of diagnosed) expect(row.notes).toContainEqual(note);
+		const write = await runCodemod([path.join(root, 'provider.ts'), path.join(root, 'View.tsx')], {
+			...options,
+			write: true,
+		});
+		expect(write.files).toEqual([
+			expect.objectContaining({ file: 'provider.ts', changed: false, notes: [note] }),
+		]);
+		expect(fs.readFileSync(path.join(root, 'provider.ts'), 'utf8')).toBe(source);
+		expect(fs.readFileSync(path.join(root, 'View.tsx'), 'utf8')).toBe(view);
+		expect(fs.existsSync(path.join(root, 'View.tsrx'))).toBe(false);
+	});
 
 	it('uses an unselected TSX object only when the relative import identifies that source', async () => {
 		const root = project({
@@ -5926,9 +6559,25 @@ export function Animation() { return useLottie({ animationData: {}, autoplay: fa
 		});
 		expect(result.files[0]?.code).toContain("from 'lottie-react'");
 		expect(result.files[0]?.notes).toContainEqual(
-			expect.objectContaining({ rule: 'bindings', severity: 'error' }),
+			expect.objectContaining({
+				rule: 'bindings',
+				severity: 'error',
+				message: expect.stringContaining('Keep this hook call under a React renderer'),
+			}),
 		);
+		expect(result.files[0]?.code).toContain('Retained React import of `lottie-react`');
 		expect(result.dependencies).toEqual([]);
+		expect(result.missing).toEqual([{ name, modules: 1, islands: 0, blocked: 1 }]);
+
+		const preview = spawnSync(
+			process.execPath,
+			[path.join(REPO, 'packages/codemod/dist/bin.js'), 'Animation.tsx', '--strong', '--print'],
+			{ cwd: root, encoding: 'utf8' },
+		);
+		expect(preview.status).toBe(1);
+		expect(preview.stdout).toContain('Retained React imports');
+		expect(preview.stdout).toContain('1 use(s) need review');
+		expect(preview.stdout).not.toContain('no Octane port');
 	});
 
 	it('maps @effect/atom-react to its binding', async () => {
@@ -5953,7 +6602,7 @@ export function Animation() { return useLottie({ animationData: {}, autoplay: fa
 		);
 		for (const file of [provider, query]) {
 			expect(file?.code).not.toContain("'@effect/atom-react'");
-			expect(file?.code).not.toContain('No Octane port');
+			expect(file?.code).not.toContain('Retained React import');
 			expect(file?.diagnostics).toEqual([]);
 		}
 		expect(result.packages).toEqual([{ from: '@effect/atom-react', to: '@octanejs/effect-atom' }]);
@@ -5983,7 +6632,7 @@ export function Animation() { return useLottie({ animationData: {}, autoplay: fa
 		for (const file of [diffTree, browser]) {
 			expect(file?.code).toContain("from '@pierre/trees';");
 			expect(file?.code).not.toContain("'@pierre/trees/react'");
-			expect(file?.code).not.toContain('No Octane port');
+			expect(file?.code).not.toContain('Retained React import');
 			expect(file?.notes.filter((note) => note.rule === 'bindings')).toEqual([]);
 		}
 		expect(result.packages).toEqual([
@@ -6668,7 +7317,7 @@ export const views = [Motion, motion.div];`,
 			{ name: 'morphicons/react', modules: 1, islands: 0, blocked: 1 },
 		]);
 		expect(file.notes.map((note) => note.message)).toEqual([
-			'`<BaseMorphIcon>` takes children or props that Octane renders, which cannot cross into a React island. `morphicons/react` has no Octane port.',
+			'`<BaseMorphIcon>` takes children or props that Octane renders, which cannot cross into a React island. `morphicons/react` stays on React.',
 		]);
 		// It throws that error where it would render, not as its module loads:
 		// T3's Clerk shell imports `<ClerkProvider>` but renders it only with a key.
