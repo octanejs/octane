@@ -805,8 +805,7 @@ export function octaneRootComponents(file: string, source: string) {
 			const rootScope = (node: ts.Node) => ts.isFunctionLike(node) || ts.isClassLike(node);
 			const owner = ts.findAncestor(handle, rootScope);
 			const refs = (uses ??= localUses(sf, checker))(handle);
-			if (rootHandleEscapes(refs) || refs.some((ref) => ts.findAncestor(ref, rootScope) !== owner))
-				return;
+			if (rootHandleEscapes(refs, (ref) => ts.findAncestor(ref, rootScope) === owner)) return;
 		}
 		return call.arguments[0];
 	}

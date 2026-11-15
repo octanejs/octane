@@ -753,7 +753,12 @@ it('warns at existing standalone client roots when the migrated hook reads conte
 			export function unmountCaptured() { captured.unmount(); }
 			const reexported = createRoot(document.createElement('div'));
 			reexported.render(Pane);
-			export { reexported as publicRoot };`,
+			export { reexported as publicRoot };
+			const typed = createRoot(document.createElement('div'));
+			type ReadHandle = () => typeof typed;
+			interface HandleByKey { [key: string]: typeof typed }
+			export type { ReadHandle, HandleByKey };
+			typed.render(Pane);`,
 		'app/src/unverified/client.ts': `import { hydrateRoot } from 'octane';
 			import { Pane } from '../pane.tsx';
 			export const hydrate = (host: HTMLElement) => hydrateRoot(host, Pane);`,
@@ -773,9 +778,11 @@ it('warns at existing standalone client roots when the migrated hook reads conte
 	const client = files.find((file) => file.file === 'src/client.ts');
 	expect(files.find((file) => file.file === 'src/unverified/client.ts')?.notes).toEqual([]);
 	const bootstrap = files.find((file) => file.file === 'src/bootstrap.ts');
-	expect(bootstrap.notes).toEqual([
-		expect.objectContaining({ rule: 'store-hook', severity: 'warning', line: 4 }),
-	]);
+	expect(bootstrap.notes).toEqual(
+		[4, 22].map((line) =>
+			expect.objectContaining({ rule: 'store-hook', severity: 'warning', line }),
+		),
+	);
 	expect(client.notes).toEqual(
 		[7, 8, 11, 30].map((line) => ({
 			rule: 'store-hook',

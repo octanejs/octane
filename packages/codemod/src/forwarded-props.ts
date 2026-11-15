@@ -118,7 +118,10 @@ export function renderUses(refs: ts.Identifier[]) {
 }
 
 /** A local root handle stays owned while callers only invoke its two root methods. */
-export function rootHandleEscapes(refs: ts.Identifier[]) {
+export function rootHandleEscapes(
+	refs: ts.Identifier[],
+	inOwner?: (ref: ts.Identifier) => boolean,
+) {
 	return renderUses(refs).some((ref) => {
 		const member = ref.parent;
 		return (
@@ -126,7 +129,8 @@ export function rootHandleEscapes(refs: ts.Identifier[]) {
 			member.expression !== ref ||
 			(member.name.text !== 'render' && member.name.text !== 'unmount') ||
 			!ts.isCallExpression(member.parent) ||
-			member.parent.expression !== member
+			member.parent.expression !== member ||
+			inOwner?.(ref) === false
 		);
 	});
 }
