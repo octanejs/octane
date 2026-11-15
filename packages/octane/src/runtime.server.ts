@@ -2396,6 +2396,12 @@ export function ssrTextSlot(text: string): string {
 	return text === '' ? EMPTY_COMMENT : text;
 }
 
+/** @internal A compiled body retains a separate slot for each root text literal. */
+export function ssrRootTextMarker(separate: boolean): string {
+	if (!MARKERS || !ssrContentParsesComments()) return '';
+	return separate ? TEXT_SEPARATOR : EMPTY_COMMENT;
+}
+
 /**
  * A dynamic text hole in FIRST-CHILD position of a newline-eating element
  * (`<pre>`/`<textarea>`/`<listing>`): the HTML parser discards a newline that
