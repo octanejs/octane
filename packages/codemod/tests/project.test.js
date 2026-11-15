@@ -1825,6 +1825,48 @@ export async function clipboard() {
 			['explicit React JSX', '/** @jsxImportSource react */ ' + server, owner],
 			['escaped import', server.replace('/server', '/\\u0073erver'), owner],
 			['underscore alias', server.replace('as Host', 'as _Host'), owner.replace('<Host', '<_Host')],
+			['asserted direct', server, owner.replace(' />;', ' /> as any;')],
+			['satisfies direct', server, owner.replace(' />;', ' /> satisfies any;')],
+			[
+				'setup before a direct host',
+				server,
+				'export function App() { const props = {}; return <Host component={Leaf} props={props} />; }',
+			],
+			[
+				'fallback before a host in an intrinsic',
+				server,
+				'export function App({ show }: { show: boolean }) { if (!show) return <i />; return <div><Host component={Leaf} /></div>; }',
+			],
+			[
+				'a host in an intrinsic fragment',
+				server,
+				'export const App = () => <div><><i /><Host component={Leaf} /></></div>;',
+			],
+			[
+				'a host in a root fragment',
+				server,
+				'export const App = () => <><i /><Host component={Leaf} /></>;',
+			],
+			[
+				'an asserted host after setup',
+				server,
+				'export function App() { const props = {}; return <Host component={Leaf} props={props} /> as any; }',
+			],
+			[
+				'a root fragment with a satisfies assertion after setup',
+				server,
+				'export function App() { const props = {}; return <><i /><Host component={Leaf} props={props} /></> satisfies any; }',
+			],
+			[
+				'a host returned by a default export',
+				server,
+				'const App = () => <div><Host component={Leaf} /></div>; export default App;',
+			],
+			[
+				'a host returned by a named JSX factory',
+				server,
+				'export function factory() { return <div><Host component={Leaf} /></div>; }',
+			],
 		])('keeps a selected authored %s host in React', async (_, hostImport, component) => {
 			const { root, files, selected } = app(`${hostImport}\n${child}\n${component}`, native);
 			selected.push(path.join(root, 'App.server.tsx'));
@@ -1870,6 +1912,62 @@ export async function clipboard() {
 				'local alias using the server specifier',
 				`${server}\n${child}\n${owner}`,
 				{ 'octane/react/server': ['./Other.ts'] },
+				true,
+			],
+			[
+				'shadowed host inside returned JSX',
+				`${server}
+${child}
+export function App() { const Host = () => <i />; return <div><Host /></div>; }`,
+				{},
+				true,
+			],
+			[
+				'host captured by a callback',
+				`${server}
+${child}
+declare function register(render: () => unknown): void; export function App() { register(() => <Host component={Leaf} />); return <i />; }`,
+				{},
+				true,
+			],
+			[
+				'host in a dead leading branch',
+				`${server}
+${child}
+export function App() { if (false) { return <div><Host component={Leaf} /></div>; } return <i />; }`,
+				{},
+				true,
+			],
+			[
+				'host after an unconditional fallback',
+				`${server}
+${child}
+export function App() { if (true) return <i />; return <div><Host component={Leaf} /></div>; }`,
+				{},
+				true,
+			],
+			[
+				'host after a constant named fallback',
+				`${server}
+${child}
+export function App() { const loaded = false; if (!loaded) return <i />; return <div><Host component={Leaf} /></div>; }`,
+				{},
+				true,
+			],
+			[
+				'host in a dead ternary branch',
+				`${server}
+${child}
+export function App() { return <div>{false ? <Host component={Leaf} /> : <i />}</div>; }`,
+				{},
+				true,
+			],
+			[
+				'host handed to an unknown React slot',
+				`${server}
+${child}
+declare function Owner(props: { render: unknown }): any; export function App() { return <Owner render={<Host component={Leaf} />} />; }`,
+				{},
 				true,
 			],
 			[
