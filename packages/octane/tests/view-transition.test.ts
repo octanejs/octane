@@ -29,6 +29,7 @@ import {
 	RenderErrorApp,
 	NestedSiblingsApp,
 	StagedTemplateApp,
+	BoundaryRowsApp,
 } from './_fixtures/view-transition-features.tsrx';
 
 function evalServer(source: string, filename: string): Record<string, any> {
@@ -323,6 +324,39 @@ describe('ViewTransition features', () => {
 		expect(typeof inst.old.animate).toBe('function');
 
 		(document as never as Record<string, any>)['startViewTransition'] = origSVT;
+	});
+
+	it('animates exactly the list rows whose boundary content changed', async () => {
+		const updated: string[] = [];
+		const onUpdate = (instance: { name: string }) => updated.push(instance.name);
+		const rowsOf = (labels: string[]) => labels.map((label, i) => ({ id: 'r' + i, label }));
+		const first = rowsOf(['a', 'b', 'c', 'd']);
+		await act(() => {
+			startTransition(() => root.render(BoundaryRowsApp, { rows: first, tone: 'x', onUpdate }));
+		});
+		const hosts = [...container.querySelectorAll('li')];
+
+		// Same row objects in a fresh array, one replaced: only that row's boundary updates.
+		const second = [first[0], { id: 'r1', label: 'b, now much longer' }, first[2], first[3]];
+		await act(() => {
+			startTransition(() => root.render(BoundaryRowsApp, { rows: second, tone: 'x', onUpdate }));
+		});
+		expect(container.querySelector('#r1')!.textContent).toBe('b, now much longer');
+		expect(updated).toHaveLength(1);
+		expect([...container.querySelectorAll('li')]).toEqual(hosts);
+
+		// A captured parent value changes every row: every row re-renders and none is stale.
+		updated.length = 0;
+		await act(() => {
+			startTransition(() => root.render(BoundaryRowsApp, { rows: second, tone: 'y', onUpdate }));
+		});
+		expect([...container.querySelectorAll('li')].map((li) => li.dataset.tone)).toEqual([
+			'y',
+			'y',
+			'y',
+			'y',
+		]);
+		expect([...container.querySelectorAll('li')]).toEqual(hosts);
 	});
 
 	async function captureUnchangedSibling(outerUpdate: string) {

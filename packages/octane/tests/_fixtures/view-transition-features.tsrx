@@ -35,6 +35,21 @@ export function NestedSiblingsApp(props) @{
 	</ViewTransition>
 }
 
+// A keyed list whose rows each own a boundary: the ordinary animated-list shape.
+export function BoundaryRowsApp(props) @{
+	const tone = props.tone;
+	const onUpdate = props.onUpdate;
+	<ul>
+		@for (const row of props.rows; key row.id) {
+			<ViewTransition update="row" {onUpdate}>
+				<li id={row.id} data-tone={tone}>
+					{row.label as string}
+				</li>
+			</ViewTransition>
+		}
+	</ul>
+}
+
 // Named pair for the share viewport-decay test.
 export function NamedShareApp(props) @{
 	<>

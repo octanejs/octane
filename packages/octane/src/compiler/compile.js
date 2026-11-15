@@ -2258,13 +2258,16 @@ function inheritSoleCompRoot(bodyNodes, ctx) {
 // Collect the LOCAL names bound to the octane boundary builtins (see
 // inheritSoleCompRoot) from a module's import declarations. Aliased imports
 // (`import { Suspense as S }`) are matched by their local binding.
-function collectOctaneBoundaryNames(astBody, onlySuspense = false) {
+const SUSPENSE_IMPORTS = new Set(['Suspense']);
+const VIEW_TRANSITION_IMPORTS = new Set(['ViewTransition', 'unstable_ViewTransition']);
+
+function collectOctaneBoundaryNames(astBody, only = null) {
 	const names = new Set();
 	for (const node of astBody) {
 		if (node.type !== 'ImportDeclaration' || node.source.value !== 'octane') continue;
 		for (const sp of node.specifiers || []) {
 			const imported = sp.imported?.name;
-			if (onlySuspense && imported !== 'Suspense') continue;
+			if (only !== null && !only.has(imported)) continue;
 			if (
 				(imported === 'Suspense' ||
 					imported === 'ErrorBoundary' ||
@@ -5537,13 +5540,14 @@ function containsComponentCallOrControlFlow(stmts) {
 }
 
 /**
- * A host-only conditional can share its containing row's immutable
- * item/dependency proof, including through a narrowly proven nested keyed list.
+ * A host-only conditional or ViewTransition wrapper can share its containing
+ * row's immutable item/dependency proof, including through a narrowly proven
+ * nested keyed list.
  * Entering either construct still needs the row's active scope. Lists without a
  * conditional, components, opaque list expressions, and every other
  * control-flow boundary remain on their existing path.
  */
-function hasOnlyHostConditionalItemBodies(stmts) {
+function hasOnlyHostConditionalItemBodies(stmts, viewTransitionNames) {
 	let hasConditional = false;
 	let disallowed = false;
 	const seen = new WeakSet();
@@ -5572,10 +5576,15 @@ function hasOnlyHostConditionalItemBodies(stmts) {
 			return;
 		}
 		if ((type === 'Element' || type === 'JSXElement') && isComponentTag(node)) {
-			disallowed = true;
-			return;
-		}
-		if (type === 'IfStatement' || type === 'JSXIfExpression') {
+			// A ViewTransition boundary reads no context and renders its children as
+			// given, so around host content it is as transparent as a conditional and
+			// likewise needs the row's own scope when the row does render.
+			if (!viewTransitionNames.has((node.openingElement?.name || node.id)?.name)) {
+				disallowed = true;
+				return;
+			}
+			hasConditional = true;
+		} else if (type === 'IfStatement' || type === 'JSXIfExpression') {
 			hasConditional = true;
 		} else if (type === 'JSXForExpression') {
 			const declaration = node.left;
@@ -8713,7 +8722,7 @@ function collectAutoMemoLocalHazards(stmts, importedNames) {
 	return hazards;
 }
 
-function containsAutoMemoUnsafeStructure(stmts, ctx = null) {
+function containsAutoMemoUnsafeStructure(stmts, ctx = null, viewTransitionNames = null) {
 	let found = false;
 	const seen = new WeakSet();
 	// Spread bags on HOST elements, marked admissible by the owning element's
@@ -8857,11 +8866,12 @@ function containsAutoMemoUnsafeStructure(stmts, ctx = null) {
 			}
 			const name = tag?.name;
 			if (
-				name === 'Suspense' ||
-				name === 'ErrorBoundary' ||
-				name === 'ViewTransition' ||
-				name === 'Activity' ||
-				name === 'unstable_Activity'
+				!viewTransitionNames?.has(name) &&
+				(name === 'Suspense' ||
+					name === 'ErrorBoundary' ||
+					name === 'ViewTransition' ||
+					name === 'Activity' ||
+					name === 'unstable_Activity')
 			) {
 				found = true;
 				return;
@@ -13223,7 +13233,8 @@ function compileInternal(
 	ctx._moduleBoundNames = collectModuleBoundNames(ast);
 	// M3 inherit-range exclusion set (see inheritSoleCompRoot).
 	ctx._octaneBoundaryNames = collectOctaneBoundaryNames(ast.body);
-	ctx._octaneSuspenseNames = collectOctaneBoundaryNames(ast.body, true);
+	ctx._octaneSuspenseNames = collectOctaneBoundaryNames(ast.body, SUSPENSE_IMPORTS);
+	ctx._octaneViewTransitionNames = collectOctaneBoundaryNames(ast.body, VIEW_TRANSITION_IMPORTS);
 	const productionEffects = !ctx.hmr && !ctx.dev && !ctx.profile;
 	const exportedComponents = ast.body.filter(
 		(statement) =>
@@ -14663,7 +14674,8 @@ function compileServer(
 	// M3 inherit-range exclusion set — must match the client compile's
 	// (see inheritSoleCompRoot; both modes read the same import declarations).
 	ctx._octaneBoundaryNames = collectOctaneBoundaryNames(ast.body);
-	ctx._octaneSuspenseNames = collectOctaneBoundaryNames(ast.body, true);
+	ctx._octaneSuspenseNames = collectOctaneBoundaryNames(ast.body, SUSPENSE_IMPORTS);
+	ctx._octaneViewTransitionNames = collectOctaneBoundaryNames(ast.body, VIEW_TRANSITION_IMPORTS);
 
 	// Style maps are module values and can be referenced by a component declared
 	// before the map itself. Lower every top-level map before compiling any
@@ -38652,7 +38664,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			!hasHook &&
 			!containsRenderCall(regionStmts, ctx) &&
 			!containsRenderCall([keyBody], ctx) &&
-			!containsAutoMemoUnsafeStructure(regionStmts, ctx) &&
+			!containsAutoMemoUnsafeStructure(regionStmts, ctx, ctx._octaneViewTransitionNames) &&
 			!containsAutoMemoUnsafeStructure([keyBody], ctx) &&
 			!containsImportedMemberRead(keyBody, ctx.importedNames) &&
 			!containsImportedMemberRead(regionAst, ctx.importedNames);
@@ -38664,7 +38676,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			rendersOpaqueChild(regionAst, [...ctx.currentComponentLocals, ...bodyScope], ctx);
 		if (listSafe) {
 			for (const name of regionFree) {
-				if (ctx._octaneBoundaryNames.has(name) || ctx.importNamespaceNames.has(name)) {
+				if (
+					(ctx._octaneBoundaryNames.has(name) && !ctx._octaneViewTransitionNames.has(name)) ||
+					ctx.importNamespaceNames.has(name)
+				) {
 					listSafe = false;
 					break;
 				}
@@ -38724,7 +38739,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// the only thing the skip compares — stays fixed.
 		const hostConditionalPure =
 			hasNestedComp &&
-			hasOnlyHostConditionalItemBodies(subStmts) &&
+			hasOnlyHostConditionalItemBodies(subStmts, ctx._octaneViewTransitionNames) &&
 			!containsAutoMemoUnsafeStructure(subStmts, ctx) &&
 			!containsImportedMemberRead(bodyAst, ctx.importedNames);
 		const hostPure =
@@ -38743,7 +38758,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 			autoMemoDeps !== null &&
 			autoMemoDeps.every((name) => seenDeps.has(name) || ctx.importedNames.has(name)) &&
 			!autoMemoContextReads(bodyAst, ctx) &&
-			hasOnlyHostConditionalItemBodies(subStmts);
+			hasOnlyHostConditionalItemBodies(subStmts, ctx._octaneViewTransitionNames);
 		if (structuredHostDepEligible) {
 			// The whole-list cache already witnesses imported projections. A row
 			// survivor now makes the same decision independently, so its existing
