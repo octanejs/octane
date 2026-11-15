@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-const { animateMock } = vi.hoisted(() => ({ animateMock: vi.fn(() => ({ stop: vi.fn() })) }));
+const { animateMock } = vi.hoisted(() => ({
+	animateMock: vi.fn<
+		(...args: unknown[]) => { stop: () => void; finished?: { then(done: () => void): unknown } }
+	>(() => ({ stop: () => {} })),
+}));
 vi.mock('motion', () => ({
 	animate: animateMock,
 	hover: vi.fn(() => vi.fn()),
@@ -49,6 +53,104 @@ describe('variants', () => {
 			r.unmount();
 		}
 	});
+
+	it.each(['replaces', 'adds', 'removes'] as const)(
+		'%s the completion listener without restarting the animation',
+		async (change) => {
+			const stop = vi.fn();
+			let finish!: () => void;
+			const finished = new Promise<void>((resolve) => {
+				finish = resolve;
+			});
+			animateMock.mockReturnValueOnce({ stop, finished });
+			const original = vi.fn();
+			const next = vi.fn();
+			const first = change === 'adds' ? undefined : original;
+			const second = change === 'removes' ? undefined : next;
+			const r = mount(VariantCompletion, { target: 'hidden', onComplete: first });
+			try {
+				r.update(VariantCompletion, { target: 'visible', onComplete: first });
+				r.update(VariantCompletion, { target: 'visible', onComplete: second });
+				expect(stop).not.toHaveBeenCalled();
+				expect(original).not.toHaveBeenCalled();
+				expect(next).not.toHaveBeenCalled();
+				finish();
+				await nextPaint();
+				expect(original).not.toHaveBeenCalled();
+				expect(next.mock.calls).toEqual(change === 'removes' ? [] : [['visible']]);
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it('does not complete when no target ever starts', async () => {
+		const onComplete = vi.fn();
+		const r = mount(VariantCompletion, {});
+		try {
+			r.update(VariantCompletion, { onComplete });
+			await nextPaint();
+			expect(onComplete).not.toHaveBeenCalled();
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it.each(['replacement', 'target removal', 'unmount'] as const)(
+		'suppresses completion delivered by a stopped animation on %s',
+		async (teardown) => {
+			let finish: (() => void) | undefined;
+			const finished = {
+				then(done: () => void) {
+					finish = done;
+				},
+			};
+			const stop = vi.fn(() => finish?.());
+			animateMock.mockReturnValueOnce({ stop, finished });
+			const onComplete = vi.fn();
+			const r = mount(VariantCompletion, { target: 'hidden', onComplete });
+			try {
+				r.update(VariantCompletion, { target: 'visible', onComplete });
+				if (teardown === 'unmount') r.unmount();
+				else
+					r.update(VariantCompletion, {
+						target: teardown === 'replacement' ? 'hidden' : undefined,
+						onComplete,
+					});
+				await nextPaint();
+				expect(stop).toHaveBeenCalledOnce();
+				expect(onComplete.mock.calls).toEqual(teardown === 'replacement' ? [['hidden']] : []);
+			} finally {
+				r.unmount();
+			}
+		},
+	);
+
+	it.each(['synchronous', 'promise'] as const)(
+		'reports a throwing %s completion and still stops the animation',
+		async (mode) => {
+			const stop = vi.fn();
+			animateMock.mockReturnValueOnce(
+				mode === 'synchronous' ? { stop } : { stop, finished: Promise.resolve() },
+			);
+			const error = new Error('completion failed');
+			const reportError = vi.fn();
+			vi.stubGlobal('reportError', reportError);
+			const onComplete = () => {
+				throw error;
+			};
+			const r = mount(VariantCompletion, { target: 'hidden', onComplete });
+			try {
+				r.update(VariantCompletion, { target: 'visible', onComplete });
+				await nextPaint();
+				expect(reportError.mock.calls).toEqual([[error]]);
+			} finally {
+				r.unmount();
+				vi.unstubAllGlobals();
+			}
+			expect(stop).toHaveBeenCalledOnce();
+		},
+	);
 
 	it('passes the inherited label from a completed child animation', async () => {
 		const onComplete = vi.fn();
