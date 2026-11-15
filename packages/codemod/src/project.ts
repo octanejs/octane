@@ -2015,7 +2015,6 @@ export async function runCodemod(
 						if (
 							(!explicit && edge.renderer !== 'createElement') ||
 							edge.lazy ||
-							edge.renderer === 'server render' ||
 							(!splitIntrinsicDefault && !originalExports.wrappers.has(edge.name)) ||
 							!hasTemplateExport(leaf, edge.name)
 						)

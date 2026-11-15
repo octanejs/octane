@@ -2859,6 +2859,8 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 	);
 
 	describe('retained React server rendering', () => {
+		const wrapper =
+			'function Child() { return <button>Original</button>; } export default function Leaf() { return <Child />; }';
 		it.each([
 			['direct JSX', 'render(<Leaf />)', '', true],
 			['empty JSX pair', 'render(<Leaf></Leaf>)', '', true],
@@ -2874,7 +2876,23 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 			['intrinsic tag with a lowercase import', 'render(<leaf />)', '', false],
 			['separate physical JSX issuer', 'render(<Leaf />)', 'jsx sibling', false],
 			['unsupported element children', 'render(h(Leaf, null, load()))', '', false],
-		])('reports the %s in a retained issuer', async (_, call, alias, warns) => {
+			['JSX rendering a migrated wrapper', 'render(<Leaf />)', '', true, wrapper],
+			['createElement rendering a migrated wrapper', 'render(h(Leaf, null))', '', true, wrapper],
+			[
+				'a wrapper rendered by a local serializer',
+				'render(<Leaf />)',
+				'react-dom/server',
+				false,
+				wrapper,
+			],
+			[
+				'a wrapper without an emitted template',
+				'render(<Leaf />)',
+				'',
+				false,
+				wrapper.replace('<Child />', '<Child /> as React.ReactElement'),
+			],
+		])('reports the %s in a retained issuer', async (_, call, alias, warns, leaf) => {
 			const files = {
 				'package.json': '{"name":"app","type":"module"}',
 				'tsconfig.json': JSON.stringify({
@@ -2890,7 +2908,7 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 					import { createElement as h } from 'react';
 					import ${call.includes('<leaf') ? 'leaf' : 'Leaf'} from './Leaf.${alias === 'jsx sibling' ? 'jsx' : 'tsx'}';
 					export function page() { return ${call}; }`,
-				'Leaf.tsx': 'export default function Leaf() { return <button>Original</button>; }',
+				'Leaf.tsx': leaf ?? 'export default function Leaf() { return <button>Original</button>; }',
 				'index.html': '<script type="module" src="./Leaf.tsx"></script>',
 			};
 			if (alias === 'jsx sibling') files['Leaf.jsx'] = "export default () => 'retained';";
