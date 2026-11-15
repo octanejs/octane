@@ -11,12 +11,9 @@ import {
 	NodeSelectionChange,
 	ParentExpandChild,
 	initialConnection,
-	NodeOrigin,
-	CoordinateExtent,
 	fitViewport,
 	getHandlePosition,
 	Position,
-	ZIndexMode,
 } from '@xyflow/system';
 
 import {
@@ -25,14 +22,8 @@ import {
 	createSelectionChange,
 	getSelectionChanges,
 } from '../utils/changes';
-import getInitialState from './initialState';
-import type {
-	ReactFlowState,
-	Node,
-	Edge,
-	UnselectNodesAndEdgesParams,
-	FitViewOptions,
-} from '../types';
+import getInitialState, { type InitialStateOptions } from './initialState';
+import type { ReactFlowState, Node, Edge, UnselectNodesAndEdgesParams } from '../types';
 
 const createStore = ({
 	nodes,
@@ -48,21 +39,7 @@ const createStore = ({
 	nodeOrigin,
 	nodeExtent,
 	zIndexMode,
-}: {
-	nodes?: Node[];
-	edges?: Edge[];
-	defaultNodes?: Node[];
-	defaultEdges?: Edge[];
-	width?: number;
-	height?: number;
-	fitView?: boolean;
-	fitViewOptions?: FitViewOptions;
-	minZoom?: number;
-	maxZoom?: number;
-	nodeOrigin?: NodeOrigin;
-	nodeExtent?: CoordinateExtent;
-	zIndexMode?: ZIndexMode;
-}) =>
+}: InitialStateOptions) =>
 	createWithEqualityFn<ReactFlowState>((set, get) => {
 		async function resolveFitView() {
 			const {

@@ -18,6 +18,22 @@ const devWarn = createDevWarn('React Flow', 'https://reactflow.dev/');
 
 import type { Edge, FitViewOptions, InternalNode, Node, ReactFlowStore } from '../types';
 
+export type InitialStateOptions = {
+	nodes?: Node[] | undefined;
+	edges?: Edge[] | undefined;
+	defaultNodes?: Node[] | undefined;
+	defaultEdges?: Edge[] | undefined;
+	width?: number | undefined;
+	height?: number | undefined;
+	fitView?: boolean | undefined;
+	fitViewOptions?: FitViewOptions | undefined;
+	minZoom?: number | undefined;
+	maxZoom?: number | undefined;
+	nodeOrigin?: NodeOrigin | undefined;
+	nodeExtent?: CoordinateExtent | undefined;
+	zIndexMode?: ZIndexMode | undefined;
+};
+
 const getInitialState = ({
 	nodes,
 	edges,
@@ -32,21 +48,7 @@ const getInitialState = ({
 	nodeOrigin,
 	nodeExtent,
 	zIndexMode = 'basic',
-}: {
-	nodes?: Node[];
-	edges?: Edge[];
-	defaultNodes?: Node[];
-	defaultEdges?: Edge[];
-	width?: number;
-	height?: number;
-	fitView?: boolean;
-	fitViewOptions?: FitViewOptions;
-	minZoom?: number;
-	maxZoom?: number;
-	nodeOrigin?: NodeOrigin;
-	nodeExtent?: CoordinateExtent;
-	zIndexMode?: ZIndexMode;
-} = {}): ReactFlowStore => {
+}: InitialStateOptions = {}): ReactFlowStore => {
 	const nodeLookup = new Map<string, InternalNode>();
 	const parentLookup = new Map();
 	const connectionLookup = new Map();
