@@ -220,3 +220,9 @@ export function IconHost(props: { kind: string }) {
 	const icon = useBadgeIcon(props.kind);
 	return <div className="icon-host">{icon}</div>;
 }
+
+export function ShadowedUndefined({ stop }: { stop: boolean }) {
+	const undefined = 'fallback';
+	if (stop) return undefined;
+	return <i>ready</i>;
+}
