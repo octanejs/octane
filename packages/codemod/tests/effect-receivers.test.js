@@ -137,13 +137,26 @@ it('reports numeric coercion of own data from a local object when it can call us
 		'+probe.value',
 		'~(flag ? probe.value : 0)',
 		'-(probe.value ?? 0)',
+		'+(probe.value || 0)',
+		'+(flag && probe.value)',
+		'+((+probe.value) && 1)',
 		'typeof +probe.value',
 	]) {
 		expect(migrate(input(dependency)).notes, dependency).toContainEqual(dependencyError);
 	}
-	for (const dependency of ['typeof probe.value', '+!probe.value', '+(false && probe.value)']) {
+	for (const dependency of [
+		'typeof probe.value',
+		'+!probe.value',
+		'+(false && probe.value)',
+		'+(probe.value && 1)',
+	]) {
 		expect(migrate(input(dependency)).notes, dependency).not.toContainEqual(dependencyError);
 	}
+	const getter = input('+(probe.value && 1)').replace(
+		'value: { valueOf() { return readNumber(); } }',
+		'get value() { return readNumber(); }',
+	);
+	expect(migrate(getter).notes).toContainEqual(dependencyError);
 	const localNumber = input('+(flag ? probe.value : 0)').replace(
 		'{ valueOf() { return readNumber(); } }',
 		'1',

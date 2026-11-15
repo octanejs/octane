@@ -5242,7 +5242,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					op === ts.SyntaxKind.BarBarToken ||
 					op === ts.SyntaxKind.QuestionQuestionToken
 				) {
-					const left = read(member.left, coercesNumber);
+					// Only a falsy left value can become the result of &&.
+					const left = read(
+						member.left,
+						coercesNumber && op !== ts.SyntaxKind.AmpersandAmpersandToken,
+					);
 					if (left) return left;
 					const condition = literalCondition(member.left);
 					if (
