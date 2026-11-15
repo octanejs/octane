@@ -215,6 +215,21 @@ for (const parserName of ['native', 'javascript']) {
 				expect(typecheck(files)).toEqual([]);
 			});
 
+			it('preserves a local value beside erased Fragment import metadata', () => {
+				parser.javascript = parserName === 'javascript';
+				const result = compile(
+					`import type { Fragment } from 'octane';
+					function Fragment() @{ <strong>local view</strong> }
+					export function App() @{ <main><Fragment><p>ignored child</p></Fragment></main> }`,
+					'/src/local-fragment.tsrx',
+					{ mode, hmr: false, output: 'ts' },
+				);
+				const emitted = ts.transpileModule(result.code, {
+					compilerOptions: { module: ts.ModuleKind.ESNext },
+				}).outputText;
+				expect(emitted).toContain('Fragment,');
+			});
+
 			it('keeps generic class members in their enclosing type scope', () => {
 				parser.javascript = parserName === 'javascript';
 				const result = compile(

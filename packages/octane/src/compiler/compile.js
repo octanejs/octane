@@ -1963,6 +1963,7 @@ function addUserImportSpecifiers(ctx, node) {
 function collectOctaneImportBindings(astBody) {
 	const locals = new Map();
 	const namespaces = new Set();
+	let fragmentImportSources = null;
 	// Local names bound by VALUE imports from any module OTHER than 'octane'. A
 	// library may export a hook whose name collides with a base hook (`useId`
 	// from a React-parity binding) — such a call site is that library's CUSTOM
@@ -1983,12 +1984,19 @@ function collectOctaneImportBindings(astBody) {
 		for (const sp of node.specifiers || []) {
 			if (sp.type === 'ImportSpecifier' && sp.local?.name && sp.imported?.name) {
 				locals.set(sp.local.name, sp.imported.name);
+				if (
+					sp.imported.name === 'Fragment' &&
+					sp.importKind !== 'type' &&
+					node.importKind !== 'type'
+				)
+					(fragmentImportSources ??= new Set()).add(node.source);
 			} else if (sp.type === 'ImportNamespaceSpecifier' && sp.local?.name) {
 				namespaces.add(sp.local.name);
+				if (node.importKind !== 'type') (fragmentImportSources ??= new Set()).add(node.source);
 			}
 		}
 	}
-	return { locals, namespaces, foreignLocals };
+	return { locals, namespaces, foreignLocals, fragmentImportSources };
 }
 
 export function collectNestedBindingNames(root) {
@@ -13058,6 +13066,7 @@ function compileInternal(
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
+		ctx.fragmentImportSources = imports.fragmentImportSources;
 		ctx.foreignImportLocals = imports.foreignLocals;
 		ctx.provenContextBindings = collectProvenContextBindings(ast);
 		ctx.activityModuleAst = ast;
@@ -14661,6 +14670,7 @@ function compileServer(
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
+		ctx.fragmentImportSources = imports.fragmentImportSources;
 		ctx.foreignImportLocals = imports.foreignLocals;
 		ctx.provenContextBindings = collectProvenContextBindings(ast);
 		ctx.activityModuleAst = ast;
@@ -36663,7 +36673,11 @@ function isCheckedCompiledBoundary(node, ctx) {
 function resolvesModuleFragmentImport(name, node, ctx) {
 	const binding = activityReferenceBinding(name, node, ctx);
 	// TypeScript output retains erased imports in the import-name table.
-	return binding == null || binding.scope === ctx.activityLexical.rootScope;
+	return (
+		binding == null ||
+		(binding.scope === ctx.activityLexical.rootScope &&
+			ctx.fragmentImportSources?.has(binding.importSource) === true)
+	);
 }
 
 function isFragmentLongForm(node, ctx = null, bindingFragment = null) {
