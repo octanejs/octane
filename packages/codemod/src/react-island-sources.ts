@@ -724,8 +724,10 @@ export function retainedReactElementReturns(file: string, source: string) {
 	const bound = bind(file, source);
 	const { sf, checker } = bound;
 	const edges: { name: string; module: string; line: number }[] = [];
+	const seen = new Set<ts.Node>();
 	for (const { output } of exportReturns(bound)) {
 		if (
+			seen.has(output) ||
 			!ts.isCallExpression(output) ||
 			ts.isOptionalChain(output) ||
 			!ts.isIdentifier(output.expression) ||
@@ -738,11 +740,13 @@ export function retainedReactElementReturns(file: string, source: string) {
 		const component = skipWrappers(output.arguments[0]);
 		if (!ts.isIdentifier(component)) continue;
 		const leaf = imported(checker, component);
-		if (leaf?.module.startsWith('.'))
+		if (leaf?.module.startsWith('.')) {
+			seen.add(output);
 			edges.push({
 				...leaf,
 				line: sf.getLineAndCharacterOfPosition(output.getStart(sf)).line + 1,
 			});
+		}
 	}
 	return edges;
 }

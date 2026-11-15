@@ -2710,9 +2710,26 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 		['extensionless component import', 'return element(Leaf);', './Leaf', false, true],
 		['re-exported component', 'return element(Leaf);', './barrel', false, false],
 		['spread component position', 'return element(...[Leaf]);', './Leaf.tsx', false, false],
+		['dual exports', 'return element(Leaf);', './Leaf.tsx', false, true],
+		[
+			'a named default wrapper',
+			'return element(Leaf);',
+			'./Leaf.tsx',
+			false,
+			true,
+			'function Child() { return <strong>Ready</strong>; } export default function Leaf() { return <Child />; }',
+		],
+		[
+			'a wrapper without a template export',
+			'return element(Leaf);',
+			'./Leaf.tsx',
+			false,
+			false,
+			'function Child() { return <strong>Ready</strong>; } export default function Leaf() { return <Child /> as React.ReactElement; }',
+		],
 	])(
 		'reports a retained React element factory for a %s',
-		async (_, body, specifier, alias, warns) => {
+		async (kind, body, specifier, alias, warns, leaf) => {
 			const root = project({
 				'package.json': '{"type":"module"}',
 				'tsconfig.json': JSON.stringify({
@@ -2728,8 +2745,9 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 					"import { createElement as element } from 'react';",
 					`import Leaf from '${specifier}';`,
 					`export function Owner() { ${body} }`,
+					...(kind === 'dual exports' ? ['export default Owner;'] : []),
 				].join('\n'),
-				'Leaf.tsx': 'export default function Leaf() { return <strong>Ready</strong>; }',
+				'Leaf.tsx': leaf ?? 'export default function Leaf() { return <strong>Ready</strong>; }',
 			});
 			fs.mkdirSync(path.join(root, 'node_modules/@types'), { recursive: true });
 			for (const name of ['octane', 'react'])
@@ -2748,15 +2766,18 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 				verify: true,
 				write: false,
 			});
-			const warning = expect.objectContaining({
-				rule: 'react-compat',
-				severity: 'warning',
-				message: expect.stringContaining('retained React createElement'),
-			});
-			for (const file of ['Owner.ts', 'Leaf.tsx']) {
+			for (const [file, line] of [
+				['Owner.ts', 3],
+				['Leaf.tsx', 1],
+			]) {
 				const notes = result.files.find((entry) => entry.file === file)?.notes ?? [];
-				if (warns) expect(notes).toContainEqual(warning);
-				else expect(notes).not.toContainEqual(warning);
+				const warnings = notes.filter(
+					(note) =>
+						note.rule === 'react-compat' && note.message.includes('retained React createElement'),
+				);
+				expect(warnings).toEqual(
+					warns ? [expect.objectContaining({ severity: 'warning', line })] : [],
+				);
 			}
 		},
 	);

@@ -1619,12 +1619,18 @@ export async function runCodemod(
 			const { program, errors } = parseSync(file.output, file.code);
 			if (program && !errors.length) {
 				for (const statement of program.body) {
+					const defaultExport = statement.type === 'ExportDefaultDeclaration';
 					const fn =
-						statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
-					if (fn?.type !== 'FunctionDeclaration' || !fn.id) continue;
+						defaultExport || statement.type === 'ExportNamedDeclaration'
+							? statement.declaration
+							: statement;
+					if (fn?.type !== 'FunctionDeclaration') continue;
 					// The parser exposes TSRX code blocks through its ESTree body type.
 					const body: unknown = fn.body;
-					if (isRecord(body) && body.type === 'JSXCodeBlock') names.add(fn.id.name);
+					if (isRecord(body) && body.type === 'JSXCodeBlock') {
+						if (defaultExport) names.add('default');
+						else if (fn.id) names.add(fn.id.name);
+					}
 				}
 			}
 			templateExports.set(file.output, names);
@@ -1976,9 +1982,9 @@ export async function runCodemod(
 					if (edge.lazy && originalExports.mayExportThen) continue;
 					if (!originalExports.intrinsics.has(exportName)) {
 						if (
-							!explicit ||
+							(!explicit && edge.renderer !== 'createElement') ||
 							edge.lazy ||
-							edge.renderer !== 'JSX' ||
+							edge.renderer === 'server render' ||
 							!originalExports.wrappers.has(edge.name) ||
 							!hasTemplateExport(leaf, edge.name)
 						)
