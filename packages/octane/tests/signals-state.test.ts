@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
 	createScope,
 	ScopeDisposedError,
+	SIGNAL_BINDING_SUBSCRIBE,
 	SignalCycleError,
 	SignalWriteError,
 	type Scope,
@@ -477,6 +478,37 @@ describe('scoped synchronous signals', () => {
 		expect(() => value$.get()).toThrow(ScopeDisposedError);
 		expect(() => value$.set(3)).toThrow(ScopeDisposedError);
 		expect(() => value$.subscribe(() => {})).toThrow(ScopeDisposedError);
+	});
+
+	it('tells a binding of each write once, however far the change travels', () => {
+		const scope = owner();
+		const count$ = scope.signal$('count', 1);
+		const doubled$ = scope.derived$('doubled', () => count$.get() * 2);
+		const label$ = scope.derived$('label', () => `${doubled$.get()} and ${count$.get()}`);
+		expect(label$.get()).toBe('2 and 1');
+		const heard: string[] = [];
+		const stops = [
+			count$[SIGNAL_BINDING_SUBSCRIBE](() => heard.push('count')),
+			doubled$[SIGNAL_BINDING_SUBSCRIBE](() => heard.push('doubled')),
+			label$[SIGNAL_BINDING_SUBSCRIBE](() => heard.push('label')),
+		];
+		count$.set(2);
+		expect(heard.sort()).toEqual(['count', 'doubled', 'label']);
+		// A binding reads what it was told of before it hears of it again.
+		expect(label$.get()).toBe('4 and 2');
+		heard.length = 0;
+		// One batch delivers once, after its last write.
+		scope.batch(() => {
+			count$.set(3);
+			count$.set(4);
+			expect(heard).toEqual([]);
+		});
+		expect(heard.sort()).toEqual(['count', 'doubled', 'label']);
+		expect(label$.get()).toBe('8 and 4');
+		for (const stop of stops) stop();
+		heard.length = 0;
+		count$.set(5);
+		expect(heard).toEqual([]);
 	});
 
 	it('delivers accepted updates to remaining subscribers when one callback throws', () => {

@@ -178,7 +178,15 @@ export function persistedRead(read: Read<any, any>): PersistedRead {
 }
 
 /** A value to save, and the read it belongs to. */
-export type Saving = { readonly stored: Stored; readonly read: PersistedRead };
+export type Saving = {
+	readonly stored: Stored;
+	readonly read: PersistedRead;
+	/**
+	 * When the shared owner's request that read the value started, in a tab
+	 * that shares one. The owner keeps the value of the newest.
+	 */
+	readonly requestedAt?: number | undefined;
+};
 
 export interface Persistence {
 	/** The saved value for `key`, unless it was saved for another shape of `read`. */
