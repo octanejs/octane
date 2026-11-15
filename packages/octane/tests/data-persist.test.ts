@@ -26,6 +26,7 @@ import {
 	type DataRequest,
 	type FeedFrame,
 	type Listener,
+	type OwnerPort,
 	type PersistentStorage,
 	type ReadHandle,
 	type StandardSchema,
@@ -69,6 +70,18 @@ const unread = view({
 	limit: 2,
 	fresh: 60_000,
 });
+/** A read whose validator returns another representation than the one the server sent. */
+const tally = read({
+	name: 'tally',
+	output: {
+		'~standard': {
+			version: 1,
+			vendor: 'test',
+			validate: (value: any) => ({ value: { checked: value.checked + 1 } }),
+		},
+	} as StandardSchema<unknown, { checked: number }>,
+	fresh: 60_000,
+});
 const setRead = write({
 	name: 'setRead',
 	input: schema<{ id: string; read: boolean }>((v) => typeof v?.read === 'boolean'),
@@ -94,6 +107,7 @@ function server(books: Book[], applied = new Set<string>()) {
 		if (name === 'count') return books.length;
 		if (name === 'secret') return 'hunter2';
 		if (name === 'serial') return 7;
+		if (name === 'tally') return { checked: 0 };
 		const sorted = books.map((book) => ({ ...book })).sort((a, b) => (a.title < b.title ? -1 : 1));
 		if (name === 'shelf') return sorted;
 		const { offset, limit } = input as { offset: number; limit: number };
@@ -1814,7 +1828,7 @@ afterEach(() => {
 });
 
 describe('octane/data persistence through a shared owner', () => {
-	const contracts = [shelf, count, unread, setRead, receipt];
+	const contracts = [shelf, count, tally, unread, setRead, receipt];
 	const journal = { writes: [setRead], receipt };
 	const closing: Array<() => void> = [];
 	afterEach(() => {
@@ -1860,6 +1874,63 @@ describe('octane/data persistence through a shared owner', () => {
 		const remote = server(first.books);
 		const restarted = tab(ownerOver(storage, remote), tabStorage);
 		expect((await value<Book[]>(restarted, shelf)).value).toHaveLength(3);
+		expect(remote.log).toEqual([]);
+	});
+
+	/** A tab of `owner`, and everything it posts to it, as the text a structured clone carries. */
+	function watchedTab(owner: DataOwner) {
+		const channel = new MessageChannel();
+		owner.connect(channel.port1);
+		closing.push(() => (channel.port1.close(), channel.port2.close()));
+		const posted: string[] = [];
+		const port: OwnerPort = {
+			postMessage(message) {
+				posted.push(JSON.stringify(message));
+				channel.port2.postMessage(message);
+			},
+			addEventListener: (type, listener) => channel.port2.addEventListener(type, listener),
+			start: () => channel.port2.start(),
+		};
+		const store = createReplica(port, {
+			transport: () => Promise.reject(new Error('this tab did not share its owner')),
+			persist: cache(memoryStorage(), 'ada', { journal }),
+			contracts,
+		});
+		return { store, posted };
+	}
+
+	it('saves a value a tab validated unchanged from the owner’s copy, so no tab sends it back', async () => {
+		const storage = memoryStorage();
+		const first = server(books());
+		const owner = ownerOver(storage, first);
+		const [one, two] = [watchedTab(owner), watchedTab(owner)];
+		await value(one.store, shelf);
+		const other = await value<Book[]>(two.store, shelf);
+		// The first tab asks for the newer value; the second is told it.
+		first.books[0]!.title = 'Beloved';
+		await one.store.read(shelf).refresh();
+		await vi.waitFor(() => expect(other.handle.getSnapshot().value![0]!.title).toBe('Beloved'));
+		await saved();
+		for (const message of [...one.posted, ...two.posted])
+			expect(message).not.toMatch(/Kindred|Beloved/);
+
+		const remote = server(first.books);
+		const restarted = tab(ownerOver(storage, remote), memoryStorage());
+		expect((await value<Book[]>(restarted, shelf)).value[0]!.title).toBe('Beloved');
+		expect(remote.log).toEqual([]);
+	});
+
+	it('saves the representation a tab’s validator returned, where it is not the owner’s', async () => {
+		const storage = memoryStorage();
+		const first = server(books());
+		const store = tab(ownerOver(storage, first), memoryStorage());
+		expect((await value(store, tally)).value).toEqual({ checked: 1 });
+		await saved();
+
+		const remote = server(first.books);
+		const restarted = tab(ownerOver(storage, remote), memoryStorage());
+		// A restored value is validated again: it was saved as the tab validated it.
+		expect((await value(restarted, tally)).value).toEqual({ checked: 2 });
 		expect(remote.log).toEqual([]);
 	});
 
