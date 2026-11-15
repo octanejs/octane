@@ -6652,9 +6652,11 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return `@{ const ${param} = ${useContext}(${this.emit(tag.expression, PLAIN)}); ${output} }`;
 	}
 
-	private suspenseFallback(node: ts.JsxElement) {
+	private suspenseFallback(node: ts.JsxElement, allowKey = false) {
 		const attributes = node.openingElement.attributes.properties.filter(
-			(a) => !this.removed.has(a),
+			(a) =>
+				!this.removed.has(a) &&
+				!(allowKey && ts.isJsxAttribute(a) && a.name.getText(this.sf) === 'key'),
 		);
 		const fallback = attributes[0];
 		if (
@@ -7837,12 +7839,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return TRUTHY | FALSY | NULLISH;
 	}
 
-	private checkReactClassOutput(
-		node: ts.Expression,
-		conditional = false,
-		retained = false,
-		childSlot = false,
-	) {
+	private checkReactClassOutput(node: ts.Expression, conditional = false, retained = false) {
 		if (!this.options.localReactClass) return;
 		if (!retained && !conditional) {
 			while (isWrapper(node)) {
@@ -7859,9 +7856,8 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (ts.isConditionalExpression(node)) {
 				const condition = literalCondition(node.condition);
 				if (condition === undefined || condition === 'truthy')
-					this.checkReactClassOutput(node.whenTrue, conditional, false, childSlot);
-				if (condition !== 'truthy')
-					this.checkReactClassOutput(node.whenFalse, conditional, false, childSlot);
+					this.checkReactClassOutput(node.whenTrue, conditional);
+				if (condition !== 'truthy') this.checkReactClassOutput(node.whenFalse, conditional);
 				return;
 			}
 			if (ts.isBinaryExpression(node)) {
@@ -7871,9 +7867,8 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				const left = this.logicalResult(node.left);
 				// The left result of && is falsy and cannot render JSX.
 				if (operator !== ts.SyntaxKind.AmpersandAmpersandToken && left & ~rightCases)
-					this.checkReactClassOutput(node.left, conditional, false, childSlot);
-				if (left & rightCases)
-					this.checkReactClassOutput(node.right, conditional, false, childSlot);
+					this.checkReactClassOutput(node.left, conditional);
+				if (left & rightCases) this.checkReactClassOutput(node.right, conditional);
 				return;
 			}
 			if (ts.isCallExpression(node)) {
@@ -7892,17 +7887,15 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				return;
 			if (ts.isJsxSelfClosingElement(node))
 				return this.checkReactClassRoot(node, conditional, retained);
-			if (!retained && !conditional && rendersOrdinaryHtmlChildren(node.openingElement)) {
-				this.checkReactClassChildren(node, conditional, false, true);
+			if (!retained && rendersOrdinaryHtmlChildren(node.openingElement)) {
+				this.checkReactClassChildren(node, conditional, false);
 				return;
 			}
 			const tag = node.openingElement.tagName;
 			const callee = this.callee(tag);
 			if (callee?.module !== 'react' && callee?.module !== 'octane')
 				return this.checkReactClassRoot(node, conditional, retained);
-			if (callee.name === 'Fragment') {
-				if (childSlot && callee.module !== 'react')
-					return this.checkReactClassRoot(node, conditional, retained);
+			if (callee.name === 'Fragment' || callee.name === 'Suspense') {
 				const member = ts.isPropertyAccessExpression(tag);
 				const reference = member ? tag.expression : tag;
 				const declaration = ts.isIdentifier(reference) && this.declarationOf(reference);
@@ -7913,37 +7906,29 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				)
 					return this.checkReactClassRoot(node, conditional, retained);
 				const imp = ts.findAncestor(declaration, ts.isImportDeclaration);
-				if (
-					!imp ||
-					imp.attributes ||
-					(childSlot &&
-						!node.openingElement.attributes.properties.every(
-							(attr) =>
-								ts.isJsxAttribute(attr) && ts.isIdentifier(attr.name) && attr.name.text === 'key',
-						))
-				)
-					return this.checkReactClassRoot(node, conditional, retained);
-			} else if (callee.name !== 'StrictMode') {
-				const fallback =
-					!retained && !childSlot && callee.name === 'Suspense' && this.suspenseFallback(node);
-				if (!fallback) return this.checkReactClassRoot(node, conditional, retained);
-				if (ts.isJsxExpression(fallback) && fallback.expression) {
-					const expression = skipParens(fallback.expression);
-					if (isJsx(expression)) this.checkReactClassOutput(expression, true);
+				if (!imp || imp.attributes) return this.checkReactClassRoot(node, conditional, retained);
+				if (callee.name === 'Suspense') {
+					const fallback = !retained && this.suspenseFallback(node, true);
+					if (!fallback) return this.checkReactClassRoot(node, conditional, retained);
+					if (ts.isJsxExpression(fallback) && fallback.expression) {
+						const expression = skipParens(fallback.expression);
+						if (isJsx(expression)) this.checkReactClassOutput(expression, true);
+					}
 				}
+			} else if (callee.name !== 'StrictMode') {
+				return this.checkReactClassRoot(node, conditional, retained);
 			}
 		}
-		this.checkReactClassChildren(node, conditional, retained, childSlot);
+		this.checkReactClassChildren(node, conditional, retained);
 	}
 
 	private checkReactClassChildren(
 		node: ts.JsxElement | ts.JsxFragment,
 		conditional: boolean,
 		retained: boolean,
-		childSlot: boolean,
 	) {
 		for (const child of node.children) {
-			if (isJsx(child)) this.checkReactClassOutput(child, conditional, retained, childSlot);
+			if (isJsx(child)) this.checkReactClassOutput(child, conditional, retained);
 			else if (
 				!retained &&
 				!conditional &&
@@ -7951,7 +7936,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				child.expression &&
 				!child.dotDotDotToken
 			)
-				this.checkReactClassOutput(child.expression, conditional, false, true);
+				this.checkReactClassOutput(child.expression);
 		}
 	}
 
