@@ -892,7 +892,7 @@ export function reactServerComponents(
 						ref = skipWrappers(value.arguments[0]);
 				}
 				const leaf = ref && imported(checker, ref);
-				if (leaf?.module.startsWith('.') && /\.[jt]sx$/.test(leaf.module))
+				if (leaf?.module.startsWith('.') && (!selected || /\.[jt]sx$/.test(leaf.module)))
 					edges.push({
 						...leaf,
 						line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,

@@ -3221,6 +3221,19 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 		const wrapper =
 			'function Child() { return <button>Original</button>; } export default function Leaf() { return <Child />; }';
 		it.each([
+			['extensionless JSX', 'render(<Leaf />)', 'extensionless', true],
+			['extensionless element', 'render(h(Leaf))', 'extensionless', true],
+			['extensionless wrapper', 'render(<Leaf />)', 'extensionless', true, wrapper],
+			['extensionless dotted stem', 'render(<Leaf />)', 'dotted stem', true],
+			['explicit JavaScript substitution', 'render(<Leaf />)', 'js substitution', false],
+			[
+				'extensionless named alias',
+				'render(<Leaf />)',
+				'named',
+				true,
+				'export function View() { return <button>Original</button>; }',
+			],
+			['extensionless JSX with a physical JS sibling', 'render(<Leaf />)', 'js shadow', false],
 			['direct JSX', 'render(<Leaf />)', '', true],
 			['empty JSX pair', 'render(<Leaf></Leaf>)', '', true],
 			['comment-only JSX pair', 'render(<Leaf>{/* comment */}</Leaf>)', '', true],
@@ -3252,6 +3265,17 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 				wrapper.replace('<Child />', '<Child /> as React.ReactElement'),
 			],
 		])('reports the %s in a retained issuer', async (_, call, alias, warns, leaf) => {
+			const stem = alias === 'dotted stem' ? 'Leaf.light' : 'Leaf';
+			const leafFile = `${stem}.tsx`;
+			const ext = ['extensionless', 'named', 'js shadow', 'dotted stem'].includes(alias)
+				? ''
+				: alias === 'jsx sibling'
+					? '.jsx'
+					: alias === 'js substitution'
+						? '.js'
+						: '.tsx';
+			const importName =
+				alias === 'named' ? '{ View as Leaf }' : call.includes('<leaf') ? 'leaf' : 'Leaf';
 			const files = {
 				'package.json': '{"name":"app","type":"module"}',
 				'tsconfig.json': JSON.stringify({
@@ -3265,12 +3289,13 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 				'Owner.tsx': `${alias === 'pragma' ? '/** @jsxImportSource octane */\n' : ''}
 					import { renderToStaticMarkup as render } from 'react-dom/server';
 					import { createElement as h } from 'react';
-					import ${call.includes('<leaf') ? 'leaf' : 'Leaf'} from './Leaf.${alias === 'jsx sibling' ? 'jsx' : 'tsx'}';
+					import ${importName} from './${stem}${ext}';
 					export function page() { return ${call}; }`,
-				'Leaf.tsx': leaf ?? 'export default function Leaf() { return <button>Original</button>; }',
-				'index.html': '<script type="module" src="./Leaf.tsx"></script>',
+				[leafFile]: leaf ?? 'export default function Leaf() { return <button>Original</button>; }',
+				'index.html': `<script type="module" src="./${leafFile}"></script>`,
 			};
 			if (alias === 'jsx sibling') files['Leaf.jsx'] = "export default () => 'retained';";
+			if (alias === 'js shadow') files['Leaf.js'] = "export default () => 'retained';";
 			const root = project(files);
 			fs.mkdirSync(path.join(root, 'node_modules'));
 			for (const name of ['octane', 'react', 'react-dom'])
@@ -3286,7 +3311,7 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 				);
 				fs.symlinkSync(path.dirname(source), path.join(root, 'node_modules/@types', name), 'dir');
 			}
-			const selected = [path.join(root, 'Leaf.tsx')];
+			const selected = [path.join(root, leafFile)];
 			const options = { root, strong: true, verify: true };
 			const warning = expect.objectContaining({
 				rule: 'react-compat',
@@ -3294,7 +3319,7 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 				message: expect.stringContaining('retained React server render'),
 			});
 			const preview = await runCodemod(selected, { ...options, write: false });
-			for (const name of ['Leaf.tsx', 'Owner.tsx']) {
+			for (const name of [leafFile, 'Owner.tsx']) {
 				const notes = preview.files.find((file) => file.file === name)?.notes ?? [];
 				if (warns) expect(notes).toContainEqual(warning);
 				else expect(notes).not.toContainEqual(warning);
@@ -3307,7 +3332,7 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 			}
 			for (const [name, source] of Object.entries(files))
 				expect(fs.readFileSync(path.join(root, name), 'utf8')).toBe(source);
-			expect(fs.existsSync(path.join(root, 'Leaf.tsrx'))).toBe(false);
+			expect(fs.existsSync(path.join(root, `${stem}.tsrx`))).toBe(false);
 		});
 	});
 
