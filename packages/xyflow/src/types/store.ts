@@ -1,7 +1,8 @@
 import {
 	ConnectionMode,
 	withResolvers,
-	type ConnectionState,
+	type ConnectionInProgress,
+	type NoConnection,
 	type CoordinateExtent,
 	type InternalNodeUpdate,
 	type UpdateNodePositions,
@@ -21,13 +22,10 @@ import {
 	type OnMoveStart,
 	type OnMove,
 	type OnMoveEnd,
-	type UpdateConnection,
 	type EdgeLookup,
 	type ConnectionLookup,
-	type NodeLookup,
 	type NodeChange,
 	type EdgeChange,
-	type ParentLookup,
 	type AriaLabelConfig,
 	type SetCenter,
 	type ZIndexMode,
@@ -51,6 +49,15 @@ import type {
 	InternalNode,
 } from '.';
 
+// The pinned system generics cannot prove their default InternalNodeBase
+// constraint for a generic InternalNode<NodeType> under exact optionals.
+type FlowConnectionState<NodeType extends Node = Node> =
+	| NoConnection
+	| (Omit<ConnectionInProgress, 'fromNode' | 'toNode'> & {
+			fromNode: InternalNode<NodeType>;
+			toNode: InternalNode<NodeType> | null;
+	  });
+
 export type ReactFlowStore<NodeType extends Node = Node, EdgeType extends Edge = Edge> = {
 	rfId: string;
 	width: number;
@@ -58,8 +65,8 @@ export type ReactFlowStore<NodeType extends Node = Node, EdgeType extends Edge =
 	transform: Transform;
 	nodes: NodeType[];
 	nodesInitialized: boolean;
-	nodeLookup: NodeLookup<InternalNode<NodeType>>;
-	parentLookup: ParentLookup<InternalNode<NodeType>>;
+	nodeLookup: Map<string, InternalNode<NodeType>>;
+	parentLookup: Map<string, Map<string, InternalNode<NodeType>>>;
 	edges: EdgeType[];
 	edgeLookup: EdgeLookup<EdgeType>;
 	connectionLookup: ConnectionLookup;
@@ -83,7 +90,7 @@ export type ReactFlowStore<NodeType extends Node = Node, EdgeType extends Edge =
 	userSelectionActive: boolean;
 	userSelectionRect: SelectionRect | null;
 
-	connection: ConnectionState<InternalNode<NodeType>>;
+	connection: FlowConnectionState<NodeType>;
 	connectionMode: ConnectionMode;
 	connectionClickStartHandle:
 		(Pick<Handle, 'nodeId' | 'id'> & Required<Pick<Handle, 'type'>>) | null;
@@ -184,7 +191,7 @@ export type ReactFlowActions<NodeType extends Node, EdgeType extends Edge> = {
 	setTranslateExtent: (translateExtent: CoordinateExtent) => void;
 	setNodeExtent: (nodeExtent: CoordinateExtent) => void;
 	cancelConnection: () => void;
-	updateConnection: UpdateConnection<InternalNode<NodeType>>;
+	updateConnection: (state: FlowConnectionState<NodeType>) => void;
 	reset: () => void;
 	triggerNodeChanges: (changes: NodeChange<NodeType>[]) => void;
 	triggerEdgeChanges: (changes: EdgeChange<EdgeType>[]) => void;
