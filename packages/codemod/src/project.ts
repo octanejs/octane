@@ -17,6 +17,7 @@ import path from 'node:path';
 import { findRoot, readInstalled, scanSourceFiles } from '@octanejs/cli';
 import { DATA } from '@octanejs/cli/data';
 import { parseSync } from '@tsrx/oxc/parser';
+import type { DefaultTreeAdapterMap } from 'parse5';
 import ts from 'typescript';
 import { finding, loadCompiler, thrown } from './compiler.js';
 import { isReactMotion, PORTED_PACKAGES } from './mappings.js';
@@ -1793,7 +1794,7 @@ export async function runCodemod(
 		}
 	}
 
-	const pages = planEntryPages(
+	const pages = await planEntryPages(
 		root,
 		paths.map((entry) => path.resolve(entry)),
 		renames,
@@ -2692,29 +2693,85 @@ function rendersWithReact(name: string, from: string) {
  * Point `<script src>` in HTML entry pages at renamed modules.
  * @param targets the paths being migrated
  */
-function planEntryPages(
+async function planEntryPages(
 	root: string,
 	targets: string[],
 	renames: Map<string, string>,
 	unmatched: (file: string, issuer: string) => void,
 ) {
 	const updated = new Map<string, string>();
-	for (const page of findHtml(root, targets)) {
-		const html = fs.readFileSync(page, 'utf8');
-		const next = html.replace(
-			/(<script\b[^>]*\bsrc=)(["'])([^"']+)\2/g,
-			(match, open: string, quote: string, src: string) => {
-				// Vite serves `/` from the page's own directory, as it does `./`.
-				const file = path.join(path.dirname(page), src);
-				const renamed = renames.get(file);
-				if (!renamed) {
-					unmatched(file, page);
-					return match;
-				}
-				return open + quote + src.replace(/\.[jt]sx?$/, '.tsrx') + quote;
-			},
-		);
-		if (next !== html) updated.set(page, next);
+	const pages = renames.size ? findHtml(root, targets) : [];
+	if (!pages.length) return updated;
+	const {
+		parse,
+		html: { NS },
+	} = await import('parse5');
+	function elements(source: string, scriptingEnabled: boolean) {
+		const nodes: DefaultTreeAdapterMap['node'][] = [
+			parse(source, { sourceCodeLocationInfo: !scriptingEnabled, scriptingEnabled }),
+		];
+		const result: DefaultTreeAdapterMap['element'][] = [];
+		for (const node of nodes) {
+			if ('childNodes' in node) for (const child of node.childNodes) nodes.push(child);
+			if (!scriptingEnabled && 'content' in node) nodes.push(node.content);
+			if ('attrs' in node) result.push(node);
+		}
+		return result;
+	}
+	for (const page of pages) {
+		const source = fs.readFileSync(page, 'utf8');
+		let hasBase: boolean | undefined;
+		const edits: { start: number; end: number }[] = [];
+		// Vite loads scripts in templates and noscript.
+		for (const script of elements(source, false)) {
+			if (script.tagName !== 'script') continue;
+			const src = script.sourceCodeLocation?.attrs?.src;
+			if (!src) continue;
+			const raw = source.slice(src.startOffset, src.endOffset);
+			const quoted = /^src\s*=\s*(["'])([\s\S]*)\1$/i.exec(raw);
+			if (!quoted) continue;
+			const value = quoted[2];
+			const pathname = value.split(/[?#]/, 1)[0];
+			const extension = /\.[jt]sx?$/.exec(pathname);
+			if (!extension) continue;
+			if (pathname !== value) {
+				const parsedPath = script.attrs
+					.find(({ name, prefix }) => !prefix && name === 'src')
+					?.value.split(/[?#]/, 1)[0];
+				if (
+					!script.attrs.some(
+						({ name, prefix, value }) => !prefix && name === 'type' && value === 'module',
+					) ||
+					script.attrs.some(({ name, prefix }) => !prefix && name === 'vite-ignore') ||
+					!/^\.{1,2}\//.test(pathname) ||
+					/[\u0000-\u0020%\\]/.test(pathname) ||
+					parsedPath !== pathname
+				)
+					continue;
+				// Only an active document base changes resolution in the browser.
+				hasBase ??=
+					/<base\b/i.test(source) &&
+					elements(source, true).some(
+						(node) =>
+							node.namespaceURI === NS.HTML &&
+							node.tagName === 'base' &&
+							node.attrs.some(({ name }) => name === 'href'),
+					);
+				if (hasBase) continue;
+			}
+			const file = path.join(path.dirname(page), pathname);
+			if (!renames.has(file)) {
+				unmatched(file, page);
+				continue;
+			}
+			const end = src.endOffset - 1 - (value.length - pathname.length);
+			edits.push({ start: end - extension[0].length, end });
+		}
+		let next = source;
+		for (const { start, end } of edits.sort((a, b) => b.start - a.start)) {
+			next = next.slice(0, start) + '.tsrx' + next.slice(end);
+		}
+		if (next !== source) updated.set(page, next);
 	}
 	return updated;
 }
