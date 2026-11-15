@@ -6078,10 +6078,8 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	}
 
 	/**
-	 * `root.render(<App a={1} />)` and `root.render(createElement(App, props))`
-	 * are `root.render(App, props)`, which mounts the component without an
-	 * element: the generic element renderer stays out of the bundle. So are
-	 * `hydrateRoot(c, <App />)` and the server renderers' element argument.
+	 * Mount component roots directly when the element carries no key or
+	 * factory configuration. The same applies to hydration and server roots.
 	 *
 	 * @param argument the element, the call's last argument
 	 */
@@ -6141,17 +6139,10 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			if (!type || children.length > 0) return null;
 			if (!(ts.isIdentifier(type) || ts.isPropertyAccessExpression(type))) return null;
 			if (!isComponentName(type.getText(this.sf).split('.').pop() ?? '')) return null;
-			const config = props && skipWrappers(props);
-			// A bound `undefined` can carry props that still need the factory's config handling.
-			if (
-				config &&
-				ts.isIdentifier(config) &&
-				config.text === 'undefined' &&
-				this.declarationOf(config)
-			)
+			// The element factory extracts the config's key and snapshots its enumerable props.
+			if (props && (!isNullish(props) || (ts.isIdentifier(props) && this.declarationOf(props))))
 				return null;
-			const text = this.emit(type, PLAIN);
-			return !props || isNullish(props) ? text : `${text}, ${this.emit(props, PLAIN)}`;
+			return this.emit(type, PLAIN);
 		}
 		return null;
 	}
