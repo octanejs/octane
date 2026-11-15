@@ -20,6 +20,7 @@ import { parseSync } from '@tsrx/oxc/parser';
 import type { DefaultTreeAdapterMap } from 'parse5';
 import ts from 'typescript';
 import { finding, loadCompiler, thrown } from './compiler.js';
+import { skipWrappers } from './expression-wrappers.js';
 import { isReactMotion, PORTED_PACKAGES } from './mappings.js';
 import { strengthen } from './strong.js';
 import {
@@ -187,6 +188,17 @@ export async function runCodemod(
 			continue;
 		}
 		renames.set(file, output);
+	}
+	for (const entry of implicitReactRouterEntries(root, renames.keys(), outputKey)) {
+		const conflict = conflictFor(
+			entry,
+			fs.readFileSync(entry, 'utf8'),
+			renames.get(entry)!,
+			'is an implicit React Router entry that must keep its original extension',
+		);
+		if (write) return blockedWrite(root, conflict);
+		conflicts.set(entry, conflict);
+		renames.delete(entry);
 	}
 	// A colliding source remains in place, so its imports and export contracts
 	// must not participate in the preview as if it had been migrated.
@@ -2371,6 +2383,65 @@ function collect(entry: string, test: (name: string) => boolean = isSource) {
 
 function isTsrx(name: string) {
 	return name.endsWith('.tsrx');
+}
+
+// React Router 7's file discovery does not consider .tsrx to be an entry extension.
+const REACT_ROUTER_ENTRY_EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx', '.mjs', '.mts'];
+
+function implicitReactRouterEntries(
+	root: string,
+	renamedFiles: Iterable<string>,
+	entryKey: (file: string) => string,
+): string[] {
+	const candidates = [...renamedFiles].filter((file) =>
+		/^(?:root|routes)\.[jt]sx?$/i.test(path.basename(file)),
+	);
+	if (!candidates.length) return [];
+	const pkg = readInstalled(root, '@react-router/dev');
+	if (
+		pkg?.manifest.name !== '@react-router/dev' ||
+		!pkg.version.startsWith('7.') ||
+		!record(pkg.manifest.exports)['./routes']
+	)
+		return [];
+
+	const findEntry = (dir: string, name: string) =>
+		REACT_ROUTER_ENTRY_EXTENSIONS.map((ext) => path.join(dir, name + ext)).find((file) =>
+			fs.existsSync(file),
+		);
+	const config = findEntry(root, 'react-router.config');
+	if (!config) return [];
+
+	let app = 'app';
+	const source = ts.createSourceFile(
+		config,
+		fs.readFileSync(config, 'utf8'),
+		ts.ScriptTarget.Latest,
+	);
+	const exported = source.statements.find(ts.isExportAssignment);
+	const value = exported && !exported.isExportEquals && skipWrappers(exported.expression);
+	if (!value || !ts.isObjectLiteralExpression(value)) return [];
+	let hasAppDirectory = false;
+	for (const property of value.properties) {
+		if (!property.name || (!ts.isIdentifier(property.name) && !ts.isStringLiteral(property.name)))
+			return [];
+		if (property.name.text === '__proto__' || property.name.text === 'presets') return [];
+		if (property.name.text !== 'appDirectory') continue;
+		const directory = ts.isPropertyAssignment(property) && skipWrappers(property.initializer);
+		if (hasAppDirectory || !directory || !ts.isStringLiteralLike(directory)) return [];
+		app = directory.text || app;
+		hasAppDirectory = true;
+	}
+
+	const dir = path.resolve(root, app);
+	const relative = path.relative(root, dir);
+	if (relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative))
+		return [];
+	const rootEntry = findEntry(dir, 'root');
+	const routesEntry = findEntry(dir, 'routes');
+	if (!rootEntry || !routesEntry) return [];
+	const entries = new Set([entryKey(rootEntry), entryKey(routesEntry)]);
+	return candidates.filter((file) => entries.has(entryKey(file)));
 }
 
 /** The compiler options of the tsconfig that governs `root`, or null. */
