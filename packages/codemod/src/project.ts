@@ -305,7 +305,7 @@ export async function runCodemod(
 	const compiler = verify || strong ? await loadCompiler(root) : null;
 	const packages: Map<string, string> = new Map();
 	const missing: Map<string, CodemodResult['missing'][number]> = new Map();
-	// `ReactCompat` hosts a component from a package with no port in a React
+	// `ReactCompat` hosts a component from a retained package import in a React
 	// root, from 19.2 within the React 19 series it supports.
 	const reactCompat = ['react', 'react-dom'].every((name) =>
 		/^19\.(?:[2-9]|\d{2,})\./.test(readInstalled(root, name)?.version ?? ''),
@@ -2547,8 +2547,7 @@ function catalogName(specifier: string) {
 }
 
 /**
- * The React package a specifier names when Octane has no binding for it, or
- * null.
+ * The React package a specifier names when the codemod keeps it on React, or null.
  * @param from the importing module
  */
 function unportedName(specifier: string, from: string) {
