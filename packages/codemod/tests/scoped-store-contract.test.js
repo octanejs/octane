@@ -555,6 +555,35 @@ export const renderLater = () => renderToString(<Pane />);
 	},
 );
 
+it('reports the context of a standalone server root that keeps a React factory config', async () => {
+	const { app } = project({
+		'app/src/pane.tsx': `import { useSnapshot } from 'observer';
+			export function Pane() { const value = useSnapshot(); return <b>{String(value)}</b>; }`,
+		'app/src/root.tsx': `import { createElement as h } from 'react';
+			import { renderToStaticMarkup } from 'react-dom/server';
+			import { Pane } from './pane.tsx';
+			export function render() {
+				return renderToStaticMarkup(h(Pane, { key: 'page', label: 'root' }));
+			}`,
+	});
+	const inputs = ['pane', 'root'].map((name) => path.join(app, 'src', name + '.tsx'));
+	const { files } = await runCodemod(inputs, {
+		root: app,
+		strong: true,
+		verify: true,
+		write: false,
+	});
+	const result = files.find(({ file }) => file === 'src/root.tsx');
+	expect(result.notes).toContainEqual(
+		expect.objectContaining({
+			rule: 'store-hook',
+			severity: 'warning',
+			line: 5,
+			message: expect.stringMatching(/standalone.*migrated Pane.*NativeStoreProvider/),
+		}),
+	);
+});
+
 it('reports a migrated React factory root that needs its store context', async () => {
 	const { app } = project({
 		'app/src/pane.tsx': `import { useSnapshot } from 'observer';
