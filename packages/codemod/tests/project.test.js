@@ -461,6 +461,7 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				['Guard.tsx', includeClass ? 'error' : 'warning'],
 				['KeyedStrict.tsx', includeClass ? 'error' : 'warning'],
 				['LogicalArm.tsx', includeClass ? 'error' : 'warning'],
+				['MapArm.tsx', includeClass ? 'error' : 'warning'],
 				['MetadataView.tsx', includeClass ? 'error' : 'warning'],
 				['NamedFragment.tsx', includeClass ? 'error' : 'warning'],
 				['NativeFragment.tsx', includeClass ? 'error' : 'warning'],
@@ -491,6 +492,153 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				);
 				expect(code).toContain('return <i>');
 			}
+		}
+	});
+
+	it('reports imported React classes in ordinary native HTML children', async () => {
+		const view = (
+			jsx,
+			retained = false,
+		) => `import React, { Fragment as Group, StrictMode, Suspense } from 'react';
+import { Frame } from './Frame';
+import { ReactCompat } from 'octane/react';
+function Holder() { return <b>ignored</b>; }
+export function App({ enabled }: { enabled: boolean }) {
+${retained ? 'if (!enabled) { const text = "off"; return <i>{text}</i>; }' : ''}
+return ${jsx};
+}`;
+		const cases = {
+			'ClassName.tsx': '<article className={enabled ? "on" : "off"}><Frame /></article>',
+			'Composed.tsx':
+				'<main data-page="app"><><StrictMode><section><Frame /></section></StrictMode></></main>',
+			'DirectHole.tsx': '<div>{(<Frame />)}</div>',
+			'ConditionalHole.tsx': '<main>{enabled ? <Frame /> : null}</main>',
+			'LogicalHole.tsx': '<section>{enabled && <Frame />}</section>',
+			'NamedFragment.tsx': '<Group key="group"><Frame /></Group>',
+			'MemberFragment.tsx': '<main><React.Fragment>{enabled && <Frame />}</React.Fragment></main>',
+			'MapChild.tsx': '<main>{[1].map((row) => <Frame key={row} />)}</main>',
+			'MapRoot.tsx': '[1].map((row) => <Frame key={row} />)',
+			'MapContinues.tsx':
+				'<main>{[1, 2].map((row) => { if (row === 1) return null; return <Frame />; })}</main>',
+			'MapSkipsAll.tsx':
+				'<main>{[1].map((row) => { if (row === 1) return null; return <Frame />; })}</main>',
+			'MapUnconditionalExit.tsx':
+				'<main>{[1].map((_row) => { return null; return <Frame />; })}</main>',
+			'AssertedHole.tsx': '<main>{((<Frame /> as unknown) satisfies unknown)!}</main>',
+			'StringAssertion.tsx': '<main>{((<Frame /> as unknown as string) satisfies unknown)!}</main>',
+			'StringSatisfies.tsx': '<main>{((<Frame /> as unknown) satisfies string)!}</main>',
+			'FallbackOr.tsx': '<main>{enabled || <Frame />}</main>',
+			'FallbackOrChain.tsx': '<main>{enabled || <Frame /> || "last"}</main>',
+			'FallbackNullish.tsx': '<main>{(enabled ? null : 0) ?? <Frame />}</main>',
+			'FallbackLeft.tsx': '<main>{(<Frame /> as unknown) ?? <i />}</main>',
+			'DeadFallback.tsx': '<main>{true || <Frame />}{false ?? <Frame />}</main>',
+			'DeadFallbackAfterJsx.tsx': '<main>{<i /> || <Frame />}{<i /> ?? <Frame />}</main>',
+			'DeadLogicalChains.tsx':
+				'<main>{enabled || <i /> || <Frame />}{(enabled ?? <i />) ?? <Frame />}{(enabled && false) && <Frame />}</main>',
+			'DeadMixedLogicalChains.tsx':
+				'<main>{(enabled || false) ?? <Frame />}{((enabled ?? <i />) as unknown) ?? <Frame />}</main>',
+			'LiveLogicalChainOutputs.tsx':
+				'<main>{(enabled && <Frame />) || <i />}{(enabled ?? null) ?? <Frame />}{(enabled && true) && <Frame />}</main>',
+			'DeadHole.tsx': '<div>{false && <Frame />}{true ? null : <Frame />}</div>',
+			'UnusedMap.tsx': '<main>{[].map((row) => <Frame key={row} />)}</main>',
+			'SpreadMap.tsx': '<main>{[...[]].map((row) => <Frame key={row} />)}</main>',
+			'OpaqueMap.tsx': '<main>{Array.from({ length: 1 }).map((row) => <Frame key={row} />)}</main>',
+			'OpaqueCall.tsx': '<div>{Boolean(<Frame />)}</div>',
+			'FragmentProps.tsx': '<main><Group {...{}}><Frame /></Group></main>',
+			'Attribute.tsx': '<article title={String(<Frame />)}>text</article>',
+			'Custom.tsx': '<main><Holder><Frame /></Holder></main>',
+			'Foreign.tsx': '<main><svg><g><Frame /></g></svg></main>',
+			'Template.tsx': '<main><template><Frame /></template></main>',
+			'Spread.tsx': '<main {...{ className: "app" }}><Frame /></main>',
+			'Children.tsx': '<main children={null}><Frame /></main>',
+			'RawHtml.tsx': '<main dangerouslySetInnerHTML={{ __html: "html" }}><Frame /></main>',
+			'Hosted.tsx': '<main><ReactCompat><Frame /></ReactCompat></main>',
+			'Customized.tsx': '<main IS="x-main"><Frame /></main>',
+		};
+		const root = project({
+			'tsconfig.json': '{ "compilerOptions": { "jsx": "react-jsx" } }',
+			'Frame.tsx': `import { Component } from 'react';
+export class Frame extends Component { render() { return <b>ready</b>; } }`,
+			'RetainedHtmlChild.tsx': view('<main><Frame /></main>', true),
+			'RootFragmentProps.tsx': view('<Group {...{}}><Frame /></Group>'),
+			'RetainedFragmentProps.tsx': view('<Group {...{}}><Frame /></Group>', true),
+			'NativeFallbackHtml.tsx': view(
+				'<Suspense fallback={<main><Frame /></main>}><b /></Suspense>',
+			),
+			'NativeFallbackMap.tsx': view(
+				'<Suspense fallback={<>{[1].map(n => <Frame key={n} />)}</>}><b /></Suspense>',
+			),
+			'NativeFallbackClass.tsx': view('<Suspense fallback={<Frame />}><b /></Suspense>'),
+			'NestedSuspense.tsx': view('<main><Suspense fallback={<Frame />}><b /></Suspense></main>'),
+			'ShadowedFragment.tsx': `import { Fragment as Group } from 'react';
+import { Frame } from './Frame';
+function Holder() { return <b>ignored</b>; }
+export function App() { const Group = Holder; return <div><Group><Frame /></Group></div>; }`,
+			...Object.fromEntries(Object.entries(cases).map(([name, jsx]) => [name, view(jsx)])),
+		});
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+		);
+
+		for (const includeClass of [true, false]) {
+			const inputs = [
+				...Object.keys(cases),
+				'ShadowedFragment.tsx',
+				'RetainedHtmlChild.tsx',
+				'RootFragmentProps.tsx',
+				'RetainedFragmentProps.tsx',
+				'NativeFallbackHtml.tsx',
+				'NativeFallbackMap.tsx',
+				'NativeFallbackClass.tsx',
+				'NestedSuspense.tsx',
+			];
+			if (includeClass) inputs.push('Frame.tsx');
+			const { files } = await runCodemod(
+				inputs.map((file) => path.join(root, file)),
+				{ root, strong: true, verify: true, projectTypes: false, write: false },
+			);
+			expect(
+				files
+					.flatMap(({ file, notes }) =>
+						notes
+							.filter(
+								(note) =>
+									note.rule === 'class-component' && note.message.includes('imported React class'),
+							)
+							.map((note) => [file, note.severity]),
+					)
+					.sort(),
+			).toEqual([
+				['AssertedHole.tsx', includeClass ? 'error' : 'warning'],
+				['ClassName.tsx', includeClass ? 'error' : 'warning'],
+				['Composed.tsx', includeClass ? 'error' : 'warning'],
+				['ConditionalHole.tsx', includeClass ? 'error' : 'warning'],
+				['DirectHole.tsx', includeClass ? 'error' : 'warning'],
+				['FallbackLeft.tsx', includeClass ? 'error' : 'warning'],
+				['FallbackNullish.tsx', includeClass ? 'error' : 'warning'],
+				['FallbackOr.tsx', includeClass ? 'error' : 'warning'],
+				['FallbackOrChain.tsx', includeClass ? 'error' : 'warning'],
+				...Array.from({ length: 3 }, () => [
+					'LiveLogicalChainOutputs.tsx',
+					includeClass ? 'error' : 'warning',
+				]),
+				['LogicalHole.tsx', includeClass ? 'error' : 'warning'],
+				['MapChild.tsx', includeClass ? 'error' : 'warning'],
+				['MapContinues.tsx', includeClass ? 'error' : 'warning'],
+				['MapRoot.tsx', includeClass ? 'error' : 'warning'],
+				['MemberFragment.tsx', includeClass ? 'error' : 'warning'],
+				['NamedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['NativeFallbackClass.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedFragmentProps.tsx', includeClass ? 'error' : 'warning'],
+				['RootFragmentProps.tsx', includeClass ? 'error' : 'warning'],
+			]);
+			if (includeClass)
+				expect(
+					files
+						.find((file) => file.file === 'NativeFallbackClass.tsx')
+						.notes.find((note) => note.rule === 'class-component').message,
+				).toContain('this native template can render');
 		}
 	});
 
