@@ -188,6 +188,8 @@ export function projectTypeAt(node: ts.Node, types: TransformOptions['types']) {
  * members.
  */
 export function bind(filename: string, source: string) {
+	// The program asks its host for slash-delimited paths even on Windows.
+	filename = filename.replaceAll('\\', '/');
 	const lib = esLib();
 	const sf = ts.createSourceFile(
 		filename,
@@ -355,16 +357,14 @@ function readsCssToken(ref: ts.Identifier) {
 }
 
 /**
- * What a module's import of a package with no Octane port leaves to do.
+ * Describe a package import that the codemod keeps on React.
  */
 function portComment({ name, islands, blocked }: Unported) {
-	const missing = `No Octane port of \`${name}\` exists`;
-	if (blocked > 0) {
-		return `${missing}, and this module needs one: Octane cannot call its hooks, read its contexts, or pass Octane content to its components.`;
-	}
+	const retained = `Retained React import of \`${name}\``;
+	if (blocked > 0) return `${retained}. Review the uses that need a React renderer.`;
 	return islands > 0
-		? `${missing}, so its components render in React through ReactCompat.`
-		: `${missing}; React stays a dependency for it.`;
+		? `${retained}. Its components render in React through ReactCompat.`
+		: `${retained}. Keep React as a dependency.`;
 }
 
 /**
@@ -926,7 +926,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		// Added imports quote their module as the module's own imports do.
 		const first = this.sf.statements.find(ts.isImportDeclaration);
 		this.quote = first ? first.moduleSpecifier.getText(this.sf)[0] : "'";
-		/** Locals imported from a package with no Octane port. */
+		/** Locals whose package imports stay on React. */
 		const portLocals = new Set<string>();
 		const reactSvgImports = new Set<Import>();
 		for (const statement of this.sf.statements) {
@@ -942,7 +942,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						RULE.bindings,
 						'warning',
 						statement,
-						`\`${port.name}\` has no Octane port: import its components from it where they render, so they can render in a \`ReactCompat\` island.`,
+						`\`${port.name}\` stays on React. Import its components directly where they render so they can render in a \`ReactCompat\` island.`,
 					);
 				}
 			}
@@ -1436,8 +1436,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	}
 
 	/**
-	 * The package with no Octane port that a specifier names, or null. It
-	 * still runs on React, which only the codemod's report and a comment say.
+	 * The package that the codemod keeps on React for this specifier, or null.
 	 */
 	portOf(module: string) {
 		let port = this.ports.get(module);
@@ -1479,7 +1478,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	}
 
 	/**
-	 * A component from a package with no Octane port renders in React, inside
+	 * A component from a retained React import renders in React, inside
 	 * a `ReactCompat` island, when its element hands React nothing Octane
 	 * renders. Its hooks and contexts cannot run in an Octane component, so
 	 * they are reported.
@@ -1504,7 +1503,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const parent = member.parent;
 		const block = (message: string) => {
 			port.blocked++;
-			const error = `${message} \`${port.name}\` has no Octane port.`;
+			const error = `${message} \`${port.name}\` stays on React.`;
 			this.note(RULE.bindings, 'error', member, error);
 			return error;
 		};
@@ -1554,12 +1553,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 		} else if (ts.isCallExpression(parent) && parent.expression === member) {
 			if (/^use[A-Z0-9]/.test(name))
-				block(`\`${text}\` is a React hook, which Octane cannot call.`);
+				block(`\`${text}\` is a React hook. Keep this hook call under a React renderer.`);
 		} else if (
 			ts.isCallExpression(parent) &&
 			/^(?:use|useContext)$/.test(this.calleeName(parent.expression) ?? '')
 		) {
-			block(`\`${text}\` is a React context, which Octane cannot read.`);
+			block(`\`${text}\` is a React context. Keep this context read under a React renderer.`);
 		}
 	}
 
@@ -2977,9 +2976,20 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		}
 		// A React import of the same name becomes this import.
 		const prior = this.apiLocals.get(name);
+		const originalFactory =
+			module === 'octane' &&
+			name === 'createElement' &&
+			prior?.module === 'react' &&
+			[...this.imports].some(
+				([declaration, entry]) =>
+					entry === prior &&
+					ts.isImportSpecifier(declaration) &&
+					this.retainedReactFactoryImport(declaration),
+			);
 		const collides =
 			(this.declared.has(name) || this.readsGlobal(name)) &&
-			!(prior && mapReactImport(prior.module, prior.imported, prior.typeOnly)?.name === name);
+			(originalFactory ||
+				!(prior && mapReactImport(prior.module, prior.imported, prior.typeOnly)?.name === name));
 		let local = collides ? `Octane${name[0].toUpperCase()}${name.slice(1)}` : name;
 		while (collides && (this.declared.has(local) || this.readsGlobal(local))) local += '_';
 		names.set(name, { local, typeOnly });
@@ -3336,7 +3346,178 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		return null;
 	}
 
+	private retainedRegistryFactoryImport(react: ts.ImportDeclaration) {
+		const resolveRegistry = this.options.retainedRegistry;
+		const statements = this.sf.statements;
+		const bindings = react.importClause?.namedBindings;
+		if (
+			!resolveRegistry ||
+			statements.length !== 3 ||
+			!statements.slice(0, 2).every(ts.isImportDeclaration) ||
+			react.attributes ||
+			react.importClause?.name ||
+			!bindings ||
+			!ts.isNamedImports(bindings) ||
+			bindings.elements.length !== 1 ||
+			!this.options.originalReact
+		)
+			return false;
+
+		const binding = this.importOf(bindings.elements[0].name);
+		if (!binding || binding.typeOnly || binding.imported !== 'createElement') return false;
+
+		// Only a registration module can keep the descriptor without also moving
+		// a consumer of it in the same file.
+		const declaration = statements[2];
+		if (
+			!ts.isVariableStatement(declaration) ||
+			!(declaration.declarationList.flags & ts.NodeFlags.Const)
+		)
+			return false;
+		const [entry, extra] = declaration.declarationList.declarations;
+		const use = entry?.initializer;
+		if (
+			extra ||
+			!entry ||
+			!ts.isIdentifier(entry.name) ||
+			entry.type ||
+			!use ||
+			!ts.isCallExpression(use) ||
+			use.questionDotToken ||
+			use.typeArguments ||
+			!ts.isIdentifier(use.expression)
+		)
+			return false;
+		const owner = this.importOf(use.expression);
+		if (!owner || owner.namespace || owner.typeOnly) return false;
+		const [name, object, trailing] = use.arguments;
+		if (
+			!name ||
+			!ts.isStringLiteral(name) ||
+			!object ||
+			!ts.isObjectLiteralExpression(object) ||
+			trailing ||
+			object.properties.length !== 1
+		)
+			return false;
+		const [property] = object.properties;
+		if (!ts.isPropertyAssignment(property) || !ts.isIdentifier(property.name)) return false;
+		const arrow = property.initializer;
+		if (
+			!ts.isArrowFunction(arrow) ||
+			arrow.type ||
+			arrow.modifiers ||
+			arrow.typeParameters ||
+			arrow.parameters.length ||
+			ts.isBlock(arrow.body)
+		)
+			return false;
+		const call = skipParens(arrow.body);
+		if (
+			!ts.isCallExpression(call) ||
+			call.questionDotToken ||
+			call.typeArguments ||
+			this.importOf(call.expression) !== binding
+		)
+			return false;
+		const [tag, props, ...children] = call.arguments;
+		if (
+			!tag ||
+			!ts.isStringLiteral(tag) ||
+			(props &&
+				props.kind !== ts.SyntaxKind.NullKeyword &&
+				(!ts.isObjectLiteralExpression(props) ||
+					!props.properties.every(
+						(item) =>
+							ts.isPropertyAssignment(item) &&
+							ts.isIdentifier(item.name) &&
+							ts.isStringLiteral(item.initializer),
+					))) ||
+			!children.every(ts.isStringLiteral)
+		)
+			return false;
+
+		const types = this.options.types;
+		if (!types || types.sourceFile.text !== this.source) return false;
+		const file = resolveRegistry(owner.module);
+		if (!file) return false;
+		const { sourceFile, checker } = types;
+		const peer = nodeSpanning(sourceFile, call.getStart(this.sf), call.end);
+		const callee = nodeSpanning(sourceFile, use.expression.getStart(this.sf), use.expression.end);
+		const specifier = nodeSpanning(
+			sourceFile,
+			react.moduleSpecifier.getStart(this.sf),
+			react.moduleSpecifier.end,
+		);
+		if (!peer || !ts.isCallExpression(peer) || !callee || !specifier) return false;
+		const signatures = checker.getTypeAtLocation(callee).getCallSignatures();
+		const signature = signatures[0];
+		const decl = signature?.declaration;
+		if (
+			signatures.length !== 1 ||
+			signature.typeParameters?.length ||
+			!decl ||
+			!ts.isFunctionDeclaration(decl) ||
+			!decl.body ||
+			decl.getSourceFile() !== file ||
+			!(ts.getCombinedModifierFlags(decl) & ts.ModifierFlags.Export)
+		)
+			return false;
+		const module = checker.getSymbolAtLocation(specifier);
+		const reactNode =
+			module && checker.getExportsOfModule(module).find((symbol) => symbol.name === 'ReactNode');
+		return !!reactNode && checker.getContextualType(peer)?.aliasSymbol === reactNode;
+	}
+
 	// ---------------------------------------------------------------- imports
+
+	private retainedHookSetup() {
+		return {
+			calleeName: (callee: ts.Expression) => this.calleeName(callee),
+			nativeOutput: (element: ts.JsxElement | ts.JsxSelfClosingElement) =>
+				this.nativeOutput(element, this.localUses),
+			originalReact: () => this.options.originalReact === true,
+		};
+	}
+
+	private warnRetainedPrivateContext(module: string, name: string, site: ts.Expression) {
+		const resolution = module.endsWith('.js')
+			? ' and the import resolves to its TypeScript source'
+			: '';
+		this.note(
+			RULE.bindings,
+			'warning',
+			site,
+			`If native setup reaches the unchanged ${module} export ${name} after its module initializes${resolution}, its private helper calls React's useContext. Provide a compiled Octane hook or keep the component under React.`,
+		);
+	}
+
+	private checkRetainedNamespaceHooks(module: string, binding: ts.Identifier) {
+		const retainedHook = this.options.localReactHook;
+		if (!retainedHook) return;
+		let reported: Set<string> | undefined;
+		for (const ref of renderUses(this.localUses(binding))) {
+			const member = ref.parent;
+			if (!ts.isPropertyAccessExpression(member) && !ts.isElementAccessExpression(member)) continue;
+			if (member.expression !== ref || ts.isOptionalChain(member)) continue;
+			const name = ts.isPropertyAccessExpression(member)
+				? member.name.text
+				: ts.isStringLiteralLike(member.argumentExpression) && member.argumentExpression.text;
+			if (!name || !/^use[A-Z0-9]/.test(name) || reported?.has(name)) continue;
+			if (
+				!nativeSetupHook(member, this.localUses, this.checker, {
+					...this.retainedHookSetup(),
+					privateContext: true,
+				})
+			)
+				continue;
+			const local = retainedHook(module, name, false);
+			if (local && typeof local !== 'string' && 'privateContext' in local) {
+				this.warnRetainedPrivateContext(module, name, member);
+				(reported ??= new Set()).add(name);
+			}
+		}
+	}
 
 	rewriteImport(node: ts.ImportDeclaration) {
 		const native = this.pathSvgImports.get(node);
@@ -3359,17 +3540,17 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			);
 		}
 		if (module in REACT_MODULES) {
+			if (module === 'react' && this.retainedRegistryFactoryImport(node)) return null;
 			this.importSlots.push(node);
 			return `\u0000IMPORT${this.importSlots.length - 1}\u0000`;
 		}
 		const clause = node.importClause;
 		const bindings = clause?.namedBindings;
-		if (
-			bindings &&
-			ts.isNamespaceImport(bindings) &&
-			this.radixSlotImports?.get(bindings.name) === 'original'
-		)
-			return null;
+		if (clause && bindings && ts.isNamespaceImport(bindings)) {
+			if (this.radixSlotImports?.get(bindings.name) === 'original') return null;
+			if (!clause.isTypeOnly && !node.attributes)
+				this.checkRetainedNamespaceHooks(module, bindings.name);
+		}
 		if (clause && bindings && ts.isNamedImports(bindings)) {
 			const moved = new Map<string, string[]>();
 			const kept: ts.ImportSpecifier[] = [];
@@ -3402,12 +3583,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 							sites.length > 0 &&
 							sites.every(Boolean) &&
 							(!sites.includes('afterRefs') || this.options.originalReact === true);
-						const setup = {
-							calleeName: (callee: ts.Expression) => this.calleeName(callee),
-							nativeOutput: (element: ts.JsxElement | ts.JsxSelfClosingElement) =>
-								this.nativeOutput(element, this.localUses),
-							originalReact: () => this.options.originalReact === true,
-						};
+						const setup = this.retainedHookSetup();
 						const call =
 							refs[sites.indexOf('first')] ??
 							(nativeOnly
@@ -3447,16 +3623,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 									privateContext: true,
 								}),
 							);
-							const resolution = module.endsWith('.js')
-								? ' and the import resolves to its TypeScript source'
-								: '';
-							if (advisorySite)
-								this.note(
-									RULE.bindings,
-									'warning',
-									advisorySite,
-									`If native setup reaches the unchanged ${module} export ${name} after its module initializes${resolution}, its private helper calls React's useContext. Provide a compiled Octane hook or keep the component under React.`,
-								);
+							if (advisorySite) this.warnRetainedPrivateContext(module, name, advisorySite);
 						}
 					}
 					if (!dest) {
@@ -3505,7 +3672,9 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			!port ||
 			ts
 				.getLeadingCommentRanges(this.source, node.pos)
-				?.some((range) => this.source.slice(range.pos, range.end).includes('No Octane port of'))
+				?.some(({ pos, end }) =>
+					/(?:No Octane port|Retained React import) of/.test(this.source.slice(pos, end)),
+				)
 		)
 			return text;
 		return `// ${portComment(port)}\n${text ?? node.getText(this.sf)}`;
@@ -3899,6 +4068,118 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		);
 	}
 
+	private retainedReactFactory(ref: ts.Identifier) {
+		const call = ref.parent;
+		if (
+			!ts.isCallExpression(call) ||
+			call.expression !== ref ||
+			ts.isOptionalChain(call) ||
+			call.typeArguments?.length
+		)
+			return false;
+		const [tag, props, ...children] = call.arguments;
+		if (
+			!tag ||
+			!ts.isStringLiteral(tag) ||
+			props?.kind !== ts.SyntaxKind.NullKeyword ||
+			!children.every(ts.isStringLiteral)
+		)
+			return false;
+		let value: ts.Expression = call;
+		while (ts.isParenthesizedExpression(value.parent)) value = value.parent;
+		const direct = value.parent;
+		const block =
+			ts.isReturnStatement(direct) &&
+			ts.isBlock(direct.parent) &&
+			direct.parent.statements.length === 1
+				? direct.parent
+				: null;
+		const callback = block ? block.parent : direct;
+		if (
+			!ts.isArrowFunction(callback) ||
+			callback.body !== (block ?? value) ||
+			callback.parameters.length ||
+			callback.type ||
+			callback.typeParameters?.length ||
+			callback.modifiers?.length
+		)
+			return false;
+		const property = callback.parent;
+		if (
+			!ts.isPropertyAssignment(property) ||
+			property.initializer !== callback ||
+			!ts.isIdentifier(property.name) ||
+			property.name.text === '__proto__' ||
+			property.parent.properties.length !== 1
+		)
+			return false;
+		const expression = property.parent.parent;
+		const attribute = expression.parent;
+		if (
+			!ts.isJsxExpression(expression) ||
+			expression.dotDotDotToken ||
+			!ts.isJsxAttribute(attribute) ||
+			attribute.initializer !== expression ||
+			!ts.isIdentifier(attribute.name) ||
+			attribute.name.text !== 'props'
+		)
+			return false;
+		const island = attribute.parent.parent;
+		if (!ts.isJsxSelfClosingElement(island) || island.attributes.properties.length !== 2)
+			return false;
+		const component = island.attributes.properties.find((item) => item !== attribute);
+		if (
+			!component ||
+			!ts.isJsxAttribute(component) ||
+			!ts.isIdentifier(component.name) ||
+			component.name.text !== 'component' ||
+			!component.initializer ||
+			!ts.isJsxExpression(component.initializer) ||
+			!component.initializer.expression
+		)
+			return false;
+		const named = (id: ts.Node) => {
+			if (!ts.isIdentifier(id)) return;
+			const decl = this.declarationOf(id);
+			const entry = decl && this.imports.get(decl);
+			if (
+				decl &&
+				ts.isImportSpecifier(decl) &&
+				entry &&
+				!entry.typeOnly &&
+				!decl.parent.parent.parent.attributes
+			)
+				return entry;
+		};
+		const bridge = named(island.tagName);
+		const owner = named(component.initializer.expression);
+		return (
+			!!bridge &&
+			!!owner &&
+			nativeReactCompat(bridge.module, bridge.imported) &&
+			this.options.retainedReactBridgeComponent?.(bridge.module, owner.module, owner.imported) ===
+				true
+		);
+	}
+
+	private retainedReactFactoryImport(element: ts.ImportSpecifier) {
+		const binding = this.imports.get(element);
+		if (
+			binding?.module !== 'react' ||
+			binding.imported !== 'createElement' ||
+			binding.typeOnly ||
+			element.parent.parent.parent.attributes ||
+			this.target !== 'tsrx' ||
+			!this.hasReactBridge ||
+			!this.options.retainedReactBridgeComponent ||
+			!this.options.originalReact ||
+			hasEval(this.sf)
+		)
+			return false;
+		const refs = this.localUses(element.name).filter((ref) => !inTypeNode(ref));
+		return refs.length > 0 && refs.every((ref) => this.retainedReactFactory(ref));
+	}
+
 	/**
 	 * Fill each React import placeholder. The first one carries every Octane
 	 * import the module needs, the module's own specifiers first; the others
@@ -3920,6 +4201,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		const kept = new Map<string, string[]>();
 		/** Locals of React's `jsx` factories, which a JSX runtime consumer calls. */
 		const factories: string[] = [];
+		let retainsCreateElement = false;
 		for (const node of this.importSlots) {
 			const module = (node.moduleSpecifier as ts.StringLiteral).text;
 			const clause = node.importClause;
@@ -3936,6 +4218,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				if (!this.used.has(local)) continue;
 				const imported = (element.propertyName ?? element.name).text;
 				const typeOnly = clause.isTypeOnly || element.isTypeOnly;
+				if (imported === 'createElement' && this.retainedReactFactoryImport(element)) {
+					add(module, imported, local, false);
+					retainsCreateElement ||= local === 'createElement';
+					continue;
+				}
 				const mapped = mapReactImport(module, imported, typeOnly);
 				if (mapped) {
 					// A name read only in types imports as a type, which bundlers elide.
@@ -3959,6 +4246,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				kept.set(module, [...(kept.get(module) ?? []), spec]);
 			}
 		}
+		const jsxFactory =
+			retainsCreateElement && factories.length > 0
+				? this.require('octane', 'createElement', false)
+				: 'createElement';
+		if (jsxFactory !== 'createElement')
+			imports.get('octane')?.delete('createElement createElement');
 		for (const [module, names] of this.added) {
 			for (const [name, { local, typeOnly }] of names) add(module, name, local, typeOnly);
 		}
@@ -3985,12 +4278,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			// React's runtime takes the key apart from the props; Octane's
 			// `createElement` reads it from them.
 			const params = this.isTypeScript()
-				? 'type: Parameters<typeof createElement>[0], props: Record<string, unknown>, key?: string | number'
+				? `type: Parameters<typeof ${jsxFactory}>[0], props: Record<string, unknown>, key?: string | number`
 				: 'type, props, key';
 			const [first, ...rest] = factories;
 			lines.push(
 				`function ${first}(${params}) {`,
-				`${this.indentUnit}return createElement(type, key === undefined ? props : { ...props, key });`,
+				`${this.indentUnit}return ${jsxFactory}(type, key === undefined ? props : { ...props, key });`,
 				'}',
 				...rest.map((local) => `const ${local} = ${first};`),
 			);
@@ -4051,7 +4344,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		// the Strong fallback can find its own directive line again. The
 		// comment on an unported package's import stays with it.
 		const prologue =
-			/^(?:#![^\n]*\n)?(?:[ \t]*(?:\/\/(?! No Octane port of)[^\n]*|\/\*[\s\S]*?\*\/[ \t]*|(['"])use [a-z ]+\1;?[^\n]*)?\r?\n)*/.exec(
+			/^(?:#![^\n]*\n)?(?:[ \t]*(?:\/\/(?! (?:No Octane port|Retained React import) of)[^\n]*|\/\*[\s\S]*?\*\/[ \t]*|(['"])use [a-z ]+\1;?[^\n]*)?\r?\n)*/.exec(
 				code,
 			);
 		return prologue ? prologue[0].length : 0;
@@ -4121,18 +4414,24 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				const topLevelInitializer =
 					ts.isVariableDeclaration(declaration) &&
 					declaration.initializer === value &&
+					ts.isVariableDeclarationList(declaration.parent) &&
 					ts.isVariableStatement(declaration.parent.parent) &&
 					declaration.parent.parent.parent === this.sf;
-				if (
-					(isTag || topLevelInitializer) &&
-					ts.isIdentifier(node.expression) &&
-					this.hasLocalProviderGetter(node.expression)
-				)
+				const change =
+					(isTag || topLevelInitializer) && ts.isIdentifier(node.expression)
+						? this.localProviderReadChange(
+								node.expression,
+								topLevelInitializer && declaration.parent.declarations[0] === declaration
+									? declaration.parent.parent
+									: undefined,
+							)
+						: undefined;
+				if (change)
 					this.note(
 						CONTEXT_PROVIDER_GETTER,
 						'error',
 						node,
-						'Replacing this React context Provider read can skip an authored getter. Review the custom Provider before migrating it.',
+						`Replacing this React context Provider read can skip an authored ${change}. Review the custom Provider before migrating it.`,
 					);
 				this.count(RULE.provider);
 			}
@@ -6024,8 +6323,13 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return ts.isCallExpression(node) && this.calleeName(node.expression) === 'createContext';
 	}
 
-	private hasLocalProviderGetter(context: ts.Identifier): boolean {
-		if (!this.source.includes('defineProperty') && !this.source.includes('\\u')) return false;
+	private localProviderReadChange(context: ts.Identifier, capture: ts.Statement | undefined) {
+		if (
+			!this.source.includes('defineProperty') &&
+			!(capture && this.source.includes('assign')) &&
+			!this.source.includes('\\u')
+		)
+			return;
 		const initial = this.constValue(context);
 		const factory = initial && skipParens(initial);
 		if (
@@ -6033,8 +6337,11 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			!ts.isCallExpression(factory) ||
 			this.reactHook(factory.expression) !== 'createContext'
 		)
-			return false;
-		return this.localUses(context).some((reference) => {
+			return;
+		let change: 'getter' | 'Provider replacement' = 'getter';
+		const declaration = this.declarationOf(context);
+		const references = this.localUses(context);
+		const found = references.some((reference) => {
 			let target: ts.Expression = reference;
 			while (isWrapper(target.parent) && target.parent.expression === target)
 				target = target.parent;
@@ -6051,17 +6358,63 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				return false;
 			const method = skipWrappers(call.expression);
 			const object = ts.isPropertyAccessExpression(method) && skipWrappers(method.expression);
-			const [, keyArgument, descriptorArgument] = call.arguments;
-			const key = keyArgument && skipWrappers(keyArgument);
-			const descriptor = descriptorArgument && skipWrappers(descriptorArgument);
 			if (
 				!ts.isPropertyAccessExpression(method) ||
 				method.questionDotToken ||
-				method.name.text !== 'defineProperty' ||
 				!object ||
 				!ts.isIdentifier(object) ||
 				object.text !== 'Object' ||
-				this.declarationOf(object)?.getSourceFile().hasNoDefaultLib !== true ||
+				this.declarationOf(object)?.getSourceFile().hasNoDefaultLib !== true
+			)
+				return false;
+			const [, keyArgument, descriptorArgument] = call.arguments;
+			if (capture && method.name.text === 'assign' && call.arguments.length === 2) {
+				if (
+					this.sf.statements[this.sf.statements.indexOf(capture) - 1] !== call.parent ||
+					hasEval(this.sf) ||
+					this.localUses(object).some((use) => !inTypeNode(use)) ||
+					references.some(
+						(use) =>
+							use !== reference &&
+							!(declaration && ts.isVariableDeclaration(declaration) && use === declaration.name) &&
+							!inTypeNode(use),
+					)
+				)
+					return false;
+				const data = skipWrappers(keyArgument);
+				if (!ts.isObjectLiteralExpression(data) || data.properties.length !== 1) return false;
+				const [property] = data.properties;
+				const name = property.name;
+				if (
+					!name ||
+					(!ts.isIdentifier(name) && !ts.isStringLiteral(name)) ||
+					name.text !== 'Provider' ||
+					!ts.isPropertyAssignment(property)
+				)
+					return false;
+				const value = skipWrappers(property.initializer);
+				const binding = ts.isIdentifier(value) && this.declarationOf(value);
+				if (
+					!ts.isArrowFunction(value) &&
+					!ts.isFunctionExpression(value) &&
+					!(
+						binding &&
+						ts.isFunctionDeclaration(binding) &&
+						binding.parent === this.sf &&
+						binding.body &&
+						binding.name &&
+						!binding.modifiers?.length &&
+						renderUses(this.localUses(binding.name)).every((ref) => ref === value)
+					)
+				)
+					return false;
+				change = 'Provider replacement';
+				return true;
+			}
+			const key = keyArgument && skipWrappers(keyArgument);
+			const descriptor = descriptorArgument && skipWrappers(descriptorArgument);
+			if (
+				method.name.text !== 'defineProperty' ||
 				!key ||
 				!ts.isStringLiteralLike(key) ||
 				key.text !== 'Provider' ||
@@ -6092,6 +6445,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			}
 			return getter;
 		});
+		return found ? change : undefined;
 	}
 
 	/**
@@ -6166,11 +6520,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return `@{ const ${param} = ${useContext}(${this.emit(tag.expression, PLAIN)}); ${output} }`;
 	}
 
-	/**
-	 * `<Suspense fallback={f}>…</Suspense>` is the template boundary
-	 * `@try { … } @pending { f }`.
-	 */
-	rewriteSuspense(node: ts.JsxElement) {
+	private suspenseFallback(node: ts.JsxElement) {
 		const attributes = node.openingElement.attributes.properties.filter(
 			(a) => !this.removed.has(a),
 		);
@@ -6183,8 +6533,20 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		) {
 			return null;
 		}
-		let pending: string;
 		const value = fallback.initializer;
+		return ts.isStringLiteral(value) || (ts.isJsxExpression(value) && value.expression)
+			? value
+			: null;
+	}
+
+	/**
+	 * `<Suspense fallback={f}>…</Suspense>` is the template boundary
+	 * `@try { … } @pending { f }`.
+	 */
+	rewriteSuspense(node: ts.JsxElement) {
+		const value = this.suspenseFallback(node);
+		if (!value) return null;
+		let pending: string;
 		if (ts.isStringLiteral(value)) pending = `<>{${value.getText(this.sf)}}</>`;
 		else if (ts.isJsxExpression(value) && value.expression) {
 			const expression = skipParens(value.expression);
@@ -7148,7 +7510,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				) &&
 				this.options.automaticReactJsx
 			)
-				this.checkReactClassOutput(inner);
+				this.checkReactClassOutput(inner, false, true);
 			return null;
 		}
 		let output = this.output(inner);
@@ -7273,34 +7635,58 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return null;
 	}
 
-	private checkReactClassOutput(node: ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment) {
+	private checkReactClassOutput(
+		node: ts.JsxElement | ts.JsxSelfClosingElement | ts.JsxFragment,
+		conditional = false,
+		retained = false,
+	) {
 		if (!this.options.localReactClass) return;
-		const callee = ts.isJsxElement(node) && this.callee(node.openingElement.tagName);
-		if (
-			ts.isJsxFragment(node) ||
-			(ts.isJsxElement(node) &&
-				callee &&
-				callee.module === 'react' &&
-				callee.name === 'StrictMode' &&
-				!this.islands.has(node) &&
-				!this.unrenderable.has(node) &&
-				!this.reactRendererBodies.has(node))
-		) {
-			for (const child of node.children) if (isJsx(child)) this.checkReactClassOutput(child);
-		} else if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
-			this.checkReactClassRoot(node);
+		if (!ts.isJsxFragment(node)) {
+			if (
+				this.islands.has(node) ||
+				this.unrenderable.has(node) ||
+				this.reactRendererBodies.has(node)
+			)
+				return;
+			if (ts.isJsxSelfClosingElement(node))
+				return this.checkReactClassRoot(node, conditional, retained);
+			const tag = node.openingElement.tagName;
+			const callee = this.callee(tag);
+			if (callee?.module !== 'react' && callee?.module !== 'octane')
+				return this.checkReactClassRoot(node, conditional, retained);
+			if (callee.name === 'Fragment') {
+				const member = ts.isPropertyAccessExpression(tag);
+				const reference = member ? tag.expression : tag;
+				const declaration = ts.isIdentifier(reference) && this.declarationOf(reference);
+				if (
+					!declaration ||
+					this.imports.get(declaration)?.typeOnly !== false ||
+					(member && callee.module === 'octane' && !ts.isNamespaceImport(declaration))
+				)
+					return this.checkReactClassRoot(node, conditional, retained);
+				const imp = ts.findAncestor(declaration, ts.isImportDeclaration);
+				if (!imp || imp.attributes) return this.checkReactClassRoot(node, conditional, retained);
+			} else if (callee.name !== 'StrictMode') {
+				const fallback = !retained && callee.name === 'Suspense' && this.suspenseFallback(node);
+				if (!fallback) return this.checkReactClassRoot(node, conditional, retained);
+				if (ts.isJsxExpression(fallback) && fallback.expression) {
+					const expression = skipParens(fallback.expression);
+					if (isJsx(expression)) this.checkReactClassOutput(expression, true);
+				}
+			}
+		}
+		for (const child of node.children) {
+			if (isJsx(child)) this.checkReactClassOutput(child, conditional, retained);
 		}
 	}
 
-	private checkReactClassRoot(node: ts.JsxElement | ts.JsxSelfClosingElement) {
+	private checkReactClassRoot(
+		node: ts.JsxElement | ts.JsxSelfClosingElement,
+		conditional: boolean,
+		retained: boolean,
+	) {
 		const check = this.options.localReactClass;
-		if (
-			!check ||
-			this.islands.has(node) ||
-			this.unrenderable.has(node) ||
-			this.reactRendererBodies.has(node)
-		)
-			return;
+		if (!check) return;
 		const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
 		if (!ts.isIdentifier(tag) || !isComponentName(tag.text)) return;
 		const entry = this.importOf(tag);
@@ -7314,8 +7700,8 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			severity,
 			tag,
 			severity === 'error'
-				? `The migration resolves \`${entry.module}\` to the imported React class \`${tag.text}\`. The call fails if Octane renders this output. Keep this render in React or replace the class with an Octane function component.`
-				: `If Octane renders the imported React class \`${tag.text}\` resolved from \`${entry.module}\`, the call will fail. Verify the runtime import, keep the render in React, or replace the class with an Octane function component.`,
+				? `The migration resolves \`${entry.module}\` to the imported React class \`${tag.text}\`, ${retained ? 'which fails if Octane renders this output' : `which this native template ${conditional ? 'can render' : 'renders'}`}. Keep this render in React or replace the class with an Octane function component.`
+				: `If ${retained ? 'Octane' : 'this native template'} renders the imported React class \`${tag.text}\` resolved from \`${entry.module}\`, the call will fail. Verify the runtime import, keep the render in React, or replace the class with an Octane function component.`,
 		);
 	}
 
@@ -7326,8 +7712,19 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	/** A direct module component, without going through an arbitrary wrapper or callback. */
 	private moduleComponent(node: ts.FunctionDeclaration | ts.FunctionExpression | ts.ArrowFunction) {
 		const parent = node.parent;
+		if (parent === this.sf && ts.isFunctionDeclaration(node)) {
+			if (
+				!node.name ||
+				node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+			)
+				return true;
+			const refs = renderUses(this.localUses(node.name));
+			return (
+				refs.some((ref) => ts.isExportSpecifier(ref.parent) || ts.isExportAssignment(ref.parent)) ||
+				(refs.length > 0 && refs.every(componentTagOrExport))
+			);
+		}
 		return (
-			parent === this.sf ||
 			(ts.isExportAssignment(parent) && !parent.isExportEquals && parent.parent === this.sf) ||
 			(ts.isVariableDeclaration(parent) &&
 				parent.initializer === node &&
