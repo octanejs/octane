@@ -4538,6 +4538,72 @@ export function Inspector({ children }: { children: Child }) { return isValidEle
 		]);
 	});
 
+	it('renames relative HTML module paths without rewriting their URL suffix or other text', async () => {
+		const src = "./Page.tsx?mode=warm&amp;label=it's#section";
+		const script = `<script data-src="${src}" TYPE="module" SRC = "${src}"></script>`;
+		const html = [
+			`<!-- ${script} -->`,
+			`<script>const example = ${JSON.stringify(script.replace('</script>', ''))};</script>`,
+			`<script type="module" vite-ignore src="${src}"></script>`,
+			`<svg><script xlink:type="module" src="${src}"></script></svg>`,
+			`<script type="module" src="//cdn.example/Page.tsx?mode=warm"></script>`,
+			script,
+		].join('\n');
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'index.html': html,
+			'src/nested.html': '<script type="module" src=\'../Page.tsx#section\'></script>',
+			'public/redirect.html':
+				'<base href="./elsewhere/"><script type="module" src="../Page.tsx?mode=warm"></script>',
+			'Page.tsx': 'export const Page = () => <h1 />;',
+		});
+
+		const result = await runCodemod([path.join(root, 'Page.tsx')], { verify: false });
+
+		const read = (/** @type {string} */ name) => fs.readFileSync(path.join(root, name), 'utf8');
+		expect(result.html.sort()).toEqual(['index.html', 'src/nested.html']);
+		expect(read('index.html')).toBe(
+			html.slice(0, -script.length) +
+				script.replace(`SRC = "${src}`, 'SRC = "' + src.replace('.tsx', '.tsrx')),
+		);
+		expect(read('src/nested.html')).toBe(
+			'<script type="module" src=\'../Page.tsrx#section\'></script>',
+		);
+		expect(read('public/redirect.html')).toBe(
+			'<base href="./elsewhere/"><script type="module" src="../Page.tsx?mode=warm"></script>',
+		);
+		expect(fs.existsSync(path.join(root, 'Page.tsrx'))).toBe(true);
+		expect(fs.existsSync(path.join(root, 'Page.tsx'))).toBe(false);
+	});
+
+	it('follows nested Vite entry scripts without treating inactive bases as document bases', async () => {
+		const html = [
+			'<html><head><noscript><base href="/elsewhere/"></noscript></head><body>',
+			'<template><template><base href="/elsewhere/"><script type="module" src="./Page.tsx"></script></template></template>',
+			'<noscript><base href="/elsewhere/"><script type="module" src="./Page.tsx#other"></script></noscript>',
+			'<svg><script type="module" src="./Page.tsx"></script></svg>',
+			'<script type="module" src="./Page.tsx?mode=warm"></script>',
+			'</body></html>',
+		].join('\n');
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'index.html': html,
+			'public/redirect.html':
+				'<base href="/elsewhere/"><script type="module" src="../Page.tsx"></script>',
+			'Page.tsx': 'export const Page = () => <h1 />;',
+		});
+
+		const result = await runCodemod([path.join(root, 'Page.tsx')], { verify: false });
+
+		expect(result.html.sort()).toEqual(['index.html', 'public/redirect.html']);
+		expect(fs.readFileSync(path.join(root, 'index.html'), 'utf8')).toBe(
+			html.replaceAll('./Page.tsx', './Page.tsrx'),
+		);
+		expect(fs.readFileSync(path.join(root, 'public/redirect.html'), 'utf8')).toContain(
+			'src="../Page.tsrx"',
+		);
+	});
+
 	it('renames template modules and rewrites every import of them', async () => {
 		const root = project({
 			'package.json':
