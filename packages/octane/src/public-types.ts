@@ -214,6 +214,7 @@ export type KeyboardEvent<T = Element> = NativeEvent<T, globalThis.KeyboardEvent
 export type KeyboardEventHandler<T = Element> = EventHandler<KeyboardEvent<T>>;
 export type MouseEvent<T = Element> = NativeEvent<T, globalThis.MouseEvent>;
 export type MouseEventHandler<T = Element> = EventHandler<MouseEvent<T>>;
+export type Touch = React.Touch;
 export type TouchEvent<T = Element> = NativeEvent<T, globalThis.TouchEvent>;
 export type TouchEventHandler<T = Element> = EventHandler<TouchEvent<T>>;
 export type PointerEvent<T = Element> = NativeEvent<T, globalThis.PointerEvent>;
