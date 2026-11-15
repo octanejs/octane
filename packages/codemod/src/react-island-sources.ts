@@ -226,10 +226,11 @@ function hasSingleReactImport(sf: ts.SourceFile, source: string) {
 export function retainedReactContextExports(file: string, source: string) {
 	const { sf, checker } = bind(file, source);
 	const module = checker.getSymbolAtLocation(sf);
-	const names = new Set<string>();
+	const names = new Map<string, boolean>();
 	if (!module) return names;
 	let uses: ReturnType<typeof localUses> | undefined;
 	let singleReactImport: boolean | undefined;
+	let dynamicScope: boolean | undefined;
 	for (const symbol of checker.getExportsOfModule(module)) {
 		const declaration = localValueExport(symbol, checker);
 		if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer)
@@ -249,7 +250,7 @@ export function retainedReactContextExports(file: string, source: string) {
 		if (entry?.module !== 'react' || entry.name !== 'createContext') continue;
 		if (ts.isPropertyAccessExpression(factory)) {
 			// With interop the default and namespace can share the same mutable React object.
-			singleReactImport ??= !hasEval(sf) && hasSingleReactImport(sf, source);
+			singleReactImport ??= !(dynamicScope ??= hasEval(sf)) && hasSingleReactImport(sf, source);
 			if (
 				!singleReactImport ||
 				!ts.isIdentifier(factory.expression) ||
@@ -258,7 +259,15 @@ export function retainedReactContextExports(file: string, source: string) {
 			)
 				continue;
 		}
-		names.add(symbol.name);
+		// The context itself stays a React value even if its Provider member is reassigned.
+		// For a retained member read, require the producer to keep that object local.
+		const unchangedProvider =
+			ts.isIdentifier(declaration.name) &&
+			!(dynamicScope ??= hasEval(sf)) &&
+			(uses ??= localUses(sf, checker))(declaration.name).every(
+				(ref) => inTypeNode(ref) || componentTagOrExport(ref),
+			);
+		names.set(symbol.name, unchangedProvider);
 	}
 	return names;
 }

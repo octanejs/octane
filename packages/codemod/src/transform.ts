@@ -776,7 +776,7 @@ class ModuleTransform {
 	/** `<Fragment key>` rows whose key moved to the `@for` header. */
 	readonly bare = new Set<ts.Node>();
 	/** Map calls in output with a proven native renderer. */
-	classOutputMaps?: WeakSet<ts.CallExpression>;
+	nativeOutputMaps?: WeakSet<ts.CallExpression>;
 	private logicalResults?: WeakMap<ts.BinaryExpression, number>;
 	/** Functions whose parameter list a rule replaced. */
 	readonly parameters = new Map<ts.Node, string>();
@@ -7018,10 +7018,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	arm(expression: ts.Expression, componentRoot = false): string | null {
 		const node = skipParens(expression);
 		if (isJsx(node)) {
-			if (componentRoot) {
-				this.checkRetainedReactContext(node);
-				this.checkReactClassOutput(node);
-			}
+			if (componentRoot) this.checkNativeOutput(node);
 			return this.relative(this.emit(node, TEMPLATE), node);
 		}
 		if (isNullish(node)) return '';
@@ -7271,19 +7268,16 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			)
 				this.bare.add(opening.parent);
 		}
-		const classOutput =
-			this.options.localReactClass && (componentRoot || this.classOutputMaps?.has(node));
-		const contextOutput = componentRoot && this.options.localReactContext;
-		const rowCanRender =
-			(classOutput || contextOutput) &&
+		if (
+			(componentRoot || this.nativeOutputMaps?.has(node)) &&
 			literal.elements.some((element) => !ts.isSpreadElement(element)) &&
-			(!skipsRow || this.mapRowCanRender(item, literal, setup));
-		if (classOutput && rowCanRender) this.checkReactClassOutput(root);
+			(!skipsRow || this.mapRowCanRender(item, literal, setup))
+		)
+			this.checkNativeOutput(root);
 		const arm = ts.isConditionalExpression(root)
 			? this.ifDirective(root)
 			: this.relative(this.emit(root, TEMPLATE), root);
 		if (arm === null) return null;
-		if (contextOutput && rowCanRender) this.checkRetainedReactContext(root);
 		if (index && this.patternReadsOrdinal(item.name, index)) {
 			this.note(
 				MAP_PARAMETER_TDZ,
@@ -7774,7 +7768,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				) &&
 				this.options.automaticReactJsx
 			)
-				this.checkReactClassOutput(inner, false, true);
+				this.checkNativeOutput(inner, false, true);
 			return null;
 		}
 		let output = this.output(inner);
@@ -7890,8 +7884,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	 */
 	output(node: ts.Expression) {
 		if (isJsx(node)) {
-			this.checkRetainedReactContext(node);
-			this.checkReactClassOutput(node);
+			this.checkNativeOutput(node);
 			return this.emit(node, TEMPLATE);
 		}
 		if (ts.isConditionalExpression(node) || ts.isCallExpression(node)) {
@@ -7932,13 +7925,13 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return TRUTHY | FALSY | NULLISH;
 	}
 
-	private checkReactClassOutput(
+	private checkNativeOutput(
 		node: ts.Expression,
 		conditional: boolean | 'map' = false,
 		retained = false,
 		descriptorValue = false,
 	) {
-		if (!this.options.localReactClass) return;
+		if (!this.options.localReactClass && !this.options.localReactContext) return;
 		if (!retained) {
 			while (isWrapper(node)) {
 				// String assertions select text in template holes. Descriptor values erase them.
@@ -7955,9 +7948,9 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			if (ts.isConditionalExpression(node)) {
 				const condition = literalCondition(node.condition);
 				if (condition === undefined || condition === 'truthy')
-					this.checkReactClassOutput(node.whenTrue, conditional, false, descriptorValue);
+					this.checkNativeOutput(node.whenTrue, conditional, false, descriptorValue);
 				if (condition !== 'truthy')
-					this.checkReactClassOutput(node.whenFalse, conditional, false, descriptorValue);
+					this.checkNativeOutput(node.whenFalse, conditional, false, descriptorValue);
 				return;
 			}
 			if (ts.isBinaryExpression(node)) {
@@ -7967,31 +7960,34 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				const left = this.logicalResult(node.left);
 				// The left result of && is falsy and cannot render JSX.
 				if (operator !== ts.SyntaxKind.AmpersandAmpersandToken && left & ~rightCases)
-					this.checkReactClassOutput(node.left, conditional, false, descriptorValue);
+					this.checkNativeOutput(node.left, conditional, false, descriptorValue);
 				if (left & rightCases)
-					this.checkReactClassOutput(node.right, conditional, false, descriptorValue);
+					this.checkNativeOutput(node.right, conditional, false, descriptorValue);
 				return;
 			}
 			if (ts.isArrayLiteralExpression(node)) {
 				for (const element of node.elements)
-					this.checkReactClassOutput(element, conditional, false, true);
+					this.checkNativeOutput(element, conditional, false, true);
 				return;
 			}
 			if (ts.isCallExpression(node)) {
 				const callee = node.expression;
 				if (!ts.isPropertyAccessExpression(callee) || callee.name.text !== 'map') return;
-				if (descriptorValue) this.checkDescriptorMapClassOutput(node, callee.expression);
-				else if (!conditional) (this.classOutputMaps ??= new WeakSet()).add(node);
+				if (descriptorValue) {
+					if (this.options.localReactClass)
+						this.checkDescriptorMapClassOutput(node, callee.expression);
+				} else if (!conditional) (this.nativeOutputMaps ??= new WeakSet()).add(node);
 				return;
 			}
 		}
 		if (!isJsx(node)) return;
 		if (!ts.isJsxFragment(node)) {
 			if (this.retainedReactOutput(node)) return;
+			if (!retained && !descriptorValue) this.checkRetainedReactContext(node);
 			if (ts.isJsxSelfClosingElement(node))
 				return this.checkReactClassRoot(node, conditional, retained);
 			if (!retained && rendersOrdinaryHtmlChildren(node.openingElement)) {
-				this.checkReactClassChildren(node, conditional, false, descriptorValue);
+				this.checkNativeChildren(node, conditional, false, descriptorValue);
 				return;
 			}
 			const tag = node.openingElement.tagName;
@@ -8016,7 +8012,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					if (ts.isJsxExpression(fallback) && fallback.expression) {
 						const expression = skipParens(fallback.expression);
 						if (isJsx(expression))
-							this.checkReactClassOutput(
+							this.checkNativeOutput(
 								expression,
 								conditional === 'map' ? 'map' : true,
 								false,
@@ -8028,7 +8024,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				return this.checkReactClassRoot(node, conditional, retained);
 			}
 		}
-		this.checkReactClassChildren(node, conditional, retained, descriptorValue);
+		this.checkNativeChildren(node, conditional, retained, descriptorValue);
 	}
 
 	private checkDescriptorMapClassOutput(call: ts.CallExpression, receiver: ts.Expression) {
@@ -8056,19 +8052,19 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				: undefined
 			: body;
 		// The retained map can be overridden and discard its callback's result.
-		if (output) this.checkReactClassOutput(output, 'map', false, true);
+		if (output) this.checkNativeOutput(output, 'map', false, true);
 	}
 
-	private checkReactClassChildren(
+	private checkNativeChildren(
 		node: ts.JsxElement | ts.JsxFragment,
 		conditional: boolean | 'map',
 		retained: boolean,
 		descriptorValue: boolean,
 	) {
 		for (const child of node.children) {
-			if (isJsx(child)) this.checkReactClassOutput(child, conditional, retained, descriptorValue);
+			if (isJsx(child)) this.checkNativeOutput(child, conditional, retained, descriptorValue);
 			else if (!retained && ts.isJsxExpression(child) && child.expression && !child.dotDotDotToken)
-				this.checkReactClassOutput(child.expression, conditional, false, descriptorValue);
+				this.checkNativeOutput(child.expression, conditional, false, descriptorValue);
 		}
 	}
 
@@ -8086,37 +8082,48 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		if (declaration && !declaration.attributes) return { tag, entry };
 	}
 
-	private checkRetainedReactContext(expression: ts.Expression) {
-		if (!this.options.localReactContext) return;
-		const node = skipParens(expression);
-		if (ts.isConditionalExpression(node)) {
-			const condition = literalCondition(node.condition);
-			if (condition === undefined || condition === 'truthy')
-				this.checkRetainedReactContext(node.whenTrue);
-			if (condition !== 'truthy') this.checkRetainedReactContext(node.whenFalse);
-			return;
-		}
-		if (
-			!(ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) ||
-			this.retainedReactOutput(node)
-		)
-			return;
+	private checkRetainedReactContext(node: ts.JsxElement | ts.JsxSelfClosingElement) {
+		const check = this.options.localReactContext;
+		if (!check) return;
 		const tag = ts.isJsxElement(node) ? node.openingElement.tagName : node.tagName;
 		const provider = ts.isPropertyAccessExpression(tag) && tag.name.text === 'Provider';
 		if (!provider && (!ts.isIdentifier(tag) || !isComponentName(tag.text))) return;
 		const binding = this.directImportedValue(provider ? tag.expression : tag);
 		if (!binding) return;
 		const { tag: context, entry } = binding;
+		if (!check(entry.module, entry.imported, false)) return;
+		const retainedMember = provider && !this.isContext(context);
 		if (
-			this.options.localReactContext(entry.module, entry.imported) &&
-			(!provider || this.isContext(context, tag))
+			retainedMember &&
+			(!check(entry.module, entry.imported, true) || !this.hasUnchangedProviderUse(context))
 		)
-			this.note(
-				'retained-react-context',
-				'warning',
-				tag,
-				`If this native template resolves \`${entry.module}\` to the retained React context \`${context.text}\`, Octane cannot render it as a provider. Verify the runtime import and keep this render in React or migrate the context producer.`,
-			);
+			return;
+		this.note(
+			'retained-react-context',
+			'warning',
+			tag,
+			retainedMember
+				? `If \`${context.text}.Provider\` from \`${entry.module}\` still exposes the React provider, this native template cannot render it. Verify the runtime import and keep this render in React or migrate the context producer.`
+				: `If this native template resolves \`${entry.module}\` to the retained React context \`${context.text}\`, Octane cannot render it as a provider. Verify the runtime import and keep this render in React or migrate the context producer.`,
+		);
+	}
+
+	private hasUnchangedProviderUse(context: ts.Identifier) {
+		return (
+			(!/eval|\\/.test(this.source) || !hasEval(this.sf)) &&
+			this.localUses(context).every((ref) => {
+				if (declaresName(ref) || inTypeNode(ref) || componentTagOrExport(ref)) return true;
+				const member = ref.parent;
+				if (!ts.isPropertyAccessExpression(member) || member.expression !== ref) return false;
+				const use = member.parent;
+				return (
+					(ts.isJsxOpeningElement(use) ||
+						ts.isJsxSelfClosingElement(use) ||
+						ts.isJsxClosingElement(use)) &&
+					use.tagName === member
+				);
+			})
+		);
 	}
 
 	private checkReactClassRoot(

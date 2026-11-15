@@ -54,7 +54,7 @@ export interface TransformOptions {
 	/** A dispatcher hook directly called by an unchanged component at a migrated React DOM root. */
 	localReactRootComponent?(module: string, name: string): string | undefined;
 	/** A directly imported context declaration that remains in React. */
-	localReactContext?(module: string, name: string): boolean;
+	localReactContext?(module: string, name: string, member: boolean): boolean;
 	/** Severity for a direct render of a local React class component. */
 	localReactClass?(module: string, name: string): 'error' | 'warning' | undefined;
 	/** Resolve a source-backed workspace hook after verifying its implementation and its call sites. */

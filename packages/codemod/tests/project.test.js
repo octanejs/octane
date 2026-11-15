@@ -228,6 +228,26 @@ describe('runCodemod', () => {
 			BothArms: [`if (shown) return ${provider}; return ${provider};`, 2],
 			Map: ['return [1, 2].map(n => <State key={n} value={null} />);', 1],
 			MapConditional: [`return [1, 2].map(n => shown ? ${provider} : null);`, 1],
+			Fragment: [`return <>${provider}</>;`, 1],
+			Host: [`return <main>${provider}</main>;`, 1],
+			HostAnd: [`return <main>{Boolean(shown) && ${provider}}</main>;`, 1],
+			HostMap: [
+				`return <main>{[1, 2].map(n => <section key={n}>{Boolean(shown) && ${provider}}</section>)}</main>;`,
+				1,
+			],
+			RowAnd: [
+				`return [1, 2].map(n => <section key={n}>{Boolean(shown) && ${provider}}</section>);`,
+				1,
+			],
+			FragmentDead: [`return <>{false && ${provider}}</>;`, 0],
+			PlainMember: ['return <State.Provider value={null}><b>ready</b></State.Provider>;', 1],
+			ReplacedHere: ['State.Provider = () => null; return <State.Provider value={null}/>;', 0],
+			ReplacedOwner: ['return <State.Provider value={null}/>;', 0],
+			ReplacedGetter: ['return <State.Provider value={null}/>;', 0],
+			ChildOverride: [
+				`return <main dangerouslySetInnerHTML={{__html: 'raw'}}>${provider}</main>;`,
+				0,
+			],
 			Dead: [`return false ? ${provider} : <i />;`, 0],
 			DeadAnd: [`return shown ? (false && ${provider}) : <i />;`, 0],
 			TerminalGuard: [`if (true) return <i />; return ${provider};`, 0],
@@ -247,10 +267,14 @@ describe('runCodemod', () => {
 				}),
 				'owner.ts':
 					"import { createContext } from 'react'; export const State = createContext(null);",
+				'replaced.ts':
+					"import { createContext } from 'react'; const Local = createContext(null); Local.Provider = () => null; export {Local as State};",
+				'getter.ts':
+					"import { createContext } from 'react'; export const State = createContext(null); Object.defineProperty(State, 'Provider', { get() { return () => null; } });",
 				...Object.fromEntries(
 					Object.entries(cases).map(([name, [body]]) => [
 						`${name}.tsx`,
-						`import { State } from './owner.ts';
+						`import { State } from './${name === 'ReplacedOwner' ? 'replaced' : name === 'ReplacedGetter' ? 'getter' : 'owner'}.ts';
 						${name === 'ReactBoundary' ? "import { ReactCompat } from 'octane/react';" : ''}
 						export function View({ shown }: { shown: boolean }) { ${body} }`,
 					]),

@@ -670,8 +670,8 @@ export async function runCodemod(
 		)
 			return renamed(from, module)?.file === file ? 'error' : 'warning';
 	}
-	const retainedContexts = new Map<string, ReadonlySet<string>>();
-	function localReactContext(from: string, module: string, name: string) {
+	const retainedContexts = new Map<string, ReadonlyMap<string, boolean>>();
+	function localReactContext(from: string, module: string, name: string, member: boolean) {
 		if (/[!%?#\\]/.test(module) || catalogName(module) !== null || resolveRename(from, module))
 			return false;
 		const file = localFile(from, module, true);
@@ -679,7 +679,7 @@ export async function runCodemod(
 		let contexts = retainedContexts.get(file);
 		if (contexts === undefined) {
 			const source = fs.readFileSync(file, 'utf8');
-			contexts = noClasses;
+			contexts = new Map();
 			if (source.includes('createContext') || source.includes('\\')) {
 				const stat = fs.lstatSync(file);
 				if (
@@ -695,7 +695,8 @@ export async function runCodemod(
 			retainedContexts.set(file, contexts);
 		}
 		return (
-			contexts.has(name) && ts.findConfigFile(path.dirname(from), ts.sys.fileExists) === rootProject
+			(member ? contexts.get(name) === true : contexts.has(name)) &&
+			ts.findConfigFile(path.dirname(from), ts.sys.fileExists) === rootProject
 		);
 	}
 	const localHints = new Map<string, Map<string, string>>();
@@ -1280,7 +1281,7 @@ export async function runCodemod(
 					? (module, name) => localReactClass(file, module, name)
 					: undefined,
 				localReactContext: renames.has(file)
-					? (module, name) => localReactContext(file, module, name)
+					? (module, name, member) => localReactContext(file, module, name, member)
 					: undefined,
 				localReactRootComponent: renames.has(file)
 					? (module, name) => {
