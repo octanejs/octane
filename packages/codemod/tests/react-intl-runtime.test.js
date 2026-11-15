@@ -21,11 +21,11 @@ async function load(mode) {
 	const entry =
 		mode === 'server'
 			? "export { prerender } from 'octane/static'; export { renderToReadableStream } from 'octane/server';"
-			: "export { createRoot, flushSync, hydrateRoot } from 'octane'; export { createRoot as reactRoot } from 'react-dom/client';";
+			: "export { createRoot, flushSync, hydrateRoot } from 'octane'; export { createRoot as reactRoot, hydrateRoot as hydrateReactRoot } from 'react-dom/client';";
 	return bundleRuntime(
 		project,
 		mode,
-		`export * from './page.tsrx'; export * from './rich.tsrx'; export * from './fields.tsrx'; export * from './OwnedLocale.tsrx'; export * from './OwnedMember.tsrx'; export * from './choices.tsrx'; export * from './reader.tsrx'; export * from './paragraph.tsrx'; ${entry}
+		`export * from './page.tsrx'; export * from './rich.tsrx'; export * from './fields.tsrx'; export * from './primitive-message.tsrx'; export * from './OwnedLocale.tsrx'; export * from './OwnedMember.tsrx'; export * from './choices.tsrx'; export * from './reader.tsrx'; export * from './paragraph.tsrx'; ${entry}
 				export { OctaneCompat } from 'octane/react${mode === 'server' ? '/server' : ''}';
 				export * as react from 'react'; export * as intl from 'react-intl';
 				export { renderToString } from 'react-dom/server';`,
@@ -44,6 +44,13 @@ beforeAll(async () => {
 	await copyFile(
 		path.join(testDir, 'fixtures/react-intl/page.tsrx'),
 		path.join(project, 'page.tsrx'),
+	);
+	await writeFile(
+		path.join(project, 'primitive-message.tsrx'),
+		`import { FormattedMessage } from './react-intl.tsrx';
+		export function PrimitiveMessage({value}) @{
+			<p>Before <FormattedMessage id="primitive" values={{value}} /> after</p>
+		}`,
 	);
 	const fields = transformModule(
 		`import { useIntl, FormattedMessage } from 'react-intl';
@@ -279,6 +286,62 @@ it('uses the nearest native or React-owned formatter and respects an explicitly 
 		expect(() => renderToString(masked)).toThrow(/IntlProvider/);
 	}
 });
+
+it.each([
+	['Value:{value}!', true, 'Before Value:! after'],
+	['Value:{value}!', 9n, 'Before Value:9! after'],
+	['{value}', true, 'Before  after'],
+	['{value}', 9n, 'Before 9 after'],
+])(
+	'renders and hydrates React Intl primitive parts from %s with %s',
+	async (message, value, expected) => {
+		const { intl, react, renderToString } = server;
+		const h = react.createElement;
+		const config = { locale: 'en', messages: { primitive: message } };
+		const original = renderToString(
+			h(
+				intl.IntlProvider,
+				config,
+				h(
+					'p',
+					null,
+					'Before ',
+					h(intl.FormattedMessage, { id: 'primitive', values: { value } }),
+					' after',
+				),
+			),
+		);
+		const hosted = (runtime) =>
+			runtime.react.createElement(
+				runtime.intl.IntlProvider,
+				config,
+				runtime.react.createElement(runtime.OctaneCompat, {
+					component: runtime.PrimitiveMessage,
+					props: { value },
+				}),
+			);
+		const html = renderToString(hosted(server));
+		expect(paragraph(original)).toEqual(['', expected, 0]);
+		expect(paragraph(html)).toEqual(paragraph(original));
+		const host = document.createElement('div');
+		host.innerHTML = html;
+		const p = host.querySelector('p');
+		const errors = [];
+		let root;
+		try {
+			await client.react.act(async () => {
+				root = client.hydrateReactRoot(host, hosted(client), {
+					onRecoverableError: (error) => errors.push(error),
+				});
+			});
+			expect(errors).toEqual([]);
+			expect(host.querySelector('p')).toBe(p);
+			expect(p.textContent).toBe(expected);
+		} finally {
+			await client.react.act(async () => root?.unmount());
+		}
+	},
+);
 
 it('preserves a locale binding under the component’s own Intl provider during SSR', async () => {
 	const { intl, react, renderToString, prerender, OwnedLocale, OwnedMember } = server;

@@ -95,6 +95,37 @@ function ReactContent({ content }: { content: ReactNode }) {
 	return content;
 }
 
+type MessagePart = string | number | bigint | boolean | null | undefined;
+
+function isMessagePart(value: unknown): value is MessagePart {
+	return (
+		typeof value === 'string' ||
+		typeof value === 'number' ||
+		typeof value === 'bigint' ||
+		typeof value === 'boolean' ||
+		value === null ||
+		value === undefined
+	);
+}
+
+function plainMessageParts(value: unknown): MessagePart[] | undefined {
+	if (
+		!Array.isArray(value) ||
+		Object.getPrototypeOf(value) !== Array.prototype ||
+		Object.hasOwn(value, '$$typeof') ||
+		Object.hasOwn(value, 'then')
+	)
+		return;
+	// Copy dense data parts without calling methods or getters on custom formatter output.
+	const parts: MessagePart[] = [];
+	for (let i = 0, length = value.length; i < length; i++) {
+		const part = Object.getOwnPropertyDescriptor(value, i);
+		if (!part || !Object.hasOwn(part, 'value') || !isMessagePart(part.value)) return;
+		parts.push(part.value);
+	}
+	return parts;
+}
+
 function NativeFormattedMessage(props: MessageProps) @{
 	const { id, defaultMessage, description, values, ignoreTag } = props;
 	const intl = useIntl();
@@ -106,7 +137,9 @@ function NativeFormattedMessage(props: MessageProps) @{
 	const content = requiresReact
 		? reactElement(ReactMessage, { ...descriptor, values, ignoreTag })
 		: formatMessage(descriptor, values, { ignoreTag });
-	if (typeof content === 'string') return content;
+	if (isMessagePart(content)) return content;
+	const parts = plainMessageParts(content);
+	if (parts) return parts;
 	const Island = Object.hasOwn(props, 'inlineHost')
 		? (props.inlineHost ?? ReactCompat)
 		: ReactCompat;
