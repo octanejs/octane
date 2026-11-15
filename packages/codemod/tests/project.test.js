@@ -5857,6 +5857,11 @@ export * from './View.tsrx';`,
 			'SetterFunction.tsx': 'set: function (value) {}, ' + get,
 			'SetterArrow.tsx': get + ', set: (value) => {}',
 		};
+		const getters = {
+			'GetterArrow.tsx': 'get: () => Replacement',
+			'GetterFunction.tsx': 'get: function () { return Replacement; }',
+			'GetterWrapped.tsx': 'get: (() => Replacement) satisfies () => typeof Replacement',
+		};
 		const sources = {
 			'Caller.tsx': "import { View } from './View.tsx'; export const Caller = () => <View />;",
 			'View.tsx': [context, component, getter, tag].join('\n'),
@@ -5868,12 +5873,25 @@ export * from './View.tsrx';`,
 				tag,
 			].join('\n'),
 			...Object.fromEntries(
-				Object.entries(setters).map(([file, members]) => [
+				Object.entries({ ...setters, ...getters }).map(([file, members]) => [
 					file,
 					[context, component, descriptor(members), tag].join('\n'),
 				]),
 			),
 			'SetterOnly.tsx': [context, descriptor('set(value) {}'), tag].join('\n'),
+			'GetterFactory.tsx': [
+				context,
+				'const getterFactory = () => () => Theme;',
+				descriptor('get: getterFactory()'),
+				tag,
+			].join('\n'),
+			'ForeignGetter.tsx': [
+				context,
+				'const Foreign = makeContext("foreign");',
+				component,
+				descriptor(getters['GetterArrow.tsx']).replace('Theme', 'Foreign'),
+				tag,
+			].join('\n'),
 			'Control.tsx': [context, tag].join('\n'),
 			'Shadowed.tsx': [
 				context,
@@ -5901,12 +5919,19 @@ export * from './View.tsrx';`,
 		const options = { root, verify: false };
 		const preview = await runCodemod(inputs, { ...options, write: false });
 		const byFile = new Map(preview.files.map((file) => [file.file, file]));
-		for (const file of ['View.tsx', 'Wrapped.tsx', ...Object.keys(setters)])
+		for (const file of [
+			'View.tsx',
+			'Wrapped.tsx',
+			...Object.keys(setters),
+			...Object.keys(getters),
+		])
 			expect(byFile.get(file).notes).toEqual([note]);
 		for (const file of [
 			'Control.tsx',
 			'Optional.tsx',
 			'SetterOnly.tsx',
+			'GetterFactory.tsx',
+			'ForeignGetter.tsx',
 			'Shadowed.tsx',
 			'Sibling.tsx',
 			'Deferred.tsx',

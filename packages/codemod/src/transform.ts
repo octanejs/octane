@@ -6642,20 +6642,20 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				const name = property.name;
 				if (!name || (!ts.isIdentifier(name) && !ts.isStringLiteral(name))) return false;
 				if (name.text === 'configurable' || name.text === 'enumerable') continue;
-				if (name.text === 'set' && !setter) {
-					const value = ts.isPropertyAssignment(property)
-						? skipWrappers(property.initializer)
-						: null;
-					if (
-						!ts.isMethodDeclaration(property) &&
-						!(value && (ts.isArrowFunction(value) || ts.isFunctionExpression(value)))
-					)
-						return false;
+				if (name.text !== 'get' && name.text !== 'set') return false;
+				const value = ts.isPropertyAssignment(property) ? skipWrappers(property.initializer) : null;
+				if (
+					!ts.isMethodDeclaration(property) &&
+					!(value && (ts.isArrowFunction(value) || ts.isFunctionExpression(value)))
+				)
+					return false;
+				if (name.text === 'get') {
+					if (getter) return false;
+					getter = true;
+				} else {
+					if (setter) return false;
 					setter = true;
-					continue;
 				}
-				if (name.text !== 'get' || getter || !ts.isMethodDeclaration(property)) return false;
-				getter = true;
 			}
 			return getter;
 		});
