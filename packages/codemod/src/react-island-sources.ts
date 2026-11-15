@@ -62,6 +62,13 @@ function closedDefaultReactReceiver(receiver: ts.Identifier, uses: ReturnType<ty
 		const parent = member.parent;
 		return (
 			ts.isExpressionWithTypeArguments(parent) ||
+			((ts.isJsxOpeningElement(parent) ||
+				ts.isJsxClosingElement(parent) ||
+				ts.isJsxSelfClosingElement(parent)) &&
+				parent.tagName === member &&
+				(member.name.text === 'Fragment' ||
+					member.name.text === 'Suspense' ||
+					member.name.text === 'StrictMode')) ||
 			(ts.isCallExpression(parent) &&
 				parent.expression === member &&
 				member.name.text !== 'default')

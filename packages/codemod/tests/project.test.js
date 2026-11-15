@@ -73,6 +73,23 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					"import React, { type ReactNode } from 'react';",
 				)
 				.replace('extends Base', 'extends React.PureComponent'),
+			'DefaultBaseTags.tsx': boundary
+				.replace(
+					"import { Component as Base, type ReactNode } from 'react';",
+					"import React, { type ReactNode } from 'react';",
+				)
+				.replace('extends Base', 'extends React.Component')
+				.replace(
+					'return this.props.children;',
+					'return <React.Fragment><React.StrictMode><React.Suspense fallback={<i />}><React.Fragment />{this.props.children}</React.Suspense></React.StrictMode></React.Fragment>;',
+				),
+			'DefaultBaseNamespaceEscape.tsx': boundary
+				.replace(
+					"import { Component as Base, type ReactNode } from 'react';",
+					"import React, { type ReactNode } from 'react';",
+				)
+				.replace('extends Base', 'extends React.Component')
+				.replace('class Frame', 'replaceReact(React);\nclass Frame'),
 			'DefaultExport.tsx': boundary.replace(
 				'export { Frame as Boundary };',
 				'export default Frame;',
@@ -175,6 +192,8 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 			'PureView.tsx': entry('./Pure'),
 			'DecoratedView.tsx': entry('./Decorated'),
 			'DefaultBaseView.tsx': entry('./DefaultBase'),
+			'DefaultBaseTagsView.tsx': entry('./DefaultBaseTags'),
+			'DefaultBaseNamespaceEscapeView.tsx': entry('./DefaultBaseNamespaceEscape'),
 			'DefaultExportView.tsx': entry('./DefaultExport').replace('{ Boundary as Frame }', 'Frame'),
 			'MetadataView.tsx': entry('./Metadata'),
 			'MetadataSetterView.tsx': entry('./MetadataSetter'),
@@ -207,6 +226,7 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 						![
 							'Boundary.tsx',
 							'DefaultBase.tsx',
+							'DefaultBaseTags.tsx',
 							'DefaultExport.tsx',
 							'Hosted.tsx',
 							'Metadata.tsx',
@@ -237,6 +257,7 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					.sort(),
 			).toEqual([
 				['Alias.tsx', includeClass ? 'error' : 'warning'],
+				['DefaultBaseTagsView.tsx', includeClass ? 'error' : 'warning'],
 				['DefaultBaseView.tsx', includeClass ? 'error' : 'warning'],
 				['DefaultExportView.tsx', includeClass ? 'error' : 'warning'],
 				['Guard.tsx', includeClass ? 'error' : 'warning'],
