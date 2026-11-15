@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { compile } from 'octane/compiler';
+import { flushSync, hydrateRoot } from 'octane';
 import * as ServerRuntime from 'octane/server';
 import { mount } from './_helpers.js';
-import { loadServerFixture } from './_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 // Client compile of the same module: importing it at all is half the contract —
 // a TDZ lowering would throw during module evaluation, before any test runs.
 import { Registry } from './_fixtures/hoisted-component-ref.tsrx';
@@ -14,6 +15,145 @@ import { Registry } from './_fixtures/hoisted-component-ref.tsrx';
 // authored, valid reference into "Cannot access 'X' before initialization".
 
 const FIXTURE = 'packages/octane/tests/_fixtures/hoisted-component-ref.tsrx';
+
+describe('mutable template initializers', () => {
+	it.each([
+		['let', '() =>', 'View'],
+		['var', '() =>', 'View'],
+		['let', 'function Original()', 'Original'],
+	])('keeps a writable %s %s in client and server modules', (kind, initializer, name) => {
+		const source = `
+			export ${kind} View = ${initializer} @{
+				<span>first</span>
+			};
+			const Replacement = () => 'second';
+			export function replace() { View = Replacement; return View === Replacement; }
+			export function current() { return View; }
+			export function App() @{ <div><View /></div> }
+		`;
+		for (const strong of [false, true]) {
+			const options = {
+				id: 'mutable-template.tsrx',
+				compileOptions: { dev: true, strong },
+			};
+			const input = strong ? source.slice(0, source.indexOf('export function App')) : source;
+			const client = loadCompiledFixtureSource(input, { ...options, mode: 'client' });
+			const server = loadCompiledFixtureSource(input, { ...options, mode: 'server' });
+			// The fixture evaluator substitutes its own assignment for a direct
+			// variable export, so check name inference on a local initialized value.
+			for (const mode of ['client', 'server'] as const) {
+				const local = input.replace(`export ${kind} View`, `${kind} View`);
+				expect(loadCompiledFixtureSource(local, { ...options, mode }).current().name).toBe(name);
+			}
+			if (strong) {
+				expect(client.replace()).toBe(true);
+				expect(server.replace()).toBe(true);
+				continue;
+			}
+			const mounted = mount(client.App);
+			try {
+				expect(mounted.container.textContent).toBe('first');
+				client.replace();
+				mounted.update(client.App);
+				expect(mounted.container.textContent).toBe('second');
+			} finally {
+				mounted.unmount();
+			}
+			expect(ServerRuntime.renderToString(server.App).html).toContain('first');
+			server.replace();
+			expect(ServerRuntime.renderToString(server.App).html).toContain('second');
+		}
+	});
+
+	it.each(['client', 'server'] as const)(
+		'keeps pre-declaration var and let reads in %s',
+		(mode) => {
+			const source = (kind: string) => `
+			export const before = View;
+			${kind} View = () => @{ <span /> };
+		`;
+			const options = { id: 'early-template-binding.tsrx', mode };
+			expect(loadCompiledFixtureSource(source('var'), options).before).toBeUndefined();
+			expect(() => loadCompiledFixtureSource(source('let'), options)).toThrow(ReferenceError);
+		},
+	);
+
+	it('updates the outer binding from a hydrated component and scopes server styles', () => {
+		const source = `
+			export let View = () => @{
+				<button class="first" onClick={() => { View = Replacement; }}>
+					<style>.first { color: red; }</style>
+					first
+				</button>
+			};
+			const Replacement = () => 'second';
+			export function App({ show }) @{
+				<main>@if (show) { <View />; }</main>
+			}
+		`;
+		const options = { id: 'mutable-template-hydration.tsrx' };
+		const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+		const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+		expect(ServerRuntime.renderToString(server.App, { show: false }).css).not.toContain('red');
+		const { html, css } = ServerRuntime.renderToString(server.App, { show: true });
+		expect(css).toContain('red');
+		const host = document.createElement('div');
+		host.innerHTML = html;
+		document.body.append(host);
+		const button = host.querySelector('button');
+		const root = hydrateRoot(host, client.App, { show: true });
+		try {
+			expect(host.querySelector('button')).toBe(button);
+			flushSync(() => button!.click());
+			flushSync(() => root.render(client.App, { show: true }));
+			expect(host.textContent).toBe('second');
+		} finally {
+			root.unmount();
+			host.remove();
+		}
+	});
+
+	it('keeps a named initializer private in a component tag and a direct call', () => {
+		const source = `
+			function Self() @{ <i>outer</i> }
+			let View = function Self({ depth }) @{
+				@if (depth > 0) {
+					<Self depth={depth - 1} />
+				} @else {
+					<b>{Self.name as string}</b>
+				}
+			};
+			export function App() @{ <main><View depth={1} />{View({ depth: 0 })}</main> }
+		`;
+		const options = { id: 'mutable-template-self.tsrx' };
+		const client = loadCompiledFixtureSource(source, { ...options, mode: 'client' });
+		const server = loadCompiledFixtureSource(source, { ...options, mode: 'server' });
+		const mounted = mount(client.App);
+		try {
+			expect(mounted.container.textContent).toBe('SelfSelf');
+		} finally {
+			mounted.unmount();
+		}
+		const { html } = ServerRuntime.renderToString(server.App);
+		expect(html.match(/<b>Self<\/b>/g)).toHaveLength(2);
+	});
+
+	it.each(['client', 'server'] as const)(
+		'preserves named initializer parameter shadowing in %s',
+		(mode) => {
+			const fixture = loadCompiledFixtureSource(
+				`
+				let View = function Private(value = Private, Private = 'late') @{
+					<span>{String(value)}</span>
+				};
+				export function call() { return View(); }
+			`,
+				{ id: 'mutable-template-parameter.tsrx', mode },
+			);
+			expect(fixture.call).toThrow(ReferenceError);
+		},
+	);
+});
 
 describe('component hoisting (reference above declaration)', () => {
 	it('client: the early capture is the live component and renders', () => {

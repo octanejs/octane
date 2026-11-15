@@ -107,6 +107,24 @@ export function App({ shown }: { shown: boolean }) @{
 	expect(typecheck({ 'memo-return-contract.ts': result.code })).toEqual([]);
 });
 
+it.each(['client', 'server'] as const)(
+	'preserves typed writable template initializers in %s output',
+	(mode) => {
+		const source = `
+		type Props = { label: string };
+		type ViewBody = (props: Props) => void;
+		export let View: ViewBody = (props) => @{ <span>{props.label}</span> };
+		export var Other: (props: Props) => unknown = function Original(props: Props) @{ <span>{props.label}</span> };
+		export function replace() {
+			View = (props: Props) => { String(props.label); };
+			Other = (props: Props) => props.label;
+		}
+	`;
+		const result = compile(source, '/src/mutable-template.tsrx', { mode, output: 'ts' });
+		expect(typecheck({ 'mutable-template.ts': result.code })).toEqual([]);
+	},
+);
+
 it('typechecks generated traversal when the host exposes an opaque Node', () => {
 	const result = compile(
 		`export function Scene(props: { label: string }) @{
