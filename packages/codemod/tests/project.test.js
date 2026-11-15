@@ -499,10 +499,13 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 		const view = (
 			jsx,
 			retained = false,
-		) => `import React, { Fragment as Group, StrictMode, Suspense } from 'react';
+		) => `import React, { Fragment as Group, StrictMode, Suspense, use } from 'react';
 import { Frame } from './Frame';
 import { ReactCompat } from 'octane/react';
+import * as Native from 'octane';
 function Holder() { return <b>ignored</b>; }
+const never = new Promise<string>(() => {});
+function Pending() { return <i>{use(never)}</i>; }
 export function App({ enabled }: { enabled: boolean }) {
 ${retained ? 'if (!enabled) { const text = "off"; return <i>{text}</i>; }' : ''}
 return ${jsx};
@@ -512,6 +515,33 @@ return ${jsx};
 			'Composed.tsx':
 				'<main data-page="app"><><StrictMode><section><Frame /></section></StrictMode></></main>',
 			'DirectHole.tsx': '<div>{(<Frame />)}</div>',
+			'ArrayHole.tsx': '<main>{[[<Frame key="frame" />]]}</main>',
+			'ArrayLogicalLeft.tsx': '<main>{[<Frame key="frame" />] || [<b key="b" />]}</main>',
+			'ArrayMapHole.tsx': '<main>{[[1].map(n => <Frame key={n} />)]}</main>',
+			'ArrayMapBlock.tsx': '<main>{[[1].map(function (n) { return <Frame key={n} />; })]}</main>',
+			'ArrayMapCast.tsx': '<main>{[[1].map(n => <Frame key={n} /> as unknown as string)]}</main>',
+			'ArrayMapHost.tsx':
+				'<main>{[[1].map(n => <aside key={n}>{<Frame /> as unknown as string}</aside>)]}</main>',
+			'ArrayMapStringHole.tsx':
+				'<main>{[[1].map(n => <Frame key={n} />)] as unknown as string}</main>',
+			'ArrayMapEmpty.tsx': '<main>{[[].map(n => <Frame key={n} />)]}</main>',
+			'ArrayMapSparse.tsx': '<main>{[[,].map(n => <Frame key={n} />)]}</main>',
+			'ArrayMapDead.tsx': '<main>{[false && [1].map(n => <Frame key={n} />)]}</main>',
+			'ArrayMapEarlyExit.tsx':
+				'<main>{[[1].map(n => { if (n) return null; return <Frame key={n} />; })]}</main>',
+			'ArrayMapOpaque.tsx': '<main><Holder>{[[1].map(n => <Frame key={n} />)]}</Holder></main>',
+			'ArrayItemStringAssertion.tsx': '<main>{[<Frame key="frame" /> as unknown as string]}</main>',
+			'ArrayNestedStringAssertion.tsx': `<main>{[
+				enabled ? (<Frame key="frame" /> as unknown as string) : null,
+				enabled && (<Frame key="f" /> as unknown as string),
+				true || (<Frame key="dead" /> as unknown as string),
+				<aside key="host">{<Frame /> as unknown as string}</aside>,
+			]}</main>`,
+			'ArrayStringAssertion.tsx': '<main>{[<Frame key="frame" />] as unknown as string}</main>',
+			'ArrayLogicalRight.tsx': '<main>{[<b key="b" />] || [<Frame key="frame" />]}</main>',
+			'ArrayOpaque.tsx': '<main><Holder>{[<Frame key="frame" />]}</Holder></main>',
+			'ArrayHosted.tsx':
+				'<main><ReactCompat><Frame>{[<Frame key="frame" />]}</Frame></ReactCompat></main>',
 			'ConditionalHole.tsx': '<main>{enabled ? <Frame /> : null}</main>',
 			'LogicalHole.tsx': '<section>{enabled && <Frame />}</section>',
 			'NamedFragment.tsx': '<Group key="group"><Frame /></Group>',
@@ -522,6 +552,14 @@ return ${jsx};
 				'<main>{[1, 2].map((row) => { if (row === 1) return null; return <Frame />; })}</main>',
 			'MapSkipsAll.tsx':
 				'<main>{[1].map((row) => { if (row === 1) return null; return <Frame />; })}</main>',
+			'MapSignedCompare.tsx':
+				'<main>{[-1, 0].map((row) => { if (row === -1) return null; return <Frame />; })}</main>',
+			'MapSignedValue.tsx':
+				'<main>{[0, -1].map((row) => { if (+0 === row) return null; return <Frame />; })}</main>',
+			'MapSignedZeroSkipsAll.tsx':
+				'<main>{[-0, +0].map((row) => { if (row === -0) return null; return <Frame />; })}</main>',
+			'MapUnknownNumber.tsx':
+				'<main>{[0, NaN].map((row) => { if (row === +0) return null; return <Frame />; })}</main>',
 			'MapUnconditionalExit.tsx':
 				'<main>{[1].map((_row) => { return null; return <Frame />; })}</main>',
 			'AssertedHole.tsx': '<main>{((<Frame /> as unknown) satisfies unknown)!}</main>',
@@ -544,7 +582,13 @@ return ${jsx};
 			'SpreadMap.tsx': '<main>{[...[]].map((row) => <Frame key={row} />)}</main>',
 			'OpaqueMap.tsx': '<main>{Array.from({ length: 1 }).map((row) => <Frame key={row} />)}</main>',
 			'OpaqueCall.tsx': '<div>{Boolean(<Frame />)}</div>',
-			'FragmentProps.tsx': '<main><Group {...{}}><Frame /></Group></main>',
+			'FragmentProps.tsx': '<main><Group {...{ children: null }}><Frame /></Group></main>',
+			'ConditionalFragmentProps.tsx':
+				'<main>{enabled && <Group {...{ ref: () => {} }}><Frame /></Group>}</main>',
+			'NativeFragment.tsx': '<main><Native.Fragment><Frame /></Native.Fragment></main>',
+			'DeadFragment.tsx': '<main>{false && <Group {...{}}><Frame /></Group>}</main>',
+			'HostedFragment.tsx':
+				'<main><Group {...{}}><ReactCompat><Frame /></ReactCompat></Group></main>',
 			'Attribute.tsx': '<article title={String(<Frame />)}>text</article>',
 			'Custom.tsx': '<main><Holder><Frame /></Holder></main>',
 			'Foreign.tsx': '<main><svg><g><Frame /></g></svg></main>',
@@ -565,11 +609,37 @@ export class Frame extends Component { render() { return <b>ready</b>; } }`,
 			'NativeFallbackHtml.tsx': view(
 				'<Suspense fallback={<main><Frame /></main>}><b /></Suspense>',
 			),
+			'NativeFallbackHoles.tsx': view(
+				`<Suspense fallback={<aside>
+					{(<Frame />)}
+					<>{enabled && <Frame />}{<Frame /> as unknown as string}</>
+				</aside>}><Pending /></Suspense>`,
+			),
 			'NativeFallbackMap.tsx': view(
 				'<Suspense fallback={<>{[1].map(n => <Frame key={n} />)}</>}><b /></Suspense>',
 			),
+			'NativeFallbackArrayMap.tsx': view(
+				'<Suspense fallback={<aside>{[[1].map(n => <Frame key={n} />)]}</aside>}><Pending /></Suspense>',
+			),
 			'NativeFallbackClass.tsx': view('<Suspense fallback={<Frame />}><b /></Suspense>'),
-			'NestedSuspense.tsx': view('<main><Suspense fallback={<Frame />}><b /></Suspense></main>'),
+			'NestedSuspense.tsx': view(
+				'<main><Suspense fallback={<Frame />}><Pending /></Suspense></main>',
+			),
+			'SuspenseKey.tsx': view(
+				'<main>{<Native.Suspense key={enabled ? "on" : "off"} fallback={<Frame />}><Pending /></Native.Suspense>}</main>',
+			),
+			'SuspenseDuplicateFallback.tsx': view(
+				'<main><Suspense fallback={<Frame />} fallback={<b />}><b /></Suspense></main>',
+			),
+			'SuspenseOverriddenFallback.tsx': view(
+				'<main><Suspense fallback={<Frame />} {...{ fallback: <b /> }}><b /></Suspense></main>',
+			),
+			'SuspenseDeadFallback.tsx': view(
+				'<main><Suspense fallback={<aside>{false && <Frame />}</aside>}><b /></Suspense></main>',
+			),
+			'SuspenseCustomFallback.tsx': view(
+				'<main><Suspense fallback={<Holder><Frame /></Holder>}><b /></Suspense></main>',
+			),
 			'ShadowedFragment.tsx': `import { Fragment as Group } from 'react';
 import { Frame } from './Frame';
 function Holder() { return <b>ignored</b>; }
@@ -589,9 +659,16 @@ export function App() { const Group = Holder; return <div><Group><Frame /></Grou
 				'RootFragmentProps.tsx',
 				'RetainedFragmentProps.tsx',
 				'NativeFallbackHtml.tsx',
+				'NativeFallbackHoles.tsx',
 				'NativeFallbackMap.tsx',
+				'NativeFallbackArrayMap.tsx',
 				'NativeFallbackClass.tsx',
 				'NestedSuspense.tsx',
+				'SuspenseKey.tsx',
+				'SuspenseDuplicateFallback.tsx',
+				'SuspenseOverriddenFallback.tsx',
+				'SuspenseDeadFallback.tsx',
+				'SuspenseCustomFallback.tsx',
 			];
 			if (includeClass) inputs.push('Frame.tsx');
 			const { files } = await runCodemod(
@@ -610,15 +687,27 @@ export function App() { const Group = Holder; return <div><Group><Frame /></Grou
 					)
 					.sort(),
 			).toEqual([
+				['ArrayHole.tsx', includeClass ? 'error' : 'warning'],
+				['ArrayItemStringAssertion.tsx', includeClass ? 'error' : 'warning'],
+				['ArrayLogicalLeft.tsx', includeClass ? 'error' : 'warning'],
+				['ArrayMapBlock.tsx', 'warning'],
+				['ArrayMapCast.tsx', 'warning'],
+				['ArrayMapHole.tsx', 'warning'],
+				['ArrayMapHost.tsx', 'warning'],
+				['ArrayNestedStringAssertion.tsx', includeClass ? 'error' : 'warning'],
+				['ArrayNestedStringAssertion.tsx', includeClass ? 'error' : 'warning'],
+				['ArrayNestedStringAssertion.tsx', includeClass ? 'error' : 'warning'],
 				['AssertedHole.tsx', includeClass ? 'error' : 'warning'],
 				['ClassName.tsx', includeClass ? 'error' : 'warning'],
 				['Composed.tsx', includeClass ? 'error' : 'warning'],
+				['ConditionalFragmentProps.tsx', includeClass ? 'error' : 'warning'],
 				['ConditionalHole.tsx', includeClass ? 'error' : 'warning'],
 				['DirectHole.tsx', includeClass ? 'error' : 'warning'],
 				['FallbackLeft.tsx', includeClass ? 'error' : 'warning'],
 				['FallbackNullish.tsx', includeClass ? 'error' : 'warning'],
 				['FallbackOr.tsx', includeClass ? 'error' : 'warning'],
 				['FallbackOrChain.tsx', includeClass ? 'error' : 'warning'],
+				['FragmentProps.tsx', includeClass ? 'error' : 'warning'],
 				...Array.from({ length: 3 }, () => [
 					'LiveLogicalChainOutputs.tsx',
 					includeClass ? 'error' : 'warning',
@@ -627,16 +716,25 @@ export function App() { const Group = Holder; return <div><Group><Frame /></Grou
 				['MapChild.tsx', includeClass ? 'error' : 'warning'],
 				['MapContinues.tsx', includeClass ? 'error' : 'warning'],
 				['MapRoot.tsx', includeClass ? 'error' : 'warning'],
+				['MapSignedCompare.tsx', includeClass ? 'error' : 'warning'],
+				['MapSignedValue.tsx', includeClass ? 'error' : 'warning'],
 				['MemberFragment.tsx', includeClass ? 'error' : 'warning'],
 				['NamedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['NativeFallbackArrayMap.tsx', 'warning'],
 				['NativeFallbackClass.tsx', includeClass ? 'error' : 'warning'],
+				['NativeFallbackHoles.tsx', includeClass ? 'error' : 'warning'],
+				['NativeFallbackHoles.tsx', includeClass ? 'error' : 'warning'],
+				['NativeFallbackHtml.tsx', includeClass ? 'error' : 'warning'],
+				['NativeFragment.tsx', includeClass ? 'error' : 'warning'],
+				['NestedSuspense.tsx', includeClass ? 'error' : 'warning'],
 				['RetainedFragmentProps.tsx', includeClass ? 'error' : 'warning'],
 				['RootFragmentProps.tsx', includeClass ? 'error' : 'warning'],
+				['SuspenseKey.tsx', includeClass ? 'error' : 'warning'],
 			]);
 			if (includeClass)
 				expect(
 					files
-						.find((file) => file.file === 'NativeFallbackClass.tsx')
+						.find((file) => file.file === 'NativeFallbackHoles.tsx')
 						.notes.find((note) => note.rule === 'class-component').message,
 				).toContain('this native template can render');
 		}
