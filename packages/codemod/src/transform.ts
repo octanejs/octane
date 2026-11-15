@@ -3471,6 +3471,54 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 
 	// ---------------------------------------------------------------- imports
 
+	private retainedHookSetup() {
+		return {
+			calleeName: (callee: ts.Expression) => this.calleeName(callee),
+			nativeOutput: (element: ts.JsxElement | ts.JsxSelfClosingElement) =>
+				this.nativeOutput(element, this.localUses),
+			originalReact: () => this.options.originalReact === true,
+		};
+	}
+
+	private warnRetainedPrivateContext(module: string, name: string, site: ts.Expression) {
+		const resolution = module.endsWith('.js')
+			? ' and the import resolves to its TypeScript source'
+			: '';
+		this.note(
+			RULE.bindings,
+			'warning',
+			site,
+			`If native setup reaches the unchanged ${module} export ${name} after its module initializes${resolution}, its private helper calls React's useContext. Provide a compiled Octane hook or keep the component under React.`,
+		);
+	}
+
+	private checkRetainedNamespaceHooks(module: string, binding: ts.Identifier) {
+		const retainedHook = this.options.localReactHook;
+		if (!retainedHook) return;
+		let reported: Set<string> | undefined;
+		for (const ref of renderUses(this.localUses(binding))) {
+			const member = ref.parent;
+			if (!ts.isPropertyAccessExpression(member) && !ts.isElementAccessExpression(member)) continue;
+			if (member.expression !== ref || ts.isOptionalChain(member)) continue;
+			const name = ts.isPropertyAccessExpression(member)
+				? member.name.text
+				: ts.isStringLiteralLike(member.argumentExpression) && member.argumentExpression.text;
+			if (!name || !/^use[A-Z0-9]/.test(name) || reported?.has(name)) continue;
+			if (
+				!nativeSetupHook(member, this.localUses, this.checker, {
+					...this.retainedHookSetup(),
+					privateContext: true,
+				})
+			)
+				continue;
+			const local = retainedHook(module, name, false);
+			if (local && typeof local !== 'string' && 'privateContext' in local) {
+				this.warnRetainedPrivateContext(module, name, member);
+				(reported ??= new Set()).add(name);
+			}
+		}
+	}
+
 	rewriteImport(node: ts.ImportDeclaration) {
 		const native = this.pathSvgImports.get(node);
 		if (native) {
@@ -3498,12 +3546,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		}
 		const clause = node.importClause;
 		const bindings = clause?.namedBindings;
-		if (
-			bindings &&
-			ts.isNamespaceImport(bindings) &&
-			this.radixSlotImports?.get(bindings.name) === 'original'
-		)
-			return null;
+		if (clause && bindings && ts.isNamespaceImport(bindings)) {
+			if (this.radixSlotImports?.get(bindings.name) === 'original') return null;
+			if (!clause.isTypeOnly && !node.attributes)
+				this.checkRetainedNamespaceHooks(module, bindings.name);
+		}
 		if (clause && bindings && ts.isNamedImports(bindings)) {
 			const moved = new Map<string, string[]>();
 			const kept: ts.ImportSpecifier[] = [];
@@ -3536,12 +3583,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 							sites.length > 0 &&
 							sites.every(Boolean) &&
 							(!sites.includes('afterRefs') || this.options.originalReact === true);
-						const setup = {
-							calleeName: (callee: ts.Expression) => this.calleeName(callee),
-							nativeOutput: (element: ts.JsxElement | ts.JsxSelfClosingElement) =>
-								this.nativeOutput(element, this.localUses),
-							originalReact: () => this.options.originalReact === true,
-						};
+						const setup = this.retainedHookSetup();
 						const call =
 							refs[sites.indexOf('first')] ??
 							(nativeOnly
@@ -3581,16 +3623,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 									privateContext: true,
 								}),
 							);
-							const resolution = module.endsWith('.js')
-								? ' and the import resolves to its TypeScript source'
-								: '';
-							if (advisorySite)
-								this.note(
-									RULE.bindings,
-									'warning',
-									advisorySite,
-									`If native setup reaches the unchanged ${module} export ${name} after its module initializes${resolution}, its private helper calls React's useContext. Provide a compiled Octane hook or keep the component under React.`,
-								);
+							if (advisorySite) this.warnRetainedPrivateContext(module, name, advisorySite);
 						}
 					}
 					if (!dest) {
