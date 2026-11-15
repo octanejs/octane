@@ -36662,7 +36662,8 @@ function isCheckedCompiledBoundary(node, ctx) {
 // shadowed component retains its ordinary component semantics.
 function resolvesModuleFragmentImport(name, node, ctx) {
 	const binding = activityReferenceBinding(name, node, ctx);
-	return binding === undefined || binding?.scope === ctx.activityLexical.rootScope;
+	// TypeScript output retains erased imports in the import-name table.
+	return binding == null || binding.scope === ctx.activityLexical.rootScope;
 }
 
 function isFragmentLongForm(node, ctx = null, bindingFragment = null) {
