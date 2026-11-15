@@ -66,6 +66,15 @@ const RADIX_SLOT_MEMBERS = new Map([
 	['Slottable', 'Slottable'],
 ]);
 
+function quotedPropWithReference(node: ts.JsxAttributeLike) {
+	return (
+		ts.isJsxAttribute(node) &&
+		!!node.initializer &&
+		ts.isStringLiteral(node.initializer) &&
+		node.initializer.text.includes('&')
+	);
+}
+
 function directMember(receiver: ts.Node) {
 	const parent = receiver.parent;
 	if (
@@ -5984,7 +5993,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			: `${this.require('octane', 'hydrateRoot', false)}(${containerText}, ${elementText})`;
 	}
 
-	/** JSX kept for a prop spread still needs the direct-root ownership check. */
+	/** JSX retained for a prop spread or quoted reference still uses the migrated root. */
 	private checkLocalReactRoot(
 		call: ts.CallExpression,
 		receiver: ts.Expression,
@@ -5996,6 +6005,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (!local || !ts.isJsxSelfClosingElement(element) || !ts.isIdentifier(element.tagName)) return;
 		const tag = element.tagName;
 		const leaf = this.importOf(tag);
+		const attributes = element.attributes.properties;
 		const factoryName = ts.isPropertyAccessExpression(root.expression)
 			? root.expression.expression
 			: root.expression;
@@ -6004,7 +6014,13 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		if (
 			!isComponentName(tag.text) ||
 			(retained &&
-				(!element.attributes.properties.some(ts.isJsxSpreadAttribute) ||
+				(!(
+					attributes.some(ts.isJsxSpreadAttribute) ||
+					(attributes.some(quotedPropWithReference) &&
+						!attributes.some(
+							(attr) => ts.isJsxAttribute(attr) && /^(key|ref)$/.test(attr.name.getText(this.sf)),
+						))
+				) ||
 					this.islands.has(element) ||
 					this.reactRendererBodies.has(element) ||
 					this.unrenderable.has(element))) ||
@@ -6083,8 +6099,9 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			if (!ts.isIdentifier(tag) && !ts.isPropertyAccessExpression(tag)) return null;
 			if (!isComponentName(tag.getText(this.sf).split('.').pop() ?? '')) return null;
 			const attributes = node.attributes.properties;
-			// A spread can carry the root's key. The direct overload has no key.
-			if (!attributes.every(ts.isJsxAttribute)) return null;
+			// A spread can carry a key. Keep quoted references for the JSX parser.
+			if (!attributes.every(ts.isJsxAttribute) || attributes.some(quotedPropWithReference))
+				return null;
 			const props: string[] = [];
 			for (const property of attributes) {
 				const name = property.name.getText(this.sf);
@@ -6092,8 +6109,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				const key = /^[A-Za-z_$][\w$]*$/.test(name) ? name : JSON.stringify(name);
 				const value = property.initializer;
 				if (!value) props.push(`${key}: true`);
-				else if (ts.isStringLiteral(value)) props.push(`${key}: ${value.getText(this.sf)}`);
-				else if (ts.isJsxExpression(value) && value.expression)
+				else if (ts.isStringLiteral(value)) {
+					const text = /[\\\r\n]/.test(value.text)
+						? JSON.stringify(value.text)
+						: value.getText(this.sf);
+					props.push(`${key}: ${text}`);
+				} else if (ts.isJsxExpression(value) && value.expression)
 					props.push(`${key}: ${this.emit(value.expression, PLAIN)}`);
 				else return null;
 			}
