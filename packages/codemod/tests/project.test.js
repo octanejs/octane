@@ -4165,6 +4165,12 @@ export function Host({rows}: { rows: Row[] }) {
 		'blocks map defaults with an eager operand that reads the uninitialized index (project types %s)',
 		async (projectTypes) => {
 			const cases = [
+				['(() => { return (index as number); })()', true],
+				['(() => { return () => index; })()', false],
+				['((index = 7) => { return index; })()', false],
+				['(async () => { return index; })()', false],
+				['(() => { try { return index; } catch { return 7; } })()', false],
+				['(() => { return index; })(fail())', false],
 				['index < 1', true],
 				['0 <= index', true],
 				['index > fail()', true],

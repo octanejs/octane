@@ -7462,10 +7462,13 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 					ts.isArrowFunction(callee) &&
 					!callee.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
 					callee.parameters.length === 0 &&
-					read.arguments.length === 0 &&
-					!ts.isBlock(callee.body)
-				)
-					return readsOrdinal(callee.body);
+					read.arguments.length === 0
+				) {
+					if (!ts.isBlock(callee.body)) return readsOrdinal(callee.body);
+					if (callee.body.statements.length !== 1) return false;
+					const [statement] = callee.body.statements;
+					return ts.isReturnStatement(statement) && readsOrdinal(statement.expression);
+				}
 				// Optional calls can skip their arguments, and earlier arguments or a
 				// member getter can interrupt evaluation before the ordinal read.
 				if (!ts.isArrowFunction(callee) && (ts.isOptionalChain(read) || !ts.isIdentifier(callee)))
