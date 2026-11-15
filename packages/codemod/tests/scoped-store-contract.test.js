@@ -68,7 +68,7 @@ function fixture(replacements = {}) {
 		library,
 		planner,
 		plan: (name = 'useSnapshot', file = path.join(out, 'pane.tsx')) =>
-			planner('observer', name, file),
+			planner('observer', name, file)?.plan ?? null,
 	};
 }
 
@@ -738,7 +738,15 @@ it('warns when an existing Octane server renderer imports a migrated store consu
 it.each([
 	['direct', 'read(current)', false],
 	['nested', 'valueOf(read(current))', false],
-	['local forwarding', 'read(current)', false, false, true],
+	['local forwarding', 'read(current)', false, false, 'useForward(value)'],
+	['grouped local forwarding', 'read(current)', false, false, '(useForward(value))'],
+	[
+		'type-asserted local forwarding',
+		'read(current)',
+		false,
+		false,
+		'((useForward(value)! as number) satisfies number)',
+	],
 	['named alongside star', 'read(current)', true],
 	['parent-relative barrel', 'read(current)', false, true],
 ])(
@@ -746,7 +754,7 @@ it.each([
 	async (_case, read, named, parent, forwarding) => {
 		const view = (name) => `import { ${name} as read } from './helper';
 export function Pane() { const value = read(); return <p>{String(value)}</p>; }`;
-		const { app, library } = project({
+		const { app, library, plan } = project({
 			'observer/entry.ts': named
 				? "export * from './state'; export { useSnapshot, useMaybe } from './api';"
 				: "export * from './api'; export { valueOf } from './state';",
@@ -768,7 +776,7 @@ ${forwarding ? 'function useInner' : 'export function useChannel'}(value: number
 ${
 	forwarding
 		? `function useForward(value: number) { return useInner(value); }
-export function useChannel(value: number) { return useForward(value); }`
+export function useChannel(value: number) { return ${forwarding}; }`
 		: ''
 }
 export function useMaybe(value: number) {
@@ -815,6 +823,9 @@ export function useOptional() { return maybe(1); }`,
 				strong: true,
 				code: expect.stringContaining("from './helper'"),
 			});
+		}
+		if (forwarding) {
+			expect(plan()?.name).toBe(forwarding.startsWith('(') ? undefined : 'useChannel');
 		}
 		fs.writeFileSync(path.join(library, 'api.js'), 'export function useSnapshot() { return 1; }');
 		expect(warnings(await run(true))).toEqual([]);
@@ -2582,7 +2593,7 @@ it('emits identical companions from parent and nested links to the same workspac
 		path.join(app, 'src'),
 		path.join(app, 'src/store-context.tsrx'),
 	);
-	const nested = nestedFirst('observer', 'useSnapshot', file),
+	const nested = nestedFirst('observer', 'useSnapshot', file)?.plan,
 		parent = outer();
 	expect(nested?.files).toEqual(parent?.files);
 	expect(nested?.files.size).toBeGreaterThan(0);

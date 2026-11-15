@@ -11,10 +11,14 @@ export interface ScopedStoreHookPlan {
 	entry: string;
 	name: string;
 	files: ReadonlyMap<string, string>;
-	/** Every normal return from the verified original export reaches a React hook. */
-	requiresReact(): boolean;
 	/** Checks a store factory against its original, renderer-independent declaration. */
 	isSharedExport(module: string, imported: string, from: string): boolean;
+}
+
+interface ScopedStoreHookContract {
+	plan?: ScopedStoreHookPlan;
+	/** Every normal return from the verified original export reaches a React hook. */
+	requiresReact(): boolean;
 }
 
 // The application's React compiler must not synthesize dispatcher calls in Octane hooks.
@@ -617,17 +621,20 @@ function modulePlan(
 		files.set(out, code.slice(0, start) + nativeDirective + code.slice(start));
 		return true;
 	}
-	function forwardedCall(fn: ts.FunctionDeclaration) {
+	function forwardedCall(fn: ts.FunctionDeclaration, unwrap: boolean) {
 		if (fn.body?.statements.length !== 1) return;
 		const [only] = fn.body.statements;
-		const call = ts.isReturnStatement(only) ? only.expression : undefined;
-		if (call && ts.isCallExpression(call) && ts.isIdentifier(call.expression)) return call;
+		const expression = ts.isReturnStatement(only) ? only.expression : undefined;
+		if (!expression) return;
+		const call = unwrap ? skipWrappers(expression) : expression;
+		if (ts.isCallExpression(call) && ts.isIdentifier(call.expression)) return call;
 	}
 
 	function readsContext(
 		fn: ts.FunctionDeclaration,
 		seen: Set<ts.Symbol>,
 		files: Map<string, string>,
+		unwrap = false,
 	): boolean {
 		const symbol = fn.name && checker.getSymbolAtLocation(fn.name);
 		if (!symbol || !fn.body || !files.has(output(fn.getSourceFile())) || seen.has(symbol))
@@ -635,13 +642,13 @@ function modulePlan(
 		if (contextReaders.has(symbol)) return true;
 		seen.add(symbol);
 		// A thin exported forwarding hook may share another hook's contextual read.
-		const forward = forwardedCall(fn);
+		const forward = forwardedCall(fn, unwrap);
 		if (!forward) return false;
 		const called = referenced(checker, forward.expression);
 		const body = called?.declarations?.find(
 			(d): d is ts.FunctionDeclaration => ts.isFunctionDeclaration(d) && !!d.body,
 		);
-		return !!body && readsContext(body, seen, files);
+		return !!body && readsContext(body, seen, files, unwrap);
 	}
 
 	function reachesReact(
@@ -702,7 +709,7 @@ function modulePlan(
 			return false;
 		}
 		if (setup(fn.body)) return true;
-		const call = forwardedCall(fn);
+		const call = forwardedCall(fn, true);
 		if (!call || ts.isOptionalChain(call)) return false;
 		// The module audit already rules out reassignment and async or generator
 		// helpers. An imported alias alone does not identify the runtime module.
@@ -812,10 +819,10 @@ function modulePlan(
 		}
 		return sharedExports.get(key) ?? false;
 	}
-	const result = new Map<string, ScopedStoreHookPlan | null>();
+	const result = new Map<string, ScopedStoreHookContract | null>();
 	return (requested: string) => {
 		if (!result.has(requested)) {
-			let plan: ScopedStoreHookPlan | null = null;
+			let contract: ScopedStoreHookContract | null = null;
 			const ex = exportsOfRoot.find((s) => s.name === requested),
 				sym = ex && identity(ex);
 			const fn = sym?.declarations?.find(
@@ -825,11 +832,15 @@ function modulePlan(
 				const sf = fn.getSourceFile(),
 					files = new Map<string, string>();
 				const shared = new Set<string>();
-				if (
-					discover(sf, files, new Set(), shared) &&
-					shared.size &&
-					readsContext(fn, new Set(), files)
-				) {
+				if (discover(sf, files, new Set(), shared) && shared.size) {
+					contract = {
+						requiresReact: () =>
+							readsContext(fn, new Set(), files, true) &&
+							originalExportPath(root, requested, fn) &&
+							reachesReact(fn),
+					};
+				}
+				if (contract && readsContext(fn, new Set(), files)) {
 					const raw = output(sf),
 						entry = raw.replace(/-impl\.ts$/, '.ts');
 					const bound = exports(sf).flatMap((sym) => {
@@ -852,16 +863,15 @@ function modulePlan(
 						'',
 					].join('\n');
 					files.set(entry, nativeDirective + code);
-					plan = {
+					contract.plan = {
 						entry,
 						name: fn.name.text,
 						files,
 						isSharedExport,
-						requiresReact: () => originalExportPath(root, requested, fn) && reachesReact(fn),
 					};
 				}
 			}
-			result.set(requested, plan);
+			result.set(requested, contract);
 		}
 		return result.get(requested) ?? null;
 	};
@@ -873,7 +883,7 @@ export function createScopedStorePlanner(
 	contextBridge: string,
 	compilerOptions?: ts.CompilerOptions,
 ) {
-	type Lookup = (name: string) => ScopedStoreHookPlan | null;
+	type Lookup = (name: string) => ScopedStoreHookContract | null;
 	// All generated companions live together. Nested consumers can each declare
 	// a different symlink to the same workspace dependency.
 	const outputManifest = ts.findConfigFile(outputDir, ts.sys.fileExists, 'package.json');
@@ -996,7 +1006,7 @@ export function createScopedStorePlanner(
 		specifier: string,
 		importedName: string,
 		importer: string,
-	): ScopedStoreHookPlan | null => {
+	): ScopedStoreHookContract | null => {
 		if (!/^use[A-Z0-9]/.test(importedName) || !/^(?:@[\w.-]+\/)?[\w-][\w.-]*$/.test(specifier))
 			return null;
 		const key = path.dirname(importer) + '\0' + specifier;

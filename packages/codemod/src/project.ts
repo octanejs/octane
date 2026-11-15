@@ -1072,7 +1072,7 @@ export async function runCodemod(
 				? undefined
 				: (module, name, safeUses) => {
 						if (!unportedName(module, file)) return null;
-						const plan = planStoreHook(module, name, file);
+						const plan = planStoreHook(module, name, file)?.plan;
 						if (
 							!plan ||
 							!safeUses(
