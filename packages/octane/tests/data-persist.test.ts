@@ -461,7 +461,7 @@ describe('octane/data persistent cache', () => {
 	});
 
 	it('stays within its budget, purging the least recently used values first', async () => {
-		/** Load the shelf and keep it mounted, then load and unmount `unread`, then `count`. */
+		/** Keep the shelf mounted and compare two unobserved values on the final write. */
 		async function fill(budget: number) {
 			const storage = memoryStorage();
 			const store = createDataStore({
@@ -483,13 +483,16 @@ describe('octane/data persistent cache', () => {
 				return entry.lastUsed;
 			}
 			const mounted = await value(store, shelf);
-			let lastUsed = await nextSaved();
-			for (const contract of [unread, count]) {
-				// Make each unmounted value strictly newer in the persisted LRU order.
-				await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(lastUsed));
-				(await value(store, contract)).stop();
-				lastUsed = await nextSaved();
-			}
+			const shelfLastUsed = await nextSaved();
+			await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(shelfLastUsed));
+			// The shelf and view can already exceed the budget while saving the view.
+			const view = await value(store, unread);
+			const viewLastUsed = await nextSaved();
+			view.stop();
+			await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(viewLastUsed));
+			// Load count without a subscriber so both it and the view can be evicted.
+			await store.prefetch(count, undefined);
+			await nextSaved();
 			mounted.stop();
 			return storage;
 		}
