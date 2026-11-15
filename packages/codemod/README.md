@@ -199,8 +199,8 @@ The codemod warns when JSX renders an SVG imported with `?react` or the named
 `.svg` imports, check those tags too. A loader that emits Octane components
 can keep its existing imports.
 
-A React package with no Octane binding still runs on React, so React stays a
-dependency, and a comment above each import of it says so. When the project
+If the codemod keeps an import on React, the generated comment identifies the
+retained import. Keep React as a dependency. When the project
 has React and React DOM 19.2 or newer in the React 19 series, a component of that package renders in
 its own React root through `ReactCompat` if its element gives React nothing
 Octane renders: text children and props without elements. The package's hooks
@@ -210,9 +210,9 @@ in a local `NoOctanePort`, which throws the reported error where the component
 would render, so the page names the package instead of failing deep in
 Octane's renderer. Once you have checked that nothing Octane renders reaches
 it, such as a spread of props whose `children` no caller passes, swap the
-wrapper for `ReactCompat`. **No Octane port** lists each such
-package with the modules that import it, the elements hosted in islands, and
-the uses that need a port.
+wrapper for `ReactCompat`. **Retained React imports** lists each such package
+with the modules that import it, the elements hosted in islands, and the uses
+that need review.
 
 A patch the project applies to a React package the codemod replaces, through
 `patchedDependencies` (pnpm, Bun) or `patches/` (patch-package), patches the
