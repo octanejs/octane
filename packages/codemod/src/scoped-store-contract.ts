@@ -321,11 +321,20 @@ function modulePlan(
 	if (!neutral.size) return null;
 
 	const contextReaders = new Set<ts.Symbol>();
+	function localExportBody(item: ts.ExportSpecifier, sf: ts.SourceFile) {
+		const edge = item.parent.parent;
+		if (edge.isTypeOnly || edge.attributes || edge.moduleSpecifier || item.isTypeOnly) return;
+		return checker
+			.getExportSpecifierLocalTargetSymbol(item)
+			?.declarations?.find((d) => ts.isFunctionDeclaration(d) && !!d.body && d.parent === sf);
+	}
+
 	function discover(
 		sf: ts.SourceFile,
 		files: Map<string, string>,
 		seen: Set<string>,
 		shared: Set<string>,
+		localExports: Set<ts.Node>,
 	): boolean {
 		if (seen.has(sf.fileName)) return true;
 		if (!owned(sf.fileName) || !sourceFile.test(sf.fileName) || sf.isDeclarationFile) return false;
@@ -399,6 +408,16 @@ function modulePlan(
 					else return false;
 					helpers.add(sym);
 				}
+				continue;
+			}
+			if (
+				ts.isExportDeclaration(s) &&
+				s.exportClause &&
+				ts.isNamedExports(s.exportClause) &&
+				s.exportClause.elements.length &&
+				s.exportClause.elements.every((item) => localExportBody(item, sf))
+			) {
+				for (const item of s.exportClause.elements) localExports.add(item);
 				continue;
 			}
 			if (
@@ -489,7 +508,7 @@ function modulePlan(
 					!named.elements.every(
 						(x) => x.isTypeOnly || /^use[A-Z0-9]/.test((x.propertyName ?? x.name).text),
 					) ||
-					!discover(child, files, seen, shared)
+					!discover(child, files, seen, shared, localExports)
 				)
 					return false;
 				for (const x of named.elements) {
@@ -563,7 +582,12 @@ function modulePlan(
 				valid = false;
 				return;
 			}
-			if (!ts.isIdentifier(node) || ts.isImportSpecifier(node.parent)) return;
+			if (
+				!ts.isIdentifier(node) ||
+				ts.isImportSpecifier(node.parent) ||
+				localExports.has(node.parent)
+			)
+				return;
 			const sym = ts.isShorthandPropertyAssignment(node.parent)
 				? checker.getShorthandAssignmentValueSymbol(node.parent)
 				: checker.getSymbolAtLocation(node);
@@ -734,8 +758,18 @@ function modulePlan(
 		if (depth === 5) return false;
 		const exported = exports(sf).find((item) => item.name === name);
 		if (!exported || !identity(exported).declarations?.includes(fn)) return false;
-		if (fn.getSourceFile() === sf && fn.name?.text === name)
-			return fn.modifiers?.some((mod) => mod.kind === ts.SyntaxKind.ExportKeyword) === true;
+		if (fn.parent === sf) {
+			if (
+				fn.name?.text === name &&
+				fn.modifiers?.some((mod) => mod.kind === ts.SyntaxKind.ExportKeyword)
+			)
+				return true;
+			return (
+				exported.declarations?.some(
+					(item) => ts.isExportSpecifier(item) && localExportBody(item, sf) === fn,
+				) === true
+			);
+		}
 		const reexports = sf.statements
 			.filter(ts.isExportDeclaration)
 			.filter((edge) => !edge.isTypeOnly);
@@ -832,7 +866,8 @@ function modulePlan(
 				const sf = fn.getSourceFile(),
 					files = new Map<string, string>();
 				const shared = new Set<string>();
-				if (discover(sf, files, new Set(), shared) && shared.size) {
+				const localExports = new Set<ts.Node>();
+				if (discover(sf, files, new Set(), shared, localExports) && shared.size) {
 					contract = {
 						requiresReact: () =>
 							readsContext(fn, new Set(), files, true) &&
@@ -840,7 +875,8 @@ function modulePlan(
 							reachesReact(fn),
 					};
 				}
-				if (contract && readsContext(fn, new Set(), files)) {
+				// Local export lists only extend the advisory proof.
+				if (contract && !localExports.size && readsContext(fn, new Set(), files)) {
 					const raw = output(sf),
 						entry = raw.replace(/-impl\.ts$/, '.ts');
 					const bound = exports(sf).flatMap((sym) => {

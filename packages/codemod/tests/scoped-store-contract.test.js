@@ -749,9 +749,18 @@ it.each([
 	],
 	['named alongside star', 'read(current)', true],
 	['parent-relative barrel', 'read(current)', false, true],
+	['same-file named export', 'read(current)', false, false, 'useForward(value)', 'useChannel'],
+	[
+		'same-file aliased export',
+		'read(current)',
+		false,
+		false,
+		'useForward(value)',
+		'useChannel as useSnapshot',
+	],
 ])(
 	'warns about a retained wrapper through a %s linked hook',
-	async (_case, read, named, parent, forwarding) => {
+	async (_case, read, named, parent, forwarding, localExport) => {
 		const view = (name) => `import { ${name} as read } from './helper';
 export function Pane() { const value = read(); return <p>{String(value)}</p>; }`;
 		const { app, library, plan } = project({
@@ -762,7 +771,9 @@ export function Pane() { const value = read(); return <p>{String(value)}</p>; }`
 export function useSnapshot() { return 0; }`,
 			'observer/api/index.ts': parent
 				? "export { useChannel as useSnapshot, useMaybe } from '../implementation/hooks';"
-				: "export { useChannel as useSnapshot, useMaybe } from './hooks';",
+				: localExport?.includes(' as ')
+					? "export { useSnapshot, useMaybe } from './hooks';"
+					: "export { useChannel as useSnapshot, useMaybe } from './hooks';",
 			[parent ? 'observer/implementation/hooks.ts' : 'observer/api/hooks.ts']:
 				`import { use as read } from 'react';
 import { current } from '../renderer';
@@ -776,7 +787,8 @@ ${forwarding ? 'function useInner' : 'export function useChannel'}(value: number
 ${
 	forwarding
 		? `function useForward(value: number) { return useInner(value); }
-export function useChannel(value: number) { return ${forwarding}; }`
+${localExport ? '' : 'export '}function useChannel(value: number) { return ${forwarding}; }
+${localExport ? `export { ${localExport} };` : ''}`
 		: ''
 }
 export function useMaybe(value: number) {
@@ -825,7 +837,9 @@ export function useOptional() { return maybe(1); }`,
 			});
 		}
 		if (forwarding) {
-			expect(plan()?.name).toBe(forwarding.startsWith('(') ? undefined : 'useChannel');
+			expect(plan()?.name).toBe(
+				localExport || forwarding.startsWith('(') ? undefined : 'useChannel',
+			);
 		}
 		fs.writeFileSync(path.join(library, 'api.js'), 'export function useSnapshot() { return 1; }');
 		expect(warnings(await run(true))).toEqual([]);
