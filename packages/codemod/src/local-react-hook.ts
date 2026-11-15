@@ -333,16 +333,36 @@ function privateContextCall(
 	callee: ts.Identifier,
 ) {
 	if (ts.isOptionalChain(outer) || outer.arguments.length) return false;
-	const helper = checker.getSymbolAtLocation(callee)?.valueDeclaration;
+	const binding = checker.getSymbolAtLocation(callee)?.valueDeclaration;
+	if (!binding || (!ts.isFunctionDeclaration(binding) && !ts.isVariableDeclaration(binding)))
+		return false;
+	const name = binding.name;
+	if (!name || !ts.isIdentifier(name)) return false;
+
+	let helper: ts.FunctionDeclaration | ts.ArrowFunction | undefined;
+	if (ts.isFunctionDeclaration(binding)) {
+		if (binding.parent === sf) helper = binding;
+	} else {
+		const list = binding.parent;
+		const statement = list.parent;
+		if (
+			ts.isVariableDeclarationList(list) &&
+			(list.flags & ts.NodeFlags.BlockScoped) === ts.NodeFlags.Const &&
+			ts.isVariableStatement(statement) &&
+			statement.parent === sf &&
+			!statement.modifiers?.length &&
+			binding.initializer
+		) {
+			const initializer = skipWrappers(binding.initializer);
+			if (ts.isArrowFunction(initializer) && !ts.isBlock(initializer.body)) helper = initializer;
+		}
+	}
 	if (
 		!helper ||
-		!ts.isFunctionDeclaration(helper) ||
-		!helper.name ||
-		helper.parent !== sf ||
 		helper.modifiers?.length ||
 		helper.asteriskToken ||
 		helper.parameters.length ||
-		renderUses(uses(helper.name)).some(
+		renderUses(uses(name)).some(
 			(ref) => !ts.isCallExpression(ref.parent) || ref.parent.expression !== ref,
 		)
 	)
