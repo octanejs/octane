@@ -134,6 +134,116 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 					'return <Frame><b>ready</b></Frame>;',
 					'if (show) return <Frame />; return <b />;',
 				),
+			'Retained.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+				),
+			'RetainedCompound.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean, enabled: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } if (!enabled) return <b />; return <Frame />;',
+				),
+			'RetainedArrow.tsx': entry('./Boundary')
+				.replace('export function App()', 'export const App = (show: boolean) =>')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+				),
+			'RetainedArrowMetadata.tsx':
+				entry('./Boundary')
+					.replace('export function App()', 'export const App = (show: boolean) =>')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+					) + '; export type View = typeof App; App.displayName = "App";',
+			'RetainedDefaultArrow.tsx': entry('./Boundary')
+				.replace('export function App()', 'export default (show: boolean) =>')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+				),
+			'RetainedStrict.tsx':
+				"import { StrictMode } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <StrictMode><Frame /></StrictMode>;',
+					),
+			'RetainedCallback.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'const Build = (show: boolean) => { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; }; return <Other render={Build} />;',
+			),
+			'RetainedNamedFactory.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'const build = function Build(show: boolean) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; }; export function App() { build(true); return <b />; }',
+			),
+			'RetainedImperative.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'const Build = (show: boolean) => { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; }; export function App() { Build(true); return <b />; }',
+			),
+			'RetainedImperativeDeclaration.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'function Build(show: boolean) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; } export function App() { Build(true); return <b />; }',
+			),
+			'RetainedLocalComponent.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'function Build({ show }: { show: boolean }) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; } export function App() { return <Build show={true} />; }',
+			),
+			'RetainedSplitExport.tsx': entry('./Boundary').replace(
+				'export function App() { return <Frame><b>ready</b></Frame>; }',
+				'function Build(show: boolean) { if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />; } export { Build as App }; Build(true);',
+			),
+			'RetainedDead.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'if (true) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+			),
+			'RetainedUnconditional.tsx': entry('./Boundary').replace(
+				'return <Frame><b>ready</b></Frame>;',
+				'return <i>off</i>; return <Frame />;',
+			),
+			'RetainedFactory.tsx': entry('./Boundary')
+				.replace(
+					'export function App()',
+					'declare function makeView(frame: typeof Frame): unknown;\nexport function App(show: boolean)',
+				)
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return makeView(Frame);',
+				),
+			'RetainedCustom.tsx':
+				'/** @jsx custom */\ndeclare function custom(type: unknown, props: unknown): unknown;\n' +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Frame />;',
+					),
+			'RetainedFragment.tsx': entry('./Boundary')
+				.replace('App()', 'App(show: boolean)')
+				.replace(
+					'return <Frame><b>ready</b></Frame>;',
+					'if (!show) { const text = "off"; return <i>{text}</i>; } return <><b /><Frame /></>;',
+				),
+			'RetainedNamedFragment.tsx':
+				"import { Fragment as Group } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Group key="stable"><Frame /></Group>;',
+					),
+			'RetainedSuspense.tsx':
+				"import { Suspense } from 'react';\n" +
+				entry('./Boundary')
+					.replace('App()', 'App(show: boolean)')
+					.replace(
+						'return <Frame><b>ready</b></Frame>;',
+						'if (!show) { const text = "off"; return <i>{text}</i>; } return <Suspense fallback={<Frame />}><b /></Suspense>;',
+					),
 			'LogicalArm.tsx': entry('./Boundary')
 				.replace('App()', 'App(show: boolean, enabled: boolean)')
 				.replace(
@@ -359,11 +469,28 @@ export function App() { return <Frame><b>ready</b></Frame>; }`;
 				['NestedRootStrict.tsx', includeClass ? 'error' : 'warning'],
 				['QualifiedFragment.tsx', includeClass ? 'error' : 'warning'],
 				['Relative.tsx', includeClass ? 'error' : 'warning'],
+				['Retained.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedArrow.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedArrowMetadata.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedCompound.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedDefaultArrow.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedLocalComponent.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedNamedFragment.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedSplitExport.tsx', includeClass ? 'error' : 'warning'],
+				['RetainedStrict.tsx', includeClass ? 'error' : 'warning'],
 				['Strict.tsx', includeClass ? 'error' : 'warning'],
 				['SuspenseChild.tsx', includeClass ? 'error' : 'warning'],
 				['Ternary.tsx', includeClass ? 'error' : 'warning'],
 				['TypeUsesView.tsx', includeClass ? 'error' : 'warning'],
 			]);
+			for (const { file, notes, code } of callers) {
+				if (!file.startsWith('Retained')) continue;
+				expect(notes.find((note) => note.rule === 'class-component').message).toMatch(
+					/if octane renders/i,
+				);
+				expect(code).toContain('return <i>');
+			}
 		}
 	});
 
