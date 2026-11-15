@@ -6,6 +6,7 @@ import {
 	useState,
 	useTransition,
 	ViewTransition,
+	type OctaneNode,
 } from 'octane';
 
 export interface ReturnedContentProps {
@@ -186,6 +187,49 @@ export function NestedOutputless(props) @{
 export function NestedMixedInline(props) @{
 	<main class="mixed-parent">
 		<MixedInline mode={props.mode} label={props.label} detail={props.detail} />
+	</main>
+}
+
+const GuardedCounter = memo(function GuardedCounter({ shown }: { shown: boolean }) @{
+	if (!shown) return null;
+	const [count, setCount] = useState(1);
+	<button onClick={() => setCount(count + 1)}>{count as number}</button>
+});
+
+export function GuardedMemoApp({ shown }: { shown: boolean }) @{
+	<main>
+		<GuardedCounter shown={shown} />
+	</main>
+}
+
+const guardedState = useState;
+const GuardedAliasedCounter = memo!(
+	function GuardedAliasedCounter({ shown }: { shown: boolean }) @{
+		if (!shown) return null;
+		const [count, setCount, getCount] = guardedState(1);
+		<button onClick={() => setCount(getCount() + 1)}>{count as number}</button>
+	}!,
+)!;
+
+export function GuardedAliasedMemoApp({ shown }: { shown: boolean }) @{
+	<main>
+		<GuardedAliasedCounter shown={shown} />
+	</main>
+}
+
+const EscapedGuardedCounter = memo!(
+	function EscapedGuardedCounter({ shown }: { shown: boolean }) @{
+		if (!shown) return null;
+		<output>shown</output>
+	}!,
+)!;
+
+export function EscapedGuardedMemoApp() @{
+	const call = EscapedGuardedCounter.type as (props: { shown: boolean }) => OctaneNode;
+	const result = call({ shown: false });
+	<main>
+		<span>{String(result)}</span>
+		<EscapedGuardedCounter shown={true} />
 	</main>
 }
 
