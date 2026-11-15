@@ -448,7 +448,7 @@ export function findVoidComponentExports(source, id) {
 			: null;
 	const voidBindings = new Set();
 	const memoDependents = new Map();
-	const hasLowerableJsxReturnBranches = createJsxReturnBranchClassifier(ast.body || []);
+	const hasLowerableJsxReturnBranches = createJsxReturnBranchClassifier(ast);
 	// Mirrors the compile-time lowering decisions exactly (nullish-guard @{}
 	// bodies AND React-style conditional JSX returns), so cross-module call-site
 	// classification agrees with what each module actually compiled to.
