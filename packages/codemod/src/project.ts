@@ -32,6 +32,7 @@ import {
 	MAP_PARAMETER_TDZ,
 	MAP_PARAMETER_WRITE,
 	projectTypeAt,
+	REACT_TYPE_PROJECTION,
 	textKind,
 	transformModule,
 } from './transform.js';
@@ -1402,7 +1403,8 @@ export async function runCodemod(
 				note.rule === CONTEXT_ALIAS ||
 				note.rule === CONTEXT_PROVIDER_GETTER ||
 				note.rule === INTL_PROVIDER_DEFAULTS ||
-				note.rule === ELEMENT_CHILD_ALIAS,
+				note.rule === ELEMENT_CHILD_ALIAS ||
+				note.rule === REACT_TYPE_PROJECTION,
 		);
 		if (write && blockedTransform)
 			return blockedWrite(

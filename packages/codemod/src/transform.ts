@@ -38,6 +38,7 @@ import {
 	TEXT_FIELD_COMPONENTS,
 	TEXT_INPUT_TYPES,
 	UNSUPPORTED_VALUES,
+	hasOctaneValue,
 	isComputedReactHookOrRef,
 	mapPackageExport,
 	mapQualifiedType,
@@ -120,6 +121,7 @@ export const CONTEXT_ALIAS = 'context-path-alias';
 export const CONTEXT_PROVIDER_GETTER = 'context-provider-getter';
 export const ELEMENT_CHILD_ALIAS = 'element-child-path-alias';
 export const INTL_PROVIDER_DEFAULTS = 'intl-provider-defaults';
+export const REACT_TYPE_PROJECTION = 'react-type-projection';
 
 /** Rule names, as reported. */
 const RULE = {
@@ -3958,7 +3960,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						mapped?.name !== name &&
 						mapReactImport(module, name, false)?.name !== name
 					)
-						this.note(RULE.unsupported, 'error', item, `Octane has no export \`${name}\`.`);
+						this.note(REACT_TYPE_PROJECTION, 'error', item, `Octane has no export \`${name}\`.`);
 					migrated.push(text);
 				}
 			}
@@ -4179,12 +4181,21 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			return null;
 		}
 		const name = qualifier && ts.isIdentifier(qualifier) ? qualifier.text : null;
-		if (
-			node.isTypeOf &&
-			name &&
-			mapReactImport(specifier.text, name, true)?.module === specifier.text
-		) {
-			return null;
+		let missingValue = false;
+		if (specifier.text === 'react' && node.isTypeOf && qualifier) {
+			let value = qualifier;
+			while (ts.isQualifiedName(value)) value = value.left;
+			const retained = mapReactImport('react', value.text, true)?.module === 'react';
+			if (retained) return null;
+			if (!hasOctaneValue(value.text)) {
+				missingValue = true;
+				this.note(
+					REACT_TYPE_PROJECTION,
+					'error',
+					value,
+					`Octane has no value export \`${value.text}\`.`,
+				);
+			}
 		}
 		if (specifier.text === 'react' && !node.isTypeOf) {
 			const event = this.nativeEventType(node, name);
@@ -4194,11 +4205,13 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			}
 		}
 		this.count(RULE.import);
-		const renamed = name === null ? null : mapQualifiedType(name, specifier.text, node.isTypeOf);
-		if (name !== null && renamed === null) {
+		const renamed =
+			name === null || missingValue ? null : mapQualifiedType(name, specifier.text, node.isTypeOf);
+		if (name !== null && renamed === null && !missingValue) {
+			const unresolvedProjection = specifier.text === 'react' && !node.isTypeOf;
 			this.note(
-				RULE.unsupported,
-				specifier.text === 'react' && !node.isTypeOf ? 'error' : 'warning',
+				unresolvedProjection ? REACT_TYPE_PROJECTION : RULE.unsupported,
+				unresolvedProjection ? 'error' : 'warning',
 				node,
 				`Octane has no type \`${name}\`.`,
 			);
@@ -4737,12 +4750,29 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				}
 			}
 		}
-		if (ts.isTypeQueryNode(node.parent)) {
-			const mapped = mapReactImport(namespace?.module ?? 'react', node.right.text, true);
+		let queried: ts.QualifiedName = node;
+		if (namespace?.module === 'react') {
+			while (ts.isQualifiedName(queried.parent) && queried.parent.left === queried)
+				queried = queried.parent;
+		}
+		if (ts.isTypeQueryNode(queried.parent) && queried.parent.exprName === queried) {
+			const name = node.right.text;
+			const mapped = mapReactImport(namespace?.module ?? 'react', name, true);
 			if (mapped?.module === 'react') {
 				if (!namespace) return null;
+				const declaration = ts.isIdentifier(node.left) ? this.declarationOf(node.left) : null;
+				const clause =
+					declaration && (ts.isNamespaceImport(declaration) ? declaration.parent : declaration);
+				if (clause && ts.isImportClause(clause) && (queried !== node || clause.parent.attributes)) {
+					this.retainedTypeNamespaces.add(clause);
+					return node.getText(this.sf);
+				}
 				this.count(RULE.import);
 				return this.require(mapped.module, mapped.name, true);
+			}
+			if (namespace?.module === 'react' && !hasOctaneValue(name)) {
+				this.note(REACT_TYPE_PROJECTION, 'error', node, `Octane has no value export \`${name}\`.`);
+				return null;
 			}
 		}
 		const name = mapQualifiedType(
@@ -4752,9 +4782,11 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		);
 		if (!name) {
 			if (namespace) this.used.add(namespace.local);
+			const unresolvedProjection =
+				namespace?.module === 'react' && ts.isTypeReferenceNode(node.parent);
 			this.note(
-				RULE.unsupported,
-				namespace?.module === 'react' && ts.isTypeReferenceNode(node.parent) ? 'error' : 'warning',
+				unresolvedProjection ? REACT_TYPE_PROJECTION : RULE.unsupported,
+				unresolvedProjection ? 'error' : 'warning',
 				node,
 				`Octane has no type \`${node.getText(this.sf)}\`.`,
 			);
