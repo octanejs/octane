@@ -380,6 +380,8 @@ An inline style can set a single `transform` declaration. The value can be a str
 
 Static SVGs can also use local linear gradients, alpha masks, and simple filters. Linear gradients declare `gradientUnits="userSpaceOnUse"`, both endpoints and at least two stops. An alpha mask is a direct child of the SVG, declares `style="mask-type:alpha"` and contains paths or rectangles. The adapter preserves the fixed style attribute in server output and sets the declaration through CSSOM on the client. Filters use `filterUnits="userSpaceOnUse"` and can contain flood, normal blend, and Gaussian blur primitives. Named blend inputs must be the source graphic, source alpha, or a result declared earlier in that filter. Every definition has a unique, referenced ID within the asset. The adapter preserves authored IDs and reference order across instances. XML declarations, external references, and other inline styles require review.
 
+A supported SVG may start with one plain `<title>` containing nonempty text. The helper keeps the title inside the SVG in the same position. Title attributes, entities, multiline text, embedded markup and additional titles require review.
+
 Shared component values, React island uses, refs, spread props, and SVGs with unsupported elements keep their original imports.
 
 ## Local recipes
