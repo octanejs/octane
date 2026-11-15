@@ -50,6 +50,113 @@ function typecheckProject(root) {
 }
 
 describe('runCodemod', () => {
+	it.each([
+		[
+			'retained value import',
+			'Consumer.ts',
+			"import { Widget } from './Widget.js'; export const value = Widget;",
+			['Widget.tsx'],
+		],
+		[
+			'retained value re-export',
+			'Consumer.ts',
+			"export { Widget } from './Widget.js';",
+			['Widget.tsx'],
+		],
+		[
+			'retained dynamic import',
+			'Consumer.ts',
+			"export const load = () => import('./Widget.js');",
+			['Widget.tsx'],
+		],
+		[
+			'selected value import',
+			'Consumer.tsx',
+			"import { Widget } from './Widget.js'; export function Consumer() { return <Widget />; }",
+			['Widget.tsx', 'Consumer.tsx'],
+		],
+		[
+			'import equals',
+			'Consumer.ts',
+			"import Widget = require('./Widget.js'); export { Widget };",
+			['Widget.tsx'],
+		],
+		[
+			'inline type re-export under the nested verbatim configuration',
+			'nested/Consumer.ts',
+			"export { type Settings } from '../Widget.js';",
+			['Widget.tsx'],
+		],
+	])('keeps an explicit JavaScript sibling in %s', async (_label, consumer, source, selected) => {
+		const widget =
+			'export type Settings = { title: string }; export function Widget() { return <b>TSX</b>; }';
+		const runtime = "export function Widget() { return 'JavaScript'; }";
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'tsconfig.json':
+				'{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler","module":"ESNext","strict":true}}',
+			'Widget.tsx': widget,
+			'Widget.js': runtime,
+			'Other.tsx': 'export function Other() { return <i />; }',
+			'nested/tsconfig.json':
+				'{"extends":"../tsconfig.json","compilerOptions":{"verbatimModuleSyntax":true}}',
+			[consumer]: source,
+		});
+		const inputs = [...selected, 'Other.tsx'].map((name) => path.join(root, name));
+		const options = { root, strong: true, verify: false };
+		const note = expect.objectContaining({
+			rule: 'rename-conflict',
+			severity: 'error',
+			message: expect.stringContaining('Widget.js'),
+		});
+		const preview = await runCodemod(inputs, { ...options, write: false });
+		expect(preview.files.find((row) => row.file === 'Widget.tsx')?.notes).toContainEqual(note);
+		const consumerResult = preview.files.find((row) => row.file === consumer);
+		if (selected.includes(consumer)) expect(consumerResult?.code).toContain('./Widget.js');
+		else expect(consumerResult).toBeUndefined();
+		const written = await runCodemod(inputs, { ...options, write: true });
+		expect(written.files.find((row) => row.file === 'Widget.tsx')?.notes).toContainEqual(note);
+		expect(fs.readFileSync(path.join(root, 'Widget.tsx'), 'utf8')).toBe(widget);
+		expect(fs.readFileSync(path.join(root, 'Widget.js'), 'utf8')).toBe(runtime);
+		expect(fs.readFileSync(path.join(root, consumer), 'utf8')).toBe(source);
+		expect(fs.existsSync(path.join(root, 'Widget.tsrx'))).toBe(false);
+		expect(fs.existsSync(path.join(root, 'Other.tsrx'))).toBe(false);
+	});
+
+	it.each([
+		['an implicit TS runtime target', "export { Widget } from './Widget.js';", {}],
+		[
+			'a type-only reference',
+			"import type { Settings } from './Widget.js'; export type LocalSettings = Settings;",
+			{
+				'Widget.js': "export function Widget() { return 'JavaScript'; }",
+				'index.html': '<script type="module" src="./Widget.js"></script>',
+			},
+		],
+	])('can rename a selected TSX source reached through %s', async (_label, source, siblings) => {
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'tsconfig.json':
+				'{"compilerOptions":{"jsx":"react-jsx","moduleResolution":"bundler","module":"ESNext"}}',
+			'Widget.tsx':
+				'export type Settings = { title: string }; export function Widget() { return <b>ready</b>; }',
+			'Consumer.ts': source,
+			...siblings,
+		});
+		const result = await runCodemod([path.join(root, 'Widget.tsx')], {
+			root,
+			strong: true,
+			verify: false,
+			write: true,
+		});
+		expect(
+			result.files.flatMap((row) => row.notes).some((note) => note.rule === 'rename-conflict'),
+		).toBe(false);
+		expect(fs.readFileSync(path.join(root, 'Consumer.ts'), 'utf8')).toContain('./Widget.tsrx');
+		if (siblings['index.html'])
+			expect(fs.readFileSync(path.join(root, 'index.html'), 'utf8')).toBe(siblings['index.html']);
+	});
+
 	it.each(['./context.ts', '@/context'])(
 		'reports a native root that would render a retained React context from %s',
 		async (specifier) => {
@@ -2255,9 +2362,15 @@ export function Owner(${ownerParams}) { return <LazyLeaf />; }`,
 			});
 			const preview = await runCodemod(selected, { ...options, write: false });
 			for (const name of ['Leaf.tsx', 'Owner.tsx']) {
-				const notes = preview.files.find((file) => file.file === name)?.notes;
+				const notes = preview.files.find((file) => file.file === name)?.notes ?? [];
 				if (warns) expect(notes).toContainEqual(warning);
 				else expect(notes).not.toContainEqual(warning);
+			}
+			if (alias === 'jsx sibling') {
+				expect(preview.files.find((file) => file.file === 'Leaf.tsx')?.notes).toContainEqual(
+					expect.objectContaining({ rule: 'rename-conflict', severity: 'error' }),
+				);
+				expect(preview.files.find((file) => file.file === 'Owner.tsx')).toBeUndefined();
 			}
 			for (const [name, source] of Object.entries(files))
 				expect(fs.readFileSync(path.join(root, name), 'utf8')).toBe(source);

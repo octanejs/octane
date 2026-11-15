@@ -213,7 +213,7 @@ export async function runCodemod(
 			moduleKind === ts.ModuleKind.ESNext) &&
 		!config?.moduleSuffixes &&
 		!config?.rootDirs;
-	const renamed = renamedImports(root, config, renames);
+	const renamed = renamedImports(root, config, renames, bindingOptions);
 	const foldNames = process.platform === 'darwin';
 	const leafKey = (file: string) => {
 		const name = path.basename(file);
@@ -1591,13 +1591,30 @@ export async function runCodemod(
 		return names.has(name);
 	}
 	const jsxFactories = new Map<string, ReadonlySet<string>>();
-	const linkedConflicts = new Map<string, string>();
+	const renameConflicts = new Map<string, string>();
 	function checkLinkedRename(file: string, issuer: string) {
 		const selected = linkedRename(file);
-		if (selected && !linkedConflicts.has(selected)) linkedConflicts.set(selected, issuer);
+		if (selected && !renameConflicts.has(selected)) {
+			renameConflicts.set(
+				selected,
+				`would leave a reference in ${path.relative(root, issuer)} pointing to its original name`,
+			);
+		}
 	}
 	const scanRename = (from: string, specifier: string) =>
-		renamed(from, specifier, (winner) => checkLinkedRename(winner, from))?.specifier ?? null;
+		renamed(
+			from,
+			specifier,
+			(winner) => checkLinkedRename(winner, from),
+			(file) => {
+				if (!renameConflicts.has(file)) {
+					renameConflicts.set(
+						file,
+						`supplies types for ${JSON.stringify(specifier)} in ${path.relative(root, from)}, where that JavaScript path exists on disk`,
+					);
+				}
+			},
+		)?.specifier ?? null;
 	function protectIslandModule(issuer: string, specifier: string, owner: string) {
 		const file = ts.resolveModuleName(
 			specifier,
@@ -1879,15 +1896,8 @@ export async function runCodemod(
 		renames,
 		checkLinkedRename,
 	);
-	for (const [file, issuer] of linkedConflicts) {
-		const conflict = conflictFor(
-			file,
-			fs.readFileSync(file, 'utf8'),
-			renames.get(file)!,
-			'would leave a reference in ' +
-				path.relative(root, issuer) +
-				' pointing to its original name',
-		);
+	for (const [file, reason] of renameConflicts) {
+		const conflict = conflictFor(file, fs.readFileSync(file, 'utf8'), renames.get(file)!, reason);
 		if (write) return blockedWrite(root, conflict, compiler?.from);
 		byFile.get(file)?.notes.push(...conflict.notes);
 	}
@@ -2257,6 +2267,7 @@ function renamedImports(
 	root: string,
 	config: ts.CompilerOptions | null,
 	renames: Map<string, string>,
+	issuerOptions: (file: string) => ts.CompilerOptions | null,
 ) {
 	const options = {
 		moduleResolution: ts.ModuleResolutionKind.Bundler,
@@ -2274,7 +2285,13 @@ function renamedImports(
 				: null;
 		return { start, end, directory };
 	});
-	return (from: string, specifier: string, unmatched?: (file: string) => void) => {
+	const runtimeImports = new Map<string, ReadonlySet<string>>();
+	return (
+		from: string,
+		specifier: string,
+		unmatched?: (file: string) => void,
+		separateRuntime?: (file: string) => void,
+	) => {
 		const matches = specifier.startsWith('.')
 			? []
 			: aliases.filter(({ start, end }) =>
@@ -2290,6 +2307,27 @@ function renamedImports(
 		if (!target) {
 			if (file) unmatched?.(file);
 			return null;
+		}
+		if (file.endsWith('.tsx') && /^\.{1,2}\/.*\.jsx?$/.test(specifier)) {
+			const runtime = path.resolve(path.dirname(from), specifier);
+			if (ts.sys.fileExists(runtime) && !/\.d\.[cm]?ts$/.test(from)) {
+				let imports = runtimeImports.get(from);
+				if (!imports && !isTsrx(from)) {
+					imports = new Set(
+						executableImports(
+							from,
+							fs.readFileSync(from, 'utf8'),
+							!!issuerOptions(from)?.verbatimModuleSyntax,
+						),
+					);
+					runtimeImports.set(from, imports);
+				}
+				// Preserve the runtime path and the TypeScript source it uses for types.
+				if (!imports || imports.has(specifier)) {
+					separateRuntime?.(file);
+					return null;
+				}
+			}
 		}
 		// Only a single directory alias preserves the specifier's suffix.
 		// A fixed alias or fallback list may resolve elsewhere after a rename.

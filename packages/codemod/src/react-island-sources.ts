@@ -952,6 +952,12 @@ export function executableImports(file: string, source: string, verbatim: boolea
 				imports.push(node.moduleSpecifier.text);
 			return;
 		}
+		if (ts.isImportEqualsDeclaration(node) && !node.isTypeOnly) {
+			const reference = node.moduleReference;
+			if (ts.isExternalModuleReference(reference) && ts.isStringLiteral(reference.expression)) {
+				imports.push(reference.expression.text);
+			}
+		}
 		if (
 			ts.isCallExpression(node) &&
 			node.expression.kind === ts.SyntaxKind.ImportKeyword &&
