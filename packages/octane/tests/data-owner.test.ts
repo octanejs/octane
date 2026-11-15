@@ -8,10 +8,12 @@ import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	createDataOwner,
+	createDataStore,
 	createReplica,
 	DataRetiredError,
 	DataUncertainError,
 	listen,
+	memoryStorage,
 	read,
 	serveDataOwner,
 	sharedOwner,
@@ -20,6 +22,7 @@ import {
 	type DataStore,
 	type FeedFrame,
 	type Listener,
+	type PersistOptions,
 	type ReadHandle,
 	type StandardSchema,
 	type Transport,
@@ -50,13 +53,25 @@ const unsharedListener: Listener = () => {
 };
 const replicaOptions = { transport: unshared, listen: unsharedListener, contracts };
 
-/** An owner over `transport`, and `count` replicas connected to it by message channels. */
-function tabs(transport: Transport, count: number, feedListener?: Listener): DataStore[] {
-	const owner = createDataOwner({ transport, listen: feedListener });
+/**
+ * An owner over `transport`, and `count` replicas connected to it by message
+ * channels. With `persist`, the owner keeps the account's cache there.
+ */
+function tabs(
+	transport: Transport,
+	count: number,
+	feedListener?: Listener,
+	persist?: PersistOptions,
+): DataStore[] {
+	const owner = createDataOwner({
+		transport,
+		listen: feedListener,
+		persist: persist && (() => persist),
+	});
 	return Array.from({ length: count }, () => {
 		const channel = new MessageChannel();
 		owner.connect(channel.port1);
-		const store = createReplica(channel.port2, replicaOptions);
+		const store = createReplica(channel.port2, { ...replicaOptions, persist });
 		closers.push(() => {
 			void store.retire();
 			channel.port1.close();
@@ -106,12 +121,39 @@ describe('octane/data owner and replicas', () => {
 			const server = createServer();
 			const held: Array<() => void> = [];
 			let hold = false;
-			const [first, second] = tabs(async (request, signal) => {
-				// The server answers now, as of now; the reply reaches the tab when released.
-				const reply = await server.transport(request, signal);
-				if (hold) await new Promise<void>((resolve) => held.push(resolve));
-				return reply;
-			}, 2);
+			// The owner saves every tab's values in one cache, which counts the values it has committed.
+			const storage = memoryStorage();
+			let committed = 0;
+			const cache: PersistOptions = {
+				partition: 'ada',
+				key: 'a session secret of at least sixteen bytes',
+				storage: {
+					...storage,
+					async commit(partition, put, remove) {
+						await storage.commit(partition, put, remove);
+						if (put.some((item) => item.value !== undefined)) committed++;
+					},
+				},
+			};
+			const [first, second] = tabs(
+				async (request, signal) => {
+					// The server answers now, as of now; the reply reaches the tab when released.
+					const reply = await server.transport(request, signal);
+					if (hold) await new Promise<void>((resolve) => held.push(resolve));
+					return reply;
+				},
+				2,
+				undefined,
+				cache,
+			);
+			/** What a store starting from the cache, with no network, shows for the read. */
+			const restored = async () => {
+				const offline = createDataStore({ transport: () => new Promise(() => {}), persist: cache });
+				const handle = offline.read(read as typeof todos, undefined);
+				closers.push(handle.subscribe(() => {}));
+				await vi.waitFor(() => expect(handle.getSnapshot().value).toBeDefined());
+				return handle.getSnapshot().value!;
+			};
 			const one = await observed(first!.read(read as typeof todos, undefined));
 			const two = await observed(second!.read(read as typeof todos, undefined));
 			// Writes do not push the read out of what the tab remembers asking for.
@@ -126,15 +168,28 @@ describe('octane/data owner and replicas', () => {
 			// The second tab reloads after the change, so the first tab's request cannot answer it.
 			const newer = second!.read(read as typeof todos, undefined).refresh();
 			await vi.waitFor(() => expect(held).toHaveLength(2));
+			const before = committed;
 			held[1]!();
 			await newer;
 			expect(two()[0]!.title).toBe('Atoll');
+			await vi.waitFor(() => expect(committed).toBeGreaterThan(before));
+			expect((await restored())[0]!.title).toBe('Atoll');
 			held[0]!();
 			await older;
-			await new Promise((resolve) => setTimeout(resolve, 20));
+			await new Promise((resolve) => setTimeout(resolve, 50));
 			// The older reply, finishing last, does not take the second tab back.
 			expect(two()[0]!.title).toBe('Atoll');
 			expect(one()[0]!.title).toBe('Tides');
+			// Nor does it take the cache back: the next session starts from the newer value.
+			expect((await restored())[0]!.title).toBe('Atoll');
+
+			// The first tab is not left behind: what it reloads next is the newest, and is saved.
+			hold = false;
+			server.rows[0]!.title = 'Reef';
+			const saved = committed;
+			await first!.read(read as typeof todos, undefined).refresh();
+			await vi.waitFor(() => expect(committed).toBeGreaterThan(saved));
+			expect((await restored())[0]!.title).toBe('Reef');
 		},
 	);
 
