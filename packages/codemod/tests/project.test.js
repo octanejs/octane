@@ -2081,6 +2081,65 @@ export const renderNative = () => [native(), nativeNamespace()].map((node) => re
 		);
 	});
 
+	it('reports a retained IntlProvider onError that registers a React DOM resource', async () => {
+		const view = (attributes, setup = '') => `import { IntlProvider as Provider } from 'react-intl';
+import { report as onError, inert } from './handler';
+export function View() { ${setup} return <Provider ${attributes}><p>Ready</p></Provider>; }`;
+		const root = project({
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+			}),
+			'View.tsx': view('locale="" onError={onError}'),
+			'SelfClosing.tsx': view('locale="" onError={onError}').replace(
+				'><p>Ready</p></Provider>',
+				' />',
+			),
+			'Expression.tsx': view("locale={('')} onError={onError}"),
+			'Supported.tsx': view('locale="en" onError={onError}'),
+			'Inert.tsx': view('locale="" onError={inert}'),
+			'Shadowed.tsx': view('locale="" onError={onError}', 'const onError = () => {};'),
+			'Override.tsx': view('locale="" onError={onError} onError={inert}'),
+			'handler.ts': `import { preload } from 'react-dom';
+export function report() { preload('/locale.woff2', { as: 'font', crossOrigin: 'anonymous' }); }
+export function inert() {}`,
+		});
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+		);
+		fs.symlinkSync('handler.ts', path.join(root, 'alias.ts'));
+		const run = (...files) =>
+			runCodemod(
+				files.map((file) => path.join(root, file)),
+				{ root, strong: true, write: false },
+			);
+		const findings = ({ files }) =>
+			files.flatMap((file) =>
+				file.notes
+					.filter((note) => note.message.includes('retained callback uses React DOM'))
+					.map((note) => [file.file, note.severity]),
+			);
+		const retained = await run(
+			'View.tsx',
+			'SelfClosing.tsx',
+			'Expression.tsx',
+			'Supported.tsx',
+			'Inert.tsx',
+			'Shadowed.tsx',
+			'Override.tsx',
+		);
+		expect(findings(retained).sort()).toEqual([
+			['Expression.tsx', 'error'],
+			['SelfClosing.tsx', 'error'],
+			['View.tsx', 'error'],
+		]);
+		expect(retained.files.find((file) => file.file === 'View.tsx').code).toContain(
+			'octane-react-intl.tsrx',
+		);
+		expect(findings(await run('View.tsx', 'handler.ts'))).toEqual([]);
+		expect(findings(await run('View.tsx', 'alias.ts'))).toEqual([]);
+	});
+
 	it('reports a native setup call into a React hook left in an unselected local module', () => {
 		const helper = `import { useState as state } from 'react';
 export function useLabel() { const [label] = state('ready'); return label; }`;
