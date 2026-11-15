@@ -816,10 +816,11 @@ function resolveDeferredOwner(): SignalOwner {
  * carrier. Returns the frame to restore with restoreScopeSignalOwner, beside
  * the deferredOwnerScope the caller read first, or undefined when the caller
  * must resolve the owner itself. The root still records its document owner
- * now, which marks it as a signal root for retry bookkeeping.
+ * now, which marks it as a signal root for retry bookkeeping. Only the signal
+ * document installs a frame, so callers test signalDocumentEnabled first, which
+ * also lets a bundle without it drop this call.
  */
 export function deferScopeSignalOwner(scope: Scope): SignalOwner | null | undefined {
-	if (!signalDocumentEnabled) return;
 	const root = scope.block.idState.renderOwner;
 	if (
 		SIGNAL_RETRY_OWNERS_RETAINED &&
@@ -847,9 +848,11 @@ export function restoreScopeSignalOwner(previous: SignalOwner | null, scope: Sco
  * frame.
  */
 export function deferredOwnerToken(): SignalRendererOwnerIdentity | Scope | null {
-	return activeSynchronousSignalOwner !== DEFERRED_SIGNAL_OWNER
-		? null
-		: deferredOwnerScope!.signalOwner || deferredOwnerScope;
+	// The scope's truthiness comes first, so a bundle that never defers a frame
+	// folds this to null.
+	return deferredOwnerScope && activeSynchronousSignalOwner === DEFERRED_SIGNAL_OWNER
+		? deferredOwnerScope.signalOwner || deferredOwnerScope
+		: null;
 }
 
 export function runWithBlockSignalOwner<T>(scope: Scope | null, callback: () => T): T {
@@ -1434,8 +1437,11 @@ export function renderBlock(block: Block): void {
 	if (
 		(signalDocumentEnabled ||
 			(registerRootOptions && block.idState.renderOwner?.signalOwner !== undefined)) &&
-		// A rebuilt block's nested client build below enters the frame.
-		(rebuild || (previousSignalOwner = deferScopeSignalOwner(block)) === undefined)
+		// A rebuilt block's nested client build below enters the frame, and only
+		// the signal document has a frame to defer.
+		(rebuild ||
+			!signalDocumentEnabled ||
+			(previousSignalOwner = deferScopeSignalOwner(block)) === undefined)
 	) {
 		const owner = scopeSignalOwner(block);
 		if (owner !== undefined) {

@@ -1066,7 +1066,7 @@ export function componentSlotLite<P>(
 		if (
 			(signalDocumentEnabled ||
 				(registerRootOptions && scope.block.idState.renderOwner?.signalOwner !== undefined)) &&
-			(previousSignalOwner = deferScopeSignalOwner(scope)) === undefined
+			(!signalDocumentEnabled || (previousSignalOwner = deferScopeSignalOwner(scope)) === undefined)
 		) {
 			// Same owner-resolution order as runWithBlockSignalOwner.
 			const owner = scopeSignalOwner(scope);

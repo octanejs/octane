@@ -8,7 +8,7 @@ let synchronousOwner: SignalOwner | null = null;
  * first use (enterDeferredSignalOwner). No owner query ever returns it.
  */
 export const DEFERRED_SIGNAL_OWNER: SignalOwner = /* @__PURE__ */ Object.freeze({ scopeKey: '' });
-let resolveDeferredOwner: (() => SignalOwner) | undefined;
+let resolveDeferredOwner: (() => SignalOwner) | null = null;
 let defaultOwner: (() => SignalOwner | null) | undefined;
 let retireOwner: ((owner: SignalOwner) => void) | undefined;
 let supersedeOwner: ((owner: SignalOwner) => boolean) | undefined;
@@ -56,7 +56,10 @@ export function installSignalOwnerEnvironment(environment: SignalOwnerEnvironmen
 }
 
 function synchronousSignalOwner(): SignalOwner | null {
-	if (synchronousOwner === DEFERRED_SIGNAL_OWNER) synchronousOwner = resolveDeferredOwner!();
+	// The resolver's truthiness comes first: a bundle that never defers a frame
+	// never sets it, so its build drops the comparison and the stand-in.
+	if (resolveDeferredOwner && synchronousOwner === DEFERRED_SIGNAL_OWNER)
+		synchronousOwner = resolveDeferredOwner();
 	return synchronousOwner;
 }
 
