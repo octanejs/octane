@@ -61,6 +61,10 @@ the hidden island can therefore leave a stylesheet for visible siblings on
 its previous value. On reveal the host publishes the latest committed context
 before ancestor React layout effects run.
 
+When React removes an `OctaneCompat` host, it takes the host out of the DOM
+during the commit. Octane disposes the hosted root afterward, so its ref and
+effect cleanups can run after the surrounding React unmount call returns.
+
 Resource hints such as `preload` and `preinit` issued during an
 `OctaneCompat` render use the React host's document resource handling.
 Place declarative document metadata such as `<title>` and `<meta>` in the
