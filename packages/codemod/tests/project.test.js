@@ -1891,6 +1891,85 @@ ${shape === 'named and default export' ? 'export default Owner;' : ''}`,
 	);
 
 	it.each([
+		['direct JavaScript spelling', './Leaf.js', {}, true],
+		[
+			'named re-export',
+			'./Route.ts',
+			{ 'Route.ts': "export { Leaf as Widget } from './Leaf';" },
+			true,
+		],
+		[
+			're-export through JavaScript spelling',
+			'./Route',
+			{ 'Route.ts': "export { Leaf as Widget } from './Leaf.js';" },
+			true,
+		],
+		[
+			'type-only re-export',
+			'./Route',
+			{ 'Route.ts': "export type { Leaf as Widget } from './Leaf';" },
+			false,
+		],
+		[
+			'a real JavaScript sibling',
+			'./Leaf.js',
+			{ 'Leaf.js': 'export const Leaf = () => null;' },
+			false,
+		],
+		[
+			'an unrelated export',
+			'./Route',
+			{
+				'Route.ts': "export { Leaf as Other } from './Leaf'; export { Widget } from './Other';",
+				'Other.tsx': 'export function Widget() { return <i />; }',
+			},
+			false,
+		],
+	])('reports retained JSX through %s', async (_shape, specifier, extra, warns) => {
+		const name = specifier === './Leaf.js' ? 'Leaf as Widget' : 'Widget';
+		const owner = `import { ${name} } from '${specifier}';\nexport function View() { return <Widget />; }`;
+		const root = fs.realpathSync(
+			project({
+				'tsconfig.json': JSON.stringify({
+					compilerOptions: { jsx: 'react-jsx', moduleResolution: 'bundler', module: 'ESNext' },
+				}),
+				'Leaf.tsx': 'export function Leaf() { return <b>ready</b>; }',
+				'View.tsx': owner,
+				'Native.tsx': '/** @jsxImportSource octane */\n' + owner,
+				...extra,
+			}),
+		);
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const selected = [path.join(root, 'Leaf.tsx')];
+		const options = { root, write: false, strong: true, verify: true };
+		const preview = await runCodemod(selected, options);
+		const affected = (report) =>
+			report.files
+				.filter((file) =>
+					file.notes.some(
+						(note) =>
+							note.rule === 'react-compat' &&
+							note.severity === 'warning' &&
+							note.message.includes('retained React JSX'),
+					),
+				)
+				.map((file) => file.file)
+				.sort();
+		expect(affected(preview)).toEqual(warns ? ['Leaf.tsx', 'View.tsx'] : []);
+		if (warns && specifier !== './Leaf.js') {
+			const view = preview.files.find((row) => row.file === 'View.tsx');
+			expect(view).toMatchObject({ changed: false, code: owner });
+			const written = await runCodemod(selected, { ...options, write: true });
+			expect(affected(written)).toEqual(affected(preview));
+			expect(fs.readFileSync(path.join(root, 'View.tsx'), 'utf8')).toBe(owner);
+		}
+	});
+
+	it.each([
 		[
 			'a state tuple and direct React JSX',
 			'export function Leaf() { const [label] = useState("ready"); return <b>{label}</b>; }',
