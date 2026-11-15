@@ -3,7 +3,12 @@ import { parseSync } from '@tsrx/oxc/parser';
 import { hasRuntimeDependency } from './scoped-store-contract.js';
 import { skipWrappers } from './expression-wrappers.js';
 import { hasEval, rendersElementChildren } from './forwarded-props.js';
-import { componentTagOrExport, inTypeNode, localUses } from './local-uses.js';
+import {
+	componentTagOrExport,
+	inTypeNode,
+	localUses,
+	unchangedContextProviderUse,
+} from './local-uses.js';
 import { staticReactProps } from './react-renderer.js';
 import { bind, nativeReactCompat, skipParens, withoutJsxIndentation } from './transform.js';
 
@@ -231,6 +236,10 @@ export function retainedReactContextExports(file: string, source: string) {
 	let uses: ReturnType<typeof localUses> | undefined;
 	let singleReactImport: boolean | undefined;
 	let dynamicScope: boolean | undefined;
+	const readContext = (callee: ts.Expression) => {
+		const hook = ts.isIdentifier(callee) && imported(checker, callee);
+		return !!hook && hook.module === 'react' && hook.name === 'useContext';
+	};
 	for (const symbol of checker.getExportsOfModule(module)) {
 		const declaration = localValueExport(symbol, checker);
 		if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer)
@@ -264,8 +273,8 @@ export function retainedReactContextExports(file: string, source: string) {
 		const unchangedProvider =
 			ts.isIdentifier(declaration.name) &&
 			!(dynamicScope ??= hasEval(sf)) &&
-			(uses ??= localUses(sf, checker))(declaration.name).every(
-				(ref) => inTypeNode(ref) || componentTagOrExport(ref),
+			(uses ??= localUses(sf, checker))(declaration.name).every((ref) =>
+				unchangedContextProviderUse(ref, readContext),
 			);
 		names.set(symbol.name, unchangedProvider);
 	}

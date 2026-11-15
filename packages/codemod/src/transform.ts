@@ -17,6 +17,7 @@ import {
 	localSymbol,
 	localUses,
 	scalar,
+	unchangedContextProviderUse,
 	walkLocalValues,
 } from './local-uses.js';
 import { isWrapper, literalCondition, skipWrappers } from './expression-wrappers.js';
@@ -8109,20 +8110,21 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 	}
 
 	private hasUnchangedProviderUse(context: ts.Identifier) {
+		let originalReact: boolean | undefined;
+		const readContext = (callee: ts.Expression) => {
+			if (!ts.isIdentifier(callee)) return false;
+			const hook = this.directImportedValue(callee)?.entry;
+			return (
+				hook?.module === 'react' &&
+				hook.imported === 'useContext' &&
+				(originalReact ??= this.options.originalReact === true)
+			);
+		};
 		return (
 			(!/eval|\\/.test(this.source) || !hasEval(this.sf)) &&
-			this.localUses(context).every((ref) => {
-				if (declaresName(ref) || inTypeNode(ref) || componentTagOrExport(ref)) return true;
-				const member = ref.parent;
-				if (!ts.isPropertyAccessExpression(member) || member.expression !== ref) return false;
-				const use = member.parent;
-				return (
-					(ts.isJsxOpeningElement(use) ||
-						ts.isJsxSelfClosingElement(use) ||
-						ts.isJsxClosingElement(use)) &&
-					use.tagName === member
-				);
-			})
+			this.localUses(context).every(
+				(ref) => declaresName(ref) || unchangedContextProviderUse(ref, readContext),
+			)
 		);
 	}
 

@@ -304,6 +304,60 @@ describe('runCodemod', () => {
 		}
 	});
 
+	it('recognizes unchanged React provider members alongside ordinary context reads', async () => {
+		const react = "import { createContext, useContext as read } from 'react';";
+		const provider = 'return <State.Provider value={null}><b>ready</b></State.Provider>;';
+		const use = "import { useContext as read } from 'react';";
+		const root = project({
+			'owner.tsx': `${react}
+				export const State = createContext(null);
+				export function readState() { return read(State); }
+				export function Shell() { return <State.Provider value={null}><i /></State.Provider>; }
+				export const name = State.displayName;`,
+			'Consumer.tsx': `import { State } from './owner.tsx';
+				${use}
+				export function View() { const state = read(State); const label = State.displayName; ${provider} }`,
+			'ConsumerMember.tsx': `import { State } from './owner.tsx';
+				export function Read() { return <State.Consumer>{() => null}</State.Consumer>; }
+				export function View() { ${provider} }`,
+			'Unknown.tsx': `import { State } from './owner.tsx';
+				declare function read(value: unknown): unknown;
+				export function View() { const state = read(State); ${provider} }`,
+			'Assignment.tsx': `import { State } from './owner.tsx';
+				export function View() { State.Provider = () => null; ${provider} }`,
+			'Shadowed.tsx': `import { State } from './owner.tsx';
+				${use}
+				export function View(read: (value: typeof State) => unknown) { const state = read(State); ${provider} }`,
+		});
+		fs.symlinkSync(
+			path.resolve(import.meta.dirname, '../node_modules'),
+			path.join(root, 'node_modules'),
+			'dir',
+		);
+		const names = [
+			'Consumer.tsx',
+			'ConsumerMember.tsx',
+			'Unknown.tsx',
+			'Assignment.tsx',
+			'Shadowed.tsx',
+		];
+		const report = await runCodemod(
+			names.map((file) => path.join(root, file)),
+			{
+				root,
+				strong: true,
+				verify: true,
+				projectTypes: false,
+				write: false,
+			},
+		);
+		expect(
+			report.files
+				.filter((row) => row.notes.some((note) => note.rule === 'retained-react-context'))
+				.map((row) => row.file),
+		).toEqual(['Consumer.tsx', 'ConsumerMember.tsx']);
+	});
+
 	it('reports a direct native template root that imports a React class', async () => {
 		const boundary = `import { Component as Base, type ReactNode } from 'react';
 class Frame extends Base<{ children: ReactNode }> {
