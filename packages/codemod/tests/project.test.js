@@ -51,50 +51,54 @@ function typecheckProject(root) {
 
 describe('runCodemod', () => {
 	it.each([
-		['routes', false],
-		['root', false],
-		['root through a symlinked directory', true],
-	])('keeps the implicit React Router %s entry discoverable', async (name, symlink) => {
-		const basename = symlink ? 'root' : name;
-		const entry = `${symlink ? 'alias' : 'site'}/${basename}.tsx`;
-		const other = `unrelated/${basename}.tsx`;
-		const root = project({
-			'node_modules/@react-router/dev/package.json': JSON.stringify({
-				name: '@react-router/dev',
-				version: '7.18.1',
-				exports: { './routes': './dist/routes.js' },
-			}),
-			'react-router.config.ts':
-				'import type { Config } from "@react-router/dev/config";\nexport default { appDirectory: "site", ssr: true } satisfies Config;',
-			'site/root.tsx': 'export default function Root() { return <main />; }',
-			'site/routes.tsx': 'export default [{ path: "", file: "page.tsrx" }];',
-			'site/page.tsrx': 'export function loader() { return new Response("ok"); }',
-			[other]: 'export default function Other() { return <aside />; }',
-		});
-		if (symlink) fs.symlinkSync(path.join(root, 'site'), path.join(root, 'alias'), 'junction');
-		const files = [path.join(root, other), path.join(root, entry)];
-		const source = fs.readFileSync(files[1], 'utf8');
-		const preview = await runCodemod(files, { root, write: false });
-		expect(preview.files).toContainEqual(
-			expect.objectContaining({
-				file: entry,
-				output: entry,
-				notes: [expect.objectContaining({ rule: 'rename-conflict', severity: 'error' })],
-				code: source,
-			}),
-		);
-		expect(preview.files).toContainEqual(
-			expect.objectContaining({ file: other, output: other.replace('.tsx', '.tsrx') }),
-		);
-		const write = await runCodemod(files, { root });
-		expect(write.files).toEqual([
-			expect.objectContaining({ file: entry, output: entry, changed: false }),
-		]);
-		for (const file of files) {
-			expect(fs.existsSync(file)).toBe(true);
-			expect(fs.existsSync(file.replace('.tsx', '.tsrx'))).toBe(false);
-		}
-	});
+		['routes', '"site"', false],
+		['root', '"site"', false],
+		['root through a symlinked directory', '"site"', true],
+		['routes', '"site" as const', false],
+		['root', '("site" satisfies string)', false],
+	])(
+		'keeps the implicit React Router %s entry discoverable with appDirectory %s',
+		async (name, directory, symlink) => {
+			const basename = symlink ? 'root' : name;
+			const entry = `${symlink ? 'alias' : 'site'}/${basename}.tsx`;
+			const other = `unrelated/${basename}.tsx`;
+			const root = project({
+				'node_modules/@react-router/dev/package.json': JSON.stringify({
+					name: '@react-router/dev',
+					version: '7.18.1',
+					exports: { './routes': './dist/routes.js' },
+				}),
+				'react-router.config.ts': `import type { Config } from "@react-router/dev/config";\nexport default { appDirectory: ${directory}, ssr: true } satisfies Config;`,
+				'site/root.tsx': 'export default function Root() { return <main />; }',
+				'site/routes.tsx': 'export default [{ path: "", file: "page.tsrx" }];',
+				'site/page.tsrx': 'export function loader() { return new Response("ok"); }',
+				[other]: 'export default function Other() { return <aside />; }',
+			});
+			if (symlink) fs.symlinkSync(path.join(root, 'site'), path.join(root, 'alias'), 'junction');
+			const files = [path.join(root, other), path.join(root, entry)];
+			const source = fs.readFileSync(files[1], 'utf8');
+			const preview = await runCodemod(files, { root, write: false });
+			expect(preview.files).toContainEqual(
+				expect.objectContaining({
+					file: entry,
+					output: entry,
+					notes: [expect.objectContaining({ rule: 'rename-conflict', severity: 'error' })],
+					code: source,
+				}),
+			);
+			expect(preview.files).toContainEqual(
+				expect.objectContaining({ file: other, output: other.replace('.tsx', '.tsrx') }),
+			);
+			const write = await runCodemod(files, { root });
+			expect(write.files).toEqual([
+				expect.objectContaining({ file: entry, output: entry, changed: false }),
+			]);
+			for (const file of files) {
+				expect(fs.existsSync(file)).toBe(true);
+				expect(fs.existsSync(file.replace('.tsx', '.tsrx'))).toBe(false);
+			}
+		},
+	);
 
 	it('uses the default React Router directory when config omits it', async () => {
 		const root = project({
@@ -116,7 +120,9 @@ describe('runCodemod', () => {
 	it.each([
 		[
 			'nonstatic config',
-			{ 'react-router.config.ts': 'export default { appDirectory: process.env.ROUTES };' },
+			{
+				'react-router.config.ts': 'export default { appDirectory: process.env.ROUTES as string };',
+			},
 		],
 		['higher-priority routes sibling', { 'app/routes.ts': 'export default [];' }],
 		[

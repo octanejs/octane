@@ -2378,13 +2378,9 @@ function implicitReactRouterEntries(
 			return [];
 		if (property.name.text === '__proto__' || property.name.text === 'presets') return [];
 		if (property.name.text !== 'appDirectory') continue;
-		if (
-			hasAppDirectory ||
-			!ts.isPropertyAssignment(property) ||
-			!ts.isStringLiteralLike(property.initializer)
-		)
-			return [];
-		app = property.initializer.text || app;
+		const directory = ts.isPropertyAssignment(property) && skipWrappers(property.initializer);
+		if (hasAppDirectory || !directory || !ts.isStringLiteralLike(directory)) return [];
+		app = directory.text || app;
 		hasAppDirectory = true;
 	}
 
