@@ -25727,6 +25727,7 @@ function rewriteTsrxBlocks(
 	parentNs = 'html',
 	cssHash = null,
 	leaveCallbackReads = false,
+	directRenderChild = false,
 ) {
 	return rewrite(node, null);
 
@@ -25763,9 +25764,14 @@ function rewriteTsrxBlocks(
 			);
 			fakeBody.generator = n.generator;
 			if (n.returnType !== undefined) fakeBody.returnType = n.returnType;
+			// A direct child slot consumes the return value, just as ssrChild does.
+			const options =
+				directRenderChild && n === node && n.async !== true && hasOnlyLowerableNullishExits(n)
+					? { returnedOutput: true }
+					: null;
 			inlinedSubs.push(
 				withNestedTemplateScope(fakeBody, ctx, () =>
-					compileFunctionBody(fakeBody, ctx, helperName, parentNs, cssHash),
+					compileFunctionBody(fakeBody, ctx, helperName, parentNs, cssHash, options),
 				),
 			);
 			return inheritOriginLoc(b.id(helperName), n);
@@ -36964,13 +36970,17 @@ function makeChildCall(expr, ctx, componentName, inlinedSubs, cssHash, parentNs 
 		origin: expr,
 		isChild: true,
 		signalSite: directSignalSite(ctx, expr, 'binding'),
-		valueExpr: tsrxExprNode(
+		valueExpr: rewriteTsrxBlocks(
 			resolveStyleExpr(rewriteChildHoleValue(expr, ctx), cssHash),
 			ctx,
 			componentName,
 			inlinedSubs,
 			parentNs,
 			cssHash,
+			false,
+			ctx._universalRuntimeUnit == null &&
+				expr?.type === 'ArrowFunctionExpression' &&
+				expr.body?.type === 'JSXCodeBlock',
 		),
 	};
 	if (
