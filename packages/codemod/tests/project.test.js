@@ -1507,6 +1507,136 @@ export function deferred() { return () => hint('/later.png', { as: 'image' }); }
 		},
 	);
 
+	it('preserves a React factory returned directly by callbacks for an authored island', async () => {
+		const config = {
+			compilerOptions: {
+				strict: true,
+				jsx: 'react-jsx',
+				moduleResolution: 'bundler',
+				noEmit: true,
+				allowImportingTsExtensions: true,
+			},
+			files: ['View.tsrx'],
+		};
+		const source = `import { createElement } from 'react';
+import { ReactCompat as Island } from 'octane/react';
+import { Legacy } from './Legacy.tsx';
+export function View() {
+	return <main><Island component={Legacy} props={{
+		getIcon: () => { return (createElement('b', null, 'ready')); },
+	}} /></main>;
+}`;
+		const legacy = `/** @jsxImportSource react */
+import type { ReactNode } from 'react';
+export function Legacy({ getIcon }: { getIcon(): ReactNode }) { return <nav>{getIcon()}</nav>; }`;
+		const directory = 'Caf\u00e9';
+		const alternate = directory.normalize('NFD');
+		const root = project({
+			'tsconfig.json': JSON.stringify(config),
+			'View.tsx': source,
+			'Alias.tsx': source
+				.replaceAll('createElement', 'make')
+				.replace('{ make }', '{ createElement as make }'),
+			'Mixed.tsx': source + "\nexport const native = () => createElement('i', null, 'elsewhere');",
+			'RuntimeFactory.tsx': source.replace(
+				'export function View()',
+				"import { jsx } from 'react/jsx-runtime';\n" +
+					"import * as React from 'react';\n" +
+					"const OctaneCreateElement = 'ready';\n" +
+					"export const native = () => jsx('i', { children: OctaneCreateElement });\n" +
+					"export const nativeNamespace = () => React.createElement('em', null, OctaneCreateElement);\n" +
+					'export function View()',
+			),
+			'Spread.tsx': source.replace('props={{', 'props={{ ...extra,'),
+			'Typed.tsx': source
+				.replace('{ createElement }', '{ createElement, type ReactNode }')
+				.replace('getIcon: () =>', 'getIcon: (): ReactNode =>'),
+			'Legacy.tsx': legacy,
+			[`${directory}/Legacy.tsx`]: legacy,
+			'LinkedLeaf.tsx': source.replace('./Legacy.tsx', './LegacyLink.tsx'),
+			'LinkedParent.tsx': source.replace('./Legacy.tsx', './owner-link/Legacy.tsx'),
+		});
+		fs.symlinkSync('Legacy.tsx', path.join(root, 'LegacyLink.tsx'));
+		fs.symlinkSync(directory, path.join(root, 'owner-link'), 'dir');
+		const spelling = fs.existsSync(path.join(root, alternate)) ? alternate : directory;
+		fs.writeFileSync(
+			path.join(root, 'UnicodeOwner.tsx'),
+			source.replace('./Legacy.tsx', `./${spelling}/Legacy.tsx`),
+		);
+		const modules = path.join(root, 'node_modules');
+		fs.mkdirSync(path.join(modules, '@types'), { recursive: true });
+		for (const name of ['octane', 'react', 'react-dom'])
+			fs.symlinkSync(
+				path.join(REPO, 'packages/codemod/node_modules', name),
+				path.join(modules, name),
+				'dir',
+			);
+		fs.symlinkSync(
+			path.join(REPO, 'packages/octane/node_modules/@types/react'),
+			path.join(modules, '@types/react'),
+			'dir',
+		);
+		fs.symlinkSync(path.join(REPO, 'node_modules/@tsrx'), path.join(modules, '@tsrx'), 'dir');
+		const kept = ['View', 'Alias', 'UnicodeOwner', 'LinkedParent'];
+		const rewritten = ['Mixed', 'Spread', 'Typed', 'LinkedLeaf'];
+		const options = { root, write: false, strong: true, verify: true };
+		const result = await runCodemod(
+			[...kept, ...rewritten, 'RuntimeFactory'].map((name) => path.join(root, name + '.tsx')),
+			options,
+		);
+		for (const name of kept) {
+			const file = result.files.find((item) => item.file === name + '.tsx');
+			expect(file.strong).toBe(true);
+			expect(file.code).toMatch(/import \{ createElement(?: as make)? \} from 'react'/);
+		}
+		for (const name of rewritten) {
+			const file = result.files.find((item) => item.file === name + '.tsx');
+			expect(file.code).toMatch(/import \{ createElement(?:, type ReactNode)? \} from 'octane'/);
+		}
+		const runtimeFactory = result.files.find((item) => item.file === 'RuntimeFactory.tsx');
+		expect(runtimeFactory.code).toContain("import { createElement } from 'react'");
+		expect(runtimeFactory.code).toContain(
+			"import { createElement as OctaneCreateElement_ } from 'octane'",
+		);
+		expect(runtimeFactory.code).toContain('return OctaneCreateElement_(');
+		const view = result.files.find((item) => item.file === 'View.tsx');
+		const unicode = result.files.find((item) => item.file === 'UnicodeOwner.tsx');
+		fs.writeFileSync(path.join(root, view.output), view.code);
+		fs.writeFileSync(path.join(root, unicode.output), unicode.code);
+		fs.writeFileSync(path.join(root, 'RuntimeFactory.tsrx'), runtimeFactory.code);
+		const checked = spawnSync(
+			process.execPath,
+			[path.join(REPO, 'scripts/octane-tsc/bin.mjs'), '-p', 'tsconfig.json'],
+			{ cwd: root, encoding: 'utf8' },
+		);
+		expect(checked.status, checked.stdout + checked.stderr).toBe(0);
+		const { render, renderNative, renderUnicode } = await bundleRuntime(
+			root,
+			'server',
+			`
+import { View } from './View.tsrx';
+import { View as UnicodeView } from './UnicodeOwner.tsrx';
+import { View as RuntimeView, native, nativeNamespace } from './RuntimeFactory.tsrx';
+import { renderToReadableStream, renderToStaticMarkup } from 'octane/server';
+export const render = async (runtime = false) =>
+	new Response(await renderToReadableStream(runtime ? RuntimeView : View)).text();
+export const renderUnicode = async () => new Response(await renderToReadableStream(UnicodeView)).text();
+export const renderNative = () => [native(), nativeNamespace()].map((node) => renderToStaticMarkup(node).html);
+`,
+		);
+		expect(await render()).toContain('<nav><b>ready</b></nav>');
+		expect(await render(true)).toContain('<nav><b>ready</b></nav>');
+		expect(await renderUnicode()).toContain('<nav><b>ready</b></nav>');
+		expect(renderNative()).toEqual(['<i>ready</i>', '<em>ready</em>']);
+		const selected = await runCodemod(
+			[path.join(root, 'LinkedParent.tsx'), path.join(root, directory, 'Legacy.tsx')],
+			options,
+		);
+		expect(selected.files.find((item) => item.file === 'LinkedParent.tsx')?.code).toContain(
+			"import { createElement } from 'octane'",
+		);
+	});
+
 	it('reports a native setup call into a React hook left in an unselected local module', () => {
 		const helper = `import { useState as state } from 'react';
 export function useLabel() { const [label] = state('ready'); return label; }`;
