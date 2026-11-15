@@ -1,8 +1,10 @@
 // @vitest-environment node
 
+import react from '@vitejs/plugin-react';
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { build, createServer, parseAst, type InlineConfig, type ViteDevServer } from 'vite';
@@ -50,10 +52,12 @@ describe('octane/compiler/vite integration', () => {
 					configFile: false,
 					logLevel: 'silent',
 					appType: 'custom',
-					plugins: [octane({ output, hmr, strong: true })],
+					plugins: [octane({ ...(output === undefined ? {} : { output }), hmr, strong: true })],
 					server: { middlewareMode: true },
 				});
-				const loaded = await server.ssrLoadModule('/entry.ts');
+				const loaded = (await server.ssrLoadModule('/entry.ts')) as {
+					render(action?: string): string;
+				};
 				expect(loaded.render('/first')).toBe('<form method="post" action="/first"></form>');
 				expect(loaded.render('/second')).toBe('<form method="post" action="/second"></form>');
 				const client = await server.transformRequest('/Form.tsrx');
@@ -63,6 +67,62 @@ describe('octane/compiler/vite integration', () => {
 			});
 		}
 	}
+
+	it.each(['dev', 'build'])('renders a React-owned Octane host in Vite %s SSR', async (mode) => {
+		const root = realpathSync(mkdtempSync(join(tmpdir(), 'octane-vite-react-host-')));
+		fixtureRoot = root;
+		const modules = join(root, 'node_modules');
+		mkdirSync(modules);
+		symlinkSync(OCTANE_PACKAGE_ROOT, join(modules, 'octane'), 'dir');
+		const require = createRequire(import.meta.url);
+		for (const name of ['react', 'react-dom']) {
+			symlinkSync(dirname(require.resolve(name + '/package.json')), join(modules, name), 'dir');
+		}
+		writeFileSync(join(root, 'package.json'), JSON.stringify({ type: 'module' }));
+		writeFileSync(
+			join(root, 'caption.ts'),
+			"import { createContext } from 'react'; export const Caption = createContext('outside');",
+		);
+		writeFileSync(
+			join(root, 'Leaf.tsrx'),
+			`import { useContext } from 'octane';
+import { Caption } from './caption.ts';
+export function Leaf() @{ <strong>{useContext(Caption) as string}</strong> }`,
+		);
+		writeFileSync(
+			join(root, 'entry.tsx'),
+			`/** @jsxImportSource react */
+import { renderToString } from 'react-dom/server';
+import { OctaneCompat } from 'octane/react';
+import { Caption } from './caption.ts';
+import { Leaf } from './Leaf.tsrx';
+
+export function render(caption: string) {
+	return renderToString(<Caption.Provider value={caption}><OctaneCompat component={Leaf} /></Caption.Provider>);
+}`,
+		);
+		const config: InlineConfig = {
+			root,
+			configFile: false,
+			logLevel: 'silent',
+			plugins: [octane({ hmr: false, requireDirective: true }), react()],
+		};
+
+		let render: (caption: string) => string;
+		if (mode === 'dev') {
+			server = await createServer({
+				...config,
+				appType: 'custom',
+				server: { middlewareMode: true, hmr: false, ws: false, watch: null },
+			});
+			({ render } = await server.ssrLoadModule('/entry.tsx'));
+		} else {
+			await build({ ...config, build: { ssr: 'entry.tsx', outDir: 'server' } });
+			({ render } = await import(pathToFileURL(join(root, 'server/entry.js')).href));
+		}
+		expect(render('first')).toContain('<strong>first</strong>');
+		expect(render('second')).toContain('<strong>second</strong>');
+	});
 
 	it('discovers a parent package and routes raw dependency imports to the SSR runtime', async () => {
 		fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-vite-zero-shim-'));
@@ -116,7 +176,7 @@ describe('octane/compiler/vite integration', () => {
 		expect(server.config.optimizeDeps.exclude).toContain('raw-octane-source');
 		expect(server.config.ssr.noExternal).toContain('raw-octane-source');
 
-		const loaded = await server.ssrLoadModule('/entry.ts');
+		const loaded = (await server.ssrLoadModule('/entry.ts')) as { render(action?: string): string };
 		expect(loaded.render()).toBe('<p>zero shim</p>');
 	});
 

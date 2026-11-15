@@ -33,10 +33,13 @@ into Octane, an imperative React ref, local Suspense, and unmount/remount contro
 `OctaneCompat`, from the same entry, supports the opposite direction: compiled
 Octane components inside React 19. See the
 [two-direction interoperability guide](https://octanejs.dev/docs/react-compat)
-for choosing a boundary and setting up a mixed application. Both boundaries
-have server implementations in `octane/react/server`. Like the `ReactCompat`
-host below, the `div[data-octane-compat]` host is styled `display: contents`,
-so the island's own root element is the parent's flex or grid item. Use
+for choosing a boundary and setting up a mixed application. The Octane Vite
+plugin resolves `octane/react` imports in the SSR graph to `octane/react/server`,
+including imports from React-owned JSX. Use `octane/react/server` when the
+server loads Octane directly or when you mark Octane as external in Vite's dev
+server. Like the `ReactCompat` host below, the `div[data-octane-compat]` host is
+styled `display: contents`, so the island's own root element is the parent's flex
+or grid item. Use
 `OctaneCompatInline` from the same entries for a `span[data-octane-compat]`
 host. It takes the same props. Use phrasing content inside the span and
 respect the surrounding HTML, including a button's restriction on nested
