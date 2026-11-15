@@ -396,6 +396,82 @@ describe('ViewTransition activation and matching', () => {
 		}
 	});
 
+	describe('an unchanged boundary outside the updated subtree', () => {
+		const { Sidebar, Page } = loadCompiledFixtureSource(
+			`import { ViewTransition, useState } from 'octane';
+export function Sidebar(props) @{
+	<ViewTransition default="none" enter="pop" onEnter={props.onEnter}>
+		<span id="sidebar">{'sidebar'}</span>
+	</ViewTransition>
+}
+function Feed(props) @{
+	const [text, setText] = useState('one');
+	props.expose(setText);
+	<ViewTransition update="grow" onUpdate={props.onUpdate}>
+		<div>{text as string}</div>
+	</ViewTransition>
+}
+export function Page(props) @{
+	<main>
+		<section>
+			<Feed expose={props.expose} onUpdate={props.onUpdate} />
+		</section>
+		<aside>
+			<div>
+				<Sidebar onEnter={props.onEnter} />
+			</div>
+		</aside>
+	</main>
+}`,
+			{
+				id: '/packages/octane/tests/_fixtures/view-transition-unrelated-boundary.tsrx',
+				mode: 'client',
+				compileOptions: { hmr: false },
+			},
+		);
+
+		it('runs no enter in another root', async () => {
+			const events: string[] = [];
+			const onEnter = () => events.push('enter');
+			const onUpdate = () => events.push('update');
+			const otherContainer = document.createElement('div');
+			document.body.append(otherContainer);
+			const otherRoot = createRoot(otherContainer);
+			let setText!: (value: string) => void;
+			try {
+				await act(() => {
+					otherRoot.render(Sidebar, { onEnter });
+					root.render(Page, {
+						expose: (set: typeof setText) => (setText = set),
+						onUpdate,
+						onEnter: () => {},
+					});
+				});
+				events.length = 0;
+				await act(() => startTransition(() => setText('a much longer second text')));
+				expect(events).toEqual(['update']);
+			} finally {
+				otherRoot.unmount();
+				otherContainer.remove();
+			}
+		});
+
+		it('runs no enter elsewhere in the same root', async () => {
+			const events: string[] = [];
+			let setText!: (value: string) => void;
+			await act(() =>
+				root.render(Page, {
+					expose: (set: typeof setText) => (setText = set),
+					onUpdate: () => events.push('update'),
+					onEnter: () => events.push('enter'),
+				}),
+			);
+			events.length = 0;
+			await act(() => startTransition(() => setText('a much longer second text')));
+			expect(events).toEqual(['update']);
+		});
+	});
+
 	it('runs a deferred layout cascade urgently when a commit inside a transition interrupts it', async () => {
 		let enteredNative!: () => void;
 		const nativeStarted = new Promise<void>((resolve) => {

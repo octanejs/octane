@@ -3463,7 +3463,8 @@ function vtFlush(
 					blocksByOwner = new Map();
 					for (const group of participants) blocksByOwner.set(group.owner, []);
 					for (const block of VT_REGISTRY) {
-						if (block.disposed || unrelated?.has(block)) continue; // never captured before the update, so finalize would read it as entering
+						// An unrelated boundary has no old capture, so finalize would read it as entering.
+						if (block.disposed || unrelated?.has(block)) continue;
 						const owner = vtScopeForBlock(block);
 						if (owner !== null) blocksByOwner.get(owner)?.push(block);
 					}
