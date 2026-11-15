@@ -20,6 +20,8 @@ import type {
 	Ref,
 	SetStateAction,
 	SVGProps,
+	Touch,
+	TouchEventHandler,
 } from 'octane';
 
 const View: FC<PropsWithChildren<{ label: string }>> = (props) =>
@@ -60,6 +62,23 @@ const onClick: MouseEventHandler<HTMLButtonElement> = (event) => {
 	event.preventDefault();
 };
 const button: JSX.Element = <button onClick={onClick}>Press</button>;
+const touchPoint: Touch = {
+	identifier: 0,
+	target: document.body,
+	screenX: 0,
+	screenY: 0,
+	clientX: 0,
+	clientY: 0,
+	pageX: 0,
+	pageY: 0,
+};
+const legacyTouch: React.Touch = touchPoint;
+const touchStart: TouchEventHandler<HTMLDivElement> = (event) => {
+	const touch: Touch = event.touches[0] ?? legacyTouch;
+	event.currentTarget.dataset.touch = String(touch.identifier);
+	// @ts-expect-error Native touch lists lack React's identifiedTouch method.
+	const legacyList: React.TouchList = event.touches;
+};
 const dispatch: Dispatch<SetStateAction<number>> = (update) => {
 	const result: number = typeof update === 'function' ? update(1) : update;
 	return result;
