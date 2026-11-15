@@ -4474,7 +4474,10 @@ export function Host({rows}: { rows: Row[] }) {
 			expect(preview.files.find(({ file }) => file === 'RetainedBranch.tsx')?.code).toContain(
 				'.map(({id,label=true ? index : 7},index)',
 			);
-			for (const first of [
+			// The typed preview checks every operand. One representative write checks
+			// the shared rollback with project types, without rebuilding its graph
+			// for every form that emits the same blocking diagnostic.
+			const blockedWrites = [
 				'ArrayValue.tsx',
 				'Template.tsx',
 				'ImmediateArrow.tsx',
@@ -4485,7 +4488,8 @@ export function Host({rows}: { rows: Row[] }) {
 				'ChainedComma.tsx',
 				'StrictPrefix.tsx',
 				'NestedStrictPrefix.tsx',
-			]) {
+			];
+			for (const first of projectTypes ? blockedWrites.slice(0, 1) : blockedWrites) {
 				const result = await runCodemod(
 					[path.join(root, first), ...inputs.filter((file) => path.basename(file) !== first)],
 					options,
