@@ -63,6 +63,16 @@ describe('runCodemod', () => {
 			'Leaf.d.ts',
 			"function load(require) { return require('./Leaf.js'); }\nexports.local = load;\nconst { Leaf } = require('./Leaf.js');",
 		],
+		[
+			'Leaf.js',
+			'Leaf.d.ts',
+			"exports.cached = !!require.cache[require.resolve('./Entry.js')];\nif (require.main === module) exports.main = true;\nconst { Leaf } = require('./Leaf.js');",
+		],
+		[
+			'Leaf.js',
+			'Leaf.d.ts',
+			"delete require.cache[require.resolve('./Entry.js')];\nif (module !== require.main) exports.main = false;\nconst { Leaf } = require('./Leaf.js');",
+		],
 	])(
 		'retains the separate runtime and types of a CommonJS import when migrating %s beside %s (%#)',
 		async (selected, types, importer) => {
@@ -117,6 +127,18 @@ describe('runCodemod', () => {
 			'a replaced module loader',
 			'commonjs',
 			"Object.defineProperty(module, 'require', { value: () => 1 });\nmodule.exports = require('./Leaf.js');",
+			true,
+		],
+		[
+			'a module loader replaced through the cache',
+			'commonjs',
+			"require.cache[__filename].require = () => 1;\nmodule.exports = require('./Leaf.js');",
+			true,
+		],
+		[
+			'a module loader replaced through the main module',
+			'commonjs',
+			"require.main.require = () => 1;\nmodule.exports = require('./Leaf.js');",
 			true,
 		],
 		['an ES module loader', 'module', "export const value = require('./Leaf.js');", true],

@@ -3020,6 +3020,44 @@ async function planEntryPages(
 	return updated;
 }
 
+/** A strict identity test observes the loader's main module without exposing it. */
+function comparesMainModule(node: ts.Node) {
+	const test = node.parent;
+	if (
+		!ts.isBinaryExpression(test) ||
+		(test.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken &&
+			test.operatorToken.kind !== ts.SyntaxKind.ExclamationEqualsEqualsToken)
+	)
+		return false;
+	const [main, module] = ts.isIdentifier(test.left)
+		? [test.right, test.left]
+		: [test.left, test.right];
+	return (
+		ts.isIdentifier(module) &&
+		module.text === 'module' &&
+		ts.isPropertyAccessExpression(main) &&
+		main.name.text === 'main' &&
+		ts.isIdentifier(main.expression) &&
+		main.expression.text === 'require'
+	);
+}
+
+function observesRequire(member: ts.PropertyAccessExpression) {
+	const use = member.parent;
+	if (member.name.text === 'main') return comparesMainModule(member);
+	if (member.name.text === 'resolve') return ts.isCallExpression(use) && use.expression === member;
+	if (member.name.text !== 'cache') return false;
+	// Cache entries are mutable Module objects. A presence test or deleting the
+	// map entry does not expose an object that can replace the wrapper's loader.
+	const entry = ts.isElementAccessExpression(use) && use.expression === member ? use : member;
+	const parent = entry.parent;
+	return (
+		(ts.isPrefixUnaryExpression(parent) && parent.operator === ts.SyntaxKind.ExclamationToken) ||
+		(ts.isIfStatement(parent) && parent.expression === entry) ||
+		(entry !== member && ts.isDeleteExpression(parent))
+	);
+}
+
 /** Positions of calls to the CommonJS wrapper's own `require`. */
 function commonJsRequires(file: string, code: string) {
 	const calls = new Set<number>();
@@ -3032,11 +3070,13 @@ function commonJsRequires(file: string, code: string) {
 		if (ts.isWithStatement(node)) return true;
 		if (!ts.isIdentifier(node)) return false;
 		const parent = node.parent;
+		if (ts.isPropertyAccessExpression(parent) && parent.name === node) return false;
 		// Dynamic scope and the wrapper's arguments can change the loader.
 		if (node.text === 'eval' || node.text === 'arguments') return true;
 		// Node's wrapper delegates to module.require. Allow ordinary exports assignments.
 		if (
 			node.text === 'module' &&
+			!comparesMainModule(node) &&
 			!(
 				ts.isPropertyAccessExpression(parent) &&
 				parent.expression === node &&
@@ -3049,6 +3089,7 @@ function commonJsRequires(file: string, code: string) {
 			checker.resolveName(node.text, node, ts.SymbolFlags.Value, false)?.declarations?.length
 		)
 			return false;
+		if (ts.isPropertyAccessExpression(parent)) return !observesRequire(parent);
 		if (!ts.isCallExpression(parent) || parent.expression !== node) return true;
 		calls.add(node.end);
 		return false;
