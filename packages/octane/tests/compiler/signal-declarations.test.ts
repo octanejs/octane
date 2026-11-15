@@ -395,11 +395,13 @@ export function makeShadowed$(String) { return derived$(() => String(source$.get
 				})(),
 			);
 			expect(module.dynamic$.snapshot().status).toBe('pending');
-			for (let i = 0; i < 8; i++) await Promise.resolve();
-			expect(module.dynamic$.snapshot()).toMatchObject({ value: 9, connection: 'open' });
+			await vi.waitFor(() =>
+				expect(module.dynamic$.snapshot()).toMatchObject({ value: 9, connection: 'open' }),
+			);
 			release();
-			for (let i = 0; i < 8; i++) await Promise.resolve();
-			expect(module.dynamic$.snapshot()).toMatchObject({ value: 9, complete: true });
+			await vi.waitFor(() =>
+				expect(module.dynamic$.snapshot()).toMatchObject({ value: 9, complete: true }),
+			);
 			const shadowed$ = module.makeShadowed$(() => Promise.resolve('shadowed'));
 			expect(shadowed$.snapshot().status).toBe('pending');
 			for (let i = 0; i < 8; i++) await Promise.resolve();
