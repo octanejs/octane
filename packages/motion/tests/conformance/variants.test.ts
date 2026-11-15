@@ -7,7 +7,11 @@ vi.mock('motion', () => ({
 	inView: vi.fn(() => vi.fn()),
 }));
 import { mount, nextPaint } from '../_helpers';
-import { VariantTree } from '../_fixtures/variants.tsrx';
+import {
+	InheritedVariantCompletion,
+	VariantCompletion,
+	VariantTree,
+} from '../_fixtures/variants.tsrx';
 
 describe('variants', () => {
 	it('resolves a label to a target, and propagates the active label to children', async () => {
@@ -20,5 +24,43 @@ describe('variants', () => {
 		// Child has no explicit animate → inherits "visible" → resolves ITS variants.
 		expect(animateMock).toHaveBeenCalledWith(child, { x: 100 }, undefined);
 		r.unmount();
+	});
+
+	it('passes the authored definition of a completed host animation', async () => {
+		const onComplete = vi.fn();
+		const r = mount(VariantCompletion, { target: 'hidden', onComplete });
+		try {
+			await nextPaint();
+			expect(onComplete).not.toHaveBeenCalled();
+			r.update(VariantCompletion, { target: 'visible', onComplete });
+			await nextPaint();
+			expect(onComplete.mock.calls).toEqual([['visible']]);
+
+			const target = Object.freeze({ opacity: 0.5, transition: Object.freeze({ duration: 0 }) });
+			r.update(VariantCompletion, { target, onComplete });
+			await nextPaint();
+			expect(onComplete.mock.calls).toHaveLength(2);
+			expect(onComplete.mock.lastCall?.[0]).toBe(target);
+
+			r.update(VariantCompletion, { target: { ...target }, onComplete });
+			await nextPaint();
+			expect(onComplete.mock.calls).toHaveLength(2);
+		} finally {
+			r.unmount();
+		}
+	});
+
+	it('passes the inherited label from a completed child animation', async () => {
+		const onComplete = vi.fn();
+		const r = mount(InheritedVariantCompletion, { label: 'hidden', onComplete });
+		try {
+			await nextPaint();
+			expect(onComplete).not.toHaveBeenCalled();
+			r.update(InheritedVariantCompletion, { label: 'visible', onComplete });
+			await nextPaint();
+			expect(onComplete.mock.calls).toEqual([['visible']]);
+		} finally {
+			r.unmount();
+		}
 	});
 });

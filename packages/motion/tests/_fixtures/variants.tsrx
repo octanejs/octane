@@ -9,3 +9,25 @@ export function VariantTree() @{
 		</motion.div>
 	</motion.div>
 }
+
+export function VariantCompletion({
+	target,
+	onComplete,
+}: {
+	target: string | { opacity: number };
+	onComplete: (definition: unknown) => void;
+}) @{
+	<motion.div variants={PV} initial={false} animate={target} onAnimationComplete={onComplete} />
+}
+
+export function InheritedVariantCompletion({
+	label,
+	onComplete,
+}: {
+	label: string;
+	onComplete: (definition: unknown) => void;
+}) @{
+	<motion.div variants={PV} initial={false} animate={label}>
+		<motion.div variants={CV} onAnimationComplete={onComplete} />
+	</motion.div>
+}
