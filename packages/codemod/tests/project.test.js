@@ -515,6 +515,14 @@ return ${jsx};
 			'Composed.tsx':
 				'<main data-page="app"><><StrictMode><section><Frame /></section></StrictMode></></main>',
 			'DirectHole.tsx': '<div>{(<Frame />)}</div>',
+			'ArrayHole.tsx': '<main>{[[<Frame key="frame" />]]}</main>',
+			'ArrayLogicalLeft.tsx': '<main>{[<Frame key="frame" />] || [<b key="b" />]}</main>',
+			'ArrayItemStringAssertion.tsx': '<main>{[<Frame key="frame" /> as unknown as string]}</main>',
+			'ArrayStringAssertion.tsx': '<main>{[<Frame key="frame" />] as unknown as string}</main>',
+			'ArrayLogicalRight.tsx': '<main>{[<b key="b" />] || [<Frame key="frame" />]}</main>',
+			'ArrayOpaque.tsx': '<main><Holder>{[<Frame key="frame" />]}</Holder></main>',
+			'ArrayHosted.tsx':
+				'<main><ReactCompat><Frame>{[<Frame key="frame" />]}</Frame></ReactCompat></main>',
 			'ConditionalHole.tsx': '<main>{enabled ? <Frame /> : null}</main>',
 			'LogicalHole.tsx': '<section>{enabled && <Frame />}</section>',
 			'NamedFragment.tsx': '<Group key="group"><Frame /></Group>',
@@ -525,6 +533,14 @@ return ${jsx};
 				'<main>{[1, 2].map((row) => { if (row === 1) return null; return <Frame />; })}</main>',
 			'MapSkipsAll.tsx':
 				'<main>{[1].map((row) => { if (row === 1) return null; return <Frame />; })}</main>',
+			'MapSignedCompare.tsx':
+				'<main>{[-1, 0].map((row) => { if (row === -1) return null; return <Frame />; })}</main>',
+			'MapSignedValue.tsx':
+				'<main>{[0, -1].map((row) => { if (+0 === row) return null; return <Frame />; })}</main>',
+			'MapSignedZeroSkipsAll.tsx':
+				'<main>{[-0, +0].map((row) => { if (row === -0) return null; return <Frame />; })}</main>',
+			'MapUnknownNumber.tsx':
+				'<main>{[0, NaN].map((row) => { if (row === +0) return null; return <Frame />; })}</main>',
 			'MapUnconditionalExit.tsx':
 				'<main>{[1].map((_row) => { return null; return <Frame />; })}</main>',
 			'AssertedHole.tsx': '<main>{((<Frame /> as unknown) satisfies unknown)!}</main>',
@@ -641,6 +657,9 @@ export function App() { const Group = Holder; return <div><Group><Frame /></Grou
 					)
 					.sort(),
 			).toEqual([
+				['ArrayHole.tsx', includeClass ? 'error' : 'warning'],
+				['ArrayItemStringAssertion.tsx', includeClass ? 'error' : 'warning'],
+				['ArrayLogicalLeft.tsx', includeClass ? 'error' : 'warning'],
 				['AssertedHole.tsx', includeClass ? 'error' : 'warning'],
 				['ClassName.tsx', includeClass ? 'error' : 'warning'],
 				['Composed.tsx', includeClass ? 'error' : 'warning'],
@@ -660,6 +679,8 @@ export function App() { const Group = Holder; return <div><Group><Frame /></Grou
 				['MapChild.tsx', includeClass ? 'error' : 'warning'],
 				['MapContinues.tsx', includeClass ? 'error' : 'warning'],
 				['MapRoot.tsx', includeClass ? 'error' : 'warning'],
+				['MapSignedCompare.tsx', includeClass ? 'error' : 'warning'],
+				['MapSignedValue.tsx', includeClass ? 'error' : 'warning'],
 				['MemberFragment.tsx', includeClass ? 'error' : 'warning'],
 				['NamedFragment.tsx', includeClass ? 'error' : 'warning'],
 				['NativeFallbackClass.tsx', includeClass ? 'error' : 'warning'],
@@ -2264,6 +2285,65 @@ export const renderNative = () => [native(), nativeNamespace()].map((node) => re
 		expect(selected.files.find((item) => item.file === 'LinkedParent.tsx')?.code).toContain(
 			"import { createElement } from 'octane'",
 		);
+	});
+
+	it('reports a retained IntlProvider onError that registers a React DOM resource', async () => {
+		const view = (attributes, setup = '') => `import { IntlProvider as Provider } from 'react-intl';
+import { report as onError, inert } from './handler';
+export function View() { ${setup} return <Provider ${attributes}><p>Ready</p></Provider>; }`;
+		const root = project({
+			'tsconfig.json': JSON.stringify({
+				compilerOptions: { strict: true, jsx: 'react-jsx', moduleResolution: 'bundler' },
+			}),
+			'View.tsx': view('locale="" onError={onError}'),
+			'SelfClosing.tsx': view('locale="" onError={onError}').replace(
+				'><p>Ready</p></Provider>',
+				' />',
+			),
+			'Expression.tsx': view("locale={('')} onError={onError}"),
+			'Supported.tsx': view('locale="en" onError={onError}'),
+			'Inert.tsx': view('locale="" onError={inert}'),
+			'Shadowed.tsx': view('locale="" onError={onError}', 'const onError = () => {};'),
+			'Override.tsx': view('locale="" onError={onError} onError={inert}'),
+			'handler.ts': `import { preload } from 'react-dom';
+export function report() { preload('/locale.woff2', { as: 'font', crossOrigin: 'anonymous' }); }
+export function inert() {}`,
+		});
+		fs.symlinkSync(
+			path.join(REPO, 'packages/codemod/node_modules'),
+			path.join(root, 'node_modules'),
+		);
+		fs.symlinkSync('handler.ts', path.join(root, 'alias.ts'));
+		const run = (...files) =>
+			runCodemod(
+				files.map((file) => path.join(root, file)),
+				{ root, strong: true, write: false },
+			);
+		const findings = ({ files }) =>
+			files.flatMap((file) =>
+				file.notes
+					.filter((note) => note.message.includes('retained callback uses React DOM'))
+					.map((note) => [file.file, note.severity]),
+			);
+		const retained = await run(
+			'View.tsx',
+			'SelfClosing.tsx',
+			'Expression.tsx',
+			'Supported.tsx',
+			'Inert.tsx',
+			'Shadowed.tsx',
+			'Override.tsx',
+		);
+		expect(findings(retained).sort()).toEqual([
+			['Expression.tsx', 'error'],
+			['SelfClosing.tsx', 'error'],
+			['View.tsx', 'error'],
+		]);
+		expect(retained.files.find((file) => file.file === 'View.tsx').code).toContain(
+			'octane-react-intl.tsrx',
+		);
+		expect(findings(await run('View.tsx', 'handler.ts'))).toEqual([]);
+		expect(findings(await run('View.tsx', 'alias.ts'))).toEqual([]);
 	});
 
 	it('reports a native setup call into a React hook left in an unselected local module', () => {
