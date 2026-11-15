@@ -4344,7 +4344,9 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		}
 		this.count(RULE.import);
 		const renamed =
-			name === null || missingValue ? null : mapQualifiedType(name, specifier.text, node.isTypeOf);
+			name === null || missingValue
+				? null
+				: mapQualifiedType(name, specifier.text, node.isTypeOf, node.typeArguments?.length ?? 0);
 		if (name !== null && renamed === null && !missingValue) {
 			const unresolvedProjection = specifier.text === 'react' && !node.isTypeOf;
 			this.note(
@@ -4917,6 +4919,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			node.right.text,
 			namespace?.module ?? 'react',
 			ts.isTypeQueryNode(node.parent),
+			ts.isTypeReferenceNode(node.parent) ? (node.parent.typeArguments?.length ?? 0) : 0,
 		);
 		if (!name) {
 			if (namespace) this.used.add(namespace.local);

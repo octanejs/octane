@@ -617,6 +617,31 @@ export type Query = typeof import('react-router').redirect;`;
 		);
 	});
 
+	it('preserves an explicit element type argument on ReactElement annotations', () => {
+		const { code, notes } = transformModule(
+			`/** @jsxImportSource react */
+import type * as R from 'react';
+import type { ReactElement as Named } from 'react';
+type Props = { id: string };
+export type Qualified = R.ReactElement<Props, 'main'>;
+export type Imported = import('react').ReactElement<Props, 'main'>;
+export type NamedElement = Named<Props, 'main'>;
+export type Plain = R.ReactElement;
+export type PropsOnly = import('react').ReactElement<Props>;
+export function Page() { return <main />; }`,
+			'element.tsx',
+		);
+		expect(notes).toEqual([]);
+		expect(code).toContain(
+			"import type { ReactElement as Named, ReactElement as OctaneReactElement, OctaneElement } from 'octane';",
+		);
+		expect(code).toContain("Qualified = OctaneReactElement<Props, 'main'>;");
+		expect(code).toContain("Imported = import('octane').ReactElement<Props, 'main'>;");
+		expect(code).toContain("NamedElement = Named<Props, 'main'>;");
+		expect(code).toContain('Plain = OctaneElement;');
+		expect(code).toContain("PropsOnly = import('octane').OctaneElement<Props>;");
+	});
+
 	it('keeps ref allocator re-exports and type queries on the original React API', () => {
 		const { code, notes } = transformModule(
 			`import type * as R from 'react';
