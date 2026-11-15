@@ -50,6 +50,7 @@ import {
 	reactServerComponents,
 	retainedReactComponentReturns,
 	retainedReactContextExports,
+	retainedReactElementReturns,
 	reverseIslandExports,
 } from './react-island-sources.js';
 
@@ -1628,14 +1629,36 @@ export async function runCodemod(
 			names = new Set();
 			const { program, errors } = parseSync(file.output, file.code);
 			if (program && !errors.length) {
+				let defaultLocal: string | undefined;
 				for (const statement of program.body) {
-					const fn =
-						statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
-					if (fn?.type !== 'FunctionDeclaration' || !fn.id) continue;
+					const defaultExport = statement.type === 'ExportDefaultDeclaration';
+					let fn =
+						defaultExport || statement.type === 'ExportNamedDeclaration'
+							? statement.declaration
+							: statement;
+					if (defaultExport) {
+						while (fn?.type === 'ParenthesizedExpression') fn = fn.expression;
+						if (fn?.type === 'Identifier') defaultLocal = fn.name;
+					} else if (statement.type === 'ExportNamedDeclaration' && !statement.source) {
+						for (const specifier of statement.specifiers) {
+							if (
+								(specifier.exported.type === 'Identifier'
+									? specifier.exported.name === 'default'
+									: specifier.exported.value === 'default') &&
+								specifier.local.type === 'Identifier'
+							)
+								defaultLocal = specifier.local.name;
+						}
+					}
+					if (fn?.type !== 'FunctionDeclaration') continue;
 					// The parser exposes TSRX code blocks through its ESTree body type.
 					const body: unknown = fn.body;
-					if (isRecord(body) && body.type === 'JSXCodeBlock') names.add(fn.id.name);
+					if (isRecord(body) && body.type === 'JSXCodeBlock') {
+						if (defaultExport) names.add('default');
+						else if (fn.id) names.add(fn.id.name);
+					}
 				}
+				if (defaultLocal !== undefined && names.has(defaultLocal)) names.add('default');
 			}
 			templateExports.set(file.output, names);
 		}
@@ -1909,13 +1932,18 @@ export async function runCodemod(
 		}
 		const retainedServer =
 			paths && !isTsrx(file) && (source.includes('react-dom/server') || source.includes('\\'));
+		const retainedElement =
+			paths &&
+			!known.has(file) &&
+			file.endsWith('.ts') &&
+			((source.includes('react') && source.includes('createElement')) || source.includes('\\'));
 		if (
 			!edited.has(file) &&
-			(retainedJsx || retainedServer) &&
+			(retainedJsx || retainedServer || retainedElement) &&
 			ts.findConfigFile(path.dirname(file), ts.sys.fileExists) === rootProject
 		) {
 			const edges: (ReturnType<typeof retainedReactComponentReturns>[number] & {
-				renderer: 'JSX' | 'server render';
+				renderer: 'JSX' | 'server render' | 'createElement';
 			})[] = [];
 			if (retainedJsx && automaticReactJsx(file) && originalReactEntry(file, 'react/jsx-runtime'))
 				for (const edge of retainedReactComponentReturns(file, source))
@@ -1927,20 +1955,24 @@ export async function runCodemod(
 						: automaticReactJsx(file) && originalReactEntry(file, module),
 				))
 					edges.push({ ...edge, renderer: 'server render' });
+			if (retainedElement && installedReact(file))
+				for (const edge of retainedReactElementReturns(file, source))
+					edges.push({ ...edge, renderer: 'createElement' });
 			let installedLazy: boolean | undefined;
 			for (const edge of edges) {
 				const factory = 'factory' in edge && edge.factory;
 				const original = path.resolve(path.dirname(file), edge.module);
-				const direct = renamed(file, edge.module);
+				const direct = edge.renderer === 'createElement' ? null : renamed(file, edge.module);
 				const proven =
-					edge.renderer === 'JSX' &&
-					!factory &&
-					!edge.lazy &&
-					(!direct || /\.js$/.test(edge.module))
+					edge.renderer === 'createElement' ||
+					(edge.renderer === 'JSX' &&
+						!factory &&
+						!edge.lazy &&
+						(!direct || /\.js$/.test(edge.module)))
 						? retainedJsxTarget(file, edge.module, edge.name)
 						: undefined;
 				const match = proven ?? direct;
-				if (!match) continue;
+				if (!match || (edge.renderer === 'createElement' && proven?.indirect)) continue;
 				const exportName = proven?.name ?? edge.name;
 				const explicit =
 					match.file === original && (edge.renderer !== 'JSX' || /\.[jt]sx$/.test(edge.module));
@@ -1976,11 +2008,15 @@ export async function runCodemod(
 					const originalExports = originalReactExports(match.file);
 					if (edge.lazy && originalExports.mayExportThen) continue;
 					if (!originalExports.intrinsics.has(exportName)) {
+						const splitIntrinsicDefault =
+							edge.renderer === 'createElement' &&
+							exportName === 'default' &&
+							originalExports.splitIntrinsicDefault;
 						if (
-							!explicit ||
+							(!explicit && edge.renderer !== 'createElement') ||
 							edge.lazy ||
-							edge.renderer !== 'JSX' ||
-							!originalExports.wrappers.has(edge.name) ||
+							edge.renderer === 'server render' ||
+							(!splitIntrinsicDefault && !originalExports.wrappers.has(edge.name)) ||
 							!hasTemplateExport(leaf, edge.name)
 						)
 							continue;
@@ -1994,7 +2030,9 @@ export async function runCodemod(
 						? `The retained React JSX in ${name} uses ${leaf.file}'s ${edge.name} as a JSX child. With standard package resolution, migrate the caller too or keep this factory in React.`
 						: edge.renderer === 'JSX'
 							? `The retained React JSX in ${name} renders ${leaf.file} ${edge.lazy ? 'through React.lazy' : proven?.indirect ? 'through a re-export' : 'directly'}. With standard package resolution, migrate the caller too or keep this component in React.`
-							: `The retained React server render in ${name} imports ${leaf.file} directly. With standard package resolution, migrate the server entry too or keep this component in React.`,
+							: edge.renderer === 'createElement'
+								? `The retained React createElement call in ${name} uses ${leaf.file}. With standard package resolution, migrate the caller too or keep this component in React.`
+								: `The retained React server render in ${name} imports ${leaf.file} directly. With standard package resolution, migrate the server entry too or keep this component in React.`,
 				};
 				host.notes.push(note);
 				leaf.notes.push({ ...note, line: 1 });
