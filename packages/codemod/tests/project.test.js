@@ -229,6 +229,158 @@ export function markup() { return render(<Glyph prefix="first" />); }`,
 		},
 	);
 
+	it('warns when React Router would render a migrated default route export', async () => {
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'tsconfig.json':
+				'{"compilerOptions":{"module":"ESNext","moduleResolution":"bundler","jsx":"react-jsx"}}',
+			'react-router.config.ts': 'export default { appDirectory: "web", ssr: true };',
+			'web/root.tsx': 'export default function Root() { return <main />; }',
+			'web/routes.ts': `import { route as add, index, layout, prefix as group } from '@react-router/dev/routes';
+const prefix = (_path: string, _routes: unknown[]) => [];
+const indirect = [index('indirect.tsx')];
+const layoutFile = 'bound-layout.tsx';
+const routeFile = 'bound-route.tsx';
+const prefixPath = 'bound-prefix';
+export default [
+	add('page', 'page.tsx'),
+	layout('frame.tsx', [
+		index('index.tsx'),
+		...group('docs', [...group('api', [add('reference', 'reference.tsx')])]),
+	]),
+	layout(layoutFile, { id: 'bound' }, [index('layout-child.tsx')]),
+	add('parent', routeFile, [index('route-child.tsx')]),
+	...group(prefixPath, [index('prefix-child.tsx')]),
+	...prefix('unused', [index('unused.tsx')]),
+	...group('indirect', indirect),
+	...group(...['spread'], [index('unused.tsx')]),
+	add('data', 'data.tsx'),
+	add('nil', 'nil.tsx'),
+];
+function unused(add: (pattern: string, file: string) => unknown) { return add('fake', 'unused.tsx'); }`,
+			'web/page.tsx': 'export default function Page() { return <main>page</main>; }',
+			'web/frame.tsx': 'export default function Frame() { return <main>frame</main>; }',
+			'web/index.tsx': 'export default function Index() { return <main>index</main>; }',
+			'web/reference.tsx': 'export default function Reference() { return <main>API</main>; }',
+			'web/bound-layout.tsx': 'export default function BoundLayout() { return <main />; }',
+			'web/bound-route.tsx': 'export default function BoundRoute() { return <main />; }',
+			'web/layout-child.tsx': 'export default function LayoutChild() { return <main />; }',
+			'web/route-child.tsx': 'export default function RouteChild() { return <main />; }',
+			'web/prefix-child.tsx': 'export default function PrefixChild() { return <main />; }',
+			'web/indirect.tsx': 'export default function Indirect() { return <main>indirect</main>; }',
+			'web/data.tsx':
+				'export function loader() { return new Response("data"); } export function Local() { return <main />; }',
+			'web/nil.tsx':
+				'export default function Nil() { return null; } export function Local() { return <main />; }',
+			'web/unused.tsx': 'export default function Unused() { return <main />; }',
+		});
+		fs.mkdirSync(path.join(root, 'node_modules/@react-router'), { recursive: true });
+		const router = path.join(root, 'node_modules/@react-router/dev');
+		fs.mkdirSync(router);
+		fs.writeFileSync(
+			path.join(router, 'package.json'),
+			JSON.stringify({
+				name: '@react-router/dev',
+				version: '7.18.1',
+				exports: { './routes': './routes.js' },
+			}),
+		);
+		fs.writeFileSync(
+			path.join(router, 'routes.js'),
+			'exports.route = exports.index = exports.layout = exports.prefix = () => ({});',
+		);
+		const inputs = [
+			'page',
+			'frame',
+			'index',
+			'reference',
+			'bound-layout',
+			'bound-route',
+			'layout-child',
+			'route-child',
+			'prefix-child',
+			'indirect',
+			'data',
+			'nil',
+			'unused',
+		].map((name) => path.join(root, `web/${name}.tsx`));
+		const result = await runCodemod(inputs, { root, write: false });
+		const warned = result.files
+			.filter((file) =>
+				file.notes.some(
+					(note) => note.rule === 'react-compat' && /React Router/.test(note.message),
+				),
+			)
+			.map((file) => file.file)
+			.sort();
+		expect(warned).toEqual([
+			'web/frame.tsx',
+			'web/index.tsx',
+			'web/layout-child.tsx',
+			'web/page.tsx',
+			'web/prefix-child.tsx',
+			'web/reference.tsx',
+			'web/route-child.tsx',
+			'web/routes.ts',
+		]);
+		const registry = result.files.find((file) => file.file === 'web/routes.ts');
+		expect(registry.code).toContain("add('page', 'page.tsrx')");
+		expect(registry.code).toContain("add('reference', 'reference.tsrx')");
+	});
+
+	it.each([
+		['inline default arrow', 'export default () => <main />;', true],
+		['local const default assignment', 'const Page = () => <main />; export default Page;', true],
+		['local const export alias', 'const Page = () => <main />; export { Page as default };', true],
+		['null arrow default', 'export default () => null;', false],
+		[
+			'mutable default binding',
+			'let Page = () => <main />; Page = () => null; export default Page;',
+			false,
+		],
+		[
+			'type-only default export',
+			'const Page = () => <main />; export type { Page as default };',
+			false,
+		],
+		[
+			'type-only default specifier',
+			'const Page = () => <main />; export { type Page as default };',
+			false,
+		],
+		[
+			're-export from another file',
+			'const Page = () => <main />; export { Page as default } from "./other";',
+			false,
+		],
+	])('checks a registered route with a %s', async (_, route, warns) => {
+		const root = project({
+			'package.json': '{"type":"module"}',
+			'react-router.config.ts': 'export default { ssr: true };',
+			'app/root.tsx': 'export default function Root() { return <main />; }',
+			'app/routes.ts':
+				"import { index } from '@react-router/dev/routes'; export default [index('page.tsx')];",
+			'app/page.tsx': route,
+			'app/other.ts': 'export const Page = () => null;',
+			'node_modules/@react-router/dev/package.json': JSON.stringify({
+				name: '@react-router/dev',
+				version: '7.18.1',
+				exports: { './routes': './routes.js' },
+			}),
+			'node_modules/@react-router/dev/routes.js': 'exports.index = () => ({});',
+		});
+		const result = await runCodemod([path.join(root, 'app/page.tsx')], { root, write: false });
+		const warned = result.files
+			.filter((file) =>
+				file.notes.some(
+					(note) => note.rule === 'react-compat' && /React Router/.test(note.message),
+				),
+			)
+			.map((file) => file.file)
+			.sort();
+		expect(warned).toEqual(warns ? ['app/page.tsx', 'app/routes.ts'] : []);
+	});
+
 	it('uses the default React Router directory when config omits it', async () => {
 		const root = project({
 			'node_modules/@react-router/dev/package.json': JSON.stringify({
