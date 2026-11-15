@@ -4121,18 +4121,24 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				const topLevelInitializer =
 					ts.isVariableDeclaration(declaration) &&
 					declaration.initializer === value &&
+					ts.isVariableDeclarationList(declaration.parent) &&
 					ts.isVariableStatement(declaration.parent.parent) &&
 					declaration.parent.parent.parent === this.sf;
-				if (
-					(isTag || topLevelInitializer) &&
-					ts.isIdentifier(node.expression) &&
-					this.hasLocalProviderGetter(node.expression)
-				)
+				const change =
+					(isTag || topLevelInitializer) && ts.isIdentifier(node.expression)
+						? this.localProviderReadChange(
+								node.expression,
+								topLevelInitializer && declaration.parent.declarations[0] === declaration
+									? declaration.parent.parent
+									: undefined,
+							)
+						: undefined;
+				if (change)
 					this.note(
 						CONTEXT_PROVIDER_GETTER,
 						'error',
 						node,
-						'Replacing this React context Provider read can skip an authored getter. Review the custom Provider before migrating it.',
+						`Replacing this React context Provider read can skip an authored ${change}. Review the custom Provider before migrating it.`,
 					);
 				this.count(RULE.provider);
 			}
@@ -6030,8 +6036,13 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 		return ts.isCallExpression(node) && this.calleeName(node.expression) === 'createContext';
 	}
 
-	private hasLocalProviderGetter(context: ts.Identifier): boolean {
-		if (!this.source.includes('defineProperty') && !this.source.includes('\\u')) return false;
+	private localProviderReadChange(context: ts.Identifier, capture: ts.Statement | undefined) {
+		if (
+			!this.source.includes('defineProperty') &&
+			!(capture && this.source.includes('assign')) &&
+			!this.source.includes('\\u')
+		)
+			return;
 		const initial = this.constValue(context);
 		const factory = initial && skipParens(initial);
 		if (
@@ -6039,8 +6050,11 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			!ts.isCallExpression(factory) ||
 			this.reactHook(factory.expression) !== 'createContext'
 		)
-			return false;
-		return this.localUses(context).some((reference) => {
+			return;
+		let change: 'getter' | 'Provider replacement' = 'getter';
+		const declaration = this.declarationOf(context);
+		const references = this.localUses(context);
+		const found = references.some((reference) => {
 			let target: ts.Expression = reference;
 			while (isWrapper(target.parent) && target.parent.expression === target)
 				target = target.parent;
@@ -6057,17 +6071,63 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 				return false;
 			const method = skipWrappers(call.expression);
 			const object = ts.isPropertyAccessExpression(method) && skipWrappers(method.expression);
-			const [, keyArgument, descriptorArgument] = call.arguments;
-			const key = keyArgument && skipWrappers(keyArgument);
-			const descriptor = descriptorArgument && skipWrappers(descriptorArgument);
 			if (
 				!ts.isPropertyAccessExpression(method) ||
 				method.questionDotToken ||
-				method.name.text !== 'defineProperty' ||
 				!object ||
 				!ts.isIdentifier(object) ||
 				object.text !== 'Object' ||
-				this.declarationOf(object)?.getSourceFile().hasNoDefaultLib !== true ||
+				this.declarationOf(object)?.getSourceFile().hasNoDefaultLib !== true
+			)
+				return false;
+			const [, keyArgument, descriptorArgument] = call.arguments;
+			if (capture && method.name.text === 'assign' && call.arguments.length === 2) {
+				if (
+					this.sf.statements[this.sf.statements.indexOf(capture) - 1] !== call.parent ||
+					hasEval(this.sf) ||
+					this.localUses(object).some((use) => !inTypeNode(use)) ||
+					references.some(
+						(use) =>
+							use !== reference &&
+							!(declaration && ts.isVariableDeclaration(declaration) && use === declaration.name) &&
+							!inTypeNode(use),
+					)
+				)
+					return false;
+				const data = skipWrappers(keyArgument);
+				if (!ts.isObjectLiteralExpression(data) || data.properties.length !== 1) return false;
+				const [property] = data.properties;
+				const name = property.name;
+				if (
+					!name ||
+					(!ts.isIdentifier(name) && !ts.isStringLiteral(name)) ||
+					name.text !== 'Provider' ||
+					!ts.isPropertyAssignment(property)
+				)
+					return false;
+				const value = skipWrappers(property.initializer);
+				const binding = ts.isIdentifier(value) && this.declarationOf(value);
+				if (
+					!ts.isArrowFunction(value) &&
+					!ts.isFunctionExpression(value) &&
+					!(
+						binding &&
+						ts.isFunctionDeclaration(binding) &&
+						binding.parent === this.sf &&
+						binding.body &&
+						binding.name &&
+						!binding.modifiers?.length &&
+						renderUses(this.localUses(binding.name)).every((ref) => ref === value)
+					)
+				)
+					return false;
+				change = 'Provider replacement';
+				return true;
+			}
+			const key = keyArgument && skipWrappers(keyArgument);
+			const descriptor = descriptorArgument && skipWrappers(descriptorArgument);
+			if (
+				method.name.text !== 'defineProperty' ||
 				!key ||
 				!ts.isStringLiteralLike(key) ||
 				key.text !== 'Provider' ||
@@ -6098,6 +6158,7 @@ type ${handler}<T = unknown> = { listener(event: ${event}<T>): void }['listener'
 			}
 			return getter;
 		});
+		return found ? change : undefined;
 	}
 
 	/**
