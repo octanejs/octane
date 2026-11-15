@@ -1483,6 +1483,7 @@ export function increment() { count$.set((n) => n + 1); }`;
 			emitted: Object.entries(Object.values(result.metafile.outputs)[0].inputs)
 				.filter(([, input]) => input.bytesInOutput > 0)
 				.map(([name]) => name),
+			text: code,
 		};
 	};
 	const window = new Window();
@@ -1564,8 +1565,9 @@ export { activations, count$ } from './island-state.tsrx';`,
 	}
 	t.diagnostic(JSON.stringify(sizes));
 	// The shell never renders an independent island's children, so hosting one
-	// must not bring the renderer for arbitrary child values.
-	await t.test('a hydrated shell hosts an island without arbitrary child rendering', async () => {
+	// must bring neither the renderer for arbitrary child values nor the Suspense
+	// boundary an ordinary island's content renders in.
+	await t.test('a hydrated shell hosts an island without child rendering or Suspense', async () => {
 		const shell = app.replace(
 			"import { Hydrate } from 'octane';",
 			`import { Hydrate, hydrateRoot } from 'octane';
@@ -1585,7 +1587,8 @@ export function hydrate(container) {
 			}
 		};
 		try {
-			// Control: an authored fallback is an arbitrary child value.
+			// Control: an authored fallback is an arbitrary child value, which the
+			// general entry renders in the pending arm of its content's boundary.
 			for (const fallback of [false, true]) {
 				const client = await bundle(
 					"export { hydrate } from './island-app.tsrx';",
@@ -1598,6 +1601,8 @@ export function hydrate(container) {
 					fallback,
 					`fallback: ${fallback}`,
 				);
+				// Every try slot records its `tryBody`, a field name minification keeps.
+				assert.equal(client.text.includes('tryBody'), fallback, `fallback: ${fallback}`);
 				const host = window.document.createElement('div');
 				host.innerHTML = server.api.render();
 				window.document.body.append(host);
