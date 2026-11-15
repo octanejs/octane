@@ -1016,7 +1016,7 @@ export type Qualified = typeof R.createRef;`,
 		const source = `${imports}const options = { duration: 2 };\nexport function App({ label }: { label: string }) {\n\treturn <main onClick={() => toast(label)}><Toaster position="top-right" options={options} /><Toaster>{label} and text</Toaster></main>;\n}\n`;
 		const app = migrate(source);
 		expect(app.code).toContain(
-			"import { ReactCompat } from 'octane/react';\n// No Octane port of `toast-kit` exists, so its components render in React through ReactCompat.\nimport { Toaster, toast, useToaster, ToastContext } from 'toast-kit';\n",
+			"import { ReactCompat } from 'octane/react';\n// Retained React import of `toast-kit`. Its components render in React through ReactCompat.\nimport { Toaster, toast, useToaster, ToastContext } from 'toast-kit';\n",
 		);
 		expect(app.code).toContain(
 			'<ReactCompat><Toaster position="top-right" options={options} /></ReactCompat><ReactCompat><Toaster>{label} and text</Toaster></ReactCompat>',
@@ -1030,6 +1030,11 @@ export type Qualified = typeof R.createRef;`,
 		const tsx = migrate(source, { target: 'tsx' }).code;
 		expect(tsx.match(/<ReactCompat>/g)?.length).toBe(2);
 		expect(migrate(tsx, { target: 'tsx' }).code).toBe(tsx);
+		const legacy = tsx.replace(
+			'Retained React import of `toast-kit`. Its components render in React through ReactCompat.',
+			'No Octane port of `toast-kit` exists, so its components render in React through ReactCompat.',
+		);
+		expect(migrate(legacy, { target: 'tsx' }).code).toBe(legacy);
 
 		// React cannot render what Octane renders, call Octane's hooks, or read
 		// its contexts; without React 19.2 there is no island at all.
@@ -1051,10 +1056,10 @@ export type Qualified = typeof R.createRef;`,
 			);
 			expect([
 				result.code.includes('<ReactCompat>'),
-				result.notes.map((note) => note.message.split(', which')[0]),
+				result.notes.map((note) => note.message.split(/, which|\. Keep this /)[0]),
 			]).toEqual([false, [message]]);
 			expect(result.code).toContain(
-				'// No Octane port of `toast-kit` exists, and this module needs one: Octane cannot call its hooks, read its contexts, or pass Octane content to its components.\n',
+				'// Retained React import of `toast-kit`. Review the uses that need a React renderer.\n',
 			);
 			expect(result.code.includes(`<NoOctanePort error="${result.notes[0].message}">`)).toBe(
 				message === crossing,
@@ -1068,7 +1073,7 @@ export type Qualified = typeof R.createRef;`,
 		});
 		expect([old.code.includes('<ReactCompat>'), old.notes[0].message]).toEqual([
 			false,
-			'`<Toaster>` can render in a `ReactCompat` island only with React and React DOM 19.2 or newer in the React 19 series. `toast-kit` has no Octane port.',
+			'`<Toaster>` can render in a `ReactCompat` island only with React and React DOM 19.2 or newer in the React 19 series. `toast-kit` stays on React.',
 		]);
 		expect(old.code).toContain(
 			`export const App = () => <NoOctanePort error="${old.notes[0].message}"><Toaster /></NoOctanePort>;\n\nfunction NoOctanePort({ error }: { error: string; children?: unknown }): never {\n  throw new Error(error);\n}\n`,
@@ -1093,15 +1098,15 @@ export type Qualified = typeof R.createRef;`,
 			'export const App = () => @{ <ReactCompat><Kit.Toaster /></ReactCompat> };',
 		);
 		expect(named.code).toContain("import type { Toast } from 'toast-kit';");
-		expect(named.code.match(/No Octane port/g)?.length).toBe(1);
-		expect(named.notes.map((note) => note.message.split(', which')[0])).toEqual([
+		expect(named.code.match(/Retained React import/g)?.length).toBe(1);
+		expect(named.notes.map((note) => note.message.split(/, which|\. Keep this /)[0])).toEqual([
 			'`Kit.useToaster` is a React hook',
 		]);
 		expect(
 			migrate("import { toast } from 'toast-kit';\nexport const notify = () => toast('hi');\n")
 				.code,
 		).toBe(
-			"// No Octane port of `toast-kit` exists; React stays a dependency for it.\nimport { toast } from 'toast-kit';\nexport const notify = () => toast('hi');\n",
+			"// Retained React import of `toast-kit`. Keep React as a dependency.\nimport { toast } from 'toast-kit';\nexport const notify = () => toast('hi');\n",
 		);
 		// A re-export hides the package from the modules that render it.
 		expect(migrate("export { Toaster } from 'toast-kit';\n").notes).toMatchObject([

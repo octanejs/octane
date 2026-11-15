@@ -149,14 +149,12 @@ async function main() {
 		}
 	}
 	if (result.missing.length > 0) {
-		process.stdout.write(
-			`\n${colors.bold('No Octane port')} ${colors.dim('(still runs on React)')}\n`,
-		);
+		process.stdout.write(`\n${colors.bold('Retained React imports')}\n`);
 		for (const { name, modules, islands, blocked } of result.missing) {
 			const uses = [
 				`${modules} module(s)`,
 				islands > 0 ? `${islands} element(s) in ReactCompat islands` : null,
-				blocked > 0 ? colors.red(`${blocked} use(s) need a port`) : null,
+				blocked > 0 ? colors.red(`${blocked} use(s) need review`) : null,
 			].filter(Boolean);
 			process.stdout.write(`  ${name}  ${colors.dim(uses.join(', '))}\n`);
 		}
