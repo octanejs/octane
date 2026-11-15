@@ -103,6 +103,102 @@ it('reports an ordinary bare SVG component whose issuer changes to .tsrx', () =>
 	expect(conflict.result.notes.map((n) => n.rule)).toEqual(['rename-conflict']);
 });
 
+it.each(['renderToString', 'renderToStaticMarkup'])(
+	'adapts SVG in a local component owned by the native %s renderer',
+	async (method) => {
+		const { root, file } = fixture(`import Mark from './icons/mark.svg';
+			import { ${method} as render } from 'octane/server';
+			function Pane({heading}: {heading: string}) {
+				return <article><Mark className="status"/><h1>{heading}</h1></article>;
+			}
+			export function page() { return render((Pane), {heading: 'Ready'}).html; }`);
+		const { files } = await runCodemod([file], {
+			root,
+			svgPaths: true,
+			strong: true,
+			write: true,
+		});
+		const source = files.find((row) => row.file === 'src/pane.tsx');
+		expect(source.rules['svg-paths']).toBe(1);
+		expect(source.notes).toEqual([]);
+		expect(source.strong).toBe(true);
+		const server = await bundleRuntime(
+			root,
+			'server',
+			"export {page} from './src/pane.tsrx';",
+			[],
+			{ '.svg': 'text' },
+		);
+		const dom = installDOM();
+		try {
+			const host = document.createElement('div');
+			host.innerHTML = server.page();
+			const svg = host.querySelector('article > svg.status');
+			expect(svg.namespaceURI).toBe('http://www.w3.org/2000/svg');
+			expect(svg.querySelectorAll('path')).toHaveLength(2);
+			expect(host.querySelector('h1').textContent).toBe('Ready');
+		} finally {
+			dom.window.close();
+			vi.unstubAllGlobals();
+		}
+	},
+);
+
+it.each([
+	['React renderer', 'react-dom/server', 'render(Pane)'],
+	['namespace import', 'octane/server', 'Server.renderToString(Pane)'],
+	['local shadow', 'octane/server', '((render) => render(Pane))(consume)'],
+	['renderer alias', 'octane/server', 'invoke(Pane)'],
+	['optional call', 'octane/server', 'render?.(Pane)'],
+	['spread arguments', 'octane/server', 'render(Pane, ...args)'],
+	['different argument', 'octane/server', 'render("text", Pane)'],
+	['too many arguments', 'octane/server', 'render(Pane, {}, {}, 1)'],
+	['escaped component', 'octane/server', 'render(Pane) + consume(Pane)'],
+	['shadowed package', 'octane/server', 'render(Pane)'],
+	['nested config shadow', 'octane/server', 'render(Pane)'],
+	['generated runtime shadow', 'octane/server', 'render(Pane)'],
+	['type-only server import', 'octane/server', 'render(Pane)'],
+])(
+	'keeps SVG diagnostics when the server ownership is unproven (%s)',
+	async (reason, mod, call) => {
+		const { root, file } = fixture(`import Mark from './icons/mark.svg';
+		import ${reason === 'type-only server import' ? 'type ' : ''}{ renderToString as render } from '${mod}';
+		import * as Server from 'octane/server';
+		declare const consume: (component: unknown) => string;
+		declare const args: [];
+		const invoke = render;
+		function Pane() { return <button><Mark/></button>; }
+		export function page() { return ${call}; }`);
+		if (reason.endsWith('shadow') || reason === 'shadowed package') {
+			const nested = reason === 'nested config shadow';
+			const renderer = reason === 'generated runtime shadow' ? 'octane' : 'octane/server';
+			const config = path.join(root, 'tsconfig.json');
+			const value = JSON.parse(fs.readFileSync(config, 'utf8'));
+			value.compilerOptions.paths[renderer] = [
+				nested ? './custom-renderer.ts' : './src/custom-renderer.ts',
+			];
+			fs.writeFileSync(
+				nested ? path.join(root, 'src/tsconfig.json') : config,
+				JSON.stringify(value),
+			);
+			fs.writeFileSync(
+				path.join(root, 'src/custom-renderer.ts'),
+				'export {createElement} from "react"; export const renderToString = () => "";',
+			);
+		}
+		const { files } = await runCodemod([file], {
+			root,
+			svgPaths: true,
+			strong: true,
+			write: false,
+		});
+		const source = files.find((row) => row.file === 'src/pane.tsx');
+		expect(source.rules['svg-paths']).toBeUndefined();
+		expect(source.notes).toContainEqual(expect.objectContaining({ rule: 'svg-issuer' }));
+		expect(files.some((row) => row.output.endsWith('.svg.octane.ts'))).toBe(false);
+	},
+);
+
 it('reports a bare SVG selected from a local record without flagging a sibling', async () => {
 	const { root, file } = fixture(`import Mark from './icons/mark.svg';
 const Plain = () => <span />;

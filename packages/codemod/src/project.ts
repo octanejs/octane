@@ -1229,6 +1229,7 @@ export async function runCodemod(
 							.replace(/\.ts$/, '');
 						return { from: relative.startsWith('.') ? relative : './' + relative, name: plan.name };
 					};
+		let originalSvgServer: boolean | undefined;
 		const svgAdapter =
 			options.svgPaths && renames.has(file)
 				? (specifier: string, color?: string) => pathSvgAdapter(file, specifier, svgErrors, color)
@@ -1405,6 +1406,12 @@ export async function runCodemod(
 					return real.endsWith('.module.css') ? real : undefined;
 				},
 				pathSvgAdapter: svgAdapter,
+				get originalSvgServer() {
+					return (originalSvgServer ??=
+						!!svgAdapter &&
+						originalOctaneRuntime(file, 'octane/server', bindingOptions(file)) &&
+						originalOctaneRuntime(svgHelper, 'octane', bindingOptions(svgHelper)));
+				},
 				fixedColorSvgAdapter: svgAdapter,
 				reactStoreComponent: (specifier) => {
 					if (!reactStoreComponents.has(specifier))
@@ -1558,9 +1565,13 @@ export async function runCodemod(
 			fs.realpathSync(module.resolvedFileName).startsWith(fs.realpathSync(installed.dir) + path.sep)
 		);
 	}
-	function originalOctaneRuntime(file: string, specifier: 'octane' | 'octane/server') {
+	function originalOctaneRuntime(
+		file: string,
+		specifier: 'octane' | 'octane/server',
+		options = config,
+	) {
 		const installed = readInstalled(path.dirname(file), 'octane');
-		const module = originalModule(file, specifier);
+		const module = originalModule(file, specifier, options);
 		const adapterRuntime = readInstalled(helperDir, 'octane');
 		if (
 			installed?.manifest.name !== 'octane' ||
