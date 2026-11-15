@@ -573,6 +573,22 @@ export type Qualified = typeof R.createRef;`,
 		);
 	});
 
+	it.each(['typeof Point', 'typeof Point.token'])(
+		'keeps explicit type-only React Touch imports used in a value query (%s)',
+		(query) => {
+			const { code, notes } = transformModule(
+				`import { type Touch as Point } from 'react';
+				declare module 'react' { const Touch: { token: string }; }
+				export type View = [Point, ${query}];`,
+				'points.ts',
+			);
+			expect(code).toContain("import { type Touch as Point } from 'react';");
+			expect(notes).toContainEqual(
+				expect.objectContaining({ rule: 'unsupported-api', severity: 'error' }),
+			);
+		},
+	);
+
 	it.each(['export type { Point as PublicPoint };', 'export { type Point };'])(
 		'preserves a React Touch import referenced only by a local type export',
 		(statement) => {

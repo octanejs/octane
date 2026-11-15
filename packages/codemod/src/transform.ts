@@ -4304,6 +4304,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				const imported = (element.propertyName ?? element.name).text;
 				let typeOnly = clause.isTypeOnly || element.isTypeOnly;
 				let typeReferences = false;
+				let touchValueQuery = false;
 				if (module === 'react' && imported === 'Touch' && !node.attributes && this.isTypeScript()) {
 					// A type query still needs a value export, which Touch does not have.
 					const references = this.localUses(element.name);
@@ -4312,6 +4313,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						references.every(
 							(ref) => ts.isPartOfTypeNode(ref) || ts.isTypeOnlyExportDeclaration(ref.parent),
 						);
+					touchValueQuery = references.some((ref) => {
+						let value: ts.EntityName = ref;
+						while (ts.isQualifiedName(value.parent) && value.parent.left === value)
+							value = value.parent;
+						return ts.isTypeQueryNode(value.parent) && value.parent.exprName === value;
+					});
 					typeOnly ||= typeReferences;
 				}
 				if (!this.used.has(local) && !typeReferences) continue;
@@ -4320,7 +4327,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					retainsCreateElement ||= local === 'createElement';
 					continue;
 				}
-				const mapped = mapReactImport(module, imported, typeOnly);
+				const mapped = touchValueQuery ? null : mapReactImport(module, imported, typeOnly);
 				if (mapped) {
 					// A name read only in types imports as a type, which bundlers elide.
 					add(mapped.module, mapped.name, local, typeOnly || !this.valueUses.has(local));
