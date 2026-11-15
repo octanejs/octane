@@ -126,6 +126,38 @@ it('accepts unary reads from a closed state record when coercion cannot call use
 	expect(migrate(signed).notes).not.toContainEqual(dependencyError);
 }, 20_000);
 
+it('checks every closed state field used in a conditional or short-circuit dependency', () => {
+	const input = (dependency) =>
+		ownedState.replace('retry.failed, onFailure', dependency + ', onFailure');
+	const coercion = '{ valueOf() { return readNumber(); } }';
+	for (const dependency of [
+		'+(retry.failed ? retry.attempt : 0)',
+		'-(retry.attempt || 0)',
+		'~(retry.attempt ?? 0)',
+		'+(retry.failed && retry.attempt)',
+	]) {
+		expect(migrate(input(dependency)).notes, dependency).not.toContainEqual(dependencyError);
+	}
+	const attemptAsObject = (source) => source.replace('attempt: 0', 'attempt: ' + coercion);
+	expect(migrate(attemptAsObject(input('+(retry.attempt && 0)'))).notes).not.toContainEqual(
+		dependencyError,
+	);
+	for (const source of [
+		attemptAsObject(input('+(+retry.attempt && 0)')),
+		attemptAsObject(input('+(retry.attempt && 0), +(retry.attempt || 0)')),
+		input('+(retry.failed ? retry.attempt : 0), +(retry.failed || 0)').replace(
+			'failed: false',
+			'failed: ' + coercion,
+		),
+		input('+(retry.failed ? retry.attempt : 0)').replace(
+			'...previous, failed: true',
+			'...previous, attempt: ' + coercion,
+		),
+	]) {
+		expect(migrate(source).notes).toContainEqual(dependencyError);
+	}
+}, 20_000);
+
 it('reports numeric coercion of own data from a local object when it can call user code', () => {
 	const input = (dependency) => `import { useEffect } from 'react';
 		export function Probe({ flag }) {

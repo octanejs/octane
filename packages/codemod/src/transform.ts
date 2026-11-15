@@ -5010,6 +5010,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		key: string,
 		hook: ts.CallExpression,
 		dependencies: ts.ArrayLiteralExpression,
+		nestedRead: (member: ts.PropertyAccessExpression) => boolean | undefined,
 	) {
 		const state = this.declarationOf(receiver);
 		if (
@@ -5113,7 +5114,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				if (outer.operator !== ts.SyntaxKind.ExclamationToken) numeric.add(parent.name.text);
 				return true;
 			}
-			return (
+			if (
 				ts.isTypeOfExpression(outer) ||
 				ts.isVoidExpression(outer) ||
 				(ts.isBinaryExpression(outer) &&
@@ -5122,7 +5123,12 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				(ts.isIfStatement(outer) && outer.expression === value) ||
 				(ts.isJsxExpression(outer) && ts.isJsxAttribute(outer.parent)) ||
 				outer === dependencies
-			);
+			)
+				return true;
+			const coercesNumber = nestedRead(parent);
+			if (coercesNumber === undefined) return false;
+			if (coercesNumber) numeric.add(parent.name.text);
+			return true;
 		});
 		if (!closed) return false;
 
@@ -5192,6 +5198,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 		hook: ts.CallExpression,
 		dependencies: ts.ArrayLiteralExpression,
 		coercesNumber: boolean,
+		nestedRead: (member: ts.PropertyAccessExpression) => boolean | undefined,
 	) {
 		const receiver = skipWrappers(member.expression);
 		const name = ts.isPropertyAccessExpression(member)
@@ -5204,7 +5211,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 			return false;
 		const key = name.text;
 		if (key === '__proto__' || !ts.isIdentifier(receiver)) return false;
-		if (this.ownStateDependency(receiver, key, hook, dependencies)) return true;
+		if (this.ownStateDependency(receiver, key, hook, dependencies, nestedRead)) return true;
 		const init = this.constValue(receiver);
 		const object = init && skipWrappers(init);
 		const owner = ts.findAncestor(hook, ts.isFunctionLike);
@@ -5245,27 +5252,31 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 	private checkHookDependencyReads(node: ts.CallExpression, deps: ts.Expression) {
 		const list = skipWrappers(deps);
 		if (!this.emitsTsrx || !ts.isArrayLiteralExpression(list)) return;
-		let opaqueCoercion = false;
-		const read = (expr: ts.Expression, coercesNumber = false): ts.Expression | undefined => {
+		type Member = ts.PropertyAccessExpression | ts.ElementAccessExpression;
+		const read = (
+			expr: ts.Expression,
+			visit: (member: Member, coercesNumber: boolean) => Member | undefined,
+			coercesNumber = false,
+		): Member | undefined => {
 			const member = skipWrappers(expr);
 			if (ts.isTypeOfExpression(member) || ts.isVoidExpression(member))
-				return read(member.expression);
+				return read(member.expression, visit);
 			if (
 				ts.isPrefixUnaryExpression(member) &&
 				member.operator !== ts.SyntaxKind.PlusPlusToken &&
 				member.operator !== ts.SyntaxKind.MinusMinusToken
 			)
-				return read(member.operand, member.operator !== ts.SyntaxKind.ExclamationToken);
+				return read(member.operand, visit, member.operator !== ts.SyntaxKind.ExclamationToken);
 			if (ts.isConditionalExpression(member)) {
 				const condition = skipWrappers(member.condition);
 				if (condition.kind === ts.SyntaxKind.TrueKeyword)
-					return read(member.whenTrue, coercesNumber);
+					return read(member.whenTrue, visit, coercesNumber);
 				if (condition.kind === ts.SyntaxKind.FalseKeyword)
-					return read(member.whenFalse, coercesNumber);
+					return read(member.whenFalse, visit, coercesNumber);
 				return (
-					read(condition) ??
-					read(member.whenTrue, coercesNumber) ??
-					read(member.whenFalse, coercesNumber)
+					read(condition, visit) ??
+					read(member.whenTrue, visit, coercesNumber) ??
+					read(member.whenFalse, visit, coercesNumber)
 				);
 			}
 			if (ts.isBinaryExpression(member)) {
@@ -5278,6 +5289,7 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 					// Only a falsy left value can become the result of &&.
 					const left = read(
 						member.left,
+						visit,
 						coercesNumber && op !== ts.SyntaxKind.AmpersandAmpersandToken,
 					);
 					if (left) return left;
@@ -5288,20 +5300,37 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 						(op === ts.SyntaxKind.BarBarToken && condition !== 'truthy') ||
 						(op === ts.SyntaxKind.QuestionQuestionToken && condition === 'nullish')
 					)
-						return read(member.right, coercesNumber);
+						return read(member.right, visit, coercesNumber);
 				}
 			}
-			if (
-				(ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member)) &&
-				!this.ownDataDependency(member, node, list, coercesNumber)
-			) {
+			if (ts.isPropertyAccessExpression(member) || ts.isElementAccessExpression(member))
+				return visit(member, coercesNumber);
+		};
+		// The closed-state proof must account for every field read in this list.
+		let members: Map<Member, boolean> | undefined;
+		const nestedRead = (member: ts.PropertyAccessExpression) => {
+			if (!members) {
+				const reachable = new Map<Member, boolean>();
+				for (const entry of list.elements) {
+					read(entry, (dep, coercesNumber) => {
+						reachable.set(dep, coercesNumber);
+						return undefined;
+					});
+				}
+				members = reachable;
+			}
+			return members.get(member);
+		};
+		let opaqueCoercion = false;
+		const check = (member: Member, coercesNumber: boolean) => {
+			if (!this.ownDataDependency(member, node, list, coercesNumber, nestedRead)) {
 				opaqueCoercion = coercesNumber;
 				return member;
 			}
 		};
-		let opaque: ts.Expression | undefined;
+		let opaque: Member | undefined;
 		for (const entry of list.elements) {
-			opaque = read(entry);
+			opaque = read(entry, check);
 			if (opaque) break;
 		}
 		if (opaque)
