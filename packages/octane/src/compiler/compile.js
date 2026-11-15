@@ -19932,7 +19932,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 				b.let(
 					autoMemoCacheName,
 					b.conditional(
-						b.binary('===', b.id(autoMemoCommittedName), b.id('undefined')),
+						b.binary('===', b.id(autoMemoCommittedName), undefinedNode()),
 						b.array([]),
 						b.id(autoMemoCommittedName),
 					),
@@ -29560,7 +29560,7 @@ function emitAutoMemoRegion(
 		b.binary(
 			'===',
 			b.member(b.member(b.id('__s'), 'slots'), b.literal(slotIndex), true),
-			b.id('undefined'),
+			undefinedNode(),
 		),
 	];
 	if (extraMiss !== null) misses.push(extraMiss);
@@ -32368,7 +32368,7 @@ function witnessOkChain(names) {
 	return andChain(
 		names.flatMap((name) => [
 			b.binary('===', b.member(b.id(name), '__memo'), b.literal(true)),
-			b.binary('===', b.member(b.id(name), '__compare'), b.id('undefined')),
+			b.binary('===', b.member(b.id(name), '__compare'), undefinedNode()),
 		]),
 	);
 }
