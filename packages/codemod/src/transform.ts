@@ -24,6 +24,7 @@ import {
 import { isWrapper, literalCondition, skipWrappers } from './expression-wrappers.js';
 import ts from 'typescript';
 import {
+	atInitializedModuleHandle,
 	effectHelpers,
 	effectReceivers,
 	fixedBinding,
@@ -6030,15 +6031,9 @@ function ${this.nativeRefStoreFactory}<T>(initial: T) {
 				(ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.BlockScoped) !== ts.NodeFlags.Const
 			)
 				return;
-			const statement = declaration.parent.parent;
-			if (!ts.isVariableStatement(statement)) return;
-			const topLevel =
-				ts.isExpressionStatement(call.parent) &&
-				call.parent.parent === this.sf &&
-				statement.parent === this.sf &&
-				statement.end <= call.getStart(this.sf);
 			if (
-				(!topLevel && !initializedBefore(this.checker, receiver, call)) ||
+				(!atInitializedModuleHandle(declaration, call) &&
+					!initializedBefore(this.checker, receiver, call)) ||
 				rootHandleEscapes(this.localUses(declaration.name))
 			)
 				return;

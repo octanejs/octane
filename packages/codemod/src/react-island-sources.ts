@@ -2,7 +2,7 @@ import ts from 'typescript';
 import { parseSync } from '@tsrx/oxc/parser';
 import { hasRuntimeDependency } from './scoped-store-contract.js';
 import { literalCondition, skipWrappers } from './expression-wrappers.js';
-import { initializedBefore } from './effect-receivers.js';
+import { atInitializedModuleHandle, initializedBefore } from './effect-receivers.js';
 import { hasEval, rendersElementChildren, rootHandleEscapes } from './forwarded-props.js';
 import {
 	componentTagOrExport,
@@ -782,7 +782,9 @@ export function octaneRootComponents(file: string, source: string) {
 				!ts.isIdentifier(declaration.name) ||
 				!declaration.initializer ||
 				!(declaration.parent.flags & ts.NodeFlags.Const) ||
-				!initializedBefore(checker, receiver, call)
+				ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Export ||
+				(!atInitializedModuleHandle(declaration, call) &&
+					!initializedBefore(checker, receiver, call))
 			)
 				return;
 			handle = declaration.name;

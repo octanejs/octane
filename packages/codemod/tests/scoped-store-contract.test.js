@@ -737,6 +737,23 @@ it('warns at existing standalone client roots when the migrated hook reads conte
 			export function Plain() { return <b>plain</b>; }`,
 		'app/src/other/pane.tsx': 'export function Pane() { return <b>other</b>; }',
 		'app/src/client.ts': mount,
+		'app/src/bootstrap.ts': `import { createRoot } from 'octane';
+			import { Pane } from './pane.tsx';
+			const root = createRoot(document.createElement('div'));
+			root.render(Pane);
+			root.unmount();
+			export const exported = createRoot(document.createElement('div'));
+			exported.render(Pane);
+			beforeInit.render(Pane);
+			const beforeInit = createRoot(document.createElement('div'));
+			const deferred = createRoot(document.createElement('div'));
+			export function renderDeferred() { deferred.render(Pane); }
+			const captured = createRoot(document.createElement('div'));
+			captured.render(Pane);
+			export function unmountCaptured() { captured.unmount(); }
+			const reexported = createRoot(document.createElement('div'));
+			reexported.render(Pane);
+			export { reexported as publicRoot };`,
 		'app/src/unverified/client.ts': `import { hydrateRoot } from 'octane';
 			import { Pane } from '../pane.tsx';
 			export const hydrate = (host: HTMLElement) => hydrateRoot(host, Pane);`,
@@ -755,6 +772,10 @@ it('warns at existing standalone client roots when the migrated hook reads conte
 	const { files } = await runCodemod([leaf], { ...options, write: false });
 	const client = files.find((file) => file.file === 'src/client.ts');
 	expect(files.find((file) => file.file === 'src/unverified/client.ts')?.notes).toEqual([]);
+	const bootstrap = files.find((file) => file.file === 'src/bootstrap.ts');
+	expect(bootstrap.notes).toEqual([
+		expect.objectContaining({ rule: 'store-hook', severity: 'warning', line: 4 }),
+	]);
 	expect(client.notes).toEqual(
 		[7, 8, 11, 30].map((line) => ({
 			rule: 'store-hook',
@@ -769,6 +790,9 @@ it('warns at existing standalone client roots when the migrated hook reads conte
 	expect(fs.existsSync(path.join(app, 'src/pane.tsrx'))).toBe(false);
 	const written = await runCodemod([leaf], { ...options, write: true });
 	expect(written.files.find((file) => file.file === 'src/client.ts')?.notes).toEqual(client.notes);
+	expect(written.files.find((file) => file.file === 'src/bootstrap.ts')?.notes).toEqual(
+		bootstrap.notes,
+	);
 	expect(fs.readFileSync(host, 'utf8')).toBe(mount.replace('./pane.tsx', './pane.tsrx'));
 	const pane = written.files.find((file) => file.file === 'src/pane.tsx');
 	expect(pane.rules['store-hook']).toBe(1);
