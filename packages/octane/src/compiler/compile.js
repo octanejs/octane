@@ -38565,11 +38565,13 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		ctx.currentHoistedVars != null &&
 		node.nativeArrayMap === undefined &&
 		subStmts.length === 1 &&
-		(hasConditionalRoot || (isPlainHostRoot(subStmts[0]) && !hasNestedComp)) &&
-		(emptyStmts === null ||
-			(emptyStmts.length === 1 &&
-				isPlainHostRoot(emptyStmts[0]) &&
-				!containsComponentCallOrControlFlow(emptyStmts)))
+		(hasConditionalRoot ||
+			(isPlainHostRoot(subStmts[0]) &&
+				!hasNestedComp &&
+				(emptyStmts === null ||
+					(emptyStmts.length === 1 &&
+						isPlainHostRoot(emptyStmts[0]) &&
+						!containsComponentCallOrControlFlow(emptyStmts)))))
 	) {
 		hoistedRowVars = ctx.currentHoistedVars;
 		rowLocals = new Set([...rowLocals, ...hoistedRowVars]);

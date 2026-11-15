@@ -202,6 +202,34 @@ export function FunctionScopedConditionalKeyedRows({
 	</ol>
 }
 
+export function FunctionScopedConditionalRowsWithEmpty({
+	first,
+	rows,
+}: {
+	first: boolean;
+	rows: string[];
+}) @{
+	if (typeof first === 'boolean') {
+		var RowChoice = first ? FirstChoice : SecondChoice;
+	}
+	<ol>
+		@for (const label of rows; key label) {
+			@if (label.length > 0) {
+				<li>
+					<RowChoice label={label} />
+				</li>
+			}
+		} @empty {
+			@if (first) {
+				<RowChoice label="empty" />
+			} @else {
+				const RowChoice = FirstChoice;
+				<RowChoice label="fallback" />
+			}
+		}
+	</ol>
+}
+
 const rowPrefix = 'module:';
 const rowKey: ((row: number) => number) | undefined = undefined;
 
