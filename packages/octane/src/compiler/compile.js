@@ -36295,7 +36295,14 @@ function hoistBodyHelper(
 					stmts,
 					params,
 					false,
-					prefix === '__then' || prefix === '__else',
+					ctx.mayHaveHoistedVars &&
+						(prefix === '__then' ||
+							prefix === '__else' ||
+							prefix === '__try' ||
+							prefix === '__pending' ||
+							prefix === '__catch' ||
+							prefix === '__case' ||
+							prefix === '__default'),
 					locals,
 				);
 	const ownEnv = new Set(ownEnvNames || []);
@@ -38013,7 +38020,7 @@ function makeTryCall(
 	const pendingStmts = bodies[1]?.stmts;
 	const catchBodyStmts = bodies[2]?.stmts;
 	const catchParams = bodies[2]?.params;
-	const envNames = unionEnv(ctx, bodies);
+	const envNames = unionEnv(ctx, bodies, ctx.mayHaveHoistedVars);
 	const hydrationInputsEqual =
 		pendingStmts && hoistHydrationInputsEqual(ctx, bodies, envNames, node, componentName);
 	if (hydrationInputsEqual?.optional) {
@@ -38173,6 +38180,7 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 	const envNames = unionEnv(
 		ctx,
 		(node.cases || []).map((c) => ({ stmts: c.consequent || [], params: [] })),
+		ctx.mayHaveHoistedVars,
 	);
 	// switchBlock's lite mask: bit 0 for a hookless default, bit i + 1 for case i.
 	// Its root mask marks the arms that render one template host the same way.
