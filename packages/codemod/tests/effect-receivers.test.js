@@ -99,6 +99,55 @@ it('accepts an own data dependency over closed state updates', () => {
 	expect(result.notes).not.toContainEqual(dependencyError);
 });
 
+it('accepts unary reads from a closed state record when coercion cannot call user code', () => {
+	for (const dependency of [
+		'typeof retry.failed',
+		'void (retry.failed)',
+		'+retry.attempt',
+		'-retry.attempt',
+		'~retry.attempt',
+	]) {
+		const source = ownedState.replace('retry.failed, onFailure', dependency + ', onFailure');
+		expect(migrate(source).notes, dependency).not.toContainEqual(dependencyError);
+	}
+	const number = ownedState.replace('retry.failed, onFailure', '+retry.attempt, onFailure');
+	const coercion = '{ valueOf() { return readNumber(); } }';
+	for (const source of [
+		number.replace('attempt: 0', 'attempt: ' + coercion),
+		number.replace('attempt: 1', 'attempt: ' + coercion),
+		number.replace('...previous, failed: true', '...previous, attempt: ' + coercion),
+	]) {
+		expect(migrate(source).notes).toContainEqual(dependencyError);
+	}
+}, 20_000);
+
+it('reports numeric coercion of own data from a local object when it can call user code', () => {
+	const input = (dependency) => `import { useEffect } from 'react';
+		export function Probe({ flag }) {
+			const probe = { value: { valueOf() { return readNumber(); } } };
+			useEffect(() => {}, [${dependency}]);
+			return <b>ok</b>;
+		}`;
+	for (const dependency of [
+		'+probe.value',
+		'~(flag ? probe.value : 0)',
+		'-(probe.value ?? 0)',
+		'typeof +probe.value',
+	]) {
+		expect(migrate(input(dependency)).notes, dependency).toContainEqual(dependencyError);
+	}
+	for (const dependency of ['typeof probe.value', '+!probe.value', '+(false && probe.value)']) {
+		expect(migrate(input(dependency)).notes, dependency).not.toContainEqual(dependencyError);
+	}
+	const localNumber = input('+(flag ? probe.value : 0)').replace(
+		'{ valueOf() { return readNumber(); } }',
+		'1',
+	);
+	expect(migrate(localNumber).notes).not.toContainEqual(dependencyError);
+	const duplicate = input("+probe['1']").replace('value: { valueOf()', '"1": 1, 0x1: { valueOf()');
+	expect(migrate(duplicate).notes).toContainEqual(dependencyError);
+}, 20_000);
+
 it.each([
 	['setter escape', 'leak(setRetry);'],
 	['state escape', 'leak(retry);'],
